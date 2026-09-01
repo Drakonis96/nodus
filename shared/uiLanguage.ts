@@ -29,6 +29,68 @@ export function uiText(language: unknown, translations: UiTranslations): string 
   return translations[normalized] ?? translations.en;
 }
 
+type LocalizedTemplate = UiTranslations;
+type TemplateParams = Record<string, string | number | string[]>;
+
+function interpolateTemplate(template: string, params: TemplateParams = {}): string {
+  return template.replace(/\{(\w+)\}/g, (_match, name: string) => {
+    const value = params[name];
+    return Array.isArray(value) ? value.join(' · ') : value == null ? `{${name}}` : String(value);
+  });
+}
+
+/** Localize stable, server-produced debate prose while keeping side statements as data. */
+export function localizeDebateTension(key: unknown, params: TemplateParams | null | undefined, language: unknown): string | null {
+  const templates: Record<string, LocalizedTemplate> = {
+    'debate.contradicts': {
+      es: 'La contradicción detectada es que «{left}» entra en tensión con «{right}».', en: 'The detected contradiction is that “{left}” is in tension with “{right}”.', fr: 'La contradiction détectée est que « {left} » entre en tension avec « {right} ».', de: 'Der erkannte Widerspruch besteht darin, dass „{left}“ im Spannungsverhältnis zu „{right}“ steht.', pt: 'A contradição detetada é que «{left}» entra em tensão com «{right}».', 'pt-BR': 'A contradição detectada é que “{left}” entra em tensão com “{right}”.', it: 'La contraddizione rilevata è che «{left}» entra in tensione con «{right}».', tr: 'Tespit edilen çelişki, “{left}” ifadesinin “{right}” ile gerilim içinde olmasıdır.',
+    },
+    'debate.refutes': {
+      es: 'La refutación detectada es que «{left}» entra en tensión con «{right}».', en: 'The detected refutation is that “{left}” is in tension with “{right}”.', fr: 'La réfutation détectée est que « {left} » entre en tension avec « {right} ».', de: 'Die erkannte Widerlegung besteht darin, dass „{left}“ im Spannungsverhältnis zu „{right}“ steht.', pt: 'A refutação detetada é que «{left}» entra em tensão com «{right}».', 'pt-BR': 'A refutação detectada é que “{left}” entra em tensão com “{right}”.', it: 'La confutazione rilevata è che «{left}» entra in tensione con «{right}».', tr: 'Tespit edilen çürütme, “{left}” ifadesinin “{right}” ile gerilim içinde olmasıdır.',
+    },
+  };
+  const template = templates[String(key)];
+  return template ? interpolateTemplate(uiText(language, template), params ?? {}) : null;
+}
+
+/** Localize the stable copy keys attached to server reading-path projections. */
+export function localizeReadingPathText(key: unknown, params: TemplateParams | null | undefined, language: unknown): string | null {
+  const templates: Record<string, LocalizedTemplate> = {
+    'reading.reason.connectedIdeas': { es: 'Conecta ideas del corpus publicado.', en: 'Connects ideas from the published corpus.', fr: 'Relie des idées du corpus publié.', de: 'Verbindet Ideen aus dem veröffentlichten Korpus.', pt: 'Liga ideias do corpus publicado.', 'pt-BR': 'Conecta ideias do corpus publicado.', it: 'Collega idee del corpus pubblicato.', tr: 'Yayımlanmış derlemeye ait fikirleri birbirine bağlar.' },
+    'reading.reason.pendingAnalysis': { es: 'Obra pendiente de análisis.', en: 'Work pending analysis.', fr: 'Œuvre en attente d’analyse.', de: 'Werk wartet auf Analyse.', pt: 'Obra pendente de análise.', 'pt-BR': 'Obra pendente de análise.', it: 'Opera in attesa di analisi.', tr: 'Analiz bekleyen çalışma.' },
+    'reading.summary': { es: 'Ruta de lectura con {count} obras priorizadas.', en: 'Reading path with {count} prioritised works.', fr: 'Parcours de lecture avec {count} œuvres prioritaires.', de: 'Lesepfad mit {count} priorisierten Werken.', pt: 'Rota de leitura com {count} obras prioritárias.', 'pt-BR': 'Rota de leitura com {count} obras priorizadas.', it: 'Percorso di lettura con {count} opere prioritarie.', tr: '{count} öncelikli çalışmadan oluşan okuma yolu.' },
+    'reading.phase.foundations.title': { es: 'Textos de base', en: 'Foundational texts', fr: 'Textes fondamentaux', de: 'Grundlagentexte', pt: 'Textos de base', 'pt-BR': 'Textos fundamentais', it: 'Testi fondativi', tr: 'Temel metinler' },
+    'reading.phase.foundations.objective': { es: 'Construye el terreno común.', en: 'Build the common ground.', fr: 'Construire le socle commun.', de: 'Die gemeinsame Grundlage aufbauen.', pt: 'Constrói o terreno comum.', 'pt-BR': 'Construa a base comum.', it: 'Costruisci il terreno comune.', tr: 'Ortak zemini oluşturun.' },
+    'reading.phase.core.title': { es: 'Núcleo de la investigación', en: 'Research core', fr: 'Cœur de la recherche', de: 'Forschungskern', pt: 'Núcleo da investigação', 'pt-BR': 'Núcleo da pesquisa', it: 'Nucleo della ricerca', tr: 'Araştırmanın çekirdeği' },
+    'reading.phase.core.objective': { es: 'Lee las obras más relevantes para tu pregunta.', en: 'Read the works most relevant to your question.', fr: 'Lisez les œuvres les plus pertinentes pour votre question.', de: 'Lesen Sie die für Ihre Frage relevantesten Werke.', pt: 'Lê as obras mais relevantes para a tua pergunta.', 'pt-BR': 'Leia as obras mais relevantes para sua pergunta.', it: 'Leggi le opere più rilevanti per la tua domanda.', tr: 'Sorunuzla en ilgili çalışmaları okuyun.' },
+    'reading.phase.bridges.title': { es: 'Puentes entre temas', en: 'Bridges between themes', fr: 'Ponts entre les thèmes', de: 'Brücken zwischen Themen', pt: 'Pontes entre temas', 'pt-BR': 'Pontes entre temas', it: 'Ponti tra i temi', tr: 'Temalar arasında köprüler' },
+    'reading.phase.bridges.objective': { es: 'Conecta líneas temáticas del corpus.', en: 'Connect thematic lines in the corpus.', fr: 'Reliez les axes thématiques du corpus.', de: 'Thematische Linien im Korpus verbinden.', pt: 'Liga linhas temáticas do corpus.', 'pt-BR': 'Conecte linhas temáticas do corpus.', it: 'Collega le linee tematiche del corpus.', tr: 'Derlemdeki tematik çizgileri birbirine bağlayın.' },
+    'reading.phase.debates.title': { es: 'Debates y tensiones', en: 'Debates and tensions', fr: 'Débats et tensions', de: 'Debatten und Spannungen', pt: 'Debates e tensões', 'pt-BR': 'Debates e tensões', it: 'Dibattiti e tensioni', tr: 'Tartışmalar ve gerilimler' },
+    'reading.phase.debates.objective': { es: 'Contrasta posiciones y relaciones visibles.', en: 'Compare visible positions and relations.', fr: 'Comparez les positions et relations visibles.', de: 'Sichtbare Positionen und Beziehungen vergleichen.', pt: 'Contrasta posições e relações visíveis.', 'pt-BR': 'Compare posições e relações visíveis.', it: 'Confronta posizioni e relazioni visibili.', tr: 'Görünür konumları ve ilişkileri karşılaştırın.' },
+    'reading.phase.gaps.title': { es: 'Huecos abiertos', en: 'Open gaps', fr: 'Lacunes ouvertes', de: 'Offene Lücken', pt: 'Lacunas abertas', 'pt-BR': 'Lacunas abertas', it: 'Lacune aperte', tr: 'Açık boşluklar' },
+    'reading.phase.gaps.objective': { es: 'Acércate a lo que todavía no está cubierto.', en: 'Move towards what is not yet covered.', fr: 'Approchez-vous de ce qui n’est pas encore couvert.', de: 'Dem bisher nicht Abgedeckten näherkommen.', pt: 'Aproxima-te do que ainda não está coberto.', 'pt-BR': 'Aproxime-se do que ainda não foi coberto.', it: 'Avvicinati a ciò che non è ancora coperto.', tr: 'Henüz kapsanmayan konulara yaklaşın.' },
+    'reading.phase.pending.title': { es: 'Pendientes de analizar', en: 'Pending analysis', fr: 'À analyser', de: 'Ausstehende Analyse', pt: 'Pendentes de análise', 'pt-BR': 'Pendentes de análise', it: 'In attesa di analisi', tr: 'Analiz bekleyenler' },
+    'reading.phase.pending.objective': { es: 'Obras que aún necesitan una lectura inicial.', en: 'Works that still need an initial reading.', fr: 'Œuvres qui nécessitent encore une première lecture.', de: 'Werke, die noch eine erste Lektüre benötigen.', pt: 'Obras que ainda precisam de uma leitura inicial.', 'pt-BR': 'Obras que ainda precisam de uma leitura inicial.', it: 'Opere che necessitano ancora di una prima lettura.', tr: 'Henüz ilk okumayı gerektiren çalışmalar.' },
+  };
+  const template = templates[String(key)];
+  return template ? interpolateTemplate(uiText(language, template), params ?? {}) : null;
+}
+
+/** Localize server continuity findings without translating their entity names. */
+export function localizeContinuityText(key: unknown, params: TemplateParams | null | undefined, language: unknown): string | null {
+  const templates: Record<string, LocalizedTemplate> = {
+    'continuity.thread.noScenes.headline': { es: '«{subjects}» no avanza en ninguna escena', en: '“{subjects}” does not advance in any scene', fr: '« {subjects} » n’avance dans aucune scène', de: '„{subjects}“ kommt in keiner Szene voran', pt: '«{subjects}» não avança em nenhuma cena', 'pt-BR': '“{subjects}” não avança em nenhuma cena', it: '«{subjects}» non avanza in nessuna scena', tr: '“{subjects}” hiçbir sahnede ilerlemiyor' },
+    'continuity.thread.resolvedFlat.headline': { es: '«{subjects}» se cierra sin haber subido nunca', en: '“{subjects}” closes without ever escalating', fr: '« {subjects} » se termine sans avoir jamais gagné en intensité', de: '„{subjects}“ wird beendet, ohne sich je zugespitzt zu haben', pt: '«{subjects}» fecha sem nunca ter escalado', 'pt-BR': '“{subjects}” termina sem nunca ter escalado', it: '«{subjects}» si chiude senza essere mai cresciuto', tr: '“{subjects}” hiç yükselmeden kapanıyor' },
+    'continuity.coverage.undatedScenes.headline': { es: '{count} escenas no tienen día del mundo', en: '{count} scenes have no world day', fr: '{count} scènes n’ont pas de jour du monde', de: '{count} Szenen haben keinen Welttag', pt: '{count} cenas não têm dia do mundo', 'pt-BR': '{count} cenas não têm dia do mundo', it: '{count} scene non hanno un giorno del mondo', tr: '{count} sahnenin dünya günü yok' },
+    'continuity.lifespan.afterDeath.headline': { es: '{subjects} actúa después de morir', en: '{subjects} acts after death', fr: '{subjects} agit après sa mort', de: '{subjects} handelt nach dem Tod', pt: '{subjects} age depois de morrer', 'pt-BR': '{subjects} age depois de morrer', it: '{subjects} agisce dopo la morte', tr: '{subjects} ölümünden sonra hareket ediyor' },
+    'continuity.lifespan.beforeBirth.headline': { es: '{subjects} aparece antes de nacer', en: '{subjects} appears before birth', fr: '{subjects} apparaît avant sa naissance', de: '{subjects} erscheint vor seiner Geburt', pt: '{subjects} aparece antes de nascer', 'pt-BR': '{subjects} aparece antes de nascer', it: '{subjects} appare prima della nascita', tr: '{subjects} doğumundan önce görünüyor' },
+    'continuity.affiliation.inverted.headline': { es: '{subjects} deja su grupo antes de entrar', en: '{subjects} leaves its group before joining it', fr: '{subjects} quitte son groupe avant de le rejoindre', de: '{subjects} verlässt die Gruppe, bevor es ihr beitritt', pt: '{subjects} deixa o grupo antes de entrar nele', 'pt-BR': '{subjects} deixa o grupo antes de entrar nele', it: '{subjects} lascia il gruppo prima di entrarvi', tr: '{subjects} gruba katılmadan önce gruptan ayrılıyor' },
+    'continuity.containment.cycle.headline': { es: '{subjects} acaba conteniéndose a sí mismo', en: '{subjects} ends up containing itself', fr: '{subjects} finit par se contenir lui-même', de: '{subjects} enthält am Ende sich selbst', pt: '{subjects} acaba por se conter a si próprio', 'pt-BR': '{subjects} acaba contendo a si mesmo', it: '{subjects} finisce per contenere sé stesso', tr: '{subjects} sonunda kendisini içeriyor' },
+  };
+  const template = templates[String(key)];
+  return template ? interpolateTemplate(uiText(language, template), params ?? {}) : null;
+}
+
 /**
  * Conservative detector for Spanish application messages. It intentionally ignores
  * short user data and technical identifiers; it is only used at UI/error boundaries.
@@ -389,6 +451,89 @@ function aiProviderRuntimeError(message: string, language: unknown): string | nu
  * unknown Spanish prose becomes a localized generic error instead of leaking Spanish.
  */
 export function localizeRuntimeError(message: string, language: unknown): string {
+  if (message === 'Fallo al sintetizar el audio.') {
+    return uiText(language, { es: message, en: 'Audio synthesis failed.', fr: 'La synthèse audio a échoué.', de: 'Die Audiosynthese ist fehlgeschlagen.', pt: 'A síntese de áudio falhou.', 'pt-BR': 'A síntese de áudio falhou.', it: 'Sintesi audio non riuscita.', tr: 'Ses sentezi başarısız oldu.' });
+  }
+  if (message === 'El worker de audio falló.') {
+    return uiText(language, { es: message, en: 'The audio worker failed.', fr: 'Le worker audio a échoué.', de: 'Der Audio-Worker ist fehlgeschlagen.', pt: 'O worker de áudio falhou.', 'pt-BR': 'O worker de áudio falhou.', it: 'Il worker audio non è riuscito.', tr: 'Ses çalışanı başarısız oldu.' });
+  }
+  if (message === 'La voz de Hume seleccionada ya no está disponible.') {
+    return uiText(language, { es: message, en: 'The selected Hume voice is no longer available.', fr: 'La voix Hume sélectionnée n’est plus disponible.', de: 'Die ausgewählte Hume-Stimme ist nicht mehr verfügbar.', pt: 'A voz Hume selecionada já não está disponível.', 'pt-BR': 'A voz Hume selecionada não está mais disponível.', it: 'La voce Hume selezionata non è più disponibile.', tr: 'Seçilen Hume sesi artık kullanılamıyor.' });
+  }
+  if (message === 'eSpeak NG devolvió una respuesta sin fonemas') {
+    return uiText(language, { es: message, en: 'eSpeak NG returned a response without phonemes.', fr: 'eSpeak NG a renvoyé une réponse sans phonèmes.', de: 'eSpeak NG hat eine Antwort ohne Phoneme zurückgegeben.', pt: 'O eSpeak NG devolveu uma resposta sem fonemas.', 'pt-BR': 'O eSpeak NG retornou uma resposta sem fonemas.', it: 'eSpeak NG ha restituito una risposta senza fonemi.', tr: 'eSpeak NG fonem içermeyen bir yanıt döndürdü.' });
+  }
+  if (message === 'eSpeak NG terminó sin devolver fonemas') {
+    return uiText(language, { es: message, en: 'eSpeak NG finished without returning phonemes.', fr: 'eSpeak NG a terminé sans renvoyer de phonèmes.', de: 'eSpeak NG wurde beendet, ohne Phoneme zurückzugeben.', pt: 'O eSpeak NG terminou sem devolver fonemas.', 'pt-BR': 'O eSpeak NG terminou sem retornar fonemas.', it: 'eSpeak NG ha terminato senza restituire fonemi.', tr: 'eSpeak NG fonem döndürmeden tamamlandı.' });
+  }
+  const phonemizer = /^Error del fonetizador español de eSpeak NG: (.+)$/.exec(message);
+  if (phonemizer) {
+    return uiText(language, {
+      es: message,
+      en: `Spanish eSpeak NG phonemizer error: ${phonemizer[1]}`,
+      fr: `Erreur du phonétiseur eSpeak NG espagnol : ${phonemizer[1]}`,
+      de: `Fehler des spanischen eSpeak-NG-Phonetisierers: ${phonemizer[1]}`,
+      pt: `Erro do fonetizador espanhol eSpeak NG: ${phonemizer[1]}`,
+      'pt-BR': `Erro do fonetizador espanhol eSpeak NG: ${phonemizer[1]}`,
+      it: `Errore del fonemizzatore spagnolo eSpeak NG: ${phonemizer[1]}`,
+      tr: `İspanyolca eSpeak NG fonemleştirici hatası: ${phonemizer[1]}`,
+    });
+  }
+  const unsupportedAudioWorker = /^Proveedor de audio no soportado en el worker: (.+)$/.exec(message);
+  if (unsupportedAudioWorker) {
+    return uiText(language, {
+      es: message,
+      en: `Audio provider is not supported in the worker: ${unsupportedAudioWorker[1]}`,
+      fr: `Le fournisseur audio n’est pas pris en charge par le worker : ${unsupportedAudioWorker[1]}`,
+      de: `Der Audioanbieter wird im Worker nicht unterstützt: ${unsupportedAudioWorker[1]}`,
+      pt: `O fornecedor de áudio não é suportado pelo worker: ${unsupportedAudioWorker[1]}`,
+      'pt-BR': `O provedor de áudio não é compatível com o worker: ${unsupportedAudioWorker[1]}`,
+      it: `Il provider audio non è supportato dal worker: ${unsupportedAudioWorker[1]}`,
+      tr: `Ses sağlayıcısı worker tarafından desteklenmiyor: ${unsupportedAudioWorker[1]}`,
+    });
+  }
+  if (message === 'Transcripción cancelada.') {
+    return uiText(language, { es: message, en: 'Transcription cancelled.', fr: 'Transcription annulée.', de: 'Transkription abgebrochen.', pt: 'Transcrição cancelada.', 'pt-BR': 'Transcrição cancelada.', it: 'Trascrizione annullata.', tr: 'Transkripsiyon iptal edildi.' });
+  }
+  if (message === 'Detección de hablantes cancelada.') {
+    return uiText(language, { es: message, en: 'Speaker detection cancelled.', fr: 'Détection des locuteurs annulée.', de: 'Sprechererkennung abgebrochen.', pt: 'Deteção de oradores cancelada.', 'pt-BR': 'Detecção de falantes cancelada.', it: 'Rilevamento degli interlocutori annullato.', tr: 'Konuşmacı algılama iptal edildi.' });
+  }
+  if (message === 'No se encontró el conector integrado. En desarrollo, ejecuta "npm run browser:zip".') {
+    return uiText(language, { es: message, en: 'The bundled connector was not found. In development, run "npm run browser:zip".', fr: 'Le connecteur intégré est introuvable. En développement, exécutez « npm run browser:zip ».', de: 'Der integrierte Connector wurde nicht gefunden. Führen Sie in der Entwicklung „npm run browser:zip“ aus.', pt: 'O conector integrado não foi encontrado. Em desenvolvimento, execute «npm run browser:zip».', 'pt-BR': 'O conector integrado não foi encontrado. Em desenvolvimento, execute "npm run browser:zip".', it: 'Il connettore integrato non è stato trovato. In sviluppo, esegui «npm run browser:zip».', tr: 'Dahili bağlayıcı bulunamadı. Geliştirme sırasında "npm run browser:zip" komutunu çalıştırın.' });
+  }
+  if (message === 'Las funciones de IA del vault de estudio están desactivadas en Ajustes.') {
+    return uiText(language, { es: message, en: 'Study vault AI features are disabled in Settings.', fr: 'Les fonctions d’IA du coffre d’étude sont désactivées dans les Réglages.', de: 'Die KI-Funktionen des Lernarchivs sind in den Einstellungen deaktiviert.', pt: 'As funções de IA do arquivo de estudo estão desativadas nas Definições.', 'pt-BR': 'Os recursos de IA do vault de estudo estão desativados nas Configurações.', it: 'Le funzioni IA del vault di studio sono disattivate nelle Impostazioni.', tr: 'Çalışma kasasının yapay zekâ özellikleri Ayarlar’da devre dışı.' });
+  }
+  const localOnly = /^El modo local \(«solo modelos locales»\) impide usar (.+)\.$/.exec(message);
+  if (localOnly) {
+    const [, provider] = localOnly;
+    return uiText(language, { es: message, en: `Local-only mode cannot use ${provider}.`, fr: `Le mode local uniquement ne peut pas utiliser ${provider}.`, de: `Der Nur-lokal-Modus kann ${provider} nicht verwenden.`, pt: `O modo apenas local não pode usar ${provider}.`, 'pt-BR': `O modo somente local não pode usar ${provider}.`, it: `La modalità solo locale non può usare ${provider}.`, tr: `Yalnızca yerel mod ${provider} sağlayıcısını kullanamaz.` });
+  }
+  const externalOnly = /^El modo externo requiere un proveedor remoto; (.+) es local\.$/.exec(message);
+  if (externalOnly) {
+    const [, provider] = externalOnly;
+    return uiText(language, { es: message, en: `External-only mode requires a remote provider; ${provider} is local.`, fr: `Le mode externe uniquement exige un fournisseur distant ; ${provider} est local.`, de: `Der Nur-extern-Modus erfordert einen entfernten Anbieter; ${provider} ist lokal.`, pt: `O modo apenas externo requer um fornecedor remoto; ${provider} é local.`, 'pt-BR': `O modo somente externo requer um provedor remoto; ${provider} é local.`, it: `La modalità solo esterna richiede un fornitore remoto; ${provider} è locale.`, tr: `Yalnızca harici mod uzak bir sağlayıcı gerektirir; ${provider} yerel.` });
+  }
+  if (message === 'Esta asignatura está excluida del procesamiento externo. Usa un modelo local o elimina la exclusión en Ajustes.') {
+    return uiText(language, { es: message, en: 'This subject is excluded from external processing. Use a local model or remove the exclusion in Settings.', fr: 'Cette matière est exclue du traitement externe. Utilisez un modèle local ou retirez l’exclusion dans les Réglages.', de: 'Dieses Fach ist von der externen Verarbeitung ausgeschlossen. Verwenden Sie ein lokales Modell oder entfernen Sie den Ausschluss in den Einstellungen.', pt: 'Esta disciplina está excluída do processamento externo. Use um modelo local ou remova a exclusão nas Definições.', 'pt-BR': 'Esta disciplina está excluída do processamento externo. Use um modelo local ou remova a exclusão nas Configurações.', it: 'Questa materia è esclusa dall’elaborazione esterna. Usa un modello locale o rimuovi l’esclusione nelle Impostazioni.', tr: 'Bu ders harici işleme dışında bırakıldı. Yerel bir model kullanın veya Ayarlar’dan dışlamayı kaldırın.' });
+  }
+  const inputLimit = /^La solicitud supera el límite configurado de (.+) caracteres\.$/.exec(message);
+  if (inputLimit) {
+    const [, count] = inputLimit;
+    return uiText(language, { es: message, en: `The request exceeds the configured limit of ${count} characters.`, fr: `La demande dépasse la limite configurée de ${count} caractères.`, de: `Die Anfrage überschreitet das konfigurierte Limit von ${count} Zeichen.`, pt: `O pedido excede o limite configurado de ${count} caracteres.`, 'pt-BR': `A solicitação excede o limite configurado de ${count} caracteres.`, it: `La richiesta supera il limite configurato di ${count} caratteri.`, tr: `İstek, yapılandırılmış ${count} karakterlik sınırı aşıyor.` });
+  }
+  if (message === 'Se ha alcanzado el presupuesto mensual de IA para estudio.') {
+    return uiText(language, { es: message, en: 'The monthly study AI budget has been reached.', fr: 'Le budget mensuel d’IA pour l’étude a été atteint.', de: 'Das monatliche Lern-KI-Budget wurde erreicht.', pt: 'O orçamento mensal de IA para estudo foi atingido.', 'pt-BR': 'O orçamento mensal de IA para estudo foi atingido.', it: 'Il budget mensile per l’IA di studio è stato raggiunto.', tr: 'Aylık çalışma yapay zekâ bütçesine ulaşıldı.' });
+  }
+  if (message === 'Envío externo cancelado por el usuario.') {
+    return uiText(language, { es: message, en: 'External send cancelled by the user.', fr: 'Envoi externe annulé par l’utilisateur.', de: 'Externe Übermittlung vom Nutzer abgebrochen.', pt: 'Envio externo cancelado pelo utilizador.', 'pt-BR': 'Envio externo cancelado pelo usuário.', it: 'Invio esterno annullato dall’utente.', tr: 'Harici gönderim kullanıcı tarafından iptal edildi.' });
+  }
+  if (message === 'E2E: proveedor de IA no disponible.') {
+    return uiText(language, { es: message, en: 'E2E: AI provider unavailable.', fr: 'E2E : fournisseur d’IA indisponible.', de: 'E2E: KI-Anbieter nicht verfügbar.', pt: 'E2E: fornecedor de IA indisponível.', 'pt-BR': 'E2E: provedor de IA indisponível.', it: 'E2E: fornitore IA non disponibile.', tr: 'E2E: yapay zekâ sağlayıcısı kullanılamıyor.' });
+  }
+  if (message === 'No fue posible completar la tarea de IA.') {
+    return uiText(language, { es: message, en: 'The AI task could not be completed.', fr: 'La tâche d’IA n’a pas pu être terminée.', de: 'Die KI-Aufgabe konnte nicht abgeschlossen werden.', pt: 'Não foi possível concluir a tarefa de IA.', 'pt-BR': 'Não foi possível concluir a tarefa de IA.', it: 'Non è stato possibile completare l’attività IA.', tr: 'Yapay zekâ görevi tamamlanamadı.' });
+  }
   if (message === 'No hay un modelo de IA configurado. Elige uno en Ajustes.') {
     return uiText(language, {
       es: message,

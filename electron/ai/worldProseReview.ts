@@ -20,16 +20,10 @@ import {
   type ProseReviewSources,
 } from '@shared/worldProseReview';
 import { worldOperationSystemPrompt } from '@shared/worldOperationPrompts';
-import { BEAT_MARK_LABEL, THREAD_KIND_LABEL } from '@shared/worldThreads';
-import type { BeatThreadKind } from '@shared/types';
+import { BEAT_MARK_LABEL } from '@shared/worldThreads';
 import { stripWorldLinks } from '@shared/worldManuscript';
 import type { ProseReviewResult } from '@shared/types';
-
-/** A beat hangs off a rule as well as off a thread, and `THREAD_KIND_LABEL` only knows the
- *  two kinds of thread. Naming the third here beats widening a vocabulary that is correct. */
-function kindLabel(kind: BeatThreadKind): string {
-  return kind === 'rule' ? 'regla' : (THREAD_KIND_LABEL[kind] ?? kind);
-}
+import { proseReviewContextCopy } from '@shared/worldContextPromptPacks';
 
 export async function reviewWorldProse(sceneId: string): Promise<ProseReviewResult> {
   const scene = getDb().prepare('SELECT title FROM world_scenes WHERE scene_id = ?').get(sceneId) as
@@ -37,12 +31,15 @@ export async function reviewWorldProse(sceneId: string): Promise<ProseReviewResu
     | undefined;
   if (!scene) throw new Error('Escena no encontrada.');
 
+  const settings = getSettings();
+  const language = settings.promptLanguage ?? 'es';
+  const promptCopy = proseReviewContextCopy(language);
   const beats = beatsForScene(sceneId);
   const sources: ProseReviewSources = {
     sceneTitle: scene.title,
     beats: beats.map((beat) => ({
-      threadLabel: `${kindLabel(beat.threadKind)}: ${beat.threadTitle}`,
-      mark: BEAT_MARK_LABEL[beat.mark] ?? beat.mark,
+      threadLabel: `${promptCopy.threadKinds[beat.threadKind]}: ${beat.threadTitle}`,
+      mark: promptCopy.beatMarks[beat.mark] ?? beat.mark,
       text: beat.text,
     })),
     // The model reads what a reader would read, so the internal links go out first: a
@@ -52,12 +49,11 @@ export async function reviewWorldProse(sceneId: string): Promise<ProseReviewResu
 
   if (!hasProseReviewMaterial(sources)) return { beats: [], noMaterial: true };
 
-  const settings = getSettings();
   const model = settings.synthesisModel ?? settings.extractionModel ?? null;
   const completion = await completeText(
     {
-      system: worldOperationSystemPrompt('proseReview', settings.promptLanguage ?? 'es'),
-      user: composeProseReviewContext(sources),
+      system: worldOperationSystemPrompt('proseReview', language),
+      user: composeProseReviewContext(sources, language),
       plainContext: true,
       // Cold. This is a reading, not a piece of writing: everything true in the answer is
       // already on the page.

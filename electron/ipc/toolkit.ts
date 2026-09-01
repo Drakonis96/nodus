@@ -155,7 +155,7 @@ export function registerToolkitIpc({ h, getWindow }: IpcContext): void {
   h('aiOcr:updatePage', async (_e, id: string, index: number, text: string | null) => updateOcrPage(id, index, text));
   h('aiOcr:transcript', async (_e, id: string) => ocrTranscript(id));
   h('aiOcr:export', async (e, id: string, format: AiOcrExportFormat) => {
-    const { filename, data } = await buildOcrExport(id, format);
+    const { filename, data } = await buildOcrExport(id, format, getSettings().uiLanguage);
     const win = BrowserWindow.fromWebContents(e.sender);
     const picked = await dialog.showSaveDialog(win ?? undefined!, { title: toolkitCopy('exportTranscript'), defaultPath: filename });
     if (picked.canceled || !picked.filePath) return { canceled: true };
@@ -163,7 +163,7 @@ export function registerToolkitIpc({ h, getWindow }: IpcContext): void {
     return { canceled: false, path: picked.filePath };
   });
   h('aiOcr:exportZip', async (e, ids: string[], format: AiOcrExportFormat) => {
-    const { filename, data } = await buildOcrExportZip(ids, format);
+    const { filename, data } = await buildOcrExportZip(ids, format, getSettings().uiLanguage);
     const win = BrowserWindow.fromWebContents(e.sender);
     const picked = await dialog.showSaveDialog(win ?? undefined!, { title: toolkitCopy('exportTranscripts'), defaultPath: filename });
     if (picked.canceled || !picked.filePath) return { canceled: true };

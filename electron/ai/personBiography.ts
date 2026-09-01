@@ -9,7 +9,7 @@ import { kinOf } from '../db/relationshipsRepo';
 import { listItemsForPerson } from '../db/archiveRepo';
 import { getSettings } from '../db/settingsRepo';
 import {
-  BIOGRAPHY_SYSTEM,
+  biographySystemPrompt,
   composeBiographyContext,
   hasBiographyEvidence,
   type BiographySources,
@@ -45,9 +45,11 @@ export async function generatePersonBiography(personId: string): Promise<Biograp
 
   if (!hasBiographyEvidence(sources)) return { biography: null, noEvidence: true };
 
-  const model = getSettings().synthesisModel ?? getSettings().extractionModel ?? null;
+  const settings = getSettings();
+  const language = settings.promptLanguage ?? 'es';
+  const model = settings.synthesisModel ?? settings.extractionModel ?? null;
   const text = await completeText(
-    { system: BIOGRAPHY_SYSTEM, user: composeBiographyContext(sources), temperature: 0.3, maxTokens: 900 },
+    { system: biographySystemPrompt(language), user: composeBiographyContext(sources, language), temperature: 0.3, maxTokens: 900 },
     model
   );
   const biography = text.trim() || null;

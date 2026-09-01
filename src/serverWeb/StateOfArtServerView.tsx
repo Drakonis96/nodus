@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../components/ui";
 import { api } from "./api";
 import type { JsonRecord } from "./types";
-import { t } from "./i18nShim";
+import { errorText, t } from "./i18nShim";
+import { getActiveLang } from "./i18nShim";
+import { localizeDebateTension } from "@shared/uiLanguage";
 
 type CoverageTab = "map" | "debate" | "gaps";
 type StateOfArt = {
@@ -334,7 +336,13 @@ function DebateView({
             ? (debate.sideB as JsonRecord)
             : {};
         const id = value(debate.id, String(index));
-        const tension = value(debate.tension, `${title(a)} ↔ ${title(b)}`);
+        const tension = localizeDebateTension(
+          debate.tensionKey,
+          debate.tensionParams && typeof debate.tensionParams === "object"
+            ? (debate.tensionParams as { left?: string; right?: string })
+            : undefined,
+          getActiveLang(),
+        ) ?? value(debate.tension, `${title(a)} ↔ ${title(b)}`);
         const graphId = value(debate.idea_id ?? a.idea_id ?? b.idea_id, "");
         return (
           <article
@@ -561,7 +569,7 @@ export function StateOfArtServerView({
       })
       .catch((cause) => {
         if (current)
-          setError(cause instanceof Error ? cause.message : String(cause));
+          setError(errorText(cause));
       })
       .finally(() => {
         if (current) setLoading(false);

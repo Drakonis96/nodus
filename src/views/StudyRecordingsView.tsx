@@ -16,6 +16,7 @@ import {
   structuredStudyNotes,
 } from '@shared/studyRecordings';
 import { STUDY_STT_LANGUAGES } from '@shared/sttModels';
+import { localizeRuntimeError } from '@shared/uiLanguage';
 import {
   audioBlobToWhisperWav,
   cancelLocalWhisper,
@@ -227,7 +228,7 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
       setProcessProgress(1); setProcessPartial(''); await reload(); await open(selected.id); setActiveTranscriptKind('literal');
     } catch (cause) {
       if (!cancelledRef.current) {
-        const message = cause instanceof Error ? cause.message : String(cause);
+        const message = localizeRuntimeError(cause instanceof Error ? cause.message : String(cause), getActiveLang());
         setProcessError(message);
         await window.nodus.updateStudyRecording(selected.id, { processingStatus: 'error', processingProgress: processProgress });
       }

@@ -12,7 +12,7 @@ import type {
   AdvancedIdeaDetail,
   AdvancedWorkDetail,
 } from "../advanced/types";
-import { t } from "../i18nShim";
+import { errorText, getActiveLang, t, tx } from "../i18nShim";
 
 export type AcademicTarget = {
   kind: "idea" | "work" | "author";
@@ -153,7 +153,7 @@ function IdeaPanel({
         icon="bulb"
         eyebrow={value(idea.type, "idea")}
         title={value(idea.label, "Idea sin título")}
-        subtitle={`${detail.occurrences.length} ${t("Obras").toLowerCase()} · ${detail.relations.length} ${t("Conexiones").toLowerCase()}`}
+        subtitle={`${detail.occurrences.length} ${t("Obras").toLocaleLowerCase(getActiveLang())} · ${detail.relations.length} ${t("Conexiones").toLocaleLowerCase(getActiveLang())}`}
       />
       <Tabs
         tabs={["Idea", "Obras y evidencia", "Relaciones", "Metadatos"]}
@@ -415,7 +415,7 @@ function WorkPanel({
                       className="border-b border-neutral-200 p-3 dark:border-neutral-800"
                     >
                       <strong className="text-sm text-neutral-900 dark:text-neutral-200">
-                        {value(section.title, `Sección ${index + 1}`)}
+                        {value(section.title, tx("Sección {n}", { n: index + 1 }))}
                       </strong>
                       <p className="mt-1 text-xs leading-5 text-neutral-500">
                         {value(section.summary, "")}
@@ -452,7 +452,7 @@ function AuthorPanel({
           dossier.fullName || dossier.author.name,
           "Autor sin nombre",
         )}
-        subtitle={`${dossier.works.length} ${t("Obras").toLowerCase()} · ${dossier.ideas.length} ${t("Ideas").toLowerCase()} · ${dossier.relations.length} ${t("Conexiones").toLowerCase()}`}
+        subtitle={`${dossier.works.length} ${t("Obras").toLocaleLowerCase(getActiveLang())} · ${dossier.ideas.length} ${t("Ideas").toLocaleLowerCase(getActiveLang())} · ${dossier.relations.length} ${t("Conexiones").toLocaleLowerCase(getActiveLang())}`}
       />
       <Tabs
         tabs={[
@@ -766,7 +766,7 @@ export function AcademicDetailExplorer({
           <div className="m-5 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
             <strong>{t("No se ha podido cargar este registro.")}</strong>
             <p className="mt-1 text-xs opacity-80">
-              {error instanceof Error ? error.message : String(error)}
+              {errorText(error)}
             </p>
             <button
               className="btn btn-ghost mt-3 text-xs"

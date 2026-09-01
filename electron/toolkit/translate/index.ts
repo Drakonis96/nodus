@@ -303,7 +303,7 @@ export async function runTranslateJob(jobId: string, request: TranslateJobReques
     if (process.env.NODUS_E2E_TRANSLATE_FAKE === '1') return { blankPage: false, blocks: [] };
     const outcome = await ocrPageImage(
       { base64: page.buffer.toString('base64'), mediaType: page.mediaType },
-      { ...DEFAULT_OCR_OPTIONS, processingMode: 'translation', targetLanguage: `${language.name} (${language.nativeName})`, removeReferences: false },
+      { ...DEFAULT_OCR_OPTIONS, promptLanguage: getSettings().promptLanguage ?? 'es', processingMode: 'translation', targetLanguage: `${language.name} (${language.nativeName})`, removeReferences: false },
       model,
       visionCall,
     );

@@ -4,7 +4,7 @@ import { Icon, Spinner, modelLabel, sortModelRefs } from '../components/ui';
 import { Markdown } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { useFeatureModel } from '../hooks/useFeatureModel';
-import { t, tx, getActiveLang } from '../i18n';
+import { errorText, t, tx, getActiveLang } from '../i18n';
 
 type Phase = 'setup' | 'routes' | 'touring';
 type SetupTab = 'generate' | 'saved';
@@ -118,7 +118,7 @@ export function TutorPanel({
       try {
         const history = activeRoute.stops.slice(0, index).map((s) => s.title);
         const response = await window.nodus.tutorStepStream(
-          { route: activeRoute, stopIndex: index, overview: tourOverview, history, previousText, model: tourModel },
+          { route: activeRoute, stopIndex: index, overview: tourOverview, history, previousText, model: tourModel, language: settings.promptLanguage },
           {
             onDelta: (delta) => {
               updateSteps((current) => {
@@ -139,7 +139,7 @@ export function TutorPanel({
       } catch (e) {
         updateSteps((current) => ({
           ...current,
-          [key]: { text: e instanceof Error ? e.message : String(e), loading: false, error: true },
+          [key]: { text: errorText(e), loading: false, error: true },
         }));
         return null;
       } finally {
@@ -148,7 +148,7 @@ export function TutorPanel({
     })();
     stepRequestsRef.current.set(key, request);
     return request;
-  }, [tourModel, tourOverview, updateSteps]);
+  }, [settings.promptLanguage, tourModel, tourOverview, updateSteps]);
 
   // Spotlight the current stop on the real graph and ensure its narration is loaded.
   useEffect(() => {
@@ -184,6 +184,7 @@ export function TutorPanel({
         mode,
         prompt: mode === 'prompt' ? prompt : undefined,
         model: selectedModel,
+        language: settings.promptLanguage,
       });
       setPlan(result);
       stepsRef.current = {};
@@ -192,7 +193,7 @@ export function TutorPanel({
       await loadSavedRoutes();
       setPhase('routes');
     } catch (e) {
-      setPlanError(e instanceof Error ? e.message : String(e));
+      setPlanError(errorText(e));
     } finally {
       setGenerating(false);
     }

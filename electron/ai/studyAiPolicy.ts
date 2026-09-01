@@ -1,4 +1,4 @@
-import type { ModelRef } from '@shared/types';
+import type { AppLanguage, ModelRef } from '@shared/types';
 import { dialog } from 'electron';
 import type { StudyAiTask } from '@shared/studyAi';
 import { isLocalStudyModel } from '@shared/studyAi';
@@ -10,6 +10,10 @@ const primaryKey: Record<StudyAiTask, 'chatModel' | 'improveModel' | 'questionGe
 // request key lets those calls share one confirmation without suppressing consent
 // for a later, genuinely separate user action.
 const confirmedExternalRequests = new Set<string>();
+
+function formatCount(value: number, language: AppLanguage): string {
+  return value.toLocaleString(language === 'pt-BR' ? 'pt-BR' : language);
+}
 
 export function resolveStudyAiTaskModel(task: StudyAiTask, explicit?: ModelRef | null, subjectId?: string | null): ModelRef {
   const settings = getSettings(); const scoped = subjectId ? settings.studyAiSubjectModels[subjectId]?.[task] : null;
@@ -24,7 +28,7 @@ export function resolveStudyAiTaskModel(task: StudyAiTask, explicit?: ModelRef |
 }
 
 export async function runStudyAiTask<T>(input: { task: StudyAiTask; explicitModel?: ModelRef | null; subjectId?: string | null; inputChars: number; outputChars?: (value: T) => number; allowFallback?: () => boolean; externalPurpose?: string; externalDetail?: string; externalConsentKey?: string; externalConsentModelKey?: string }, operation: (model: ModelRef) => Promise<T>): Promise<{ value: T; model: ModelRef; fallbackUsed: boolean }> {
-  const settings = getSettings(); if (input.inputChars > settings.studyAiMaxInputChars) throw new Error(`La solicitud supera el límite configurado de ${settings.studyAiMaxInputChars.toLocaleString('es-ES')} caracteres.`);
+  const settings = getSettings(); const language = settings.uiLanguage; if (input.inputChars > settings.studyAiMaxInputChars) throw new Error(`La solicitud supera el límite configurado de ${formatCount(settings.studyAiMaxInputChars, language)} caracteres.`);
   const summary = getStudyAiUsageSummary(); if (summary.budgetUsd > 0 && summary.knownCostUsd >= summary.budgetUsd) throw new Error('Se ha alcanzado el presupuesto mensual de IA para estudio.');
   const primary = resolveStudyAiTaskModel(input.task, input.explicitModel, input.subjectId);
   if (process.env.NODUS_E2E_FORCE_STUDY_AI_FAILURE === '1') {
@@ -46,17 +50,30 @@ export async function runStudyAiTask<T>(input: { task: StudyAiTask; explicitMode
     const requestConsentKey = input.externalConsentKey ? `${externalKey}:${input.externalConsentKey}` : null;
     const externallyApproved = input.externalConsentModelKey === '*' || input.externalConsentModelKey === externalKey;
     if (!isLocalStudyModel(candidate.model) && settings.studyAiConfirmExternal && !externallyApproved && !confirmedExternal.has(externalKey) && !(requestConsentKey && confirmedExternalRequests.has(requestConsentKey))) {
+      const copy = {
+        es: { title: 'Datos fuera del dispositivo', message: 'Nodus enviará esta solicitud de estudio a', purpose: 'Finalidad', detail: 'Se enviarán hasta', chars: 'caracteres según tus límites.', cancel: 'Cancelar', continue: 'Continuar' },
+        en: { title: 'Data leaving this device', message: 'Nodus will send this study request to', purpose: 'Purpose', detail: 'Up to', chars: 'characters will be sent within your limits.', cancel: 'Cancel', continue: 'Continue' },
+        fr: { title: 'Données hors de l’appareil', message: 'Nodus enverra cette demande d’étude à', purpose: 'Finalité', detail: 'Jusqu’à', chars: 'caractères seront envoyés dans vos limites.', cancel: 'Annuler', continue: 'Continuer' },
+        de: { title: 'Daten verlassen dieses Gerät', message: 'Nodus sendet diese Studienanfrage an', purpose: 'Zweck', detail: 'Bis zu', chars: 'Zeichen werden innerhalb Ihrer Limits gesendet.', cancel: 'Abbrechen', continue: 'Weiter' },
+        pt: { title: 'Dados fora do dispositivo', message: 'O Nodus enviará este pedido de estudo para', purpose: 'Finalidade', detail: 'Serão enviados até', chars: 'caracteres dentro dos seus limites.', cancel: 'Cancelar', continue: 'Continuar' },
+        'pt-BR': { title: 'Dados fora do dispositivo', message: 'O Nodus enviará esta solicitação de estudo para', purpose: 'Finalidade', detail: 'Até', chars: 'caracteres serão enviados dentro dos seus limites.', cancel: 'Cancelar', continue: 'Continuar' },
+        it: { title: 'Dati fuori dal dispositivo', message: 'Nodus invierà questa richiesta di studio a', purpose: 'Finalità', detail: 'Verranno inviati fino a', chars: 'caratteri entro i tuoi limiti.', cancel: 'Annulla', continue: 'Continua' },
+        tr: { title: 'Veriler cihazdan çıkacak', message: 'Nodus bu çalışma isteğini şu sağlayıcıya gönderecek:', purpose: 'Amaç', detail: 'Sınırlarınız dahilinde en fazla', chars: 'karakter gönderilecek.', cancel: 'İptal', continue: 'Devam' },
+      }[language] ?? null;
+      const localized = copy ?? {
+        title: 'Data leaving this device', message: 'Nodus will send this study request to', purpose: 'Purpose', detail: 'Up to', chars: 'characters will be sent within your limits.', cancel: 'Cancel', continue: 'Continue',
+      };
       const response = dialog.showMessageBoxSync({
-        type: 'warning', title: 'Datos fuera del dispositivo',
-        message: `Nodus enviará esta solicitud de estudio a ${candidate.model.provider} (${candidate.model.model}).`,
+        type: 'warning', title: localized.title,
+        message: `${localized.message} ${candidate.model.provider} (${candidate.model.model}).`,
         // externalDetail is where a caller states what its own privacy layer does and
         // does NOT cover. This dialog is the moment the user authorises the send, so it
         // is the only honest place to say it.
         detail: [
-          `Finalidad: ${input.externalPurpose ?? input.task}. Se enviarán hasta ${input.inputChars.toLocaleString('es-ES')} caracteres según tus límites.`,
+          `${localized.purpose}: ${input.externalPurpose ?? input.task}. ${localized.detail} ${formatCount(input.inputChars, language)} ${localized.chars}`,
           input.externalDetail,
         ].filter(Boolean).join('\n\n'),
-        buttons: ['Cancelar', 'Continuar'], defaultId: 0, cancelId: 0, noLink: true,
+        buttons: [localized.cancel, localized.continue], defaultId: 0, cancelId: 0, noLink: true,
       });
       if (response !== 1) throw new Error('Envío externo cancelado por el usuario.');
       confirmedExternal.add(externalKey);

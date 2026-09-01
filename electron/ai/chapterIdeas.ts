@@ -14,6 +14,7 @@ import type {
   ChapterRelationTargetKind,
   ChapterRelationType,
   ModelRef,
+  PromptLanguage,
   ProjectChapterIdea,
 } from '@shared/types';
 import { completeJson, embedMany } from './aiClient';
@@ -33,6 +34,8 @@ import { findSimilarNotes, getNote, noteEmbeddingText, notesNeedingEmbedding, up
 import { findSimilarPassages, getPassageDetail } from '../db/passagesRepo';
 import { findSimilarWorks } from '../db/workSummariesRepo';
 import { getWork } from '../db/worksRepo';
+import { getSettings } from '../db/settingsRepo';
+import { chapterPromptPack } from '@shared/academicPromptPacks';
 
 const EXTRACT_MAX_CHUNKS = 48;
 const EXTRACT_CHUNK_BATCH = 6;
@@ -40,6 +43,25 @@ const MAX_CHAPTER_IDEAS = 40;
 const CANDIDATES_PER_IDEA = 6;
 const RELATION_MIN_SIMILARITY = 0.3;
 const TYPING_IDEA_BATCH = 6;
+
+const TARGET_FALLBACK_COPY: Record<PromptLanguage, { untitledNote: string; note: string; passage: string }> = {
+  es: { untitledNote: '(nota sin título)', note: 'nota', passage: 'pasaje' },
+  en: { untitledNote: '(untitled note)', note: 'note', passage: 'passage' },
+  fr: { untitledNote: '(note sans titre)', note: 'note', passage: 'passage' },
+  de: { untitledNote: '(Notiz ohne Titel)', note: 'Notiz', passage: 'Passage' },
+  pt: { untitledNote: '(nota sem título)', note: 'nota', passage: 'passagem' },
+  'pt-BR': { untitledNote: '(nota sem título)', note: 'nota', passage: 'trecho' },
+  it: { untitledNote: '(nota senza titolo)', note: 'nota', passage: 'passaggio' },
+  tr: { untitledNote: '(başlıksız not)', note: 'not', passage: 'pasaj' },
+};
+
+function targetFallbackCopy(): (typeof TARGET_FALLBACK_COPY)[PromptLanguage] {
+  try {
+    return TARGET_FALLBACK_COPY[getSettings().uiLanguage ?? 'es'];
+  } catch {
+    return TARGET_FALLBACK_COPY.es;
+  }
+}
 const RELATION_TYPES: ChapterRelationType[] = ['supports', 'contradicts', 'refines', 'extends', 'related'];
 const IDEA_TYPES: ChapterIdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
 
@@ -71,8 +93,9 @@ function sampleEvenly<T>(items: T[], count: number): T[] {
   for (let i = 0; i < count; i++) out.push(items[Math.floor(i * step)]);
   return out;
 }
-function ideaEmbeddingText(idea: { type: string; label: string; statement: string }): string {
-  return `tipo: ${idea.type}\netiqueta: ${idea.label}\nenunciado: ${idea.statement}`;
+function ideaEmbeddingText(idea: { type: string; label: string; statement: string }, language: PromptLanguage = getSettings().promptLanguage ?? 'es'): string {
+  const copy = chapterPromptPack(language);
+  return `${copy.embeddingType}: ${idea.type}\n${copy.embeddingLabel}: ${idea.label}\n${copy.embeddingStatement}: ${idea.statement}`;
 }
 
 // ── Extraction ───────────────────────────────────────────────────────────────
@@ -90,7 +113,8 @@ function isExtractResponse(v: unknown): v is ExtractResponse {
 
 async function extractChapterIdeas(
   chunks: { headingPath: string; text: string }[],
-  model: ModelRef | null | undefined
+  model: ModelRef | null | undefined,
+  language: PromptLanguage
 ): Promise<RawIdea[]> {
   const sampled = sampleEvenly(chunks, EXTRACT_MAX_CHUNKS);
   const batches: { headingPath: string; text: string }[][] = [];
@@ -101,13 +125,7 @@ async function extractChapterIdeas(
     try {
       const res = await completeJson<ExtractResponse>(
         {
-          system: [
-            'Eres un analista academico dentro de Nodus.',
-            'Extrae las ideas ATOMICAS del fragmento de manuscrito que recibes: afirmaciones, hallazgos, constructos, metodos o marcos.',
-            'Cada idea es una unidad autocontenida y parafraseada (no copies frases largas literales).',
-            'No inventes nada que no este en el texto. Si el fragmento es puro relato o transicion, devuelve pocas o ninguna idea.',
-            'Devuelve solo JSON {"ideas":[{"type":"claim|finding|construct|method|framework","label":"titulo breve","statement":"1-2 frases"}]}',
-          ].join('\n'),
+          system: chapterPromptPack(language).extract,
           user: JSON.stringify(
             { fragmentos: batch.map((chunk) => ({ heading: chunk.headingPath, text: clip(chunk.text, 2200) })) },
             null,
@@ -197,7 +215,8 @@ export function clamp01(value: unknown): number {
 export async function typeRelations(
   ideas: { id: string; label: string; statement: string }[],
   candidatesByIdea: Map<string, Candidate[]>,
-  model: ModelRef | null | undefined
+  model: ModelRef | null | undefined,
+  language: PromptLanguage = getSettings().promptLanguage ?? 'es'
 ): Promise<Map<string, RawRelation>> {
   // keyed by `${chapterIdeaId}|${targetKind}:${targetId}`
   const typed = new Map<string, RawRelation>();
@@ -207,13 +226,7 @@ export async function typeRelations(
     try {
       const res = await completeJson<TypeResponse>(
         {
-          system: [
-            'Eres un analista academico dentro de Nodus.',
-            'Para cada idea del manuscrito y cada candidato de la biblioteca, clasifica la relacion.',
-            'relation: "supports" (el candidato respalda la idea), "contradicts" (la contradice/tensiona), "refines" (la matiza), "extends" (la amplia) o "related" (relacion tematica sin direccion clara).',
-            'Usa exactamente los ids (chapterIdeaId, targetKind, targetId) que recibes. No inventes pares nuevos.',
-            'Devuelve solo JSON {"relations":[{"chapterIdeaId","targetKind","targetId","relation","confidence":0..1,"rationale":"breve"}]}',
-          ].join('\n'),
+          system: chapterPromptPack(language).type,
           user: JSON.stringify(
             {
               ideas_manuscrito: batch.map((idea) => ({
@@ -263,6 +276,7 @@ async function ensureNotesEmbedded(): Promise<void> {
 
 /** Resolve display metadata for a relation target. */
 export function resolveTarget(kind: ChapterRelationTargetKind, id: string): { label: string; subtitle: string | null } {
+  const copy = targetFallbackCopy();
   try {
     if (kind === 'idea') {
       const idea = getIdeaSummary(id);
@@ -270,7 +284,7 @@ export function resolveTarget(kind: ChapterRelationTargetKind, id: string): { la
     }
     if (kind === 'note') {
       const note = getNote(id);
-      return { label: note?.title || '(nota sin título)', subtitle: 'nota' };
+      return { label: note?.title || copy.untitledNote, subtitle: copy.note };
     }
     if (kind === 'work') {
       const work = getWork(id);
@@ -280,9 +294,9 @@ export function resolveTarget(kind: ChapterRelationTargetKind, id: string): { la
     }
     if (kind === 'passage') {
       const passage = getPassageDetail(id);
-      if (!passage) return { label: id, subtitle: 'pasaje' };
+      if (!passage) return { label: id, subtitle: copy.passage };
       const sub = [passage.work.authors[0], passage.page_label ? `p. ${passage.page_label}` : null].filter(Boolean).join(' · ');
-      return { label: passage.work.title, subtitle: sub || 'pasaje' };
+      return { label: passage.work.title, subtitle: sub || copy.passage };
     }
   } catch {
     /* fall through */
@@ -327,6 +341,7 @@ export async function analyzeChapterRelations(
   const chapter = getChapter(request.chapterId);
   if (!chapter) return { chapterId: request.chapterId, analyzed: false, available: true, ideas: [] };
   const model = request.model ?? null;
+  const language = request.language ?? getSettings().promptLanguage ?? 'es';
   const text = chapterText(chapter.currentMarkdown);
   const hash = hashText(text);
 
@@ -339,7 +354,7 @@ export async function analyzeChapterRelations(
   const chunks = listChapterChunks(request.chapterId);
   if (chunks.length === 0) return { chapterId: request.chapterId, analyzed: false, available: true, ideas: [] };
 
-  const rawIdeas = await extractChapterIdeas(chunks, model);
+  const rawIdeas = await extractChapterIdeas(chunks, model, language);
   if (rawIdeas.length === 0) {
     replaceChapterIdeas(request.chapterId, chapter.projectId, hash, []);
     replaceChapterIdeaRelations(request.chapterId, []);
@@ -348,7 +363,7 @@ export async function analyzeChapterRelations(
   }
 
   emit({ chapterId: request.chapterId, phase: 'embedding', current: 0, total: rawIdeas.length, message: 'Indexando ideas…' });
-  const embedTexts = rawIdeas.map((idea) => ideaEmbeddingText({ type: idea.type!, label: idea.label!, statement: idea.statement! }));
+  const embedTexts = rawIdeas.map((idea) => ideaEmbeddingText({ type: idea.type!, label: idea.label!, statement: idea.statement! }, language));
   const vectors = await embedMany(embedTexts);
   const available = vectors.some(Boolean);
 
@@ -385,7 +400,8 @@ export async function analyzeChapterRelations(
   const typed = await typeRelations(
     stored.map((idea) => ({ id: idea.id, label: idea.label, statement: idea.statement })),
     candidatesByIdea,
-    model
+    model,
+    language
   );
 
   const relations: NewChapterIdeaRelation[] = [];

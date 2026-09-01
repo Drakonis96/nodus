@@ -99,9 +99,10 @@ try {
   assert.match(ai.buildStudyKnowledgePrompt('Tema', 'Texto').system, /citas textuales exactas/i);
   const policySource = await readFile(path.join(repoRoot, 'electron/ai/studyAiPolicy.ts'), 'utf8');
   assert.match(policySource, /externalConsentKey/);
-  assert.match(policySource, /Finalidad:/);
+  assert.match(policySource, /purpose: 'Finalidad'/);
   const knowledgeSource = await readFile(path.join(repoRoot, 'electron/ai/studyKnowledge.ts'), 'utf8');
-  assert.match(knowledgeSource, /mapa conceptual trazable/);
+  const knowledgePromptSource = await readFile(path.join(repoRoot, 'shared/studyKnowledgePromptPacks.ts'), 'utf8');
+  assert.match(knowledgePromptSource, /mapa conceptual trazable/);
   assert.match(knowledgeSource, /kind === 'document' \? '\*'/, 'editor autosave does not open a redundant external-send dialog');
   assert.match(await readFile(path.join(repoRoot, 'electron/ai/studyImprove.ts'), 'utf8'), /externalConsentModelKey: '\*'/, 'visible editor AI actions do not open a second provider dialog');
   assert.deepEqual(ai.chunkStudyKnowledgeText('A'.repeat(120) + '\n\n' + 'B'.repeat(120), 150, 4).map((part) => part.length), [120, 120]);

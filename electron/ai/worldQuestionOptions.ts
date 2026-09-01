@@ -22,7 +22,8 @@ import {
 } from '@shared/worldQuestionContext';
 import { worldOperationSystemPrompt } from '@shared/worldOperationPrompts';
 import { findPlaceholders } from '@shared/worldQuestions';
-import { WORLD_ENTRY_KIND_LABEL, WORLD_LINK_FIELD_LABEL, entryKey } from '@shared/worldEncyclopedia';
+import { entryKey } from '@shared/worldEncyclopedia';
+import { worldEntryKindLabel, worldFieldLabel } from '@shared/worldPromptLanguage';
 import type { WorldEntryKind, WorldQuestionOptionsResult } from '@shared/types';
 
 /** Beyond this the neighbourhood stops being a neighbourhood and becomes the world. */
@@ -31,6 +32,8 @@ const MAX_NEIGHBOURS = 20;
 export async function proposeQuestionOptions(questionId: string): Promise<WorldQuestionOptionsResult> {
   const question = getWorldQuestion(questionId);
   if (!question) throw new Error('Pregunta no encontrada.');
+  const settings = getSettings();
+  const language = settings.promptLanguage ?? 'es';
 
   const anchor =
     question.anchorKind && question.anchorId && question.anchorTitle
@@ -39,7 +42,7 @@ export async function proposeQuestionOptions(questionId: string): Promise<WorldQ
 
   const prose = anchor ? entryProse({ kind: anchor.kind, id: anchor.id }) : [];
   const anchorProse = prose.map((block) => ({
-    field: WORLD_LINK_FIELD_LABEL[block.field] ?? block.field,
+    field: worldFieldLabel(block.field, language),
     text: block.text,
   }));
 
@@ -62,7 +65,7 @@ export async function proposeQuestionOptions(questionId: string): Promise<WorldQ
       const entry = entries.get(key);
       if (!entry || seen.has(key)) return;
       seen.add(key);
-      neighbours.push({ title: entry.title, kind: WORLD_ENTRY_KIND_LABEL[entry.kind], summary: entry.summary });
+      neighbours.push({ title: entry.title, kind: worldEntryKindLabel(entry.kind, language), summary: entry.summary });
     };
     // Outgoing first: what the sheet itself names is a stronger signal about what it is
     // than whatever happens to mention it.
@@ -73,9 +76,9 @@ export async function proposeQuestionOptions(questionId: string): Promise<WorldQ
   const sources: WorldQuestionSources = {
     question: question.question,
     anchorTitle: anchor?.title ?? null,
-    anchorKind: anchor ? WORLD_ENTRY_KIND_LABEL[anchor.kind] : null,
+    anchorKind: anchor ? worldEntryKindLabel(anchor.kind, language) : null,
     fieldLabel: question.anchorField
-      ? (WORLD_LINK_FIELD_LABEL[question.anchorField] ?? question.anchorField)
+      ? worldFieldLabel(question.anchorField, language)
       : null,
     evidence,
     anchorProse,
@@ -86,12 +89,11 @@ export async function proposeQuestionOptions(questionId: string): Promise<WorldQ
 
   if (!hasWorldQuestionMaterial(sources)) return { options: [], noMaterial: true };
 
-  const settings = getSettings();
   const model = settings.synthesisModel ?? settings.extractionModel ?? null;
   const completion = await completeText(
     {
       system: worldOperationSystemPrompt('questionOptions', settings.promptLanguage ?? 'es'),
-      user: composeWorldQuestionContext(sources),
+      user: composeWorldQuestionContext(sources, language),
       plainContext: true,
       // The warmest call in the app, and deliberately so: three answers that differ only
       // in wording are not a decision, and a cold model writes exactly those.

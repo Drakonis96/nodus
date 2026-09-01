@@ -24,6 +24,8 @@ import { getSettings } from '../db/settingsRepo';
 import { evaluateAccess, type AccessChannel } from '@shared/testimonyAccess';
 import { displayNameFor, formatTimecode } from '@shared/testimonies';
 import { effectiveAttribution } from '@shared/testimonyAccess';
+import type { PromptLanguage } from '@shared/types';
+import { testimonyAiScaffold } from '@shared/testimonyPrompts';
 
 export interface TestimonyAiContext {
   vault: string;
@@ -62,12 +64,13 @@ interface Row {
  */
 export function buildTestimonyChatContext(
   question: string,
-  options: { vaultName: string; channel?: AccessChannel; now?: Date } = { vaultName: '' },
+  options: { vaultName: string; channel?: AccessChannel; now?: Date; language?: PromptLanguage } = { vaultName: '' },
 ): TestimonyAiContext {
   const db = getDb();
   const channel: AccessChannel = options.channel ?? 'localAi';
   const now = options.now ?? new Date();
   const policy = { allowExternalProviders: getSettings().testimonyAllowExternalProviders };
+  const scaffold = testimonyAiScaffold(options.language ?? getSettings().promptLanguage ?? 'es');
 
   const terms = question
     .toLocaleLowerCase()
@@ -173,7 +176,7 @@ export function buildTestimonyChatContext(
               { workingName: passage.working_name, publicName: passage.public_name, identityMode: passage.identity_mode },
               effectiveAttribution(passage.identity_mode, agreement.attributionMode)
             )
-          : passage.speaker_label ?? 'Sin identificar';
+          : passage.speaker_label ?? scaffold.unknownSpeaker;
         const at = formatTimecode(passage.t_start);
         return {
           speaker,

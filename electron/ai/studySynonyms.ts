@@ -4,6 +4,8 @@ import type { StudySynonymAlternative, StudySynonymRequest, StudySynonymResult }
 import { resolveStudySynonymTarget } from '@shared/studySynonyms';
 import { completeTextNeutral } from './aiClient';
 import { runStudyAiTask } from './studyAiPolicy';
+import { getSettings } from '../db/settingsRepo';
+import { normalizePromptLanguage, synonymSystem } from '@shared/editorAiPrompts';
 
 const MAX_SENTENCE_CHARS = 4_000;
 const ALTERNATIVE_COUNT = 5;
@@ -72,19 +74,7 @@ export function buildStudySynonymPrompt(request: StudySynonymRequest): { system:
   const markedSentence = `${request.sentence.slice(0, request.selectionFrom)}<<<SELECCIÓN>>>${request.selectedText}<<<FIN_SELECCIÓN>>>${request.sentence.slice(request.selectionTo)}`;
   const excluded = (request.previousAlternatives ?? []).slice(-50);
   return {
-    system: `Actúas como asistente de redacción contextual de Nodus. Propones alternativas: distintas formas naturales de expresar lo mismo. No te limites a sinónimos palabra por palabra; la selección puede ser una palabra, una expresión o una frase completa.
-
-Devuelve exclusivamente JSON válido con esta forma exacta:
-{"alternatives":[{"target":"fragmento original exacto","replacement":"alternativa"}]}
-
-REGLAS:
-- Devuelve ${CANDIDATE_COUNT} alternativas de redacción naturales, distintas entre sí y distintas del original. El servidor seleccionará las cinco primeras válidas.
-- Detecta el idioma de la frase y escribe TODAS las alternativas en ese mismo idioma. Nunca traduzcas.
-- Conserva significado, registro, género, número, tiempo verbal, datos, citas y fuerza de la afirmación.
-- "target" debe ser una subcadena literal y contigua de la frase original que contenga toda la selección.
-- Usa la selección exacta como "target" siempre que el reemplazo encaje gramaticalmente.
-- Solo amplía "target" a la porción mínima necesaria de la frase si una reformulación más amplia evita discordancias o resulta claramente más natural.
-- No incluyas explicaciones, notas, Markdown envolvente ni alternativas ya excluidas.`,
+    system: synonymSystem(getPromptLanguage(), CANDIDATE_COUNT),
     user: JSON.stringify({
       originalSentence: request.sentence,
       sentenceWithSelection: markedSentence,
@@ -92,6 +82,10 @@ REGLAS:
       excludedAlternatives: excluded,
     }),
   };
+}
+
+function getPromptLanguage() {
+  try { return normalizePromptLanguage(getSettings().promptLanguage); } catch { return 'en' as const; }
 }
 
 function normalizedSynonymRequest(request: StudySynonymRequest): StudySynonymRequest {

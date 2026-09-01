@@ -89,6 +89,123 @@ export const DEEP_RESEARCH_NARRATIVE_RULES = [
   'No uses listas salvo que la información no pueda expresarse con claridad como prosa continua.',
 ] as const;
 
+/** Native versions of the shared writer contract.  These rules deliberately keep
+ * the same thirteen slots as the historical Spanish contract so adding a locale
+ * cannot silently drop a safety rule.  User-provided evidence, citation tokens,
+ * headings and other literal data are never translated by this pack. */
+const NATIVE_NARRATIVE_RULES: Record<PromptLanguage, readonly string[]> = {
+  es: DEEP_RESEARCH_NARRATIVE_RULES,
+  en: [
+    'Prioritize a continuous, well-connected and reasoned argument. Each paragraph must advance from the previous one through natural transitions.',
+    'Each paragraph must perform a new inferential function. Do not repeat the central thesis, a conclusion or the same methodological caveat in several sections with different wording.',
+    'Place each citation immediately after the concrete clause it supports. Avoid mechanical clusters of references at paragraph ends; when sources contribute different things, attribute and explain each contribution in its sentence.',
+    'Distinguish precisely four levels: documented fact, an author’s interpretation, an inference constructed by the report, and a question the corpus cannot resolve. Do not present causal inference or a control metaphor as proven fact.',
+    'Before asserting a mechanism, causality, effect or reception, check that the evidence supports that specific relation as well as topic, actor, scale and period. Intention does not prove effect, and an intended audience does not prove reception.',
+    'When disagreement exists, develop the full debate: what each position claims, which evidence or scale supports it, why they diverge and what data could decide between them. Merely announcing a debate or contradiction is insufficient.',
+    'Do not declare consensus, convergence, divergence or contradiction from one-sided evidence. Identify and cite each position separately; if one is missing, present the gap as an evidentiary limit.',
+    'If the brief requests a historiographical debate, attribute each position to authors or works in the evidence menu and compare their corpora, periods or scales. If there are not enough named positions, state the limit rather than inventing a school or consensus.',
+    'Use a few broad headings. Within each section add no subtitles, micro-sections, thematic labels or additional headings.',
+    'Do not turn every idea, source, author, period or nuance into an independent section. Integrate them into one argumentative line when they belong to the same reasoning movement.',
+    'Avoid colons, semicolons and em dashes. Use them only when strictly necessary, for example inside a verbatim quotation or a reference that must be preserved.',
+    'Prefer complete sentences joined with periods, commas and discourse connectors. Avoid paragraphs beginning with labels such as “Context:”, “Evidence:” or “Conclusion:”.',
+    'Do not use lists unless the information cannot be expressed clearly as continuous prose.',
+  ],
+  fr: [
+    'Privilégie une argumentation continue, bien liée et raisonnée. Chaque paragraphe doit progresser depuis le précédent par des transitions naturelles.',
+    'Chaque paragraphe doit remplir une nouvelle fonction inférentielle. Ne répète pas la thèse centrale, une conclusion ou la même réserve méthodologique dans plusieurs sections sous des formulations différentes.',
+    'Intègre chaque citation immédiatement après la proposition précise qu’elle étaye. Évite les grappes mécaniques de références en fin de paragraphe; si plusieurs sources apportent des éléments distincts, attribue et explique chaque apport dans la phrase correspondante.',
+    'Distingue précisément quatre niveaux: fait documenté, interprétation d’un auteur, inférence construite par le rapport et question que le corpus ne permet pas de résoudre. Ne présente pas une inférence causale ou une métaphore de contrôle comme un fait établi.',
+    'Avant d’affirmer un mécanisme, une causalité, un effet ou une réception, vérifie que les preuves étayent cette relation précise, ainsi que le thème, l’acteur, l’échelle et la période. Une intention ne prouve pas un effet et un public prévu ne prouve pas une réception.',
+    'En cas de désaccord, développe le débat complet: ce que soutient chaque position, les preuves ou l’échelle mobilisées, la raison de la divergence et les données qui permettraient de trancher. Il ne suffit pas d’annoncer un débat ou une contradiction.',
+    'Ne déclare ni consensus, ni convergence, ni divergence, ni contradiction avec des preuves d’un seul côté. Identifie et cite chaque position séparément; si l’une manque, présente la lacune comme une limite probatoire.',
+    'Si la consigne demande un débat historiographique, attribue chaque position aux auteurs ou œuvres du menu de preuves et compare leurs corpus, périodes ou échelles. S’il n’y a pas assez de positions nommées, indique la limite au lieu d’inventer une école ou un consensus.',
+    'Utilise quelques titres larges. Dans une section, n’ajoute ni sous-titres, ni micro-sections, ni étiquettes thématiques, ni autres en-têtes.',
+    'Ne transforme pas chaque idée, source, auteur, période ou nuance en section indépendante. Intègre-les dans une même ligne argumentative lorsqu’ils relèvent du même mouvement du raisonnement.',
+    'Évite les deux-points, les points-virgules et les tirets cadratins. Ne les utilise que lorsqu’ils sont strictement nécessaires, par exemple dans une citation littérale ou une référence à conserver.',
+    'Préfère des phrases complètes reliées par des points, des virgules et des connecteurs. Évite les paragraphes commençant par des étiquettes comme «Contexte:», «Preuve:» ou «Conclusion:».',
+    'N’utilise pas de listes lorsque l’information peut être exprimée clairement en prose continue.',
+  ],
+  de: [
+    'Bevorzuge eine durchgehende, gut verknüpfte und begründete Argumentation. Jeder Absatz muss durch natürliche Übergänge aus dem vorherigen fortschreiten.',
+    'Jeder Absatz muss eine neue inferenzielle Funktion erfüllen. Wiederhole weder die zentrale These noch ein Fazit oder dieselbe methodische Einschränkung in mehreren Abschnitten mit anderen Worten.',
+    'Setze jedes Zitat unmittelbar nach die konkrete Aussage, die es stützt. Vermeide mechanische Referenzketten am Absatzende; wenn Quellen Unterschiedliches beitragen, ordne jeden Beitrag zu und erkläre ihn im passenden Satz.',
+    'Unterscheide genau vier Ebenen: dokumentierte Tatsache, Interpretation eines Autors, vom Bericht gebildete Inferenz und eine Frage, die das Korpus nicht lösen kann. Stelle weder eine kausale Inferenz noch eine Kontrollmetapher als erwiesene Tatsache dar.',
+    'Prüfe vor einer Aussage über Mechanismus, Kausalität, Wirkung oder Rezeption, ob die Belege diese konkrete Beziehung sowie Thema, Akteur, Maßstab und Zeitraum tragen. Absicht beweist keine Wirkung, ein vorgesehenes Publikum keine Rezeption.',
+    'Entwickle bei Widerspruch die vollständige Debatte: Positionen, Belege oder Maßstab, Grund der Divergenz und Daten, die zwischen ihnen entscheiden könnten. Eine Debatte oder einen Widerspruch nur anzukündigen genügt nicht.',
+    'Behaupte Konsens, Konvergenz, Divergenz oder Widerspruch nicht aufgrund einseitiger Belege. Identifiziere und zitiere jede Position getrennt; fehlt eine, stelle die Lücke als Beleggrenze dar.',
+    'Wenn die Aufgabe eine historiografische Debatte verlangt, ordne jede Position den Autoren oder Werken im Belegmenü zu und vergleiche Korpora, Zeiträume oder Maßstäbe. Gibt es nicht genügend benannte Positionen, nenne die Grenze statt Schule oder Konsens zu erfinden.',
+    'Verwende wenige breite Überschriften. Füge innerhalb eines Abschnitts keine Untertitel, Mikroabschnitte, thematischen Bezeichnungen oder weiteren Überschriften hinzu.',
+    'Mache nicht aus jeder Idee, Quelle, jedem Autor, Zeitraum oder jeder Nuance einen eigenen Abschnitt. Integriere sie in eine argumentative Linie, wenn sie zur selben Denkbewegung gehören.',
+    'Vermeide Doppelpunkte, Semikolons und Gedankenstriche. Verwende sie nur, wenn unbedingt nötig, etwa in einem wörtlichen Zitat oder einer zu bewahrenden Referenz.',
+    'Bevorzuge vollständige Sätze mit Punkten, Kommas und Verknüpfungen. Beginne Absätze nicht mit Bezeichnungen wie „Kontext:“, „Beleg:“ oder „Fazit:“.',
+    'Verwende keine Listen, wenn sich die Information klar als fortlaufende Prosa ausdrücken lässt.',
+  ],
+  pt: [
+    'Privilegia uma narrativa argumentativa contínua, bem articulada e fundamentada. Cada parágrafo deve avançar a partir do anterior através de transições naturais.',
+    'Cada parágrafo deve cumprir uma nova função inferencial. Não repitas a tese central, uma conclusão ou a mesma cautela metodológica em várias secções com palavras diferentes.',
+    'Integra cada citação imediatamente depois da afirmação concreta que sustenta. Evita conjuntos mecânicos de referências no fim do parágrafo; quando as fontes contribuem de formas distintas, atribui e explica cada contribuição na frase correspondente.',
+    'Distingue precisamente quatro níveis: facto documentado, interpretação de um autor, inferência construída pelo relatório e questão que o corpus não permite resolver. Não apresentes uma inferência causal ou uma metáfora de controlo como facto provado.',
+    'Antes de afirmares um mecanismo, causalidade, efeito ou receção, verifica que a evidência sustenta essa relação específica, além do tema, interveniente, escala e período. Uma intenção não prova um efeito e um público previsto não prova receção.',
+    'Quando houver desacordo, desenvolve o debate completo: o que defende cada posição, em que evidência ou escala assenta, por que divergem e que dados permitiriam decidir entre elas. Não basta anunciar um debate ou contradição.',
+    'Não declares consenso, convergência, divergência ou contradição com evidência de apenas um lado. Identifica e cita cada posição separadamente; se faltar uma, apresenta a lacuna como limite probatório.',
+    'Se o pedido exigir um debate historiográfico, atribui cada posição aos autores ou obras presentes no menu de evidências e compara os seus corpora, periodizações ou escalas. Se não houver posições nominais suficientes, declara a limitação em vez de inventar uma escola ou consenso.',
+    'Usa poucos títulos amplos. Dentro de cada secção não acrescentes subtítulos, micro-secções, rótulos temáticos ou cabeçalhos adicionais.',
+    'Não transformes cada ideia, fonte, autor, período ou nuance numa secção independente. Integra-os numa linha argumentativa quando fizerem parte do mesmo movimento do raciocínio.',
+    'Evita dois-pontos, ponto e vírgula e travessão longo. Usa-os apenas quando forem estritamente necessários, por exemplo numa citação literal ou referência que tenha de ser preservada.',
+    'Prefere frases completas ligadas por pontos, vírgulas e conectores discursivos. Evita parágrafos que comecem por rótulos como «Contexto:», «Evidência:» ou «Conclusão:».',
+    'Não uses listas quando a informação puder ser expressa claramente em prosa contínua.',
+  ],
+  'pt-BR': [
+    'Priorize uma narrativa argumentativa contínua, bem articulada e fundamentada. Cada parágrafo deve avançar a partir do anterior por meio de transições naturais.',
+    'Cada parágrafo deve cumprir uma nova função inferencial. Não repita a tese central, uma conclusão ou a mesma cautela metodológica em várias seções com palavras diferentes.',
+    'Integre cada citação imediatamente depois da afirmação concreta que ela sustenta. Evite grupos mecânicos de referências no fim do parágrafo; quando as fontes contribuírem de formas distintas, atribua e explique cada contribuição na frase correspondente.',
+    'Diferencie precisamente quatro níveis: fato documentado, interpretação de um autor, inferência construída pelo relatório e questão que o corpus não permite resolver. Não apresente inferência causal ou metáfora de controle como fato comprovado.',
+    'Antes de afirmar mecanismo, causalidade, efeito ou recepção, verifique se as evidências sustentam essa relação específica, além de tema, ator, escala e período. Uma intenção não prova um efeito e um público previsto não prova recepção.',
+    'Quando houver discordância, desenvolva o debate completo: o que cada posição sustenta, em que evidência ou escala se apoia, por que divergem e quais dados poderiam decidir entre elas. Não basta anunciar debate ou contradição.',
+    'Não declare consenso, convergência, divergência ou contradição com evidências de apenas um lado. Identifique e cite cada posição separadamente; se uma faltar, apresente a lacuna como limite probatório.',
+    'Se o pedido exigir debate historiográfico, atribua cada posição aos autores ou obras do menu de evidências e compare seus corpora, períodos ou escalas. Se não houver posições nomeadas suficientes, declare a limitação em vez de inventar escola ou consenso.',
+    'Use poucos títulos amplos. Dentro de cada seção não adicione subtítulos, microsseções, rótulos temáticos ou cabeçalhos adicionais.',
+    'Não transforme cada ideia, fonte, autor, período ou nuance em seção independente. Integre-os na mesma linha argumentativa quando fizerem parte do mesmo movimento do raciocínio.',
+    'Evite dois-pontos, ponto e vírgula e travessão. Use-os somente quando forem estritamente necessários, por exemplo em citação literal ou referência que precise ser preservada.',
+    'Prefira frases completas ligadas por pontos, vírgulas e conectores. Evite parágrafos que comecem com rótulos como “Contexto:”, “Evidência:” ou “Conclusão:”.',
+    'Não use listas quando a informação puder ser expressa claramente em prosa contínua.',
+  ],
+  it: [
+    'Privilegia una narrazione argomentativa continua, ben collegata e ragionata. Ogni paragrafo deve avanzare rispetto al precedente tramite transizioni naturali.',
+    'Ogni paragrafo deve svolgere una nuova funzione inferenziale. Non ripetere la tesi centrale, una conclusione o la stessa cautela metodologica in più sezioni con parole diverse.',
+    'Integra ogni citazione subito dopo la clausola concreta che sostiene. Evita gruppi meccanici di riferimenti alla fine del paragrafo; quando le fonti apportano elementi diversi, attribuisci e spiega ogni contributo nella frase corrispondente.',
+    'Distingui con precisione quattro livelli: fatto documentato, interpretazione di un autore, inferenza costruita dal rapporto e questione che il corpus non consente di risolvere. Non presentare un’inferenza causale o una metafora di controllo come fatto provato.',
+    'Prima di affermare un meccanismo, una causalità, un effetto o una ricezione, verifica che le prove sostengano quella relazione specifica, oltre a tema, attore, scala e periodo. Un’intenzione non dimostra un effetto e un pubblico previsto non dimostra ricezione.',
+    'In caso di disaccordo, sviluppa il dibattito completo: cosa sostiene ogni posizione, su quali prove o scale si fonda, perché divergono e quali dati potrebbero decidere. Non basta annunciare un dibattito o una contraddizione.',
+    'Non dichiarare consenso, convergenza, divergenza o contraddizione con prove di un solo lato. Identifica e cita ogni posizione separatamente; se ne manca una, presenta la lacuna come limite probatorio.',
+    'Se il compito richiede un dibattito storiografico, attribuisci ogni posizione agli autori o alle opere nel menu delle prove e confronta corpus, periodizzazioni o scale. Se mancano posizioni nominali sufficienti, dichiara il limite invece di inventare una scuola o un consenso.',
+    'Usa pochi titoli ampi. All’interno di ogni sezione non aggiungere sottotitoli, microsezioni, etichette tematiche o ulteriori intestazioni.',
+    'Non trasformare ogni idea, fonte, autore, periodo o sfumatura in una sezione indipendente. Integrali nella stessa linea argomentativa quando appartengono allo stesso movimento del ragionamento.',
+    'Evita due punti, punto e virgola e lineette lunghe. Usali solo quando strettamente necessari, ad esempio in una citazione letterale o in un riferimento da conservare.',
+    'Preferisci frasi complete unite da punti, virgole e connettivi. Evita paragrafi che iniziano con etichette come «Contesto:», «Prova:» o «Conclusione:».',
+    'Non usare elenchi quando l’informazione può essere espressa chiaramente in prosa continua.',
+  ],
+  tr: [
+    'Sürekli, iyi bağlanmış ve gerekçeli bir anlatımı önceliklendir. Her paragraf doğal geçişlerle önceki paragraftan ilerlemelidir.',
+    'Her paragraf yeni bir çıkarımsal işlev yerine getirmelidir. Merkezi tezi, sonucu veya aynı yöntemsel uyarıyı farklı sözlerle birden çok bölümde tekrarlama.',
+    'Her alıntıyı desteklediği somut tümceden hemen sonra yerleştir. Paragraf sonunda mekanik kaynak kümelerinden kaçın; kaynaklar farklı katkılar yapıyorsa her katkıyı ilgili tümcede belirt ve açıkla.',
+    'Dört düzeyi kesin biçimde ayır: belgelenmiş olgu, yazar yorumu, raporun kurduğu çıkarım ve külliyatın çözemediği soru. Nedensel çıkarımı veya kontrol metaforunu kanıtlanmış olgu gibi sunma.',
+    'Bir mekanizma, nedensellik, etki veya alımlama ileri sürmeden önce kanıtın konu, aktör, ölçek ve dönemin yanı sıra bu özel ilişkiyi de desteklediğini denetle. Niyet etkiyi, tasarlanan kitle de alımlamayı kanıtlamaz.',
+    'Anlaşmazlık varsa tartışmayı bütünüyle geliştir: her konum neyi savunuyor, hangi kanıt veya ölçeğe dayanıyor, neden ayrışıyor ve hangi veriler karar vermeyi sağlayabilir. Yalnızca tartışma veya çelişki ilan etmek yetmez.',
+    'Tek taraflı kanıtla uzlaşma, yakınsama, ayrışma veya çelişki ilan etme. Her konumu ayrı ayrı tanımla ve kaynaklandır; biri eksikse boşluğu kanıtsal sınır olarak sun.',
+    'İstek tarih yazımı tartışması gerektiriyorsa her konumu kanıt menüsündeki yazar veya eserlere bağla ve külliyatlarını, dönemlerini veya ölçeklerini karşılaştır. Yeterli adlandırılmış konum yoksa okul ya da uzlaşma uydurmak yerine sınırı belirt.',
+    'Az sayıda geniş başlık kullan. Bölüm içinde alt başlık, mikro bölüm, tematik etiket veya ek başlık ekleme.',
+    'Her fikri, kaynağı, yazarı, dönemi veya nüansı bağımsız bölüme dönüştürme. Aynı akıl yürütme hareketine ait olduklarında bunları tek bir sav çizgisine entegre et.',
+    'İki nokta, noktalı virgül ve uzun çizgiden kaçın. Bunları yalnızca aynen korunması gereken alıntı veya referans gibi zorunlu durumlarda kullan.',
+    'Nokta, virgül ve bağlaçlarla bağlanan tam cümleleri tercih et. “Bağlam:”, “Kanıt:” veya “Sonuç:” gibi etiketlerle başlayan paragraflardan kaçın.',
+    'Bilgi sürekli düzyazıyla açıkça ifade edilebiliyorsa liste kullanma.',
+  ],
+};
+
+export function deepResearchNarrativeRules(language: PromptLanguage = 'es'): readonly string[] {
+  return NATIVE_NARRATIVE_RULES[language] ?? NATIVE_NARRATIVE_RULES.en;
+}
+
 export interface DeepResearchPlanSection {
   id: string;
   title: string;
@@ -431,6 +548,7 @@ export interface DeepResearchDeps {
    * material; it only tells each section what to remove, deepen or connect. */
   reviewReport?(input: {
     objective: string;
+    language: PromptLanguage;
     sections: Array<{ title: string; purpose: string; responsibilities: string[]; markdown: string }>;
   }): Promise<ReportEditorialReview>;
   /**
@@ -439,14 +557,14 @@ export interface DeepResearchDeps {
    * the sentence it was attached to. Must return one verdict per claim, in order.
    * Omitted skips verification entirely.
    */
-  verifyCitations?(claims: CitationClaim[]): Promise<CitationVerdict[]>;
+  verifyCitations?(claims: CitationClaim[], language?: PromptLanguage): Promise<CitationVerdict[]>;
   /**
    * Optional read-only check for sections that contradict each other. Deliberately
    * cannot rewrite: a pass that edits assembled prose puts every verified citation
    * at risk, so this only reports. Each finding must quote both sides verbatim so
    * the orchestrator can confirm the sentences really exist before believing it.
    */
-  checkCoherence?(sections: { title: string; text: string }[]): Promise<CoherenceIssue[]>;
+  checkCoherence?(sections: { title: string; text: string }[], language?: PromptLanguage): Promise<CoherenceIssue[]>;
 }
 
 /** Two passages of the same report that cannot both be right. */
@@ -887,7 +1005,7 @@ export async function orchestrateDeepResearch(
       const claims = extractCitationClaims(markdown, maps);
       if (claims.length > 0) {
         try {
-          const verdicts = await deps.verifyCitations(claims);
+          const verdicts = await deps.verifyCitations(claims, language);
           if (Array.isArray(verdicts) && verdicts.length === claims.length) {
             const outcome = applyVerification(markdown, claims, verdicts);
             firstVerificationOutcome = outcome;
@@ -948,7 +1066,7 @@ export async function orchestrateDeepResearch(
           ), maps).markdown;
           const repairedClaims = extractCitationClaims(repaired, maps);
           if (repairedClaims.length > 0) {
-            const repairedVerdicts = await deps.verifyCitations(repairedClaims);
+          const repairedVerdicts = await deps.verifyCitations(repairedClaims, language);
             if (Array.isArray(repairedVerdicts) && repairedVerdicts.length === repairedClaims.length) {
               const repairedOutcome = applyVerification(repaired, repairedClaims, repairedVerdicts);
               repaired = repairedOutcome.markdown;
@@ -1041,6 +1159,7 @@ export async function orchestrateDeepResearch(
     try {
       const review = await deps.reviewReport({
         objective: effectiveRequest.objective,
+        language,
         sections: written.map((item) => ({
           title: item.section.title,
           purpose: item.section.purpose,
@@ -1085,7 +1204,7 @@ export async function orchestrateDeepResearch(
         const revisedClaims = extractCitationClaims(revised, maps);
         let concernsAfter = 0;
         if (revisedClaims.length) {
-          const verdicts = await deps.verifyCitations(revisedClaims);
+          const verdicts = await deps.verifyCitations(revisedClaims, language);
           if (!Array.isArray(verdicts) || verdicts.length !== revisedClaims.length) continue;
           const outcome = applyVerification(revised, revisedClaims, verdicts);
           revised = outcome.markdown;
@@ -1114,7 +1233,7 @@ export async function orchestrateDeepResearch(
         const claims = extractCitationClaims(item.markdown, maps);
         if (!claims.length) continue;
         try {
-          const verdicts = await deps.verifyCitations(claims);
+          const verdicts = await deps.verifyCitations(claims, language);
           if (!Array.isArray(verdicts) || verdicts.length !== claims.length) {
             finalVerification.unverified += claims.length;
             continue;
@@ -1182,7 +1301,7 @@ export async function orchestrateDeepResearch(
   if (deps.checkCoherence && written.length > 1) {
     try {
       const sections = written.map((w) => ({ title: w.section.title, text: stripInitialHeading(w.markdown) }));
-      coherenceIssues = groundCoherenceIssues(await deps.checkCoherence(sections), sections);
+      coherenceIssues = groundCoherenceIssues(await deps.checkCoherence(sections, language), sections);
     } catch {
       /* a missing coherence check never costs the report */
     }

@@ -240,7 +240,21 @@ function publishedConflictBoard(snapshot, threads = publishedWorldThreads(snapsh
 function publishedContinuityFindings(snapshot) {
   const threads = publishedWorldThreads(snapshot);
   const findings = [];
-  const add = (checkId, severity, headline, subjects, detail) => findings.push({ fingerprint: `${checkId}:${subjects.map((subject) => `${subject.kind}:${subject.id}`).join('|')}`, checkId, family: checkId.startsWith('rule.') ? 'rule' : 'thread', severity, headline, detail: detail ?? null, subjects });
+  const add = (checkId, severity, headline, subjects, detail) => findings.push({
+    fingerprint: `${checkId}:${subjects.map((subject) => `${subject.kind}:${subject.id}`).join('|')}`,
+    checkId,
+    family: checkId.startsWith('rule.') ? 'rule' : 'thread',
+    severity,
+    // Keep the legacy prose fields for older clients, but expose a stable key and
+    // user-content parameters so newer clients can translate only the chrome.
+    headline,
+    headlineKey: `continuity.${checkId}.headline`,
+    headlineParams: { count: subjects.length, subjects: subjects.map((subject) => String(subject.title ?? subject.id)) },
+    detail: detail ?? null,
+    detailKey: detail ? `continuity.${checkId}.detail` : null,
+    detailParams: { count: subjects.length, subjects: subjects.map((subject) => String(subject.title ?? subject.id)) },
+    subjects,
+  });
   const beats = rows(snapshot, 'world_beats');
   for (const thread of threads) {
     if (thread.status === 'open' && !beats.some((beat) => String(beat.thread_id) === String(thread.thread_id))) add('thread.noScenes', 'warning', `«${thread.title}» no se mueve en ninguna escena`, [{ kind: 'thread', id: String(thread.thread_id), title: thread.title }], 'Está declarado, pero ninguna escena lo hace avanzar.');
@@ -745,7 +759,10 @@ function readingPath(snapshot, strategy = 'research_relevance', researchBrief = 
       themes: [...data.themes], orientationSummary: work.abstract ?? null, readTag: read, read,
       analysis: { lightStatus, deepStatus, summaryStatus, hasThemes: data.themes.size > 0, hasIdeas: data.ideas.length > 0, hasContradictions: contradictionCount > 0, hasGaps: gapScore > 0, hasExternalRefs: false, themeCount: data.themes.size, ideaCount: data.ideas.length, relationCount: 0, contradictionCount, gapCount: gapScore, externalRefCount: 0 },
       score, priority: score, phase: 'core', strategyScore: score, gapScore, foundationalScore: 1 - recencyScore, recencyScore, authorConnectivityScore, bridgeScore: data.themes.size > 1 ? 1 : 0, interestScore: data.ideas.length, diversityKey: [...data.themes][0] ?? null,
-      relatedGaps: gaps.filter((gap) => data.ideas.includes(String(gap.related_idea ?? ''))).map((gap) => String(gap.text ?? gap.description ?? gap.id)), relatedIdeas: data.ideas, connectedAuthors: authorIds, citedBy: 0, reason: data.ideas.length ? 'Conecta ideas del corpus publicado.' : 'Obra pendiente de análisis.',
+      relatedGaps: gaps.filter((gap) => data.ideas.includes(String(gap.related_idea ?? ''))).map((gap) => String(gap.text ?? gap.description ?? gap.id)), relatedIdeas: data.ideas, connectedAuthors: authorIds, citedBy: 0,
+      reason: data.ideas.length ? 'Conecta ideas del corpus publicado.' : 'Obra pendiente de análisis.',
+      reasonKey: data.ideas.length ? 'reading.reason.connectedIdeas' : 'reading.reason.pendingAnalysis',
+      reasonParams: {},
     };
   }).filter((entry) => includeRead || !entry.read).sort((left, right) => right.score - left.score || left.title.localeCompare(right.title)).slice(0, Math.max(1, Math.min(200, Number(limit) || 72)));
   const phaseDefs = [
@@ -761,10 +778,33 @@ function readingPath(snapshot, strategy = 'research_relevance', researchBrief = 
     const candidates = entries.filter((entry) => predicate(entry));
     const selected = candidates.filter((entry) => !used.has(entry.nodus_id)).slice(0, Math.max(1, Math.ceil(limit / phaseDefs.length)));
     selected.forEach((entry) => used.add(entry.nodus_id));
-    return { id, title, objective, entries: selected.map((entry) => ({ ...entry, phase: id })), totalCandidates: candidates.length, omitted: Math.max(0, candidates.length - selected.length) };
+    return {
+      id,
+      title,
+      objective,
+      titleKey: `reading.phase.${id}.title`,
+      objectiveKey: `reading.phase.${id}.objective`,
+      entries: selected.map((entry) => ({ ...entry, phase: id })),
+      totalCandidates: candidates.length,
+      omitted: Math.max(0, candidates.length - selected.length),
+    };
   }).filter((phase) => phase.entries.length > 0);
   const allEntries = [...works.values()].map((work) => work.read === true || work.read === 1 || work.read === '1' || work.read_tag === true || work.read_tag === 1 || work.read_tag === '1');
-  return { strategy, researchBrief: String(researchBrief ?? ''), generatedAt: new Date().toISOString(), totalWorks: works.size, shownWorks: entries.length, readCount: allEntries.filter(Boolean).length, unreadCount: allEntries.filter((entry) => !entry).length, analyzedCount: entries.filter((entry) => entry.analysis.ideaCount > 0).length, pendingAnalysisCount: entries.filter((entry) => entry.analysis.ideaCount === 0).length, summary: `Ruta de lectura con ${entries.length} obras priorizadas.`, phases };
+  return {
+    strategy,
+    researchBrief: String(researchBrief ?? ''),
+    generatedAt: new Date().toISOString(),
+    totalWorks: works.size,
+    shownWorks: entries.length,
+    readCount: allEntries.filter(Boolean).length,
+    unreadCount: allEntries.filter((entry) => !entry).length,
+    analyzedCount: entries.filter((entry) => entry.analysis.ideaCount > 0).length,
+    pendingAnalysisCount: entries.filter((entry) => entry.analysis.ideaCount === 0).length,
+    summary: `Ruta de lectura con ${entries.length} obras priorizadas.`,
+    summaryKey: 'reading.summary',
+    summaryParams: { count: entries.length },
+    phases,
+  };
 }
 
 /**
@@ -2219,7 +2259,12 @@ export function createCorpusRoutes({ readSnapshot, readAssetBytes, renderPdf }) 
       if (rest[1] === 'document.pdf') {
         if (!draft || typeof renderPdf !== 'function') return missing(res, json);
         let bytes;
-        try { bytes = await renderPdf(draft, { subject: 'Deep Research · publicado' }); }
+        try {
+          bytes = await renderPdf(draft, {
+            language: draft?.brief?.language ?? draft?.language,
+            subject: 'Deep Research · published',
+          });
+        }
         catch (error) {
           json(res, 422, { error: 'unrenderable_draft', error_description: `This report cannot be exported as PDF: ${error.message}` });
           return true;

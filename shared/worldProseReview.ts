@@ -30,6 +30,9 @@ export interface ProseReviewSources {
   prose: string;
 }
 
+import { proseReviewContextCopy } from './worldContextPromptPacks';
+import type { PromptLanguage } from './types';
+
 export const WORLD_PROSE_REVIEW_SYSTEM = `Lees una escena de una novela y dices, de una lista de cosas que el autor dijo que tenían que pasar en ella, cuáles aparecen de verdad en el texto y cuáles no.
 
 Reglas, sin excepción:
@@ -45,13 +48,14 @@ export function hasProseReviewMaterial(sources: ProseReviewSources): boolean {
   return sources.beats.length > 0 && sources.prose.trim().length > 0;
 }
 
-export function composeProseReviewContext(sources: ProseReviewSources): string {
-  const lines: string[] = [`ESCENA: ${sources.sceneTitle}`, '', 'LO QUE DIJISTE QUE TENÍA QUE PASAR:'];
+export function composeProseReviewContext(sources: ProseReviewSources, language: PromptLanguage = 'es'): string {
+  const copy = proseReviewContextCopy(language);
+  const lines: string[] = [`${copy.scene}: ${sources.sceneTitle}`, '', `${copy.declaredBeats}:`];
   sources.beats.forEach((beat, index) => {
     lines.push(`${index + 1}. ${beat.threadLabel} — ${beat.mark}${beat.text ? `: ${beat.text}` : ''}`);
   });
-  lines.push('', 'EL TEXTO DE LA ESCENA:', sources.prose.trim(), '');
-  lines.push(`Dime, en ${sources.beats.length} línea(s) y en ese mismo orden, cuáles aparecen.`);
+  lines.push('', `${copy.sceneText}:`, sources.prose.trim(), '');
+  lines.push(copy.ask(sources.beats.length));
   return lines.join('\n');
 }
 

@@ -124,7 +124,7 @@ test('Deep Research can generate account-private translations beside published o
   assert.match(personal, /Nueva traducción privada/);
   assert.match(personal, /kind: ["']deep-research["']/);
   assert.match(personal, /entry\.privateArtifact === true/);
-  assert.match(personal, /modifica el vault/i);
+  assert.match(personal, /Se traducirá el informe visible y se guardará solo en tu cuenta/);
 });
 
 test('Deep Research keeps the Desktop reader ribbon grouped and honest on Server', () => {

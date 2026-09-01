@@ -231,7 +231,7 @@ export function ArgumentMapView({
     setActiveMapKey(key);
     setSurface('map');
     try {
-      const result = await window.nodus.buildArgumentMap({ seedIdeaId: sid, model, mode });
+      const result = await window.nodus.buildArgumentMap({ seedIdeaId: sid, model, mode, language: settings.promptLanguage });
       setOpenArgumentMaps((current) => current.map((open) => (
         open.key === key ? { ...open, map: result, building: false } : open
       )));
@@ -241,7 +241,7 @@ export function ArgumentMapView({
         open.key === key ? { ...open, building: false, error: message } : open
       )));
     }
-  }, [ideaNodes, mode, model, openArgumentMaps, search, seedId, suggestions]);
+  }, [ideaNodes, mode, model, openArgumentMaps, search, seedId, settings.promptLanguage, suggestions]);
 
   const closeMapTab = useCallback((key: string) => {
     const closingIndex = openArgumentMaps.findIndex((tab) => tab.key === key);

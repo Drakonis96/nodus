@@ -15,8 +15,9 @@ import {
 } from '../db/entitiesRepo';
 import { recordKinCandidates, openSuggestionCount } from '../db/kinshipSuggestionsRepo';
 import { completeJson } from './aiClient';
+import { getSettings } from '../db/settingsRepo';
 import {
-  RECORDS_EXTRACTION_PROMPT,
+  recordsExtractionPrompt,
   buildRecordsInput,
   isRecordsChunkResult,
   mergeRecordsResults,
@@ -209,7 +210,7 @@ export async function runRecordsScan(
 function modelExtractor(model?: ModelRef | null): ChunkExtractor {
   return (input) =>
     completeJson<RecordsChunkResult>(
-      { system: RECORDS_EXTRACTION_PROMPT, user: JSON.stringify(input), temperature: 0.15, maxTokens: 8000 },
+      { system: recordsExtractionPrompt(getSettings().promptLanguage ?? 'es'), user: JSON.stringify(input), temperature: 0.15, maxTokens: 8000 },
       isRecordsChunkResult,
       model
     );

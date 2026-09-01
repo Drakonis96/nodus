@@ -17,6 +17,7 @@ import type {
 import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { completeJson } from './aiClient';
+import { synthesisPromptPack } from '@shared/synthesisPromptPacks';
 
 // The grid focuses on the most substantive authors/themes so it stays legible
 // and cheap to render; a thesis corpus can otherwise be hundreds × dozens.
@@ -158,11 +159,9 @@ export async function synthesizeMatrixCell(
   }
 
   const ideaBlock = ideaRows.map((i) => `  - ${i.label}: ${clip(i.statement, STATEMENT_CLIP)}`).join('\n');
-  const system =
-    'Eres un asistente de investigación académica. Resume en UNA sola frase la postura de un autor sobre un tema concreto, ' +
-    'a partir únicamente de las ideas proporcionadas. No inventes nada que no esté en las ideas. ' +
-    'Devuelve EXCLUSIVAMENTE un JSON con la forma {"stance": "una frase"}.';
-  const user = `AUTOR: ${author.name}\nTEMA: ${theme.label}\n\nIDEAS DEL AUTOR SOBRE ESTE TEMA:\n${ideaBlock}\n\nDevuelve {"stance": "…"}.`;
+  const prompt = synthesisPromptPack(getSettings().promptLanguage ?? 'es');
+  const system = prompt.matrixSystem;
+  const user = `${prompt.matrixAuthor}: ${author.name}\n${prompt.matrixTheme}: ${theme.label}\n\n${prompt.matrixIdeas}:\n${ideaBlock}\n\n${prompt.matrixReturn}`;
 
   const chosen = model ?? getSettings().synthesisModel ?? null;
   const result = await completeJson<StanceResponse>({ system, user, temperature: 0.2 }, isStanceResponse, chosen);

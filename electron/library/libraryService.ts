@@ -82,7 +82,8 @@ import { ZoteroSyncSessionStore } from './libraryZoteroSyncSessions';
 import { LibraryExtractionQueue } from './libraryExtractionQueue';
 import { completeTextNeutral } from '../ai/aiClient';
 import { getSettings } from '../db/settingsRepo';
-import { buildOcrTextPrompt, OCR_USER_PROMPT } from '@shared/aiOcrPrompt';
+import { localizeIpcPayload } from '@shared/uiLanguage';
+import { buildLocalizedOcrTextPrompt, ocrUserPrompt } from '@shared/aiOcrPrompt';
 import { DEFAULT_OCR_OPTIONS } from '@shared/aiOcrTypes';
 import { LibraryOperations } from './libraryOperations';
 import { normalizeLibraryCollectionRecord, normalizeLibraryItemRecord } from './libraryRecord';
@@ -171,9 +172,10 @@ async function libraryRemoteOcr(input: { image: Buffer; mimeType: 'image/png' })
   const settings = getSettings();
   const model = settings.visionModel ?? settings.extractionModel ?? null;
   if (!model) throw new Error('No hay un modelo de visión configurado para el OCR remoto explícito.');
+  const promptLanguage = settings.promptLanguage ?? 'es';
   return completeTextNeutral({
-    system: buildOcrTextPrompt({ ...DEFAULT_OCR_OPTIONS, outputMode: 'text' }),
-    user: OCR_USER_PROMPT,
+    system: buildLocalizedOcrTextPrompt({ ...DEFAULT_OCR_OPTIONS, outputMode: 'text', promptLanguage }),
+    user: ocrUserPrompt(promptLanguage),
     images: [{ base64: input.image.toString('base64'), mediaType: input.mimeType }],
     temperature: 0.1, maxTokens: 8000, plainContext: true,
   }, model);
@@ -254,9 +256,10 @@ function broadcast(status: LibraryStatus): void {
 }
 
 function broadcastMigration(progress: LibraryMigrationProgress): void {
+  const localized = localizeIpcPayload(progress, getSettings().uiLanguage);
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-      window.webContents.send('library:migrationProgress', progress);
+      window.webContents.send('library:migrationProgress', localized);
     }
   }
 }
@@ -264,8 +267,9 @@ function broadcastMigration(progress: LibraryMigrationProgress): void {
 function broadcastExtraction(progress: LibraryExtractionProgress): void {
   if (progress.status === 'done' && live) settleLibraryInvalidationsForItem(progress.itemId, live.store, live.catalog);
   if (progress.status === 'done') notifyGlobalLibraryChanged();
+  const localized = localizeIpcPayload(progress, getSettings().uiLanguage);
   for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('library:extractionProgress', progress);
+    if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('library:extractionProgress', localized);
   }
 }
 

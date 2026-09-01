@@ -8,7 +8,8 @@ import {
   type PendingAssistantNavigationTarget,
   type PendingGraphNavigationTarget,
 } from '../navigation';
-import { t, tx } from '../i18n';
+import { getActiveLang, t, tx } from '../i18n';
+import { localizeReadingPathText } from '@shared/uiLanguage';
 
 const STRATEGY_LABELS: Record<ReadingPathStrategy, string> = {
   research_relevance: 'Más relevante',
@@ -153,8 +154,8 @@ export function ReadingPathView({
           <section key={phase.id}>
             <div className="flex flex-wrap items-end gap-2 mb-2">
               <div>
-                <h2 className="text-base font-semibold">{t(phase.title)}</h2>
-                <p className="text-xs text-neutral-500">{t(phase.objective)}</p>
+                <h2 className="text-base font-semibold">{phase.titleKey ? localizedReadingPathText(phase.titleKey, phase.title) : t(phase.title)}</h2>
+                <p className="text-xs text-neutral-500">{phase.objectiveKey ? localizedReadingPathText(phase.objectiveKey, phase.objective) : t(phase.objective)}</p>
               </div>
               <div className="flex-1" />
               <Badge>{phase.entries.length}/{phase.totalCandidates}</Badge>
@@ -277,6 +278,8 @@ function ReadingEntryCard({
 
 function localizedReadingReason(entry: ReadingPathEntry): string {
   const parts: string[] = [];
+  const serverReason = localizeReadingPathText(entry.reasonKey, entry.reasonParams, getActiveLang());
+  if (serverReason) parts.push(serverReason);
   parts.push(entry.read ? t('Marcada como leída por la etiqueta de Zotero.') : t('Pendiente de lectura.'));
   if (entry.analysis.hasIdeas) parts.push(tx('{n} idea(s) extraída(s).', { n: entry.analysis.ideaCount }));
   if (entry.analysis.hasThemes) parts.push(tx('{n} tema(s) detectado(s).', { n: entry.analysis.themeCount }));
@@ -296,6 +299,10 @@ function localizedReadingReason(entry: ReadingPathEntry): string {
     parts.push(t('Conviene completar análisis antes de decidir su papel en el mapa.'));
   }
   return parts.join(' ');
+}
+
+function localizedReadingPathText(key: string | undefined, legacy: string): string {
+  return localizeReadingPathText(key, undefined, getActiveLang()) ?? t(legacy);
 }
 
 function Metric({ label, value }: { label: string; value: number }) {

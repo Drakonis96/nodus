@@ -165,3 +165,16 @@ Restituisci SOLTANTO JSON nel formato {"segments":[{"i":0,"text":"..."}]} con un
 export function testimonyAiPromptPack(language: PromptLanguage): TestimonyAiPromptPack {
   return TESTIMONY_AI_PROMPTS[language];
 }
+
+export function testimonyAiScaffold(language: PromptLanguage): { unknownSpeaker: string; noModel: string } {
+  return ({
+    es: { unknownSpeaker: 'Hablante', noModel: 'sin modelo' },
+    en: { unknownSpeaker: 'Speaker', noModel: 'no model' },
+    fr: { unknownSpeaker: 'Intervenant', noModel: 'aucun modèle' },
+    de: { unknownSpeaker: 'Sprechende Person', noModel: 'kein Modell' },
+    pt: { unknownSpeaker: 'Falante', noModel: 'sem modelo' },
+    'pt-BR': { unknownSpeaker: 'Falante', noModel: 'sem modelo' },
+    it: { unknownSpeaker: 'Interlocutore', noModel: 'nessun modello' },
+    tr: { unknownSpeaker: 'Konuşmacı', noModel: 'model yok' },
+  } as Record<PromptLanguage, { unknownSpeaker: string; noModel: string }>)[language];
+}

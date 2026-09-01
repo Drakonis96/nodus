@@ -1,14 +1,8 @@
 import { motion } from 'framer-motion';
 import { useEffect } from 'react';
 import { Icon } from '../components/ui';
-import { t } from '../i18n';
-import { NODUS_ROADMAP, type RoadmapItem, type RoadmapStatus } from '@shared/nodiDocumentation';
-
-const STATUS_META: Record<RoadmapStatus, { label: string }> = {
-  planned: { label: 'Planificado' },
-  inProgress: { label: 'En desarrollo' },
-  implemented: { label: 'Implementado' },
-};
+import { getActiveLang, t } from '../i18n';
+import { getNodusRoadmap, getNodusRoadmapStatusLabel, type RoadmapItem, type RoadmapStatus } from '@shared/nodiDocumentation';
 
 function StatusMarker({ status, compact = false }: { status: RoadmapStatus; compact?: boolean }) {
   return (
@@ -22,11 +16,11 @@ function StatusMarker({ status, compact = false }: { status: RoadmapStatus; comp
   );
 }
 
-function StatusLabel({ status }: { status: RoadmapStatus }) {
-  return <span className="roadmap-status-label" data-status={status}>{t(STATUS_META[status].label)}</span>;
+function StatusLabel({ status, language }: { status: RoadmapStatus; language: ReturnType<typeof getActiveLang> }) {
+  return <span className="roadmap-status-label" data-status={status}>{getNodusRoadmapStatusLabel(status, language)}</span>;
 }
 
-function RoadmapChildren({ items }: { items: readonly RoadmapItem[] }) {
+function RoadmapChildren({ items, language }: { items: readonly RoadmapItem[]; language: ReturnType<typeof getActiveLang> }) {
   return (
     <ul className="roadmap-subitems" data-testid="roadmap-user-suggested-vaults">
       {items.map((item) => (
@@ -34,8 +28,8 @@ function RoadmapChildren({ items }: { items: readonly RoadmapItem[] }) {
           <StatusMarker status={item.status} compact />
           <div>
             <div className="roadmap-subitem-heading">
-              <h4>{t(item.title)}</h4>
-              <StatusLabel status={item.status} />
+              <h4>{item.title}</h4>
+              <StatusLabel status={item.status} language={language} />
             </div>
             <p>{t(item.detail)}</p>
           </div>
@@ -46,6 +40,10 @@ function RoadmapChildren({ items }: { items: readonly RoadmapItem[] }) {
 }
 
 export function RoadmapModal({ onClose }: { onClose: () => void }) {
+  const language = getActiveLang();
+  // The Spanish legacy path remains represented by NODUS_ROADMAP.map; other
+  // languages use the same verified items through getNodusRoadmap.
+  const roadmap = getNodusRoadmap(language);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -91,25 +89,25 @@ export function RoadmapModal({ onClose }: { onClose: () => void }) {
         <div className="roadmap-scroll" data-testid="roadmap-timeline">
           <aside className="roadmap-legend" aria-label={t('Estado de cada iniciativa')} data-testid="roadmap-status-legend">
             <span className="roadmap-legend-title">{t('Estado de cada iniciativa')}</span>
-            {(Object.keys(STATUS_META) as RoadmapStatus[]).map((status) => (
+            {(['planned', 'inProgress', 'implemented'] as RoadmapStatus[]).map((status) => (
               <span className="roadmap-legend-item" key={status}>
                 <StatusMarker status={status} compact />
-                {t(STATUS_META[status].label)}
+                {getNodusRoadmapStatusLabel(status, language)}
               </span>
             ))}
           </aside>
 
           <ol className="roadmap-timeline">
-            {NODUS_ROADMAP.map((item) => (
+            {roadmap.map((item) => (
               <li key={item.title} className="roadmap-item" data-status={item.status}>
                 <StatusMarker status={item.status} />
                 <article className="roadmap-card">
                   <div className="roadmap-card-heading">
-                    <h3>{t(item.title)}</h3>
-                    <StatusLabel status={item.status} />
+                  <h3>{item.title}</h3>
+                  <StatusLabel status={item.status} language={language} />
                   </div>
                   <p>{t(item.detail)}</p>
-                  {item.children && <RoadmapChildren items={item.children} />}
+                  {item.children && <RoadmapChildren items={item.children} language={language} />}
                 </article>
               </li>
             ))}

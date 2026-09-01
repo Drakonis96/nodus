@@ -35,6 +35,8 @@ import {
   stripDisallowedCitations,
 } from './citationSanitize';
 import { repairLooseCitations } from './deepResearchCore';
+import { getSettings } from '../db/settingsRepo';
+import { writingWorkshopPromptPack, type WritingWorkshopFallbackCopy } from '@shared/writingWorkshopPromptPacks';
 
 const MAX_IDEAS = 120;
 const MAX_THEMES = 30;
@@ -246,56 +248,18 @@ export function buildHistoricalWritingWorkshopSnapshot(
 
 export async function generateWritingWorkshopDraft(request: WritingWorkshopDraftRequest): Promise<WritingWorkshopDraft> {
   citationLabelCache.clear();
+  const promptLanguage = getSettings().promptLanguage ?? 'es';
+  const prompt = writingWorkshopPromptPack(promptLanguage);
   const snapshot = await buildWritingWorkshopSnapshot(request.brief);
   const selection = normalizeSelection(request.selection, snapshot.recommendedSelection);
-  const context = await buildSelectedContext(request.brief, selection);
+  const context = await buildSelectedContext(request.brief, selection, prompt.contextRule);
   const user = JSON.stringify(context.payload, null, 2);
-
-  const system = [
-    'Eres el Taller de escritura de Nodus. Ayudas a convertir un grafo academico local en un borrador verificable.',
-    'Debes escribir en el idioma especificado en el campo brief.lengua (es: espanol, en: ingles, fr: frances, tr: turco).',
-    'Usa SOLO los materiales recibidos. No inventes obras, autores, citas, paginas ni relaciones.',
-    'Los campos resumen_orientacion son solo para ubicar una obra: NUNCA son evidencia ni una fuente citable. Para afirmaciones sustantivas usa ideas, evidencias, huecos o contradicciones anclados.',
-    'Cada afirmacion sustantiva del borrador debe ir ligada a una fuente mediante enlaces Markdown nodus://.',
-    'Una cita SIEMPRE tiene la forma [etiqueta](nodus://tipo/id). Nunca escribas [nodus://tipo/id] ni una URL nodus:// suelta.',
-    'El objetivo NO es una respuesta breve: entrega un borrador desarrollado, pegable en un capitulo o articulo.',
-    'Integra de forma explicita todas las ideas seleccionadas que puedas sostener con el contexto. Si hay muchas, agrupalas en lineas argumentales, pero no las reduzcas a una lista.',
-    'Relaciona las ideas entre si: muestra continuidad, diferencias, niveles de abstraccion, consecuencias metodologicas, contradicciones y huecos.',
-    'Escribe en Markdown real: usa ## para secciones, ### para subsecciones, parrafos completos y listas solo para sintesis, pasos o matriz.',
-    'Cada seccion sustantiva debe tener 2-4 parrafos desarrollados. Evita parrafos de una sola frase.',
-    'Longitud orientativa del draftMarkdown: 700-1000 palabras si hay pocas ideas, 1200-1800 si hay 8-20 ideas, y 1800-3000 si hay mas de 20 ideas y el contexto lo permite.',
-    'La matriz debe cubrir las ideas y tensiones principales; si una idea seleccionada no entra en el borrador, incluyela en matrix o limitations explicando por que.',
-    'Formatos de cita permitidos:',
-    '- Ideas: [Apellido, I. (año)](nodus://idea/<global_id>)',
-    '- Obras: [Apellido, I. (año)](nodus://work/<nodus_id>)',
-    '- Huecos: [hueco](nodus://gap/<gap_id>)',
-    '- Contradicciones: [contradiccion](nodus://contradiction/<edge_id>)',
-    '- Pasajes de texto completo: [Apellido, año, p. N](nodus://passage/<passage_id>)',
-    'Los `pasajes_evidencia` son texto literal: úsalos para sostener afirmaciones verificables y cítalos con su campo `cita` exacto. No inventes páginas ni extiendas su sentido.',
-    'Si no hay evidencia suficiente para una seccion, dilo como limitacion o siguiente paso; no rellenes.',
-    '',
-    'Devuelve EXCLUSIVAMENTE JSON valido con esta forma:',
-    '{',
-    '  "title": "titulo academico breve",',
-    '  "abstract": "5-8 lineas que resumen la tesis del apartado",',
-    '  "outline": [',
-    '    {"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sources":["[Apellido, I. (año)](nodus://idea/g-0001)"]}',
-    '  ],',
-    '  "draftMarkdown": "borrador en Markdown con H2/H3, parrafos y citas nodus://",',
-    '  "matrix": [',
-    '    {"claim":"...","role":"support|contrast|gap|method|definition|context","sourceLabel":"Apellido, I. (año)","citation":"nodus://idea/g-0001","evidence":"cita o resumen anclado","notes":"uso en el argumento"}',
-    '  ],',
-    '  "bibliography": ["Apellido, I. (año). Titulo."],',
-    '  "nextSteps": ["..."],',
-    '  "limitations": ["..."]',
-    '}',
-  ].join('\n');
 
   let ai: AiWorkshopResult;
   try {
     ai = await completeJson<AiWorkshopResult>(
       {
-        system,
+        system: prompt.system,
         user,
         temperature: 0.18,
         maxTokens: 16000,
@@ -304,10 +268,10 @@ export async function generateWritingWorkshopDraft(request: WritingWorkshopDraft
       request.model
     );
   } catch {
-    return structuralFallback(request.brief, selection, context);
+    return structuralFallback(request.brief, selection, context, prompt.fallback);
   }
 
-  return sanitizeDraft(ai, request.brief, selection, context);
+  return sanitizeDraft(ai, request.brief, selection, context, prompt.fallback);
 }
 
 function countTable(table: string): number {
@@ -1125,7 +1089,7 @@ function normalizeSelection(selection: WritingWorkshopSelection, fallback: Writi
   };
 }
 
-async function buildSelectedContext(brief: WritingWorkshopBrief, selection: WritingWorkshopSelection): Promise<WorkshopContext> {
+async function buildSelectedContext(brief: WritingWorkshopBrief, selection: WritingWorkshopSelection, contextRule = writingWorkshopPromptPack('es').contextRule): Promise<WorkshopContext> {
   const passages = await selectedPassagesForDraft(brief.objective, selection);
   const context = {
     brief: {
@@ -1142,7 +1106,7 @@ async function buildSelectedContext(brief: WritingWorkshopBrief, selection: Writ
     obras: selectedWorks(selection.workIds),
     pasajes_evidencia: passages,
     rutas_tutor: selectedRoutes(selection.tutorRouteIds),
-    regla: 'Cada id incluido aqui puede citarse con nodus://idea, nodus://work, nodus://gap, nodus://contradiction o nodus://passage. Los pasajes son evidencia literal y deben citarse de manera exacta.',
+    regla: contextRule,
   };
   const raw = JSON.stringify(context);
   const truncated = raw.length > MAX_CONTEXT_CHARS;
@@ -1501,24 +1465,25 @@ function sanitizeDraft(
   ai: AiWorkshopResult,
   brief: WritingWorkshopBrief,
   selection: WritingWorkshopSelection,
-  context: WorkshopContext
+  context: WorkshopContext,
+  copy: WritingWorkshopFallbackCopy,
 ): WritingWorkshopDraft {
   const citationPolicy = workshopCitationPolicy(context);
-  const substantial = ensureSubstantialMarkdown(cleanString(ai.draftMarkdown, ''), brief, context);
-  const primary = sanitizeWorkshopCitationText(substantial, citationPolicy);
+  const substantial = ensureSubstantialMarkdown(cleanString(ai.draftMarkdown, ''), brief, context, copy);
+  const primary = sanitizeWorkshopCitationText(substantial, citationPolicy, copy);
   // An invented or ambiguous target means the sentence that contains it is not
   // demonstrably grounded. The deterministic fallback is preferable to keeping
   // polished prose whose evidence boundary the provider crossed.
   if (primary.unsupported > 0 || (citationPolicy.keys.size > 0 && primary.refs === 0)) {
-    return structuralFallback(brief, selection, context);
+    return structuralFallback(brief, selection, context, copy);
   }
   const draftMarkdown = primary.text;
-  const outline = sanitizeOutline(ai.outline).map((section) => ({
+  const outline = sanitizeOutline(ai.outline, copy).map((section) => ({
     ...section,
-    purpose: sanitizeWorkshopCitationText(section.purpose, citationPolicy).text,
-    keyClaims: section.keyClaims.map((claim) => sanitizeWorkshopCitationText(claim, citationPolicy).text),
+    purpose: sanitizeWorkshopCitationText(section.purpose, citationPolicy, copy).text,
+    keyClaims: section.keyClaims.map((claim) => sanitizeWorkshopCitationText(claim, citationPolicy, copy).text),
     sources: section.sources
-      .map((source) => sanitizeWorkshopCitationText(source, citationPolicy).text)
+      .map((source) => sanitizeWorkshopCitationText(source, citationPolicy, copy).text)
       .filter(Boolean),
   }));
   const matrix = sanitizeMatrix(ai.matrix)
@@ -1527,11 +1492,11 @@ function sanitizeDraft(
       if (!citation) return null;
       return {
         ...row,
-        claim: sanitizeWorkshopCitationText(row.claim, citationPolicy).text,
-        sourceLabel: citationLabelForUrl(citation) ?? row.sourceLabel,
+        claim: sanitizeWorkshopCitationText(row.claim, citationPolicy, copy).text,
+        sourceLabel: citationLabelForUrl(citation, copy) ?? row.sourceLabel,
         citation,
-        evidence: sanitizeWorkshopCitationText(row.evidence, citationPolicy).text,
-        notes: sanitizeWorkshopCitationText(row.notes, citationPolicy).text,
+        evidence: sanitizeWorkshopCitationText(row.evidence, citationPolicy, copy).text,
+        notes: sanitizeWorkshopCitationText(row.notes, citationPolicy, copy).text,
       };
     })
     .filter((row): row is WritingWorkshopMatrixRow => row !== null);
@@ -1539,14 +1504,14 @@ function sanitizeDraft(
     generatedAt: new Date().toISOString(),
     brief,
     selection,
-    title: cleanString(ai.title, 'Borrador de escritura'),
-    abstract: sanitizeWorkshopCitationText(cleanString(ai.abstract, ''), citationPolicy).text,
+    title: cleanString(ai.title, copy.titleFallback),
+    abstract: sanitizeWorkshopCitationText(cleanString(ai.abstract, ''), citationPolicy, copy).text,
     outline,
     draftMarkdown,
     matrix,
     bibliography: stringList(ai.bibliography),
-    nextSteps: stringList(ai.nextSteps).map((item) => sanitizeWorkshopCitationText(item, citationPolicy).text),
-    limitations: stringList(ai.limitations).map((item) => sanitizeWorkshopCitationText(item, citationPolicy).text),
+    nextSteps: stringList(ai.nextSteps).map((item) => sanitizeWorkshopCitationText(item, citationPolicy, copy).text),
+    limitations: stringList(ai.limitations).map((item) => sanitizeWorkshopCitationText(item, citationPolicy, copy).text),
     stats: context.stats,
   };
 }
@@ -1554,10 +1519,11 @@ function sanitizeDraft(
 function structuralFallback(
   brief: WritingWorkshopBrief,
   selection: WritingWorkshopSelection,
-  context: WorkshopContext
+  context: WorkshopContext,
+  copy: WritingWorkshopFallbackCopy,
 ): WritingWorkshopDraft {
   const payload = context.payload as any;
-  const title = `${kindLabel(brief.kind)}: ${brief.objective || 'borrador'}`;
+  const title = `${writingWorkshopPromptPack(getSettings().promptLanguage ?? 'es').kindLabels[brief.kind] ?? brief.kind}: ${brief.objective || 'borrador'}`;
   const ideas = (payload.ideas ?? []) as any[];
   const gaps = (payload.huecos ?? []) as any[];
   const contradictions = (payload.contradicciones ?? []) as any[];
@@ -1566,94 +1532,94 @@ function structuralFallback(
   const outline: WritingWorkshopSection[] = [
     {
       id: 's0',
-      title: 'Evidencia textual recuperada',
-      purpose: 'Anclar el argumento en fragmentos verificables del texto completo.',
+      title: copy.evidenceTitle,
+      purpose: copy.evidencePurpose,
       keyClaims: passages.slice(0, 3).map((passage) => passage.texto),
       sources: passages.slice(0, 3).map((passage) => citationMarkdown(passage.obra, passage.cita)),
     },
     {
       id: 's1',
-      title: 'Planteamiento',
-      purpose: 'Delimitar el problema y situar las líneas principales del corpus.',
+      title: copy.planningTitle,
+      purpose: copy.planningPurpose,
       keyClaims: ideas.slice(0, 3).map((i) => i.enunciado),
       sources: ideas.slice(0, 3).map((i) => citationMarkdown(i.obras?.[0], i.cita)),
     },
     {
       id: 's2',
-      title: 'Debate y matices',
-      purpose: 'Ordenar apoyos, contrastes y contradicciones relevantes.',
+      title: copy.debateTitle,
+      purpose: copy.debatePurpose,
       keyClaims: contradictions.slice(0, 3).map((c) => c.explicacion ?? `${c.desde} / ${c.hacia}`),
-      sources: contradictions.slice(0, 3).map((c) => `[contradicción](nodus://contradiction/${c.id})`),
+      sources: contradictions.slice(0, 3).map((c) => `[${copy.contradictionCitationLabel}](nodus://contradiction/${c.id})`),
     },
     {
       id: 's3',
-      title: 'Hueco y contribución',
-      purpose: 'Convertir huecos detectados en una contribución defendible.',
+      title: copy.gapTitle,
+      purpose: copy.gapPurpose,
       keyClaims: gaps.slice(0, 3).map((g) => g.enunciado),
-      sources: gaps.slice(0, 3).map((g) => `[hueco](nodus://gap/${g.id})`),
+      sources: gaps.slice(0, 3).map((g) => `[${copy.gapCitationLabel}](nodus://gap/${g.id})`),
     },
   ];
   const matrix: WritingWorkshopMatrixRow[] = [
     ...ideas.slice(0, 8).map((idea): WritingWorkshopMatrixRow => ({
       claim: idea.enunciado,
       role: 'support',
-      sourceLabel: sourceLabel(idea.obras?.[0]),
+      sourceLabel: sourceLabel(idea.obras?.[0], copy),
       citation: idea.cita,
-      evidence: idea.evidencia?.[0]?.cita_textual ?? 'Idea extraída del corpus.',
-      notes: 'Usar como apoyo central.',
+      evidence: idea.evidencia?.[0]?.cita_textual ?? copy.ideaEvidence,
+      notes: copy.centralSupport,
     })),
     ...gaps.slice(0, 5).map((gap): WritingWorkshopMatrixRow => ({
       claim: gap.enunciado,
       role: 'gap',
-      sourceLabel: sourceLabel(gap.obra),
+      sourceLabel: sourceLabel(gap.obra, copy),
       citation: gap.cita,
-      evidence: 'Hueco minado de la obra indicada.',
-      notes: 'Usar para justificar la contribución.',
+      evidence: copy.gapEvidence,
+      notes: copy.contributionSupport,
     })),
     ...passages.slice(0, 10).map((passage): WritingWorkshopMatrixRow => ({
       claim: clip(passage.texto, 220),
       role: 'support',
-      sourceLabel: sourceLabel(passage.obra),
+      sourceLabel: sourceLabel(passage.obra, copy),
       citation: passage.cita,
       evidence: passage.texto,
-      notes: passage.localizacion ? `Evidencia literal (${passage.localizacion}).` : 'Evidencia literal del texto completo.',
+      notes: passage.localizacion ? copy.literalEvidenceWithLocation(passage.localizacion) : copy.literalEvidence,
     })),
   ];
   const draftMarkdown = [
     `## ${title}`,
     '',
-    '## Planteamiento',
-    ideas.length ? narrativeParagraph(ideas.slice(0, 5), 'El punto de partida del corpus es que') : 'No hay ideas seleccionadas suficientes para desarrollar este apartado.',
+    `## ${copy.planningHeading}`,
+    ideas.length ? narrativeParagraph(ideas.slice(0, 5), copy.lineFirst, copy) : copy.noIdeas,
     '',
-    '## Evidencia textual recuperada',
+    `## ${copy.evidenceHeading}`,
     passages.length
       ? passages
           .slice(0, 5)
-          .map((passage) => `El corpus contiene esta evidencia literal: “${passage.texto}” ${citationMarkdown(passage.obra, passage.cita)}.`)
+          .map((passage) => copy.evidenceSentence(passage.texto, citationMarkdown(passage.obra, passage.cita)))
           .join('\n\n')
-      : 'No hay pasajes indexados disponibles para anclar este borrador en texto completo.',
+      : copy.noPassages,
     '',
-    '## Lineas de desarrollo',
-    ...ideaDevelopmentSections(ideas.slice(5)),
+    `## ${copy.linesHeading}`,
+    ...ideaDevelopmentSections(ideas.slice(5), copy),
     '',
-    '## Debate, matices y tensiones',
+    `## ${copy.debateHeading}`,
     contradictions.length
       ? contradictions
           .slice(0, 4)
           .map(
             (c) =>
-              `La relacion entre ${c.desde} y ${c.hacia} introduce un matiz critico: ${c.explicacion ?? `${c.desde} / ${c.hacia}`} [contradiccion](${c.cita}).`
+              copy.relationSentence(c.desde, c.hacia, c.explicacion ?? `${c.desde} / ${c.hacia}`, c.cita)
           )
           .join('\n\n')
-      : 'No hay contradicciones seleccionadas.',
+      : copy.noContradictions,
     '',
-    '## Hueco y contribución',
+    `## ${copy.gapHeading}`,
     gaps.length
       ? gaps
           .slice(0, 5)
-          .map((g) => `Este recorrido deja visible un hueco de investigacion: ${g.enunciado} [hueco](${g.cita}).`)
+          .map((g) => copy.gapSentence(g.enunciado, g.cita))
           .join('\n\n')
-      : 'No hay huecos seleccionados.',
+      : copy.noGaps,
   ].join('\n');
 
   return {
@@ -1661,22 +1627,22 @@ function structuralFallback(
     brief,
     selection,
     title,
-    abstract: 'Borrador estructural generado a partir de materiales reales del grafo.',
+    abstract: copy.abstract,
     outline,
     draftMarkdown,
     matrix,
-    bibliography: works.map((w) => `${sourceLabel(w)}. ${w.titulo}.`),
-    nextSteps: ['Revisar cada cita y pedir una versión desarrollada con el modelo si hace falta.'],
-    limitations: ['El modelo no devolvió un JSON válido; se generó una estructura local con los materiales seleccionados.'],
+    bibliography: works.map((w) => `${sourceLabel(w, copy)}. ${w.titulo}.`),
+    nextSteps: [copy.nextStep],
+    limitations: [copy.limitation],
     stats: context.stats,
   };
 }
 
-function sanitizeOutline(items: AiWorkshopResult['outline']): WritingWorkshopSection[] {
+function sanitizeOutline(items: AiWorkshopResult['outline'], copy: WritingWorkshopFallbackCopy): WritingWorkshopSection[] {
   if (!Array.isArray(items)) return [];
   return items.slice(0, 12).map((item, index) => ({
     id: cleanString(item.id, `s${index + 1}`),
-    title: cleanString(item.title, `Sección ${index + 1}`),
+    title: cleanString(item.title, `${copy.lineHeading(index + 1)}`),
     purpose: cleanString(item.purpose, ''),
     keyClaims: stringList(item.keyClaims).slice(0, 12),
     sources: stringList(item.sources).slice(0, 12),
@@ -1704,7 +1670,8 @@ function sanitizeMatrix(items: AiWorkshopResult['matrix']): WritingWorkshopMatri
 function ensureSubstantialMarkdown(
   draftMarkdown: string,
   brief: WritingWorkshopBrief,
-  context: WorkshopContext
+  context: WorkshopContext,
+  copy: WritingWorkshopFallbackCopy,
 ): string {
   const clean = draftMarkdown.trim();
   const payload = context.payload as any;
@@ -1716,27 +1683,28 @@ function ensureSubstantialMarkdown(
 
   const supplement = [
     '',
-    '## Desarrollo ampliado de las ideas seleccionadas',
-    `El objetivo de este ${kindLabel(brief.kind)} exige que las ideas no queden como notas sueltas, sino como una secuencia argumental. ${narrativeParagraph(
+    `## ${copy.expandedIdeasHeading}`,
+    copy.objectiveIntroduction(writingWorkshopPromptPack(getSettings().promptLanguage ?? 'es').kindLabels[brief.kind] ?? brief.kind, narrativeParagraph(
       ideas.slice(0, 5),
-      'En primer lugar, el corpus permite sostener que'
-    )}`,
+      copy.lineFirst,
+      copy,
+    )),
     '',
-    ...ideaDevelopmentSections(ideas.slice(5)),
-    gaps.length ? '## Huecos que orientan la contribución' : '',
+    ...ideaDevelopmentSections(ideas.slice(5), copy),
+    gaps.length ? `## ${copy.contributionGapsHeading}` : '',
     gaps.length
       ? gaps
           .slice(0, 6)
-          .map((gap) => `Este desarrollo abre una pregunta especifica: ${gap.enunciado} [hueco](${gap.cita}).`)
+          .map((gap) => copy.specificQuestion(gap.enunciado, gap.cita))
           .join('\n\n')
       : '',
-    contradictions.length ? '## Tensiones interpretativas' : '',
+    contradictions.length ? `## ${copy.interpretiveTensionsHeading}` : '',
     contradictions.length
       ? contradictions
           .slice(0, 5)
           .map(
             (item) =>
-              `La relacion entre ${item.desde ?? 'una idea'} y ${item.hacia ?? 'otra idea'} obliga a matizar el argumento: ${item.explicacion ?? 'hay una tension registrada en el grafo'} [contradiccion](${item.cita}).`
+              copy.relationSentence(item.desde ?? 'una idea', item.hacia ?? 'otra idea', item.explicacion ?? 'hay una tension registrada en el grafo', item.cita)
           )
           .join('\n\n')
       : '',
@@ -1745,29 +1713,29 @@ function ensureSubstantialMarkdown(
   return [clean, ...supplement].join('\n');
 }
 
-function ideaDevelopmentSections(ideas: any[]): string[] {
+function ideaDevelopmentSections(ideas: any[], copy: WritingWorkshopFallbackCopy): string[] {
   const sections: string[] = [];
   let sectionNumber = 1;
   for (let i = 0; i < ideas.length; i += 5) {
     const chunk = ideas.slice(i, i + 5);
     if (chunk.length === 0) continue;
     const isFirst = sectionNumber === 1;
-    sections.push(`### Linea ${sectionNumber}`);
-    sections.push(narrativeParagraph(chunk, isFirst ? 'A partir de esa base, otra linea del corpus muestra que' : 'La linea se completa cuando'));
+    sections.push(`### ${copy.lineHeading(sectionNumber)}`);
+    sections.push(narrativeParagraph(chunk, isFirst ? copy.lineFirst : copy.lineContinue, copy));
     sections.push('');
     sectionNumber += 1;
   }
   return sections;
 }
 
-function narrativeParagraph(ideas: any[], opener: string): string {
+function narrativeParagraph(ideas: any[], opener: string, copy: WritingWorkshopFallbackCopy = writingWorkshopPromptPack('es').fallback): string {
   const clauses = ideas
     .filter((idea) => idea?.enunciado)
     .map((idea) => `${idea.enunciado} ${citationMarkdown(idea.obras?.[0], idea.cita)}`);
-  if (clauses.length === 0) return 'No hay ideas suficientes para desarrollar esta linea.';
+  if (clauses.length === 0) return copy.noIdeasLine;
   if (clauses.length === 1) return `${opener} ${clauses[0]}.`;
   const [first, ...rest] = clauses;
-  return `${opener} ${first}. Esto se conecta con ${rest.join('; y, a la vez, con ')}. En conjunto, estas ideas no deben leerse como evidencias aisladas, sino como piezas de una misma arquitectura argumental que permite pasar de la revision del corpus a una posicion propia.`;
+  return `${opener} ${first}. ${copy.narrativeConnection} ${rest.join('; ' + copy.narrativeConnection.toLowerCase() + ' ')}. ${copy.narrativeConclusion}`;
 }
 
 function placeholders(values: string[]): string {
@@ -1852,12 +1820,13 @@ function workshopCitationPolicy(context: WorkshopContext): WorkshopCitationPolic
 function sanitizeWorkshopCitationText(
   text: string,
   policy: WorkshopCitationPolicy,
+  copy: WritingWorkshopFallbackCopy = writingWorkshopPromptPack('es').fallback,
 ): { text: string; refs: number; unsupported: number } {
   const repaired = alignCitationKindsToAllowed(repairLooseCitations(text ?? ''), policy.refs);
   const canonical = canonicalizeCitationLinks(repaired);
   const refs = extractCitationRefs(canonical);
   const unsupported = refs.filter((ref) => !policy.keys.has(`${ref.kind}:${ref.id}`)).length;
-  const sanitized = normalizeCitationLabels(stripDisallowedCitations(canonical, policy.keys));
+  const sanitized = normalizeCitationLabels(stripDisallowedCitations(canonical, policy.keys), copy);
   return { text: sanitized, refs: extractCitationRefs(sanitized).length, unsupported };
 }
 
@@ -1868,17 +1837,17 @@ function canonicalWorkshopCitation(citation: string, policy: WorkshopCitationPol
   return ref ? citationUrl(ref) : null;
 }
 
-function sourceLabel(work: CitationWork | undefined): string {
-  if (!work) return 'Fuente del corpus';
+function sourceLabel(work: CitationWork | undefined, copy: WritingWorkshopFallbackCopy = writingWorkshopPromptPack('es').fallback): string {
+  if (!work) return copy.sourceFallback;
   const authors = 'autores' in work ? work.autores : work.authors;
   const year = 'ano' in work ? work.ano : work.year;
-  return authorYearLabel(authors?.[0], year);
+  return authorYearLabel(authors?.[0], year, copy);
 }
 
 /** Convert Nodus's stored `Apellido, I.` name into a readable inline citation. */
-function authorYearLabel(author: string | undefined, year: number | null | undefined): string {
+function authorYearLabel(author: string | undefined, year: number | null | undefined, copy: WritingWorkshopFallbackCopy = writingWorkshopPromptPack('es').fallback): string {
   const raw = author?.replace(/\s+/g, ' ').trim();
-  if (!raw) return year ? `Autor (${year})` : 'Autor';
+  if (!raw) return copy.authorFallback(year ?? null);
 
   const comma = raw.indexOf(',');
   const surname = (comma >= 0 ? raw.slice(0, comma) : raw.split(' ').slice(-1).join(' ')).trim() || raw;
@@ -1889,7 +1858,7 @@ function authorYearLabel(author: string | undefined, year: number | null | undef
 }
 
 /** Resolve a Nodus citation to its canonical source label. */
-function citationLabelForUrl(citation: string): string | null {
+function citationLabelForUrl(citation: string, copy: WritingWorkshopFallbackCopy = writingWorkshopPromptPack('es').fallback): string | null {
   const cached = citationLabelCache.get(citation);
   if (cached !== undefined) return cached;
 
@@ -1903,7 +1872,7 @@ function citationLabelForUrl(citation: string): string | null {
   }
 
   if (match[1] === 'gap' || match[1] === 'contradiction') {
-    const label = match[1] === 'gap' ? 'hueco' : 'contradicción';
+    const label = match[1] === 'gap' ? copy.gapCitationLabel : copy.contradictionCitationLabel;
     citationLabelCache.set(citation, label);
     return label;
   }
@@ -1919,7 +1888,7 @@ function citationLabelForUrl(citation: string): string | null {
       )
       .get(id) as { authors_json: string; year: number | null; page_label: string | null } | undefined;
     const label = passage
-      ? `${sourceLabel({ authors: parseAuthors(passage.authors_json), year: passage.year })}${passage.page_label ? `, ${passage.page_label}` : ''}`
+      ? `${sourceLabel({ authors: parseAuthors(passage.authors_json), year: passage.year }, copy)}${passage.page_label ? `, ${passage.page_label}` : ''}`
       : null;
     citationLabelCache.set(citation, label);
     return label;
@@ -1940,15 +1909,15 @@ function citationLabelForUrl(citation: string): string | null {
       )
       .get(id) as typeof row;
   }
-  const label = row ? sourceLabel({ authors: parseAuthors(row.authors_json), year: row.year }) : null;
+  const label = row ? sourceLabel({ authors: parseAuthors(row.authors_json), year: row.year }, copy) : null;
   citationLabelCache.set(citation, label);
   return label;
 }
 
 /** Never display a model-invented or abbreviated label when its nodus target is known. */
-function normalizeCitationLabels(markdown: string): string {
+function normalizeCitationLabels(markdown: string, copy: WritingWorkshopFallbackCopy = writingWorkshopPromptPack('es').fallback): string {
   return markdown.replace(/\[([^\]]*)\]\((nodus:\/\/(?:idea|work|passage|gap|contradiction)\/[^)]+)\)/g, (full, _label: string, citation: string) => {
-    const label = citationLabelForUrl(citation);
+    const label = citationLabelForUrl(citation, copy);
     return label ? `[${label}](${citation})` : full;
   });
 }

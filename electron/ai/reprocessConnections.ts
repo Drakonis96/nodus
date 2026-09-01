@@ -6,6 +6,7 @@ import type {
   ReprocessConnectionsOptions,
   ReprocessConnectionsResult,
 } from '@shared/types';
+import { reprocessConnectionsPromptPack } from '@shared/reprocessConnectionsPromptPacks';
 import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import {
@@ -94,46 +95,6 @@ function isRelationExtractionResult(v: unknown): v is RelationExtractionResult {
   return typeof v === 'object' && v !== null && Array.isArray((v as RelationExtractionResult).relations);
 }
 
-const THEME_SYSTEM = `Eres el motor de reorganización temática de Nodus. Recibes IDEAS ya extraídas
-(afirmaciones, hallazgos, constructos, métodos, marcos) y una lista de TEMAS
-principales disponibles. Tu tarea, EXCLUSIVAMENTE en JSON válido, es agrupar cada
-idea bajo los temas que mejor la representan.
-
-REGLAS:
-- Asigna 0 a 2 temas por idea. Elige los más representativos; no fuerces encajes.
-- Cuando un tema de "available_themes" encaje, copia su etiqueta EXACTA (literal).
-- No traduzcas etiquetas. No añadas explicaciones ni texto fuera del JSON.
-
-SALIDA: { "assignments": [ { "id": "<id de la idea>", "themes": ["tema", ...] } ] }`;
-
-const THEME_LOCKED_RULE =
-  '\n- TEMAS BLOQUEADOS: usa SOLO etiquetas de "available_themes". No inventes temas nuevos. Si una idea no encaja en ninguno, devuelve "themes": [].';
-const THEME_OPEN_RULE =
-  '\n- Si varias ideas comparten un tema amplio que NO está en la lista, puedes proponer una etiqueta nueva (corta, en minúsculas, reutilizable). Sé MUY conservador: prioriza reutilizar los temas existentes.';
-
-const RELATION_SYSTEM = `Eres el motor de relaciones de Nodus. Recibes PARES de ideas ya
-extraídas que el sistema propuso por similitud semántica de embeddings. Tu tarea
-es validar, EXCLUSIVAMENTE en JSON válido, si existe una relación conceptual
-real entre cada par.
-
-TIPOS válidos: extends, contradicts, applies_to, shares_method, precondition_of,
-measures_same, supports, refutes, variant_of, refines.
-
-═══ REGLAS ═══
-- Evalúa cada par independientemente. La similitud alta NO basta por sí sola.
-- Propón una relación solo si los enunciados la sustentan con claridad razonable.
-- La confianza refleja cuán evidente es la relación a partir de los enunciados:
-  0.7–1.0 si la relación es clara y directa, 0.4–0.7 si es plausible pero
-  requiere inferencia, < 0.4 solo si hay indicios débiles.
-- No relaciones una idea consigo misma.
-- No inventes relaciones que los enunciados no sustenten.
-- Usa los ids tal cual aparecen en la entrada.
-- Puedes invertir from/to si el tipo de relación es direccional.
-- "rationale": una frase breve en español que explique la validación.
-
-SALIDA: { "relations": [ { "from": "<id>", "to": "<id>", "type": "<tipo>", "confidence": 0.0-1.0, "rationale": "..." } ] }
-Si ningún par tiene relación válida: { "relations": [] }`;
-
 function clip(text: string): string {
   const clean = (text ?? '').replace(/\s+/g, ' ').trim();
   return clean.length > STATEMENT_CLIP ? `${clean.slice(0, STATEMENT_CLIP)}…` : clean;
@@ -158,6 +119,7 @@ export async function reprocessConnections(
 ): Promise<ReprocessConnectionsResult> {
   const db = getDb();
   const settings = getSettings();
+  const prompt = reprocessConnectionsPromptPack(settings.promptLanguage ?? 'es');
   const locked = settings.themesLocked;
   const themeModel = model ?? settings.extractionModel ?? settings.synthesisModel ?? null;
   const relationModel = model ?? settings.fusionModel ?? settings.synthesisModel ?? null;
@@ -209,7 +171,7 @@ export async function reprocessConnections(
 
   const existingLabels = listThemeLabels();
   const existingNorm = new Map(existingLabels.map((label) => [normalizeThemeLabel(label), label]));
-  const system = `${THEME_SYSTEM}${locked ? THEME_LOCKED_RULE : THEME_OPEN_RULE}`;
+  const system = `${prompt.themeSystem}${locked ? prompt.themeLockedRule : prompt.themeOpenRule}`;
 
   // Content hash for checkpoint scoping — changes when the idea set changes.
   const contentHash = crypto
@@ -247,7 +209,7 @@ export async function reprocessConnections(
     }
     onProgress?.({
       phase: 'themes',
-      label: 'Agrupando ideas en temas',
+      label: prompt.groupingProgress,
       current: bi + 1,
       total: themeBatches.length,
     });
@@ -342,7 +304,7 @@ export async function reprocessConnections(
         themesByIdea.set(row.global_id, labels);
       }
     }
-    relationsAdded = await reprocessRelations(activeIdeas, ideas, themesByIdea, relationModel, contentHash, onProgress, Boolean(scopedIdeaIds));
+    relationsAdded = await reprocessRelations(activeIdeas, ideas, themesByIdea, relationModel, contentHash, onProgress, Boolean(scopedIdeaIds), prompt);
   }
 
   return {
@@ -366,7 +328,8 @@ async function reprocessRelations(
   model?: ModelRef | null,
   contentHash?: string,
   onProgress?: (p: ReprocessProgress) => void,
-  incremental = false
+  incremental = false,
+  prompt: ReturnType<typeof reprocessConnectionsPromptPack> = reprocessConnectionsPromptPack('es')
 ): Promise<number> {
   const db = getDb();
   const ideaById = new Map(allIdeas.map((idea) => [idea.global_id, idea]));
@@ -457,7 +420,7 @@ async function reprocessRelations(
     }
     onProgress?.({
       phase: 'relations',
-      label: 'Validando pares semánticos entre ideas',
+      label: prompt.relationsProgress,
       current: bi + 1,
       total: batches.length,
     });
@@ -483,7 +446,7 @@ async function reprocessRelations(
     // A rejected validation call propagates directly: completed checkpoints remain
     // resumable, and silently skipping a batch would publish an incomplete graph.
     const result = await completeJson<RelationExtractionResult>(
-      { system: RELATION_SYSTEM, user: JSON.stringify(input), temperature: 0.1, maxTokens: 4000 },
+      { system: prompt.relationSystem, user: JSON.stringify(input), temperature: 0.1, maxTokens: 4000 },
       isRelationExtractionResult,
       model
     );

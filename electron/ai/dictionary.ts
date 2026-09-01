@@ -13,6 +13,7 @@ import type {
 import type {
   IdeaType,
   ModelRef,
+  PromptLanguage,
   WritingWorkshopSnapshot,
 } from "@shared/types";
 import { completeJson, embed, embedMany } from "./aiClient";
@@ -31,6 +32,12 @@ import {
 } from "../db/passagesRepo";
 import { expandCollectionKeys } from "../db/collectionsRepo";
 import { getDb } from "../db/database";
+import { getSettings } from "../db/settingsRepo";
+import {
+  dictionaryPromptPack,
+  dictionaryRuntimeCopy,
+  dictionaryScaffoldPack,
+} from "@shared/academicPromptPacks";
 import {
   currentDictionaryChangeSequence,
   detectDictionaryDuplicates,
@@ -46,6 +53,18 @@ import {
   upsertDictionaryEvidence,
   type DictionaryEvidenceUpsert,
 } from "../db/dictionaryRepo";
+
+function dictionaryPromptLanguage(requested?: PromptLanguage): PromptLanguage {
+  if (requested) return requested;
+  try {
+    return getSettings().promptLanguage ?? 'es';
+  } catch {
+    // Headless migrations/tests can run without Electron's app paths. The
+    // persisted setting remains the normal source; Spanish is the safe API
+    // default when settings cannot be read at all.
+    return 'es';
+  }
+}
 
 type WorkRow = {
   nodus_id: string;
@@ -742,7 +761,11 @@ function orderedDictionaryEvidence(
   return balanceDictionarySources(evidence);
 }
 
-function evidencePrompt(evidence: DictionaryEvidenceItem[]): string {
+function evidencePrompt(
+  evidence: DictionaryEvidenceItem[],
+  language: PromptLanguage = "es",
+): string {
+  const copy = dictionaryRuntimeCopy(language);
   return JSON.stringify(
     orderedDictionaryEvidence(evidence).map((item) => ({
       type: item.kind,
@@ -757,7 +780,7 @@ function evidencePrompt(evidence: DictionaryEvidenceItem[]): string {
         year: work.year,
       })),
       tags: item.tags,
-      citation: `[fuente](nodus://${item.kind}/${encodeURIComponent(item.id)})`,
+      citation: `[${copy.evidenceCitationLabel}](nodus://${item.kind}/${encodeURIComponent(item.id)})`,
     })),
     null,
     2,
@@ -767,7 +790,9 @@ function evidencePrompt(evidence: DictionaryEvidenceItem[]): string {
 function dictionaryCoveragePrompt(
   evidence: DictionaryEvidenceItem[],
   detailLevel: DictionaryEntryDetail["entry"]["detailLevel"],
+  language: PromptLanguage = "es",
 ): string {
+  const copy = dictionaryRuntimeCopy(language);
   const authorLimit =
     detailLevel === "detailed" ? 10 : detailLevel === "concise" ? 3 : 6;
   const workLimit =
@@ -820,7 +845,11 @@ function dictionaryCoveragePrompt(
     .slice(0, authorLimit)
     .map(
       (author) =>
-        `- ${author.name} | obras: ${[...author.works].join("; ") || "sin obra identificada"} | evidencia: ${[...author.refs].join(", ")}`,
+        copy.coverageAuthorRow(
+          author.name,
+          [...author.works].join("; "),
+          [...author.refs].join(", "),
+        ),
     );
   const workRows = [...works.values()]
     .sort(
@@ -830,24 +859,31 @@ function dictionaryCoveragePrompt(
     .slice(0, workLimit)
     .map(
       (work) =>
-        `- ${work.title} | autoría: ${[...work.authors].join(", ") || "sin autoría identificada"} | evidencia: ${[...work.refs].join(", ")}`,
+        copy.coverageWorkRow(
+          work.title,
+          [...work.authors].join(", "),
+          [...work.refs].join(", "),
+        ),
     );
   return [
-    "ÍNDICE DE COBERTURA (metadatos para recorrer EVIDENCE; no añade afirmaciones):",
-    "AUTORES CON EVIDENCIA DIRECTA:",
-    ...(authorRows.length ? authorRows : ["- Ninguno identificado"]),
-    "OBRAS CON EVIDENCIA DIRECTA:",
-    ...(workRows.length ? workRows : ["- Ninguna identificada"]),
+    copy.coverageHeader,
+    copy.coverageAuthors,
+    ...(authorRows.length ? authorRows : [`- ${copy.coverageNoAuthors}`]),
+    copy.coverageWorks,
+    ...(workRows.length ? workRows : [`- ${copy.coverageNoWorks}`]),
   ].join("\n");
 }
 
 export const __dictionaryCoveragePromptForTesting = dictionaryCoveragePrompt;
+export const __dictionaryEvidencePromptForTesting = evidencePrompt;
 
 function dictionarySourceCoverageProblems(
   evidence: DictionaryEvidenceItem[],
   usedEvidence: DictionaryEvidenceItem[],
   detailLevel: DictionaryEntryDetail["entry"]["detailLevel"],
+  language: PromptLanguage = "es",
 ): string[] {
+  const copy = dictionaryRuntimeCopy(language);
   const strongestScore = Math.max(...evidence.map((item) => item.score));
   // Diversity is a constraint among credible alternatives, never a reason to force
   // a tangential low-score tail into the definition. The generous relative window
@@ -881,11 +917,19 @@ function dictionarySourceCoverageProblems(
   const authorTarget = target(availableAuthors.size);
   if (citedWorks.size < workTarget)
     problems.push(
-      `la síntesis solo utilizó ${citedWorks.size} de ${availableWorks.size} obras disponibles; debe integrar al menos ${workTarget}`,
+      copy.coverageWorksProblem(
+        citedWorks.size,
+        availableWorks.size,
+        workTarget,
+      ),
     );
   if (citedAuthors.size < authorTarget)
     problems.push(
-      `la síntesis solo utilizó evidencia atribuida a ${citedAuthors.size} de ${availableAuthors.size} autores disponibles; debe integrar al menos ${authorTarget}`,
+      copy.coverageAuthorsProblem(
+        citedAuthors.size,
+        availableAuthors.size,
+        authorTarget,
+      ),
     );
   return problems;
 }
@@ -894,6 +938,7 @@ function structuredDictionaryCoverageProblems(
   generated: GeneratedDictionaryClaims,
   evidence: DictionaryEvidenceItem[],
   detailLevel: DictionaryEntryDetail["entry"]["detailLevel"],
+  language: PromptLanguage = "es",
 ): string[] {
   const byRef = new Map(evidence.map((item) => [evidenceRef(item), item]));
   const used = new Map<string, DictionaryEvidenceItem>();
@@ -908,22 +953,27 @@ function structuredDictionaryCoverageProblems(
     evidence,
     [...used.values()],
     detailLevel,
+    language,
   );
 }
 
 export const __structuredDictionaryCoverageProblemsForTesting =
   structuredDictionaryCoverageProblems;
 
-function dictionaryCitationLabel(item: DictionaryEvidenceItem): string {
+function dictionaryCitationLabel(
+  item: DictionaryEvidenceItem,
+  language: PromptLanguage = "es",
+): string {
+  const copy = dictionaryRuntimeCopy(language);
   if (item.kind === "idea" && item.works.length > 1)
-    return `Idea «${item.label}»`;
+    return `${copy.citationIdeaPrefix}${item.label}»`;
   const author = item.authors.find(
     (candidate) => candidate.attributionBasis !== "editor_only",
   )?.name ?? item.authors[0]?.name;
   const year = item.works.find((work) => work.year != null)?.year;
   if (author) return year ? `${author} (${year})` : author;
   const work = item.works[0]?.title || item.workTitle || item.label;
-  return year ? `${work} (${year})` : work || "fuente";
+  return year ? `${work} (${year})` : work || copy.citationSourceFallback;
 }
 
 function cleanAtomicClaim(value: string): string {
@@ -944,6 +994,7 @@ function cleanAtomicClaim(value: string): string {
 function renderStructuredDictionary(
   generated: GeneratedDictionaryClaims,
   evidence: DictionaryEvidenceItem[],
+  language: PromptLanguage = "es",
 ): { markdown: string; invalidEvidenceRefs: number } {
   const sources = new Map(
     evidence.map((item) => [`${item.kind}:${item.id}`, item]),
@@ -968,7 +1019,7 @@ function renderStructuredDictionary(
       const citations = [...refs.values()]
         .map(
           (item) =>
-            `[${dictionaryCitationLabel(item)}](nodus://${item.kind}/${encodeURIComponent(item.id)})`,
+            `[${dictionaryCitationLabel(item, language)}](nodus://${item.kind}/${encodeURIComponent(item.id)})`,
         )
         .join(", ");
       return [`${prose} ${citations}.`];
@@ -980,6 +1031,7 @@ function renderStructuredDictionary(
 
 export const __renderStructuredDictionaryForTesting =
   renderStructuredDictionary;
+export const __dictionaryCitationLabelForTesting = dictionaryCitationLabel;
 
 function citedEvidence(
   markdown: string,
@@ -1004,11 +1056,13 @@ function markdownDictionaryCoverageProblems(
   markdown: string,
   evidence: DictionaryEvidenceItem[],
   detailLevel: DictionaryEntryDetail["entry"]["detailLevel"],
+  language: PromptLanguage = "es",
 ): string[] {
   return dictionarySourceCoverageProblems(
     evidence,
     citedEvidence(markdown, evidence),
     detailLevel,
+    language,
   );
 }
 
@@ -1065,18 +1119,22 @@ function substantiveWordCount(markdown: string): number {
 function groundingProblems(
   markdown: string,
   maps: ReturnType<typeof buildSnapshotMaps>,
+  language: PromptLanguage = "es",
 ): string[] {
+  const copy = dictionaryRuntimeCopy(language);
   const survivingClaims = extractCitationClaims(markdown, maps);
   const uncited = uncitedSubstantiveSentences(markdown);
   const problems: string[] = [];
   if (substantiveWordCount(markdown) < 5)
-    problems.push("la definición quedó vacía o era demasiado trivial");
+    problems.push(copy.groundingEmpty);
   if (!survivingClaims.length)
-    problems.push("no sobrevivió ninguna afirmación con una cita válida");
+    problems.push(copy.groundingNoCitation);
   if (uncited.length)
-    problems.push(`${uncited.length} afirmaciones quedaron sin cita`);
+    problems.push(copy.groundingUncited(uncited.length));
   return problems;
 }
+
+export const __groundingProblemsForTesting = groundingProblems;
 
 function stripUncitedSubstantiveSentences(markdown: string): string {
   let cleaned = markdown;
@@ -1097,12 +1155,14 @@ function stripUncitedSubstantiveSentences(markdown: string): string {
 
 function extractiveDictionaryFallback(
   evidence: DictionaryEvidenceItem[],
+  language: PromptLanguage = "es",
 ): string {
+  const copy = dictionaryRuntimeCopy(language);
   const excerpts = orderedDictionaryEvidence(evidence)
     .slice(0, 4)
     .flatMap((item, index) => {
       const normalized = item.text.replace(/\s+/g, " ").trim();
-      const citation = `[evidencia ${index + 1}](nodus://${item.kind}/${encodeURIComponent(item.id)})`;
+      const citation = `[${copy.evidenceCitationLabel} ${index + 1}](nodus://${item.kind}/${encodeURIComponent(item.id)})`;
       const sentences = normalized.split(/(?<=[.!?])\s+/u).slice(0, 2);
       return sentences.map((sentence) => {
         const shortened =
@@ -1112,8 +1172,47 @@ function extractiveDictionaryFallback(
         return `> ${shortened} ${citation}.`;
       });
     });
-  return `## Evidencia verificable\n\n${excerpts.join("\n\n")}`;
+  return `## ${copy.degradedFallbackTitle}\n\n${excerpts.join("\n\n")}`;
 }
+
+export const __extractiveDictionaryFallbackForTesting =
+  extractiveDictionaryFallback;
+
+function insufficientDictionaryMarkdown(
+  evidence: DictionaryEvidenceItem[],
+  language: PromptLanguage = "es",
+): string {
+  const copy = dictionaryRuntimeCopy(language);
+  const citation = evidence[0]
+    ? ` [${copy.evidenceCitationLabel} disponible](nodus://${evidence[0].kind}/${encodeURIComponent(evidence[0].id)})`
+    : "";
+  return `## ${copy.insufficientTitle}\n\n${copy.insufficientIntro}${citation}\n\n${copy.insufficientLimits}`;
+}
+
+export const __insufficientDictionaryMarkdownForTesting =
+  insufficientDictionaryMarkdown;
+
+function dictionaryRetryCorrection(
+  attempt: number,
+  generationProblems: string[],
+  strippedSentences: string[],
+  language: PromptLanguage = "es",
+): string {
+  const copy = dictionaryRuntimeCopy(language);
+  return [
+    copy.retryRejected(attempt, generationProblems.join("; ")),
+    copy.retryRewrite,
+    copy.retryAtomic,
+    copy.retryCoverage,
+    strippedSentences.length
+      ? copy.retrySemantic(strippedSentences.slice(0, 4).join(" | "))
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export const __dictionaryRetryCorrectionForTesting = dictionaryRetryCorrection;
 
 function dictionaryOutputErrorReason(
   error: unknown,
@@ -1147,6 +1246,7 @@ async function groundGeneratedDescription(
   snapshot: WritingWorkshopSnapshot,
   verifyCitations: typeof aiVerifyCitations,
   model: ModelRef | null,
+  language: PromptLanguage = "es",
 ): Promise<{
   markdown: string;
   problems: string[];
@@ -1177,7 +1277,7 @@ async function groundGeneratedDescription(
     strippedSentences = outcome.strippedSentences;
   }
 
-  const problems = groundingProblems(cleaned, maps);
+  const problems = groundingProblems(cleaned, maps, language);
   return {
     markdown: cleaned,
     problems,
@@ -1216,10 +1316,14 @@ async function synthesize(
   model: ModelRef | null,
   prior: string,
   correction = "",
+  language?: PromptLanguage,
 ): Promise<GeneratedDictionary> {
   const entry = getDictionaryEntry(entryId)!;
-  const system = `Eres el redactor del Dictionary académico de Nodus. Trabaja exclusivamente a partir de EVIDENCE. No uses conocimiento externo ni inventes autores, obras, páginas, etiquetas, ideas, pasajes o identificadores. El FOCO es una instrucción editorial: nunca lo copies ni lo presentes como definición. Antes de redactar, recorre por completo el ÍNDICE DE COBERTURA y toda EVIDENCE. La cantidad de pasajes recuperados de un autor u obra no mide por sí sola la importancia de su aportación: varios fragmentos contiguos o repetitivos de una misma fuente no deben desplazar una contribución definitoria y pertinente documentada por otra. Cuando haya evidencia directa de varios autores u obras, integra el mayor número de aportaciones sustantivas que permita DETALLE y evita que una sola fuente monopolice la explicación. No fuerces una simetría artificial: pondera la relevancia y la sustancia de cada aportación, no la mera frecuencia de recuperación. Nombra al autor al atribuirle una definición, uso, matiz o crítica y cita la evidencia específica asociada a esa aportación. Abre con una definición sustantiva del concepto y desarróllala de acuerdo con DETALLE. Devuelve prosa continua organizada en párrafos, pero representa cada frase como una afirmación atómica independiente. Cada afirmación debe expresar una sola relación verificable y llevar los identificadores exactos de la evidencia que la sostiene. Si dos fuentes sostienen cláusulas diferentes, crea afirmaciones separadas. Usa varias evidencias en una misma afirmación solo si CADA una sostiene por sí sola toda la afirmación. Para comparar autores, formula por separado la posición atribuida a cada autor y solo después una afirmación comparativa respaldada plenamente. Identifica acuerdos, desacuerdos, contradicciones y cambios temporales únicamente cuando EVIDENCE los documente. Explicita los límites de la evidencia cuando sean relevantes. No escribas Markdown ni citas dentro de text. Devuelve SOLO JSON válido con esta forma exacta: {"paragraphs":[{"claims":[{"text":"Una afirmación completa","evidence":[{"kind":"idea|passage","id":"ID exacto de EVIDENCE"}]}]}]}.`;
-  const user = `CONCEPTO: ${entry.name}\nALIASES: ${entry.aliases.join(", ")}\nFOCO: ${entry.focusPrompt || "(sin foco adicional)"}\nDETALLE: ${entry.detailLevel}\nIDIOMA DE SALIDA: ${entry.outputLanguage}\n${dictionaryCoveragePrompt(evidence, entry.detailLevel)}\n${prior ? `VERSIÓN ACTUAL A ACTUALIZAR SIN COPIAR AFIRMACIONES NO RESPALDADAS:\n${prior}\n` : ""}${correction ? `CORRECCIÓN OBLIGATORIA DE LA SALIDA ANTERIOR:\n${correction}\n` : ""}EVIDENCE:\n${evidencePrompt(evidence)}`;
+  const promptLanguage = dictionaryPromptLanguage(language);
+  const copy = dictionaryPromptPack(promptLanguage);
+  const scaffold = dictionaryScaffoldPack(promptLanguage);
+  const system = copy.system;
+  const user = `${copy.concept}: ${entry.name}\n${copy.aliases}: ${entry.aliases.join(", ")}\n${copy.focus}: ${entry.focusPrompt || scaffold.none}\n${copy.detail}: ${entry.detailLevel}\n${copy.outputLanguage}: ${entry.outputLanguage}\n${dictionaryCoveragePrompt(evidence, entry.detailLevel, promptLanguage)}\n${prior ? `${copy.current}:\n${prior}\n` : ""}${correction ? `${copy.correction}:\n${correction}\n` : ""}${copy.evidence}:\n${evidencePrompt(evidence, promptLanguage)}`;
   const baseMaxTokens =
     entry.detailLevel === "detailed"
       ? 4400
@@ -1238,7 +1342,7 @@ async function synthesize(
     isGeneratedDictionaryClaims,
     model,
   );
-  const rendered = renderStructuredDictionary(structured, evidence);
+  const rendered = renderStructuredDictionary(structured, evidence, promptLanguage);
   return {
     descriptionMarkdown: rendered.markdown,
     authorSummaries: [],
@@ -1247,6 +1351,7 @@ async function synthesize(
       structured,
       evidence,
       entry.detailLevel,
+      promptLanguage,
     ),
   };
 }
@@ -1256,13 +1361,17 @@ async function synthesizeAuthorSummaries(
   evidence: DictionaryEvidenceItem[],
   descriptionMarkdown: string,
   model: ModelRef | null,
+  language?: PromptLanguage,
 ): Promise<GeneratedAuthorSummaries> {
   const selectedEvidence = citedEvidence(descriptionMarkdown, evidence);
   const authors = mainDictionaryAuthors(selectedEvidence);
   if (!authors.length) return { authorSummaries: [] };
   const entry = getDictionaryEntry(entryId)!;
-  const system = `Redacta fichas muy breves para los autores principales de una entrada del Dictionary académico de Nodus. Usa exclusivamente EVIDENCE y solo los autores enumerados en AUTHORS. Resume únicamente la aportación documentada de cada autor al concepto; no rellenes lagunas. Cada frase sustantiva debe terminar con una o más citas Markdown nodus:// copiadas exactamente de EVIDENCE. Devuelve SOLO JSON válido {"authorSummaries":[{"authorName":"nombre exacto de AUTHORS","summaryMarkdown":"una o dos frases citadas"}]}.`;
-  const user = `CONCEPTO: ${entry.name}\nIDIOMA DE SALIDA: ${entry.outputLanguage}\nAUTHORS: ${JSON.stringify(authors)}\nDESCRIPCIÓN VERIFICADA:\n${descriptionMarkdown}\nEVIDENCE:\n${evidencePrompt(selectedEvidence)}`;
+  const promptLanguage = dictionaryPromptLanguage(language);
+  const copy = dictionaryPromptPack(promptLanguage);
+  const scaffold = dictionaryScaffoldPack(promptLanguage);
+  const system = copy.authorSystem;
+  const user = `${copy.concept}: ${entry.name}\n${copy.outputLanguage}: ${entry.outputLanguage}\n${scaffold.authors}: ${JSON.stringify(authors)}\n${scaffold.verifiedDescription}:\n${descriptionMarkdown}\n${copy.evidence}:\n${evidencePrompt(selectedEvidence, promptLanguage)}`;
   return completeJson<GeneratedAuthorSummaries>(
     { system, user, temperature: 0, maxTokens: 1800 },
     isGeneratedAuthorSummaries,
@@ -1304,14 +1413,14 @@ async function generateDictionaryEntryUsing(
   authorGenerator: typeof synthesizeAuthorSummaries,
 ): Promise<DictionaryVersion> {
   const entry = getDictionaryEntry(request.entryId);
-  if (!entry) throw new Error("La entrada de Dictionary ya no existe.");
+  const promptLanguage = dictionaryPromptLanguage(request.language);
+  const copy = dictionaryRuntimeCopy(promptLanguage);
+  if (!entry) throw new Error(copy.noEntryError);
   const evidence = includedEvidence(request.entryId).filter(
     (item) => !item.unavailable && item.text.trim(),
   );
   if (!evidence.length) {
-    throw new Error(
-      "No se encontró evidencia relevante suficiente en el ámbito seleccionado para generar la definición.",
-    );
+    throw new Error(copy.noEvidenceError);
   }
   const insufficient = evidence.length < 2;
   let markdown: string;
@@ -1323,10 +1432,7 @@ async function generateDictionaryEntryUsing(
   let generationAttempts = 1;
   let generationProblems: string[] = [];
   if (insufficient) {
-    const citation = evidence[0]
-      ? ` [evidencia disponible](nodus://${evidence[0].kind}/${encodeURIComponent(evidence[0].id)})`
-      : "";
-    markdown = `## Evidencia insuficiente\n\nLa evidencia seleccionada es insuficiente para ofrecer una síntesis verificable del concepto.${citation}\n\nNo es posible comparar interpretaciones, establecer acuerdos o desacuerdos, ni describir cambios en el tiempo con el material disponible.`;
+    markdown = insufficientDictionaryMarkdown(evidence, promptLanguage);
   } else {
     const snapshot = makeSnapshot(request.entryId, evidence);
     const maps = buildSnapshotMaps(snapshot);
@@ -1347,6 +1453,7 @@ async function generateDictionaryEntryUsing(
           request.model ?? null,
           request.mode === "update" ? entry.contentMarkdown : "",
           correction,
+          request.language,
         );
       } catch (error) {
         const recoverable = dictionaryOutputErrorReason(error);
@@ -1355,18 +1462,20 @@ async function generateDictionaryEntryUsing(
         generationProblems = [
           error instanceof Error ? error.message : String(error),
         ];
+        const retry = dictionaryScaffoldPack(dictionaryPromptLanguage(request.language));
         correction = [
-          `El intento ${attempt} no produjo JSON estructurado utilizable: ${generationProblems[0]}.`,
-          "Devuelve de nuevo el objeto completo con paragraphs, claims, text y evidence.",
-          "Reduce la longitud de cada afirmación y conserva únicamente IDs exactos de EVIDENCE.",
+          `${retry.retryInvalidJson} (${attempt}): ${generationProblems[0]}.`,
+          retry.retryReturnObject,
+          retry.retryShorten,
         ].join("\n");
         continue;
       }
-      grounded = await groundGeneratedDescription(
+        grounded = await groundGeneratedDescription(
         generated,
         snapshot,
-        verifyCitations,
-        request.model ?? null,
+          verifyCitations,
+          request.model ?? null,
+          promptLanguage,
       );
       const originalGroundingProblems = [
         ...new Set([
@@ -1376,6 +1485,7 @@ async function generateDictionaryEntryUsing(
             grounded.markdown,
             evidence,
             entry.detailLevel,
+            promptLanguage,
           ),
         ]),
       ];
@@ -1395,12 +1505,13 @@ async function generateDictionaryEntryUsing(
           markdown: salvagedMarkdown,
           problems: [
             ...new Set([
-              ...groundingProblems(salvagedMarkdown, maps),
+              ...groundingProblems(salvagedMarkdown, maps, promptLanguage),
               ...(generated.coverageProblems ?? []),
               ...markdownDictionaryCoverageProblems(
                 salvagedMarkdown,
                 evidence,
                 entry.detailLevel,
+                promptLanguage,
               ),
             ]),
           ],
@@ -1416,9 +1527,7 @@ async function generateDictionaryEntryUsing(
         ? "invalid_evidence_refs"
         : needsSemanticRepair
           ? "semantic_rejection"
-          : /ninguna afirmación con una cita válida/.test(
-                grounded.problems.join(" "),
-              ) &&
+          : grounded.problems.includes(copy.groundingNoCitation) &&
               !/nodus:\/\/(?:idea|passage)\//.test(
                 generated.descriptionMarkdown,
               )
@@ -1429,23 +1538,20 @@ async function generateDictionaryEntryUsing(
           ? grounded.problems
           : originalGroundingProblems),
         ...(generated.invalidEvidenceRefs || grounded.invalidCitationRefs
-          ? [`${(generated.invalidEvidenceRefs ?? 0) + grounded.invalidCitationRefs} referencias de evidencia no eran válidas`]
+          ? [copy.invalidEvidence(
+              (generated.invalidEvidenceRefs ?? 0) + grounded.invalidCitationRefs,
+            )]
           : []),
         ...(needsSemanticRepair
-          ? [`${grounded.strippedSentences.length} afirmaciones no superaron la verificación semántica`]
+          ? [copy.semanticRejected(grounded.strippedSentences.length)]
           : []),
       ];
-      correction = [
-        `El intento ${attempt} fue rechazado porque ${generationProblems.join("; ")}.`,
-        "Reescribe desde cero una definición sustantiva. No copies el FOCO.",
-        "Haz afirmaciones atómicas y asigna a cada una solo evidencia que respalde la afirmación completa.",
-        "Revisa de nuevo el índice completo: no midas la importancia de un autor por la cantidad de fragmentos recuperados y conserva las aportaciones pertinentes de fuentes distintas.",
-        grounded.strippedSentences.length
-          ? `Estas frases no superaron la verificación y no deben repetirse sin estrecharlas: ${grounded.strippedSentences.slice(0, 4).join(" | ")}`
-          : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
+      correction = dictionaryRetryCorrection(
+        attempt,
+        generationProblems,
+        grounded.strippedSentences,
+        promptLanguage,
+      );
       // On the final attempt, a substantive remainder whose rejected claims were
       // safely removed is still a genuine synthesis. Empty/invalid output degrades.
       if (attempt === maxAttempts && !grounded.problems.length) completed = true;
@@ -1454,12 +1560,12 @@ async function generateDictionaryEntryUsing(
       outcome = "degraded";
       degradationReason = lastReason;
       markdown = decorateIdeaTags(
-        extractiveDictionaryFallback(evidence),
+        extractiveDictionaryFallback(evidence, promptLanguage),
         evidence,
       );
       if (!generationProblems.length)
         generationProblems = [
-          "No sobrevivió una síntesis sustantiva respaldada por citas válidas.",
+          copy.groundingNoCitation,
         ];
       generated = { descriptionMarkdown: markdown, authorSummaries: [] };
     } else {
@@ -1471,6 +1577,7 @@ async function generateDictionaryEntryUsing(
             evidence,
             markdown,
             request.model ?? null,
+            request.language,
           )
         ).authorSummaries;
       } catch {

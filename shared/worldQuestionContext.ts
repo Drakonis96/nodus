@@ -13,6 +13,10 @@
  * Pure: the composition and, above all, the parser are asserted without a provider.
  */
 
+import type { AppLanguage } from './types';
+import { normalizeUiLanguage, worldEntryKindLabel, worldFieldLabel } from './worldPromptLanguage';
+import { worldOperationSystemPrompt } from './worldOperationPrompts';
+
 export interface WorldQuestionSources {
   question: string;
   anchorTitle: string | null;
@@ -46,6 +50,11 @@ Reglas, sin excepción:
 OPCIÓN: <la respuesta>
 IMPLICA: <lo que arrastra>`;
 
+/** Localized system contract for direct users of this pure context module. */
+export function worldQuestionOptionsSystemPrompt(language: AppLanguage = 'es'): string {
+  return worldOperationSystemPrompt('questionOptions', normalizeUiLanguage(language));
+}
+
 /**
  * True when there is something to answer.
  *
@@ -59,43 +68,59 @@ export function hasWorldQuestionMaterial(sources: WorldQuestionSources): boolean
   return words.length >= 3 || sources.anchorProse.length > 0 || sources.neighbours.length > 0;
 }
 
-export function composeWorldQuestionContext(sources: WorldQuestionSources): string {
+export function composeWorldQuestionContext(sources: WorldQuestionSources, language: AppLanguage = 'es'): string {
+  const locale = normalizeUiLanguage(language);
+  const copy = QUESTION_CONTEXT_COPY[locale];
   const lines: string[] = [];
-  lines.push(`LO QUE FALTA POR DECIDIR: ${sources.question.trim()}`);
+  lines.push(`${copy.question}: ${sources.question.trim()}`);
   if (sources.anchorTitle) {
     lines.push(
-      `SOBRE: ${sources.anchorTitle}${sources.anchorKind ? ` (${sources.anchorKind})` : ''}${
-        sources.fieldLabel ? ` — se escribirá en «${sources.fieldLabel}»` : ''
+      `${copy.about}: ${sources.anchorTitle}${sources.anchorKind ? ` (${worldEntryKindLabel(sources.anchorKind, locale)})` : ''}${
+        sources.fieldLabel ? ` — ${copy.writtenIn} «${worldFieldLabel(sources.fieldLabel, locale)}»` : ''
       }`
     );
   }
-  if ((sources.evidence ?? '').trim()) lines.push(`LA FRASE DONDE ESTÁ EL HUECO: ${sources.evidence!.trim()}`);
-  if (sources.blockedScene) lines.push(`BLOQUEA LA ESCENA: ${sources.blockedScene}`);
+  if ((sources.evidence ?? '').trim()) lines.push(`${copy.evidence}: ${sources.evidence!.trim()}`);
+  if (sources.blockedScene) lines.push(`${copy.blocksScene}: ${sources.blockedScene}`);
 
   if (sources.anchorProse.length) {
     lines.push('');
-    lines.push('LO QUE LA FICHA YA DICE (respétalo; la respuesta tiene que encajar aquí):');
-    for (const block of sources.anchorProse) lines.push(`- ${block.field}: ${block.text.trim()}`);
+    lines.push(copy.anchorProse);
+    for (const block of sources.anchorProse) lines.push(`- ${worldFieldLabel(block.field, locale)}: ${block.text.trim()}`);
   }
 
   if (sources.neighbours.length) {
     lines.push('');
-    lines.push('EL MUNDO ALREDEDOR (úsalo; no inventes nada fuera de aquí):');
+    lines.push(copy.neighbours);
     for (const neighbour of sources.neighbours) {
-      lines.push(`- ${neighbour.title} (${neighbour.kind})${neighbour.summary ? `: ${neighbour.summary}` : ''}`);
+      lines.push(`- ${neighbour.title} (${worldEntryKindLabel(neighbour.kind, locale)})${neighbour.summary ? `: ${neighbour.summary}` : ''}`);
     }
   }
 
   if (sources.existing.length) {
     lines.push('');
-    lines.push('LO QUE EL AUTOR YA HA ESCRITO COMO RESPUESTA (no lo repitas):');
+    lines.push(copy.existing);
     for (const option of sources.existing) lines.push(`- ${option}`);
   }
 
   lines.push('');
-  lines.push('Propón tres respuestas posibles.');
+  lines.push(copy.propose);
   return lines.join('\n');
 }
+
+const QUESTION_CONTEXT_COPY: Record<AppLanguage, {
+  question: string; about: string; writtenIn: string; evidence: string; blocksScene: string;
+  anchorProse: string; neighbours: string; existing: string; propose: string;
+}> = {
+  es: { question: 'LO QUE FALTA POR DECIDIR', about: 'SOBRE', writtenIn: 'se escribirá en', evidence: 'LA FRASE DONDE ESTÁ EL HUECO', blocksScene: 'BLOQUEA LA ESCENA', anchorProse: 'LO QUE LA FICHA YA DICE (respétalo; la respuesta tiene que encajar aquí):', neighbours: 'EL MUNDO ALREDEDOR (úsalo; no inventes nada fuera de aquí):', existing: 'LO QUE EL AUTOR YA HA ESCRITO COMO RESPUESTA (no lo repitas):', propose: 'Propón tres respuestas posibles.' },
+  en: { question: 'WHAT REMAINS UNDECIDED', about: 'ABOUT', writtenIn: 'will be written in', evidence: 'THE SENTENCE WITH THE GAP', blocksScene: 'BLOCKS THE SCENE', anchorProse: 'WHAT THE RECORD ALREADY SAYS (respect it; the answer must fit here):', neighbours: 'THE WORLD AROUND IT (use it; invent nothing beyond it):', existing: 'WHAT THE AUTHOR HAS ALREADY WRITTEN AS AN ANSWER (do not repeat it):', propose: 'Propose three possible answers.' },
+  fr: { question: 'CE QUI RESTE À DÉCIDER', about: 'À PROPOS DE', writtenIn: 'sera écrit dans', evidence: 'LA PHRASE OÙ SE TROUVE LE TROU', blocksScene: 'BLOQUE LA SCÈNE', anchorProse: 'CE QUE DIT DÉJÀ LA FICHE (respecte-le ; la réponse doit s’y accorder) :', neighbours: 'LE MONDE AUTOUR (utilise-le ; n’invente rien au-delà) :', existing: 'CE QUE L’AUTEUR A DÉJÀ ÉCRIT COMME RÉPONSE (ne le répète pas) :', propose: 'Propose trois réponses possibles.' },
+  de: { question: 'NOCH NICHT ENTSCHIEDEN', about: 'ZU', writtenIn: 'wird eingetragen in', evidence: 'DER SATZ MIT DER LÜCKE', blocksScene: 'BLOCKIERT DIE SZENE', anchorProse: 'WAS IM EINTRAG BEREITS STEHT (beachten; die Antwort muss hierher passen):', neighbours: 'DIE WELT DARUM (verwenden; nichts darüber hinaus erfinden):', existing: 'WAS DIE AUTORIN ODER DER AUTOR BEREITS ALS ANTWORT GESCHRIEBEN HAT (nicht wiederholen):', propose: 'Schlage drei mögliche Antworten vor.' },
+  pt: { question: 'O QUE FALTA DECIDIR', about: 'SOBRE', writtenIn: 'será escrito em', evidence: 'A FRASE ONDE ESTÁ A LACUNA', blocksScene: 'BLOQUEIA A CENA', anchorProse: 'O QUE A FICHA JÁ DIZ (respeita-o; a resposta tem de se encaixar aqui):', neighbours: 'O MUNDO À VOLTA (usa-o; não inventes para além dele):', existing: 'O QUE O AUTOR JÁ ESCREVEU COMO RESPOSTA (não repitas):', propose: 'Propõe três respostas possíveis.' },
+  'pt-BR': { question: 'O QUE FALTA DECIDIR', about: 'SOBRE', writtenIn: 'será escrito em', evidence: 'A FRASE ONDE ESTÁ A LACUNA', blocksScene: 'BLOQUEIA A CENA', anchorProse: 'O QUE A FICHA JÁ DIZ (respeite; a resposta precisa se encaixar aqui):', neighbours: 'O MUNDO AO REDOR (use-o; não invente além dele):', existing: 'O QUE O AUTOR JÁ ESCREVEU COMO RESPOSTA (não repita):', propose: 'Proponha três respostas possíveis.' },
+  it: { question: 'COSA RESTA DA DECIDERE', about: 'RIGUARDO A', writtenIn: 'sarà scritto in', evidence: 'LA FRASE CON IL VUOTO', blocksScene: 'BLOCCA LA SCENA', anchorProse: 'COSA DICE GIÀ LA SCHEDA (rispettalo; la risposta deve adattarsi):', neighbours: 'IL MONDO INTORNO (usalo; non inventare oltre):', existing: 'COSA HA GIÀ SCRITTO L’AUTORE COME RISPOSTA (non ripeterlo):', propose: 'Proponi tre risposte possibili.' },
+  tr: { question: 'KARAR VERİLMEYEN KISIM', about: 'HAKKINDA', writtenIn: 'şuraya yazılacak', evidence: 'BOŞLUĞUN BULUNDUĞU CÜMLE', blocksScene: 'SAHNEYİ ENGELLİYOR', anchorProse: 'KAYDIN ZATEN SÖYLEDİKLERİ (uy; yanıt buraya oturmalı):', neighbours: 'ÇEVRESİNDEKİ DÜNYA (kullan; bunun dışında bir şey uydurma):', existing: 'YAZARIN YANIT OLARAK ZATEN YAZDIKLARI (tekrarlama):', propose: 'Üç olası yanıt öner.' },
+};
 
 // ── Reading the answer back ──────────────────────────────────────────────────
 

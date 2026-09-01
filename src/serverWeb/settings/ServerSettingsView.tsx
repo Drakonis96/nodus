@@ -323,10 +323,10 @@ function modelCandidatesForProvider(
   ];
 }
 function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
+  if (error instanceof ApiError) return t(error.message);
   return error instanceof Error
-    ? error.message
-    : String(error || t("No se ha podido completar la operación."));
+    ? t(error.message)
+    : t(String(error || "No se ha podido completar la operación."));
 }
 
 function translateSettingsNode(node: ReactNode): ReactNode {

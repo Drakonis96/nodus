@@ -13,6 +13,7 @@ import type { AIJob, AIPreferences, JsonRecord, UserArtifact } from "./types";
 import { SERVER_DEFAULT_MODELS, serverModelsFor } from "./modelCatalog";
 import { PROVIDER_LABELS } from "@shared/providers";
 import { getActiveLang, t, tx } from "./i18nShim";
+import { serverLabel, serverPrompt } from "./serverAiPrompts";
 
 type DbColumn = { id: string; name: string; type?: string };
 type DbRow = { id: string; cells: Record<string, unknown> };
@@ -326,8 +327,8 @@ function errorText(error: unknown): string {
   return error instanceof ApiError && error.code === "credential_required"
     ? t("Configura una credencial del proveedor en Ajustes.")
     : error instanceof Error
-      ? error.message
-      : String(error);
+      ? t(error.message)
+      : t(String(error));
 }
 
 export function DatabaseDeepResearchServerView({
@@ -348,6 +349,7 @@ export function DatabaseDeepResearchServerView({
   const [provider, setProvider] = useState("openai");
   const [model, setModel] = useState(DEFAULT_MODELS.openai);
   const [preferences, setPreferences] = useState<AIPreferences>({});
+  const [promptLanguage, setPromptLanguage] = useState("en");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -389,11 +391,12 @@ export function DatabaseDeepResearchServerView({
     let alive = true;
     Promise.all([
       refresh(),
-      api
-        .aiPreferences()
-        .then(({ preferences: next }) => {
+      Promise.all([api.aiPreferences(), api.profilePreferences()])
+        .then(([ai, profile]) => {
+          const next = ai.preferences;
           if (!alive) return;
           setPreferences(next);
+          setPromptLanguage(profile.profile.values?.appearance?.promptLanguage || profile.profile.values?.appearance?.uiLanguage || "en");
           const requested = next.defaultProvider || "openai";
           const chosen = EXECUTABLE_PROVIDERS.has(requested)
             ? requested
@@ -470,12 +473,11 @@ export function DatabaseDeepResearchServerView({
           messages: [
             {
               role: "system",
-              content:
-                "Eres un analista de datos cuidadoso. Redacta un informe en Markdown sobre el contexto proporcionado. Usa únicamente esos datos, indica límites y no inventes fuentes. No repitas identificadores de filas ni datos sensibles. Cita la procedencia como [base: columna] usando los nombres incluidos; si no hay evidencia suficiente, dilo.",
+              content: serverPrompt(promptLanguage, "databaseDeepResearch"),
             },
             {
               role: "user",
-              content: `Objetivo: ${title}\n\nProcedencia (solo lectura): ${JSON.stringify(provenance)}\n\nContexto autorizado y redactado:\n${JSON.stringify(context).slice(0, 1_500_000)}`,
+              content: `${serverLabel(promptLanguage, "objective")}: ${title}\n\n${serverLabel(promptLanguage, "provenance")}: ${JSON.stringify(provenance)}\n\n${serverLabel(promptLanguage, "authorizedContext")}:\n${JSON.stringify(context).slice(0, 1_500_000)}`,
             },
           ],
         },
@@ -887,7 +889,7 @@ export function DatabaseDeepResearchServerView({
                       </p>
                       {job.error?.message && (
                         <p className="mt-1 text-red-600 dark:text-red-300">
-                          {job.error.message}
+                          {t(job.error.message)}
                         </p>
                       )}
                     </div>

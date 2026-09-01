@@ -8071,4 +8071,9 @@ export const TR: Record<string, string> = {
   "PDFs y EPUBs añadidos a Zotero sin una entrada encima. Llegan sin autor ni año.": "Zotero’ya üstlerinde bir kayıt olmadan eklenen PDF ve EPUB’lar. Yazar ve yıl bilgisi olmadan gelirler.",
   "Archivos sueltos no importados": "Bağımsız dosyalar içe aktarılmadı",
   "Tu biblioteca tiene {n} archivo(s) sin ficha bibliográfica. Marca la casilla de arriba y vuelve a importar si los quieres.": "Kitaplığınızda kaynakça kaydı olmayan {n} dosya var. Bunları istiyorsanız yukarıdaki kutuyu işaretleyip yeniden içe aktarın.",
+  "La app ha alcanzado su límite de almacenamiento (256 KB).": "Uygulama depolama sınırına ulaştı (256 KB).",
+  "El almacenamiento no está activado.": "Depolama etkin değil.",
+  "La clave o el dato no son válidos.": "Anahtar veya veri geçersiz.",
+  "Conversación no encontrada.": "Konuşma bulunamadı.",
+  "Informe sin título": "Başlıksız rapor",
 };

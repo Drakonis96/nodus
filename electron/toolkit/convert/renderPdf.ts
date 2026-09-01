@@ -28,12 +28,12 @@ const PRINT_CSS = `
   a { color: #1d4ed8; }
 `;
 
-function buildPrintableHtml(input: string): string {
+function buildPrintableHtml(input: string, language = 'en'): string {
   const raw = fs.readFileSync(input, 'utf8');
   const ext = path.extname(input).toLowerCase();
   const body = ext === '.html' || ext === '.htm' ? raw.replace(/^[\s\S]*?<body[^>]*>/i, '').replace(/<\/body>[\s\S]*$/i, '') || raw : markdownToHtml(raw);
   const title = path.basename(input, ext);
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${title}</title><style>${PRINT_CSS}</style></head><body>${body}</body></html>`;
+  return `<!doctype html><html lang="${language}"><head><meta charset="utf-8"><title>${title}</title><style>${PRINT_CSS}</style></head><body>${body}</body></html>`;
 }
 
 /**
@@ -44,13 +44,13 @@ function buildPrintableHtml(input: string): string {
  *
  * This stylesheet has no `@page` rule, so the printer margins have to come from here.
  */
-async function renderToPdf(input: string): Promise<ToolkitProduced[]> {
-  const pdf = await htmlToPdfBytes(buildPrintableHtml(input), {
+async function renderToPdf(input: string, language = 'en'): Promise<ToolkitProduced[]> {
+  const pdf = await htmlToPdfBytes(buildPrintableHtml(input, language), {
     margins: { top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 },
   });
   return [{ data: new Uint8Array(pdf), ext: 'pdf' }];
 }
 
 export const renderPdfOps: ToolkitOpRegistry = {
-  'text-to-pdf': { arity: 'each', run: ([input]) => renderToPdf(input) },
+  'text-to-pdf': { arity: 'each', run: ([input], ctx) => renderToPdf(input, ctx.request.language ?? 'en') },
 };

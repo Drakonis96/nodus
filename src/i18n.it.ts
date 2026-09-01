@@ -7726,4 +7726,9 @@ export const IT: Record<string, string> = {
   "PDFs y EPUBs añadidos a Zotero sin una entrada encima. Llegan sin autor ni año.": "PDF ed EPUB aggiunti a Zotero senza una voce sopra di essi. Arrivano senza autore né anno.",
   "Archivos sueltos no importados": "File singoli non importati",
   "Tu biblioteca tiene {n} archivo(s) sin ficha bibliográfica. Marca la casilla de arriba y vuelve a importar si los quieres.": "La tua biblioteca contiene {n} file senza scheda bibliografica. Spunta la casella qui sopra e reimporta se li vuoi.",
+  "La app ha alcanzado su límite de almacenamiento (256 KB).": "L’app ha raggiunto il limite di archiviazione (256 KB).",
+  "El almacenamiento no está activado.": "L’archiviazione non è attivata.",
+  "La clave o el dato no son válidos.": "La chiave o il dato non sono validi.",
+  "Conversación no encontrada.": "Conversazione non trovata.",
+  "Informe sin título": "Rapporto senza titolo",
 };

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import type { ModelRef, Work } from '@shared/types';
 import { AiError, completeText, embed } from './aiClient';
-import { PROMPT_SUMMARY } from './prompts';
+import { coreStructuredPrompt } from './prompts';
 import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { setSummaryResult } from '../db/worksRepo';
@@ -160,7 +160,7 @@ export async function runSummaryScan(work: Work, model?: ModelRef | null): Promi
   let summary: string;
   try {
     summary = (await completeText({
-      system: PROMPT_SUMMARY,
+      system: coreStructuredPrompt('summary', getSettings().promptLanguage ?? 'es'),
       user: JSON.stringify(input),
       temperature: 0.2,
       maxTokens: 800,

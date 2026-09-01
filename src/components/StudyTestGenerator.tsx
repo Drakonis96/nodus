@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { StudyAssistantSourceOption, StudyFlashcard, StudyQuestion, StudyWorkspace } from '@shared/types';
 import { Icon, Spinner } from './ui';
-import { t } from '../i18n';
+import { errorText, t } from '../i18n';
 import { studyQuestionGenerationEmptyMessage } from '../studyQuestions';
 
 export interface StudyTestScope { courseId?: string | null; subjectId?: string | null; folderId?: string | null; topicId?: string | null }
@@ -76,7 +76,7 @@ export function StudyTestGeneratorDialog({ kind = 'test', scope, scopeTitle, onC
       else await window.nodus.createStudyAssessment({ kind: 'exam', title: `${t('Examen')} · ${scopeTitle} · ${new Date().toLocaleDateString()}`, description: customPrompt.trim(), questionIds: saved.map((question) => question.id), points, config: { selection: 'manual', correctionMode: 'end', randomizeQuestions: false, randomizeOptions: false, showExplanations: true, negativePoints: 0, blankPoints: 0 } });
       onCreated(saved);
       onCancel();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    } catch (cause) { setError(errorText(cause)); }
     finally { setBusy(false); }
   };
 

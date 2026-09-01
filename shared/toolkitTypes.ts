@@ -148,6 +148,8 @@ export interface ToolkitJobRequest {
   /** Base name (without extension) for the packaged zip. */
   zipName: string | null;
   openFolderOnDone: boolean;
+  /** Locale for generated document metadata; content itself remains unchanged. */
+  language?: 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 'tr';
 }
 
 export interface ToolkitJobProgress {

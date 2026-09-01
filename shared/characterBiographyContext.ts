@@ -11,13 +11,12 @@
  * Pure so it is unit-tested without the DB or a provider.
  */
 
-import { CHARACTER_EVENT_TYPE_LABEL, CHARACTER_LIFE_STATUS_LABEL, CHARACTER_ROLE_LABEL } from './characterLabels';
-import { eventTypeLabel } from './eventTypes';
-import type { CharacterBiographyMode, CharacterLifeStatus, CharacterNarrativeRole, EventTypeValue } from './types';
+import { characterBiographyContextCopy } from './worldContextPromptPacks';
+import type { CharacterBiographyMode, CharacterLifeStatus, CharacterNarrativeRole, EventTypeValue, PromptLanguage } from './types';
 
 export interface CharacterBiographySources {
   name: string;
-  aliases: { name: string; kind: string | null }[];
+  aliases: { name: string; kind: string | null; kindToken?: string | null }[];
   species: string | null;
   gender: string | null
   pronouns: string | null;
@@ -73,46 +72,51 @@ function list(label: string, items: string[]): string {
 /** Build the user message: a compact, ordered digest of the sheet. */
 export function composeCharacterBiographyContext(
   sources: CharacterBiographySources,
-  mode: CharacterBiographyMode = 'faithful'
+  mode: CharacterBiographyMode = 'faithful',
+  language: PromptLanguage = 'es',
 ): string {
+  const copy = characterBiographyContextCopy(language);
   const lines: string[] = [];
 
-  lines.push(`Personaje: ${sources.name}.`);
+  lines.push(`${copy.character}: ${sources.name}.`);
   const identity = [
-    sources.species ? `especie: ${sources.species}` : '',
-    sources.gender ? `género: ${sources.gender}` : '',
+    sources.species ? `${copy.species}: ${sources.species}` : '',
+    sources.gender ? `${copy.gender}: ${sources.gender}` : '',
     // Spelled out rather than listed, because getting this wrong is the one error that
     // makes a generated biography unusable.
-    sources.pronouns ? `pronombres (úsalos literalmente): ${sources.pronouns}` : '',
-    `estado: ${CHARACTER_LIFE_STATUS_LABEL[sources.lifeStatus]}`,
-    sources.narrativeRole ? `papel en el relato: ${CHARACTER_ROLE_LABEL[sources.narrativeRole]}` : '',
+    sources.pronouns ? `${copy.pronouns}: ${sources.pronouns}` : '',
+    `${copy.status}: ${copy.lifeStatuses[sources.lifeStatus]}`,
+    sources.narrativeRole ? `${copy.narrativeRole}: ${copy.roles[sources.narrativeRole]}` : '',
   ].filter(Boolean);
   if (identity.length) lines.push(`${identity.join('; ')}.`);
 
   const aliases = sources.aliases.filter((alias) => alias.name.trim() && alias.name !== sources.name);
   if (aliases.length) {
     lines.push(
-      `También conocido como: ${aliases.map((alias) => (alias.kind ? `${alias.name} (${alias.kind})` : alias.name)).join(', ')}.`
+      `${copy.alsoKnownAs}: ${aliases.map((alias) => {
+        const kind = alias.kindToken ? copy.aliasKinds[alias.kindToken] ?? alias.kind : alias.kind;
+        return kind ? `${alias.name} (${kind})` : alias.name;
+      }).join(', ')}.`
     );
   }
 
-  if (sources.birthDate) lines.push(`Nacimiento: ${sources.birthDate}.`);
-  if (sources.deathDate) lines.push(`Muerte: ${sources.deathDate}.`);
+  if (sources.birthDate) lines.push(`${copy.birth}: ${sources.birthDate}.`);
+  if (sources.deathDate) lines.push(`${copy.death}: ${sources.deathDate}.`);
 
-  if (sources.appearance) lines.push(`Apariencia: ${sources.appearance.trim()}`);
-  if (sources.personality) lines.push(`Personalidad: ${sources.personality.trim()}`);
-  if (sources.backstory) lines.push(`Trasfondo: ${sources.backstory.trim()}`);
+  if (sources.appearance) lines.push(`${copy.appearance}: ${sources.appearance.trim()}`);
+  if (sources.personality) lines.push(`${copy.personality}: ${sources.personality.trim()}`);
+  if (sources.backstory) lines.push(`${copy.backstory}: ${sources.backstory.trim()}`);
 
   const kin = [
-    list('Progenitores', sources.parents),
-    list('Parejas', sources.spouses),
-    list('Descendencia', sources.children),
-    list('Hermanos', sources.siblings),
+    list(copy.parents, sources.parents),
+    list(copy.partners, sources.spouses),
+    list(copy.children, sources.children),
+    list(copy.siblings, sources.siblings),
   ].filter(Boolean);
   if (kin.length) lines.push(kin.join(' '));
 
   if (sources.relations.length) {
-    lines.push('Vínculos:');
+    lines.push(`${copy.links}:`);
     for (const relation of sources.relations.slice(0, 20)) {
       const detail = relation.notes?.replace(/\s+/g, ' ').trim().slice(0, 180);
       lines.push(`- ${relation.role}: ${relation.target}${detail ? `. ${detail}` : ''}`);
@@ -120,24 +124,24 @@ export function composeCharacterBiographyContext(
   }
 
   if (sources.events.length) {
-    lines.push('Hechos de su vida, en orden:');
+    lines.push(`${copy.lifeEvents}:`);
     for (const event of sources.events.slice(0, 40)) {
-      const parts = [eventTypeLabel(event.type, CHARACTER_EVENT_TYPE_LABEL)];
-      if (event.worldYear != null) parts.push(`año ${event.worldYear}`);
+      const parts = [copy.eventTypes[event.type] ?? event.type];
+      if (event.worldYear != null) parts.push(`${copy.year} ${event.worldYear}`);
       if (event.date) parts.push(event.date);
-      if (event.place) parts.push(`en ${event.place}`);
+      if (event.place) parts.push(`${copy.inPlace} ${event.place}`);
       const notes = (event.notes ?? '').replace(/\s+/g, ' ').trim().slice(0, 180);
       lines.push(`- ${parts.join(', ')}.${notes ? ` ${notes}` : ''}`);
     }
   }
 
   const notes = (sources.notes ?? '').replace(/\s+/g, ' ').trim().slice(0, 800);
-  if (notes) lines.push(`Notas del autor: ${notes}`);
+  if (notes) lines.push(`${copy.authorNotes}: ${notes}`);
 
   lines.push(
     mode === 'propose'
-      ? '\nRedacta la biografía del personaje a partir de lo anterior, y propón lo que falte marcándolo entre corchetes.'
-      : '\nRedacta la biografía del personaje a partir de lo anterior.'
+      ? `\n${copy.writePropose}`
+      : `\n${copy.writeFaithful}`
   );
   return lines.join('\n');
 }

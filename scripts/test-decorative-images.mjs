@@ -73,7 +73,11 @@ try {
   assert.ok(service.includes('setTimeout(() => void runGeneration'), 'image work starts asynchronously');
   assert.ok(service.includes('active.get(key) !== token'), 'stale/deleted attempts cannot overwrite image state');
   assert.ok(service.includes('interruptDecorativeImageGenerations'), 'vault/app shutdown can invalidate process-local image work');
-  assert.ok(service.includes('Máximo 45 palabras') && service.includes('maxTokens: 100'), 'visual-context call is short');
+  assert.ok(service.includes('VISUAL_CONTEXT_COPY') && service.includes("getSettings().promptLanguage ?? 'es'"), 'visual-context call follows the configured prompt language');
+  for (const marker of ['Maximum 45 words', '45 mots maximum', 'Höchstens 45 Wörter', 'Máximo de 45 palavras', 'Massimo 45 parole', 'En fazla 45 kelime']) {
+    assert.ok(service.includes(marker), `visual-context copy includes ${marker}`);
+  }
+  assert.ok(service.includes('maxTokens: 100'), 'visual-context call remains short');
   assert.ok(service.includes('request.visualContext') && service.includes('buildDecorativeImagePrompt(style, context)'), 'a user-edited scene rebuilds the styled prompt');
   assert.ok(service.includes('noRetry: true') && service.includes('maxRetries: 0'), 'text and Google image calls are single-attempt');
   assert.ok(service.includes('IMAGE_CONTEXT_TIMEOUT_MS = 45_000') && service.includes('IMAGE_TIMEOUT_MS = 120_000'), 'both context and image work are time-bounded');

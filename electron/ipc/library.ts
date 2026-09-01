@@ -1,10 +1,12 @@
-import type { IpcContext } from './context';
+import { localizedForUi, type IpcContext } from './context';
 import { BrowserWindow, clipboard, dialog, shell } from 'electron';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { uiText, type UiTranslations } from '@shared/uiLanguage';
 import { showImportOpenDialog } from '../privacy';
+import { getSettings } from '../db/settingsRepo';
 import {
   getGlobalLibraryStatus,
   listGlobalLibraryItemsResponsive,
@@ -103,6 +105,7 @@ async function revealAttachmentInFolder(filePath: string): Promise<boolean> {
 }
 
 export function registerLibraryIpc({ h }: IpcContext): void {
+  const dialogText = (copy: UiTranslations): string => uiText(getSettings().uiLanguage, copy);
   const existingItem = async (itemId: string) => {
     const item = await getGlobalLibraryItem(itemId);
     if (!item) throw new Error('El documento ya no existe.');
@@ -121,12 +124,12 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:zoteroLibraries', async () => listZoteroImportLibraries());
   h('library:importZotero', async (event, requestId, selection) => startZoteroLibraryImport(
     requestId, selection, (progress) => {
-      if (!event.sender.isDestroyed()) event.sender.send('library:zoteroImportProgress', progress);
+      if (!event.sender.isDestroyed()) event.sender.send('library:zoteroImportProgress', localizedForUi(progress));
     },
   ));
   h('library:zoteroSyncSessions', async () => listZoteroSyncSessions());
   h('library:resumeZoteroImport', async (event, requestId) => resumeZoteroLibraryImport(requestId, (progress) => {
-    if (!event.sender.isDestroyed()) event.sender.send('library:zoteroImportProgress', progress);
+    if (!event.sender.isDestroyed()) event.sender.send('library:zoteroImportProgress', localizedForUi(progress));
   }));
   h('library:cancelZoteroImport', async (_event, requestId) => cancelZoteroLibraryImport(requestId));
   h('library:enqueueExtraction', async (_event, itemIds, options, priority) => enqueueLibraryExtraction(itemIds, options, priority));
@@ -154,10 +157,10 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:importFiles', async (event, collectionId) => {
     const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
     const options = {
-      title: 'Importar documentos en la Biblioteca',
+      title: dialogText({ es: 'Importar documentos en la Biblioteca', en: 'Import documents into the Library', fr: 'Importer des documents dans la Bibliothèque', de: 'Dokumente in die Bibliothek importieren', pt: 'Importar documentos para a Biblioteca', 'pt-BR': 'Importar documentos para a Biblioteca', it: 'Importa documenti nella Biblioteca', tr: 'Belgeleri Kütüphaneye aktar' }),
       properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>,
       filters: [{
-        name: 'Documentos compatibles',
+        name: dialogText({ es: 'Documentos compatibles', en: 'Supported documents', fr: 'Documents compatibles', de: 'Unterstützte Dokumente', pt: 'Documentos compatíveis', 'pt-BR': 'Documentos compatíveis', it: 'Documenti compatibili', tr: 'Desteklenen belgeler' }),
         extensions: ['pdf', 'epub', 'md', 'markdown', 'txt', 'html', 'htm', 'xml', 'jats', 'doc', 'docx', 'odt', 'rtf', 'ppt', 'pptx', 'odp', 'csv', 'tsv', 'xlsx', 'xls', 'ods', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'heic', 'tif', 'tiff'],
       }],
     };
@@ -173,7 +176,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:importBibliography', async (event, collectionId) => {
     const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
     const options = {
-      title: 'Importar referencias bibliográficas',
+      title: dialogText({ es: 'Importar referencias bibliográficas', en: 'Import bibliographic references', fr: 'Importer des références bibliographiques', de: 'Literaturangaben importieren', pt: 'Importar referências bibliográficas', 'pt-BR': 'Importar referências bibliográficas', it: 'Importa riferimenti bibliografici', tr: 'Kaynakça kayıtlarını içe aktar' }),
       properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>,
       filters: [{ name: 'RIS, BibTeX, BibLaTeX, CSL JSON, EndNote, Zotero RDF, CSV o Markdown', extensions: ['ris', 'bib', 'bibtex', 'biblatex', 'json', 'xml', 'rdf', 'csv', 'md', 'markdown'] }],
     };
@@ -189,8 +192,8 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:addAttachments', async (event, itemId) => {
     const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
     const options = {
-      title: 'Añadir adjuntos a la referencia', properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>,
-      filters: [{ name: 'Documentos, datos e imágenes', extensions: ['pdf', 'epub', 'md', 'markdown', 'txt', 'html', 'htm', 'xml', 'jats', 'doc', 'docx', 'odt', 'rtf', 'ppt', 'pptx', 'odp', 'csv', 'tsv', 'xlsx', 'xls', 'ods', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'heic', 'tif', 'tiff'] }],
+      title: dialogText({ es: 'Añadir adjuntos a la referencia', en: 'Add attachments to the reference', fr: 'Ajouter des pièces jointes à la référence', de: 'Anhänge zur Literaturangabe hinzufügen', pt: 'Adicionar anexos à referência', 'pt-BR': 'Adicionar anexos à referência', it: 'Aggiungi allegati al riferimento', tr: 'Kaynak kaydına ek dosyalar ekle' }), properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>,
+      filters: [{ name: dialogText({ es: 'Documentos, datos e imágenes', en: 'Documents, data and images', fr: 'Documents, données et images', de: 'Dokumente, Daten und Bilder', pt: 'Documentos, dados e imagens', 'pt-BR': 'Documentos, dados e imagens', it: 'Documenti, dati e immagini', tr: 'Belgeler, veriler ve görseller' }), extensions: ['pdf', 'epub', 'md', 'markdown', 'txt', 'html', 'htm', 'xml', 'jats', 'doc', 'docx', 'odt', 'rtf', 'ppt', 'pptx', 'odp', 'csv', 'tsv', 'xlsx', 'xls', 'ods', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'heic', 'tif', 'tiff'] }],
     };
     const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
     return selected.canceled ? existingItem(itemId) : addGlobalLibraryAttachments(itemId, selected.filePaths);
@@ -198,7 +201,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:updateAttachment', async (_event, itemId, attachmentId, patch) => updateGlobalLibraryAttachment(itemId, attachmentId, patch));
   h('library:replaceAttachment', async (event, itemId, attachmentId) => {
     const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
-    const options = { title: 'Sustituir adjunto', properties: ['openFile'] as Array<'openFile'> };
+    const options = { title: dialogText({ es: 'Sustituir adjunto', en: 'Replace attachment', fr: 'Remplacer la pièce jointe', de: 'Anhang ersetzen', pt: 'Substituir anexo', 'pt-BR': 'Substituir anexo', it: 'Sostituisci allegato', tr: 'Ek dosyayı değiştir' }), properties: ['openFile'] as Array<'openFile'> };
     const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
     return selected.canceled ? existingItem(itemId) : replaceGlobalLibraryAttachment(itemId, attachmentId, selected.filePaths[0]);
   });
@@ -214,7 +217,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:updateMetadata', async (_event, itemId, patch) => updateGlobalLibraryItemMetadata(itemId, patch));
   h('library:resolveMetadata', async (_event, kind, value) => resolveGlobalLibraryMetadata(kind, value));
   h('library:startMetadataBatch', async (event, requestId, itemIds) => startGlobalLibraryMetadataBatch(requestId, itemIds, (progress) => {
-    if (!event.sender.isDestroyed()) event.sender.send('library:metadataBatchProgress', progress);
+    if (!event.sender.isDestroyed()) event.sender.send('library:metadataBatchProgress', localizedForUi(progress));
   }));
   h('library:applyMetadataBatch', async (_event, requestId, itemIds) => applyGlobalLibraryMetadataBatch(requestId, itemIds));
   h('library:cancelMetadataBatch', async (_event, requestId) => cancelGlobalLibraryMetadataBatch(requestId));
@@ -222,7 +225,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:citationStyles', async () => listGlobalLibraryCitationStyles());
   h('library:importCitationStyles', async (event) => {
     const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
-    const options = { title: 'Importar estilos CSL', properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>, filters: [{ name: 'Citation Style Language', extensions: ['csl'] }] };
+    const options = { title: dialogText({ es: 'Importar estilos CSL', en: 'Import CSL styles', fr: 'Importer des styles CSL', de: 'CSL-Stile importieren', pt: 'Importar estilos CSL', 'pt-BR': 'Importar estilos CSL', it: 'Importa stili CSL', tr: 'CSL stillerini içe aktar' }), properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>, filters: [{ name: 'Citation Style Language', extensions: ['csl'] }] };
     const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
     return selected.canceled ? { imported: 0, updated: 0, skipped: 0, styles: listGlobalLibraryCitationStyles(), warnings: [] } : importGlobalLibraryCitationStyleFiles(selected.filePaths);
   });
@@ -230,7 +233,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     const automatic = importGlobalLibraryZoteroCitationStyles();
     if (automatic.imported || automatic.updated || !automatic.warnings.length) return automatic;
     const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
-    const options = { title: 'Seleccionar la carpeta styles de Zotero', properties: ['openDirectory'] as Array<'openDirectory'> };
+    const options = { title: dialogText({ es: 'Seleccionar la carpeta styles de Zotero', en: 'Select the Zotero styles folder', fr: 'Sélectionner le dossier styles de Zotero', de: 'Zotero-Ordner „styles“ auswählen', pt: 'Selecionar a pasta styles do Zotero', 'pt-BR': 'Selecionar a pasta styles do Zotero', it: 'Seleziona la cartella styles di Zotero', tr: 'Zotero styles klasörünü seç' }), properties: ['openDirectory'] as Array<'openDirectory'> };
     const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
     return selected.canceled ? automatic : importGlobalLibraryZoteroCitationStyles(selected.filePaths);
   });
@@ -244,7 +247,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     const extensions = { ris: 'ris', bibtex: 'bib', biblatex: 'biblatex', 'csl-json': 'json', 'endnote-xml': 'xml', 'zotero-rdf': 'rdf', csv: 'csv', markdown: 'md' } as const;
     const extension = extensions[request.format as keyof typeof extensions]; if (!extension) throw new Error('Formato de exportación no compatible.');
     const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
-    const options = { title: 'Exportar referencias bibliográficas', defaultPath: `nodus-library.${extension}`, filters: [{ name: request.format, extensions: [extension] }] };
+    const options = { title: dialogText({ es: 'Exportar referencias bibliográficas', en: 'Export bibliographic references', fr: 'Exporter les références bibliographiques', de: 'Literaturangaben exportieren', pt: 'Exportar referências bibliográficas', 'pt-BR': 'Exportar referências bibliográficas', it: 'Esporta riferimenti bibliografici', tr: 'Kaynakça kayıtlarını dışa aktar' }), defaultPath: `nodus-library.${extension}`, filters: [{ name: request.format, extensions: [extension] }] };
     const selected = owner ? await dialog.showSaveDialog(owner, options) : await dialog.showSaveDialog(options);
     if (selected.canceled || !selected.filePath) return { format: request.format, exported: 0, filePath: null, canceled: true, warnings: [] };
     const report = await exportGlobalLibraryBibliography(request, selected.filePath);

@@ -359,7 +359,7 @@ function announceDictionary(entryId: string | null): void {
 function announceDictionaryProgress(progress: DictionaryProgress): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
-      win.webContents.send('dictionary:progress', progress);
+      win.webContents.send('dictionary:progress', localizedForUi(progress));
       if (progress.phase === 'failed' && isAiModelRequiredError(progress.error)) {
         win.webContents.send('ai:modelRequired');
       }
@@ -1208,7 +1208,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('study:search:query', async (_e, query: string, options?: StudySearchOptions) => studySearch.searchStudyCorpus(query, options));
   h('study:search:status', async () => studySearch.getStudySearchIndexStatus());
   h('study:search:rebuild', async (e) => {
-    const off = studySearch.onStudySearchProgress((next) => { if (!e.sender.isDestroyed()) e.sender.send('study:search:progress', next); });
+    const off = studySearch.onStudySearchProgress((next) => { if (!e.sender.isDestroyed()) e.sender.send('study:search:progress', localizedForUi(next)); });
     try { return await studySearch.rebuildStudySearchIndex(); } finally { off(); }
   });
   h('study:search:pause', async () => studySearch.pauseStudySearchIndex());
@@ -1937,7 +1937,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   let scanModelRequiredNotified = false;
   scanQueue.onProgress((p) => {
     const win = getWindow();
-    win?.webContents.send('queue:progress', p);
+    win?.webContents.send('queue:progress', localizedForUi(p));
     const modelRequired = isAiModelRequiredError(p.pausedReason);
     if (modelRequired && !scanModelRequiredNotified) win?.webContents.send('ai:modelRequired');
     scanModelRequiredNotified = modelRequired;
@@ -1955,11 +1955,11 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
 
   // Stream embedding pipeline progress to the renderer.
   onEmbeddingProgress((p) => {
-    getWindow()?.webContents.send('embeddings:progress', p);
+    getWindow()?.webContents.send('embeddings:progress', localizedForUi(p));
   });
 
   onPassageProgress((p) => {
-    getWindow()?.webContents.send('passages:progress', p);
+    getWindow()?.webContents.send('passages:progress', localizedForUi(p));
   });
 
   onStudyMaterialIndexChanged((materialId) => {
@@ -1971,11 +1971,11 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   });
 
   onChapterRelationsProgress((p) => {
-    getWindow()?.webContents.send('projects:chapterRelations:progress', p);
+    getWindow()?.webContents.send('projects:chapterRelations:progress', localizedForUi(p));
   });
 
   // Stream semantic bridge progress to the renderer.
   onSemanticBridgeProgress((p) => {
-    getWindow()?.webContents.send('bridges:progress', p);
+    getWindow()?.webContents.send('bridges:progress', localizedForUi(p));
   });
 }

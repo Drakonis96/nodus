@@ -17,7 +17,7 @@ import type {
 import { STUDY_GENERATABLE_QUESTION_TYPES, STUDY_QUESTION_TYPES } from '@shared/studyQuestions';
 import type { StudyGeneratableQuestionType } from '@shared/studyQuestions';
 import { Icon, Spinner } from '../components/ui';
-import { t } from '../i18n';
+import { errorText, t } from '../i18n';
 import { studyQuestionGenerationEmptyMessage } from '../studyQuestions';
 
 const TYPE_LABELS: Record<StudyQuestionType, string> = {
@@ -106,7 +106,7 @@ export function StudyBankView({
     setSelectedId((current) => current && nextQuestions.some((question) => question.id === current) ? current : (category !== 'flashcards' ? nextQuestions[0]?.id ?? null : null));
   }, [category, difficulty, search, semanticSearch, status, subjectId, type]);
 
-  useEffect(() => { void load().catch((cause) => setError(cause instanceof Error ? cause.message : String(cause))); }, [load]);
+  useEffect(() => { void load().catch((cause) => setError(errorText(cause))); }, [load]);
   const selected = questions.find((question) => question.id === selectedId) ?? null;
   const selectedCard = flashcards.find((card) => card.id === selectedCardId) ?? null;
   useEffect(() => {
@@ -125,11 +125,11 @@ export function StudyBankView({
       window.nodus.listStudyQuestionVersions(selectedId),
     ]).then(([nextAnalytics, nextSimilar, nextVersions]) => {
       setAnalytics(nextAnalytics); setSimilar(nextSimilar); setVersions(nextVersions);
-    }).catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)));
+    }).catch((cause) => setError(errorText(cause)));
   }, [selectedId]);
   const mutate = async (task: () => Promise<unknown>) => {
     setBusy(true); setError('');
-    try { await task(); await load(); } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    try { await task(); await load(); } catch (cause) { setError(errorText(cause)); }
     finally { setBusy(false); }
   };
 
@@ -153,7 +153,7 @@ export function StudyBankView({
       });
       setGenerated(result.questions);
       if (!result.questions.length) setError(studyQuestionGenerationEmptyMessage(result));
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    } catch (cause) { setError(errorText(cause)); }
     finally { setBusy(false); }
   };
 

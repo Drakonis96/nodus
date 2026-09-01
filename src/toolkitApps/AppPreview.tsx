@@ -29,7 +29,7 @@ function readState(appId: string): Record<string, ToolkitAppJsonValue> {
 
 function writeState(appId: string, state: Record<string, ToolkitAppJsonValue>): void {
   const encoded = JSON.stringify(state);
-  if (encoded.length > 256_000) throw new Error('La app ha alcanzado su límite de almacenamiento (256 KB).');
+  if (encoded.length > 256_000) throw new Error(t('La app ha alcanzado su límite de almacenamiento (256 KB).'));
   localStorage.setItem(storageKey(appId), encoded);
 }
 
@@ -110,12 +110,12 @@ export function ToolkitAppPreview({
           });
           return;
         }
-        if (!manifest.capabilities.storage) return respond(false, null, 'El almacenamiento no está activado.');
+        if (!manifest.capabilities.storage) return respond(false, null, t('El almacenamiento no está activado.'));
         const key = typeof message.key === 'string' ? message.key.trim().slice(0, 100) : '';
         const state = readState(appId);
         if (message.type === 'storage:get') return respond(true, key ? state[key] ?? null : null);
         if (message.type === 'storage:set') {
-          if (!key || !isToolkitAppJsonValue(message.value) || JSON.stringify(message.value).length > 64_000) throw new Error('La clave o el dato no son válidos.');
+          if (!key || !isToolkitAppJsonValue(message.value) || JSON.stringify(message.value).length > 64_000) throw new Error(t('La clave o el dato no son válidos.'));
           state[key] = message.value; writeState(appId, state); return respond(true, true);
         }
         if (message.type === 'storage:remove') { if (key) delete state[key]; writeState(appId, state); return respond(true, true); }

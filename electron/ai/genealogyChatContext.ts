@@ -15,6 +15,7 @@ import { getSettings } from '../db/settingsRepo';
 import { embed } from './aiClient';
 import { nameTokens } from '@shared/archiveDiscovery';
 import { deriveTreeKinship, treeKinshipLabel, type TreeKinshipContext } from '@shared/treeKinship';
+import type { PromptLanguage } from '@shared/types';
 
 const MAX_PERSONS = 250;
 const MAX_EVENTS = 220;
@@ -42,7 +43,7 @@ export interface GenealogyChatContext {
 }
 
 /** Assemble the bounded family context relevant to a chat question. */
-export async function buildGenealogyContext(question: string): Promise<GenealogyChatContext> {
+export async function buildGenealogyContext(question: string, language: PromptLanguage = getSettings().promptLanguage ?? 'es'): Promise<GenealogyChatContext> {
   const persons = listPersons();
   const nameById = new Map(persons.map((p) => [p.personId, p.displayName]));
   const relationships = allRelationships();
@@ -95,7 +96,7 @@ export async function buildGenealogyContext(question: string): Promise<Genealogy
       conyuges: spouses.get(p.personId) ?? [],
       hijos: children.get(p.personId) ?? [],
       parentesco_tag: relative?.role,
-      parentesco_con_persona_central: relative ? treeKinshipLabel(relative, 'es') : undefined,
+      parentesco_con_persona_central: relative ? treeKinshipLabel(relative, language) : undefined,
       rama_de_la_persona_central: relative?.branch,
       relevante_para_la_consulta: relevantIds.has(p.personId) || undefined,
     };

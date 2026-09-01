@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { EdgeType, ModelRef, SemanticBridgeResult, SemanticBridgeProgress } from '@shared/types';
+import type { EdgeType, ModelRef, PromptLanguage, SemanticBridgeResult, SemanticBridgeProgress } from '@shared/types';
 import { getDb } from '../db/database';
 import {
   addEdge,
@@ -11,6 +11,8 @@ import {
 import { completeJson } from './aiClient';
 import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanCheckpointRepo';
 import { computeNearestNeighbors } from '../graph/computeHost';
+import { getSettings } from '../db/settingsRepo';
+import { semanticBridgePrompt } from '@shared/graphPromptPacks';
 
 const SIM_THRESHOLD = 0.70;
 const TOP_K_PER_IDEA = 12;
@@ -60,27 +62,6 @@ interface LlmValidationResult {
 function isLlmValidationResult(v: unknown): v is LlmValidationResult {
   return typeof v === 'object' && v !== null && Array.isArray((v as LlmValidationResult).relations);
 }
-
-const VALIDATION_SYSTEM = `Eres el motor de descubrimiento semántico de Nodus. Recibes PARES de ideas
-académicas que tienen alta similitud semántica (calculada por embeddings) pero
-que aún no están conectadas en el grafo. Tu tarea es determinar, EXCLUSIVAMENTE
-en JSON válido, si existe una relación válida entre cada par.
-
-TIPOS válidos: extends, contradicts, applies_to, shares_method, precondition_of,
-measures_same, supports, refutes, variant_of, refines.
-
-REGLAS:
-- Evalúa CADA par de forma independiente.
-- La similitud semántica alta NO implica automáticamente una relación: dos ideas
-  pueden usar vocabulario similar y no estar relacionadas conceptualmente.
-- Solo propón relaciones que los enunciados sustenten claramente.
-- Confianza: 0.7–1.0 si la relación es directa, 0.4–0.7 si es inferible, < 0.4
-  solo si hay indicios débiles. Si no ves relación, omite el par.
-- No inventes relaciones. Ante la duda, no incluyas el par.
-- "rationale": una frase breve en español que explique por qué existe la relación.
-
-SALIDA: { "relations": [ { "from": "<id>", "to": "<id>", "type": "<tipo>", "confidence": 0.0-1.0, "rationale": "..." } ] }
-Si no hay ninguna relación válida: { "relations": [] }`;
 
 const listeners = new Set<ProgressListener>();
 
@@ -219,7 +200,8 @@ async function findCandidates(nodusIds?: string[]): Promise<Candidate[]> {
 async function validateCandidates(
   candidates: Candidate[],
   model?: ModelRef | null,
-  onProgress?: (p: SemanticBridgeProgress) => void
+  onProgress?: (p: SemanticBridgeProgress) => void,
+  language: PromptLanguage = getSettings().promptLanguage ?? 'es'
 ): Promise<Map<string, { from: string; to: string; type: EdgeType; confidence: number; similarity: number; rationale: string | null }>> {
   const batches = chunk(candidates, VALIDATION_BATCH);
   const contentHash = crypto
@@ -282,7 +264,7 @@ async function validateCandidates(
     // A missing validation batch is not equivalent to "no bridges". The rejection
     // propagates while earlier checkpoints remain available for a fail-closed resume.
     const result = await completeJson<LlmValidationResult>(
-      { system: VALIDATION_SYSTEM, user: JSON.stringify(input), temperature: 0.1 },
+      { system: semanticBridgePrompt(language), user: JSON.stringify(input), temperature: 0.1 },
       isLlmValidationResult,
       model
     );
@@ -330,7 +312,8 @@ function persistBridges(
 export async function discoverSemanticBridges(
   model?: ModelRef | null,
   onProgress?: ProgressListener,
-  nodusIds?: string[]
+  nodusIds?: string[],
+  language: PromptLanguage = getSettings().promptLanguage ?? 'es'
 ): Promise<SemanticBridgeResult> {
   if (running) {
     return { candidatesScanned: 0, crossThemeCandidates: 0, validated: 0, added: 0 };
@@ -352,7 +335,7 @@ export async function discoverSemanticBridges(
       return { candidatesScanned: 0, crossThemeCandidates: 0, validated: 0, added: 0 };
     }
 
-    const validated = await validateCandidates(candidates, model, emit);
+    const validated = await validateCandidates(candidates, model, emit, language);
     const added = persistBridges(validated, model);
 
     emit({ phase: 'done', label: `${added} nuevas relaciones`, current: 1, total: 1, candidatesFound: candidates.length, bridgesAdded: added });

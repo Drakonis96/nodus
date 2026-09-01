@@ -1333,9 +1333,15 @@ try {
       'electron/ai/deepResearchClient.ts',
       'electron/ai/studyDeepResearch.ts',
     ].map((file) => readFile(path.join(repoRoot, file), 'utf8')));
-    assert.ok(sources.every((source) => source.includes('DEEP_RESEARCH_NARRATIVE_RULES')), 'all Deep Research writers share the prose contract');
-    assert.match(sources[0], /valor marginal sea cero/, 'general writer stops when evidence adds no new value');
-    assert.match(sources[1], /valor probatorio marginal/, 'genealogy writer uses the same evidence-driven stopping rule');
+    const [writingPromptPacks, genealogyPromptPacks] = await Promise.all([
+      'shared/deepResearchWritingPromptPacks.ts',
+      'shared/genealogyDeepResearchPromptPacks.ts',
+    ].map((file) => readFile(path.join(repoRoot, file), 'utf8')));
+    assert.ok(sources.every((source) => source.includes('deepResearchNarrativeRules')), 'all Deep Research writers share the locale-aware prose contract');
+    assert.match(sources[0], /deepResearchWritingPromptPack/, 'the general writer resolves its native prompt pack');
+    assert.match(sources[1], /genealogyDeepResearchPromptPack/, 'the genealogy writer resolves its native prompt pack');
+    assert.match(writingPromptPacks, /valor marginal sea cero/, 'the Spanish general writer stops when evidence adds no new value');
+    assert.match(genealogyPromptPacks, /valor probatorio marginal/, 'the Spanish genealogy writer uses the same evidence-driven stopping rule');
     assert.match(DEEP_RESEARCH_NARRATIVE_RULES.join('\n'), /evidencia de un solo lado/iu, 'every writer rejects unilateral agreement and contradiction claims');
     assert.match(DEEP_RESEARCH_NARRATIVE_RULES.join('\n'), /intención no demuestra un efecto/iu, 'every writer separates intent, effect and reception');
   }

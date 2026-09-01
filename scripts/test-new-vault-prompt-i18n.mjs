@@ -31,7 +31,10 @@ test('every new vault has a substantive native context pack in every prompt lang
   );
   assert.deepEqual(PROMPT_LANGUAGES, ['es', 'en', 'fr', 'tr', 'de', 'pt', 'pt-BR', 'it']);
 
-  for (const vaultType of ['primary_sources', 'testimonios', 'prosopography', 'worldbuilding']) {
+  for (const vaultType of [
+    'primary_sources', 'testimonios', 'prosopography', 'worldbuilding',
+    'genealogy', 'estudio', 'databases', 'docencia',
+  ]) {
     const packs = NEW_VAULT_PROMPT_PACKS[vaultType];
     assert.deepEqual(Object.keys(packs).sort(), [...PROMPT_LANGUAGES].sort(), `${vaultType}: exact language set`);
     assert.equal(new Set(Object.values(packs)).size, PROMPT_LANGUAGES.length, `${vaultType}: no language silently reuses another`);
@@ -41,6 +44,34 @@ test('every new vault has a substantive native context pack in every prompt lang
     }
   }
   assert.equal(localizedNewVaultPromptPack('academic', 'it'), null);
+});
+
+test('vault prompt consumers resolve every type and locale without Spanish leakage', () => {
+  const { PROMPT_LANGUAGES } = loadModule('shared/types.ts', 'types-vault-runtime');
+  const { VAULT_TYPES, vaultTypePromptPack } = loadModule('shared/vaultTypes.ts', 'vaultTypes-runtime');
+  const vaultTypes = VAULT_TYPES.map(({ id }) => id);
+  assert.deepEqual(vaultTypes, [
+    'academic', 'genealogy', 'prosopography', 'estudio', 'primary_sources',
+    'databases', 'testimonios', 'worldbuilding', 'docencia',
+  ]);
+
+  for (const vaultType of vaultTypes) {
+    const Spanish = vaultTypePromptPack(vaultType, 'es');
+    assert.equal(typeof Spanish, 'string');
+    for (const language of PROMPT_LANGUAGES) {
+      const prompt = vaultTypePromptPack(vaultType, language);
+      assert.equal(typeof prompt, 'string', `${vaultType}/${language}: prompt is a string`);
+      if (vaultType === 'academic') {
+        assert.equal(prompt, '', `${vaultType}/${language}: academic remains empty`);
+        continue;
+      }
+      assert.ok(prompt.length > 400, `${vaultType}/${language}: substantive runtime pack`);
+      if (language !== 'es') {
+        assert.notEqual(prompt, Spanish, `${vaultType}/${language}: reused Spanish pack`);
+        assert.doesNotMatch(prompt, /CONTEXTO DEL VAULT|Este vault (reconstruye|se usa|es un gestor|es el espacio)|Tu tarea|No inventes|Cuando falte/i, `${vaultType}/${language}: Spanish prose leaked`);
+      }
+    }
+  }
 });
 
 test('Testimonies analysis and transcript-correction prompts are native in all languages', () => {

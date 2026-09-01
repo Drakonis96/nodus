@@ -159,6 +159,52 @@ try {
   );
   assert.match(coverageIndex, /Fuentes Vega/);
   assert.match(coverageIndex, /Tercera Autora/);
+  const promptLanguages = ["es", "en", "fr", "de", "pt", "pt-BR", "it", "tr"];
+  const SpanishCoverageMarkers = /ÍNDICE DE COBERTURA \(metadatos para recorrer|AUTORES CON EVIDENCIA DIRECTA|OBRAS CON EVIDENCIA DIRECTA|sin obra identificada|sin autoría identificada|evidencia:/i;
+  for (const language of promptLanguages) {
+    const localizedCoverage = ai.__dictionaryCoveragePromptForTesting(
+      coverageEvidence,
+      "standard",
+      language,
+    );
+    const localizedEvidence = ai.__dictionaryEvidencePromptForTesting(
+      coverageEvidence,
+      language,
+    );
+    assert.match(localizedCoverage, language === "es" ? SpanishCoverageMarkers : /coverage|auteurs|autoren|autores|autori|yazarlar|œuvres|werke|obras|opere|eserler/i, `${language}: localized coverage labels`);
+    if (language !== "es") {
+      assert.doesNotMatch(localizedCoverage, SpanishCoverageMarkers, `${language}: Spanish coverage labels leaked`);
+      assert.doesNotMatch(localizedEvidence, /\[fuente\]/, `${language}: Spanish evidence citation label leaked`);
+    } else {
+      assert.match(localizedEvidence, /\[fuente\]/);
+    }
+  }
+  const multiWorkIdea = {
+    ...coverageEvidence[0],
+    kind: "idea",
+    works: [coverageEvidence[0].works[0], { ...coverageEvidence[0].works[0], id: "other-work" }],
+    authors: [],
+  };
+  for (const language of promptLanguages) {
+    const label = ai.__dictionaryCitationLabelForTesting(multiWorkIdea, language);
+    if (language === "es" || language === "it") assert.match(label, /^Idea/);
+    else assert.doesNotMatch(label, /^Idea «/i, `${language}: Spanish Idea citation label leaked`);
+    const fallback = ai.__extractiveDictionaryFallbackForTesting([coverageEvidence[0]], language);
+    if (language === "es") assert.match(fallback, /Evidencia verificable/);
+    else assert.doesNotMatch(fallback, /Evidencia verificable|\[evidencia /i, `${language}: Spanish extractive fallback leaked`);
+    const insufficient = ai.__insufficientDictionaryMarkdownForTesting([coverageEvidence[0]], language);
+    if (language === "es") assert.match(insufficient, /Evidencia insuficiente/);
+    else assert.doesNotMatch(insufficient, /Evidencia insuficiente|La evidencia seleccionada|No es posible comparar/i, `${language}: Spanish insufficient-evidence output leaked`);
+    const retry = ai.__dictionaryRetryCorrectionForTesting(
+      1,
+      ["coverage failure"],
+      ["unsupported sentence"],
+      language,
+    );
+    if (language !== "es") {
+      assert.doesNotMatch(retry, /El intento|Reescribe desde cero|Haz afirmaciones|Revisa de nuevo/i, `${language}: Spanish retry instructions leaked`);
+    }
+  }
   const skewedCoverageProblems =
     ai.__structuredDictionaryCoverageProblemsForTesting(
       {

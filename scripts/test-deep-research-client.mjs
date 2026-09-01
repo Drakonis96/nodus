@@ -187,6 +187,28 @@ try {
     assert.ok(brief.method.some((rule) => rule.includes('estructura de la literatura')), 'finalizer rules reach the client handoff');
   }
 
+  // ── 1c. The client writing kit follows the requested prompt language ───────
+  {
+    const markers = { es: /Cita CADA/, en: /Cite EVERY/, fr: /Citez CHAQUE/, de: /Belegen Sie JEDE/, pt: /Cita CADA/, 'pt-BR': /Cite CADA/, it: /Cita OGNI/, tr: /HER önemli iddiayı/ };
+    for (const language of Object.keys(markers)) {
+      const brief = await buildDeepResearchBrief(
+        { objective: 'Topic', language, approach: 'general', sectionLimit: 'single' },
+        async () => makeSnapshot(4),
+      );
+      const instructions = [...brief.citationPolicy, ...brief.method].join('\n');
+      assert.match(instructions, markers[language], `${language} client citation policy is not localized`);
+      for (const token of ['materials', 'nodus://', 'sectionsMarkdown', 'sectionLimit: "single"', 'nodus_finalize_deep_research']) {
+        assert.ok(instructions.includes(token), `${language} lost client contract token ${token}`);
+      }
+      if (language !== 'es') assert.doesNotMatch(instructions, /Cita CADA afirmación|Reparte TODAS las ideas|Cuando termines de redactar/, `${language} leaked Spanish client instructions`);
+    }
+    const specialized = await buildDeepResearchBrief(
+      { objective: 'Topic', language: 'en', approach: 'literature_review' },
+      async () => makeSnapshot(4),
+    );
+    assert.doesNotMatch(specialized.method.join('\n'), /Nunca crees una sección|Sintetiza las fuentes|estructura de la literatura/, 'English specialized rules leaked Spanish');
+  }
+
   // ── 2. Finalize: strip hallucinations, build references from cited works ────
   {
     const snap = makeSnapshot(10);

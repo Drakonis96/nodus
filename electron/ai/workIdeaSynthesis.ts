@@ -4,18 +4,11 @@ import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { getIdeasByWork } from '../db/ideasRepo';
 import { completeJson } from './aiClient';
+import { synthesisPromptPack, type SynthesisPromptPack } from '@shared/synthesisPromptPacks';
 
 const STATEMENT_CLIP = 240;
 const MAX_IDEAS_IN_PROMPT = 80;
 const MAX_REMEMBER = 6;
-
-const IDEA_TYPE_LABELS: Record<IdeaType, string> = {
-  claim: 'afirmación',
-  finding: 'hallazgo',
-  construct: 'constructo',
-  method: 'método',
-  framework: 'marco',
-};
 
 interface WorkSynthesisResponse {
   thesis: string;
@@ -123,7 +116,7 @@ function themesForIdeas(globalIds: string[]): string[] {
   return rows.map((row) => row.label);
 }
 
-function connectionLine(globalIds: string[]): string {
+function connectionLine(globalIds: string[], prompt: SynthesisPromptPack): string {
   if (globalIds.length === 0) return 'sin conexiones internas registradas';
   const placeholders = globalIds.map(() => '?').join(',');
   const rows = getDb()
@@ -137,11 +130,11 @@ function connectionLine(globalIds: string[]): string {
         LIMIT 16`
     )
     .all(...globalIds, ...globalIds) as { type: string; fromLabel: string; toLabel: string }[];
-  if (rows.length === 0) return 'sin conexiones internas registradas';
+  if (rows.length === 0) return prompt.noConnections;
   return rows.map((row) => `- ${row.fromLabel} ${row.type} ${row.toLabel}`).join('\n');
 }
 
-function ideaBlock(ideas: IdeaByWork[]): string {
+function ideaBlock(ideas: IdeaByWork[], prompt: SynthesisPromptPack): string {
   const byType = new Map<IdeaType, IdeaByWork[]>();
   for (const idea of ideas.slice(0, MAX_IDEAS_IN_PROMPT)) {
     const list = byType.get(idea.type) ?? [];
@@ -152,11 +145,11 @@ function ideaBlock(ideas: IdeaByWork[]): string {
     .map(([type, list]) => {
       const items = list
         .map((idea) => {
-          const role = idea.role === 'principal' ? 'principal' : 'secundaria';
+          const role = idea.role === 'principal' ? prompt.primary : prompt.secondary;
           return `  - [${role}] ${idea.label}: ${clip(idea.statement, STATEMENT_CLIP)}`;
         })
         .join('\n');
-      return `${IDEA_TYPE_LABELS[type] ?? type} (${list.length}):\n${items}`;
+      return `${prompt.ideaTypes[type] ?? type} (${list.length}):\n${items}`;
     })
     .join('\n\n');
 }
@@ -170,21 +163,16 @@ export async function synthesizeWorkIdeas(nodusId: string, model?: ModelRef | nu
 
   const globalIds = page.ideas.map((idea) => idea.global_id);
   const themes = themesForIdeas(globalIds);
-  const system =
-    'Eres un asistente de investigación académica. A partir de las ideas extraídas de UNA obra, ' +
-    'produces una ficha breve de síntesis para estudiar esa obra dentro de un corpus. ' +
-    'No inventes información externa ni citas. Trabaja solo con las ideas, temas y conexiones proporcionadas. ' +
-    'Devuelve EXCLUSIVAMENTE un JSON con la forma ' +
-    '{"thesis": "1-2 frases con la tesis central de la obra", "remember": ["punto clave", "..."], "positioning": "un párrafo sobre cómo se organiza internamente y qué tensiones o relaciones contiene"}. ' +
-    `El campo "remember" debe tener entre 3 y ${MAX_REMEMBER} puntos breves.`;
+  const prompt = synthesisPromptPack(getSettings().promptLanguage ?? 'es');
+  const system = prompt.workSystem(MAX_REMEMBER);
 
   const user =
-    `OBRA: ${work.title}\n` +
-    `AUTORES: ${work.authors.length ? work.authors.join('; ') : 'autoría no disponible'}${work.year ? ` (${work.year})` : ''}\n` +
-    `TEMAS: ${themes.length ? themes.join(', ') : 'sin temas registrados'}\n\n` +
-    `IDEAS DE LA OBRA:\n${ideaBlock(page.ideas)}\n\n` +
-    `CONEXIONES INTERNAS ENTRE IDEAS:\n${connectionLine(globalIds)}\n\n` +
-    'Devuelve el JSON de síntesis de la obra.';
+    `${prompt.work}: ${work.title}\n` +
+    `${prompt.authors}: ${work.authors.length ? work.authors.join('; ') : prompt.noAuthorship}${work.year ? ` (${work.year})` : ''}\n` +
+    `${prompt.themes}: ${themes.length ? themes.join(', ') : prompt.noThemes}\n\n` +
+    `${prompt.workIdeas}:\n${ideaBlock(page.ideas, prompt)}\n\n` +
+    `${prompt.connections}:\n${connectionLine(globalIds, prompt)}\n\n` +
+    prompt.workReturn;
 
   const chosen = model ?? getSettings().synthesisModel ?? null;
   const result = await completeJson<WorkSynthesisResponse>({ system, user, temperature: 0.2 }, isWorkSynthesisResponse, chosen);

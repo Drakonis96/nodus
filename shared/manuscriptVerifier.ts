@@ -185,7 +185,7 @@ export function classifyClaimLocally(input: {
   evidence: ManuscriptEvidenceCandidate[];
   language?: AppLanguage;
 }): ManuscriptClaimCheck {
-  const language = input.language === 'en' ? 'en' : 'es';
+  const language = input.language ?? 'es';
   const evidence = pruneDistantCandidates(input.evidence);
   const top = evidence[0] ?? null;
   const strong = Boolean(top && (top.score >= 0.32 || (top.score >= 0.24 && evidence.length >= 2)));
@@ -197,38 +197,33 @@ export function classifyClaimLocally(input: {
   if (input.claim.hasCitation) {
     status = 'covered';
     severity = 'info';
-    rationale =
-      language === 'en'
-        ? 'The sentence already contains a citation marker, so it is not flagged as missing.'
-        : 'La frase ya contiene una marca de cita, por lo que no se marca como falta.';
+    rationale = localizedVerifierText(language, {
+      es: 'La frase ya contiene una marca de cita, por lo que no se marca como falta.', en: 'The sentence already contains a citation marker, so it is not flagged as missing.', fr: 'La phrase contient déjà un marqueur de citation ; elle n’est donc pas signalée comme dépourvue de source.', de: 'Der Satz enthält bereits einen Zitiermarker und wird daher nicht als fehlender Beleg markiert.', pt: 'A frase já contém um marcador de citação, pelo que não é assinalada como estando em falta.', 'pt-BR': 'A frase já contém um marcador de citação, portanto não é sinalizada como ausente.', it: 'La frase contiene già un indicatore di citazione, quindi non viene segnalata come priva di fonte.', tr: 'Cümle zaten bir alıntı işareti içerdiğinden eksik olarak işaretlenmez.',
+    });
   } else if (input.claim.ownContribution) {
     status = 'own_argument';
     severity = 'info';
-    rationale =
-      language === 'en'
-        ? 'The wording frames this as the author’s own contribution.'
-        : 'La formulacion presenta esto como aportacion propia del autor.';
+    rationale = localizedVerifierText(language, {
+      es: 'La formulacion presenta esto como aportacion propia del autor.', en: 'The wording frames this as the author’s own contribution.', fr: 'La formulation présente cela comme une contribution propre de l’auteur.', de: 'Die Formulierung stellt dies als eigenen Beitrag des Autors dar.', pt: 'A formulação apresenta isto como um contributo próprio do autor.', 'pt-BR': 'A formulação apresenta isso como uma contribuição própria do autor.', it: 'La formulazione presenta questo come un contributo dell’autore.', tr: 'İfade bunu yazarın kendi katkısı olarak sunuyor.',
+    });
   } else if (strong) {
     status = 'missing_citation';
     severity = top!.score >= 0.42 ? 'high' : 'medium';
-    rationale =
-      language === 'en'
-        ? 'A close corpus match was found and the sentence has no citation marker.'
-        : 'Hay una coincidencia cercana en el corpus y la frase no tiene marca de cita.';
+    rationale = localizedVerifierText(language, {
+      es: 'Hay una coincidencia cercana en el corpus y la frase no tiene marca de cita.', en: 'A close corpus match was found and the sentence has no citation marker.', fr: 'Une correspondance proche a été trouvée dans le corpus et la phrase ne comporte aucun marqueur de citation.', de: 'Im Korpus wurde eine enge Übereinstimmung gefunden, aber der Satz enthält keinen Zitiermarker.', pt: 'Foi encontrada uma correspondência próxima no corpus e a frase não tem marcador de citação.', 'pt-BR': 'Foi encontrada uma correspondência próxima no corpus e a frase não tem marcador de citação.', it: 'È stata trovata una corrispondenza vicina nel corpus e la frase non contiene un indicatore di citazione.', tr: 'Derlemde yakın bir eşleşme bulundu ve cümlede alıntı işareti yok.',
+    });
   } else if (direct) {
     status = 'weak_match';
     severity = 'low';
-    rationale =
-      language === 'en'
-        ? 'The corpus has related material, but the match is not strong enough to demand a citation.'
-        : 'El corpus contiene material relacionado, pero la coincidencia no basta para exigir cita.';
+    rationale = localizedVerifierText(language, {
+      es: 'El corpus contiene material relacionado, pero la coincidencia no basta para exigir cita.', en: 'The corpus has related material, but the match is not strong enough to demand a citation.', fr: 'Le corpus contient des éléments associés, mais la correspondance n’est pas assez forte pour exiger une citation.', de: 'Das Korpus enthält verwandtes Material, aber die Übereinstimmung ist nicht stark genug, um einen Beleg zu verlangen.', pt: 'O corpus contém material relacionado, mas a correspondência não é suficientemente forte para exigir uma citação.', 'pt-BR': 'O corpus contém material relacionado, mas a correspondência não é forte o bastante para exigir uma citação.', it: 'Il corpus contiene materiale correlato, ma la corrispondenza non è abbastanza forte da richiedere una citazione.', tr: 'Derlemde ilgili malzeme var, ancak eşleşme alıntı gerektirecek kadar güçlü değil.',
+    });
   } else {
     status = 'own_argument';
     severity = 'info';
-    rationale =
-      language === 'en'
-        ? 'No direct match was found in listed or indexed corpus ideas.'
-        : 'No se encontro una coincidencia directa en ideas listadas o indexadas del corpus.';
+    rationale = localizedVerifierText(language, {
+      es: 'No se encontro una coincidencia directa en ideas listadas o indexadas del corpus.', en: 'No direct match was found in listed or indexed corpus ideas.', fr: 'Aucune correspondance directe n’a été trouvée parmi les idées listées ou indexées du corpus.', de: 'Unter den aufgelisteten oder indexierten Korpusideen wurde keine direkte Übereinstimmung gefunden.', pt: 'Não foi encontrada uma correspondência direta nas ideias listadas ou indexadas do corpus.', 'pt-BR': 'Não foi encontrada uma correspondência direta nas ideias listadas ou indexadas do corpus.', it: 'Non è stata trovata alcuna corrispondenza diretta tra le idee elencate o indicizzate del corpus.', tr: 'Listelenen veya dizinlenmiş derlem fikirlerinde doğrudan eşleşme bulunamadı.',
+    });
   }
 
   return {
@@ -244,6 +239,10 @@ export function classifyClaimLocally(input: {
     suggestedCitations: evidence,
     replacementHint: top ? citationHint(top) : null,
   };
+}
+
+function localizedVerifierText(language: AppLanguage, values: Record<AppLanguage, string>): string {
+  return values[language] ?? values.es;
 }
 
 /**

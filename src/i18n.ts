@@ -244,7 +244,7 @@ export function notificationLine(text: NodiNotificationText | undefined, fallbac
     // A timestamp is formatted here, not by the emitter, for the same reason the
     // sentence is: only the renderer knows the locale this reader is looking at.
     values[name] = typeof value === 'object'
-      ? new Date(value.datetime).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+      ? new Date(value.datetime).toLocaleString(activeLang, { dateStyle: 'medium', timeStyle: 'short' })
       : value;
   }
   return tx(source, values);

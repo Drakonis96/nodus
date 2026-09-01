@@ -9,7 +9,8 @@ import {
   transformStudyDictation,
 } from '@shared/sttModels';
 import { Icon, Spinner } from '../ui';
-import { t } from '../../i18n';
+import { getActiveLang, t } from '../../i18n';
+import { localizeRuntimeError } from '@shared/uiLanguage';
 import { confirmMicrophonePrivacy } from '../../privacyNotices';
 import {
   audioBlobToWhisperWav,
@@ -190,7 +191,7 @@ export function StudyDictation({
       setProgress(1);
       setState('idle');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(localizeRuntimeError(cause instanceof Error ? cause.message : String(cause), getActiveLang()));
       setState('error');
     }
   };

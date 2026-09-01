@@ -39,7 +39,8 @@ import { SpeakerDetection } from './SpeakerDetection';
 import { TranscriptImprove } from './TranscriptImprove';
 import { TESTIMONY_MEDIA_ACCENT, formatBytes } from '../media/mediaFormat';
 import { TestimonyField } from './TestimonyField';
-import { t, tx } from '../../i18n';
+import { t, tx, getActiveLang } from '../../i18n';
+import { localizeRuntimeError } from '@shared/uiLanguage';
 
 /**
  * Sesiones, grabaciones y transcripción de una entrevista.
@@ -229,7 +230,7 @@ export function InterviewSessions({
       await reload();
       await onChanged();
     } catch (cause) {
-      if (!cancelledRef.current) setError(cause instanceof Error ? cause.message : String(cause));
+      if (!cancelledRef.current) setError(localizeRuntimeError(cause instanceof Error ? cause.message : String(cause), getActiveLang()));
     } finally {
       setBusy(false);
     }

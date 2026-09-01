@@ -1,5 +1,6 @@
 import type {
   ModelRef,
+  PromptLanguage,
   ResearchQuestionDetail,
   RqCoverageLink,
   RqCoverageStatus,
@@ -10,7 +11,8 @@ import type {
 import { getDb } from '../db/database';
 import { findSimilarIdeas } from '../db/ideasRepo';
 import { completeJson, embed } from './aiClient';
-import { PROMPT_RQ_COVERAGE, PROMPT_RQ_DECOMPOSE } from './prompts';
+import { coreStructuredPrompt } from './prompts';
+import { getSettings } from '../db/settingsRepo';
 import * as repo from '../db/researchMapRepo';
 
 const SEM_THRESHOLD = 0.3;
@@ -59,9 +61,9 @@ function parseAuthors(value: string): string[] {
   }
 }
 
-function authorYear(authors: string[], year: number | null): string {
+function authorYear(authors: string[], year: number | null, language: PromptLanguage = 'es'): string {
   const raw = authors[0]?.replace(/\s+/g, ' ').trim();
-  const surname = raw ? (raw.includes(',') ? raw.slice(0, raw.indexOf(',')) : raw.split(' ').slice(-1)[0]).trim() : 'Autor';
+  const surname = raw ? (raw.includes(',') ? raw.slice(0, raw.indexOf(',')) : raw.split(' ').slice(-1)[0]).trim() : ({ es: 'Autor', en: 'Author', fr: 'Auteur', de: 'Autor', pt: 'Autor', 'pt-BR': 'Autor', it: 'Autore', tr: 'Yazar' } as Record<PromptLanguage, string>)[language];
   return year ? `${surname}, ${year}` : surname;
 }
 
@@ -175,7 +177,7 @@ interface DisputeEdge {
   label: string;
 }
 
-function disputesAmong(ids: string[]): DisputeEdge[] {
+function disputesAmong(ids: string[], language: PromptLanguage = 'es'): DisputeEdge[] {
   if (ids.length < 2) return [];
   const db = getDb();
   const placeholders = ids.map(() => '?').join(',');
@@ -190,7 +192,9 @@ function disputesAmong(ids: string[]): DisputeEdge[] {
     edgeId: r.id,
     fromId: r.from_id,
     toId: r.to_id,
-    label: r.type === 'refutes' ? 'refutación' : 'contradicción',
+    label: r.type === 'refutes'
+      ? ({ es: 'refutación', en: 'refutation', fr: 'réfutation', de: 'Widerlegung', pt: 'refutação', 'pt-BR': 'refutação', it: 'confutazione', tr: 'çürütme' } as Record<PromptLanguage, string>)[language]
+      : ({ es: 'contradicción', en: 'contradiction', fr: 'contradiction', de: 'Widerspruch', pt: 'contradição', 'pt-BR': 'contradição', it: 'contraddizione', tr: 'çelişki' } as Record<PromptLanguage, string>)[language],
   }));
 }
 
@@ -223,11 +227,12 @@ function isAiCoverage(value: unknown): value is AiCoverage {
 
 export async function decomposeQuestion(request: RqDecomposeRequest): Promise<ResearchQuestionDetail> {
   const rq = repo.getResearchQuestion(request.rqId);
-  if (!rq) throw new Error('No se encontró la pregunta de investigación.');
+  const language = getSettings().promptLanguage ?? 'es';
+  if (!rq) throw new Error(localizedMapText(language, { es: 'No se encontró la pregunta de investigación.', en: 'The research question was not found.', fr: 'La question de recherche est introuvable.', de: 'Die Forschungsfrage wurde nicht gefunden.', pt: 'A pergunta de investigação não foi encontrada.', 'pt-BR': 'A pergunta de pesquisa não foi encontrada.', it: 'La domanda di ricerca non è stata trovata.', tr: 'Araştırma sorusu bulunamadı.' }));
 
   const user = JSON.stringify({ pregunta: rq.question, notas: rq.notes ?? '' }, null, 2);
   const ai = await completeJson<AiDecomposition>(
-    { system: PROMPT_RQ_DECOMPOSE, user, temperature: 0.2, maxTokens: 1600 },
+    { system: coreStructuredPrompt('rqDecompose', getSettings().promptLanguage ?? 'es'), user, temperature: 0.2, maxTokens: 1600 },
     isAiDecomposition,
     request.model
   );
@@ -248,7 +253,8 @@ export async function mapCoverage(
   onProgress?: (p: RqMapProgress) => void
 ): Promise<ResearchQuestionDetail> {
   const rq = repo.getResearchQuestion(request.rqId);
-  if (!rq) throw new Error('No se encontró la pregunta de investigación.');
+  const language = getSettings().promptLanguage ?? 'es';
+  if (!rq) throw new Error(localizedMapText(language, { es: 'No se encontró la pregunta de investigación.', en: 'The research question was not found.', fr: 'La question de recherche est introuvable.', de: 'Die Forschungsfrage wurde nicht gefunden.', pt: 'A pergunta de investigação não foi encontrada.', 'pt-BR': 'A pergunta de pesquisa não foi encontrada.', it: 'La domanda di ricerca non è stata trovata.', tr: 'Araştırma sorusu bulunamadı.' }));
   const subs = repo.getSubQuestionRows(request.rqId);
 
   // Load lightweight idea rows once for the lexical fallback path.
@@ -268,9 +274,9 @@ export async function mapCoverage(
 
     let coverage: AiCoverage;
     if (candidates.length === 0) {
-      coverage = { status: 'uncovered', justification: 'La biblioteca no contiene ideas que aborden esta sub-pregunta.', ideaIds: [] };
+      coverage = { status: 'uncovered', justification: localizedMapText(language, { es: 'La biblioteca no contiene ideas que aborden esta sub-pregunta.', en: 'The library contains no ideas that address this sub-question.', fr: 'La bibliothèque ne contient aucune idée répondant à cette sous-question.', de: 'Die Bibliothek enthält keine Ideen, die diese Unterfrage behandeln.', pt: 'A biblioteca não contém ideias que abordem esta subquestão.', 'pt-BR': 'A biblioteca não contém ideias que abordem esta subpergunta.', it: 'La biblioteca non contiene idee che affrontino questa sotto-domanda.', tr: 'Kütüphanede bu alt soruyu ele alan fikir bulunmuyor.' }), ideaIds: [] };
     } else {
-      const disputesAll = disputesAmong(candidates.map((c) => c.id));
+      const disputesAll = disputesAmong(candidates.map((c) => c.id), language);
       const payload = {
         subPregunta: sub.text,
         ideasCandidatas: candidates.map((c) => ({
@@ -286,7 +292,7 @@ export async function mapCoverage(
       };
       try {
         coverage = await completeJson<AiCoverage>(
-          { system: PROMPT_RQ_COVERAGE, user: JSON.stringify(payload, null, 2), temperature: 0.15, maxTokens: 900 },
+          { system: coreStructuredPrompt('rqCoverage', getSettings().promptLanguage ?? 'es'), user: JSON.stringify(payload, null, 2), temperature: 0.15, maxTokens: 900 },
           isAiCoverage,
           request.model
         );
@@ -294,7 +300,7 @@ export async function mapCoverage(
         // Fall back to a conservative data-only verdict if the model call fails.
         coverage = {
           status: candidates.length >= 2 ? 'partial' : 'uncovered',
-          justification: 'Clasificación automática no disponible; verdicto provisional por recuperación.',
+          justification: localizedMapText(language, { es: 'Clasificación automática no disponible; veredicto provisional por recuperación.', en: 'Automatic classification unavailable; provisional verdict based on retrieval.', fr: 'Classification automatique indisponible ; verdict provisoire fondé sur la récupération.', de: 'Automatische Klassifizierung nicht verfügbar; vorläufiges Urteil auf Grundlage des Abrufs.', pt: 'Classificação automática indisponível; veredito provisório baseado na recuperação.', 'pt-BR': 'Classificação automática indisponível; veredito provisório baseado na recuperação.', it: 'Classificazione automatica non disponibile; verdetto provvisorio basato sul recupero.', tr: 'Otomatik sınıflandırma kullanılamıyor; getirmeye dayalı geçici karar.' }),
           ideaIds: candidates.slice(0, 4).map((c) => c.id),
         };
       }
@@ -322,7 +328,7 @@ export async function mapCoverage(
         links.push({
           kind: 'work',
           refId: w.nodus_id,
-          label: `${authorYear(w.authors, w.year)} — ${clip(w.title, 80)}`,
+        label: `${authorYear(w.authors, w.year, language)} — ${clip(w.title, 80)}`,
           score: null,
           readState: w.read ? 'read' : 'unread',
         });
@@ -330,7 +336,7 @@ export async function mapCoverage(
     }
 
     // Data-driven dispute cross-link: if chosen ideas contradict each other, surface it.
-    const disputes = disputesAmong(chosenIds);
+    const disputes = disputesAmong(chosenIds, language);
     for (const d of disputes) {
       links.push({ kind: 'debate', refId: d.edgeId, label: d.label, score: null, readState: null });
     }
@@ -345,4 +351,8 @@ export async function mapCoverage(
   repo.setRqMapped(request.rqId);
   repo.updateRqModel(request.rqId, request.model ?? (rq.model as ModelRef | null) ?? null);
   return repo.getResearchQuestionDetail(request.rqId)!;
+}
+
+function localizedMapText(language: PromptLanguage, values: Record<PromptLanguage, string>): string {
+  return values[language] ?? values.es;
 }

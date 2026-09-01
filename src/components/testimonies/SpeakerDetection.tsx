@@ -10,7 +10,8 @@ import {
 import { formatTimecode } from '@shared/testimonies';
 import { diarizeAudio, isDiarizationModelReady } from '../../lib/diarize';
 import { Icon } from '../ui';
-import { t, tx } from '../../i18n';
+import { localizeRuntimeError } from '@shared/uiLanguage';
+import { getActiveLang, t, tx } from '../../i18n';
 
 /**
  * Detectar cuántas voces hay en la grabación y dónde habla cada una.
@@ -57,7 +58,7 @@ export function SpeakerDetection({
         detected.turns,
       ));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(localizeRuntimeError(cause instanceof Error ? cause.message : String(cause), getActiveLang()));
       setResult(null);
       setProposals([]);
     } finally {
@@ -80,7 +81,7 @@ export function SpeakerDetection({
       setProposals([]);
       await onApplied();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(localizeRuntimeError(cause instanceof Error ? cause.message : String(cause), getActiveLang()));
     } finally {
       setBusy(false);
     }

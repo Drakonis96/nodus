@@ -11,8 +11,10 @@ import type {
   ResearchChatResponse,
   ResearchContextSelection,
   ResearchContextStats,
+  PromptLanguage,
   Work,
 } from '@shared/types';
+import { researchAssistantPromptPack } from '@shared/researchAssistantPromptPacks';
 import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
@@ -39,6 +41,9 @@ import {
   type HierarchicalDocumentHit,
   type HierarchicalPassageHit,
 } from './hierarchicalRetrieval';
+
+// Genealogy context protocol fields remain stable across languages:
+// `persona_central`, `parentesco_tag`, and `parentesco_con_persona_central`.
 
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_DOCUMENTS = 30;
@@ -212,20 +217,20 @@ export async function streamResearchChat(
  * first user message when the model is unavailable or returns nothing usable.
  */
 export async function generateChatTitle(messages: ChatMessageRecord[], model?: ModelRef | null): Promise<string> {
+  const promptLanguage = getSettings().promptLanguage ?? 'es';
+  const prompt = researchAssistantPromptPack(promptLanguage);
   const relevant = messages
     .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content.trim() && !m.error)
     .slice(0, 6)
-    .map((m) => `${m.role === 'user' ? 'Usuario' : 'Asistente'}: ${m.content.trim().slice(0, 600)}`);
+    .map((m) => `${m.role === 'user' ? prompt.titleLabels.user : prompt.titleLabels.assistant}: ${m.content.trim().slice(0, 600)}`);
   const firstUser = messages.find((m) => m.role === 'user' && m.content.trim())?.content.trim() ?? '';
-  const fallback = firstUser ? truncateTitle(firstUser) : 'Conversación sin título';
+  const fallback = firstUser ? truncateTitle(firstUser) : prompt.titleLabels.untitled;
   if (relevant.length === 0) return fallback;
 
   try {
     const raw = await completeText(
       {
-        system:
-          'Eres un asistente que pone títulos. Devuelve EXCLUSIVAMENTE un título breve (máximo 6 palabras), ' +
-          'en español, sin comillas, sin punto final y sin prefijos como "Título:". Resume el tema de la conversación.',
+        system: prompt.titleSystem,
         user: relevant.join('\n'),
         temperature: 0.2,
         maxTokens: 40,
@@ -350,10 +355,12 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
   if (compact) messages = messages.slice(-4);
 
   const question = messages[messages.length - 1].content;
+  const promptLanguage = getSettings().promptLanguage ?? 'es';
+  const prompt = researchAssistantPromptPack(promptLanguage);
   // In a genealogy vault the assistant is a genealogist working over the records
   // ontology (people, kinship, events, documents, evidence), not the idea graph.
   const genealogy = getActiveVault().type === 'genealogy';
-  const system = genealogy ? buildGenealogyChatSystemPrompt(compact) : buildChatSystemPrompt(compact);
+  const system = genealogy ? buildGenealogyChatSystemPrompt(compact, promptLanguage) : buildChatSystemPrompt(compact, promptLanguage);
 
   // Derive the budget from the window. Cloud (window === null) keeps the cloud-sized cap
   // and the default generation budget; local shrinks both to fit the loaded window.
@@ -372,10 +379,10 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
   }
 
   if (genealogy) {
-    const context = await buildGenealogyContext(question);
+    const context = await buildGenealogyContext(question, promptLanguage);
     const user = JSON.stringify({ contexto_familiar: context, conversacion: messages }, null, 2);
     const stats: ResearchContextStats = {
-      sections: ['Personas', 'Eventos', 'Documentos', 'Evidencia', 'Parentescos sugeridos'],
+      sections: prompt.context.genealogySections,
       works: 0,
       documents: context.documentos.length,
       summaries: 0,
@@ -386,7 +393,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
     return { system, user, stats, maxTokens, local, citationRequired: false };
   }
 
-  const { context, stats } = await buildResearchContext(request.selection, question, contextBudget);
+  const { context, stats } = await buildResearchContext(request.selection, question, contextBudget, promptLanguage);
 
   const contextJson = JSON.stringify(context);
   const citationContract = buildCitationOutputContract(contextJson);
@@ -403,68 +410,9 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
   return { system, user, stats, maxTokens, local, citationRequired: citationContract != null };
 }
 
-/** System prompt for the genealogy-mode assistant: an evidence-first family historian. */
-function buildGenealogyChatSystemPrompt(compact: boolean): string {
-  if (compact) {
-    return [
-      'Eres un genealogista experto. Respondes en español usando SOLO el contexto familiar que recibes (personas, parentescos, eventos, documentos y evidencia).',
-      '`persona_central` es el protagonista actual del árbol; usa `parentesco_con_persona_central` como la etiqueta recalculada de cada persona respecto a él o ella.',
-      'No inventes personas, fechas ni parentescos que no consten. Si un dato es incierto o contradictorio, dilo. Si el contexto no basta, dilo y sugiere qué fuente lo aportaría.',
-      'Respeta los nombres y fechas de época tal como constan; no los modernices. Nombra a las personas por su nombre completo y cita el documento y su cita literal cuando lo uses.',
-    ].join('\n');
-  }
-  return [
-    'Eres un genealogista experto que ayuda a reconstruir la historia de una familia.',
-    'Respondes en español, con rigor, y usando ÚNICAMENTE el contexto familiar que recibes: la sección `personas` (con su parentesco), `eventos`, `documentos` (fuentes con su texto), `evidencia` (citas) y `parentescos_sugeridos` (propuestas de la IA aún sin confirmar).',
-    '`persona_central` identifica al protagonista elegido en el árbol. Cada `parentesco_con_persona_central` y `parentesco_tag` se recalcula respecto a esa persona; interpreta siempre las etiquetas desde su punto de vista.',
-    '',
-    'MÉTODO (estándar de prueba genealógico):',
-    '- La identidad y el parentesco son HIPÓTESIS que se prueban con evidencia. Nunca afirmes que dos registros son la misma persona, ni un vínculo de parentesco, sin apoyo documental en el contexto.',
-    '- Cuando sostengas un hecho (una fecha, un parentesco, una identidad), cítalo: nombra el documento (`documentos[].titulo`) y, si procede, su cita literal y localización de la sección `evidencia`.',
-    '- Distingue lo que la fuente AFIRMA de lo que se INFIERE. Señala con claridad los datos inciertos, ausentes o contradictorios, y cuando dos fuentes discrepen, explícalo.',
-    '- Los `parentescos_sugeridos` son PROPUESTAS pendientes de confirmación: preséntalos como hipótesis a revisar, con su evidencia, nunca como hechos establecidos.',
-    '',
-    'ESTILO:',
-    '- Respeta los nombres y las fechas tal como constan en época; no los modernices ni normalices las fechas inciertas ("hacia 1850").',
-    '- Nombra a cada persona por su nombre completo tal como aparece en `personas`.',
-    '- No inventes personas, documentos ni datos que no estén en el contexto. Si el contexto no basta para responder, dilo con concreción y sugiere qué registro o fuente podría aportar el dato que falta.',
-  ].join('\n');
-}
-
-/**
- * The full NotebookLM-style citation rulebook. Exported so Nodi's companion chat can
- * instruct the model with the SAME `nodus://` link contract as the research chat — one
- * source of truth, so the two never drift. Every rule forbids using the raw id as the
- * visible link text; humanizeResearchCitations repairs it deterministically regardless.
- */
-export const CHAT_CITATION_RULES: string[] = [
-  'CITAS DE FUENTES (obligatorio, estilo NotebookLM):',
-  '- Cada vez que te refieras a una idea concreta (afirmacion, hallazgo, constructo, metodo o marco) presente en el contexto, DEBES citar su fuente inmediatamente despues de la mencion.',
-  '- La cita es un enlace markdown con el formato `[Autor, Año](nodus://idea/<id>)`, donde `<id>` es el campo `id` exacto de la idea en el contexto y `Autor, Año` provienen de la obra que la desarrolla (usa el apellido del primer autor y el año). Ejemplo: `la memoria de trabajo es limitada ([Baddeley, 1992](nodus://idea/abc-123))`.',
-  '- El texto visible del enlace es SIEMPRE «Autor, Año»; NUNCA uses el id como texto visible.',
-  '- Si la idea aparece en varias obras, cita la principal; si citas dos, repite el enlace con cada autor.',
-  '- Para citar un documento concreto sin idea asociada, usa `[Autor, Año](nodus://work/<nodus_id>)` con el `nodus_id` exacto del documento.',
-  '- Para citar una contradiccion o refutacion concreta de la seccion `contradicciones`, usa `[contradiccion](nodus://contradiction/<id>)` con el `id` exacto de esa relacion.',
-  '- Para citar un hueco concreto de la seccion `huecos_de_investigacion`, usa `[hueco](nodus://gap/<id>)` con el `id` exacto de ese hueco.',
-  '- La sección `pasajes_relevantes` contiene texto literal de las obras. Cuando sostengas una afirmación con uno de esos pasajes, cítalo inmediatamente como `[Autor, Año, p. N](nodus://passage/<id>)` usando el campo `citation` exacto del pasaje. No atribuyas al pasaje más de lo que dice literalmente.',
-  '- Si `pasajes_relevantes` no está vacío, prioriza sus citas para las afirmaciones verificables. Un enlace general a una obra orienta, pero NO sustituye la evidencia literal disponible.',
-  '- Ante una consulta global o comparativa, usa `orientacion_documental` para planificar qué dimensiones y obras debes cubrir. Después, fundamenta cada apartado sustantivo con al menos un `pasaje_relevante` pertinente cuando exista; si no existe, usa una `idea_generada` respaldada. No rellenes una cuota con evidencia tangencial.',
-  '- Si una conclusion se apoya en una idea y tambien en una contradiccion o hueco, incluye ambas citas junto a la frase relevante.',
-  '- Usa SIEMPRE el id exacto que aparece en el contexto. Nunca inventes ni abrevies los ids.',
-  '- No conviertas en enlace las citas a obras que no esten en el contexto; en ese caso nombra autor y año en texto plano.',
-  '- La sección `documentos_resumidos` contiene resúmenes de ORIENTACIÓN. Úsala para ubicar y comparar obras, pero NUNCA la cites como evidencia ni atribuyas a ella afirmaciones verificables. Las citas deben seguir apuntando a ideas, evidencias, huecos, contradicciones o la obra original.',
-  '- La sección `orientacion_documental` es una ficha generada y auditada para ENRUTAR la búsqueda. No es una fuente y NUNCA se cita. Verifica cualquier afirmación que sugiera contra `ideas_generadas` o `pasajes_relevantes`.',
-];
-
-/** The terse citation contract for tiny local windows (spends fewer tokens on rules). */
-export const CHAT_CITATION_RULES_COMPACT: string[] = [
-  'CITAS: tras mencionar una idea/afirmacion del contexto, añade un enlace markdown [Autor, Año](nodus://idea/<id>) con el `id` EXACTO del campo "id".',
-  'Documentos: [Autor, Año](nodus://work/<nodus_id>). Pasajes: [Autor, Año, p. N](nodus://passage/<id>) con el campo `citation` exacto.',
-  'Si hay `pasajes_relevantes`, úsalos como evidencia prioritaria; una cita general a la obra no los sustituye.',
-  'En consultas globales o comparativas, usa la orientación para cubrir las dimensiones centrales y respalda cada apartado con un pasaje pertinente cuando exista; nunca uses pasajes tangenciales para cumplir una cuota.',
-  '`orientacion_documental` sirve solo para localizar obras: nunca la cites como evidencia.',
-  'El texto visible del enlace debe ser «Autor, Año» (el apellido del primer autor y el año de la obra), NUNCA el id. Usa el id exacto solo dentro de los parentesis; nunca lo inventes.',
-];
+/** Canonical Spanish exports retained for Nodi's shared citation contract. */
+export const CHAT_CITATION_RULES: string[] = researchAssistantPromptPack('es').citationRules;
+export const CHAT_CITATION_RULES_COMPACT: string[] = researchAssistantPromptPack('es').citationRulesCompact;
 
 /**
  * Repair citation labels in an answer against the corpus — bare ids become "Autor, Año"
@@ -494,24 +442,15 @@ export function sanitizeResearchCitations(answer: string, sourceContext: string)
  * rather than instructions. Both forbid using the raw id as the visible link text — and
  * finalizeAnswer repairs it deterministically for weaker local models regardless.
  */
-function buildChatSystemPrompt(compact: boolean): string {
-  if (compact) {
-    return [
-      'Eres el asistente de investigacion de Nodus. Responde en espanol, con rigor y usando SOLO el contexto que recibes.',
-      'Se conciso y directo: prioriza terminar la respuesta antes que extenderte, porque el espacio es limitado.',
-      'Si el contexto no basta para responder, dilo con claridad; no inventes.',
-      ...CHAT_CITATION_RULES_COMPACT,
-    ].join('\n');
-  }
-  return [
-    'Eres el asistente de investigacion avanzado de Nodus.',
-    'Responde en espanol, con rigor academico y usando solo el contexto modular que recibes.',
-    'Si el contexto seleccionado no contiene la seccion necesaria, dilo de forma concreta y explica que seccion convendria activar.',
-    'Conserva las relaciones entre autores, documentos e ideas cuando esten presentes en el contexto.',
-    'No inventes contenido de documentos que no aparezca en el contexto.',
-    '',
-    ...CHAT_CITATION_RULES,
-  ].join('\n');
+function buildChatSystemPrompt(compact: boolean, language: PromptLanguage = getSettings().promptLanguage ?? 'es'): string {
+  const prompt = researchAssistantPromptPack(language);
+  return compact ? prompt.chat.compact : prompt.chat.full;
+}
+
+/** System prompt for the genealogy-mode assistant: an evidence-first family historian. */
+function buildGenealogyChatSystemPrompt(compact: boolean, language: PromptLanguage = getSettings().promptLanguage ?? 'es'): string {
+  const prompt = researchAssistantPromptPack(language);
+  return compact ? prompt.genealogy.compact : prompt.genealogy.full;
 }
 
 /**
@@ -624,11 +563,13 @@ function resolveIdeaIds(scope: RelevanceScope, limit: number): string[] {
 async function buildResearchContext(
   selection: ResearchContextSelection,
   question = '',
-  maxContextChars = MAX_TOTAL_CONTEXT_CHARS
+  maxContextChars = MAX_TOTAL_CONTEXT_CHARS,
+  language: PromptLanguage = getSettings().promptLanguage ?? 'es'
 ): Promise<BuildResult> {
+  const prompt = researchAssistantPromptPack(language);
   const context: SectionPayload = {
     generated_at: new Date().toISOString(),
-    note: 'Este objeto contiene exclusivamente las secciones marcadas por el usuario, acotadas a lo relevante para la consulta.',
+    note: prompt.context.note,
   };
   const sections: string[] = [];
   const linkedWorkIds = new Set<string>();
@@ -638,22 +579,22 @@ async function buildResearchContext(
 
   if (selection.ideas) {
     context.ideas_generadas = listIdeas(linkedWorkIds, scope);
-    sections.push('Ideas generadas');
+    sections.push(prompt.context.sections.ideas);
   }
 
   if (selection.themes) {
     context.temas_principales = listThemes(linkedWorkIds, scope);
-    sections.push('Temas principales');
+    sections.push(prompt.context.sections.themes);
   }
 
   if (selection.contradictions) {
     context.contradicciones = listContradictions(linkedWorkIds, scope);
-    sections.push('Contradicciones');
+    sections.push(prompt.context.sections.contradictions);
   }
 
   if (selection.gaps) {
     context.huecos_de_investigacion = listGaps(linkedWorkIds, scope);
-    sections.push('Huecos de investigacion');
+    sections.push(prompt.context.sections.gaps);
   }
 
   if (selection.readingPath) {
@@ -662,24 +603,24 @@ async function buildResearchContext(
       for (const entry of phase.entries) linkedWorkIds.add(entry.nodus_id);
     }
     context.rutas_de_lectura = plan;
-    sections.push('Rutas de lectura');
+    sections.push(prompt.context.sections.readingPath);
   }
 
   if (selection.authors) {
     context.autores = listAuthors(linkedWorkIds, scope);
-    sections.push('Autores');
+    sections.push(prompt.context.sections.authors);
   }
 
   if (selection.graph) {
     context.grafo = await listGraph(selection, linkedWorkIds, scope);
-    sections.push('Grafo');
+    sections.push(prompt.context.sections.graph);
   }
 
   const passageScopeWorkIds = new Set(linkedWorkIds);
 
   if (scope.documentHits.length > 0) {
     context.orientacion_documental = compactDocumentOrientation(scope.documentHits);
-    sections.push('Orientación documental');
+    sections.push(prompt.context.sections.orientation);
   }
 
   // The full-text sections dominate the payload; on a small local budget, cap how much
@@ -693,7 +634,7 @@ async function buildResearchContext(
     if (documentContext.omitted > 0) {
       context.documentos_relacionados_omitidos = documentContext.omitted;
     }
-    sections.push('Documentos relacionados');
+    sections.push(prompt.context.sections.documents);
     truncated = truncated || documentContext.truncated;
   }
 
@@ -702,7 +643,7 @@ async function buildResearchContext(
   if (selection.passages !== false) {
     const passages = await listRelevantPassages(scope, passageScopeWorkIds, heavyCap);
     context.pasajes_relevantes = passages;
-    sections.push('Pasajes de texto completo');
+    sections.push(prompt.context.sections.passages);
   }
 
   const budget = enforceContextBudget(context, maxContextChars);
@@ -742,7 +683,7 @@ export async function buildNodiResearchContext(question: string, maxContextChars
     passages: true,
     graph: false,
     graphParts: { ideaNodes: false, themeNodes: false, ideaEdges: false, authorGraph: false },
-  }, question, maxContextChars);
+  }, question, maxContextChars, getSettings().promptLanguage ?? 'es');
 }
 
 function listIdeas(linkedWorkIds: Set<string>, scope: RelevanceScope) {

@@ -7,11 +7,13 @@
 //      conceptually linked ideas surface even when their wording differs;
 //   3. AI curation — let the model pick the ones that genuinely belong and
 //      justify each, reconciled against the known candidate ids.
-import type { FolderIdeaSuggestion, FolderIdeaSuggestionsResult, IdeaType } from '@shared/types';
+import type { FolderIdeaSuggestion, FolderIdeaSuggestionsResult, IdeaType, PromptLanguage } from '@shared/types';
 import { getDb } from '../db/database';
 import { getNoteFolder } from '../db/notesRepo';
 import * as ideas from '../db/ideasRepo';
 import { embed, completeJson } from './aiClient';
+import { getSettings } from '../db/settingsRepo';
+import { folderPromptPack } from '@shared/academicPromptPacks';
 
 // Mirrors MANUAL_IDEA_MARKER / idea-note provenance: idea notes carry the idea's
 // global_id in source_json `$.ref`. Those refs are what's "already in the folder".
@@ -102,7 +104,9 @@ function clamp01(value: unknown): number {
   return Math.max(0, Math.min(1, n));
 }
 
-export async function suggestFolderIdeas(folderId: string): Promise<FolderIdeaSuggestionsResult> {
+export async function suggestFolderIdeas(folderId: string, requestedLanguage?: PromptLanguage): Promise<FolderIdeaSuggestionsResult> {
+  const language = requestedLanguage ?? getSettings().promptLanguage ?? 'es';
+  const copy = folderPromptPack(language);
   const empty = (message: string | null, ok = false): FolderIdeaSuggestionsResult => ({
     ok,
     message,
@@ -175,21 +179,18 @@ export async function suggestFolderIdeas(folderId: string): Promise<FolderIdeaSu
   }
 
   // ── Stage 3: AI curation + justification ───────────────────────────────────
+  const localizedVia = ({ es: 'mediante conexión', en: 'via connection', fr: 'via une connexion', de: 'über Verbindung', pt: 'através de ligação', 'pt-BR': 'via conexão', it: 'tramite collegamento', tr: 'bağlantı üzerinden' } as const)[language];
+  const localizedAffinity = ({ es: 'similitud', en: 'similarity', fr: 'similarité', de: 'Ähnlichkeit', pt: 'semelhança', 'pt-BR': 'similaridade', it: 'affinità', tr: 'benzerlik' } as const)[language];
   const list = candidates
     .map((c, i) => {
-      const via = c.viaConnection ? ' [vía conexión]' : '';
-      const sim = c.similarity != null ? ` (afinidad ${c.similarity.toFixed(2)})` : '';
+      const via = c.viaConnection ? ` [${localizedVia}]` : '';
+      const sim = c.similarity != null ? ` (${localizedAffinity} ${c.similarity.toFixed(2)})` : '';
       return `${i + 1}. id="${c.global_id}"${via}${sim} · ${c.label}\n   ${c.statement}`;
     })
     .join('\n');
 
-  const system =
-    'Eres un documentalista académico. Recibes el RESUMEN de una carpeta de investigación (qué ideas debería integrar) y una lista de IDEAS candidatas. ' +
-    'Selecciona únicamente las ideas que encajan de verdad en la carpeta según su resumen, descartando las tangenciales. ' +
-    'Para cada idea elegida da una razón breve (1 frase) de por qué pertenece a la carpeta y una puntuación de ajuste entre 0 y 1. ' +
-    'Devuelve EXCLUSIVAMENTE un JSON con la forma {"selected": [{"id": "g-0001", "reason": "…", "score": 0.0}]} ' +
-    'usando los id EXACTOS proporcionados, sin inventar ni repetir ninguno. Puedes devolver una lista vacía si ninguna encaja.';
-  const user = `Resumen de la carpeta «${folder.name}»:\n${summary}\n\nIdeas candidatas:\n${list}\n\nDevuelve {"selected": [...]} con los id exactos.`;
+  const system = copy.system;
+  const user = `${copy.folderSummary} «${folder.name}»:\n${summary}\n\n${copy.candidates}:\n${list}\n\n${copy.returnJson}`;
 
   let curated: CurationResponse;
   try {
@@ -208,7 +209,7 @@ export async function suggestFolderIdeas(folderId: string): Promise<FolderIdeaSu
     }));
     return {
       ok: true,
-      message: 'No se pudo completar el análisis de IA; se muestran las ideas más afines por similitud.',
+      message: copy.fallback,
       suggestions: fallback,
       excludedCount,
       consideredCount: candidates.length,

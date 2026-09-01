@@ -65,6 +65,7 @@ export async function applyCopilotPromptStyle(input: {
     level: style.level,
     length: style.length,
     mode: 'preserve',
+    promptLanguage: settings.promptLanguage,
     variables: {
       language: style.language,
       documentType: 'Microsoft Word',
@@ -72,7 +73,7 @@ export async function applyCopilotPromptStyle(input: {
     },
     model,
   };
-  const prompt = buildStudyImprovePrompt(request, style, protectedValue.text);
+  const prompt = buildStudyImprovePrompt(request, style, protectedValue.text, settings.promptLanguage);
   const raw = await completeText({
     system: prompt.system,
     user: prompt.user,
@@ -93,7 +94,7 @@ export async function applyCopilotPromptStyle(input: {
   if (!text) throw new Error('La IA no devolvió texto insertable.');
   return {
     text,
-    warnings: studyImprovementWarnings(original, text, protectedValue.spans, 'preserve'),
+    warnings: studyImprovementWarnings(original, text, protectedValue.spans, 'preserve', settings.uiLanguage === 'es' ? 'es' : 'en'),
     styleId: style.id,
     model,
   };

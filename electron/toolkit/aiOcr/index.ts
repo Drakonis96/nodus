@@ -56,7 +56,7 @@ function resolveOcrModel(explicit?: ModelRef | null): ModelRef | null {
 }
 
 function mergeOptions(partial?: Partial<OcrOptions>): OcrOptions {
-  return { ...DEFAULT_OCR_OPTIONS, ...(partial ?? {}) };
+  return { ...DEFAULT_OCR_OPTIONS, promptLanguage: getSettings().promptLanguage ?? 'es', ...(partial ?? {}) };
 }
 
 let store: OcrStore | null = null;
@@ -214,24 +214,24 @@ export async function updateOcrPage(id: string, index: number, text: string | nu
 
 function sanitizeFilename(name: string): string {
   const cleaned = name.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
-  return cleaned || 'documento';
+  return cleaned || 'document';
 }
 
-async function transcriptBytes(id: string, format: AiOcrExportFormat, title: string): Promise<Uint8Array> {
+async function transcriptBytes(id: string, format: AiOcrExportFormat, title: string, language = 'en'): Promise<Uint8Array> {
   const md = requireStore().readTranscript(id) ?? '';
   if (format === 'pdf') {
-    const pdf = await htmlToPdfBytes(transcriptToHtml(md, title), { margins: { top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 } });
+    const pdf = await htmlToPdfBytes(transcriptToHtml(md, title, language), { margins: { top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 } });
     return new Uint8Array(pdf);
   }
-  return exportTranscriptBytes(md, format, title);
+  return exportTranscriptBytes(md, format, title, language);
 }
 
 /** Produce the bytes + suggested filename for exporting one document. */
-export async function buildOcrExport(id: string, format: AiOcrExportFormat): Promise<{ filename: string; data: Uint8Array }> {
+export async function buildOcrExport(id: string, format: AiOcrExportFormat, language = 'en'): Promise<{ filename: string; data: Uint8Array }> {
   const doc = requireStore().readDoc(id);
   if (!doc) throw new Error('Documento OCR no encontrado.');
-  const title = doc.name || 'documento';
-  const data = await transcriptBytes(id, format, title);
+  const title = doc.name || 'Document';
+  const data = await transcriptBytes(id, format, title, language);
   return { filename: `${sanitizeFilename(title)}.${AI_OCR_EXPORT_EXT[format]}`, data };
 }
 
@@ -249,7 +249,7 @@ export function saveOcrToVault(id: string): { noteId: string; title: string } {
 }
 
 /** Bundle every completed document's transcript into one ZIP in the chosen format. */
-export async function buildOcrExportZip(ids: string[], format: AiOcrExportFormat): Promise<{ filename: string; data: Uint8Array }> {
+export async function buildOcrExportZip(ids: string[], format: AiOcrExportFormat, language = 'en'): Promise<{ filename: string; data: Uint8Array }> {
   const store = requireStore();
   const entries: ZipEntry[] = [];
   const taken = new Set<string>();
@@ -257,12 +257,12 @@ export async function buildOcrExportZip(ids: string[], format: AiOcrExportFormat
   for (const id of ids) {
     const doc = store.readDoc(id);
     if (!doc || doc.status !== 'done') continue;
-    const base = sanitizeFilename(doc.name || 'documento');
+    const base = sanitizeFilename(doc.name || 'Document');
     let name = `${base}.${ext}`;
     let n = 2;
     while (taken.has(name)) name = `${base} (${n++}).${ext}`;
     taken.add(name);
-    entries.push({ name, data: Buffer.from(await transcriptBytes(id, format, doc.name || 'documento')), store: false });
+        entries.push({ name, data: Buffer.from(await transcriptBytes(id, format, doc.name || 'Document', language)), store: false });
   }
   if (entries.length === 0) throw new Error('No hay documentos completados para exportar.');
   return { filename: 'ocr-export.zip', data: new Uint8Array(buildZip(entries)) };

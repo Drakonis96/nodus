@@ -1,6 +1,6 @@
 import { AiError, completeJson } from './aiClient';
 import { modelRefSupportsExtraction } from '@shared/localAiModels';
-import { PROMPT_LIGHT } from './prompts';
+import { lightScanPrompt } from './prompts';
 import { normalizeThemeLabel, setWorkThemes } from '../db/themesRepo';
 import { setLightResult } from '../db/worksRepo';
 import { getSettings } from '../db/settingsRepo';
@@ -29,13 +29,6 @@ export interface LightScanOptions {
    */
   lockedLabels?: string[] | null;
 }
-
-const LOCKED_CONSTRAINT = `
-
-RESTRICCIÓN DE TEMAS BLOQUEADOS:
-- El usuario ha fijado una lista cerrada de temas principales en "available_main_themes".
-- Asigna la obra SOLO a los temas de esa lista que realmente le correspondan, copiando su etiqueta EXACTA.
-- NO inventes temas nuevos ni variantes. Si ninguno encaja, devuelve "themes": [].`;
 
 /** Light scan: title + abstract only → coarse themes. Cheap, incremental, includes unread works. */
 export async function runLightScan(
@@ -71,10 +64,9 @@ export async function runLightScan(
     item_type: work.item_type,
     abstract: abstract ?? null,
   };
-  let system = PROMPT_LIGHT;
+  const system = lightScanPrompt(settings.promptLanguage ?? 'es', Boolean(lockedLabels));
   if (lockedLabels) {
     input.available_main_themes = lockedLabels;
-    system = `${PROMPT_LIGHT}${LOCKED_CONSTRAINT}`;
   }
 
   try {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { StudyStyle, StudyStyleInput } from '@shared/types';
 import { studyStyleIcon, validateStudyStylePrompt } from '@shared/studyImprove';
-import { t, tx } from '../../i18n';
+import { getActiveLang, t, tx } from '../../i18n';
 import { Icon, ICON_NAMES, Spinner } from '../ui';
 import { IconEmojiPicker } from '../IconEmojiPicker';
 import { ConfirmModal } from '../ConfirmModal';
@@ -118,7 +118,7 @@ export function StudyImproveDialog({ onToolbarChanged, onClose }: {
     finally { setBusy(false); }
   };
 
-  const warnings = validateStudyStylePrompt(draft.prompt);
+  const warnings = validateStudyStylePrompt(draft.prompt, getActiveLang());
 
   return <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/65 p-4" data-testid="study-improve-dialog" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="flex max-h-[78vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-2xl dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100">

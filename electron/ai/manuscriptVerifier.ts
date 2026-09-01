@@ -18,6 +18,7 @@ import {
   type ExtractedManuscriptClaim,
 } from '../../shared/manuscriptVerifier';
 import { completeJson, embed } from './aiClient';
+import { manuscriptVerifierPrompt } from '@shared/manuscriptVerifierPromptPacks';
 import { getSettings } from '../db/settingsRepo';
 import { allIdeaCandidates, findSimilarIdeas } from '../db/ideasRepo';
 import { findSimilarPassages } from '../db/passagesRepo';
@@ -225,20 +226,7 @@ async function refineWithAi(
     try {
       const response = await completeJson<AiReviewResponse>(
         {
-          system: [
-            'Eres un verificador academico dentro de Nodus.',
-            'No recibes el manuscrito completo. Solo recibes frases candidatas y candidatos recuperados desde ideas/pasajes del corpus local.',
-            'Tu tarea es clasificar si una frase necesita cita, ya esta cubierta, es aportacion propia o solo tiene una coincidencia debil.',
-            'Usa status exactamente: missing_citation, covered, own_argument, weak_match.',
-            'Marca missing_citation solo si NO hay cita existente y algun candidato respalda directamente la frase.',
-            'Marca own_argument si la frase expresa una contribucion del autor o si no hay respaldo directo en los candidatos.',
-            'No inventes fuentes, ids ni citas. Usa solo evidenceIds de los candidatos recibidos.',
-            'En evidenceIds incluye SOLO los candidatos que respaldan directamente la frase, del mas al menos pertinente. Omite los candidatos fuera de tema aunque aparezcan en la lista.',
-            language === 'en'
-              ? 'Write rationale and replacementHint in English.'
-              : 'Escribe rationale y replacementHint en espanol.',
-            'Devuelve solo JSON {"claims":[{"id","status","severity":"high|medium|low|info","rationale":"breve","evidenceIds":["kind:id"],"replacementHint":"opcional"}]}',
-          ].join('\n'),
+          system: manuscriptVerifierPrompt(language),
           user: JSON.stringify(
             {
               claims: batch.map((check) => ({
@@ -350,27 +338,17 @@ function sortChecks(checks: ManuscriptClaimCheck[]): ManuscriptClaimCheck[] {
 }
 
 function warn(language: AppLanguage, kind: 'empty' | 'noClaims' | 'noIdeas' | 'noEmbeddings' | 'noAi'): string {
-  const en = language === 'en';
-  switch (kind) {
-    case 'empty':
-      return en ? 'The selected chapter has no text to verify.' : 'El capitulo seleccionado no tiene texto que verificar.';
-    case 'noClaims':
-      return en
-        ? 'No citation-worthy academic claims were detected in this chapter.'
-        : 'No se detectaron afirmaciones academicas verificables en este capitulo.';
-    case 'noIdeas':
-      return en
-        ? 'There are no listed corpus ideas to compare against.'
-        : 'No hay ideas listadas del corpus contra las que comparar.';
-    case 'noEmbeddings':
-      return en
-        ? 'Embeddings are unavailable, so the verifier used listed ideas only.'
-        : 'No hay embeddings disponibles; el verificador uso solo ideas listadas.';
-    case 'noAi':
-      return en
-        ? 'AI review was unavailable, so deterministic retrieval results are shown.'
-        : 'La revision con IA no estuvo disponible; se muestran resultados deterministas.';
-  }
+  const copy: Record<AppLanguage, Record<typeof kind, string>> = {
+    es: { empty: 'El capitulo seleccionado no tiene texto que verificar.', noClaims: 'No se detectaron afirmaciones academicas verificables en este capitulo.', noIdeas: 'No hay ideas listadas del corpus contra las que comparar.', noEmbeddings: 'No hay embeddings disponibles; el verificador uso solo ideas listadas.', noAi: 'La revision con IA no estuvo disponible; se muestran resultados deterministas.' },
+    en: { empty: 'The selected chapter has no text to verify.', noClaims: 'No citation-worthy academic claims were detected in this chapter.', noIdeas: 'There are no listed corpus ideas to compare against.', noEmbeddings: 'Embeddings are unavailable, so the verifier used listed ideas only.', noAi: 'AI review was unavailable, so deterministic retrieval results are shown.' },
+    fr: { empty: 'Le chapitre sélectionné ne contient aucun texte à vérifier.', noClaims: 'Aucune affirmation universitaire nécessitant une citation n’a été détectée dans ce chapitre.', noIdeas: 'Aucune idée listée du corpus ne permet une comparaison.', noEmbeddings: 'Les embeddings sont indisponibles ; le vérificateur a utilisé uniquement les idées listées.', noAi: 'La vérification par IA est indisponible ; les résultats de récupération déterministes sont affichés.' },
+    de: { empty: 'Das ausgewählte Kapitel enthält keinen zu prüfenden Text.', noClaims: 'In diesem Kapitel wurden keine belegpflichtigen wissenschaftlichen Aussagen erkannt.', noIdeas: 'Es gibt keine aufgelisteten Korpusideen zum Vergleich.', noEmbeddings: 'Embeddings sind nicht verfügbar; der Prüfer verwendete nur aufgelistete Ideen.', noAi: 'Die KI-Prüfung war nicht verfügbar; deterministische Abrufresultate werden angezeigt.' },
+    pt: { empty: 'O capítulo selecionado não contém texto para verificar.', noClaims: 'Não foram detetadas afirmações académicas que exijam citação neste capítulo.', noIdeas: 'Não há ideias listadas do corpus para comparação.', noEmbeddings: 'Os embeddings não estão disponíveis; o verificador usou apenas as ideias listadas.', noAi: 'A revisão por IA não está disponível; são apresentados resultados determinísticos de recuperação.' },
+    'pt-BR': { empty: 'O capítulo selecionado não contém texto para verificar.', noClaims: 'Nenhuma afirmação acadêmica que exija citação foi detectada neste capítulo.', noIdeas: 'Não há ideias listadas do corpus para comparação.', noEmbeddings: 'Os embeddings não estão disponíveis; o verificador usou apenas as ideias listadas.', noAi: 'A revisão por IA não está disponível; resultados determinísticos de recuperação são exibidos.' },
+    it: { empty: 'Il capitolo selezionato non contiene testo da verificare.', noClaims: 'In questo capitolo non sono state rilevate affermazioni accademiche che richiedano una citazione.', noIdeas: 'Non ci sono idee del corpus elencate con cui confrontarsi.', noEmbeddings: 'Gli embedding non sono disponibili; il verificatore ha usato solo le idee elencate.', noAi: 'La revisione tramite IA non è disponibile; vengono mostrati risultati di recupero deterministici.' },
+    tr: { empty: 'Seçilen bölümde doğrulanacak metin yok.', noClaims: 'Bu bölümde alıntı gerektiren akademik bir iddia tespit edilmedi.', noIdeas: 'Karşılaştırılacak listelenmiş derlem fikri yok.', noEmbeddings: 'Embedding’ler kullanılamıyor; doğrulayıcı yalnızca listelenen fikirleri kullandı.', noAi: 'Yapay zekâ incelemesi kullanılamadı; deterministik getirme sonuçları gösteriliyor.' },
+  };
+  return copy[language]?.[kind] ?? copy.es[kind];
 }
 
 function clip(text: string, max: number): string {

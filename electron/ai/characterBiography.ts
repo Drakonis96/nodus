@@ -61,6 +61,7 @@ export async function generateCharacterBiography(
     aliases: character.names.map((entry) => ({
       name: entry.name,
       kind: entry.kind ? CHARACTER_NAME_KIND_LABEL[entry.kind] ?? entry.kind : null,
+      kindToken: entry.kind,
     })),
     species: character.profile.species,
     gender: character.profile.gender,
@@ -97,7 +98,7 @@ export async function generateCharacterBiography(
         mode === 'propose' ? 'biographyPropose' : 'biography',
         settings.promptLanguage ?? 'es',
       ),
-      user: composeCharacterBiographyContext(sources, mode),
+      user: composeCharacterBiographyContext(sources, mode, settings.promptLanguage ?? 'es'),
       plainContext: true,
       // Warmer than the genealogy biography's 0.3: this is narrative prose about an
       // invented person, not a cautious reading of records. Warmer still when proposing.

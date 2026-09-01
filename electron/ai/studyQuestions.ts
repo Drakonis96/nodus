@@ -14,6 +14,7 @@ import { runStudyAiTask } from './studyAiPolicy';
 import { retrieveStudyAssistantEntries } from './studySearch';
 import { retrieveStudyKnowledgeContext } from './studyKnowledge';
 import type { StudyAssessmentKnowledgeContext } from '@shared/studyKnowledge';
+import type { PromptLanguage } from '@shared/types';
 
 function searchOptions(request: StudyQuestionGenerationRequest): StudySearchOptions {
   return {
@@ -55,16 +56,27 @@ function queryFor(request: StudyQuestionGenerationRequest): string {
 
 interface QuestionPromptSource { id: string; title: string; type: string; location: unknown; exactFragment: string }
 
+const STUDY_QUESTION_SCAFFOLD: Record<PromptLanguage, { conceptMap: string; studentSelection: string }> = {
+  es: { conceptMap: 'MAPA CONCEPTUAL DE LA ASIGNATURA', studentSelection: 'Selección del alumno' },
+  en: { conceptMap: 'SUBJECT CONCEPT MAP', studentSelection: 'Student selection' },
+  fr: { conceptMap: 'CARTE CONCEPTUELLE DE LA MATIÈRE', studentSelection: 'Sélection de l’étudiant' },
+  de: { conceptMap: 'BEGRIFFSKARTE DES FACHES', studentSelection: 'Auswahl des Lernenden' },
+  pt: { conceptMap: 'MAPA CONCEPTUAL DA DISCIPLINA', studentSelection: 'Seleção do estudante' },
+  'pt-BR': { conceptMap: 'MAPA CONCEITUAL DA DISCIPLINA', studentSelection: 'Seleção do estudante' },
+  it: { conceptMap: 'MAPPA CONCETTUALE DELLA MATERIA', studentSelection: 'Selezione dello studente' },
+  tr: { conceptMap: 'DERS KAVRAM HARİTASI', studentSelection: 'Öğrenci seçimi' },
+};
+
 export function studyQuestionGenerationTask(types: StudyQuestionGenerationRequest['types']): 'questions' | 'flashcards' {
   return types.length === 1 && types[0] === 'definition' ? 'flashcards' : 'questions';
 }
 
-function sourcePayload(entries: StudySearchIndexEntry[], selection?: string): QuestionPromptSource[] {
+function sourcePayload(entries: StudySearchIndexEntry[], selection: string | undefined, language: PromptLanguage): QuestionPromptSource[] {
   const sources: QuestionPromptSource[] = entries.map((entry, index) => {
     const compressed = compressStudyAssistantEvidence(entry.text, queryFor({ sourceKeys: [], count: 1, difficulty: 'medium', cognitiveLevels: [], types: [], selection }), 4200);
     return { id: `S${index + 1}`, title: entry.title, type: entry.kind, location: entry.location, exactFragment: compressed.text };
   });
-  if (selection?.trim()) sources.unshift({ id: 'S0', title: 'Selección del alumno', type: 'selection', location: {}, exactFragment: selection.trim().slice(0, 8000) });
+  if (selection?.trim()) sources.unshift({ id: 'S0', title: STUDY_QUESTION_SCAFFOLD[language].studentSelection, type: 'selection', location: {}, exactFragment: selection.trim().slice(0, 8000) });
   return sources;
 }
 
@@ -79,16 +91,27 @@ const PROMPT_COPY = {
   it: { role: 'Crea domande a scelta multipla a partire dai materiali di studio.', developmentRole: 'Crea domande a risposta breve per verificare la comprensione dei concetti chiave.', source: 'CONTENUTO INDICIZZATO', custom: 'ISTRUZIONI AGGIUNTIVE', grounding: 'Usa esclusivamente il contenuto fornito. Non inventare informazioni ed evita domande ripetitive o ambigue.', development: (count: number) => `Genera esattamente ${count} domande. Dopo ogni domanda, includi una risposta modello breve e sufficiente per la correzione.`, test: (count: number, options: number) => `Genera esattamente ${count} domande con ${options} risposte ciascuna. Deve esserci una sola risposta corretta. Le risposte errate devono essere plausibili.`, rules: 'Restituisci soltanto le domande. Non aggiungere introduzioni, numerazione, Markdown, blocchi di codice o spiegazioni.', format: 'Formato obbligatorio per ogni domanda', question: 'Inserisci qui la domanda', correct: 'Risposta corretta', incorrect: 'Risposta errata' },
 } as const;
 
-export function buildStudyQuestionPrompt(request: StudyQuestionGenerationRequest, sources: ReturnType<typeof sourcePayload>, knowledge?: StudyAssessmentKnowledgeContext) {
+const CONCEPT_MAP_RULE = {
+  es: 'El mapa conceptual sirve para elegir qué evaluar, pero no es evidencia. Toda respuesta correcta y todo distractor deben poder verificarse en CONTENIDO INDEXADO.',
+  en: 'The concept map helps choose what to assess, but it is not evidence. Every correct answer and distractor must be verifiable in INDEXED CONTENT.',
+  fr: 'La carte conceptuelle sert à choisir ce qui sera évalué, mais ne constitue pas une preuve. Toute bonne réponse et tout distracteur doivent pouvoir être vérifiés dans le CONTENU INDEXÉ.',
+  tr: 'Kavram haritası neyin değerlendirileceğini seçmeye yarar, ancak kanıt değildir. Her doğru yanıt ve çeldirici DİZİNE EKLENMİŞ İÇERİK içinde doğrulanabilmelidir.',
+  de: 'Die Konzeptkarte hilft bei der Auswahl der Prüfungsinhalte, ist aber kein Beleg. Jede richtige Antwort und jeder Distraktor muss im INDEXIERTEN INHALT überprüfbar sein.',
+  pt: 'O mapa conceptual ajuda a escolher o que avaliar, mas não é evidência. Todas as respostas corretas e todos os distratores devem poder ser verificados no CONTEÚDO INDEXADO.',
+  'pt-BR': 'O mapa conceitual ajuda a escolher o que avaliar, mas não é evidência. Toda resposta correta e todo distrator deve poder ser verificado no CONTEÚDO INDEXADO.',
+  it: 'La mappa concettuale serve a scegliere cosa valutare, ma non è una prova. Ogni risposta corretta e ogni distrattore devono poter essere verificati nel CONTENUTO INDICIZZATO.',
+} as const;
+
+export function buildStudyQuestionPrompt(request: StudyQuestionGenerationRequest, sources: QuestionPromptSource[], knowledge?: StudyAssessmentKnowledgeContext, requestedLanguage?: PromptLanguage) {
   const count = Math.max(1, Math.min(40, Math.round(request.count)));
   const development = request.types.includes('essay');
   const optionCount = Math.max(2, Math.min(10, Math.round(request.optionCount ?? 4)));
-  const language = getSettings().promptLanguage ?? 'es';
+  const language = requestedLanguage ?? getSettings().promptLanguage ?? 'es';
   const copy = PROMPT_COPY[language];
   return {
     system: `${development ? copy.developmentRole : copy.role}
 ${copy.grounding}
-El mapa conceptual sirve para elegir qué evaluar, pero no es evidencia. Toda respuesta correcta y todo distractor deben poder verificarse en CONTENIDO INDEXADO.
+${CONCEPT_MAP_RULE[language] ?? CONCEPT_MAP_RULE.en}
 ${development ? copy.development(count) : copy.test(count, optionCount)}
 ${copy.rules}
 
@@ -96,7 +119,7 @@ ${copy.format}
 Q: ${copy.question}
 * ${copy.correct}
 ${development ? '' : Array.from({ length: optionCount - 1 }, () => `- ${copy.incorrect}`).join('\n')}`,
-    user: `${knowledge?.outline ? `MAPA CONCEPTUAL DE LA ASIGNATURA\n${knowledge.outline}\n\n` : ''}${copy.source}\n${sources.map((source) => `[${source.title}]\n${source.exactFragment}`).join('\n\n')}${request.customPrompt?.trim() ? `\n\n${copy.custom}\n${request.customPrompt.trim()}` : ''}`,
+    user: `${knowledge?.outline ? `${STUDY_QUESTION_SCAFFOLD[language].conceptMap}\n${knowledge.outline}\n\n` : ''}${copy.source}\n${sources.map((source) => `[${source.title}]\n${source.exactFragment}`).join('\n\n')}${request.customPrompt?.trim() ? `\n\n${copy.custom}\n${request.customPrompt.trim()}` : ''}`,
     count, optionCount, development,
   };
 }
@@ -112,8 +135,8 @@ export function mergeStudyAssessmentKnowledgeContexts(contexts: StudyAssessmentK
   };
 }
 
-function applySource(question: StudyQuestionInput, entries: StudySearchIndexEntry[], selection?: string): StudyQuestionInput {
-  if (!entries.length && selection?.trim()) return { ...question, source: { title: 'Selección del alumno', excerpt: selection.trim() } };
+function applySource(question: StudyQuestionInput, entries: StudySearchIndexEntry[], selection: string | undefined, language: PromptLanguage): StudyQuestionInput {
+  if (!entries.length && selection?.trim()) return { ...question, source: { title: STUDY_QUESTION_SCAFFOLD[language].studentSelection, excerpt: selection.trim() } };
   const entry = [...entries].sort((a, b) => studyQuestionSimilarity(question.prompt, b.text) - studyQuestionSimilarity(question.prompt, a.text))[0];
   if (!entry) return question;
   const excerpt = compressStudyAssistantEvidence(entry.text, question.prompt, 2200).text;
@@ -129,6 +152,8 @@ function applySource(question: StudyQuestionInput, entries: StudySearchIndexEntr
 }
 
 export async function generateStudyQuestions(request: StudyQuestionGenerationRequest): Promise<StudyQuestionGenerationResult> {
+  const aiSettings = getSettings();
+  const language = aiSettings.promptLanguage ?? 'es';
   if (!request.types.length) throw new Error('Selecciona al menos un tipo de pregunta.');
   if (!request.cognitiveLevels.length) throw new Error('Selecciona al menos un nivel cognitivo.');
   // The prompt has only a development and a multiple-choice shape, so anything outside
@@ -146,9 +171,8 @@ export async function generateStudyQuestions(request: StudyQuestionGenerationReq
   const knowledgeContexts = await Promise.all(subjectIds.map((subjectId) => retrieveStudyKnowledgeContext(subjectId, retrievalQuery, sourceKeys)));
   const knowledge = knowledgeContexts.length ? mergeStudyAssessmentKnowledgeContexts(knowledgeContexts) : undefined;
   if (!entries.length && !request.selection?.trim()) throw new Error('No hay fuentes de estudio disponibles para generar preguntas.');
-  const sources = sourcePayload(entries, request.selection);
-  const prompt = buildStudyQuestionPrompt(request, sources, knowledge);
-  const aiSettings = getSettings();
+  const sources = sourcePayload(entries, request.selection, language);
+  const prompt = buildStudyQuestionPrompt(request, sources, knowledge, language);
   const task = studyQuestionGenerationTask(request.types);
   const completed = await runStudyAiTask<string>({ task, explicitModel: request.model, subjectId: request.subjectId ?? (subjectIds.length === 1 ? subjectIds[0] : undefined), inputChars: prompt.system.length + prompt.user.length, outputChars: (value) => value.length },
     (model) => completeText({ system: prompt.system, user: prompt.user, temperature: aiSettings.studyAiTemperature, maxTokens: Math.min(aiSettings.studyAiMaxOutputTokens, Math.max(1800, prompt.count * prompt.optionCount * 90)), reasoning: 'off' }, model));
@@ -171,7 +195,7 @@ export async function generateStudyQuestions(request: StudyQuestionGenerationReq
     ]);
     if (duplicate) { rejectedDuplicates += 1; continue; }
     accepted.push({
-      ...applySource(normalized, entries, request.selection),
+      ...applySource(normalized, entries, request.selection, language),
       type: generatedType,
       difficulty: request.difficulty === 'mixed' ? normalized.difficulty : request.difficulty,
       courseId: request.courseId ?? normalized.courseId ?? null,

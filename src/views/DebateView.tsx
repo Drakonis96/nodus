@@ -11,9 +11,15 @@ import {
   type PendingGraphNavigationTarget,
 } from '../navigation';
 import { t, tx } from '../i18n';
+import { getActiveLang } from '../i18n';
+import { localizeDebateTension } from '@shared/uiLanguage';
 
 type BasisFilter = 'all' | 'explicit' | 'inferred';
 type StatusFilter = 'all' | 'open' | 'leaning';
+
+function localizedTension(debate: Debate): string {
+  return localizeDebateTension(debate.tensionKey, debate.tensionParams, getActiveLang()) ?? debate.tension;
+}
 
 // Above this many distinct ideas, a connected component is no longer a meaningful
 // single "debate" — render its face-offs as standalone cards instead of one cluster.
@@ -205,7 +211,7 @@ export function DebateView({
               onCite={setCitation}
               onSaveToNotes={(text) =>
                 setNoteTarget({
-                  content: `# ${t('Debate')}: ${d.sideA.label} · ${d.sideB.label}\n\n> ${d.tension}\n\n${text}`,
+                  content: `# ${t('Debate')}: ${d.sideA.label} · ${d.sideB.label}\n\n> ${localizedTension(d)}\n\n${text}`,
                   title: `${t('Debate')}: ${d.sideA.label} · ${d.sideB.label}`,
                 })
               }
@@ -346,7 +352,7 @@ function DebateCard({
               selection: ASSISTANT_CONTEXTS.contradiction,
               prompt:
                 `${t('Analiza este debate del corpus. Resume las posiciones, su evidencia y las lecturas necesarias para decidir si es tensión real o diferencia de marco.')}\n\n` +
-                `${debate.sideA.label} vs. ${debate.sideB.label}\n${debate.tension}`,
+                `${debate.sideA.label} vs. ${debate.sideB.label}\n${localizedTension(debate)}`,
             })
           }
         >

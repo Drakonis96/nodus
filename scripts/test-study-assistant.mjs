@@ -92,7 +92,11 @@ try {
   assert.equal(updated.title, 'Memoria de trabajo');
   assert.equal(updated.selection.topicId, topic.id, 'academic scope persists with conversation history');
   assert.equal(assistant.listStudyAssistantConversations()[0].messageCount, 2);
-  assert.match(assistant.renderStudyAssistantConversation(updated), /Fuentes: S1 — Memoria/);
+  assert.match(
+    assistant.renderStudyAssistantConversation(updated),
+    /Sources: S1 — Memoria/,
+    'conversation exports follow the configured prompt language instead of retaining Spanish labels',
+  );
   assistant.updateStudyAssistantConversation(conversation.id, { archived: true });
   assert.equal(assistant.listStudyAssistantConversations().length, 0);
   assert.equal(assistant.listStudyAssistantConversations(true)[0].archived, true);

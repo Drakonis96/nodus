@@ -16,7 +16,7 @@ const virtual = new Map([
     export const completeText = (...args) => globalThis.__summaryComplete(...args);
     export const embed = (...args) => globalThis.__summaryEmbed(...args);
   `],
-  ['./prompts', `export const PROMPT_SUMMARY = 'summary-system';`],
+  ['./prompts', `export const coreStructuredPrompt = () => 'summary-system';`],
   ['../db/database', `export const getDb = () => globalThis.__summaryDb;`],
   ['../db/settingsRepo', `export const getSettings = () => ({
     summaryModel: { provider: 'test', model: 'summary-model' }, synthesisModel: null,

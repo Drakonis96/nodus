@@ -64,6 +64,7 @@ import {
   type PseudonymStudent,
   type PseudonymWarning,
 } from '@shared/studentPseudonyms';
+import type { AppLanguage } from '@shared/types';
 import { getSettings } from '../db/settingsRepo';
 
 export interface ActivePrivacyScope {
@@ -115,8 +116,17 @@ export function currentPrivacyScope(): ActivePrivacyScope | null {
 export function privacyConsentDetail(privacy: ActivePrivacyScope | null): string | undefined {
   if (!privacy) return undefined;
   const n = privacy.scope.students.length;
-  return (
-    `Los nombres del alumnado se sustituyen por identificadores (${n} ${n === 1 ? 'alumno' : 'alumnos'}). ` +
-    'No cubre transcripción de audio, análisis de imágenes ni embeddings.'
-  );
+  const language = getSettings().uiLanguage ?? 'es';
+  const copy: Record<AppLanguage, { prefix: string; student: string; students: string; detail: string }> = {
+    es: { prefix: 'Los nombres del alumnado se sustituyen por identificadores', student: 'alumno', students: 'alumnos', detail: 'No cubre transcripción de audio, análisis de imágenes ni embeddings.' },
+    en: { prefix: 'Student names are replaced with identifiers', student: 'student', students: 'students', detail: 'It does not cover audio transcription, image analysis, or embeddings.' },
+    fr: { prefix: 'Les noms des élèves sont remplacés par des identifiants', student: 'élève', students: 'élèves', detail: 'La mesure ne couvre pas la transcription audio, l’analyse d’images ni les embeddings.' },
+    de: { prefix: 'Die Namen der Schülerinnen und Schüler werden durch Kennungen ersetzt', student: 'Schüler', students: 'Schüler', detail: 'Sie umfasst keine Audiotranskription, Bildanalyse oder Embeddings.' },
+    pt: { prefix: 'Os nomes dos alunos são substituídos por identificadores', student: 'aluno', students: 'alunos', detail: 'Não abrange transcrição de áudio, análise de imagens nem embeddings.' },
+    'pt-BR': { prefix: 'Os nomes dos alunos são substituídos por identificadores', student: 'aluno', students: 'alunos', detail: 'Não abrange transcrição de áudio, análise de imagens nem embeddings.' },
+    it: { prefix: 'I nomi degli studenti vengono sostituiti da identificativi', student: 'studente', students: 'studenti', detail: 'Non copre la trascrizione audio, l’analisi delle immagini né gli embedding.' },
+    tr: { prefix: 'Öğrenci adları tanımlayıcılarla değiştirilir', student: 'öğrenci', students: 'öğrenci', detail: 'Ses transkripsiyonunu, görüntü analizini veya embedding’leri kapsamaz.' },
+  };
+  const text = copy[language] ?? copy.es;
+  return `${text.prefix} (${n} ${n === 1 ? text.student : text.students}). ${text.detail}`;
 }

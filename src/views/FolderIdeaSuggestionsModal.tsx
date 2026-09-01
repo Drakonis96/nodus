@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FolderIdeaSuggestion, FolderIdeaSuggestionsResult, NoteFolder } from '@shared/types';
 import { Badge, Icon, NODE_LABELS } from '../components/ui';
 import { buildIdeaNote } from '../notes';
-import { t, tx } from '../i18n';
+import { errorText, t, tx } from '../i18n';
 
 /**
  * Suggests ideas to integrate into a folder. Asks the backend to match the
@@ -40,7 +40,7 @@ export function FolderIdeaSuggestionsModal({
       const res = await window.nodus.suggestFolderIdeas(folder.id);
       if (mounted.current) setResult(res);
     } catch (e) {
-      if (mounted.current) setError(e instanceof Error ? e.message : String(e));
+      if (mounted.current) setError(errorText(e));
     } finally {
       if (mounted.current) setLoading(false);
     }
@@ -79,7 +79,7 @@ export function FolderIdeaSuggestionsModal({
         setAdded((prev) => new Set(prev).add(s.global_id));
         onAdded();
       } catch (e) {
-        if (mounted.current) setError(e instanceof Error ? e.message : String(e));
+        if (mounted.current) setError(errorText(e));
       } finally {
         if (mounted.current) setAdding(null);
       }

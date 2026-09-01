@@ -10,6 +10,7 @@ import type {
   DecorativeImageStyle,
   ImageProvider,
   ModelRef,
+  PromptLanguage,
 } from '@shared/types';
 import { buildDecorativeImagePrompt, DEFAULT_DECORATIVE_IMAGE_STYLE } from '@shared/imageStyles';
 import { IMAGE_PROVIDERS } from '@shared/providers';
@@ -110,15 +111,22 @@ function imageSource(kind: DecorativeImageEntityKind, id: string): ImageSource {
   };
 }
 
-const VISUAL_CONTEXT_SYSTEM = [
-  'Describe una sola escena visual concreta que represente el contenido dado.',
-  'Máximo 45 palabras. Solo la escena: sin títulos, texto visible, letras, logos ni explicaciones.',
-].join('\n');
+const VISUAL_CONTEXT_COPY: Record<PromptLanguage, { system: string; title: string; content: string }> = {
+  es: { system: 'Describe una sola escena visual concreta que represente el contenido dado.\nMáximo 45 palabras. Solo la escena: sin títulos, texto visible, letras, logos ni explicaciones.', title: 'Título', content: 'Contenido' },
+  en: { system: 'Describe one concrete visual scene that represents the supplied content.\nMaximum 45 words. Output only the scene: no titles, visible text, lettering, logos, or explanations.', title: 'Title', content: 'Content' },
+  fr: { system: 'Décrivez une seule scène visuelle concrète qui représente le contenu fourni.\n45 mots maximum. Donnez uniquement la scène : aucun titre, texte visible, lettrage, logo ni explication.', title: 'Titre', content: 'Contenu' },
+  de: { system: 'Beschreiben Sie eine einzige konkrete visuelle Szene, die den angegebenen Inhalt darstellt.\nHöchstens 45 Wörter. Nur die Szene: keine Titel, sichtbaren Texte, Schriftzüge, Logos oder Erklärungen.', title: 'Titel', content: 'Inhalt' },
+  pt: { system: 'Descreve uma única cena visual concreta que represente o conteúdo fornecido.\nMáximo de 45 palavras. Apenas a cena: sem títulos, texto visível, letras, logótipos ou explicações.', title: 'Título', content: 'Conteúdo' },
+  'pt-BR': { system: 'Descreva uma única cena visual concreta que represente o conteúdo fornecido.\nMáximo de 45 palavras. Somente a cena: sem títulos, texto visível, letras, logotipos ou explicações.', title: 'Título', content: 'Conteúdo' },
+  it: { system: 'Descrivi un’unica scena visiva concreta che rappresenti il contenuto fornito.\nMassimo 45 parole. Solo la scena: niente titoli, testo visibile, scritte, loghi o spiegazioni.', title: 'Titolo', content: 'Contenuto' },
+  tr: { system: 'Verilen içeriği temsil eden tek bir somut görsel sahne betimleyin.\nEn fazla 45 kelime. Yalnızca sahneyi verin: başlık, görünür metin, yazı, logo veya açıklama kullanmayın.', title: 'Başlık', content: 'İçerik' },
+};
 
 function visualContextCall(source: ImageSource) {
+  const copy = VISUAL_CONTEXT_COPY[getSettings().promptLanguage ?? 'es'];
   return {
-    system: VISUAL_CONTEXT_SYSTEM,
-    user: `Título: ${source.title}\nContenido: ${source.content}`,
+    system: copy.system,
+    user: `${copy.title}: ${source.title}\n${copy.content}: ${source.content}`,
     temperature: 0.2,
     maxTokens: 100,
     noRetry: true,

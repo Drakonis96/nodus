@@ -62,6 +62,16 @@ Rivera (2020) muestra que las rutas patrimoniales median la memoria publica en c
   const own = classifyClaimLocally({ claim: claims[1], evidence: strongEvidence, language: 'es' });
   assert.equal(own.status, 'own_argument');
 
+  const rationaleMarkers = {
+    es: 'formulacion', en: 'wording', fr: 'formulation', de: 'Formulierung',
+    pt: 'formulação', 'pt-BR': 'formulação', it: 'formulazione', tr: 'İfade',
+  };
+  for (const [language, marker] of Object.entries(rationaleMarkers)) {
+    const localized = classifyClaimLocally({ claim: claims[1], evidence: strongEvidence, language });
+    assert.equal(localized.status, 'own_argument');
+    assert.match(localized.rationale, new RegExp(marker, 'i'), `${language} local rationale`);
+  }
+
   const covered = classifyClaimLocally({ claim: claims[2], evidence: [], language: 'en' });
   assert.equal(covered.status, 'covered');
 

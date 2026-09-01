@@ -1,4 +1,10 @@
 import { getActiveLang } from "./i18n";
+import { FR as LEGACY_FR } from "./i18n.fr";
+import { DE as LEGACY_DE } from "./i18n.de";
+import { PT as LEGACY_PT } from "./i18n.pt";
+import { PT_BR as LEGACY_PT_BR } from "./i18n.pt-BR";
+import { IT as LEGACY_IT } from "./i18n.it";
+import { TR as LEGACY_TR } from "./i18n.tr";
 
 /** Compass copy is kept in a feature slice so the view can ship independently of
  * the large legacy language tables. Spanish is the source language used by Nodus. */
@@ -152,8 +158,14 @@ const EN: Record<string, string> = {
   checking: "checking",
 };
 
-const FR: Record<string, string> = {
-  ...EN,
+function completeCompass(overrides: Record<string, string>, legacy: Record<string, string>): Record<string, string> {
+  // Reuse the complete application catalog for shared keys, then apply Compass
+  // terminology overrides. EN is retained only as a safety net for newly added
+  // feature copy; the parity test rejects accidental EN inheritance.
+  return Object.fromEntries(Object.keys(EN).map((key) => [key, overrides[key] ?? legacy[key] ?? EN[key]]));
+}
+
+const FR: Record<string, string> = completeCompass({
   "Nodus Compass": "Nodus Compass",
   "Descubre literatura académica en fuentes abiertas.":
     "Découvrez la littérature académique dans des sources ouvertes.",
@@ -212,14 +224,11 @@ const FR: Record<string, string> = {
   "no-file": "aucun fichier ouvert",
   "skipped-limit": "omis (limite)",
   failed: "échec",
-};
+}, LEGACY_FR);
 
-// The feature owns its copy until the next language-table regeneration. Spreading
-// the English baseline keeps every visible key translated in all supported locales;
-// these high-frequency labels have native overrides and the rest intentionally use
-// the same neutral terminology used by the provider attribution.
-const DE: Record<string, string> = {
-  ...EN,
+// Compass-specific labels override the shared locale catalog below. New Compass
+// copy should be added here (or to the shared catalog) rather than left in English.
+const DE: Record<string, string> = completeCompass({
   Buscar: "Suchen",
   "Limpiar resultados": "Ergebnisse löschen",
   Filtros: "Filter",
@@ -254,9 +263,8 @@ const DE: Record<string, string> = {
   "no-file": "keine offene Datei",
   "skipped-limit": "wegen Limit übersprungen",
   failed: "fehlgeschlagen",
-};
-const PT: Record<string, string> = {
-  ...EN,
+}, LEGACY_DE);
+const PT: Record<string, string> = completeCompass({
   Buscar: "Pesquisar",
   "Limpiar resultados": "Limpar resultados",
   Filtros: "Filtros",
@@ -291,10 +299,9 @@ const PT: Record<string, string> = {
   "no-file": "sem ficheiro aberto",
   "skipped-limit": "omitido por limite",
   failed: "falhou",
-};
-const PT_BR: Record<string, string> = { ...PT, "Cargar más": "Carregar mais" };
-const IT: Record<string, string> = {
-  ...EN,
+}, LEGACY_PT);
+const PT_BR: Record<string, string> = completeCompass({ "Cargar más": "Carregar mais" }, LEGACY_PT_BR);
+const IT: Record<string, string> = completeCompass({
   Buscar: "Cerca",
   "Limpiar resultados": "Cancella risultati",
   Filtros: "Filtri",
@@ -329,9 +336,8 @@ const IT: Record<string, string> = {
   "no-file": "nessun file aperto",
   "skipped-limit": "omesso per limite",
   failed: "non riuscito",
-};
-const TR: Record<string, string> = {
-  ...EN,
+}, LEGACY_IT);
+const TR: Record<string, string> = completeCompass({
   Buscar: "Ara",
   "Limpiar resultados": "Sonuçları temizle",
   Filtros: "Filtreler",
@@ -366,7 +372,7 @@ const TR: Record<string, string> = {
   "no-file": "açık dosya yok",
   "skipped-limit": "sınır nedeniyle atlandı",
   failed: "başarısız",
-};
+}, LEGACY_TR);
 
 Object.assign(FR, {
   "Descubre literatura académica y fuentes primarias abiertas.":
@@ -529,6 +535,29 @@ Object.assign(TR, {
   error: "hata",
 });
 
+// The shared catalogs predate Compass-specific explanatory copy. Keep the
+// remaining strings native here so a catalog lookup can never silently expose
+// the English baseline in these six locales.
+Object.assign(FR, {
+  "Interpretar con IA": "Interpréter avec l’IA", Tipo: "Catégorie", Disciplina: "Domaine", Fecha: "Date calendaire", Citas: "Références",
+  "Prueba otra consulta o quita algún filtro.": "Essayez une autre requête ou retirez un filtre.", "Interpretando consulta…": "Interprétation de la requête…", "Resultados parciales": "Résultats partiels", "Búsqueda completa": "Recherche terminée", "Búsqueda cancelada": "Recherche annulée", "Error en la búsqueda": "Erreur de recherche", "No hay búsquedas todavía.": "Aucune recherche pour le moment.", Vinculado: "Associé", Fallidos: "Échecs", "Esta consulta se enviará a las fuentes seleccionadas.": "Cette requête sera envoyée aux sources sélectionnées.", "La interpretación con IA es opcional.": "L’interprétation par IA est facultative.", "Acceso abierto": "Libre accès", Fuente: "Origine", "Sin resumen": "Sans résumé", "Por qué se recomienda": "Pourquoi cette recommandation", "Coincide con los conceptos de la consulta": "Correspond aux concepts de votre requête", "Coincide con una frase exacta": "Correspond à une expression exacte", "Coincide con el autor solicitado": "Correspond à l’auteur demandé", "Coincide con el idioma solicitado": "Correspond à la langue demandée", "Coincide con el tipo de publicación": "Correspond au type de publication demandé", "Coincide con el intervalo de fechas": "Correspond à la période demandée", "Tiene acceso abierto verificado": "Dispose d’un accès ouvert vérifié", "Procede de una fuente adecuada para la consulta": "Provient d’un index adapté à la requête", "Está relacionado por citas": "Est lié par les citations", "Tiene similitud semántica local": "Présente une similarité sémantique locale", "Artículo": "Publication", "Capítulo": "Section", "Informe": "Compte rendu", "Prepublicación": "Version préliminaire", "Candidatos guardados": "Candidats enregistrés", "Sin conexión": "Hors connexion", idle: "inactif", Audio: "Son", audio: "son",
+});
+Object.assign(DE, {
+  "Descubre literatura académica en fuentes abiertas.": "Entdecken Sie wissenschaftliche Literatur in offenen Quellen.", "Buscar literatura": "Literatur suchen", "Interpretar con IA": "Mit KI interpretieren", Disciplina: "Fachgebiet", "Solo acceso abierto": "Nur Open Access", "Prueba otra consulta o quita algún filtro.": "Versuchen Sie eine andere Suchanfrage oder entfernen Sie einen Filter.", "Escribe una consulta para empezar.": "Geben Sie zum Start eine Suchanfrage ein.", "Interpretando consulta…": "Suchanfrage wird interpretiert…", "Resultados parciales": "Teilergebnisse", "Búsqueda completa": "Suche abgeschlossen", "Búsqueda cancelada": "Suche abgebrochen", "Error en la búsqueda": "Suchfehler", "No hay búsquedas todavía.": "Noch keine Suchen vorhanden.", Vinculado: "Verknüpft", Fallidos: "Fehlgeschlagen", "Esta consulta se enviará a las fuentes seleccionadas.": "Diese Suchanfrage wird an die ausgewählten Quellen gesendet.", "La interpretación con IA es opcional.": "Die KI-Interpretation ist optional.", Detalles: "Einzelheiten", "Acceso abierto": "Offener Zugang", "Sin resumen": "Keine Zusammenfassung", "Por qué se recomienda": "Grund für die Empfehlung", "Coincide con los conceptos de la consulta": "Entspricht den Begriffen Ihrer Suchanfrage", "Coincide con una frase exacta": "Entspricht einer exakten Formulierung", "Coincide con el autor solicitado": "Entspricht dem gewünschten Autor", "Coincide con el idioma solicitado": "Entspricht der gewünschten Sprache", "Coincide con el tipo de publicación": "Entspricht dem gewünschten Publikationstyp", "Coincide con el intervalo de fechas": "Entspricht dem gewünschten Zeitraum", "Tiene acceso abierto verificado": "Verfügt über geprüften offenen Zugang", "Procede de una fuente adecuada para la consulta": "Stammt aus einem passenden Index", "Está relacionado por citas": "Ist über Zitate verknüpft", "Tiene similitud semántica local": "Hat lokale semantische Ähnlichkeit", "Capítulo": "Beitrag", "Informe": "Dokument", "Prepublicación": "Vorabveröffentlichung", "Candidatos guardados": "Gespeicherte Kandidaten", "Sin conexión": "Offline-Modus", idle: "untätig", Audio: "Ton", "Vídeo": "Videodatei", offline: "nicht verbunden",
+});
+Object.assign(PT, {
+  "Descubre literatura académica en fuentes abiertas.": "Descubra literatura académica em fontes abertas.", "Buscar literatura": "Pesquisar literatura", "Interpretar con IA": "Interpretar com IA", Disciplina: "Área", "Solo acceso abierto": "Apenas acesso aberto", "Prueba otra consulta o quita algún filtro.": "Experimente outra pesquisa ou remova um filtro.", "Escribe una consulta para empezar.": "Escreva uma pesquisa para começar.", "Interpretando consulta…": "A interpretar a pesquisa…", "Resultados parciales": "Resultados parciais", "Búsqueda completa": "Pesquisa concluída", "Búsqueda cancelada": "Pesquisa cancelada", "Error en la búsqueda": "Erro na pesquisa", "No hay búsquedas todavía.": "Ainda não existem pesquisas.", Vinculado: "Associado", Fallidos: "Falhados", "Esta consulta se enviará a las fuentes seleccionadas.": "Esta pesquisa será enviada para as fontes selecionadas.", "La interpretación con IA es opcional.": "A interpretação por IA é opcional.", Detalles: "Detalhes", "Acceso abierto": "Acesso livre", "Sin resumen": "Sem resumo", "Por qué se recomienda": "Por que é recomendado", "Coincide con los conceptos de la consulta": "Coincide com os conceitos da pesquisa", "Coincide con una frase exacta": "Coincide com uma frase exata", "Coincide con el autor solicitado": "Coincide com o autor solicitado", "Coincide con el idioma solicitado": "Coincide com o idioma solicitado", "Coincide con el tipo de publicación": "Coincide com o tipo de publicação solicitado", "Coincide con el intervalo de fechas": "Coincide com o período solicitado", "Tiene acceso abierto verificado": "Tem acesso aberto verificado", "Procede de una fuente adecuada para la consulta": "Vem de um índice adequado à pesquisa", "Está relacionado por citas": "Está relacionado por citações", "Tiene similitud semántica local": "Tem semelhança semântica local", "Capítulo": "Secção", "Informe": "Relatório", "Prepublicación": "Pré-publicação", "Candidatos guardados": "Candidatos guardados", "Sin conexión": "Sem ligação", idle: "inativo", offline: "desligado",
+});
+Object.assign(PT_BR, {
+  "Descubre literatura académica en fuentes abiertas.": "Descubra literatura acadêmica em fontes abertas.", "Buscar literatura": "Pesquisar literatura", "Interpretar con IA": "Interpretar com IA", Disciplina: "Área", "Solo acceso abierto": "Somente acesso aberto", "Prueba otra consulta o quita algún filtro.": "Tente outra busca ou remova um filtro.", "Escribe una consulta para empezar.": "Digite uma busca para começar.", "Interpretando consulta…": "Interpretando a busca…", "Resultados parciales": "Resultados parciais", "Búsqueda completa": "Busca concluída", "Búsqueda cancelada": "Busca cancelada", "Error en la búsqueda": "Erro na busca", "No hay búsquedas todavía.": "Ainda não há buscas.", Vinculado: "Vinculado", Fallidos: "Falhos", "Esta consulta se enviará a las fuentes seleccionadas.": "Esta busca será enviada às fontes selecionadas.", "La interpretación con IA es opcional.": "A interpretação por IA é opcional.", Detalles: "Detalhes", "Acceso abierto": "Acesso aberto", "Sin resumen": "Sem resumo", "Por qué se recomienda": "Por que é recomendado", "Coincide con los conceptos de la consulta": "Corresponde aos conceitos da busca", "Coincide con una frase exacta": "Corresponde a uma frase exata", "Coincide con el autor solicitado": "Corresponde ao autor solicitado", "Coincide con el idioma solicitado": "Corresponde ao idioma solicitado", "Coincide con el tipo de publicación": "Corresponde ao tipo de publicação solicitado", "Coincide con el intervalo de fechas": "Corresponde ao período solicitado", "Tiene acceso abierto verificado": "Tem acesso aberto verificado", "Procede de una fuente adecuada para la consulta": "Vem de um índice adequado à busca", "Está relacionado por citas": "Está relacionado por citações", "Tiene similitud semántica local": "Tem similaridade semântica local", "Capítulo": "Capítulo de obra", "Informe": "Relatório", "Prepublicación": "Pré-publicação", "Candidatos guardados": "Candidatos salvos", "Sin conexión": "Sem conexão", idle: "inativo", offline: "desconectado",
+});
+Object.assign(IT, {
+  "Descubre literatura académica en fuentes abiertas.": "Scopri la letteratura accademica nelle fonti aperte.", "Buscar literatura": "Cerca letteratura", "Interpretar con IA": "Interpreta con l’IA", Disciplina: "Ambito", Proveedor: "Fornitore", "Solo acceso abierto": "Solo accesso aperto", "Prueba otra consulta o quita algún filtro.": "Prova un’altra ricerca o rimuovi un filtro.", "Escribe una consulta para empezar.": "Inserisci una ricerca per iniziare.", "Interpretando consulta…": "Interpretazione della ricerca…", "Resultados parciales": "Risultati parziali", "Búsqueda completa": "Ricerca completata", "Búsqueda cancelada": "Ricerca annullata", "Error en la búsqueda": "Errore di ricerca", "No hay búsquedas todavía.": "Nessuna ricerca disponibile.", Vinculado: "Collegato", Fallidos: "Non riusciti", "Esta consulta se enviará a las fuentes seleccionadas.": "Questa ricerca verrà inviata alle fonti selezionate.", "La interpretación con IA es opcional.": "L’interpretazione con IA è facoltativa.", Detalles: "Dettagli", "Acceso abierto": "Accesso aperto", "Cargando…": "Caricamento in corso…", "Sin resumen": "Senza abstract", "Por qué se recomienda": "Perché è consigliato", "Coincide con los conceptos de la consulta": "Corrisponde ai concetti della ricerca", "Coincide con una frase exacta": "Corrisponde a una frase esatta", "Coincide con el autor solicitado": "Corrisponde all’autore richiesto", "Coincide con el idioma solicitado": "Corrisponde alla lingua richiesta", "Coincide con el tipo de publicación": "Corrisponde al tipo di pubblicazione richiesto", "Coincide con el intervalo de fechas": "Corrisponde all’intervallo richiesto", "Tiene acceso abierto verificado": "Dispone di accesso aperto verificato", "Procede de una fuente adecuada para la consulta": "Proviene da un indice adatto alla ricerca", "Está relacionado por citas": "È collegato tramite citazioni", "Tiene similitud semántica local": "Presenta similarità semantica locale", "Capítulo": "Sezione", "Informe": "Relazione", "Prepublicación": "Pubblicazione preliminare", "Candidatos guardados": "Candidati salvati", "Sin conexión": "Non in linea", idle: "inattivo", Audio: "Suono", "Vídeo": "Video clip", audio: "suono", video: "video file", offline: "non connesso",
+});
+Object.assign(TR, {
+  "Descubre literatura académica en fuentes abiertas.": "Açık kaynaklarda akademik literatürü keşfedin.", "Buscar literatura": "Literatür ara", "Interpretar con IA": "Yapay zekâ ile yorumla", Disciplina: "Alan", "Solo acceso abierto": "Yalnızca açık erişim", "Prueba otra consulta o quita algún filtro.": "Başka bir arama deneyin veya bir filtreyi kaldırın.", "Escribe una consulta para empezar.": "Başlamak için bir arama yazın.", "Interpretando consulta…": "Arama yorumlanıyor…", "Resultados parciales": "Kısmi sonuçlar", "Búsqueda completa": "Arama tamamlandı", "Búsqueda cancelada": "Arama iptal edildi", "Error en la búsqueda": "Arama hatası", "No hay búsquedas todavía.": "Henüz arama yok.", Vinculado: "Bağlı", Fallidos: "Başarısız", "Esta consulta se enviará a las fuentes seleccionadas.": "Bu arama seçilen kaynaklara gönderilecek.", "La interpretación con IA es opcional.": "Yapay zekâ ile yorumlama isteğe bağlıdır.", Detalles: "Ayrıntılar", "Acceso abierto": "Açık erişim", "Sin resumen": "Özet yok", "Por qué se recomienda": "Neden öneriliyor", "Coincide con los conceptos de la consulta": "Aramanızdaki kavramlarla eşleşiyor", "Coincide con una frase exacta": "Tam bir ifadeyle eşleşiyor", "Coincide con el autor solicitado": "İstenen yazarla eşleşiyor", "Coincide con el idioma solicitado": "İstenen dille eşleşiyor", "Coincide con el tipo de publicación": "İstenen yayın türüyle eşleşiyor", "Coincide con el intervalo de fechas": "İstenen tarih aralığıyla eşleşiyor", "Tiene acceso abierto verificado": "Doğrulanmış açık erişim sunuyor", "Procede de una fuente adecuada para la consulta": "Aramaya uygun bir dizinden geliyor", "Está relacionado por citas": "Atıflar üzerinden ilişkili", "Tiene similitud semántica local": "Yerel anlamsal benzerlik taşıyor", "Capítulo": "Bölüm", "Informe": "Rapor", "Prepublicación": "Ön baskı", "Candidatos guardados": "Kaydedilen adaylar", "Sin conexión": "Bağlantı yok", idle: "boşta", "Vídeo": "Video klibi", video: "video dosyası",
+});
+
 Object.assign(FR, {
   "Reintentar búsqueda": "Réessayer la recherche",
   "Importación completada": "Importation terminée",
@@ -586,3 +615,6 @@ export function compassT(
     value = value.replaceAll(`{${name}}`, String(replacement));
   return value;
 }
+
+// Exported for the locale parity test; the view continues to use compassT only.
+export { EN, FR, DE, PT, PT_BR, IT, TR };

@@ -13,6 +13,7 @@
 import type { CharacterBiographySources } from './characterBiographyContext';
 import { composeCharacterBiographyContext } from './characterBiographyContext';
 import type { PromptLanguage } from './types';
+import { worldCharacterInterviewPrompt } from './worldOperationPrompts';
 
 export interface InterviewTurn {
   role: 'author' | 'character';
@@ -30,7 +31,8 @@ export interface CharacterInterviewSources extends CharacterBiographySources {
   canSendImages?: boolean;
 }
 
-export function characterInterviewSystem(sources: CharacterInterviewSources): string {
+export function characterInterviewSystem(sources: CharacterInterviewSources, language: PromptLanguage = 'es'): string {
+  if (language !== 'es') return worldCharacterInterviewPrompt(sources, language);
   const lines: string[] = [
     `Vas a INTERPRETAR a un personaje de ficción llamado ${sources.name} y responder como él, en primera persona, a las preguntas de su autor.`,
     '',

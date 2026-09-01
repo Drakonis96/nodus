@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { StudyFlashcard, StudyQuestion, StudyWorkspace } from '@shared/types';
 import { Icon, Spinner } from '../components/ui';
-import { t } from '../i18n';
+import { errorText, t } from '../i18n';
 import { studyQuestionGenerationEmptyMessage } from '../studyQuestions';
 
 type ReviewKind = 'test' | 'exam' | 'flashcards';
@@ -55,7 +55,7 @@ export function StudyReviewView() {
         : nextQuestions.filter((question) => inScope(question) && (question.tags.includes(`nodus:${kind}`) || (!question.tags.some((tag) => tag.startsWith('nodus:')) && (kind === 'test' ? ['single_choice', 'multiple_choice', 'true_false'].includes(question.type) : true)))).map((question) => ({ id: question.id, front: question.prompt, back: question.answer.text ?? String(question.answer.value ?? '') }))).slice(0, count);
       if (!selected.length) throw new Error(t('No hay elementos disponibles para esta revisión.'));
       setItems(selected); setIndex(0); setRevealed(false); setStep('session');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    } catch (cause) { setError(errorText(cause)); }
     finally { setBusy(false); }
   };
   const next = async (rating?: 1 | 3 | 4 | 5) => {

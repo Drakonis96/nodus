@@ -2968,6 +2968,20 @@ type TranslationTables = Partial<
 >;
 const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
   en: {
+    "No se ha podido cargar este documento.": "This document could not be loaded.",
+    "Abrir {title} en otra pestaña": "Open {title} in another tab",
+    copia: "copy",
+    "Código de confirmación": "Confirmation code",
+    "Se creará una copia independiente de «{name}».": "An independent copy of «{name}» will be created.",
+    "{n} eventos publicados · solo lectura": "{n} published events · read only",
+    "Capítulos publicados": "Published chapters",
+    "Enlaces del proyecto": "Project links",
+    "Se eliminará definitivamente el vault nativo «{name}» y su base de datos del servidor.":
+      "The server-native vault «{name}» and its database will be permanently deleted.",
+    "Se vaciará el contenido de «{name}» conservando su identidad y configuración.":
+      "The contents of «{name}» will be cleared while preserving its identity and configuration.",
+    "Selecciona una copia SQLite compatible para «{name}». La importación sustituye solo el vault nativo del servidor.":
+      "Select a compatible SQLite copy for «{name}». Import only replaces the server-native vault.",
     "Nuevo vault": "New vault",
     "Connected Vault": "Connected Vault",
     "Añadir vault": "Add vault",
@@ -3020,6 +3034,20 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
     "No se ha podido cargar el registro.": "The record could not be loaded.",
   },
   fr: {
+    "No se ha podido cargar este documento.": "Impossible de charger ce document.",
+    "Abrir {title} en otra pestaña": "Ouvrir {title} dans un nouvel onglet",
+    copia: "copie",
+    "Código de confirmación": "Code de confirmation",
+    "Se creará una copia independiente de «{name}».": "Une copie indépendante de « {name} » sera créée.",
+    "{n} eventos publicados · solo lectura": "{n} événements publiés · lecture seule",
+    "Capítulos publicados": "Chapitres publiés",
+    "Enlaces del proyecto": "Liens du projet",
+    "Se eliminará definitivamente el vault nativo «{name}» y su base de datos del servidor.":
+      "Le coffre natif « {name} » et sa base de données seront définitivement supprimés.",
+    "Se vaciará el contenido de «{name}» conservando su identidad y configuración.":
+      "Le contenu de « {name} » sera vidé tout en conservant son identité et sa configuration.",
+    "Selecciona una copia SQLite compatible para «{name}». La importación sustituye solo el vault nativo del servidor.":
+      "Sélectionnez une copie SQLite compatible pour « {name} ». L’importation ne remplace que le coffre natif du serveur.",
     "Nuevo vault": "Nouveau coffre",
     "Connected Vault": "Coffre connecté",
     "Añadir vault": "Ajouter un coffre",
@@ -3065,6 +3093,20 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
       "L’enregistrement n’a pas pu être chargé.",
   },
   de: {
+    "No se ha podido cargar este documento.": "Dieses Dokument konnte nicht geladen werden.",
+    "Abrir {title} en otra pestaña": "{title} in einem neuen Tab öffnen",
+    copia: "Kopie",
+    "Código de confirmación": "Bestätigungscode",
+    "Se creará una copia independiente de «{name}».": "Eine unabhängige Kopie von «{name}» wird erstellt.",
+    "{n} eventos publicados · solo lectura": "{n} veröffentlichte Ereignisse · schreibgeschützt",
+    "Capítulos publicados": "Veröffentlichte Kapitel",
+    "Enlaces del proyecto": "Projektlinks",
+    "Se eliminará definitivamente el vault nativo «{name}» y su base de datos del servidor.":
+      "Der Server-Tresor «{name}» und seine Datenbank werden endgültig gelöscht.",
+    "Se vaciará el contenido de «{name}» conservando su identidad y configuración.":
+      "Der Inhalt von «{name}» wird geleert; Identität und Konfiguration bleiben erhalten.",
+    "Selecciona una copia SQLite compatible para «{name}». La importación sustituye solo el vault nativo del servidor.":
+      "Wählen Sie eine kompatible SQLite-Kopie für «{name}». Der Import ersetzt nur den nativen Server-Tresor.",
     "Nuevo vault": "Neuer Tresor",
     "Connected Vault": "Verbundener Tresor",
     "Añadir vault": "Tresor hinzufügen",
@@ -3110,6 +3152,20 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
       "Der Datensatz konnte nicht geladen werden.",
   },
   pt: {
+    "No se ha podido cargar este documento.": "Não foi possível carregar este documento.",
+    "Abrir {title} en otra pestaña": "Abrir {title} num novo separador",
+    copia: "cópia",
+    "Código de confirmación": "Código de confirmação",
+    "Se creará una copia independiente de «{name}».": "Será criada uma cópia independente de «{name}».",
+    "{n} eventos publicados · solo lectura": "{n} eventos publicados · só leitura",
+    "Capítulos publicados": "Capítulos publicados",
+    "Enlaces del proyecto": "Ligações do projeto",
+    "Se eliminará definitivamente el vault nativo «{name}» y su base de datos del servidor.":
+      "O cofre nativo «{name}» e a sua base de dados serão eliminados definitivamente.",
+    "Se vaciará el contenido de «{name}» conservando su identidad y configuración.":
+      "O conteúdo de «{name}» será limpo, preservando a sua identidade e configuração.",
+    "Selecciona una copia SQLite compatible para «{name}». La importación sustituye solo el vault nativo del servidor.":
+      "Selecione uma cópia SQLite compatível para «{name}». A importação substitui apenas o cofre nativo do servidor.",
     "Nuevo vault": "Novo cofre",
     "Connected Vault": "Cofre ligado",
     "Añadir vault": "Adicionar cofre",
@@ -3177,6 +3233,20 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
       "Não foi possível carregar o registo.",
   },
   "pt-BR": {
+    "No se ha podido cargar este documento.": "Não foi possível carregar este documento.",
+    "Abrir {title} en otra pestaña": "Abrir {title} em uma nova aba",
+    copia: "cópia",
+    "Código de confirmación": "Código de confirmação",
+    "Se creará una copia independiente de «{name}».": "Uma cópia independente de «{name}» será criada.",
+    "{n} eventos publicados · solo lectura": "{n} eventos publicados · somente leitura",
+    "Capítulos publicados": "Capítulos publicados",
+    "Enlaces del proyecto": "Links do projeto",
+    "Se eliminará definitivamente el vault nativo «{name}» y su base de datos del servidor.":
+      "O cofre nativo «{name}» e seu banco de dados serão excluídos permanentemente.",
+    "Se vaciará el contenido de «{name}» conservando su identidad y configuración.":
+      "O conteúdo de «{name}» será esvaziado, preservando sua identidade e configuração.",
+    "Selecciona una copia SQLite compatible para «{name}». La importación sustituye solo el vault nativo del servidor.":
+      "Selecione uma cópia SQLite compatível para «{name}». A importação substitui apenas o cofre nativo do servidor.",
     "Nuevo vault": "Novo cofre",
     "Connected Vault": "Cofre conectado",
     "Añadir vault": "Adicionar cofre",
@@ -3243,6 +3313,20 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
       "Não foi possível carregar o registro.",
   },
   it: {
+    "No se ha podido cargar este documento.": "Impossibile caricare questo documento.",
+    "Abrir {title} en otra pestaña": "Apri {title} in una nuova scheda",
+    copia: "copia",
+    "Código de confirmación": "Codice di conferma",
+    "Se creará una copia independiente de «{name}».": "Verrà creata una copia indipendente di «{name}».",
+    "{n} eventos publicados · solo lectura": "{n} eventi pubblicati · sola lettura",
+    "Capítulos publicados": "Capitoli pubblicati",
+    "Enlaces del proyecto": "Collegamenti del progetto",
+    "Se eliminará definitivamente el vault nativo «{name}» y su base de datos del servidor.":
+      "Il vault nativo «{name}» e il relativo database verranno eliminati definitivamente.",
+    "Se vaciará el contenido de «{name}» conservando su identidad y configuración.":
+      "Il contenuto di «{name}» verrà svuotato, preservandone identità e configurazione.",
+    "Selecciona una copia SQLite compatible para «{name}». La importación sustituye solo el vault nativo del servidor.":
+      "Seleziona una copia SQLite compatibile per «{name}». L’importazione sostituisce solo il vault nativo del server.",
     "Nuevo vault": "Nuovo vault",
     "Connected Vault": "Vault connesso",
     "Añadir vault": "Aggiungi vault",
@@ -3290,6 +3374,20 @@ const SERVER_WEB_FINAL_CHROME_TRANSLATIONS: TranslationTables = {
       "Non è stato possibile caricare il record.",
   },
   tr: {
+    "No se ha podido cargar este documento.": "Bu belge yüklenemedi.",
+    "Abrir {title} en otra pestaña": "{title} öğesini yeni sekmede aç",
+    copia: "kopya",
+    "Código de confirmación": "Onay kodu",
+    "Se creará una copia independiente de «{name}».": "«{name}» adlı bağımsız bir kopya oluşturulacak.",
+    "{n} eventos publicados · solo lectura": "{n} yayımlanmış etkinlik · salt okunur",
+    "Capítulos publicados": "Yayımlanmış bölümler",
+    "Enlaces del proyecto": "Proje bağlantıları",
+    "Se eliminará definitivamente el vault nativo «{name}» y su base de datos del servidor.":
+      "«{name}» adlı sunucu yerel kasası ve veritabanı kalıcı olarak silinecek.",
+    "Se vaciará el contenido de «{name}» conservando su identidad y configuración.":
+      "«{name}» içeriği, kimliği ve yapılandırması korunarak temizlenecek.",
+    "Selecciona una copia SQLite compatible para «{name}». La importación sustituye solo el vault nativo del servidor.":
+      "«{name}» için uyumlu bir SQLite kopyası seçin. İçe aktarma yalnızca sunucu yerel kasasını değiştirir.",
     "Nuevo vault": "Yeni kasa",
     "Connected Vault": "Bağlı kasa",
     "Añadir vault": "Kasa ekle",

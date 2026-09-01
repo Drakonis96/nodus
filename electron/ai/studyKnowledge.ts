@@ -8,6 +8,8 @@ import type {
   StudyKnowledgeProgress,
   StudyKnowledgeSourceKind,
 } from '@shared/studyKnowledge';
+import type { PromptLanguage } from '@shared/types';
+import { studyKnowledgePromptPack } from '@shared/studyKnowledgePromptPacks';
 import { completeJson, embed, embedMany } from './aiClient';
 import { runStudyAiTask } from './studyAiPolicy';
 import { currentEmbeddingConfig } from '../db/ideasRepo';
@@ -62,15 +64,11 @@ export function isStudyKnowledgeExtraction(value: unknown): value is StudyKnowle
       && typeof relation.type === 'string');
 }
 
-export function buildStudyKnowledgePrompt(title: string, text: string) {
+export function buildStudyKnowledgePrompt(title: string, text: string, language: PromptLanguage = 'es') {
+  const prompt = studyKnowledgePromptPack(language);
   return {
-    system: `Analiza material docente y devuelve un mapa conceptual trazable. Extrae solo ideas respaldadas por el texto.
-Cada idea necesita una etiqueta breve, un enunciado autosuficiente y una o más citas textuales exactas.
-Usa tipos: concept, definition, principle, process, cause, consequence, example, debate.
-Usa relaciones: related, supports, contrasts, causes, depends_on, part_of, applies.
-Las relaciones solo pueden referirse a las claves de ideas devueltas. No inventes páginas ni citas.
-Devuelve JSON: {"ideas":[{"key":"i1","type":"concept","label":"...","statement":"...","role":"principal|secondary","confidence":0.8,"evidence":[{"quote":"...","location":"p. 2"}]}],"relations":[{"from":"i1","to":"i2","type":"related","basis":"...","confidence":0.8}]}`,
-    user: `TÍTULO: ${title}\n\nTEXTO:\n${text}`,
+    system: prompt.system,
+    user: `${prompt.title}: ${title}\n\n${prompt.text}:\n${text}`,
   };
 }
 
@@ -146,10 +144,12 @@ export function getStudyKnowledgeProgress(): StudyKnowledgeProgress { return pro
 export function onStudyKnowledgeChanged(listener: Listener): () => void { listeners.add(listener); return () => listeners.delete(listener); }
 
 async function analyzeSource(source: SourceData, force: boolean, externalConsentModelKey: string | null): Promise<void> {
+  const language = getSettings().promptLanguage ?? 'es';
+  const promptPack = studyKnowledgePromptPack(language);
   syncStudyKnowledgeSourceScopes(source.kind, source.id);
   const subjectIds = sourceSubjectIds(source.kind, source.id); if (!subjectIds.length) return;
   if (source.text.length < 80) {
-    for (const subjectId of subjectIds) setStudyKnowledgeJob({ subjectId, sourceKind: source.kind, sourceId: source.id, status: 'unavailable', phase: 'empty', sourceHash: source.hash, error: 'La fuente no contiene suficiente texto para extraer ideas.' });
+    for (const subjectId of subjectIds) setStudyKnowledgeJob({ subjectId, sourceKind: source.kind, sourceId: source.id, status: 'unavailable', phase: 'empty', sourceHash: source.hash, error: promptPack.insufficientText });
     return;
   }
   const pendingSubjects = subjectIds.filter((subjectId) => force || getStudyKnowledgeJob(subjectId, source.kind, source.id)?.sourceHash !== source.hash
@@ -160,12 +160,12 @@ async function analyzeSource(source: SourceData, force: boolean, externalConsent
   try {
     const chunks = chunkStudyKnowledgeText(source.text); const parts: StudyKnowledgeExtraction[] = [];
     for (const chunk of chunks) {
-      const prompt = buildStudyKnowledgePrompt(source.title, chunk);
+      const prompt = buildStudyKnowledgePrompt(source.title, chunk, language);
       const completed = await runStudyAiTask<StudyKnowledgeExtraction>({
         task: 'questions',
         subjectId: pendingSubjects[0],
         inputChars: prompt.system.length + prompt.user.length,
-        externalPurpose: 'analizar el material y extraer un mapa conceptual trazable',
+        externalPurpose: promptPack.externalPurpose,
         externalConsentKey: `knowledge:${source.kind}:${source.id}:${source.hash}`,
         externalConsentModelKey: externalConsentModelKey ?? undefined,
       },
@@ -228,6 +228,7 @@ function cosine(a: number[] | null, b: number[] | null): number {
 }
 
 export async function retrieveStudyKnowledgeContext(subjectId: string, query: string, sourceKeys: string[] = [], limit = 10): Promise<StudyAssessmentKnowledgeContext> {
+  const prompt = studyKnowledgePromptPack(getSettings().promptLanguage ?? 'es');
   const candidates = listStudyIdeaVectors(subjectId, sourceKeys); if (!candidates.length) return { ideas: [], connections: [], outline: '', embeddingAvailable: false };
   const queryVector = await embed(query).catch(() => null);
   const ranked = candidates.map((idea) => ({ idea, score: queryVector ? cosine(queryVector, idea.embedding) : 0 }))
@@ -237,7 +238,7 @@ export async function retrieveStudyKnowledgeContext(subjectId: string, query: st
   const label = new Map(ranked.map((idea) => [idea.id, idea.label]));
   const outline = [
     ...ranked.map((idea) => `- [${idea.id}] ${idea.label}: ${idea.statement}`),
-    ...connections.map((edge: StudyIdeaConnection) => `- Conexión: ${label.get(edge.fromId) ?? edge.fromId} ${edge.type} ${label.get(edge.toId) ?? edge.toId}. ${edge.basis}`),
+    ...connections.map((edge: StudyIdeaConnection) => `- ${prompt.connection}: ${label.get(edge.fromId) ?? edge.fromId} ${edge.type} ${label.get(edge.toId) ?? edge.toId}. ${edge.basis}`),
   ].join('\n');
   return { ideas: ranked.map(({ embedding: _embedding, ...idea }) => idea), connections, outline, embeddingAvailable: Boolean(queryVector) };
 }
