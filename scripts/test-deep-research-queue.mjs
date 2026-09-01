@@ -96,6 +96,35 @@ try {
     assert.equal(queue.isDeepResearchLaneBusy(), false);
   }
 
+  // ── Queue-owned UI copy follows all supported report languages ─────────────
+  {
+    queue.__resetDeepResearchQueueForTest();
+    let runningSignal;
+    queue.configureDeepResearchQueue({
+      generate: (_request, _onProgress, signal) => new Promise((_resolve, reject) => {
+        runningSignal = signal;
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      }),
+      saveDraft: () => 'draft-localized',
+      activeVault: () => ({ id: 'v1', name: 'Corpus' }),
+    });
+    const running = queue.runDeepResearchJob({ request: { objective: 'running', language: 'es' }, origin: 'app', save: false }).catch((error) => error);
+    await waitFor(() => runningSignal instanceof AbortSignal, 'the localization sentinel to start');
+    const expected = { en: /Queued/, fr: /En attente/, de: /Warteschlange/, pt: /Em fila/, 'pt-BR': /Na fila/, it: /In coda/, tr: /Kuyrukta/ };
+    const queuedJobs = Object.entries(expected).map(([language, marker]) => {
+      const record = queue.enqueueDeepResearchJob({ request: { objective: `job-${language}`, language }, origin: 'mcp', save: false });
+      const current = queue.getDeepResearchJob(record.id).job;
+      assert.match(current.progress.message, marker, `${language} queue progress is native`);
+      assert.doesNotMatch(current.progress.message, /En cola|informe.*por delante/i, `${language} queue progress does not leak Spanish`);
+      return current;
+    });
+    for (const record of queuedJobs) queue.cancelDeepResearchJob(record.id);
+    const runningId = queue.listDeepResearchJobs().find((job) => job.title === 'running').id;
+    queue.cancelDeepResearchJob(runningId);
+    await running;
+    await waitFor(() => queue.isDeepResearchLaneBusy() === false, 'the localization sentinel to unwind');
+  }
+
   // ── A vault switch parks the job until its own corpus is active again ────────
   {
     queue.__resetDeepResearchQueueForTest();

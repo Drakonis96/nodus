@@ -26,8 +26,8 @@ import {
   buildSnapshotMaps,
   collectCitedWorkIds,
   countWords,
+  deepResearchNarrativeRules,
   resolveSectionPlan,
-  DEEP_RESEARCH_NARRATIVE_RULES,
   type CitationCatalog,
   type DeepResearchPlanSection,
 } from './deepResearchCore';
@@ -36,6 +36,7 @@ import {
   deterministicApproachRetrievalPlan,
   mergeApproachSnapshots,
 } from './deepResearchApproaches';
+import { deepResearchClientPromptPack } from '@shared/deepResearchClientPromptPacks';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Client-driven Deep Research (Option B).
@@ -118,7 +119,7 @@ export async function buildDeepResearchBrief(
   const deepResearchVersion = parseDeepResearchRequestVersion(request.deepResearchVersion);
   const snapshotBuilder = buildSnapshot ?? snapshotBuilderForVersion(deepResearchVersion);
   const ordinary = await snapshotBuilder(briefFor({ ...request, deepResearchVersion }));
-  const retrieval = deterministicApproachRetrievalPlan(approach, request.objective);
+  const retrieval = deterministicApproachRetrievalPlan(approach, request.objective, language);
   const snapshot = approach === 'general'
     ? ordinary
     : mergeApproachSnapshots(ordinary, await snapshotBuilder(briefFor({ ...request, deepResearchVersion }), retrieval.probes), approach);
@@ -128,8 +129,9 @@ export async function buildDeepResearchBrief(
     request.objective,
     request.coverageQuestions ?? [],
   );
-  const specializedRules = approach === 'general' ? null : approachRules(approach, 'client');
+  const specializedRules = approach === 'general' ? null : approachRules(approach, 'client', language);
   const singleNarrative = request.sectionLimit === 'single';
+  const copy = deepResearchClientPromptPack(language);
   return {
     mode: 'client',
     deepResearchVersion,
@@ -140,26 +142,18 @@ export async function buildDeepResearchBrief(
     structure: singleNarrative ? 'single' : 'sectioned',
     sections: { suggested: sectionPlan.target, mode: sectionPlan.mode },
     materials: buildCitationCatalog(snapshot),
-    citationPolicy: [
-      'Cita CADA afirmación sustantiva con un token del catálogo, copiado EXACTAMENTE (incluido el enlace nodus://) y colocado entre paréntesis.',
-      'Usa SOLO los tokens de `materials`. Cualquier cita que no esté en el catálogo será eliminada al ensamblar: no inventes autores, obras, años ni ids.',
-      'Puedes citar el mismo token varias veces. No añadas una sección de Referencias ni bibliografía: Nodus la construye a partir de las obras realmente citadas.',
-    ],
+    citationPolicy: [...copy.citationPolicy],
     method: [
-      `La evidencia sugiere en torno a ${sectionPlan.target} movimientos argumentales, pero no es una cuota ni un límite. Desarrolla cada afirmación, relación, contraste y evidencia relevante una sola vez y detente cuando no aporte valor marginal verificable.`,
-      singleNarrative
-        ? 'Redacta una única narración continua, sin encabezados, subtítulos ni rótulos internos. Organiza los movimientos del argumento mediante párrafos y transiciones naturales.'
-        : 'Prefiere POCAS secciones LARGAS y profundas antes que muchas cortas: cada sección agrupa varias ideas afines y las relaciona (continuidad, tensiones, consecuencias), no una idea por sección.',
-      ...DEEP_RESEARCH_NARRATIVE_RULES,
+      copy.evidenceShape(sectionPlan.target),
+      singleNarrative ? copy.singleNarrative : copy.sectionedNarrative,
+      ...deepResearchNarrativeRules(language),
       ...(specializedRules?.planner ?? []),
       ...(specializedRules?.writer ?? []),
       ...(specializedRules?.finalizer ?? []),
-      'Reparte TODAS las ideas relevantes del catálogo entre las secciones. Sitúa los huecos y contradicciones donde aporten tensión argumental. Cierra con una síntesis.',
-      'Cada entrada del catálogo trae en `note` el contenido real de lo que cita. Los pasajes traen el texto literal de la obra entre comillas angulares: úsalos como evidencia textual y no extiendas su sentido. Los huecos y las contradicciones traen lo que afirman, así que arguméntalos por su contenido en vez de nombrarlos de pasada.',
-      singleNarrative
-        ? 'Entrega el cuerpo seguido en `sectionsMarkdown`, sin ningún encabezado Markdown. No incluyas el resumen, las limitaciones ni las referencias: pásalos como campos aparte y conserva `sectionLimit: "single"` al finalizar.'
-        : 'Empieza cada sección con un encabezado Markdown "## Título". No incluyas el resumen, las limitaciones ni las referencias en `sectionsMarkdown`: pásalos como campos aparte a la herramienta de ensamblado.',
-      `Cuando termines de redactar, llama a \`${'nodus_finalize_deep_research'}\` con tu markdown para validar las citas, construir las referencias y (si quieres) guardar el borrador.`,
+      copy.distributeEvidence,
+      copy.catalogSemantics,
+      singleNarrative ? copy.singleOutput : copy.sectionedOutput,
+      copy.finalize,
     ],
     finalizeWith: 'nodus_finalize_deep_research',
   };
@@ -218,7 +212,7 @@ export async function assembleClientDeepResearchReport(
   const brief = briefFor(request);
   const snapshotBuilder = buildSnapshot ?? snapshotBuilderForVersion(deepResearchVersion);
   const ordinary = await snapshotBuilder(brief);
-  const retrieval = deterministicApproachRetrievalPlan(approach, input.objective);
+  const retrieval = deterministicApproachRetrievalPlan(approach, input.objective, language);
   const snapshot = approach === 'general'
     ? ordinary
     : mergeApproachSnapshots(ordinary, await snapshotBuilder(brief, retrieval.probes), approach);

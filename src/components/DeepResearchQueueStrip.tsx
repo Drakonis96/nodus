@@ -6,7 +6,7 @@
 import type { DeepResearchProgress } from '@shared/types';
 import { deepResearchProgressPercent } from '@shared/deepResearchProgress';
 import { Icon } from './ui';
-import { t, tx } from '../i18n';
+import { errorText, t, tx } from '../i18n';
 import { elapsedTimeLabel } from '@shared/elapsedTime';
 import { useElapsedClock } from '../useElapsedClock';
 
@@ -111,6 +111,7 @@ export function DeepResearchQueueStrip({
     null,
   );
   const totalElapsed = elapsedTimeLabel(queueStartedAt, null, now);
+  const displayTitle = (item: QueueStripItem): string => item.title === 'Informe sin título' ? t(item.title) : item.title;
   return (
     <div className="border-b border-neutral-800 bg-indigo-950/15 px-4 py-2.5">
       <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-300">
@@ -137,7 +138,7 @@ export function DeepResearchQueueStrip({
                 >
                   {queuePosition}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-neutral-300" title={item.title}>{item.title}</span>
+                <span className="min-w-0 flex-1 truncate text-neutral-300" title={displayTitle(item)}>{displayTitle(item)}</span>
                 {item.origin === 'mcp' && <OriginBadge />}
                 <span className="shrink-0 text-[11px] tabular-nums text-neutral-500">
                   {elapsedTimeLabel(item.enqueuedAt, null, now)}
@@ -171,13 +172,13 @@ export function DeepResearchQueueStrip({
             <Icon name="alert" size={12} className="text-red-400" />
             <span
               className="min-w-0 flex-1 truncate text-red-300"
-              title={item.error ? t(item.error) : item.title}
+              title={item.error ? errorText(item.error) : displayTitle(item)}
             >
-              {item.title}
+              {displayTitle(item)}
             </span>
             {item.origin === 'mcp' && <OriginBadge />}
-            <span className="max-w-[45%] shrink-0 truncate text-[11px] text-red-400/80" title={item.error ? t(item.error) : undefined}>
-              {item.error ? `${t('Falló')}: ${t(item.error)}` : t('Falló')}
+            <span className="max-w-[45%] shrink-0 truncate text-[11px] text-red-400/80" title={item.error ? errorText(item.error) : undefined}>
+              {item.error ? `${t('Falló')}: ${errorText(item.error)}` : t('Falló')}
             </span>
           </div>
         ))}

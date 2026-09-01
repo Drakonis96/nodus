@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../components/ui";
 import { api } from "./api";
 import type { JsonRecord, PageResponse } from "./types";
-import { t } from "./i18nShim";
+import { errorText, t } from "./i18nShim";
 
 const text = (value: unknown, fallback = "—") =>
-  value == null || value === "" ? fallback : String(value);
+  value == null || value === "" ? t(fallback) : String(value);
 const rows = (page: PageResponse | undefined, key: string) =>
   Array.isArray(page?.[key])
     ? (page![key] as JsonRecord[])
@@ -167,7 +167,7 @@ export function PrimarySourcesArchiveServerView({
       })
       .catch((cause: unknown) => {
         if (active)
-          setError(cause instanceof Error ? cause.message : String(cause));
+          setError(errorText(cause));
       });
     return () => {
       active = false;

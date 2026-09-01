@@ -3,12 +3,15 @@ import type {
   StudyDiarizationResult,
   StudyTranscriptSegmentInput,
 } from '@shared/studyRecordings';
+import type { PromptLanguage } from '@shared/types';
+import { studyDiarizationPromptPack } from '@shared/studyDiarizationPromptPacks';
 import {
   getStudyRecording,
   getStudyRecordingContent,
   updateStudyTranscript,
 } from '../db/studyRecordingsRepo';
 import { getApiKey } from '../secrets/secretStore';
+import { getSettings } from '../db/settingsRepo';
 
 export const STUDY_DIARIZATION_MODEL = 'gemini-2.5-flash-lite';
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
@@ -223,18 +226,18 @@ async function deleteGeminiFile(key: string, file: GeminiFile | null): Promise<v
   await fetch(`${GEMINI_API}/v1beta/${file.name}?key=${encodeURIComponent(key)}`, { method: 'DELETE' }).catch(() => undefined);
 }
 
-function transcriptPrompt(content: string, expectedSpeakers?: number | null): string {
+function transcriptPrompt(content: string, expectedSpeakers?: number | null, language: PromptLanguage = 'es'): string {
+  const prompt = studyDiarizationPromptPack(language);
   const expected = expectedSpeakers && expectedSpeakers > 0
-    ? `Se esperan aproximadamente ${Math.round(expectedSpeakers)} hablantes.`
-    : 'Determina el número de hablantes por sus voces; no lo deduzcas por el contenido.';
+    ? prompt.expected(Math.round(expectedSpeakers))
+    : prompt.inferSpeakers;
   return [
-    'Analiza acústicamente este audio y realiza diarización de hablantes.',
+    prompt.analyze,
     expected,
-    'Devuelve exclusivamente JSON con esta forma:',
-    '{"segments":[{"startSeconds":0.0,"endSeconds":1.2,"speaker":"speaker_1","text":"fragmento oído","confidence":0.95}]}',
-    'Crea un segmento por turno de voz. Usa el mismo identificador para la misma voz y otro cuando cambie la voz.',
-    'No inventes nombres propios para los hablantes. Los tiempos deben estar en segundos y no solaparse.',
-    'La transcripción existente se aporta solo para facilitar la alineación; la aplicación preservará literalmente su texto:',
+    prompt.json,
+    prompt.turns,
+    prompt.noNames,
+    prompt.transcript,
     content.slice(0, 120_000),
   ].join('\n\n');
 }
@@ -244,6 +247,7 @@ export async function requestGeminiDiarization(
   content: { bytes: Uint8Array; mimeType: string; fileName: string },
   transcript: string,
   expectedSpeakers?: number | null,
+  language: PromptLanguage = 'es',
 ): Promise<{ turns: GeminiTurn[]; speakers: string[] }> {
   let remoteFile: GeminiFile | null = null;
   try {
@@ -257,7 +261,7 @@ export async function requestGeminiDiarization(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: transcriptPrompt(transcript, expectedSpeakers) }, audioPart] }],
+        contents: [{ role: 'user', parts: [{ text: transcriptPrompt(transcript, expectedSpeakers, language) }, audioPart] }],
         generationConfig: { temperature: 0, responseMimeType: 'application/json', maxOutputTokens: 16_384 },
       }),
     });
@@ -274,6 +278,7 @@ export async function requestGeminiDiarization(
 }
 
 export async function diarizeStudyRecording(request: StudyDiarizationRequest): Promise<StudyDiarizationResult> {
+  const language = getSettings().promptLanguage ?? 'es';
   const key = getApiKey('gemini');
   if (!key) throw new Error('Falta la clave de Gemini para detectar hablantes. Configúrala en Ajustes.');
   const recording = getStudyRecording(request.recordingId);
@@ -281,13 +286,13 @@ export async function diarizeStudyRecording(request: StudyDiarizationRequest): P
   if (!transcript || transcript.kind !== 'literal') throw new Error('Selecciona una transcripción literal válida para detectar hablantes.');
   if (!transcript.segments.length) throw new Error('La transcripción literal no contiene segmentos que puedan alinearse.');
   const content = getStudyRecordingContent(request.recordingId);
-  let analysis = await requestGeminiDiarization(key, content, transcript.contentMarkdown, request.expectedSpeakers);
+  let analysis = await requestGeminiDiarization(key, content, transcript.contentMarkdown, request.expectedSpeakers, language);
   const expectedSpeakers = Math.max(0, Math.round(request.expectedSpeakers ?? 0));
   // With similar voices a fast model can occasionally collapse an expected pair
   // into one label. One bounded retry is preferable to silently persisting a result
   // the user already told us is incomplete.
   if (expectedSpeakers > 1 && analysis.speakers.length < expectedSpeakers) {
-    analysis = await requestGeminiDiarization(key, content, transcript.contentMarkdown, expectedSpeakers);
+    analysis = await requestGeminiDiarization(key, content, transcript.contentMarkdown, expectedSpeakers, language);
   }
   if (expectedSpeakers > 1 && analysis.speakers.length < expectedSpeakers) {
     throw new Error(`Solo se distinguieron ${analysis.speakers.length} de los ${expectedSpeakers} hablantes esperados. Prueba con un audio más nítido o revisa el número indicado.`);

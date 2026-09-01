@@ -5,14 +5,14 @@
 
 import { completeJson } from './aiClient';
 import {
-  IMAGE_ANALYSIS_SYSTEM,
-  IMAGE_ANALYSIS_USER,
+  imageAnalysisPrompt,
   isImageAnalysisShape,
   isVisionMime,
   normalizeAnalysis,
   type ImageAnalysis,
 } from '@shared/imageAnalysis';
 import type { ModelRef } from '@shared/types';
+import { getSettings } from '../db/settingsRepo';
 
 export async function analyzeImageBytes(
   bytes: Buffer,
@@ -20,10 +20,11 @@ export async function analyzeImageBytes(
   model?: ModelRef | null
 ): Promise<ImageAnalysis | null> {
   if (!isVisionMime(mime)) return null;
+  const prompt = imageAnalysisPrompt(getSettings().promptLanguage ?? 'es');
   const raw = await completeJson(
     {
-      system: IMAGE_ANALYSIS_SYSTEM,
-      user: IMAGE_ANALYSIS_USER,
+      system: prompt.system,
+      user: prompt.user,
       images: [{ base64: bytes.toString('base64'), mediaType: mime.toLowerCase() }],
       plainContext: true,
       temperature: 0.2,

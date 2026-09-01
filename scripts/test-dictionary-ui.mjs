@@ -16,6 +16,7 @@ const [
   promptPresets,
   dictionaryI18n,
   viewSnapshots,
+  academicPrompts,
 ] =
   await Promise.all([
     readFile(path.join(root, "src/views/DictionaryView.tsx"), "utf8"),
@@ -32,6 +33,7 @@ const [
     readFile(path.join(root, "shared/dictionaryPromptPresets.ts"), "utf8"),
     readFile(path.join(root, "src/i18n.dictionary.ts"), "utf8"),
     readFile(path.join(root, "src/app/viewSnapshots.ts"), "utf8"),
+    readFile(path.join(root, "shared/academicPromptPacks.ts"), "utf8"),
   ]);
 
 assert.match(
@@ -384,8 +386,13 @@ assert.match(
 );
 assert.match(
   ai,
+  /dictionaryPromptPack\([\s\S]*copy\.system/,
+  "Dictionary synthesis resolves its locale-specific native prompt pack",
+);
+assert.match(
+  academicPrompts,
   /cantidad de pasajes recuperados[\s\S]*no mide por sí sola la importancia/,
-  "Dictionary synthesis does not treat repeated passages as author importance",
+  "Dictionary native prompt keeps the rule that repeated passages do not determine author importance",
 );
 assert.match(
   ai,
@@ -399,7 +406,7 @@ assert.match(
 );
 assert.match(
   ai,
-  /No se encontró evidencia relevante suficiente/,
+  /copy\.noEvidenceError/,
   "an empty automatic retrieval fails explicitly without inventing content",
 );
 assert.doesNotMatch(

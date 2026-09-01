@@ -27,7 +27,7 @@ import {
 } from '../components/ReaderSelectionActions';
 import { HoverLabelButton, Icon, ModalBackdrop, Spinner } from '../components/ui';
 import { confirm } from '../components/feedback';
-import { t, tx } from '../i18n';
+import { errorText, t, tx } from '../i18n';
 
 GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -282,7 +282,7 @@ function OriginalPagePreview({
     }).then((document) => {
       if (!document || !live) return;
       setPdf(document); setPageNumber((value) => Math.min(document.numPages, Math.max(1, value))); setLoading(false);
-    }).catch((cause) => { if (live) { setError(cause instanceof Error ? cause.message : String(cause)); setLoading(false); } });
+    }).catch((cause) => { if (live) { setError(errorText(cause)); setLoading(false); } });
     return () => { live = false; void task?.destroy(); };
   }, [attachmentId, documentId]);
 
@@ -299,7 +299,7 @@ function OriginalPagePreview({
       canvas.style.width = `${Math.ceil(viewport.width)}px`; canvas.style.height = `${Math.ceil(viewport.height)}px`;
       await page.render({ canvasContext: canvas.getContext('2d')!, viewport, transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0] }).promise;
       page.cleanup();
-    }).catch((cause) => { if (!canceled) setError(cause instanceof Error ? cause.message : String(cause)); });
+    }).catch((cause) => { if (!canceled) setError(errorText(cause)); });
     return () => { canceled = true; };
   }, [pdf, pageNumber, scale]);
   useEffect(() => {
@@ -394,7 +394,7 @@ export function LibraryDocumentReader({
     try {
       setReader(await window.nodus.getLibraryReaderDocument(reference.id));
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : String(nextError));
+      setError(errorText(nextError));
       setReader(null);
     } finally {
       setLoading(false);
@@ -414,7 +414,7 @@ export function LibraryDocumentReader({
       setOrphanedAnnotations(orphaned);
       setAnnotationError(null);
     } catch (nextError) {
-      setAnnotationError(nextError instanceof Error ? nextError.message : String(nextError));
+      setAnnotationError(errorText(nextError));
     }
   }, [reference.id]);
 
@@ -457,7 +457,7 @@ export function LibraryDocumentReader({
     let alive = true;
     void window.nodus.listLibraryReaderChatMessages(reference.id)
       .then((messages) => { if (alive) setChatMessages(messages); })
-      .catch((nextError) => { if (alive) setChatError(nextError instanceof Error ? nextError.message : String(nextError)); });
+      .catch((nextError) => { if (alive) setChatError(errorText(nextError)); });
     return () => { alive = false; };
   }, [reader, reference.id]);
   useEffect(() => {
@@ -742,7 +742,7 @@ export function LibraryDocumentReader({
         id: crypto.randomUUID(), role: 'assistant', content: response.answer, createdAt: new Date().toISOString(),
       }]);
     } catch (nextError) {
-      const message = nextError instanceof Error ? nextError.message : String(nextError);
+      const message = errorText(nextError);
       setChatError(message);
       setChatMessages((current) => [...current, {
         id: crypto.randomUUID(), role: 'assistant', content: message, createdAt: new Date().toISOString(), error: true,

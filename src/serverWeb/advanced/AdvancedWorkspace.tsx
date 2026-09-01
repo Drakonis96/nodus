@@ -30,7 +30,7 @@ import {
 } from "./types";
 import { AcademicDetailExplorer } from "../academic/AcademicDetailExplorer";
 import type { GraphPresetId } from "../../navigation";
-import { getActiveLang, t, tx } from "../i18nShim";
+import { errorText, getActiveLang, t, tx } from "../i18nShim";
 
 type Surface = "ideas" | "authors" | "graph";
 
@@ -94,7 +94,7 @@ function ErrorMessage({
     >
       <strong>{t("No se ha podido cargar el contenido publicado.")}</strong>
       <p className="mt-1 text-xs opacity-80">
-        {error instanceof Error ? error.message : String(error)}
+        {errorText(error)}
       </p>
       {onRetry && (
         <button className="btn btn-ghost mt-3 text-xs" onClick={onRetry}>

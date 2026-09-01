@@ -13,7 +13,7 @@ import {
   setCell,
   listRows,
 } from '../db/databasesRepo';
-import { AI_COLUMN_SYSTEM, buildAiCellPrompt, buildAiRowContext } from '@shared/databaseAi';
+import { aiColumnSystem, buildAiCellPrompt, buildAiRowContext } from '@shared/databaseAi';
 import { attachmentKind } from '@shared/databases';
 import { isVisionMime } from '@shared/imageAnalysis';
 import { AI_PROVIDERS } from '@shared/providers';
@@ -69,10 +69,11 @@ export async function runAiCell(rowId: string, columnId: string, deps: AiCellDep
   const row = getRow(rowId);
   if (!detail || !row) throw new Error('Fila no encontrada.');
 
-  const context = buildAiRowContext(detail.columns, row, { excludeColumnId: columnId });
+  const settings = getSettings();
+  const language = settings.promptLanguage ?? 'es';
+  const context = buildAiRowContext(detail.columns, row, { excludeColumnId: columnId, language });
   const images = sourceImages(rowId, col.config.aiSourceColumnId as string | undefined);
 
-  const settings = getSettings();
   const columnModel = configuredModel(col.config.aiModel);
   const model = deps.model ?? columnModel ?? settings.chatModel ?? settings.synthesisModel ?? null;
   const visionModel = deps.visionModel ?? columnModel ?? settings.visionModel ?? settings.extractionModel ?? settings.synthesisModel ?? model;
@@ -89,8 +90,8 @@ export async function runAiCell(rowId: string, columnId: string, deps: AiCellDep
     });
   const text = await complete(
     {
-      system: AI_COLUMN_SYSTEM,
-      user: buildAiCellPrompt(prompt, context),
+      system: aiColumnSystem(language),
+      user: buildAiCellPrompt(prompt, context, language),
       images: images.length ? images : undefined,
       plainContext: true,
       temperature: 0.2,

@@ -86,7 +86,7 @@ import type {
   SpaceSummary,
 } from "./types";
 import { placeHeaderBadge, type HeaderBadgePlacement } from "../headerLayout";
-import { setActiveLang, t } from "./i18nShim";
+import { errorText, getActiveLang, setActiveLang, t } from "./i18nShim";
 
 type ServerView = View | "assistant" | "nodi";
 type Route =
@@ -628,7 +628,7 @@ function ErrorState({
         )}
       </strong>
       <p className="mt-1 opacity-80">
-        {error instanceof Error ? error.message : String(error)}
+        {errorText(error)}
       </p>
       {expired ? (
         <a
@@ -1574,7 +1574,7 @@ function CollectionView({ spaceId, view }: { spaceId: string; view: View }) {
                 className="input input-with-leading-icon w-full"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder={`${t("Buscar en")} ${collectionLabel.toLowerCase()}…`}
+                placeholder={`${t("Buscar en")} ${collectionLabel.toLocaleLowerCase(getActiveLang())}…`}
               />
             </div>
           </div>
@@ -1600,7 +1600,7 @@ function CollectionView({ spaceId, view }: { spaceId: string; view: View }) {
                 <Loading />
               ) : filtered.length === 0 ? (
                 <EmptyState
-                  title={`${t("No hay")} ${collectionLabel.toLowerCase()} ${t("publicados")}`}
+                  title={`${t("No hay")} ${collectionLabel.toLocaleLowerCase(getActiveLang())} ${t("publicados")}`}
                 />
               ) : (
                 filtered.map((item, index) => (

@@ -81,6 +81,20 @@ try {
   assert.match(shared.renderStudyStylePrompt('Para {{subject}}: {{selectedText}}', { subject: 'Historia', selectedText: 'Texto' }), /Historia: Texto/);
   assert.ok(shared.validateStudyStylePrompt('Inventa nuevas citas y datos para ampliar el texto seleccionado.').length > 0, 'unsafe custom prompt is warned');
   assert.ok(shared.studyImprovementWarnings('Hubo 37 casos.', 'Hubo 41 casos.', [], 'preserve').length >= 2, 'changed and new numbers are warned');
+  assert.deepEqual(
+    shared.studyImprovementWarnings('There were 37 cases.', 'There were 41 cases.', [], 'preserve', 'en'),
+    ['Numbers present in the original are missing.', 'Numbers not present in the original have appeared.'],
+    'the exact Word number-change warning follows the English UI rather than the prompt text',
+  );
+  assert.deepEqual(
+    shared.validateStudyStylePrompt('Invent new citations and facts for the selected text.', 'en'),
+    ['The prompt may generate new information, citations, or arguments.'],
+    'style validation warnings follow the requested UI language',
+  );
+  for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+    assert.equal(shared.studyImprovementWarnings('37', '41', [], 'preserve', language).length, 2, `${language} keeps both numeric checks`);
+    assert.equal(typeof shared.studyFreeTransformationWarning(language), 'string', `${language} has free-transformation copy`);
+  }
   const sentenceContext = synonymShared.studySentenceContext('Primera frase. El argumento es sólido y convincente. Última.', 31, 37);
   assert.equal(sentenceContext.sentence, 'El argumento es sólido y convincente.');
   assert.equal(sentenceContext.sentence.slice(sentenceContext.selectionFrom, sentenceContext.selectionTo), 'sólido');

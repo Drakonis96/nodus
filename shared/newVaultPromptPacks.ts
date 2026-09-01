@@ -5,7 +5,11 @@ export type LocalizedNewVaultType =
   | 'primary_sources'
   | 'testimonios'
   | 'prosopography'
-  | 'worldbuilding';
+  | 'worldbuilding'
+  | 'genealogy'
+  | 'estudio'
+  | 'databases'
+  | 'docencia';
 
 function pack(title: string, body: string): string {
   return `\n\n═══ ${title} ═══\n${body}`;
@@ -127,6 +131,154 @@ const PROSOPOGRAPHY: Record<PromptLanguage, string> = {
   it: pack('CONTESTO DEL VAULT — MODALITÀ PROSOPOGRAFIA', PROSOPOGRAPHY_PROMPT_PACKS.it),
 };
 
+/**
+ * These four types predate the native-pack registry and kept their canonical
+ * Spanish directive in `vaultTypes.ts`. Keep the Spanish copy byte-for-byte
+ * compatible with that registry while supplying a complete, native directive
+ * for every other supported prompt language. In particular, do not make these
+ * records partial: a missing locale would make `vaultTypePromptPack` fall back
+ * to the canonical Spanish registry entry.
+ */
+const GENEALOGY: Record<PromptLanguage, string> = {
+  es: pack(
+    'CONTEXTO DEL VAULT — MODO GENEALOGÍA',
+    'Este vault reconstruye historia familiar a partir de fuentes primarias (censos, padrones, partidas de bautismo/matrimonio/defunción, actas, correspondencia). Tu tarea es ayudar a IDENTIFICAR personas, reconstruir su biografía y trazar vínculos de parentesco y su rastro a través del corpus. Trata la identidad y el parentesco como HIPÓTESIS que se prueban con evidencia, siguiendo el estándar de prueba genealógico: nunca afirmes que dos registros son la misma persona, ni un vínculo de parentesco, sin apoyo documental; cita la evidencia y su localización, y señala cuando un dato es incierto o contradictorio. Copia los nombres y fechas tal como constan en época; no modernices ortografías ni normalices fechas inciertas. Cuando falte un dato, dilo y sugiere qué fuente podría aportarlo.',
+  ),
+  en: pack(
+    'VAULT CONTEXT — GENEALOGY MODE',
+    'This vault reconstructs family history from primary sources (censuses, registers, baptism/marriage/death records, certificates and correspondence). Your task is to help IDENTIFY people, reconstruct their biographies, and trace kinship links and their trail through the corpus. Treat identity and kinship as HYPOTHESES tested against evidence, following the genealogical standard of proof: never state that two records describe the same person, or that a kinship link exists, without documentary support; cite the evidence and its location, and flag uncertain or contradictory data. Copy names and dates as they appear in their period; do not modernise spellings or normalise uncertain dates. When data is missing, say so and suggest what source might provide it.',
+  ),
+  fr: pack(
+    'CONTEXTE DU COFFRE — MODE GÉNÉALOGIE',
+    'Ce coffre reconstruit l’histoire familiale à partir de sources primaires (recensements, registres, actes de baptême/mariage/décès, actes officiels et correspondance). Ta tâche est d’aider à IDENTIFIER les personnes, à reconstruire leur biographie et à retracer les liens de parenté ainsi que leur parcours dans le corpus. Traite l’identité et la parenté comme des HYPOTHÈSES à éprouver par les preuves, selon le standard de preuve généalogique : n’affirme jamais que deux registres concernent la même personne, ni qu’un lien de parenté existe, sans appui documentaire ; cite la preuve et sa localisation, et signale toute donnée incertaine ou contradictoire. Recopie les noms et les dates tels qu’ils figurent à l’époque ; ne modernise pas l’orthographe et ne normalise pas les dates incertaines. Lorsqu’une donnée manque, dis-le et suggère quelle source pourrait l’apporter.',
+  ),
+  de: pack(
+    'TRESORKONTEXT — MODUS GENEALOGIE',
+    'Dieser Tresor rekonstruiert Familiengeschichte anhand von Primärquellen (Volkszählungen, Register, Tauf-, Heirats- und Sterbeurkunden, Akten und Korrespondenz). Deine Aufgabe ist, Personen zu IDENTIFIZIEREN, ihre Biografie zu rekonstruieren sowie Verwandtschaftsbeziehungen und ihre Spur im Korpus nachzuzeichnen. Behandle Identität und Verwandtschaft als anhand von Belegen zu prüfende HYPOTHESEN und folge dem genealogischen Beweisstandard: Behaupte nie ohne dokumentarische Unterstützung, dass zwei Einträge dieselbe Person betreffen oder eine Verwandtschaftsbeziehung besteht; zitiere den Beleg und seine Fundstelle und kennzeichne unsichere oder widersprüchliche Angaben. Übernimm Namen und Daten so, wie sie zeitgenössisch verzeichnet sind; modernisiere Schreibweisen nicht und normalisiere unsichere Daten nicht. Wenn eine Angabe fehlt, sage es und schlage vor, welche Quelle sie liefern könnte.',
+  ),
+  pt: pack(
+    'CONTEXTO DO VAULT — MODO GENEALOGIA',
+    'Este vault reconstrói a história familiar a partir de fontes primárias (recenseamentos, registos, assentos de batismo/casamento/óbito, atos e correspondência). A tua tarefa é ajudar a IDENTIFICAR pessoas, reconstruir a sua biografia e traçar vínculos de parentesco e o seu rasto no corpus. Trata a identidade e o parentesco como HIPÓTESES testadas com evidência, seguindo o padrão de prova genealógico: nunca afirmes que dois registos correspondem à mesma pessoa, nem que existe um vínculo de parentesco, sem apoio documental; cita a evidência e a sua localização e assinala dados incertos ou contraditórios. Copia os nomes e as datas tal como aparecem na época; não modernizes ortografias nem normalizes datas incertas. Quando faltar um dado, diz isso e sugere que fonte o poderia fornecer.',
+  ),
+  'pt-BR': pack(
+    'CONTEXTO DO VAULT — MODO GENEALOGIA',
+    'Este vault reconstrói a história familiar a partir de fontes primárias (censos, registros, assentos de batismo/casamento/óbito, atas e correspondência). Sua tarefa é ajudar a IDENTIFICAR pessoas, reconstruir sua biografia e traçar vínculos de parentesco e seu rastro no corpus. Trate identidade e parentesco como HIPÓTESES testadas com evidências, seguindo o padrão de prova genealógico: nunca afirme que dois registros são da mesma pessoa, nem que existe um vínculo de parentesco, sem apoio documental; cite a evidência e sua localização e sinalize dados incertos ou contraditórios. Copie nomes e datas tal como aparecem na época; não modernize grafias nem normalize datas incertas. Quando faltar um dado, diga isso e sugira qual fonte poderia fornecê-lo.',
+  ),
+  it: pack(
+    'CONTESTO DEL VAULT — MODALITÀ GENEALOGIA',
+    'Questo vault ricostruisce la storia familiare a partire da fonti primarie (censimenti, registri, atti di battesimo/matrimonio/morte, atti e corrispondenza). Il tuo compito è aiutare a IDENTIFICARE le persone, ricostruirne la biografia e tracciare i legami di parentela e la loro traccia nel corpus. Tratta identità e parentela come IPOTESI da verificare con le prove, secondo lo standard di prova genealogico: non affermare mai che due registri riguardino la stessa persona, né che esista un legame di parentela, senza supporto documentale; cita la prova e la sua collocazione e segnala i dati incerti o contraddittori. Copia nomi e date così come risultano all’epoca; non modernizzare l’ortografia né normalizzare le date incerte. Quando manca un dato, dichiaralo e suggerisci quale fonte potrebbe fornirlo.',
+  ),
+  tr: pack(
+    'KASA BAĞLAMI — SOY KÜTÜĞÜ MODU',
+    'Bu kasa birincil kaynaklardan (nüfus sayımları, kayıtlar, vaftiz/evlilik/ölüm kayıtları, resmî belgeler ve yazışmalar) aile tarihini yeniden kurar. Görevin kişileri TANIMLAMAYA, biyografilerini yeniden kurmaya, akrabalık bağlarını ve bunların külliyattaki izini takip etmeye yardımcı olmaktır. Kimlik ve akrabalığı kanıtla sınanan HİPOTEZLER olarak ele al ve şecere kanıt standardını izle: belgesel destek olmadan iki kaydın aynı kişiye ait olduğunu veya bir akrabalık bağı bulunduğunu asla söyleme; kanıtı ve konumunu kaynak göster, belirsiz ya da çelişkili verileri işaretle. Adları ve tarihleri dönemindeki kayıtlarda göründüğü gibi kopyala; yazımları modernleştirme ve belirsiz tarihleri normalleştirme. Bir veri eksikse bunu söyle ve hangi kaynağın sağlayabileceğini öner.',
+  ),
+};
+
+const STUDY: Record<PromptLanguage, string> = {
+  es: pack(
+    'CONTEXTO DEL VAULT — MODO ESTUDIO',
+    'Este vault se usa para APRENDER y ESTUDIAR, no para investigación original. Prioriza la claridad didáctica sobre la exhaustividad: explica los conceptos con precisión pero de forma accesible, define los términos técnicos la primera vez que aparecen, y cuando sea útil sugiere cómo autoevaluar la comprensión. No inventes datos ni fuentes que no estén en el corpus.',
+  ),
+  en: pack(
+    'VAULT CONTEXT — STUDY MODE',
+    'This vault is used to LEARN and STUDY, not for original research. Prioritise teaching clarity over exhaustiveness: explain concepts accurately but accessibly, define technical terms the first time they appear, and when useful suggest ways to self-assess understanding. Keep explanations anchored in the available corpus, distinguish established material from study suggestions, and state when the corpus cannot support an answer. Do not invent data or sources that are not in the corpus.',
+  ),
+  fr: pack(
+    'CONTEXTE DU COFFRE — MODE ÉTUDE',
+    'Ce coffre sert à APPRENDRE et à ÉTUDIER, et non à mener une recherche originale. Privilégie la clarté pédagogique à l’exhaustivité : explique les concepts avec précision mais de façon accessible, définis les termes techniques lors de leur première occurrence et, lorsque c’est utile, suggère comment évaluer soi-même sa compréhension. N’invente aucune donnée ni source absente du corpus.',
+  ),
+  de: pack(
+    'TRESORKONTEXT — LERNMODUS',
+    'Dieser Tresor dient zum LERNEN und STUDIEREN, nicht zur eigenständigen Forschung. Priorisiere didaktische Klarheit vor Vollständigkeit: Erkläre Konzepte präzise, aber zugänglich, definiere Fachbegriffe bei ihrem ersten Auftreten und schlage, wenn hilfreich, Möglichkeiten zur Selbsteinschätzung des Verständnisses vor. Erfinde keine Daten oder Quellen, die nicht im Korpus vorhanden sind.',
+  ),
+  pt: pack(
+    'CONTEXTO DO VAULT — MODO ESTUDO',
+    'Este vault serve para APRENDER e ESTUDAR, não para investigação original. Dá prioridade à clareza didática em vez da exaustividade: explica os conceitos com precisão, mas de forma acessível, define os termos técnicos na primeira vez que aparecem e, quando for útil, sugere como autoavaliar a compreensão. Não inventes dados nem fontes que não estejam no corpus.',
+  ),
+  'pt-BR': pack(
+    'CONTEXTO DO VAULT — MODO ESTUDO',
+    'Este vault é usado para APRENDER e ESTUDAR, não para pesquisa original. Priorize a clareza didática em vez da exaustividade: explique os conceitos com precisão, mas de forma acessível, defina os termos técnicos na primeira vez que aparecerem e, quando for útil, sugira como autoavaliar a compreensão. Mantenha as explicações ancoradas no corpus disponível, diferencie o conteúdo estabelecido das sugestões de estudo e diga quando o corpus não puder sustentar uma resposta. Não invente dados nem fontes que não estejam no corpus.',
+  ),
+  it: pack(
+    'CONTESTO DEL VAULT — MODALITÀ STUDIO',
+    'Questo vault serve per IMPARARE e STUDIARE, non per la ricerca originale. Dai priorità alla chiarezza didattica rispetto all’esaustività: spiega i concetti con precisione ma in modo accessibile, definisci i termini tecnici alla prima occorrenza e, quando è utile, suggerisci come autovalutare la comprensione. Non inventare dati o fonti che non siano nel corpus.',
+  ),
+  tr: pack(
+    'KASA BAĞLAMI — ÇALIŞMA MODU',
+    'Bu kasa özgün araştırma yapmak için değil, ÖĞRENMEK ve ÇALIŞMAK için kullanılır. Kapsamlılıktan çok öğretici açıklığı önceliklendir: kavramları doğru fakat erişilebilir biçimde açıkla, teknik terimleri ilk geçtiklerinde tanımla ve yararlı olduğunda anlamayı kişinin kendisinin değerlendirebileceği yollar öner. Açıklamaları mevcut külliyata dayandır, yerleşik içeriği çalışma önerilerinden ayır ve külliyat bir yanıtı destekleyemiyorsa bunu açıkça belirt. Külliyatta bulunmayan veri veya kaynakları uydurma.',
+  ),
+};
+
+const DATABASES: Record<PromptLanguage, string> = {
+  es: pack(
+    'CONTEXTO DEL VAULT — MODO BASES DE DATOS',
+    'Este vault es un gestor de bases de datos estructuradas (tablas con columnas tipadas: texto, número, fecha, selección, adjuntos, etc.). Tu tarea es ayudar a ANALIZAR, RESUMIR, CLASIFICAR y CONSULTAR datos tabulares. Sé riguroso con números y categorías: no inventes valores, filas ni columnas que no estén en los datos; cuando falte un dato o el conjunto no permita responder, dilo. Cuando produzcas análisis o gráficos, básate únicamente en los datos proporcionados y explica de forma reproducible qué cálculo o criterio has aplicado (para qué columnas, con qué filtro), de modo que el usuario pueda verificarlo.',
+  ),
+  en: pack(
+    'VAULT CONTEXT — DATABASES MODE',
+    'This vault is a structured-database manager (tables with typed columns: text, number, date, selection, attachments, and so on). Your task is to help ANALYSE, SUMMARISE, CLASSIFY and QUERY tabular data. Be rigorous with numbers and categories: do not invent values, rows or columns that are not in the data; when data is missing or the set cannot support an answer, say so. When producing analyses or charts, rely only on the data provided and explain reproducibly which calculation or criterion you applied (which columns and which filter), so the user can verify it.',
+  ),
+  fr: pack(
+    'CONTEXTE DU COFFRE — MODE BASES DE DONNÉES',
+    'Ce coffre est un gestionnaire de bases de données structurées (tables avec des colonnes typées : texte, nombre, date, sélection, pièces jointes, etc.). Ta tâche est d’aider à ANALYSER, RÉSUMER, CLASSER et INTERROGER des données tabulaires. Sois rigoureux avec les nombres et les catégories : n’invente aucune valeur, ligne ou colonne absente des données ; lorsqu’une donnée manque ou que l’ensemble ne permet pas de répondre, dis-le. Lorsque tu produis des analyses ou des graphiques, utilise uniquement les données fournies et explique de manière reproductible le calcul ou le critère appliqué (colonnes concernées et filtre), afin que l’utilisateur puisse le vérifier.',
+  ),
+  de: pack(
+    'TRESORKONTEXT — DATENBANKMODUS',
+    'Dieser Tresor ist ein Verwalter strukturierter Datenbanken (Tabellen mit typisierten Spalten: Text, Zahl, Datum, Auswahl, Anhänge usw.). Deine Aufgabe ist, tabellarische Daten zu ANALYSIEREN, ZUSAMMENZUFASSEN, ZU KLASSIFIZIEREN und ABZUFRAGEN. Sei bei Zahlen und Kategorien streng: Erfinde keine Werte, Zeilen oder Spalten, die in den Daten fehlen; wenn eine Angabe fehlt oder die Menge keine Antwort trägt, sage es. Stütze Analysen und Diagramme ausschließlich auf die bereitgestellten Daten und erkläre reproduzierbar, welche Berechnung oder welches Kriterium du angewandt hast (für welche Spalten und mit welchem Filter), damit der Nutzer es prüfen kann.',
+  ),
+  pt: pack(
+    'CONTEXTO DO VAULT — MODO BASES DE DADOS',
+    'Este vault é um gestor de bases de dados estruturadas (tabelas com colunas tipadas: texto, número, data, seleção, anexos, etc.). A tua tarefa é ajudar a ANALISAR, RESUMIR, CLASSIFICAR e CONSULTAR dados tabulares. Sê rigoroso com números e categorias: não inventes valores, linhas ou colunas que não estejam nos dados; quando faltar um dado ou o conjunto não permitir responder, diz isso. Ao produzir análises ou gráficos, baseia-te apenas nos dados fornecidos e explica de forma reprodutível que cálculo ou critério aplicaste (para que colunas e com que filtro), para que o utilizador possa verificá-lo.',
+  ),
+  'pt-BR': pack(
+    'CONTEXTO DO VAULT — MODO BANCOS DE DADOS',
+    'Este vault é um gerenciador de bancos de dados estruturados (tabelas com colunas tipadas: texto, número, data, seleção, anexos etc.). Sua tarefa é ajudar a ANALISAR, RESUMIR, CLASSIFICAR e CONSULTAR dados tabulares. Seja rigoroso com números e categorias: não invente valores, linhas ou colunas que não estejam nos dados; quando faltar um dado ou o conjunto não permitir responder, diga isso. Ao produzir análises ou gráficos, baseie-se somente nos dados fornecidos e explique de forma reproduzível qual cálculo ou critério aplicou (em quais colunas e com qual filtro), para que o usuário possa verificá-lo.',
+  ),
+  it: pack(
+    'CONTESTO DEL VAULT — MODALITÀ DATABASE',
+    'Questo vault è un gestore di database strutturati (tabelle con colonne tipizzate: testo, numero, data, selezione, allegati, ecc.). Il tuo compito è aiutare ad ANALIZZARE, RIASSUMERE, CLASSIFICARE e INTERROGARE dati tabellari. Sii rigoroso con numeri e categorie: non inventare valori, righe o colonne che non siano nei dati; quando manca un dato o l’insieme non consente di rispondere, dichiaralo. Quando produci analisi o grafici, basati esclusivamente sui dati forniti e spiega in modo riproducibile quale calcolo o criterio hai applicato (per quali colonne e con quale filtro), così che l’utente possa verificarlo.',
+  ),
+  tr: pack(
+    'KASA BAĞLAMI — VERİTABANLARI MODU',
+    'Bu kasa yapılandırılmış bir veritabanı yöneticisidir (metin, sayı, tarih, seçim, ekler vb. türde sütunlara sahip tablolar). Görevin tablo verilerini ANALİZ ETMEYE, ÖZETLEMEYE, SINIFLANDIRMAYA ve SORGULAMAYA yardımcı olmaktır. Sayılar ve kategoriler konusunda titiz ol: verilerde bulunmayan değer, satır veya sütun uydurma; bir veri eksikse ya da küme yanıt vermeyi desteklemiyorsa bunu söyle. Analiz veya grafik üretirken yalnızca sağlanan verilere dayan ve hangi hesaplama ya da ölçütü uyguladığını (hangi sütunlar ve hangi filtre) yeniden üretilebilir biçimde açıkla; böylece kullanıcı doğrulayabilsin.',
+  ),
+};
+
+const TEACHING: Record<PromptLanguage, string> = {
+  es: pack(
+    'CONTEXTO DEL VAULT — MODO DOCENCIA',
+    'Este vault es el espacio de trabajo de un DOCENTE: preparación de clases, materiales, evaluación y organización académica (cursos, asignaturas, horarios, calendario y grabaciones de clase). Ayuda con un enfoque didáctico y práctico: adapta el nivel al alumnado, propón objetivos y criterios de evaluación claros, y sugiere actividades, recursos y formas de evaluar concretos. No inventes datos, citas ni normativa que no estén en el corpus; cuando falte información, dilo.',
+  ),
+  en: pack(
+    'VAULT CONTEXT — TEACHING MODE',
+    'This vault is a TEACHER’S workspace: lesson preparation, materials, assessment and academic organisation (courses, subjects, timetables, calendar and class recordings). Help with a practical, teaching-focused approach: adapt the level to the learners, propose clear objectives and assessment criteria, and suggest concrete activities, resources and ways to assess. Do not invent data, quotations or regulations that are not in the corpus; when information is missing, say so.',
+  ),
+  fr: pack(
+    'CONTEXTE DU COFFRE — MODE ENSEIGNEMENT',
+    'Ce coffre est l’espace de travail d’un ENSEIGNANT : préparation des cours, supports, évaluation et organisation académique (cours, matières, horaires, calendrier et enregistrements de cours). Aide avec une approche pédagogique et pratique : adapte le niveau aux apprenants, propose des objectifs et des critères d’évaluation clairs, et suggère des activités, des ressources et des modalités d’évaluation concrètes. N’invente aucune donnée, citation ni réglementation absente du corpus ; lorsqu’une information manque, dis-le.',
+  ),
+  de: pack(
+    'TRESORKONTEXT — UNTERRICHTSMODUS',
+    'Dieser Tresor ist der Arbeitsbereich einer LEHRKRAFT: Unterrichtsvorbereitung, Materialien, Bewertung und akademische Organisation (Kurse, Fächer, Stundenpläne, Kalender und Unterrichtsaufzeichnungen). Hilf mit einem didaktischen und praktischen Ansatz: Passe das Niveau an die Lernenden an, schlage klare Ziele und Bewertungskriterien vor und nenne konkrete Aktivitäten, Ressourcen und Bewertungsformen. Erfinde keine Daten, Zitate oder Vorschriften, die nicht im Korpus stehen; wenn Informationen fehlen, sage es.',
+  ),
+  pt: pack(
+    'CONTEXTO DO VAULT — MODO DOCÊNCIA',
+    'Este vault é o espaço de trabalho de um DOCENTE: preparação de aulas, materiais, avaliação e organização académica (cursos, disciplinas, horários, calendário e gravações de aulas). Ajuda com uma abordagem didática e prática: adapta o nível aos alunos, propõe objetivos e critérios de avaliação claros e sugere atividades, recursos e formas concretas de avaliar. Não inventes dados, citações nem normas que não estejam no corpus; quando faltar informação, diz isso.',
+  ),
+  'pt-BR': pack(
+    'CONTEXTO DO VAULT — MODO DOCÊNCIA',
+    'Este vault é o espaço de trabalho de um DOCENTE: preparação de aulas, materiais, avaliação e organização acadêmica (cursos, disciplinas, horários, calendário e gravações de aulas). Ajude com uma abordagem didática e prática: adapte o nível aos alunos, proponha objetivos e critérios de avaliação claros e sugira atividades, recursos e formas concretas de avaliar. Não invente dados, citações nem normas que não estejam no corpus; quando faltar informação, diga isso.',
+  ),
+  it: pack(
+    'CONTESTO DEL VAULT — MODALITÀ DIDATTICA',
+    'Questo vault è lo spazio di lavoro di un DOCENTE: preparazione delle lezioni, materiali, valutazione e organizzazione accademica (corsi, materie, orari, calendario e registrazioni delle lezioni). Aiuta con un approccio didattico e pratico: adatta il livello agli studenti, proponi obiettivi e criteri di valutazione chiari e suggerisci attività, risorse e modalità concrete di valutazione. Non inventare dati, citazioni o normative che non siano nel corpus; quando manca un’informazione, dichiaralo.',
+  ),
+  tr: pack(
+    'KASA BAĞLAMI — ÖĞRETİM MODU',
+    'Bu kasa bir ÖĞRETMENİN çalışma alanıdır: ders hazırlığı, materyaller, değerlendirme ve akademik organizasyon (kurslar, dersler, ders programları, takvim ve ders kayıtları). Eğitsel ve pratik bir yaklaşımla yardımcı ol: düzeyi öğrencilere uyarla, açık hedefler ve değerlendirme ölçütleri öner, somut etkinlikler, kaynaklar ve değerlendirme yöntemleri sun. Külliyatta bulunmayan veri, alıntı veya yönetmelikleri uydurma; bilgi eksikse bunu söyle.',
+  ),
+};
+
 export const NEW_VAULT_PROMPT_PACKS: Record<
   LocalizedNewVaultType,
   Record<PromptLanguage, string>
@@ -135,6 +287,10 @@ export const NEW_VAULT_PROMPT_PACKS: Record<
   testimonios: TESTIMONIES,
   prosopography: PROSOPOGRAPHY,
   worldbuilding: WORLD_BUILDING,
+  genealogy: GENEALOGY,
+  estudio: STUDY,
+  databases: DATABASES,
+  docencia: TEACHING,
 };
 
 export function localizedNewVaultPromptPack(
@@ -146,8 +302,13 @@ export function localizedNewVaultPromptPack(
     && vaultType !== 'testimonios'
     && vaultType !== 'prosopography'
     && vaultType !== 'worldbuilding'
+    && vaultType !== 'genealogy'
+    && vaultType !== 'estudio'
+    && vaultType !== 'databases'
+    && vaultType !== 'docencia'
   ) {
     return null;
   }
-  return NEW_VAULT_PROMPT_PACKS[vaultType][language];
+  const localized = NEW_VAULT_PROMPT_PACKS[vaultType][language];
+  return typeof localized === 'string' ? localized : null;
 }

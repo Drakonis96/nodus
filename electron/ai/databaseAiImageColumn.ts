@@ -55,8 +55,9 @@ export async function runAiImageCell(rowId: string, columnId: string, deps: AiIm
   const row = getRow(rowId);
   if (!detail || !row) throw new Error('Fila no encontrada.');
 
-  const context = buildAiRowContext(detail.columns, row, { excludeColumnId: columnId });
-  const fullPrompt = buildAiImagePrompt(prompt, context);
+  const language = getSettings().promptLanguage ?? 'es';
+  const context = buildAiRowContext(detail.columns, row, { excludeColumnId: columnId, language });
+  const fullPrompt = buildAiImagePrompt(prompt, context, language);
 
   const generate = deps.generate ?? realGenerate;
   const { image, mimeType } = await generate(fullPrompt, configuredImageModel(col.config.aiImageModel));

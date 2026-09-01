@@ -1,9 +1,10 @@
 import { v4 as uuid } from 'uuid';
-import type { ArgumentBlock, ArgumentMap, ArgumentMapRequest, ArgumentRouteSuggestion, EdgeType, IdeaType, ModelRef } from '@shared/types';
+import type { ArgumentBlock, ArgumentMap, ArgumentMapRequest, ArgumentRouteSuggestion, EdgeType, IdeaType, ModelRef, PromptLanguage } from '@shared/types';
 import { getDb } from '../db/database';
 import { getIdeaSummary } from '../db/ideasRepo';
 import { getSettings } from '../db/settingsRepo';
 import { completeJson } from './aiClient';
+import { argumentMapPrompt } from '@shared/graphPromptPacks';
 
 // The argument map is built from the LOCAL subgraph around the seed idea (BFS
 // over real idea↔idea edges), so the model can only reference ideas that
@@ -36,8 +37,6 @@ const EDGE_TYPE_LABELS: Record<string, string> = {
   refutes: 'refuta',
 };
 
-// English counterpart for the structural (auto-mode) overview/summary, which are
-// shown verbatim in the UI; picked by the interface language.
 const EDGE_TYPE_LABELS_EN: Record<string, string> = {
   extends: 'extends',
   variant_of: 'variant of',
@@ -50,6 +49,54 @@ const EDGE_TYPE_LABELS_EN: Record<string, string> = {
   supports: 'supports',
   refutes: 'refutes',
 };
+
+const EDGE_TYPE_LABELS_BY_LANGUAGE: Record<PromptLanguage, Record<string, string>> = {
+  es: EDGE_TYPE_LABELS,
+  en: EDGE_TYPE_LABELS_EN,
+  fr: { extends: 'étend', variant_of: 'variante de', refines: 'affine', contradicts: 'contredit', applies_to: "s'applique à", shares_method: 'partage la méthode', precondition_of: 'prérequis de', measures_same: 'mesure la même chose', supports: 'soutient', refutes: 'réfute' },
+  de: { extends: 'erweitert', variant_of: 'Variante von', refines: 'verfeinert', contradicts: 'widerspricht', applies_to: 'gilt für', shares_method: 'teilt die Methode', precondition_of: 'Voraussetzung für', measures_same: 'misst dasselbe', supports: 'stützt', refutes: 'widerlegt' },
+  pt: { extends: 'estende', variant_of: 'variante de', refines: 'refina', contradicts: 'contradiz', applies_to: 'aplica-se a', shares_method: 'partilha o método', precondition_of: 'pré-condição de', measures_same: 'mede o mesmo', supports: 'apoia', refutes: 'refuta' },
+  'pt-BR': { extends: 'estende', variant_of: 'variante de', refines: 'refina', contradicts: 'contradiz', applies_to: 'aplica-se a', shares_method: 'compartilha o método', precondition_of: 'pré-condição de', measures_same: 'mede o mesmo', supports: 'apoia', refutes: 'refuta' },
+  it: { extends: 'estende', variant_of: 'variante di', refines: 'perfeziona', contradicts: 'contraddice', applies_to: 'si applica a', shares_method: 'condivide il metodo', precondition_of: 'precondizione di', measures_same: 'misura lo stesso', supports: 'supporta', refutes: 'confuta' },
+  tr: { extends: 'genişletir', variant_of: 'şunun varyantı', refines: 'iyileştirir', contradicts: 'çelişir', applies_to: 'şuna uygulanır', shares_method: 'yöntemi paylaşır', precondition_of: 'şunun ön koşulu', measures_same: 'aynı şeyi ölçer', supports: 'destekler', refutes: 'çürütür' },
+};
+
+const NO_CONNECTION_COPY: Record<PromptLanguage, { summary: string; overview: string }> = {
+  es: { summary: 'Esta idea no tiene conexiones con otras ideas en el grafo.', overview: 'La idea seleccionada no tiene conexiones directas con otras ideas analizadas.' },
+  en: { summary: 'This idea has no connections to other ideas in the graph.', overview: 'The selected idea has no direct connections to other ideas.' },
+  fr: { summary: "Cette idée n'est reliée à aucune autre idée du graphe.", overview: "L'idée sélectionnée n'a aucun lien direct avec d'autres idées." },
+  de: { summary: 'Diese Idee hat keine Verbindungen zu anderen Ideen im Graphen.', overview: 'Die ausgewählte Idee hat keine direkten Verbindungen zu anderen Ideen.' },
+  pt: { summary: 'Esta ideia não tem ligações a outras ideias no grafo.', overview: 'A ideia selecionada não tem ligações diretas a outras ideias.' },
+  'pt-BR': { summary: 'Esta ideia não tem conexões com outras ideias no grafo.', overview: 'A ideia selecionada não tem conexões diretas com outras ideias.' },
+  it: { summary: 'Questa idea non ha collegamenti con altre idee nel grafo.', overview: "L'idea selezionata non ha collegamenti diretti con altre idee." },
+  tr: { summary: 'Bu fikrin grafikte başka fikirlerle bağlantısı yok.', overview: 'Seçilen fikrin başka fikirlerle doğrudan bağlantısı yok.' },
+};
+
+function structuralOverview(language: PromptLanguage, degree: number, debates: number, branches: number): string {
+  if (degree === 0) return NO_CONNECTION_COPY[language].overview;
+  const debatePart = debates > 0
+    ? ({
+        es: `, de las cuales ${debates} son debates (contradicciones/refutaciones)`,
+        en: `, ${debates} of them debates (contradictions/refutations)`,
+        fr: `, dont ${debates} débats (contradictions/réfutations)`,
+        de: `, davon ${debates} Debatten (Widersprüche/Widerlegungen)`,
+        pt: `, das quais ${debates} debates (contradições/refutações)`,
+        'pt-BR': `, sendo ${debates} debates (contradições/refutações)`,
+        it: `, di cui ${debates} dibattiti (contraddizioni/confutazioni)`,
+        tr: `; bunların ${debates} kadarı tartışma (çelişki/çürütme)`,
+      } as Record<PromptLanguage, string>)[language]
+    : '';
+  return ({
+    es: `Recorrido automático: la idea central articula ${degree} conexiones${debatePart}. El mapa abre ${branches} rama(s) más fuertes y sigue cada una por las conexiones reales.`,
+    en: `Automatic walkthrough: the central idea links ${degree} connection(s)${debatePart}. The map opens its ${branches} strongest branch(es) and follows each through real connections.`,
+    fr: `Parcours automatique : l'idée centrale relie ${degree} connexion(s)${debatePart}. La carte ouvre ${branches} branche(s) principales et suit chacune par les liens réels.`,
+    de: `Automatischer Rundgang: Die zentrale Idee verbindet ${degree} Verbindung(en)${debatePart}. Die Karte öffnet ${branches} stärkste(n) Zweig(e) und folgt den echten Verbindungen.`,
+    pt: `Percurso automático: a ideia central liga ${degree} ligação(ões)${debatePart}. O mapa abre ${branches} ramo(s) mais fortes e segue cada um pelas ligações reais.`,
+    'pt-BR': `Percurso automático: a ideia central conecta ${degree} conexão(ões)${debatePart}. O mapa abre ${branches} ramo(s) mais fortes e segue cada um pelas conexões reais.`,
+    it: `Percorso automatico: l'idea centrale collega ${degree} connessione/i${debatePart}. La mappa apre ${branches} ramo/i più forti e segue ciascuno attraverso i collegamenti reali.`,
+    tr: `Otomatik gezinti: merkez fikir ${degree} bağlantı kurar${debatePart}. Harita ${branches} güçlü dalı açar ve her birini gerçek bağlantılar boyunca izler.`,
+  } as Record<PromptLanguage, string>)[language];
+}
 
 const VALID_RELATIONS = new Set<string>([
   'extends',
@@ -216,36 +263,6 @@ function isRawResult(v: unknown): v is RawResult {
   return typeof v === 'object' && v !== null && typeof (v as RawResult).root === 'object';
 }
 
-const SYSTEM = `Eres el cartógrafo de argumentos de Nodus. Recibes una idea SEMILLA y el subgrafo REAL de ideas conectadas a ella (con sus tipos y las relaciones reales entre ellas: apoya, refuta, contradice, extiende, refina, aplica a, etc.).
-
-OBJETIVO:
-- Traza un ESQUEMA JERÁRQUICO DE BLOQUES (árbol) que despliegue progresivamente cómo se ramifica la argumentación desde la semilla.
-- La RAÍZ es la idea semilla. Sus hijos son las ideas directamente conectadas, agrupadas en ramas coherentes. Desciende recursivamente siguiendo las conexiones reales hasta profundidad 3-4.
-- Cada bloque representa UNA idea real del subgrafo. Usa su "ideaId" exacto. El árbol debe reflejar la estructura argumental: lo que la semilla APOYA o de lo que se DERIVA, los DEBATES (contradicciones/refutaciones) como ramas distintas, las extensiones y refinamientos como subramas.
-- "relation" describe cómo el bloque se vincula a su padre: usa el tipo de arista real (supports, refutes, contradicts, extends, refines, applies_to, shares_method, precondition_of, measures_same, variant_of). Si no hay una arista directa clara, usa "related".
-- "summary" es UNA línea breve (máx ~140 caracteres) que explica el papel de esa idea en el argumento, en español, claro y concreto.
-- "label" puede ser una versión ligeramente abreviada/legible del título de la idea (no la inventes).
-
-REGLAS ESTRICTAS:
-- "ideaId" debe ser un id presente en "ideas" del subgrafo recibido. La raíz debe ser exactamente la idea semilla. No inventes ids ni ideas.
-- Un mismo ideaId puede aparecer una sola vez en todo el árbol (evita duplicados; si una idea conecta de varias formas, colócala bajo el padre más significativo).
-- No dejes ramas vacías: si un bloque no tiene hijos relevantes, usa "children": [].
-- Cubre TODAS las ideas relevantes del subgrafo que aporten al argumento; no resumas dejando fuera ideas conectadas significativas. Prioriza cobertura sobre brevedad.
-
-SALIDA: EXCLUSIVAMENTE JSON válido con esta forma:
-{
-  "overview": "1-2 frases: qué argumento despliega este mapa y su estructura a vista de pájaro.",
-  "root": {
-    "ideaId": "g-0001",
-    "label": "…",
-    "summary": "…",
-    "relation": "root",
-    "children": [
-      { "ideaId": "…", "label": "…", "summary": "…", "relation": "supports", "children": [ … ] }
-    ]
-  }
-}`;
-
 /** Recursively sanitize + ground the model's tree in real idea data. */
 function sanitizeBlock(
   raw: RawBlock,
@@ -300,10 +317,11 @@ function countIdeas(block: ArgumentBlock, set = new Set<string>()): Set<string> 
 }
 
 export async function buildArgumentMap(request: ArgumentMapRequest, model?: ModelRef | null): Promise<ArgumentMap> {
+  const language: PromptLanguage = request.language ?? getSettings().promptLanguage ?? 'es';
   // Automatic mode: build the tree structurally from the real graph edges,
   // no model needed. Falls through to the AI path otherwise.
   if (request.mode === 'auto') {
-    return buildStructuralArgumentMap(request.seedIdeaId);
+    return buildStructuralArgumentMap(request.seedIdeaId, language);
   }
 
   const { seedIdeaId } = request;
@@ -320,14 +338,14 @@ export async function buildArgumentMap(request: ArgumentMapRequest, model?: Mode
       label: seed.label,
       statement: seed.statement,
       type: seed.type,
-      summary: 'Esta idea no tiene conexiones con otras ideas en el grafo.',
+      summary: NO_CONNECTION_COPY[language].summary,
       relation: 'root',
       children: [],
     };
     return {
       seedIdeaId: seed.global_id,
       seedLabel: seed.label,
-      overview: 'La idea seleccionada no tiene conexiones directas con otras ideas analizada.',
+      overview: NO_CONNECTION_COPY[language].overview,
       root,
       generatedAt: new Date().toISOString(),
       truncated: false,
@@ -346,7 +364,7 @@ export async function buildArgumentMap(request: ArgumentMapRequest, model?: Mode
     from: e.from_id,
     to: e.to_id,
     type: e.type,
-    type_label: EDGE_TYPE_LABELS[e.type] ?? e.type,
+    type_label: EDGE_TYPE_LABELS_BY_LANGUAGE[language]?.[e.type] ?? e.type,
     basis: e.basis,
     confidence: e.confidence,
   }));
@@ -358,7 +376,7 @@ export async function buildArgumentMap(request: ArgumentMapRequest, model?: Mode
   });
 
   const result = await completeJson<RawResult>(
-    { system: SYSTEM, user, temperature: 0.2, maxTokens: 8000 },
+    { system: argumentMapPrompt(language), user, temperature: 0.2, maxTokens: 8000 },
     isRawResult,
     model
   );
@@ -520,7 +538,7 @@ export function discoverArgumentRoutes(): ArgumentRouteSuggestion[] {
 }
 
 /** Build the block tree structurally from the real graph edges (no model). */
-export function buildStructuralArgumentMap(seedIdeaId: string): ArgumentMap {
+export function buildStructuralArgumentMap(seedIdeaId: string, language: PromptLanguage = getSettings().promptLanguage ?? 'es'): ArgumentMap {
   const seed = getIdeaSummary(seedIdeaId);
   if (!seed) throw new Error('La idea indicada no existe en el grafo.');
 
@@ -538,9 +556,19 @@ export function buildStructuralArgumentMap(seedIdeaId: string): ArgumentMap {
     (adj.get(e.to_id) ?? adj.set(e.to_id, []).get(e.to_id)!).push({ other: e.from_id, edge: e });
   }
 
-  const lang: 'es' | 'en' = getSettings().uiLanguage === 'es' ? 'es' : 'en';
+  const lang = language;
   const relLabelOf = (rel: string): string =>
-    (lang === 'en' ? EDGE_TYPE_LABELS_EN[rel] : EDGE_TYPE_LABELS[rel]) ?? rel;
+    (EDGE_TYPE_LABELS_BY_LANGUAGE[lang]?.[rel]) ?? rel;
+  const structuralCountCopy = ({
+    es: { connection: 'conexiones', debate: 'debate(s)', derivation: 'derivación(es)' },
+    en: { connection: 'connection(s)', debate: 'debate(s)', derivation: 'derivation(s)' },
+    fr: { connection: 'connexion(s)', debate: 'débat(s)', derivation: 'dérivation(s)' },
+    de: { connection: 'Verbindung(en)', debate: 'Debatte(n)', derivation: 'Ableitung(en)' },
+    pt: { connection: 'ligação(ões)', debate: 'debate(s)', derivation: 'derivação(ões)' },
+    'pt-BR': { connection: 'conexão(ões)', debate: 'debate(s)', derivation: 'derivação(ões)' },
+    it: { connection: 'connessione/i', debate: 'dibattito/i', derivation: 'derivazione/i' },
+    tr: { connection: 'bağlantı', debate: 'tartışma', derivation: 'türetim' },
+  } as Record<PromptLanguage, { connection: string; debate: string; derivation: string }>)[lang];
   // Counted over the whole graph, not the kept subgraph: the route list promises
   // the real figure, and a map that quietly reported the post-cap one read as if
   // connections had gone missing.
@@ -595,34 +623,20 @@ export function buildStructuralArgumentMap(seedIdeaId: string): ArgumentMap {
     const hidden = Math.max(0, degree - block.children.length);
     if (hidden > 0) block.hiddenChildren = hidden;
     if (block.relation === 'root') {
-      block.summary =
-        lang === 'en'
-          ? `${seedDegree} connection(s)${seedDebate ? ` · ${seedDebate} debate(s)` : ''}`
-          : `${seedDegree} conexiones${seedDebate ? ` · ${seedDebate} debate(s)` : ''}`;
+      block.summary = `${seedDegree} ${structuralCountCopy.connection}${seedDebate ? ` · ${seedDebate} ${structuralCountCopy.debate}` : ''}`;
     } else {
       const relLabel = relLabelOf(block.relation);
       const conf = parentEdgeOf.get(block.id)?.confidence ?? 0;
       block.summary =
         block.children.length > 0
-          ? `${relLabel} · conf ${conf.toFixed(2)} · ${block.children.length} ${lang === 'en' ? 'derivation(s)' : 'derivación(es)'}`
+          ? `${relLabel} · conf ${conf.toFixed(2)} · ${block.children.length} ${structuralCountCopy.derivation}`
           : `${relLabel} · conf ${conf.toFixed(2)}`;
     }
     for (const child of block.children) describe(child);
   };
   describe(root);
 
-  const overview =
-    seedDegree === 0
-      ? lang === 'en'
-        ? 'The selected idea has no direct connections to other ideas.'
-        : 'La idea seleccionada no tiene conexiones directas con otras ideas.'
-      : lang === 'en'
-        ? `Automatic walkthrough: the central idea links ${seedDegree} connection(s)${
-            seedDebate ? `, of which ${seedDebate} are debates (contradictions/refutations)` : ''
-          }. The map opens its ${root.children.length} strongest branch(es) — debates, support and refinements — and follows each one down the real connections. Expand the branches to explore the argument.`
-        : `Recorrido automático: la idea central articula ${seedDegree} conexiones${
-            seedDebate ? `, de las cuales ${seedDebate} son debates (contradicciones/refutaciones)` : ''
-          }. El mapa abre sus ${root.children.length} ramas más fuertes —debates, apoyos y refinamientos— y sigue cada una por las conexiones reales. Despliega las ramas para explorar la argumentación.`;
+  const overview = structuralOverview(lang, seedDegree, seedDebate, root.children.length);
 
   return {
     seedIdeaId: seed.global_id,

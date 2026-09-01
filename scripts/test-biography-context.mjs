@@ -51,6 +51,24 @@ test('the system prompt forbids invention and bounds length', () => {
   assert.match(bio.BIOGRAPHY_SYSTEM, /120 a 220 palabras/);
 });
 
+test('genealogy biography system and context are native in every prompt language', () => {
+  const personLabels = { es: 'Persona', en: 'Person', fr: 'Personne', de: 'Person', pt: 'Pessoa', 'pt-BR': 'Pessoa', it: 'Persona', tr: 'Kişi' };
+  for (const locale of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+    const system = bio.biographySystemPrompt(locale);
+    const context = bio.composeBiographyContext(base, locale);
+    assert.ok(system.includes('120') && system.includes('220'));
+    assert.match(context, /Juan Pérez/);
+    assert.match(context, /c\. 1850/);
+    assert.match(context, /Sevilla/);
+    assert.match(context, /"Juan Pérez, jornalero"/);
+    assert.ok(context.startsWith(`${personLabels[locale]}: Juan Pérez`));
+    if (locale !== 'es') {
+      assert.doesNotMatch(system, /Eres un genealogista|No inventes|No incluyas encabezados/);
+      assert.doesNotMatch(context, /Redacta la biografía factual a partir de lo anterior/);
+    }
+  }
+});
+
 test('hasBiographyEvidence gates empty persons', () => {
   assert.equal(bio.hasBiographyEvidence(base), true);
   const empty = { ...base, birthDate: null, deathDate: null, parents: [], spouses: [], children: [], siblings: [], events: [], documents: [], evidence: [] };

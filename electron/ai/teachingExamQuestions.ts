@@ -10,8 +10,8 @@ import {
   type ExamQuestionGenerationResult,
   type ExamQuestionInput,
   type ExamQuestionType,
-  type ExamLanguage,
 } from '@shared/teachingExams';
+import { teachingPromptPack } from '@shared/teachingPromptPacks';
 
 /**
  * Generates ONE exam question at a time, from the subject's own materials.
@@ -42,66 +42,6 @@ function isRawQuestion(value: unknown): value is RawQuestion {
   return typeof value === 'object' && value !== null && typeof (value as RawQuestion).prompt === 'string';
 }
 
-const LANGUAGE_NAMES: Record<ExamLanguage, string> = {
-  es: 'español',
-  en: 'inglés',
-  fr: 'francés',
-  de: 'alemán',
-  pt: 'portugués de Portugal',
-  'pt-BR': 'portugués de Brasil',
-  it: 'italiano',
-  tr: 'turco',
-};
-
-/** The JSON contract the model must satisfy, per question type. */
-function shapeFor(type: ExamQuestionType, optionCount: number): string {
-  switch (type) {
-    case 'section':
-      // A statement asks nothing by itself: the sub-questions do. Asking the model for a
-      // "solution" here would print an answer to a question nobody was asked.
-      return `{"prompt": "texto, fuente o caso práctico común, listo para imprimir", "solution": ""}
-- NO formules ninguna pregunta: esto es solo el material del que colgarán varias preguntas.
-- Entre 80 y 200 palabras, autocontenido y comprensible sin contexto adicional.`;
-    case 'multiple_choice':
-      return `{"prompt": "enunciado", "options": [${Array.from({ length: optionCount }, (_, i) => `"opción ${i + 1}"`).join(', ')}], "correctIndex": 0, "solution": "por qué esa es la correcta"}
-- Exactamente ${optionCount} opciones, todas verosímiles y mutuamente excluyentes.
-- "correctIndex" es el índice (empezando en 0) de la única opción correcta.`;
-    case 'true_false':
-      return `{"prompt": "afirmación que se evalúa como verdadera o falsa", "correct": true, "solution": "justificación breve"}
-- "prompt" debe ser una AFIRMACIÓN, nunca una pregunta.`;
-    case 'matching':
-      return `{"prompt": "instrucción para relacionar", "pairs": [{"left": "elemento", "right": "elemento correspondiente"}], "solution": "criterio de corrección"}
-- Entre 4 y 6 parejas inequívocas.`;
-    case 'ordering':
-      return `{"prompt": "instrucción para ordenar", "items": ["elemento 1", "elemento 2"], "solution": "orden correcto"}
-- Entre 4 y 6 elementos, en "items" ya en el ORDEN CORRECTO (la app los barajará al imprimir).`;
-    case 'fill_blank':
-      return `{"prompt": "texto con huecos marcados como ______", "solution": "palabras que completan cada hueco, en orden"}
-- Entre 2 y 5 huecos marcados con ______ (guiones bajos).`;
-    case 'image_comment':
-      return `{"prompt": "enunciado que pide comentar la imagen", "imageCaption": "pie de imagen sugerido", "solution": "qué debe aparecer en un buen comentario"}
-- No describas una imagen concreta: el enunciado debe funcionar con la imagen que el profesor insertará.`;
-    case 'definition':
-      return `{"prompt": "término o concepto que hay que definir", "solution": "definición de referencia"}`;
-    case 'problem':
-      return `{"prompt": "supuesto práctico completo con los datos necesarios", "solution": "resolución razonada"}`;
-    default:
-      // short_answer and the three essay lengths share the open-response shape.
-      return `{"prompt": "enunciado de la pregunta", "solution": "respuesta modelo o criterios de corrección"}`;
-  }
-}
-
-/** How long the expected answer is, so the model calibrates the question's scope. */
-function scopeHint(type: ExamQuestionType): string {
-  switch (type) {
-    case 'short_essay': return 'Debe poder responderse en unas 5 líneas.';
-    case 'medium_essay': return 'Debe poder responderse en media página.';
-    case 'long_essay': return 'Es un tema para desarrollar en una página completa.';
-    case 'short_answer': return 'Debe poder responderse en una sola línea.';
-    default: return '';
-  }
-}
-
 function toText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -111,7 +51,7 @@ function toStringList(value: unknown, max: number): string[] {
 }
 
 /** Map the model's JSON onto the exam question shape, enforcing each type's invariants. */
-function buildQuestion(type: ExamQuestionType, raw: RawQuestion, optionCount: number, instruction: string): ExamQuestionInput {
+function buildQuestion(type: ExamQuestionType, raw: RawQuestion, optionCount: number, instruction: string, trueFalseLabels: { true: string; false: string }): ExamQuestionInput {
   const def = examQuestionTypeDef(type);
   const question: ExamQuestionInput = {
     type,
@@ -137,8 +77,8 @@ function buildQuestion(type: ExamQuestionType, raw: RawQuestion, optionCount: nu
   } else if (type === 'true_false') {
     // Rendered as two fixed choices; the model only decides which one is right.
     question.options = [
-      { id: 'O1', text: 'Verdadero', correct: raw.correct === true },
-      { id: 'O2', text: 'Falso', correct: raw.correct !== true },
+      { id: 'O1', text: trueFalseLabels.true, correct: raw.correct === true },
+      { id: 'O2', text: trueFalseLabels.false, correct: raw.correct !== true },
     ];
   } else if (type === 'matching') {
     const pairs = Array.isArray(raw.pairs) ? raw.pairs : [];
@@ -167,6 +107,8 @@ export async function generateExamQuestion(request: ExamQuestionGenerationReques
   if (!instruction) throw new Error('Escribe qué quieres que genere la IA para esta pregunta.');
   const def = examQuestionTypeDef(type);
   const optionCount = Math.max(2, Math.min(10, Math.round(request.optionCount ?? def.defaultOptionCount ?? 4)));
+  const settings = getSettings();
+  const pack = teachingPromptPack(settings.promptLanguage ?? 'es').exam;
 
   // Evidence: the subject's own materials. An exam without a subject still works — the
   // model just writes from its own knowledge — but grounding is the whole point here.
@@ -193,29 +135,28 @@ export async function generateExamQuestion(request: ExamQuestionGenerationReques
     .join('\n\n')
     .slice(0, 12000);
 
-  const languageName = LANGUAGE_NAMES[request.language] ?? LANGUAGE_NAMES.es;
+  const languageName = pack.languageNames[request.language] ?? pack.languageNames.es;
   const system = [
-    'Eres un docente experto que redacta preguntas de examen claras, inequívocas y evaluables.',
-    `Redacta la pregunta ÍNTEGRAMENTE en ${languageName}.`,
-    'Devuelve solo JSON válido con la forma indicada, sin texto adicional ni markdown.',
-    'No numeres la pregunta ni añadas la puntuación: la aplicación se encarga del formato.',
+    pack.systemRole,
+    `${pack.systemLanguage} ${languageName}.`,
+    pack.systemJson,
+    pack.systemFormat,
     evidence
-      ? 'Basa la pregunta en los MATERIALES aportados. Si los materiales no cubren lo pedido, redáctala igualmente pero sin inventar datos concretos atribuidos a ellos.'
-      : 'No hay materiales de referencia: redacta la pregunta con conocimiento general de la materia.',
+      ? pack.systemEvidence
+      : pack.systemNoEvidence,
   ].join(' ');
 
   const user = [
-    `TIPO DE PREGUNTA: ${def.label} — ${def.description}`,
-    scopeHint(type),
-    `INSTRUCCIÓN DEL PROFESOR: ${instruction}`,
-    request.avoidPrompt ? `EVITA repetir esta pregunta anterior, propón algo claramente distinto:\n${request.avoidPrompt}` : '',
-    evidence ? `MATERIALES DE LA ASIGNATURA:\n${evidence}` : '',
-    `FORMATO JSON EXACTO:\n${shapeFor(type, optionCount)}`,
+    `${pack.userQuestionType}: ${pack.typeLabels[type].label} — ${pack.typeLabels[type].description}`,
+    pack.scopeHints[type] ?? '',
+    `${pack.userTeacherInstruction}: ${instruction}`,
+    request.avoidPrompt ? `${pack.userAvoid}\n${request.avoidPrompt}` : '',
+    evidence ? `${pack.userMaterials}\n${evidence}` : '',
+    `${pack.userExactJson}:\n${pack.shapeFor(type, optionCount)}`,
   ]
     .filter(Boolean)
     .join('\n\n');
 
-  const settings = getSettings();
   const outcome = await runStudyAiTask<RawQuestion>(
     {
       task: 'questions',
@@ -239,7 +180,8 @@ export async function generateExamQuestion(request: ExamQuestionGenerationReques
       )
   );
 
-  const question = buildQuestion(type, outcome.value, optionCount, instruction);
+  const outputLabels = teachingPromptPack(request.language).exam.trueFalseLabels;
+  const question = buildQuestion(type, outcome.value, optionCount, instruction, outputLabels);
   if (!question.prompt) throw new Error('La IA no devolvió un enunciado utilizable. Vuelve a intentarlo o escribe la pregunta a mano.');
   return { question, model: outcome.model, sourceCount: entries.length };
 }

@@ -31,7 +31,7 @@ import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { ProjectGuideStepModal } from '../components/ProjectGuideStepModal';
 import { notifyDataChanged, useDataRefresh } from '../hooks';
-import { t, tx } from '../i18n';
+import { getActiveLang, t, tx } from '../i18n';
 
 type ChapterTab = 'texto' | 'relaciones' | 'verificacion' | 'sugerencias' | 'versiones' | 'exportar';
 
@@ -87,7 +87,8 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     [detail]
   );
 
-  const guide = useMemo(() => (detail ? buildProjectGuide(detail) : null), [detail]);
+  const guideLanguage = getActiveLang();
+  const guide = useMemo(() => (detail ? buildProjectGuide(detail, guideLanguage) : null), [detail, guideLanguage]);
 
   const loadProjects = useCallback(async () => {
     const list = await window.nodus.listProjects();
@@ -356,6 +357,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       const result = await window.nodus.analyzeChapterRelations({
         chapterId: selectedChapter.id,
         model: detail.project.model ?? settings.synthesisModel,
+        language: settings.promptLanguage,
         force,
       });
       setRelations(result);

@@ -121,6 +121,10 @@ try {
   assert.match(prompt.system, /Formato obligatorio/);
   assert.match(prompt.system, /no es evidencia/i, 'concept planning never replaces source grounding');
   assert.match(prompt.user, /MAPA CONCEPTUAL DE LA ASIGNATURA/);
+  const englishPrompt = ai.buildStudyQuestionPrompt({ sourceKeys: [`document:${document.id}`], count: 3, difficulty: 'mixed', cognitiveLevels: ['remember', 'understand'], types: ['short', 'single_choice'] }, [{ id: 'S0', title: 'Student selection', type: 'selection', location: {}, exactFragment: 'Working memory has limited capacity.' }],
+    { ideas: [], connections: [], outline: '- Working memory: limited capacity.', embeddingAvailable: false }, 'en');
+  assert.match(englishPrompt.user, /SUBJECT CONCEPT MAP/);
+  assert.doesNotMatch(englishPrompt.user, /MAPA CONCEPTUAL|Selección del alumno/);
   const generated = await ai.generateStudyQuestions({ sourceKeys: [`document:${document.id}`], count: 3, difficulty: 'mixed', cognitiveLevels: ['remember', 'understand'], types: ['single_choice'], model: { provider: 'ollama', model: 'question-verifier' } });
   assert.equal(generated.questions.length, 2, 'near-identical generated question is rejected');
   assert.equal(generated.rejectedDuplicates, 1);

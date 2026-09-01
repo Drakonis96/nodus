@@ -52,13 +52,14 @@ async function judge(candidates: EntryCandidate[]) {
   }));
 
   const settings = getSettings();
+  const language = settings.promptLanguage ?? 'es';
   const model = settings.synthesisModel ?? settings.extractionModel ?? null;
   let parsed: ModelCandidate[] = [];
   try {
     const text = await completeText(
       {
         system: worldOperationSystemPrompt('missingEntries', settings.promptLanguage ?? 'es'),
-        user: composeMissingEntriesContext(candidates),
+        user: composeMissingEntriesContext(candidates, language),
         plainContext: true,
         temperature: 0.2,
         maxTokens: 1200,

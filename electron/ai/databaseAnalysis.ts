@@ -41,7 +41,8 @@ import {
 } from '@shared/stats';
 import type { ColumnProfile, DatabaseProfile, DistributionSlice, HistogramBucket, NumberStats } from '@shared/dataProfile';
 import type { AnalysisRequest, AnalysisResult, AnalysisSuggestion, DescriptiveColumn, GroupMetric, ScatterPoint, SeriesLine } from '@shared/analysisSpec';
-import type { DatabaseColumn, DatabaseRow, ModelRef } from '@shared/types';
+import type { DatabaseColumn, DatabaseRow, ModelRef, PromptLanguage } from '@shared/types';
+import { getSettings } from '../db/settingsRepo';
 
 export interface DatabaseProfileResult {
   databaseName: string;
@@ -194,6 +195,49 @@ export function getDatabaseProfile(databaseId: string): DatabaseProfileResult | 
 }
 
 const ANALYSIS_SYSTEM = `Eres un analista de datos. Recibes el PERFIL ESTADÍSTICO de una base de datos (ya calculado: recuentos, medias, distribuciones). Escribe un informe breve y claro en Markdown que: (1) resuma el tamaño y la completitud de los datos, (2) destaque los patrones y valores atípicos que se deduzcan de las cifras, (3) señale posibles problemas de calidad (columnas poco rellenas, valores dominantes). Usa ÚNICAMENTE las cifras del perfil; no inventes datos ni cifras que no aparezcan. Sé conciso.`;
+const ANALYSIS_SYSTEM_I18N = {
+  en: 'You are a data analyst. You receive the STATISTICAL PROFILE of a database (already calculated: counts, averages, distributions). Write a brief, clear Markdown report that: (1) summarizes data size and completeness, (2) highlights patterns and outliers that follow from the figures, and (3) points out possible quality issues (sparsely populated columns, dominant values). Use ONLY figures in the profile; do not invent data or figures that do not appear. Be concise.',
+  fr: 'Vous êtes analyste de données. Vous recevez le PROFIL STATISTIQUE d’une base de données (déjà calculé : décomptes, moyennes, distributions). Rédigez un rapport Markdown bref et clair qui : (1) résume le volume et la complétude des données, (2) met en évidence les tendances et valeurs atypiques déductibles des chiffres, et (3) signale d’éventuels problèmes de qualité (colonnes peu renseignées, valeurs dominantes). Utilisez UNIQUEMENT les chiffres du profil ; n’inventez ni données ni chiffres absents. Soyez concis.',
+  de: 'Du bist Datenanalyst. Du erhältst das STATISTISCHE PROFIL einer Datenbank (bereits berechnet: Anzahlen, Mittelwerte, Verteilungen). Verfasse einen kurzen, klaren Markdown-Bericht, der (1) Umfang und Vollständigkeit der Daten zusammenfasst, (2) aus den Zahlen ableitbare Muster und Ausreißer hervorhebt und (3) mögliche Qualitätsprobleme benennt (schwach befüllte Spalten, dominierende Werte). Verwende AUSSCHLIESSLICH Zahlen aus dem Profil; erfinde keine Daten oder nicht vorhandenen Zahlen. Sei knapp.',
+  pt: 'És analista de dados. Recebes o PERFIL ESTATÍSTICO de uma base de dados (já calculado: contagens, médias, distribuições). Redige um relatório Markdown breve e claro que: (1) resuma a dimensão e a completude dos dados, (2) destaque padrões e valores atípicos dedutíveis dos números e (3) assinale possíveis problemas de qualidade (colunas pouco preenchidas, valores dominantes). Usa APENAS os números do perfil; não inventes dados nem números ausentes. Sê conciso.',
+  'pt-BR': 'Você é analista de dados. Recebe o PERFIL ESTATÍSTICO de um banco de dados (já calculado: contagens, médias, distribuições). Escreva um relatório Markdown breve e claro que: (1) resuma o tamanho e a completude dos dados, (2) destaque padrões e valores atípicos dedutíveis dos números e (3) indique possíveis problemas de qualidade (colunas pouco preenchidas, valores dominantes). Use SOMENTE os números do perfil; não invente dados nem números ausentes. Seja conciso.',
+  it: 'Sei un analista di dati. Ricevi il PROFILO STATISTICO di un database (già calcolato: conteggi, medie, distribuzioni). Scrivi un rapporto Markdown breve e chiaro che: (1) riassuma dimensione e completezza dei dati, (2) evidenzi schemi e valori anomali deducibili dalle cifre e (3) segnali possibili problemi di qualità (colonne poco compilate, valori dominanti). Usa ESCLUSIVAMENTE le cifre del profilo; non inventare dati o cifre assenti. Sii conciso.',
+  tr: 'Bir veri analistisin. Bir veritabanının İSTATİSTİKSEL PROFİLİNİ alırsın (sayımlar, ortalamalar ve dağılımlar önceden hesaplanmıştır). Şunları yapan kısa ve anlaşılır bir Markdown raporu yaz: (1) verinin boyutunu ve doluluk düzeyini özetle, (2) sayılardan çıkarılabilen örüntüleri ve aykırı değerleri vurgula, (3) olası kalite sorunlarını belirt (az doldurulmuş sütunlar, baskın değerler). YALNIZCA profildeki sayıları kullan; görünmeyen veri veya sayı uydurma. Kısa ol.',
+} as const;
+function localizedAnalysisSystem(language: string | undefined, purpose: 'report' | 'suggest' | 'narrate' = 'report'): string {
+  const base = purpose === 'report' ? ANALYSIS_SYSTEM : purpose === 'suggest' ? SUGGEST_SYSTEM : NARRATE_SYSTEM;
+  if (language === 'es') return base;
+  const translated = purpose === 'report'
+    ? ANALYSIS_SYSTEM_I18N[language as keyof typeof ANALYSIS_SYSTEM_I18N]
+    : purpose === 'suggest'
+      ? SUGGEST_SYSTEM_I18N[language ?? '']
+      : NARRATE_SYSTEM_I18N[language ?? ''];
+  const directives = {
+    en: 'Write free-text fields in English; preserve every JSON key, enum, catalog id, and supplied figure exactly.',
+    fr: 'Rédige les champs libres en français ; conserve exactement chaque clé JSON, énumération, identifiant du catalogue et chiffre fourni.',
+    de: 'Schreibe freie Textfelder auf Deutsch; bewahre jeden JSON-Schlüssel, Enum-Wert, Katalogbezeichner und jede gelieferte Zahl exakt.',
+    pt: 'Escreve os campos livres em português; conserva exatamente cada chave JSON, enumeração, id do catálogo e número fornecido.',
+    'pt-BR': 'Escreva os campos livres em português brasileiro; preserve exatamente cada chave JSON, enum, id do catálogo e número fornecido.',
+    it: 'Scrivi i campi liberi in italiano; conserva esattamente ogni chiave JSON, enumerazione, id del catalogo e numero fornito.',
+    tr: 'Serbest metin alanlarını Türkçe yaz; tüm JSON anahtarlarını, enum değerlerini, katalog kimliklerini ve verilen sayıları aynen koru.',
+  } as const;
+  return `${translated || base}\n\n${directives[(language as keyof typeof directives)] || directives.en}`;
+}
+
+function analysisScaffolding(language: string | undefined, kind: 'profile' | 'result' | 'report' | 'suggest' | 'narrate'): string {
+  const labels = {
+    es: { profile: '=== PERFIL DE DATOS ===', result: '=== RESULTADO ===', report: 'Escribe el informe.', suggest: 'Devuelve el array JSON de análisis sugeridos.', narrate: 'Explícalo.' },
+    en: { profile: '=== DATA PROFILE ===', result: '=== RESULT ===', report: 'Write the report.', suggest: 'Return the JSON array of suggested analyses.', narrate: 'Explain it.' },
+    fr: { profile: '=== PROFIL DES DONNÉES ===', result: '=== RÉSULTAT ===', report: 'Rédige le rapport.', suggest: 'Renvoie le tableau JSON des analyses proposées.', narrate: 'Explique-le.' },
+    de: { profile: '=== DATENPROFIL ===', result: '=== ERGEBNIS ===', report: 'Verfasse den Bericht.', suggest: 'Gib das JSON-Array der vorgeschlagenen Analysen zurück.', narrate: 'Erkläre es.' },
+    pt: { profile: '=== PERFIL DE DADOS ===', result: '=== RESULTADO ===', report: 'Redige o relatório.', suggest: 'Devolve o array JSON das análises sugeridas.', narrate: 'Explica-o.' },
+    'pt-BR': { profile: '=== PERFIL DE DADOS ===', result: '=== RESULTADO ===', report: 'Escreva o relatório.', suggest: 'Retorne o array JSON das análises sugeridas.', narrate: 'Explique-o.' },
+    it: { profile: '=== PROFILO DEI DATI ===', result: '=== RISULTATO ===', report: 'Scrivi il rapporto.', suggest: 'Restituisci l’array JSON delle analisi suggerite.', narrate: 'Spiegalo.' },
+    tr: { profile: '=== VERİ PROFİLİ ===', result: '=== SONUÇ ===', report: 'Raporu yaz.', suggest: 'Önerilen analizlerin JSON dizisini döndür.', narrate: 'Açıkla.' },
+  } as const;
+  const selected = labels[(language as keyof typeof labels)] || labels.en;
+  return selected[kind];
+}
 
 export interface AnalysisDeps {
   complete?: (opts: { system: string; user: string; plainContext?: boolean; temperature?: number; maxTokens?: number }, model?: ModelRef | null) => Promise<string>;
@@ -217,10 +261,11 @@ async function defaultComplete(opts: { system: string; user: string; plainContex
 export async function generateAnalysisReport(databaseId: string, deps: AnalysisDeps = {}): Promise<AnalysisReport> {
   const result = getDatabaseProfile(databaseId);
   if (!result) throw new Error('Base de datos no encontrada.');
-  const profileText = profileToText(result.databaseName, result.profile);
+  const language = getSettings().promptLanguage ?? 'es';
+  const profileText = profileToText(result.databaseName, result.profile, language);
   const complete = deps.complete ?? defaultComplete;
   const report = await complete(
-    { system: ANALYSIS_SYSTEM, user: `=== PERFIL DE DATOS ===\n${profileText}\n\nEscribe el informe.`, plainContext: true, temperature: 0.3, maxTokens: 1200 },
+    { system: localizedAnalysisSystem(language), user: `${analysisScaffolding(language, 'profile')}\n${profileText}\n\n${analysisScaffolding(language, 'report')}`, plainContext: true, temperature: 0.3, maxTokens: 1200 },
     deps.model ?? null
   );
   return { databaseName: result.databaseName, profileText, report: report.trim() };
@@ -242,6 +287,102 @@ Reglas estrictas:
 - No repitas el mismo análisis con las mismas columnas.
 - title y rationale en el idioma del perfil (español).`;
 
+// These are complete translations of SUGGEST_SYSTEM: the JSON contract, catalog
+// identifiers and validation rules must never be shortened when changing locale.
+const SUGGEST_SYSTEM_I18N: Record<string, string> = {
+  en: `You are an expert data analyst. You receive a database PROFILE and the CATALOG of analyses the application can compute (with valid column ids for each role). Your task is to PROPOSE the most revealing analyses, NOT to calculate them.
+
+Return ONLY a JSON array (no additional text, no markdown) containing 4 to 7 objects, ordered from most to least interesting, with this exact shape:
+[{"kind":"<one catalog kind>","columns":["<id>","<id>"],"title":"<short human title>","rationale":"<why it is interesting, 1 sentence>"}]
+
+Strict rules:
+- Use ONLY column ids appearing in the catalog, and respect each slot's role (numeric/category/lowCard/date). In the catalog, a role with "+" accepts MULTIPLE columns and "?" is optional.
+- Use multi-selection when useful: "descriptive", "group_compare", and "time_series" may contain multiple numeric columns; "correlation_matrix"/"covariance_matrix" with "columns":[] use all columns, or a subset of ≥2.
+- "chi_square"/"crosstab": two different categorical columns; "crosstab" accepts an optional third numeric column for aggregation (mean/sum).
+- "data_quality" uses "columns": [].
+- Prioritize relationships between columns (correlations, chi-square, cross-tabs, group comparisons) over single-column summaries.
+- Do not repeat the same analysis with the same columns.
+- title and rationale in the profile's language (English).`,
+  fr: `Tu es un analyste de données expert. Tu reçois le PROFIL d’une base de données et le CATALOGUE des analyses que l’application peut calculer (avec les identifiants de colonnes valides pour chaque rôle). Ta tâche est de PROPOSER les analyses les plus révélatrices, PAS de les calculer.
+
+Renvoie UNIQUEMENT un tableau JSON (aucun texte supplémentaire, aucun markdown) contenant 4 à 7 objets, classés du plus au moins intéressant, avec cette forme exacte :
+[{"kind":"<un type du catalogue>","columns":["<id>","<id>"],"title":"<titre court et humain>","rationale":"<pourquoi c’est intéressant, 1 phrase>"}]
+
+Règles strictes :
+- Utilise UNIQUEMENT les identifiants de colonnes présents dans le catalogue et respecte le rôle de chaque emplacement (numeric/category/lowCard/date). Dans le catalogue, un rôle avec « + » accepte PLUSIEURS colonnes et « ? » est facultatif.
+- Utilise la sélection multiple lorsqu’elle est utile : « descriptive », « group_compare » et « time_series » peuvent contenir plusieurs colonnes numériques ; « correlation_matrix »/« covariance_matrix » avec "columns":[] utilisent toutes les colonnes, ou un sous-ensemble d’au moins 2.
+- « chi_square »/« crosstab » : deux colonnes catégorielles distinctes ; « crosstab » accepte une troisième colonne numérique facultative pour agréger (moyenne/somme).
+- « data_quality » utilise "columns": [].
+- Donne la priorité aux relations entre colonnes (corrélations, chi carré, tableaux croisés, comparaisons de groupes) plutôt qu’aux résumés d’une seule colonne.
+- Ne répète pas la même analyse avec les mêmes colonnes.
+- title et rationale dans la langue du profil (français).`,
+  de: `Du bist ein erfahrener Datenanalyst. Du erhältst das PROFIL einer Datenbank und den KATALOG der Analysen, die die Anwendung berechnen kann (mit gültigen Spalten-IDs je Rolle). Deine Aufgabe ist es, die aufschlussreichsten Analysen VORZUSCHLAGEN, NICHT sie zu berechnen.
+
+Gib AUSSCHLIESSLICH ein JSON-Array (kein zusätzlicher Text, kein Markdown) mit 4 bis 7 Objekten zurück, geordnet vom interessantesten zum am wenigsten interessanten, exakt in dieser Form:
+[{"kind":"<ein Katalogtyp>","columns":["<id>","<id>"],"title":"<kurzer, verständlicher Titel>","rationale":"<warum interessant, 1 Satz>"}]
+
+Strenge Regeln:
+- Verwende NUR Spalten-IDs aus dem Katalog und beachte die Rolle jedes Platzes (numeric/category/lowCard/date). Eine Rolle mit "+" erlaubt MEHRERE Spalten, "?" ist optional.
+- Nutze Mehrfachauswahl, wenn sie sinnvoll ist: "descriptive", "group_compare" und "time_series" können mehrere numerische Spalten enthalten; "correlation_matrix"/"covariance_matrix" mit "columns":[] verwenden alle Spalten oder eine Teilmenge von mindestens 2.
+- "chi_square"/"crosstab": zwei verschiedene kategoriale Spalten; "crosstab" akzeptiert optional eine dritte numerische Spalte zur Aggregation (Mittelwert/Summe).
+- "data_quality" verwendet "columns": [].
+- Bevorzuge Beziehungen zwischen Spalten (Korrelationen, Chi-Quadrat, Kreuztabellen, Gruppenvergleiche) gegenüber Zusammenfassungen einzelner Spalten.
+- Wiederhole nicht dieselbe Analyse mit denselben Spalten.
+- title und rationale in der Sprache des Profils (Deutsch).`,
+  pt: `És um analista de dados experiente. Recebes o PERFIL de uma base de dados e o CATÁLOGO de análises que a aplicação consegue calcular (com ids de coluna válidos por função). A tua tarefa é PROPOR as análises mais reveladoras, NÃO calculá-las.
+
+Devolve APENAS um array JSON (sem texto adicional, sem markdown) com 4 a 7 objetos, ordenados do mais para o menos interessante, com esta forma exata:
+[{"kind":"<um tipo do catálogo>","columns":["<id>","<id>"],"title":"<título curto e humano>","rationale":"<por que é interessante, 1 frase>"}]
+
+Regras estritas:
+- Usa APENAS ids de coluna presentes no catálogo e respeita a função de cada posição (numeric/category/lowCard/date). No catálogo, uma função com "+" aceita VÁRIAS colunas e "?" é opcional.
+- Usa a seleção múltipla quando for útil: "descriptive", "group_compare" e "time_series" podem conter várias colunas numéricas; "correlation_matrix"/"covariance_matrix" com "columns":[] usam todas as colunas ou um subconjunto de ≥2.
+- "chi_square"/"crosstab": duas colunas categóricas diferentes; "crosstab" aceita uma terceira coluna numérica opcional para agregar (média/soma).
+- "data_quality" usa "columns": [].
+- Dá prioridade às relações entre colunas (correlações, qui-quadrado, tabelas cruzadas, comparação de grupos) em vez de resumos de uma coluna.
+- Não repitas a mesma análise com as mesmas colunas.
+- title e rationale na língua do perfil (português).`,
+  'pt-BR': `Você é um analista de dados experiente. Recebe o PERFIL de um banco de dados e o CATÁLOGO de análises que o aplicativo pode calcular (com ids de coluna válidos por função). Sua tarefa é PROPOR as análises mais reveladoras, NÃO calculá-las.
+
+Retorne SOMENTE um array JSON (sem texto adicional, sem markdown) com 4 a 7 objetos, ordenados do mais para o menos interessante, nesta forma exata:
+[{"kind":"<um tipo do catálogo>","columns":["<id>","<id>"],"title":"<título curto e humano>","rationale":"<por que é interessante, 1 frase>"}]
+
+Regras estritas:
+- Use SOMENTE ids de coluna presentes no catálogo e respeite a função de cada espaço (numeric/category/lowCard/date). No catálogo, uma função com "+" aceita VÁRIAS colunas e "?" é opcional.
+- Use a seleção múltipla quando for útil: "descriptive", "group_compare" e "time_series" podem conter várias colunas numéricas; "correlation_matrix"/"covariance_matrix" com "columns":[] usam todas as colunas ou um subconjunto de ≥2.
+- "chi_square"/"crosstab": duas colunas categóricas diferentes; "crosstab" aceita uma terceira coluna numérica opcional para agregar (média/soma).
+- "data_quality" usa "columns": [].
+- Priorize relações entre colunas (correlações, qui-quadrado, tabelas cruzadas, comparação de grupos) em vez de resumos de uma única coluna.
+- Não repita a mesma análise com as mesmas colunas.
+- title e rationale no idioma do perfil (português brasileiro).`,
+  it: `Sei un analista dei dati esperto. Ricevi il PROFILO di un database e il CATALOGO delle analisi che l’applicazione può calcolare (con id di colonna validi per ruolo). Il tuo compito è PROPORRE le analisi più rivelatrici, NON calcolarle.
+
+Restituisci SOLO un array JSON (nessun testo aggiuntivo, nessun markdown) con 4-7 oggetti, ordinati dal più al meno interessante, in questa forma esatta:
+[{"kind":"<un tipo del catalogo>","columns":["<id>","<id>"],"title":"<titolo breve e chiaro>","rationale":"<perché è interessante, 1 frase>"}]
+
+Regole rigorose:
+- Usa SOLO gli id di colonna presenti nel catalogo e rispetta il ruolo di ogni posizione (numeric/category/lowCard/date). Nel catalogo, un ruolo con "+" ammette PIÙ colonne e "?" è facoltativo.
+- Usa la selezione multipla quando utile: "descriptive", "group_compare" e "time_series" possono contenere più colonne numeriche; "correlation_matrix"/"covariance_matrix" con "columns":[] usano tutte le colonne o un sottoinsieme di ≥2.
+- "chi_square"/"crosstab": due colonne categoriali diverse; "crosstab" accetta una terza colonna numerica facoltativa per l’aggregazione (media/somma).
+- "data_quality" usa "columns": [].
+- Dai priorità alle relazioni tra colonne (correlazioni, chi-quadrato, tabelle incrociate, confronti tra gruppi) rispetto ai riepiloghi di una singola colonna.
+- Non ripetere la stessa analisi con le stesse colonne.
+- title e rationale nella lingua del profilo (italiano).`,
+  tr: `Uzman bir veri analistisin. Bir veritabanının PROFİLİNİ ve uygulamanın hesaplayabildiği analizlerin KATALOĞUNU (her rol için geçerli sütun kimlikleriyle) alırsın. Görevin en açıklayıcı analizleri HESAPLAMAK DEĞİL, ÖNERMEKTİR.
+
+Yalnızca 4-7 nesneden oluşan bir JSON dizisi döndür (ek metin veya markdown yok); nesneleri en ilginçten en az ilginçe sırala ve tam olarak şu biçimi kullan:
+[{"kind":"<katalogdan bir tür>","columns":["<id>","<id>"],"title":"<kısa, anlaşılır başlık>","rationale":"<neden ilginç, 1 cümle>"}]
+
+Kesin kurallar:
+- YALNIZCA katalogda bulunan sütun kimliklerini kullan ve her yuvanın rolüne uy (numeric/category/lowCard/date). Katalogda "+" içeren rol BİRDEN ÇOK sütun, "?" ise isteğe bağlıdır.
+- Yararlı olduğunda çoklu seçimi kullan: "descriptive", "group_compare" ve "time_series" birden çok sayısal sütun alabilir; "correlation_matrix"/"covariance_matrix" için "columns":[] tüm sütunları veya ≥2’lik bir alt kümeyi kullanır.
+- "chi_square"/"crosstab": iki farklı kategorik sütun; "crosstab" toplulaştırma (ortalama/toplam) için isteğe bağlı üçüncü sayısal sütunu kabul eder.
+- "data_quality" için "columns": [] kullan.
+- Tek sütun özetleri yerine sütunlar arası ilişkileri (korelasyonlar, ki-kare, çapraz tablolar, grup karşılaştırmaları) önceliklendir.
+- Aynı analizi aynı sütunlarla tekrarlama.
+- title ve rationale profilin dilinde (Türkçe) olsun.`,
+};
+
 export interface SuggestionResult {
   databaseName: string;
   suggestions: AnalysisSuggestion[];
@@ -252,12 +393,13 @@ export async function suggestDatabaseAnalyses(databaseId: string, deps: Analysis
   const result = getDatabaseProfile(databaseId);
   if (!result) throw new Error('Base de datos no encontrada.');
   const profile = result.profile;
-  const manifest = catalogManifest(profile);
-  const profileText = profileToText(result.databaseName, profile);
+  const language = getSettings().promptLanguage ?? 'es';
+  const manifest = catalogManifest(profile, language);
+  const profileText = profileToText(result.databaseName, profile, language);
   const complete = deps.complete ?? defaultComplete;
 
   const reply = await complete(
-    { system: SUGGEST_SYSTEM, user: `=== PERFIL DE DATOS ===\n${profileText}\n\n${manifest}\n\nDevuelve el array JSON de análisis sugeridos.`, plainContext: true, temperature: 0.4, maxTokens: 900 },
+    { system: localizedAnalysisSystem(language, 'suggest'), user: `${analysisScaffolding(language, 'profile')}\n${profileText}\n\n${manifest}\n\n${analysisScaffolding(language, 'suggest')}`, plainContext: true, temperature: 0.4, maxTokens: 900 },
     deps.model ?? null
   );
 
@@ -654,45 +796,74 @@ export function runDatabaseAnalysis(databaseId: string, request: AnalysisRequest
 // ── narrate (AI prose over a computed result) ─────────────────────────────────
 
 const NARRATE_SYSTEM = `Eres un analista de datos. Recibes el RESULTADO ya calculado de un análisis estadístico. Explícalo en 2-4 frases claras en Markdown: qué mide, qué muestran las cifras (correlación, significación, diferencias entre grupos, atípicos…) y una lectura prudente. Usa ÚNICAMENTE las cifras dadas; recuerda que correlación no implica causalidad y que los p-valores son aproximados. Sé conciso.`;
+const NARRATE_SYSTEM_I18N: Record<string, string> = {
+  en: 'You are a data analyst. You receive the already calculated RESULT of a statistical analysis. Explain it in 2–4 clear Markdown sentences: what it measures, what the figures show (correlation, significance, group differences, outliers…), and a cautious interpretation. Use ONLY the supplied figures; remember that correlation does not imply causation and p-values are approximate. Be concise.',
+  fr: 'Tu es analyste de données. Tu reçois le RÉSULTAT déjà calculé d’une analyse statistique. Explique-le en 2 à 4 phrases claires en Markdown : ce qu’il mesure, ce que montrent les chiffres (corrélation, significativité, différences entre groupes, valeurs atypiques…) et une interprétation prudente. Utilise UNIQUEMENT les chiffres fournis ; rappelle-toi que corrélation n’implique pas causalité et que les p-values sont approximatives. Sois concis.',
+  de: 'Du bist Datenanalyst. Du erhältst das bereits berechnete ERGEBNIS einer statistischen Analyse. Erkläre es in 2–4 klaren Markdown-Sätzen: was es misst, was die Zahlen zeigen (Korrelation, Signifikanz, Gruppenunterschiede, Ausreißer …) und eine vorsichtige Interpretation. Verwende NUR die gelieferten Zahlen; Korrelation bedeutet keine Kausalität und p-Werte sind Näherungen. Sei prägnant.',
+  pt: 'És analista de dados. Recebes o RESULTADO já calculado de uma análise estatística. Explica-o em 2–4 frases claras em Markdown: o que mede, o que mostram os números (correlação, significância, diferenças entre grupos, valores atípicos…) e uma interpretação prudente. Usa APENAS os números fornecidos; lembra-te de que correlação não implica causalidade e os valores-p são aproximados. Sê conciso.',
+  'pt-BR': 'Você é um analista de dados. Recebe o RESULTADO já calculado de uma análise estatística. Explique-o em 2–4 frases claras em Markdown: o que mede, o que os números mostram (correlação, significância, diferenças entre grupos, valores atípicos…) e uma interpretação prudente. Use SOMENTE os números fornecidos; lembre-se de que correlação não implica causalidade e os valores-p são aproximados. Seja conciso.',
+  it: 'Sei un analista dei dati. Ricevi il RISULTATO già calcolato di un’analisi statistica. Spiegalo in 2–4 frasi chiare in Markdown: cosa misura, cosa mostrano i numeri (correlazione, significatività, differenze tra gruppi, valori anomali…) e un’interpretazione prudente. Usa SOLO i numeri forniti; ricorda che correlazione non implica causalità e i p-value sono approssimativi. Sii conciso.',
+  tr: 'Veri analistisin. İstatistiksel bir analizin önceden hesaplanmış SONUCUNU alırsın. Sonucu Markdown biçiminde 2–4 açık cümleyle açıkla: neyi ölçtüğünü, sayıların ne gösterdiğini (korelasyon, anlamlılık, grup farkları, aykırı değerler…) ve ihtiyatlı bir yorumu belirt. YALNIZCA verilen sayıları kullan; korelasyonun nedensellik anlamına gelmediğini ve p-değerlerinin yaklaşık olduğunu unutma. Kısa ve öz ol.',
+};
+
+interface ResultTextCopy {
+  descriptive: string; mean: string; median: string; variance: string; deviation: string; skewness: string; kurtosis: string; outliers: string;
+  correlation: string; regressionSlope: string; covariance: string; matrix: string; numeric: string; chiSquare: string; dof: string;
+  crosstab: string; of: string; total: string; comparison: string; by: string; frequent: string; distinct: string;
+  timeSeries: string; per: string; dataQuality: string; rows: string; columns: string; filled: string; noIssues: string;
+  issues: Record<string, string>;
+}
+
+const RESULT_TEXT_COPY: Record<PromptLanguage, ResultTextCopy> = {
+  es: { descriptive: 'Descriptiva', mean: 'media', median: 'mediana', variance: 'varianza', deviation: 'desv', skewness: 'asimetría', kurtosis: 'curtosis', outliers: 'atípicos', correlation: 'Correlación', regressionSlope: 'regresión pendiente', covariance: 'covarianza', matrix: 'Matriz', numeric: 'numéricas', chiSquare: 'Chi-cuadrado', dof: 'gl', crosstab: 'Tabla cruzada', of: 'de', total: 'Total', comparison: 'Comparación', by: 'por', frequent: 'Valores más frecuentes', distinct: 'distintos', timeSeries: 'Serie temporal', per: 'por', dataQuality: 'Calidad de datos', rows: 'filas', columns: 'columnas', filled: 'relleno', noIssues: 'sin problemas detectados; todas las columnas suficientemente completas', issues: { 'Columna vacía': 'Columna vacía', 'Muy incompleta': 'Muy incompleta', 'Valor constante': 'Valor constante', 'Casi único (¿identificador?)': 'Casi único (¿identificador?)' } },
+  en: { descriptive: 'Descriptive statistics', mean: 'mean', median: 'median', variance: 'variance', deviation: 'stdev', skewness: 'skewness', kurtosis: 'kurtosis', outliers: 'outliers', correlation: 'Correlation', regressionSlope: 'regression slope', covariance: 'covariance', matrix: 'Matrix', numeric: 'numeric variables', chiSquare: 'Chi-square', dof: 'df', crosstab: 'Cross-tabulation', of: 'of', total: 'Total', comparison: 'Comparison', by: 'by', frequent: 'Most frequent values', distinct: 'distinct', timeSeries: 'Time series', per: 'by', dataQuality: 'Data quality', rows: 'rows', columns: 'columns', filled: 'filled', noIssues: 'no issues detected; every column is sufficiently complete', issues: { 'Columna vacía': 'Empty column', 'Muy incompleta': 'Highly incomplete', 'Valor constante': 'Constant value', 'Casi único (¿identificador?)': 'Almost unique (identifier?)' } },
+  fr: { descriptive: 'Statistiques descriptives', mean: 'moyenne', median: 'médiane', variance: 'variance', deviation: 'écart-type', skewness: 'asymétrie', kurtosis: 'kurtosis', outliers: 'valeurs atypiques', correlation: 'Corrélation', regressionSlope: 'pente de régression', covariance: 'covariance', matrix: 'Matrice', numeric: 'variables numériques', chiSquare: 'Khi carré', dof: 'ddl', crosstab: 'Tableau croisé', of: 'de', total: 'Total', comparison: 'Comparaison', by: 'par', frequent: 'Valeurs les plus fréquentes', distinct: 'distinctes', timeSeries: 'Série temporelle', per: 'par', dataQuality: 'Qualité des données', rows: 'lignes', columns: 'colonnes', filled: 'rempli', noIssues: 'aucun problème détecté ; toutes les colonnes sont suffisamment complètes', issues: { 'Columna vacía': 'Colonne vide', 'Muy incompleta': 'Très incomplète', 'Valor constante': 'Valeur constante', 'Casi único (¿identificador?)': 'Presque unique (identifiant ?)' } },
+  de: { descriptive: 'Deskriptive Statistik', mean: 'Mittelwert', median: 'Median', variance: 'Varianz', deviation: 'Standardabw.', skewness: 'Schiefe', kurtosis: 'Kurtosis', outliers: 'Ausreißer', correlation: 'Korrelation', regressionSlope: 'Regressionssteigung', covariance: 'Kovarianz', matrix: 'Matrix', numeric: 'numerische Variablen', chiSquare: 'Chi-Quadrat', dof: 'df', crosstab: 'Kreuztabelle', of: 'von', total: 'Gesamt', comparison: 'Vergleich', by: 'nach', frequent: 'Häufigste Werte', distinct: 'verschiedene', timeSeries: 'Zeitreihe', per: 'nach', dataQuality: 'Datenqualität', rows: 'Zeilen', columns: 'Spalten', filled: 'gefüllt', noIssues: 'keine Probleme erkannt; alle Spalten sind ausreichend vollständig', issues: { 'Columna vacía': 'Leere Spalte', 'Muy incompleta': 'Sehr unvollständig', 'Valor constante': 'Konstanter Wert', 'Casi único (¿identificador?)': 'Fast eindeutig (Bezeichner?)' } },
+  pt: { descriptive: 'Estatística descritiva', mean: 'média', median: 'mediana', variance: 'variância', deviation: 'desvio-padrão', skewness: 'assimetria', kurtosis: 'curtose', outliers: 'atípicos', correlation: 'Correlação', regressionSlope: 'inclinação da regressão', covariance: 'covariância', matrix: 'Matriz', numeric: 'variáveis numéricas', chiSquare: 'Qui-quadrado', dof: 'gl', crosstab: 'Tabela cruzada', of: 'de', total: 'Total', comparison: 'Comparação', by: 'por', frequent: 'Valores mais frequentes', distinct: 'distintos', timeSeries: 'Série temporal', per: 'por', dataQuality: 'Qualidade dos dados', rows: 'linhas', columns: 'colunas', filled: 'preenchido', noIssues: 'sem problemas detetados; todas as colunas estão suficientemente completas', issues: { 'Columna vacía': 'Coluna vazia', 'Muy incompleta': 'Muito incompleta', 'Valor constante': 'Valor constante', 'Casi único (¿identificador?)': 'Quase único (identificador?)' } },
+  'pt-BR': { descriptive: 'Estatística descritiva', mean: 'média', median: 'mediana', variance: 'variância', deviation: 'desvio-padrão', skewness: 'assimetria', kurtosis: 'curtose', outliers: 'atípicos', correlation: 'Correlação', regressionSlope: 'inclinação da regressão', covariance: 'covariância', matrix: 'Matriz', numeric: 'variáveis numéricas', chiSquare: 'Qui-quadrado', dof: 'gl', crosstab: 'Tabela cruzada', of: 'de', total: 'Total', comparison: 'Comparação', by: 'por', frequent: 'Valores mais frequentes', distinct: 'distintos', timeSeries: 'Série temporal', per: 'por', dataQuality: 'Qualidade dos dados', rows: 'linhas', columns: 'colunas', filled: 'preenchido', noIssues: 'nenhum problema detectado; todas as colunas estão suficientemente completas', issues: { 'Columna vacía': 'Coluna vazia', 'Muy incompleta': 'Muito incompleta', 'Valor constante': 'Valor constante', 'Casi único (¿identificador?)': 'Quase único (identificador?)' } },
+  it: { descriptive: 'Statistica descrittiva', mean: 'media', median: 'mediana', variance: 'varianza', deviation: 'dev. std.', skewness: 'asimmetria', kurtosis: 'curtosi', outliers: 'anomali', correlation: 'Correlazione', regressionSlope: 'pendenza di regressione', covariance: 'covarianza', matrix: 'Matrice', numeric: 'variabili numeriche', chiSquare: 'Chi quadrato', dof: 'gdl', crosstab: 'Tabella incrociata', of: 'di', total: 'Totale', comparison: 'Confronto', by: 'per', frequent: 'Valori più frequenti', distinct: 'distinti', timeSeries: 'Serie temporale', per: 'per', dataQuality: 'Qualità dei dati', rows: 'righe', columns: 'colonne', filled: 'compilato', noIssues: 'nessun problema rilevato; tutte le colonne sono sufficientemente complete', issues: { 'Columna vacía': 'Colonna vuota', 'Muy incompleta': 'Molto incompleta', 'Valor constante': 'Valore costante', 'Casi único (¿identificador?)': 'Quasi univoco (identificatore?)' } },
+  tr: { descriptive: 'Betimsel istatistik', mean: 'ortalama', median: 'medyan', variance: 'varyans', deviation: 'std. sapma', skewness: 'çarpıklık', kurtosis: 'basıklık', outliers: 'aykırı değerler', correlation: 'Korelasyon', regressionSlope: 'regresyon eğimi', covariance: 'kovaryans', matrix: 'Matris', numeric: 'sayısal değişken', chiSquare: 'Ki-kare', dof: 'sd', crosstab: 'Çapraz tablo', of: 'için', total: 'Toplam', comparison: 'Karşılaştırma', by: 'gruplama', frequent: 'En sık değerler', distinct: 'farklı', timeSeries: 'Zaman serisi', per: 'ölçekte', dataQuality: 'Veri kalitesi', rows: 'satır', columns: 'sütun', filled: 'dolu', noIssues: 'sorun saptanmadı; tüm sütunlar yeterince dolu', issues: { 'Columna vacía': 'Boş sütun', 'Muy incompleta': 'Çok eksik', 'Valor constante': 'Sabit değer', 'Casi único (¿identificador?)': 'Neredeyse benzersiz (kimlik?)' } },
+};
 
 /** Compact textual summary of a computed result for the narration prompt. */
-export function resultToText(r: AnalysisResult): string {
+export function resultToText(r: AnalysisResult, language: PromptLanguage = 'es'): string {
+  const c = RESULT_TEXT_COPY[language] ?? RESULT_TEXT_COPY.es;
   switch (r.kind) {
     case 'descriptive':
       return r.columns
-        .map((c) => `Descriptiva de "${c.columnName}": n=${c.stats.n}, media=${c.stats.mean}, mediana=${c.stats.median}, varianza=${c.stats.variance}, desv=${c.stats.stdev}, CV=${c.stats.cv}, Q1=${c.stats.q1}, Q3=${c.stats.q3}, asimetría=${c.stats.skewness}, curtosis=${c.stats.kurtosis}, atípicos=${c.stats.outliers.length}.`)
+        .map((column) => `${c.descriptive} ${c.of} "${column.columnName}": n=${column.stats.n}, ${c.mean}=${column.stats.mean}, ${c.median}=${column.stats.median}, ${c.variance}=${column.stats.variance}, ${c.deviation}=${column.stats.stdev}, CV=${column.stats.cv}, Q1=${column.stats.q1}, Q3=${column.stats.q3}, ${c.skewness}=${column.stats.skewness}, ${c.kurtosis}=${column.stats.kurtosis}, ${c.outliers}=${column.stats.outliers.length}.`)
         .join('\n');
     case 'correlation':
-      return `Correlación "${r.xName}" vs "${r.yName}": Pearson r=${r.pearson.r} (n=${r.pearson.n}, p=${r.pearson.p}), Spearman=${r.spearman.r}, regresión pendiente=${r.regression.slope}, R²=${r.regression.r2}.`;
+      return `${c.correlation} "${r.xName}" vs "${r.yName}": Pearson r=${r.pearson.r} (n=${r.pearson.n}, p=${r.pearson.p}), Spearman=${r.spearman.r}, ${c.regressionSlope}=${r.regression.slope}, R²=${r.regression.r2}.`;
     case 'correlation_matrix':
     case 'covariance_matrix': {
       const pairs: string[] = [];
       for (let i = 0; i < r.matrix.labels.length; i++)
         for (let j = i + 1; j < r.matrix.labels.length; j++) pairs.push(`${r.matrix.labels[i]}~${r.matrix.labels[j]}=${r.matrix.matrix[i][j]}`);
-      const noun = r.kind === 'covariance_matrix' ? 'covarianza' : 'correlación';
-      return `Matriz de ${noun} (${r.matrix.labels.length} numéricas): ${pairs.join(', ')}.`;
+      const noun = r.kind === 'covariance_matrix' ? c.covariance : c.correlation.toLocaleLowerCase(language);
+      return `${c.matrix} ${c.of} ${noun} (${r.matrix.labels.length} ${c.numeric}): ${pairs.join(', ')}.`;
     }
     case 'chi_square':
-      return `Chi-cuadrado "${r.rowName}" x "${r.colName}": χ²=${r.result.chi2}, gl=${r.result.dof}, V de Cramér=${r.result.cramersV}, p=${r.result.p}, n=${r.result.table.total}.`;
+      return `${c.chiSquare} "${r.rowName}" x "${r.colName}": χ²=${r.result.chi2}, ${c.dof}=${r.result.dof}, V de Cramér=${r.result.cramersV}, p=${r.result.p}, n=${r.result.table.total}.`;
     case 'crosstab': {
       const rowsTxt = r.rowLabels.map((rl, i) => `${rl}: [${r.colLabels.map((cl, j) => `${cl}=${r.values[i][j]}`).join(', ')}]`).join('; ');
-      return `Tabla cruzada "${r.rowName}" x "${r.colName}" (${r.aggregate}${r.valueName ? ` de ${r.valueName}` : ''}): ${rowsTxt}. Total=${r.total}.`;
+      return `${c.crosstab} "${r.rowName}" x "${r.colName}" (${r.aggregate}${r.valueName ? ` ${c.of} ${r.valueName}` : ''}): ${rowsTxt}. ${c.total}=${r.total}.`;
     }
     case 'group_compare':
       return r.metrics
         .map((m) => {
-          const g = m.result.groups.map((x) => `${x.label}: media=${x.mean} (n=${x.count})`).join('; ');
+          const g = m.result.groups.map((x) => `${x.label}: ${c.mean}=${x.mean} (n=${x.count})`).join('; ');
           const a = m.result.anova ? ` ANOVA F=${m.result.anova.f}, p=${m.result.anova.p}, η²=${m.result.anova.etaSquared}.` : '';
-          return `Comparación de "${m.valueName}" por "${r.groupName}": ${g}.${a}`;
+          return `${c.comparison} ${c.of} "${m.valueName}" ${c.by} "${r.groupName}": ${g}.${a}`;
         })
         .join('\n');
     case 'top_values':
-      return `Valores más frecuentes de "${r.columnName}" (${r.distinct} distintos, ${r.total} total): ${r.items.map((i) => `${i.label} (${i.count})`).join(', ')}.`;
+      return `${c.frequent} ${c.of} "${r.columnName}" (${r.distinct} ${c.distinct}, ${r.total} ${c.total.toLocaleLowerCase(language)}): ${r.items.map((i) => `${i.label} (${i.count})`).join(', ')}.`;
     case 'time_series':
-      return `Serie temporal de "${r.dateName}" (${r.metric}, por ${r.bucket}): ${r.series.map((s) => `${s.label}: ${s.points.map((p) => `${p.bucket}=${p.value}`).join(', ')}`).join(' | ')}.`;
+      return `${c.timeSeries} ${c.of} "${r.dateName}" (${r.metric}, ${c.per} ${r.bucket}): ${r.series.map((s) => `${s.label}: ${s.points.map((p) => `${p.bucket}=${p.value}`).join(', ')}`).join(' | ')}.`;
     case 'data_quality': {
       const flagged = r.columns.filter((c) => c.issues.length);
-      return `Calidad de datos (${r.rowCount} filas, ${r.columns.length} columnas): ${flagged.length ? flagged.map((c) => `${c.name} (relleno ${Math.round(c.fillRate * 100)}%: ${c.issues.join(', ')})`).join('; ') : 'sin problemas detectados; todas las columnas suficientemente completas'}.`;
+      return `${c.dataQuality} (${r.rowCount} ${c.rows}, ${r.columns.length} ${c.columns}): ${flagged.length ? flagged.map((column) => `${column.name} (${c.filled} ${Math.round(column.fillRate * 100)}%: ${column.issues.map((issue) => c.issues[issue] ?? issue).join(', ')})`).join('; ') : c.noIssues}.`;
     }
   }
 }
@@ -700,8 +871,9 @@ export function resultToText(r: AnalysisResult): string {
 /** Write a short prose reading of an already-computed analysis result. */
 export async function narrateAnalysisResult(result: AnalysisResult, deps: AnalysisDeps = {}): Promise<string> {
   const complete = deps.complete ?? defaultComplete;
+  const language = getSettings().promptLanguage ?? 'es';
   const text = await complete(
-    { system: NARRATE_SYSTEM, user: `=== RESULTADO ===\n${resultToText(result)}\n\nExplícalo.`, plainContext: true, temperature: 0.3, maxTokens: 400 },
+    { system: localizedAnalysisSystem(language, 'narrate'), user: `${analysisScaffolding(language, 'result')}\n${resultToText(result, language)}\n\n${analysisScaffolding(language, 'narrate')}`, plainContext: true, temperature: 0.3, maxTokens: 400 },
     deps.model ?? null
   );
   return text.trim();

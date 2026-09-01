@@ -21,8 +21,8 @@ import { evaluateAccess, type AccessChannel } from '@shared/testimonyAccess';
 import { isLocalProvider } from '@shared/providers';
 import { formatTimecode, preferredTranscript } from '@shared/testimonies';
 import { locateQuote, verifyRewrite } from '@shared/testimonyAiGuards';
-import type { ModelRef } from '@shared/types';
-import { testimonyAiPromptPack } from '@shared/testimonyPrompts';
+import type { ModelRef, PromptLanguage } from '@shared/types';
+import { testimonyAiPromptPack, testimonyAiScaffold } from '@shared/testimonyPrompts';
 
 export interface ProposedCode {
   label: string;
@@ -79,7 +79,7 @@ interface TranscriptLine {
 }
 
 /** La versión más autorizada de la entrevista, en líneas con minuto y hablante. */
-function transcriptLines(interviewId: string): { transcriptId: string; lines: TranscriptLine[] } {
+function transcriptLines(interviewId: string, language: PromptLanguage): { transcriptId: string; lines: TranscriptLine[] } {
   const db = getDb();
   const sessions = listSessions(interviewId);
   const media = sessions.flatMap((session) => session.media).filter((item) => !item.deletedAt);
@@ -106,8 +106,8 @@ function transcriptLines(interviewId: string): { transcriptId: string; lines: Tr
       tStart: segment.tStart,
       text: segment.text,
       speaker: segment.speakerPersonId
-        ? names.get(segment.speakerPersonId) ?? segment.speakerLabel ?? 'Hablante'
-        : segment.speakerLabel ?? 'Hablante',
+        ? names.get(segment.speakerPersonId) ?? segment.speakerLabel ?? testimonyAiScaffold(language).unknownSpeaker
+        : segment.speakerLabel ?? testimonyAiScaffold(language).unknownSpeaker,
     })),
   };
 }
@@ -135,10 +135,12 @@ export async function analyzeTestimonyInterview(interviewId: string): Promise<In
   if (!interview) throw new Error('Esa entrevista no existe.');
   const settings = getSettings();
   const model = settings.studyModel ?? settings.chatModel ?? settings.synthesisModel ?? null;
-  const prompt = testimonyAiPromptPack(settings.promptLanguage ?? 'es');
+  const language = settings.promptLanguage ?? 'es';
+  const prompt = testimonyAiPromptPack(language);
+  const scaffold = testimonyAiScaffold(language);
   requireAccess(interviewId, channelFor(model));
 
-  const { transcriptId, lines } = transcriptLines(interviewId);
+  const { transcriptId, lines } = transcriptLines(interviewId, language);
   const body = lines
     .map((line) => `[${formatTimecode(line.tStart)}] ${line.speaker}: ${line.text}`)
     .join('\n');
@@ -186,7 +188,7 @@ export async function analyzeTestimonyInterview(interviewId: string): Promise<In
     codes,
     passages,
     discarded,
-    model: model ? `${model.provider}/${model.model}` : 'sin modelo',
+    model: model ? `${model.provider}/${model.model}` : scaffold.noModel,
   };
 }
 
@@ -244,7 +246,9 @@ export async function improveTestimonyTranscript(transcriptId: string): Promise<
 
   const settings = getSettings();
   const model = settings.improveModel ?? settings.chatModel ?? settings.synthesisModel ?? null;
-  const prompt = testimonyAiPromptPack(settings.promptLanguage ?? 'es');
+  const language = settings.promptLanguage ?? 'es';
+  const prompt = testimonyAiPromptPack(language);
+  const scaffold = testimonyAiScaffold(language);
   requireAccess(row.interview_id, channelFor(model));
 
   const segments = listSegments(transcriptId);
@@ -287,6 +291,6 @@ export async function improveTestimonyTranscript(transcriptId: string): Promise<
     segments: out,
     accepted: out.filter((segment) => segment.accepted).length,
     rejected: out.filter((segment) => !segment.accepted).length,
-    model: model ? `${model.provider}/${model.model}` : 'sin modelo',
+    model: model ? `${model.provider}/${model.model}` : scaffold.noModel,
   };
 }

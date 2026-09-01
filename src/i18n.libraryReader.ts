@@ -754,9 +754,91 @@ const READER_OPENING_TRANSLATIONS: Record<LibraryTranslationLocale, Record<strin
   },
 };
 
+/** Small chrome strings used by the server-side reader as well as Desktop. */
+const LIBRARY_READER_UI_EXTRA = {
+  en: {
+    'Añadir nota': 'Add note', 'Guardar anotación': 'Save annotation',
+    'Comentario': 'Comment', 'Imprimir': 'Print', 'Versión': 'Version',
+    'En este documento': 'In this document', 'Añade títulos para crear un índice navegable.': 'Add headings to create a navigable outline.',
+    'Versiones y archivos': 'Versions and files', 'disponibles': 'available',
+    'Preguntar de nuevo al abrir': 'Ask again when opening', 'Documento': 'Document',
+    'Enviar': 'Send', 'Info': 'Info', 'No leído': 'Unread', 'Leído': 'Read',
+    'archivo': 'file', 'Biblioteca': 'Library', 'Chat': 'Chat', 'Cargando lector…': 'Loading reader…',
+    'La consulta y sus respuestas son privadas.': 'Your questions and answers are private.', 'Bloque de estudio': 'Study block',
+    'El trabajo sigue activo; puedes consultarlo desde el historial privado.': 'The job is still running; you can check it in your private history.',
+  },
+  fr: {
+    'Añadir nota': 'Ajouter une note', 'Guardar anotación': 'Enregistrer l’annotation',
+    'Comentario': 'Commentaire', 'Imprimir': 'Imprimer', 'Versión': 'Version',
+    'En este documento': 'Dans ce document', 'Añade títulos para crear un índice navegable.': 'Ajoutez des titres pour créer un plan navigable.',
+    'Versiones y archivos': 'Versions et fichiers', 'disponibles': 'disponibles',
+    'Preguntar de nuevo al abrir': 'Demander à nouveau à l’ouverture', 'Documento': 'Document',
+    'Enviar': 'Envoyer', 'Info': 'Infos', 'No leído': 'Non lu', 'Leído': 'Lu',
+    'archivo': 'fichier', 'Biblioteca': 'Bibliothèque', 'Chat': 'Chat', 'Cargando lector…': 'Chargement du lecteur…',
+    'La consulta y sus respuestas son privadas.': 'Vos questions et vos réponses sont privées.', 'Bloque de estudio': 'Bloc d’étude',
+    'El trabajo sigue activo; puedes consultarlo desde el historial privado.': 'La tâche est toujours active ; vous pouvez la consulter dans votre historique privé.',
+  },
+  de: {
+    'Añadir nota': 'Notiz hinzufügen', 'Guardar anotación': 'Anmerkung speichern',
+    'Comentario': 'Kommentar', 'Imprimir': 'Drucken', 'Versión': 'Version',
+    'En este documento': 'In diesem Dokument', 'Añade títulos para crear un índice navegable.': 'Fügen Sie Überschriften für eine navigierbare Gliederung hinzu.',
+    'Versiones y archivos': 'Versionen und Dateien', 'disponibles': 'verfügbar',
+    'Preguntar de nuevo al abrir': 'Beim Öffnen erneut fragen', 'Documento': 'Dokument',
+    'Enviar': 'Senden', 'Info': 'Info', 'No leído': 'Ungelesen', 'Leído': 'Gelesen',
+    'archivo': 'Datei', 'Biblioteca': 'Bibliothek', 'Chat': 'Chat', 'Cargando lector…': 'Reader wird geladen…',
+    'La consulta y sus respuestas son privadas.': 'Ihre Fragen und Antworten sind privat.', 'Bloque de estudio': 'Studienblock',
+    'El trabajo sigue activo; puedes consultarlo desde el historial privado.': 'Der Auftrag läuft noch; Sie können ihn im privaten Verlauf prüfen.',
+  },
+  pt: {
+    'Añadir nota': 'Adicionar nota', 'Guardar anotación': 'Guardar anotação',
+    'Comentario': 'Comentário', 'Imprimir': 'Imprimir', 'Versión': 'Versão',
+    'En este documento': 'Neste documento', 'Añade títulos para crear un índice navegable.': 'Adicione títulos para criar um índice navegável.',
+    'Versiones y archivos': 'Versões e ficheiros', 'disponibles': 'disponíveis',
+    'Preguntar de nuevo al abrir': 'Perguntar novamente ao abrir', 'Documento': 'Documento',
+    'Enviar': 'Enviar', 'Info': 'Info', 'No leído': 'Não lido', 'Leído': 'Lido',
+    'archivo': 'ficheiro', 'Biblioteca': 'Biblioteca', 'Chat': 'Chat', 'Cargando lector…': 'A carregar o leitor…',
+    'La consulta y sus respuestas son privadas.': 'As suas perguntas e respostas são privadas.', 'Bloque de estudio': 'Bloco de estudo',
+    'El trabajo sigue activo; puedes consultarlo desde el historial privado.': 'A tarefa continua ativa; pode consultá-la no seu histórico privado.',
+  },
+  'pt-BR': {
+    'Añadir nota': 'Adicionar nota', 'Guardar anotación': 'Salvar anotação',
+    'Comentario': 'Comentário', 'Imprimir': 'Imprimir', 'Versión': 'Versão',
+    'En este documento': 'Neste documento', 'Añade títulos para crear un índice navegable.': 'Adicione títulos para criar um índice navegável.',
+    'Versiones y archivos': 'Versões e arquivos', 'disponibles': 'disponíveis',
+    'Preguntar de nuevo al abrir': 'Perguntar novamente ao abrir', 'Documento': 'Documento',
+    'Enviar': 'Enviar', 'Info': 'Info', 'No leído': 'Não lido', 'Leído': 'Lido',
+    'archivo': 'arquivo', 'Biblioteca': 'Biblioteca', 'Chat': 'Chat', 'Cargando lector…': 'Carregando leitor…',
+    'La consulta y sus respuestas son privadas.': 'Suas perguntas e respostas são privadas.', 'Bloque de estudio': 'Bloco de estudo',
+    'El trabajo sigue activo; puedes consultarlo desde el historial privado.': 'A tarefa ainda está ativa; você pode consultá-la no seu histórico privado.',
+  },
+  it: {
+    'Añadir nota': 'Aggiungi nota', 'Guardar anotación': 'Salva annotazione',
+    'Comentario': 'Commento', 'Imprimir': 'Stampa', 'Versión': 'Versione',
+    'En este documento': 'In questo documento', 'Añade títulos para crear un índice navegable.': 'Aggiungi titoli per creare un indice navigabile.',
+    'Versiones y archivos': 'Versioni e file', 'disponibles': 'disponibili',
+    'Preguntar de nuevo al abrir': 'Chiedi di nuovo all’apertura', 'Documento': 'Documento',
+    'Enviar': 'Invia', 'Info': 'Info', 'No leído': 'Non letto', 'Leído': 'Letto',
+    'archivo': 'file', 'Biblioteca': 'Biblioteca', 'Chat': 'Chat', 'Cargando lector…': 'Caricamento del lettore…',
+    'La consulta y sus respuestas son privadas.': 'Le tue domande e risposte sono private.', 'Bloque de estudio': 'Blocco di studio',
+    'El trabajo sigue activo; puedes consultarlo desde el historial privado.': 'Il processo è ancora attivo; puoi consultarlo nella cronologia privata.',
+  },
+  tr: {
+    'Añadir nota': 'Not ekle', 'Guardar anotación': 'Notu kaydet',
+    'Comentario': 'Yorum', 'Imprimir': 'Yazdır', 'Versión': 'Sürüm',
+    'En este documento': 'Bu belgede', 'Añade títulos para crear un índice navegable.': 'Gezilebilir bir taslak oluşturmak için başlık ekleyin.',
+    'Versiones y archivos': 'Sürümler ve dosyalar', 'disponibles': 'kullanılabilir',
+    'Preguntar de nuevo al abrir': 'Açarken yeniden sor', 'Documento': 'Belge',
+    'Enviar': 'Gönder', 'Info': 'Bilgi', 'No leído': 'Okunmadı', 'Leído': 'Okundu',
+    'archivo': 'dosya', 'Biblioteca': 'Kitaplık', 'Chat': 'Sohbet', 'Cargando lector…': 'Okuyucu yükleniyor…',
+    'La consulta y sus respuestas son privadas.': 'Sorularınız ve yanıtları özeldir.', 'Bloque de estudio': 'Çalışma bloğu',
+    'El trabajo sigue activo; puedes consultarlo desde el historial privado.': 'İş hâlâ sürüyor; özel geçmişinizden kontrol edebilirsiniz.',
+  },
+} as const;
+
 /** Copy introduced by the clean Markdown library reader. */
 export const LIBRARY_READER_TRANSLATIONS = {
   en: {
+    ...LIBRARY_READER_UI_EXTRA.en,
     ...LIBRARY_MANAGEMENT_EN,
     ...READER_OPENING_TRANSLATIONS.en,
     'Abrir lector limpio': 'Open clean reader',
@@ -793,6 +875,7 @@ export const LIBRARY_READER_TRANSLATIONS = {
     'Abrir en Asistente': 'Open in Assistant',
   },
   fr: {
+    ...LIBRARY_READER_UI_EXTRA.fr,
     ...LIBRARY_MANAGEMENT_EN,
     ...READER_OPENING_TRANSLATIONS.fr,
     ...LIBRARY_PARITY_FR,
@@ -830,6 +913,7 @@ export const LIBRARY_READER_TRANSLATIONS = {
     'Abrir en Asistente': 'Ouvrir dans Assistant',
   },
   de: {
+    ...LIBRARY_READER_UI_EXTRA.de,
     ...LIBRARY_MANAGEMENT_EN,
     ...LIBRARY_PARITY_DE,
     ...READER_OPENING_TRANSLATIONS.de,
@@ -867,6 +951,7 @@ export const LIBRARY_READER_TRANSLATIONS = {
     'Abrir en Asistente': 'Im Assistenten öffnen',
   },
   pt: {
+    ...LIBRARY_READER_UI_EXTRA.pt,
     ...LIBRARY_MANAGEMENT_EN,
     ...LIBRARY_PARITY_PT,
     ...READER_OPENING_TRANSLATIONS.pt,
@@ -904,6 +989,7 @@ export const LIBRARY_READER_TRANSLATIONS = {
     'Abrir en Asistente': 'Abrir no Assistente',
   },
   'pt-BR': {
+    ...LIBRARY_READER_UI_EXTRA['pt-BR'],
     ...LIBRARY_MANAGEMENT_EN,
     ...LIBRARY_PARITY_PT_BR,
     ...READER_OPENING_TRANSLATIONS['pt-BR'],
@@ -941,6 +1027,7 @@ export const LIBRARY_READER_TRANSLATIONS = {
     'Abrir en Asistente': 'Abrir no Assistente',
   },
   it: {
+    ...LIBRARY_READER_UI_EXTRA.it,
     ...LIBRARY_MANAGEMENT_EN,
     ...LIBRARY_PARITY_IT,
     ...READER_OPENING_TRANSLATIONS.it,
@@ -978,6 +1065,7 @@ export const LIBRARY_READER_TRANSLATIONS = {
     'Abrir en Asistente': 'Apri in Assistente',
   },
   tr: {
+    ...LIBRARY_READER_UI_EXTRA.tr,
     ...LIBRARY_MANAGEMENT_EN,
     ...LIBRARY_PARITY_TR,
     ...READER_OPENING_TRANSLATIONS.tr,

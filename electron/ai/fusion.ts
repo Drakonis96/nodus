@@ -1,5 +1,5 @@
 import { AiError, completeJson, embed } from './aiClient';
-import { PROMPT_FUSION } from './prompts';
+import { coreStructuredPrompt } from './prompts';
 import {
   createIdea,
   findSimilarIdeas,
@@ -200,7 +200,7 @@ export async function planIdeaFusion(
   try {
     const result = await completeJson<FusionResult>(
       {
-        system: PROMPT_FUSION,
+        system: coreStructuredPrompt('fusion', getSettings().promptLanguage ?? 'es'),
         user: JSON.stringify(input),
         temperature: 0.1,
         maxTokens: 800,

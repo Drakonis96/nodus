@@ -17,7 +17,7 @@ import {
 } from "../../components/vaultTypeUi";
 import { Icon } from "../../components/ui";
 import { api, ApiError } from "../api";
-import { t } from "../i18nShim";
+import { getActiveLang, t, tx } from "../i18nShim";
 import type { Space } from "../types";
 
 type ManagedSpace = Space & { vaultType?: string; createdAt?: string | null };
@@ -64,7 +64,7 @@ function translateVaultNode(node: ReactNode): ReactNode {
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
+  if (error instanceof ApiError) return t(error.message);
   return error instanceof Error
     ? t(error.message)
     : t(String(error || "No se ha podido completar la operación."));
@@ -93,7 +93,7 @@ function Modal({
             type="button"
             className="btn btn-ghost px-2"
             onClick={onClose}
-            aria-label="Cerrar"
+            aria-label={t("Cerrar")}
           >
             <Icon name="x" />
           </button>
@@ -191,7 +191,7 @@ export function ServerVaultManager({
       const a = left as ManagedSpace;
       const b = right as ManagedSpace;
       if (sortKey === "name")
-        return left.name.localeCompare(right.name, "es", {
+        return left.name.localeCompare(right.name, getActiveLang(), {
           sensitivity: "base",
         });
       const aDate =
@@ -200,7 +200,7 @@ export function ServerVaultManager({
         sortKey === "created" ? dateValue(b.createdAt) : dateValue(b.updatedAt);
       return (
         bDate - aDate ||
-        left.name.localeCompare(right.name, "es", { sensitivity: "base" })
+        left.name.localeCompare(right.name, getActiveLang(), { sensitivity: "base" })
       );
     });
   }, [query, sortKey, spaces, typeFilter]);
@@ -539,7 +539,7 @@ export function ServerVaultManager({
                             disabled={!editable || busy}
                             onClick={() => {
                               setDuplicateTarget(managed);
-                              setDuplicateValue(`${space.name} copia`);
+                              setDuplicateValue(`${space.name} ${t("copia")}`);
                             }}
                             title={editable ? "Duplicar" : "Solo lectura"}
                             aria-label={`Duplicar ${space.name}`}
@@ -672,7 +672,9 @@ export function ServerVaultManager({
               onClose={() => setDuplicateTarget(null)}
             >
               <p className="text-sm text-neutral-400">
-                Se creará una copia independiente de «{duplicateTarget.name}».
+                {tx("Se creará una copia independiente de «{name}».", {
+                  name: duplicateTarget.name,
+                })}
               </p>
               <input
                 className="input mt-3 w-full"
@@ -716,8 +718,14 @@ export function ServerVaultManager({
                 <>
                   <p className="text-sm leading-6 text-neutral-300">
                     {confirmAction.action === "delete"
-                      ? `Se eliminará definitivamente el vault nativo «${confirmAction.space.name}» y su base de datos del servidor.`
-                      : `Se vaciará el contenido de «${confirmAction.space.name}» conservando su identidad y configuración.`}
+                      ? tx(
+                          "Se eliminará definitivamente el vault nativo «{name}» y su base de datos del servidor.",
+                          { name: confirmAction.space.name },
+                        )
+                      : tx(
+                          "Se vaciará el contenido de «{name}» conservando su identidad y configuración.",
+                          { name: confirmAction.space.name },
+                        )}
                   </p>
                   <div className="mt-5 flex justify-end gap-2">
                     <button
@@ -763,7 +771,7 @@ export function ServerVaultManager({
                         else setDestructiveError("Código incorrecto.");
                       }
                     }}
-                    aria-label="Código de confirmación"
+                    aria-label={t("Código de confirmación")}
                     data-testid="vault-destructive-code"
                   />
                   {destructiveError && (
@@ -826,8 +834,10 @@ export function ServerVaultManager({
           {importTarget && (
             <Modal title="Importar vault" onClose={() => setImportTarget(null)}>
               <p className="text-sm leading-6 text-neutral-300">
-                Selecciona una copia SQLite compatible para «{importTarget.name}
-                ». La importación sustituye solo el vault nativo del servidor.
+                {tx(
+                  "Selecciona una copia SQLite compatible para «{name}». La importación sustituye solo el vault nativo del servidor.",
+                  { name: importTarget.name },
+                )}
               </p>
               <input
                 className="mt-4 block w-full text-xs"

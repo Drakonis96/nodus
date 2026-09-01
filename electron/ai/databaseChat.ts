@@ -5,10 +5,11 @@
 
 import { getDatabase, getColumns, queryDatabaseRows } from '../db/databasesRepo';
 import { computeProfile, profileToText } from '@shared/dataProfile';
-import { buildDbChatContext, buildDbChatUser, DB_CHAT_SYSTEM } from '@shared/databaseChat';
+import { buildDbChatContext, buildDbChatUser, databaseChatSystem } from '@shared/databaseChat';
 import { decodeCheckbox, decodeMultiSelect } from '@shared/databases';
 import type { DbChatPart } from '@shared/databaseChat';
-import type { DatabaseChatRequest, DatabaseColumn, DatabaseRow } from '@shared/types';
+import type { DatabaseChatRequest, DatabaseColumn, DatabaseRow, PromptLanguage } from '@shared/types';
+import { getSettings } from '../db/settingsRepo';
 
 export type { DatabaseChatRequest };
 
@@ -33,7 +34,12 @@ const SAMPLE_VALUE_CHARS = 120;
 const clip = (v: string) => (v.length > SAMPLE_VALUE_CHARS ? `${v.slice(0, SAMPLE_VALUE_CHARS).trimEnd()}…` : v);
 
 /** One compact line per row: "col: value; …" resolving option labels. */
-function sampleText(columns: DatabaseColumn[], rows: DatabaseRow[]): string {
+function sampleText(columns: DatabaseColumn[], rows: DatabaseRow[], language: PromptLanguage = 'es'): string {
+  const booleanCopy = {
+    es: ['sí', 'no'], en: ['yes', 'no'], fr: ['oui', 'non'], de: ['ja', 'nein'],
+    pt: ['sim', 'não'], 'pt-BR': ['sim', 'não'], it: ['sì', 'no'], tr: ['evet', 'hayır'],
+  } as const;
+  const [yes, no] = booleanCopy[language] ?? booleanCopy.es;
   const cols = columns.filter((c) => c.type !== 'ai').slice(0, SAMPLE_COLS);
   return rows
     .slice(0, SAMPLE_ROWS)
@@ -48,7 +54,7 @@ function sampleText(columns: DatabaseColumn[], rows: DatabaseRow[]): string {
               .map((id) => col.options.find((o) => o.id === id)?.label ?? '')
               .filter(Boolean)
               .join('/');
-          else if (col.type === 'checkbox') v = decodeCheckbox(raw) ? 'sí' : 'no';
+          else if (col.type === 'checkbox') v = decodeCheckbox(raw) ? yes : no;
           else if (col.type === 'attachment' || col.type === 'files') v = String((row.attachments?.[col.id] ?? []).length);
           else if (col.type === 'relation') v = String(row.relationCounts?.[col.id] ?? 0);
           else v = raw ?? '';
@@ -72,7 +78,7 @@ function queryAllRows(databaseId: string): DatabaseRow[] {
 }
 
 /** Build the bounded context string for the selected databases. */
-export function buildDatabaseChatContext(databaseIds: string[]): { context: string; names: string[] } {
+export function buildDatabaseChatContext(databaseIds: string[], language = getSettings().promptLanguage ?? 'es'): { context: string; names: string[] } {
   const parts: DbChatPart[] = [];
   const names: string[] = [];
   for (const id of databaseIds) {
@@ -83,14 +89,14 @@ export function buildDatabaseChatContext(databaseIds: string[]): { context: stri
     const profile = computeProfile(columns, rows);
     parts.push({
       name: database.name,
-      profileText: profileToText(database.name, profile),
-      sample: sampleText(columns, rows),
+      profileText: profileToText(database.name, profile, language),
+      sample: sampleText(columns, rows, language),
       rowCount: rows.length,
       sampleSize: Math.min(rows.length, SAMPLE_ROWS),
     });
     names.push(database.name);
   }
-  return { context: buildDbChatContext(parts), names };
+  return { context: buildDbChatContext(parts, language), names };
 }
 
 export interface DatabaseChatDeps {
@@ -109,8 +115,9 @@ export async function streamDatabaseChat(
   deps: DatabaseChatDeps = {}
 ): Promise<{ text: string }> {
   if (!request.databaseIds.length) throw new Error('Elige al menos una base de datos.');
-  const { context } = buildDatabaseChatContext(request.databaseIds);
-  const user = buildDbChatUser(context, request.question, request.history ?? []);
+  const language = getSettings().promptLanguage ?? 'es';
+  const { context } = buildDatabaseChatContext(request.databaseIds, language);
+  const user = buildDbChatUser(context, request.question, request.history ?? [], language);
 
   const stream =
     deps.stream ??
@@ -124,7 +131,7 @@ export async function streamDatabaseChat(
     });
 
   const text = await stream(
-    { system: DB_CHAT_SYSTEM, user, plainContext: true, temperature: 0.3, maxTokens: 1500 },
+    { system: databaseChatSystem(language), user, plainContext: true, temperature: 0.3, maxTokens: 1500 },
     onDelta,
     signal
   );

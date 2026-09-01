@@ -88,7 +88,10 @@ export function createArtifactRoutes({ authorize, json, jsonBody, publicUrl, art
           title: artifact.title,
           draftMarkdown: artifact.content,
           abstract: artifact.metadata?.objective || '',
-        }, { subject: 'Deep Research · privado' });
+        }, {
+          language: artifact.metadata?.language,
+          subject: 'Deep Research · private',
+        });
       } catch (error) {
         json(res, 422, { error: 'unrenderable_artifact', error_description: String(error?.message || error) }); return true;
       }

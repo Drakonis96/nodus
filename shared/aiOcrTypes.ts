@@ -6,7 +6,7 @@
 // for models that cannot produce valid JSON, a single verbatim MAIN_TEXT block (the
 // "text" fallback mode). `normalizeOcrPageResult` coerces whatever the model returns
 // into this shape so a sloppy-but-usable response never crashes the pipeline.
-import type { ModelRef } from './types';
+import type { ModelRef, PromptLanguage } from './types';
 
 /** Layout role of a transcribed block. Mirrors the labels the prompt asks the model
  *  to assign; reconstruction uses them to place titles and to filter out chrome. */
@@ -44,6 +44,8 @@ export type OcrProcessingMode = 'ocr' | 'translation' | 'manual';
 export type OcrOutputMode = 'structured' | 'text';
 
 export interface OcrOptions {
+  /** Language of model instructions; extracted text remains source/target controlled below. */
+  promptLanguage?: PromptLanguage;
   outputMode: OcrOutputMode;
   processingMode: OcrProcessingMode;
   /** Only for `translation`: the language to translate the transcription into. */

@@ -24,7 +24,8 @@ import { api } from "../api";
 import { MarkdownReader } from "../readers";
 import { TreeFrame, TreeFrameDefs } from "../../components/TreeFrame";
 import type { JsonRecord, PageResponse } from "../types";
-import { t } from "../i18nShim";
+import { getActiveLang, t, tx } from "../i18nShim";
+import { localizeContinuityText } from "@shared/uiLanguage";
 
 export { ServerVaultManager } from "./ServerVaultManager";
 
@@ -1177,7 +1178,7 @@ function NestedTable({
   if (!Array.isArray(nested) || nested.length === 0)
     return (
       <div className="rounded-lg border border-dashed border-neutral-300 p-4 text-xs text-neutral-500 dark:border-neutral-800">
-        {t("No hay")} {t(label).toLocaleLowerCase()} {t("publicados")}.
+        {t("No hay")} {t(label).toLocaleLowerCase(getActiveLang())} {t("publicados")}.
       </div>
     );
   const rows = nested.filter((entry): entry is JsonRecord =>
@@ -1258,7 +1259,7 @@ function nestedCollection(parent: string, key: string): string | null {
 function SurfaceEmpty({ label }: { label: string }) {
   return (
     <div className="grid min-h-48 place-items-center p-8 text-sm text-neutral-500">
-      {t("No hay")} {t(label).toLocaleLowerCase()} {t("publicados")}.
+      {t("No hay")} {t(label).toLocaleLowerCase(getActiveLang())} {t("publicados")}.
     </div>
   );
 }
@@ -2457,15 +2458,6 @@ function MapCatalog({
 }
 
 type StudyCalendarMode = "month" | "week" | "year";
-const STUDY_CALENDAR_WEEKDAYS = [
-  "Lun",
-  "Mar",
-  "Mié",
-  "Jue",
-  "Vie",
-  "Sáb",
-  "Dom",
-];
 const STUDY_CALENDAR_TYPES: Record<
   string,
   { label: string; className: string; dot: string }
@@ -2539,8 +2531,13 @@ function calendarDateLabel(date: Date, mode: StudyCalendarMode): string {
   return mode === "year"
     ? String(date.getFullYear())
     : mode === "week"
-      ? `${date.toLocaleDateString(undefined, { day: "numeric", month: "short" })} – ${addCalendarDays(date, 6).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`
-      : date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      ? `${date.toLocaleDateString(getActiveLang(), { day: "numeric", month: "short" })} – ${addCalendarDays(date, 6).toLocaleDateString(getActiveLang(), { day: "numeric", month: "short", year: "numeric" })}`
+      : date.toLocaleDateString(getActiveLang(), { month: "long", year: "numeric" });
+}
+function calendarWeekdayLabel(date: Date, narrow = false): string {
+  return date.toLocaleDateString(getActiveLang(), {
+    weekday: narrow ? "narrow" : "short",
+  });
 }
 
 /** Calendar replica for published events. It keeps Desktop's month/week/year navigation;
@@ -2633,7 +2630,7 @@ function CalendarCatalog({
     const date = localCalendarDate(row);
     const time =
       date && row.all_day !== 1 && row.all_day !== true
-        ? date.toLocaleTimeString(undefined, {
+        ? date.toLocaleTimeString(getActiveLang(), {
             hour: "2-digit",
             minute: "2-digit",
           })
@@ -2746,7 +2743,7 @@ function CalendarCatalog({
                   </time>
                   <span className="min-w-0">
                     <span className="block text-[10px] font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-400">
-                      {kind}
+                      {t(kind)}
                     </span>
                     <strong className="mt-1 block text-sm">{title(row)}</strong>
                     <span className="mt-1 block text-xs text-neutral-500">
@@ -2766,11 +2763,11 @@ function CalendarCatalog({
           {Object.entries(STUDY_CALENDAR_TYPES).map(([key, type]) => (
             <span key={key} className="inline-flex items-center gap-1">
               <i className={`h-1.5 w-1.5 rounded-full ${type.dot}`} />
-              {type.label}
+              {t(type.label)}
             </span>
           ))}
           <span className="ml-auto">
-            {indexed.length} {t("eventos publicados · solo lectura")}
+            {tx("{n} eventos publicados · solo lectura", { n: indexed.length })}
           </span>
         </div>
       }
@@ -2780,12 +2777,12 @@ function CalendarCatalog({
           data-testid="study-calendar-month-grid"
         >
           <div className="grid grid-cols-7 border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
-            {STUDY_CALENDAR_WEEKDAYS.map((day) => (
+            {monthDays.slice(0, 7).map((date) => (
               <div
-                key={day}
+                key={date.toISOString()}
                 className="px-2 py-2 text-center text-[10px] font-semibold uppercase text-neutral-500"
               >
-                {day}
+                {calendarWeekdayLabel(date)}
               </div>
             ))}
           </div>
@@ -2829,7 +2826,7 @@ function CalendarCatalog({
             >
               <header className="mb-2 border-b border-neutral-200 pb-2 text-center dark:border-neutral-800">
                 <span className="block text-[10px] uppercase text-neutral-500">
-                  {STUDY_CALENDAR_WEEKDAYS[(date.getDay() + 6) % 7]}
+                  {calendarWeekdayLabel(date)}
                 </span>
                 <strong className="text-sm">{date.getDate()}</strong>
               </header>
@@ -2864,12 +2861,12 @@ function CalendarCatalog({
                     setMode("month");
                   }}
                 >
-                  {monthDate.toLocaleDateString(undefined, { month: "long" })}
+                  {monthDate.toLocaleDateString(getActiveLang(), { month: "long" })}
                 </button>
                 <div className="grid grid-cols-7 gap-1 text-[9px] text-neutral-500">
-                  {STUDY_CALENDAR_WEEKDAYS.map((day) => (
-                    <span key={day} className="text-center">
-                      {day.slice(0, 1)}
+                  {calendarMonthDays(monthDate).slice(0, 7).map((date) => (
+                    <span key={date.toISOString()} className="text-center">
+                      {calendarWeekdayLabel(date, true)}
                     </span>
                   ))}
                   {calendarMonthDays(monthDate).map((date) => (
@@ -2885,7 +2882,7 @@ function CalendarCatalog({
                   ))}
                 </div>
                 <span className="mt-2 block text-[10px] text-neutral-500">
-                  {monthEntries.length} eventos
+                  {tx("{n} eventos", { n: monthEntries.length })}
                 </span>
               </section>
             );
@@ -3882,14 +3879,14 @@ function ContinuityCatalog({
                 />
                 <div className="min-w-0">
                   <strong className="block text-sm">
-                    {value(row.headline, "Aviso")}
+                    {localizeContinuityText(row.headlineKey, row.headlineParams as { count?: number; subjects?: string[] } | undefined, getActiveLang()) ?? value(row.headline, "Aviso")}
                   </strong>
                   <span className="mt-1 block text-[10px] uppercase tracking-wider text-neutral-500">
                     {value(row.severity)} · {value(row.family)}
                   </span>
                   {row.detail != null && (
                     <p className="mt-1 text-xs text-neutral-500">
-                      {value(row.detail)}
+                      {localizeContinuityText(row.detailKey, row.detailParams as { count?: number; subjects?: string[] } | undefined, getActiveLang()) ?? value(row.detail)}
                     </p>
                   )}
                 </div>
@@ -9439,7 +9436,7 @@ export function VaultSurfaceView({
                 className="input input-with-leading-icon w-full"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder={`${t("Buscar en")} ${localizedDescriptor.label.toLowerCase()}…`}
+                placeholder={`${t("Buscar en")} ${localizedDescriptor.label.toLocaleLowerCase(getActiveLang())}…`}
               />
             </div>
           </div>

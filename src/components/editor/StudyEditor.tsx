@@ -560,6 +560,7 @@ export function StudyEditor({
       const result = await window.nodus.improveStudyText({
         ...port.improveTarget(active.id), subjectId, text: target.text, styleId: style.id, scope: target.scope,
         level: style.level, length: style.length, mode: 'preserve',
+        promptLanguage: settings.promptLanguage,
         variables: { language: style.language, documentType: active.kind ?? 'nota', selectedText: target.text },
         protectedTerms: [active.title, ...data.customDictionary], model: aiModel,
       }, { onDelta: (delta) => {

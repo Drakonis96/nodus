@@ -33,11 +33,10 @@ import {
 } from '@shared/worldChatContext';
 import { worldOperationSystemPrompt } from '@shared/worldOperationPrompts';
 import { findingsFor } from '@shared/worldFindings';
-import { BEAT_MARK_LABEL } from '@shared/worldThreads';
-import { RULE_SCOPE_LABEL } from '@shared/worldRules';
 import { entryKey, parseEntryKey } from '@shared/worldEncyclopedia';
+import { worldBeatMarkLabel, worldRuleScopeLabel } from '@shared/worldPromptLanguage';
 import { buildStays, buildJourneys, positionAt, presenceKey } from '@shared/worldPresence';
-import type { WorldChatRequest, WorldChatResult, WorldEntryKind } from '@shared/types';
+import type { AppLanguage, WorldChatRequest, WorldChatResult, WorldEntryKind } from '@shared/types';
 
 /** Enough of a sheet to answer from; past this the focus stops fitting a local window. */
 const MAX_PROSE_CHARS = 1200;
@@ -74,9 +73,9 @@ function resolveFocus(request: WorldChatRequest): WorldChatRef[] {
     .map((entry) => ({ kind: entry.kind, id: entry.id, title: entry.title }));
 }
 
-export function buildWorldChatFacts(request: WorldChatRequest): WorldChatFacts {
+export function buildWorldChatFacts(request: WorldChatRequest, language: AppLanguage = 'es'): WorldChatFacts {
   const focus = resolveFocus(request);
-  const worldDay = readWorldDay(request.question);
+  const worldDay = readWorldDay(request.question, language);
   const history = (request.history ?? [])
     .filter((turn) => (turn.role === 'user' || turn.role === 'assistant') && turn.content.trim())
     .slice(-MAX_HISTORY_TURNS)
@@ -131,7 +130,7 @@ export function buildWorldChatFacts(request: WorldChatRequest): WorldChatFacts {
       rules.push({
         rule: effective.rule.title,
         ruleId: effective.rule.ruleId,
-        scope: RULE_SCOPE_LABEL[effective.rule.scopeKind] ?? effective.rule.scopeKind,
+        scope: worldRuleScopeLabel(effective.rule.scopeKind, language),
         overriddenBy: effective.overriddenBy.map((child) => child.title),
       });
       cite({ kind: 'rule', id: effective.rule.ruleId, title: effective.rule.title });
@@ -214,7 +213,7 @@ export function buildWorldChatFacts(request: WorldChatRequest): WorldChatFacts {
     beatsForScene(scene.id).map((beat) => ({
       sceneTitle: scene.title,
       threadTitle: beat.threadTitle,
-      mark: BEAT_MARK_LABEL[beat.mark] ?? beat.mark,
+      mark: worldBeatMarkLabel(beat.mark, language),
       text: beat.text,
     }))
   );
@@ -251,17 +250,18 @@ export async function streamWorldChat(
   onDelta: (delta: string) => void,
   signal?: AbortSignal
 ): Promise<WorldChatResult> {
-  const facts = buildWorldChatFacts(request);
+  const settings = getSettings();
+  const language = settings.promptLanguage ?? 'es';
+  const facts = buildWorldChatFacts(request, language);
   if (!hasWorldChatMaterial(facts)) {
     return { text: '', focus: facts.focus, noMaterial: true };
   }
 
-  const settings = getSettings();
   const model = request.model ?? settings.chatModel ?? settings.synthesisModel ?? null;
   const raw = await completeTextStream(
     {
       system: worldOperationSystemPrompt('worldChat', settings.promptLanguage ?? 'es'),
-      user: composeWorldChatContext(facts),
+      user: composeWorldChatContext(facts, language),
       plainContext: true,
       // Cool. Everything true in the answer is already in the material; the model's job is
       // to choose and phrase, not to imagine.
@@ -283,7 +283,7 @@ export async function streamWorldChat(
   );
   const validated = validateCitations(raw, allowed);
   return {
-    text: ensureWorldCitations(validated, facts.citable, settings.uiLanguage),
+    text: ensureWorldCitations(validated, facts.citable, language),
     focus: facts.focus,
     noMaterial: false,
   };

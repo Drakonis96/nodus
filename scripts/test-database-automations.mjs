@@ -94,7 +94,14 @@ try {
   assert.equal(publicPost.status, 200); assert.match(await publicPost.text(), /Recibido/);
   const secondPublicPost = await fetch(`${origin}/forms/solicitud-publica`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': 'loop-15-public' }, body: new URLSearchParams({ [`field_${title.id}`]: 'Margaret' }) }); assert.equal(secondPublicPost.status, 200);
   const limitedPost = await fetch(`${origin}/forms/solicitud-publica`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': 'loop-15-public' }, body: new URLSearchParams({ [`field_${title.id}`]: 'Exceso' }) }); assert.equal(limitedPost.status, 429);
-  assert.equal((await fetch(`${origin}/forms/privado`)).status, 401); const rejectedToken = await fetch(`${origin}/forms/privado?token=incorrecto`); assert.equal(rejectedToken.status, 401); assert.match(await rejectedToken.text(), /token no es válido/i); assert.equal((await fetch(`${origin}/forms/privado?token=secreto-real`)).status, 200);
+  assert.equal((await fetch(`${origin}/forms/privado`)).status, 401);
+  const rejectedTokenEn = await fetch(`${origin}/forms/privado?token=incorrecto&lang=en`);
+  assert.equal(rejectedTokenEn.status, 401);
+  assert.match(await rejectedTokenEn.text(), /token is not valid/i);
+  const rejectedTokenEs = await fetch(`${origin}/forms/privado?token=incorrecto&lang=es`);
+  assert.equal(rejectedTokenEs.status, 401);
+  assert.match(await rejectedTokenEs.text(), /token no es válido/i);
+  assert.equal((await fetch(`${origin}/forms/privado?token=secreto-real`)).status, 200);
   const privatePost = await fetch(`${origin}/forms/privado`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ _token: 'secreto-real', [`field_${title.id}`]: 'Dorothy' }) }); assert.equal(privatePost.status, 200);
   assert.ok(automations.listDatabaseFormSubmissions(form.id).length >= 3); assert.equal(formServer.databaseFormPublicUrl('privado'), `${origin}/forms/privado`);
 

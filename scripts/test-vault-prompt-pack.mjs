@@ -49,10 +49,11 @@ try {
   // Composition order: vault-type pack first, output-language directive last.
   updateSettings({ promptLanguage: 'en' });
   const composed = withPromptLanguage(withVaultTypeContext({ system: BASE })).system;
-  assert.match(composed, /MODO ESTUDIO/, 'pack present in composed prompt');
+  assert.match(composed, /STUDY MODE/, 'native English pack present in composed prompt');
+  assert.doesNotMatch(composed, /MODO ESTUDIO/, 'English composition does not retain the Spanish pack');
   assert.match(composed, /HIGHEST PRIORITY/, 'language directive present in composed prompt');
   assert.ok(
-    composed.indexOf('MODO ESTUDIO') < composed.indexOf('HIGHEST PRIORITY'),
+    composed.indexOf('STUDY MODE') < composed.indexOf('HIGHEST PRIORITY'),
     'the language directive must come after the vault-type pack'
   );
 

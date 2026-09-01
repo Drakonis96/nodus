@@ -8,7 +8,7 @@
 // plain-text transcription when the JSON is unusable. A completely empty response in
 // the default structured path is surfaced as an error (retryable) rather than a fake
 // blank page, so a model that silently returns nothing is never reported as "done".
-import { buildOcrSystemPrompt, buildOcrTextPrompt, OCR_USER_PROMPT } from '@shared/aiOcrPrompt';
+import { buildLocalizedOcrSystemPrompt, buildLocalizedOcrTextPrompt, ocrUserPrompt } from '@shared/aiOcrPrompt';
 import {
   isOcrPageShape,
   normalizeOcrPageResult,
@@ -72,7 +72,7 @@ export async function ocrPageImage(
 
   // User explicitly chose the simple verbatim path: trust it, empty = blank.
   if (options.outputMode === 'text') {
-    const text = await call.completeText({ system: buildOcrTextPrompt(options), user: OCR_USER_PROMPT, ...base }, model);
+    const text = await call.completeText({ system: buildLocalizedOcrTextPrompt(options), user: ocrUserPrompt(options.promptLanguage), ...base }, model);
     return { result: textToPageResult(text), mode: 'text' };
   }
 
@@ -80,7 +80,7 @@ export async function ocrPageImage(
   let structured: OcrPageResult | null = null;
   try {
     const raw = await call.completeJson(
-      { system: buildOcrSystemPrompt(options), user: OCR_USER_PROMPT, ...base },
+      { system: buildLocalizedOcrSystemPrompt(options), user: ocrUserPrompt(options.promptLanguage), ...base },
       isOcrPageShape,
       model,
     );
@@ -93,7 +93,7 @@ export async function ocrPageImage(
 
   // The JSON was missing or empty-but-not-blank. Retry as verbatim text — this is what
   // rescues models that can't produce valid JSON.
-  const text = await call.completeText({ system: buildOcrTextPrompt(options), user: OCR_USER_PROMPT, ...base }, model);
+  const text = await call.completeText({ system: buildLocalizedOcrTextPrompt(options), user: ocrUserPrompt(options.promptLanguage), ...base }, model);
   const result = textToPageResult(text);
   if (pageHasText(result)) return { result, mode: 'text' };
 

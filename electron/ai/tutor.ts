@@ -16,6 +16,8 @@ import { aggregateGaps } from '../db/gapsRepo';
 import { getEdgeDetail, getIdeaDetail } from '../db/ideasRepo';
 import { buildIdeaGraph, getContradictions } from '../graph/graphService';
 import { completeJson, completeText, completeTextStream } from './aiClient';
+import { getSettings } from '../db/settingsRepo';
+import { tutorLanguage, tutorPlanPrompt, tutorRepairPrompt, tutorRuntimeCopy, tutorStepPrompt } from '@shared/tutorPromptPacks';
 
 // The plan is built from the SAME graph the user sees, so node ids returned by the
 // model can be spotlighted directly in the graph. We send a compact projection and
@@ -27,20 +29,6 @@ const MAX_GAPS = 30;
 const MAX_CONTRADICTIONS = 30;
 const STEP_MEMBER_IDEAS = 24;
 const MAX_PLAN_REPAIR_ATTEMPTS = 2;
-
-const EDGE_TYPE_LABELS: Record<string, string> = {
-  contains: 'contiene',
-  extends: 'extiende',
-  variant_of: 'variante de',
-  refines: 'refina',
-  contradicts: 'contradice',
-  applies_to: 'aplica a',
-  shares_method: 'comparte método',
-  precondition_of: 'precondición de',
-  measures_same: 'mide lo mismo',
-  supports: 'apoya',
-  refutes: 'refuta',
-};
 
 const STOP_KINDS = new Set<TutorStopKind>(['theme', 'idea', 'connection']);
 
@@ -100,94 +88,8 @@ function yearRange(years: number[]): string | null {
   return min === max ? String(min) : `${min}–${max}`;
 }
 
-const PLAN_SYSTEM = `Eres el Tutor de Nodus: un compañero de investigación que guía al usuario, paso a paso,
-por su propio grafo de ideas y temas extraído de sus lecturas. Recibes el grafo COMPLETO
-(temas, ideas tipadas, conexiones reales entre ideas, contradicciones y huecos) y diseñas
-RECORRIDOS GUIADOS (rutas) para que, avanzando con flechas anterior/siguiente, el usuario
-comprenda todo su mapa como una LECTURA GUIADA, no como una lista de puntos sueltos.
-
-OBJETIVO:
-- Cada ruta es un HILO ARGUMENTAL continuo: una secuencia de paradas que se explican luego como
-  un discurso progresivo de principio a fin. Ordena las paradas para que cada una prepare la
-  siguiente, encadenándolas a través de las conexiones REALES del grafo (sigue las aristas:
-  extiende, apoya, contradice, aplica a, precondición de…). Empieza por lo más central/fundacional
-  y avanza hacia lo más específico o hacia los debates y huecos.
-- Indica el PESO de cada ruta (1 a 5) y una etiqueta corta ("línea principal", "debate central",
-  "rama secundaria"…). Ordena las rutas de mayor a menor peso.
-
-COBERTURA (prioridad máxima):
-- Prioriza la cobertura COMPLETA y significativa del grafo. Recorre TODOS los nodos relevantes y
-  conectados que hagan falta para explicar bien la estructura, las conexiones y los temas. Incluye
-  paradas de conexión cuando una relación sea importante para entender el encadenamiento.
-- NO hay número máximo de paradas. Si una línea tiene muchas ideas relacionadas, haz una ruta
-  LARGA con todas ellas en vez de resumir. Es un error grave dejar fuera ideas o conexiones
-  relevantes por brevedad: prefiere una ruta extensa y exhaustiva.
-- Solo omite un nodo cuando sea claramente redundante (otra idea casi idéntica ya incluida),
-  irrelevante o no aporte nada nuevo. Entre todas las rutas, la unión de paradas debe cubrir la
-  inmensa mayoría de las ideas y temas; reparte sin repetir el mismo nodo en exceso.
-
-REGLAS DE IDS (estrictas):
-- "nodeIds" debe contener ids que aparezcan EXACTAMENTE en el grafo recibido. Las ideas usan su
-  global_id; los temas usan el formato "theme:<id>".
-- kind = "theme": un único id de tema. kind = "idea": uno o varios ids de idea (normalmente uno).
-  kind = "connection": EXACTAMENTE los dos ids de los extremos y, en "edgeId", el id de la
-  conexión recibida que los une.
-- No inventes ids ni conexiones. Si dudas de una conexión, usa una parada de idea normal.
-
-ESTILO:
-- Todo en español. "overview" describe el mapa a vista de pájaro (cuántos temas/ideas hay, qué
-  líneas pesan más y qué rutas se ofrecen), en 1-2 párrafos. Puede usar Markdown ligero.
-- "title"/"focus" son breves y NO deben mencionar números de parada ni fórmulas de navegación; la
-  explicación larga y fluida se generará después, parada a parada.
-
-SALIDA: EXCLUSIVAMENTE JSON válido con esta forma:
-{
-  "overview": "…",
-  "routes": [
-    {
-      "title": "…",
-      "description": "…",
-      "weight": 1-5,
-      "weightLabel": "…",
-      "themes": ["…"],
-      "stops": [
-        { "kind": "theme|idea|connection", "title": "…", "focus": "…",
-          "nodeIds": ["…"], "edgeId": "<id de conexión o null>" }
-      ]
-    }
-  ]
-}`;
-
-const PROMPT_MODE_RULE = `\n\nMODO DIRIGIDO: el usuario ha indicado QUÉ quiere repasar (ver "objetivo_del_usuario").
-Genera 1-3 rutas centradas en ese objetivo (la primera, la más ajustada y con mayor peso),
-seleccionando del grafo TODAS las ideas, temas y conexiones pertinentes (no solo unas pocas) y
-encadenándolas como un discurso continuo. Si el objetivo toca muchas ideas conectadas, haz una
-ruta larga que las recorra todas. La "overview" debe explicar cómo has interpretado su petición.`;
-
-const OVERVIEW_MODE_RULE = `\n\nMODO PANORÁMICO: ofrece varias rutas (normalmente 3-9, según el tamaño real del grafo) que,
-EN CONJUNTO, cubran todo el grafo. La unión de sus paradas debe alcanzar la inmensa mayoría de
-ideas y temas enviados. Empieza por la(s) ruta(s) de mayor peso (las líneas centrales del corpus) y
-sigue con ramas secundarias, debates (contradicciones) y huecos. Cada ruta debe ser tan extensa
-como haga falta para recorrer sus nodos relevantes; no resumas dejando ideas fuera. La "overview"
-debe mencionar todo lo importante a vista de pájaro.`;
-
-const PLAN_REPAIR_SYSTEM = `${PLAN_SYSTEM}
-
-TAREA DE REVISIÓN:
-El plan anterior dejó fuera nodos que Nodus ha auditado como relevantes. Debes devolver un PLAN COMPLETO NUEVO,
-no un parche. Integra los nodos omitidos dentro de rutas argumentales con sentido de principio a fin: puedes
-alargar rutas existentes, partir una ruta comprimida en varias o crear nuevas rutas temáticas. No crees una ruta
-llamada "cobertura", "restante", "auditoría" ni una lista residual. Todo debe estar integrado como itinerarios
-interpretativos de la IA.
-
-OBLIGATORIO:
-- Usa los ids de "nodos_omitidos" como paradas normales dentro de rutas coherentes.
-- Mantén las reglas estrictas de ids y conexiones.
-- Prefiere varias rutas largas con sentido antes que pocas rutas comprimidas.
-- Devuelve EXCLUSIVAMENTE el JSON completo con overview y routes.`;
-
 /** Compact, id-stable projection of the idea graph for the planner. */
-function buildPlanContext(graph: GraphData): {
+function buildPlanContext(graph: GraphData, language: import('@shared/types').PromptLanguage): {
   payload: Record<string, unknown>;
   validNodeIds: Set<string>;
   edgesById: Map<string, GraphEdge>;
@@ -251,7 +153,7 @@ function buildPlanContext(graph: GraphData): {
     from_label: labelById.get(e.source) ?? e.source,
     to_label: labelById.get(e.target) ?? e.target,
     type: e.type,
-    type_label: EDGE_TYPE_LABELS[e.type] ?? e.type,
+    type_label: tutorRuntimeCopy(language).edgeTypeLabels[e.type] ?? e.type,
     basis: e.basis,
     confidence: e.confidence,
   }));
@@ -312,19 +214,17 @@ function themeSampleWorks(themeNodeId: string): { title: string; year: number | 
   return rows.map((r) => ({ title: clip(r.title, 120), year: r.year, status: r.status }));
 }
 
-function weightLabelFor(weight: number): string {
-  if (weight >= 5) return 'línea principal';
-  if (weight >= 4) return 'línea destacada';
-  if (weight >= 3) return 'línea relevante';
-  if (weight >= 2) return 'rama secundaria';
-  return 'ruta de apoyo';
+function weightLabelFor(weight: number, language: import('@shared/types').PromptLanguage): string {
+  const level = Math.max(1, Math.min(5, Math.round(weight))) as 1 | 2 | 3 | 4 | 5;
+  return tutorRuntimeCopy(language).weightLabels[level];
 }
 
 /** Validate/repair a model stop against the real graph; returns null to drop it. */
 function sanitizeStop(
   raw: NonNullable<NonNullable<PlanResult['routes']>[number]['stops']>[number],
   validNodeIds: Set<string>,
-  edgesById: Map<string, GraphEdge>
+  edgesById: Map<string, GraphEdge>,
+  language: import('@shared/types').PromptLanguage
 ): TutorStop | null {
   const kind: TutorStopKind = STOP_KINDS.has(raw.kind as TutorStopKind) ? (raw.kind as TutorStopKind) : 'idea';
   let nodeIds = Array.isArray(raw.nodeIds) ? raw.nodeIds.filter((id) => typeof id === 'string' && validNodeIds.has(id)) : [];
@@ -353,7 +253,7 @@ function sanitizeStop(
   return {
     id: uuid(),
     kind,
-    title: clip(raw.title ?? '', 120) || 'Parada',
+    title: clip(raw.title ?? '', 120) || tutorRuntimeCopy(language).stopFallback,
     focus: clip(raw.focus ?? '', 240),
     nodeIds,
     edgeId,
@@ -374,20 +274,20 @@ function routeCoverage(routes: TutorRoute[]): { ideas: Set<string>; themes: Set<
   return { ideas, themes };
 }
 
-function sanitizeRoutes(result: PlanResult, validNodeIds: Set<string>, edgesById: Map<string, GraphEdge>): TutorRoute[] {
+function sanitizeRoutes(result: PlanResult, validNodeIds: Set<string>, edgesById: Map<string, GraphEdge>, language: import('@shared/types').PromptLanguage): TutorRoute[] {
   const routes: TutorRoute[] = [];
   for (const rawRoute of result.routes ?? []) {
     const stops = (rawRoute.stops ?? [])
-      .map((s) => sanitizeStop(s, validNodeIds, edgesById))
+      .map((s) => sanitizeStop(s, validNodeIds, edgesById, language))
       .filter((s): s is TutorStop => s !== null);
     if (stops.length === 0) continue;
     const weight = Math.max(1, Math.min(5, Math.round(Number(rawRoute.weight) || 3)));
     routes.push({
       id: uuid(),
-      title: clip(rawRoute.title ?? '', 140) || 'Recorrido',
+      title: clip(rawRoute.title ?? '', 140) || tutorRuntimeCopy(language).routeFallback,
       description: clip(rawRoute.description ?? '', 600),
       weight,
-      weightLabel: clip(rawRoute.weightLabel ?? '', 40) || weightLabelFor(weight),
+      weightLabel: clip(rawRoute.weightLabel ?? '', 40) || weightLabelFor(weight, language),
       themes: Array.isArray(rawRoute.themes)
         ? rawRoute.themes.filter((t): t is string => typeof t === 'string').slice(0, 8)
         : [],
@@ -454,6 +354,7 @@ async function repairPlanCoverage(params: {
   missingIdeas: GraphNode[];
   missingThemes: GraphNode[];
   request: TutorPlanRequest;
+  language: import('@shared/types').PromptLanguage;
 }): Promise<PlanResult> {
   const user = JSON.stringify(
     {
@@ -470,22 +371,24 @@ async function repairPlanCoverage(params: {
   );
 
   return completeJson<PlanResult>(
-    { system: PLAN_REPAIR_SYSTEM, user, temperature: 0.2, maxTokens: 14000 },
+    { system: tutorRepairPrompt(params.language), user, temperature: 0.2, maxTokens: 14000 },
     isPlanResult,
     params.request.model
   );
 }
 
 export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPlan> {
+  const language = tutorLanguage(request.language ?? getSettings().promptLanguage ?? 'es');
+  const copy = tutorRuntimeCopy(language);
   const graph = await buildIdeaGraph();
   if (graph.nodes.length === 0) {
-    throw new Error('El grafo aún no tiene ideas. Analiza algunas obras antes de iniciar el modo Tutor.');
+    throw new Error(copy.errors.emptyGraph);
   }
 
-  const { payload, validNodeIds, edgesById, plannedIdeaIds, plannedThemeIds, truncated, totals } = buildPlanContext(graph);
+  const { payload, validNodeIds, edgesById, plannedIdeaIds, plannedThemeIds, truncated, totals } = buildPlanContext(graph, language);
   const mode = request.mode === 'prompt' ? 'prompt' : 'overview';
   const prompt = (request.prompt ?? '').trim().slice(0, 2000);
-  const system = `${PLAN_SYSTEM}${mode === 'prompt' ? PROMPT_MODE_RULE : OVERVIEW_MODE_RULE}`;
+  const system = tutorPlanPrompt(language, mode);
 
   const user = JSON.stringify(
     mode === 'prompt'
@@ -496,8 +399,7 @@ export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPl
             temas_a_integrar: plannedThemeIds.size,
             ideas_a_integrar: plannedIdeaIds.size,
             minimo_orientativo_de_paradas: Math.min(120, plannedThemeIds.size + plannedIdeaIds.size),
-            criterio:
-              'Si tu respuesta queda muy por debajo de este mínimo, faltarán nodos y deberás rediseñar rutas más largas antes de responder.',
+            criterio: copy.coverageCriterion,
           },
         },
     null,
@@ -511,7 +413,7 @@ export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPl
   );
 
   let finalResult = result;
-  let routes = sanitizeRoutes(finalResult, validNodeIds, edgesById);
+  let routes = sanitizeRoutes(finalResult, validNodeIds, edgesById, language);
 
   if (mode === 'overview') {
     for (let attempt = 0; attempt < MAX_PLAN_REPAIR_ATTEMPTS; attempt++) {
@@ -523,8 +425,9 @@ export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPl
         missingIdeas: missing.missingIdeas,
         missingThemes: missing.missingThemes,
         request,
+        language,
       });
-      const repairedRoutes = sanitizeRoutes(repaired, validNodeIds, edgesById);
+      const repairedRoutes = sanitizeRoutes(repaired, validNodeIds, edgesById, language);
       if (repairedRoutes.length > 0) {
         finalResult = repaired;
         routes = repairedRoutes;
@@ -533,7 +436,7 @@ export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPl
   }
 
   if (routes.length === 0) {
-    throw new Error('El Tutor no pudo trazar un recorrido válido sobre el grafo actual. Inténtalo de nuevo.');
+    throw new Error(copy.errors.invalidPlan);
   }
 
   const coveredIdeas = routeCoverage(routes).ideas;
@@ -542,7 +445,7 @@ export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPl
     generatedAt: new Date().toISOString(),
     mode,
     prompt,
-    overview: (finalResult.overview ?? '').trim() || 'Recorrido guiado por tu grafo de ideas.',
+    overview: (finalResult.overview ?? '').trim() || copy.overviewFallback,
     totalThemes: totals.themes,
     totalIdeas: totals.ideas,
     totalConnections: totals.connections,
@@ -596,17 +499,18 @@ function themeMembers(themeNodeId: string): {
   };
 }
 
-function resolveStopContext(stop: TutorStop): Record<string, unknown> {
+function resolveStopContext(stop: TutorStop, language: import('@shared/types').PromptLanguage): Record<string, unknown> {
+  const copy = tutorRuntimeCopy(language);
   if (stop.kind === 'theme') {
-    return { tipo: 'tema', tema: themeMembers(stop.nodeIds[0]) };
+    return { tipo: copy.contextKinds.theme, tema: themeMembers(stop.nodeIds[0]) };
   }
 
   if (stop.kind === 'connection' && stop.edgeId) {
     const detail = getEdgeDetail(stop.edgeId);
     if (detail) {
       return {
-        tipo: 'conexión',
-        relacion: EDGE_TYPE_LABELS[detail.edge.type] ?? detail.edge.type,
+        tipo: copy.contextKinds.connection,
+        relacion: copy.edgeTypeLabels[detail.edge.type] ?? detail.edge.type,
         base: detail.edge.basis,
         confianza: detail.edge.confidence,
         explicacion: detail.explanation ?? null,
@@ -642,53 +546,19 @@ function resolveStopContext(stop: TutorStop): Record<string, unknown> {
           .map((e) => ({ cita: clip(e.quote, 280), ubicacion: e.location })),
       };
     });
-  return { tipo: 'idea', ideas };
+  return { tipo: copy.contextKinds.idea, ideas };
 }
 
 function buildStepPrompt(request: TutorStepRequest): { system: string; user: string } {
   const { route, stopIndex } = request;
   const stop = route.stops[stopIndex];
-  if (!stop) throw new Error('Parada de recorrido inválida.');
+  const language = tutorLanguage(request.language ?? getSettings().promptLanguage ?? 'es');
+  if (!stop) throw new Error(tutorRuntimeCopy(language).errors.invalidStop);
   const total = route.stops.length;
   const prev = stopIndex > 0 ? route.stops[stopIndex - 1] : null;
   const next = stopIndex < total - 1 ? route.stops[stopIndex + 1] : null;
 
-  const system = [
-    'Eres el Tutor de Nodus, un compañero de investigación que guía al usuario por su grafo de ideas.',
-    'Estás narrando UN ÚNICO recorrido como un discurso continuo, fluido y progresivo de principio a fin,',
-    'no una lista de puntos sueltos. Ahora te toca redactar el fragmento que corresponde al nodo actual.',
-    'Apóyate ÚNICAMENTE en el contexto recibido (ideas, obras, evidencia, conexiones); no inventes datos.',
-    '',
-    'CONTINUIDAD (muy importante):',
-    '- Cada parada se muestra por separado en pantalla. Escribe por tanto un BLOQUE AUTÓNOMO y cerrado',
-    '  que se entienda por sí solo, pero que prolongue el mismo argumento a través del SENTIDO',
-    '  (conceptos y relaciones reales del grafo).',
-    '- "cierre_previo_para_contexto" es una referencia semántica: NO es una frase que debas terminar ni',
-    '  un texto que debas copiar. Empieza este bloque con una oración completa, gramatical y con mayúscula.',
-    '- PROHIBIDO empezar o terminar con "…" / "...", con una oración cortada o con conectores que',
-    '  dependan de una frase no visible ("pero…", "por ello…", "de ahí…", "frente a ello…").',
-    '- Cierra el bloque con un párrafo y una idea completos. La siguiente parada enlazará después a partir',
-    '  de ese cierre; nunca dejes una frase suspendida para que otra parada la complete.',
-    '- NO repitas lo ya dicho ni vuelvas a presentar ideas anteriores; añade algo nuevo.',
-    '- PROHIBIDO usar fórmulas de navegación o meta-comentarios sobre el recorrido. No escribas',
-    '  "bienvenido", "empecemos", "en esta parada", "la primera/segunda/última parada", "seguimos con",',
-    '  "a continuación veremos", "para terminar", "como vimos antes", ni números de parada. Habla SIEMPRE',
-    '  del contenido (los conceptos), nunca de la mecánica del recorrido.',
-    '- Las transiciones deben ser naturales y argumentales: nombra la relación que une ambos conceptos',
-    '  (p. ej. "La distinción entre X e Y permite relacionar ambos conceptos."), no anuncies un cambio de parada.',
-    stopIndex === 0
-      ? 'Es el ARRANQUE del hilo: entra directamente en la materia y deja encuadrado el tema sin saludos ni preámbulos.'
-      : 'Es un tramo INTERMEDIO del hilo: enlaza con el bloque anterior mediante una relación conceptual explícita, sin continuar literalmente su última frase.',
-    stopIndex === total - 1
-      ? 'Es el CIERRE del hilo: integra y cierra el argumento de forma natural, sin anunciar que es el final.'
-      : '',
-    '',
-    'FORMATO: redacta en Markdown válido (puedes usar negritas, cursivas, listas, citas con ">",',
-    'enlaces y código en línea cuando aporten). Evita encabezados de nivel 1 (#). 1-3 párrafos sustanciosos.',
-  ]
-    .filter((line) => line !== undefined)
-    .join('\n');
-
+  const system = tutorStepPrompt(request.language ?? getSettings().promptLanguage ?? 'es');
   const user = JSON.stringify(
     {
       recorrido: { titulo: route.title, descripcion: route.description },
@@ -696,7 +566,7 @@ function buildStepPrompt(request: TutorStepRequest): { system: string; user: str
       cierre_previo_para_contexto: request.previousText ? clipTail(request.previousText, 900) : null,
       ya_tratado: (request.history ?? []).slice(-12),
       nodo_anterior: prev ? prev.title : null,
-      nodo_actual: { titulo: stop.title, foco: stop.focus, contexto: resolveStopContext(stop) },
+      nodo_actual: { titulo: stop.title, foco: stop.focus, contexto: resolveStopContext(stop, language) },
       nodo_siguiente: next ? next.title : null,
     },
     null,

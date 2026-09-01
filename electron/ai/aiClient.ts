@@ -434,20 +434,35 @@ type TextDeltaHandler = (delta: string, kind?: 'content' | 'reasoning') => void;
  * existing content).
  */
 const OUTPUT_LANGUAGE_NAME: Record<Exclude<PromptLanguage, 'es'>, string> = {
-  en: 'INGLÉS (English)',
-  fr: 'FRANCÉS (Français)',
-  tr: 'TURCO (Türkçe)',
-  de: 'ALEMÁN (Deutsch)',
-  pt: 'PORTUGUÉS DE PORTUGAL (português europeu)',
-  'pt-BR': 'PORTUGUÉS DE BRASIL (português brasileiro)',
-  it: 'ITALIANO (Italiano)',
+  en: 'ENGLISH',
+  fr: 'FRANÇAIS',
+  tr: 'TÜRKÇE',
+  de: 'DEUTSCH',
+  pt: 'PORTUGUÊS EUROPEU',
+  'pt-BR': 'PORTUGUÊS DO BRASIL',
+  it: 'ITALIANO',
 };
 
 function outputLanguageDirective(lang: Exclude<PromptLanguage, 'es'>): string {
-  return `
-
-═══ IDIOMA DE SALIDA — PRIORIDAD MÁXIMA / OUTPUT LANGUAGE — HIGHEST PRIORITY ═══
-Escribe TODOS los campos de salida de texto libre / lenguaje natural en ${OUTPUT_LANGUAGE_NAME[lang]}, independientemente del idioma del documento de origen Y de cualquier instrucción anterior de este prompt que pida escribir "en español". Esto incluye label, statement, development, summary, rationale, explanation, notes, title, body, reason y cualquier prosa que produzcas. La ÚNICA excepción: cualquier campo "quote" / evidencia literal debe copiarse EXACTAMENTE en el idioma original de la fuente (nunca traduzcas las citas). Las claves JSON y los valores enum se mantienen exactamente como se especifican.`;
+  const headings: Record<Exclude<PromptLanguage, 'es'>, string> = {
+    en: 'OUTPUT LANGUAGE — HIGHEST PRIORITY',
+    fr: 'LANGUE DE SORTIE — PRIORITÉ ABSOLUE',
+    tr: 'ÇIKTI DİLİ — EN YÜKSEK ÖNCELİK',
+    de: 'AUSGABESPRACHE — HÖCHSTE PRIORITÄT',
+    pt: 'IDIOMA DE SAÍDA — PRIORIDADE MÁXIMA',
+    'pt-BR': 'IDIOMA DE SAÍDA — PRIORIDADE MÁXIMA',
+    it: 'LINGUA DI OUTPUT — PRIORITÀ MASSIMA',
+  };
+  const directives: Record<Exclude<PromptLanguage, 'es'>, string> = {
+    en: `Output-language priority: write EVERY free-text/natural-language output field in ${OUTPUT_LANGUAGE_NAME[lang]}, regardless of source-document language or earlier instructions. This includes labels, statements, development, summaries, rationales, explanations, notes, titles, bodies, reasons, and all prose. The ONLY exception is any quote/verbatim-evidence field, which must be copied EXACTLY in the source language; never translate quotes. Keep JSON keys and enum values exactly as specified.`,
+    fr: `Priorité de langue de sortie : rédige TOUS les champs de texte libre en ${OUTPUT_LANGUAGE_NAME[lang]}, quelle que soit la langue du document source ou toute instruction précédente. Cela inclut labels, énoncés, développements, résumés, justifications, explications, notes, titres, corps, raisons et toute prose. SEULE exception : les champs quote/preuve littérale doivent être copiés EXACTEMENT dans la langue source ; ne traduis jamais les citations. Conserve exactement les clés JSON et valeurs d’énumération.`,
+    tr: `Çıktı dili önceliği: Kaynak belgenin diline veya önceki talimatlara bakılmaksızın TÜM serbest metin alanlarını ${OUTPUT_LANGUAGE_NAME[lang]} yaz. Buna etiketler, ifadeler, geliştirmeler, özetler, gerekçeler, açıklamalar, notlar, başlıklar ve tüm düzyazı dahildir. TEK istisna quote/aynen kanıt alanlarıdır; bunları kaynak dilinde AYNEN kopyala, alıntıları çevirme. JSON anahtarlarını ve enum değerlerini aynen koru.`,
+    de: `Ausgabesprache hat Vorrang: Schreibe ALLE freien Textfelder in ${OUTPUT_LANGUAGE_NAME[lang]}, unabhängig von Quellsprache oder früheren Anweisungen. Dazu gehören Labels, Aussagen, Entwicklungen, Zusammenfassungen, Begründungen, Erklärungen, Notizen, Titel, Textkörper, Gründe und jede Prosa. EINZIGE Ausnahme: quote/wörtliche Belege müssen EXAKT in der Quellsprache kopiert werden; Zitate nie übersetzen. JSON-Schlüssel und Enum-Werte unverändert lassen.`,
+    pt: `Prioridade do idioma de saída: escreve TODOS os campos de texto livre em ${OUTPUT_LANGUAGE_NAME[lang]}, independentemente do idioma da fonte ou de instruções anteriores. Inclui etiquetas, afirmações, desenvolvimentos, resumos, justificações, explicações, notas, títulos, corpo, motivos e toda a prosa. ÚNICA exceção: campos quote/evidência literal devem ser copiados EXATAMENTE no idioma da fonte; nunca traduzas citações. Mantém exatamente as chaves JSON e os valores enum.`,
+    'pt-BR': `Prioridade do idioma de saída: escreva TODOS os campos de texto livre em ${OUTPUT_LANGUAGE_NAME[lang]}, independentemente do idioma da fonte ou de instruções anteriores. Isso inclui rótulos, afirmações, desenvolvimentos, resumos, justificativas, explicações, notas, títulos, corpo, motivos e toda prosa. ÚNICA exceção: campos quote/evidência literal devem ser copiados EXATAMENTE no idioma da fonte; nunca traduza citações. Mantenha exatamente as chaves JSON e os valores enum.`,
+    it: `Priorità della lingua di output: scrivi TUTTI i campi di testo libero in ${OUTPUT_LANGUAGE_NAME[lang]}, indipendentemente dalla lingua della fonte o da istruzioni precedenti. Include etichette, enunciati, sviluppi, riepiloghi, motivazioni, spiegazioni, note, titoli, corpo, ragioni e ogni prosa. UNICA eccezione: i campi quote/prova letterale vanno copiati ESATTAMENTE nella lingua della fonte; non tradurre mai le citazioni. Mantieni esattamente chiavi JSON e valori enum.`,
+  };
+  return `\n\n═══ ${headings[lang]} ═══\n${directives[lang]}`;
 }
 
 /** Exported for unit testing: appends the output-language directive per the current

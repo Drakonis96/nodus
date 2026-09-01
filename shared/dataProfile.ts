@@ -10,6 +10,7 @@ import { decodeCheckbox, decodeMultiSelect, decodeNumber } from './databases';
 import type { DatabaseColumn, DatabaseColumnType, DatabaseRow } from './databases';
 import { comparableType } from './databaseFormula';
 import { databaseDateSortValue } from './databaseProperties';
+import type { PromptLanguage } from './types';
 
 export interface HistogramBucket {
   label: string;
@@ -177,29 +178,41 @@ export function computeProfile(columns: DatabaseColumn[], rows: DatabaseRow[]): 
   return { rowCount: rows.length, columns: columns.map((c) => computeColumnProfile(c, rows)) };
 }
 
+const PROFILE_TEXT_COPY: Record<PromptLanguage, { database: string; rows: string; filled: string; mean: string; median: string; deviation: string; sum: string; checked: string; unchecked: string; from: string; to: string; links: string; distinct: string }> = {
+  es: { database: 'Base de datos', rows: 'Filas', filled: 'relleno', mean: 'media', median: 'mediana', deviation: 'desv', sum: 'suma', checked: 'marcado', unchecked: 'sin marcar', from: 'de', to: 'a', links: 'enlaces', distinct: 'valores distintos' },
+  en: { database: 'Database', rows: 'Rows', filled: 'filled', mean: 'mean', median: 'median', deviation: 'stdev', sum: 'sum', checked: 'checked', unchecked: 'unchecked', from: 'from', to: 'to', links: 'links', distinct: 'distinct values' },
+  fr: { database: 'Base de données', rows: 'Lignes', filled: 'rempli', mean: 'moyenne', median: 'médiane', deviation: 'écart-type', sum: 'somme', checked: 'coché', unchecked: 'non coché', from: 'de', to: 'à', links: 'liens', distinct: 'valeurs distinctes' },
+  de: { database: 'Datenbank', rows: 'Zeilen', filled: 'gefüllt', mean: 'Mittelwert', median: 'Median', deviation: 'Standardabw.', sum: 'Summe', checked: 'markiert', unchecked: 'nicht markiert', from: 'von', to: 'bis', links: 'Verknüpfungen', distinct: 'verschiedene Werte' },
+  pt: { database: 'Base de dados', rows: 'Linhas', filled: 'preenchido', mean: 'média', median: 'mediana', deviation: 'desvio-padrão', sum: 'soma', checked: 'marcado', unchecked: 'desmarcado', from: 'de', to: 'a', links: 'ligações', distinct: 'valores distintos' },
+  'pt-BR': { database: 'Banco de dados', rows: 'Linhas', filled: 'preenchido', mean: 'média', median: 'mediana', deviation: 'desvio-padrão', sum: 'soma', checked: 'marcado', unchecked: 'desmarcado', from: 'de', to: 'a', links: 'links', distinct: 'valores distintos' },
+  it: { database: 'Database', rows: 'Righe', filled: 'compilato', mean: 'media', median: 'mediana', deviation: 'dev. std.', sum: 'somma', checked: 'selezionato', unchecked: 'non selezionato', from: 'da', to: 'a', links: 'collegamenti', distinct: 'valori distinti' },
+  tr: { database: 'Veritabanı', rows: 'Satırlar', filled: 'dolu', mean: 'ortalama', median: 'medyan', deviation: 'std. sapma', sum: 'toplam', checked: 'işaretli', unchecked: 'işaretsiz', from: 'başlangıç', to: 'bitiş', links: 'bağlantı', distinct: 'farklı değer' },
+};
+
 /** Compact, human-readable profile for the AI report prompt (never the raw rows). */
-export function profileToText(databaseName: string, profile: DatabaseProfile): string {
-  const lines: string[] = [`Base de datos: ${databaseName}`, `Filas: ${profile.rowCount}`, ''];
+export function profileToText(databaseName: string, profile: DatabaseProfile, language: PromptLanguage = 'es'): string {
+  const copy = PROFILE_TEXT_COPY[language] ?? PROFILE_TEXT_COPY.es;
+  const lines: string[] = [`${copy.database}: ${databaseName}`, `${copy.rows}: ${profile.rowCount}`, ''];
   for (const c of profile.columns) {
     const pct = Math.round(c.fillRate * 100);
     let detail = '';
     if (c.number) {
       const n = c.number;
-      detail = `min ${n.min}, max ${n.max}, media ${n.mean}, mediana ${n.median}, desv ${n.stdev}, suma ${n.sum}`;
+      detail = `min ${n.min}, max ${n.max}, ${copy.mean} ${n.mean}, ${copy.median} ${n.median}, ${copy.deviation} ${n.stdev}, ${copy.sum} ${n.sum}`;
     } else if (c.distribution) {
       detail = c.distribution.map((d) => `${d.label}: ${d.count}`).join(', ');
     } else if (c.checkbox) {
-      detail = `marcado ${c.checkbox.checked}, sin marcar ${c.checkbox.unchecked}`;
+      detail = `${copy.checked} ${c.checkbox.checked}, ${copy.unchecked} ${c.checkbox.unchecked}`;
     } else if (c.dateRange) {
-      detail = `de ${c.dateRange.min} a ${c.dateRange.max}`;
+      detail = `${copy.from} ${c.dateRange.min} ${copy.to} ${c.dateRange.max}`;
     } else if (c.relationLinks != null) {
-      detail = `${c.relationLinks} enlaces`;
+      detail = `${c.relationLinks} ${copy.links}`;
     } else if (c.distinct != null) {
-      detail = `${c.distinct} valores distintos`;
+      detail = `${c.distinct} ${copy.distinct}`;
     }
     // Announce what the column holds: "(formula)" tells a model nothing it can reason with,
     // while "(number)" lets it use the min/max/mean that follow.
-    lines.push(`- ${c.name} (${c.valueType}) · relleno ${pct}%${detail ? ` · ${detail}` : ''}`);
+    lines.push(`- ${c.name} (${c.valueType}) · ${copy.filled} ${pct}%${detail ? ` · ${detail}` : ''}`);
   }
   return lines.join('\n');
 }

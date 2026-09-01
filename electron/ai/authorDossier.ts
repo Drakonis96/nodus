@@ -19,34 +19,19 @@ import type {
   Evidence,
   IdeaType,
   ModelRef,
+  PromptLanguage,
 } from '@shared/types';
 import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { savedAuthorIds } from '../db/savedAuthorsRepo';
 import { completeJson } from './aiClient';
+import { authorPromptPack, authorPromptScaffold } from '@shared/academicPromptPacks';
 
 const STATEMENT_CLIP = 220;
 const MAX_IDEAS_IN_PROMPT = 60;
 const MAX_REMEMBER = 6;
 const TOP_THEMES = 4;
 const TOP_TAGS = 5;
-
-const IDEA_TYPE_LABELS: Record<IdeaType, string> = {
-  claim: 'afirmación',
-  finding: 'hallazgo',
-  construct: 'constructo',
-  method: 'método',
-  framework: 'marco',
-};
-
-const RELATION_TYPE_LABELS: Record<string, string> = {
-  contradicts: 'contradice a',
-  refutes: 'refuta a',
-  extends: 'extiende a',
-  supports: 'apoya a',
-  refines: 'refina a',
-  coauthor: 'es coautor de',
-};
 
 function clip(value: string, max: number): string {
   const clean = (value || '').replace(/\s+/g, ' ').trim();
@@ -556,10 +541,14 @@ function isSynthesisResponse(v: unknown): v is SynthesisResponse {
 /** Generate and cache the narrated synthesis for one author. */
 export async function synthesizeAuthorDossier(
   authorId: string,
-  model?: ModelRef | null
+  model?: ModelRef | null,
+  language?: PromptLanguage
 ): Promise<AuthorDossierSynthesis> {
   const dossier = buildAuthorDossier(authorId);
   if (!dossier) throw new Error('Autor no encontrado');
+  const promptLanguage = language ?? getSettings().promptLanguage ?? 'es';
+  const copy = authorPromptPack(promptLanguage);
+  const scaffold = authorPromptScaffold(promptLanguage);
 
   const ideasByType = new Map<IdeaType, AuthorDossierIdea[]>();
   for (const idea of dossier.ideas.slice(0, MAX_IDEAS_IN_PROMPT)) {
@@ -570,7 +559,7 @@ export async function synthesizeAuthorDossier(
   const ideaBlock = [...ideasByType.entries()]
     .map(([type, list]) => {
       const items = list.map((i) => `  - ${i.label}: ${clip(i.statement, STATEMENT_CLIP)}`).join('\n');
-      return `${IDEA_TYPE_LABELS[type] ?? type} (${list.length}):\n${items}`;
+      return `${copy.ideaTypes[type] ?? type} (${list.length}):\n${items}`;
     })
     .join('\n\n');
 
@@ -579,29 +568,23 @@ export async function synthesizeAuthorDossier(
       ? dossier.relations
           .slice(0, 20)
           .map((r) => {
-            const rel = RELATION_TYPE_LABELS[r.type] ?? r.type;
-            const shared = r.sharedThemes.length ? ` (temas comunes: ${r.sharedThemes.slice(0, 3).join(', ')})` : '';
+            const rel = copy.relationTypes[r.type] ?? r.type;
+            const shared = r.sharedThemes.length ? ` (${scaffold.sharedThemes}: ${r.sharedThemes.slice(0, 3).join(', ')})` : '';
             return `  - ${rel} ${r.name}${shared}`;
           })
           .join('\n')
-      : '  (sin conexiones detectadas con otros autores en el corpus)';
+      : `  ${copy.noRelations}`;
 
   const themeLine = dossier.themes.length ? dossier.themes.slice(0, 8).join(', ') : '—';
 
-  const system =
-    'Eres un asistente de investigación académica. A partir de las ideas extraídas de las obras de UN autor y de sus relaciones con otros autores del corpus, ' +
-    'produces una ficha de síntesis para alguien que necesita quedarse con lo esencial rápido. ' +
-    'Sé fiel a las ideas proporcionadas: no inventes tesis, datos ni autores que no aparezcan. ' +
-    'Devuelve EXCLUSIVAMENTE un JSON con la forma ' +
-    '{"thesis": "1-2 frases con la tesis central del autor", "remember": ["punto clave", "…"], "positioning": "un párrafo sobre cómo se relaciona con los autores conectados"}. ' +
-    `El campo "remember" debe tener entre 3 y ${MAX_REMEMBER} puntos breves y accionables.`;
+  const system = copy.system;
 
   const user =
-    `AUTOR: ${dossier.author.name}${dossier.author.affiliation ? ` — ${dossier.author.affiliation}` : ''}\n` +
-    `TEMAS QUE TRABAJA: ${themeLine}\n\n` +
-    `IDEAS DEL AUTOR:\n${ideaBlock || '  (sin ideas registradas)'}\n\n` +
-    `RELACIONES CON OTROS AUTORES:\n${relBlock}\n\n` +
-    'Devuelve el JSON de la ficha.';
+    `${copy.author}: ${dossier.author.name}${dossier.author.affiliation ? ` — ${dossier.author.affiliation}` : ''}\n` +
+    `${copy.themes}: ${themeLine}\n\n` +
+    `${copy.ideas}:\n${ideaBlock || `  (${scaffold.noIdeas})`}\n\n` +
+    `${copy.relations}:\n${relBlock}\n\n` +
+    copy.returnJson;
 
   const chosen = model ?? getSettings().synthesisModel ?? null;
   const result = await completeJson<SynthesisResponse>({ system, user, temperature: 0.2 }, isSynthesisResponse, chosen);

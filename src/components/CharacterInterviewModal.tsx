@@ -10,7 +10,7 @@ import { ConfirmModal } from './ConfirmModal';
 import { ImageLightbox } from './ImageLightbox';
 import { PersonPortrait } from './PersonPortrait';
 import { characterChatImageUrl, characterChatThumbnailUrl } from '../lib/imageUrl';
-import { t, tx } from '../i18n';
+import { errorText, t, tx } from '../i18n';
 
 /**
  * Persistent, in-character chat. A conversation is created lazily on its first message,
@@ -61,7 +61,7 @@ export function CharacterInterviewModal({
         setImageEnabled(last.imageEnabled);
       })
       .catch((err) => {
-        if (alive) setError(err instanceof Error ? err.message : String(err));
+        if (alive) setError(errorText(err));
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -81,12 +81,12 @@ export function CharacterInterviewModal({
     setError(null);
     try {
       const loaded = await window.nodus.getCharacterChatConversation(id);
-      if (!loaded || loaded.personId !== character.personId) throw new Error('Conversación no encontrada.');
+      if (!loaded || loaded.personId !== character.personId) throw new Error(t('Conversación no encontrada.'));
       setConversation(loaded);
       setImageEnabled(loaded.imageEnabled);
       setHistoryOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
     } finally {
       setLoading(false);
     }
@@ -112,7 +112,7 @@ export function CharacterInterviewModal({
       await refreshHistory();
     } catch (err) {
       setImageEnabled(!next);
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
     }
   };
 
@@ -142,7 +142,7 @@ export function CharacterInterviewModal({
       if (result.imageError) setImageNotice(result.imageError);
       await refreshHistory();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
       // The author turn is intentionally durable even if the text provider fails.
       if (active) {
         const saved = await window.nodus.getCharacterChatConversation(active.id).catch(() => null);
@@ -169,7 +169,7 @@ export function CharacterInterviewModal({
       setPendingDelete(null);
       await refreshHistory();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
     } finally {
       setBusy(false);
     }

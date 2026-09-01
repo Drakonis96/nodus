@@ -26,9 +26,14 @@ import {
   type WorldRuleTest,
 } from '@shared/worldRuleContext';
 import { worldOperationSystemPrompt } from '@shared/worldOperationPrompts';
-import { RULE_HARDNESS_HINT, RULE_HARDNESS_LABEL, RULE_SCOPE_LABEL } from '@shared/worldRules';
-import { BEAT_MARK_LABEL } from '@shared/worldThreads';
-import { WORLD_ENTRY_KIND_LABEL, entryKey } from '@shared/worldEncyclopedia';
+import { entryKey } from '@shared/worldEncyclopedia';
+import {
+  worldBeatMarkLabel,
+  worldEntryKindLabel,
+  worldRuleHardnessHint,
+  worldRuleHardnessLabel,
+  worldRuleScopeLabel,
+} from '@shared/worldPromptLanguage';
 import type { WorldRuleDraftResult } from '@shared/types';
 
 /** Beyond this the prompt stops being how the story uses the law and becomes the story. */
@@ -38,6 +43,8 @@ const MAX_MENTIONS = 15;
 export async function draftWorldRule(ruleId: string): Promise<WorldRuleDraftResult> {
   const rule = getWorldRule(ruleId);
   if (!rule) throw new Error('Regla no encontrada.');
+  const settings = getSettings();
+  const language = settings.promptLanguage ?? 'es';
 
   const scopeName =
     rule.scopeKind === 'group'
@@ -51,7 +58,7 @@ export async function draftWorldRule(ruleId: string): Promise<WorldRuleDraftResu
     .sort((a, b) => a.narrativeOrder - b.narrativeOrder)
     .slice(0, MAX_TESTS)
     .map((beat) => ({
-      mark: BEAT_MARK_LABEL[beat.mark] ?? beat.mark,
+      mark: worldBeatMarkLabel(beat.mark, language),
       sceneTitle: beat.sceneTitle,
       text: beat.text,
       subjectName: beat.subjectName,
@@ -65,7 +72,7 @@ export async function draftWorldRule(ruleId: string): Promise<WorldRuleDraftResu
     .slice(0, MAX_MENTIONS)
     .map((entry) => ({
       title: entry.title,
-      kind: WORLD_ENTRY_KIND_LABEL[entry.kind],
+      kind: worldEntryKindLabel(entry.kind, language),
       summary: entry.summary,
     }));
 
@@ -75,9 +82,9 @@ export async function draftWorldRule(ruleId: string): Promise<WorldRuleDraftResu
   const calendar = getWorldCalendar();
   const sources: WorldRuleSources = {
     title: rule.title,
-    hardness: RULE_HARDNESS_LABEL[rule.hardness],
-    hardnessHint: RULE_HARDNESS_HINT[rule.hardness],
-    scope: scopeName ?? RULE_SCOPE_LABEL[rule.scopeKind] ?? RULE_SCOPE_LABEL.world,
+    hardness: worldRuleHardnessLabel(rule.hardness, language),
+    hardnessHint: worldRuleHardnessHint(rule.hardness, language),
+    scope: scopeName ?? worldRuleScopeLabel(rule.scopeKind, language),
     statement: rule.statement,
     cost: rule.cost,
     limits: rule.limits,
@@ -91,12 +98,11 @@ export async function draftWorldRule(ruleId: string): Promise<WorldRuleDraftResu
 
   if (!hasWorldRuleMaterial(sources)) return { text: null, noMaterial: true };
 
-  const settings = getSettings();
   const model = settings.synthesisModel ?? settings.extractionModel ?? null;
   const completion = await completeText(
     {
       system: worldOperationSystemPrompt('ruleDraft', settings.promptLanguage ?? 'es'),
-      user: composeWorldRuleContext(sources),
+      user: composeWorldRuleContext(sources, language),
       plainContext: true,
       // Warm: this is a sentence about an invented world, not a cautious reading of
       // records. Cold, the model returns the title back as a sentence.

@@ -20,6 +20,8 @@ import {
   validateStudyAssistantAnswer,
 } from '@shared/studyAssistant';
 import type { StudySearchIndexEntry, StudySearchOptions } from '@shared/studySearch';
+import type { PromptLanguage } from '@shared/types';
+import { studyAssistantDemoSourceTitle, studyAssistantPromptPack } from '../../shared/studyAssistantPromptPacks';
 import { getSettings } from '../db/settingsRepo';
 import { activeVaultDir } from '../vaults/vaultRegistry';
 import { completeTextStream, resolveModelRef } from './aiClient';
@@ -35,15 +37,13 @@ const MAX_SOURCE_CHARS = 3_600;
 const DEMO_CONVERSATION_IDS = { study: 'demo-study-chat-membrane', teaching: 'demo-teaching-chat-commentary' } as const;
 type StudyChatDemoVariant = keyof typeof DEMO_CONVERSATION_IDS;
 
-const INSUFFICIENT_INFORMATION: Record<string, string> = {
-  es: 'No hay información suficiente en las fuentes seleccionadas para responder con seguridad. Añade materiales, amplía el ámbito o selecciona otras fuentes.',
-  en: 'There is not enough information in the selected sources to answer safely. Add materials, broaden the scope, or select other sources.',
-  fr: 'Les sources sélectionnées ne contiennent pas assez d’informations pour répondre de façon fiable. Ajoutez des documents, élargissez le périmètre ou choisissez d’autres sources.',
-  de: 'Die ausgewählten Quellen enthalten nicht genügend Informationen für eine verlässliche Antwort. Füge Material hinzu, erweitere den Bereich oder wähle andere Quellen aus.',
-  pt: 'As fontes selecionadas não contêm informação suficiente para responder com segurança. Adicione materiais, alargue o âmbito ou selecione outras fontes.',
-  'pt-BR': 'As fontes selecionadas não contêm informações suficientes para responder com segurança. Adicione materiais, amplie o escopo ou selecione outras fontes.',
-  tr: 'Seçilen kaynaklarda güvenilir bir yanıt vermek için yeterli bilgi yok. Materyal ekleyin, kapsamı genişletin veya başka kaynaklar seçin.',
-};
+function promptLanguage(value: unknown): PromptLanguage {
+  return value === 'en' || value === 'fr' || value === 'de' || value === 'pt' || value === 'pt-BR' || value === 'it' || value === 'tr' ? value : 'es';
+}
+
+function effectivePromptLanguage(requestLanguage: unknown): PromptLanguage {
+  return promptLanguage(requestLanguage === 'auto' ? getSettings().promptLanguage : requestLanguage);
+}
 
 function now(): string { return new Date().toISOString(); }
 function storePath(): string { return path.join(activeVaultDir(), 'study-chat-history.json'); }
@@ -86,8 +86,9 @@ export function getStudyAssistantConversation(id: string): StudyAssistantConvers
 
 export function createStudyAssistantConversation(input: StudyAssistantConversationInput = {}): StudyAssistantConversation {
   const timestamp = now();
+  const defaultTitle = studyAssistantPromptPack(promptLanguage(getSettings().promptLanguage)).conversationTitle;
   const conversation: StudyAssistantConversation = {
-    id: crypto.randomUUID(), title: input.title?.trim() || 'Conversación de estudio', createdAt: timestamp, updatedAt: timestamp,
+    id: crypto.randomUUID(), title: input.title?.trim() || defaultTitle, createdAt: timestamp, updatedAt: timestamp,
     archived: false, selection: normalizeSelection(input.selection), model: input.model ?? null, messageCount: 0,
     task: 'answer', level: 'standard', tone: 'clear', language: 'auto', allowExternalKnowledge: false, messages: [],
   };
@@ -99,7 +100,7 @@ export function updateStudyAssistantConversation(id: string, patch: StudyAssista
   const current = store.conversations[index];
   const next: StudyAssistantConversation = {
     ...current, ...patch,
-    title: patch.title !== undefined ? (patch.title.trim().slice(0, 120) || 'Conversación de estudio') : current.title,
+    title: patch.title !== undefined ? (patch.title.trim().slice(0, 120) || studyAssistantPromptPack(promptLanguage(getSettings().promptLanguage)).conversationTitle) : current.title,
     selection: patch.selection ? normalizeSelection(patch.selection) : current.selection,
     messages: patch.messages ? patch.messages.slice(-100) : current.messages,
     updatedAt: now(),
@@ -119,37 +120,30 @@ export function deleteStudyAssistantConversation(id: string): void {
  * is precisely the broken-evidence state the chat is built to avoid showing.
  */
 function demoConversation(variant: StudyChatDemoVariant, timestamp: string): StudyAssistantConversation {
+  const language = promptLanguage(getSettings().promptLanguage);
+  const copy = studyAssistantPromptPack(language);
   if (variant === 'teaching') {
-    const es = getSettings().uiLanguage === 'es';
     const sourceKey = 'material:demo-teaching-material-guide';
     const citation: StudyAssistantCitation = {
       id: 'S1', sourceKey, indexId: 'demo-teaching-chat-evidence', kind: 'material', sourceId: 'demo-teaching-material-guide',
-      title: es ? 'Fuente · Informe fabril (1832)' : 'Source · Factory report (1832)',
-      subtitle: es ? 'Historia' : 'History',
-      quote: es
-        ? 'Los niños entran en la fábrica antes del amanecer y salen cuando ya ha oscurecido.'
-        : 'The children enter the mill before daybreak and leave when it is already dark.',
+      title: studyAssistantDemoSourceTitle(language, 'teaching'), subtitle: copy.demo.teachingSubtitle, quote: copy.demo.teachingQuote,
       location: { materialId: 'demo-teaching-material-guide', from: 60, to: 150 },
       scope: { courseId: 'demo-teaching-course', subjectId: 'demo-teaching-subject-history', folderId: 'demo-teaching-folder-unit3', topicId: 'demo-teaching-topic-sources' },
     };
     return {
       id: DEMO_CONVERSATION_IDS.teaching,
-      title: es ? 'Preparar el comentario de la sesión 3' : 'Preparing the session 3 commentary',
+      title: copy.demo.teachingTitle,
       createdAt: timestamp, updatedAt: timestamp, archived: false,
       selection: { scope: 'subject', courseId: 'demo-teaching-course', subjectId: 'demo-teaching-subject-history', topicId: null, sourceKeys: [sourceKey] },
-      model: null, messageCount: 2, task: 'explain', level: 'standard', tone: 'clear', language: es ? 'es' : 'en', allowExternalKnowledge: false,
+      model: null, messageCount: 2, task: 'explain', level: 'standard', tone: 'clear', language: language as StudyAssistantConversation['language'], allowExternalKnowledge: false,
       messages: [
         {
           id: 'demo-teaching-chat-user', role: 'user', createdAt: timestamp,
-          content: es
-            ? '¿Qué condiciones de trabajo describe la fuente y qué preguntas puedo plantear en clase?'
-            : 'Which working conditions does the source describe, and what can I ask the class?',
+          content: copy.demo.teachingQuestion,
         },
         {
           id: 'demo-teaching-chat-assistant', role: 'assistant', createdAt: timestamp, citations: [citation],
-          content: es
-            ? 'La fuente describe jornadas que empiezan antes del amanecer y terminan de noche, con polvo de algodón y ruido constante [S1](nodus://study/evidence/S1). En clase puedes partir de quién escribe y con qué intención antes de entrar en el contenido.'
-            : 'The source describes days that begin before dawn and end after dark, with cotton dust and constant noise [S1](nodus://study/evidence/S1). In class you can start from who is writing and to what end before moving on to the content.',
+          content: copy.demo.teachingAnswer,
         },
       ],
     };
@@ -157,19 +151,19 @@ function demoConversation(variant: StudyChatDemoVariant, timestamp: string): Stu
   const sourceKey = 'document:demo-study-doc-cell';
   const citation: StudyAssistantCitation = {
     id: 'S1', sourceKey, indexId: 'demo-study-chat-evidence', kind: 'document', sourceId: 'demo-study-doc-cell',
-    title: 'Membrana plasmática · resumen', subtitle: 'Biología celular',
-    quote: 'El transporte activo mueve solutos contra gradiente y requiere energía.',
+    title: studyAssistantDemoSourceTitle(language, 'study'), subtitle: copy.demo.studySubtitle,
+    quote: copy.demo.studyQuote,
     location: { documentId: 'demo-study-doc-cell', from: 190, to: 260 },
     scope: { courseId: 'demo-study-course-biology', subjectId: 'demo-study-subject-cell', folderId: 'demo-study-folder-cell', topicId: 'demo-study-topic-membrane' },
   };
   return {
-    id: DEMO_CONVERSATION_IDS.study, title: 'Dudas sobre la membrana plasmática', createdAt: timestamp, updatedAt: timestamp,
+    id: DEMO_CONVERSATION_IDS.study, title: copy.demo.studyTitle, createdAt: timestamp, updatedAt: timestamp,
     archived: false,
     selection: { scope: 'subject', courseId: 'demo-study-course-biology', subjectId: 'demo-study-subject-cell', topicId: null, sourceKeys: [sourceKey] },
-    model: null, messageCount: 2, task: 'explain', level: 'standard', tone: 'guided', language: 'es', allowExternalKnowledge: false,
+    model: null, messageCount: 2, task: 'explain', level: 'standard', tone: 'guided', language: language as StudyAssistantConversation['language'], allowExternalKnowledge: false,
     messages: [
-      { id: 'demo-study-chat-user', role: 'user', content: '¿En qué se diferencian el transporte pasivo y el activo?', createdAt: timestamp },
-      { id: 'demo-study-chat-assistant', role: 'assistant', content: 'El transporte pasivo ocurre a favor del gradiente y no consume ATP. El transporte activo desplaza sustancias contra el gradiente y necesita energía [S1](nodus://study/evidence/S1).', createdAt: timestamp, citations: [citation] },
+      { id: 'demo-study-chat-user', role: 'user', content: copy.demo.studyQuestion, createdAt: timestamp },
+      { id: 'demo-study-chat-assistant', role: 'assistant', content: copy.demo.studyAnswer, createdAt: timestamp, citations: [citation] },
     ],
   };
 }
@@ -222,39 +216,16 @@ function toCitation(id: string, entry: StudySearchIndexEntry, quote: string): St
   };
 }
 
-const TASK_INSTRUCTION: Record<StudyAssistantRequest['task'], string> = {
-  answer: 'Responde directamente a la pregunta.',
-  summary: 'Sintetiza lo esencial sin perder matices ni condiciones.',
-  explain: 'Explica paso a paso y define los conceptos necesarios.',
-  compare: 'Compara autores, teorías, conceptos, eventos o fuentes en criterios explícitos.',
-  outline: 'Crea un esquema jerárquico útil para estudiar.',
-  timeline: 'Construye una cronología ordenada; no inventes fechas.',
-  table: 'Usa una tabla Markdown comparativa cuando las fuentes lo permitan.',
-  'concept-map': 'Crea un mapa conceptual textual con relaciones etiquetadas.',
-  glossary: 'Crea un glosario breve con definiciones fundamentadas.',
-  critique: 'Detecta contradicciones, información incompleta, conceptos sin explicar y zonas débiles.',
-  'review-questions': 'Genera preguntas de repaso y añade respuestas separadas al final.',
-};
-
 export function buildStudyAssistantPrompt(request: StudyAssistantRequest, citations: StudyAssistantCitation[]): { system: string; user: string } {
   const history = request.messages.filter((message) => message.content.trim()).slice(-MAX_HISTORY_MESSAGES);
   const sources = citations.map((citation) => ({
     id: citation.id, title: citation.title, type: citation.kind, location: citation.location, exact_fragment: citation.quote,
   }));
-  const language = request.language === 'auto' ? 'el idioma de la pregunta' : request.language;
-  const external = request.allowExternalKnowledge
-    ? 'Puedes añadir conocimiento general, pero debes separarlo bajo el epígrafe "Conocimiento externo" y nunca atribuirle una cita del corpus.'
-    : 'Está PROHIBIDO usar conocimiento externo. Si las fuentes no bastan, dilo con claridad y explica qué información falta.';
-  const system = `Eres el asistente de estudio de Nodus. Trabajas con un corpus local seleccionado por el alumno.
-
-REGLAS INNEGOCIABLES
-- Fundamenta las afirmaciones sobre el corpus exclusivamente en FUENTES.
-- Cita la evidencia inmediatamente después de la afirmación con [S1], [S2], etc. No inventes ids, títulos, páginas, marcas temporales ni citas.
-- Cada cita debe corresponder exactamente a uno de los ids suministrados. No incluyas bibliografía no presente.
-- ${external}
-- Si hay versiones o fuentes contradictorias, descríbelas como tales; no las fusiones silenciosamente.
-- Responde en ${language}, nivel ${request.level}, tono ${request.tone}.
-- Conserva Markdown. ${TASK_INSTRUCTION[request.task]}`;
+  const selectedLanguage = effectivePromptLanguage(request.language);
+  const pack = studyAssistantPromptPack(selectedLanguage);
+  const language = request.language === 'auto' ? pack.responseLanguage : selectedLanguage;
+  const external = request.allowExternalKnowledge ? pack.system.externalAllowed : pack.system.externalForbidden;
+  const system = [pack.system.intro, '', pack.system.rulesHeading, `- ${pack.system.corpus}`, `- ${pack.system.cite}`, `- ${pack.system.exact}`, `- ${external}`, `- ${pack.system.contradiction}`, `- ${pack.system.language(language, request.level, request.tone)}`, `- ${pack.system.markdown} ${pack.taskInstruction[request.task]}`].join('\n');
   const user = JSON.stringify({ fuentes_seleccionadas: sources, conversacion: history.map(({ role, content }) => ({ role, content })) }, null, 2);
   return { system, user };
 }
@@ -265,10 +236,10 @@ export async function streamStudyAssistant(
   signal?: AbortSignal,
 ): Promise<StudyAssistantResponse> {
   const lastUser = [...request.messages].reverse().find((message) => message.role === 'user' && message.content.trim());
-  if (!lastUser) throw new Error('Escribe una pregunta antes de enviar.');
+  if (!lastUser) throw new Error(studyAssistantPromptPack(effectivePromptLanguage(request.language)).noQuestion);
   const settings = getSettings();
-  const responseLanguage = request.language === 'auto' ? settings.promptLanguage : request.language;
-  const insufficientAnswer = INSUFFICIENT_INFORMATION[responseLanguage] ?? INSUFFICIENT_INFORMATION.en;
+  const responseLanguage = effectivePromptLanguage(request.language);
+  const insufficientAnswer = studyAssistantPromptPack(responseLanguage).insufficientInformation;
   const configuredModel = request.model ?? settings.studyModel ?? settings.chatModel ?? settings.synthesisModel ?? null;
   const { citations: availableCitations, truncated } = await buildCitations(lastUser.content, normalizeSelection(request.selection));
   const sourceChars = availableCitations.reduce((sum, citation) => sum + citation.quote.length, 0);
@@ -290,11 +261,12 @@ export async function streamStudyAssistant(
 }
 
 export function renderStudyAssistantConversation(conversation: StudyAssistantConversation): string {
-  const header = `# ${conversation.title}\n\n_Exportado desde el chat de estudio de Nodus · ${conversation.updatedAt}_\n`;
+  const pack = studyAssistantPromptPack(effectivePromptLanguage(conversation.language));
+  const header = `# ${conversation.title}\n\n${pack.exportHeader(conversation.updatedAt)}\n`;
   const messages = conversation.messages.map((message) => {
-    const label = message.role === 'user' ? 'Alumno' : 'Asistente';
+    const label = message.role === 'user' ? pack.labels.user : pack.labels.assistant;
     const sources = message.role === 'assistant' && message.citations?.length
-      ? `\n\nFuentes: ${message.citations.map((citation) => `${citation.id} — ${citation.title}`).join('; ')}` : '';
+      ? `\n\n${pack.labels.sources}: ${message.citations.map((citation) => `${citation.id} — ${citation.title}`).join('; ')}` : '';
     return `## ${label}\n\n${message.content}${sources}`;
   }).join('\n\n');
   return `${header}\n${messages}\n`;

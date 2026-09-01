@@ -231,7 +231,7 @@ export function McpConnectionModal({
             {(tunnel.errorCode || actionError) && (
               <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/70 dark:bg-red-950/20 dark:text-red-200">
                 <p>{actionError || tunnelErrorLabel(tunnel.errorCode)}</p>
-                {tunnel.errorDetail && <details className="mt-2 text-xs text-red-700 dark:text-red-300/70"><summary className="cursor-pointer">{t('Ver detalle técnico')}</summary><pre className="mt-2 max-h-36 overflow-auto whitespace-pre-wrap break-words rounded bg-red-100/70 p-2 text-red-900 dark:bg-black/20 dark:text-red-100">{tunnel.errorDetail}</pre></details>}
+                {tunnel.errorDetail && <details className="mt-2 text-xs text-red-700 dark:text-red-300/70"><summary className="cursor-pointer">{t('Ver detalle técnico')}</summary><pre className="mt-2 max-h-36 overflow-auto whitespace-pre-wrap break-words rounded bg-red-100/70 p-2 text-red-900 dark:bg-black/20 dark:text-red-100">{errorText(tunnel.errorDetail)}</pre></details>}
               </div>
             )}
 

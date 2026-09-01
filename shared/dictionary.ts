@@ -269,6 +269,7 @@ export interface DictionaryGenerationRequest {
   entryId: string;
   mode: "creation" | "update" | "regeneration";
   model?: ModelRef | null;
+  language?: import('./types').PromptLanguage;
 }
 
 export interface DictionaryRelation {

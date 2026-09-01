@@ -15,6 +15,9 @@
 
 import { normalizeTitle } from './worldEncyclopedia';
 import type { WorldEntry, WorldEntryKey } from './types';
+import type { AppLanguage } from './types';
+import { normalizeUiLanguage } from './worldPromptLanguage';
+import { worldOperationSystemPrompt } from './worldOperationPrompts';
 
 export interface CandidateOccurrence {
   key: WorldEntryKey;
@@ -201,15 +204,32 @@ Descarta los que no son lore: verbos, nombres comunes capitalizados por estar al
 Devuelve JSON y nada más, con esta forma:
 {"candidates":[{"term":"...","category":"magic|religion|language|creature|species|artifact|technology|concept|event|organization|flora|fauna|custom|other","why":"una frase corta","suggestedSummary":"una línea que el autor pueda editar","confidence":0.0}]}`;
 
-export function composeMissingEntriesContext(candidates: EntryCandidate[]): string {
-  const lines = ['TÉRMINOS SIN DEFINIR, con dónde aparecen:', ''];
+/** Localized system contract for direct users of this pure context module. */
+export function missingEntriesSystemPrompt(language: AppLanguage = 'es'): string {
+  return worldOperationSystemPrompt('missingEntries', normalizeUiLanguage(language));
+}
+
+export function composeMissingEntriesContext(candidates: EntryCandidate[], language: AppLanguage = 'es'): string {
+  const copy = MISSING_CONTEXT_COPY[normalizeUiLanguage(language)];
+  const lines = [copy.heading, ''];
   for (const candidate of candidates) {
     lines.push(
-      `- "${candidate.term}" (${candidate.source === 'unresolved_link' ? 'el autor lo enlazó y no existe' : `${candidate.occurrences.length} apariciones`})`
+      `- "${candidate.term}" (${candidate.source === 'unresolved_link' ? copy.unresolved : `${candidate.occurrences.length} ${copy.appearances}`})`
     );
     for (const occurrence of candidate.occurrences.slice(0, 2)) {
-      lines.push(`    · en «${occurrence.title}»: ${occurrence.snippet}`);
+      lines.push(`    · ${copy.inEntry} «${occurrence.title}»: ${occurrence.snippet}`);
     }
   }
   return lines.join('\n');
 }
+
+const MISSING_CONTEXT_COPY: Record<AppLanguage, { heading: string; unresolved: string; appearances: string; inEntry: string }> = {
+  es: { heading: 'TÉRMINOS SIN DEFINIR, con dónde aparecen:', unresolved: 'el autor lo enlazó y no existe', appearances: 'apariciones', inEntry: 'en' },
+  en: { heading: 'UNDEFINED TERMS, with where they appear:', unresolved: 'the author linked it and it does not exist', appearances: 'appearances', inEntry: 'in' },
+  fr: { heading: 'TERMES NON DÉFINIS, avec leurs occurrences :', unresolved: 'l’auteur l’a lié mais il n’existe pas', appearances: 'occurrences', inEntry: 'dans' },
+  de: { heading: 'UNDEFINIERTE BEGRIFFE mit ihren Fundstellen:', unresolved: 'die Autorin oder der Autor hat ihn verlinkt, aber er existiert nicht', appearances: 'Vorkommen', inEntry: 'in' },
+  pt: { heading: 'TERMOS NÃO DEFINIDOS, com os locais onde aparecem:', unresolved: 'o autor ligou-o, mas não existe', appearances: 'ocorrências', inEntry: 'em' },
+  'pt-BR': { heading: 'TERMOS NÃO DEFINIDOS, com os locais onde aparecem:', unresolved: 'o autor o vinculou, mas ele não existe', appearances: 'ocorrências', inEntry: 'em' },
+  it: { heading: 'TERMINI NON DEFINITI, con i luoghi in cui compaiono:', unresolved: 'l’autore lo ha collegato ma non esiste', appearances: 'occorrenze', inEntry: 'in' },
+  tr: { heading: 'TANIMLANMAMIŞ TERİMLER ve göründükleri yerler:', unresolved: 'yazar ona bağlantı verdi ama mevcut değil', appearances: 'görünüm', inEntry: 'şurada' },
+};

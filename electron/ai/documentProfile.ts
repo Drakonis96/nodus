@@ -6,6 +6,7 @@ import type {
   DocumentProfileSupport,
   DocumentSection,
   ModelRef,
+  PromptLanguage,
   Work,
 } from '@shared/types';
 import { getDb } from '../db/database';
@@ -29,6 +30,7 @@ import { AiError, completeJson, embedMany } from './aiClient';
 import { mapOrderedPool } from './orderedPool';
 import { modelRefSupportsCapability } from '@shared/localAiModels';
 import type { PerfContext } from '../perf';
+import { documentProfilePromptPack } from '@shared/academicPromptPacks';
 
 export const DOCUMENT_PROFILE_PIPELINE_VERSION = 'document-profile/4';
 export const DOCUMENT_PROFILE_SCHEMA_VERSION = 1;
@@ -36,28 +38,6 @@ const ANALYSIS_WORDS = 2_500;
 const MIN_SECTION_WORDS = 80;
 const DIRECT_SUPPORT_CONFIDENCE_FLOOR = 0.8;
 const CENTRAL_FIELD_KINDS = new Set<DocumentProfileFieldKind>(['problem', 'question', 'thesis', 'method', 'conclusion', 'contribution']);
-
-const SECTION_SYSTEM = `Analiza íntegramente el fragmento de una sección académica. Devuelve JSON estricto:
-{"title":"","summary":"","role":"","concepts":[""],"claims":[{"text":"","support_quote":"cita literal del fragmento","page":"p. N o null","confidence":0.0}]}
-La cita debe copiarse literalmente. Distingue el argumento central de menciones incidentales. No inventes.`;
-
-const SECTION_REDUCE_SYSTEM = `Fusiona análisis parciales de UNA misma sección. Devuelve el mismo JSON estricto.
-Conserva solo afirmaciones centrales y sus citas literales ya presentes en los análisis parciales. No inventes citas.`;
-
-const SECTION_AUDIT_SYSTEM = `Audita un análisis de sección contra el fragmento completo que lo sustenta. Devuelve JSON estricto:
-{"passed":true,"issues":[""],"analysis":{"title":"","summary":"","role":"","concepts":[""],"claims":[{"text":"","support_quote":"cita literal del fragmento","page":"p. N o null","confidence":0.0}]}}
-Comprueba que summary, role y claims no contradigan el fragmento, que distingan tesis de menciones incidentales y que toda support_quote sea literal. Si passed=false, devuelve en analysis una versión íntegra ya corregida usando solo el fragmento. Si passed=true, repite sin cambios el análisis recibido. No inventes.`;
-
-const PROFILE_SYSTEM = `Construye una ficha verificable de una obra a partir de sus secciones ya analizadas. Devuelve JSON estricto:
-{"source_language":"es","overview":"","fields":[{"kind":"thesis","text":"","confidence":0.0,"centrality":0.0,"support_quote":"cita literal ya incluida en las secciones","page":"p. N o null"}]}
-Kinds permitidos: object,problem,question,thesis,argument,method,sources,concept,temporal_scope,geographic_scope,disciplinary_scope,structure,conclusion,contribution,limitation,genre,audience,positioning,original_abstract.
-Incluye varios argument/concept cuando proceda. Omite lo que la obra no permita afirmar. Toda afirmación debe tener apoyo literal. No uses conocimiento externo.`;
-
-const AUDIT_SYSTEM = `Audita una ficha documental contra su estructura y apoyos literales. Devuelve JSON estricto:
-{"passed":true,"score":0.0,"issues":[""],"field_fixes":[{"index":0,"text":"","support_quote":""}],"overview":""}
-Comprueba tesis central, método, fuentes, alcance, conclusiones, centralidad frente a menciones incidentales y fidelidad de cada apoyo. passed solo puede ser true si no hay errores sustantivos. No inventes.`;
-
-const REPAIR_SYSTEM = `Repara la ficha usando exclusivamente los análisis de sección y los problemas del auditor. Devuelve exactamente el esquema de ficha original. Elimina campos no apoyados. Cada support_quote debe copiar, sin alterar una sola palabra, uno de los support_quote presentes en claims; no lo resumas, traduzcas ni parafrasees.`;
 
 export interface DerivedDocumentSection extends DocumentSection {
   body: string;
@@ -109,6 +89,7 @@ export interface RunDocumentProfileOptions {
   onProgress?: (progress: DocumentProfileScanProgress) => void;
   /** Audit-only timing context; never contains document text. */
   perf?: PerfContext;
+  language?: PromptLanguage;
 }
 
 const clean = (value: unknown, max = 20_000): string => typeof value === 'string'
@@ -427,7 +408,7 @@ async function auditSectionAnalysis(
     let response: SectionAuditResponse;
     try {
       response = normalizeSectionAuditResponse(await completeJson<SectionAuditResponse>({
-        system: SECTION_AUDIT_SYSTEM,
+        system: documentProfilePromptPack(options.language ?? getSettings().promptLanguage ?? 'es').sectionAudit,
         user: JSON.stringify({ fragment: evidence, analysis: current, prior_issues: issues }),
         temperature: 0, maxTokens: 5_000, signal: options.signal,
         requestClass: 'background', jobId: `${options.jobId}:section-audit`,
@@ -498,7 +479,7 @@ async function analyzeSectionPart(
   let candidate: SectionAnalysis;
   try {
     candidate = normalizeSectionAnalysis(await completeJson<SectionAnalysis>({
-      system: SECTION_SYSTEM,
+      system: documentProfilePromptPack(options.language ?? getSettings().promptLanguage ?? 'es').section,
       user: JSON.stringify({ section_title: title, page_start: pageStart, fragment: evidence }),
       temperature: 0, maxTokens: 4_000, signal: options.signal,
       requestClass: 'background', jobId: `${options.jobId}:${key}`,
@@ -552,7 +533,7 @@ async function analyzeSection(section: DerivedDocumentSection, options: RunDocum
   let candidate: SectionAnalysis;
   try {
     candidate = normalizeSectionAnalysis(await completeJson<SectionAnalysis>({
-      system: SECTION_REDUCE_SYSTEM, user: JSON.stringify({ title: section.title, analyses }),
+      system: documentProfilePromptPack(options.language ?? getSettings().promptLanguage ?? 'es').reduce, user: JSON.stringify({ title: section.title, analyses }),
       temperature: 0, maxTokens: 5_000, signal: options.signal,
       requestClass: 'background', jobId: `${options.jobId}:section:${section.sectionId}:reduce`,
       perf: options.perf,
@@ -712,7 +693,7 @@ async function synthesizeProfileAdaptive(
   if (checkpoint) return checkpoint;
   try {
     const profile = normalizeProfile(await completeJson<ProfileSynthesis>({
-      system: PROFILE_SYSTEM,
+      system: documentProfilePromptPack(options.language ?? getSettings().promptLanguage ?? 'es').profile,
       user: JSON.stringify(input),
       temperature: 0,
       maxTokens: 8_000,
@@ -1000,7 +981,7 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
       attempt === 0 ? 'Auditando la ficha contra el texto…' : `Reparando la ficha (${attempt}/2)…`);
     try {
       auditor = normalizeDocumentProfileAuditResponse(await completeJson<AuditResponse>({
-        system: AUDIT_SYSTEM,
+        system: documentProfilePromptPack(options.language ?? getSettings().promptLanguage ?? 'es').audit,
         user: JSON.stringify({ profile, sections: synthesisInput.sections, deterministic: {
           support_coverage: deterministic.supportCoverage, structure_coverage: deterministic.structureCoverage,
         } }),
@@ -1034,7 +1015,7 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     if (attempt >= 2) break;
     try {
       profile = normalizeProfile(await completeJson<ProfileSynthesis>({
-        system: REPAIR_SYSTEM,
+        system: documentProfilePromptPack(options.language ?? getSettings().promptLanguage ?? 'es').repair,
         user: JSON.stringify({ profile, audit: auditor, sections: synthesisInput.sections }),
         temperature: 0, maxTokens: 8_000, signal: options.signal,
         requestClass: 'background', jobId: `${options.jobId}:profile:repair:${attempt}`,
@@ -1153,7 +1134,7 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     profile: { ...profile, metadata: synthesisInput.metadata, fallbackMode: extractiveFallback ? 'extractive' : null }, fields,
     sections: sections.map(({ body: _body, ...section }) => section), supports, ideaLinks,
     vectors, generatorModel: options.generatorModel, auditorModel: options.auditorModel,
-    promptHash: sha256(`${SECTION_SYSTEM}|${SECTION_REDUCE_SYSTEM}|${SECTION_AUDIT_SYSTEM}|${PROFILE_SYSTEM}|${AUDIT_SYSTEM}|${REPAIR_SYSTEM}`), audit,
+    promptHash: sha256(JSON.stringify(documentProfilePromptPack(options.language ?? settings.promptLanguage ?? 'es'))), audit,
     qualityScore: Math.min(audit.score, audit.supportCoverage, audit.structureCoverage),
     expectedWorkRevision: {
       zoteroKey: work.zotero_key,

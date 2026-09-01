@@ -18,6 +18,7 @@ import {
   type InterviewTurn,
 } from '@shared/characterInterview';
 import { worldCharacterInterviewPrompt } from '@shared/worldOperationPrompts';
+import { characterBiographyContextCopy } from '@shared/worldContextPromptPacks';
 
 export async function interviewCharacter(
   personId: string,
@@ -49,11 +50,15 @@ export async function interviewCharacter(
     })
     .filter((scene): scene is NonNullable<typeof scene> => scene !== null);
 
+  const settings = getSettings();
+  const language = settings.promptLanguage ?? 'es';
+  const biographyCopy = characterBiographyContextCopy(language);
   const sources: CharacterInterviewSources = {
     name: character.displayName,
     aliases: character.names.map((entry) => ({
       name: entry.name,
-      kind: entry.kind ? CHARACTER_NAME_KIND_LABEL[entry.kind] ?? entry.kind : null,
+      kind: entry.kind ? biographyCopy.aliasKinds[entry.kind] ?? CHARACTER_NAME_KIND_LABEL[entry.kind] ?? entry.kind : null,
+      kindToken: entry.kind,
     })),
     species: character.profile.species,
     gender: character.profile.gender,
@@ -91,9 +96,7 @@ export async function interviewCharacter(
     canSendImages: options.canSendImages === true,
   };
 
-  const settings = getSettings();
   const model = settings.chatModel ?? settings.synthesisModel ?? settings.extractionModel ?? null;
-  const language = settings.promptLanguage ?? 'es';
   const reply = await completeText(
     {
       system: worldCharacterInterviewPrompt(sources, language),

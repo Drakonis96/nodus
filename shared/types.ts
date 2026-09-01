@@ -5276,6 +5276,9 @@ export interface Debate {
   timeline: DebateTimelineEntry[];
   /** Rule-based, no-AI summary of the tension (always present). */
   tension: string;
+  /** Stable localization key and user-content parameters for the rule-based summary. */
+  tensionKey?: 'debate.refutes' | 'debate.contradicts';
+  tensionParams?: { left: string; right: string };
   trace?: EdgeTrace | null;
 }
 
@@ -5548,12 +5551,18 @@ export interface ReadingPathEntry {
   connectedAuthors: string[];
   citedBy: number;
   reason: string;
+  /** Stable server projection key; `reason` remains for older clients. */
+  reasonKey?: string;
+  reasonParams?: Record<string, string | number | string[]>;
 }
 
 export interface ReadingPathPhase {
   id: string;
   title: string;
   objective: string;
+  /** Stable server projection keys; legacy prose fields remain for old clients. */
+  titleKey?: string;
+  objectiveKey?: string;
   entries: ReadingPathEntry[];
   totalCandidates: number;
   omitted: number;
@@ -5570,6 +5579,8 @@ export interface ReadingPathPlan {
   analyzedCount: number;
   pendingAnalysisCount: number;
   summary: string;
+  summaryKey?: string;
+  summaryParams?: Record<string, string | number | string[]>;
   phases: ReadingPathPhase[];
 }
 
@@ -5701,6 +5712,7 @@ export interface TutorPlanRequest {
   mode: TutorMode;
   prompt?: string;
   model?: ModelRef | null;
+  language?: PromptLanguage;
 }
 
 export interface TutorStepRequest {
@@ -5713,6 +5725,7 @@ export interface TutorStepRequest {
   /** Tail of the immediately previous stop's narration, so the discourse continues without repeating. */
   previousText?: string;
   model?: ModelRef | null;
+  language?: PromptLanguage;
 }
 
 export interface TutorStepResponse {
@@ -5761,6 +5774,7 @@ export interface ArgumentMap {
 export interface ArgumentMapRequest {
   seedIdeaId: string;
   model?: ModelRef | null;
+  language?: PromptLanguage;
   /** 'ai' traces the tree with the model; 'auto' builds it structurally from the
    *  real graph edges (no model needed). Defaults to 'ai'. */
   mode?: 'ai' | 'auto';
@@ -6465,6 +6479,7 @@ export interface ChapterRelationsProgress {
 export interface AnalyzeChapterRelationsRequest {
   chapterId: string;
   model?: ModelRef | null;
+  language?: PromptLanguage;
   /** Re-extract and recompute even if cached for the current text hash. */
   force?: boolean;
 }

@@ -187,8 +187,10 @@ test('Teaching keeps the teacher outline and focus after approach rules', async 
 
 test('Genealogy keeps its evidence-first and unproven-kinship rules', async () => {
   const source = await readFile(path.join(repoRoot, 'electron/ai/genealogyDeepResearch.ts'), 'utf8');
-  assert.match(source, /Sigue el estándar de prueba genealógico/);
-  assert.match(source, /nunca afirmes una identidad o un parentesco sin apoyo documental/);
+  const promptPacks = await readFile(path.join(repoRoot, 'shared/genealogyDeepResearchPromptPacks.ts'), 'utf8');
+  assert.match(source, /genealogyDeepResearchPromptPack/);
+  assert.match(promptPacks, /Sigue el estándar de prueba genealógico/);
+  assert.match(promptPacks, /nunca afirmes una identidad o un parentesco sin apoyo documental/);
   assert.match(source, /if \(approach === 'general'\)[\s\S]*orchestrateGenealogyDeepResearch\(request, ordinarySources, family, realDeps\(model\)/);
 });
 

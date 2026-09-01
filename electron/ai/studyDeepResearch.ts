@@ -32,7 +32,8 @@ import {
   planApproachRetrieval,
   type ApproachRetrievalPlan,
 } from './deepResearchApproaches';
-import { assembleContinuousNarrative, DEEP_RESEARCH_NARRATIVE_RULES, MAX_COVERAGE_QUESTIONS } from './deepResearchCore';
+import { assembleContinuousNarrative, deepResearchNarrativeRules, MAX_COVERAGE_QUESTIONS } from './deepResearchCore';
+import { studyDeepResearchPromptPack as studyDeepResearchRulesPromptPack } from '@shared/studyDeepResearchPromptPacks';
 
 export { normalizeStudyDeepResearchAudience };
 
@@ -44,10 +45,8 @@ export const MAX_UNIT_SECTIONS = 12;
  * enforces the shape regardless — this only stops the model wasting a turn proposing
  * a different one, and gets the source assignment aligned with the given titles.
  */
-const FIXED_OUTLINE_RULE = 'ESTRUCTURA FIJADA POR EL DOCENTE: el campo "fixedSections" define exactamente las partes de la unidad, su número y su orden. Devuelve EXACTAMENTE esas partes, con los mismos id y en el mismo orden. No añadas, elimines ni reordenes ninguna. Cuando una parte trae "title", cópialo literalmente; cuando viene vacío, ponle tú un título. Cuando trae "focus", es una instrucción del docente sobre qué debe tratar esa parte: respétala al asignarle propósito, afirmaciones clave y fuentes.';
 
 /** Appended to the writer prompt for a part the teacher gave an explicit steer for. */
-const SECTION_FOCUS_RULE = 'El campo "teacherFocus" es una instrucción del docente sobre lo que esta parte debe tratar. Es vinculante: organiza la parte en torno a ella y no la sustituyas por otro enfoque, aunque las fuentes sugieran uno más amplio.';
 
 interface StudyResearchSource {
   id: string;
@@ -407,6 +406,7 @@ export function assembleStudyDraftBody(input: {
   limitations: string[];
   referencesLabel: string;
   limitationsLabel: string;
+  noCitationsLabel?: string;
   abstract?: string;
   structure: DeepResearchRequest['sectionLimit'];
 }): string {
@@ -417,7 +417,7 @@ export function assembleStudyDraftBody(input: {
       input.limitations,
       input.referencesLabel,
       input.limitationsLabel,
-      'Sin fuentes citadas',
+      input.noCitationsLabel ?? studyDeepResearchRulesPromptPack('es').progress.noCitations,
       input.abstract,
     );
   }
@@ -553,18 +553,8 @@ async function reviseStudySection(input: {
   model: ModelRef | null;
 }): Promise<string> {
   const system = [
-    input.teacherPlan
-      ? 'Eres el editor pedagógico final de una parte de una unidad didáctica profesional.'
-      : 'Eres el editor pedagógico final de un informe de estudio riguroso.',
-    'Reescribe el borrador para corregir exclusivamente los problemas medidos que se indican.',
-    'Conserva la extensión, el idioma, la audiencia y el propósito. Usa solo los extractos permitidos y copia sus enlaces exactos. No inventes hechos, ejemplos atribuidos ni materiales.',
-    'Mejora la progresión conceptual, la explicación de mecanismos, el contraste entre fuentes, los matices y la conexión explícita con el objetivo.',
-    input.teacherPlan
-      ? 'Conserva las actividades y comprobaciones de comprensión, pero asegúrate de que se derivan de los materiales y de que son realizables.'
-      : 'Los ejemplos o analogías deben distinguirse con claridad de los hechos documentados y no sustituir la evidencia.',
-    'No acumules citas para elevar artificialmente la densidad. Cada párrafo sustantivo debe quedar respaldado y, cuando haya tres o más materiales, al menos tres párrafos deben poner dos fuentes en diálogo explícito; con dos materiales, hazlo en al menos dos párrafos. Explica la relación, no juntes enlaces.',
-    ...DEEP_RESEARCH_NARRATIVE_RULES,
-    'Mantén un único encabezado ##, sin microsecciones ni listas salvo necesidad pedagógica estricta. Devuelve solo el Markdown revisado.',
+    studyDeepResearchRulesPromptPack(input.language).reviseStudySection(input.teacherPlan),
+    ...deepResearchNarrativeRules(input.language),
   ].join('\n');
   return completeText({
     system,
@@ -616,7 +606,10 @@ export async function generateStudyDeepResearchReport(
   );
   const teacherPlan = unitMode && audience === 'teacher';
   const prompts = studyDeepResearchPromptPack(language, audience, unitMode);
-  emit({ phase: 'snapshot', message: unitMode ? 'Recuperando materiales, apuntes y transcripciones de clase…' : 'Recuperando apuntes, materiales y transcripciones relevantes…' });
+  const copy = studyDeepResearchRulesPromptPack(language);
+  const FIXED_OUTLINE_RULE = copy.fixedOutlineRule;
+  const SECTION_FOCUS_RULE = copy.sectionFocusRule;
+  emit({ phase: 'snapshot', message: copy.progress.snapshot(unitMode) });
   const ordinaryRetrieved = await retrieveStudyAssistantEntries(request.objective, { kinds: ['material', 'document', 'transcript'] }, [], 48);
   let approachContext: StudyApproachContext | null = null;
   let retrieved = ordinaryRetrieved;
@@ -655,9 +648,7 @@ export async function generateStudyDeepResearchReport(
     ? ordinarySources
     : mergeStudySources(ordinarySources, buildSources(retrieved, 24));
   if (!sources.length) {
-    throw new Error(unitMode
-      ? 'No hay contenido indexado suficiente en los materiales de clase para diseñar la unidad.'
-      : 'No hay contenido indexado suficiente en los materiales de estudio para generar el informe.');
+    throw new Error(copy.progress.noSources(unitMode));
   }
   // A unit is sequenced by concept dependencies. Specialized Study approaches also
   // need those relationships for debates, comparisons and conceptual dependencies;
@@ -674,13 +665,7 @@ export async function generateStudyDeepResearchReport(
   const count = sectionCount(request, sources.length, knowledge.ideas.length, request.coverageQuestions?.length ?? 0);
   emit({
     phase: 'planning',
-    message: requestedOutline.length
-      ? `Ajustando el esquema indicado (${count} partes) a los materiales…`
-      : teacherPlan
-        ? `Diseñando la unidad en ${count} partes…`
-        : unitMode
-          ? `Preparando apuntes para el alumnado en ${count} partes…`
-          : `Diseñando una explicación didáctica en ${count} secciones…`,
+    message: copy.progress.planning(Boolean(requestedOutline.length), teacherPlan, unitMode, count),
   });
   const sourcePayload = sources.map(({ id, kind, title, subtitle, location, text }) => ({ id, kind, title, subtitle, location, extract: text }));
   const plan = await completeJson<StudyPlan>({
@@ -688,9 +673,7 @@ export async function generateStudyDeepResearchReport(
     // can replace, reorder or ignore it.
     system: [
       prompts.plan,
-      'CALIDAD DE FUENTES: asigna a cada parte de desarrollo al menos tres materiales distintos cuando existan y sean pertinentes. Evita que varias partes dependan siempre del mismo material. La diversidad nunca justifica incluir una fuente marginal.',
-      'Cada afirmación clave debe poder demostrarse con los extractos asignados. Si los materiales no cubren una parte del objetivo, conviértelo en un límite explícito y no en una afirmación especulativa.',
-      'COBERTURA OBLIGATORIA: asigna cada elemento de `coverageQuestions` al menos a una parte copiándolo literalmente en el campo `coverageQuestions` de esa parte. No omitas una pregunta difícil y no inventes una respuesta si las fuentes no bastan.',
+      ...copy.plannerRules,
       ...(approachContext?.rules.planner ?? []),
       ...(requestedOutline.length ? [FIXED_OUTLINE_RULE] : []),
     ].join('\n'),
@@ -745,7 +728,7 @@ export async function generateStudyDeepResearchReport(
     ).map((idea) => ({ type: idea.type, label: idea.label, statement: idea.statement }));
     emit({
       phase: 'section',
-      message: `${teacherPlan ? 'Redactando' : 'Explicando'}: ${section.title}`,
+      message: copy.progress.section(teacherPlan, section.title),
       sectionIndex: index + 1,
       sectionTotal: sections.length,
       sectionTitle: section.title,
@@ -754,10 +737,8 @@ export async function generateStudyDeepResearchReport(
       // A teacher focus is also last and therefore authoritative inside its section.
       system: [
         prompts.write,
-        'La extensión la determina la evidencia y la función didáctica de esta parte. Desarrolla cada concepto, conexión, matiz o desacuerdo que aporte valor y detente cuando el valor marginal sea nulo; no persigas una cantidad de palabras/párrafos ni repitas una idea con reformulaciones.',
-        'ESTÁNDAR DE CALIDAD: cada párrafo sustantivo debe conectar su afirmación con evidencia concreta. Cuando haya tres o más materiales, incluye al menos tres párrafos que pongan dos fuentes en diálogo explícito; con dos materiales, hazlo en al menos dos. Explica si convergen, discrepan o cumplen funciones distintas: juntar enlaces no cuenta como síntesis.',
-        'No confundas una analogía pedagógica con un hecho documentado. Distingue lo que dicen los materiales de la explicación que construyes a partir de ellos y declara los límites del corpus.',
-        ...DEEP_RESEARCH_NARRATIVE_RULES,
+        ...copy.writerRules,
+        ...deepResearchNarrativeRules(language),
         ...(approachContext?.rules.writer ?? []),
         ...(section.focus ? [SECTION_FOCUS_RULE] : []),
       ].join('\n'),
@@ -833,16 +814,12 @@ export async function generateStudyDeepResearchReport(
 
   emit({
     phase: 'assembling',
-    message: teacherPlan
-      ? 'Preparando síntesis, materiales y propuestas de evaluación…'
-      : unitMode
-        ? 'Preparando síntesis, fuentes y actividades de autoevaluación…'
-        : 'Preparando síntesis, fuentes y actividades de comprensión…',
+    message: copy.progress.assembling(teacherPlan, unitMode),
   });
   const firstFinal = await completeJson<StudyFinal>({
     system: [
       prompts.finalize,
-      'El título y el resumen solo pueden sintetizar lo establecido en `sectionFindings`. No prometas aprendizajes, relaciones, ejemplos o certezas que el cuerpo y las fuentes usadas no desarrollen.',
+      ...copy.finalizerRules,
       ...(approachContext?.rules.finalizer ?? []),
     ].join('\n'),
     user: JSON.stringify({
@@ -866,10 +843,7 @@ export async function generateStudyDeepResearchReport(
   }, isFinal, model).catch((): StudyFinal => ({}));
   const auditedFinal = await completeJson<StudyFinal>({
     system: [
-      'Eres el control epistemológico final de un informe de estudio o unidad didáctica. Audita solo título, resumen, limitaciones y próximos pasos.',
-      'Compara cada afirmación del resumen con `sectionFindings`. Estrecha o elimina cualquier concepto, relación, dominio, ejemplo, aprendizaje o certeza que el cuerpo no establezca.',
-      'No introduzcas información nueva ni elimines limitaciones previas. Los próximos pasos pueden comprobar o ampliar lo aprendido, pero no presentarlo como ya demostrado.',
-      'Conserva el idioma. Devuelve SOLO JSON con {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}.',
+      ...copy.finalAuditRules,
       ...(approachContext?.rules.finalizer ?? []),
     ].join('\n'),
     user: JSON.stringify({
@@ -900,6 +874,7 @@ export async function generateStudyDeepResearchReport(
     written,
     citedSourceTokens,
     limitations,
+    noCitationsLabel: copy.progress.noCitations,
     referencesLabel: prompts.references,
     limitationsLabel: prompts.limitations,
     abstract: final.abstract?.trim() || plan.abstract?.trim() || '',
@@ -957,7 +932,7 @@ export async function generateStudyDeepResearchReport(
     ideasCovered: usedIdeaIds.length,
     ideasConsidered: knowledge.ideas.length,
     worksCited: usedSourceIds.size,
-    stoppedReason: retrieved.length >= 48 ? 'El contexto se acotó a los fragmentos más relevantes del índice de estudio.' : null,
+    stoppedReason: retrieved.length >= 48 ? copy.progress.stoppedReason : null,
     qualityRevisions,
     coverage: request.coverageQuestions?.length
       ? { questions: [...request.coverageQuestions], ratio: qualityAssessment.metrics.objectiveCoverage }
@@ -965,11 +940,7 @@ export async function generateStudyDeepResearchReport(
   };
   emit({
     phase: 'done',
-    message: teacherPlan
-      ? `Unidad lista: ${singleNarrative ? 'bloque continuo' : `${sections.length} partes`} · ${usedSourceIds.size} materiales`
-      : unitMode
-        ? `Apuntes listos: ${singleNarrative ? 'bloque continuo' : `${sections.length} partes`} · ${usedSourceIds.size} materiales`
-        : `Informe de estudio listo: ${singleNarrative ? 'bloque continuo' : `${sections.length} secciones`} · ${usedSourceIds.size} fuentes`,
+    message: copy.progress.done(teacherPlan, unitMode, singleNarrative, sections.length, usedSourceIds.size),
     wordsSoFar: words,
     pagesSoFar: meta.pages,
   });

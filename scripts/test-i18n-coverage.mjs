@@ -792,7 +792,6 @@ test('issue #12 examples pass through localization at their render boundaries', 
 test('two-language compatibility paths choose English for every non-Spanish UI locale', () => {
   const files = [
     ['electron/copilot/server.ts', /uiLanguage === 'es' \? 'es' : 'en'/],
-    ['electron/ai/argumentMap.ts', /uiLanguage === 'es' \? 'es' : 'en'/],
     ['electron/ipc.ts', /const es = language === 'es'/],
   ];
   for (const [file, expected] of files) {

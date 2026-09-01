@@ -5,6 +5,7 @@
 // is available `available:false` is returned so the UI can explain why.
 import type {
   GlobalSearchResult,
+  PromptLanguage,
   SearchResultKind,
   SemanticSearchOptions,
   SemanticSearchResponse,
@@ -15,11 +16,24 @@ import { findSimilarPassages } from '../db/passagesRepo';
 import { findSimilarWorks } from '../db/workSummariesRepo';
 import { embed } from './aiClient';
 import { retrieveHierarchical } from './hierarchicalRetrieval';
+import { getSettings } from '../db/settingsRepo';
 
 const DEFAULT_KINDS: SearchResultKind[] = ['idea', 'passage', 'work'];
 const SEMANTIC_KINDS: SearchResultKind[] = ['idea', 'passage', 'work'];
 const DEFAULT_LIMIT = 12;
 const DEFAULT_MIN_SIMILARITY = 0.2;
+
+const UNTITLED: Record<PromptLanguage, string> = {
+  es: '(sin título)', en: '(untitled)', fr: '(sans titre)', de: '(ohne Titel)', pt: '(sem título)', 'pt-BR': '(sem título)', it: '(senza titolo)', tr: '(başlıksız)',
+};
+
+function interfaceLanguage(): PromptLanguage {
+  try {
+    return getSettings().uiLanguage ?? 'es';
+  } catch {
+    return 'es';
+  }
+}
 
 function snippet(text: string | null | undefined, max = 200): string | null {
   if (!text) return null;
@@ -48,7 +62,8 @@ function rankByVector(
   kinds: Set<SearchResultKind>,
   limit: number,
   threshold: number,
-  excludeIdeaIds: string[] = []
+  excludeIdeaIds: string[] = [],
+  language: PromptLanguage = 'es',
 ): GlobalSearchResult[] {
   const results: GlobalSearchResult[] = [];
 
@@ -72,7 +87,7 @@ function rankByVector(
       results.push({
         kind: 'passage',
         id: p.passage_id,
-        title: p.title || '(sin título)',
+        title: p.title || UNTITLED[language],
         subtitle: [sub, p.page_label ? `p. ${p.page_label}` : null].filter(Boolean).join(' · ') || null,
         snippet: snippet(p.text),
         nodusId: p.nodus_id,
@@ -109,7 +124,7 @@ function rankByVector(
         results.push({
           kind: 'work',
           id: h.nodus_id,
-          title: m.title || '(sin título)',
+          title: m.title || UNTITLED[language],
           subtitle: workSubtitle(parseAuthors(m.authors_json), m.year),
           snippet: snippet(h.summary),
           zoteroKey: m.zotero_key,
@@ -139,7 +154,8 @@ export async function semanticSearch(
   const limit = options.limit ?? DEFAULT_LIMIT;
   const threshold = options.minSimilarity ?? DEFAULT_MIN_SIMILARITY;
 
-  const results = rankByVector(vector, kinds, limit, threshold);
+  const language = interfaceLanguage();
+  const results = rankByVector(vector, kinds, limit, threshold, [], language);
   if (kinds.has('work')) {
     // Whole-document and section vectors complement the historical summary vector.
     // Keep one search-result row per work; its snippet may now come from the most
@@ -162,7 +178,7 @@ export async function semanticSearch(
       results.push({
         kind: 'work',
         id: hit.nodusId,
-        title: hit.title || '(sin título)',
+        title: hit.title || UNTITLED[language],
         subtitle: workSubtitle(hit.authors, hit.year),
         snippet: snippet(hit.text),
         similarity: Math.max(hit.similarity, routedStrength),
@@ -185,6 +201,6 @@ export async function semanticSearch(
 export async function findSimilarToIdea(globalId: string, limit = DEFAULT_LIMIT): Promise<SemanticSearchResponse> {
   const idea = getIdea(globalId);
   if (!idea?.embedding || idea.embedding.length === 0) return { available: false, results: [] };
-  const results = rankByVector(idea.embedding, new Set(['idea']), limit, DEFAULT_MIN_SIMILARITY, [globalId]);
+  const results = rankByVector(idea.embedding, new Set(['idea']), limit, DEFAULT_MIN_SIMILARITY, [globalId], interfaceLanguage());
   return { available: true, results };
 }

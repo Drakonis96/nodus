@@ -3,7 +3,9 @@
 // one — like the sections of an argument. The new order is persisted via
 // order_idx and returned so the UI can offer keep / undo.
 import type { NotesReorderResult } from '@shared/types';
+import { notesOrderPromptPack } from '@shared/notesOrderPromptPacks';
 import { getNote, reorderNotes } from '../db/notesRepo';
+import { getSettings } from '../db/settingsRepo';
 import { completeJson } from './aiClient';
 
 interface OrderResponse {
@@ -35,19 +37,17 @@ export async function reorderNotesByAI(noteIds: string[]): Promise<NotesReorderR
     return { orderedIds: notes.map((n) => n.id) };
   }
 
+  const prompt = notesOrderPromptPack(getSettings().promptLanguage ?? 'es');
+
   const list = notes
     .map((n, i) => {
       const body = snippet(n.content);
-      return `${i + 1}. id="${n.id}" · título: ${n.title}${body ? `\n   resumen: ${body}` : ''}`;
+      return `${i + 1}. id="${n.id}" · ${prompt.title}: ${n.title}${body ? `\n   ${prompt.summary}: ${body}` : ''}`;
     })
     .join('\n');
 
-  const system =
-    'Eres un editor académico. Ordena un conjunto de notas de investigación para que la sucesión de una nota tras otra tenga lógica: ' +
-    'de lo general a lo concreto, respetando dependencias conceptuales (definiciones y premisas antes que sus consecuencias) y agrupando temas afines. ' +
-    'Devuelve EXCLUSIVAMENTE un JSON con la forma {"order": ["id1","id2", ...]} usando los id exactos proporcionados, ' +
-    'incluyendo todos los id una sola vez, sin inventar ni omitir ninguno.';
-  const user = `Notas a ordenar:\n${list}\n\nDevuelve el orden lógico como {"order": [...]} con los id exactos.`;
+  const system = prompt.system;
+  const user = `${prompt.notes}:\n${list}\n\n${prompt.returnOrder}`;
 
   const result = await completeJson<OrderResponse>({ system, user, temperature: 0 }, isOrderResponse);
 

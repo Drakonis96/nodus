@@ -42,7 +42,7 @@ try {
   const chart = require(path.join(repoRoot, 'shared/chartSpec.ts'));
   const exportShared = require(path.join(repoRoot, 'shared/databaseExport.ts'));
   const { exportDatabase, buildXlsx } = require(path.join(repoRoot, 'electron/export/databaseExport.ts'));
-  const { generateAnalysisReport } = require(path.join(repoRoot, 'electron/ai/databaseAnalysis.ts'));
+  const { generateAnalysisReport, resultToText } = require(path.join(repoRoot, 'electron/ai/databaseAnalysis.ts'));
   const { buildDatabaseChatContext } = require(path.join(repoRoot, 'electron/ai/databaseChat.ts'));
   const chatShared = require(path.join(repoRoot, 'shared/databaseChat.ts'));
   const { runAiCell, runAiColumn } = require(path.join(repoRoot, 'electron/ai/databaseAiColumn.ts'));
@@ -927,6 +927,15 @@ try {
   });
   assert.equal(rep.report, 'Informe: ok', 'report written over the profile');
   assert.match(rep.profileText, /Filas: 3/, 'report exposes the data it used');
+  for (const locale of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+    const localizedResult = resultToText({
+      kind: 'data_quality', rowCount: 3,
+      columns: [{ column: 'c1', name: 'Value', type: 'text', filled: 0, fillRate: 0, distinct: 0, issues: ['Columna vacía'] }],
+    }, locale);
+    assert.doesNotMatch(localizedResult, /Calidad de datos|filas|columnas|relleno|Columna vacía/, `${locale} narration input has no Spanish scaffold`);
+    assert.match(localizedResult, /3/);
+    assert.match(localizedResult, /Value/);
+  }
 
   // ── Chat: chart-spec parsing + context builder (Phase 7) ───────────────────
   const segs = chart.parseChatSegments('Antes.\n```chart\n{"type":"bar","items":[{"label":"A","value":3}]}\n```\nDespués.');

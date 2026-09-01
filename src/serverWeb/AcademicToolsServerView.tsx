@@ -3,7 +3,7 @@ import { Icon } from "../components/ui";
 import { MarkdownReader } from "./readers";
 import { api } from "./api";
 import type { JsonRecord, PageResponse } from "./types";
-import { t } from "./i18nShim";
+import { errorText, t } from "./i18nShim";
 
 type Tool =
   "argument" | "hypothesis" | "reading" | "immersion" | "writing" | "projects";
@@ -184,7 +184,7 @@ function ArgumentView({
     })
       .then((r) => r.json())
       .then((v) => setRoutes(Array.isArray(v.routes) ? v.routes : []))
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(errorText(e)));
   }, [spaceId]);
   useEffect(() => {
     if (!active?.ideaId) {
@@ -585,7 +585,7 @@ function ReadingView({
       })
       .then(setData)
       .catch((cause) =>
-        setError(cause instanceof Error ? cause.message : String(cause)),
+        setError(errorText(cause)),
       )
       .finally(() => setLoading(false));
   };
@@ -630,7 +630,7 @@ function ReadingView({
           resource: "reading-path",
           documentId: id,
           kind: "note",
-          title: read ? "Leída" : "Pendiente",
+          title: read ? t("Leída") : t("Pendiente"),
           content: read ? "read" : "unread",
           quote: "",
           baseVersion: annotationVersion,
@@ -643,7 +643,7 @@ function ReadingView({
       setAnnotationVersion(response.version);
       setReadOverlay((current) => ({ ...current, [id]: read }));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorText(cause));
     }
   };
   const openAssistant = (entry: ReadingEntry) => {
@@ -1081,7 +1081,7 @@ function PrivateArtifactEditor({
       setContent("");
       onChange();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorText(cause));
     } finally {
       setBusy(false);
     }
@@ -1103,7 +1103,7 @@ function PrivateArtifactEditor({
       setContent("");
       onChange();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorText(cause));
     } finally {
       setBusy(false);
     }
@@ -1406,7 +1406,7 @@ function _ProjectsView({
         </div>
         {chapters.length > 0 && (
           <section className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
-            <h3 className="mb-2 text-sm font-semibold">Capítulos publicados</h3>
+            <h3 className="mb-2 text-sm font-semibold">{t("Capítulos publicados")}</h3>
             <div className="space-y-2">
               {chapters.map((chapter, index) => (
                 <div
@@ -1424,7 +1424,7 @@ function _ProjectsView({
         )}
         {links.length > 0 && (
           <section className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
-            <h3 className="mb-2 text-sm font-semibold">Enlaces del proyecto</h3>
+            <h3 className="mb-2 text-sm font-semibold">{t("Enlaces del proyecto")}</h3>
             <div className="space-y-1 text-xs text-neutral-500">
               {links.map((link, index) => (
                 <div key={text(link.id, String(index))}>

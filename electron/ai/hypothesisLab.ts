@@ -18,6 +18,7 @@ import { getSettings } from '../db/settingsRepo';
 import { getContradictions } from '../graph/graphService';
 import * as projects from '../db/projectsRepo';
 import { completeJson } from './aiClient';
+import { hypothesisLabPrompt } from '../../shared/researchPromptPacks';
 
 interface IdeaRow {
   id: string;
@@ -86,17 +87,7 @@ export async function generateHypothesisLab(request: HypothesisLabRequest): Prom
   try {
     const ai = await completeJson<AiHypothesisResult>(
       {
-        system: [
-          'Eres el Laboratorio de hipotesis de Nodus. Tu tarea es mejorar hipotesis academicas generadas desde un corpus local.',
-          'Usa SOLO los candidatos y evidencias recibidos. No inventes autores, obras, paginas, citas ni datos externos.',
-          'Puedes mejorar la formulacion, variables, metodo, predicciones, objeciones, siguientes pasos y resumen.',
-          'Conserva los ids de candidatos. No cambies puntuaciones ni cites fuentes nuevas.',
-          'Cada hipotesis debe ser comprobable, defendible y expresada como una proposicion de investigacion, no como tema generico.',
-          'Si el usuario pidio ingles, escribe todos los campos de prosa en ingles.',
-          '',
-          'Devuelve EXCLUSIVAMENTE JSON valido:',
-          '{"candidates":[{"id":"hyp-...","title":"...","hypothesis":"...","rationale":"...","variables":[{"name":"...","role":"phenomenon|context|condition|mechanism|outcome|case|method","description":"..."}],"methods":["..."],"predictions":["..."],"counterArguments":["..."],"nextSteps":["..."],"searchQueries":["..."],"draftAbstract":"..."}],"warnings":["..."]}',
-        ].join('\n'),
+        system: hypothesisLabPrompt(corpus.request.language),
         user: JSON.stringify(buildAiContext(fallback), null, 2),
         temperature: 0.18,
         maxTokens: 12000,
@@ -106,14 +97,29 @@ export async function generateHypothesisLab(request: HypothesisLabRequest): Prom
     );
     return mergeAi(fallback, ai);
   } catch (error) {
+    const language = corpus.request.language ?? 'es';
     return {
       ...fallback,
       warnings: [
         ...fallback.warnings,
-        `La IA no pudo refinar las hipótesis; se muestra la versión estructural local. ${error instanceof Error ? error.message : String(error)}`,
+        localizedRefinementWarning(language, error instanceof Error ? error.message : String(error)),
       ],
     };
   }
+}
+
+function localizedRefinementWarning(language: HypothesisLabRequest['language'], detail: string): string {
+  const message = ({
+    es: 'La IA no pudo refinar las hipótesis; se muestra la versión estructural local.',
+    en: 'AI refinement was unavailable; the local structural version is shown.',
+    fr: 'Le raffinement par IA est indisponible ; la version structurelle locale est affichée.',
+    de: 'Die KI-Verfeinerung war nicht verfügbar; die lokale Strukturversion wird angezeigt.',
+    pt: 'O aperfeiçoamento por IA não está disponível; é apresentada a versão estrutural local.',
+    'pt-BR': 'O refinamento por IA não está disponível; a versão estrutural local é exibida.',
+    it: 'Il perfezionamento tramite IA non è disponibile; viene mostrata la versione strutturale locale.',
+    tr: 'Yapay zekâ iyileştirmesi kullanılamadı; yerel yapısal sürüm gösteriliyor.',
+  } as Record<NonNullable<HypothesisLabRequest['language']>, string>)[language ?? 'es'];
+  return `${message} ${detail}`;
 }
 
 function buildCorpus(request: HypothesisLabRequest): HypothesisLabCorpus {
@@ -254,6 +260,7 @@ function projectSource(projectId: string): HypothesisProjectSource | null {
 }
 
 function buildAiContext(result: HypothesisLabResult): Record<string, unknown> {
+  const language = result.request.language ?? 'es';
   return {
     request: {
       objective: result.request.objective,
@@ -288,9 +295,9 @@ function buildAiContext(result: HypothesisLabResult): Record<string, unknown> {
       draftAbstract: candidate.draftAbstract,
     })),
     rules: [
-      'No anadas fuentes nuevas.',
-      'No cambies ids.',
-      'Mantén cada hipótesis comprobable y ligada al hueco detectado.',
+      ({ es: 'No anadas fuentes nuevas.', en: 'Do not add new sources.', fr: 'N’ajoute aucune nouvelle source.', de: 'Füge keine neuen Quellen hinzu.', pt: 'Não adiciones novas fontes.', 'pt-BR': 'Não adicione novas fontes.', it: 'Non aggiungere nuove fonti.', tr: 'Yeni kaynak eklemeyin.' } as Record<NonNullable<HypothesisLabResult['request']['language']>, string>)[language],
+      ({ es: 'No cambies ids.', en: 'Do not change ids.', fr: 'Ne modifie pas les ids.', de: 'Ändere keine ids.', pt: 'Não alteres os ids.', 'pt-BR': 'Não altere os ids.', it: 'Non modificare gli ids.', tr: 'Kimlikleri değiştirmeyin.' } as Record<NonNullable<HypothesisLabResult['request']['language']>, string>)[language],
+      ({ es: 'Mantén cada hipótesis comprobable y ligada al hueco detectado.', en: 'Keep each hypothesis testable and linked to the detected gap.', fr: 'Garde chaque hypothèse testable et liée à la lacune détectée.', de: 'Halte jede Hypothese prüfbar und mit der erkannten Lücke verknüpft.', pt: 'Mantém cada hipótese testável e ligada à lacuna detetada.', 'pt-BR': 'Mantenha cada hipótese testável e ligada à lacuna detectada.', it: 'Mantieni ogni ipotesi verificabile e collegata alla lacuna individuata.', tr: 'Her hipotezi sınanabilir tutun ve tespit edilen boşluğa bağlayın.' } as Record<NonNullable<HypothesisLabResult['request']['language']>, string>)[language],
     ],
   };
 }

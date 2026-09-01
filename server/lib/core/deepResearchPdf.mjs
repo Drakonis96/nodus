@@ -13,7 +13,26 @@ function pdfSafe(value) {
     .replace(/[^\x20-\x7e]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-function reportText(draft) {
+// The server's dependency-light PDF path cannot import the TypeScript report catalogue.
+// Keep its small set of structural headings explicit so a Spanish report is not silently
+// labelled in Spanish when the report itself was generated in another supported language.
+const PDF_LABELS = {
+  es: { outline: 'Esquema de investigación', next: 'Siguientes pasos', limitations: 'Limitaciones', bibliography: 'Bibliografía', empty: 'Informe sin contenido.', cover: 'Informe Deep Research' },
+  en: { outline: 'Research outline', next: 'Next steps', limitations: 'Limitations', bibliography: 'Bibliography', empty: 'Report has no content.', cover: 'Deep Research report' },
+  fr: { outline: 'Plan de recherche', next: 'Prochaines étapes', limitations: 'Limites', bibliography: 'Bibliographie', empty: 'Le rapport ne contient aucun contenu.', cover: 'Rapport Deep Research' },
+  de: { outline: 'Forschungsstruktur', next: 'Nächste Schritte', limitations: 'Einschränkungen', bibliography: 'Bibliografie', empty: 'Der Bericht enthält keinen Inhalt.', cover: 'Deep-Research-Bericht' },
+  pt: { outline: 'Esquema de investigação', next: 'Próximos passos', limitations: 'Limitações', bibliography: 'Bibliografia', empty: 'O relatório não contém conteúdo.', cover: 'Relatório Deep Research' },
+  'pt-BR': { outline: 'Estrutura da pesquisa', next: 'Próximos passos', limitations: 'Limitações', bibliography: 'Bibliografia', empty: 'O relatório não contém conteúdo.', cover: 'Relatório Deep Research' },
+  it: { outline: 'Schema della ricerca', next: 'Passi successivi', limitations: 'Limiti', bibliography: 'Bibliografia', empty: 'Il report non contiene contenuti.', cover: 'Report Deep Research' },
+  tr: { outline: 'Araştırma planı', next: 'Sonraki adımlar', limitations: 'Sınırlamalar', bibliography: 'Kaynakça', empty: 'Raporda içerik yok.', cover: 'Deep Research raporu' },
+};
+
+function pdfLanguage(value) {
+  if (value === 'pt-BR') return value;
+  return Object.prototype.hasOwnProperty.call(PDF_LABELS, value) ? value : 'en';
+}
+
+function reportText(draft, labels) {
   const sections = [];
   const title = text(draft?.title);
   const abstract = text(draft?.abstract);
@@ -25,9 +44,9 @@ function reportText(draft) {
     const values = Array.isArray(value) ? value.map(text).filter(Boolean) : [];
     if (values.length) sections.push(`${label}\n${values.map((entry) => `• ${entry}`).join('\n')}`);
   };
-  list('Siguientes pasos', draft?.nextSteps);
-  list('Limitaciones', draft?.limitations);
-  return sections.join('\n\n') || 'Informe sin contenido.';
+  list(labels.next, draft?.nextSteps);
+  list(labels.limitations, draft?.limitations);
+  return sections.join('\n\n') || labels.empty;
 }
 
 function cleanInline(value) {
@@ -36,7 +55,7 @@ function cleanInline(value) {
 }
 
 /** Preserve the document's reading hierarchy without executing or embedding its HTML. */
-function reportBlocks(draft) {
+function reportBlocks(draft, labels) {
   const blocks = [];
   const addMarkdown = (value) => {
     const lines = text(value).split('\n');
@@ -55,7 +74,7 @@ function reportBlocks(draft) {
   };
   if (text(draft?.abstract)) blocks.push({ type: 'abstract', value: cleanInline(draft.abstract) });
   if (Array.isArray(draft?.outline) && draft.outline.length) {
-    blocks.push({ type: 'heading', level: 2, value: 'Esquema de investigación' });
+    blocks.push({ type: 'heading', level: 2, value: labels.outline });
     for (const entry of draft.outline) {
       const title = cleanInline(entry?.title || entry?.name);
       const focus = cleanInline(entry?.focus || entry?.purpose);
@@ -63,12 +82,12 @@ function reportBlocks(draft) {
     }
   }
   addMarkdown(draft?.draftMarkdown || draft?.markdown || draft?.content);
-  for (const [label, value] of [['Siguientes pasos', draft?.nextSteps], ['Limitaciones', draft?.limitations], ['Bibliografía', draft?.bibliography]]) {
+  for (const [label, value] of [[labels.next, draft?.nextSteps], [labels.limitations, draft?.limitations], [labels.bibliography, draft?.bibliography]]) {
     if (!Array.isArray(value) || !value.length) continue;
     blocks.push({ type: 'heading', level: 2, value: label });
     value.map(cleanInline).filter(Boolean).forEach((entry) => blocks.push({ type: 'bullet', value: entry }));
   }
-  return blocks.length ? blocks : [{ type: 'paragraph', value: 'Informe sin contenido.' }];
+  return blocks.length ? blocks : [{ type: 'paragraph', value: labels.empty }];
 }
 
 function wrap(value, font, size, maxWidth) {
@@ -89,7 +108,9 @@ function wrap(value, font, size, maxWidth) {
  * Produce a valid, text-searchable PDF for a report. This is intentionally a conservative
  * fallback export; the styled HTML document remains available for browser printing.
  */
-export async function deepResearchPdfBytes(draft, { author = 'Nodus', subject = 'Deep Research' } = {}) {
+export async function deepResearchPdfBytes(draft, { author = 'Nodus', subject = 'Deep Research', language } = {}) {
+  const locale = pdfLanguage(language || draft?.brief?.language || draft?.language);
+  const labels = PDF_LABELS[locale];
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -111,13 +132,13 @@ export async function deepResearchPdfBytes(draft, { author = 'Nodus', subject = 
       y -= gap / 2;
     }
   };
-  const rawTitle = pdfSafe(draft?.title) || 'Informe Deep Research';
+  const rawTitle = pdfSafe(draft?.title) || labels.cover;
   const titleLines = wrap(rawTitle, bold, 22, maxWidth);
   for (const line of titleLines) { page.drawText(line, { x: margin, y, size: 22, font: bold, color: rgb(0.12, 0.24, 0.46) }); y -= 27; }
   y -= 8;
   page.drawText('NODUS · Deep Research', { x: margin, y, size: 9, font: bold, color: rgb(0.25, 0.48, 0.55) });
   y -= 25;
-  for (const block of reportBlocks(draft)) {
+  for (const block of reportBlocks(draft, labels)) {
     if (block.type === 'heading') {
       ensureSpace(28); y -= 8;
       drawParagraph(block.value, bold, block.level === 1 ? 16 : 13, 5, 0, rgb(0.12, 0.24, 0.46));

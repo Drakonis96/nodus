@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState, type DragEvent, type RefObject } 
 import { createPortal } from 'react-dom';
 import { Icon } from '../components/ui';
 import { ToolkitAppHero } from '../components/ToolkitAppHero';
-import { t, tr, tx } from '../i18n';
+import { getActiveLang, t, tr, tx } from '../i18n';
 import {
   TOOLKIT_CATEGORIES,
   TOOLKIT_OPS,
@@ -517,6 +517,7 @@ export function ToolkitConvertView({ onBack }: { onBack: () => void }) {
       zipOutput,
       zipName: zipOutput ? zipName.trim() || null : null,
       openFolderOnDone: openOnDone,
+      language: getActiveLang(),
     });
   };
 

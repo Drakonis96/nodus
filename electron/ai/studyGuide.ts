@@ -9,6 +9,7 @@ import type {
   StudySessionRequest,
   StudySessionStep,
   StudyQuizQuestion,
+  PromptLanguage,
 } from '@shared/types';
 import {
   buildStudyGuidePlan,
@@ -16,6 +17,7 @@ import {
   type StudyGuideIdeaInput,
   type StudyGuideWorkInput,
 } from '../../shared/studyGuide';
+import { localizeStudyGuidePlan, studyGuidePromptPack } from '../../shared/studyGuidePromptPacks';
 import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { findSimilarIdeas } from '../db/ideasRepo';
@@ -27,6 +29,15 @@ import { completeJson, embed } from './aiClient';
 
 const MAX_KEY_IDEAS_PER_AUTHOR = 16;
 const MAX_PASSAGES_FOR_SESSION = 8;
+
+function promptLanguage(value: unknown): PromptLanguage {
+  return value === 'en' || value === 'fr' || value === 'de' || value === 'pt' || value === 'pt-BR' || value === 'it' || value === 'tr' ? value : 'es';
+}
+
+function requestLanguage(request: unknown): PromptLanguage {
+  const explicit = (request as { language?: unknown } | null)?.language;
+  return promptLanguage(explicit === undefined || explicit === null || explicit === 'auto' ? getSettings().promptLanguage : explicit);
+}
 
 function parseAuthors(value: string | null): string[] {
   if (!value) return [];
@@ -54,14 +65,14 @@ interface SemanticBoosts {
   workBoosts: Map<string, number>;
 }
 
-async function semanticBoosts(objective: string | undefined, enabled: boolean): Promise<SemanticBoosts> {
+async function semanticBoosts(objective: string | undefined, enabled: boolean, language: PromptLanguage): Promise<SemanticBoosts> {
   const clean = objective?.trim() ?? '';
   if (!enabled || clean.length < 3) {
     return { available: false, summary: null, authorBoosts: new Map(), workBoosts: new Map() };
   }
   const vector = await embed(clean);
   if (!vector) {
-    return { available: false, summary: 'No hay embeddings configurados o disponibles para afinar el objetivo.', authorBoosts: new Map(), workBoosts: new Map() };
+    return { available: false, summary: studyGuidePromptPack(language).noEmbeddings, authorBoosts: new Map(), workBoosts: new Map() };
   }
 
   const db = getDb();
@@ -109,13 +120,13 @@ async function semanticBoosts(objective: string | undefined, enabled: boolean): 
 
   return {
     available: true,
-    summary: hits > 0 ? `Afinado con ${hits} coincidencia(s) semanticas en ideas, pasajes y resumenes.` : 'Embeddings disponibles, pero sin coincidencias fuertes para el objetivo.',
+    summary: hits > 0 ? studyGuidePromptPack(language).semanticMatches(hits) : studyGuidePromptPack(language).semanticNone,
     authorBoosts,
     workBoosts,
   };
 }
 
-function loadWorkInputs(workBoosts: Map<string, number>): Map<string, StudyGuideWorkInput[]> {
+function loadWorkInputs(workBoosts: Map<string, number>, language: PromptLanguage): Map<string, StudyGuideWorkInput[]> {
   const rows = getDb()
     .prepare(
       `WITH idea_counts AS (
@@ -166,7 +177,7 @@ function loadWorkInputs(workBoosts: Map<string, number>): Map<string, StudyGuide
     const record = progress.get(`work:${row.nodus_id}`);
     const work: StudyGuideWorkInput = {
       nodusId: row.nodus_id,
-      title: row.title || '(sin titulo)',
+      title: row.title || studyGuidePromptPack(language).session.untitled,
       authors: parseAuthors(row.authorsJson),
       year: row.year,
       zoteroKey: row.zoteroKey,
@@ -237,9 +248,11 @@ function loadKeyIdeas(): Map<string, StudyGuideIdeaInput[]> {
 }
 
 export async function buildStudyPlan(request: StudyPlanRequest = {}): Promise<StudyGuidePlan> {
-  const boosts = await semanticBoosts(request.objective, Boolean(request.semanticFocus));
+  const language = requestLanguage(request);
+  const pack = studyGuidePromptPack(language);
+  const boosts = await semanticBoosts(request.objective, Boolean(request.semanticFocus), language);
   const progress = studyProgressMap();
-  const worksByAuthor = loadWorkInputs(boosts.workBoosts);
+  const worksByAuthor = loadWorkInputs(boosts.workBoosts, language);
   const ideasByAuthor = loadKeyIdeas();
   const authors: StudyGuideAuthorInput[] = listAuthors().map((author) => {
     const record = progress.get(`author:${author.author_id}`);
@@ -261,9 +274,9 @@ export async function buildStudyPlan(request: StudyPlanRequest = {}): Promise<St
     };
   });
 
-  return buildStudyGuidePlan({
+  const plan = buildStudyGuidePlan({
     authors,
-    objective: request.objective,
+    objective: request.objective?.trim() || pack.defaultObjective,
     sessionMinutes: request.sessionMinutes,
     authorLimit: request.authorLimit,
     worksPerAuthor: request.worksPerAuthor,
@@ -272,27 +285,29 @@ export async function buildStudyPlan(request: StudyPlanRequest = {}): Promise<St
     semanticFocusUsed: boosts.available && Boolean(request.semanticFocus),
     semanticFocusSummary: boosts.summary,
   });
+  return localizeStudyGuidePlan(plan, language);
 }
 
-function fallbackSession(authorName: string, plan: StudyGuidePlan, author: StudyGuidePlan['authors'][number], model: ModelRef | null): StudySession {
+function fallbackSession(authorName: string, plan: StudyGuidePlan, author: StudyGuidePlan['authors'][number], model: ModelRef | null, language: PromptLanguage): StudySession {
+  const copy = studyGuidePromptPack(language).session;
   const sequence: StudySessionStep[] = [
     {
-      title: 'Tesis y mapa mental',
-      body: `Empieza por formular en una frase que aporta ${authorName} al corpus. Usa sus temas principales y las primeras ideas clave.`,
+      title: copy.blocks[0],
+      body: copy.stepBodies[0].replace('{author}', authorName),
       workIds: author.recommendedWorks.slice(0, 1).map((w) => w.nodusId),
       ideaIds: author.keyIdeas.slice(0, 3).map((i) => i.globalId),
       minutes: Math.max(8, Math.round(plan.sessionMinutes * 0.25)),
     },
     {
-      title: 'Obras y evidencia',
-      body: 'Abre las obras recomendadas en Zotero y contrasta las ideas con pasajes, resumenes y notas de lectura.',
+      title: copy.blocks[1],
+      body: copy.stepBodies[1],
       workIds: author.recommendedWorks.slice(0, 3).map((w) => w.nodusId),
       ideaIds: author.keyIdeas.slice(0, 5).map((i) => i.globalId),
       minutes: Math.max(12, Math.round(plan.sessionMinutes * 0.45)),
     },
     {
-      title: 'Repaso activo',
-      body: 'Responde las preguntas sin mirar la ficha y marca lo que requiera lectura completa.',
+      title: copy.blocks[2],
+      body: copy.stepBodies[2],
       workIds: author.recommendedWorks.slice(0, 2).map((w) => w.nodusId),
       ideaIds: author.keyIdeas.slice(0, 5).map((i) => i.globalId),
       minutes: Math.max(8, Math.round(plan.sessionMinutes * 0.3)),
@@ -301,7 +316,7 @@ function fallbackSession(authorName: string, plan: StudyGuidePlan, author: Study
   const quiz = author.reviewQuestions.slice(0, 4).map((question, index): StudyQuizQuestion => ({
     id: `q-${index + 1}`,
     question,
-    expected: author.keyIdeas[index]?.statement ?? 'Debe recuperar tesis, evidencia y relacion con otros autores.',
+    expected: author.keyIdeas[index]?.statement ?? copy.expected,
     ideaIds: author.keyIdeas.slice(index, index + 2).map((i) => i.globalId),
     workIds: author.recommendedWorks.slice(0, 2).map((w) => w.nodusId),
   }));
@@ -311,7 +326,7 @@ function fallbackSession(authorName: string, plan: StudyGuidePlan, author: Study
     generatedAt: new Date().toISOString(),
     model,
     usedFullText: false,
-    guide: `Sesion de estudio para ${authorName}: ${author.nextAction}`,
+    guide: copy.guide(authorName, author.nextAction),
     sequence,
     recommendedWorks: author.recommendedWorks,
     keyIdeas: author.keyIdeas,
@@ -319,9 +334,7 @@ function fallbackSession(authorName: string, plan: StudyGuidePlan, author: Study
     quiz,
     fullReadCandidates: author.recommendedWorks.filter((w) => w.zoteroKey && (!w.read || w.progressStatus === 'needs_full_read')),
     nextActions: [
-      'Marcar el estado del autor al terminar la sesion.',
-      'Abrir en Zotero la primera obra recomendada antes de citar.',
-      'Regenerar la sesion tutor si cambian las ideas o el objetivo.',
+      ...copy.nextActions,
     ],
   };
 }
@@ -329,8 +342,10 @@ function fallbackSession(authorName: string, plan: StudyGuidePlan, author: Study
 async function loadSessionPassages(
   objective: string,
   works: StudyRecommendedWork[],
-  useFullText: boolean
+  useFullText: boolean,
+  language: PromptLanguage,
 ): Promise<StudySessionPassage[]> {
+  const untitled = studyGuidePromptPack(language).session.untitled;
   if (!useFullText || works.length === 0) return [];
   const workIds = works.map((w) => w.nodusId);
   const vector = objective.trim().length >= 3 ? await embed(objective) : null;
@@ -338,7 +353,7 @@ async function loadSessionPassages(
     return findSimilarPassages(vector, 0.18, MAX_PASSAGES_FOR_SESSION, { nodusIds: workIds }).map((p) => ({
       passageId: p.passage_id,
       workId: p.nodus_id,
-      workTitle: p.title || '(sin titulo)',
+      workTitle: p.title || untitled,
       zoteroKey: p.zotero_key,
       pageLabel: p.page_label,
       snippet: clip(p.text, 560),
@@ -367,7 +382,7 @@ async function loadSessionPassages(
   return rows.map((row) => ({
     passageId: row.passage_id,
     workId: row.nodus_id,
-    workTitle: row.title || '(sin titulo)',
+    workTitle: row.title || untitled,
     zoteroKey: row.zotero_key,
     pageLabel: row.page_label,
     snippet: clip(row.text, 560),
@@ -393,11 +408,12 @@ function isAiStudySession(value: unknown): value is AiStudySession {
   );
 }
 
-function safeSteps(items: StudySessionStep[], fallback: StudySessionStep[]): StudySessionStep[] {
+function safeSteps(items: StudySessionStep[], fallback: StudySessionStep[], language: PromptLanguage): StudySessionStep[] {
+  const blockLabel = studyGuidePromptPack(language).session.blocks[0].split(/\s+/)[0];
   const valid = items
     .filter((item) => item && typeof item.title === 'string' && typeof item.body === 'string')
     .map((item, index) => ({
-      title: item.title.trim() || `Bloque ${index + 1}`,
+      title: item.title.trim() || `${blockLabel} ${index + 1}`,
       body: item.body.trim(),
       workIds: Array.isArray(item.workIds) ? item.workIds.filter((id): id is string => typeof id === 'string') : [],
       ideaIds: Array.isArray(item.ideaIds) ? item.ideaIds.filter((id): id is string => typeof id === 'string') : [],
@@ -422,7 +438,9 @@ function safeQuiz(items: StudyQuizQuestion[], fallback: StudyQuizQuestion[]): St
 }
 
 export async function generateStudySession(request: StudySessionRequest): Promise<StudySession> {
-  const objective = request.objective?.trim() || 'Dominar este autor dentro del corpus.';
+  const language = requestLanguage(request);
+  const copy = studyGuidePromptPack(language).session;
+  const objective = request.objective?.trim() || copy.defaultObjective;
   const plan = await buildStudyPlan({
     objective,
     sessionMinutes: request.sessionMinutes,
@@ -430,15 +448,16 @@ export async function generateStudySession(request: StudySessionRequest): Promis
     authorLimit: 80,
     worksPerAuthor: 6,
     semanticFocus: false,
-  });
+    language,
+  } as StudyPlanRequest & { language: PromptLanguage });
   const authorPlan = plan.authors.find((author) => author.authorId === request.authorId);
-  if (!authorPlan) throw new Error('Autor no encontrado en el plan de estudio');
+  if (!authorPlan) throw new Error(copy.notFound);
   const dossier = buildAuthorDossier(request.authorId);
   const authorName = dossier?.fullName || authorPlan.fullName || authorPlan.name;
   const settings = getSettings();
   const chosen = request.model ?? settings.studyModel ?? settings.synthesisModel ?? null;
-  const fallback = fallbackSession(authorName, plan, authorPlan, chosen);
-  const passages = await loadSessionPassages(objective, authorPlan.recommendedWorks, Boolean(request.useFullText));
+  const fallback = fallbackSession(authorName, plan, authorPlan, chosen, language);
+  const passages = await loadSessionPassages(objective, authorPlan.recommendedWorks, Boolean(request.useFullText), language);
 
   if (!chosen) {
     return { ...fallback, passages, usedFullText: passages.length > 0 };
@@ -479,10 +498,7 @@ export async function generateStudySession(request: StudySessionRequest): Promis
     })),
   };
 
-  const system =
-    'Eres el tutor de estudio de Nodus. Tu tarea no es resumir sin mas: debes guiar a una persona para dominar un autor dentro de un corpus academico. ' +
-    'Usa solo los datos proporcionados. Da una secuencia de estudio concreta, con obras que debe abrir en Zotero, ideas que debe dominar, pasajes que debe comprobar y preguntas de recuperacion activa. ' +
-    'Devuelve exclusivamente JSON con esta forma: {"guide":"parrafo breve de orientacion","sequence":[{"title":"...","body":"...","workIds":["..."],"ideaIds":["..."],"minutes":12}],"quiz":[{"id":"q1","question":"...","expected":"...","ideaIds":["..."],"workIds":["..."]}],"nextActions":["..."]}.';
+  const system = studyGuidePromptPack(language).session.system;
   const user = JSON.stringify(material);
 
   try {
@@ -491,7 +507,7 @@ export async function generateStudySession(request: StudySessionRequest): Promis
       ...fallback,
       generatedAt: new Date().toISOString(),
       guide: ai.guide.trim() || fallback.guide,
-      sequence: safeSteps(ai.sequence, fallback.sequence),
+      sequence: safeSteps(ai.sequence, fallback.sequence, language),
       quiz: safeQuiz(ai.quiz, fallback.quiz),
       passages,
       usedFullText: passages.length > 0,

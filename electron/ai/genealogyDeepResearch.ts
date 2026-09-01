@@ -34,10 +34,15 @@ import {
 } from '@shared/deepResearchQuality';
 import {
   assembleContinuousNarrative,
-  DEEP_RESEARCH_NARRATIVE_RULES,
+  deepResearchNarrativeRules,
   countWords,
   normalizeNarrativeSection,
 } from './deepResearchCore';
+import {
+  genealogyDeepResearchPromptPack,
+  genealogyDeepResearchRuntimeCopy,
+} from '@shared/genealogyDeepResearchPromptPacks';
+import { normalizePromptLanguage } from '@shared/editorAiPrompts';
 import { getSettings } from '../db/settingsRepo';
 import { listPersons, getPerson, listEvents, listEvidenceFor } from '../db/entitiesRepo';
 import { allRelationships } from '../db/relationshipsRepo';
@@ -161,9 +166,10 @@ export function buildFocusPerson(personId: string, family: FamilyFacts): FocusPe
  *  person is given, every document already linked to them is guaranteed into the
  *  pool (even if it wouldn't rank high by similarity) and the retrieval query is
  *  biased toward their name. */
-export async function buildGenealogySourcePool(objective: string, focusPersonId?: string | null): Promise<GenSource[]> {
+export async function buildGenealogySourcePool(objective: string, focusPersonId?: string | null, promptLanguage?: string): Promise<GenSource[]> {
   const sources: GenSource[] = [];
   const seen = new Set<string>();
+  const runtimeCopy = genealogyDeepResearchRuntimeCopy(normalizePromptLanguage(promptLanguage ?? getSettings().promptLanguage ?? 'es'));
 
   const addDoc = (item: { itemId: string; title: string; docType: string | null; extractedText: string | null; description: string | null; linkedPersons: { displayName: string }[] }) => {
     if (seen.has(item.itemId) || sources.filter((s) => s.kind === 'document').length >= MAX_DOC_SOURCES) return;
@@ -174,7 +180,7 @@ export async function buildGenealogySourcePool(objective: string, focusPersonId?
       kind: 'document',
       refId: item.itemId,
       title: item.title,
-      label: item.docType ?? 'documento',
+      label: item.docType ?? runtimeCopy.document,
       persons: item.linkedPersons.map((p) => p.displayName),
       snippet: clip(text, DOC_SNIPPET),
       fullText: text,
@@ -202,7 +208,7 @@ export async function buildGenealogySourcePool(objective: string, focusPersonId?
         kind: 'work',
         refId: w.nodus_id,
         title: w.title,
-        label: authorYear(authors[0], w.year),
+        label: authorYear(authors[0], w.year, runtimeCopy.author),
         persons: [],
         snippet: clip(w.title, DOC_SNIPPET),
         fullText: '', // resolved on demand while writing the section it's assigned to
@@ -284,7 +290,8 @@ export async function orchestrateGenealogyDeepResearch(
   focusPerson: FocusPerson | null = null,
   signal?: AbortSignal,
 ): Promise<DeepResearchReport> {
-  const language = request.language ?? 'es';
+  const language = normalizePromptLanguage(request.language ?? getSettings().promptLanguage ?? 'es');
+  const runtimeCopy = genealogyDeepResearchRuntimeCopy(language);
   const emit = (p: DeepResearchProgress) => {
     signal?.throwIfAborted();
     try {
@@ -302,9 +309,9 @@ export async function orchestrateGenealogyDeepResearch(
 
   emit({
     phase: 'snapshot',
-    message: focusPerson ? `Reuniendo documentos y evidencia sobre ${focusPerson.nombre}…` : 'Reuniendo documentos y evidencia de la familia…',
+    message: focusPerson ? runtimeCopy.snapshotFocus(focusPerson.nombre) : runtimeCopy.snapshotFamily,
   });
-  emit({ phase: 'planning', message: `Planificando ${sectionTarget} secciones según la evidencia disponible…` });
+  emit({ phase: 'planning', message: runtimeCopy.planning(sectionTarget) });
 
   let plan: GenPlan;
   try {
@@ -321,13 +328,14 @@ export async function orchestrateGenealogyDeepResearch(
       sourceById,
       sectionTarget,
       request.coverageQuestions ?? [],
+      language,
     );
   } catch {
-    plan = fallbackPlan(request.objective, sources, focusPerson);
+    plan = fallbackPlan(request.objective, sources, focusPerson, language);
     assignGenealogyCoverage(plan.sections, request.coverageQuestions ?? []);
   }
   if (plan.sections.length === 0) {
-    plan = fallbackPlan(request.objective, sources, focusPerson);
+    plan = fallbackPlan(request.objective, sources, focusPerson, language);
     assignGenealogyCoverage(plan.sections, request.coverageQuestions ?? []);
   }
 
@@ -339,7 +347,7 @@ export async function orchestrateGenealogyDeepResearch(
 
   for (let i = 0; i < plan.sections.length; i++) {
     if (written.length >= sectionHardCap) {
-      stoppedReason = `Se alcanzó el máximo de ${sectionHardCap} secciones.`;
+      stoppedReason = runtimeCopy.maxSections(sectionHardCap);
       break;
     }
     const section = plan.sections[i];
@@ -347,7 +355,7 @@ export async function orchestrateGenealogyDeepResearch(
 
     emit({
       phase: 'section',
-      message: `Redactando: ${section.title}`,
+      message: runtimeCopy.drafting(section.title),
       sectionIndex: written.length + 1,
       sectionTotal: Math.min(plan.sections.length, sectionHardCap),
       sectionTitle: section.title,
@@ -376,8 +384,8 @@ export async function orchestrateGenealogyDeepResearch(
     try {
       raw = await deps.writeSection({ objective: request.objective, language, section, isConclusion, sources: sectionSources, family, focusPerson, evidence, priorSummary: summarizePrior(written) });
     } catch {
-      raw = degradedSection(section, sectionSources);
-      if (!stoppedReason) stoppedReason = 'Una o más secciones se resolvieron de forma degradada por un fallo del modelo.';
+      raw = degradedSection(section, sectionSources, language);
+      if (!stoppedReason) stoppedReason = runtimeCopy.degraded;
     }
 
     let { markdown, cited } = applyGenealogyCitations(normalizeNarrativeSection(raw, section.title), sourceById);
@@ -427,7 +435,7 @@ export async function orchestrateGenealogyDeepResearch(
     totalWords += countWords(markdown);
   }
 
-  emit({ phase: 'assembling', message: 'Ensamblando informe y fuentes…', wordsSoFar: totalWords, pagesSoFar: pages(totalWords) });
+  emit({ phase: 'assembling', message: runtimeCopy.assembling, wordsSoFar: totalWords, pagesSoFar: pages(totalWords) });
 
   let finalize: GenFinalizeResult;
   try {
@@ -455,11 +463,11 @@ export async function orchestrateGenealogyDeepResearch(
       }
     }
   } catch {
-    finalize = { title: plan.title || request.objective, abstract: plan.abstract, limitations: [], nextSteps: ['Contrastar cada dato con la fuente original y buscar registros que confirmen los vínculos aún no probados.'] };
+    finalize = { title: plan.title || request.objective, abstract: plan.abstract, limitations: [], nextSteps: [runtimeCopy.verificationNextStep] };
   }
 
   const citedSources = [...citedSourceIds].map((id) => sourceById.get(id)).filter((s): s is GenSource => !!s);
-  const references = buildReferences(citedSources);
+  const references = buildReferences(citedSources, language);
   const singleNarrative = request.sectionLimit === 'single';
   const draftMarkdown = assemble(written, references, finalize, language, singleNarrative);
   const qualityAssessment = assessDeepResearchReport({
@@ -496,7 +504,7 @@ export async function orchestrateGenealogyDeepResearch(
     abstract: finalize.abstract,
     outline,
     draftMarkdown,
-    matrix: buildMatrix(citedSources),
+    matrix: buildMatrix(citedSources, language),
     bibliography: references,
     nextSteps: finalize.nextSteps,
     limitations: finalize.limitations,
@@ -531,7 +539,12 @@ export async function orchestrateGenealogyDeepResearch(
       : null,
   };
 
-  emit({ phase: 'done', message: `Informe listo: ${singleNarrative ? 'bloque continuo' : `${written.length} secciones`} · ~${meta.pages} páginas`, wordsSoFar: totalWords, pagesSoFar: meta.pages });
+  emit({
+    phase: 'done',
+    message: singleNarrative ? runtimeCopy.doneSingle(meta.pages) : runtimeCopy.doneSections(written.length, meta.pages),
+    wordsSoFar: totalWords,
+    pagesSoFar: meta.pages,
+  });
   return { draft, meta };
 }
 
@@ -543,10 +556,11 @@ export async function generateGenealogyDeepResearchReport(
 ): Promise<DeepResearchReport> {
   signal?.throwIfAborted();
   const settings = getSettings();
+  const language = normalizePromptLanguage(request.language ?? settings.promptLanguage ?? 'es');
   const model = request.model ?? settings.deepResearchModel ?? settings.synthesisModel ?? null;
   const approach = normalizeDeepResearchApproach(request.approach);
   const [ordinarySources, family] = await Promise.all([
-    buildGenealogySourcePool(request.objective, request.focusPersonId),
+    buildGenealogySourcePool(request.objective, request.focusPersonId, language),
     Promise.resolve(buildFamilyFacts()),
   ]);
   const focusPerson = request.focusPersonId ? buildFocusPerson(request.focusPersonId, family) : null;
@@ -558,7 +572,7 @@ export async function generateGenealogyDeepResearchReport(
     approach,
     variant: 'genealogy',
     objective: request.objective,
-    language: request.language ?? 'es',
+    language,
     model,
     corpusPreview: {
       focusPerson,
@@ -568,7 +582,7 @@ export async function generateGenealogyDeepResearchReport(
     },
   });
   const supplementalPools = await Promise.all(
-    retrieval.probes.slice(0, 6).map((probe) => buildGenealogySourcePool(probe, request.focusPersonId)),
+    retrieval.probes.slice(0, 6).map((probe) => buildGenealogySourcePool(probe, request.focusPersonId, language)),
   );
   const sources = mergeGenealogyApproachSources(ordinarySources, supplementalPools.flat(), approach);
   signal?.throwIfAborted();
@@ -576,7 +590,7 @@ export async function generateGenealogyDeepResearchReport(
     request,
     sources,
     family,
-    specializedGenealogyDeps(model, approach, retrieval),
+    specializedGenealogyDeps(model, approach, retrieval, language),
     onProgress,
     focusPerson,
     signal,
@@ -636,11 +650,12 @@ function specializedGenealogyDeps(
   model: ModelRef | null,
   approach: DeepResearchApproach,
   retrieval: ApproachRetrievalPlan,
+  language: ReturnType<typeof normalizePromptLanguage>,
 ): GenDeepDeps {
   const context: GenealogyApproachContext = {
     approach,
     retrieval,
-    rules: approachRules(approach, 'genealogy'),
+    rules: approachRules(approach, 'genealogy', language),
   };
   const base = realDeps(model);
   return {
@@ -667,21 +682,11 @@ function isAiPlan(v: unknown): v is AiPlanShape {
 }
 
 async function aiPlan(input: GenPlanInput, model: ModelRef | null, approach?: GenealogyApproachContext): Promise<GenPlan> {
+  const copy = genealogyDeepResearchPromptPack(input.language);
+  const runtimeCopy = genealogyDeepResearchRuntimeCopy(input.language);
   const system = [
-    'Eres el planificador de un INFORME DE HISTORIA FAMILIAR (Deep Research en modo genealogía de Nodus).',
-    'Diseñas el esqueleto de un informe riguroso y bien documentado a partir de las FUENTES (documentos de archivo y bibliografía) y de los HECHOS de la familia (personas, parentescos, eventos) que se te dan.',
-    'PRINCIPIO: pocas secciones LARGAS y de fondo, no muchas cortas. Organiza el relato de forma útil (p. ej. por generaciones, por figuras clave, por lugares o migraciones, y una sección de fuentes y método).',
-    `Organiza ${input.sectionTarget} unidades narrativas solo cuando cada una tenga una función probatoria distinta. No añadas secciones para alcanzar una longitud: si una sección no aporta evidencia o análisis nuevo, intégrala en otra.`,
-    'Cada título debe abarcar una etapa o línea narrativa sustantiva. Evita títulos partidos por dos puntos, punto y coma o guion largo.',
-    'Sigue el estándar de prueba genealógico: identidad y parentesco son HIPÓTESIS probadas con evidencia; no des por ciertos vínculos sin apoyo documental.',
-    'Asigna a cada sección los `sourceIds` que la sostienen (copia los ids EXACTOS de la lista de fuentes). No inventes fuentes ni ids.',
-    'Cuando existan fuentes independientes pertinentes, asigna varias a la misma sección para triangular identidad, fecha, lugar y parentesco. No cuentes como corroboración dos extractos derivados del mismo documento.',
-    'COBERTURA OBLIGATORIA: asigna cada elemento de `preguntas_de_cobertura` a una sección copiándolo literalmente en `coverageQuestions`. Si las fuentes no permiten responderlo, la sección debe declararlo como límite probatorio, no omitirlo.',
-    input.focusPerson
-      ? `Hay una PERSONA EN FOCO: ${input.focusPerson.nombre}. Este informe es SU biografía documentada, no un panorama genérico de la familia. Organiza las secciones en torno a su vida (orígenes y familia, etapas vitales, vínculos y descendencia, su rastro documental) y trae al resto de personas solo en la medida en que se relacionan con ella. El título del informe debe nombrarla.`
-      : '',
+    copy.planner(input.sectionTarget, input.focusPerson?.nombre),
     ...(approach?.rules.planner ?? []),
-    'Devuelve SOLO JSON: {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyPoints":["..."],"coverageQuestions":["pregunta exacta"],"sourceIds":["..."]}]}',
   ].filter(Boolean).join('\n');
   const user = JSON.stringify(
     {
@@ -703,7 +708,7 @@ async function aiPlan(input: GenPlanInput, model: ModelRef | null, approach?: Ge
     abstract: ai.abstract ?? '',
     sections: (ai.sections ?? []).map((s, i) => ({
       id: s.id ?? `s${i + 1}`,
-      title: s.title ?? `Sección ${i + 1}`,
+      title: s.title ?? runtimeCopy.section(i + 1),
       purpose: s.purpose ?? '',
       keyPoints: Array.isArray(s.keyPoints) ? s.keyPoints : [],
       sourceIds: Array.isArray(s.sourceIds) ? s.sourceIds : [],
@@ -713,20 +718,10 @@ async function aiPlan(input: GenPlanInput, model: ModelRef | null, approach?: Ge
 }
 
 async function aiWriteSection(input: GenSectionInput, model: ModelRef | null, approach?: GenealogyApproachContext): Promise<string> {
+  const copy = genealogyDeepResearchPromptPack(input.language);
+  const runtimeCopy = genealogyDeepResearchRuntimeCopy(input.language);
   const system = [
-    'Eres el redactor de un INFORME DE HISTORIA FAMILIAR (Deep Research en modo genealogía). Escribes UNA sección.',
-    'Escribe en español salvo que el idioma pida otra lengua. Desarrolla todas las afirmaciones, comparaciones e incertidumbres que la evidencia justifique y detente cuando no quede valor probatorio marginal; no persigas un número de párrafos o palabras ni repitas una idea con otras formulaciones.',
-    'Usa SOLO las fuentes y los hechos del contexto (documentos con su texto, personas, eventos, evidencia). No inventes personas, documentos, fechas ni parentescos.',
-    'Sigue el estándar de prueba genealógico: distingue lo que la fuente AFIRMA de lo que se infiere; nunca afirmes una identidad o un parentesco sin apoyo documental; señala los datos inciertos o contradictorios.',
-    'Cuando haya varias fuentes independientes, compáralas explícitamente y explica qué dato corrobora, contradice o deja abierto cada una. Cuando solo exista una, formula la conclusión como provisional.',
-    'Cuando existan tres o más fuentes independientes, distribuye al menos tres triangulaciones explícitas en párrafos distintos; con dos fuentes, hazlo en al menos dos. Una triangulación debe explicar qué confirma, contradice o limita cada registro, no limitarse a juntar enlaces.',
-    'CITAS: cuando sostengas un hecho con una fuente, cítala inmediatamente como enlace Markdown. Documentos: `[Título](nodus://archive/<itemId>)`. Obras: `[Autor, Año](nodus://work/<nodusId>)`. Copia el `id` EXACTO del campo `id` de la fuente (quita el prefijo `doc:`/`work:`). Nunca inventes ids.',
-    'Respeta los nombres y las fechas de época tal como constan; no los modernices. Nombra a las personas por su nombre completo.',
-    ...DEEP_RESEARCH_NARRATIVE_RULES,
-    'No repitas lo ya dicho (se te da un resumen de las secciones previas). Empieza con un encabezado Markdown "## " y el título dado. Devuelve solo el Markdown de la sección.',
-    input.focusPerson
-      ? `Hay una PERSONA EN FOCO: ${input.focusPerson.nombre}. Mantén el relato centrado en ella: el resto de personas aparece solo en la medida en que se relaciona con su vida.`
-      : '',
+    copy.writer(input.focusPerson?.nombre, deepResearchNarrativeRules(normalizePromptLanguage(input.language))),
     ...(approach?.rules.writer ?? []),
   ].filter(Boolean).join('\n');
   const user = JSON.stringify(
@@ -738,7 +733,7 @@ async function aiWriteSection(input: GenSectionInput, model: ModelRef | null, ap
       familia_relevante: input.family,
       persona_en_foco: input.focusPerson,
       evidencia: input.evidence,
-      resumen_secciones_previas: input.priorSummary || '(esta es la primera sección)',
+      resumen_secciones_previas: input.priorSummary || runtimeCopy.firstSection,
       ...(approach ? { enfoque_de_investigacion: approach.approach, plan_de_recuperacion: approach.retrieval } : {}),
     },
     null,
@@ -751,15 +746,9 @@ async function aiReviseGenealogySection(
   input: GenSectionInput & { draft: string; quality: DeepResearchSectionQuality },
   model: ModelRef | null,
 ): Promise<string> {
+  const copy = genealogyDeepResearchPromptPack(input.language);
   const system = [
-    'Eres el editor final de un informe de historia familiar sometido al estándar de prueba genealógico.',
-    'Reescribe la sección para corregir únicamente los fallos medidos. Conserva el idioma y todo dato ya correctamente formulado, y elimina cualquier repetición sin valor probatorio.',
-    'Usa exclusivamente las fuentes, hechos y evidencias proporcionados. No inventes identidades, parentescos, fechas, lugares ni documentos.',
-    'Distingue explícitamente dato documentado, inferencia razonada, conflicto entre registros y ausencia de prueba. Una coincidencia de nombre nunca basta por sí sola para identificar a una persona.',
-    'Compara fuentes independientes cuando existan y explica qué aporta cada una. Si una fuente es única, limita la conclusión en vez de reforzarla retóricamente.',
-    'Cuando haya tres o más fuentes independientes, conserva al menos tres párrafos de triangulación explícita; con dos fuentes, al menos dos. Cada párrafo debe explicar la relación probatoria entre registros, no acumular citas.',
-    'Copia solo los enlaces nodus:// permitidos. No acumules citas ni dejes afirmaciones sustantivas sin apoyo.',
-    'Mantén un único encabezado ## y prosa continua. Devuelve solo el Markdown completo revisado.',
+    copy.editor,
   ].join('\n');
   const allowedSources = input.sources.map((source) => {
     const [prefix, ...rest] = source.id.split(':');
@@ -796,14 +785,9 @@ function isAiFinal(v: unknown): v is AiFinalShape {
   return typeof v === 'object' && v !== null;
 }
 async function aiFinalize(input: GenFinalizeInput, model: ModelRef | null, approach?: GenealogyApproachContext): Promise<GenFinalizeResult> {
+  const copy = genealogyDeepResearchPromptPack(input.language);
   const system = [
-    'Cierras un INFORME DE HISTORIA FAMILIAR (Deep Research en modo genealogía).',
-    'Escribe en español salvo que el idioma pida otra lengua.',
-    'Devuelve SOLO JSON: {"title":"título breve del informe","abstract":"resumen de 6-10 líneas","limitations":["..."],"nextSteps":["..."]}',
-    'Las limitaciones deben ser honestas y genealógicas: vínculos aún no probados, fuentes no consultadas, fechas inciertas o contradictorias, homónimos por resolver.',
-    'El título y el resumen solo pueden sintetizar hallazgos presentes en `hallazgos_verificados`. No conviertas una hipótesis, coincidencia nominal, ausencia documental o relación posible en parentesco o identidad demostrados.',
-    'Los próximos pasos deben sugerir qué registros o fuentes buscar para probar lo que queda como hipótesis.',
-    'Redacta el título y el resumen como prosa fluida. Evita dos puntos, punto y coma y guion largo salvo necesidad estricta.',
+    copy.finalizer,
     ...(approach?.rules.finalizer ?? []),
   ].join('\n');
   const user = JSON.stringify(
@@ -835,18 +819,16 @@ async function aiAuditGenealogyFinalSummary(
   model: ModelRef | null,
   approach?: GenealogyApproachContext,
 ): Promise<GenFinalizeResult> {
+  const copy = genealogyDeepResearchPromptPack(input.language);
   const system = [
-    'Eres el control epistemológico final de un informe de historia familiar. Audita únicamente título, resumen, limitaciones y próximos pasos.',
-    'Compara cada afirmación del título y del resumen con `hallazgos_verificados`. Estrecha o elimina cualquier identidad, parentesco, cronología, causalidad o certeza que el cuerpo no establezca de forma explícita.',
-    'Distingue coincidencia nominal, hipótesis razonada, evidencia conflictiva y vínculo probado. Nunca mejores el grado de certeza del cuerpo.',
-    'No elimines ninguna limitación previa. Puedes añadir otras cuando el resumen dependa de homónimos, registros ausentes o fuentes únicas.',
-    'No introduzcas datos nuevos. Conserva el idioma y devuelve SOLO JSON con {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}.',
+    copy.auditor,
     ...(approach?.rules.finalizer ?? []),
   ].join('\n');
   const ai = await completeJson<AiFinalShape>({
     system,
     user: JSON.stringify({
       objetivo: input.objective,
+      idioma: input.language,
       hallazgos_verificados: input.sectionFindings ?? [],
       propuesta: draft,
     }, null, 2),
@@ -893,21 +875,22 @@ export function applyGenealogyCitations(markdown: string, sourceById: Map<string
   return { markdown: out, cited };
 }
 
-export function buildReferences(cited: GenSource[]): string[] {
+export function buildReferences(cited: GenSource[], language: string = 'es'): string[] {
   const entries = cited.map((s) =>
     s.kind === 'document' ? `${s.title}${s.label ? ` [${s.label}]` : ''}` : `${s.label ? `${s.label}. ` : ''}${s.title}`
   );
-  return [...new Set(entries.map((e) => e.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+  return [...new Set(entries.map((e) => e.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, language));
 }
 
-function buildMatrix(cited: GenSource[]): WritingWorkshopMatrixRow[] {
+function buildMatrix(cited: GenSource[], language: string): WritingWorkshopMatrixRow[] {
+  const copy = genealogyDeepResearchRuntimeCopy(language);
   return cited.slice(0, 60).map((s) => ({
     claim: clip(s.snippet || s.title, 240),
     role: s.kind === 'document' ? 'context' : 'support',
-    sourceLabel: s.kind === 'document' ? s.label || 'documento' : s.label || 'obra',
+    sourceLabel: s.kind === 'document' ? s.label || copy.document : s.label || copy.work,
     citation: `nodus://${s.kind === 'document' ? 'archive' : 'work'}/${encodeURIComponent(s.refId)}`,
-    evidence: s.persons.length ? `Menciona a: ${s.persons.slice(0, 6).join(', ')}.` : 'Fuente del archivo o la biblioteca.',
-    notes: s.kind === 'document' ? 'Fuente primaria del archivo.' : 'Fuente secundaria de la biblioteca.',
+    evidence: s.persons.length ? copy.mentions(s.persons.slice(0, 6).join(', ')) : copy.archiveOrLibrary,
+    notes: s.kind === 'document' ? copy.primarySource : copy.secondarySource,
   }));
 }
 
@@ -916,11 +899,13 @@ function normalizePlan(
   sourceById: Map<string, GenSource>,
   maxSections: number,
   coverageQuestions: string[] = [],
+  language: string = 'es',
 ): GenPlan {
+  const copy = genealogyDeepResearchRuntimeCopy(language);
   const validCoverage = new Set(coverageQuestions);
   const sections = (plan.sections ?? []).slice(0, maxSections).map((s, i) => ({
     id: cleanStr(s.id, `s${i + 1}`),
-    title: cleanStr(s.title, `Sección ${i + 1}`),
+    title: cleanStr(s.title, copy.section(i + 1)),
     purpose: cleanStr(s.purpose, ''),
     keyPoints: strList(s.keyPoints).slice(0, 8),
     sourceIds: strList(s.sourceIds).filter((id) => sourceById.has(id)),
@@ -953,29 +938,31 @@ function genealogyTerms(text: string): Set<string> {
   return new Set(text.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^\p{L}\p{N}]+/u).filter((word) => word.length > 3));
 }
 
-function fallbackPlan(objective: string, sources: GenSource[], focusPerson: FocusPerson | null = null): GenPlan {
+function fallbackPlan(objective: string, sources: GenSource[], focusPerson: FocusPerson | null = null, language: string = 'es'): GenPlan {
+  const copy = genealogyDeepResearchRuntimeCopy(language);
   const docs = sources.filter((s) => s.kind === 'document');
   const per = Math.max(1, Math.ceil(docs.length / 3));
   const sections: GenPlanSection[] = focusPerson
     ? [
-        { id: 's1', title: `Orígenes y familia de ${focusPerson.nombre}`, purpose: 'Presentar a la persona en foco y sus fuentes.', keyPoints: [], sourceIds: docs.slice(0, per).map((s) => s.id) },
-        { id: 's2', title: `Vida documentada de ${focusPerson.nombre}`, purpose: 'Reconstruir su biografía y vínculos a partir de los registros.', keyPoints: [], sourceIds: docs.slice(per, per * 2).map((s) => s.id) },
-        { id: 's3', title: 'Síntesis, incertidumbres y próximos pasos', purpose: 'Integrar lo probado, señalar lo incierto y qué fuentes faltan.', keyPoints: [], sourceIds: docs.slice(per * 2).map((s) => s.id) },
+        { id: 's1', title: copy.focusOrigins(focusPerson.nombre), purpose: copy.focusOriginsPurpose, keyPoints: [], sourceIds: docs.slice(0, per).map((s) => s.id) },
+        { id: 's2', title: copy.focusLife(focusPerson.nombre), purpose: copy.focusLifePurpose, keyPoints: [], sourceIds: docs.slice(per, per * 2).map((s) => s.id) },
+        { id: 's3', title: copy.synthesis, purpose: copy.synthesisPurpose, keyPoints: [], sourceIds: docs.slice(per * 2).map((s) => s.id) },
       ]
     : [
-        { id: 's1', title: 'Panorama de la familia y sus fuentes', purpose: 'Presentar a las personas y los documentos disponibles.', keyPoints: [], sourceIds: docs.slice(0, per).map((s) => s.id) },
-        { id: 's2', title: 'Vidas y vínculos documentados', purpose: 'Reconstruir biografías y parentescos a partir de los registros.', keyPoints: [], sourceIds: docs.slice(per, per * 2).map((s) => s.id) },
-        { id: 's3', title: 'Síntesis, incertidumbres y próximos pasos', purpose: 'Integrar lo probado, señalar lo incierto y qué fuentes faltan.', keyPoints: [], sourceIds: docs.slice(per * 2).map((s) => s.id) },
+        { id: 's1', title: copy.familyOverview, purpose: copy.familyOverviewPurpose, keyPoints: [], sourceIds: docs.slice(0, per).map((s) => s.id) },
+        { id: 's2', title: copy.documentedLives, purpose: copy.documentedLivesPurpose, keyPoints: [], sourceIds: docs.slice(per, per * 2).map((s) => s.id) },
+        { id: 's3', title: copy.synthesis, purpose: copy.synthesisPurpose, keyPoints: [], sourceIds: docs.slice(per * 2).map((s) => s.id) },
       ];
-  const title = focusPerson ? `Historia de ${focusPerson.nombre}: ${objective}` : `Informe familiar: ${objective}`;
+  const title = focusPerson ? copy.focusReport(focusPerson.nombre, objective) : copy.familyReport(objective);
   return { title: title.slice(0, 140), abstract: '', sections };
 }
 
-function degradedSection(section: GenPlanSection, sources: GenSectionInput['sources']): string {
+function degradedSection(section: GenPlanSection, sources: GenSectionInput['sources'], language: string = 'es'): string {
+  const copy = genealogyDeepResearchRuntimeCopy(language);
   const lines = [`## ${section.title}`, ''];
   if (section.purpose) lines.push(section.purpose, '');
   for (const s of sources.slice(0, 6)) lines.push(`- ${clip(s.texto || s.title, 240)} [${s.title}](nodus://archive/${encodeURIComponent(s.id.replace(/^doc:/, ''))})`);
-  if (sources.length === 0) lines.push('_No se pudo desarrollar esta sección con el modelo; revisar las fuentes asignadas._');
+  if (sources.length === 0) lines.push(copy.degradedNoSources);
   return lines.join('\n');
 }
 
@@ -1060,16 +1047,17 @@ function parseAuthors(json: string): string[] {
     return [];
   }
 }
-function authorYear(author: string | undefined, year: number | null): string {
+function authorYear(author: string | undefined, year: number | null, fallbackAuthor: string): string {
   const raw = (author ?? '').trim();
   const surname = raw.includes(',') ? raw.split(',')[0].trim() : raw.split(/\s+/).slice(-1)[0] || raw;
-  return year ? `${surname || 'Autor'} (${year})` : surname || 'Autor';
+  return year ? `${surname || fallbackAuthor} (${year})` : surname || fallbackAuthor;
 }
 function labels(language: string) {
   if (language === 'en') return { abstract: 'Abstract', limitations: 'Limitations', sources: 'Sources', noSources: 'No sources cited.' };
   if (language === 'fr') return { abstract: 'Résumé', limitations: 'Limites', sources: 'Sources', noSources: 'Aucune source citée.' };
   if (language === 'tr') return { abstract: 'Özet', limitations: 'Sınırlılıklar', sources: 'Kaynaklar', noSources: 'Kaynak belirtilmedi.' };
   if (language === 'de') return { abstract: 'Zusammenfassung', limitations: 'Einschränkungen', sources: 'Quellen', noSources: 'Keine Quellen angegeben.' };
+  if (language === 'it') return { abstract: 'Abstract', limitations: 'Limitazioni', sources: 'Fonti', noSources: 'Nessuna fonte citata.' };
   if (language === 'pt') return { abstract: 'Resumo', limitations: 'Limitações', sources: 'Fontes', noSources: 'Nenhuma fonte citada.' };
   if (language === 'pt-BR') return { abstract: 'Resumo', limitations: 'Limitações', sources: 'Fontes', noSources: 'Nenhuma fonte citada.' };
   return { abstract: 'Resumen', limitations: 'Limitaciones', sources: 'Fuentes', noSources: 'Sin fuentes citadas.' };

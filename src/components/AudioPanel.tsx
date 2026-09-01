@@ -22,7 +22,8 @@ import {
   type AudioGenerationResult,
 } from '../backgroundJobs';
 import { useAudioPlayer, type PlayerTrack } from './AudioPlayer';
-import { t, tx } from '../i18n';
+import { localizeRuntimeError } from '@shared/uiLanguage';
+import { getActiveLang, t, tx } from '../i18n';
 
 /**
  * Reusable narration panel for a Deep Research report or an immersion. It asks
@@ -143,7 +144,7 @@ export function AudioPanel({
       }
       setRun(null);
       if (!job) return;
-      if (job.status === 'failed' && job.error) setError(job.error);
+      if (job.status === 'failed' && job.error) setError(localizeRuntimeError(job.error, getActiveLang()));
       void refreshClips();
       void refreshStudyMeta();
       // Drop the finished snapshot so a later remount does not resurrect it.

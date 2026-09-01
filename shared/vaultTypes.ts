@@ -432,8 +432,13 @@ export function defaultHiddenViewsForType(value: unknown): string[] {
 }
 
 export function vaultTypePromptPack(value: unknown, language: PromptLanguage = 'es'): string {
-  return localizedNewVaultPromptPack(normalizeVaultType(value), language)
-    ?? getVaultTypeDef(value).promptPack;
+  const type = normalizeVaultType(value);
+  // Every non-academic vault type has a complete native pack for every
+  // PromptLanguage. The registry fallback is retained for academic (whose
+  // canonical pack is intentionally empty) and for forward compatibility with
+  // a future type that has not yet entered the localized registry; it must not
+  // be used as a locale fallback for the supported types below.
+  return localizedNewVaultPromptPack(type, language) ?? getVaultTypeDef(type).promptPack;
 }
 
 /** A style modifier appended to generated decorative-image prompts, by vault type. */

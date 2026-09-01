@@ -114,15 +114,15 @@ async function docxConvert(input: string, ctx: ToolkitRunContext): Promise<Toolk
   }
   const { value: html } = await mammoth.convertToHtml({ path: input });
   if (format === 'html') {
-    return [{ data: enc.encode(wrapHtml(String(html ?? ''))), ext: 'html' }];
+    return [{ data: enc.encode(wrapHtml(String(html ?? ''), 'Document', ctx.request.language ?? 'en')), ext: 'html' }];
   }
   const TurndownService = (await import('turndown')).default as any;
   const md = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' }).turndown(String(html ?? ''));
   return [{ data: enc.encode(md + '\n'), ext: 'md' }];
 }
 
-function wrapHtml(bodyHtml: string, title = 'Documento'): string {
-  return `<!doctype html>\n<html lang="es">\n<head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head>\n<body>\n${bodyHtml}\n</body>\n</html>\n`;
+function wrapHtml(bodyHtml: string, title = 'Document', language = 'en'): string {
+  return `<!doctype html>\n<html lang="${escapeHtml(language)}">\n<head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head>\n<body>\n${bodyHtml}\n</body>\n</html>\n`;
 }
 
 // ── A4 — Markdown / HTML → DOCX ─────────────────────────────────────────────
@@ -288,7 +288,7 @@ function xhtmlChapter(title: string, bodyHtml: string): string {
   );
 }
 
-async function markdownToEpub(input: string): Promise<ToolkitProduced[]> {
+async function markdownToEpub(input: string, language = 'en'): Promise<ToolkitProduced[]> {
   const md = readText(input);
   const title = md.match(/^#\s+(.*)$/m)?.[1]?.trim() || path.basename(input, path.extname(input));
 
@@ -333,14 +333,14 @@ async function markdownToEpub(input: string): Promise<ToolkitProduced[]> {
       data: Buffer.from(
         '<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bid">' +
           `<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="bid">urn:uuid:nodus-${uid}</dc:identifier>` +
-          `<dc:title>${escapeHtml(title)}</dc:title><dc:language>es</dc:language></metadata>` +
+          `<dc:title>${escapeHtml(title)}</dc:title><dc:language>${escapeHtml(language)}</dc:language></metadata>` +
           `<manifest>${manifestItems}</manifest><spine>${spineItems}</spine></package>`,
       ),
       store: false,
     },
     ...sections.map((s, idx) => ({
       name: `OEBPS/chap${idx + 1}.xhtml`,
-      data: Buffer.from(xhtmlChapter(s.title, s.body)),
+      data: Buffer.from(xhtmlChapter(s.title, s.body).replace('<html xmlns="http://www.w3.org/1999/xhtml">', `<html lang="${escapeHtml(language)}" xmlns="http://www.w3.org/1999/xhtml">`)),
       store: false,
     })),
   ];
@@ -353,5 +353,5 @@ export const docOps: ToolkitOpRegistry = {
   'docx-to-text': { arity: 'each', run: ([input], ctx) => docxConvert(input, ctx) },
   'text-to-docx': { arity: 'each', run: ([input], ctx) => textToDocx(input, ctx) },
   'epub-to-text': { arity: 'each', run: ([input], ctx) => epubConvert(input, ctx) },
-  'md-to-epub': { arity: 'each', run: ([input]) => markdownToEpub(input) },
+  'md-to-epub': { arity: 'each', run: ([input], ctx) => markdownToEpub(input, ctx.request.language ?? 'en') },
 };

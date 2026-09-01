@@ -15,7 +15,7 @@ import type {
 } from '@shared/libraryTypes';
 import { confirm, toast } from '../feedback';
 import { Icon, Spinner } from '../ui';
-import { t, tx } from '../../i18n';
+import { errorText, t, tx } from '../../i18n';
 import { CitationStylePicker, matchesCitationStyleQuery } from './CitationStylePicker';
 import {
   detectLibraryMetadataIdentifier,
@@ -73,7 +73,7 @@ export function LibraryCreateReferenceDialog({ defaultMode = 'identifier', colle
           : 'La referencia ya existía, pero no se encontró un PDF accesible.'), { tone: 'info', duration: 6500 });
       }
       onCreated(result.item, false); onClose();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    } catch (cause) { setError(errorText(cause)); }
     finally { setBusy(false); }
   };
 
@@ -85,7 +85,7 @@ export function LibraryCreateReferenceDialog({ defaultMode = 'identifier', colle
         title: title.trim(), itemType, creators: [], year: null, isbn: [], issn: [], tags: [],
       }, collectionIds);
       onCreated(created, true); onClose();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    } catch (cause) { setError(errorText(cause)); }
     finally { setBusy(false); }
   };
 
@@ -133,7 +133,7 @@ export function LibraryMetadataEditor({ item, onClose, onSaved }: {
       const final = citationKey.trim() !== (saved.citationKey ?? '')
         ? await window.nodus.updateGlobalLibraryCitationKey(saved.id, citationKey.trim()) : saved;
       toast(t('Metadatos guardados.')); onSaved(final); onClose();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    } catch (cause) { setError(errorText(cause)); }
     finally { setSaving(false); }
   };
 
@@ -183,12 +183,12 @@ export function LibraryMetadataBatchDialog({ itemIds, onClose, onApplied }: {
   const start = async () => {
     setBusy(true); setError('');
     try { const value = await window.nodus.startGlobalLibraryMetadataBatch(requestId, itemIds); setResult(value); setSelected(new Set(value.entries.filter((entry) => !!entry.candidate).map((entry) => entry.itemId))); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    catch (cause) { setError(errorText(cause)); }
     finally { setBusy(false); }
   };
   const apply = async () => {
     setBusy(true); try { const value = await window.nodus.applyGlobalLibraryMetadataBatch(requestId, [...selected]); setResult(value); toast(tx('{n} ficha(s) actualizada(s).', { n: value.entries.filter((entry) => entry.applied).length })); onApplied(); onClose(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); } finally { setBusy(false); }
+    catch (cause) { setError(errorText(cause)); } finally { setBusy(false); }
   };
   const close = () => { if (busy) void window.nodus.cancelGlobalLibraryMetadataBatch(requestId); onClose(); };
   return <div className="fixed inset-0 z-[90] grid place-items-center bg-black/70 p-5" role="dialog" aria-modal="true" data-testid="library-metadata-batch-dialog">
@@ -219,16 +219,16 @@ export function LibraryCitationExportDialog({ itemIds, requestScope, initialStyl
       setRepositoryLoading(true);
       void window.nodus.searchGlobalLibraryRepositoryCitationStyles(repositorySearch, 80)
         .then(setRepositoryStyles)
-        .catch((cause) => toast(cause instanceof Error ? cause.message : String(cause)))
+        .catch((cause) => toast(errorText(cause)))
         .finally(() => setRepositoryLoading(false));
     }, 180);
     return () => window.clearTimeout(timer);
   }, [repositoryOpen, repositorySearch]);
-  const copy = async () => { setBusy(true); try { const result = await window.nodus.formatGlobalLibraryCitation(targetIds, style, kind, locale); setPreview(result.text); await refreshStyles(); toast(t('Cita copiada al portapapeles.')); } catch (cause) { toast(cause instanceof Error ? cause.message : String(cause)); } finally { setBusy(false); } };
+  const copy = async () => { setBusy(true); try { const result = await window.nodus.formatGlobalLibraryCitation(targetIds, style, kind, locale); setPreview(result.text); await refreshStyles(); toast(t('Cita copiada al portapapeles.')); } catch (cause) { toast(errorText(cause)); } finally { setBusy(false); } };
   const exportFile = async () => { setBusy(true); try { const result = await window.nodus.exportGlobalLibraryBibliography({ ...requestScope, ...(targetIds.length ? { itemIds: targetIds } : {}), format }); if (!result.canceled) toast(tx('{n} referencia(s) exportada(s).', { n: result.exported })); } finally { setBusy(false); } };
   const filteredStyles = styles.filter((entry) => matchesCitationStyleQuery(entry, styleSearch));
-  const runImport = async (source: 'file' | 'zotero') => { setBusy(true); try { const result = source === 'file' ? await window.nodus.importGlobalLibraryCitationStyles() : await window.nodus.importZoteroCitationStyles(); setStyles(result.styles); if (result.imported || result.updated) toast(tx('{n} estilo(s) CSL importado(s).', { n: result.imported + result.updated })); else if (result.warnings[0]) toast(result.warnings[0]); } catch (cause) { toast(cause instanceof Error ? cause.message : String(cause)); } finally { setBusy(false); } };
-  const installRepository = async (id: string) => { setBusy(true); try { const installed = await window.nodus.installGlobalLibraryRepositoryCitationStyle(id); await refreshStyles(); setStyle(installed.id); toast(t('Estilo CSL instalado.')); } catch (cause) { toast(cause instanceof Error ? cause.message : String(cause)); } finally { setBusy(false); } };
+  const runImport = async (source: 'file' | 'zotero') => { setBusy(true); try { const result = source === 'file' ? await window.nodus.importGlobalLibraryCitationStyles() : await window.nodus.importZoteroCitationStyles(); setStyles(result.styles); if (result.imported || result.updated) toast(tx('{n} estilo(s) CSL importado(s).', { n: result.imported + result.updated })); else if (result.warnings[0]) toast(result.warnings[0]); } catch (cause) { toast(errorText(cause)); } finally { setBusy(false); } };
+  const installRepository = async (id: string) => { setBusy(true); try { const installed = await window.nodus.installGlobalLibraryRepositoryCitationStyle(id); await refreshStyles(); setStyle(installed.id); toast(t('Estilo CSL instalado.')); } catch (cause) { toast(errorText(cause)); } finally { setBusy(false); } };
   return <div className="fixed inset-0 z-[90] grid place-items-center bg-black/70 p-5" role="dialog" aria-modal="true" data-testid="library-citation-export-dialog"><section className="card flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden"><header className="flex items-center gap-3 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800"><Icon name="quote" className="text-indigo-500 dark:text-indigo-300" /><div className="flex-1"><h2 className="font-semibold">{t('Citas y exportación')}</h2><p className="text-xs text-neutral-500">{itemIds.length ? tx('{n} referencia(s) seleccionada(s)', { n: itemIds.length }) : t('Colección o búsqueda actual')}</p></div><button className="btn btn-ghost" onClick={onClose}><Icon name="x" /></button></header><div className="min-h-0 flex-1 overflow-y-auto"><div className="grid gap-5 p-5 sm:grid-cols-2"><section><div className="flex items-center justify-between"><h3 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Copiar cita')}</h3><button className="text-[10px] text-indigo-600 hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200" onClick={() => setStyleManagerOpen((value) => !value)}><Icon name="settings" size={11} /> {t('Gestionar estilos')}</button></div><CitationStylePicker styles={styles} value={style} onChange={setStyle} disabled={busy} /><div className="mt-2 grid grid-cols-2 gap-2"><select className="input w-full" value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}><option value="bibliography">{t('Entrada bibliográfica')}</option><option value="citation">{t('Cita en el texto')}</option></select><select className="input w-full" value={locale} onChange={(event) => setLocale(event.target.value)} aria-label={t('Idioma de la cita')}><option value="es-ES">Español</option><option value="en-US">English</option><option value="fr-FR">Français</option><option value="de-DE">Deutsch</option><option value="nl-NL">Nederlands</option></select></div><button data-testid="copy-library-citation" className="btn btn-primary mt-3 w-full" disabled={busy || !targetIds.length} onClick={() => void copy()}>{busy ? <Spinner /> : <Icon name="copy" />} {t('Copiar')}</button>{preview && <pre className="mt-3 max-h-40 whitespace-pre-wrap rounded-xl bg-neutral-100 p-3 text-[10px] leading-5 text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">{preview}</pre>}</section><section><h3 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Exportar referencias')}</h3><select data-testid="library-export-format" className="input mt-2 w-full" value={format} onChange={(event) => setFormat(event.target.value as LibraryBibliographyFormat)}>{[['ris', 'RIS'], ['bibtex', 'BibTeX'], ['biblatex', 'BibLaTeX'], ['csl-json', 'CSL-JSON'], ['endnote-xml', 'EndNote XML'], ['zotero-rdf', 'Zotero RDF'], ['csv', 'CSV'], ['markdown', 'Markdown']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><p className="mt-3 text-xs leading-5 text-neutral-500">{t('Los campos desconocidos se conservan para poder volver a importar el archivo sin pérdidas.')}</p><button data-testid="export-library-bibliography" className="btn btn-secondary mt-3 w-full" disabled={busy} onClick={() => void exportFile()}><Icon name="download" /> {t('Exportar…')}</button></section></div>
       {styleManagerOpen && <section data-testid="library-citation-style-manager" className="border-t border-neutral-200 bg-neutral-50/70 p-5 dark:border-neutral-800 dark:bg-neutral-950/25"><div className="flex flex-wrap items-center gap-2"><div className="relative min-w-56 flex-1"><Icon name="search" size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" /><input data-testid="library-installed-style-search" className="input input-with-leading-icon w-full" value={styleSearch} onChange={(event) => setStyleSearch(event.target.value)} placeholder={t('Buscar estilos instalados…')} /></div><button data-testid="import-library-csl" className="btn btn-secondary" disabled={busy} onClick={() => void runImport('file')}><Icon name="upload" />{t('Importar .csl')}</button><button data-testid="import-zotero-csl" className="btn btn-secondary" disabled={busy} onClick={() => void runImport('zotero')}><Icon name="library" />{t('Importar de Zotero')}</button><button data-testid="browse-csl-repository" className="btn btn-secondary" disabled={busy} onClick={() => setRepositoryOpen((value) => !value)}><Icon name="plus" />{t('Añadir más estilos')}</button></div><p className="mt-3 text-[10px] leading-5 text-neutral-500">{t('Los estilos oficiales pertenecen al proyecto CSL y conservan su autoría y licencia CC BY-SA 3.0. Los estilos privados sin licencia permanecen sólo en tu nodus-library.')}</p>
         {repositoryOpen && <div data-testid="library-csl-repository" className="mt-3 rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-950"><div className="relative"><Icon name="search" size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" /><input autoFocus data-testid="library-csl-repository-search" className="input input-with-leading-icon w-full" value={repositorySearch} onChange={(event) => setRepositorySearch(event.target.value)} placeholder={t('Buscar en el repositorio oficial CSL…')} /></div><div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-neutral-200 dark:border-neutral-800">{repositoryLoading ? <div className="p-4"><Spinner label={t('Consultando estilos oficiales…')} /></div> : repositoryStyles.map((entry) => <button key={entry.id} type="button" className="flex w-full items-center justify-between gap-3 border-b border-neutral-200 px-3 py-2 text-left text-xs last:border-0 hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-900" disabled={busy} onClick={() => void installRepository(entry.id)}><span className="min-w-0"><b className="block truncate">{entry.title}</b><span className="block truncate font-mono text-[9px] text-neutral-500">{entry.id}</span></span><Icon name="download" size={13} /></button>)}</div></div>}

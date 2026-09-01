@@ -200,6 +200,35 @@ try {
   assert.match(groundedChat.readerGrounding.citationUri, /^nodus:\/\/reader\/zotero%3AE7FGXJFE$/);
   assert.deepEqual(groundedChat.readerGrounding.sections.map((section) => section.page), [1, 1, 2]);
 
+  const localizedReaderMarkers = {
+    es: ['Markdown limpio', 'contenido central omitido'],
+    en: ['Clean Markdown', 'middle content omitted'],
+    fr: ['Markdown nettoyé', 'contenu central omis'],
+    de: ['Bereinigtes Markdown', 'mittlerer Inhalt'],
+    pt: ['Markdown limpo', 'conteúdo central omitido'],
+    'pt-BR': ['Markdown limpo', 'conteúdo central omitido'],
+    it: ['Markdown pulito', 'contenuto centrale omesso'],
+    tr: ['Temiz Markdown', 'orta bölüm atlandı'],
+  };
+  for (const [language, [sourceMarker, truncationMarker]] of Object.entries(localizedReaderMarkers)) {
+    const localized = readerChat.buildLibraryReaderNodiContext({
+      documentId: document.workId,
+      title: document.title,
+      authors: document.authors,
+      year: document.year,
+      markdown: `# Title\n\n${'x'.repeat(2_500)}`,
+      sourceId: 'clean',
+      annotations: [],
+      sections: [],
+      documentCharLimit: 2_000,
+      language,
+    });
+    assert.match(localized.currentView.text, new RegExp(sourceMarker), `${language} localizes the clean-source label`);
+    assert.match(localized.currentView.text, new RegExp(truncationMarker), `${language} localizes the truncation marker`);
+    assert.match(localized.currentView.text, /<open_document>[\s\S]*<document_content>/, `${language} uses neutral structural tags`);
+    if (language !== 'es') assert.doesNotMatch(localized.currentView.text, /contenido central omitido|Markdown limpio/, `${language} does not leak Spanish reader scaffolding`);
+  }
+
   const selectedText = 'Texto limpio';
   const startOffset = markdown.indexOf(selectedText);
   const created = readerStore.createLibraryReaderAnnotation('zotero:E7FGXJFE', {

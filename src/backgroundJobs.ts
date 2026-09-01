@@ -18,6 +18,7 @@ import type {
   TranslateJobResult,
 } from '@shared/types';
 import type { DatabaseAttachment, DatabaseRow } from '@shared/databases';
+import { t } from './i18n';
 
 export type BackgroundJobStatus = 'running' | 'completed' | 'failed';
 
@@ -405,7 +406,7 @@ export function getDeepResearchQueue(): DeepResearchQueueItem[] {
 
 function objectivePreview(objective: string): string {
   const clean = objective.replace(/\s+/g, ' ').trim();
-  return clean.length > 100 ? `${clean.slice(0, 100)}…` : clean || 'Informe sin título';
+  return clean.length > 100 ? `${clean.slice(0, 100)}…` : clean || t('Informe sin título');
 }
 
 export function enqueueDeepResearch(request: DeepResearchRequest): DeepResearchQueueItem {

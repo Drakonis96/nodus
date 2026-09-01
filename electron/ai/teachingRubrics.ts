@@ -17,9 +17,9 @@ import {
   type RubricCriterion,
   type RubricGenerationRequest,
   type RubricGenerationResult,
-  type RubricLanguage,
   type RubricLevel,
 } from '@shared/teachingRubrics';
+import { teachingPromptPack } from '@shared/teachingPromptPacks';
 
 /**
  * Rubric AI, in two shapes the teacher actually asks for:
@@ -35,26 +35,6 @@ import {
  * choice, privacy gates, monthly budget and fallback model.
  */
 
-const LANGUAGE_NAMES: Record<RubricLanguage, string> = {
-  es: 'español',
-  en: 'inglés',
-  fr: 'francés',
-  de: 'alemán',
-  pt: 'portugués de Portugal',
-  'pt-BR': 'portugués de Brasil',
-  it: 'italiano',
-  tr: 'turco',
-};
-
-/** The rules that separate a usable descriptor from a vague one. */
-const DESCRIPTOR_RULES = [
-  'Describe conductas OBSERVABLES y evaluables, no actitudes internas.',
-  'Mantén la estructura paralela entre niveles: cambia el GRADO de calidad, no el tema ni la redacción.',
-  'Un solo aspecto por criterio; si mezclas dos, sepáralos en criterios distintos.',
-  'Evita negaciones vagas ("no está mal") y cuantificadores imprecisos ("algunos", "bastante"); concreta cantidad o alcance cuando proceda.',
-  'Describe calidad, no frecuencia de entrega ni esfuerzo.',
-].join(' ');
-
 export async function fillRubricCell(request: RubricCellFillRequest): Promise<RubricCellFillResult> {
   const rubric = getTeachingRubric(request.rubricId);
   const target = describeRubricCell(rubric, request.criterionId, request.levelId);
@@ -63,26 +43,27 @@ export async function fillRubricCell(request: RubricCellFillRequest): Promise<Ru
   const criterion = rubric.criteria.find((entry) => entry.id === request.criterionId)!;
   if (!criterion.name.trim()) throw new Error('Escribe primero el nombre del criterio para que la IA sepa qué describir.');
 
+  const settings = getSettings();
+  const pack = teachingPromptPack(settings.promptLanguage ?? 'es').rubric;
   const table = rubricToMarkdown(rubric);
   const system = [
-    'Eres un docente experto en evaluación por criterios que redacta descriptores de rúbrica.',
-    `Escribe ÍNTEGRAMENTE en ${LANGUAGE_NAMES[rubric.language] ?? LANGUAGE_NAMES.es}.`,
-    DESCRIPTOR_RULES,
-    'Devuelve SOLO el texto del descriptor pedido: una o dos frases, sin comillas, sin el nombre del nivel ni del criterio, sin markdown.',
+    pack.systemRole,
+    `${pack.systemLanguage} ${pack.languageNames[rubric.language] ?? pack.languageNames.es}.`,
+    pack.descriptorRules,
+    pack.systemDescriptorOutput,
   ].join(' ');
 
   const user = [
-    `RÚBRICA COMPLETA (para que el nuevo descriptor encaje con los demás):\n\n${table}`,
-    `CRITERIO: ${criterion.name}${criterion.description.trim() ? ` — ${criterion.description}` : ''}`,
-    `NIVEL A REDACTAR: "${level.label}" (${level.score} de ${rubric.scaleMax} puntos).`,
-    `Es ${levelPosition(rubric.levels, level)} de ${rubric.levels.length} niveles, ordenados de mayor a menor desempeño.`,
-    request.instruction?.trim() ? `INDICACIÓN DEL PROFESOR: ${request.instruction.trim()}` : '',
-    'Redacta el descriptor de ESA casilla.',
+    `${pack.rubricComplete}\n\n${table}`,
+    `${pack.criterion} ${criterion.name}${criterion.description.trim() ? ` — ${criterion.description}` : ''}`,
+    `${pack.level} "${level.label}" (${level.score} de ${rubric.scaleMax} puntos).`,
+    pack.levelsPosition(rubric.levels.findIndex((entry) => entry.id === level.id), rubric.levels.length),
+    request.instruction?.trim() ? `${pack.teacherInstruction} ${request.instruction.trim()}` : '',
+    pack.writeCell,
   ]
     .filter(Boolean)
     .join('\n\n');
 
-  const settings = getSettings();
   const outcome = await runStudyAiTask<string>(
     {
       task: 'questions',
@@ -107,13 +88,6 @@ export async function fillRubricCell(request: RubricCellFillRequest): Promise<Ru
     .trim();
   if (!text) throw new Error('La IA no devolvió un descriptor utilizable. Vuelve a intentarlo o escríbelo a mano.');
   return { text, model: outcome.model };
-}
-
-function levelPosition(levels: RubricLevel[], level: RubricLevel): string {
-  const index = levels.findIndex((entry) => entry.id === level.id);
-  if (index === 0) return 'el nivel MÁS ALTO';
-  if (index === levels.length - 1) return 'el nivel MÁS BAJO';
-  return `el nivel ${index + 1}`;
 }
 
 interface RawRubric {
@@ -157,7 +131,7 @@ function makeRubricGuard(criteriaCount: number, levelCount: number) {
 const asText = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
 /** Read the task instructions the rubric must assess, from wherever they live. */
-async function loadSourceText(request: RubricGenerationRequest): Promise<string> {
+async function loadSourceText(request: RubricGenerationRequest, sourceSearchFallback: string): Promise<string> {
   if (request.source.kind === 'file') {
     const extracted = await extractFromPath(request.source.filePath);
     return (extracted.text ?? '').slice(0, 20000);
@@ -165,7 +139,7 @@ async function loadSourceText(request: RubricGenerationRequest): Promise<string>
   if (request.source.kind === 'material') {
     try {
       const entries = await retrieveStudyAssistantEntries(
-        request.instruction || 'criterios de evaluación de la tarea',
+        request.instruction || sourceSearchFallback,
         { subjectId: request.subjectId ?? undefined },
         [`material:${request.source.materialId}`],
         10
@@ -187,36 +161,28 @@ export async function generateRubric(request: RubricGenerationRequest): Promise<
   const language = request.language;
   const levelCount = Math.max(2, Math.min(MAX_RUBRIC_LEVELS, Math.round(request.levelCount || 4)));
   const criteriaCount = Math.max(1, Math.min(MAX_RUBRIC_CRITERIA, Math.round(request.criteriaCount || 4)));
-  const sourceText = await loadSourceText(request);
+  const settings = getSettings();
+  const pack = teachingPromptPack(settings.promptLanguage ?? 'es').rubric;
+  const sourceText = await loadSourceText(request, pack.sourceSearchFallback);
 
   const system = [
-    'Eres un docente experto en evaluación que diseña rúbricas analíticas.',
-    `Redacta TODO en ${LANGUAGE_NAMES[language] ?? LANGUAGE_NAMES.es}.`,
-    DESCRIPTOR_RULES,
-    'Los criterios deben ser independientes entre sí y cubrir la tarea sin solaparse.',
-    'Devuelve solo JSON válido, sin markdown ni texto adicional.',
+    pack.taskSystemRole,
+    `${pack.taskSystemLanguage} ${pack.languageNames[language] ?? pack.languageNames.es}.`,
+    pack.descriptorRules,
+    pack.independentCriteria,
+    pack.taskSystemJson,
   ].join(' ');
 
   const user = [
-    `TAREA A EVALUAR: ${instruction || 'la tarea descrita en el documento adjunto'}`,
-    sourceText ? `INSTRUCCIONES / MATERIAL DE LA TAREA:\n${sourceText}` : '',
-    `Genera EXACTAMENTE ${criteriaCount} criterios y ${levelCount} niveles de desempeño, ordenados de MAYOR a MENOR.`,
-    request.weighted ? 'Asigna a cada criterio un "weight" en porcentaje; los pesos deben sumar 100.' : '',
-    `FORMATO JSON EXACTO:
-{
-  "title": "título de la rúbrica",
-  "description": "una frase sobre qué evalúa",
-  "levels": ["nombre del nivel más alto", "…", "nombre del nivel más bajo"],
-  "criteria": [
-    { "name": "nombre del criterio", "description": "qué se observa"${request.weighted ? ', "weight": 25' : ''}, "descriptors": ["descriptor del nivel más alto", "…", "descriptor del nivel más bajo"] }
-  ]
-}
-- "descriptors" debe tener exactamente ${levelCount} elementos, en el MISMO orden que "levels".`,
+    `${pack.task}: ${instruction || pack.attachedTask}`,
+    sourceText ? `${pack.sourceMaterial}\n${sourceText}` : '',
+    pack.exactCounts(criteriaCount, levelCount),
+    request.weighted ? pack.weighted : '',
+    `${pack.exactJson}\n${pack.jsonFormat(Boolean(request.weighted))}\n${pack.descriptorCount(levelCount)}`,
   ]
     .filter(Boolean)
     .join('\n\n');
 
-  const settings = getSettings();
   const outcome = await runStudyAiTask<RawRubric>(
     {
       task: 'questions',
@@ -258,7 +224,7 @@ export async function generateRubric(request: RubricGenerationRequest): Promise<
     });
     return {
       id: `C${index + 1}`,
-      name: asText(item.name) || `Criterio ${index + 1}`,
+      name: asText(item.name) || `${teachingPromptPack(language).rubric.criterionFallback} ${index + 1}`,
       description: asText(item.description),
       weight: Number.isFinite(Number(item.weight)) ? Number(item.weight) : 0,
       cells,
@@ -273,7 +239,7 @@ export async function generateRubric(request: RubricGenerationRequest): Promise<
 
   return {
     rubric: {
-      title: asText(raw.title) || instruction.slice(0, 80) || 'Rúbrica',
+      title: asText(raw.title) || instruction.slice(0, 80) || teachingPromptPack(language).rubric.rubricFallback,
       description: asText(raw.description),
       subjectId: request.subjectId ?? null,
       courseId: request.courseId ?? null,

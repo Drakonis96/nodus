@@ -196,6 +196,11 @@ function assemble(edge, clusterId, clusterSize, support, themes, side) {
     sideB,
     timeline: timeline(sideA, sideB),
     tension: tensionText(edge.type, sideA, sideB),
+    tensionKey: edge.type === "refutes" ? "debate.refutes" : "debate.contradicts",
+    tensionParams: {
+      left: clip(sideA.statement || sideA.label, DEBATE_TENSION_CLIP),
+      right: clip(sideB.statement || sideB.label, DEBATE_TENSION_CLIP)
+    },
     trace: null
   };
 }

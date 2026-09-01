@@ -280,6 +280,8 @@ try {
   const ideasSource = fs.readFileSync(path.join(repoRoot, 'src/views/IdeasView.tsx'), 'utf8');
   const serverSource = fs.readFileSync(path.join(repoRoot, 'electron/copilot/server.ts'), 'utf8');
   const copilotChatSource = fs.readFileSync(path.join(repoRoot, 'electron/ai/copilotChat.ts'), 'utf8');
+  const copilotPromptStylesSource = fs.readFileSync(path.join(repoRoot, 'electron/ai/copilotPromptStyles.ts'), 'utf8');
+  const editorAiPromptsSource = fs.readFileSync(path.join(repoRoot, 'shared/editorAiPrompts.ts'), 'utf8');
   const { isAllowedCopilotOrigin } = require(path.join(repoRoot, 'electron/copilot/originPolicy.ts'));
   assert.equal(isAllowedCopilotOrigin(undefined, 4320), true, 'native clients without Origin remain supported');
   assert.equal(isAllowedCopilotOrigin('https://localhost:4320', 4320), true);
@@ -298,9 +300,10 @@ try {
   assert.match(serverSource, /COPILOT_MODEL_PROVIDERS\.has\(provider\)/, 'unknown providers must be rejected before reaching the AI client');
   assert.match(serverSource, /streamOfficeChat\(normalizedChat/);
   assert.match(copilotChatSource, /untrustedSelectedPassage/);
-  assert.match(copilotChatSource, /Solo authorizedQuestion contiene la instrucción actual autorizada/, 'only the latest question may direct the model');
+  assert.match(editorAiPromptsSource, /Solo authorizedQuestion contiene la instrucción actual autorizada/, 'only the latest question may direct the model');
   assert.match(copilotChatSource, /completeTextStreamNeutral/, 'global promptLanguage must not override the question language');
-  assert.match(copilotChatSource, /No inventes contenido ausente del contexto/, 'chat must stay grounded in the selected Word context');
+  assert.match(copilotPromptStylesSource, /studyImprovementWarnings\([\s\S]*settings\.uiLanguage === 'es' \? 'es' : 'en'/, 'Word validation warnings must follow the pane UI language, not promptLanguage');
+  assert.match(editorAiPromptsSource, /No inventes contenido ausente del contexto/, 'chat must stay grounded in the selected Word context');
   assert.match(referencesJs, /fingerprint === externalStateFingerprint/, 'identical Writer polling snapshots must not rebuild the citation composer');
   assert.match(serverSource, /suggestCopilotAlternatives\(\{/, 'the Word endpoint must use the direct AI Edition-style alternatives engine');
   assert.match(serverSource, /composeFromSelection\(\{[\s\S]*?model: modelRef\(body\.model\)/, 'selection actions must honor the Ideas/Passages model selector');

@@ -49,8 +49,8 @@ export function markdownToPlainText(md: string): string {
 }
 
 /** A self-contained HTML document — used both for HTML export and (via htmlToPdf) PDF. */
-export function transcriptToHtml(md: string, title: string): string {
-  return `<!doctype html>\n<html lang="es">\n<head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${READER_CSS}</style></head>\n<body>\n${markdownToHtml(md)}\n</body>\n</html>\n`;
+export function transcriptToHtml(md: string, title: string, language = 'en'): string {
+  return `<!doctype html>\n<html lang="${escapeHtml(language)}">\n<head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${READER_CSS}</style></head>\n<body>\n${markdownToHtml(md)}\n</body>\n</html>\n`;
 }
 
 function xhtmlChapter(title: string, bodyHtml: string): string {
@@ -63,8 +63,8 @@ function xhtmlChapter(title: string, bodyHtml: string): string {
 
 /** Build a valid EPUB (OCF: mimetype first + STORED) from the transcript Markdown,
  *  splitting into chapters at top-level (#) headings. Mirrors the Convert MD→EPUB op. */
-export function transcriptToEpubBytes(md: string, title: string): Uint8Array {
-  const docTitle = md.match(/^#\s+(.*)$/m)?.[1]?.trim() || title || 'Documento';
+export function transcriptToEpubBytes(md: string, title: string, language = 'en'): Uint8Array {
+  const docTitle = md.match(/^#\s+(.*)$/m)?.[1]?.trim() || title || 'Document';
   const sections: Array<{ title: string; body: string }> = [];
   let currentTitle = docTitle;
   let buf: string[] = [];
@@ -100,14 +100,14 @@ export function transcriptToEpubBytes(md: string, title: string): Uint8Array {
       data: Buffer.from(
         '<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bid">' +
           `<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="bid">urn:uuid:nodus-${uid}</dc:identifier>` +
-          `<dc:title>${escapeHtml(docTitle)}</dc:title><dc:language>es</dc:language></metadata>` +
+          `<dc:title>${escapeHtml(docTitle)}</dc:title><dc:language>${escapeHtml(language)}</dc:language></metadata>` +
           `<manifest>${manifestItems}</manifest><spine>${spineItems}</spine></package>`,
       ),
       store: false,
     },
     ...sections.map((s, idx) => ({
       name: `OEBPS/chap${idx + 1}.xhtml`,
-      data: Buffer.from(xhtmlChapter(s.title, s.body)),
+      data: Buffer.from(xhtmlChapter(s.title, s.body).replace('<html xmlns="http://www.w3.org/1999/xhtml">', `<html lang="${escapeHtml(language)}" xmlns="http://www.w3.org/1999/xhtml">`)),
       store: false,
     })),
   ];
@@ -115,11 +115,11 @@ export function transcriptToEpubBytes(md: string, title: string): Uint8Array {
 }
 
 /** Non-PDF export bytes. PDF is handled by the wiring via transcriptToHtml + htmlToPdf. */
-export function exportTranscriptBytes(md: string, format: Exclude<AiOcrExportFormat, 'pdf'>, title: string): Uint8Array {
+export function exportTranscriptBytes(md: string, format: Exclude<AiOcrExportFormat, 'pdf'>, title: string, language = 'en'): Uint8Array {
   switch (format) {
     case 'txt': return enc.encode(markdownToPlainText(md) + '\n');
     case 'md': return enc.encode(md.endsWith('\n') ? md : md + '\n');
-    case 'html': return enc.encode(transcriptToHtml(md, title));
-    case 'epub': return transcriptToEpubBytes(md, title);
+    case 'html': return enc.encode(transcriptToHtml(md, title, language));
+    case 'epub': return transcriptToEpubBytes(md, title, language);
   }
 }

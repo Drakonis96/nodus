@@ -3,7 +3,7 @@
 // with a verifiable citation and the Zotero item to cite. This is the ad-hoc,
 // symmetric counterpart of the per-chapter relation analysis, reusing the same
 // candidate retrieval + relation typing as electron/ai/chapterIdeas.ts.
-import type { EdgeDetail, Idea, LiveRelation, LiveRelationsResult, ModelRef } from '@shared/types';
+import type { EdgeDetail, Idea, LiveRelation, LiveRelationsResult, ModelRef, PromptLanguage } from '@shared/types';
 import { completeText, embed } from './aiClient';
 import {
   clamp01,
@@ -18,6 +18,7 @@ import { findSimilarIdeas, getIdeaDetail, getIdeaEdges, getIdeaSummary } from '.
 import { embeddedPassageCount, findSimilarPassages, getPassageDetail } from '../db/passagesRepo';
 import { getWork } from '../db/worksRepo';
 import { getDb } from '../db/database';
+import { liveRelationsPromptPack } from '../../shared/researchPromptPacks';
 
 const PSEUDO_ID = 'paragraph';
 const LIVE_RESULT_LIMIT = 36;
@@ -718,23 +719,18 @@ export async function composeCopilotIdeaInsertion(input: {
   paragraphText: string;
   selectionText?: string;
   model?: ModelRef | null;
+  language?: PromptLanguage;
 }): Promise<CopilotInsertionResult> {
   const detail = getCopilotIdeaDetail(input.ideaId);
   if (!detail) throw new Error('No se encontró la idea en Nodus.');
   const settings = getSettings();
   const model = input.model ?? settings.synthesisModel;
+  const language = input.language ?? settings.promptLanguage ?? 'es';
   const authorYear = detail.authorYear ?? detail.occurrences[0]?.authorYear ?? null;
   const source = detail.occurrences[0] ?? null;
   const text = await completeText(
     {
-      system: [
-        'Eres Nodus Copilot dentro de Microsoft Word.',
-        'Inserta UNA idea de la biblioteca en el párrafo del usuario con estilo académico natural.',
-        'Parafrasea: no copies evidencia literal salvo fragmentos mínimos inevitables.',
-        'Usa solo la idea, sus desarrollos, evidencias y conexiones recibidas. No inventes autores, años, páginas ni obras.',
-        authorYear ? `La respuesta debe incluir exactamente esta cita parentética en texto plano: (${authorYear}).` : 'Si no hay autor-año, no inventes cita bibliográfica.',
-        'Devuelve solo el texto que se insertará, sin Markdown, sin viñetas, sin explicación.',
-      ].join('\n'),
+      system: liveRelationsPromptPack(language).ideaInsertion + '\n' + (authorYear ? citationRequirement(language, authorYear) : noCitationRequirement(language)),
       user: JSON.stringify(
         {
           parrafo_actual: clip(input.paragraphText, 2200),
@@ -785,7 +781,7 @@ export async function composeCopilotIdeaInsertion(input: {
  * Analyze an arbitrary paragraph and return its typed relations with the library.
  * Returns `available:false` when no embedding provider/key is configured.
  */
-export async function analyzeText(text: string, model?: ModelRef | null): Promise<LiveRelationsResult> {
+export async function analyzeText(text: string, model?: ModelRef | null, language: PromptLanguage = getSettings().promptLanguage ?? 'es'): Promise<LiveRelationsResult> {
   const trimmed = text.trim();
   if (trimmed.length < 12) return { available: true, relations: [] };
 
@@ -800,7 +796,8 @@ export async function analyzeText(text: string, model?: ModelRef | null): Promis
   const typed = await typeRelations(
     [{ id: PSEUDO_ID, label: clip(trimmed, 80), statement: trimmed }],
     new Map([[PSEUDO_ID, candidates]]),
-    model
+    model,
+    language
   );
 
   const relations: LiveRelation[] = candidates.map((candidate) => {
@@ -937,35 +934,51 @@ export interface CopilotComposeResult {
 
 const COMPOSE_MAX_CONTEXT = 5;
 
-function composeSystemPrompt(mode: CopilotComposeMode): string {
-  const base = [
-    'Eres Nodus Copilot dentro de un procesador de texto académico.',
-    'Trabajas SOLO con el texto del usuario y las ideas de su biblioteca que se te pasan.',
-    'No inventes autores, años, páginas ni obras: usa únicamente las citas (autor, año) proporcionadas.',
-    'Escribe en el mismo idioma que el texto del usuario, con prosa académica natural.',
-    'Cuando te apoyes en una idea de la biblioteca, incorpora su cita parentética en texto plano, p. ej. (Autor, 2019).',
-    'Devuelve SOLO el texto resultante: sin Markdown, sin viñetas, sin comillas globales de apertura/cierre, sin explicación ni encabezados.',
-  ];
-  if (mode === 'rewrite') {
-    base.push(
-      'Tarea: REESCRIBE la selección con mejor prosa académica conservando su significado; integra 1-2 citas de apoyo solo si encajan con naturalidad. El resultado SUSTITUYE a la selección.'
-    );
-  } else if (mode === 'expand') {
-    base.push(
-      'Tarea: CONTINÚA y AMPLÍA la selección con 1-3 frases que desarrollen la idea apoyándose en la biblioteca y sus citas. El resultado se AÑADE tras la selección.'
-    );
-  } else {
-    base.push(
-      'Tarea: redacta un CONTRAARGUMENTO matizado a la selección basándote en las ideas de la biblioteca que la tensionan o contradicen, con sus citas. Empieza con una fórmula del tipo «Sin embargo,» o «No obstante,». El resultado se AÑADE tras la selección.'
-    );
-  }
-  return base.join('\n');
+function localizedComposeSystemPrompt(mode: CopilotComposeMode, language: PromptLanguage): string {
+  const pack = liveRelationsPromptPack(language);
+  return pack.composeBase + '\n' + pack.output[mode];
 }
 
-function composeOutputHint(mode: CopilotComposeMode): string {
-  if (mode === 'rewrite') return 'Versión reescrita de la selección (la sustituye).';
-  if (mode === 'expand') return '1-3 frases nuevas que continúan el texto (se añaden tras la selección).';
-  return '1-3 frases de contraargumento con su(s) cita(s) (se añaden tras la selección).';
+function localizedComposeOutputHint(mode: CopilotComposeMode, language: PromptLanguage): string {
+  const hints: Record<PromptLanguage, Record<CopilotComposeMode, string>> = {
+    es: { rewrite: 'Versión reescrita de la selección (la sustituye).', expand: '1-3 frases nuevas que continúan el texto (se añaden tras la selección).', counter: '1-3 frases de contraargumento con su(s) cita(s) (se añaden tras la selección).' },
+    en: { rewrite: 'Rewritten version of the selection (it replaces it).', expand: '1-3 new sentences continuing the text (added after the selection).', counter: '1-3 counterargument sentences with citation(s) (added after the selection).' },
+    fr: { rewrite: 'Version réécrite de la sélection (elle la remplace).', expand: '1 à 3 phrases nouvelles qui prolongent le texte (ajoutées après la sélection).', counter: '1 à 3 phrases de contre-argument avec citation(s) (ajoutées après la sélection).' },
+    de: { rewrite: 'Überarbeitete Fassung der Auswahl (sie ersetzt die Auswahl).', expand: '1–3 neue Sätze, die den Text fortsetzen (nach der Auswahl eingefügt).', counter: '1–3 Sätze eines Gegenarguments mit Zitat(en) (nach der Auswahl eingefügt).' },
+    pt: { rewrite: 'Versão reescrita da seleção (substitui a seleção).', expand: '1–3 frases novas que continuam o texto (acrescentadas depois da seleção).', counter: '1–3 frases de contra-argumento com citação(ões) (acrescentadas depois da seleção).' },
+    'pt-BR': { rewrite: 'Versão reescrita da seleção (substitui a seleção).', expand: '1–3 frases novas que continuam o texto (adicionadas após a seleção).', counter: '1–3 frases de contra-argumento com citação(ões) (adicionadas após a seleção).' },
+    it: { rewrite: 'Versione riscritta della selezione (la sostituisce).', expand: '1–3 frasi nuove che continuano il testo (aggiunte dopo la selezione).', counter: '1–3 frasi di controargomentazione con citazione/i (aggiunte dopo la selezione).' },
+    tr: { rewrite: 'Seçimin yeniden yazılmış sürümü (seçimin yerini alır).', expand: 'Metni sürdüren 1-3 yeni cümle (seçimin ardından eklenir).', counter: 'Alıntı(lar) içeren 1-3 karşı argüman cümlesi (seçimin ardından eklenir).' },
+  };
+  return hints[language][mode];
+}
+
+function citationRequirement(language: PromptLanguage, authorYear: string): string {
+  const text: Record<PromptLanguage, string> = {
+    es: 'La respuesta debe incluir exactamente esta cita parentética en texto plano: (' + authorYear + ').',
+    en: 'The response must include exactly this parenthetical citation in plain text: (' + authorYear + ').',
+    fr: 'La réponse doit inclure exactement cette citation parenthétique en texte brut : (' + authorYear + ').',
+    de: 'Die Antwort muss genau diese Klammerzitation als Klartext enthalten: (' + authorYear + ').',
+    pt: 'A resposta deve incluir exatamente esta citação parentética em texto simples: (' + authorYear + ').',
+    'pt-BR': 'A resposta deve incluir exatamente esta citação entre parênteses em texto simples: (' + authorYear + ').',
+    it: 'La risposta deve includere esattamente questa citazione parentetica in testo semplice: (' + authorYear + ').',
+    tr: 'Yanıt düz metin olarak tam şu parantez içi alıntıyı içermeli: (' + authorYear + ').',
+  };
+  return text[language];
+}
+
+function noCitationRequirement(language: PromptLanguage): string {
+  const text: Record<PromptLanguage, string> = {
+    es: 'Si no hay autor-año, no inventes cita bibliográfica.',
+    en: 'If there is no author-year, do not invent a bibliographic citation.',
+    fr: 'Sans auteur-année, n’invente pas de référence bibliographique.',
+    de: 'Wenn kein Autor-Jahr vorliegt, erfinde keine bibliografische Angabe.',
+    pt: 'Se não houver autor-ano, não inventes uma citação bibliográfica.',
+    'pt-BR': 'Se não houver autor-ano, não invente uma citação bibliográfica.',
+    it: 'Senza autore-anno, non inventare una citazione bibliografica.',
+    tr: 'Yazar-yıl yoksa bibliyografik alıntı uydurma.',
+  };
+  return text[language];
 }
 
 function normalizeComposeText(raw: string): string {
@@ -988,6 +1001,7 @@ export async function composeFromSelection(input: {
   selectionText: string;
   paragraphText: string;
   model?: ModelRef | null;
+  language?: PromptLanguage;
 }): Promise<CopilotComposeResult> {
   const { mode } = input;
   const selection = (input.selectionText ?? '').trim();
@@ -997,7 +1011,8 @@ export async function composeFromSelection(input: {
     throw new Error('Selecciona (o sitúate en) un fragmento con algo más de texto para trabajarlo.');
   }
 
-  const analysis = await analyzeText(focus, input.model ?? null);
+  const language = input.language ?? getSettings().promptLanguage ?? 'es';
+  const analysis = await analyzeText(focus, input.model ?? null, language);
   if (!analysis.available) return { available: false, mode, text: '', citations: [] };
 
   const relations = analysis.relations.slice();
@@ -1019,13 +1034,13 @@ export async function composeFromSelection(input: {
   const model = input.model ?? getSettings().synthesisModel;
   const raw = await completeText(
     {
-      system: composeSystemPrompt(mode),
+      system: localizedComposeSystemPrompt(mode, language),
       user: JSON.stringify(
         {
           seleccion: clip(selection, 1400),
           parrafo: clip(paragraph, 2200),
           ideas_de_la_biblioteca: context,
-          salida: composeOutputHint(mode),
+          salida: localizedComposeOutputHint(mode, language),
         },
         null,
         2

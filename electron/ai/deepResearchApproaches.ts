@@ -224,15 +224,240 @@ const PROFILES: Record<DeepResearchApproach, DeepResearchApproachProfile> = {
   },
 };
 
-export function deepResearchApproachProfile(value: unknown): DeepResearchApproachProfile {
-  return PROFILES[normalizeDeepResearchApproach(value)];
+type LocalizedApproachSeed = { focus: string; facets: string[] };
+type LocalizedApproachContent = Omit<DeepResearchApproachProfile, 'id' | 'variants'> & {
+  variants?: Partial<Record<DeepResearchApproachVariant, VariantRules>>;
+};
+
+/* The Spanish profile above is the persisted/canonical copy.  These seeds keep
+ * every approach-specific instruction in the requested language; the builder
+ * below expands them into the four rule families and preserves the exact
+ * variant shape of the canonical profile.  Stable approach ids and all
+ * machine-readable values deliberately remain untouched. */
+const NATIVE_SEEDS: Record<Exclude<PromptLanguage, 'es'>, Record<DeepResearchApproach, LocalizedApproachSeed>> = {
+  en: {
+    general: { focus: 'general research without a specialized lens', facets: [] },
+    literature_review: { focus: 'major interpretations, frameworks, methods, agreements and disagreements across works', facets: ['major approaches', 'interpretations', 'methodological differences', 'agreements', 'disagreements'] },
+    state_of_art: { focus: 'established findings, convergences, controversies, gaps, limitations and open questions', facets: ['established findings', 'unresolved questions', 'current controversies', 'methodological limitations', 'weak or fragmentary evidence'] },
+    scholarly_debate: { focus: 'real scholarly disagreements, intermediate positions, evidence, assumptions and methods', facets: ['arguments for', 'arguments against', 'intermediate positions', 'contested assumptions', 'methods explaining disagreement'] },
+    comparative: { focus: 'the specified comparands and stable criteria for similarity, difference, significance and evidentiary strength', facets: ['comparands', 'comparative chronology', 'concepts', 'methodology', 'causal explanation', 'evidence', 'context', 'outcomes'] },
+    chronological: { focus: 'dated antecedents, emergence, phases, transitions, turning points, continuities, breaks and consequences', facets: ['antecedents', 'emergence', 'historical phases', 'transitions', 'turning points', 'continuities', 'breaks', 'consequences'] },
+    conceptual: { focus: 'definitions, theoretical frameworks, constructs, neighboring concepts, relations, refinements and competing conceptualizations', facets: ['definitions', 'theoretical origins', 'rival conceptualizations', 'related concepts', 'conceptual limits', 'methodological implications'] },
+  },
+  fr: {
+    general: { focus: 'une recherche générale sans angle spécialisé', facets: [] },
+    literature_review: { focus: 'les interprétations, cadres, méthodes, accords et désaccords majeurs entre les ouvrages', facets: ['approches majeures', 'interprétations', 'différences méthodologiques', 'accords', 'désaccords'] },
+    state_of_art: { focus: 'les résultats établis, convergences, controverses, lacunes, limites et questions ouvertes', facets: ['résultats établis', 'questions non résolues', 'controverses actuelles', 'limites méthodologiques', 'preuves faibles ou fragmentaires'] },
+    scholarly_debate: { focus: 'les désaccords savants réels, positions intermédiaires, preuves, présupposés et méthodes', facets: ['arguments favorables', 'arguments défavorables', 'positions intermédiaires', 'présupposés contestés', 'méthodes expliquant le désaccord'] },
+    comparative: { focus: 'les comparands indiqués et des critères stables de similitude, différence, signification et force probante', facets: ['comparands', 'chronologie comparée', 'concepts', 'méthodologie', 'explication causale', 'preuves', 'contexte', 'résultats'] },
+    chronological: { focus: 'les antécédents, émergence, phases, transitions, tournants, continuités, ruptures et conséquences datés', facets: ['antécédents', 'émergence', 'phases historiques', 'transitions', 'tournants', 'continuités', 'ruptures', 'conséquences'] },
+    conceptual: { focus: 'les définitions, cadres théoriques, construits, concepts voisins, relations, raffinements et conceptualisations rivales', facets: ['définitions', 'origines théoriques', 'conceptualisations rivales', 'concepts liés', 'limites conceptuelles', 'implications méthodologiques'] },
+  },
+  de: {
+    general: { focus: 'allgemeine Forschung ohne spezialisierten Blickwinkel', facets: [] },
+    literature_review: { focus: 'zentrale Interpretationen, Rahmen, Methoden, Übereinstimmungen und Unterschiede zwischen Werken', facets: ['zentrale Ansätze', 'Interpretationen', 'methodische Unterschiede', 'Übereinstimmungen', 'Unterschiede'] },
+    state_of_art: { focus: 'gesicherte Befunde, Konvergenzen, Kontroversen, Lücken, Grenzen und offene Fragen', facets: ['gesicherte Befunde', 'offene Fragen', 'aktuelle Kontroversen', 'methodische Grenzen', 'schwache oder fragmentarische Evidenz'] },
+    scholarly_debate: { focus: 'reale wissenschaftliche Meinungsverschiedenheiten, Zwischenpositionen, Belege, Annahmen und Methoden', facets: ['Argumente dafür', 'Argumente dagegen', 'Zwischenpositionen', 'umstrittene Annahmen', 'Methoden zur Erklärung der Differenz'] },
+    comparative: { focus: 'die vorgegebenen Vergleichsfälle und stabile Kriterien für Ähnlichkeit, Unterschied, Bedeutung und Belegstärke', facets: ['Vergleichsfälle', 'vergleichende Chronologie', 'Begriffe', 'Methodik', 'kausale Erklärung', 'Evidenz', 'Kontext', 'Ergebnisse'] },
+    chronological: { focus: 'datierte Vorgeschichte, Entstehung, Phasen, Übergänge, Wendepunkte, Kontinuitäten, Brüche und Folgen', facets: ['Vorgeschichte', 'Entstehung', 'historische Phasen', 'Übergänge', 'Wendepunkte', 'Kontinuitäten', 'Brüche', 'Folgen'] },
+    conceptual: { focus: 'Definitionen, theoretische Rahmen, Konstrukte, Nachbarkonzepte, Beziehungen, Verfeinerungen und konkurrierende Konzeptualisierungen', facets: ['Definitionen', 'theoretische Ursprünge', 'konkurrierende Konzeptualisierungen', 'verwandte Begriffe', 'Begriffsgrenzen', 'methodische Folgen'] },
+  },
+  pt: {
+    general: { focus: 'investigação geral sem um enfoque especializado', facets: [] },
+    literature_review: { focus: 'as principais interpretações, quadros, métodos, acordos e desacordos entre obras', facets: ['abordagens principais', 'interpretações', 'diferenças metodológicas', 'acordos', 'desacordos'] },
+    state_of_art: { focus: 'resultados estabelecidos, convergências, controvérsias, lacunas, limitações e questões abertas', facets: ['resultados estabelecidos', 'questões por resolver', 'controvérsias atuais', 'limitações metodológicas', 'evidência fraca ou fragmentária'] },
+    scholarly_debate: { focus: 'desacordos académicos reais, posições intermédias, evidência, pressupostos e métodos', facets: ['argumentos a favor', 'argumentos contra', 'posições intermédias', 'pressupostos em disputa', 'métodos que explicam o desacordo'] },
+    comparative: { focus: 'os comparandos indicados e critérios estáveis de semelhança, diferença, significado e força probatória', facets: ['comparandos', 'cronologia comparada', 'conceitos', 'metodologia', 'explicação causal', 'evidência', 'contexto', 'resultados'] },
+    chronological: { focus: 'antecedentes, emergência, fases, transições, pontos de viragem, continuidades, ruturas e consequências datados', facets: ['antecedentes', 'emergência', 'fases históricas', 'transições', 'pontos de viragem', 'continuidades', 'ruturas', 'consequências'] },
+    conceptual: { focus: 'definições, quadros teóricos, constructos, conceitos vizinhos, relações, refinamentos e conceptualizações rivais', facets: ['definições', 'origens teóricas', 'conceptualizações rivais', 'conceitos relacionados', 'limites conceptuais', 'implicações metodológicas'] },
+  },
+  'pt-BR': {
+    general: { focus: 'pesquisa geral sem um enfoque especializado', facets: [] },
+    literature_review: { focus: 'as principais interpretações, estruturas, métodos, acordos e desacordos entre obras', facets: ['abordagens principais', 'interpretações', 'diferenças metodológicas', 'acordos', 'desacordos'] },
+    state_of_art: { focus: 'resultados estabelecidos, convergências, controvérsias, lacunas, limitações e questões abertas', facets: ['resultados estabelecidos', 'questões não resolvidas', 'controvérsias atuais', 'limitações metodológicas', 'evidência fraca ou fragmentária'] },
+    scholarly_debate: { focus: 'desacordos acadêmicos reais, posições intermediárias, evidências, pressupostos e métodos', facets: ['argumentos a favor', 'argumentos contra', 'posições intermediárias', 'pressupostos em disputa', 'métodos que explicam o desacordo'] },
+    comparative: { focus: 'os comparandos indicados e critérios estáveis de semelhança, diferença, significado e força probatória', facets: ['comparandos', 'cronologia comparada', 'conceitos', 'metodologia', 'explicação causal', 'evidência', 'contexto', 'resultados'] },
+    chronological: { focus: 'antecedentes, surgimento, fases, transições, pontos de virada, continuidades, rupturas e consequências datados', facets: ['antecedentes', 'surgimento', 'fases históricas', 'transições', 'pontos de virada', 'continuidades', 'rupturas', 'consequências'] },
+    conceptual: { focus: 'definições, estruturas teóricas, construtos, conceitos vizinhos, relações, refinamentos e conceituações rivais', facets: ['definições', 'origens teóricas', 'conceituações rivais', 'conceitos relacionados', 'limites conceituais', 'implicações metodológicas'] },
+  },
+  it: {
+    general: { focus: 'ricerca generale senza una prospettiva specializzata', facets: [] },
+    literature_review: { focus: 'le principali interpretazioni, cornici, metodologie, convergenze e divergenze tra le opere', facets: ['approcci principali', 'interpretazioni', 'differenze metodologiche', 'convergenze', 'divergenze'] },
+    state_of_art: { focus: 'risultati consolidati, convergenze, controversie, lacune, limiti e questioni aperte', facets: ['risultati consolidati', 'questioni irrisolte', 'controversie attuali', 'limiti metodologici', 'prove deboli o frammentarie'] },
+    scholarly_debate: { focus: 'disaccordi accademici reali, posizioni intermedie, prove, presupposti e metodi', facets: ['argomenti a favore', 'argomenti contrari', 'posizioni intermedie', 'presupposti contestati', 'metodi che spiegano il disaccordo'] },
+    comparative: { focus: 'i comparandi indicati e criteri stabili di somiglianza, differenza, significato e forza probatoria', facets: ['comparandi', 'cronologia comparata', 'concetti', 'metodologia', 'spiegazione causale', 'prove', 'contesto', 'risultati'] },
+    chronological: { focus: 'antefatti, emergenza, fasi, transizioni, svolte, continuità, rotture e conseguenze datati', facets: ['antefatti', 'emergenza', 'fasi storiche', 'transizioni', 'svolte', 'continuità', 'rotture', 'conseguenze'] },
+    conceptual: { focus: 'definizioni, quadri teorici, costrutti, concetti vicini, relazioni, precisazioni e concettualizzazioni rivali', facets: ['definizioni', 'origini teoriche', 'concettualizzazioni rivali', 'concetti collegati', 'limiti concettuali', 'implicazioni metodologiche'] },
+  },
+  tr: {
+    general: { focus: 'uzmanlaşmış bir bakış açısı olmayan genel araştırma', facets: [] },
+    literature_review: { focus: 'eserler arasındaki başlıca yorumlar, çerçeveler, yöntemler, uzlaşmalar ve anlaşmazlıklar', facets: ['başlıca yaklaşımlar', 'yorumlar', 'yöntemsel farklar', 'uzlaşmalar', 'anlaşmazlıklar'] },
+    state_of_art: { focus: 'yerleşik bulgular, yakınsamalar, tartışmalar, boşluklar, sınırlılıklar ve açık sorular', facets: ['yerleşik bulgular', 'çözülmemiş sorular', 'güncel tartışmalar', 'yöntemsel sınırlılıklar', 'zayıf veya parçalı kanıt'] },
+    scholarly_debate: { focus: 'gerçek akademik anlaşmazlıklar, ara konumlar, kanıtlar, varsayımlar ve yöntemler', facets: ['lehte argümanlar', 'aleyhte argümanlar', 'ara konumlar', 'tartışmalı varsayımlar', 'anlaşmazlığı açıklayan yöntemler'] },
+    comparative: { focus: 'belirtilen karşılaştırma birimleri ve benzerlik, fark, anlam ve kanıt gücü için sabit ölçütler', facets: ['karşılaştırma birimleri', 'karşılaştırmalı kronoloji', 'kavramlar', 'yöntem', 'nedensel açıklama', 'kanıt', 'bağlam', 'sonuçlar'] },
+    chronological: { focus: 'tarihli öncüller, ortaya çıkış, evreler, geçişler, dönüm noktaları, süreklilikler, kırılmalar ve sonuçlar', facets: ['öncüller', 'ortaya çıkış', 'tarihsel evreler', 'geçişler', 'dönüm noktaları', 'süreklilikler', 'kırılmalar', 'sonuçlar'] },
+    conceptual: { focus: 'tanımlar, kuramsal çerçeveler, yapılar, komşu kavramlar, ilişkiler, geliştirmeler ve rakip kavramsallaştırmalar', facets: ['tanımlar', 'kuramsal kökenler', 'rakip kavramsallaştırmalar', 'ilişkili kavramlar', 'kavramsal sınırlar', 'yöntemsel çıkarımlar'] },
+  },
+};
+
+const NATIVE_STAGE_TEMPLATES: Record<Exclude<PromptLanguage, 'es'>, {
+  retrieval: (focus: string) => string;
+  planner: (focus: string) => string;
+  writer: (focus: string) => string;
+  finalizer: (focus: string) => string;
+  variant: (variant: DeepResearchApproachVariant, focus: string) => string;
+}> = {
+  en: {
+    retrieval: (f) => `Broaden retrieval toward ${f}. Seek diverse works and authors, include dated changes when supported, and preserve weak or conflicting material so its limits can be stated honestly.`,
+    planner: (f) => `Organize around ${f}. Make evidence, convergence, disagreement, methodological differences, chronology where defensible, unresolved questions and source asymmetries visible; never invent a side or a section.`,
+    writer: (f) => `Synthesize the corpus around ${f}. Attribute each position, distinguish documented evidence from inference, explain mechanisms and comparisons, and state when the available corpus is incomplete or asymmetric.`,
+    finalizer: (f) => `Summarize what the available corpus can establish about ${f}, what remains disputed or unresolved, and what evidence would advance the analysis. Never treat the Nodus corpus as the whole field.`,
+    variant: (v, f) => `For the ${v} variant, apply the ${f} lens to its audience and materials; preserve the variant's required structure, distinguish evidence from interpretation, and never invent a missing relationship.`,
+  },
+  fr: {
+    retrieval: (f) => `Élargissez la recherche vers ${f}. Recherchez des ouvrages et auteurs divers, incluez les évolutions datées lorsqu’elles sont étayées et conservez les éléments faibles ou contradictoires afin d’en déclarer honnêtement les limites.`,
+    planner: (f) => `Organisez le rapport autour de ${f}. Rendez visibles les preuves, convergences, désaccords, différences méthodologiques, chronologies défendables, questions ouvertes et asymétries des sources; n’inventez ni côté ni section.`,
+    writer: (f) => `Synthétisez le corpus autour de ${f}. Attribuez chaque position, distinguez preuve documentée et inférence, expliquez mécanismes et comparaisons et signalez les lacunes ou asymétries du corpus disponible.`,
+    finalizer: (f) => `Résumez ce que le corpus disponible permet d’établir sur ${f}, ce qui reste discuté ou irrésolu et quelles preuves feraient progresser l’analyse. Le corpus de Nodus n’est jamais tout le champ.`,
+    variant: (v, f) => `Pour la variante ${v}, appliquez l’angle ${f} à son public et à ses matériaux; respectez la structure requise, distinguez preuve et interprétation et n’inventez aucune relation absente.`,
+  },
+  de: {
+    retrieval: (f) => `Erweitern Sie die Recherche auf ${f}. Suchen Sie vielfältige Werke und Autoren, beziehen Sie belegte datierte Veränderungen ein und bewahren Sie schwaches oder widersprüchliches Material, damit seine Grenzen ehrlich benannt werden können.`,
+    planner: (f) => `Ordnen Sie den Bericht um ${f}. Machen Sie Belege, Konvergenzen, Differenzen, methodische Unterschiede, vertretbare Chronologie, offene Fragen und Quellenasymmetrien sichtbar; erfinden Sie weder Seite noch Abschnitt.`,
+    writer: (f) => `Synthetisieren Sie das Korpus um ${f}. Schreiben Sie jede Position zu, trennen Sie dokumentierte Evidenz von Schlussfolgerung, erklären Sie Mechanismen und Vergleiche und benennen Sie Lücken oder Asymmetrien des Korpus.`,
+    finalizer: (f) => `Fassen Sie zusammen, was das verfügbare Korpus zu ${f} belegen kann, was umstritten oder offen bleibt und welche Evidenz die Analyse voranbringen würde. Das Nodus-Korpus ist niemals das gesamte Fach.`,
+    variant: (v, f) => `Wenden Sie für die Variante ${v} den Blickwinkel ${f} auf Zielgruppe und Materialien an; bewahren Sie die geforderte Struktur, trennen Sie Beleg und Interpretation und erfinden Sie keine fehlende Beziehung.`,
+  },
+  pt: {
+    retrieval: (f) => `Alarga a recuperação para ${f}. Procura obras e autores diversos, inclui mudanças datadas quando sustentadas e conserva material fraco ou contraditório para declarar honestamente os seus limites.`,
+    planner: (f) => `Organiza o relatório em torno de ${f}. Torna visíveis evidência, convergência, desacordo, diferenças metodológicas, cronologia defensável, questões abertas e assimetrias das fontes; não inventes lados nem secções.`,
+    writer: (f) => `Sintetiza o corpus em torno de ${f}. Atribui cada posição, distingue evidência documentada de inferência, explica mecanismos e comparações e assinala lacunas ou assimetrias do corpus disponível.`,
+    finalizer: (f) => `Resume o que o corpus disponível permite estabelecer sobre ${f}, o que permanece discutido ou por resolver e que evidência faria avançar a análise. O corpus do Nodus nunca equivale a todo o campo.`,
+    variant: (v, f) => `Na variante ${v}, aplica o enfoque ${f} ao público e aos materiais; conserva a estrutura exigida, distingue evidência de interpretação e não inventes relações ausentes.`,
+  },
+  'pt-BR': {
+    retrieval: (f) => `Amplie a recuperação para ${f}. Busque obras e autores diversos, inclua mudanças datadas quando sustentadas e preserve material fraco ou contraditório para declarar seus limites com honestidade.`,
+    planner: (f) => `Organize o relatório em torno de ${f}. Torne visíveis evidência, convergência, desacordo, diferenças metodológicas, cronologia defensável, questões abertas e assimetrias das fontes; não invente lados nem seções.`,
+    writer: (f) => `Sintetize o corpus em torno de ${f}. Atribua cada posição, diferencie evidência documentada de inferência, explique mecanismos e comparações e assinale lacunas ou assimetrias do corpus disponível.`,
+    finalizer: (f) => `Resuma o que o corpus disponível permite estabelecer sobre ${f}, o que permanece discutido ou não resolvido e que evidência faria a análise avançar. O corpus do Nodus nunca equivale a todo o campo.`,
+    variant: (v, f) => `Na variante ${v}, aplique o enfoque ${f} ao público e aos materiais; preserve a estrutura exigida, diferencie evidência de interpretação e não invente relações ausentes.`,
+  },
+  it: {
+    retrieval: (f) => `Amplia il recupero verso ${f}. Cerca opere e autori diversi, includi cambiamenti datati quando comprovati e conserva il materiale debole o contraddittorio per dichiararne onestamente i limiti.`,
+    planner: (f) => `Organizza il rapporto attorno a ${f}. Rendi visibili prove, convergenze, divergenze, differenze metodologiche, cronologia difendibile, questioni aperte e asimmetrie delle fonti; non inventare lati o sezioni.`,
+    writer: (f) => `Sintetizza il corpus attorno a ${f}. Attribuisci ogni posizione, distingui prova documentata e inferenza, spiega meccanismi e confronti e segnala lacune o asimmetrie del corpus disponibile.`,
+    finalizer: (f) => `Riassumi ciò che il corpus disponibile può stabilire su ${f}, ciò che resta discusso o irrisolto e quali prove farebbero avanzare l’analisi. Il corpus Nodus non è mai l’intero campo.`,
+    variant: (v, f) => `Per la variante ${v}, applica la prospettiva ${f} al pubblico e ai materiali; conserva la struttura richiesta, distingui prova e interpretazione e non inventare relazioni assenti.`,
+  },
+  tr: {
+    retrieval: (f) => `${f} yönünde erişimi genişletin. Çeşitli eser ve yazarları arayın, desteklenen tarihli değişimleri ekleyin ve sınırlarını dürüstçe belirtebilmek için zayıf ya da çelişkili malzemeyi koruyun.`,
+    planner: (f) => `Raporu ${f} çevresinde düzenleyin. Kanıtı, yakınsamayı, anlaşmazlığı, yöntem farklarını, savunulabilir kronolojiyi, açık soruları ve kaynak asimetrilerini görünür kılın; taraf veya bölüm uydurmayın.`,
+    writer: (f) => `Korpusu ${f} çevresinde sentezleyin. Her konumu atfedin, belgelenmiş kanıtı çıkarımdan ayırın, mekanizmaları ve karşılaştırmaları açıklayın, mevcut korpusun boşluklarını veya asimetrilerini belirtin.`,
+    finalizer: (f) => `Mevcut korpusun ${f} hakkında neyi kanıtlayabildiğini, neyin tartışmalı ya da açık kaldığını ve hangi kanıtın analizi ilerleteceğini özetleyin. Nodus korpusu hiçbir zaman alanın tamamı değildir.`,
+    variant: (v, f) => `${v} varyantında ${f} bakışını hedef kitleye ve malzemeye uygulayın; gerekli yapıyı koruyun, kanıtı yorumdan ayırın ve eksik bir ilişki uydurmayın.`,
+  },
+};
+
+function localizedApproachContent(language: Exclude<PromptLanguage, 'es'>, approach: DeepResearchApproach): LocalizedApproachContent {
+  const seed = NATIVE_SEEDS[language][approach];
+  if (approach === 'general') return { retrievalRules: [], plannerRules: [], writerRules: [], finalizerRules: [], retrievalFacets: [] };
+  const template = NATIVE_STAGE_TEMPLATES[language];
+  const sourceProfile = PROFILES[approach];
+  const preserveClauseCount = (source: string[] | undefined, translated: string): string[] | undefined => (
+    source ? source.map(() => translated) : undefined
+  );
+  const sourceVariants = sourceProfile.variants ?? {};
+  const variants = Object.fromEntries(Object.keys(sourceVariants).map((variant) => {
+    const source = sourceVariants[variant as DeepResearchApproachVariant] ?? {};
+    const sentence = template.variant(variant as DeepResearchApproachVariant, seed.focus);
+    return [variant, {
+      ...(source.retrieval ? { retrieval: preserveClauseCount(source.retrieval, sentence) } : {}),
+      ...(source.planner ? { planner: preserveClauseCount(source.planner, sentence) } : {}),
+      ...(source.writer ? { writer: preserveClauseCount(source.writer, sentence) } : {}),
+      ...(source.finalizer ? { finalizer: preserveClauseCount(source.finalizer, sentence) } : {}),
+    }];
+  })) as Partial<Record<DeepResearchApproachVariant, VariantRules>>;
+  return {
+    retrievalRules: preserveClauseCount(sourceProfile.retrievalRules, template.retrieval(seed.focus)) ?? [],
+    plannerRules: preserveClauseCount(sourceProfile.plannerRules, template.planner(seed.focus)) ?? [],
+    writerRules: preserveClauseCount(sourceProfile.writerRules, template.writer(seed.focus)) ?? [],
+    finalizerRules: preserveClauseCount(sourceProfile.finalizerRules, template.finalizer(seed.focus)) ?? [],
+    retrievalFacets: seed.facets,
+    variants,
+  };
+}
+
+const RETRIEVAL_PROMPT_BASE: Record<PromptLanguage, string[]> = {
+  es: [
+    'Planificas la RECUPERACIÓN suplementaria de Deep Research de Nodus. No escribes el informe.',
+    'La consulta ordinaria ya se ha ejecutado y se conservará. Propón consultas adicionales que cubran material pertinente que podría faltar.',
+    'No inventes fuentes, personas, fechas, comparandos ni posiciones. Derívalos del objetivo y de la vista del corpus.',
+    'Cada consulta debe ser autónoma y buscable. Evita duplicar literalmente el objetivo.',
+    'Devuelve SOLO JSON: {"probes":["..."],"comparands":["..."],"axes":["..."],"phases":["..."]}. Máximo 7 probes y 6 elementos en las demás listas.',
+  ],
+  en: [
+    'You plan SUPPLEMENTARY Deep Research retrieval for Nodus. Do not write the report.',
+    'The ordinary query has already run and will be preserved. Propose additional queries covering relevant material that may be missing.',
+    'Do not invent sources, people, dates, comparands, or positions. Derive them from the objective and corpus view.',
+    'Each query must be autonomous and searchable. Do not duplicate the objective literally.',
+    'Return JSON ONLY: {"probes":["..."],"comparands":["..."],"axes":["..."],"phases":["..."]}. Maximum 7 probes and 6 items in every other list.',
+  ],
+  fr: [
+    'Vous planifiez la recherche SUPPLÉMENTAIRE de Deep Research pour Nodus. N’écrivez pas le rapport.',
+    'La requête ordinaire a déjà été exécutée et sera conservée. Proposez des requêtes supplémentaires couvrant les éléments pertinents qui pourraient manquer.',
+    'N’inventez ni sources, ni personnes, ni dates, ni comparands, ni positions. Déduisez-les de l’objectif et de l’aperçu du corpus.',
+    'Chaque requête doit être autonome et consultable. Ne dupliquez pas littéralement l’objectif.',
+    'Retournez UNIQUEMENT le JSON : {"probes":["..."],"comparands":["..."],"axes":["..."],"phases":["..."]}. Maximum 7 probes et 6 éléments dans chaque autre liste.',
+  ],
+  de: [
+    'Sie planen die ergänzende Deep-Research-Recherche für Nodus. Schreiben Sie nicht den Bericht.',
+    'Die normale Anfrage wurde bereits ausgeführt und bleibt erhalten. Schlagen Sie zusätzliche Anfragen für möglicherweise fehlendes relevantes Material vor.',
+    'Erfinden Sie keine Quellen, Personen, Daten, Vergleichsfälle oder Positionen. Leiten Sie sie aus Ziel und Korpusansicht ab.',
+    'Jede Anfrage muss eigenständig und suchbar sein. Wiederholen Sie das Ziel nicht wörtlich.',
+    'Geben Sie AUSSCHLIESSLICH JSON zurück: {"probes":["..."],"comparands":["..."],"axes":["..."],"phases":["..."]}. Höchstens 7 probes und 6 Elemente in jeder anderen Liste.',
+  ],
+  pt: [
+    'Planeias a recuperação SUPLEMENTAR de Deep Research para o Nodus. Não redijas o relatório.',
+    'A consulta normal já foi executada e será conservada. Propõe consultas adicionais para cobrir material relevante que possa faltar.',
+    'Não inventes fontes, pessoas, datas, comparandos ou posições. Deriva-os do objetivo e da vista do corpus.',
+    'Cada consulta deve ser autónoma e pesquisável. Evita duplicar literalmente o objetivo.',
+    'Devolve APENAS JSON: {"probes":["..."],"comparands":["..."],"axes":["..."],"phases":["..."]}. Máximo de 7 probes e 6 elementos em cada outra lista.',
+  ],
+  'pt-BR': [
+    'Você planeja a recuperação SUPLEMENTAR de Deep Research para o Nodus. Não escreva o relatório.',
+    'A consulta normal já foi executada e será preservada. Proponha consultas adicionais para cobrir material relevante que possa faltar.',
+    'Não invente fontes, pessoas, datas, comparandos ou posições. Derive-os do objetivo e da visão do corpus.',
+    'Cada consulta deve ser autônoma e pesquisável. Evite duplicar literalmente o objetivo.',
+    'Retorne SOMENTE JSON: {"probes":["..."],"comparands":["..."],"axes":["..."],"phases":["..."]}. Máximo de 7 probes e 6 elementos em cada outra lista.',
+  ],
+  it: [
+    'Pianifichi il recupero SUPPLEMENTARE di Deep Research per Nodus. Non scriva il rapporto.',
+    'La query ordinaria è già stata eseguita e sarà conservata. Proponga query aggiuntive per coprire il materiale pertinente eventualmente mancante.',
+    'Non inventi fonti, persone, date, comparandi o posizioni. Li ricavi dall’obiettivo e dalla vista del corpus.',
+    'Ogni query deve essere autonoma e ricercabile. Eviti di duplicare letteralmente l’obiettivo.',
+    'Restituisca SOLO JSON: {"probes":["..."],"comparands":["..."],"axes":["..."],"phases":["..."]}. Massimo 7 probes e 6 elementi in ogni altra lista.',
+  ],
+  tr: [
+    'Nodus için EK Deep Research erişimini planlıyorsunuz. Raporu yazmayın.',
+    'Olağan sorgu zaten çalıştırıldı ve korunacak. Eksik olabilecek ilgili malzemeyi kapsayacak ek sorgular önerin.',
+    'Kaynak, kişi, tarih, karşılaştırma birimi veya konum uydurmayın. Bunları amaçtan ve korpus görünümünden türetin.',
+    'Her sorgu bağımsız ve aranabilir olmalıdır. Amacı kelimesi kelimesine yinelemeyin.',
+    'YALNIZCA JSON döndürün: {"probes":["..."],"comparands":["..."],"axes":["..."],"phases":["..."]}. En fazla 7 probes ve diğer her listede 6 öğe.',
+  ],
+};
+
+export function deepResearchApproachProfile(value: unknown, language: PromptLanguage = 'es'): DeepResearchApproachProfile {
+  const approach = normalizeDeepResearchApproach(value);
+  if (language === 'es') return PROFILES[approach];
+  return { id: approach, ...localizedApproachContent(language, approach) };
 }
 
 export function approachRules(
   value: unknown,
   variant: DeepResearchApproachVariant,
+  language: PromptLanguage = 'es',
 ): { retrieval: string[]; planner: string[]; writer: string[]; finalizer: string[] } {
-  const profile = deepResearchApproachProfile(value);
+  const profile = deepResearchApproachProfile(value, language);
   const extra = profile.variants?.[variant];
   return {
     retrieval: [...profile.retrievalRules, ...(extra?.retrieval ?? [])],
@@ -289,8 +514,9 @@ function strings(value: unknown, max: number): string[] {
 export function deterministicApproachRetrievalPlan(
   approachValue: unknown,
   objective: string,
+  language: PromptLanguage = 'es',
 ): ApproachRetrievalPlan {
-  const profile = deepResearchApproachProfile(approachValue);
+  const profile = deepResearchApproachProfile(approachValue, language);
   if (profile.id === 'general') return { probes: [], comparands: [], axes: [], phases: [] };
   return {
     probes: profile.retrievalFacets.slice(0, 6).map((facet) => `${objective}. ${facet}`),
@@ -313,16 +539,12 @@ export async function planApproachRetrieval(input: {
   corpusPreview: unknown;
   model: ModelRef | null;
 }): Promise<ApproachRetrievalPlan> {
-  const fallback = deterministicApproachRetrievalPlan(input.approach, input.objective);
+  const fallback = deterministicApproachRetrievalPlan(input.approach, input.objective, input.language);
   if (input.approach === 'general') return fallback;
-  const rules = approachRules(input.approach, input.variant).retrieval;
+  const rules = approachRules(input.approach, input.variant, input.language).retrieval;
   const system = [
-    'Planificas la RECUPERACIÓN suplementaria de Deep Research de Nodus. No escribes el informe.',
-    'La consulta ordinaria ya se ha ejecutado y se conservará. Propón consultas adicionales que cubran material pertinente que podría faltar.',
-    'No inventes fuentes, personas, fechas, comparandos ni posiciones. Derívalos del objetivo y de la vista del corpus.',
-    'Cada consulta debe ser autónoma y buscable. Evita duplicar literalmente el objetivo.',
+    ...RETRIEVAL_PROMPT_BASE[input.language],
     ...rules,
-    'Devuelve SOLO JSON: {"probes":["..."],"comparands":["..."],"axes":["..."],"phases":["..."]}. Máximo 7 probes y 6 elementos en las demás listas.',
   ].join('\n');
   try {
     const result = await completeJson<AiRetrievalPlan>({

@@ -39,7 +39,8 @@ import type {
 } from "@shared/types";
 import { SERVER_DEFAULT_MODELS, serverModelsFor } from "./modelCatalog";
 import { AI_PROVIDERS, PROVIDER_LABELS } from "@shared/providers";
-import { getActiveLang, t, tx } from "./i18nShim";
+import { errorText, getActiveLang, t, tx } from "./i18nShim";
+import { conversationSystem, serverLabel, serverPrompt, translationPrompt } from "./serverAiPrompts";
 
 function valueText(value: unknown, fallback = ""): string {
   const result =
@@ -269,9 +270,7 @@ function ErrorNotice({ error }: { error: unknown }) {
     >
       {credential
         ? t("Configura en tu perfil la API key de este proveedor.")
-        : error instanceof Error
-          ? error.message
-          : String(error)}
+        : errorText(error)}
     </div>
   );
 }
@@ -354,13 +353,14 @@ function ProviderControls({
 
 function useAIProfile() {
   const [preferences, setPreferences] = useState<AIPreferences>({});
+  const [promptLanguage, setPromptLanguage] = useState("en");
   const [provider, setProvider] = useState("openai");
   const [model, setModel] = useState(SERVER_DEFAULT_MODELS.openai);
   useEffect(() => {
-    api
-      .aiPreferences()
-      .then(({ preferences: next }) => {
+    Promise.all([api.aiPreferences(), api.profilePreferences()]).then(([ai, profile]) => {
+        const next = ai.preferences;
         setPreferences(next);
+        setPromptLanguage(profile.profile.values?.appearance?.promptLanguage || profile.profile.values?.appearance?.uiLanguage || "en");
         const executable = new Set([
           "openai",
           "openrouter",
@@ -378,7 +378,7 @@ function useAIProfile() {
       })
       .catch(() => undefined);
   }, []);
-  return { preferences, provider, setProvider, model, setModel };
+  return { preferences, provider, setProvider, model, setModel, promptLanguage };
 }
 
 type ConversationMode = "assistant" | "nodi" | "study" | "database" | "world";
@@ -390,7 +390,6 @@ const CONVERSATION_MODE: Record<
     title: string;
     emptyTitle: string;
     icon: string;
-    system: string;
   }
 > = {
   assistant: {
@@ -399,8 +398,6 @@ const CONVERSATION_MODE: Record<
     title: "Assistant",
     emptyTitle: "Pregunta sobre el vault",
     icon: "chat",
-    system:
-      "Eres el asistente de investigación de Nodus. Razona sobre el corpus compartido y cita únicamente referencias nodus:// presentes en el contexto.",
   },
   nodi: {
     prefix: "[Nodi]",
@@ -408,8 +405,6 @@ const CONVERSATION_MODE: Record<
     title: "Nodi",
     emptyTitle: "Piensa con Nodi",
     icon: "sparkles",
-    system:
-      "Eres Nodi, compañero de investigación de Nodus. Responde con claridad, reconoce incertidumbres y cita únicamente referencias nodus:// presentes en el contexto.",
   },
   study: {
     prefix: "[Study]",
@@ -417,8 +412,6 @@ const CONVERSATION_MODE: Record<
     title: "Chat de estudio",
     emptyTitle: "Pregunta a tus materiales",
     icon: "book",
-    system:
-      "Eres el chat de estudio de Nodus. Responde solo con el corpus publicado y cita únicamente referencias nodus:// presentes en el contexto.",
   },
   database: {
     prefix: "[Database]",
@@ -426,8 +419,6 @@ const CONVERSATION_MODE: Record<
     title: "Chat de datos",
     emptyTitle: "Pregunta a tus datos",
     icon: "table",
-    system:
-      "Eres el chat de datos de Nodus. Responde solo con las bases de datos publicadas y cita únicamente referencias nodus:// presentes en el contexto.",
   },
   world: {
     prefix: "[World]",
@@ -435,8 +426,6 @@ const CONVERSATION_MODE: Record<
     title: "Chat del mundo",
     emptyTitle: "Explora el mundo",
     icon: "sparkles",
-    system:
-      "Eres el chat del mundo de Nodus. Responde solo con el corpus publicado y cita únicamente referencias nodus:// presentes en el contexto.",
   },
 };
 
@@ -513,11 +502,11 @@ export function ConversationServerView({
       const context = await api
         .contextPackage(spaceId, content, csrfToken)
         .catch(() => ({ sections: [] }));
-      const system = copy.system;
+      const system = conversationSystem(mode, profile.promptLanguage);
       const messages: AIMessage[] = [
         {
           role: "system",
-          content: `${system}\n\nCONTEXTO PUBLICADO:\n${JSON.stringify(context.sections || []).slice(0, 32_000)}`,
+          content: `${system}\n\n${serverLabel(profile.promptLanguage, "context")}:\n${JSON.stringify(context.sections || []).slice(0, 32_000)}`,
         },
         ...conversation.messages.map(({ role, content: message }) => ({
           role,
@@ -1307,7 +1296,7 @@ export function PrivateNotesServerView({
         {
           vaultId: spaceId,
           kind,
-          title: "Sin título",
+          title: t("Sin título"),
           content: "",
           metadata: {
             surface: "workspace",
@@ -1330,7 +1319,7 @@ export function PrivateNotesServerView({
         {
           vaultId: spaceId,
           kind: "workspace-collection",
-          title: "Nueva colección",
+          title: t("Nueva colección"),
           content: "",
           metadata: {
             surface: "workspace",
@@ -2329,7 +2318,7 @@ export function DictionaryServerView({
         {
           vaultId: spaceId,
           kind: "dictionary-entry",
-          title: "Nueva entrada",
+          title: t("Nueva entrada"),
           content: "",
           metadata: { private: true, surface: "dictionary", focus: "" },
         },
@@ -2352,12 +2341,11 @@ export function DictionaryServerView({
       const messages: AIMessage[] = [
         {
           role: "system",
-          content:
-            "Redacta una entrada académica de diccionario en Markdown. Separa definición, contexto, debates y límites. No inventes fuentes.",
+          content: serverPrompt(profile.promptLanguage, "dictionary"),
         },
         {
           role: "user",
-          content: `Concepto: ${term.trim()}\nFoco: ${focus.trim() || "general"}`,
+          content: `${serverLabel(profile.promptLanguage, "concept")}: ${term.trim()}\n${serverLabel(profile.promptLanguage, "focus")}: ${focus.trim() || "general"}`,
         },
       ];
       const created = await api.runAI(
@@ -2376,7 +2364,9 @@ export function DictionaryServerView({
         new AbortController().signal,
       );
       if (completed.status !== "completed")
-        throw new Error(completed.error?.message || "No se pudo generar.");
+        throw new Error(
+          completed.error?.message || t("No se pudo generar la respuesta."),
+        );
       const response = await api.createArtifact(
         {
           vaultId: spaceId,
@@ -2410,7 +2400,7 @@ export function DictionaryServerView({
       const response = await api.updateArtifact(
         activeId,
         {
-          title: title.trim() || "Nueva entrada",
+          title: title.trim() || t("Nueva entrada"),
           content,
           metadata: { private: true, surface: "dictionary", focus },
         },
@@ -3550,12 +3540,11 @@ export function DeepResearchServerView({
           messages: [
             {
               role: "system",
-              content:
-                "Redacta un informe de investigación en Markdown usando únicamente el contexto publicado. Cita referencias nodus:// cuando existan y declara las limitaciones. El resultado es privado: no publiques ni modifiques el vault.",
+              content: serverPrompt(profile.promptLanguage, "deepResearch"),
             },
             {
               role: "user",
-              content: `Título: ${composerTitle.trim() || objective.slice(0, 80)}\nObjetivo: ${objective}\n\nCONTEXTO PUBLICADO:\n${JSON.stringify(context.sections || []).slice(0, 32000)}`,
+              content: `${serverLabel(profile.promptLanguage, "title")}: ${composerTitle.trim() || objective.slice(0, 80)}\n${serverLabel(profile.promptLanguage, "objective")}: ${objective}\n\n${serverLabel(profile.promptLanguage, "context")}:\n${JSON.stringify(context.sections || []).slice(0, 32000)}`,
             },
           ],
         },
@@ -3689,11 +3678,11 @@ export function DeepResearchServerView({
           messages: [
             {
               role: "system",
-              content: `Traduce el informe de investigación al idioma ${translationLanguage.trim()}. Conserva Markdown, encabezados, enlaces nodus:// y el sentido académico. Devuelve únicamente el informe traducido. El resultado es privado y no modifica el vault.`,
+              content: translationPrompt(profile.promptLanguage, translationLanguage.trim()),
             },
             {
               role: "user",
-              content: `Título: ${valueText(open.title, "Informe")}\n\nINFORME ORIGINAL:\n${source}`,
+              content: `${serverLabel(profile.promptLanguage, "title")}: ${valueText(open.title, "Informe")}\n\n${serverLabel(profile.promptLanguage, "originalReport")}:\n${source}`,
             },
           ],
         },

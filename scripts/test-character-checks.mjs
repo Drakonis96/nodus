@@ -34,6 +34,7 @@ const checks = load('shared/characterChecks.ts');
 const interview = load('shared/characterInterview.ts');
 const characterChat = load('shared/characterChat.ts');
 const biography = load('shared/characterBiographyContext.ts');
+const proseReview = load('shared/worldProseReview.ts');
 
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
@@ -218,6 +219,30 @@ test('the biography context passes the pronouns and the invented date through ve
   assert.match(biography.composeCharacterBiographyContext(sheet, 'propose'), /propón/);
 });
 
+test('biography and prose-review context scaffolds are native in every prompt language', () => {
+  const locales = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+  const translatedSheet = { ...sheet, aliases: [{ name: 'El Cuervo de Vael', kind: 'Epíteto o título', kindToken: 'epithet' }] };
+  for (const locale of locales) {
+    const context = biography.composeCharacterBiographyContext(translatedSheet, 'faithful', locale);
+    assert.match(context, /Kaelen Vor/);
+    assert.match(context, /elle\/le/);
+    assert.match(context, /13 de Lluvia, 1204 T\.E\./);
+    assert.match(context, /1221/);
+    if (locale !== 'es') {
+      assert.doesNotMatch(context, /Personaje:|pronombres \(úsalos|Hechos de su vida|Notas del autor|Redacta la biografía/);
+    }
+
+    const review = proseReview.composeProseReviewContext({
+      sceneTitle: 'La puerta sitiada',
+      beats: [{ threadLabel: 'conflict: El asedio', mark: 'Rises', text: 'La guardia cede' }],
+      prose: 'La puerta tembló.',
+    }, locale);
+    assert.match(review, /La puerta sitiada/);
+    assert.match(review, /La puerta tembló/);
+    if (locale !== 'es') assert.doesNotMatch(review, /ESCENA:|LO QUE DIJISTE|EL TEXTO DE LA ESCENA|Dime, en/);
+  }
+});
+
 test('the interview prompt keeps the character in voice and ignorant of what is not on the sheet', () => {
   const system = interview.characterInterviewSystem({
     ...sheet,
@@ -326,6 +351,20 @@ test('the transcript speaks the same language as the task contract', () => {
       `${language}: the turn is handed over in the prompt language`
     );
     assert.match(prompt, /«Look at the edge»/, `${language}: the spent opening is still named`);
+  }
+});
+
+test('the legacy character-interview system builder is native outside Spanish too', () => {
+  const sources = {
+    ...sheet,
+    voiceRegister: 'Dry', voiceTics: null, voiceSample: 'Do not ask twice.',
+    abilities: [], arc: { want: null, need: null, flaw: null, lie: null, wound: null }, scenes: [],
+  };
+  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+    const prompt = interview.characterInterviewSystem(sources, language);
+    assert.match(prompt, /Kaelen Vor/);
+    assert.match(prompt, /Do not ask twice/);
+    assert.doesNotMatch(prompt, /Vas a INTERPRETAR|Reglas estrictas|Habla SIEMPRE|Nunca rompas el personaje|TU FICHA/);
   }
 });
 

@@ -13,6 +13,7 @@ import type {
   ImmersionQuizQuestion,
   ImmersionRequest,
   ImmersionStation,
+  PromptLanguage,
 } from '@shared/types';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,7 +145,7 @@ export interface ImmersionMaterial {
 
 export interface CurriculumInput {
   topic: string;
-  language: 'es' | 'en';
+  language: PromptLanguage;
   stationCount: number;
   ideas: { id: string; label: string; statement: string; authors: string[]; themes: string[] }[];
   passages: { id: string; workTitle: string; pageLabel: string | null; excerpt: string }[];
@@ -168,7 +169,7 @@ export interface CurriculumResult {
 
 export interface PanoramaInput {
   topic: string;
-  language: 'es' | 'en';
+  language: PromptLanguage;
   stationQuestions: string[];
   ideas: { id: string; label: string; statement: string; authors: string[]; citation: string }[];
   works: { id: string; title: string; authors: string[]; year: number | null; citation: string; orientation: string | null }[];
@@ -182,7 +183,7 @@ export interface PanoramaResult {
 
 export interface StationInput {
   topic: string;
-  language: 'es' | 'en';
+  language: PromptLanguage;
   title: string;
   question: string;
   includeQuiz: boolean;
@@ -214,7 +215,7 @@ export interface StationResult {
 
 export interface ContrastsInput {
   topic: string;
-  language: 'es' | 'en';
+  language: PromptLanguage;
   authors: string[];
   rows: {
     stationId: string;
@@ -229,7 +230,7 @@ export interface ContrastsResult {
 
 export interface ExamInput {
   topic: string;
-  language: 'es' | 'en';
+  language: PromptLanguage;
   stationQuestions: string[];
   ideas: { id: string; label: string; statement: string; authors: string[] }[];
   questionCount: number;
@@ -294,7 +295,11 @@ export async function orchestrateImmersion(
   deps: ImmersionDeps,
   onProgress?: ProgressFn
 ): Promise<ImmersionPlan> {
-  const language: 'es' | 'en' = request.language === 'en' ? 'en' : 'es';
+  // The persisted shared request predates the full prompt-language set. Keep
+  // accepting its wire shape while honoring newer runtime values supplied by
+  // the desktop settings/request boundary.
+  const requestedLanguage = (request as ImmersionRequest & { language?: PromptLanguage }).language;
+  const language: PromptLanguage = isPromptLanguage(requestedLanguage) ? requestedLanguage : 'es';
   const msg = labels(language);
   const emit: ProgressFn = (p) => onProgress?.(p);
   const degradations: string[] = [];
@@ -418,7 +423,9 @@ export async function orchestrateImmersion(
   const plan: ImmersionPlan = {
     topic: request.topic,
     title: curriculum.title || request.topic,
-    language,
+    // ImmersionPlan's persisted shared contract predates the extended prompt
+    // language union; retain the wire shape while storing the runtime value.
+    language: language as ImmersionPlan['language'],
     minutes: request.minutes,
     generatedAt: new Date().toISOString(),
     model: request.model ?? null,
@@ -449,7 +456,7 @@ export async function orchestrateImmersion(
 // Input builders
 // ─────────────────────────────────────────────────────────────────────────────
 
-function curriculumInput(topic: string, language: 'es' | 'en', stationCount: number, material: ImmersionMaterial): CurriculumInput {
+function curriculumInput(topic: string, language: PromptLanguage, stationCount: number, material: ImmersionMaterial): CurriculumInput {
   // A longer route needs more raw material to distribute; the planner sees a
   // generous slice so it can build coherent, deepening threads across stations.
   return {
@@ -479,7 +486,7 @@ function curriculumInput(topic: string, language: 'es' | 'en', stationCount: num
   };
 }
 
-function panoramaInput(topic: string, language: 'es' | 'en', curriculum: CurriculumResult, material: ImmersionMaterial): PanoramaInput {
+function panoramaInput(topic: string, language: PromptLanguage, curriculum: CurriculumResult, material: ImmersionMaterial): PanoramaInput {
   return {
     topic,
     language,
@@ -505,7 +512,7 @@ function panoramaInput(topic: string, language: 'es' | 'en', curriculum: Curricu
 
 function stationInput(
   request: ImmersionRequest,
-  language: 'es' | 'en',
+  language: PromptLanguage,
   spec: CurriculumStation,
   material: ImmersionMaterial
 ): StationInput {
@@ -545,7 +552,7 @@ function stationInput(
   };
 }
 
-function contrastsInput(topic: string, language: 'es' | 'en', stations: ImmersionStation[], material: ImmersionMaterial): ContrastsInput {
+function contrastsInput(topic: string, language: PromptLanguage, stations: ImmersionStation[], material: ImmersionMaterial): ContrastsInput {
   const authors = topAuthors(material);
   const ideaById = new Map(material.ideas.map((i) => [i.id, i] as const));
   return {
@@ -567,7 +574,7 @@ function contrastsInput(topic: string, language: 'es' | 'en', stations: Immersio
   };
 }
 
-function examInput(topic: string, language: 'es' | 'en', stations: ImmersionStation[], material: ImmersionMaterial): ExamInput {
+function examInput(topic: string, language: PromptLanguage, stations: ImmersionStation[], material: ImmersionMaterial): ExamInput {
   const covered = new Set(stations.flatMap((s) => s.ideaIds));
   return {
     topic,
@@ -1015,7 +1022,11 @@ function strList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string' && v.trim().length > 0) : [];
 }
 
-export function labels(language: 'es' | 'en') {
+function isPromptLanguage(value: unknown): value is PromptLanguage {
+  return value === 'es' || value === 'en' || value === 'fr' || value === 'de' || value === 'pt' || value === 'pt-BR' || value === 'it' || value === 'tr';
+}
+
+export function labels(language: PromptLanguage) {
   if (language === 'en') {
     return {
       material: 'Mapping the topic territory…',
@@ -1042,6 +1053,33 @@ export function labels(language: 'es' | 'en') {
         `Explain, in your own words and as if teaching a colleague, what the corpus knows about “${topic}”: the main positions, which author defends each one, and where they disagree.`,
     };
   }
+  if (language === 'fr') {
+    return {
+      material: 'Cartographie du territoire du sujet…', curriculum: 'Conception du parcours guidé…', panorama: 'Rédaction du panorama…', station: 'Rédaction de la station…', contrasts: 'Construction de la matrice des contrastes…', frontiers: 'Cartographie des frontières du corpus…', exam: 'Préparation de l’examen final…', assembling: 'Assemblage de l’immersion…', done: 'Immersion prête.', noMaterial: 'Aucun contenu pertinent n’a été trouvé pour ce sujet. Analysez davantage d’ouvrages ou reformulez le sujet.', degradedCurriculum: 'le parcours structurel a remplacé le plan des stations', degradedPanorama: 'le panorama a utilisé un contenu structurel', degradedStation: 'une station a utilisé un contenu structurel :', degradedContrasts: 'la matrice des contrastes a utilisé un contenu structurel', degradedExam: 'l’examen a repris les questions des stations', overviewTitle: (topic: string) => `Panorama : ${topic}`, overviewIntro: (ideas: number, works: number, authors: number) => `Votre corpus contient ${ideas} idées pertinentes réparties dans ${works} ouvrages de ${authors} auteurs sur ce sujet. Voici les lignes les plus fortes :`, gapDetail: (kind: string) => `Lacune détectée dans le corpus (${kind}).`, thinCoverage: (n: number) => `${n} idées pertinentes sont restées hors des stations guidées.`, feynman: (topic: string) => `Expliquez avec vos propres mots, comme si vous enseigniez à un collègue, ce que le corpus sait sur « ${topic} » : les positions principales, l’auteur qui défend chacune et leurs désaccords.`,
+    };
+  }
+  if (language === 'de') {
+    return {
+      material: 'Das Themengebiet wird kartiert…', curriculum: 'Die geführte Route wird entworfen…', panorama: 'Das Panorama wird geschrieben…', station: 'Die Station wird geschrieben…', contrasts: 'Die Autoren-Kontrastmatrix wird erstellt…', frontiers: 'Die Grenzen des Korpus werden kartiert…', exam: 'Die Abschlussprüfung wird vorbereitet…', assembling: 'Die Immersion wird zusammengestellt…', done: 'Immersion bereit.', noMaterial: 'Für dieses Thema wurde kein relevantes Material gefunden. Analysieren Sie weitere Werke oder präzisieren Sie das Thema.', degradedCurriculum: 'der strukturierte Plan wurde für den Stationsplan verwendet', degradedPanorama: 'das Panorama verwendete strukturellen Inhalt', degradedStation: 'eine Station verwendete strukturellen Inhalt:', degradedContrasts: 'die Kontrastmatrix verwendete strukturellen Inhalt', degradedExam: 'die Prüfung übernahm Stationsfragen', overviewTitle: (topic: string) => `Panorama: ${topic}`, overviewIntro: (ideas: number, works: number, authors: number) => `Ihr Korpus enthält ${ideas} relevante Ideen aus ${works} Werken von ${authors} Autoren zu diesem Thema. Dies sind die stärksten Linien:`, gapDetail: (kind: string) => `Lücke im Korpus erkannt (${kind}).`, thinCoverage: (n: number) => `${n} relevante Ideen blieben außerhalb der geführten Stationen.`, feynman: (topic: string) => `Erklären Sie mit eigenen Worten, als würden Sie es einem Kollegen beibringen, was das Korpus über „${topic}“ weiß: die wichtigsten Positionen, welcher Autor sie vertritt und worin sie sich unterscheiden.`,
+    };
+  }
+  if (language === 'pt' || language === 'pt-BR') {
+    const br = language === 'pt-BR';
+    return {
+      material: br ? 'Mapeando o território do tema…' : 'A cartografar o território do tema…', curriculum: br ? 'Desenhando a rota guiada…' : 'A desenhar a rota guiada…', panorama: br ? 'Redigindo o panorama…' : 'A redigir o panorama…', station: br ? 'Redigindo a estação…' : 'A redigir a estação…', contrasts: br ? 'Construindo a matriz de contrastes entre autores…' : 'A construir a matriz de contrastes entre autores…', frontiers: br ? 'Mapeando as fronteiras do corpus…' : 'A cartografar as fronteiras do corpus…', exam: br ? 'Preparando o exame final…' : 'A preparar o exame final…', assembling: br ? 'Montando a imersão…' : 'A montar a imersão…', done: br ? 'Imersão pronta.' : 'Imersão pronta.', noMaterial: br ? 'Nenhum material relevante foi encontrado para este tema. Analise mais obras ou refine o tema.' : 'Não foi encontrado material relevante para este tema. Analise mais obras ou refine o tema.', degradedCurriculum: br ? 'o plano estrutural foi usado para as estações' : 'o plano estrutural foi usado para as estações', degradedPanorama: br ? 'o panorama usou conteúdo estrutural' : 'o panorama usou conteúdo estrutural', degradedStation: br ? 'uma estação usou conteúdo estrutural:' : 'uma estação usou conteúdo estrutural:', degradedContrasts: br ? 'a matriz de contrastes usou conteúdo estrutural' : 'a matriz de contrastes usou conteúdo estrutural', degradedExam: br ? 'o exame reutilizou perguntas das estações' : 'o exame reutilizou perguntas das estações', overviewTitle: (topic: string) => `Panorama: ${topic}`, overviewIntro: (ideas: number, works: number, authors: number) => br ? `Seu corpus contém ${ideas} ideias relevantes em ${works} obras de ${authors} autores sobre este tema. Estas são as linhas mais fortes:` : `O seu corpus contém ${ideas} ideias relevantes em ${works} obras de ${authors} autores sobre este tema. Estas são as linhas mais fortes:`, gapDetail: (kind: string) => br ? `Lacuna detectada no corpus (${kind}).` : `Lacuna detetada no corpus (${kind}).`, thinCoverage: (n: number) => br ? `${n} ideias relevantes ficaram fora das estações guiadas.` : `${n} ideias relevantes ficaram fora das estações guiadas.`, feynman: (topic: string) => br ? `Explique com suas próprias palavras, como se ensinasse a um colega, o que o corpus sabe sobre “${topic}”: as posições principais, qual autor defende cada uma e onde discordam.` : `Explique pelas suas palavras, como se ensinasse a um colega, o que o corpus sabe sobre «${topic}»: as posições principais, que autor defende cada uma e onde discordam.`,
+    };
+  }
+  if (language === 'it') {
+    return {
+      material: 'Mappatura del territorio dell’argomento…', curriculum: 'Progettazione del percorso guidato…', panorama: 'Scrittura del panorama…', station: 'Scrittura della stazione…', contrasts: 'Costruzione della matrice dei contrasti tra autori…', frontiers: 'Mappatura delle frontiere del corpus…', exam: 'Preparazione dell’esame finale…', assembling: 'Assemblaggio dell’immersione…', done: 'Immersione pronta.', noMaterial: 'Non è stato trovato materiale rilevante per questo argomento. Analizza altre opere o precisa l’argomento.', degradedCurriculum: 'il piano strutturale ha sostituito il percorso delle stazioni', degradedPanorama: 'il panorama ha usato contenuto strutturale', degradedStation: 'una stazione ha usato contenuto strutturale:', degradedContrasts: 'la matrice dei contrasti ha usato contenuto strutturale', degradedExam: 'l’esame ha riutilizzato le domande delle stazioni', overviewTitle: (topic: string) => `Panorama: ${topic}`, overviewIntro: (ideas: number, works: number, authors: number) => `Il tuo corpus contiene ${ideas} idee rilevanti in ${works} opere di ${authors} autori su questo argomento. Queste sono le linee più forti:`, gapDetail: (kind: string) => `Lacuna rilevata nel corpus (${kind}).`, thinCoverage: (n: number) => `${n} idee rilevanti sono rimaste fuori dalle stazioni guidate.`, feynman: (topic: string) => `Spiega con parole tue, come se lo insegnassi a un collega, ciò che il corpus sa su «${topic}»: le posizioni principali, quale autore difende ciascuna e dove divergono.`,
+    };
+  }
+  if (language === 'tr') {
+    return {
+      material: 'Konu alanı haritalandırılıyor…', curriculum: 'Yönlendirilmiş rota tasarlanıyor…', panorama: 'Panorama yazılıyor…', station: 'İstasyon yazılıyor…', contrasts: 'Yazar karşılaştırma matrisi oluşturuluyor…', frontiers: 'Korpusun sınırları haritalandırılıyor…', exam: 'Final sınavı hazırlanıyor…', assembling: 'İmmersiyon birleştiriliyor…', done: 'İmmersiyon hazır.', noMaterial: 'Bu konu için ilgili materyal bulunamadı. Daha fazla eser analiz edin veya konuyu daraltın.', degradedCurriculum: 'istasyon planı için yapısal rota kullanıldı', degradedPanorama: 'panorama yapısal içerik kullandı', degradedStation: 'bir istasyon yapısal içerik kullandı:', degradedContrasts: 'karşılaştırma matrisi yapısal içerik kullandı', degradedExam: 'sınav istasyon sorularını yeniden kullandı', overviewTitle: (topic: string) => `Panorama: ${topic}`, overviewIntro: (ideas: number, works: number, authors: number) => `Korpusunuz bu konuda ${authors} yazarın ${works} eserinde ${ideas} ilgili fikir içeriyor. En güçlü çizgiler şunlar:`, gapDetail: (kind: string) => `Korpusta boşluk saptandı (${kind}).`, thinCoverage: (n: number) => `${n} ilgili fikir yönlendirilmiş istasyonların dışında kaldı.`, feynman: (topic: string) => `Bir meslektaşınıza öğretir gibi, kendi sözlerinizle korpusun “${topic}” hakkında ne bildiğini açıklayın: temel konumlar, her birini savunan yazar ve ayrıldıkları noktalar.`,
+    };
+  }
+  // Exhaustiveness is intentional; an unknown value is kept safe at the call boundary.
   return {
     material: 'Cartografiando el territorio del tema…',
     curriculum: 'Diseñando la ruta guiada…',

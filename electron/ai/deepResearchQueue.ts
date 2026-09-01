@@ -116,13 +116,33 @@ function messageFromError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function isSpanish(language: PromptLanguage | undefined): boolean {
-  return (language ?? 'es') === 'es';
+interface QueueCopy {
+  untitled: string;
+  recovered: string;
+  queued: (ahead: number) => string;
+  vaultChanged: (requested: string, current: string) => string;
+  generationCancelled: string;
+  reportCancelled: string;
 }
 
-function objectivePreview(objective: string): string {
+const QUEUE_COPY: Record<PromptLanguage, QueueCopy> = {
+  es: { untitled: 'Informe sin título', recovered: 'Recuperado tras reiniciar Nodus…', queued: (ahead) => `En cola · ${ahead} informe(s) por delante…`, vaultChanged: (requested, current) => `El informe se pidió sobre la bóveda «${requested}», pero ahora la activa es «${current}». No se ha generado sobre otro corpus.`, generationCancelled: 'Generación cancelada por el usuario.', reportCancelled: 'Informe cancelado antes de empezar.' },
+  en: { untitled: 'Untitled report', recovered: 'Recovered after restarting Nodus…', queued: (ahead) => `Queued · ${ahead} report(s) ahead…`, vaultChanged: (requested, current) => `This report was requested against the "${requested}" vault, but "${current}" is now active. It was not generated against a different corpus.`, generationCancelled: 'Generation cancelled by the user.', reportCancelled: 'Report cancelled before it started.' },
+  fr: { untitled: 'Rapport sans titre', recovered: 'Récupéré après le redémarrage de Nodus…', queued: (ahead) => `En attente · ${ahead} rapport(s) devant…`, vaultChanged: (requested, current) => `Ce rapport a été demandé pour le vault « ${requested} », mais « ${current} » est maintenant actif. Il n’a pas été généré à partir d’un autre corpus.`, generationCancelled: 'Génération annulée par l’utilisateur.', reportCancelled: 'Rapport annulé avant son démarrage.' },
+  de: { untitled: 'Bericht ohne Titel', recovered: 'Nach dem Neustart von Nodus wiederhergestellt…', queued: (ahead) => `Warteschlange · ${ahead} Bericht(e) davor…`, vaultChanged: (requested, current) => `Dieser Bericht wurde für den Vault „${requested}“ angefordert, aber jetzt ist „${current}“ aktiv. Er wurde nicht mit einem anderen Korpus erzeugt.`, generationCancelled: 'Erstellung durch den Benutzer abgebrochen.', reportCancelled: 'Bericht vor dem Start abgebrochen.' },
+  pt: { untitled: 'Relatório sem título', recovered: 'Recuperado após reiniciar o Nodus…', queued: (ahead) => `Em fila · ${ahead} relatório(s) à frente…`, vaultChanged: (requested, current) => `Este relatório foi pedido para o vault «${requested}», mas «${current}» está agora ativo. Não foi gerado com outro corpus.`, generationCancelled: 'Geração cancelada pelo utilizador.', reportCancelled: 'Relatório cancelado antes de começar.' },
+  'pt-BR': { untitled: 'Relatório sem título', recovered: 'Recuperado após reiniciar o Nodus…', queued: (ahead) => `Na fila · ${ahead} relatório(s) à frente…`, vaultChanged: (requested, current) => `Este relatório foi solicitado para o vault “${requested}”, mas “${current}” está ativo agora. Ele não foi gerado com outro corpus.`, generationCancelled: 'Geração cancelada pelo usuário.', reportCancelled: 'Relatório cancelado antes de começar.' },
+  it: { untitled: 'Rapporto senza titolo', recovered: 'Ripristinato dopo il riavvio di Nodus…', queued: (ahead) => `In coda · ${ahead} rapporto/i davanti…`, vaultChanged: (requested, current) => `Questo rapporto è stato richiesto per il vault «${requested}», ma ora è attivo «${current}». Non è stato generato con un corpus diverso.`, generationCancelled: 'Generazione annullata dall’utente.', reportCancelled: 'Rapporto annullato prima dell’avvio.' },
+  tr: { untitled: 'Başlıksız rapor', recovered: 'Nodus yeniden başlatıldıktan sonra kurtarıldı…', queued: (ahead) => `Kuyrukta · önde ${ahead} rapor var…`, vaultChanged: (requested, current) => `Bu rapor “${requested}” kasası için istendi, ancak şu anda “${current}” etkin. Farklı bir derlem üzerinde oluşturulmadı.`, generationCancelled: 'Oluşturma kullanıcı tarafından iptal edildi.', reportCancelled: 'Rapor başlamadan önce iptal edildi.' },
+};
+
+function queueCopy(language: PromptLanguage | undefined): QueueCopy {
+  return QUEUE_COPY[language ?? 'es'] ?? QUEUE_COPY.es;
+}
+
+function objectivePreview(objective: string, language?: PromptLanguage): string {
   const clean = objective.replace(/\s+/g, ' ').trim();
-  if (!clean) return 'Informe sin título';
+  if (!clean) return queueCopy(language).untitled;
   return clean.length > 100 ? `${clean.slice(0, 100)}…` : clean;
 }
 
@@ -188,9 +208,7 @@ function restorePersistedJobs(persisted: DeepResearchPersistedJob[]): void {
         progress: wasRunning
           ? {
               phase: 'queued',
-              message: isSpanish(stored.request.language)
-                ? 'Recuperado tras reiniciar Nodus…'
-                : 'Recovered after restarting Nodus…',
+              message: queueCopy(stored.request.language).recovered,
             }
           : stored.record.progress,
         startedAt: wasRunning ? null : stored.record.startedAt,
@@ -226,9 +244,7 @@ function reportQueuePositions(): void {
     if (ahead === 0) return;
     const progress: DeepResearchProgress = {
       phase: 'queued',
-      message: isSpanish(job.request.language)
-        ? `En cola · ${ahead} informe(s) por delante…`
-        : `Queued · ${ahead} report(s) ahead…`,
+      message: queueCopy(job.request.language).queued(ahead),
     };
     job.record.progress = progress;
     job.listener?.(progress);
@@ -265,9 +281,7 @@ function evictFinished(): void {
 }
 
 function vaultChangedMessage(job: QueuedJob, current: DeepResearchQueueVault): string {
-  return isSpanish(job.request.language)
-    ? `El informe se pidió sobre la bóveda «${job.record.vaultName}», pero ahora la activa es «${current.name}». No se ha generado sobre otro corpus.`
-    : `This report was requested against the "${job.record.vaultName}" vault, but "${current.name}" is now active. It was not generated against a different corpus.`;
+  return queueCopy(job.request.language).vaultChanged(job.record.vaultName, current.name);
 }
 
 function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listener' | 'resolve' | 'reject'>): QueuedJob {
@@ -280,7 +294,7 @@ function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listen
       vaultId: vault.id,
       vaultName: vault.name,
       objective: input.request.objective,
-      title: objectivePreview(input.request.objective),
+      title: objectivePreview(input.request.objective, input.request.language),
       deepResearchApproach: normalizeDeepResearchApproach(input.request.approach),
       deepResearchVersion,
       structure: input.request.sectionLimit === 'single' ? 'single' : 'sectioned',
@@ -339,9 +353,8 @@ export function cancelDeepResearchJob(id: string): boolean {
   const job = jobs.find((entry) => entry.record.id === id);
   if (!job || (job.record.status !== 'queued' && job.record.status !== 'running')) return false;
   const wasRunning = job.record.status === 'running';
-  const message = isSpanish(job.request.language)
-    ? (wasRunning ? 'Generación cancelada por el usuario.' : 'Informe cancelado antes de empezar.')
-    : (wasRunning ? 'Generation cancelled by the user.' : 'Report cancelled before it started.');
+  const copy = queueCopy(job.request.language);
+  const message = wasRunning ? copy.generationCancelled : copy.reportCancelled;
   job.record.status = 'cancelled';
   job.record.error = message;
   if (wasRunning) {
@@ -411,7 +424,7 @@ async function drain(): Promise<void> {
       if (job.controller.signal.aborted) {
         settle(job, {
           error: job.record.error
-            ?? (isSpanish(job.request.language) ? 'Generación cancelada por el usuario.' : 'Generation cancelled by the user.'),
+            ?? queueCopy(job.request.language).generationCancelled,
         });
         return;
       }
@@ -443,7 +456,7 @@ async function drain(): Promise<void> {
       settle(job, {
         error: job.controller.signal.aborted
           ? job.record.error
-            ?? (isSpanish(job.request.language) ? 'Generación cancelada por el usuario.' : 'Generation cancelled by the user.')
+            ?? queueCopy(job.request.language).generationCancelled
           : messageFromError(error),
       });
     }

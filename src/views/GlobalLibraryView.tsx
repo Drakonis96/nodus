@@ -36,7 +36,7 @@ import { LibraryRecoveryDialog, LibraryTrashImpactDialog } from '../components/l
 import { LibraryDocumentReader } from './LibraryDocumentReader';
 import { VirtualList } from '../components/VirtualList';
 import { confirm, promptText, toast } from '../components/feedback';
-import { t, tx } from '../i18n';
+import { errorText, t, tx } from '../i18n';
 import { zoteroConnectionHint, zoteroFailureText } from '../lib/zoteroConnection';
 import type { PendingAssistantNavigationTarget } from '../navigation';
 import type { PendingLibraryNavigationTarget } from '../navigation';
@@ -308,7 +308,7 @@ function LibraryCollectionStyleDialog({ collection, onClose, onSave }: {
   const save = async () => {
     setBusy(true); setError('');
     try { await onSave(icon, color); onClose(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    catch (cause) { setError(errorText(cause)); }
     finally { setBusy(false); }
   };
   return (

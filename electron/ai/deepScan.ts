@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { completeJson, embedMany, AiError } from './aiClient';
 import { modelRefSupportsExtraction } from '@shared/localAiModels';
-import { PROMPT_DEEP } from './prompts';
+import { deepScanPrompt } from './prompts';
 import { planIdeaFusion, applyFusionPlan, ExtractedIdea } from './fusion';
 import {
   upsertOccurrence,
@@ -580,7 +580,7 @@ export async function runDeepScan(
           try {
             const rawResult = await completeJson<Record<string, unknown>>(
               {
-                system: PROMPT_DEEP,
+                system: deepScanPrompt(getSettings().promptLanguage ?? 'es'),
                 user: JSON.stringify(requestInput),
                 temperature: 0.15,
                 maxTokens,

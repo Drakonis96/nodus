@@ -25,7 +25,8 @@ import {
   type WorldArticleNeighbour,
   type WorldArticleSources,
 } from '@shared/worldArticleContext';
-import { ARTICLE_CATEGORY_LABEL, WORLD_ENTRY_KIND_LABEL, entryKey } from '@shared/worldEncyclopedia';
+import { entryKey } from '@shared/worldEncyclopedia';
+import { worldArticleCategoryLabel, worldEntryKindLabel } from '@shared/worldPromptLanguage';
 import type { WorldArticleDraftMode, WorldArticleDraftResult } from '@shared/types';
 import { worldOperationSystemPrompt } from '@shared/worldOperationPrompts';
 
@@ -39,6 +40,8 @@ export async function draftWorldArticle(
 ): Promise<WorldArticleDraftResult> {
   const article = getWorldArticle(articleId);
   if (!article) throw new Error('Artículo no encontrado.');
+  const settings = getSettings();
+  const language = settings.promptLanguage ?? 'es';
 
   const detail = getWorldEntry({ kind: 'article', id: articleId });
   const entries = new Map(listWorldEntries().map((entry) => [entry.key, entry]));
@@ -51,7 +54,7 @@ export async function draftWorldArticle(
     seen.add(key);
     neighbours.push({
       title: entry.title,
-      kind: WORLD_ENTRY_KIND_LABEL[entry.kind],
+      kind: worldEntryKindLabel(entry.kind, language),
       summary: entry.summary,
       direction,
     });
@@ -68,7 +71,7 @@ export async function draftWorldArticle(
   const hasCalendar = calendar.eras.length > 0 || calendar.months.length > 0;
   const sources: WorldArticleSources = {
     title: article.title,
-    category: ARTICLE_CATEGORY_LABEL[article.category] ?? article.category,
+    category: worldArticleCategoryLabel(article.category, language),
     aliases: (article.aka ?? '').split(/\r?\n/).map((name) => name.trim()).filter(Boolean),
     summary: article.summary,
     body: mode === 'expand' ? article.body : null,
@@ -80,7 +83,6 @@ export async function draftWorldArticle(
 
   if (!hasWorldArticleMaterial(sources)) return { body: null, noMaterial: true };
 
-  const settings = getSettings();
   const model = settings.synthesisModel ?? settings.extractionModel ?? null;
   const text = await completeText(
     {
@@ -88,7 +90,7 @@ export async function draftWorldArticle(
         mode === 'expand' ? 'articleExpand' : 'articleDraft',
         settings.promptLanguage ?? 'es',
       ),
-      user: composeWorldArticleContext(sources),
+      user: composeWorldArticleContext(sources, language),
       plainContext: true,
       // As warm as the character biography: this is prose about an invented thing, not a
       // cautious reading of records.

@@ -10,7 +10,8 @@ import { Icon } from "../components/ui";
 import { MarkdownReader } from "./readers";
 import { api, ApiError } from "./api";
 import type { AIJob, Annotation, JsonRecord, LibraryDocument } from "./types";
-import { t } from "./i18nShim";
+import { errorText, getActiveLang, t, tx } from "./i18nShim";
+import { serverLabel, serverPrompt } from "./serverAiPrompts";
 
 type LibraryProps = { spaceId: string; onOpen: (id: string) => void };
 
@@ -111,7 +112,7 @@ async function waitForJob(id: string, signal: AbortSignal): Promise<AIJob> {
     await new Promise((resolve) => window.setTimeout(resolve, 500));
   }
   throw new Error(
-    "El trabajo sigue activo; puedes consultarlo desde el historial privado.",
+    t("El trabajo sigue activo; puedes consultarlo desde el historial privado."),
   );
 }
 
@@ -267,13 +268,13 @@ function ReaderFilesMenu({
         <Icon name="folder" size={13} className="text-neutral-400" />
         <span className="min-w-0 flex-1">
           <b className="block text-[11px] font-medium text-neutral-300">
-            Versiones y archivos
+            {t("Versiones y archivos")}
           </b>
           <small className="block truncate text-[9px] text-neutral-600">
-            {document.originalFileName || "Documento"} ·{" "}
+            {document.originalFileName || t("Documento")} ·{" "}
             {Number(document.cleanAvailable) +
               Number(document.originalAvailable)}{" "}
-            disponibles
+            {t("disponibles")}
           </small>
         </span>
         <Icon
@@ -296,7 +297,7 @@ function ReaderFilesMenu({
             onClick={() => choose("clean")}
           >
             <Icon name="book" size={12} />
-            <span className="truncate">Markdown limpio</span>
+            <span className="truncate">{t("Markdown limpio")}</span>
           </button>
           <button
             type="button"
@@ -307,10 +308,10 @@ function ReaderFilesMenu({
           >
             <Icon name="file" size={12} />
             <span className="min-w-0 flex-1 truncate">
-              {document.originalFileName || "Archivo original"}
+              {document.originalFileName || t("Archivo original")}
             </span>
             <span className="text-[9px] uppercase text-neutral-600">
-              {document.originalMimeType || "archivo"}
+              {document.originalMimeType || t("archivo")}
             </span>
           </button>
           {readOpeningFormatPreference() && (
@@ -323,7 +324,7 @@ function ReaderFilesMenu({
                 setOpen(false);
               }}
             >
-              <Icon name="refresh" size={11} /> Preguntar de nuevo al abrir
+              <Icon name="refresh" size={11} /> {t("Preguntar de nuevo al abrir")}
             </button>
           )}
         </div>
@@ -566,7 +567,9 @@ export function PublishedLibraryView({ spaceId, onOpen }: LibraryProps) {
                     href={href}
                     target="_blank"
                     rel="noreferrer"
-                    aria-label={`${t("Abrir")} ${titleFor(item)} en otra pestaña`}
+                    aria-label={tx("Abrir {title} en otra pestaña", {
+                      title: titleFor(item),
+                    })}
                   >
                     <Icon name="external" size={12} />
                     {t("Abrir")}
@@ -643,7 +646,9 @@ function ReaderNotes({
           resource: annotationResource,
           documentId: id,
           kind: selectedQuote ? "highlight" : "comment",
-          title: title.trim() || (selectedQuote ? "Subrayado" : "Anotación"),
+          title:
+            title.trim() ||
+            (selectedQuote ? t("Subrayado") : t("Anotación")),
           content: content.trim(),
           quote: selectedQuote,
           createdAt: now,
@@ -680,14 +685,14 @@ function ReaderNotes({
       data-testid="library-reader-sidebar"
     >
       <div className="flex items-center justify-between border-b border-neutral-800 px-3 py-2">
-        <h2 className="text-xs font-semibold text-neutral-200">Documento</h2>
+        <h2 className="text-xs font-semibold text-neutral-200">{t("Documento")}</h2>
         <div className="flex items-center gap-1">
           <button
             className="btn btn-ghost h-7 px-2 text-[10px]"
             onClick={() => setOpen((value) => !value)}
             data-testid="library-reader-add-note"
           >
-            {open ? "Cerrar" : "Añadir nota"}
+            {open ? t("Cerrar") : t("Añadir nota")}
           </button>
           <button
             type="button"
@@ -721,21 +726,23 @@ function ReaderNotes({
             value={content}
             onChange={(event) => setContent(event.target.value)}
             placeholder={
-              selectedQuote ? "Comentario sobre la selección…" : "Comentario…"
+              selectedQuote
+                ? `${t("Comentario sobre la selección")}…`
+                : `${t("Comentario")}…`
             }
           />
           <button
             className="btn btn-primary justify-self-start text-xs"
             disabled={saving}
           >
-            {saving ? "Guardando…" : "Guardar anotación"}
+            {saving ? t("Guardando…") : t("Guardar anotación")}
           </button>
         </form>
       )}
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
         {visibleNotes.length === 0 ? (
           <div className="rounded-xl border border-dashed border-neutral-800 px-4 py-8 text-center text-xs leading-5 text-neutral-600">
-            Selecciona texto para subrayarlo, anotarlo o preguntarle a Nodi.
+            {t("Selecciona texto para subrayarlo, anotarlo o preguntarle a Nodi.")}
           </div>
         ) : (
           visibleNotes.map((note) => (
@@ -745,7 +752,7 @@ function ReaderNotes({
             >
               <div className="flex items-start justify-between gap-2">
                 <strong className="text-xs text-neutral-300">
-                  {note.title || (note.quote ? "Subrayado" : "Anotación")}
+                  {note.title || (note.quote ? t("Subrayado") : t("Anotación"))}
                 </strong>
                 <button
                   className="rounded p-1 text-neutral-600 hover:text-red-400"
@@ -1013,7 +1020,14 @@ export function LibraryDetail({
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const preferences = await api.aiPreferences();
+      const [preferences, profileResponse] = await Promise.all([
+        api.aiPreferences(),
+        api.profilePreferences(),
+      ]);
+      const promptLanguage =
+        profileResponse.profile.values?.appearance?.promptLanguage ||
+        profileResponse.profile.values?.appearance?.uiLanguage ||
+        "en";
       const provider = preferences.preferences.defaultProvider;
       const model = provider
         ? preferences.preferences.chatModels?.[provider]
@@ -1027,7 +1041,7 @@ export function LibraryDetail({
           messages: [
             {
               role: "system",
-              content: `Responde sobre el documento publicado. No inventes información.\n\nTítulo: ${titleFor(document!)}\n\nTexto:\n${readable.slice(0, 120_000)}`,
+              content: `${serverPrompt(promptLanguage, "contentQuery")}\n\n${serverLabel(promptLanguage, "title")}: ${titleFor(document!)}\n\n${serverLabel(promptLanguage, "context")}:\n${readable.slice(0, 120_000)}`,
             },
             ...messages,
           ],
@@ -1039,7 +1053,7 @@ export function LibraryDetail({
       const job = await waitForJob(response.job.id, controller.signal);
       if (job.status !== "completed")
         throw new Error(
-          job.error?.message || "No se pudo completar la consulta.",
+          job.error?.message || t("No se pudo generar la respuesta."),
         );
       setChat((current) => [
         ...current,
@@ -1047,7 +1061,7 @@ export function LibraryDetail({
       ]);
     } catch (cause) {
       if (!(cause instanceof DOMException && cause.name === "AbortError"))
-        setChatError(cause instanceof Error ? cause.message : String(cause));
+        setChatError(errorText(cause));
     } finally {
       setChatBusy(false);
       setChatJobId(null);
@@ -1058,17 +1072,17 @@ export function LibraryDetail({
     return (
       <div className="h-full p-6">
         <p className="text-sm text-red-400">
-          No se ha podido cargar este documento.
+          {t("No se ha podido cargar este documento.")}
         </p>
         <button className="btn btn-ghost mt-3" onClick={onBack}>
-          Volver
+          {t("Volver")}
         </button>
       </div>
     );
   if (!document)
     return (
       <div className="grid h-full place-items-center text-sm text-neutral-500">
-        Cargando lector…
+        {t("Cargando lector…")}
       </div>
     );
   const originalUrl = document.originalAvailable
@@ -1086,7 +1100,7 @@ export function LibraryDetail({
           data-testid="library-reader-back"
         >
           <Icon name="chevronLeft" />
-          Biblioteca
+          {t("Biblioteca")}
         </button>
         <button
           className="btn btn-ghost h-9 w-9 p-0"
@@ -1105,8 +1119,8 @@ export function LibraryDetail({
             {titleFor(document)}
           </h1>
           <p className="truncate text-[11px] text-neutral-500">
-            {document.creators?.join(", ") || "Documento publicado"} ·{" "}
-            {progress}% leído
+            {document.creators?.join(", ") || t("Documento publicado")} ·{" "}
+            {progress}% {t("Leído").toLocaleLowerCase(getActiveLang())}
           </p>
         </div>
         <select
@@ -1119,10 +1133,10 @@ export function LibraryDetail({
           data-testid="library-reader-source-picker"
         >
           <option value="clean" disabled={!document.cleanAvailable}>
-            Markdown limpio
+            {t("Markdown limpio")}
           </option>
           <option value="original" disabled={!document.originalAvailable}>
-            Archivo original
+            {t("Archivo original")}
           </option>
         </select>
         <button
@@ -1130,10 +1144,10 @@ export function LibraryDetail({
           onClick={toggleRead}
           data-testid="library-reader-read-state"
           aria-pressed={isRead}
-          title={isRead ? "Marcar como no leído" : "Marcar como leído"}
+          title={isRead ? t("Marcar como no leído") : t("Marcar como leído")}
         >
           <Icon name={isRead ? "check" : "book"} size={13} />
-          {isRead ? "Leído" : "No leído"}
+          {isRead ? t("Leído") : t("No leído")}
         </button>
         {source === "clean" && (
           <button
@@ -1154,7 +1168,7 @@ export function LibraryDetail({
           data-testid="library-reader-notes"
         >
           <Icon name="notebook" size={13} />
-          Notas
+          {t("Notas")}
         </button>
         <button
           className="btn btn-ghost h-9 px-2 text-xs"
@@ -1164,7 +1178,7 @@ export function LibraryDetail({
           data-testid="library-reader-info"
         >
           <Icon name="info" size={13} />
-          Info
+          {t("Info")}
         </button>
         <button
           className="btn btn-primary h-9 px-2 text-xs"
@@ -1174,7 +1188,7 @@ export function LibraryDetail({
           data-testid="library-reader-open-chat"
         >
           <Icon name="chat" size={13} />
-          Chat
+          {t("Chat")}
         </button>
         {originalUrl && (
           <a
@@ -1185,7 +1199,7 @@ export function LibraryDetail({
             data-testid="library-reader-original"
           >
             <Icon name="external" size={13} />
-            Original
+            {t("Original")}
           </a>
         )}
         <a
@@ -1195,13 +1209,13 @@ export function LibraryDetail({
           data-testid="library-reader-download"
         >
           <Icon name="download" size={13} />
-          Descargar
+          {t("Descargar")}
         </a>
         <button
           className="btn btn-ghost h-9 w-9 p-0"
           onClick={() => window.print()}
-          aria-label="Imprimir"
-          title="Imprimir"
+          aria-label={t("Imprimir")}
+          title={t("Imprimir")}
         >
           <Icon name="external" size={14} />
         </button>
@@ -1219,7 +1233,7 @@ export function LibraryDetail({
         >
           <div className="mb-3 flex items-center justify-between px-2">
             <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
-              En este documento
+              {t("En este documento")}
             </span>
             <span className="text-[10px] text-neutral-600">{progress}%</span>
           </div>
@@ -1237,17 +1251,17 @@ export function LibraryDetail({
               ))
             ) : (
               <p className="px-2 py-3 text-[10px] text-neutral-600">
-                Añade títulos para crear un índice navegable.
+                {t("Añade títulos para crear un índice navegable.")}
               </p>
             )}
             <div className="mt-4 border-t border-neutral-800 pt-3">
               <span className="text-[10px] uppercase tracking-wider text-neutral-600">
-                Versión
+                {t("Versión")}
               </span>
               <p className="mt-1 text-xs text-neutral-400">
                 {source === "clean"
-                  ? "Markdown limpio"
-                  : document.originalFileName || "Archivo original"}
+                  ? t("Markdown limpio")
+                  : document.originalFileName || t("Archivo original")}
               </p>
             </div>
             <ReaderFilesMenu
@@ -1288,7 +1302,7 @@ export function LibraryDetail({
           >
             <iframe
               className="server-document-frame"
-              title="Archivo original"
+              title={t("Archivo original")}
               src={originalUrl}
               sandbox="allow-same-origin"
               data-testid="library-reader-original-frame"
@@ -1334,7 +1348,7 @@ export function LibraryDetail({
               ].map(([label, value]) => (
                 <div key={label}>
                   <dt className="text-[10px] uppercase tracking-wider text-neutral-600">
-                    {label}
+                    {t(String(label))}
                   </dt>
                   <dd className="mt-1 break-words text-neutral-300">
                     {display(value)}
@@ -1365,14 +1379,13 @@ export function LibraryDetail({
                 </button>
               </div>
               <p className="mt-1 text-[10px] text-neutral-600">
-                La consulta y sus respuestas son privadas.
+                {t("La consulta y sus respuestas son privadas.")}
               </p>
             </div>
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
               {chat.length === 0 && (
                 <p className="rounded-xl border border-dashed border-neutral-800 p-4 text-center text-xs text-neutral-600">
-                  Pregunta por la tesis, un concepto o la relación entre tus
-                  subrayados.
+                  {t("Pregunta por la tesis, un concepto o la relación entre tus subrayados.")}
                 </p>
               )}
               {chat.map((message, index) => (
@@ -1401,7 +1414,7 @@ export function LibraryDetail({
                 value={chatInput}
                 disabled={chatBusy}
                 onChange={(event) => setChatInput(event.target.value)}
-                placeholder="Pregunta sobre este documento…"
+                placeholder={t("Pregunta sobre este documento…")}
               />
               <div className="mt-2 flex justify-end border-t border-neutral-800 pt-2">
                 {chatBusy ? (
@@ -1416,14 +1429,14 @@ export function LibraryDetail({
                           .catch(() => undefined);
                     }}
                   >
-                    Cancelar
+                    {t("Cancelar")}
                   </button>
                 ) : (
                   <button
                     className="btn btn-primary h-7 text-[10px]"
                     disabled={!chatInput.trim()}
                   >
-                    Enviar
+                    {t("Enviar")}
                   </button>
                 )}
               </div>

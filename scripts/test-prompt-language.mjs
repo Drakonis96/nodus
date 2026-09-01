@@ -47,15 +47,15 @@ try {
   }
 
   const cases = [
-    { lang: 'en', name: 'INGLÉS' },
-    { lang: 'fr', name: 'FRANCÉS' },
-    { lang: 'tr', name: 'TURCO' },
-    { lang: 'de', name: 'ALEMÁN' },
-    { lang: 'pt', name: 'PORTUGUÉS DE PORTUGAL' },
-    { lang: 'pt-BR', name: 'PORTUGUÉS DE BRASIL' },
-    { lang: 'it', name: 'ITALIANO' },
+    { lang: 'en', name: 'ENGLISH', heading: 'OUTPUT LANGUAGE — HIGHEST PRIORITY' },
+    { lang: 'fr', name: 'FRANÇAIS', heading: 'LANGUE DE SORTIE — PRIORITÉ ABSOLUE' },
+    { lang: 'tr', name: 'TÜRKÇE', heading: 'ÇIKTI DİLİ — EN YÜKSEK ÖNCELİK' },
+    { lang: 'de', name: 'DEUTSCH', heading: 'AUSGABESPRACHE — HÖCHSTE PRIORITÄT' },
+    { lang: 'pt', name: 'PORTUGUÊS EUROPEU', heading: 'IDIOMA DE SAÍDA — PRIORIDADE MÁXIMA' },
+    { lang: 'pt-BR', name: 'PORTUGUÊS DO BRASIL', heading: 'IDIOMA DE SAÍDA — PRIORIDADE MÁXIMA' },
+    { lang: 'it', name: 'ITALIANO', heading: 'LINGUA DI OUTPUT — PRIORITÀ MASSIMA' },
   ];
-  for (const { lang, name } of cases) {
+  for (const { lang, name, heading } of cases) {
     updateSettings({ promptLanguage: lang });
     const out = withPromptLanguage({ system: BASE }).system;
 
@@ -71,13 +71,10 @@ try {
     );
 
     // …and a high-priority override directive is appended, naming the target language.
-    assert.ok(out.includes('HIGHEST PRIORITY'), `${lang}: must append the priority directive`);
+    assert.ok(out.includes(heading), `${lang}: must append the localized priority directive`);
     assert.ok(out.includes(name), `${lang}: directive must name the target language (${name})`);
-    // The directive must explicitly supersede the inline "escribe en español" instruction.
-    assert.ok(
-      /instrucción anterior de este prompt que pida escribir "en español"/i.test(out),
-      `${lang}: directive must override prior "en español" instructions`
-    );
+    // The directive must explicitly supersede the inline Spanish instruction.
+    assert.match(out, /free-text|texte libre|freien Text|texto livre|testo libero|serbest metin/i, `${lang}: directive must override prior language instructions`);
   }
 
   // Unknown/undefined prompt language must not throw and must fall back to no directive.

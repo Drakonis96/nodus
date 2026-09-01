@@ -1857,7 +1857,7 @@ export function Settings({
               {mcpStatus.running ? (
                 <span className="text-emerald-700 dark:text-emerald-400">{t('Activo')}: {mcpStatus.url}</span>
               ) : mcpStatus.error ? (
-                <span className="text-red-700 dark:text-red-400">{t('Error del servidor MCP')}: {mcpStatus.error}</span>
+                <span className="text-red-700 dark:text-red-400">{t('Error del servidor MCP')}: {errorText(mcpStatus.error)}</span>
               ) : (
                 <span className="text-neutral-500">{t('Apagado')}</span>
               )}

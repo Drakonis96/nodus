@@ -7,6 +7,7 @@ import type {
   ProjectInsertionSuggestion,
   ProjectLink,
 } from '@shared/types';
+import { projectInsertionPromptPack } from '@shared/projectInsertionPromptPacks';
 import { completeJson, embedMany } from './aiClient';
 import {
   citationUrl,
@@ -21,6 +22,7 @@ import { getIdeaDetail, getEdgeDetail, getIdeaEdges, findSimilarIdeas } from '..
 import { relatedLibraryIdeaIds } from '../db/projectChapterIdeasRepo';
 import { getGapDetail } from '../db/gapsRepo';
 import { getNote, getNotesTree } from '../db/notesRepo';
+import { getSettings } from '../db/settingsRepo';
 import { getWork } from '../db/worksRepo';
 
 const MATERIAL_LIMIT = 48;
@@ -116,21 +118,13 @@ export async function generateProjectSuggestions(
   const target = Math.max(1, Math.min(materials.length, limit));
   let raw: AiSuggestion[] = [];
   try {
+    const prompt = projectInsertionPromptPack(getSettings().promptLanguage ?? 'es');
     const ai = await completeJson<AiResponse>(
       {
-        system: [
-          'Eres un asistente academico dentro de Nodus.',
-          'Tu tarea es proponer inserciones puntuales para un capitulo de manuscrito usando SOLO los materiales del proyecto que recibes.',
-          'Se EXHAUSTIVO: genera UNA sugerencia por cada material relevante para el capitulo. No agrupes varios materiales en una sola sugerencia ni te limites a unas pocas.',
-          'Devuelve al menos objetivo.numero_minimo sugerencias siempre que haya materiales suficientes (hay tantos materiales como para cubrir ese minimo).',
-          'No copies literalmente evidencia ni texto de las fuentes. Parafrasea siempre, salvo que se pida una cita textual, que aqui no se pide.',
-          'Cada texto propuesto debe incluir al menos una cita Markdown nodus:// verificable.',
-          'Cita SOLO con los ids exactos que aparecen en "citationRefs" y "relatedRefs" de cada material. Tipos de cita validos: idea, work, gap, contradiction. NO cites pasajes ni uses ids de chunk.',
-          'Cuando un material conecta con otras ideas (relatedRefs), enlaza tambien esas ideas en el texto con su cita nodus:// para mostrar la conexion.',
-          'Nunca inventes ids, autores, anos, obras ni fuentes. Si no puedes sostener una propuesta con una fuente disponible, no la incluyas.',
-          'Devuelve solo JSON valido con la forma {"suggestions":[...]}',
-        ].join('\n'),
+        system: prompt.system,
         user: JSON.stringify(
+          // Input property names and enum values are deliberately stable protocol
+          // tokens; only the human-readable example values come from the locale pack.
           {
             objetivo: { numero_minimo: target, una_sugerencia_por_material: true },
             proyecto: {
@@ -162,13 +156,13 @@ export async function generateProjectSuggestions(
             salida_esperada: {
               suggestions: [
                 {
-                  targetChunkId: 'id exacto de chunk',
+                  targetChunkId: prompt.examples.chunkId,
                   kind: 'idea|gap|debate|work|note',
-                  refId: 'id exacto del material usado',
+                  refId: prompt.examples.materialId,
                   operation: 'insert_after',
-                  proposedText: '1 parrafo breve, parafraseado, con una o varias citas Markdown nodus:// (incluye las ideas conectadas cuando aporten)',
-                  citationRefs: [{ kind: 'idea|work|gap|contradiction', id: 'id exacto de citationRefs/relatedRefs' }],
-                  rationale: 'por que encaja aqui',
+                  proposedText: prompt.examples.paragraph,
+                  citationRefs: [{ kind: 'idea|work|gap|contradiction', id: prompt.examples.exactCitationRef }],
+                  rationale: prompt.examples.whyItFits,
                   confidence: 0.72,
                 },
               ],

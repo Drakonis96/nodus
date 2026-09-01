@@ -991,6 +991,11 @@ function assembleDebate(
     sideB,
     timeline: debateTimeline(sideA, sideB),
     tension: debateTensionText(row.type, sideA, sideB),
+    tensionKey: row.type === 'refutes' ? 'debate.refutes' : 'debate.contradicts',
+    tensionParams: {
+      left: clip(sideA.statement || sideA.label, DEBATE_TENSION_CLIP),
+      right: clip(sideB.statement || sideB.label, DEBATE_TENSION_CLIP),
+    },
     trace: getEdgeTrace(row.id),
   };
 }

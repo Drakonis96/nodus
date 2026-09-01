@@ -796,7 +796,7 @@ export function DeepResearchView({
       title: t('Quitar de la cola'),
       message: (
         <>
-          <span>«{item.title}»</span>
+          <span>«{item.title === 'Informe sin título' ? t(item.title) : item.title}»</span>
           <br />
           {t('Esta acción no se puede deshacer.')}
         </>
