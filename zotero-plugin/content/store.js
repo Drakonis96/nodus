@@ -303,6 +303,7 @@
   }
   const EVIDENCE_CACHE_VERSION = 1;
   let evidenceDbPromise = null;
+  let evidenceDbClosed = false;
 
   function legacyIndexDir() {
     const dir = Services.dirsvc.get("ProfD", Components.interfaces.nsIFile).path;
@@ -328,6 +329,31 @@
   function evidenceVectorPath(libraryID, attachmentKey) {
     return PathUtils.join(evidenceDir(), evidenceStem(libraryID, attachmentKey) + ".f32");
   }
+  // Layout extraction used to persist the same coordinate map twice: once as
+  // page spans and again as chunk positions. Nothing in retrieval, citation
+  // navigation or highlighting consumes either persisted map; Zotero resolves
+  // the live page when the user opens a citation. On large PDFs these millions
+  // of tiny objects dominate both JSON size and JS heap usage.
+  function compactEvidenceIndex(index) {
+    let changed = false;
+    for (const chunk of Array.isArray(index && index.chunks) ? index.chunks : []) {
+      if (Object.prototype.hasOwnProperty.call(chunk, "positions")) {
+        delete chunk.positions;
+        changed = true;
+      }
+    }
+    for (const page of Array.isArray(index && index.pages) ? index.pages : []) {
+      if (Object.prototype.hasOwnProperty.call(page, "rawText")) {
+        delete page.rawText;
+        changed = true;
+      }
+      if (Object.prototype.hasOwnProperty.call(page, "spans")) {
+        delete page.spans;
+        changed = true;
+      }
+    }
+    return changed;
+  }
   async function gzipText(value) {
     const bytes = new TextEncoder().encode(String(value || ""));
     if (typeof CompressionStream === "undefined") throw new Error("gzip-unavailable");
@@ -340,6 +366,7 @@
     return new TextDecoder().decode(await new Response(stream).arrayBuffer());
   }
   function detachEmbeddings(index) {
+    compactEvidenceIndex(index);
     const copy = { ...(index || {}) };
     const chunks = [];
     let totalFloats = 0;
@@ -389,6 +416,7 @@
     return copy;
   }
   async function evidenceDb() {
+    if (evidenceDbClosed) throw new Error("evidence-db-closed");
     if (evidenceDbPromise) return evidenceDbPromise;
     evidenceDbPromise = (async () => {
       await IOUtils.makeDirectory(evidenceDir(), { ignoreExisting: true });
@@ -409,6 +437,16 @@
     });
     return evidenceDbPromise;
   }
+  async function closeEvidenceDb() {
+    evidenceDbClosed = true;
+    const pending = evidenceDbPromise;
+    evidenceDbPromise = null;
+    if (!pending) return;
+    try {
+      const db = await pending;
+      if (db && db.closeDatabase) await db.closeDatabase(true);
+    } catch (e) { try { Zotero.logError(e); } catch (x) {} }
+  }
   async function loadEvidenceIndex(libraryID, attachmentKey) {
     let dataPath = evidenceDataPath(libraryID, attachmentKey);
     let vectorPath = evidenceVectorPath(libraryID, attachmentKey);
@@ -428,7 +466,12 @@
     try {
       const packed = await IOUtils.read(dataPath);
       const vectors = await IOUtils.read(vectorPath);
-      return attachEmbeddings(JSON.parse(await gunzipText(packed)), vectors);
+      const index = attachEmbeddings(JSON.parse(await gunzipText(packed)), vectors);
+      // One-time in-place migration of old, coordinate-heavy sidecars. The
+      // first read releases the duplicate objects immediately and rewrites a
+      // compact cache so subsequent Zotero sessions never parse them again.
+      if (compactEvidenceIndex(index)) await saveEvidenceIndex(index);
+      return index;
     } catch (e) {}
     // One-way lazy migration from the v0.1 JSON cache.  The old file is left in
     // place until the new cache has been written successfully.
@@ -593,8 +636,8 @@
     getAgent, setAgent, getAgentAuto, setAgentAuto,
     getHistoryEnabled, setHistoryEnabled, getHistoryRetention, setHistoryRetention,
     getManual, setManual, loadConversations, saveConversations, deleteConversationHistory, compactAudit, compactConversations,
-    EVIDENCE_CACHE_VERSION, gzipText, gunzipText, detachEmbeddings, attachEmbeddings,
+    EVIDENCE_CACHE_VERSION, gzipText, gunzipText, compactEvidenceIndex, detachEmbeddings, attachEmbeddings,
     loadEvidenceIndex, saveEvidenceIndex, deleteEvidenceIndex, listEvidenceRecords, loadEvidenceIndexes,
-    pruneEvidenceIndexes, clearEvidenceIndexes, evidenceCacheStats, newId,
+    pruneEvidenceIndexes, clearEvidenceIndexes, evidenceCacheStats, closeEvidenceDb, newId,
   };
 })();

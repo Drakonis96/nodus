@@ -15,18 +15,47 @@
     fingerprint: "Xenova/multilingual-e5-small@761b726dd34fb83930e26aab4e9ac3899aa1fa78:q8:mean:l2:v1",
   });
   const WORKER_URL = "chrome://nodus/content/runtime/local-embedding-worker.js";
+  // Keeping the WASM model alive costs hundreds of MiB. A short grace period
+  // avoids reloading it between related questions, while still returning that
+  // memory to Zotero after the user stops using semantic retrieval.
+  const IDLE_TERMINATE_MS = 5 * 60 * 1000;
 
   let worker = null;
+  let idleTimer = null;
   let seq = 0;
   let lastBackend = null;
   const pending = new Map();
   const progressListeners = new Set();
 
+  function clearIdleTermination() {
+    if (idleTimer == null) return;
+    clearTimeout(idleTimer);
+    idleTimer = null;
+  }
+
+  function terminateWorker() {
+    clearIdleTermination();
+    const current = worker;
+    worker = null;
+    lastBackend = null;
+    if (current) { try { current.terminate(); } catch (e) {} }
+  }
+
+  function scheduleIdleTermination() {
+    clearIdleTermination();
+    if (!worker || pending.size) return;
+    idleTimer = setTimeout(() => {
+      idleTimer = null;
+      if (!pending.size) terminateWorker();
+    }, IDLE_TERMINATE_MS);
+  }
+
   function makeWorker() {
     if (worker) return worker;
     const WorkerImpl = typeof ChromeWorker !== "undefined" ? ChromeWorker : Worker;
-    worker = new WorkerImpl(WORKER_URL);
-    worker.addEventListener("message", (event) => {
+    const instance = new WorkerImpl(WORKER_URL);
+    worker = instance;
+    instance.addEventListener("message", (event) => {
       const message = event && event.data ? event.data : {};
       if (message.type === "progress") {
         for (const listener of progressListeners) {
@@ -44,29 +73,36 @@
       if (job.cleanup) job.cleanup();
       if (message.type === "error") job.reject(new Error(String(message.error || "local-embedding-failed")));
       else job.resolve(message.result);
+      scheduleIdleTermination();
     });
-    worker.addEventListener("error", (event) => {
+    instance.addEventListener("error", (event) => {
       const error = new Error(String(event && (event.message || event.error) || "local-embedding-worker-failed"));
       for (const job of pending.values()) {
         if (job.cleanup) job.cleanup();
         job.reject(error);
       }
       pending.clear();
-      try { worker.terminate(); } catch (e) {}
-      worker = null;
+      if (worker === instance) terminateWorker();
+      else { try { instance.terminate(); } catch (e) {} }
     });
     return worker;
   }
 
   function request(type, payload, signal) {
     if (signal && signal.aborted) return Promise.reject(new DOMException("Aborted", "AbortError"));
+    clearIdleTermination();
     const id = "le_" + Date.now() + "_" + (++seq);
     return new Promise((resolve, reject) => {
       const onAbort = () => {
         const job = pending.get(id);
         if (!job) return;
         pending.delete(id);
+        if (job.cleanup) job.cleanup();
         reject(new DOMException("Aborted", "AbortError"));
+        // The worker API cannot cancel an individual inference. If this was
+        // the final request, terminate it so an aborted long document does not
+        // keep consuming CPU and RAM in the background.
+        if (!pending.size) terminateWorker();
       };
       const cleanup = signal ? () => signal.removeEventListener("abort", onAbort) : null;
       if (signal) signal.addEventListener("abort", onAbort, { once: true });
@@ -76,6 +112,7 @@
         pending.delete(id);
         if (cleanup) cleanup();
         reject(error);
+        scheduleIdleTermination();
       }
     });
   }
@@ -105,14 +142,15 @@
     return lastBackend;
   }
   function reset() {
-    if (worker) { try { worker.terminate(); } catch (e) {} }
-    worker = null;
+    terminateWorker();
     for (const job of pending.values()) {
       if (job.cleanup) job.cleanup();
       job.reject(new Error("local-embedding-reset"));
     }
     pending.clear();
   }
+
+  window.addEventListener("unload", reset, { once: true });
 
   window.NodusLocalEmbeddings = {
     MODEL,
