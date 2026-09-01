@@ -764,6 +764,7 @@ function LibraryScopeControls({
   return (
     <div
       data-testid="library-scope-switcher"
+      data-tour="library-scope"
       data-scope-placement="content-header"
       className="library-scope-switcher"
       role="group"

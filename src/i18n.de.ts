@@ -53,8 +53,10 @@ import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 import { ADAPTIVE_CONCURRENCY_TRANSLATIONS } from './i18n.adaptiveConcurrency';
 import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
+import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const DE: Record<string, string> = {
+  ...ACADEMIC_TOUR_TRANSLATIONS.de,
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS.de,
   ...DATABASE_DEEP_RESEARCH_TRANSLATIONS.de,
   ...MODEL_SETTINGS_TRANSLATIONS.de,

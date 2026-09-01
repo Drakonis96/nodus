@@ -117,12 +117,22 @@ export function TourOverlay({
     }
     let cancelled = false;
     let timer = 0;
+    let scrolledIntoView = false;
     const deadline = Date.now() + 5_000;
     const measure = () => {
       if (cancelled) return;
       const el = document.querySelector<HTMLElement>(`[data-tour="${activeTarget}"]`);
       const r = el?.getBoundingClientRect();
       if (r && r.width > 0 && r.height > 0) {
+        // Long sidebars can contain a perfectly valid target below their own scroll
+        // viewport. A spotlight around those off-screen coordinates teaches nothing,
+        // so bring the item into view once and measure again after the scroll settles.
+        if (!scrolledIntoView && (r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth)) {
+          scrolledIntoView = true;
+          el?.scrollIntoView({ block: 'center', inline: 'nearest' });
+          timer = window.setTimeout(measure, 120);
+          return;
+        }
         setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
         return; // found — the resize listener keeps it fresh from here
       }
@@ -311,6 +321,7 @@ export function TourOverlay({
                   </button>
                 )}
                 <button
+                  data-testid="tour-start-walkthrough"
                   className={`w-full ${video ? 'btn btn-ghost border border-neutral-700' : 'btn btn-primary'}`}
                   onClick={() => {
                     setStarted(true);
@@ -324,11 +335,11 @@ export function TourOverlay({
                 </button>
               </>
             ) : isLast ? (
-              <button className="btn btn-primary" onClick={onClose}>
+              <button data-testid="tour-finish" className="btn btn-primary" onClick={onClose}>
                 {t('Empezar')}
               </button>
             ) : (
-              <button className="btn btn-primary" onClick={() => setI((n) => n + 1)}>
+              <button data-testid="tour-next" className="btn btn-primary" onClick={() => setI((n) => n + 1)}>
                 {t('Siguiente')}
               </button>
             )}
