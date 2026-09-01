@@ -149,6 +149,34 @@ test('academic onboarding offers Nodus Library or optional Zotero while dedicate
   assert.match(onboarding, /Construye un mundo de ficción coherente a partir de tu propio canon/);
 });
 
+test('academic first-run tour stays focused on the current evidence workflow in every language', async () => {
+  const [tour, engine, library, translations] = await Promise.all([
+    read('src/views/Tour.tsx'),
+    read('src/views/tourEngine.tsx'),
+    read('src/views/GlobalLibraryView.tsx'),
+    read('src/i18n.academicTour.ts'),
+  ]);
+
+  assert.match(tour, /export const ACADEMIC_TOUR_STEPS/);
+  assert.equal(tour.match(/^\s{4}title:/gm)?.length, 9, 'the essential tour should remain a nine-step path');
+  assert.match(tour, /Biblioteca → Ideas → Grafo/);
+  assert.match(tour, /La fuente sigue siendo la autoridad|la fuente sigue siendo la autoridad/);
+  for (const target of ['vault-badge', 'nav-library', 'library-scope', 'nav-ideas', 'nav-graph', 'nav-workspace']) {
+    assert.match(tour, new RegExp(`target: '${target}'`), `missing current tour target ${target}`);
+  }
+  for (const obsoleteTarget of ['sync', 'model', 'nav-notes', 'nav-search']) {
+    assert.doesNotMatch(tour, new RegExp(`target: '${obsoleteTarget}'`), `obsolete tour target ${obsoleteTarget}`);
+  }
+
+  assert.match(library, /data-tour="library-scope"/);
+  assert.match(engine, /scrollIntoView\(\{ block: 'center', inline: 'nearest' \}\)/);
+  assert.match(engine, /data-testid="tour-next"/);
+  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+    const key = language === 'pt-BR' ? `'pt-BR'` : language;
+    assert.match(translations, new RegExp(`^  ${key}: \\{`, 'm'), `missing academic tour copy for ${language}`);
+  }
+});
+
 test('a failed Zotero check names the setting that fixes it', async () => {
   const [client, helper, onboarding, translate, en] = await Promise.all([
     read('electron/zotero/zoteroClient.ts'),
