@@ -1273,13 +1273,13 @@ async function buildSelectedIndexes(force, signal) {
 }
 async function syncLibraryIdentityBeforeSend() {
   if (state.sourceScope !== "library") return;
-  const indexes = await buildSelectedIndexes(false, null);
-  const nextIdentity = await librarySourceIdentity(indexes);
+  // Identity only depends on the cache catalogue. prepareEvidence() validates
+  // and loads the full indexes immediately afterwards; doing that here as well
+  // doubled the largest allocation on every library-scoped message.
+  const records = NS.listEvidenceRecords ? await NS.listEvidenceRecords() : [];
+  const nextIdentity = await librarySourceIdentity(records);
   const changed = !!state.sourceIdentity && state.sourceIdentity !== nextIdentity;
-  if (changed) {
-    await resetSourceContext(false);
-    state.indexes = indexes;
-  }
+  if (changed) await resetSourceContext(false);
   state.sourceIdentity = nextIdentity;
   state.lastItemKey = nextIdentity;
   if (state.conv && !state.conv.messages.length) state.conv.sourceIdentity = nextIdentity;
@@ -2736,11 +2736,20 @@ function registerNotifier() {
     };
     state.notifierID = Zotero.Notifier.registerObserver(observer, ["item", "tab", "collection"], "nodus-sidebar");
     window.addEventListener("unload", () => {
+      try { if (state.abort) state.abort.abort(); } catch (e) {}
       try { if (state.notifierID) Zotero.Notifier.unregisterObserver(state.notifierID); } catch (e) {}
       try { if (state.pollTimer) clearInterval(state.pollTimer); } catch (e) {}
+      try { if (refreshTimer) clearTimeout(refreshTimer); } catch (e) {}
       try { if (evidencePruneTimer) clearTimeout(evidencePruneTimer); } catch (e) {}
+      try { if (toastTimer) clearTimeout(toastTimer); } catch (e) {}
+      try { window.removeEventListener("focus", retryConnectionNow); } catch (e) {}
       try { stopConnectionWatch(); } catch (e) {}
       cancelBackgroundEmbeddings(false).catch(() => {});
+      try { if (NL && NL.reset) NL.reset(); } catch (e) {}
+      try { if (NS.closeEvidenceDb) NS.closeEvidenceDb().catch(() => {}); } catch (e) {}
+      state.indexes = [];
+      state.evidence = new Map();
+      state.visuals = [];
     });
   } catch (e) { try { Zotero.logError(e); } catch (x) {} }
 }

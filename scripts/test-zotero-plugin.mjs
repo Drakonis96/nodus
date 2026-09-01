@@ -518,6 +518,20 @@ test('store: evidence cache separates compressed metadata from Float32 vectors',
   assert.ok(Math.abs(restored.chunks[2].embedding[2] + 1) < 1e-6);
 });
 
+test('store: evidence cache drops unused duplicate layout maps', () => {
+  const { NodusStore: S } = loadModule('store.js');
+  const index = {
+    pages: [{ text: 'alpha', rawText: 'alpha', spans: [{ start: 0, end: 5, rect: [1, 2, 3, 4], text: 'alpha' }] }],
+    chunks: [{ text: 'alpha', positions: [{ start: 0, end: 5, rect: [1, 2, 3, 4], text: 'alpha' }] }],
+  };
+  assert.equal(S.compactEvidenceIndex(index), true);
+  assert.equal(index.pages[0].rawText, undefined);
+  assert.equal(index.pages[0].spans, undefined);
+  assert.equal(index.chunks[0].positions, undefined);
+  assert.equal(index.pages[0].text, 'alpha', 'retrieval text remains intact');
+  assert.equal(S.compactEvidenceIndex(index), false, 'migration is idempotent');
+});
+
 test('evidence: layout extraction removes repeated margins, orders columns and retains exact coordinates', () => {
   const { NodusEvidence: E } = loadModule('evidence.js');
   const item = (str, x, y, width = 90) => ({ str, x, y, width, height: 10 });
@@ -1251,9 +1265,59 @@ test('local retrieval: E5 is pinned, isolated in a worker and requires no embedd
   assert.match(worker, /env\.useCustomCache = true/);
   assert.ok(worker.includes('createIndexedDbCache') && worker.includes("indexedDB.open(CACHE_DB, 1)"));
   assert.ok(bridge.includes('ChromeWorker') && bridge.includes('embedQueries'));
+  assert.ok(bridge.includes('IDLE_TERMINATE_MS') && bridge.includes('scheduleIdleTermination'));
+  assert.match(bridge, /addEventListener\("unload", reset/);
   assert.ok(sidebar.includes('NL.embedPassages') && sidebar.includes('NL.embedQuery'));
   assert.ok(!sidebar.includes('NP.embed('), 'retrieval no longer calls a provider embedding API');
   assert.ok(!html.includes('nd-embedding-model'), 'embedding configuration was removed');
+});
+
+test('local retrieval: completed workers terminate when idle and pending work terminates on unload', async () => {
+  const workers = [];
+  const timers = new Map();
+  let nextTimer = 0;
+  let unload = null;
+  class FakeWorker {
+    constructor() { this.listeners = {}; this.terminated = false; workers.push(this); }
+    addEventListener(type, listener) { this.listeners[type] = listener; }
+    postMessage(message) { this.message = message; }
+    terminate() { this.terminated = true; }
+    reply(result) { this.listeners.message({ data: { type: 'result', id: this.message.id, result } }); }
+  }
+  const fakeWindow = {
+    addEventListener(type, listener) { if (type === 'unload') unload = listener; },
+  };
+  const { NodusLocalEmbeddings: embeddings } = loadModule('local-embeddings.js', {
+    window: fakeWindow,
+    ChromeWorker: FakeWorker,
+    DOMException,
+    setTimeout(listener, ms) { const id = ++nextTimer; timers.set(id, { listener, ms }); return id; },
+    clearTimeout(id) { timers.delete(id); },
+  });
+
+  const completed = embeddings.embedPassages(['alpha']);
+  workers[0].reply([[0.1, 0.2]]);
+  await completed;
+  const idle = [...timers.values()].find((timer) => timer.ms === 5 * 60 * 1000);
+  assert.ok(idle, 'the heavyweight worker gets an idle deadline');
+  idle.listener();
+  assert.equal(workers[0].terminated, true);
+  assert.equal(embeddings.getBackend(), null);
+
+  const pending = embeddings.warmup();
+  assert.equal(workers.length, 2, 'work after the deadline creates a fresh worker');
+  unload();
+  await assert.rejects(pending, /local-embedding-reset/);
+  assert.equal(workers[1].terminated, true);
+});
+
+test('library scope computes identity from metadata and loads full indexes only for retrieval', () => {
+  const sidebar = readSource('zotero-plugin/content/sidebar.js');
+  const start = sidebar.indexOf('async function syncLibraryIdentityBeforeSend()');
+  const end = sidebar.indexOf('\nfunction availableContextTokens()', start);
+  const body = sidebar.slice(start, end);
+  assert.ok(body.includes('NS.listEvidenceRecords'));
+  assert.ok(!body.includes('buildSelectedIndexes'), 'identity sync must not duplicate the full-index allocation');
 });
 
 test('agentic retrieval: both modes use a validated two-round planner', () => {

@@ -81,10 +81,16 @@ function shutdown() {
   try { eachMainWindow((w) => { removeLibraryButton(w); removeSidebar(w); }); } catch (e) {}
   if (Nodus.readerToolbarListener) {
     try { Zotero.Reader.unregisterEventListener("renderToolbar", Nodus.readerToolbarListener); } catch (e) {}
+    Nodus.readerToolbarListener = null;
   }
   if (Nodus.selectionListener) {
     try { Zotero.Reader.unregisterEventListener("renderTextSelectionPopup", Nodus.selectionListener); } catch (e) {}
+    Nodus.selectionListener = null;
   }
+  try {
+    if (_popupMods && _popupMods.NS && _popupMods.NS.closeEvidenceDb) _popupMods.NS.closeEvidenceDb().catch(() => {});
+  } catch (e) {}
+  _popupMods = null;
   if (chromeHandle) { try { chromeHandle.destruct(); } catch (e) {} chromeHandle = null; }
   Nodus.rootURI = null;
 }
