@@ -642,8 +642,14 @@ footer.site-foot {
 }
 .prose img { border-radius: var(--r-m); border: 1px solid var(--membrane); }
 .prose hr { border: 0; border-top: 1px solid var(--membrane); margin: 2.4em 0; }
-.prose table { width: 100%; border-collapse: collapse; font-size: 15px; }
-.prose th, .prose td { padding: 10px 12px; border-bottom: 1px solid var(--membrane); text-align: left; }
+/* A table wider than the column scrolls inside itself; the page never scrolls
+   sideways because of one. `width: max-content` keeps a narrow table narrow. */
+.prose table {
+  display: block; width: max-content; max-width: 100%; overflow-x: auto;
+  border-collapse: collapse; font-size: 15px;
+}
+.prose th, .prose td { padding: 10px 12px; border-bottom: 1px solid var(--membrane); text-align: left; vertical-align: top; }
+.prose td:first-child, .prose th:first-child { white-space: nowrap; }
 .prose th { color: var(--ink); font-weight: 620; }
 
 /* ============================================================ search + filter bars */
