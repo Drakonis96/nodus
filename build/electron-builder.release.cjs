@@ -29,5 +29,20 @@ if (channel !== 'latest' && channel !== 'beta') {
 //     app-builder-lib's own scheme.json rather than waiting for a release.
 module.exports = {
   ...pkg.build,
+  // Release builds are intentionally stricter than local `npm run dist:mac`:
+  // no identity, notarization credential, staple or verification means no
+  // artifact. electron-builder 26 keeps these keys directly under `mac`.
+  mac: {
+    ...pkg.build.mac,
+    forceCodeSigning: true,
+    hardenedRuntime: true,
+    strictVerify: true,
+    preAutoEntitlements: false,
+    entitlements: 'build/entitlements.mac.plist',
+    entitlementsInherit: 'build/entitlements.mac.inherit.plist',
+    sign: 'build/macSign.cjs',
+    notarize: true,
+  },
+  afterSign: 'build/afterSign.cjs',
   publish: pkg.build.publish.map((target) => ({ ...target, channel })),
 };

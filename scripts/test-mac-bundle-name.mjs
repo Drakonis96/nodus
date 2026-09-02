@@ -1,8 +1,8 @@
 // The .app bundle name is a FORWARD contract: old versions read it, not new ones.
 //
-// Nodus ships unsigned on macOS, so it does not hand off to Squirrel.Mac. It
-// replaces its own bundle with a helper script it writes at update time — and the
-// helper that runs belongs to the version being REPLACED, never to the one being
+// Older and local ad-hoc builds do not hand off to Squirrel.Mac. They replace
+// their own bundle with a helper script written at update time — and the helper
+// that runs belongs to the version being REPLACED, never to the one being
 // installed. v4.2.3's helper is literally:
 //
 //   NEW_APP="$(/usr/bin/find "$STAGING" -type d -name Nodus.app -print -quit)"

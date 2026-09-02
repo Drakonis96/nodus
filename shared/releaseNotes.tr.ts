@@ -106,6 +106,10 @@ const RELEASE_5_1_0_TR = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.1.3": [
+    "macOS için Nodus artık Developer ID imzası ve Apple noter onayıyla dağıtılıyor. Hardened Runtime uygulamayı koruyor, Gatekeeper ise uygulamayı açmadan önce imzayı ve bileti doğruluyor. Paketteki tüm yardımcılar, frameworkler, yerel modüller ve yürütülebilir dosyalar yalnızca ihtiyaç duydukları izinlerle imzalanıyor.",
+    "Sözlük artık tek bir kaynağın seçime hakim olmasına izin vermek yerine kanıtları farklı eserler ve yazarlar arasında dağıtıyor. Anlamsal ve sözcüksel aramayı birleştiriyor, fikirlerin, alıntıların ve ilişkilerin kaynağını belirtiyor ve bir tanım yeterli sayıda kaynak veya yazarı kapsamıyorsa uyarıyor.",
+  ],
   "5.1.2": [
     ...RELEASE_5_1_0_TR,
     "Başlıktaki Güncelle düğmesi artık yalnızca izlediğiniz Zotero koleksiyonlarının kataloğunu yeniliyor. Yeni öğeler analiz başlatılmadan veya kuyruğa eklenmeden Kitaplıkta görünüyor. Bu sürüm ayrıca Zotero 10’un döndürdüğü sıfır öğe sürümünü düzeltiyor. Bu değer daha önce tüm kitaplığı bir anda değişmiş gibi gösterebiliyordu.",

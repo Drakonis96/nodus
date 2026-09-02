@@ -24,13 +24,29 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
-  // 5.1.2 preserves the complete 5.1.1 announcement and adds every repair
-  // merged afterwards in all eight interface languages.
+  // 5.1.3 deliberately presents only the two changes in this patch. Apple
+  // notarization leads so the trust change is the first thing macOS users see.
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.1.2');
+  assert.equal(currentRelease?.version, '5.1.3');
   assert.equal(currentRelease?.date, '2026-08-31');
-  assert.equal(currentRelease?.highlights.length, 13);
+  assert.equal(currentRelease?.highlights.length, 2);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
+    'apple', 'academic',
+  ]);
+  for (const phrase of [
+    /Developer ID signature and Apple notarization/,
+    /Gatekeeper verifies its signature and ticket/,
+    /only the permissions it needs/,
+    /different works and authors/,
+    /semantic and lexical search/,
+    /does not cover enough sources or authors/,
+  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+
+  // 5.1.2 remains intact immediately below the new focused patch.
+  const release512 = RELEASE_NOTES.find((note) => note.version === '5.1.2');
+  assert.equal(release512?.date, '2026-08-31');
+  assert.equal(release512?.highlights.length, 13);
+  assert.deepEqual(release512?.highlights.map((highlight) => highlight.scope), [
     'ai', 'ai', 'zotero', 'server', 'library', 'databases', 'word', 'connector', 'zotero',
     'word', 'ai', 'zotero', 'general',
   ]);
@@ -50,12 +66,12 @@ try {
     /saves and shows the reason/,
     /appear as clean text/,
     /at least eight characters/,
-  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+  ]) assert.ok(release512?.highlights.some((highlight) => phrase.test(highlight.en)));
 
   const previousPatchRelease = RELEASE_NOTES.find((note) => note.version === '5.1.1');
   assert.equal(previousPatchRelease?.date, '2026-08-31');
   assert.equal(previousPatchRelease?.highlights.length, 9);
-  assert.deepEqual(currentRelease?.highlights.slice(0, 9), previousPatchRelease?.highlights);
+  assert.deepEqual(release512?.highlights.slice(0, 9), previousPatchRelease?.highlights);
 
   const minorRelease = RELEASE_NOTES.find((note) => note.version === '5.1.0');
   assert.equal(minorRelease?.date, '2026-08-30');
@@ -344,6 +360,9 @@ try {
   assert.match(whatsNew, /function ZoteroReleaseIcon/);
   assert.match(whatsNew, /M16 18H48L16 46H48/);
   assert.match(whatsNew, /scope === 'zotero'/);
+  assert.match(whatsNew, /function AppleReleaseIcon/);
+  assert.match(whatsNew, /M24\.132 18\.851/);
+  assert.match(whatsNew, /scope === 'apple'/);
   const currentMajorNotes = releaseNotesForMajor('2.3.8');
 
   assert.equal(currentMajorNotes[0]?.version, '2.3.8');
@@ -376,6 +395,7 @@ try {
     'languages',
     'browser',
     'radar',
+    'apple',
   ]);
   for (const note of RELEASE_NOTES) {
     for (const highlight of note.highlights) {

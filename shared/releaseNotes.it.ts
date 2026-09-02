@@ -166,6 +166,10 @@ const RELEASE_5_1_0_IT = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.1.3": [
+    "Nodus per macOS viene ora distribuito con firma Developer ID e notarizzazione Apple. Hardened Runtime protegge l’applicazione e Gatekeeper verifica la firma e il ticket prima di aprirla. Tutti gli helper, i framework, i moduli nativi e gli eseguibili inclusi vengono firmati solo con i permessi necessari.",
+    "Il Dizionario distribuisce ora le prove tra opere e autori diversi invece di lasciare che una sola fonte domini la selezione. Combina ricerca semantica e lessicale, identifica l’origine di idee, citazioni e relazioni e avvisa quando una definizione non copre abbastanza fonti o autori.",
+  ],
   "5.1.2": [
     ...RELEASE_5_1_0_IT,
     "Il pulsante Aggiorna nell’intestazione ora aggiorna soltanto il catalogo delle collezioni Zotero monitorate. I nuovi elementi compaiono nella Libreria senza avviare né accodare analisi. Questa versione gestisce anche il valore zero restituito da Zotero 10, che poteva far apparire modificata tutta la libreria in una sola volta.",

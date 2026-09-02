@@ -23,7 +23,7 @@ execFileSync(path.join(repoRoot, 'node_modules/.bin/esbuild'), [
   `--outfile=${bundle}`,
 ], { cwd: repoRoot, stdio: 'inherit' });
 
-const { applyUpdateChannel, isPrereleaseVersion } = require(bundle);
+const { applyUpdateChannel, availableUpdateVersion, isPrereleaseVersion } = require(bundle);
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
 test('stable is the default preference and the beta choice is app-wide', async () => {
@@ -48,6 +48,21 @@ test('selecting either feed keeps downgrades disabled', () => {
   }
   assert.equal(isPrereleaseVersion('3.3.0-beta.1'), true);
   assert.equal(isPrereleaseVersion('3.3.0'), false);
+});
+
+test('a rejected older stable feed cannot become an update prompt in a beta build', () => {
+  assert.equal(availableUpdateVersion({
+    isUpdateAvailable: false,
+    updateInfo: { version: '5.1.2' },
+  }, '5.1.3-beta.4'), null);
+  assert.equal(availableUpdateVersion({
+    isUpdateAvailable: true,
+    updateInfo: { version: '5.1.3' },
+  }, '5.1.3-beta.4'), '5.1.3');
+  assert.equal(availableUpdateVersion({
+    isUpdateAvailable: true,
+    updateInfo: { version: '5.1.3-beta.4' },
+  }, '5.1.3-beta.4'), null);
 });
 
 test('opting out cancels a pending prerelease and blocks its installation', async () => {
@@ -165,4 +180,15 @@ test('release version validation cannot cross channels', () => {
   assert.throws(() => validateReleaseChannel('latest', 'v3.3.0-beta.2', '3.3.0-beta.2'));
   assert.throws(() => validateReleaseChannel('beta', 'v3.3.0', '3.3.0'));
   assert.throws(() => validateReleaseChannel('beta', 'v3.3.0-beta.3', '3.3.0-beta.2'));
+});
+
+test('desktop betas keep the Chrome connector on its Manifest V3 base version', async () => {
+  const [pkg, manifest, builder] = await Promise.all([
+    read('package.json').then(JSON.parse),
+    read('browser-extension/manifest.json').then(JSON.parse),
+    read('scripts/build-browser-extension.mjs'),
+  ]);
+  assert.equal(manifest.version, pkg.version.replace(/-beta\.\d+$/, ''));
+  assert.match(builder, /const connectorVersion = pkg\.version\.replace\(\/-beta\\\.\\d\+\$\/, ''\)/);
+  assert.match(builder, /manifest\.version !== connectorVersion/);
 });

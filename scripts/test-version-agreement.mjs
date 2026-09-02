@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (relative) => readFile(path.join(repoRoot, relative), 'utf8');
 
-test('the desktop and the server state the same version', async () => {
+test('stable desktop and server versions agree while desktop betas leave the server channel untouched', async () => {
   const [rootPackage, serverPackage] = await Promise.all([
     read('package.json').then(JSON.parse),
     read('server/package.json').then(JSON.parse),
@@ -29,10 +29,14 @@ test('the desktop and the server state the same version', async () => {
   const { NODUS_VERSION } = await import('../server/lib/version.mjs');
 
   const expected = rootPackage.version;
-  assert.match(expected, /^\d+\.\d+\.\d+$/, 'the root package version is the one everything else follows');
-
-  assert.equal(serverPackage.version, expected, 'server/package.json disagrees with package.json');
-  assert.equal(NODUS_VERSION, expected, 'server/lib/version.mjs disagrees with package.json');
+  const beta = /^\d+\.\d+\.\d+-beta\.\d+$/.test(expected);
+  assert.ok(beta || /^\d+\.\d+\.\d+$/.test(expected), 'the root package carries a supported release version');
+  assert.equal(NODUS_VERSION, serverPackage.version, 'server/lib/version.mjs disagrees with server/package.json');
+  if (beta) {
+    assert.match(serverPackage.version, /^\d+\.\d+\.\d+$/, 'a desktop beta leaves the stable-only server stream on a stable version');
+  } else {
+    assert.equal(serverPackage.version, expected, 'server/package.json disagrees with package.json');
+  }
 });
 
 test('the server states its version everywhere a client can read it', async () => {

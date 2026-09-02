@@ -13,8 +13,11 @@ const output = path.join(outputDir, 'nodus-research-connector-chrome.zip');
 
 const manifest = JSON.parse(await readFile(path.join(source, 'manifest.json'), 'utf8'));
 const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
+const connectorVersion = pkg.version.replace(/-beta\.\d+$/, '');
 if (manifest.manifest_version !== 3) throw new Error('The Chrome connector must use Manifest V3.');
-if (manifest.version !== pkg.version) throw new Error(`Connector ${manifest.version} does not match Nodus ${pkg.version}.`);
+if (manifest.version !== connectorVersion) {
+  throw new Error(`Connector ${manifest.version} does not match Nodus ${pkg.version} (expected ${connectorVersion}).`);
+}
 if (manifest.background?.scripts || manifest.content_security_policy?.extension_pages?.includes('http')) {
   throw new Error('Remote or legacy extension code is not permitted.');
 }

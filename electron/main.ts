@@ -63,7 +63,7 @@ import { closeGlobalLibraryRuntime } from './library/libraryRuntime';
 import { setBrowserTheme } from './browser/tabs';
 import { destroyBrowserSubsystem } from './browser/lifecycle';
 import { ensurePreV4Recovery } from './recovery/preV4Recovery';
-import { applyUpdateChannel, isPrereleaseVersion } from './updateChannel';
+import { applyUpdateChannel, availableUpdateVersion, isPrereleaseVersion } from './updateChannel';
 import {
   upgradeWorldbuildingDemoDynasties,
   upgradeWorldbuildingDemoImageQuality,
@@ -586,7 +586,7 @@ async function checkForUpdates(reason: string): Promise<UpdateCheckResponse> {
         },
       );
     }
-    const version = result?.updateInfo?.version;
+    const version = availableUpdateVersion(result, app.getVersion());
     if (isPrereleaseVersion(version) && !getSettings().betaUpdates) {
       cancellationToken?.cancel();
       if (activeUpdateCancellationToken === cancellationToken) activeUpdateCancellationToken = null;
@@ -598,7 +598,7 @@ async function checkForUpdates(reason: string): Promise<UpdateCheckResponse> {
         progress: null,
       });
     }
-    if (version && version !== app.getVersion()) {
+    if (version) {
       return emitUpdate({
         status: 'available',
         message: `Actualización ${version} encontrada. La descarga empezará automáticamente.`,

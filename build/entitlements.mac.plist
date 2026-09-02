@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Electron 43 / V8 requires JIT when Hardened Runtime is enabled. -->
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<!-- Nodus records interviews, classes and dictated notes after explicit consent. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<!-- The embedded browser can grant camera access after a per-site prompt. -->
+	<key>com.apple.security.device.camera</key>
+	<true/>
+	<!-- Presentation import and casting automate Keynote, PowerPoint or System Events. -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+</dict>
+</plist>

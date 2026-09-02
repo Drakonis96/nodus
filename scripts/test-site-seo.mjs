@@ -8,6 +8,7 @@ import { loadSiteMetadata } from './lib/site-metadata.mjs';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const siteRoot = path.join(repoRoot, 'site');
 const metadata = loadSiteMetadata(repoRoot);
+const isPrerelease = metadata.version.includes('-');
 
 const filesUnder = (directory, predicate = () => true) => {
   const files = [];
@@ -68,7 +69,11 @@ test('all JSON-LD parses and the canonical entities stay consistent', () => {
   const author = homeGraph.find((entry) => entry['@id'] === metadata.authorId);
   assert.equal(website.name, 'Nodus Research');
   assert.equal(software.name, 'Nodus');
-  assert.equal(software.softwareVersion, metadata.version);
+  if (isPrerelease) {
+    assert.match(software.softwareVersion, /^\d+\.\d+\.\d+$/, 'a desktop beta does not replace the stable public website release');
+  } else {
+    assert.equal(software.softwareVersion, metadata.version);
+  }
   assert.equal(software.operatingSystem, 'macOS, Windows, Linux');
   assert.equal(software.license, metadata.licenseUrl);
   assert.equal(software.codeRepository, metadata.repository);
@@ -84,16 +89,21 @@ test('release and citation metadata have one generated source of truth', () => {
   assert.match(citation, new RegExp(`^date-released: "${metadata.releaseDate}"$`, 'm'));
   assert.match(citation, new RegExp(`^doi: "${metadata.citationDoi.replaceAll('.', '\\.')}"$`, 'm'));
 
+  const publicSoftware = jsonLdBlocks(read('index.html'))[0]['@graph']
+    .find((entry) => entry['@id'] === metadata.softwareId);
+  const publicVersion = isPrerelease ? publicSoftware.softwareVersion : metadata.version;
+  const publicReleaseTag = `v${publicVersion}`;
   for (const relative of ['index.html', 'app/index.html', 'cite/index.html']) {
-    assert.ok(read(relative).includes(`"softwareVersion": "${metadata.version}"`), `${relative} has the current softwareVersion`);
-    assert.ok(read(relative).includes(`${metadata.repository}/releases/tag/${metadata.releaseTag}`), `${relative} has the current release tag`);
+    assert.ok(read(relative).includes(`"softwareVersion": "${publicVersion}"`), `${relative} has the public softwareVersion`);
+    assert.ok(read(relative).includes(`${metadata.repository}/releases/tag/${publicReleaseTag}`), `${relative} has the public release tag`);
+    if (isPrerelease) assert.ok(!read(relative).includes(metadata.releaseTag), `${relative} does not advertise a prerelease as stable`);
   }
   const cite = read('cite/index.html');
-  for (const value of [metadata.version, metadata.releaseTag, metadata.conceptDoi, metadata.versionDoi].filter(Boolean)) {
+  for (const value of [publicVersion, publicReleaseTag, metadata.conceptDoi, metadata.versionDoi].filter(Boolean)) {
     assert.ok(cite.includes(value), `/cite/ includes ${value}`);
   }
   assert.match(cite, /generated:citation-formats:start/);
-  assert.match(cite, new RegExp(`Version ${metadata.version.replaceAll('.', '\\.')}`));
+  assert.match(cite, new RegExp(`Version ${publicVersion.replaceAll('.', '\\.')}`));
 });
 
 test('public website copy has no stale licence, version, domain or social handles', () => {
