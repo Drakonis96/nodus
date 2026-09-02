@@ -2276,6 +2276,8 @@ export const TR: Record<string, string> = {
   "Corrígelo en Ajustes y pulsa": "Ayarlar'da düzeltin ve tuşuna basın.",
   "Reanudar": "Devam et",
   "Cola": "Sıra",
+  "Cola y tareas": "Kuyruk ve görevler",
+  "Sin tareas ni colas en curso.": "Devam eden görev veya kuyruk yok.",
   "Procesando:": "İşleme:",
   "Cola en pausa": "Duraklatılan sıra",
   "En cola…": "Sırada…",

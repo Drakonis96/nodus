@@ -2112,6 +2112,8 @@ export const DE: Record<string, string> = {
   'Corrígelo en Ajustes y pulsa': 'Beheben Sie es in den Einstellungen und klicken Sie auf',
   'Reanudar': 'Fortsetzen',
   'Cola': 'Warteschlange',
+  'Cola y tareas': 'Warteschlange und Aufgaben',
+  'Sin tareas ni colas en curso.': 'Keine Aufgaben oder Warteschlangen aktiv.',
   'Procesando:': 'Wird verarbeitet:',
   'Cola en pausa': 'Warteschlange pausiert',
   'En cola…': 'In der Warteschlange…',

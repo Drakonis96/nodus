@@ -1892,6 +1892,8 @@ export const IT: Record<string, string> = {
   "Corrígelo en Ajustes y pulsa": "Correggilo in Impostazioni e fai clic",
   "Reanudar": "Riprendi",
   "Cola": "Coda",
+  "Cola y tareas": "Coda e attività",
+  "Sin tareas ni colas en curso.": "Nessuna attività o coda in corso.",
   "Procesando:": "Elaborazione:",
   "Cola en pausa": "Coda in pausa",
   "En cola…": "In coda...",
