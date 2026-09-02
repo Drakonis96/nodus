@@ -127,7 +127,7 @@ ${(post.tags || []).map((tag) => `<meta property="article:tag" content="${escape
 <link rel="alternate" type="application/rss+xml" title="Nodus Blog" href="feed.xml"/>
 <link rel="preload" as="font" type="font/woff2" href="../assets/fonts/inter-latin.woff2" crossorigin/>
 <link rel="preload" as="font" type="font/woff2" href="../assets/fonts/fraunces-latin.woff2" crossorigin/>
-<link rel="stylesheet" href="../assets/css/nodus.css?v=20260819a"/>
+<link rel="stylesheet" href="../assets/css/nodus.css?v=20260902a"/>
 <link rel="stylesheet" href="blog.css?v=20260817"/>
 <script type="application/ld+json">${structuredData}</script>
 </head>
