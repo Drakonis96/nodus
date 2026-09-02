@@ -24,13 +24,33 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
-  // 5.1.3 deliberately presents only the two changes in this patch. Apple
-  // notarization leads so the trust change is the first thing macOS users see.
+  // 5.1.4 stands alone like 5.1.3 before it: whoever installed 5.1.3 already read its
+  // two entries. The scope order below is also the rendered order, because the modal
+  // puts the largest scope cluster first and `ai` carries four of the eight.
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.1.3');
-  assert.equal(currentRelease?.date, '2026-08-31');
-  assert.equal(currentRelease?.highlights.length, 2);
+  assert.equal(currentRelease?.version, '5.1.4');
+  assert.equal(currentRelease?.date, '2026-09-02');
+  assert.equal(currentRelease?.highlights.length, 8);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
+    'ai', 'ai', 'ai', 'ai', 'academic', 'academic', 'library', 'zotero',
+  ]);
+  for (const phrase of [
+    /written natively in all eight interface languages/,
+    /no longer comes out in Spanish/,
+    /separates the context window from the output budget/,
+    /can no longer leave you with nothing/,
+    /hypotheses and findings as fields of their own/,
+    /nine calm steps along a single path/,
+    /sortable columns/,
+    /stops piling up memory/,
+  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+
+  // 5.1.3 keeps the focused two-item modal it shipped with. Apple notarization leads
+  // it so the trust change stayed the first thing macOS users saw.
+  const notarizationRelease = RELEASE_NOTES.find((note) => note.version === '5.1.3');
+  assert.equal(notarizationRelease?.date, '2026-08-31');
+  assert.equal(notarizationRelease?.highlights.length, 2);
+  assert.deepEqual(notarizationRelease?.highlights.map((highlight) => highlight.scope), [
     'apple', 'academic',
   ]);
   for (const phrase of [
@@ -40,7 +60,7 @@ try {
     /different works and authors/,
     /semantic and lexical search/,
     /does not cover enough sources or authors/,
-  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+  ]) assert.ok(notarizationRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
 
   // 5.1.2 remains intact immediately below the new focused patch.
   const release512 = RELEASE_NOTES.find((note) => note.version === '5.1.2');

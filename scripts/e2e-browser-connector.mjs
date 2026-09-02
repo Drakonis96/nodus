@@ -138,7 +138,7 @@ async function exerciseMultiCapture() {
       scripting: { executeScript: async () => [{ result: nextSnapshot }] },
       storage: { local: { get: async (defaults) => ({ ...defaults, ...values }), set: async (input) => Object.assign(values, input), remove: async (keys) => { for (const key of keys) delete values[key]; } } },
       permissions: { request: async () => true, contains: async () => false, remove: async () => true },
-      runtime: { getManifest: () => ({ version: '5.1.3' }), getURL: (path = '') => `chrome-extension://ilcclajjhofhieoljdjmikmfopfbamej/${path}`, openOptionsPage: async () => undefined },
+      runtime: { getManifest: () => ({ version: '5.1.4' }), getURL: (path = '') => `chrome-extension://ilcclajjhofhieoljdjmikmfopfbamej/${path}`, openOptionsPage: async () => undefined },
     };
   }, { messages: english, snapshot: detected });
   let saves = 0;
