@@ -26,6 +26,7 @@ export const GLOBAL_PREF_KEYS = [
   'libraryScope',
   'libraryScopeOnboardingVersion',
   'theme',
+  'appTheme',
   'uiLanguage',
   'promptLanguage',
   'interfaceScale',

@@ -24,6 +24,7 @@
     "dev": "vite",
     "build": "npm run build:cloudflare && npm run typecheck && vite build",
     "build:cloudflare": "node scripts/build-cloudflare-worker.mjs",
+    "gen:theme": "node scripts/gen-theme-utilities.mjs",
     "build:server-web": "vite build --config vite.server-web.config.ts",
     "pretest": "node scripts/prepare-electron-tests.mjs",
     "test": "node --test scripts/test-*.mjs",
