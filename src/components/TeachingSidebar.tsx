@@ -1,4 +1,5 @@
 import { Icon } from './ui';
+import { Tooltip } from './Tooltip';
 import { t } from '../i18n';
 import type { RoadmapTopicKey } from '../views/RoadmapFeedbackModal';
 import { orderSidebarItems } from '../navigation';
@@ -94,41 +95,47 @@ export function TeachingSidebar({
             {!compact && group.hint && (
               <p className="px-3 pb-1 text-[10px] leading-snug text-neutral-500">{t(group.hint)}</p>
             )}
-            {items.map((item) => item.view ? (
-              <button
-                key={item.id}
-                data-tour={`nav-${item.view}`}
-                onClick={() => onNavigate(item.view!)}
-                aria-label={compact ? t(item.label) : undefined}
-                title={compact ? t(item.label) : undefined}
-                className={`flex items-center rounded-lg py-2 text-left text-sm ${compact ? 'justify-center px-2' : 'gap-2 px-3'} ${
-                  activeView === item.view ? 'bg-indigo-600 text-white' : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'
-                }`}
-              >
-                <Icon name={item.icon} className="shrink-0" />
-                <span className={compact ? 'sr-only' : undefined}>{t(item.label)}</span>
-              </button>
-            ) : (
-              <button
-                key={item.id}
-                type="button"
-                data-testid={`teaching-roadmap-${item.topic}`}
-                onClick={() => onOpenRoadmap(item.topic!)}
-                aria-label={compact ? t(item.label) : undefined}
-                title={`${t(item.label)} · ${t('En diseño')} · ${t('Cuéntame qué necesitas en esta sección')}`}
-                className={`group flex w-full items-center rounded-lg border border-dashed border-indigo-400 py-2 text-left text-sm text-neutral-500 transition-colors hover:bg-indigo-600/20 hover:text-indigo-700 dark:hover:text-indigo-300 ${compact ? 'justify-center px-2' : 'gap-2 px-3'}`}
-              >
-                <Icon name={item.icon} className="shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
-                <span className={compact ? 'sr-only' : 'min-w-0 flex-1 truncate'}>{t(item.label)}</span>
-                {!compact && (
-                  <Icon
-                    name="sparkles"
-                    size={13}
-                    className="shrink-0 text-indigo-500 opacity-70 transition-opacity group-hover:opacity-100"
-                  />
-                )}
-              </button>
-            ))}
+            {items.map((item) => {
+              // El botón "En diseño" explica su estado; en el raíl plegado ese texto
+              // completo es el tooltip, no un `title` paralelo.
+              const roadmapTooltip = `${t(item.label)} · ${t('En diseño')} · ${t('Cuéntame qué necesitas en esta sección')}`;
+              const button = item.view ? (
+                <button
+                  key={item.id}
+                  data-tour={`nav-${item.view}`}
+                  onClick={() => onNavigate(item.view!)}
+                  aria-label={compact ? t(item.label) : undefined}
+                  className={`flex items-center rounded-lg py-2 text-left text-sm ${compact ? 'justify-center px-2' : 'gap-2 px-3'} ${
+                    activeView === item.view ? 'bg-indigo-600 text-white' : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'
+                  }`}
+                >
+                  <Icon name={item.icon} className="shrink-0" />
+                  <span className={compact ? 'sr-only' : undefined}>{t(item.label)}</span>
+                </button>
+              ) : (
+                <button
+                  key={item.id}
+                  type="button"
+                  data-testid={`teaching-roadmap-${item.topic}`}
+                  onClick={() => onOpenRoadmap(item.topic!)}
+                  aria-label={compact ? t(item.label) : undefined}
+                  title={compact ? undefined : roadmapTooltip}
+                  className={`group flex w-full items-center rounded-lg border border-dashed border-indigo-400 py-2 text-left text-sm text-neutral-500 transition-colors hover:bg-indigo-600/20 hover:text-indigo-700 dark:hover:text-indigo-300 ${compact ? 'justify-center px-2' : 'gap-2 px-3'}`}
+                >
+                  <Icon name={item.icon} className="shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
+                  <span className={compact ? 'sr-only' : 'min-w-0 flex-1 truncate'}>{t(item.label)}</span>
+                  {!compact && (
+                    <Icon
+                      name="sparkles"
+                      size={13}
+                      className="shrink-0 text-indigo-500 opacity-70 transition-opacity group-hover:opacity-100"
+                    />
+                  )}
+                </button>
+              );
+              if (!compact) return button;
+              return <Tooltip key={item.id} label={item.view ? t(item.label) : roadmapTooltip} placement="right">{button}</Tooltip>;
+            })}
           </section>
         );
       })}
