@@ -764,21 +764,21 @@ function StatusCard({
     cyan: 'hover:border-cyan-700/70',
   }[tone];
   return (
-    <section className={`card home-status-card flex h-full min-h-[15rem] flex-col border-neutral-800/90 p-5 shadow-sm shadow-black/10 transition-all hover:-translate-y-0.5 ${toneBorderClass} hover:shadow-lg hover:shadow-black/10`} data-home-tone={tone}>
+    <section className={`card home-status-card relative flex h-full min-h-[15rem] flex-col border-neutral-800/90 p-5 shadow-sm shadow-black/10 transition-all hover:-translate-y-0.5 ${toneBorderClass} hover:shadow-lg hover:shadow-black/10`} data-home-tone={tone}>
       <div className="flex items-start gap-3 border-b border-neutral-800/80 pb-4">
         <span className={`home-status-icon inline-flex h-6 w-6 items-center justify-center rounded-md ${toneClass}`}>
           <Icon name={icon} size={14} />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold leading-6 tracking-tight">{title}</h2>
-          <div className="mt-2 flex min-w-0 flex-nowrap items-baseline gap-x-2">
+          <h2 className="pr-24 text-lg font-semibold leading-6 tracking-tight">{title}</h2>
+          <div className="mt-4 flex min-w-0 flex-nowrap items-baseline gap-x-2">
             {/* Numeric metrics get the big display size; status words (lista/pendiente)
                 would look disproportionate at that size, so render them smaller. */}
             <span className={`shrink-0 font-semibold leading-none tabular-nums ${typeof metric === 'string' && !/\d/.test(metric) ? 'text-sm' : 'text-base'}`}>{metric}</span>
             <span className="min-w-0 truncate whitespace-nowrap text-[11px] leading-4 text-neutral-400">{metricLabel}</span>
           </div>
         </div>
-        {action && <div className="shrink-0">{action}</div>}
+        {action && <div className="absolute right-5 top-5 z-10">{action}</div>}
       </div>
       <div className="mt-5 flex-1">{children}</div>
     </section>
