@@ -1,6 +1,15 @@
 /* Inter is loaded from the system font stack (Tailwind `sans` falls back to
    system-ui). A runtime Google Fonts @import is blocked by the app CSP and
    breaks offline use, so it is intentionally not used. */
+
+/* Colour themes. `tokens.generated.css` + `utilities.generated.css` are produced by
+   `npm run gen:theme` from src/theme/themes.mjs; `theme-components.css` is hand-written.
+   The `default` theme carries no rules here and renders through the Tailwind + `.light`
+   cascade below, so it stays byte-identical. See src/theme/themes.mjs. */
+@import './theme/tokens.generated.css';
+@import './theme/utilities.generated.css';
+@import './theme/theme-components.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
