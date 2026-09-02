@@ -119,18 +119,31 @@ test('newly indexed passages are current even while the deep analysis still belo
   assert.deepEqual(s.missing, ['ideas']);
 });
 
-test('failure outranks absence, and live queue activity outranks both', () => {
+test('failure outranks absence, and queued/running work has honest transient labels', () => {
   const failed = deriveWorkStatus(work({ summary_status: 'failed', light_status: 'none' }), embedded(), indexed());
   assert.equal(failed.readiness, 'failed');
   assert.equal(deriveWorkStatus(work({ deep_error: 'falló el reintento' }), embedded(), indexed()).readiness, 'failed',
     'a replacement failure is visible even while the committed deep graph remains readable');
 
-  // A queued job wins even though nothing is persisted as pending yet.
-  const running = deriveWorkStatus(work({ deep_status: 'failed' }), embedded(), indexed(), [
+  // A queued job wins even though nothing is persisted as pending yet, but it
+  // must not claim that model inference has already started.
+  const pending = deriveWorkStatus(work({ deep_status: 'failed' }), embedded(), indexed(), [
     { id: 'q1', nodus_id: 'w1', title: 'Obra', kind: 'deep', state: 'queued' },
+  ]);
+  assert.equal(pending.readiness, 'pending');
+  assert.equal(pending.steps.ideas.state, 'pending');
+
+  const running = deriveWorkStatus(work({ deep_status: 'failed' }), embedded(), indexed(), [
+    { id: 'q1', nodus_id: 'w1', title: 'Obra', kind: 'deep', state: 'running' },
   ]);
   assert.equal(running.readiness, 'running');
   assert.equal(running.steps.ideas.state, 'running');
+});
+
+test('a persisted resumption marker is pending, never falsely running', () => {
+  const pending = deriveWorkStatus(work({ deep_status: 'pending' }), undefined, undefined);
+  assert.equal(pending.readiness, 'pending');
+  assert.equal(pending.steps.ideas.state, 'pending');
 });
 
 test('queue indexing keeps only live items and groups them by work', () => {

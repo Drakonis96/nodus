@@ -122,7 +122,7 @@ try {
   assert.match(deepScan, /const timedOut = aiError\?\.code === 'timeout'/, 'the deep scan recognises a timeout');
   assert.match(deepScan, /const maxDepth = timedOut \? 1 : 4/,
     'a timeout gets one split, not four: each failed attempt costs the full local budget');
-  assert.match(deepScan, /if \(!timedOut && depth === 0 && maxTokens < 16000\)/,
+  assert.match(deepScan, /if \(!timedOut && aiError\?\.code !== 'context_overflow' && depth === 0 && maxTokens < 16000\)/,
     'raising the output ceiling answers truncation only — after a timeout it just buys more rope');
   assert.match(deepScan, /\(!recoverableJson && !timedOut\) \|\| depth >= maxDepth/,
     'a timed-out chunk is recoverable, where it used to kill the whole deep pass');

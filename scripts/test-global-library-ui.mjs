@@ -132,6 +132,8 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(libraryTypes, /interface ZoteroImportVerification[\s\S]*status: 'passed' \| 'blocked'[\s\S]*expected: ZoteroImportVerificationCounts[\s\S]*imported: ZoteroImportVerificationCounts[\s\S]*mismatches: ZoteroImportVerificationMismatch\[\]/, 'Zotero reports expose a serializable verification contract');
   assert.match(libraryTypes, /verification\?: ZoteroImportVerification/, 'verification remains optional for pre-verification BETA sessions');
   assert.match(libraryTypes, /sourceVersion\?: number[\s\S]*sourceModifiedAt\?: string/, 'attachment provenance retains source version and modification time');
+  assert.match(libraryTypes, /accessDate\?: string[\s\S]*zoteroDateAdded\?: string[\s\S]*zoteroDateModified\?: string/, 'Zotero access/add/modified dates are first-class sortable metadata');
+  assert.match(view, /column === 'accessDate'[\s\S]*column === 'zoteroDateAdded'[\s\S]*column === 'zoteroDateModified'/, 'source dates are rendered as date columns instead of opaque metadata');
   assert.match(libraryTypes, /interface LibraryNoteRecord[\s\S]*sourceVersion\?: number/, 'mirrored Zotero notes retain source version');
   assert.match(libraryTypes, /attachment-unavailable.*attachment-corrupt.*verification-mismatch.*concurrent-source-change.*storage/, 'Zotero reports support typed integrity and coordination failures');
   assert.match(view, /status\.conflicts > 0 \|\| status\.invalidRecords > 0/);

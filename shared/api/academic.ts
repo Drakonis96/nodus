@@ -128,6 +128,7 @@ import type {
   ManuscriptVerificationRequest,
   ManuscriptVerificationResult,
   ModelRef,
+  AnalysisRunOptions,
   Note,
   NoteFolder,
   NoteTagPatch,
@@ -255,8 +256,8 @@ export interface AcademicApi {
   analyzeBoth(nodusId: string, model?: ModelRef | null): Promise<void>;
   analyzeBothBulk(nodusIds: string[], model?: ModelRef | null): Promise<void>;
   /** Run the full chain (themes + ideas + summary + index + relationship discovery) for one work. */
-  processFull(nodusId: string, model?: ModelRef | null): Promise<void>;
-  processFullBulk(nodusIds: string[], model?: ModelRef | null): Promise<void>;
+  processFull(nodusId: string, model?: ModelRef | null, options?: AnalysisRunOptions): Promise<void>;
+  processFullBulk(nodusIds: string[], model?: ModelRef | null, options?: AnalysisRunOptions): Promise<void>;
   /** Re-run the cheap theme scan over the whole library to backfill broad parent themes. */
   reassignThemes(model?: ModelRef | null): Promise<number>;
   rescan(nodusId: string, kind: QueueKind, model?: ModelRef | null): Promise<void>;

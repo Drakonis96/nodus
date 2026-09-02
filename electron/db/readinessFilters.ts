@@ -5,15 +5,15 @@
 // "Incompleto" must get exactly the rows whose pill says "Incompleto".
 //
 // Two deliberate divergences, both forced:
-//   * 'running' has no predicate. It lives only in the in-memory scan queue, so
-//     a queued work matches whichever preset its persisted columns describe.
+//   * transient pending/running states have no preset predicate. The renderer
+//     derives them from persisted resumption markers plus the in-memory queue.
 //   * the semantic-index step is not consulted. Whether an idea's embedding is
 //     current depends on a text hash computed in JS (embeddingPipeline), which
 //     SQL cannot evaluate — which is why it does not gate "ready" there either.
 import type { WorkReadiness } from '@shared/types';
 import { currentEmbeddingConfig } from './ideasRepo';
 
-type Readiness = Exclude<WorkReadiness, 'running'>;
+type Readiness = Exclude<WorkReadiness, 'pending' | 'running'>;
 
 /** Any of the three AI passes reported a failure. Outranks everything below. */
 const FAILED = `(w.light_status = 'failed' OR w.deep_status = 'failed' OR w.deep_error IS NOT NULL OR w.summary_status = 'failed')`;

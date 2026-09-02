@@ -54,11 +54,11 @@ try {
     );
     CREATE TABLE notes (id TEXT PRIMARY KEY, source_json TEXT, updated_at TEXT);
     CREATE TABLE edges (id TEXT PRIMARY KEY, from_id TEXT, to_id TEXT, type TEXT, basis TEXT, confidence REAL, source_work TEXT);
-    CREATE TABLE edge_traces (edge_id TEXT PRIMARY KEY);
+    CREATE TABLE edge_traces (edge_id TEXT PRIMARY KEY, method TEXT NOT NULL DEFAULT 'deep');
     CREATE TABLE evidence (id TEXT PRIMARY KEY, nodus_id TEXT, global_id TEXT);
     CREATE TABLE idea_theme_links (theme_id TEXT, nodus_id TEXT, global_id TEXT, confidence REAL);
-    CREATE TABLE gaps (id TEXT PRIMARY KEY, nodus_id TEXT, related_idea TEXT);
-    CREATE TABLE external_refs (id TEXT PRIMARY KEY, nodus_id TEXT, from_idea TEXT);
+    CREATE TABLE gaps (id TEXT PRIMARY KEY, nodus_id TEXT, related_idea TEXT, evidence_id TEXT);
+    CREATE TABLE external_refs (id TEXT PRIMARY KEY, nodus_id TEXT, from_idea TEXT, evidence_id TEXT);
     CREATE TABLE project_chapter_idea_relations (target_kind TEXT, target_id TEXT);
     CREATE TABLE db_relations (target_kind TEXT, target_id TEXT, target_vault_id TEXT);
     CREATE TABLE work_authors (author_id TEXT, nodus_id TEXT);
@@ -109,12 +109,18 @@ try {
     1,
     'the whole cycle minted no duplicate idea — identity is stable'
   );
+  assert.doesNotThrow(() => repo.assertDeepDataIntegrity('w1'), 'a complete replacement passes the post-commit audit');
+  assert.throws(() => db.transaction(() => {
+    db.prepare("INSERT INTO gaps (id, nodus_id, related_idea) VALUES ('broken-gap', 'w1', 'missing-idea')").run();
+    repo.assertDeepDataIntegrity('w1');
+  })(), /gaps→ideas: 1/, 'an orphaned derived reference aborts the replacement');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM gaps WHERE id='broken-gap'").get().n, 0, 'the failed integrity audit rolled its transaction back');
 
   // ── 5. Pruning: only long-dormant, never manual, cleans dangling edges ─────
   const doomed = repo.createIdea({ type: 'claim', label: 'Efímera', statement: 'x', embedding: [0, 1, 0] });
   repo.upsertOccurrence(doomed.global_id, 'w2', 'secondary', '', 0.5);
   db.prepare("INSERT INTO edges VALUES ('e-doom', ?, ?, 'supports', 'inferred', 0.7, NULL)").run(doomed.global_id, originalId);
-  db.prepare("INSERT INTO edge_traces VALUES ('e-doom')").run();
+  db.prepare("INSERT INTO edge_traces VALUES ('e-doom', 'deep')").run();
   repo.purgeDeepData('w2');
 
   assert.equal(repo.pruneDormantIdeas(30), 0, 'recently dormant ideas are protected');
@@ -130,13 +136,13 @@ try {
 
   // ── 6. Explicit deletion is complete, but preserves user-authored note text ─
   db.prepare("INSERT INTO edges VALUES ('e-manual', ?, ?, 'supports', 'manual', 1, NULL)").run(manual.global_id, originalId);
-  db.prepare("INSERT INTO edge_traces VALUES ('e-manual')").run();
+  db.prepare("INSERT INTO edge_traces VALUES ('e-manual', 'deep')").run();
   db.prepare("INSERT INTO edge_feedback VALUES (?, ?, 'supports', 'confirmed', '', ?)").run(manual.global_id, originalId, daysAgo(1));
   db.prepare("INSERT INTO idea_occurrences VALUES (?, 'w3', 'principal', '', 1)").run(manual.global_id);
   db.prepare("INSERT INTO evidence VALUES ('ev-manual', 'w3', ?)").run(manual.global_id);
   db.prepare("INSERT INTO idea_theme_links VALUES ('theme', 'w3', ?, 1)").run(manual.global_id);
-  db.prepare("INSERT INTO gaps VALUES ('gap-manual', 'w3', ?)").run(manual.global_id);
-  db.prepare("INSERT INTO external_refs VALUES ('ref-manual', 'w3', ?)").run(manual.global_id);
+  db.prepare("INSERT INTO gaps (id, nodus_id, related_idea) VALUES ('gap-manual', 'w3', ?)").run(manual.global_id);
+  db.prepare("INSERT INTO external_refs (id, nodus_id, from_idea) VALUES ('ref-manual', 'w3', ?)").run(manual.global_id);
   db.prepare("INSERT INTO project_chapter_idea_relations VALUES ('idea', ?)").run(manual.global_id);
   db.prepare("INSERT INTO db_relations VALUES ('idea', ?, NULL)").run(manual.global_id);
   assert.equal(repo.deleteIdea(manual.global_id), true, 'an academic idea can be explicitly deleted');

@@ -44,12 +44,14 @@ try {
   const woman = operations.createItem({
     title: 'Women and reconstruction', abstract: 'Postwar labor and political change', itemType: 'journal-article',
     creators: [{ creatorType: 'author', firstName: 'María', lastName: 'Aliaga' }],
-    date: '1947-05-01', year: 1947, isbn: [], issn: ['1234-5678'], tags: ['women', 'postwar'],
+    date: '1947-05-01', accessDate: '2026-03-01', zoteroDateAdded: '2026-01-02T10:00:00Z',
+    zoteroDateModified: '2026-02-02T10:00:00Z', year: 1947, isbn: [], issn: ['1234-5678'], tags: ['women', 'postwar'],
   }, [history.id]);
   const theory = operations.createItem({
     title: 'Desire and norms', abstract: 'Gender theory', itemType: 'book',
     creators: [{ creatorType: 'author', firstName: 'Elena', lastName: 'García' }],
-    date: '2020', year: 2020, edition: '2', doi: '10.5555/desire', isbn: ['9780000000000'], issn: [], tags: ['gender', 'theory'],
+    date: '2020', accessDate: '2025-12-01', zoteroDateAdded: '2026-01-01T10:00:00Z',
+    zoteroDateModified: '2026-02-03T10:00:00Z', year: 2020, edition: '2', doi: '10.5555/desire', isbn: ['9780000000000'], issn: [], tags: ['gender', 'theory'],
   }, [reading.id]);
   const beforeOrganization = store.readMaterializedItem(woman.storageId).contentRevision;
   operations.patchItemCollections([woman.id], { add: [reading.id] });
@@ -91,12 +93,15 @@ try {
 
   const sorted = catalog.list({ includeDeleted: true, sort: [{ field: 'year', direction: 'asc' }] });
   assert.deepEqual(sorted.items.map((item) => item.year), [1947, 2020]);
+  assert.deepEqual(catalog.list({ includeDeleted: true, sort: [{ field: 'zoteroDateAdded', direction: 'asc' }] }).items.map((item) => item.id), [theory.id, woman.id]);
+  assert.deepEqual(catalog.list({ includeDeleted: true, sort: [{ field: 'zoteroDateModified', direction: 'desc' }] }).items.map((item) => item.id), [theory.id, woman.id]);
+  assert.deepEqual(catalog.list({ includeDeleted: true, sort: [{ field: 'accessDate', direction: 'asc' }] }).items.map((item) => item.id), [theory.id, woman.id]);
   assert.ok(sorted.facets.sources.some((facet) => facet.value === 'nodus' && facet.count === 2));
   assert.ok(sorted.facets.tags.some((facet) => facet.value === 'women'));
   assert.ok(sorted.facets.vaults.some((facet) => facet.value === 'vault-academic'));
 
   const preferences = operations.setViewPreferences({
-    visibleColumns: ['doi', 'title', 'edition', 'creator', 'attachments'],
+    visibleColumns: ['doi', 'title', 'edition', 'creator', 'attachments', 'accessDate', 'zoteroDateAdded', 'zoteroDateModified'],
     columnWidths: { title: 320, doi: 180 },
     sort: [{ field: 'edition', direction: 'desc' }, { field: 'creator', direction: 'asc' }, { field: 'year', direction: 'desc' }],
   });
@@ -113,6 +118,7 @@ try {
   assert.deepEqual(new LibraryOperations(store, catalog).getSettings(), librarySettings, 'Global Library behavior settings survive restart');
   const theoryCatalog = catalog.list({ includeDeleted: true, sort: [{ field: 'doi', direction: 'asc' }] }).items.find((entry) => entry.id === theory.id);
   assert.equal(theoryCatalog.metadata.edition, '2');
+  assert.equal(theoryCatalog.metadata.accessDate, '2025-12-01');
   assert.equal(theoryCatalog.createdAt, theory.createdAt);
   assert.equal(operations.deleteSavedSearch(saved.id), true);
   assert.equal(operations.listSavedSearches().length, 0);

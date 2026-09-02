@@ -55,7 +55,7 @@ const server = createServer((req, res) => {
   req.on('data', (c) => { body += c; });
   req.on('end', () => {
     const parsed = JSON.parse(body || '{}');
-    const user = parsed.messages?.find((m) => m.role === 'user')?.content ?? '';
+    const user = parsed.input ?? parsed.messages?.find((m) => m.role === 'user')?.content ?? '';
     let words = 0;
     try { words = JSON.parse(user).chunk?.word_count ?? 0; } catch { /* fusion calls are not chunk-shaped */ }
     hits.push({ words, chars: user.length });
@@ -70,7 +70,9 @@ const server = createServer((req, res) => {
       return;
     }
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: deepReply(`idea-${hits.length}`) }, finish_reason: 'stop' }] }));
+    // LM Studio is native-first now. Exercise the response contract used by
+    // /api/v1/chat instead of accidentally depending on the compatibility API.
+    res.end(JSON.stringify({ output_text: deepReply(`idea-${hits.length}`), finish_reason: 'stop' }));
   });
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));

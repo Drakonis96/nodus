@@ -3042,6 +3042,9 @@ export function Settings({
                 <Row label={t('Fusión y deduplicación')} hint={t('Combina resultados equivalentes y elimina duplicados sin perder su evidencia.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" requiredCapability="fusion" /></Row>
                 <ExtractionCapabilityNotice model={settings.fusionModel} />
                 <SubscriptionQuotaNotice model={settings.fusionModel} />
+                <Row label={t('Relaciones semánticas')} hint={t('Valida pares de ideas y genera las relaciones del grafo.')}><ModelWithReasoning allowEmpty settings={settings} value={settings.relationModel} onChange={(relationModel) => void patch({ relationModel })} emptyLabel="Usar modelo de fusión" requiredCapability="fusion" /></Row>
+                <ExtractionCapabilityNotice model={settings.relationModel ?? settings.fusionModel} />
+                <SubscriptionQuotaNotice model={settings.relationModel ?? settings.fusionModel} />
                 <Row label={t('Asistente Nodi')} hint={t('Responde en el asistente Nodi y usa el contexto de la vista cuando lo autorizas.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.nodiModel} onChange={(nodiModel) => void patch({ nodiModel })} emptyLabel="Seleccionar modelo" /></Row>
               </div>
               <VaultModelOverrides settings={settings} vaultType={activeVault?.type ?? 'academic'} vaultName={activeVault?.name ?? t('Vault actual')} patch={patch} />

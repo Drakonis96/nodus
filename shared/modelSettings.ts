@@ -1,6 +1,6 @@
 import type { AppSettings, ModelRef } from './types';
 
-export const MODEL_SETTINGS_VERSION = 3;
+export const MODEL_SETTINGS_VERSION = 4;
 
 /** Text/vision task selections managed together by the basic/advanced mode. */
 export const GRANULAR_MODEL_KEYS = [
@@ -8,6 +8,7 @@ export const GRANULAR_MODEL_KEYS = [
   'visionModel',
   'summaryModel',
   'fusionModel',
+  'relationModel',
   'chatModel',
   'nodiModel',
   'deepResearchModel',

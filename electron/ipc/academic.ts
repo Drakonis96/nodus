@@ -264,7 +264,7 @@ import os from 'node:os';
 import AdmZip from 'adm-zip';
 import { dialog, app } from 'electron';
 import { showImportOpenDialog } from '../privacy';
-import type { ModelRef, StudyMaterialImportInput } from '@shared/types';
+import type { AnalysisRunOptions, ModelRef, StudyMaterialImportInput } from '@shared/types';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { stopMcpServer, stopMcpTunnel } from '../mcp';
 import * as works from '../db/worksRepo';
@@ -293,16 +293,20 @@ const MANUAL_IDEA_MARKER = 'manual-idea';
  * with `chain: true` so the scan queue continues into summary, indexing (ideas +
  * passages) and semantic bridge discovery even when the auto-* settings are off.
  */
-function processFullChain(nodusId: string, model?: ModelRef | null): void {
+function processFullChain(nodusId: string, model?: ModelRef | null, options: AnalysisRunOptions = { mode: 'if-stale' }): void {
   const w = works.getWork(nodusId);
   if (!w) return;
-  if (w.light_status !== 'done') {
-    works.setLightPending(nodusId);
-    scanQueue.enqueue(nodusId, w.title, 'light', model);
+  const refresh = options.mode === 'refresh';
+  if (refresh || w.light_status !== 'done') {
+    // Keep a committed light result readable while its forced replacement is in
+    // flight. Queue state already communicates progress; the new result publishes
+    // atomically, and a failed refresh must leave the previous status current.
+    if (!(refresh && w.light_status === 'done')) works.setLightPending(nodusId);
+    scanQueue.enqueue(nodusId, w.title, 'light', model, { refresh });
   }
   works.setManualDeep(nodusId, true);
   works.setDeepPending(nodusId);
-  scanQueue.enqueue(nodusId, w.title, 'deep', model, { chain: true });
+  scanQueue.enqueue(nodusId, w.title, 'deep', model, { chain: true, refresh });
 }
 async function importStudyMaterialPaths(paths: string[], input: StudyMaterialImportInput = {}) {
   const results: Awaited<ReturnType<typeof studyMaterials.importStudyMaterialFile>>[] = [];
@@ -557,11 +561,11 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
       scanQueue.enqueue(id, w.title, 'deep', model);
     }
   });
-  h('works:processFull', async (_e, nodusId: string, model?: ModelRef | null) => {
-    processFullChain(nodusId, model);
+  h('works:processFull', async (_e, nodusId: string, model?: ModelRef | null, options?: AnalysisRunOptions) => {
+    processFullChain(nodusId, model, options);
   });
-  h('works:processFullBulk', async (_e, nodusIds: string[], model?: ModelRef | null) => {
-    for (const id of nodusIds) processFullChain(id, model);
+  h('works:processFullBulk', async (_e, nodusIds: string[], model?: ModelRef | null, options?: AnalysisRunOptions) => {
+    for (const id of nodusIds) processFullChain(id, model, options);
   });
   h('works:reassignThemes', async (_e, model?: ModelRef | null) => {
     // Re-run the cheap (title+abstract) theme scan for every work so older works pick

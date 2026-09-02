@@ -9,6 +9,7 @@ import {
   addEdge,
   purgeDeepData,
   embeddingTextForIdea,
+  assertDeepDataIntegrity,
 } from '../db/ideasRepo';
 import { addGap, addExternalRef } from '../db/gapsRepo';
 import { canonicalKeyFromDisplay, linkZoteroAuthors, recomputeAuthorRelations } from '../db/authorsRepo';
@@ -26,6 +27,12 @@ import type { Work, IdeaType, EdgeType, EdgeBasis, EvidenceKind, GapKind, ModelR
 import { planTextChunks, ExtractedDoc } from '../extraction/textExtractor';
 import { perfLog, startPerf } from '../perf';
 import { recordLinkedLibraryAnalysis } from '../library/libraryVaultProvenance';
+import {
+  analysisFingerprint,
+  analysisModelFingerprint,
+  isLocalAnalysisCurrent,
+  recordLocalAnalysisProvenance,
+} from '../db/libraryAnalysisProvenance';
 import { getDb } from '../db/database';
 import { mapOrderedPool } from './orderedPool';
 import { OrderedPublicationBarrier } from './orderedPublicationBarrier';
@@ -448,6 +455,7 @@ export async function runDeepScan(
   model?: ModelRef | null,
   onProgress?: (p: DeepScanProgress) => void,
   publicationOrdinal?: number,
+  options: { force?: boolean } = {},
 ): Promise<void> {
   // Queue callers reserve this before PDF extraction. Direct scans still receive a
   // safe ordinal here, preserving a single ordering domain for graph publication.
@@ -457,9 +465,16 @@ export async function runDeepScan(
   const totalDone = startPerf('deep pipeline', perf, { sourceType: doc.sourceType, chars: doc.text.length });
   const text = doc.text;
   const hash = crypto.createHash('sha1').update(text).digest('hex');
+  const settings = getSettings();
+  const extractionModel = model ?? settings.extractionModel ?? settings.synthesisModel ?? null;
+  const fusionModel = model ?? settings.fusionModel ?? settings.synthesisModel ?? null;
+  const effectiveSettings = { ...settings, extractionModel, fusionModel };
+  const deepModelFingerprint = analysisModelFingerprint('deep', effectiveSettings);
+  const ideasModelFingerprint = analysisModelFingerprint('ideas', effectiveSettings);
 
   try {
-    if (work.deep_hash === hash && work.source_type === doc.sourceType) {
+    if (!options.force && work.deep_hash === hash && work.source_type === doc.sourceType
+      && isLocalAnalysisCurrent(work.nodus_id, 'deep', hash, deepModelFingerprint)) {
       // Queueing marks the row pending before this function reads it. Restore the
       // committed status explicitly when the resolved corpus is byte-identical.
       setDeepResult(work.nodus_id, 'done', hash, work.source_type, work.notes);
@@ -473,8 +488,6 @@ export async function runDeepScan(
       return;
     }
 
-    const settings = getSettings();
-    const extractionModel = model ?? settings.extractionModel ?? settings.synthesisModel ?? null;
     // A vision-only local model (Qwen3.5-0.8B, LFM2.5) loops inside the JSON and returns 0 ideas.
     // The UI blocks picking one for this role, but a value set before that guard existed could still
     // reach here — fail once with an actionable message (config error → the queue pauses) instead of
@@ -488,13 +501,20 @@ export async function runDeepScan(
     }
     // Fusion runs many small dedup/relate calls; let it use a dedicated (often faster)
     // model, falling back to the synthesis model to preserve prior behavior.
-    const fusionModel = model ?? settings.fusionModel ?? settings.synthesisModel ?? null;
     const chunkPlan = planTextChunks(text, {
       mode: settings.deepContextMode,
       standardChunkWords: settings.deepStandardChunkWords,
       longChunkWords: settings.deepLongChunkWords,
     });
     const chunks = chunkPlan.chunks;
+    const checkpointHash = analysisFingerprint({
+      document: hash,
+      model: deepModelFingerprint,
+      prompt: deepScanPrompt(settings.promptLanguage ?? 'es'),
+      chunkPlan,
+      localTokenPolicy: 1,
+    });
+    if (options.force) clearCheckpoints(work.nodus_id, checkpointHash, 'deep_chunk');
     perfLog('chunking', 0, perf, {
       mode: chunkPlan.mode,
       words: chunkPlan.wordCount,
@@ -509,7 +529,7 @@ export async function runDeepScan(
     const citationCorpus = citationCorpusFor(doc);
 
     // Load any previously checkpointed chunk results so we can resume after a failure.
-    const checkpoints = loadCheckpoints(work.nodus_id, hash, 'deep_chunk');
+    const checkpoints = loadCheckpoints(work.nodus_id, checkpointHash, 'deep_chunk');
 
     const llmDone = startPerf('deep LLM extraction', perf, { chunks: chunks.length, mode: chunkPlan.mode });
     const extractionPool = settings.aiConcurrencyMode === 'automatic'
@@ -521,7 +541,7 @@ export async function runDeepScan(
       const reusable = usableCheckpoint(checkpoints.get(i), sourceMap, defaultSourceAlias, citationCorpus);
       if (reusable) {
         // Upgrade legacy checkpoints in place so every later resume is strict.
-        saveCheckpoint(work.nodus_id, hash, 'deep_chunk', i, reusable);
+        saveCheckpoint(work.nodus_id, checkpointHash, 'deep_chunk', i, reusable);
         return reusable;
       }
       onProgress?.({ detail: `Analizando fragmento ${i + 1}/${chunks.length} con IA…`, pct: i / chunks.length });
@@ -569,11 +589,19 @@ export async function runDeepScan(
         const baseMaxTokens = chunkPlan.mode === 'long' ? 12000 : 8000;
         const adaptive = { leaves: 0 };
         const completeAdaptive = async (chunkText: string, depth: number, maxTokens: number): Promise<DeepResult> => {
+          const adaptiveWordCount = chunkText.split(/\s+/).filter(Boolean).length;
+          const adaptiveIdeas = Math.max(1, Math.min(chunkPlan.maxIdeasPerChunk, Math.ceil(adaptiveWordCount / 450)));
           const requestInput = {
             ...input,
+            analysis_limits: {
+              ...input.analysis_limits,
+              max_ideas: adaptiveIdeas,
+              max_internal_relations: Math.max(1, Math.min(chunkPlan.maxRelationsPerChunk, Math.ceil(adaptiveIdeas * 1.5))),
+              max_gaps: Math.max(1, Math.min(chunkPlan.maxGapsPerChunk, adaptiveIdeas >= 3 ? 2 : 1)),
+            },
             chunk: {
               ...input.chunk,
-              word_count: chunkText.split(/\s+/).filter(Boolean).length,
+              word_count: adaptiveWordCount,
               text: chunkText,
             },
           };
@@ -584,6 +612,8 @@ export async function runDeepScan(
                 user: JSON.stringify(requestInput),
                 temperature: 0.15,
                 maxTokens,
+                task: 'deep-extraction',
+                splitDepth: depth,
                 perf,
                 signal: poolSignal,
                 requestClass: 'background',
@@ -600,7 +630,9 @@ export async function runDeepScan(
             return normalized;
           } catch (error) {
             const aiError = error instanceof AiError ? error : null;
-            const recoverableJson = aiError?.code === 'output_truncated' || /json|esquema|truncad|límite de salida/i.test(error instanceof Error ? error.message : String(error));
+            const recoverableJson = aiError?.code === 'output_truncated'
+              || aiError?.code === 'context_overflow'
+              || /context|json|esquema|truncad|límite de salida/i.test(error instanceof Error ? error.message : String(error));
             // A chunk that ran out of time is recoverable the same way a clipped one is —
             // by asking for less — and until now it wasn't: the whole deep pass died on the
             // first slow chunk, which is what a local model did to every long work. It gets
@@ -616,7 +648,7 @@ export async function runDeepScan(
             // split on the marker-aware chunker and merge only strict child results.
             // Headroom is the answer to truncation only: raising the ceiling after a
             // timeout just buys a slow model more rope to run out of time with.
-            if (!timedOut && depth === 0 && maxTokens < 16000) {
+            if (!timedOut && aiError?.code !== 'context_overflow' && depth === 0 && maxTokens < 16000) {
               try {
                 return await completeAdaptive(chunkText, depth + 1, Math.min(16000, maxTokens * 2));
               } catch (expandedError) {
@@ -639,7 +671,7 @@ export async function runDeepScan(
         const result = await completeAdaptive(chunks[i], 0, baseMaxTokens);
         chunkDone({ ideas: result.ideas.length, themes: result.theme_nodes?.length ?? 0 });
         // Checkpoint this chunk so a later failure doesn't lose the work.
-        saveCheckpoint(work.nodus_id, hash, 'deep_chunk', i, result);
+        saveCheckpoint(work.nodus_id, checkpointHash, 'deep_chunk', i, result);
         return result;
       } catch (e) {
         chunkDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
@@ -772,8 +804,9 @@ export async function runDeepScan(
 
           for (const g of merged.gaps) {
             const related = g.related_idea ? labelToGlobal.get(g.related_idea) ?? null : null;
-            const evId = g.evidence?.quote
-              ? addEvidence(related ?? labelToGlobal.values().next().value ?? '', work.nodus_id, g.evidence.quote, g.evidence.location, g.evidence.kind, { sourceRef: g.evidence.source_ref, pageNumber: g.evidence.page_number })
+            const evidenceIdea = related ?? labelToGlobal.values().next().value ?? null;
+            const evId = g.evidence?.quote && evidenceIdea
+              ? addEvidence(evidenceIdea, work.nodus_id, g.evidence.quote, g.evidence.location, g.evidence.kind, { sourceRef: g.evidence.source_ref, pageNumber: g.evidence.page_number })
               : null;
             addGap(work.nodus_id, g.kind, g.statement, related, g.confidence, evId);
           }
@@ -785,16 +818,30 @@ export async function runDeepScan(
           }
           linkZoteroAuthors(work.nodus_id, { createIfMissing: true, affiliationByKey });
           setDeepResult(work.nodus_id, 'done', hash, doc.sourceType, merged.ideas.size === 0 ? doc.notes ?? null : null);
-          recordLinkedLibraryAnalysis({
+          recordLocalAnalysisProvenance({
             workId: work.nodus_id,
             components: ['deep', 'ideas', 'embeddings'],
             documentFingerprint: hash,
+            modelFingerprints: {
+              deep: deepModelFingerprint,
+              ideas: ideasModelFingerprint,
+            },
           });
           recomputeAuthorRelations();
-          clearCheckpoints(work.nodus_id, hash, 'deep_chunk');
+          clearCheckpoints(work.nodus_id, checkpointHash, 'deep_chunk');
+          assertDeepDataIntegrity(work.nodus_id);
         })();
       });
       fusionDone({ mapped: labelToGlobal.size });
+      try {
+        recordLinkedLibraryAnalysis({
+          workId: work.nodus_id,
+          components: ['deep', 'ideas', 'embeddings'],
+          documentFingerprint: hash,
+        });
+      } catch (error) {
+        console.warn(`[deepScan] análisis guardado; procedencia externa diferida para ${work.nodus_id}: ${error instanceof Error ? error.message : String(error)}`);
+      }
     } catch (e) {
       embeddingDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
       fusionDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });

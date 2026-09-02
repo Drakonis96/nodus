@@ -2,12 +2,13 @@ import { createHash } from 'node:crypto';
 import type { LibraryAnalysisReuseComponent } from '@shared/libraryTypes';
 import type { AppSettings, ModelRef } from '@shared/types';
 import { getDb } from './database';
+import { getSettings } from './settingsRepo';
 
 export const ANALYSIS_PIPELINES: Record<LibraryAnalysisReuseComponent, string> = {
-  light: 'nodus-light-scan/2',
-  deep: 'nodus-deep-scan/2',
-  summary: 'nodus-summary/2',
-  ideas: 'nodus-deep-scan/2',
+  light: 'nodus-light-scan/3',
+  deep: 'nodus-deep-scan/3',
+  summary: 'nodus-summary/3',
+  ideas: 'nodus-deep-scan/3',
   passages: 'nodus-passage-index/2',
   embeddings: 'nodus-embeddings/2',
   documentProfile: 'document-profile/1',
@@ -50,15 +51,35 @@ function model(model: ModelRef | null | undefined): Record<string, string | null
 /** The exact configuration gate used both when an analysis is produced and when
  * another vault considers copying it. Prompt changes advance the pipeline ID. */
 export function analysisModelFingerprint(component: LibraryAnalysisReuseComponent, settings: AppSettings): string {
-  if (component === 'light') return analysisFingerprint({ model: model(settings.extractionModel ?? settings.synthesisModel) });
+  if (component === 'light') return analysisFingerprint({
+    model: model(settings.extractionModel ?? settings.synthesisModel),
+    language: settings.promptLanguage,
+    themesLocked: settings.themesLocked,
+    localProviders: settings.localProviders,
+  });
   if (component === 'deep' || component === 'ideas') return analysisFingerprint({
     extraction: model(settings.extractionModel ?? settings.synthesisModel),
     fusion: model(settings.fusionModel ?? settings.synthesisModel),
+    language: settings.promptLanguage,
+    themesLocked: settings.themesLocked,
     contextMode: settings.deepContextMode,
     standardChunkWords: settings.deepStandardChunkWords,
     longChunkWords: settings.deepLongChunkWords,
+    // The local deep scan is stale when its fusion embedding policy changes. Cross-
+    // vault reuse keeps textual ideas independent: their vectors are a separately
+    // gated component and can be regenerated for the target embedding model.
+    ...(component === 'deep' ? {
+      embeddingProvider: settings.embeddingProvider,
+      embeddingModel: settings.embeddingModel,
+    } : {}),
+    localProviders: settings.localProviders,
+    localTokenPolicy: 1,
   });
-  if (component === 'summary') return analysisFingerprint({ model: model(settings.summaryModel ?? settings.synthesisModel) });
+  if (component === 'summary') return analysisFingerprint({
+    model: model(settings.summaryModel ?? settings.synthesisModel),
+    language: settings.promptLanguage,
+    localProviders: settings.localProviders,
+  });
   if (component === 'documentProfile') return analysisFingerprint({
     generator: model(settings.documentProfileModel ?? settings.summaryModel ?? settings.synthesisModel),
     auditor: model(settings.documentAuditModel ?? settings.documentProfileModel ?? settings.summaryModel ?? settings.synthesisModel),
@@ -67,6 +88,50 @@ export function analysisModelFingerprint(component: LibraryAnalysisReuseComponen
     embeddingModel: settings.embeddingModel,
   });
   return analysisFingerprint({ provider: settings.embeddingProvider, model: settings.embeddingModel });
+}
+
+export function recordLocalAnalysisProvenance(input: {
+  workId: string;
+  components: LibraryAnalysisReuseComponent[];
+  documentFingerprint: string;
+  outputFingerprint?: string;
+  /** Exact per-run fingerprints when a caller supplied a model override. */
+  modelFingerprints?: Partial<Record<LibraryAnalysisReuseComponent, string>>;
+}): void {
+  const settings = getSettings();
+  const updatedAt = new Date().toISOString();
+  for (const component of input.components) {
+    upsertLibraryAnalysisProvenance({
+      workId: input.workId,
+      component,
+      documentFingerprint: input.documentFingerprint,
+      libraryItemId: null,
+      libraryRevisionFingerprint: null,
+      pipelineVersion: ANALYSIS_PIPELINES[component],
+      modelFingerprint: input.modelFingerprints?.[component] ?? analysisModelFingerprint(component, settings),
+      outputFingerprint: input.outputFingerprint ?? input.documentFingerprint,
+      sourceVaultId: null,
+      sourceWorkId: input.workId,
+      updatedAt,
+    });
+  }
+}
+
+export function isLocalAnalysisCurrent(
+  workId: string,
+  component: LibraryAnalysisReuseComponent,
+  documentFingerprint: string,
+  expectedModelFingerprint?: string,
+): boolean {
+  const row = getDb().prepare(`
+    SELECT document_fingerprint, pipeline_version, model_fingerprint
+      FROM library_analysis_provenance WHERE work_id=? AND component=?
+  `).get(workId, component) as { document_fingerprint: string; pipeline_version: string; model_fingerprint: string } | undefined;
+  if (!row) return false;
+  const settings = getSettings();
+  return row.document_fingerprint === documentFingerprint
+    && row.pipeline_version === ANALYSIS_PIPELINES[component]
+    && row.model_fingerprint === (expectedModelFingerprint ?? analysisModelFingerprint(component, settings));
 }
 
 export function upsertLibraryAnalysisProvenance(record: LibraryAnalysisProvenanceRecord): void {

@@ -711,6 +711,19 @@ export function resetGraphData(): void {
 export function purgeDeepData(nodusId: string): void {
   const db = getDb();
   const tx = db.transaction(() => {
+    const impacted = (db.prepare('SELECT DISTINCT global_id FROM idea_occurrences WHERE nodus_id = ?').all(nodusId) as Array<{ global_id: string }>)
+      .map((row) => row.global_id);
+    if (impacted.length > 0) {
+      const placeholders = impacted.map(() => '?').join(',');
+      // Cross-work semantic edges are derived from the old embeddings/statements.
+      // Remove only recomputable relations; explicit/deep edges owned by other works
+      // remain physically present and the visible view hides dormant endpoints.
+      db.prepare(`DELETE FROM edges WHERE id IN (
+        SELECT e.id FROM edges e LEFT JOIN edge_traces et ON et.edge_id = e.id
+         WHERE (e.from_id IN (${placeholders}) OR e.to_id IN (${placeholders}))
+           AND (e.id LIKE 'reproc:%' OR et.method IN ('reprocess', 'bridge'))
+      )`).run(...impacted, ...impacted);
+    }
     db.prepare('DELETE FROM idea_occurrences WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM evidence WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM edge_traces WHERE edge_id IN (SELECT id FROM edges WHERE source_work = ?)').run(nodusId);
@@ -744,9 +757,67 @@ export function purgeDeepData(nodusId: string): void {
        WHERE from_id NOT IN (SELECT global_id FROM ideas)
           OR to_id NOT IN (SELECT global_id FROM ideas)`
     ).run();
+    db.prepare(
+      `DELETE FROM edges
+        WHERE id IN (SELECT edge_id FROM edge_traces WHERE method IN ('reprocess', 'bridge'))
+          AND (from_id IN (SELECT global_id FROM ideas WHERE orphaned_at IS NOT NULL)
+            OR to_id IN (SELECT global_id FROM ideas WHERE orphaned_at IS NOT NULL))`
+    ).run();
     db.prepare('DELETE FROM edge_traces WHERE edge_id NOT IN (SELECT id FROM edges)').run();
   });
   tx();
+}
+
+/**
+ * Fail-closed audit for the deep-analysis replacement of one work. Call this from the
+ * same transaction that writes the replacement: any violation throws and restores the
+ * complete previous analysis instead of committing a partially linked graph.
+ */
+export function assertDeepDataIntegrity(nodusId: string): void {
+  const db = getDb();
+  const checks: Array<[string, string]> = [
+    ['occurrences→ideas', `SELECT COUNT(*) AS n FROM idea_occurrences io
+      LEFT JOIN ideas i ON i.global_id = io.global_id
+      WHERE io.nodus_id = ? AND (i.global_id IS NULL OR i.orphaned_at IS NOT NULL)`],
+    ['evidence→ideas', `SELECT COUNT(*) AS n FROM evidence ev
+      LEFT JOIN ideas i ON i.global_id = ev.global_id
+      WHERE ev.nodus_id = ? AND (i.global_id IS NULL OR i.orphaned_at IS NOT NULL)`],
+    ['edges→active ideas', `SELECT COUNT(*) AS n FROM edges e
+      LEFT JOIN ideas src ON src.global_id = e.from_id
+      LEFT JOIN ideas dst ON dst.global_id = e.to_id
+      WHERE e.source_work = ? AND (
+        src.global_id IS NULL OR dst.global_id IS NULL
+        OR src.orphaned_at IS NOT NULL OR dst.orphaned_at IS NOT NULL
+      )`],
+    ['theme links→ideas', `SELECT COUNT(*) AS n FROM idea_theme_links itl
+      LEFT JOIN ideas i ON i.global_id = itl.global_id
+      WHERE itl.nodus_id = ? AND (i.global_id IS NULL OR i.orphaned_at IS NOT NULL)`],
+    ['gaps→ideas', `SELECT COUNT(*) AS n FROM gaps g
+      LEFT JOIN ideas i ON i.global_id = g.related_idea
+      WHERE g.nodus_id = ? AND g.related_idea IS NOT NULL
+        AND (i.global_id IS NULL OR i.orphaned_at IS NOT NULL)`],
+    ['gaps→evidence', `SELECT COUNT(*) AS n FROM gaps g
+      LEFT JOIN evidence ev ON ev.id = g.evidence_id
+      WHERE g.nodus_id = ? AND g.evidence_id IS NOT NULL AND ev.id IS NULL`],
+    ['external refs→ideas', `SELECT COUNT(*) AS n FROM external_refs er
+      LEFT JOIN ideas i ON i.global_id = er.from_idea
+      WHERE er.nodus_id = ? AND (i.global_id IS NULL OR i.orphaned_at IS NOT NULL)`],
+    ['external refs→evidence', `SELECT COUNT(*) AS n FROM external_refs er
+      LEFT JOIN evidence ev ON ev.id = er.evidence_id
+      WHERE er.nodus_id = ? AND er.evidence_id IS NOT NULL AND ev.id IS NULL`],
+  ];
+  const failures: string[] = [];
+  for (const [label, sql] of checks) {
+    const count = Number((db.prepare(sql).get(nodusId) as { n: number } | undefined)?.n ?? 0);
+    if (count > 0) failures.push(`${label}: ${count}`);
+  }
+  const orphanTraces = Number((db.prepare(
+    'SELECT COUNT(*) AS n FROM edge_traces et LEFT JOIN edges e ON e.id = et.edge_id WHERE e.id IS NULL',
+  ).get() as { n: number } | undefined)?.n ?? 0);
+  if (orphanTraces > 0) failures.push(`edge traces→edges: ${orphanTraces}`);
+  if (failures.length > 0) {
+    throw new Error(`Deep analysis integrity check failed for ${nodusId}: ${failures.join(', ')}`);
+  }
 }
 
 /**

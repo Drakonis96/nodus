@@ -19,8 +19,8 @@ import {
 } from './appPrefs';
 
 const DEFAULT_LOCAL_PROVIDERS: AppSettings['localProviders'] = {
-  ollama: { baseUrl: DEFAULT_LOCAL_BASE_URLS.ollama },
-  lmstudio: { baseUrl: DEFAULT_LOCAL_BASE_URLS.lmstudio },
+  ollama: { baseUrl: DEFAULT_LOCAL_BASE_URLS.ollama, contextMode: 'auto' },
+  lmstudio: { baseUrl: DEFAULT_LOCAL_BASE_URLS.lmstudio, contextMode: 'auto' },
 };
 
 function sanitizeCodexReasoningEfforts(value: unknown): AppSettings['codexReasoningEfforts'] {
@@ -61,6 +61,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   documentProfileModel: null,
   documentAuditModel: null,
   fusionModel: null,
+  relationModel: null,
   chatModel: null,
   nodiModel: null,
   deepResearchModel: null,
@@ -336,6 +337,15 @@ export function getSettings(): AppSettings {
     ollama: { ...DEFAULT_LOCAL_PROVIDERS.ollama, ...parsed.localProviders?.ollama },
     lmstudio: { ...DEFAULT_LOCAL_PROVIDERS.lmstudio, ...parsed.localProviders?.lmstudio },
   };
+  for (const provider of ['ollama', 'lmstudio'] as const) {
+    const local = merged.localProviders[provider];
+    if (local.contextMode !== 'manual') {
+      local.contextMode = 'auto';
+      delete local.manualContextTokens;
+    } else if (![4096, 8192, 16384, 32768, 65536, 131072].includes(Number(local.manualContextTokens))) {
+      local.manualContextTokens = 16384;
+    }
+  }
   merged.embeddingProvider = normalizeEmbeddingProvider((parsed as Partial<AppSettings>).embeddingProvider);
   if (!merged.embeddingModel?.trim()) merged.embeddingModel = DEFAULT_EMBEDDING_MODELS[merged.embeddingProvider];
   Object.assign(merged, recoverV23VaultEmbeddingSelection(merged as AppSettings));
@@ -348,6 +358,7 @@ export function getSettings(): AppSettings {
     merged.synthesisModel ??= legacyDefault;
     merged.summaryModel ??= legacyDefault;
     merged.fusionModel ??= legacyDefault;
+    merged.relationModel ??= legacyDefault;
     merged.defaultModel = null;
     writeRaw('app', JSON.stringify(merged));
   }

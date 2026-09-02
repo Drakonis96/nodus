@@ -1278,6 +1278,10 @@ export type ImageProvider = 'google' | 'openai' | 'openrouter' | 'nodus' | 'code
  *  scheme, host and port (e.g. "http://localhost:11434"); no trailing "/v1". */
 export interface LocalProviderConfig {
   baseUrl: string;
+  /** Auto chooses the smallest safe 4K/8K/16K bucket. Manual never changes a
+   * task's output ceiling; it only controls the total prompt+completion window. */
+  contextMode?: 'auto' | 'manual';
+  manualContextTokens?: 4096 | 8192 | 16384 | 32768 | 65536 | 131072;
 }
 
 /** Result of pinging a local provider from Settings ("Test connection"). */
@@ -1289,6 +1293,27 @@ export interface LocalProviderTestResult {
   modelCount?: number;
   /** Human-readable error when `ok` is false. */
   message?: string;
+}
+
+export interface LocalAiRequestDiagnostic {
+  provider: LocalProvider;
+  model: string;
+  task: string;
+  transport: 'native' | 'openai-compatible';
+  contextMode: 'auto' | 'manual';
+  requestedContextTokens?: number;
+  effectiveContextTokens: number;
+  estimatedInputTokens: number;
+  actualInputTokens?: number;
+  requestedOutputTokens: number;
+  sentOutputTokens: number;
+  actualOutputTokens?: number;
+  reasoningTokens?: number;
+  finishReason?: string;
+  batchSize?: number;
+  splitDepth?: number;
+  elapsedMs: number;
+  timestamp: number;
 }
 
 /** A rolling usage window reported by the official Codex App Server. */
@@ -1513,6 +1538,14 @@ export interface ModelInfo {
   quantization?: string;
   /** Max context length in tokens (LM Studio). */
   contextLength?: number;
+  /** Architecture/training ceiling, distinct from the context currently loaded. */
+  trainedContextLength?: number;
+  /** Context currently allocated by the local runtime, when it reports it. */
+  loadedContextLength?: number;
+  /** Context Nodus will use after applying settings and provider/model ceilings. */
+  effectiveContextLength?: number;
+  /** Conservative value recommended by Nodus for background processing. */
+  recommendedContextLength?: number;
   /** Whether the model is currently loaded into memory (LM Studio). */
   loaded?: boolean;
   /** Model kind reported by LM Studio: chat/vision vs embeddings. */
@@ -1751,6 +1784,9 @@ export interface AppSettings {
   // synthesisModel so a fast model can be used here without slowing long-form output.
   // Falls back to synthesisModel when unset.
   fusionModel: ModelRef | null;
+  /** Model dedicated to semantic-pair validation and bridge discovery. Falls back
+   * to fusionModel, then synthesisModel. */
+  relationModel: ModelRef | null;
   // Per-feature choices. Null means "seed from synthesisModel until the user
   // chooses inside that feature"; once chosen, each value persists separately.
   chatModel: ModelRef | null;
@@ -4902,8 +4938,15 @@ export interface QueueItem {
    * to run on completion regardless of the auto-* settings. Used by "Procesar todo".
    */
   chain?: boolean;
+  /** Explicit user-confirmed renewal: bypasses currentness/no-op gates while keeping
+   * the previous committed analysis visible until replacement succeeds. */
+  refresh?: boolean;
   /** Changed works that bound an automatic semantic-maintenance job. Omitted for a manual full pass. */
   scopeNodusIds?: string[];
+}
+
+export interface AnalysisRunOptions {
+  mode: 'if-stale' | 'refresh';
 }
 
 export interface QueueProgress {
@@ -6197,7 +6240,9 @@ export type CorpusHealthBucketId = 'withoutText' | 'lightOnly' | 'deepPriority' 
  */
 export type WorkReadiness =
   | 'unstarted'
-  /** Queued or being processed right now. Live-queue only: never a SQL filter. */
+  /** Accepted by the queue but not executing yet. Never exposed as a SQL filter. */
+  | 'pending'
+  /** Being processed right now. Live-queue only: never a SQL filter. */
   | 'running'
   | 'failed'
   /** Text extraction was attempted and there was nothing usable to read. */
@@ -8821,9 +8866,9 @@ export interface WorkFilter {
   healthBucket?: CorpusHealthBucketId;
   /**
    * Restrict to one readiness value — what the library's status presets use.
-   * 'running' is not accepted: it only exists in the live scan queue.
+   * Transient queue states are not accepted: they are renderer-only.
    */
-  readiness?: Exclude<WorkReadiness, 'running'>;
+  readiness?: Exclude<WorkReadiness, 'pending' | 'running'>;
   theme?: string;
   /** Zotero tags to match. Multiple tags can use any-match (default) or all-match. */
   zoteroTags?: string[];

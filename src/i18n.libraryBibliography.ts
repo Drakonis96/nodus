@@ -104,9 +104,20 @@ const styleManager = {
   },
 } as const;
 
+const dateColumns = {
+  en: { 'Fecha de acceso': 'Accessed', 'Añadido a Zotero': 'Added to Zotero', 'Modificado en Zotero': 'Modified in Zotero', 'Añadido a Nodus': 'Added to Nodus', 'Modificado en Nodus': 'Modified in Nodus' },
+  fr: { 'Fecha de acceso': 'Date de consultation', 'Añadido a Zotero': 'Ajouté à Zotero', 'Modificado en Zotero': 'Modifié dans Zotero', 'Añadido a Nodus': 'Ajouté à Nodus', 'Modificado en Nodus': 'Modifié dans Nodus' },
+  de: { 'Fecha de acceso': 'Zugriffsdatum', 'Añadido a Zotero': 'Zu Zotero hinzugefügt', 'Modificado en Zotero': 'In Zotero geändert', 'Añadido a Nodus': 'Zu Nodus hinzugefügt', 'Modificado en Nodus': 'In Nodus geändert' },
+  pt: { 'Fecha de acceso': 'Data de acesso', 'Añadido a Zotero': 'Adicionado ao Zotero', 'Modificado en Zotero': 'Modificado no Zotero', 'Añadido a Nodus': 'Adicionado ao Nodus', 'Modificado en Nodus': 'Modificado no Nodus' },
+  'pt-BR': { 'Fecha de acceso': 'Data de acesso', 'Añadido a Zotero': 'Adicionado ao Zotero', 'Modificado en Zotero': 'Modificado no Zotero', 'Añadido a Nodus': 'Adicionado ao Nodus', 'Modificado en Nodus': 'Modificado no Nodus' },
+  it: { 'Fecha de acceso': 'Data di accesso', 'Añadido a Zotero': 'Aggiunto a Zotero', 'Modificado en Zotero': 'Modificato in Zotero', 'Añadido a Nodus': 'Aggiunto a Nodus', 'Modificado en Nodus': 'Modificato in Nodus' },
+  tr: { 'Fecha de acceso': 'Erişim tarihi', 'Añadido a Zotero': "Zotero'ya eklendi", 'Modificado en Zotero': "Zotero'da değiştirildi", 'Añadido a Nodus': "Nodus'a eklendi", 'Modificado en Nodus': "Nodus'ta değiştirildi" },
+} as const;
+
 const en = {
   ...identifiers,
   ...styleManager.en,
+  ...dateColumns.en,
   'Consulta fuentes bibliográficas públicas. Nada se aplica sin tu revisión.': 'Search public bibliographic sources. Nothing is applied without your review.',
   '{n} ficha(s) actualizada(s).': '{n} record(s) updated.',
   'Completar metadatos en lote': 'Complete metadata in bulk',
@@ -136,6 +147,7 @@ const en = {
 const fr = {
   ...identifiers,
   ...styleManager.fr,
+  ...dateColumns.fr,
   'Consulta fuentes bibliográficas públicas. Nada se aplica sin tu revisión.': 'Consulte des sources bibliographiques publiques. Rien ne sera appliqué sans votre vérification.',
   '{n} ficha(s) actualizada(s).': '{n} notice(s) mise(s) à jour.',
   'Completar metadatos en lote': 'Compléter les métadonnées par lot',
@@ -163,6 +175,7 @@ const fr = {
 const de = {
   ...identifiers,
   ...styleManager.de,
+  ...dateColumns.de,
   'Consulta fuentes bibliográficas públicas. Nada se aplica sin tu revisión.': 'Öffentliche bibliografische Quellen durchsuchen. Ohne Ihre Prüfung wird nichts übernommen.',
   '{n} ficha(s) actualizada(s).': '{n} Datensätze aktualisiert.',
   'Completar metadatos en lote': 'Metadaten stapelweise vervollständigen',
@@ -190,6 +203,7 @@ const de = {
 const pt = {
   ...identifiers,
   ...styleManager.pt,
+  ...dateColumns.pt,
   'Consulta fuentes bibliográficas públicas. Nada se aplica sin tu revisión.': 'Consulta fontes bibliográficas públicas. Nada é aplicado sem a sua revisão.',
   '{n} ficha(s) actualizada(s).': '{n} registo(s) atualizado(s).',
   'Completar metadatos en lote': 'Completar metadados em lote',
@@ -217,6 +231,7 @@ const pt = {
 const ptBR = {
   ...identifiers,
   ...styleManager['pt-BR'],
+  ...dateColumns['pt-BR'],
   'Consulta fuentes bibliográficas públicas. Nada se aplica sin tu revisión.': 'Consulta fontes bibliográficas públicas. Nada é aplicado sem a sua revisão.',
   '{n} ficha(s) actualizada(s).': '{n} registro(s) atualizado(s).',
   'Completar metadatos en lote': 'Completar metadados em lote',
@@ -244,6 +259,7 @@ const ptBR = {
 const it = {
   ...identifiers,
   ...styleManager.it,
+  ...dateColumns.it,
   'Consulta fuentes bibliográficas públicas. Nada se aplica sin tu revisión.': 'Consulta fonti bibliografiche pubbliche. Nulla viene applicato senza la tua revisione.',
   '{n} ficha(s) actualizada(s).': '{n} scheda/e aggiornata/e.',
   'Completar metadatos en lote': 'Completa i metadati in blocco',
@@ -271,6 +287,7 @@ const it = {
 const tr = {
   ...identifiers,
   ...styleManager.tr,
+  ...dateColumns.tr,
   'Consulta fuentes bibliográficas públicas. Nada se aplica sin tu revisión.': 'Açık bibliyografik kaynakları ara. İncelemeniz olmadan hiçbir şey uygulanmaz.',
   '{n} ficha(s) actualizada(s).': '{n} kayıt güncellendi.',
   'Completar metadatos en lote': 'Meta verileri toplu tamamla',

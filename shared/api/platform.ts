@@ -36,6 +36,7 @@ import type {
   HumeVoiceInfo,
   ImageModelInfo,
   LocalProvider,
+  LocalAiRequestDiagnostic,
   LocalProviderTestResult,
   McpServerStatus,
   McpTunnelConnectInput,
@@ -189,6 +190,7 @@ export interface PlatformApi {
   deleteNodusLocalImageModel(model: string): Promise<NodusLocalImageStatus>;
   /** Ping a local provider (Ollama / LM Studio) to verify its base URL is reachable. */
   testLocalProvider(provider: LocalProvider): Promise<LocalProviderTestResult>;
+  getLocalAiDiagnostics(): Promise<LocalAiRequestDiagnostic[]>;
   getDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): Promise<DecorativeImage | null>;
   getDecorativeImageDataUrl(entityKind: DecorativeImageEntityKind, entityId: string, thumbnail?: boolean): Promise<string | null>;
   queueDecorativeImage(request: DecorativeImageActionRequest): Promise<DecorativeImage>;

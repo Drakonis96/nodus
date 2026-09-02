@@ -21,7 +21,7 @@ import type {
   LibraryMetadataIdentifierKind,
 } from '@shared/libraryTypes';
 import { LibraryDiskStore } from './libraryStorage';
-import { libraryCreatorDedupKey, librarySourceIdentityKey, normalizeLibraryDedupTitle, normalizeLibraryDedupUrl } from './libraryRecord';
+import { libraryCreatorDedupKey, librarySourceIdentityKey, normalizeLibraryDedupTitle, normalizeLibraryDedupUrl, normalizeLibraryMetadata } from './libraryRecord';
 import { validateLibrarySmartSearchGroup } from './librarySmartCollections';
 import { atomicWriteJson } from './libraryFileUtils';
 
@@ -173,6 +173,9 @@ function orderBySql(sort: LibrarySortRule[] | undefined): string {
     creator: "LOWER(COALESCE(json_extract(i.creators_json, '$[0].lastName'), json_extract(i.creators_json, '$[0].name'), ''))",
     itemType: 'i.item_type COLLATE NOCASE', publicationTitle: "LOWER(COALESCE(json_extract(i.metadata_json, '$.publicationTitle'), ''))",
     publisher: "LOWER(COALESCE(json_extract(i.metadata_json, '$.publisher'), ''))", date: 'i.date_value COLLATE NOCASE',
+    accessDate: "COALESCE(json_extract(i.metadata_json, '$.accessDate'), json_extract(i.metadata_json, '$.extra.\"Zotero field: accessDate\"')) COLLATE NOCASE",
+    zoteroDateAdded: "COALESCE(json_extract(i.metadata_json, '$.zoteroDateAdded'), json_extract(i.metadata_json, '$.extra.\"Zotero date added\"')) COLLATE NOCASE",
+    zoteroDateModified: "COALESCE(json_extract(i.metadata_json, '$.zoteroDateModified'), json_extract(i.metadata_json, '$.extra.\"Zotero date modified\"')) COLLATE NOCASE",
     year: 'i.year', edition: "LOWER(COALESCE(json_extract(i.metadata_json, '$.edition'), ''))",
     volume: "LOWER(COALESCE(json_extract(i.metadata_json, '$.volume'), ''))", issue: "LOWER(COALESCE(json_extract(i.metadata_json, '$.issue'), ''))",
     pages: "LOWER(COALESCE(json_extract(i.metadata_json, '$.pages'), ''))", doi: "LOWER(COALESCE(i.doi, ''))",
@@ -189,7 +192,12 @@ function orderBySql(sort: LibrarySortRule[] | undefined): string {
     unique.add(entry.field);
     return true;
   })
-    .slice(0, 3).map((entry) => `${expressions[entry.field]} ${entry.direction === 'asc' ? 'ASC' : 'DESC'}`);
+    .slice(0, 3).flatMap((entry) => {
+      const expression = expressions[entry.field];
+      // Missing values belong at the end in both directions. This matters most
+      // for source dates: Nodus and non-Zotero records legitimately lack them.
+      return [`(${expression}) IS NULL ASC`, `${expression} ${entry.direction === 'asc' ? 'ASC' : 'DESC'}`];
+    });
   return [...clauses, 'i.id ASC'].join(', ');
 }
 
@@ -1107,7 +1115,10 @@ export class LibraryCatalog {
       sourceKey: row.source_key == null ? null : String(row.source_key),
       sourceState: row.source_state == null ? null : row.source_state as LibraryCatalogItem['sourceState'],
       citationKey: row.citation_key == null ? null : String(row.citation_key),
-      metadata: json<LibraryItemMetadata>(row.metadata_json, { title: String(row.title), itemType: row.item_type as LibraryItemMetadata['itemType'], creators: [], year: null, isbn: [], issn: [], tags: [] }),
+      metadata: normalizeLibraryMetadata(
+        json<LibraryItemMetadata>(row.metadata_json, { title: String(row.title), itemType: row.item_type as LibraryItemMetadata['itemType'], creators: [], year: null, isbn: [], issn: [], tags: [] }),
+        String(row.title),
+      ),
       title: String(row.title),
       itemType: row.item_type as LibraryCatalogItem['itemType'],
       creators: json(row.creators_json, []),

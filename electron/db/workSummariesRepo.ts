@@ -125,6 +125,12 @@ export function findSimilarWorks(
             AND embedding_provider = ?
             AND embedding_model = ?
             AND embedding_dim = ?
+            AND EXISTS (
+              SELECT 1 FROM works w
+               WHERE w.nodus_id = work_summaries.nodus_id
+                 AND w.summary_status = 'done'
+                 AND w.summary_hash = work_summaries.content_hash
+            )
        ) WHERE similarity >= ?
        ORDER BY similarity DESC
        LIMIT ?`
@@ -154,7 +160,13 @@ export async function findSimilarWorksPaged(
              AND embedding IS NOT NULL
              AND embedding_provider = ?
              AND embedding_model = ?
-             AND embedding_dim = ?`,
+             AND embedding_dim = ?
+             AND EXISTS (
+               SELECT 1 FROM works w
+                WHERE w.nodus_id = work_summaries.nodus_id
+                  AND w.summary_status = 'done'
+                  AND w.summary_hash = work_summaries.content_hash
+             )`,
     params: [config.provider, config.model, queryEmbedding.length],
     query: queryEmbedding,
     threshold,
@@ -164,7 +176,9 @@ export async function findSimilarWorksPaged(
 
   const byId = new Map(ranked.map((row) => [row.nodus_id, row.similarity]));
   const rows = getDb()
-    .prepare(`SELECT nodus_id, summary FROM work_summaries WHERE nodus_id IN (${ranked.map(() => '?').join(',')})`)
+    .prepare(`SELECT ws.nodus_id, ws.summary FROM work_summaries ws JOIN works w ON w.nodus_id = ws.nodus_id
+      WHERE ws.nodus_id IN (${ranked.map(() => '?').join(',')})
+        AND w.summary_status = 'done' AND w.summary_hash = ws.content_hash`)
     .all(...ranked.map((row) => row.nodus_id)) as { nodus_id: string; summary: string }[];
   return rows
     .map((row) => ({ ...row, similarity: byId.get(row.nodus_id) ?? 0 }))

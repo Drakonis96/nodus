@@ -9,6 +9,8 @@ import {
   OPENROUTER_HEADERS,
   isLocalProvider,
   localContextWindow,
+  localContextCapabilities,
+  localBaseUrl,
   FREE_TIER_PROVIDERS,
   freeTierMaxTokens,
   groqFreeTpm,
@@ -57,6 +59,13 @@ import {
 } from './geminiEmbeddings';
 import { completeGeminiDeterministicJson } from './geminiDeterministicCompletion';
 import { withTransportDeadline } from './transportDeadline';
+import {
+  buildLocalRequestPlan,
+  recordLocalAiDiagnostic,
+  type LocalAiTask,
+  type LocalRequestPlan,
+} from './localRequestPlanner';
+import { completeLocalNative, LocalNativeUnavailableError, streamLocalNative } from './localNativeCompletion';
 
 const concurrencyListeners = new Set<(snapshots: AiConcurrencySnapshot[]) => void>();
 const concurrencyTelemetry = new Map<string, string>();
@@ -143,7 +152,7 @@ function providerRequestDescriptor(
     credentialScope: credentialScope(model.provider, key, endpoint),
     endpoint,
     requestClass: opts.requestClass ?? 'interactive',
-    estimatedInputTokens: estimateTokens(opts.system) + estimateTokens(opts.user),
+    estimatedInputTokens: estimateLocalTokens(opts.system) + estimateLocalTokens(opts.user),
     estimatedOutputTokens: opts.maxTokens,
     signal: opts.signal,
     jobId: opts.jobId,
@@ -214,7 +223,7 @@ export class AiError extends Error {
     message: string,
     public retriable = false,
     public config = false,
-    public code: 'output_truncated' | 'invalid_json' | 'timeout' | 'provider_empty_error' | typeof AI_MODEL_REQUIRED_ERROR_CODE | null = null,
+    public code: 'output_truncated' | 'invalid_json' | 'timeout' | 'provider_empty_error' | 'context_overflow' | typeof AI_MODEL_REQUIRED_ERROR_CODE | null = null,
   ) {
     super(message);
   }
@@ -253,8 +262,10 @@ function resolveProviderKey(provider: AiProvider): string | null {
 // the same prompt overflows with a cryptic "n_keep >= n_ctx". These helpers size
 // max_tokens to the real window and refuse up front with an actionable message.
 
-/** Smallest generation budget worth attempting; below this the window has no room. */
-const MIN_LOCAL_GENERATION_TOKENS = 512;
+/** Safety floor for the built-in Nodus runtime only. This is neither a context window
+ * nor a task output target; it is the minimum free generation room before refusing a
+ * request whose prompt already occupies virtually the entire loaded context. */
+const MIN_NODUS_LOCAL_OUTPUT_ROOM_TOKENS = 512;
 
 /**
  * Pessimistic token estimate, used only by the local-model guards below.
@@ -273,7 +284,7 @@ const MIN_LOCAL_GENERATION_TOKENS = 512;
  * refusal carrying an actionable message; undershooting costs a wrong answer the user cannot
  * detect, which is the trade this exists to make.
  */
-function estimateTokens(text: string): number {
+export function estimateLocalTokens(text: string): number {
   let units = 0;
   for (const m of text.matchAll(/[A-Za-z0-9]+|[^A-Za-z0-9\s]|\s+/g)) {
     const chunk = m[0];
@@ -307,18 +318,16 @@ function genericContextOverflowMessage(): string {
 
 /**
  * Output ceiling hit mid-JSON: retrying the same request verbatim reproduces it, so this
- * has to say what the reader can actually change. On a local server that is the context
- * window and nothing else — the budget here is whatever is left of it after the prompt,
- * so a 4k window leaves ~1.7k for output while a full idea extraction wants ~7k, and no
- * amount of retrying closes that gap. Telling someone to "analyse a smaller fragment"
- * would be advice they cannot take: chunk sizes are fixed in code, not exposed in the UI.
+ * has to distinguish the task's requested output ceiling from the context window. A
+ * larger context only helps when the planner had to clamp that request to make the
+ * prompt fit; it never turns a task's 4K output request into 64K output.
  */
 function truncatedJsonMessage(model: ModelRef, maxTokens: number): string {
   const label = PROVIDER_LABELS[model.provider] ?? model.provider;
   const cut = `La respuesta de «${model.model}» (${label}) se cortó al alcanzar el límite de ${maxTokens.toLocaleString('es')} tokens de salida y el JSON quedó incompleto.`;
   if (isLocalProvider(model.provider) || model.provider === 'nodus') {
     const knob = model.provider === 'ollama' ? 'num_ctx' : 'Context Length';
-    return `${cut} El espacio de salida es lo que queda de la ventana de contexto tras el prompt: amplíala en ${label} (${knob}), elige un modelo local con más contexto o usa un proveedor en la nube para esta tarea.`;
+    return `${cut} El límite de salida y la ventana de contexto son ajustes distintos. Nodus intentará dividir las tareas estructuradas compatibles; ampliar ${label} (${knob}) solo ayuda cuando el prompt no deja espacio suficiente. Si el error persiste, usa un modelo que siga mejor JSON o un proveedor en la nube para esta tarea.`;
   }
   return `${cut} Usa un modelo con mayor límite de salida o reduce el tamaño de la tarea.`;
 }
@@ -356,24 +365,37 @@ export function completionTimeoutMs(model: ModelRef): number {
  * room to generate. No-ops (returns the requested value) when the window can't be
  * detected — the runtime-error translation is the safety net for that case.
  */
-async function localMaxTokens(model: ModelRef, opts: CallOpts, requestedMax: number): Promise<number> {
-  const ctx = await localContextWindow(model.provider as LocalProvider, model.model, getApiKey(model.provider));
-  if (!ctx) return requestedMax;
-  const promptTokens = estimateTokens(opts.system) + estimateTokens(opts.user) + 16;
-  const reserve = Math.max(256, Math.round(ctx * 0.05));
-  const available = ctx - promptTokens - reserve;
-  if (available < MIN_LOCAL_GENERATION_TOKENS) {
-    throw new AiError(contextOverflowMessage(model.provider, model.model, ctx, promptTokens), false, true);
+async function localCompatPlan(model: ModelRef, opts: CallOpts, requestedMax: number): Promise<LocalRequestPlan | null> {
+  const provider = model.provider as LocalProvider;
+  const key = getApiKey(model.provider);
+  const capabilities = await localContextCapabilities(provider, model.model, key);
+  const loaded = capabilities.loaded ?? await localContextWindow(provider, model.model, key);
+  if (!loaded) return null;
+  const promptTokens = estimateLocalTokens(opts.system) + estimateLocalTokens(opts.user) + 16;
+  try {
+    return buildLocalRequestPlan({
+      provider,
+      model: model.model,
+      task: opts.task ?? 'generic',
+      promptTokens,
+      requestedOutputTokens: requestedMax,
+      contextMode: getSettings().localProviders?.[provider]?.contextMode,
+      manualContextTokens: getSettings().localProviders?.[provider]?.manualContextTokens,
+      trainedContextTokens: capabilities.trained,
+      loadedContextTokens: loaded,
+      nativeTransport: false,
+    });
+  } catch {
+    throw new AiError(contextOverflowMessage(model.provider, model.model, loaded, promptTokens), false, true, 'context_overflow');
   }
-  return Math.min(requestedMax, available);
 }
 
 function nodusLocalMaxTokens(model: ModelRef, opts: CallOpts, requestedMax: number): number {
   const ctx = getNodusLocalModel(model.model)?.contextLength ?? 8192;
-  const promptTokens = estimateTokens(opts.system) + estimateTokens(opts.user) + 16;
+  const promptTokens = estimateLocalTokens(opts.system) + estimateLocalTokens(opts.user) + 16;
   const reserve = Math.max(256, Math.round(ctx * 0.05));
   const available = ctx - promptTokens - reserve;
-  if (available < MIN_LOCAL_GENERATION_TOKENS) {
+  if (available < MIN_NODUS_LOCAL_OUTPUT_ROOM_TOKENS) {
     throw new AiError(contextOverflowMessage(model.provider, model.model, ctx, promptTokens), false, true);
   }
   return Math.min(requestedMax, available);
@@ -415,11 +437,148 @@ interface CallOpts {
    * creative and conversational calls deliberately do not.
    */
   deterministic?: boolean;
+  /** Local request policy. It controls context planning independently from output. */
+  task?: LocalAiTask;
+  /** Content-free batching metadata for diagnostics and adaptive recovery. */
+  batchSize?: number;
+  splitDepth?: number;
 }
 
 /** Streaming delta. `kind` distinguishes the final answer (`content`, default) from
  *  the model's reasoning/thinking trace (`reasoning`). */
 type TextDeltaHandler = (delta: string, kind?: 'content' | 'reasoning') => void;
+
+async function tryLocalNativeCompletion(
+  model: ModelRef,
+  opts: CallOpts,
+  jsonMode: boolean,
+  key: string,
+): Promise<string | null> {
+  if (!isLocalProvider(model.provider) || opts.images?.length) return null;
+  const provider = model.provider as LocalProvider;
+  const config = getSettings().localProviders?.[provider];
+  const requestedOutput = opts.maxTokens ?? 8000;
+  const promptTokens = estimateLocalTokens(opts.system) + estimateLocalTokens(opts.user) + 16;
+  const capabilities = await localContextCapabilities(provider, model.model, key);
+  let plan: LocalRequestPlan;
+  try {
+    plan = buildLocalRequestPlan({
+      provider,
+      model: model.model,
+      task: opts.task ?? 'generic',
+      promptTokens,
+      requestedOutputTokens: requestedOutput,
+      contextMode: config?.contextMode,
+      manualContextTokens: config?.manualContextTokens,
+      trainedContextTokens: capabilities.trained,
+      loadedContextTokens: capabilities.loaded,
+      nativeTransport: true,
+    });
+  } catch {
+    const configured = config?.contextMode === 'manual' ? config.manualContextTokens ?? null : 16384;
+    throw new AiError(contextOverflowMessage(provider, model.model, configured, promptTokens), false, true, 'context_overflow');
+  }
+
+  const started = Date.now();
+  try {
+    const result = await scheduleProviderRequest(model, opts, key, `${localBaseUrl(provider)}/native`, () => completeLocalNative({
+      provider,
+      baseUrl: localBaseUrl(provider),
+      key: key === 'local' ? null : key,
+      model: model.model,
+      system: opts.system,
+      user: opts.user,
+      temperature: opts.temperature ?? 0.15,
+      contextTokens: plan.contextTokens,
+      outputTokens: plan.outputTokens,
+      jsonMode,
+      timeoutMs: opts.timeoutMs ?? completionTimeoutMs(model),
+      signal: opts.signal,
+      deterministic: opts.deterministic,
+    }));
+    recordLocalAiDiagnostic({
+      provider,
+      model: model.model,
+      task: plan.task,
+      transport: 'native',
+      contextMode: plan.contextMode,
+      requestedContextTokens: config?.contextMode === 'manual' ? config.manualContextTokens : undefined,
+      effectiveContextTokens: plan.contextTokens,
+      estimatedInputTokens: plan.promptTokens,
+      actualInputTokens: result.inputTokens,
+      requestedOutputTokens: plan.requestedOutputTokens,
+      sentOutputTokens: plan.outputTokens,
+      actualOutputTokens: result.outputTokens,
+      reasoningTokens: result.reasoningTokens,
+      finishReason: result.finishReason,
+      batchSize: opts.batchSize,
+      splitDepth: opts.splitDepth,
+      elapsedMs: Date.now() - started,
+      timestamp: Date.now(),
+    });
+    if (jsonMode && /length|max_tokens|max_output_tokens/i.test(result.finishReason ?? '')) {
+      throw new AiError(truncatedJsonMessage(model, plan.outputTokens), true, false, 'output_truncated');
+    }
+    if (!result.text.trim()) {
+      throw new AiError(`Respuesta vacía del proveedor de IA (${result.finishReason ?? 'sin finish_reason'}).`, false);
+    }
+    return result.text;
+  } catch (error) {
+    if (error instanceof LocalNativeUnavailableError) return null;
+    if (error instanceof AiError) throw error;
+    throw wrapProviderError(error);
+  }
+}
+
+async function tryLocalNativeStreaming(
+  model: ModelRef,
+  opts: CallOpts,
+  key: string,
+  signal: AbortSignal | undefined,
+  onDelta: TextDeltaHandler,
+): Promise<string | null> {
+  if (!isLocalProvider(model.provider) || opts.images?.length) return null;
+  const provider = model.provider as LocalProvider;
+  const config = getSettings().localProviders?.[provider];
+  const promptTokens = estimateLocalTokens(opts.system) + estimateLocalTokens(opts.user) + 16;
+  const requestedOutput = opts.maxTokens ?? 8000;
+  const capabilities = await localContextCapabilities(provider, model.model, key);
+  let plan: LocalRequestPlan;
+  try {
+    plan = buildLocalRequestPlan({
+      provider, model: model.model, task: opts.task ?? 'chat', promptTokens,
+      requestedOutputTokens: requestedOutput, contextMode: config?.contextMode,
+      manualContextTokens: config?.manualContextTokens, trainedContextTokens: capabilities.trained,
+      loadedContextTokens: capabilities.loaded, nativeTransport: true,
+    });
+  } catch {
+    throw new AiError(contextOverflowMessage(provider, model.model, config?.manualContextTokens ?? 16384, promptTokens), false, true, 'context_overflow');
+  }
+  const started = Date.now();
+  try {
+    const result = await scheduleProviderRequest(model, { ...opts, signal }, key, `${localBaseUrl(provider)}/native-stream`, () => streamLocalNative({
+      provider, baseUrl: localBaseUrl(provider), key: key === 'local' ? null : key,
+      model: model.model, system: opts.system, user: opts.user,
+      temperature: opts.temperature ?? 0.15, contextTokens: plan.contextTokens,
+      outputTokens: plan.outputTokens, jsonMode: false,
+      timeoutMs: opts.timeoutMs ?? completionTimeoutMs(model), signal,
+    }, onDelta));
+    recordLocalAiDiagnostic({
+      provider, model: model.model, task: plan.task, transport: 'native', contextMode: plan.contextMode,
+      requestedContextTokens: config?.contextMode === 'manual' ? config.manualContextTokens : undefined,
+      effectiveContextTokens: plan.contextTokens, estimatedInputTokens: plan.promptTokens,
+      actualInputTokens: result.inputTokens, requestedOutputTokens: plan.requestedOutputTokens,
+      sentOutputTokens: plan.outputTokens, actualOutputTokens: result.outputTokens,
+      reasoningTokens: result.reasoningTokens, finishReason: result.finishReason,
+      elapsedMs: Date.now() - started, timestamp: Date.now(),
+    });
+    return result.text;
+  } catch (error) {
+    if (error instanceof LocalNativeUnavailableError) return null;
+    if (error instanceof AiError) throw error;
+    throw wrapProviderError(error);
+  }
+}
 
 /**
  * Output-language control. The prompts are authored in Spanish; when the user picks
@@ -573,7 +732,7 @@ function isProviderFreeTier(provider: AiProvider): boolean {
  * a config error, so the queue pauses once — beats firing a request that just 413s "Request too large".
  */
 function freeTierBudget(model: ModelRef, opts: CallOpts, localMax: number): number {
-  const promptTokens = estimateTokens(opts.system) + estimateTokens(opts.user) + 16;
+  const promptTokens = estimateLocalTokens(opts.system) + estimateLocalTokens(opts.user) + 16;
   const budget = freeTierMaxTokens(model.provider, model.model, promptTokens, localMax);
   if (budget <= 0) {
     throw new AiError(
@@ -841,6 +1000,15 @@ async function rawCompleteTransport(
     }
   }
 
+  // Local background/JSON calls use the providers' native contracts so context
+  // allocation and output allowance remain two independent parameters. Old
+  // servers are detected by endpoint availability and continue below through the
+  // OpenAI-compatible seam.
+  if (isLocalProvider(model.provider)) {
+    const native = await tryLocalNativeCompletion(model, opts, jsonMode, key);
+    if (native !== null) return native;
+  }
+
   if (model.provider === 'anthropic') {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const client = new Anthropic({
@@ -875,9 +1043,12 @@ async function rawCompleteTransport(
   // Local models load a small, fixed context window; size the request to it (and bail
   // early with an actionable error) instead of overflowing with a cryptic llama.cpp error.
   const requestedMax = opts.maxTokens ?? 8000;
+  const compatLocalPlan = isLocalProvider(model.provider)
+    ? await localCompatPlan(model, opts, requestedMax)
+    : null;
   const localMax = model.provider === 'nodus'
     ? nodusLocalMaxTokens(model, opts, requestedMax)
-    : isLocalProvider(model.provider) ? await localMaxTokens(model, opts, requestedMax) : requestedMax;
+    : compatLocalPlan?.outputTokens ?? requestedMax;
   // On a flagged free tier, shrink max_tokens so prompt + output fits the provider's per-minute
   // token budget (Groq) — otherwise the request 400s with "Request too large". No-op off free tier.
   const freeTier = isProviderFreeTier(model.provider);
@@ -966,6 +1137,7 @@ async function rawCompleteTransport(
     ],
   };
   const extras = optionalBody(model, jsonMode, reasoning);
+  const compatStarted = Date.now();
   try {
     let res;
     try {
@@ -989,6 +1161,28 @@ async function rawCompleteTransport(
       }
     }
     const choice = res.choices[0];
+    if (isLocalProvider(model.provider) && compatLocalPlan) {
+      const config = getSettings().localProviders?.[model.provider];
+      recordLocalAiDiagnostic({
+        provider: model.provider,
+        model: model.model,
+        task: compatLocalPlan.task,
+        transport: 'openai-compatible',
+        contextMode: compatLocalPlan.contextMode,
+        requestedContextTokens: config?.contextMode === 'manual' ? config.manualContextTokens : undefined,
+        effectiveContextTokens: compatLocalPlan.contextTokens,
+        estimatedInputTokens: compatLocalPlan.promptTokens,
+        actualInputTokens: Number((res as any).usage?.prompt_tokens) || undefined,
+        requestedOutputTokens: compatLocalPlan.requestedOutputTokens,
+        sentOutputTokens: maxTokens,
+        actualOutputTokens: Number((res as any).usage?.completion_tokens) || undefined,
+        finishReason: choice?.finish_reason ?? undefined,
+        batchSize: opts.batchSize,
+        splitDepth: opts.splitDepth,
+        elapsedMs: Date.now() - compatStarted,
+        timestamp: Date.now(),
+      });
+    }
     perfLogNs('AI response metadata', 0n, opts.perf, {
       provider: model.provider,
       model: model.model,
@@ -1376,6 +1570,14 @@ async function rawCompleteStreamTransport(
   const key = resolveProviderKey(model.provider);
   if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
 
+  if (isLocalProvider(model.provider)) {
+    const native = await tryLocalNativeStreaming(model, opts, key, scheduleOpts.signal, (delta, kind) => {
+      if (kind === 'reasoning') emitReasoning(delta);
+      else emitContent(delta);
+    });
+    if (native !== null) return finish();
+  }
+
   if (model.provider === 'opencode-go') {
     try {
       const result = await scheduleProviderRequest(model, scheduleOpts, key, 'opencode-go', () => completeWithOpenCodeGo({
@@ -1438,9 +1640,12 @@ async function rawCompleteStreamTransport(
     : openAiCompatBase(model.provider);
   // See rawComplete: fit the request to a local model's real context window.
   const requestedMax = opts.maxTokens ?? 8000;
+  const compatLocalPlan = isLocalProvider(model.provider)
+    ? await localCompatPlan(model, opts, requestedMax)
+    : null;
   const localMax = model.provider === 'nodus'
     ? nodusLocalMaxTokens(model, opts, requestedMax)
-    : isLocalProvider(model.provider) ? await localMaxTokens(model, opts, requestedMax) : requestedMax;
+    : compatLocalPlan?.outputTokens ?? requestedMax;
   const freeTier = isProviderFreeTier(model.provider);
   const maxTokens = freeTier ? freeTierBudget(model, opts, localMax) : localMax;
   const streamTimeoutMs = opts.timeoutMs ?? completionTimeoutMs(model);
@@ -1465,6 +1670,7 @@ async function rawCompleteStreamTransport(
   // Streaming is plain text (no JSON mode); only reasoning + routing apply.
   const extras = optionalBody(model, false, reasoning);
   const schedulerEndpoint = model.provider === 'nodus' ? 'nodus-local-runtime' : baseURL;
+  const compatStarted = Date.now();
   const consumeStream = async (
     streamClient: InstanceType<typeof OpenAI>,
     body: any,
@@ -1530,6 +1736,23 @@ async function rawCompleteStreamTransport(
     if (e instanceof AiError) throw e;
     throw wrapProviderError(e);
   }
+  if (isLocalProvider(model.provider) && compatLocalPlan) {
+    const config = getSettings().localProviders?.[model.provider];
+    recordLocalAiDiagnostic({
+      provider: model.provider,
+      model: model.model,
+      task: compatLocalPlan.task,
+      transport: 'openai-compatible',
+      contextMode: compatLocalPlan.contextMode,
+      requestedContextTokens: config?.contextMode === 'manual' ? config.manualContextTokens : undefined,
+      effectiveContextTokens: compatLocalPlan.contextTokens,
+      estimatedInputTokens: compatLocalPlan.promptTokens,
+      requestedOutputTokens: compatLocalPlan.requestedOutputTokens,
+      sentOutputTokens: maxTokens,
+      elapsedMs: Date.now() - compatStarted,
+      timestamp: Date.now(),
+    });
+  }
   // Flush before the emptiness check: the held tail can be the whole answer.
   const answer = finish();
   if (!answer.trim()) throw new AiError('Respuesta vacía del proveedor de IA.', false);
@@ -1575,7 +1798,7 @@ async function requestEmbeddings(
     credentialScope: credentialScope(provider, key, endpoint),
     endpoint,
     requestClass: 'embedding',
-    estimatedInputTokens: (Array.isArray(input) ? input : [input]).reduce((sum, value) => sum + estimateTokens(value), 0),
+    estimatedInputTokens: (Array.isArray(input) ? input : [input]).reduce((sum, value) => sum + estimateLocalTokens(value), 0),
     signal,
     jobId: options.jobId,
   };

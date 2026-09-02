@@ -17,15 +17,13 @@ import type {
   PromptLanguage,
   ProjectChapterIdea,
 } from '@shared/types';
-import { completeJson, embedMany } from './aiClient';
+import { AiError, completeJson, embedMany } from './aiClient';
 import { getChapter, listChapterChunks } from '../db/projectsRepo';
 import {
-  chapterIdeaEmbeddings,
   chapterIdeasSourceHash,
   listChapterIdeaRelations,
   listChapterIdeas,
-  replaceChapterIdeaRelations,
-  replaceChapterIdeas,
+  replaceChapterAnalysis,
   type NewChapterIdea,
   type NewChapterIdeaRelation,
 } from '../db/projectChapterIdeasRepo';
@@ -36,13 +34,15 @@ import { findSimilarWorks } from '../db/workSummariesRepo';
 import { getWork } from '../db/worksRepo';
 import { getSettings } from '../db/settingsRepo';
 import { chapterPromptPack } from '@shared/academicPromptPacks';
+import { adaptiveStructuredBatch } from './adaptiveStructuredBatch';
+import { localTaskOutputTokens } from './localRequestPlanner';
 
 const EXTRACT_MAX_CHUNKS = 48;
 const EXTRACT_CHUNK_BATCH = 6;
 const MAX_CHAPTER_IDEAS = 40;
 const CANDIDATES_PER_IDEA = 6;
 const RELATION_MIN_SIMILARITY = 0.3;
-const TYPING_IDEA_BATCH = 6;
+const TYPING_PAIR_BATCH = 36;
 
 const TARGET_FALLBACK_COPY: Record<PromptLanguage, { untitledNote: string; note: string; passage: string }> = {
   es: { untitledNote: '(nota sin título)', note: 'nota', passage: 'pasaje' },
@@ -108,40 +108,52 @@ interface ExtractResponse {
   ideas: RawIdea[];
 }
 function isExtractResponse(v: unknown): v is ExtractResponse {
-  return Boolean(v && typeof v === 'object' && Array.isArray((v as ExtractResponse).ideas));
+  return Boolean(
+    v
+    && typeof v === 'object'
+    && Array.isArray((v as ExtractResponse).ideas)
+    && (v as ExtractResponse).ideas.every((idea) => (
+      idea
+      && typeof idea === 'object'
+      && typeof idea.statement === 'string'
+      && idea.statement.trim().length > 0
+      && (idea.label === undefined || typeof idea.label === 'string')
+      && (idea.type === undefined || typeof idea.type === 'string')
+    )),
+  );
 }
 
-async function extractChapterIdeas(
+export async function extractChapterIdeas(
   chunks: { headingPath: string; text: string }[],
   model: ModelRef | null | undefined,
   language: PromptLanguage
 ): Promise<RawIdea[]> {
   const sampled = sampleEvenly(chunks, EXTRACT_MAX_CHUNKS);
-  const batches: { headingPath: string; text: string }[][] = [];
-  for (let i = 0; i < sampled.length; i += EXTRACT_CHUNK_BATCH) batches.push(sampled.slice(i, i + EXTRACT_CHUNK_BATCH));
-
-  const collected: RawIdea[] = [];
-  for (const batch of batches) {
-    try {
+  const collected = await adaptiveStructuredBatch<{ headingPath: string; text: string }, RawIdea[]>({
+    items: sampled,
+    initialBatchSize: EXTRACT_CHUNK_BATCH,
+    execute: async (batch, context) => {
       const res = await completeJson<ExtractResponse>(
         {
           system: chapterPromptPack(language).extract,
           user: JSON.stringify(
-            { fragmentos: batch.map((chunk) => ({ heading: chunk.headingPath, text: clip(chunk.text, 2200) })) },
+            { fragmentos: batch.map((chunk) => ({ heading: chunk.headingPath, text: clip(chunk.text, context.textLimit) })) },
             null,
             2
           ),
           temperature: 0.1,
-          maxTokens: 3000,
+          maxTokens: localTaskOutputTokens('chapter-idea-extraction', batch.length),
+          task: 'chapter-idea-extraction',
+          batchSize: batch.length,
+          splitDepth: context.splitDepth,
         },
         isExtractResponse,
         model
       );
-      collected.push(...res.ideas);
-    } catch {
-      // A failed batch shouldn't abort the whole extraction; skip it.
-    }
-  }
+      return res.ideas;
+    },
+    combine: (parts) => parts.flat(),
+  });
   return dedupeIdeas(collected).slice(0, MAX_CHAPTER_IDEAS);
 }
 
@@ -212,50 +224,98 @@ export function clamp01(value: unknown): number {
   return Math.max(0, Math.min(1, n));
 }
 
+interface TypingPair {
+  idea: { id: string; label: string; statement: string };
+  candidate: Candidate;
+}
+
+function relationKey(relation: { chapterIdeaId?: string; targetKind?: string; targetId?: string }): string {
+  return `${relation.chapterIdeaId ?? ''}|${relation.targetKind ?? ''}:${relation.targetId ?? ''}`;
+}
+
+function validateTypedBatch(batch: TypingPair[], relations: RawRelation[]): RawRelation[] {
+  const expected = new Set(batch.map(({ idea, candidate }) => `${idea.id}|${candidate.kind}:${candidate.id}`));
+  const seen = new Set<string>();
+  for (const relation of relations) {
+    const key = relationKey(relation);
+    const valid = expected.has(key)
+      && !seen.has(key)
+      && RELATION_TYPES.includes(String(relation.relation) as ChapterRelationType)
+      && typeof relation.confidence === 'number'
+      && Number.isFinite(relation.confidence)
+      && relation.confidence >= 0
+      && relation.confidence <= 1
+      && typeof relation.rationale === 'string';
+    if (!valid) throw new AiError('La clasificación devolvió pares incompletos, duplicados o inválidos.', true, false, 'invalid_json');
+    seen.add(key);
+  }
+  if (seen.size !== expected.size) {
+    throw new AiError(`La clasificación devolvió ${seen.size} de ${expected.size} pares requeridos.`, true, false, 'invalid_json');
+  }
+  return relations;
+}
+
 export async function typeRelations(
   ideas: { id: string; label: string; statement: string }[],
   candidatesByIdea: Map<string, Candidate[]>,
   model: ModelRef | null | undefined,
-  language: PromptLanguage = getSettings().promptLanguage ?? 'es'
+  language: PromptLanguage = getSettings().promptLanguage ?? 'es',
+  failureMode: 'fallback' | 'strict' = 'fallback',
 ): Promise<Map<string, RawRelation>> {
-  // keyed by `${chapterIdeaId}|${targetKind}:${targetId}`
   const typed = new Map<string, RawRelation>();
-  const withCandidates = ideas.filter((idea) => (candidatesByIdea.get(idea.id)?.length ?? 0) > 0);
-  for (let i = 0; i < withCandidates.length; i += TYPING_IDEA_BATCH) {
-    const batch = withCandidates.slice(i, i + TYPING_IDEA_BATCH);
-    try {
-      const res = await completeJson<TypeResponse>(
-        {
-          system: chapterPromptPack(language).type,
-          user: JSON.stringify(
-            {
-              ideas_manuscrito: batch.map((idea) => ({
-                chapterIdeaId: idea.id,
-                label: idea.label,
-                statement: clip(idea.statement, 400),
-                candidatos: (candidatesByIdea.get(idea.id) ?? []).map((c) => ({
-                  targetKind: c.kind,
-                  targetId: c.id,
-                  texto: clip(c.text, 400),
+  const pairs: TypingPair[] = ideas.flatMap((idea) => (
+    (candidatesByIdea.get(idea.id) ?? []).map((candidate) => ({ idea, candidate }))
+  ));
+  if (pairs.length === 0) return typed;
+
+  try {
+    const relations = await adaptiveStructuredBatch<TypingPair, RawRelation[]>({
+      items: pairs,
+      initialBatchSize: TYPING_PAIR_BATCH,
+      execute: async (batch, context) => {
+        const grouped = new Map<string, { idea: TypingPair['idea']; candidates: Candidate[] }>();
+        for (const pair of batch) {
+          const entry = grouped.get(pair.idea.id) ?? { idea: pair.idea, candidates: [] };
+          entry.candidates.push(pair.candidate);
+          grouped.set(pair.idea.id, entry);
+        }
+        const res = await completeJson<TypeResponse>(
+          {
+            system: chapterPromptPack(language).type,
+            user: JSON.stringify(
+              {
+                ideas_manuscrito: [...grouped.values()].map(({ idea, candidates }) => ({
+                  chapterIdeaId: idea.id,
+                  label: idea.label,
+                  statement: clip(idea.statement, Math.min(400, context.textLimit)),
+                  candidatos: candidates.map((c) => ({
+                    targetKind: c.kind,
+                    targetId: c.id,
+                    texto: clip(c.text, Math.min(400, context.textLimit)),
+                  })),
                 })),
-              })),
-            },
-            null,
-            2
-          ),
-          temperature: 0.1,
-          maxTokens: 4000,
-        },
-        isTypeResponse,
-        model
-      );
-      for (const rel of res.relations) {
-        if (!rel.chapterIdeaId || !rel.targetKind || !rel.targetId) continue;
-        typed.set(`${rel.chapterIdeaId}|${rel.targetKind}:${rel.targetId}`, rel);
-      }
-    } catch {
-      // Fall back to untyped 'related' for this batch (handled by the caller).
-    }
+              },
+              null,
+              2,
+            ),
+            temperature: 0.1,
+            maxTokens: localTaskOutputTokens('chapter-relation-typing', batch.length),
+            task: 'chapter-relation-typing',
+            batchSize: batch.length,
+            splitDepth: context.splitDepth,
+          },
+          isTypeResponse,
+          model,
+        );
+        return validateTypedBatch(batch, res.relations);
+      },
+      combine: (parts) => parts.flat(),
+    });
+    for (const relation of relations) typed.set(relationKey(relation), relation);
+  } catch (error) {
+    if (failureMode === 'strict') throw error;
+    // Live paragraph analysis deliberately degrades to semantic ranking.
+    return new Map();
   }
   return typed;
 }
@@ -353,74 +413,72 @@ export async function analyzeChapterRelations(
   emit({ chapterId: request.chapterId, phase: 'extracting', current: 0, total: 0, message: 'Extrayendo ideas del capítulo…' });
   const chunks = listChapterChunks(request.chapterId);
   if (chunks.length === 0) return { chapterId: request.chapterId, analyzed: false, available: true, ideas: [] };
-
-  const rawIdeas = await extractChapterIdeas(chunks, model, language);
-  if (rawIdeas.length === 0) {
-    replaceChapterIdeas(request.chapterId, chapter.projectId, hash, []);
-    replaceChapterIdeaRelations(request.chapterId, []);
-    emit({ chapterId: request.chapterId, phase: 'done', current: 0, total: 0, message: 'Sin ideas extraíbles.' });
-    return getChapterRelations(request.chapterId);
-  }
-
-  emit({ chapterId: request.chapterId, phase: 'embedding', current: 0, total: rawIdeas.length, message: 'Indexando ideas…' });
-  const embedTexts = rawIdeas.map((idea) => ideaEmbeddingText({ type: idea.type!, label: idea.label!, statement: idea.statement! }, language));
-  const vectors = await embedMany(embedTexts);
-  const available = vectors.some(Boolean);
-
-  const newIdeas: NewChapterIdea[] = rawIdeas.map((idea, index) => ({
-    type: normalizeIdeaType(idea.type),
-    label: idea.label!,
-    statement: idea.statement!,
-    embedding: vectors[index] ?? null,
-    embeddingText: embedTexts[index],
-  }));
-  const stored = replaceChapterIdeas(request.chapterId, chapter.projectId, hash, newIdeas);
-
-  if (!available) {
-    replaceChapterIdeaRelations(request.chapterId, []);
-    emit({ chapterId: request.chapterId, phase: 'error', current: 0, total: 0, message: 'No hay proveedor de embeddings configurado.' });
-    return { ...getChapterRelations(request.chapterId), available: false };
-  }
-
-  // Notes must be embedded before they can be matched.
-  emit({ chapterId: request.chapterId, phase: 'relating', current: 0, total: stored.length, message: 'Buscando relaciones…' });
-  await ensureNotesEmbedded();
-
-  const embedded = chapterIdeaEmbeddings(request.chapterId);
-  const embeddingById = new Map(embedded.map((row) => [row.id, row.embedding]));
-  const candidatesByIdea = new Map<string, Candidate[]>();
-  let done = 0;
-  for (const idea of stored) {
-    const vector = embeddingById.get(idea.id);
-    if (vector) candidatesByIdea.set(idea.id, gatherCandidates(vector));
-    done += 1;
-    if (done % 5 === 0) emit({ chapterId: request.chapterId, phase: 'relating', current: done, total: stored.length, message: 'Buscando relaciones…' });
-  }
-
-  const typed = await typeRelations(
-    stored.map((idea) => ({ id: idea.id, label: idea.label, statement: idea.statement })),
-    candidatesByIdea,
-    model,
-    language
-  );
-
-  const relations: NewChapterIdeaRelation[] = [];
-  for (const [chapterIdeaId, candidates] of candidatesByIdea) {
-    for (const candidate of candidates) {
-      const hit = typed.get(`${chapterIdeaId}|${candidate.kind}:${candidate.id}`);
-      relations.push({
-        chapterIdeaId,
-        targetKind: candidate.kind,
-        targetId: candidate.id,
-        relation: normalizeRelationType(hit?.relation),
-        similarity: candidate.similarity,
-        confidence: hit ? clamp01(hit.confidence) : candidate.similarity,
-        rationale: clip(hit?.rationale ?? '', 400),
-      });
+  try {
+    const rawIdeas = await extractChapterIdeas(chunks, model, language);
+    if (rawIdeas.length === 0) {
+      throw new AiError('El nuevo análisis no produjo ninguna idea verificable; se ha conservado el análisis anterior.', true);
     }
-  }
-  replaceChapterIdeaRelations(request.chapterId, relations);
 
-  emit({ chapterId: request.chapterId, phase: 'done', current: stored.length, total: stored.length, message: 'Análisis completado.' });
-  return getChapterRelations(request.chapterId);
+    emit({ chapterId: request.chapterId, phase: 'embedding', current: 0, total: rawIdeas.length, message: 'Indexando ideas…' });
+    const embedTexts = rawIdeas.map((idea) => ideaEmbeddingText({ type: idea.type!, label: idea.label!, statement: idea.statement! }, language));
+    const vectors = await embedMany(embedTexts, undefined, { jobId: `chapter-relations:${request.chapterId}` });
+    if (vectors.some((vector) => !vector)) {
+      emit({ chapterId: request.chapterId, phase: 'error', current: 0, total: 0, message: 'No hay proveedor de embeddings configurado. Se ha conservado el análisis anterior.' });
+      return { ...getChapterRelations(request.chapterId), available: false };
+    }
+
+    const newIdeas: NewChapterIdea[] = rawIdeas.map((idea, index) => ({
+      id: crypto.randomUUID(),
+      type: normalizeIdeaType(idea.type),
+      label: idea.label!,
+      statement: idea.statement!,
+      embedding: vectors[index],
+      embeddingText: embedTexts[index],
+    }));
+
+    // Notes may be indexed as a prerequisite, but the chapter's last valid
+    // analysis remains untouched until ideas and relations are both complete.
+    emit({ chapterId: request.chapterId, phase: 'relating', current: 0, total: newIdeas.length, message: 'Buscando relaciones…' });
+    await ensureNotesEmbedded();
+
+    const candidatesByIdea = new Map<string, Candidate[]>();
+    let done = 0;
+    for (const idea of newIdeas) {
+      candidatesByIdea.set(idea.id!, gatherCandidates(idea.embedding!));
+      done += 1;
+      if (done % 5 === 0) emit({ chapterId: request.chapterId, phase: 'relating', current: done, total: newIdeas.length, message: 'Buscando relaciones…' });
+    }
+
+    const typed = await typeRelations(
+      newIdeas.map((idea) => ({ id: idea.id!, label: idea.label, statement: idea.statement })),
+      candidatesByIdea,
+      model,
+      language,
+      'strict',
+    );
+
+    const relations: NewChapterIdeaRelation[] = [];
+    for (const [chapterIdeaId, candidates] of candidatesByIdea) {
+      for (const candidate of candidates) {
+        const hit = typed.get(`${chapterIdeaId}|${candidate.kind}:${candidate.id}`);
+        if (!hit) throw new AiError('Falta una relación validada; no se publicará un análisis parcial.', true, false, 'invalid_json');
+        relations.push({
+          chapterIdeaId,
+          targetKind: candidate.kind,
+          targetId: candidate.id,
+          relation: hit.relation as ChapterRelationType,
+          similarity: candidate.similarity,
+          confidence: hit.confidence!,
+          rationale: clip(hit.rationale!, 400),
+        });
+      }
+    }
+    const stored = replaceChapterAnalysis(request.chapterId, chapter.projectId, hash, newIdeas, relations);
+    emit({ chapterId: request.chapterId, phase: 'done', current: stored.length, total: stored.length, message: 'Análisis completado.' });
+    return getChapterRelations(request.chapterId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    emit({ chapterId: request.chapterId, phase: 'error', current: 0, total: 0, message });
+    throw error;
+  }
 }

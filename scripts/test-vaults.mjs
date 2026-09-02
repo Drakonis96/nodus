@@ -198,6 +198,7 @@ settingsRepo.updateSettings({
   modelSettingsMode: 'advanced',
   chatModel: 'openrouter/anthropic/claude-3',
   synthesisModel: { provider: 'openai', model: 'gpt-4o' },
+  relationModel: { provider: 'openai', model: 'gpt-4o' },
   favorites: [{ provider: 'openai', model: 'gpt-4o' }],
 });
 assert.equal(settingsRepo.getSettings().theme, 'light', 'theme applied in the active vault');

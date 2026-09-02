@@ -7,6 +7,8 @@ import { getSettings } from '../db/settingsRepo';
 import type { Work, ModelRef } from '@shared/types';
 import crypto from 'node:crypto';
 import { recordLinkedLibraryAnalysis } from '../library/libraryVaultProvenance';
+import { analysisModelFingerprint, isLocalAnalysisCurrent, recordLocalAnalysisProvenance } from '../db/libraryAnalysisProvenance';
+import { getDb } from '../db/database';
 
 interface LightResult {
   themes: { label: string; confidence: number }[];
@@ -22,6 +24,7 @@ function isLightResult(v: unknown): v is LightResult {
 }
 
 export interface LightScanOptions {
+  force?: boolean;
   /**
    * When provided, the scan must assign the work ONLY to themes from this curated set
    * (matched/returned by normalized label) and may not invent new ones. Used when the
@@ -54,8 +57,10 @@ export async function runLightScan(
     .createHash('sha1')
     .update(`${work.title}\n${abstract ?? ''}\nlocked:${lockedLabels ? lockedLabels.slice().sort().join('|') : ''}`)
     .digest('hex');
+  const modelFingerprint = analysisModelFingerprint('light', { ...settings, extractionModel: scanModel });
 
-  if (work.light_status === 'done' && work.light_hash === hash) return; // unchanged
+  if (!options.force && work.light_status === 'done' && work.light_hash === hash
+    && isLocalAnalysisCurrent(work.nodus_id, 'light', hash, modelFingerprint)) return;
 
   const input: Record<string, unknown> = {
     title: work.title,
@@ -71,7 +76,7 @@ export async function runLightScan(
 
   try {
     const result = await completeJson<LightResult>(
-      { system, user: JSON.stringify(input), temperature: 0.15, maxTokens: 1500 },
+      { system, user: JSON.stringify(input), temperature: 0.15, maxTokens: 1500, task: 'light-extraction' },
       isLightResult,
       scanModel
     );
@@ -90,12 +95,28 @@ export async function runLightScan(
     }
     // Light scan owns the broad theme assignment. Replacing avoids stale one-off
     // labels accumulating after prompt/model changes or global reassignments.
-    setWorkThemes(work.nodus_id, labels);
-    setLightResult(work.nodus_id, 'done', hash, result.notes ?? null);
-    recordLinkedLibraryAnalysis({ workId: work.nodus_id, components: ['light'], documentFingerprint: hash });
+    getDb().transaction(() => {
+      setWorkThemes(work.nodus_id, labels);
+      setLightResult(work.nodus_id, 'done', hash, result.notes ?? null);
+      recordLocalAnalysisProvenance({
+        workId: work.nodus_id,
+        components: ['light'],
+        documentFingerprint: hash,
+        modelFingerprints: { light: modelFingerprint },
+      });
+    })();
+    try {
+      recordLinkedLibraryAnalysis({ workId: work.nodus_id, components: ['light'], documentFingerprint: hash });
+    } catch (error) {
+      console.warn(`[lightScan] análisis guardado; procedencia externa diferida para ${work.nodus_id}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   } catch (e) {
     if (e instanceof AiError && e.config) throw e;
-    setLightResult(work.nodus_id, 'failed', hash, (e as Error).message);
+    // A forced refresh is replacement-by-commit: if generation fails, retain the
+    // previous successful analysis instead of destroying its currentness/status.
+    if (!(options.force && work.light_status === 'done')) {
+      setLightResult(work.nodus_id, 'failed', hash, (e as Error).message);
+    }
     throw e;
   }
 }

@@ -119,7 +119,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 173;
+export const SCHEMA_VERSION = 174;
 
 export const migrations: Migration[] = [
   {
@@ -9288,6 +9288,23 @@ export const migrations: Migration[] = [
     version: 173,
     up: /* sql */ `SELECT 1;`,
     after: ensureZoteroTitleMarkupColumn,
+  },
+  {
+    version: 174,
+    up: /* sql */ `
+      DROP VIEW IF EXISTS visible_edges;
+      CREATE VIEW visible_edges AS
+        SELECT e.* FROM edges e
+        JOIN ideas source_idea ON source_idea.global_id = e.from_id AND source_idea.orphaned_at IS NULL
+        JOIN ideas target_idea ON target_idea.global_id = e.to_id AND target_idea.orphaned_at IS NULL
+        WHERE NOT EXISTS (
+          SELECT 1 FROM edge_feedback f
+          WHERE f.verdict = 'rejected'
+            AND f.type = e.type
+            AND ((f.from_id = e.from_id AND f.to_id = e.to_id)
+              OR (f.from_id = e.to_id AND f.to_id = e.from_id))
+        );
+    `,
   },
 ];
 

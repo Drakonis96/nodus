@@ -134,7 +134,10 @@ test('Codex App Server is reaped after its explicit idle limit', async () => {
     codexHome: home,
     appVersion: 'test',
     idleTimeoutMs: 20,
-    maxLifetimeMs: 200,
+    // This case isolates the idle reap. On a low-power or loaded runner, process
+    // startup itself can exceed 200 ms and make the independent hard-lifetime
+    // timer win before the probe reply (covered by the next test).
+    maxLifetimeMs: 5_000,
   });
   await client.request('probe');
   assert.equal(client.isRunning(), true);
