@@ -1576,6 +1576,117 @@ body {
   @apply bg-white border-neutral-200;
 }
 
+/* The Home dashboard has its own card language: a clear edge, a restrained lift,
+   and enough contrast between a card and the tiles inside it to make scanning easy. */
+.home-panel-card {
+  border-color: #2f4141;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+.light .home-panel-card {
+  border-color: #cbd5e1;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+.home-status-card {
+  position: relative;
+  overflow: hidden;
+  border-color: #2f4141;
+  background: linear-gradient(145deg, rgba(29, 43, 43, 0.98), rgba(22, 32, 32, 0.98));
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+.home-status-card::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: var(--home-card-accent, #64748b);
+  content: '';
+  opacity: 0.85;
+}
+.home-status-card[data-home-tone='indigo'] { --home-card-accent: #818cf8; }
+.home-status-card[data-home-tone='green'] { --home-card-accent: #34d399; }
+.home-status-card[data-home-tone='amber'] { --home-card-accent: #fbbf24; }
+.home-status-card[data-home-tone='red'] { --home-card-accent: #f87171; }
+.home-status-card[data-home-tone='cyan'] { --home-card-accent: #22d3ee; }
+.home-status-card:hover {
+  border-color: var(--home-card-accent);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.home-status-card > div:first-child { border-color: #304343; }
+.home-status-icon {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.home-status-card p {
+  color: #a6b4b4;
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+.home-status-card .text-neutral-500,
+.home-dashboard-tile .text-neutral-500 {
+  color: #94a3a3;
+}
+.home-status-card .text-neutral-600,
+.home-dashboard-tile .text-neutral-600 {
+  color: #738383;
+}
+.home-dashboard-tile {
+  border-color: #304343;
+  background: rgba(13, 24, 24, 0.42);
+}
+.home-dashboard-tile:hover { border-color: #526666; }
+.home-dashboard-action {
+  border-color: #304343;
+  background: rgba(13, 24, 24, 0.42);
+}
+.home-dashboard-action:hover {
+  border-color: #526666;
+  background: rgba(35, 52, 52, 0.72);
+}
+.light .home-status-card {
+  border-color: #cbd5e1;
+  background: linear-gradient(145deg, #ffffff, #f8fafc);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.light .home-status-card > div:first-child { border-color: #e2e8f0; }
+.light .home-status-card p { color: #64748b; }
+.light .home-status-card .text-neutral-500,
+.light .home-dashboard-tile .text-neutral-500 { color: #64748b; }
+.light .home-status-card .text-neutral-600,
+.light .home-dashboard-tile .text-neutral-600 { color: #94a3b8; }
+.light .home-dashboard-tile,
+.light .home-dashboard-action {
+  border-color: #dbe3ec;
+  background: #f8fafc;
+}
+.light .home-dashboard-tile:hover,
+.light .home-dashboard-action:hover {
+  border-color: #aebdce;
+  background: #f1f5f9;
+}
+
+/* Home dashboard cards use a quieter, compact action treatment so every card has
+   the same visual anchor without competing with the primary next-step action. */
+.home-card-action {
+  min-height: 34px;
+  border-color: #404040;
+  background-color: rgba(23, 23, 23, 0.32);
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+.home-card-action:hover {
+  border-color: #737373;
+  background-color: rgba(38, 38, 38, 0.72);
+}
+.light .home-card-action {
+  border-color: #d4d4d4;
+  background-color: #fafafa;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+.light .home-card-action:hover {
+  border-color: #a3a3a3;
+  background-color: #f5f5f5;
+}
+
 /* Opaque surface for dialogs/modals: the translucent .card lets the dimmed page
  * bleed through, which reads as a bug when floated over the scrim. Use this for any
  * modal panel instead of .card. */
