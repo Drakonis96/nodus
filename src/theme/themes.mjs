@@ -31,8 +31,8 @@ const SHADES = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
 /** Neutral interpolation position for each shade (0 = pale surface, 1 = deep surface),
  *  shaped to roughly track Tailwind's own neutral luminance curve. */
 const N_STOPS = {
-  50: 0.0, 100: 0.03, 200: 0.08, 300: 0.16, 400: 0.34, 500: 0.52,
-  600: 0.66, 700: 0.77, 800: 0.87, 900: 0.94, 950: 1.0,
+  50: 0.0, 100: 0.035, 200: 0.09, 300: 0.17, 400: 0.36, 500: 0.56,
+  600: 0.7, 700: 0.81, 800: 0.89, 900: 0.95, 950: 1.0,
 };
 
 function clamp8(n) { return Math.max(0, Math.min(255, Math.round(n))); }
@@ -56,6 +56,28 @@ export function mix(a, b, amount) {
 const WHITE = '#ffffff';
 const BLACK = '#0a0a0a';
 
+/** WCAG relative luminance. */
+function luminance(hex) {
+  const [r, g, b] = parseHex(hex).map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** WCAG contrast ratio between two hexes. */
+export function contrast(a, b) {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** Darken `hex` toward black until it clears `min` contrast against `against`. */
+function ensureContrast(hex, against, min) {
+  let c = hex;
+  for (let i = 0; i < 24 && contrast(c, against) < min; i++) c = mix(c, BLACK, 0.08);
+  return c;
+}
+
 /** Monotonic pale→deep neutral ramp, lightly tinted with the accent in the mids. */
 function neutralRamp(pale, deep, accent, tint) {
   /** @type {Ramp} */ const ramp = /** @type {any} */ ({});
@@ -67,22 +89,45 @@ function neutralRamp(pale, deep, accent, tint) {
   return ramp;
 }
 
-/** Accent ramp. Light mode darkens 300/400 so accent text stays legible on pale surfaces. */
+/**
+ * Accent ramp.
+ *
+ * 500 is the raw brand hue (focus rings, borders — never a text/background pair).
+ * 600–950 run progressively dark so white text on 700 (the primary-button
+ * background) is legible for every hue, matching Tailwind's own indigo curve.
+ * Light mode pushes 300/400 dark enough to read as accent text on pale surfaces.
+ */
 function accentRamp(accent, mode) {
   const light = mode === 'light';
-  return /** @type {Ramp} */ ({
-    50: mix(accent, WHITE, light ? 0.9 : 0.88),
-    100: mix(accent, WHITE, light ? 0.8 : 0.76),
-    200: mix(accent, WHITE, light ? 0.62 : 0.58),
-    300: light ? mix(accent, BLACK, 0.1) : mix(accent, WHITE, 0.4),
-    400: light ? mix(accent, BLACK, 0.03) : mix(accent, WHITE, 0.18),
+  const ramp = /** @type {Ramp} */ ({
+    50: mix(accent, WHITE, 0.9),
+    100: mix(accent, WHITE, 0.8),
+    200: mix(accent, WHITE, 0.6),
+    300: light ? mix(accent, BLACK, 0.35) : mix(accent, WHITE, 0.38),
+    400: light ? mix(accent, BLACK, 0.24) : mix(accent, WHITE, 0.16),
     500: accent,
-    600: mix(accent, BLACK, light ? 0.16 : 0.14),
-    700: mix(accent, BLACK, light ? 0.32 : 0.3),
-    800: mix(accent, BLACK, light ? 0.48 : 0.46),
-    900: mix(accent, BLACK, light ? 0.62 : 0.6),
-    950: mix(accent, BLACK, light ? 0.76 : 0.74),
+    600: mix(accent, BLACK, 0.26),
+    700: mix(accent, BLACK, 0.46),
+    800: mix(accent, BLACK, 0.6),
+    900: mix(accent, BLACK, 0.72),
+    950: mix(accent, BLACK, 0.84),
   });
+  // ColorHunt accents are mid-lightness hues that fail white-on-colour at their
+  // raw value. `.btn-primary` (`@apply bg-indigo-600`) and every `bg-indigo-{500,600}`
+  // fill in the app pairs these shades with white text, so force them to clear WCAG,
+  // darkening toward black as needed. 500 matches Tailwind indigo-500's ~3.5:1 floor;
+  // 600+ clear AA.
+  ramp[500] = ensureContrast(ramp[500], WHITE, 3.5);
+  ramp[600] = ensureContrast(ramp[600], WHITE, 4.6);
+  ramp[700] = ensureContrast(ramp[700], WHITE, 5.6);
+  ramp[800] = ensureContrast(ramp[800], WHITE, 7.0);
+  ramp[900] = ensureContrast(ramp[900], WHITE, 9.0);
+  ramp[950] = ensureContrast(ramp[950], WHITE, 12.0);
+  if (light) {
+    ramp[300] = ensureContrast(ramp[300], WHITE, 4.6); // accent text on white
+    ramp[400] = ensureContrast(ramp[400], WHITE, 3.6);
+  }
+  return ramp;
 }
 
 /**

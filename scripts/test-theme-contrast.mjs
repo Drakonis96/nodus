@@ -1,34 +1,32 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { THEMES } from '../src/theme/themes.mjs';
+import { THEMES, contrast } from '../src/theme/themes.mjs';
 
-// Sanity floor on the curated palettes: body text on the base surface must clear
-// WCAG AA (4.5:1) in both modes, and white on the primary-button accent must clear
-// 3:1. Not a full audit — just a guard against a palette edit that makes the app
-// unreadable.
-
-function luminance(hex) {
-  const c = hex.replace('#', '');
-  const [r, g, b] = [0, 2, 4].map((i) => {
-    const v = parseInt(c.slice(i, i + 2), 16) / 255;
-    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-function ratio(a, b) {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-}
+// Sanity floor on the curated palettes. Not a full audit — a guard against a
+// palette edit that makes something unreadable.
 
 for (const theme of THEMES) {
-  test(`${theme.id}: contrast floor`, () => {
-    const { n, a } = theme.tokens;
-    // Dark mode: bright text (n-100) on deep surface (n-950).
-    assert.ok(ratio(n[100], n[950]) >= 4.5, `dark body text ${ratio(n[100], n[950]).toFixed(2)}:1`);
-    // Light mode: dark text (n-900) on pale surface (n-50).
-    assert.ok(ratio(n[900], n[50]) >= 4.5, `light body text ${ratio(n[900], n[50]).toFixed(2)}:1`);
-    // Primary button label.
-    assert.ok(ratio('#ffffff', a.dark[600]) >= 3, `dark button ${ratio('#ffffff', a.dark[600]).toFixed(2)}:1`);
-    assert.ok(ratio('#ffffff', a.light[600]) >= 3, `light button ${ratio('#ffffff', a.light[600]).toFixed(2)}:1`);
+  const { n, a } = theme.tokens;
+  test(`${theme.id}: dark surfaces`, () => {
+    assert.ok(contrast(n[100], n[950]) >= 4.5, `body text ${contrast(n[100], n[950]).toFixed(2)}:1`);
+    assert.ok(contrast(n[300], n[900]) >= 3, `muted text on card ${contrast(n[300], n[900]).toFixed(2)}:1`);
+  });
+  test(`${theme.id}: light surfaces`, () => {
+    // Light mode mirrors the ramp: body text = n[900] on n[50]; muted text
+    // (text-neutral-400 → n[600]) on a card (n[100]); border = n[200].
+    assert.ok(contrast(n[900], n[50]) >= 4.5, `body text ${contrast(n[900], n[50]).toFixed(2)}:1`);
+    assert.ok(contrast(n[600], n[100]) >= 3, `muted text ${contrast(n[600], n[100]).toFixed(2)}:1`);
+    assert.ok(contrast(n[900], n[100]) >= 4.5, `card body text ${contrast(n[900], n[100]).toFixed(2)}:1`);
+  });
+  test(`${theme.id}: accent buttons (white label)`, () => {
+    for (const mode of ['dark', 'light']) {
+      assert.ok(contrast('#ffffff', a[mode][700]) >= 4.5, `${mode} .btn-primary ${contrast('#ffffff', a[mode][700]).toFixed(2)}:1`);
+      assert.ok(contrast('#ffffff', a[mode][600]) >= 3.8, `${mode} bg-indigo-600 ${contrast('#ffffff', a[mode][600]).toFixed(2)}:1`);
+    }
+  });
+  test(`${theme.id}: accent text on pale surface (light mode)`, () => {
+    assert.ok(contrast(a.light[300], '#ffffff') >= 4.5, `text-indigo-300 ${contrast(a.light[300], '#ffffff').toFixed(2)}:1`);
+    assert.ok(contrast(a.light[400], '#ffffff') >= 3.5, `text-indigo-400 ${contrast(a.light[400], '#ffffff').toFixed(2)}:1`);
+    assert.ok(contrast(a.light[600], '#ffffff') >= 4.5, `text-indigo-600 ${contrast(a.light[600], '#ffffff').toFixed(2)}:1`);
   });
 }
