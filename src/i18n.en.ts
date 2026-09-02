@@ -320,6 +320,8 @@ export const EN: Record<string, string> = {
   'Bóveda cargada.': 'Vault loaded.',
   'Claves API copiadas: {n}.': 'API keys copied: {n}.',
   'En cola': 'Queued',
+  'Cola y tareas': 'Queue and tasks',
+  'Sin tareas ni colas en curso.': 'No tasks or queues in progress.',
   'Fallido': 'Failed',
   'Cancelado': 'Cancelled',
   'Pausado': 'Paused',

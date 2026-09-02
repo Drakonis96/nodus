@@ -6,11 +6,7 @@ import type { NotionImportReport } from '@shared/notionImport';
 import { FeedbackModal } from './views/FeedbackModal';
 import { RoadmapFeedbackModal, type RoadmapTopicKey } from './views/RoadmapFeedbackModal';
 import { RoadmapModal } from './views/RoadmapModal';
-import { QueueBar } from './components/QueueBar';
-import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
-import { PassageProgressBar } from './components/PassageProgressBar';
-import { ZoteroImportProgressBar } from './components/ZoteroImportProgressBar';
-import { DocumentIndexProgressBar } from './components/DocumentIndexProgressBar';
+import { QueuePanel, useQueueActivity } from './components/QueuePanel';
 import { VaultSwitcher, vaultTypeIcon, vaultTypeLabel } from './components/VaultSwitcher';
 import { ServerInbox } from './components/ServerInbox';
 import { unreadServerInboxGroupCount } from './serverInboxGrouping';
@@ -131,6 +127,7 @@ function HeaderAction({
   vaultTrigger = false,
   inboxTrigger = false,
   notificationsTrigger = false,
+  queueTrigger = false,
 }: {
   icon: string;
   label: string;
@@ -147,6 +144,8 @@ function HeaderAction({
   inboxTrigger?: boolean;
   /** Same, for the notifications panel. */
   notificationsTrigger?: boolean;
+  /** Same, for the queue panel. */
+  queueTrigger?: boolean;
 }) {
   return (
     <HoverLabelButton
@@ -154,6 +153,7 @@ function HeaderAction({
       data-vault-trigger={vaultTrigger ? '' : undefined}
       data-inbox-trigger={inboxTrigger ? '' : undefined}
       data-notifications-trigger={notificationsTrigger ? '' : undefined}
+      data-queue-trigger={queueTrigger ? '' : undefined}
       icon={icon}
       label={label}
       title={title}
@@ -271,6 +271,9 @@ export function App() {
   const [inbox, setInbox] = useState<ServerInboxEntry[]>([]);
   // The notification centre. Same two lists Nodi shows, reachable without Nodi.
   const [notificationsAnchor, setNotificationsAnchor] = useState<HTMLElement | null>(null);
+  // Queue and task progress, relocated from the bottom strip into its own dropdown.
+  const [queueAnchor, setQueueAnchor] = useState<HTMLElement | null>(null);
+  const { live: queueLive } = useQueueActivity();
   const [notifications, setNotifications] = useState<NodiNotification[]>([]);
   const [refreshingNotifications, setRefreshingNotifications] = useState(false);
   const {
@@ -301,6 +304,10 @@ export function App() {
   );
   const toggleInbox = useCallback(
     (el: HTMLElement) => setInboxAnchor((cur) => (cur === el ? null : el)),
+    []
+  );
+  const toggleQueue = useCallback(
+    (el: HTMLElement) => setQueueAnchor((cur) => (cur === el ? null : el)),
     []
   );
   // Opening the panel clears the ACTIVITY feed only — "I have seen these" is all that
@@ -1484,6 +1491,21 @@ export function App() {
             onClick={() => void toggleTheme()}
             dataTour="theme-toggle"
           />
+          {/* Queue and task progress, moved here from the bottom strip: same dropdown
+              treatment as the notification centre, with a live-work badge. */}
+          <span className="relative inline-flex">
+            <HeaderAction
+              dataTour="queue"
+              icon="clock"
+              label={t('Cola y tareas')}
+              title={t('Cola y tareas')}
+              queueTrigger
+              onClick={(e) => toggleQueue(e.currentTarget)}
+            />
+            {queueLive > 0 && (
+              <span className="header-action-badge">{queueLive > 9 ? '9+' : queueLive}</span>
+            )}
+          </span>
           {/* The notification centre, reachable whether or not Nodi is enabled — turning
               the mascot off used to take the only way to read these with it. */}
           <span className="relative inline-flex">
@@ -1543,6 +1565,13 @@ export function App() {
           onRefresh={refreshNotificationCenter}
           refreshing={refreshingNotifications}
           onClearAll={() => void window.nodus.clearNotifications().then(setNotifications).catch(() => {})}
+          captureBrowserOverlaySnapshot={captureNotificationsBrowserSnapshot}
+          setBrowserOverlayVisible={setNotificationsBrowserOverlayVisible}
+        />
+
+        <QueuePanel
+          anchorEl={queueAnchor}
+          onClose={() => setQueueAnchor(null)}
           captureBrowserOverlaySnapshot={captureNotificationsBrowserSnapshot}
           setBrowserOverlayVisible={setNotificationsBrowserOverlayVisible}
         />
@@ -1861,14 +1890,6 @@ export function App() {
           </div>
         </main>
         </ContinuityProvider>
-      </div>
-
-      <div data-tour="queue">
-        <QueueBar />
-        <ZoteroImportProgressBar />
-        <DocumentIndexProgressBar />
-        <EmbeddingProgressBar />
-        <PassageProgressBar />
       </div>
 
       <FeedbackHost />

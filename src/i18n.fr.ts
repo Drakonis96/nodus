@@ -2126,6 +2126,8 @@ export const FR: Record<string, string> = {
   'Corrígelo en Ajustes y pulsa': 'Corrigez-le dans les paramètres et cliquez sur',
   'Reanudar': 'Reprendre',
   'Cola': 'File',
+  'Cola y tareas': 'File et tâches',
+  'Sin tareas ni colas en curso.': 'Aucune tâche ni file en cours.',
   'Procesando:': 'Traitement :',
   'Cola en pausa': 'File en pause',
   'En cola…': 'En file d\'attente…',
