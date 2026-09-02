@@ -157,9 +157,9 @@ export function HomeView({
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <div className="mx-auto max-w-5xl">
-      <div className="mb-6">
+    <div className="h-full overflow-y-auto bg-neutral-950/10 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl">
+      <div className="mb-5">
         <HomeIntroCard
           eyebrow={t('Vault académico')}
           title={t('Tu espacio de investigación')}
@@ -169,28 +169,28 @@ export function HomeView({
       </div>
 
       {showDemoOffer && (
-        <div className="mb-6">
+        <div className="mb-5">
           <DemoOfferCard variant="academic" demoBusy={demoBusy} onLoadDemo={onLoadDemo} onLoadGenealogyDemo={onLoadGenealogyDemo} onLoadDatabasesDemo={onLoadDatabasesDemo} />
         </div>
       )}
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-300">
+        <div className="mb-5 rounded-xl border border-red-800 bg-red-950/40 px-4 py-3 text-sm text-red-300">
           {error}
         </div>
       )}
 
-      <section className="card p-4 mb-4">
-        <div className="flex flex-wrap items-start gap-4">
-          <div className="flex-1 min-w-[18rem]">
+      <section className="card home-panel-card mb-5 border-indigo-800/70 p-5 shadow-sm shadow-black/10 sm:p-6">
+        <div className="flex flex-wrap items-start gap-5">
+          <div className="min-w-[18rem] flex-1">
             <div className="text-xs uppercase text-neutral-500 mb-1">{t('Siguiente paso recomendado')}</div>
-            <h2 className="text-lg font-semibold">{recommendation.title}</h2>
-            <p className="text-sm text-neutral-400 mt-1 max-w-2xl">{recommendation.body}</p>
+            <h2 className="text-xl font-semibold tracking-tight">{recommendation.title}</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">{recommendation.body}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 border-neutral-800/80 md:border-l md:pl-5">
             {recommendation.secondary && (
               <button
-                className="btn btn-ghost border border-neutral-700 gap-1.5"
+                className="btn btn-ghost home-card-action border border-neutral-700 gap-1.5"
                 onClick={() => onNavigate(recommendation.secondary!.target)}
               >
                 <Icon name={recommendation.secondary.icon} /> {recommendation.secondary.label}
@@ -216,14 +216,14 @@ export function HomeView({
         />
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
         <StatusCard
           title={t('Corpus')}
           icon="book"
           tone="indigo"
           metric={stats.totalWorks}
           metricLabel={t('obras sincronizadas')}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('library')}>{t('Biblioteca')}</button>}
+          action={<button className="btn btn-ghost home-card-action border border-neutral-700" onClick={() => onNavigate('library')}>{t('Biblioteca')}</button>}
         >
           <ProgressLine label={t('con tag de lectura')} value={stats.readTaggedWorks} total={stats.totalWorks} />
           <div className="flex flex-wrap gap-1.5 mt-3">
@@ -241,7 +241,7 @@ export function HomeView({
           tone="green"
           metric={`${stats.lightDone}/${stats.totalWorks}`}
           metricLabel={t('con temas')}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('library')}>{t('Analizar')}</button>}
+          action={<button className="btn btn-ghost home-card-action border border-neutral-700" onClick={() => onNavigate('library')}>{t('Analizar')}</button>}
         >
           <ProgressLine label={t('temas')} value={stats.lightDone} total={stats.totalWorks} />
           <ProgressLine label={t('ideas')} value={stats.deepDone} total={stats.deepTarget} />
@@ -259,7 +259,7 @@ export function HomeView({
           tone={stats.queueFailed > 0 ? 'red' : stats.queueActive ? 'amber' : 'cyan'}
           metric={snapshot?.queue?.total ?? 0}
           metricLabel={stats.queueActive ? t('trabajos en cola') : t('trabajos registrados')}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('library')}>{t('Ver obras')}</button>}
+          action={<button className="btn btn-ghost home-card-action border border-neutral-700" onClick={() => onNavigate('library')}>{t('Ver obras')}</button>}
         >
           <ProgressLine label={t('progreso')} value={stats.queueDone + stats.queueFailed} total={snapshot?.queue?.total ?? 0} />
           <div className="flex flex-wrap gap-1.5 mt-3">
@@ -281,7 +281,7 @@ export function HomeView({
           tone="cyan"
           metric={stats.ideaNodes}
           metricLabel={t('ideas navegables')}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('graph')}>{t('Abrir grafo')}</button>}
+          action={<button className="btn btn-ghost home-card-action border border-neutral-700" onClick={() => onNavigate('graph')}>{t('Abrir grafo')}</button>}
         >
           <ProgressLine label={t('relaciones')} value={stats.semanticEdges} total={Math.max(stats.semanticEdges, stats.ideaNodes)} />
           <div className="flex flex-wrap gap-1.5 mt-3">
@@ -297,13 +297,13 @@ export function HomeView({
           tone="amber"
           metric={stats.gaps}
           metricLabel={t('huecos minados')}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('gaps')}>{t('Revisar')}</button>}
+          action={<button className="btn btn-ghost home-card-action border border-neutral-700" onClick={() => onNavigate('gaps')}>{t('Revisar')}</button>}
         >
           <div className="grid grid-cols-2 gap-2">
             <MiniMetric label={t('contradicciones')} value={stats.contradictions} />
             <MiniMetric label={t('por leer')} value={stats.unreadWorks} />
           </div>
-          <button className="btn btn-ghost border border-neutral-700 mt-3 w-full" onClick={() => onNavigate('reading')}>
+          <button className="btn btn-ghost home-card-action border border-neutral-700 mt-3 w-full" onClick={() => onNavigate('reading')}>
             <Icon name="route" /> {t('Ruta de lectura')}
           </button>
         </StatusCard>
@@ -314,7 +314,7 @@ export function HomeView({
           tone="indigo"
           metric={stats.ideaNodes > 0 ? t('lista') : t('pendiente')}
           metricLabel={t('notas, borradores y organización')}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('workspace')}>{t('Abrir')}</button>}
+          action={<button className="btn btn-ghost home-card-action border border-neutral-700" onClick={() => onNavigate('workspace')}>{t('Abrir')}</button>}
         >
           <div className="grid grid-cols-2 gap-2">
             <MiniMetric label={t('ideas')} value={stats.ideaNodes} />
@@ -331,7 +331,7 @@ export function HomeView({
           tone={settings.synthesisModel ? 'green' : 'red'}
           metric={settings.synthesisModel ? t('lista') : t('pendiente')}
           metricLabel={t('modelos por tarea')}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('settings')}>{t('Ajustes')}</button>}
+          action={<button className="btn btn-ghost home-card-action border border-neutral-700" onClick={() => onNavigate('settings')}>{t('Ajustes')}</button>}
         >
           <ProgressLine label={t('embeddings')} value={stats.embeddedIdeas} total={stats.totalEmbeddableIdeas} />
           <div className="flex flex-wrap gap-1.5 mt-3">
@@ -586,9 +586,9 @@ function CorpusHealthPanel({
       : 100;
 
   return (
-    <section className="card p-4 mb-4">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="h-8 w-8 rounded-lg inline-flex items-center justify-center text-emerald-300 bg-emerald-900/40">
+    <section className="card home-panel-card mb-5 border-emerald-900/70 p-5 shadow-sm shadow-black/10 sm:p-6">
+      <div className="mb-4 flex items-center gap-3 border-b border-neutral-800/80 pb-4">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-900/40 text-emerald-300">
           <Icon name="layers" />
         </span>
         <div>
@@ -600,7 +600,7 @@ function CorpusHealthPanel({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <HealthBucketTile
           icon="book"
           label={t('Sin texto')}
@@ -629,9 +629,12 @@ function CorpusHealthPanel({
           tone={health.pdfsToRecover.count > 0 ? 'red' : 'neutral'}
           onClick={() => onOpenBucket('pdfsToRecover')}
         />
-        <div className="rounded-lg border border-neutral-800 px-3 py-2">
-          <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-            <Icon name="search" size={13} /> {t('Embeddings')}
+        <div className="home-dashboard-tile rounded-xl border border-neutral-800 bg-neutral-900/30 px-4 py-3">
+          <div className="flex items-center gap-2 text-xs text-neutral-400">
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-emerald-900/50 text-emerald-300">
+              <Icon name="search" size={10} />
+            </span>
+            <span>{t('Embeddings')}</span>
           </div>
           <div className="mt-1 text-lg font-semibold tabular-nums">
             {health.embeddings.pendingIdeas}
@@ -647,9 +650,9 @@ function CorpusHealthPanel({
       </div>
 
       {actions.length > 0 && (
-        <div className="mt-4">
+        <div className="mt-5 border-t border-neutral-800/80 pt-5">
           <div className="text-xs uppercase tracking-wide text-neutral-500 mb-2">{t('Próximas acciones')}</div>
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             {actions.map((a, i) => {
               const dot = {
                 amber: 'bg-amber-400',
@@ -660,7 +663,7 @@ function CorpusHealthPanel({
               return (
                 <li key={i}>
                   <button
-                    className="flex w-full items-start gap-2.5 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 py-2 text-left transition-colors hover:border-neutral-700 hover:bg-neutral-900"
+                    className="home-dashboard-action flex w-full items-start gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-3 text-left transition-colors hover:border-neutral-700 hover:bg-neutral-900"
                     onClick={a.run}
                   >
                     <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
@@ -708,14 +711,18 @@ function HealthBucketTile({
   const sampleTitles = bucket.sample.map((w) => w.title).join('\n');
   return (
     <button
-      className="rounded-lg border border-neutral-800 px-3 py-2 text-left transition-colors hover:border-neutral-700 hover:bg-neutral-900/60"
+      className="home-dashboard-tile min-h-[7.5rem] rounded-xl border border-neutral-800 bg-neutral-900/20 px-4 py-3 text-left transition-colors hover:border-neutral-700 hover:bg-neutral-900/60"
+      data-home-tone={tone}
       onClick={onClick}
       title={sampleTitles || undefined}
     >
-      <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-        <Icon name={icon} size={13} /> {label}
+      <div className="flex items-start gap-2 text-xs text-neutral-400">
+        <span className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-neutral-800/80 ${toneClass}`}>
+          <Icon name={icon} size={10} />
+        </span>
+        <span className="leading-5">{label}</span>
       </div>
-      <div className={`mt-1 text-2xl font-semibold tabular-nums ${bucket.count > 0 ? toneClass : 'text-neutral-600'}`}>
+      <div className={`mt-3 text-2xl font-semibold leading-none tabular-nums ${bucket.count > 0 ? toneClass : 'text-neutral-600'}`}>
         {bucket.count}
       </div>
       {bucket.sample[0] && (
@@ -749,24 +756,31 @@ function StatusCard({
     red: 'text-red-300 bg-red-900/50',
     cyan: 'text-cyan-300 bg-cyan-900/50',
   }[tone];
+  const toneBorderClass = {
+    indigo: 'hover:border-indigo-700/70',
+    green: 'hover:border-emerald-700/70',
+    amber: 'hover:border-amber-700/70',
+    red: 'hover:border-red-700/70',
+    cyan: 'hover:border-cyan-700/70',
+  }[tone];
   return (
-    <section className="card p-4 min-h-[14rem] flex flex-col">
-      <div className="flex items-start gap-3">
-        <span className={`h-9 w-9 rounded-lg inline-flex items-center justify-center ${toneClass}`}>
-          <Icon name={icon} />
+    <section className={`card home-status-card flex h-full min-h-[15rem] flex-col border-neutral-800/90 p-5 shadow-sm shadow-black/10 transition-all hover:-translate-y-0.5 ${toneBorderClass} hover:shadow-lg hover:shadow-black/10`} data-home-tone={tone}>
+      <div className="flex items-start gap-3 border-b border-neutral-800/80 pb-4">
+        <span className={`home-status-icon inline-flex h-6 w-6 items-center justify-center rounded-md ${toneClass}`}>
+          <Icon name={icon} size={14} />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="font-semibold text-sm">{title}</h2>
-          <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
+          <h2 className="text-lg font-semibold leading-6 tracking-tight">{title}</h2>
+          <div className="mt-2 flex min-w-0 flex-nowrap items-baseline gap-x-2">
             {/* Numeric metrics get the big display size; status words (lista/pendiente)
                 would look disproportionate at that size, so render them smaller. */}
-            <span className={`font-semibold tabular-nums ${typeof metric === 'string' && !/\d/.test(metric) ? 'text-lg' : 'text-2xl'}`}>{metric}</span>
-            <span className="text-xs text-neutral-500">{metricLabel}</span>
+            <span className={`shrink-0 font-semibold leading-none tabular-nums ${typeof metric === 'string' && !/\d/.test(metric) ? 'text-sm' : 'text-base'}`}>{metric}</span>
+            <span className="min-w-0 truncate whitespace-nowrap text-[11px] leading-4 text-neutral-400">{metricLabel}</span>
           </div>
         </div>
-        {action}
+        {action && <div className="shrink-0">{action}</div>}
       </div>
-      <div className="mt-4 flex-1">{children}</div>
+      <div className="mt-5 flex-1">{children}</div>
     </section>
   );
 }
@@ -779,8 +793,8 @@ function ProgressLine({ label, value, total }: { label: string; value: number; t
         <span>{label}</span>
         <span className="tabular-nums">{total > 0 ? `${value}/${total}` : '0/0'}</span>
       </div>
-      <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden">
-        <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, pct)}%` }} />
+      <div className="h-2 overflow-hidden rounded-full bg-neutral-800">
+        <div className="h-full rounded-full bg-indigo-500 transition-[width]" style={{ width: `${Math.min(100, pct)}%` }} />
       </div>
     </div>
   );
@@ -788,7 +802,7 @@ function ProgressLine({ label, value, total }: { label: string; value: number; t
 
 function MiniMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-neutral-800 px-3 py-2">
+    <div className="home-dashboard-tile rounded-xl border border-neutral-800 bg-neutral-900/20 px-3 py-2.5">
       <div className="text-xs text-neutral-500">{label}</div>
       <div className="text-lg font-semibold tabular-nums">{value}</div>
     </div>
@@ -807,13 +821,20 @@ export function HomeIntroCard({
   icon: string;
 }) {
   return (
-    <header className="rounded-2xl border border-indigo-800/60 bg-indigo-950/25 p-6">
-      <div className="mb-2 flex items-center gap-2 text-indigo-300">
-        <Icon name={icon} size={20} />
-        <span className="text-xs font-semibold uppercase tracking-[0.2em]">{eyebrow}</span>
+    <header className="home-panel-card home-intro-card relative overflow-hidden rounded-2xl border border-indigo-800/60 bg-indigo-950/25 p-6 shadow-md shadow-indigo-950/10 sm:p-8">
+      <div className="flex items-start gap-4 sm:gap-5">
+        <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-indigo-700/50 bg-indigo-900/50 text-indigo-300 shadow-inner sm:h-14 sm:w-14">
+          <Icon name={icon} size={24} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-indigo-300">
+            <span className="text-xs font-semibold uppercase tracking-[0.2em]">{eyebrow}</span>
+            <span className="hidden h-px w-8 bg-indigo-700/60 sm:block" aria-hidden="true" />
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-neutral-100 sm:text-3xl">{title}</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-neutral-400">{description}</p>
+        </div>
       </div>
-      <h1 className="text-2xl font-semibold text-neutral-100">{title}</h1>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">{description}</p>
     </header>
   );
 }
@@ -911,8 +932,11 @@ export function DemoOfferCard({
             onClick: onLoadDemo ?? (async () => {}),
           };
   return (
-    <section className="rounded-xl border border-indigo-200 bg-indigo-50 p-5 dark:border-indigo-800/60 dark:bg-indigo-950/20" data-testid={`${variant}-demo-offer`}>
-      <div className="flex flex-wrap items-center gap-4">
+    <section className="home-panel-card rounded-2xl border border-indigo-200 bg-indigo-50 p-5 shadow-sm shadow-indigo-950/10 dark:border-indigo-800/60 dark:bg-indigo-950/20 sm:p-6" data-testid={`${variant}-demo-offer`}>
+      <div className="flex flex-wrap items-center gap-4 sm:gap-5">
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-200 bg-white/70 text-indigo-500 dark:border-indigo-700/60 dark:bg-indigo-900/50 dark:text-indigo-300">
+          <Icon name={card.icon} />
+        </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">{card.title}</h2>
           <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">{card.desc}</p>
@@ -1035,9 +1059,9 @@ export function GenealogyHome({
   })();
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <div className="mx-auto max-w-5xl">
-      <div className="mb-6">
+    <div className="h-full overflow-y-auto bg-neutral-950/10 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl">
+      <div className="mb-5">
         <HomeIntroCard
           eyebrow={t('Vault de genealogía')}
           title={t('Tu historia familiar')}
@@ -1047,25 +1071,25 @@ export function GenealogyHome({
       </div>
 
       {showDemoOffer && (
-        <div className="mb-6">
+        <div className="mb-5">
           <DemoOfferCard variant="genealogy" demoBusy={demoBusy} onLoadDemo={onLoadDemo} onLoadGenealogyDemo={onLoadGenealogyDemo} onLoadDatabasesDemo={onLoadDatabasesDemo} />
         </div>
       )}
 
-      <section className="card p-4 mb-4">
-        <div className="flex flex-wrap items-start gap-4">
-          <div className="flex-1 min-w-[18rem]">
+      <section className="card mb-5 border-indigo-800/70 p-5 shadow-sm shadow-black/10 sm:p-6">
+        <div className="flex flex-wrap items-start gap-5">
+          <div className="min-w-[18rem] flex-1">
             <div className="text-xs uppercase text-neutral-500 mb-1">{t('Siguiente paso recomendado')}</div>
             <h2 className="text-lg font-semibold">{recommendation.title}</h2>
             <p className="text-sm text-neutral-400 mt-1 max-w-2xl">{recommendation.body}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onOpenAssistant}>
+          <div className="flex flex-wrap gap-2 border-neutral-800/80 md:border-l md:pl-5">
+            <button className="btn btn-ghost home-card-action border border-neutral-700 gap-1.5" onClick={onOpenAssistant}>
               <Icon name="chat" /> {t('Asistente')}
             </button>
             {recommendation.secondary && (
               <button
-                className="btn btn-ghost border border-neutral-700 gap-1.5"
+                className="btn btn-ghost home-card-action border border-neutral-700 gap-1.5"
                 onClick={() => onNavigate(recommendation.secondary!.target)}
               >
                 <Icon name={recommendation.secondary.icon} /> {recommendation.secondary.label}
@@ -1078,14 +1102,14 @@ export function GenealogyHome({
         </div>
       </section>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
         <StatusCard
           title={t('Personas')}
           icon="users"
           tone="indigo"
           metric={s?.persons ?? 0}
           metricLabel={t('personas')}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('persons')}>{t('Abrir')}</button>}
+          action={<button className="btn btn-ghost home-card-action border border-neutral-700" onClick={() => onNavigate('persons')}>{t('Abrir')}</button>}
         >
           <div className="grid grid-cols-2 gap-2">
             <MiniMetric label={t('vínculos')} value={s?.relationships ?? 0} />
@@ -1102,7 +1126,7 @@ export function GenealogyHome({
           tone="amber"
           metric={s?.relationships ?? 0}
           metricLabel={t('vínculos de parentesco')}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('tree')}>{t('Ver árbol')}</button>}
+          action={<button className="btn btn-ghost home-card-action border border-neutral-700" onClick={() => onNavigate('tree')}>{t('Ver árbol')}</button>}
         >
           <div className="flex flex-wrap gap-1.5 mt-1">
             <Badge>{tx('{n} personas', { n: s?.persons ?? 0 })}</Badge>
@@ -1123,7 +1147,7 @@ export function GenealogyHome({
           tone={s && s.suggestions > 0 ? 'amber' : 'green'}
           metric={s?.suggestions ?? 0}
           metricLabel={t('por revisar')}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('persons')}>{t('Revisar')}</button>}
+          action={<button className="btn btn-ghost home-card-action border border-neutral-700" onClick={() => onNavigate('persons')}>{t('Revisar')}</button>}
         >
           <p className="text-xs text-neutral-500 mt-1">
             {s && s.suggestions > 0
@@ -1138,13 +1162,13 @@ export function GenealogyHome({
           tone="cyan"
           metric={s?.events ?? 0}
           metricLabel={t('eventos')}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('timeline')}>{t('Abrir')}</button>}
+          action={<button className="btn btn-ghost home-card-action border border-neutral-700" onClick={() => onNavigate('timeline')}>{t('Abrir')}</button>}
         >
           <div className="grid grid-cols-2 gap-2">
             <MiniMetric label={t('lugares')} value={s?.places ?? 0} />
             <MiniMetric label={t('personas')} value={s?.persons ?? 0} />
           </div>
-          <button className="btn btn-ghost border border-neutral-700 mt-3 w-full" onClick={() => onNavigate('map')}>
+          <button className="btn btn-ghost home-card-action border border-neutral-700 mt-3 w-full" onClick={() => onNavigate('map')}>
             <Icon name="map" /> {t('Ver mapa')}
           </button>
         </StatusCard>
@@ -1155,7 +1179,7 @@ export function GenealogyHome({
           tone="indigo"
           metric={s?.archiveItems ?? 0}
           metricLabel={t('documentos')}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('archive')}>{t('Abrir')}</button>}
+          action={<button className="btn btn-ghost home-card-action border border-neutral-700" onClick={() => onNavigate('archive')}>{t('Abrir')}</button>}
         >
           <ProgressLine label={t('indexados')} value={s?.indexed ?? 0} total={s?.indexTotal ?? 0} />
           <div className="flex flex-wrap gap-1.5 mt-3">
@@ -1172,7 +1196,7 @@ export function GenealogyHome({
           tone={settings.synthesisModel ? 'green' : 'red'}
           metric={settings.synthesisModel ? t('lista') : t('pendiente')}
           metricLabel={t('modelo de extracción')}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('settings')}>{t('Ajustes')}</button>}
+          action={<button className="btn btn-ghost home-card-action border border-neutral-700" onClick={() => onNavigate('settings')}>{t('Ajustes')}</button>}
         >
           <p className="text-xs text-neutral-500 mt-1">
             {t('La IA extrae personas y eventos de tus documentos, sugiere parentescos, redacta biografías y genera retratos. Configura los modelos en Ajustes.')}
@@ -1214,8 +1238,8 @@ export function DatabasesHome({
   const totalRows = databases.reduce((sum, d) => sum + d.rowCount, 0);
   return (
     <div className="h-full overflow-y-auto">
-     <div className="mx-auto max-w-5xl p-6">
-      <div className="mb-6">
+     <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+      <div className="mb-5">
         <HomeIntroCard
           eyebrow={t('Vault de bases de datos')}
           title={t('Tu espacio de datos')}
@@ -1225,12 +1249,12 @@ export function DatabasesHome({
       </div>
 
       {databases.length === 0 && onLoadDatabasesDemo && (
-        <div className="mb-6">
+        <div className="mb-5">
           <DemoOfferCard variant="databases" demoBusy={demoBusy} onLoadDatabasesDemo={onLoadDatabasesDemo} />
         </div>
       )}
 
-      <div className="mb-5 flex flex-wrap items-center justify-end gap-2">
+      <div className="mb-5 flex flex-wrap items-center justify-end gap-3 rounded-xl border border-neutral-800/80 p-3">
         <div className="flex gap-2">
           {onImportCsv && (
             <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onImportCsv}>
@@ -1251,7 +1275,7 @@ export function DatabasesHome({
       <section className="mb-5">
         <div className="text-xs uppercase text-neutral-500 mb-2">{t('Bases de datos')}</div>
         {databases.length === 0 ? (
-          <div className="card p-6 text-center">
+          <div className="card home-panel-card min-h-[14rem] p-8 text-center">
             <Icon name="table" size={32} className="text-neutral-600 mx-auto mb-2" />
             <p className="text-sm text-neutral-400">{t('Aún no hay bases de datos.')}</p>
             <div className="flex flex-wrap gap-2 justify-center mt-3">
@@ -1261,11 +1285,11 @@ export function DatabasesHome({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {databases.map((db) => (
               <button
                 key={db.id}
-                className="card p-4 text-left hover:border-indigo-600/70 transition-colors"
+                className="card home-panel-card min-h-[8rem] p-5 text-left transition-all hover:-translate-y-0.5 hover:border-indigo-600/70 hover:shadow-lg"
                 onClick={() => onOpenDatabase(db.id)}
               >
                 <div className="flex items-center gap-2">
@@ -1282,8 +1306,8 @@ export function DatabasesHome({
         )}
       </section>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <button className="card p-4 text-left hover:border-indigo-600/70 transition-colors" onClick={onOpenAnalysis}>
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <button className="card home-panel-card min-h-[8rem] p-5 text-left transition-all hover:-translate-y-0.5 hover:border-indigo-600/70 hover:shadow-lg" onClick={onOpenAnalysis}>
           <div className="flex items-center gap-2 font-medium">
             <Icon name="chartBar" className="text-indigo-400" /> {t('Análisis')}
           </div>
@@ -1291,7 +1315,7 @@ export function DatabasesHome({
             {t('Estadísticas e informes con IA sobre una base de datos.')}
           </p>
         </button>
-        <button className="card p-4 text-left hover:border-indigo-600/70 transition-colors" onClick={onOpenChat}>
+        <button className="card home-panel-card min-h-[8rem] p-5 text-left transition-all hover:-translate-y-0.5 hover:border-indigo-600/70 hover:shadow-lg" onClick={onOpenChat}>
           <div className="flex items-center gap-2 font-medium">
             <Icon name="chat" className="text-indigo-400" /> {t('Chat de datos')}
           </div>
@@ -1299,7 +1323,7 @@ export function DatabasesHome({
             {tx('Pregunta a tus datos ({n} entradas en total).', { n: totalRows.toLocaleString() })}
           </p>
         </button>
-        <button data-testid="open-database-deep-research" className="card p-4 text-left hover:border-cyan-600/70 transition-colors" onClick={onOpenDeepResearch}>
+        <button data-testid="open-database-deep-research" className="card home-panel-card min-h-[8rem] p-5 text-left transition-all hover:-translate-y-0.5 hover:border-cyan-600/70 hover:shadow-lg" onClick={onOpenDeepResearch}>
           <div className="flex items-center gap-2 font-medium">
             <Icon name="telescope" className="text-cyan-500" /> {t('Deep Research')}
           </div>
