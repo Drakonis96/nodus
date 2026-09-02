@@ -927,9 +927,9 @@ export type DocumentUnderstandingState =
   | 'stale' | 'failed' | 'paused' | 'unavailable';
 
 export type DocumentProfileFieldKind =
-  | 'object' | 'problem' | 'question' | 'thesis' | 'argument' | 'method'
+  | 'object' | 'problem' | 'question' | 'hypothesis' | 'thesis' | 'argument' | 'method'
   | 'sources' | 'concept' | 'temporal_scope' | 'geographic_scope'
-  | 'disciplinary_scope' | 'structure' | 'conclusion' | 'contribution'
+  | 'disciplinary_scope' | 'structure' | 'finding' | 'conclusion' | 'contribution'
   | 'limitation' | 'genre' | 'audience' | 'positioning' | 'original_abstract';
 
 export interface DocumentProfileField {

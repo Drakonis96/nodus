@@ -56,10 +56,42 @@ export interface FusionPlan {
   } | null;
 }
 
+const FUSION_EDGE_TYPES = new Set<EdgeType>([
+  'extends',
+  'contradicts',
+  'applies_to',
+  'shares_method',
+  'precondition_of',
+  'measures_same',
+  'supports',
+  'refutes',
+  'variant_of',
+  'refines',
+]);
+
 function isFusionResult(v: unknown): v is FusionResult {
   if (typeof v !== 'object' || v === null) return false;
   const o = v as Record<string, unknown>;
-  return o.resolution === 'same_as' || o.resolution === 'variant_of' || o.resolution === 'new';
+  if (o.resolution !== 'same_as' && o.resolution !== 'variant_of' && o.resolution !== 'new') return false;
+  if (typeof o.merged_label !== 'string' || !o.merged_label.trim()) return false;
+  if (typeof o.rationale !== 'string' || !o.rationale.trim()) return false;
+  if (typeof o.confidence !== 'number' || !Number.isFinite(o.confidence) || o.confidence < 0 || o.confidence > 1) return false;
+  const matchedId = typeof o.matched_id === 'string' && o.matched_id.trim() ? o.matched_id : null;
+  const edge = o.edge_to_existing;
+  const hasValidEdge = edge !== null
+    && typeof edge === 'object'
+    && FUSION_EDGE_TYPES.has((edge as Record<string, unknown>).type as EdgeType)
+    && ((edge as Record<string, unknown>).basis === 'explicit' || (edge as Record<string, unknown>).basis === 'inferred')
+    && typeof (edge as Record<string, unknown>).confidence === 'number'
+    && Number.isFinite((edge as Record<string, unknown>).confidence)
+    && Number((edge as Record<string, unknown>).confidence) >= 0
+    && Number((edge as Record<string, unknown>).confidence) <= 1;
+  if (o.resolution === 'same_as') return Boolean(matchedId) && edge === null;
+  if (o.resolution === 'variant_of') {
+    const edgeType = hasValidEdge ? (edge as Record<string, unknown>).type : null;
+    return Boolean(matchedId) && hasValidEdge && (edgeType === 'variant_of' || edgeType === 'refines' || edgeType === 'contradicts');
+  }
+  return edge === null ? o.matched_id === null : Boolean(matchedId) && hasValidEdge;
 }
 
 const SIM_THRESHOLD = 0.7;
@@ -212,12 +244,15 @@ export async function planIdeaFusion(
       fusionModel
     );
     fusionDone({ resolution: result.resolution, matched: Boolean(result.matched_id) });
-    if (result.resolution === 'same_as' && result.matched_id && getIdea(result.matched_id)) {
-      return { idea, embedding, embeddingText, themes: opts.themes ?? [], model: fusionModel, existingId: result.matched_id, label: idea.label, edge: null };
+    const matchedCandidate = result.matched_id
+      ? candidates.find((candidate) => candidate.global_id === result.matched_id)
+      : null;
+    if (result.resolution === 'same_as' && matchedCandidate && getIdea(matchedCandidate.global_id)) {
+      return { idea, embedding, embeddingText, themes: opts.themes ?? [], model: fusionModel, existingId: matchedCandidate.global_id, label: idea.label, edge: null };
     }
 
     const matched = result.matched_id && result.edge_to_existing && getIdea(result.matched_id)
-      ? candidates.find((candidate) => candidate.global_id === result.matched_id)
+      ? matchedCandidate
       : null;
     return {
       idea,
