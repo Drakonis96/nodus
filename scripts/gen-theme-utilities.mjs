@@ -310,7 +310,15 @@ function selector(themeId, key, u, mode) {
 
 // ── 3. Emit utilities.generated.css ──────────────────────────────────────────
 
-const sortedKeys = [...used.keys()].sort();
+// `dark:`-variant utilities are emitted AFTER their bare counterparts so that, at
+// equal specificity, `dark:hover:bg-neutral-900/55` wins over `hover:bg-neutral-50`
+// in dark mode — i.e. the class the component author meant for dark mode wins,
+// instead of the light-mode fallback flashing white / hiding text.
+const sortedKeys = [...used.keys()].sort((a, b) => {
+  const ad = used.get(a).variants.includes('dark') ? 1 : 0;
+  const bd = used.get(b).variants.includes('dark') ? 1 : 0;
+  return ad - bd || (a < b ? -1 : a > b ? 1 : 0);
+});
 
 /** Which modes a utility is emitted for. A `dark:`-variant utility only ever
  *  applies in dark mode; everything else is emitted for both (light mode mirrors
