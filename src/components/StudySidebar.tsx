@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Icon } from './ui';
+import { Tooltip } from './Tooltip';
 import { t } from '../i18n';
 import { orderSidebarItems } from '../navigation';
 
@@ -60,21 +61,24 @@ export function StudySidebar({
           {t('Organización')}
         </button>
       )}
-      {(compact || !collapsed) && visibleSections.map((item) => (
-        <button
-          key={item.view}
-          data-tour={`nav-${item.view}`}
-          onClick={() => onNavigate(item.view)}
-          aria-label={compact ? t(item.label) : undefined}
-          title={compact ? t(item.label) : undefined}
-          className={`flex items-center rounded-lg py-2 text-left text-sm ${compact ? 'justify-center px-2' : 'gap-2 px-3'} ${
-            activeView === item.view ? 'bg-indigo-600 text-white' : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'
-          }`}
-        >
-          <Icon name={item.icon} className="shrink-0" />
-          <span className={compact ? 'sr-only' : undefined}>{t(item.label)}</span>
-        </button>
-      ))}
+      {(compact || !collapsed) && visibleSections.map((item) => {
+        const button = (
+          <button
+            key={item.view}
+            data-tour={`nav-${item.view}`}
+            onClick={() => onNavigate(item.view)}
+            aria-label={compact ? t(item.label) : undefined}
+            className={`flex items-center rounded-lg py-2 text-left text-sm ${compact ? 'justify-center px-2' : 'gap-2 px-3'} ${
+              activeView === item.view ? 'bg-indigo-600 text-white' : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'
+            }`}
+          >
+            <Icon name={item.icon} className="shrink-0" />
+            <span className={compact ? 'sr-only' : undefined}>{t(item.label)}</span>
+          </button>
+        );
+        if (!compact) return button;
+        return <Tooltip key={item.view} label={t(item.label)} placement="right">{button}</Tooltip>;
+      })}
     </div>
   );
 }
