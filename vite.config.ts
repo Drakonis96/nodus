@@ -27,6 +27,11 @@ const databaseComputeWorkerAliases = () => ({
   },
 });
 
+// The main Electron entry owns the single dev-server bootstrap. Secondary
+// worker/preload builds must remain passive rebuilds; defining `onstart` here
+// competes for the plugin's startup lifecycle and prevents the app from
+// launching.
+
 // Native node modules and Electron-only deps must stay external in the main process bundle.
 const mainExternals = [
   'better-sqlite3',
@@ -84,7 +89,6 @@ const mainExternals = [
  * reload the renderer instead of spawning another Electron instance in dev.
  */
 const preloadBuild = (name: string, entry: string) => ({
-  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     // The top-level resolve.alias only applies to the renderer build.
     resolve: {
@@ -105,7 +109,6 @@ const preloadBuild = (name: string, entry: string) => ({
 });
 
 const databaseComputeWorkerBuild = {
-  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     plugins: [databaseComputeWorkerAliases()],
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
@@ -125,7 +128,6 @@ const databaseComputeWorkerBuild = {
 };
 
 const databaseScaleFixtureWorkerBuild = {
-  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     plugins: [databaseComputeWorkerAliases()],
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
@@ -142,7 +144,6 @@ const databaseScaleFixtureWorkerBuild = {
 };
 
 const databaseAggregateWorkerBuild = {
-  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     plugins: [databaseComputeWorkerAliases()],
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
@@ -159,7 +160,6 @@ const databaseAggregateWorkerBuild = {
 };
 
 const databaseDeepResearchWorkerBuild = {
-  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     plugins: [databaseComputeWorkerAliases()],
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
@@ -176,7 +176,6 @@ const databaseDeepResearchWorkerBuild = {
 };
 
 const vectorScanWorkerBuild = {
-  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
     build: {
@@ -195,7 +194,6 @@ const vectorScanWorkerBuild = {
  * chunk may pull `app`/`BrowserWindow` imports into a process where Electron does not
  * expose them. Build it as one self-contained ESM file instead. */
 const utilityBuild = (name: string, entry: string) => ({
-  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     resolve: {
       alias: { '@shared': path.resolve(__dirname, 'shared') },
