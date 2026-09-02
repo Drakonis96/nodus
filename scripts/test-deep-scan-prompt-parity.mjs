@@ -32,13 +32,51 @@ try {
     rqDecompose: prompts.PROMPT_RQ_DECOMPOSE,
     rqCoverage: prompts.PROMPT_RQ_COVERAGE,
   };
+  const fusionGuardAnchors = {
+    es: 'REGLA PRIORITARIA DE DECISIÓN',
+    en: 'PRIORITY DECISION RULE',
+    fr: 'RÈGLE DE DÉCISION PRIORITAIRE',
+    de: 'VORRANGIGE ENTSCHEIDUNGSREGEL',
+    pt: 'REGRA PRIORITÁRIA DE DECISÃO',
+    'pt-BR': 'REGRA PRIORITÁRIA DE DECISÃO',
+    it: 'REGOLA DECISIONALE PRIORITARIA',
+    tr: 'ÖNCELİKLİ KARAR KURALI',
+  };
+  const fusionContractAnchors = {
+    es: 'PRUEBA OPERATIVA OBLIGATORIA',
+    en: 'MANDATORY OPERATIONAL TEST',
+    fr: 'TEST OPÉRATIONNEL OBLIGATOIRE',
+    de: 'VERBINDLICHER OPERATIVER TEST',
+    pt: 'TESTE OPERACIONAL OBRIGATÓRIO',
+    'pt-BR': 'TESTE OPERACIONAL OBRIGATÓRIO',
+    it: 'TEST OPERATIVO OBBLIGATORIO',
+    tr: 'ZORUNLU İŞLETİM TESTİ',
+  };
+  const fusionSemanticParity = {
+    es: [/“Puede causar” y “causa”/, /usa inferred; usa explicit solo si/, /new con relación conceptual clara/],
+    en: [/“May cause” versus “causes”/, /use inferred; use explicit only when/, /new with a clear conceptual relationship/],
+    fr: [/« Peut causer » et « cause »/, /utilisez inferred ; utilisez explicit seulement si/, /new avec une relation conceptuelle claire/],
+    de: [/„Kann verursachen“ und „verursacht“/, /verwende inferred; verwende explicit nur/, /new mit einer klaren konzeptuellen Beziehung/],
+    pt: [/«Pode causar» e «causa»/, /usa inferred; usa explicit apenas se/, /new com uma relação conceptual clara/],
+    'pt-BR': [/“Pode causar” e “causa”/, /use inferred; use explicit somente se/, /new com uma relação conceitual clara/],
+    it: [/«Può causare» e «causa»/, /usa inferred; usa explicit solo se/, /new con una chiara relazione concettuale/],
+    tr: [/“Neden olabilir” ile “neden olur”/, /inferred kullanın; explicit yalnızca/, /açık bir kavramsal ilişkisi olan new/],
+  };
   for (const [key, tokens] of Object.entries(coreKeys)) {
-    assert.equal(prompts.coreStructuredPrompt(key, 'es'), canonicalCore[key], `${key}: Spanish canonical contract changed`);
+    if (key !== 'fusion') assert.equal(prompts.coreStructuredPrompt(key, 'es'), canonicalCore[key], `${key}: Spanish canonical contract changed`);
     for (const language of languages) {
       const value = prompts.coreStructuredPrompt(key, language);
       assert.ok(value.length >= canonicalCore[key].length * 0.65, `${language}.${key}: translated contract is unexpectedly short`);
       for (const token of tokens) assert.ok(value.includes(token), `${language}.${key}: missing ${token}`);
       assert.equal((value.match(/^- /gm) ?? []).length, (canonicalCore[key].match(/^- /gm) ?? []).length, `${language}.${key}: list-rule count changed`);
+      if (key === 'fusion') {
+        assert.ok(value.includes(fusionGuardAnchors[language]), `${language}.${key}: priority decision guard was lost`);
+        assert.ok(value.includes(fusionContractAnchors[language]), `${language}.${key}: operational contract guard was lost`);
+        assert.match(value, /similarity >= 0\.7/, `${language}.${key}: high-similarity exception was lost`);
+        assert.doesNotMatch(value, /dos ideas con similarity ≥ 0\.7 rara vez|two ideas with similarity ≥ 0\.7 are rarely/i, `${language}.${key}: obsolete threshold heuristic survived`);
+        assert.match(value, /basis[^\n]+explicit[^\n]+inferred/i, `${language}.${key}: basis enum contract was lost`);
+        for (const pattern of fusionSemanticParity[language]) assert.match(value, pattern, `${language}.${key}: translated V3 semantic guard was lost`);
+      }
       if (language !== 'es') assert.doesNotMatch(value, /Eres el (motor|analista|planificador|evaluador)|Devuelve SOLO JSON|PRINCIPIO RECTOR|TU TAREA/, `${language}.${key}: Spanish prose leaked`);
     }
   }
