@@ -29,4 +29,10 @@ for (const theme of THEMES) {
     assert.ok(contrast(a.light[400], '#ffffff') >= 3.5, `text-indigo-400 ${contrast(a.light[400], '#ffffff').toFixed(2)}:1`);
     assert.ok(contrast(a.light[600], '#ffffff') >= 4.5, `text-indigo-600 ${contrast(a.light[600], '#ffffff').toFixed(2)}:1`);
   });
+  test(`${theme.id}: accent text/icons on dark surface (dark mode)`, () => {
+    // Dark-mode `text-indigo-*` maps to a.dark[300] (shade ≤ 300) or a.dark[400];
+    // both must read on the deepest surface n[950].
+    assert.ok(contrast(a.dark[300], n[950]) >= 4.5, `text-indigo-300 ${contrast(a.dark[300], n[950]).toFixed(2)}:1`);
+    assert.ok(contrast(a.dark[400], n[950]) >= 3.5, `text-indigo-{400+} ${contrast(a.dark[400], n[950]).toFixed(2)}:1`);
+  });
 }
