@@ -28,4 +28,5 @@ export const THEME_LABELS: Record<string, string>;
 export const SHADES: ThemeShade[];
 
 export function mix(a: string, b: string, amount: number): string;
+export function contrast(a: string, b: string): number;
 export function deriveThemeTokens(def: { anchors: ThemeAnchors }): ThemeTokens;

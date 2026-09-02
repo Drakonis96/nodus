@@ -29,7 +29,10 @@ test('every non-default theme defines all 22 tokens', () => {
     assert.ok(tokensCss.includes(`html.theme-${theme.id} {`), `${theme.id} neutral block missing from tokens.generated.css`);
     assert.ok(tokensCss.includes(`html.theme-${theme.id}.dark {`), `${theme.id} dark accent block missing`);
     assert.ok(tokensCss.includes(`html.theme-${theme.id}.light {`), `${theme.id} light accent block missing`);
-    assert.ok(utilsCss.includes(`html.theme-${theme.id} .bg-neutral-950 {`), `${theme.id} has no generated utility block`);
+    // Neutral utilities are dark-scoped (light themes reuse the default surface system).
+    assert.ok(utilsCss.includes(`html.theme-${theme.id}.dark .bg-neutral-950 {`), `${theme.id} has no generated neutral block`);
+    assert.ok(utilsCss.includes(`html.theme-${theme.id}.dark .text-indigo-600 {`), `${theme.id} has no dark accent block`);
+    assert.ok(utilsCss.includes(`html.theme-${theme.id}.light .text-indigo-600 {`), `${theme.id} has no light accent block`);
   }
 });
 
