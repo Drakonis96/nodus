@@ -198,12 +198,24 @@ export function normalizeLibraryMetadata(value: unknown, fallbackTitle = 'Docume
       }))
     : undefined;
   const abstract = metadataStringValue(input.abstract, 500_000);
+  // Releases before these fields became sortable retained the same Zotero data
+  // losslessly in `extra`. Promote it on read so an existing library benefits
+  // immediately, without a destructive re-import.
+  const accessDate = metadataStringValue(input.accessDate, 200)
+    ?? metadataStringValue(extra?.['Zotero field: accessDate'], 200);
+  const zoteroDateAdded = metadataStringValue(input.zoteroDateAdded, 200)
+    ?? metadataStringValue(extra?.['Zotero date added'], 200);
+  const zoteroDateModified = metadataStringValue(input.zoteroDateModified, 200)
+    ?? metadataStringValue(extra?.['Zotero date modified'], 200);
   return {
     title: metadataStringValue(input.title, 10_000) ?? fallbackTitle,
     itemType,
     creators: normalizeCreators(input.creators ?? input.authors),
     ...(abstract ? { abstract } : {}),
     ...(metadataStringValue(input.date, 200) ? { date: metadataStringValue(input.date, 200) } : {}),
+    ...(accessDate ? { accessDate } : {}),
+    ...(zoteroDateAdded ? { zoteroDateAdded } : {}),
+    ...(zoteroDateModified ? { zoteroDateModified } : {}),
     year: Number.isInteger(rawYear) && rawYear > -10_000 && rawYear < 10_000 ? rawYear : null,
     ...(metadataStringValue(input.language, 100) ? { language: metadataStringValue(input.language, 100) } : {}),
     ...(metadataStringValue(input.publisher, 2_000) ? { publisher: metadataStringValue(input.publisher, 2_000) } : {}),

@@ -892,6 +892,18 @@ function LocalProviderRow({
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const hasToken = settings.providerKeys?.[provider];
+  const [diagnostics, setDiagnostics] = useState<Awaited<ReturnType<typeof window.nodus.getLocalAiDiagnostics>>>([]);
+  const localConfig = settings.localProviders?.[provider] ?? { baseUrl: savedUrl, contextMode: 'auto' as const };
+
+  const persistLocalConfig = async (patch: Partial<typeof localConfig>) => {
+    await window.nodus.updateSettings({
+      localProviders: {
+        ...settings.localProviders,
+        [provider]: { ...localConfig, ...patch },
+      },
+    });
+    await onChange();
+  };
 
   // Keep the URL field in sync if the saved value changes elsewhere (e.g. vault switch).
   useEffect(() => setUrlInput(savedUrl), [savedUrl]);
@@ -899,10 +911,7 @@ function LocalProviderRow({
   const persistUrl = async () => {
     const next = urlInput.trim() || DEFAULT_LOCAL_BASE_URLS[provider];
     if (next !== savedUrl) {
-      await window.nodus.updateSettings({
-        localProviders: { ...settings.localProviders, [provider]: { baseUrl: next } },
-      });
-      await onChange();
+      await persistLocalConfig({ baseUrl: next });
     }
   };
 
@@ -980,6 +989,38 @@ function LocalProviderRow({
             </div>
           </label>
 
+          <div className="rounded-lg border border-neutral-800 p-3 text-xs text-neutral-500">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="font-medium text-neutral-300">{t('Ventana de contexto')}</label>
+              <select
+                className="input"
+                value={localConfig.contextMode === 'manual' ? String(localConfig.manualContextTokens ?? 16384) : 'auto'}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  void persistLocalConfig(value === 'auto'
+                    ? { contextMode: 'auto', manualContextTokens: undefined }
+                    : { contextMode: 'manual', manualContextTokens: Number(value) as 4096 | 8192 | 16384 | 32768 | 65536 | 131072 });
+                }}
+              >
+                <option value="auto">{t('Auto (recomendado, hasta 16K)')}</option>
+                <option value="4096">4K</option>
+                <option value="8192">8K</option>
+                <option value="16384">16K</option>
+                <option value="32768">32K</option>
+                <option value="65536">65K</option>
+                <option value="131072">128K</option>
+              </select>
+            </div>
+            <p className="mt-2 leading-5">
+              {t('El contexto contiene prompt y respuesta. El máximo de salida se calcula por separado para cada tarea. Auto divide los lotes antes de superar 16K.')}
+            </p>
+            {localConfig.contextMode === 'manual' && Number(localConfig.manualContextTokens) >= 32768 && (
+              <p className="mt-1 text-amber-400">
+                {t('32K–128K puede aumentar mucho el uso de RAM/VRAM y la latencia; no mejora por sí solo la longitud de salida.')}
+              </p>
+            )}
+          </div>
+
           {test && (
             <div className={`text-xs ${test.ok ? 'text-emerald-400' : 'text-red-400'}`}>
               {test.ok
@@ -990,6 +1031,19 @@ function LocalProviderRow({
                 : tx('Sin conexión: {msg}', { msg: test.message ?? '' })}
             </div>
           )}
+
+          <div className="rounded-lg border border-neutral-800 p-3 text-xs text-neutral-500">
+            <div className="flex items-center justify-between gap-2">
+              <span>{t('Última petición local')}</span>
+              <button className="btn btn-ghost" onClick={() => void window.nodus.getLocalAiDiagnostics().then(setDiagnostics)}>{t('Actualizar')}</button>
+            </div>
+            {diagnostics.filter((entry) => entry.provider === provider).slice(-1).map((entry) => (
+              <div key={entry.timestamp} className="mt-2 font-mono text-[10px] leading-5 text-neutral-400">
+                {entry.transport} · {entry.task} · ctx {entry.effectiveContextTokens} · entrada {entry.actualInputTokens ?? `~${entry.estimatedInputTokens}`} · salida {entry.actualOutputTokens ?? '?'} / {entry.sentOutputTokens} · {Math.round(entry.elapsedMs / 100) / 10}s
+              </div>
+            ))}
+            {!diagnostics.some((entry) => entry.provider === provider) && <p className="mt-2">{t('Todavía no hay peticiones registradas en esta sesión.')}</p>}
+          </div>
 
           <div className="flex gap-2 items-center">
             <input
@@ -1048,7 +1102,9 @@ function modelMetaParts(m: ModelInfo): string[] {
   const parts: string[] = [];
   if (m.paramSize) parts.push(m.paramSize);
   if (m.quantization) parts.push(m.quantization);
-  if (m.contextLength) parts.push(`${Math.round(m.contextLength / 1000)}K ctx`);
+  const trained = m.trainedContextLength ?? m.contextLength;
+  if (trained) parts.push(`${Math.round(trained / 1000)}K ctx máx.`);
+  if (m.loadedContextLength) parts.push(`${Math.round(m.loadedContextLength / 1000)}K cargado`);
   const size = formatBytes(m.sizeBytes);
   if (size) parts.push(size);
   return parts;

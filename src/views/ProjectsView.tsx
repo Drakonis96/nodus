@@ -31,7 +31,7 @@ import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { ProjectGuideStepModal } from '../components/ProjectGuideStepModal';
 import { notifyDataChanged, useDataRefresh } from '../hooks';
-import { getActiveLang, t, tx } from '../i18n';
+import { errorText, getActiveLang, t, tx } from '../i18n';
 
 type ChapterTab = 'texto' | 'relaciones' | 'verificacion' | 'sugerencias' | 'versiones' | 'exportar';
 
@@ -368,6 +368,12 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
             ? t('No se pudieron extraer ideas de este capítulo.')
             : tx('Analizadas {n} idea(s) del capítulo y sus relaciones con la biblioteca.', { n: result.ideas.length })
       );
+    } catch (error) {
+      setMessage(errorText(error));
+      // The backend publishes atomically, so reload the last valid analysis rather
+      // than leaving transient progress or an optimistic empty state on screen.
+      const preserved = await window.nodus.getChapterRelations(selectedChapter.id).catch(() => null);
+      if (preserved) setRelations(preserved);
     } finally {
       setBusy(null);
       setRelationsProgress(null);

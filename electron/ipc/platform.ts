@@ -33,6 +33,7 @@ import { getAcademicHomeStats } from '../db/homeRepo';
 import { calibrateNodusLocalModelConcurrency, cancelNodusLocalDownloads, deleteNodusLocalModel, downloadNodusLocalModel, getNodusLocalAiStatus, installNodusLocalRuntime } from '../ai/nodusLocalAi';
 import { deleteNodusLocalImageModel, downloadNodusLocalImageModel, getNodusLocalImageStatus, installNodusLocalImageRuntime } from '../ai/nodusLocalImages';
 import { TRANSLATION_LANGUAGES } from '@shared/types';
+import { listLocalAiDiagnostics } from '../ai/localRequestPlanner';
 import { translateMarkdown, titleFromMarkdown } from '../ai/translate';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -231,6 +232,7 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
     listEmbeddingModels(provider, getApiKey(provider))
   );
   h('ai:testLocalProvider', async (_e, provider: LocalProvider) => testLocalProvider(provider, getApiKey(provider)));
+  h('ai:localDiagnostics', async () => listLocalAiDiagnostics());
   h('ai:listImageModels', async () => listImageModels());
   h('ai:nodusLocal:status', async () => getNodusLocalAiStatus());
   h('ai:nodusLocal:installRuntime', async (event, requestId: string) =>

@@ -70,6 +70,7 @@ const initialSortDir = (key: SortKey): 'asc' | 'desc' => (NUMERIC_SORT_KEYS.has(
  */
 const READINESS_LABEL: Record<WorkReadiness, string> = {
   unstarted: 'Sin analizar',
+  pending: 'Pendiente',
   running: 'Analizando…',
   failed: 'Con fallos',
   noText: 'Sin texto',
@@ -81,6 +82,7 @@ const READINESS_LABEL: Record<WorkReadiness, string> = {
 const READINESS_TONE: Record<WorkReadiness, string> = {
   // Reuses utilities that already have a light-mode remap in index.css.
   unstarted: 'border-neutral-700 text-neutral-400',
+  pending: 'library-status-warning',
   running: 'library-status-warning',
   failed: 'border-red-700/60 bg-red-900/20 text-red-300',
   noText: 'border-neutral-700 bg-neutral-900/40 text-neutral-400',
@@ -91,6 +93,7 @@ const READINESS_TONE: Record<WorkReadiness, string> = {
 
 const READINESS_ICON: Record<WorkReadiness, string> = {
   unstarted: 'minus',
+  pending: 'clock',
   running: 'clock',
   failed: 'x',
   // Nodus never got to see the text of this work.
@@ -285,7 +288,7 @@ function StatusFlagsPicker({
  * a preset returns is exactly what the pills say — see readinessFilters.ts.
  * 'running' is absent on purpose: it exists only in the live queue.
  */
-const STATUS_PRESETS: Exclude<WorkReadiness, 'running'>[] = [
+const STATUS_PRESETS: Exclude<WorkReadiness, 'pending' | 'running'>[] = [
   'unstarted',
   'incomplete',
   'ready',
@@ -487,8 +490,8 @@ export function Library({
   const [documentWork, setDocumentWork] = useState<WorkView | null>(null);
   const [documentManagerOpen, setDocumentManagerOpen] = useState(false);
   // Live scan-queue items indexed by work. The persisted *_status fields go
-  // 'pending' when a job is enqueued but never say whether it is waiting in line
-  // or running right now, so this is the only way a row can show "Analizando…".
+  // Persisted 'pending' says a job must resume; the live queue is the authority
+  // that distinguishes an honest "Pendiente" from "Analizando…".
   const [queuedByWork, setQueuedByWork] = useState<Map<string, QueueItem[]>>(new Map());
   // Client-side ordering over the already-in-memory filtered set. `null` keeps
   // the backend order (year desc, title asc).
@@ -772,7 +775,16 @@ export function Library({
 
   // Full chain for a single work: themes → ideas → summary → index → relationships.
   const processFullWork = async (w: WorkView) => {
-    await window.nodus.processFull(w.nodus_id);
+    const refresh = w.deep_status === 'done';
+    if (refresh) {
+      const ok = await confirm({
+        title: t('Renovar análisis'),
+        message: t('Se recalcularán temas, ideas, resumen y relaciones con la configuración actual. El análisis anterior seguirá visible si la renovación falla.'),
+        confirmLabel: t('Renovar'),
+      });
+      if (!ok) return;
+    }
+    await window.nodus.processFull(w.nodus_id, undefined, { mode: refresh ? 'refresh' : 'if-stale' });
     await load();
   };
 
@@ -814,17 +826,39 @@ export function Library({
   const processFullSelected = async () => {
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
-    const pending = await reuseSelectedAnalysis(ids, ['ideas']);
-    if (pending.length > 0) await window.nodus.processFullBulk(pending);
+    const processedIds = works
+      .filter((work) => ids.includes(work.nodus_id) && work.deep_status === 'done')
+      .map((work) => work.nodus_id);
+    if (processedIds.length > 0) {
+      const ok = await confirm({
+        title: t('Renovar análisis'),
+        message: tx('Se renovará el análisis de {n} obra(s) ya procesada(s) con la configuración actual. Los resultados anteriores se conservarán si alguna renovación falla.', { n: processedIds.length }),
+        confirmLabel: t('Renovar'),
+      });
+      if (!ok) return;
+    }
+    // Keep cross-vault reuse for new works, but never let it suppress an explicit
+    // renewal of already processed ones. Mixed selections therefore use two modes.
+    const processedSet = new Set(processedIds);
+    const newIds = ids.filter((id) => !processedSet.has(id));
+    const pendingNewIds = await reuseSelectedAnalysis(newIds, ['ideas']);
+    if (processedIds.length > 0) {
+      await window.nodus.processFullBulk(processedIds, undefined, { mode: 'refresh' });
+    }
+    if (pendingNewIds.length > 0) {
+      await window.nodus.processFullBulk(pendingNewIds, undefined, { mode: 'if-stale' });
+    }
     setSelected(new Set());
     await load();
   };
 
   const processFullLibrary = async () => {
     const ids: string[] = [];
+    let processed = 0;
     for (let offset = 0; offset < totalWorks; offset += 250) {
       const page = await window.nodus.listWorksPage(filter, { offset, limit: 250, sort: null });
       ids.push(...page.items.map((work) => work.nodus_id));
+      processed += page.items.filter((work) => work.deep_status === 'done').length;
     }
     if (ids.length === 0) return;
     const ok = await confirm({
@@ -836,7 +870,7 @@ export function Library({
       confirmLabel: t('Continuar'),
     });
     if (!ok) return;
-    await window.nodus.processFullBulk(ids);
+    await window.nodus.processFullBulk(ids, undefined, { mode: processed > 0 ? 'refresh' : 'if-stale' });
     setSelected(new Set());
     await load();
     toast(tx('Procesado completo en cola para {n} obra(s). Verás el progreso en la cola.', { n: ids.length }));
@@ -929,7 +963,7 @@ export function Library({
   const selectedReadiness = filter.readiness ?? null;
   // Presets and the corpus-health buckets are both whole-corpus status filters;
   // letting them stack would mean two answers to the same question.
-  const setReadiness = (readiness: Exclude<WorkReadiness, 'running'> | null) => {
+  const setReadiness = (readiness: Exclude<WorkReadiness, 'pending' | 'running'> | null) => {
     setPageOffset(0);
     updateFilter((current) => ({ ...current, readiness: readiness ?? undefined, healthBucket: undefined }));
   };

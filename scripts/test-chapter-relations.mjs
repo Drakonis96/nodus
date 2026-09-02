@@ -5,6 +5,7 @@
 // (same pattern as test-search-health.mjs); the queries mirror the repos.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -90,6 +91,32 @@ try {
   insertRel.run('r-3', 'ci-2', 'chap-1', 'idea', 'g-200', 'contradicts', 0.7, 0.71, 'tensiona', now);
   insertRel.run('r-4', 'ci-2', 'chap-1', 'idea', 'g-100', 'refines', 0.5, 0.5, '', now); // dup target idea g-100
 
+  // ── Atomic publication through the real repository ─────────────────────────
+  db.prepare('INSERT INTO project_chapters (id, project_id) VALUES (?, ?)').run('chap-atomic', 'proj-1');
+  insertIdea.run('old-idea', 'chap-atomic', 'proj-1', 'claim', 'Anterior', 'Análisis válido', 0, 'old-hash', encode([1, 0]), 'openai', 'test-embedding', 2, 'old', now);
+  insertRel.run('old-rel', 'old-idea', 'chap-atomic', 'idea', 'g-old', 'supports', 0.9, 0.9, 'anterior', now);
+  const atomicRepo = loadProjectChapterIdeasRepo(db);
+  const replacementIdeas = [
+    { id: 'new-a', type: 'claim', label: 'Nueva A', statement: 'A', embedding: [1, 0], embeddingText: 'A' },
+    { id: 'new-b', type: 'finding', label: 'Nueva B', statement: 'B', embedding: [0, 1], embeddingText: 'B' },
+  ];
+  assert.throws(
+    () => atomicRepo.replaceChapterAnalysis('chap-atomic', 'proj-1', 'new-hash', replacementIdeas, [{
+      chapterIdeaId: 'missing', targetKind: 'idea', targetId: 'g-new', relation: 'related', similarity: 0.7, confidence: 0.7, rationale: '',
+    }]),
+    /no pertenece/,
+  );
+  assert.equal(db.prepare("SELECT source_hash FROM project_chapter_ideas WHERE chapter_id='chap-atomic'").get().source_hash, 'old-hash', 'a rejected publication preserves the previous ideas');
+  assert.equal(db.prepare("SELECT target_id FROM project_chapter_idea_relations WHERE chapter_id='chap-atomic'").get().target_id, 'g-old', 'a rejected publication preserves the previous relations');
+
+  atomicRepo.replaceChapterAnalysis('chap-atomic', 'proj-1', 'new-hash', replacementIdeas, [{
+    chapterIdeaId: 'new-a', targetKind: 'idea', targetId: 'g-new', relation: 'refines', similarity: 0.8, confidence: 0.75, rationale: 'nueva',
+  }]);
+  assert.deepEqual(db.prepare("SELECT id FROM project_chapter_ideas WHERE chapter_id='chap-atomic' ORDER BY id").all().map((row) => row.id), ['new-a', 'new-b']);
+  assert.deepEqual(db.prepare("SELECT chapter_idea_id, target_id FROM project_chapter_idea_relations WHERE chapter_id='chap-atomic'").all(), [{ chapter_idea_id: 'new-a', target_id: 'g-new' }]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM project_chapter_idea_relations r LEFT JOIN project_chapter_ideas i ON i.id=r.chapter_idea_id WHERE r.chapter_id='chap-atomic' AND i.id IS NULL").get().n, 0, 'atomic publication leaves no orphan relation');
+  db.prepare("DELETE FROM project_chapters WHERE id='chap-atomic'").run();
+
   // ── relatedLibraryIdeaIds: distinct idea targets ─────────────────────────────
   const relatedIdeaIds = db
     .prepare(
@@ -157,4 +184,34 @@ function indexExists(db, name) {
 }
 function count(db, table) {
   return db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n;
+}
+
+function loadProjectChapterIdeasRepo(db) {
+  const ts = require('typescript');
+  const Module = require('node:module');
+  const originalLoad = Module._load;
+  require.extensions['.ts'] = function loadTs(module, filename) {
+    const output = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+      fileName: filename,
+      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true },
+    }).outputText;
+    module._compile(output, filename);
+  };
+  Module._load = function load(request, parent, isMain) {
+    if (parent?.filename?.endsWith('projectChapterIdeasRepo.ts') && request === './database') return { getDb: () => db };
+    if (parent?.filename?.endsWith('projectChapterIdeasRepo.ts') && request === './ideasRepo') {
+      return {
+        currentEmbeddingConfig: () => ({ provider: 'openai', model: 'test-embedding' }),
+        decodeEmbedding: (buffer) => Array.from(new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength / 4)),
+        encodeEmbedding: encode,
+        embeddingTextHash: (text) => `hash:${text}`,
+      };
+    }
+    return originalLoad.call(this, request, parent, isMain);
+  };
+  try {
+    return require(path.join(repoRoot, 'electron/db/projectChapterIdeasRepo.ts'));
+  } finally {
+    Module._load = originalLoad;
+  }
 }

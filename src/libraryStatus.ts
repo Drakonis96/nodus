@@ -21,7 +21,9 @@ export type StepState =
   | 'partial'
   /** Never run, and it could be. */
   | 'missing'
-  /** Queued or currently being processed. */
+  /** Persisted for resumption or waiting in the live queue. */
+  | 'pending'
+  /** Currently being processed. */
   | 'running'
   | 'failed'
   /** Impossible until something outside Nodus changes (no full text available). */
@@ -103,7 +105,7 @@ function themesState(work: WorkView): StepState {
     case 'done':
       return 'done';
     case 'pending':
-      return 'running';
+      return 'pending';
     case 'failed':
       return 'failed';
     default:
@@ -121,7 +123,7 @@ function ideasState(work: WorkView): StepState {
         ? 'partial'
         : 'done';
     case 'pending':
-      return 'running';
+      return 'pending';
     case 'failed':
       return 'failed';
     case 'skipped_no_text':
@@ -136,7 +138,7 @@ function summaryState(work: WorkView): StepState {
     case 'done':
       return 'done';
     case 'pending':
-      return 'running';
+      return 'pending';
     case 'failed':
       return 'failed';
     case 'skipped_no_text':
@@ -193,11 +195,12 @@ export function deriveWorkStatus(
     citable: citableStep(work, passage),
   };
 
-  // A live queue entry outranks whatever the row last persisted.
+  // A live queue entry outranks whatever the row last persisted, and is the only
+  // authority that may call a step `running`.
   for (const item of queued) {
     if (item.state !== 'queued' && item.state !== 'running') continue;
     const step = QUEUE_KIND_STEP[item.kind];
-    if (step) steps[step] = { ...steps[step], state: 'running' };
+    if (step) steps[step] = { ...steps[step], state: item.state === 'running' ? 'running' : 'pending' };
   }
 
   const states = STEP_ORDER.map((id) => steps[id].state);
@@ -208,6 +211,7 @@ export function deriveWorkStatus(
   // Nodus cannot finish is never presented as one retry away from done.
   let readiness: WorkReadiness;
   if (states.includes('running')) readiness = 'running';
+  else if (states.includes('pending')) readiness = 'pending';
   else if (states.includes('failed')) readiness = 'failed';
   else if (work.light_status === 'none' && work.deep_status === 'none') readiness = 'unstarted';
   else if (isAbstractOnly(work)) readiness = 'abstractOnly';

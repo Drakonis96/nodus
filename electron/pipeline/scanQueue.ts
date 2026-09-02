@@ -162,7 +162,7 @@ class ScanQueue {
     this.items.push(item);
   }
 
-  enqueue(nodusId: string, title: string, kind: QueueKind, model?: ModelRef | null, opts?: { chain?: boolean }): void {
+  enqueue(nodusId: string, title: string, kind: QueueKind, model?: ModelRef | null, opts?: { chain?: boolean; refresh?: boolean }): void {
     // Avoid duplicate pending/running jobs for the same work+kind.
     const existing = this.items.find(
       (i) => i.nodus_id === nodusId && i.kind === kind && (i.state === 'queued' || i.state === 'running')
@@ -170,6 +170,7 @@ class ScanQueue {
     if (existing) {
       // Preserve a chain request even when the job is already queued.
       if (opts?.chain) existing.chain = true;
+      if (opts?.refresh) existing.refresh = true;
       return;
     }
     this.beginTask();
@@ -186,6 +187,7 @@ class ScanQueue {
       finished_at: null,
       model: model ?? null,
       chain: opts?.chain ?? false,
+      refresh: opts?.refresh ?? false,
     });
     this.emit();
     void this.run();
@@ -485,7 +487,7 @@ class ScanQueue {
       item.detail = 'Generando el resumen requerido…';
       this.emit();
       setSummaryPending(work.nodus_id);
-      await runSummaryScan(work, item.model ?? null);
+      await runSummaryScan(work, item.model ?? null, { force: item.refresh });
     }
     if (this.cancelAfterCurrent.has(item.id)) return;
     if (this.embeddingConfigured()) {
@@ -542,7 +544,7 @@ class ScanQueue {
   private maybeEnqueueBridge(nodusIds: string[]): boolean {
     if (!this.embeddingConfigured()) return false;
     const settings = getSettings();
-    this.enqueueBridge(settings.synthesisModel ?? null, nodusIds);
+    this.enqueueBridge(settings.relationModel ?? settings.fusionModel ?? settings.synthesisModel ?? null, nodusIds);
     return true;
   }
 
@@ -584,10 +586,11 @@ class ScanQueue {
     }
     try {
       if (item.kind === 'light') {
-        await this.doLight(work, item.model ?? null);
+        await this.doLight(work, item);
       } else if (item.kind === 'deep') {
         await this.doDeep(work, item);
-        await this.chainAfterDeep(work, item);
+        const committedWork = getWorkById(work.nodus_id) ?? work;
+        await this.chainAfterDeep(committedWork, item);
         this.deepSinceReprocess = true;
       } else {
         await this.doSummary(work, item);
@@ -627,7 +630,9 @@ class ScanQueue {
           console.error(`[scanQueue] ${item.kind} falló: ${item.title} -> ${(e as Error).message}`);
           // Persist deep-scan failure so it's visible in the library and not
           // re-enqueued forever by resumePending(). (Light scans already persist.)
-          if (item.kind === 'deep') setDeepResult(work.nodus_id, 'failed', null, null, (e as Error).message);
+          if (item.kind === 'deep' && !(item.refresh && work.deep_status === 'done')) {
+            setDeepResult(work.nodus_id, 'failed', null, null, (e as Error).message);
+          }
         }
       }
     }
@@ -645,7 +650,7 @@ class ScanQueue {
     this.emit();
   }
 
-  private async doLight(work: Work, model: ModelRef | null): Promise<void> {
+  private async doLight(work: Work, item: QueueItem): Promise<void> {
     const settings = getSettings();
     let abstract: string | null = null;
     try {
@@ -656,7 +661,7 @@ class ScanQueue {
     }
     // When the user has locked the main themes, constrain assignment to that set.
     const lockedLabels = settings.themesLocked ? listThemeLabels() : null;
-    await runLightScan(work, abstract, model, { lockedLabels });
+    await runLightScan(work, abstract, item.model ?? null, { lockedLabels, force: item.refresh });
   }
 
   private async doDeep(
@@ -710,7 +715,7 @@ class ScanQueue {
         queueItem.detail = p.detail;
         queueItem.subPct = p.pct;
         this.emit();
-      }, publicationOrdinal);
+      }, publicationOrdinal, { force: queueItem.refresh });
     } finally {
       // `runDeepScan` normally advances it; this also covers extraction failures.
       finishDeepScanPublicationOrdinal(publicationOrdinal);
@@ -721,7 +726,7 @@ class ScanQueue {
     item.detail = 'Resumiendo…';
     item.subPct = null;
     this.emit();
-    await runSummaryScan(work, item.model ?? null);
+    await runSummaryScan(work, item.model ?? null, { force: item.refresh });
   }
 
   private async doBridge(item: QueueItem): Promise<void> {

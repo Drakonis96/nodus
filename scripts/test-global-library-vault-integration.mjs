@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -12,6 +13,21 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const scratch = await mkdtemp(path.join(os.tmpdir(), 'nodus-global-vault-link-'));
 const userData = path.join(scratch, 'profile');
 const backupRoot = path.join(scratch, 'backups');
+// This suite verifies the deterministic Global Library fallback, not the user's
+// live Zotero installation. A private empty API prevents parallel test runs from
+// contending with Zotero on port 23119 (or succeeding/failing based on whether it
+// happens to be open on the developer's machine).
+const zoteroStub = createServer((_request, response) => {
+  response.writeHead(200, { 'Content-Type': 'application/json', 'Total-Results': '0' });
+  response.end('[]');
+});
+await new Promise((resolve, reject) => {
+  zoteroStub.once('error', reject);
+  zoteroStub.listen(0, '127.0.0.1', resolve);
+});
+const zoteroAddress = zoteroStub.address();
+if (!zoteroAddress || typeof zoteroAddress === 'string') throw new Error('No se pudo iniciar el Zotero de prueba.');
+process.env.NODUS_ZOTERO_API_BASE = `http://127.0.0.1:${zoteroAddress.port}/api`;
 installRuntimeHooks(userData);
 const require = createRequire(import.meta.url);
 
@@ -125,6 +141,7 @@ try {
   closeDb();
   console.log('Global Library → vault reference, clean Markdown resolution and idempotency tests passed!');
 } finally {
+  await new Promise((resolve) => zoteroStub.close(resolve));
   // macOS runners can still be flushing the migration marker when Electron
   // exits. Let fs.rm retry the transient ENOTEMPTY instead of turning a
   // successful integration run into a cleanup-only failure.

@@ -13,6 +13,8 @@ import { getDb } from './database';
 import { currentEmbeddingConfig, decodeEmbedding, encodeEmbedding, embeddingTextHash } from './ideasRepo';
 
 export interface NewChapterIdea {
+  /** Supplied by fail-closed analysis so relations can be built before publication. */
+  id?: string;
   type: ChapterIdeaType;
   label: string;
   statement: string;
@@ -169,6 +171,77 @@ export function replaceChapterIdeaRelations(chapterId: string, relations: NewCha
       );
     }
   })();
+}
+
+/** Publish a complete chapter analysis in one transaction. The caller builds the
+ * ideas and their relations in memory, so an AI/embedding failure before this call
+ * leaves the last valid analysis untouched. */
+export function replaceChapterAnalysis(
+  chapterId: string,
+  projectId: string,
+  sourceHash: string,
+  ideas: NewChapterIdea[],
+  relations: NewChapterIdeaRelation[],
+): ProjectChapterIdea[] {
+  const db = getDb();
+  const config = currentEmbeddingConfig();
+  const createdAt = new Date().toISOString();
+  const ids = new Set(ideas.map((idea) => idea.id).filter((id): id is string => Boolean(id)));
+  if (ids.size !== ideas.length) throw new Error('Cada idea del capítulo debe tener un identificador único antes de publicarse.');
+  for (const relation of relations) {
+    if (!ids.has(relation.chapterIdeaId)) throw new Error('Una relación del capítulo apunta a una idea que no pertenece al análisis nuevo.');
+  }
+
+  const insertIdea = db.prepare(
+    `INSERT INTO project_chapter_ideas (
+       id, chapter_id, project_id, type, label, statement, order_idx, source_hash,
+       embedding, embedding_provider, embedding_model, embedding_dim, embedding_text_hash, created_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  const insertRelation = db.prepare(
+    `INSERT INTO project_chapter_idea_relations (
+       id, chapter_idea_id, chapter_id, target_kind, target_id, relation, similarity, confidence, rationale, created_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+
+  db.transaction(() => {
+    db.prepare('DELETE FROM project_chapter_idea_relations WHERE chapter_id = ?').run(chapterId);
+    db.prepare('DELETE FROM project_chapter_ideas WHERE chapter_id = ?').run(chapterId);
+    ideas.forEach((idea, index) => {
+      const embedding = idea.embedding;
+      insertIdea.run(
+        idea.id,
+        chapterId,
+        projectId,
+        idea.type,
+        idea.label,
+        idea.statement,
+        index,
+        sourceHash,
+        embedding ? encodeEmbedding(embedding) : null,
+        embedding ? config.provider : null,
+        embedding ? config.model : null,
+        embedding?.length ?? null,
+        embedding ? embeddingTextHash(idea.embeddingText) : null,
+        createdAt,
+      );
+    });
+    for (const relation of relations) {
+      insertRelation.run(
+        randomUUID(),
+        relation.chapterIdeaId,
+        chapterId,
+        relation.targetKind,
+        relation.targetId,
+        relation.relation,
+        relation.similarity,
+        relation.confidence,
+        relation.rationale,
+        createdAt,
+      );
+    }
+  })();
+  return listChapterIdeas(chapterId);
 }
 
 export interface ChapterIdeaRelationRow {

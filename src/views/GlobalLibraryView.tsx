@@ -130,6 +130,12 @@ function catalogColumnText(item: LibraryCatalogItem, column: LibraryColumnId): s
   if (column === 'citationKey') return item.citationKey ?? '—';
   if (column === 'attachments') return String(item.attachmentCount);
   if (column === 'createdAt' || column === 'updatedAt') return new Date(item[column]).toLocaleDateString();
+  if (column === 'accessDate' || column === 'zoteroDateAdded' || column === 'zoteroDateModified') {
+    const value = item.metadata[column];
+    if (!value) return '—';
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString();
+  }
   if (column === 'isbn' || column === 'issn' || column === 'tags') return (item.metadata[column] ?? []).join('; ') || '—';
   const metadataValue = (item.metadata as unknown as Record<string, unknown>)[column];
   return metadataValue == null || metadataValue === '' ? '—' : String(metadataValue);
@@ -1616,7 +1622,10 @@ function GlobalLibraryContent({
                                 : t('Preparación pendiente');
                     return <span key={column} className={`flex items-center gap-1.5 text-[10px] ${activeJob ? 'text-indigo-300' : item.extractionStatus === 'ready' ? 'text-emerald-400' : item.extractionStatus === 'failed' ? 'text-red-400' : item.extractionStatus === 'needs-review' ? 'text-amber-400' : 'text-neutral-500'}`}>{activeJob && <Spinner />} {label}</span>;
                   }
-                  if (column === 'createdAt' || column === 'updatedAt') return <time key={column} className="truncate pr-3 text-[10px] text-neutral-500" dateTime={item[column]}>{catalogColumnText(item, column)}</time>;
+                  if (column === 'createdAt' || column === 'updatedAt' || column === 'accessDate' || column === 'zoteroDateAdded' || column === 'zoteroDateModified') {
+                    const dateTime = column === 'createdAt' || column === 'updatedAt' ? item[column] : item.metadata[column];
+                    return <time key={column} className="truncate pr-3 text-[10px] text-neutral-500" dateTime={dateTime}>{catalogColumnText(item, column)}</time>;
+                  }
                   return <span key={column} title={catalogColumnText(item, column)} className={`truncate pr-3 text-neutral-500 ${['year', 'attachments'].includes(column) ? 'tabular-nums' : ''}`}>{catalogColumnText(item, column)}</span>;
                 })}
               </div>;

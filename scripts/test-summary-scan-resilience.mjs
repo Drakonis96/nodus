@@ -36,6 +36,11 @@ const virtual = new Map([
       if (globalThis.__summaryProvenanceFails) throw new Error('provenance unavailable');
     };
   `],
+  ['../db/libraryAnalysisProvenance', `
+    export const analysisModelFingerprint = () => 'summary-model-fingerprint';
+    export const isLocalAnalysisCurrent = () => false;
+    export const recordLocalAnalysisProvenance = (input) => globalThis.__summaryEvents.localProvenance.push(input);
+  `],
   ['@shared/localAiModels', `export const modelRefSupportsCapability = () => true;`],
   ['../perf', `export const startPerf = () => (result) => globalThis.__summaryEvents.perf.push(result);`],
 ]);
@@ -69,7 +74,7 @@ try {
     zotero_key: 'Z1', doi: null, deep_hash: 'deep-hash', light_hash: 'light-hash',
     deep_status: 'done', summary_status: 'pending', summary_hash: null,
   };
-  const freshEvents = () => ({ results: [], upserts: [], embeddings: [], provenance: [], perf: [], transactions: 0 });
+  const freshEvents = () => ({ results: [], upserts: [], embeddings: [], provenance: [], localProvenance: [], perf: [], transactions: 0 });
   globalThis.__summaryDb = {
     prepare: () => ({ all: () => [] }),
     transaction: (operation) => () => {
@@ -106,6 +111,12 @@ try {
     assert.match(globalThis.__summaryEvents.results[0][2], /^[a-f0-9]{40}$/);
     assert.equal(globalThis.__summaryEvents.results[0][3], 'generation exploded',
       'the actual generation error is persisted for the status modal');
+
+    globalThis.__summaryEvents = freshEvents();
+    globalThis.__summaryComplete = async () => { throw new Error('refresh generation exploded'); };
+    await assert.rejects(scan.runSummaryScan({ ...work, summary_status: 'done' }, undefined, { force: true }), /refresh generation exploded/);
+    assert.equal(globalThis.__summaryEvents.results.length, 0,
+      'a failed forced refresh preserves the previously committed summary and status');
 
     globalThis.__summaryEvents = freshEvents();
     globalThis.__summaryComplete = async () => { throw new globalThis.__SummaryAiError('configuration missing', false, true); };

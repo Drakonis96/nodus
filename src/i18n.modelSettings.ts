@@ -24,6 +24,18 @@ const KEYS = [
   'Se usa para recuperar texto académico cuando el documento no está disponible por otras vías.',
   'Elige cuánto texto conserva cada análisis profundo antes de dividirlo.',
   'Define el tamaño de cada fragmento según el modo de contexto seleccionado.',
+  'Renovar análisis',
+  'Se recalcularán temas, ideas, resumen y relaciones con la configuración actual. El análisis anterior seguirá visible si la renovación falla.',
+  'Renovar',
+  'Se renovará el análisis de {n} obra(s) ya procesada(s) con la configuración actual. Los resultados anteriores se conservarán si alguna renovación falla.',
+  'Ventana de contexto',
+  'Auto (recomendado, hasta 16K)',
+  'El contexto contiene prompt y respuesta. El máximo de salida se calcula por separado para cada tarea. Auto divide los lotes antes de superar 16K.',
+  '32K–128K puede aumentar mucho el uso de RAM/VRAM y la latencia; no mejora por sí solo la longitud de salida.',
+  'Última petición local',
+  'Todavía no hay peticiones registradas en esta sesión.',
+  'Relaciones semánticas',
+  'Valida pares de ideas y genera las relaciones del grafo.',
 ] as const;
 
 function table(values: readonly string[]): Record<string, string> {
@@ -55,6 +67,18 @@ const en = table([
   'Used to recover scholarly text when the document is unavailable through other routes.',
   'Chooses how much text each deep analysis keeps before splitting it.',
   'Sets each chunk size according to the selected context mode.',
+  'Refresh analysis',
+  'Themes, ideas, summary, and relationships will be recalculated with the current settings. The previous analysis will remain visible if the refresh fails.',
+  'Refresh',
+  'The analysis of {n} already processed work(s) will be refreshed with the current settings. Previous results will be preserved if any refresh fails.',
+  'Context window',
+  'Auto (recommended, up to 16K)',
+  'The context contains the prompt and response. The maximum output is calculated separately for each task. Auto splits batches before exceeding 16K.',
+  '32K–128K can greatly increase RAM/VRAM use and latency; it does not by itself increase output length.',
+  'Latest local request',
+  'No requests have been recorded in this session yet.',
+  'Semantic relationships',
+  'Validates idea pairs and generates graph relationships.',
 ]);
 
 const fr = table([
@@ -81,6 +105,18 @@ const fr = table([
   'Sert à récupérer le texte scientifique lorsque le document n’est pas disponible autrement.',
   'Détermine la quantité de texte conservée par chaque analyse approfondie avant sa division.',
   'Définit la taille de chaque fragment selon le mode de contexte choisi.',
+  'Actualiser l’analyse',
+  'Les thèmes, les idées, le résumé et les relations seront recalculés avec les réglages actuels. L’analyse précédente restera visible si l’actualisation échoue.',
+  'Actualiser',
+  'L’analyse de {n} œuvre(s) déjà traitée(s) sera actualisée avec les réglages actuels. Les résultats précédents seront conservés en cas d’échec.',
+  'Fenêtre de contexte',
+  'Auto (recommandé, jusqu’à 16K)',
+  'Le contexte contient la requête et la réponse. La sortie maximale est calculée séparément pour chaque tâche. Auto divise les lots avant de dépasser 16K.',
+  '32K–128K peut fortement augmenter l’utilisation de la RAM/VRAM et la latence ; cela n’allonge pas à lui seul la sortie.',
+  'Dernière requête locale',
+  'Aucune requête n’a encore été enregistrée pendant cette session.',
+  'Relations sémantiques',
+  'Valide les paires d’idées et génère les relations du graphe.',
 ]);
 
 const de = table([
@@ -107,6 +143,18 @@ const de = table([
   'Dient zur Wiederherstellung wissenschaftlicher Texte, wenn das Dokument anderweitig nicht verfügbar ist.',
   'Legt fest, wie viel Text eine Tiefenanalyse vor der Aufteilung behält.',
   'Legt die Fragmentgröße passend zum gewählten Kontextmodus fest.',
+  'Analyse aktualisieren',
+  'Themen, Ideen, Zusammenfassung und Beziehungen werden mit den aktuellen Einstellungen neu berechnet. Bei einem Fehler bleibt die vorherige Analyse sichtbar.',
+  'Aktualisieren',
+  'Die Analyse von {n} bereits verarbeiteten Werk(en) wird mit den aktuellen Einstellungen aktualisiert. Bei Fehlern bleiben die vorherigen Ergebnisse erhalten.',
+  'Kontextfenster',
+  'Auto (empfohlen, bis 16K)',
+  'Der Kontext enthält Eingabe und Antwort. Die maximale Ausgabe wird für jede Aufgabe separat berechnet. Auto teilt Stapel vor dem Überschreiten von 16K.',
+  '32K–128K kann RAM-/VRAM-Verbrauch und Latenz stark erhöhen; die Ausgabelänge steigt dadurch allein nicht.',
+  'Letzte lokale Anfrage',
+  'In dieser Sitzung wurden noch keine Anfragen aufgezeichnet.',
+  'Semantische Beziehungen',
+  'Validiert Ideenpaare und erzeugt die Beziehungen des Graphen.',
 ]);
 
 const pt = table([
@@ -133,6 +181,18 @@ const pt = table([
   'É usado para recuperar texto académico quando o documento não está disponível por outras vias.',
   'Escolhe quanto texto cada análise profunda conserva antes de o dividir.',
   'Define o tamanho de cada fragmento segundo o modo de contexto selecionado.',
+  'Renovar análise',
+  'Os temas, ideias, resumo e relações serão recalculados com as definições atuais. A análise anterior continuará visível se a renovação falhar.',
+  'Renovar',
+  'A análise de {n} obra(s) já processada(s) será renovada com as definições atuais. Os resultados anteriores serão mantidos se alguma renovação falhar.',
+  'Janela de contexto',
+  'Auto (recomendado, até 16K)',
+  'O contexto contém o pedido e a resposta. O máximo de saída é calculado separadamente para cada tarefa. Auto divide os lotes antes de ultrapassar 16K.',
+  '32K–128K pode aumentar muito o uso de RAM/VRAM e a latência; por si só, não aumenta o comprimento da saída.',
+  'Último pedido local',
+  'Ainda não há pedidos registados nesta sessão.',
+  'Relações semânticas',
+  'Valida pares de ideias e gera as relações do grafo.',
 ]);
 
 const ptBR = table([
@@ -159,6 +219,18 @@ const ptBR = table([
   'É usado para recuperar texto acadêmico quando o documento não está disponível por outras vias.',
   'Escolhe quanto texto cada análise profunda conserva antes de dividi-lo.',
   'Define o tamanho de cada fragmento conforme o modo de contexto selecionado.',
+  'Atualizar análise',
+  'Temas, ideias, resumo e relações serão recalculados com as configurações atuais. A análise anterior continuará visível se a atualização falhar.',
+  'Atualizar',
+  'A análise de {n} obra(s) já processada(s) será atualizada com as configurações atuais. Os resultados anteriores serão preservados se alguma atualização falhar.',
+  'Janela de contexto',
+  'Auto (recomendado, até 16K)',
+  'O contexto contém o prompt e a resposta. O máximo de saída é calculado separadamente para cada tarefa. Auto divide os lotes antes de ultrapassar 16K.',
+  '32K–128K pode aumentar muito o uso de RAM/VRAM e a latência; isso não aumenta, por si só, o tamanho da saída.',
+  'Última solicitação local',
+  'Ainda não há solicitações registradas nesta sessão.',
+  'Relações semânticas',
+  'Valida pares de ideias e gera as relações do grafo.',
 ]);
 
 const it = table([
@@ -185,6 +257,18 @@ const it = table([
   'Serve a recuperare testo accademico quando il documento non è disponibile in altro modo.',
   'Sceglie quanto testo conserva ogni analisi approfondita prima di dividerlo.',
   'Definisce la dimensione di ogni frammento in base alla modalità di contesto selezionata.',
+  'Aggiorna analisi',
+  'Temi, idee, riepilogo e relazioni verranno ricalcolati con le impostazioni correnti. L’analisi precedente resterà visibile se l’aggiornamento non riesce.',
+  'Aggiorna',
+  'L’analisi di {n} opera/e già elaborata/e verrà aggiornata con le impostazioni correnti. I risultati precedenti saranno conservati in caso di errore.',
+  'Finestra di contesto',
+  'Auto (consigliato, fino a 16K)',
+  'Il contesto contiene prompt e risposta. L’output massimo è calcolato separatamente per ogni attività. Auto divide i batch prima di superare 16K.',
+  '32K–128K può aumentare molto l’uso di RAM/VRAM e la latenza; da solo non aumenta la lunghezza dell’output.',
+  'Ultima richiesta locale',
+  'Non è stata ancora registrata alcuna richiesta in questa sessione.',
+  'Relazioni semantiche',
+  'Convalida coppie di idee e genera le relazioni del grafo.',
 ]);
 
 const tr = table([
@@ -211,6 +295,18 @@ const tr = table([
   'Belgeye başka yollardan ulaşılamadığında akademik metni kurtarmak için kullanılır.',
   'Her derin analizin bölünmeden önce ne kadar metin tutacağını seçer.',
   'Seçilen bağlam moduna göre her parçanın boyutunu belirler.',
+  'Analizi yenile',
+  'Temalar, fikirler, özet ve ilişkiler geçerli ayarlarla yeniden hesaplanır. Yenileme başarısız olursa önceki analiz görünür kalır.',
+  'Yenile',
+  'Daha önce işlenmiş {n} eserin analizi geçerli ayarlarla yenilenir. Bir yenileme başarısız olursa önceki sonuçlar korunur.',
+  'Bağlam penceresi',
+  'Otomatik (önerilen, en fazla 16K)',
+  'Bağlam, istemi ve yanıtı içerir. En yüksek çıktı her görev için ayrı hesaplanır. Otomatik mod, 16K aşılmadan önce grupları böler.',
+  '32K–128K, RAM/VRAM kullanımını ve gecikmeyi büyük ölçüde artırabilir; tek başına çıktı uzunluğunu artırmaz.',
+  'Son yerel istek',
+  'Bu oturumda henüz kayıtlı bir istek yok.',
+  'Anlamsal ilişkiler',
+  'Fikir çiftlerini doğrular ve grafik ilişkilerini oluşturur.',
 ]);
 
 export const MODEL_SETTINGS_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr } as const;

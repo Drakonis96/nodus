@@ -13,6 +13,8 @@ import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanChe
 import { computeNearestNeighbors } from '../graph/computeHost';
 import { getSettings } from '../db/settingsRepo';
 import { semanticBridgePrompt } from '@shared/graphPromptPacks';
+import { adaptiveStructuredBatch } from './adaptiveStructuredBatch';
+import { localTaskOutputTokens } from './localRequestPlanner';
 
 const SIM_THRESHOLD = 0.70;
 const TOP_K_PER_IDEA = 12;
@@ -204,9 +206,26 @@ async function validateCandidates(
   language: PromptLanguage = getSettings().promptLanguage ?? 'es'
 ): Promise<Map<string, { from: string; to: string; type: EdgeType; confidence: number; similarity: number; rationale: string | null }>> {
   const batches = chunk(candidates, VALIDATION_BATCH);
+  const prompt = semanticBridgePrompt(language);
   const contentHash = crypto
-    .createHash('sha1')
-    .update(candidates.map((c) => `${c.fromId}:${c.toId}`).sort().join(','))
+    .createHash('sha256')
+    .update(JSON.stringify({
+      policy: 2,
+      model,
+      language,
+      prompt,
+      candidates: candidates.map((candidate) => ({
+        fromId: candidate.fromId,
+        toId: candidate.toId,
+        fromType: candidate.fromType,
+        toType: candidate.toType,
+        fromLabel: candidate.fromLabel,
+        toLabel: candidate.toLabel,
+        fromStatement: candidate.fromStatement,
+        toStatement: candidate.toStatement,
+        similarity: candidate.similarity,
+      })),
+    }))
     .digest('hex');
 
   const checkpoints = loadCheckpoints('bridges', contentHash, CHECKPOINT_KIND);
@@ -253,21 +272,33 @@ async function validateCandidates(
       bridgesAdded: validated.size,
     });
 
-    const input = {
-      pairs: batch.map((c): ValidationInput => ({
-        from: { id: c.fromId, type: c.fromType, label: c.fromLabel, statement: clip(c.fromStatement) },
-        to: { id: c.toId, type: c.toType, label: c.toLabel, statement: clip(c.toStatement) },
-        similarity: Number(c.similarity.toFixed(3)),
-      })),
-    };
-
-    // A missing validation batch is not equivalent to "no bridges". The rejection
-    // propagates while earlier checkpoints remain available for a fail-closed resume.
-    const result = await completeJson<LlmValidationResult>(
-      { system: semanticBridgePrompt(language), user: JSON.stringify(input), temperature: 0.1 },
-      isLlmValidationResult,
-      model
-    );
+    const result = await adaptiveStructuredBatch<Candidate, LlmValidationResult>({
+      items: batch,
+      initialBatchSize: batch.length,
+      combine: (parts) => ({ relations: parts.flatMap((part) => part.relations) }),
+      execute: async (part, context) => {
+        const input = {
+          pairs: part.map((c): ValidationInput => ({
+            from: { id: c.fromId, type: c.fromType, label: c.fromLabel, statement: clip(c.fromStatement, context.textLimit) },
+            to: { id: c.toId, type: c.toType, label: c.toLabel, statement: clip(c.toStatement, context.textLimit) },
+            similarity: Number(c.similarity.toFixed(3)),
+          })),
+        };
+        return completeJson<LlmValidationResult>(
+          {
+            system: prompt,
+            user: JSON.stringify(input),
+            temperature: 0.1,
+            maxTokens: localTaskOutputTokens('semantic-bridge', part.length),
+            task: 'semantic-bridge',
+            batchSize: part.length,
+            splitDepth: context.splitDepth,
+          },
+          isLlmValidationResult,
+          model,
+        );
+      },
+    });
 
     saveCheckpoint('bridges', contentHash, CHECKPOINT_KIND, bi, result);
 
@@ -315,6 +346,7 @@ export async function discoverSemanticBridges(
   nodusIds?: string[],
   language: PromptLanguage = getSettings().promptLanguage ?? 'es'
 ): Promise<SemanticBridgeResult> {
+  model ??= getSettings().relationModel ?? getSettings().fusionModel ?? getSettings().synthesisModel ?? null;
   if (running) {
     return { candidatesScanned: 0, crossThemeCandidates: 0, validated: 0, added: 0 };
   }

@@ -130,6 +130,11 @@ export interface LibraryItemMetadata {
   creators: LibraryCreator[];
   abstract?: string;
   date?: string;
+  /** Bibliographic access date (Zotero's accessDate), not the last time Nodus opened it. */
+  accessDate?: string;
+  /** Source-owned timestamps preserved from Zotero independently of Nodus' record clock. */
+  zoteroDateAdded?: string;
+  zoteroDateModified?: string;
   year?: number | null;
   language?: string;
   publisher?: string;
@@ -622,7 +627,8 @@ export interface LibraryCatalogQuery {
 }
 
 export type LibrarySortField =
-  | 'title' | 'creator' | 'itemType' | 'publicationTitle' | 'publisher' | 'date' | 'year'
+  | 'title' | 'creator' | 'itemType' | 'publicationTitle' | 'publisher' | 'date' | 'accessDate'
+  | 'zoteroDateAdded' | 'zoteroDateModified' | 'year'
   | 'edition' | 'volume' | 'issue' | 'pages' | 'doi' | 'isbn' | 'issn' | 'language'
   | 'pmid' | 'pmcid' | 'arxiv' | 'url' | 'tags' | 'citationKey' | 'source' | 'createdAt'
   | 'updatedAt' | 'extraction' | 'attachments';
@@ -705,7 +711,8 @@ export interface LibraryItemCollectionPatch {
 }
 
 export type LibraryColumnId =
-  | 'title' | 'creator' | 'itemType' | 'publicationTitle' | 'publisher' | 'date' | 'year'
+  | 'title' | 'creator' | 'itemType' | 'publicationTitle' | 'publisher' | 'date' | 'accessDate'
+  | 'zoteroDateAdded' | 'zoteroDateModified' | 'year'
   | 'edition' | 'volume' | 'issue' | 'pages' | 'doi' | 'isbn' | 'issn' | 'pmid'
   | 'pmcid' | 'arxiv' | 'url' | 'language' | 'citationKey' | 'tags' | 'source'
   | 'status' | 'attachments' | 'createdAt' | 'updatedAt';

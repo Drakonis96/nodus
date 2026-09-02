@@ -26,6 +26,8 @@ import {
 import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanCheckpointRepo';
 import { completeJson } from './aiClient';
 import { computeNearestNeighbors } from '../graph/computeHost';
+import { adaptiveStructuredBatch } from './adaptiveStructuredBatch';
+import { localTaskOutputTokens } from './localRequestPlanner';
 
 const THEME_BATCH = 30;
 const RELATION_TOP_K_PER_IDEA = 10;
@@ -122,7 +124,7 @@ export async function reprocessConnections(
   const prompt = reprocessConnectionsPromptPack(settings.promptLanguage ?? 'es');
   const locked = settings.themesLocked;
   const themeModel = model ?? settings.extractionModel ?? settings.synthesisModel ?? null;
-  const relationModel = model ?? settings.fusionModel ?? settings.synthesisModel ?? null;
+  const relationModel = model ?? settings.relationModel ?? settings.fusionModel ?? settings.synthesisModel ?? null;
 
   const ideas = db
     .prepare(
@@ -173,10 +175,24 @@ export async function reprocessConnections(
   const existingNorm = new Map(existingLabels.map((label) => [normalizeThemeLabel(label), label]));
   const system = `${prompt.themeSystem}${locked ? prompt.themeLockedRule : prompt.themeOpenRule}`;
 
-  // Content hash for checkpoint scoping — changes when the idea set changes.
+  // Checkpoints are reusable only for the exact content, prompt policy, model and
+  // theme vocabulary. IDs alone reused stale answers after a statement/model change.
   const contentHash = crypto
-    .createHash('sha1')
-    .update(activeIdeas.map((i) => i.global_id).sort().join(','))
+    .createHash('sha256')
+    .update(JSON.stringify({
+      policy: 2,
+      locked,
+      existingLabels: [...existingLabels].sort(),
+      system,
+      themeModel,
+      relationModel,
+      ideas: activeIdeas.map((idea) => ({
+        id: idea.global_id,
+        type: idea.type,
+        label: idea.label,
+        statement: idea.statement,
+      })),
+    }))
     .digest('hex');
 
   // ── Phase 1: reassign ideas to themes ──────────────────────────────────────
@@ -213,21 +229,36 @@ export async function reprocessConnections(
       current: bi + 1,
       total: themeBatches.length,
     });
-    const input = {
-      locked,
-      available_themes: existingLabels,
-      ideas: batch.map((idea) => ({
-        id: idea.global_id,
-        type: idea.type,
-        label: idea.label,
-        statement: clip(idea.statement),
-      })),
-    };
-    const result = await completeJson<ThemeAssignmentResult>(
-      { system, user: JSON.stringify(input), temperature: 0.1 },
-      isThemeAssignmentResult,
-      themeModel
-    );
+    const result = await adaptiveStructuredBatch<IdeaRow, ThemeAssignmentResult>({
+      items: batch,
+      initialBatchSize: batch.length,
+      combine: (parts) => ({ assignments: parts.flatMap((part) => part.assignments) }),
+      execute: async (part, context) => {
+        const input = {
+          locked,
+          available_themes: existingLabels,
+          ideas: part.map((idea) => ({
+            id: idea.global_id,
+            type: idea.type,
+            label: idea.label,
+            statement: clip(idea.statement).slice(0, context.textLimit),
+          })),
+        };
+        return completeJson<ThemeAssignmentResult>(
+          {
+            system,
+            user: JSON.stringify(input),
+            temperature: 0.1,
+            maxTokens: localTaskOutputTokens('theme-assignment', part.length),
+            task: 'theme-assignment',
+            batchSize: part.length,
+            splitDepth: context.splitDepth,
+          },
+          isThemeAssignmentResult,
+          themeModel,
+        );
+      },
+    });
     // Checkpoint this batch result.
     saveCheckpoint('reprocess', contentHash, 'reproc_theme_batch', bi, result);
     const byId = new Map(result.assignments.map((a) => [a.id, Array.isArray(a.themes) ? a.themes : []]));
@@ -424,32 +455,47 @@ async function reprocessRelations(
       current: bi + 1,
       total: batches.length,
     });
-    const input = {
-      pairs: batch.map((candidate) => ({
-        from: {
-          id: candidate.fromId,
-          type: candidate.fromType,
-          label: candidate.fromLabel,
-          statement: clip(candidate.fromStatement),
-          themes: candidate.fromThemes,
-        },
-        to: {
-          id: candidate.toId,
-          type: candidate.toType,
-          label: candidate.toLabel,
-          statement: clip(candidate.toStatement),
-          themes: candidate.toThemes,
-        },
-        similarity: Number(candidate.similarity.toFixed(3)),
-      })),
-    };
-    // A rejected validation call propagates directly: completed checkpoints remain
-    // resumable, and silently skipping a batch would publish an incomplete graph.
-    const result = await completeJson<RelationExtractionResult>(
-      { system: prompt.relationSystem, user: JSON.stringify(input), temperature: 0.1, maxTokens: 4000 },
-      isRelationExtractionResult,
-      model
-    );
+    // A root checkpoint is written only after every adaptive child validates, so a
+    // truncated child can never publish or checkpoint a partial relation graph.
+    const result = await adaptiveStructuredBatch<RelationCandidate, RelationExtractionResult>({
+      items: batch,
+      initialBatchSize: batch.length,
+      combine: (parts) => ({ relations: parts.flatMap((part) => part.relations) }),
+      execute: async (part, context) => {
+        const input = {
+          pairs: part.map((candidate) => ({
+            from: {
+              id: candidate.fromId,
+              type: candidate.fromType,
+              label: candidate.fromLabel,
+              statement: clip(candidate.fromStatement).slice(0, context.textLimit),
+              themes: candidate.fromThemes,
+            },
+            to: {
+              id: candidate.toId,
+              type: candidate.toType,
+              label: candidate.toLabel,
+              statement: clip(candidate.toStatement).slice(0, context.textLimit),
+              themes: candidate.toThemes,
+            },
+            similarity: Number(candidate.similarity.toFixed(3)),
+          })),
+        };
+        return completeJson<RelationExtractionResult>(
+          {
+            system: prompt.relationSystem,
+            user: JSON.stringify(input),
+            temperature: 0.1,
+            maxTokens: localTaskOutputTokens('relation-validation', part.length),
+            task: 'relation-validation',
+            batchSize: part.length,
+            splitDepth: context.splitDepth,
+          },
+          isRelationExtractionResult,
+          model,
+        );
+      },
+    });
     saveCheckpoint('reprocess', relationHash, 'reproc_relation_batch', bi, result);
     for (const relation of result.relations) acceptRelation(relation);
   }

@@ -82,6 +82,9 @@ export const LIBRARY_COLUMNS: readonly LibraryColumnDefinition[] = [
   { id: 'publicationTitle', label: 'Publicación', width: '11rem', sort: 'publicationTitle' },
   { id: 'publisher', label: 'Editorial', width: '10rem', sort: 'publisher' },
   { id: 'date', label: 'Fecha', width: '8rem', sort: 'date' },
+  { id: 'accessDate', label: 'Fecha de acceso', width: '9rem', sort: 'accessDate' },
+  { id: 'zoteroDateAdded', label: 'Añadido a Zotero', width: '10rem', sort: 'zoteroDateAdded' },
+  { id: 'zoteroDateModified', label: 'Modificado en Zotero', width: '11rem', sort: 'zoteroDateModified' },
   { id: 'year', label: 'Año', width: '4.5rem', sort: 'year' },
   { id: 'edition', label: 'Edición', width: '6rem', sort: 'edition' },
   { id: 'volume', label: 'Volumen', width: '6rem', sort: 'volume' },
@@ -100,8 +103,8 @@ export const LIBRARY_COLUMNS: readonly LibraryColumnDefinition[] = [
   { id: 'source', label: 'Origen', width: '7rem', sort: 'source' },
   { id: 'status', label: 'Estado', width: '7.5rem', sort: 'extraction' },
   { id: 'attachments', label: 'Adjuntos', width: '5.5rem', sort: 'attachments' },
-  { id: 'createdAt', label: 'Añadido', width: '8.5rem', sort: 'createdAt' },
-  { id: 'updatedAt', label: 'Modificado', width: '8.5rem', sort: 'updatedAt' },
+  { id: 'createdAt', label: 'Añadido a Nodus', width: '9.5rem', sort: 'createdAt' },
+  { id: 'updatedAt', label: 'Modificado en Nodus', width: '10.5rem', sort: 'updatedAt' },
 ] as const;
 
 export const LIBRARY_COLUMN_BY_ID = Object.fromEntries(

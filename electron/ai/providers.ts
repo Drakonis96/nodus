@@ -462,10 +462,10 @@ async function listGeminiEmbeddingModels(key: string | null): Promise<ModelInfo[
 }
 
 // ── Local providers: Ollama & LM Studio ──────────────────────────────────────
-// Chat + embeddings inference goes through the OpenAI-compatible surface (see
-// openAiCompatBase + aiClient). Model *listing* uses each server's native
-// endpoint because it carries richer metadata (size, quantization, state) than
-// the OpenAI-compat /v1/models list.
+// Chat inference is native-first so Nodus can set context and output independently;
+// older servers fall back to their OpenAI-compatible surface. Embeddings still use
+// the compatibility endpoint. Model listing uses each native endpoint because it
+// carries richer metadata (size, quantization, state) than /v1/models.
 
 /** fetch() against a local server with a short timeout so an unreachable host
  *  fails fast instead of hanging the Settings "Load models" button. */
@@ -559,6 +559,12 @@ async function listLmStudio(key: string | null, embeddingsOnly: boolean): Promis
         name: m.publisher ? `${m.arch ?? m.id} · ${m.publisher}` : m.arch,
         quantization: m.quantization,
         contextLength: typeof m.max_context_length === 'number' ? m.max_context_length : undefined,
+        trainedContextLength: typeof m.max_context_length === 'number' ? m.max_context_length : undefined,
+        loadedContextLength: typeof m.loaded_context_length === 'number' ? m.loaded_context_length : undefined,
+        effectiveContextLength: typeof m.loaded_context_length === 'number'
+          ? m.loaded_context_length
+          : Math.min(m.max_context_length ?? 16384, 16384),
+        recommendedContextLength: Math.min(m.max_context_length ?? 16384, 16384),
         loaded: m.state === 'loaded',
         kind,
         // LM Studio reports vision models as 'vlm'; text/embeddings can't take images.
@@ -589,6 +595,41 @@ const contextCache = new Map<string, ContextCacheEntry>();
  * lets an over-long prompt past the guard, so the probe is cheap enough to repeat often.
  */
 const CONTEXT_TTL_MS = 30_000;
+
+export interface LocalContextCapabilities {
+  trained: number | null;
+  loaded: number | null;
+}
+
+/** Separate the architecture ceiling from the runtime allocation. Native local
+ * transports can request a different allocation per call; OpenAI-compatible ones
+ * cannot, so callers must never collapse these two values into one `contextLength`. */
+export async function localContextCapabilities(
+  provider: LocalProvider,
+  modelId: string,
+  key: string | null,
+): Promise<LocalContextCapabilities> {
+  const base = localBaseUrl(provider);
+  if (provider === 'ollama') {
+    const [loaded, shown] = await Promise.all([
+      ollamaRunningContext(base, modelId, key),
+      ollamaShowContext(base, modelId, key),
+    ]);
+    return { trained: shown.trained, loaded: loaded ?? shown.pinned };
+  }
+  try {
+    const res = await localFetch(`${base}/api/v0/models`, key, 4000);
+    if (!res.ok) return { trained: null, loaded: null };
+    const data = (await res.json()) as { data?: LmStudioModel[] };
+    const found = (data.data ?? []).find((candidate) => candidate.id === modelId);
+    return {
+      trained: found?.max_context_length ?? null,
+      loaded: found?.loaded_context_length ?? null,
+    };
+  } catch {
+    return { trained: null, loaded: null };
+  }
+}
 
 /**
  * The effective context window (in tokens) a local model is loaded with, or null when it

@@ -9,6 +9,7 @@ import { getItem } from '../zotero/zoteroClient';
 import { resolveWorkText } from '../extraction/textExtractor';
 import { updateWorkSummaryEmbedding, upsertWorkSummary } from '../db/workSummariesRepo';
 import { recordLinkedLibraryAnalysis } from '../library/libraryVaultProvenance';
+import { analysisModelFingerprint, isLocalAnalysisCurrent, recordLocalAnalysisProvenance } from '../db/libraryAnalysisProvenance';
 import { modelRefSupportsCapability } from '@shared/localAiModels';
 import { startPerf } from '../perf';
 
@@ -49,14 +50,16 @@ export function summaryContentHash(
  * Builds a non-citable orientation summary from material already extracted into
  * Nodus. Full text is only used when neither ideas nor an abstract is available.
  */
-export async function runSummaryScan(work: Work, model?: ModelRef | null): Promise<void> {
+export async function runSummaryScan(work: Work, model?: ModelRef | null, options: { force?: boolean } = {}): Promise<void> {
   const perf = { nodusId: work.nodus_id, title: work.title };
   const summaryDone = startPerf('summary pipeline', perf);
   const settings = getSettings();
   const scanModel = model ?? settings.summaryModel ?? settings.synthesisModel ?? null;
   const hash = summaryContentHash(work, model);
+  const modelFingerprint = analysisModelFingerprint('summary', { ...settings, summaryModel: scanModel });
 
-  if (work.summary_status === 'done' && work.summary_hash === hash) return;
+  if (!options.force && work.summary_status === 'done' && work.summary_hash === hash
+    && isLocalAnalysisCurrent(work.nodus_id, 'summary', hash, modelFingerprint)) return;
 
   const db = getDb();
   const ideas = db
@@ -164,6 +167,7 @@ export async function runSummaryScan(work: Work, model?: ModelRef | null): Promi
       user: JSON.stringify(input),
       temperature: 0.2,
       maxTokens: 800,
+      task: 'summary',
       requestClass: 'background',
       jobId: `${work.nodus_id}:summary`,
       perf,
@@ -181,11 +185,19 @@ export async function runSummaryScan(work: Work, model?: ModelRef | null): Promi
         contentHash: hash,
       });
       setSummaryResult(work.nodus_id, 'done', hash);
+      recordLocalAnalysisProvenance({
+        workId: work.nodus_id,
+        components: ['summary'],
+        documentFingerprint: hash,
+        modelFingerprints: { summary: modelFingerprint },
+      });
     })();
   } catch (error) {
     summaryDone({ status: 'error', error: error instanceof Error ? error.message : String(error) });
     if (error instanceof AiError && error.config) throw error;
-    setSummaryResult(work.nodus_id, 'failed', hash, error instanceof Error ? error.message : String(error));
+    if (!(options.force && work.summary_status === 'done')) {
+      setSummaryResult(work.nodus_id, 'failed', hash, error instanceof Error ? error.message : String(error));
+    }
     throw error;
   }
 
