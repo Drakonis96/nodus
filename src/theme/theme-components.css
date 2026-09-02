@@ -1,0 +1,45 @@
+/* Themed component surfaces.
+ *
+ * A handful of shared classes (`body`, `.card`, `.input`, `.btn-primary`, …) bake
+ * their colours in via Tailwind `@apply` in index.css, so the generated utility
+ * sheet cannot reach them. These rules restyle them from the theme tokens.
+ *
+ * Every selector is scoped `html:not(.theme-default)`, so the `default` theme is
+ * completely untouched and keeps rendering through the index.css cascade. */
+
+/* ── Root surface ─────────────────────────────────────────────────────────── */
+html:not(.theme-default) body { background-color: var(--n-950); color: var(--n-100); }
+html:not(.theme-default).light body { background-color: var(--n-50); color: var(--n-900); }
+
+/* ── Scrollbars ──────────────────────────────────────────────────────────── */
+html:not(.theme-default) ::-webkit-scrollbar-thumb { background-color: var(--n-700); }
+html:not(.theme-default).light ::-webkit-scrollbar-thumb { background-color: var(--n-300); }
+
+/* ── Cards, modals ──────────────────────────────────────────────────────── */
+html:not(.theme-default) :is(.card, .card-modal) {
+  background-color: var(--n-900);
+  border-color: var(--n-800);
+}
+html:not(.theme-default) .card { background-color: color-mix(in srgb, var(--n-900) 60%, transparent); }
+html:not(.theme-default).light :is(.card, .card-modal) {
+  background-color: var(--n-50);
+  border-color: var(--n-200);
+}
+
+/* ── Inputs ─────────────────────────────────────────────────────────────── */
+html:not(.theme-default) .input { background-color: var(--n-900); border-color: var(--n-700); }
+html:not(.theme-default).light .input {
+  background-color: var(--n-50);
+  border-color: var(--n-300);
+  color: var(--n-900);
+}
+html:not(.theme-default) .input:focus { border-color: var(--a-500); }
+html:not(.theme-default) .input::placeholder { color: var(--n-500); }
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+html:not(.theme-default) .btn-primary { background-color: var(--a-600); color: #fff; }
+html:not(.theme-default) .btn-primary:hover { background-color: var(--a-500); }
+html:not(.theme-default) .btn-ghost { color: var(--n-300); }
+html:not(.theme-default) .btn-ghost:hover { background-color: var(--n-800); }
+html:not(.theme-default).light .btn-ghost { color: var(--n-700); }
+html:not(.theme-default).light .btn-ghost:hover { background-color: var(--n-100); }

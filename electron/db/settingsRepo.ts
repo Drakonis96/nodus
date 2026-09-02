@@ -122,6 +122,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   zoteroStoragePath: '',
   monitoredCollections: [],
   theme: 'dark',
+  appTheme: 'default',
   uiLanguage: 'es',
   promptLanguage: 'es',
   animationSpeed: 1,

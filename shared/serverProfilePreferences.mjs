@@ -6,6 +6,8 @@
  * policy and the vault's immutable embedding selection. None of those fields may cross
  * this boundary, even when a future setting is added to Desktop.
  */
+import { APP_THEME_IDS } from './appThemes.mjs';
+
 export const SERVER_PROFILE_PREFERENCES_VERSION = 1;
 
 export const SERVER_PROFILE_MODEL_FIELDS = Object.freeze([
@@ -43,7 +45,7 @@ const DESKTOP_MODEL_FIELDS = Object.freeze({
 
 const ROOT_KEYS = new Set(['schemaVersion', 'appearance', 'ai', 'workspace']);
 const APPEARANCE_KEYS = new Set([
-  'theme', 'uiLanguage', 'promptLanguage', 'animationSpeed', 'interfaceScale',
+  'theme', 'appTheme', 'uiLanguage', 'promptLanguage', 'animationSpeed', 'interfaceScale',
   'accessibleFont', 'highContrast', 'reduceMotion', 'readingFocusMode', 'mascot',
 ]);
 const MASCOT_KEYS = new Set(['enabled', 'scale', 'vaultCostumes', 'style', 'orbColorMode', 'orbColor']);
@@ -186,6 +188,7 @@ export function extractServerProfilePreferences(settings) {
     schemaVersion: SERVER_PROFILE_PREFERENCES_VERSION,
     appearance: {
       theme: settings.theme,
+      appTheme: settings.appTheme,
       uiLanguage: settings.uiLanguage,
       promptLanguage: settings.promptLanguage,
       animationSpeed: settings.animationSpeed,
@@ -259,6 +262,7 @@ export function desktopSettingsPatchFromServerProfile(value) {
     .map((name) => [DESKTOP_MODEL_FIELDS[name], profile.ai.models[name]]));
   return {
     theme: profile.appearance.theme,
+    appTheme: profile.appearance.appTheme,
     uiLanguage: profile.appearance.uiLanguage,
     promptLanguage: profile.appearance.promptLanguage,
     animationSpeed: profile.appearance.animationSpeed,
@@ -362,6 +366,8 @@ export function sanitizeServerProfilePreferences(value) {
     schemaVersion: SERVER_PROFILE_PREFERENCES_VERSION,
     appearance: {
       theme: enumValue(appearance.theme, ['dark', 'light', 'system']),
+      // Tolerate profiles written before this key existed.
+      appTheme: enumValue(appearance.appTheme ?? 'default', APP_THEME_IDS),
       uiLanguage: enumValue(appearance.uiLanguage, ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']),
       promptLanguage: enumValue(appearance.promptLanguage, ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']),
       animationSpeed: number(appearance.animationSpeed, 0, 1),

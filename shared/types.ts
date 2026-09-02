@@ -1482,6 +1482,22 @@ export interface DecorativeImageActionRequest {
 export type SyncMode = 'realtime' | 'manual';
 /** 'system' follows the OS light/dark preference and reacts to changes at runtime. */
 export type ThemeMode = 'dark' | 'light' | 'system';
+/** Colour theme (palette family). Orthogonal to {@link ThemeMode}: every theme has a
+ *  light and a dark mode. `default` is the built-in indigo/neutral palette; the rest are
+ *  curated ColorHunt palettes. Keep in sync with `THEME_IDS` in src/theme/themes.mjs and
+ *  `APP_THEME_IDS` in shared/appThemes.mjs. */
+export type AppTheme =
+  | 'default'
+  | 'teal-noir'
+  | 'deep-ocean'
+  | 'forest-pine'
+  | 'sunset-coral'
+  | 'royal-violet'
+  | 'mint-slate'
+  | 'amber-ember'
+  | 'berry-wine'
+  | 'indigo-night'
+  | 'rose-quartz';
 export type DeepContextMode = 'standard' | 'long';
 /** Languages Nodus can speak. `uiLanguage` localizes the interface; `promptLanguage`
  *  is injected into the AI prompts and so determines the language of generated content
@@ -1879,6 +1895,8 @@ export interface AppSettings {
   zoteroStoragePath: string;
   monitoredCollections: string[]; // collection keys
   theme: ThemeMode;
+  /** Colour palette. Light/dark is still governed by {@link AppSettings.theme}. */
+  appTheme: AppTheme;
   // Interface language (localizes all UI text).
   uiLanguage: AppLanguage;
   // Language injected into AI prompts → language of generated ideas/themes/answers.

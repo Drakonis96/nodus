@@ -65,6 +65,18 @@ import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vault
 import { DOCUMENT_INDEX_CONTINUOUS_AVAILABLE } from '@shared/documentIndexPolicy';
 import { validateBackupPassword } from '@shared/backupPasswordPolicy';
 import chromeWebStoreLogo from '../assets/brands/chrome-web-store.svg';
+import { THEMES } from '../theme/themes.mjs';
+
+/** Colour-theme picker options: `default` first, then the curated palettes. Each
+ *  swatch shows a light surface, the accent and a deep surface. */
+const THEME_PICKER_OPTIONS: { id: AppSettings['appTheme']; label: string; swatch: string[] }[] = [
+  { id: 'default', label: 'Default', swatch: ['#fafafa', '#6366f1', '#0a0a0a'] },
+  ...THEMES.map((th) => ({
+    id: th.id as AppSettings['appTheme'],
+    label: th.label,
+    swatch: [th.tokens.n[50], th.tokens.a.dark[500], th.tokens.n[950]],
+  })),
+];
 
 type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'browser' | 'server' | 'system' | 'data' | 'about' | 'updates';
 
@@ -999,9 +1011,36 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('interface', 'Apariencia', 'tema claro oscuro animaciones velocidad') && (
+      {visibleSettingsSection('interface', 'Apariencia', 'tema claro oscuro animaciones velocidad paleta color colores teal ocean forest sunset violet mint amber berry indigo rose') && (
           <Section title={t('Apariencia')}>
-            <Row label={t('Tema')}>
+            <Row label={t('Tema')} hint={t('Paletas de color. El modo claro u oscuro se ajusta aparte.')}>
+              <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3" data-testid="theme-picker">
+                {THEME_PICKER_OPTIONS.map((opt) => {
+                  const active = (settings.appTheme ?? 'default') === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => patch({ appTheme: opt.id })}
+                      className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition-colors ${
+                        active
+                          ? 'border-indigo-500 bg-indigo-500/10 text-neutral-100'
+                          : 'border-neutral-800 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200'
+                      }`}
+                    >
+                      <span className="flex flex-shrink-0 overflow-hidden rounded-md border border-black/20">
+                        {opt.swatch.map((c, i) => (
+                          <span key={i} className="block h-6 w-3" style={{ background: c }} />
+                        ))}
+                      </span>
+                      <span className="min-w-0 truncate">{opt.id === 'default' ? t('Predeterminado') : opt.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Row>
+            <Row label={t('Modo de color')}>
               <select className="input" value={settings.theme} onChange={(e) => patch({ theme: e.target.value as any })}>
                 <option value="system">{t('Sistema')}</option>
                 <option value="dark">{t('Oscuro')}</option>

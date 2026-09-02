@@ -12,6 +12,8 @@ import {
 } from "react";
 import { AI_PROVIDERS, PROVIDER_LABELS } from "@shared/providers";
 import type { AppLanguage } from "@shared/types";
+import { APP_THEME_IDS } from "@shared/appThemes.mjs";
+import { THEME_LABELS } from "../../theme/themes.mjs";
 import { Icon } from "../../components/ui";
 import { api, ApiError } from "../api";
 import { setActiveLang, t, tx } from "../i18nShim";
@@ -187,6 +189,7 @@ function blankProfile(
     schemaVersion: 1,
     appearance: {
       theme,
+      appTheme: "default",
       uiLanguage: "en",
       promptLanguage: "en",
       animationSpeed: 1,
@@ -510,6 +513,7 @@ export type ServerSettingsViewProps = {
   theme: "dark" | "light";
   initialTab?: TabId;
   onThemeChange?: (theme: "dark" | "light") => void;
+  onAppThemeChange?: (appTheme: string) => void;
   onLanguageChange?: (language: AppLanguage) => void;
 };
 
@@ -519,6 +523,7 @@ export function ServerSettingsView({
   theme,
   initialTab,
   onThemeChange,
+  onAppThemeChange,
   onLanguageChange,
 }: ServerSettingsViewProps) {
   const requested =
@@ -1285,7 +1290,27 @@ export function ServerSettingsView({
       title="Interfaz"
       description="Apariencia y accesibilidad forman parte del perfil portable y se comparten transversalmente."
     >
-      <Row label="Tema">
+      <Row label={t("Tema")}>
+        <select
+          className="ss-select"
+          data-testid="app-theme"
+          value={profile.appearance.appTheme || "default"}
+          onChange={(event) => {
+            const value = event.target.value;
+            changeProfile((next) => {
+              next.appearance.appTheme = value as PortableProfileValues["appearance"]["appTheme"];
+            });
+            onAppThemeChange?.(value);
+          }}
+        >
+          {APP_THEME_IDS.map((id) => (
+            <option key={id} value={id}>
+              {id === "default" ? t("Predeterminado") : THEME_LABELS[id] || id}
+            </option>
+          ))}
+        </select>
+      </Row>
+      <Row label={t("Modo de color")}>
         <select
           className="ss-select"
           value={profile.appearance.theme}
