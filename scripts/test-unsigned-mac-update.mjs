@@ -1,6 +1,6 @@
 // The unsigned-macOS update path: staged, then never installed.
 //
-// Nodus ships unsigned, so it replaces its own .app with an external helper
+// Older and local ad-hoc builds replace their own .app with an external helper
 // instead of handing off to Squirrel.Mac. The helper waits for the app to exit
 // before touching the bundle — correct, because swapping a running bundle breaks
 // it — and that wait was unbounded. When app.quit() failed to terminate the

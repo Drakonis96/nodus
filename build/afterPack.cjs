@@ -1,8 +1,7 @@
-// electron-builder afterPack hook. CI uses a Developer ID certificate when one
-// is configured; never overwrite that signature with an ad-hoc one. The latter
-// is retained only for local/dev artifacts, where it is useful for opening the
-// app manually but is not sufficient for macOS auto-update.
-const { execFileSync, spawnSync } = require('node:child_process');
+// electron-builder afterPack hook. Release builds are signed later by the
+// release-only custom signer; ad-hoc signing remains available solely for local
+// development artifacts.
+const { execFileSync } = require('node:child_process');
 const { copyFileSync, existsSync, mkdirSync } = require('node:fs');
 const path = require('node:path');
 const { verifyPackagedNativeRuntime } = require('../scripts/verify-packaged-native-runtime.cjs');
@@ -36,15 +35,13 @@ exports.default = async function afterPack(context) {
   // (or a stale Intel dependency tree) ever slips back into the release path.
   verifyPackagedNativeRuntime(appPath);
 
-  const signature = spawnSync('codesign', ['-dv', '--verbose=4', appPath], { encoding: 'utf8' });
-  const signatureInfo = `${signature.stdout || ''}\n${signature.stderr || ''}`;
-  if (signature.status === 0 && /Authority=Developer ID Application:/.test(signatureInfo)) {
-    console.log(`[afterPack] Preserved Developer ID signature for ${appPath}`);
+  if (process.env.NODUS_REQUIRE_MACOS_SIGNING === 'true') {
+    console.log(`[afterPack] Deferred ${appPath} to the mandatory Developer ID signer`);
     return;
   }
 
-  // --force replaces an unsigned/default signature; --deep covers nested
-  // frameworks/helpers. Production releases must use the branch above.
+  // This branch is never reachable from the GitHub release workflow. It makes
+  // local/dev bundles launchable while remaining recognisably non-production.
   execFileSync('codesign', ['--force', '--deep', '--sign', '-', appPath], { stdio: 'inherit' });
   console.log(`[afterPack] Ad-hoc signed ${appPath} (local/dev fallback)`);
 };

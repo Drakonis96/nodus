@@ -2,6 +2,63 @@
 
 ## Unreleased
 
+## 5.1.4 — 2026-09-02
+
+Nodus 5.1.4 writes every AI instruction natively in the eight interface
+languages, makes local-model analysis finish and recover, and refreshes the
+academic onboarding tour.
+
+- Added native prompt and runtime packs for all eight supported locales across
+  every AI workflow, keeping protocol keys, identifiers, enums and citation
+  rules untouched.
+- Separated the UI locale from the prompt and output language and localized IPC
+  payloads, Server Web views, Nodi documentation, native dialogs and Word
+  add-in warnings that still surfaced Spanish copy.
+- Separated local-model context capacity from per-task output budgets and mapped
+  the resulting limits correctly onto Ollama and OpenAI-compatible LM Studio
+  requests, with a new context-window control and a last-local-request card in
+  Settings.
+- Replaced fixed structured-output ceilings with task-aware planning, adaptive
+  batching, completeness validation and recovery for idea extraction, summaries,
+  merging and semantic relation validation.
+- Made document reanalysis transactional so a failed or cancelled run preserves
+  the previous valid analysis, while a successful run replaces ideas,
+  embeddings, relations, graph data and profiles without dangling references.
+- Corrected stale Pending and Analyzing labels across cancellation, resume and
+  relaunch flows.
+- Added explicit `hypothesis` and `finding` document-profile kinds with strict
+  provenance, coverage, audit and repair rules.
+- Replaced the embedding-threshold fusion heuristic with a proposition-level
+  decision contract, strict runtime validation and rejection of fusion targets
+  that were not among the candidates supplied to the model.
+- Replaced the outdated fourteen-step academic vault tour with a nine-step
+  Library, Ideas and Graph workflow, complete in all eight languages.
+- Added sortable Zotero date-added, date-modified and access-date fields while
+  preserving compatibility with older records.
+- Released the Zotero add-on's semantic retrieval memory by terminating the
+  local embedding worker after inactivity or teardown and compacting legacy
+  evidence sidecars on first read.
+- Integrated the 5.1.3 Developer ID signing and Apple notarization pipeline,
+  which shipped from its own release branch and had never reached the main
+  line.
+
+## 5.1.3 — 2026-08-31
+
+Nodus 5.1.3 introduces the complete Developer ID signing and Apple notarization
+pipeline and improves the quality and transparency of Dictionary evidence.
+
+- Signed the macOS application and every nested executable component with the
+  minimum required entitlements and Hardened Runtime enabled.
+- Submitted the signed application to Apple, stapled the accepted ticket and
+  made publication fail closed unless `codesign`, `spctl` and `stapler` all
+  verify the result.
+- Balanced Dictionary evidence across works and authors, combined semantic and
+  lexical retrieval, exposed source provenance and added coverage warnings.
+- Added a focused two-item What's New modal in all eight interface languages,
+  led by the Apple notarization milestone and its dedicated SVG icon.
+- Prevented beta installations from presenting an older stable release as an
+  available update after `electron-updater` had correctly rejected the downgrade.
+
 ## 5.1.2 — 2026-08-31
 
 Nodus 5.1.2 improves Word model selection and fixes local analysis, Zotero
