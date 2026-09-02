@@ -209,10 +209,45 @@ function lightAccentDeclarations(u) {
   }
 }
 
+/**
+ * Dark-mode declaration for an accent (indigo) utility.
+ *
+ * The straight ramp is wrong here too: `--a-500..700` are darkened to clear
+ * white-on-colour, so `text-indigo-500` (used bare, no `dark:` variant, e.g. the
+ * icons in the Ideas panel) would vanish on a dark surface, and the low `bg`
+ * shades the app uses as pale chips would flash near-white. Accent text/icons map
+ * to a light shade; pale `bg` fills become a faint accent tint. Solid fills
+ * (shade ≥ 500), tinted `bg`, borders and rings keep the straight shade.
+ */
+function darkAccentDeclarations(u) {
+  const { prop, shade, alpha } = u;
+  const textShade = shade <= 300 ? 300 : 400;
+  switch (prop) {
+    case 'text': return `color:${mixA(textShade, alpha)};`;
+    case 'decoration': return `text-decoration-color:${mixA(300, alpha)};`;
+    case 'fill': return `fill:${mixA(textShade, alpha)};`;
+    case 'stroke': return `stroke:${mixA(textShade, alpha)};`;
+    case 'caret': return `caret-color:${mixA(400, alpha)};`;
+    case 'accent': return `accent-color:${mixA(400, alpha)};`;
+    case 'placeholder': return `color:${mixA(400, alpha)};`;
+    case 'outline': return `outline-color:${mixA(400, alpha)};`;
+    case 'bg':
+      if (alpha != null) return `background-color:${mixA(shade, alpha)};`;
+      if (shade <= 400) return `background-color:color-mix(in srgb, var(--a-500) 16%, transparent);`;
+      return `background-color:var(--a-${shade});`;
+    case 'border': return `border-color:${mixA(shade, alpha)};`;
+    case 'divide': return `border-color:${mixA(shade, alpha)};`;
+    case 'ring': return `--tw-ring-color:${mixA(shade, alpha)};`;
+    case 'ring-offset': return `--tw-ring-offset-color:${mixA(shade, alpha)};`;
+    case 'from': case 'to': case 'via': return null;
+    default: return null;
+  }
+}
+
 /** One or more `prop: value;` declarations for the utility's CSS property.
  *  `key` is the authored class string; `theme` supplies the ramp hexes. */
 function declarations(u, mode, key, theme) {
-  if (mode === 'light' && u.family === 'indigo') return lightAccentDeclarations(u);
+  if (u.family === 'indigo') return (mode === 'light' ? lightAccentDeclarations : darkAccentDeclarations)(u);
   let eff = u;
   if (mode === 'light' && u.family === 'neutral') {
     // Follow index.css's own `.light .<util>` decision: nearest theme shade to the
