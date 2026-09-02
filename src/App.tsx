@@ -51,6 +51,7 @@ import { recoveryHealthAdvice, recoveryHealthHeadline } from './recoveryHealth';
 import { NodiMascot } from './components/nodi/NodiMascot';
 import { NodiStyleModal } from './components/NodiStyleModal';
 import { HoverLabelButton, Icon } from './components/ui';
+import { Tooltip } from './components/Tooltip';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { t, tx, setActiveLang } from './i18n';
 import { resolveStartupGate } from './app/StartupGate';
@@ -121,10 +122,11 @@ function applyThemeClasses(theme: import('@shared/types').ThemeMode): boolean {
   return dark;
 }
 
-/** Header action rendered as an icon that reveals its label on hover/focus, so the
- *  top bar's action rail stays a clean row of icons. Every action shares the same
- *  ghost styling so none stands out; pass `showLabel` to keep the text pinned open
- *  (e.g. an action in progress, or an alert that must be noticed). */
+/** Header action rendered as an icon whose name shows in a shared tooltip on
+ *  hover/focus, so the top bar's action rail stays a clean row of icons. Every
+ *  action shares the same ghost styling so none stands out; pass `showLabel` to
+ *  keep the text pinned open (e.g. an action in progress, or an alert that must
+ *  be noticed). */
 function HeaderAction({
   icon,
   label,
@@ -156,6 +158,10 @@ function HeaderAction({
   /** Same, for the notifications panel. */
   notificationsTrigger?: boolean;
 }) {
+  // A keyboard shortcut is part of the name: the hidden label span keeps it in the
+  // accessibility tree, so the tooltip reads it out too instead of dropping it now
+  // that labels no longer expand on hover.
+  const tooltip = kbd ? `${title ?? label} · ${kbd}` : title;
   return (
     <HoverLabelButton
       data-tour={dataTour}
@@ -164,7 +170,7 @@ function HeaderAction({
       data-notifications-trigger={notificationsTrigger ? '' : undefined}
       icon={icon}
       label={label}
-      title={title}
+      title={tooltip}
       onClick={onClick}
       disabled={disabled}
       spinning={spinning}
@@ -1400,10 +1406,11 @@ export function App() {
         )}
 
         <div className="flex-1" />
-        {/* Right-side action rail: icon-only by default, each button reveals its
-            label on hover/focus so the header reads as a clean row of icons. It
-            grows leftwards as labels open, which is why the centre badge measures
-            it instead of assuming a fixed clearance. */}
+        {/* Right-side action rail: icon-only, each button's name in a shared tooltip
+            on hover/focus so the header reads as a clean row of icons. Labels no
+            longer expand on hover, so the rail keeps a constant width; the centre
+            badge still measures it, which now costs nothing and survives future
+            rail changes. */}
         <div ref={setHeaderActionsEl} data-testid="header-actions" className="header-action-rail flex min-w-0 items-center justify-end gap-0.5 overflow-hidden pr-4">
           {/* No Bóvedas button: the centred badge is the way in, and it is now shown at
               every width for exactly that reason (see the badge above). */}
@@ -1444,7 +1451,7 @@ export function App() {
               placeHeaderBadge, which keeps this rail from ever reaching the centred vault
               badge. A badge positioned outside this box is exactly what that geometry
               cannot see. The wrapper is what the count hangs off — HoverLabelButton's
-              `trailing` slot sits inside a label span that is max-w-0 until hover.
+              `trailing` slot sits inside the button's visually hidden label span.
 
               Only shown once something has actually arrived: the inbox is per vault and
               only means anything for a connected one, so on a local install it was a
@@ -1584,33 +1591,40 @@ export function App() {
           >
             <div data-testid="sidebar-scroll-region" className="vault-sidebar-scroll mr-[6px] flex h-full min-h-0 flex-col gap-1 overflow-y-auto p-2">
               {(() => {
-              const navButton = (n: { id: View; icon: string; label: string }, disabled = false) => (
-                <button
-                  key={n.id}
-                  data-tour={`nav-${n.id}`}
-                  disabled={disabled}
-                  aria-disabled={disabled}
-                  aria-label={sidebarCompact ? t(n.label) : undefined}
-                  title={disabled ? `${t(n.label)} · ${t('Próximamente')}` : sidebarCompact ? t(n.label) : undefined}
-                  onClick={() => {
-                    if (disabled) return;
-                    // La sección Herramientas siempre entra por el catálogo.
-                    if (n.id === 'toolkit') setToolkitPage('home');
-                    setView(n.id);
-                  }}
-                  className={`flex items-center rounded-lg py-2 text-sm text-left transition-colors ${sidebarCompact ? 'justify-center px-2' : 'gap-2 px-3'} ${
-                    disabled
-                      ? 'cursor-not-allowed text-neutral-700 opacity-65'
-                      : view === n.id && (n.id !== 'toolkit' || toolkitPage === 'home')
-                        ? 'bg-indigo-600 text-white'
-                        : 'text-neutral-400 hover:bg-neutral-900'
-                  }`}
-                >
-                  <Icon name={n.icon} className="shrink-0 opacity-70" />
-                  <span className={sidebarCompact ? 'sr-only' : undefined}>{t(n.label)}</span>
-                  {disabled && !sidebarCompact && <span className="ml-auto text-[9px] font-semibold uppercase tracking-wide">{t('Próximamente')}</span>}
-                </button>
-              );
+              const navButton = (n: { id: View; icon: string; label: string }, disabled = false) => {
+                const button = (
+                  <button
+                    key={n.id}
+                    data-tour={`nav-${n.id}`}
+                    disabled={disabled}
+                    aria-disabled={disabled}
+                    aria-label={sidebarCompact ? t(n.label) : undefined}
+                    title={disabled ? `${t(n.label)} · ${t('Próximamente')}` : undefined}
+                    onClick={() => {
+                      if (disabled) return;
+                      // La sección Herramientas siempre entra por el catálogo.
+                      if (n.id === 'toolkit') setToolkitPage('home');
+                      setView(n.id);
+                    }}
+                    className={`flex items-center rounded-lg py-2 text-sm text-left transition-colors ${sidebarCompact ? 'justify-center px-2' : 'gap-2 px-3'} ${
+                      disabled
+                        ? 'cursor-not-allowed text-neutral-700 opacity-65'
+                        : view === n.id && (n.id !== 'toolkit' || toolkitPage === 'home')
+                          ? 'bg-indigo-600 text-white'
+                          : 'text-neutral-400 hover:bg-neutral-900'
+                    }`}
+                  >
+                    <Icon name={n.icon} className="shrink-0 opacity-70" />
+                    <span className={sidebarCompact ? 'sr-only' : undefined}>{t(n.label)}</span>
+                    {disabled && !sidebarCompact && <span className="ml-auto text-[9px] font-semibold uppercase tracking-wide">{t('Próximamente')}</span>}
+                  </button>
+                );
+                // En el raíl plegado el nombre vive en el tooltip compartido; los botones
+                // deshabilitados tragan los eventos de puntero, así que conservan el
+                // `title` nativo, que un botón deshabilitado sí muestra.
+                if (disabled || !sidebarCompact) return button;
+                return <Tooltip key={n.id} label={t(n.label)} placement="right">{button}</Tooltip>;
+              };
               // A collapsible group header (chevron + label), optionally with a control
               // on the right (e.g. the "new database" +).
               const groupHeaderButton = (groupId: string, label: string, collapsed: boolean, hasActive: boolean) => (
@@ -1728,14 +1742,15 @@ export function App() {
                     <div className={`${sidebarCompact ? 'mt-1 border-t border-neutral-800/70 pt-1' : 'mt-2'} flex flex-col gap-1`} data-tour="db-list">
                       <div className="flex items-center px-3">
                         {!sidebarCompact && groupHeaderButton('explore', exploreLabel, exploreCollapsed, ['databases', 'pages', 'dbSearch'].includes(view))}
-                        <button
-                          onClick={() => void createDatabase()}
-                          title={t('Nueva base de datos')}
-                          aria-label={t('Nueva base de datos')}
-                          className={`${sidebarCompact ? 'flex w-full justify-center py-2' : ''} text-neutral-500 hover:text-neutral-300`}
-                        >
-                          <Icon name="plus" size={14} />
-                        </button>
+                        <Tooltip label={t('Nueva base de datos')} placement={sidebarCompact ? 'right' : 'bottom'}>
+                          <button
+                            onClick={() => void createDatabase()}
+                            aria-label={t('Nueva base de datos')}
+                            className={`${sidebarCompact ? 'flex w-full justify-center py-2' : ''} text-neutral-500 hover:text-neutral-300`}
+                          >
+                            <Icon name="plus" size={14} />
+                          </button>
+                        </Tooltip>
                       </div>
                       {!exploreCollapsed && navButton(pagesItem)}
                       {!exploreCollapsed && navButton(dbSearchItem)}
@@ -1804,17 +1819,18 @@ export function App() {
               );
               })()}
             </div>
-            <button
-              data-testid="sidebar-resize-handle"
-              type="button"
-              className="sidebar-resize-handle"
-              aria-label={t('Cambiar el ancho del menú lateral')}
-              title={t('Arrastra para cambiar el ancho. Haz doble clic para restablecerlo.')}
-              onPointerDown={beginSidebarResize}
-              onClick={(event) => event.currentTarget.focus()}
-              onKeyDown={resizeSidebarWithKeyboard}
-              onDoubleClick={() => { setSidebarWidth(SIDEBAR_DEFAULT_WIDTH); localStorage.setItem('nodus.sidebarWidth', String(SIDEBAR_DEFAULT_WIDTH)); }}
-            />
+            <Tooltip label={t('Arrastra para cambiar el ancho. Haz doble clic para restablecerlo.')} placement="right">
+              <button
+                data-testid="sidebar-resize-handle"
+                type="button"
+                className="sidebar-resize-handle"
+                aria-label={t('Cambiar el ancho del menú lateral')}
+                onPointerDown={beginSidebarResize}
+                onClick={(event) => event.currentTarget.focus()}
+                onKeyDown={resizeSidebarWithKeyboard}
+                onDoubleClick={() => { setSidebarWidth(SIDEBAR_DEFAULT_WIDTH); localStorage.setItem('nodus.sidebarWidth', String(SIDEBAR_DEFAULT_WIDTH)); }}
+              />
+            </Tooltip>
           </nav>
         )}
 

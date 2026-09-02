@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { EdgeType, ModelRef, GraphNodeType } from '@shared/types';
 import { t } from '../i18n';
+import { Tooltip } from './Tooltip';
 
 export {
   AI_PROVIDERS,
@@ -311,14 +312,17 @@ export function AiBadge({
 }
 
 /**
- * An action rendered as an icon that opens its label on hover or keyboard focus, so a
- * row of them reads as a clean rail of icons instead of a wall of text.
+ * An action rendered as an icon; its name reaches the reader through the shared
+ * <Tooltip /> on hover or keyboard focus, so a row of them reads as a clean rail
+ * of icons instead of a wall of text.
  *
- * Shared by the titlebar's action rail and the Deep Research reader header. The label
- * is always in the accessibility tree (`aria-label` plus the `title` tooltip); only its
- * width is animated, so nothing is hidden from a screen reader or a pointerless user.
- * `showLabel` pins the text open — use it for an action in progress or one that must be
- * noticed. Sizing and tone come from `className` (`h-9 min-h-9 btn-ghost`, …).
+ * Shared by the titlebar's action rail, the Deep Research reader header and the
+ * server web shell. The label is always in the accessibility tree (`aria-label`
+ * plus the visually hidden span) but no longer expands on hover — the tooltip
+ * carries the name. `showLabel` pins the text open — use it for an action in
+ * progress or one that must be noticed (that state skips the tooltip, which would
+ * only duplicate what is already on screen). Sizing and tone come from `className`
+ * (`h-9 min-h-9 btn-ghost`, …).
  */
 export function HoverLabelButton({
   icon,
@@ -340,7 +344,7 @@ export function HoverLabelButton({
   spinning?: boolean;
   showLabel?: boolean;
   disabled?: boolean;
-  /** Rendered inside the expanding label (a keyboard shortcut, a dropdown chevron). */
+  /** Rendered inside the hidden label (a keyboard shortcut, a dropdown chevron). */
   trailing?: React.ReactNode;
   'data-tour'?: string;
   'data-vault-trigger'?: string;
@@ -348,28 +352,31 @@ export function HoverLabelButton({
   'data-notifications-trigger'?: string;
   'data-testid'?: string;
 }) {
-  return (
+  const button = (
     <button
       {...rest}
       type="button"
       onClick={onClick}
       disabled={disabled}
-      title={title ?? label}
       aria-label={label}
-      className={`header-action group btn justify-center px-2.5 py-0 leading-none ${className}`}
+      className={`header-action btn justify-center px-2.5 py-0 leading-none ${className}`}
     >
       <Icon name={icon} className={spinning ? 'animate-spin' : ''} />
       <span
         className={`flex items-center overflow-hidden whitespace-nowrap transition-all duration-200 ${
-          showLabel
-            ? 'ml-1.5 max-w-[14rem] opacity-100'
-            : 'ml-0 max-w-0 opacity-0 group-hover:ml-1.5 group-hover:max-w-[14rem] group-hover:opacity-100 group-focus-visible:ml-1.5 group-focus-visible:max-w-[14rem] group-focus-visible:opacity-100'
+          showLabel ? 'ml-1.5 max-w-[14rem] opacity-100' : 'ml-0 max-w-0 opacity-0'
         }`}
       >
         {label}
         {trailing}
       </span>
     </button>
+  );
+  if (showLabel) return button;
+  return (
+    <Tooltip label={title ?? label} placement="bottom" disabled={disabled}>
+      {button}
+    </Tooltip>
   );
 }
 

@@ -1408,6 +1408,30 @@ body {
   color: #292524;
 }
 
+/* Shared styled tooltip (src/components/Tooltip.tsx). It is portal-rendered so the
+   compact sidebar's scroll region and the header's overflow-hidden rail cannot clip
+   it; this class only carries the look, with a .light counterpart for the theme. */
+.nodus-tooltip {
+  max-width: min(16rem, calc(100vw - 1.5rem));
+  padding: 0.3rem 0.55rem;
+  border: 1px solid rgba(82, 82, 82, 0.9);
+  border-radius: 0.4rem;
+  background: rgba(23, 23, 23, 0.98);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+  color: #fafafa;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  white-space: normal;
+}
+.light .nodus-tooltip {
+  border-color: #d6d3d1;
+  background: rgba(255, 255, 255, 0.99);
+  box-shadow: 0 8px 22px rgba(28, 25, 23, 0.18);
+  color: #292524;
+}
+
 .study-selection-tools-host {
   display: contents;
 }
