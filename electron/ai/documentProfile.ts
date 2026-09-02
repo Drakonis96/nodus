@@ -32,12 +32,14 @@ import { modelRefSupportsCapability } from '@shared/localAiModels';
 import type { PerfContext } from '../perf';
 import { documentProfilePromptPack } from '@shared/academicPromptPacks';
 
-export const DOCUMENT_PROFILE_PIPELINE_VERSION = 'document-profile/4';
-export const DOCUMENT_PROFILE_SCHEMA_VERSION = 1;
+export const DOCUMENT_PROFILE_PIPELINE_VERSION = 'document-profile/5';
+export const DOCUMENT_PROFILE_SCHEMA_VERSION = 2;
 const ANALYSIS_WORDS = 2_500;
 const MIN_SECTION_WORDS = 80;
 const DIRECT_SUPPORT_CONFIDENCE_FLOOR = 0.8;
-const CENTRAL_FIELD_KINDS = new Set<DocumentProfileFieldKind>(['problem', 'question', 'thesis', 'method', 'conclusion', 'contribution']);
+const CENTRAL_FIELD_KINDS = new Set<DocumentProfileFieldKind>([
+  'problem', 'question', 'hypothesis', 'thesis', 'method', 'finding', 'conclusion', 'contribution',
+]);
 
 export interface DerivedDocumentSection extends DocumentSection {
   body: string;
@@ -175,8 +177,8 @@ function isProfileSynthesis(value: unknown): value is ProfileSynthesis {
 }
 
 const FIELD_KINDS = new Set<DocumentProfileFieldKind>([
-  'object','problem','question','thesis','argument','method','sources','concept','temporal_scope',
-  'geographic_scope','disciplinary_scope','structure','conclusion','contribution','limitation',
+  'object','problem','question','hypothesis','thesis','argument','method','sources','concept','temporal_scope',
+  'geographic_scope','disciplinary_scope','structure','finding','conclusion','contribution','limitation',
   'genre','audience','positioning','original_abstract',
 ]);
 

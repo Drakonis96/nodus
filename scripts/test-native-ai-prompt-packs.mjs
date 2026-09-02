@@ -101,7 +101,7 @@ test('dictionary, document profile, folder and gap prompts are native and preser
     for (const marker of ['paragraphs', 'claims', 'text', 'evidence', 'kind', 'idea|passage', 'authorSummaries']) assert.match(`${dictionary.system}\n${dictionary.authorSystem}`, new RegExp(marker), `${language} dictionary contract missing ${marker}`);
     for (const marker of ['none', 'authors', 'verifiedDescription', 'retryInvalidJson', 'retryReturnObject', 'retryShorten']) assert.ok(dictionaryScaffold[marker], `${language} dictionary scaffold missing ${marker}`);
     const profile = packs.documentProfilePromptPack(language);
-    for (const marker of ['title', 'summary', 'claims', 'support_quote', 'source_language', 'fields', 'field_fixes', 'passed', 'confidence', 'centrality']) assert.match(Object.values(profile).join('\n'), new RegExp(marker), `${language} document profile contract missing ${marker}`);
+    for (const marker of ['title', 'summary', 'claims', 'support_quote', 'source_language', 'fields', 'field_fixes', 'passed', 'confidence', 'centrality', 'hypothesis', 'finding']) assert.match(Object.values(profile).join('\n'), new RegExp(marker), `${language} document profile contract missing ${marker}`);
     const folder = packs.folderPromptPack(language);
     for (const marker of ['selected', 'id', 'reason', 'score']) assert.match(folder.system, new RegExp(marker), `${language} folder contract missing ${marker}`);
     const gap = packs.gapPromptPack(language);
@@ -112,6 +112,32 @@ test('dictionary, document profile, folder and gap prompts are native and preser
   assert.match(read('electron/ai/documentProfile.ts'), /documentProfilePromptPack\(/);
   assert.match(read('electron/ai/folderIdeaSuggestions.ts'), /folderPromptPack\(language\)/);
   assert.match(read('electron/ai/gapSearch.ts'), /gapPromptPack\(language\)/);
+});
+
+test('document profile preserves the full finding, audit, and repair contract in every locale', async () => {
+  const packs = await load('shared/academicPromptPacks.ts', 'profile-finding-contract');
+  const requirements = {
+    es: [/MISMA sección/, /INVENTARIO OBLIGATORIO/, /Hechos narrativos o históricos/, /patrón cualitativo o descubrimiento archivístico/, /cantidad es señal de cobertura/, /CADA finding/, /cantidad, contraste o condición central perdida/, /circunstancias del objeto como limitation/, /prueba de tres condiciones/, /subcadena literal continua/],
+    en: [/THE SAME section/, /MANDATORY INVENTORY/, /Narrative or historical facts/, /qualitative pattern or archival discovery/, /quantity signals coverage, not type/, /EACH finding/, /central quantity, contrast, or condition lost/, /circumstances of the subject as limitation/, /three-condition test/, /continuous literal substring/],
+    fr: [/LA MÊME section/, /INVENTAIRE OBLIGATOIRE/, /faits narratifs ou historiques/i, /motif qualitatif ou une découverte archivistique/, /quantité signale la couverture/, /CHAQUE finding/, /quantité, tout contraste ou toute condition centrale perdus/, /circonstances de l’objet classées comme limitation/, /test des trois conditions/, /sous-chaîne littérale continue/],
+    de: [/DERSELBEN Sektion/, /VERBINDLICHES INVENTAR/, /Narrative oder historische Fakten/, /qualitatives Muster oder ein Archivfund/, /Zahl ist ein Abdeckungssignal/, /JEDES finding/, /zentrale Menge, jeden Kontrast oder jede Bedingung/, /Umstände des Gegenstands als limitation/, /Drei-Bedingungen-Test/, /zusammenhängende wörtliche Teilzeichenfolge/],
+    pt: [/MESMA secção/, /INVENTÁRIO OBRIGATÓRIO/, /Factos narrativos ou históricos/, /padrão qualitativo ou uma descoberta de arquivo/, /quantidade é sinal de cobertura/, /CADA finding/, /quantidade, contraste ou condição central perdida/, /circunstâncias do objeto como limitation/, /teste das três condições/, /subcadeia literal contínua/],
+    'pt-BR': [/MESMA seção/, /INVENTÁRIO OBRIGATÓRIO/, /Fatos narrativos ou históricos/, /padrão qualitativo ou uma descoberta de arquivo/, /quantidade é sinal de cobertura/, /CADA finding/, /quantidade, contraste ou condição central perdida/, /circunstâncias do objeto como limitation/, /teste das três condições/, /substring literal contínua/],
+    it: [/STESSA sezione/, /INVENTARIO OBBLIGATORIO/, /Fatti narrativi o storici/, /pattern qualitativo o una scoperta archivistica/, /quantità segnala copertura/, /OGNI finding/, /quantità, contrasto o condizione centrale persa/, /circostanze dell’oggetto come limitation/, /test delle tre condizioni/, /sottostringa letterale continua/],
+    tr: [/AYNI bölüm/, /ZORUNLU ENVANTER/, /anlatısal veya tarihsel olgular/, /Nitel bir örüntü veya arşiv keşfi/, /miktar bir kapsam sinyalidir/, /HER finding/, /merkezi miktarı, karşılaştırmayı veya koşulu/, /limitation olarak sınıflandırılmış nesne koşullarını/, /üç koşullu testi/, /kesintisiz ve kelimesi kelimesine alt dizesi/],
+  };
+  const invariantProfileTokens = ['hypothesis', 'finding', 'conclusion', 'argument', 'question', 'thesis', 'genre', 'audience', 'role', 'claims'];
+  const invariantAuditTokens = ['hypothesis', 'finding', 'conclusion', 'argument', 'question', 'limitation', 'genre', 'audience', 'claims'];
+  for (const language of languages) {
+    const profile = packs.documentProfilePromptPack(language);
+    for (const token of invariantProfileTokens) assert.ok(profile.profile.includes(token), `${language} profile: missing ${token}`);
+    for (const token of invariantAuditTokens) assert.ok(profile.audit.includes(token), `${language} audit: missing ${token}`);
+    assert.match(profile.repair, /support_quote/);
+    for (const [index, pattern] of requirements[language].entries()) {
+      const value = index < 5 ? profile.profile : index < 8 ? profile.audit : profile.repair;
+      assert.match(value, pattern, `${language} document-profile semantic rule ${index + 1} missing`);
+    }
+  }
 });
 
 test('dictionary prompts preserve every semantic rule in every locale', async () => {
