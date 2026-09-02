@@ -95,6 +95,19 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
   { id: 'updates', label: 'Actualizaciones y novedades', icon: 'sync', keywords: 'actualizaciones update actualizar version novedades ultimos cambios latest changes changelog buscar instalar reiniciar beta testers prerelease canal estable' },
 ];
 
+const SETTINGS_TAB_STORAGE_KEY = 'nodus.settingsTab';
+
+function readRememberedSettingsTab(): SettingsTabId {
+  try {
+    const remembered = localStorage.getItem(SETTINGS_TAB_STORAGE_KEY);
+    return SETTINGS_TABS.some((tab) => tab.id === remembered)
+      ? remembered as SettingsTabId
+      : 'providers';
+  } catch {
+    return 'providers';
+  }
+}
+
 const ZOTERO_FREE_VAULT_TYPES = new Set<VaultType>(['testimonios', 'prosopography', 'worldbuilding']);
 
 const ABOUT_ACTION_BUTTON_CLASS = 'btn btn-ghost w-full min-h-9 shrink-0 justify-center border border-neutral-300 dark:border-neutral-700 sm:h-9 sm:w-auto sm:min-w-56 sm:whitespace-nowrap';
@@ -172,7 +185,7 @@ export function Settings({
   const [syncHasPassphrase, setSyncHasPassphrase] = useState(true);
   const [importSyncPassphrase, setImportSyncPassphrase] = useState('');
   const [importSyncPromptOpen, setImportSyncPromptOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<SettingsTabId>('providers');
+  const [settingsTab, setSettingsTab] = useState<SettingsTabId>(readRememberedSettingsTab);
   const [settingsQuery, setSettingsQuery] = useState('');
   const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocId | null>(null);
   // Reset-graph flow: a confirm() dialog, then a modal that requires typing a
@@ -196,6 +209,14 @@ export function Settings({
   const integrationsTabRequested = settingsTabRequested('integrations', settingsTab, settingsQuery);
   const modelsTabRequested = settingsTabRequested('models', settingsTab, settingsQuery);
   const serverTabRequested = settingsTabRequested('server', settingsTab, settingsQuery);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, settingsTab);
+    } catch {
+      // Settings should remain usable when storage is unavailable or blocked.
+    }
+  }, [settingsTab]);
 
   useEffect(() => {
     void window.nodus.getAiConcurrencySnapshot().then(setAiConcurrency);
