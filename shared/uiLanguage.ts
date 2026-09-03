@@ -1,4 +1,5 @@
 import type { AppLanguage } from './types';
+import { MAIN_PROCESS_ERRORS, MAIN_PROCESS_ERROR_PATTERNS } from './mainProcessErrors';
 
 export type UiTranslations = Partial<Record<AppLanguage, string>> & { en: string };
 
@@ -446,6 +447,26 @@ function aiProviderRuntimeError(message: string, language: unknown): string | nu
 }
 
 /**
+ * The main-process error catalogue (shared/mainProcessErrors.ts).
+ *
+ * It runs last, after the Zotero and AI provider tables, so nothing here can shadow a
+ * message one of those already words more precisely — and before the Spanish detector,
+ * because a sentence with a real translation must never be traded for the generic line.
+ */
+function mainProcessRuntimeError(message: string, language: unknown): string | null {
+  // hasOwnProperty, not a bare index: an error message of "constructor" or "toString"
+  // would otherwise find an inherited member and spread into an empty translation.
+  if (Object.prototype.hasOwnProperty.call(MAIN_PROCESS_ERRORS, message)) {
+    return uiText(language, { ...MAIN_PROCESS_ERRORS[message], es: message });
+  }
+  for (const { pattern, translate } of MAIN_PROCESS_ERROR_PATTERNS) {
+    const match = pattern.exec(message);
+    if (match) return uiText(language, { ...translate(...match.slice(1)), es: message });
+  }
+  return null;
+}
+
+/**
  * Last-resort protection for legacy Electron errors that still contain prose rather
  * than a stable error code. Specific messages should be translated by the caller;
  * unknown Spanish prose becomes a localized generic error instead of leaking Spanish.
@@ -600,6 +621,8 @@ export function localizeRuntimeError(message: string, language: unknown): string
   if (zoteroFailure) return zoteroFailure;
   const providerFailure = aiProviderRuntimeError(message, language);
   if (providerFailure) return providerFailure;
+  const mainProcessFailure = mainProcessRuntimeError(message, language);
+  if (mainProcessFailure) return mainProcessFailure;
   if (!looksLikeSpanishUiText(message)) return message;
   return uiText(language, {
     es: message,
