@@ -34,6 +34,9 @@ installRuntimeHooks(root);
  */
 let queue = [];
 let seen = [];
+/** Flips when the fake server actually flushes a delayed body, so ordering can be asserted. */
+let bodyFlushed = false;
+let announceBodyFlush = () => undefined;
 const server = createServer((req, res) => {
   let body = '';
   req.on('data', (chunk) => { body += chunk; });
@@ -48,7 +51,11 @@ const server = createServer((req, res) => {
       // Reproduce the SDK edge case: headers arrive within its timeout, while the
       // response body remains pending beyond the complete-operation deadline.
       res.flushHeaders();
-      setTimeout(() => res.end(payload), reply.bodyDelayMs);
+      setTimeout(() => {
+        bodyFlushed = true;
+        announceBodyFlush();
+        res.end(payload);
+      }, reply.bodyDelayMs);
     } else {
       res.end(payload);
     }
@@ -69,7 +76,7 @@ try {
   const opts = { system: 'system', user: 'user', maxTokens: 256 };
   /** Demands a field the model may omit — the realistic schema-mismatch shape. */
   const guard = (v) => !!v && typeof v === 'object' && Array.isArray(v.ideas);
-  const run = (replies) => { queue = replies; seen = []; };
+  const run = (replies) => { queue = replies; seen = []; bodyFlushed = false; };
 
   // 1. Happy path: one well-formed, schema-valid response costs exactly one call.
   run(['{"ideas":["a"]}']);
@@ -208,12 +215,17 @@ try {
   // SDK timeout stops at that boundary, which allowed a 180s request to occupy a Nodus
   // slot for 267s when DeepSeek stalled while delivering the body.
   run([{ content: '{"ideas":["late"]}', finish_reason: 'stop', bodyDelayMs: 200 }]);
-  const timeoutStarted = Date.now();
+  // Ordering, not milliseconds: an unarmed deadline can only surface after the body
+  // lands, so a rejection that beats the flush is the property itself under any load.
+  const bodyDelivered = new Promise((resolve) => { announceBodyFlush = resolve; });
   await assert.rejects(() => aiClient.completeJson({ ...opts, timeoutMs: 40 }, guard, model), (e) => {
     assert.equal(e.code, 'timeout');
     return true;
   });
-  assert.ok(Date.now() - timeoutStarted < 180, 'body delivery is bounded by the caller deadline');
+  assert.equal(bodyFlushed, false, 'the caller deadline fires before the stalled body is ever delivered');
+  // Waiting for the flush proves the delayed path really ran, so the check above is not vacuous.
+  await bodyDelivered;
+  assert.equal(bodyFlushed, true, 'the fake server did stall the body, so the ordering check had something to beat');
   assert.equal(seen.length, 1, 'an ambiguous body timeout is not replayed blindly');
 
   // 10. Deterministic Gemini extraction uses the native GenerationConfig contract:
