@@ -1,4 +1,4 @@
-import type { AiProvider, EmbeddingProvider, ImageProvider, LocalProvider, ModelRef } from './types';
+import type { AiProvider, CustomProviderConfig, EmbeddingProvider, ImageProvider, LocalProvider, ModelRef } from './types';
 
 // Single source of truth for provider identity, labels and defaults, shared by
 // the main process (electron/) and the renderer (src/). Adding a provider to
@@ -20,6 +20,7 @@ export const AI_PROVIDERS: AiProvider[] = [
   'xiaomi',
   'ollama',
   'lmstudio',
+  'custom',
 ];
 
 /** Providers whose credentials are Nodus-managed API keys/tokens. ChatGPT's
@@ -36,6 +37,7 @@ export const SECRET_PROVIDERS: Exclude<AiProvider, 'codex' | 'github-copilot' | 
   'xiaomi',
   'ollama',
   'lmstudio',
+  'custom',
 ];
 
 /**
@@ -69,6 +71,10 @@ export const PROVIDER_LABELS: Record<AiProvider, string> = {
   xiaomi: 'Xiaomi MiMo',
   ollama: 'Ollama',
   lmstudio: 'LM Studio',
+  // Not a brand: the endpoint is whatever the user runs. Kept in English like the
+  // rest of this record because it is rendered raw by modelLabel() in every model
+  // picker; the descriptive prose around it in Settings is translated normally.
+  custom: 'Custom (OpenAI-compatible)',
   nodus: 'Nodus local',
 };
 
@@ -138,6 +144,44 @@ export const DEFAULT_LOCAL_BASE_URLS: Record<LocalProvider, string> = {
   ollama: 'http://localhost:11434',
   lmstudio: 'http://localhost:1234',
 };
+
+// ── Custom (OpenAI-compatible) provider ──────────────────────────────────────
+// Pure normalisers, kept here rather than in electron/ai/providers.ts so that the
+// settings repository can call them without importing the module that reads
+// settings — that pair imports each other and the cycle is real.
+
+/**
+ * The endpoint exactly as typed, minus any trailing slash.
+ *
+ * Deliberately NOT `${url}/v1` the way the local providers build theirs: these
+ * gateways mount the OpenAI API wherever they please (LiteLLM at the root, vLLM
+ * at /v1, proxies under /openai/v1), so guessing the suffix would break as many
+ * installs as it fixed. The user pastes the complete base.
+ */
+export function normalizeCustomBaseUrl(raw: string): string {
+  return String(raw ?? '').trim().replace(/\/+$/, '');
+}
+
+/** Model slugs typed by hand: trimmed, de-duplicated, order preserved. */
+export function normalizeCustomModels(models: readonly string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of models ?? []) {
+    const id = String(raw ?? '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+/** Normalise a whole stored or incoming config blob. */
+export function normalizeCustomProviderConfig(config: Partial<CustomProviderConfig> | undefined): CustomProviderConfig {
+  return {
+    baseUrl: normalizeCustomBaseUrl(config?.baseUrl ?? ''),
+    models: normalizeCustomModels(config?.models),
+  };
+}
 
 /** Embedding-capable providers, in the order the Settings selector shows them. */
 export const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ['openai', 'gemini', 'openrouter', 'ollama', 'lmstudio', 'nodus'];

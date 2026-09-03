@@ -15,7 +15,12 @@ import type {
   OpenCodeGoUsageStatus,
 } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
-import { DEFAULT_LOCAL_BASE_URLS, supportsFreeTierShaping } from '@shared/providers';
+import {
+  DEFAULT_LOCAL_BASE_URLS,
+  normalizeCustomBaseUrl,
+  normalizeCustomModels,
+  supportsFreeTierShaping,
+} from '@shared/providers';
 import { AI_PROVIDERS, PROVIDER_LABELS, Icon, isLocalAiProvider, modelLabel, sameModel } from '../components/ui';
 import { IMAGE_PROVIDER_LABELS } from '@shared/providers';
 import { SettingsModelDot, SettingsModelList, settingsModelRowClass } from '../components/SettingsModelList';
@@ -125,6 +130,16 @@ export function ProvidersSettings({
               key={p}
               expanded={open === p}
               onToggle={() => setOpen(open === p ? null : p)}
+              isFav={isFav}
+              toggleFav={toggleFav}
+            />
+          ) : p === 'custom' ? (
+            <CustomProviderRow
+              key={p}
+              settings={settings}
+              expanded={open === p}
+              onToggle={() => setOpen(open === p ? null : p)}
+              onChange={onChange}
               isFav={isFav}
               toggleFav={toggleFav}
             />
@@ -861,6 +876,243 @@ function OpenCodeObservedCard({
         cap: cap.toFixed(0),
       })}</div>
       {period.unpricedRequests > 0 && <div className="text-amber-700 dark:text-amber-400">{tx('{n} sin precio estimable', { n: period.unpricedRequests })}</div>}
+    </div>
+  );
+}
+
+/**
+ * The user's own OpenAI-compatible endpoint.
+ *
+ * Not a LocalProviderRow: that one owns a context-window planner and a diagnostics
+ * panel that only mean something for Ollama/LM Studio, and it appends nothing to the
+ * URL — whereas the whole point here is that Nodus must not guess the path. What
+ * this row adds instead is the hand-written model list, which is what keeps a
+ * gateway without GET /models usable.
+ */
+function CustomProviderRow({
+  settings,
+  expanded,
+  onToggle,
+  onChange,
+  isFav,
+  toggleFav,
+}: {
+  settings: AppSettings;
+  expanded: boolean;
+  onToggle: () => void;
+  onChange: () => Promise<unknown>;
+  isFav: (m: ModelRef) => boolean;
+  toggleFav: (m: ModelRef) => Promise<void>;
+}) {
+  const config = settings.customProvider ?? { baseUrl: '', models: [] };
+  const savedUrl = config.baseUrl ?? '';
+  const manualModels = config.models ?? [];
+  const [urlInput, setUrlInput] = useState(savedUrl);
+  const [modelInput, setModelInput] = useState('');
+  const [keyInput, setKeyInput] = useState('');
+  const [models, setModels] = useState<ModelInfo[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [test, setTest] = useState<LocalProviderTestResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const hasKey = settings.providerKeys?.custom;
+
+  // Keep the field in sync when the saved value changes elsewhere (vault switch).
+  useEffect(() => setUrlInput(savedUrl), [savedUrl]);
+
+  const persist = async (patch: { baseUrl?: string; models?: string[] }) => {
+    await window.nodus.updateSettings({
+      customProvider: {
+        baseUrl: normalizeCustomBaseUrl(patch.baseUrl ?? savedUrl),
+        models: normalizeCustomModels(patch.models ?? manualModels),
+      },
+    });
+    await onChange();
+  };
+
+  const persistUrl = async () => {
+    const next = normalizeCustomBaseUrl(urlInput);
+    setUrlInput(next);
+    if (next !== savedUrl) await persist({ baseUrl: next });
+  };
+
+  const addModel = async () => {
+    const id = modelInput.trim();
+    if (!id) return;
+    setModelInput('');
+    await persist({ models: [...manualModels, id] });
+  };
+
+  const removeModel = async (id: string) => {
+    await persist({ models: manualModels.filter((model) => model !== id) });
+  };
+
+  const saveKey = async () => {
+    if (!keyInput.trim()) return;
+    await window.nodus.setApiKey('custom', keyInput.trim());
+    setKeyInput('');
+    await onChange();
+  };
+
+  const runTest = async () => {
+    setTesting(true);
+    setTest(null);
+    setError(null);
+    try {
+      await persistUrl();
+      setTest(await window.nodus.testCustomProvider());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const loadModels = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await persistUrl();
+      setModels(await window.nodus.listModels('custom'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filtered = (models ?? []).filter((m) => {
+    const q = search.toLowerCase();
+    return !q || (m.id ?? '').toLowerCase().includes(q) || (m.name ?? '').toLowerCase().includes(q);
+  });
+  const shown = filtered.slice(0, 300);
+
+  return (
+    <div className="border border-neutral-800 rounded-lg" data-testid="provider-row-custom">
+      <button className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm" onClick={onToggle}>
+        <span className="text-neutral-500">{expanded ? '▾' : '▸'}</span>
+        <span className="font-medium">{PROVIDER_LABELS.custom}</span>
+        <span className="text-xs text-neutral-600">{t('(tu servidor)')}</span>
+        <span className="ml-auto truncate font-mono text-[10px] text-neutral-500" title={savedUrl}>{savedUrl}</span>
+      </button>
+
+      {expanded && (
+        <div className="px-3 pb-3 space-y-2">
+          <p className="text-xs leading-5 text-neutral-500">
+            {t('Conecta Nodus con cualquier servidor que hable la API de OpenAI: LiteLLM, vLLM, el servidor de llama.cpp o un proxy propio.')}
+          </p>
+
+          <label className="block text-xs text-neutral-500">
+            {t('Dirección del servidor (URL completa)')}
+            <div className="mt-1 flex gap-2 items-center">
+              <input
+                className="input flex-1 font-mono"
+                data-testid="custom-provider-url"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                onBlur={() => void persistUrl()}
+                placeholder="http://localhost:8317/v1"
+                spellCheck={false}
+              />
+              <button className="btn btn-ghost border border-neutral-700" onClick={() => void runTest()} disabled={testing}>
+                {testing ? t('Probando…') : t('Probar conexión')}
+              </button>
+            </div>
+          </label>
+          <p className="text-xs leading-5 text-neutral-500">
+            {t('Nodus no añade "/v1" por su cuenta: escribe la ruta exacta que sirve tu servidor.')}
+          </p>
+
+          {test && (
+            <div className={`text-xs ${test.ok ? 'text-emerald-400' : 'text-red-400'}`} data-testid="custom-provider-test">
+              {test.ok
+                ? tx('Conectado{version} · {n} modelos disponibles', { version: '', n: test.modelCount ?? 0 })
+                : tx('Sin conexión: {msg}', { msg: test.message ?? '' })}
+            </div>
+          )}
+
+          <div className="flex gap-2 items-center">
+            <input
+              type="password"
+              className="input flex-1"
+              placeholder={hasKey ? t('•••••••• clave guardada (opcional)') : t('clave de API (opcional)')}
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+            />
+            <button className="btn btn-primary" onClick={saveKey}>{t('Guardar')}</button>
+            {hasKey && (
+              <button className="btn btn-ghost text-red-400" onClick={() => window.nodus.clearApiKey('custom').then(onChange)}>
+                {t('Borrar')}
+              </button>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-neutral-800 p-3 text-xs text-neutral-500">
+            <div className="font-medium text-neutral-300">{t('Modelos escritos a mano')}</div>
+            <p className="mt-1 leading-5">
+              {t('Si tu servidor no publica catálogo, escribe aquí los identificadores. Quedan guardados y se pueden elegir en cualquier selector de modelo.')}
+            </p>
+            <div className="mt-2 flex gap-2 items-center">
+              <input
+                className="input flex-1 font-mono"
+                data-testid="custom-provider-model-input"
+                value={modelInput}
+                onChange={(e) => setModelInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void addModel(); } }}
+                placeholder={t('identificador del modelo')}
+                spellCheck={false}
+              />
+              <button className="btn btn-ghost border border-neutral-700" onClick={() => void addModel()}>{t('Añadir')}</button>
+            </div>
+            {manualModels.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1" data-testid="custom-provider-manual-models">
+                {manualModels.map((id) => (
+                  <span key={id} className="flex items-center gap-1 rounded bg-neutral-800 px-2 py-0.5 text-xs text-neutral-300">
+                    <span className="font-mono">{id}</span>
+                    <button
+                      className="ml-0.5 grid h-4 w-4 shrink-0 place-items-center rounded text-neutral-500 hover:bg-neutral-700 hover:text-red-400"
+                      title={t('Quitar modelo')}
+                      aria-label={t('Quitar modelo')}
+                      onClick={() => void removeModel(id)}
+                    >
+                      <Icon name="x" size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2 items-center">
+            <button className="btn btn-ghost border border-neutral-700" onClick={loadModels} disabled={loading}>
+              {loading ? t('Cargando…') : t('Cargar modelos')}
+            </button>
+            {models && (
+              <input className="input flex-1" placeholder={t('Buscar modelo…')} value={search} onChange={(e) => setSearch(e.target.value)} />
+            )}
+            {models && <span className="text-xs text-neutral-500">{filtered.length}</span>}
+          </div>
+
+          {error && <div className="text-xs text-red-400">{error}</div>}
+
+          {models && (
+            <SettingsModelList className="max-h-64 overflow-y-auto" data-testid="provider-model-list-custom">
+              <ModelList provider="custom" models={shown} isFav={isFav} toggleFav={toggleFav} />
+              {models.length === 0 && (
+                <div className="p-3 text-xs text-neutral-500">{t('Ni el servidor publica modelos ni has escrito ninguno todavía.')}</div>
+              )}
+              {filtered.length > shown.length && (
+                <div className="text-xs text-neutral-600 p-2">{tx('Mostrando {n}; refina la búsqueda para ver más.', { n: shown.length })}</div>
+              )}
+            </SettingsModelList>
+          )}
+
+          <p className="text-xs leading-5 text-neutral-500">
+            {t('Este proveedor genera texto, no embeddings. Para la búsqueda semántica elige otro proveedor en Ajustes.')}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -677,6 +677,23 @@ try {
   await page.getByText(/Anthropic no permite que aplicaciones de terceros ofrezcan inicio de sesión de Claude\.ai/).waitFor();
   console.log('[e2e] provider UI exposes subscriptions, usage limits and real light/dark surfaces');
 
+  // The custom OpenAI-compatible provider: its whole reason to exist is that the
+  // user can name models a gateway never publishes, so the row must offer both the
+  // URL field and the manual-model list, and must store what it captured. Placed
+  // after the OpenCode assertions on purpose: this accordion shows one provider at
+  // a time, so expanding a row here collapses whatever the previous block opened.
+  const customProvider = page.getByTestId('provider-row-custom');
+  await customProvider.waitFor();
+  await customProvider.locator('button').first().click();
+  await customProvider.getByTestId('custom-provider-url').fill('http://127.0.0.1:8317/v1/');
+  await customProvider.getByTestId('custom-provider-model-input').fill('gateway-model-a');
+  await customProvider.getByRole('button', { name: 'Añadir', exact: true }).click();
+  await customProvider.getByTestId('custom-provider-manual-models').getByText('gateway-model-a', { exact: true }).waitFor();
+  const storedCustomProvider = await page.evaluate(async () => (await window.nodus.getSettings()).customProvider);
+  assert.deepEqual(storedCustomProvider, { baseUrl: 'http://127.0.0.1:8317/v1', models: ['gateway-model-a'] },
+    'the custom endpoint is stored normalised, with the hand-typed model');
+  console.log('[e2e] custom OpenAI-compatible provider accepts a URL and hand-typed models');
+
   // ── ChatGPT MCP connector: every semantic surface must work in both themes ──
   await page.getByRole('button', { name: 'Integraciones', exact: true }).click();
   const mcpSettingsCard = page.getByTestId('mcp-settings-card');
