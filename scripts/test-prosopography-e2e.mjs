@@ -100,10 +100,13 @@ try {
   // localStorage sentinel is being advanced. Follow the real startup sequence
   // instead of waiting behind it forever when a new release note has just landed.
   const whatsNewModal = page.getByTestId('whats-new-cinematic-modal');
-  if (await whatsNewModal.isVisible()) {
+  for (let staleMount = 0; staleMount < 2 && await whatsNewModal.isVisible(); staleMount += 1) {
     await whatsNewModal.getByRole('button', { name: 'Cerrar', exact: true }).click();
-    await whatsNewModal.waitFor({ state: 'detached' });
+    // A reload can finish mounting the fresh release modal just after the stale one
+    // closes. If that happens, close the fresh mount too before testing update startup.
+    await page.waitForTimeout(50);
   }
+  await whatsNewModal.waitFor({ state: 'detached' });
   const startupUpdateModal = page.getByTestId('startup-update-modal');
   await startupUpdateModal.waitFor();
   await page.waitForFunction(() =>

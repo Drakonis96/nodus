@@ -1002,7 +1002,7 @@ function LocalProviderRow({
                     : { contextMode: 'manual', manualContextTokens: Number(value) as 4096 | 8192 | 16384 | 32768 | 65536 | 131072 });
                 }}
               >
-                <option value="auto">{t('Auto (recomendado, hasta 16K)')}</option>
+                <option value="auto">{t('Auto (recomendado, hasta 32K)')}</option>
                 <option value="4096">4K</option>
                 <option value="8192">8K</option>
                 <option value="16384">16K</option>
@@ -1012,7 +1012,7 @@ function LocalProviderRow({
               </select>
             </div>
             <p className="mt-2 leading-5">
-              {t('El contexto contiene prompt y respuesta. El máximo de salida se calcula por separado para cada tarea. Auto divide los lotes antes de superar 16K.')}
+              {t('El contexto contiene prompt y respuesta. El máximo de salida se calcula por separado para cada tarea. Auto puede usar 32K en el análisis profundo y divide los lotes que no caben.')}
             </p>
             {localConfig.contextMode === 'manual' && Number(localConfig.manualContextTokens) >= 32768 && (
               <p className="mt-1 text-amber-400">

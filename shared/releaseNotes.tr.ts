@@ -534,3 +534,6 @@ export const RELEASE_NOTES_TR: Record<string, string[]> = {
     "\"Sharvard\" sesi düzeltildi: artık bir erkek sesi olarak görünüyor, motorun gerçekte gösterdiği de bu.",
   ],
 };
+
+// 5.1.5 intentionally ships the exact same What's New copy as 5.1.4.
+RELEASE_NOTES_TR["5.1.5"] = RELEASE_NOTES_TR["5.1.4"];

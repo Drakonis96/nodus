@@ -2398,7 +2398,8 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
- * 5.1.4 stands on its own, like 5.1.3 before it. Everyone who installed 5.1.3 already
+ * 5.1.4 stands on its own, like 5.1.3 before it. 5.1.5 intentionally reuses this
+ * exact modal for its focused hotfix. Everyone who installed 5.1.3 already
  * read its two entries, so repeating them here would bury the eight changes that are
  * actually new. The order below is the authored order and also the rendered one: the
  * modal groups highlights by scope and puts the largest cluster first, and `ai` (four)
@@ -2480,6 +2481,11 @@ const RELEASE_5_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.1.5',
+    date: '2026-09-03',
+    highlights: RELEASE_5_1_4_HIGHLIGHTS,
+  },
   {
     version: '5.1.4',
     date: '2026-09-02',

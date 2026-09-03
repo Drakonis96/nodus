@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 5.1.5 — 2026-09-03
+
+Nodus 5.1.5 is a focused hotfix for local idea extraction with reasoning
+models, restoring the reliable 16K output allowance used before 5.1.4.
+
+- Restored a real 16K structured-output allowance for deep idea extraction,
+  independent of the prompt and context-window budget, with enough transport
+  time for a slow local model to finish that allowance.
+- Allowed automatic context planning to select 32K for deep extraction when
+  needed, while retaining the previous 16K automatic ceiling for ordinary
+  local-model tasks.
+- Kept LM Studio reasoning traces separate from the assistant JSON and detected
+  responses that spend their full allowance on reasoning, so adaptive recovery
+  can split and retry the source instead of silently losing the analysis.
+- Added regressions for the 16K/32K planner contract and LM Studio's native
+  reasoning-exhaustion response shape.
+
 ## 5.1.4 — 2026-09-02
 
 Nodus 5.1.4 writes every AI instruction natively in the eight interface

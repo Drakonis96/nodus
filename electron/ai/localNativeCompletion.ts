@@ -111,9 +111,15 @@ function lmStudioText(data: any): string {
   if (typeof data?.message?.content === 'string') return data.message.content;
   const output = Array.isArray(data?.output) ? data.output : [];
   return output.flatMap((item: any) => {
+    // Native v1 returns reasoning and assistant messages as sibling output items.
+    // Reasoning is not part of the answer and may itself contain JSON fragments.
+    if (item?.type && item.type !== 'message') return [];
     if (typeof item?.content === 'string') return [item.content];
     if (!Array.isArray(item?.content)) return [];
-    return item.content.map((part: any) => part?.text ?? part?.content ?? '').filter(Boolean);
+    return item.content
+      .filter((part: any) => part?.type !== 'reasoning')
+      .map((part: any) => part?.text ?? part?.content ?? '')
+      .filter(Boolean);
   }).join('');
 }
 
@@ -146,11 +152,19 @@ async function lmStudio(request: LocalNativeRequest): Promise<LocalNativeResult>
     if (!res.ok) throw await errorFor(res);
     const data = await res.json() as any;
     const stats = data?.stats ?? data?.usage ?? {};
+    const outputTokens = Number(stats?.total_output_tokens ?? stats?.output_tokens ?? stats?.completion_tokens) || undefined;
+    const reportedFinishReason = data?.finish_reason ?? data?.stop_reason ?? data?.status;
+    // LM Studio native v1 does not consistently expose a finish reason. Its total
+    // output count includes reasoning, so equality with the allowance is the durable
+    // signal for a model that spent the whole budget before emitting complete JSON.
+    const finishReason = outputTokens != null && outputTokens >= request.outputTokens
+      ? 'max_output_tokens'
+      : reportedFinishReason;
     return {
       text: lmStudioText(data),
-      finishReason: data?.finish_reason ?? data?.stop_reason ?? data?.status,
+      finishReason,
       inputTokens: Number(stats?.input_tokens ?? stats?.prompt_tokens) || undefined,
-      outputTokens: Number(stats?.total_output_tokens ?? stats?.output_tokens ?? stats?.completion_tokens) || undefined,
+      outputTokens,
       reasoningTokens: Number(stats?.reasoning_output_tokens ?? stats?.reasoning_tokens) || undefined,
     };
   } finally {

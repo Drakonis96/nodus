@@ -535,3 +535,6 @@ export const RELEASE_NOTES_IT: Record<string, string[]> = {
     "Risolto il problema con la voce \"Sharvard\": ora appare come una voce maschile, che è ciò che effettivamente rende il motore."
   ]
 };
+
+// 5.1.5 intentionally ships the exact same What's New copy as 5.1.4.
+RELEASE_NOTES_IT["5.1.5"] = RELEASE_NOTES_IT["5.1.4"];

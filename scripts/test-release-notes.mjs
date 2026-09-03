@@ -24,12 +24,12 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
-  // 5.1.4 stands alone like 5.1.3 before it: whoever installed 5.1.3 already read its
-  // two entries. The scope order below is also the rendered order, because the modal
-  // puts the largest scope cluster first and `ai` carries four of the eight.
+  // 5.1.5 deliberately duplicates the 5.1.4 modal for this focused hotfix. The scope
+  // order below is also the rendered order, because the modal puts the largest scope
+  // cluster first and `ai` carries four of the eight.
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.1.4');
-  assert.equal(currentRelease?.date, '2026-09-02');
+  assert.equal(currentRelease?.version, '5.1.5');
+  assert.equal(currentRelease?.date, '2026-09-03');
   assert.equal(currentRelease?.highlights.length, 8);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
     'ai', 'ai', 'ai', 'ai', 'academic', 'academic', 'library', 'zotero',
@@ -44,6 +44,10 @@ try {
     /sortable columns/,
     /stops piling up memory/,
   ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+
+  const release514 = RELEASE_NOTES.find((note) => note.version === '5.1.4');
+  assert.equal(release514?.date, '2026-09-02');
+  assert.deepEqual(currentRelease?.highlights, release514?.highlights);
 
   // 5.1.3 keeps the focused two-item modal it shipped with. Apple notarization leads
   // it so the trust change stayed the first thing macOS users saw.

@@ -338,8 +338,8 @@ function truncatedJsonMessage(model: ModelRef, maxTokens: number): string {
  * A cloud provider that has said nothing for three minutes is stuck: it runs the model
  * on hardware sized for it, and the request is billed whether or not we keep waiting.
  * A model on the user's own laptop is a different animal — the wait IS the work. Idea
- * extraction asks for up to 8.000 JSON tokens per chunk, which at the 15-40 tokens/s a
- * quantized 7B reaches on an M-series is 200-530 seconds of perfectly healthy
+ * extraction asks for up to 16.000 JSON tokens per chunk, which at the 15-40 tokens/s a
+ * quantized 7B reaches on an M-series is 400-1.067 seconds of perfectly healthy
  * generation. Under one shared 180s ceiling that arrived as "timed out waiting for the
  * AI provider" on every chunk, which is why local models could produce Themes (1.500
  * tokens, one call) and never Ideas. Nothing is billed by the second here and the deep
@@ -347,7 +347,7 @@ function truncatedJsonMessage(model: ModelRef, maxTokens: number): string {
  * finite because a wedged local server must not hold the scan queue open forever.
  */
 const CLOUD_COMPLETION_TIMEOUT_MS = 180_000;
-const ON_DEVICE_COMPLETION_TIMEOUT_MS = 900_000;
+const ON_DEVICE_COMPLETION_TIMEOUT_MS = 1_200_000;
 
 /** True when the model runs on this machine: the built-in runtime, or a local server. */
 function runsOnDevice(provider: AiProvider): boolean {
