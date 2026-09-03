@@ -4,6 +4,7 @@
 const { execFileSync } = require('node:child_process');
 const { copyFileSync, existsSync, mkdirSync } = require('node:fs');
 const path = require('node:path');
+const { Arch } = require('electron-builder');
 const { verifyPackagedNativeRuntime } = require('../scripts/verify-packaged-native-runtime.cjs');
 
 exports.default = async function afterPack(context) {
@@ -30,10 +31,11 @@ exports.default = async function afterPack(context) {
 
   if (context.electronPlatformName !== 'darwin') return;
 
-  // npm optional native packages follow the runner architecture. The macOS
-  // product is ARM64-only, so fail packaging before signing if an Intel runner
-  // (or a stale Intel dependency tree) ever slips back into the release path.
-  verifyPackagedNativeRuntime(appPath);
+  // npm optional native packages follow the runner architecture, so each macOS
+  // product must be packed on a host of its own architecture. Fail before
+  // signing if the dependency tree does not match the slice being packed —
+  // a mixed bundle installs fine and only breaks on the user's machine.
+  verifyPackagedNativeRuntime(appPath, Arch[context.arch]);
 
   if (process.env.NODUS_REQUIRE_MACOS_SIGNING === 'true') {
     console.log(`[afterPack] Deferred ${appPath} to the mandatory Developer ID signer`);

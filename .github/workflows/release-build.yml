@@ -62,11 +62,25 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # The application targets Apple Silicon. npm selects native optional
-          # dependencies from the host architecture, so this must be ARM64 too.
+          # macOS ships one single-architecture product per slice. npm selects
+          # native optional dependencies from the host architecture, so each
+          # slice must be packed on a host of that same architecture: there is
+          # no runner that can honestly produce both. macos-15-intel is the last
+          # x86_64 image GitHub offers, available until August 2027.
+          #
+          # The arch flag is what picks the slice: build.mac.target deliberately
+          # carries no `arch` key, because an explicit one there is NOT narrowed
+          # by the CLI flag (computeArchToTargetNamesMap only falls back to the
+          # requested arch when the target omits it) and each runner would try
+          # to pack the architecture it has no dependencies for.
           - os: macos-latest
-            platform: '--mac'
-            asset-platform: mac
+            platform: '--mac --arm64'
+            asset-platform: mac-arm64
+            mac_arch: arm64
+          - os: macos-15-intel
+            platform: '--mac --x64'
+            asset-platform: mac-x64
+            mac_arch: x64
           - os: windows-latest
             platform: '--win'
             asset-platform: win
@@ -107,7 +121,7 @@ jobs:
         run: npm run build
 
       - name: Prepare temporary macOS signing keychain
-        if: matrix.os == 'macos-latest'
+        if: startsWith(matrix.os, 'macos')
         shell: bash
         env:
           MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
@@ -199,7 +213,7 @@ jobs:
         run: npx electron-builder ${{ matrix.platform }} --publish never --config build/electron-builder.release.cjs
 
       - name: Build, sign and notarize macOS artifacts
-        if: matrix.os == 'macos-latest'
+        if: startsWith(matrix.os, 'macos')
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: true
           NODUS_REQUIRE_MACOS_SIGNING: true
@@ -208,15 +222,15 @@ jobs:
         run: npx electron-builder ${{ matrix.platform }} --publish never --config build/electron-builder.release.cjs
 
       - name: Verify signed and notarized macOS release artifacts
-        if: matrix.os == 'macos-latest'
-        run: node scripts/verify-macos-release.cjs release
+        if: startsWith(matrix.os, 'macos')
+        run: node scripts/verify-macos-release.cjs release ${{ matrix.mac_arch }}
 
       - name: Build Linux installer
         if: matrix.os == 'ubuntu-latest'
         run: npx electron-builder ${{ matrix.platform }} --publish never --config build/electron-builder.release.cjs
 
       - name: Remove temporary macOS credentials
-        if: always() && matrix.os == 'macos-latest'
+        if: always() && startsWith(matrix.os, 'macos')
         shell: bash
         run: |
           set +e
@@ -232,6 +246,80 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/upload-release-assets.mjs ${{ matrix.asset-platform }}
+
+      # upload-release-assets.mjs deliberately does not publish the macOS
+      # manifest: both runners write a <channel>-mac.yml naming only their own
+      # files, so uploading them would leave whichever job finished last and
+      # break updates for the other architecture. Park them under distinct
+      # names for merge-mac-manifest, which removes them again.
+      - name: Park this architecture's update manifest for the merge job
+        if: startsWith(matrix.os, 'macos')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHANNEL: ${{ inputs.channel }}
+          MAC_ARCH: ${{ matrix.mac_arch }}
+        run: |
+          set -euo pipefail
+          cp "release/${CHANNEL}-mac.yml" "release/${CHANNEL}-mac-${MAC_ARCH}.yml"
+          gh release upload "$RELEASE_TAG" \
+            "release/${CHANNEL}-mac-${MAC_ARCH}.yml" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+  merge-mac-manifest:
+    # electron-updater reads exactly one <channel>-mac.yml per release and picks
+    # its file from the `files` list by architecture. Two runners each produced
+    # a manifest listing only their own half, so combine them here instead of
+    # letting the second upload overwrite the first. Both halves are required:
+    # publishing a manifest that names only one architecture would leave the
+    # other one either unable to update or silently updating to the wrong build.
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      CHANNEL: ${{ inputs.channel }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Merge both macOS update manifests into the published one
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          for arch in arm64 x64; do
+            gh release download "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern "${CHANNEL}-mac-${arch}.yml" \
+              --dir "$work"
+          done
+          node scripts/merge-mac-update-manifest.mjs \
+            "$work/${CHANNEL}-mac.yml" \
+            "$work/${CHANNEL}-mac-arm64.yml" \
+            "$work/${CHANNEL}-mac-x64.yml"
+          gh release upload "$RELEASE_TAG" \
+            "$work/${CHANNEL}-mac.yml" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+      - name: Remove the per-architecture manifests from the release
+        run: |
+          set -euo pipefail
+          for arch in arm64 x64; do
+            gh release delete-asset "$RELEASE_TAG" "${CHANNEL}-mac-${arch}.yml" \
+              --repo "$GITHUB_REPOSITORY" --yes
+          done
 
   build-zotero-plugin:
     # The fixed-name plugin assets remain stable-only: installed plugins resolve
@@ -278,9 +366,11 @@ jobs:
     if: >-
       always() &&
       needs.release.result == 'success' &&
+      needs.merge-mac-manifest.result == 'success' &&
       (inputs.channel == 'beta' || needs.build-zotero-plugin.result == 'success')
     needs:
       - release
+      - merge-mac-manifest
       - build-zotero-plugin
     runs-on: ubuntu-latest
     env:
@@ -293,6 +383,7 @@ jobs:
           assets="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
           expected=(
             Nodus-mac-arm64.dmg
+            Nodus-mac-x64.dmg
             Nodus-win-x64.exe
             Nodus-linux-amd64.deb
             Nodus-linux-x86_64.AppImage
@@ -322,6 +413,36 @@ jobs:
               fi
             done
           fi
+
+      - name: Verify the published macOS manifest serves both architectures
+        run: |
+          set -euo pipefail
+          verify_dir="$(mktemp -d)"
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "${RELEASE_CHANNEL}-mac.yml" \
+            --dir "$verify_dir"
+          manifest="$verify_dir/${RELEASE_CHANNEL}-mac.yml"
+          for arch in arm64 x64; do
+            if ! grep -q "Nodus-mac-${arch}.zip" "$manifest"; then
+              echo "::error::The published macOS update manifest does not list Nodus-mac-${arch}.zip"
+              exit 1
+            fi
+          done
+          # The deprecated top-level pointer is what a client reads when it
+          # ignores `files` entirely. It must stay on arm64 or every Apple
+          # silicon install would quietly move itself to the Intel build.
+          if ! grep -qx "path: Nodus-mac-arm64.zip" "$manifest"; then
+            echo "::error::The macOS compatibility pointer must stay on the arm64 ZIP"
+            exit 1
+          fi
+          for arch in arm64 x64; do
+            if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '.assets[].name' | grep -Fxq "${RELEASE_CHANNEL}-mac-${arch}.yml"; then
+              echo "::error::The per-architecture manifest ${RELEASE_CHANNEL}-mac-${arch}.yml was left on the release"
+              exit 1
+            fi
+          done
 
       - name: Verify published Zotero integrity chain
         if: env.RELEASE_CHANNEL == 'latest'

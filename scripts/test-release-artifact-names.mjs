@@ -38,6 +38,8 @@ function artifactName(template, { os, arch, ext }) {
 const PUBLISHED = [
   { os: 'mac', arch: 'arm64', ext: 'dmg', name: 'Nodus-mac-arm64.dmg' },
   { os: 'mac', arch: 'arm64', ext: 'zip', name: 'Nodus-mac-arm64.zip' },
+  { os: 'mac', arch: 'x64', ext: 'dmg', name: 'Nodus-mac-x64.dmg' },
+  { os: 'mac', arch: 'x64', ext: 'zip', name: 'Nodus-mac-x64.zip' },
   { os: 'win', arch: 'x64', ext: 'exe', name: 'Nodus-win-x64.exe' },
   { os: 'linux', arch: 'amd64', ext: 'deb', name: 'Nodus-linux-amd64.deb' },
   { os: 'linux', arch: 'x86_64', ext: 'AppImage', name: 'Nodus-linux-x86_64.AppImage' },
@@ -83,13 +85,16 @@ test('the uploader expects the names the builder produces', () => {
     assert.ok(uploader.includes(`'${target.name}'`),
       `upload-release-assets.mjs must expect ${target.name}`);
   }
-  // And it selects by the same literal prefix the template is pinned to.
-  assert.match(uploader, /startsWith\('Nodus-'\)/);
+  // And it selects by literal prefixes of the same pinned template, never by a
+  // pattern derived from the product name.
+  for (const prefix of ['Nodus-mac-arm64', 'Nodus-mac-x64', 'Nodus-win', 'Nodus-linux']) {
+    assert.ok(uploader.includes(`'${prefix}'`), `upload-release-assets.mjs must select by ${prefix}`);
+  }
 });
 
 test('the release workflow verifies the same names before publishing', () => {
   const workflow = read('.github/workflows/release-build.yml');
-  for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-win-x64.exe', 'Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage']) {
+  for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-mac-x64.dmg', 'Nodus-win-x64.exe', 'Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage']) {
     assert.ok(workflow.includes(name), `the release workflow must verify ${name}`);
   }
 });
@@ -97,7 +102,11 @@ test('the release workflow verifies the same names before publishing', () => {
 test('the download links the public actually clicks resolve to these names', () => {
   const base = 'https://github.com/Drakonis96/nodus/releases/latest/download/';
   const page = read('site/app/index.html');
-  for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-win-x64.exe', 'Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage']) {
+  for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-mac-x64.dmg', 'Nodus-win-x64.exe', 'Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage']) {
     assert.ok(page.includes(`${base}${name}`), `site/app/index.html links ${name}`);
+  }
+  const readme = read('README.md');
+  for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-mac-x64.dmg']) {
+    assert.ok(readme.includes(`${base}${name}`), `README.md links ${name}`);
   }
 });

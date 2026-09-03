@@ -119,8 +119,16 @@ test('stable and beta publication have isolated entry points and shared build lo
   assert.match(shared, /beta-mac\.yml beta\.yml beta-linux\.yml/);
   assert.match(shared, /Beta release contains stable update manifest/);
   assert.match(shared, /--prerelease --latest=false/);
-  assert.match(shared, /- os: macos-latest/, 'ARM64 macOS packaging runs on an ARM64 host for native optional dependencies');
-  assert.doesNotMatch(shared, /macos-15-intel/, 'the ARM64 application is never packaged from an Intel dependency tree');
+  assert.match(shared, /- os: macos-latest/, 'Apple silicon packaging runs on an ARM64 host for native optional dependencies');
+  assert.match(shared, /- os: macos-15-intel/, 'Intel packaging runs on an Intel host for native optional dependencies');
+  assert.match(shared, /platform: '--mac --arm64'/, 'each macOS runner packs exactly one architecture');
+  assert.match(shared, /platform: '--mac --x64'/, 'each macOS runner packs exactly one architecture');
+  // Neither macOS runner may publish <channel>-mac.yml: each one lists only its
+  // own files, so the second upload would decide which architecture can still
+  // update itself. One job merges them and publication waits for it.
+  assert.match(shared, /merge-mac-manifest:/, 'the two macOS manifests are merged into the published one');
+  assert.match(shared, /needs\.merge-mac-manifest\.result == 'success'/, 'publication waits for the merged manifest');
+  assert.match(shared, /merge-mac-update-manifest\.mjs/, 'the merge job runs the audited merger');
   assert.match(shared, /node node_modules\/electron\/install\.js/, 'release runners install Electron legal files before packaging');
   assert.match(shared, /gh release create[\s\S]*--draft/, 'the workflow creates one explicit draft before native builds');
   assert.match(shared, /upload-release-assets\.mjs/, 'all platforms upload to the explicit shared draft');
@@ -129,25 +137,33 @@ test('stable and beta publication have isolated entry points and shared build lo
   const lock = JSON.parse(await read('package-lock.json'));
   const nativePackages = [
     '@esbuild/darwin-arm64',
+    '@esbuild/darwin-x64',
     '@esbuild/linux-x64',
     '@esbuild/win32-x64',
     '@github/copilot-darwin-arm64',
+    '@github/copilot-darwin-x64',
     '@github/copilot-linux-x64',
     '@github/copilot-win32-x64',
     '@img/sharp-darwin-arm64',
+    '@img/sharp-darwin-x64',
     '@img/sharp-libvips-darwin-arm64',
+    '@img/sharp-libvips-darwin-x64',
     '@img/sharp-linux-x64',
     '@img/sharp-win32-x64',
     '@koromix/koffi-darwin-arm64',
+    '@koromix/koffi-darwin-x64',
     '@koromix/koffi-linux-x64',
     '@koromix/koffi-win32-x64',
     '@napi-rs/canvas-darwin-arm64',
+    '@napi-rs/canvas-darwin-x64',
     '@napi-rs/canvas-linux-x64-gnu',
     '@napi-rs/canvas-win32-x64-msvc',
     '@openai/codex-darwin-arm64',
+    '@openai/codex-darwin-x64',
     '@openai/codex-linux-x64',
     '@openai/codex-win32-x64',
     '@rollup/rollup-darwin-arm64',
+    '@rollup/rollup-darwin-x64',
     '@rollup/rollup-linux-x64-gnu',
     '@rollup/rollup-win32-x64-msvc',
   ];
@@ -158,6 +174,11 @@ test('stable and beta publication have isolated entry points and shared build lo
     assert.ok(entry.integrity, `${packageName} has a deterministic integrity hash`);
   }
   assert.equal(lock.packages['node_modules/@koromix/koffi-darwin-arm64'].version, '3.1.1');
+  assert.equal(
+    lock.packages['node_modules/@koromix/koffi-darwin-x64'].version,
+    lock.packages['node_modules/@koromix/koffi-darwin-arm64'].version,
+    'both macOS runners must resolve the same Koffi release',
+  );
   assert.equal(
     lock.packages['node_modules/@rollup/rollup-darwin-arm64'].version,
     lock.packages['node_modules/rollup'].version,

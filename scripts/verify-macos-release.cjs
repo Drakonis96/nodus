@@ -35,12 +35,17 @@ function assertSameApp(candidate, expected, label) {
   }
 }
 
-function verifyRelease(releaseDirectory) {
+const SUPPORTED_ARCHITECTURES = ['arm64', 'x64'];
+
+function verifyRelease(releaseDirectory, architecture) {
   if (process.platform !== 'darwin') fail('artifact verification must run on macOS');
+  if (!SUPPORTED_ARCHITECTURES.includes(architecture)) {
+    fail(`unsupported macOS architecture: ${architecture} (expected ${SUPPORTED_ARCHITECTURES.join(' or ')})`);
+  }
   const releaseDir = path.resolve(releaseDirectory);
   const appPath = findApp(releaseDir);
-  const dmgPath = path.join(releaseDir, 'Nodus-mac-arm64.dmg');
-  const zipPath = path.join(releaseDir, 'Nodus-mac-arm64.zip');
+  const dmgPath = path.join(releaseDir, `Nodus-mac-${architecture}.dmg`);
+  const zipPath = path.join(releaseDir, `Nodus-mac-${architecture}.zip`);
   for (const required of [appPath, dmgPath, zipPath]) {
     if (!required || !existsSync(required)) fail(`missing release output: ${required ?? 'Nodus.app'}`);
   }
@@ -69,9 +74,11 @@ function verifyRelease(releaseDirectory) {
     rmSync(scratch, { recursive: true, force: true });
   }
 
-  console.log('[macOS release] Verified app, ZIP and DMG; publication may proceed');
+  console.log(`[macOS release] Verified ${architecture} app, ZIP and DMG; publication may proceed`);
 }
 
-if (require.main === module) verifyRelease(process.argv[2] ?? path.join(__dirname, '..', 'release'));
+if (require.main === module) {
+  verifyRelease(process.argv[2] ?? path.join(__dirname, '..', 'release'), process.argv[3]);
+}
 
-module.exports = { verifyRelease };
+module.exports = { SUPPORTED_ARCHITECTURES, verifyRelease };
