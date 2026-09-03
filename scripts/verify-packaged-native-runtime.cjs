@@ -43,14 +43,26 @@ const REQUIRED_BINARY_PATTERNS = {
   ],
 };
 
-// The markers of the OTHER macOS architecture. These are matched against the
-// asar listing only: some vendored packages legitimately carry every platform's
-// prebuild (@github/copilot bundles a clipboard addon for all six targets), and
-// those live in app.asar.unpacked, outside this listing.
-const FOREIGN_PACKAGE_MARKERS = {
-  arm64: [/darwin-x64/i, /darwin_x64/i, /x86_64-apple-darwin/i],
-  x64: [/darwin-arm64/i, /darwin_arm64/i, /aarch64-apple-darwin/i],
-};
+// npm names an architecture-specific package with the target as a suffix, so
+// what has to be absent is a TOP-LEVEL package of the other architecture:
+// `@img/sharp-darwin-arm64` inside the Intel app is what breaks at first launch.
+//
+// This deliberately reads the package name and not the whole path. Vendored
+// binaries for every platform live inside the correct package and are perfectly
+// legitimate — @github/copilot-darwin-x64 ships ripgrep and tgrep for
+// darwin-arm64 among others — and a substring match over the path flagged those
+// and failed the first Intel build ever attempted. Nested node_modules are the
+// vendor's own business for the same reason, so only the top level is read.
+const FOREIGN_PACKAGE_SUFFIXES = { arm64: '-darwin-x64', x64: '-darwin-arm64' };
+
+/** The top-level package an asar entry belongs to, or null if it is nested. */
+function topLevelPackage(entry) {
+  const segments = entry.split('node_modules/');
+  if (segments.length !== 2) return null; // not in node_modules, or vendored deeper
+  const parts = segments[1].split('/');
+  if (parts.length === 0) return null;
+  return parts[0].startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+}
 
 function assertSupportedArchitecture(architecture) {
   if (!SUPPORTED_ARCHITECTURES.includes(architecture)) {
@@ -62,8 +74,13 @@ function assertSupportedArchitecture(architecture) {
 
 function findForeignRuntimePaths(architecture, entries) {
   assertSupportedArchitecture(architecture);
-  const markers = FOREIGN_PACKAGE_MARKERS[architecture];
-  return entries.filter((entry) => markers.some((marker) => marker.test(entry)));
+  const suffix = FOREIGN_PACKAGE_SUFFIXES[architecture];
+  const foreign = new Set();
+  for (const entry of entries) {
+    const packageName = topLevelPackage(entry);
+    if (packageName && packageName.endsWith(suffix)) foreign.add(packageName);
+  }
+  return [...foreign].sort();
 }
 
 function getArchitectures(filename) {
@@ -104,10 +121,10 @@ function verifyPackagedNativeRuntime(appPath, architecture, options = {}) {
   if (!existsSync(asarPath)) throw new Error(`Missing packaged application archive: ${asarPath}`);
 
   const archiveEntries = (options.listPackage || asar.listPackage)(asarPath);
-  const foreignEntries = findForeignRuntimePaths(architecture, archiveEntries);
-  if (foreignEntries.length > 0) {
+  const foreignPackages = findForeignRuntimePaths(architecture, archiveEntries);
+  if (foreignPackages.length > 0) {
     throw new Error(
-      `macOS runtime packages for the other architecture were bundled into the ${architecture} app:\n${foreignEntries.slice(0, 20).join('\n')}`,
+      `macOS runtime packages for the other architecture were bundled into the ${architecture} app:\n${foreignPackages.join('\n')}`,
     );
   }
 
@@ -139,6 +156,7 @@ module.exports = {
   SUPPORTED_ARCHITECTURES,
   REQUIRED_BINARIES,
   REQUIRED_BINARY_PATTERNS,
+  topLevelPackage,
   assertBinaryArchitecture,
   findUniquePackagedBinary,
   findForeignRuntimePaths,
