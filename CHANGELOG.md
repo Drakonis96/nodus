@@ -2,7 +2,27 @@
 
 ## Unreleased
 
-## 5.1.5 — 2026-09-03
+## 5.1.6 — 2026-09-03
+
+Nodus 5.1.6 adds a custom OpenAI-compatible AI provider in Settings and
+completes the interface translation of progress bars and main-process errors.
+
+- Added a `custom` AI provider for the user's own OpenAI-compatible endpoint
+  (gateways, local servers and proxies). The base URL is used exactly as typed
+  apart from the trailing slash, the model list combines hand-typed slugs with
+  an optional `GET /models` discovery, and Settings offers connection testing
+  with an optional API key stored like the other credentials.
+- Sent the OpenCode Go session header (`x-opencode-session`) with a named
+  `Nodus/<version>` User-Agent on every opencode.ai call, grouping each unit
+  of work under a fresh random session id that is never persisted.
+- Translated every progress-bar line into all seven non-Spanish interface
+  languages and stopped healthy states from being rewritten as errors, while
+  preserving library and work names verbatim.
+- Translated every main-process error into all seven non-Spanish interface
+  languages, so connection tests and failure notices now state their real
+  cause instead of leaking Spanish or collapsing into the generic notice.
+- Added regression coverage pinning the custom-provider contract, the
+  progress-bar language round-trip and the main-process error catalogue.
 
 Nodus 5.1.5 is a focused hotfix for local idea extraction with reasoning
 models, restoring the reliable 16K output allowance used before 5.1.4.

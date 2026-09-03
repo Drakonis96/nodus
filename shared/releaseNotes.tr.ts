@@ -106,6 +106,11 @@ const RELEASE_5_1_0_TR = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.1.6": [
+    "İlerleme çubukları artık dilinizi konuşuyor. Dizin oluşturma, embedding, pasaj, kuyruk ve Zotero içe aktarma satırları sekiz dilde çevrilmiş görünüyor. Her şey yolundayken hatalı hata uyarıları artık görünmüyor ve kitaplık ile eser adlarınız aynen korunuyor.",
+    "Ana işlem hataları artık dilinize çevrilmiş olarak geliyor. Eskiden İspanyolca veya genel bir uyarı olarak görünen binden fazla ileti artık gerçek nedenini açıklıyor. Bağlantı testi bunu açıkça gösteriyor. Ollama yanıt vermezse adresini, HTTP kodunu ve çalışıp çalışmadığı sorusunu göreceksiniz.",
+    "Ayarlar, OpenAI API ile uyumlu özel bir sağlayıcı kazanıyor. Nodus yola hiçbir şey eklemeden sunucunuzun tam adresini yazın ve diğer sağlayıcıları ya da kendi proxinizi bağlayın. Modellerinizi elle yazabilir, sunucunun yayımladıklarını keşfedebilir ve kullanmadan önce bağlantıyı test edebilirsiniz. Anahtar isteğe bağlıdır ve diğer kimlik bilgileri gibi saklanır.",
+  ],
   "5.1.4": [
     "Nodus’un yapay zekâya gönderdiği yönergeler artık sekiz arayüz dilinin tamamında özgün olarak yazılıyor. Daha önce neredeyse tümü İspanyolca hazırlanıyor ve modelden yalnızca başka bir dilde yanıt vermesi isteniyordu, bu da yanıtın kalitesinde ve seçilen terimlerde kendini gösteriyordu. Artık her görevin kendi dilinizde bir yönerge sözleşmesi var: derlem analizinden Deep Research’e, Öğretmen’e, Yazma Atölyesi’ne, Sözlük’e ve Nodi’ye kadar. Protokol anahtarları, tanımlayıcılar ve alıntı kuralları olduğu gibi korunuyor.",
     "Uygulamanın arayüz dışında ürettiği metinler artık İspanyolca çıkmıyor. Word eklentisinin uyarıları, web sunucusunun iletileri, sistemin yerel iletişim kutuları ve Nodi belgeleri artık seçtiğiniz dili izliyor. Nodus’u Türkçe kullanıp İspanyolca uyarılar görüyorduysanız bu sona erdi.",

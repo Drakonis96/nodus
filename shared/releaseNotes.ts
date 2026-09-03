@@ -2480,7 +2480,49 @@ const RELEASE_5_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+/**
+ * v5.1.6 stands on its own with the three changes that are actually new: a
+ * custom OpenAI-compatible provider in Settings, and the two translation
+ * repairs for progress bars and main-process errors. The order below is the
+ * authored order and also the rendered one: the modal groups highlights by
+ * scope and puts the largest cluster first, and `languages` (two) leads `ai`.
+ */
+const RELEASE_5_1_6_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'languages',
+    es: 'Las barras de progreso hablan ya tu idioma. Las líneas de indexación, embeddings, pasajes, cola e importación de Zotero se muestran traducidas en los ocho idiomas. Además dejan de aparecer avisos de error cuando todo va bien y conservan los nombres de tus bibliotecas y obras tal como son.',
+    en: 'Progress bars now speak your language. Indexing, embeddings, passages, queue and Zotero import lines appear translated in all eight languages. False error notices no longer show up when everything is fine, and your library and work names stay exactly as they are.',
+    fr: 'Les barres de progression parlent désormais votre langue. Les lignes d’indexation, d’embeddings, de passages, de file d’attente et d’importation Zotero s’affichent traduites dans les huit langues. Les faux avis d’erreur n’apparaissent plus quand tout va bien, et les noms de vos bibliothèques et de vos œuvres restent intacts.',
+    de: 'Die Fortschrittsleisten sprechen jetzt Ihre Sprache. Die Zeilen für Indexierung, Embeddings, Passagen, Warteschlange und Zotero-Import erscheinen in allen acht Sprachen übersetzt. Falsche Fehlermeldungen erscheinen nicht mehr, wenn alles in Ordnung ist, und die Namen Ihrer Bibliotheken und Werke bleiben genau wie sie sind.',
+    pt: 'As barras de progresso falam agora o seu idioma. As linhas de indexação, embeddings, passagens, fila e importação do Zotero aparecem traduzidas nos oito idiomas. Os falsos avisos de erro deixam de aparecer quando está tudo bem e os nomes das suas bibliotecas e obras mantêm-se tal como são.',
+    'pt-BR': 'As barras de progresso agora falam o seu idioma. As linhas de indexação, embeddings, trechos, fila e importação do Zotero aparecem traduzidas nos oito idiomas. Os falsos avisos de erro não aparecem mais quando está tudo bem, e os nomes das suas bibliotecas e obras continuam exatamente como são.',
+  },
+  {
+    scope: 'languages',
+    es: 'Los errores del proceso principal llegan ya traducidos a tu idioma. Más de mil mensajes que antes salían en español o como un aviso genérico explican ahora su causa real. La prueba de conexión lo muestra claro. Si Ollama no responde, verás su dirección, el código HTTP y la pregunta de si está en marcha.',
+    en: 'Main-process errors now arrive translated into your language. More than a thousand messages that used to appear in Spanish or as a generic notice now explain their real cause. The connection test shows it clearly. If Ollama does not answer, you will see its address, the HTTP code and the question of whether it is running.',
+    fr: 'Les erreurs du processus principal arrivent désormais traduites dans votre langue. Plus de mille messages qui s’affichaient en espagnol ou sous forme d’avis générique expliquent maintenant leur cause réelle. Le test de connexion le montre bien. Si Ollama ne répond pas, vous verrez son adresse, le code HTTP et la question de savoir s’il est en cours d’exécution.',
+    de: 'Fehler aus dem Hauptprozess kommen jetzt in Ihrer Sprache übersetzt an. Mehr als tausend Meldungen, die zuvor auf Spanisch oder als allgemeiner Hinweis erschienen, erklären nun ihre tatsächliche Ursache. Der Verbindungstest zeigt es deutlich. Antwortet Ollama nicht, sehen Sie seine Adresse, den HTTP-Code und die Frage, ob es läuft.',
+    pt: 'Os erros do processo principal chegam agora traduzidos para o seu idioma. Mais de mil mensagens que apareciam em espanhol ou como um aviso genérico explicam agora a sua causa real. O teste de ligação mostra-o bem. Se o Ollama não responder, verá o seu endereço, o código HTTP e a pergunta sobre se está em execução.',
+    'pt-BR': 'Os erros do processo principal agora chegam traduzidos para o seu idioma. Mais de mil mensagens que apareciam em espanhol ou como um aviso genérico agora explicam sua causa real. O teste de conexão mostra isso bem. Se o Ollama não responder, você verá seu endereço, o código HTTP e a pergunta sobre se ele está em execução.',
+  },
+  {
+    scope: 'ai',
+    es: 'Ajustes estrena un proveedor personalizado compatible con la API de OpenAI. Escribe la dirección exacta de tu servidor, sin que Nodus añada nada a la ruta, y conecta otros proveedores o un proxy propio. Puedes escribir tus modelos a mano, descubrir los que publica el servidor y comprobar la conexión antes de usarlos. La clave es opcional y se guarda como el resto de credenciales.',
+    en: 'Settings gains a custom provider compatible with the OpenAI API. Type the exact address of your server, with Nodus adding nothing to the path, and connect other providers or your own proxy. You can type your models by hand, discover the ones your server publishes and test the connection before using them. The key is optional and is stored like the other credentials.',
+    fr: 'Les Paramètres accueillent un fournisseur personnalisé compatible avec l’API d’OpenAI. Saisissez l’adresse exacte de votre serveur, sans que Nodus n’ajoute rien au chemin, et connectez d’autres fournisseurs ou votre propre proxy. Vous pouvez saisir vos modèles à la main, découvrir ceux que publie votre serveur et tester la connexion avant de les utiliser. La clé est facultative et se conserve comme les autres identifiants.',
+    de: 'Die Einstellungen erhalten einen benutzerdefinierten Anbieter, der mit der OpenAI-API kompatibel ist. Geben Sie die genaue Adresse Ihres Servers ein, ohne dass Nodus etwas an den Pfad anhängt, und verbinden Sie weitere Anbieter oder einen eigenen Proxy. Sie können Ihre Modelle von Hand eintragen, die von Ihrem Server veröffentlichten entdecken und die Verbindung vor der Nutzung testen. Der Schlüssel ist optional und wird wie die übrigen Zugangsdaten gespeichert.',
+    pt: 'As Definições estreiam um fornecedor personalizado compatível com a API da OpenAI. Escreva o endereço exato do seu servidor, sem que o Nodus acrescente nada ao caminho, e ligue outros fornecedores ou um proxy próprio. Pode escrever os seus modelos à mão, descobrir os que o servidor publica e testar a ligação antes de os usar. A chave é opcional e guarda-se como as restantes credenciais.',
+    'pt-BR': 'As Configurações estreiam um provedor personalizado compatível com a API da OpenAI. Digite o endereço exato do seu servidor, sem que o Nodus acrescente nada ao caminho, e conecte outros provedores ou um proxy próprio. Você pode digitar seus modelos à mão, descobrir os que o servidor publica e testar a conexão antes de usá-los. A chave é opcional e é guardada como as demais credenciais.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.1.6',
+    date: '2026-09-03',
+    highlights: RELEASE_5_1_6_HIGHLIGHTS,
+  },
   {
     version: '5.1.5',
     date: '2026-09-03',

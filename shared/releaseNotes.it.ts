@@ -166,6 +166,11 @@ const RELEASE_5_1_0_IT = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.1.6": [
+    "Le barre di avanzamento parlano ora la tua lingua. Le righe di indicizzazione, embedding, passaggi, coda e importazione di Zotero appaiono tradotte nelle otto lingue. I falsi avvisi di errore non compaiono più quando va tutto bene e i nomi delle tue biblioteche e opere restano esattamente come sono.",
+    "Gli errori del processo principale arrivano ora tradotti nella tua lingua. Più di mille messaggi che apparivano in spagnolo o come avviso generico spiegano ora la loro causa reale. Il test di connessione lo mostra bene. Se Ollama non risponde, vedrai il suo indirizzo, il codice HTTP e la domanda se è in esecuzione.",
+    "Le Impostazioni accolgono un provider personalizzato compatibile con le API di OpenAI. Digita l’indirizzo esatto del tuo server, senza che Nodus aggiunga nulla al percorso, e collega altri provider o un tuo proxy. Puoi digitare i modelli a mano, scoprire quelli pubblicati dal server e provare la connessione prima di usarli. La chiave è facoltativa e viene conservata come le altre credenziali.",
+  ],
   "5.1.4": [
     "Le istruzioni che Nodus invia all’IA sono ora scritte in modo nativo in tutte e otto le lingue dell’interfaccia. Quasi tutte erano redatte in spagnolo e si limitavano a chiedere al modello di rispondere in un’altra lingua, cosa che si notava nella qualità della risposta e nei termini scelti. Ogni attività ha ora il proprio contratto di istruzioni nella tua lingua, dall’analisi del corpus a Deep Research, al Tutor, al Laboratorio di scrittura, al Dizionario e a Nodi. Le chiavi del protocollo, gli identificatori e le regole di citazione restano invariati.",
     "I testi che l’applicazione genera al di fuori dell’interfaccia non compaiono più in spagnolo. Gli avvisi del componente aggiuntivo di Word, i messaggi del server web, le finestre di dialogo native del sistema e la documentazione di Nodi seguono ora la lingua impostata. Se usavi Nodus in italiano e continuavi a vedere avvisi in spagnolo, ora non succede più.",
