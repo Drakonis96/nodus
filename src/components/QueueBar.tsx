@@ -195,7 +195,7 @@ export function QueueBar() {
                     // The queue has always carried why an item failed and never shown it,
                     // so a failure read as a bare "Fallido" and the reason lived only in
                     // the DevTools console. Hover the state to read it.
-                    title={it.error ?? undefined}
+                    title={it.error ? tr(it.error) : undefined}
                     className={
                       it.state === 'done'
                         ? 'text-emerald-400'

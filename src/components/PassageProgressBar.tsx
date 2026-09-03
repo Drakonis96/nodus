@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { PassageEmbeddingProgress } from '@shared/types';
 import { Icon } from './ui';
-import { t, tx } from '../i18n';
+import { t, tr, tx } from '../i18n';
 import { elapsedTimeLabel } from '@shared/elapsedTime';
 import { useElapsedClock } from '../useElapsedClock';
 
@@ -40,7 +40,7 @@ export function PassageProgressBar() {
 
   return (
     <div className="border-t border-neutral-200 bg-neutral-100/80 backdrop-blur px-4 py-2 text-sm dark:border-neutral-800 dark:bg-neutral-900/80">
-      {error && <div className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-700 dark:border-red-800/60 dark:bg-red-950/60 dark:text-red-300">{t('Error')}: {error}</div>}
+      {error && <div className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-700 dark:border-red-800/60 dark:bg-red-950/60 dark:text-red-300">{t('Error')}: {tr(error)}</div>}
       <div className="flex items-center gap-3">
         <span className="text-xs font-medium whitespace-nowrap text-green-400">{t('Pasajes')}</span>
         <div className="flex-1">
