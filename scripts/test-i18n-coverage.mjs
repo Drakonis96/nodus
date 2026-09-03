@@ -683,8 +683,12 @@ test('legacy Spanish Electron errors cannot leak into a non-Spanish interface', 
   }
   assert.equal(uiText('de', { en: 'English fallback' }), 'English fallback');
   assert.equal(uiText('unknown', { en: 'English fallback', es: 'Español' }), 'English fallback');
+  // `Archivo no encontrado.` used to belong here as an example of the generic fallback.
+  // It is now in shared/mainProcessErrors.ts and names its own cause, so the fallback is
+  // shown with a sentence the catalogue genuinely does not know — which is what this
+  // assertion was always about: unknown Spanish prose must be replaced, never leaked.
   const payload = localizeIpcPayload({ ok: false, message: 'Archivo no encontrado.', nested: { error: 'La operación falló.' } }, 'en');
-  assert.deepEqual(payload, { ok: false, message: 'The operation could not be completed.', nested: { error: 'The operation could not be completed.' } });
+  assert.deepEqual(payload, { ok: false, message: 'File not found.', nested: { error: 'The operation could not be completed.' } });
   const rendererTranslated = 'No se puede cambiar de bóveda mientras se están indexando pasajes.';
   assert.equal(localizeIpcPayload({ message: rendererTranslated }, 'en').message, rendererTranslated);
 
