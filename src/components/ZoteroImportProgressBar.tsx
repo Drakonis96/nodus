@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { ZoteroImportProgress } from '@shared/libraryTypes';
 import { Icon } from './ui';
-import { t } from '../i18n';
+import { t, tr } from '../i18n';
 import { elapsedTimeLabel } from '@shared/elapsedTime';
 import { useElapsedClock } from '../useElapsedClock';
 
@@ -66,7 +66,7 @@ export function ZoteroImportProgressBar() {
             <span className="min-w-0 truncate">
               <span className={failed ? 'text-red-400' : done ? 'text-emerald-400' : 'text-neutral-200'}>{t(PHASE_LABEL[phase])}</span>
               {libraryName && <span className="ml-1 text-neutral-500">· {libraryName}</span>}
-              {!done && message && <span className="ml-1 text-neutral-600">· {message}</span>}
+              {!done && message && <span className="ml-1 text-neutral-600">· {tr(message)}</span>}
             </span>
             <span className="flex shrink-0 items-center gap-3 tabular-nums">
               {/* Both counters, always: the catalogue finishing is not the import

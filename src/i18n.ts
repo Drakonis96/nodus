@@ -100,7 +100,7 @@ type RuntimePattern = {
 
 const RUNTIME_PATTERNS: RuntimePattern[] = [
   {
-    pattern: /^(Agrupando ideas en temas|Validando pares semánticos entre ideas) \((\d+)\/(\d+)\)$/,
+    pattern: /^(Agrupando ideas en temas|Validando pares semánticos entre ideas|Validando candidatos con IA) \((\d+)\/(\d+)\)$/,
     render: (m) => `${t(m[1])} (${m[2]}/${m[3]})`,
   },
   {
@@ -120,6 +120,10 @@ const RUNTIME_PATTERNS: RuntimePattern[] = [
   {
     pattern: /^Extrayendo p\. (\d+)\/(\d+)$/,
     render: (m) => tx('Extrayendo p. {current}/{total}', { current: m[1], total: m[2] }),
+  },
+  {
+    pattern: /^OCR p\. (\d+)\/(\d+)$/,
+    render: (m) => tx('OCR p. {current}/{total}', { current: m[1], total: m[2] }),
   },
   {
     pattern: /^(\d+) candidatos encontrados \((\d+) cross-tema\)$/,
@@ -160,6 +164,34 @@ const RUNTIME_PATTERNS: RuntimePattern[] = [
   {
     pattern: /^Revisa las páginas (.+): el texto necesitó un ajuste tipográfico intenso\.$/,
     render: (m) => tx('Revisa las páginas {pages}: el texto necesitó un ajuste tipográfico intenso.', { pages: m[1] }),
+  },
+  // The Zotero import readout, which names the library or the item it is working
+  // through. `shared/uiLanguage.ts` hands these over untranslated on purpose (see
+  // ZOTERO_IMPORT_PROGRESS_MESSAGES) so the name survives and the sentence around it
+  // is translated here.
+  {
+    pattern: /^Inventariando (.+)…$/,
+    render: (m) => tx('Inventariando {library}…', { library: m[1] }),
+  },
+  {
+    pattern: /^Reconciliando colecciones de (.+)…$/,
+    render: (m) => tx('Reconciliando colecciones de {library}…', { library: m[1] }),
+  },
+  {
+    pattern: /^Verificando (.+) contra el inventario…$/,
+    render: (m) => tx('Verificando {library} contra el inventario…', { library: m[1] }),
+  },
+  {
+    pattern: /^Catálogo disponible: (.+)$/,
+    render: (m) => tx('Catálogo disponible: {title}', { title: m[1] }),
+  },
+  {
+    pattern: /^Notas: (.+)$/,
+    render: (m) => tx('Notas: {title}', { title: m[1] }),
+  },
+  {
+    pattern: /^Adjuntos: (.+)$/,
+    render: (m) => tx('Adjuntos: {title}', { title: m[1] }),
   },
   // Cloudflare deployment progress and failures. The main process builds these with the
   // Worker's own name and status code, so they are prose by the time they reach the modal.

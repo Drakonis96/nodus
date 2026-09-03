@@ -36,7 +36,7 @@ import { LibraryRecoveryDialog, LibraryTrashImpactDialog } from '../components/l
 import { LibraryDocumentReader } from './LibraryDocumentReader';
 import { VirtualList } from '../components/VirtualList';
 import { confirm, promptText, toast } from '../components/feedback';
-import { errorText, t, tx } from '../i18n';
+import { errorText, t, tr, tx } from '../i18n';
 import { zoteroConnectionHint, zoteroFailureText } from '../lib/zoteroConnection';
 import type { PendingAssistantNavigationTarget } from '../navigation';
 import type { PendingLibraryNavigationTarget } from '../navigation';
@@ -531,7 +531,7 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
           {resumable && !requestId && (
             <div data-testid="zotero-sync-resume" className="mb-4 flex items-center gap-3 rounded-xl border border-amber-500/35 bg-amber-500/10 p-3">
               <Icon name="refresh" className="shrink-0 text-amber-700 dark:text-amber-300" />
-              <div className="min-w-0 flex-1 text-xs"><b className="block text-amber-950 dark:text-amber-100">{resumableIsPartial ? t('Sincronización requiere revisión') : t('Sincronización interrumpida')}</b><span className="text-amber-800 dark:text-amber-200/80">{resumable.progress.message}</span></div>
+              <div className="min-w-0 flex-1 text-xs"><b className="block text-amber-950 dark:text-amber-100">{resumableIsPartial ? t('Sincronización requiere revisión') : t('Sincronización interrumpida')}</b><span className="text-amber-800 dark:text-amber-200/80">{tr(resumable.progress.message)}</span></div>
               <button data-testid="resume-zotero-sync" className="btn btn-ghost border border-amber-500/25" onClick={() => void run(resumable.id)}>{resumableIsPartial ? t('Reintentar') : t('Reanudar')}</button>
             </div>
           )}
@@ -560,7 +560,7 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
           </div>
           {progress && (
             <div className="mt-5 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
-              <div className="flex items-center justify-between gap-3 text-xs"><span className="truncate text-indigo-200">{progress.message}</span><b className="tabular-nums">{progress.percent}%</b></div>
+              <div className="flex items-center justify-between gap-3 text-xs"><span className="truncate text-indigo-200">{tr(progress.message)}</span><b className="tabular-nums">{progress.percent}%</b></div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-800"><div className="h-full bg-indigo-500 transition-[width]" style={{ width: `${progress.percent}%` }} /></div>
               <p className="mt-2 text-[10px] text-neutral-500">{progress.processedItems}/{progress.totalItems || '—'} {t('documentos')} · {progress.processedAttachments}/{progress.totalAttachments || '—'} {t('adjuntos')}</p>
             </div>
