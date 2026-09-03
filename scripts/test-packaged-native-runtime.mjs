@@ -12,16 +12,56 @@ const {
   assertBinaryArchitecture,
   findForeignRuntimePaths,
   findUniquePackagedBinary,
+  topLevelPackage,
 } = require(path.join(repoRoot, 'scripts/verify-packaged-native-runtime.cjs'));
 
 test('packaged runtime audit rejects the other architecture, whichever is being packed', () => {
   const paths = [
     '/node_modules/@napi-rs/canvas-darwin-x64/skia.darwin-x64.node',
     '/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex',
-    '/node_modules/@koromix/koffi-darwin_x64/darwin_x64/koffi.node',
+    '/node_modules/@img/sharp-libvips-darwin-x64/lib/libvips-cpp.8.18.6.dylib',
+    '/node_modules/better-sqlite3/build/Release/better_sqlite3.node',
   ];
-  assert.deepEqual(findForeignRuntimePaths('arm64', paths), [paths[0], paths[2]]);
-  assert.deepEqual(findForeignRuntimePaths('x64', paths), [paths[1]]);
+  assert.deepEqual(findForeignRuntimePaths('arm64', paths), [
+    '@img/sharp-libvips-darwin-x64',
+    '@napi-rs/canvas-darwin-x64',
+  ]);
+  assert.deepEqual(findForeignRuntimePaths('x64', paths), ['@openai/codex-darwin-arm64']);
+});
+
+test('THE REGRESSION: a vendor shipping every platform inside the right package is not foreign', () => {
+  // These four paths failed the first Intel build ever attempted. They are
+  // helper binaries vendored by @github/copilot-darwin-x64 — the CORRECT
+  // package for that build — whose paths merely contain the other architecture.
+  // The arm64 package does not vendor them, so a substring match over the path
+  // passed on Apple silicon for months and then failed on Intel.
+  const vendored = [
+    '/node_modules/@github/copilot-darwin-x64/ripgrep/bin/darwin-arm64',
+    '/node_modules/@github/copilot-darwin-x64/ripgrep/bin/darwin-arm64/rg',
+    '/node_modules/@github/copilot-darwin-x64/tgrep/bin/darwin-arm64',
+    '/node_modules/@github/copilot-darwin-x64/tgrep/bin/darwin-arm64/tgrep',
+  ];
+  assert.deepEqual(findForeignRuntimePaths('x64', vendored), []);
+
+  // Same shape on Apple silicon: a nested per-architecture dependency inside
+  // the correct package is the vendor's business, not a mixed tree.
+  assert.deepEqual(findForeignRuntimePaths('arm64', [
+    '/node_modules/@github/copilot-darwin-arm64/clipboard/node_modules/@teddyzhu/clipboard/clipboard.darwin-x64.node',
+    '/node_modules/@github/copilot-darwin-arm64/clipboard/node_modules/@teddyzhu/clipboard-darwin-x64/clipboard.darwin-x64.node',
+  ]), []);
+
+  // But the package that would actually break at launch is still caught.
+  assert.deepEqual(
+    findForeignRuntimePaths('x64', ['/node_modules/@github/copilot-darwin-arm64/copilot']),
+    ['@github/copilot-darwin-arm64'],
+  );
+});
+
+test('the top-level package is read, and only the top level', () => {
+  assert.equal(topLevelPackage('/node_modules/@img/sharp-darwin-x64/lib/x.node'), '@img/sharp-darwin-x64');
+  assert.equal(topLevelPackage('node_modules/better-sqlite3/build/x.node'), 'better-sqlite3');
+  assert.equal(topLevelPackage('/node_modules/a/node_modules/b-darwin-arm64/x'), null);
+  assert.equal(topLevelPackage('/dist/renderer-darwin-arm64.js'), null);
 });
 
 test('packaged runtime audit requires the slice being packed', () => {
