@@ -8296,4 +8296,18 @@ export const PT_BR: Record<string, string> = {
   "La clave o el dato no son válidos.": "A chave ou o dado não são válidos.",
   "Conversación no encontrada.": "Conversa não encontrada.",
   "Informe sin título": "Relatório sem título",
+
+  // Custom (OpenAI-compatible) provider — Settings → Providers.
+  "(tu servidor)": "(seu servidor)",
+  "Conecta Nodus con cualquier servidor que hable la API de OpenAI: LiteLLM, vLLM, el servidor de llama.cpp o un proxy propio.": "Conecte o Nodus a qualquer servidor que fale a API da OpenAI: LiteLLM, vLLM, o servidor do llama.cpp ou um proxy seu.",
+  "Dirección del servidor (URL completa)": "Endereço do servidor (URL completa)",
+  "Nodus no añade \"/v1\" por su cuenta: escribe la ruta exacta que sirve tu servidor.": "O Nodus não acrescenta \"/v1\" sozinho: digite o caminho exato que o seu servidor serve.",
+  "•••••••• clave guardada (opcional)": "•••••••• chave salva (opcional)",
+  "clave de API (opcional)": "chave de API (opcional)",
+  "Modelos escritos a mano": "Modelos digitados à mão",
+  "Si tu servidor no publica catálogo, escribe aquí los identificadores. Quedan guardados y se pueden elegir en cualquier selector de modelo.": "Se o seu servidor não publica catálogo, digite aqui os identificadores. Eles ficam salvos e podem ser escolhidos em qualquer seletor de modelo.",
+  "identificador del modelo": "identificador do modelo",
+  "Quitar modelo": "Remover modelo",
+  "Ni el servidor publica modelos ni has escrito ninguno todavía.": "O servidor não publica modelos e você ainda não digitou nenhum.",
+  "Este proveedor genera texto, no embeddings. Para la búsqueda semántica elige otro proveedor en Ajustes.": "Este provedor gera texto, não embeddings. Para a busca semântica escolha outro provedor nas Configurações.",
 };

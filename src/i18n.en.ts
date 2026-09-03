@@ -8574,4 +8574,18 @@ export const EN: Record<string, string> = {
   "La clave o el dato no son válidos.": "The key or data is invalid.",
   "Conversación no encontrada.": "Conversation not found.",
   "Informe sin título": "Untitled report",
+
+  // Custom (OpenAI-compatible) provider — Settings → Providers.
+  "(tu servidor)": "(your server)",
+  "Conecta Nodus con cualquier servidor que hable la API de OpenAI: LiteLLM, vLLM, el servidor de llama.cpp o un proxy propio.": "Connect Nodus to any server that speaks the OpenAI API: LiteLLM, vLLM, the llama.cpp server or a proxy of your own.",
+  "Dirección del servidor (URL completa)": "Server address (full URL)",
+  "Nodus no añade \"/v1\" por su cuenta: escribe la ruta exacta que sirve tu servidor.": "Nodus does not add \"/v1\" on its own: type the exact path your server serves.",
+  "•••••••• clave guardada (opcional)": "•••••••• key saved (optional)",
+  "clave de API (opcional)": "API key (optional)",
+  "Modelos escritos a mano": "Hand-typed models",
+  "Si tu servidor no publica catálogo, escribe aquí los identificadores. Quedan guardados y se pueden elegir en cualquier selector de modelo.": "If your server publishes no catalogue, type the identifiers here. They are saved and can be picked in any model selector.",
+  "identificador del modelo": "model identifier",
+  "Quitar modelo": "Remove model",
+  "Ni el servidor publica modelos ni has escrito ninguno todavía.": "The server publishes no models and you have not typed any yet.",
+  "Este proveedor genera texto, no embeddings. Para la búsqueda semántica elige otro proveedor en Ajustes.": "This provider generates text, not embeddings. For semantic search, pick another provider in Settings.",
 };

@@ -6,16 +6,28 @@ import type {
   ModelInfo,
 } from '@shared/types';
 import { getSettings } from '../db/settingsRepo';
-import { DEFAULT_LOCAL_BASE_URLS } from '@shared/providers';
+import { DEFAULT_LOCAL_BASE_URLS, normalizeCustomBaseUrl, normalizeCustomModels } from '@shared/providers';
 import { listNodusLocalChatModels, listNodusLocalEmbeddingModels } from './nodusLocalAi';
+import { nodusUserAgent, openCodeGoSessionId } from './clientIdentity';
 
 export { AI_PROVIDERS, PROVIDER_LABELS, LOCAL_PROVIDERS, isLocalProvider } from '@shared/providers';
+export { normalizeCustomBaseUrl, normalizeCustomModels, normalizeCustomProviderConfig } from '@shared/providers';
 export { FREE_TIER_PROVIDERS } from '@shared/providers';
 
 /** The configured base URL for a local provider, without a trailing slash. */
 export function localBaseUrl(provider: LocalProvider): string {
   const configured = getSettings().localProviders?.[provider]?.baseUrl?.trim();
   return (configured || DEFAULT_LOCAL_BASE_URLS[provider]).replace(/\/+$/, '');
+}
+
+/** The user's configured endpoint, or '' when unset. See normalizeCustomBaseUrl. */
+export function customBaseUrl(): string {
+  return normalizeCustomBaseUrl(getSettings().customProvider?.baseUrl ?? '');
+}
+
+/** The model slugs the user typed by hand for that endpoint. */
+export function customManualModels(): string[] {
+  return normalizeCustomModels(getSettings().customProvider?.models);
 }
 
 /** Optional bearer header when a local instance is secured with a token. */
@@ -49,6 +61,11 @@ export function openAiCompatBase(provider: AiProvider): string | null {
     case 'lmstudio':
       // Local servers expose an OpenAI-compatible surface under {baseUrl}/v1.
       return `${localBaseUrl(provider)}/v1`;
+    case 'custom':
+      // Whatever the user configured, used verbatim. Null when unset so callers
+      // refuse with an actionable error instead of silently falling back to
+      // api.openai.com, which is what an undefined baseURL would do.
+      return customBaseUrl() || null;
     case 'anthropic':
     case 'codex':
     case 'github-copilot':
@@ -75,6 +92,10 @@ export function supportsJsonMode(provider: AiProvider): boolean {
     provider === 'gemini' ||
     provider === 'xiaomi' ||
     provider === 'nodus' ||
+    // The user's own gateway: response_format is part of the OpenAI contract it
+    // claims to implement. A backend that ignores or rejects it is caught by the
+    // caller's 400 retry, which strips the optional params and sends again.
+    provider === 'custom' ||
     // Ollama and LM Studio both accept OpenAI's response_format on their compat
     // surface. A small model that ignores it is caught by the caller's 400 retry.
     provider === 'ollama' ||
@@ -177,6 +198,10 @@ export function reasoningBody(
     case 'opencode-go':
       // Go serves a mixed OpenAI/Anthropic catalogue through dedicated paths.
       return {};
+    case 'custom':
+      // Nodus cannot know what sits behind the user's gateway, and an unsupported
+      // reasoning field is a 400 the caller would have to retry past. Send none.
+      return {};
   }
 }
 
@@ -277,8 +302,65 @@ export async function listModels(provider: AiProvider, key: string | null): Prom
       return listOllama(key);
     case 'lmstudio':
       return listLmStudio(key, false);
+    case 'custom':
+      return listCustom(key);
     case 'nodus':
       return listNodusLocalChatModels();
+  }
+}
+
+/**
+ * The union of what the user typed and what their endpoint reports.
+ *
+ * The remote half is best-effort ON PURPOSE. A gateway that serves inference
+ * without implementing GET /models is precisely the case this provider exists
+ * for, and throwing here would empty every model picker in the app for a setup
+ * that works perfectly well. The failure is surfaced by testCustomProvider
+ * instead — where the user actually asked a question and can act on the answer.
+ *
+ * Manual slugs come first (the user's own list is the one they are looking for)
+ * and win on collision; the remote half stays sorted as listOpenAiStyle returns it.
+ */
+async function listCustom(key: string | null): Promise<ModelInfo[]> {
+  const manual: ModelInfo[] = customManualModels().map((id) => ({ id, name: id }));
+  const base = customBaseUrl();
+  if (!base) return manual;
+  let remote: ModelInfo[] = [];
+  try {
+    remote = await listOpenAiStyle(`${base}/models`, key, false, { keyRequired: false, timeoutMs: 8000 });
+  } catch {
+    // Endpoint has no catalogue, is unreachable, or rejects the key: the manual
+    // list still selects and still runs inference.
+    remote = [];
+  }
+  const typed = new Set(manual.map((model) => model.id));
+  return [...manual, ...remote.filter((model) => !typed.has(model.id))];
+}
+
+/**
+ * "Test connection" for the custom endpoint, in the spirit of testLocalProvider.
+ *
+ * A catalogue failure is reported as such, but the message says the manual list
+ * still works: for many gateways a missing /models is normal, not broken.
+ */
+export async function testCustomProvider(key: string | null): Promise<LocalProviderTestResult> {
+  const base = customBaseUrl();
+  if (!base) return { ok: false, message: 'Falta la dirección del servidor.' };
+  const manual = customManualModels().length;
+  try {
+    const models = await listOpenAiStyle(`${base}/models`, key, false, { keyRequired: false, timeoutMs: 8000 });
+    const typed = new Set(customManualModels());
+    return { ok: true, modelCount: models.filter((model) => !typed.has(model.id)).length + manual };
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      message: manual > 0
+        ? `${base}: ${detail}. ${manual === 1
+            ? 'El modelo escrito a mano sigue disponible.'
+            : `Los ${manual} modelos escritos a mano siguen disponibles.`}`
+        : `${base}: ${detail}`,
+    };
   }
 }
 
@@ -317,7 +399,12 @@ const OPENCODE_GO_MODEL_NAMES: Record<string, string> = {
  * for inference, so Settings can show what the subscription offers before a key
  * is pasted. The response intentionally carries no inferred vision capability. */
 async function listOpenCodeGo(): Promise<ModelInfo[]> {
-  const res = await fetch('https://opencode.ai/zen/go/v1/models');
+  // Unauthenticated, but still an OpenCode Go request: it needs the session
+  // header like any other or it may start being rejected, which would empty the
+  // model picker in Settings before a key is even pasted.
+  const res = await fetch('https://opencode.ai/zen/go/v1/models', {
+    headers: { 'User-Agent': nodusUserAgent(), 'x-opencode-session': openCodeGoSessionId() },
+  });
   if (!res.ok) throw new Error(`OpenCode Go /models HTTP ${res.status}`);
   const data = (await res.json()) as { data?: { id?: string }[] };
   return (data.data ?? [])
@@ -353,9 +440,32 @@ async function listAnthropic(key: string | null): Promise<ModelInfo[]> {
   return (data.data ?? []).map((m) => ({ id: m.id, name: m.display_name })).sort(byId);
 }
 
-async function listOpenAiStyle(url: string, key: string | null, filterChat: boolean): Promise<ModelInfo[]> {
-  if (!key) throw new Error('Falta la clave del proveedor.');
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${key}` } });
+/**
+ * GET {url} in OpenAI's /models shape.
+ *
+ * `keyRequired` exists for the custom provider, whose endpoint is frequently a
+ * gateway on the user's own machine that needs no credential at all; `timeoutMs`
+ * likewise, so a mistyped host fails fast instead of hanging the Settings button
+ * the way an untimed fetch against a black-holed IP would.
+ */
+async function listOpenAiStyle(
+  url: string,
+  key: string | null,
+  filterChat: boolean,
+  options: { keyRequired?: boolean; timeoutMs?: number } = {},
+): Promise<ModelInfo[]> {
+  if (!key && options.keyRequired !== false) throw new Error('Falta la clave del proveedor.');
+  const controller = new AbortController();
+  const timer = options.timeoutMs ? setTimeout(() => controller.abort(), options.timeoutMs) : null;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: key ? { Authorization: `Bearer ${key}` } : {},
+      signal: timer ? controller.signal : undefined,
+    });
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
   if (!res.ok) throw new Error(`/models HTTP ${res.status}`);
   const data = (await res.json()) as {
     data?: {

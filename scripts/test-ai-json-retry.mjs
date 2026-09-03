@@ -42,7 +42,7 @@ const server = createServer((req, res) => {
   req.on('data', (chunk) => { body += chunk; });
   req.on('end', () => {
     if (!req.url.includes('/chat/completions')) { res.writeHead(404).end('{}'); return; }
-    seen.push({ url: req.url, body: JSON.parse(body || '{}') });
+    seen.push({ url: req.url, headers: req.headers, body: JSON.parse(body || '{}') });
     const next = queue.shift() ?? '{}';
     const reply = typeof next === 'string' ? { content: next, finish_reason: 'stop' } : next;
     res.writeHead(200, { 'content-type': 'application/json' });
@@ -82,6 +82,12 @@ try {
   run(['{"ideas":["a"]}']);
   assert.deepEqual((await aiClient.completeJson(opts, guard, model)).ideas, ['a']);
   assert.equal(seen.length, 1, 'a valid first response costs a single provider call');
+  // Every OpenAI-compatible provider (OpenAI, Groq, Cerebras, DeepSeek, Xiaomi,
+  // Gemini-compat, OpenRouter) is built through this one client, so proving the
+  // User-Agent survives the SDK here proves it for all of them. `defaultHeaders`
+  // must WIN over the SDK's own UA, which is the part worth pinning down.
+  assert.match(seen[0].headers['user-agent'], /^Nodus\/\d+\.\d+/, 'requests announce the app and its version');
+  assert.doesNotMatch(seen[0].headers['user-agent'], /OpenAI/i, 'the SDK User-Agent is replaced, not appended to');
 
   /** A repair prompt would ship the bad text back under this key. It is forbidden here. */
   const isRepairCall = (hit) => JSON.stringify(hit.body).includes('invalid_json');

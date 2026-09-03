@@ -8096,4 +8096,18 @@ export const TR: Record<string, string> = {
   "La clave o el dato no son válidos.": "Anahtar veya veri geçersiz.",
   "Conversación no encontrada.": "Konuşma bulunamadı.",
   "Informe sin título": "Başlıksız rapor",
+
+  // Custom (OpenAI-compatible) provider — Settings → Providers.
+  "(tu servidor)": "(sunucunuz)",
+  "Conecta Nodus con cualquier servidor que hable la API de OpenAI: LiteLLM, vLLM, el servidor de llama.cpp o un proxy propio.": "Nodus’u OpenAI API’sini konuşan herhangi bir sunucuya bağlayın: LiteLLM, vLLM, llama.cpp sunucusu ya da kendi proxy’niz.",
+  "Dirección del servidor (URL completa)": "Sunucu adresi (tam URL)",
+  "Nodus no añade \"/v1\" por su cuenta: escribe la ruta exacta que sirve tu servidor.": "Nodus \"/v1\" ekini kendiliğinden eklemez: sunucunuzun sunduğu yolu birebir yazın.",
+  "•••••••• clave guardada (opcional)": "•••••••• anahtar kaydedildi (isteğe bağlı)",
+  "clave de API (opcional)": "API anahtarı (isteğe bağlı)",
+  "Modelos escritos a mano": "Elle yazılan modeller",
+  "Si tu servidor no publica catálogo, escribe aquí los identificadores. Quedan guardados y se pueden elegir en cualquier selector de modelo.": "Sunucunuz katalog yayımlamıyorsa tanımlayıcıları buraya yazın. Kaydedilir ve her model seçicide seçilebilir.",
+  "identificador del modelo": "model tanımlayıcısı",
+  "Quitar modelo": "Modeli kaldır",
+  "Ni el servidor publica modelos ni has escrito ninguno todavía.": "Sunucu model yayımlamıyor ve henüz hiçbirini yazmadınız.",
+  "Este proveedor genera texto, no embeddings. Para la búsqueda semántica elige otro proveedor en Ajustes.": "Bu sağlayıcı metin üretir, gömme (embedding) üretmez. Anlamsal arama için Ayarlar’dan başka bir sağlayıcı seçin.",
 };
