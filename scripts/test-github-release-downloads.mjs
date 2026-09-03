@@ -24,6 +24,8 @@ test('classifies the supported packages by operating system', () => {
   assert.equal(classifyReleaseAsset('Nodus-x86_64.AppImage'), 'linux');
   assert.equal(classifyReleaseAsset('Nodus-mac-arm64.dmg'), 'macos');
   assert.equal(classifyReleaseAsset('Nodus-mac-arm64.zip'), 'macos');
+  assert.equal(classifyReleaseAsset('Nodus-mac-x64.dmg'), 'macos');
+  assert.equal(classifyReleaseAsset('Nodus-mac-x64.zip'), 'macos');
   assert.equal(classifyReleaseAsset('Nodus-win-x64.exe'), 'windows');
   assert.equal(classifyReleaseAsset('checksums.txt'), null);
 });

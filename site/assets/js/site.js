@@ -246,6 +246,7 @@ page is still a complete, readable document.
             }
           };
           wire('dl-mac', find('-mac-arm64.dmg'), 'Apple Silicon · .dmg');
+          wire('dl-mac-intel', find('-mac-x64.dmg'), 'Intel · .dmg');
           wire('dl-win', find('-win-x64.exe'), 'x64 installer · .exe');
           wire('dl-linux', find('-linux-x86_64.AppImage'), 'x86_64 · .AppImage');
         })

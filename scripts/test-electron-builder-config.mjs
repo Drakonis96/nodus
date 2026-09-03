@@ -87,3 +87,39 @@ test('the schema is the one electron-builder itself will use', () => {
   assert.ok(declared.includes(builderVersion.split('.')[0]),
     `app-builder-lib ${builderVersion} does not match the declared electron-builder ${declared}`);
 });
+
+test('the macOS arch flag, and only the arch flag, selects which slice is packed', () => {
+  // The linchpin of shipping two macOS products from two runners, resolved
+  // against electron-builder's own resolver rather than from the docs.
+  //
+  // build.mac.target deliberately carries no `arch` key. computeArchToTargetNamesMap
+  // only falls back to the requested architecture when the target omits its own,
+  // so an explicit `arch` there is NOT narrowed by --arm64 / --x64: each runner
+  // would try to pack the architecture it has no native dependencies for, and
+  // the failure would land halfway through a release.
+  const { computeArchToTargetNamesMap } = require('app-builder-lib/out/targets/targetFactory.js');
+  const { Arch, Platform } = require('electron-builder');
+  const packager = { platformSpecificBuildOptions: pkg.build.mac, defaultTarget: ['dmg'] };
+  const resolve = (raw) => new Map(
+    [...computeArchToTargetNamesMap(raw, packager, Platform.MAC)]
+      .map(([arch, targets]) => [Arch[arch], [...targets].sort()]),
+  );
+
+  for (const arch of ['arm64', 'x64']) {
+    assert.deepEqual(
+      resolve(new Map([[Arch[arch], []]])),
+      new Map([[arch, ['dmg', 'zip']]]),
+      `--mac --${arch} must pack exactly one slice, as both installer and update ZIP`,
+    );
+  }
+
+  // With no flag at all — a developer running `npm run dist:mac` — it follows
+  // the host, which is the only architecture that machine has dependencies for.
+  assert.deepEqual(resolve(new Map()), new Map([[process.arch, ['dmg', 'zip']]]));
+
+  // THE REGRESSION: pinning an arch in the config makes the flag powerless.
+  const pinned = { platformSpecificBuildOptions: { target: [{ target: 'dmg', arch: ['arm64'] }] }, defaultTarget: ['dmg'] };
+  const ignored = computeArchToTargetNamesMap(new Map([[Arch.x64, []]]), pinned, Platform.MAC);
+  assert.ok(ignored.has(Arch.arm64),
+    'a config-pinned arch survives --x64, which is why build.mac.target must not name one');
+});
