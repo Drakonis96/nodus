@@ -27,6 +27,7 @@ function desktopSettings(overrides = {}) {
     studyAiMaxOutputTokens: 4000, studyAiTemperature: 0.15, studyAiRetryCount: 1,
     studentPseudonymsEnabled: true, sidebarOrder: ['home', 'ideas'], sidebarHidden: ['tools'],
     sidebarCustomized: true, concurrency: 2, deepContextMode: 'standard', deepStandardChunkWords: 1800,
+    toolkitPinnedPages: ['apps', 'ocr'],
     deepLongChunkWords: 30000,
     // These values prove that the exporter is an allowlist rather than a broad object copy.
     providerKeys: { openai: true }, lockedProviderKeys: ['openai'], embeddingProvider: 'openai',
@@ -58,6 +59,7 @@ test('Desktop profile preferences persist per user without secrets or embedding 
   }
   assert.equal(portable.ai.models.assistant.model, 'gpt-5.4');
   assert.equal(portable.appearance.interfaceScale, 1.1);
+  assert.deepEqual(portable.workspace.toolkitPinnedPages, ['apps', 'ocr']);
 
   await withServer({ label: 'user-profile-preferences', ai: true }, async (ctx) => {
     const spaceId = await ctx.createSpace('Shared preferences vault');

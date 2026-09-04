@@ -49,7 +49,11 @@ export function QueueBar() {
     maintenanceRunning, maintenanceDetail, startedAt, finishedAt, items,
   } = progress;
   const terminalItems = items.filter((item) => item.state === 'done' || item.state === 'failed' || item.state === 'cancelled').length;
-  const pct = total ? Math.round((terminalItems / total) * 100) : maintenanceRunning ? 99 : 0;
+  const itemPct = total ? Math.round((terminalItems / total) * 100) : 0;
+  // Finished scan rows are followed by required graph maintenance. Holding at
+  // 99% makes it clear that semantic validation is still live; 100% and the
+  // dismiss tick arrive together only after the whole pipeline has settled.
+  const pct = maintenanceRunning ? (total ? Math.min(itemPct, 99) : 99) : itemPct;
   const workActive = items.some((item) => item.state === 'queued' || item.state === 'running' || item.state === 'paused');
   const active = workActive || maintenanceRunning;
   const terminal = !active && !maintenanceError;

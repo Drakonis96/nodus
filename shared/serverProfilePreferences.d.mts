@@ -22,7 +22,7 @@ export type ServerProfilePreferences = {
     audio: { provider: string; voice: string; speed: number; pending?: boolean };
     studyPolicy: { enabled: boolean; privacyMode: AppSettings['studyAiPrivacyMode']; confirmExternal: boolean; monthlyBudgetUsd: number; budgetWarningPercent: number; maxInputChars: number; maxOutputTokens: number; temperature: number; retryCount: number; studentPseudonyms: boolean };
   };
-  workspace: { sidebarOrder: string[]; sidebarHidden: string[]; sidebarCustomized: boolean; aiConcurrencyMode: AppSettings['aiConcurrencyMode']; aiConcurrencyVersion: number; concurrency: number; deepContextMode: AppSettings['deepContextMode']; standardChunkWords: number; longChunkWords: number };
+  workspace: { sidebarOrder: string[]; sidebarHidden: string[]; sidebarCustomized: boolean; toolkitPinnedPages: AppSettings['toolkitPinnedPages']; aiConcurrencyMode: AppSettings['aiConcurrencyMode']; aiConcurrencyVersion: number; concurrency: number; deepContextMode: AppSettings['deepContextMode']; standardChunkWords: number; longChunkWords: number };
 };
 
 export class ServerProfilePreferenceError extends Error { code: string }

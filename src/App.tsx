@@ -65,6 +65,7 @@ import type {
   PendingGraphNavigationTarget,
   PendingIdeaNavigationTarget,
   PendingLibraryNavigationTarget,
+  SidebarNavItem,
   View,
 } from './navigation';
 import { dedicatedVaultNavIds, groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
@@ -478,8 +479,12 @@ export function App() {
     const outsideDedicatedWorkspace = dedicatedIds
       ? NAV_ITEMS.filter((item) => item.id !== 'home' && item.id !== 'settings' && !dedicatedIds.includes(item.id)).map((item) => item.id)
       : [];
-    return groupedNav(settings?.sidebarOrder ?? [], ['library', ...activeSidebarHidden, ...disallowed, ...outsideDedicatedWorkspace]);
-  }, [settings?.sidebarOrder, activeSidebarHidden, activeVault?.type]);
+    return groupedNav(
+      settings?.sidebarOrder ?? [],
+      ['library', ...activeSidebarHidden, ...disallowed, ...outsideDedicatedWorkspace],
+      settings?.toolkitPinnedPages ?? [],
+    );
+  }, [settings?.sidebarOrder, settings?.toolkitPinnedPages, activeSidebarHidden, activeVault?.type]);
 
   // If the active vault type doesn't allow the current view (e.g. switching from a
   // primary-source vault to an academic one while on Personas), fall back to Home.
@@ -1569,7 +1574,7 @@ export function App() {
           >
             <div data-testid="sidebar-scroll-region" className="vault-sidebar-scroll mr-[6px] flex h-full min-h-0 flex-col gap-1 overflow-y-auto p-2">
               {(() => {
-              const navButton = (n: { id: View; icon: string; label: string }, disabled = false) => (
+              const navButton = (n: SidebarNavItem, disabled = false) => (
                 <button
                   key={n.id}
                   data-tour={`nav-${n.id}`}
@@ -1579,6 +1584,11 @@ export function App() {
                   title={disabled ? `${t(n.label)} · ${t('Próximamente')}` : sidebarCompact ? t(n.label) : undefined}
                   onClick={() => {
                     if (disabled) return;
+                    if ('toolkitPage' in n) {
+                      setToolkitPage(n.toolkitPage);
+                      setView('toolkit');
+                      return;
+                    }
                     // La sección Herramientas siempre entra por el catálogo.
                     if (n.id === 'toolkit') setToolkitPage('home');
                     setView(n.id);
@@ -1586,7 +1596,9 @@ export function App() {
                   className={`flex items-center rounded-lg py-2 text-sm text-left transition-colors ${sidebarCompact ? 'justify-center px-2' : 'gap-2 px-3'} ${
                     disabled
                       ? 'cursor-not-allowed text-neutral-700 opacity-65'
-                      : view === n.id && (n.id !== 'toolkit' || toolkitPage === 'home')
+                      : ('toolkitPage' in n
+                          ? view === 'toolkit' && toolkitPage === n.toolkitPage
+                          : view === n.id && (n.id !== 'toolkit' || toolkitPage === 'home'))
                         ? 'bg-indigo-600 text-white'
                         : 'text-neutral-400 hover:bg-neutral-900'
                   }`}
@@ -1617,7 +1629,9 @@ export function App() {
               );
               const renderGroup = (group: (typeof navGroups)[number]) => {
                 const collapsed = !sidebarCompact && collapsedGroups.has(group.id);
-                const hasActive = group.items.some((n) => n.id === view);
+                const hasActive = group.items.some((n) => 'toolkitPage' in n
+                  ? view === 'toolkit' && toolkitPage === n.toolkitPage
+                  : n.id === view);
                 return (
                   <div key={group.id} className={`${sidebarCompact ? 'mt-1 border-t border-neutral-800/70 pt-1' : 'mt-2'} flex flex-col gap-1`}>
                     {!sidebarCompact && <div className="flex items-center px-3">{groupHeaderButton(group.id, group.label, collapsed, hasActive)}</div>}

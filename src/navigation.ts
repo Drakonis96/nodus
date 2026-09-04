@@ -1,6 +1,7 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
 import type { LibraryScope } from '@shared/libraryTypes';
 import { type VaultType, normalizeVaultType } from '@shared/vaultTypes';
+import type { ToolkitToolPage } from '@shared/toolkitNavigation';
 
 export type View = 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'dictionary' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'pages' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'dbDeepResearch' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'workspace' | 'browser' | 'radar' | 'compass' | 'toolkit' | 'settings';
 
@@ -143,13 +144,12 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 /** Pages inside the Herramientas section. The toolkit keeps a SINGLE entry in the
- * View union — its tools are addressed by this id instead — so that adding a tool
- * never turns into a new top-level view (and never leaks into sidebarOrder, the
- * per-vault-type allow-lists or the reordering UI). 'home' is the catalogue. */
-export type ToolkitPage = 'home' | 'apps' | 'convert' | 'translate' | 'protect' | 'presenter' | 'ocr';
+ * View union — pinned tools use namespaced sidebar shortcut ids instead — so that
+ * adding a tool never expands the vault-type allow-lists. 'home' is the catalogue. */
+export type ToolkitPage = 'home' | ToolkitToolPage;
 
 export interface ToolkitToolDef {
-  page: Exclude<ToolkitPage, 'home'>;
+  page: ToolkitToolPage;
   /** Marca de la herramienta; NO se traduce. */
   name: string;
   /** Clave i18n (español) de la descripción de la tarjeta. */
@@ -213,6 +213,37 @@ export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
   },
 ];
 
+export type ToolkitSidebarId = `toolkit:${ToolkitToolPage}`;
+
+/** A pinned Toolkit page behaves like a sidebar item without becoming a View. */
+export interface ToolkitSidebarNavItem {
+  id: ToolkitSidebarId;
+  label: string;
+  icon: string;
+  group: 'tools';
+  toolkitPage: ToolkitToolPage;
+}
+
+export type SidebarNavItem = NavItem | ToolkitSidebarNavItem;
+
+export function toolkitSidebarId(page: ToolkitToolPage): ToolkitSidebarId {
+  return `toolkit:${page}`;
+}
+
+/** Derive sidebar shortcuts from the canonical Toolkit catalogue (including icons). */
+export function pinnedToolkitSidebarItems(pages: unknown): ToolkitSidebarNavItem[] {
+  const pinned = new Set(Array.isArray(pages) ? pages : []);
+  return TOOLKIT_TOOLS
+    .filter((tool) => pinned.has(tool.page))
+    .map((tool) => ({
+      id: toolkitSidebarId(tool.page),
+      label: tool.name,
+      icon: tool.icon,
+      group: 'tools' as const,
+      toolkitPage: tool.page,
+    }));
+}
+
 const VAULT_TYPE_LABELS: Partial<Record<VaultType, Partial<Record<View, string>>>> = {
   docencia: {
     studyChat: 'Chat',
@@ -250,6 +281,10 @@ export function orderedNav(sidebarOrder: string[]): NavItem[] {
 }
 
 export interface NavGroup extends NavGroupDef {
+  items: SidebarNavItem[];
+}
+
+export interface StandardNavGroup extends NavGroupDef {
   items: NavItem[];
 }
 
@@ -316,19 +351,32 @@ export function orderSidebarItems<T extends { id: string }>(items: readonly T[],
  * order. Home and Settings are pinned outside groups and are not returned here.
  * Empty groups (all sections hidden) are dropped.
  */
-export function groupedNav(sidebarOrder: string[], sidebarHidden: string[]): NavGroup[] {
+export function groupedNav(sidebarOrder: string[], sidebarHidden: string[]): StandardNavGroup[];
+export function groupedNav(
+  sidebarOrder: string[],
+  sidebarHidden: string[],
+  toolkitPinnedPages: unknown,
+): NavGroup[];
+export function groupedNav(
+  sidebarOrder: string[],
+  sidebarHidden: string[],
+  toolkitPinnedPages?: unknown,
+): NavGroup[] {
   const hidden = new Set(sidebarHidden);
-  const ordered = orderedNav(sidebarOrder).filter(
-    (n) => n.id !== 'home' && n.id !== 'settings' && !hidden.has(n.id),
-  );
-  const toolsOrder = new Map<View, number>([['browser', 0], ['radar', 1], ['compass', 2], ['toolkit', 3]]);
+  const base = orderedNav(sidebarOrder).filter((n) => n.id !== 'home' && n.id !== 'settings');
+  const pinned = pinnedToolkitSidebarItems(toolkitPinnedPages ?? []);
+  const toolkitIndex = base.findIndex((item) => item.id === 'toolkit');
+  const combined: SidebarNavItem[] = [...base];
+  combined.splice(toolkitIndex >= 0 ? toolkitIndex + 1 : combined.length, 0, ...pinned);
+  // Once a shortcut has been moved in Settings its saved position wins. A newly
+  // pinned shortcut has no saved position yet and starts directly after Nodus Tools.
+  const ordered = pinned.some((item) => sidebarOrder.includes(item.id))
+    ? orderSidebarItems(combined, sidebarOrder)
+    : combined;
   return NAV_GROUPS.map((g) => ({
     ...g,
     items: ordered
-      .filter((n) => n.group === g.id)
-      .sort((a, b) => g.id === 'tools'
-        ? (toolsOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (toolsOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER)
-        : 0),
+      .filter((n) => n.group === g.id && !hidden.has(n.id)),
   })).filter((g) => g.items.length > 0);
 }
 

@@ -45,7 +45,7 @@ function profileWithFavorites(favorites) {
       },
     },
     workspace: {
-      sidebarOrder: [], sidebarHidden: [], sidebarCustomized: false, concurrency: 2,
+      sidebarOrder: [], sidebarHidden: [], sidebarCustomized: false, toolkitPinnedPages: [], concurrency: 2,
       deepContextMode: 'standard', standardChunkWords: 1800, longChunkWords: 30000,
     },
   };

@@ -244,6 +244,7 @@ function blankProfile(
       sidebarOrder: [],
       sidebarHidden: [],
       sidebarCustomized: false,
+      toolkitPinnedPages: [],
       aiConcurrencyMode: "automatic",
       aiConcurrencyVersion: 1,
       concurrency: 2,

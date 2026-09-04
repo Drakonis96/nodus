@@ -270,6 +270,21 @@ assert.match(
 );
 assert.match(
   view,
+  /jobs\s*\.filter\(\(job\) => job\.phase !== ["']done["']\)/,
+  "a completed job does not permanently cover the entry lifecycle status after remounting",
+);
+assert.match(
+  view,
+  /progress\.phase === ["']done["'][\s\S]*reload\(false\)\.then\(\(reloaded\)[\s\S]*next\.delete\(progress\.entryId\)/,
+  "the generated confirmation yields to the saved Active status after a successful reload",
+);
+assert.match(
+  view,
+  /progress\.phase === ["']done["'] && status !== ["']draft["'][\s\S]*<StatusPill status=\{status\}/,
+  "stale successful progress cannot replace an already-persisted lifecycle status",
+);
+assert.match(
+  view,
   /const hasEvidence = detail\.coverage\.included > 0/,
   "generation eligibility uses the live included selection, not a nonexistent draft version",
 );

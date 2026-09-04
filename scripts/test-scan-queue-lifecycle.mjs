@@ -15,6 +15,7 @@ globalThis.__scanQueueLife = {
   reprocessStarted: false,
   releaseReprocess: null,
   releaseBridge: null,
+  deepFailures: 0,
 };
 
 await build({
@@ -40,7 +41,7 @@ await build({
       `);
       stub(/\.\.\/db\/settingsRepo$/, 'settings', `export function getSettings(){return {aiConcurrencyMode:'manual',concurrency:1,autoBridgeAfterQueue:false,autoSummaryAfterDeep:false,embeddingProvider:'openai',providerKeys:{openai:false},zoteroUserId:'',zoteroStoragePath:'',unpaywallEmail:'',preferZoteroFulltext:false,ocrEnabled:false,ocrLanguages:[],ocrMaxPages:0,themesLocked:false,synthesisModel:null}}`);
       stub(/\.\.\/ai\/lightScan$/, 'light', `export async function runLightScan(){}`);
-      stub(/\.\.\/ai\/deepScan$/, 'deep', `export function issueDeepScanPublicationOrdinal(){return 1}export function finishDeepScanPublicationOrdinal(){}export async function runDeepScan(){}`);
+      stub(/\.\.\/ai\/deepScan$/, 'deep', `export function issueDeepScanPublicationOrdinal(){return 1}export function finishDeepScanPublicationOrdinal(){}export async function runDeepScan(){if(globalThis.__scanQueueLife.deepFailures>0){globalThis.__scanQueueLife.deepFailures-=1;throw new Error('temporary fusion failure')}}`);
       stub(/\.\.\/ai\/summaryScan$/, 'summary', `export async function runSummaryScan(){}`);
       stub(/\.\.\/ai\/reprocessConnections$/, 'reprocess', `export async function reprocessConnections(_options,_model,onProgress){globalThis.__scanQueueLife.reprocessStarted=true;onProgress?.({phase:'themes',label:'Agrupando ideas en temas',current:1,total:1});await new Promise(resolve=>{globalThis.__scanQueueLife.releaseReprocess=resolve});return {relationsAdded:0,newThemes:0}}`);
       stub(/\.\.\/db\/themesRepo$/, 'themes', `export function listThemeLabels(){return []}`);
@@ -78,6 +79,28 @@ test('required graph maintenance remains active after the paper itself finishes'
   globalThis.__scanQueueLife.releaseReprocess();
   await waitFor(() => !scanQueue.snapshot().maintenanceRunning, 'maintenance settles');
   assert.ok(scanQueue.snapshot().finishedAt, 'the task finishes only after its required post-processing');
+});
+
+test('retrying one work replaces its failed attempt instead of accumulating failures', async () => {
+  scanQueue.clear();
+  globalThis.__scanQueueLife.deepFailures = 1;
+  scanQueue.enqueue('paper-1', 'Paper one', 'deep');
+  await waitFor(() => scanQueue.snapshot().failed === 1, 'first attempt fails');
+  const failedId = scanQueue.snapshot().items.find((item) => item.state === 'failed').id;
+
+  globalThis.__scanQueueLife.reprocessStarted = false;
+  scanQueue.enqueue('paper-1', 'Paper one', 'deep');
+  const retrying = scanQueue.snapshot();
+  assert.equal(retrying.items.some((item) => item.id === failedId), false, 'the superseded failure leaves the operational queue');
+  assert.equal(retrying.failed, 0, 'the retry control counts current failures, not attempt history');
+
+  await waitFor(() => globalThis.__scanQueueLife.reprocessStarted, 'successful retry reaches graph maintenance');
+  globalThis.__scanQueueLife.releaseReprocess();
+  await waitFor(() => !scanQueue.snapshot().maintenanceRunning, 'retry maintenance settles');
+  const completed = scanQueue.snapshot();
+  assert.equal(completed.failed, 0);
+  assert.equal(completed.done, 1);
+  assert.equal(completed.items.filter((item) => item.kind === 'deep').length, 1, 'only the successful current attempt remains');
 });
 
 test('stopping an accepted provider operation never hides it while it is still running', async () => {

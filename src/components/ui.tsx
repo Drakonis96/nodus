@@ -59,6 +59,7 @@ const ICON_PATHS: Record<string, string> = {
   flag: '<path d="M5 21V4"/><path d="M5 4h11l-2 3.5L16 11H5"/>',
   ruler: '<path d="M3 15 15 3l6 6L9 21z"/><path d="m7 11 2 2"/><path d="m10 8 2 2"/><path d="m13 5 2 2"/>',
   mapPin: '<path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/>',
+  pin: '<path d="M12 17v5"/><path d="M5 17h14"/><path d="M7 17V9l-2-2V5h14v2l-2 2v8"/><path d="M9 5V2h6v3"/>',
   scissors: '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8.1 7.7 20 18"/><path d="M8.1 16.3 20 6"/>',
   truck: '<path d="M3 6h11v10H3z"/><path d="M14 9h4l3 3v4h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17.5" cy="18" r="1.6"/>',
   anchor: '<circle cx="12" cy="5" r="2.5"/><path d="M12 7.5V21"/><path d="M8 11H5a7 7 0 0 0 14 0h-3"/>',

@@ -59,7 +59,7 @@ const STUDY_KEYS = new Set([
   'maxInputChars', 'maxOutputTokens', 'temperature', 'retryCount', 'studentPseudonyms',
 ]);
 const WORKSPACE_KEYS = new Set([
-  'sidebarOrder', 'sidebarHidden', 'sidebarCustomized', 'aiConcurrencyMode', 'aiConcurrencyVersion', 'concurrency', 'deepContextMode',
+  'sidebarOrder', 'sidebarHidden', 'sidebarCustomized', 'toolkitPinnedPages', 'aiConcurrencyMode', 'aiConcurrencyVersion', 'concurrency', 'deepContextMode',
   'standardChunkWords', 'longChunkWords',
 ]);
 const PROVIDER_PATTERN = /^[a-z][a-z0-9-]{0,47}$/;
@@ -232,6 +232,7 @@ export function extractServerProfilePreferences(settings) {
       sidebarOrder: Array.isArray(settings.sidebarOrder) ? settings.sidebarOrder : [],
       sidebarHidden: Array.isArray(settings.sidebarHidden) ? settings.sidebarHidden : [],
       sidebarCustomized: settings.sidebarCustomized,
+      toolkitPinnedPages: Array.isArray(settings.toolkitPinnedPages) ? settings.toolkitPinnedPages : [],
       aiConcurrencyMode: settings.aiConcurrencyMode,
       aiConcurrencyVersion: settings.aiConcurrencyVersion,
       concurrency: settings.concurrency,
@@ -305,6 +306,7 @@ export function desktopSettingsPatchFromServerProfile(value) {
     sidebarOrder: [...profile.workspace.sidebarOrder],
     sidebarHidden: [...profile.workspace.sidebarHidden],
     sidebarCustomized: profile.workspace.sidebarCustomized,
+    toolkitPinnedPages: [...profile.workspace.toolkitPinnedPages],
     aiConcurrencyMode: profile.workspace.aiConcurrencyMode,
     aiConcurrencyVersion: profile.workspace.aiConcurrencyVersion,
     concurrency: profile.workspace.concurrency,
@@ -414,6 +416,7 @@ export function sanitizeServerProfilePreferences(value) {
     workspace: {
       sidebarOrder: strings(workspace.sidebarOrder), sidebarHidden: strings(workspace.sidebarHidden),
       sidebarCustomized: bool(workspace.sidebarCustomized),
+      toolkitPinnedPages: workspace.toolkitPinnedPages === undefined ? [] : strings(workspace.toolkitPinnedPages),
       // Version 1 records an explicit selector choice. Older/missing values are
       // the pre-release opt-in default and graduate once to production automatic.
       aiConcurrencyMode: workspace.aiConcurrencyVersion !== undefined

@@ -9,6 +9,7 @@ import { parseTestimonyLink, type TestimonyDeepLink } from '@shared/testimonyDee
 import { t } from '../i18n';
 import { VERIFY_DEBOUNCE_MS, planCitationVerification } from '../citationVerification';
 import { parsePrimarySourceExcerptDeepLink } from '@shared/primarySourceDeepLink';
+import { rehypeGroupParenthesizedCitations } from '../markdownCitationGroups';
 
 const nodusUrlTransform = (value: string) => {
   if (value.startsWith('nodus://')) return value;
@@ -152,7 +153,7 @@ function MarkdownComponent({
     <div className={`md ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[rehypeKatex]}
+        rehypePlugins={[rehypeKatex, rehypeGroupParenthesizedCitations]}
         urlTransform={(value, key) => {
           if (allowDataImages && key === 'src' && /^data:image\/(?:png|jpeg|gif|webp|svg\+xml);base64,/i.test(value)) return value;
           return nodusUrlTransform(value);

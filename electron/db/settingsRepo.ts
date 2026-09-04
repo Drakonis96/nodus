@@ -13,6 +13,7 @@ import { lockedApiKeyProviders, providerKeyMap } from '../secrets/secretStore';
 import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
 import { DEFAULT_NODUS_IMAGE_QUALITY, isNodusImageQuality } from '@shared/localImageModels';
 import { EMPTY_CUSTOM_EVENT_TYPES, sanitizeCustomEventTypes } from '@shared/eventTypes';
+import { normalizeToolkitToolPages } from '@shared/toolkitNavigation';
 import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
 import {
   GLOBAL_PREF_KEYS,
@@ -229,6 +230,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   sidebarOrder: [],
   sidebarHidden: [],
   sidebarCustomized: false,
+  toolkitPinnedPages: [],
   treeFrame: 'oak',
   treeFocusPersonId: null,
   treeOrientation: 'ancestors_top',
@@ -333,6 +335,7 @@ export function getSettings(): AppSettings {
   merged.mascotScale = normalizeNodiScale(parsed.mascotScale);
   merged.studyImproveToolbarStyleIds = [...new Set((Array.isArray(merged.studyImproveToolbarStyleIds) ? merged.studyImproveToolbarStyleIds : [])
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0))].slice(0, 4);
+  merged.toolkitPinnedPages = normalizeToolkitToolPages(parsed.toolkitPinnedPages);
   merged.customEventTypes = sanitizeCustomEventTypes(parsed.customEventTypes);
   // Pre-2.3 builds called the Transformers.js worker simply "local".
   if ((parsed as { sttProvider?: string }).sttProvider === 'local') merged.sttProvider = 'transformers';
@@ -387,8 +390,9 @@ export function getSettings(): AppSettings {
   // The global preferences file is user-editable, so validate the shared size again
   // after it has overlaid the vault defaults.
   merged.mascotScale = normalizeNodiScale(merged.mascotScale);
-  // Global preferences are user-editable JSON on disk. Fail closed to the v3-safe
-  // vault scope if those three values are missing or malformed.
+  // Global preferences are user-editable JSON on disk; discard unknown pin ids.
+  merged.toolkitPinnedPages = normalizeToolkitToolPages(merged.toolkitPinnedPages);
+  // Fail closed to the v3-safe vault scope if these three values are malformed.
   if (merged.libraryScope !== 'global' && merged.libraryScope !== 'vault') merged.libraryScope = 'vault';
   if (typeof merged.libraryGlobalEnabled !== 'boolean') merged.libraryGlobalEnabled = false;
   if (!Number.isInteger(merged.libraryScopeOnboardingVersion) || merged.libraryScopeOnboardingVersion < 0) {
@@ -525,6 +529,9 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   }
   if (patch.studyImproveToolbarStyleIds) {
     patch = { ...patch, studyImproveToolbarStyleIds: [...new Set(patch.studyImproveToolbarStyleIds.filter((value) => typeof value === 'string' && value.trim()))].slice(0, 4) };
+  }
+  if (patch.toolkitPinnedPages !== undefined) {
+    patch = { ...patch, toolkitPinnedPages: normalizeToolkitToolPages(patch.toolkitPinnedPages) };
   }
   if (patch.transcriptionModel !== undefined) {
     patch = { ...patch, transcriptionModel: sanitizeTranscriptionModel(patch.transcriptionModel) };
