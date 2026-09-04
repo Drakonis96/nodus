@@ -90,6 +90,7 @@ export function GeneralTextModelControl({
           value={settings.synthesisModel}
           onChange={(model) => void patch({ synthesisModel: model })}
           requireExtraction
+          menu
         />
         <button
           className="btn btn-ghost justify-center border border-neutral-700"

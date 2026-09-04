@@ -3085,27 +3085,27 @@ export function Settings({
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Ajustes avanzados comunes')}</h3>
                 {/* The four selectors below drive the scan pipeline: one run covers a
                     whole corpus, so a subscription plan's quota is the real limit. */}
-                <Row label={t('Extracción de temas, ideas y evidencias')} hint={t('Extrae temas, ideas, evidencias y relaciones cuando Nodus analiza el corpus.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.extractionModel} onChange={(extractionModel) => void patch({ extractionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
+                <Row label={t('Extracción de temas, ideas y evidencias')} hint={t('Extrae temas, ideas, evidencias y relaciones cuando Nodus analiza el corpus.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.extractionModel} onChange={(extractionModel) => void patch({ extractionModel })} emptyLabel="Seleccionar modelo" requireExtraction menu /></Row>
                 <ExtractionCapabilityNotice model={settings.extractionModel} />
                 <SubscriptionQuotaNotice model={settings.extractionModel} />
-                <Row label={t('Visión y OCR de imágenes')} hint={t('Interpreta imágenes y páginas escaneadas y obtiene su texto cuando hace falta.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.visionModel} onChange={(visionModel) => void patch({ visionModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Visión y OCR de imágenes')} hint={t('Interpreta imágenes y páginas escaneadas y obtiene su texto cuando hace falta.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.visionModel} onChange={(visionModel) => void patch({ visionModel })} emptyLabel="Seleccionar modelo" menu /></Row>
                 <SubscriptionQuotaNotice model={settings.visionModel} />
-                <Row label={t('Resúmenes de obras')} hint={t('Redacta resúmenes breves de cada obra para orientar la navegación y la recuperación.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.summaryModel} onChange={(summaryModel) => void patch({ summaryModel })} emptyLabel="Seleccionar modelo" requiredCapability="summary" /></Row>
+                <Row label={t('Resúmenes de obras')} hint={t('Redacta resúmenes breves de cada obra para orientar la navegación y la recuperación.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.summaryModel} onChange={(summaryModel) => void patch({ summaryModel })} emptyLabel="Seleccionar modelo" requiredCapability="summary" menu /></Row>
                 <SubscriptionQuotaNotice model={settings.summaryModel} />
                 {activeVault?.type === 'academic' && <>
-                  <Row label={t('Comprensión de documentos completos')} hint={t('Analiza todas las secciones y sintetiza la arquitectura global de cada obra.')}><ModelWithReasoning settings={settings} value={settings.documentProfileModel} onChange={(documentProfileModel) => void patch({ documentProfileModel })} emptyLabel="Usar modelo de resúmenes" requiredCapability="documentProfile" /></Row>
+                  <Row label={t('Comprensión de documentos completos')} hint={t('Analiza todas las secciones y sintetiza la arquitectura global de cada obra.')}><ModelWithReasoning settings={settings} value={settings.documentProfileModel} onChange={(documentProfileModel) => void patch({ documentProfileModel })} emptyLabel="Usar modelo de resúmenes" requiredCapability="documentProfile" menu /></Row>
                   <ExtractionCapabilityNotice model={settings.documentProfileModel ?? settings.summaryModel} />
                   <SubscriptionQuotaNotice model={settings.documentProfileModel ?? settings.summaryModel} />
-                  <Row label={t('Auditor de fichas documentales')} hint={t('Revisa soporte, cobertura y fidelidad antes de publicar una versión nueva.')}><ModelWithReasoning settings={settings} value={settings.documentAuditModel} onChange={(documentAuditModel) => void patch({ documentAuditModel })} emptyLabel="Usar modelo de comprensión documental" requiredCapability="documentProfile" /></Row>
+                  <Row label={t('Auditor de fichas documentales')} hint={t('Revisa soporte, cobertura y fidelidad antes de publicar una versión nueva.')}><ModelWithReasoning settings={settings} value={settings.documentAuditModel} onChange={(documentAuditModel) => void patch({ documentAuditModel })} emptyLabel="Usar modelo de comprensión documental" requiredCapability="documentProfile" menu /></Row>
                   <SubscriptionQuotaNotice model={settings.documentAuditModel ?? settings.documentProfileModel ?? settings.summaryModel} />
                 </>}
-                <Row label={t('Fusión y deduplicación')} hint={t('Combina resultados equivalentes y elimina duplicados sin perder su evidencia.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" requiredCapability="fusion" /></Row>
+                <Row label={t('Fusión y deduplicación')} hint={t('Combina resultados equivalentes y elimina duplicados sin perder su evidencia.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" requiredCapability="fusion" menu /></Row>
                 <ExtractionCapabilityNotice model={settings.fusionModel} />
                 <SubscriptionQuotaNotice model={settings.fusionModel} />
-                <Row label={t('Relaciones semánticas')} hint={t('Valida pares de ideas y genera las relaciones del grafo.')}><ModelWithReasoning allowEmpty settings={settings} value={settings.relationModel} onChange={(relationModel) => void patch({ relationModel })} emptyLabel="Usar modelo de fusión" requiredCapability="fusion" /></Row>
+                <Row label={t('Relaciones semánticas')} hint={t('Valida pares de ideas y genera las relaciones del grafo.')}><ModelWithReasoning allowEmpty settings={settings} value={settings.relationModel} onChange={(relationModel) => void patch({ relationModel })} emptyLabel="Usar modelo de fusión" requiredCapability="fusion" menu /></Row>
                 <ExtractionCapabilityNotice model={settings.relationModel ?? settings.fusionModel} />
                 <SubscriptionQuotaNotice model={settings.relationModel ?? settings.fusionModel} />
-                <Row label={t('Asistente Nodi')} hint={t('Responde en el asistente Nodi y usa el contexto de la vista cuando lo autorizas.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.nodiModel} onChange={(nodiModel) => void patch({ nodiModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Asistente Nodi')} hint={t('Responde en el asistente Nodi y usa el contexto de la vista cuando lo autorizas.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.nodiModel} onChange={(nodiModel) => void patch({ nodiModel })} emptyLabel="Seleccionar modelo" menu /></Row>
               </div>
               <VaultModelOverrides settings={settings} vaultType={activeVault?.type ?? 'academic'} vaultName={activeVault?.name ?? t('Vault actual')} patch={patch} />
             </>}
@@ -3888,7 +3888,7 @@ function VaultModelOverrides({ settings, vaultType, vaultName, patch }: {
     <p className="mb-3 mt-1 text-xs text-neutral-600">{t('Estos cambios no modifican los demás vaults.')}</p>
     {vaultType === 'estudio' ? <StudyVaultModelOverrides settings={settings} patch={patch} /> : <div className="space-y-3">
       {keys.map((key) => <Row key={key} label={t(VAULT_MODEL_FIELDS[key])} hint={t(VAULT_MODEL_HINTS[key])}>
-        <ModelWithReasoning allowEmpty={false} settings={settings} value={settings[key] ?? null} onChange={(model) => void patch({ [key]: model })} emptyLabel="Seleccionar modelo" />
+        <ModelWithReasoning allowEmpty={false} settings={settings} value={settings[key] ?? null} onChange={(model) => void patch({ [key]: model })} emptyLabel="Seleccionar modelo" menu />
       </Row>)}
     </div>}
   </div>;
@@ -3914,8 +3914,8 @@ function StudyVaultModelOverrides({ settings, patch }: {
         {t(item.label)}
         <span className="mt-0.5 block text-[10px] leading-4 text-neutral-500">{t(item.hint)}</span>
       </span>
-      <ModelWithReasoning compact allowEmpty={false} settings={settings} value={settings[item.key]} onChange={(model) => void patch({ [item.key]: model })} emptyLabel="Seleccionar modelo" />
-      <ModelWithReasoning compact settings={settings} value={settings.studyAiFallbackModels[item.task] ?? null} onChange={(model) => void patch({ studyAiFallbackModels: { ...settings.studyAiFallbackModels, [item.task]: model } })} emptyLabel="Sin modelo alternativo" />
+      <ModelWithReasoning compact allowEmpty={false} settings={settings} value={settings[item.key]} onChange={(model) => void patch({ [item.key]: model })} emptyLabel="Seleccionar modelo" menu />
+      <ModelWithReasoning compact settings={settings} value={settings.studyAiFallbackModels[item.task] ?? null} onChange={(model) => void patch({ studyAiFallbackModels: { ...settings.studyAiFallbackModels, [item.task]: model } })} emptyLabel="Sin modelo alternativo" menu />
     </div>)}
   </div>;
 }

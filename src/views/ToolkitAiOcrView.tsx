@@ -162,7 +162,7 @@ function ReprocessModelModal({ settings, initial, title, onConfirm, onCancel }: 
           <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{title ?? t('Reprocesar documento')}</h3>
           <p className="text-sm text-neutral-500 dark:text-neutral-400">{t('Elige el modelo para volver a procesar.')}</p>
         </div>
-        <ModelPicker settings={settings} value={choice} onChange={setChoice} allowEmpty={false} emptyLabel="Seleccionar modelo" />
+        <ModelPicker settings={settings} value={choice} onChange={setChoice} allowEmpty={false} emptyLabel="Seleccionar modelo" menu />
         <SubscriptionQuotaNotice model={choice} />
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onCancel} className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">{t('Cancelar')}</button>
@@ -549,7 +549,7 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
         <div className="space-y-2">
           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-200">{t('Modelo de visión')}</label>
           {settings
-            ? <ModelPicker settings={settings} value={model} onChange={setModel} allowEmpty={false} emptyLabel="Seleccionar modelo" />
+            ? <ModelPicker settings={settings} value={model} onChange={setModel} allowEmpty={false} emptyLabel="Seleccionar modelo" menu />
             : <Spinner label={t('Cargando…')} />}
           <SubscriptionQuotaNotice model={model} />
           {cloudModel && model && (

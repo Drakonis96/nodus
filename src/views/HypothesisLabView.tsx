@@ -148,7 +148,7 @@ export function HypothesisLabView({
           )}
         </div>
         <div className="flex-1" />
-        <ModelPicker settings={settings} value={model} onChange={setModel} compact />
+        <ModelPicker settings={settings} value={model} onChange={setModel} compact menu />
         <button className="btn btn-primary gap-1.5" onClick={() => void generate()} disabled={loading}>
           <Icon name={loading ? 'sync' : 'flask'} className={loading ? 'animate-spin' : ''} />
           {loading ? t('Generando…') : t('Generar hipótesis')}

@@ -194,6 +194,7 @@ export function ModelWithReasoning({
   emptyLabel,
   requireExtraction = false,
   requiredCapability,
+  menu,
 }: {
   settings: AppSettings;
   value: ModelRef | null;
@@ -203,6 +204,7 @@ export function ModelWithReasoning({
   emptyLabel?: string;
   requireExtraction?: boolean;
   requiredCapability?: NodusLocalCapability;
+  menu?: boolean;
 }) {
   return (
     <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
@@ -216,6 +218,7 @@ export function ModelWithReasoning({
         emptyLabel={emptyLabel}
         requireExtraction={requireExtraction}
         requiredCapability={requiredCapability}
+        menu={menu}
       />
       <ReasoningPicker settings={settings} model={value} onChange={onChange} compact={compact} />
     </div>
