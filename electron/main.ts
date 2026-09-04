@@ -560,7 +560,7 @@ async function checkForUpdates(reason: string): Promise<UpdateCheckResponse> {
   if (downloadedUpdateVersion) {
     return emitUpdate({
       status: 'downloaded',
-      message: `Actualización ${downloadedUpdateVersion} descargada. Reiniciando para instalarla…`,
+      message: `Actualización ${downloadedUpdateVersion} descargada. Haz clic en "Instalar ahora" para reiniciar con la nueva versión.`,
       version: downloadedUpdateVersion,
       progress: 100,
     });
@@ -842,14 +842,13 @@ function setupAutoUpdates(): void {
     }
     downloadedUpdateVersion = info.version;
     downloadedUpdateFile = info.downloadedFile;
-    console.log(`[updates] downloaded ${info.version}; preparing protected installation`);
+    console.log(`[updates] downloaded ${info.version}; waiting for user to restart`);
     emitUpdate({
       status: 'downloaded',
-      message: `Actualización ${info.version} descargada. Reiniciando para instalarla…`,
+      message: `Actualización ${info.version} descargada. Haz clic en "Instalar ahora" para reiniciar con la nueva versión.`,
       version: info.version,
       progress: 100,
     });
-    setTimeout(() => void installDownloadedUpdate(), 1200);
   });
   autoUpdater.on('error', (e) => {
     if (installUpdateTimer) {
