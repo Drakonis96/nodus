@@ -1761,7 +1761,7 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Get document profile',
       description:
-        'Gets the current audited whole-document profile for one work: overview, central question, thesis, method, scope, section architecture and links to extracted ideas. The profile is generated orientation metadata, never a citable source; verify claims through its support passages or the original work. workId accepts a nodus_id or Zotero key. Read-only.',
+        'Gets the current audited whole-document profile for one work: overview, central question, explicit hypotheses, thesis, method, findings, contribution, scope, section architecture and links to extracted ideas. The profile is generated orientation metadata, never a citable source; verify claims through its support passages or the original work. workId accepts a nodus_id or Zotero key. Read-only.',
       inputSchema: { workId: z.string().trim().min(1) },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },

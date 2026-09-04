@@ -21,7 +21,7 @@ const planner = require(path.join(root, 'electron/ai/localRequestPlanner.ts'));
 const native = require(path.join(root, 'electron/ai/localNativeCompletion.ts'));
 const adaptive = require(path.join(root, 'electron/ai/adaptiveStructuredBatch.ts'));
 
-test('Auto chooses only 4K/8K/16K and keeps output independent', () => {
+test('Auto reserves 32K only when deep extraction needs a real 16K output budget', () => {
   const small = planner.buildLocalRequestPlan({
     provider: 'ollama', model: 'qwen', task: 'summary', promptTokens: 500,
     requestedOutputTokens: 800, contextMode: 'auto', trainedContextTokens: 131072, nativeTransport: true,
@@ -29,13 +29,21 @@ test('Auto chooses only 4K/8K/16K and keeps output independent', () => {
   assert.equal(small.contextTokens, 4096);
   assert.equal(small.outputTokens, 800);
 
-  const large = planner.buildLocalRequestPlan({
-    provider: 'ollama', model: 'qwen', task: 'deep-extraction', promptTokens: 9000,
+  const deep = planner.buildLocalRequestPlan({
+    provider: 'ollama', model: 'qwen', task: 'deep-extraction', promptTokens: 6000,
+    requestedOutputTokens: 16000, contextMode: 'auto', trainedContextTokens: 131072, nativeTransport: true,
+  });
+  assert.equal(deep.contextTokens, 32768);
+  assert.equal(deep.outputTokens, 16000, 'the successful fixed 16K allowance survives planning unchanged');
+  assert.ok(deep.promptTokens + deep.outputTokens + deep.reserveTokens <= deep.contextTokens);
+
+  const ordinary = planner.buildLocalRequestPlan({
+    provider: 'ollama', model: 'qwen', task: 'generic', promptTokens: 9000,
     requestedOutputTokens: 8000, contextMode: 'auto', trainedContextTokens: 131072, nativeTransport: true,
   });
-  assert.equal(large.contextTokens, 16384);
-  assert.ok(large.outputTokens < 8000, 'remaining context, not context itself, caps output');
-  assert.ok(large.promptTokens + large.outputTokens + large.reserveTokens <= large.contextTokens);
+  assert.equal(ordinary.contextTokens, 16384, 'ordinary automatic calls retain the previous memory ceiling');
+  assert.ok(ordinary.outputTokens < 8000);
+  assert.equal(planner.localTaskOutputTokens('deep-extraction'), 16000);
 });
 
 test('65K and 128K manual context never become output limits', () => {
@@ -106,6 +114,40 @@ test('native providers receive separate exact context/output fields', async (t) 
   assert.equal(seen[2].body.max_output_tokens, 777);
   assert.equal(seen[2].body.store, false);
   assert.ok(!Object.hasOwn(seen[2].body, 'reasoning'));
+});
+
+test('LM Studio native output excludes reasoning and infers an exhausted allowance from usage', async (t) => {
+  let responseBody = {};
+  const server = createServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(responseBody));
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+  const request = {
+    provider: 'lmstudio', baseUrl: `http://127.0.0.1:${server.address().port}`,
+    key: null, model: 'reasoning-model', system: 's', user: 'u', temperature: 0,
+    contextTokens: 32768, outputTokens: 16000, jsonMode: true, timeoutMs: 5000,
+  };
+
+  responseBody = {
+    output: [
+      { type: 'reasoning', content: 'I considered {several JSON shapes}.' },
+      { type: 'message', content: '{"ideas":["complete"]}' },
+    ],
+    stats: { input_tokens: 100, total_output_tokens: 4000, reasoning_output_tokens: 3000 },
+  };
+  const complete = await native.completeLocalNative(request);
+  assert.equal(complete.text, '{"ideas":["complete"]}');
+  assert.equal(complete.finishReason, undefined);
+
+  responseBody = {
+    output: [{ type: 'reasoning', content: 'The model used the entire allowance before answering.' }],
+    stats: { input_tokens: 100, total_output_tokens: 16000, reasoning_output_tokens: 16000 },
+  };
+  const exhausted = await native.completeLocalNative(request);
+  assert.equal(exhausted.text, '');
+  assert.equal(exhausted.finishReason, 'max_output_tokens');
 });
 
 test('native timeout remains active while the response body is stalled', async (t) => {

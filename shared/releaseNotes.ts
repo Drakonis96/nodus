@@ -30,7 +30,8 @@ export type ReleaseNoteScope =
   | 'plugin'
   | 'languages'
   | 'browser'
-  | 'radar';
+  | 'radar'
+  | 'apple';
 
 interface RawReleaseHighlight {
   es: string;
@@ -1876,6 +1877,27 @@ const RELEASE_5_1_1_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+const RELEASE_5_1_3_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'apple',
+    es: 'Nodus para macOS se distribuye ahora firmado con Developer ID y notarizado por Apple. Hardened Runtime protege la aplicación y Gatekeeper verifica la firma y el ticket antes de abrirla. Todos los helpers, frameworks, módulos nativos y binarios incluidos se firman con los permisos mínimos que necesitan.',
+    en: 'Nodus for macOS is now distributed with a Developer ID signature and Apple notarization. Hardened Runtime protects the application, and Gatekeeper verifies its signature and ticket before opening it. Every bundled helper, framework, native module, and executable is signed with only the permissions it needs.',
+    fr: 'Nodus pour macOS est désormais distribué avec une signature Developer ID et une notarisation Apple. Hardened Runtime protège l’application et Gatekeeper vérifie la signature et le ticket avant son ouverture. Tous les assistants, frameworks, modules natifs et exécutables inclus sont signés avec uniquement les autorisations nécessaires.',
+    de: 'Nodus für macOS wird jetzt mit einer Developer-ID-Signatur und Apple-Notarisierung ausgeliefert. Hardened Runtime schützt die Anwendung, und Gatekeeper prüft vor dem Öffnen Signatur und Ticket. Alle enthaltenen Hilfsprogramme, Frameworks, nativen Module und ausführbaren Dateien werden nur mit den benötigten Berechtigungen signiert.',
+    pt: 'O Nodus para macOS passa a ser distribuído com assinatura Developer ID e notarização da Apple. O Hardened Runtime protege a aplicação e o Gatekeeper verifica a assinatura e o comprovativo antes de a abrir. Todos os auxiliares, frameworks, módulos nativos e executáveis incluídos são assinados apenas com as permissões necessárias.',
+    'pt-BR': 'O Nodus para macOS agora é distribuído com assinatura Developer ID e notarização da Apple. O Hardened Runtime protege o aplicativo e o Gatekeeper verifica a assinatura e o tíquete antes de abri-lo. Todos os auxiliares, frameworks, módulos nativos e executáveis incluídos são assinados apenas com as permissões necessárias.',
+  },
+  {
+    scope: 'academic',
+    es: 'El Diccionario reparte ahora las fuentes entre distintas obras y autorías en vez de dejar que una sola domine la selección. Combina búsqueda semántica y léxica, identifica el origen de ideas, citas y relaciones, y avisa si una definición no cubre suficientes fuentes o autores.',
+    en: 'The Dictionary now spreads evidence across different works and authors instead of letting one source dominate the selection. It combines semantic and lexical search, identifies the origin of ideas, quotations, and relationships, and warns when a definition does not cover enough sources or authors.',
+    fr: 'Le Dictionnaire répartit désormais les preuves entre plusieurs œuvres et auteurs au lieu de laisser une seule source dominer la sélection. Il combine recherche sémantique et lexicale, identifie l’origine des idées, citations et relations, et avertit lorsqu’une définition ne couvre pas assez de sources ou d’auteurs.',
+    de: 'Das Wörterbuch verteilt Belege jetzt auf verschiedene Werke und Autorinnen oder Autoren, statt eine einzige Quelle die Auswahl bestimmen zu lassen. Es kombiniert semantische und lexikalische Suche, kennzeichnet die Herkunft von Ideen, Zitaten und Beziehungen und warnt, wenn eine Definition nicht genügend Quellen oder Urheber abdeckt.',
+    pt: 'O Dicionário distribui agora as provas por diferentes obras e autorias em vez de deixar uma única fonte dominar a seleção. Combina pesquisa semântica e lexical, identifica a origem de ideias, citações e relações e avisa quando uma definição não cobre fontes ou autores suficientes.',
+    'pt-BR': 'O Dicionário agora distribui as evidências entre diferentes obras e autorias em vez de deixar uma única fonte dominar a seleção. Ele combina busca semântica e lexical, identifica a origem de ideias, citações e relações e avisa quando uma definição não cobre fontes ou autores suficientes.',
+  },
+];
+
 /**
  * v5.1.2 keeps the complete v5.1.1 announcement and appends the fixes merged
  * afterwards. The patch remains self-contained for anyone updating from an
@@ -2375,7 +2397,171 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+/**
+ * 5.1.4 stands on its own, like 5.1.3 before it. 5.1.5 intentionally reuses this
+ * exact modal for its focused hotfix. Everyone who installed 5.1.3 already
+ * read its two entries, so repeating them here would bury the eight changes that are
+ * actually new. The order below is the authored order and also the rendered one: the
+ * modal groups highlights by scope and puts the largest cluster first, and `ai` (four)
+ * already leads, followed by `academic` (two), `library` and `zotero`.
+ */
+const RELEASE_5_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'ai',
+    es: 'Las instrucciones que Nodus envía a la IA están ahora escritas de forma nativa en los ocho idiomas de la interfaz. Antes casi todas se redactaban en español y solo pedían al modelo que contestara en otro idioma, lo que se notaba en la calidad de la respuesta y en los términos que elegía. Ahora cada tarea tiene su propio contrato de instrucciones en tu idioma, desde el análisis del corpus hasta Deep Research, el Tutor, el Taller de escritura, el Diccionario y Nodi. Las claves del protocolo, los identificadores y las reglas de cita se mantienen intactas.',
+    en: 'The instructions Nodus sends to the AI are now written natively in all eight interface languages. Almost all of them used to be drafted in Spanish and merely asked the model to answer in another language, which showed in the quality of the answer and in the terms it chose. Every task now has its own instruction contract in your language, from corpus analysis to Deep Research, the Tutor, the Writing Workshop, the Dictionary and Nodi. Protocol keys, identifiers and citation rules are left untouched.',
+    fr: 'Les instructions que Nodus envoie à l’IA sont désormais rédigées nativement dans les huit langues de l’interface. Presque toutes étaient écrites en espagnol et demandaient simplement au modèle de répondre dans une autre langue, ce qui se voyait dans la qualité de la réponse et dans les termes choisis. Chaque tâche dispose maintenant de son propre contrat d’instructions dans votre langue, de l’analyse du corpus à Deep Research, au Tuteur, à l’Atelier d’écriture, au Dictionnaire et à Nodi. Les clés du protocole, les identifiants et les règles de citation restent intacts.',
+    de: 'Die Anweisungen, die Nodus an die KI schickt, sind jetzt in allen acht Oberflächensprachen nativ verfasst. Fast alle wurden zuvor auf Spanisch geschrieben und baten das Modell lediglich, in einer anderen Sprache zu antworten, was sich in der Qualität der Antwort und in der Wortwahl zeigte. Jede Aufgabe hat nun ihren eigenen Anweisungsvertrag in Ihrer Sprache, von der Korpusanalyse über Deep Research, den Tutor, die Schreibwerkstatt und das Wörterbuch bis zu Nodi. Protokollschlüssel, Bezeichner und Zitierregeln bleiben unverändert.',
+    pt: 'As instruções que o Nodus envia à IA passam a estar escritas de forma nativa nos oito idiomas da interface. Quase todas eram redigidas em espanhol e apenas pediam ao modelo que respondesse noutro idioma, o que se notava na qualidade da resposta e nos termos escolhidos. Cada tarefa tem agora o seu próprio contrato de instruções no seu idioma, desde a análise do corpus até ao Deep Research, ao Tutor, à Oficina de escrita, ao Dicionário e ao Nodi. As chaves do protocolo, os identificadores e as regras de citação mantêm-se intactos.',
+    'pt-BR': 'As instruções que o Nodus envia à IA agora são escritas de forma nativa nos oito idiomas da interface. Quase todas eram redigidas em espanhol e apenas pediam ao modelo que respondesse em outro idioma, o que aparecia na qualidade da resposta e nos termos escolhidos. Cada tarefa tem agora seu próprio contrato de instruções no seu idioma, da análise do corpus ao Deep Research, ao Tutor, à Oficina de escrita, ao Dicionário e ao Nodi. As chaves do protocolo, os identificadores e as regras de citação continuam intactos.',
+  },
+  {
+    scope: 'ai',
+    es: 'Los textos que la aplicación genera fuera de la interfaz dejan de salir en español. Los avisos del complemento de Word, los mensajes del servidor web, los diálogos nativos del sistema y la documentación de Nodi siguen ahora el idioma que tengas configurado. Si tenías Nodus en inglés y veías advertencias en español, eso ya no ocurre.',
+    en: 'Text the application generates outside the interface no longer comes out in Spanish. Word add-in warnings, server web messages, native system dialogs and Nodi documentation now follow the language you have set. If you ran Nodus in English and kept seeing Spanish warnings, that is over.',
+    fr: 'Les textes que l’application produit en dehors de l’interface ne sortent plus en espagnol. Les avertissements du complément Word, les messages du serveur web, les boîtes de dialogue natives du système et la documentation de Nodi suivent désormais la langue que vous avez choisie. Si vous utilisiez Nodus en français et voyiez encore des avertissements en espagnol, c’est terminé.',
+    de: 'Texte, die die Anwendung außerhalb der Oberfläche erzeugt, erscheinen nicht mehr auf Spanisch. Die Warnungen des Word-Add-ins, die Meldungen des Webservers, die nativen Systemdialoge und die Nodi-Dokumentation folgen jetzt der eingestellten Sprache. Wenn Sie Nodus auf Deutsch nutzten und weiterhin spanische Hinweise sahen, ist das vorbei.',
+    pt: 'Os textos que a aplicação gera fora da interface deixam de aparecer em espanhol. Os avisos do suplemento do Word, as mensagens do servidor web, as caixas de diálogo nativas do sistema e a documentação do Nodi seguem agora o idioma que tiver configurado. Se usava o Nodus em português e continuava a ver avisos em espanhol, isso acabou.',
+    'pt-BR': 'Os textos que o aplicativo gera fora da interface não aparecem mais em espanhol. Os avisos do suplemento do Word, as mensagens do servidor web, as caixas de diálogo nativas do sistema e a documentação do Nodi agora seguem o idioma que você configurou. Se você usava o Nodus em português e continuava vendo avisos em espanhol, isso acabou.',
+  },
+  {
+    scope: 'ai',
+    es: 'Los modelos locales terminan los análisis exigentes. Nodus separa ahora la ventana de contexto del máximo de salida y calcula ese máximo para cada tarea, en vez de aplicar un tope fijo que cortaba la respuesta a medias. Los lotes se adaptan solos, se comprueba que la respuesta esté completa y, si no lo está, se reintenta con un plan menor. Ajustes estrena un control de ventana de contexto con modo automático y una ficha de la última petición local para ver qué se envió de verdad.',
+    en: 'Local models finish demanding analyses. Nodus now separates the context window from the output budget and works that budget out per task, instead of applying a fixed ceiling that cut answers in half. Batches adapt on their own, each answer is checked for completeness and, when it is not complete, the work is retried with a smaller plan. Settings gains a context-window control with an automatic mode and a card showing the last local request, so you can see what was really sent.',
+    fr: 'Les modèles locaux terminent les analyses exigeantes. Nodus sépare désormais la fenêtre de contexte du budget de sortie et calcule ce budget pour chaque tâche, au lieu d’appliquer un plafond fixe qui coupait la réponse en deux. Les lots s’adaptent tout seuls, chaque réponse est vérifiée et, si elle est incomplète, le travail est relancé avec un plan plus modeste. Les Paramètres gagnent un réglage de fenêtre de contexte avec mode automatique et une fiche de la dernière requête locale, pour voir ce qui a réellement été envoyé.',
+    de: 'Lokale Modelle bringen anspruchsvolle Analysen zu Ende. Nodus trennt jetzt das Kontextfenster vom Ausgabebudget und berechnet dieses Budget pro Aufgabe, statt eine feste Obergrenze anzuwenden, die Antworten mitten entzweischnitt. Die Stapel passen sich selbst an, jede Antwort wird auf Vollständigkeit geprüft, und wenn sie unvollständig ist, wird mit einem kleineren Plan erneut versucht. Die Einstellungen erhalten eine Kontextfenster-Steuerung mit Automatikmodus und eine Karte zur letzten lokalen Anfrage, damit Sie sehen, was tatsächlich gesendet wurde.',
+    pt: 'Os modelos locais terminam as análises exigentes. O Nodus separa agora a janela de contexto do orçamento de saída e calcula esse orçamento para cada tarefa, em vez de aplicar um limite fixo que cortava a resposta a meio. Os lotes adaptam-se sozinhos, verifica-se se a resposta está completa e, se não estiver, o trabalho é repetido com um plano menor. As Definições estreiam um controlo de janela de contexto com modo automático e uma ficha do último pedido local, para ver o que foi realmente enviado.',
+    'pt-BR': 'Os modelos locais terminam as análises exigentes. O Nodus agora separa a janela de contexto do orçamento de saída e calcula esse orçamento para cada tarefa, em vez de aplicar um teto fixo que cortava a resposta pela metade. Os lotes se adaptam sozinhos, a resposta é verificada e, se estiver incompleta, o trabalho é refeito com um plano menor. As Configurações estreiam um controle de janela de contexto com modo automático e um card da última requisição local, para você ver o que foi realmente enviado.',
+  },
+  {
+    scope: 'ai',
+    es: 'Renovar el análisis de una obra ya no puede dejarte sin nada. Si la renovación falla o la cancelas, el análisis anterior sigue intacto y visible. Si termina bien, se sustituyen ideas, vectores, relaciones, grafo y perfil sin dejar restos del análisis viejo. La cola también deja de mostrar «Pendiente» o «Analizando» en obras que ya no lo están.',
+    en: 'Refreshing a work’s analysis can no longer leave you with nothing. If the refresh fails or you cancel it, the previous analysis stays intact and visible. If it succeeds, ideas, vectors, relationships, graph and profile are replaced without leaving any remains of the old analysis behind. The queue also stops showing “Pending” or “Analysing” on works that are neither.',
+    fr: 'Relancer l’analyse d’une œuvre ne peut plus vous laisser sans rien. Si la relance échoue ou si vous l’annulez, l’analyse précédente reste intacte et visible. Si elle aboutit, idées, vecteurs, relations, graphe et profil sont remplacés sans laisser de restes de l’ancienne analyse. La file d’attente cesse aussi d’afficher « En attente » ou « Analyse en cours » sur des œuvres qui ne le sont plus.',
+    de: 'Eine Analyse zu erneuern kann Sie nicht mehr mit nichts zurücklassen. Scheitert die Erneuerung oder brechen Sie sie ab, bleibt die vorherige Analyse unversehrt und sichtbar. Gelingt sie, werden Ideen, Vektoren, Beziehungen, Graph und Profil ersetzt, ohne Reste der alten Analyse zu hinterlassen. Auch die Warteschlange zeigt nicht länger „Ausstehend“ oder „Wird analysiert“ bei Werken, auf die das nicht mehr zutrifft.',
+    pt: 'Renovar a análise de uma obra já não o pode deixar sem nada. Se a renovação falhar ou a cancelar, a análise anterior mantém-se intacta e visível. Se terminar bem, substituem-se ideias, vetores, relações, grafo e perfil sem deixar restos da análise antiga. A fila também deixa de mostrar «Pendente» ou «A analisar» em obras que já não estão nesse estado.',
+    'pt-BR': 'Renovar a análise de uma obra não pode mais deixar você sem nada. Se a renovação falhar ou você cancelá-la, a análise anterior continua intacta e visível. Se terminar bem, ideias, vetores, relações, grafo e perfil são substituídos sem deixar restos da análise antiga. A fila também deixa de mostrar “Pendente” ou “Analisando” em obras que já não estão nesse estado.',
+  },
+  {
+    scope: 'academic',
+    es: 'El perfil del documento reconoce ahora hipótesis y hallazgos como campos propios, con sus reglas de procedencia y de cobertura. Y la fusión de ideas deja de decidirse por un umbral de parecido entre vectores: el modelo tiene que justificar en cada caso si dos ideas son la misma, una variante o algo nuevo, y Nodus rechaza la fusión si la idea elegida no estaba entre las candidatas que se le ofrecieron.',
+    en: 'The document profile now recognises hypotheses and findings as fields of their own, with their own provenance and coverage rules. And idea fusion is no longer decided by a vector-similarity threshold: the model has to justify in each case whether two ideas are the same, a variant or something new, and Nodus rejects the merge when the chosen idea was not among the candidates it was offered.',
+    fr: 'Le profil du document reconnaît désormais les hypothèses et les résultats comme des champs à part entière, avec leurs propres règles de provenance et de couverture. Et la fusion des idées ne se décide plus par un seuil de similarité entre vecteurs : le modèle doit justifier à chaque fois si deux idées sont identiques, une variante ou quelque chose de nouveau, et Nodus refuse la fusion lorsque l’idée retenue ne figurait pas parmi les candidates proposées.',
+    de: 'Das Dokumentprofil erkennt Hypothesen und Befunde jetzt als eigene Felder, mit eigenen Herkunfts- und Abdeckungsregeln. Und die Ideenfusion wird nicht mehr über einen Ähnlichkeitsschwellenwert zwischen Vektoren entschieden: Das Modell muss in jedem Fall begründen, ob zwei Ideen dieselbe sind, eine Variante oder etwas Neues, und Nodus weist die Zusammenführung zurück, wenn die gewählte Idee nicht unter den angebotenen Kandidaten war.',
+    pt: 'O perfil do documento reconhece agora hipóteses e achados como campos próprios, com as suas regras de proveniência e de cobertura. E a fusão de ideias deixa de se decidir por um limiar de semelhança entre vetores: o modelo tem de justificar em cada caso se duas ideias são a mesma, uma variante ou algo novo, e o Nodus rejeita a fusão quando a ideia escolhida não estava entre as candidatas apresentadas.',
+    'pt-BR': 'O perfil do documento agora reconhece hipóteses e achados como campos próprios, com suas regras de proveniência e de cobertura. E a fusão de ideias deixa de ser decidida por um limiar de semelhança entre vetores: o modelo precisa justificar em cada caso se duas ideias são a mesma, uma variante ou algo novo, e o Nodus rejeita a fusão quando a ideia escolhida não estava entre as candidatas oferecidas.',
+  },
+  {
+    scope: 'academic',
+    es: 'El tutorial del vault académico se ha rehecho entero. Los catorce pasos antiguos, que señalaban botones que ya no existen, dejan paso a nueve pasos tranquilos que recorren una sola ruta: Biblioteca, Ideas y Grafo. Explica la diferencia entre Global y Este vault, por qué conviene analizar una sola fuente al principio, cómo verificar la evidencia de una idea y por qué el grafo tarda en poblarse. Está completo en los ocho idiomas.',
+    en: 'The academic vault tour has been rebuilt from scratch. The old fourteen steps, which pointed at buttons that no longer exist, give way to nine calm steps along a single path: Library, Ideas and Graph. It explains the difference between Global and This vault, why it is better to analyse a single source at first, how to verify the evidence behind an idea and why the graph takes a while to fill up. It is complete in all eight languages.',
+    fr: 'La visite guidée du coffre académique a été entièrement refaite. Les quatorze anciennes étapes, qui désignaient des boutons disparus, laissent place à neuf étapes tranquilles suivant un seul parcours : Bibliothèque, Idées et Graphe. Elle explique la différence entre Global et Ce coffre, pourquoi mieux vaut analyser une seule source au début, comment vérifier la preuve derrière une idée et pourquoi le graphe met du temps à se remplir. Elle est complète dans les huit langues.',
+    de: 'Die Tour durch den akademischen Tresor wurde vollständig neu gebaut. Die alten vierzehn Schritte, die auf Schaltflächen zeigten, die es nicht mehr gibt, weichen neun ruhigen Schritten entlang eines einzigen Wegs: Bibliothek, Ideen und Graph. Sie erklärt den Unterschied zwischen Global und Diesem Tresor, warum es besser ist, zunächst eine einzige Quelle zu analysieren, wie man den Beleg hinter einer Idee prüft und warum der Graph Zeit braucht, um sich zu füllen. Sie liegt vollständig in allen acht Sprachen vor.',
+    pt: 'O tutorial do cofre académico foi refeito por completo. Os catorze passos antigos, que apontavam para botões que já não existem, dão lugar a nove passos tranquilos ao longo de um único percurso: Biblioteca, Ideias e Grafo. Explica a diferença entre Global e Este cofre, porque convém analisar uma só fonte ao início, como verificar a evidência por trás de uma ideia e porque o grafo demora a encher-se. Está completo nos oito idiomas.',
+    'pt-BR': 'O tutorial do cofre acadêmico foi refeito por completo. Os catorze passos antigos, que apontavam para botões que não existem mais, dão lugar a nove passos tranquilos ao longo de um único percurso: Biblioteca, Ideias e Grafo. Explica a diferença entre Global e Este cofre, por que convém analisar uma só fonte no começo, como verificar a evidência por trás de uma ideia e por que o grafo demora a encher. Está completo nos oito idiomas.',
+  },
+  {
+    scope: 'library',
+    es: 'La Biblioteca añade las fechas de Zotero como columnas ordenables. Puedes ordenar por fecha de incorporación, de modificación y de consulta, y las fichas antiguas que no las guardaban siguen funcionando igual.',
+    en: 'The Library adds Zotero’s dates as sortable columns. You can sort by date added, date modified and access date, and older records that never stored them keep working exactly as before.',
+    fr: 'La Bibliothèque ajoute les dates de Zotero comme colonnes triables. Vous pouvez trier par date d’ajout, date de modification et date de consultation, et les anciennes fiches qui ne les enregistraient pas continuent de fonctionner comme avant.',
+    de: 'Die Bibliothek ergänzt die Zotero-Daten als sortierbare Spalten. Sie können nach Hinzufügedatum, Änderungsdatum und Zugriffsdatum sortieren, und ältere Einträge, die diese nie gespeichert haben, funktionieren weiterhin genau wie zuvor.',
+    pt: 'A Biblioteca acrescenta as datas do Zotero como colunas ordenáveis. Pode ordenar por data de adição, de modificação e de consulta, e as fichas antigas que não as guardavam continuam a funcionar como antes.',
+    'pt-BR': 'A Biblioteca acrescenta as datas do Zotero como colunas ordenáveis. Você pode ordenar por data de inclusão, de modificação e de consulta, e as fichas antigas que não as guardavam continuam funcionando como antes.',
+  },
+  {
+    scope: 'zotero',
+    es: 'El complemento de Zotero deja de acumular memoria. El motor de embeddings locales se apaga tras cinco minutos sin uso y también al cerrar el complemento o al cancelar la última petición. Los índices de evidencia antiguos se compactan la primera vez que se leen, sin perder textos, vectores, OCR ni citas. En el perfil diagnosticado el índice pasó de unos 168 MB a unos 13 MB.',
+    en: 'The Zotero add-on stops piling up memory. The local embedding engine shuts down after five minutes of inactivity, and also when the add-on unloads or the last request is cancelled. Older evidence indexes are compacted the first time they are read, without losing text, vectors, OCR or citations. On the profile we diagnosed, the index went from about 168 MB down to about 13 MB.',
+    fr: 'Le module Zotero cesse d’accumuler de la mémoire. Le moteur d’embeddings locaux s’éteint après cinq minutes d’inactivité, ainsi qu’à la fermeture du module ou à l’annulation de la dernière requête. Les anciens index de preuves sont compactés à la première lecture, sans perdre les textes, les vecteurs, l’OCR ni les citations. Sur le profil diagnostiqué, l’index est passé d’environ 168 Mo à environ 13 Mo.',
+    de: 'Das Zotero-Add-on häuft keinen Speicher mehr an. Die lokale Embedding-Engine schaltet sich nach fünf Minuten ohne Nutzung ab, ebenso beim Entladen des Add-ons oder beim Abbrechen der letzten Anfrage. Ältere Belegindizes werden beim ersten Lesen verdichtet, ohne Texte, Vektoren, OCR oder Zitate zu verlieren. Im untersuchten Profil sank der Index von rund 168 MB auf rund 13 MB.',
+    pt: 'O suplemento do Zotero deixa de acumular memória. O motor de embeddings locais desliga-se ao fim de cinco minutos sem uso e também ao fechar o suplemento ou ao cancelar o último pedido. Os índices de evidência antigos são compactados na primeira leitura, sem perder textos, vetores, OCR nem citações. No perfil diagnosticado, o índice passou de cerca de 168 MB para cerca de 13 MB.',
+    'pt-BR': 'O complemento do Zotero deixa de acumular memória. O motor de embeddings locais se desliga após cinco minutos sem uso e também ao fechar o complemento ou ao cancelar a última requisição. Os índices de evidência antigos são compactados na primeira leitura, sem perder textos, vetores, OCR nem citações. No perfil diagnosticado, o índice caiu de cerca de 168 MB para cerca de 13 MB.',
+  },
+];
+
+/**
+ * v5.1.7 carries a single repair: the Dictionary status line announced a
+ * failure while the definition was being written correctly. Its progress copy
+ * travelled in a `message` field, so the main-process localizer rewrote it as
+ * the generic "the operation could not be completed" notice in every language
+ * other than Spanish. The sentences are now handed to the renderer untouched.
+ */
+const RELEASE_5_1_7_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'languages',
+    es: 'Generar una definici\u00f3n del diccionario ya no parece un fallo. La l\u00ednea de estado anunciaba que la operaci\u00f3n no se pudo completar mientras la definici\u00f3n se escrib\u00eda sin problemas. Ahora muestra el progreso real en tu idioma: en cola, analizando corpus y generando definici\u00f3n.',
+    en: 'Generating a dictionary definition no longer looks like a failure. The status line announced that the operation could not be completed while the definition was being written just fine. It now shows the real progress in your language: queued, analysing corpus and generating definition.',
+    fr: 'G\u00e9n\u00e9rer une d\u00e9finition du dictionnaire ne ressemble plus \u00e0 un \u00e9chec. La ligne d\u2019\u00e9tat annon\u00e7ait que l\u2019op\u00e9ration n\u2019avait pas pu aboutir alors que la d\u00e9finition s\u2019\u00e9crivait sans probl\u00e8me. Elle affiche maintenant la progression r\u00e9elle dans votre langue : en file d\u2019attente, analyse du corpus et g\u00e9n\u00e9ration de la d\u00e9finition.',
+    de: 'Das Erzeugen einer W\u00f6rterbuchdefinition sieht nicht l\u00e4nger nach einem Fehler aus. Die Statuszeile meldete, der Vorgang habe nicht abgeschlossen werden k\u00f6nnen, w\u00e4hrend die Definition einwandfrei geschrieben wurde. Jetzt zeigt sie den echten Fortschritt in Ihrer Sprache: in der Warteschlange, Korpus wird analysiert und Definition wird erzeugt.',
+    pt: 'Gerar uma defini\u00e7\u00e3o do dicion\u00e1rio j\u00e1 n\u00e3o parece uma falha. A linha de estado anunciava que a opera\u00e7\u00e3o n\u00e3o p\u00f4de ser conclu\u00edda enquanto a defini\u00e7\u00e3o se escrevia sem problemas. Agora mostra o progresso real no seu idioma: em fila, a analisar o corpus e a gerar a defini\u00e7\u00e3o.',
+    'pt-BR': 'Gerar uma defini\u00e7\u00e3o do dicion\u00e1rio n\u00e3o parece mais uma falha. A linha de status anunciava que a opera\u00e7\u00e3o n\u00e3o p\u00f4de ser conclu\u00edda enquanto a defini\u00e7\u00e3o era escrita sem problemas. Agora ela mostra o progresso real no seu idioma: na fila, analisando o corpus e gerando a defini\u00e7\u00e3o.',
+  },
+];
+
+/**
+ * v5.1.6 stands on its own with the three changes that are actually new: a
+ * custom OpenAI-compatible provider in Settings, and the two translation
+ * repairs for progress bars and main-process errors. The order below is the
+ * authored order and also the rendered one: the modal groups highlights by
+ * scope and puts the largest cluster first, and `languages` (two) leads `ai`.
+ */
+const RELEASE_5_1_6_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'languages',
+    es: 'Las barras de progreso hablan ya tu idioma. Las líneas de indexación, embeddings, pasajes, cola e importación de Zotero se muestran traducidas en los ocho idiomas. Además dejan de aparecer avisos de error cuando todo va bien y conservan los nombres de tus bibliotecas y obras tal como son.',
+    en: 'Progress bars now speak your language. Indexing, embeddings, passages, queue and Zotero import lines appear translated in all eight languages. False error notices no longer show up when everything is fine, and your library and work names stay exactly as they are.',
+    fr: 'Les barres de progression parlent désormais votre langue. Les lignes d’indexation, d’embeddings, de passages, de file d’attente et d’importation Zotero s’affichent traduites dans les huit langues. Les faux avis d’erreur n’apparaissent plus quand tout va bien, et les noms de vos bibliothèques et de vos œuvres restent intacts.',
+    de: 'Die Fortschrittsleisten sprechen jetzt Ihre Sprache. Die Zeilen für Indexierung, Embeddings, Passagen, Warteschlange und Zotero-Import erscheinen in allen acht Sprachen übersetzt. Falsche Fehlermeldungen erscheinen nicht mehr, wenn alles in Ordnung ist, und die Namen Ihrer Bibliotheken und Werke bleiben genau wie sie sind.',
+    pt: 'As barras de progresso falam agora o seu idioma. As linhas de indexação, embeddings, passagens, fila e importação do Zotero aparecem traduzidas nos oito idiomas. Os falsos avisos de erro deixam de aparecer quando está tudo bem e os nomes das suas bibliotecas e obras mantêm-se tal como são.',
+    'pt-BR': 'As barras de progresso agora falam o seu idioma. As linhas de indexação, embeddings, trechos, fila e importação do Zotero aparecem traduzidas nos oito idiomas. Os falsos avisos de erro não aparecem mais quando está tudo bem, e os nomes das suas bibliotecas e obras continuam exatamente como são.',
+  },
+  {
+    scope: 'languages',
+    es: 'Los errores del proceso principal llegan ya traducidos a tu idioma. Más de mil mensajes que antes salían en español o como un aviso genérico explican ahora su causa real. La prueba de conexión lo muestra claro. Si Ollama no responde, verás su dirección, el código HTTP y la pregunta de si está en marcha.',
+    en: 'Main-process errors now arrive translated into your language. More than a thousand messages that used to appear in Spanish or as a generic notice now explain their real cause. The connection test shows it clearly. If Ollama does not answer, you will see its address, the HTTP code and the question of whether it is running.',
+    fr: 'Les erreurs du processus principal arrivent désormais traduites dans votre langue. Plus de mille messages qui s’affichaient en espagnol ou sous forme d’avis générique expliquent maintenant leur cause réelle. Le test de connexion le montre bien. Si Ollama ne répond pas, vous verrez son adresse, le code HTTP et la question de savoir s’il est en cours d’exécution.',
+    de: 'Fehler aus dem Hauptprozess kommen jetzt in Ihrer Sprache übersetzt an. Mehr als tausend Meldungen, die zuvor auf Spanisch oder als allgemeiner Hinweis erschienen, erklären nun ihre tatsächliche Ursache. Der Verbindungstest zeigt es deutlich. Antwortet Ollama nicht, sehen Sie seine Adresse, den HTTP-Code und die Frage, ob es läuft.',
+    pt: 'Os erros do processo principal chegam agora traduzidos para o seu idioma. Mais de mil mensagens que apareciam em espanhol ou como um aviso genérico explicam agora a sua causa real. O teste de ligação mostra-o bem. Se o Ollama não responder, verá o seu endereço, o código HTTP e a pergunta sobre se está em execução.',
+    'pt-BR': 'Os erros do processo principal agora chegam traduzidos para o seu idioma. Mais de mil mensagens que apareciam em espanhol ou como um aviso genérico agora explicam sua causa real. O teste de conexão mostra isso bem. Se o Ollama não responder, você verá seu endereço, o código HTTP e a pergunta sobre se ele está em execução.',
+  },
+  {
+    scope: 'ai',
+    es: 'Ajustes estrena un proveedor personalizado compatible con la API de OpenAI. Escribe la dirección exacta de tu servidor, sin que Nodus añada nada a la ruta, y conecta otros proveedores o un proxy propio. Puedes escribir tus modelos a mano, descubrir los que publica el servidor y comprobar la conexión antes de usarlos. La clave es opcional y se guarda como el resto de credenciales.',
+    en: 'Settings gains a custom provider compatible with the OpenAI API. Type the exact address of your server, with Nodus adding nothing to the path, and connect other providers or your own proxy. You can type your models by hand, discover the ones your server publishes and test the connection before using them. The key is optional and is stored like the other credentials.',
+    fr: 'Les Paramètres accueillent un fournisseur personnalisé compatible avec l’API d’OpenAI. Saisissez l’adresse exacte de votre serveur, sans que Nodus n’ajoute rien au chemin, et connectez d’autres fournisseurs ou votre propre proxy. Vous pouvez saisir vos modèles à la main, découvrir ceux que publie votre serveur et tester la connexion avant de les utiliser. La clé est facultative et se conserve comme les autres identifiants.',
+    de: 'Die Einstellungen erhalten einen benutzerdefinierten Anbieter, der mit der OpenAI-API kompatibel ist. Geben Sie die genaue Adresse Ihres Servers ein, ohne dass Nodus etwas an den Pfad anhängt, und verbinden Sie weitere Anbieter oder einen eigenen Proxy. Sie können Ihre Modelle von Hand eintragen, die von Ihrem Server veröffentlichten entdecken und die Verbindung vor der Nutzung testen. Der Schlüssel ist optional und wird wie die übrigen Zugangsdaten gespeichert.',
+    pt: 'As Definições estreiam um fornecedor personalizado compatível com a API da OpenAI. Escreva o endereço exato do seu servidor, sem que o Nodus acrescente nada ao caminho, e ligue outros fornecedores ou um proxy próprio. Pode escrever os seus modelos à mão, descobrir os que o servidor publica e testar a ligação antes de os usar. A chave é opcional e guarda-se como as restantes credenciais.',
+    'pt-BR': 'As Configurações estreiam um provedor personalizado compatível com a API da OpenAI. Digite o endereço exato do seu servidor, sem que o Nodus acrescente nada ao caminho, e conecte outros provedores ou um proxy próprio. Você pode digitar seus modelos à mão, descobrir os que o servidor publica e testar a conexão antes de usá-los. A chave é opcional e é guardada como as demais credenciais.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.1.7',
+    date: '2026-09-04',
+    highlights: RELEASE_5_1_7_HIGHLIGHTS,
+  },
+  {
+    version: '5.1.6',
+    date: '2026-09-03',
+    highlights: RELEASE_5_1_6_HIGHLIGHTS,
+  },
+  {
+    version: '5.1.5',
+    date: '2026-09-03',
+    highlights: RELEASE_5_1_4_HIGHLIGHTS,
+  },
+  {
+    version: '5.1.4',
+    date: '2026-09-02',
+    highlights: RELEASE_5_1_4_HIGHLIGHTS,
+  },
+  {
+    version: '5.1.3',
+    date: '2026-08-31',
+    highlights: RELEASE_5_1_3_HIGHLIGHTS,
+  },
   {
     version: '5.1.2',
     date: '2026-08-31',

@@ -1,6 +1,11 @@
 import { getDb } from './database';
 import type { AppSettings, ModelRef } from '@shared/types';
-import { DEFAULT_EMBEDDING_MODELS, DEFAULT_LOCAL_BASE_URLS, normalizeEmbeddingProvider } from '@shared/providers';
+import {
+  DEFAULT_EMBEDDING_MODELS,
+  DEFAULT_LOCAL_BASE_URLS,
+  normalizeCustomProviderConfig,
+  normalizeEmbeddingProvider,
+} from '@shared/providers';
 import { isOpenAiStudySttModel } from '@shared/sttModels';
 import { NODI_ORB_DEFAULT_COLOR } from '@shared/nodiOrb';
 import { NODI_DEFAULT_SCALE, normalizeNodiScale } from '@shared/nodiSize';
@@ -22,6 +27,9 @@ const DEFAULT_LOCAL_PROVIDERS: AppSettings['localProviders'] = {
   ollama: { baseUrl: DEFAULT_LOCAL_BASE_URLS.ollama, contextMode: 'auto' },
   lmstudio: { baseUrl: DEFAULT_LOCAL_BASE_URLS.lmstudio, contextMode: 'auto' },
 };
+
+/** No default endpoint exists for someone else's gateway: unconfigured means off. */
+const DEFAULT_CUSTOM_PROVIDER: AppSettings['customProvider'] = { baseUrl: '', models: [] };
 
 function sanitizeCodexReasoningEfforts(value: unknown): AppSettings['codexReasoningEfforts'] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -50,6 +58,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   embeddingProvider: 'openai',
   embeddingModel: DEFAULT_EMBEDDING_MODELS.openai,
   localProviders: DEFAULT_LOCAL_PROVIDERS,
+  customProvider: DEFAULT_CUSTOM_PROVIDER,
   favorites: [],
   defaultModel: null,
   modelSettingsMode: 'basic',
@@ -334,6 +343,10 @@ export function getSettings(): AppSettings {
   if (!['ask', 'always', 'never'].includes(merged.studyKnowledgeAutoProcess)) merged.studyKnowledgeAutoProcess = 'ask';
   // Deep-merge local-provider config so a stored partial (or a newly added
   // provider absent from an older settings blob) keeps its default base URL.
+  // Normalise on the way OUT as well as in: a blob written by an older build (or by
+  // hand) can carry a trailing slash or duplicate slugs, and every consumer reads
+  // this value rather than re-normalising for itself.
+  merged.customProvider = normalizeCustomProviderConfig(parsed.customProvider ?? merged.customProvider);
   merged.localProviders = {
     ollama: { ...DEFAULT_LOCAL_PROVIDERS.ollama, ...parsed.localProviders?.ollama },
     lmstudio: { ...DEFAULT_LOCAL_PROVIDERS.lmstudio, ...parsed.localProviders?.lmstudio },
@@ -501,6 +514,12 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   }
   if (patch.customEventTypes !== undefined) {
     patch = { ...patch, customEventTypes: sanitizeCustomEventTypes(patch.customEventTypes) };
+  }
+  if (patch.customProvider !== undefined) {
+    // Normalise on the way IN as well as out: the stored blob is what Settings
+    // renders back, and a trailing slash the user pasted should not survive to be
+    // shown to them (nor to be diffed against the next value they type).
+    patch = { ...patch, customProvider: normalizeCustomProviderConfig(patch.customProvider) };
   }
   if (patch.codexReasoningEfforts !== undefined) {
     patch = { ...patch, codexReasoningEfforts: sanitizeCodexReasoningEfforts(patch.codexReasoningEfforts) };

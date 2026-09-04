@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { DocumentIndexCampaign, DocumentIndexJob, DocumentIndexJobPhase, DocumentIndexProgress } from '@shared/types';
 import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
-import { t, tx } from '../i18n';
+import { t, tr, tx } from '../i18n';
 import { compareDocumentIndexJobsForDisplay, documentIndexPercentLabel } from '@shared/documentIndexProgress';
 import { elapsedTimeLabel } from '@shared/elapsedTime';
 import { useElapsedClock } from '../useElapsedClock';
@@ -96,7 +96,7 @@ export function DocumentIndexProgressBar() {
       {error && (
         <div className="document-index-warning mb-2 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-5" role="alert">
           <Icon name="warning" size={14} className="mt-0.5 shrink-0" />
-          <span className="min-w-0 flex-1 break-words">{error}</span>
+          <span className="min-w-0 flex-1 break-words">{tr(error)}</span>
         </div>
       )}
       <div className="flex items-center gap-3">

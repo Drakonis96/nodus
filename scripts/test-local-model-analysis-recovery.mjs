@@ -1,9 +1,9 @@
 // What happens when the model runs on the user's own laptop and is slow.
 //
 // A cloud provider that has said nothing for three minutes is stuck. A local model that
-// has been generating for three minutes is working: idea extraction asks for up to 8.000
+// has been generating for three minutes is working: idea extraction asks for up to 16.000
 // JSON tokens per chunk, and at the 15-40 tokens/s a quantized model reaches on an
-// M-series that is 200-530 seconds of perfectly healthy generation. Under one shared
+// M-series that is 400-1.067 seconds of perfectly healthy generation. Under one shared
 // 180s transport ceiling the deep pass died on every long work, which is why local users
 // could produce Themes (one call, 1.500 tokens) and never Ideas — and the whole pass died
 // with the first slow chunk, because a timeout was not something the adaptive retry knew
@@ -82,9 +82,9 @@ try {
   for (const provider of ['lmstudio', 'ollama', 'nodus']) {
     const budget = aiClient.completionTimeoutMs({ provider, model: 'x' });
     assert.ok(budget > cloudBudget, `${provider} runs on this machine and must get more room than the cloud`);
-    // 8.000 output tokens at a pessimistic 15 tokens/s is ~530s; the budget has to clear
+    // 16.000 output tokens at a pessimistic 15 tokens/s is ~1.067s; the budget has to clear
     // that with margin or the fix does not reach the case it was written for.
-    assert.ok(budget >= 600_000, `${provider} must clear a full extraction chunk on slow hardware, got ${budget}ms`);
+    assert.ok(budget >= 1_200_000, `${provider} must clear a full extraction chunk on slow hardware, got ${budget}ms`);
   }
 
   // --- 2. A timeout is tagged, not merely worded ------------------------------

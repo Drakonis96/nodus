@@ -11,6 +11,7 @@ import {
   localContextWindow,
   localContextCapabilities,
   localBaseUrl,
+  customBaseUrl,
   FREE_TIER_PROVIDERS,
   freeTierMaxTokens,
   groqFreeTpm,
@@ -42,6 +43,7 @@ import { classifyProviderError } from './providerErrors';
 import { completeWithChatGptSubscription } from './codexSubscription';
 import { completeWithGitHubCopilotSubscription } from './githubCopilotSubscription';
 import { completeWithOpenCodeGo, OUTPUT_TRUNCATED_MARKER } from './openCodeGoCompletion';
+import { nodusUserAgent, openCodeGoSessionId } from './clientIdentity';
 import { recordOpenCodeGoUsage } from './openCodeGoUsage';
 import { AI_MODEL_REQUIRED_ERROR_CODE } from '@shared/aiModelRequired';
 import { createHash } from 'node:crypto';
@@ -249,10 +251,17 @@ function withJsonModeDirective(system: string, jsonMode: boolean): string {
 /** Stored key for a provider, or a harmless placeholder for local providers
  *  (Ollama / LM Studio need no key; the OpenAI SDK still requires a non-empty
  *  string). A user-supplied token for a secured local instance takes precedence. */
+const CUSTOM_ENDPOINT_MISSING =
+  'Falta la dirección del servidor compatible con OpenAI. Configúrala en Ajustes → Proveedores.';
+
 function resolveProviderKey(provider: AiProvider): string | null {
   const stored = getApiKey(provider);
   if (stored) return stored;
-  return isLocalProvider(provider) || provider === 'nodus' ? 'local' : null;
+  // A gateway on the user's own machine usually authenticates nobody, and the
+  // OpenAI SDK refuses to construct without an apiKey — so these providers get the
+  // same placeholder bearer the local ones have always sent. A real key, when the
+  // user stores one, is returned above and takes its place.
+  return isLocalProvider(provider) || provider === 'nodus' || provider === 'custom' ? 'local' : null;
 }
 
 // ── Local model context budgeting ────────────────────────────────────────────
@@ -338,8 +347,8 @@ function truncatedJsonMessage(model: ModelRef, maxTokens: number): string {
  * A cloud provider that has said nothing for three minutes is stuck: it runs the model
  * on hardware sized for it, and the request is billed whether or not we keep waiting.
  * A model on the user's own laptop is a different animal — the wait IS the work. Idea
- * extraction asks for up to 8.000 JSON tokens per chunk, which at the 15-40 tokens/s a
- * quantized 7B reaches on an M-series is 200-530 seconds of perfectly healthy
+ * extraction asks for up to 16.000 JSON tokens per chunk, which at the 15-40 tokens/s a
+ * quantized 7B reaches on an M-series is 400-1.067 seconds of perfectly healthy
  * generation. Under one shared 180s ceiling that arrived as "timed out waiting for the
  * AI provider" on every chunk, which is why local models could produce Themes (1.500
  * tokens, one call) and never Ideas. Nothing is billed by the second here and the deep
@@ -347,7 +356,7 @@ function truncatedJsonMessage(model: ModelRef, maxTokens: number): string {
  * finite because a wedged local server must not hold the scan queue open forever.
  */
 const CLOUD_COMPLETION_TIMEOUT_MS = 180_000;
-const ON_DEVICE_COMPLETION_TIMEOUT_MS = 900_000;
+const ON_DEVICE_COMPLETION_TIMEOUT_MS = 1_200_000;
 
 /** True when the model runs on this machine: the built-in runtime, or a local server. */
 function runsOnDevice(provider: AiProvider): boolean {
@@ -744,8 +753,22 @@ function freeTierBudget(model: ModelRef, opts: CallOpts, localMax: number): numb
   return budget;
 }
 
-function openAiClientHeaders(model: ModelRef): Record<string, string> | undefined {
-  return model.provider === 'openrouter' ? OPENROUTER_HEADERS : undefined;
+/**
+ * Headers every OpenAI-compatible client sends: this one seam covers OpenAI,
+ * Groq, Cerebras, DeepSeek, Xiaomi, Gemini's compatible surface and OpenRouter,
+ * for chat and embeddings alike.
+ *
+ * None of them require the User-Agent — unlike OpenCode Go, see
+ * electron/ai/clientIdentity.ts — but announcing the app and version costs
+ * nothing and beats appearing in their logs as an anonymous "node". It carries no
+ * user data, and the API key already identifies the account far more precisely.
+ * OpenRouter additionally gets the attribution pair it uses for ranking.
+ */
+function openAiClientHeaders(model: Pick<ModelRef, 'provider'>): Record<string, string> {
+  return {
+    'User-Agent': nodusUserAgent(),
+    ...(model.provider === 'openrouter' ? OPENROUTER_HEADERS : {}),
+  };
 }
 
 /** Cerebras documents the current Chat Completions token cap as
@@ -977,6 +1000,12 @@ async function rawCompleteTransport(
   }
   const key = resolveProviderKey(model.provider);
   if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
+  // Refuse an unconfigured custom endpoint here: further down the base URL becomes
+  // `baseURL ?? undefined`, and an undefined baseURL sends the request to
+  // api.openai.com — the user's prompt would leave for a provider they never chose.
+  if (model.provider === 'custom' && !customBaseUrl()) {
+    throw new AiError(CUSTOM_ENDPOINT_MISSING, false, true);
+  }
 
   if (model.provider === 'opencode-go') {
     try {
@@ -992,6 +1021,7 @@ async function rawCompleteTransport(
         timeoutMs: opts.timeoutMs,
         images: opts.images,
         signal: opts.signal,
+        sessionId: openCodeGoSessionId(opts.jobId),
       }));
       await recordOpenCodeGoUsage(model.model, result.usage);
       return result.text;
@@ -1569,6 +1599,12 @@ async function rawCompleteStreamTransport(
 
   const key = resolveProviderKey(model.provider);
   if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
+  // Refuse an unconfigured custom endpoint here: further down the base URL becomes
+  // `baseURL ?? undefined`, and an undefined baseURL sends the request to
+  // api.openai.com — the user's prompt would leave for a provider they never chose.
+  if (model.provider === 'custom' && !customBaseUrl()) {
+    throw new AiError(CUSTOM_ENDPOINT_MISSING, false, true);
+  }
 
   if (isLocalProvider(model.provider)) {
     const native = await tryLocalNativeStreaming(model, opts, key, scheduleOpts.signal, (delta, kind) => {
@@ -1594,6 +1630,7 @@ async function rawCompleteStreamTransport(
         signal,
         onDelta: emitContent,
         onReasoningDelta: emitReasoning,
+        sessionId: openCodeGoSessionId(opts.jobId),
       }));
       await recordOpenCodeGoUsage(model.model, result.usage);
       if (!full && result.text) emitContent(result.text);
@@ -1876,13 +1913,7 @@ async function requestEmbeddings(
   const client = new OpenAI({
     apiKey: key,
     baseURL: endpoint,
-    defaultHeaders:
-      provider === 'openrouter'
-        ? {
-            'HTTP-Referer': 'https://github.com/Drakonis96/nodus',
-            'X-Title': 'Nodus',
-          }
-        : undefined,
+    defaultHeaders: openAiClientHeaders({ provider }),
   });
   try {
     const res = await withProviderRetries(freeTier, () => runEmbeddingRequest(async () => {

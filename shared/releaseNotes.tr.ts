@@ -106,6 +106,28 @@ const RELEASE_5_1_0_TR = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.1.7": [
+    "Sözlük tanımı oluşturmak artık bir hata gibi görünmüyor. Durum satırı, tanım sorunsuz yazılırken işlemin tamamlanamadığını duyuruyordu. Artık gerçek ilerlemeyi dilinizde gösteriyor: kuyrukta, derlem inceleniyor ve tanım oluşturuluyor.",
+  ],
+  "5.1.6": [
+    "İlerleme çubukları artık dilinizi konuşuyor. Dizin oluşturma, embedding, pasaj, kuyruk ve Zotero içe aktarma satırları sekiz dilde çevrilmiş görünüyor. Her şey yolundayken hatalı hata uyarıları artık görünmüyor ve kitaplık ile eser adlarınız aynen korunuyor.",
+    "Ana işlem hataları artık dilinize çevrilmiş olarak geliyor. Eskiden İspanyolca veya genel bir uyarı olarak görünen binden fazla ileti artık gerçek nedenini açıklıyor. Bağlantı testi bunu açıkça gösteriyor. Ollama yanıt vermezse adresini, HTTP kodunu ve çalışıp çalışmadığı sorusunu göreceksiniz.",
+    "Ayarlar, OpenAI API ile uyumlu özel bir sağlayıcı kazanıyor. Nodus yola hiçbir şey eklemeden sunucunuzun tam adresini yazın ve diğer sağlayıcıları ya da kendi proxinizi bağlayın. Modellerinizi elle yazabilir, sunucunun yayımladıklarını keşfedebilir ve kullanmadan önce bağlantıyı test edebilirsiniz. Anahtar isteğe bağlıdır ve diğer kimlik bilgileri gibi saklanır.",
+  ],
+  "5.1.4": [
+    "Nodus’un yapay zekâya gönderdiği yönergeler artık sekiz arayüz dilinin tamamında özgün olarak yazılıyor. Daha önce neredeyse tümü İspanyolca hazırlanıyor ve modelden yalnızca başka bir dilde yanıt vermesi isteniyordu, bu da yanıtın kalitesinde ve seçilen terimlerde kendini gösteriyordu. Artık her görevin kendi dilinizde bir yönerge sözleşmesi var: derlem analizinden Deep Research’e, Öğretmen’e, Yazma Atölyesi’ne, Sözlük’e ve Nodi’ye kadar. Protokol anahtarları, tanımlayıcılar ve alıntı kuralları olduğu gibi korunuyor.",
+    "Uygulamanın arayüz dışında ürettiği metinler artık İspanyolca çıkmıyor. Word eklentisinin uyarıları, web sunucusunun iletileri, sistemin yerel iletişim kutuları ve Nodi belgeleri artık seçtiğiniz dili izliyor. Nodus’u Türkçe kullanıp İspanyolca uyarılar görüyorduysanız bu sona erdi.",
+    "Yerel modeller zorlu analizleri tamamlıyor. Nodus artık bağlam penceresini çıktı bütçesinden ayırıyor ve bu bütçeyi sabit bir üst sınır uygulamak yerine her görev için ayrı hesaplıyor. Eskiden bu sabit sınır yanıtı ortasından kesiyordu. Yığınlar kendiliğinden uyarlanıyor, her yanıtın eksiksiz olup olmadığı denetleniyor ve eksikse iş daha küçük bir planla yeniden deneniyor. Ayarlar’a otomatik kipli bir bağlam penceresi denetimi ile son yerel isteğin kartı ekleniyor, böylece gerçekte ne gönderildiğini görebiliyorsunuz.",
+    "Bir eserin analizini yenilemek artık sizi elinizde hiçbir şey kalmadan bırakamıyor. Yenileme başarısız olursa ya da onu iptal ederseniz önceki analiz olduğu gibi ve görünür kalıyor. Başarıyla biterse fikirler, vektörler, ilişkiler, çizge ve profil eski analizden hiçbir kalıntı bırakmadan değiştiriliyor. Kuyruk da artık durumu değişmiş eserlerde “Beklemede” ya da “Analiz ediliyor” göstermiyor.",
+    "Belge profili artık hipotezleri ve bulguları kendi provenans ve kapsam kurallarıyla birer alan olarak tanıyor. Fikirlerin birleştirilmesi de artık vektörler arasındaki benzerlik eşiğine göre kararlaştırılmıyor: model her seferinde iki fikrin aynı mı, bir varyant mı yoksa yeni bir şey mi olduğunu gerekçelendirmek zorunda ve seçilen fikir kendisine sunulan adaylar arasında değilse Nodus birleştirmeyi reddediyor.",
+    "Akademik kasanın tanıtım turu baştan yazıldı. Artık var olmayan düğmeleri gösteren eski on dört adımın yerini tek bir güzergâhı izleyen dokuz sakin adım alıyor: Kitaplık, Fikirler ve Çizge. Global ile Bu kasa arasındaki farkı, başlangıçta neden tek bir kaynağı analiz etmenin daha iyi olduğunu, bir fikrin arkasındaki kanıtın nasıl doğrulanacağını ve çizgenin dolmasının neden zaman aldığını anlatıyor. Sekiz dilin tamamında eksiksiz.",
+    "Kitaplık, Zotero tarihlerini sıralanabilir sütunlar olarak ekliyor. Eklenme, değiştirilme ve erişim tarihine göre sıralayabilirsiniz, bu değerleri hiç saklamamış eski kayıtlar da eskisi gibi çalışmayı sürdürüyor.",
+    "Zotero eklentisi artık bellek biriktirmiyor. Yerel gömme motoru beş dakikalık hareketsizlikten sonra, ayrıca eklenti kapatıldığında veya son istek iptal edildiğinde kapanıyor. Eski kanıt dizinleri metinler, vektörler, OCR ve alıntılar kaybolmadan ilk okumada sıkıştırılıyor. İncelenen profilde dizin yaklaşık 168 MB’tan yaklaşık 13 MB’a indi.",
+  ],
+  "5.1.3": [
+    "macOS için Nodus artık Developer ID imzası ve Apple noter onayıyla dağıtılıyor. Hardened Runtime uygulamayı koruyor, Gatekeeper ise uygulamayı açmadan önce imzayı ve bileti doğruluyor. Paketteki tüm yardımcılar, frameworkler, yerel modüller ve yürütülebilir dosyalar yalnızca ihtiyaç duydukları izinlerle imzalanıyor.",
+    "Sözlük artık tek bir kaynağın seçime hakim olmasına izin vermek yerine kanıtları farklı eserler ve yazarlar arasında dağıtıyor. Anlamsal ve sözcüksel aramayı birleştiriyor, fikirlerin, alıntıların ve ilişkilerin kaynağını belirtiyor ve bir tanım yeterli sayıda kaynak veya yazarı kapsamıyorsa uyarıyor.",
+  ],
   "5.1.2": [
     ...RELEASE_5_1_0_TR,
     "Başlıktaki Güncelle düğmesi artık yalnızca izlediğiniz Zotero koleksiyonlarının kataloğunu yeniliyor. Yeni öğeler analiz başlatılmadan veya kuyruğa eklenmeden Kitaplıkta görünüyor. Bu sürüm ayrıca Zotero 10’un döndürdüğü sıfır öğe sürümünü düzeltiyor. Bu değer daha önce tüm kitaplığı bir anda değişmiş gibi gösterebiliyordu.",
@@ -520,3 +542,6 @@ export const RELEASE_NOTES_TR: Record<string, string[]> = {
     "\"Sharvard\" sesi düzeltildi: artık bir erkek sesi olarak görünüyor, motorun gerçekte gösterdiği de bu.",
   ],
 };
+
+// 5.1.5 intentionally ships the exact same What's New copy as 5.1.4.
+RELEASE_NOTES_TR["5.1.5"] = RELEASE_NOTES_TR["5.1.4"];

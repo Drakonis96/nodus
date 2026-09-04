@@ -37,14 +37,14 @@ export interface LocalRequestPlan {
   contextMode: 'auto' | 'manual';
 }
 
-const AUTO_BUCKETS = [4096, 8192, 16384] as const;
+const AUTO_BUCKETS = [4096, 8192, 16384, 32768] as const;
 export const LOCAL_CONTEXT_VALUES = [4096, 8192, 16384, 32768, 65536, 131072] as const;
 export const MIN_LOCAL_OUTPUT_TOKENS = 512;
 
 export function localTaskOutputTokens(task: LocalAiTask, itemCount = 1): number {
   switch (task) {
     case 'light-extraction': return 1500;
-    case 'deep-extraction': return 8000;
+    case 'deep-extraction': return 16000;
     case 'fusion': return 800;
     case 'summary': return 800;
     case 'theme-assignment': return Math.max(512, Math.min(4000, 256 + 96 * itemCount));
@@ -65,8 +65,9 @@ function capToModel(value: number, trained?: number | null): number {
   return trained && trained > 0 ? Math.min(value, trained) : value;
 }
 
-/** Pure, deterministic planner. It never treats output tokens as context and never
- * automatically allocates more than 16K on a user's local runtime. */
+/** Pure, deterministic planner. It never treats output tokens as context. Automatic
+ * mode stays at or below 16K for ordinary work, but deep extraction may use 32K so its
+ * proven 16K structured-output budget still fits beside the prompt. */
 export function buildLocalRequestPlan(input: LocalRequestPlanInput): LocalRequestPlan {
   const mode = input.contextMode === 'manual' ? 'manual' : 'auto';
   let contextTokens: number;
@@ -79,7 +80,9 @@ export function buildLocalRequestPlan(input: LocalRequestPlanInput): LocalReques
     contextTokens = capToModel(requested, input.trainedContextTokens);
   } else {
     const neededWithoutReserve = input.promptTokens + input.requestedOutputTokens;
-    contextTokens = AUTO_BUCKETS.find((bucket) => neededWithoutReserve + localContextReserve(bucket) <= bucket) ?? 16384;
+    const maxAutoContext = input.task === 'deep-extraction' ? 32768 : 16384;
+    const autoBuckets = AUTO_BUCKETS.filter((bucket) => bucket <= maxAutoContext);
+    contextTokens = autoBuckets.find((bucket) => neededWithoutReserve + localContextReserve(bucket) <= bucket) ?? maxAutoContext;
     contextTokens = capToModel(contextTokens, input.trainedContextTokens);
   }
 

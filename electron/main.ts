@@ -63,7 +63,8 @@ import { closeGlobalLibraryRuntime } from './library/libraryRuntime';
 import { setBrowserTheme } from './browser/tabs';
 import { destroyBrowserSubsystem } from './browser/lifecycle';
 import { ensurePreV4Recovery } from './recovery/preV4Recovery';
-import { applyUpdateChannel, isPrereleaseVersion } from './updateChannel';
+import { applyUpdateChannel, availableUpdateVersion, isPrereleaseVersion } from './updateChannel';
+import { registerNodusClientVersion } from './ai/clientIdentity';
 import {
   upgradeWorldbuildingDemoDynasties,
   upgradeWorldbuildingDemoImageQuality,
@@ -83,6 +84,11 @@ const { autoUpdater } = require('electron-updater') as typeof import('electron-u
 // server and Bridge credentials in the macOS Keychain. It is a compatibility identifier, not a
 // user-facing product name.
 app.setName('Nodus');
+
+// The version every outbound API request announces in its User-Agent. Registered
+// here rather than imported where it is used, because those modules are bundled
+// by the node --test harnesses, where `electron` has no `app` on it.
+registerNodusClientVersion(app.getVersion());
 
 // Deeplink for OAuth: nodus://authorize?code=XYZ
 // Google blocks OAuth in embedded webviews; the correct pattern is
@@ -586,7 +592,7 @@ async function checkForUpdates(reason: string): Promise<UpdateCheckResponse> {
         },
       );
     }
-    const version = result?.updateInfo?.version;
+    const version = availableUpdateVersion(result, app.getVersion());
     if (isPrereleaseVersion(version) && !getSettings().betaUpdates) {
       cancellationToken?.cancel();
       if (activeUpdateCancellationToken === cancellationToken) activeUpdateCancellationToken = null;
@@ -598,7 +604,7 @@ async function checkForUpdates(reason: string): Promise<UpdateCheckResponse> {
         progress: null,
       });
     }
-    if (version && version !== app.getVersion()) {
+    if (version) {
       return emitUpdate({
         status: 'available',
         message: `Actualización ${version} encontrada. La descarga empezará automáticamente.`,

@@ -89,6 +89,10 @@ export type GlobalPrefKey = (typeof GLOBAL_PREF_KEYS)[number];
 export const SHARED_MODEL_KEYS = [
   'codexReasoningEfforts',
   'localProviders',
+  // The user's own OpenAI-compatible endpoint. App-level like the local base URLs:
+  // one gateway serves every vault, and re-typing the URL per vault is nobody's idea
+  // of a preference.
+  'customProvider',
   'providerFreeTier',
   'extractionModel',
   'visionModel',

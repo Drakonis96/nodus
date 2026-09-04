@@ -1,5 +1,6 @@
 import type { ReasoningEffort } from '@shared/types';
 import type { VisionImagePart } from '@shared/imageAnalysis';
+import { nodusUserAgent, openCodeGoSessionId } from './clientIdentity';
 
 /**
  * Prefix that marks an output-ceiling cutoff. aiClient re-types errors carrying it as
@@ -34,6 +35,8 @@ export interface OpenCodeGoCompletionOptions {
   onReasoningDelta?: (delta: string) => void;
   /** Test seam; production always uses the documented OpenCode Go endpoint. */
   baseUrl?: string;
+  /** `x-opencode-session` grouping key. Defaults to the per-process session. */
+  sessionId?: string;
 }
 
 export interface OpenCodeGoCompletionResult {
@@ -53,6 +56,22 @@ export function openCodeGoProtocol(model: string): OpenCodeGoProtocol {
   return ANTHROPIC_MODEL_PREFIXES.some((prefix) => normalized.startsWith(prefix))
     ? 'anthropic'
     : 'openai';
+}
+
+/**
+ * Headers every OpenCode Go request carries, whichever protocol it speaks.
+ *
+ * `x-opencode-session` is required by OpenCode: without it they may reject the
+ * request outright from 2026-09-06. The User-Agent is courtesy — their logs saw
+ * only "Node fetch" and could not tell which client was calling.
+ */
+function goHeaders(options: OpenCodeGoCompletionOptions, auth: Record<string, string>): Record<string, string> {
+  return {
+    ...auth,
+    'Content-Type': 'application/json',
+    'User-Agent': nodusUserAgent(),
+    'x-opencode-session': options.sessionId ?? openCodeGoSessionId(),
+  };
 }
 
 function apiError(status: number, payload: unknown): Error & { status: number } {
@@ -232,7 +251,7 @@ async function completeResponses(options: OpenCodeGoCompletionOptions, url: stri
   const streaming = Boolean(options.onDelta);
   const response = await postWithOptionalExtras(
     `${url}/v1/responses`,
-    { Authorization: `Bearer ${options.apiKey}`, 'Content-Type': 'application/json' },
+    goHeaders(options, { Authorization: `Bearer ${options.apiKey}` }),
     signal,
     {
       model: options.model,
@@ -289,7 +308,7 @@ async function completeOpenAi(options: OpenCodeGoCompletionOptions, url: string,
   const streaming = Boolean(options.onDelta);
   const response = await postWithOptionalExtras(
     `${url}/v1/chat/completions`,
-    { Authorization: `Bearer ${options.apiKey}`, 'Content-Type': 'application/json' },
+    goHeaders(options, { Authorization: `Bearer ${options.apiKey}` }),
     signal,
     {
       model: options.model,
@@ -348,11 +367,7 @@ async function completeAnthropic(options: OpenCodeGoCompletionOptions, url: stri
   const isQwen = options.model.toLowerCase().startsWith('qwen');
   const response = await fetch(`${url}/v1/messages`, {
     method: 'POST',
-    headers: {
-      'x-api-key': options.apiKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
+    headers: goHeaders(options, { 'x-api-key': options.apiKey, 'anthropic-version': '2023-06-01' }),
     signal,
     body: JSON.stringify({
       model: options.model,

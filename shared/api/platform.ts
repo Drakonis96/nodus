@@ -190,6 +190,9 @@ export interface PlatformApi {
   deleteNodusLocalImageModel(model: string): Promise<NodusLocalImageStatus>;
   /** Ping a local provider (Ollama / LM Studio) to verify its base URL is reachable. */
   testLocalProvider(provider: LocalProvider): Promise<LocalProviderTestResult>;
+  /** Ping the user's own OpenAI-compatible endpoint. Reuses LocalProviderTestResult:
+   *  the question ("is it reachable, how many models?") is the same one. */
+  testCustomProvider(): Promise<LocalProviderTestResult>;
   getLocalAiDiagnostics(): Promise<LocalAiRequestDiagnostic[]>;
   getDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): Promise<DecorativeImage | null>;
   getDecorativeImageDataUrl(entityKind: DecorativeImageEntityKind, entityId: string, thumbnail?: boolean): Promise<string | null>;

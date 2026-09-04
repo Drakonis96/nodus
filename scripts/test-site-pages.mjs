@@ -423,6 +423,7 @@ test('the app page documents the current desktop builds and available vaults', (
   const app = read('app/index.html');
   for (const asset of [
     'Nodus-mac-arm64.dmg',
+    'Nodus-mac-x64.dmg',
     'Nodus-win-x64.exe',
     'Nodus-linux-x86_64.AppImage',
     'Nodus-linux-amd64.deb',

@@ -88,7 +88,10 @@ assert.match(modal, /connector: \{ icon: 'external', color: '#0891b2', label: 'N
 assert.match(modal, /languages: \{ icon: 'languages', color: '#db2777', label: 'Idiomas' \}/);
 assert.match(modal, /browser: \{ icon: 'globe', color: '#2563eb', label: 'Nodus Browser' \}/);
 assert.match(modal, /radar: \{ icon: 'radar', color: '#f97316', label: 'Nodus Radar' \}/);
-for (const scope of ['ai', 'library', 'server', 'word', 'zotero', 'connector']) {
+assert.match(modal, /apple: \{ icon: null, color: '#111827', label: 'Apple' \}/);
+assert.match(modal, /function AppleReleaseIcon/);
+assert.match(modal, /scope === 'apple'/);
+for (const scope of ['ai', 'library', 'server', 'word', 'zotero', 'connector', 'apple']) {
   assert.match(releaseNotes, new RegExp(`\\| '${scope}'`));
 }
 assert.match(releaseNotes, /RELEASE_4_2_0_HIGHLIGHTS[\s\S]*scope: 'browser'[\s\S]*scope: 'radar'/);

@@ -586,7 +586,10 @@ export async function runDeepScan(
         maxIdeas: chunkPlan.maxIdeasPerChunk,
       });
       try {
-        const baseMaxTokens = chunkPlan.mode === 'long' ? 12000 : 8000;
+        // Deep JSON routinely needs more than 8K once a local reasoning model accounts
+        // for its private trace. The adaptive planner owns the context window; this is
+        // the independent, proven output allowance for both standard and long chunks.
+        const baseMaxTokens = 16000;
         const adaptive = { leaves: 0 };
         const completeAdaptive = async (chunkText: string, depth: number, maxTokens: number): Promise<DeepResult> => {
           const adaptiveWordCount = chunkText.split(/\s+/).filter(Boolean).length;

@@ -1,56 +1,67 @@
-Academic research often starts with a relatively small collection of sources. A few books, some articles, a folder of PDFs and a growing list of notes can be easy enough to manage. The situation changes as a project develops. A thesis, dissertation or long-term research project can eventually contain hundreds of books and articles, thousands of pages and a large number of notes, ideas and references.
+Every research project starts out easy to manage. A dozen articles, three books, a folder of PDFs, a notes file. You know where everything is because there isn't much of it.
 
-At that point, the problem is no longer simply finding a place to store academic papers. The more important question is how to keep the material useful as the research grows. A good research library should make it possible to find sources again, understand why they were collected and connect them to the ideas and arguments that have developed from them.
+Then it grows. A thesis or a multi-year project ends up holding several hundred books and articles, thousands of pages, and a pile of notes and references that no longer fits in anyone's memory. At that point storage has stopped being the problem. Disk space is free and every reference manager can hold ten thousand items without complaining.
+
+The problem is that a large academic research library slowly stops answering the questions you actually ask it. Not "where is that file", but "why did I keep this", "who was it that disagreed with this", and "where exactly does it say that".
 
 ## Why large research libraries become difficult to manage
 
-The difficulty with a large academic library is rarely the number of files alone. It is the relationships between them.
+It isn't the number of files. It's the relations between them.
 
-A single article might be relevant to several different parts of a research project. A book may contain an argument that leads to a note several months later. An idea might appear in several sources, sometimes with similar formulations and sometimes in direct disagreement. Bibliographic information may be stored in one application while the actual documents, annotations and research notes are kept somewhere else.
+One article is relevant to three different chapters. A book contains an argument that only becomes important when you read something else eight months later. The same idea shows up in five sources, phrased differently each time, and in two of them it's being attacked rather than defended. Meanwhile the bibliographic data lives in one application, the PDFs live in a folder, the annotations live inside a reader, and the notes live somewhere you'll regret.
 
-Traditional folders can help with the basic organisation of files, but they do not necessarily preserve these relationships. The same is true of a reference manager when it is used only as a catalogue. It can tell you what you have collected, but it does not always make it easy to understand how the material relates to the research you are doing.
+Folders are fine for files and useless for relations. A folder can only put a document in one place, and the interesting documents belong in four. Tags help a little, until you have ninety of them and can't remember whether you used "memory" or "collective memory" in 2024.
 
-This becomes particularly noticeable during a literature review. Researchers often return to sources they read weeks or months earlier and need to reconstruct why a particular paper was important, which argument it supported or contradicted and where the relevant passage was located.
+A reference manager used purely as a catalogue has the same limit. It's a superb record of what you collected. It has nothing to say about how any of it connects to the argument you're building, because you never told it, because there was nowhere to put that.
 
-For this reason, organising an academic research library is not only about creating categories. It is also about preserving context.
+You notice this most sharply during a literature review, and again the moment you start writing. You come back to something you read four months ago and have to reconstruct, from scratch, why it mattered, what it was arguing against, and where the relevant paragraph was. That reconstruction is the tax. Nobody budgets for it, and on a long project it costs weeks.
+
+So organising a research library is not really a filing problem. It's a context problem.
 
 ## From documents to ideas and connections
 
-One useful approach is to treat documents as the starting point rather than the final structure of a research library.
+The useful shift is to treat documents as the starting point of the structure, not the structure itself.
 
-A paper can contain several relevant ideas. Those ideas can relate to ideas found in other papers, support different arguments or reveal disagreements between authors. Notes can then become a way of recording how the researcher understands those relationships rather than simply storing excerpts from individual sources.
+A paper contains several claims worth keeping. Those claims relate to claims in other papers. They support arguments, they contradict each other, and they occasionally turn out to be the same claim wearing different vocabulary. Notes then become a record of how you understand those relations, instead of a place where excerpts go to be forgotten.
 
-This does not mean that every research project needs a complex knowledge graph. In many cases, a simple connection between a source and a note is already useful. The important part is being able to move in both directions. You should be able to start with a source and see what you have extracted from it, but also start with an idea and find the documents that support, challenge or develop it.
+This doesn't require an elaborate knowledge graph, and I'd be suspicious of any advice that starts there. A single link between a source and a note is already worth more than a folder. What matters is that you can walk it in both directions: start from a source and see what you took from it, and start from an idea and see every document that supports, complicates or contradicts it.
 
-Nodus is designed around this approach. Documents can be stored in a research library alongside bibliographic information, notes and ideas. Ideas extracted from sources can be connected to other elements of the project, allowing the library to become more than a collection of files.
+A few things that reliably help, whatever software you use:
 
-Existing reference managers can remain part of this workflow. Nodus can connect to Zotero, allowing researchers to continue using their existing bibliographic library while adding another layer for documents, ideas and analysis. The [Zotero integration guide](/zotero/) explains the read-only connection and how it differs from the standalone plugin.
+- **Record why you kept something, at the moment you keep it.** One sentence. Future you cannot reconstruct it and will not try.
+- **Attach claims to passages, not to documents.** "Smith argues X" is much less useful in eighteen months than "Smith, p. 114, argues X" with the sentence attached.
+- **Write down disagreements as disagreements.** The contradictions are the most valuable thing in the library and the easiest to lose.
+- **Let the structure follow the argument.** Categories invented in month one describe a project that no longer exists by month twenty.
+
+Nodus is built around that shape. Documents sit in a research library alongside their bibliographic data, notes and ideas, and the ideas extracted from a source connect to the rest of the project, so the library becomes something more than a pile of files with good metadata.
+
+You don't have to abandon what you already use. Nodus connects to Zotero read-only, so the bibliography stays where it is and Nodus adds the layer above it. The [Zotero integration guide](/zotero/) explains that connection and how it differs from the standalone plugin.
 
 ## Using AI to explore your own research sources
 
-AI can be useful when working with a large research library, but its usefulness depends heavily on what it has access to.
+AI is genuinely useful on a large library, with one condition attached: it has to be looking at your library.
 
-A general purpose AI assistant may be able to discuss a subject, but it does not necessarily know what is contained in your particular collection of sources. Academic research often depends on precisely that information. A useful research assistant should be able to work with the documents that form the basis of the project and help locate relevant evidence within them.
+A general-purpose assistant can discuss a field at the level of a decent undergraduate essay. It does not know what is in your four hundred sources, and in academic work that's usually the only thing you needed. Worse, it will answer anyway. A research assistant is only worth having if it works from the documents your project is actually built on and can point at where in them it found something.
 
-Semantic search is one way of doing this. Instead of searching only for an exact word or phrase, a semantic search can identify material that is conceptually related to a question. This can be particularly useful when different authors use different terminology to discuss similar ideas.
+Semantic search is the least glamorous and most immediately useful piece of this. Instead of matching the exact string, it finds material that is conceptually near your question, which matters constantly in the humanities and social sciences where three authors will describe the same phenomenon with three incompatible vocabularies. If you have ever known that somebody made an argument, and failed to find it because you were searching for your word rather than theirs, that's the gap it closes.
 
-AI can also help with the initial analysis of large collections. Documents can be processed to identify ideas and relevant passages, while relationships between sources can be explored across the corpus. In a larger research project, this can make it easier to discover connections that would otherwise require repeatedly searching through individual documents.
+AI also earns its keep on first-pass analysis at scale. Documents can be processed to surface candidate ideas and the passages behind them, and relations across the corpus can be explored without opening every file. On a large project that turns a week of rereading into an afternoon of checking.
 
-Nodus includes these kinds of tools as optional parts of the research workflow. Researchers can use external AI providers or compatible local models, depending on their requirements. The purpose is not to automate the interpretation of the research, but to reduce some of the work involved in finding and organising information.
+In Nodus this is optional, and you choose the provider or run a compatible local model. The point isn't to have the software interpret your sources for you. It's to cut down the hours spent finding and arranging things, so more of the time goes on the part only you can do.
 
 ## A research library should remain useful throughout the project
 
-The best organisation system is not necessarily the one with the most categories, tags or features. It is the one that remains understandable when the project becomes much larger than it was when it started.
+The best organisation system is not the one with the most tags. It's the one that still makes sense when the project is five times bigger than it was when you designed it.
 
-For a doctoral thesis, this might mean keeping references connected to the documents they represent, recording ideas as they emerge and making it possible to return quickly to the passages that support an argument. For another project, it might mean organising primary sources, photographs, interviews or structured research data.
+For a doctoral thesis that usually means: references stay attached to the documents they describe, ideas get recorded as they appear, and any claim in the draft is a click away from the passage that backs it. For a project built on primary sources, photographs, interviews or structured data, it means something different in the details and identical in principle.
 
-The important thing is that the organisation should reflect the research process rather than becoming another task that competes with it.
+Whatever the shape, the organisation has to reflect how the research actually proceeds. The moment maintaining the system becomes a separate job competing with the research, you will stop doing it, and you'll be right to.
 
-This is one of the reasons Nodus uses different vaults for different types of work. The Academic vault provides tools for research involving sources, references, notes, ideas and databases, while other vaults are designed for teaching, study, genealogy, oral history and other workflows.
+That's why Nodus splits into vaults instead of offering one universal layout. The Academic vault handles sources, references, notes, ideas and analysis; other vaults are built for teaching, study, genealogy, oral history and the rest, because a family tree and a literature review do not want the same furniture.
 
-A large academic research library will always require some organisation from the researcher. No application can decide what matters in a particular project or replace the judgement involved in interpreting sources. Good research software can, however, make it easier to preserve the connections between the material that has been collected and the ideas that develop from it.
+None of this removes the work. No application decides what matters in your project, and nothing here replaces the judgement involved in reading a source properly. What good software can do is stop the connections you've already made from evaporating, which is most of what goes wrong in a large library.
 
-The result is a library that is not simply a place where research material is stored. It becomes part of the research process itself.
+Get that right and the library stops being the place your research material is stored. It becomes part of how the research is done.
 
 [Explore the Nodus academic research workspace](/research/)
 

@@ -927,9 +927,9 @@ export type DocumentUnderstandingState =
   | 'stale' | 'failed' | 'paused' | 'unavailable';
 
 export type DocumentProfileFieldKind =
-  | 'object' | 'problem' | 'question' | 'thesis' | 'argument' | 'method'
+  | 'object' | 'problem' | 'question' | 'hypothesis' | 'thesis' | 'argument' | 'method'
   | 'sources' | 'concept' | 'temporal_scope' | 'geographic_scope'
-  | 'disciplinary_scope' | 'structure' | 'conclusion' | 'contribution'
+  | 'disciplinary_scope' | 'structure' | 'finding' | 'conclusion' | 'contribution'
   | 'limitation' | 'genre' | 'audience' | 'positioning' | 'original_abstract';
 
 export interface DocumentProfileField {
@@ -1267,6 +1267,7 @@ export type AiProvider =
   | 'xiaomi'
   | 'ollama'
   | 'lmstudio'
+  | 'custom'
   | 'nodus';
 /** Providers that run on the user's machine (or LAN) via a configurable base URL.
  *  They need no API key (an optional token is supported for secured instances). */
@@ -1282,6 +1283,25 @@ export interface LocalProviderConfig {
    * task's output ceiling; it only controls the total prompt+completion window. */
   contextMode?: 'auto' | 'manual';
   manualContextTokens?: 4096 | 8192 | 16384 | 32768 | 65536 | 131072;
+}
+
+/**
+ * The user's own OpenAI-compatible endpoint (LiteLLM, vLLM, llama.cpp server, a
+ * proxy such as CLIProxyAPI or codex-lb). App-level, not per vault.
+ *
+ * Unlike LocalProviderConfig, `baseUrl` is used EXACTLY as typed apart from the
+ * trailing slash: these gateways mount their API on wildly different paths
+ * ("/v1", "/openai/v1", the root), so appending "/v1" would break as many setups
+ * as it fixed. The user pastes the full base, e.g. "http://localhost:8317/v1".
+ */
+export interface CustomProviderConfig {
+  baseUrl: string;
+  /**
+   * Model slugs typed by the user. Kept independently of anything GET /models
+   * returns, because plenty of gateways serve inference without implementing
+   * that endpoint at all — the manual list is what keeps those usable.
+   */
+  models: string[];
 }
 
 /** Result of pinging a local provider from Settings ("Test connection"). */
@@ -1774,6 +1794,9 @@ export interface AppSettings {
   // Connection settings for local providers (Ollama, LM Studio). The base URL is
   // user-editable; an optional access token, when set, is stored like an API key.
   localProviders: Record<LocalProvider, LocalProviderConfig>;
+  // The user's own OpenAI-compatible endpoint: base URL and manually typed model
+  // slugs. An optional API key travels the ordinary secret path, never this blob.
+  customProvider: CustomProviderConfig;
   // Favorite models the user pinned. This list is app-wide and shared across vaults.
   // Workload and feature selectors below remain deliberately independent: changing
   // one must never retarget another flow.

@@ -1,4 +1,5 @@
 import type { AppLanguage } from './types';
+import { MAIN_PROCESS_ERRORS, MAIN_PROCESS_ERROR_PATTERNS } from './mainProcessErrors';
 
 export type UiTranslations = Partial<Record<AppLanguage, string>> & { en: string };
 
@@ -446,6 +447,26 @@ function aiProviderRuntimeError(message: string, language: unknown): string | nu
 }
 
 /**
+ * The main-process error catalogue (shared/mainProcessErrors.ts).
+ *
+ * It runs last, after the Zotero and AI provider tables, so nothing here can shadow a
+ * message one of those already words more precisely — and before the Spanish detector,
+ * because a sentence with a real translation must never be traded for the generic line.
+ */
+function mainProcessRuntimeError(message: string, language: unknown): string | null {
+  // hasOwnProperty, not a bare index: an error message of "constructor" or "toString"
+  // would otherwise find an inherited member and spread into an empty translation.
+  if (Object.prototype.hasOwnProperty.call(MAIN_PROCESS_ERRORS, message)) {
+    return uiText(language, { ...MAIN_PROCESS_ERRORS[message], es: message });
+  }
+  for (const { pattern, translate } of MAIN_PROCESS_ERROR_PATTERNS) {
+    const match = pattern.exec(message);
+    if (match) return uiText(language, { ...translate(...match.slice(1)), es: message });
+  }
+  return null;
+}
+
+/**
  * Last-resort protection for legacy Electron errors that still contain prose rather
  * than a stable error code. Specific messages should be translated by the caller;
  * unknown Spanish prose becomes a localized generic error instead of leaking Spanish.
@@ -600,6 +621,8 @@ export function localizeRuntimeError(message: string, language: unknown): string
   if (zoteroFailure) return zoteroFailure;
   const providerFailure = aiProviderRuntimeError(message, language);
   if (providerFailure) return providerFailure;
+  const mainProcessFailure = mainProcessRuntimeError(message, language);
+  if (mainProcessFailure) return mainProcessFailure;
   if (!looksLikeSpanishUiText(message)) return message;
   return uiText(language, {
     es: message,
@@ -658,8 +681,69 @@ export const IMAGE_GENERATION_ERROR_MESSAGES = [
   'El informe guardado ya no existe.',
 ];
 
+/**
+ * The three sentences the bottom progress bars use to say what a run is DOING, not
+ * that it broke. They travel in a field called `error`, so they were localized as
+ * failures: two became the generic "the operation could not be completed" — an idle
+ * embedding queue announcing a crash that never happened — and the third leaked
+ * Spanish into every other interface. They are keys in src/i18n.*.ts, translated by
+ * tr() where they are rendered.
+ */
+export const PROGRESS_STATE_MESSAGES = [
+  'No hay obras con análisis profundo para indexar.',
+  'No hay obras disponibles para indexar.',
+  'La obra ya no existe.',
+];
+
+/** Dictionary generation status copy is translated by DictionaryView. */
+export const DICTIONARY_PROGRESS_MESSAGES = [
+  'En cola',
+  'Analizando corpus',
+  'Generando definición',
+  'Definición generada',
+  'La síntesis necesita revisión',
+  'Error al generar',
+];
+
+/**
+ * The Zotero import readout, exactly as `electron/library/zoteroLibraryImport.ts`
+ * writes it.
+ *
+ * It travels in a field called `message`, so it used to be treated as an error like
+ * any other and a perfectly healthy import told a non-Spanish reader one of two
+ * wrong things: the Spanish sentence verbatim (`Copiando y verificando adjuntos…`
+ * carries too few function words to be detected as Spanish) or the generic "the
+ * operation could not be completed" (`Catálogo listo…` carries an accent, so it IS
+ * detected — and a progress step became a failure on screen). Neither is a failure,
+ * and neither is the progress the bar exists to show. These sentences are keys in
+ * src/i18n.*.ts instead: tr() translates them in the renderer, where the library and
+ * item names they carry pass through untouched.
+ */
+export const ZOTERO_IMPORT_PROGRESS_MESSAGES = [
+  'Conectando con Zotero…',
+  'Catálogo listo; reconciliando notas…',
+  'Copiando y verificando adjuntos…',
+  'Verificando el índice local…',
+  'Finalizando claves de cita y cola de extracción…',
+  'Importación de Zotero completada y verificada.',
+  'Importación cancelada; el catálogo ya importado se conserva.',
+];
+
+/** The same readout while it names the library or the item it is working through. */
+export const ZOTERO_IMPORT_PROGRESS_PATTERNS = [
+  /^Inventariando .+…$/,
+  /^Reconciliando colecciones de .+…$/,
+  /^Catálogo disponible: .+$/,
+  /^Notas: .+$/,
+  /^Adjuntos: .+$/,
+  /^Verificando .+ contra el inventario…$/,
+];
+
 const RENDERER_TRANSLATED_MESSAGES = new Set([
   ...IMAGE_GENERATION_ERROR_MESSAGES,
+  ...ZOTERO_IMPORT_PROGRESS_MESSAGES,
+  ...PROGRESS_STATE_MESSAGES,
+  ...DICTIONARY_PROGRESS_MESSAGES,
   'Bóveda no encontrada.',
   'No se encontró la bóveda de origen de las claves API.',
   'Esta bóveda ya está cargada.',
@@ -672,6 +756,9 @@ const RENDERER_TRANSLATED_MESSAGES = new Set([
 
 function isRendererTranslatedMessage(message: string): boolean {
   if (RENDERER_TRANSLATED_MESSAGES.has(message)) return true;
+  if (ZOTERO_IMPORT_PROGRESS_PATTERNS.some((pattern) => pattern.test(message))) return true;
+  // A queue item counting down its own retries is a progress readout too.
+  if (/^Reintentando \(\d+\/\d+\)…$/.test(message)) return true;
   return /^(?:Esta bóveda ya está cargada\.|Bóveda cargada\.) Claves API copiadas: \d+\.$/.test(message);
 }
 

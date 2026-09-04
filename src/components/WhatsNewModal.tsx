@@ -25,7 +25,7 @@ const STARTUP_VERSION_HISTORY_LIMIT = 12;
  */
 const vaultScope = (type: VaultType) => ({ icon: vaultTypeIcon(type), color: VAULT_TYPE_COLORS[type] });
 
-const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string; color: string; label: string }> = {
+const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string | null; color: string; label: string }> = {
   general: { icon: 'sparkles', color: '#64748b', label: 'General' },
   academic: { ...vaultScope('academic'), label: 'Académico' },
   estudio: { ...vaultScope('estudio'), label: 'Estudio' },
@@ -51,7 +51,23 @@ const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string; color: string
   languages: { icon: 'languages', color: '#db2777', label: 'Idiomas' },
   browser: { icon: 'globe', color: '#2563eb', label: 'Nodus Browser' },
   radar: { icon: 'radar', color: '#f97316', label: 'Nodus Radar' },
+  apple: { icon: null, color: '#111827', label: 'Apple' },
 };
+
+/** Apple marks the macOS signing and notarization milestone without borrowing a generic glyph. */
+function AppleReleaseIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      fill="currentColor"
+    >
+      <path d="M24.132 18.851c-.482 1.096-.704 1.584-1.325 2.55-.86 1.336-2.074 3.002-3.577 3.015-1.336.012-1.682-.886-3.5-.876-1.818.009-2.198.89-3.534.878-1.503-.014-2.653-1.516-3.514-2.852-2.404-3.735-2.657-8.118-1.174-10.447 1.055-1.659 2.72-2.633 4.286-2.633 1.592 0 2.594.89 3.91.89 1.276 0 2.052-.892 3.896-.892 1.394 0 2.87.76 3.926 2.073-3.45 1.893-2.89 6.816.606 8.294zM18.218 7.024c.67-.86 1.179-2.075.994-3.316-1.094.075-2.373.771-3.12 1.675-.676.82-1.233 2.043-1.015 3.23 1.195.037 2.424-.67 3.141-1.589z" />
+    </svg>
+  );
+}
 
 /** The rotated N is exclusive to the What's New badge for Zotero-plugin news. */
 function ZoteroReleaseIcon({ size = 13 }: { size?: number }) {
@@ -335,7 +351,7 @@ export function WhatsNewModal({
             <h2>{t('Nodus acaba de mejorar')}</h2>
             <p>{t('Hemos preparado nuevas funciones y mejoras para que sigas construyendo conocimiento con menos fricción.')}</p>
             <div className="whats-new-version">
-              <span>{selectedNote.version === current ? t('Nueva versión') : t('Versiones')}</span>
+              <span>{selectedNote.version === current.split('-')[0] ? t('Nueva versión') : t('Versiones')}</span>
               <b>v{selectedNote.version}</b>
             </div>
           </div>
@@ -369,9 +385,11 @@ export function WhatsNewModal({
                       aria-label={scopeLabel}
                       aria-describedby={tooltipId}
                     >
-                      {scope === 'zotero'
-                        ? <ZoteroReleaseIcon size={13} />
-                        : <Icon name={scopeMeta.icon} size={13} />}
+                      {scope === 'apple'
+                        ? <AppleReleaseIcon size={13} />
+                        : scope === 'zotero'
+                          ? <ZoteroReleaseIcon size={13} />
+                          : <Icon name={scopeMeta.icon!} size={13} />}
                       <span id={tooltipId} role="tooltip" className="whats-new-scope-tooltip">{scopeLabel}</span>
                     </span>
                     <span>{h[lang] ?? h.en}</span>

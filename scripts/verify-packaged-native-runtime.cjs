@@ -3,38 +3,97 @@ const { existsSync, readdirSync } = require('node:fs');
 const path = require('node:path');
 const asar = require('@electron/asar');
 
-const REQUIRED_ARM64_BINARIES = [
-  ['Canvas', '@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node'],
-  ['Koffi', '@koromix/koffi-darwin-arm64/darwin_arm64/koffi.node'],
-  ['Codex', '@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex'],
-  ['Copilot', '@github/copilot-darwin-arm64/copilot'],
-  ['Copilot native runtime', '@github/copilot-darwin-arm64/prebuilds/darwin-arm64/runtime.node'],
-];
+// macOS ships as two single-architecture products, one per runner: npm resolves
+// the native optional dependencies from the host architecture, so a build can
+// only ever contain the slice of the machine that produced it. That is exactly
+// what makes a mixed tree dangerous — an Intel dependency inside the Apple
+// silicon app (or the reverse) does not fail at packaging time, it fails on a
+// user's machine at first launch. Everything below exists to make that
+// impossible before the artifact is signed.
+const SUPPORTED_ARCHITECTURES = ['arm64', 'x64'];
 
-const REQUIRED_ARM64_BINARY_PATTERNS = [
-  ['Sharp', '@img/sharp-darwin-arm64/lib', /^sharp-darwin-arm64(?:-[0-9.]+)?\.node$/],
-  ['libvips', '@img/sharp-libvips-darwin-arm64/lib', /^libvips-cpp\.[0-9.]+\.dylib$/],
-];
+// `lipo -archs` names the Intel slice x86_64; electron-builder names it x64.
+const LIPO_ARCHITECTURES = { arm64: 'arm64', x64: 'x86_64' };
 
-const INTEL_PACKAGE_MARKERS = [
-  /darwin-x64/i,
-  /darwin_x64/i,
-  /x86_64-apple-darwin/i,
-];
+const REQUIRED_BINARIES = {
+  arm64: [
+    ['Canvas', '@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node'],
+    ['Koffi', '@koromix/koffi-darwin-arm64/darwin_arm64/koffi.node'],
+    ['Codex', '@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex'],
+    ['Copilot', '@github/copilot-darwin-arm64/copilot'],
+    ['Copilot native runtime', '@github/copilot-darwin-arm64/prebuilds/darwin-arm64/runtime.node'],
+  ],
+  x64: [
+    ['Canvas', '@napi-rs/canvas-darwin-x64/skia.darwin-x64.node'],
+    ['Koffi', '@koromix/koffi-darwin-x64/darwin_x64/koffi.node'],
+    ['Codex', '@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/bin/codex'],
+    ['Copilot', '@github/copilot-darwin-x64/copilot'],
+    ['Copilot native runtime', '@github/copilot-darwin-x64/prebuilds/darwin-x64/runtime.node'],
+  ],
+};
 
-function findIntelRuntimePaths(entries) {
-  return entries.filter((entry) => INTEL_PACKAGE_MARKERS.some((marker) => marker.test(entry)));
+const REQUIRED_BINARY_PATTERNS = {
+  arm64: [
+    ['Sharp', '@img/sharp-darwin-arm64/lib', /^sharp-darwin-arm64(?:-[0-9.]+)?\.node$/],
+    ['libvips', '@img/sharp-libvips-darwin-arm64/lib', /^libvips-cpp\.[0-9.]+\.dylib$/],
+  ],
+  x64: [
+    ['Sharp', '@img/sharp-darwin-x64/lib', /^sharp-darwin-x64(?:-[0-9.]+)?\.node$/],
+    ['libvips', '@img/sharp-libvips-darwin-x64/lib', /^libvips-cpp\.[0-9.]+\.dylib$/],
+  ],
+};
+
+// npm names an architecture-specific package with the target as a suffix, so
+// what has to be absent is a TOP-LEVEL package of the other architecture:
+// `@img/sharp-darwin-arm64` inside the Intel app is what breaks at first launch.
+//
+// This deliberately reads the package name and not the whole path. Vendored
+// binaries for every platform live inside the correct package and are perfectly
+// legitimate — @github/copilot-darwin-x64 ships ripgrep and tgrep for
+// darwin-arm64 among others — and a substring match over the path flagged those
+// and failed the first Intel build ever attempted. Nested node_modules are the
+// vendor's own business for the same reason, so only the top level is read.
+const FOREIGN_PACKAGE_SUFFIXES = { arm64: '-darwin-x64', x64: '-darwin-arm64' };
+
+/** The top-level package an asar entry belongs to, or null if it is nested. */
+function topLevelPackage(entry) {
+  const segments = entry.split('node_modules/');
+  if (segments.length !== 2) return null; // not in node_modules, or vendored deeper
+  const parts = segments[1].split('/');
+  if (parts.length === 0) return null;
+  return parts[0].startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+}
+
+function assertSupportedArchitecture(architecture) {
+  if (!SUPPORTED_ARCHITECTURES.includes(architecture)) {
+    throw new Error(
+      `Unsupported macOS architecture: ${architecture} (expected ${SUPPORTED_ARCHITECTURES.join(' or ')})`,
+    );
+  }
+}
+
+function findForeignRuntimePaths(architecture, entries) {
+  assertSupportedArchitecture(architecture);
+  const suffix = FOREIGN_PACKAGE_SUFFIXES[architecture];
+  const foreign = new Set();
+  for (const entry of entries) {
+    const packageName = topLevelPackage(entry);
+    if (packageName && packageName.endsWith(suffix)) foreign.add(packageName);
+  }
+  return [...foreign].sort();
 }
 
 function getArchitectures(filename) {
   return execFileSync('lipo', ['-archs', filename], { encoding: 'utf8' }).trim().split(/\s+/);
 }
 
-function assertArm64Binary(label, filename, architectureReader = getArchitectures) {
-  if (!existsSync(filename)) throw new Error(`Missing packaged ARM64 ${label}: ${filename}`);
+function assertBinaryArchitecture(label, filename, architecture, architectureReader = getArchitectures) {
+  assertSupportedArchitecture(architecture);
+  const expected = LIPO_ARCHITECTURES[architecture];
+  if (!existsSync(filename)) throw new Error(`Missing packaged ${architecture} ${label}: ${filename}`);
   const architectures = architectureReader(filename);
-  if (!architectures.includes('arm64')) {
-    throw new Error(`Packaged ${label} is not ARM64 (${architectures.join(', ')}): ${filename}`);
+  if (!architectures.includes(expected)) {
+    throw new Error(`Packaged ${label} is not ${expected} (${architectures.join(', ')}): ${filename}`);
   }
 }
 
@@ -43,55 +102,63 @@ function findUniquePackagedBinary(label, directory, pattern, directoryReader = r
   try {
     entries = directoryReader(directory);
   } catch {
-    throw new Error(`Missing packaged ARM64 ${label} directory: ${directory}`);
+    throw new Error(`Missing packaged ${label} directory: ${directory}`);
   }
   const matches = entries.filter((entry) => pattern.test(entry)).sort();
   if (matches.length !== 1) {
     throw new Error(
-      `Expected exactly one packaged ARM64 ${label} binary in ${directory}; found ${matches.length}`,
+      `Expected exactly one packaged ${label} binary in ${directory}; found ${matches.length}`,
     );
   }
   return path.join(directory, matches[0]);
 }
 
-function verifyPackagedNativeRuntime(appPath, options = {}) {
+function verifyPackagedNativeRuntime(appPath, architecture, options = {}) {
+  assertSupportedArchitecture(architecture);
   const resourcesPath = path.join(appPath, 'Contents', 'Resources');
   const asarPath = path.join(resourcesPath, 'app.asar');
   const unpackedModules = path.join(resourcesPath, 'app.asar.unpacked', 'node_modules');
   if (!existsSync(asarPath)) throw new Error(`Missing packaged application archive: ${asarPath}`);
 
   const archiveEntries = (options.listPackage || asar.listPackage)(asarPath);
-  const intelEntries = findIntelRuntimePaths(archiveEntries);
-  if (intelEntries.length > 0) {
-    throw new Error(`Intel-only macOS runtime packages were bundled:\n${intelEntries.slice(0, 20).join('\n')}`);
+  const foreignPackages = findForeignRuntimePaths(architecture, archiveEntries);
+  if (foreignPackages.length > 0) {
+    throw new Error(
+      `macOS runtime packages for the other architecture were bundled into the ${architecture} app:\n${foreignPackages.join('\n')}`,
+    );
   }
 
   const appName = path.basename(appPath, '.app');
-  assertArm64Binary(
+  assertBinaryArchitecture(
     'Electron executable',
     path.join(appPath, 'Contents', 'MacOS', appName),
+    architecture,
     options.getArchitectures,
   );
-  for (const [label, relativePath] of REQUIRED_ARM64_BINARIES) {
-    assertArm64Binary(label, path.join(unpackedModules, relativePath), options.getArchitectures);
+  for (const [label, relativePath] of REQUIRED_BINARIES[architecture]) {
+    assertBinaryArchitecture(label, path.join(unpackedModules, relativePath), architecture, options.getArchitectures);
   }
-  for (const [label, relativeDirectory, pattern] of REQUIRED_ARM64_BINARY_PATTERNS) {
+  for (const [label, relativeDirectory, pattern] of REQUIRED_BINARY_PATTERNS[architecture]) {
     const filename = findUniquePackagedBinary(
       label,
       path.join(unpackedModules, relativeDirectory),
       pattern,
       options.readDirectory,
     );
-    assertArm64Binary(label, filename, options.getArchitectures);
+    assertBinaryArchitecture(label, filename, architecture, options.getArchitectures);
   }
-  console.log(`[native-runtime] Verified ARM64 Electron, Canvas, Sharp, Koffi, Codex and Copilot in ${appPath}`);
+  console.log(
+    `[native-runtime] Verified ${architecture} Electron, Canvas, Sharp, Koffi, Codex and Copilot in ${appPath}`,
+  );
 }
 
 module.exports = {
-  REQUIRED_ARM64_BINARIES,
-  REQUIRED_ARM64_BINARY_PATTERNS,
-  assertArm64Binary,
+  SUPPORTED_ARCHITECTURES,
+  REQUIRED_BINARIES,
+  REQUIRED_BINARY_PATTERNS,
+  topLevelPackage,
+  assertBinaryArchitecture,
   findUniquePackagedBinary,
-  findIntelRuntimePaths,
+  findForeignRuntimePaths,
   verifyPackagedNativeRuntime,
 };

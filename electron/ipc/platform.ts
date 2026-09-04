@@ -14,7 +14,7 @@ import { ensureCopilotCert } from '../copilot/certs';
 import { installCopilotAddin, installLibreOfficeCopilot } from '../copilot/install';
 import { setApiKey, clearApiKey, getApiKey, getLocalServerAdminPassword } from '../secrets/secretStore';
 import { recoverLegacyApiKeys } from '../secrets/legacySecretRecovery';
-import { listEmbeddingModels, listModels, testLocalProvider } from '../ai/providers';
+import { listEmbeddingModels, listModels, testCustomProvider, testLocalProvider } from '../ai/providers';
 import { cancelChatGptSubscriptionLogin, getChatGptSubscriptionStatus, listChatGptSubscriptionModels, logoutChatGptSubscription, startChatGptSubscriptionLogin } from '../ai/codexSubscription';
 import { cancelGitHubCopilotSubscriptionLogin, getGitHubCopilotSubscriptionStatus, listGitHubCopilotSubscriptionModels, logoutGitHubCopilotSubscription, startGitHubCopilotSubscriptionLogin } from '../ai/githubCopilotSubscription';
 import { getOpenCodeGoUsageStatus } from '../ai/openCodeGoUsage';
@@ -232,6 +232,7 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
     listEmbeddingModels(provider, getApiKey(provider))
   );
   h('ai:testLocalProvider', async (_e, provider: LocalProvider) => testLocalProvider(provider, getApiKey(provider)));
+  h('ai:testCustomProvider', async () => testCustomProvider(getApiKey('custom')));
   h('ai:localDiagnostics', async () => listLocalAiDiagnostics());
   h('ai:listImageModels', async () => listImageModels());
   h('ai:nodusLocal:status', async () => getNodusLocalAiStatus());

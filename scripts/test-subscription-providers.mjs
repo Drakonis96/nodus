@@ -15,6 +15,7 @@ const entry = path.join(outDir, 'entry.ts');
 fs.writeFileSync(entry, [
   `export * from ${JSON.stringify(path.join(repoRoot, 'electron/ai/openCodeGoCompletion.ts'))};`,
   `export * from ${JSON.stringify(path.join(repoRoot, 'electron/ai/openCodeGoPricing.ts'))};`,
+  `export * from ${JSON.stringify(path.join(repoRoot, 'electron/ai/clientIdentity.ts'))};`,
   `export * from ${JSON.stringify(path.join(repoRoot, 'electron/ai/githubCopilotCompletion.ts'))};`,
 ].join('\n'));
 execFileSync(path.join(repoRoot, 'node_modules/.bin/esbuild'), [
@@ -30,6 +31,9 @@ const {
   completeWithOpenCodeGo,
   estimateOpenCodeGoCostUsd,
   openCodeGoProtocol,
+  openCodeGoSessionId,
+  registerNodusClientVersion,
+  nodusUserAgent,
   runIsolatedGitHubCopilotCompletion,
 } = require(bundle);
 
@@ -143,6 +147,8 @@ test('OpenCode Go selects its three documented protocols and normalizes usage', 
     const openaiCall = fake.calls[0];
     assert.equal(openaiCall.url, '/v1/chat/completions');
     assert.equal(openaiCall.headers.authorization, 'Bearer go-key');
+    assert.match(openaiCall.headers['user-agent'], /^Nodus\//);
+    assert.ok(openaiCall.headers['x-opencode-session'], 'Chat Completions carries the session header');
     assert.deepEqual(openaiCall.payload.response_format, { type: 'json_object' });
 
     const anthropic = await completeWithOpenCodeGo({
@@ -154,6 +160,8 @@ test('OpenCode Go selects its three documented protocols and normalizes usage', 
     assert.equal(anthropicCall.url, '/v1/messages');
     assert.equal(anthropicCall.headers['x-api-key'], 'go-key');
     assert.equal(anthropicCall.headers['anthropic-version'], '2023-06-01');
+    assert.match(anthropicCall.headers['user-agent'], /^Nodus\//);
+    assert.ok(anthropicCall.headers['x-opencode-session'], 'Messages carries the session header');
     assert.deepEqual(anthropicCall.payload.thinking, { type: 'disabled' });
 
     const responses = await completeWithOpenCodeGo({
@@ -164,9 +172,49 @@ test('OpenCode Go selects its three documented protocols and normalizes usage', 
     const responsesCall = fake.calls[2];
     assert.equal(responsesCall.url, '/v1/responses');
     assert.equal(responsesCall.headers.authorization, 'Bearer go-key');
+    assert.match(responsesCall.headers['user-agent'], /^Nodus\//);
+    assert.ok(responsesCall.headers['x-opencode-session'], 'Responses carries the session header');
     assert.match(responsesCall.payload.instructions, /valid JSON/);
   } finally {
     await fake.close();
+  }
+});
+
+test('OpenCode Go sends an opaque session per unit of work and a named User-Agent', async () => {
+  // OpenCode rejects requests without x-opencode-session from 2026-09-06, so the
+  // header is a contract, not a nicety. What it carries must stay opaque: a job id
+  // is content-free but still names the pipeline, and nothing may persist across
+  // restarts or the "session" becomes a stable identifier for the user.
+  const first = openCodeGoSessionId('WORK123:deep:0:1:abc');
+  assert.match(first, /^[0-9a-f-]{36}$/, 'the session is a random UUID, not the job id');
+  assert.equal(openCodeGoSessionId('WORK123:deep:7:1:def'), first, 'chunks of one run share a session');
+  assert.notEqual(openCodeGoSessionId('WORK456:deep:0:1:abc'), first, 'a different work is a different session');
+  const processScoped = openCodeGoSessionId();
+  assert.equal(openCodeGoSessionId(null), processScoped, 'job-less calls share the process session');
+  assert.notEqual(processScoped, first);
+
+  registerNodusClientVersion('9.9.9');
+  assert.equal(nodusUserAgent(), 'Nodus/9.9.9', 'the User-Agent names the app and tracks package.json');
+
+  const fake = await fakeOpenCodeGo();
+  try {
+    await completeWithOpenCodeGo({
+      apiKey: 'go-key', model: 'kimi-k3', system: 's', user: 'u', baseUrl: fake.baseUrl, sessionId: first,
+    });
+    assert.equal(fake.calls[0].headers['x-opencode-session'], first, 'the caller-supplied session is what travels');
+    assert.equal(fake.calls[0].headers['user-agent'], 'Nodus/9.9.9');
+  } finally {
+    await fake.close();
+  }
+});
+
+test('the app version reaching third parties is read, never typed in', () => {
+  // A hand-written Nodus/4.2.3 kept going out to GitHub for eleven releases.
+  const main = fs.readFileSync(path.join(repoRoot, 'electron/main.ts'), 'utf8');
+  assert.match(main, /registerNodusClientVersion\(app\.getVersion\(\)\)/, 'main.ts registers the running version');
+  for (const file of ['electron/ai/openCodeGoCompletion.ts', 'electron/ai/providers.ts', 'electron/library/libraryCslStyles.ts']) {
+    const source = fs.readFileSync(path.join(repoRoot, file), 'utf8');
+    assert.doesNotMatch(source, /Nodus\/\d+\.\d+/, `${file} must not hard-code a version`);
   }
 });
 
