@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 5.1.7 — 2026-09-04
+
+Nodus 5.1.7 is a single-fix release for the Dictionary, which reported a failure
+while the definition was being written correctly.
+
+- Stopped the main-process localizer from rewriting the Dictionary generation
+  status as the generic "the operation could not be completed" notice. The
+  queued, corpus-analysis and definition-generation lines travel in a `message`
+  field, so they were localized as failures in every interface language other
+  than Spanish while the definition itself came out fine. They now reach
+  `DictionaryView` untouched and are translated where they are rendered.
+- Added regression coverage pinning the Dictionary progress catalogue to the
+  renderer-translated allowlist in all seven non-Spanish languages.
+
 ## 5.1.6 — 2026-09-03
 
 Nodus 5.1.6 adds a custom OpenAI-compatible AI provider in Settings and

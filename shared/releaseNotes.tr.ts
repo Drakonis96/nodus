@@ -106,6 +106,9 @@ const RELEASE_5_1_0_TR = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.1.7": [
+    "Sözlük tanımı oluşturmak artık bir hata gibi görünmüyor. Durum satırı, tanım sorunsuz yazılırken işlemin tamamlanamadığını duyuruyordu. Artık gerçek ilerlemeyi dilinizde gösteriyor: kuyrukta, derlem inceleniyor ve tanım oluşturuluyor.",
+  ],
   "5.1.6": [
     "İlerleme çubukları artık dilinizi konuşuyor. Dizin oluşturma, embedding, pasaj, kuyruk ve Zotero içe aktarma satırları sekiz dilde çevrilmiş görünüyor. Her şey yolundayken hatalı hata uyarıları artık görünmüyor ve kitaplık ile eser adlarınız aynen korunuyor.",
     "Ana işlem hataları artık dilinize çevrilmiş olarak geliyor. Eskiden İspanyolca veya genel bir uyarı olarak görünen binden fazla ileti artık gerçek nedenini açıklıyor. Bağlantı testi bunu açıkça gösteriyor. Ollama yanıt vermezse adresini, HTTP kodunu ve çalışıp çalışmadığı sorusunu göreceksiniz.",
