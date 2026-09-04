@@ -249,7 +249,7 @@ export function WorldChatView({ settings, onNavigate }: {
             <h1 className="truncate text-sm font-semibold">{conversation?.title ?? t('Chat del mundo')}</h1>
             <p className="truncate text-[10px] text-neutral-500">{t('Pregunta a las fichas de tu mundo con referencias verificables.')}</p>
           </div>
-          <div className="w-56 min-w-0 max-w-[42%] shrink"><ModelPicker settings={settings} value={model} onChange={setModel} compact className="w-full min-w-0" /></div>
+          <div className="w-56 min-w-0 max-w-[42%] shrink"><ModelPicker settings={settings} value={model} onChange={setModel} compact className="w-full min-w-0" menu /></div>
           <button data-testid="world-chat-header-new" className="btn btn-ghost relative z-10 h-8 w-8 shrink-0 p-0" aria-label={t('Nuevo chat')} title={t('Nuevo chat')} onClick={resetChat}><Icon name="plus" size={13} /></button>
           <button data-testid="world-chat-context-toggle" className={`btn relative z-10 h-8 w-8 shrink-0 p-0 ${contextOpen ? 'btn-secondary' : 'btn-ghost'}`} aria-label={t(contextOpen ? 'Ocultar ámbito y fuentes' : 'Mostrar ámbito y fuentes')} title={t(contextOpen ? 'Ocultar ámbito y fuentes' : 'Mostrar ámbito y fuentes')} onClick={toggleContext}><Icon name="columns" size={14} /></button>
         </header>

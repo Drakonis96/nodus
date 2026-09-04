@@ -3909,6 +3909,7 @@ function AiColumnConfig({ column, onChanged }: { column: DatabaseColumn; onChang
                 : t('Predeterminado')
             }
             className="w-full mt-1"
+            menu
           />
         </>
       )}

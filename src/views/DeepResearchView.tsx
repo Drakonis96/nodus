@@ -2438,7 +2438,7 @@ function ComposerModal({
             </label>
             <label className="block min-w-0">
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">{t('Modelo')}</span>
-              <ModelPicker settings={settings} value={model} onChange={onModel} ariaLabel={t('Modelo')} className="w-full text-sm" />
+              <ModelPicker settings={settings} value={model} onChange={onModel} ariaLabel={t('Modelo')} className="w-full text-sm" menu />
             </label>
           </div>
           <div className="flex flex-wrap items-center gap-2">
