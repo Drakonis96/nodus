@@ -2481,6 +2481,25 @@ const RELEASE_5_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * v5.1.7 carries a single repair: the Dictionary status line announced a
+ * failure while the definition was being written correctly. Its progress copy
+ * travelled in a `message` field, so the main-process localizer rewrote it as
+ * the generic "the operation could not be completed" notice in every language
+ * other than Spanish. The sentences are now handed to the renderer untouched.
+ */
+const RELEASE_5_1_7_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'languages',
+    es: 'Generar una definici\u00f3n del diccionario ya no parece un fallo. La l\u00ednea de estado anunciaba que la operaci\u00f3n no se pudo completar mientras la definici\u00f3n se escrib\u00eda sin problemas. Ahora muestra el progreso real en tu idioma: en cola, analizando corpus y generando definici\u00f3n.',
+    en: 'Generating a dictionary definition no longer looks like a failure. The status line announced that the operation could not be completed while the definition was being written just fine. It now shows the real progress in your language: queued, analysing corpus and generating definition.',
+    fr: 'G\u00e9n\u00e9rer une d\u00e9finition du dictionnaire ne ressemble plus \u00e0 un \u00e9chec. La ligne d\u2019\u00e9tat annon\u00e7ait que l\u2019op\u00e9ration n\u2019avait pas pu aboutir alors que la d\u00e9finition s\u2019\u00e9crivait sans probl\u00e8me. Elle affiche maintenant la progression r\u00e9elle dans votre langue : en file d\u2019attente, analyse du corpus et g\u00e9n\u00e9ration de la d\u00e9finition.',
+    de: 'Das Erzeugen einer W\u00f6rterbuchdefinition sieht nicht l\u00e4nger nach einem Fehler aus. Die Statuszeile meldete, der Vorgang habe nicht abgeschlossen werden k\u00f6nnen, w\u00e4hrend die Definition einwandfrei geschrieben wurde. Jetzt zeigt sie den echten Fortschritt in Ihrer Sprache: in der Warteschlange, Korpus wird analysiert und Definition wird erzeugt.',
+    pt: 'Gerar uma defini\u00e7\u00e3o do dicion\u00e1rio j\u00e1 n\u00e3o parece uma falha. A linha de estado anunciava que a opera\u00e7\u00e3o n\u00e3o p\u00f4de ser conclu\u00edda enquanto a defini\u00e7\u00e3o se escrevia sem problemas. Agora mostra o progresso real no seu idioma: em fila, a analisar o corpus e a gerar a defini\u00e7\u00e3o.',
+    'pt-BR': 'Gerar uma defini\u00e7\u00e3o do dicion\u00e1rio n\u00e3o parece mais uma falha. A linha de status anunciava que a opera\u00e7\u00e3o n\u00e3o p\u00f4de ser conclu\u00edda enquanto a defini\u00e7\u00e3o era escrita sem problemas. Agora ela mostra o progresso real no seu idioma: na fila, analisando o corpus e gerando a defini\u00e7\u00e3o.',
+  },
+];
+
+/**
  * v5.1.6 stands on its own with the three changes that are actually new: a
  * custom OpenAI-compatible provider in Settings, and the two translation
  * repairs for progress bars and main-process errors. The order below is the
@@ -2518,6 +2537,11 @@ const RELEASE_5_1_6_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.1.7',
+    date: '2026-09-04',
+    highlights: RELEASE_5_1_7_HIGHLIGHTS,
+  },
   {
     version: '5.1.6',
     date: '2026-09-03',

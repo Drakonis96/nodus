@@ -166,6 +166,9 @@ const RELEASE_5_1_0_IT = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.1.7": [
+    "Generare una definizione del dizionario non sembra più un errore. La riga di stato annunciava che l’operazione non poteva essere completata mentre la definizione veniva scritta senza problemi. Ora mostra l’avanzamento reale nella tua lingua: in coda, analisi del corpus e generazione della definizione.",
+  ],
   "5.1.6": [
     "Le barre di avanzamento parlano ora la tua lingua. Le righe di indicizzazione, embedding, passaggi, coda e importazione di Zotero appaiono tradotte nelle otto lingue. I falsi avvisi di errore non compaiono più quando va tutto bene e i nomi delle tue biblioteche e opere restano esattamente come sono.",
     "Gli errori del processo principale arrivano ora tradotti nella tua lingua. Più di mille messaggi che apparivano in spagnolo o come avviso generico spiegano ora la loro causa reale. Il test di connessione lo mostra bene. Se Ollama non risponde, vedrai il suo indirizzo, il codice HTTP e la domanda se è in esecuzione.",

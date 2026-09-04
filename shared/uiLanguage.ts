@@ -695,6 +695,16 @@ export const PROGRESS_STATE_MESSAGES = [
   'La obra ya no existe.',
 ];
 
+/** Dictionary generation status copy is translated by DictionaryView. */
+export const DICTIONARY_PROGRESS_MESSAGES = [
+  'En cola',
+  'Analizando corpus',
+  'Generando definición',
+  'Definición generada',
+  'La síntesis necesita revisión',
+  'Error al generar',
+];
+
 /**
  * The Zotero import readout, exactly as `electron/library/zoteroLibraryImport.ts`
  * writes it.
@@ -733,6 +743,7 @@ const RENDERER_TRANSLATED_MESSAGES = new Set([
   ...IMAGE_GENERATION_ERROR_MESSAGES,
   ...ZOTERO_IMPORT_PROGRESS_MESSAGES,
   ...PROGRESS_STATE_MESSAGES,
+  ...DICTIONARY_PROGRESS_MESSAGES,
   'Bóveda no encontrada.',
   'No se encontró la bóveda de origen de las claves API.',
   'Esta bóveda ya está cargada.',

@@ -24,16 +24,28 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
+  // 5.1.7 is a single-fix release: the Dictionary status line reported a failure
+  // while the definition was being written correctly, because its progress copy
+  // travelled in a `message` field the main-process localizer rewrote.
+  const currentRelease = RELEASE_NOTES[0];
+  assert.equal(currentRelease?.version, '5.1.7');
+  assert.equal(currentRelease?.date, '2026-09-04');
+  assert.equal(currentRelease?.highlights.length, 1);
+  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['languages']);
+  for (const phrase of [
+    /Generating a dictionary definition no longer looks like a failure/,
+    /queued, analysing corpus and generating definition/,
+  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+
   // 5.1.6 stands alone with the three changes that are actually new: a custom
   // OpenAI-compatible provider plus the progress-bar and main-process error
   // translations. The scope order below is also the rendered order, because the
   // modal puts the largest scope cluster first and `languages` carries two of
   // the three.
-  const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.1.6');
-  assert.equal(currentRelease?.date, '2026-09-03');
-  assert.equal(currentRelease?.highlights.length, 3);
-  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
+  const release516 = RELEASE_NOTES.find((note) => note.version === '5.1.6');
+  assert.equal(release516?.date, '2026-09-03');
+  assert.equal(release516?.highlights.length, 3);
+  assert.deepEqual(release516?.highlights.map((highlight) => highlight.scope), [
     'languages', 'languages', 'ai',
   ]);
   for (const phrase of [
@@ -43,7 +55,7 @@ try {
     /More than a thousand messages/,
     /Settings gains a custom provider compatible with the OpenAI API/,
     /adding nothing to the path/,
-  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+  ]) assert.ok(release516?.highlights.some((highlight) => phrase.test(highlight.en)));
 
   // 5.1.5 deliberately duplicated the 5.1.4 modal for its focused hotfix.
   const release515 = RELEASE_NOTES.find((note) => note.version === '5.1.5');

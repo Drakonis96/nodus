@@ -35,7 +35,7 @@ execFileSync(
 
 const require = createRequire(import.meta.url);
 const mod = require(bundle);
-const { localizeIpcPayload, localizeRuntimeError } = mod;
+const { DICTIONARY_PROGRESS_MESSAGES, localizeIpcPayload, localizeRuntimeError } = mod;
 
 /**
  * The original implementation, kept as the correctness oracle. It needs the
@@ -196,6 +196,18 @@ try {
     const payload = { ok: false, message: 'Algo salió mal en el proceso.' };
     const out = localizeIpcPayload(payload, 'es');
     assert.deepEqual(out, payload, 'Spanish output must be unchanged in value');
+  }
+
+  // --- 8. Dictionary progress is UI copy, not a runtime failure -----------
+  for (const language of LANGUAGES) {
+    for (const message of DICTIONARY_PROGRESS_MESSAGES) {
+      const payload = { message };
+      assert.equal(
+        localizeIpcPayload(payload, language),
+        payload,
+        `Dictionary progress must reach DictionaryView intact in ${language}: ${message}`
+      );
+    }
   }
 
   console.log('# localize IPC payload tests passed');
