@@ -3406,12 +3406,12 @@ select.input optgroup {
   background: rgb(64 64 64 / 0.7);
 }
 .library-scope-button:focus-visible {
-  outline: 2px solid #818cf8;
+  outline: 2px solid var(--a-400, #818cf8);
   outline-offset: 1px;
 }
 .library-scope-button.is-active {
   color: #ffffff;
-  background: #4f46e5;
+  background: var(--a-600, #4f46e5);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.24);
 }
 .library-scope-button:disabled { cursor: wait; opacity: 0.65; }
@@ -3456,7 +3456,7 @@ select.input optgroup {
 }
 .light .library-scope-button.is-active {
   color: #ffffff;
-  background: #4f46e5;
+  background: var(--a-600, #4f46e5);
 }
 .light .library-scope-tooltip {
   border-color: #d4d4d4;
@@ -3533,9 +3533,10 @@ select.input optgroup {
 .library-action-menu-badge.is-beta { color: #fcd34d; background: rgb(245 158 11 / 0.16); }
 .library-action-menu-badge.is-recommended { color: #6ee7b7; background: rgb(16 185 129 / 0.14); }
 /* The way back into the Library guide. It is the one glyph-only button in a row of
-   labelled ones, so it takes the active vault's accent (handed in as
-   --library-help-accent) instead of the shared neutral outline. */
+   labelled ones, so it takes the theme accent (--library-help-accent defaults to
+   the --a-500 ramp step) instead of the shared neutral outline. */
 .library-help-button {
+  --library-help-accent: var(--a-500, #6366f1);
   --library-help-glyph: color-mix(in srgb, var(--library-help-accent) 62%, #ffffff);
   display: inline-flex;
   min-width: 2.25rem;
