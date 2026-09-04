@@ -35,7 +35,7 @@ import {
 } from '../navigation';
 import { t, tx } from '../i18n';
 import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
-import { vaultTypeColor } from '@shared/vaultTypes';
+
 import { DOCUMENT_INDEX_MANAGER_VISIBLE } from '@shared/documentIndexPolicy';
 import type { LibraryVaultSnapshot, ListPlacement } from '../app/viewSnapshots';
 
@@ -1189,7 +1189,6 @@ export function Library({
             data-testid="library-open-tutorial"
             type="button"
             className="library-help-button"
-            style={{ ['--library-help-accent' as string]: vaultTypeColor(vaultType) }}
             onClick={onOpenTutorial}
             aria-label={t('Cómo funciona la Biblioteca')}
             title={t('Cómo funciona la Biblioteca')}
