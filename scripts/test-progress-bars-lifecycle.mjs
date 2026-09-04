@@ -23,6 +23,13 @@ test('finished lower bars use semantic SVG status icons instead of destructive t
   }
 });
 
+test('the scan queue reaches 100% only when its dismiss tick is available', async () => {
+  const queue = await source('QueueBar.tsx');
+  assert.match(queue, /const pct = maintenanceRunning \? \(total \? Math\.min\(itemPct, 99\) : 99\) : itemPct/);
+  assert.match(queue, /const terminal = !active && !maintenanceError/);
+  assert.match(queue, /\{terminal && \([\s\S]*?<Icon name=\{failed > 0 \? 'warning' : 'check'\}/);
+});
+
 test('every persistent processing rail exposes total time and its current item time where applicable', async () => {
   const names = [
     'QueueBar.tsx',

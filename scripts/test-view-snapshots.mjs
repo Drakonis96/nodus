@@ -57,6 +57,7 @@ const store = bundleOf('src/app/viewSnapshots.ts', 'viewSnapshots.cjs');
 const preferences = bundleOf('src/app/filterPreferences.ts', 'filterPreferences.cjs');
 const { topAnchorId } = bundleOf('src/listPlacement.ts', 'listPlacement.cjs');
 const { readingBlocks, topBlockIndex } = bundleOf('src/readingPlace.ts', 'readingPlace.cjs');
+const { groupParenthesizedCitations } = bundleOf('src/markdownCitationGroups.ts', 'markdownCitationGroups.cjs');
 
 test.after(async () => { await rm(bundleDir, { recursive: true, force: true }); });
 
@@ -547,11 +548,63 @@ test('Deep Research restores its gallery, the report it was left in and the plac
   }
 });
 
+test('parentheses and a citation pill wrap as one unit', () => {
+  const citation = {
+    type: 'element',
+    tagName: 'a',
+    properties: { href: 'nodus://idea/cita-1' },
+    children: [{ type: 'text', value: 'Moreno Garrido, A. (2012)' }],
+  };
+  const tree = {
+    type: 'root',
+    children: [
+      { type: 'element', tagName: 'p', properties: {}, children: [
+        { type: 'text', value: 'Texto anterior (' },
+        citation,
+        { type: 'text', value: '), texto posterior' },
+      ] },
+    ],
+  };
+
+  groupParenthesizedCitations(tree);
+
+  assert.equal(tree.children[0].children[0].value, 'Texto anterior ');
+  assert.equal(tree.children[0].children[2].value, ', texto posterior');
+  assert.deepEqual(tree.children[0].children[1], {
+    type: 'element',
+    tagName: 'span',
+    properties: { className: ['citation-group'] },
+    children: [
+      { type: 'text', value: '(' },
+      citation,
+      { type: 'text', value: ')' },
+    ],
+  });
+});
+
+test('the citation grouping transform leaves ordinary links and bare citations untouched', () => {
+  for (const [href, before, after] of [
+    ['https://example.com', '(', ')'],
+    ['nodus://idea/cita-1', 'sin paréntesis ', ' al final'],
+  ]) {
+    const tree = { type: 'p', children: [
+      { type: 'text', value: before },
+      { type: 'element', tagName: 'a', properties: { href }, children: [] },
+      { type: 'text', value: after },
+    ] };
+    const original = structuredClone(tree);
+    groupParenthesizedCitations(tree);
+    assert.deepEqual(tree, original);
+  }
+});
+
 test('the Deep Research reader has persistent typography and a live report outline', async () => {
-  const [view, css, shared] = await Promise.all([
+  const [view, css, shared, markdown, citationGroups] = await Promise.all([
     readSource('src/views/DeepResearchView.tsx'),
     readSource('src/index.css'),
     readSource('src/views/writingShared.tsx'),
+    readSource('src/components/Markdown.tsx'),
+    readSource('src/markdownCitationGroups.ts'),
   ]);
   assert.match(view, /READER_FONT_STORAGE_KEY = 'nodus\.deepResearch\.readerFontSize'/);
   assert.match(view, /data-testid="deep-research-font-decrease"/);
@@ -567,6 +620,9 @@ test('the Deep Research reader has persistent typography and a live report outli
   assert.match(css, /\.deep-research-reader-document \.md \{[\s\S]*?font-size: var\(--deep-research-font-size, 16px\)/);
   assert.match(css, /overflow-wrap: normal;\s*word-break: normal;\s*hyphens: none;/);
   assert.match(css, /\.deep-research-reader-document \.md :is\(a, code, \.citation-link\)[\s\S]*?overflow-wrap: anywhere/);
+  assert.match(citationGroups, /function groupParenthesizedCitations\(tree:[\s\S]*?className: \['citation-group'\]/, 'citation punctuation is grouped with its pill');
+  assert.match(markdown, /rehypePlugins=\{\[rehypeKatex, rehypeGroupParenthesizedCitations\]\}/, 'the citation grouping transform runs in rendered Markdown');
+  assert.match(css, /\.md \.citation-group \{\s*display: inline-block;\s*white-space: nowrap;/, 'a parenthesized citation wraps as one inline unit');
   assert.doesNotMatch(shared, /text-justify hyphens-auto/, 'justified report prose does not hyphenate words behind the reader');
   assert.match(shared, /icon="copyText"\s*label=\{t\('Copiar sin referencias'\)\}/, 'plain-text copy uses a text-copy mark');
   assert.doesNotMatch(shared, /icon="volume"\s*label=\{t\('Copiar sin referencias'\)\}/, 'plain-text copy is not presented as audio');

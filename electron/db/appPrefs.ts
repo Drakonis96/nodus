@@ -33,6 +33,9 @@ export const GLOBAL_PREF_KEYS = [
   'highContrast',
   'reduceMotion',
   'readingFocusMode',
+  // Toolkit pins are a user preference, not vault content. Their position stays
+  // in each vault's sidebarOrder, but the chosen shortcuts follow vault switches.
+  'toolkitPinnedPages',
   'announcementsEnabled',
   'betaUpdates',
   'favorites',

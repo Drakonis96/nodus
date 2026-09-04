@@ -19,6 +19,7 @@ import type { LibraryApi } from './api/library';
 import type { RadarApi } from './api/radar';
 import type { CompassApi } from './api/compass';
 import type { LibraryAttachmentRecord } from './libraryTypes';
+import type { ToolkitToolPage } from './toolkitNavigation';
 
 export type {
   LibraryAttachmentRecord,
@@ -2153,6 +2154,8 @@ export interface AppSettings {
    * `sidebarHidden` and this flips true, so their choice is respected thereafter.
    */
   sidebarCustomized: boolean;
+  /** Toolkit destinations explicitly pinned as independent sidebar shortcuts. */
+  toolkitPinnedPages: ToolkitToolPage[];
   /** Default wooden frame design for the genealogy tree (per-person overrides win). */
   treeFrame: string;
   /** Person used as the relative centre for every displayed and AI-visible kinship tag. */

@@ -162,6 +162,28 @@ class ScanQueue {
     this.items.push(item);
   }
 
+  /**
+   * The queue is an operational view, not an attempt log. Starting the same step
+   * again supersedes its completed/failed/cancelled row; keeping those rows made a
+   * successful third attempt still look like two actionable failures.
+   */
+  private dropSupersededAttempts(nodusId: string, kind: QueueKind): void {
+    const staleIds = this.items
+      .filter((item) =>
+        item.nodus_id === nodusId
+        && item.kind === kind
+        && (item.state === 'done' || item.state === 'failed' || item.state === 'cancelled')
+      )
+      .map((item) => item.id);
+    if (staleIds.length === 0) return;
+    const stale = new Set(staleIds);
+    this.items = this.items.filter((item) => !stale.has(item.id));
+    for (const id of stale) {
+      this.retries.delete(id);
+      this.notifiedTerminalIds.delete(id);
+    }
+  }
+
   enqueue(nodusId: string, title: string, kind: QueueKind, model?: ModelRef | null, opts?: { chain?: boolean; refresh?: boolean }): void {
     // Avoid duplicate pending/running jobs for the same work+kind.
     const existing = this.items.find(
@@ -173,6 +195,7 @@ class ScanQueue {
       if (opts?.refresh) existing.refresh = true;
       return;
     }
+    this.dropSupersededAttempts(nodusId, kind);
     this.beginTask();
     if (kind === 'deep') setDeepPending(nodusId);
     this.insertPending({
@@ -200,6 +223,7 @@ class ScanQueue {
       else if (existing.scopeNodusIds) existing.scopeNodusIds = [...new Set([...existing.scopeNodusIds, ...scopeNodusIds])];
       return;
     }
+    this.dropSupersededAttempts('', 'bridge');
     this.beginTask();
     this.insertPending({
       id: uuid(),

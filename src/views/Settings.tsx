@@ -50,7 +50,7 @@ import { LocalAiModelsSettings } from '../components/LocalAiModelsSettings';
 import { LocalImageModelSettings } from '../components/LocalImageModelSettings';
 import { McpConnectionModal } from '../components/McpConnectionModal';
 import { CloudflareDeployModal } from '../components/CloudflareDeployModal';
-import { dedicatedVaultNavIds, NAV_GROUPS, navItemLabel, orderSidebarItems, orderedNav } from '../navigation';
+import { dedicatedVaultNavIds, groupedNav, NAV_GROUPS, navItemLabel, orderSidebarItems, orderedNav } from '../navigation';
 import { teachingItemId, TEACHING_GROUPS } from '../components/TeachingSidebar';
 import { WORLDBUILDING_GROUPS } from '../components/WorldbuildingSidebar';
 import { TESTIMONY_GROUPS } from '../components/TestimonySidebar';
@@ -1326,6 +1326,7 @@ export function Settings({
             <SidebarOrderEditor
               sidebarOrder={settings.sidebarOrder}
               sidebarHidden={effectiveSidebarHidden(settings.sidebarHidden, settings.sidebarCustomized, activeVault?.type)}
+              toolkitPinnedPages={settings.toolkitPinnedPages}
               vaultType={activeVault?.type}
               onReorder={(ids) => void patch({ sidebarOrder: ids })}
               onToggleHidden={(hidden) => void patch({ sidebarHidden: hidden, sidebarCustomized: true })}
@@ -3589,12 +3590,14 @@ function NodusServerGuideModal({ onOpenGuide, onClose }: { onOpenGuide: () => vo
 function SidebarOrderEditor({
   sidebarOrder,
   sidebarHidden,
+  toolkitPinnedPages,
   vaultType,
   onReorder,
   onToggleHidden,
 }: {
   sidebarOrder: string[];
   sidebarHidden: string[];
+  toolkitPinnedPages: AppSettings['toolkitPinnedPages'];
   vaultType: VaultType | undefined;
   onReorder: (ids: string[]) => void;
   onToggleHidden: (hidden: string[]) => void;
@@ -3602,7 +3605,11 @@ function SidebarOrderEditor({
   type EditorItem = { id: string; label: string; icon: string; group: string };
   type EditorGroup = { id: string; label: string; items: EditorItem[] };
 
-  const toolkit = orderedNav(sidebarOrder).find((item) => item.id === 'toolkit');
+  // Use the exact same resolved Tools group as the real sidebar. Pinned Toolkit
+  // pages therefore inherit the catalogue's icon/name and can be hidden, dragged,
+  // or moved with the arrow controls like every other sidebar entry.
+  const universalTools = groupedNav(sidebarOrder, [], toolkitPinnedPages)
+    .find((group) => group.id === 'tools');
   let groups: EditorGroup[];
   if (vaultType === 'docencia') {
     groups = TEACHING_GROUPS.map((group) => ({
@@ -3647,11 +3654,12 @@ function SidebarOrderEditor({
         .map((item) => ({ ...item, label: navItemLabel(item, vaultType), group: group.id })),
     }));
   }
-  if ((vaultType === 'docencia' || vaultType === 'worldbuilding' || vaultType === 'testimonios') && toolkit) {
-    const tools = NAV_GROUPS.find((group) => group.id === 'tools')!;
+  groups = groups.filter((group) => group.id !== 'tools');
+  if (universalTools?.items.length) {
     groups.push({
-      ...tools,
-      items: [{ ...toolkit, group: tools.id }],
+      id: universalTools.id,
+      label: universalTools.label,
+      items: universalTools.items.map((item) => ({ ...item, group: universalTools.id })),
     });
   }
   groups = groups.filter((group) => group.items.length > 0);

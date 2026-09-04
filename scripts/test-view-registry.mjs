@@ -48,10 +48,12 @@ test('every view has a renderer and every renderer is a view', () => {
 
 test('App.tsx renders through the registry and holds no view chain of its own', () => {
   const app = readSource('src/App.tsx');
-  assert.match(app, /\{VIEW_REGISTRY\[view\]\(viewContext\)\}/);
-  // The four that remain are sidebar active-state checks, not dispatch.
-  const branches = [...app.matchAll(/view === /g)].length;
-  assert.ok(branches <= 6, `App.tsx still dispatches on view ${branches} times`);
+  const main = app.match(/^\s*<main\b[^>]*>([\s\S]*?)<\/main>/m)?.[1];
+  assert.ok(main, 'App.tsx must have a main content region');
+  // Sidebar active states and browser effects legitimately compare views. Check
+  // the content region instead of imposing a global budget on those comparisons.
+  assert.doesNotMatch(main, /\bview\s*===|===\s*view\b|switch\s*\(\s*view\s*\)/);
+  assert.match(main, /<AppErrorBoundary key=\{view\}>\s*\{VIEW_REGISTRY\[view\]\(viewContext\)\}\s*<\/AppErrorBoundary>/);
   // The crash boundary and the lazy fallback stay around the registry, not inside it.
   assert.match(app, /<AppErrorBoundary key=\{view\}>/);
   assert.match(app, /<Suspense fallback=/);

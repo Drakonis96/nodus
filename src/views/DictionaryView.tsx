@@ -1098,8 +1098,10 @@ export function DictionaryView({
         setEntries(page.items);
         setTotal(page.total);
         setFacets(nextFacets);
+        return true;
       } catch (reason) {
         setError(message(reason));
+        return false;
       } finally {
         if (foreground) setLoading(false);
       }
@@ -1146,11 +1148,18 @@ export function DictionaryView({
       .then((jobs) => {
         if (!alive) return;
         setGenerationJobs((current) => {
-          const next = new Map(jobs.map((job) => [job.entryId, job]));
+          // A successful job has already committed the entry's persistent
+          // lifecycle status. Rehydrating that terminal progress would cover
+          // "Active" with "Generated" for the rest of the app session.
+          const next = new Map(
+            jobs
+              .filter((job) => job.phase !== "done")
+              .map((job) => [job.entryId, job]),
+          );
           // Events received while the IPC round-trip was in flight are newer than
           // the returned snapshot and must win.
           for (const [entryId, progress] of current) {
-            next.set(entryId, progress);
+            if (progress.phase !== "done") next.set(entryId, progress);
           }
           return next;
         });
@@ -1175,7 +1184,21 @@ export function DictionaryView({
           next.set(progress.entryId, progress);
           return next;
         });
-        if (["done", "degraded"].includes(progress.phase)) void reload(false);
+        if (progress.phase === "done") {
+          // Keep the completion tick only until the saved entry has been read
+          // back. Afterwards its real status (normally Active) owns the column.
+          void reload(false).then((reloaded) => {
+            if (!reloaded) return;
+            setGenerationJobs((current) => {
+              if (current.get(progress.entryId)?.phase !== "done") return current;
+              const next = new Map(current);
+              next.delete(progress.entryId);
+              return next;
+            });
+          });
+        } else if (progress.phase === "degraded") {
+          void reload(false);
+        }
       }),
     [reload],
   );
@@ -1679,7 +1702,11 @@ function DictionaryGenerationState({
   progress?: DictionaryProgress;
   status: DictionaryEntryStatus;
 }) {
-  if (!progress) return <StatusPill status={status} />;
+  // Defensively prefer the persisted lifecycle once a successful generation has
+  // already activated (or preserved the archived state of) the entry.
+  if (!progress || (progress.phase === "done" && status !== "draft")) {
+    return <StatusPill status={status} />;
+  }
   if (progress.phase === "failed") {
     return (
       <span

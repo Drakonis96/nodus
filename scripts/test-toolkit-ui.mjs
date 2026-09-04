@@ -59,9 +59,9 @@ test('every sidebar icon stays unique so a collapsed sidebar keeps sections apar
   assert.equal(icons.filter((icon) => icon === 'tools').length, 1, 'the tools icon belongs to the toolkit alone');
 });
 
-test('the toolkit icons exist in the shared catalogue', async () => {
+test('the toolkit and pin icons exist in the shared catalogue', async () => {
   const ui = await read('src/components/ui.tsx');
-  for (const icon of ['tools', 'swap', 'shield', 'scanText', 'presentation', 'languages', 'chevronLeft']) {
+  for (const icon of ['tools', 'swap', 'shield', 'scanText', 'presentation', 'languages', 'chevronLeft', 'pin']) {
     assert.match(ui, new RegExp(`\\n\\s{2}${icon}: '`), `${icon} is defined in ICON_PATHS`);
   }
 });
@@ -87,6 +87,52 @@ test('the toolkit shows in every vault type, including databases and study', () 
   assert.deepEqual(tools.items.map((n) => n.id), ['browser', 'radar', 'compass', 'toolkit']);
 });
 
+test('pinned Toolkit pages become reorderable sidebar shortcuts with their catalogue icons', () => {
+  const pinned = navigation.pinnedToolkitSidebarItems(['apps', 'ocr', 'apps', 'unknown']);
+  assert.deepEqual(
+    pinned.map(({ id, label, icon, toolkitPage }) => ({ id, label, icon, toolkitPage })),
+    [
+      { id: 'toolkit:apps', label: 'Nodus Apps', icon: 'grid', toolkitPage: 'apps' },
+      { id: 'toolkit:ocr', label: 'OCR Workspace', icon: 'scanText', toolkitPage: 'ocr' },
+    ],
+  );
+
+  const defaultTools = navigation.groupedNav([], [], ['apps', 'ocr']).find((group) => group.id === 'tools');
+  assert.deepEqual(
+    defaultTools.items.map((item) => item.id),
+    ['browser', 'radar', 'compass', 'toolkit', 'toolkit:apps', 'toolkit:ocr'],
+    'new pins start beside the Nodus Tools catalogue',
+  );
+
+  const reordered = navigation.groupedNav(
+    ['browser', 'toolkit:ocr', 'radar', 'toolkit', 'toolkit:apps', 'compass'],
+    [],
+    ['apps', 'ocr'],
+  ).find((group) => group.id === 'tools');
+  assert.deepEqual(
+    reordered.items.map((item) => item.id),
+    ['browser', 'toolkit:ocr', 'radar', 'toolkit', 'toolkit:apps', 'compass'],
+    'the Settings order applies to parent sections and pinned tools together',
+  );
+});
+
+test('the Toolkit hub, real sidebar and Settings editor share the pin contract', async () => {
+  const [view, app, settings, defaults, appPrefs] = await Promise.all([
+    read('src/views/ToolkitView.tsx'),
+    read('src/App.tsx'),
+    read('src/views/Settings.tsx'),
+    read('electron/db/settingsRepo.ts'),
+    read('electron/db/appPrefs.ts'),
+  ]);
+  assert.match(view, /onTogglePinned=\{\(\) => void togglePinned\(tool\.page\)\}/);
+  assert.match(app, /settings\?\.toolkitPinnedPages \?\? \[\]/, 'the real sidebar resolves the saved pins');
+  assert.match(app, /setToolkitPage\(n\.toolkitPage\)[\s\S]*?setView\('toolkit'\)/, 'a shortcut opens its nested Toolkit page');
+  assert.match(settings, /groupedNav\(sidebarOrder, \[\], toolkitPinnedPages\)/, 'Settings uses the real Tools group');
+  assert.match(settings, /toolkitPinnedPages=\{settings\.toolkitPinnedPages\}/, 'Settings receives the persistent pin set');
+  assert.match(defaults, /toolkitPinnedPages: \[\]/, 'existing profiles start with no pinned tools');
+  assert.match(appPrefs, /'toolkitPinnedPages'/, 'pins follow the user when switching vaults');
+});
+
 test('the hub renders every built tool including Nodus Translate', async () => {
   const view = await read('src/views/ToolkitView.tsx');
   assert.ok(view.includes('data-testid="toolkit-home"'), 'the hub is addressable');
@@ -107,6 +153,10 @@ test('the hub renders every built tool including Nodus Translate', async () => {
   );
   assert.match(view, /name=\{tool\.name\}/, 'the card shows the brand name verbatim, never through t()');
   assert.match(view, /description=\{t\(tool\.description\)\}/, 'only the description is translated');
+  assert.match(view, /data-testid=\{`\$\{testid\}-pin`\}/, 'every card exposes its pin control');
+  assert.match(view, /aria-pressed=\{pinned\}/, 'pin state is accessible');
+  assert.match(view, /toolkitPinnedPages:/, 'pinning persists the selected Toolkit page');
+  assert.match(view, /sidebarOrder: isPinned/, 'unpinning retires stale order entries');
 
   // Every tool is built and openable; none is coming soon.
   assert.deepEqual(
@@ -205,24 +255,19 @@ test('Protect exposes the complete local workflow and the secure preload boundar
   }
 });
 
-test('the toolkit has one sidebar entry and keeps its tools in the catalogue', async () => {
+test('Toolkit tools remain nested destinations even when pinned into the sidebar', async () => {
   const app = await read('@shell');
-  // The tools are NOT views: they must never enter NAV_ITEMS, or they would show
-  // up in sidebarOrder, the reordering UI and the vault-type allow-lists.
+  // The tools are NOT views: the optional shortcuts are namespaced ids and open
+  // the existing nested page, so vault-type allow-lists never need to grow.
   const toolPages = new Set(navigation.TOOLKIT_TOOLS.map((tool) => tool.page));
   assert.ok(
     !navigation.NAV_ITEMS.some((n) => toolPages.has(n.id)),
     'the tools stay out of the canonical nav table'
   );
   assert.doesNotMatch(app, /toolkitSubNav/, 'the sidebar does not render nested tool buttons');
-  assert.doesNotMatch(app, /nav-toolkit-/, 'tools are only addressable from the catalogue');
   assert.match(app, /if \(n\.id === 'toolkit'\) setToolkitPage\('home'\);/, 'the section button opens the catalogue');
-  // The section is highlighted only while its catalogue is on screen.
-  assert.match(
-    app,
-    /view === n\.id && \(n\.id !== 'toolkit' \|\| toolkitPage === 'home'\)/,
-    'the section and its open tool never highlight at once'
-  );
+  assert.match(app, /'toolkitPage' in n[\s\S]*?toolkitPage === n\.toolkitPage/, 'only the shortcut for the open tool is highlighted');
+  assert.match(app, /n\.id !== 'toolkit' \|\| toolkitPage === 'home'/, 'the catalogue entry is inactive inside a tool');
 });
 
 test('the hub cards share one shape and omit development labels', async () => {
@@ -230,7 +275,7 @@ test('the hub cards share one shape and omit development labels', async () => {
   // One ToolCard component renders every card, so they cannot drift apart.
   assert.equal((view.match(/<ToolCard\b/g) ?? []).length, 1, 'a single ToolCard renders the whole catalogue');
   assert.match(view, /grid gap-4 sm:grid-cols-2/, 'the cards use a two-column grid when space permits');
-  assert.match(view, /className=\{`flex h-full flex-col/, 'each card fills its grid cell');
+  assert.match(view, /className=\{`flex h-full w-full flex-col/, 'each card fills its grid cell');
   assert.match(view, /h-12 w-12 shrink-0 items-center justify-center/, 'the card icon sits in a fixed centred tile');
   assert.doesNotMatch(view, /t\('En desarrollo'\)/, 'available apps do not show a development label');
   assert.match(view, /disabled && \(/, 'only unavailable tools render a status label');

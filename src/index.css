@@ -3819,6 +3819,10 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 
 /* NotebookLM-style inline source citation. Rendered as a small pill that opens a
    source modal instead of navigating. */
+.md .citation-group {
+  display: inline-block;
+  white-space: nowrap;
+}
 .md .citation-link {
   display: inline-flex;
   align-items: center;

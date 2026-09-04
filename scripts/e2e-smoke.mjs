@@ -1147,6 +1147,25 @@ try {
     assert.equal(centring.square, true, `${testId} icon tile is square`);
     assert.ok(centring.dx <= 0.5 && centring.dy <= 0.5, `${testId} icon is centred (dx ${centring.dx}, dy ${centring.dy})`);
   }
+  // A card pin creates a real direct shortcut, using the exact same catalogue
+  // icon, and that shortcut opens the nested page without turning it into a View.
+  const ocrPin = page.getByTestId('toolkit-card-aiocr-pin');
+  assert.equal(await ocrPin.getAttribute('aria-pressed'), 'false', 'OCR starts unpinned');
+  await ocrPin.click();
+  await page.waitForFunction(() => document.querySelector('[data-tour="nav-toolkit:ocr"]'));
+  assert.equal(await ocrPin.getAttribute('aria-pressed'), 'true', 'the card reflects its saved pin');
+  const ocrShortcut = page.locator('[data-tour="nav-toolkit:ocr"]');
+  assert.equal(
+    await ocrShortcut.locator('svg').innerHTML(),
+    await page.getByTestId('toolkit-card-aiocr').locator('span svg').first().innerHTML(),
+    'the shortcut reuses the OCR catalogue icon',
+  );
+  await ocrShortcut.click();
+  await page.getByTestId('aiocr-home').waitFor({ timeout: 10_000 });
+  await page.getByTestId('toolkit-aiocr-back').click();
+  await page.getByTestId('toolkit-home').waitFor();
+  await page.getByTestId('toolkit-card-aiocr-pin').click();
+  await ocrShortcut.waitFor({ state: 'detached' });
   // Nodus Apps opens its beginner-facing catalogue and executes both curated
   // multilingual apps in the real sandbox before exercising app management.
   assert.equal(await page.getByTestId('toolkit-card-apps').isDisabled(), false, 'Nodus Apps opens');

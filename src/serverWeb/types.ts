@@ -179,6 +179,7 @@ export type PortableProfileValues = {
     sidebarOrder: string[];
     sidebarHidden: string[];
     sidebarCustomized: boolean;
+    toolkitPinnedPages: string[];
     aiConcurrencyMode: 'automatic' | 'manual';
     aiConcurrencyVersion: number;
     concurrency: number;
