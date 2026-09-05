@@ -584,9 +584,9 @@ function ConnectedIdeaRow({
   const edgeLabel = t(EDGE_LABELS[edge.type as keyof typeof EDGE_LABELS]) ?? edge.type;
 
   return (
-    <div className={`card overflow-hidden ${open ? 'ring-1 ring-indigo-500/40' : ''}`}>
+    <div className="border-b border-neutral-800/80 pb-2 last:border-b-0">
       <button
-        className="w-full text-left p-2.5 hover:bg-neutral-800/60 transition-colors"
+        className={`w-full rounded-lg p-2.5 text-left transition-colors hover:bg-neutral-800/60 ${open ? 'bg-neutral-900/70' : ''}`}
         onClick={toggle}
         aria-expanded={open}
       >
@@ -606,7 +606,7 @@ function ConnectedIdeaRow({
       </button>
 
       {open && (
-        <div className="border-t border-neutral-800 bg-neutral-950/40 p-2.5">
+        <div className="px-2.5 pt-2.5">
           {loading && (
             <div className="animate-pulse space-y-2">
               <div className="h-3 w-2/3 rounded bg-neutral-800" />
