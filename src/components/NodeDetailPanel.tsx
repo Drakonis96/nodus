@@ -475,8 +475,8 @@ export function OccurrenceCard({ occurrence }: { occurrence: IdeaDetail['occurre
       </div>
       <p className="text-xs text-neutral-400 mt-1 leading-relaxed">{occurrence.development}</p>
       {summary && (
-        <div className="mt-2 rounded border border-violet-900/60 bg-violet-950/15 p-2 text-xs leading-relaxed text-neutral-300">
-          <div className="mb-1 text-[10px] font-medium uppercase text-violet-200">{t('Resumen (orientación)')}</div>
+        <div className="mt-2 border-l-2 border-violet-700 pl-2 text-xs leading-relaxed text-neutral-300">
+          <div className="mb-0.5 text-[10px] font-medium uppercase text-violet-300">{t('Resumen (orientación)')}</div>
           {summary.summary}
           <div className="mt-1 text-[10px] text-neutral-500">{t('No es evidencia citable.')}</div>
         </div>
