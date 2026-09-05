@@ -1,6 +1,6 @@
 // Deep Research — a gallery of saved reports (grid/list, search, sort), a
-// chained generation queue, and an immersive reader that expands one report to
-// full width with a back button to the gallery. The heavy lifting (generation,
+// chained generation queue, and tabbed readers that expand reports to full width
+// with a persistent route back to the gallery. The heavy lifting (generation,
 // saving, citations) is shared with the Writing workshop via writingShared.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import type {
@@ -41,6 +41,7 @@ import type { DeepResearchSnapshot } from '../app/viewSnapshots';
 import { useListPlacement } from '../listPlacement';
 import { readingBlocks, topBlockIndex, useReadingPlace, type ReadingPlace } from '../readingPlace';
 import { HoverLabelButton, Icon, RestoringPane, modelLabel } from '../components/ui';
+import { WorkspaceTabStrip } from '../components/library/LibraryWorkspaceTabs';
 import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
 import { confirm } from '../components/feedback';
@@ -287,6 +288,12 @@ export function DeepResearchView({
     () => (snapshot?.surface === 'reader' && snapshot.openReport ? 'reader' : 'gallery')
   );
 
+  const [openIds, setOpenIds] = useState<string[]>(() => snapshot?.openIds ?? (snapshot?.openReport ? [snapshot.openReport.id] : []));
+  const readingById = useRef<Record<string, ReadingPlace | null>>({
+    ...snapshot?.readingById,
+    ...(snapshot?.openReport ? { [snapshot.openReport.id]: snapshot.reading } : {}),
+  });
+
   // Composer (new report) state.
   const [composerOpen, setComposerOpen] = useState(false);
   const [objective, setObjective] = useState('');
@@ -366,6 +373,9 @@ export function DeepResearchView({
     // empty, and saying so would erase the very report that is on its way back.
     if (reopening.current) return;
     report.current?.({
+      openIds,
+      readingById: { ...readingById.current },
+      reading: openDraft ? readingById.current[openDraft.id] ?? null : null,
       surface: mode,
       openReport: openDraft ? { id: openDraft.id, label: openDraft.title } : null,
       search,
@@ -373,7 +383,7 @@ export function DeepResearchView({
       sortKey,
       viewMode,
     });
-  }, [mode, openDraft, readFilter, search, sortKey, viewMode]);
+  }, [mode, openDraft, openIds, readFilter, search, sortKey, viewMode]);
 
   // The place inside the open report. Kept in a ref rather than in state because it
   // is written on every scroll frame and read only when the reader mounts.
@@ -539,8 +549,9 @@ export function DeepResearchView({
   };
 
   const openReader = (saved: WritingWorkshopSavedDraft) => {
-    // A place taken in another report is not a place in this one.
-    restoredReading.current = null;
+    if (mode === 'reader' && openDraft?.id === saved.id) return;
+    setOpenIds((ids) => ids.includes(saved.id) ? ids : [...ids, saved.id]);
+    restoredReading.current = readingById.current[saved.id] ?? null;
     setOpenDraft(saved);
     setMode('reader');
     setShowMatrix(false);
@@ -555,11 +566,54 @@ export function DeepResearchView({
     setFullscreen(false);
     setOpenDraft(null);
     restoredReading.current = null;
-    report.current?.({ reading: null });
+    report.current?.({ reading: null, readingById: { ...readingById.current } });
     setTranslationOpen(false);
     setAppliedTranslation(null);
+    setCitation(null);
+    setSavingToNotes(false);
     void refreshSavedDrafts();
   };
+
+  const closeReport = (id: string) => {
+    const remaining = openIds.filter((key) => key !== id);
+    setOpenIds(remaining);
+    delete readingById.current[id];
+    if (mode === 'reader' && openDraft?.id === id) {
+      const nextId = remaining[Math.min(openIds.indexOf(id), remaining.length - 1)];
+      const next = savedDrafts.find((draft) => draft.id === nextId);
+      if (next) openReader(next);
+      else backToGallery();
+    }
+  };
+
+  useEffect(() => {
+    if (!galleryRead) return;
+    setOpenIds((ids) => {
+      const remaining = ids.filter((id) => savedDrafts.some((draft) => draft.id === id));
+      return remaining.length === ids.length ? ids : remaining;
+    });
+  }, [galleryRead, savedDrafts]);
+
+  const workspaceTabs = (
+    <WorkspaceTabStrip
+      homeLabel={t(copy.heading)}
+      homeIcon="telescope"
+      homeTestId="deep-research-tab-home"
+      tabTestId={(tab) => `deep-research-tab-${tab.key}`}
+      closeTestId={(tab) => `deep-research-close-${tab.key}`}
+      tabs={openIds.flatMap((id) => {
+        const draft = savedDrafts.find((item) => item.id === id);
+        return draft ? [{ key: id, title: draft.title, icon: 'telescope' }] : [];
+      })}
+      activeKey={mode === 'reader' ? openDraft?.id ?? null : null}
+      onActivateHome={backToGallery}
+      onActivateTab={(id) => {
+        const draft = savedDrafts.find((item) => item.id === id);
+        if (draft) openReader(draft);
+      }}
+      onCloseTab={closeReport}
+    />
+  );
 
   const reusePrompt = (saved: WritingWorkshopSavedDraft) => {
     setObjective(saved.brief.objective);
@@ -845,16 +899,21 @@ export function DeepResearchView({
 
   if (mode === 'reader' && openDraft) {
     return (
-      <>
+      <div className="h-full flex flex-col min-h-0">
+        {workspaceTabs}
         {/* Full screen is the same reader lifted out of the shell: a fixed layer over
             the window, so the report and its own toolbar are all that is left on
-            screen. `display: contents` keeps the normal case exactly as it was. */}
-        <div className={fullscreen ? 'fixed inset-0 z-40 flex flex-col bg-neutral-950' : 'contents'} data-testid="deep-research-reader-shell" data-fullscreen={fullscreen ? 'on' : 'off'}>
+            screen. In the shell, the reader fills the space below the tabs. */}
+        <div className={fullscreen ? 'fixed inset-0 z-40 flex flex-col bg-neutral-950' : 'flex flex-col flex-1 min-h-0'} data-testid="deep-research-reader-shell" data-fullscreen={fullscreen ? 'on' : 'off'}>
           <ReaderView
+            key={openDraft.id}
             saved={openDraft}
             settings={settings}
             initialReading={restoredReading.current}
-            onReadingChange={(place) => report.current?.({ reading: place })}
+            onReadingChange={(place) => {
+              readingById.current[openDraft.id] = place;
+              report.current?.({ reading: place, readingById: { ...readingById.current } });
+            }}
             showMatrix={showMatrix}
             fullscreen={fullscreen}
             exporting={exporting}
@@ -906,12 +965,13 @@ export function DeepResearchView({
             onClose={() => setSavingToNotes(false)}
           />
         )}
-      </>
+      </div>
     );
   }
 
   return (
     <div className="h-full flex flex-col min-h-0">
+      {workspaceTabs}
       <SectionHeader
         icon="telescope"
         title={t(copy.heading)}

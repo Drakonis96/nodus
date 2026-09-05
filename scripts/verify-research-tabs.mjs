@@ -1,0 +1,110 @@
+// Start the renderer with: npx vite --config visual-tests/vite.config.ts --port 5197
+// Then run: node scripts/verify-research-tabs.mjs
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { mkdir } from 'node:fs/promises';
+import { chromium } from 'playwright-core';
+
+const base = process.env.NODUS_VISUAL_URL ?? 'http://127.0.0.1:5197';
+const output = path.resolve('artifacts/research-tabs');
+await mkdir(output, { recursive: true });
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const page = await browser.newPage({ viewport: { width: 1440, height: 960 }, deviceScaleFactor: 1 });
+const errors = [];
+page.on('pageerror', (error) => errors.push(error.message));
+const screenshot = async (name) => {
+  // Framer Motion animates with requestAnimationFrame, outside CSS animation controls.
+  await page.waitForTimeout(500);
+  await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
+  await page.screenshot({ path: path.join(output, name) });
+};
+try {
+  await page.goto(`${base}/visual-tests/research-tabs-harness.html`);
+  await page.getByRole('button', { name: 'Leer', exact: true }).first().click();
+  await page.getByTestId('deep-research-reader-document').waitFor();
+  await page.getByTestId('deep-research-tab-home').click();
+  await page.getByRole('button', { name: 'Leer', exact: true }).nth(1).click();
+  await page.getByTestId('deep-research-tab-report-0').click();
+  assert.equal(await page.getByRole('tab').count(), 3);
+  await page.getByTestId('deep-research-tab-report-0').click();
+  assert.equal(await page.getByRole('tab').count(), 3, 'opening a report twice reuses its tab');
+  const reader = page.getByTestId('deep-research-reader-document');
+  await reader.waitFor();
+  await reader.locator('..').evaluate(() => {
+    const main = document.querySelector('[data-testid="deep-research-reader-document"]').closest('main');
+    main.dispatchEvent(new WheelEvent('wheel', { deltaY: 600, bubbles: true }));
+    main.scrollTop = 600;
+  });
+  await page.waitForFunction(() => window.snapshots.research?.readingById?.['report-0']?.blockIndex > 0);
+  const block = await page.evaluate(() => window.snapshots.research.readingById['report-0'].blockIndex);
+  await page.getByTestId('deep-research-tab-report-1').click();
+  await page.getByTestId('deep-research-tab-report-0').click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="deep-research-reader-document"]').closest('main').scrollTop > 100);
+  assert.equal(await page.evaluate(() => window.snapshots.research.readingById['report-0'].blockIndex), block);
+  await page.evaluate(() => window.remount());
+  await page.getByTestId('deep-research-tab-report-0').waitFor();
+  assert.equal(await page.getByRole('tab').count(), 3, 'tabs survive a section remount');
+  await page.getByTestId('deep-research-tab-report-1').click();
+  await screenshot('deep-research-reader.png');
+  await page.getByTestId('deep-research-tab-home').click();
+  await screenshot('deep-research-gallery.png');
+  await page.getByPlaceholder('Buscar entre tus informes…').fill('Memoria');
+  await page.getByRole('button', { name: 'Vista lista', exact: true }).click();
+  await page.getByTestId('deep-research-tab-report-1').click();
+  await page.getByTestId('deep-research-tab-home').click();
+  assert.equal(await page.getByPlaceholder('Buscar entre tus informes…').inputValue(), 'Memoria');
+  assert.equal(await page.evaluate(() => window.snapshots.research.viewMode), 'list');
+  await page.getByPlaceholder('Buscar entre tus informes…').fill('');
+  await page.getByTestId('deep-research-tab-report-1').click();
+  await page.getByTestId('deep-research-close-report-0').click();
+  assert.equal(await page.getByTestId('deep-research-tab-report-1').getAttribute('aria-selected'), 'true', 'closing a background tab keeps the active report');
+  await page.getByTestId('deep-research-tab-report-1').press('Delete');
+  assert.equal(await page.getByRole('tab').count(), 0, 'closing the final tab returns to the original gallery');
+  await page.getByRole('button', { name: 'Leer', exact: true }).first().click();
+  await page.evaluate(() => window.removeReport('report-0'));
+  await page.getByRole('button', { name: 'Leer', exact: true }).first().waitFor();
+  assert.equal(await page.getByRole('tab').count(), 0, 'external deletion removes the tab and reader');
+
+  await page.goto(`${base}/visual-tests/research-tabs-harness.html?section=immersion`);
+  await page.getByRole('button', { name: 'Empezar', exact: true }).first().click();
+  await page.getByTestId('immersion-tab-home').click();
+  await page.getByRole('button', { name: 'Empezar', exact: true }).nth(1).click();
+  await page.getByTestId('immersion-tab-session-0').click();
+  assert.equal(await page.getByRole('tab').count(), 3);
+  await page.getByTestId('immersion-tab-session-0').press('ArrowRight');
+  assert.equal(await page.getByTestId('immersion-tab-session-1').getAttribute('aria-selected'), 'true');
+  assert.ok(await page.getByText('Paso 1 de 7', { exact: false }).count(), 'tab arrows do not advance the immersion');
+  await page.getByTestId('immersion-tab-session-1').press('Home');
+  assert.equal(await page.getByTestId('immersion-tab-home').getAttribute('aria-selected'), 'true');
+  await page.getByTestId('immersion-tab-home').press('End');
+  assert.equal(await page.getByTestId('immersion-tab-session-1').getAttribute('aria-selected'), 'true');
+  await screenshot('immersion-player.png');
+  await page.getByRole('button', { name: /Memoria e identidad/ }).last().click();
+  await page.getByText('Paso 2 de 7', { exact: false }).waitFor();
+  await page.getByTestId('immersion-tab-session-0').click();
+  await page.getByText('Paso 1 de 7', { exact: false }).waitFor();
+  await page.getByTestId('immersion-tab-session-1').click();
+  await page.getByText('Paso 2 de 7', { exact: false }).waitFor();
+  await page.evaluate(() => window.remount());
+  await page.getByText('Paso 2 de 7', { exact: false }).waitFor();
+  assert.equal(await page.getByRole('tab').count(), 3);
+  await page.getByTestId('immersion-tab-home').click();
+  await screenshot('immersion-gallery.png');
+  await page.getByPlaceholder('Buscar entre tus inmersiones…').fill('Patrimonio');
+  await page.getByRole('button', { name: 'Vista lista', exact: true }).click();
+  await page.getByTestId('immersion-tab-session-0').click();
+  await page.getByTestId('immersion-tab-home').click();
+  assert.equal(await page.getByPlaceholder('Buscar entre tus inmersiones…').inputValue(), 'Patrimonio');
+  assert.equal(await page.evaluate(() => window.snapshots.immersion.viewMode), 'list');
+  await page.getByPlaceholder('Buscar entre tus inmersiones…').fill('');
+  await page.getByTestId('immersion-tab-session-1').click();
+  await page.getByTestId('immersion-close-session-1').click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="immersion-tab-session-0"]')?.getAttribute('aria-selected') === 'true');
+  await page.getByTestId('immersion-close-session-0').click();
+  assert.equal(await page.getByRole('tab').count(), 0);
+  assert.deepEqual(errors, [], 'no runtime errors');
+  console.log('Research tabs: opening, deduplication, keyboard, closing, per-tab reading/progress, remount and deletion passed.');
+  console.log(`Screenshots: ${output}`);
+} finally {
+  await browser.close();
+}
