@@ -147,3 +147,8 @@ You can also visit the [interactive browser tour](https://nodusresearch.com/demo
 ## License
 
 Nodus 4.0.0 and later are licensed under the [GNU Affero General Public License v3.0](LICENSE), SPDX `AGPL-3.0-only`; published versions through 3.2.7 remain under the MIT License.
+
+Contributions require acceptance of the [Contributor License Agreement](CLA.md).
+Contributors retain ownership and grant the maintainer permission to sublicense
+and relicense their contributions, including under commercial terms. See
+[CONTRIBUTING.md](CONTRIBUTING.md#accepting-the-cla) for the acceptance process.

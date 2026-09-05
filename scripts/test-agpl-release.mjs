@@ -87,7 +87,9 @@ test('project licensing scope is machine-readable and historical MIT releases st
   assert.ok(exceptions.entries.length >= 4);
   assert.match(notices, /Versions through 3\.2\.7 remain\s+available under MIT/);
   assert.match(readme, /AGPL-3\.0-only/);
-  assert.match(contributing, /without an additional contributor license agreement/);
+  assert.match(contributing, /Contributions also require explicit acceptance/);
+  assert.match(contributing, /\[Nodus Research Contributor License Agreement\]\(CLA.md\)/);
+  assert.doesNotMatch(contributing, /without an additional contributor license agreement/);
   assert.match(privacy, /GNU Affero General Public License v3\.0 only/);
   assert.match(site, /AGPL-3\.0-only/);
   assert.doesNotMatch(site, /Nodus (?:is|es|est|è|ist|é).*\bMIT\b/);

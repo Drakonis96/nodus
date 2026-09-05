@@ -163,15 +163,50 @@ Keep each pull request focused on one coherent change. In the pull request:
 - Call out migrations, privacy effects, network access, or compatibility risks.
 - Update documentation and translations when behavior changes.
 
-All required CI checks must pass. Maintainers may ask for a smaller scope,
+All required CI checks, including **CLA / signature**, must pass. Every human
+author and coauthor must accept the [Contributor License Agreement](CLA.md)
+before a pull request can be merged. Maintainers may ask for a smaller scope,
 additional tests, or changes needed to preserve the project's privacy and
 evidence standards.
 
 ## Licensing
 
-By submitting a contribution, you agree that it may be distributed exclusively
-under the project's [GNU Affero General Public License v3.0](LICENSE), SPDX
-`AGPL-3.0-only`, without an additional contributor license agreement. You must
-have the right to submit the contribution and must preserve all applicable
-third-party notices. Published Nodus releases through 3.2.7 retain their MIT
-license.
+The public project uses the [GNU Affero General Public License v3.0](LICENSE),
+SPDX `AGPL-3.0-only`. Contributions also require explicit acceptance of the
+[Nodus Research Contributor License Agreement](CLA.md). You retain ownership
+and grant the maintainer permission to sublicense and relicense your Contribution,
+including under different open-source, source-available, or commercial terms.
+You must have the authority to grant these rights and preserve all applicable
+third-party notices. Previously merged contributions are not automatically
+covered. Published Nodus releases through 3.2.7 retain their MIT license.
+
+### Accepting the CLA
+
+1. Read [CLA.md](CLA.md).
+2. Open **CLA / signature → Details** in your pull request's checks.
+3. Copy the exact acceptance statement, including the document digest, from the
+   workflow summary and post it as a **new comment from your own GitHub account**
+   on the pull request. Do not edit an existing comment to sign.
+4. The workflow records the acceptance and rechecks open pull requests. You only
+   need to accept once for this exact agreement. Every other author and coauthor
+   must do the same; a maintainer cannot accept on another person's behalf.
+
+The check includes the pull request author and all commit authors and coauthors.
+Use commit email addresses associated with the correct GitHub accounts. Missing
+account mappings, incomplete contributor data, and unsigned accounts block the
+check. Maintainers must accept too. AI-assisted contributions are welcome: the
+person submitting them must review them, accept the CLA, and have the authority
+to grant the required rights. Recognized Claude/Codex tool attributions do not
+need a separate signature; they never exempt the responsible human or another
+human coauthor. Unrecognized or misattributed identities must be corrected;
+never remove a real author's attribution to avoid obtaining their acceptance.
+See the exact recognized tool identities in
+[the maintenance guide](docs/cla-maintenance.md#ai-attributions).
+
+Acceptance records are public on the `cla-signatures` branch. They contain the
+account identifier, username, statement, comment link and timestamp, originating
+PR, and exact agreement. Do not post private identity or contact information.
+Checking a box in the PR template does not replace acceptance.
+
+Maintainer setup and recovery are documented in
+[docs/cla-maintenance.md](docs/cla-maintenance.md).

@@ -1,0 +1,52 @@
+name: Contributor License Agreement
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - CLA.md
+      - scripts/cla.mjs
+      - .github/workflows/cla.yml
+  pull_request_target:
+    types: [opened, reopened, closed, synchronize, edited, ready_for_review]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+# Never check out or execute the PR's code in this privileged workflow.
+permissions:
+  contents: write # Acceptance records on cla-signatures only.
+  pull-requests: read
+  statuses: write
+
+# Every run scans all open PRs, including their acceptance comments, so signatures
+# are not lost when GitHub replaces a pending run in this concurrency group.
+concurrency:
+  group: nodus-cla
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: >-
+      github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request &&
+       startsWith(github.event.comment.body, 'I have read and agree to the Nodus Research CLA'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout trusted default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            CLA.md
+            scripts/cla.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Verify and record CLA acceptance
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const { run } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/cla.mjs`);
+            await run({ github, context, core });
