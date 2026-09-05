@@ -2,8 +2,11 @@ import type { StellarPosition, StellarSession } from "@shared/stellarGraph";
 type Camera = StellarSession["camera"];
 /** Frame both endpoints inside the readable area above the playback controls. */
 export function frameConnection(a: StellarPosition, b: StellarPosition, width: number, height: number, bottomInset = 250): Camera {
-  const side = Math.min(155, width * .25), top = Math.min(130, height * .22), bottom = Math.min(bottomInset, Math.max(40, height-top-50));
-  const usableWidth = Math.max(40, width - side * 2), usableHeight = Math.max(40, height - top - bottom);
+  // Close endpoints put one caption 100px above its node. Keep that caption
+  // inside short canvases, and let the node span shrink before sacrificing
+  // the space reserved for captions and playback controls.
+  const side = Math.min(155, width * .25), top = Math.min(130, Math.max(108, height * .22)), bottom = Math.min(bottomInset, Math.max(0, height-top-1));
+  const usableWidth = Math.max(40, width - side * 2), usableHeight = Math.max(1, height - top - bottom);
   const zoom = Math.max(.0001, Math.min(1.15, usableWidth / Math.max(1, Math.abs(b.x-a.x)), usableHeight / Math.max(1, Math.abs(b.y-a.y))));
   return { x: (a.x+b.x)/2, y: (a.y+b.y)/2 + (bottom-top)/2/zoom, zoom };
 }

@@ -7,7 +7,8 @@ const page=await app.firstWindow();page.setDefaultTimeout(30000);const errors=[]
 await page.waitForFunction(()=>typeof window.nodus?.stellarPage==='function');
 await page.evaluate(async()=>{sessionStorage.setItem('nodus.startupUpdateChecked','1');localStorage.setItem('nodus.lastSeenVersion','5.1.7');localStorage.setItem('nodus.mobileTeaserSeen.5.1.7','1');for(const key of ['nodus.platformHighlightsSeen.2026-07','nodus.tutorialVideosAnnouncementSeen.2026-07','nodus.toolkitBetaGuideSeen.2.4.0'])localStorage.setItem(key,'1');await window.nodus.updateSettings({onboardingComplete:true,basicsTutorialVersion:5,recoverySetupVersion:1,tourComplete:true,advancedTourComplete:true,mascotEnabled:false,mascotStyle:'orb',mascotStyleChosen:true,uiLanguage:'es',theme:'dark'});});
 await page.evaluate(()=>window.nodus.seedDemoData());await page.reload();await page.waitForTimeout(1800);
-await app.evaluate(({BrowserWindow})=>{const w=BrowserWindow.getAllWindows()[0];w.setSize(1500,1000);});
+// Exercise the short viewport available on CI and smaller laptop displays.
+await app.evaluate(({BrowserWindow})=>{const w=BrowserWindow.getAllWindows()[0];w.setContentSize(1500,700);});
 await page.locator('[data-tour="nav-graph"]').click();await page.getByTestId('stellar-canvas').waitFor();
 await page.waitForTimeout(1000);await page.screenshot({path:root+'/work/stellar-preview/start.png'});
 const report=await page.evaluate(async()=>{const first=await window.nodus.stellarPage({kind:'search',limit:20});for(const n of first.nodes){const p=await window.nodus.stellarPage({kind:'neighbors',id:n.id,limit:200});if(p.edges.length>2)return {node:n,neighbors:p};}return {node:first.nodes[0]};});
@@ -32,11 +33,11 @@ const frame = async () => {
     }, undefined, { timeout: 10000 });
   } catch (error) {
     await page.screenshot({path:root+'/work/stellar-preview/framing-failure.png'});
-    console.error('Framing geometry:', await page.evaluate(() => ({
+    console.error('Framing geometry:', JSON.stringify(await page.evaluate(() => ({
       canvas:document.querySelector('.stellar-canvas').getBoundingClientRect().toJSON(),
       player:document.querySelector('.stellar-player').getBoundingClientRect().toJSON(),
       labels:[...document.querySelectorAll('.stellar-node-label.featured')].map(node=>({text:node.textContent,box:node.getBoundingClientRect().toJSON()})),
-    })));
+    })), null, 2));
     throw error;
   }
 };
