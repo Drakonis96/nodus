@@ -38,6 +38,7 @@
 
 ## Contributor checklist
 
+- [ ] I have read [CLA.md](https://github.com/Drakonis96/nodus/blob/main/CLA.md) and accepted it through the **CLA / signature** check. Every author and coauthor must accept separately; this checkbox alone is not acceptance.
 - [ ] I added or updated focused tests.
 - [ ] I updated documentation where behavior changed.
 - [ ] I updated every language table for new static UI text.
