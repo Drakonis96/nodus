@@ -180,7 +180,7 @@ export function AuthorsView({
           <div className="flex-1" />
           <div className="flex items-center gap-2">
             <span className="text-xs text-neutral-500">{t('Modelo de síntesis')}</span>
-            <ModelPicker settings={settings} value={model} onChange={setModel} compact />
+            <ModelPicker settings={settings} value={model} onChange={setModel} compact menu />
           </div>
         </div>
 

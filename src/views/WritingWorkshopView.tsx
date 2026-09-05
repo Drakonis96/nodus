@@ -387,7 +387,7 @@ export function WritingWorkshopView({
           <option value="pt-BR">Português (Brasil)</option>
           <option value="tr">Türkçe</option>
         </select>
-        <ModelPicker settings={settings} value={selectedModel} onChange={setSelectedModel} compact />
+        <ModelPicker settings={settings} value={selectedModel} onChange={setSelectedModel} compact menu />
         <div className="flex-1" />
         <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={() => setShowTutorial((value) => !value)}>
           <Icon name="help" />

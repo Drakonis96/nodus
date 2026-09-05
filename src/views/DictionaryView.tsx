@@ -909,6 +909,7 @@ function CreationDialog({
                   onChange={onModel}
                   compact
                   allowEmpty={false}
+                  menu
                 />
               </Field>
             </div>
@@ -1282,6 +1283,7 @@ export function DictionaryView({
             onChange={setModel}
             compact
             allowEmpty={false}
+            menu
           />
           {selected.size > 0 && (
             <button
@@ -1959,6 +1961,7 @@ function DictionaryEntryView({
                   compact
                   disabled
                   ariaLabel={t("Modelo del Diccionario")}
+                  menu
                 />
               </div>
               <div className="grid grid-cols-[minmax(0,1fr)_minmax(118px,0.58fr)_minmax(118px,0.58fr)] gap-2">

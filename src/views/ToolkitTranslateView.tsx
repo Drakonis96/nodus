@@ -289,7 +289,7 @@ export function ToolkitTranslateView({ onBack, settings }: { onBack: () => void;
     {tab !== 'history' && <><section className="space-y-4 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900/40">
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block text-sm"><span className="mb-1 block font-medium">{t('Idioma de destino')}</span><select data-testid="translate-target-language" className="input" value={targetLanguage} onChange={(event) => setTargetLanguage(event.target.value)}>{TRANSLATION_LANGUAGES.map((language) => <option key={language.code} value={language.code}>{language.nativeName} — {language.name}</option>)}</select></label>
-        <label className="block text-sm"><span className="mb-1 block font-medium">{t('Modelo de IA')}</span>{settings ? <ModelPicker settings={settings} value={model} onChange={setModel} allowEmpty={false} emptyLabel={t('Seleccionar modelo')} /> : <Spinner label={t('Cargando…')} />}</label>
+        <label className="block text-sm"><span className="mb-1 block font-medium">{t('Modelo de IA')}</span>{settings ? <ModelPicker settings={settings} value={model} onChange={setModel} allowEmpty={false} emptyLabel={t('Seleccionar modelo')} menu /> : <Spinner label={t('Cargando…')} />}</label>
       </div>
       <SubscriptionQuotaNotice model={model} />
       {cloud && model && <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200"><Icon name="lock" size={13} className="mr-1 inline" />{tx('El contenido se enviará a {provider}. Para mantenerlo en el dispositivo, selecciona un modelo local.', { provider: model.provider })}</p>}

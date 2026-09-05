@@ -392,7 +392,7 @@ export function ArgumentMapView({
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="uppercase tracking-wide text-neutral-500">{t('Modelo')}</label>
-                    <ModelPicker settings={settings} value={model} onChange={setModel} compact />
+                    <ModelPicker settings={settings} value={model} onChange={setModel} compact menu />
                   </div>
                   <button className="btn btn-primary gap-1.5" onClick={() => build()} disabled={!seedId || selectedMapBuilding || !hasModel} title={!hasModel ? t('Configura un modelo de IA en Ajustes') : t('Trazar el mapa de argumentos')}>
                     <Icon name="map" /> {selectedMapBuilding ? t('Trazando…') : t('Trazar mapa')}
