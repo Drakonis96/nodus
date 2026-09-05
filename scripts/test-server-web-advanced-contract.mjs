@@ -38,7 +38,7 @@ test('Advanced UI exposes ideas, authors, graph, tabs, rich details and publishe
     'advanced-author-dossier',
     'advanced-author-synthesis',
     'advanced-graph-view',
-    '<SigmaGraph',
+    '<StellarWorkspace',
   ]) assert.match(ui, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), marker);
 });
 

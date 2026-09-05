@@ -24,7 +24,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
  */
 const NUL_SEPARATOR_FILES = new Set([
   'electron/db/ideaDedupe.ts',
-  'src/views/graph/lod.ts',
+  'src/stellarGraph/exploration.ts',
   'shared/stats.ts',
   'electron/export/syncPackage.ts',
 ]);

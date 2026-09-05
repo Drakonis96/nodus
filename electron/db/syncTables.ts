@@ -232,6 +232,8 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
  * quietly dropped.
  */
 const NOT_SYNCED_TABLES = new Set([
+  // Canvas positions and playback history are local navigation state, not corpus records.
+  'stellar_sessions',
   'works', 'work_aliases', 'work_authors', 'work_collections', 'work_idea_synthesis', 'work_summaries',
   'work_themes', 'work_zotero_tags', 'authors', 'author_relations', 'author_dossier_synthesis',
   'saved_authors',

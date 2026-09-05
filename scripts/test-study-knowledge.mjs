@@ -138,15 +138,15 @@ try {
   for (const marker of ['study-ideas-view', 'study-ideas-subject']) assert.match(ideasView, new RegExp(marker));
   for (const marker of ['study-graph-view', 'study-graph-subject']) assert.match(graphView, new RegExp(marker));
   for (const academicPattern of ['IDEAS_PAGE_SIZE', 'ideas-tabs', 'ideas-tab-catalog', 'ideas-tab-idea', "t\\('Ordenar'\\)", 'Todos los tipos', 'Ideas conectadas']) assert.match(ideasEngine, new RegExp(academicPattern));
-  for (const graphCapability of ['SigmaGraph', 'GRAPH_PRESETS', 'highlightDepth', 'playGraphHistory', 'focusPendingNavigation', 'sigma-graph-engine']) assert.match(graphCapability === 'sigma-graph-engine' ? await readFile(path.join(repoRoot, 'src/views/graph/SigmaGraph.tsx'), 'utf8') : graphEngine, new RegExp(graphCapability));
+  for (const marker of ['StellarWorkspace','desktopSource']) assert.match(graphEngine,new RegExp(marker));
   assert.match(adapter, /key: `study:\$\{subjectId\}`/);
   assert.match(adapter, /window\.nodus\.getStudyKnowledgeGraph\(subjectId\)/);
   assert.match(adapter, /window\.nodus\.listStudyIdeas\(subjectId/);
-  assert.match(adapter, /theme:study:\$\{subjectId\}/);
+  assert.doesNotMatch(adapter, /study-theme:/);
   assert.match(adapter, /window\.nodus\.createStudyDocument/);
   assert.match(adapter, /placement: \{ courseId: subject\?\.courseId \?\? null, subjectId \}/);
   assert.doesNotMatch(adapter, /window\.nodus\.getGraph\(/);
-  assert.match(graphEngine, /sourceStorageKey\(FILTER_KEY, dataSource\.key\)/, 'graph filters are isolated by knowledge source');
+  assert.match(graphEngine, /desktopSource\(\s*dataSource/, 'canvas sessions are isolated by source');
   closeDb(); console.log('Study knowledge graph tests passed!');
 } finally { await rm(root, { recursive: true, force: true }); }
 

@@ -27,8 +27,6 @@ const source: KnowledgeViewSource = {
   listIdeaConnections: async () => [],
   getEdgeDetail: async () => null,
   getGraph: async () => ({ nodes: [], edges: [] }),
-  getGraphOverview: async () => ({ nodes: [], edges: [] }),
-  getGraphTheme: async () => ({ nodes: [], edges: [] }),
   deleteIdea: async () => undefined,
 };
 

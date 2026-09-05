@@ -164,6 +164,8 @@ const INDIRECT_KEY_SOURCES = [
   { file: 'electron/cloudflare/pricing.ts', pattern: /\bline\('[^']*',\s*(')((?:\\.|(?!\1).)*?)\1/g },
   { file: 'electron/cloudflare/pricing.ts', pattern: /\bline\('[^']*',\s*'[^']*',\s*[^,]+,\s*(')((?:\\.|(?!\1).)*?)\1/g },
   // Sidebar + command palette labels, rendered as t(n.label) / t(g.label) in App.tsx.
+  { file: 'src/stellarGraph/palette.ts', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  { file: 'src/stellarGraph/palette.ts', pattern: /^  (?:claim|finding|construct|method|framework): (["'])(?!#)((?:\\.|(?!\1).)*?)\1/gm },
   { file: 'src/navigation.ts', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Settings tab labels, rendered as t(tab.label).
   { file: 'src/views/Settings.tsx', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },

@@ -1,3 +1,4 @@
+import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
@@ -51,6 +52,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
+  ...STELLAR_GRAPH_TRANSLATIONS["it"],
   ...ACADEMIC_TOUR_TRANSLATIONS.it,
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS.it,
   ...DATABASE_DEEP_RESEARCH_TRANSLATIONS.it,

@@ -72,14 +72,14 @@ try {
 
 
   // ── the themes overview, straight from the app ───────────────────────────
-  const overview = await page.evaluate(() => window.nodus.getGraphOverview?.() ?? null).catch(() => null);
+  const overview = await page.evaluate(() => window.nodus.stellarPage?.({kind:"search",limit:20}) ?? null).catch(() => null);
   if (overview) {
     const nodes = (overview.nodes ?? overview ?? []).slice(0, 12).map((n) => ({
       id: n.id ?? n.theme_id, label: n.label ?? n.name, size: n.size ?? n.count ?? n.ideas,
     }));
     console.log('graph overview from IPC:', JSON.stringify(nodes, null, 1).slice(0, 600));
   } else {
-    console.log('no getGraphOverview');
+    console.log('no stellarPage');
   }
 
   await page.locator('[data-tour="nav-graph"]').first().click();

@@ -1060,6 +1060,47 @@ export function createCorpusRoutes({ readSnapshot, readAssetBytes, renderPdf }) 
       });
     }
 
+    if (head === 'stellar-edge' && rest.length === 0) {
+      const snapshot = requireSnapshot(res,json,space.id);
+      if (!snapshot) return true;
+      const edge = visibleEdges(snapshot).find(e=>String(e.id)===url.searchParams.get('id'));
+      if (!edge) { json(res,404,{error:'not_found'});return true; }
+      const ideas = new Map(rows(snapshot,'ideas').map(i=>[i.global_id,i]));
+      const trace = rows(snapshot,'edge_traces').find(t=>t.edge_id===edge.id);
+      return send(res,json,{edge,fromLabel:ideas.get(edge.from_id)?.label||edge.from_id,toLabel:ideas.get(edge.to_id)?.label||edge.to_id,explanation:trace?.rationale||null,evidence:edge.source_work ? rows(snapshot,'evidence').filter(e=>e.nodus_id===edge.source_work && [edge.from_id,edge.to_id].includes(e.global_id)) : []});
+    }
+
+    if (head === 'stellar' && rest.length === 0) {
+      const snapshot = requireSnapshot(res, json, space.id);
+      if (!snapshot) return true;
+      const request = JSON.parse(url.searchParams.get('request') || '{}');
+      const cursor = Math.max(0, Math.floor(Number(request.cursor) || 0));
+      const limit = Math.min(200, Math.max(1, Math.floor(Number(request.limit) || 200)));
+      let ideas = graphIdeaRows(snapshot, null, Number.MAX_SAFE_INTEGER).filter(i => !i.orphaned_at);
+      const valid = new Set(ideas.map(i => String(i.global_id)));
+      let edges = visibleEdges(snapshot).filter(e => valid.has(String(e.from_id)) && valid.has(String(e.to_id)));
+      if (request.kind === 'search') {
+        const q = String(request.search || '').toLocaleLowerCase();
+        ideas = ideas.filter(i => `${i.label} ${i.statement}`.toLocaleLowerCase().includes(q)).sort((a,b)=>String(a.label).localeCompare(String(b.label)) || String(a.global_id).localeCompare(String(b.global_id)));
+        edges = [];
+      } else if (request.kind === 'neighbors') {
+        ideas = [];
+        edges = edges.filter(e=>e.from_id===request.id || e.to_id===request.id).sort((a,b)=>(a.basis==='explicit'?0:1)-(b.basis==='explicit'?0:1) || Number(b.confidence)-Number(a.confidence) || String(a.id).localeCompare(String(b.id)));
+      } else if (request.kind === 'work') {
+        ideas = ideas.filter(i=>i.workIds.includes(request.id));
+        const ids = new Set(ideas.map(i=>i.global_id));
+        edges = edges.filter(e=>ids.has(e.from_id)&&ids.has(e.to_id));
+      } else if (request.kind === 'elements') {
+        ideas = ideas.filter(i=>Array.isArray(request.nodeIds)&&request.nodeIds.slice(0,200).includes(i.global_id));
+        edges = edges.filter(e=>Array.isArray(request.edgeIds)&&request.edgeIds.slice(0,200).includes(e.id));
+      } else { json(res,400,{error:'Invalid graph page'});return true; }
+      const total = Math.max(ideas.length, edges.length);
+      ideas = ideas.slice(cursor,cursor+limit); edges = edges.slice(cursor,cursor+limit);
+      const ids = new Set([...ideas.map(i=>i.global_id),...edges.flatMap(e=>[e.from_id,e.to_id])]);
+      const nodes = graphIdeaRows(snapshot,ids,Number.MAX_SAFE_INTEGER).map(i=>({id:i.global_id,label:i.label || i.statement,type:i.type,statement:i.statement,workCount:i.workCount,workIds:i.workIds,read:false,themes:i.themes,years:[],authors:[],maxConfidence:i.maxConfidence}));
+      return send(res,json,{nodes,edges:edges.map(e=>({id:e.id,source:e.from_id,target:e.to_id,type:e.type,basis:e.basis,confidence:e.confidence})),total,next:cursor+limit<total?cursor+limit:null,revision:space.revision});
+    }
+
     if (head === 'graph' && rest.length === 0) {
       const snapshot = requireSnapshot(res, json, space.id);
       if (!snapshot) return true;

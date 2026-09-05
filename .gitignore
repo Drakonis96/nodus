@@ -103,3 +103,6 @@ scripts/.cache/
 
 # Local Nodus Server state (admin hashes, device tokens) — never committed
 server/data/
+
+# Isolated Stellar preview: copied vaults, recordings, audit reports, and build scratch.
+work/stellar-preview/

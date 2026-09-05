@@ -51,5 +51,7 @@ test('light mode covers the Server shell and advanced read-only states', () => {
   assert.match(advancedTsx, /role="alert"/);
   assert.match(advancedTsx, /No hay ideas publicadas/);
   assert.match(advancedTsx, /No hay autores todavía/);
-  assert.match(advancedTsx, /Publica ideas para explorar su grafo/);
+  assert.match(advancedTsx, /<StellarWorkspace/);
+  const stellarCss = fs.readFileSync(new URL('../src/stellarGraph/stellar.css', import.meta.url), 'utf8');
+  assert.match(stellarCss, /\.light \.stellar-workspace/);
 });

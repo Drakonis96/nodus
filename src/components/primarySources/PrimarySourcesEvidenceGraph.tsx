@@ -5,7 +5,7 @@ import type {
   PrimarySourceRelationEdge,
   PrimarySourceRelationNode,
 } from '@shared/primarySourcesTypes';
-import { seedMissingPositions, settleSync, resolveOverlaps } from '../../views/graph/layout';
+import { seedMissingPositions, settleSync, resolveOverlaps } from './evidenceLayout';
 
 const NODE_COLORS: Record<PrimarySourceRelationNode['status'], string> = {
   confirmed: '#6366f1',

@@ -10,7 +10,7 @@ import Graph from 'graphology';
 import Sigma from 'sigma';
 import type { NodeLabelDrawingFunction } from 'sigma/rendering';
 import type { SocialGraphData } from '@shared/types';
-import { seedMissingPositions, settleSync, resolveOverlaps } from './graph/layout';
+import { seedMissingPositions, settleSync, resolveOverlaps } from '../components/primarySources/evidenceLayout';
 import { Icon } from '../components/ui';
 import { PersonDossierModal } from '../components/PersonDossierModal';
 import { ContactDossier } from '../components/ContactDossier';

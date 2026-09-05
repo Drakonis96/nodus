@@ -5,7 +5,7 @@ import { readSource } from './ipc-channel-census.mjs';
 const SEARCH_VIEWS = [
   'src/views/ArgumentMapView.tsx',
   'src/views/GraphView.tsx',
-  'src/views/graph/model.ts',
+  'src/stellarGraph/source.ts',
   'src/views/NotesView.tsx',
   'src/components/nodi/NodiCompanion.tsx',
   'src/views/DeepResearchView.tsx',

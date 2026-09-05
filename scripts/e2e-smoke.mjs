@@ -1675,25 +1675,8 @@ try {
   const authorsGraph = await page.evaluate(() => window.nodus.getGraph('authors'));
   assert.ok(Array.isArray(authorsGraph.nodes), 'authors lens answers too');
 
-  const graphOverview = await page.evaluate(() => window.nodus.getGraphOverview());
-  assert.ok(
-    Array.isArray(graphOverview.nodes) && graphOverview.nodes.every((node) => node.type === 'theme'),
-    'graph:overview returns only compact theme hubs'
-  );
-  if (graphOverview.nodes.length > 0) {
-    const graphTheme = await page.evaluate(
-      ({ label }) => window.nodus.getGraphTheme(label, 90),
-      { label: graphOverview.nodes[0].themes[0] ?? graphOverview.nodes[0].label }
-    );
-    const graphThemeIdeas = graphTheme.nodes.filter((node) => node.type !== 'theme');
-    assert.ok(graphThemeIdeas.length <= 150, 'graph:theme keeps the default scene bounded');
-    const graphThemeNodeIds = new Set(graphTheme.nodes.map((node) => node.id));
-    assert.ok(
-      graphTheme.edges.every((edge) => graphThemeNodeIds.has(edge.source) && graphThemeNodeIds.has(edge.target)),
-      'graph:theme only returns edges whose endpoints are present'
-    );
-  }
-  console.log(`[e2e] progressive graph IPC ok (${graphOverview.nodes.length} overview themes)`);
+  const stellar = await page.evaluate(() => window.nodus.stellarPage({kind:'search',limit:20}));
+  assert.ok(Array.isArray(stellar.nodes) && stellar.nodes.length <= 20, 'stellar seed search is paginated');
 
   // ── Records ontology + evidence archive over real IPC ───────────────────────
   const records = await page.evaluate(async () => {

@@ -7,9 +7,11 @@ const shim = fs.readFileSync(new URL('../src/serverWeb/i18nShim.ts', import.meta
 
 test('advanced server surfaces use the shared locale adapter for fixed chrome', () => {
   assert.match(advanced, /import \{[^}]*getActiveLang[^}]*t[^}]*tx[^}]*\} from ['"]\.\.\/i18nShim['"]/);
-  for (const source of ['Ideas', 'Autores', 'Grafo', 'Buscar ideas…', 'Buscar autor…', 'Buscar en el grafo…', 'Superficies académicas']) {
+  for (const source of ['Ideas', 'Autores', 'Grafo', 'Buscar ideas…', 'Buscar autor…', 'Superficies académicas']) {
     assert.ok(advanced.includes(`t("${source}")`), `${source} must use t()`);
   }
+  const search = fs.readFileSync(new URL('../src/stellarGraph/StellarSearch.tsx', import.meta.url), 'utf8');
+  assert.ok(search.includes('t("Buscar una idea…")'));
   assert.doesNotMatch(advanced, /placeholder="[^"]+"|aria-label="[^"]+"/);
   assert.match(advanced, /toLocaleString\(getActiveLang\(\)\)/);
 });

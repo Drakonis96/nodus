@@ -119,7 +119,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 174;
+export const SCHEMA_VERSION = 175;
 
 export const migrations: Migration[] = [
   {
@@ -9306,6 +9306,7 @@ export const migrations: Migration[] = [
         );
     `,
   },
+  { version: 175, up: `CREATE TABLE IF NOT EXISTS stellar_sessions (context TEXT PRIMARY KEY, state TEXT NOT NULL, updated_at TEXT NOT NULL);` },
 ];
 
 /**
