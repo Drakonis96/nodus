@@ -201,7 +201,7 @@ export function WorkIdeasModal({
       onClick={onClose}
     >
       <div
-        className="card relative flex h-full w-full max-w-[1200px] flex-col overflow-hidden border border-neutral-700 bg-neutral-950 shadow-2xl"
+        className="card-modal relative flex h-full w-full max-w-[1200px] flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

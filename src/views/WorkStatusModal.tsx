@@ -271,7 +271,7 @@ export function WorkStatusModal({
       onClick={() => busy == null && onClose()}
     >
       <div
-        className="card relative flex max-h-full w-full max-w-[720px] flex-col overflow-hidden border border-neutral-200 bg-white text-neutral-900 shadow-2xl dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+        className="card-modal relative flex max-h-full w-full max-w-[720px] flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
