@@ -8,7 +8,7 @@ on:
       - scripts/cla.mjs
       - .github/workflows/cla.yml
   pull_request_target:
-    types: [opened, reopened, synchronize, edited, ready_for_review]
+    types: [opened, reopened, closed, synchronize, edited, ready_for_review]
   issue_comment:
     types: [created]
   workflow_dispatch:

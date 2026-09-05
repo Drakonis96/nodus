@@ -35,7 +35,7 @@ are posted to PR discussions.
 
 Runs are serialized. Each run scans every open PR so concurrent acceptances are
 found even if GitHub replaces a pending run, and signing on one PR unblocks other
-covered PRs. New PRs, pushes to PR branches, reopening, retargeting, new acceptance
+covered PRs. New PRs, pushes to PR branches, reopening, closing, retargeting, new acceptance
 comments, changes to the agreement/workflow on main, and manual dispatch recheck
 the gate. `workflow_dispatch` also initializes checks for PRs already open when
 the workflow is installed.
