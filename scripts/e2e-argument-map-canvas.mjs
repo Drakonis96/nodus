@@ -62,7 +62,10 @@ try{
  const wideView=await transform(),wideZoom=await zoom();
  await page.locator('.argument-node-content').nth(3).click();
  await page.waitForTimeout(400);
- assert.ok(await zoom()>wideZoom && await zoom()>=.85,'selection focuses a dense view at a readable scale');
+ const focusedCard=await page.locator('.argument-node.is-selected').boundingBox(),focusedStage=await stage.boundingBox();
+ assert.ok(await zoom()>wideZoom,'selection enlarges the card in a dense view');
+ assert.ok(await zoom()>=.85 || focusedCard.height>=focusedStage.height-150-.5,'focus reaches a readable scale or uses the available height above controls');
+ assert.ok(focusedCard.y>=focusedStage.y && focusedCard.y+focusedCard.height<=focusedStage.y+focusedStage.height,'the focused card fits vertically in a short viewport');
  await page.getByRole('button',{name:'Vista anterior',exact:true}).click();
  assert.equal(await transform(),wideView,'previous view restores the exact manual frame without closing branches');
  const autoFocus=page.getByRole('switch',{name:'Zoom automático',exact:true});
@@ -92,6 +95,7 @@ try{
   const geometry=await page.locator('.argument-map-tab').evaluate(el=>{const rect=el.getBoundingClientRect();return {width:rect.width,height:rect.height,viewportWidth:innerWidth,viewportHeight:innerHeight};});
   assert.ok(Math.abs(geometry.width-geometry.viewportWidth)<2 && Math.abs(geometry.height-geometry.viewportHeight)<2,'workspace fills the screen');
   assert.ok(await stage.evaluate(el=>el.getBoundingClientRect().height)>normalHeight,'fullscreen gives the canvas more space');
+  assert.ok(await zoom()>=.85,'full-screen focus presents the selected card at a readable scale');
   assert.equal(await page.locator('.argument-atlas-heading').isVisible(),false,'full screen hides the overview');
   assert.equal(await page.locator('.graph-detail-panel').isVisible(),true,'source details remain visible in full screen');
   const surface=await canvas.evaluate(el=>getComputedStyle(el).backgroundColor);
