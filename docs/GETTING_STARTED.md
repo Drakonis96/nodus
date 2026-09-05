@@ -122,16 +122,21 @@ tokens, so target them.
 
 ![Idea graph](screenshots/02-graph.png)
 
-Open **Graph**. Every node is an idea or theme; every edge is a *typed* relation
-(supports, contradicts, refines, extends…). Use the presets to switch lenses —
-contradictions, gaps, reading focus, unread works, authors — filter by theme, or
-search. Click any node to open a detail panel with its occurrences across works,
-its evidence, and its connections.
+Open **Graph**, search for an idea, and choose it to display its direct connections.
+The graph starts empty, and **Relations per idea** controls how many connections
+are loaded (25 by default, or unlimited). Use **+ / −** beside search results to
+add or remove ideas from the canvas. **Clear** empties the current graph without
+deleting anything from your library. Create independent graphs with **+** in the
+tab strip, and use **Full screen** for more room to explore. Click an idea to read
+its occurrences, evidence, and connections in the detail panel.
 
 ![Argument map](screenshots/09-argument-map.png)
 
-For a single claim, **Argument map** shows the logical structure around it — what
-supports it, what pushes back — at a glance.
+For a single claim, **Argument map** shows its typed relationships in a visual
+card map or an outline. Expand branches, filter relationship types, and select a
+card to follow its evidence. **Auto zoom** focuses the selected card; disable it
+for manual navigation, use **Previous view** to step back, or **Fit all** to see
+the overview. Full screen is available here too.
 
 ![Ideas](screenshots/03-ideas.png)
 

@@ -12,6 +12,7 @@ import { ThemesModal } from "./ThemesModal";
 import { IdeaDuplicatesModal } from "./IdeaDuplicatesModal";
 import { EdgeAuditModal } from "./EdgeAuditModal";
 import { t } from "../i18n";
+import type { StellarWorkspaceSnapshot } from "../stellarGraph/snapshot";
 export function GraphView({
   settings,
   onSettingsChange,
@@ -19,6 +20,8 @@ export function GraphView({
   dataSource = academicKnowledgeViewSource,
   scopeControl,
   testId,
+  snapshot,
+  onSnapshotChange,
 }: {
   settings: AppSettings;
   onSettingsChange: () => void;
@@ -26,6 +29,8 @@ export function GraphView({
   dataSource?: KnowledgeViewSource;
   scopeControl?: ReactNode;
   testId?: string;
+  snapshot?: StellarWorkspaceSnapshot;
+  onSnapshotChange?(snapshot: StellarWorkspaceSnapshot): void;
 }) {
   const [tutorTarget, setTutorTarget] = useState<GraphNavigationTarget | null>(
     null,
@@ -51,8 +56,10 @@ export function GraphView({
   return (
     <div className="h-full min-h-0" data-testid={testId || "graph-view"}>
       <StellarWorkspace
-        key={`${source.key}:${target?.nonce || 0}`}
         source={source}
+        snapshot={snapshot}
+        onSnapshotChange={onSnapshotChange}
+        navigationKey={tutorTarget?.nonce || target?.nonce}
         workId={target?.workId}
         initialSeed={
           tutorTarget?.nodeId ||

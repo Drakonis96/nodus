@@ -86,6 +86,8 @@ export const studyViews = {
       settings={ctx.settings}
       onSettingsChange={ctx.reloadSettings}
       target={ctx.studyGraphTarget}
+      snapshot={ctx.snapshots.read('studyGraph')}
+      onSnapshotChange={snapshot => ctx.snapshots.patch('studyGraph', snapshot)}
       onOpenMaterial={openMaterial(ctx)}
       onOpenDocument={openDocument(ctx)}
     />

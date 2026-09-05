@@ -479,3 +479,34 @@
   .stellar-player .stellar-step-node { font-size: 10px; }
   .stellar-player .stellar-step-relation { font-size: 9px; max-width: 80px; }
 }
+
+/* Independent graph workspaces share the renderer, never their topology or camera. */
+.stellar-tabs-workspace { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; background: #080b18; color: #e6eaf8; }
+.stellar-tabs-workspace:fullscreen { width: 100vw; height: 100vh; }
+.stellar-tabs-header { display: flex; align-items: stretch; gap: 6px; padding: 10px 16px 0; border-bottom: 1px solid #b1bfeb29; background: #0d1120; }
+.stellar-tabs { display: flex; gap: 5px; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.stellar-tab { display: flex; align-items: center; flex-shrink: 0; color: #929cb8; border: 1px solid transparent; border-bottom: 0; border-radius: 9px 9px 0 0; }
+.stellar-tab.active { background: #181e34; color: #e6eaf8; border-color: #b1bfeb29; }
+.stellar-tab [role="tab"] { display: flex; align-items: center; gap: 8px; padding: 11px 9px 11px 12px; font-size: 11px; min-width: 100px; }
+.stellar-tab [role="tab"] span { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stellar-tab-close { padding: 8px; font-size: 15px; border-radius: 5px; margin-right: 3px; }
+.stellar-new-tab { display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1; flex-shrink: 0; align-self: center; margin-bottom: 7px; width: 30px; height: 30px; border: 1px solid #b1bfeb29; border-radius: 7px; }
+.stellar-fullscreen { flex-shrink: 0; margin: 0 0 7px auto; padding: 7px 10px; display: flex; align-items: center; gap: 8px; font-size: 10px; border: 1px solid #b1bfeb29; border-radius: 7px; }
+.stellar-tabs-header button:hover { color: #d7c8ff; background: #b5a2f414; }
+.stellar-tabs-header button:focus-visible { outline: 2px solid #bda2ff; outline-offset: -2px; }
+.stellar-tab-panel { flex: 1; min-height: 0; }
+.stellar-tabs-workspace:fullscreen .stellar-workspace { min-height: 0; }
+.stellar-search-result { display: grid; grid-template-columns: minmax(0, 1fr) 34px; align-items: center; gap: 6px; border-radius: 8px; border: 1px solid transparent; }
+.stellar-search-result[aria-selected="true"] { border-color: var(--stellar-line); background: #b5a2f414; }
+.stellar-search-result.included .stellar-search-choice strong { color: #c4b7f0; }
+.stellar-search-result .stellar-search-toggle { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; line-height: 1; border: 1px solid var(--stellar-line); border-radius: 7px; color: var(--stellar-text); }
+.stellar-search-result.included .stellar-search-toggle { color: #c4b7f0; border-color: #b5a2f455; background: #b5a2f418; }
+.stellar-navigation { flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 28px); }
+.light .stellar-tabs-workspace { background: #f7f8fc; color: #27304b; }
+.light .stellar-tabs-header { background: #fafaff; border-color: #27375626; }
+.light .stellar-tab { color: #5c6884; }
+.light .stellar-tab.active { background: #eeebf8; color: #574482; border-color: #27375626; }
+.light .stellar-new-tab, .light .stellar-fullscreen { border-color: #27375626; }
+.light .stellar-tabs-header button:hover { color: #574482; background: #b5a2f41c; }
+.light .stellar-search-result.included .stellar-search-choice strong, .light .stellar-search-result.included .stellar-search-toggle { color: #70559e; }
+@media (max-width: 800px) { .stellar-tabs-header { padding: 7px 9px 0; } .stellar-tab [role="tab"] span { max-width: 130px; } .stellar-fullscreen { font-size: 9px; padding: 6px; } }

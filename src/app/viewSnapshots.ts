@@ -35,6 +35,7 @@
 // expected to hold — and those are written through to `filterPreferences` and read
 // back as the seed a section mounts with. That file says why only those three.
 import type { View } from '../navigation';
+import type { StellarWorkspaceSnapshot } from '../stellarGraph/snapshot';
 import {
   PREFERENCE_VIEWS,
   readFilterPreferences,
@@ -314,6 +315,8 @@ export type { CompassSnapshot } from '@shared/compass';
 
 /** One optional entry per section that has opted in. Keys are `View` members. */
 export interface ViewSnapshots {
+  graph?: StellarWorkspaceSnapshot;
+  studyGraph?: StellarWorkspaceSnapshot;
   authors?: AuthorsSnapshot;
   ideas?: IdeasSnapshot;
   dictionary?: DictionarySnapshot;

@@ -97,11 +97,11 @@ export function StellarCanvas(props: Props) {
     });
     worker.current = w;
     w.onmessage = ({ data }) => {
-      if (data.request === seq.current)
-        live.current.onPositions({
-          ...data.positions,
-          ...live.current.positions,
-        });
+      if (data.request === seq.current) {
+        const ids = new Set(live.current.data.nodes.map(node => node.id));
+        const positions = Object.fromEntries(Object.entries({ ...data.positions, ...live.current.positions }).filter(([id]) => ids.has(id))) as Record<string, StellarPosition>;
+        live.current.onPositions(positions);
+      }
     };
     w.onerror = () =>
       setError(
@@ -113,9 +113,10 @@ export function StellarCanvas(props: Props) {
     };
   }, []);
   useEffect(() => {
+    const request = ++seq.current;
     if (props.data.nodes.some((n) => !props.positions[n.id]))
       worker.current?.postMessage({
-        request: ++seq.current,
+        request,
         ids: props.data.nodes.map((n) => n.id),
         edges: props.data.edges,
         positions: props.positions,

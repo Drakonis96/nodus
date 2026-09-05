@@ -42,6 +42,8 @@
     "version": "npm run citation:sync && git add CITATION.cff",
     "test:e2e": "node scripts/e2e-smoke.mjs",
     "test:e2e:stellar": "node scripts/e2e-graph-progressive.mjs",
+    "test:e2e:stellar-tabs": "node scripts/e2e-stellar-tabs.mjs",
+    "test:e2e:argument-map": "node scripts/e2e-argument-map-canvas.mjs",
     "audit:adaptive:prepare": "node scripts/adaptive-concurrency-audit.mjs prepare",
     "audit:adaptive:verify": "node scripts/adaptive-concurrency-audit.mjs verify",
     "audit:adaptive:campaign": "node scripts/run-adaptive-concurrency-campaign.mjs",

@@ -22,6 +22,7 @@ import { useListPlacement } from '../listPlacement';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 import { expandableIdsByDepth } from '../argumentMapTree';
 import { t, tx } from '../i18n';
+import { ArgumentMapCanvas } from '../components/argumentMap/ArgumentMapCanvas';
 
 const RELATION_LABELS: Record<string, string> = {
   ...EDGE_LABELS,
@@ -479,6 +480,39 @@ function ArgumentMapTab({ tab, active }: { tab: ArgumentMapTabState; active: boo
   // Every open map owns its reveal and detail state. Keeping this inside the tab is
   // what makes switching maps preserve the exact branches and side panel the reader
   // was using in each one.
+  const [presentation, setPresentation] = useState<'map' | 'outline'>('map');
+  const workspaceRef = useRef<HTMLElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState(false);
+
+  useEffect(() => {
+    const update = () => setFullscreen(document.fullscreenElement === workspaceRef.current);
+    // Electron does not consistently leave HTML full screen on Escape itself.
+    // Consume it before the detail panel so the selected evidence stays open.
+    const exitOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || document.fullscreenElement !== workspaceRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void document.exitFullscreen().catch(() => setFullscreenError(true));
+    };
+    document.addEventListener('fullscreenchange', update);
+    document.addEventListener('keydown', exitOnEscape, true);
+    return () => {
+      document.removeEventListener('fullscreenchange', update);
+      document.removeEventListener('keydown', exitOnEscape, true);
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    setFullscreenError(false);
+    try {
+      if (document.fullscreenElement === workspaceRef.current) await document.exitFullscreen();
+      else await workspaceRef.current?.requestFullscreen();
+    } catch {
+      setFullscreenError(true);
+    }
+  };
+
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const revealTimerRef = useRef<number | null>(null);
   const [ideaDetail, setIdeaDetail] = useState<IdeaDetail | null>(null);
@@ -568,24 +602,36 @@ function ArgumentMapTab({ tab, active }: { tab: ArgumentMapTabState; active: boo
   };
 
   return (
-    <section className={active ? 'flex h-full min-h-0' : 'hidden'}>
-      <div className="min-w-0 flex-1 overflow-y-auto p-4">
-        {tab.error && <div className="card flex items-start gap-2 p-4 text-sm text-red-400"><Icon name="alert" /> <span>{tab.error}</span></div>}
-        {tab.building && !tab.map && <div className="flex h-full flex-col items-center justify-center gap-3 text-neutral-500"><Spinner label={tab.mode === 'auto' ? t('Construyendo el esquema…') : t('El modelo está trazando el esquema de argumentos…')} /></div>}
+    <section ref={workspaceRef} className={active ? 'argument-map-tab flex h-full min-h-0' : 'hidden'}>
+      <div className="flex min-w-0 flex-1 flex-col">
         {tab.map && (
-          <div className="mx-auto max-w-4xl">
-            <div className="card mb-4 bg-neutral-900/60 p-4">
-              <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-                <Icon name="map" size={14} /> {t('Mapa desde')} <span className="text-neutral-300">{tab.map.seedLabel}</span>
-                <span>· {tx('{n} ideas', { n: tab.map.ideaCount })}</span>
-                {tab.map.truncated && <span className="text-amber-500">· {t('subgrafo recortado')}</span>}
-                <span className="text-neutral-600">· {tab.mode === 'auto' ? t('modo automático') : t('modo IA')}</span>
-              </div>
-              {tab.map.overview && <p className="text-sm leading-relaxed text-neutral-300">{tab.map.overview}</p>}
+          <div className="argument-view-switch">
+            <span>{t('Mapa de argumentos')} · {tab.mode === 'auto' ? t('modo automático') : t('modo IA')}</span>
+            <div>
+              <button aria-pressed={presentation === 'map'} onClick={() => setPresentation('map')}>{t('Mapa visual')}</button>
+              <button aria-pressed={presentation === 'outline'} onClick={() => setPresentation('outline')}>{t('Esquema')}</button>
             </div>
-            <BlockTree block={tab.map.root} depth={0} expanded={expanded} onToggle={toggleExpand} onSelect={selectBlock} />
           </div>
         )}
+        <div className={presentation === 'map' ? 'min-h-0 flex-1' : 'min-h-0 flex-1 overflow-y-auto p-4'}>
+          {tab.map && <div className={presentation === 'map' ? 'h-full' : 'hidden'}><ArgumentMapCanvas map={tab.map} onSelect={selectBlock} fullscreen={fullscreen} onToggleFullscreen={toggleFullscreen} fullscreenError={fullscreenError} /></div>}
+          {tab.error && <div className="card flex items-start gap-2 p-4 text-sm text-red-400"><Icon name="alert" /> <span>{tab.error}</span></div>}
+          {tab.building && !tab.map && <div className="flex h-full flex-col items-center justify-center gap-3 text-neutral-500"><Spinner label={tab.mode === 'auto' ? t('Construyendo el esquema…') : t('El modelo está trazando el esquema de argumentos…')} /></div>}
+          {tab.map && presentation === 'outline' && (
+            <div className="mx-auto max-w-4xl">
+              <div className="card mb-4 bg-neutral-900/60 p-4">
+                <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+                  <Icon name="map" size={14} /> {t('Mapa desde')} <span className="text-neutral-300">{tab.map.seedLabel}</span>
+                  <span>· {tx('{n} ideas', { n: tab.map.ideaCount })}</span>
+                  {tab.map.truncated && <span className="text-amber-500">· {t('subgrafo recortado')}</span>}
+                  <span className="text-neutral-600">· {tab.mode === 'auto' ? t('modo automático') : t('modo IA')}</span>
+                </div>
+                {tab.map.overview && <p className="text-sm leading-relaxed text-neutral-300">{tab.map.overview}</p>}
+              </div>
+              <BlockTree block={tab.map.root} depth={0} expanded={expanded} onToggle={toggleExpand} onSelect={selectBlock} />
+            </div>
+          )}
+        </div>
       </div>
       {(ideaDetail || edgeDetail || detailLoading) && <NodeDetailPanel ideaDetail={ideaDetail} edgeDetail={edgeDetail} loading={detailLoading} width={detailWidth} fontSize={detailFontSize} onWidthChange={setDetailWidth} onFontChange={changeDetailFont} onClose={closeDetail} />}
     </section>

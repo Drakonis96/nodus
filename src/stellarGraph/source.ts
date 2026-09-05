@@ -44,6 +44,7 @@ export function memorySource(
             .toLocaleLowerCase()
             .includes(q),
         );
+        if (req.author) ns = ns.filter(n => n.authors.some(author => author.toLocaleLowerCase().includes(req.author!.toLocaleLowerCase())));
         es = [];
       }
       if (req.kind === "neighbors") {
@@ -115,4 +116,21 @@ export function desktopSource(
         await window.nodus.saveStellarSession(vaultId, context, state);
     },
   };
+}
+
+/** Work graphs keep their scope, but load no visible topology until the user chooses an idea. */
+export function workScopedSource(source: StellarGraphSource, workId: string): StellarGraphSource {
+  const scoped = memorySource(`${source.key}:work:${workId}`, async () => {
+    const nodes = new Map<string, GraphData["nodes"][number]>();
+    const edges = new Map<string, GraphData["edges"][number]>();
+    let cursor: number | null = 0;
+    do {
+      const page = await source.page({ kind: "work", id: workId, cursor });
+      page.nodes.forEach(node => nodes.set(node.id, node));
+      page.edges.forEach(edge => edges.set(edge.id, edge));
+      cursor = page.next;
+    } while (cursor !== null);
+    return { nodes: [...nodes.values()], edges: [...edges.values()] };
+  });
+  return { ...source, ...scoped };
 }

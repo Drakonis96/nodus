@@ -4,12 +4,16 @@ import type { StellarGraphSource } from "./source";
 /** Pure reveal history plus paginated breadth-first traversal. Rendering never owns topology. */
 export class Exploration {
   private cancelled = false;
+  private revision = 0;
+  removedNodes = new Set<string>();
   private interrupted = false;
   interrupt() {
     this.interrupted = true;
+    this.revision++;
   }
   cancel() {
     this.cancelled = true;
+    this.revision++;
   }
   nodes = new Map<string, GraphNode>();
   edges = new Map<string, GraphEdge>();
@@ -28,7 +32,7 @@ export class Exploration {
   private head = 0;
   constructor(readonly source: StellarGraphSource) {}
   ingest(data: GraphData) {
-    for (const n of data.nodes) this.nodes.set(n.id, n);
+    for (const n of data.nodes) if (!this.removedNodes.has(n.id)) this.nodes.set(n.id, n);
     for (const e of data.edges)
       if (this.nodes.has(e.source) && this.nodes.has(e.target))
         this.edges.set(e.id, e);
@@ -46,6 +50,7 @@ export class Exploration {
   }
   start(id: string) {
     if (!this.nodes.has(id)) return;
+    this.revision++;
     this.history = this.history.slice(0, this.cursor);
     this.historySet = new Set(this.history);
     if (!this.seeds.includes(id)) this.seeds.push(id);
@@ -57,6 +62,81 @@ export class Exploration {
     this.pageCursor = 0;
     this.head = 0;
   }
+  /** Load only the selected idea's direct links, paginating until its exact budget is met. */
+  async add(id: string, limit: number): Promise<number | undefined> {
+    if (this.cancelled) return;
+    const revision = ++this.revision;
+    this.interrupted = false;
+    const nodes = new Map<string, GraphNode>();
+    const edges = new Map<string, GraphEdge>();
+    if (!this.nodes.has(id)) {
+      const seed = await this.source.page({ kind: "elements", nodeIds: [id] });
+      if (this.cancelled || revision !== this.revision) return;
+      seed.nodes.forEach(node => nodes.set(node.id, node));
+      if (!nodes.has(id)) return;
+    }
+    let cursor: number | null = 0;
+    do {
+      const page = await this.source.page({ kind: "neighbors", id, cursor, limit: limit ? Math.min(200, limit - edges.size) : 200 });
+      if (this.cancelled || revision !== this.revision) return;
+      for (const node of page.nodes) nodes.set(node.id, node);
+      for (const edge of page.edges) {
+        if (edge.source !== id && edge.target !== id) continue;
+        const other = edge.source === id ? edge.target : edge.source;
+        if (this.removedNodes.has(other)) continue;
+        edges.set(edge.id, edge);
+        if (limit && edges.size >= limit) break;
+      }
+      if (limit && edges.size >= limit) break;
+      if (page.next === cursor) throw new Error("No se pudieron cargar todas las conexiones. Vuelve a intentarlo.");
+      cursor = page.next;
+      // Yield between pages so Clear, tab changes and cancellation stay responsive.
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    } while (cursor !== null && !this.cancelled && revision === this.revision);
+    if (this.cancelled || revision !== this.revision) return;
+    this.removedNodes.delete(id);
+    this.ingest({ nodes: [...nodes.values()], edges: [...edges.values()] });
+    this.start(id);
+    for (const edge of edges.values()) {
+      if (!this.edges.has(edge.id) || this.historySet.has(edge.id)) continue;
+      this.history.push(edge.id);
+      this.historySet.add(edge.id);
+    }
+    this.cursor = this.history.length;
+    return edges.size;
+  }
+
+  clear() {
+    this.interrupt();
+    this.nodes.clear(); this.edges.clear();
+    this.baselineNodes.clear(); this.baselineEdges.clear(); this.removedNodes.clear();
+    this.seeds = []; this.history = []; this.historySet.clear(); this.cursor = 0;
+    this.activeSeed = null; this.queue = []; this.pending = [];
+    this.visited.clear(); this.seen.clear(); this.pageCursor = 0; this.head = 0;
+  }
+
+  /** Keep the other visible ideas, including those left isolated, and suppress dangling edges. */
+  remove(id: string) {
+    this.interrupt();
+    const visible = this.visible();
+    this.removedNodes.add(id);
+    this.baselineNodes = new Set(visible.nodes.filter(n => n.id !== id).map(n => n.id));
+    const kept = (edgeId: string) => {
+      const edge = this.edges.get(edgeId);
+      return !!edge && edge.source !== id && edge.target !== id;
+    };
+    this.cursor = this.history.slice(0, this.cursor).filter(kept).length;
+    this.history = this.history.filter(kept);
+    this.historySet = new Set(this.history);
+    this.baselineEdges = new Set([...this.baselineEdges].filter(kept));
+    this.seeds = this.seeds.filter(seed => seed !== id);
+    this.nodes.delete(id);
+    for (const [key, edge] of this.edges) if (edge.source === id || edge.target === id) this.edges.delete(key);
+    this.activeSeed = this.activeSeed === id ? this.seeds[0] ?? null : this.activeSeed;
+    this.queue = this.activeSeed ? [this.activeSeed] : [];
+    this.visited = new Set(this.queue); this.seen.clear(); this.pending = []; this.pageCursor = 0; this.head = 0;
+  }
+
   previous() {
     if (this.cursor > 0) this.cursor--;
   }
@@ -83,6 +163,7 @@ export class Exploration {
   async next(): Promise<GraphEdge | null | undefined> {
     if (this.cancelled) return null;
     this.interrupted = false;
+    const revision = this.revision;
     if (this.cursor < this.history.length)
       return this.edges.get(this.history[this.cursor++]) ?? null;
 
@@ -103,6 +184,7 @@ export class Exploration {
           cursor: this.pageCursor,
         });
         if (this.cancelled) return null;
+        if (revision !== this.revision) return undefined;
         this.ingest(page);
         this.pending = page.edges;
         this.pageCursor = page.next;
@@ -110,10 +192,11 @@ export class Exploration {
         // Let input and cancellation run even when traversing a large already-visible baseline.
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
         if (this.cancelled) return null;
-        if (this.interrupted) return undefined;
+        if (this.interrupted || revision !== this.revision) return undefined;
       }
       while (this.pending.length) {
         const edge = this.pending.shift()!;
+        if (this.removedNodes.has(edge.source) || this.removedNodes.has(edge.target)) continue;
         if (this.seen.has(edge.id)) continue;
         this.seen.add(edge.id);
         for (const id of [edge.source, edge.target])
@@ -132,8 +215,9 @@ export class Exploration {
     return null;
   }
   async restore(session: StellarSession) {
+    this.removedNodes = new Set(session.removedNodes || []);
     const edges = [...new Set(session.history)],
-      nodes = [...new Set(session.seeds)];
+      nodes = [...new Set([...session.seeds, ...(session.pinnedNodes || [])])];
     for (
       let i = 0;
       i < Math.max(edges.length, nodes.length) && !this.cancelled;
@@ -146,6 +230,7 @@ export class Exploration {
           edgeIds: edges.slice(i, i + 200),
         }),
       );
+    this.baselineNodes = new Set((session.pinnedNodes || []).filter(id => this.nodes.has(id)));
     this.seeds = session.seeds.filter((id) => this.nodes.has(id));
     const history = session.history.filter((id) => this.edges.has(id));
     if (session.activeSeed && this.nodes.has(session.activeSeed))

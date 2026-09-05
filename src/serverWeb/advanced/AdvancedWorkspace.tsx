@@ -1,4 +1,5 @@
 import { StellarWorkspace } from '../../stellarGraph/StellarWorkspace';
+import type { StellarWorkspaceSnapshot } from '../../stellarGraph/snapshot';
 import { webStellarSource } from '../../stellarGraph/webSource';
 import {
   useCallback,
@@ -1354,9 +1355,9 @@ export function AuthorsServerView({
   );
 }
 
-export function GraphServerView({spaceId, initialSeedId, onOpenIdea}: {spaceId:string;csrfToken?:string;initialSeedId?:string;onOpenIdea?:(id:string)=>void}) {
+export function GraphServerView({spaceId, initialSeedId, onOpenIdea, snapshot, onSnapshotChange}: {spaceId:string;csrfToken?:string;initialSeedId?:string;onOpenIdea?:(id:string)=>void;snapshot?:StellarWorkspaceSnapshot;onSnapshotChange?:(snapshot:StellarWorkspaceSnapshot)=>void}) {
   const source=useMemo(()=>webStellarSource(spaceId),[spaceId]);
-  return <div className="h-full" data-testid="advanced-graph-view"><StellarWorkspace source={source} initialSeed={initialSeedId} onOpenIdea={onOpenIdea}/></div>;
+  return <div className="h-full" data-testid="advanced-graph-view"><StellarWorkspace source={source} initialSeed={initialSeedId} onOpenIdea={onOpenIdea} snapshot={snapshot} onSnapshotChange={onSnapshotChange}/></div>;
 }
 
 export function AdvancedServerWorkspace({
@@ -1373,6 +1374,7 @@ export function AdvancedServerWorkspace({
   onOpenIdea?: (id: string) => void;
 }) {
   const [surface, setSurface] = useState<Surface>(initialSurface);
+  const graphSnapshot = useRef<StellarWorkspaceSnapshot>();
   return (
     <div
       className="server-desktop-surface flex h-full min-h-0 flex-col bg-neutral-950 text-neutral-100"
@@ -1411,6 +1413,8 @@ export function AdvancedServerWorkspace({
             spaceId={spaceId}
             csrfToken={csrfToken}
             initialSeedId={initialGraphSeedId}
+            snapshot={graphSnapshot.current}
+            onSnapshotChange={snapshot => { graphSnapshot.current = snapshot; }}
             onOpenIdea={onOpenIdea}
           />
         )}

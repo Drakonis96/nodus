@@ -1,12 +1,13 @@
 import {
   useCallback,
+  useId,
   useEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
-import type { GraphData, IdeaDetail, EdgeDetail } from "@shared/types";
+import type { GraphData, GraphNode, IdeaDetail, EdgeDetail } from "@shared/types";
 import type { StellarSession, StellarPosition } from "@shared/stellarGraph";
 import {
   NodeDetailPanel,
@@ -14,11 +15,13 @@ import {
 } from "../components/NodeDetailPanel";
 import { StellarCanvas, type StellarCanvasApi } from "./StellarCanvas";
 import { Exploration } from "./exploration";
-import type { StellarGraphSource } from "./source";
+import { workScopedSource, type StellarGraphSource } from "./source";
 import { StellarSearch } from "./StellarSearch";
-import { isLegacyLinearLayout, STELLAR_LAYOUT_VERSION } from "./layout";
+import { STELLAR_LAYOUT_VERSION } from "./layout";
 import { relation, RELATIONS } from "./palette";
-import { t } from "../i18n";
+import { errorText, t, tx } from "../i18n";
+import { Icon } from "../components/ui";
+import type { StellarGraphTabDescriptor, StellarTabSnapshot, StellarWorkspaceSnapshot } from "./snapshot";
 const EMPTY: GraphData = { nodes: [], edges: [] };
 export interface StellarWorkspaceProps {
   source: StellarGraphSource;
@@ -26,6 +29,9 @@ export interface StellarWorkspaceProps {
   initialSeed?: string;
   initialEdge?: string;
   initialSearch?: string;
+  navigationKey?: number;
+  snapshot?: StellarWorkspaceSnapshot;
+  onSnapshotChange?(snapshot: StellarWorkspaceSnapshot): void;
   author?: string;
   title?: string;
   toolbar?: ReactNode;
@@ -36,7 +42,111 @@ export interface StellarWorkspaceProps {
   audit?: boolean;
   baseline?: boolean;
 }
-export function StellarWorkspace({
+export function StellarWorkspace(props: StellarWorkspaceProps) {
+  return <StellarTabs key={`${props.source.key}:${props.workId || "corpus"}`} {...props} />;
+}
+
+function StellarTabs(props: StellarWorkspaceProps) {
+  const source = useMemo(() => props.workId ? workScopedSource(props.source, props.workId) : props.source, [props.source, props.workId]);
+  const scope = `${props.source.key}:${props.workId || "corpus"}`;
+  const [saved] = useState(() => props.snapshot?.scope === scope ? props.snapshot : undefined);
+  const { initialSeed, initialEdge, initialSearch, author, navigationKey } = props;
+  const [tabs, setTabs] = useState<StellarGraphTabDescriptor[]>(saved?.tabs || [{ id: 1, label: "", initialSeed, initialEdge, initialSearch, author }]);
+  const [active, setActive] = useState(saved?.active || 1);
+  const nextId = useRef(saved?.nextId || 2);
+  const targetKey = JSON.stringify([initialSeed, initialEdge, initialSearch, author, navigationKey]);
+  const lastTarget = useRef(saved?.targetKey || targetKey);
+  const tabStates = useRef<Record<number, StellarTabSnapshot>>({ ...saved?.states });
+  const snapshotCallback = useRef(props.onSnapshotChange);
+  snapshotCallback.current = props.onSnapshotChange;
+  const currentSnapshot = useRef({ tabs, active, scope });
+  currentSnapshot.current = { tabs, active, scope };
+  const publishSnapshot = useCallback(() => {
+    const current = currentSnapshot.current;
+    snapshotCallback.current?.({ ...current, targetKey: lastTarget.current, nextId: nextId.current,
+      states: Object.fromEntries(current.tabs.flatMap(tab => tabStates.current[tab.id] ? [[tab.id, tabStates.current[tab.id]]] : [])) });
+  }, []);
+  useEffect(() => {
+    if (targetKey === lastTarget.current) return;
+    lastTarget.current = targetKey;
+    if (!initialSeed && !initialEdge && !initialSearch && !author) return;
+    const id = nextId.current++;
+    setTabs(current => [...current, { id, label: "", initialSeed, initialEdge, initialSearch, author }]);
+    setActive(id);
+  }, [targetKey, initialSeed, initialEdge, initialSearch, author]);
+  useEffect(publishSnapshot, [tabs, active, publishSnapshot]);
+  const tabsId = useId();
+  const host = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState(false);
+  useEffect(() => {
+    const update = () => setFullscreen(document.fullscreenElement === host.current);
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || document.fullscreenElement !== host.current) return;
+      event.preventDefault(); event.stopPropagation();
+      void document.exitFullscreen().catch(() => setFullscreenError(true));
+    };
+    document.addEventListener("fullscreenchange", update);
+    document.addEventListener("keydown", escape, true);
+    return () => { document.removeEventListener("fullscreenchange", update); document.removeEventListener("keydown", escape, true); };
+  }, []);
+  const toggleFullscreen = async () => {
+    setFullscreenError(false);
+    try {
+      if (document.fullscreenElement === host.current) await document.exitFullscreen();
+      else await host.current?.requestFullscreen();
+    } catch { setFullscreenError(true); }
+  };
+  const addTab = () => {
+    const id = nextId.current++;
+    setTabs(current => [...current, { id, label: "" }]);
+    setActive(id);
+  };
+  const closeTab = (id: number) => {
+    delete tabStates.current[id];
+    const index = tabs.findIndex(tab => tab.id === id);
+    const remaining = tabs.filter(tab => tab.id !== id);
+    if (!remaining.length) {
+      const newId = nextId.current++;
+      setTabs([{ id: newId, label: "" }]); setActive(newId);
+    } else {
+      setTabs(remaining);
+      if (active === id) setActive(remaining[Math.min(index, remaining.length - 1)].id);
+    }
+  };
+  return <div className="stellar-tabs-workspace" ref={host} data-testid="stellar-tabs-workspace">
+    <div className="stellar-tabs-header">
+      <div className="stellar-tabs" role="tablist" aria-label={t("Grafos abiertos")}>
+        {tabs.map(tab => <div className={`stellar-tab ${active === tab.id ? "active" : ""}`} key={tab.id}>
+          <button role="tab" id={`${tabsId}-tab-${tab.id}`} aria-controls={`${tabsId}-panel-${tab.id}`} aria-selected={active === tab.id}
+            tabIndex={active === tab.id ? 0 : -1} onClick={() => setActive(tab.id)} onKeyDown={event => {
+              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+              event.preventDefault();
+              const index = tabs.findIndex(item => item.id === tab.id);
+              const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+              setActive(tabs[next].id); document.getElementById(`${tabsId}-tab-${tabs[next].id}`)?.focus();
+            }} title={tab.label || tx("Grafo {n}", { n: tab.id })}><Icon name="map" size={14} /><span>{tab.label || tx("Grafo {n}", { n: tab.id })}</span></button>
+          <button className="stellar-tab-close" aria-label={tx("Cerrar grafo {n}", { n: tab.id })} onClick={() => closeTab(tab.id)}>×</button>
+        </div>)}
+      </div>
+      <button className="stellar-new-tab" onClick={addTab} title={t("Nuevo grafo")} aria-label={t("Nuevo grafo")}><Icon name="plus" size={18} /></button>
+      <button className="stellar-fullscreen" onClick={() => void toggleFullscreen()} aria-pressed={fullscreen} title={t(fullscreen ? "Salir de pantalla completa" : "Pantalla completa")}>
+        <Icon name={fullscreen ? "minimize" : "maximize"} size={15} />{t(fullscreen ? "Salir de pantalla completa" : "Pantalla completa")}
+      </button>
+    </div>
+    {fullscreenError && <p role="alert">{t("No se pudo activar la pantalla completa.")}</p>}
+    {tabs.map(tab => <div key={tab.id} role="tabpanel" id={`${tabsId}-panel-${tab.id}`} aria-labelledby={`${tabsId}-tab-${tab.id}`} className={active === tab.id ? "stellar-tab-panel" : "hidden"}>
+      <StellarGraphTab {...props} source={source} active={active === tab.id}
+        initialSeed={tab.initialSeed} initialEdge={tab.initialEdge}
+        initialSearch={tab.initialSearch} author={tab.author}
+        initialState={saved?.states[tab.id]}
+        onTabSnapshot={state => { tabStates.current[tab.id] = state; publishSnapshot(); }}
+        onTitleChange={label => setTabs(current => current.map(item => item.id === tab.id ? { ...item, label } : item))} />
+    </div>)}
+  </div>;
+}
+
+function StellarGraphTab({
   source,
   workId,
   initialSeed,
@@ -50,7 +160,11 @@ export function StellarWorkspace({
   saveIdea,
   saveEdge,
   audit,
-}: StellarWorkspaceProps) {
+  active,
+  onTitleChange,
+  initialState,
+  onTabSnapshot,
+}: StellarWorkspaceProps & { active: boolean; onTitleChange(label: string): void; initialState?: StellarTabSnapshot; onTabSnapshot(state: StellarTabSnapshot): void }) {
   const [engine, setEngine] = useState<Exploration | null>(null),
     [data, setData] = useState<GraphData>(EMPTY);
   const [positions, setPositions] = useState<Record<string, StellarPosition>>(
@@ -78,13 +192,18 @@ export function StellarWorkspace({
     [follow, setFollow] = useState(true),
     [reload, setReload] = useState(0);
   const selectionEpoch = useRef(0);
+  const titleCallback = useRef(onTitleChange);
+  titleCallback.current = onTitleChange;
+  const tabSnapshotCallback = useRef(onTabSnapshot);
+  tabSnapshotCallback.current = onTabSnapshot;
+  const [searchQuery, setSearchQuery] = useState(initialState?.search ?? initialSearch ?? "");
   const api = useRef<StellarCanvasApi | null>(null),
     detailSeq = useRef(0),
     life = useRef(0),
     stepping = useRef(false),
     count = useRef(0),
     fitOnce = useRef(false),
-    latestSession = useRef<StellarSession | null>(null),
+    latestSession = useRef<StellarSession | null>(initialState?.session || null),
     ready = useRef(false);
   const bindApi = useCallback((value: StellarCanvasApi | null) => {
     api.current = value;
@@ -105,6 +224,8 @@ export function StellarWorkspace({
     const generation = ++life.current;
     ready.current = false;
     setLoading(true);
+    setBusy(false);
+    stepping.current = false;
     setPlaying(false);
     setEngine(null);
     setData(EMPTY);
@@ -115,28 +236,24 @@ export function StellarWorkspace({
     fitOnce.current = false;
     const e = new Exploration(source);
     void (async () => {
-      const saved = await source.restore?.();
-      if (generation !== life.current) return;
-      if (workId) await e.baseline(workId);
+      const saved = latestSession.current;
       if (generation !== life.current) return;
       if (saved?.version === 1) {
         await e.restore(saved);
         if (generation !== life.current) return;
-        const repairRow = workId && saved.layoutVersion !== STELLAR_LAYOUT_VERSION
-          && isLegacyLinearLayout(e.visible().nodes.map(n => n.id), saved.positions || {});
-        setPositions(repairRow ? {} : saved.positions || {});
-        setCamera(repairRow ? { x: 0, y: 0, zoom: 1 } : saved.camera);
+        setPositions(saved.positions || {});
+        setCamera(saved.camera);
         setLimit(saved.limit);
         setSpeed(saved.speed);
-        fitOnce.current = !repairRow;
+        fitOnce.current = true;
       }
-      if (initialSeed) {
+      if (initialSeed && !saved) {
         e.ingest(
           await source.page({ kind: "elements", nodeIds: [initialSeed] }),
         );
-        e.start(initialSeed);
+        await e.add(initialSeed, 25);
       }
-      if (initialEdge) {
+      if (initialEdge && !saved) {
         const page = await source.page({
           kind: "elements",
           edgeIds: [initialEdge],
@@ -151,11 +268,12 @@ export function StellarWorkspace({
       if (generation !== life.current) return;
       setEngine(e);
       setData(e.visible());
+      if (initialSeed && !saved) titleCallback.current(e.nodes.get(initialSeed)?.label || "");
       ready.current = true;
       setLoading(false);
     })().catch((err) => {
       if (generation === life.current) {
-        setError(String(err));
+        setError(errorText(err));
         setLoading(false);
       }
     });
@@ -171,6 +289,8 @@ export function StellarWorkspace({
       version: 1,
       layoutVersion: STELLAR_LAYOUT_VERSION,
       seeds: [...engine.seeds],
+      pinnedNodes: [...engine.baselineNodes],
+      removedNodes: [...engine.removedNodes],
       history: [...engine.history],
       cursor: engine.cursor,
       activeSeed: engine.activeSeed,
@@ -180,22 +300,15 @@ export function StellarWorkspace({
       speed,
     };
     latestSession.current = state;
-    const timer = setTimeout(() => {
-      void source
-        .save?.(state)
-        .catch((err) =>
-          setError(`${t("No se pudo guardar el canvas")}: ${err}`),
-        );
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [engine, data, positions, camera, limit, speed, source]);
-  useEffect(
-    () => () => {
-      if (latestSession.current)
-        void source.save?.(latestSession.current).catch(() => {});
-    },
-    [source],
-  );
+    tabSnapshotCallback.current({ session: state, search: searchQuery });
+  }, [engine, data, positions, camera, limit, speed, searchQuery]);
+  useEffect(() => {
+    if (!active) {
+      engine?.interrupt();
+      setPlaying(false);
+      setAnimating(false);
+    }
+  }, [active, engine]);
   useEffect(() => {
     if (
       !fitOnce.current &&
@@ -246,11 +359,10 @@ export function StellarWorkspace({
         );
       }
     } catch (err) {
-      setError(String(err));
+      setError(errorText(err));
       setPlaying(false);
     } finally {
-      stepping.current = false;
-      if (generation === life.current) setBusy(false);
+      if (generation === life.current) { stepping.current = false; setBusy(false); }
     }
   }, [engine, limit, frameStep]);
   useEffect(() => {
@@ -304,7 +416,7 @@ export function StellarWorkspace({
         })
         .catch((err) => {
           if (seq === detailSeq.current) {
-            setError(String(err));
+            setError(errorText(err));
             setDetailLoading(null);
           }
         });
@@ -339,22 +451,51 @@ export function StellarWorkspace({
       })
       .catch((err) => {
         if (seq === detailSeq.current) {
-          setError(String(err));
+          setError(errorText(err));
           setDetailLoading(null);
         }
       });
   };
-  const start = (id: string) => {
-    if (!engine || busy) return;
-    setPlaying(false);
-    frameStep(null);
-    setAnimating(false);
-    setPlaybackNotice("");
-    engine.start(id);
-    count.current = 0;
-    setData(engine.visible());
-    setMessage(t("Pulsa Play o Siguiente para seguir sus conexiones."));
+  const start = async (id: string, node?: GraphNode) => {
+    if (!engine || stepping.current) return;
+    const generation = life.current;
+    stepping.current = true;
+    setBusy(true); setError(""); setPlaying(false); setAnimating(false);
+    setActiveEdge(null); setFollow(false); setPlaybackNotice("");
+    if (node) engine.ingest({ nodes: [node], edges: [] });
+    try {
+      const found = await engine.add(id, limit);
+      if (generation !== life.current || found === undefined) return;
+      fitOnce.current = false;
+      count.current = 0;
+      setData(engine.visible());
+      onTitleChange(engine.nodes.get(id)?.label || "");
+      setMessage(tx("{n} conexiones directas cargadas. Añade otra idea con +.", { n: found }));
+    } catch (err) {
+      if (generation === life.current) setError(errorText(err));
+    } finally {
+      if (generation === life.current) { stepping.current = false; setBusy(false); }
+    }
   };
+  const clearCanvas = () => {
+    life.current++; engine?.clear();
+    stepping.current = false; count.current = 0; fitOnce.current = false;
+    latestSession.current = null;
+    setBusy(false); setPlaying(false); setAnimating(false); setFollow(false);
+    setData(EMPTY); setPositions({}); setCamera({ x: 0, y: 0, zoom: 1 });
+    setActiveEdge(null); setFocusRequest(0); setShowSources(false);
+    setMessage(t("Lienzo vacío. Busca una idea para empezar.")); setError(""); setPlaybackNotice("");
+    closeDetail(); onTitleChange("");
+  };
+  const removeNode = (id: string) => {
+    if (!engine) return;
+    life.current++; engine.remove(id); stepping.current = false;
+    setBusy(false); setPlaying(false); setAnimating(false); setActiveEdge(null); setFollow(false);
+    setData(engine.visible());
+    setPositions(current => Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)));
+    closeDetail(); setPlaybackNotice(""); setMessage(t("Idea retirada del lienzo."));
+  };
+  const visibleIds = useMemo(() => new Set(data.nodes.map(node => node.id)), [data.nodes]);
   const connections = useMemo(
     () =>
       selected
@@ -366,7 +507,7 @@ export function StellarWorkspace({
   );
   const step = activeEdge ? data.edges.find(e => e.id === activeEdge) : undefined;
   return (
-    <div className="stellar-workspace" data-testid="stellar-workspace">
+    <div className="stellar-workspace" data-testid="stellar-workspace" data-node-count={data.nodes.length} data-edge-count={data.edges.length}>
       <header className="stellar-header">
         <div className="stellar-heading">
           <span className="stellar-eyebrow">NODUS / {t("CONSTELACIÓN")}</span>
@@ -374,17 +515,16 @@ export function StellarWorkspace({
         </div>
         <div className="stellar-header-actions">
           {toolbar}
-          <StellarSearch source={source} author={author} initialQuery={initialSearch}
-            disabled={busy || loading} onChoose={node => {
-              engine?.ingest({ nodes: [node], edges: [] });
+          <StellarSearch source={source} author={author} initialQuery={searchQuery} onQueryChange={setSearchQuery}
+            disabled={busy || loading} visibleIds={visibleIds} onRemove={removeNode} onChoose={node => {
               closeDetail();
-              start(node.id);
+              void start(node.id, node);
             }} />
         </div>
       </header>
       <div className="stellar-body">
         <div className="stellar-stage">
-          <StellarCanvas
+          {active && <StellarCanvas
             data={data}
             positions={positions}
             camera={camera}
@@ -430,17 +570,17 @@ export function StellarWorkspace({
                   pageNumber: ev?.page_number || null,
                 });
             }}
-          />
+          />}
           <div className="stellar-meta">
             <span className="stellar-live-dot" />
             {loading
               ? t("Preparando constelación…")
               : `${data.nodes.length.toLocaleString()} ${t("ideas")} · ${data.edges.length.toLocaleString()} ${t("relaciones")}`}{" "}
-            {workId && <span> / {t("Obra completa")}</span>}
+            {workId && <span> / {t("Grafo de la obra")}</span>}
           </div>
           {!loading && !data.nodes.length && (
             <div className="stellar-empty stellar-empty-hint">
-              {t(workId ? "Esta obra todavía no tiene ideas extraídas." : "Busca una idea arriba para empezar a explorar.")}
+              {t("Busca una idea arriba para empezar a explorar.")}
             </div>
           )}
           {error && (
@@ -495,6 +635,7 @@ export function StellarWorkspace({
                 setPositions({});
               }}
             >{t("Reorganizar")}</button>
+            <button disabled={loading || (!data.nodes.length && !busy)} onClick={clearCanvas} title={t("Quitar todas las ideas y conexiones del lienzo")}>{t("Limpiar")}</button>
           </div>
           <div className="stellar-player">
             <div className="stellar-player-line">
@@ -541,7 +682,7 @@ export function StellarWorkspace({
               </button>
               <span className="stellar-divider" />
               <label>
-                {t("Relaciones")}
+                {t("Relaciones por idea")}
                 <input
                   aria-label={t("Límite de relaciones")}
                   type="number"
@@ -583,10 +724,11 @@ export function StellarWorkspace({
                   <i aria-hidden="true" />{engine?.nodes.get(selected)?.label}
                 </span>
                 <small title={t("conexiones visibles")}>{connections.length} {t("conexiones")}</small>
-                <button className="stellar-primary" disabled={busy} onClick={() => start(selected)}
+                <button className="stellar-primary" disabled={busy} onClick={() => void start(selected)}
                   title={t("Expandir desde aquí")} aria-label={t("Expandir desde aquí")}>
                   {t("Expandir")} ↗
                 </button>
+                <button onClick={() => removeNode(selected)} aria-label={t("Quitar idea del lienzo")} title={t("Quitar idea del lienzo")}>− {t("Quitar")}</button>
                 <button className={showSources ? "active" : ""} aria-pressed={showSources}
                   aria-label={t(showSources ? "Ocultar fuentes" : "Mostrar fuentes")}
                   title={t(showSources ? "Ocultar fuentes" : "Mostrar fuentes")}

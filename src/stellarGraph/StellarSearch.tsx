@@ -3,12 +3,16 @@ import type { GraphNode } from "@shared/types";
 import type { StellarGraphSource } from "./source";
 import { NODE_LABELS } from "./palette";
 import { t } from "../i18n";
+import { Icon } from "../components/ui";
 
-export function StellarSearch({ source, author, initialQuery = "", disabled, onChoose }: {
+export function StellarSearch({ source, author, initialQuery = "", onQueryChange, disabled, visibleIds, onRemove, onChoose }: {
   source: StellarGraphSource;
   author?: string;
   initialQuery?: string;
+  onQueryChange?(query: string): void;
   disabled: boolean;
+  visibleIds: Set<string>;
+  onRemove(id: string): void;
   onChoose(node: GraphNode): void;
 }) {
   const [query, setQuery] = useState(initialQuery);
@@ -22,6 +26,7 @@ export function StellarSearch({ source, author, initialQuery = "", disabled, onC
   const input = useRef<HTMLInputElement>(null);
   const request = useRef(0);
   const listId = useId();
+  useEffect(() => { onQueryChange?.(query); }, [query, onQueryChange]);
 
   useEffect(() => {
     const version = ++request.current;
@@ -54,11 +59,10 @@ export function StellarSearch({ source, author, initialQuery = "", disabled, onC
     if (open && active >= 0) document.getElementById(`${listId}-${active}`)?.scrollIntoView({ block: "nearest" });
   }, [active, open, listId]);
 
-  const choose = (node: GraphNode) => {
+  const choose = (node: GraphNode, keepOpen = false) => {
     if (disabled || busy) return;
     onChoose(node);
-    setOpen(false);
-    input.current?.blur();
+    if (!keepOpen) { setOpen(false); input.current?.blur(); }
   };
   const more = async () => {
     if (busy || cursor === null) return;
@@ -82,7 +86,7 @@ export function StellarSearch({ source, author, initialQuery = "", disabled, onC
       <div className="stellar-search-field">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg>
         <input ref={input} type="search" role="combobox" aria-label={t("Buscar una idea")}
-          aria-autocomplete="list" aria-expanded={open} aria-controls={open ? listId : undefined}
+          aria-autocomplete="list" aria-haspopup="grid" aria-expanded={open} aria-controls={open ? listId : undefined}
           aria-activedescendant={open && active >= 0 ? `${listId}-${active}` : undefined}
           placeholder={t("Buscar una idea…")} value={query}
           onFocus={() => setOpen(true)}
@@ -104,14 +108,22 @@ export function StellarSearch({ source, author, initialQuery = "", disabled, onC
         }}>×</button>}
       </div>
       {open && <div className="stellar-search-popover">
-        <div className="stellar-search-caption">{t("ELIGE EL PUNTO DE PARTIDA")}<kbd>esc</kbd></div>
-        <div id={listId} role="listbox" aria-label={t("Ideas encontradas")} aria-busy={busy} className="stellar-search-results">
-          {results.map((node, index) => <button key={node.id} id={`${listId}-${index}`} role="option"
-            aria-selected={index === active} tabIndex={-1} disabled={disabled || busy}
-            onMouseDown={event => event.preventDefault()} onClick={() => choose(node)}>
-            <small>{t(NODE_LABELS[node.type] || node.type)} · {node.workCount} {t("fuentes")}</small>
-            <strong>{node.label}</strong><span>{node.statement}</span>
-          </button>)}
+        <div className="stellar-search-caption">{t("AÑADE IDEAS AL LIENZO")}<kbd>esc</kbd></div>
+        <div id={listId} role="grid" aria-label={t("Ideas encontradas")} aria-busy={busy} className="stellar-search-results">
+          {results.map((node, index) => <div key={node.id} id={`${listId}-${index}`} role="row" aria-selected={index === active}
+            className={`stellar-search-result ${visibleIds.has(node.id) ? "included" : ""}`}>
+            <div role="gridcell"><button className="stellar-search-choice" tabIndex={-1} disabled={disabled || busy}
+              onMouseDown={event => event.preventDefault()} onClick={() => choose(node)}>
+              <small>{t(NODE_LABELS[node.type] || node.type)} · {node.workCount} {t("fuentes")}</small>
+              <strong>{node.label}</strong><span>{node.statement}</span>
+            </button></div>
+            <div role="gridcell"><button className="stellar-search-toggle" disabled={disabled || busy}
+              aria-label={`${t(visibleIds.has(node.id) ? "Quitar idea del lienzo" : "Añadir idea al lienzo")}: ${node.label}`}
+              title={t(visibleIds.has(node.id) ? "Quitar idea del lienzo" : "Añadir idea al lienzo")}
+              onMouseDown={event => event.preventDefault()} onClick={() => visibleIds.has(node.id) ? onRemove(node.id) : choose(node, true)}>
+              <Icon name={visibleIds.has(node.id) ? "minus" : "plus"} size={18} />
+            </button></div>
+          </div>)}
         </div>
         {busy && <p role="status">{t("Buscando…")}</p>}
         {error && <p role="alert">{error}</p>}

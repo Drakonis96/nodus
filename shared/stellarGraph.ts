@@ -22,6 +22,9 @@ export interface StellarSession {
   version: 1;
   layoutVersion?: number;
   seeds: string[];
+  /** Local workspace visibility, including isolated ideas retained after removing a neighbor. */
+  pinnedNodes?: string[];
+  removedNodes?: string[];
   history: string[];
   cursor: number;
   activeSeed: string | null;

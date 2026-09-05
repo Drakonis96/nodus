@@ -74,3 +74,11 @@ jobs:
       - name: Stellar canvas E2E (isolated demonstration profile)
         timeout-minutes: 5
         run: npm run test:e2e:stellar
+
+      - name: Graph tabs E2E (isolated demonstration profile)
+        timeout-minutes: 5
+        run: npm run test:e2e:stellar-tabs
+
+      - name: Argument map E2E (isolated demonstration profile)
+        timeout-minutes: 5
+        run: npm run test:e2e:argument-map

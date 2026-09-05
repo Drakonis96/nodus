@@ -5,6 +5,7 @@ import { Spinner } from '../components/ui';
 import { t } from '../i18n';
 import { GraphView } from './GraphView';
 import { createStudyKnowledgeViewSource } from './studyKnowledgeViewSource';
+import type { StellarWorkspaceSnapshot } from '../stellarGraph/snapshot';
 
 const SUBJECT_KEY = 'nodus.studyKnowledgeSubjectId';
 
@@ -14,12 +15,16 @@ export function StudyGraphView({
   target,
   onOpenMaterial,
   onOpenDocument,
+  snapshot,
+  onSnapshotChange,
 }: {
   settings: AppSettings;
   onSettingsChange: () => void;
   target?: GraphNavigationTarget | null;
   onOpenMaterial: (id: string) => void;
   onOpenDocument: (id: string) => void;
+  snapshot?: StellarWorkspaceSnapshot;
+  onSnapshotChange?(snapshot: StellarWorkspaceSnapshot): void;
 }) {
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
   const [subjectId, setSubjectId] = useState(() => localStorage.getItem(SUBJECT_KEY) ?? '');
@@ -44,6 +49,8 @@ export function StudyGraphView({
     onSettingsChange={onSettingsChange}
     target={target}
     dataSource={dataSource}
+    snapshot={snapshot}
+    onSnapshotChange={onSnapshotChange}
     testId="study-graph-view"
     scopeControl={<select data-testid="study-graph-subject" className="input min-w-48 text-sm" value={subjectId} onChange={(event) => setSubjectId(event.target.value)} aria-label={t('Asignatura')}>{workspace.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>}
   />;
