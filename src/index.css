@@ -1,6 +1,15 @@
 /* Inter is loaded from the system font stack (Tailwind `sans` falls back to
    system-ui). A runtime Google Fonts @import is blocked by the app CSP and
    breaks offline use, so it is intentionally not used. */
+
+/* Colour themes. `tokens.generated.css` + `utilities.generated.css` are produced by
+   `npm run gen:theme` from src/theme/themes.mjs; `theme-components.css` is hand-written.
+   The `default` theme carries no rules here and renders through the Tailwind + `.light`
+   cascade below, so it stays byte-identical. See src/theme/themes.mjs. */
+@import './theme/tokens.generated.css';
+@import './theme/utilities.generated.css';
+@import './theme/theme-components.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -1393,6 +1402,30 @@ body {
 }
 
 .light .study-milkdown .milkdown-toolbar .study-selection-tooltip::after {
+  border-color: #d6d3d1;
+  background: rgba(255, 255, 255, 0.99);
+  box-shadow: 0 8px 22px rgba(28, 25, 23, 0.18);
+  color: #292524;
+}
+
+/* Shared styled tooltip (src/components/Tooltip.tsx). It is portal-rendered so the
+   compact sidebar's scroll region and the header's overflow-hidden rail cannot clip
+   it; this class only carries the look, with a .light counterpart for the theme. */
+.nodus-tooltip {
+  max-width: min(16rem, calc(100vw - 1.5rem));
+  padding: 0.3rem 0.55rem;
+  border: 1px solid rgba(82, 82, 82, 0.9);
+  border-radius: 0.4rem;
+  background: rgba(23, 23, 23, 0.98);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+  color: #fafafa;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  white-space: normal;
+}
+.light .nodus-tooltip {
   border-color: #d6d3d1;
   background: rgba(255, 255, 255, 0.99);
   box-shadow: 0 8px 22px rgba(28, 25, 23, 0.18);
@@ -3373,12 +3406,12 @@ select.input optgroup {
   background: rgb(64 64 64 / 0.7);
 }
 .library-scope-button:focus-visible {
-  outline: 2px solid #818cf8;
+  outline: 2px solid var(--a-400, #818cf8);
   outline-offset: 1px;
 }
 .library-scope-button.is-active {
   color: #ffffff;
-  background: #4f46e5;
+  background: var(--a-600, #4f46e5);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.24);
 }
 .library-scope-button:disabled { cursor: wait; opacity: 0.65; }
@@ -3423,7 +3456,7 @@ select.input optgroup {
 }
 .light .library-scope-button.is-active {
   color: #ffffff;
-  background: #4f46e5;
+  background: var(--a-600, #4f46e5);
 }
 .light .library-scope-tooltip {
   border-color: #d4d4d4;
@@ -3500,9 +3533,10 @@ select.input optgroup {
 .library-action-menu-badge.is-beta { color: #fcd34d; background: rgb(245 158 11 / 0.16); }
 .library-action-menu-badge.is-recommended { color: #6ee7b7; background: rgb(16 185 129 / 0.14); }
 /* The way back into the Library guide. It is the one glyph-only button in a row of
-   labelled ones, so it takes the active vault's accent (handed in as
-   --library-help-accent) instead of the shared neutral outline. */
+   labelled ones, so it takes the theme accent (--library-help-accent defaults to
+   the --a-500 ramp step) instead of the shared neutral outline. */
 .library-help-button {
+  --library-help-accent: var(--a-500, #6366f1);
   --library-help-glyph: color-mix(in srgb, var(--library-help-accent) 62%, #ffffff);
   display: inline-flex;
   min-width: 2.25rem;

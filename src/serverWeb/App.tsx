@@ -24,6 +24,7 @@ import {
   type View,
 } from "../navigation";
 import { HoverLabelButton, Icon } from "../components/ui";
+import { applyAppThemeClass } from "../theme/themeBoot";
 import { vaultTypeIcon, vaultTypeLabel } from "../components/vaultTypeUi";
 import { WorldbuildingSidebar } from "../components/WorldbuildingSidebar";
 import { ProsopographySidebar } from "../components/ProsopographySidebar";
@@ -1756,6 +1757,9 @@ export default function App() {
   const [theme, setTheme] = useState<"dark" | "light">(() =>
     localStorage.getItem("nodus-web-theme") === "light" ? "light" : "dark",
   );
+  const [appTheme, setAppTheme] = useState<string>(
+    () => localStorage.getItem("nodus-app-theme") || "default",
+  );
   const [sidebarWidth, setSidebarWidth] = useState(() =>
     Math.max(
       SERVER_SIDEBAR_MIN_WIDTH,
@@ -1809,6 +1813,12 @@ export default function App() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("nodus-web-theme", theme);
   }, [theme]);
+  useEffect(() => {
+    // Colour palette lives on a `theme-<id>` class; `data-theme` above is already
+    // taken by light/dark on this build.
+    applyAppThemeClass(appTheme);
+    localStorage.setItem("nodus-app-theme", appTheme);
+  }, [appTheme]);
   const summarySequence = useRef(0);
   const refreshSpaces = useCallback(async () => {
     const value = await api.me();
@@ -1857,6 +1867,7 @@ export default function App() {
         setLanguage(response.profile.values.appearance.uiLanguage || "en");
         profileThemeRef.current = response.profile.values.appearance.theme;
         setTheme(resolveTheme(response.profile.values.appearance.theme));
+        setAppTheme(response.profile.values.appearance.appTheme || "default");
       })
       .catch(() => undefined);
     const listener = (event: Event) => {
@@ -1866,6 +1877,7 @@ export default function App() {
         setLanguage(next.appearance.uiLanguage || "en");
         profileThemeRef.current = next.appearance.theme;
         setTheme(resolveTheme(next.appearance.theme));
+        setAppTheme(next.appearance.appTheme || "default");
       }
     };
     addEventListener("nodus-profile-updated", listener);
@@ -2427,6 +2439,7 @@ export default function App() {
           theme={theme}
           initialTab={settingsTab as TabId}
           onThemeChange={setTheme}
+          onAppThemeChange={setAppTheme}
           onLanguageChange={setLanguage}
         />
       );

@@ -1,9 +1,10 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron/simple';
 import electronPlugin from 'vite-plugin-electron';
 import renderer from 'vite-plugin-electron-renderer';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 // graphology and sigma ship CJS builds that `require('events')` (a Node
@@ -13,6 +14,32 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const eventsPolyfill = require.resolve('events/');
 const pkg = require('./package.json') as { version: string };
+
+// `src/theme/{tokens,utilities}.generated.css` are derived from `src/theme/themes.mjs`
+// by scripts/gen-theme-utilities.mjs (see that file's header). Running the generator
+// as a Vite plugin — rather than requiring `npm run gen:theme` as a separate manual
+// step — means `npm run dev` and `npm run build` always see fresh CSS, and editing
+// themes.mjs during dev regenerates + hot-reloads without a restart. The generator is
+// spawned as its own process (rather than imported) because it computes its output at
+// module-load time from the files on disk, so a fresh process is the simplest way to
+// pick up an edit.
+const themeGenPlugin = (): Plugin => {
+  const script = path.resolve(__dirname, 'scripts/gen-theme-utilities.mjs');
+  const themesSource = path.resolve(__dirname, 'src/theme/themes.mjs');
+  const run = () => execFileSync(process.execPath, [script], { stdio: 'inherit' });
+  return {
+    name: 'gen-theme-utilities',
+    buildStart() {
+      run();
+    },
+    configureServer(server) {
+      server.watcher.add(themesSource);
+      server.watcher.on('change', (file) => {
+        if (path.resolve(file) === themesSource) run();
+      });
+    },
+  };
+};
 
 const databaseComputeWorkerAliases = () => ({
   name: 'database-compute-worker-aliases',
@@ -26,6 +53,11 @@ const databaseComputeWorkerAliases = () => ({
     return null;
   },
 });
+
+// The main Electron entry owns the single dev-server bootstrap. Secondary
+// worker/preload builds must remain passive rebuilds; defining `onstart` here
+// competes for the plugin's startup lifecycle and prevents the app from
+// launching.
 
 // Native node modules and Electron-only deps must stay external in the main process bundle.
 const mainExternals = [
@@ -78,7 +110,6 @@ const mainExternals = [
  * reload the renderer instead of spawning another Electron instance in dev.
  */
 const preloadBuild = (name: string, entry: string) => ({
-  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     // The top-level resolve.alias only applies to the renderer build.
     resolve: {
@@ -99,7 +130,6 @@ const preloadBuild = (name: string, entry: string) => ({
 });
 
 const databaseComputeWorkerBuild = {
-  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     plugins: [databaseComputeWorkerAliases()],
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
@@ -119,7 +149,6 @@ const databaseComputeWorkerBuild = {
 };
 
 const databaseScaleFixtureWorkerBuild = {
-  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     plugins: [databaseComputeWorkerAliases()],
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
@@ -136,7 +165,6 @@ const databaseScaleFixtureWorkerBuild = {
 };
 
 const databaseAggregateWorkerBuild = {
-  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     plugins: [databaseComputeWorkerAliases()],
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
@@ -153,7 +181,6 @@ const databaseAggregateWorkerBuild = {
 };
 
 const databaseDeepResearchWorkerBuild = {
-  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     plugins: [databaseComputeWorkerAliases()],
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
@@ -170,7 +197,6 @@ const databaseDeepResearchWorkerBuild = {
 };
 
 const vectorScanWorkerBuild = {
-  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
     build: {
@@ -189,7 +215,6 @@ const vectorScanWorkerBuild = {
  * chunk may pull `app`/`BrowserWindow` imports into a process where Electron does not
  * expose them. Build it as one self-contained ESM file instead. */
 const utilityBuild = (name: string, entry: string) => ({
-  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     resolve: {
       alias: { '@shared': path.resolve(__dirname, 'shared') },
@@ -263,6 +288,7 @@ export default defineConfig({
     ],
   },
   plugins: [
+    themeGenPlugin(),
     react(),
     electron({
       main: {

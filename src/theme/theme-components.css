@@ -1,0 +1,24 @@
+/* Themed component surfaces.
+ *
+ * Intentionally almost empty: the shared classes that bake colours in via Tailwind
+ * `@apply` in index.css (`body`, `.card`, `.card-modal`, `.input`, `.btn-primary`,
+ * `.btn-ghost`, scrollbars) are themed automatically — Tailwind's `@apply` grafts
+ * the `html.theme-<id>.<mode> .<util> { … }` rules from `utilities.generated.css`
+ * onto each host selector, in both modes. Add a rule here only for a surface that
+ * `@apply` cannot reach, or where the graft produces a poor result.
+ *
+ * Every selector must be scoped `html:not(.theme-default)` so the `default` theme
+ * stays untouched, and use a specificity high enough to beat the graft
+ * (`html.theme-<id>.<mode> .<sel>` = 0,3,1). */
+
+/* Native <select> option lists. index.css hard-codes `select.input option` to
+ * #171717 / #ffffff — `@apply` can't reach a bare `option`, so the open dropdown
+ * kept the default neutral while the rest of the field was themed. */
+html:not(.theme-default).dark :is(select.input option, select.input optgroup) {
+  background-color: var(--n-900);
+  color: var(--n-100);
+}
+html:not(.theme-default).light :is(select.input option, select.input optgroup) {
+  background-color: var(--n-50);
+  color: var(--n-900);
+}
