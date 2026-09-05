@@ -17,17 +17,28 @@ await page.locator('.stellar-search input').fill(report.node.label);await page.w
 await page.waitForFunction(()=>document.querySelector('.stellar-workspace')?.getAttribute('data-edge-count')==='1');
 const click = name => page.getByRole('button', { name, exact: true }).evaluate(button => button.click());
 const frame = async () => {
-  await page.waitForTimeout(900);
-  const visible = await page.evaluate(() => {
-    const canvas = document.querySelector('.stellar-canvas').getBoundingClientRect();
-    const player = document.querySelector('.stellar-player').getBoundingClientRect();
-    return [...document.querySelectorAll('.stellar-node-label.featured')].map(node => {
-      const box = node.getBoundingClientRect();
-      return box.left >= canvas.left && box.right <= canvas.right && box.top >= canvas.top && box.bottom < player.top;
-    });
-  });
-  assert.equal(visible.length, 2, 'both relationship endpoint captions are rendered');
-  assert.ok(visible.every(Boolean), 'both endpoints fit above controls in the available canvas');
+  // Layout-worker replies and ResizeObserver callbacks can restart the camera
+  // transition. Wait for the actual framing invariant, not a fixed wall-clock delay.
+  try {
+    await page.waitForFunction(() => {
+      if (document.querySelector('.stellar-player-line > button:nth-child(3)').disabled) return false;
+      const canvas = document.querySelector('.stellar-canvas').getBoundingClientRect();
+      const player = document.querySelector('.stellar-player').getBoundingClientRect();
+      const labels = [...document.querySelectorAll('.stellar-node-label.featured')];
+      return labels.length === 2 && labels.every(node => {
+        const box = node.getBoundingClientRect();
+        return box.left >= canvas.left && box.right <= canvas.right && box.top >= canvas.top && box.bottom < player.top;
+      });
+    }, undefined, { timeout: 10000 });
+  } catch (error) {
+    await page.screenshot({path:root+'/work/stellar-preview/framing-failure.png'});
+    console.error('Framing geometry:', await page.evaluate(() => ({
+      canvas:document.querySelector('.stellar-canvas').getBoundingClientRect().toJSON(),
+      player:document.querySelector('.stellar-player').getBoundingClientRect().toJSON(),
+      labels:[...document.querySelectorAll('.stellar-node-label.featured')].map(node=>({text:node.textContent,box:node.getBoundingClientRect().toJSON()})),
+    })));
+    throw error;
+  }
 };
 await click('Siguiente →'); await frame();
 const first = await page.locator('.stellar-step-node').evaluateAll(nodes => nodes.map(node => node.dataset.stepNode));
