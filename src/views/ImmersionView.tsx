@@ -10,7 +10,7 @@
 // Styling note: every color utility here either has an explicit `.light` override
 // in index.css or reads correctly in both themes; the hero uses the dedicated
 // `immersion-hero` class. Graph excerpts MUST live inside a `relative
-// overflow-hidden` box with an explicit height — SigmaGraph renders `absolute
+// overflow-hidden` box with an explicit height — StellarExcerpt renders `absolute
 // inset-0` and would otherwise escape its card.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -44,9 +44,8 @@ import { SourceCitationModal, type CitationTarget, type OpenCitationLibraryWork 
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { TranslationModal } from '../components/TranslationModal';
 import { confirm, toast } from '../components/feedback';
-import { SigmaGraph } from './graph/SigmaGraph';
+import { StellarExcerpt } from '../stellarGraph/StellarExcerpt';
 import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
-import { GRAPH_NODE_TYPES, EDGE_TYPE_COLORS, type GraphFilters } from './graph/model';
 import { t, tx, getActiveLang } from '../i18n';
 import {
   IMMERSION_GENERATION_JOB_KEY,
@@ -71,21 +70,6 @@ import {
   ReaderSelectionActions,
   type ReaderSelectionActionsHandle,
 } from '../components/ReaderSelectionActions';
-
-// Wide-open filters: visibility is controlled by the data subset we feed in.
-const OPEN_FILTERS: GraphFilters = {
-  search: '',
-  nodeTypes: [...GRAPH_NODE_TYPES],
-  edgeTypes: Object.keys(EDGE_TYPE_COLORS),
-  theme: '',
-  workIds: [],
-  authors: [],
-  yearMin: null,
-  yearMax: null,
-  readState: 'all',
-  minConfidence: 0,
-  basis: 'all',
-};
 
 const TIME_PRESETS: { minutes: number; label: string; hint: string }[] = [
   { minutes: 90, label: 'Exprés', hint: '~6 paradas' },
@@ -142,9 +126,7 @@ const SECTION_LABELS: Record<ReturnType<typeof stepSection>, string> = {
   cierre: 'Cierre',
 };
 
-const lightTheme = () => typeof document !== 'undefined' && document.documentElement.classList.contains('light');
-
-/** SigmaGraph renders `absolute inset-0`, so it must be fenced in explicitly. */
+/** StellarExcerpt renders `absolute inset-0`, so it must be fenced in explicitly. */
 function GraphBox({
   data,
   className,
@@ -157,18 +139,7 @@ function GraphBox({
   return (
     <div className={`relative overflow-hidden ${className}`}>
       <GraphErrorBoundary>
-        <SigmaGraph
-          data={data}
-          filters={OPEN_FILTERS}
-          lens="ideas"
-          preset="overview"
-          highlightDepth={1}
-          lightTheme={lightTheme()}
-          showMinimap={false}
-          onOpenNode={onOpenNode}
-          onOpenEdge={() => undefined}
-          onClearFocus={() => undefined}
-        />
+        <StellarExcerpt data={data} onOpenNode={onOpenNode} />
       </GraphErrorBoundary>
     </div>
   );

@@ -1,3 +1,4 @@
+import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 /**
  * French translations keyed by the Spanish source string (see {@link ./i18n}).
  * Key order mirrors {@link ./i18n.en} so the two tables can be diffed side by side.
@@ -56,6 +57,7 @@ import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch
 import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const FR: Record<string, string> = {
+  ...STELLAR_GRAPH_TRANSLATIONS["fr"],
   ...ACADEMIC_TOUR_TRANSLATIONS.fr,
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS.fr,
   ...DATABASE_DEEP_RESEARCH_TRANSLATIONS.fr,

@@ -8,7 +8,7 @@ const source = readFileSync(path.join(root, 'src/components/NodeDetailPanel.tsx'
 
 assert.match(
   source,
-  /if \(page === null && !sourceRef && !onOpen\)/,
+  /page === null && !sourceRef && !onOpen/,
   'an exact attachment remains actionable even when it has no PDF page',
 );
 assert.match(

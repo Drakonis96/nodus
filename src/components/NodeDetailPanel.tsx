@@ -38,6 +38,8 @@ export interface DetailLoading {
 /** One typed relation of the open idea, ready to render + navigate. */
 export interface RelationRow {
   id: string;
+  edgeId?: string;
+  direction?: 'incoming' | 'outgoing';
   label: string;
   relLabel: string;
   relColor: string;
@@ -62,7 +64,13 @@ export function NodeDetailPanel({
   showEdgeAudit = true,
   onSaveIdea,
   onSaveEdge,
+  readOnly = false,
+  edgeLabel,
+  edgeContext,
 }: {
+  readOnly?: boolean;
+  edgeLabel?: string;
+  edgeContext?: string;
   ideaDetail: IdeaDetail | null;
   edgeDetail: EdgeDetail | null;
   loading: DetailLoading | null;
@@ -102,7 +110,7 @@ export function NodeDetailPanel({
   };
 
   return (
-    <div className="relative shrink-0 border-l border-neutral-800 bg-neutral-900/95 overflow-y-auto p-4 graph-detail-panel" style={{ width, '--detail-font-size': `${fontSize}px` } as React.CSSProperties}>
+    <div className="relative flex min-h-0 shrink-0 flex-col border-l border-neutral-800 bg-neutral-900 graph-detail-panel" style={{ width, '--detail-font-size': `${fontSize}px` } as React.CSSProperties}>
       <div
         className="absolute left-0 top-0 h-full w-2 -translate-x-1/2 cursor-col-resize hover:bg-indigo-500/25"
         role="separator"
@@ -110,8 +118,8 @@ export function NodeDetailPanel({
         title={t('Ajustar ancho')}
         onPointerDown={startResize}
       />
-      <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-3 flex items-center justify-end gap-1 border-b border-neutral-800 bg-neutral-900/95 px-4 py-2">
-        {(ideaDetail || edgeDetail) && (
+      <div className="graph-detail-header relative z-10 flex shrink-0 items-center justify-end gap-1 border-b border-neutral-800 px-4 py-2">
+        {!readOnly && (ideaDetail || edgeDetail) && (
           <button
             className="card mr-auto inline-flex items-center gap-1.5 bg-neutral-900 px-2 py-1 text-xs hover:bg-neutral-800"
             title={t('Guardar en notas')}
@@ -155,6 +163,7 @@ export function NodeDetailPanel({
           ✕
         </button>
       </div>
+      <div className="graph-detail-scroll mt-6 min-h-0 flex-1 overflow-y-auto px-4 pb-4">
       {loading && !ideaDetail && !edgeDetail && (
         <div className="space-y-3 animate-pulse">
           {loading.kind === 'idea' ? (
@@ -200,7 +209,7 @@ export function NodeDetailPanel({
               <div className="-mx-1">
                 {relations.map((r) => (
                   <button
-                    key={r.id}
+                    key={r.edgeId || r.id}
                     className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-neutral-800"
                     onClick={() => onOpenIdea?.(r.id)}
                     title={t('Abrir esta idea')}
@@ -209,7 +218,7 @@ export function NodeDetailPanel({
                     <span className="min-w-0 flex-1">
                       <span className="block leading-snug text-neutral-200">{r.label}</span>
                       <span className="text-[11px] text-neutral-500">
-                        {r.relLabel}
+                        {r.direction && (r.direction === 'incoming' ? `${t('Entrante')} ← · ` : `${t('Saliente')} → · `)}{r.relLabel}
                         {r.themeLabel && (
                           <>
                             {' · '}
@@ -229,7 +238,7 @@ export function NodeDetailPanel({
           <div>
             <div className="text-xs uppercase text-neutral-500 mb-1">{t('Obras que la desarrollan')}</div>
             {ideaDetail.occurrences.map((o) => (
-              <OccurrenceCard key={o.nodus_id} occurrence={o} />
+              <OccurrenceCard key={o.nodus_id} occurrence={o} readOnly={readOnly} />
             ))}
           </div>
           {ideaDetail.evidence.length > 0 && (
@@ -247,7 +256,7 @@ export function NodeDetailPanel({
       {edgeDetail && (
         <div className="space-y-3">
           <h3 className="font-semibold">
-            {t(EDGE_LABELS[edgeDetail.edge.type as keyof typeof EDGE_LABELS]) ?? edgeDetail.edge.type}
+            {t(edgeLabel || EDGE_LABELS[edgeDetail.edge.type as keyof typeof EDGE_LABELS] || edgeDetail.edge.type)}
           </h3>
           {edgeDetail.explanation && <p className="text-neutral-300">{edgeDetail.explanation}</p>}
           <div className="text-neutral-400">
@@ -259,6 +268,7 @@ export function NodeDetailPanel({
             {edgeDetail.trace?.method && <Badge>{edgeDetail.trace.method}</Badge>}
             {edgeDetail.trace?.similarity != null && <Badge>sim {edgeDetail.trace.similarity.toFixed(2)}</Badge>}
           </div>
+          {edgeContext && <p className="text-xs text-neutral-400">{edgeContext}</p>}
           {edgeDetail.trace && (
             <div className="rounded-md border border-neutral-800 bg-neutral-950/35 p-3 text-xs text-neutral-300 space-y-1">
               {edgeDetail.trace.rationale && <p>{edgeDetail.trace.rationale}</p>}
@@ -278,6 +288,7 @@ export function NodeDetailPanel({
           {showEdgeAudit && <EdgeAuditControls edgeDetail={edgeDetail} onEdgeFeedback={onEdgeFeedback} />}
         </div>
       )}
+      </div>
       {saving && (
         <SaveToNotesModal
           content={saving.content}
@@ -312,7 +323,7 @@ export function EvidenceLocationLink({
   onOpen?: (sourceRef: string, location: string | null) => void;
 }) {
   const page = pageNumber ?? parsePageNumber(location);
-  if (page === null && !sourceRef && !onOpen) {
+  if ((!window.nodus && !onOpen) || (page === null && !sourceRef && !onOpen)) {
     return <span className="text-neutral-500 not-italic">{(location ?? '') + suffix}</span>;
   }
   return (
@@ -424,7 +435,7 @@ function itemTypeLabel(type?: string | null): string | null {
   return type ? t(ITEM_TYPE_ES[type] ?? type) : null;
 }
 
-export function OccurrenceCard({ occurrence }: { occurrence: IdeaDetail['occurrences'][number] }) {
+export function OccurrenceCard({ occurrence, readOnly=false }: { occurrence: IdeaDetail['occurrences'][number]; readOnly?: boolean }) {
   const [open, setOpen] = useState(false);
   const [summary, setSummary] = useState<WorkSummary | null>(null);
   const work = occurrence.work;
@@ -433,14 +444,14 @@ export function OccurrenceCard({ occurrence }: { occurrence: IdeaDetail['occurre
 
   useEffect(() => {
     let active = true;
-    if (work.summary_status !== 'done') return;
+    if (readOnly || work.summary_status !== 'done') return;
     void window.nodus.getWorkSummary(work.nodus_id).then((value) => {
       if (active) setSummary(value);
     });
     return () => {
       active = false;
     };
-  }, [work.nodus_id, work.summary_status]);
+  }, [work.nodus_id, work.summary_status, readOnly]);
 
   return (
     <div className="card p-3 mb-2">
@@ -452,7 +463,7 @@ export function OccurrenceCard({ occurrence }: { occurrence: IdeaDetail['occurre
             {work.authors.length > 1 ? ' et al.' : ''} ({year})
           </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        {!readOnly && <div className="flex items-center gap-1 shrink-0">
           <button
             className="inline-flex items-center justify-center text-neutral-500 hover:text-neutral-200 p-1"
             title={open ? t('Ocultar metadatos') : t('Mostrar metadatos')}
@@ -467,7 +478,7 @@ export function OccurrenceCard({ occurrence }: { occurrence: IdeaDetail['occurre
           >
             <Icon name="external" size={13} /> Zotero
           </button>
-        </div>
+        </div>}
       </div>
       {open && <OccurrenceMeta work={work} />}
       <div className="text-[11px] text-neutral-500 mt-2">

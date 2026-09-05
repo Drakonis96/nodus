@@ -159,17 +159,15 @@ test('State of the question matches Desktop without invented private overlays', 
   assert.match(app, /initialSeedId=.*location\.search.*seed/);
 });
 
-test('Graph parity keeps Desktop lenses, presets and safe audit filters visible', () => {
+test('Graph parity uses the shared guided Stellar canvas and a read-only published source', () => {
   const graph = read('src/serverWeb/advanced/AdvancedWorkspace.tsx');
-  for (const marker of ['graph-controls', 'graph-search', 'graph-read-filter', 'graph-confidence-filter']) {
-    assert.match(graph, new RegExp(`data-testid="${marker}"`), `${marker} is testable`);
-  }
-  assert.match(graph, /data-testid=\{`graph-preset-\$\{id\}`\}/, 'all graph presets are testable');
-  assert.match(graph, /buildPresetAtlas\(graph, filters, lens, preset\)/);
-  assert.match(graph, /next === ["']reading["'].*readState: ["']read["']/s);
-  assert.match(graph, /next === ["']unread["'].*readState: ["']unread["']/s);
-  assert.match(graph, /["']contradicts["'], ["']refutes["'], ["']contains["']/);
-  assert.match(graph, /onDrillDown=/);
+  const source = read('src/stellarGraph/webSource.ts');
+  assert.match(graph, /<StellarWorkspace/);
+  assert.match(graph, /webStellarSource\(spaceId\)/);
+  assert.match(source, /readOnly: true/);
+  assert.match(source, /stellar-edge/);
+  assert.match(source, /indexedDB.open/);
+  assert.doesNotMatch(graph, /buildPresetAtlas|SigmaGraph|onDrillDown/);
 });
 
 test('Academic tools render current Desktop contracts and legacy removed routes stay hidden', () => {

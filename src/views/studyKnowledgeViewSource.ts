@@ -109,20 +109,6 @@ async function graphData(subjectId: string): Promise<GraphData> {
     window.nodus.listStudyIdeas(subjectId),
   ]);
   const summaries = new Map(ideas.map((idea) => [idea.id, idea]));
-  const usedTypes = [...new Set(ideas.map((idea) => idea.type))];
-  const themeId = (type: StudyIdeaType) => `theme:study:${subjectId}:${type}`;
-  const themeNodes: GraphData['nodes'] = usedTypes.map((type) => ({
-    id: themeId(type),
-    label: t(STUDY_TYPE_LABEL[type]),
-    type: 'theme',
-    createdAt: ideas.filter((idea) => idea.type === type).map((idea) => idea.createdAt).sort()[0] ?? null,
-    workCount: ideas.filter((idea) => idea.type === type).length,
-    read: true,
-    themes: [t(STUDY_TYPE_LABEL[type])],
-    years: [],
-    authors: [],
-    maxConfidence: 1,
-  }));
   const nodes: GraphData['nodes'] = graph.nodes.map((node) => {
     const summary = summaries.get(node.id);
     return {
@@ -143,21 +129,11 @@ async function graphData(subjectId: string): Promise<GraphData> {
     id: edge.id,
     source: edge.source,
     target: edge.target,
-    type: edgeType(edge.type),
+    type: edge.type,
     basis: edge.type === 'related' ? 'inferred' : 'explicit',
     confidence: edge.confidence,
   }));
-  for (const idea of ideas) {
-    edges.push({
-      id: `study-theme:${idea.id}`,
-      source: themeId(idea.type),
-      target: idea.id,
-      type: 'contains',
-      basis: 'explicit',
-      confidence: 1,
-    });
-  }
-  return { nodes: [...themeNodes, ...nodes], edges };
+  return { nodes, edges };
 }
 
 export function createStudyKnowledgeViewSource(subjectId: string, openEvidence?: KnowledgeViewSource['openEvidence']): KnowledgeViewSource {
@@ -203,26 +179,6 @@ export function createStudyKnowledgeViewSource(subjectId: string, openEvidence?:
     },
     async getEdgeDetail(id): Promise<EdgeDetail | null> {
       const graph = await window.nodus.getStudyKnowledgeGraph(subjectId);
-      if (id.startsWith('study-theme:')) {
-        const ideaId = id.slice('study-theme:'.length);
-        const idea = await window.nodus.getStudyIdeaDetail(ideaId);
-        if (!idea) return null;
-        return {
-          edge: {
-            id,
-            from_id: `theme:study:${subjectId}:${idea.type}`,
-            to_id: idea.id,
-            type: 'contains',
-            basis: 'explicit',
-            confidence: 1,
-            source_work: null,
-          },
-          fromLabel: t(STUDY_TYPE_LABEL[idea.type]),
-          toLabel: idea.label,
-          explanation: t('Clasificación conceptual dentro de la asignatura.'),
-          evidence: [],
-        };
-      }
       const edge = graph.edges.find((item) => item.id === id);
       if (!edge) return null;
       const fromLabel = graph.nodes.find((node) => node.id === edge.source)?.label ?? '';
@@ -244,8 +200,6 @@ export function createStudyKnowledgeViewSource(subjectId: string, openEvidence?:
       };
     },
     getGraph: () => graphData(subjectId),
-    getGraphOverview: () => graphData(subjectId),
-    getGraphTheme: () => graphData(subjectId),
     deleteIdea: (id) => window.nodus.deleteStudyIdea(id),
     subscribe: (refresh) => window.nodus.onStudyKnowledgeChanged(refresh),
     openEvidence,

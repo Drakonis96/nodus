@@ -425,6 +425,32 @@ test('debates and the idea subgraph both hide what the owner vetoed', { timeout:
   });
 });
 
+test('Stellar pages preserve native directions, visibility, pagination, and space authorization', { timeout: 60_000 }, async () => {
+  await withServer({ label: 'api-stellar' }, async (server) => {
+    const spaceId = await server.createSpace('Stellar fixture');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
+    await server.createUser('stellar-reader@example.test', 'stellar-reader-password', [{ spaceId, role: 'reader' }]);
+    const reader = await server.deviceToken('stellar-reader@example.test', 'stellar-reader-password', spaceId);
+    await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot());
+    const root = `/api/v1/spaces/${spaceId}`;
+    const request = payload => server.api(reader.deviceToken, 'GET', `${root}/stellar?request=${encodeURIComponent(JSON.stringify(payload))}`);
+    const first = await readJson(await request({kind:'neighbors', id:'i-a', limit:1}));
+    const second = await readJson(await request({kind:'neighbors', id:'i-a', limit:1, cursor:first.next}));
+    assert.equal(first.next, 1); assert.equal(second.next, null);
+    assert.deepEqual([...first.edges,...second.edges].map(edge => [edge.id,edge.source,edge.target]), [['e-ab','i-a','i-b'],['e-sup','i-c','i-a']]);
+    assert.ok(first.edges.every(edge => [edge.source,edge.target].every(id => first.nodes.some(node => node.id===id))));
+    const work = await readJson(await request({kind:'work', id:'w-2'}));
+    assert.deepEqual(work.nodes.map(node=>node.id).sort(), ['i-b','i-c']);
+    assert.deepEqual(work.edges.map(edge=>edge.id), ['e-bc']);
+    const detail = await readJson(await server.api(reader.deviceToken, 'GET', `${root}/stellar-edge?id=e-ab`));
+    assert.equal(detail.edge.from_id, 'i-a'); assert.equal(detail.edge.to_id, 'i-b');
+    assert.equal((await server.api(reader.deviceToken,'GET',`${root}/stellar-edge?id=e-hidden`)).status,404);
+    assert.equal((await fetch(`${server.origin}${root}/stellar?request=${encodeURIComponent(JSON.stringify({kind:'search'}))}`)).status,401);
+    const other = await server.createSpace('Unshared fixture');
+    assert.equal((await server.api(reader.deviceToken,'GET',`/api/v1/spaces/${other}/stellar?request=${encodeURIComponent(JSON.stringify({kind:'search'}))}`)).status,401);
+  });
+});
+
 test('reads are cached by revision and revalidate with 304', { timeout: 60_000 }, async () => {
   await withServer({ label: 'api-etag' }, async (server) => {
     const spaceId = await server.createSpace('Corpus');

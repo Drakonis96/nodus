@@ -160,9 +160,10 @@ export const academicApi: AcademicApi = {
     return () => ipcRenderer.removeListener('documents:index:progress', listener);
   },
 
+  stellarPage: (request) => ipcRenderer.invoke('stellar:page', request),
+  getStellarSession: (key) => ipcRenderer.invoke('stellar:session', key),
+  saveStellarSession: (vaultId, key, state) => ipcRenderer.invoke('stellar:save', vaultId, key, state),
   getGraph: (lens) => ipcRenderer.invoke('graph:get', lens),
-  getGraphOverview: () => ipcRenderer.invoke('graph:overview'),
-  getGraphTheme: (theme, cap) => ipcRenderer.invoke('graph:theme', theme, cap),
   listIdeasPage: (request) => ipcRenderer.invoke('ideas:listPage', request),
   listPickerIdeas: () => ipcRenderer.invoke('ideas:picker'),
   listIdeaConnections: (globalId) => ipcRenderer.invoke('ideas:connections', globalId),

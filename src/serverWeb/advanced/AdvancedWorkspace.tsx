@@ -1,5 +1,6 @@
+import { StellarWorkspace } from '../../stellarGraph/StellarWorkspace';
+import { webStellarSource } from '../../stellarGraph/webSource';
 import {
-  lazy,
   useCallback,
   useEffect,
   useMemo,
@@ -8,20 +9,9 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import type { GraphData } from "@shared/types";
 import { Icon } from "../../components/ui";
-import { GraphErrorBoundary } from "../../views/graph/GraphErrorBoundary";
-import {
-  buildGraphModel,
-  buildPresetAtlas,
-  buildThemeBackbone,
-  buildThemeConstellation,
-  type GraphFilters,
-  type GraphLens,
-} from "../../views/graph/model";
 import { advancedRest, type AuthorsQuery, type IdeasQuery } from "./api";
 import {
-  toGraphData,
   type AdvancedAuthor,
   type AdvancedAuthorDossier,
   type AdvancedIdea,
@@ -29,16 +19,10 @@ import {
   type AdvancedPage,
 } from "./types";
 import { AcademicDetailExplorer } from "../academic/AcademicDetailExplorer";
-import type { GraphPresetId } from "../../navigation";
 import { errorText, getActiveLang, t, tx } from "../i18nShim";
 
 type Surface = "ideas" | "authors" | "graph";
 
-const SigmaGraph = lazy(() =>
-  import("../../views/graph/SigmaGraph").then((module) => ({
-    default: module.SigmaGraph,
-  })),
-);
 
 const IDEA_TYPES = [
   "",
@@ -1370,325 +1354,11 @@ export function AuthorsServerView({
   );
 }
 
-const GRAPH_FILTERS: GraphFilters = {
-  search: "",
-  nodeTypes: ["theme", "claim", "finding", "construct", "method", "framework"],
-  edgeTypes: [
-    "supports",
-    "refutes",
-    "contradicts",
-    "extends",
-    "refines",
-    "applies_to",
-    "shares_method",
-    "precondition_of",
-    "measures_same",
-    "variant_of",
-    "contains",
-  ],
-  theme: "",
-  workIds: [],
-  authors: [],
-  yearMin: null,
-  yearMax: null,
-  readState: "all",
-  minConfidence: 0,
-  basis: "all",
-};
-
-export function GraphServerView({
-  spaceId,
-  csrfToken: _csrfToken,
-  initialSeedId,
-  onOpenIdea,
-}: {
-  spaceId: string;
-  csrfToken?: string;
-  initialSeedId?: string;
-  onOpenIdea?: (id: string) => void;
-}) {
-  const [seeds, setSeeds] = useState<AdvancedIdea[]>([]);
-  const [seedId, setSeedId] = useState(initialSeedId ?? "");
-  const [themeLabel, setThemeLabel] = useState("");
-  const [lens, setLens] = useState<GraphLens>("ideas");
-  const [preset, setPreset] = useState<GraphPresetId>("overview");
-  const [filters, setFilters] = useState<GraphFilters>(GRAPH_FILTERS);
-  const [graph, setGraph] = useState<GraphData | null>(null);
-  const [error, setError] = useState<unknown>();
-  const [loading, setLoading] = useState(false);
-  const graphRequest = useRef(0);
-  useEffect(() => {
-    advancedRest
-      .ideas(spaceId, { offset: 0, limit: 200, sort: "connections" })
-      .then((page) => setSeeds(page.items))
-      .catch(setError);
-  }, [spaceId]);
-  const load = useCallback(async () => {
-    const request = ++graphRequest.current;
-    setLoading(true);
-    setError(undefined);
-    try {
-      const payload = seedId
-        ? await advancedRest.ideaGraph(spaceId, seedId, 3, 200)
-        : await advancedRest.graph(spaceId);
-      const next = toGraphData(payload);
-      if (request === graphRequest.current) setGraph(next);
-    } catch (cause) {
-      if (request === graphRequest.current) setError(cause);
-    } finally {
-      if (request === graphRequest.current) setLoading(false);
-    }
-  }, [seedId, spaceId]);
-  useEffect(() => {
-    void load();
-  }, [load]);
-  const selectedLabel = useMemo(
-    () => seeds.find((idea) => idea.id === seedId)?.label,
-    [seedId, seeds],
-  );
-  const graphModel = useMemo(() => {
-    if (!graph) return null;
-    if (seedId || lens === "authors" || preset !== "overview")
-      return (
-        buildPresetAtlas(graph, filters, lens, preset) ||
-        buildGraphModel(graph, filters, lens, preset)
-      );
-    if (themeLabel) return buildThemeBackbone(graph, themeLabel);
-    return buildThemeConstellation(graph);
-  }, [filters, graph, lens, preset, seedId, themeLabel]);
-  const resetAtlas = () => {
-    setSeedId("");
-    setThemeLabel("");
-    setLens("ideas");
-    setPreset("overview");
-    setFilters(GRAPH_FILTERS);
-  };
-  const applyPreset = (next: GraphPresetId) => {
-    setSeedId("");
-    setPreset(next);
-    setThemeLabel("");
-    setLens(next === "authors" ? "authors" : "ideas");
-    setFilters(() => {
-      if (next === "contradictions")
-        return {
-          ...GRAPH_FILTERS,
-          edgeTypes: ["contradicts", "refutes", "contains"],
-          minConfidence: 0.1,
-        };
-      if (next === "gaps")
-        return {
-          ...GRAPH_FILTERS,
-          nodeTypes: ["theme", "finding", "claim", "construct", "framework"],
-          edgeTypes: [
-            "extends",
-            "refines",
-            "applies_to",
-            "shares_method",
-            "measures_same",
-            "variant_of",
-            "contains",
-          ],
-        };
-      if (next === "reading") return { ...GRAPH_FILTERS, readState: "read" };
-      if (next === "unread") return { ...GRAPH_FILTERS, readState: "unread" };
-      if (next === "authors") return { ...GRAPH_FILTERS };
-      return { ...GRAPH_FILTERS };
-    });
-  };
-  return (
-    <div
-      className="nodus-graph-workspace flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100"
-      data-testid="advanced-graph-view"
-    >
-      <header className="nodus-graph-toolbar shrink-0 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
-            <Icon name="network" size={18} />
-          </span>
-          <div>
-            <h1 className="text-base font-semibold">{t("Grafo")}</h1>
-            <p className="text-[11px] text-neutral-500">
-              {seedId
-                ? tx("Vecindad · {label}", { label: selectedLabel || seedId })
-                : themeLabel
-                  ? tx("Tema · {label}", { label: themeLabel })
-                  : t("Atlas completo organizado primero por temas")}
-            </p>
-          </div>
-          <ReadOnlyBadge />
-          <button
-            className={`btn ml-auto text-xs ${seedId || themeLabel ? "btn-ghost" : ""}`}
-            onClick={resetAtlas}
-            data-testid="graph-atlas-home"
-          >
-            <Icon name="layers" size={13} /> {t("Temas")}
-          </button>
-          <label className="flex items-center gap-2 text-xs text-neutral-500">
-            {t("Ir a idea")}
-            <select
-              data-testid="advanced-graph-seed"
-              className="input max-w-72 text-xs"
-              value={seedId}
-              onChange={(event) => {
-                setThemeLabel("");
-                setPreset("overview");
-                setSeedId(event.target.value);
-              }}
-            >
-              <option value="">{t("Atlas de temas")}</option>
-              {seeds.map((idea) => (
-                <option key={idea.id} value={idea.id}>
-                  {idea.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div
-          className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-3 dark:border-neutral-800"
-          data-testid="graph-controls"
-        >
-          <div className="flex overflow-hidden rounded-md border border-neutral-300 text-xs dark:border-neutral-700">
-            <button
-              className={`px-2.5 py-1.5 ${lens === "ideas" ? "bg-indigo-600 text-white" : "text-neutral-500"}`}
-              onClick={() => applyPreset("overview")}
-            >
-              {t("Ideas")}
-            </button>
-            <button
-              className={`px-2.5 py-1.5 ${lens === "authors" ? "bg-indigo-600 text-white" : "text-neutral-500"}`}
-              onClick={() => applyPreset("authors")}
-            >
-              {t("Autores")}
-            </button>
-          </div>
-          <div className="flex overflow-hidden rounded-md border border-neutral-300 text-xs dark:border-neutral-700">
-            {(
-              [
-                ["overview", "Atlas"],
-                ["reading", "Lecturas"],
-                ["unread", "No leídas"],
-                ["gaps", "Huecos"],
-                ["contradictions", "Contradicciones"],
-              ] as [GraphPresetId, string][]
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                data-testid={`graph-preset-${id}`}
-                className={`px-2.5 py-1.5 ${preset === id ? "bg-indigo-600 text-white" : "text-neutral-500"}`}
-                onClick={() => applyPreset(id)}
-              >
-                {t(label)}
-              </button>
-            ))}
-          </div>
-          <div className="relative min-w-[12rem] flex-1">
-            <Icon
-              name="search"
-              size={13}
-              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500"
-            />
-            <input
-              data-testid="graph-search"
-              className="input input-with-leading-icon h-8 w-full text-xs"
-              value={filters.search}
-              onChange={(event) => {
-                setFilters((current) => ({
-                  ...current,
-                  search: event.target.value,
-                }));
-                setThemeLabel("");
-              }}
-              placeholder={t("Buscar en el grafo…")}
-            />
-          </div>
-          <label className="flex items-center gap-1.5 text-xs text-neutral-500">
-            {t("Lectura")}
-            <select
-              data-testid="graph-read-filter"
-              className="input h-8 text-xs"
-              value={filters.readState}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  readState: event.target.value as GraphFilters["readState"],
-                }))
-              }
-            >
-              <option value="all">{t("Todas")}</option>
-              <option value="read">{t("Leídas")}</option>
-              <option value="unread">{t("No leídas")}</option>
-            </select>
-          </label>
-          <label className="flex items-center gap-1.5 text-xs text-neutral-500">
-            {t("Conf.")} ≥{" "}
-            <input
-              data-testid="graph-confidence-filter"
-              className="w-20"
-              type="range"
-              min="0"
-              max="1"
-              step=".1"
-              value={filters.minConfidence}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  minConfidence: Number(event.target.value),
-                }))
-              }
-            />
-            <span className="tabular-nums">
-              {filters.minConfidence.toFixed(1)}
-            </span>
-          </label>
-        </div>
-      </header>
-      <div className="nodus-graph-stage relative min-h-0 flex-1 overflow-hidden">
-        {error ? (
-          <div className="p-4">
-            <ErrorMessage error={error} onRetry={() => void load()} />
-          </div>
-        ) : loading && !graph ? (
-          <Loading />
-        ) : graph && graphModel ? (
-          <GraphErrorBoundary>
-            <SigmaGraph
-              data={graph}
-              filters={filters}
-              lens={lens}
-              preset={preset}
-              highlightDepth={2}
-              lightTheme={
-                typeof document !== "undefined" &&
-                document.documentElement.classList.contains("light")
-              }
-              overrideModel={graphModel}
-              viewLevel={seedId ? "full" : themeLabel ? "theme" : "corpus"}
-              showMinimap
-              onDrillDown={(_id, label) => {
-                setSeedId("");
-                setThemeLabel(label);
-              }}
-              onOpenNode={(id, _label, type) => {
-                if (type === "theme") setThemeLabel(_label);
-                else onOpenIdea?.(id);
-              }}
-              onOpenEdge={() => undefined}
-              onClearFocus={resetAtlas}
-            />
-          </GraphErrorBoundary>
-        ) : (
-          <div className="grid h-full min-h-60 place-items-center text-sm text-neutral-600">
-            {t("Publica ideas para explorar su grafo.")}
-          </div>
-        )}
-        <div className="shrink-0 overflow-auto px-4 pb-4"></div>
-      </div>
-    </div>
-  );
+export function GraphServerView({spaceId, initialSeedId, onOpenIdea}: {spaceId:string;csrfToken?:string;initialSeedId?:string;onOpenIdea?:(id:string)=>void}) {
+  const source=useMemo(()=>webStellarSource(spaceId),[spaceId]);
+  return <div className="h-full" data-testid="advanced-graph-view"><StellarWorkspace source={source} initialSeed={initialSeedId} onOpenIdea={onOpenIdea}/></div>;
 }
 
-/** Opt-in composition used by the Server Advanced shell; it performs no writes. */
 export function AdvancedServerWorkspace({
   spaceId,
   csrfToken,

@@ -1,139 +1,72 @@
-// Focused real-Electron smoke for the progressive graph path. It intentionally
-// avoids unrelated product tours so graph IPC/rendering can be verified even
-// when the broader E2E suite is being changed elsewhere.
-// Run after a build with: node scripts/e2e-graph-progressive.mjs
-import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-import os from 'node:os';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { _electron as electron } from 'playwright-core';
-
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const require = createRequire(import.meta.url);
-const appVersion = require(path.join(repoRoot, 'package.json')).version;
-
-if (!process.argv.includes('--electron-graph-progressive-e2e')) {
-  execFileSync(
-    path.join(repoRoot, 'node_modules/.bin/electron'),
-    [path.join(repoRoot, 'scripts/e2e-graph-progressive.mjs'), '--electron-graph-progressive-e2e'],
-    { cwd: repoRoot, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, stdio: 'inherit' }
-  );
-  process.exit(0);
-}
-
-assert.ok(
-  existsSync(path.join(repoRoot, 'dist-electron/main.js')) && existsSync(path.join(repoRoot, 'dist/index.html')),
-  'production build exists'
-);
-
-const userData = await mkdtemp(path.join(os.tmpdir(), 'nodus-graph-e2e-'));
-let app = null;
-try {
-  const childEnv = {
-    ...process.env,
-    NODUS_USERDATA: userData,
-    NODUS_DISABLE_AUTO_UPDATE: '1',
-    NODUS_E2E_UPDATE_STATUS: 'not-available',
-  };
-  delete childEnv.ELECTRON_RUN_AS_NODE;
-  app = await electron.launch({
-    executablePath: require('electron'),
-    args: [repoRoot],
-    env: childEnv,
-  });
-  const page = await app.firstWindow();
-  page.setDefaultTimeout(30_000);
-  const pageErrors = [];
-  page.on('pageerror', (error) => pageErrors.push(String(error?.message ?? error)));
-  await page.waitForFunction(() => typeof window.nodus?.getGraphOverview === 'function');
-
-  assert.equal(await page.evaluate(() => window.nodus.seedDemoData()), true, 'demo corpus seeded');
-  const result = await page.evaluate(async () => {
-    const overview = await window.nodus.getGraphOverview();
-    const firstTheme = overview.nodes.find((node) => node.type === 'theme');
-    const theme = firstTheme
-      ? await window.nodus.getGraphTheme(firstTheme.themes[0] ?? firstTheme.label, 90)
-      : { nodes: [], edges: [] };
-    return { overview, theme };
-  });
-
-  assert.ok(result.overview.nodes.length > 0, 'overview has theme hubs');
-  assert.ok(result.overview.nodes.every((node) => node.type === 'theme'), 'overview contains only theme hubs');
-  const ideaNodes = result.theme.nodes.filter((node) => node.type !== 'theme');
-  assert.ok(ideaNodes.length <= 150, 'theme scene is bounded to core plus bridges');
-  const themeIds = new Set(result.theme.nodes.map((node) => node.id));
-  assert.ok(
-    result.theme.edges.every((edge) => themeIds.has(edge.source) && themeIds.has(edge.target)),
-    'theme edges have present endpoints'
-  );
-
-  await page.evaluate(async (version) => {
-    sessionStorage.setItem('nodus.startupUpdateChecked', '1');
-    localStorage.setItem('nodus.lastSeenVersion', version);
-    localStorage.setItem(`nodus.mobileTeaserSeen.${version}`, '1');
-    localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
-    localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
-    localStorage.setItem('nodus.toolkitBetaGuideSeen.2.4.0', '1');
-    await window.nodus.updateSettings({
-      onboardingComplete: true,
-      basicsTutorialVersion: 5,
-      recoverySetupVersion: 1,
-      tourComplete: true,
-      advancedTourComplete: true,
-      uiLanguage: 'es',
-      mascotStyle: 'orb',
-      mascotStyleChosen: true,
-      mascotEnabled: false,
-      reduceMotion: true,
+import {_electron as electron} from 'playwright-core';
+import {createRequire} from 'node:module';import fs from 'node:fs';import assert from 'node:assert/strict';
+const require=createRequire(import.meta.url),root=process.cwd(),profile=fs.mkdtempSync('/tmp/nodus-stellar-e2e-');fs.mkdirSync(root+'/work/stellar-preview',{recursive:true});
+const app=await electron.launch({executablePath:require('electron'),args:[root],env:{...process.env,NODUS_USERDATA:profile,NODUS_STELLAR_PREVIEW:'1',NODUS_DISABLE_AUTO_UPDATE:'1',NODUS_DISABLE_ANNOUNCEMENTS:'1',NODUS_QA_ROOT:profile,NODUS_QA_DATABASE_AUDIT_LOG:profile+'/database-audit.jsonl'}});
+try{
+const page=await app.firstWindow();page.setDefaultTimeout(30000);const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+await page.waitForFunction(()=>typeof window.nodus?.stellarPage==='function');
+await page.evaluate(async()=>{sessionStorage.setItem('nodus.startupUpdateChecked','1');localStorage.setItem('nodus.lastSeenVersion','5.1.7');localStorage.setItem('nodus.mobileTeaserSeen.5.1.7','1');for(const key of ['nodus.platformHighlightsSeen.2026-07','nodus.tutorialVideosAnnouncementSeen.2026-07','nodus.toolkitBetaGuideSeen.2.4.0'])localStorage.setItem(key,'1');await window.nodus.updateSettings({onboardingComplete:true,basicsTutorialVersion:5,recoverySetupVersion:1,tourComplete:true,advancedTourComplete:true,mascotEnabled:false,mascotStyle:'orb',mascotStyleChosen:true,uiLanguage:'es',theme:'dark'});});
+await page.evaluate(()=>window.nodus.seedDemoData());await page.reload();await page.waitForTimeout(1800);
+await app.evaluate(({BrowserWindow})=>{const w=BrowserWindow.getAllWindows()[0];w.setSize(1500,1000);});
+await page.locator('[data-tour="nav-graph"]').click();await page.getByTestId('stellar-canvas').waitFor();
+await page.waitForTimeout(1000);await page.screenshot({path:root+'/work/stellar-preview/start.png'});
+const report=await page.evaluate(async()=>{const first=await window.nodus.stellarPage({kind:'search',limit:20});for(const n of first.nodes){const p=await window.nodus.stellarPage({kind:'neighbors',id:n.id,limit:200});if(p.edges.length>2)return {node:n,neighbors:p};}return {node:first.nodes[0]};});
+assert.ok(report.node,'real ideas loaded');
+await page.locator('.stellar-search input').fill(report.node.label);await page.waitForTimeout(600);await page.locator('.stellar-search-results button').first().click();
+const click = name => page.getByRole('button', { name, exact: true }).evaluate(button => button.click());
+const frame = async () => {
+  await page.waitForTimeout(900);
+  const visible = await page.evaluate(() => {
+    const canvas = document.querySelector('.stellar-canvas').getBoundingClientRect();
+    const player = document.querySelector('.stellar-player').getBoundingClientRect();
+    return [...document.querySelectorAll('.stellar-node-label.featured')].map(node => {
+      const box = node.getBoundingClientRect();
+      return box.left >= canvas.left && box.right <= canvas.right && box.top >= canvas.top && box.bottom < player.top;
     });
-  }, appVersion);
-  await page.reload();
-  const nodiStyleModal = page.getByTestId('nodi-style-modal');
-  await nodiStyleModal.waitFor({ state: 'attached', timeout: 1_000 }).catch(() => {});
-  if (await nodiStyleModal.count()) {
-    await page.getByTestId('nodi-style-orb').click();
-    await nodiStyleModal.waitFor({ state: 'detached' });
-  }
-  await page.locator('[data-tour="nav-graph"]').click();
-  await page.locator('canvas').first().waitFor({ state: 'visible' });
-  await page.waitForTimeout(250);
-  assert.deepEqual(pageErrors, [], 'progressive graph renders without uncaught renderer errors');
-
-  // Regression: opening Graph from an idea tab used to leave the new renderer
-  // on the whole corpus because the deep-link still targeted the removed engine.
-  await page.locator('[data-tour="nav-ideas"]').click();
-  await page.getByTestId('ideas-catalog-table').waitFor({ state: 'visible' });
-  const firstIdea = page.locator('[data-testid^="idea-row-"]').first();
-  await firstIdea.waitFor({ state: 'visible' });
-  await firstIdea.click();
-  const ideaDetail = page.getByTestId('idea-detail-tab');
-  await ideaDetail.waitFor({ state: 'visible' });
-  const ideaLabel = (await ideaDetail.locator('h2').innerText()).trim();
-  assert.ok(ideaLabel, 'idea detail tab exposes its label');
-  await ideaDetail.getByRole('button', { name: /Graph|Grafo/, exact: true }).click();
-
-  await page.getByTestId('sigma-graph-engine').waitFor({ state: 'visible' });
-  const focusedPanel = page.locator('.graph-detail-panel');
-  await focusedPanel.waitFor({ state: 'visible' });
-  await focusedPanel.locator('h3').filter({ hasText: ideaLabel }).waitFor({ state: 'visible' });
-  assert.equal(
-    await page.getByTestId('knowledge-atlas-hud').getAttribute('data-preset'),
-    'overview',
-    'idea deep-link stays on the overview preset',
-  );
-  assert.deepEqual(pageErrors, [], 'idea-to-graph deep-link renders without uncaught renderer errors');
-
-  console.log(
-    `[e2e:graph] passed (${result.overview.nodes.length} overview themes, `
-      + `${ideaNodes.length} bounded theme ideas; idea deep-link focused by Sigma)`
-  );
-  await app.close();
-  app = null;
-} finally {
-  if (app) await app.close().catch(() => {});
-  await rm(userData, { recursive: true, force: true });
+  });
+  assert.equal(visible.length, 2, 'both relationship endpoint captions are rendered');
+  assert.ok(visible.every(Boolean), 'both endpoints fit above controls in the available canvas');
+};
+await click('Siguiente →'); await frame();
+const first = await page.locator('.stellar-step-node').evaluateAll(nodes => nodes.map(node => node.dataset.stepNode));
+await click('Encuadrar'); await click('Siguiente →'); await frame();
+await page.getByTitle('Alejar', {exact:true}).evaluate(button => button.click());
+await click('← Anterior'); await frame();
+assert.deepEqual(await page.locator('.stellar-step-node').evaluateAll(nodes => nodes.map(node => node.dataset.stepNode)), first, 'Previous restores the original relationship direction');
+await page.locator('.stellar-step-node').last().click();
+await page.locator('.graph-detail-panel h3').waitFor();
+const detailTitle = await page.locator('.graph-detail-panel h3').innerText();
+await page.getByRole('spinbutton', {name:'Límite de relaciones'}).fill('2');
+await page.getByRole('combobox', {name:'Velocidad'}).selectOption('2');
+await click('▶ Play'); await frame();
+await page.waitForTimeout(2400); await frame();
+assert.equal(await page.getByRole('button', {name:'▶ Play', exact:true}).count(), 1, 'Play stops at the exact limit');
+assert.equal(await page.locator('.graph-detail-panel h3').innerText(), detailTitle, 'playback keeps the chosen detail open');
+await page.waitForTimeout(650);
+const saved = await page.evaluate(() => window.nodus.getStellarSession('academic:corpus'));
+assert.equal(saved.session.cursor, 3, 'Play adds exactly two relationships after the first');
+for (const control of ['← Anterior', 'Siguiente →']) {
+  await click('Encuadrar'); await click(control); await frame();
+  assert.equal(await page.locator('.graph-detail-panel h3').innerText(), detailTitle, 'transport preserves sidebar content');
 }
+for (const light of [false, true]) {
+  await page.evaluate(light => document.documentElement.classList.toggle('light', light), light);
+  await page.locator('.graph-detail-scroll').evaluate(element => element.scrollTop = 100);
+  const header = await page.evaluate(() => {
+    const panel = document.querySelector('.graph-detail-panel').getBoundingClientRect();
+    const element = document.querySelector('.graph-detail-header'), h = element.getBoundingClientRect();
+    const body = document.querySelector('.graph-detail-scroll').getBoundingClientRect();
+    return {top:h.top-panel.top, gap:body.top-h.bottom, color:getComputedStyle(element).backgroundColor};
+  });
+  assert.ok(Math.abs(header.top) < 1 && header.gap >= 24, 'header stays at the top with space below');
+  assert.match(header.color, /^rgb\(/, 'header is opaque');
+  await page.screenshot({path:root+'/work/stellar-preview/demo-stellar-'+(light?'light':'dark')+'.png'});
+}
+await page.reload();await page.waitForTimeout(1000);await page.locator('[data-tour="nav-graph"]').click();await page.waitForTimeout(1800);
+const restored = await page.evaluate(() => window.nodus.getStellarSession('academic:corpus'));
+assert.deepEqual(restored.session.history, saved.session.history, 'session history survives a reload');
+assert.equal(await page.getByRole('button',{name:'▶ Play',exact:true}).count(),1,'restored playback is paused');
+await click('▶ Play');await frame();
+assert.deepEqual(errors,[]);
+console.log('Stellar E2E: search, framing after manual navigation, native direction, exact playback budget, pinned detail, opaque header, and paused restoration passed');
+}finally{await app.close();fs.rmSync(profile,{recursive:true,force:true});}

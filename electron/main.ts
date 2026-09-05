@@ -953,7 +953,7 @@ app.whenReady().then(async () => {
   // Do this before creating either the main window or a browser tab: Chromium
   // then exposes the same effective preference to pages from their first frame.
   setBrowserTheme(getSettings().theme);
-  await startDatabaseFormServer(Number.parseInt(process.env.NODUS_DATABASE_FORM_PORT ?? '0', 10) || 0);
+  if (process.env.NODUS_STELLAR_PREVIEW !== '1') await startDatabaseFormServer(Number.parseInt(process.env.NODUS_DATABASE_FORM_PORT ?? '0', 10) || 0);
   upgradeWorldbuildingDemoDynasties();
   upgradeWorldbuildingDemoImageQuality();
   upgradeWorldbuildingDemoNarrativeDepth();
@@ -977,6 +977,8 @@ app.whenReady().then(async () => {
     (betaUpdates) => configureUpdateChannel(betaUpdates, 'setting changed'),
   );
   createWindow();
+  // The isolated graph review copy never resumes background jobs or connects integrations.
+  if (process.env.NODUS_STELLAR_PREVIEW === '1') return;
   // Existing installs may have one full database copy per historical schema update.
   // Queue every registered vault after the window exists; the utility worker applies
   // retention without delaying startup or opening any vault on the main thread.

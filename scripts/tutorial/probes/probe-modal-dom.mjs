@@ -48,7 +48,7 @@ try {
   // clicked where a theme node is drawn? Labels are not in the DOM, so the only
   // route is coordinates — and those have to come from the app, not from guessing.
   const overview = await page.evaluate(async () => {
-    const g = await window.nodus.getGraphOverview();
+    const g = await window.nodus.stellarPage({kind:"search",limit:20});
     const nodes = (g?.nodes ?? g ?? []).map((n) => ({
       id: n.id, label: n.label, type: n.type, size: n.size, x: n.x, y: n.y, ideas: n.ideas ?? n.count,
     }));

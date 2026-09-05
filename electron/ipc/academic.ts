@@ -1,3 +1,4 @@
+import { stellarPage, getStellarSession, saveStellarSession } from '../graph/stellarService';
 // The academic corpus and the study vault, moved verbatim out of the monolithic
 // registerIpc. The channel names are unchanged; scripts/test-ipc-contract.mjs is
 // what proves it.
@@ -142,7 +143,7 @@ import { listCollectionFacets } from '../db/collectionsRepo';
 import { setEdgeFeedback, listEdgeFeedback } from '../db/edgeFeedbackRepo';
 import { aggregateGaps, aggregateGapsPage, contradictionCount, getGapDetail } from '../db/gapsRepo';
 import { ingestZoteroItem } from '../sync/syncService';
-import { buildIdeaGraph, buildIdeaGraphOverview, buildIdeaThemeGraph, buildAuthorGraph, getContradictions, getDebates, buildReadingPath } from '../graph/graphService';
+import { buildIdeaGraph,   buildAuthorGraph, getContradictions, getDebates, buildReadingPath } from '../graph/graphService';
 import { streamDebateAnalysis } from '../ai/debate';
 import * as rqRepo from '../db/researchMapRepo';
 import * as writingAnnotations from '../db/writingAnnotationsRepo';
@@ -820,12 +821,14 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     await documentIndexQueue.cancelJob(getActiveVault().id, jobId);
   });
 
+  // Stellar canvas
+  h('stellar:page', async (_e, request) => stellarPage(request));
+  h('stellar:session', async (_e, key) => getStellarSession(key));
+  h('stellar:save', async (_e, vaultId, key, state) => saveStellarSession(vaultId, key, state));
   // graph
   h('graph:get', async (_e, lens: 'ideas' | 'authors') =>
     lens === 'authors' ? buildAuthorGraph() : buildIdeaGraph()
   );
-  h('graph:overview', async () => buildIdeaGraphOverview());
-  h('graph:theme', async (_e, theme: string, cap?: number) => buildIdeaThemeGraph(theme, cap));
   h('ideas:listPage', async (_e, request) => ideas.listIdeasPage(request));
   h('ideas:picker', async () => ideas.listPickerIdeas());
   h('ideas:connections', async (_e, globalId: string) => ideas.listIdeaConnections(globalId));

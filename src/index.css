@@ -3017,6 +3017,12 @@ select.input optgroup {
 .graph-detail-panel {
   font-size: var(--detail-font-size, 14px);
 }
+.graph-detail-header {
+  background-color: #171717;
+}
+.light .graph-detail-header {
+  background-color: #fff;
+}
 .graph-detail-panel .text-sm {
   font-size: var(--detail-font-size, 14px);
 }

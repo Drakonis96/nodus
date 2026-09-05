@@ -70,3 +70,7 @@ jobs:
       - name: E2E smoke (real app boot)
         timeout-minutes: 10
         run: npm run test:e2e
+
+      - name: Stellar canvas E2E (isolated demonstration profile)
+        timeout-minutes: 5
+        run: npm run test:e2e:stellar
