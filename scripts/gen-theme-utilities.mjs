@@ -10,8 +10,11 @@
  * The `default` theme gets NO utility block: it renders through raw Tailwind + the
  * hand-written `.light` rules in index.css and stays byte-identical to today.
  *
- * Run `npm run gen:theme` after editing themes.mjs. `scripts/test-theme-utilities-fresh.mjs`
- * fails CI if the committed files drift.
+ * `npm run dev` and `npm run build` regenerate these automatically (see the
+ * `gen-theme-utilities` Vite plugin in vite.config.ts), so editing themes.mjs is
+ * enough day-to-day. `npm run gen:theme` remains as a manual entry point (e.g. to
+ * regenerate without starting Vite). `scripts/test-theme-utilities-fresh.mjs` fails
+ * CI if the committed files drift from themes.mjs.
  */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
