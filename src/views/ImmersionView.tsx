@@ -36,6 +36,7 @@ import { immersionAnnotationDocumentId } from '@shared/readerAnnotations';
 import type { ImmersionSnapshot } from '../app/viewSnapshots';
 import { useListPlacement } from '../listPlacement';
 import { Badge, Icon, RestoringPane, TypeDot } from '../components/ui';
+import { WorkspaceTabStrip } from '../components/library/LibraryWorkspaceTabs';
 import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
@@ -200,8 +201,12 @@ export function ImmersionView({
     return fromDossier || snapshot?.openSession?.id || null;
   });
   const [mode, setMode] = useState<'home' | 'scope' | 'player'>(() => (resumeTarget ? 'player' : 'home'));
+  const [openIds, setOpenIds] = useState<string[]>(() => snapshot?.openIds ?? (resumeTarget ? [resumeTarget] : []));
+  const sessionCache = useRef(new Map<string, ImmersionSession>());
+  const openingRequest = useRef(0);
   const [sessions, setSessions] = useState<ImmersionSessionSummary[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [sessionsRead, setSessionsRead] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
 
   const [topic, setTopic] = useState('');
@@ -240,6 +245,7 @@ export function ImmersionView({
     setLoadingSessions(true);
     try {
       setSessions(await window.nodus.listImmersionSessions());
+      setSessionsRead(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -250,6 +256,18 @@ export function ImmersionView({
   useEffect(() => {
     void refreshSessions();
   }, [refreshSessions]);
+
+  useEffect(() => {
+    if (!sessionsRead) return;
+    const available = new Set(sessions.map((item) => item.id));
+    setOpenIds((ids) => {
+      const remaining = ids.filter((id) => available.has(id));
+      return remaining.length === ids.length ? ids : remaining;
+    });
+    for (const id of sessionCache.current.keys()) {
+      if (!available.has(id)) sessionCache.current.delete(id);
+    }
+  }, [sessions, sessionsRead]);
 
   useEffect(() => {
     if (!generationJob) {
@@ -280,6 +298,8 @@ export function ImmersionView({
     }
     if (generationJob.result) {
       setError(null);
+      sessionCache.current.set(generationJob.result.id, generationJob.result);
+      setOpenIds((ids) => ids.includes(generationJob.result!.id) ? ids : [...ids, generationJob.result!.id]);
       setSession(generationJob.result);
       setMode('player');
       void refreshSessions();
@@ -322,20 +342,26 @@ export function ImmersionView({
   const openSession = async (id: string, restart = false): Promise<ImmersionSession | null> => {
     setError(null);
     setOpeningId(id);
+    const request = ++openingRequest.current;
     try {
       const loaded = restart
         ? await window.nodus.restartImmersionSession(id)
-        : await window.nodus.getImmersionSession(id);
+        : sessionCache.current.get(id) ?? await window.nodus.getImmersionSession(id);
+      if (request !== openingRequest.current) return null;
       if (loaded) {
+        sessionCache.current.set(id, loaded);
+        setOpenIds((ids) => ids.includes(id) ? ids : [...ids, id]);
         setSession(loaded);
         setMode('player');
+      } else {
+        setOpenIds((ids) => ids.filter((key) => key !== id));
       }
       return loaded ?? null;
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (request === openingRequest.current) setError(e instanceof Error ? e.message : String(e));
       return null;
     } finally {
-      setOpeningId(null);
+      if (request === openingRequest.current) setOpeningId(null);
     }
   };
 
@@ -347,8 +373,8 @@ export function ImmersionView({
   const resuming = useRef<string | null>(resumeTarget);
   useEffect(() => {
     if (resuming.current) return;
-    report.current?.({ openSession: session ? { id: session.id, label: session.plan.title } : null });
-  }, [session]);
+    report.current?.({ openIds, openSession: mode === 'player' && session ? { id: session.id, label: session.plan.title } : null });
+  }, [session, mode, openIds]);
 
   useEffect(() => {
     const resume = resuming.current;
@@ -374,6 +400,7 @@ export function ImmersionView({
     });
     if (!ok) return;
     await window.nodus.deleteImmersionSession(summary.id);
+    closeSession(summary.id);
     void refreshSessions();
   };
 
@@ -387,11 +414,16 @@ export function ImmersionView({
     });
     if (!ok) return false;
     await Promise.all(ids.map((id) => window.nodus.deleteImmersionSession(id)));
+    ids.forEach((id) => sessionCache.current.delete(id));
+    setOpenIds((current) => current.filter((id) => !ids.includes(id)));
+    if (session && ids.includes(session.id)) exitPlayer();
     void refreshSessions();
     return true;
   };
 
   const exitPlayer = () => {
+    openingRequest.current++;
+    setOpeningId(null);
     if (generationJob?.status !== 'running') clearBackgroundJob(IMMERSION_GENERATION_JOB_KEY, generationJob?.id);
     if (session) clearBackgroundJob(immersionDossierJobKey(session.id));
     setSession(null);
@@ -399,10 +431,39 @@ export function ImmersionView({
     void refreshSessions();
   };
 
+  const closeSession = (id: string) => {
+    if (openingId === id) {
+      openingRequest.current++;
+      setOpeningId(null);
+    }
+    const remaining = openIds.filter((key) => key !== id);
+    setOpenIds(remaining);
+    sessionCache.current.delete(id);
+    if (session?.id === id && mode === 'player') {
+      const next = remaining[Math.min(openIds.indexOf(id), remaining.length - 1)];
+      if (next) void openSession(next);
+      else exitPlayer();
+    }
+  };
+
   return (
     <div className="h-full flex flex-col min-h-0">
-      {mode === 'home' && (
-        <>
+      {mode !== 'scope' && <WorkspaceTabStrip
+        homeLabel={t('Inmersión')}
+        homeIcon="target"
+        homeTestId="immersion-tab-home"
+        tabTestId={(tab) => `immersion-tab-${tab.key}`}
+        closeTestId={(tab) => `immersion-close-${tab.key}`}
+        tabs={openIds.flatMap((id) => {
+          const title = sessionCache.current.get(id)?.plan.title ?? sessions.find((item) => item.id === id)?.title;
+          return title ? [{ key: id, title, icon: 'target' }] : [];
+        })}
+        activeKey={mode === 'player' ? session?.id ?? null : null}
+        onActivateHome={exitPlayer}
+        onActivateTab={(id) => { void openSession(id); }}
+        onCloseTab={closeSession}
+      />}
+      <div className={mode === 'home' ? 'flex-1 min-h-0' : 'hidden'}>
           <ImmersionHome
             settings={settings}
             sessions={sessions}
@@ -419,7 +480,7 @@ export function ImmersionView({
             onDeleteSession={(s) => void deleteSession(s)}
             onDeleteSessions={deleteSessions}
           />
-          {composerOpen && (
+          {mode === 'home' && composerOpen && (
             <ImmersionComposerModal
               settings={settings}
               topic={topic}
@@ -443,8 +504,7 @@ export function ImmersionView({
               onClose={() => setComposerOpen(false)}
             />
           )}
-        </>
-      )}
+      </div>
 
       {mode === 'scope' && scope && (
         <ImmersionScopeScreen
@@ -472,7 +532,10 @@ export function ImmersionView({
         <ImmersionPlayer
           key={session.id}
           session={session}
-          onSession={setSession}
+          onSession={(next) => {
+            sessionCache.current.set(next.id, next);
+            setSession((current) => current?.id === next.id ? next : current);
+          }}
           onExit={exitPlayer}
           onCitation={setCitation}
           onSaveToNotes={() => setSavingToNotes(true)}
@@ -1399,8 +1462,9 @@ function ImmersionPlayer({
   // ← / → navigate between steps (ignored while typing).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!progress.startedAt) return;
+      if (!progress.startedAt || e.defaultPrevented) return;
       const target = e.target as HTMLElement | null;
+      if (target?.closest('[role="tablist"], [role="dialog"]')) return;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
       if (e.key === 'ArrowRight') goTo(current + 1, true);
       if (e.key === 'ArrowLeft') goTo(current - 1);

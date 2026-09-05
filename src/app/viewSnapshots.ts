@@ -263,6 +263,8 @@ export interface LibrarySnapshot {
  * reader meant.
  */
 export interface DeepResearchSnapshot {
+  openIds?: string[];
+  readingById?: Record<string, ReadingPlace | null>;
   surface: 'gallery' | 'reader';
   /** id and title of the open report; the report itself is re-read from the gallery. */
   openReport: OpenEntityTab | null;
@@ -299,6 +301,7 @@ export interface DatabaseDeepResearchSnapshot {
  * redrawing it means paying for that pass again just to walk back into the section.
  */
 export interface ImmersionSnapshot {
+  openIds?: string[];
   openSession: OpenEntityTab | null;
   search: string;
   sortKey: ImmersionSortKey;

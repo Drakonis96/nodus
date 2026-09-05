@@ -54,10 +54,17 @@ export function WorkspaceTabStrip({
   onCloseTab: (key: string) => void;
 }) {
   const stripRef = useRef<HTMLDivElement>(null);
+  const focusAfterActivation = useRef(false);
 
   useEffect(() => {
-    stripRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
-      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const active = stripRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+    active?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    // Activation can load a document asynchronously. Wait for its selected tab,
+    // rather than moving focus to the old one on the next animation frame.
+    if (active && focusAfterActivation.current) {
+      active.focus({ preventScroll: true });
+      focusAfterActivation.current = false;
+    }
   }, [activeKey, tabs.length]);
 
   if (!tabs.length) return null;
@@ -71,15 +78,24 @@ export function WorkspaceTabStrip({
   };
 
   const tabKeyDown = (event: KeyboardEvent, key: string | null) => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End', 'Delete'].includes(event.key)) return;
     event.preventDefault();
-    activateAdjacentTab(key, event.key === 'ArrowLeft' ? -1 : 1);
+    event.stopPropagation();
+    if (event.key === 'Delete') {
+      if (key !== null) closeTab(key);
+      return;
+    }
+    focusAfterActivation.current = true;
+    if (event.key === 'Home') onActivateHome();
+    else if (event.key === 'End') onActivateTab(tabs[tabs.length - 1].key);
+    else activateAdjacentTab(key, event.key === 'ArrowLeft' ? -1 : 1);
     requestAnimationFrame(() => {
       stripRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
     });
   };
 
   const closeTab = (key: string) => {
+    focusAfterActivation.current = true;
     onCloseTab(key);
     requestAnimationFrame(() => {
       stripRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
