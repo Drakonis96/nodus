@@ -29,6 +29,12 @@ test('queue dropdown retains and controls every processing lane', { timeout: 240
     const css = path.join(dir, 'style.css');
     execFileSync(path.join(root, 'node_modules/.bin/tailwindcss'), ['-i', 'src/index.css', '-o', css, '--minify'], { cwd: root, stdio: 'pipe' });
     const errors = [];
+    async function mount(initial = {}, hold = []) {
+      await page.addStyleTag({ content: await readFile(css, 'utf8') });
+      await page.evaluate(({ initial, hold }) => { window.initial = initial; window.hold = hold; }, { initial, hold });
+      await page.addScriptTag({ content: bundle.outputFiles[0].text });
+      await page.getByTestId('trigger').waitFor();
+    }
     async function fresh(initial = {}, hold = []) {
       if (page) await page.close();
       page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
@@ -36,10 +42,11 @@ test('queue dropdown retains and controls every processing lane', { timeout: 240
       page.on('pageerror', (e) => errors.push(e.message));
       await page.route('http://queue.test/', (route) => route.fulfill({ contentType: 'text/html', body: '<html class="dark"><body><div id="root"></div></body></html>' }));
       await page.goto('http://queue.test/');
-      await page.addStyleTag({ content: await readFile(css, 'utf8') });
-      await page.evaluate(({ initial, hold }) => { window.initial = initial; window.hold = hold; }, { initial, hold });
-      await page.addScriptTag({ content: bundle.outputFiles[0].text });
-      await page.getByTestId('trigger').waitFor();
+      await mount(initial, hold);
+    }
+    async function restart(initial = {}) {
+      await page.reload();
+      await mount(initial);
     }
     const emit = async (event, value) => { await page.evaluate(([event, value]) => window.emit(event, value), [event, value]); };
     const open = async () => { await page.evaluate(() => window.openPanel()); await page.getByTestId('header-queue-panel').waitFor(); };
@@ -53,6 +60,153 @@ test('queue dropdown retains and controls every processing lane', { timeout: 240
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
       await page.waitForTimeout(350); await page.mouse.up();
     }
+    await t.test('global clear confirms dismissal across lanes and preserves running, pending and paused tasks', async () => {
+      const mixedScan = queue();
+      mixedScan.items.push(
+        { id: 'scan-done', title: 'Escaneo completado', kind: 'deep', state: 'done' },
+        { id: 'scan-failed', title: 'Escaneo fallido', kind: 'deep', state: 'failed' },
+        { id: 'scan-paused', title: 'Escaneo pausado', kind: 'deep', state: 'paused' },
+      );
+      mixedScan.total = 5; mixedScan.done = 1; mixedScan.failed = 1;
+      const mixedDocuments = documents('failed');
+      mixedDocuments.campaigns.push({ ...documents('paused').campaigns[0], campaignId: 'c2' });
+      const initial = {
+        getQueue: mixedScan,
+        getDocumentIndexProgress: mixedDocuments,
+        getEmbeddingStatus: { ...embedding, running: false, error: 'Embedding fallido' },
+        getPassageStatus: { ...passages, running: false, paused: true },
+        listLibraryExtractionJobs: [
+          { id: 'e1', itemId: 'book', status: 'failed', phase: 'ocr', progress: .5, updatedAt: now },
+          { id: 'e2', itemId: 'book2', status: 'queued', phase: 'queued', progress: 0, updatedAt: now },
+        ],
+        listDeepResearchJobs: [{ id: 'r1', title: 'Informe fallido', status: 'failed' }, { id: 'r2', title: 'Informe pendiente', status: 'queued' }],
+        listDictionaryGenerationJobs: [{ entryId: 'd1', phase: 'failed', message: 'Fallido' }, { entryId: 'd2', phase: 'queued', message: 'En cola' }],
+        listOcrDocs: [{ id: 'o1', status: 'error', errorCount: 1 }, { id: 'o2', status: 'pending', errorCount: 0 }],
+      };
+      await fresh(initial); await emit('onZoteroImportProgress', zotero('complete')); await open();
+      const completedBackground = await page.evaluate(() => window.startJob('toolkit:convert', { done: 1, total: 1 }));
+      await page.evaluate(() => { window.deferredJobs['toolkit:convert'].resolve({}); window.startJob('toolkit:translate', { done: 0, total: 1 }); });
+      await page.getByTestId(`background-task-${completedBackground}`).getByRole('button', { name: 'Ocultar' }).waitFor();
+      await count(8);
+      const clear = page.getByRole('button', { name: 'Limpiar terminadas', exact: true });
+      await clear.click();
+      const confirmation = page.getByRole('dialog', { name: 'Limpiar tareas terminadas', exact: true });
+      await confirmation.getByRole('button', { name: 'Cancelar', exact: true }).click();
+      await page.getByTestId('library-extraction-e1').waitFor();
+      await clear.click(); await page.keyboard.press('Escape');
+      await confirmation.waitFor({ state: 'detached' }); await page.getByTestId('header-queue-panel').waitFor();
+      await clear.click(); await confirmation.getByRole('button', { name: 'Limpiar terminadas', exact: true }).click();
+      for (const id of ['library-extraction-e1', 'document-result-c1', 'research-task-r1', 'dictionary-task-d1', 'ocr-task-o1', 'zotero-progress-bar', `background-task-${completedBackground}`]) {
+        await page.getByTestId(id).waitFor({ state: 'detached' });
+      }
+      for (const id of ['library-extraction-e2', 'document-index-progress-bar', 'research-task-r2', 'dictionary-task-d2', 'ocr-task-o2']) await page.getByTestId(id).waitFor();
+      await count(8);
+      assert.deepEqual(await page.evaluate(() => window.activity.queue.items.map((item) => item.id)), ['running', 'waiting', 'scan-paused']);
+      assert.equal(await page.getByTestId('attention').innerText(), 'false');
+      assert.equal(await clear.isDisabled(), true);
+      assert.deepEqual(await page.evaluate(() => window.actions), [], 'clearing history never invokes a destructive queue or document API');
+      await restart(initial); await open();
+      assert.equal(await clear.isDisabled(), true);
+      assert.equal(await page.getByTestId('attention').innerText(), 'false');
+      await page.getByTestId('library-extraction-e2').waitFor();
+    });
+    await t.test('global clear leaves an empty panel and retains required graph maintenance', async () => {
+      await fresh(); await open();
+      const clear = page.getByRole('button', { name: 'Limpiar terminadas', exact: true });
+      assert.equal(await clear.isDisabled(), true);
+      await emit('onQueueProgress', { ...emptyQueue, total: 1, done: 1, items: [{ id: 's1', title: 'Terminado', state: 'done', kind: 'deep' }] });
+      await emit('onEmbeddingProgress', { ...embedding, running: false, ideasEmbedded: 100 });
+      await emit('onPassageProgress', { ...passages, running: false, passagesEmbedded: 500 });
+      await emit('onLibraryExtractionProgress', { id: 'e1', itemId: 'book', status: 'done', phase: 'done', progress: 1, updatedAt: new Date().toISOString() });
+      await clear.click();
+      await page.getByRole('dialog', { name: 'Limpiar tareas terminadas', exact: true }).getByRole('button', { name: 'Limpiar terminadas', exact: true }).click();
+      await page.getByTestId('header-queue-empty').waitFor();
+      assert.equal(await clear.isDisabled(), true);
+      await emit('onQueueProgress', { ...emptyQueue, maintenanceRunning: true, maintenanceDetail: 'Postprocesando relaciones del grafo…' });
+      await count(1); await page.getByTestId('queue-progress-bar').waitFor();
+      assert.equal(await clear.isDisabled(), true);
+      await emit('onQueueProgress', { ...emptyQueue, maintenanceError: 'Revisión pendiente' });
+      await page.getByRole('button', { name: 'Reintentar', exact: true }).waitFor();
+      assert.equal(await page.getByTestId('attention').innerText(), 'true');
+      assert.equal(await clear.isDisabled(), true);
+    });
+    await t.test('startup history stays quiet, including cancellation errors and later whole-list broadcasts', async () => {
+      const cancelled = documents('cancelled');
+      cancelled.campaigns[0].error = 'Cancelled by the user.';
+      cancelled.campaigns[0].failedJobs = 1;
+      const report = { id: 'old-report', title: 'Informe antiguo', status: 'cancelled', error: 'The operation could not be completed.', finishedAt: now };
+      const initial = {
+        getDocumentIndexProgress: cancelled,
+        listDeepResearchJobs: [report],
+        listLibraryExtractionJobs: [{ id: 'old-extraction', itemId: 'book', status: 'done', phase: 'done', progress: 1, updatedAt: now }],
+        listOcrDocs: [{ id: 'old-ocr', status: 'done', pageCount: 10, doneCount: 10, errorCount: 0, updatedAt: Date.parse(now) }],
+        listDictionaryGenerationJobs: [{ entryId: 'old-dictionary', phase: 'done', message: 'Completado' }],
+      };
+      await fresh(initial); await open(); await count(0);
+      await page.getByTestId('header-queue-empty').waitFor();
+      assert.equal(await page.getByTestId('attention').innerText(), 'false');
+      await emit('onDocumentIndexProgress', cancelled);
+      await emit('onDeepResearchQueue', [report, { ...report, id: 'new-report', status: 'running', error: null }]);
+      await count(1);
+      assert.equal(await page.getByTestId('research-task-old-report').count(), 0);
+      await restart(initial); await open(); await page.getByTestId('header-queue-empty').waitFor();
+      // Some services broadcast a full snapshot before their initial read resolves.
+      await fresh({}, ['getDocumentIndexProgress', 'listDeepResearchJobs']);
+      await emit('onDocumentIndexProgress', cancelled); await emit('onDeepResearchQueue', [report]);
+      await open(); await page.getByTestId('header-queue-empty').waitFor();
+    });
+    await t.test('real failures survive startup but dismissed results stay hidden after a full renderer restart', async () => {
+      const failed = documents('failed'); failed.campaigns[0].error = 'Fallo de índice';
+      const report = { id: 'r1', title: 'Informe', status: 'completed', saveError: 'No se pudo guardar', finishedAt: now };
+      const initial = {
+        getDocumentIndexProgress: failed,
+        listDeepResearchJobs: [report],
+        listLibraryExtractionJobs: [{ id: 'e1', itemId: 'book', status: 'failed', phase: 'ocr', progress: .5, error: 'Fallo de OCR', updatedAt: now }],
+        listOcrDocs: [{ id: 'o1', status: 'done', pageCount: 10, doneCount: 9, errorCount: 1 }],
+        listDictionaryGenerationJobs: [{ entryId: 'd1', phase: 'degraded', message: 'Evidencia insuficiente' }],
+      };
+      await fresh(initial); await open();
+      assert.equal(await page.getByTestId('attention').innerText(), 'true');
+      for (const id of ['document-result-c1', 'research-task-r1', 'library-extraction-e1', 'ocr-task-o1', 'dictionary-task-d1']) {
+        await page.getByTestId(id).getByRole('button', { name: 'Ocultar', exact: true }).click();
+      }
+      await page.getByTestId('header-queue-empty').waitFor();
+      await restart(initial); await open(); await page.getByTestId('header-queue-empty').waitFor();
+      assert.equal(await page.getByTestId('attention').innerText(), 'false');
+      await page.evaluate(([active, failed]) => { window.emit('onDocumentIndexProgress', active); window.emit('onDocumentIndexProgress', failed); }, [documents(), failed]);
+      await page.getByTestId('document-result-c1').waitFor();
+      await page.evaluate((report) => { window.emit('onDeepResearchQueue', [{ ...report, status: 'running' }]); window.emit('onDeepResearchQueue', [report]); }, report);
+      await page.getByTestId('research-task-r1').waitFor();
+      assert.equal(await page.getByTestId('attention').innerText(), 'true');
+    });
+    await t.test('cancellation is a neutral result, not an error notification', async () => {
+      await fresh({ getDocumentIndexProgress: documents(), listDeepResearchJobs: [{ id: 'r1', title: 'Informe', status: 'running' }] });
+      const cancelled = documents('cancelled'); cancelled.campaigns[0].error = 'Cancelled by the user.'; cancelled.campaigns[0].failedJobs = 1;
+      await emit('onDocumentIndexProgress', cancelled);
+      await emit('onDeepResearchQueue', [{ id: 'r1', title: 'Informe', status: 'cancelled', error: 'The operation could not be completed.' }]);
+      await page.evaluate(() => window.emit('onOcrEvent', 'o1', { docId: 'o1', status: 'cancelled', errorCount: 1, error: 'Cancelled' }));
+      await open(); await count(0);
+      await page.getByTestId('document-result-c1').waitFor(); await page.getByTestId('research-task-r1').waitFor();
+      assert.equal(await page.getByTestId('attention').innerText(), 'false');
+      assert.equal(await page.getByRole('alert').count(), 0);
+    });
+    await t.test('a completion received during startup is not hidden by a delayed historical read', async () => {
+      await fresh({}, ['listOcrDocs', 'listLibraryExtractionJobs']);
+      const done = { id: 'e1', itemId: 'book', status: 'done', phase: 'done', progress: 1, updatedAt: new Date().toISOString() };
+      await emit('onLibraryExtractionProgress', done);
+      const ocr = { id: 'o1', docId: 'o1', status: 'done', pageCount: 10, doneCount: 10, errorCount: 0 };
+      await page.evaluate((job) => window.emit('onOcrEvent', job.id, job), ocr);
+      await page.evaluate(([done, ocr]) => { window.pending.listLibraryExtractionJobs([done]); window.pending.listOcrDocs([ocr]); }, [done, ocr]);
+      await open(); await page.getByTestId('library-extraction-e1').waitFor(); await page.getByTestId('ocr-task-o1').waitFor();
+      // A job can also finish while the initial request is pending, before we see any event.
+      await fresh({}, ['listOcrDocs', 'listLibraryExtractionJobs']);
+      await page.evaluate(([done, ocr]) => {
+        const updatedAt = new Date().toISOString();
+        window.pending.listLibraryExtractionJobs([{ ...done, updatedAt }]);
+        window.pending.listOcrDocs([{ ...ocr, updatedAt: Date.now() }]);
+      }, [done, ocr]);
+      await open(); await page.getByTestId('library-extraction-e1').waitFor(); await page.getByTestId('ocr-task-o1').waitFor();
+    });
     await t.test('closed Zotero failures survive reopening and dismissal; subscriptions are unique', async () => {
       await fresh(); await emit('onZoteroImportProgress', zotero('failed')); await open();
       assert.match(await page.getByTestId('zotero-progress-bar').innerText(), /No se pudo completar/);
@@ -192,12 +346,19 @@ test('queue dropdown retains and controls every processing lane', { timeout: 240
       await emit('onLibraryExtractionProgress', job);
       await page.evaluate((job) => window.pending.listLibraryExtractionJobs([{ ...job, progress: .1 }, { ...job, id: 'e2', itemId: 'b2' }]), job);
       await open(); assert.match(await page.getByTestId('library-extraction-e1').innerText(), /80%/); await page.getByTestId('library-extraction-e2').waitFor();
-      const jobs = Array.from({ length: 70 }, (_, n) => ({ ...job, id: `e${n}`, itemId: `b${n}`, status: n === 69 ? 'processing' : 'done' }));
+      const jobs = Array.from({ length: 70 }, (_, n) => ({ ...job, id: `e${n}`, itemId: `b${n}`, status: n === 69 ? 'processing' : 'failed' }));
       await fresh({ listLibraryExtractionJobs: jobs }); await open(); await count(1);
       assert.equal(await page.locator('[data-testid^="library-extraction-"]').count(), 50);
       await page.getByTestId('library-extraction-e69').waitFor();
       await page.getByRole('button', { name: 'Mostrar más', exact: true }).click();
       assert.equal(await page.locator('[data-testid^="library-extraction-"]').count(), 70);
+      await fresh({ listLibraryExtractionJobs: jobs }); await open();
+      assert.equal(await page.locator('[data-testid^="library-extraction-"]').count(), 50);
+      await page.getByRole('button', { name: 'Limpiar terminadas', exact: true }).click();
+      await page.getByRole('dialog', { name: 'Limpiar tareas terminadas', exact: true }).getByRole('button', { name: 'Limpiar terminadas', exact: true }).click();
+      await page.waitForFunction(() => window.activity.extraction.length === 1);
+      await page.getByTestId('library-extraction-e69').waitFor(); await count(1);
+      assert.equal(await page.getByRole('button', { name: 'Limpiar terminadas', exact: true }).isDisabled(), true);
     });
     await t.test('simultaneous pipelines fit the compact panel in both themes and at narrow widths', async () => {
       await fresh({ getQueue: queue(), getEmbeddingStatus: embedding, getPassageStatus: passages, getDocumentIndexProgress: documents(), listZoteroSyncSessions: [{ status: 'running', updatedAt: new Date().toISOString(), progress: zotero() }] }); await open(); await count(5);

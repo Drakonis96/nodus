@@ -563,3 +563,6 @@ export const RELEASE_NOTES_IT: Record<string, string[]> = {
 
 // 5.1.5 intentionally ships the exact same What's New copy as 5.1.4.
 RELEASE_NOTES_IT["5.1.5"] = RELEASE_NOTES_IT["5.1.4"];
+
+// 5.2.1 intentionally ships the exact same What's New copy as 5.2.0.
+RELEASE_NOTES_IT["5.2.1"] = RELEASE_NOTES_IT["5.2.0"];

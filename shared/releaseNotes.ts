@@ -2677,6 +2677,12 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
   {
+    version: '5.2.1',
+    date: '2026-09-06',
+    // This focused hotfix intentionally reuses the 5.2.0 What's New modal.
+    highlights: RELEASE_5_2_0_HIGHLIGHTS,
+  },
+  {
     version: '5.2.0',
     date: '2026-09-06',
     highlights: RELEASE_5_2_0_HIGHLIGHTS,
