@@ -1,3 +1,4 @@
+import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from './chatAssets';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -72,6 +73,7 @@ export function saveNodiConversation(input: NodiConversationInput): NodiConversa
   const store = read();
   const existingIndex = input.id ? store.conversations.findIndex((conversation) => conversation.id === input.id) : -1;
   const existing = existingIndex >= 0 ? store.conversations[existingIndex] : null;
+  if (input.id && !existing) throw new Error('This conversation has been deleted. Start a new chat.');
   const now = Date.now();
   let vault: { id: string; name: string } | null = null;
   try {
@@ -92,17 +94,21 @@ export function saveNodiConversation(input: NodiConversationInput): NodiConversa
   });
   if (existingIndex >= 0) store.conversations.splice(existingIndex, 1);
   store.conversations.unshift(conversation);
+  for (const removed of store.conversations.slice(MAX_CONVERSATIONS)) deleteChatAssets(chatAssetOwner('nodi', removed.id));
   store.conversations = store.conversations.slice(0, MAX_CONVERSATIONS);
   write(store);
+  reconcileChatAssets(chatAssetOwner('nodi', conversation.id), conversation.messages);
   return conversation;
 }
 
 export function deleteNodiConversation(id: string): void {
+  deleteChatAssets(chatAssetOwner('nodi', id));
   const store = read();
   store.conversations = store.conversations.filter((conversation) => conversation.id !== id);
   write(store);
 }
 
 export function clearNodiConversations(): void {
+  for (const conversation of read().conversations) deleteChatAssets(chatAssetOwner('nodi', conversation.id));
   write({ version: 1, conversations: [] });
 }

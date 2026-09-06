@@ -1,3 +1,4 @@
+import { buildChatSkillsPrompt, chatSkillsOutputContract, type ChatSkill } from '@shared/chatSkills';
 // Ask a worldbuilding character a question and get their answer, in voice.
 //
 // This function is deliberately stateless: it receives bounded history and returns one
@@ -24,7 +25,7 @@ export async function interviewCharacter(
   personId: string,
   question: string,
   history: InterviewTurn[] = [],
-  options: { canSendImages?: boolean } = {}
+  options: { canSendImages?: boolean; skills?: ChatSkill[] } = {}
 ): Promise<string> {
   const trimmed = question.trim();
   if (!trimmed) throw new Error('Escribe una pregunta.');
@@ -99,13 +100,14 @@ export async function interviewCharacter(
   const model = settings.chatModel ?? settings.synthesisModel ?? settings.extractionModel ?? null;
   const reply = await completeText(
     {
-      system: worldCharacterInterviewPrompt(sources, language),
-      user: composeInterviewPrompt(history, trimmed, language),
+      system: `${worldCharacterInterviewPrompt(sources, language)}\n\n${buildChatSkillsPrompt(options.skills ?? [])}`,
+      user: `${composeInterviewPrompt(history, trimmed, language)}\n\n${chatSkillsOutputContract(options.skills ?? [])}`,
+      englishImagePrompts: options.skills?.some(skill => skill.builtin === 'image'),
       plainContext: true,
       // High: this is performance, not extraction. A cold temperature makes every
       // character sound like the same polite narrator.
       temperature: 0.95,
-      maxTokens: 500,
+      maxTokens: options.skills?.length ? 10_000 : 500,
     },
     model
   );

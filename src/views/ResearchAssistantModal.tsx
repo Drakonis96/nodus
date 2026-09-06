@@ -1,3 +1,5 @@
+import { ChatMarkdown } from '../components/ChatMarkdown';
+import { ChatSkillsControl } from '../components/ChatSkillsControl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AppSettings,
@@ -9,7 +11,7 @@ import type {
   ResearchGraphPartsSelection,
 } from '@shared/types';
 import { Icon, modelLabel, sortModelRefs } from '../components/ui';
-import { Markdown, type MarkdownCitation } from '../components/Markdown';
+import type { MarkdownCitation } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ChatTypingIndicator } from '../components/ChatTypingIndicator';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
@@ -18,6 +20,7 @@ import { VirtualList } from '../components/VirtualList';
 import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 import { useFeatureModel } from '../hooks/useFeatureModel';
+import './researchAssistant.css';
 
 const DEFAULT_SELECTION: ResearchContextSelection = {
   ideas: false,
@@ -439,7 +442,7 @@ export function ResearchAssistantModal({
 
     try {
       const response = await window.nodus.researchChatStream(
-        { messages: requestMessages, selection, model: selectedModel },
+        { messages: requestMessages, selection, model: selectedModel, conversationId },
         {
           onDelta: (delta) => {
             if (activeIdRef.current !== conversationId) return; // user switched away
@@ -569,6 +572,7 @@ export function ResearchAssistantModal({
               </option>
             ))}
           </select>
+          <div className="research-assistant-actions">
           {isGenealogy ? (
             <span
               className="inline-flex items-center gap-1.5 rounded-md border border-amber-900/60 bg-amber-950/20 px-2 py-1 text-xs text-amber-200"
@@ -578,21 +582,35 @@ export function ResearchAssistantModal({
             </span>
           ) : (
             <button
+              type="button"
+              data-testid="research-context-trigger"
               className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1"
               title={t('Elegir qué partes del corpus ve el asistente')}
+              aria-haspopup="dialog"
+              aria-expanded={showContext}
               onClick={() => setShowContext(true)}
             >
-              <Icon name="layers" size={13} className="text-indigo-300" />
+              <Icon name="layers" size={15} className="text-indigo-300" />
               <span className="hidden sm:inline">{activeMode ? t(activeMode.label) : t('Contexto')}</span>
               <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
             </button>
           )}
+          <ChatSkillsControl surface="assistant" disabled={sending} />
           {!isGenealogy && contextTitle && (
-            <span className="hidden md:inline-flex max-w-xs items-center gap-1.5 rounded-md border border-indigo-900/70 bg-indigo-950/25 px-2 py-1 text-xs text-indigo-200">
-              <Icon name="fit" size={12} />
+            <button
+              type="button"
+              data-testid="research-focus-trigger"
+              className="hidden md:inline-flex items-center gap-1.5 rounded-md border border-indigo-900/70 bg-indigo-950/25 px-2 py-1 text-xs text-indigo-200"
+              title={t('Elegir qué partes del corpus ve el asistente')}
+              aria-haspopup="dialog"
+              aria-expanded={showContext}
+              onClick={() => setShowContext(true)}
+            >
+              <Icon name="fit" size={15} />
               <span className="truncate">{contextTitle}</span>
-            </span>
+            </button>
           )}
+          </div>
           <div className="flex-1" />
           <button className="btn btn-ghost" onClick={onClose} title={t('Cerrar')}>
             <Icon name="x" />
@@ -736,7 +754,7 @@ export function ResearchAssistantModal({
                       {message.role === 'assistant' && !message.error ? (
                         message.content ? (
                           <div className={message.id === streamingId ? 'stream-body' : undefined}>
-                            <Markdown content={message.content} onCitation={handleCitation} />
+                            <ChatMarkdown content={message.content} onCitation={handleCitation} streaming={message.id === streamingId} />
                             {message.id === streamingId && <span aria-hidden className="stream-caret" />}
                           </div>
                         ) : message.id === streamingId ? (

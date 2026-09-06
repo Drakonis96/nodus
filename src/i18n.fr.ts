@@ -1,3 +1,4 @@
+import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 /**
  * French translations keyed by the Spanish source string (see {@link ./i18n}).
@@ -57,6 +58,7 @@ import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch
 import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const FR: Record<string, string> = {
+  ...CHAT_SKILLS_TRANSLATIONS['fr'],
   ...STELLAR_GRAPH_TRANSLATIONS["fr"],
   ...ACADEMIC_TOUR_TRANSLATIONS.fr,
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS.fr,

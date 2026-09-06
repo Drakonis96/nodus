@@ -411,6 +411,8 @@ function nodusLocalMaxTokens(model: ModelRef, opts: CallOpts, requestedMax: numb
 }
 
 interface CallOpts {
+  /** Image-tool production prompts stay English while visible prose follows the UI language. */
+  englishImagePrompts?: boolean;
   system: string;
   user: string;
   temperature?: number;
@@ -635,10 +637,11 @@ function outputLanguageDirective(lang: Exclude<PromptLanguage, 'es'>): string {
 
 /** Exported for unit testing: appends the output-language directive per the current
  *  `promptLanguage` setting without mutating the base prompt. */
-export function withPromptLanguage<T extends { system: string }>(opts: T): T {
+export function withPromptLanguage<T extends { system: string; englishImagePrompts?: boolean }>(opts: T): T {
   const lang = getSettings().promptLanguage ?? 'es';
   if (lang === 'es') return opts;
-  return { ...opts, system: `${opts.system}${outputLanguageDirective(lang)}` };
+  const toolException = opts.englishImagePrompts ? '\nIMAGE TOOL PROTOCOL EXCEPTION: In nodus-image JSON requests, the prompt field is an internal production instruction and MUST be written in English. Visible prose, title and alt still follow the output language above. Keep JSON keys and aspect-ratio values unchanged.' : '';
+  return { ...opts, system: `${opts.system}${outputLanguageDirective(lang)}${toolException}` };
 }
 
 /**

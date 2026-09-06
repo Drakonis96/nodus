@@ -12,7 +12,8 @@ import type {
 import type { View } from '../navigation';
 import { ARTICLE_CATEGORY_LABEL } from '@shared/worldEncyclopedia';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { Markdown } from '../components/Markdown';
+import { ChatMarkdown } from '../components/ChatMarkdown';
+import { ChatSkillsControl } from '../components/ChatSkillsControl';
 import { ModelPicker } from '../components/ModelPicker';
 import { Icon } from '../components/ui';
 import { useFeatureModel } from '../hooks/useFeatureModel';
@@ -164,6 +165,7 @@ export function WorldChatView({ settings, onNavigate }: {
             : selection.keepFocus
               ? focus.map((ref) => `${ref.kind}:${ref.id}`)
               : undefined,
+          conversationId: active.id,
           history: previous,
           model,
         },
@@ -209,7 +211,8 @@ export function WorldChatView({ settings, onNavigate }: {
     if (section) onNavigate?.(section);
   };
   const answer = (text: string) => (
-    <Markdown
+    <ChatMarkdown
+      streaming={busy && text === streaming}
       content={text}
       className="text-sm"
       verify={false}
@@ -250,6 +253,7 @@ export function WorldChatView({ settings, onNavigate }: {
             <p className="truncate text-[10px] text-neutral-500">{t('Pregunta a las fichas de tu mundo con referencias verificables.')}</p>
           </div>
           <div className="w-56 min-w-0 max-w-[42%] shrink"><ModelPicker settings={settings} value={model} onChange={setModel} compact className="w-full min-w-0" menu /></div>
+          <ChatSkillsControl surface="assistant" disabled={busy} />
           <button data-testid="world-chat-header-new" className="btn btn-ghost relative z-10 h-8 w-8 shrink-0 p-0" aria-label={t('Nuevo chat')} title={t('Nuevo chat')} onClick={resetChat}><Icon name="plus" size={13} /></button>
           <button data-testid="world-chat-context-toggle" className={`btn relative z-10 h-8 w-8 shrink-0 p-0 ${contextOpen ? 'btn-secondary' : 'btn-ghost'}`} aria-label={t(contextOpen ? 'Ocultar ámbito y fuentes' : 'Mostrar ámbito y fuentes')} title={t(contextOpen ? 'Ocultar ámbito y fuentes' : 'Mostrar ámbito y fuentes')} onClick={toggleContext}><Icon name="columns" size={14} /></button>
         </header>

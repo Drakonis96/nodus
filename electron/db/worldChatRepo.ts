@@ -1,3 +1,5 @@
+import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from '../chatAssets';
+import { getActiveVault } from '../vaults/vaultRegistry';
 import { v4 as uuid } from 'uuid';
 import type {
   DbChatTurn,
@@ -117,9 +119,11 @@ export function saveWorldChatConversation(
       new Date().toISOString(),
       id
     );
+  reconcileChatAssets(chatAssetOwner('world-assistant', id, getActiveVault().id), messages);
   return getWorldChatConversation(id);
 }
 
 export function deleteWorldChatConversation(id: string): void {
+  deleteChatAssets(chatAssetOwner('world-assistant', id, getActiveVault().id));
   getDb().prepare('DELETE FROM world_chat_conversations WHERE id = ?').run(id);
 }

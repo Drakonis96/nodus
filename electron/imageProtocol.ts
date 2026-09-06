@@ -1,3 +1,4 @@
+import { getChatImage } from './chatAssets';
 import { protocol } from 'electron';
 import { getPersonPortrait, getPersonPortraitThumbnail } from './db/entitiesRepo';
 import { getMapImageBlob, getMapThumbnail } from './db/worldMapsRepo';
@@ -25,7 +26,7 @@ export function registerImageSchemePrivileges(): void {
 }
 
 type ImagePayload = { blob: Buffer; mime: string } | null;
-const ORIGINAL_IMAGE_ROUTES = new Set(['portrait', 'world', 'map', 'character-chat']);
+const ORIGINAL_IMAGE_ROUTES = new Set(['portrait', 'world', 'map', 'character-chat', 'chat']);
 
 function safeImageMime(mime: string): string {
   return /^image\/[a-z0-9.+-]+$/i.test(mime) ? mime : 'application/octet-stream';
@@ -42,6 +43,7 @@ function imageIdFromRequest(request: Request): string | null {
 }
 
 function payloadFor(host: string, id: string): ImagePayload {
+  if (host === 'chat') return getChatImage(id);
   if (host === 'portrait') return getPersonPortrait(id);
   if (host === 'portrait-thumbnail') return getPersonPortraitThumbnail(id);
   if (host === 'world') return getWorldImageBlob(id);
@@ -98,7 +100,7 @@ export function registerImageProtocol(): void {
         headers: {
           'Content-Type': safeImageMime(payload.mime),
           'Content-Length': String(payload.blob.byteLength),
-          'Cache-Control': 'private, max-age=31536000, immutable',
+          'Cache-Control': url.hostname === 'chat' ? 'no-store' : 'private, max-age=31536000, immutable',
         },
       });
     } catch {

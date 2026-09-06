@@ -1,3 +1,4 @@
+import { ChatVisual } from './ChatVisual';
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -58,8 +59,10 @@ function MarkdownComponent({
   onTestimonyLink,
   verify = true,
   allowDataImages = false,
+  chatVisuals = false,
 }: {
   content: string;
+  chatVisuals?: boolean;
   className?: string;
   onCitation?: (citation: MarkdownCitation) => void;
   /** `nodus://reader/<document>[/section/<id>|/page/<n>]` returns to traced
@@ -155,14 +158,17 @@ function MarkdownComponent({
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex, rehypeGroupParenthesizedCitations]}
         urlTransform={(value, key) => {
+          if (chatVisuals && key === 'src' && /^nodus-image:\/\/chat\/[a-f0-9]{64}\/[a-f0-9-]{36}$/.test(value)) return value;
           if (allowDataImages && key === 'src' && /^data:image\/(?:png|jpeg|gif|webp|svg\+xml);base64,/i.test(value)) return value;
           return nodusUrlTransform(value);
         }}
         components={{
+          img: ({ src, alt }) => chatVisuals && src?.startsWith('nodus-image://chat/') ? <ChatVisual source={src} alt={alt} /> : <img src={src} alt={alt} />,
           p: ({ node, children, ...props }) => {
             const first = (node as any)?.children?.[0];
             const href = first?.tagName === 'a' ? String(first.properties?.href ?? '') : '';
             const id = href.startsWith('#nodus-reference-') ? decodeURIComponent(href.slice(1)) : undefined;
+            if (chatVisuals && (node as any)?.children?.some((child: any) => child.tagName === 'img')) return <div {...props} id={id}>{children}</div>;
             return <p {...props} id={id}>{children}</p>;
           },
           a: ({ node: _node, href, children, ...anchorProps }) => {

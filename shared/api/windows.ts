@@ -39,6 +39,14 @@ export const NODI_WINDOW_METHODS = [
   'saveNodiNote',
   'deleteNodiNote',
   // chat
+  'listChatSkills',
+  'saveChatSkill',
+  'deleteChatSkill',
+  'restoreChatSkills',
+  'onChatSkillsChanged',
+  'getChatImageMetadata',
+  'copyChatImage',
+  'downloadOriginalImage',
   'nodiChatStream',
   'cancelNodiChat',
   'getNodiViewContext',
@@ -64,6 +72,7 @@ export const NODI_WINDOW_METHODS = [
   'onVaultChanged',
   // the citation card
   'getCitationPreview',
+  'verifyCitations',
   'getIdeaDetail',
   'getEdgeDetail',
   'getGapDetail',

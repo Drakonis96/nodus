@@ -1,3 +1,4 @@
+import { localizeRuntimeError } from '@shared/uiLanguage';
 // platform channels, moved verbatim out of the monolithic registerIpc.
 // The channel names are unchanged; scripts/test-ipc-contract.mjs is what proves it.
 import { localizedForUi, type IpcContext } from './context';
@@ -307,10 +308,10 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
     const image = originalImagePayloadFromUrl(source);
     if (!image) throw new Error('No se encontró la imagen original.');
     const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
-      title: 'Descargar imagen original',
+      title: localizeRuntimeError('Download original image', getSettings().uiLanguage),
       defaultPath: originalImageFileName(label, image.mime),
       filters: [{
-        name: 'Imagen original',
+        name: localizeRuntimeError('Original image', getSettings().uiLanguage),
         extensions: [extensionForOriginalImage(image.mime)],
       }],
     });

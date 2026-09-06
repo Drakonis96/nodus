@@ -1,3 +1,4 @@
+import type { ChatSkill } from './chatSkills';
 // Shared domain types used by both the Electron main process and the React renderer.
 // Keep this file free of any runtime imports from either side.
 // Per-domain slices of the window.nodus contract. NodusApi extends them, so the
@@ -597,6 +598,7 @@ export type {
 export type { ColumnRole, ColumnRoles, KindMeta, RoleColumn } from './analysisCatalog';
 
 export interface DatabaseChatRequest {
+  conversationId?: string;
   question: string;
   databaseIds: string[];
   history?: DbChatTurn[];
@@ -3626,6 +3628,7 @@ export interface ManuscriptProgress {
 /** A question for the world chat. `focusKeys` is the author's explicit choice; with none,
  *  the repo resolves the focus from the names the question itself uses. */
 export interface WorldChatRequest {
+  conversationId?: string;
   question: string;
   focusKeys?: string[];
   history?: DbChatTurn[];
@@ -5684,6 +5687,7 @@ export interface ResearchChatMessage {
 }
 
 export interface ResearchChatRequest {
+  conversationId?: string;
   messages: ResearchChatMessage[];
   selection: ResearchContextSelection;
   model?: ModelRef | null;
@@ -8053,6 +8057,7 @@ export interface TestimonyTranscriptImprovement {
 }
 
 export interface NodiChatRequest {
+  conversationId?: string;
   messages: NodiChatMessage[];
   contexts: NodiContextKind[];
   model?: ModelRef | null;
@@ -8759,6 +8764,13 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   listAnnouncements(): Promise<AnnouncementEntry[]>;
   markAnnouncementRead(id: string): Promise<AnnouncementEntry[]>;
   onAnnouncementsChanged(cb: (list: AnnouncementEntry[]) => void): () => void;
+  listChatSkills(): Promise<ChatSkill[]>;
+  saveChatSkill(skill: ChatSkill): Promise<ChatSkill[]>;
+  deleteChatSkill(id: string): Promise<ChatSkill[]>;
+  restoreChatSkills(): Promise<ChatSkill[]>;
+  onChatSkillsChanged(cb: () => void): () => void;
+  getChatImageMetadata(source: string): Promise<Record<string, string> | null>;
+  copyChatImage(source: string): Promise<void>;
   listNodiConversations(): Promise<NodiConversation[]>;
   getNodiConversation(id: string): Promise<NodiConversation | null>;
   saveNodiConversation(input: NodiConversationInput): Promise<NodiConversation>;

@@ -1,3 +1,8 @@
+import { buildChatSkillsPrompt, chatSkillsOutputContract, transformChatProse } from '@shared/chatSkills';
+import { enabledChatSkills } from '../chatSkills';
+import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
+import { getNodiConversation } from '../nodiConversations';
+import { executeChatSkills, assertChatSkillSession, type ChatSkillExecution } from './chatSkillExecution';
 import { completeTextStream, resolveModelRef } from './aiClient';
 import { getSettings } from '../db/settingsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
@@ -324,12 +329,20 @@ async function buildContext(
 export async function streamNodiChat(
   request: NodiChatRequest,
   onDelta: (delta: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  skillSession?: ChatSkillExecution
 ): Promise<string> {
   const messages = request.messages.filter((message) => message.content.trim()).slice(-MAX_HISTORY_MESSAGES);
   const latestUserIndex = messages.map((message) => message.role).lastIndexOf('user');
   const question = latestUserIndex >= 0 ? messages[latestUserIndex].content : '';
   const chatModel = request.model ?? getSettings().nodiModel ?? getSettings().chatModel;
+  const owner = request.conversationId ? chatAssetOwner('nodi', request.conversationId) : undefined;
+  const execution: ChatSkillExecution = skillSession ?? {
+    skills: enabledChatSkills('nodi'), owner, version: owner ? chatAssetVersion(owner) : 0,
+    isCurrent: () => !request.conversationId || !!getNodiConversation(request.conversationId), question, model: chatModel,
+  };
+  assertChatSkillSession(execution, signal);
+  const { skills } = execution;
   const context = await buildContext(request, question, chatModel && isLocalProvider(chatModel.provider) ? 'localAi' : 'externalAi');
   const pack = getPromptPack();
   const history = messages.slice(0, Math.max(0, latestUserIndex)).map((message) => `${message.role === 'user' ? pack.historyUser : pack.historyAssistant}: ${clip(message.content, 6_000)}`).join('\n\n');
@@ -338,14 +351,17 @@ export async function streamNodiChat(
     history ? `<${pack.contextLabels.historyTag}>\n${history}\n</${pack.contextLabels.historyTag}>` : '',
     `<${pack.contextLabels.currentQuestionTag}>\n${question}\n</${pack.contextLabels.currentQuestionTag}>`,
     pack.answerOnly,
+    chatSkillsOutputContract(skills),
   ].filter(Boolean).join('\n\n');
   const settings = getSettings();
-  const answer = await completeTextStream(
-    { system: buildSystemPrompt(request, context.sources), user, maxTokens: 1_200, temperature: 0.2, reasoning: 'off', useConfiguredCodexReasoning: true, plainContext: true },
+  assertChatSkillSession(execution, signal);
+  let answer = await completeTextStream(
+    { system: `${buildSystemPrompt(request, context.sources)}\n\n${buildChatSkillsPrompt(skills)}`, user, englishImagePrompts: skills.some(skill => skill.builtin === 'image'), maxTokens: skills.length ? 10_000 : 1_200, temperature: 0.2, reasoning: 'off', useConfiguredCodexReasoning: true, plainContext: true },
     (delta, kind) => { if (kind === 'content') onDelta(delta); },
     request.model ?? settings.nodiModel ?? settings.chatModel,
     signal
   );
+  answer = await executeChatSkills(answer, execution, signal);
   // Deterministically repair citation labels (bare ids → "Autor, Año", bracketed ids →
   // proper nodus:// links) so weaker/local models still produce clickable sources. The
   // frontend re-renders with this returned answer, replacing the streamed deltas.
@@ -353,13 +369,13 @@ export async function streamNodiChat(
     const facts = buildWorldChatFacts({ question });
     const allowed = new Set(facts.citable.map((ref) => `${ref.kind}:${ref.id}`));
     return ensureWorldCitations(
-      validateWorldCitations(answer, allowed),
+      transformChatProse(answer, prose => validateWorldCitations(prose, allowed)),
       facts.citable,
       settings.uiLanguage
     );
   }
   if (primarySourceCitationsEnabled(request)) {
-    return validatePrimarySourceAnswerCitations(answer);
+    return transformChatProse(answer, validatePrimarySourceAnswerCitations);
   }
   return corpusCitationsEnabled(request) ? sanitizeResearchCitations(answer, user) : answer;
 }

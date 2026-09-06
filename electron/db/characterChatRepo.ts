@@ -1,3 +1,5 @@
+import { chatAssetOwner, deleteChatAssets } from '../chatAssets';
+import { getActiveVault } from '../vaults/vaultRegistry';
 import { v4 as uuid } from 'uuid';
 import type {
   CharacterChatConversation,
@@ -225,13 +227,15 @@ function deleteConversationRows(id: string): void {
 
 export function deleteCharacterChatConversation(id: string): void {
   getDb().transaction(() => deleteConversationRows(id))();
+  deleteChatAssets(chatAssetOwner('character', id, getActiveVault().id));
 }
 
 export function deleteCharacterChatConversations(personId: string): void {
   const db = getDb();
+  const rows = db.prepare('SELECT id FROM character_chat_conversations WHERE person_id = ?').all(personId) as { id: string }[];
   const tx = db.transaction(() => {
-    const rows = db.prepare('SELECT id FROM character_chat_conversations WHERE person_id = ?').all(personId) as { id: string }[];
     for (const row of rows) deleteConversationRows(row.id);
   });
   tx();
+  for (const row of rows) deleteChatAssets(chatAssetOwner('character', row.id, getActiveVault().id));
 }

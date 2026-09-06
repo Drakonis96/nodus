@@ -1,3 +1,4 @@
+import type { ChatImageAspectRatio } from '@shared/chatSkills';
 import { GoogleGenAI } from '@google/genai';
 import type {
   CharacterImage,
@@ -183,7 +184,7 @@ function providerKey(provider: ImageProvider): string | null {
   return getApiKey(provider);
 }
 
-async function generateGoogle(model: string, prompt: string, key: string): Promise<GeneratedImageBytes> {
+async function generateGoogle(model: string, prompt: string, key: string, signal?: AbortSignal, aspectRatio: ChatImageAspectRatio = '16:9'): Promise<GeneratedImageBytes> {
   const client = new GoogleGenAI({ apiKey: key });
   const response = await client.interactions.create(
     {
@@ -193,16 +194,16 @@ async function generateGoogle(model: string, prompt: string, key: string): Promi
       // JPEG is the ONLY mime the Interactions API accepts here — PNG is rejected with a
       // 400 before the model runs. The declared type is a fallback anyway: the stored mime
       // comes from sniffing the returned bytes.
-      response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: '16:9', image_size: '1K' },
+      response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: aspectRatio, image_size: '1K' },
     },
-    { timeout: IMAGE_TIMEOUT_MS, maxRetries: 0 }
+    { timeout: IMAGE_TIMEOUT_MS, maxRetries: 0, signal }
   );
   const data = response.output_image?.data;
   if (!data) throw new Error('Google no devolvió datos de imagen.');
   return { bytes: Buffer.from(data, 'base64'), mimeType: response.output_image?.mime_type ?? 'image/jpeg' };
 }
 
-async function postBase64Image(url: string, body: Record<string, unknown>, key: string): Promise<GeneratedImageBytes> {
+async function postBase64Image(url: string, body: Record<string, unknown>, key: string, signal?: AbortSignal): Promise<GeneratedImageBytes> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), IMAGE_TIMEOUT_MS);
   try {
@@ -210,7 +211,7 @@ async function postBase64Image(url: string, body: Record<string, unknown>, key: 
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: controller.signal,
+      signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
     });
     const payload = (await response.json().catch(() => ({}))) as {
       data?: Array<{ b64_json?: string; media_type?: string }>;
@@ -226,33 +227,35 @@ async function postBase64Image(url: string, body: Record<string, unknown>, key: 
   }
 }
 
-function generateOpenAI(model: string, prompt: string, key: string): Promise<GeneratedImageBytes> {
+function generateOpenAI(model: string, prompt: string, key: string, signal?: AbortSignal, aspectRatio: ChatImageAspectRatio = '16:9'): Promise<GeneratedImageBytes> {
   return postBase64Image(
     'https://api.openai.com/v1/images/generations',
     {
       model,
       prompt,
       n: 1,
-      size: '1536x1024',
+      size: aspectRatio === '1:1' ? '1024x1024' : ['9:16', '3:4', '2:3'].includes(aspectRatio) ? '1024x1536' : '1536x1024',
       quality: 'high',
       output_format: 'png',
     },
-    key
+    key, signal
   );
 }
 
-function generateOpenRouter(model: string, prompt: string, key: string): Promise<GeneratedImageBytes> {
+function generateOpenRouter(model: string, prompt: string, key: string, signal?: AbortSignal): Promise<GeneratedImageBytes> {
   // Model endpoints expose different optional knobs. Keeping the request to the
   // documented common denominator (plus an explicit single output) prevents a
   // provider-specific parameter from making an otherwise compatible model fail.
-  return postBase64Image('https://openrouter.ai/api/v1/images', { model, prompt, n: 1 }, key);
+  return postBase64Image('https://openrouter.ai/api/v1/images', { model, prompt, n: 1 }, key, signal);
 }
 
-export async function callImageProvider(provider: ImageProvider, model: string, prompt: string): Promise<GeneratedImageBytes> {
-  if (provider === 'nodus') return generateNodusLocalImage(model, prompt, getSettings().imageQuality);
+export async function callImageProvider(provider: ImageProvider, model: string, prompt: string, signal?: AbortSignal, aspectRatio?: ChatImageAspectRatio): Promise<GeneratedImageBytes> {
+  signal?.throwIfAborted();
+  if (aspectRatio) prompt = `${prompt}\nOutput aspect ratio: ${aspectRatio}.`;
+  if (provider === 'nodus') return generateNodusLocalImage(model, prompt, getSettings().imageQuality, aspectRatio);
   // Billed to the user's ChatGPT plan, and the only provider whose size and format are
   // the agent's decision rather than a request parameter.
-  if (provider === 'codex') return generateImageWithChatGptSubscription({ model, prompt });
+  if (provider === 'codex') return generateImageWithChatGptSubscription({ model, prompt, signal });
   const key = providerKey(provider);
   // One fixed sentence per provider instead of one interpolated sentence: a stored
   // failure reason has to survive into every interface language, and an interpolated
@@ -266,11 +269,11 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
   }
   switch (provider) {
     case 'google':
-      return generateGoogle(model, prompt, key);
+      return generateGoogle(model, prompt, key, signal, aspectRatio);
     case 'openai':
-      return generateOpenAI(model, prompt, key);
+      return generateOpenAI(model, prompt, key, signal, aspectRatio);
     case 'openrouter':
-      return generateOpenRouter(model, prompt, key);
+      return generateOpenRouter(model, prompt, key, signal);
   }
 }
 

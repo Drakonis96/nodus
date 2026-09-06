@@ -1,75 +1,30 @@
 import type { CharacterChatSendResult } from '@shared/types';
 import type { InterviewTurn } from '@shared/characterInterview';
-import { buildCharacterChatImagePrompt, isCharacterImageRequest } from '@shared/characterChat';
-import {
-  appendCharacterChatMessage,
-  attachCharacterChatImage,
-  getCharacterChatConversation,
-} from '../db/characterChatRepo';
-import { getCharacter } from '../db/charactersRepo';
+import { appendCharacterChatMessage, getCharacterChatConversation } from '../db/characterChatRepo';
 import { getSettings } from '../db/settingsRepo';
-import { callImageProvider, prepareGeneratedImage } from './decorativeImages';
 import { interviewCharacter } from './characterInterview';
+import { vaultChatSkillSession } from './chatSkillSession';
+import { executeChatSkills, assertChatSkillSession } from './chatSkillExecution';
 
-/**
- * Save the author's turn first, then the character's reply, then (optionally) its image.
- * An image-provider failure must never discard a successful conversation.
- */
-export async function sendCharacterChatMessage(
-  conversationId: string,
-  question: string
-): Promise<CharacterChatSendResult> {
+/** Persist visual tool output with the character turn; previous image attachments remain readable. */
+export async function sendCharacterChatMessage(conversationId: string, question: string): Promise<CharacterChatSendResult> {
   const trimmed = question.trim();
   if (!trimmed) throw new Error('Escribe una pregunta.');
   const before = getCharacterChatConversation(conversationId);
   if (!before) throw new Error('Conversación no encontrada.');
-  const character = getCharacter(before.personId);
-  if (!character) throw new Error('Personaje no encontrado.');
-
-  const history: InterviewTurn[] = before.messages.map((message) => ({
-    role: message.role,
-    content: message.content,
-  }));
+  const settings = getSettings();
+  const model = settings.chatModel ?? settings.synthesisModel ?? settings.extractionModel ?? null;
+  const execution = vaultChatSkillSession('character', conversationId, trimmed, model, getCharacterChatConversation);
+  assertChatSkillSession(execution);
+  const history: InterviewTurn[] = before.messages.map(({ role, content }) => ({ role, content }));
   appendCharacterChatMessage(conversationId, 'author', trimmed);
-
-  const wantsImage = before.imageEnabled && isCharacterImageRequest(trimmed);
-  const answer = await interviewCharacter(before.personId, trimmed, history, { canSendImages: wantsImage });
-  const characterMessage = appendCharacterChatMessage(conversationId, 'character', answer);
-
-  let imageError: string | null = null;
-  if (wantsImage) {
-    try {
-      const settings = getSettings();
-      if (!settings.imageProvider || !settings.imageModel) {
-        throw new Error('Configura un proveedor y modelo de imagen en Ajustes → Proveedores.');
-      }
-      const prompt = buildCharacterChatImagePrompt({
-        style: settings.imageStyle,
-        name: character.displayName,
-        visualSeed: character.profile.visualSeed,
-        appearance: character.profile.appearance,
-        request: trimmed,
-        answer,
-      });
-      const generated = await callImageProvider(settings.imageProvider, settings.imageModel, prompt);
-      const stored = prepareGeneratedImage(generated);
-      attachCharacterChatImage({
-        conversationId,
-        messageId: characterMessage.id,
-        blob: stored.image,
-        thumbnailBlob: stored.thumbnail,
-        thumbnailMimeType: stored.thumbnailMimeType,
-        mimeType: stored.mimeType,
-        prompt,
-        provider: settings.imageProvider,
-        model: settings.imageModel,
-      });
-    } catch (error) {
-      imageError = error instanceof Error ? error.message : String(error);
-    }
-  }
-
+  const raw = await interviewCharacter(before.personId, trimmed, history, {
+    canSendImages: execution.skills.some(skill => skill.builtin === 'image'), skills: execution.skills,
+  });
+  const answer = await executeChatSkills(raw, execution);
+  assertChatSkillSession(execution);
+  appendCharacterChatMessage(conversationId, 'character', answer);
   const conversation = getCharacterChatConversation(conversationId);
   if (!conversation) throw new Error('La conversación se eliminó antes de terminar la respuesta.');
-  return { conversation, imageError };
+  return { conversation, imageError: null };
 }

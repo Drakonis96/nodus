@@ -58,7 +58,7 @@ test('the Nodi overlay declares every bridge method its code calls', () => {
   // NotificationsPanel is named for the header, but the overlay imports its
   // useAnnouncements hook — and a bridge call the overlay makes through a file this
   // pattern does not name is exactly the failure this test exists to catch.
-  const used = methodsUsedBy((rel) => /nodi|mascot/i.test(rel) || rel === 'src/components/NotificationsPanel.tsx');
+  const used = methodsUsedBy((rel) => /nodi|mascot/i.test(rel) || rel === 'src/components/NotificationsPanel.tsx' || /^src\/components\/(Markdown|ChatMarkdown|ChatVisual|ChatSkillsControl)\.tsx$/.test(rel));
   const missing = [...used].filter(([name]) => !declared.has(name)).map(([name, rel]) => `${name} (${rel})`);
   assert.deepEqual(missing, [], 'Nodi calls methods its preload does not expose');
 });

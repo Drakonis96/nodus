@@ -1,3 +1,5 @@
+import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from '../chatAssets';
+import { getActiveVault } from '../vaults/vaultRegistry';
 import { v4 as uuid } from 'uuid';
 import { getDb } from './database';
 import type {
@@ -156,6 +158,7 @@ export function saveMessages(
     db.prepare(`UPDATE chat_conversations SET ${sets.join(', ')} WHERE id = @id`).run(params);
   });
   tx();
+  reconcileChatAssets(chatAssetOwner('assistant', id, getActiveVault().id), messages);
 }
 
 export function renameConversation(id: string, title: string): void {
@@ -170,6 +173,7 @@ export function setArchived(id: string, archived: boolean): void {
 }
 
 export function deleteConversation(id: string): void {
+  deleteChatAssets(chatAssetOwner('assistant', id, getActiveVault().id));
   const db = getDb();
   const tx = db.transaction(() => {
     db.prepare('DELETE FROM chat_messages WHERE conversation_id = ?').run(id);

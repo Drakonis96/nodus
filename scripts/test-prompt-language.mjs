@@ -58,6 +58,9 @@ try {
   for (const { lang, name, heading } of cases) {
     updateSettings({ promptLanguage: lang });
     const out = withPromptLanguage({ system: BASE }).system;
+    const skillPrompt = withPromptLanguage({ system: BASE, englishImagePrompts: true }).system;
+    assert.match(skillPrompt, /prompt field is an internal production instruction and MUST be written in English/);
+    assert.ok(skillPrompt.indexOf('IMAGE TOOL PROTOCOL EXCEPTION') > skillPrompt.indexOf('═══'));
 
     // The base prompt is preserved verbatim (nothing was rewritten in place)…
     assert.ok(out.startsWith(BASE), `${lang}: base prompt must be preserved as a prefix`);

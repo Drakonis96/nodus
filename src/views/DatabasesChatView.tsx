@@ -1,6 +1,7 @@
+import { ChatSkillsControl } from '../components/ChatSkillsControl';
+import { ChatMarkdown } from '../components/ChatMarkdown';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/ui';
-import { Markdown } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ChartFromSpec } from '../components/DatabaseChart';
 import { t } from '../i18n';
@@ -23,12 +24,12 @@ function relativeDate(value: string): string {
 }
 
 /** Renders an assistant message: Markdown prose with any native chart specs inline. */
-function AssistantMessage({ text }: { text: string }) {
+function AssistantMessage({ text, streaming = false }: { text: string; streaming?: boolean }) {
   const segments = parseChatSegments(text);
   return (
     <div className="text-sm">
       {segments.map((seg, i) =>
-        seg.kind === 'chart' ? <ChartFromSpec key={i} spec={seg.spec} /> : <Markdown key={i} content={seg.text} className="text-sm" />
+        seg.kind === 'chart' ? <ChartFromSpec key={i} spec={seg.spec} /> : <ChatMarkdown key={i} streaming={streaming} content={seg.text} className="text-sm" />
       )}
     </div>
   );
@@ -74,8 +75,9 @@ export function DatabasesChatView({ initialDatabaseId }: { initialDatabaseId: st
     localStorage.setItem('nodus.databaseChatHistoryOpen', open ? '0' : '1');
     return !open;
   });
-  const resetChat = () => { setConversationId(null); setConversationTitle(null); setMessages([]); setStreaming(''); setInput(''); };
+  const resetChat = () => { if (busy) return; setConversationId(null); setConversationTitle(null); setMessages([]); setStreaming(''); setInput(''); };
   const openConversation = async (id: string) => {
+    if (busy) return;
     const conversation = await window.nodus.getDatabaseChatConversation(id); if (!conversation) return;
     setConversationId(conversation.id); setConversationTitle(conversation.title); setMessages(conversation.messages); setSelected(new Set(conversation.databaseIds)); setStreaming(''); setInput('');
   };
@@ -102,7 +104,7 @@ export function DatabasesChatView({ initialDatabaseId }: { initialDatabaseId: st
     setMessages(withUser);
     try {
       const res = await window.nodus.dbChatStream(
-        { question: q, databaseIds: [...selected], history: previous },
+        { conversationId: activeId, question: q, databaseIds: [...selected], history: previous },
         { onDelta: (delta) => setStreaming((s) => s + delta) }
       );
       const next: DbChatTurn[] = [...withUser, { role: 'assistant', content: res.text }];
@@ -133,7 +135,8 @@ export function DatabasesChatView({ initialDatabaseId }: { initialDatabaseId: st
         <div className="ml-auto flex min-w-0 flex-wrap justify-end gap-1">
           {databases.map((d) => <button key={d.id} onClick={() => toggleDb(d.id)} className={`max-w-36 truncate rounded border px-2 py-1 text-xs ${selected.has(d.id) ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-neutral-300 text-neutral-500 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800'}`}>{d.name}</button>)}
         </div>
-        <button className="btn btn-ghost h-8 shrink-0" onClick={resetChat}><Icon name="plus" size={13} />{t('Nuevo chat')}</button>
+        <ChatSkillsControl surface="assistant" disabled={busy} />
+        <button disabled={busy} className="btn btn-ghost h-8 shrink-0" onClick={resetChat}><Icon name="plus" size={13} />{t('Nuevo chat')}</button>
       </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -174,7 +177,7 @@ export function DatabasesChatView({ initialDatabaseId }: { initialDatabaseId: st
           )}
           {streaming && (
             <div className="self-start max-w-[95%] rounded-2xl border border-neutral-200 bg-white px-3.5 py-2 dark:border-neutral-800 dark:bg-neutral-900">
-              <AssistantMessage text={streaming} />
+              <AssistantMessage text={streaming} streaming />
             </div>
           )}
           {busy && !streaming && <div className="self-start text-xs text-neutral-500">{t('Pensando…')}</div>}

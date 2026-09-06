@@ -99,6 +99,17 @@ export const nodusApi: NodusApi = {
   markNotificationsRead: () => ipcRenderer.invoke('nodi:notifications:markRead'),
   clearNotifications: () => ipcRenderer.invoke('nodi:notifications:clear'),
   openNotification: (id) => ipcRenderer.invoke('nodi:notifications:open', id).then(() => undefined),
+  listChatSkills: () => ipcRenderer.invoke('chatSkills:list'),
+  saveChatSkill: (skill) => ipcRenderer.invoke('chatSkills:save', skill),
+  deleteChatSkill: (id) => ipcRenderer.invoke('chatSkills:delete', id),
+  restoreChatSkills: () => ipcRenderer.invoke('chatSkills:restore'),
+  onChatSkillsChanged: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on('chatSkills:changed', listener);
+    return () => ipcRenderer.removeListener('chatSkills:changed', listener);
+  },
+  getChatImageMetadata: (source) => ipcRenderer.invoke('chatImages:metadata', source),
+  copyChatImage: (source) => ipcRenderer.invoke('chatImages:copy', source),
   listNodiConversations: () => ipcRenderer.invoke('nodi:conversations:list'),
   getNodiConversation: (id) => ipcRenderer.invoke('nodi:conversations:get', id),
   saveNodiConversation: (input) => ipcRenderer.invoke('nodi:conversations:save', input),

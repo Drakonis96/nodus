@@ -1,3 +1,5 @@
+import { ChatSkillsControl } from '../components/ChatSkillsControl';
+import { ChatMarkdown } from '../components/ChatMarkdown';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
@@ -767,6 +769,7 @@ export function LibraryDocumentReader({
       message: t('Se eliminará el chat guardado junto a este documento.'),
       confirmLabel: t('Vaciar'), danger: true,
     }))) return;
+    if (chatSending) await window.nodus.cancelLibraryReaderChat();
     await window.nodus.clearLibraryReaderChat(reference.id);
     setChatMessages([]);
     setChatStreaming('');
@@ -1037,16 +1040,17 @@ export function LibraryDocumentReader({
                   <p className="min-w-0 flex-1 truncate text-[9px] text-neutral-600">{t(selectedSource === 'clean' ? 'Documento, anotaciones y vault incluidos' : 'Archivo, anotaciones y vault incluidos')}</p>
                   {chatMessages.length > 0 && <button className="rounded p-1.5 text-neutral-600 hover:bg-red-950 hover:text-red-400" aria-label={t('Vaciar conversación')} onClick={() => void clearChat()}><Icon name="trash" size={12} /></button>}
                   </div>
-                  {chatSettings && <div data-testid="library-reader-chat-model" className="relative z-20 mt-2">
+                  <div className="mt-2 flex items-center gap-2"><div className="min-w-0 flex-1">{chatSettings && <div data-testid="library-reader-chat-model">
                     <ModelPicker settings={chatSettings} value={chatModel} onChange={changeChatModel} compact menu allowEmpty={false} emptyLabel="Usar modelo de síntesis" />
-                  </div>}
+                  </div>}</div><ChatSkillsControl surface="assistant" disabled={chatSending} />
+                  </div>
                 </div>
                 <div ref={chatMessagesRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3" aria-live="polite">
                   {!chatMessages.length && !chatSending && <div className="rounded-xl border border-dashed border-indigo-500/20 bg-indigo-500/5 px-4 py-6 text-center"><p className="text-xs leading-5 text-neutral-500">{t('Pregunta por la tesis, un concepto o la relación entre tus subrayados.')}</p></div>}
                   {chatMessages.map((message) => <article key={message.id} className={message.role === 'user' ? 'ml-5 rounded-xl bg-indigo-600/20 px-3 py-2.5 text-xs leading-5 text-indigo-100' : `mr-1 rounded-xl border px-3 py-2.5 text-xs leading-5 ${message.error ? 'border-red-500/25 bg-red-500/5 text-red-300' : 'border-neutral-800 bg-neutral-950/45 text-neutral-300'}`}>
-                    {message.role === 'assistant' && !message.error ? <Markdown content={message.content} onCitation={(next) => setCitation(next)} onReaderCitation={openReaderCitation} className="text-xs leading-5" /> : <p className="whitespace-pre-wrap">{message.content}</p>}
+                    {message.role === 'assistant' && !message.error ? <ChatMarkdown content={message.content} onCitation={(next) => setCitation(next)} onReaderCitation={openReaderCitation} className="text-xs leading-5" /> : <p className="whitespace-pre-wrap">{message.content}</p>}
                   </article>)}
-                  {chatSending && <article data-testid="library-reader-chat-stream" className="mr-1 rounded-xl border border-neutral-800 bg-neutral-950/45 px-3 py-2.5 text-xs leading-5 text-neutral-300">{chatStreaming ? <Markdown content={chatStreaming} verify={false} className="text-xs leading-5" /> : <span className="flex items-center gap-2 text-neutral-500"><Spinner /> {t('Leyendo el documento…')}</span>}</article>}
+                  {chatSending && <article data-testid="library-reader-chat-stream" className="mr-1 rounded-xl border border-neutral-800 bg-neutral-950/45 px-3 py-2.5 text-xs leading-5 text-neutral-300">{chatStreaming ? <ChatMarkdown streaming content={chatStreaming} verify={false} className="text-xs leading-5" /> : <span className="flex items-center gap-2 text-neutral-500"><Spinner /> {t('Leyendo el documento…')}</span>}</article>}
                 </div>
                 {chatError && <p role="alert" className="shrink-0 px-4 pt-2 text-[10px] leading-4 text-red-400">{chatError}</p>}
                 <div className="m-3 mt-2 shrink-0 rounded-xl border border-neutral-800 bg-neutral-950/55 p-2 focus-within:border-indigo-500/50">

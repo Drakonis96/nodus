@@ -1,0 +1,68 @@
+.chat-skills-control,.chat-skills-control * { box-sizing: border-box; }
+.chat-skills-panel { font-weight: 400; font-size: 12px; line-height: 1.5; }
+.chat-skills-control { position: relative; flex-shrink: 0; color: #e4e4e7; }
+.chat-skills-trigger { display: flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid #818cf845; background: #6366f10e; border-radius: 9px; font-size: 12px; color: #c7d2fe; }
+.chat-skills-trigger:hover,.chat-skills-trigger[aria-expanded='true'] { background: #6366f125; border-color: #818cf885; }
+.chat-skills-count { min-width: 16px; text-align: center; border-radius: 4px; background: #818cf81c; font-size: 10px; padding: 1px 4px; }
+.chat-skills-panel { position: absolute; top: calc(100% + 12px); right: 0; z-index: 100; width: 420px; max-width: calc(100vw - 32px); max-height: min(720px, 75vh); overflow-y: auto; border-radius: 18px; background: #18191f; border: 1px solid #818cf83a; box-shadow: 0 24px 80px #0009; padding: 22px; color: #e4e4e7; text-align: left; }
+.chat-skills-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.chat-skills-eyebrow { font-size: 9px; color: #a5b4fc; letter-spacing: .15em; font-weight: 700; }
+.chat-skills-heading h3 { font-size: 20px; line-height: 1.35; font-weight: 600; letter-spacing: -.025em; margin: 5px 0 0; }
+.chat-skills-heading>button { padding: 5px; color: #a1a1aa; }
+.chat-skills-intro { font-size: 12px; color: #a1a1aa; line-height: 1.6; margin: 12px 0 18px; }
+.chat-skills-intro span { display: block; font-size: 10px; margin-top: 10px; color: #a5b4fc; }
+.chat-skills-search { display: flex; align-items: center; gap: 9px; min-height: 38px; margin-bottom: 14px; padding: 0 11px; border: 1px solid #818cf830; border-radius: 10px; background: #111218; color: #858591; transition: border-color .15s, box-shadow .15s; }
+.chat-skills-search:focus-within { border-color: #818cf8; box-shadow: 0 0 0 2px #818cf81c; }
+.chat-skills-search > svg { flex-shrink: 0; }
+.chat-skills-search input { flex: 1; min-width: 0; width: 100%; height: 36px; padding: 0; border: 0; outline: none; box-shadow: none; background: transparent; color: #eeeef4; font: inherit; font-size: 12px; }
+.chat-skills-search input::placeholder { color: #858591; opacity: 1; }
+.chat-skills-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.chat-skills-search button { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; padding: 0; border-radius: 5px; color: #a1a1aa; }
+.chat-skills-search button:hover { background: #818cf81c; color: #c7d2fe; }
+.chat-skills-empty { display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 25px 12px; border: 1px dashed #818cf830; border-radius: 12px; color: #a1a1aa; font-size: 12px; text-align: center; }
+.chat-skills-list { display: grid; gap: 10px; }
+.chat-skill-item { border: 1px solid #ffffff12; border-radius: 12px; padding: 14px; background: #ffffff02; }
+.chat-skill-item.enabled { border-color: #818cf833; background: linear-gradient(135deg,#6366f108,#c084fc04); }
+.chat-skill-main { display: flex; align-items: flex-start; gap: 12px; }
+.chat-skill-symbol { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; border-radius: 10px; background: #818cf819; color: #a5b4fc; }.chat-skill-symbol.image { color: #e9b6e9; background: #d946ef15; }
+.chat-skill-main>div { flex: 1; min-width: 0; }.chat-skill-main b { font-size: 13px; font-weight: 600; }.chat-skill-main p { font-size: 11px; color: #a1a1aa; line-height: 1.55; margin: 5px 0 0; }
+.chat-skill-switch { width: 29px; height: 17px; padding: 2px; background: #45454f; border-radius: 10px; flex-shrink: 0; margin-top: 3px; }.chat-skill-switch span { display: block; width: 13px; height: 13px; background: #fff; border-radius: 50%; transition: transform .15s; }.chat-skill-switch[aria-checked='true'] { background: #6366f1; }.chat-skill-switch[aria-checked='true'] span { transform: translateX(12px); }
+.chat-skill-item-foot { display: flex; align-items: center; gap: 7px; border-top: 1px solid #ffffff09; margin-top: 12px; padding-top: 8px; }.chat-skill-item-foot small { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 9px; color: #858591; }.chat-skill-item-foot button { padding: 4px; color: #a1a1aa; }
+.chat-skills-add { display: flex; gap: 8px; margin-top: 16px; }.chat-skills-add button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px; font-size: 11px; border: 1px solid #ffffff18; border-radius: 8px; }.chat-skill-primary { background: #6366f1 !important; color: #fff; border-color: #818cf8 !important; }
+.chat-skills-restore { display: block; margin: 14px auto 0; font-size: 10px; color: #858591; }
+.chat-skill-editor { display: flex; flex-direction: column; gap: 13px; margin-top: 18px; }.chat-skill-editor>label { display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: #b4b4bf; }.chat-skill-editor input:not([type='checkbox']),.chat-skill-editor textarea { width: 100%; padding: 9px 10px; background: #111218; color: #eeeef4; border: 1px solid #ffffff1c; border-radius: 8px; font-size: 12px; }.chat-skill-editor input:focus,.chat-skill-editor textarea:focus { outline: 2px solid #818cf87a; outline-offset: 1px; }.chat-skill-editor .chat-skill-prompt { font-family: ui-monospace, monospace; line-height: 1.6; font-size: 11px; resize: vertical; min-height: 130px; }.chat-skill-editor>small { font-size: 10px; color: #858591; line-height: 1.5; }
+.chat-skill-targets { display: flex; gap: 20px; font-size: 11px; }.chat-skill-targets label { display: flex; align-items: center; gap: 7px; }.chat-skill-targets input { accent-color: #818cf8; }
+.chat-skill-editor-actions { display: flex; justify-content: flex-end; gap: 8px; }.chat-skill-editor-actions button { font-size: 11px; border-radius: 8px; padding: 9px 13px; }
+.chat-skill-confirm { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px 0 0; font-size: 10px; color: #d4d4d8; }.chat-skill-confirm button { color: #a5b4fc; }.chat-skill-error { font-size: 11px; color: #fca5a5; margin-top: 12px; }
+.chat-skills-control.compact { position: static; }.compact .chat-skills-trigger { gap: 3px; padding: 4px; border: 0; background: transparent; }.compact .chat-skills-count { min-width: 11px; padding: 0 2px; font-size: 8px; }.compact .chat-skills-panel { top: 40px; left: 8px; right: 8px; width: auto; max-height: 400px; padding: 16px; border-radius: 12px; }.compact .chat-skills-heading h3 { font-size: 17px; }
+.chat-skills-panel button:focus-visible { outline: 2px solid #a5b4fc; outline-offset: 2px; }.chat-skills-panel button:disabled { opacity: .45; }
+
+:is(.light, .nodi-theme-light) .chat-skills-control { color: #27272a; }
+:is(.light, .nodi-theme-light) .chat-skills-trigger { color: #4f46e5; }
+:is(.light, .nodi-theme-light) .chat-skills-search { background: #fafafa; border-color: #d4d4df; color: #656575; }
+:is(.light, .nodi-theme-light) .chat-skills-search:focus-within { border-color: #6366f1; }
+:is(.light, .nodi-theme-light) .chat-skills-search input { color: #27272a; }
+:is(.light, .nodi-theme-light) .chat-skills-search input::placeholder { color: #71717a; }
+:is(.light, .nodi-theme-light) .chat-skills-search button { color: #656575; }
+:is(.light, .nodi-theme-light) .chat-skills-search button:hover { color: #4f46e5; }
+:is(.light, .nodi-theme-light) .chat-skills-empty { border-color: #d4d4df; color: #656575; }
+:is(.light, .nodi-theme-light) .chat-skills-panel { background: #fff; color: #27272a; border-color: #c7d2fe; box-shadow: 0 24px 80px #27272a26; }
+:is(.light, .nodi-theme-light) .chat-skills-eyebrow,:is(.light, .nodi-theme-light) .chat-skills-intro span,:is(.light, .nodi-theme-light) .chat-skill-confirm button { color: #4f46e5; }
+:is(.light, .nodi-theme-light) .chat-skills-intro,:is(.light, .nodi-theme-light) .chat-skill-main p,:is(.light, .nodi-theme-light) .chat-skill-item-foot small,:is(.light, .nodi-theme-light) .chat-skills-restore,:is(.light, .nodi-theme-light) .chat-skill-editor>small { color: #656575; }
+:is(.light, .nodi-theme-light) .chat-skill-item { border-color: #e4e4ed; }:is(.light, .nodi-theme-light) .chat-skill-item.enabled { border-color: #c7d2fe; }
+:is(.light, .nodi-theme-light) .chat-skill-symbol { color: #4f46e5; }:is(.light, .nodi-theme-light) .chat-skill-symbol.image { color: #a21caf; }
+:is(.light, .nodi-theme-light) .chat-skill-item-foot,:is(.light, .nodi-theme-light) .chat-skills-add button { border-color: #e4e4ed; }
+:is(.light, .nodi-theme-light) .chat-skill-editor>label,:is(.light, .nodi-theme-light) .chat-skill-confirm { color: #52525b; }
+:is(.light, .nodi-theme-light) .chat-skill-editor input:not([type='checkbox']),:is(.light, .nodi-theme-light) .chat-skill-editor textarea { color: #27272a; background: #fafafa; border-color: #d4d4df; }
+:is(.light, .nodi-theme-light) .chat-skill-error { color: #b91c1c; }
+
+/* Tool-backed capabilities retain their own identity even while switched off. */
+.chat-skills-panel,.chat-skills-panel * { box-sizing: border-box; }
+.chat-skill-item.tool-skill { border-color: #2dd4bf42; background: #14b8a606; }
+.chat-skill-item.tool-skill.enabled { border-color: #2dd4bf75; background: linear-gradient(135deg,#14b8a613,#06b6d405); }
+.chat-skill-item.tool-skill .chat-skill-symbol { color: #5eead4; background: #14b8a620; }
+.chat-skill-tool-badge { display: table; margin-top: 5px; padding: 1px 6px; border-radius: 5px; font-size: 9px; line-height: 1.6; font-weight: 600; color: #5eead4; background: #14b8a618; border: 1px solid #2dd4bf30; }
+.tool-skill .chat-skill-switch[aria-checked='true'] { background: #0d9488; }
+:is(.light, .nodi-theme-light) .chat-skill-item.tool-skill { border-color: #99d9cf; background: #f5fcfa; }
+:is(.light, .nodi-theme-light) .chat-skill-item.tool-skill.enabled { border-color: #5fbbab; background: #edfaf6; }
+:is(.light, .nodi-theme-light) .tool-skill .chat-skill-symbol,:is(.light, .nodi-theme-light) .chat-skill-tool-badge { color: #0f766e; background: #ccfbf1; }

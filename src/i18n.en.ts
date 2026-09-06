@@ -1,3 +1,4 @@
+import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
@@ -56,6 +57,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  ...CHAT_SKILLS_TRANSLATIONS['en'],
   ...STELLAR_GRAPH_TRANSLATIONS["en"],
   ...ACADEMIC_TOUR_TRANSLATIONS.en,
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS.en,

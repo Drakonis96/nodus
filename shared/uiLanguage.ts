@@ -1,3 +1,4 @@
+import { localizeChatSkillError } from './chatSkillErrors';
 import type { AppLanguage } from './types';
 import { MAIN_PROCESS_ERRORS, MAIN_PROCESS_ERROR_PATTERNS } from './mainProcessErrors';
 
@@ -472,6 +473,8 @@ function mainProcessRuntimeError(message: string, language: unknown): string | n
  * unknown Spanish prose becomes a localized generic error instead of leaking Spanish.
  */
 export function localizeRuntimeError(message: string, language: unknown): string {
+  const skillError = localizeChatSkillError(message, normalizeUiLanguage(language));
+  if (skillError) return skillError;
   if (message === 'Fallo al sintetizar el audio.') {
     return uiText(language, { es: message, en: 'Audio synthesis failed.', fr: 'La synthèse audio a échoué.', de: 'Die Audiosynthese ist fehlgeschlagen.', pt: 'A síntese de áudio falhou.', 'pt-BR': 'A síntese de áudio falhou.', it: 'Sintesi audio non riuscita.', tr: 'Ses sentezi başarısız oldu.' });
   }

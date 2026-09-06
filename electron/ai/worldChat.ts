@@ -1,3 +1,9 @@
+import { enabledChatSkills } from '../chatSkills';
+import { buildChatSkillsPrompt, chatSkillsOutputContract, transformChatProse } from '@shared/chatSkills';
+import { executeChatSkills } from './chatSkillExecution';
+import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
+import { getWorldChatConversation } from '../db/worldChatRepo';
+import { getActiveVault } from '../vaults/vaultRegistry';
 // The world chat: Nodus calculates, the model writes.
 //
 // This is the last piece of "Analizar" and it is designed KNOWING the other five exist,
@@ -251,22 +257,26 @@ export async function streamWorldChat(
   signal?: AbortSignal
 ): Promise<WorldChatResult> {
   const settings = getSettings();
+  const skills = enabledChatSkills('assistant');
+  const vaultId = getActiveVault().id;
+  const owner = request.conversationId ? chatAssetOwner('world-assistant', request.conversationId, vaultId) : undefined;
+  const version = owner ? chatAssetVersion(owner) : 0;
   const language = settings.promptLanguage ?? 'es';
   const facts = buildWorldChatFacts(request, language);
-  if (!hasWorldChatMaterial(facts)) {
+  if (!hasWorldChatMaterial(facts) && !skills.length) {
     return { text: '', focus: facts.focus, noMaterial: true };
   }
 
   const model = request.model ?? settings.chatModel ?? settings.synthesisModel ?? null;
   const raw = await completeTextStream(
     {
-      system: worldOperationSystemPrompt('worldChat', settings.promptLanguage ?? 'es'),
-      user: composeWorldChatContext(facts, language),
+      system: `${worldOperationSystemPrompt('worldChat', settings.promptLanguage ?? 'es')}\n\n${buildChatSkillsPrompt(skills)}\nNew creative proposals are not established world canon. Label them accordingly.`,
+      user: `${composeWorldChatContext(facts, language)}\n\n${chatSkillsOutputContract(skills)}`,
       plainContext: true,
-      // Cool. Everything true in the answer is already in the material; the model's job is
-      // to choose and phrase, not to imagine.
+      englishImagePrompts: skills.some(skill => skill.builtin === 'image'),
+      // Keep factual answers grounded and creative proposals clearly identified.
       temperature: 0.3,
-      maxTokens: 1200,
+      maxTokens: skills.length ? 10_000 : 1200,
     },
     (delta, kind) => {
       if (kind !== 'reasoning') onDelta(delta);
@@ -281,9 +291,9 @@ export async function streamWorldChat(
   const allowed = new Set(
     facts.citable.map((ref) => `${ref.kind}:${ref.id}`)
   );
-  const validated = validateCitations(raw, allowed);
+  const validated = transformChatProse(raw, prose => validateCitations(prose, allowed));
   return {
-    text: ensureWorldCitations(validated, facts.citable, language),
+    text: await executeChatSkills(ensureWorldCitations(validated, facts.citable, language), { skills, owner, version, model, question: request.question, isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getWorldChatConversation(request.conversationId)) }, signal),
     focus: facts.focus,
     noMaterial: false,
   };

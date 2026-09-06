@@ -10,7 +10,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // the three former hot files are directories now — and any other path to that file.
 const read = async (file) => readSource(file);
 
-test('character chat exposes persistent history, image opt-in and destructive confirmation', async () => {
+test('character chat exposes persistent history, shared skill tools and destructive confirmation', async () => {
   const [modal, preload, ipc, api] = await Promise.all([
     read('src/components/CharacterInterviewModal.tsx'),
     read('@bridge'),
@@ -19,9 +19,9 @@ test('character chat exposes persistent history, image opt-in and destructive co
   ]);
 
   assert.match(modal, /data-testid="character-chat-history-toggle"/);
-  assert.match(modal, /data-testid="character-chat-image-toggle"/);
-  assert.match(modal, /role="switch"/);
-  assert.match(modal, /absolute left-0\.5 top-0\.5/, 'the switch thumb is anchored inside its track');
+  assert.match(modal, /<ChatSkillsControl surface="assistant" disabled=\{busy\}/);
+  assert.match(modal, /<ChatMarkdown content=\{message.content\}/);
+  assert.doesNotMatch(modal, /data-testid="character-chat-image-toggle"/, 'one shared image capability replaces the conflicting legacy switch');
   assert.match(modal, /PersonPortrait/);
   assert.match(modal, /data-testid="character-chat-character-avatar"/);
   assert.match(modal, /listCharacterChatConversations/);

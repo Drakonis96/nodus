@@ -1,3 +1,5 @@
+import { ChatSkillsControl } from './ChatSkillsControl';
+import { ChatMarkdown } from './ChatMarkdown';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type {
@@ -26,7 +28,6 @@ export function CharacterInterviewModal({
   const [conversation, setConversation] = useState<CharacterChatConversation | null>(null);
   const [history, setHistory] = useState<CharacterChatConversationSummary[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [imageEnabled, setImageEnabled] = useState(false);
   const [question, setQuestion] = useState('');
   /** The turn the author just sent, shown while the character is still answering. */
   const [pending, setPending] = useState<string | null>(null);
@@ -58,7 +59,6 @@ export function CharacterInterviewModal({
         const last = await window.nodus.getCharacterChatConversation(rows[0].id);
         if (!alive || !last || last.personId !== character.personId) return;
         setConversation(last);
-        setImageEnabled(last.imageEnabled);
       })
       .catch((err) => {
         if (alive) setError(errorText(err));
@@ -83,7 +83,6 @@ export function CharacterInterviewModal({
       const loaded = await window.nodus.getCharacterChatConversation(id);
       if (!loaded || loaded.personId !== character.personId) throw new Error(t('Conversación no encontrada.'));
       setConversation(loaded);
-      setImageEnabled(loaded.imageEnabled);
       setHistoryOpen(false);
     } catch (err) {
       setError(errorText(err));
@@ -99,21 +98,6 @@ export function CharacterInterviewModal({
     setError(null);
     setImageNotice(null);
     setHistoryOpen(false);
-  };
-
-  const toggleImages = async () => {
-    if (busy) return;
-    const next = !imageEnabled;
-    setImageEnabled(next);
-    if (!conversation) return;
-    try {
-      const updated = await window.nodus.setCharacterChatImagesEnabled(conversation.id, next);
-      if (updated) setConversation(updated);
-      await refreshHistory();
-    } catch (err) {
-      setImageEnabled(!next);
-      setError(errorText(err));
-    }
   };
 
   const ask = async () => {
@@ -132,13 +116,11 @@ export function CharacterInterviewModal({
         active = await window.nodus.createCharacterChatConversation({
           personId: character.personId,
           title: trimmed,
-          imageEnabled,
         });
         setConversation(active);
       }
       const result = await window.nodus.sendCharacterChatMessage(active.id, trimmed);
       setConversation(result.conversation);
-      setImageEnabled(result.conversation.imageEnabled);
       if (result.imageError) setImageNotice(result.imageError);
       await refreshHistory();
     } catch (err) {
@@ -289,27 +271,7 @@ export function CharacterInterviewModal({
                 {t('Responde en su propia voz; las conversaciones se guardan en esta bóveda.')}
               </p>
             </div>
-            <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[11px] text-neutral-600 dark:text-neutral-400">
-              <span className="hidden sm:inline">{t('Imágenes')}</span>
-              <button
-                type="button"
-                role="switch"
-                data-testid="character-chat-image-toggle"
-                aria-checked={imageEnabled}
-                aria-label={t('Imágenes')}
-                disabled={busy}
-                className={`relative h-5 w-9 rounded-full transition-colors disabled:opacity-50 ${
-                  imageEnabled ? 'bg-indigo-600' : 'bg-neutral-300 dark:bg-neutral-700'
-                }`}
-                onClick={() => void toggleImages()}
-              >
-                <span
-                  className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                    imageEnabled ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </label>
+            <ChatSkillsControl surface="assistant" disabled={busy} />
             <button
               type="button"
               className="btn btn-ghost h-8 w-8 shrink-0 p-0"
@@ -373,9 +335,7 @@ export function CharacterInterviewModal({
                       : 'max-w-[78%] rounded-2xl rounded-bl-md border border-neutral-200 bg-white text-neutral-800 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70 dark:text-neutral-200 sm:max-w-[80%]'
                   }`}
                 >
-                  <p className={message.role === 'author' ? 'whitespace-pre-wrap' : 'whitespace-pre-wrap px-3 py-2'}>
-                    {message.content}
-                  </p>
+                  {message.role === 'author' ? <p className="whitespace-pre-wrap">{message.content}</p> : <div className="px-3 py-2"><ChatMarkdown content={message.content} verify={false} /></div>}
                   {message.image && (
                     <button
                       type="button"

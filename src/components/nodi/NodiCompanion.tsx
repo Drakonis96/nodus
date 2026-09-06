@@ -1,3 +1,5 @@
+import { ChatMarkdown } from '../ChatMarkdown';
+import { ChatSkillsControl } from '../ChatSkillsControl';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { deriveNodiNoteTitle } from '@shared/nodiNotes';
 import { announcementCopyFor, type AnnouncementRefreshResult } from '@shared/announcements';
@@ -872,7 +874,7 @@ export function NodiCompanion({
       setActiveConversationId(saved.id);
       const currentView = contexts.includes('current_view') ? await window.nodus.getNodiViewContext() : null;
       const answer = await window.nodus.nodiChatStream(
-        { messages: next, contexts, model: nodiModel, currentView },
+        { messages: next, contexts, model: nodiModel, currentView, conversationId: conversationId ?? undefined },
         {
           onDelta: (delta) => {
             assistantText += delta;
@@ -1090,6 +1092,7 @@ export function NodiCompanion({
               <button className="nodi-head-icon" disabled={streaming} onClick={newChat} title={t('Nuevo chat')} aria-label={t('Nuevo chat')}><Icon name="plus" size={15} /></button>
               <button className={`nodi-head-icon${chatTool === 'history' ? ' active' : ''}`} disabled={streaming} onClick={() => setChatTool((tool) => tool === 'history' ? 'none' : 'history')} title={t('Historial de chats')} aria-label={t('Historial de chats')}><Icon name="clock" size={15} /></button>
               <button className={`nodi-head-icon nodi-context-button${chatTool === 'contexts' ? ' active' : ''}`} onClick={() => setChatTool((tool) => tool === 'contexts' ? 'none' : 'contexts')} title={t('Contextos')} aria-label={t('Contextos')}><Icon name="layers" size={15} /><span>{contexts.length}</span></button>
+              <ChatSkillsControl surface="nodi" compact disabled={streaming} />
               <button className={`nodi-head-icon${chatTool === 'settings' ? ' active' : ''}`} onClick={() => setChatTool((tool) => tool === 'settings' ? 'none' : 'settings')} title={t('Ajustes de Nodi')} aria-label={t('Ajustes de Nodi')}><Icon name="settings" size={15} /></button>
               <button className="nodi-head-icon" onClick={() => setPanel('none')} title={t('Cerrar')} aria-label={t('Cerrar')}><Icon name="x" size={15} /></button>
             </div>
@@ -1171,7 +1174,8 @@ export function NodiCompanion({
                   </button>
                   {m.content
                     ? m.role === 'assistant' ? (
-                      <Markdown
+                      <ChatMarkdown
+                        streaming={streaming && i === messages.length - 1}
                         content={m.content}
                         verify={citesCorpus}
                         onCitation={citesCorpus ? setCitation : undefined}

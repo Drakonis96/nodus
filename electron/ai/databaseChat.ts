@@ -1,3 +1,7 @@
+import { buildChatSkillsPrompt, chatSkillsOutputContract } from '@shared/chatSkills';
+import { vaultChatSkillSession } from './chatSkillSession';
+import { executeChatSkills, assertChatSkillSession } from './chatSkillExecution';
+import { getDatabaseChatConversation } from '../db/databaseChatRepo';
 // Database chat orchestrator: builds a bounded context (statistical profile + a sample
 // of rows) for the selected databases and streams an analyst answer that may include a
 // native chart spec. The context assembly is pure (shared/databaseChat.ts); this module
@@ -101,7 +105,7 @@ export function buildDatabaseChatContext(databaseIds: string[], language = getSe
 
 export interface DatabaseChatDeps {
   stream?: (
-    opts: { system: string; user: string; plainContext?: boolean; temperature?: number; maxTokens?: number },
+    opts: { system: string; user: string; englishImagePrompts?: boolean; plainContext?: boolean; temperature?: number; maxTokens?: number },
     onDelta: (delta: string) => void,
     signal?: AbortSignal
   ) => Promise<string>;
@@ -115,7 +119,11 @@ export async function streamDatabaseChat(
   deps: DatabaseChatDeps = {}
 ): Promise<{ text: string }> {
   if (!request.databaseIds.length) throw new Error('Elige al menos una base de datos.');
-  const language = getSettings().promptLanguage ?? 'es';
+  const settings = getSettings();
+  const execution = vaultChatSkillSession('database', request.conversationId, request.question, settings.chatModel ?? settings.synthesisModel, getDatabaseChatConversation);
+  assertChatSkillSession(execution, signal);
+  const { skills } = execution;
+  const language = settings.promptLanguage ?? 'es';
   const { context } = buildDatabaseChatContext(request.databaseIds, language);
   const user = buildDbChatUser(context, request.question, request.history ?? [], language);
 
@@ -131,9 +139,9 @@ export async function streamDatabaseChat(
     });
 
   const text = await stream(
-    { system: databaseChatSystem(language), user, plainContext: true, temperature: 0.3, maxTokens: 1500 },
+    { system: `${databaseChatSystem(language)}\n\n${buildChatSkillsPrompt(skills)}`, user: `${user}\n\n${chatSkillsOutputContract(skills)}`, englishImagePrompts: skills.some(skill => skill.builtin === 'image'), plainContext: true, temperature: 0.3, maxTokens: skills.length ? 10_000 : 1500 },
     onDelta,
     signal
   );
-  return { text };
+  return { text: await executeChatSkills(text, execution, signal) };
 }

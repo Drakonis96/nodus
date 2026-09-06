@@ -1,3 +1,4 @@
+import { splitChatVisuals } from './chatSkills';
 import type { ModelRef } from './types';
 import type { StudySearchKind, StudySearchLocation, StudySearchScope } from './studySearch';
 
@@ -91,6 +92,7 @@ export interface StudyAssistantConversationPatch {
 }
 
 export interface StudyAssistantRequest {
+  conversationId?: string;
   messages: StudyAssistantMessage[];
   selection: StudyAssistantSelection;
   task: StudyAssistantTask;
@@ -155,13 +157,19 @@ export function validateStudyAssistantAnswer(
     used.add(citation.id);
     return studyAssistantCitationLink(citation.id);
   };
-  let clean = answer
+  // Validate prose citations without rewriting labels or instructions inside visual artifacts.
+  let clean = splitChatVisuals(answer).map(part => {
+    if (part.kind !== 'markdown') {
+      const language = part.kind === 'svg' ? 'svg' : part.kind === 'image-request' ? 'nodus-image' : 'nodus-image-error';
+      return `\n\n\`\`\`${language}\n${part.content}\n${part.complete ? '```' : ''}\n\n`;
+    }
+    return part.content
     .replace(/\[\[(S\d+)\]\]/gi, normalize)
     .replace(/\[(S\d+)\]\([^)]+\)/gi, normalize)
     .replace(/\[(S\d+)\](?!\()/gi, normalize)
     .replace(/\s+([,.;:!?])/g, '$1')
-    .replace(/ {2,}/g, ' ')
-    .trim();
+    .replace(/ {2,}/g, ' ');
+  }).join('').trim();
   const citations = [...used].map((id) => byId.get(id)!).filter(Boolean);
   const citationWarning = available.length > 0 && citations.length === 0;
   if (!clean) clean = emptyAnswer;

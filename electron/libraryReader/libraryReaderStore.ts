@@ -1,3 +1,4 @@
+import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from '../chatAssets';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -981,6 +982,11 @@ export function deleteLibraryReaderAnnotationFromContext(target: LibraryReaderAn
   return true;
 }
 
+export function libraryReaderChatAssetOwner(documentId: string): string | undefined {
+  const resolved = resolvedDocument(documentId);
+  return resolved ? chatAssetOwner('library-reader', resolved.folder) : undefined;
+}
+
 function chatPath(documentId: string): string | null {
   const resolved = resolvedDocument(documentId);
   return resolved ? optionalDocumentFile(resolved.folder, resolved.metadata.files?.chat, 'chat.json') : null;
@@ -1012,10 +1018,14 @@ export function saveLibraryReaderChatMessages(documentId: string, messages: Libr
     content: message.content.slice(0, 200_000),
   }));
   atomicWriteJson(filePath, safe);
+  const owner = libraryReaderChatAssetOwner(documentId);
+  if (owner) reconcileChatAssets(owner, safe);
 }
 
 export function clearLibraryReaderChat(documentId: string): void {
   const filePath = chatPath(documentId);
   if (!filePath) return;
   atomicWriteJson(filePath, []);
+  const owner = libraryReaderChatAssetOwner(documentId);
+  if (owner) deleteChatAssets(owner);
 }

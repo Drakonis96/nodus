@@ -1,3 +1,8 @@
+import { buildChatSkillsPrompt, chatSkillsOutputContract } from '@shared/chatSkills';
+import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from '../chatAssets';
+import { getActiveVault } from '../vaults/vaultRegistry';
+import { vaultChatSkillSession } from './chatSkillSession';
+import { executeChatSkills, assertChatSkillSession } from './chatSkillExecution';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -106,11 +111,14 @@ export function updateStudyAssistantConversation(id: string, patch: StudyAssista
     updatedAt: now(),
     messageCount: patch.messages?.length ?? current.messages.length,
   };
-  store.conversations[index] = next; writeStore(store); return next;
+  store.conversations[index] = next; writeStore(store);
+  if (patch.messages) reconcileChatAssets(chatAssetOwner('study', id, getActiveVault().id), next.messages);
+  return next;
 }
 
 export function deleteStudyAssistantConversation(id: string): void {
   const store = readStore(); store.conversations = store.conversations.filter((conversation) => conversation.id !== id); writeStore(store);
+  deleteChatAssets(chatAssetOwner('study', id, getActiveVault().id));
 }
 
 /**
@@ -179,7 +187,10 @@ export function clearStudyAssistantDemoConversation(variant: StudyChatDemoVarian
   const store = readStore();
   const id = DEMO_CONVERSATION_IDS[variant];
   const next = store.conversations.filter((conversation) => conversation.id !== id);
-  if (next.length !== store.conversations.length) writeStore({ ...store, conversations: next });
+  if (next.length !== store.conversations.length) {
+    writeStore({ ...store, conversations: next });
+    deleteChatAssets(chatAssetOwner('study', id, getActiveVault().id));
+  }
 }
 
 export function getStudyAssistantSources(): StudyAssistantSourceOption[] { return listStudyAssistantSourceOptions(); }
@@ -241,6 +252,9 @@ export async function streamStudyAssistant(
   const responseLanguage = effectivePromptLanguage(request.language);
   const insufficientAnswer = studyAssistantPromptPack(responseLanguage).insufficientInformation;
   const configuredModel = request.model ?? settings.studyModel ?? settings.chatModel ?? settings.synthesisModel ?? null;
+  const execution = vaultChatSkillSession('study', request.conversationId, lastUser.content, configuredModel, getStudyAssistantConversation);
+  assertChatSkillSession(execution, signal);
+  const { skills } = execution;
   const { citations: availableCitations, truncated } = await buildCitations(lastUser.content, normalizeSelection(request.selection));
   const sourceChars = availableCitations.reduce((sum, citation) => sum + citation.quote.length, 0);
   const stats = {
@@ -253,10 +267,11 @@ export async function streamStudyAssistant(
   }
   const effectiveModel = resolveModelRef(configuredModel);
   const prompt = buildStudyAssistantPrompt(request, availableCitations);
-  const raw = await completeTextStream({ ...prompt, temperature: 0.18, maxTokens: 3200 }, onDelta, effectiveModel, signal);
+  assertChatSkillSession(execution, signal);
+  const raw = await completeTextStream({ system: `${prompt.system}\n\n${buildChatSkillsPrompt(skills)}`, user: `${prompt.user}\n\n${chatSkillsOutputContract(skills)}`, englishImagePrompts: skills.some(skill => skill.builtin === 'image'), temperature: 0.18, maxTokens: skills.length ? 10_000 : 3200 }, onDelta, effectiveModel, signal);
   const validated = validateStudyAssistantAnswer(raw, availableCitations, insufficientAnswer);
   return {
-    ...validated, availableCitations, insufficientInformation: !raw.trim(), interrupted: Boolean(signal?.aborted), stats,
+    ...validated, answer: await executeChatSkills(validated.answer, execution, signal), availableCitations, insufficientInformation: !raw.trim(), interrupted: Boolean(signal?.aborted), stats,
   };
 }
 

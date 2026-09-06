@@ -281,7 +281,7 @@
 }
 .nodi-panel-head .grow { flex: 1; }
 .nodi-chat-title { min-width: 0; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nodi-panel-head button {
+.nodi-panel-head > button {
   background: transparent;
   border: 0;
   color: #9aa6b8;
@@ -290,8 +290,8 @@
   padding: 2px 6px;
   border-radius: 6px;
 }
-.nodi-panel-head button:hover { color: #f3e6c2; background: rgba(255, 255, 255, 0.06); }
-.nodi-panel-head button.nodi-head-icon {
+.nodi-panel-head > button:hover { color: #f3e6c2; background: rgba(255, 255, 255, 0.06); }
+.nodi-panel-head > button.nodi-head-icon {
   width: 25px;
   height: 25px;
   padding: 0;
@@ -300,8 +300,8 @@
   justify-content: center;
   flex: 0 0 auto;
 }
-.nodi-panel-head button.nodi-head-icon.active { color: #f3d67a; background: rgba(212, 175, 55, 0.14); }
-.nodi-panel-head button.nodi-head-icon:disabled { opacity: .35; cursor: default; }
+.nodi-panel-head > button.nodi-head-icon.active { color: #f3d67a; background: rgba(212, 175, 55, 0.14); }
+.nodi-panel-head > button.nodi-head-icon:disabled { opacity: .35; cursor: default; }
 .nodi-context-button { position: relative; }
 .nodi-context-button > span {
   position: absolute;
@@ -827,12 +827,12 @@
   box-shadow: 0 16px 40px rgba(15, 23, 42, .18);
 }
 .nodi-theme-light .nodi-panel-head { border-bottom-color: rgba(15, 23, 42, .08); color: #1f2937; }
-.nodi-theme-light .nodi-panel-head button { color: var(--nodi-vault-accent, #6366f1); }
-.nodi-theme-light .nodi-panel-head button:hover {
+.nodi-theme-light .nodi-panel-head > button { color: var(--nodi-vault-accent, #6366f1); }
+.nodi-theme-light .nodi-panel-head > button:hover {
   color: var(--nodi-vault-accent, #6366f1);
   background: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 10%, transparent);
 }
-.nodi-theme-light .nodi-panel-head button.nodi-head-icon.active {
+.nodi-theme-light .nodi-panel-head > button.nodi-head-icon.active {
   color: var(--nodi-vault-accent, #6366f1);
   background: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 14%, transparent);
 }

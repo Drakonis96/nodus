@@ -1,3 +1,4 @@
+import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 /**
  * pt-BR translations keyed by the Spanish source string (see {@link ./i18n}).
@@ -57,6 +58,7 @@ import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch
 import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const PT_BR: Record<string, string> = {
+  ...CHAT_SKILLS_TRANSLATIONS['pt-BR'],
   ...STELLAR_GRAPH_TRANSLATIONS["pt-BR"],
   ...ACADEMIC_TOUR_TRANSLATIONS['pt-BR'],
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS['pt-BR'],

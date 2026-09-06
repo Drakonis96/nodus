@@ -1,3 +1,7 @@
+import { enabledChatSkills } from '../chatSkills';
+import { chatAssetVersion } from '../chatAssets';
+import { getActiveVault } from '../vaults/vaultRegistry';
+import { assertChatSkillSession, type ChatSkillExecution } from './chatSkillExecution';
 import type {
   LibraryReaderChatRequest,
   LibraryReaderChatResponse,
@@ -11,6 +15,7 @@ import { getSettings } from '../db/settingsRepo';
 import {
   getLibraryReaderAttachmentContent,
   getLibraryReaderDocument,
+  libraryReaderChatAssetOwner,
   getLibraryReaderRawContent,
   libraryReaderAttachmentPath,
   listLibraryReaderAnnotations,
@@ -135,6 +140,15 @@ export async function streamLibraryReaderChat(
   const copy = LIBRARY_READER_CONTEXT_COPY[language];
   const document = getLibraryReaderDocument(request.documentId);
   if (!document) throw new Error(copy.documentUnavailable);
+  const owner = libraryReaderChatAssetOwner(request.documentId);
+  const vaultId = getActiveVault().id;
+  const execution: ChatSkillExecution = {
+    skills: enabledChatSkills('assistant'), owner, version: owner ? chatAssetVersion(owner) : 0,
+    question: [...request.messages].reverse().find(message => message.role === 'user')?.content,
+    model: effectiveModel(request),
+    isCurrent: () => getActiveVault().id === vaultId && libraryReaderChatAssetOwner(request.documentId) === owner,
+  };
+  assertChatSkillSession(execution, signal);
   const clean = getLibraryReaderRawContent(request.documentId);
   const sourceId = request.sourceId && request.sourceId !== 'clean' ? request.sourceId : 'clean';
   const attachment = sourceId === 'clean' ? null : document.attachments.find((entry) => entry.id === sourceId) ?? null;
@@ -190,6 +204,6 @@ export async function streamLibraryReaderChat(
     currentView: grounding.currentView,
     readerGrounding: grounding.readerGrounding,
   };
-  const answer = await streamNodiChat(nodiRequest, (delta) => onDelta(delta, 'content'), signal);
+  const answer = await streamNodiChat(nodiRequest, (delta) => onDelta(delta, 'content'), signal, execution);
   return { answer: answer.trim(), model };
 }

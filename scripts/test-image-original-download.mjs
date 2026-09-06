@@ -23,7 +23,7 @@ test('the download resolver returns full internal images and rejects thumbnails 
         setup(builder) {
           builder.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'download-stub' }));
           builder.onLoad({ filter: /^electron$/, namespace: 'download-stub' }, () => ({
-            contents: 'export const protocol = { registerSchemesAsPrivileged(){}, handle(){} };',
+            contents: 'export const app = { getPath: () => "/nonexistent-nodus-image-test" }; export const protocol = { registerSchemesAsPrivileged(){}, handle(){} };',
             loader: 'js',
           }));
           builder.onResolve({ filter: /\/db\/entitiesRepo$/ }, () => ({ path: 'entities', namespace: 'download-stub' }));

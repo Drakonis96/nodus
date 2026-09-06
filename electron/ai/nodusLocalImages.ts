@@ -1,3 +1,4 @@
+import type { ChatImageAspectRatio } from '@shared/chatSkills';
 import { app } from 'electron';
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
@@ -281,7 +282,7 @@ function runSdCli(executable: string, args: string[], cwd: string): Promise<void
   });
 }
 
-async function generateNow(prompt: string, quality: NodusImageQuality): Promise<Buffer> {
+async function generateNow(prompt: string, quality: NodusImageQuality, aspectRatio?: ChatImageAspectRatio): Promise<Buffer> {
   const cleanPrompt = prompt.replace(/\s+/g, ' ').trim();
   if (!cleanPrompt) throw new Error('El prompt de imagen está vacío.');
   const status = await getNodusLocalImageStatus();
@@ -289,6 +290,10 @@ async function generateNow(prompt: string, quality: NodusImageQuality): Promise<
   const executable = status.runtime.executablePath;
   if (!executable) throw new Error('Instala el motor local de imágenes antes de generar.');
   const preset = getNodusImageQualityPreset(quality);
+  const [ratioWidth, ratioHeight] = (aspectRatio ?? `${preset.width}:${preset.height}`).split(':').map(Number);
+  const area = preset.width * preset.height;
+  const width = aspectRatio ? Math.max(256, Math.round(Math.sqrt(area * ratioWidth / ratioHeight) / 64) * 64) : preset.width;
+  const height = aspectRatio ? Math.max(256, Math.round(Math.sqrt(area * ratioHeight / ratioWidth) / 64) * 64) : preset.height;
   const temporary = await fsp.mkdtemp(path.join(os.tmpdir(), 'nodus-flux2-'));
   const output = path.join(temporary, `${randomUUID()}.png`);
   const directory = modelDirectory();
@@ -299,8 +304,8 @@ async function generateNow(prompt: string, quality: NodusImageQuality): Promise<
       '--llm', path.join(directory, NODUS_LOCAL_IMAGE_MODEL.textEncoderFile),
       '--prompt', cleanPrompt,
       '--output', output,
-      '--width', String(preset.width),
-      '--height', String(preset.height),
+      '--width', String(width),
+      '--height', String(height),
       '--steps', String(preset.steps),
       '--cfg-scale', '1.0',
       '--sampling-method', 'euler',
@@ -323,7 +328,8 @@ async function generateNow(prompt: string, quality: NodusImageQuality): Promise<
 export function generateNodusLocalImage(
   modelId: string,
   prompt: string,
-  quality: NodusImageQuality
+  quality: NodusImageQuality,
+  aspectRatio?: ChatImageAspectRatio
 ): Promise<{ bytes: Buffer; mimeType: 'image/png' }> {
   if (modelId !== NODUS_LOCAL_IMAGE_MODEL.id) return Promise.reject(new Error(`Modelo de imagen local no soportado: ${modelId}`));
   const previous = generationTail.catch(() => undefined);
@@ -332,7 +338,7 @@ export function generateNodusLocalImage(
   return previous.then(async () => {
     activeGenerations += 1;
     try {
-      return { bytes: await generateNow(prompt, quality), mimeType: 'image/png' as const };
+      return { bytes: await generateNow(prompt, quality, aspectRatio), mimeType: 'image/png' as const };
     } finally {
       activeGenerations -= 1;
       release();

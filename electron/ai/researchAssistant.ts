@@ -1,3 +1,8 @@
+import { buildChatSkillsPrompt, chatSkillsOutputContract, splitChatVisuals, transformChatProse } from '@shared/chatSkills';
+import { enabledChatSkills } from '../chatSkills';
+import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
+import { getConversation } from '../db/chatRepo';
+import { executeChatSkills } from './chatSkillExecution';
 import type {
   Author,
   ChatMessageRecord,
@@ -174,13 +179,21 @@ interface PromptBuild {
 
 const CHAT_CITATION_ATTEMPTS = 3;
 
+function skillExecution(request: ResearchChatRequest) {
+  const vaultId = getActiveVault().id;
+  const owner = request.conversationId ? chatAssetOwner('assistant', request.conversationId, vaultId) : undefined;
+  return { skills: enabledChatSkills('assistant'), question: request.messages.filter(message => message.role === 'user').at(-1)?.content, model: request.model, owner, version: owner ? chatAssetVersion(owner) : 0,
+    isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getConversation(request.conversationId)) };
+}
+
 export async function answerResearchChat(request: ResearchChatRequest): Promise<ResearchChatResponse> {
-  const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request);
-  const opts = { system, user, temperature: 0.2, maxTokens };
+  const execution = skillExecution(request);
+  const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request, execution.skills);
+  const opts = { system, user, englishImagePrompts: execution.skills.some(skill => skill.builtin === 'image'), temperature: 0.2, maxTokens };
   let answer = '';
   for (let attempt = 0; attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
     answer = finalizeAnswer(await completeText(opts, request.model), local, user);
-    if (!citationRequired || extractCitationRefs(answer).length > 0) return { answer, stats };
+    if (!citationRequired || extractCitationRefs(answer).length > 0 || splitChatVisuals(answer).some(part => part.kind !== 'markdown')) return { answer: await executeChatSkills(answer, execution), stats };
   }
   throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
 }
@@ -190,25 +203,26 @@ export async function streamResearchChat(
   onDelta: (delta: string, kind?: 'content' | 'reasoning') => void,
   signal?: AbortSignal
 ): Promise<ResearchChatResponse> {
-  const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request);
-  const opts = { system, user, temperature: 0.2, maxTokens, signal };
+  const execution = skillExecution(request);
+  const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request, execution.skills);
+  const opts = { system, user, englishImagePrompts: execution.skills.some(skill => skill.builtin === 'image'), temperature: 0.2, maxTokens, signal };
   let answer = finalizeAnswer(await completeTextStream(
     opts,
     onDelta,
     request.model,
     signal
   ), local, user);
-  for (let attempt = 1; citationRequired && extractCitationRefs(answer).length === 0 && attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; citationRequired && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown') && attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
     signal?.throwIfAborted();
     // Streamed deltas are provisional and the renderer replaces them with the
     // returned answer. Recovery repeats the frozen request without changing any
     // model, prompt, temperature or output-budget parameter.
     answer = finalizeAnswer(await completeText(opts, request.model), local, user);
   }
-  if (citationRequired && extractCitationRefs(answer).length === 0) {
+  if (citationRequired && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown')) {
     throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
   }
-  return { answer, stats };
+  return { answer: await executeChatSkills(answer, execution, signal), stats };
 }
 
 /**
@@ -248,7 +262,7 @@ export async function generateChatTitle(messages: ChatMessageRecord[], model?: M
  *  resolving each id to its "Autor, Año" against the corpus. */
 function finalizeAnswer(answer: string, local: boolean, sourceContext: string): string {
   const trimmed = answer.trim();
-  const labelled = local ? humanizeCitationLabels(trimmed, citationDisplayLabel) : trimmed;
+  const labelled = local ? transformChatProse(trimmed, prose => humanizeCitationLabels(prose, citationDisplayLabel)) : trimmed;
   return sanitizeResearchCitations(labelled, sourceContext);
 }
 
@@ -336,7 +350,7 @@ function truncateTitle(text: string): string {
   return `${clean.slice(0, 57).trim()}…`;
 }
 
-async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<PromptBuild> {
+async function buildResearchChatPrompt(request: ResearchChatRequest, skills = enabledChatSkills('assistant')): Promise<PromptBuild> {
   // Resolve the effective model up front so a local target can size the whole payload
   // (context + history + output) to its real, small window instead of overflowing.
   const model = resolveModelRef(request.model);
@@ -360,11 +374,11 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
   // In a genealogy vault the assistant is a genealogist working over the records
   // ontology (people, kinship, events, documents, evidence), not the idea graph.
   const genealogy = getActiveVault().type === 'genealogy';
-  const system = genealogy ? buildGenealogyChatSystemPrompt(compact, promptLanguage) : buildChatSystemPrompt(compact, promptLanguage);
+  const system = [genealogy ? buildGenealogyChatSystemPrompt(compact, promptLanguage) : buildChatSystemPrompt(compact, promptLanguage), buildChatSkillsPrompt(skills)].join('\n\n');
 
   // Derive the budget from the window. Cloud (window === null) keeps the cloud-sized cap
   // and the default generation budget; local shrinks both to fit the loaded window.
-  let maxTokens = 6000;
+  let maxTokens = skills.length ? 10_000 : 6000;
   let contextBudget = MAX_TOTAL_CONTEXT_CHARS;
   if (window != null) {
     const margin = Math.max(96, Math.round(window * 0.05));
@@ -380,7 +394,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
 
   if (genealogy) {
     const context = await buildGenealogyContext(question, promptLanguage);
-    const user = JSON.stringify({ contexto_familiar: context, conversacion: messages }, null, 2);
+    const user = JSON.stringify({ contexto_familiar: context, conversacion: messages, application_output_contract: chatSkillsOutputContract(skills) }, null, 2);
     const stats: ResearchContextStats = {
       sections: prompt.context.genealogySections,
       works: 0,
@@ -396,18 +410,19 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
   const { context, stats } = await buildResearchContext(request.selection, question, contextBudget, promptLanguage);
 
   const contextJson = JSON.stringify(context);
-  const citationContract = buildCitationOutputContract(contextJson);
+  const citationContract = skills.length ? null : buildCitationOutputContract(contextJson);
   const user = JSON.stringify(
     {
       contexto_modular_seleccionado: context,
       conversacion: messages,
       ...(citationContract ? { contrato_de_salida_obligatorio: citationContract } : {}),
+      application_output_contract: chatSkillsOutputContract(skills),
     },
     null,
     2
   );
 
-  return { system, user, stats, maxTokens, local, citationRequired: citationContract != null };
+  return { system, user, stats, maxTokens, local, citationRequired: buildCitationOutputContract(contextJson) != null };
 }
 
 /** Canonical Spanish exports retained for Nodi's shared citation contract. */
@@ -426,6 +441,10 @@ export function humanizeResearchCitations(answer: string): string {
 
 /** Remove model-invented/dead citations before the final answer replaces streamed deltas. */
 export function sanitizeResearchCitations(answer: string, sourceContext: string): string {
+  return transformChatProse(answer, prose => sanitizeResearchProseCitations(prose, sourceContext));
+}
+
+function sanitizeResearchProseCitations(answer: string, sourceContext: string): string {
   const sourceRefs = extractCitationRefs(sourceContext);
   const repaired = alignCitationKindsToAllowed(repairLooseCitations(answer.trim()), sourceRefs);
   const labelled = canonicalizeCitationLinks(humanizeResearchCitations(repaired));
@@ -444,7 +463,15 @@ export function sanitizeResearchCitations(answer: string, sourceContext: string)
  */
 function buildChatSystemPrompt(compact: boolean, language: PromptLanguage = getSettings().promptLanguage ?? 'es'): string {
   const prompt = researchAssistantPromptPack(language);
-  return compact ? prompt.chat.compact : prompt.chat.full;
+  // Creation-capable English instructions replace the old prompt.chat.full / prompt.chat.compact
+  // source-only prohibition. The output language and citation contract remain explicit.
+  return [
+    "You are Nodus's research assistant. Give rigorous, useful answers and complete the user's requested task.",
+    `Respond in the user's requested language, otherwise use this language code: ${language}.`,
+    'Treat retrieved sources as evidence. Attribute only what they support, distinguish your reasoning and general knowledge from documentary claims, and never invent quotations, citations, source content, or unavailable features.',
+    'For a request specifically about the corpus, explain a real evidence gap briefly. For a general exercise or creative request, apply your knowledge and construct the answer; the sources do not need to contain the worked solution or output format.',
+    ...(compact ? prompt.citationRulesCompact : prompt.citationRules),
+  ].join('\n');
 }
 
 /** System prompt for the genealogy-mode assistant: an evidence-first family historian. */
