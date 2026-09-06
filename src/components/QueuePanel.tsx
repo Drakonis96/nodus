@@ -11,6 +11,7 @@ import { ZoteroImportProgressBar } from './ZoteroImportProgressBar';
 import { DocumentIndexProgressBar } from './DocumentIndexProgressBar';
 import { EmbeddingProgressBar } from './EmbeddingProgressBar';
 import { PassageProgressBar } from './PassageProgressBar';
+import { ConfirmModal } from './ConfirmModal';
 
 interface QueuePanelProps {
   activity: QueueActivity;
@@ -35,6 +36,7 @@ export function QueuePanel({
   setBrowserOverlayVisible,
 }: QueuePanelProps) {
   const open = anchorEl != null;
+  const [confirmClear, setConfirmClear] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; width: number; originX: number } | null>(null);
   const [browserSnapshot, setBrowserSnapshot] = useState<{
@@ -45,6 +47,7 @@ export function QueuePanel({
     height: number;
   } | null>(null);
   const { visible } = activity;
+  useEffect(() => { if (!open) setConfirmClear(false); }, [open]);
 
   // Placement, Escape and outside-click are ServerInbox's, deliberately: the panels
   // hanging off the header behave identically, and that one already solved it.
@@ -170,7 +173,10 @@ export function QueuePanel({
           aria-label={t('Cola y tareas')}
         >
           <div className="flex items-center justify-between gap-2 border-b border-neutral-800 px-3 py-2">
-            <div className="text-sm font-semibold text-neutral-200">{t('Cola y tareas')}</div>
+            <div className="min-w-0 flex-1 text-sm font-semibold text-neutral-200">{t('Cola y tareas')}</div>
+            <button className="btn btn-ghost shrink-0 px-2 py-1 text-xs" disabled={!activity.canClearFinished} onClick={() => setConfirmClear(true)}>
+              {t('Limpiar terminadas')}
+            </button>
             <button className="btn btn-ghost px-2 py-1" onClick={onClose} title={t('Cerrar')}>
               <Icon name="x" />
             </button>
@@ -190,6 +196,13 @@ export function QueuePanel({
               </p>
             )}
           </div>
+          {confirmClear && <ConfirmModal
+            title={t('Limpiar tareas terminadas')}
+            message={t('Se ocultarán de la cola las tareas completadas, canceladas o fallidas. Se conservarán las tareas en curso, pendientes o en pausa y los documentos generados.')}
+            confirmLabel={t('Limpiar terminadas')}
+            onConfirm={() => { activity.clearFinished(); setConfirmClear(false); }}
+            onCancel={() => setConfirmClear(false)}
+          />}
         </motion.div>,
       ]}
     </AnimatePresence>,

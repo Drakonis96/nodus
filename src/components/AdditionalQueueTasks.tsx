@@ -1,7 +1,7 @@
 import { clearBackgroundJob, cancelAudioGeneration, type AudioGenerationRequest } from '../backgroundJobs';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { QueueActivity } from '../queueActivity';
-import { DICTIONARY_FINISHED, DOCUMENT_LIVE, backgroundFailure } from '../queueActivity';
+import { DICTIONARY_FINISHED, DOCUMENT_LIVE, backgroundFailure, ocrVersion, researchVersion } from '../queueActivity';
 import { deepResearchProgressPercent } from '@shared/deepResearchProgress';
 import { progressDetail } from './DeepResearchQueueStrip';
 import { errorText, t, tr, tx } from '../i18n';
@@ -58,7 +58,7 @@ export function AdditionalQueueTasks({ activity }: { activity: QueueActivity }) 
     {activity.extraction.slice(0, limit).map((job) => {
       const live = job.status === 'queued' || job.status === 'processing';
       return <Task key={job.id} testId={`library-extraction-${job.id}`} title={`${t('Extracción de texto')} · ${titles[job.itemId] ?? t('Documento')}`}
-        detail={job.message ? tr(job.message) : t(job.status === 'canceled' ? 'Cancelado' : EXTRACTION_PHASE[job.phase])} error={job.error} percent={job.progress * 100}>
+        detail={job.message ? tr(job.message) : t(job.status === 'canceled' ? 'Cancelado' : EXTRACTION_PHASE[job.phase])} error={job.status === 'canceled' ? null : job.error} percent={job.progress * 100}>
         {live ? <Action label={t('Cancelar')} run={() => window.nodus.cancelLibraryExtraction(job.id)} /> : <>
           {(job.status === 'failed' || job.status === 'canceled') && <Action label={t('Reintentar')} run={() => window.nodus.retryLibraryExtraction(job.id)} />}
           <Action label={t('Ocultar')} run={() => activity.dismiss(`extraction:${job.id}`, `${job.status}:${job.updatedAt}`)} />
@@ -67,23 +67,23 @@ export function AdditionalQueueTasks({ activity }: { activity: QueueActivity }) 
     })}
     {activity.documents?.campaigns.filter((job) => !DOCUMENT_LIVE.has(job.status)).slice(0, limit).map((job) => <Task key={job.campaignId} testId={`document-result-${job.campaignId}`}
       title={t('Índice documental')} detail={`${t(job.status === 'cancelled' ? 'Cancelado' : job.status === 'failed' ? 'Fallido' : 'Completado')} · ${tx('{done} de {total} obras', { done: job.completedJobs, total: job.totalJobs })}`}
-      error={job.error ?? activity.documents?.jobs.find((item) => item.campaignId === job.campaignId && item.error)?.error ?? (job.failedJobs > 0 ? `${job.failedJobs} ${t('fallidos')}` : null)}>
+      error={job.status === 'cancelled' ? null : job.error ?? activity.documents?.jobs.find((item) => item.campaignId === job.campaignId && item.error)?.error ?? (job.failedJobs > 0 ? `${job.failedJobs} ${t('fallidos')}` : null)}>
       <Action label={t('Ocultar')} run={() => activity.dismiss(`documents:${job.campaignId}`, `${job.status}:${job.updatedAt}`)} />
     </Task>)}
     {activity.research.slice(0, limit).map((job) => {
       const live = job.status === 'queued' || job.status === 'running';
       return <Task key={job.id} testId={`research-task-${job.id}`} title={`${t('Deep Research')} · ${job.title}`}
         detail={job.status === 'running' ? progressDetail(job.progress) : t(job.status === 'queued' ? 'En cola' : job.status === 'cancelled' ? 'Cancelado' : job.status === 'failed' ? 'Fallido' : 'Completado')}
-        error={job.error ?? job.saveError} percent={job.status === 'running' ? deepResearchProgressPercent(job.progress) : null}>
-        {live ? <Action label={t('Cancelar')} run={() => window.nodus.cancelDeepResearchJob(job.id)} /> : <Action label={t('Ocultar')} run={() => activity.dismiss(`research:${job.id}`, job.status)} />}
+        error={job.saveError ?? (job.status === 'cancelled' ? null : job.error)} percent={job.status === 'running' ? deepResearchProgressPercent(job.progress) : null}>
+        {live ? <Action label={t('Cancelar')} run={() => window.nodus.cancelDeepResearchJob(job.id)} /> : <Action label={t('Ocultar')} run={() => activity.dismiss(`research:${job.id}`, researchVersion(job))} />}
       </Task>;
     })}
     {activity.ocr.slice(0, limit).map((job) => {
       const live = job.status === 'pending' || job.status === 'processing';
       return <Task key={job.id} testId={`ocr-task-${job.id}`} title={`${t('OCR')} · ${job.name ?? t('Documento')}`}
         detail={t(job.status === 'pending' ? 'En cola' : job.status === 'processing' ? 'Procesando…' : job.status === 'cancelled' ? 'Cancelado' : job.status === 'error' ? 'Fallido' : 'Completado')}
-        error={job.error ?? (job.errorCount > 0 ? `${job.errorCount} ${t('fallidos')}` : null)} percent={job.pageCount ? job.doneCount / job.pageCount * 100 : null}>
-        {live ? <Action label={t('Cancelar')} run={() => window.nodus.cancelOcrDoc(job.id)} /> : <Action label={t('Ocultar')} run={() => activity.dismiss(`ocr:${job.id}`, `${job.status}:${job.doneCount}:${job.error ?? ''}`)} />}
+        error={job.status === 'cancelled' ? null : job.error ?? (job.errorCount > 0 ? `${job.errorCount} ${t('fallidos')}` : null)} percent={job.pageCount ? job.doneCount / job.pageCount * 100 : null}>
+        {live ? <Action label={t('Cancelar')} run={() => window.nodus.cancelOcrDoc(job.id)} /> : <Action label={t('Ocultar')} run={() => activity.dismiss(`ocr:${job.id}`, ocrVersion(job))} />}
       </Task>;
     })}
     {activity.background.slice(0, limit).map((job) => {

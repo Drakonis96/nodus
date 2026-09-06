@@ -25,7 +25,8 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.2.0');
+  assert.equal(currentRelease?.version, '5.2.1');
+  assert.deepEqual(currentRelease.highlights, RELEASE_NOTES.find((note) => note.version === '5.2.0')?.highlights, '5.2.1 reuses the complete 5.2.0 modal in every language');
   assert.equal(currentRelease?.date, '2026-09-06');
   assert.equal(currentRelease?.highlights.length, 15);
   assert.deepEqual(currentRelease.highlights.map((highlight) => highlight.scope), [

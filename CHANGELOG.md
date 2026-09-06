@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 5.2.1 — 2026-09-06
+
+- Stop completed and cancelled queue history from reappearing at startup, remember dismissed results across restarts, and keep cancellation messages from triggering false error alerts.
+- Add a translated **Clear finished** action with confirmation for all queue lanes. It dismisses completed, cancelled and failed results while preserving active, queued and paused work and generated documents.
+- Reuse the 5.2.0 What's New highlights unchanged in all eight interface languages for this focused hotfix.
+
 ## 5.2.0 — 2026-09-06
 
 Nodus 5.2.0 introduces the Stellar idea graph, tabbed research workspaces,
