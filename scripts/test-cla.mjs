@@ -50,6 +50,7 @@ function harness(prs, options = {}) {
         get: async ({ pull_number }) => ({ data: {
           ...prs.find(pr => pr.number === pull_number),
           ...(options.changedHead ? { head: { sha: 'changed' } } : {}),
+          ...(options.closedPrs?.includes(pull_number) ? { state: 'closed' } : {}),
         } }),
       },
       git: { getRef: async () => ({ data: {} }) },
@@ -203,6 +204,40 @@ test('API failures, persistence failures, corrupt records, and changed heads fai
     assert.equal(h.statuses[0].state, 'pending');
     assert.equal(h.statuses.at(-1).state, 'failure');
     assert.ok(h.errors.length);
+  }
+});
+
+test('closing or merging a PR during verification does not fail the workflow or grant acceptance', async () => {
+  const closing = fixture();
+  const open = fixture(2, bob);
+  open.comments = [signingComment(bob)];
+  const h = harness([closing, open], { closedPrs: [1] });
+  await h.execute();
+  assert.deepEqual(h.errors, []);
+  assert.deepEqual(h.statuses.filter(s => s.sha === closing.head.sha).map(s => s.state), ['pending']);
+  assert.equal(h.statuses.filter(s => s.sha === open.head.sha).at(-1).state, 'success');
+  assert.match(h.summary(), /PR #1\nClosed during verification; skipped/);
+
+  // A reopened PR must still obtain its own acceptance.
+  const reopened = harness([closing], { files: h.files });
+  await reopened.execute();
+  assert.equal(reopened.statuses.at(-1).state, 'failure');
+  assert.match(reopened.statuses.at(-1).description, /@alice/);
+});
+
+test('a PR closing during verification cannot override the gate of an open PR sharing its SHA', async () => {
+  for (const signed of [false, true]) {
+    for (const closedFirst of [false, true]) {
+      const closing = fixture(1);
+      const open = fixture(2, bob);
+      open.head.sha = closing.head.sha;
+      if (signed) open.comments = [signingComment(bob)];
+      const h = harness(closedFirst ? [closing, open] : [open, closing], { closedPrs: [1] });
+      await h.execute();
+      assert.deepEqual(h.errors, []);
+      assert.equal(h.statuses.at(-1).state, signed ? 'success' : 'failure');
+      if (!signed) assert.match(h.statuses.at(-1).description, /@bob/);
+    }
   }
 });
 

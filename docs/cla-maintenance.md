@@ -33,6 +33,11 @@ while reporting a missing signature. Its **Details** link opens the workflow
 summary, including the exact agreement and statement to post. No bot comments
 are posted to PR discussions.
 
+If a PR closes or merges during verification, the scan skips publishing its
+result instead of failing the workflow. Its pending status does not grant
+acceptance; reopening triggers a fresh check. Open PRs sharing its head SHA
+still determine that SHA's final status using their own contributors.
+
 Runs are serialized. Each run scans every open PR so concurrent acceptances are
 found even if GitHub replaces a pending run, and signing on one PR unblocks other
 covered PRs. New PRs, pushes to PR branches, reopening, closing, retargeting, new acceptance

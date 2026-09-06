@@ -198,6 +198,13 @@ export async function run({ github, context, core, document }) {
         const missing = [];
         for (const user of result.users) if (!await getRecord(user.id)) missing.push(`@${user.login}`);
         const { data: latest } = await github.rest.pulls.get({ ...repo, pull_number: pr.number });
+        if (latest.state === 'closed') {
+          // A merge/close during this scan is normal, not a signature failure.
+          // Do not grant success or alter outcomes for open PRs sharing this SHA.
+          // The pending status stays unapproved; reopening triggers a fresh scan.
+          summary.push(`\n### PR #${pr.number}\nClosed during verification; skipped. Reopening triggers a new check.`);
+          continue;
+        }
         if (latest.head.sha !== pr.head.sha || latest.state !== 'open') {
           throw new Error('PR changed before publication; a new workflow run must verify it.');
         }
