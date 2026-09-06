@@ -233,7 +233,7 @@ test('Nodi uses the bounded world model and opens validated worldbuilding refere
   ]);
   assert.match(backend, /buildWorldChatFacts\(\{ question \}\)/);
   assert.match(backend, /composeWorldChatContext/);
-  assert.match(backend, /validateWorldCitations\(answer/);
+  assert.match(backend, /transformChatProse\(answer, prose => validateWorldCitations\(prose, allowed\)\)/, 'world citations are validated without rewriting visual markup');
   assert.match(backend, /worldbuilding: 'construcción de mundos'/);
   assert.match(companion, /NODI_WORLD_STARTERS/);
   assert.match(companion, /vaultType === 'worldbuilding'/);
