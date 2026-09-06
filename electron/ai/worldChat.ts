@@ -263,7 +263,8 @@ export async function streamWorldChat(
   const version = owner ? chatAssetVersion(owner) : 0;
   const language = settings.promptLanguage ?? 'es';
   const facts = buildWorldChatFacts(request, language);
-  if (!hasWorldChatMaterial(facts) && !skills.length) {
+  // Skills change how grounded material is presented; they do not supply world facts.
+  if (!hasWorldChatMaterial(facts)) {
     return { text: '', focus: facts.focus, noMaterial: true };
   }
 
