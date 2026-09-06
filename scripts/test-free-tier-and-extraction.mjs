@@ -106,6 +106,45 @@ test('Gemini 3 transport omits rejected sampling and impossible thinking-off con
   );
 });
 
+test('provider/model transport preserves legacy fields and adapts only incompatible models', async () => {
+  const m = await load('electron/ai/providers.ts');
+
+  assert.deepEqual(m.samplingTemperatureBody('anthropic', 'claude-fable-5-1', 0.3), {});
+  assert.deepEqual(m.samplingTemperatureBody('anthropic', 'claude-opus-4-8', 0.3), {});
+  assert.deepEqual(
+    m.samplingTemperatureBody('anthropic', 'claude-sonnet-4-5', 0.3),
+    { temperature: 0.3 },
+    'older Claude models keep temperature',
+  );
+  assert.deepEqual(
+    m.samplingTemperatureBody('deepseek', 'deepseek-chat', 0.3),
+    { temperature: 0.3 },
+    'unrelated providers keep their sampling contract',
+  );
+  assert.deepEqual(m.samplingTemperatureBody('openai', 'gpt-5-mini', 0.3), {});
+  assert.deepEqual(m.samplingTemperatureBody('openai', 'o4-mini', 0.3), {});
+  assert.deepEqual(m.samplingTemperatureBody('openai', 'gpt-5.4', 0.3, 'high'), {});
+  assert.deepEqual(
+    m.samplingTemperatureBody('openai', 'gpt-5.4', 0.3, 'off'),
+    { temperature: 0.3 },
+    'GPT-5.4 keeps sampling when reasoning is disabled',
+  );
+
+  assert.deepEqual(m.completionTokensBody('openai', 'gpt-5.4', 8000), { max_completion_tokens: 8000 });
+  assert.deepEqual(m.completionTokensBody('openai', 'o4-mini', 8000), { max_completion_tokens: 8000 });
+  assert.deepEqual(m.completionTokensBody('openai', 'gpt-6-astra', 8000), { max_completion_tokens: 8000 });
+  assert.deepEqual(
+    m.completionTokensBody('openai', 'gpt-4.1-mini', 8000),
+    { max_tokens: 8000 },
+    'legacy OpenAI models keep max_tokens',
+  );
+  assert.deepEqual(
+    m.completionTokensBody('openrouter', 'openai/gpt-5.4', 8000),
+    { max_tokens: 8000 },
+    'other compatible providers retain their own established contract',
+  );
+});
+
 test('OpenRouter omits thinking-off only for endpoints with mandatory reasoning', async () => {
   const m = await load('electron/ai/providers.ts');
   assert.deepEqual(

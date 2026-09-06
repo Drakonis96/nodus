@@ -116,6 +116,28 @@ function isGemini3Model(modelId: string | undefined): boolean {
   return Boolean(modelId && /^gemini-3(?:[.-]|$)/i.test(modelId));
 }
 
+/** Anthropic deprecated sampling controls for Claude 4.7+ (including the 5.x
+ * families) and Mythos Preview. Those models reject a non-default value with
+ * HTTP 400, so prompt wording is the only portable creativity control. */
+function isAnthropicSamplingDeprecatedModel(modelId: string | undefined): boolean {
+  if (!modelId) return false;
+  if (/mythos/i.test(modelId)) return true;
+  const version = modelId.match(/^claude-[a-z]+-(\d+)[.-](\d+)(?:[.-]|$)/i);
+  if (!version) return false;
+  const major = Number(version[1]);
+  const minor = Number(version[2]);
+  return major > 4 || (major === 4 && minor >= 7);
+}
+
+function isOpenAiSamplingUnsupportedModel(modelId: string, effort: ReasoningEffort): boolean {
+  if (/^o(?:1|3|4)(?:[.-]|$)/i.test(modelId) || /^gpt-6(?:[.-]|$)/i.test(modelId)) return true;
+  if (/^gpt-5(?:$|-mini(?:[.-]|$)|-nano(?:[.-]|$)|-pro(?:[.-]|$)|-codex(?:[.-]|$)|-20\d{2})/i.test(modelId)) {
+    return true;
+  }
+  // GPT-5.1+ sampling is available only with reasoning disabled.
+  return /^gpt-5\.\d+(?:[.-]|$)/i.test(modelId) && effort !== 'off';
+}
+
 /** OpenRouter models whose endpoint requires reasoning and rejects
  * `reasoning.enabled=false`. Their minimum supported effort is the only safe mapping
  * for Nodus' `off`: omitting the field can select a `max` default that spends the
@@ -126,17 +148,37 @@ function isOpenRouterMandatoryReasoningModel(modelId: string | undefined): boole
 }
 
 /**
- * Sampling controls are deliberately absent for Gemini 3.x. Google recommends the
- * model defaults for the whole family and, starting with 3.5 Flash-Lite / 3.6,
- * rejects deprecated temperature/top-p/top-k fields with HTTP 400. Keeping this
- * decision at the transport seam makes non-streaming and streaming calls identical.
+ * Sampling controls are deliberately absent for model families that reject them.
+ * Keeping this decision at the transport seam makes non-streaming and streaming
+ * calls identical while older models and all other providers keep their current
+ * request shape.
  */
 export function samplingTemperatureBody(
   provider: AiProvider,
   modelId: string,
   temperature: number,
+  reasoningEffort: ReasoningEffort = 'off',
 ): Record<string, number> {
-  return provider === 'gemini' && isGemini3Model(modelId) ? {} : { temperature };
+  return (provider === 'gemini' && isGemini3Model(modelId)) ||
+    (provider === 'anthropic' && isAnthropicSamplingDeprecatedModel(modelId)) ||
+    (provider === 'openai' && isOpenAiSamplingUnsupportedModel(modelId, reasoningEffort))
+    ? {}
+    : { temperature };
+}
+
+/** OpenAI reasoning models use `max_completion_tokens`; legacy OpenAI models and
+ * other OpenAI-compatible providers still receive `max_tokens`. Cerebras already
+ * documents the newer field for its own compatible endpoint. */
+export function completionTokensBody(
+  provider: AiProvider,
+  modelId: string,
+  maxTokens: number,
+): Record<string, number> {
+  const openAiReasoningModel = provider === 'openai' &&
+    (/^gpt-[56](?:[.-]|$)/i.test(modelId) || /^o(?:1|3|4)(?:[.-]|$)/i.test(modelId));
+  return provider === 'cerebras' || openAiReasoningModel
+    ? { max_completion_tokens: maxTokens }
+    : { max_tokens: maxTokens };
 }
 
 export function reasoningBody(

@@ -5,6 +5,7 @@ import {
   supportsJsonMode,
   reasoningBody,
   samplingTemperatureBody,
+  completionTokensBody,
   openRouterRoutingBody,
   OPENROUTER_HEADERS,
   isLocalProvider,
@@ -774,15 +775,6 @@ function openAiClientHeaders(model: Pick<ModelRef, 'provider'>): Record<string, 
   };
 }
 
-/** Cerebras documents the current Chat Completions token cap as
- * `max_completion_tokens`; the other compatible providers used here accept the
- * legacy OpenAI `max_tokens` field. Keep the difference at the transport seam. */
-function completionTokensBody(model: ModelRef, maxTokens: number): Record<string, number> {
-  return model.provider === 'cerebras'
-    ? { max_completion_tokens: maxTokens }
-    : { max_tokens: maxTokens };
-}
-
 /**
  * Only retry a 400 when the provider explicitly names an unsupported optional
  * transport field. A generic 400 can be an ambiguous timeout or rejected payload;
@@ -1053,7 +1045,7 @@ async function rawCompleteTransport(
       const res = await scheduleProviderRequest(model, opts, key, 'anthropic', () => client.messages.create({
         model: model.model,
         max_tokens: opts.maxTokens ?? 8000,
-        temperature: opts.temperature ?? 0.15,
+        ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15, reasoning),
         system: opts.system,
         messages: [
           { role: 'user', content: opts.images?.length ? (anthropicVisionContent(opts.user, opts.images) as any) : opts.user },
@@ -1162,8 +1154,8 @@ async function rawCompleteTransport(
     });
   const baseBody = {
     model: model.model,
-    ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15),
-    ...completionTokensBody(model, maxTokens),
+    ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15, reasoning),
+    ...completionTokensBody(model.provider, model.model, maxTokens),
     messages: [
       { role: 'system' as const, content: opts.system },
       { role: 'user' as const, content: opts.images?.length ? (openAiVisionContent(opts.user, opts.images) as any) : opts.user },
@@ -1652,7 +1644,7 @@ async function rawCompleteStreamTransport(
         const stream = await (client.messages.create as any)({
           model: model.model,
           max_tokens: opts.maxTokens ?? 8000,
-          temperature: opts.temperature ?? 0.15,
+          ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15, reasoning),
           system: opts.system,
           stream: true,
           messages: [{ role: 'user', content: opts.user }],
@@ -1699,8 +1691,8 @@ async function rawCompleteStreamTransport(
   });
   const baseBody = {
     model: model.model,
-    ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15),
-    ...completionTokensBody(model, maxTokens),
+    ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15, reasoning),
+    ...completionTokensBody(model.provider, model.model, maxTokens),
     stream: true as const,
     messages: [
       { role: 'system' as const, content: opts.system },
