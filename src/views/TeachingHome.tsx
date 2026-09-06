@@ -50,8 +50,8 @@ export function TeachingHome({
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 5);
   return (
-    <div className="study-home h-full overflow-y-auto p-6">
-      <div className="mx-auto max-w-5xl space-y-6">
+    <div className="study-home h-full home-dashboard overflow-y-auto p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
         <HomeIntroCard
           eyebrow={t('Vault de docencia')}
           title={t('Tu espacio docente')}
@@ -63,14 +63,14 @@ export function TeachingHome({
           <DemoOfferCard variant="teaching" demoBusy={demoBusy} onLoadTeachingDemo={onLoadDemo} />
         )}
 
-        <section className="grid gap-3 sm:grid-cols-3">
+        <section className="home-metric-grid">
           {[
             { label: 'Cursos activos', value: workspace?.courses.length ?? 0, icon: 'graduation' },
             { label: 'Asignaturas', value: workspace?.subjects.length ?? 0, icon: 'book' },
             { label: 'Materiales', value: materialCount, icon: 'notebook' },
           ].map((metric) => (
             <button key={metric.label} onClick={() => onNavigate(metric.label === 'Materiales' ? 'studyLibrary' : 'studyCourses')}
-              className="study-home-card flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 text-left hover:border-indigo-700/60">
+              className="study-home-card home-accent-card flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 text-left hover:border-indigo-700/60">
               <span className="study-home-icon rounded-lg bg-indigo-600/15 p-2 text-indigo-300"><Icon name={metric.icon} /></span>
               <span><span className="block text-xl font-semibold text-neutral-100">{metric.value}</span><span className="text-xs text-neutral-500">{t(metric.label)}</span></span>
             </button>
@@ -79,11 +79,11 @@ export function TeachingHome({
 
         <section>
           <h2 className="mb-3 text-sm font-semibold text-neutral-300">{t('Empezar')}</h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="home-status-grid">
             {TEACHING_DESTINATIONS.map((item) => (
               <button
                 key={item.view}
-                className="study-home-card group rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 text-left transition-colors hover:border-indigo-700/60 hover:bg-indigo-950/20"
+                className="study-home-card home-accent-card group rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 text-left transition-colors hover:border-indigo-700/60 hover:bg-indigo-950/20"
                 onClick={() => onNavigate(item.view)}
               >
                 <span className="study-home-icon mb-3 inline-flex rounded-lg bg-indigo-600/15 p-2 text-indigo-300">
@@ -96,7 +96,7 @@ export function TeachingHome({
           </div>
         </section>
 
-        <section className="study-home-card rounded-xl border border-neutral-800 bg-neutral-900/40">
+        <section className="study-home-card home-panel-card rounded-xl border border-neutral-800 bg-neutral-900/40">
           <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
             <h2 className="text-sm font-semibold text-neutral-300">{t('Actividad reciente')}</h2>
             <button className="text-xs text-indigo-400 hover:text-indigo-300" onClick={() => onNavigate('studyLibrary')}>{t('Ver materiales')}</button>

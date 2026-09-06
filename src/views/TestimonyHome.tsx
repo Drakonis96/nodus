@@ -80,8 +80,8 @@ export function TestimonyHome({
   ];
 
   return (
-    <div className="h-full overflow-y-auto p-6" data-testid="testimony-home">
-      <div className="mx-auto max-w-5xl space-y-6">
+    <div className="h-full home-dashboard overflow-y-auto p-4 sm:p-6 lg:p-8" data-testid="testimony-home">
+      <div className="mx-auto max-w-7xl space-y-6">
         <HomeIntroCard
           eyebrow={t('Vault de testimonios')}
           title={t('Tu proyecto de historia oral')}
@@ -105,9 +105,9 @@ export function TestimonyHome({
           </button>
         </section>
 
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="testimony-metrics">
+        <section className="home-status-grid" data-testid="testimony-metrics">
           {cards.map((card) => (
-            <div key={card.label} className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+            <div key={card.label} className="home-accent-card rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
               <span className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-neutral-500">
                 <Icon name={card.icon} size={13} /> {t(card.label)}
               </span>

@@ -52,8 +52,8 @@ export function WorldbuildingHome({
   const alive = counts?.byStatus.alive ?? 0;
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <div className="mx-auto max-w-5xl space-y-6">
+    <div className="h-full home-dashboard overflow-y-auto p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
         <HomeIntroCard
           eyebrow={t('Vault de worldbuilding')}
           title={t('Tu mundo')}
@@ -69,7 +69,7 @@ export function WorldbuildingHome({
           />
         )}
 
-        <section className="grid gap-3 sm:grid-cols-4">
+        <section className="home-metric-grid">
           {[
             { label: 'Personajes', value: total, icon: 'users', view: 'characters' as View },
             { label: 'Protagonistas', value: protagonists, icon: 'target', view: 'characters' as View },
@@ -87,16 +87,16 @@ export function WorldbuildingHome({
             <button
               key={metric.label}
               onClick={() => onNavigate(metric.view)}
-              className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 text-left hover:border-indigo-700/60"
+              className="home-accent-card flex items-center gap-3 rounded-xl border p-4 text-left"
             >
               <span className="rounded-lg bg-indigo-600/15 p-2 text-indigo-300">
                 <Icon name={metric.icon} />
               </span>
               <span className="min-w-0">
                 <span className="block text-xl font-semibold text-neutral-100">{metric.value}</span>
-                <span className="block truncate text-xs text-neutral-500">{t(metric.label)}</span>
+                <span className="block text-xs leading-5 text-neutral-500">{t(metric.label)}</span>
                 {'hint' in metric && metric.hint && (
-                  <span className="block truncate text-[10px] text-neutral-600">{metric.hint}</span>
+                  <span className="block text-xs leading-5 text-neutral-500">{metric.hint}</span>
                 )}
               </span>
             </button>

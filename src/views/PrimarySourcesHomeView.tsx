@@ -86,8 +86,8 @@ export function PrimarySourcesHomeView({
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-neutral-50 p-6 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid="primary-sources-home">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <div className="h-full home-dashboard overflow-y-auto bg-neutral-50 p-4 sm:p-6 lg:p-8 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid="primary-sources-home">
+      <div className="mx-auto max-w-7xl space-y-6">
         <header className="rounded-2xl border border-indigo-200 bg-white p-6 shadow-sm dark:border-indigo-950 dark:bg-neutral-900">
           <p className="text-xs font-semibold tracking-[0.18em] text-indigo-600 dark:text-indigo-300">{t('CORPUS DOCUMENTAL')}</p>
           <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
@@ -113,12 +113,12 @@ export function PrimarySourcesHomeView({
           />
         )}
 
-        <section aria-label={t('Métricas')} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <section aria-label={t('Métricas')} className="home-status-grid">
           {METRICS.map((metric) => (
-            <article key={metric.key} className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-              <div className="flex items-center justify-between text-neutral-500">
-                <span className="text-sm">{t(metric.label)}</span>
-                <Icon name={metric.icon} size={16} />
+            <article key={metric.key} className="home-accent-card rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+              <div className="flex items-start justify-between gap-3 text-neutral-500">
+                <span className="home-metric-label text-sm">{t(metric.label)}</span>
+                <Icon name={metric.icon} size={16} className="mt-0.5 shrink-0" />
               </div>
               <p className="mt-2 text-2xl font-semibold tabular-nums">{loading ? '—' : dashboard.metrics[metric.key].toLocaleString()}</p>
             </article>

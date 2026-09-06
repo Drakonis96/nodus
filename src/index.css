@@ -1543,6 +1543,150 @@ body {
   @apply bg-white border-neutral-200;
 }
 
+/* Home surfaces are neutral; vault and status colours stay in the top edge,
+   icons and text. Grid minima use the content width (including sidebar resizing). */
+.home-dashboard {
+  --home-surface: #171717;
+  --home-tile: #1f1f1f;
+  --home-border: #383838;
+  --home-muted: #a3a3a3;
+  --home-hover: #222222;
+  --home-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.light .home-dashboard {
+  --home-surface: #ffffff;
+  --home-tile: #fafafa;
+  --home-border: #dedede;
+  --home-muted: #616161;
+  --home-hover: #f5f5f5;
+  --home-shadow: 0 3px 12px rgba(0, 0, 0, 0.045);
+}
+.home-status-grid,
+.home-metric-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+}
+.home-metric-grid {
+  gap: 0.875rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+}
+.home-status-grid > *,
+.home-metric-grid > * { min-width: 0; }
+.home-panel-card {
+  border-color: var(--home-border, #383838);
+  box-shadow: var(--home-shadow, 0 4px 14px rgba(0, 0, 0, 0.12));
+}
+.light .home-panel-card {
+  border-color: var(--home-border, #dedede);
+  box-shadow: var(--home-shadow, 0 3px 12px rgba(0, 0, 0, 0.045));
+}
+.home-dashboard .home-accent-card {
+  position: relative;
+  isolation: isolate;
+  border-color: var(--home-border);
+  background: var(--home-surface);
+  box-shadow: var(--home-shadow);
+}
+.home-accent-card::before {
+  position: absolute;
+  inset: -1px 0 auto;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--home-card-accent, var(--vault-accent, #818cf8));
+  content: '';
+  pointer-events: none;
+}
+.home-accent-card[data-home-tone='indigo'] { --home-card-accent: var(--vault-accent, #818cf8); }
+.home-accent-card[data-home-tone='green'] { --home-card-accent: #34d399; }
+.home-accent-card[data-home-tone='amber'] { --home-card-accent: #fbbf24; }
+.home-accent-card[data-home-tone='red'] { --home-card-accent: #f87171; }
+.home-accent-card[data-home-tone='cyan'] { --home-card-accent: #22d3ee; }
+.light .home-accent-card[data-home-tone='green'] { --home-card-accent: #059669; }
+.light .home-accent-card[data-home-tone='amber'] { --home-card-accent: #d97706; }
+.light .home-accent-card[data-home-tone='red'] { --home-card-accent: #dc2626; }
+.light .home-accent-card[data-home-tone='cyan'] { --home-card-accent: #0891b2; }
+.home-dashboard button.home-accent-card:hover {
+  background: var(--home-hover);
+  border-color: var(--home-card-accent, var(--vault-accent, #818cf8));
+}
+.home-dashboard button.home-accent-card:focus-visible {
+  outline: 2px solid var(--home-card-accent, var(--vault-accent, #818cf8));
+  outline-offset: 3px;
+}
+.home-status-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.home-status-title,
+.home-status-summary,
+.home-metric-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.home-status-title { padding-top: 0.25rem; }
+.home-status-icon { border: 1px solid rgba(128, 128, 128, 0.15); }
+.home-dashboard .study-home-icon {
+  color: color-mix(in srgb, var(--vault-accent, #818cf8) 55%, white);
+  background: color-mix(in srgb, var(--vault-accent, #818cf8) 15%, var(--home-surface));
+}
+.light .home-dashboard .study-home-icon {
+  color: color-mix(in srgb, var(--vault-accent, #6366f1) 80%, #171717);
+}
+.home-dashboard .home-status-content { border-color: var(--home-border); }
+.home-dashboard .home-status-card p { line-height: 1.6; }
+.home-dashboard .text-neutral-500,
+.home-dashboard .text-neutral-600,
+.home-dashboard .home-accent-card .text-neutral-500,
+.home-dashboard .home-accent-card .text-neutral-600,
+.home-dashboard .home-status-card .text-neutral-500,
+.home-dashboard .home-status-card .text-neutral-600,
+.home-dashboard .home-dashboard-tile .text-neutral-500,
+.home-dashboard .home-dashboard-tile .text-neutral-600 {
+  color: var(--home-muted);
+}
+.home-dashboard .home-dashboard-tile,
+.home-dashboard .home-dashboard-action {
+  border-color: var(--home-border);
+  background: var(--home-tile);
+}
+.home-dashboard button.home-dashboard-tile:hover,
+.home-dashboard .home-dashboard-action:hover {
+  border-color: var(--home-muted);
+  background: var(--home-hover);
+}
+.home-dashboard .home-status-card .home-status-badges > span,
+.light .home-dashboard .home-status-card .home-status-badges > span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--home-border);
+  background: var(--home-tile);
+}
+/* Two classes keep the compact padding/type above the generic .btn rules below. */
+.btn.home-card-action {
+  min-height: 32px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border-color: var(--home-border, #404040);
+  background: var(--home-tile, #1f1f1f);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  overflow-wrap: anywhere;
+}
+.btn.home-card-action:hover {
+  border-color: var(--home-muted, #a3a3a3);
+  background: var(--home-hover, #262626);
+}
+.light .btn.home-card-action {
+  border-color: var(--home-border, #dedede);
+  background: var(--home-tile, #fafafa);
+}
+.light .btn.home-card-action:hover {
+  border-color: var(--home-muted, #616161);
+  background: var(--home-hover, #f5f5f5);
+}
+
 /* Opaque surface for dialogs/modals: the translucent .card lets the dimmed page
  * bleed through, which reads as a bug when floated over the scrim. Use this for any
  * modal panel instead of .card. */

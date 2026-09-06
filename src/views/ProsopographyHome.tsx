@@ -14,8 +14,8 @@ const steps: Array<{ label: string; icon: string; view: View }> = [
 export function ProsopographyHome({ onNavigate }: { onNavigate: (view: View) => void }) {
   const [demoMessage,setDemoMessage]=useState('');
   return (
-    <div className="h-full overflow-auto bg-neutral-50 text-neutral-950 dark:bg-neutral-950 dark:text-neutral-100" data-testid="prosopography-home">
-      <div className="mx-auto max-w-6xl space-y-6 p-6 lg:p-8">
+    <div className="home-dashboard h-full overflow-auto bg-neutral-50 text-neutral-950 dark:bg-neutral-950 dark:text-neutral-100" data-testid="prosopography-home">
+      <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
         <header className="overflow-hidden rounded-3xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-6 dark:border-blue-900/60 dark:from-blue-950/35 dark:via-neutral-950 dark:to-indigo-950/20 sm:p-8">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
             <Icon name="users" size={12} /> {t('Prosopografía')}
@@ -41,13 +41,13 @@ export function ProsopographyHome({ onNavigate }: { onNavigate: (view: View) => 
           {demoMessage&&<p role="status" className="mt-3 text-xs text-blue-700 dark:text-blue-300">{demoMessage}</p>}
         </header>
 
-        <section className="grid gap-4 md:grid-cols-3" aria-label={t('Estado metodológico')}>
+        <section className="home-status-grid" aria-label={t('Estado metodológico')}>
           {[
             ['Estado metodológico', 'Estudio sin definir', 'Define la pregunta, el universo y los límites del estudio.', 'compass'],
             ['Cuestionario', 'Sin versión publicada', 'Publica un cuestionario común antes de codificar observaciones.', 'table'],
             ['Corpus documental', 'Sin fuentes', 'Registra las fuentes previstas y su cobertura.', 'archive'],
           ].map(([title, value, description, icon]) => (
-            <article key={title} className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
+            <article key={title} className="home-accent-card rounded-2xl border p-5">
               <span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300"><Icon name={icon} size={16} /></span>
               <h2 className="mt-4 text-xs font-semibold uppercase tracking-wider text-neutral-500">{t(title)}</h2>
               <p className="mt-1 text-base font-semibold">{t(value)}</p>
@@ -64,10 +64,10 @@ export function ProsopographyHome({ onNavigate }: { onNavigate: (view: View) => 
             </div>
             <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">{t('No hay tareas pendientes.')}</span>
           </div>
-          <ol className="mt-5 grid gap-3 sm:grid-cols-5">
+          <ol className="home-metric-grid mt-5">
             {steps.map((step, index) => (
               <li key={step.label}>
-                <button className="group w-full rounded-xl border border-neutral-200 p-3 text-left transition hover:border-blue-400 hover:bg-blue-50 dark:border-neutral-800 dark:hover:border-blue-700 dark:hover:bg-blue-950/20" onClick={() => onNavigate(step.view)}>
+                <button className="home-accent-card group w-full rounded-xl border border-neutral-200 p-3 text-left transition hover:border-blue-400 hover:bg-blue-50 dark:border-neutral-800 dark:hover:border-blue-700 dark:hover:bg-blue-950/20" onClick={() => onNavigate(step.view)}>
                   <span className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400"><span>{index + 1}</span><Icon name={step.icon} size={13} /></span>
                   <span className="mt-3 block text-xs font-medium group-hover:text-blue-700 dark:group-hover:text-blue-300">{t(step.label)}</span>
                 </button>
