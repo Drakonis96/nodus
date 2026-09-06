@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 5.2.0 — 2026-09-06
+
+Nodus 5.2.0 introduces the Stellar idea graph, tabbed research workspaces,
+chat skills and visual answers, and a clearer desktop interface.
+
+- Introducing Stellar, the new idea graph. Search for an idea and explore its connections step by step or with automatic playback. Move forward, go back and consult the sources and evidence for each relationship as you explore the graph. Available in the corpus, works, Study, Immersion and published Nodus Server spaces.
+- Several graphs open at once. Each tab keeps its own ideas, positions, exploration history and evidence panel during the session. Add ideas from search, remove them from the canvas or open another exploration without replacing the previous one. You can also work in full screen.
+- A visual argument map. Explore the central idea and its branches through expandable cards, filter relationship types and open their evidence. Automatic zoom brings the selected argument closer, and you can return to the previous view without closing branches. The outline view remains available.
+- Tabs in Deep Research and Immersion. Keep several reports or sessions open and switch between them from a tab bar, with direct access to the gallery. Deep Research also remembers your reading position in each report as you switch between them.
+- Ideas and evidence are easier to read. Connections and summaries have a simpler presentation, with fewer nested boxes. The ideas dialog for a work now uses an opaque background so the content behind it does not interfere with reading.
+- The Dictionary shows the correct status when finished. Once a definition is complete, the generation indicator gives way to the entry's actual status. Active entries no longer keep showing “Generated” for the rest of the session.
+- A refreshed home. Cards on home screens have a clearer presentation and adapt to the available space. They improve contrast in light and dark themes and retain each vault's colors to identify its sections and statuses.
+- All activity in the top bar. The processing queue and progress indicators come together in a dropdown panel. Check active and pending tasks and follow their progress in one place, leaving more room to work.
+- You decide when to install updates. Nodus downloads the new version in the background and lets you choose “Install and restart” or “Later”. Downloading no longer triggers an automatic restart, and installation retains the pre-update backup check.
+- Settings remembers where you were. When you reopen Settings, you return to the last tab you were viewing. Shortcuts to a specific section still take you to their intended destination.
+- Better citation formatting. Linked citations and their parentheses stay together when a line wraps, avoiding stray punctuation in reports and chat responses.
+- Skills to personalize your conversations. Enable reusable instructions for studying, writing, developing ideas, comparing options or reviewing an argument. You can create your own skills, import Markdown or JSON files and edit the included ones. Chats share the configuration. Nodi keeps its own selection.
+- Diagrams and images directly in chat. SVG Studio creates vector diagrams, and Image Atelier generates images with the provider and model configured in Settings. Enlarge, copy and download the results, inspect the SVG code or view the instructions used to generate an image. Both skills are enabled by default.
+- Choosing a model is easier. Model selectors use searchable menus with a look that matches the app's theme. Search accepts different ways of writing the name, and dropdowns adapt to the available space.
+- Your favorite utilities close at hand. Pin Toolkit tools to the sidebar using the pin on each card. Open the ones you use most directly and remove their shortcuts whenever you like.
+
 ## 5.1.7 — 2026-09-04
 
 Nodus 5.1.7 is a single-fix release for the Dictionary, which reported a failure

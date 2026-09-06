@@ -106,6 +106,23 @@ const RELEASE_5_1_0_TR = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.2.0": [
+    "Yeni fikir grafiği Stellar ile tanışın. Bir fikir arayın ve bağlantılarını adım adım veya otomatik oynatmayla keşfedin. Grafikte ilerlerken ileri ve geri gidebilir, her ilişkinin kaynaklarını ve kanıtlarını inceleyebilirsiniz. Külliyatta, eserlerde, Çalışma’da, Daldırma’de ve yayımlanmış Nodus Server alanlarında kullanılabilir.",
+    "Aynı anda birden fazla grafik açın. Her sekme oturum boyunca kendi fikirlerini, konumlarını, keşif geçmişini ve kanıt panelini korur. Aramadan fikir ekleyin, fikirleri tuvalden kaldırın veya öncekinin yerine geçmeden başka bir keşif açın. Tam ekranda da çalışabilirsiniz.",
+    "Görsel bir argüman haritası. Merkezî fikri ve dallarını genişletilebilir kartlarla keşfedin, ilişki türlerini filtreleyin ve kanıtlarını açın. Otomatik yakınlaştırma seçili argümanı yaklaştırır. Dalları kapatmadan önceki görünüme dönebilirsiniz. Ana hat görünümü de kullanılabilir olmaya devam eder.",
+    "Deep Research ve Daldırma’de sekmeler. Birden fazla raporu veya oturumu açık tutun ve galeriye doğrudan erişim sunan sekme çubuğundan aralarında geçiş yapın. Deep Research, raporlar arasında geçiş yaparken her rapordaki okuma konumunuzu da hatırlar.",
+    "Fikirleri ve kanıtları okumak daha kolay. Bağlantılar ve özetler daha az iç içe kutuyla, daha sade biçimde sunulur. Bir eserin fikirler penceresi artık opak bir arka plan kullanır. Böylece arkadaki içerik okumayı engellemez.",
+    "Sözlük tamamlandığında doğru durumu gösterir. Bir tanım tamamlanınca üretim göstergesinin yerini girdinin gerçek durumu alır. Etkin girdiler artık oturumun geri kalanında “Oluşturuldu” olarak görünmez.",
+    "Yenilenen ana sayfa. Ana sayfa kartları daha anlaşılır bir sunuma sahiptir ve kullanılabilir alana uyum sağlar. Açık ve koyu temalarda kontrast iyileştirilmiştir. Bölümleri ve durumları ayırt etmek için her kasanın renkleri korunur.",
+    "Tüm etkinlikler üst çubukta. İşlem kuyruğu ve ilerleme göstergeleri açılır bir panelde bir araya gelir. Etkin ve bekleyen görevleri tek bir yerden inceleyip ilerlemelerini takip edin. Böylece çalışmak için daha fazla alan kalır.",
+    "Güncellemeleri ne zaman kuracağınıza siz karar verin. Nodus yeni sürümü arka planda indirir ve “Yükle ve yeniden başlat” ile “Daha sonra” arasında seçim yapmanızı sağlar. İndirme artık otomatik yeniden başlatmaya yol açmaz. Kurulum öncesi yedekleme kontrolü korunur.",
+    "Ayarlar kaldığınız yeri hatırlar. Ayarlar’ı yeniden açtığınızda en son görüntülediğiniz sekmeye dönersiniz. Belirli bir bölüme giden kısayollar sizi yine doğrudan hedeflerine götürür.",
+    "Daha düzenli kaynak gösterimleri. Bağlantılı kaynak gösterimleri ve parantezleri satır kaydırıldığında birlikte kalır. Böylece raporlarda ve sohbet yanıtlarında tek başına kalan noktalama işaretleri oluşmaz.",
+    "Sohbetlerinizi kişiselleştiren skills. Çalışmak, yazmak, fikir geliştirmek, seçenekleri karşılaştırmak veya bir argümanı incelemek için yeniden kullanılabilir talimatları etkinleştirin. Kendi skills öğelerinizi oluşturabilir, Markdown veya JSON dosyalarını içe aktarabilir ve hazır olanları düzenleyebilirsiniz. Sohbetler yapılandırmayı paylaşır. Nodi kendi seçimini korur.",
+    "Doğrudan sohbette diyagramlar ve görseller. SVG Studio vektör diyagramları oluşturur. Image Atelier, Ayarlar’da yapılandırılan sağlayıcı ve modelle görseller üretir. Sonuçları büyütebilir, kopyalayabilir ve indirebilir, SVG kodunu veya görsel üretiminde kullanılan talimatları inceleyebilirsiniz. Her iki skill de başlangıçta etkindir.",
+    "Model seçmek daha kolay. Model seçiciler uygulamanın temasına uyan, arama yapılabilen menüler kullanır. Arama, adın farklı yazılış biçimlerini kabul eder ve açılır menüler kullanılabilir alana uyum sağlar.",
+    "Sevdiğiniz araçlar elinizin altında. Her karttaki raptiyeyi kullanarak Toolkit araçlarını kenar çubuğuna sabitleyin. En çok kullandıklarınızı doğrudan açın ve kısayollarını istediğiniz zaman kaldırın.",
+  ],
   "5.1.7": [
     "Sözlük tanımı oluşturmak artık bir hata gibi görünmüyor. Durum satırı, tanım sorunsuz yazılırken işlemin tamamlanamadığını duyuruyordu. Artık gerçek ilerlemeyi dilinizde gösteriyor: kuyrukta, derlem inceleniyor ve tanım oluşturuluyor.",
   ],
