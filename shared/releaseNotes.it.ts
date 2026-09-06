@@ -166,6 +166,23 @@ const RELEASE_5_1_0_IT = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.2.0": [
+    "Arriva Stellar, il nuovo grafo delle idee. Cerca un’idea ed esplora le sue connessioni passo dopo passo o con la riproduzione automatica. Puoi avanzare, tornare indietro e consultare le fonti e le evidenze di ogni relazione mentre percorri il grafo. Disponibile nel corpus, nelle opere, in Studio, Immersione e negli spazi pubblicati di Nodus Server.",
+    "Più grafi aperti contemporaneamente. Ogni scheda conserva le proprie idee, posizioni, il percorso e il pannello delle evidenze durante la sessione. Aggiungi idee dalla ricerca, rimuovile dall’area di lavoro o apri un’altra esplorazione senza sostituire la precedente. Puoi anche lavorare a schermo intero.",
+    "Una mappa degli argomenti visiva. Esplora l’idea centrale e le sue diramazioni con riquadri espandibili, filtra i tipi di relazione e apri le loro evidenze. Lo zoom automatico avvicina l’argomento selezionato e puoi tornare all’inquadratura precedente senza chiudere i rami. La vista a schema resta disponibile.",
+    "Schede in Deep Research e Immersione. Tieni aperti più rapporti o sessioni e passa dall’uno all’altro tramite una barra di schede, con accesso diretto alla galleria. Deep Research ricorda anche il punto di lettura di ogni rapporto quando passi da uno all’altro.",
+    "Idee ed evidenze più facili da leggere. Le connessioni e i riepiloghi hanno una presentazione più semplice, con meno riquadri annidati. La finestra delle idee di un’opera utilizza ora uno sfondo opaco, così il contenuto retrostante non disturba la lettura.",
+    "Il Dizionario mostra lo stato corretto al termine. Quando una definizione è completa, l’indicatore di generazione lascia il posto allo stato effettivo della voce. Le voci attive non continuano più a mostrare «Generato» per il resto della sessione.",
+    "Una schermata iniziale rinnovata. Le schede delle schermate iniziali sono più chiare e si adattano allo spazio disponibile. Migliorano il contrasto nei temi chiaro e scuro e mantengono i colori di ogni deposito per identificarne sezioni e stati.",
+    "Tutte le attività nella barra superiore. La coda di elaborazione e gli indicatori di avanzamento si riuniscono in un pannello a discesa. Consulta le attività in corso e in attesa e seguine l’avanzamento da un unico punto, lasciando più spazio per lavorare.",
+    "Decidi tu quando installare gli aggiornamenti. Nodus scarica la nuova versione in background e ti permette di scegliere «Installa e riavvia» oppure «Più tardi». Il download non provoca più un riavvio automatico e l’installazione mantiene il controllo del backup preventivo.",
+    "Le Impostazioni ricordano dove eri. Quando riapri le Impostazioni, ritrovi l’ultima scheda che stavi consultando. I collegamenti a una sezione specifica continuano a portarti alla destinazione prevista.",
+    "Citazioni presentate meglio. Le citazioni collegate e le loro parentesi restano unite quando il testo va a capo, evitando segni isolati nei rapporti e nelle risposte delle chat.",
+    "Skills per personalizzare le tue conversazioni. Attiva istruzioni riutilizzabili per studiare, scrivere, sviluppare idee, confrontare opzioni o esaminare un argomento. Puoi creare le tue skills, importare file Markdown o JSON e modificare quelle incluse. Le chat condividono la configurazione. Nodi mantiene la propria selezione.",
+    "Diagrammi e immagini direttamente in chat. SVG Studio crea diagrammi vettoriali e Image Atelier genera immagini con il fornitore e il modello configurati nelle Impostazioni. Puoi ingrandire, copiare e scaricare i risultati, consultare il codice SVG o vedere le istruzioni usate per generare un’immagine. Entrambe le skills sono attive per impostazione predefinita.",
+    "Scegliere un modello è più comodo. I selettori dei modelli utilizzano menu con ricerca e un aspetto coerente con il tema dell’applicazione. La ricerca accetta diversi modi di scrivere il nome e i menu si adattano allo spazio disponibile.",
+    "Le tue utilità preferite a portata di mano. Fissa gli strumenti del Toolkit nella barra laterale con la puntina di ogni scheda. Apri direttamente quelli che usi di più e rimuovi i loro collegamenti quando vuoi.",
+  ],
   "5.1.7": [
     "Generare una definizione del dizionario non sembra più un errore. La riga di stato annunciava che l’operazione non poteva essere completata mentre la definizione veniva scritta senza problemi. Ora mostra l’avanzamento reale nella tua lingua: in coda, analisi del corpus e generazione della definizione.",
   ],

@@ -24,18 +24,37 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
+  const currentRelease = RELEASE_NOTES[0];
+  assert.equal(currentRelease?.version, '5.2.0');
+  assert.equal(currentRelease?.date, '2026-09-06');
+  assert.equal(currentRelease?.highlights.length, 15);
+  assert.deepEqual(currentRelease.highlights.map((highlight) => highlight.scope), [
+    ...Array(6).fill('academic'), ...Array(5).fill('general'), ...Array(3).fill('ai'), 'toolkit',
+  ]);
+  for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+    assert.ok(currentRelease.highlights.every((highlight) => highlight[language]?.length > 80));
+  }
+  for (const phrase of [
+    /Introducing Stellar/, /Several graphs open at once/, /visual argument map/,
+    /Tabs in Deep Research and Immersion/, /Ideas and evidence are easier to read/,
+    /Dictionary shows the correct status/, /refreshed home/, /activity in the top bar/,
+    /You decide when to install updates/, /Settings remembers/, /Better citation formatting/,
+    /Skills to personalize/, /Diagrams and images directly in chat/, /Choosing a model/,
+    /favorite utilities close at hand/,
+  ]) assert.ok(currentRelease.highlights.some((highlight) => phrase.test(highlight.en)));
+
   // 5.1.7 is a single-fix release: the Dictionary status line reported a failure
   // while the definition was being written correctly, because its progress copy
   // travelled in a `message` field the main-process localizer rewrote.
-  const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.1.7');
-  assert.equal(currentRelease?.date, '2026-09-04');
-  assert.equal(currentRelease?.highlights.length, 1);
-  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), ['languages']);
+  const release517 = RELEASE_NOTES.find((note) => note.version === '5.1.7');
+  assert.equal(release517?.version, '5.1.7');
+  assert.equal(release517?.date, '2026-09-04');
+  assert.equal(release517?.highlights.length, 1);
+  assert.deepEqual(release517?.highlights.map((highlight) => highlight.scope), ['languages']);
   for (const phrase of [
     /Generating a dictionary definition no longer looks like a failure/,
     /queued, analysing corpus and generating definition/,
-  ]) assert.ok(currentRelease?.highlights.some((highlight) => phrase.test(highlight.en)));
+  ]) assert.ok(release517?.highlights.some((highlight) => phrase.test(highlight.en)));
 
   // 5.1.6 stands alone with the three changes that are actually new: a custom
   // OpenAI-compatible provider plus the progress-bar and main-process error
