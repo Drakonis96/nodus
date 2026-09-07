@@ -37,6 +37,7 @@ try {
   await page.getByTestId('app-shell').waitFor();
   await page.setViewportSize({ width: 1512, height: 982 });
   if (await page.locator('.whats-new-backdrop').count()) await page.locator('.whats-new-backdrop').getByRole('button', { name: 'Close', exact: true }).click();
+  if (await page.locator('.startup-update-backdrop').count()) await page.locator('.startup-update-backdrop').getByRole('button', { name: 'Got it', exact: true }).click();
   console.log('READY', await page.title());
   if (process.env.NODUS_SKILLS_PROMPT_LANGUAGE) await page.evaluate(language => window.nodus.updateSettings({ promptLanguage: language }), process.env.NODUS_SKILLS_PROMPT_LANGUAGE);
   if (process.argv.includes('--inspect')) {
@@ -141,7 +142,7 @@ try {
         const answer = saved.messages.filter(message => message.role === 'assistant').at(-1).content;
         const expectedTitle = answer.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
         assert.ok(expectedTitle, 'persisted SVG has an accessible title');
-        await page.getByText(conversation.title, { exact: true }).click();
+        await page.getByText(conversation.title, { exact: true }).first().click();
         const card = page.getByTestId('chat-svg').last();
         // Loading a chat is asynchronous: an existing card can belong to the
         // previously selected conversation until getConversation resolves.
@@ -178,9 +179,11 @@ try {
       await page.screenshot({ path: path.join(shots, '08-skills-spanish-light.png') });
     }
     const samples = [
-      ['02-chloroform', 'Draw a molecule of chloroform, CHCl3, using solid, wedged, and dashed lines to show its tetrahedral geometry. Use classical organic chemistry notation, with an elegant readable legend. Draw it now as SVG.'],
+      ['02-chloroform', 'Draw a molecule of chloroform, CHCl3, using solid, wedged, and dashed lines to show its tetrahedral geometry.'],
       ['03-systems', 'Create a clear SVG diagram explaining a circular economy for a small furniture company: design, responsibly sourced materials, manufacture, use, repair and reuse, then recovery. Show the return loops, keep every label readable, and distinguish product life extension from material recycling.'],
       ['04-image', 'Generate an editorial illustration for an essay about collective memory: an archive reading room where fragments of letters, maps and photographs form a luminous tree above a research table. A thoughtful paper-cut illustration with tactile layers, warm amber and midnight blue, beautifully composed, no visible text.'],
+      ['05-line-bonds', 'Write line-bond structures for the following substances, showing all nonbonding electrons: (a) CHCl3, chloroform (b) H2S, hydrogen sulfide (c) CH3NH2, methylamine (d) CH3Li, methyllithium.'],
+      ['06-propane', 'Draw a line-bond structure for propane, CH3CH2CH3. Predict the value of each bond angle, and indicate the overall shape of the molecule.'],
     ];
     for (const [name, prompt] of samples.filter(([name]) => !process.argv.includes('--review-existing') && (!process.env.NODUS_SKILLS_SAMPLE || name.includes(process.env.NODUS_SKILLS_SAMPLE)))) {
       await page.getByRole('button', { name: 'New conversation', exact: true }).click();
@@ -196,7 +199,7 @@ try {
       assert.equal(saved.messages.filter(message => message.role === 'user').at(-1).content, prompt);
       // Reopen the exact saved conversation before captures, then wait for its
       // own content instead of accepting a card left on screen by another chat.
-      await page.getByText(saved.title, { exact: true }).click();
+      await page.getByText(saved.title, { exact: true }).first().click();
       if (name !== '04-image') {
         const title = saved.messages.filter(message => message.role === 'assistant').at(-1).content.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
         assert.ok(title);
@@ -239,7 +242,7 @@ try {
         assert.ok(chat.messages.some(message => message.content.includes(source)));
         await page.reload();
         await page.getByTitle('Open research assistant', { exact: true }).click();
-        await page.getByText(chat.title, { exact: true }).click();
+        await page.getByText(chat.title, { exact: true }).first().click();
         await card.waitFor(); await card.locator('img').evaluate(image => image.decode());
         assert.equal(await card.locator('img').getAttribute('src'), source);
         await page.evaluate(id => window.nodus.deleteConversation(id), chat.id);

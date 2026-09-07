@@ -1,7 +1,7 @@
 import { refineChatSvg } from './chatSvgQuality';
 import type { ModelRef } from '@shared/types';
 import type { ChatSkill } from '@shared/chatSkills';
-import { CHAT_IMAGE_ASPECT_RATIOS, type ChatImageAspectRatio, splitChatVisuals } from '@shared/chatSkills';
+import { CHAT_IMAGE_ASPECT_RATIOS, serializeChatVisualPart, type ChatImageAspectRatio, splitChatVisuals } from '@shared/chatSkills';
 import { callImageProvider, prepareGeneratedImage } from './decorativeImages';
 import { getSettings } from '../db/settingsRepo';
 import { chatAssetVersion, storeChatImage } from '../chatAssets';
@@ -31,7 +31,7 @@ export async function executeChatSkills(answer: string, execution: ChatSkillExec
   const result: string[] = [];
   for (const part of parts) {
     if (part.kind !== 'image-request') {
-      result.push(part.kind === 'svg' ? `\n\n\`\`\`svg\n${part.content}\n${part.complete ? '```' : ''}\n\n` : part.kind === 'image-error' ? `\n\n\`\`\`nodus-image-error\n${part.content}\n\`\`\`\n\n` : part.content);
+      result.push(serializeChatVisualPart(part));
       continue;
     }
     signal?.throwIfAborted();

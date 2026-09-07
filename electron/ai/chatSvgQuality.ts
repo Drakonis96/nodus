@@ -1,8 +1,9 @@
 import { BrowserWindow } from 'electron';
 import { sanitizeChatSvg } from '@shared/chatSvg';
-import { splitChatVisuals, type ChatSkill } from '@shared/chatSkills';
+import { serializeChatVisualPart, splitChatVisuals, type ChatSkill } from '@shared/chatSkills';
 import type { ModelRef } from '@shared/types';
 import { completeText } from './aiClient';
+import { chemistrySvgAuditSystem, chemistrySvgMarkupIssues, chemistrySvgMode, isChemistrySvgRequest } from './chatChemistrySvg';
 
 /** Inspect actual font metrics in an isolated, offscreen document whose CSP blocks page scripts. */
 export async function inspectChatSvg(svg: string): Promise<string[]> {
@@ -51,23 +52,56 @@ export async function refineChatSvg(answer: string, options: { question: string;
   const skill = options.skills.find(item => item.builtin === 'svg');
   if (!skill) return answer;
   const parts = splitChatVisuals(answer);
+  const chemistryMode = chemistrySvgMode(options.question);
+  const audited = new Set<(typeof parts)[number]>();
+  const chemistryParts = parts.filter(part => part.kind === 'svg' && isChemistrySvgRequest(options.question, part.content));
+  if (chemistryParts.length > 1) {
+    try {
+      options.signal?.throwIfAborted();
+      const repaired = await completeText({
+        system: `${chemistrySvgAuditSystem(skill, chemistryMode)}\n\nThe draft split one requested answer across several SVGs. Combine every requested structure into one spacious SVG with one clearly labeled panel per item, a consistent scale and notation, and one shared accessible title and description. Preserve every requested molecule; do not omit or duplicate a panel. Return exactly one SVG.`,
+        user: JSON.stringify({ request: options.question, requiredMode: chemistryMode, svgs: chemistryParts.map(part => part.content) }),
+        maxTokens: 14_000, temperature: 0, reasoning: 'off', plainContext: true, signal: options.signal,
+      }, options.model);
+      const replacement = splitChatVisuals(repaired).find(item => item.kind === 'svg' && item.complete);
+      if (replacement) {
+        chemistryParts[0].content = replacement.content;
+        chemistryParts[0].complete = true;
+        audited.add(chemistryParts[0]);
+        for (const redundant of chemistryParts.slice(1)) { redundant.kind = 'markdown'; redundant.content = ''; }
+      }
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      // Preserve the original panels if optional consolidation fails.
+    }
+  }
   // Bound both browser work and model calls even if a weak model emits many blocks.
   let count = 0;
   for (const part of parts) {
     if (part.kind !== 'svg' || count++ >= 3) continue;
     options.signal?.throwIfAborted();
     try {
-      let issues = await inspectChatSvg(part.content);
+      const chemistry = isChemistrySvgRequest(options.question, part.content);
+      if (!audited.has(part) && chemistry) {
+        const repaired = await completeText({
+          system: chemistrySvgAuditSystem(skill, chemistryMode),
+          user: JSON.stringify({ request: options.question, requiredMode: chemistryMode, svg: part.content }),
+          maxTokens: 12_000, temperature: 0, reasoning: 'off', plainContext: true, signal: options.signal,
+        }, options.model);
+        const replacement = splitChatVisuals(repaired).find(item => item.kind === 'svg' && item.complete);
+        if (replacement) { part.content = replacement.content; part.complete = true; }
+      }
+      let issues = [...(chemistry ? chemistrySvgMarkupIssues(options.question, part.content) : []), ...await inspectChatSvg(part.content)];
       for (let attempt = 0; issues.length && attempt < 2; attempt++) {
         options.signal?.throwIfAborted();
         const repaired = await completeText({
-          system: `You are the visual quality editor for SVG Studio. Repair the supplied SVG, preserving the user's intended content and all correct relationships. Return only one complete fenced svg block.\n${skill.instructions}\nActual rendered font measurements found the issues listed below. Fix them with a simpler, more spacious layout. Prefer a vertical legend with one short explanation per row over a crowded horizontal legend. Increase canvas height or wrap text with tspan when needed; never hide, truncate, shrink to unreadable type, or delete required labels. Use explicit Arial, sans-serif typography. Preserve factual content. No external resources or scripts.`,
+          system: `${chemistry ? chemistrySvgAuditSystem(skill, chemistryMode) : `You are the visual quality editor for SVG Studio. Repair the supplied SVG, preserving the user's intended content and all correct relationships. Return only one complete fenced svg block.\n${skill.instructions}`}\nActual SVG checks found the issues listed below. Fix every listed issue with a simpler, more spacious layout. Prefer a vertical legend with one short explanation per row over a crowded horizontal legend. Increase canvas height or wrap text with tspan when needed; never hide, truncate, shrink to unreadable type, or delete required labels. Use explicit Arial, sans-serif typography. Preserve factual content. No external resources or scripts.`,
           user: JSON.stringify({ request: options.question, issues, svg: part.content }),
           maxTokens: 10_000, temperature: 0.2, reasoning: 'off', plainContext: true, signal: options.signal,
         }, options.model);
         const replacement = splitChatVisuals(repaired).find(item => item.kind === 'svg' && item.complete);
         if (!replacement) break;
-        const nextIssues = await inspectChatSvg(replacement.content);
+        const nextIssues = [...(chemistry ? chemistrySvgMarkupIssues(options.question, replacement.content) : []), ...await inspectChatSvg(replacement.content)];
         // Never replace a drawing with a measurably worse repair.
         if (nextIssues.length <= issues.length) { part.content = replacement.content; part.complete = true; issues = nextIssues; }
       }
@@ -77,6 +111,5 @@ export async function refineChatSvg(answer: string, options: { question: string;
       // still sanitizes the result and exposes invalid markup as readable code.
     }
   }
-  return parts.map(part => part.kind === 'svg' ? `\n\n\`\`\`svg\n${part.content}\n\`\`\`\n\n`
-    : part.kind === 'image-error' ? `\n\n\`\`\`nodus-image-error\n${part.content}\n\`\`\`\n\n` : part.kind === 'image-request' ? `\n\n\`\`\`nodus-image\n${part.content}\n${part.complete ? '```' : ''}\n\n` : part.content).join('');
+  return parts.map(serializeChatVisualPart).join('');
 }

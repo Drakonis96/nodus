@@ -62,6 +62,11 @@ const mainExternals = [
   // as the real CommonJS package, where the require resolves normally.
   'turndown',
   '@mixmark-io/domino',
+  // Chemistry Studio loads node-tikzjax's WASM and TeX tree from the package at
+  // runtime. Keeping both chemistry dependencies external preserves those paths
+  // and avoids embedding OpenChemLib's large pure-JS bundle in the main chunk.
+  'node-tikzjax',
+  'openchemlib',
 ];
 
 /**

@@ -1,5 +1,6 @@
 import { listChatSkills, saveChatSkill, deleteChatSkill, restoreChatSkills } from './chatSkills';
 import { getChatImageMetadata } from './chatAssets';
+import { compileChemfig, compileLewis, compileSmiles } from './chemistry';
 import { originalImagePayloadFromUrl } from './imageProtocol';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -560,6 +561,9 @@ export function registerIpc(
   h('chatSkills:save', async (_e, skill) => skillsChanged(saveChatSkill(skill)));
   h('chatSkills:delete', async (_e, id: string) => skillsChanged(deleteChatSkill(id)));
   h('chatSkills:restore', async () => skillsChanged(restoreChatSkills()));
+  h('chemistry:compileChemfig', async (_e, source: string) => compileChemfig(source));
+  h('chemistry:compileLewis', async (_e, source: string) => compileLewis(source));
+  h('chemistry:compileSmiles', async (_e, source: string) => compileSmiles(source));
   h('chatImages:metadata', async (_e, source: string) => getChatImageMetadata(source));
   h('chatImages:copy', async (_e, source: string) => {
     if (!source.startsWith('nodus-image://chat/')) throw new Error('Invalid chat image.');

@@ -108,6 +108,9 @@ export const nodusApi: NodusApi = {
     ipcRenderer.on('chatSkills:changed', listener);
     return () => ipcRenderer.removeListener('chatSkills:changed', listener);
   },
+  compileChemfig: (source) => ipcRenderer.invoke('chemistry:compileChemfig', source),
+  compileLewis: (source) => ipcRenderer.invoke('chemistry:compileLewis', source),
+  compileSmiles: (source) => ipcRenderer.invoke('chemistry:compileSmiles', source),
   getChatImageMetadata: (source) => ipcRenderer.invoke('chatImages:metadata', source),
   copyChatImage: (source) => ipcRenderer.invoke('chatImages:copy', source),
   listNodiConversations: () => ipcRenderer.invoke('nodi:conversations:list'),
