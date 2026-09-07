@@ -198,7 +198,7 @@ export function serializeChatVisualPart(part: ChatVisualPart): string {
   if (part.kind === 'markdown') return part.content;
   const language = part.kind === 'image-request' ? 'nodus-image'
     : part.kind === 'image-error' ? 'nodus-image-error' : part.kind;
-  return `\n\n\`\`\`${language}\n${part.content}\n${part.complete ? '\`\`\`' : ''}\n\n`;
+  return `\n\n\`\`\`${language}\n${part.content}\n${part.complete ? '```' : ''}\n\n`;
 }
 
 /** Citation repair operates on prose; visual code and image production briefs are opaque. */
