@@ -1,4 +1,4 @@
-import { splitChatVisuals } from './chatSkills';
+import { serializeChatVisualPart, splitChatVisuals } from './chatSkills';
 import type { ModelRef } from './types';
 import type { StudySearchKind, StudySearchLocation, StudySearchScope } from './studySearch';
 
@@ -159,10 +159,7 @@ export function validateStudyAssistantAnswer(
   };
   // Validate prose citations without rewriting labels or instructions inside visual artifacts.
   let clean = splitChatVisuals(answer).map(part => {
-    if (part.kind !== 'markdown') {
-      const language = part.kind === 'svg' ? 'svg' : part.kind === 'image-request' ? 'nodus-image' : 'nodus-image-error';
-      return `\n\n\`\`\`${language}\n${part.content}\n${part.complete ? '```' : ''}\n\n`;
-    }
+    if (part.kind !== 'markdown') return serializeChatVisualPart(part);
     return part.content
     .replace(/\[\[(S\d+)\]\]/gi, normalize)
     .replace(/\[(S\d+)\]\([^)]+\)/gi, normalize)

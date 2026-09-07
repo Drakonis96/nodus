@@ -8769,6 +8769,9 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   deleteChatSkill(id: string): Promise<ChatSkill[]>;
   restoreChatSkills(): Promise<ChatSkill[]>;
   onChatSkillsChanged(cb: () => void): () => void;
+  compileChemfig(source: string): Promise<string>;
+  compileLewis(source: string): Promise<string>;
+  compileSmiles(source: string): Promise<string>;
   getChatImageMetadata(source: string): Promise<Record<string, string> | null>;
   copyChatImage(source: string): Promise<void>;
   listNodiConversations(): Promise<NodiConversation[]>;

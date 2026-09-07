@@ -5,17 +5,19 @@ import { randomUUID } from 'node:crypto';
 import { DEFAULT_CHAT_SKILLS, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
 
 const file = () => path.join(app.getPath('userData'), 'chat-skills.json');
-const LIBRARY_VERSION = 3;
+const LIBRARY_VERSION = 4;
 export function listChatSkills(): ChatSkill[] {
   if (!fs.existsSync(file())) return structuredClone(DEFAULT_CHAT_SKILLS);
   let parsed: { version?: number; skills?: ChatSkill[] };
   try { parsed = JSON.parse(fs.readFileSync(file(), 'utf8')); } catch { throw new Error('The skills library could not be read.'); }
-  if (![1, 2, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');
+  if (![1, 2, 3, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');
   if (parsed.version! < LIBRARY_VERSION) {
     // Each release adds only newly introduced defaults. Never restore a skill
     // deleted in an earlier version or overwrite its edited instructions/flags.
     const additions = DEFAULT_CHAT_SKILLS.filter(skill =>
-      ((parsed.version! < 2 && skill.builtin === 'socratic') || (parsed.version! < 3 && skill.builtin === 'general'))
+      ((parsed.version! < 2 && skill.builtin === 'socratic')
+        || (parsed.version! < 3 && skill.builtin === 'general')
+        || (parsed.version! < 4 && skill.builtin === 'chemistry'))
       && !parsed.skills!.some(existing => existing.id === skill.id));
     return write([...parsed.skills, ...structuredClone(additions)]);
   }
