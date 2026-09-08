@@ -58,6 +58,7 @@ import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch
 import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const PT_BR: Record<string, string> = {
+  'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Escolha o modo claro, escuro ou siga o sistema operacional.',
   ...CHAT_SKILLS_TRANSLATIONS['pt-BR'],
   ...STELLAR_GRAPH_TRANSLATIONS["pt-BR"],
   ...ACADEMIC_TOUR_TRANSLATIONS['pt-BR'],

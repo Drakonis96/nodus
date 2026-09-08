@@ -57,6 +57,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Choose light mode, dark mode, or follow the operating system.',
   ...CHAT_SKILLS_TRANSLATIONS['en'],
   ...STELLAR_GRAPH_TRANSLATIONS["en"],
   ...ACADEMIC_TOUR_TRANSLATIONS.en,

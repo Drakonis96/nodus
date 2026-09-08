@@ -13,7 +13,7 @@ import { lockedApiKeyProviders, providerKeyMap } from '../secrets/secretStore';
 import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
 import { DEFAULT_NODUS_IMAGE_QUALITY, isNodusImageQuality } from '@shared/localImageModels';
 import { EMPTY_CUSTOM_EVENT_TYPES, sanitizeCustomEventTypes } from '@shared/eventTypes';
-import { sanitizeCustomThemes } from '@shared/appThemes.mjs';
+import { sanitizeCustomThemes } from '@shared/appThemes';
 import { normalizeToolkitToolPages } from '@shared/toolkitNavigation';
 import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
 import {

@@ -53,6 +53,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
+  'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Açık veya koyu modu seçin ya da işletim sistemini takip edin.',
   ...CHAT_SKILLS_TRANSLATIONS['tr'],
   ...STELLAR_GRAPH_TRANSLATIONS["tr"],
   ...ACADEMIC_TOUR_TRANSLATIONS.tr,

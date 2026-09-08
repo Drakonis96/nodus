@@ -1,4 +1,4 @@
-import { sanitizeCustomThemes } from '@shared/appThemes.mjs';
+import { sanitizeCustomThemes } from '@shared/appThemes';
 import type { ThemeMode } from '@shared/types';
 import { deriveThemeTokens, SHADES, THEMES } from './themes.mjs';
 

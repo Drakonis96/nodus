@@ -2453,6 +2453,8 @@ html.theme-active.light .home-dashboard .study-home-icon {
 .worldbuilding.dark .dark\:hover\:text-indigo-200:hover { color: #ddd6fe; }
 .worldbuilding.dark .dark\:hover\:text-indigo-300:hover { color: #c4b5fd; }
 .worldbuilding.dark .dark\:bg-indigo-400 { background-color: #a78bfa; }
+.worldbuilding.dark .dark\:bg-indigo-600 { background-color: #7c3aed; }
+.worldbuilding.dark .dark\:hover\:bg-indigo-500:hover { background-color: #8b5cf6; }
 .worldbuilding.dark .dark\:bg-indigo-500\/15 { background-color: rgba(139, 92, 246, 0.15); }
 .worldbuilding.dark .dark\:bg-indigo-600\/10 { background-color: rgba(124, 58, 237, 0.1); }
 .worldbuilding.dark .dark\:bg-indigo-600\/15 { background-color: rgba(124, 58, 237, 0.15); }
@@ -2747,6 +2749,8 @@ html.theme-active.light .home-dashboard .study-home-icon {
    remaps a utility that the app also uses behind `dark:` without remapping the variant. */
 /* genealogy */
 .genealogy.dark .dark\:bg-indigo-400 { background-color: #fbbf24; }
+.genealogy.dark .dark\:bg-indigo-600 { background-color: #ca8a04; }
+.genealogy.dark .dark\:hover\:bg-indigo-500:hover { background-color: #eab308; }
 .genealogy.dark .dark\:bg-indigo-600\/15 { background-color: rgba(202, 138, 4, 0.15); }
 .genealogy.dark .dark\:bg-indigo-900\/40 { background-color: rgba(120, 53, 15, 0.4); }
 .genealogy.dark .dark\:bg-indigo-900\/50 { background-color: rgba(120, 53, 15, 0.5); }
@@ -2772,6 +2776,8 @@ html.theme-active.light .home-dashboard .study-home-icon {
 
 /* estudio */
 .estudio.dark .dark\:bg-indigo-400 { background-color: #2dd4bf; }
+.estudio.dark .dark\:bg-indigo-600 { background-color: #0f766e; }
+.estudio.dark .dark\:hover\:bg-indigo-500:hover { background-color: #0d9488; }
 .estudio.dark .dark\:bg-indigo-600\/15 { background-color: rgba(15, 118, 110, 0.15); }
 .estudio.dark .dark\:bg-indigo-900\/40 { background-color: rgba(19, 78, 74, 0.4); }
 .estudio.dark .dark\:bg-indigo-900\/50 { background-color: rgba(19, 78, 74, 0.5); }
@@ -2797,6 +2803,8 @@ html.theme-active.light .home-dashboard .study-home-icon {
 
 /* docencia */
 .docencia.dark .dark\:bg-indigo-400 { background-color: #fb923c; }
+.docencia.dark .dark\:bg-indigo-600 { background-color: #ea580c; }
+.docencia.dark .dark\:hover\:bg-indigo-500:hover { background-color: #f97316; }
 .docencia.dark .dark\:bg-indigo-600\/15 { background-color: rgba(234, 88, 12, 0.15); }
 .docencia.dark .dark\:bg-indigo-900\/40 { background-color: rgba(124, 45, 18, 0.4); }
 .docencia.dark .dark\:bg-indigo-900\/50 { background-color: rgba(124, 45, 18, 0.5); }
@@ -2824,6 +2832,8 @@ html.theme-active.light .home-dashboard .study-home-icon {
 
 /* databases */
 .databases.dark .dark\:bg-indigo-400 { background-color: #e23a63; }
+.databases.dark .dark\:bg-indigo-600 { background-color: #b30333; }
+.databases.dark .dark\:hover\:bg-indigo-500:hover { background-color: #d40a3f; }
 .databases.dark .dark\:bg-indigo-500\/20 { background-color: rgba(204, 10, 58, 0.2); }
 .databases.dark .dark\:bg-indigo-600\/15 { background-color: rgba(179, 3, 51, 0.15); }
 .databases.dark .dark\:bg-indigo-900\/40 { background-color: rgba(77, 1, 22, 0.4); }

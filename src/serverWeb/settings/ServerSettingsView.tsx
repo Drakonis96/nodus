@@ -12,7 +12,7 @@ import {
 } from "react";
 import { AI_PROVIDERS, PROVIDER_LABELS } from "@shared/providers";
 import type { AppLanguage, CustomAppTheme } from "@shared/types";
-import { APP_THEME_IDS } from "@shared/appThemes.mjs";
+import { APP_THEME_IDS } from "@shared/appThemes";
 import { contrast, deriveThemeTokens, THEMES } from "../../theme/themes.mjs";
 import { Icon } from "../../components/ui";
 import { api, ApiError } from "../api";

@@ -73,7 +73,7 @@ import { applyAppTheme as applyRuntimeAppTheme, applyThemeMode } from '../theme/
 type ThemePickerOption = { id: string; label: string; swatch: string[]; custom?: boolean };
 
 const THEME_PICKER_OPTIONS: ThemePickerOption[] = [
-  { id: 'default', label: 'Default', swatch: ['#fafafa', '#6366f1', '#0a0a0a'] },
+  { id: 'default', label: 'Predeterminado', swatch: ['#fafafa', '#6366f1', '#0a0a0a'] },
   ...THEMES.map((th) => ({
     id: th.id as AppSettings['appTheme'],
     label: th.label,

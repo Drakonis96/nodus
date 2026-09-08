@@ -83,7 +83,7 @@ import nodusLogoViolet from './assets/nodus-logo-violet.svg';
 import nodusLogoCyan from './assets/nodus-logo-cyan.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
 import { APP_THEME_DEFINITIONS_STORAGE_KEY, APP_THEME_STORAGE_KEY, applyAppTheme as applyRuntimeAppTheme, applyThemeMode } from './theme/themeBoot';
-import { APP_THEME_IDS } from '@shared/appThemes.mjs';
+import { APP_THEME_IDS } from '@shared/appThemes';
 import { useBrowserNativeOverlayGuard } from './browserOverlay';
 
 const CsvImportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.CsvImportModal })));
