@@ -1,0 +1,224 @@
+{
+  "kind": "public-reference-regressions-not-held-out",
+  "cases": [
+    {
+      "name": "(R)-lactic acid",
+      "references": [
+        {
+          "provider": "opsin",
+          "query": "(R)-lactic acid",
+          "smiles": "C([C@H](O)C)(=O)O",
+          "retrievedAt": "2026-09-08T13:10:17.503Z",
+          "url": "https://www.ebi.ac.uk/opsin/ws/(R)-lactic%20acid.json"
+        },
+        {
+          "provider": "pubchem",
+          "query": "(R)-lactic acid",
+          "smiles": "C[C@H](C(=O)O)O",
+          "retrievedAt": "2026-09-08T13:10:17.503Z",
+          "url": "https://pubchem.ncbi.nlm.nih.gov/compound/61503"
+        }
+      ],
+      "canonicalSmiles": "C[C@@H](O)C(=O)O"
+    },
+    {
+      "name": "(2R,3S)-2,3-dibromobutane",
+      "references": [
+        {
+          "provider": "opsin",
+          "query": "(2R,3S)-2,3-dibromobutane",
+          "smiles": "Br[C@H](C)[C@H](C)Br",
+          "retrievedAt": "2026-09-08T13:10:18.634Z",
+          "url": "https://www.ebi.ac.uk/opsin/ws/(2R%2C3S)-2%2C3-dibromobutane.json"
+        },
+        {
+          "provider": "pubchem",
+          "query": "(2R,3S)-2,3-dibromobutane",
+          "smiles": "C[C@H]([C@H](C)Br)Br",
+          "retrievedAt": "2026-09-08T13:10:18.634Z",
+          "url": "https://pubchem.ncbi.nlm.nih.gov/compound/98508"
+        }
+      ],
+      "canonicalSmiles": "C[C@H](Br)[C@@H](C)Br"
+    },
+    {
+      "name": "(E)-1-bromo-1-chloroprop-1-ene",
+      "references": [
+        {
+          "provider": "opsin",
+          "query": "(E)-1-bromo-1-chloroprop-1-ene",
+          "smiles": "Br\\C(=C\\C)\\Cl",
+          "retrievedAt": "2026-09-08T13:10:18.984Z",
+          "url": "https://www.ebi.ac.uk/opsin/ws/(E)-1-bromo-1-chloroprop-1-ene.json"
+        }
+      ],
+      "canonicalSmiles": "C/C=C(\\Cl)Br"
+    },
+    {
+      "name": "(Z)-1-bromo-1-chloroprop-1-ene",
+      "references": [
+        {
+          "provider": "opsin",
+          "query": "(Z)-1-bromo-1-chloroprop-1-ene",
+          "smiles": "Br\\C(=C/C)\\Cl",
+          "retrievedAt": "2026-09-08T13:10:19.188Z",
+          "url": "https://www.ebi.ac.uk/opsin/ws/(Z)-1-bromo-1-chloroprop-1-ene.json"
+        },
+        {
+          "provider": "pubchem",
+          "query": "(Z)-1-bromo-1-chloroprop-1-ene",
+          "smiles": "C/C=C(/Cl)\\Br",
+          "retrievedAt": "2026-09-08T13:10:19.188Z",
+          "url": "https://pubchem.ncbi.nlm.nih.gov/compound/20838826"
+        }
+      ],
+      "canonicalSmiles": "C/C=C(/Cl)Br"
+    },
+    {
+      "name": "beta-D-glucopyranose",
+      "references": [
+        {
+          "provider": "opsin",
+          "query": "beta-D-glucopyranose",
+          "smiles": "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO",
+          "retrievedAt": "2026-09-08T13:10:19.533Z",
+          "url": "https://www.ebi.ac.uk/opsin/ws/beta-D-glucopyranose.json"
+        },
+        {
+          "provider": "pubchem",
+          "query": "beta-D-glucopyranose",
+          "smiles": "C([C@@H]1[C@H]([C@@H]([C@H]([C@@H](O1)O)O)O)O)O",
+          "retrievedAt": "2026-09-08T13:10:19.533Z",
+          "url": "https://pubchem.ncbi.nlm.nih.gov/compound/64689"
+        }
+      ],
+      "canonicalSmiles": "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+    },
+    {
+      "name": "alpha-D-glucopyranose",
+      "references": [
+        {
+          "provider": "opsin",
+          "query": "alpha-D-glucopyranose",
+          "smiles": "O[C@@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO",
+          "retrievedAt": "2026-09-08T13:10:19.892Z",
+          "url": "https://www.ebi.ac.uk/opsin/ws/alpha-D-glucopyranose.json"
+        },
+        {
+          "provider": "pubchem",
+          "query": "alpha-D-glucopyranose",
+          "smiles": "C([C@@H]1[C@H]([C@@H]([C@H]([C@H](O1)O)O)O)O)O",
+          "retrievedAt": "2026-09-08T13:10:19.892Z",
+          "url": "https://pubchem.ncbi.nlm.nih.gov/compound/79025"
+        }
+      ],
+      "canonicalSmiles": "OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+    },
+    {
+      "name": "cholesterol",
+      "references": [
+        {
+          "provider": "opsin",
+          "query": "cholesterol",
+          "smiles": "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C",
+          "retrievedAt": "2026-09-08T13:10:20.315Z",
+          "url": "https://www.ebi.ac.uk/opsin/ws/cholesterol.json"
+        },
+        {
+          "provider": "pubchem",
+          "query": "cholesterol",
+          "smiles": "C[C@H](CCCC(C)C)[C@H]1CC[C@@H]2[C@@]1(CC[C@H]3[C@H]2CC=C4[C@@]3(CC[C@@H](C4)O)C)C",
+          "retrievedAt": "2026-09-08T13:10:20.315Z",
+          "url": "https://pubchem.ncbi.nlm.nih.gov/compound/5997"
+        }
+      ],
+      "canonicalSmiles": "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C"
+    },
+    {
+      "name": "strychnine",
+      "references": [
+        {
+          "provider": "pubchem",
+          "query": "strychnine",
+          "smiles": "C1CN2CC3=CCO[C@H]4CC(=O)N5[C@H]6[C@H]4[C@H]3C[C@H]2[C@@]61C7=CC=CC=C75",
+          "retrievedAt": "2026-09-08T13:10:20.700Z",
+          "url": "https://pubchem.ncbi.nlm.nih.gov/compound/441071"
+        }
+      ],
+      "canonicalSmiles": "O=C1C[C@@H]2OCC=C3CN4CC[C@]56c7ccccc7N1[C@H]5[C@H]2[C@H]3C[C@H]46"
+    },
+    {
+      "name": "morphine",
+      "references": [
+        {
+          "provider": "opsin",
+          "query": "morphine",
+          "smiles": "C1=CC(O)=C2C=3[C@@]45[C@@H](O2)[C@@H](O)C=C[C@H]4[C@@H](CC13)N(C)CC5",
+          "retrievedAt": "2026-09-08T13:10:21.063Z",
+          "url": "https://www.ebi.ac.uk/opsin/ws/morphine.json"
+        },
+        {
+          "provider": "pubchem",
+          "query": "morphine",
+          "smiles": "CN1CC[C@]23[C@@H]4[C@H]1CC5=C2C(=C(C=C5)O)O[C@H]3[C@H](C=C4)O",
+          "retrievedAt": "2026-09-08T13:10:21.063Z",
+          "url": "https://pubchem.ncbi.nlm.nih.gov/compound/5288826"
+        }
+      ],
+      "canonicalSmiles": "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5"
+    },
+    {
+      "name": "paclitaxel",
+      "references": [
+        {
+          "provider": "pubchem",
+          "query": "paclitaxel",
+          "smiles": "CC1=C2[C@H](C(=O)[C@@]3([C@H](C[C@@H]4[C@]([C@H]3[C@@H]([C@@](C2(C)C)(C[C@@H]1OC(=O)[C@@H]([C@H](C5=CC=CC=C5)NC(=O)C6=CC=CC=C6)O)O)OC(=O)C7=CC=CC=C7)(CO4)OC(=O)C)O)C)OC(=O)C",
+          "retrievedAt": "2026-09-08T13:10:21.414Z",
+          "url": "https://pubchem.ncbi.nlm.nih.gov/compound/36314"
+        }
+      ],
+      "canonicalSmiles": "CC(=O)O[C@H]1C(=O)[C@@]2(C)[C@H]([C@H](OC(=O)c3ccccc3)[C@]3(O)C[C@H](OC(=O)[C@H](O)[C@@H](NC(=O)c4ccccc4)c4ccccc4)C(C)=C1C3(C)C)[C@]1(OC(C)=O)CO[C@@H]1C[C@@H]2O"
+    },
+    {
+      "name": "adamantane",
+      "references": [
+        {
+          "provider": "opsin",
+          "query": "adamantane",
+          "smiles": "C12CC3CC(CC(C1)C3)C2",
+          "retrievedAt": "2026-09-08T13:10:21.904Z",
+          "url": "https://www.ebi.ac.uk/opsin/ws/adamantane.json"
+        },
+        {
+          "provider": "pubchem",
+          "query": "adamantane",
+          "smiles": "C1C2CC3CC1CC(C2)C3",
+          "retrievedAt": "2026-09-08T13:10:21.904Z",
+          "url": "https://pubchem.ncbi.nlm.nih.gov/compound/9238"
+        }
+      ],
+      "canonicalSmiles": "C1C2CC3CC1CC(C2)C3"
+    },
+    {
+      "name": "cubane",
+      "references": [
+        {
+          "provider": "opsin",
+          "query": "cubane",
+          "smiles": "C12C3C4C5C3C1C5C24",
+          "retrievedAt": "2026-09-08T13:10:22.291Z",
+          "url": "https://www.ebi.ac.uk/opsin/ws/cubane.json"
+        },
+        {
+          "provider": "pubchem",
+          "query": "cubane",
+          "smiles": "C12C3C4C1C5C2C3C45",
+          "retrievedAt": "2026-09-08T13:10:22.291Z",
+          "url": "https://pubchem.ncbi.nlm.nih.gov/compound/136090"
+        }
+      ],
+      "canonicalSmiles": "C12C3C4C1C1C2C3C41"
+    }
+  ]
+}
