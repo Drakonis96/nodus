@@ -3,7 +3,7 @@ import type { GraphData, GraphNode } from "@shared/types";
 import type { StellarPosition, StellarTheme } from "@shared/stellarGraph";
 import { themeName, type StellarGraphSource } from "./source";
 import { sortThemes, themeConstellation } from "./themes";
-import { CorpusContextControls, useCorpusContext } from "./CorpusContext";
+import { CorpusContextProgress, CorpusContextControls, useCorpusContext } from "./CorpusContext";
 import { StellarCanvas, type StellarCanvasApi } from "./StellarCanvas";
 import { errorText, t, tx } from "../i18n";
 import { Icon } from "../components/ui";
@@ -214,6 +214,7 @@ export function ThemesOverview({
               return `${t("Tema")} · ${count.toLocaleString()} ${t(count === 1 ? "idea" : "ideas")}`;
             }}
           />}
+          <CorpusContextProgress context={corpusContext} />
           <div className="stellar-meta">
             <span className="stellar-live-dot" />
             {themes === null

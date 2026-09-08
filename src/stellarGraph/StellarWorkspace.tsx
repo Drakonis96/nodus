@@ -13,7 +13,8 @@ import {
   NodeDetailPanel,
   type DetailLoading,
 } from "../components/NodeDetailPanel";
-import { CorpusContextControls, useCorpusContext } from "./CorpusContext";
+import { StellarProgress } from "./StellarProgress";
+import { CorpusContextProgress, CorpusContextControls, useCorpusContext } from "./CorpusContext";
 import { StellarCanvas, ZOOM_STEP, type StellarCanvasApi } from "./StellarCanvas";
 import { Exploration } from "./exploration";
 import { workScopedSource, type StellarGraphSource } from "./source";
@@ -775,18 +776,13 @@ function StellarGraphTab({
                 : "Busca una idea arriba para empezar a explorar.")}
             </div>
           )}
-          {(loading || layoutProgress < 1) && !!themeId && (
-            <div className="stellar-progress" role="status" aria-live="polite">
-              <span>{loading
-                ? tx("Cargando el tema… {n} ideas", { n: progress.loaded.toLocaleString() })
-                : tx("Distribuyendo la constelación… {n}%", { n: Math.round(layoutProgress * 100) })}</span>
-              <div className="stellar-progress-track">
-                <i style={{ width: `${Math.round(100 * (loading
-                  ? progress.total ? Math.min(1, progress.loaded / progress.total) : 0
-                  : layoutProgress))}%` }} />
-              </div>
-            </div>
-          )}
+          {(loading || layoutProgress < 1) && !!themeId
+            ? <StellarProgress
+                label={loading
+                  ? tx("Cargando el tema… {n} ideas", { n: progress.loaded.toLocaleString() })
+                  : tx("Distribuyendo la constelación… {n}%", { n: Math.round(layoutProgress * 100) })}
+                progress={loading ? (progress.total ? progress.loaded / progress.total : 0) : layoutProgress} />
+            : <CorpusContextProgress context={corpusContext} />}
           {error && (
             <div className="stellar-error" role="alert">
               {error}

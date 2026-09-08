@@ -3,6 +3,7 @@ import type { GraphData } from "@shared/types";
 import type { StellarPosition } from "@shared/stellarGraph";
 import type { StellarGraphSource } from "./source";
 import { loadCorpusContext } from "./context";
+import { StellarProgress } from "./StellarProgress";
 import { t, tx } from "../i18n";
 
 const cache = new WeakMap<StellarGraphSource, GraphData>();
@@ -69,11 +70,16 @@ export function CorpusContextControls({ context, onFit }: {
       <input type="range" min="5" max="40" step="1" value={Math.round(context.opacity * 100)}
         aria-label={t("Intensidad del contexto")} title={t("Intensidad del contexto")}
         onChange={event => context.setOpacity(Number(event.target.value) / 100)} />
-      {context.loading ? <span role="status">{Math.round(context.progress * 100)}%</span>
-        : context.error ? <span role="alert">{t("No se pudo cargar el contexto del corpus.")}</span>
+      {context.error ? <span role="alert">{t("No se pudo cargar el contexto del corpus.")}</span>
         : <button disabled={!context.layer} onClick={onFit} title={context.layer
           ? tx("{n} ideas · {edges} conexiones en el corpus", { n: context.layer.data.nodes.length.toLocaleString(), edges: context.layer.data.edges.length.toLocaleString() })
           : undefined}>{t("Ver corpus")}</button>}
     </>}
   </div>;
+}
+
+export function CorpusContextProgress({ context }: { context: ReturnType<typeof useCorpusContext> }) {
+  if (!context.enabled || !context.loading) return null;
+  return <StellarProgress progress={context.progress}
+    label={tx("Cargando el contexto… {n}%", { n: Math.round(context.progress * 100) })} />;
 }

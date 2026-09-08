@@ -623,7 +623,7 @@
   .stellar-breadcrumb { flex-basis: 100%; }
 }
 
-/* Loading a whole theme takes several pages plus a layout pass: show both advancing. */
+/* Shared by theme loading, layout and corpus context loading. */
 .stellar-progress {
   position: absolute;
   top: 44px;

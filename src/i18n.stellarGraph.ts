@@ -1,5 +1,6 @@
 export const STELLAR_GRAPH_TRANSLATIONS = {
   "en": {
+    "Cargando el contexto… {n}%": "Loading context… {n}%",
     "Contexto": "Context",
     "Intensidad del contexto": "Context intensity",
     "Ver corpus": "View corpus",
@@ -103,6 +104,7 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Finding"
   },
   "fr": {
+    "Cargando el contexto… {n}%": "Chargement du contexte… {n}%",
     "Contexto": "Contexte",
     "Intensidad del contexto": "Intensité du contexte",
     "Ver corpus": "Voir le corpus",
@@ -206,6 +208,7 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Résultat"
   },
   "de": {
+    "Cargando el contexto… {n}%": "Kontext wird geladen… {n}%",
     "Contexto": "Kontext",
     "Intensidad del contexto": "Kontextintensität",
     "Ver corpus": "Korpus ansehen",
@@ -309,6 +312,7 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Befund"
   },
   "pt": {
+    "Cargando el contexto… {n}%": "A carregar o contexto… {n}%",
     "Contexto": "Contexto",
     "Intensidad del contexto": "Intensidade do contexto",
     "Ver corpus": "Ver corpus",
@@ -412,6 +416,7 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Descoberta"
   },
   "pt-BR": {
+    "Cargando el contexto… {n}%": "Carregando contexto… {n}%",
     "Contexto": "Contexto",
     "Intensidad del contexto": "Intensidade do contexto",
     "Ver corpus": "Ver corpus",
@@ -515,6 +520,7 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Achado"
   },
   "it": {
+    "Cargando el contexto… {n}%": "Caricamento del contesto… {n}%",
     "Contexto": "Contesto",
     "Intensidad del contexto": "Intensità del contesto",
     "Ver corpus": "Vedi corpus",
@@ -618,6 +624,7 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Risultato"
   },
   "tr": {
+    "Cargando el contexto… {n}%": "Bağlam yükleniyor… {n}%",
     "Contexto": "Bağlam",
     "Intensidad del contexto": "Bağlam yoğunluğu",
     "Ver corpus": "Derlemi göster",
