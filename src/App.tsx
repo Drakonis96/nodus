@@ -37,6 +37,7 @@ import { ProsopographyTour } from './views/ProsopographyTour';
 import { WorldbuildingTour } from './views/WorldbuildingTour';
 import { FIRST_VAULT_VERSION } from './views/FirstVaultSetup';
 import { hasPendingWhatsNew, WhatsNewModal } from './components/WhatsNewModal';
+import { PdfPresenterTutorialAnnouncement } from './components/PdfPresenterTutorialAnnouncement';
 import { TutorialVideosUpdateTour } from './components/TutorialVideosGuide';
 import { PlatformHighlightsUpdateTour } from './components/PlatformHighlightsGuide';
 import { ToolkitBetaUpdateTour } from './components/ToolkitBetaGuide';
@@ -188,6 +189,8 @@ export function App() {
   // The 2.4.0 toolkit/model guide queues directly behind release notes. Its own
   // versioned guard settles immediately for new installs and for users who saw it.
   const [toolkitBetaTourSettled, setToolkitBetaTourSettled] = useState(false);
+  // The PDF Presenter video announcement queues immediately after release notes.
+  const [pdfPresenterTutorialSettled, setPdfPresenterTutorialSettled] = useState(false);
   // Users who completed the essential guide before the video tutorials existed were
   // never asked "video or text", so the catalogue is announced to them once, here.
   const [tutorialVideosSettled, setTutorialVideosSettled] = useState(false);
@@ -2111,14 +2114,21 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && !mobileTeaserSettled && !manualWhatsNewOpen && (
+      {whatsNewSettled && !pdfPresenterTutorialSettled && !manualWhatsNewOpen && (
+        <PdfPresenterTutorialAnnouncement
+          language={settings.uiLanguage}
+          onSettled={() => setPdfPresenterTutorialSettled(true)}
+        />
+      )}
+
+      {whatsNewSettled && pdfPresenterTutorialSettled && !mobileTeaserSettled && !manualWhatsNewOpen && (
         <MobileTeaserGuide
           uiLanguage={settings.uiLanguage}
           onSettled={() => setMobileTeaserSettled(true)}
         />
       )}
 
-      {whatsNewSettled && mobileTeaserSettled && !platformHighlightsSettled && !manualWhatsNewOpen && (
+      {whatsNewSettled && pdfPresenterTutorialSettled && mobileTeaserSettled && !platformHighlightsSettled && !manualWhatsNewOpen && (
         <PlatformHighlightsUpdateTour
           uiLanguage={settings.uiLanguage}
           previousTutorialVersion={settings.basicsTutorialVersion}
@@ -2126,7 +2136,7 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && !toolkitBetaTourSettled && !manualWhatsNewOpen && (
+      {whatsNewSettled && pdfPresenterTutorialSettled && mobileTeaserSettled && platformHighlightsSettled && !toolkitBetaTourSettled && !manualWhatsNewOpen && (
         <ToolkitBetaUpdateTour
           uiLanguage={settings.uiLanguage}
           previousTutorialVersion={settings.basicsTutorialVersion}
@@ -2134,7 +2144,7 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && !tutorialVideosSettled && !manualWhatsNewOpen && (
+      {whatsNewSettled && pdfPresenterTutorialSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && !tutorialVideosSettled && !manualWhatsNewOpen && (
         <TutorialVideosUpdateTour
           uiLanguage={settings.uiLanguage}
           previousTutorialVersion={settings.basicsTutorialVersion}
@@ -2142,7 +2152,7 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && !updateSettled && (
+      {whatsNewSettled && pdfPresenterTutorialSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && !updateSettled && (
         <StartupUpdateModal
           settings={settings}
           activeVaultType={activeVault?.type ?? null}
