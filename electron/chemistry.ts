@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { Molecule } from 'openchemlib';
+import { overlayElectronArrows, prepareElectronArrows } from './chemfigElectronArrows';
 
 type Tex2Svg = (input: string, options?: {
   texPackages?: Record<string, string>;
@@ -228,13 +229,24 @@ export async function compileChemfig(source: string): Promise<string> {
   const key = `chemfig:${createHash('sha256').update(drawable).digest('hex')}`;
   const cached = cache.get(key);
   if (cached) return cached;
-  const input = `\\begin{document}\n${drawable}\n\\end{document}`;
+  const layout = prepareElectronArrows(drawable);
+  // TeX's bundled input buffer is 5000 characters per line. Generated schemes
+  // can be larger after adding measurement hooks; whitespace between molecules
+  // is semantically inert and keeps every input line bounded.
+  const input = `\\begin{document}\n${layout.source.replace(/\\chemfig\b/g, '\n\\chemfig')}\n\\end{document}`;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const raw = await Promise.race([
-    getChemfigEngine()(input, { texPackages: { chemfig: '' }, showConsole: false }),
+    getChemfigEngine()(input, { texPackages: { chemfig: '' }, showConsole: process.env.NODUS_CHEMFIG_DEBUG === '1' }),
     new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => reject(new Error('Chemfig compilation timed out.')), COMPILE_TIMEOUT_MS);
     }),
   ]).finally(() => { if (timer) clearTimeout(timer); });
-  return remember(key, decorateSvg(raw, 'Chemical structure', 'Static chemical drawing compiled from Chemfig notation.', 0.34));
+  // The bundled DVI converter drops the stroke inside nested TikZ pictures
+  // (notably schemestart). Bond paths survive, but inherit stroke="none" from
+  // text groups. Restore the unfilled chemical paths before sanitization.
+  const visible = overlayElectronArrows(raw, layout).replace(/<text\b([^>]*\bfont-family="cmsy\d+"[^>]*)>¡<\/text>/g,
+    '<text$1>−</text>').replace(/<path\b[^>]*>/g, tag => /\bfill="none"/.test(tag) && !/\bstroke="(?!none")[^"]+"/.test(tag)
+    ? tag.replace(/\s+stroke="[^"]*"/g, '').replace(/<path\b/, '<path stroke="#000"')
+    : tag);
+  return remember(key, decorateSvg(visible, 'Chemical structure', 'Static chemical drawing compiled from Chemfig notation.', 0.08));
 }

@@ -67,6 +67,7 @@ const mainExternals = [
   // and avoids embedding OpenChemLib's large pure-JS bundle in the main chunk.
   'node-tikzjax',
   'openchemlib',
+  '@rdkit/rdkit',
 ];
 
 /**
@@ -339,6 +340,7 @@ export default defineConfig({
       databaseDeepResearchWorkerBuild,
       vectorScanWorkerBuild,
       utilityBuild('backupUtilityWorker', 'electron/export/backupUtilityWorker.ts'),
+      utilityBuild('chemistryValidationWorker', 'electron/chemistryValidationWorker.ts'),
       utilityBuild('recoveryProbeUtilityWorker', 'electron/recovery/recoveryProbeUtilityWorker.ts'),
       utilityBuild('migrationRecoveryUtilityWorker', 'electron/db/migrationRecoveryUtilityWorker.ts'),
       utilityBuild('serverPublishWorker', 'electron/serverSync/serverPublishWorker.ts'),

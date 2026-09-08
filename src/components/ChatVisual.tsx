@@ -5,7 +5,7 @@ import { sanitizeChatSvg, svgImageUrl } from '../lib/chatSvg';
 import { t } from '../i18n';
 import './chatVisuals.css';
 
-export function ChatVisual({ svg, source, alt = '', kindLabel = 'SVG Studio' }: { svg?: string; source?: string; alt?: string; kindLabel?: string }) {
+export function ChatVisual({ svg, source, alt = '', kindLabel = 'SVG Studio', provenanceLabel }: { svg?: string; source?: string; alt?: string; kindLabel?: string; provenanceLabel?: string }) {
   const sanitized = useMemo(() => svg ? sanitizeChatSvg(svg) : null, [svg]);
   const src = useMemo(() => sanitized ? svgImageUrl(sanitized.svg) : source, [sanitized, source]);
   const [expanded, setExpanded] = useState(false);
@@ -15,7 +15,7 @@ export function ChatVisual({ svg, source, alt = '', kindLabel = 'SVG Studio' }: 
   const [error, setError] = useState('');
   const [zoom, setZoom] = useState(1);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const title = meta?.title || sanitized?.title || alt || (svg ? kindLabel : 'Image Atelier');
+  const title = meta?.title || alt || sanitized?.title || (svg ? kindLabel : 'Image Atelier');
   useEffect(() => {
     setMeta(null); setError(''); setStatus(''); setDetails(false); setExpanded(false);
     if (!source) return;
@@ -72,7 +72,7 @@ export function ChatVisual({ svg, source, alt = '', kindLabel = 'SVG Studio' }: 
   const feedback = <>{status && <span className="chat-visual-feedback" role="status">{status}</span>}{error && <span className="chat-visual-error" role="alert">{error}</span>}</>;
   const detail = details && <div className="chat-visual-details"><div><b>{sanitized ? 'SVG' : `${meta?.provider ?? ''} · ${meta?.model ?? ''}`}</b><button type="button" onClick={() => void act(() => navigator.clipboard.writeText(sanitized?.svg ?? meta?.prompt ?? ''), t('Copiado'))}>{t('Copiar texto')}</button></div><pre>{sanitized?.svg ?? meta?.prompt ?? t('Cargando…')}</pre></div>;
   return <div className="chat-visual" data-testid={svg ? 'chat-svg' : 'chat-image'}>
-    <span className="chat-visual-head"><span className="chat-visual-kind"><Icon name={svg ? 'code' : 'image'} size={13} />{svg ? kindLabel : 'Image Atelier'}</span><span className="chat-visual-original">{t('Creación original')}</span></span>
+    <span className="chat-visual-head"><span className="chat-visual-kind"><Icon name={svg ? 'code' : 'image'} size={13} />{svg ? kindLabel : 'Image Atelier'}</span><span className="chat-visual-original">{provenanceLabel ?? t('Creación original')}</span></span>
     <button type="button" className="chat-visual-preview" onClick={() => { setExpanded(true); setZoom(1); }} aria-label={t('Ampliar imagen')}><img src={src} alt={alt || title} onError={() => setError(t('La imagen ya no está disponible.'))} /><span className="chat-visual-expand"><Icon name="fit" size={15} /></span></button>
     <span className="chat-visual-foot"><span className="chat-visual-title">{title}</span>{toolbar}</span>
     {!expanded && <>{feedback}{detail}</>}
