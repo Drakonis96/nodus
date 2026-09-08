@@ -42,8 +42,8 @@ export function ChatChemistryDocument({ source }: { source: string }) {
       {/^https:\/\/openstax\.org\/books\/organic-chemistry\/pages\//.test(mechanism.source) && <p><a href={mechanism.source} target="_blank" rel="noreferrer">{t("Fundamento de la regla")}</a></p>}
       {chemfigButton(mechanism.chemfig)}
       {mechanism.panels?.map((panel, i) => <div key={i}>
-        <p>{panel.title ?? t('Panel {number}', { number: i + 1 })}</p>
-        <ChatVisual svg={panel.svg} alt={panel.title ?? t('Panel {number}', { number: i + 1 })} kindLabel="Chemistry Studio" provenanceLabel={t("Etapa o alternativa contrastada")} />
+        <p>{panel.title ?? t('Panel {number}').replace('{number}', String(i + 1))}</p>
+        <ChatVisual svg={panel.svg} alt={panel.title ?? t('Panel {number}').replace('{number}', String(i + 1))} kindLabel="Chemistry Studio" provenanceLabel={t("Etapa o alternativa contrastada")} />
         {chemfigButton(panel.chemfig)}
       </div>)}
     </div>}
