@@ -2653,8 +2653,15 @@ try {
   await page.getByTestId('study-graph-subject').waitFor();
   await page.getByTestId('study-graph-view').getByTestId('stellar-canvas').waitFor();
   await page.getByTestId('study-graph-view').getByRole('combobox', { name: 'Buscar una idea', exact: true }).waitFor();
-  for (const control of ['Anterior', 'Play', 'Siguiente', 'Encuadrar']) await page.getByTestId('study-graph-view').getByRole('button', { name: new RegExp(control) }).first().waitFor();
-  console.log('[e2e] study Ideas reuse the original list and study Graph reuses the Stellar canvas and playback controls');
+  // Memory-backed study graphs now enter through the same permanent themes hub.
+  // Playback belongs to an exploration tab, so exercise that transition explicitly.
+  const studyGraph = page.getByTestId('study-graph-view');
+  await studyGraph.getByTestId('stellar-themes').waitFor();
+  assert.equal(await studyGraph.getByRole('button', { name: 'Play', exact: true }).count(), 0, 'the themes hub does not expose playback');
+  await studyGraph.getByRole('button', { name: 'Nuevo grafo', exact: true }).click();
+  await studyGraph.getByTestId('stellar-workspace').waitFor();
+  for (const control of ['Anterior', 'Play', 'Siguiente', 'Encuadrar']) await studyGraph.getByRole('button', { name: new RegExp(control) }).first().waitFor();
+  console.log('[e2e] study Ideas reuse the original list and study Graph opens its themes hub and independent playback tab');
 
   await page.locator('[data-tour="nav-settings"]').click();
   await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();
