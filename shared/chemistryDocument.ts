@@ -3,12 +3,23 @@ export type NewmanConformation = 'anti' | 'gauche' | 'eclipsed' | 'staggered';
 /** Model-authored intent is deliberately distinct from application-authored evidence. */
 export interface ChemistryIntent {
   version: 2;
-  kind: 'structure' | 'comparison' | 'mechanism';
+  kind: 'structure' | 'comparison' | 'mechanism' | 'reaction';
   depiction: 'skeletal' | 'fischer' | 'haworth' | 'newman';
   rule?: ChemistryRule;
   conformation?: NewmanConformation;
   approach?: 'endo' | 'exo';
-  species: Array<{ id: string; input: { kind: 'name' | 'pubchem-cid' | 'smiles'; value: string } }>;
+  species: Array<{ id: string; input: { kind: 'name' | 'pubchem-cid' | 'smiles'; value: string }; role?: ReactionRole; coefficient?: number }>;
+}
+
+export type ReactionRole = 'reactant' | 'product' | 'agent';
+export interface ReactionSpecies { id: string; smiles: string; role: ReactionRole; coefficient: number }
+export interface ChemistryReactionArtifact {
+  scope: 'balanced-scheme-not-mechanism';
+  svg: string;
+  chemfig: ChemistryChemfigExport;
+  species: ReactionSpecies[];
+  balance: { atoms: Record<string, number>; charge: number };
+  limitations: string[];
 }
 
 export interface ChemistryReference {
@@ -34,6 +45,7 @@ export interface ChemistryDocument {
   engine: { name: 'RDKit'; version: string };
   species: Array<{ id: string; input: ChemistryIntent['species'][number]['input']; references: ChemistryReference[]; graph: ChemistryGraph; svg: string; depiction?: ChemistryIntent['depiction']; chemfig?: ChemistryChemfigExport; projection?: { convention: string; axis: [string, string]; dihedralDegrees: number; molfile3D: string } }>;
   mechanism?: ChemistryMechanismArtifact;
+  reaction?: ChemistryReactionArtifact;
   limitations: string[];
 }
 
@@ -56,5 +68,5 @@ export interface ChemistryMechanismArtifact {
   geometry?: { description: string; molfile3D: string; dihedralDegrees?: number };
   panels?: ChemistryMechanismArtifact[];
 }
-export interface ChemistryValidationRequest { references: string[]; depiction?: ChemistryIntent['depiction']; conformation?: NewmanConformation; exportChemfig?: boolean; mechanism?: { rule: ChemistryRule; inputs: string[]; approach?: 'endo' | 'exo' } }
-export interface ChemistryValidationResult { graph: ChemistryGraph; svg: string; engineVersion: string; chemfig?: ChemistryChemfigExport; mechanism?: ChemistryMechanismArtifact; projection?: ChemistryDocument['species'][number]['projection'] }
+export interface ChemistryValidationRequest { references: string[]; depiction?: ChemistryIntent['depiction']; conformation?: NewmanConformation; exportChemfig?: boolean; mechanism?: { rule: ChemistryRule; inputs: string[]; approach?: 'endo' | 'exo' }; reaction?: ReactionSpecies[] }
+export interface ChemistryValidationResult { graph: ChemistryGraph; svg: string; engineVersion: string; chemfig?: ChemistryChemfigExport; mechanism?: ChemistryMechanismArtifact; reaction?: ChemistryReactionArtifact; projection?: ChemistryDocument['species'][number]['projection'] }

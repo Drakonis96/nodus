@@ -54,6 +54,14 @@ test('hard deadline kills a nonresponsive process exactly once', async () => {
   assert.equal(worker.kills, 1);
 });
 
+test('reaction schemes retain a killable thirty-second budget', async () => {
+  const worker = child(), original = globalThis.setTimeout;
+  let timeout, promise;
+  globalThis.setTimeout = (callback, ms) => { assert.equal(ms, 30000); timeout = callback; return 0; };
+  try { promise = validateChemistryInUtility({ references: ['N'], reaction: [{ id: 'r', smiles: 'N', role: 'reactant', coefficient: 1 }, { id: 'p', smiles: 'N', role: 'product', coefficient: 1 }] }); } finally { globalThis.setTimeout = original; }
+  timeout(); await assert.rejects(promise, /exceeded 30 seconds/); assert.equal(worker.kills, 1);
+});
+
 test('multi-panel rules retain a bounded thirty-second deadline and are killed on expiry', async () => {
   const worker = child(), original = globalThis.setTimeout;
   let timeout, promise;

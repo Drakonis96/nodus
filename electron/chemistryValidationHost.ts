@@ -19,7 +19,7 @@ export function validateChemistryInUtility(request: ChemistryValidationRequest, 
     // Multi-panel rules compile each audited panel and the combined export.
     // Four C6 E2 alternatives can legitimately exceed the single-diagram budget.
     // Keep a hard, killable deadline; cancellation still terminates immediately.
-    const budget = request.mechanism && ['e2', 'aldol', 'diels-alder'].includes(request.mechanism.rule) ? 30_000 : 15_000;
+    const budget = request.reaction || request.mechanism && ['e2', 'aldol', 'diels-alder'].includes(request.mechanism.rule) ? 30_000 : 15_000;
     const timeout = setTimeout(() => finish(new Error(`Chemical validation exceeded ${budget / 1000} seconds.`)), budget);
     signal?.addEventListener('abort', abort, { once: true });
     child.on('message', (message: { error?: string; result?: ChemistryValidationResult }) => {

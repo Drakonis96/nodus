@@ -1,5 +1,9 @@
 // Skill instructions are authored in English; interface controls follow the app language.
 const rows = [
+  ["Esquema balanceado; mecanismo no verificado","Balanced scheme; mechanism not verified","Schéma équilibré ; mécanisme non vérifié","Ausgeglichenes Schema; Mechanismus nicht verifiziert","Esquema equilibrado; mecanismo não verificado","Esquema balanceado; mecanismo não verificado","Schema bilanciato; meccanismo non verificato","Dengelenmiş şema; mekanizma doğrulanmadı"],
+  ["Reactivo","Reactant","Réactif","Edukt","Reagente","Reagente","Reagente","Reaktan"],
+  ["Producto","Product","Produit","Produkt","Produto","Produto","Prodotto","Ürün"],
+  ["Agente; excluido del balance","Agent; excluded from balance","Agent ; exclu du bilan","Agens; nicht bilanziert","Agente; excluído do balanço","Agente; excluído do balanço","Agente; escluso dal bilancio","Ajan; denge hesabına dahil değil"],
   ["Chemistry Studio: documento químico inválido.","Chemistry Studio: invalid chemical document.","Chemistry Studio : document chimique invalide.","Chemistry Studio: ungültiges chemisches Dokument.","Chemistry Studio: documento químico inválido.","Chemistry Studio: documento químico inválido.","Chemistry Studio: documento chimico non valido.","Chemistry Studio: geçersiz kimyasal belge."],
   ["ChemFig no exportado:","ChemFig not exported:","ChemFig non exporté :","ChemFig nicht exportiert:","ChemFig não exportado:","ChemFig não exportado:","ChemFig non esportato:","ChemFig dışa aktarılmadı:"],
   ["No ha superado la validación.","Validation did not pass.","La validation a échoué.","Validierung fehlgeschlagen.","A validação falhou.","A validação falhou.","Validazione non superata.","Doğrulama başarısız."],

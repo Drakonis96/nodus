@@ -74,6 +74,24 @@ test('Chemfig covers perspective bonds, lone pairs and grouped structures', asyn
   await assert.rejects(chemistry.compileChemfig(String.raw`\input{/etc/passwd}`), /Unsupported TeX command/);
 });
 
+test('amsmath arrow annotations and four simultaneous compilations remain stable', async () => {
+  const sources = [
+    String.raw`\schemestart\chemfig{CH_3-OH}\arrow{->[$\text{conc.}$][$\text{heat}$]}\chemfig{CH_2=O}\schemestop`,
+    String.raw`\chemfig{N^{+}(-O^{-})(=O)-O^{-}}`,
+    String.raw`\chemfig{CH_3-O-P(=O)(-O^{-})-O^{-}}`,
+    String.raw`\chemfig{CH_2=CH-CH_2^{+}}`,
+  ];
+  const results = await Promise.all(sources.map(source => chemistry.compileChemfig(source)));
+  results.forEach(svg => assert.match(svg, /^<svg\b/));
+  assert.match(results[0], /conc/);
+  assert.match(results[0], /heat/);
+  assert.equal((results[1].match(/>−<\/text>/g) ?? []).length, 2);
+  assert.equal((results[1].match(/>\+<\/text>/g) ?? []).length, 1);
+  await assert.rejects(chemistry.compileChemfig(String.raw`\input{bad}`), /Unsupported/);
+  await assert.rejects(chemistry.compileChemfig(String.raw`\chemfig{C}\notARealChemistryCommand`));
+  assert.match(await chemistry.compileChemfig(String.raw`\chemfig{CH_3-NH_2}`), /^<svg\b/);
+});
+
 test('nested reaction schemes retain visible bond strokes', async () => {
   const svg = await chemistry.compileChemfig(String.raw`\schemestart\chemname{\chemfig{CH_3-CH_2-OH}}{ethanol}\schemestop`);
   const bonds = [...svg.matchAll(/<path\b[^>]*fill="none"[^>]*>/g)];

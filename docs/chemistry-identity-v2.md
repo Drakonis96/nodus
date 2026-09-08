@@ -1,6 +1,6 @@
 # Chemistry Studio v2: identity-first foundation
 
-This is a safety-oriented implementation, **not completion of the near-infallibility plan**. The verified path supports skeletal structures/comparisons, bounded Fischer/Haworth projections, conditional SN2 and N,N-dimethylamide resonance. See [projection/mechanism validation](chemistry-projections-mechanisms.md) for precise scope. It deliberately abstains on unsupported depictions rather than falling back to model-authored ChemFig.
+This is a safety-oriented implementation, **not completion of the near-infallibility plan**. The verified path supports skeletal structures/comparisons, bounded projections and mechanism rules. See [projection/mechanism validation](chemistry-projections-mechanisms.md) and [balanced reaction schemes](chemistry-balanced-schemes.md) for current scope; the run history below describes the original v2 rollout. It deliberately abstains on unsupported depictions rather than falling back to model-authored ChemFig.
 
 ## Implemented
 
