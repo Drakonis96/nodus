@@ -36,6 +36,25 @@ try {
  await page.reload();await page.locator('[data-tour="nav-graph"]').click();
  const active=()=>page.locator('.stellar-tab-panel [data-testid="stellar-workspace"]');
  const hub=()=>page.locator('.stellar-tab-panel [data-testid="stellar-themes"]');
+ const captureThemes=process.env.NODUS_STELLAR_THEME_CAPTURE==='1';
+ const reviewDir=root+'/output/stellar-theme-review';
+ if(captureThemes)fs.mkdirSync(reviewDir,{recursive:true});
+ const captureAppearance=async name=>{
+  if(!captureThemes)return;
+  const original=await page.evaluate(()=>document.documentElement.classList.contains('light')?'light':'dark');
+  for(const mode of ['light','dark']){
+   await page.evaluate(mode=>{document.documentElement.classList.remove('light','dark');document.documentElement.classList.add(mode);},mode);
+   await page.mouse.move(10,10);await page.waitForTimeout(180);
+   const colors=await page.locator('.stellar-tab-panel .stellar-workspace:visible').evaluate(el=>({
+    graph:getComputedStyle(el).backgroundColor,body:getComputedStyle(document.body).backgroundColor,
+    node:el.querySelector('.stellar-node-label')?getComputedStyle(el.querySelector('.stellar-node-label')).color:null,
+   }));
+   assert.equal(colors.graph,colors.body,'graph uses the same background as the app');
+   if(colors.node)assert.equal(colors.node,mode==='light'?'rgb(38, 40, 62)':'rgb(230, 234, 248)','node caption colors stay unchanged');
+   await page.screenshot({path:reviewDir+'/'+name+'-'+mode+'.png'});
+  }
+  await page.evaluate(mode=>{document.documentElement.classList.remove('light','dark');document.documentElement.classList.add(mode);},original);
+ };
  const count=async field=>Number(await active().getAttribute(`data-${field}-count`));
  const waitEdges=n=>page.waitForFunction(n=>document.querySelector('.stellar-tab-panel [data-testid="stellar-workspace"]')?.getAttribute('data-edge-count')===String(n),n);
  const centered=async button=>{
@@ -66,6 +85,7 @@ try {
   await slider.fill('35');
   assert.deepEqual(await container.locator('.stellar-hit').evaluateAll(nodes=>nodes.map(n=>[n.dataset.node,n.getAttribute('style')])),before,'intensity does not move working nodes');
   await page.screenshot({path:root+'/output/stellar-tabs/context-'+name+'.png'});
+  if(name==='exploration')await captureAppearance('contexto');
   await control.click();
   assert.equal(Number(await canvas.getAttribute('data-context-nodes')),0);
   assert.deepEqual(await container.locator('.stellar-hit').evaluateAll(nodes=>nodes.map(n=>[n.dataset.node,n.getAttribute('style')])),before,'turning off restores the unchanged foreground');
@@ -83,6 +103,7 @@ try {
  const uniqueIdeas=await page.evaluate(async()=> (await window.nodus.listIdeasPage({limit:1,offset:0,sort:'label'})).total);
  assert.ok(bubbles.reduce((sum,theme)=>sum+theme.ideas,0)>uniqueIdeas,'fixture includes ideas that belong to multiple themes');
  assert.ok((await hub().locator('.stellar-meta').innerText()).includes(`${uniqueIdeas.toLocaleString()} ideas únicas en el corpus`),'hub counts unique ideas instead of summing overlapping theme memberships');
+ await captureAppearance('temas');
  await verifyContext(hub(),'hub');
  const dots=await page.locator('[data-testid="stellar-themes"] .stellar-hit').count();
  assert.equal(dots,bubbles.length,'every theme is drawn as a graph node');
@@ -116,6 +137,7 @@ try {
  await page.waitForTimeout(400);
  assert.ok(await count('node')<=bubbles[0].ideas,'stepping back in narrows the walk again');
  await page.screenshot({path:root+'/output/stellar-tabs/theme.png'});
+ await captureAppearance('tema-abierto');
  await page.getByRole('button',{name:'Volver a los temas'}).click();
  await hub().waitFor();
  assert.equal(await page.getByRole('tab').first().innerText(),'Temas','going back restores the hub');
@@ -145,6 +167,7 @@ try {
  await page.getByRole('button',{name:'Nuevo grafo',exact:true}).click();
  assert.equal(await page.getByRole('tab').count(),2);
  assert.equal(await active().getAttribute('data-node-count'),'0','a new tab is a blank canvas');
+ await captureAppearance('pestana-vacia');
  await verifyContext(active(),'blank');
  await active().getByRole('switch',{name:'Contexto',exact:true}).click();
  const backgroundIdea=active().locator('.stellar-context-label').first();
@@ -164,6 +187,7 @@ try {
  await page.locator('.stellar-tab-panel .stellar-search-choice').first().click();await waitEdges(2);
  assert.ok(await count('node')>=2,'choosing a seed loads its links without Play');
  await page.waitForTimeout(750);
+ await captureAppearance('exploracion');
  await verifyContext(active(),'exploration');
  const firstCount=await count('node');
  await search(seed.label);
@@ -235,6 +259,18 @@ try {
  await active().locator('.stellar-step').waitFor();
  await page.waitForTimeout(650);
  assert.equal(await active().locator('.stellar-player').evaluate(el=>el.getBoundingClientRect().height),unselectedHeight,'an inferred or explicit relation keeps transport height stable');
+ await captureAppearance('conexion-seleccionada');
+ if(captureThemes){
+  const {build}=await import('esbuild');
+  const compiled=await build({entryPoints:[root+'/shared/vaultColors.ts'],bundle:true,platform:'node',format:'esm',write:false});
+  const {VAULT_TYPE_COLORS}=await import('data:text/javascript;base64,'+Buffer.from(compiled.outputFiles[0].text).toString('base64'));
+  const original=await page.locator('[data-testid="app-shell"]').evaluate(el=>el.style.getPropertyValue('--vault-accent'));
+  for(const [vault,color] of Object.entries(VAULT_TYPE_COLORS)){
+   await page.locator('[data-testid="app-shell"]').evaluate((el,color)=>el.style.setProperty('--vault-accent',color),color);
+   await captureAppearance('acento-'+vault);
+  }
+  await page.locator('[data-testid="app-shell"]').evaluate((el,color)=>el.style.setProperty('--vault-accent',color),original);
+ }
  const clearOfControls=await active().evaluate(el=>{
   const player=el.querySelector('.stellar-player'),top=player.getBoundingClientRect().top;
   return [...el.querySelectorAll('.stellar-node-label')].every(label=>label.getBoundingClientRect().bottom<=top);
