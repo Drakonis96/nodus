@@ -121,7 +121,7 @@ test('the tutorial gallery lives in the wiki and is generated from the file the 
   assert.match(script, /id: 'videos'/, 'the wiki exposes a Video tutorials page');
   assert.doesNotMatch(read('assets/js/home.js'), /tutorials\.json/, 'the home page no longer carries the gallery');
   const tutorials = JSON.parse(read('tutorials.json'));
-  const titled = [...script.matchAll(/^\s{2}([a-z]+): \[/gm)].map((match) => match[1]);
+  const titled = [...script.matchAll(/^\s{2}(?:'([a-z-]+)'|([a-z]+)): \[/gm)].map((match) => match[1] ?? match[2]);
   for (const video of tutorials.videos) {
     assert.ok(titled.includes(video.id), `the wiki gives the ${video.id} tutorial an English title`);
     assert.match(video.youtubeId, /^[\w-]{11}$/, `${video.id} has a valid YouTube id`);

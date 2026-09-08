@@ -56,7 +56,7 @@ try {
   await page.evaluate(() => window.nodus.updateSettings({ onboardingComplete: true, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true, basicsTutorialVersion: 5, firstVaultVersion: 5, uiLanguage: 'en', promptLanguage: 'en', reduceMotion: true, theme: 'dark' }));
   await page.evaluate(() => {
     localStorage.setItem('nodus.lastSeenVersion', '5.2.1');
-    for (const key of ['nodus.mobileTeaserSeen.3.2.4', 'nodus.platformHighlightsSeen.2026-07', 'nodus.toolkitBetaGuideSeen.2.4.0', 'nodus.tutorialVideosAnnouncementSeen.2026-07']) localStorage.setItem(key, '1');
+    for (const key of ['nodus.mobileTeaserSeen.3.2.4', 'nodus.platformHighlightsSeen.2026-07', 'nodus.toolkitBetaGuideSeen.2.4.0', 'nodus.tutorialVideosAnnouncementSeen.2026-07', 'nodus.pdfPresenterTutorialSeen.e2js_u-05OA']) localStorage.setItem(key, '1');
   });
   await page.reload();
   await page.getByTestId('app-shell').waitFor();

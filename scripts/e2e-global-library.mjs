@@ -111,6 +111,7 @@ try {
     localStorage.setItem('nodus.mobileTeaserSeen.3.2.4', '1');
     localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
     localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
+    localStorage.setItem('nodus.pdfPresenterTutorialSeen.e2js_u-05OA', '1');
     localStorage.setItem('nodus.toolkitBetaGuideSeen.2.4.0', '1');
     await window.nodus.updateSettings({
       onboardingComplete: true, basicsTutorialVersion: 999, recoverySetupVersion: 999,
