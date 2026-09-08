@@ -166,7 +166,7 @@ try {
       localStorage.setItem("nodus.lastSeenVersion", appVersion);
       localStorage.setItem(`nodus.mobileTeaserSeen.${appVersion}`, "1");
       localStorage.setItem("nodus.platformHighlightsSeen.2026-07", "1");
-      localStorage.setItem("nodus.tutorialVideosAnnouncementSeen.2026-07", "1");
+      localStorage.setItem("nodus.tutorialVideosAnnouncementSeen.2026-07", "1"); localStorage.setItem('nodus.pdfPresenterTutorialSeen.e2js_u-05OA', '1');
       localStorage.setItem("nodus.navCollapsed", "0");
       localStorage.setItem("nodus.sidebarWidth", "220");
       sessionStorage.setItem("nodus.startupUpdateChecked", "1");

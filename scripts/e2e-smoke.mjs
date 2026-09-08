@@ -173,6 +173,7 @@ try {
   // across the reloads below (same origin).
   await page.evaluate((version) => {
     localStorage.setItem('nodus.lastSeenVersion', version);
+    localStorage.setItem('nodus.pdfPresenterTutorialSeen.e2js_u-05OA', '1');
     // The mobile teaser sits between release notes and everything behind it.
     localStorage.setItem(`nodus.mobileTeaserSeen.${version}`, '1');
   }, appVersion);
@@ -376,6 +377,7 @@ try {
   // seen key exercised here never touches the developer's real Nodus profile.
   await page.evaluate(async (version) => {
     localStorage.removeItem('nodus.lastSeenVersion');
+    localStorage.removeItem('nodus.pdfPresenterTutorialSeen.e2js_u-05OA');
     localStorage.removeItem('nodus.platformHighlightsSeen.2026-07');
     // Walking the tutorial above marked the videos announcement seen, exactly as it
     // does for a real first run. Clear it here so the announcement this existing user
@@ -420,6 +422,13 @@ try {
   }, releaseOriginalWindow);
   await page.evaluate((className) => { document.documentElement.className = className; }, releaseOriginalClasses);
   await whatsNewForExistingUser.getByRole('button', { name: 'Explorar las novedades', exact: true }).click();
+
+  const pdfPresenterAnnouncement = page.getByTestId('pdf-presenter-tutorial-announcement');
+  await pdfPresenterAnnouncement.waitFor();
+  assert.match(await pdfPresenterAnnouncement.locator('iframe').getAttribute('src'), /e2js_u-05OA/);
+  await pdfPresenterAnnouncement.getByRole('button', { name: 'Cerrar', exact: true }).click();
+  await pdfPresenterAnnouncement.waitFor({ state: 'detached' });
+  assert.equal(await page.evaluate(() => localStorage.getItem('nodus.pdfPresenterTutorialSeen.e2js_u-05OA')), '1');
 
   // First behind release notes sat the look at the mobile app, and it was a 3.2.4
   // one-off: it presents only on the version it names, and its seen-key carries that
