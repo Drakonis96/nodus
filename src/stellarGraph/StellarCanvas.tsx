@@ -446,6 +446,10 @@ export function StellarCanvas(props: Props) {
   }
   const occupied: { x: number; y: number }[] = [];
   const visibleLabels = labels.filter(({n,labelX,labelY}) => {
+    // Manual panning can put an endpoint behind the controls even with follow paused.
+    // Hide captions outside the readable area instead of letting them cover the toolbar.
+    const height = featured.has(n.id) ? 87 : 52;
+    if (labelY < 0 || labelY + height > captionBottom) return false;
     if (props.labelPolicy === "all") return true;
     if (props.camera.zoom < .12 && !closeNodes.has(n.id)) return false;
     if (!featured.has(n.id) && occupied.some(p => Math.abs(p.x-labelX)<245 && Math.abs(p.y-labelY)<100)) return false;

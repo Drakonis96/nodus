@@ -93,6 +93,9 @@
     radial-gradient(ellipse at 75% 75%, #173b4a30, transparent 50%);
 }
 .stellar-canvas {
+  /* Node captions stay inside the canvas stacking context, below every control. */
+  z-index: 0;
+  isolation: isolate;
   position: absolute;
   inset: 0;
   touch-action: none;
@@ -216,6 +219,7 @@
 .stellar-search-popover p { font-size: 11px; color: var(--stellar-muted); padding: 12px 8px; }
 .stellar-search .stellar-search-more { width: 100%; margin-top: 7px; background: transparent; }
 .stellar-player {
+  z-index: 3;
   position: absolute;
   bottom: 24px;
   left: 50%;
@@ -227,7 +231,7 @@
   border-radius: 14px;
   box-shadow: 0 15px 50px #0004;
   backdrop-filter: blur(24px);
-  padding: 12px 14px;
+  padding: 8px 12px;
 }
 .stellar-player-line {
   display: flex;
@@ -495,7 +499,8 @@
 .stellar-player .stellar-step-relation { border: 0; background: transparent; padding: 3px 5px; font-size: 10px; max-width: 110px; }
 .stellar-step-relation span { display: block; }
 .stellar-step-relation span:last-child { font-size: 24px; line-height: 1; }
-.stellar-stage:has(.stellar-player) .stellar-legend { bottom: 210px; }
+.stellar-stage:has(.stellar-player) .stellar-legend { bottom: 140px; }
+.stellar-theme-view .stellar-stage:has(.stellar-player) .stellar-legend { bottom: 86px; }
 @media (max-width: 800px) {
   .stellar-step-ideas { gap: 5px; }
   .stellar-player .stellar-step-node { font-size: 10px; }
@@ -571,21 +576,24 @@
 .stellar-hub-panel { height: 100%; min-height: 0; }
 
 /* Selection has a reserved area: text length and evidence never resize the transport. */
-.stellar-player-selection { height: 92px; margin-top: 9px; border-top: 1px solid var(--stellar-line); overflow: hidden; }
-.stellar-player-line { height: 40px; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
+.stellar-player-selection { height: 44px; margin-top: 6px; border-top: 1px solid var(--stellar-line); overflow: hidden; }
+.stellar-player-line { height: 34px; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
 .stellar-player-line > * { flex-shrink: 0; }
 .stellar-player-line::-webkit-scrollbar { display: none; }
 .stellar-player-line > :first-child { margin-left: auto; }
 .stellar-player-line > :last-child { margin-right: auto; }
 .stellar-player-selection > .stellar-node-actions,
 .stellar-player-selection > p,
-.stellar-player-selection > .stellar-step { height: 100%; margin: 0; border: 0; padding-top: 8px; }
+.stellar-player-selection > .stellar-step { height: 100%; margin: 0; border: 0; padding-top: 3px; }
 .stellar-player-selection > p { display: flex; align-items: center; padding-top: 0; }
 .stellar-player-selection .stellar-step { display: flex; flex-direction: column; }
 .stellar-step-ideas { order: 0; flex: 1; min-height: 0; margin-top: 0; }
-.stellar-step-meta { order: 1; justify-content: center; height: 24px; flex-shrink: 0; overflow: hidden; white-space: nowrap; }
+.stellar-step-meta { order: 1; justify-content: center; height: 18px; flex-shrink: 0; overflow: hidden; white-space: nowrap; }
 .stellar-step-meta button { margin-left: 0; flex-shrink: 0; }
-.stellar-player .stellar-step-node { -webkit-line-clamp: 2; max-height: 3.45em; overflow-wrap: anywhere; }
+.stellar-player .stellar-step-node { display: block; white-space: nowrap; text-overflow: ellipsis; padding: 0; }
+.stellar-player .stellar-step-relation { display: flex; align-items: center; gap: 4px; padding: 0 4px; }
+.stellar-step-relation span:last-child { font-size: 15px; }
+.stellar-player .stellar-step-meta button { padding: 0 5px; line-height: 16px; }
 .light .stellar-search-result.included .stellar-search-choice strong, .light .stellar-search-result.included .stellar-search-toggle { color: color-mix(in srgb, var(--stellar-accent) 76%, #1b1630); }
 @media (max-width: 800px) { .stellar-tabs-header { padding: 7px 9px 0; } .stellar-tab [role="tab"] span { max-width: 130px; } .stellar-fullscreen { font-size: 9px; padding: 6px; } }
 
@@ -601,8 +609,8 @@
   border: 1px solid var(--stellar-line); border-radius: 9px; padding: 8px 12px;
   background: var(--stellar-panel); font-size: 11px;
 }
-/* Two relation budgets fit on a single transport line: wider bar, tighter spacing. */
-.stellar-theme-view .stellar-player { width: 940px; padding: 9px 12px; }
+/* Theme navigation only needs the visible-relation budget and neighbourhood depth. */
+.stellar-theme-view .stellar-player { width: max-content; padding: 8px 12px; }
 .stellar-theme-view .stellar-player-line { gap: 5px; }
 .stellar-theme-view .stellar-player label { gap: 5px; }
 .stellar-theme-view .stellar-player button { padding: 7px 9px; }

@@ -808,7 +808,7 @@ function StellarGraphTab({
             >
               {t("Encuadrar")}
             </button>
-            <button
+            {!themeId && <button
               disabled={!engine?.activeSeed}
               onClick={() => {
                 manualCamera();
@@ -816,7 +816,7 @@ function StellarGraphTab({
               }}
             >
               {t("Semilla")}
-            </button>
+            </button>}
             <button
               disabled={busy || loading || !data.nodes.length}
               title={t("Reorganizar las posiciones del canvas")}
@@ -829,10 +829,11 @@ function StellarGraphTab({
                 setPositions({});
               }}
             >{t("Reorganizar")}</button>
-            <button disabled={loading || (!data.nodes.length && !busy)} onClick={clearCanvas} title={t("Quitar todas las ideas y conexiones del lienzo")}>{t("Limpiar")}</button>
+            {!themeId && <button disabled={loading || (!data.nodes.length && !busy)} onClick={clearCanvas} title={t("Quitar todas las ideas y conexiones del lienzo")}>{t("Limpiar")}</button>}
           </div>
           <div className="stellar-player">
             <div className="stellar-player-line">
+              {!themeId && <>
               <button
                 disabled={!engine?.cursor || busy}
                 onClick={() => {
@@ -875,6 +876,7 @@ function StellarGraphTab({
                 {t("Siguiente")} →
               </button>
               <span className="stellar-divider" />
+              </>}
               {themeId && <label className="stellar-child-limit">
                 {t("Visibles por idea")}
                 <input
@@ -911,7 +913,7 @@ function StellarGraphTab({
                   <option value={0}>{t("Todo")}</option>
                 </select>
               </label>}
-              {themeId && <span className="stellar-divider" />}
+              {!themeId && <>
               <label>
                 {t("Relaciones por idea")}
                 <input
@@ -948,8 +950,9 @@ function StellarGraphTab({
                 <option value={1}>1×</option>
                 <option value={2}>2×</option>
               </select>
+              </>}
             </div>
-            <div className="stellar-player-selection">
+            {!themeId && <div className="stellar-player-selection">
             {selected && !step ? (
               <div className="stellar-node-actions" aria-label={t("Acciones de la idea seleccionada")}>
                 <span className="stellar-selected-name" title={engine?.nodes.get(selected)?.label}>
@@ -990,7 +993,7 @@ function StellarGraphTab({
                 : message || t("Elige una idea para empezar a investigar.")}
               <span>{engine?.cursor || 0} / {engine?.history.length || 0}</span>
             </p>}
-            </div>
+            </div>}
           </div>
           <details className="stellar-legend">
             <summary>{t("Relaciones y evidencia")}</summary>

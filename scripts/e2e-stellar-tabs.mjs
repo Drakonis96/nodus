@@ -56,6 +56,11 @@ try {
  await page.waitForFunction(()=>Number(document.querySelector('.stellar-tab-panel [data-testid="stellar-workspace"]')?.getAttribute('data-node-count'))>0);
  assert.equal(await page.getByRole('tab').first().innerText(),bubbles[0].label,'the tab follows you into the theme');
  const walked=await count('node');
+ const themePlayer=active().locator('.stellar-player');
+ assert.ok(await themePlayer.evaluate(el=>el.getBoundingClientRect().height)<=56,'theme controls fit in one compact row');
+ assert.equal(await themePlayer.locator('.stellar-play,.stellar-player-selection').count(),0,'themes have no playback or empty selection footer');
+ assert.equal(await active().getByRole('spinbutton',{name:'Límite de relaciones'}).count(),0,'themes show only their visible connection budget');
+ assert.equal(await active().getByRole('combobox',{name:'Velocidad'}).count(),0,'playback speed is exclusive to exploration tabs');
  assert.ok(walked>0&&walked<=bubbles[0].ideas,'a theme opens on a neighbourhood, never on every idea at once');
  const walkedEdges=await count('edge');
  await active().getByRole('spinbutton',{name:'Relaciones visibles por idea'}).fill('1');
@@ -125,6 +130,7 @@ try {
  assert.ok(await count('edge')>=2);
  const preserved=await count('node');
  const playerHeight=await active().locator('.stellar-player').evaluate(el=>el.getBoundingClientRect().height);
+ assert.ok(playerHeight<=108,'exploration transport stays compact even before selecting an idea');
  await page.locator('.stellar-tab-panel .stellar-node-label').first().press('Enter');
  await page.locator('.stellar-tab-panel .graph-detail-panel h3').waitFor();
  assert.equal(await active().locator('.stellar-player').evaluate(el=>el.getBoundingClientRect().height),playerHeight,'selecting an idea keeps transport height stable');
@@ -176,7 +182,25 @@ try {
  const unselectedHeight=await active().locator('.stellar-player').evaluate(el=>el.getBoundingClientRect().height);
  await active().getByRole('button',{name:'Siguiente',exact:false}).click();
  await active().locator('.stellar-step').waitFor();
+ await page.waitForTimeout(650);
  assert.equal(await active().locator('.stellar-player').evaluate(el=>el.getBoundingClientRect().height),unselectedHeight,'an inferred or explicit relation keeps transport height stable');
+ const clearOfControls=await active().evaluate(el=>{
+  const player=el.querySelector('.stellar-player'),top=player.getBoundingClientRect().top;
+  return [...el.querySelectorAll('.stellar-node-label')].every(label=>label.getBoundingClientRect().bottom<=top);
+ });
+ assert.ok(clearOfControls,'endpoint cards fit above the compact controls');
+ const layered=await active().evaluate(el=>{
+  const label=el.querySelector('.stellar-node-label.featured');
+  if(!label)return false;
+  const original=label.getAttribute('style');
+  const player=el.querySelector('.stellar-player').getBoundingClientRect(),canvas=el.querySelector('.stellar-canvas').getBoundingClientRect();
+  const x=player.x+player.width/2,y=player.y+10;
+  label.style.left=`${x-canvas.x}px`;label.style.top=`${y-canvas.y-5}px`;
+  const result=!!document.elementFromPoint(x,y)?.closest('.stellar-player');
+  label.setAttribute('style',original);return result;
+ });
+ assert.ok(layered,'a card dragged underneath the transport cannot paint over or intercept it');
+ await page.screenshot({path:root+'/output/stellar-tabs/compact-connection.png'});
  const stage=active().locator('.stellar-canvas');
  await stage.dblclick({position:{x:20,y:90}});
  assert.equal(await active().locator('.stellar-step,.stellar-node-actions,.stellar-hit.selected,.stellar-node-label.featured').count(),0,'double-clicking the background clears node and edge selection');

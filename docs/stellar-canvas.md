@@ -20,7 +20,7 @@ Use **+** in the tab strip to create another empty graph. The first tab cannot b
 
 Each playback step frames both endpoints above the controls, using a 550 ms camera transition. The current relationship, direction, and endpoint labels stand out against the dimmed context. Play advances immediately and leaves 3.5 seconds between steps at normal speed. Reduced-motion preferences disable the camera animation.
 
-The transport reserves a fixed-height selection area, with relationship provenance centered at the bottom. Long node names remain within their captions. Clicking the background, including a double click, clears the idea or relationship selection, closes its detail, and pauses playback.
+Theme views have a single compact row for visible connections per idea and neighbourhood depth. Playback, speed, seed and clear controls belong only to exploration tabs. Their transport keeps a compact, fixed-height selection strip, with relationship provenance centered at the bottom. Long node names remain within their captions, and canvas cards stay below the controls even during manual panning. Clicking the background, including a double click, clears the idea or relationship selection, closes its detail, and pauses playback.
 
 Dragging, zooming, Fit all, and Seed pause playback for manual exploration. Play, Previous, and Next automatically resume framing; no follow checkbox is required. Previous at the beginning centers the starting idea. View connection recenters the current relationship without advancing.
 
