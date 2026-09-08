@@ -981,7 +981,10 @@ function StellarGraphTab({
                   <button className="stellar-step-node" title={engine?.nodes.get(step.source)?.statement || engine?.nodes.get(step.source)?.label}
                     data-step-node={step.source} onClick={() => openNode(step.source)}>{engine?.nodes.get(step.source)?.label}</button>
                   <button className="stellar-step-relation" style={{ color: relation(step.type).color }} onClick={() => openEdge(step.id)}>
-                    <span>{t(relation(step.type).label)}</span><span aria-hidden="true">⟶</span>
+                    <span>{t(relation(step.type).label)}</span>
+                    <svg width="28" height="8" viewBox="0 0 28 8" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true">
+                      <path d="M1 4h26m-3-3 3 3-3 3" />
+                    </svg>
                   </button>
                   <button className="stellar-step-node" title={engine?.nodes.get(step.target)?.statement || engine?.nodes.get(step.target)?.label}
                     data-step-node={step.target} onClick={() => openNode(step.target)}>{engine?.nodes.get(step.target)?.label}</button>

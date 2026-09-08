@@ -8,6 +8,8 @@ The idea graph uses one WebGL2 infinite canvas across the corpus, work view, Stu
 
 The corpus graph opens on a permanent **Themes** tab when its source provides themes. Search for ideas here and use **+** beside each result to add them immediately alongside the themes; **−** removes them from the hub. The picker stays open for successive additions. Opening a pinned idea creates its own exploration tab, while opening a theme stays in the first tab with a route back to the hub. Pinned ideas survive theme visits and section navigation during the current window session.
 
+The hub counter reports unique ideas across the eligible corpus. Each theme counts its own distinct members; those counts overlap and must not be added to obtain the corpus total. The relationship label in the exploration strip shares the strip's horizontal center with the small arrow beneath it.
+
 In an exploration tab, search for an idea and choose it to load its direct incoming and outgoing relationships immediately, up to **Relations per idea** (25 by default). **Unlimited** loads the entire direct neighborhood, including hubs larger than one page. Sources without themes start with an empty graph. Work and Study graphs respect their source scope.
 
 Use **+** beside a search result to add another idea and its direct connections. Every visible idea shows **−**, which removes only that idea and its incident connections; other ideas remain, including isolated ones. Removed ideas stay excluded from subsequent exploration until explicitly added again. **Clear**, beside **Reorganize**, empties the active canvas and cancels pending exploration. These actions never delete library records.

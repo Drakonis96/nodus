@@ -34,6 +34,7 @@ export function ThemesOverview({
   active: boolean;
 }) {
   const [themes, setThemes] = useState<StellarTheme[] | null>(null);
+  const [ideaCount, setIdeaCount] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [positions, setPositions] = useState<Record<string, StellarPosition>>({});
@@ -69,9 +70,14 @@ export function ThemesOverview({
     let live = true;
     setError("");
     setThemes(null);
-    void source
-      .themes?.()
-      .then((list) => live && setThemes(list))
+    setIdeaCount(null);
+    // Theme memberships overlap. The unfiltered search total counts each corpus idea once.
+    void Promise.all([source.themes!(), source.page({ kind: "search", limit: 1 })])
+      .then(([list, page]) => {
+        if (!live) return;
+        setThemes(list);
+        setIdeaCount(page.total);
+      })
       .catch((err) => live && (setError(errorText(err)), setThemes([])));
     return () => {
       live = false;
@@ -84,7 +90,6 @@ export function ThemesOverview({
     () => (needle ? sorted.filter((theme) => themeName(theme).toLocaleLowerCase().includes(needle)) : sorted),
     [sorted, needle],
   );
-  const ideas = sorted.reduce((total, theme) => total + theme.ideaCount, 0);
 
   // A theme is a node like any other: the canvas draws it, we only say what it is.
   const data = useMemo<GraphData>(
@@ -209,7 +214,8 @@ export function ThemesOverview({
             <span className="stellar-live-dot" />
             {themes === null
               ? t("Reuniendo los temas…")
-              : `${sorted.length.toLocaleString()} ${t(sorted.length === 1 ? "tema" : "temas")} · ${ideas.toLocaleString()} ${t("ideas")}`}
+              : `${sorted.length.toLocaleString()} ${t(sorted.length === 1 ? "tema" : "temas")}`}
+            {ideaCount !== null && ` · ${tx("{n} ideas únicas en el corpus", { n: ideaCount.toLocaleString() })}`}
           </div>
           <div className="stellar-navigation">
             <button title={t("Alejar")} onClick={() => api.current?.zoom(1 / 1.55)}>

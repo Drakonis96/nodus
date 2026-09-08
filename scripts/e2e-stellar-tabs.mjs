@@ -2,6 +2,7 @@
 import { _electron as electron } from 'playwright-core';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 const require=createRequire(import.meta.url),root=process.cwd(),profile=fs.mkdtempSync('/tmp/nodus-stellar-tabs-');
 const env={...process.env,NODUS_USERDATA:profile,NODUS_STELLAR_PREVIEW:'1',NODUS_DISABLE_AUTO_UPDATE:'1',NODUS_DISABLE_ANNOUNCEMENTS:'1',NODUS_QA_ROOT:profile,NODUS_QA_DATABASE_AUDIT_LOG:profile+'/database-audit.jsonl'};
@@ -20,6 +21,18 @@ try {
   const state=await window.nodus.getStellarSession('academic:corpus');
   await window.nodus.saveStellarSession(state.vaultId,'academic:corpus',{version:1,seeds:['demo-i1'],history:[],cursor:0,activeSeed:'demo-i1',positions:{},camera:{x:0,y:0,zoom:1},limit:3,speed:1});
  });
+ // Give one demo idea a second theme so the hub must deduplicate memberships.
+ execFileSync(require('electron'),['-e',`
+  const fs=require('node:fs'),path=require('node:path');
+  const profile=process.argv[2];
+  const registry=JSON.parse(fs.readFileSync(path.join(profile,'vaults.json'),'utf8'));
+  const target=registry.vaults.find(v=>v.id===registry.activeVaultId).path;
+  if(!target.startsWith(profile+path.sep))throw new Error('Fixture database is outside the demo profile');
+  const Database=require(process.argv[1]),db=new Database(target);
+  try {
+   db.prepare("INSERT INTO idea_theme_links(nodus_id,global_id,theme_id,confidence,basis) SELECT io.nodus_id,io.global_id,t.theme_id,1,'explicit' FROM idea_occurrences io CROSS JOIN themes t WHERE NOT EXISTS(SELECT 1 FROM idea_theme_links l WHERE l.nodus_id=io.nodus_id AND l.global_id=io.global_id AND l.theme_id=t.theme_id) LIMIT 1").run();
+  } finally {db.close();}
+ `,require.resolve('better-sqlite3'),profile],{env:{...process.env,ELECTRON_RUN_AS_NODE:'1'}});
  await page.reload();await page.locator('[data-tour="nav-graph"]').click();
  const active=()=>page.locator('.stellar-tab-panel [data-testid="stellar-workspace"]');
  const hub=()=>page.locator('.stellar-tab-panel [data-testid="stellar-themes"]');
@@ -47,6 +60,9 @@ try {
  assert.ok(bubbles.length>1,'the demo corpus has several themes');
  assert.equal(new Set(bubbles.map(b=>b.size)).size,1,'every theme is the same node, whatever it holds');
  assert.ok(bubbles.every(b=>b.ideas>0),'each theme node says how many ideas it holds');
+ const uniqueIdeas=await page.evaluate(async()=> (await window.nodus.listIdeasPage({limit:1,offset:0,sort:'label'})).total);
+ assert.ok(bubbles.reduce((sum,theme)=>sum+theme.ideas,0)>uniqueIdeas,'fixture includes ideas that belong to multiple themes');
+ assert.ok((await hub().locator('.stellar-meta').innerText()).includes(`${uniqueIdeas.toLocaleString()} ideas únicas en el corpus`),'hub counts unique ideas instead of summing overlapping theme memberships');
  const dots=await page.locator('[data-testid="stellar-themes"] .stellar-hit').count();
  assert.equal(dots,bubbles.length,'every theme is drawn as a graph node');
  const busiest=bubbles.reduce((best,b)=>b.ideas>best.ideas?b:best,bubbles[0]);
@@ -200,6 +216,17 @@ try {
   label.setAttribute('style',original);return result;
  });
  assert.ok(layered,'a card dragged underneath the transport cannot paint over or intercept it');
+ const balanced=await active().locator('.stellar-step-relation').evaluate(button=>{
+  const label=button.querySelector('span'),original=label.textContent;
+  const row=button.closest('.stellar-step-ideas').getBoundingClientRect(),center=row.x+row.width/2;
+  const results=['Apoya','Refuta','Aplica','Comparte método','Es condición de','Mide lo mismo','Es variante de','Contiene','Causa','Depende de','Forma parte de','Contrasta','Se relaciona'].map(text=>{
+   label.textContent=text;
+   const box=button.getBoundingClientRect(),word=label.getBoundingClientRect(),arrow=button.querySelector('svg').getBoundingClientRect();
+   return Math.abs(box.x+box.width/2-center)<.1&&Math.abs(word.x+word.width/2-center)<.1&&Math.abs(arrow.x+arrow.width/2-center)<.1&&arrow.top>=word.bottom;
+  });
+  label.textContent=original;return results.every(Boolean);
+ });
+ assert.ok(balanced,'every relation and its arrow share the exact horizontal centre of the strip');
  await page.screenshot({path:root+'/output/stellar-tabs/compact-connection.png'});
  const stage=active().locator('.stellar-canvas');
  await stage.dblclick({position:{x:20,y:90}});

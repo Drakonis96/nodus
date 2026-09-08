@@ -1,5 +1,6 @@
 export const STELLAR_GRAPH_TRANSLATIONS = {
   "en": {
+    "{n} ideas únicas en el corpus": "{n} unique ideas in the corpus",
     "{n} ideas en este tema": "{n} ideas in this theme",
     "Tema": "Theme",
     "{n} de {total} ideas del tema · {edges} relaciones": "{n} of {total} ideas in the theme · {edges} relationships",
@@ -96,6 +97,7 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Finding"
   },
   "fr": {
+    "{n} ideas únicas en el corpus": "{n} idées uniques dans le corpus",
     "{n} ideas en este tema": "{n} idées dans ce thème",
     "Tema": "Thème",
     "{n} de {total} ideas del tema · {edges} relaciones": "{n} idées du thème sur {total} · {edges} relations",
@@ -192,6 +194,7 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Résultat"
   },
   "de": {
+    "{n} ideas únicas en el corpus": "{n} eindeutige Ideen im Korpus",
     "{n} ideas en este tema": "{n} Ideen in diesem Thema",
     "Tema": "Thema",
     "{n} de {total} ideas del tema · {edges} relaciones": "{n} von {total} Ideen des Themas · {edges} Beziehungen",
@@ -288,6 +291,7 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Befund"
   },
   "pt": {
+    "{n} ideas únicas en el corpus": "{n} ideias únicas no corpus",
     "{n} ideas en este tema": "{n} ideias neste tema",
     "Tema": "Tema",
     "{n} de {total} ideas del tema · {edges} relaciones": "{n} de {total} ideias do tema · {edges} relações",
@@ -384,6 +388,7 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Descoberta"
   },
   "pt-BR": {
+    "{n} ideas únicas en el corpus": "{n} ideias únicas no corpus",
     "{n} ideas en este tema": "{n} ideias neste tema",
     "Tema": "Tema",
     "{n} de {total} ideas del tema · {edges} relaciones": "{n} de {total} ideias do tema · {edges} relações",
@@ -480,6 +485,7 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Achado"
   },
   "it": {
+    "{n} ideas únicas en el corpus": "{n} idee uniche nel corpus",
     "{n} ideas en este tema": "{n} idee in questo tema",
     "Tema": "Tema",
     "{n} de {total} ideas del tema · {edges} relaciones": "{n} di {total} idee del tema · {edges} relazioni",
@@ -576,6 +582,7 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Risultato"
   },
   "tr": {
+    "{n} ideas únicas en el corpus": "Korpusta {n} benzersiz fikir",
     "{n} ideas en este tema": "Bu konuda {n} fikir",
     "Tema": "Konu",
     "{n} de {total} ideas del tema · {edges} relaciones": "Konudaki {total} fikirden {n} tanesi · {edges} ilişki",
