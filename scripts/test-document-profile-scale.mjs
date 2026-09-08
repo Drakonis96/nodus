@@ -113,6 +113,21 @@ try {
   })();
 
   const repo = require(bundle);
+  // Inspect the actual production statements, not a copied query. Both the
+  // paged scan and winner hydration must look up profile state by its work key.
+  const prepare = db.prepare.bind(db);
+  const profilePlans = [];
+  db.prepare = (sql) => {
+    const statement = prepare(sql);
+    if (/JOIN document_profile_state dps/.test(sql)) {
+      const all = statement.all.bind(statement);
+      statement.all = (...params) => {
+        profilePlans.push(prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params));
+        return all(...params);
+      };
+    }
+    return statement;
+  };
   let ticks = 0;
   const tick = () => { ticks += 1; timer = setImmediate(tick); };
   let timer = setImmediate(tick);
@@ -123,7 +138,16 @@ try {
   const semanticCpu = process.cpuUsage(semanticCpuStart);
   const semanticCpuMs = (semanticCpu.user + semanticCpu.system) / 1_000;
   clearImmediate(timer);
+  assert.ok(profilePlans.length > 1, 'inspect paged scanning and winner hydration');
+  for (const plan of profilePlans) {
+    assert.ok(plan.some((row) => /SEARCH dps USING INDEX .*\(nodus_id=\?\)/.test(row.detail)),
+      `profile state must use its work-key index: ${JSON.stringify(plan)}`);
+    assert.ok(!plan.some((row) => /SCAN dps\b/.test(row.detail)), 'never rescan all profile states per vector');
+  }
   assert.ok(semantic.some((hit) => hit.nodusId === `work-${WORKS - 1}`), 'the strongest document survives the 16k-vector scan');
+  assert.equal(semantic.length, 20);
+  assert.equal(semantic[0].nodusId, `work-${WORKS - 1}`);
+  assert.equal(semantic[0].similarity, 1);
   assert.ok(ticks >= 5, `the semantic scan yielded only ${ticks} times`);
   // `npm test` runs hundreds of files concurrently. Wall time there includes
   // time this isolated Electron child was not scheduled, so keep the release
@@ -151,6 +175,19 @@ try {
   assert.equal(statuses.length, WORKS);
   assert.ok(statusCpuMs < 1_000, `2k profile statuses used ${statusCpuMs.toFixed(1)} ms of CPU`);
   assert.ok(statusMs < 5_000, `2k profile statuses stalled for ${statusMs.toFixed(1)} ms wall time`);
+
+  // The indexed join still filters archived works and superseded versions,
+  // and cannot borrow another work's current-version pointer.
+  db.prepare('UPDATE works SET archived=1 WHERE nodus_id=?').run(`work-${WORKS - 1}`);
+  assert.ok(!(await repo.findSimilarDocuments(query, -1, 20))
+    .some((hit) => hit.nodusId === `work-${WORKS - 1}`));
+  db.prepare('UPDATE works SET archived=0 WHERE nodus_id=?').run(`work-${WORKS - 1}`);
+  db.prepare('UPDATE document_profile_state SET current_version_id=? WHERE nodus_id=?')
+    .run('superseding-version', `work-${WORKS - 1}`);
+  db.prepare('UPDATE document_profile_state SET current_version_id=? WHERE nodus_id=?')
+    .run(`version-${WORKS - 1}`, 'work-0');
+  assert.ok(!(await repo.findSimilarDocuments(query, -1, 20))
+    .some((hit) => hit.nodusId === `work-${WORKS - 1}`), 'a different work cannot activate an obsolete version');
   db.close();
   console.log(`document profile scale passed: ${WORKS} works/${WORKS * VECTORS_PER_WORK} vectors; semantic ${semanticMs.toFixed(1)} ms wall/${semanticCpuMs.toFixed(1)} ms CPU, FTS ${lexicalMs.toFixed(1)}/${lexicalCpuMs.toFixed(1)} ms, statuses ${statusMs.toFixed(1)}/${statusCpuMs.toFixed(1)} ms`);
 } finally {

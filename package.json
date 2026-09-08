@@ -166,6 +166,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@napi-rs/canvas": "^0.1.65",
     "@openai/codex": "0.144.6",
+    "@rdkit/rdkit": "2025.3.4-1.0.0",
     "adm-zip": "^0.6.0",
     "better-sqlite3": "^12.11.1",
     "archiver": "^5.3.2",
@@ -314,6 +315,7 @@
     "asarUnpack": [
       "zotero-plugin/**/*",
       "node_modules/node-tikzjax/**",
+      "node_modules/@rdkit/rdkit/**",
       "node_modules/@openai/codex-*/vendor/**/*",
       "node_modules/@github/copilot-*/**/*",
       "node_modules/heic-decode/**/*",

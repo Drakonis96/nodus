@@ -5,6 +5,9 @@ import { CHAT_IMAGE_ASPECT_RATIOS, serializeChatVisualPart, type ChatImageAspect
 import { callImageProvider, prepareGeneratedImage } from './decorativeImages';
 import { getSettings } from '../db/settingsRepo';
 import { chatAssetVersion, storeChatImage } from '../chatAssets';
+import { resolveChemistryIntent } from './chemistryIdentity';
+import { validateChemistryInUtility } from '../chemistryValidationHost';
+import { isChemistrySvgRequest } from './chatChemistrySvg';
 
 export interface ChatSkillExecution {
   skills: ChatSkill[];
@@ -25,11 +28,73 @@ export function assertChatSkillSession(execution: ChatSkillExecution, signal?: A
 /** Provider-independent tool adapter: only the current model answer may invoke it. */
 export async function executeChatSkills(answer: string, execution: ChatSkillExecution, signal?: AbortSignal): Promise<string> {
   assertChatSkillSession(execution, signal);
-  answer = await refineChatSvg(answer, { question: execution.question ?? '', skills: execution.skills, model: execution.model, signal });
+  // Some providers surround a generic JSON intent with prose, or repeat it.
+  // Promote one unique intent, discarding unchecked prose. Conflicting drafts
+  // abstain; unrelated/incomplete JSON remains ordinary text. Every promoted
+  // field still goes through the strict user-grounded resolver below.
+  if (execution.skills.some(skill => skill.builtin === 'chemistry') && !splitChatVisuals(answer).some(p => p.kind === 'chemistry-plan')) {
+    const candidates = new Map<string, string>();
+    for (const match of answer.matchAll(/```json\s*\n([\s\S]*?)\n```/gi)) {
+      try {
+        const candidate = JSON.parse(match[1]);
+        if (candidate?.version === 2 && ['skeletal', 'fischer', 'haworth', 'newman'].includes(candidate.depiction) && ['structure', 'comparison', 'mechanism', 'reaction'].includes(candidate.kind) && (Array.isArray(candidate.species) || candidate.kind === 'reaction' && typeof candidate.reactionSmiles === 'string')) candidates.set(JSON.stringify(candidate), match[1]);
+      } catch { /* Not a complete JSON tool intent. */ }
+    }
+    if (candidates.size > 1) return 'Chemistry Studio — unsupported: conflicting chemical intents were returned. Request one explicit structure or mechanism.';
+    if (candidates.size === 1) answer = serializeChatVisualPart({ kind: 'chemistry-plan', content: candidates.values().next().value!, complete: true });
+  }
+  const initialParts = splitChatVisuals(answer), initialIntent = initialParts.some(part => part.kind === 'chemistry-plan');
+  if (!initialIntent && execution.skills.some(skill => skill.builtin === 'chemistry')) {
+    const question = execution.question ?? '';
+    const nonMolecular = /\b(?:orbital|energy diagram|energy profile|reaction coordinate|diagrama de energ[ií]a)\b/i.test(question);
+    const verifiedDrawing = /\b(?:chemfig|smiles|fischer|haworth|newman|sn[12]|e[12]|aldol|nitration|nitraci[oó]n|diels.alder|molecular structure|chemical structure|estructura molecular|estructura qu[ií]mica)\b/i.test(question)
+      && !nonMolecular;
+    const bypass = initialParts.some(part => (verifiedDrawing && part.kind !== 'markdown' && part.kind !== 'image-error')
+      || (!nonMolecular && part.kind === 'svg' && isChemistrySvgRequest(question, part.content)))
+      || (verifiedDrawing && /!\[[^\]]*\]\(|<img\b/i.test(answer));
+    // Unsupported chemistry must not escape through another drawing provider.
+    // Drop the accompanying unvalidated product/prose claims too, before any
+    // SVG repair or paid image generation can run.
+    if (bypass) return 'Chemistry Studio — unsupported: no validated identity/projection/mechanism intent was returned. Unverified SVG, images and ChemFig cannot replace the requested chemical drawing. Use a supported projection or rule with an exact name, PubChem CID or isomeric SMILES.';
+  }
+  if (!initialIntent) answer = await refineChatSvg(answer, { question: execution.question ?? '', skills: execution.skills, model: execution.model, signal });
   const parts = splitChatVisuals(answer);
+  const hasChemistryIntent = parts.some(part => part.kind === 'chemistry-plan');
   let requested = false;
+  let chemistryRequested = false;
   const result: string[] = [];
   for (const part of parts) {
+    // Model prose is not checked by graph validators and may contradict the
+    // resolved structure. Only evidence-derived captions accompany new plans.
+    if (hasChemistryIntent && part.kind !== 'chemistry-plan') continue;
+    if (part.kind === 'chemistry-plan') {
+      signal?.throwIfAborted();
+      if (process.env.NODUS_CHEMFIG_QA_LOG === '1') console.log('[chemistry-plan]', part.content);
+      try {
+        if (chemistryRequested) throw new Error('Only one chemistry plan can be compiled per reply.');
+        chemistryRequested = true;
+        if (!execution.skills.some(skill => skill.builtin === 'chemistry')) throw new Error('Enable Chemistry Studio to render this plan.');
+        if (!part.complete) throw new Error('The chemistry plan was interrupted. Retry the response.');
+        const document = await resolveChemistryIntent(part.content, execution.question ?? '', {
+          fetch: globalThis.fetch, validate: validateChemistryInUtility,
+        }, signal);
+        assertChatSkillSession(execution, signal);
+        if (document.status !== 'verified') {
+          result.push(`\n\nChemistry Studio — ${document.status}: ${document.reason.replace(/[\r\n`*<>[\]]/g, ' ').slice(0, 700)}\n\n`);
+        } else {
+          result.push(serializeChatVisualPart({ kind: 'chemistry-document', content: JSON.stringify(document), complete: true }));
+        }
+      } catch (error) {
+        if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
+        const message = error instanceof Error ? error.message : 'The chemistry plan could not be compiled.';
+        result.push(`\n\n**Chemistry Studio:** ${message.replace(/[\r\n]+/g, ' ').slice(0, 700)}\n\n`);
+      }
+      continue;
+    }
+    if (['chemfig', 'smiles', 'lewis', 'chemistry-document'].includes(part.kind)) {
+      result.push('\n\nChemistry Studio: las nuevas estructuras requieren un plan de identidad de versión 2. Los dibujos antiguos siguen siendo visibles, pero no se consideran verificados.\n\n');
+      continue;
+    }
     if (part.kind !== 'image-request') {
       result.push(serializeChatVisualPart(part));
       continue;

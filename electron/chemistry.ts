@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { Molecule } from 'openchemlib';
+import { overlayElectronArrows, prepareElectronArrows } from './chemfigElectronArrows';
 
 type Tex2Svg = (input: string, options?: {
   texPackages?: Record<string, string>;
@@ -16,6 +17,11 @@ const MAX_SMILES_SOURCE = 1_000;
 const COMPILE_TIMEOUT_MS = 15_000;
 const MAX_CACHE_ENTRIES = 160;
 const cache = new Map<string, string>();
+// The TeX WASM engine is process-global and non-reentrant, including for old
+// chat cards that compile concurrently through IPC. Never reuse it after a
+// timeout: Promise.race cannot cancel the underlying WASM operation.
+let compilationTail: Promise<unknown> = Promise.resolve();
+let compilerTimedOut = false;
 
 const VALENCE_ELECTRONS: Record<number, number> = {
   1: 1, 3: 1, 5: 3, 6: 4, 7: 5, 8: 6, 9: 7,
@@ -220,6 +226,13 @@ export async function compileSmiles(smiles: string): Promise<string> {
 /** Compile a narrowly scoped Chemfig drawing to SVG using the bundled WASM TeX
  * runtime. The returned SVG is still sanitized by ChatVisual before display. */
 export async function compileChemfig(source: string): Promise<string> {
+  const run = compilationTail.then(() => compileChemfigSerial(source));
+  compilationTail = run.catch(() => undefined);
+  return run;
+}
+
+async function compileChemfigSerial(source: string): Promise<string> {
+  if (compilerTimedOut) throw new Error('ChemFig engine timed out; restart the application before compiling again.');
   const code = String(source ?? '').trim();
   if (!code) throw new Error('Empty Chemfig source.');
   if (code.length > MAX_CHEMFIG_SOURCE) throw new Error('Chemfig source is too large to render.');
@@ -228,13 +241,24 @@ export async function compileChemfig(source: string): Promise<string> {
   const key = `chemfig:${createHash('sha256').update(drawable).digest('hex')}`;
   const cached = cache.get(key);
   if (cached) return cached;
-  const input = `\\begin{document}\n${drawable}\n\\end{document}`;
+  const layout = prepareElectronArrows(drawable);
+  // TeX's bundled input buffer is 5000 characters per line. Generated schemes
+  // can be larger after adding measurement hooks; whitespace between molecules
+  // is semantically inert and keeps every input line bounded.
+  const input = `\\begin{document}\n${layout.source.replace(/\\chemfig\b/g, '\n\\chemfig')}\n\\end{document}`;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const raw = await Promise.race([
-    getChemfigEngine()(input, { texPackages: { chemfig: '' }, showConsole: false }),
+    getChemfigEngine()(input, { texPackages: { amsmath: '', chemfig: '' }, showConsole: process.env.NODUS_CHEMFIG_DEBUG === '1' }),
     new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => reject(new Error('Chemfig compilation timed out.')), COMPILE_TIMEOUT_MS);
+      timer = setTimeout(() => { compilerTimedOut = true; reject(new Error('Chemfig compilation timed out.')); }, COMPILE_TIMEOUT_MS);
     }),
   ]).finally(() => { if (timer) clearTimeout(timer); });
-  return remember(key, decorateSvg(raw, 'Chemical structure', 'Static chemical drawing compiled from Chemfig notation.', 0.34));
+  // The bundled DVI converter drops the stroke inside nested TikZ pictures
+  // (notably schemestart). Bond paths survive, but inherit stroke="none" from
+  // text groups. Restore the unfilled chemical paths before sanitization.
+  const visible = overlayElectronArrows(raw, layout).replace(/<text\b([^>]*\bfont-family="cmsy\d+"[^>]*)>¡<\/text>/g,
+    '<text$1>−</text>').replace(/<path\b[^>]*>/g, tag => /\bfill="none"/.test(tag) && !/\bstroke="(?!none")[^"]+"/.test(tag)
+    ? tag.replace(/\s+stroke="[^"]*"/g, '').replace(/<path\b/, '<path stroke="#000"')
+    : tag);
+  return remember(key, decorateSvg(visible, 'Chemical structure', 'Static chemical drawing compiled from Chemfig notation.', 0.08));
 }
