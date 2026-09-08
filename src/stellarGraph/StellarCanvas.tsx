@@ -436,6 +436,14 @@ export function StellarCanvas(props: Props) {
     const upper = from.y <= to.y ? from : to, lower = upper === from ? to : from;
     upper.labelY = upper.y-100; lower.labelY = lower.y+25;
   }
+  // Keep a visible node's full caption above the bottom edge and transport controls.
+  const captionBottom = size.h - (size.footer ? size.footer + 32 : 8);
+  for (const label of labels) {
+    const height = featured.has(label.n.id) ? 87 : 52;
+    if (label.y < 0 || label.y > captionBottom) continue;
+    if (label.labelY + height > captionBottom) label.labelY = label.y - height - 16;
+    label.labelY = Math.max(8, label.labelY);
+  }
   const occupied: { x: number; y: number }[] = [];
   const visibleLabels = labels.filter(({n,labelX,labelY}) => {
     if (props.labelPolicy === "all") return true;

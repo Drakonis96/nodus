@@ -6,17 +6,21 @@ The idea graph uses one WebGL2 infinite canvas across the corpus, work view, Stu
 
 ![Independent graph tabs using demonstration data](images/stellar-tabs-demo.png)
 
-The first visit in a new app session opens an empty graph. Search for an idea and choose it to load its direct incoming and outgoing relationships immediately, up to **Relations per idea** (25 by default). **Unlimited** loads the entire direct neighborhood, including hubs larger than one page. Work and Study graphs respect their source scope.
+The corpus graph opens on a permanent **Themes** tab when its source provides themes. Search for ideas here and use **+** beside each result to add them immediately alongside the themes; **−** removes them from the hub. The picker stays open for successive additions. Opening a pinned idea creates its own exploration tab, while opening a theme stays in the first tab with a route back to the hub. Pinned ideas survive theme visits and section navigation during the current window session.
+
+In an exploration tab, search for an idea and choose it to load its direct incoming and outgoing relationships immediately, up to **Relations per idea** (25 by default). **Unlimited** loads the entire direct neighborhood, including hubs larger than one page. Sources without themes start with an empty graph. Work and Study graphs respect their source scope.
 
 Use **+** beside a search result to add another idea and its direct connections. Every visible idea shows **−**, which removes only that idea and its incident connections; other ideas remain, including isolated ones. Removed ideas stay excluded from subsequent exploration until explicitly added again. **Clear**, beside **Reorganize**, empties the active canvas and cancels pending exploration. These actions never delete library records.
 
-Use **+** in the tab strip to create another empty graph. Each tab keeps its own ideas, history, positions, camera, limit, and evidence panel while switching tabs. Returning from another section restores the open graphs during the current window session. A new app session starts empty. External idea navigation opens a separate tab without replacing existing graphs. **Full screen** enlarges the workspace; use its exit button or Escape to return.
+Use **+** in the tab strip to create another empty graph. The first tab cannot be closed; subsequent tabs can. Each tab keeps its own ideas, history, positions, camera, limit, and evidence panel while switching tabs. Returning from another section restores the open graphs during the current window session. A new app session starts at the source's entry view. External idea navigation opens a separate tab without replacing existing graphs or removing access to themes. **Full screen** enlarges the workspace; use its exit button or Escape to return.
 
 **Next** and **Play** continue breadth-first exploration through stored relationships, prioritizing confirmed and explicit relationships where available. Incoming relationships retain their native arrows. Playback never generates AI relationships. The same limit controls the number of steps in a playback run; unlimited playback continues until the reachable component is exhausted.
 
 **Previous** rewinds the exploration; **Next** replays existing history before discovering more relationships. Changing the starting idea retains the canvas and truncates any undone continuation.
 
 Each playback step frames both endpoints above the controls, using a 550 ms camera transition. The current relationship, direction, and endpoint labels stand out against the dimmed context. Play advances immediately and leaves 3.5 seconds between steps at normal speed. Reduced-motion preferences disable the camera animation.
+
+The transport reserves a fixed-height selection area, with relationship provenance centered at the bottom. Long node names remain within their captions. Clicking the background, including a double click, clears the idea or relationship selection, closes its detail, and pauses playback.
 
 Dragging, zooming, Fit all, and Seed pause playback for manual exploration. Play, Previous, and Next automatically resume framing; no follow checkbox is required. Previous at the beginning centers the starting idea. View connection recenters the current relationship without advancing.
 

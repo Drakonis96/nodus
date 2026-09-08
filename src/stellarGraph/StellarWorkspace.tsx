@@ -90,12 +90,15 @@ function StellarTabs(props: StellarWorkspaceProps) {
   const scope = `${props.source.key}:${props.workId || "corpus"}`;
   const [saved] = useState(() => props.snapshot?.scope === scope ? props.snapshot : undefined);
   const { initialSeed, initialEdge, initialSearch, author, navigationKey } = props;
-  const themed = !!source.themes && !initialSeed && !initialEdge && !initialSearch && !author;
+  const themed = !!source.themes;
+  const targeted = !!(initialSeed || initialEdge || initialSearch || author);
   const [tabs, setTabs] = useState<StellarGraphTabDescriptor[]>(
-    saved?.tabs || [{ id: 1, label: "", mode: themed ? "themes" : undefined, initialSeed, initialEdge, initialSearch, author }],
+    saved?.tabs || (themed
+      ? [{ id: 1, label: "", mode: "themes" }, ...(targeted ? [{ id: 2, label: "", initialSeed, initialEdge, initialSearch, author }] : [])]
+      : [{ id: 1, label: "", initialSeed, initialEdge, initialSearch, author }]),
   );
-  const [active, setActive] = useState(saved?.active || 1);
-  const nextId = useRef(saved?.nextId || 2);
+  const [active, setActive] = useState(saved?.active || (themed && targeted ? 2 : 1));
+  const nextId = useRef(saved?.nextId || (themed && targeted ? 3 : 2));
   const targetKey = JSON.stringify([initialSeed, initialEdge, initialSearch, author, navigationKey]);
   const lastTarget = useRef(saved?.targetKey || targetKey);
   const tabStates = useRef<Record<number, StellarTabSnapshot>>({ ...saved?.states });
@@ -163,16 +166,12 @@ function StellarTabs(props: StellarWorkspaceProps) {
   const tabName = (tab: StellarGraphTabDescriptor) =>
     tab.label || (tab.mode === "themes" ? t("Temas") : tx("Grafo {n}", { n: tab.id }));
   const closeTab = (id: number) => {
+    if (id === tabs[0]?.id || !tabs.some(tab => tab.id === id)) return;
     delete tabStates.current[id];
     const index = tabs.findIndex(tab => tab.id === id);
     const remaining = tabs.filter(tab => tab.id !== id);
-    if (!remaining.length) {
-      const newId = nextId.current++;
-      setTabs([{ id: newId, label: "" }]); setActive(newId);
-    } else {
-      setTabs(remaining);
-      if (active === id) setActive(remaining[Math.min(index, remaining.length - 1)].id);
-    }
+    setTabs(remaining);
+    if (active === id) setActive(remaining[Math.min(index, remaining.length - 1)].id);
   };
   return <div className="stellar-tabs-workspace" ref={host} data-testid="stellar-tabs-workspace">
     <div className="stellar-tabs-header">
@@ -186,7 +185,7 @@ function StellarTabs(props: StellarWorkspaceProps) {
               const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
               setActive(tabs[next].id); document.getElementById(`${tabsId}-tab-${tabs[next].id}`)?.focus();
             }} title={tabName(tab)}><Icon name={tab.mode === "themes" ? "layers" : "map"} size={14} /><span>{tabName(tab)}</span></button>
-          <button className="stellar-tab-close" aria-label={tx("Cerrar grafo {n}", { n: tab.id })} onClick={() => closeTab(tab.id)}>×</button>
+          {tab.id !== tabs[0].id && <button className="stellar-tab-close" aria-label={tx("Cerrar grafo {n}", { n: tab.id })} onClick={() => closeTab(tab.id)}>×</button>}
         </div>)}
       </div>
       <button className="stellar-new-tab" onClick={addTab} title={t("Nuevo grafo")} aria-label={t("Nuevo grafo")}><Icon name="plus" size={18} /></button>
@@ -196,10 +195,16 @@ function StellarTabs(props: StellarWorkspaceProps) {
     </div>
     {fullscreenError && <p role="alert">{t("No se pudo activar la pantalla completa.")}</p>}
     {tabs.map(tab => <div key={tab.id} role="tabpanel" id={`${tabsId}-panel-${tab.id}`} aria-labelledby={`${tabsId}-tab-${tab.id}`} className={active === tab.id ? "stellar-tab-panel" : "hidden"}>
-      {tab.mode === "themes" && !tab.themeId
-        ? <ThemesOverview source={source} toolbar={props.toolbar}
-            onOpen={theme => openTheme(tab.id, theme)} />
-        : <StellarGraphTab {...props} key={tab.themeId || "canvas"} source={source} active={active === tab.id}
+      {tab.mode === "themes" && <div className={tab.themeId ? "hidden" : "stellar-hub-panel"}>
+        <ThemesOverview source={source} toolbar={props.toolbar} initialIdeaIds={tab.hubIdeaIds} active={active === tab.id && !tab.themeId}
+          onIdeasChange={hubIdeaIds => setTabs(current => current.map(item => item.id === tab.id ? { ...item, hubIdeaIds } : item))}
+          onOpenIdea={node => {
+            const id = nextId.current++;
+            setTabs(current => [...current, { id, label: node.label, initialSeed: node.id }]);
+            setActive(id);
+          }} onOpen={theme => openTheme(tab.id, theme)} />
+      </div>}
+      {(tab.mode !== "themes" || tab.themeId) && <StellarGraphTab {...props} key={tab.themeId || "canvas"} source={source} active={active === tab.id}
             initialSeed={tab.initialSeed} initialEdge={tab.initialEdge}
             initialSearch={tab.initialSearch} author={tab.author}
             themeId={tab.themeId} themeLabel={tab.themeLabel}
@@ -484,7 +489,15 @@ function StellarGraphTab({
     return () => clearTimeout(timer);
   }, [playing, busy, next, speed, data]);
   const closeDetail = () => {
+    selectionEpoch.current++;
+    engine?.interrupt();
     detailSeq.current++;
+    setPlaying(false);
+    setAnimating(false);
+    setFollow(false);
+    setActiveEdge(null);
+    setShowSources(false);
+    setMessage("");
     setSelected(null);
     setIdea(null);
     setEdge(null);
@@ -530,7 +543,7 @@ function StellarGraphTab({
           }
         });
     },
-    [engine, source, onOpenIdea],
+    [engine, source, onOpenIdea, themeId],
   );
   const openEdge = (id: string) => {
     selectionEpoch.current++;
@@ -936,6 +949,7 @@ function StellarGraphTab({
                 <option value={2}>2×</option>
               </select>
             </div>
+            <div className="stellar-player-selection">
             {selected && !step ? (
               <div className="stellar-node-actions" aria-label={t("Acciones de la idea seleccionada")}>
                 <span className="stellar-selected-name" title={engine?.nodes.get(selected)?.label}>
@@ -976,7 +990,7 @@ function StellarGraphTab({
                 : message || t("Elige una idea para empezar a investigar.")}
               <span>{engine?.cursor || 0} / {engine?.history.length || 0}</span>
             </p>}
-
+            </div>
           </div>
           <details className="stellar-legend">
             <summary>{t("Relaciones y evidencia")}</summary>

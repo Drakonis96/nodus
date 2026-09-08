@@ -36,6 +36,7 @@ try {
  await centered(page.locator('.stellar-new-tab'));
  await hub().waitFor();
  assert.equal(await page.getByRole('tab').first().innerText(),'Temas','the graph opens on the themes hub');
+ assert.equal(await page.getByRole('button',{name:'Cerrar grafo 1',exact:true}).count(),0,'the first tab is permanent');
  const themeNode='[data-testid="stellar-themes"] .stellar-node-label';
  await page.locator(themeNode).first().waitFor();
  const bubbles=await page.locator(themeNode).evaluateAll(list=>list.map(b=>({
@@ -76,6 +77,27 @@ try {
  assert.equal(await page.getByRole('tab').first().innerText(),'Temas','going back restores the hub');
  await page.locator(themeNode).first().waitFor();
  await page.screenshot({path:root+'/output/stellar-tabs/themes.png'});
+ const hubSearch=hub().getByRole('combobox',{name:'Buscar una idea'});
+ await hubSearch.fill(''); await hubSearch.focus();
+ await hub().locator('.stellar-search-toggle').first().waitFor();
+ const pinnedLabel=await hub().locator('.stellar-search-choice strong').first().innerText();
+ const initialHubNodes=await hub().locator('.stellar-hit').count();
+ await hub().locator('.stellar-search-toggle').first().click();
+ assert.equal(await hub().locator('.stellar-search-toggle').first().getAttribute('title'),'Quitar idea del lienzo','adding to the hub updates the toggle immediately');
+ await page.waitForFunction(n=>document.querySelectorAll('.stellar-tab-panel .stellar-hit').length===n,initialHubNodes+1);
+ assert.equal(await page.getByRole('tab').count(),1,'quick addition stays in the main tab');
+ await hub().locator('.stellar-search-toggle').nth(1).click();
+ await page.waitForFunction(n=>document.querySelectorAll('.stellar-tab-panel .stellar-hit').length===n,initialHubNodes+2);
+ await page.keyboard.press('Escape');
+ await page.locator(`${themeNode}[data-node="${busiest.id}"]`).click();
+ await active().waitFor();
+ await page.getByRole('button',{name:'Volver a los temas'}).click();
+ assert.equal(await hub().locator('.stellar-hit').count(),initialHubNodes+2,'hub additions survive entering and leaving a theme');
+ await hubSearch.focus();
+ await hub().locator('.stellar-search-toggle').nth(1).click();
+ await page.waitForFunction(n=>document.querySelectorAll('.stellar-tab-panel .stellar-hit').length===n,initialHubNodes+1);
+ await page.keyboard.press('Escape');
+ await page.screenshot({path:root+'/output/stellar-tabs/hub-ideas.png'});
  await page.getByRole('button',{name:'Nuevo grafo',exact:true}).click();
  assert.equal(await page.getByRole('tab').count(),2);
  assert.equal(await active().getAttribute('data-node-count'),'0','a new tab is a blank canvas');
@@ -102,8 +124,10 @@ try {
  await page.waitForTimeout(450);await page.keyboard.press('Escape');
  assert.ok(await count('edge')>=2);
  const preserved=await count('node');
+ const playerHeight=await active().locator('.stellar-player').evaluate(el=>el.getBoundingClientRect().height);
  await page.locator('.stellar-tab-panel .stellar-node-label').first().press('Enter');
  await page.locator('.stellar-tab-panel .graph-detail-panel h3').waitFor();
+ assert.equal(await active().locator('.stellar-player').evaluate(el=>el.getBoundingClientRect().height),playerHeight,'selecting an idea keeps transport height stable');
  const detail=await page.locator('.stellar-tab-panel .graph-detail-panel h3').innerText();
  await active().getByRole('button',{name:'Mostrar fuentes',exact:true}).click();
  await active().getByTitle('Alejar',{exact:true}).click();await page.waitForTimeout(500);
@@ -125,31 +149,63 @@ try {
  await page.getByRole('tab').nth(2).click();assert.equal(await count('edge'),1,'clear leaves other tabs alone');
  for(const theme of ['dark','light']){
   await page.evaluate(theme=>{document.documentElement.classList.remove('dark','light');document.documentElement.classList.add(theme);},theme);
+  const tab=page.locator('.stellar-tab.active');
+  for(const target of [tab.getByRole('tab'),tab.locator('.stellar-tab-close')]){
+   await target.hover();
+   const colors=await tab.evaluate(el=>Array.from(el.querySelectorAll('button')).map(b=>({color:getComputedStyle(b).color,background:getComputedStyle(b).backgroundColor})));
+   assert.equal(colors[0].color,colors[1].color,'tab and close share the accent on hover');
+   assert.equal(colors[0].background,colors[1].background,'hover does not split the tab surface');
+  }
   await page.getByRole('button',{name:'Pantalla completa',exact:true}).click();await page.waitForFunction(()=>!!document.fullscreenElement);
   await page.waitForTimeout(1200);
   assert.equal(await page.evaluate(()=>document.fullscreenElement?.classList.contains('stellar-tabs-workspace')),true);
+  const label=active().locator('.stellar-node-label').first();
+  await label.waitFor();
+  const contained=await label.evaluate(el=>{
+   const span=el.querySelector('span'),original=span.textContent;
+   span.textContent='Nombre extremadamente largo de una idea que debe seguir dentro de su tarjeta incluso con palabras '.repeat(15)+'x'.repeat(150);
+   const box=el.getBoundingClientRect(),text=span.getBoundingClientRect();
+   const result=text.bottom<=box.bottom+.5&&text.right<=box.right+.5&&text.height<=parseFloat(getComputedStyle(span).lineHeight)*3+.5;
+   span.textContent=original;return result;
+  });
+  assert.ok(contained,'long node names remain inside their label in both themes');
   await page.screenshot({path:root+'/output/stellar-tabs/fullscreen-'+theme+'.png'});
   await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.fullscreenElement);await page.waitForTimeout(1200);
  }
- await page.getByRole('button',{name:'Cerrar grafo 1',exact:true}).click();assert.equal(await page.getByRole('tab').count(),2);
- await page.getByRole('button',{name:'Cerrar grafo 2',exact:true}).click();assert.equal(await page.getByRole('tab').count(),1);assert.equal(await count('edge'),1);
- await page.getByRole('button',{name:'Cerrar grafo 3',exact:true}).click();assert.equal(await page.getByRole('tab').count(),1);assert.equal(await count('node'),0,'closing the last graph leaves a blank canvas');
+ await page.getByRole('button',{name:'Cerrar grafo 2',exact:true}).click();assert.equal(await page.getByRole('tab').count(),2);assert.equal(await count('edge'),1);
+ const unselectedHeight=await active().locator('.stellar-player').evaluate(el=>el.getBoundingClientRect().height);
+ await active().getByRole('button',{name:'Siguiente',exact:false}).click();
+ await active().locator('.stellar-step').waitFor();
+ assert.equal(await active().locator('.stellar-player').evaluate(el=>el.getBoundingClientRect().height),unselectedHeight,'an inferred or explicit relation keeps transport height stable');
+ const stage=active().locator('.stellar-canvas');
+ await stage.dblclick({position:{x:20,y:90}});
+ assert.equal(await active().locator('.stellar-step,.stellar-node-actions,.stellar-hit.selected,.stellar-node-label.featured').count(),0,'double-clicking the background clears node and edge selection');
+ assert.equal(await active().locator('.graph-detail-panel').count(),0);
+ await page.getByRole('button',{name:'Cerrar grafo 3',exact:true}).click();assert.equal(await page.getByRole('tab').count(),1);await hub().waitFor();
+ assert.equal(await hub().locator('.stellar-hit').count(),initialHubNodes+1,'closing secondary tabs preserves the hub and pinned ideas');
+ await hub().locator('.stellar-node-label').filter({hasText:pinnedLabel}).first().press('Enter');
+ await active().waitFor();
+ assert.equal(await page.getByRole('tab').count(),2,'a pinned idea opens its own exploration');
  await search(seed.label);await page.locator('.stellar-tab-panel .stellar-search-choice').first().click();await page.waitForTimeout(600);
  const beforeNavigation=await count('node');assert.ok(beforeNavigation>0);
  await page.locator('[data-tour="nav-ideas"]').click();await page.getByTestId('ideas-tabs').waitFor();
  await page.locator('[data-tour="nav-graph"]').click();await active().waitFor();
  await page.waitForFunction(n=>Number(document.querySelector('.stellar-tab-panel .stellar-workspace')?.getAttribute('data-node-count'))===n,beforeNavigation);
+ await page.getByRole('tab').first().click();await hub().waitFor();
+ await page.waitForFunction(n=>document.querySelectorAll('.stellar-tab-panel .stellar-hit').length===n,initialHubNodes+1);
+ assert.equal(await hub().locator('.stellar-node-label').filter({hasText:pinnedLabel}).count(),1,'pinned ideas restore after section navigation');
+ await page.getByRole('tab').nth(1).click();await active().waitFor();
  const beforeTarget=await count('node');
  await app.evaluate(({BrowserWindow},ideaId)=>BrowserWindow.getAllWindows()[0].webContents.send('copilot:openIdea',{ideaId,destination:'graph'}),other.ideaId);
- await page.waitForFunction(()=>document.querySelectorAll('.stellar-tabs [role="tab"]').length===2);
+ await page.waitForFunction(()=>document.querySelectorAll('.stellar-tabs [role="tab"]').length===3);
  await page.waitForFunction(()=>Number(document.querySelector('.stellar-tab-panel .stellar-workspace')?.getAttribute('data-edge-count'))>0);
  assert.ok((await page.getByRole('tab').last().innerText()).includes(other.label.slice(0,20)),'an external idea opens its own graph');
- await page.getByRole('tab').first().click();assert.equal(await count('node'),beforeTarget,'external navigation preserves previous graphs');
+ await page.getByRole('tab').nth(1).click();assert.equal(await count('node'),beforeTarget,'external navigation preserves previous graphs');
  await page.reload();await page.locator('[data-tour="nav-graph"]').click();await hub().waitFor();
  assert.equal(await page.getByRole('tab').count(),1,'a fresh app session starts on the themes hub alone');
  await page.locator('[data-testid="stellar-themes"] .stellar-node-label').first().click();await active().waitFor();
  await page.getByRole('button',{name:'Volver a los temas'}).click();await hub().waitFor();
  await page.screenshot({path:root+'/output/stellar-tabs/empty.png'});
  assert.deepEqual(errors,[]);
- console.log('Stellar tabs E2E passed: themes hub entry, themes drawn as graph nodes, theme walk + child limit + depth + back, blank new tabs, direct limits, additive search, minus/removal, isolated tabs, clear, light/dark full screen, Escape, close last tab, section navigation, hub on reload.');
+ console.log('Stellar tabs E2E passed: permanent themes hub, instant additive hub search, pinned-idea exploration, theme walk + child limit + depth + back, isolated tabs, stable transport height, unified accent hover, background deselection, light/dark full screen, section navigation, hub on reload.');
 } finally {await app.close();fs.rmSync(profile,{recursive:true,force:true});}

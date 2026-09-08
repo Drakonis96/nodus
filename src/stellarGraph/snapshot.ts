@@ -17,6 +17,8 @@ export interface StellarGraphTabDescriptor {
   /** Theme the hub tab has drilled into, if any. */
   themeId?: string;
   themeLabel?: string;
+  /** Ideas pinned to the themes hub during this app session. */
+  hubIdeaIds?: string[];
   initialSeed?: string;
   initialEdge?: string;
   initialSearch?: string;

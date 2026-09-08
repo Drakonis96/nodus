@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { GraphData } from "@shared/types";
+import type { GraphData, GraphNode } from "@shared/types";
 import type { StellarPosition, StellarTheme } from "@shared/stellarGraph";
 import { themeName, type StellarGraphSource } from "./source";
 import { sortThemes, themeConstellation } from "./themes";
 import { StellarCanvas, type StellarCanvasApi } from "./StellarCanvas";
 import { errorText, t, tx } from "../i18n";
 import { Icon } from "../components/ui";
-
-const EMPTY: GraphData = { nodes: [], edges: [] };
+import { StellarSearch } from "./StellarSearch";
+import { NODE_LABELS } from "./palette";
 
 /**
  * First stop of the graph: every theme of the vault — the ones a scan extracted and the
@@ -19,11 +19,19 @@ export function ThemesOverview({
   source,
   onOpen,
   toolbar,
+  initialIdeaIds,
+  onIdeasChange,
+  onOpenIdea,
+  active,
 }: {
   /** A new source identity — a reprocess, a vault change — refetches the hubs. */
   source: StellarGraphSource;
   onOpen(theme: StellarTheme): void;
   toolbar?: ReactNode;
+  initialIdeaIds?: string[];
+  onIdeasChange(ids: string[]): void;
+  onOpenIdea(node: GraphNode): void;
+  active: boolean;
 }) {
   const [themes, setThemes] = useState<StellarTheme[] | null>(null);
   const [error, setError] = useState("");
@@ -32,6 +40,31 @@ export function ThemesOverview({
   const [camera, setCamera] = useState({ x: 0, y: 0, zoom: 1 });
   const api = useRef<StellarCanvasApi | null>(null);
   const framed = useRef("");
+  const [pinned, setPinned] = useState<GraphNode[]>([]);
+  const initialIds = useRef(initialIdeaIds || []);
+  useEffect(() => {
+    let live = true;
+    const restore = async () => {
+      const nodes: GraphNode[] = [];
+      const ids = [...initialIds.current];
+      for (let offset = 0; offset < ids.length; offset += 200) {
+        const page = await source.page({ kind: "elements", nodeIds: ids.slice(offset, offset + 200), limit: 200 });
+        nodes.push(...page.nodes);
+      }
+      if (live) setPinned(current => {
+        const byId = new Map([...current, ...nodes].map(node => [node.id, node]));
+        return initialIds.current.flatMap(id => byId.has(id) ? [byId.get(id)!] : []);
+      });
+    };
+    void restore().catch(err => live && setError(errorText(err)));
+    return () => { live = false; };
+  }, [source]);
+  const visibleIds = useMemo(() => new Set(pinned.map(node => node.id)), [pinned]);
+  const updateIdeas = (nodes: GraphNode[]) => {
+    initialIds.current = nodes.map(node => node.id);
+    setPinned(nodes);
+    onIdeasChange(initialIds.current);
+  };
   useEffect(() => {
     let live = true;
     setError("");
@@ -56,7 +89,7 @@ export function ThemesOverview({
   // A theme is a node like any other: the canvas draws it, we only say what it is.
   const data = useMemo<GraphData>(
     () => ({
-      nodes: shown.map((theme) => ({
+      nodes: [...shown.map<GraphNode>((theme) => ({
         id: theme.id,
         label: themeName(theme) || theme.id,
         type: "theme",
@@ -68,19 +101,36 @@ export function ThemesOverview({
         years: [],
         authors: [],
         maxConfidence: 1,
-      })),
+      })), ...pinned],
       edges: [],
     }),
-    [shown],
+    [shown, pinned],
   );
   const byId = useMemo(() => new Map(shown.map((theme) => [theme.id, theme])), [shown]);
 
   // The rings are decided by the themes on screen, so filtering re-forms the constellation.
   const signature = shown.map((theme) => theme.id).join("|");
   useEffect(() => {
-    setPositions(themeConstellation(shown));
+    setPositions(current => ({ ...current, ...themeConstellation(shown) }));
     framed.current = "";
   }, [signature]);
+  useEffect(() => {
+    // Add near the current viewport, keeping the existing constellation and camera still.
+    setPositions(current => {
+      const next = { ...current };
+      for (const node of pinned) {
+        if (next[node.id]) continue;
+        let point = { x: camera.x, y: camera.y - 30 / camera.zoom };
+        for (let i = 1; i <= 1000; i++) {
+          if (Object.values(next).every(p => Math.abs(p.x - point.x) * camera.zoom > 245 || Math.abs(p.y - point.y) * camera.zoom > 95)) break;
+          const angle = i * 2.399963, radius = 70 * Math.sqrt(i) / camera.zoom;
+          point = { x: camera.x + Math.cos(angle) * radius, y: camera.y + Math.sin(angle) * radius * 0.6 };
+        }
+        next[node.id] = point;
+      }
+      return next;
+    });
+  }, [pinned]);
   useEffect(() => {
     if (!data.nodes.length || framed.current === signature) return;
     if (!data.nodes.every((node) => positions[node.id])) return;
@@ -109,6 +159,12 @@ export function ThemesOverview({
         </div>
         <div className="stellar-header-actions">
           {toolbar}
+          <StellarSearch source={source} disabled={false} visibleIds={visibleIds}
+            onChoose={node => { if (!visibleIds.has(node.id)) updateIdeas([...pinned, node]); }}
+            onRemove={id => {
+              updateIdeas(pinned.filter(node => node.id !== id));
+              setPositions(current => Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)));
+            }} />
           <div className="stellar-search">
             <div className="stellar-search-field">
               <Icon name="search" size={14} />
@@ -126,8 +182,8 @@ export function ThemesOverview({
       </header>
       <div className="stellar-body">
         <div className="stellar-stage">
-          <StellarCanvas
-            data={themes === null ? EMPTY : data}
+          {active && <StellarCanvas
+            data={data}
             positions={positions}
             camera={camera}
             onPositions={setPositions}
@@ -136,14 +192,19 @@ export function ThemesOverview({
             onNode={(id) => {
               const theme = byId.get(id);
               if (theme) onOpen(theme);
+              else {
+                const node = pinned.find(item => item.id === id);
+                if (node) onOpenIdea(node);
+              }
             }}
             onEdge={() => {}}
             labelPolicy="all"
             nodeMeta={(node) => {
+              if (node.type !== "theme") return `${t(NODE_LABELS[node.type] || node.type)} · ${node.workCount} ${t(node.workCount === 1 ? "fuente" : "fuentes")}`;
               const count = byId.get(node.id)?.ideaCount ?? 0;
               return `${t("Tema")} · ${count.toLocaleString()} ${t(count === 1 ? "idea" : "ideas")}`;
             }}
-          />
+          />}
           <div className="stellar-meta">
             <span className="stellar-live-dot" />
             {themes === null
@@ -164,7 +225,7 @@ export function ThemesOverview({
               {error}
             </div>
           )}
-          {themes !== null && !sorted.length && !error && (
+          {themes !== null && !sorted.length && !pinned.length && !error && (
             <div className="stellar-empty stellar-empty-hint">
               {t("Todavía no hay temas. Analiza obras o añade los tuyos en Herramientas › Temas.")}
             </div>
