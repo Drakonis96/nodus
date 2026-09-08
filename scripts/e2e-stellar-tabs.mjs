@@ -50,6 +50,26 @@ try {
  await hub().waitFor();
  assert.equal(await page.getByRole('tab').first().innerText(),'Temas','the graph opens on the themes hub');
  assert.equal(await page.getByRole('button',{name:'Cerrar grafo 1',exact:true}).count(),0,'the first tab is permanent');
+
+ const verifyContext=async(container,name)=>{
+  const canvas=container.locator('[data-testid="stellar-canvas"]');
+  const before=await container.locator('.stellar-hit').evaluateAll(nodes=>nodes.map(n=>[n.dataset.node,n.getAttribute('style')]));
+  const control=container.getByRole('switch',{name:'Contexto',exact:true});
+  assert.equal(await control.getAttribute('aria-checked'),'false');
+  await control.click();
+  await page.waitForFunction(()=>Number(document.querySelector('.stellar-tab-panel [data-testid="stellar-canvas"]')?.getAttribute('data-context-nodes'))>0);
+  const all=await page.evaluate(async()=> (await window.nodus.listIdeasPage({limit:1,offset:0,sort:'label'})).total);
+  assert.equal(Number(await canvas.getAttribute('data-context-nodes')),all,'context contains unique corpus ideas');
+  assert.ok(Number(await canvas.getAttribute('data-context-edges'))>0);
+  assert.deepEqual(await container.locator('.stellar-hit').evaluateAll(nodes=>nodes.map(n=>[n.dataset.node,n.getAttribute('style')])),before,'context preserves foreground and camera');
+  const slider=container.getByRole('slider',{name:'Intensidad del contexto'});
+  await slider.fill('35');
+  assert.deepEqual(await container.locator('.stellar-hit').evaluateAll(nodes=>nodes.map(n=>[n.dataset.node,n.getAttribute('style')])),before,'intensity does not move working nodes');
+  await page.screenshot({path:root+'/output/stellar-tabs/context-'+name+'.png'});
+  await control.click();
+  assert.equal(Number(await canvas.getAttribute('data-context-nodes')),0);
+  assert.deepEqual(await container.locator('.stellar-hit').evaluateAll(nodes=>nodes.map(n=>[n.dataset.node,n.getAttribute('style')])),before,'turning off restores the unchanged foreground');
+ };
  const themeNode='[data-testid="stellar-themes"] .stellar-node-label';
  await page.locator(themeNode).first().waitFor();
  const bubbles=await page.locator(themeNode).evaluateAll(list=>list.map(b=>({
@@ -63,6 +83,7 @@ try {
  const uniqueIdeas=await page.evaluate(async()=> (await window.nodus.listIdeasPage({limit:1,offset:0,sort:'label'})).total);
  assert.ok(bubbles.reduce((sum,theme)=>sum+theme.ideas,0)>uniqueIdeas,'fixture includes ideas that belong to multiple themes');
  assert.ok((await hub().locator('.stellar-meta').innerText()).includes(`${uniqueIdeas.toLocaleString()} ideas únicas en el corpus`),'hub counts unique ideas instead of summing overlapping theme memberships');
+ await verifyContext(hub(),'hub');
  const dots=await page.locator('[data-testid="stellar-themes"] .stellar-hit').count();
  assert.equal(dots,bubbles.length,'every theme is drawn as a graph node');
  const busiest=bubbles.reduce((best,b)=>b.ideas>best.ideas?b:best,bubbles[0]);
@@ -71,6 +92,8 @@ try {
  await active().waitFor();
  await page.waitForFunction(()=>Number(document.querySelector('.stellar-tab-panel [data-testid="stellar-workspace"]')?.getAttribute('data-node-count'))>0);
  assert.equal(await page.getByRole('tab').first().innerText(),bubbles[0].label,'the tab follows you into the theme');
+ await page.waitForTimeout(700);
+ await verifyContext(active(),'theme');
  const walked=await count('node');
  const themePlayer=active().locator('.stellar-player');
  assert.ok(await themePlayer.evaluate(el=>el.getBoundingClientRect().height)<=56,'theme controls fit in one compact row');
@@ -122,6 +145,17 @@ try {
  await page.getByRole('button',{name:'Nuevo grafo',exact:true}).click();
  assert.equal(await page.getByRole('tab').count(),2);
  assert.equal(await active().getAttribute('data-node-count'),'0','a new tab is a blank canvas');
+ await verifyContext(active(),'blank');
+ await active().getByRole('switch',{name:'Contexto',exact:true}).click();
+ const backgroundIdea=active().locator('.stellar-context-label').first();
+ await backgroundIdea.waitFor();
+ const backgroundId=await backgroundIdea.getAttribute('data-context-node');
+ await backgroundIdea.click();
+ await page.waitForFunction(id=>!!document.querySelector('.stellar-tab-panel .stellar-hit[data-node="'+id+'"]'),backgroundId);
+ assert.ok(await count('node')>0,'clicking a context label promotes that idea into the working exploration');
+ await active().getByRole('button',{name:'Limpiar',exact:true}).click();
+ await active().getByRole('switch',{name:'Contexto',exact:true}).click();
+ assert.equal(await count('node'),0,'clearing an exploration leaves its context separate');
  const candidates=await page.evaluate(()=>window.nodus.discoverArgumentRoutes());
  const seed=candidates.find(n=>n.degree>=3);assert.ok(seed);
  const search=async label=>{await page.locator('.stellar-tab-panel .stellar-search input').fill(label);await page.locator('.stellar-tab-panel .stellar-search-choice').first().waitFor();};
@@ -130,6 +164,7 @@ try {
  await page.locator('.stellar-tab-panel .stellar-search-choice').first().click();await waitEdges(2);
  assert.ok(await count('node')>=2,'choosing a seed loads its links without Play');
  await page.waitForTimeout(750);
+ await verifyContext(active(),'exploration');
  const firstCount=await count('node');
  await search(seed.label);
  const minus=page.locator('.stellar-tab-panel .stellar-search-toggle').first();
@@ -258,5 +293,5 @@ try {
  await page.getByRole('button',{name:'Volver a los temas'}).click();await hub().waitFor();
  await page.screenshot({path:root+'/output/stellar-tabs/empty.png'});
  assert.deepEqual(errors,[]);
- console.log('Stellar tabs E2E passed: permanent themes hub, instant additive hub search, pinned-idea exploration, theme walk + child limit + depth + back, isolated tabs, stable transport height, unified accent hover, background deselection, light/dark full screen, section navigation, hub on reload.');
+ console.log('Stellar tabs E2E passed: corpus context in hub/theme/blank/exploration, intensity and toggle preserve foreground, context idea promotion, permanent themes hub, instant additive hub search, pinned-idea exploration, theme walk + child limit + depth + back, isolated tabs, stable transport height, unified accent hover, background deselection, light/dark full screen, section navigation, hub on reload.');
 } finally {await app.close();fs.rmSync(profile,{recursive:true,force:true});}

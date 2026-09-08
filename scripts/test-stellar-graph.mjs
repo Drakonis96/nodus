@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';import path from 'node:path';
 const tmp=await mkdtemp(path.join(os.tmpdir(),'stellar-tests-'));
-await build({entryPoints:['src/stellarGraph/exploration.ts','src/stellarGraph/source.ts','src/stellarGraph/layout.ts','src/stellarGraph/themes.ts','src/stellarGraph/forceLayout.ts'],outdir:tmp,bundle:true,platform:'node',format:'esm',outExtension:{'.js':'.mjs'}});
+await build({entryPoints:['src/stellarGraph/context.ts','src/stellarGraph/exploration.ts','src/stellarGraph/source.ts','src/stellarGraph/layout.ts','src/stellarGraph/themes.ts','src/stellarGraph/forceLayout.ts'],outdir:tmp,bundle:true,platform:'node',format:'esm',outExtension:{'.js':'.mjs'}});
 const {Exploration}=await import(path.join(tmp,'exploration.mjs'));
 const {memorySource}=await import(path.join(tmp,'source.mjs'));
 const {placeNodes,isLegacyLinearLayout}=await import(path.join(tmp,'layout.mjs'));
@@ -208,4 +208,21 @@ test('walking a theme keeps an isolated focus visible and never invents relation
  const view=neighbourhood(data,'lonely',2);
  assert.deepEqual(view.nodes.map(n=>n.id),['lonely']);
  assert.deepEqual(view.edges,[]);
+});
+
+const {loadCorpusContext}=await import(path.join(tmp,'context.mjs'));
+test('corpus context includes every unique idea, isolated ideas and cross-theme links',async()=>{
+ const g={nodes:Array.from({length:503},(_,i)=>({...node('c'+i),themes:[i%2?'A':'B']})),edges:Array.from({length:502},(_,i)=>edge('c'+i,'c'+i,'c'+(i+1)))};
+ const result=await loadCorpusContext(memorySource('corpus',async()=>g),()=>false,()=>{});
+ assert.equal(result.nodes.length,503);assert.equal(result.edges.length,502);
+ assert.equal(new Set(result.nodes.map(n=>n.id)).size,503);
+ const withLoose=await loadCorpusContext(source(),()=>false,()=>{});
+ assert.ok(withLoose.nodes.some(n=>n.id==='isolated'));
+ assert.ok(withLoose.edges.some(e=>e.source==='outside'));
+});
+test('context cancellation stops pagination and malformed pagination fails',async()=>{
+ const base=source();let cancelled=false,calls=0;
+ const result=await loadCorpusContext({...base,page:async req=>{calls++;cancelled=true;return {...await base.page(req),next:200};}},()=>cancelled,()=>{});
+ assert.equal(result,null);assert.equal(calls,1);
+ await assert.rejects(loadCorpusContext({...base,page:async req=>({...await base.page(req),next:0})},()=>false,()=>{}),/contexto/);
 });

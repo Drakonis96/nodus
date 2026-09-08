@@ -140,6 +140,16 @@ export function stellarPage(req: StellarPageRequest): StellarPage {
         `${edgeSelect} WHERE ${where} ORDER BY CASE WHEN verdict='confirmed' THEN 0 WHEN e.basis='explicit' THEN 1 ELSE 2 END,e.confidence DESC,e.id LIMIT ? OFFSET ?`,
       )
       .all(req.id, req.id, limit, offset) as GraphEdge[];
+  } else if (req.kind === "corpus") {
+    const nodeScope = `i.orphaned_at IS NULL AND ${eligible("i.global_id")}`;
+    const links = `${edgeScope} AND EXISTS (SELECT 1 FROM ideas i WHERE i.global_id=e.from_id AND i.orphaned_at IS NULL) AND EXISTS (SELECT 1 FROM ideas i WHERE i.global_id=e.to_id AND i.orphaned_at IS NULL)`;
+    ids = (db.prepare(`SELECT i.global_id AS id FROM ideas i WHERE ${nodeScope} ORDER BY i.global_id LIMIT ? OFFSET ?`)
+      .all(limit, offset) as { id: string }[]).map(row => row.id);
+    edges = db.prepare(`${edgeSelect} WHERE ${links} ORDER BY e.id LIMIT ? OFFSET ?`).all(limit, offset) as GraphEdge[];
+    total = Math.max(
+      (db.prepare(`SELECT COUNT(*) AS n FROM ideas i WHERE ${nodeScope}`).get() as { n: number }).n,
+      (db.prepare(`SELECT COUNT(*) AS n FROM visible_edges e WHERE ${links}`).get() as { n: number }).n,
+    );
   } else if (req.kind === "theme") {
     if (!req.id) return { nodes: [], edges: [], total: 0, next: null };
     // Named parameters throughout: the membership subquery binds the theme twice and

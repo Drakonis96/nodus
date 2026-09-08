@@ -1,7 +1,7 @@
 import type { GraphData } from "./types";
 export interface StellarPageRequest {
   /** `theme` returns every idea nested under a theme plus the relations between them. */
-  kind: "search" | "neighbors" | "work" | "elements" | "theme";
+  kind: "search" | "neighbors" | "work" | "elements" | "theme" | "corpus";
   id?: string;
   search?: string;
   theme?: string;

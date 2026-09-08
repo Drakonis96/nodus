@@ -13,6 +13,7 @@ import {
   NodeDetailPanel,
   type DetailLoading,
 } from "../components/NodeDetailPanel";
+import { CorpusContextControls, useCorpusContext } from "./CorpusContext";
 import { StellarCanvas, ZOOM_STEP, type StellarCanvasApi } from "./StellarCanvas";
 import { Exploration } from "./exploration";
 import { workScopedSource, type StellarGraphSource } from "./source";
@@ -632,6 +633,7 @@ function StellarGraphTab({
     () => themeId ? neighbourhood(capped, focal, depth) : capped,
     [themeId, capped, focal, depth],
   );
+  const corpusContext = useCorpusContext(source, view, positions, active);
   // A theme is always entered from somewhere. Without this a restored session would open
   // on the whole theme at once, which is exactly the wall of lines the walk exists to avoid.
   useEffect(() => {
@@ -694,6 +696,14 @@ function StellarGraphTab({
             layout={themeId && view.nodes.length > FORCE_LAYOUT_FROM ? "force" : "spiral"}
             onLayoutProgress={setLayoutProgress}
             data={view}
+            context={corpusContext.layer}
+            onContextNode={node => {
+              if (busy || loading) return;
+              closeDetail();
+              const position = corpusContext.layer?.positions[node.id];
+              if (position) setPositions(current => ({ ...current, [node.id]: position }));
+              void start(node.id, node).then(() => { if (themeId) setFocal(node.id); });
+            }}
             positions={positions}
             camera={camera}
             selected={activeEdge ? null : selected}
@@ -758,7 +768,7 @@ function StellarGraphTab({
               <span> · {tx("{n} ocultas por el límite", { n: hiddenRelations.toLocaleString() })}</span>}
             {workId && <span> / {t("Grafo de la obra")}</span>}
           </div>
-          {!loading && !view.nodes.length && (
+          {!loading && !view.nodes.length && !corpusContext.layer && (
             <div className="stellar-empty stellar-empty-hint">
               {t(themeId
                 ? "Este tema todavía no anida ninguna idea analizada."
@@ -791,6 +801,7 @@ function StellarGraphTab({
             </div>
           )}
           <div className="stellar-navigation">
+            <CorpusContextControls context={corpusContext} onFit={() => api.current?.fitContext()} />
             <button title={t("Alejar")} onClick={() => api.current?.zoom(1 / ZOOM_STEP)}>
               −
             </button>

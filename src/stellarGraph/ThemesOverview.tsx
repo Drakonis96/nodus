@@ -3,6 +3,7 @@ import type { GraphData, GraphNode } from "@shared/types";
 import type { StellarPosition, StellarTheme } from "@shared/stellarGraph";
 import { themeName, type StellarGraphSource } from "./source";
 import { sortThemes, themeConstellation } from "./themes";
+import { CorpusContextControls, useCorpusContext } from "./CorpusContext";
 import { StellarCanvas, type StellarCanvasApi } from "./StellarCanvas";
 import { errorText, t, tx } from "../i18n";
 import { Icon } from "../components/ui";
@@ -111,6 +112,7 @@ export function ThemesOverview({
     }),
     [shown, pinned],
   );
+  const corpusContext = useCorpusContext(source, data, positions, active);
   const byId = useMemo(() => new Map(shown.map((theme) => [theme.id, theme])), [shown]);
 
   // The rings are decided by the themes on screen, so filtering re-forms the constellation.
@@ -189,6 +191,8 @@ export function ThemesOverview({
         <div className="stellar-stage">
           {active && <StellarCanvas
             data={data}
+            context={corpusContext.layer}
+            onContextNode={node => { if (!visibleIds.has(node.id)) updateIdeas([...pinned, node]); }}
             positions={positions}
             camera={camera}
             onPositions={setPositions}
@@ -218,6 +222,7 @@ export function ThemesOverview({
             {ideaCount !== null && ` · ${tx("{n} ideas únicas en el corpus", { n: ideaCount.toLocaleString() })}`}
           </div>
           <div className="stellar-navigation">
+            <CorpusContextControls context={corpusContext} onFit={() => api.current?.fitContext()} />
             <button title={t("Alejar")} onClick={() => api.current?.zoom(1 / 1.55)}>
               −
             </button>

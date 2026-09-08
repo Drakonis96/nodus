@@ -1,5 +1,11 @@
 export const STELLAR_GRAPH_TRANSLATIONS = {
   "en": {
+    "Contexto": "Context",
+    "Intensidad del contexto": "Context intensity",
+    "Ver corpus": "View corpus",
+    "Mostrar el corpus tenue alrededor de las ideas de esta pestaña": "Show the faint corpus around the ideas in this tab",
+    "No se pudo cargar el contexto del corpus.": "Could not load the corpus context.",
+    "{n} ideas · {edges} conexiones en el corpus": "{n} ideas · {edges} connections in the corpus",
     "{n} ideas únicas en el corpus": "{n} unique ideas in the corpus",
     "{n} ideas en este tema": "{n} ideas in this theme",
     "Tema": "Theme",
@@ -97,6 +103,12 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Finding"
   },
   "fr": {
+    "Contexto": "Contexte",
+    "Intensidad del contexto": "Intensité du contexte",
+    "Ver corpus": "Voir le corpus",
+    "Mostrar el corpus tenue alrededor de las ideas de esta pestaña": "Afficher le corpus en estompé autour des idées de cet onglet",
+    "No se pudo cargar el contexto del corpus.": "Impossible de charger le contexte du corpus.",
+    "{n} ideas · {edges} conexiones en el corpus": "{n} idées · {edges} connexions dans le corpus",
     "{n} ideas únicas en el corpus": "{n} idées uniques dans le corpus",
     "{n} ideas en este tema": "{n} idées dans ce thème",
     "Tema": "Thème",
@@ -194,6 +206,12 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Résultat"
   },
   "de": {
+    "Contexto": "Kontext",
+    "Intensidad del contexto": "Kontextintensität",
+    "Ver corpus": "Korpus ansehen",
+    "Mostrar el corpus tenue alrededor de las ideas de esta pestaña": "Den Korpus dezent um die Ideen dieses Tabs anzeigen",
+    "No se pudo cargar el contexto del corpus.": "Der Korpuskontext konnte nicht geladen werden.",
+    "{n} ideas · {edges} conexiones en el corpus": "{n} Ideen · {edges} Verbindungen im Korpus",
     "{n} ideas únicas en el corpus": "{n} eindeutige Ideen im Korpus",
     "{n} ideas en este tema": "{n} Ideen in diesem Thema",
     "Tema": "Thema",
@@ -291,6 +309,12 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Befund"
   },
   "pt": {
+    "Contexto": "Contexto",
+    "Intensidad del contexto": "Intensidade do contexto",
+    "Ver corpus": "Ver corpus",
+    "Mostrar el corpus tenue alrededor de las ideas de esta pestaña": "Mostrar o corpus esbatido à volta das ideias deste separador",
+    "No se pudo cargar el contexto del corpus.": "Não foi possível carregar o contexto do corpus.",
+    "{n} ideas · {edges} conexiones en el corpus": "{n} ideias · {edges} ligações no corpus",
     "{n} ideas únicas en el corpus": "{n} ideias únicas no corpus",
     "{n} ideas en este tema": "{n} ideias neste tema",
     "Tema": "Tema",
@@ -388,6 +412,12 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Descoberta"
   },
   "pt-BR": {
+    "Contexto": "Contexto",
+    "Intensidad del contexto": "Intensidade do contexto",
+    "Ver corpus": "Ver corpus",
+    "Mostrar el corpus tenue alrededor de las ideas de esta pestaña": "Mostrar o corpus esmaecido ao redor das ideias desta aba",
+    "No se pudo cargar el contexto del corpus.": "Não foi possível carregar o contexto do corpus.",
+    "{n} ideas · {edges} conexiones en el corpus": "{n} ideias · {edges} conexões no corpus",
     "{n} ideas únicas en el corpus": "{n} ideias únicas no corpus",
     "{n} ideas en este tema": "{n} ideias neste tema",
     "Tema": "Tema",
@@ -485,6 +515,12 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Achado"
   },
   "it": {
+    "Contexto": "Contesto",
+    "Intensidad del contexto": "Intensità del contesto",
+    "Ver corpus": "Vedi corpus",
+    "Mostrar el corpus tenue alrededor de las ideas de esta pestaña": "Mostra il corpus attenuato intorno alle idee di questa scheda",
+    "No se pudo cargar el contexto del corpus.": "Impossibile caricare il contesto del corpus.",
+    "{n} ideas · {edges} conexiones en el corpus": "{n} idee · {edges} connessioni nel corpus",
     "{n} ideas únicas en el corpus": "{n} idee uniche nel corpus",
     "{n} ideas en este tema": "{n} idee in questo tema",
     "Tema": "Tema",
@@ -582,6 +618,12 @@ export const STELLAR_GRAPH_TRANSLATIONS = {
     "Hallazgo": "Risultato"
   },
   "tr": {
+    "Contexto": "Bağlam",
+    "Intensidad del contexto": "Bağlam yoğunluğu",
+    "Ver corpus": "Derlemi göster",
+    "Mostrar el corpus tenue alrededor de las ideas de esta pestaña": "Bu sekmedeki fikirlerin çevresinde derlemi soluk göster",
+    "No se pudo cargar el contexto del corpus.": "Derlem bağlamı yüklenemedi.",
+    "{n} ideas · {edges} conexiones en el corpus": "Derlemde {n} fikir · {edges} bağlantı",
     "{n} ideas únicas en el corpus": "Korpusta {n} benzersiz fikir",
     "{n} ideas en este tema": "Bu konuda {n} fikir",
     "Tema": "Konu",

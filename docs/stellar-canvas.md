@@ -60,3 +60,17 @@ Full screen gives the map and evidence panel the entire workspace. Both themes, 
 Run `npm test` for traversal, pagination, cancellation, complete works, stable placement, session boundaries, and camera geometry. `npm run test:e2e:stellar` exercises the real application with an isolated demonstration profile, including search, playback, framing, rewind, empty startup, and sidebar behavior. `npm run test:e2e:stellar-tabs` covers additive search, removal, independent tabs, view snapshots, and full screen. `npm run test:e2e:argument-map` covers visual branches, filters, camera history, auto zoom, text selection, and full screen. All three use isolated demonstration profiles. The normal repository lint, builds, and E2E smoke also apply.
 
 Local review copies can use `NODUS_USERDATA` with `NODUS_STELLAR_PREVIEW=1` to skip startup background integrations. QA uses the existing database-path guard. Profiles, copied vault content, reports, and recordings are local artifacts and are not distributed with the source.
+
+### Corpus context overlay
+
+The themes hub, theme walks and blank exploration tabs offer **Context** beside the zoom
+controls. It is off by default. Turning it on pages the complete eligible source corpus,
+including disconnected ideas and links across themes. The intensity slider changes only
+its appearance. **View corpus** fits the background; **Fit** returns to the working graph.
+The background uses its own worker layout anchored to the working positions, faint points
+and straight links. Connections touching working ideas receive extra emphasis. Sparse
+background captions can be clicked to add an idea to the hub or current exploration.
+Background data never enters playback, working counts, or saved exploration history unless
+explicitly added. The control does not increase either transport bar's height.
+Completed loads are reused for tabs sharing the same source object; changing source
+invalidates the layer. Cancelling or leaving a loading tab stops further page requests.
