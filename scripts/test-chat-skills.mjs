@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 import { build } from 'esbuild';
 
 const require = createRequire(import.meta.url);
@@ -192,7 +193,7 @@ test('existing libraries receive the disabled tutor once without overwriting use
     assert.equal(migrated.some(skill => skill.builtin === 'image'), false, 'deleted image skill stays deleted');
     const tutor = migrated.find(skill => skill.builtin === 'socratic');
     assert.deepEqual(tutor.enabled, { assistant: false, nodi: false });
-    assert.equal(JSON.parse(fs.readFileSync(location)).version, 8);
+    assert.equal(JSON.parse(fs.readFileSync(location)).version, 9);
     assert.equal(lib.listChatSkills().length, 12, 'migration is idempotent');
     lib.deleteChatSkill(tutor.id);
     assert.equal(lib.listChatSkills().some(skill => skill.builtin === 'socratic'), false, 'deleted tutor does not reappear');
@@ -249,7 +250,7 @@ test('version 3 migration adds Chemistry Studio once and preserves existing skil
     const migrated = lib.listChatSkills();
     assert.deepEqual(migrated[0], edited);
     assert.equal(migrated.filter(skill => skill.builtin === 'chemistry').length, 1);
-    assert.equal(JSON.parse(fs.readFileSync(location)).version, 8);
+    assert.equal(JSON.parse(fs.readFileSync(location)).version, 9);
     assert.deepEqual(lib.listChatSkills(), migrated, 'version 6 migration is idempotent');
   } finally { fs.writeFileSync(location, original); }
 });
@@ -259,12 +260,37 @@ test('historical migrations preserve user-edited Chemistry Studio instructions',
   const original = fs.readFileSync(location);
   try {
     const chemistry = { ...lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'chemistry'), instructions: 'Keep my custom chemistry workflow.', enabled: { assistant: false, nodi: true } };
-    for (const version of [4, 5, 6, 7]) {
+    for (const version of [4, 5, 6, 7, 8]) {
       fs.writeFileSync(location, JSON.stringify({ version, skills: [chemistry] }));
       assert.deepEqual(lib.listChatSkills(), [chemistry]);
-      assert.equal(JSON.parse(fs.readFileSync(location)).version, 8);
+      assert.equal(JSON.parse(fs.readFileSync(location)).version, 9);
     }
   } finally { fs.writeFileSync(location, original); }
+});
+
+test('untouched v8 chemistry instructions upgrade once without resetting flags or deleted skills', () => {
+  const location = path.join(temporary, 'chat-skills.json'), original = fs.readFileSync(location);
+  try {
+    const instructions = fs.readFileSync(path.join(root, 'scripts/fixtures/chemistry-skill-v8.txt'), 'utf8').trimEnd();
+    assert.equal(createHash('sha256').update(instructions).digest('hex'), '876f9cf3d84a695540625bc79865b5f1d9026f6e577dbbbfd78a970e5552db94');
+    const chemistry = { ...lib.DEFAULT_CHAT_SKILLS.find(s => s.builtin === 'chemistry'), instructions, enabled: { assistant: false, nodi: true } };
+    fs.writeFileSync(location, JSON.stringify({ version: 8, skills: [chemistry] }));
+    const migrated = lib.listChatSkills(); assert.equal(migrated.length, 1);
+    assert.equal(migrated[0].instructions, lib.DEFAULT_CHAT_SKILLS.find(s => s.builtin === 'chemistry').instructions);
+    assert.deepEqual(migrated[0].enabled, chemistry.enabled);
+    assert.deepEqual(lib.listChatSkills(), migrated);
+    fs.writeFileSync(location, JSON.stringify({ version: 8, skills: [] }));
+    assert.deepEqual(lib.listChatSkills(), []);
+  } finally { fs.writeFileSync(location, original); }
+});
+
+test('reaction JSON reaches the same resolver and untrusted claims are removed', async () => {
+  const intent = { version: 2, kind: 'reaction', depiction: 'skeletal', reactionSmiles: 'N>>N' };
+  let calls = 0;
+  globalThis.__skillChemistryResolver = async source => { assert.deepEqual(JSON.parse(source), intent); calls++; return { version: 2, status: 'unsupported', reason: 'Test abstention.' }; };
+  const execution = { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, isCurrent: () => true };
+  const result = await lib.executeChatSkills('Guaranteed reaction!\n```json\n' + JSON.stringify(intent) + '\n```', execution);
+  assert.equal(calls, 1); assert.match(result, /Test abstention/); assert.doesNotMatch(result, /Guaranteed/);
 });
 
 test('image requests use the exact model and prompt, persist metadata, and return real local URLs', async () => {

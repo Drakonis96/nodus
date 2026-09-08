@@ -17,6 +17,11 @@ const MAX_SMILES_SOURCE = 1_000;
 const COMPILE_TIMEOUT_MS = 15_000;
 const MAX_CACHE_ENTRIES = 160;
 const cache = new Map<string, string>();
+// The TeX WASM engine is process-global and non-reentrant, including for old
+// chat cards that compile concurrently through IPC. Never reuse it after a
+// timeout: Promise.race cannot cancel the underlying WASM operation.
+let compilationTail: Promise<unknown> = Promise.resolve();
+let compilerTimedOut = false;
 
 const VALENCE_ELECTRONS: Record<number, number> = {
   1: 1, 3: 1, 5: 3, 6: 4, 7: 5, 8: 6, 9: 7,
@@ -221,6 +226,13 @@ export async function compileSmiles(smiles: string): Promise<string> {
 /** Compile a narrowly scoped Chemfig drawing to SVG using the bundled WASM TeX
  * runtime. The returned SVG is still sanitized by ChatVisual before display. */
 export async function compileChemfig(source: string): Promise<string> {
+  const run = compilationTail.then(() => compileChemfigSerial(source));
+  compilationTail = run.catch(() => undefined);
+  return run;
+}
+
+async function compileChemfigSerial(source: string): Promise<string> {
+  if (compilerTimedOut) throw new Error('ChemFig engine timed out; restart the application before compiling again.');
   const code = String(source ?? '').trim();
   if (!code) throw new Error('Empty Chemfig source.');
   if (code.length > MAX_CHEMFIG_SOURCE) throw new Error('Chemfig source is too large to render.');
@@ -236,9 +248,9 @@ export async function compileChemfig(source: string): Promise<string> {
   const input = `\\begin{document}\n${layout.source.replace(/\\chemfig\b/g, '\n\\chemfig')}\n\\end{document}`;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const raw = await Promise.race([
-    getChemfigEngine()(input, { texPackages: { chemfig: '' }, showConsole: process.env.NODUS_CHEMFIG_DEBUG === '1' }),
+    getChemfigEngine()(input, { texPackages: { amsmath: '', chemfig: '' }, showConsole: process.env.NODUS_CHEMFIG_DEBUG === '1' }),
     new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => reject(new Error('Chemfig compilation timed out.')), COMPILE_TIMEOUT_MS);
+      timer = setTimeout(() => { compilerTimedOut = true; reject(new Error('Chemfig compilation timed out.')); }, COMPILE_TIMEOUT_MS);
     }),
   ]).finally(() => { if (timer) clearTimeout(timer); });
   // The bundled DVI converter drops the stroke inside nested TikZ pictures

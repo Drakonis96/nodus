@@ -37,7 +37,7 @@ export async function executeChatSkills(answer: string, execution: ChatSkillExec
     for (const match of answer.matchAll(/```json\s*\n([\s\S]*?)\n```/gi)) {
       try {
         const candidate = JSON.parse(match[1]);
-        if (candidate?.version === 2 && ['skeletal', 'fischer', 'haworth', 'newman'].includes(candidate.depiction) && ['structure', 'comparison', 'mechanism'].includes(candidate.kind) && Array.isArray(candidate.species)) candidates.set(JSON.stringify(candidate), match[1]);
+        if (candidate?.version === 2 && ['skeletal', 'fischer', 'haworth', 'newman'].includes(candidate.depiction) && ['structure', 'comparison', 'mechanism', 'reaction'].includes(candidate.kind) && (Array.isArray(candidate.species) || candidate.kind === 'reaction' && typeof candidate.reactionSmiles === 'string')) candidates.set(JSON.stringify(candidate), match[1]);
       } catch { /* Not a complete JSON tool intent. */ }
     }
     if (candidates.size > 1) return 'Chemistry Studio — unsupported: conflicting chemical intents were returned. Request one explicit structure or mechanism.';

@@ -5,7 +5,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { DEFAULT_CHAT_SKILLS, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
 
 const file = () => path.join(app.getPath('userData'), 'chat-skills.json');
-const LIBRARY_VERSION = 8;
+const LIBRARY_VERSION = 9;
+const LEGACY_CHEMISTRY_V8_SHA256 = '876f9cf3d84a695540625bc79865b5f1d9026f6e577dbbbfd78a970e5552db94';
 const LEGACY_CHEMISTRY_V7_SHA256 = '752f1a771d090e09a2ac564421e563167fc89b858d9167eba50eb2327ce1c5ef';
 const LEGACY_CHEMISTRY_V6_SHA256 = '2fcb5625341467d5724b42ef1ac37d2429eb48779237e0593f7f75a605f00d5c';
 const LEGACY_CHEMISTRY_V5_SHA256 = '52585c98d17188a731ce06b5df8a34f914f63d68ef779fe8212cbe92db77b506';
@@ -14,7 +15,7 @@ export function listChatSkills(): ChatSkill[] {
   if (!fs.existsSync(file())) return structuredClone(DEFAULT_CHAT_SKILLS);
   let parsed: { version?: number; skills?: ChatSkill[] };
   try { parsed = JSON.parse(fs.readFileSync(file(), 'utf8')); } catch { throw new Error('The skills library could not be read.'); }
-  if (![1, 2, 3, 4, 5, 6, 7, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');
+  if (![1, 2, 3, 4, 5, 6, 7, 8, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');
   if (parsed.version! < LIBRARY_VERSION) {
     // Each release adds only newly introduced defaults. Never restore a skill
     // deleted in an earlier version or overwrite its edited instructions/flags.
@@ -23,7 +24,8 @@ export function listChatSkills(): ChatSkill[] {
       && ((parsed.version === 4 && createHash('sha256').update(skill.instructions).digest('hex') === LEGACY_CHEMISTRY_V4_SHA256)
         || (parsed.version === 5 && createHash('sha256').update(skill.instructions).digest('hex') === LEGACY_CHEMISTRY_V5_SHA256)
         || (parsed.version === 6 && createHash('sha256').update(skill.instructions).digest('hex') === LEGACY_CHEMISTRY_V6_SHA256)
-        || (parsed.version === 7 && createHash('sha256').update(skill.instructions).digest('hex') === LEGACY_CHEMISTRY_V7_SHA256))
+        || (parsed.version === 7 && createHash('sha256').update(skill.instructions).digest('hex') === LEGACY_CHEMISTRY_V7_SHA256)
+        || (parsed.version === 8 && createHash('sha256').update(skill.instructions).digest('hex') === LEGACY_CHEMISTRY_V8_SHA256))
       && latestChemistry
       ? { ...skill, instructions: latestChemistry.instructions }
       : skill);

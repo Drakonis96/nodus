@@ -9,9 +9,15 @@ export function ChatChemistryDocument({ source }: { source: string }) {
     if (source.length > 2_000_000) throw new Error();
     document = JSON.parse(source);
     if (!document || document.version !== 2 || document.status !== 'verified' || document.scope !== 'reference-graph-and-molfile-roundtrip'
-      || !Array.isArray(document.species) || document.species.length < 1 || document.species.length > 4
+      || !Array.isArray(document.species) || document.species.length < 1 || document.species.length > (document.reaction ? 12 : 4)
       || document.species.some(s => !s || !s.input || typeof s.input.value !== 'string' || typeof s.svg !== 'string' || !Array.isArray(s.references)
         || s.references.some(ref => !ref || !['user', 'opsin', 'pubchem'].includes(ref.provider)))
+      || (document.reaction && (document.mechanism || document.reaction.scope !== 'balanced-scheme-not-mechanism'
+        || typeof document.reaction.svg !== 'string' || document.reaction.chemfig?.status !== 'validated' || typeof document.reaction.chemfig.source !== 'string'
+        || !Array.isArray(document.reaction.limitations) || document.reaction.limitations.some(text => typeof text !== 'string')
+        || !Array.isArray(document.reaction.species) || document.reaction.species.length !== document.species.length
+        || !document.reaction.species.some(s => s?.role === 'reactant') || !document.reaction.species.some(s => s?.role === 'product')
+        || document.reaction.species.some((s, i) => !s || s.id !== document.species[i].id || typeof s.smiles !== 'string' || !['reactant', 'product', 'agent'].includes(s.role) || !Number.isInteger(s.coefficient) || s.coefficient < 1 || s.coefficient > 12)))
       || (document.mechanism && (typeof document.mechanism.svg !== 'string' || !Array.isArray(document.mechanism.limitations)
         || document.mechanism.limitations.some(text => typeof text !== 'string')
         || (document.mechanism.panels != null && (!Array.isArray(document.mechanism.panels) || document.mechanism.panels.length > 8
@@ -34,8 +40,14 @@ export function ChatChemistryDocument({ source }: { source: string }) {
     }}>{t("Descargar fragmento ChemFig contrastado")}</button>;
   };
   const mechanism = document.mechanism;
+  const reaction = document.reaction;
   const mechanismTitle = (rule: string) => ({ sn2: t("SN2: mecanismo condicional"), e2: t("E2: alternativas anti-periplanares"), aldol: t("Adición aldólica: mecanismo por etapas"), 'diels-alder': t("Diels–Alder: cicloadición suprafacial"), 'amide-resonance': t("Contribuyentes de resonancia de amida") }[rule] ?? t("Mecanismo químico"));
   return <section aria-label="Chemistry Studio" className="space-y-3">
+    {reaction && <div>
+      <ChatVisual svg={reaction.svg} alt={t("Esquema balanceado; mecanismo no verificado")} kindLabel="Chemistry Studio" provenanceLabel={t("Esquema balanceado; mecanismo no verificado")} />
+      {reaction.limitations.map((text, i) => <p key={i}>{text}</p>)}
+      {chemfigButton(reaction.chemfig)}
+    </div>}
     {mechanism && typeof mechanism.svg === 'string' && Array.isArray(mechanism.limitations) && <div>
       {!mechanism.panels && <ChatVisual svg={mechanism.svg} alt={mechanismTitle(mechanism.rule)} kindLabel="Chemistry Studio" provenanceLabel={t("Regla y balance contrastados")} />}
       {mechanism.limitations.map((text, i) => <p key={i}>{text}</p>)}
@@ -48,7 +60,8 @@ export function ChatChemistryDocument({ source }: { source: string }) {
       </div>)}
     </div>}
     {document.species.map((species, i) => <div key={i}>
-      {!mechanism && <>
+      {reaction && <p>{reaction.species[i].coefficient} × {species.input.value} ({reaction.species[i].role === 'reactant' ? t("Reactivo") : reaction.species[i].role === 'product' ? t("Producto") : t("Agente; excluido del balance")})</p>}
+      {!mechanism && !reaction && <>
       <ChatVisual svg={species.svg} alt={species.input.value} kindLabel="Chemistry Studio" provenanceLabel={t("Grafo contrastado")} />
       {species.depiction && species.depiction !== 'skeletal' && <p>{species.depiction === 'newman' ? species.projection?.convention : species.depiction === 'fischer' ? t("Fischer: enlaces horizontales hacia el observador; verticales hacia atrás.") : t("Haworth: sustituyentes verticales por encima o por debajo del plano idealizado del anillo.")}</p>}
       {chemfigButton(species.chemfig)}

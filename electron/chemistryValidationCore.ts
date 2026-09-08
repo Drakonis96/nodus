@@ -115,6 +115,11 @@ export async function validateChemicalReferences(request: ChemistryValidationReq
     const svg = newman ? renderNewman(newman) : drawing.convention ? renderScene(drawing) : scene.get_svg_with_highlights(JSON.stringify({ ...size, atomColourPalette, prepareMolsBeforeDrawing: false, addStereoAnnotation: false }));
     if (!svg.includes('<svg') || /NaN|Infinity/.test(svg)) throw new Error('Invalid SVG geometry.');
     const result: ChemistryValidationResult = { graph, svg, engineVersion: kit.version() };
+    if (request.reaction) {
+      if (request.mechanism) throw new Error('A balanced scheme cannot also claim mechanism verification.');
+      const { renderBalancedReaction } = await import('./chemistryReaction');
+      result.reaction = await renderBalancedReaction(request.reaction, validateChemicalReferences);
+    }
     if (newman) result.projection = newmanEvidence(newman);
     if (request.exportChemfig) {
       try {

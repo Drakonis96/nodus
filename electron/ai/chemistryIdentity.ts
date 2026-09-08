@@ -1,4 +1,5 @@
 import type { ChemistryIntent, ChemistryReference, ChemistryResolution, ChemistryValidationRequest, ChemistryValidationResult } from '@shared/chemistryDocument';
+import { reactionSmilesSpecies } from '@shared/chemistryReaction';
 
 export interface ChemistryIdentityDependencies {
   fetch: typeof fetch;
@@ -12,8 +13,21 @@ export function parseChemistryIntent(source: string, question: string): Chemistr
     || /wedge[\s\S]{0,40}(?:dash|hash)|solid wedge[\s\S]{0,60}hashed/i.test(question)) {
     throw new Error('The requested specialized depiction is outside the current verified scope; a skeletal drawing will not be substituted.');
   }
-  const raw = JSON.parse(source);
-  if (!raw || raw.version !== 2 || !['structure', 'comparison', 'mechanism'].includes(raw.kind) || !['skeletal', 'fischer', 'haworth', 'newman'].includes(raw.depiction)) {
+  let raw = JSON.parse(source);
+  if (raw?.kind === 'reaction' && /\b(equilibrium|equilibrio|reversible)\b|⇌|↔|<=>/.test(question.toLowerCase())) throw new Error('Only forward reaction schemes are supported; an equilibrium or reversible arrow will not be substituted.');
+  const reactionTokens = question.split(/\s|`/).filter(token => token.split('>').length >= 3);
+  if (raw?.kind === 'reaction' && reactionTokens.length && (reactionTokens.length !== 1 || raw.reactionSmiles !== reactionTokens[0])) {
+    throw new Error('Use the complete single reaction SMILES, including all species and agents; do not replace it with a partial species list.');
+  }
+  if (raw?.kind === 'reaction' && raw.reactionSmiles != null) {
+    if (raw.version !== 2 || raw.depiction !== 'skeletal' || Object.keys(raw).some(k => !['version', 'kind', 'depiction', 'reactionSmiles'].includes(k))
+      || typeof raw.reactionSmiles !== 'string' || !question.includes(raw.reactionSmiles)) throw new Error('Reaction SMILES must be copied completely from the current request.');
+    const value = raw.reactionSmiles;
+    // A substring must not discard reactants, agents or products at either end.
+    if (!question.split(/\s|`/).includes(value)) throw new Error('Provide the complete reaction SMILES on its own line or in a code fence.');
+    raw = { version: 2, kind: 'reaction', depiction: 'skeletal', species: reactionSmilesSpecies(value) };
+  }
+  if (!raw || raw.version !== 2 || !['structure', 'comparison', 'mechanism', 'reaction'].includes(raw.kind) || !['skeletal', 'fischer', 'haworth', 'newman'].includes(raw.depiction)) {
     throw new Error('Use a version-2 identity intent with a supported structure, projection or mechanism rule.');
   }
   if (/\bfischer\b/i.test(question) && raw.depiction !== 'fischer' || /\bhaworth\b/i.test(question) && raw.depiction !== 'haworth' || /\bnewman\b/i.test(question) && raw.depiction !== 'newman') throw new Error('The requested specialized depiction must not be replaced with another projection.');
@@ -36,14 +50,16 @@ export function parseChemistryIntent(source: string, question: string): Chemistr
   if (approaches.length && (raw.rule !== 'diels-alder' || approaches.length === 1 && raw.approach !== approaches[0] || approaches.length === 2 && raw.approach != null)) throw new Error('Preserve the requested endo/exo alternatives.');
   const exactKeys = (value: object, keys: string[]) => Object.keys(value).every(key => keys.includes(key));
   if (!exactKeys(raw, ['version', 'kind', 'depiction', 'species', 'rule', 'conformation', 'approach']) || !Array.isArray(raw.species)
-    || raw.species.length < 1 || raw.species.length > 4 || (raw.kind === 'structure' && raw.species.length !== 1)
+    || raw.species.length < 1 || raw.species.length > (raw.kind === 'reaction' ? 12 : 4) || (raw.kind === 'structure' && raw.species.length !== 1)
     || (raw.kind === 'comparison' && raw.species.length < 2)
     || (raw.kind === 'mechanism' && raw.species.length !== (raw.rule === 'amide-resonance' ? 1 : raw.rule === 'aldol' ? 3 : 2))) throw new Error('Invalid chemical intent schema.');
   const ids = new Set<string>();
   for (const item of raw.species) {
-    if (!item || typeof item !== 'object' || !exactKeys(item, ['id', 'input']) || typeof item.id !== 'string'
+    if (!item || typeof item !== 'object' || !exactKeys(item, raw.kind === 'reaction' ? ['id', 'input', 'role', 'coefficient'] : ['id', 'input']) || typeof item.id !== 'string'
       || !/^[a-z][a-z0-9-]{0,39}$/.test(item.id) || ids.has(item.id)) throw new Error('Invalid or duplicate species ID.');
     ids.add(item.id);
+    if (raw.kind === 'reaction' && (raw.depiction !== 'skeletal' || !['reactant', 'product', 'agent'].includes(item.role)
+      || !Number.isInteger(item.coefficient) || item.coefficient < 1 || item.coefficient > 12)) throw new Error('A reaction requires explicit roles and positive integer coefficients (1–12).');
     const input = item.input;
     if (!input || typeof input !== 'object' || !exactKeys(input, ['kind', 'value']) || !['name', 'pubchem-cid', 'smiles'].includes(input.kind)
       || typeof input.value !== 'string' || !input.value || input.value !== input.value.trim() || input.value.length > (input.kind === 'smiles' ? 2000 : 200)) throw new Error('Invalid chemical identity input.');
@@ -60,6 +76,7 @@ export function parseChemistryIntent(source: string, question: string): Chemistr
       || !/\b(?:pubchem(?:\s+cid)?|cid)\s*[:#]?\s*$/i.test(question.slice(Math.max(0, start - 30), start)))) throw new Error('Provide an explicitly labelled PubChem CID.');
     if (input.kind === 'name' && (!/\p{L}/u.test(input.value) || !/^[\p{L}\p{N}\s()[\]{},.'′’+−–-]+$/u.test(input.value))) throw new Error('Unsupported chemical name syntax.');
   }
+  if (raw.kind === 'reaction' && (!raw.species.some((s: ChemistryIntent['species'][number]) => s.role === 'reactant') || !raw.species.some((s: ChemistryIntent['species'][number]) => s.role === 'product'))) throw new Error('Both reaction sides are required; supply products rather than guessing them.');
   return raw as ChemistryIntent;
 }
 
@@ -135,7 +152,7 @@ export async function resolveChemistryIntent(source: string, question: string, d
       signal?.throwIfAborted();
       const evidence = await references(item.input, deps, signal);
       if (!evidence.length) throw new Error('No exact chemical reference was found; provide an isomeric SMILES or PubChem CID.');
-      const result = await deps.validate({ references: evidence.map(ref => ref.smiles), depiction: intent.depiction, conformation: intent.conformation, exportChemfig: intent.kind !== 'mechanism' }, signal);
+      const result = await deps.validate({ references: evidence.map(ref => ref.smiles), depiction: intent.depiction, conformation: intent.conformation, exportChemfig: intent.kind !== 'mechanism' && intent.kind !== 'reaction' }, signal);
       const axis = /\bC([1-6])\s*(?:[-–→]|to|a)\s*C([1-6])\b/i.exec(question);
       if (intent.depiction === 'newman' && axis && result.projection?.axis.join('-') !== `C${axis[1]}-C${axis[2]}`) throw new Error('That Newman viewing axis is outside the supported convention; use the displayed canonical chain axis.');
       engineVersion = result.engineVersion;
@@ -143,7 +160,9 @@ export async function resolveChemistryIntent(source: string, question: string, d
     }
     const mechanism = intent.kind === 'mechanism' ? (await deps.validate({ references: [species[0].graph.canonicalSmiles], mechanism: { rule: intent.rule!, inputs: species.map(s => s.graph.canonicalSmiles), approach: intent.approach } }, signal)).mechanism : undefined;
     if (intent.kind === 'mechanism' && !mechanism) throw new Error('The mechanism worker returned no checked rule result.');
-    return { version: 2, status: 'verified', scope: 'reference-graph-and-molfile-roundtrip', engine: { name: 'RDKit', version: engineVersion }, species, ...(mechanism ? { mechanism } : {}),
+    const reaction = intent.kind === 'reaction' ? (await deps.validate({ references: [species[0].graph.canonicalSmiles], reaction: species.map(s => ({ id: s.id, smiles: s.graph.canonicalSmiles, role: s.role!, coefficient: s.coefficient! })) }, signal)).reaction : undefined;
+    if (intent.kind === 'reaction' && !reaction) throw new Error('The worker returned no balanced reaction scheme.');
+    return { version: 2, status: 'verified', scope: 'reference-graph-and-molfile-roundtrip', engine: { name: 'RDKit', version: engineVersion }, species, ...(mechanism ? { mechanism } : {}), ...(reaction ? { reaction } : {}),
       limitations: ['Verification covers reference graphs and the stated projection/rule, not all visual layout defects or experimental product dominance.', 'User SMILES certify only the supplied graph, not a compound name.', 'Projection and mechanism coverage is bounded; new aldol stereocentres are not assigned an arbitrary configuration, and alternative reaction products are not ranked.'] };
   } catch (error) {
     signal?.throwIfAborted();
