@@ -16,15 +16,17 @@ Themes are synced to Nodus Server via the portable profile, so Desktop and Serve
 
 ## How it works
 
-Every theme defines three anchor colours:
+Every theme defines three surface/accent colours and two mode-specific foreground colours:
 
 - **Accent** — the primary brand colour (used for buttons, links, active states, focus rings)
 - **Deep surface** — the darker tinted background
 - **Pale surface** — the lighter tinted background
+- **Light-mode text** — the foreground used in light mode
+- **Dark-mode text** — the foreground used in dark mode
 
-A build script (`npm run gen:theme`) reads each palette file from `res/themes/` and expands those three anchors into full `--n-*` (neutral) and `--a-*` (accent) CSS custom-property ramps. The generated output is committed to the repo.
+The renderer derives those ramps at runtime and writes them to CSS custom properties on the document root. The CSS utility mapping is static, so a new theme never requires a build or a generated stylesheet.
 
-When you select a theme, Nodus applies an `html.theme-<id>` class. Generated CSS rules scoped to that class retint every `neutral-*` and `indigo-*` utility the app uses, in both light and dark modes. The default theme carries no rules, so the app behaves exactly as it did before the feature was added.
+When you select a theme, Nodus applies runtime `--n-*` and `--a-*` variables and a generic theme marker to the document root. Static CSS rules retint every `neutral-*` and `indigo-*` utility the app uses, in both light and dark modes. The default theme leaves the original Tailwind values in place, so the app behaves exactly as it did before the feature was added.
 
 ### Dark mode accent handling
 
@@ -56,23 +58,9 @@ Platform-native `<select>` dropdowns are also themed. The option list background
 
 ---
 
-## Adding a new theme
+## Creating a new theme
 
-1. Create a JSON palette file in `res/themes/`:
-
-```json
-{
-  "id": "my-theme",
-  "name": "My Theme",
-  "accent": "#6366f1",
-  "deep": "#1e1b4b",
-  "pale": "#e0e7ff"
-}
-```
-
-2. Run `npm run gen:theme` to regenerate `tokens.generated.css` and `utilities.generated.css`.
-
-3. The new swatch appears automatically in Settings → Appearance and in the command palette.
+Open **Settings → Appearance → Create theme**. Choose a name, accent colour, pale surface, deep surface, light-mode text, dark-mode text, and tint amount. Nodus derives the ramps, checks both mode-specific foreground/surface pairs, applies the preview immediately, and stores the definition with the profile. Custom themes are available in both Desktop and Server Web and do not require a rebuild.
 
 ---
 

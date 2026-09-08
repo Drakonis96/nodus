@@ -4,7 +4,9 @@ export type Ramp = Record<ThemeShade, string>;
 export interface ThemeAnchors {
   accent: string;
   deep: string;
-  pale?: string;
+  pale: string;
+  lightText: string;
+  darkText: string;
   tint?: number;
 }
 
@@ -13,6 +15,8 @@ export interface ThemeTokens {
   n: Ramp;
   /** Accent ramp — mode-split. */
   a: { dark: Ramp; light: Ramp };
+  /** Explicit mode-specific foreground colours. */
+  text: { dark: string; light: string };
 }
 
 export interface ThemeDef {
@@ -23,8 +27,6 @@ export interface ThemeDef {
 }
 
 export const THEMES: ThemeDef[];
-export const THEME_IDS: string[];
-export const THEME_LABELS: Record<string, string>;
 export const SHADES: ThemeShade[];
 
 export function mix(a: string, b: string, amount: number): string;

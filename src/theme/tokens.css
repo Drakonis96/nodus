@@ -1,0 +1,68 @@
+/* Static runtime token layer. Custom palettes replace these variables at runtime. */
+:root {
+  --n-50: #fafafa;
+  --n-100: #f5f5f5;
+  --n-200: #e5e5e5;
+  --n-300: #d4d4d4;
+  --n-400: #a3a3a3;
+  --n-500: #737373;
+  --n-600: #525252;
+  --n-700: #404040;
+  --n-800: #262626;
+  --n-900: #171717;
+  --n-950: #0a0a0a;
+  --a-50: #eef2ff;
+  --a-100: #e0e7ff;
+  --a-200: #c7d2fe;
+  --a-300: #a5b4fc;
+  --a-400: #818cf8;
+  --a-500: #6366f1;
+  --a-600: #4f46e5;
+  --a-700: #4338ca;
+  --a-800: #3730a3;
+  --a-900: #312e81;
+  --a-950: #1e1b4b;
+  --theme-text-light: #171717;
+  --theme-text-dark: #f5f5f5;
+  /* Foreground-derived semantic tokens keep muted copy, icons and borders
+   * visible even when a custom palette uses unusual surface colours. */
+  --theme-text-light-muted: color-mix(in srgb, var(--theme-text-light) 68%, var(--n-50));
+  --theme-text-light-subtle: color-mix(in srgb, var(--theme-text-light) 46%, var(--n-50));
+  --theme-text-dark-muted: color-mix(in srgb, var(--theme-text-dark) 68%, var(--n-950));
+  --theme-text-dark-subtle: color-mix(in srgb, var(--theme-text-dark) 46%, var(--n-950));
+  --theme-border-light: color-mix(in srgb, var(--theme-text-light) 18%, var(--n-50));
+  --theme-border-light-strong: color-mix(in srgb, var(--theme-text-light) 30%, var(--n-50));
+  --theme-border-dark: color-mix(in srgb, var(--theme-text-dark) 18%, var(--n-950));
+  --theme-border-dark-strong: color-mix(in srgb, var(--theme-text-dark) 30%, var(--n-950));
+}
+
+/* Runtime palettes keep both accent ramps available; utility mappings select the
+ * mode-specific alias below. */
+html.theme-active.dark,
+html.theme-active.light {
+  --a-50: var(--a-dark-50);
+  --a-100: var(--a-dark-100);
+  --a-200: var(--a-dark-200);
+  --a-300: var(--a-dark-300);
+  --a-400: var(--a-dark-400);
+  --a-500: var(--a-dark-500);
+  --a-600: var(--a-dark-600);
+  --a-700: var(--a-dark-700);
+  --a-800: var(--a-dark-800);
+  --a-900: var(--a-dark-900);
+  --a-950: var(--a-dark-950);
+}
+
+html.theme-active.light {
+  --a-50: var(--a-light-50);
+  --a-100: var(--a-light-100);
+  --a-200: var(--a-light-200);
+  --a-300: var(--a-light-300);
+  --a-400: var(--a-light-400);
+  --a-500: var(--a-light-500);
+  --a-600: var(--a-light-600);
+  --a-700: var(--a-light-700);
+  --a-800: var(--a-light-800);
+  --a-900: var(--a-light-900);
+  --a-950: var(--a-light-950);
+}

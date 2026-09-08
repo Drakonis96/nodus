@@ -93,6 +93,17 @@ html[data-theme='light'] .server-settings-native .ss-warning { background: #fffb
 .ss-row p { margin: 4px 0 0; color: var(--ss-muted); font-size: 11px; line-height: 1.45; }
 .ss-control { display: flex; min-width: 0; justify-content: flex-end; align-items: center; }
 .ss-select { width: min(100%, 360px); min-height: 34px; border: 1px solid var(--ss-border); border-radius: 7px; padding: 5px 30px 5px 9px; outline: none; background-color: var(--ss-panel); color: var(--ss-text); font: inherit; font-size: 12px; }
+.ss-theme-control { display: grid; width: min(100%, 520px); gap: 7px; justify-items: end; }
+.ss-theme-actions { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
+.ss-theme-editor { display: grid; width: 100%; gap: 8px; border: 1px solid var(--ss-border); border-radius: 8px; padding: 10px; background: var(--ss-panel-soft); }
+.ss-theme-editor > input:not([type='color']) { min-height: 32px; border: 1px solid var(--ss-border); border-radius: 6px; padding: 5px 8px; background: var(--ss-panel); color: var(--ss-text); font: inherit; }
+.ss-theme-editor > input[type='range'] { width: 100%; accent-color: var(--ss-accent); }
+.ss-theme-colours { display: flex; flex-wrap: wrap; gap: 10px; color: var(--ss-muted); font-size: 11px; }
+.ss-theme-colours label { display: inline-flex; align-items: center; gap: 5px; }
+.ss-theme-colours input[type='color'] { width: 26px; height: 26px; box-sizing: border-box; appearance: none; -webkit-appearance: none; border: 1px solid #111827; border-radius: 50%; overflow: hidden; padding: 0; background: transparent; cursor: pointer; }
+.ss-theme-colours input[type='color']::-webkit-color-swatch-wrapper { padding: 0; border-radius: 50%; overflow: hidden; }
+.ss-theme-colours input[type='color']::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.ss-theme-colours input[type='color']::-moz-color-swatch { border: 0; border-radius: 50%; }
 .ss-control input[type='range'] { width: min(100%, 300px); accent-color: var(--ss-accent); }
 .ss-value { min-width: 0; overflow-wrap: anywhere; color: var(--ss-text); }
 .ss-status { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 8px; background: var(--ss-panel-soft); color: var(--ss-muted); font-size: 11px; }

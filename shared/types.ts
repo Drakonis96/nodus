@@ -1510,20 +1510,40 @@ export type SyncMode = 'realtime' | 'manual';
 export type ThemeMode = 'dark' | 'light' | 'system';
 /** Colour theme (palette family). Orthogonal to {@link ThemeMode}: every theme has a
  *  light and a dark mode. `default` is the built-in indigo/neutral palette; the rest are
- *  curated ColorHunt palettes. Keep in sync with `THEME_IDS` in src/theme/themes.mjs and
- *  `APP_THEME_IDS` in shared/appThemes.mjs. */
+ *  curated FreeColorPalettes palettes. Keep the built-in IDs in sync with `APP_THEME_IDS` in
+ *  shared/appThemes.mjs. */
 export type AppTheme =
   | 'default'
-  | 'teal-noir'
+  | 'amethyst-iris'
   | 'deep-ocean'
-  | 'forest-pine'
-  | 'sunset-coral'
-  | 'royal-violet'
+  | 'plum-lilac'
+  | 'sage-stone'
+  | 'azure-night'
+  | 'slate-gray'
   | 'mint-slate'
   | 'amber-ember'
   | 'berry-wine'
-  | 'indigo-night'
-  | 'rose-quartz';
+  | 'burnt-sun'
+  | 'rose-quartz'
+  | 'pine-grove'
+  | 'golden-hour'
+  | 'plum-noir'
+  | 'sea-glass'
+  | 'lagoon'
+  | (string & {});
+/** User-created palette definition. The runtime derives the full ramps from these anchors. */
+export interface CustomAppTheme {
+  id: string;
+  label: string;
+  accent: string;
+  deep: string;
+  pale: string;
+  /** Foreground used when the UI is in light mode. */
+  lightText: string;
+  /** Foreground used when the UI is in dark mode. */
+  darkText: string;
+  tint: number;
+}
 export type DeepContextMode = 'standard' | 'long';
 /** Languages Nodus can speak. `uiLanguage` localizes the interface; `promptLanguage`
  *  is injected into the AI prompts and so determines the language of generated content
@@ -1926,6 +1946,8 @@ export interface AppSettings {
   theme: ThemeMode;
   /** Colour palette. Light/dark is still governed by {@link AppSettings.theme}. */
   appTheme: AppTheme;
+  /** User-created palettes, persisted with the profile and kept separate from built-ins. */
+  customThemes: CustomAppTheme[];
   // Interface language (localizes all UI text).
   uiLanguage: AppLanguage;
   // Language injected into AI prompts → language of generated ideas/themes/answers.

@@ -25,7 +25,7 @@ import {
   type View,
 } from "../navigation";
 import { HoverLabelButton, Icon } from "../components/ui";
-import { applyAppThemeClass } from "../theme/themeBoot";
+import { APP_THEME_DEFINITIONS_STORAGE_KEY, APP_THEME_STORAGE_KEY, applyAppTheme as applyRuntimeAppTheme } from "../theme/themeBoot";
 import { vaultTypeIcon, vaultTypeLabel } from "../components/vaultTypeUi";
 import { WorldbuildingSidebar } from "../components/WorldbuildingSidebar";
 import { ProsopographySidebar } from "../components/ProsopographySidebar";
@@ -1816,11 +1816,19 @@ export default function App() {
     localStorage.setItem("nodus-web-theme", theme);
   }, [theme]);
   useEffect(() => {
-    // Colour palette lives on a `theme-<id>` class; `data-theme` above is already
-    // taken by light/dark on this build.
-    applyAppThemeClass(appTheme);
-    localStorage.setItem("nodus-app-theme", appTheme);
-  }, [appTheme]);
+    // Colour palette lives in runtime CSS variables; `data-theme` above remains
+    // reserved for light/dark mode on this build.
+    // Keep the boot-time cached palette in place until the portable profile has
+    // arrived. Applying a custom id with an empty definition list would make
+    // themeBoot correctly fail closed to the default, briefly (and sometimes
+    // permanently for a slow/failed profile request) repainting the app with
+    // the default palette.
+    if (!profile) return;
+    const customThemes = profile?.appearance.customThemes ?? [];
+    applyRuntimeAppTheme(appTheme, customThemes);
+    localStorage.setItem(APP_THEME_STORAGE_KEY, appTheme);
+    localStorage.setItem(APP_THEME_DEFINITIONS_STORAGE_KEY, JSON.stringify(customThemes));
+  }, [appTheme, profile?.appearance.customThemes]);
   const summarySequence = useRef(0);
   const refreshSpaces = useCallback(async () => {
     const value = await api.me();

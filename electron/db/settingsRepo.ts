@@ -13,6 +13,7 @@ import { lockedApiKeyProviders, providerKeyMap } from '../secrets/secretStore';
 import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
 import { DEFAULT_NODUS_IMAGE_QUALITY, isNodusImageQuality } from '@shared/localImageModels';
 import { EMPTY_CUSTOM_EVENT_TYPES, sanitizeCustomEventTypes } from '@shared/eventTypes';
+import { sanitizeCustomThemes } from '@shared/appThemes.mjs';
 import { normalizeToolkitToolPages } from '@shared/toolkitNavigation';
 import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
 import {
@@ -133,6 +134,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   monitoredCollections: [],
   theme: 'dark',
   appTheme: 'default',
+  customThemes: [],
   uiLanguage: 'es',
   promptLanguage: 'es',
   animationSpeed: 1,
@@ -388,6 +390,9 @@ export function getSettings(): AppSettings {
     if (globalPrefs[key] === undefined) seed[key] = merged[key];
     else (merged as Record<string, unknown>)[key] = globalPrefs[key];
   }
+  // app-prefs.json is user-editable; normalize custom themes after the global
+  // overlay so malformed or legacy values can never reach the renderer.
+  merged.customThemes = sanitizeCustomThemes(merged.customThemes);
   // The global preferences file is user-editable, so validate the shared size again
   // after it has overlaid the vault defaults.
   merged.mascotScale = normalizeNodiScale(merged.mascotScale);
@@ -524,6 +529,12 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
     // renders back, and a trailing slash the user pasted should not survive to be
     // shown to them (nor to be diffed against the next value they type).
     patch = { ...patch, customProvider: normalizeCustomProviderConfig(patch.customProvider) };
+  }
+  if (patch.customThemes !== undefined) {
+    patch = { ...patch, customThemes: sanitizeCustomThemes(patch.customThemes) };
+  }
+  if (patch.appTheme !== undefined) {
+    patch = { ...patch, appTheme: typeof patch.appTheme === 'string' ? patch.appTheme.trim().toLowerCase() : 'default' };
   }
   if (patch.codexReasoningEfforts !== undefined) {
     patch = { ...patch, codexReasoningEfforts: sanitizeCodexReasoningEfforts(patch.codexReasoningEfforts) };

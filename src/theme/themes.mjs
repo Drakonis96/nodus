@@ -12,16 +12,14 @@
  * The accent scale (`--a-50` … `--a-950`) IS mode-split: `text-indigo-300`-style
  * utilities need a lighter accent on dark surfaces and a darker one on pale surfaces.
  *
- * Each theme is defined by three anchor colours (an accent plus a deep and a pale
- * surface) and a deterministic derivation expands those into the ramps consumed by
- * `tokens.generated.css`. Adding a theme = one entry here + `npm run gen:theme`.
+ * Each theme is defined by an accent, deep and pale surfaces, plus explicit
+ * foreground colours for light and dark mode. Every theme supplies those
+ * foregrounds independently so surface colours never silently become text colours.
  *
- * `default` is special: no ramps, no generated utility block — it renders through
- * raw Tailwind + the hand-written `.light` rules in index.css and stays the
+ * `default` is special: it keeps the raw Tailwind + hand-written `.light` rules in index.css and stays the
  * recovery-safe baseline.
  *
- * Anchor colours are drawn from curated ColorHunt palettes
- * (https://colorhunt.co/palettes/popular).
+ * Anchor colours are drawn from curated FreeColorPalettes palettes.
  */
 
 /** @typedef {Record<50|100|200|300|400|500|600|700|800|900|950, string>} Ramp */
@@ -75,6 +73,13 @@ export function contrast(a, b) {
 function ensureContrast(hex, against, min) {
   let c = hex;
   for (let i = 0; i < 24 && contrast(c, against) < min; i++) c = mix(c, BLACK, 0.08);
+  return c;
+}
+
+/** Lighten a foreground toward white until it reads on a dark surface. */
+function ensureLightContrast(hex, against, min) {
+  let c = hex;
+  for (let i = 0; i < 24 && contrast(c, against) < min; i++) c = mix(c, WHITE, 0.08);
   return c;
 }
 
@@ -134,41 +139,50 @@ function accentRamp(accent, mode) {
  * @typedef {Object} ThemeAnchors
  * @property {string} accent   accent hue (maps to --a-500)
  * @property {string} deep     deepest surface (maps to --n-950)
- * @property {string} [pale]   palest surface (maps to --n-50); defaults to a faint accent-tinted white
+ * @property {string} pale      palest surface (maps to --n-50)
+ * @property {string} lightText foreground used in light mode
+ * @property {string} darkText  foreground used in dark mode
  * @property {number} [tint]   0–1, how much accent bleeds into the mid neutrals
  */
 
 /** @type {Array<{ id:string, label:string, anchors:ThemeAnchors }>} */
 const THEME_DEFS = [
-  { id: 'teal-noir', label: 'Teal Noir', anchors: { accent: '#00adb5', deep: '#1b2126', pale: '#f6f8f9', tint: 0.05 } },
-  { id: 'deep-ocean', label: 'Deep Ocean', anchors: { accent: '#3f72af', deep: '#101c2e', pale: '#f9f7f7', tint: 0.06 } },
-  { id: 'forest-pine', label: 'Forest Pine', anchors: { accent: '#00a389', deep: '#121815', pale: '#f2f6f4', tint: 0.05 } },
-  { id: 'sunset-coral', label: 'Sunset Coral', anchors: { accent: '#e8734f', deep: '#241a16', pale: '#fbf1ec', tint: 0.06 } },
-  { id: 'royal-violet', label: 'Royal Violet', anchors: { accent: '#9b4dd6', deep: '#1b1430', pale: '#f7f2fb', tint: 0.06 } },
-  { id: 'mint-slate', label: 'Mint Slate', anchors: { accent: '#0e8388', deep: '#1a2222', pale: '#eff5f4', tint: 0.05 } },
-  { id: 'amber-ember', label: 'Amber Ember', anchors: { accent: '#f08a00', deep: '#1f1913', pale: '#fdf6ec', tint: 0.06 } },
-  { id: 'berry-wine', label: 'Berry Wine', anchors: { accent: '#bd5579', deep: '#241320', pale: '#fdf2f5', tint: 0.06 } },
-  { id: 'indigo-night', label: 'Indigo Night', anchors: { accent: '#5566e8', deep: '#0d1230', pale: '#f2f5ff', tint: 0.06 } },
-  { id: 'rose-quartz', label: 'Rose Quartz', anchors: { accent: '#c0849b', deep: '#241f21', pale: '#fdf6f6', tint: 0.05 } },
+  { id: 'amethyst-iris', label: 'Amethyst Iris', anchors: { accent: '#6a0dad', deep: '#0e0019', pale: '#efe3f7', lightText: '#24113a', darkText: '#f7effb', tint: 0.06 } },
+  { id: 'deep-ocean', label: 'Deep Ocean', anchors: { accent: '#3f72af', deep: '#101c2e', pale: '#f9f7f7', lightText: '#171717', darkText: '#f5f5f5', tint: 0.06 } },
+  { id: 'plum-lilac', label: 'Plum Lilac', anchors: { accent: '#5e548e', deep: '#0a0613', pale: '#e0b1cb', lightText: '#231942', darkText: '#f8f0f6', tint: 0.06 } },
+  { id: 'sage-stone', label: 'Sage Stone', anchors: { accent: '#a98467', deep: '#201817', pale: '#f0ead2', lightText: '#3b2d26', darkText: '#fff8e8', tint: 0.05 } },
+  { id: 'azure-night', label: 'Azure Night', anchors: { accent: '#1f6feb', deep: '#030d17', pale: '#f0f6fc', lightText: '#0a2540', darkText: '#eef7ff', tint: 0.06 } },
+  { id: 'slate-gray', label: 'Slate Gray', anchors: { accent: '#64748b', deep: '#0b111c', pale: '#f1f5f9', lightText: '#1e293b', darkText: '#f8fafc', tint: 0.03 } },
+  { id: 'mint-slate', label: 'Mint Slate', anchors: { accent: '#0e8388', deep: '#1a2222', pale: '#eff5f4', lightText: '#171717', darkText: '#f5f5f5', tint: 0.05 } },
+  { id: 'amber-ember', label: 'Amber Ember', anchors: { accent: '#f08a00', deep: '#1f1913', pale: '#fdf6ec', lightText: '#171717', darkText: '#f5f5f5', tint: 0.06 } },
+  { id: 'berry-wine', label: 'Berry Wine', anchors: { accent: '#bd5579', deep: '#241320', pale: '#fdf2f5', lightText: '#171717', darkText: '#f5f5f5', tint: 0.06 } },
+  { id: 'burnt-sun', label: 'Burnt Sun', anchors: { accent: '#c44b1b', deep: '#240a00', pale: '#f0cc6c', lightText: '#3b1608', darkText: '#fff3c4', tint: 0.05 } },
+  { id: 'rose-quartz', label: 'Rose Quartz', anchors: { accent: '#c0849b', deep: '#241f21', pale: '#fdf6f6', lightText: '#171717', darkText: '#f5f5f5', tint: 0.05 } },
+  { id: 'pine-grove', label: 'Pine Grove', anchors: { accent: '#2e7d32', deep: '#061406', pale: '#f1fbf1', lightText: '#173017', darkText: '#effff0', tint: 0.05 } },
+  { id: 'golden-hour', label: 'Golden Hour', anchors: { accent: '#ccb800', deep: '#252000', pale: '#fffde7', lightText: '#3d3500', darkText: '#fffde7', tint: 0.04 } },
+  { id: 'plum-noir', label: 'Plum Noir', anchors: { accent: '#7b2d6a', deep: '#160019', pale: '#f0e8ee', lightText: '#32102b', darkText: '#fff3fa', tint: 0.06 } },
+  { id: 'sea-glass', label: 'Sea Glass', anchors: { accent: '#3d7a8a', deep: '#051115', pale: '#d4e5e8', lightText: '#173d46', darkText: '#effcff', tint: 0.05 } },
+  { id: 'lagoon', label: 'Lagoon', anchors: { accent: '#4ecdc4', deep: '#051215', pale: '#f7fff7', lightText: '#16464c', darkText: '#effffc', tint: 0.05 } },
 ];
 
 /** Build the full token set for one theme: one neutral ramp + a per-mode accent ramp. */
 export function deriveThemeTokens(def) {
-  const { accent, deep, tint = 0 } = def.anchors;
-  const pale = def.anchors.pale ?? mix(WHITE, accent, 0.03);
+  const { accent, deep, pale, lightText, darkText, tint = 0 } = def.anchors;
+  const neutralTokens = neutralRamp(pale, deep, accent, tint);
+  const accentTokens = { dark: accentRamp(accent, 'dark'), light: accentRamp(accent, 'light') };
+  accentTokens.dark[300] = ensureLightContrast(accentTokens.dark[300], neutralTokens[950], 4.5);
+  accentTokens.dark[400] = ensureLightContrast(accentTokens.dark[400], neutralTokens[950], 3.5);
   return {
-    n: neutralRamp(pale, deep, accent, tint),
-    a: { dark: accentRamp(accent, 'dark'), light: accentRamp(accent, 'light') },
+    n: neutralTokens,
+    a: accentTokens,
+    text: {
+      light: lightText,
+      dark: darkText,
+    },
   };
 }
 
 /** Non-default themes, with derived ramps attached. */
 export const THEMES = THEME_DEFS.map((def) => ({ ...def, tokens: deriveThemeTokens(def) }));
-
-/** Every selectable theme id, `default` first. */
-export const THEME_IDS = ['default', ...THEME_DEFS.map((d) => d.id)];
-
-/** id → display label (default handled by the UI via i18n). */
-export const THEME_LABELS = Object.fromEntries(THEME_DEFS.map((d) => [d.id, d.label]));
 
 export { SHADES };

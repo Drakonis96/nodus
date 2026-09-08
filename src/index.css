@@ -2,12 +2,10 @@
    system-ui). A runtime Google Fonts @import is blocked by the app CSP and
    breaks offline use, so it is intentionally not used. */
 
-/* Colour themes. `tokens.generated.css` + `utilities.generated.css` are produced by
-   `npm run gen:theme` from src/theme/themes.mjs; `theme-components.css` is hand-written.
-   The `default` theme carries no rules here and renders through the Tailwind + `.light`
-   cascade below, so it stays byte-identical. See src/theme/themes.mjs. */
-@import './theme/tokens.generated.css';
-@import './theme/utilities.generated.css';
+/* Colour themes use a static utility mapping plus runtime CSS variables. The default
+   theme leaves the original Tailwind + `.light` cascade in place. */
+@import './theme/tokens.css';
+@import './theme/runtime-utilities.css';
 @import './theme/theme-components.css';
 
 @tailwind base;
@@ -1575,20 +1573,34 @@ body {
 /* Home surfaces are neutral; vault and status colours stay in the top edge,
    icons and text. Grid minima use the content width (including sidebar resizing). */
 .home-dashboard {
-  --home-surface: #171717;
-  --home-tile: #1f1f1f;
-  --home-border: #383838;
-  --home-muted: #a3a3a3;
-  --home-hover: #222222;
+  --home-surface: var(--n-900);
+  --home-tile: var(--n-800);
+  --home-border: var(--theme-border-dark);
+  --home-muted: var(--theme-text-dark-muted);
+  --home-hover: var(--n-800);
   --home-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 .light .home-dashboard {
-  --home-surface: #ffffff;
-  --home-tile: #fafafa;
-  --home-border: #dedede;
-  --home-muted: #616161;
-  --home-hover: #f5f5f5;
+  --home-surface: var(--n-50);
+  --home-tile: var(--n-100);
+  --home-border: var(--theme-border-light);
+  --home-muted: var(--theme-text-light-muted);
+  --home-hover: var(--n-100);
   --home-shadow: 0 3px 12px rgba(0, 0, 0, 0.045);
+}
+html.theme-active.dark .home-dashboard {
+  --home-surface: var(--n-900);
+  --home-tile: var(--n-800);
+  --home-border: var(--theme-border-dark);
+  --home-muted: var(--theme-text-dark-muted);
+  --home-hover: var(--n-800);
+}
+html.theme-active.light .home-dashboard {
+  --home-surface: var(--n-50);
+  --home-tile: var(--n-100);
+  --home-border: var(--theme-border-light);
+  --home-muted: var(--theme-text-light-muted);
+  --home-hover: var(--n-100);
 }
 .home-status-grid,
 .home-metric-grid {
@@ -1657,11 +1669,17 @@ body {
 .home-status-title { padding-top: 0.25rem; }
 .home-status-icon { border: 1px solid rgba(128, 128, 128, 0.15); }
 .home-dashboard .study-home-icon {
-  color: color-mix(in srgb, var(--vault-accent, #818cf8) 55%, white);
-  background: color-mix(in srgb, var(--vault-accent, #818cf8) 15%, var(--home-surface));
+  color: color-mix(in srgb, var(--a-400, var(--vault-accent, #818cf8)) 72%, var(--theme-text-dark) 28%);
+  background: color-mix(in srgb, var(--a-500, var(--vault-accent, #818cf8)) 15%, var(--home-surface));
 }
 .light .home-dashboard .study-home-icon {
-  color: color-mix(in srgb, var(--vault-accent, #6366f1) 80%, #171717);
+  color: color-mix(in srgb, var(--a-700, var(--vault-accent, #6366f1)) 78%, var(--theme-text-light) 22%);
+}
+html.theme-active.dark .home-dashboard .study-home-icon {
+  color: color-mix(in srgb, var(--a-400) 72%, var(--theme-text-dark) 28%);
+}
+html.theme-active.light .home-dashboard .study-home-icon {
+  color: color-mix(in srgb, var(--a-700) 78%, var(--theme-text-light) 22%);
 }
 .home-dashboard .home-status-content { border-color: var(--home-border); }
 .home-dashboard .home-status-card p { line-height: 1.6; }
@@ -2897,6 +2915,34 @@ body {
 .light .input {
   @apply bg-white border-neutral-300 text-neutral-900 placeholder:text-neutral-500;
 }
+/* Color inputs should expose only the swatch. The browser's default color
+ * control adds a grey padded well that clashes with the theme editor. */
+[data-testid="theme-editor"] input[type='color'] {
+  width: 1.75rem;
+  height: 1.75rem;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid #111827;
+  border-radius: 9999px;
+  overflow: hidden;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+[data-testid="theme-editor"] input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 0;
+  border-radius: 50%;
+  overflow: hidden;
+}
+[data-testid="theme-editor"] input[type='color']::-webkit-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
+[data-testid="theme-editor"] input[type='color']::-moz-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
 /* The focus colour above is baked into `.input`'s own rule by `@apply`, so it lands as
    `.input:focus` — a selector no `.<vault> .border-indigo-500` remap can reach, since the
    element never carries that class. Every field in a themed vault therefore lit up indigo
@@ -3722,6 +3768,67 @@ select.input optgroup {
 .light .library-action-menu-item small { color: #737373; }
 .library-action-menu-item.text-red-400 { color: #f87171; }
 .light .library-action-menu-item.text-red-400 { color: #b91c1c; }
+
+/* The Library has a few bespoke controls whose colours are deliberately kept
+ * in index.css instead of Tailwind utilities. Keep those controls on the same
+ * semantic surface/foreground rails as the rest of the runtime theme. */
+html.theme-active.dark :is(.library-theme, .library-theme-canvas, .library-theme-bar) {
+  background: var(--n-950);
+  color: var(--theme-text-dark);
+  color-scheme: dark;
+}
+html.theme-active.light :is(.library-theme, .library-theme-canvas, .library-theme-bar) {
+  background: var(--n-50);
+  color: var(--theme-text-light);
+  color-scheme: light;
+}
+html.theme-active.dark .library-theme-panel {
+  border-color: var(--theme-border-dark);
+  background: var(--n-950);
+}
+html.theme-active.light .library-theme-panel {
+  border-color: var(--theme-border-light);
+  background: var(--n-50);
+}
+html.theme-active.dark .library-workspace-tabs {
+  border-color: var(--theme-border-dark);
+  background: color-mix(in srgb, var(--n-950) 96%, var(--n-900));
+}
+html.theme-active.light .library-workspace-tabs {
+  border-color: var(--theme-border-light);
+  background: color-mix(in srgb, var(--n-50) 97%, var(--n-100));
+}
+html.theme-active.dark .library-workspace-tab { color: var(--theme-text-dark-muted); }
+html.theme-active.dark .library-workspace-tab:hover { background: var(--n-900); color: var(--theme-text-dark); }
+html.theme-active.dark .library-workspace-tab.is-active { border-color: var(--theme-border-dark); background: var(--n-800); color: var(--theme-text-dark); }
+html.theme-active.dark .library-workspace-tab-close { color: var(--theme-text-dark-subtle); }
+html.theme-active.dark .library-workspace-tab-close:hover { background: var(--n-700); color: var(--theme-text-dark); }
+html.theme-active.light .library-workspace-tab { color: var(--theme-text-light-muted); }
+html.theme-active.light .library-workspace-tab:hover { background: var(--n-100); color: var(--theme-text-light); }
+html.theme-active.light .library-workspace-tab.is-active { border-color: var(--theme-border-light); background: var(--n-50); color: var(--theme-text-light); }
+html.theme-active.light .library-workspace-tab-close { color: var(--theme-text-light-subtle); }
+html.theme-active.light .library-workspace-tab-close:hover { background: var(--n-200); color: var(--theme-text-light); }
+html.theme-active.dark .library-scope-switcher { border-color: var(--theme-border-dark); background: color-mix(in srgb, var(--n-800) 72%, transparent); }
+html.theme-active.light .library-scope-switcher { border-color: var(--theme-border-light); background: var(--n-50); }
+html.theme-active.dark .library-scope-button { color: var(--theme-text-dark-muted); }
+html.theme-active.dark .library-scope-button:hover:not(:disabled),
+html.theme-active.dark .library-scope-button:focus-visible { color: var(--theme-text-dark); background: var(--n-700); }
+html.theme-active.light .library-scope-button { color: var(--theme-text-light-muted); }
+html.theme-active.light .library-scope-button:hover:not(:disabled),
+html.theme-active.light .library-scope-button:focus-visible { color: var(--theme-text-light); background: var(--n-100); }
+html.theme-active.dark .library-scope-tooltip,
+html.theme-active.dark .library-action-menu { border-color: var(--theme-border-dark); background: var(--n-950); color: var(--theme-text-dark); }
+html.theme-active.light .library-scope-tooltip,
+html.theme-active.light .library-action-menu { border-color: var(--theme-border-light); background: var(--n-50); color: var(--theme-text-light); }
+html.theme-active.dark .library-action-menu-item { color: var(--theme-text-dark); }
+html.theme-active.dark .library-action-menu-item:hover,
+html.theme-active.dark .library-action-menu-item:focus-visible { background: var(--n-800); color: var(--theme-text-dark); }
+html.theme-active.dark .library-action-menu-item small { color: var(--theme-text-dark-muted); }
+html.theme-active.light .library-action-menu-item { color: var(--theme-text-light); }
+html.theme-active.light .library-action-menu-item:hover,
+html.theme-active.light .library-action-menu-item:focus-visible { background: var(--n-100); color: var(--theme-text-light); }
+html.theme-active.light .library-action-menu-item small { color: var(--theme-text-light-muted); }
+
 .light .library-theme .bg-neutral-950\/25,
 .light .library-theme .bg-neutral-950\/30,
 .light .library-theme .bg-neutral-950\/35,
@@ -4537,9 +4644,9 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 .light .study-editor-shell .milkdown .ProseMirror pre { background: #f5f5f4; }
 
 /* Cinematic release modal: a compact premiere scene rather than a full-screen tour. */
-.whats-new-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgb(2 6 23 / .78); backdrop-filter: blur(10px); animation: modal-backdrop-in .24s ease-out both; }
-.whats-new-cinema { --wn-surface: #090d16; --wn-card: rgb(255 255 255 / .045); --wn-border: rgb(255 255 255 / .1); --wn-text: #e7e5e4; --wn-muted: #9ca3af; display: flex; width: min(860px, 100%); max-height: min(88vh, 800px); flex-direction: column; overflow: hidden; border: 1px solid rgb(148 163 184 / .25); border-radius: 26px; color: var(--wn-text); background: var(--wn-surface); box-shadow: 0 40px 120px rgb(0 0 0 / .58), 0 0 0 1px rgb(255 255 255 / .04) inset; animation: whats-new-modal-in .46s cubic-bezier(.2,.8,.2,1) both; contain: layout paint style; }
-.light .whats-new-cinema { --wn-surface: #f8fafc; --wn-card: #fff; --wn-border: #e2e8f0; --wn-text: #172033; --wn-muted: #64748b; border-color: rgb(30 41 59 / .2); box-shadow: 0 35px 100px rgb(15 23 42 / .28); }
+.whats-new-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: color-mix(in srgb, var(--n-950) 78%, transparent); backdrop-filter: blur(10px); animation: modal-backdrop-in .24s ease-out both; }
+.whats-new-cinema { --wn-surface: var(--n-950); --wn-card: color-mix(in srgb, var(--n-900) 92%, transparent); --wn-border: var(--theme-border-dark); --wn-text: var(--theme-text-dark); --wn-muted: var(--theme-text-dark-muted); display: flex; width: min(860px, 100%); max-height: min(88vh, 800px); flex-direction: column; overflow: hidden; border: 1px solid var(--theme-border-dark-strong); border-radius: 26px; color: var(--wn-text); background: var(--wn-surface); box-shadow: 0 40px 120px rgb(0 0 0 / .58), 0 0 0 1px color-mix(in srgb, var(--theme-text-dark) 4%, transparent) inset; animation: whats-new-modal-in .46s cubic-bezier(.2,.8,.2,1) both; contain: layout paint style; }
+.light .whats-new-cinema { --wn-surface: var(--n-100); --wn-card: var(--n-50); --wn-border: var(--theme-border-light); --wn-text: var(--theme-text-light); --wn-muted: var(--theme-text-light-muted); border-color: var(--theme-border-light-strong); box-shadow: 0 35px 100px color-mix(in srgb, var(--n-950) 28%, transparent); }
 .whats-new-hero { position: relative; display: grid; min-height: 236px; flex: 0 0 auto; grid-template-columns: minmax(0, 1fr) 250px; align-items: center; overflow: hidden; padding: 30px 38px; color: #f8fafc; background: radial-gradient(circle at 78% 40%, rgb(45 212 191 / .18), transparent 28%), radial-gradient(circle at 15% 5%, rgb(129 140 248 / .28), transparent 35%), linear-gradient(125deg, #111b31 0%, #0b1222 48%, #07151a 100%); }
 .whats-new-hero::after { content: ''; position: absolute; right: 0; bottom: 0; left: 0; height: 1px; background: linear-gradient(90deg, transparent, rgb(94 234 212 / .5), transparent); }
 .whats-new-aurora { position: absolute; inset: -80% -10% -100% 35%; pointer-events: none; opacity: .7; filter: blur(45px); background: conic-gradient(from 180deg, transparent, rgb(45 212 191 / .24), transparent 32%, rgb(129 140 248 / .2), transparent 65%); animation: whats-new-aurora 4s ease-out both; }
@@ -4665,11 +4772,49 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 @media (max-width: 680px) { .whats-new-backdrop { padding: 12px; } .whats-new-cinema { max-height: 92vh; border-radius: 20px; } .whats-new-hero { min-height: 205px; grid-template-columns: 1fr 145px; padding: 25px 20px; } .whats-new-hero h2 { font-size: 31px; } .whats-new-hero-copy > p { font-size: 11px; } .whats-new-nodi svg { height: 150px !important; } .whats-new-scroll { padding: 18px; } .whats-new-section-header { align-items: stretch; flex-direction: column; gap: 9px; } .whats-new-version-trigger { width: 100%; } .whats-new-version-menu { right: auto; left: 0; width: min(100%, 320px); } .whats-new-support { align-items: flex-start; flex-wrap: wrap; } .whats-new-social { align-items: flex-start; flex-wrap: wrap; } }
 @media (prefers-reduced-motion: reduce) { .whats-new-aurora, .whats-new-confetti { animation: none; } }
 
+/* Curated cinematic modals keep their visual identity, but their surfaces and
+   primary highlights follow the active application palette. */
+html.theme-active .whats-new-hero,
+html.theme-active .startup-update-hero,
+html.theme-active .toolkit-guide-hero {
+  color: var(--theme-text-dark);
+  background:
+    radial-gradient(circle at 78% 40%, color-mix(in srgb, var(--a-400) 22%, transparent), transparent 28%),
+    radial-gradient(circle at 15% 5%, color-mix(in srgb, var(--a-300) 28%, transparent), transparent 35%),
+    linear-gradient(125deg, color-mix(in srgb, var(--n-950) 86%, var(--a-900)), var(--n-950) 52%, color-mix(in srgb, var(--n-950) 88%, var(--a-800)));
+}
+html.theme-active .roadmap-hero {
+  color: var(--theme-text-dark);
+  background:
+    radial-gradient(circle at 80% 38%, color-mix(in srgb, var(--a-400) 30%, transparent), transparent 27%),
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--a-300) 20%, transparent), transparent 34%),
+    linear-gradient(125deg, color-mix(in srgb, var(--n-950) 86%, var(--a-900)), var(--n-950) 48%, color-mix(in srgb, var(--n-950) 88%, var(--a-800)));
+}
+html.theme-active .whats-new-kicker,
+html.theme-active .startup-update-kicker,
+html.theme-active .toolkit-guide-kicker { color: var(--a-300); }
+html.theme-active .whats-new-hero-copy > p,
+html.theme-active .startup-update-hero p,
+html.theme-active .toolkit-guide-hero p,
+html.theme-active .roadmap-hero-copy > p { color: color-mix(in srgb, var(--theme-text-dark) 72%, var(--n-950)); }
+html.theme-active .whats-new-version { border-color: color-mix(in srgb, var(--a-300) 30%, transparent); color: var(--a-200); background: color-mix(in srgb, var(--a-500) 16%, transparent); }
+html.theme-active .whats-new-version b { color: var(--n-950); background: var(--a-300); }
+html.theme-active .whats-new-version-trigger b,
+html.theme-active .whats-new-version-option svg,
+html.theme-active .whats-new-release-version { color: var(--a-400); }
+html.theme-active .whats-new-version-trigger:hover,
+html.theme-active .whats-new-version-trigger[aria-expanded='true'] { border-color: color-mix(in srgb, var(--a-400) 55%, transparent); }
+html.theme-active .whats-new-version-option:hover { background: color-mix(in srgb, var(--a-500) 10%, transparent); }
+html.theme-active .whats-new-version-option[aria-selected='true'] { color: var(--a-400); background: color-mix(in srgb, var(--a-500) 16%, transparent); }
+html.theme-active .whats-new-release-card::before { background: linear-gradient(var(--a-300), var(--a-500)); }
+html.theme-active .whats-new-release-card li > span:last-child { color: var(--wn-text); }
+html.theme-active .whats-new-scope-tooltip { border-color: var(--wn-border); color: var(--wn-text); background: var(--wn-surface); }
+
 /* Roadmap — a quieter sibling of the cinematic What's New modal. The in-progress
    state deliberately follows --vault-accent so it changes with the active vault. */
-.roadmap-backdrop { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; background: rgb(2 6 23 / .78); backdrop-filter: blur(10px); }
-.roadmap-cinema { --rm-surface: #090d16; --rm-card: rgb(255 255 255 / .045); --rm-border: rgb(255 255 255 / .1); --rm-text: #e7e5e4; --rm-muted: #9ca3af; display: flex; width: min(780px, 100%); max-height: min(90vh, 820px); flex-direction: column; overflow: hidden; border: 1px solid rgb(148 163 184 / .25); border-radius: 26px; color: var(--rm-text); background: var(--rm-surface); box-shadow: 0 40px 120px rgb(0 0 0 / .58), 0 0 0 1px rgb(255 255 255 / .04) inset; }
-.light .roadmap-cinema { --rm-surface: #f8fafc; --rm-card: #fff; --rm-border: #e2e8f0; --rm-text: #172033; --rm-muted: #64748b; border-color: rgb(30 41 59 / .2); box-shadow: 0 35px 100px rgb(15 23 42 / .28); }
+.roadmap-backdrop { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; background: color-mix(in srgb, var(--n-950) 78%, transparent); backdrop-filter: blur(10px); }
+.roadmap-cinema { --rm-surface: var(--n-950); --rm-card: color-mix(in srgb, var(--n-900) 92%, transparent); --rm-border: var(--theme-border-dark); --rm-text: var(--theme-text-dark); --rm-muted: var(--theme-text-dark-muted); display: flex; width: min(780px, 100%); max-height: min(90vh, 820px); flex-direction: column; overflow: hidden; border: 1px solid var(--theme-border-dark-strong); border-radius: 26px; color: var(--rm-text); background: var(--rm-surface); box-shadow: 0 40px 120px rgb(0 0 0 / .58), 0 0 0 1px color-mix(in srgb, var(--theme-text-dark) 4%, transparent) inset; }
+.light .roadmap-cinema { --rm-surface: var(--n-100); --rm-card: var(--n-50); --rm-border: var(--theme-border-light); --rm-text: var(--theme-text-light); --rm-muted: var(--theme-text-light-muted); border-color: var(--theme-border-light-strong); box-shadow: 0 35px 100px color-mix(in srgb, var(--n-950) 28%, transparent); }
 .roadmap-hero { position: relative; display: grid; min-height: 205px; flex: 0 0 auto; grid-template-columns: minmax(0, 1fr) 220px; align-items: center; overflow: hidden; padding: 30px 38px; color: #f8fafc; background: radial-gradient(circle at 80% 38%, color-mix(in srgb, var(--vault-accent, #6366f1) 30%, transparent), transparent 27%), radial-gradient(circle at 12% 0%, rgb(45 212 191 / .2), transparent 34%), linear-gradient(125deg, #111b31 0%, #0b1222 48%, #07151a 100%); }
 .roadmap-hero::after { content: ''; position: absolute; right: 0; bottom: 0; left: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--vault-accent, #6366f1), transparent); opacity: .65; }
 .roadmap-aurora { position: absolute; inset: -100% -15% -120% 32%; pointer-events: none; opacity: .72; filter: blur(46px); background: conic-gradient(from 180deg, transparent, color-mix(in srgb, var(--vault-accent, #6366f1) 32%, transparent), transparent 34%, rgb(45 212 191 / .18), transparent 66%); animation: roadmap-aurora 14s linear infinite; }
@@ -4801,9 +4946,9 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 
 /* Cinematic startup update check. It deliberately has its own surface rather
    than borrowing vault colours: application updates belong to Nodus itself. */
-.startup-update-backdrop { position: fixed; inset: 0; z-index: 72; display: grid; place-items: center; padding: 24px; background: rgb(2 6 23 / .78); backdrop-filter: blur(10px); animation: modal-backdrop-in .22s ease-out both; }
-.startup-update-cinema { --su-surface: #090d16; --su-card: rgb(255 255 255 / .045); --su-border: rgb(255 255 255 / .1); --su-text: #e7e5e4; --su-muted: #9ca3af; display: flex; width: min(680px, 100%); max-height: min(88vh, 720px); flex-direction: column; overflow: hidden; border: 1px solid rgb(148 163 184 / .25); border-radius: 26px; color: var(--su-text); background: var(--su-surface); box-shadow: 0 40px 120px rgb(0 0 0 / .58), 0 0 0 1px rgb(255 255 255 / .04) inset; animation: startup-update-modal-in .42s cubic-bezier(.2,.8,.2,1) both; contain: layout paint style; }
-.light .startup-update-cinema { --su-surface: #f8fafc; --su-card: #fff; --su-border: #e2e8f0; --su-text: #172033; --su-muted: #64748b; border-color: rgb(30 41 59 / .2); box-shadow: 0 35px 100px rgb(15 23 42 / .28); }
+.startup-update-backdrop { position: fixed; inset: 0; z-index: 72; display: grid; place-items: center; padding: 24px; background: color-mix(in srgb, var(--n-950) 78%, transparent); backdrop-filter: blur(10px); animation: modal-backdrop-in .22s ease-out both; }
+.startup-update-cinema { --su-surface: var(--n-950); --su-card: color-mix(in srgb, var(--n-900) 92%, transparent); --su-border: var(--theme-border-dark); --su-text: var(--theme-text-dark); --su-muted: var(--theme-text-dark-muted); display: flex; width: min(680px, 100%); max-height: min(88vh, 720px); flex-direction: column; overflow: hidden; border: 1px solid var(--theme-border-dark-strong); border-radius: 26px; color: var(--su-text); background: var(--su-surface); box-shadow: 0 40px 120px rgb(0 0 0 / .58), 0 0 0 1px color-mix(in srgb, var(--theme-text-dark) 4%, transparent) inset; animation: startup-update-modal-in .42s cubic-bezier(.2,.8,.2,1) both; contain: layout paint style; }
+.light .startup-update-cinema { --su-surface: var(--n-100); --su-card: var(--n-50); --su-border: var(--theme-border-light); --su-text: var(--theme-text-light); --su-muted: var(--theme-text-light-muted); border-color: var(--theme-border-light-strong); box-shadow: 0 35px 100px color-mix(in srgb, var(--n-950) 28%, transparent); }
 .startup-update-hero { position: relative; display: grid; min-height: 184px; grid-template-columns: minmax(0, 1fr) 190px; align-items: center; overflow: hidden; padding: 28px 34px; color: #f8fafc; background: radial-gradient(circle at 78% 42%, rgb(56 189 248 / .2), transparent 28%), radial-gradient(circle at 12% 0%, rgb(129 140 248 / .3), transparent 38%), linear-gradient(125deg, #111b31 0%, #0b1222 52%, #07151a 100%); }
 .startup-update-hero::after { content: ''; position: absolute; right: 0; bottom: 0; left: 0; height: 1px; background: linear-gradient(90deg, transparent, rgb(94 234 212 / .5), transparent); }
 .startup-update-aurora { position: absolute; inset: -110% -20% -130% 28%; pointer-events: none; opacity: .75; filter: blur(42px); background: conic-gradient(from 180deg, transparent, rgb(56 189 248 / .26), transparent 32%, rgb(129 140 248 / .24), transparent 65%); animation: whats-new-aurora 4s ease-out both; }
@@ -4845,9 +4990,9 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 
 /* One-off 2.4.0 Toolkit + model guidance. The content blocks are also reused by
    the full-screen essentials tutorial below. */
-.toolkit-guide-backdrop { position: fixed; inset: 0; z-index: 76; display: grid; place-items: center; padding: 22px; background: rgb(2 6 23 / .82); backdrop-filter: blur(12px); }
-.toolkit-guide-cinema { --tg-surface: #090d16; --tg-card: rgb(255 255 255 / .055); --tg-border: rgb(255 255 255 / .11); --tg-text: #f1f5f9; --tg-muted: #a3acba; display: flex; width: min(840px, 100%); max-height: min(calc(100vh - 32px), 830px); flex-direction: column; overflow: hidden; border: 1px solid rgb(148 163 184 / .28); border-radius: 28px; color: var(--tg-text); background: var(--tg-surface); box-shadow: 0 42px 130px rgb(0 0 0 / .62), 0 0 0 1px rgb(255 255 255 / .035) inset; }
-.light .toolkit-guide-cinema { --tg-surface: #f8fafc; --tg-card: #fff; --tg-border: #dbe3ee; --tg-text: #172033; --tg-muted: #64748b; border-color: rgb(30 41 59 / .2); box-shadow: 0 38px 110px rgb(15 23 42 / .3); }
+.toolkit-guide-backdrop { position: fixed; inset: 0; z-index: 76; display: grid; place-items: center; padding: 22px; background: color-mix(in srgb, var(--n-950) 82%, transparent); backdrop-filter: blur(12px); }
+.toolkit-guide-cinema { --tg-surface: var(--n-950); --tg-card: color-mix(in srgb, var(--n-900) 92%, transparent); --tg-border: var(--theme-border-dark); --tg-text: var(--theme-text-dark); --tg-muted: var(--theme-text-dark-muted); display: flex; width: min(840px, 100%); max-height: min(calc(100vh - 32px), 830px); flex-direction: column; overflow: hidden; border: 1px solid var(--theme-border-dark-strong); border-radius: 28px; color: var(--tg-text); background: var(--tg-surface); box-shadow: 0 42px 130px rgb(0 0 0 / .62), 0 0 0 1px color-mix(in srgb, var(--theme-text-dark) 4%, transparent) inset; }
+.light .toolkit-guide-cinema { --tg-surface: var(--n-100); --tg-card: var(--n-50); --tg-border: var(--theme-border-light); --tg-text: var(--theme-text-light); --tg-muted: var(--theme-text-light-muted); border-color: var(--theme-border-light-strong); box-shadow: 0 38px 110px color-mix(in srgb, var(--n-950) 30%, transparent); }
 .toolkit-guide-hero { position: relative; display: grid; min-height: 190px; flex: 0 0 auto; grid-template-columns: minmax(0, 1fr) 210px; align-items: center; overflow: hidden; padding: 24px 38px; color: #f8fafc; background: radial-gradient(circle at 82% 34%, rgb(245 158 11 / .2), transparent 30%), radial-gradient(circle at 18% 5%, rgb(45 212 191 / .23), transparent 36%), linear-gradient(124deg, #111827, #0b1522 54%, #10140d); }
 .toolkit-guide-hero::after { content: ''; position: absolute; right: 0; bottom: 0; left: 0; height: 1px; background: linear-gradient(90deg, transparent, rgb(251 191 36 / .58), rgb(45 212 191 / .45), transparent); }
 .toolkit-guide-aurora { position: absolute; inset: -140% -30% -120% 32%; opacity: .7; filter: blur(45px); background: conic-gradient(from 190deg, transparent, rgb(45 212 191 / .2), transparent 34%, rgb(251 191 36 / .2), transparent 66%); animation: whats-new-aurora 14s linear infinite; }
@@ -5384,3 +5529,9 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 .light [data-testid="source-citation-modal"] .text-neutral-600 {
   color: #64748b;
 }
+
+/* Keep the legacy light-reader overrides palette-aware for custom themes. */
+html.theme-active.light .library-theme :is(.bg-neutral-950\/25, .bg-neutral-950\/30, .bg-neutral-950\/35, .bg-neutral-950\/40, .bg-neutral-950\/45, .bg-neutral-950\/50, .bg-neutral-950\/55, .bg-neutral-950\/60, .bg-neutral-950\/70, .bg-neutral-950\/80, .bg-neutral-900, .bg-neutral-900\/40, .bg-neutral-900\/50, .bg-neutral-900\/55, .bg-neutral-900\/60, .bg-neutral-900\/70) {
+  background-color: var(--n-50);
+}
+html.theme-active.light .library-theme .text-indigo-100 { color: var(--a-700); }

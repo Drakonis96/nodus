@@ -6,7 +6,7 @@
  * policy and the vault's immutable embedding selection. None of those fields may cross
  * this boundary, even when a future setting is added to Desktop.
  */
-import { APP_THEME_IDS } from './appThemes.mjs';
+import { APP_THEME_IDS, sanitizeCustomThemes } from './appThemes.mjs';
 
 export const SERVER_PROFILE_PREFERENCES_VERSION = 1;
 
@@ -45,7 +45,7 @@ const DESKTOP_MODEL_FIELDS = Object.freeze({
 
 const ROOT_KEYS = new Set(['schemaVersion', 'appearance', 'ai', 'workspace']);
 const APPEARANCE_KEYS = new Set([
-  'theme', 'appTheme', 'uiLanguage', 'promptLanguage', 'animationSpeed', 'interfaceScale',
+  'theme', 'appTheme', 'customThemes', 'uiLanguage', 'promptLanguage', 'animationSpeed', 'interfaceScale',
   'accessibleFont', 'highContrast', 'reduceMotion', 'readingFocusMode', 'mascot',
 ]);
 const MASCOT_KEYS = new Set(['enabled', 'scale', 'vaultCostumes', 'style', 'orbColorMode', 'orbColor']);
@@ -189,6 +189,7 @@ export function extractServerProfilePreferences(settings) {
     appearance: {
       theme: settings.theme,
       appTheme: settings.appTheme,
+      customThemes: settings.customThemes,
       uiLanguage: settings.uiLanguage,
       promptLanguage: settings.promptLanguage,
       animationSpeed: settings.animationSpeed,
@@ -264,6 +265,7 @@ export function desktopSettingsPatchFromServerProfile(value) {
   return {
     theme: profile.appearance.theme,
     appTheme: profile.appearance.appTheme,
+    customThemes: profile.appearance.customThemes,
     uiLanguage: profile.appearance.uiLanguage,
     promptLanguage: profile.appearance.promptLanguage,
     animationSpeed: profile.appearance.animationSpeed,
@@ -346,6 +348,8 @@ export function sanitizeServerProfilePreferences(value) {
     .filter(Boolean)
     .map((model) => [`${model.provider}\u0000${model.model}`, model])).values()];
   const pendingAssignments = strings(ai.pendingAssignments ?? [], 100, 80);
+  const customThemes = sanitizeCustomThemes(appearance.customThemes);
+  const allowedAppThemes = APP_THEME_IDS.concat(customThemes.map((theme) => theme.id));
   if (favorites.some((entry) => entry && isLocalServerModel(entry.provider, entry.model)) && !pendingAssignments.includes('favorites')) pendingAssignments.push('favorites');
   const canonicalModels = Object.fromEntries(SERVER_PROFILE_MODEL_FIELDS.map((name) => {
     const input = models[name];
@@ -369,7 +373,8 @@ export function sanitizeServerProfilePreferences(value) {
     appearance: {
       theme: enumValue(appearance.theme, ['dark', 'light', 'system']),
       // Tolerate profiles written before this key existed.
-      appTheme: enumValue(appearance.appTheme ?? 'default', APP_THEME_IDS),
+      appTheme: enumValue(appearance.appTheme ?? 'default', allowedAppThemes),
+      customThemes,
       uiLanguage: enumValue(appearance.uiLanguage, ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']),
       promptLanguage: enumValue(appearance.promptLanguage, ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']),
       animationSpeed: number(appearance.animationSpeed, 0, 1),
