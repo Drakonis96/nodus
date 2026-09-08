@@ -598,11 +598,13 @@ export async function findSimilarDocuments(
   queryEmbedding: number[], threshold = 0.24, limit = 20
 ): Promise<DocumentSearchHit[]> {
   const config = currentEmbeddingConfig();
+  // Join state by its indexed work key as well as version: a version-only
+  // join scans every profile state for each candidate vector.
   const ranked = await scanSimilar<{ vector_id: string; rid: number; similarity: number }>({
     table: 'document_vectors',
     sql: `SELECT dv.vector_id, dv.rowid rid, vec_scan(dv.embedding) similarity
             FROM document_vectors dv
-            JOIN document_profile_state dps ON dps.current_version_id=dv.version_id
+            JOIN document_profile_state dps ON dps.nodus_id=dv.nodus_id AND dps.current_version_id=dv.version_id
             JOIN works w ON w.nodus_id=dv.nodus_id
            WHERE dv.rowid>? AND dv.rowid<=? AND dv.embedding IS NOT NULL
              AND w.archived=0 AND dv.embedding_provider=? AND dv.embedding_model=?
@@ -618,7 +620,7 @@ export async function findSimilarDocuments(
     `SELECT dv.vector_id,dv.nodus_id,dv.version_id,dv.kind,dv.source_id,dv.text,dv.weight,
             w.title,w.authors_json,w.year,dps.status
        FROM document_vectors dv JOIN works w ON w.nodus_id=dv.nodus_id
-       JOIN document_profile_state dps ON dps.current_version_id=dv.version_id
+       JOIN document_profile_state dps ON dps.nodus_id=dv.nodus_id AND dps.current_version_id=dv.version_id
       WHERE dv.vector_id IN (${ranked.map(() => '?').join(',')})`
   ).all(...ranked.map((item) => item.vector_id)) as Record<string, unknown>[];
   const bestBySource = new Map<string, DocumentSearchHit>();
