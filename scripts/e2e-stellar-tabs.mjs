@@ -21,11 +21,10 @@ try {
   await window.nodus.saveStellarSession(state.vaultId,'academic:corpus',{version:1,seeds:['demo-i1'],history:[],cursor:0,activeSeed:'demo-i1',positions:{},camera:{x:0,y:0,zoom:1},limit:3,speed:1});
  });
  await page.reload();await page.locator('[data-tour="nav-graph"]').click();
- const active=()=>page.locator('.stellar-tab-panel .stellar-workspace');
- await active().waitFor();
- assert.equal(await active().getAttribute('data-node-count'),'0','normal entry ignores old saved topology');
+ const active=()=>page.locator('.stellar-tab-panel [data-testid="stellar-workspace"]');
+ const hub=()=>page.locator('.stellar-tab-panel [data-testid="stellar-themes"]');
  const count=async field=>Number(await active().getAttribute(`data-${field}-count`));
- const waitEdges=n=>page.waitForFunction(n=>document.querySelector('.stellar-tab-panel .stellar-workspace')?.getAttribute('data-edge-count')===String(n),n);
+ const waitEdges=n=>page.waitForFunction(n=>document.querySelector('.stellar-tab-panel [data-testid="stellar-workspace"]')?.getAttribute('data-edge-count')===String(n),n);
  const centered=async button=>{
   const delta=await button.evaluate(button=>{
    const icon=button.querySelector('svg'),box=button.getBoundingClientRect(),shape=icon.getBBox();
@@ -35,6 +34,51 @@ try {
   assert.ok(Math.abs(delta.x)<.02&&Math.abs(delta.y)<.02,'icon is centered on both button axes');
  };
  await centered(page.locator('.stellar-new-tab'));
+ await hub().waitFor();
+ assert.equal(await page.getByRole('tab').first().innerText(),'Temas','the graph opens on the themes hub');
+ const themeNode='[data-testid="stellar-themes"] .stellar-node-label';
+ await page.locator(themeNode).first().waitFor();
+ const bubbles=await page.locator(themeNode).evaluateAll(list=>list.map(b=>({
+  id:b.dataset.node,
+  label:b.querySelector('span').textContent,
+  ideas:Number(b.querySelector('small').textContent.replace(/\D/g,'')),
+  size:Math.round(b.getBoundingClientRect().width)})));
+ assert.ok(bubbles.length>1,'the demo corpus has several themes');
+ assert.equal(new Set(bubbles.map(b=>b.size)).size,1,'every theme is the same node, whatever it holds');
+ assert.ok(bubbles.every(b=>b.ideas>0),'each theme node says how many ideas it holds');
+ const dots=await page.locator('[data-testid="stellar-themes"] .stellar-hit').count();
+ assert.equal(dots,bubbles.length,'every theme is drawn as a graph node');
+ const busiest=bubbles.reduce((best,b)=>b.ideas>best.ideas?b:best,bubbles[0]);
+ bubbles[0]=busiest;
+ await page.locator(`${themeNode}[data-node="${busiest.id}"]`).click();
+ await active().waitFor();
+ await page.waitForFunction(()=>Number(document.querySelector('.stellar-tab-panel [data-testid="stellar-workspace"]')?.getAttribute('data-node-count'))>0);
+ assert.equal(await page.getByRole('tab').first().innerText(),bubbles[0].label,'the tab follows you into the theme');
+ const walked=await count('node');
+ assert.ok(walked>0&&walked<=bubbles[0].ideas,'a theme opens on a neighbourhood, never on every idea at once');
+ const walkedEdges=await count('edge');
+ await active().getByRole('spinbutton',{name:'Relaciones visibles por idea'}).fill('1');
+ await page.waitForTimeout(400);
+ assert.ok(await count('edge')<=walkedEdges,'the child limit only removes relations');
+ assert.ok(await count('node')<=walked,'limiting relations never adds an idea');
+ await active().getByRole('button',{name:'Mostrar todas las relaciones del tema'}).click();
+ await page.waitForTimeout(400);
+ // Walking all the way out must land on exactly the ideas the theme node announced.
+ await active().getByRole('combobox',{name:'Pasos desde la idea enfocada'}).selectOption('0');
+ await page.waitForFunction(n=>Number(document.querySelector('.stellar-tab-panel [data-testid="stellar-workspace"]')?.getAttribute('data-node-count'))===n,bubbles[0].ideas);
+ assert.equal(await count('node'),bubbles[0].ideas,'the whole theme holds exactly the ideas its node announced');
+ await active().getByRole('combobox',{name:'Pasos desde la idea enfocada'}).selectOption('2');
+ await page.waitForTimeout(400);
+ assert.ok(await count('node')<=bubbles[0].ideas,'stepping back in narrows the walk again');
+ await page.screenshot({path:root+'/output/stellar-tabs/theme.png'});
+ await page.getByRole('button',{name:'Volver a los temas'}).click();
+ await hub().waitFor();
+ assert.equal(await page.getByRole('tab').first().innerText(),'Temas','going back restores the hub');
+ await page.locator(themeNode).first().waitFor();
+ await page.screenshot({path:root+'/output/stellar-tabs/themes.png'});
+ await page.getByRole('button',{name:'Nuevo grafo',exact:true}).click();
+ assert.equal(await page.getByRole('tab').count(),2);
+ assert.equal(await active().getAttribute('data-node-count'),'0','a new tab is a blank canvas');
  const candidates=await page.evaluate(()=>window.nodus.discoverArgumentRoutes());
  const seed=candidates.find(n=>n.degree>=3);assert.ok(seed);
  const search=async label=>{await page.locator('.stellar-tab-panel .stellar-search input').fill(label);await page.locator('.stellar-tab-panel .stellar-search-choice').first().waitFor();};
@@ -65,11 +109,11 @@ try {
  await active().getByTitle('Alejar',{exact:true}).click();await page.waitForTimeout(500);
  const positions=await page.locator('.stellar-tab-panel .stellar-hit').evaluateAll(nodes=>Object.fromEntries(nodes.map(node=>[node.dataset.node,node.getAttribute('style')])));
  await page.getByRole('button',{name:'Nuevo grafo',exact:true}).click();
- assert.equal(await page.getByRole('tab').count(),2);
+ assert.equal(await page.getByRole('tab').count(),3);
  assert.equal(await count('node'),0,'new tab starts empty');
  await active().getByRole('spinbutton',{name:'Límite de relaciones'}).fill('1');
  await search(other.label);await page.locator('.stellar-tab-panel .stellar-search-choice').first().click();await waitEdges(1);
- await page.getByRole('tab').first().click();assert.equal(await count('node'),preserved,'first tab keeps its topology');
+ await page.getByRole('tab').nth(1).click();assert.equal(await count('node'),preserved,'each canvas keeps its topology');
  await page.waitForTimeout(250);
  assert.equal(await page.locator('.stellar-tab-panel .graph-detail-panel h3').innerText(),detail,'the chosen detail belongs to its tab');
  assert.equal(await active().getByRole('button',{name:'Ocultar fuentes',exact:true}).getAttribute('aria-pressed'),'true');
@@ -78,7 +122,7 @@ try {
  await active().getByRole('button',{name:'Limpiar',exact:true}).click();
  assert.equal(await count('node'),0);assert.equal(await count('edge'),0);
  await page.waitForTimeout(500);assert.equal(await count('node'),0,'late layout messages cannot repopulate cleared topology');
- await page.getByRole('tab').nth(1).click();assert.equal(await count('edge'),1,'clear leaves other tabs alone');
+ await page.getByRole('tab').nth(2).click();assert.equal(await count('edge'),1,'clear leaves other tabs alone');
  for(const theme of ['dark','light']){
   await page.evaluate(theme=>{document.documentElement.classList.remove('dark','light');document.documentElement.classList.add(theme);},theme);
   await page.getByRole('button',{name:'Pantalla completa',exact:true}).click();await page.waitForFunction(()=>!!document.fullscreenElement);
@@ -87,8 +131,9 @@ try {
   await page.screenshot({path:root+'/output/stellar-tabs/fullscreen-'+theme+'.png'});
   await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.fullscreenElement);await page.waitForTimeout(1200);
  }
- await page.getByRole('button',{name:'Cerrar grafo 1',exact:true}).click();assert.equal(await page.getByRole('tab').count(),1);assert.equal(await count('edge'),1);
- await page.getByRole('button',{name:'Cerrar grafo 2',exact:true}).click();assert.equal(await page.getByRole('tab').count(),1);assert.equal(await count('node'),0);
+ await page.getByRole('button',{name:'Cerrar grafo 1',exact:true}).click();assert.equal(await page.getByRole('tab').count(),2);
+ await page.getByRole('button',{name:'Cerrar grafo 2',exact:true}).click();assert.equal(await page.getByRole('tab').count(),1);assert.equal(await count('edge'),1);
+ await page.getByRole('button',{name:'Cerrar grafo 3',exact:true}).click();assert.equal(await page.getByRole('tab').count(),1);assert.equal(await count('node'),0,'closing the last graph leaves a blank canvas');
  await search(seed.label);await page.locator('.stellar-tab-panel .stellar-search-choice').first().click();await page.waitForTimeout(600);
  const beforeNavigation=await count('node');assert.ok(beforeNavigation>0);
  await page.locator('[data-tour="nav-ideas"]').click();await page.getByTestId('ideas-tabs').waitFor();
@@ -100,9 +145,11 @@ try {
  await page.waitForFunction(()=>Number(document.querySelector('.stellar-tab-panel .stellar-workspace')?.getAttribute('data-edge-count'))>0);
  assert.ok((await page.getByRole('tab').last().innerText()).includes(other.label.slice(0,20)),'an external idea opens its own graph');
  await page.getByRole('tab').first().click();assert.equal(await count('node'),beforeTarget,'external navigation preserves previous graphs');
- await page.reload();await page.locator('[data-tour="nav-graph"]').click();await active().waitFor();
- assert.equal(await count('node'),0,'a fresh app session starts with an empty graph');
+ await page.reload();await page.locator('[data-tour="nav-graph"]').click();await hub().waitFor();
+ assert.equal(await page.getByRole('tab').count(),1,'a fresh app session starts on the themes hub alone');
+ await page.locator('[data-testid="stellar-themes"] .stellar-node-label').first().click();await active().waitFor();
+ await page.getByRole('button',{name:'Volver a los temas'}).click();await hub().waitFor();
  await page.screenshot({path:root+'/output/stellar-tabs/empty.png'});
  assert.deepEqual(errors,[]);
- console.log('Stellar tabs E2E passed: empty entry, direct limits, additive search, minus/removal, isolated tabs, clear, light/dark full screen, Escape, close last tab, section navigation, empty reload.');
+ console.log('Stellar tabs E2E passed: themes hub entry, themes drawn as graph nodes, theme walk + child limit + depth + back, blank new tabs, direct limits, additive search, minus/removal, isolated tabs, clear, light/dark full screen, Escape, close last tab, section navigation, hub on reload.');
 } finally {await app.close();fs.rmSync(profile,{recursive:true,force:true});}

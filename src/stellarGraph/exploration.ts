@@ -37,15 +37,29 @@ export class Exploration {
       if (this.nodes.has(e.source) && this.nodes.has(e.target))
         this.edges.set(e.id, e);
   }
-  async baseline(workId: string) {
+  /**
+   * Reveal a whole scope at once — every idea of a work or of a theme, and only the
+   * relations that stay inside it. Playback still starts from zero on top of it.
+   * `onProgress` reports the ideas loaded so far and the scope total, since a large theme
+   * takes many pages and the user needs to see it advancing.
+   */
+  async baseline(
+    id: string,
+    kind: "work" | "theme" = "work",
+    onProgress?: (nodes: number, total: number) => void,
+  ) {
     let cursor: number | null = 0;
     do {
-      const page = await this.source.page({ kind: "work", id: workId, cursor });
+      const page = await this.source.page({ kind, id, cursor });
       if (this.cancelled) return;
       this.ingest(page);
-      for (const n of page.nodes) this.baselineNodes.add(n.id);
-      for (const e of page.edges) this.baselineEdges.add(e.id);
+      // A node the user removed stays removed when the scope is (re)loaded.
+      for (const n of page.nodes) if (!this.removedNodes.has(n.id)) this.baselineNodes.add(n.id);
+      for (const e of page.edges) if (this.edges.has(e.id)) this.baselineEdges.add(e.id);
       cursor = page.next;
+      onProgress?.(this.baselineNodes.size, page.total);
+      // Yield between pages so cancelling or leaving the theme stays responsive.
+      if (cursor !== null) await new Promise<void>(resolve => setTimeout(resolve, 0));
     } while (cursor !== null);
   }
   start(id: string) {

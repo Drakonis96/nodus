@@ -11,7 +11,8 @@ import "./stellar.css";
 type Camera = StellarSession["camera"];
 export interface StellarCanvasApi {
   fit(): void;
-  focus(id: string): void;
+  /** `zoom` overrides the current level — a dense theme has to open closer to read. */
+  focus(id: string, zoom?: number): void;
   zoom(factor: number): void;
 }
 interface Props {
@@ -33,7 +34,23 @@ interface Props {
   onManualCamera?(): void;
   sources?: { id: string; label: string }[];
   onSource?(id: string): void;
+  /** "force" spreads a whole theme by its topology; "spiral" packs a growing canvas. */
+  layout?: "spiral" | "force";
+  /** Overrides the "TYPE · N sources" line under a node, for canvases of something else. */
+  nodeMeta?(node: GraphData["nodes"][number]): string;
+  /**
+   * "cull" (default) drops labels that would collide, which is right for a canvas of
+   * thousands. "all" keeps every one: on a canvas of a few named things — the themes hub —
+   * a node with no name is useless, and their spacing is chosen so they fit.
+   */
+  labelPolicy?: "cull" | "all";
+  onLayoutProgress?(progress: number): void;
 }
+/** Zoom range and step. A 25% step is imperceptible on a canvas this size. */
+const MIN_ZOOM = 0.02;
+const MAX_ZOOM = 8;
+export const ZOOM_STEP = 1.55;
+const clampZoom = (zoom: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
 const rgb = (hex: string) =>
   [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
 export function StellarCanvas(props: Props) {
@@ -56,6 +73,8 @@ export function StellarCanvas(props: Props) {
     moved: boolean;
   } | null>(null);
   const boxes = useRef<Obstacle[]>([]);
+  // Coordinates the user chose by hand outlive any relayout.
+  const pinned = useRef(new Set<string>());
   const routes = useRef<{ id: string; points: StellarPosition[] }[]>([]);
   const cameraFrame = useRef(0);
   const stopCamera = () => cancelAnimationFrame(cameraFrame.current);
@@ -97,11 +116,17 @@ export function StellarCanvas(props: Props) {
     });
     worker.current = w;
     w.onmessage = ({ data }) => {
-      if (data.request === seq.current) {
-        const ids = new Set(live.current.data.nodes.map(node => node.id));
-        const positions = Object.fromEntries(Object.entries({ ...data.positions, ...live.current.positions }).filter(([id]) => ids.has(id))) as Record<string, StellarPosition>;
-        live.current.onPositions(positions);
-      }
+      if (data.request !== seq.current) return;
+      const ids = new Set(live.current.data.nodes.map(node => node.id));
+      // A force run streams successive frames, so each one must win over the previous
+      // result; the spiral pass runs once and must never move an existing node.
+      const merged = data.mode === "force"
+        ? { ...live.current.positions, ...data.positions }
+        : { ...data.positions, ...live.current.positions };
+      for (const id of pinned.current)
+        if (live.current.positions[id]) merged[id] = live.current.positions[id];
+      live.current.onPositions(Object.fromEntries(Object.entries(merged).filter(([id]) => ids.has(id))) as Record<string, StellarPosition>);
+      live.current.onLayoutProgress?.(data.mode === "force" ? data.progress : 1);
     };
     w.onerror = () =>
       setError(
@@ -113,15 +138,22 @@ export function StellarCanvas(props: Props) {
     };
   }, []);
   useEffect(() => {
+    // Only a new request invalidates the running one. A force pass streams many frames,
+    // and bumping the sequence on every render would discard all but the first of them —
+    // leaving the layout frozen part-way. Clear and Re-arrange empty the positions, which
+    // does post a new request and so does supersede whatever was in flight.
+    if (!props.data.nodes.some((n) => !props.positions[n.id])) return;
     const request = ++seq.current;
-    if (props.data.nodes.some((n) => !props.positions[n.id]))
-      worker.current?.postMessage({
-        request,
-        ids: props.data.nodes.map((n) => n.id),
-        edges: props.data.edges,
-        positions: props.positions,
-      });
-  }, [props.data, props.positions]);
+    // Only the force pass takes long enough to report; the spiral one lands in one go.
+    props.onLayoutProgress?.(props.layout === "force" ? 0 : 1);
+    worker.current?.postMessage({
+      request,
+      mode: props.layout === "force" ? "force" : "spiral",
+      ids: props.data.nodes.map((n) => n.id),
+      edges: props.data.edges,
+      positions: props.positions,
+    });
+  }, [props.data, props.positions, props.layout]);
   useEffect(() => {
     const api: StellarCanvasApi = {
       fit() {
@@ -150,23 +182,20 @@ export function StellarCanvas(props: Props) {
           ),
         });
       },
-      focus(id) {
+      focus(id, zoom) {
         stopCamera();
         const p = live.current.positions[id];
         if (p)
           live.current.onCamera({
             ...p,
-            zoom: Math.max(0.8, live.current.camera.zoom),
+            zoom: zoom ?? Math.max(0.8, live.current.camera.zoom),
           });
       },
       zoom(factor) {
         stopCamera();
         live.current.onManualCamera?.();
         const c = live.current.camera;
-        live.current.onCamera({
-          ...c,
-          zoom: Math.max(0.025, Math.min(3, c.zoom * factor)),
-        });
+        live.current.onCamera({ ...c, zoom: clampZoom(c.zoom * factor) });
       },
     };
     props.onApi?.(api);
@@ -367,10 +396,7 @@ export function StellarCanvas(props: Props) {
         x = e.clientX - r.left - size.w / 2,
         y = e.clientY - r.top - size.h / 2;
       if (e.ctrlKey || e.metaKey || Math.abs(e.deltaY) >= 40) {
-        const zoom = Math.max(
-          0.025,
-          Math.min(3, c.zoom * Math.exp(-e.deltaY * 0.002)),
-        );
+        const zoom = clampZoom(c.zoom * Math.exp(-e.deltaY * 0.0045));
         live.current.onCamera({
           x: c.x + x / c.zoom - x / zoom,
           y: c.y + y / c.zoom - y / zoom,
@@ -412,6 +438,7 @@ export function StellarCanvas(props: Props) {
   }
   const occupied: { x: number; y: number }[] = [];
   const visibleLabels = labels.filter(({n,labelX,labelY}) => {
+    if (props.labelPolicy === "all") return true;
     if (props.camera.zoom < .12 && !closeNodes.has(n.id)) return false;
     if (!featured.has(n.id) && occupied.some(p => Math.abs(p.x-labelX)<245 && Math.abs(p.y-labelY)<100)) return false;
     occupied.push({x:labelX,y:labelY}); return true;
@@ -479,6 +506,7 @@ export function StellarCanvas(props: Props) {
         stopCamera();
         props.onManualCamera?.();
         if (d.id) {
+          pinned.current.add(d.id);
           props.onPositions({
             ...props.positions,
             [d.id]: {
@@ -535,7 +563,7 @@ export function StellarCanvas(props: Props) {
       <div className="stellar-labels">
         {labels
           .filter(
-            ({ n }) => props.camera.zoom >= 0.3 || n.id === props.selected || featured.has(n.id),
+            ({ n }) => props.labelPolicy === "all" || props.camera.zoom >= 0.3 || n.id === props.selected || featured.has(n.id),
           )
           .map(({ n, x, y }) => (
             <button
@@ -575,7 +603,11 @@ export function StellarCanvas(props: Props) {
             }}
           >
             <small>
-              {featured.has(n.id) ? t(active?.source === n.id ? "Origen" : "Destino") : t(NODE_LABELS[n.type] || n.type)} · {n.workCount} {t(n.workCount === 1 ? "fuente" : "fuentes")}
+              {featured.has(n.id)
+                ? t(active?.source === n.id ? "Origen" : "Destino")
+                : props.nodeMeta
+                  ? props.nodeMeta(n)
+                  : `${t(NODE_LABELS[n.type] || n.type)} · ${n.workCount} ${t(n.workCount === 1 ? "fuente" : "fuentes")}`}
             </small>
             <span>{n.label}</span>
           </button>

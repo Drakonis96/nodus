@@ -4,10 +4,12 @@ import {build} from 'esbuild';
 import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';import path from 'node:path';
 const tmp=await mkdtemp(path.join(os.tmpdir(),'stellar-tests-'));
-await build({entryPoints:['src/stellarGraph/exploration.ts','src/stellarGraph/source.ts','src/stellarGraph/layout.ts'],outdir:tmp,bundle:true,platform:'node',format:'esm',outExtension:{'.js':'.mjs'}});
+await build({entryPoints:['src/stellarGraph/exploration.ts','src/stellarGraph/source.ts','src/stellarGraph/layout.ts','src/stellarGraph/themes.ts','src/stellarGraph/forceLayout.ts'],outdir:tmp,bundle:true,platform:'node',format:'esm',outExtension:{'.js':'.mjs'}});
 const {Exploration}=await import(path.join(tmp,'exploration.mjs'));
 const {memorySource}=await import(path.join(tmp,'source.mjs'));
 const {placeNodes,isLegacyLinearLayout}=await import(path.join(tmp,'layout.mjs'));
+const {capRelations,sortThemes,neighbourhood,themeConstellation,THEME_SQUASH}=await import(path.join(tmp,'themes.mjs'));
+const {forceLayout}=await import(path.join(tmp,'forceLayout.mjs'));
 const node=id=>({id,label:id,type:'claim',workCount:1,workIds:id==='outside'?['w2']:['w1'],read:true,themes:[],years:[],authors:[],maxConfidence:1});
 const edge=(id,source,target)=>({id,source,target,type:'supports',basis:'explicit',confidence:.8});
 const graph={nodes:['a','b','c','d','isolated','outside'].map(node),edges:[edge('1','a','b'),edge('2','a','c'),edge('3','b','d'),edge('4','c','d'),edge('5','d','a'),edge('6','outside','d'),{...edge('7','a','b'),type:'contains'}]};
@@ -81,4 +83,129 @@ test('work-scoped search and expansion stay inside the work without a visible ba
  assert.deepEqual(e.visible(),{nodes:[],edges:[]});
  assert.ok(!(await scoped.page({kind:'search',search:''})).nodes.some(n=>n.id==='outside'));
  await e.add('d',0);assert.ok(!e.visible().nodes.some(n=>n.id==='outside'));
+});
+
+// --- Themes hub: the first graph tab and the section behind each theme.
+const themed=(id,...labels)=>({...node(id),themes:labels});
+test('theme nodes sit on rings around the centre and fit a screen at full size',()=>{
+ const hub=(label,ideaCount)=>({id:label,label,ideaCount,workCount:1,curated:false});
+ for(const n of [2,7,14,31]){
+  const themes=Array.from({length:n},(_,i)=>hub('t'+i,100-i));
+  const p=themeConstellation(themes);
+  assert.equal(Object.keys(p).length,n,`every theme is placed (${n})`);
+  assert.equal(new Set(Object.values(p).map(q=>`${q.x},${q.y}`)).size,n,`no two themes share a spot (${n})`);
+  // Every node lies on one of a few ellipses: that is what makes it read as a ring.
+  const radii=new Set(themes.map(t=>Math.round(Math.hypot(p[t.id].x,p[t.id].y/THEME_SQUASH)/10)*10));
+  assert.ok(radii.size<=Math.max(2,Math.ceil(n/6)),`themes form rings, not a scatter (${n} → ${radii.size} radii)`);
+  const nearest=themes.map(a=>Math.min(...themes.filter(b=>b!==a)
+    .map(b=>Math.hypot(p[a.id].x-p[b.id].x,p[a.id].y-p[b.id].y))));
+  assert.ok(Math.min(...nearest)>150,`label cards keep room between neighbours (${n})`);
+  const width=Math.max(...Object.values(p).map(q=>q.x))-Math.min(...Object.values(p).map(q=>q.x));
+  const height=Math.max(...Object.values(p).map(q=>q.y))-Math.min(...Object.values(p).map(q=>q.y));
+  // A screen holds about sixteen label cards; past that the ring grows and "Fit all" earns
+  // its keep, but it must never grow for a corpus that would have fitted.
+  if(n<=16) assert.ok(width<=1400&&height<=800,`the ring fits on screen without zooming out (${n}: ${width}x${height})`);
+  // Two themes sit top and bottom, so only a real ring can be judged by its shape.
+  if(n>=7) assert.ok(width>height,`the ring follows the shape of a screen (${n})`);
+  assert.deepEqual(themeConstellation([...themes].reverse()),p,'input order cannot change the ring');
+ }
+ const seven=themeConstellation(Array.from({length:7},(_,i)=>hub('t'+i,100-i)));
+ assert.equal(new Set(Object.values(seven).map(q=>Math.round(Math.hypot(q.x,q.y/THEME_SQUASH)/10)*10)).size,1,
+  'a handful of themes make a single circle');
+ assert.deepEqual(themeConstellation([hub('only',3)]).only,{x:0,y:0},'a single theme sits in the middle');
+});
+test('theme hubs are ordered by the ideas they nest, curated ones first on a tie',()=>{
+ const hub=(label,ideaCount,curated=false)=>({id:label,label,ideaCount,workCount:1,curated});
+ assert.deepEqual(sortThemes([hub('b',3),hub('a',9),hub('c',3,true)]).map(t=>t.label),['a','c','b']);
+});
+test('a theme page carries every idea of the theme and only its internal relations',async()=>{
+ const graph={nodes:[themed('a','Poder'),themed('b','Poder'),themed('c','Ritual')],
+  edges:[edge('1','a','b'),edge('2','b','c')]};
+ const source=memorySource('themes',async()=>graph);
+ const page=await source.page({kind:'theme',id:'Poder'});
+ assert.deepEqual(page.nodes.map(n=>n.id).sort(),['a','b']);
+ assert.deepEqual(page.edges.map(e=>e.id),['1'],'a relation leaving the theme is not part of it');
+ const hubs=await source.themes();
+ assert.deepEqual(hubs.map(t=>[t.label,t.ideaCount]),[['Poder',2],['Ritual',1]]);
+});
+test('a whole theme loads as the visible baseline, ideas included',async()=>{
+ const graph={nodes:[themed('a','Poder'),themed('b','Poder'),themed('lonely','Poder')],edges:[edge('1','a','b')]};
+ const e=new Exploration(memorySource('theme-baseline',async()=>graph));
+ await e.baseline('Poder','theme');
+ assert.deepEqual(e.visible().nodes.map(n=>n.id).sort(),['a','b','lonely']);
+ assert.deepEqual(e.visible().edges.map(x=>x.id),['1']);
+});
+test('the child-relation limit caps every idea without dropping one, and 0 shows them all',()=>{
+ const nodes=['hub','x','y','z'].map(node);
+ const edges=[edge('e1','hub','x'),edge('e2','hub','y'),edge('e3','hub','z')];
+ const data={nodes,edges};
+ assert.equal(capRelations(data,0).edges.length,3);
+ const capped=capRelations(data,1);
+ assert.equal(capped.edges.length,1,'the hub spends its single relation once');
+ assert.equal(capped.nodes.length,4,'no idea leaves the theme because its relations are hidden');
+ const degree=id=>capped.edges.filter(e=>e.source===id||e.target===id).length;
+ assert.ok(nodes.every(n=>degree(n.id)<=1));
+});
+test('the strongest relations win the budget, and a revealed one is never hidden',()=>{
+ const nodes=['hub','x','y'].map(node);
+ const weak={...edge('weak','hub','x'),basis:'inferred',confidence:.2};
+ const strong={...edge('strong','hub','y'),basis:'explicit',confidence:.9};
+ const data={nodes,edges:[weak,strong]};
+ assert.deepEqual(capRelations(data,1).edges.map(e=>e.id),['strong']);
+ assert.deepEqual(capRelations(data,1,['weak']).edges.map(e=>e.id),['weak'],'the revealed step survives the cap');
+ assert.deepEqual(capRelations(data,1).edges,capRelations(data,1).edges,'the cap is deterministic');
+});
+
+test('the theme layout pulls linked ideas together and pushes the rest apart',()=>{
+ // Two cliques joined by nothing: the layout must separate them, not blend them into a disc.
+ const a=['a1','a2','a3','a4'],b=['b1','b2','b3','b4'];
+ const clique=ids=>ids.flatMap((x,i)=>ids.slice(i+1).map(y=>({source:x,target:y})));
+ const ids=[...a,...b],edges=[...clique(a),...clique(b)];
+ const p=forceLayout(ids,edges,{},{iterations:220});
+ const spread=group=>{const xs=group.map(id=>p[id]);return Math.max(...xs.flatMap(u=>xs.map(v=>Math.hypot(u.x-v.x,u.y-v.y))));};
+ const centre=group=>({x:group.reduce((s,id)=>s+p[id].x,0)/group.length,y:group.reduce((s,id)=>s+p[id].y,0)/group.length});
+ const gap=Math.hypot(centre(a).x-centre(b).x,centre(a).y-centre(b).y);
+ assert.ok(gap>Math.max(spread(a),spread(b)),`clusters stay apart (gap ${gap.toFixed(0)})`);
+ assert.equal(new Set(ids.map(id=>`${p[id].x},${p[id].y}`)).size,8,'no two ideas share a coordinate');
+});
+test('the theme layout is deterministic and never loses or misplaces an idea',()=>{
+ const ids=Array.from({length:400},(_,i)=>'n'+i);
+ const edges=ids.slice(1).map((id,i)=>({source:ids[i%40],target:id}));
+ const first=forceLayout(ids,edges,{},{iterations:60});
+ assert.deepEqual(forceLayout([...ids].reverse(),[...edges].reverse(),{},{iterations:60}),first,'input order cannot change the result');
+ assert.equal(Object.keys(first).length,400);
+ assert.ok(ids.every(id=>Number.isFinite(first[id].x)&&Number.isFinite(first[id].y)));
+});
+test('ideas with no relation inside the theme are parked outside the connected core',()=>{
+ const ids=['a','b','c','lonely1','lonely2'];
+ const p=forceLayout(ids,[{source:'a',target:'b'},{source:'b',target:'c'}],{},{iterations:120});
+ const core=Math.max(...['a','b','c'].map(id=>Math.hypot(p[id].x,p[id].y)));
+ for(const id of ['lonely1','lonely2'])
+  assert.ok(Math.hypot(p[id].x,p[id].y)>core,'an unconnected idea sits beyond the core, still placed');
+ assert.notDeepEqual(p.lonely1,p.lonely2,'unconnected ideas do not stack on one another');
+});
+test('layout progress is reported and hand-placed coordinates seed the run',()=>{
+ const ids=['a','b','c'],edges=[{source:'a',target:'b'}];
+ const frames=[];
+ forceLayout(ids,edges,{a:{x:1000,y:0}},{iterations:24,progressEvery:6,onProgress:(f,p)=>frames.push([f,Object.keys(p).length])});
+ assert.ok(frames.length>=4,'the canvas can draw the graph settling');
+ assert.equal(frames.at(-1)[0],1);
+ assert.ok(frames.every(([,n])=>n===3),'every frame carries every idea');
+});
+
+test('a theme is walked one step at a time, and depth 0 still shows the whole thing',()=>{
+ const ids=['a','b','c','d','far'];
+ const data={nodes:ids.map(node),edges:[edge('1','a','b'),edge('2','a','c'),edge('3','c','d'),edge('4','d','far')]};
+ assert.deepEqual(neighbourhood(data,'a',1).nodes.map(n=>n.id).sort(),['a','b','c']);
+ assert.deepEqual(neighbourhood(data,'a',1).edges.map(e=>e.id).sort(),['1','2']);
+ assert.deepEqual(neighbourhood(data,'a',2).nodes.map(n=>n.id).sort(),['a','b','c','d']);
+ assert.equal(neighbourhood(data,'a',0).nodes.length,5,'depth 0 is the whole theme');
+ assert.equal(neighbourhood(data,null,2).nodes.length,5,'without a focus nothing is hidden');
+ assert.equal(neighbourhood(data,'gone',2).nodes.length,5,'a focus that left the canvas hides nothing');
+});
+test('walking a theme keeps an isolated focus visible and never invents relations',()=>{
+ const data={nodes:['lonely','x'].map(node),edges:[]};
+ const view=neighbourhood(data,'lonely',2);
+ assert.deepEqual(view.nodes.map(n=>n.id),['lonely']);
+ assert.deepEqual(view.edges,[]);
 });

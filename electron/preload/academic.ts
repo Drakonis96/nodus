@@ -161,6 +161,7 @@ export const academicApi: AcademicApi = {
   },
 
   stellarPage: (request) => ipcRenderer.invoke('stellar:page', request),
+  stellarThemes: () => ipcRenderer.invoke('stellar:themes'),
   getStellarSession: (key) => ipcRenderer.invoke('stellar:session', key),
   saveStellarSession: (vaultId, key, state) => ipcRenderer.invoke('stellar:save', vaultId, key, state),
   getGraph: (lens) => ipcRenderer.invoke('graph:get', lens),

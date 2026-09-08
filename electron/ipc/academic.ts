@@ -1,4 +1,4 @@
-import { stellarPage, getStellarSession, saveStellarSession } from '../graph/stellarService';
+import { stellarPage, stellarThemes, getStellarSession, saveStellarSession } from '../graph/stellarService';
 // The academic corpus and the study vault, moved verbatim out of the monolithic
 // registerIpc. The channel names are unchanged; scripts/test-ipc-contract.mjs is
 // what proves it.
@@ -823,6 +823,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
 
   // Stellar canvas
   h('stellar:page', async (_e, request) => stellarPage(request));
+  h('stellar:themes', async () => stellarThemes());
   h('stellar:session', async (_e, key) => getStellarSession(key));
   h('stellar:save', async (_e, vaultId, key, state) => saveStellarSession(vaultId, key, state));
   // graph

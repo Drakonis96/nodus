@@ -5,6 +5,7 @@ import type {
   StellarPageRequest,
   StellarPage,
   StellarSession,
+  StellarTheme,
 } from "@shared/stellarGraph";
 
 const eligible = (id: string) =>
@@ -12,6 +13,55 @@ const eligible = (id: string) =>
 const edgeScope = `${eligible("e.from_id")} AND ${eligible("e.to_id")} AND (e.source_work IS NULL OR EXISTS (SELECT 1 FROM works w WHERE w.nodus_id=e.source_work AND w.archived=0 AND w.deep_status='done'))`;
 const edgeSelect = `SELECT e.id,e.from_id AS source,e.to_id AS target,e.type,e.basis,e.confidence,
  (SELECT f.verdict FROM edge_feedback f WHERE f.type=e.type AND f.verdict='confirmed' AND ((f.from_id=e.from_id AND f.to_id=e.to_id) OR (f.from_id=e.to_id AND f.to_id=e.from_id)) LIMIT 1) AS verdict FROM visible_edges e`;
+/**
+ * Ideas nested under a theme, with the same membership the theme lens uses in
+ * graphService: the explicit idea↔theme links a deep scan wrote, plus — only for the
+ * occurrences no scan ever linked — the themes of the work the idea came from. Both
+ * halves stay inside the eligible corpus, so a theme bubble counts exactly the ideas
+ * its drill-down opens.
+ */
+const themeMembers = (theme: string) => `SELECT io.global_id FROM idea_occurrences io
+ JOIN works w ON w.nodus_id=io.nodus_id
+ WHERE w.archived=0 AND w.deep_status='done' AND (
+   EXISTS (SELECT 1 FROM idea_theme_links it WHERE it.global_id=io.global_id AND it.nodus_id=io.nodus_id AND it.theme_id=${theme})
+   OR (EXISTS (SELECT 1 FROM work_themes wt WHERE wt.nodus_id=io.nodus_id AND wt.theme_id=${theme})
+       AND NOT EXISTS (SELECT 1 FROM idea_theme_links l WHERE l.global_id=io.global_id AND l.nodus_id=io.nodus_id)))`;
+
+/** Every theme hub of the vault: those a scan extracted and those the user curated. */
+export function stellarThemes(): StellarTheme[] {
+  const rows = getDb()
+    .prepare(
+      `WITH eligible AS (
+         SELECT io.nodus_id, io.global_id FROM idea_occurrences io
+         JOIN works w ON w.nodus_id=io.nodus_id
+         JOIN ideas i ON i.global_id=io.global_id
+         WHERE w.archived=0 AND w.deep_status='done' AND i.orphaned_at IS NULL
+       ),
+       membership AS (
+         SELECT it.theme_id, it.global_id FROM idea_theme_links it
+         JOIN eligible e ON e.nodus_id=it.nodus_id AND e.global_id=it.global_id
+         UNION
+         SELECT wt.theme_id, e.global_id FROM eligible e
+         JOIN work_themes wt ON wt.nodus_id=e.nodus_id
+         WHERE NOT EXISTS (SELECT 1 FROM idea_theme_links l WHERE l.nodus_id=e.nodus_id AND l.global_id=e.global_id)
+       )
+       SELECT t.theme_id AS id, t.label, t.pinned,
+              COUNT(DISTINCT m.global_id) AS ideaCount,
+              (SELECT COUNT(DISTINCT wt.nodus_id) FROM work_themes wt JOIN works w ON w.nodus_id=wt.nodus_id
+                WHERE wt.theme_id=t.theme_id AND w.archived=0 AND w.deep_status='done') AS workCount
+       FROM themes t LEFT JOIN membership m ON m.theme_id=t.theme_id
+       GROUP BY t.theme_id
+       ORDER BY ideaCount DESC, t.pinned DESC, t.label`,
+    )
+    .all() as { id: string; label: string; pinned: number; ideaCount: number; workCount: number }[];
+  return rows.map((r) => ({
+    id: r.id,
+    label: r.label || r.id,
+    ideaCount: r.ideaCount,
+    workCount: r.workCount,
+    curated: r.pinned === 1,
+  }));
+}
 function nodes(ids: string[]): GraphNode[] {
   if (!ids.length) return [];
   const db = getDb();
@@ -90,6 +140,40 @@ export function stellarPage(req: StellarPageRequest): StellarPage {
         `${edgeSelect} WHERE ${where} ORDER BY CASE WHEN verdict='confirmed' THEN 0 WHEN e.basis='explicit' THEN 1 ELSE 2 END,e.confidence DESC,e.id LIMIT ? OFFSET ?`,
       )
       .all(req.id, req.id, limit, offset) as GraphEdge[];
+  } else if (req.kind === "theme") {
+    if (!req.id) return { nodes: [], edges: [], total: 0, next: null };
+    // Named parameters throughout: the membership subquery binds the theme twice and
+    // appears twice in the edge queries, which positional placeholders cannot line up.
+    const member = themeMembers("@theme");
+    const args = { theme: req.id, limit, offset };
+    // Nodes and edges page independently against the same cursor, as `work` does.
+    ids = (
+      db
+        .prepare(
+          `SELECT i.global_id AS id FROM ideas i WHERE i.orphaned_at IS NULL AND ${eligible("i.global_id")} AND i.global_id IN (${member}) ORDER BY i.global_id LIMIT @limit OFFSET @offset`,
+        )
+        .all(args) as { id: string }[]
+    ).map((r) => r.id);
+    edges = db
+      .prepare(
+        `${edgeSelect} WHERE ${edgeScope} AND e.from_id IN (${member}) AND e.to_id IN (${member}) ORDER BY e.id LIMIT @limit OFFSET @offset`,
+      )
+      .all(args) as GraphEdge[];
+    const n = (
+      db
+        .prepare(
+          `SELECT COUNT(DISTINCT i.global_id) AS n FROM ideas i WHERE i.orphaned_at IS NULL AND ${eligible("i.global_id")} AND i.global_id IN (${member})`,
+        )
+        .get({ theme: req.id }) as { n: number }
+    ).n;
+    const e = (
+      db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM visible_edges e WHERE ${edgeScope} AND e.from_id IN (${member}) AND e.to_id IN (${member})`,
+        )
+        .get({ theme: req.id }) as { n: number }
+    ).n;
+    total = Math.max(n, e);
   } else if (req.kind === "work") {
     const member = `SELECT io.global_id FROM idea_occurrences io WHERE io.nodus_id=?`;
     // Page nodes and edges independently with the same cursor; both exhaust before next=null.

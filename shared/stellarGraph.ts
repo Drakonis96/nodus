@@ -1,6 +1,7 @@
 import type { GraphData } from "./types";
 export interface StellarPageRequest {
-  kind: "search" | "neighbors" | "work" | "elements";
+  /** `theme` returns every idea nested under a theme plus the relations between them. */
+  kind: "search" | "neighbors" | "work" | "elements" | "theme";
   id?: string;
   search?: string;
   theme?: string;
@@ -10,6 +11,17 @@ export interface StellarPageRequest {
   cursor?: number;
   limit?: number;
 }
+/** A theme hub as shown on the first graph tab: the bubble area encodes `ideaCount`. */
+export interface StellarTheme {
+  id: string;
+  label: string;
+  /** Distinct ideas nested under the theme; drives the node size and the drill-down. */
+  ideaCount: number;
+  workCount: number;
+  /** Curated by the user in "Temas principales" instead of extracted by a scan. */
+  curated: boolean;
+}
+
 export interface StellarPage extends GraphData {
   next: number | null;
   total: number;
