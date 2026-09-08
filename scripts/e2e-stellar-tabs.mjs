@@ -30,7 +30,8 @@ try {
   if(!target.startsWith(profile+path.sep))throw new Error('Fixture database is outside the demo profile');
   const Database=require(process.argv[1]),db=new Database(target);
   try {
-   db.prepare("INSERT INTO idea_theme_links(nodus_id,global_id,theme_id,confidence,basis) SELECT io.nodus_id,io.global_id,t.theme_id,1,'explicit' FROM idea_occurrences io CROSS JOIN themes t WHERE NOT EXISTS(SELECT 1 FROM idea_theme_links l WHERE l.nodus_id=io.nodus_id AND l.global_id=io.global_id AND l.theme_id=t.theme_id) LIMIT 1").run();
+   const inserted=db.prepare("INSERT INTO idea_theme_links(nodus_id,global_id,theme_id,confidence,basis) SELECT io.nodus_id,io.global_id,t.theme_id,1,'explicit' FROM idea_occurrences io CROSS JOIN themes t WHERE io.global_id='demo-i1' AND NOT EXISTS(SELECT 1 FROM idea_theme_links l WHERE l.nodus_id=io.nodus_id AND l.global_id=io.global_id AND l.theme_id=t.theme_id) ORDER BY t.theme_id LIMIT 1").run();
+   if(inserted.changes!==1)throw new Error('The overlapping-theme fixture was not inserted');
   } finally {db.close();}
  `,require.resolve('better-sqlite3'),profile],{env:{...process.env,ELECTRON_RUN_AS_NODE:'1'}});
  await page.reload();await page.locator('[data-tour="nav-graph"]').click();
@@ -92,6 +93,13 @@ try {
  };
  const themeNode='[data-testid="stellar-themes"] .stellar-node-label';
  await page.locator(themeNode).first().waitFor();
+ const expectedThemes=await page.evaluate(()=>window.nodus.stellarThemes());
+ const uniqueIdeas=await page.evaluate(async()=> (await window.nodus.listIdeasPage({limit:1,offset:0,sort:'label'})).total);
+ assert.ok(expectedThemes.reduce((sum,theme)=>sum+theme.ideaCount,0)>uniqueIdeas,'fixture includes ideas that belong to multiple themes');
+ // The initial full-size constellation may extend beyond a CI runner's screen.
+ // Fit it before inspecting every caption; offscreen captions are intentionally culled.
+ await hub().getByRole('button',{name:'Encuadrar',exact:true}).click();
+ await page.waitForFunction(n=>document.querySelectorAll('[data-testid="stellar-themes"] .stellar-node-label').length===n,expectedThemes.length);
  const bubbles=await page.locator(themeNode).evaluateAll(list=>list.map(b=>({
   id:b.dataset.node,
   label:b.querySelector('span').textContent,
@@ -100,8 +108,7 @@ try {
  assert.ok(bubbles.length>1,'the demo corpus has several themes');
  assert.equal(new Set(bubbles.map(b=>b.size)).size,1,'every theme is the same node, whatever it holds');
  assert.ok(bubbles.every(b=>b.ideas>0),'each theme node says how many ideas it holds');
- const uniqueIdeas=await page.evaluate(async()=> (await window.nodus.listIdeasPage({limit:1,offset:0,sort:'label'})).total);
- assert.ok(bubbles.reduce((sum,theme)=>sum+theme.ideas,0)>uniqueIdeas,'fixture includes ideas that belong to multiple themes');
+ assert.equal(bubbles.reduce((sum,theme)=>sum+theme.ideas,0),expectedThemes.reduce((sum,theme)=>sum+theme.ideaCount,0),'visible theme captions match the complete membership counts');
  assert.ok((await hub().locator('.stellar-meta').innerText()).includes(`${uniqueIdeas.toLocaleString()} ideas únicas en el corpus`),'hub counts unique ideas instead of summing overlapping theme memberships');
  await captureAppearance('temas');
  await verifyContext(hub(),'hub');
