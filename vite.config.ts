@@ -3,14 +3,8 @@ import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron/simple';
 import electronPlugin from 'vite-plugin-electron';
 import renderer from 'vite-plugin-electron-renderer';
-import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-
-// `ELECTRON_RUN_AS_NODE` is useful for standalone worker verification, but it
-// makes the Electron executable launch the main bundle through Node. Clear it
-// for the desktop dev server so a reused shell cannot silently disable Electron.
-delete process.env.ELECTRON_RUN_AS_NODE;
 
 // graphology and sigma ship CJS builds that `require('events')` (a Node
 // builtin). Vite's dev optimizer externalizes builtins for the browser, which
@@ -32,11 +26,6 @@ const databaseComputeWorkerAliases = () => ({
     return null;
   },
 });
-
-// The main Electron entry owns the single dev-server bootstrap. Secondary
-// worker/preload builds must remain passive rebuilds; defining `onstart` here
-// competes for the plugin's startup lifecycle and prevents the app from
-// launching.
 
 // Native node modules and Electron-only deps must stay external in the main process bundle.
 const mainExternals = [
@@ -95,7 +84,7 @@ const mainExternals = [
  * reload the renderer instead of spawning another Electron instance in dev.
  */
 const preloadBuild = (name: string, entry: string) => ({
-  onstart: () => {},
+  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     // The top-level resolve.alias only applies to the renderer build.
     resolve: {
@@ -116,7 +105,7 @@ const preloadBuild = (name: string, entry: string) => ({
 });
 
 const databaseComputeWorkerBuild = {
-  onstart: () => {},
+  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     plugins: [databaseComputeWorkerAliases()],
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
@@ -136,7 +125,7 @@ const databaseComputeWorkerBuild = {
 };
 
 const databaseScaleFixtureWorkerBuild = {
-  onstart: () => {},
+  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     plugins: [databaseComputeWorkerAliases()],
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
@@ -153,7 +142,7 @@ const databaseScaleFixtureWorkerBuild = {
 };
 
 const databaseAggregateWorkerBuild = {
-  onstart: () => {},
+  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     plugins: [databaseComputeWorkerAliases()],
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
@@ -170,7 +159,7 @@ const databaseAggregateWorkerBuild = {
 };
 
 const databaseDeepResearchWorkerBuild = {
-  onstart: () => {},
+  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     plugins: [databaseComputeWorkerAliases()],
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
@@ -187,7 +176,7 @@ const databaseDeepResearchWorkerBuild = {
 };
 
 const vectorScanWorkerBuild = {
-  onstart: () => {},
+  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
     build: {
@@ -206,7 +195,7 @@ const vectorScanWorkerBuild = {
  * chunk may pull `app`/`BrowserWindow` imports into a process where Electron does not
  * expose them. Build it as one self-contained ESM file instead. */
 const utilityBuild = (name: string, entry: string) => ({
-  onstart: () => {},
+  onstart: (args: { reload: () => void }) => args.reload(),
   vite: {
     resolve: {
       alias: { '@shared': path.resolve(__dirname, 'shared') },
@@ -275,6 +264,7 @@ export default defineConfig({
       'graphology',
       'graphology-layout-forceatlas2',
       'graphology-layout-forceatlas2/worker',
+      'graphology-communities-louvain',
       'events',
     ],
   },
@@ -282,25 +272,19 @@ export default defineConfig({
     react(),
     electron({
       main: {
-        // Keep the main entry as the only build owned by vite-plugin-electron/simple.
-        // Its startup hook runs after the main and preload builds; putting worker
-        // entries here makes the hook race the multi-entry watcher and can launch
-        // Electron before dist-electron/main.js exists.
-        entry: 'electron/main.ts',
-        onstart: async ({ startup, reload }) => {
-          if (process.electronApp) {
-            reload();
-            return;
-          }
-          const mainBundle = path.resolve(__dirname, 'dist-electron/main.js');
-          const deadline = Date.now() + 120_000;
-          while (!existsSync(mainBundle) && Date.now() < deadline) {
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
-          if (!existsSync(mainBundle)) {
-            throw new Error(`Electron main bundle was not emitted: ${mainBundle}`);
-          }
-          await startup();
+        // computeWorker.ts is a worker_threads entry: it must land in
+        // dist-electron as its own file (computeWorker.js) so the main process
+        // can spawn it with `new Worker(...)`.
+        // Use named entries rather than a positional array. Besides keeping the
+        // packaged filenames stable, this prevents Rollup from coalescing
+        // worker entries that share most of their Library dependency graph.
+        entry: {
+          main: 'electron/main.ts',
+          computeWorker: 'electron/workers/computeWorker.ts',
+          libraryExtractionWorker: 'electron/workers/libraryExtractionWorker.ts',
+          libraryOperationWorker: 'electron/workers/libraryOperationWorker.ts',
+          libraryReaderWorker: 'electron/workers/libraryReaderWorker.ts',
+          compassWorker: 'electron/workers/compassWorker.ts',
         },
         vite: {
           // The top-level resolve.alias only applies to the renderer build;
@@ -350,12 +334,6 @@ export default defineConfig({
       // NOTHING on window: it is a sensor the main process drives, and the whole
       // point is that a remote website finds no bridge to reach for.
       preloadBuild('preload.browserPage', 'electron/preload/browserPage.ts'),
-      // Keep worker builds passive so the main startup hook cannot race them.
-      utilityBuild('computeWorker', 'electron/workers/computeWorker.ts'),
-      utilityBuild('libraryExtractionWorker', 'electron/workers/libraryExtractionWorker.ts'),
-      utilityBuild('libraryOperationWorker', 'electron/workers/libraryOperationWorker.ts'),
-      utilityBuild('libraryReaderWorker', 'electron/workers/libraryReaderWorker.ts'),
-      utilityBuild('compassWorker', 'electron/workers/compassWorker.ts'),
       databaseComputeWorkerBuild,
       databaseScaleFixtureWorkerBuild,
       databaseAggregateWorkerBuild,
