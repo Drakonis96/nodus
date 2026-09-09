@@ -22,6 +22,8 @@ export interface SkillSource { id: string; url: string; commit?: string; updated
 export interface SkillMarketplace { version: 1; sources: SkillSource[] }
 export const skillSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64) || 'my-skill';
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+// Reject control characters in package text while allowing tabs and line breaks.
+// eslint-disable-next-line no-control-regex
 const plain = (value: unknown, max: number) => typeof value === 'string' && value.trim().length > 0 && value.length <= max && !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value);
 export function validateManifest(value: unknown): SkillManifest {
   const m = value as SkillManifest;

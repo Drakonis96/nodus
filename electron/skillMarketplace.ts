@@ -43,7 +43,7 @@ async function request(url: string, fetcher: typeof fetch, limit: number): Promi
   const reader = response.body?.getReader();
   if (!reader) throw new Error('Empty repository response.');
   const chunks: Uint8Array[] = []; let bytes = 0;
-  try { while (true) { const next = await reader.read().catch(() => { throw new SkillSourceFetchError('GitHub download was interrupted. The previous catalog is preserved.'); }); if (next.done) break; bytes += next.value.length; if (bytes > limit) throw new Error('Repository response is too large.'); chunks.push(next.value); } }
+  try { for (;;) { const next = await reader.read().catch(() => { throw new SkillSourceFetchError('GitHub download was interrupted. The previous catalog is preserved.'); }); if (next.done) break; bytes += next.value.length; if (bytes > limit) throw new Error('Repository response is too large.'); chunks.push(next.value); } }
   finally { await reader.cancel().catch(() => {}); }
   return Buffer.concat(chunks).toString('utf8');
 }

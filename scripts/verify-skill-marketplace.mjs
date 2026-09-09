@@ -64,6 +64,13 @@ try {
   const catalog = await page.evaluate(() => window.nodus.getSkillMarketplace());
   assert.ok(catalog.sources[0].entries.length >= 15); assert.deepEqual(catalog.sources[0].errors, []);
   await page.screenshot({ path: path.join(artifacts, 'marketplace.png') });
+  for (const name of ['AlphaGenome', 'Legalize']) {
+    await page.getByRole('searchbox', { name: 'Search marketplace' }).fill(name);
+    await page.getByRole('button', { name: 'Review skill', exact: true }).click();
+    assert.equal(await page.getByRole('button', { name: 'Install skill', exact: true }).isDisabled(), true);
+    await page.getByText(/This build cannot install this skill/).waitFor();
+    await page.getByRole('button', { name: '← Back to catalog', exact: true }).click();
+  }
   await page.getByRole('searchbox', { name: 'Search marketplace' }).fill('Descriptive Statistics');
   await page.getByRole('button', { name: 'Review skill', exact: true }).click();
   await page.screenshot({ path: path.join(artifacts, 'review.png') });
