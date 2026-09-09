@@ -1,3 +1,4 @@
+import type { SkillMarketplace } from './skillMarketplace';
 import type { ChatSkill } from './chatSkills';
 // Shared domain types used by both the Electron main process and the React renderer.
 // Keep this file free of any runtime imports from either side.
@@ -8764,6 +8765,13 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   listAnnouncements(): Promise<AnnouncementEntry[]>;
   markAnnouncementRead(id: string): Promise<AnnouncementEntry[]>;
   onAnnouncementsChanged(cb: (list: AnnouncementEntry[]) => void): () => void;
+  getSkillMarketplace(): Promise<SkillMarketplace>;
+  addSkillSource(url: string): Promise<SkillMarketplace>;
+  removeSkillSource(id: string): Promise<SkillMarketplace>;
+  updateSkillSource(id: string): Promise<SkillMarketplace>;
+  installMarketplaceSkill(sourceId: string, packagePath: string, commit: string): Promise<ChatSkill[]>;
+  importSkillPackage(): Promise<ChatSkill[]>;
+  exportSkillPackage(id: string): Promise<string | null>;
   listChatSkills(): Promise<ChatSkill[]>;
   saveChatSkill(skill: ChatSkill): Promise<ChatSkill[]>;
   deleteChatSkill(id: string): Promise<ChatSkill[]>;

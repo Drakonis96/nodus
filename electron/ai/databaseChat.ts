@@ -1,3 +1,4 @@
+import { skillHasCapability } from '@shared/chatSkills';
 import { buildChatSkillsPrompt, chatSkillsOutputContract } from '@shared/chatSkills';
 import { vaultChatSkillSession } from './chatSkillSession';
 import { executeChatSkills, assertChatSkillSession } from './chatSkillExecution';
@@ -139,7 +140,7 @@ export async function streamDatabaseChat(
     });
 
   const text = await stream(
-    { system: `${databaseChatSystem(language)}\n\n${buildChatSkillsPrompt(skills)}`, user: `${user}\n\n${chatSkillsOutputContract(skills)}`, englishImagePrompts: skills.some(skill => skill.builtin === 'image'), plainContext: true, temperature: 0.3, maxTokens: skills.length ? 10_000 : 1500 },
+    { system: `${databaseChatSystem(language)}\n\n${buildChatSkillsPrompt(skills)}`, user: `${user}\n\n${chatSkillsOutputContract(skills)}`, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), plainContext: true, temperature: 0.3, maxTokens: skills.length ? 10_000 : 1500 },
     onDelta,
     signal
   );

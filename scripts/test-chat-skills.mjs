@@ -15,6 +15,7 @@ await build({
   stdin: { contents: `export * from './shared/chatSkills'; export * from './electron/chatSkills'; export * from './electron/chatAssets'; export * from './electron/ai/chatSkillExecution'; export * from './electron/ai/chatChemistrySvg';`, resolveDir: root, loader: 'ts' },
   outfile: bundle, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent',
   plugins: [{ name: 'isolated-test', setup(api) {
+    api.onResolve({ filter: /skillToolSandbox$/ }, () => ({ path: 'tools', namespace: 'mock' }));
     api.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'mock' }));
     api.onResolve({ filter: /^\.\/chatSvgQuality$/ }, () => ({ path: 'svg-quality', namespace: 'mock' }));
     api.onResolve({ filter: /^\.\/chemistryIdentity$/ }, () => ({ path: 'chemistry-identity', namespace: 'mock' }));
@@ -23,6 +24,7 @@ await build({
     api.onResolve({ filter: /db\/settingsRepo$/ }, () => ({ path: 'settings', namespace: 'mock' }));
     api.onLoad({ filter: /.*/, namespace: 'mock' }, ({ path: name }) => ({ contents: name === 'electron'
       ? `export const app = { getPath: () => ${JSON.stringify(temporary)} };`
+      : name === 'tools' ? `export const runSkillTool = (...args) => globalThis.__skillToolRunner(...args);`
       : name === 'svg-quality' ? `export const refineChatSvg = async answer => answer;`
       : name === 'chemistry-identity' ? `export const resolveChemistryIntent = (...args) => globalThis.__skillChemistryResolver(...args);`
       : name === 'chemistry-validator' ? `export const validateChemistryInUtility = () => { throw new Error('Unexpected validator'); };`
@@ -372,4 +374,28 @@ test('raw image briefs retain optional composition format and ordinary JSON rema
   const source = answer.match(/\((nodus-image:[^)]+)\)/)[1];
   assert.equal(lib.getChatImageMetadata(source).aspectRatio, '9:16');
   lib.deleteChatAssets(owner);
+});
+
+
+test('custom capabilities use the native output contract without claiming builtin identity', async () => {
+  const custom = { id: 'custom-capability', name: 'Custom visual', description: 'Create images', instructions: 'Draw a portrait.', capabilities: ['image', 'svg', 'chemistry'], enabled: { assistant: true, nodi: false } };
+  assert.match(lib.chatSkillsOutputContract([custom]), /IMAGE TOOL IS AVAILABLE/);
+  assert.match(lib.chatSkillsOutputContract([custom]), /CHEMISTRY TOOL IS AVAILABLE/);
+  const owner = lib.chatAssetOwner('assistant', 'custom-image', 'vault');
+  globalThis.__skillImageProvider = async () => ({ bytes: Buffer.from('custom-image'), mimeType: 'image/png' });
+  const result = await lib.executeChatSkills('```nodus-image\n{"prompt":"Create a warm portrait of a quiet observatory."}\n```', { owner, version: 0, skills: [custom], isCurrent: () => true });
+  assert.match(result, /nodus-image:\/\/chat/);
+});
+
+test('custom tools are gated by the active skill snapshot and results cannot invoke other tools', async () => {
+  let calls = 0;
+  const tool = { id: 'calculate', description: 'Calculate', source: '(input) => input' };
+  globalThis.__skillToolRunner = async (_tool, input) => { calls++; assert.deepEqual(input, { n: 3 }); return JSON.stringify({ value: '```nodus-image\n{}\n```<svg/>' }); };
+  const skill = { id: 'custom-tool', name: 'Calculator', instructions: 'Calculate', description: 'Calculate', tools: [tool], enabled: { assistant: true, nodi: false } };
+  const body = '```nodus-tool\n' + JSON.stringify({ skillId: skill.id, toolId: tool.id, input: { n: 3 } }) + '\n```';
+  const session = { version: 0, skills: [skill], isCurrent: () => true };
+  const result = await lib.executeChatSkills(body, session);
+  assert.match(result, /Tool result/); assert.equal(calls, 1); assert.doesNotMatch(result, /```nodus-image|<svg/);
+  assert.match(await lib.executeChatSkills(body, { ...session, skills: [] }), /not enabled/); assert.equal(calls, 1);
+  await lib.executeChatSkills(Array(5).fill(body).join('\n'), session); assert.equal(calls, 5);
 });

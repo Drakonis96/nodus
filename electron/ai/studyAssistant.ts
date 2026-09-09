@@ -1,3 +1,4 @@
+import { skillHasCapability } from '@shared/chatSkills';
 import { buildChatSkillsPrompt, chatSkillsOutputContract } from '@shared/chatSkills';
 import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from '../chatAssets';
 import { getActiveVault } from '../vaults/vaultRegistry';
@@ -268,7 +269,7 @@ export async function streamStudyAssistant(
   const effectiveModel = resolveModelRef(configuredModel);
   const prompt = buildStudyAssistantPrompt(request, availableCitations);
   assertChatSkillSession(execution, signal);
-  const raw = await completeTextStream({ system: `${prompt.system}\n\n${buildChatSkillsPrompt(skills)}`, user: `${prompt.user}\n\n${chatSkillsOutputContract(skills)}`, englishImagePrompts: skills.some(skill => skill.builtin === 'image'), temperature: 0.18, maxTokens: skills.length ? 10_000 : 3200 }, onDelta, effectiveModel, signal);
+  const raw = await completeTextStream({ system: `${prompt.system}\n\n${buildChatSkillsPrompt(skills)}`, user: `${prompt.user}\n\n${chatSkillsOutputContract(skills)}`, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.18, maxTokens: skills.length ? 10_000 : 3200 }, onDelta, effectiveModel, signal);
   const validated = validateStudyAssistantAnswer(raw, availableCitations, insufficientAnswer);
   return {
     ...validated, answer: await executeChatSkills(validated.answer, execution, signal), availableCitations, insufficientInformation: !raw.trim(), interrupted: Boolean(signal?.aborted), stats,

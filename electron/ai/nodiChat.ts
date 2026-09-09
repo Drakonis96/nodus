@@ -1,3 +1,4 @@
+import { skillHasCapability } from '@shared/chatSkills';
 import { buildChatSkillsPrompt, chatSkillsOutputContract, transformChatProse } from '@shared/chatSkills';
 import { enabledChatSkills } from '../chatSkills';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
@@ -356,7 +357,7 @@ export async function streamNodiChat(
   const settings = getSettings();
   assertChatSkillSession(execution, signal);
   let answer = await completeTextStream(
-    { system: `${buildSystemPrompt(request, context.sources)}\n\n${buildChatSkillsPrompt(skills)}`, user, englishImagePrompts: skills.some(skill => skill.builtin === 'image'), maxTokens: skills.length ? 10_000 : 1_200, temperature: 0.2, reasoning: 'off', useConfiguredCodexReasoning: true, plainContext: true },
+    { system: `${buildSystemPrompt(request, context.sources)}\n\n${buildChatSkillsPrompt(skills)}`, user, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), maxTokens: skills.length ? 10_000 : 1_200, temperature: 0.2, reasoning: 'off', useConfiguredCodexReasoning: true, plainContext: true },
     (delta, kind) => { if (kind === 'content') onDelta(delta); },
     request.model ?? settings.nodiModel ?? settings.chatModel,
     signal
