@@ -1691,6 +1691,7 @@ export const FR: Record<string, string> = {
   'Versión instalada': 'Version installée',
   'Continuar en segundo plano': 'Continuer en arrière-plan',
   'Servidor MCP': 'Serveur MCP',
+  'Marketplace de Skills': 'Marketplace de Skills',
   'Activar servidor MCP': 'Activer le serveur MCP',
   'Copiloto de escritura (Word)': 'Copilote d\'écriture (Word)',
   '1) Genera el certificado local · 2) Activa el copiloto · 3) Instálalo en Word y ábrelo desde la pestaña Nodus.':

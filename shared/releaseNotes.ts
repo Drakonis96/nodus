@@ -28,6 +28,7 @@ export type ReleaseNoteScope =
   | 'nodi'
   | 'toolkit'
   | 'plugin'
+  | 'marketplace'
   | 'languages'
   | 'browser'
   | 'radar'
@@ -2675,6 +2676,54 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+const RELEASE_5_3_0_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'marketplace',
+    es: 'Estrenamos el Marketplace de Skills. Desde Skills puedes explorar el catálogo oficial, revisar el contenido y las capacidades de cada paquete antes de instalarlo y añadir otros repositorios públicos de GitHub. Actualizar un catálogo no cambia lo que ya tienes instalado, y quitar una fuente tampoco borra sus skills.',
+    en: 'Introducing the Skills Marketplace. From Skills you can explore the official catalog, review the contents and capabilities of every package before installing it, and add other public GitHub repositories. Updating a catalog does not change what you already have installed, and removing a source does not delete its skills either.',
+    fr: 'Découvrez le Marketplace de Skills. Depuis Skills, vous pouvez explorer le catalogue officiel, examiner le contenu et les capacités de chaque paquet avant de l’installer et ajouter d’autres dépôts GitHub publics. La mise à jour d’un catalogue ne modifie pas ce qui est déjà installé, et retirer une source ne supprime pas non plus ses skills.',
+    de: 'Der Skills Marketplace ist da. Unter Skills können Sie den offiziellen Katalog erkunden, Inhalt und Fähigkeiten jedes Pakets vor der Installation prüfen und weitere öffentliche GitHub-Repositories hinzufügen. Eine Katalogaktualisierung verändert bereits installierte Inhalte nicht, und das Entfernen einer Quelle löscht ihre Skills ebenfalls nicht.',
+    pt: 'Estreia o Marketplace de Skills. Em Skills pode explorar o catálogo oficial, rever o conteúdo e as capacidades de cada pacote antes de o instalar e adicionar outros repositórios públicos do GitHub. Atualizar um catálogo não altera o que já tem instalado, e remover uma fonte também não apaga as suas skills.',
+    'pt-BR': 'Estreia o Marketplace de Skills. Em Skills você pode explorar o catálogo oficial, revisar o conteúdo e as capacidades de cada pacote antes de instalá-lo e adicionar outros repositórios públicos do GitHub. Atualizar um catálogo não altera o que já está instalado, e remover uma fonte também não apaga suas skills.',
+  },
+  {
+    scope: 'marketplace',
+    es: 'Las skills ya pueden incluir herramientas JavaScript para cálculos, transformaciones y generadores. Se ejecutan en un entorno aislado sin acceso a tus archivos, credenciales, red ni datos de Nodus. También puedes importar y exportar paquetes completos, mientras el Asistente y Nodi conservan activaciones independientes.',
+    en: 'Skills can now include JavaScript tools for calculations, transformations and generators. They run in an isolated environment without access to your files, credentials, network or Nodus data. You can also import and export complete packages, while the Assistant and Nodi keep independent activation settings.',
+    fr: 'Les skills peuvent désormais inclure des outils JavaScript pour les calculs, les transformations et les générateurs. Ils s’exécutent dans un environnement isolé sans accès à vos fichiers, identifiants, réseau ni données Nodus. Vous pouvez aussi importer et exporter des paquets complets, tandis que l’Assistant et Nodi conservent des activations indépendantes.',
+    de: 'Skills können jetzt JavaScript-Werkzeuge für Berechnungen, Umwandlungen und Generatoren enthalten. Sie laufen in einer isolierten Umgebung ohne Zugriff auf Ihre Dateien, Zugangsdaten, das Netzwerk oder Nodus-Daten. Sie können außerdem vollständige Pakete importieren und exportieren, während Assistent und Nodi getrennte Aktivierungen behalten.',
+    pt: 'As skills já podem incluir ferramentas JavaScript para cálculos, transformações e geradores. São executadas num ambiente isolado sem acesso aos seus ficheiros, credenciais, rede nem dados do Nodus. Também pode importar e exportar pacotes completos, enquanto o Assistente e o Nodi mantêm ativações independentes.',
+    'pt-BR': 'As skills agora podem incluir ferramentas JavaScript para cálculos, transformações e geradores. Elas são executadas em um ambiente isolado sem acesso aos seus arquivos, credenciais, rede nem dados do Nodus. Você também pode importar e exportar pacotes completos, enquanto o Assistente e o Nodi mantêm ativações independentes.',
+  },
+  {
+    scope: 'ai',
+    es: 'AlphaGenome llega como skill opcional para investigación no comercial. Tras añadir tu propia clave e instalar el cliente oficial, puedes pedir predicciones regulatorias de variantes GRCh38 desde los chats de Nodus. Los resultados y sus gráficas se guardan solo en este equipo, y las exportaciones conservan la atribución y las condiciones de uso.',
+    en: 'AlphaGenome arrives as an optional skill for non-commercial research. After adding your own key and installing the official client, you can request regulatory predictions for GRCh38 variants from Nodus chats. Results and plots are stored only on this computer, and exports preserve attribution and the applicable terms of use.',
+    fr: 'AlphaGenome arrive sous forme de skill facultative pour la recherche non commerciale. Après avoir ajouté votre propre clé et installé le client officiel, vous pouvez demander des prédictions régulatrices pour des variants GRCh38 depuis les chats de Nodus. Les résultats et leurs graphiques restent uniquement sur cet ordinateur, et les exportations conservent l’attribution et les conditions d’utilisation.',
+    de: 'AlphaGenome kommt als optionaler Skill für nicht kommerzielle Forschung. Nachdem Sie Ihren eigenen Schlüssel hinterlegt und den offiziellen Client installiert haben, können Sie in Nodus-Chats regulatorische Vorhersagen für GRCh38-Varianten anfordern. Ergebnisse und Diagramme bleiben ausschließlich auf diesem Rechner, und Exporte bewahren Namensnennung und Nutzungsbedingungen.',
+    pt: 'O AlphaGenome chega como skill opcional para investigação não comercial. Depois de adicionar a sua própria chave e instalar o cliente oficial, pode pedir previsões regulatórias de variantes GRCh38 nos chats do Nodus. Os resultados e gráficos ficam guardados apenas neste computador, e as exportações preservam a atribuição e as condições de utilização.',
+    'pt-BR': 'O AlphaGenome chega como skill opcional para pesquisa não comercial. Depois de adicionar sua própria chave e instalar o cliente oficial, você pode pedir previsões regulatórias de variantes GRCh38 nos chats do Nodus. Os resultados e gráficos ficam armazenados apenas neste computador, e as exportações preservam a atribuição e os termos de uso.',
+  },
+  {
+    scope: 'ai',
+    es: 'Legalize permite consultar legislación de 32 repositorios nacionales y de la Unión Europea desde cualquier chat. Indica el país, la norma o su identificador y, si quieres, el artículo. Nodus recupera el texto real con su fuente oficial, revisión y atribuciones. No necesitas Git, cuenta ni clave de API.',
+    en: 'Legalize lets you consult legislation from 32 reviewed national and European Union repositories in any chat. Name the country, the law or its identifier and, if needed, the article. Nodus retrieves the real text with its official source, revision and attribution. No Git installation, account or API key is required.',
+    fr: 'Legalize permet de consulter la législation de 32 dépôts nationaux et de l’Union européenne vérifiés depuis n’importe quel chat. Indiquez le pays, la loi ou son identifiant et, si nécessaire, l’article. Nodus récupère le texte réel avec sa source officielle, sa révision et ses attributions. Aucun Git, compte ni clé API n’est nécessaire.',
+    de: 'Mit Legalize können Sie in jedem Chat Rechtsvorschriften aus 32 geprüften nationalen und EU-Repositories abrufen. Nennen Sie das Land, das Gesetz oder seine Kennung und bei Bedarf den Artikel. Nodus holt den echten Text mit offizieller Quelle, Revision und Namensnennungen. Git, ein Konto oder ein API-Schlüssel sind nicht erforderlich.',
+    pt: 'O Legalize permite consultar legislação de 32 repositórios nacionais e da União Europeia revistos a partir de qualquer chat. Indique o país, a lei ou o seu identificador e, se necessário, o artigo. O Nodus obtém o texto real com a fonte oficial, revisão e atribuições. Não precisa de Git, conta nem chave de API.',
+    'pt-BR': 'O Legalize permite consultar legislação de 32 repositórios nacionais e da União Europeia revisados em qualquer chat. Informe o país, a lei ou seu identificador e, se necessário, o artigo. O Nodus obtém o texto real com a fonte oficial, revisão e atribuições. Você não precisa de Git, conta nem chave de API.',
+  },
+  {
+    scope: 'general',
+    es: 'También pulimos tres detalles visibles. Las importaciones temporales dejan de fallar en Windows al guardar los archivos con seguridad. El control Contexto del grafo permanece en su sitio al activarlo. Y el tutorial de PDF Presenter recupera un icono y un degradado propios de una presentación.',
+    en: 'We also polished three visible details. Temporary imports no longer fail on Windows when files are saved safely. The graph’s Context control stays in place when enabled. And the PDF Presenter tutorial now uses an icon and gradient that clearly identify it as a presentation.',
+    fr: 'Nous avons aussi peaufiné trois détails visibles. Les importations temporaires n’échouent plus sous Windows lors de l’enregistrement sécurisé des fichiers. La commande Contexte du graphe reste en place une fois activée. Et le tutoriel PDF Presenter utilise désormais une icône et un dégradé qui l’identifient clairement comme une présentation.',
+    de: 'Drei sichtbare Details wurden ebenfalls verbessert. Temporäre Importe schlagen unter Windows beim sicheren Speichern der Dateien nicht mehr fehl. Der Kontext-Schalter des Graphen bleibt beim Aktivieren an seinem Platz. Und das PDF-Presenter-Tutorial verwendet jetzt ein Symbol und einen Farbverlauf, die es klar als Präsentation kennzeichnen.',
+    pt: 'Também aperfeiçoámos três detalhes visíveis. As importações temporárias deixam de falhar no Windows ao guardar os ficheiros em segurança. O controlo Contexto do grafo permanece no lugar quando é ativado. E o tutorial do PDF Presenter passa a usar um ícone e um degradado que o identificam claramente como apresentação.',
+    'pt-BR': 'Também refinamos três detalhes visíveis. As importações temporárias não falham mais no Windows ao salvar os arquivos com segurança. O controle Contexto do grafo permanece no lugar quando é ativado. E o tutorial do PDF Presenter agora usa um ícone e um degradê que o identificam claramente como apresentação.',
+  },
+];
+
 const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
     scope: "ai",
@@ -2751,6 +2800,11 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.3.0',
+    date: '2026-09-09',
+    highlights: RELEASE_5_3_0_HIGHLIGHTS,
+  },
   {
     version: '5.2.2',
     date: '2026-09-09',

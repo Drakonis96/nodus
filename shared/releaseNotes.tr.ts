@@ -106,6 +106,13 @@ const RELEASE_5_1_0_TR = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.3.0": [
+    "Skills Marketplace kullanıma açıldı. Skills bölümünden resmî kataloğu keşfedebilir, her paketi kurmadan önce içeriğini ve yeteneklerini inceleyebilir ve başka herkese açık GitHub depoları ekleyebilirsiniz. Bir kataloğu güncellemek kurulu olanları değiştirmez, bir kaynağı kaldırmak da o kaynaktan gelen becerileri silmez.",
+    "Beceriler artık hesaplama, dönüştürme ve üretme işlemleri için JavaScript araçları içerebilir. Bu araçlar dosyalarınıza, kimlik bilgilerinize, ağa veya Nodus verilerine erişemeyen yalıtılmış bir ortamda çalışır. Tam paketleri içe ve dışa aktarabilirsiniz. Asistan ile Nodi ise ayrı etkinleştirme ayarlarını korur.",
+    "AlphaGenome, ticari olmayan araştırmalar için isteğe bağlı bir beceri olarak geliyor. Kendi anahtarınızı ekleyip resmî istemciyi kurduktan sonra Nodus sohbetlerinden GRCh38 varyantları için düzenleyici tahminler isteyebilirsiniz. Sonuçlar ve grafikler yalnızca bu bilgisayarda saklanır, dışa aktarımlar ise atıf ve kullanım koşullarını korur.",
+    "Legalize, incelenmiş 32 ulusal ve Avrupa Birliği deposundaki mevzuata herhangi bir sohbetten ulaşmanızı sağlar. Ülkeyi, yasayı veya kimliğini ve gerekirse maddeyi belirtin. Nodus gerçek metni resmî kaynağı, revizyonu ve atıflarıyla getirir. Git kurulumu, hesap veya API anahtarı gerekmez.",
+    "Görünen üç ayrıntıyı da iyileştirdik. Geçici içe aktarımlar, dosyalar güvenli biçimde kaydedilirken artık Windows'ta başarısız olmuyor. Grafiğin Bağlam denetimi etkinleştirildiğinde yerinde kalıyor. PDF Presenter eğitimi de artık onu açıkça bir sunum olarak tanıtan bir simge ve renk geçişi kullanıyor."
+  ],
   "5.2.2": [
     "Chemistry Studio sohbete geliyor. SMILES verilerinden molekül yapıları, Lewis diyagramları ve ChemFig çizimleri oluşturun, sonuçları büyütün ve indirin. Arayüz çevrilmiştir ve becerileriniz için özelleştirdiğiniz talimatlar korunur.",
     "Kimyasal çizimler açık kontroller kazanıyor. Nodus molekül kimliğini doğrular ve Fischer, Haworth ve Newman projeksiyonları ile SN2, E2, aldol, Diels–Alder ve amit rezonansı için sınırlı kuralları destekler. Kanıtları ve kontrol edilmiş ChemFig çıktısını indirin. Bir öneri doğrulanamıyorsa Nodus çizim uydurmak yerine bunu belirtir.",
