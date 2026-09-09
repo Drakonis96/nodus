@@ -39,6 +39,13 @@ export const NODI_WINDOW_METHODS = [
   'saveNodiNote',
   'deleteNodiNote',
   // chat
+  'getSkillMarketplace',
+  'addSkillSource',
+  'removeSkillSource',
+  'updateSkillSource',
+  'installMarketplaceSkill',
+  'importSkillPackage',
+  'exportSkillPackage',
   'listChatSkills',
   'getGenomicsStatus',
   'configureGenomics',

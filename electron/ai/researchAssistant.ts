@@ -1,3 +1,4 @@
+import { skillHasCapability } from '@shared/chatSkills';
 import { buildChatSkillsPrompt, chatSkillsOutputContract, chemistryTitleSummary, splitChatVisuals, transformChatProse } from '@shared/chatSkills';
 import { enabledChatSkills } from '../chatSkills';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
@@ -189,7 +190,7 @@ function skillExecution(request: ResearchChatRequest) {
 export async function answerResearchChat(request: ResearchChatRequest): Promise<ResearchChatResponse> {
   const execution = skillExecution(request);
   const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request, execution.skills);
-  const opts = { system, user, englishImagePrompts: execution.skills.some(skill => skill.builtin === 'image'), temperature: 0.2, maxTokens };
+  const opts = { system, user, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, maxTokens };
   let answer = '';
   for (let attempt = 0; attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
     answer = finalizeAnswer(await completeText(opts, request.model), local, user);
@@ -205,7 +206,7 @@ export async function streamResearchChat(
 ): Promise<ResearchChatResponse> {
   const execution = skillExecution(request);
   const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request, execution.skills);
-  const opts = { system, user, englishImagePrompts: execution.skills.some(skill => skill.builtin === 'image'), temperature: 0.2, maxTokens, signal };
+  const opts = { system, user, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, maxTokens, signal };
   let answer = finalizeAnswer(await completeTextStream(
     opts,
     onDelta,

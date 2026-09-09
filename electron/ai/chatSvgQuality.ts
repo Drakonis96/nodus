@@ -1,3 +1,4 @@
+import { skillHasCapability } from '@shared/chatSkills';
 import { BrowserWindow } from 'electron';
 import { sanitizeChatSvg } from '@shared/chatSvg';
 import { serializeChatVisualPart, splitChatVisuals, type ChatSkill } from '@shared/chatSkills';
@@ -49,7 +50,7 @@ export async function inspectChatSvg(svg: string): Promise<string[]> {
 }
 
 export async function refineChatSvg(answer: string, options: { question: string; skills: ChatSkill[]; model?: ModelRef | null; signal?: AbortSignal }): Promise<string> {
-  const skill = options.skills.find(item => item.builtin === 'svg');
+  const skill = options.skills.find(item => skillHasCapability(item, 'svg'));
   if (!skill) return answer;
   const parts = splitChatVisuals(answer);
   const chemistryMode = chemistrySvgMode(options.question);

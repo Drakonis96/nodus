@@ -31,7 +31,7 @@ and **Perspective Switcher** start disabled. Their instructions are editable.
 Built-in names, descriptions and instructions are currently English; interface
 controls follow all eight supported UI languages.
 
-A skill supplies a method, not unrestricted code execution. The model chooses
+A skill supplies a method and may declare native capabilities or isolated JavaScript tools. See [Skill marketplace](skill-marketplace.md) for package authoring, installation and runtime boundaries. The model chooses
 relevant enabled skills for the current request. Original diagrams can be derived
 from supported concepts without requiring a source to contain the finished SVG.
 Explicit source-only constraints and truthful citation requirements still apply.

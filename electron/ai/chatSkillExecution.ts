@@ -1,3 +1,5 @@
+import { runSkillTool } from '../skillToolSandbox';
+import { skillHasCapability } from '@shared/chatSkills';
 import { parseLegalPlan } from '@shared/legalize';
 import { retrieveLegalize } from '../legalize';
 import { refineChatSvg } from './chatSvgQuality';
@@ -73,7 +75,7 @@ export async function executeChatSkills(answer: string, execution: ChatSkillExec
   // Promote one unique intent, discarding unchecked prose. Conflicting drafts
   // abstain; unrelated/incomplete JSON remains ordinary text. Every promoted
   // field still goes through the strict user-grounded resolver below.
-  if (execution.skills.some(skill => skill.builtin === 'chemistry') && !splitChatVisuals(answer).some(p => p.kind === 'chemistry-plan')) {
+  if (execution.skills.some(skill => skillHasCapability(skill, 'chemistry')) && !splitChatVisuals(answer).some(p => p.kind === 'chemistry-plan')) {
     const candidates = new Map<string, string>();
     for (const match of answer.matchAll(/```json\s*\n([\s\S]*?)\n```/gi)) {
       try {
@@ -84,8 +86,32 @@ export async function executeChatSkills(answer: string, execution: ChatSkillExec
     if (candidates.size > 1) return 'Chemistry Studio — unsupported: conflicting chemical intents were returned. Request one explicit structure or mechanism.';
     if (candidates.size === 1) answer = serializeChatVisualPart({ kind: 'chemistry-plan', content: candidates.values().next().value!, complete: true });
   }
+  let toolCalls = 0;
+  const toolPattern = /```nodus-tool[ \t]*\r?\n([\s\S]*?)\r?\n```/g;
+  let cursor = 0, processed = '';
+  for (const match of answer.matchAll(toolPattern)) {
+    processed += answer.slice(cursor, match.index);
+    try {
+      assertChatSkillSession(execution, signal);
+      if (++toolCalls > 4) throw new Error('At most four custom tool calls are allowed per reply.');
+      if (match[1].length > 64000) throw new Error('Tool request is too large.');
+      const request = JSON.parse(match[1]);
+      const skill = execution.skills.find(s => s.id === request.skillId);
+      const tool = skill?.tools?.find(t => t.id === request.toolId);
+      if (!tool) throw new Error('This tool is not enabled for this reply.');
+      const output = await runSkillTool(tool, request.input, signal);
+      assertChatSkillSession(execution, signal);
+      // JSON text is data: never feed tool output back into visual/tool parsers.
+      processed += '\n\nTool result (' + tool.id + '):\n\n    ' + output.replace(/`/g, '\\u0060').replace(/</g, '\\u003c').replace(/>/g, '\\u003e') + '\n\n';
+    } catch (error) {
+      if (signal?.aborted || error instanceof Error && error.name === 'AbortError') throw error;
+      processed += '\n\nTool error: ' + String(error instanceof Error ? error.message : error).replace(/[\r\n`*<>[\]]/g, ' ').slice(0, 500) + '\n\n';
+    }
+    cursor = match.index! + match[0].length;
+  }
+  answer = processed + answer.slice(cursor);
   const initialParts = splitChatVisuals(answer), initialIntent = initialParts.some(part => part.kind === 'chemistry-plan');
-  if (!initialIntent && execution.skills.some(skill => skill.builtin === 'chemistry')) {
+  if (!initialIntent && execution.skills.some(skill => skillHasCapability(skill, 'chemistry'))) {
     const question = execution.question ?? '';
     const nonMolecular = /\b(?:orbital|energy diagram|energy profile|reaction coordinate|diagrama de energ[ií]a)\b/i.test(question);
     const verifiedDrawing = /\b(?:chemfig|smiles|fischer|haworth|newman|sn[12]|e[12]|aldol|nitration|nitraci[oó]n|diels.alder|molecular structure|chemical structure|estructura molecular|estructura qu[ií]mica)\b/i.test(question)
@@ -114,7 +140,7 @@ export async function executeChatSkills(answer: string, execution: ChatSkillExec
       try {
         if (chemistryRequested) throw new Error('Only one chemistry plan can be compiled per reply.');
         chemistryRequested = true;
-        if (!execution.skills.some(skill => skill.builtin === 'chemistry')) throw new Error('Enable Chemistry Studio to render this plan.');
+        if (!execution.skills.some(skill => skillHasCapability(skill, 'chemistry'))) throw new Error('Enable Chemistry Studio to render this plan.');
         if (!part.complete) throw new Error('The chemistry plan was interrupted. Retry the response.');
         const document = await resolveChemistryIntent(part.content, execution.question ?? '', {
           fetch: globalThis.fetch, validate: validateChemistryInUtility,
@@ -144,7 +170,7 @@ export async function executeChatSkills(answer: string, execution: ChatSkillExec
     try {
       if (requested) throw new Error('Only one image can be generated per reply. Send another message to create a variation.');
       requested = true;
-      if (!execution.skills.some(skill => skill.builtin === 'image')) throw new Error('Enable Image Atelier in Skills to generate images.');
+      if (!execution.skills.some(skill => skillHasCapability(skill, 'image'))) throw new Error('Enable Image Atelier in Skills to generate images.');
       if (!execution.owner) throw new Error('Start a saved chat in Nodi or the assistant to generate an image.');
       if (!part.complete) throw new Error('The image brief was interrupted. Retry the response.');
       let value: { title?: unknown; alt?: unknown; prompt?: unknown; aspectRatio?: unknown };

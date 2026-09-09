@@ -1,3 +1,4 @@
+import { skillHasCapability } from '@shared/chatSkills';
 import { enabledChatSkills } from '../chatSkills';
 import { buildChatSkillsPrompt, chatSkillsOutputContract, transformChatProse } from '@shared/chatSkills';
 import { executeChatSkills } from './chatSkillExecution';
@@ -274,7 +275,7 @@ export async function streamWorldChat(
       system: `${worldOperationSystemPrompt('worldChat', settings.promptLanguage ?? 'es')}\n\n${buildChatSkillsPrompt(skills)}\nNew creative proposals are not established world canon. Label them accordingly.`,
       user: `${composeWorldChatContext(facts, language)}\n\n${chatSkillsOutputContract(skills)}`,
       plainContext: true,
-      englishImagePrompts: skills.some(skill => skill.builtin === 'image'),
+      englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')),
       // Keep factual answers grounded and creative proposals clearly identified.
       temperature: 0.3,
       maxTokens: skills.length ? 10_000 : 1200,

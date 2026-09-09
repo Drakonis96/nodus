@@ -1,3 +1,4 @@
+import { skillHasCapability } from '@shared/chatSkills';
 import { buildChatSkillsPrompt, chatSkillsOutputContract, type ChatSkill } from '@shared/chatSkills';
 // Ask a worldbuilding character a question and get their answer, in voice.
 //
@@ -102,7 +103,7 @@ export async function interviewCharacter(
     {
       system: `${worldCharacterInterviewPrompt(sources, language)}\n\n${buildChatSkillsPrompt(options.skills ?? [])}`,
       user: `${composeInterviewPrompt(history, trimmed, language)}\n\n${chatSkillsOutputContract(options.skills ?? [])}`,
-      englishImagePrompts: options.skills?.some(skill => skill.builtin === 'image'),
+      englishImagePrompts: options.skills?.some(skill => skillHasCapability(skill, 'image')),
       plainContext: true,
       // High: this is performance, not extraction. A cold temperature makes every
       // character sound like the same polite narrator.

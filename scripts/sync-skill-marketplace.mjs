@@ -1,0 +1,32 @@
+// Export the application contract and built-in methods into the official marketplace checkout.
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { build } from 'esbuild';
+import { pathToFileURL } from 'node:url';
+const target = process.argv[2];
+if (!target || !fs.existsSync(path.join(target, '.git'))) throw new Error('Pass the marketplace checkout directory.');
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-marketplace-export-'));
+try {
+  const bundle = path.join(temporary, 'skills.mjs');
+  await build({ entryPoints: ['shared/chatSkills.ts'], bundle: true, platform: 'node', format: 'esm', outfile: bundle });
+  const { DEFAULT_CHAT_SKILLS } = await import(pathToFileURL(bundle));
+  fs.mkdirSync(path.join(target, 'scripts'), { recursive: true });
+  await build({ entryPoints: ['shared/skillMarketplace.ts'], bundle: true, platform: 'node', format: 'esm', outfile: path.join(target, 'scripts/contract.mjs') });
+  fs.mkdirSync(path.join(target, 'assets'), { recursive: true });
+  const logoBundle = path.join(temporary, 'logo.mjs');
+  await build({ entryPoints: ['shared/marketplaceLogo.ts'], bundle: true, platform: 'node', format: 'esm', outfile: logoBundle });
+  const { marketplaceLogoSvg } = await import(pathToFileURL(logoBundle));
+  fs.writeFileSync('src/assets/nodus-marketplace.svg', marketplaceLogoSvg() + '\n');
+  fs.writeFileSync(path.join(target, 'assets/nodus-marketplace.svg'), marketplaceLogoSvg() + '\n');
+  for (const skill of DEFAULT_CHAT_SKILLS) {
+    // Keep the separately curated PR700 packages and their required native capabilities.
+    if (skill.builtin === 'genomics' || skill.builtin === 'legal') continue;
+    const id = skill.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const category = ({ svg: 'Visual creation', image: 'Visual creation', chemistry: 'Science', socratic: 'Learning' })[skill.builtin] ?? 'Thinking and writing';
+    const manifest = { schemaVersion: 1, id, name: skill.name, version: '1.0.0', author: 'Drakonis96', description: skill.description, category, license: 'AGPL-3.0-only', instructions: 'SKILL.md', capabilities: ['svg','image','chemistry'].includes(skill.builtin) ? [skill.builtin] : [], tools: [] };
+    const dir = path.join(target, id); fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skill.json'), JSON.stringify(manifest, null, 2) + '\n');
+    fs.writeFileSync(path.join(dir, 'SKILL.md'), skill.instructions + '\n');
+  }
+} finally { fs.rmSync(temporary, { recursive: true, force: true }); }

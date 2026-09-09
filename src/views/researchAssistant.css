@@ -42,6 +42,6 @@
 .research-assistant-actions > button:hover { background-color: #6366f125; }
 .research-assistant-actions > button:focus-visible,
 .research-assistant-actions > .chat-skills-control > .chat-skills-trigger:focus-visible {
-  outline: 2px solid #a5b4fc;
+  outline: 2px solid var(--vault-accent, #6366f1);
   outline-offset: 2px;
 }

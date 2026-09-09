@@ -1,3 +1,4 @@
+import type { SkillMarketplace } from './skillMarketplace';
 import type { ChatSkill } from './chatSkills';
 import type { GenomicsStatus, GenomicsSettingsInput, GenomicsResult } from './genomics';
 // Shared domain types used by both the Electron main process and the React renderer.
@@ -8765,6 +8766,13 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   listAnnouncements(): Promise<AnnouncementEntry[]>;
   markAnnouncementRead(id: string): Promise<AnnouncementEntry[]>;
   onAnnouncementsChanged(cb: (list: AnnouncementEntry[]) => void): () => void;
+  getSkillMarketplace(): Promise<SkillMarketplace>;
+  addSkillSource(url: string): Promise<SkillMarketplace>;
+  removeSkillSource(id: string): Promise<SkillMarketplace>;
+  updateSkillSource(id: string): Promise<SkillMarketplace>;
+  installMarketplaceSkill(sourceId: string, packagePath: string, commit: string): Promise<ChatSkill[]>;
+  importSkillPackage(): Promise<ChatSkill[]>;
+  exportSkillPackage(id: string): Promise<string | null>;
   listChatSkills(): Promise<ChatSkill[]>;
   getGenomicsStatus(): Promise<GenomicsStatus>;
   configureGenomics(input: GenomicsSettingsInput): Promise<GenomicsStatus>;
