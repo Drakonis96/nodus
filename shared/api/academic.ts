@@ -1,4 +1,4 @@
-import type { StellarPageRequest, StellarPage, StellarSession } from '../stellarGraph';
+import type { StellarPageRequest, StellarPage, StellarSession, StellarTheme } from '../stellarGraph';
 // The academic and study slice of the window.nodus contract. NodusApi extends it,
 // so the renderer surface stays flat and every call site is unchanged.
 import type { StudyAnnotation, StudyAnnotationInput, StudyDocEditorData, StudyDocUpdateInput } from '../studyEditor';
@@ -349,6 +349,8 @@ export interface AcademicApi {
 
   // graph
   stellarPage(request: StellarPageRequest): Promise<StellarPage>;
+  /** Theme hubs for the first graph tab, each with the ideas it nests. */
+  stellarThemes(): Promise<StellarTheme[]>;
   getStellarSession(key: string): Promise<{vaultId: string; session: StellarSession | null}>;
   saveStellarSession(vaultId: string, key: string, session: StellarSession): Promise<void>;
   getGraph(lens: 'ideas' | 'authors'): Promise<GraphData>;

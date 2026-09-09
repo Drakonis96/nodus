@@ -284,8 +284,27 @@ html {
   font-size: calc(16px * var(--interface-scale));
 }
 
+/* Shared application surfaces: graph chrome and the shell use the same palette. */
+:root {
+  --app-canvas: theme('colors.neutral.950');
+  --app-panel: theme('colors.neutral.900');
+  --app-hover: theme('colors.neutral.800');
+  --app-border: theme('colors.neutral.800');
+  --app-text: theme('colors.neutral.100');
+  --app-muted: theme('colors.neutral.400');
+}
+:root.light {
+  --app-canvas: theme('colors.neutral.50');
+  --app-panel: theme('colors.white');
+  --app-hover: theme('colors.gray.200');
+  --app-border: theme('colors.neutral.300');
+  --app-text: theme('colors.neutral.900');
+  --app-muted: theme('colors.neutral.600');
+}
 body {
-  @apply bg-neutral-950 text-neutral-100 font-sans antialiased;
+  @apply font-sans antialiased;
+  background: var(--app-canvas);
+  color: var(--app-text);
 }
 
 /* Accessibility controls are offline-safe and affect renderer-owned surfaces,
@@ -357,7 +376,8 @@ body {
 }
 
 .light body {
-  @apply bg-neutral-50 text-neutral-900;
+  background: var(--app-canvas);
+  color: var(--app-text);
 }
 
 .light .text-neutral-100,

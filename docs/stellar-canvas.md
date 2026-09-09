@@ -6,17 +6,23 @@ The idea graph uses one WebGL2 infinite canvas across the corpus, work view, Stu
 
 ![Independent graph tabs using demonstration data](images/stellar-tabs-demo.png)
 
-The first visit in a new app session opens an empty graph. Search for an idea and choose it to load its direct incoming and outgoing relationships immediately, up to **Relations per idea** (25 by default). **Unlimited** loads the entire direct neighborhood, including hubs larger than one page. Work and Study graphs respect their source scope.
+The corpus graph opens on a permanent **Themes** tab when its source provides themes. Search for ideas here and use **+** beside each result to add them immediately alongside the themes; **−** removes them from the hub. The picker stays open for successive additions. Opening a pinned idea creates its own exploration tab, while opening a theme stays in the first tab with a route back to the hub. Pinned ideas survive theme visits and section navigation during the current window session.
+
+The hub counter reports unique ideas across the eligible corpus. Each theme counts its own distinct members; those counts overlap and must not be added to obtain the corpus total. The relationship label in the exploration strip shares the strip's horizontal center with the small arrow beneath it.
+
+In an exploration tab, search for an idea and choose it to load its direct incoming and outgoing relationships immediately, up to **Relations per idea** (25 by default). **Unlimited** loads the entire direct neighborhood, including hubs larger than one page. Sources without themes start with an empty graph. Work and Study graphs respect their source scope.
 
 Use **+** beside a search result to add another idea and its direct connections. Every visible idea shows **−**, which removes only that idea and its incident connections; other ideas remain, including isolated ones. Removed ideas stay excluded from subsequent exploration until explicitly added again. **Clear**, beside **Reorganize**, empties the active canvas and cancels pending exploration. These actions never delete library records.
 
-Use **+** in the tab strip to create another empty graph. Each tab keeps its own ideas, history, positions, camera, limit, and evidence panel while switching tabs. Returning from another section restores the open graphs during the current window session. A new app session starts empty. External idea navigation opens a separate tab without replacing existing graphs. **Full screen** enlarges the workspace; use its exit button or Escape to return.
+Use **+** in the tab strip to create another empty graph. The first tab cannot be closed; subsequent tabs can. Each tab keeps its own ideas, history, positions, camera, limit, and evidence panel while switching tabs. Returning from another section restores the open graphs during the current window session. A new app session starts at the source's entry view. External idea navigation opens a separate tab without replacing existing graphs or removing access to themes. **Full screen** enlarges the workspace; use its exit button or Escape to return.
 
 **Next** and **Play** continue breadth-first exploration through stored relationships, prioritizing confirmed and explicit relationships where available. Incoming relationships retain their native arrows. Playback never generates AI relationships. The same limit controls the number of steps in a playback run; unlimited playback continues until the reachable component is exhausted.
 
 **Previous** rewinds the exploration; **Next** replays existing history before discovering more relationships. Changing the starting idea retains the canvas and truncates any undone continuation.
 
 Each playback step frames both endpoints above the controls, using a 550 ms camera transition. The current relationship, direction, and endpoint labels stand out against the dimmed context. Play advances immediately and leaves 3.5 seconds between steps at normal speed. Reduced-motion preferences disable the camera animation.
+
+Theme views have a single compact row for visible connections per idea and neighbourhood depth. Playback, speed, seed and clear controls belong only to exploration tabs. Their transport keeps a compact, fixed-height selection strip, with relationship provenance centered at the bottom. Long node names remain within their captions, and canvas cards stay below the controls even during manual panning. Clicking the background, including a double click, clears the idea or relationship selection, closes its detail, and pauses playback.
 
 Dragging, zooming, Fit all, and Seed pause playback for manual exploration. Play, Previous, and Next automatically resume framing; no follow checkbox is required. Previous at the beginning centers the starting idea. View connection recenters the current relationship without advancing.
 
@@ -54,3 +60,17 @@ Full screen gives the map and evidence panel the entire workspace. Both themes, 
 Run `npm test` for traversal, pagination, cancellation, complete works, stable placement, session boundaries, and camera geometry. `npm run test:e2e:stellar` exercises the real application with an isolated demonstration profile, including search, playback, framing, rewind, empty startup, and sidebar behavior. `npm run test:e2e:stellar-tabs` covers additive search, removal, independent tabs, view snapshots, and full screen. `npm run test:e2e:argument-map` covers visual branches, filters, camera history, auto zoom, text selection, and full screen. All three use isolated demonstration profiles. The normal repository lint, builds, and E2E smoke also apply.
 
 Local review copies can use `NODUS_USERDATA` with `NODUS_STELLAR_PREVIEW=1` to skip startup background integrations. QA uses the existing database-path guard. Profiles, copied vault content, reports, and recordings are local artifacts and are not distributed with the source.
+
+### Corpus context overlay
+
+The themes hub, theme walks and blank exploration tabs offer **Context** beside the zoom
+controls. It is off by default. Turning it on pages the complete eligible source corpus,
+including disconnected ideas and links across themes. The intensity slider changes only
+its appearance. **View corpus** fits the background; **Fit** returns to the working graph.
+The background uses its own worker layout anchored to the working positions, faint points
+and straight links. Connections touching working ideas receive extra emphasis. Sparse
+background captions can be clicked to add an idea to the hub or current exploration.
+Background data never enters playback, working counts, or saved exploration history unless
+explicitly added. The control does not increase either transport bar's height.
+Completed loads are reused for tabs sharing the same source object; changing source
+invalidates the layer. Cancelling or leaving a loading tab stops further page requests.

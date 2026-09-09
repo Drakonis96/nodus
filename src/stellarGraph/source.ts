@@ -3,12 +3,15 @@ import type {
   StellarPage,
   StellarPageRequest,
   StellarSession,
+  StellarTheme,
 } from "@shared/stellarGraph";
 import type { KnowledgeViewSource } from "../views/knowledgeViewSource";
 export interface StellarGraphSource {
   key: string;
   readOnly?: boolean;
   page(request: StellarPageRequest): Promise<StellarPage>;
+  /** Theme hubs for the first tab. A source without themes keeps a blank first canvas. */
+  themes?(): Promise<StellarTheme[]>;
   idea?(id: string): Promise<IdeaDetail | null>;
   edge?(id: string): Promise<EdgeDetail | null>;
   restore?(): Promise<StellarSession | null>;
@@ -53,6 +56,12 @@ export function memorySource(
           .sort(compareEdges);
         ns = [];
       }
+      if (req.kind === "theme") {
+        // Memory sources have no theme table: the label a node carries is its identity.
+        ns = ns.filter((n) => n.themes.includes(req.id!));
+        const ids = new Set(ns.map((n) => n.id));
+        es = es.filter((e) => ids.has(e.source) && ids.has(e.target));
+      }
       if (req.kind === "work") {
         ns = ns.filter((n) => n.workIds?.includes(req.id!));
         const ids = new Set(ns.map((n) => n.id));
@@ -78,8 +87,32 @@ export function memorySource(
         next: offset + limit < total ? offset + limit : null,
       };
     },
+    async themes() {
+      const graph = await (cached ??= get().then(cleanGraph));
+      const counts = new Map<string, number>();
+      const works = new Map<string, Set<string>>();
+      for (const node of graph.nodes)
+        for (const label of new Set(node.themes)) {
+          counts.set(label, (counts.get(label) ?? 0) + 1);
+          const ws = works.get(label) ?? new Set<string>();
+          for (const id of node.workIds ?? []) ws.add(id);
+          works.set(label, ws);
+        }
+      return [...counts]
+        .map(([label, ideaCount]) => ({
+          id: label,
+          label,
+          ideaCount,
+          workCount: works.get(label)?.size ?? 0,
+          curated: false,
+        }))
+        // Theme labels come from the vault and can be missing in imported data.
+        .sort((a, b) => b.ideaCount - a.ideaCount || themeName(a).localeCompare(themeName(b)));
+    },
   };
 }
+/** A theme label safe to sort and match on, whatever the payload holds. */
+export const themeName = (theme: { label?: string | null }) => String(theme.label ?? "");
 export function compareEdges(
   a: GraphData["edges"][number],
   b: GraphData["edges"][number],
@@ -100,6 +133,7 @@ export function desktopSource(
       ? {
           key: context,
           page: (r: StellarPageRequest) => window.nodus.stellarPage(r),
+          themes: () => window.nodus.stellarThemes(),
         }
       : memorySource(context, () => source.getGraph("ideas"));
   return {
@@ -132,5 +166,5 @@ export function workScopedSource(source: StellarGraphSource, workId: string): St
     } while (cursor !== null);
     return { nodes: [...nodes.values()], edges: [...edges.values()] };
   });
-  return { ...source, ...scoped };
+  return { ...source, ...scoped, themes: undefined };
 }
