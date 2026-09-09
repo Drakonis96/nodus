@@ -1,5 +1,7 @@
 import { runSkillTool } from '../skillToolSandbox';
 import { skillHasCapability } from '@shared/chatSkills';
+import { parseLegalPlan } from '@shared/legalize';
+import { retrieveLegalize } from '../legalize';
 import { refineChatSvg } from './chatSvgQuality';
 import type { ModelRef } from '@shared/types';
 import type { ChatSkill } from '@shared/chatSkills';
@@ -10,6 +12,9 @@ import { chatAssetVersion, storeChatImage } from '../chatAssets';
 import { resolveChemistryIntent } from './chemistryIdentity';
 import { validateChemistryInUtility } from '../chemistryValidationHost';
 import { isChemistrySvgRequest } from './chatChemistrySvg';
+import { parseGenomicsPlan } from '@shared/genomics';
+import { predictGenomics } from '../genomics';
+import { storeGenomicsResult } from '../chatAssets';
 
 export interface ChatSkillExecution {
   skills: ChatSkill[];
@@ -30,6 +35,42 @@ export function assertChatSkillSession(execution: ChatSkillExecution, signal?: A
 /** Provider-independent tool adapter: only the current model answer may invoke it. */
 export async function executeChatSkills(answer: string, execution: ChatSkillExecution, signal?: AbortSignal): Promise<string> {
   assertChatSkillSession(execution, signal);
+  const legalParts = splitChatVisuals(answer).filter(p => p.kind === 'legal-plan' || p.kind === 'legal-result');
+  if (legalParts.length) {
+    try {
+      if (!execution.skills.some(s => s.builtin === 'legal')) throw Error('Legalize: activa la skill antes de consultar legislación.');
+      if (legalParts.length !== 1 || legalParts[0].kind !== 'legal-plan' || !legalParts[0].complete) throw Error('Legalize: se necesita una única solicitud completa; no se aceptan resultados inventados por el modelo.');
+      const plan = parseLegalPlan(legalParts[0].content, execution.question ?? '');
+      const result = await retrieveLegalize(plan, signal);
+      assertChatSkillSession(execution, signal);
+      return serializeChatVisualPart({ kind: 'legal-result', content: JSON.stringify(result), complete: true });
+    } catch (error) {
+      if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
+      return error instanceof Error ? error.message : 'Legalize: no se pudo consultar la legislación.';
+    }
+  }
+  const genomicParts = splitChatVisuals(answer).filter(p => p.kind === 'genomics-plan' || p.kind === 'genomics-result');
+  if (genomicParts.length) {
+    try {
+      if (!execution.skills.some(s => s.builtin === 'genomics')) throw new Error('AlphaGenome: enable the skill first.');
+      if (genomicParts.length !== 1 || genomicParts[0].kind !== 'genomics-plan' || !genomicParts[0].complete) throw new Error('AlphaGenome: one complete prediction request is required; model-authored results are not accepted.');
+      if (!execution.owner) throw new Error('AlphaGenome: start a saved conversation first.');
+      const plan = parseGenomicsPlan(genomicParts[0].content, execution.question ?? '');
+      const prediction = await predictGenomics(plan, signal);
+      assertChatSkillSession(execution, signal);
+      // The result never enters chat text, sync, citation repair or provider context.
+      const source = storeGenomicsResult(execution.owner, prediction);
+      return serializeChatVisualPart({ kind: 'genomics-result', content: source, complete: true });
+    } catch (error) {
+      if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
+      return error instanceof Error ? error.message : 'AlphaGenome: prediction failed.';
+    }
+  }
+  if (execution.skills.some(s => s.builtin === 'genomics') && /alphagenome/i.test(execution.question ?? '')
+    && /chr(?:\d+|X|Y):\d+:[ACGT]:[ACGT]/.test(execution.question ?? '')
+    && splitChatVisuals(answer).some(p => p.kind !== 'markdown')) {
+    return 'AlphaGenome: no validated prediction request was returned. SVG, images and model-authored values cannot replace an AlphaGenome query.';
+  }
   // Some providers surround a generic JSON intent with prose, or repeat it.
   // Promote one unique intent, discarding unchecked prose. Conflicting drafts
   // abstain; unrelated/incomplete JSON remains ordinary text. Every promoted

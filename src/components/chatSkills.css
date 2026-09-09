@@ -86,3 +86,13 @@
 .skill-marketplace-review { display: grid; gap: 10px; }.skill-marketplace pre { max-height: 220px; white-space: pre-wrap; overflow: auto; overflow-wrap: anywhere; background: color-mix(in srgb, var(--vault-accent, #6366f1) 6.3%, transparent); border-radius: 8px; padding: 10px; font-size: 10px; }
 .skill-marketplace-policy { font-size: 10px; opacity: .7; border-top: 1px solid color-mix(in srgb, var(--vault-accent, #6366f1) 18.8%, transparent); padding-top: 12px; }
 .skill-author-fields,.skill-tool-editor { display: grid; gap: 8px; }.chat-skill-editor fieldset { border: 1px solid color-mix(in srgb, var(--vault-accent, #6366f1) 18.8%, transparent); border-radius: 8px; padding: 10px; display: flex; gap: 12px; }.chat-skill-editor fieldset label { display: flex; align-items: center; gap: 5px; }.skill-tool-editor { padding: 10px 0; }
+.genomics-config { margin: 10px; padding: 12px; border: 1px solid #71809655; border-radius: 10px; font-size: 12px; line-height: 1.5; display: grid; gap: 10px; }
+.genomics-config p { margin: 0; }
+.genomics-config a { text-decoration: underline; }
+.genomics-config input[type=password] { display: block; width: 100%; padding: 8px; border: 1px solid #71809688; border-radius: 6px; background: transparent; box-sizing: border-box; }
+.genomics-accept { display: flex; align-items: flex-start; gap: 8px; }
+.genomics-accept input { margin-top: 4px; flex-shrink: 0; }
+.genomics-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.genomics-config button, .genomics-config-button { padding: 6px 10px; border: 1px solid #71809655; border-radius: 6px; }
+.genomics-config-button { margin: 8px; }
+.genomics-config button:disabled { opacity: .5; }

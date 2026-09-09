@@ -106,3 +106,9 @@ server/data/
 
 # Isolated Stellar preview: copied vaults, recordings, audit reports, and build scratch.
 work/stellar-preview/
+
+!legal/generated/ALPHAGENOME_LICENSE.txt
+!legal/generated/ALPHAGENOME_SERVICE_TERMS_20260908.pdf
+!legal/generated/ALPHAGENOME_OUTPUT_TERMS.pdf
+
+!legal/generated/LEGALIZE_*

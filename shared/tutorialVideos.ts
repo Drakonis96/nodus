@@ -144,7 +144,7 @@ export const TUTORIAL_VIDEOS: readonly TutorialVideo[] = [
     youtubeId: 'e2js_u-05OA',
     order: 7.5,
     category: 'features',
-    icon: 'file',
+    icon: 'presentation',
     poster: 'linear-gradient(140deg, #075985 0%, #4338ca 55%, #111827 100%)',
   },
   {
@@ -792,7 +792,7 @@ export const TUTORIAL_CATALOGUE_URL = 'https://nodusresearch.com/tutorials.json'
 const YOUTUBE_ID_SHAPE = /^[A-Za-z0-9_-]{11}$/;
 const SLUG_SHAPE = /^[a-z0-9][a-z0-9-]{0,39}$/;
 /** Icons a catalogue entry may pick; anything else falls back to the play glyph. */
-const CATALOGUE_ICONS = ['play', 'network', 'archive', 'sparkles', 'graduation', 'layers', 'tree', 'table', 'chartBar', 'microphone', 'image', 'tools', 'star', 'file', 'book', 'plug', 'puzzle', 'globe', 'link'];
+const CATALOGUE_ICONS = ['play', 'network', 'archive', 'sparkles', 'graduation', 'layers', 'tree', 'table', 'chartBar', 'microphone', 'image', 'tools', 'star', 'file', 'presentation', 'book', 'plug', 'puzzle', 'globe', 'link'];
 /** Posters handed out, in order, to entries this build knows nothing about. */
 const CATALOGUE_POSTERS = [
   'linear-gradient(140deg, #155e75 0%, #1e3a8a 55%, #111827 100%)',

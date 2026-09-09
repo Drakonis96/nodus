@@ -23,7 +23,7 @@ await build({
     api.onResolve({ filter: /^\.\/decorativeImages$/ }, () => ({ path: 'images', namespace: 'mock' }));
     api.onResolve({ filter: /db\/settingsRepo$/ }, () => ({ path: 'settings', namespace: 'mock' }));
     api.onLoad({ filter: /.*/, namespace: 'mock' }, ({ path: name }) => ({ contents: name === 'electron'
-      ? `export const app = { getPath: () => ${JSON.stringify(temporary)} };`
+      ? `export const safeStorage = { isEncryptionAvailable: () => false }; export const app = { getPath: () => ${JSON.stringify(temporary)} };`
       : name === 'tools' ? `export const runSkillTool = (...args) => globalThis.__skillToolRunner(...args);`
       : name === 'svg-quality' ? `export const refineChatSvg = async answer => answer;`
       : name === 'chemistry-identity' ? `export const resolveChemistryIntent = (...args) => globalThis.__skillChemistryResolver(...args);`
@@ -153,17 +153,17 @@ test('chemistry SVG audit is scoped to semantic chemical drawings and enforces t
 });
 
 test('skills support independent activation, CRUD and explicit built-in restoration', () => {
-  assert.equal(lib.listChatSkills().length, 12);
+  assert.equal(lib.listChatSkills().length, 14);
   const built = lib.listChatSkills()[0];
   lib.saveChatSkill({ ...built, enabled: { assistant: false, nodi: true } });
-  assert.equal(lib.enabledChatSkills('assistant').length, 2);
-  assert.equal(lib.enabledChatSkills('nodi').length, 3);
+  assert.equal(lib.enabledChatSkills('assistant').length, 1);
+  assert.equal(lib.enabledChatSkills('nodi').length, 2);
   lib.saveChatSkill({ id: 'untrusted-id', builtin: 'image', name: 'A custom skill', description: 'For reviews', instructions: 'Give two recommendations.', enabled: { assistant: true, nodi: false } });
   const custom = lib.listChatSkills().find(item => !item.builtin);
   assert.ok(custom); assert.notEqual(custom.id, 'untrusted-id');
   lib.deleteChatSkill(built.id);
   assert.equal(lib.listChatSkills().some(item => item.id === built.id), false);
-  assert.equal(lib.restoreChatSkills().length, 13);
+  assert.equal(lib.restoreChatSkills().length, 15);
   lib.deleteChatSkill(custom.id);
   assert.throws(() => lib.saveChatSkill({ name: '' }), /name, description/);
 });
@@ -195,8 +195,8 @@ test('existing libraries receive the disabled tutor once without overwriting use
     assert.equal(migrated.some(skill => skill.builtin === 'image'), false, 'deleted image skill stays deleted');
     const tutor = migrated.find(skill => skill.builtin === 'socratic');
     assert.deepEqual(tutor.enabled, { assistant: false, nodi: false });
-    assert.equal(JSON.parse(fs.readFileSync(location)).version, 9);
-    assert.equal(lib.listChatSkills().length, 12, 'migration is idempotent');
+    assert.equal(JSON.parse(fs.readFileSync(location)).version, 12);
+    assert.equal(lib.listChatSkills().length, 14, 'migration is idempotent');
     lib.deleteChatSkill(tutor.id);
     assert.equal(lib.listChatSkills().some(skill => skill.builtin === 'socratic'), false, 'deleted tutor does not reappear');
   } finally { fs.writeFileSync(location, original); }
@@ -226,7 +226,7 @@ test('version 2 migration adds general skills once and preserves edited or delet
     const edited = { ...lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'general'), instructions: 'Keep my imported method.', enabled: { assistant: false, nodi: true } };
     fs.writeFileSync(location, JSON.stringify({ version: 2, skills: [tutor, edited] }));
     const migrated = lib.listChatSkills();
-    assert.equal(migrated.length, 10);
+    assert.equal(migrated.length, 12);
     assert.deepEqual(migrated.slice(0, 2), [tutor, edited]);
     assert.equal(migrated.some(skill => ['svg', 'image'].includes(skill.builtin)), false);
     for (const skill of migrated.slice(2).filter(item => item.builtin === 'general')) assert.deepEqual(skill.enabled, { assistant: false, nodi: false });
@@ -235,7 +235,7 @@ test('version 2 migration adds general skills once and preserves edited or delet
     assert.equal(lib.listChatSkills().some(skill => skill.id === edited.id), false);
     fs.writeFileSync(location, JSON.stringify({ version: 2, skills: [] }));
     const fromEmpty = lib.listChatSkills();
-    assert.equal(fromEmpty.length, 9);
+    assert.equal(fromEmpty.length, 11);
     assert.equal(fromEmpty.filter(skill => skill.builtin === 'general').length, 8);
     assert.equal(fromEmpty.filter(skill => skill.builtin === 'chemistry').length, 1);
     assert.equal(fromEmpty.some(skill => skill.builtin === 'socratic'), false, 'a previously deleted tutor stays deleted');
@@ -252,7 +252,7 @@ test('version 3 migration adds Chemistry Studio once and preserves existing skil
     const migrated = lib.listChatSkills();
     assert.deepEqual(migrated[0], edited);
     assert.equal(migrated.filter(skill => skill.builtin === 'chemistry').length, 1);
-    assert.equal(JSON.parse(fs.readFileSync(location)).version, 9);
+    assert.equal(JSON.parse(fs.readFileSync(location)).version, 12);
     assert.deepEqual(lib.listChatSkills(), migrated, 'version 6 migration is idempotent');
   } finally { fs.writeFileSync(location, original); }
 });
@@ -264,8 +264,8 @@ test('historical migrations preserve user-edited Chemistry Studio instructions',
     const chemistry = { ...lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'chemistry'), instructions: 'Keep my custom chemistry workflow.', enabled: { assistant: false, nodi: true } };
     for (const version of [4, 5, 6, 7, 8]) {
       fs.writeFileSync(location, JSON.stringify({ version, skills: [chemistry] }));
-      assert.deepEqual(lib.listChatSkills(), [chemistry]);
-      assert.equal(JSON.parse(fs.readFileSync(location)).version, 9);
+      assert.deepEqual(lib.listChatSkills().filter(s => !['genomics', 'legal'].includes(s.builtin)), [chemistry]);
+      assert.equal(JSON.parse(fs.readFileSync(location)).version, 12);
     }
   } finally { fs.writeFileSync(location, original); }
 });
@@ -277,12 +277,12 @@ test('untouched v8 chemistry instructions upgrade once without resetting flags o
     assert.equal(createHash('sha256').update(instructions).digest('hex'), '876f9cf3d84a695540625bc79865b5f1d9026f6e577dbbbfd78a970e5552db94');
     const chemistry = { ...lib.DEFAULT_CHAT_SKILLS.find(s => s.builtin === 'chemistry'), instructions, enabled: { assistant: false, nodi: true } };
     fs.writeFileSync(location, JSON.stringify({ version: 8, skills: [chemistry] }));
-    const migrated = lib.listChatSkills(); assert.equal(migrated.length, 1);
+    const migrated = lib.listChatSkills(); assert.equal(migrated.length, 3);
     assert.equal(migrated[0].instructions, lib.DEFAULT_CHAT_SKILLS.find(s => s.builtin === 'chemistry').instructions);
     assert.deepEqual(migrated[0].enabled, chemistry.enabled);
     assert.deepEqual(lib.listChatSkills(), migrated);
     fs.writeFileSync(location, JSON.stringify({ version: 8, skills: [] }));
-    assert.deepEqual(lib.listChatSkills(), []);
+    assert.deepEqual(lib.listChatSkills().map(s => s.builtin), ['genomics', 'legal']);
   } finally { fs.writeFileSync(location, original); }
 });
 

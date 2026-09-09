@@ -62,7 +62,7 @@ try {
   if (!checkout) await page.getByRole('button', { name: 'Update catalog', exact: true }).click();
   await page.waitForFunction(async () => Boolean((await window.nodus.getSkillMarketplace()).sources[0]?.commit), undefined, { timeout: 120000, polling: 300 });
   const catalog = await page.evaluate(() => window.nodus.getSkillMarketplace());
-  assert.equal(catalog.sources[0].entries.length, 13); assert.deepEqual(catalog.sources[0].errors, []);
+  assert.ok(catalog.sources[0].entries.length >= 15); assert.deepEqual(catalog.sources[0].errors, []);
   await page.screenshot({ path: path.join(artifacts, 'marketplace.png') });
   await page.getByRole('searchbox', { name: 'Search marketplace' }).fill('Descriptive Statistics');
   await page.getByRole('button', { name: 'Review skill', exact: true }).click();
@@ -157,7 +157,7 @@ try {
   await page.waitForFunction(() => document.documentElement.classList.contains('light'));
   await page.screenshot({ path: path.join(artifacts, 'vault-docencia-light.png') });
   assert.deepEqual(errors, []);
-  fs.writeFileSync(path.join(artifacts, 'verification.json'), JSON.stringify({ catalogMode, sourceCommit: catalog.sources[0].commit, packages: 13, provider: 'deterministic local fixture', providerCalls, assistant: 'pass', nodiEnabled: 'pass', nodiDisabled: 'pass', sourceManagement: 'pass', authoringExportImport: 'pass', themeChecks, rendererErrors: errors }, null, 2));
+  fs.writeFileSync(path.join(artifacts, 'verification.json'), JSON.stringify({ catalogMode, sourceCommit: catalog.sources[0].commit, packages: catalog.sources[0].entries.length, provider: 'deterministic local fixture', providerCalls, assistant: 'pass', nodiEnabled: 'pass', nodiDisabled: 'pass', sourceManagement: 'pass', authoringExportImport: 'pass', themeChecks, rendererErrors: errors }, null, 2));
   console.log(`MARKETPLACE E2E PASS (${catalogMode}): review, install, enable, real Assistant/Nodi tool execution, source management, authoring/export/import and nine vault themes.`);
 } catch (error) {
   if (app) { const page = await app.firstWindow(); await page.screenshot({ path: path.join(artifacts, 'failure.png') }).catch(() => {}); console.error((await page.locator('body').innerText()).slice(-6500)); }

@@ -1,5 +1,7 @@
 import type { SkillCapability, SkillTool } from './skillMarketplace';
 import { GENERAL_CHAT_SKILLS } from './generalChatSkills';
+import { LEGALIZE_INSTRUCTIONS } from './legalize';
+import { GENOMICS_INSTRUCTIONS } from './genomics';
 
 export type ChatImageAspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '3:2' | '2:3';
 export const CHAT_IMAGE_ASPECT_RATIOS: ChatImageAspectRatio[] = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'];
@@ -19,7 +21,7 @@ export interface ChatSkill {
   version?: string;
   license?: string;
   origin?: { sourceId: string; path: string; commit: string; packageId: string; version: string; digest: string };
-  builtin?: 'svg' | 'chemistry' | 'image' | 'socratic' | 'general';
+  builtin?: 'svg' | 'chemistry' | 'genomics' | 'legal' | 'image' | 'socratic' | 'general';
 }
 
 export function skillHasCapability(skill: ChatSkill, capability: SkillCapability): boolean {
@@ -48,7 +50,7 @@ Before returning, audit semantic correctness, counts, units, arrow direction, co
   {
     id: 'builtin-chemistry', name: 'Chemistry Studio', builtin: 'chemistry',
     description: 'Reference-backed molecular structures, Fischer/Haworth/Newman projections and bounded reaction mechanisms with validated ChemFig export.',
-    enabled: { assistant: true, nodi: true },
+    enabled: { assistant: false, nodi: false },
     instructions: `CHEMISTRY STUDIO — VERIFIED IDENTITY FIRST
 For a molecular drawing, return exactly one fenced chemistry-plan block containing ONLY a version-2 intent. Do not invent SMILES, formulae, stereochemical direction arrays, reference URLs, verification status or a drawing.
 Shape: {"version":2,"kind":"structure","depiction":"skeletal","species":[{"id":"target","input":{"kind":"name","value":"exact chemical name copied from the current user request"}}]}
@@ -90,6 +92,10 @@ Give specific feedback: identify what is correct, explain any misconception resp
 Use relevant vault evidence accurately and cite source-dependent claims. Distinguish supplied evidence from general knowledge, original examples and assumptions. Do not invent facts or citations, or demand that the sources contain a worked answer before teaching the underlying concept. Use an enabled visual skill only when a diagram would clarify the current learning step; do not reveal a whole solution through a visual while inviting the learner to discover it.
 When the learner demonstrates understanding, summarize the key idea in a few sentences and offer one short transfer exercise or a natural stopping point. Treat success as the learner being able to explain or apply the idea, not merely agreeing with you.`,
   },
+  { id: 'builtin-genomics', name: 'AlphaGenome', builtin: 'genomics',
+    description: 'AlphaGenome regulatory variant predictions for non-commercial research, with local plots and attributed exports. Requires a personal API key.',
+    enabled: { assistant: false, nodi: false }, instructions: GENOMICS_INSTRUCTIONS },
+  { id: 'builtin-legal', name: 'Legalize', builtin: 'legal', description: 'Busca legislación por país en legalize-dev, con texto, fuente oficial, versión y atribuciones.', enabled: { assistant: false, nodi: false }, instructions: LEGALIZE_INSTRUCTIONS },
   ...GENERAL_CHAT_SKILLS,
 ];
 
@@ -111,6 +117,8 @@ export function buildChatSkillsPrompt(skills: ChatSkill[]): string {
 /** Keep the execution protocol close to the question even in a long research context. */
 export function chatSkillsOutputContract(skills: ChatSkill[]): string {
   return [
+    skills.some(skill => skill.builtin === 'legal') ? 'LEGAL TOOL IS AVAILABLE: emit one legal-plan JSON object with version:1, country catalogue code, query copied from the current user and optional requested article. Follow Legalize. Never invent retrieved legislation or emit legal-result.' : '',
+    skills.some(skill => skill.builtin === 'genomics') ? 'GENOMICS TOOL IS AVAILABLE: for an explicit AlphaGenome prediction emit one genomics-plan JSON intent following AlphaGenome. Copy exact current-user variant, GRCh38 assembly, tissue ontology and output. Never invent predicted values or results.' : '',
     'Apply the relevant enabled skills to the current user request. In this application JSON wrapper, the LAST role=user entry in conversacion is the CURRENT user request you must answer, not an older exchange. Its exact names and SMILES are supplied by the current user. Create the actual requested artifact.',
     skills.some(skill => skillHasCapability(skill, 'image'))
       ? 'IMAGE TOOL IS AVAILABLE: For a requested illustration, photograph, painting, concept art or textured scene, emit ```nodus-image followed by a JSON object {"title":"…","alt":"…","prompt":"…"} and a closing ``` fence. Write a polished English image production prompt in the prompt field. The application calls the user-selected image model and displays the resulting image. Do not substitute SVG or a prose description for an image-generation request.' : '',
@@ -122,7 +130,7 @@ export function chatSkillsOutputContract(skills: ChatSkill[]): string {
   ].filter(Boolean).join('\n');
 }
 
-export interface ChatVisualPart { kind: 'markdown' | 'svg' | 'chemfig' | 'chemistry-plan' | 'chemistry-document' | 'smiles' | 'lewis' | 'image-request' | 'image-error'; content: string; complete: boolean }
+export interface ChatVisualPart { kind: 'markdown' | 'svg' | 'chemfig' | 'chemistry-plan' | 'chemistry-document' | 'genomics-plan' | 'genomics-result' | 'legal-plan' | 'legal-result' | 'smiles' | 'lewis' | 'image-request' | 'image-error'; content: string; complete: boolean }
 
 /** Recognize whole SVG blocks, including raw SVG, without treating ordinary code as visuals. */
 export function splitChatVisuals(content: string): ChatVisualPart[] {
@@ -167,6 +175,10 @@ export function splitChatVisuals(content: string): ChatVisualPart[] {
         : language === 'lewis' ? 'lewis'
         : language === 'chemistry-plan' ? 'chemistry-plan'
         : language === 'chemistry-document' ? 'chemistry-document'
+        : language === 'legal-plan' ? 'legal-plan'
+        : language === 'legal-result' ? 'legal-result'
+        : language === 'genomics-plan' ? 'genomics-plan'
+        : language === 'genomics-result' ? 'genomics-result'
         : isChemfig ? 'chemfig'
         : /^(svg|xml|html)?$/.test(language) && /^<svg\b/i.test(body) ? 'svg' : 'markdown';
       if (kind === 'markdown') { pattern.lastIndex = end; continue; }
