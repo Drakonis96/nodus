@@ -567,11 +567,11 @@ export function registerIpc(
   h('skillMarketplace:update', async (_e, id: string) => marketplaceChanged(await updateSkillSource(id)));
   h('skillMarketplace:install', async (_e, sourceId: string, packagePath: string, commit: string) => skillsChanged(installMarketplaceSkill(sourceId, packagePath, commit)));
   h('skillMarketplace:import', async () => {
-    const result = await dialog.showOpenDialog({ title: 'Import skill package directory', properties: ['openDirectory'] });
+    const result = await showImportOpenDialog({ title: 'Import skill package directory', properties: ['openDirectory'] });
     return result.canceled ? listChatSkills() : skillsChanged(importSkillDirectory(result.filePaths[0]));
   });
   h('skillMarketplace:export', async (_e, id: string) => {
-    const result = await dialog.showOpenDialog({ title: 'Export skill package into a directory', properties: ['openDirectory', 'createDirectory'] });
+    const result = await showImportOpenDialog({ title: 'Export skill package into a directory', properties: ['openDirectory', 'createDirectory'] });
     return result.canceled ? null : exportSkillDirectory(id, result.filePaths[0]);
   });
   h('chatSkills:list', async () => listChatSkills());

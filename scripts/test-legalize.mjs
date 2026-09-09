@@ -9,8 +9,9 @@ import AdmZip from 'adm-zip';
 const root = path.resolve(import.meta.dirname, '..'), scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-legalize-test-'));
 const bundle = path.join(scratch, 'test.cjs');
 await build({ stdin: { contents: `export * from './shared/legalize'; export * from './shared/chatSkills'; export * from './electron/legalize'; export * from './electron/chatSkills'; export * from './electron/ai/chatSkillExecution';`, resolveDir: root, loader: 'ts' }, outfile: bundle, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent', plugins: [{ name: 'isolate', setup(b) {
-  for (const [filter, name] of [[/^electron$/, 'electron'], [/chatSvgQuality$/, 'svg'], [/decorativeImages$/, 'image'], [/settingsRepo$/, 'settings'], [/chemistryIdentity$/, 'chemistry'], [/chemistryValidationHost$/, 'validate']]) b.onResolve({ filter }, () => ({ path: name, namespace: 'mock' }));
+  for (const [filter, name] of [[/skillToolSandbox$/, 'tools'], [/^electron$/, 'electron'], [/chatSvgQuality$/, 'svg'], [/decorativeImages$/, 'image'], [/settingsRepo$/, 'settings'], [/chemistryIdentity$/, 'chemistry'], [/chemistryValidationHost$/, 'validate']]) b.onResolve({ filter }, () => ({ path: name, namespace: 'mock' }));
   b.onLoad({ filter: /.*/, namespace: 'mock' }, ({ path: name }) => ({ contents: name === 'electron' ? `export const app = { getPath: () => ${JSON.stringify(scratch)}, getAppPath: () => ${JSON.stringify(root)}, isPackaged: false }; export const safeStorage = {};`
+    : name === 'tools' ? 'export const runSkillTool = () => { throw Error("Unexpected custom skill tool"); };'
     : name === 'svg' ? 'export const refineChatSvg = async a => a;'
     : name === 'image' ? 'export const callImageProvider = () => { throw Error("Unexpected image"); }; export const prepareGeneratedImage = () => {};'
     : name === 'settings' ? 'export const getSettings = () => ({});'

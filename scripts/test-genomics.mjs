@@ -21,9 +21,10 @@ globalThis.__genomicsSafeStorage = {
 await build({ stdin: { contents: `export * from './shared/genomics'; export * from './shared/chatSkills'; export * from './electron/genomics'; export * from './electron/chatSkills'; export * from './electron/chatAssets'; export * from './electron/ai/chatSkillExecution';`, resolveDir: root, loader: 'ts' }, outfile: bundle, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent', plugins: [{ name: 'isolate', setup(api) {
   api.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'test' }));
   api.onResolve({ filter: /^\.\.\/genomics$/ }, () => ({ path: 'predict', namespace: 'test' }));
-  for (const [filter, name] of [[/chatSvgQuality$/, 'svg'], [/decorativeImages$/, 'image'], [/db\/settingsRepo$/, 'settings'], [/chemistryIdentity$/, 'chemistry'], [/chemistryValidationHost$/, 'validate']]) api.onResolve({ filter }, () => ({ path: name, namespace: 'test' }));
+  for (const [filter, name] of [[/skillToolSandbox$/, 'tools'], [/chatSvgQuality$/, 'svg'], [/decorativeImages$/, 'image'], [/db\/settingsRepo$/, 'settings'], [/chemistryIdentity$/, 'chemistry'], [/chemistryValidationHost$/, 'validate']]) api.onResolve({ filter }, () => ({ path: name, namespace: 'test' }));
   api.onLoad({ filter: /.*/, namespace: 'test' }, ({ path: name }) => ({ loader: 'js', contents: name === 'electron' ? `export const app = { getPath: () => ${JSON.stringify(scratch)}, getAppPath: () => ${JSON.stringify(root)}, isPackaged: false }; export const safeStorage = globalThis.__genomicsSafeStorage;`
     : name === 'predict' ? 'export const predictGenomics = (...args) => globalThis.__genomicsPredict(...args);'
+    : name === 'tools' ? 'export const runSkillTool = () => { throw Error("Unexpected custom skill tool"); };'
     : name === 'svg' ? 'export const refineChatSvg = async a => a;'
     : name === 'image' ? 'export const callImageProvider = () => { throw Error("Unexpected image generation") }; export const prepareGeneratedImage = () => {};'
     : name === 'settings' ? 'export const getSettings = () => ({});'
