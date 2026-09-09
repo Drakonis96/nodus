@@ -290,6 +290,10 @@
       {
         "from": "cloudflare/dist",
         "to": "nodus-cloudflare"
+      },
+      {
+        "from": "scripts/alphagenome_worker.py",
+        "to": "genomics/alphagenome_worker.py"
       }
     ],
     "files": [

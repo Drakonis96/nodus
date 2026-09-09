@@ -2,6 +2,7 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
+import { validateGenomicsResult, type GenomicsResult } from '@shared/genomics';
 
 const versions = new Map<string, number>();
 const root = () => path.join(app.getPath('userData'), 'chat-assets');
@@ -44,12 +45,29 @@ export function deleteChatAssets(owner: string): void {
   versions.set(owner, chatAssetVersion(owner) + 1);
   fs.rmSync(directory(owner), { recursive: true, force: true });
 }
+export function storeGenomicsResult(owner: string, result: GenomicsResult): string {
+  validateGenomicsResult(result);
+  const id = randomUUID();
+  const dir = directory(owner);
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(path.join(dir, `${id}.genomics`), JSON.stringify(result), { mode: 0o600 });
+  return `nodus-genomics://chat/${owner}/${id}`;
+}
+export function getGenomicsResult(source: string): GenomicsResult | null {
+  const match = /^nodus-genomics:\/\/chat\/([a-f0-9]{64}\/[a-f0-9-]{36})$/.exec(source);
+  if (!match) return null;
+  try { return validateGenomicsResult(JSON.parse(fs.readFileSync(path.join(root(), `${match[1]}.genomics`), 'utf8'))); } catch { return null; }
+}
 /** Remove images dropped by regeneration, message truncation, or history retention. */
 export function reconcileChatAssets(owner: string, messages: Array<{ content: string }>): void {
   const dir = directory(owner);
   if (!fs.existsSync(dir)) return;
   const text = messages.map(message => message.content).join('\n');
   for (const file of fs.readdirSync(dir)) {
+    if (file.endsWith('.genomics')) {
+      if (!text.includes(`nodus-genomics://chat/${owner}/${file.slice(0, -9)}`)) fs.rmSync(path.join(dir, file), { force: true });
+      continue;
+    }
     const id = file.replace(/\.(json|image)$/, '');
     if (!text.includes(`nodus-image://chat/${owner}/${id}`)) fs.rmSync(path.join(dir, file), { force: true });
   }

@@ -16,6 +16,34 @@ resources with:
 - the GNU GPL/LGPL and Creative Commons license texts; and
 - instructions and source references for replacing/rebuilding LGPL components.
 
+## AlphaGenome — Apache 2.0 client; separate service/output terms
+
+AlphaGenome interoperates with Google DeepMind's AlphaGenome through a
+user-installed, unmodified official Python SDK. Copyright 2024 Google LLC.
+SDK revision: `aa6fc8f6faadcb8c910fa2b85b57386fbd5c7b5d` (0.9.0).
+Source: https://github.com/google-deepmind/alphagenome
+
+The client is Apache-2.0; its full license is included in
+`legal/generated/ALPHAGENOME_LICENSE.txt`. SDK examples and documentation are
+CC BY 4.0; its full text is in `legal/generated/CC-BY-4.0.txt`. Nodus's adapter,
+skill instructions and plots are independently authored. No SDK modifications,
+model weights or reference datasets are distributed. Python dependencies are
+installed into the user's isolated runtime with their own upstream licenses.
+
+The service and predictions are **not** licensed under Apache 2.0 or Nodus's
+AGPL. This integration requires a personal key and eligible non-commercial
+use under https://deepmind.google.com/science/alphagenome/terms and
+https://developers.google.com/terms. Output/derivative use and redistribution
+are subject to https://deepmind.google.com/science/alphagenome/output-terms.
+The official service/output terms PDFs are bundled in `legal/generated/`.
+See `legal/ALPHAGENOME.md` for the reviewed obligations and implementation.
+
+Every generated result and graphic includes its output terms, provenance and
+Nodus modifications (track selection, bin averaging and visualization).
+Research use only; no clinical use. Nodus is not endorsed by Google.
+Scientific citation: Avsec et al. (2026), Nature 649, 1206–1218,
+https://doi.org/10.1038/s41586-025-10014-0.
+
 ## GeoNames geographical data — CC BY 4.0
 
 The offline gazetteer in Nodus is derived from the GeoNames `cities15000`,
@@ -219,3 +247,35 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Legalize — legislation by country
+
+The optional **Legalize** chat skill reads public repositories from
+[legalize-dev](https://github.com/legalize-dev), created by
+[Enrique López](https://enriquelopez.eu). The United Kingdom contribution also
+credits [Florin Ungur (@florinungur)](https://github.com/florinungur), and South
+Korea credits [@9bow](https://github.com/9bow).
+
+The MIT licence for Legalize's tooling/overview is **not** a blanket licence for
+its legislative datasets. Each country retains its source's terms. Nodus does
+not redistribute the pipeline, SDK, MCP server, Git, government logos or model
+weights. It retrieves Markdown documents over HTTPS and retains their metadata.
+The independently written adapter remains under Nodus's licence; retrieved
+legislation is not relicensed under Nodus's AGPL.
+
+[The country-by-country attribution and licence register](legal/LEGALIZE.md)
+identifies all 32 enabled jurisdictions, their exact reviewed repository
+revisions, official sources and terms. Unmodified per-repository LICENSE and
+README notices are included in `legal/generated/LEGALIZE_*` and in the normal
+SHA-256-verified legal bundle. They are also linked from **About → Licenses and
+attribution**. Result cards, saved chat records and text downloads retain
+country-specific credits, the source link, declared last update, repository
+revision and a statement identifying Nodus's presentation/extraction changes.
+
+Spain: **Basado en datos de la Agencia Estatal Boletín Oficial del Estado**
+([BOE](https://www.boe.es)). **Texto consolidado de carácter meramente
+informativo.** Reuse follows the BOE conditions approved on 27 June 2024. Nodus
+and Legalize are not endorsed by the BOE. The original document's update and
+reuse metadata are preserved. Other mandatory source attributions, including
+SAIJ, IMPO, Lovdata, Crown/database rights and Korean KOGL type 1, appear in the
+country register and alongside applicable results.

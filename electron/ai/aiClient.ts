@@ -1,4 +1,5 @@
 import { getSettings } from '../db/settingsRepo';
+import { excludeGenomicsResults } from '@shared/genomics';
 import { getApiKey } from '../secrets/secretStore';
 import {
   openAiCompatBase,
@@ -961,7 +962,7 @@ async function rawCompleteTransport(
   // Student names must leave before any provider-specific branch. Subscription
   // providers do not use API keys, so this deliberately precedes key resolution.
   // The public entry points map the opaque codes back after parsing/repair.
-  opts = anonymizeCallOpts(opts).sent;
+  opts = anonymizeCallOpts({ ...opts, system: excludeGenomicsResults(opts.system), user: excludeGenomicsResults(opts.user) }).sent;
 
   if (model.provider === 'codex') {
     try {
@@ -1507,7 +1508,7 @@ async function rawCompleteStreamTransport(
   signal?: AbortSignal,
   codexReasoning?: CodexReasoningEffort | null
 ): Promise<string> {
-  const { sent, privacy } = anonymizeCallOpts(opts);
+  const { sent, privacy } = anonymizeCallOpts({ ...opts, system: excludeGenomicsResults(opts.system), user: excludeGenomicsResults(opts.user) });
   opts = sent;
   const scheduleOpts = { ...opts, signal: signal ?? opts.signal };
 
