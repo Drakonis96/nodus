@@ -14,7 +14,7 @@ try {
  await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setContentSize(1560,1000));
  await page.waitForFunction(()=>typeof window.nodus?.updateSettings==='function');
  await page.evaluate(async()=>{
-  sessionStorage.setItem('nodus.startupUpdateChecked','1');localStorage.setItem('nodus.lastSeenVersion','5.2.1');localStorage.setItem('nodus.mobileTeaserSeen.5.2.1','1');
+  sessionStorage.setItem('nodus.startupUpdateChecked','1');localStorage.setItem('nodus.lastSeenVersion','5.2.2');localStorage.setItem('nodus.mobileTeaserSeen.5.2.2','1');
   for(const key of ['nodus.platformHighlightsSeen.2026-07','nodus.tutorialVideosAnnouncementSeen.2026-07', 'nodus.pdfPresenterTutorialSeen.e2js_u-05OA','nodus.toolkitBetaGuideSeen.2.4.0'])localStorage.setItem(key,'1');
   await window.nodus.updateSettings({onboardingComplete:true,basicsTutorialVersion:999,recoverySetupVersion:999,tourComplete:true,advancedTourComplete:true,mascotEnabled:false,mascotStyle:'orb',mascotStyleChosen:true,uiLanguage:'es',theme:'dark'});
   await window.nodus.seedDemoData();
