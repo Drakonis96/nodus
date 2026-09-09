@@ -25,18 +25,31 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.2.2');
+  assert.equal(currentRelease?.version, '5.3.0');
   assert.equal(currentRelease?.date, '2026-09-09');
-  assert.equal(currentRelease?.highlights.length, 8);
+  assert.equal(currentRelease?.highlights.length, 5);
   assert.deepEqual(currentRelease.highlights.map((h) => h.scope), [
-    'ai', 'ai', 'ai', 'ai', 'academic', 'academic', 'library', 'general',
+    'marketplace', 'marketplace', 'ai', 'ai', 'general',
   ]);
   for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
     assert.ok(currentRelease.highlights.every((h) => h[language]?.length > 80));
   }
+  for (const phrase of [/Skills Marketplace/, /JavaScript tools/, /AlphaGenome/, /Legalize/, /Temporary imports/]) {
+    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)));
+  }
+  const release522 = RELEASE_NOTES.find((note) => note.version === '5.2.2');
+  assert.equal(release522?.version, '5.2.2');
+  assert.equal(release522?.date, '2026-09-09');
+  assert.equal(release522?.highlights.length, 8);
+  assert.deepEqual(release522.highlights.map((h) => h.scope), [
+    'ai', 'ai', 'ai', 'ai', 'academic', 'academic', 'library', 'general',
+  ]);
+  for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+    assert.ok(release522.highlights.every((h) => h[language]?.length > 80));
+  }
   for (const phrase of [/Chemistry Studio/, /Fischer, Haworth and Newman/, /balanced reaction schemes/,
     /Claude 4.7/, /permanent themes hub/, /context background/, /Document profile/, /PDF Presenter tutorial/]) {
-    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)));
+    assert.ok(release522.highlights.some((h) => phrase.test(h.en)));
   }
   const release521 = RELEASE_NOTES.find((note) => note.version === '5.2.1');
   assert.equal(release521?.version, '5.2.1');
@@ -470,6 +483,7 @@ try {
     'nodi',
     'toolkit',
     'plugin',
+    'marketplace',
     'languages',
     'browser',
     'radar',

@@ -1947,6 +1947,7 @@ export const TR: Record<string, string> = {
   "Versión instalada": "Yüklü sürüm",
   "Continuar en segundo plano": "Arka planda devam et",
   "Servidor MCP": "MCP Sunucusu",
+  "Marketplace de Skills": "Skills Marketplace",
   "Activar servidor MCP": "MCP sunucusunu etkinleştirin",
   "Copiloto de escritura (Word)": "Yardımcı Pilot Yazma (Word)",
   "1) Genera el certificado local · 2) Activa el copiloto · 3) Instálalo en Word y ábrelo desde la pestaña Nodus.": "1) Yerel sertifikayı oluşturun · 2) Yardımcı pilotu etkinleştirin · 3) Word'e yükleyin ve Nodus sekmesinden açın.",

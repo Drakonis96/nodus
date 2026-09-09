@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 5.3.0 — 2026-09-09
+
+Nodus 5.3.0 opens Skills to installable community packages and adds two
+reviewed, opt-in research integrations.
+
+- Introducing the Skills Marketplace. Explore the official catalog, inspect each package before installation, and add other public GitHub repositories. Catalog updates and source removal never alter installed skills.
+- Skills can include JavaScript tools for calculations, transformations and generators. They run in an ephemeral sandbox without access to files, credentials, the network or Nodus data. Complete skill packages can also be imported and exported.
+- AlphaGenome is available as an optional skill for non-commercial regulatory-variant research. It uses the official client and the user’s own key, keeps prediction data local, and preserves the service’s attribution and output terms in exports.
+- Legalize retrieves real legislation from 32 reviewed national and European Union repositories. Results include the official source, repository revision, licence and attribution, with no Git installation, account or API key required.
+- Imported temporary files on Windows are now opened with write access before the durability sync, preventing valid imports from failing at the final save step.
+- The Stellar graph’s Context control stays in its original position when enabled instead of jumping within the toolbar.
+- PDF Presenter tutorial cards now use the presentation icon and presentation-specific gradient instead of an unrelated thumbnail.
+- Add the complete 5.3.0 What’s New modal in all eight interface languages, with the Marketplace’s own basket-and-N icon.
+
 ## 5.2.2 — 2026-09-09
 
 - Chemistry Studio comes to chat. Create molecular structures from SMILES, Lewis diagrams and ChemFig drawings, with controls to enlarge and download the result. The interface is translated and your customized skill instructions are preserved.

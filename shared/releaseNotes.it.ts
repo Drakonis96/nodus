@@ -166,6 +166,13 @@ const RELEASE_5_1_0_IT = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.3.0": [
+    "Arriva il Marketplace delle Skill. Da Skill puoi esplorare il catalogo ufficiale, esaminare contenuti e capacità di ogni pacchetto prima di installarlo e aggiungere altri repository GitHub pubblici. Aggiornare un catalogo non modifica ciò che hai già installato, e rimuovere una fonte non elimina neppure le sue skill.",
+    "Le skill possono ora includere strumenti JavaScript per calcoli, trasformazioni e generatori. Vengono eseguiti in un ambiente isolato senza accesso ai tuoi file, credenziali, rete o dati di Nodus. Puoi anche importare ed esportare pacchetti completi, mentre l'Assistente e Nodi mantengono attivazioni indipendenti.",
+    "AlphaGenome arriva come skill facoltativa per la ricerca non commerciale. Dopo aver aggiunto la tua chiave e installato il client ufficiale, puoi richiedere previsioni regolatorie per varianti GRCh38 dalle chat di Nodus. Risultati e grafici restano memorizzati solo su questo computer, e le esportazioni conservano attribuzione e condizioni d'uso.",
+    "Legalize consente di consultare da qualsiasi chat la legislazione di 32 repository nazionali e dell'Unione europea sottoposti a revisione. Indica il paese, la legge o il suo identificatore e, se serve, l'articolo. Nodus recupera il testo reale con fonte ufficiale, revisione e attribuzioni. Non servono Git, un account o una chiave API.",
+    "Abbiamo anche rifinito tre dettagli visibili. Le importazioni temporanee non falliscono più su Windows quando i file vengono salvati in sicurezza. Il controllo Contesto del grafo resta al suo posto quando viene attivato. E il tutorial di PDF Presenter usa ora un'icona e una sfumatura che lo identificano chiaramente come presentazione."
+  ],
   "5.2.2": [
     "Chemistry Studio arriva nella chat. Crea strutture molecolari da SMILES, diagrammi di Lewis e disegni ChemFig, con comandi per ingrandire e scaricare il risultato. L’interfaccia è tradotta e le istruzioni personalizzate delle tue abilità vengono conservate.",
     "I disegni chimici ricevono controlli espliciti. Nodus convalida l’identità molecolare e supporta proiezioni Fischer, Haworth e Newman e regole circoscritte per SN2, E2, aldol, Diels–Alder e risonanza delle ammidi. Scarica le evidenze e il ChemFig verificato. Se una proposta non è verificabile, Nodus lo segnala invece di inventare un disegno.",
