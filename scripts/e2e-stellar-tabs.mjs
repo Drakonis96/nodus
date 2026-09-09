@@ -321,6 +321,9 @@ try {
  await page.locator('[data-tour="nav-graph"]').click();await active().waitFor();
  await page.waitForFunction(n=>Number(document.querySelector('.stellar-tab-panel .stellar-workspace')?.getAttribute('data-node-count'))===n,beforeNavigation);
  await page.getByRole('tab').first().click();await hub().waitFor();
+ // Section navigation remounts the hub at its initial zoom; restore a full view
+ // before comparing its visible targets with the pre-navigation fitted canvas.
+ await hub().getByRole('button',{name:'Encuadrar',exact:true}).click();
  await page.waitForFunction(n=>document.querySelectorAll('.stellar-tab-panel .stellar-hit').length===n,initialHubNodes+1);
  assert.equal(await hub().locator('.stellar-node-label').filter({hasText:pinnedLabel}).count(),1,'pinned ideas restore after section navigation');
  await page.getByRole('tab').nth(1).click();await active().waitFor();
@@ -331,6 +334,7 @@ try {
  assert.ok((await page.getByRole('tab').last().innerText()).includes(other.label.slice(0,20)),'an external idea opens its own graph');
  await page.getByRole('tab').nth(1).click();assert.equal(await count('node'),beforeTarget,'external navigation preserves previous graphs');
  await page.reload();await page.locator('[data-tour="nav-graph"]').click();await hub().waitFor();
+ await hub().getByRole('button',{name:'Encuadrar',exact:true}).click();
  assert.equal(await page.getByRole('tab').count(),1,'a fresh app session starts on the themes hub alone');
  await page.locator('[data-testid="stellar-themes"] .stellar-node-label').first().click();await active().waitFor();
  await page.getByRole('button',{name:'Volver a los temas'}).click();await hub().waitFor();
