@@ -303,3 +303,46 @@ procedure, security and, where there is a high risk, an impact assessment.
 
 Material changes will be published in the repository and included in the new versions. Git's history
 allows you to audit each modification.
+
+## Optional AlphaGenome skill
+
+AlphaGenome sends only the explicitly requested genomic variant, centered
+reference interval, tissue ontology and signal type directly to Google DeepMind
+using the user's personal AlphaGenome key. Google's service terms and privacy
+policy apply: https://deepmind.google.com/science/alphagenome/terms and
+https://deepmind.google.com/science/alphagenome/privacy. Do not submit patient
+records or HIPAA-regulated information.
+
+The new key is entered in the skill's password field, passed once to the main
+process, OS-encrypted on this device and cleared from the form. It is never
+returned by configuration/status APIs or included in chat, Nodus backups or
+synchronization. The Python adapter receives it only over a local stdin pipe.
+An explicit setup action downloads the official client and dependencies from
+GitHub/PyPI into an isolated environment.
+
+Predictions remain in device-local chat assets. Conversation history contains
+only opaque references, so predictions are not forwarded to text providers or
+Nodus Server and are not included in Nodus backup archives. Deleting or pruning
+the corresponding chat removes its assets. User-requested JSON/SVG exports
+contain results, parameters, provenance, modifications and binding output-term
+notices; recipients must comply with those terms.
+
+### Legalize chat skill
+
+Legalize is disabled by default. When enabled and invoked, Nodus contacts
+GitHub (`api.github.com`, `raw.githubusercontent.com`, `codeload.github.com`)
+for the selected public country repository and document paths. No GitHub token,
+Git executable, Legalize account or API key is used. The network requests do not
+include the chat, personal legal circumstances or vault documents. Title
+matching occurs locally against a downloaded country snapshot; GitHub receives
+the IP address and requested country/document paths.
+
+The latest country title/identifier/path index is cached under
+`userData/legalize-indexes/<country>.json`, replacing the previous version for
+that country. Compressed archives are processed in memory, never executed or
+extracted into the filesystem. Retrieved law text, original metadata and
+attribution are saved in the chat result, so they follow that chat's normal
+history, synchronization and backup rules. They may be included in later prompts
+to the text provider selected for that chat. Downloads include the same source
+and licence attribution. These are public legislative sources; this feature is
+not a confidential legal advice service.

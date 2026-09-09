@@ -1,4 +1,6 @@
 import { listChatSkills, saveChatSkill, deleteChatSkill, restoreChatSkills } from './chatSkills';
+import { getGenomicsStatus, configureGenomics, clearGenomicsConfiguration, installGenomicsRuntime } from './genomics';
+import { getGenomicsResult } from './chatAssets';
 import { getChatImageMetadata } from './chatAssets';
 import { compileChemfig, compileLewis, compileSmiles } from './chemistry';
 import { originalImagePayloadFromUrl } from './imageProtocol';
@@ -558,6 +560,16 @@ export function registerIpc(
     return skills;
   };
   h('chatSkills:list', async () => listChatSkills());
+  h('genomics:status', async () => getGenomicsStatus());
+  h('genomics:configure', async (_e, input) => configureGenomics(input));
+  h('genomics:clear', async () => {
+    const status = clearGenomicsConfiguration();
+    const skill = listChatSkills().find(s => s.builtin === 'genomics');
+    if (skill) skillsChanged(saveChatSkill({ ...skill, enabled: { assistant: false, nodi: false } }));
+    return status;
+  });
+  h('genomics:install', async () => installGenomicsRuntime());
+  h('genomics:result', async (_e, source: string) => typeof source === 'string' ? getGenomicsResult(source) : null);
   h('chatSkills:save', async (_e, skill) => skillsChanged(saveChatSkill(skill)));
   h('chatSkills:delete', async (_e, id: string) => skillsChanged(deleteChatSkill(id)));
   h('chatSkills:restore', async () => skillsChanged(restoreChatSkills()));

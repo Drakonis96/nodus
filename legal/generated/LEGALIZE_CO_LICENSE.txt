@@ -1,0 +1,17 @@
+LEGALIZE — Colombia: legislation as open data
+
+SOFTWARE / PIPELINE
+The software that generates and maintains this repository is open source
+under the MIT License:
+  https://github.com/legalize-dev/legalize-pipeline
+
+LEGISLATIVE CONTENT (DATA)
+Textos normativos oficiales del Estado colombiano, reproducibles conforme al art. 41 de la Ley 23 de 1982, con la obligación de conformarse con la edición oficial. Los campos editoriales que acompañan a cada norma (vigencia, subtipo, sector, materia) y el historial de reformas provienen de la anotación de SUIN-Juriscol (Ministerio de Justicia y del Derecho); Legalize no reclama derechos sobre ellos, ni reproduce el formato, el diseño ni la marca del portal. La licencia MIT cubre el código del pipeline, nunca el contenido normativo.
+These are official public-sector texts reproduced from their official
+source. The original source of each document is recorded in the `source`
+field of that file's YAML front matter.
+
+DISCLAIMER
+Automated reproduction of official sources. This is not an official or
+verified legal text. Always consult the official source for authoritative
+versions.

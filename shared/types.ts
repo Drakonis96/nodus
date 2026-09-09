@@ -1,4 +1,5 @@
 import type { ChatSkill } from './chatSkills';
+import type { GenomicsStatus, GenomicsSettingsInput, GenomicsResult } from './genomics';
 // Shared domain types used by both the Electron main process and the React renderer.
 // Keep this file free of any runtime imports from either side.
 // Per-domain slices of the window.nodus contract. NodusApi extends them, so the
@@ -8765,6 +8766,11 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   markAnnouncementRead(id: string): Promise<AnnouncementEntry[]>;
   onAnnouncementsChanged(cb: (list: AnnouncementEntry[]) => void): () => void;
   listChatSkills(): Promise<ChatSkill[]>;
+  getGenomicsStatus(): Promise<GenomicsStatus>;
+  configureGenomics(input: GenomicsSettingsInput): Promise<GenomicsStatus>;
+  clearGenomicsConfiguration(): Promise<GenomicsStatus>;
+  installGenomicsRuntime(): Promise<GenomicsStatus>;
+  getGenomicsResult(source: string): Promise<GenomicsResult | null>;
   saveChatSkill(skill: ChatSkill): Promise<ChatSkill[]>;
   deleteChatSkill(id: string): Promise<ChatSkill[]>;
   restoreChatSkills(): Promise<ChatSkill[]>;

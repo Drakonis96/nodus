@@ -1,0 +1,909 @@
+[
+  {
+    "code": "es",
+    "name": "España",
+    "aliases": [
+      "España",
+      "Spain",
+      "Espana",
+      "española",
+      "español"
+    ],
+    "repo": "legalize-es",
+    "revision": "00304e8675a4bb9e62c6fe5d0d657fcc37c28bf7",
+    "licenseSha256": "5542f7ac787b6df9fa195ec7367e77c7cc3b1181e6a58c204a37136c627fe34d",
+    "readmeSha256": "3bcb9f2cd91e68039a350133285f782cd38921eab0cdff0c89a3adbfd1ab3761",
+    "license": "Condiciones de reutilización del BOE — cita obligatoria de la fuente",
+    "sourceName": "Agencia Estatal Boletín Oficial del Estado",
+    "sourceUrl": "https://www.boe.es",
+    "attribution": "Basado en datos de la Agencia Estatal Boletín Oficial del Estado (https://www.boe.es). Texto consolidado de carácter meramente informativo. Reutilización conforme a la Resolución de 27 de junio de 2024. Nodus y Legalize no están patrocinados por el BOE.",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://www.boe.es/informacion/aviso_legal/index.php"
+  },
+  {
+    "code": "us",
+    "name": "United States",
+    "aliases": [
+      "United States",
+      "Estados Unidos",
+      "EEUU",
+      "EE.UU.",
+      "USA",
+      "U.S.",
+      "estadounidense"
+    ],
+    "repo": "legalize-us",
+    "revision": "44061d035c7bc104ce2a70768eb041a996c40f8a",
+    "licenseSha256": "9790a817e2a34bddad89ce47b03e608b6b499ea5d85b240d2f21a9ca827d54dc",
+    "readmeSha256": "a760d553ed8cd3e5fa48882a8015f3634802bcf4d75815222f7e2f999a59acf5",
+    "license": "public domain (work of the U.S. Government, 17 U.S.C. § 105)",
+    "sourceName": "Office of the Law Revision Counsel, U.S. House of Representatives",
+    "sourceUrl": "https://uscode.house.gov/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-us/blob/44061d035c7bc104ce2a70768eb041a996c40f8a/LICENSE"
+  },
+  {
+    "code": "uk",
+    "name": "United Kingdom",
+    "aliases": [
+      "United Kingdom",
+      "Reino Unido",
+      "Great Britain",
+      "Gran Bretaña",
+      "británica"
+    ],
+    "repo": "legalize-uk",
+    "revision": "ac5a93d2ce7d419cfc3d4cfcb3e1c63dc28b59a1",
+    "licenseSha256": "6b7a54f360ab33e716cfd7966cae6af838059762a2a499876bb22f961ecd6ce7",
+    "readmeSha256": "a952fa4b66e4c30a3e198f413e08b54bf04076ffffe6704f34fc6ac483dce719",
+    "license": "Open Government Licence v3.0 (attribution required)",
+    "sourceName": "The National Archives",
+    "sourceUrl": "https://www.legislation.gov.uk/",
+    "attribution": "© Crown and database right. Derived from content available under the Open Government Licence v3.0 from legislation.gov.uk. Where identified as Westlaw-supplied: Westlaw UK derived from Crown Copyright material and contributed to legislation.gov.uk. EU-originating material: © European Union, reused under Commission Decision 2011/833/EU and CC BY 4.0 as applicable; https://legislation.github.io/data-documentation/reuse-licence.html.",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      },
+      {
+        "name": "Florin Ungur (@florinungur)",
+        "url": "https://github.com/florinungur"
+      }
+    ],
+    "termsUrl": "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
+  },
+  {
+    "code": "ar",
+    "name": "Argentina",
+    "aliases": [
+      "Argentina"
+    ],
+    "repo": "legalize-ar",
+    "revision": "c3753de1ea91caa547fcfa97753f418d8c91783e",
+    "licenseSha256": "08fd9a170b1f190adff8bc843765c6e9c8331e33ac12cdd1351a0dab8ace0c11",
+    "readmeSha256": "c26174a2fa6734eb129117855369f204f4a2cd72cc7971cd0100778a9d81d5de",
+    "license": "CC-BY 4.0 (atribución obligatoria a SAIJ)",
+    "sourceName": "Ministerio de Justicia — Dirección Nacional del SAIJ",
+    "sourceUrl": "https://datos.jus.gob.ar",
+    "attribution": "Datos legislativos provistos por el Ministerio de Justicia de la República Argentina a través de la Dirección Nacional del Sistema Argentino de Información Jurídica (SAIJ). Publicados en https://datos.jus.gob.ar bajo licencia Creative Commons Atribución 4.0 Internacional.",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  {
+    "code": "at",
+    "name": "Österreich",
+    "aliases": [
+      "Österreich",
+      "Austria"
+    ],
+    "repo": "legalize-at",
+    "revision": "00337481783f9d4b9286c24cadc515a69691bb00",
+    "licenseSha256": "b37469445dd34dcf69837b777b1b1d4a8e28849d214d604f6a4176403a986af4",
+    "readmeSha256": "883e23c26668031e1e0eba14a57676afebed4064b0edeb3f7215213a525b5158",
+    "license": "CC BY 4.0 (Creative Commons Namensnennung 4.0 International)",
+    "sourceName": "RIS — Bundeskanzleramt der Republik Österreich",
+    "sourceUrl": "https://www.ris.bka.gv.at/",
+    "attribution": "Quelle: RIS – Rechtsinformationssystem des Bundes, Bundeskanzleramt der Republik Österreich (https://www.ris.bka.gv.at/). Lizenziert unter CC BY 4.0 (Creative Commons Namensnennung 4.0 International). Aus den Daten können keinerlei Rechtsansprüche abgeleitet werden.",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  {
+    "code": "ad",
+    "name": "Andorra",
+    "aliases": [
+      "Andorra"
+    ],
+    "repo": "legalize-ad",
+    "revision": "afb110ed55095dea94b518b80fa91aa6c6095a7f",
+    "licenseSha256": "eeff493a124e1db68b1918d5909420acc90c7787bbaff6abf849dcec12e68aef",
+    "readmeSha256": "2f3229e344d67b3d41758c49260bb508ae11acba22e3f00514b8aba9fbb2d0a3",
+    "license": "Domini públic — els textos oficials estan exclosos de la protecció del dret d'autor (art. 4.2 de la Llei sobre drets d'autor i drets veïns, 1999)",
+    "sourceName": "Butlletí Oficial del Principat d’Andorra — Govern i Consell General",
+    "sourceUrl": "https://www.bopa.ad/",
+    "attribution": "Font: Butlletí Oficial del Principat d'Andorra (BOPA) — Govern del Principat d'Andorra i Consell General (https://www.bopa.ad/). Els textos oficials estan exclosos de la protecció del dret d'autor segons l'article 4.2 de la Llei sobre drets d'autor i drets veïns (1999). Aquest repositori és un mirall **no oficial**; el BOPA continua sent l'única font autèntica de la legislació andorrana.",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-ad/blob/afb110ed55095dea94b518b80fa91aa6c6095a7f/LICENSE"
+  },
+  {
+    "code": "be",
+    "name": "Belgique",
+    "aliases": [
+      "Belgique",
+      "Belgium",
+      "Bélgica",
+      "Belgie"
+    ],
+    "repo": "legalize-be",
+    "revision": "81ccdfcaab4362e609287324df55055c8b198d19",
+    "licenseSha256": "1f57da797c9823f52edb9944b5e3884a5e969fde494eba1c6baf859e3d6d37b0",
+    "readmeSha256": "dc06ec577b33125abc9197956884ca55607d1b6a8fe6bf77678aaf703a22f0ae",
+    "license": "Licence ouverte / open data fédéral belge (CC0 par défaut)",
+    "sourceName": "Justel — Service public fédéral Justice",
+    "sourceUrl": "https://www.ejustice.just.fgov.be/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  {
+    "code": "ch",
+    "name": "Schweiz",
+    "aliases": [
+      "Schweiz",
+      "Switzerland",
+      "Suiza",
+      "Suisse"
+    ],
+    "repo": "legalize-ch",
+    "revision": "bb25076ced856706100f601346a87764d8530630",
+    "licenseSha256": "f25dbf00637883e1032fccfd590dda276cba6884427c1386d89cfdcbc523c9d9",
+    "readmeSha256": "f17f8887b19db9a58f8ef24818475fcee23f125795822398b27e786f0d814dc3",
+    "license": "gemeinfrei (amtliche Texte, von Gesetzes wegen vom Urheberrechtsschutz ausgenommen)",
+    "sourceName": "Fedlex — Schweizerische Bundeskanzlei",
+    "sourceUrl": "https://www.fedlex.admin.ch/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-ch/blob/bb25076ced856706100f601346a87764d8530630/LICENSE"
+  },
+  {
+    "code": "cl",
+    "name": "Chile",
+    "aliases": [
+      "Chile"
+    ],
+    "repo": "legalize-cl",
+    "revision": "eab1fb5b66beb12e121353c97b81880677b79014",
+    "licenseSha256": "e846d1e635db410508e8f7b17b40c70adf8319de2c33df50a19e1c8670c35587",
+    "readmeSha256": "2892b447c733a2f1d25e52373fbaefee518caa825ac32fc63eddadd680caf9e2",
+    "license": "Dominio público (publicaciones oficiales del Estado)",
+    "sourceName": "Biblioteca del Congreso Nacional de Chile — Ley Chile",
+    "sourceUrl": "https://www.bcn.cl/leychile/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-cl/blob/eab1fb5b66beb12e121353c97b81880677b79014/LICENSE"
+  },
+  {
+    "code": "co",
+    "name": "Colombia",
+    "aliases": [
+      "Colombia"
+    ],
+    "repo": "legalize-co",
+    "revision": "c25da5b1a507dd681b6704334e284d2e60f8e6d3",
+    "licenseSha256": "13c2722a10121b4d464ce8c7a9dd35f3d2bf8093f3c239539c6f8cf2ac9e61c2",
+    "readmeSha256": "1c77c23ffcc7834de44ff54d39bebec3679a20aba1d5f2553c1e84ca35102163",
+    "license": "Textos normativos oficiales del Estado colombiano, reproducibles conforme al art. 41 de la Ley 23 de 1982, con la obligación de conformarse con la edición oficial. Los campos editoriales que acompañan a cada norma (vigencia, subtipo, sector, materia) y el historial de reformas provienen de la anotación de SUIN-Juriscol (Ministerio de Justicia y del Derecho); Legalize no reclama derechos sobre ellos, ni reproduce el formato, el diseño ni la marca del portal. La licencia MIT cubre el código del pipeline, nunca el contenido normativo.",
+    "sourceName": "SUIN-Juriscol — Ministerio de Justicia y del Derecho",
+    "sourceUrl": "https://www.suin-juriscol.gov.co/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-co/blob/c25da5b1a507dd681b6704334e284d2e60f8e6d3/LICENSE"
+  },
+  {
+    "code": "cz",
+    "name": "Česko",
+    "aliases": [
+      "Česko",
+      "Czech Republic",
+      "Chequia",
+      "República Checa"
+    ],
+    "repo": "legalize-cz",
+    "revision": "fa082106d2f06a667e7993242adc85a049248c49",
+    "licenseSha256": "15ac65997fa529831f63638f104223d10acdf43c070a5c1d92767cc48aa1109c",
+    "readmeSha256": "3638b491af3a53ab2ad6cbe4ead8663fab3658bad4e0deb5a7a47df82c5c58b4",
+    "license": "volné dílo (úřední díla podle § 3 písm. a) zákona č. 121/2000 Sb., autorského zákona)",
+    "sourceName": "e-Sbírka — Ministerstvo vnitra",
+    "sourceUrl": "https://www.e-sbirka.cz/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-cz/blob/fa082106d2f06a667e7993242adc85a049248c49/LICENSE"
+  },
+  {
+    "code": "de",
+    "name": "Deutschland",
+    "aliases": [
+      "Deutschland",
+      "Germany",
+      "Alemania",
+      "alemana",
+      "alemán"
+    ],
+    "repo": "legalize-de",
+    "revision": "f1690b5d6a745eb015be7bfccfcf7af6292ef206",
+    "licenseSha256": "a35b6493b7e5477e9e92cf9e615baf765b3f8c1b013a97952b32dad36b204727",
+    "readmeSha256": "4ca9b3874f6a53e8180ac725bdcb9119880790e43cd74aa80f5503131fe35ae5",
+    "license": "gemeinfrei (amtliche Werke nach § 5 UrhG; freie Nutzung und Weiterverwendung)",
+    "sourceName": "Gesetze im Internet — BMJ / Bundesamt für Justiz",
+    "sourceUrl": "https://www.gesetze-im-internet.de/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-de/blob/f1690b5d6a745eb015be7bfccfcf7af6292ef206/LICENSE"
+  },
+  {
+    "code": "ee",
+    "name": "Eesti",
+    "aliases": [
+      "Eesti",
+      "Estonia"
+    ],
+    "repo": "legalize-ee",
+    "revision": "5d9503824059b635f570a02682a3986b8de143dd",
+    "licenseSha256": "5920a8b8e5a46abb6f7aae02519c7c7c431243ca3185e2f211ab96612c16c2d5",
+    "readmeSha256": "0cb69e5f7bfe38f19a73f5ebabbf61a98876ed6816c366bb92e3d9c7537d6e93",
+    "license": "avalik omand (ametlikud riiklikud väljaanded)",
+    "sourceName": "Riigi Teataja",
+    "sourceUrl": "https://www.riigiteataja.ee/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-ee/blob/5d9503824059b635f570a02682a3986b8de143dd/LICENSE"
+  },
+  {
+    "code": "eu",
+    "name": "European Union",
+    "aliases": [
+      "European Union",
+      "Unión Europea",
+      "Union européenne",
+      "UE"
+    ],
+    "repo": "legalize-eu",
+    "revision": "5280e683aedaa7e0d6f0418548b150e073eae216",
+    "licenseSha256": "ebb7202c5076f3f534cce05f7de33d7aab2976c64e050b991bec9c013e45efef",
+    "readmeSha256": "1d2b2841cb78b612652b3e5eb5934cf5146dd740d86dd311c148233cfa230854",
+    "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+    "sourceName": "Publications Office of the European Union — EUR-Lex / CELLAR",
+    "sourceUrl": "https://eur-lex.europa.eu/",
+    "attribution": "© European Union, https://eur-lex.europa.eu — Source: EUR-Lex (Publications Office of the European Union). Reused under the Creative Commons Attribution 4.0 International (CC BY 4.0) licence. Only EU legislation published in the printed Official Journal of the European Union is deemed authentic; consolidated texts are reproduced here for documentation purposes and have been reformatted to Markdown.",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  {
+    "code": "fi",
+    "name": "Suomi",
+    "aliases": [
+      "Suomi",
+      "Finland",
+      "Finlandia"
+    ],
+    "repo": "legalize-fi",
+    "revision": "d7dcce82303aa4ee7cd841f908fc0a08beec00c8",
+    "licenseSha256": "aca9e968e1c78f2d72ebdf9d230aae84ced2e217eb816e066023e54b255cde81",
+    "readmeSha256": "c04b06b1005c934e1d19eddd5038e28339efd920689b87dfce1563f4bc842751",
+    "license": "Creative Commons Nimeä 4.0 Kansainvälinen (CC BY 4.0)",
+    "sourceName": "Finlex — Ministry of Justice, Finland",
+    "sourceUrl": "https://www.finlex.fi/",
+    "attribution": "Sisältää Finlexin aineistoa, jonka on julkaissut oikeusministeriö (Oikeusrekisterikeskus). Aineisto on lisensoitu Creative Commons Nimeä 4.0 Kansainvälinen (CC BY 4.0) -lisenssillä: https://creativecommons.org/licenses/by/4.0/deed.fi. Aineistoon on tehty muotomuutoksia (XML-muoto muunnettu Markdowniksi).",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  {
+    "code": "fr",
+    "name": "France",
+    "aliases": [
+      "France",
+      "Francia",
+      "francesa",
+      "francés"
+    ],
+    "repo": "legalize-fr",
+    "revision": "e38417fd7b982b2df02fbe01f2960127a7bf9031",
+    "licenseSha256": "6c00ac415be1aa33298d8e5f4d0a96e05f5a01dd00c50bd3299bd50d841113b9",
+    "readmeSha256": "7dac70c309316eaed19805ac9caf1c12a602d3c95fd01918f32e4b83e9b7dc75",
+    "license": "Licence Ouverte / Open Licence (Etalab) v2.0",
+    "sourceName": "DILA — Légifrance, base LEGI",
+    "sourceUrl": "https://www.legifrance.gouv.fr/",
+    "attribution": "Source : Direction de l'information légale et administrative (DILA) — base LEGI / Légifrance (https://www.legifrance.gouv.fr). Données réutilisées sous Licence Ouverte / Open Licence (Etalab) v2.0. Les textes ont été convertis au format Markdown par Legalize ; ils peuvent différer de la version officielle. Seules les versions publiées au Journal officiel et sur Légifrance font foi.",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/etalab/licence-ouverte/blob/master/LO.md"
+  },
+  {
+    "code": "gr",
+    "name": "Ελλάδα",
+    "aliases": [
+      "Ελλάδα",
+      "Greece",
+      "Grecia"
+    ],
+    "repo": "legalize-gr",
+    "revision": "c944d191290e333b9c72ebba1128be8c991c8e0f",
+    "licenseSha256": "66ab9a463c8ae62efbf5fdf2ea6f686546edfa4e7f876a7bfdf0e81ed2889de3",
+    "readmeSha256": "bb9fe41b534e268edaf15f13c8bd3e5f6ddee8c2269f18bf196c3d5d4d085611",
+    "license": "Δημόσιος τομέας (επίσημα κρατικά κείμενα)",
+    "sourceName": "Εθνικό Τυπογραφείο — ΦΕΚ",
+    "sourceUrl": "https://search.et.gr/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-gr/blob/c944d191290e333b9c72ebba1128be8c991c8e0f/LICENSE"
+  },
+  {
+    "code": "ie",
+    "name": "Ireland",
+    "aliases": [
+      "Ireland",
+      "Irlanda"
+    ],
+    "repo": "legalize-ie",
+    "revision": "046eacac6559cc6f1900a0c976e9fb40800c8f60",
+    "licenseSha256": "f3ebbe48f3f1d5eb1102662c4c1fe38bd83711e4b9c3e66aaa886229c93d830c",
+    "readmeSha256": "47f4f11dd8811b889c004e06dbd6c8039551345f2df6fb16ff62ddbf0b3a296a",
+    "license": "CC-BY 4.0 (Oireachtas Open Data PSI Licence)",
+    "sourceName": "Irish Statute Book / Houses of the Oireachtas",
+    "sourceUrl": "https://www.irishstatutebook.ie/",
+    "attribution": "Contains Irish Public Sector Information licensed under the Oireachtas (Houses of the Oireachtas) Open Data PSI Licence / Creative Commons Attribution 4.0 International, sourced from https://www.irishstatutebook.ie.",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  {
+    "code": "it",
+    "name": "Italia",
+    "aliases": [
+      "Italia",
+      "Italy",
+      "italiana",
+      "italiano"
+    ],
+    "repo": "legalize-it",
+    "revision": "8a28bf912c838697f3d1664394768023f35b1bb0",
+    "licenseSha256": "bb100fddc9bb82471383e60f9b23f182c42a7d199967499faa521c436792e8fa",
+    "readmeSha256": "004e9eabe8c5e9784c9354b986a80037054baf174c72c6b7456941895f50317a",
+    "license": "Pubblico dominio (testi ufficiali, art. 5 L. 633/1941)",
+    "sourceName": "Normattiva — Istituto Poligrafico e Zecca dello Stato",
+    "sourceUrl": "https://www.normattiva.it/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-it/blob/8a28bf912c838697f3d1664394768023f35b1bb0/LICENSE"
+  },
+  {
+    "code": "kr",
+    "name": "대한민국",
+    "aliases": [
+      "대한민국",
+      "South Korea",
+      "Corea del Sur",
+      "Korea"
+    ],
+    "repo": "legalize-kr",
+    "revision": "b0aa32a368a15b2327c8a2c0a4223dbb8d2d1049",
+    "licenseSha256": "67e3cb9bc96a32bbe1d3738ea29093443b67c28315b7ab7312cc6f04a895af4d",
+    "readmeSha256": "8b10538e9cae85be3c7a0e61da00f92346df614eeb23bcd8298b21d2239fa1b2",
+    "license": "공공누리 제1유형(출처표시) — 법령 본문은 저작권 보호 제외(저작권법 §7)",
+    "sourceName": "National Law Information Center — Ministry of Government Legislation",
+    "sourceUrl": "https://www.law.go.kr/",
+    "attribution": "출처: 국가법령정보센터(법제처, https://www.law.go.kr) — 공공누리 제1유형(출처표시)에 따라 이용.",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      },
+      {
+        "name": "@9bow",
+        "url": "https://github.com/9bow"
+      }
+    ],
+    "termsUrl": "https://www.kogl.or.kr/info/licenseType1.do"
+  },
+  {
+    "code": "li",
+    "name": "Liechtenstein",
+    "aliases": [
+      "Liechtenstein"
+    ],
+    "repo": "legalize-li",
+    "revision": "1b19742b74b852c50b50bde418b8045db774b2ba",
+    "licenseSha256": "8ecb49cd6fe9493d8f5e3167bfdc383ee33841c535ed4bc185cb7feedf9aacad",
+    "readmeSha256": "6e84d4a6cac50cfd1e0fd8eb477375f8658c5db6e51ceffef9a403ca5da3c63c",
+    "license": "gemeinfrei (amtliche Werke des Staates)",
+    "sourceName": "Lilex — Regierung des Fürstentums Liechtenstein",
+    "sourceUrl": "https://www.gesetze.li/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-li/blob/1b19742b74b852c50b50bde418b8045db774b2ba/LICENSE"
+  },
+  {
+    "code": "lt",
+    "name": "Lietuva",
+    "aliases": [
+      "Lietuva",
+      "Lithuania",
+      "Lituania"
+    ],
+    "repo": "legalize-lt",
+    "revision": "c68003bcc7b61be52d915c24c3121cbc888dfd8e",
+    "licenseSha256": "bcf60bfcc65949351eacd2ca961cdea755a96f80478def33c72891e57327daf3",
+    "readmeSha256": "e2312ce94300a2a3418b994ff38b4f7f05a4513b39766109073adfc451deb709",
+    "license": "Creative Commons Priskyrimas 4.0 tarptautinė (CC BY 4.0)",
+    "sourceName": "Teisės aktų registras — TAR",
+    "sourceUrl": "https://www.e-tar.lt/",
+    "attribution": "Duomenų šaltinis: Teisės aktų registras (TAR), Lietuvos atvirų duomenų portalas (data.gov.lt). Licencija: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.lt). Duomenys gali būti pakeisti (konvertuoti į Markdown formatą).",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  {
+    "code": "lu",
+    "name": "Luxembourg",
+    "aliases": [
+      "Luxembourg",
+      "Luxemburgo",
+      "Lëtzebuerg"
+    ],
+    "repo": "legalize-lu",
+    "revision": "064419bf91de116caac313476bc6ad794fdc68fb",
+    "licenseSha256": "7fce03877a868ba1e5402d79aa5ba772a32de7aa9c625d0c500c7bd9ff1fd9c7",
+    "readmeSha256": "53d61ebe6ab45ce20f1d4682170d2a4bf35298f53310508989bf4cdc519a6707",
+    "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+    "sourceName": "Legilux — Service central de législation",
+    "sourceUrl": "https://legilux.public.lu/",
+    "attribution": "Source : Legilux — Journal officiel du Grand-Duché de Luxembourg (Service central de législation, Ministère d'État). Données réutilisées sous licence Creative Commons Attribution 4.0 International (CC BY 4.0).",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  {
+    "code": "lv",
+    "name": "Latvija",
+    "aliases": [
+      "Latvija",
+      "Latvia",
+      "Letonia"
+    ],
+    "repo": "legalize-lv",
+    "revision": "01a633cb9e1e53a932cdd69ac1034fb68b3c06a2",
+    "licenseSha256": "f35fdbeefa3ac10212eeb23c72425485666fafb40422cad0dd2db86033f1f830",
+    "readmeSha256": "256daa3c71570a674acbc1b63aebe79f80905e5888d4ac4dc4efe7a6cc9b249d",
+    "license": "brīvi pieejams (oficiālie valsts izdevumi nav aizsargāti ar autortiesībām)",
+    "sourceName": "Latvijas Vēstnesis — likumi.lv",
+    "sourceUrl": "https://likumi.lv/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-lv/blob/01a633cb9e1e53a932cdd69ac1034fb68b3c06a2/LICENSE"
+  },
+  {
+    "code": "nl",
+    "name": "Nederland",
+    "aliases": [
+      "Nederland",
+      "Netherlands",
+      "Países Bajos",
+      "Holanda"
+    ],
+    "repo": "legalize-nl",
+    "revision": "95f141afea40438a666e188afb0e3f9bd0bcb40f",
+    "licenseSha256": "ce7481578cd0944852f311ee42d9af6b0beaf41cbab236a0eaa56086fa7ff6d0",
+    "readmeSha256": "9f1fdfd3931e82b0128ed3a408d4e550f55158d524d311ec7c93699734bca5b8",
+    "license": "CC0 1.0 Universeel (publiek domein)",
+    "sourceName": "Basiswettenbestand — Overheid.nl",
+    "sourceUrl": "https://wetten.overheid.nl/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  {
+    "code": "no",
+    "name": "Norge",
+    "aliases": [
+      "Norge",
+      "Norway",
+      "Noruega"
+    ],
+    "repo": "legalize-no",
+    "revision": "729ce30333de9d6f9f1e5faf537999cf42bc2a2f",
+    "licenseSha256": "06a962968f93a3dce6dfb459299a07e37bf8121fe925d45fc850614935d31f83",
+    "readmeSha256": "c09f75ce66e0f70aad01e8dd95708c3232458df5fbf9d397ba4480525303855b",
+    "license": "NLOD 2.0 (Norsk lisens for offentlige data)",
+    "sourceName": "Lovdata",
+    "sourceUrl": "https://lovdata.no/",
+    "attribution": "Inneholder data under Norsk lisens for offentlige data (NLOD) distribuert av Stiftelsen Lovdata.",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://data.norge.no/nlod/en/2.0"
+  },
+  {
+    "code": "pl",
+    "name": "Polska",
+    "aliases": [
+      "Polska",
+      "Poland",
+      "Polonia"
+    ],
+    "repo": "legalize-pl",
+    "revision": "6c0a7be3dc30bc3522b44afb6bee140f5ef4e5d0",
+    "licenseSha256": "b6cb399a98947a77ac740075fd3edb2efb40e4ff49d1dfc930f879fc568ba003",
+    "readmeSha256": "6e06ba707f4e3056309e7b1649afb838e7e5567e42de29702099d530a8dbe226",
+    "license": "domena publiczna (urzędowe publikacje rządowe)",
+    "sourceName": "Sejm RP — Dziennik Ustaw",
+    "sourceUrl": "https://api.sejm.gov.pl/eli",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-pl/blob/6c0a7be3dc30bc3522b44afb6bee140f5ef4e5d0/LICENSE"
+  },
+  {
+    "code": "pt",
+    "name": "Portugal",
+    "aliases": [
+      "Portugal",
+      "portuguesa",
+      "portugués"
+    ],
+    "repo": "legalize-pt",
+    "revision": "5ee5b7393b27141ebb550664f5356c4df32dea33",
+    "licenseSha256": "309f2212fb92e5c87ef37aeaa840f39e4b24d4ed511edbb3f79ddf448a31d58c",
+    "readmeSha256": "9319076015bbaafd87515548896f3dc882726ecdb0612488856d18f6cd39f792",
+    "license": "Acesso universal e gratuito ao Diário da República, nos termos do artigo 3.º do Decreto-Lei n.º 83/2016, de 16 de dezembro, que abrange a impressão, o arquivo, a pesquisa e o livre acesso ao conteúdo dos atos publicados, em formatos eletrónicos de acesso aberto; e do regime de dados abertos da Lei n.º 68/2021, de 26 de agosto. A edição eletrónica é a que faz fé (eli:legal_value = official).",
+    "sourceName": "Diário da República — Imprensa Nacional-Casa da Moeda",
+    "sourceUrl": "https://diariodarepublica.pt/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-pt/blob/5ee5b7393b27141ebb550664f5356c4df32dea33/LICENSE"
+  },
+  {
+    "code": "ro",
+    "name": "România",
+    "aliases": [
+      "România",
+      "Romania",
+      "Rumanía"
+    ],
+    "repo": "legalize-ro",
+    "revision": "6f133c9b66b4d523c4fb6a223c6be773652e2abd",
+    "licenseSha256": "eced5a9a410503ebdf14ab3f76e9b9b18ac078d63e4e266f5fb1806793cef84c",
+    "readmeSha256": "c998788580660af660703509ac534ab807e03b674a83c960088cbfb1e876b9a4",
+    "license": "Domeniu public (texte oficiale, Legea nr. 8/1996, art. 9)",
+    "sourceName": "Portalul Legislativ — Ministerul Justiției",
+    "sourceUrl": "https://legislatie.just.ro/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-ro/blob/6f133c9b66b4d523c4fb6a223c6be773652e2abd/LICENSE"
+  },
+  {
+    "code": "se",
+    "name": "Sverige",
+    "aliases": [
+      "Sverige",
+      "Sweden",
+      "Suecia"
+    ],
+    "repo": "legalize-se",
+    "revision": "87fc55425e256d6d9ea9d414506451f069a43655",
+    "licenseSha256": "3157857055c3ecfc913235c76041360384d1810b9b003ae1568bdd5f628d7a0e",
+    "readmeSha256": "2562e42b24ef985ec9e3b6bba4f06d7ad6ba995470a4ed1c30eb48f9addfe58c",
+    "license": "Fri användning med källhänvisning (Riksdagens öppna data)",
+    "sourceName": "Sveriges riksdag — Riksdagens öppna data",
+    "sourceUrl": "https://data.riksdagen.se/",
+    "attribution": "Källa: Sveriges riksdag (Riksdagens öppna data). Detta projekt drivs inte av och är inte godkänt av Sveriges riksdag.",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-se/blob/87fc55425e256d6d9ea9d414506451f069a43655/LICENSE"
+  },
+  {
+    "code": "sk",
+    "name": "Slovensko",
+    "aliases": [
+      "Slovensko",
+      "Slovakia",
+      "Eslovaquia"
+    ],
+    "repo": "legalize-sk",
+    "revision": "5bdaa6eb40a6123d2d3dc8748074d0942796abf6",
+    "licenseSha256": "26c90e249246ef4d4e76944bdd964eda98c89e63913ed2d6cac724819b9572d5",
+    "readmeSha256": "c416fcf6b8552976b68fd2c70df314e7dcc7d18dcdd6ca190d916c463fdf4009",
+    "license": "verejná doména (úradné texty vylúčené z autorskoprávnej ochrany)",
+    "sourceName": "Slov-Lex — Ministerstvo spravodlivosti",
+    "sourceUrl": "https://www.slov-lex.sk/",
+    "attribution": "",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://github.com/legalize-dev/legalize-sk/blob/5bdaa6eb40a6123d2d3dc8748074d0942796abf6/LICENSE"
+  },
+  {
+    "code": "uy",
+    "name": "Uruguay",
+    "aliases": [
+      "Uruguay"
+    ],
+    "repo": "legalize-uy",
+    "revision": "aae656e57392b1b17a36a406a9583d1f0c3b0bbf",
+    "licenseSha256": "96b2b5c150d0228e5a7a343ee03b9c484c108254ddb4eedb676c5f806bbb3830",
+    "readmeSha256": "1a1bb76a632cc31d8b22b8c86f9bbda69eb199ca53fd0375a5a45780a44c7169",
+    "license": "Licencia de Datos Abiertos – Uruguay (Decreto 54/017) — requiere atribución",
+    "sourceName": "IMPO — Centro de Información Oficial",
+    "sourceUrl": "https://www.impo.com.uy/",
+    "attribution": "Fuente: IMPO — Centro de Información Oficial (https://www.impo.com.uy). Datos reutilizados bajo la Licencia de Datos Abiertos – Uruguay (Decreto 54/017).",
+    "authors": [
+      {
+        "name": "legalize-dev / Legalize — Enrique López",
+        "url": "https://github.com/legalize-dev"
+      },
+      {
+        "name": "Enrique López",
+        "url": "https://enriquelopez.eu"
+      }
+    ],
+    "termsUrl": "https://www.impo.com.uy/bases/decretos/54-2017"
+  }
+]

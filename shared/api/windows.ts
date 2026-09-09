@@ -40,6 +40,11 @@ export const NODI_WINDOW_METHODS = [
   'deleteNodiNote',
   // chat
   'listChatSkills',
+  'getGenomicsStatus',
+  'configureGenomics',
+  'clearGenomicsConfiguration',
+  'installGenomicsRuntime',
+  'getGenomicsResult',
   'saveChatSkill',
   'deleteChatSkill',
   'restoreChatSkills',

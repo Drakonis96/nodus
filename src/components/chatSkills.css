@@ -66,3 +66,13 @@
 :is(.light, .nodi-theme-light) .chat-skill-item.tool-skill { border-color: #99d9cf; background: #f5fcfa; }
 :is(.light, .nodi-theme-light) .chat-skill-item.tool-skill.enabled { border-color: #5fbbab; background: #edfaf6; }
 :is(.light, .nodi-theme-light) .tool-skill .chat-skill-symbol,:is(.light, .nodi-theme-light) .chat-skill-tool-badge { color: #0f766e; background: #ccfbf1; }
+.genomics-config { margin: 10px; padding: 12px; border: 1px solid #71809655; border-radius: 10px; font-size: 12px; line-height: 1.5; display: grid; gap: 10px; }
+.genomics-config p { margin: 0; }
+.genomics-config a { text-decoration: underline; }
+.genomics-config input[type=password] { display: block; width: 100%; padding: 8px; border: 1px solid #71809688; border-radius: 6px; background: transparent; box-sizing: border-box; }
+.genomics-accept { display: flex; align-items: flex-start; gap: 8px; }
+.genomics-accept input { margin-top: 4px; flex-shrink: 0; }
+.genomics-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.genomics-config button, .genomics-config-button { padding: 6px 10px; border: 1px solid #71809655; border-radius: 6px; }
+.genomics-config-button { margin: 8px; }
+.genomics-config button:disabled { opacity: .5; }

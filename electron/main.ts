@@ -1,3 +1,4 @@
+import { initializeChatSkillDefaults } from './chatSkills';
 import { app, BrowserWindow, dialog, nativeTheme, session, shell } from 'electron';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -919,6 +920,7 @@ app.on('second-instance', (_event, argv) => {
 app.whenReady().then(async () => {
   // Losing the lock queues a quit; do not open the database or a window.
   if (!hasSingleInstanceLock) return;
+  initializeChatSkillDefaults();
   removeDisplacedMacBundle();
   restorePersistedDockIcon();
   // YouTube (embedded by the PDF Presenter's audience overlay) flags Electron's

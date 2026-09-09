@@ -12,6 +12,14 @@ Tool-backed skills have a teal accent and a translated **Uses tools** label.
 
 ## Built-in skills
 
+**AlphaGenome** starts disabled. Its own configuration accepts a personal
+AlphaGenome API key, requires the service/output terms and eligible non-commercial
+use, and installs the official Python client into an isolated runtime. It
+produces local, attributed genomic prediction plots. See
+[AlphaGenome](alphagenome.md) for supported inputs, setup, limitations
+and verification. Prediction data is kept outside model history, sync and
+backups; its exports retain the separate AlphaGenome output terms.
+
 **SVG Studio** and **Image Atelier** start enabled. SVG Studio creates precise
 vector diagrams, schematics and other editable drawings. Image Atelier prepares
 an English production prompt and calls the image provider and model selected in
@@ -85,3 +93,5 @@ inspection in Electron. `scripts/verify-chat-skills.mjs` is an optional live-pro
 QA harness: it requires an explicitly supplied disposable profile, makes model
 calls, and writes local visual artifacts. Do not point it at a production profile
 or publish its output if it contains private material.
+
+**Legalize** is one opt-in legislation skill for the reviewed country repositories. See [setup, country coverage and verification](legalize.md). New installations enable only SVG Studio and Image Atelier; version-12 migration preserves existing users’ choices, including Chemistry.
