@@ -104,7 +104,8 @@ function copyImmutable(source: string, destination: string): void {
   const temporary = `${destination}.tmp-${process.pid}-${randomUUID()}`;
   try {
     fs.copyFileSync(source, temporary, fs.constants.COPYFILE_EXCL);
-    const descriptor = fs.openSync(temporary, 'r');
+    // Windows requires write access to flush the copied file to disk.
+    const descriptor = fs.openSync(temporary, 'r+');
     try { fs.fsyncSync(descriptor); } finally { fs.closeSync(descriptor); }
     fs.renameSync(temporary, destination);
   } finally {

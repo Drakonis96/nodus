@@ -253,7 +253,8 @@ async function copyImmutable(source: string, destination: string, signal?: Abort
       fs.createWriteStream(temporary, { flags: 'wx' }),
       { signal },
     );
-    const descriptor = await fsp.open(temporary, 'r');
+    // Windows requires write access to flush the copied file to disk.
+    const descriptor = await fsp.open(temporary, 'r+');
     try { await descriptor.sync(); } finally { await descriptor.close(); }
     signal?.throwIfAborted();
     await fsp.rename(temporary, destination);
