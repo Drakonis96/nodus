@@ -154,7 +154,7 @@ function TutorialVideoCard({
         {/* The shelf, not a number: the published titles stopped being numbered, and a
             catalogue that grows by category would renumber itself every time. */}
         <span className="tutorial-video-order">{copy.categories[video.category]}</span>
-        <Icon name={video.icon} size={34} className="tutorial-video-poster-icon" />
+        <Icon name={video.id === 'pdf-presenter' ? 'presentation' : video.icon} size={34} className="tutorial-video-poster-icon" />
         <span className="tutorial-video-play" aria-hidden="true"><Icon name="play" size={18} /></span>
         {watched && <span className="tutorial-video-watched"><Icon name="check" size={12} />{copy.watched}</span>}
       </button>
@@ -221,7 +221,7 @@ export function TutorialVideoFeature({
           data-testid={`tutorial-video-play-${video.id}`}
         >
           <span className="tutorial-video-order">{copy.categories[video.category]}</span>
-          <Icon name={video.icon} size={46} className="tutorial-video-poster-icon" />
+          <Icon name={video.id === 'pdf-presenter' ? 'presentation' : video.icon} size={46} className="tutorial-video-poster-icon" />
           <span className="tutorial-video-play" aria-hidden="true"><Icon name="play" size={22} /></span>
           {watched.includes(video.id) && <span className="tutorial-video-watched"><Icon name="check" size={12} />{copy.watched}</span>}
         </button>
