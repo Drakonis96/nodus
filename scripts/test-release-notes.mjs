@@ -25,15 +25,29 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.2.1');
-  assert.deepEqual(currentRelease.highlights, RELEASE_NOTES.find((note) => note.version === '5.2.0')?.highlights, '5.2.1 reuses the complete 5.2.0 modal in every language');
-  assert.equal(currentRelease?.date, '2026-09-06');
-  assert.equal(currentRelease?.highlights.length, 15);
-  assert.deepEqual(currentRelease.highlights.map((highlight) => highlight.scope), [
+  assert.equal(currentRelease?.version, '5.2.2');
+  assert.equal(currentRelease?.date, '2026-09-09');
+  assert.equal(currentRelease?.highlights.length, 8);
+  assert.deepEqual(currentRelease.highlights.map((h) => h.scope), [
+    'ai', 'ai', 'ai', 'ai', 'academic', 'academic', 'library', 'general',
+  ]);
+  for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+    assert.ok(currentRelease.highlights.every((h) => h[language]?.length > 80));
+  }
+  for (const phrase of [/Chemistry Studio/, /Fischer, Haworth and Newman/, /balanced reaction schemes/,
+    /Claude 4.7/, /permanent themes hub/, /context background/, /Document profile/, /PDF Presenter tutorial/]) {
+    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)));
+  }
+  const release521 = RELEASE_NOTES.find((note) => note.version === '5.2.1');
+  assert.equal(release521?.version, '5.2.1');
+  assert.deepEqual(release521.highlights, RELEASE_NOTES.find((note) => note.version === '5.2.0')?.highlights, '5.2.1 reuses the complete 5.2.0 modal in every language');
+  assert.equal(release521?.date, '2026-09-06');
+  assert.equal(release521?.highlights.length, 15);
+  assert.deepEqual(release521.highlights.map((highlight) => highlight.scope), [
     ...Array(6).fill('academic'), ...Array(5).fill('general'), ...Array(3).fill('ai'), 'toolkit',
   ]);
   for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
-    assert.ok(currentRelease.highlights.every((highlight) => highlight[language]?.length > 80));
+    assert.ok(release521.highlights.every((highlight) => highlight[language]?.length > 80));
   }
   for (const phrase of [
     /Introducing Stellar/, /Several graphs open at once/, /visual argument map/,
@@ -42,7 +56,7 @@ try {
     /You decide when to install updates/, /Settings remembers/, /Better citation formatting/,
     /Skills to personalize/, /Diagrams and images directly in chat/, /Choosing a model/,
     /favorite utilities close at hand/,
-  ]) assert.ok(currentRelease.highlights.some((highlight) => phrase.test(highlight.en)));
+  ]) assert.ok(release521.highlights.some((highlight) => phrase.test(highlight.en)));
 
   // 5.1.7 is a single-fix release: the Dictionary status line reported a failure
   // while the definition was being written correctly, because its progress copy

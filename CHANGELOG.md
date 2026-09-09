@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 5.2.2 — 2026-09-09
+
+- Chemistry Studio comes to chat. Create molecular structures from SMILES, Lewis diagrams and ChemFig drawings, with controls to enlarge and download the result. The interface is translated and your customized skill instructions are preserved.
+- Chemical drawings gain explicit checks. Nodus validates molecular identity and supports Fischer, Haworth and Newman projections and bounded rules for SN2, E2, aldol, Diels–Alder and amide resonance. Download the evidence and checked ChemFig. When a proposal cannot be verified, Nodus says so instead of inventing a drawing.
+- Complete, balanced reaction schemes preserve declared species, counterions and coefficients, with agents shown separately. Nodus checks elements, isotopes, hydrogens and charge and compiles the complete ChemFig export. A balanced scheme does not mean a verified mechanism or predict reaction feasibility. Rendering several drawings is also more stable.
+- Fewer errors when requesting AI answers. Requests adapt to the parameters each model accepts, including Claude 4.7 and later, GPT-5, GPT-6 and o-series models. The fix covers both complete and streaming responses while preserving compatibility with older models.
+- The graph opens on a permanent themes hub. Enter a theme and adjust depth and visible relationships per idea, or open independent explorations in other tabs. Add and remove ideas in the hub and preserve each exploration when navigating. Zoom, captions, selection and controls are clearer, with your vault colors in light and dark mode.
+- See your graph within the corpus. Enable a context background with adjustable intensity in the themes hub and explorations. External connections stand out, and clicking a background idea adds it to your work. Context does not alter playback or working counts. Corpus totals count unique ideas even across overlapping themes, and published Nodus Server graphs gain the same improvements.
+- Faster searches in large libraries. Document profile queries find each work by its identifier, avoiding repeated scans of all profiles. Results stay the same while performance improves as the library grows.
+- A new PDF Presenter tutorial helps you discover the tool. Find it in Features, on the website and in the wiki, with title and description in twelve languages. An announcement shows the video after the release notes without autoplay. Dismissing it marks it as seen so it does not return on later launches.
+
+- Translate all eight new What’s New highlights into all eight interface languages and retain the published 5.2.1 history.
+
 ## 5.2.1 — 2026-09-06
 
 - Stop completed and cancelled queue history from reappearing at startup, remember dismissed results across restarts, and keep cancellation messages from triggering false error alerts.

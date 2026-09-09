@@ -2675,7 +2675,87 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: "ai",
+    "es": "Chemistry Studio llega al chat. Crea estructuras moleculares a partir de SMILES, diagramas de Lewis y dibujos ChemFig, con controles para ampliar y descargar el resultado. La interfaz está traducida y las instrucciones personalizadas de tus habilidades se conservan.",
+    "en": "Chemistry Studio comes to chat. Create molecular structures from SMILES, Lewis diagrams and ChemFig drawings, with controls to enlarge and download the result. The interface is translated and your customized skill instructions are preserved.",
+    "fr": "Chemistry Studio arrive dans le chat. Créez des structures moléculaires à partir de SMILES, des diagrammes de Lewis et des dessins ChemFig, puis agrandissez et téléchargez le résultat. L’interface est traduite et vos instructions personnalisées sont conservées.",
+    "de": "Chemistry Studio kommt in den Chat. Erstellen Sie Molekülstrukturen aus SMILES, Lewis-Diagramme und ChemFig-Zeichnungen und vergrößern oder laden Sie die Ergebnisse herunter. Die Oberfläche ist übersetzt und Ihre angepassten Skill-Anweisungen bleiben erhalten.",
+    "pt": "O Chemistry Studio chega ao chat. Crie estruturas moleculares a partir de SMILES, diagramas de Lewis e desenhos ChemFig, com controlos para ampliar e descarregar o resultado. A interface está traduzida e as instruções personalizadas das suas competências são preservadas.",
+    "pt-BR": "O Chemistry Studio chega ao chat. Crie estruturas moleculares a partir de SMILES, diagramas de Lewis e desenhos ChemFig, com controles para ampliar e baixar o resultado. A interface está traduzida e as instruções personalizadas das suas habilidades são preservadas.",
+  },
+  {
+    scope: "ai",
+    "es": "Dibujos químicos con comprobaciones explícitas. Nodus valida la identidad molecular y admite proyecciones Fischer, Haworth y Newman y reglas acotadas de SN2, E2, aldol, Diels–Alder y resonancia de amidas. Puedes descargar las evidencias y el ChemFig comprobado. Si no puede verificar una propuesta, lo indica en lugar de inventar un dibujo.",
+    "en": "Chemical drawings gain explicit checks. Nodus validates molecular identity and supports Fischer, Haworth and Newman projections and bounded rules for SN2, E2, aldol, Diels–Alder and amide resonance. Download the evidence and checked ChemFig. When a proposal cannot be verified, Nodus says so instead of inventing a drawing.",
+    "fr": "Les dessins chimiques bénéficient de contrôles explicites. Nodus valide l’identité moléculaire et prend en charge les projections de Fischer, Haworth et Newman ainsi que des règles limitées pour SN2, E2, aldol, Diels–Alder et la résonance des amides. Téléchargez les preuves et le ChemFig vérifié. Une proposition non vérifiable est signalée au lieu d’être dessinée arbitrairement.",
+    "de": "Chemische Zeichnungen erhalten ausdrückliche Prüfungen. Nodus validiert die Molekülidentität und unterstützt Fischer-, Haworth- und Newman-Projektionen sowie begrenzte Regeln für SN2, E2, Aldol, Diels–Alder und Amidresonanz. Laden Sie Prüfnachweise und geprüftes ChemFig herunter. Lässt sich ein Vorschlag nicht verifizieren, meldet Nodus dies, statt eine Zeichnung zu erfinden.",
+    "pt": "Os desenhos químicos passam a ter verificações explícitas. O Nodus valida a identidade molecular e admite projeções Fischer, Haworth e Newman e regras limitadas de SN2, E2, aldol, Diels–Alder e ressonância de amidas. Descarregue as evidências e o ChemFig verificado. Quando não consegue verificar uma proposta, indica-o em vez de inventar um desenho.",
+    "pt-BR": "Os desenhos químicos passam a ter verificações explícitas. O Nodus valida a identidade molecular e aceita projeções Fischer, Haworth e Newman e regras limitadas de SN2, E2, aldol, Diels–Alder e ressonância de amidas. Baixe as evidências e o ChemFig verificado. Quando não consegue verificar uma proposta, informa isso em vez de inventar um desenho.",
+  },
+  {
+    scope: "ai",
+    "es": "Esquemas de reacción completos y equilibrados. Se conservan las especies declaradas, los contraiones y los coeficientes, y los agentes se muestran aparte. Se comprueban elementos, isótopos, hidrógenos y carga, y se compila la exportación ChemFig completa. Un esquema equilibrado no implica un mecanismo verificado ni predice que la reacción sea viable. También mejora la estabilidad al renderizar varios dibujos.",
+    "en": "Complete, balanced reaction schemes preserve declared species, counterions and coefficients, with agents shown separately. Nodus checks elements, isotopes, hydrogens and charge and compiles the complete ChemFig export. A balanced scheme does not mean a verified mechanism or predict reaction feasibility. Rendering several drawings is also more stable.",
+    "fr": "Les schémas réactionnels complets et équilibrés conservent les espèces déclarées, contre-ions et coefficients, avec les agents affichés séparément. Nodus contrôle éléments, isotopes, hydrogènes et charge et compile l’export ChemFig complet. Un schéma équilibré ne prouve ni le mécanisme ni la faisabilité de la réaction. Le rendu de plusieurs dessins est aussi plus stable.",
+    "de": "Vollständige, ausgeglichene Reaktionsschemata bewahren angegebene Spezies, Gegenionen und Koeffizienten. Hilfsstoffe erscheinen separat. Nodus prüft Elemente, Isotope, Wasserstoff und Ladung und kompiliert den vollständigen ChemFig-Export. Ein ausgeglichenes Schema bestätigt weder den Mechanismus noch die Durchführbarkeit der Reaktion. Mehrere Zeichnungen werden zudem stabiler gerendert.",
+    "pt": "Os esquemas de reação completos e equilibrados preservam as espécies declaradas, contra-iões e coeficientes, com os agentes apresentados separadamente. O Nodus verifica elementos, isótopos, hidrogénios e carga e compila a exportação ChemFig completa. Um esquema equilibrado não significa um mecanismo verificado nem prevê a viabilidade da reação. A apresentação de vários desenhos também é mais estável.",
+    "pt-BR": "Os esquemas de reação completos e balanceados preservam as espécies declaradas, contraíons e coeficientes, com os agentes apresentados separadamente. O Nodus verifica elementos, isótopos, hidrogênios e carga e compila a exportação ChemFig completa. Um esquema balanceado não significa um mecanismo verificado nem prevê a viabilidade da reação. A renderização de vários desenhos também está mais estável.",
+  },
+  {
+    scope: "ai",
+    "es": "Menos errores al pedir respuestas a la IA. Las solicitudes se adaptan a los parámetros admitidos por cada modelo, incluidos Claude 4.7 y posteriores, GPT-5, GPT-6 y la serie o. La corrección se aplica tanto a respuestas completas como a las que aparecen mientras se generan, conservando la compatibilidad con modelos anteriores.",
+    "en": "Fewer errors when requesting AI answers. Requests adapt to the parameters each model accepts, including Claude 4.7 and later, GPT-5, GPT-6 and o-series models. The fix covers both complete and streaming responses while preserving compatibility with older models.",
+    "fr": "Moins d’erreurs lors des demandes à l’IA. Les requêtes utilisent les paramètres acceptés par chaque modèle, notamment Claude 4.7 et suivants, GPT-5, GPT-6 et la série o. La correction couvre les réponses complètes et celles affichées progressivement, tout en préservant la compatibilité avec les anciens modèles.",
+    "de": "Weniger Fehler bei KI-Anfragen. Anfragen passen sich an die unterstützten Parameter des jeweiligen Modells an, darunter Claude ab 4.7, GPT-5, GPT-6 und die o-Serie. Die Korrektur gilt für vollständige und schrittweise angezeigte Antworten und erhält die Kompatibilität mit älteren Modellen.",
+    "pt": "Menos erros ao pedir respostas à IA. Os pedidos adaptam-se aos parâmetros aceites por cada modelo, incluindo Claude 4.7 e posteriores, GPT-5, GPT-6 e a série o. A correção abrange respostas completas e progressivas, preservando a compatibilidade com modelos anteriores.",
+    "pt-BR": "Menos erros ao pedir respostas à IA. As solicitações se adaptam aos parâmetros aceitos por cada modelo, incluindo Claude 4.7 e posteriores, GPT-5, GPT-6 e a série o. A correção abrange respostas completas e progressivas, preservando a compatibilidade com modelos anteriores.",
+  },
+  {
+    scope: "academic",
+    "es": "El grafo se abre en un mapa de temas permanente. Entra en un tema y ajusta la profundidad y las relaciones visibles por idea, o abre exploraciones independientes en otras pestañas. Puedes añadir y quitar ideas del mapa y conservar cada exploración al cambiar de vista. Mejoran el zoom, las etiquetas, la selección y los controles, con los colores de tu bóveda en modo claro y oscuro.",
+    "en": "The graph opens on a permanent themes hub. Enter a theme and adjust depth and visible relationships per idea, or open independent explorations in other tabs. Add and remove ideas in the hub and preserve each exploration when navigating. Zoom, captions, selection and controls are clearer, with your vault colors in light and dark mode.",
+    "fr": "Le graphe s’ouvre sur une carte des thèmes permanente. Ouvrez un thème et réglez la profondeur et les relations visibles par idée, ou lancez des explorations indépendantes dans d’autres onglets. Ajoutez et retirez des idées de la carte et conservez chaque exploration pendant la navigation. Zoom, libellés, sélection et commandes sont plus clairs, aux couleurs du coffre en mode clair et sombre.",
+    "de": "Der Graph öffnet sich mit einer dauerhaften Themenübersicht. Öffnen Sie ein Thema und passen Sie Tiefe und sichtbare Beziehungen pro Idee an oder starten Sie unabhängige Erkundungen in weiteren Tabs. Fügen Sie Ideen hinzu oder entfernen Sie sie und behalten Sie jede Erkundung beim Navigieren. Zoom, Beschriftungen, Auswahl und Bedienelemente sind klarer und nutzen Ihre Tresorfarben im hellen und dunklen Modus.",
+    "pt": "O grafo abre num mapa de temas permanente. Entre num tema e ajuste a profundidade e as relações visíveis por ideia, ou abra explorações independentes noutros separadores. Adicione e remova ideias do mapa e preserve cada exploração ao navegar. O zoom, as legendas, a seleção e os controlos ficam mais claros, com as cores do cofre nos modos claro e escuro.",
+    "pt-BR": "O grafo abre em um mapa de temas permanente. Entre em um tema e ajuste a profundidade e as relações visíveis por ideia, ou abra explorações independentes em outras abas. Adicione e remova ideias do mapa e preserve cada exploração ao navegar. O zoom, as legendas, a seleção e os controles ficam mais claros, com as cores do cofre nos modos claro e escuro.",
+  },
+  {
+    scope: "academic",
+    "es": "Ve tu grafo dentro del corpus. Activa un fondo de contexto con intensidad ajustable en el mapa de temas y las exploraciones. Las conexiones externas destacan y puedes pulsar una idea del fondo para incorporarla al trabajo. El contexto no altera el recorrido ni sus recuentos. El total del corpus cuenta ideas únicas, también cuando varios temas las comparten, y la mejora llega a los grafos publicados en Nodus Server.",
+    "en": "See your graph within the corpus. Enable a context background with adjustable intensity in the themes hub and explorations. External connections stand out, and clicking a background idea adds it to your work. Context does not alter playback or working counts. Corpus totals count unique ideas even across overlapping themes, and published Nodus Server graphs gain the same improvements.",
+    "fr": "Situez votre graphe dans le corpus. Activez un fond contextuel d’intensité réglable dans la carte des thèmes et les explorations. Les connexions externes ressortent et un clic sur une idée du fond l’ajoute au travail. Le contexte ne modifie ni le parcours ni ses compteurs. Le total compte les idées uniques même entre thèmes superposés. Les graphes publiés sur Nodus Server en bénéficient aussi.",
+    "de": "Sehen Sie Ihren Graphen im Kontext des Korpus. Aktivieren Sie einen Hintergrund mit einstellbarer Intensität in der Themenübersicht und den Erkundungen. Externe Verbindungen werden hervorgehoben und ein Klick übernimmt eine Hintergrundidee in Ihre Arbeit. Der Kontext verändert weder Wiedergabe noch Arbeitszähler. Korpuswerte zählen eindeutige Ideen auch bei überlappenden Themen. Veröffentlichte Nodus-Server-Graphen erhalten dieselben Verbesserungen.",
+    "pt": "Veja o grafo no contexto do corpus. Ative um fundo com intensidade ajustável no mapa de temas e nas explorações. As ligações externas destacam-se e pode clicar numa ideia do fundo para a incorporar no trabalho. O contexto não altera o percurso nem as contagens de trabalho. O total conta ideias únicas mesmo entre temas sobrepostos. Os grafos publicados no Nodus Server recebem as mesmas melhorias.",
+    "pt-BR": "Veja o grafo no contexto do corpus. Ative um fundo com intensidade ajustável no mapa de temas e nas explorações. As conexões externas se destacam e você pode clicar em uma ideia do fundo para incorporá-la ao trabalho. O contexto não altera o percurso nem as contagens de trabalho. O total conta ideias únicas mesmo entre temas sobrepostos. Os grafos publicados no Nodus Server recebem as mesmas melhorias.",
+  },
+  {
+    scope: "library",
+    "es": "Búsquedas más ágiles en bibliotecas grandes. La consulta de los perfiles de documentos encuentra cada obra mediante su identificador, evitando recorrer repetidamente todos los perfiles. Se mantienen los resultados y mejora el rendimiento a medida que crece la biblioteca.",
+    "en": "Faster searches in large libraries. Document profile queries find each work by its identifier, avoiding repeated scans of all profiles. Results stay the same while performance improves as the library grows.",
+    "fr": "Des recherches plus rapides dans les grandes bibliothèques. Les requêtes sur les profils de documents retrouvent chaque œuvre par son identifiant et évitent de parcourir tous les profils à répétition. Les résultats restent identiques et les performances progressent lorsque la bibliothèque grandit.",
+    "de": "Schnellere Suche in großen Bibliotheken. Abfragen von Dokumentprofilen finden jedes Werk über seine Kennung und vermeiden wiederholtes Durchsuchen aller Profile. Die Ergebnisse bleiben gleich, während die Leistung bei wachsender Bibliothek steigt.",
+    "pt": "Pesquisas mais rápidas em bibliotecas grandes. A consulta dos perfis de documentos encontra cada obra pelo seu identificador, evitando percorrer todos os perfis repetidamente. Os resultados mantêm-se e o desempenho melhora à medida que a biblioteca cresce.",
+    "pt-BR": "Buscas mais rápidas em bibliotecas grandes. A consulta dos perfis de documentos encontra cada obra pelo identificador, evitando percorrer todos os perfis repetidamente. Os resultados são mantidos e o desempenho melhora conforme a biblioteca cresce.",
+  },
+  {
+    scope: "general",
+    "es": "Un nuevo tutorial de PDF Presenter te ayuda a descubrir la herramienta. Está disponible en Funciones, en la web y en la wiki, con título y descripción en doce idiomas. Tras las novedades aparece un aviso con el vídeo, sin reproducción automática. Al cerrarlo queda marcado como visto y no vuelve a aparecer en los siguientes inicios.",
+    "en": "A new PDF Presenter tutorial helps you discover the tool. Find it in Features, on the website and in the wiki, with title and description in twelve languages. An announcement shows the video after the release notes without autoplay. Dismissing it marks it as seen so it does not return on later launches.",
+    "fr": "Un nouveau tutoriel PDF Presenter vous fait découvrir l’outil. Retrouvez-le dans Fonctionnalités, sur le site et dans le wiki, avec titre et description en douze langues. Une annonce affiche la vidéo après les nouveautés, sans lecture automatique. Une fois fermée, elle est marquée comme vue et ne revient plus aux prochains démarrages.",
+    "de": "Ein neues PDF-Presenter-Tutorial stellt Ihnen das Werkzeug vor. Sie finden es unter Funktionen, auf der Website und im Wiki, mit Titel und Beschreibung in zwölf Sprachen. Nach den Versionshinweisen erscheint ein Hinweis mit dem Video ohne automatische Wiedergabe. Nach dem Schließen gilt er als gesehen und erscheint bei späteren Starts nicht erneut.",
+    "pt": "Um novo tutorial do PDF Presenter ajuda a descobrir a ferramenta. Está disponível em Funcionalidades, no site e na wiki, com título e descrição em doze idiomas. Após as novidades aparece um aviso com o vídeo, sem reprodução automática. Ao fechá-lo fica marcado como visto e não volta a aparecer nos arranques seguintes.",
+    "pt-BR": "Um novo tutorial do PDF Presenter ajuda a descobrir a ferramenta. Está disponível em Funcionalidades, no site e na wiki, com título e descrição em doze idiomas. Após as novidades aparece um aviso com o vídeo, sem reprodução automática. Ao fechá-lo, ele fica marcado como visto e não volta a aparecer nas próximas inicializações.",
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.2.2',
+    date: '2026-09-09',
+    highlights: RELEASE_5_2_2_HIGHLIGHTS,
+  },
   {
     version: '5.2.1',
     date: '2026-09-06',

@@ -106,6 +106,16 @@ const RELEASE_5_1_0_TR = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.2.2": [
+    "Chemistry Studio sohbete geliyor. SMILES verilerinden molekül yapıları, Lewis diyagramları ve ChemFig çizimleri oluşturun, sonuçları büyütün ve indirin. Arayüz çevrilmiştir ve becerileriniz için özelleştirdiğiniz talimatlar korunur.",
+    "Kimyasal çizimler açık kontroller kazanıyor. Nodus molekül kimliğini doğrular ve Fischer, Haworth ve Newman projeksiyonları ile SN2, E2, aldol, Diels–Alder ve amit rezonansı için sınırlı kuralları destekler. Kanıtları ve kontrol edilmiş ChemFig çıktısını indirin. Bir öneri doğrulanamıyorsa Nodus çizim uydurmak yerine bunu belirtir.",
+    "Tam ve dengelenmiş tepkime şemaları belirtilen türleri, karşı iyonları ve katsayıları korur. Yardımcı maddeler ayrı gösterilir. Nodus elementleri, izotopları, hidrojenleri ve yükü kontrol eder ve tam ChemFig çıktısını derler. Dengeli bir şema, mekanizmanın doğrulandığı veya tepkimenin gerçekleşebileceği anlamına gelmez. Birden fazla çizimin görüntülenmesi de daha kararlıdır.",
+    "Yapay zekâ yanıtlarında daha az hata. İstekler Claude 4.7 ve sonrası, GPT-5, GPT-6 ve o serisi dahil her modelin kabul ettiği parametrelere uyarlanır. Düzeltme hem tam hem de akış halinde gösterilen yanıtları kapsar ve eski modellerle uyumluluğu korur.",
+    "Grafik kalıcı bir tema haritasıyla açılır. Bir temaya girip derinliği ve fikir başına görünen ilişkileri ayarlayın veya başka sekmelerde bağımsız keşifler açın. Haritaya fikir ekleyip çıkarın ve gezinirken her keşfin durumunu koruyun. Yakınlaştırma, etiketler, seçim ve kontroller daha anlaşılırdır ve açık ve koyu modda kasanızın renklerini kullanır.",
+    "Grafiğinizi derlemin içinde görün. Tema haritasında ve keşiflerde yoğunluğu ayarlanabilir bir bağlam arka planı açın. Dış bağlantılar öne çıkar ve arka plandaki bir fikre tıklamak onu çalışmanıza ekler. Bağlam, oynatmayı veya çalışma sayılarını değiştirmez. Derlem toplamı, örtüşen temalarda bile fikirleri bir kez sayar. Nodus Server üzerinde yayımlanan grafikler de bu iyileştirmeleri alır.",
+    "Büyük kütüphanelerde daha hızlı arama. Belge profili sorguları her eseri kimliğiyle bulur ve tüm profillerin tekrar tekrar taranmasını önler. Sonuçlar aynı kalırken kütüphane büyüdükçe performans iyileşir.",
+    "Yeni PDF Presenter eğitimi aracı keşfetmenize yardımcı olur. Özellikler bölümünde, web sitesinde ve wikide başlık ve açıklaması on iki dilde sunulur. Sürüm notlarından sonra videoyu otomatik oynatmadan gösteren bir duyuru açılır. Kapattığınızda görüldü olarak işaretlenir ve sonraki açılışlarda yeniden görünmez."
+],
   "5.2.0": [
     "Yeni fikir grafiği Stellar ile tanışın. Bir fikir arayın ve bağlantılarını adım adım veya otomatik oynatmayla keşfedin. Grafikte ilerlerken ileri ve geri gidebilir, her ilişkinin kaynaklarını ve kanıtlarını inceleyebilirsiniz. Külliyatta, eserlerde, Çalışma’da, Daldırma’de ve yayımlanmış Nodus Server alanlarında kullanılabilir.",
     "Aynı anda birden fazla grafik açın. Her sekme oturum boyunca kendi fikirlerini, konumlarını, keşif geçmişini ve kanıt panelini korur. Aramadan fikir ekleyin, fikirleri tuvalden kaldırın veya öncekinin yerine geçmeden başka bir keşif açın. Tam ekranda da çalışabilirsiniz.",
