@@ -61,11 +61,6 @@ export function CorpusContextControls({ context, onFit }: {
   onFit(): void;
 }) {
   return <div className="stellar-context-controls">
-    <button type="button" role="switch" aria-checked={context.enabled}
-      title={t("Mostrar el corpus tenue alrededor de las ideas de esta pestaña")}
-      onClick={() => context.setEnabled(!context.enabled)}>
-      <i aria-hidden="true" />{t("Contexto")}
-    </button>
     {context.enabled && <>
       <input type="range" min="5" max="40" step="1" value={Math.round(context.opacity * 100)}
         aria-label={t("Intensidad del contexto")} title={t("Intensidad del contexto")}
@@ -75,6 +70,11 @@ export function CorpusContextControls({ context, onFit }: {
           ? tx("{n} ideas · {edges} conexiones en el corpus", { n: context.layer.data.nodes.length.toLocaleString(), edges: context.layer.data.edges.length.toLocaleString() })
           : undefined}>{t("Ver corpus")}</button>}
     </>}
+    <button type="button" role="switch" aria-checked={context.enabled}
+      title={t("Mostrar el corpus tenue alrededor de las ideas de esta pestaña")}
+      onClick={() => context.setEnabled(!context.enabled)}>
+      <i aria-hidden="true" />{t("Contexto")}
+    </button>
   </div>;
 }
 
