@@ -70,6 +70,8 @@ test('Chemistry Studio is separate from general SVG routing', () => {
   assert.match(chemistry.instructions, /Do not invent SMILES/i);
   assert.match(chemistry.instructions, /current verified scope/i);
   assert.match(lib.chatSkillsOutputContract([svg, chemistry]), /Chemistry Studio takes precedence over SVG Studio/i);
+  assert.match(lib.chatSkillsOutputContract([svg, chemistry]), /model-authored SVG fallback/i);
+  assert.match(lib.buildChatSkillsPrompt([chemistry]), /SVG Studio is not enabled/i);
   assert.match(svg.description, /maps, timelines and visual systems/i);
 });
 
@@ -118,13 +120,20 @@ test('whole-answer generic JSON chemical intents still pass through the full ide
   assert.match(conflicting, /conflicting chemical intents/); assert.equal(calls, 2);
 });
 
-test('unsupported chemistry cannot bypass validation through SVG or an image provider', async () => {
+test('unsupported chemistry degrades to a labeled SVG but still refuses images and legacy formats', async () => {
   const execution = { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, question: 'Draw a verified E2 mechanism with validated ChemFig export.', isCurrent: () => true };
-  for (const visual of ['```svg\n<svg><text>Unverified product</text></svg>\n```', '```nodus-image\n{"title":"E2","alt":"E2","prompt":"Draw an unverified chemical reaction."}\n```', '![Mechanism](https://example.com/drawing.png)']) {
+  const svg = await lib.executeChatSkills('The major product is guaranteed.\n```svg\n<svg><text>Unverified product</text></svg>\n```', execution);
+  assert.match(svg, /unverified drawing/i);
+  assert.match(svg, /<svg/);
+  assert.doesNotMatch(svg, /unsupported/);
+  assert.ok(svg.indexOf('unverified drawing') < svg.indexOf('major product'), 'the warning precedes model-authored chemistry claims');
+  for (const visual of ['```nodus-image\n{"title":"E2","alt":"E2","prompt":"Draw an unverified chemical reaction."}\n```', '![Mechanism](https://example.com/drawing.png)', '```svg\n<svg><text>C</text></svg>\n```\n```nodus-image\n{"title":"E2","alt":"E2","prompt":"Draw an unverified chemical reaction."}\n```', '```svg\n<svg><text>C</text></svg>\n```\n```chemfig\n\\chemfig{C-C}\n```']) {
     const answer = await lib.executeChatSkills('The major product is guaranteed.\n' + visual, execution);
     assert.match(answer, /unsupported/);
     assert.doesNotMatch(answer, /guaranteed|<svg|example.com|nodus-image/);
   }
+  const chemistry = lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'chemistry');
+  assert.match(await lib.executeChatSkills('```svg\n<svg><text>C</text></svg>\n```', { ...execution, skills: [chemistry] }), /requires SVG Studio/);
   const ordinary = '```svg\n<svg><text>Energy</text></svg>\n```';
   assert.equal((await lib.executeChatSkills(ordinary, { ...execution, question: 'Draw an energy diagram for E2.' })).trim(), ordinary);
   const orbital = '```svg\n<svg><text>C</text><text>p orbital</text></svg>\n```';
@@ -135,6 +144,8 @@ test('chemistry SVG audit is scoped to semantic chemical drawings and enforces t
   const molecule = '<svg><text>C</text><text>Cl</text><path aria-label="bond"/></svg>';
   assert.equal(lib.isChemistrySvgRequest('Draw CHCl3 with wedge and dash bonds.', molecule), true);
   assert.equal(lib.isChemistrySvgRequest('Draw a molecular line-bond structure.', molecule), true);
+  assert.equal(lib.isChemistrySvgRequest('Draw a reaction mechanism.', molecule), true);
+  assert.equal(lib.isChemistrySvgRequest('Draw the Claisen mechanism.', molecule), true);
   assert.equal(lib.isChemistrySvgRequest('Show the financial bond market.', '<svg><text>Bonds</text></svg>'), false);
   assert.equal(lib.isChemistrySvgRequest('Draw a tetrahedral molecule.', '<svg><text>Unrelated process</text></svg>'), false);
   assert.equal(lib.chemistrySvgMode('Draw CHCl3 with wedge and dash bonds.'), 'tetrahedral');
@@ -197,7 +208,7 @@ test('existing libraries receive the disabled tutor once without overwriting use
     assert.equal(migrated.some(skill => skill.builtin === 'image'), false, 'deleted image skill stays deleted');
     const tutor = migrated.find(skill => skill.builtin === 'socratic');
     assert.deepEqual(tutor.enabled, { assistant: false, nodi: false });
-    assert.equal(JSON.parse(fs.readFileSync(location)).version, 13);
+    assert.equal(JSON.parse(fs.readFileSync(location)).version, 14);
     assert.equal(lib.listChatSkills().length, 14, 'migration is idempotent');
     lib.deleteChatSkill(tutor.id);
     assert.equal(lib.listChatSkills().some(skill => skill.builtin === 'socratic'), false, 'deleted tutor does not reappear');
@@ -254,7 +265,7 @@ test('version 3 migration adds Chemistry Studio once and preserves existing skil
     const migrated = lib.listChatSkills();
     assert.deepEqual(migrated[0], edited);
     assert.equal(migrated.filter(skill => skill.builtin === 'chemistry').length, 1);
-    assert.equal(JSON.parse(fs.readFileSync(location)).version, 13);
+    assert.equal(JSON.parse(fs.readFileSync(location)).version, 14);
     assert.deepEqual(lib.listChatSkills(), migrated, 'version 6 migration is idempotent');
   } finally { fs.writeFileSync(location, original); }
 });
@@ -267,7 +278,7 @@ test('historical migrations preserve user-edited Chemistry Studio instructions',
     for (const version of [4, 5, 6, 7, 8]) {
       fs.writeFileSync(location, JSON.stringify({ version, skills: [chemistry] }));
       assert.deepEqual(lib.listChatSkills().filter(s => !['genomics', 'legal'].includes(s.builtin)), [chemistry]);
-      assert.equal(JSON.parse(fs.readFileSync(location)).version, 13);
+      assert.equal(JSON.parse(fs.readFileSync(location)).version, 14);
     }
   } finally { fs.writeFileSync(location, original); }
 });
@@ -285,6 +296,38 @@ test('untouched v8 chemistry instructions upgrade once without resetting flags o
     assert.deepEqual(lib.listChatSkills(), migrated);
     fs.writeFileSync(location, JSON.stringify({ version: 8, skills: [] }));
     assert.deepEqual(lib.listChatSkills().map(s => s.builtin), ['genomics', 'legal']);
+  } finally { fs.writeFileSync(location, original); }
+});
+
+test('version 13 upgrades untouched SVG and Chemistry instructions but preserves user edits', () => {
+  const location = path.join(temporary, 'chat-skills.json'), original = fs.readFileSync(location);
+  try {
+    const latestSvg = lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'svg');
+    const latestChemistry = lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'chemistry');
+    const oldSvgText = 'Choose domain-appropriate conventions: circuit symbols for circuits; arrows and labeled dependencies for processes; and oriented and labeled axes for plots. When Chemistry Studio is enabled, leave molecular structures, reactions and mechanisms to that skill, even if the requested export is SVG. SVG Studio may draw non-molecular orbital/energy diagrams or explanatory infographics, but must never replace an unsupported molecular mechanism or projection.';
+    const newSvgText = latestSvg.instructions.match(/Choose domain-appropriate conventions:[^\n]+/)[0];
+    const oldChemistryOpening = 'For a molecular drawing, return exactly one fenced chemistry-plan block containing ONLY a version-2 intent. Do not invent SMILES, formulae, stereochemical direction arrays, reference URLs, verification status or a drawing.';
+    const newChemistryOpening = latestChemistry.instructions.split('\n')[1];
+    const oldChemistryFallback = 'Submit supported conditional rule intents even when uncertain; the application validates substrate scope. Nitration, chair/cyclic E2, asymmetric/substituted Diels–Alder partners beyond the listed family, and aldol dehydration remain unsupported. Do not substitute another rule or generate an SVG/image fallback. Do not return legacy version-1, smiles, chemfig, lewis or hand-authored SVG molecular blocks. Legacy saved drawings remain viewable but are not retrospectively verified.';
+    const newChemistryFallback = latestChemistry.instructions.match(/Submit supported conditional rule intents[^\n]+/)[0];
+    const previousSvg = latestSvg.instructions.replace(newSvgText, oldSvgText);
+    const previousChemistry = latestChemistry.instructions.replace(newChemistryOpening, oldChemistryOpening).replace(newChemistryFallback, oldChemistryFallback);
+    assert.equal(createHash('sha256').update(previousSvg).digest('hex'), '8a8629caa2db26ab2d86ad7b2ee3daae72bd4156d198a8da01b639218c328570');
+    assert.equal(createHash('sha256').update(previousChemistry).digest('hex'), '72d01438357e6e4a591a0a067c62cbfbe6e2aa7fc801b30ace8d6c1a470fb725');
+    fs.writeFileSync(location, JSON.stringify({ version: 13, skills: [
+      { ...latestSvg, version: undefined, instructions: previousSvg, enabled: { assistant: false, nodi: true } },
+      { ...latestChemistry, version: undefined, instructions: previousChemistry, enabled: { assistant: true, nodi: false } },
+    ] }));
+    const upgraded = lib.listChatSkills();
+    assert.equal(upgraded[0].instructions, latestSvg.instructions); assert.equal(upgraded[0].version, '1.0.1');
+    assert.equal(upgraded[1].instructions, latestChemistry.instructions); assert.equal(upgraded[1].version, '1.0.1');
+    assert.deepEqual(upgraded.map(skill => skill.enabled), [{ assistant: false, nodi: true }, { assistant: true, nodi: false }]);
+    const custom = [
+      { ...latestSvg, instructions: 'Keep my custom SVG workflow.', enabled: { assistant: false, nodi: true } },
+      { ...latestChemistry, instructions: 'Keep my custom chemistry workflow.', enabled: { assistant: true, nodi: false } },
+    ];
+    fs.writeFileSync(location, JSON.stringify({ version: 13, skills: custom }));
+    assert.deepEqual(lib.listChatSkills(), custom);
   } finally { fs.writeFileSync(location, original); }
 });
 

@@ -1,6 +1,6 @@
 import type { ChatSkill } from '@shared/chatSkills';
 
-const CHEMISTRY_REQUEST = /\b(?:atom|bond-line|line-bond|chemical|chemistry|molecul|orbital|electron|valen|lone[ -]?pair|nonbonding|lewis|kekul|skeletal|tetrahed|wedge|hashed|dash(?:ed)?|staggered|eclipsed|conformation|hybridi[sz]|alkane|chloroform|ethane|propane|methyllithium|methylamine|hydrogen sulfide)\b/i;
+const CHEMISTRY_REQUEST = /\b(?:atom|bond-line|line-bond|chemical|chemistry|molecul|reactions?|mechanisms?|orbital|electron|valen|lone[ -]?pair|nonbonding|lewis|kekul|skeletal|tetrahed|wedge|hashed|dash(?:ed)?|staggered|eclipsed|conformation|hybridi[sz]|alkane|chloroform|ethane|propane|methyllithium|methylamine|hydrogen sulfide)\b/i;
 const CHEMISTRY_SVG = /(?:>\s*(?:C|H|N|O|S|P|F|Cl|Br|I|Li)\s*<|CH(?:Cl|₃|3)|tetrahed|lone[ -]?pair|bond)/i;
 
 /** Keep the extra model call scoped to drawings where chemistry conventions carry
