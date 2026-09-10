@@ -8,7 +8,7 @@ import { build } from 'esbuild';
 const root = path.resolve(import.meta.dirname, '..');
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-marketplace-test-'));
 const bundle = path.join(temporary, 'test.cjs');
-await build({ stdin: { contents: `export * from './shared/skillMarketplace'; export * from './electron/skillMarketplace'; export * from './electron/chatSkills';`, resolveDir: root, loader: 'ts' }, outfile: bundle, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent', plugins: [{ name: 'isolated-profile', setup(api) {
+await build({ stdin: { contents: `export * from './shared/skillMarketplace'; export * from './shared/chatSkills'; export * from './electron/skillMarketplace'; export * from './electron/chatSkills';`, resolveDir: root, loader: 'ts' }, outfile: bundle, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent', plugins: [{ name: 'isolated-profile', setup(api) {
   api.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'mock' }));
   api.onLoad({ filter: /.*/, namespace: 'mock' }, () => ({ contents: `export const app = { getPath: () => ${JSON.stringify(temporary)}, getVersion: () => '5.3.0' }; export const safeStorage = { isEncryptionAvailable: () => false };` }));
   api.onResolve({ filter: /^@shared\// }, ({ path: specifier }) => ({ path: path.join(root, 'shared', `${specifier.slice(8)}.ts`) }));
@@ -120,4 +120,90 @@ test('AlphaGenome and Legalize are registered capabilities available to compatib
     assert.ok(personal); assert.ok(lib.enabledChatSkills('assistant').some(skill => skill.id === personal.id));
     for (const skill of lib.listChatSkills().filter(skill => !skill.builtin)) lib.deleteChatSkill(skill.id);
   }
+});
+
+// The official catalog publishes this build's own built-ins (scripts/sync-skill-marketplace.mjs).
+const builtinPackages = {
+  'svg-studio': { manifest: { ...manifest, id: 'svg-studio', name: 'SVG Studio', capabilities: ['svg'], tools: [] }, files: { 'SKILL.md': 'Published catalog copy of the built-in.' } },
+  alphagenome: { manifest: { ...manifest, id: 'alphagenome', name: 'AlphaGenome', capabilities: ['genomics'], tools: [] }, files: { 'SKILL.md': 'Published catalog copy of the native integration.' } },
+};
+const builtinFetch = async url => {
+  const target = String(url);
+  if (target.includes('raw.githubusercontent.com')) {
+    const [directory, ...rest] = target.split(`${commit}/`)[1].split('/');
+    const file = rest.join('/');
+    return new Response(file === 'skill.json' ? JSON.stringify(builtinPackages[directory].manifest) : builtinPackages[directory].files[file]);
+  }
+  if (target.includes('/git/trees/')) return new Response(JSON.stringify({ tree: Object.entries(builtinPackages).flatMap(([id, pkg]) => ['skill.json', ...Object.keys(pkg.files)].map(file => ({ path: `${id}/${file}`, mode: '100644', type: 'blob', size: 100 }))) }));
+  if (target.includes('/commits/')) return new Response(JSON.stringify({ sha: commit }));
+  return new Response(JSON.stringify({ default_branch: 'main' }));
+};
+
+test('official listings of built-in skills reinstall the bundled skill instead of a second copy', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = builtinFetch;
+  try {
+    const official = lib.addSkillSource(lib.DEFAULT_SKILL_SOURCE).sources.find(source => lib.isOfficialSkillSource(source.url));
+    await lib.updateSkillSource(official.id);
+    lib.restoreChatSkills();
+    const before = lib.listChatSkills().length;
+    const installed = lib.installMarketplaceSkill(official.id, 'svg-studio', commit);
+    const svg = installed.filter(skill => skill.name === 'SVG Studio');
+    assert.equal(svg.length, 1, 'a listed built-in is never installed alongside itself');
+    assert.equal(installed.length, before);
+    assert.equal(svg[0].builtin, 'svg');
+    assert.equal(svg[0].origin, undefined);
+    assert.equal(svg[0].instructions, lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'svg').instructions, 'the bundled text is restored, never repository text');
+    // Uninstalling removes the skill only: the native capability ships with the build and returns with it.
+    lib.deleteChatSkill(svg[0].id);
+    assert.equal(lib.listChatSkills().some(skill => skill.builtin === 'svg'), false);
+    const reinstalled = lib.installMarketplaceSkill(official.id, 'svg-studio', commit);
+    assert.deepEqual(reinstalled[0], lib.DEFAULT_CHAT_SKILLS[0]);
+    // A registered capability is still installed as the bundled built-in from the official listing.
+    lib.deleteChatSkill(reinstalled.find(skill => skill.builtin === 'genomics').id);
+    const genomics = lib.installMarketplaceSkill(official.id, 'alphagenome', commit).filter(skill => skill.name === 'AlphaGenome');
+    assert.equal(genomics.length, 1);
+    assert.equal(genomics[0].builtin, 'genomics');
+    assert.equal(genomics[0].origin, undefined);
+    // A community source reusing an official identifier stays an ordinary, downloaded package.
+    const community = lib.addSkillSource('https://github.com/community/nodus-skills').sources.at(-1);
+    await lib.updateSkillSource(community.id);
+    const shared = lib.installMarketplaceSkill(community.id, 'svg-studio', commit).filter(skill => skill.name === 'SVG Studio');
+    assert.equal(shared.length, 2);
+    assert.equal(shared.find(skill => skill.origin)?.instructions, builtinPackages['svg-studio'].files['SKILL.md']);
+    // Now that nodus:genomics is a registered capability, a community copy installs — but as an
+    // ordinary downloaded package beside the built-in, never as the built-in itself.
+    const communityGenomics = lib.installMarketplaceSkill(community.id, 'alphagenome', commit).filter(skill => skill.name === 'AlphaGenome');
+    assert.equal(communityGenomics.length, 2);
+    const downloaded = communityGenomics.find(skill => skill.origin);
+    assert.ok(downloaded); assert.equal(downloaded.builtin, undefined);
+    assert.deepEqual(downloaded.enabled, { assistant: false, nodi: false });
+    lib.deleteChatSkill(downloaded.id);
+    lib.deleteChatSkill(shared.find(skill => skill.origin).id);
+    lib.removeSkillSource(community.id);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('a duplicate installed by an earlier build is consolidated instead of surviving beside the built-in', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = builtinFetch;
+  try {
+    const official = lib.getSkillMarketplace().sources.find(source => lib.isOfficialSkillSource(source.url));
+    lib.restoreChatSkills();
+    // Exactly the library an earlier build produced: the built-in plus a downloaded copy of it.
+    const legacy = lib.installChatSkillPackage(builtinPackages['svg-studio'],
+      { sourceId: lib.officialSkillSourceId(), path: 'svg-studio', commit, packageId: 'svg-studio', version: '1.0.0', digest: lib.packageDigest(builtinPackages['svg-studio']) })
+      .find(skill => skill.origin?.packageId === 'svg-studio');
+    assert.equal(lib.listChatSkills().filter(skill => skill.name === 'SVG Studio').length, 2);
+    const consolidated = lib.installMarketplaceSkill(official.id, 'svg-studio', commit);
+    assert.deepEqual(consolidated.filter(skill => skill.name === 'SVG Studio'), [lib.DEFAULT_CHAT_SKILLS[0]], 'the downloaded duplicate is removed, leaving one built-in');
+    assert.equal(fs.existsSync(path.join(temporary, 'skills', legacy.id)), false, 'its package directory goes with it');
+    // A copy from another repository is a different skill and is never touched.
+    const community = lib.addSkillSource('https://github.com/community/nodus-skills').sources.at(-1);
+    await lib.updateSkillSource(community.id);
+    const external = lib.installMarketplaceSkill(community.id, 'svg-studio', commit).find(skill => skill.origin?.sourceId === community.id);
+    assert.equal(lib.installMarketplaceSkill(official.id, 'svg-studio', commit).some(skill => skill.id === external.id), true);
+    lib.deleteChatSkill(external.id);
+    lib.removeSkillSource(community.id);
+  } finally { globalThis.fetch = originalFetch; }
 });

@@ -60,17 +60,50 @@ try {
   await page.getByTestId('chat-skills-assistant').click();
   await page.getByRole('button', { name: 'Marketplace', exact: true }).click();
   if (!checkout) await page.getByRole('button', { name: 'Update catalog', exact: true }).click();
-  await page.waitForFunction(async () => Boolean((await window.nodus.getSkillMarketplace()).sources[0]?.commit), undefined, { timeout: 120000, polling: 300 });
+  // waitForFunction treats the pending promise of an async predicate as a truthy result, so it
+  // returned before the first scan finished; page.evaluate awaits the value it is polling.
+  for (let attempt = 0; !await page.evaluate(async () => Boolean((await window.nodus.getSkillMarketplace()).sources[0]?.commit)); attempt++) {
+    if (attempt >= 400) throw new Error('The official catalog did not finish loading.');
+    await page.waitForTimeout(300);
+  }
   const catalog = await page.evaluate(() => window.nodus.getSkillMarketplace());
   assert.ok(catalog.sources[0].entries.length >= 15); assert.deepEqual(catalog.sources[0].errors, []);
   await page.screenshot({ path: path.join(artifacts, 'marketplace.png') });
+  // Skills this build already includes are listed as installed, never offered as a second copy.
+  const installedFilter = page.getByRole('group', { name: 'Installed filter' });
+  await installedFilter.getByRole('button', { name: /^Installed / }).click();
+  await page.getByRole('button', { name: 'Uninstall Legalize', exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Uninstall Descriptive Statistics', exact: true }).count(), 0);
+  await installedFilter.getByRole('button', { name: /^Available / }).click();
+  await page.getByRole('button', { name: 'Review skill', exact: true }).first().waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Uninstall Legalize', exact: true }).count(), 0);
+  await page.screenshot({ path: path.join(artifacts, 'installed-filter.png') });
+  await installedFilter.getByRole('button', { name: /^All / }).click();
   for (const name of ['AlphaGenome', 'Legalize']) {
     await page.getByRole('searchbox', { name: 'Search marketplace' }).fill(name);
-    await page.getByRole('button', { name: 'Review skill', exact: true }).click();
-    assert.equal(await page.getByRole('button', { name: 'Install skill', exact: true }).isDisabled(), true);
-    await page.getByText(/This build cannot install this skill/).waitFor();
+    await page.getByRole('button', { name: 'Manage skill', exact: true }).click();
+    await page.getByText(/Included in Nodus/).waitFor();
+    // A capability reserved to the application is restored from this build, so it never blocks.
+    assert.equal(await page.getByRole('button', { name: 'Reinstall included skill', exact: true }).isDisabled(), false);
+    assert.equal(await page.getByText(/This build cannot install this skill/).count(), 0);
     await page.getByRole('button', { name: '← Back to catalog', exact: true }).click();
   }
+  // Uninstall an included skill from the catalog and restore it, leaving the rest of the library alone.
+  await page.getByRole('searchbox', { name: 'Search marketplace' }).fill('Legalize');
+  await page.getByRole('button', { name: 'Uninstall Legalize', exact: true }).click();
+  await page.getByText('Uninstall Legalize? Its native capabilities stay in Nodus.', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Uninstall', exact: true }).click();
+  await page.getByText(/Its native capabilities stay in Nodus/).waitFor();
+  await page.waitForFunction(async () => !(await window.nodus.listChatSkills()).some(skill => skill.builtin === 'legal'));
+  await page.getByRole('button', { name: 'Review skill', exact: true }).click();
+  await page.getByRole('button', { name: 'Install skill', exact: true }).click();
+  await page.getByText('Included skill restored. Check its activation in My skills.', { exact: true }).waitFor();
+  const restoredBuiltin = await page.evaluate(async () => {
+    const skills = await window.nodus.listChatSkills();
+    return { legal: skills.find(skill => skill.builtin === 'legal'), builtins: skills.filter(skill => skill.builtin).length };
+  });
+  assert.equal(restoredBuiltin.legal.name, 'Legalize'); assert.equal(restoredBuiltin.legal.origin, undefined);
+  assert.equal(restoredBuiltin.builtins, 14, 'restoring one included skill leaves the rest of the library alone');
   await page.getByRole('searchbox', { name: 'Search marketplace' }).fill('Descriptive Statistics');
   await page.getByRole('button', { name: 'Review skill', exact: true }).click();
   await page.screenshot({ path: path.join(artifacts, 'review.png') });
@@ -164,8 +197,8 @@ try {
   await page.waitForFunction(() => document.documentElement.classList.contains('light'));
   await page.screenshot({ path: path.join(artifacts, 'vault-docencia-light.png') });
   assert.deepEqual(errors, []);
-  fs.writeFileSync(path.join(artifacts, 'verification.json'), JSON.stringify({ catalogMode, sourceCommit: catalog.sources[0].commit, packages: catalog.sources[0].entries.length, provider: 'deterministic local fixture', providerCalls, assistant: 'pass', nodiEnabled: 'pass', nodiDisabled: 'pass', sourceManagement: 'pass', authoringExportImport: 'pass', themeChecks, rendererErrors: errors }, null, 2));
-  console.log(`MARKETPLACE E2E PASS (${catalogMode}): review, install, enable, real Assistant/Nodi tool execution, source management, authoring/export/import and nine vault themes.`);
+  fs.writeFileSync(path.join(artifacts, 'verification.json'), JSON.stringify({ catalogMode, sourceCommit: catalog.sources[0].commit, packages: catalog.sources[0].entries.length, provider: 'deterministic local fixture', providerCalls, assistant: 'pass', nodiEnabled: 'pass', nodiDisabled: 'pass', sourceManagement: 'pass', authoringExportImport: 'pass', includedSkills: 'listed, uninstalled and restored', themeChecks, rendererErrors: errors }, null, 2));
+  console.log(`MARKETPLACE E2E PASS (${catalogMode}): review, install, enable, real Assistant/Nodi tool execution, included-skill uninstall and restore, source management, authoring/export/import and nine vault themes.`);
 } catch (error) {
   if (app) { const page = await app.firstWindow(); await page.screenshot({ path: path.join(artifacts, 'failure.png') }).catch(() => {}); console.error((await page.locator('body').innerText()).slice(-6500)); }
   console.error('Provider calls:', providerCalls);

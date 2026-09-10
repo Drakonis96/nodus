@@ -1,8 +1,33 @@
 .nodi-companion {
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --nodi-scrollbar-track: #111824;
+  --nodi-scrollbar-thumb: #596579;
+  --nodi-scrollbar-thumb-hover: #748198;
 }
 .nodi-companion,
 .nodi-companion * { box-sizing: border-box; }
+.nodi-companion,
+.nodi-companion * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--nodi-scrollbar-thumb) var(--nodi-scrollbar-track);
+}
+.nodi-companion::-webkit-scrollbar,
+.nodi-companion *::-webkit-scrollbar { width: 8px; height: 8px; }
+.nodi-companion::-webkit-scrollbar-track,
+.nodi-companion *::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: var(--nodi-scrollbar-track);
+}
+.nodi-companion::-webkit-scrollbar-thumb,
+.nodi-companion *::-webkit-scrollbar-thumb {
+  border: 2px solid var(--nodi-scrollbar-track);
+  border-radius: 999px;
+  background: var(--nodi-scrollbar-thumb);
+}
+.nodi-companion::-webkit-scrollbar-thumb:hover,
+.nodi-companion *::-webkit-scrollbar-thumb:hover { background: var(--nodi-scrollbar-thumb-hover); }
+.nodi-companion::-webkit-scrollbar-corner,
+.nodi-companion *::-webkit-scrollbar-corner { background: var(--nodi-scrollbar-track); }
 .nodi-anchor { position: absolute; }
 
 .nodi-figure {
@@ -590,31 +615,6 @@
   cursor: pointer;
 }
 .nodi-open-settings:hover { background: rgba(212,175,55,.14); }
-.nodi-chat-msgs,
-.nodi-chat-input,
-.nodi-history,
-.nodi-panel-body,
-.nodi-msg .md pre { scrollbar-width: thin; scrollbar-color: #596579 #111824; }
-.nodi-chat-msgs::-webkit-scrollbar,
-.nodi-chat-input::-webkit-scrollbar,
-.nodi-history::-webkit-scrollbar,
-.nodi-panel-body::-webkit-scrollbar,
-.nodi-msg .md pre::-webkit-scrollbar { width: 8px; height: 8px; }
-.nodi-chat-msgs::-webkit-scrollbar-track,
-.nodi-chat-input::-webkit-scrollbar-track,
-.nodi-history::-webkit-scrollbar-track,
-.nodi-panel-body::-webkit-scrollbar-track,
-.nodi-msg .md pre::-webkit-scrollbar-track { background: #111824; border-radius: 999px; }
-.nodi-chat-msgs::-webkit-scrollbar-thumb,
-.nodi-chat-input::-webkit-scrollbar-thumb,
-.nodi-history::-webkit-scrollbar-thumb,
-.nodi-panel-body::-webkit-scrollbar-thumb,
-.nodi-msg .md pre::-webkit-scrollbar-thumb { background: #596579; border: 2px solid #111824; border-radius: 999px; }
-.nodi-chat-msgs::-webkit-scrollbar-thumb:hover,
-.nodi-chat-input::-webkit-scrollbar-thumb:hover,
-.nodi-history::-webkit-scrollbar-thumb:hover,
-.nodi-panel-body::-webkit-scrollbar-thumb:hover,
-.nodi-msg .md pre::-webkit-scrollbar-thumb:hover { background: #748198; }
 /* Quick notes ───────────────────────────────────────────────────────────── */
 .nodi-panel.nodi-notes-panel { width: 372px; max-height: 480px; }
 
@@ -779,21 +779,13 @@
 .nodi-note-foot { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; padding: 8px; border-top: 0.5px solid rgba(255, 255, 255, 0.08); }
 .nodi-note-state { font-size: 10px; color: #7a8598; text-align: center; }
 
-.nodi-notes-list,
-.nodi-note-textarea,
-.nodi-note-preview { scrollbar-width: thin; scrollbar-color: #596579 #111824; }
-.nodi-notes-list::-webkit-scrollbar,
-.nodi-note-textarea::-webkit-scrollbar,
-.nodi-note-preview::-webkit-scrollbar { width: 8px; height: 8px; }
-.nodi-notes-list::-webkit-scrollbar-track,
-.nodi-note-textarea::-webkit-scrollbar-track,
-.nodi-note-preview::-webkit-scrollbar-track { background: #111824; border-radius: 999px; }
-.nodi-notes-list::-webkit-scrollbar-thumb,
-.nodi-note-textarea::-webkit-scrollbar-thumb,
-.nodi-note-preview::-webkit-scrollbar-thumb { background: #596579; border: 2px solid #111824; border-radius: 999px; }
-
 /* Shared light mode — driven by Nodus' resolved theme and the active vault accent.
  * Dark mode deliberately keeps the original navy/gold Nodi identity above. */
+.nodi-theme-light {
+  --nodi-scrollbar-track: #eef2f7;
+  --nodi-scrollbar-thumb: #cbd5e1;
+  --nodi-scrollbar-thumb-hover: #94a3b8;
+}
 .nodi-theme-light .nodi-node {
   border-color: var(--nodi-vault-accent, #6366f1);
   background: #ffffff;
@@ -871,26 +863,6 @@
   opacity: 1;
 }
 .nodi-theme-light .nodi-msg.user .md blockquote + p { color: inherit; }
-.nodi-theme-light .nodi-chat-msgs,
-.nodi-theme-light .nodi-chat-input,
-.nodi-theme-light .nodi-history,
-.nodi-theme-light .nodi-panel-body,
-.nodi-theme-light .nodi-msg .md pre { scrollbar-color: #cbd5e1 #eef2f7; }
-.nodi-theme-light .nodi-chat-msgs::-webkit-scrollbar-track,
-.nodi-theme-light .nodi-chat-input::-webkit-scrollbar-track,
-.nodi-theme-light .nodi-history::-webkit-scrollbar-track,
-.nodi-theme-light .nodi-panel-body::-webkit-scrollbar-track,
-.nodi-theme-light .nodi-msg .md pre::-webkit-scrollbar-track { background: #eef2f7; }
-.nodi-theme-light .nodi-chat-msgs::-webkit-scrollbar-thumb,
-.nodi-theme-light .nodi-chat-input::-webkit-scrollbar-thumb,
-.nodi-theme-light .nodi-history::-webkit-scrollbar-thumb,
-.nodi-theme-light .nodi-panel-body::-webkit-scrollbar-thumb,
-.nodi-theme-light .nodi-msg .md pre::-webkit-scrollbar-thumb { background: #cbd5e1; border-color: #eef2f7; }
-.nodi-theme-light .nodi-chat-msgs::-webkit-scrollbar-thumb:hover,
-.nodi-theme-light .nodi-chat-input::-webkit-scrollbar-thumb:hover,
-.nodi-theme-light .nodi-history::-webkit-scrollbar-thumb:hover,
-.nodi-theme-light .nodi-panel-body::-webkit-scrollbar-thumb:hover,
-.nodi-theme-light .nodi-msg .md pre::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 .nodi-theme-light .nodi-chat-foot { border-top-color: rgba(15, 23, 42, .08); }
 .nodi-theme-light .nodi-chat-quote { background: rgba(15, 23, 42, .045); color: #475569; }
 .nodi-theme-light .nodi-chat-quote button { color: #64748b; }
@@ -1015,16 +987,6 @@
 .nodi-theme-light .nodi-notes-panel .nodi-note-preview .md a { color: var(--nodi-vault-accent, #6366f1); }
 .nodi-theme-light .nodi-notes-panel .nodi-note-foot { border-top-color: rgba(15, 23, 42, 0.08); }
 .nodi-theme-light .nodi-notes-panel .nodi-note-state { color: #94a3b8; }
-.nodi-theme-light .nodi-notes-panel .nodi-notes-list,
-.nodi-theme-light .nodi-notes-panel .nodi-note-textarea,
-.nodi-theme-light .nodi-notes-panel .nodi-note-preview { scrollbar-color: #cbd5e1 #eef2f7; }
-.nodi-theme-light .nodi-notes-panel .nodi-notes-list::-webkit-scrollbar-track,
-.nodi-theme-light .nodi-notes-panel .nodi-note-textarea::-webkit-scrollbar-track,
-.nodi-theme-light .nodi-notes-panel .nodi-note-preview::-webkit-scrollbar-track { background: #eef2f7; }
-.nodi-theme-light .nodi-notes-panel .nodi-notes-list::-webkit-scrollbar-thumb,
-.nodi-theme-light .nodi-notes-panel .nodi-note-textarea::-webkit-scrollbar-thumb,
-.nodi-theme-light .nodi-notes-panel .nodi-note-preview::-webkit-scrollbar-thumb { background: #cbd5e1; border-color: #eef2f7; }
-
 /* Corpus starters on an empty chat ─────────────────────────────────────────── */
 .nodi-chat-welcome { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 18px 12px; text-align: center; }
 .nodi-chat-welcome .nodi-empty { padding: 0; }
@@ -1154,11 +1116,6 @@
 .nodi-cite-btn:hover { background: rgba(255, 255, 255, 0.1); }
 .nodi-cite-btn.primary { border-color: rgba(212, 175, 55, 0.5); background: rgba(212, 175, 55, 0.14); color: #f3d67a; }
 .nodi-cite-btn.primary:hover { background: rgba(212, 175, 55, 0.22); }
-.nodi-cite-body { scrollbar-width: thin; scrollbar-color: #596579 #111824; }
-.nodi-cite-body::-webkit-scrollbar { width: 8px; }
-.nodi-cite-body::-webkit-scrollbar-track { background: #111824; border-radius: 999px; }
-.nodi-cite-body::-webkit-scrollbar-thumb { background: #596579; border: 2px solid #111824; border-radius: 999px; }
-
 /* Light theme — driven by Nodus' resolved theme + active vault accent. */
 .nodi-theme-light .nodi-starter {
   border-color: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 40%, transparent);
@@ -1217,10 +1174,6 @@
   color: var(--nodi-vault-accent, #6366f1);
 }
 .nodi-theme-light .nodi-cite-btn.primary:hover { background: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 18%, transparent); }
-.nodi-theme-light .nodi-cite-body { scrollbar-color: #cbd5e1 #eef2f7; }
-.nodi-theme-light .nodi-cite-body::-webkit-scrollbar-track { background: #eef2f7; }
-.nodi-theme-light .nodi-cite-body::-webkit-scrollbar-thumb { background: #cbd5e1; border-color: #eef2f7; }
-
 @keyframes nodi-badge-pop { 0% { transform: scale(0); } 70% { transform: scale(1.3); } 100% { transform: scale(1); } }
 @keyframes nodi-bubble-pop { 0% { opacity: 0; transform: scale(0.6) translateY(8px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
 @keyframes nodi-panel-pop { 0% { opacity: 0; transform: scale(0.85) translateY(8px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }

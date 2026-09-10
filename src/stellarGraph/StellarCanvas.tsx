@@ -237,10 +237,15 @@ export function StellarCanvas(props: Props) {
     let lastAnimatedEdge: string | null | undefined;
     const reduce = matchMedia("(prefers-reduced-motion: reduce)");
     const render = () => {
+      // Unmount detaches the ref during commit but this loop's rAF is only
+      // cancelled by the passive cleanup after paint, so one in-flight frame
+      // can still run with host.current === null.
+      const hostEl = host.current;
+      if (!hostEl) return;
       const p = live.current,
         dpr = Math.min(devicePixelRatio, 2),
-        w = host.current!.clientWidth,
-        h = host.current!.clientHeight;
+        w = hostEl.clientWidth,
+        h = hostEl.clientHeight;
       el.width = Math.round(w * dpr);
       el.height = Math.round(h * dpr);
       const screen = (pos: StellarPosition) => ({

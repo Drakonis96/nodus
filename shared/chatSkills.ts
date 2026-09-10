@@ -1,4 +1,4 @@
-import type { SkillCapability, SkillTool } from './skillMarketplace';
+import { skillSlug, type SkillCapability, type SkillTool } from './skillMarketplace';
 import { normalizeCapabilityId } from '../skill-capabilities/contracts';
 import { GENERAL_CHAT_SKILLS } from './generalChatSkills';
 import { LEGALIZE_INSTRUCTIONS } from './legalize';
@@ -103,6 +103,14 @@ When the learner demonstrates understanding, summarize the key idea in a few sen
   { id: 'builtin-legal', name: 'Legalize', builtin: 'legal', capabilities: ['nodus:legal'], description: 'Busca legislación por país en legalize-dev, con texto, fuente oficial, versión y atribuciones.', enabled: { assistant: false, nodi: false }, instructions: LEGALIZE_INSTRUCTIONS },
   ...GENERAL_CHAT_SKILLS,
 ];
+
+/** Package identifier each built-in is published under in the official catalog, mirroring the
+ * export rule of scripts/sync-skill-marketplace.mjs. The catalog lists this build's own skills,
+ * so an entry found here is already part of Nodus: it is shown as installed and reinstalled from
+ * DEFAULT_CHAT_SKILLS instead of being downloaded a second time. Native capabilities never leave
+ * the application, so uninstalling one of these removes the skill only. */
+export const BUILTIN_SKILL_PACKAGES: Record<string, string> = Object.fromEntries(DEFAULT_CHAT_SKILLS.map(skill => [skillSlug(skill.name), skill.id]));
+export const builtinSkillForPackage = (packageId: string): ChatSkill | undefined => DEFAULT_CHAT_SKILLS.find(skill => skill.id === BUILTIN_SKILL_PACKAGES[packageId]);
 
 export function buildChatSkillsPrompt(skills: ChatSkill[]): string {
   return [CHAT_CREATION_RULES,

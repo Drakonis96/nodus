@@ -2,8 +2,9 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { DEFAULT_SKILL_SOURCE, normalizeSkillSource, validateManifest, validateSkillPackage, type SkillMarketplace, type SkillPackage, type SkillSource } from '@shared/skillMarketplace';
-import { installChatPluginPackage, installChatSkillPackage } from './chatSkills';
+import { DEFAULT_SKILL_SOURCE, isOfficialSkillSource, normalizeSkillSource, validateManifest, validateSkillPackage, type SkillMarketplace, type SkillPackage, type SkillSource } from '@shared/skillMarketplace';
+import { BUILTIN_SKILL_PACKAGES } from '@shared/chatSkills';
+import { installBuiltinChatSkill, installChatPluginPackage, installChatSkillPackage } from './chatSkills';
 import { validatePluginPackage } from '../skill-capabilities/pluginPackage';
 const location = () => path.join(app.getPath('userData'), 'skill-marketplace.json');
 export const packageDigest = (pkg: SkillPackage) => createHash('sha256').update(JSON.stringify(validateSkillPackage(pkg))).digest('hex');
@@ -123,6 +124,9 @@ export function installMarketplaceSkill(sourceId: string, packagePath: string, c
   const source = getSkillMarketplace().sources.find(s => s.id === sourceId);
   const entry = source?.entries.find(e => e.path === packagePath);
   if (!entry || !source?.commit || source.commit !== commit) throw new Error('The catalog changed. Review the package again before installing.');
+  // The official catalog lists this build's own built-ins. Restore the bundled skill rather than
+  // adding a second, repository-tracked copy of something Nodus already includes.
+  if (isOfficialSkillSource(source.url) && BUILTIN_SKILL_PACKAGES[entry.package.manifest.id]) return installBuiltinChatSkill(entry.package.manifest.id);
   return installChatSkillPackage(entry.package, { sourceId, path: packagePath, commit, packageId: entry.package.manifest.id, version: entry.package.manifest.version, digest: packageDigest(entry.package) });
 }
 export function installMarketplacePlugin(sourceId: string, packagePath: string, commit: string, approvePermissions = false) {

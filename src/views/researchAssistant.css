@@ -45,3 +45,19 @@
   outline: 2px solid var(--vault-accent, #6366f1);
   outline-offset: 2px;
 }
+
+/* Context picker balloon: the same anchored treatment as the Skills menu,
+   instead of a centered modal that covers the conversation. */
+.research-context-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #18191f;
+  border: 1px solid color-mix(in srgb, var(--vault-accent, #6366f1) 22.7%, transparent);
+  box-shadow: 0 24px 80px #0009;
+  color: #e4e4e7;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.5;
+}

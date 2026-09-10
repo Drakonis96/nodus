@@ -23,6 +23,9 @@ export interface MarketplaceEntry { path: string; package: SkillPackage }
 export interface PluginMarketplaceEntry { path: string; package: PluginPackage }
 export interface SkillSource { id: string; url: string; commit?: string; updatedAt?: string; entries: MarketplaceEntry[]; plugins?: PluginMarketplaceEntry[]; errors: string[] }
 export interface SkillMarketplace { version: 1; sources: SkillSource[] }
+/** The official catalog publishes this build's own built-in skills; a community source that
+ * happens to reuse one of those package identifiers is a different, downloadable skill. */
+export const isOfficialSkillSource = (url: string) => url.trim().toLowerCase().replace(/\/$/, '') === DEFAULT_SKILL_SOURCE.toLowerCase();
 export const skillSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64) || 'my-skill';
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 // Reject control characters in package text while allowing tabs and line breaks.
@@ -58,6 +61,8 @@ export function validateSkillPackage(value: SkillPackage): SkillPackage {
   }
   return { manifest, files };
 }
+/** Identifier the official repository is stored under, so packages installed from it are recognizable. */
+export const officialSkillSourceId = () => normalizeSkillSource(DEFAULT_SKILL_SOURCE).id;
 export function normalizeSkillSource(input: string): { id: string; url: string; owner: string; repo: string } {
   const url = new URL(input.trim());
   const match = /^\/([a-zA-Z0-9-]+)\/([a-zA-Z0-9_.-]+)\/?$/.exec(url.pathname);

@@ -1,6 +1,7 @@
 import { ChatMarkdown } from '../components/ChatMarkdown';
 import { ChatSkillsControl } from '../components/ChatSkillsControl';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import type {
   AppSettings,
   ChatConversationSummary,
@@ -229,11 +230,17 @@ export function ResearchAssistantModal({
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showContext, setShowContext] = useState(false);
+  // The context picker opens as a balloon anchored to its header trigger (like
+  // Skills) instead of a centered modal, so the corpus selection stays in reach.
+  const [contextPanelStyle, setContextPanelStyle] = useState<CSSProperties>({});
   // Id of the assistant message currently streaming — drives the live caret and
   // the "stop" affordance. Null when nothing is in flight.
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const contextTriggerRef = useRef<HTMLButtonElement>(null);
+  const focusTriggerRef = useRef<HTMLButtonElement>(null);
+  const contextPanelRef = useRef<HTMLDivElement>(null);
   // Whether new stream deltas should keep the view pinned to the bottom. Starts
   // true on send and flips off as soon as the user scrolls up to read back.
   const stickToBottomRef = useRef(true);
@@ -276,6 +283,62 @@ export function ResearchAssistantModal({
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 224)}px`;
   }, [input]);
+
+  // Anchor the context balloon to its trigger, flipping above when there is no
+  // room below. Mirrors the Skills popover so both header menus feel the same.
+  useLayoutEffect(() => {
+    if (!showContext) return;
+    const place = () => {
+      const rect = (contextTriggerRef.current ?? focusTriggerRef.current)?.getBoundingClientRect();
+      if (!rect) return;
+      const width = Math.min(420, window.innerWidth - 24);
+      const below = window.innerHeight - rect.bottom - 20;
+      const above = rect.top - 20;
+      const upwards = below < 360 && above > below;
+      setContextPanelStyle({
+        position: 'fixed',
+        width,
+        left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
+        top: upwards ? 'auto' : rect.bottom + 8,
+        bottom: upwards ? window.innerHeight - rect.top + 8 : 'auto',
+        maxHeight: Math.min(720, Math.max(200, upwards ? above : below)),
+        zIndex: 10050,
+      });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [showContext]);
+
+  useEffect(() => {
+    if (!showContext) return;
+    const close = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        !contextTriggerRef.current?.contains(target) &&
+        !focusTriggerRef.current?.contains(target) &&
+        !contextPanelRef.current?.contains(target)
+      ) {
+        setShowContext(false);
+      }
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopImmediatePropagation();
+        setShowContext(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', escape, true);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', escape, true);
+    };
+  }, [showContext]);
 
   const isNearBottom = useCallback(() => {
     const el = scrollRef.current;
@@ -583,12 +646,13 @@ export function ResearchAssistantModal({
           ) : (
             <button
               type="button"
+              ref={contextTriggerRef}
               data-testid="research-context-trigger"
               className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1"
               title={t('Elegir qué partes del corpus ve el asistente')}
               aria-haspopup="dialog"
               aria-expanded={showContext}
-              onClick={() => setShowContext(true)}
+              onClick={() => setShowContext((value) => !value)}
             >
               <Icon name="layers" size={15} className="text-indigo-300" />
               <span className="hidden sm:inline">{activeMode ? t(activeMode.label) : t('Contexto')}</span>
@@ -599,12 +663,13 @@ export function ResearchAssistantModal({
           {!isGenealogy && contextTitle && (
             <button
               type="button"
+              ref={focusTriggerRef}
               data-testid="research-focus-trigger"
               className="hidden md:inline-flex items-center gap-1.5 rounded-md border border-indigo-900/70 bg-indigo-950/25 px-2 py-1 text-xs text-indigo-200"
               title={t('Elegir qué partes del corpus ve el asistente')}
               aria-haspopup="dialog"
               aria-expanded={showContext}
-              onClick={() => setShowContext(true)}
+              onClick={() => setShowContext((value) => !value)}
             >
               <Icon name="fit" size={15} />
               <span className="truncate">{contextTitle}</span>
@@ -842,16 +907,14 @@ export function ResearchAssistantModal({
         </div>
       </div>
 
-      {showContext && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setShowContext(false)}
-        >
+      {showContext &&
+        createPortal(
           <div
+            ref={contextPanelRef}
             role="dialog"
-            aria-modal="true"
-            className="flex max-h-[86vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            aria-label={t('Contexto del asistente')}
+            style={contextPanelStyle}
+            className="research-context-panel"
           >
             <header className="flex items-center gap-2 border-b border-neutral-800 px-4 py-3">
               <Icon name="layers" className="text-indigo-300" />
@@ -962,9 +1025,9 @@ export function ResearchAssistantModal({
                 {t('Listo')}
               </button>
             </footer>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       {pendingDelete && (
         <ConfirmModal
