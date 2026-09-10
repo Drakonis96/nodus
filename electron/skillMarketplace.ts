@@ -4,7 +4,8 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { DEFAULT_SKILL_SOURCE, isOfficialSkillSource, normalizeSkillSource, validateManifest, validateSkillPackage, type SkillMarketplace, type SkillPackage, type SkillSource } from '@shared/skillMarketplace';
 import { BUILTIN_SKILL_PACKAGES } from '@shared/chatSkills';
-import { installBuiltinChatSkill, installChatSkillPackage } from './chatSkills';
+import { installBuiltinChatSkill, installChatPluginPackage, installChatSkillPackage } from './chatSkills';
+import { validatePluginPackage } from '../skill-capabilities/pluginPackage';
 const location = () => path.join(app.getPath('userData'), 'skill-marketplace.json');
 export const packageDigest = (pkg: SkillPackage) => createHash('sha256').update(JSON.stringify(validateSkillPackage(pkg))).digest('hex');
 export function getSkillMarketplace(): SkillMarketplace {
@@ -58,9 +59,11 @@ export async function scanSkillSource(source: SkillSource, fetcher: typeof fetch
   const tree = JSON.parse(await request(`${api}/git/trees/${commit}?recursive=1`, fetcher, 8000000));
   if (tree.truncated || !Array.isArray(tree.tree)) throw new Error('Repository tree is incomplete. Split this repository into smaller sources.');
   const blobs = new Map<string, { mode: string; size: number }>(tree.tree.filter((item: {type: string}) => item.type === 'blob').map((item: {path: string; mode: string; size: number}) => [item.path, item]));
-  const candidates = [...blobs.keys()].filter(p => /^[a-z0-9]+(?:-[a-z0-9]+)*\/skill\.json$/.test(p));
-  if (candidates.length > 500) throw new Error('A source can contain at most 500 packages.');
-  const result: SkillSource = { id: source.id, url: source.url, commit, updatedAt: new Date().toISOString(), entries: [], errors: [] };
+  const pluginCandidates = [...blobs.keys()].filter(p => /^[a-z0-9]+(?:-[a-z0-9]+)*\/plugin\.json$/.test(p));
+  const pluginDirectories = new Set(pluginCandidates.map(candidate => candidate.split('/')[0]));
+  const candidates = [...blobs.keys()].filter(p => /^[a-z0-9]+(?:-[a-z0-9]+)*\/skill\.json$/.test(p) && !pluginDirectories.has(p.split('/')[0]));
+  if (candidates.length + pluginCandidates.length > 500) throw new Error('A source can contain at most 500 packages.');
+  const result: SkillSource = { id: source.id, url: source.url, commit, updatedAt: new Date().toISOString(), entries: [], plugins: [], errors: [] };
   let total = 0;
   const read = async (file: string, limit: number) => {
     const blob = blobs.get(file);
@@ -77,6 +80,28 @@ export async function scanSkillSource(source: SkillSource, fetcher: typeof fetch
       const files: Record<string, string> = {};
       for (const file of ['SKILL.md', ...manifest.tools.map(t => t.entry)]) files[file] = await read(`${directory}/${file}`, file === 'SKILL.md' ? 64000 : 256000);
       result.entries.push({ path: directory, package: validateSkillPackage({ manifest, files }) });
+    } catch (error) { if (error instanceof SkillSourceFetchError) throw error; result.errors.push(`${directory}: ${error instanceof Error ? error.message : String(error)}`); }
+  }
+  for (const candidate of pluginCandidates) {
+    const directory = candidate.split('/')[0];
+    try {
+      const manifestSource = await read(candidate, 64_000), manifest = JSON.parse(manifestSource);
+      if (manifest.id !== directory) throw new Error('Directory name must match the plugin id.');
+      const files: Record<string, string> = { 'plugin.json': manifestSource };
+      for (const skillPath of manifest.skills ?? []) {
+        files[skillPath] = await read(`${directory}/${skillPath}`, 64_000);
+        const skill = validateManifest(JSON.parse(files[skillPath]));
+        const base = skillPath.slice(0, -'skill.json'.length);
+        for (const file of ['SKILL.md', ...skill.tools.map(tool => tool.entry)]) files[base + file] = await read(`${directory}/${base}${file}`, file === 'SKILL.md' ? 64_000 : 256_000);
+      }
+      for (const capabilityPath of manifest.capabilities ?? []) {
+        files[capabilityPath] = await read(`${directory}/${capabilityPath}`, 64_000);
+        const capability = JSON.parse(files[capabilityPath]);
+        const base = capabilityPath.slice(0, -'capability.json'.length);
+        files[base + capability.entry] = await read(`${directory}/${base}${capability.entry}`, 256_000);
+      }
+      const pkg = validatePluginPackage({ manifest, files });
+      result.plugins!.push({ path: directory, package: { manifest: pkg.manifest, files: pkg.files } });
     } catch (error) { if (error instanceof SkillSourceFetchError) throw error; result.errors.push(`${directory}: ${error instanceof Error ? error.message : String(error)}`); }
   }
   return result;
@@ -103,4 +128,11 @@ export function installMarketplaceSkill(sourceId: string, packagePath: string, c
   // adding a second, repository-tracked copy of something Nodus already includes.
   if (isOfficialSkillSource(source.url) && BUILTIN_SKILL_PACKAGES[entry.package.manifest.id]) return installBuiltinChatSkill(entry.package.manifest.id);
   return installChatSkillPackage(entry.package, { sourceId, path: packagePath, commit, packageId: entry.package.manifest.id, version: entry.package.manifest.version, digest: packageDigest(entry.package) });
+}
+export function installMarketplacePlugin(sourceId: string, packagePath: string, commit: string, approvePermissions = false) {
+  const source = getSkillMarketplace().sources.find(item => item.id === sourceId);
+  const entry = source?.plugins?.find(item => item.path === packagePath);
+  if (!entry || !source?.commit || source.commit !== commit) throw new Error('The catalog changed. Review the plugin again before installing.');
+  const pkg = validatePluginPackage(entry.package);
+  return installChatPluginPackage(pkg, { sourceId, sourcePath: packagePath, sourceCommit: commit, approvePermissions, autoUpdate: source.url.toLowerCase() === DEFAULT_SKILL_SOURCE.toLowerCase() });
 }

@@ -1,12 +1,26 @@
-import { assertSkillCapabilitiesSupported, officialSkillSourceId, unsupportedSkillCapabilities, validateManifest, validateSkillPackage, skillSlug, type SkillPackage } from '@shared/skillMarketplace';
+import { assertSkillCapabilitiesSupported, officialSkillSourceId, validateManifest, validateSkillPackage, skillSlug, type SkillPackage } from '@shared/skillMarketplace';
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { DEFAULT_CHAT_SKILLS, builtinSkillForPackage, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
+import { normalizeCapabilityId } from '../skill-capabilities/contracts';
+import { resolvePluginCapabilityReference, type ValidatedPluginPackage } from '../skill-capabilities/pluginPackage';
+import {
+  approvePendingPlugin,
+  installPluginPackage,
+  installedCapabilityAvailable,
+  pluginPackageDigest,
+  readActivePluginPackage,
+  readPluginDirectory,
+  readPluginState,
+  removePlugin as removeInstalledPlugin,
+  rollbackPlugin,
+  type PluginInstallOptions,
+} from './skillPlugins';
 
 const file = () => path.join(app.getPath('userData'), 'chat-skills.json');
-const LIBRARY_VERSION = 12;
+const LIBRARY_VERSION = 13;
 const LEGACY_CHEMISTRY_V8_SHA256 = '876f9cf3d84a695540625bc79865b5f1d9026f6e577dbbbfd78a970e5552db94';
 const LEGACY_CHEMISTRY_V7_SHA256 = '752f1a771d090e09a2ac564421e563167fc89b858d9167eba50eb2327ce1c5ef';
 const LEGACY_CHEMISTRY_V6_SHA256 = '2fcb5625341467d5724b42ef1ac37d2429eb48779237e0593f7f75a605f00d5c';
@@ -25,7 +39,7 @@ export function listChatSkills(): ChatSkill[] {
   if (!fs.existsSync(file())) return write(structuredClone(DEFAULT_CHAT_SKILLS));
   let parsed: { version?: number; skills?: ChatSkill[] };
   try { parsed = JSON.parse(fs.readFileSync(file(), 'utf8')); } catch { throw new Error('The skills library could not be read.'); }
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');
   if (parsed.version! < LIBRARY_VERSION) {
     // Each release adds only newly introduced defaults. Never restore a skill
     // deleted in an earlier version or overwrite its edited instructions/flags.
@@ -42,7 +56,9 @@ export function listChatSkills(): ChatSkill[] {
         || (parsed.version === 8 && createHash('sha256').update(skill.instructions).digest('hex') === LEGACY_CHEMISTRY_V8_SHA256))
       && latestChemistry
       ? { ...skill, instructions: latestChemistry.instructions }
-      : skill);
+      : skill).map(skill => skill.builtin && ['svg','image','chemistry','genomics','legal'].includes(skill.builtin)
+        ? { ...skill, capabilities: [`nodus:${skill.builtin}`] }
+        : skill);
     const additions = DEFAULT_CHAT_SKILLS.filter(skill =>
       ((parsed.version! < 2 && skill.builtin === 'socratic')
         || (parsed.version! < 3 && skill.builtin === 'general')
@@ -64,7 +80,8 @@ function write(skills: ChatSkill[]): ChatSkill[] {
   return skills;
 }
 export function enabledChatSkills(surface: ChatSkillSurface): ChatSkill[] {
-  return listChatSkills().filter(skill => skill.enabled[surface] && !unsupportedSkillCapabilities(skill.capabilities ?? []).length);
+  return listChatSkills().filter(skill => skill.enabled[surface]
+    && (skill.capabilities ?? []).every(capability => installedCapabilityAvailable(normalizeCapabilityId(capability))));
 }
 export function saveChatSkill(input: ChatSkill): ChatSkill[] {
   const skills = listChatSkills();
@@ -78,10 +95,12 @@ export function saveChatSkill(input: ChatSkill): ChatSkill[] {
     author: input.author ?? existing?.author ?? 'local', category: input.category ?? existing?.category ?? 'Personal',
     version: input.version ?? existing?.version ?? '1.0.0', license: input.license ?? existing?.license ?? 'AGPL-3.0-only',
     ...(existing?.origin ? { origin: existing.origin } : {}),
+    ...(existing?.plugin ? { plugin: existing.plugin, capabilityTools: existing.capabilityTools,
+      overrides: { name: clean(input.name, 80), description: clean(input.description, 500), instructions: clean(input.instructions, 16000) } } : {}),
     ...(existing?.builtin ? { builtin: existing.builtin } : {}),
   };
   if (!skill.name || !skill.description || !skill.instructions) throw new Error('Add a name, description and instructions.');
-  assertSkillCapabilitiesSupported(skill.capabilities ?? []);
+  if (!existing?.plugin) assertSkillCapabilitiesSupported(skill.capabilities ?? []);
   chatSkillPackage(skill); // Validate capability declarations and authoring metadata before persisting.
   return write(existing ? skills.map(item => item.id === skill.id ? skill : item) : [...skills, skill]);
 }
@@ -155,6 +174,7 @@ export function installChatSkillPackage(input: SkillPackage, origin?: ChatSkill[
   return write(existing ? skills.map(s => s.id === existing.id ? skill : s) : [...skills, skill]);
 }
 export function importSkillDirectory(directory: string) {
+  if (fs.existsSync(path.join(directory, 'plugin.json'))) return installChatPluginDirectory(directory, { sourceId: 'local', sourcePath: directory, approvePermissions: true, autoUpdate: false });
   const read = (file: string) => {
     const target = path.join(directory, file), stat = fs.lstatSync(target);
     if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 256000 || !fs.realpathSync(target).startsWith(fs.realpathSync(directory) + path.sep)) throw new Error('Invalid package file.');
@@ -164,6 +184,82 @@ export function importSkillDirectory(directory: string) {
   // Validate paths before opening any files declared by the package.
   const checked = validateManifest(manifest);
   return installChatSkillPackage({ manifest: checked, files: Object.fromEntries(['SKILL.md', ...checked.tools.map(t => t.entry)].map(file => [file, read(file)])) });
+}
+
+function pluginSkillBase(pkg: ValidatedPluginPackage, packageId: string) {
+  return pkg.skills.find(item => item.package.manifest.id === packageId)?.package;
+}
+
+function materializePluginSkills(pkg: ValidatedPluginPackage, options: PluginInstallOptions, previous?: ValidatedPluginPackage): ChatSkill[] {
+  const installed = listChatSkills();
+  const ids = new Set(pkg.skills.map(item => item.package.manifest.id));
+  const retained = installed.filter(skill => skill.plugin?.id !== pkg.manifest.id || ids.has(skill.origin?.packageId ?? ''));
+  for (const item of pkg.skills) {
+    const m = item.package.manifest;
+    const existing = retained.find(skill => skill.plugin?.id === pkg.manifest.id && skill.origin?.packageId === m.id);
+    const previousBase = previous && pluginSkillBase(previous, m.id);
+    const inferred = existing && previousBase ? {
+      ...(existing.name !== previousBase.manifest.name ? { name: existing.name } : {}),
+      ...(existing.description !== previousBase.manifest.description ? { description: existing.description } : {}),
+      ...(existing.instructions !== previousBase.files['SKILL.md'] ? { instructions: existing.instructions } : {}),
+    } : {};
+    const overlay = { ...inferred, ...(existing?.overrides ?? {}) };
+    const capabilities = m.capabilities.map(capability => resolvePluginCapabilityReference(pkg.manifest.id, capability));
+    const capabilityTools = pkg.capabilities
+      .filter(capability => capabilities.includes(`${pkg.manifest.id}:${capability.manifest.id}`))
+      .flatMap(capability => capability.manifest.tools.map(tool => ({ capabilityId: `${pkg.manifest.id}:${capability.manifest.id}`, toolId: tool.id, description: tool.description, inputSchema: tool.inputSchema, resultKinds: tool.resultKinds })));
+    const skill: ChatSkill = {
+      id: existing?.id ?? randomUUID(), name: overlay.name ?? m.name, description: overlay.description ?? m.description,
+      instructions: overlay.instructions ?? item.package.files['SKILL.md'], author: m.author, category: m.category,
+      version: m.version, license: m.license, capabilities, capabilityTools,
+      tools: m.tools.map(tool => ({ id: tool.id, description: tool.description, source: item.package.files[tool.entry] })),
+      enabled: existing?.enabled ?? { assistant: false, nodi: false },
+      origin: { sourceId: options.sourceId, path: options.sourcePath ?? pkg.manifest.id, commit: options.sourceCommit ?? pkg.manifest.version, packageId: m.id, version: m.version, digest: createHash('sha256').update(JSON.stringify(item.package)).digest('hex') },
+      plugin: { id: pkg.manifest.id, version: pkg.manifest.version, digest: pluginPackageDigest(pkg) },
+      ...(Object.keys(overlay).length ? { overrides: overlay } : {}),
+    };
+    const index = retained.findIndex(candidate => candidate.id === skill.id);
+    if (index >= 0) retained[index] = skill; else retained.push(skill);
+  }
+  return write(retained);
+}
+
+export function installChatPluginPackage(pkg: ValidatedPluginPackage, options: PluginInstallOptions): ChatSkill[] {
+  let previous: ValidatedPluginPackage | undefined;
+  try { previous = readActivePluginPackage(pkg.manifest.id); } catch { /* first install */ }
+  const outcome = installPluginPackage(pkg, options);
+  return outcome.activated ? materializePluginSkills(outcome.package, options, previous) : listChatSkills();
+}
+
+export function installChatPluginDirectory(directory: string, options: PluginInstallOptions): ChatSkill[] {
+  return installChatPluginPackage(readPluginDirectory(directory), options);
+}
+
+export function approvePendingChatPlugin(id: string): ChatSkill[] {
+  let previous: ValidatedPluginPackage | undefined;
+  try { previous = readActivePluginPackage(id); } catch { /* first install */ }
+  const outcome = approvePendingPlugin(id);
+  return outcome.activated ? materializePluginSkills(outcome.package, { sourceId: outcome.state.sourceId, sourcePath: outcome.state.sourcePath, sourceCommit: outcome.state.sourceCommit, approvePermissions: true, autoUpdate: outcome.state.autoUpdate }, previous) : listChatSkills();
+}
+
+export function rollbackChatPlugin(id: string): ChatSkill[] {
+  rollbackPlugin(id);
+  const statePackage = readActivePluginPackage(id);
+  const state = readPluginState(id)!;
+  return materializePluginSkills(statePackage, { sourceId: state.sourceId, sourcePath: state.sourcePath, sourceCommit: state.sourceCommit, approvePermissions: true }, undefined);
+}
+
+export function removeChatPlugin(id: string): ChatSkill[] {
+  removeInstalledPlugin(id);
+  return write(listChatSkills().filter(skill => skill.plugin?.id !== id));
+}
+
+export function restorePluginSkillAuthorVersion(id: string): ChatSkill[] {
+  const skills = listChatSkills(), existing = skills.find(skill => skill.id === id);
+  if (!existing?.plugin || !existing.origin?.packageId) throw new Error('This skill is not supplied by an installed plugin.');
+  const base = pluginSkillBase(readActivePluginPackage(existing.plugin.id), existing.origin.packageId);
+  if (!base) throw new Error('The author version is no longer available.');
+  return write(skills.map(skill => skill.id === id ? { ...skill, name: base.manifest.name, description: base.manifest.description, instructions: base.files['SKILL.md'], overrides: undefined } : skill));
 }
 export function exportSkillDirectory(id: string, parent: string): string {
   const skill = listChatSkills().find(s => s.id === id);

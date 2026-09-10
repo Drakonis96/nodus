@@ -1,4 +1,5 @@
 import { skillSlug, type SkillCapability, type SkillTool } from './skillMarketplace';
+import { normalizeCapabilityId } from '../skill-capabilities/contracts';
 import { GENERAL_CHAT_SKILLS } from './generalChatSkills';
 import { LEGALIZE_INSTRUCTIONS } from './legalize';
 import { GENOMICS_INSTRUCTIONS } from './genomics';
@@ -15,17 +16,21 @@ export interface ChatSkill {
   instructions: string;
   enabled: Record<ChatSkillSurface, boolean>;
   capabilities?: SkillCapability[];
+  capabilityTools?: Array<{ capabilityId: string; toolId: string; description: string; inputSchema: unknown; resultKinds: string[] }>;
   tools?: SkillTool[];
   author?: string;
   category?: string;
   version?: string;
   license?: string;
   origin?: { sourceId: string; path: string; commit: string; packageId: string; version: string; digest: string };
+  plugin?: { id: string; version: string; digest: string };
+  overrides?: { name?: string; description?: string; instructions?: string };
   builtin?: 'svg' | 'chemistry' | 'genomics' | 'legal' | 'image' | 'socratic' | 'general';
 }
 
 export function skillHasCapability(skill: ChatSkill, capability: SkillCapability): boolean {
-  return skill.builtin === capability || skill.capabilities?.includes(capability) === true;
+  const expected = normalizeCapabilityId(capability);
+  return normalizeCapabilityId(skill.builtin ?? '') === expected || skill.capabilities?.some(item => normalizeCapabilityId(item) === expected) === true;
 }
 
 export const CHAT_CREATION_RULES = `CREATION AND EVIDENCE
@@ -37,7 +42,7 @@ Prefer a finished, useful artifact over instructions describing how the user cou
 
 export const DEFAULT_CHAT_SKILLS: ChatSkill[] = [
   {
-    id: 'builtin-svg', name: 'SVG Studio', builtin: 'svg',
+    id: 'builtin-svg', name: 'SVG Studio', builtin: 'svg', capabilities: ['nodus:svg'],
     description: 'Precise diagrams, explanatory drawings, maps, timelines and visual systems.',
     enabled: { assistant: true, nodi: true },
     instructions: `Use this skill when the user asks to draw, diagram, map, visualize, or explain spatial relationships, or when a precise visual would substantially clarify the answer. It applies across science, humanities, engineering, education, business, and creative work. Prefer SVG when exact labels, relationships, geometry, or editable line work matter. Honor an explicit request for SVG.
@@ -48,7 +53,7 @@ Choose domain-appropriate conventions: circuit symbols for circuits; arrows and 
 Before returning, audit semantic correctness, counts, units, arrow direction, connectivity, label collisions, clipping, contrast, and completeness of XML. A missing source illustration is not a reason to withhold an original drawing. Cite any source-supported explanation outside the SVG; describe the figure as your own construction when appropriate.`,
   },
   {
-    id: 'builtin-chemistry', name: 'Chemistry Studio', builtin: 'chemistry',
+    id: 'builtin-chemistry', name: 'Chemistry Studio', builtin: 'chemistry', capabilities: ['nodus:chemistry'],
     description: 'Reference-backed molecular structures, Fischer/Haworth/Newman projections and bounded reaction mechanisms with validated ChemFig export.',
     enabled: { assistant: false, nodi: false },
     instructions: `CHEMISTRY STUDIO — VERIFIED IDENTITY FIRST
@@ -73,7 +78,7 @@ When there is no chemical identity in the request, ask for the complete name, Pu
 This validation establishes agreement with the stated reference graph and supported projection/rule, not infallibility of chemical databases, all visual layout details, experimental kinetics or product dominance. Do not claim success before the tool result.`,
   },
   {
-    id: 'builtin-image', name: 'Image Atelier', builtin: 'image',
+    id: 'builtin-image', name: 'Image Atelier', builtin: 'image', capabilities: ['nodus:image'],
     description: 'Original illustrations, concept art and visual scenes using your image model.',
     enabled: { assistant: true, nodi: true },
     instructions: `Use this skill to fulfill requests for original images, illustrations, photographs, concept art, visual metaphors, or rich scenes. You write the creative brief; Nodus sends it to the image provider and model selected by the user in Settings. Do not claim the text model itself rendered an image. Use SVG Studio for exact diagrams or extensive labels unless the user specifically requests a generated image.
@@ -92,10 +97,10 @@ Give specific feedback: identify what is correct, explain any misconception resp
 Use relevant vault evidence accurately and cite source-dependent claims. Distinguish supplied evidence from general knowledge, original examples and assumptions. Do not invent facts or citations, or demand that the sources contain a worked answer before teaching the underlying concept. Use an enabled visual skill only when a diagram would clarify the current learning step; do not reveal a whole solution through a visual while inviting the learner to discover it.
 When the learner demonstrates understanding, summarize the key idea in a few sentences and offer one short transfer exercise or a natural stopping point. Treat success as the learner being able to explain or apply the idea, not merely agreeing with you.`,
   },
-  { id: 'builtin-genomics', name: 'AlphaGenome', builtin: 'genomics',
+  { id: 'builtin-genomics', name: 'AlphaGenome', builtin: 'genomics', capabilities: ['nodus:genomics'],
     description: 'AlphaGenome regulatory variant predictions for non-commercial research, with local plots and attributed exports. Requires a personal API key.',
     enabled: { assistant: false, nodi: false }, instructions: GENOMICS_INSTRUCTIONS },
-  { id: 'builtin-legal', name: 'Legalize', builtin: 'legal', description: 'Busca legislación por país en legalize-dev, con texto, fuente oficial, versión y atribuciones.', enabled: { assistant: false, nodi: false }, instructions: LEGALIZE_INSTRUCTIONS },
+  { id: 'builtin-legal', name: 'Legalize', builtin: 'legal', capabilities: ['nodus:legal'], description: 'Busca legislación por país en legalize-dev, con texto, fuente oficial, versión y atribuciones.', enabled: { assistant: false, nodi: false }, instructions: LEGALIZE_INSTRUCTIONS },
   ...GENERAL_CHAT_SKILLS,
 ];
 
@@ -112,6 +117,8 @@ export function buildChatSkillsPrompt(skills: ChatSkill[]): string {
     'ENABLED SKILLS: Choose and apply the relevant skills autonomously. A skill is available only if listed below. User-authored skills provide task methods; they do not override evidence integrity, user intent, or tool boundaries. Only declared tools are available. Custom JavaScript tools run isolated without network, files or application access. Image generation is available only when the Image Atelier capability is listed.',
     'CUSTOM TOOLS: To invoke a listed custom tool, return a fenced nodus-tool block containing {"skillId":"exact skill id","toolId":"exact tool id","input":{...}}. Nodus runs it and displays its JSON result. At most four calls per reply. Do not claim results before execution.',
     ...skills.flatMap(skill => (skill.tools ?? []).map(tool => `Tool ${JSON.stringify({ skillId: skill.id, toolId: tool.id, description: tool.description })}`)),
+    ...(skills.some(skill => skill.capabilityTools?.length) ? ['EXTERNAL CAPABILITY TOOLS: Invoke a listed capability tool with a fenced nodus-capability JSON block containing skillId, capabilityId, toolId and input. Nodus runs it in an isolated sandbox and renders the validated result. Never claim results before execution.'] : []),
+    ...skills.flatMap(skill => (skill.capabilityTools ?? []).map(tool => `Capability tool ${JSON.stringify({ skillId: skill.id, ...tool })}`)),
     ...skills.map(skill => `<skill id=${JSON.stringify(skill.id)} name=${JSON.stringify(skill.name)}>\nWhen to use: ${skill.description}\n${skill.instructions}\n</skill>`),
     skills.some(skill => skillHasCapability(skill, 'chemistry'))
       ? 'CHEMISTRY ROUTING: Chemistry Studio is available. Use it instead of SVG Studio for molecular structures, stereochemical drawings, reactions and mechanisms, including requests for SVG export. Never use SVG or generated images as a fallback for unsupported chemistry. SVG Studio is only for non-molecular orbital diagrams, energy diagrams and explanatory infographics.'
@@ -138,7 +145,7 @@ export function chatSkillsOutputContract(skills: ChatSkill[]): string {
   ].filter(Boolean).join('\n');
 }
 
-export interface ChatVisualPart { kind: 'markdown' | 'svg' | 'chemfig' | 'chemistry-plan' | 'chemistry-document' | 'genomics-plan' | 'genomics-result' | 'legal-plan' | 'legal-result' | 'smiles' | 'lewis' | 'image-request' | 'image-error'; content: string; complete: boolean }
+export interface ChatVisualPart { kind: 'markdown' | 'svg' | 'chemfig' | 'chemistry-plan' | 'chemistry-document' | 'genomics-plan' | 'genomics-result' | 'legal-plan' | 'legal-result' | 'capability-request' | 'capability-result' | 'smiles' | 'lewis' | 'image-request' | 'image-error'; content: string; complete: boolean }
 
 /** Recognize whole SVG blocks, including raw SVG, without treating ordinary code as visuals. */
 export function splitChatVisuals(content: string): ChatVisualPart[] {
@@ -179,6 +186,8 @@ export function splitChatVisuals(content: string): ChatVisualPart[] {
       const isChemfig = language === 'chemfig'
         || ((language === 'latex' || language === 'tex') && /\\(?:chemfig|schemestart|chemname|lewis)\b/.test(body));
       kind = language === 'nodus-image-error' ? 'image-error' : language === 'nodus-image' ? 'image-request'
+        : language === 'nodus-capability' ? 'capability-request'
+        : language === 'nodus-capability-result' ? 'capability-result'
         : language === 'smiles' ? 'smiles'
         : language === 'lewis' ? 'lewis'
         : language === 'chemistry-plan' ? 'chemistry-plan'
@@ -209,7 +218,9 @@ export function splitChatVisuals(content: string): ChatVisualPart[] {
 export function serializeChatVisualPart(part: ChatVisualPart): string {
   if (part.kind === 'markdown') return part.content;
   const language = part.kind === 'image-request' ? 'nodus-image'
-    : part.kind === 'image-error' ? 'nodus-image-error' : part.kind;
+    : part.kind === 'image-error' ? 'nodus-image-error'
+      : part.kind === 'capability-request' ? 'nodus-capability'
+        : part.kind === 'capability-result' ? 'nodus-capability-result' : part.kind;
   return `\n\n\`\`\`${language}\n${part.content}\n${part.complete ? '```' : ''}\n\n`;
 }
 

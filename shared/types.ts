@@ -1,4 +1,5 @@
 import type { SkillMarketplace } from './skillMarketplace';
+import type { InboxPluginSummary, InstalledPluginSummary } from '../skill-capabilities/contracts';
 import type { ChatSkill } from './chatSkills';
 import type { GenomicsStatus, GenomicsSettingsInput, GenomicsResult } from './genomics';
 // Shared domain types used by both the Electron main process and the React renderer.
@@ -8788,6 +8789,18 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   compileSmiles(source: string): Promise<string>;
   getChatImageMetadata(source: string): Promise<Record<string, string> | null>;
   copyChatImage(source: string): Promise<void>;
+  downloadCapabilityFile(source: string): Promise<void>;
+  listInstalledPlugins(): Promise<InstalledPluginSummary[]>;
+  listInboxPlugins(): Promise<InboxPluginSummary[]>;
+  approveInboxPlugin(directory: string): Promise<ChatSkill[]>;
+  discardInboxPlugin(directory: string): Promise<InboxPluginSummary[]>;
+  installMarketplacePlugin(sourceId: string, packagePath: string, commit: string, approvePermissions: boolean): Promise<ChatSkill[]>;
+  approvePlugin(id: string): Promise<ChatSkill[]>;
+  setPluginAutoUpdate(id: string, enabled: boolean): Promise<InstalledPluginSummary[]>;
+  rollbackPlugin(id: string): Promise<ChatSkill[]>;
+  removePlugin(id: string): Promise<ChatSkill[]>;
+  configurePluginSecret(pluginId: string, capabilityId: string, secretId: string, value: string): Promise<InstalledPluginSummary[]>;
+  restorePluginSkillAuthorVersion(id: string): Promise<ChatSkill[]>;
   listNodiConversations(): Promise<NodiConversation[]>;
   getNodiConversation(id: string): Promise<NodiConversation | null>;
   saveNodiConversation(input: NodiConversationInput): Promise<NodiConversation>;
