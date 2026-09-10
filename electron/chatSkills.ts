@@ -3,7 +3,7 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { DEFAULT_CHAT_SKILLS, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
+import { DEFAULT_CHAT_SKILLS, builtinSkillForPackage, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
 
 const file = () => path.join(app.getPath('userData'), 'chat-skills.json');
 const LIBRARY_VERSION = 12;
@@ -90,6 +90,20 @@ export function deleteChatSkill(id: string): ChatSkill[] {
   const result = write(skills.filter(skill => skill.id !== id));
   if (skills.some(s => s.id === id)) fs.rmSync(skillDirectory(id), { recursive: true, force: true });
   return result;
+}
+/** Reinstall a single built-in published by the official catalog. The bundled definition is
+ * restored, never repository text, so the skill returns exactly as this build ships it — including
+ * capabilities that no downloaded package may declare — and the rest of the library is untouched. */
+export function installBuiltinChatSkill(packageId: string): ChatSkill[] {
+  const preset = builtinSkillForPackage(packageId);
+  if (!preset) throw new Error('This package is not a built-in Nodus skill.');
+  const skills = listChatSkills(), restored = structuredClone(preset);
+  // Reinstalling one already present restores its shipped instructions and activation in place.
+  if (skills.some(skill => skill.id === preset.id)) return write(skills.map(skill => skill.id === preset.id ? restored : skill));
+  // Otherwise return the skill to its shipped position instead of the end of the library.
+  const order = DEFAULT_CHAT_SKILLS.map(skill => skill.id);
+  const next = skills.findIndex(skill => order.includes(skill.id) && order.indexOf(skill.id) > order.indexOf(preset.id));
+  return write(next === -1 ? [...skills, restored] : [...skills.slice(0, next), restored, ...skills.slice(next)]);
 }
 export function restoreChatSkills(): ChatSkill[] {
   const skills = listChatSkills();

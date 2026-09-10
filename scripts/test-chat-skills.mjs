@@ -399,3 +399,40 @@ test('custom tools are gated by the active skill snapshot and results cannot inv
   assert.match(await lib.executeChatSkills(body, { ...session, skills: [] }), /not enabled/); assert.equal(calls, 1);
   await lib.executeChatSkills(Array(5).fill(body).join('\n'), session); assert.equal(calls, 5);
 });
+
+test('every built-in is published under the identifier the marketplace export produces', () => {
+  // scripts/sync-skill-marketplace.mjs derives the package directory from the skill name; the
+  // catalog can only recognize an installed built-in while both rules agree.
+  for (const skill of lib.DEFAULT_CHAT_SKILLS) {
+    const id = skill.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    assert.equal(lib.BUILTIN_SKILL_PACKAGES[id], skill.id, `${skill.name} is not published as ${id}`);
+    assert.equal(lib.builtinSkillForPackage(id).name, skill.name);
+  }
+  assert.equal(Object.keys(lib.BUILTIN_SKILL_PACKAGES).length, lib.DEFAULT_CHAT_SKILLS.length, 'two built-ins share one package identifier');
+  assert.equal(lib.builtinSkillForPackage('descriptive-statistics'), undefined);
+});
+
+test('a built-in can be uninstalled and reinstalled alone, keeping every other skill as it was', () => {
+  lib.restoreChatSkills();
+  const edited = lib.listChatSkills().find(skill => skill.builtin === 'chemistry');
+  lib.saveChatSkill({ ...edited, instructions: 'Keep my edited chemistry instructions.', enabled: { assistant: true, nodi: false } });
+  const personal = lib.saveChatSkill({ name: 'Personal method', description: 'For reviews', instructions: 'Give two recommendations.', enabled: { assistant: true, nodi: true } }).find(skill => !skill.builtin);
+  const svg = lib.listChatSkills()[0];
+  assert.equal(svg.builtin, 'svg');
+  const removed = lib.deleteChatSkill(svg.id);
+  assert.equal(removed.some(skill => skill.id === svg.id), false);
+  assert.equal(fs.existsSync(path.join(temporary, 'skills', svg.id)), false);
+  assert.equal(lib.enabledChatSkills('assistant').some(skill => skill.builtin === 'svg'), false);
+  const restored = lib.installBuiltinChatSkill('svg-studio');
+  assert.deepEqual(restored[0], lib.DEFAULT_CHAT_SKILLS[0], 'the built-in returns to its shipped definition and position');
+  assert.equal(fs.existsSync(path.join(temporary, 'skills', svg.id, 'SKILL.md')), true);
+  assert.equal(restored.find(skill => skill.builtin === 'chemistry').instructions, 'Keep my edited chemistry instructions.');
+  assert.deepEqual(restored.find(skill => skill.id === personal.id), personal, 'a personal skill is untouched');
+  // Reinstalling one already present restores the shipped text in place instead of duplicating it.
+  lib.saveChatSkill({ ...restored[0], instructions: 'My own drawing rules.' });
+  const again = lib.installBuiltinChatSkill('svg-studio');
+  assert.equal(again.filter(skill => skill.builtin === 'svg').length, 1);
+  assert.deepEqual(again[0], lib.DEFAULT_CHAT_SKILLS[0]);
+  assert.throws(() => lib.installBuiltinChatSkill('descriptive-statistics'), /not a built-in/);
+  lib.deleteChatSkill(personal.id);
+});

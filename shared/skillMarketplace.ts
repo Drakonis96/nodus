@@ -20,6 +20,9 @@ export interface SkillPackage { manifest: SkillManifest; files: Record<string, s
 export interface MarketplaceEntry { path: string; package: SkillPackage }
 export interface SkillSource { id: string; url: string; commit?: string; updatedAt?: string; entries: MarketplaceEntry[]; errors: string[] }
 export interface SkillMarketplace { version: 1; sources: SkillSource[] }
+/** The official catalog publishes this build's own built-in skills; a community source that
+ * happens to reuse one of those package identifiers is a different, downloadable skill. */
+export const isOfficialSkillSource = (url: string) => url.trim().toLowerCase().replace(/\/$/, '') === DEFAULT_SKILL_SOURCE.toLowerCase();
 export const skillSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64) || 'my-skill';
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 // Reject control characters in package text while allowing tabs and line breaks.
