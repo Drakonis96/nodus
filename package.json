@@ -53,6 +53,7 @@
     "test:adaptive-concurrency": "node --test scripts/test-ai-request-gate.mjs scripts/test-ai-ordered-pool.mjs scripts/test-ordered-publication-barrier.mjs scripts/test-strict-embeddings.mjs scripts/test-gemini-embedding-batch.mjs scripts/test-adaptive-concurrency-audit.mjs",
     "test:e2e:saved-authors": "node scripts/e2e-saved-authors.mjs",
     "test:e2e:deep-research-annotations": "npm run build && node scripts/e2e-deep-research-annotations.mjs",
+    "test:e2e:deep-research-section-length": "node scripts/e2e-deep-research-section-length.mjs",
     "test:e2e:library-reader": "npm run build && node scripts/e2e-library-reader.mjs",
     "test:e2e:view-snapshots": "npm run build && node scripts/e2e-view-snapshots.mjs",
     "test:e2e:global-library": "npm run build && node scripts/e2e-global-library.mjs",

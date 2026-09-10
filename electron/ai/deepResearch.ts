@@ -2,6 +2,15 @@ import type { DeepResearchProgress, DeepResearchReport, DeepResearchRequest, Mod
 import { deepResearchPlanningPromptPack } from '@shared/deepResearchPlanningPromptPacks';
 import { deepResearchQualityPromptPack } from '@shared/deepResearchQualityPromptPacks';
 import { deepResearchWritingPromptPack, deepResearchWritingRuntimeCopy } from '@shared/deepResearchWritingPromptPacks';
+import { deepResearchLengthPromptPack, isEmptyContinuation } from '@shared/deepResearchLengthPromptPacks';
+import {
+  countDeepResearchWords,
+  extendDeepResearchSection,
+  normalizeDeepResearchSectionLength,
+  planDeepResearchSectionLength,
+  type DeepResearchSectionLength,
+  type DeepResearchSectionLengthPlan,
+} from '@shared/deepResearchSectionLength';
 import type { DeepResearchApproach } from '@shared/deepResearchApproaches';
 import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
 import {
@@ -109,7 +118,10 @@ export async function generateDeepResearchReport(
   signal?.throwIfAborted();
   const approach = normalizeDeepResearchApproach(request.approach);
   const deepResearchVersion = parseDeepResearchRequestVersion(request.deepResearchVersion);
-  const versionedRequest: DeepResearchRequest = { ...request, deepResearchVersion };
+  // Normalized once at the entry point every variant shares, so Study, Teaching,
+  // Genealogy and both academic engines record the same value on their reports.
+  const sectionLength = normalizeDeepResearchSectionLength(request.sectionLength);
+  const versionedRequest: DeepResearchRequest = { ...request, deepResearchVersion, sectionLength };
   let report: DeepResearchReport;
   // Study and teaching share one pipeline over the local study_* corpus. Teaching adds
   // the extracted idea network and the unit prompts, selected by `unitMode`; the vault
@@ -119,14 +131,14 @@ export async function generateDeepResearchReport(
       ? await requestWithCoverageQuestions(versionedRequest, model, signal)
       : versionedRequest;
     report = await generateStudyDeepResearchReport({ ...routedRequest, unitMode: true }, model, onProgress, signal);
-    return withGenerationMetadata(report, approach, deepResearchVersion, model);
+    return withGenerationMetadata(report, approach, deepResearchVersion, model, sectionLength);
   }
   if (request.studyMode || getActiveVault().type === 'estudio') {
     const routedRequest = deepResearchVersion === 'v2'
       ? await requestWithCoverageQuestions(versionedRequest, model, signal)
       : versionedRequest;
     report = await generateStudyDeepResearchReport(routedRequest, model, onProgress, signal);
-    return withGenerationMetadata(report, approach, deepResearchVersion, model);
+    return withGenerationMetadata(report, approach, deepResearchVersion, model, sectionLength);
   }
   // A genealogy vault has no idea graph; its Deep Research writes a family-history
   // report over the embedding-indexed archive + library instead (own pipeline).
@@ -135,19 +147,19 @@ export async function generateDeepResearchReport(
       ? await requestWithCoverageQuestions(versionedRequest, model, signal)
       : versionedRequest;
     report = await generateGenealogyDeepResearchReport(routedRequest, onProgress, signal);
-    return withGenerationMetadata(report, approach, deepResearchVersion, model);
+    return withGenerationMetadata(report, approach, deepResearchVersion, model, sectionLength);
   }
   // Both academic routes are graph-first. Full-document profiles are prepared and
   // queried only after the orchestrator has frozen the argument.
   const deps = deepResearchEnginePath(deepResearchVersion, approach) === 'v1-general'
-      ? legacyAcademicDeps(model)
+      ? legacyAcademicDeps(model, signal)
     : deepResearchEnginePath(deepResearchVersion, approach) === 'v1-specialized'
-      ? legacySpecializedAcademicDeps(model, approach, versionedRequest)
+      ? legacySpecializedAcademicDeps(model, approach, versionedRequest, signal)
       : deepResearchEnginePath(deepResearchVersion, approach) === 'v2-general'
       ? realDeps(model, signal)
       : specializedAcademicDeps(model, approach, versionedRequest, signal);
   report = await orchestrateDeepResearch({ ...versionedRequest, model }, deps, onProgress, signal);
-  return withGenerationMetadata(report, approach, deepResearchVersion, model);
+  return withGenerationMetadata(report, approach, deepResearchVersion, model, sectionLength);
 }
 
 /** Exact production planning path without section writing. Used by the isolated
@@ -389,11 +401,19 @@ export function deepResearchEnginePath(
   return characterizeDeepResearchEngine(version, deepResearchApproachPath(approachValue) === 'specialized');
 }
 
+/**
+ * The one seam every variant returns through — academic v1/v2, the specialized
+ * approaches, Study, Teaching and Genealogy — so generation-time provenance is
+ * recorded once instead of five times. The requested section length belongs here
+ * for the same reason: reusing a prompt has to restore it whichever pipeline wrote
+ * the report, and a report written before the control reads back as `'auto'`.
+ */
 function withGenerationMetadata(
   report: DeepResearchReport,
   approach: DeepResearchApproach,
   deepResearchVersion: DeepResearchVersion,
   model: ModelRef | null,
+  sectionLength: DeepResearchSectionLength = 'auto',
 ): DeepResearchReport {
   return {
     ...report,
@@ -402,20 +422,21 @@ function withGenerationMetadata(
       brief: { ...report.draft.brief, deepResearchApproach: approach, deepResearchVersion },
       deepResearchApproach: approach,
       deepResearchVersion,
+      deepResearchSectionLength: report.draft.deepResearchSectionLength ?? sectionLength,
       generationModel: model ? { ...model } : null,
     },
-    meta: { ...report.meta, deepResearchVersion },
+    meta: { ...report.meta, deepResearchVersion, sectionLength: report.meta.sectionLength ?? sectionLength },
   };
 }
 
 /** Reproducible compatibility engine. It preserves the historical idea/passage
  * retrieval architecture while sharing the current evidence-driven (length-free)
  * writing and citation safety contract. */
-function legacyAcademicDeps(model: ModelRef | null): DeepResearchDeps {
+function legacyAcademicDeps(model: ModelRef | null, signal?: AbortSignal): DeepResearchDeps {
   return {
     buildSnapshot: (brief) => buildHistoricalWritingWorkshopSnapshot(brief),
     planReport: (input) => aiPlanReport(input, model),
-    writeSection: (input) => aiWriteSection(input, model),
+    writeSection: (input) => aiWriteSection(input, model, undefined, signal),
     finalize: (input) => aiFinalize(input, model),
     retrieveForSection: (input) => retrieveSectionMaterialLegacy(input),
     verifyCitations: (claims, language) => aiVerifyCitations(claims, model, language),
@@ -427,6 +448,7 @@ function legacySpecializedAcademicDeps(
   model: ModelRef | null,
   approach: DeepResearchApproach,
   request: DeepResearchRequest,
+  signal?: AbortSignal,
 ): DeepResearchDeps {
   let context: AcademicApproachContext = {
     approach,
@@ -456,7 +478,7 @@ function legacySpecializedAcademicDeps(
       return merged;
     },
     planReport: (input) => aiPlanReport(input, model, context),
-    writeSection: (input) => aiWriteSection(input, model, context),
+    writeSection: (input) => aiWriteSection(input, model, context, signal),
     finalize: (input) => aiFinalize(input, model, context),
     retrieveForSection: (input) => retrieveSectionMaterialLegacy(input),
     verifyCitations: (claims, language) => aiVerifyCitations(claims, model, language),
@@ -474,7 +496,7 @@ function realDeps(model: ModelRef | null, signal?: AbortSignal): DeepResearchDep
       return snapshot;
     },
     planReport: (input) => aiPlanReport({ ...input, relationships }, model),
-    writeSection: (input) => aiWriteSection(input, model),
+    writeSection: (input) => aiWriteSection(input, model, undefined, signal),
     finalize: (input) => aiFinalize(input, model),
     auditFinalSummary: (input, draft) => aiAuditFinalSummary(input, draft, model),
     decomposeObjective: (objective, language) => aiDecomposeObjective(objective, language, model),
@@ -546,7 +568,7 @@ function specializedAcademicDeps(
       return merged;
     },
     planReport: (input) => aiPlanReport(input, model, context),
-    writeSection: (input) => aiWriteSection(input, model, context),
+    writeSection: (input) => aiWriteSection(input, model, context, signal),
     finalize: (input) => aiFinalize(input, model, context),
     auditFinalSummary: (input, draft) => aiAuditFinalSummary(input, draft, model, context),
     decomposeObjective: (objective, language) => aiDecomposeObjective(objective, language, model),
@@ -979,14 +1001,24 @@ async function aiPlanReport(input: PlanInput, model: ModelRef | null, approach?:
     sectionMode: input.sectionMode,
     approachRules: approach?.rules.planner ?? [],
   });
-  const system = promptPack.planReport;
+  // The length steer reaches the planner in the report's own language, so a section
+  // mandate is designed wide enough for the development the user asked for.
+  const lengthPack = deepResearchLengthPromptPack(input.language);
+  const lengthWords = input.sectionLength?.targetWords ?? null;
+  const system = lengthWords === null
+    ? promptPack.planReport
+    : `${promptPack.planReport}\n${lengthPack.plan(lengthWords)}`;
   const user = JSON.stringify(
     {
       objetivo: input.objective,
       idioma: input.language,
       audiencia: input.audience ?? null,
-      secciones_objetivo: input.sectionCount,
-      arquitectura_sugerida: input.sectionMode === 'user' ? 'preferencia_organizativa_del_usuario' : 'derivada_de_la_evidencia',
+      // The same number means different things in the two modes, so it is named
+      // for what it is: a ceiling the user chose, or an evidence-derived target.
+      ...(input.sectionMode === 'user'
+        ? { secciones_maximas: input.sectionCount, arquitectura_sugerida: 'maximo_fijado_por_el_usuario' }
+        : { secciones_objetivo: input.sectionCount, arquitectura_sugerida: 'derivada_de_la_evidencia' }),
+      ...(lengthWords === null ? {} : { palabras_orientativas_por_seccion: lengthWords }),
       preguntas_de_cobertura_obligatoria: input.coverageQuestions,
       ideas: input.ideas,
       temas: input.themes,
@@ -1224,9 +1256,16 @@ async function aiPlanSectionEvidence(
   approach?: AcademicApproachContext,
 ): Promise<SectionEvidencePlan> {
   const copy = deepResearchWritingRuntimeCopy(input.language);
-  const system = deepResearchWritingPromptPack(input.language, {
+  const lengthPlan = sectionLengthPlanOf(input);
+  const base = deepResearchWritingPromptPack(input.language, {
     approachRules: approach?.rules.writer ?? [],
   }).evidencePlan;
+  // A longer section is planned as MORE distinct evidence-bearing paragraphs, not
+  // as longer ones: the paragraph writer below then produces each in its own
+  // bounded call, so structure, citations and context survive the extra length.
+  const system = lengthPlan.targetWords === null
+    ? base
+    : `${base}\n${deepResearchLengthPromptPack(input.language).evidencePlan(lengthPlan.paragraphTarget, lengthPlan.targetWords)}`;
   const user = JSON.stringify({
     objetivo: input.objective,
     seccion: {
@@ -1288,64 +1327,124 @@ async function aiPlanSectionEvidence(
   };
 }
 
-async function aiWriteSection(input: SectionInput, model: ModelRef | null, approach?: AcademicApproachContext): Promise<string> {
+/** The length plan for one section, defaulting to auto for pre-control callers. */
+function sectionLengthPlanOf(input: SectionInput): DeepResearchSectionLengthPlan {
+  return input.sectionLength ?? planDeepResearchSectionLength('auto');
+}
+
+async function aiWriteSection(
+  input: SectionInput,
+  model: ModelRef | null,
+  approach?: AcademicApproachContext,
+  signal?: AbortSignal,
+): Promise<string> {
   const copy = deepResearchWritingRuntimeCopy(input.language);
   if ((input.evidencePlan?.paragraphs.length ?? 0) >= 1) {
     try {
-      return await aiWriteSectionParagraphByParagraph(input, model, approach);
+      return await aiWriteSectionParagraphByParagraph(input, model, approach, signal);
     } catch {
       /* one bounded monolithic fallback keeps provider hiccups non-fatal */
     }
   }
-  const system = deepResearchWritingPromptPack(input.language, {
+  const lengthPlan = sectionLengthPlanOf(input);
+  const lengthPack = deepResearchLengthPromptPack(input.language);
+  const base = deepResearchWritingPromptPack(input.language, {
     approachRules: approach?.rules.writer ?? [],
     narrativeRules: deepResearchNarrativeRules(input.language),
     isConclusion: input.isConclusion,
   }).sectionWriter;
-  const user = JSON.stringify(
-    {
-      objetivo: input.objective,
-      idioma: input.language,
-      seccion: { titulo: input.section.title, proposito: input.section.purpose, proposiciones_a_contrastar: sectionClaimsForWriting(input.section), preguntas_de_cobertura: input.section.coverageQuestions ?? [] },
-      menu_de_citas: input.citationMenu,
-      recorrido_secciones_previas: input.priorSummary || copy.firstSectionPath,
-      afirmaciones_ya_desarrolladas: input.alreadyDeveloped,
-      responsabilidades_reservadas_a_otras_secciones: input.reservedForOtherSections ?? [],
-      plan_probatorio: input.evidencePlan ?? null,
-      auditoria_epistemologica: input.claimAudit ?? null,
-      ...(approach ? {
-        enfoque_de_investigacion: approach.approach,
-        comparandos: approach.retrieval.comparands,
-        ejes: approach.retrieval.axes,
-        fases: approach.retrieval.phases,
-        relaciones_del_grafo: approach.relationships.slice(0, 40),
-      } : {}),
+  const system = lengthPlan.targetWords === null
+    ? base
+    : `${base}\n${lengthPack.section(lengthPlan.targetWords)}`;
+  const payload = {
+    objetivo: input.objective,
+    idioma: input.language,
+    seccion: { titulo: input.section.title, proposito: input.section.purpose, proposiciones_a_contrastar: sectionClaimsForWriting(input.section), preguntas_de_cobertura: input.section.coverageQuestions ?? [] },
+    menu_de_citas: input.citationMenu,
+    recorrido_secciones_previas: input.priorSummary || copy.firstSectionPath,
+    afirmaciones_ya_desarrolladas: input.alreadyDeveloped,
+    responsabilidades_reservadas_a_otras_secciones: input.reservedForOtherSections ?? [],
+    plan_probatorio: input.evidencePlan ?? null,
+    auditoria_epistemologica: input.claimAudit ?? null,
+    ...(approach ? {
+      enfoque_de_investigacion: approach.approach,
+      comparandos: approach.retrieval.comparands,
+      ejes: approach.retrieval.axes,
+      fases: approach.retrieval.phases,
+      relaciones_del_grafo: approach.relationships.slice(0, 40),
+    } : {}),
+  };
+  const user = JSON.stringify(payload, null, 2);
+  // The first pass keeps its historical budget so an auto-length report is byte-for
+  // byte unchanged; only a chosen length raises it, and only within the shared cap.
+  const firstPassTokens = lengthPlan.targetWords === null ? 5200 : Math.max(5200, lengthPlan.maxTokensPerPass);
+  const first = await completeText({ system, user, temperature: 0.3, maxTokens: firstPassTokens }, model);
+  if (lengthPlan.targetWords === null) return first;
+  // A long section is produced by BOUNDED CONTINUATIONS, never by asking one
+  // response for 20.000 words: every provider — and every local runtime — answers
+  // a ~1.000-word request reliably, and each pass is its own cancellation point.
+  const outcome = await extendDeepResearchSection({
+    plan: lengthPlan,
+    initial: first,
+    signal,
+    countWords: countDeepResearchWords,
+    writeContinuation: async (context) => {
+      const continuationUser = JSON.stringify({
+        ...payload,
+        seccion_escrita_hasta_ahora: context.produced.slice(-4_000),
+        palabras_escritas: context.wordsSoFar,
+        palabras_restantes: context.remainingWords,
+      }, null, 2);
+      const raw = await completeText({
+        system: `${system}\n${lengthPack.continuation(context.remainingWords, context.passWords)}\n${lengthPack.continuationStop}`,
+        user: continuationUser,
+        temperature: 0.3,
+        maxTokens: lengthPlan.maxTokensPerPass,
+      }, model);
+      // The model saying "nothing supported left to add" is a SUCCESSFUL stop, not
+      // a failure: returning '' ends the loop instead of padding the report.
+      if (isEmptyContinuation(raw)) return '';
+      return raw
+        .replace(/^```(?:markdown)?\s*/iu, '')
+        .replace(/\s*```$/u, '')
+        .replace(/^#{1,6}\s+[^\n]+\n+/u, '')
+        .trim();
     },
-    null,
-    2
-  );
-  return completeText({ system, user, temperature: 0.3, maxTokens: 5200 }, model);
+  });
+  return outcome.markdown;
 }
 
 async function aiWriteSectionParagraphByParagraph(
   input: SectionInput,
   model: ModelRef | null,
   approach?: AcademicApproachContext,
+  signal?: AbortSignal,
 ): Promise<string> {
   const copy = deepResearchWritingRuntimeCopy(input.language);
   const plan = input.evidencePlan!;
+  const lengthPlan = sectionLengthPlanOf(input);
+  // Words per paragraph, derived from the section target and the paragraphs the
+  // evidence actually sustained. Evidence decides how many; the target only
+  // decides how fully each one is developed.
+  const paragraphWords = lengthPlan.targetWords === null
+    ? null
+    : Math.max(120, Math.min(600, Math.round(lengthPlan.targetWords / Math.max(1, plan.paragraphs.length))));
   const menuByToken = new Map(input.citationMenu.map((item) => [item.token, item]));
   const written: string[] = [];
   for (let index = 0; index < plan.paragraphs.length; index += 1) {
+    signal?.throwIfAborted();
     const paragraph = plan.paragraphs[index];
     const evidence = paragraph.evidenceTokens
       .map((token) => menuByToken.get(token))
       .filter((item): item is NonNullable<typeof item> => Boolean(item));
     if (!evidence.length) continue;
-    const system = deepResearchWritingPromptPack(input.language, {
+    const paragraphBase = deepResearchWritingPromptPack(input.language, {
       approachRules: approach?.rules.writer ?? [],
       narrativeRules: deepResearchNarrativeRules(input.language),
     }).paragraphWriter;
+    const system = paragraphWords === null
+      ? paragraphBase
+      : `${paragraphBase}\n${deepResearchLengthPromptPack(input.language).paragraph(paragraphWords)}`;
     const user = JSON.stringify({
       objetivo: input.objective,
       seccion: {
@@ -1364,7 +1463,12 @@ async function aiWriteSectionParagraphByParagraph(
       responsabilidades_reservadas_a_otras_secciones: input.reservedForOtherSections ?? [],
       cierre_del_parrafo_anterior: written.length ? written[written.length - 1].slice(-900) : copy.sectionStart,
     }, null, 2);
-    const raw = await completeText({ system, user, temperature: 0.12, maxTokens: 1500 }, model);
+    const raw = await completeText({
+      system,
+      user,
+      temperature: 0.12,
+      maxTokens: paragraphWords === null ? 1500 : Math.max(1500, Math.round(paragraphWords * 2.4) + 400),
+    }, model);
     const cleaned = raw
       .replace(/^```(?:markdown)?\s*/iu, '')
       .replace(/\s*```$/u, '')

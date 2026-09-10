@@ -165,28 +165,28 @@ type SectionMode = 'auto' | 'user' | 'evidence';
 function countGuidance(language: PromptLanguage, sectionCount: number, sectionMode: SectionMode): string {
   const copy: Record<PromptLanguage, string> = {
     es: sectionMode === 'user'
-      ? `El usuario prefiere una arquitectura de ${sectionCount} secciones amplias. Es una preferencia organizativa, nunca un límite de contenido ni una obligación de rellenar.`
+      ? `El usuario ha fijado un MÁXIMO de ${sectionCount} secciones amplias. No devuelvas más de ${sectionCount}; si la evidencia solo justifica menos, devuelve menos. Es un límite de ARQUITECTURA, nunca de contenido: agrupa el material en esas secciones en lugar de descartarlo, y no rellenes para llegar a la cifra.`
       : `La evidencia recuperada sugiere ${sectionCount} movimientos argumentales amplios. Usa únicamente los cortes que correspondan a funciones intelectuales distintas.`,
     en: sectionMode === 'user'
-      ? `The user prefers an architecture of ${sectionCount} broad sections. This is an organizational preference, never a content limit or an obligation to fill space.`
+      ? `The user set a MAXIMUM of ${sectionCount} broad sections. Never return more than ${sectionCount}; if the evidence only warrants fewer, return fewer. This bounds the ARCHITECTURE, never the content: group the material into those sections instead of discarding it, and do not pad to reach the number.`
       : `The retrieved evidence suggests ${sectionCount} broad argumentative moves. Use only divisions that correspond to distinct intellectual functions.`,
     fr: sectionMode === 'user'
-      ? `L’utilisateur préfère une architecture de ${sectionCount} grandes sections. Il s’agit d’une préférence organisationnelle, jamais d’une limite de contenu ni d’une obligation de remplir l’espace.`
+      ? `L’utilisateur a fixé un MAXIMUM de ${sectionCount} grandes sections. Ne renvoyez jamais plus de ${sectionCount} ; si les éléments n’en justifient que moins, renvoyez-en moins. Cette limite porte sur l’ARCHITECTURE, jamais sur le contenu : regroupez la matière dans ces sections au lieu de l’écarter, et ne remplissez pas pour atteindre le chiffre.`
       : `Les éléments récupérés suggèrent ${sectionCount} grands mouvements argumentatifs. N’utilisez que les coupures correspondant à des fonctions intellectuelles distinctes.`,
     de: sectionMode === 'user'
-      ? `Der Nutzer bevorzugt eine Architektur aus ${sectionCount} umfassenden Abschnitten. Dies ist eine organisatorische Präferenz, niemals eine Inhaltsgrenze oder eine Pflicht, Raum zu füllen.`
+      ? `Der Nutzer hat ein MAXIMUM von ${sectionCount} umfassenden Abschnitten festgelegt. Geben Sie nie mehr als ${sectionCount} zurück; rechtfertigen die Belege nur weniger, geben Sie weniger zurück. Die Grenze betrifft die ARCHITEKTUR, nie den Inhalt: Bündeln Sie das Material in diesen Abschnitten, statt es zu verwerfen, und füllen Sie nicht auf, um die Zahl zu erreichen.`
       : `Die abgerufenen Belege legen ${sectionCount} umfassende argumentative Schritte nahe. Verwenden Sie nur Einschnitte, die unterschiedlichen intellektuellen Funktionen entsprechen.`,
     pt: sectionMode === 'user'
-      ? `O utilizador prefere uma arquitetura de ${sectionCount} secções amplas. É uma preferência organizativa, nunca um limite de conteúdo nem uma obrigação de preencher espaço.`
+      ? `O utilizador fixou um MÁXIMO de ${sectionCount} secções amplas. Nunca devolvas mais de ${sectionCount}; se a evidência só justificar menos, devolve menos. O limite é de ARQUITETURA, nunca de conteúdo: agrupa o material nessas secções em vez de o descartares e não encham para chegar ao número.`
       : `A evidência recuperada sugere ${sectionCount} movimentos argumentativos amplos. Usa apenas cortes que correspondam a funções intelectuais distintas.`,
     'pt-BR': sectionMode === 'user'
-      ? `O usuário prefere uma arquitetura de ${sectionCount} seções amplas. É uma preferência organizacional, nunca um limite de conteúdo nem uma obrigação de preencher espaço.`
+      ? `O usuário fixou um MÁXIMO de ${sectionCount} seções amplas. Nunca devolva mais de ${sectionCount}; se as evidências só justificarem menos, devolva menos. O limite é de ARQUITETURA, nunca de conteúdo: agrupe o material nessas seções em vez de descartá-lo e não encha para chegar ao número.`
       : `As evidências recuperadas sugerem ${sectionCount} movimentos argumentativos amplos. Use somente cortes que correspondam a funções intelectuais distintas.`,
     it: sectionMode === 'user'
-      ? `L’utente preferisce un’architettura di ${sectionCount} sezioni ampie. È una preferenza organizzativa, non un limite di contenuto né un obbligo di riempire spazio.`
+      ? `L’utente ha fissato un MASSIMO di ${sectionCount} sezioni ampie. Non restituire mai più di ${sectionCount}; se le evidenze ne giustificano meno, restituiscine meno. Il limite riguarda l’ARCHITETTURA, mai il contenuto: raggruppa il materiale in quelle sezioni invece di scartarlo e non riempire per raggiungere la cifra.`
       : `Le evidenze recuperate suggeriscono ${sectionCount} ampi passaggi argomentativi. Usa solo suddivisioni che corrispondano a funzioni intellettuali distinte.`,
     tr: sectionMode === 'user'
-      ? `Kullanıcı ${sectionCount} geniş bölümden oluşan bir mimariyi tercih ediyor. Bu bir düzenleme tercihidir; hiçbir zaman içerik sınırı veya alan doldurma zorunluluğu değildir.`
+      ? `Kullanıcı EN FAZLA ${sectionCount} geniş bölüm belirledi. Asla ${sectionCount} sayısından fazlasını döndürmeyin; kanıtlar yalnızca daha azını gerektiriyorsa daha azını döndürün. Bu sınır MİMARİYE ilişkindir, içeriğe değil: malzemeyi atmak yerine bu bölümlerde toplayın ve sayıya ulaşmak için doldurma yapmayın.`
       : `Erişilen kanıtlar ${sectionCount} geniş tartışma hamlesine işaret ediyor. Yalnızca farklı entelektüel işlevlere karşılık gelen kesimleri kullanın.`,
   };
   return copy[language];
