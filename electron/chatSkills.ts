@@ -1,9 +1,9 @@
-import { assertSkillCapabilitiesSupported, unsupportedSkillCapabilities, validateManifest, validateSkillPackage, skillSlug, type SkillPackage } from '@shared/skillMarketplace';
+import { assertSkillCapabilitiesSupported, officialSkillSourceId, unsupportedSkillCapabilities, validateManifest, validateSkillPackage, skillSlug, type SkillPackage } from '@shared/skillMarketplace';
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { DEFAULT_CHAT_SKILLS, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
+import { DEFAULT_CHAT_SKILLS, builtinSkillForPackage, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
 
 const file = () => path.join(app.getPath('userData'), 'chat-skills.json');
 const LIBRARY_VERSION = 12;
@@ -89,6 +89,26 @@ export function deleteChatSkill(id: string): ChatSkill[] {
   const skills = listChatSkills();
   const result = write(skills.filter(skill => skill.id !== id));
   if (skills.some(s => s.id === id)) fs.rmSync(skillDirectory(id), { recursive: true, force: true });
+  return result;
+}
+/** Reinstall a single built-in published by the official catalog. The bundled definition is
+ * restored, never repository text, so the skill returns exactly as this build ships it — including
+ * capabilities that no downloaded package may declare — and the rest of the library is untouched. */
+export function installBuiltinChatSkill(packageId: string): ChatSkill[] {
+  const preset = builtinSkillForPackage(packageId);
+  if (!preset) throw new Error('This package is not a built-in Nodus skill.');
+  const skills = listChatSkills(), restored = structuredClone(preset);
+  // Earlier builds let the official catalog install a downloaded copy of a skill Nodus already
+  // includes. Consolidate that duplicate here instead of leaving two equivalent skills behind.
+  const legacy = skills.filter(skill => skill.id !== preset.id && skill.origin?.sourceId === officialSkillSourceId() && skill.origin.packageId === packageId);
+  const library = skills.filter(skill => !legacy.includes(skill));
+  // Reinstalling one already present restores its shipped instructions and activation in place;
+  // otherwise the skill returns to its shipped position instead of the end of the library.
+  const order = DEFAULT_CHAT_SKILLS.map(skill => skill.id);
+  const next = library.findIndex(skill => order.includes(skill.id) && order.indexOf(skill.id) > order.indexOf(preset.id));
+  const result = write(library.some(skill => skill.id === preset.id) ? library.map(skill => skill.id === preset.id ? restored : skill)
+    : next === -1 ? [...library, restored] : [...library.slice(0, next), restored, ...library.slice(next)]);
+  for (const skill of legacy) fs.rmSync(skillDirectory(skill.id), { recursive: true, force: true });
   return result;
 }
 export function restoreChatSkills(): ChatSkill[] {
