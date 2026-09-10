@@ -480,6 +480,8 @@ test('every built-in is published under the identifier the marketplace export pr
     const id = skill.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     assert.equal(lib.BUILTIN_SKILL_PACKAGES[id], skill.id, `${skill.name} is not published as ${id}`);
     assert.equal(lib.builtinSkillForPackage(id).name, skill.name);
+    assert.match(skill.version ?? '', /^\d+\.\d+\.\d+$/, `${skill.name} needs a marketplace version`);
+    assert.ok(skill.category, `${skill.name} needs a marketplace category`);
   }
   assert.equal(Object.keys(lib.BUILTIN_SKILL_PACKAGES).length, lib.DEFAULT_CHAT_SKILLS.length, 'two built-ins share one package identifier');
   assert.equal(lib.builtinSkillForPackage('descriptive-statistics'), undefined);

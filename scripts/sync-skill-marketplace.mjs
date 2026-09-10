@@ -23,8 +23,8 @@ try {
     // Keep the separately curated PR700 packages and their required native capabilities.
     if (skill.builtin === 'genomics' || skill.builtin === 'legal') continue;
     const id = skill.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const category = ({ svg: 'Visual creation', image: 'Visual creation', chemistry: 'Science', socratic: 'Learning' })[skill.builtin] ?? 'Thinking and writing';
-    const manifest = { schemaVersion: 1, id, name: skill.name, version: skill.version ?? '1.0.0', author: 'Drakonis96', description: skill.description, category, license: 'AGPL-3.0-only', instructions: 'SKILL.md', capabilities: ['svg','image','chemistry'].includes(skill.builtin) ? [skill.builtin] : [], tools: [] };
+    if (!skill.category) throw new Error(`Built-in skill ${skill.name} needs a marketplace category.`);
+    const manifest = { schemaVersion: 1, id, name: skill.name, version: skill.version ?? '1.0.0', author: 'Drakonis96', description: skill.description, category: skill.category, license: 'AGPL-3.0-only', instructions: 'SKILL.md', capabilities: ['svg','image','chemistry'].includes(skill.builtin) ? [skill.builtin] : [], tools: [] };
     const dir = path.join(target, id); fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'skill.json'), JSON.stringify(manifest, null, 2) + '\n');
     fs.writeFileSync(path.join(dir, 'SKILL.md'), skill.instructions + '\n');
