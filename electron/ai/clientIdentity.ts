@@ -18,7 +18,7 @@ export function registerNodusClientVersion(version: string): void {
   if (trimmed) clientVersion = trimmed;
 }
 
-/** `Nodus/5.3.0`. Product name and running version — nothing about the user. */
+/** `Nodus/5.3.1`. Product name and running version — nothing about the user. */
 export function nodusUserAgent(): string {
   return `Nodus/${clientVersion}`;
 }

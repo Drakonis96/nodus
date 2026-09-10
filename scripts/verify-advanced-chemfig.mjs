@@ -159,7 +159,7 @@ try {
     await page.evaluate(() => window.nodus.updateSettings({ embeddingProvider: 'openrouter', embeddingModel: 'baai/bge-m3' }));
   }
   await page.evaluate(() => {
-    localStorage.setItem('nodus.lastSeenVersion', '5.3.0');
+    localStorage.setItem('nodus.lastSeenVersion', '5.3.1');
     for (const key of ['nodus.mobileTeaserSeen.3.2.4', 'nodus.platformHighlightsSeen.2026-07', 'nodus.toolkitBetaGuideSeen.2.4.0', 'nodus.tutorialVideosAnnouncementSeen.2026-07', 'nodus.pdfPresenterTutorialSeen.e2js_u-05OA']) localStorage.setItem(key, '1');
   });
   await page.reload();
