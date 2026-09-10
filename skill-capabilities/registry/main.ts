@@ -7,9 +7,8 @@ import { executeImageRequest } from '../builtins/image/main';
 import { executeLegal } from '../builtins/legal/main';
 import { refineSvg } from '../builtins/svg/main';
 import { executeExternalCapability } from '../external/main';
-import type { ChatSkillExecution } from './types';
-
-const MAX_EXTENSIBILITY_CALLS = 4;
+import { SANDBOXED_CALL_LIMIT } from '../contracts';
+import type { ChatCallBudget, ChatSkillExecution } from './types';
 
 export function assertChatSkillSession(execution: ChatSkillExecution, signal?: AbortSignal): void {
   signal?.throwIfAborted();
@@ -31,15 +30,17 @@ export async function executeRegisteredChatSkills(answer: string, execution: Cha
   if (chemistry.terminal) return chemistry.terminal;
   answer = chemistry.answer;
 
-  // JavaScript tools and external capabilities intentionally share one budget.
-  let extensibilityCalls = 0;
+  // Deterministic sandboxed work and work that can leave the machine are budgeted apart:
+  // a permissionless capability costs the same as a JavaScript tool, and only a capability
+  // that declares network, secrets or storage is charged to the strict lane.
+  const budget: ChatCallBudget = { sandboxed: 0, metered: 0 };
   const toolPattern = /```nodus-tool[ \t]*\r?\n([\s\S]*?)\r?\n```/g;
   let cursor = 0, processed = '';
   for (const match of answer.matchAll(toolPattern)) {
     processed += answer.slice(cursor, match.index);
     try {
       current();
-      if (++extensibilityCalls > MAX_EXTENSIBILITY_CALLS) throw new Error('At most four tool and capability calls are allowed per reply.');
+      if (++budget.sandboxed > SANDBOXED_CALL_LIMIT) throw new Error(`At most ${SANDBOXED_CALL_LIMIT} sandboxed tool and capability calls are allowed per reply.`);
       if (match[1].length > 64_000) throw new Error('Tool request is too large.');
       const request = JSON.parse(match[1]);
       const skill = execution.skills.find(item => item.id === request.skillId);
@@ -79,8 +80,7 @@ export async function executeRegisteredChatSkills(answer: string, execution: Cha
       continue;
     }
     if (part.kind === 'capability-request') {
-      if (++extensibilityCalls > MAX_EXTENSIBILITY_CALLS) result.push('\n\nCapability error: At most four tool and capability calls are allowed per reply.\n\n');
-      else result.push(await executeExternalCapability(part.content, part.complete, execution, signal));
+      result.push(await executeExternalCapability(part.content, part.complete, execution, budget, signal));
       continue;
     }
     if (part.kind === 'image-request') {

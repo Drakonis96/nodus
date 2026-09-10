@@ -163,6 +163,19 @@ export interface InboxPluginSummary {
   permissions: CapabilityPermissionSet;
 }
 
+/** Two lanes, because two very different costs were sharing one number. A JavaScript tool
+ *  and a capability that declares no permissions are deterministic, local and free: they
+ *  cannot reach the network, read a secret or persist anything, so the only thing a caller
+ *  spends is CPU. A capability that declares any permission can leave the machine, spend the
+ *  user's API quota and touch stored state, so it keeps the strict budget. */
+export const SANDBOXED_CALL_LIMIT = 16;
+export const METERED_CALL_LIMIT = 4;
+
+/** A capability is metered when it declares anything that reaches beyond its own sandbox. */
+export function capabilityIsMetered(permissions: CapabilityPermissionSet): boolean {
+  return Boolean(permissions.network?.length || permissions.secrets?.length || permissions.storage);
+}
+
 export interface CapabilityRegistryEntry {
   id: string;
   version: string;
