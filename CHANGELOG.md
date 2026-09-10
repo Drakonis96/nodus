@@ -5,6 +5,10 @@
 - The Marketplace now shows which skills you already have. Skills included in Nodus appear as installed instead of being offered again, an All / Installed / Available filter reviews your library from the catalog, and each installed skill can be uninstalled from its card or its detail page.
 - Installing a catalog entry that Nodus already includes restores the version shipped with your build instead of adding a duplicate skill with the same name, and removes a duplicate a previous version had already installed. AlphaGenome and Legalize can be restored this way too.
 - Uninstalling affects the skill only. Native capabilities stay in Nodus and come back with the skill, and My skills now explains that a built-in skill can be reinstalled from the Marketplace.
+- Skills can now come as plugins: one versioned package bundling several skills, or a skill with a sandboxed capability of its own. A capability runs in an ephemeral Chromium session with no Node, filesystem, application bridge, navigation or direct network access, and reaches the outside only through the HTTPS endpoints its manifest declares. Keys you configure are injected into the request by Nodus and are never visible to the plugin's code.
+- Plugins update as one unit and can always be undone. An update that asks for more than you approved waits for your approval, instructions you edited locally survive as an overlay you can reset to the author's version, and the previous version stays available for rollback. Auto-update is on for the official Marketplace and per-plugin opt-in for other sources.
+- Plugins dropped into the profile's plugins/inbox folder are listed for review with the exact permissions they request, and nothing in them runs before you approve it.
+- AlphaGenome and Legalize are ordinary capabilities now, so any compatible skill can declare them instead of them being reserved for the built-ins.
 
 ## 5.3.0 — 2026-09-09
 
