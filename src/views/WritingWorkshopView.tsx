@@ -18,6 +18,7 @@ import type {
   WritingWorkshopThemeCandidate,
   WritingWorkshopWorkCandidate,
 } from '@shared/types';
+import { PROMPT_LANGUAGE_OPTIONS } from '@shared/promptLanguageOptions';
 import { Badge, EDGE_LABELS, Icon, NODE_LABELS, modelLabel } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import { confirm } from '../components/feedback';
@@ -379,13 +380,9 @@ export function WritingWorkshopView({
           value={brief.language ?? 'es'}
           onChange={(e) => setBrief((current) => ({ ...current, language: e.target.value as WritingWorkshopBrief['language'] }))}
         >
-          <option value="es">Español</option>
-          <option value="en">English</option>
-          <option value="fr">Français</option>
-          <option value="de">Deutsch</option>
-          <option value="pt">Português (Portugal)</option>
-          <option value="pt-BR">Português (Brasil)</option>
-          <option value="tr">Türkçe</option>
+          {PROMPT_LANGUAGE_OPTIONS.map((option) => (
+            <option key={option.id} value={option.id}>{option.label}</option>
+          ))}
         </select>
         <ModelPicker settings={settings} value={selectedModel} onChange={setSelectedModel} compact menu />
         <div className="flex-1" />
