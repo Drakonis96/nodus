@@ -10,7 +10,7 @@ const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-marketplace-test-
 const bundle = path.join(temporary, 'test.cjs');
 await build({ stdin: { contents: `export * from './shared/skillMarketplace'; export * from './electron/skillMarketplace'; export * from './electron/chatSkills';`, resolveDir: root, loader: 'ts' }, outfile: bundle, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent', plugins: [{ name: 'isolated-profile', setup(api) {
   api.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'mock' }));
-  api.onLoad({ filter: /.*/, namespace: 'mock' }, () => ({ contents: `export const app = { getPath: () => ${JSON.stringify(temporary)} };` }));
+  api.onLoad({ filter: /.*/, namespace: 'mock' }, () => ({ contents: `export const app = { getPath: () => ${JSON.stringify(temporary)}, getVersion: () => '5.3.0' }; export const safeStorage = { isEncryptionAvailable: () => false };` }));
   api.onResolve({ filter: /^@shared\// }, ({ path: specifier }) => ({ path: path.join(root, 'shared', `${specifier.slice(8)}.ts`) }));
 } }] });
 const lib = createRequire(import.meta.url)(bundle);
@@ -101,7 +101,7 @@ test('local imports reject symlink escapes', () => {
   assert.throws(() => lib.importSkillDirectory(dir), /Invalid package file/);
 });
 
-test('reserved PR 700 capabilities are discoverable but cannot be installed, imported or enabled in an unsupported build', async () => {
+test('AlphaGenome and Legalize are registered capabilities available to compatible external skills', async () => {
   for (const capability of ['genomics', 'legal']) {
     const nativeManifest = { ...manifest, capabilities: [capability], tools: [] };
     const nativePackage = { manifest: nativeManifest, files: { 'SKILL.md': 'Use the required native integration.' } };
@@ -109,14 +109,15 @@ test('reserved PR 700 capabilities are discoverable but cannot be installed, imp
     const scanned = await lib.scanSkillSource(lib.getSkillMarketplace().sources[0], async url => String(url).endsWith('/skill.json')
       ? new Response(JSON.stringify(nativeManifest)) : mockFetch()(url));
     assert.equal(scanned.entries[0].package.manifest.capabilities[0], capability);
-    const before = lib.listChatSkills();
-    assert.throws(() => lib.installChatSkillPackage(nativePackage), /does not support these native capabilities/);
+    const installed = lib.installChatSkillPackage(nativePackage).find(skill => !skill.builtin && skill.capabilities?.includes(capability));
+    assert.ok(installed); assert.deepEqual(installed.enabled, { assistant: false, nodi: false });
     const directory = path.join(temporary, `unsupported-${capability}`);
     fs.mkdirSync(directory);
     fs.writeFileSync(path.join(directory, 'skill.json'), JSON.stringify(nativeManifest));
     fs.writeFileSync(path.join(directory, 'SKILL.md'), nativePackage.files['SKILL.md']);
-    assert.throws(() => lib.importSkillDirectory(directory), /does not support these native capabilities/);
-    assert.throws(() => lib.saveChatSkill({ name: 'Unsupported', description: 'Requires native integration', instructions: 'Execute native plan', capabilities: [capability], enabled: { assistant: true, nodi: true } }), /does not support these native capabilities/);
-    assert.deepEqual(lib.listChatSkills(), before);
+    assert.ok(lib.importSkillDirectory(directory).some(skill => !skill.builtin && skill.capabilities?.includes(capability)));
+    const personal = lib.saveChatSkill({ name: `External ${capability}`, description: 'Requires native integration', instructions: 'Execute native plan', capabilities: [capability], enabled: { assistant: true, nodi: true } }).find(skill => skill.name === `External ${capability}`);
+    assert.ok(personal); assert.ok(lib.enabledChatSkills('assistant').some(skill => skill.id === personal.id));
+    for (const skill of lib.listChatSkills().filter(skill => !skill.builtin)) lib.deleteChatSkill(skill.id);
   }
 });

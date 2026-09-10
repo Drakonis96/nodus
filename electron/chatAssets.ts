@@ -58,6 +58,23 @@ export function getGenomicsResult(source: string): GenomicsResult | null {
   if (!match) return null;
   try { return validateGenomicsResult(JSON.parse(fs.readFileSync(path.join(root(), `${match[1]}.genomics`), 'utf8'))); } catch { return null; }
 }
+export function storeCapabilityFile(owner: string, input: { bytes: Buffer; mimeType: string; name: string; title?: string }): string {
+  if (input.bytes.length > 10_000_000 || !input.bytes.length) throw new Error('Capability file exceeds its size limit.');
+  if (!input.name || /[\\/\0]/.test(input.name) || input.name.length > 160 || !/^[\w.+-]+\/[\w.+-]+$/i.test(input.mimeType)) throw new Error('Invalid capability file metadata.');
+  const id = randomUUID(), dir = directory(owner); fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  try {
+    fs.writeFileSync(path.join(dir, `${id}.capability`), input.bytes, { mode: 0o600 });
+    fs.writeFileSync(path.join(dir, `${id}.capability.json`), JSON.stringify({ mimeType: input.mimeType, name: input.name, title: input.title ?? input.name }), { mode: 0o600 });
+  } catch (error) {
+    fs.rmSync(path.join(dir, `${id}.capability`), { force: true }); fs.rmSync(path.join(dir, `${id}.capability.json`), { force: true }); throw error;
+  }
+  return `nodus-capability://chat/${owner}/${id}`;
+}
+export function getCapabilityFile(source: string): { blob: Buffer; mimeType: string; name: string; title: string } | null {
+  const match = /^nodus-capability:\/\/chat\/([a-f0-9]{64}\/[a-f0-9-]{36})$/.exec(source); if (!match) return null;
+  try { const metadata = JSON.parse(fs.readFileSync(path.join(root(), `${match[1]}.capability.json`), 'utf8')); return { blob: fs.readFileSync(path.join(root(), `${match[1]}.capability`)), ...metadata }; }
+  catch { return null; }
+}
 /** Remove images dropped by regeneration, message truncation, or history retention. */
 export function reconcileChatAssets(owner: string, messages: Array<{ content: string }>): void {
   const dir = directory(owner);
@@ -66,6 +83,11 @@ export function reconcileChatAssets(owner: string, messages: Array<{ content: st
   for (const file of fs.readdirSync(dir)) {
     if (file.endsWith('.genomics')) {
       if (!text.includes(`nodus-genomics://chat/${owner}/${file.slice(0, -9)}`)) fs.rmSync(path.join(dir, file), { force: true });
+      continue;
+    }
+    if (file.endsWith('.capability') || file.endsWith('.capability.json')) {
+      const id = file.replace(/\.capability(?:\.json)?$/, '');
+      if (!text.includes(`nodus-capability://chat/${owner}/${id}`)) fs.rmSync(path.join(dir, file), { force: true });
       continue;
     }
     const id = file.replace(/\.(json|image)$/, '');

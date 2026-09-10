@@ -1,10 +1,12 @@
 /** Versioned package contract shared by local authors, repository scanning and installation. */
+import { isCapabilityReference, normalizeCapabilityId, type BuiltinCapabilityId, type PluginPackage } from '../skill-capabilities/contracts';
+import { REGISTERED_BUILTIN_CAPABILITY_IDS } from '../skill-capabilities/registry/catalog';
 export const DEFAULT_SKILL_SOURCE = 'https://github.com/NodusResearch/nodus-research-skill-marketplace';
 export const SKILL_CAPABILITIES = ['svg', 'chemistry', 'image', 'genomics', 'legal'] as const;
-export type SkillCapability = typeof SKILL_CAPABILITIES[number];
-// Register a capability here only after its native routing and configuration ship.
-export const SUPPORTED_SKILL_CAPABILITIES: readonly SkillCapability[] = ['svg', 'chemistry', 'image'];
-export const unsupportedSkillCapabilities = (capabilities: readonly SkillCapability[]) => capabilities.filter(c => !SUPPORTED_SKILL_CAPABILITIES.includes(c));
+export type SkillCapability = string;
+/** @deprecated UI compatibility. Runtime support is resolved by the capability registry. */
+export const SUPPORTED_SKILL_CAPABILITIES: readonly SkillCapability[] = REGISTERED_BUILTIN_CAPABILITY_IDS;
+export const unsupportedSkillCapabilities = (capabilities: readonly SkillCapability[]) => capabilities.filter(c => !REGISTERED_BUILTIN_CAPABILITY_IDS.includes(normalizeCapabilityId(c) as BuiltinCapabilityId));
 export function assertSkillCapabilitiesSupported(capabilities: readonly SkillCapability[]) {
   const missing = unsupportedSkillCapabilities(capabilities);
   if (missing.length) throw new Error(`This Nodus build does not support these native capabilities: ${missing.join(', ')}. A compatible Nodus build is required.`);
@@ -18,7 +20,8 @@ export interface SkillManifest {
 }
 export interface SkillPackage { manifest: SkillManifest; files: Record<string, string> }
 export interface MarketplaceEntry { path: string; package: SkillPackage }
-export interface SkillSource { id: string; url: string; commit?: string; updatedAt?: string; entries: MarketplaceEntry[]; errors: string[] }
+export interface PluginMarketplaceEntry { path: string; package: PluginPackage }
+export interface SkillSource { id: string; url: string; commit?: string; updatedAt?: string; entries: MarketplaceEntry[]; plugins?: PluginMarketplaceEntry[]; errors: string[] }
 export interface SkillMarketplace { version: 1; sources: SkillSource[] }
 export const skillSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64) || 'my-skill';
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -32,7 +35,7 @@ export function validateManifest(value: unknown): SkillManifest {
     || !plain(m.description, 500) || !plain(m.category, 60) || !plain(m.license, 80)
     || !plain(m.author, 39) || !/^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(m.author)
     || !/^\d+\.\d+\.\d+$/.test(m.version) || m.instructions !== 'SKILL.md'
-    || !Array.isArray(m.capabilities) || m.capabilities.some(c => !SKILL_CAPABILITIES.includes(c)) || new Set(m.capabilities).size !== m.capabilities.length
+    || !Array.isArray(m.capabilities) || m.capabilities.some(c => !isCapabilityReference(c)) || new Set(m.capabilities.map(normalizeCapabilityId)).size !== m.capabilities.length
     || !Array.isArray(m.tools) || m.tools.length > 12) throw new Error('Invalid skill.json: use the Nodus skill package v1 format.');
   const ids = new Set<string>();
   for (const tool of m.tools) {

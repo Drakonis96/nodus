@@ -19,6 +19,6 @@
       "@shared/*": ["./shared/*"]
     }
   },
-  "include": ["src", "shared"],
+  "include": ["src", "shared", "skill-capabilities"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

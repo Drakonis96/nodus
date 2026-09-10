@@ -1,4 +1,6 @@
 import { initializeChatSkillDefaults } from './chatSkills';
+import { initializePluginStore } from './skillPlugins';
+import { startPluginUpdates, stopPluginUpdates } from './skillPluginUpdates';
 import { app, BrowserWindow, dialog, nativeTheme, session, shell } from 'electron';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -60,6 +62,7 @@ import { restoreAppWindows } from './windowLifecycle';
 import { registerImageProtocol, registerImageSchemePrivileges } from './imageProtocol';
 import { registerArchiveProtocol, registerArchiveSchemePrivileges } from './archiveProtocol';
 import { registerLibraryProtocol, registerLibrarySchemePrivileges } from './libraryProtocol';
+import { registerCapabilitySchemePrivileges } from '../skill-capabilities/sandbox/runtime';
 import { closeGlobalLibraryRuntime } from './library/libraryRuntime';
 import { setBrowserTheme } from './browser/tabs';
 import { destroyBrowserSubsystem } from './browser/lifecycle';
@@ -101,6 +104,7 @@ if (!app.isDefaultProtocolClient('nodus')) {
 registerImageSchemePrivileges();
 registerArchiveSchemePrivileges();
 registerLibrarySchemePrivileges();
+registerCapabilitySchemePrivileges();
 
 if (process.platform === 'linux') {
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
@@ -921,6 +925,7 @@ app.whenReady().then(async () => {
   // Losing the lock queues a quit; do not open the database or a window.
   if (!hasSingleInstanceLock) return;
   initializeChatSkillDefaults();
+  initializePluginStore();
   removeDisplacedMacBundle();
   restorePersistedDockIcon();
   // YouTube (embedded by the PDF Presenter's audience overlay) flags Electron's
@@ -1097,6 +1102,7 @@ app.whenReady().then(async () => {
   // And the other direction, on its own timer too: an incoming mutation dirties nothing,
   // so an idle desktop that only ever published would never collect what was sent to it.
   startInboxPolling();
+  startPluginUpdates();
   // Connected vaults pull on their own timer: a replica must stay current whichever vault
   // happens to be open, exactly like the publisher already does.
   startReplicaSync();
@@ -1155,6 +1161,7 @@ app.on('window-all-closed', () => {
     stopRealtimeSync();
     stopNodusServerSync();
     stopInboxPolling();
+    stopPluginUpdates();
     stopRadarScheduler();
     stopReplicaSync();
     void stopDesktopBridge();
@@ -1189,6 +1196,7 @@ app.on('before-quit', () => {
   stopRealtimeSync();
   stopNodusServerSync();
   stopInboxPolling();
+  stopPluginUpdates();
   stopRadarScheduler();
   stopReplicaSync();
   void stopDesktopBridge();
@@ -1236,6 +1244,7 @@ updateAwareApp.on('before-quit-for-update', () => {
   stopRealtimeSync();
   stopNodusServerSync();
   stopInboxPolling();
+  stopPluginUpdates();
   stopRadarScheduler();
   stopReplicaSync();
   void stopDesktopBridge();

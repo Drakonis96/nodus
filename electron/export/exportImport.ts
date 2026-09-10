@@ -203,7 +203,7 @@ async function addFileIfPresent(files: Record<string, Buffer>, archiveName: stri
   }
 }
 
-async function addDirectoryIfPresent(files: Record<string, Buffer>, archivePrefix: string, sourceDir: string): Promise<void> {
+async function addDirectoryIfPresent(files: Record<string, Buffer>, archivePrefix: string, sourceDir: string, excludedNames = new Set<string>()): Promise<void> {
   let entries: fs.Dirent[];
   try {
     entries = await fs.promises.readdir(sourceDir, { withFileTypes: true });
@@ -211,10 +211,10 @@ async function addDirectoryIfPresent(files: Record<string, Buffer>, archivePrefi
     return;
   }
   for (const entry of entries) {
-    if (entry.isSymbolicLink()) continue;
+    if (entry.isSymbolicLink() || excludedNames.has(entry.name)) continue;
     const source = path.join(sourceDir, entry.name);
     const target = `${archivePrefix}/${entry.name}`;
-    if (entry.isDirectory()) await addDirectoryIfPresent(files, target, source);
+    if (entry.isDirectory()) await addDirectoryIfPresent(files, target, source, excludedNames);
     else if (entry.isFile()) await addFileIfPresent(files, target, source);
   }
 }
@@ -260,6 +260,7 @@ async function addAuxiliaryFiles(
     for (const name of GLOBAL_AUXILIARY_FILES) {
       await addFileIfPresent(files, `aux/global/${name}`, path.join(app.getPath('userData'), name));
     }
+    await addDirectoryIfPresent(files, 'aux/global/plugins/installed', path.join(app.getPath('userData'), 'plugins', 'installed'), new Set(['secrets.bin']));
   }
   for (const vault of vaults) {
     const dir = path.dirname(vault.path);
@@ -940,6 +941,8 @@ function plannedRestoreEntries(
   const selection = normalizeBackupSelection(payloadManifest.selection as Partial<BackupSelection> | undefined, false);
   if (selection.includePreferences) {
     for (const name of GLOBAL_AUXILIARY_FILES) add(`aux/global/${name}`);
+    const prefix = 'aux/global/plugins/installed/';
+    for (const entry of payload.entries) if (!entry.isDirectory && entry.name.startsWith(prefix)) names.add(entry.name);
   }
   for (const vault of streamedVaultEntries(payloadManifest) ?? []) {
     if (selection.includeHistories) {
@@ -1098,6 +1101,14 @@ async function restoreAuxiliaryFilesFromFile(
       if (name === 'browser-bookmarks.json') restoredBookmarks = true;
     }
     if (restoredBookmarks) browserBookmarksRepository().reloadFromDisk();
+    const pluginPrefix = 'aux/global/plugins/installed/';
+    for (const entry of payload.entries) {
+      if (entry.isDirectory || !entry.name.startsWith(pluginPrefix)) continue;
+      const relative = safeArchiveRelative(entry.name.slice(pluginPrefix.length));
+      const target = relative ? archiveTargetInside(path.join(app.getPath('userData'), 'plugins', 'installed'), relative) : null;
+      if (!target || path.basename(target) === 'secrets.bin') throw new Error(`The backup contains an invalid plugin path: ${entry.name}`);
+      await extractAtomicEntry(payload, entry, target, tracker);
+    }
   }
 
   const restoredVaults = new Map(listVaults().map((vault) => [vault.id, vault]));
@@ -1474,6 +1485,14 @@ function restoreAuxiliaryFiles(payload: AdmZip, payloadManifest: PayloadManifest
       if (name === 'browser-bookmarks.json') restoredBookmarks = true;
     }
     if (restoredBookmarks) browserBookmarksRepository().reloadFromDisk();
+    const pluginPrefix = 'aux/global/plugins/installed/';
+    for (const entry of payload.getEntries()) {
+      if (entry.isDirectory || !entry.entryName.startsWith(pluginPrefix)) continue;
+      const relative = safeArchiveRelative(entry.entryName.slice(pluginPrefix.length));
+      const target = relative ? archiveTargetInside(path.join(app.getPath('userData'), 'plugins', 'installed'), relative) : null;
+      if (!target || path.basename(target) === 'secrets.bin') throw new Error(`The backup contains an invalid plugin path: ${entry.entryName}`);
+      writeAtomicFile(target, entry.getData());
+    }
   }
 
   const restoredVaults = new Map(listVaults().map((vault) => [vault.id, vault]));

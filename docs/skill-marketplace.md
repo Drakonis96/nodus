@@ -4,7 +4,24 @@ Nodus Skills now shares one package contract between the Assistant, all native c
 
 Every package has `<id>/skill.json`, `<id>/SKILL.md` and optional `<id>/tools/<tool-id>.js` at the repository root. The contract in `shared/skillMarketplace.ts` validates manifests, paths, capabilities and file limits. Catalogs pin their contents to one Git commit; source refresh never updates installed packages. Reinstallation is explicit and replaces local edits, resetting both activation flags. Invalid packages are skipped with visible reasons; source-level failures preserve the previous catalog.
 
-The catalogue also recognizes the reserved `genomics` and `legal` capabilities for AlphaGenome and Legalize from PR #700. PR #700 is merged and its built-in integrations remain available. Marketplace routing for those two capabilities is not enabled in this change: review displays the missing capabilities, installation/import/save reject them, and unsupported skills cannot become active. A follow-up must wire marketplace capability routing and configuration before registering them in `SUPPORTED_SKILL_CAPABILITIES`.
+Capabilities are no longer branches inside the chat dispatcher. `skill-capabilities/` holds the shared contracts, the registry, the sandbox and one module per built-in capability, and `electron/ai/chatSkillExecution.ts` is a re-export of the registry dispatcher. `SUPPORTED_SKILL_CAPABILITIES` is derived from what is actually registered, so `nodus:svg`, `nodus:image`, `nodus:chemistry`, `nodus:genomics` and `nodus:legal` are ordinary capabilities that any compatible skill may declare. The historical aliases `svg`, `image`, `chemistry`, `genomics` and `legal` normalize to their `nodus:*` identifiers.
+
+## Plugins
+
+Alongside the single-skill `<id>/skill.json` package, a source may publish a plugin:
+
+```text
+plugin-id/
+  plugin.json
+  skills/<skill-id>/{skill.json,SKILL.md,tools/...}
+  capabilities/<capability-id>/{capability.json,runtime.js}
+```
+
+`plugin.json` carries a SemVer version, the minimum Nodus and capability-API it supports, author, license and its components. Any change to a skill or capability requires a new plugin version; republishing different content under the same version is refused. Skills depend on `nodus:*` or `self:<capability-id>`; there are no cross-plugin dependencies. Existing `<id>/skill.json` packages keep working as single-skill plugins.
+
+A capability's `runtime.js` runs in an ephemeral Chromium session with no preload, Node, filesystem, application bridge, navigation, WebRTC or direct network access. It is served from, and may only talk to, a session-scoped `nodus-capability://host` origin whose only operations are HTTPS requests to declared endpoints, methods and path prefixes; user-configured secrets that Nodus injects without revealing them to the runtime; and a namespaced, quota-limited JSON store. Results are validated as text, JSON, table, sanitized SVG, image or downloadable file — HTML and executable content are rejected — and are inert: they are never re-parsed as a protocol block and never trigger a second model call. JavaScript tools and external capabilities share one budget of four calls per reply.
+
+The profile keeps plugins under `plugins/{inbox,staging,installed/<plugin-id>/{state.json,versions,storage,storage-snapshots}}`. Anything dropped into `inbox/` is validated and listed for review, and nothing in it executes before the user reads its permissions and approves them. Updates are atomic and keep exactly the active and previous version: a failed download, validation, sandbox or write leaves the active version untouched, downgrades require an explicit rollback, and a wider permission set blocks the update until it is approved again. Locally edited instructions survive updates as an overlay that can be reset to the author's version. Auto-update is on by default for the official marketplace and opt-in per plugin for community sources; sources are checked at startup and every 24 hours. Installed versions, state, overlays and storage are included in backups; the inbox, staging, caches and secrets are not.
 
 The editor exposes creator, category, version, native capabilities and JavaScript tools. Export creates a new directory without overwriting existing files. Import checks the same contract and rejects symlink escapes. Native SVG, image and chemistry capabilities now depend on declarations rather than built-in identity, preserving existing execution checks and provider settings. Custom tools use the `nodus-tool` protocol and run in an ephemeral sandboxed Chromium window: no preload, Node.js, application bridge, network, permissions, external navigation or popups. Calls are limited to four per reply, five seconds each and 64 KB input/output. Tool results are inert JSON. Invalid, disabled or cancelled requests cannot execute or retain results.
 
@@ -18,7 +35,11 @@ The official repository includes 15 packages, a generated category catalog, a st
 
 ## Verification
 
+- `npm run test:skill-capabilities` runs the whole capability battery: the registry and plugin suites, the seven-orchestrator matrix, and both Chromium sandbox verifications.
 - `node --test scripts/test-skill-marketplace.mjs scripts/test-chat-skills.mjs scripts/test-chat-skills-surfaces.mjs scripts/test-window-preloads.mjs scripts/test-window-lifecycle.mjs`
+- `node --test scripts/test-skill-capabilities.mjs` builds a real temporary Git repository with a bare origin and worktrees, then exercises import, automatic update, permission gating, overlays, integrity, storage snapshots, rollback and the inbox review path.
+- `node --test scripts/test-skill-capability-matrix.mjs` drives the seven chat orchestrators — Research Assistant, Nodi, World Chat, Database Chat, Study/Teaching, Library Reader and Character Chat — against every capability in turn, plus the disabled-skill, absent-capability, invalid-input, call-limit, forged-result, recursion, cancellation and changed-chat paths.
+- `node scripts/verify-skill-capability-sandbox.mjs` uses real Electron to check Chromium isolation, the absence of Node/bridge/WebRTC/direct network, the RPC allowlist, storage quotas, result schemas, timeout and cancellation. It reports through a verdict file, so a killed or crashed run fails instead of looking like a pass.
 - `node scripts/verify-skill-tool-sandbox.mjs` uses real Electron to check computation, lack of Node/bridge/network, timeout, output limits and cancellation.
 - `npm run build` checks both TypeScript projects and builds the production renderer, main process and preloads.
 - `node scripts/verify-skill-marketplace.mjs` launches the production application in a disposable profile, scans the live official repository, reviews and installs a skill through the UI, then exercises Assistant and Nodi using a deterministic local text-provider fixture. It uses no user credentials or paid model calls. For repeat visual tests when GitHub limits anonymous requests, set `NODUS_MARKETPLACE_CHECKOUT=/path/to/marketplace-checkout`; this explicitly skips the live refresh and seeds a catalog from the verified checkout. The result records which catalog mode was used. Screenshots and a result summary are saved under `artifacts/skill-marketplace/`.

@@ -6,6 +6,7 @@ import { ChatVisual } from './ChatVisual';
 import { ChatFormula } from './ChatFormula';
 import { ChatChemistryDocument } from './ChatChemistryDocument';
 import { ChatGenomicsResult } from './ChatGenomicsResult';
+import { ChatCapabilityResult } from './ChatCapabilityResult';
 import { Icon } from './ui';
 import { localizeRuntimeError } from '@shared/uiLanguage';
 import { t, getActiveLang } from '../i18n';
@@ -22,6 +23,8 @@ export function ChatMarkdown({ content, streaming = false, ...props }: Component
     if (part.kind === 'legal-plan' || part.kind === 'legal-result') return <div key={index} role="status" className="chat-visual-pending"><b>Legalize</b><span>{streaming ? t('Consultando legislación…') : t('La generación se interrumpió. Vuelve a intentarlo.')}</span></div>;
     if (part.kind === 'genomics-result' && part.complete && !streaming) return <ChatGenomicsResult key={index} source={part.content} />;
     if (part.kind === 'genomics-plan' || part.kind === 'genomics-result') return <div key={index} role="status" className="chat-visual-pending"><b>AlphaGenome</b><span>{streaming ? t('Consultando AlphaGenome…') : t('La generación se interrumpió. Vuelve a intentarlo.')}</span></div>;
+    if (part.kind === 'capability-result' && part.complete && !streaming) return <ChatCapabilityResult key={index} source={part.content} />;
+    if (part.kind === 'capability-request' || part.kind === 'capability-result') return <div key={index} role="status" className="chat-visual-pending"><Icon name="sparkles" size={22} /><div><b>Capability</b><span>{streaming ? t('Cargando…') : t('La generación se interrumpió. Vuelve a intentarlo.')}</span></div></div>;
     if (part.kind === 'svg' && part.complete && !streaming) return <ChatVisual key={index} svg={part.content} />;
     if (part.kind === 'chemistry-document' && part.complete && !streaming) return <ChatChemistryDocument key={index} source={part.content} />;
     if ((part.kind === 'smiles' || part.kind === 'chemfig' || part.kind === 'lewis') && part.complete && !streaming) return <ChatFormula key={index} kind={part.kind} source={part.content} />;

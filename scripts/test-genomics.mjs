@@ -20,11 +20,16 @@ globalThis.__genomicsSafeStorage = {
 };
 await build({ stdin: { contents: `export * from './shared/genomics'; export * from './shared/chatSkills'; export * from './electron/genomics'; export * from './electron/chatSkills'; export * from './electron/chatAssets'; export * from './electron/ai/chatSkillExecution';`, resolveDir: root, loader: 'ts' }, outfile: bundle, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent', plugins: [{ name: 'isolate', setup(api) {
   api.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'test' }));
-  api.onResolve({ filter: /^\.\.\/genomics$/ }, () => ({ path: 'predict', namespace: 'test' }));
-  for (const [filter, name] of [[/skillToolSandbox$/, 'tools'], [/chatSvgQuality$/, 'svg'], [/decorativeImages$/, 'image'], [/db\/settingsRepo$/, 'settings'], [/chemistryIdentity$/, 'chemistry'], [/chemistryValidationHost$/, 'validate']]) api.onResolve({ filter }, () => ({ path: name, namespace: 'test' }));
+  // Only the capability's own prediction host is mocked; the suite still exercises the
+  // real electron/genomics module it re-exports for configuration and credentials.
+  api.onResolve({ filter: /\/genomics$/ }, args => (args.path === '../genomics'
+    || (args.path.endsWith('electron/genomics') && args.importer.includes(`${path.sep}skill-capabilities${path.sep}`)))
+    ? { path: 'predict', namespace: 'test' } : undefined);
+  for (const [filter, name] of [[/skillToolSandbox$/, 'tools'], [/sandbox\/runtime$/, 'capability'], [/chatSvgQuality$/, 'svg'], [/decorativeImages$/, 'image'], [/db\/settingsRepo$/, 'settings'], [/chemistryIdentity$/, 'chemistry'], [/chemistryValidationHost$/, 'validate']]) api.onResolve({ filter }, () => ({ path: name, namespace: 'test' }));
   api.onLoad({ filter: /.*/, namespace: 'test' }, ({ path: name }) => ({ loader: 'js', contents: name === 'electron' ? `export const app = { getPath: () => ${JSON.stringify(scratch)}, getAppPath: () => ${JSON.stringify(root)}, isPackaged: false }; export const safeStorage = globalThis.__genomicsSafeStorage;`
     : name === 'predict' ? 'export const predictGenomics = (...args) => globalThis.__genomicsPredict(...args);'
     : name === 'tools' ? 'export const runSkillTool = () => { throw Error("Unexpected custom skill tool"); };'
+    : name === 'capability' ? 'export const runCapabilitySandbox = () => { throw Error("Unexpected external capability"); };'
     : name === 'svg' ? 'export const refineChatSvg = async a => a;'
     : name === 'image' ? 'export const callImageProvider = () => { throw Error("Unexpected image generation") }; export const prepareGeneratedImage = () => {};'
     : name === 'settings' ? 'export const getSettings = () => ({});'

@@ -1,7 +1,9 @@
-import { getSkillMarketplace, addSkillSource, removeSkillSource, updateSkillSource, installMarketplaceSkill } from './skillMarketplace';
-import { listChatSkills, saveChatSkill, deleteChatSkill, restoreChatSkills, importSkillDirectory, exportSkillDirectory } from './chatSkills';
+import { getSkillMarketplace, addSkillSource, removeSkillSource, updateSkillSource, installMarketplaceSkill, installMarketplacePlugin } from './skillMarketplace';
+import { listChatSkills, saveChatSkill, deleteChatSkill, restoreChatSkills, importSkillDirectory, exportSkillDirectory, approvePendingChatPlugin, rollbackChatPlugin, removeChatPlugin, installChatPluginPackage, restorePluginSkillAuthorVersion } from './chatSkills';
+import { configurePluginSecret, discardInboxPlugin, listInboxPlugins, listInstalledPlugins, readInboxPlugin, readPluginDirectory, setPluginAutoUpdate } from './skillPlugins';
+import { mergedPluginPermissions } from '../skill-capabilities/pluginPackage';
 import { getGenomicsStatus, configureGenomics, clearGenomicsConfiguration, installGenomicsRuntime } from './genomics';
-import { getGenomicsResult } from './chatAssets';
+import { getCapabilityFile, getGenomicsResult } from './chatAssets';
 import { getChatImageMetadata } from './chatAssets';
 import { compileChemfig, compileLewis, compileSmiles } from './chemistry';
 import { originalImagePayloadFromUrl } from './imageProtocol';
@@ -566,9 +568,15 @@ export function registerIpc(
   h('skillMarketplace:remove', async (_e, id: string) => marketplaceChanged(removeSkillSource(id)));
   h('skillMarketplace:update', async (_e, id: string) => marketplaceChanged(await updateSkillSource(id)));
   h('skillMarketplace:install', async (_e, sourceId: string, packagePath: string, commit: string) => skillsChanged(installMarketplaceSkill(sourceId, packagePath, commit)));
+  h('skillMarketplace:installPlugin', async (_e, sourceId: string, packagePath: string, commit: string, approvePermissions: boolean) => skillsChanged(installMarketplacePlugin(sourceId, packagePath, commit, approvePermissions === true)));
   h('skillMarketplace:import', async () => {
     const result = await showImportOpenDialog({ title: 'Import skill package directory', properties: ['openDirectory'] });
-    return result.canceled ? listChatSkills() : skillsChanged(importSkillDirectory(result.filePaths[0]));
+    if (result.canceled) return listChatSkills();
+    const directory = result.filePaths[0];
+    if (!fs.existsSync(path.join(directory, 'plugin.json'))) return skillsChanged(importSkillDirectory(directory));
+    const pkg = readPluginDirectory(directory), permissions = mergedPluginPermissions(pkg);
+    const consent = await dialog.showMessageBox({ type: 'question', title: `Install ${pkg.manifest.name}?`, message: `${pkg.manifest.name} ${pkg.manifest.version}`, detail: `Skills: ${pkg.skills.length}\nCapabilities: ${pkg.capabilities.length}\nHTTPS endpoints: ${permissions.network?.map(item => item.origin).join(', ') || 'none'}\nSecrets: ${permissions.secrets?.map(item => item.label).join(', ') || 'none'}\nStorage: ${permissions.storage?.maxBytes ?? 0} bytes\n\nCapability code runs only in the Nodus Chromium sandbox.`, buttons: ['Cancel', 'Install'], defaultId: 0, cancelId: 0 });
+    return consent.response === 1 ? skillsChanged(installChatPluginPackage(pkg, { sourceId: 'local', sourcePath: directory, approvePermissions: true, autoUpdate: false })) : listChatSkills();
   });
   h('skillMarketplace:export', async (_e, id: string) => {
     const result = await showImportOpenDialog({ title: 'Export skill package into a directory', properties: ['openDirectory', 'createDirectory'] });
@@ -588,6 +596,24 @@ export function registerIpc(
   h('chatSkills:save', async (_e, skill) => skillsChanged(saveChatSkill(skill)));
   h('chatSkills:delete', async (_e, id: string) => skillsChanged(deleteChatSkill(id)));
   h('chatSkills:restore', async () => skillsChanged(restoreChatSkills()));
+  h('plugins:list', async () => listInstalledPlugins());
+  h('plugins:inbox', async () => listInboxPlugins());
+  h('plugins:approveInbox', async (_e, directory: string) => {
+    // Inbox content is inert until the user reads these permissions and accepts them.
+    const pkg = readInboxPlugin(String(directory)), permissions = mergedPluginPermissions(pkg);
+    const consent = await dialog.showMessageBox({ type: 'question', title: `Install ${pkg.manifest.name}?`, message: `${pkg.manifest.name} ${pkg.manifest.version}`, detail: `Skills: ${pkg.skills.length}\nCapabilities: ${pkg.capabilities.length}\nHTTPS endpoints: ${permissions.network?.map(item => item.origin).join(', ') || 'none'}\nSecrets: ${permissions.secrets?.map(item => item.label).join(', ') || 'none'}\nStorage: ${permissions.storage?.maxBytes ?? 0} bytes\n\nCapability code runs only in the Nodus Chromium sandbox.`, buttons: ['Cancel', 'Install'], defaultId: 0, cancelId: 0 });
+    if (consent.response !== 1) return listChatSkills();
+    const skills = skillsChanged(installChatPluginPackage(pkg, { sourceId: 'inbox', sourcePath: String(directory), approvePermissions: true, autoUpdate: false }));
+    discardInboxPlugin(String(directory));
+    return skills;
+  });
+  h('plugins:discardInbox', async (_e, directory: string) => { discardInboxPlugin(String(directory)); return listInboxPlugins(); });
+  h('plugins:approve', async (_e, id: string) => skillsChanged(approvePendingChatPlugin(String(id))));
+  h('plugins:autoUpdate', async (_e, id: string, enabled: boolean) => setPluginAutoUpdate(String(id), enabled === true));
+  h('plugins:rollback', async (_e, id: string) => skillsChanged(rollbackChatPlugin(String(id))));
+  h('plugins:remove', async (_e, id: string) => skillsChanged(removeChatPlugin(String(id))));
+  h('plugins:secret', async (_e, pluginId: string, capabilityId: string, secretId: string, value: string) => configurePluginSecret(String(pluginId), String(capabilityId), String(secretId), String(value)));
+  h('plugins:restoreSkill', async (_e, id: string) => skillsChanged(restorePluginSkillAuthorVersion(String(id))));
   h('chemistry:compileChemfig', async (_e, source: string) => compileChemfig(source));
   h('chemistry:compileLewis', async (_e, source: string) => compileLewis(source));
   h('chemistry:compileSmiles', async (_e, source: string) => compileSmiles(source));
@@ -599,6 +625,11 @@ export function registerIpc(
     const image = nativeImage.createFromBuffer(payload.blob);
     if (image.isEmpty()) throw new Error('The image could not be copied.');
     clipboard.writeImage(image);
+  });
+  h('capabilityFiles:download', async (_e, source: string) => {
+    const payload = getCapabilityFile(String(source)); if (!payload) throw new Error('The capability file is no longer available.');
+    const result = await dialog.showSaveDialog({ title: 'Save capability file', defaultPath: path.join(app.getPath('downloads'), payload.name) });
+    if (!result.canceled && result.filePath) fs.writeFileSync(result.filePath, payload.blob, { mode: 0o600 });
   });
   h('nodi:conversations:list', async () => listNodiConversations());
   h('nodi:conversations:get', async (_e, id: string) => getNodiConversation(id));

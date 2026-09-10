@@ -5,7 +5,7 @@ import { sanitizeChatSvg, svgImageUrl } from '../lib/chatSvg';
 import { t } from '../i18n';
 import './chatVisuals.css';
 
-export function ChatVisual({ svg, source, alt = '', kindLabel = 'SVG Studio', provenanceLabel }: { svg?: string; source?: string; alt?: string; kindLabel?: string; provenanceLabel?: string }) {
+export function ChatVisual({ svg, source, alt = '', kindLabel, provenanceLabel }: { svg?: string; source?: string; alt?: string; kindLabel?: string; provenanceLabel?: string }) {
   const sanitized = useMemo(() => svg ? sanitizeChatSvg(svg) : null, [svg]);
   const src = useMemo(() => sanitized ? svgImageUrl(sanitized.svg) : source, [sanitized, source]);
   const [expanded, setExpanded] = useState(false);
@@ -15,7 +15,8 @@ export function ChatVisual({ svg, source, alt = '', kindLabel = 'SVG Studio', pr
   const [error, setError] = useState('');
   const [zoom, setZoom] = useState(1);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const title = meta?.title || alt || sanitized?.title || (svg ? kindLabel : 'Image Atelier');
+  const label = kindLabel ?? (svg ? 'SVG Studio' : 'Image Atelier');
+  const title = meta?.title || alt || sanitized?.title || label;
   useEffect(() => {
     setMeta(null); setError(''); setStatus(''); setDetails(false); setExpanded(false);
     if (!source) return;
@@ -72,12 +73,12 @@ export function ChatVisual({ svg, source, alt = '', kindLabel = 'SVG Studio', pr
   const feedback = <>{status && <span className="chat-visual-feedback" role="status">{status}</span>}{error && <span className="chat-visual-error" role="alert">{error}</span>}</>;
   const detail = details && <div className="chat-visual-details"><div><b>{sanitized ? 'SVG' : `${meta?.provider ?? ''} · ${meta?.model ?? ''}`}</b><button type="button" onClick={() => void act(() => navigator.clipboard.writeText(sanitized?.svg ?? meta?.prompt ?? ''), t('Copiado'))}>{t('Copiar texto')}</button></div><pre>{sanitized?.svg ?? meta?.prompt ?? t('Cargando…')}</pre></div>;
   return <div className="chat-visual" data-testid={svg ? 'chat-svg' : 'chat-image'}>
-    <span className="chat-visual-head"><span className="chat-visual-kind"><Icon name={svg ? 'code' : 'image'} size={13} />{svg ? kindLabel : 'Image Atelier'}</span><span className="chat-visual-original">{provenanceLabel ?? t('Creación original')}</span></span>
+    <span className="chat-visual-head"><span className="chat-visual-kind"><Icon name={svg ? 'code' : 'image'} size={13} />{label}</span><span className="chat-visual-original">{provenanceLabel ?? t('Creación original')}</span></span>
     <button type="button" className="chat-visual-preview" onClick={() => { setExpanded(true); setZoom(1); }} aria-label={t('Ampliar imagen')}><img src={src} alt={alt || title} onError={() => setError(t('La imagen ya no está disponible.'))} /><span className="chat-visual-expand"><Icon name="fit" size={15} /></span></button>
     <span className="chat-visual-foot"><span className="chat-visual-title">{title}</span>{toolbar}</span>
     {!expanded && <>{feedback}{detail}</>}
     {expanded && createPortal(<div className="chat-visual-modal" data-nodi-interactive role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={dialogRef}>
-      <header><div><small>{svg ? kindLabel : 'Image Atelier'}</small><strong>{title}</strong></div>{toolbar}<button type="button" onClick={() => setExpanded(false)} aria-label={t('Cerrar')}><Icon name="x" size={20} /></button></header>
+      <header><div><small>{label}</small><strong>{title}</strong></div>{toolbar}<button type="button" onClick={() => setExpanded(false)} aria-label={t('Cerrar')}><Icon name="x" size={20} /></button></header>
       <div className="chat-visual-canvas"><img src={src} alt={alt || title} style={{ width: `${zoom * 100}%`, maxWidth: 'none', height: zoom === 1 ? '100%' : 'auto' }} /></div>
       <footer><button type="button" onClick={() => setZoom(value => Math.max(1, value - .5))} disabled={zoom === 1} aria-label={t('Reducir')}>−</button><span>{Math.round(zoom * 100)}%</span><button type="button" onClick={() => setZoom(value => Math.min(4, value + .5))} disabled={zoom === 4} aria-label={t('Ampliar')}>+</button>{feedback}</footer>{detail}
     </div>, document.body)}
