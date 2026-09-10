@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 5.3.1 — 2026-09-10
+
+Nodus 5.3.1 turns the Skills Marketplace into a view of the library you actually
+have, and adds the plugin format: a versioned package that can carry sandboxed
+capabilities of its own.
 
 - The Marketplace now shows which skills you already have. Skills included in Nodus appear as installed instead of being offered again, an All / Installed / Available filter reviews your library from the catalog, and each installed skill can be uninstalled from its card or its detail page.
 - Installing a catalog entry that Nodus already includes restores the version shipped with your build instead of adding a duplicate skill with the same name, and removes a duplicate a previous version had already installed. AlphaGenome and Legalize can be restored this way too.
@@ -9,6 +13,16 @@
 - Plugins update as one unit and can always be undone. An update that asks for more than you approved waits for your approval, instructions you edited locally survive as an overlay you can reset to the author's version, and the previous version stays available for rollback. Auto-update is on for the official Marketplace and per-plugin opt-in for other sources.
 - Plugins dropped into the profile's plugins/inbox folder are listed for review with the exact permissions they request, and nothing in them runs before you approve it.
 - AlphaGenome and Legalize are ordinary capabilities now, so any compatible skill can declare them instead of them being reserved for the built-ins.
+- Nodus warns before installing a plugin the running build cannot execute. The review screen compares the build with the plugin's `minNodusVersion` floor and says so above the install button, and the confirmation matches. A plugin already staged as pending because it is incompatible now names the version it needs instead of showing its own description.
+- Tools and capabilities are charged to two separate lanes. Sandboxed work that declares no network, secret or storage permission has sixteen calls per reply, and anything that declares one keeps four. The single-image and single-chemistry-plan limits are unchanged.
+- Deep Research treats "Max. N sections" as a ceiling instead of a floor. A rich corpus no longer overrides the number you picked, and the coverage grace slot is reachable only in auto mode. No evidence is dropped: surplus sections are merged and every idea, work, gap, contradiction and coverage question is reassigned.
+- Added "Guideline section length" to every Deep Research composer: Auto, 2,500, 5,000, 10,000, 15,000 or 20,000 words, or a custom figure. It counts words rather than tokens and is editorial guidance, produced by bounded continuation passes rather than by raising `maxTokens`. The selection travels through IPC, the persisted queue, MCP and Nodus Server, and is stored on the report. Database Deep Research remains the exception and steers only its writer and editor roles.
+- The research assistant's corpus context picker opens as a balloon anchored to its header trigger instead of a centered modal covering the conversation, with outside-click and Escape dismissal and an upward flip when there is no room below.
+- Italian is offered in the Writing Workshop language picker. All three composers now render the shared `PROMPT_LANGUAGE_OPTIONS` list, and a contract test fails the build if a picker hand-writes its own options or the list drifts from `PROMPT_LANGUAGES`.
+- Leaving the Stellar graph while its render loop is in flight no longer throws. The self-scheduling frame returns early when the host ref has already been detached.
+- Nodi's standalone overlay keeps the track of every unchecked skills switch visible and applies light and dark scrollbar tokens to each of its scroll surfaces.
+- A chemistry drawing that cannot be fully verified is rendered with its labels instead of being discarded.
+- Added the complete 5.3.1 What's New modal in all eight interface languages.
 
 ## 5.3.0 — 2026-09-09
 

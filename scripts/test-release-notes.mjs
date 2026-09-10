@@ -25,17 +25,36 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.3.0');
-  assert.equal(currentRelease?.date, '2026-09-09');
-  assert.equal(currentRelease?.highlights.length, 5);
+  assert.equal(currentRelease?.version, '5.3.1');
+  assert.equal(currentRelease?.date, '2026-09-10');
+  assert.equal(currentRelease?.highlights.length, 8);
   assert.deepEqual(currentRelease.highlights.map((h) => h.scope), [
-    'marketplace', 'marketplace', 'ai', 'ai', 'general',
+    'marketplace', 'marketplace', 'plugin', 'plugin', 'academic', 'ai', 'languages', 'general',
   ]);
   for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
     assert.ok(currentRelease.highlights.every((h) => h[language]?.length > 80));
   }
+  for (const phrase of [
+    /knows which skills you already have/, /needs a newer Nodus/, /arrive as plugins/,
+    /update as one unit/, /number of sections you choose/, /corpus context picker/,
+    /Italian is offered/, /three visible details/,
+  ]) {
+    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.3.1 is missing ${phrase}`);
+  }
+
+  // 5.3.0 keeps the modal it shipped with: the Marketplace debut and the two
+  // reviewed integrations.
+  const release530 = RELEASE_NOTES.find((note) => note.version === '5.3.0');
+  assert.equal(release530?.date, '2026-09-09');
+  assert.equal(release530?.highlights.length, 5);
+  assert.deepEqual(release530.highlights.map((h) => h.scope), [
+    'marketplace', 'marketplace', 'ai', 'ai', 'general',
+  ]);
+  for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+    assert.ok(release530.highlights.every((h) => h[language]?.length > 80));
+  }
   for (const phrase of [/Skills Marketplace/, /JavaScript tools/, /AlphaGenome/, /Legalize/, /Temporary imports/]) {
-    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)));
+    assert.ok(release530.highlights.some((h) => phrase.test(h.en)));
   }
   const release522 = RELEASE_NOTES.find((note) => note.version === '5.2.2');
   assert.equal(release522?.version, '5.2.2');
