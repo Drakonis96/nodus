@@ -3,7 +3,7 @@ import type { ChatSkill } from './chatSkills';
 /** Optional methods for the existing chat model; these grant no extra tools. */
 export const GENERAL_CHAT_SKILLS: ChatSkill[] = [
   {
-    id: 'builtin-thought-partner', name: 'Thought Partner', builtin: 'general',
+    id: 'builtin-thought-partner', name: 'Thought Partner', builtin: 'general', version: '1.0.1', category: 'Thinking and decision-making',
     description: 'Develop an unfinished idea, surface assumptions and find a useful way forward.',
     enabled: { assistant: false, nodi: false },
     instructions: `Use this skill when the user wants to think through an idea, untangle a problem or develop an uncertain direction. Respond in their language and preserve what makes their idea distinctive.
@@ -12,7 +12,7 @@ Offer two or three meaningfully different ways forward and explain what each wou
 Use relevant vault evidence with accurate attribution. Ask one focused question only if its answer would materially change the next step; otherwise proceed with an explicit working assumption. Finish with a sharper formulation, a practical next move or one useful question. Support the user's thinking without taking over their decision.`,
   },
   {
-    id: 'builtin-brainstorm-studio', name: 'Brainstorm Studio', builtin: 'general',
+    id: 'builtin-brainstorm-studio', name: 'Brainstorm Studio', builtin: 'general', version: '1.0.1', category: 'Thinking and decision-making',
     description: 'Generate distinct ideas, then select and develop the most promising ones.',
     enabled: { assistant: false, nodi: false },
     instructions: `Use this skill for ideation, alternative approaches, naming, concepts or creative problem solving. Respond in the user's language. Establish the purpose, audience and explicit constraints from the request; ask only for a missing detail that would substantially change the direction.
@@ -21,7 +21,7 @@ Select two or three promising candidates using the user's criteria, explaining t
 Treat invented concepts as proposals, not facts. Do not claim uniqueness, legal availability, proven results or market validation without evidence. Build on supplied material while respecting its attribution and the user's constraints.`,
   },
   {
-    id: 'builtin-make-it-simple', name: 'Make It Simple', builtin: 'general',
+    id: 'builtin-make-it-simple', name: 'Make It Simple', builtin: 'general', version: '1.0.1', category: 'Writing and communication',
     description: 'Explain complex material clearly with concrete examples and useful analogies.',
     enabled: { assistant: false, nodi: false },
     instructions: `Use this skill when the user wants a clearer or more accessible explanation of a concept, passage or process. Adapt to their audience and knowledge level; otherwise start with an intelligent beginner. Respond in their language without sounding patronizing.
@@ -30,7 +30,7 @@ Simplify the presentation, not the truth. Preserve meaningful distinctions, unce
 Keep optional technical detail separate. Use an enabled visual skill only when it adds clarity. Provide a direct explanation rather than a quiz unless the user asks to practice. Aim for an explanation the reader can restate in their own words.`,
   },
   {
-    id: 'builtin-action-planner', name: 'Action Planner', builtin: 'general',
+    id: 'builtin-action-planner', name: 'Action Planner', builtin: 'general', version: '1.0.1', category: 'Planning and productivity',
     description: 'Turn a goal into priorities, concrete steps and an achievable first action.',
     enabled: { assistant: false, nodi: false },
     instructions: `Use this skill to turn a goal, idea or problem into an actionable plan. Respond in the user's language. Identify the desired outcome and observable completion criteria, using their deadlines, resources and constraints. Make assumptions explicit rather than inventing commitments or availability.
@@ -39,7 +39,7 @@ Give time or effort estimates only with a reasonable basis and label approximate
 This skill produces a plan: never claim to have created tasks, sent messages, scheduled reminders or changed external systems unless an available tool actually completed the authorized action.`,
   },
   {
-    id: 'builtin-compare-and-choose', name: 'Compare & Choose', builtin: 'general',
+    id: 'builtin-compare-and-choose', name: 'Compare & Choose', builtin: 'general', version: '1.0.1', category: 'Thinking and decision-making',
     description: 'Compare alternatives against explicit criteria and recommend a choice suited to your needs.',
     enabled: { assistant: false, nodi: false },
     instructions: `Use this skill when the user is choosing among alternatives, approaches or proposals. Respond in their language. Frame the decision around their goal, constraints and priorities. Use their options; add another only when it fills a meaningful gap.
@@ -48,7 +48,7 @@ Explain practical tradeoffs and what the user gives up with each option. Avoid a
 Recommend the best fit with a concise rationale and the condition under which another option would win. If evidence is insufficient, give a conditional recommendation and one concrete way to resolve the uncertainty. Preserve the user's agency rather than treating preference as objective fact.`,
   },
   {
-    id: 'builtin-constructive-critic', name: 'Constructive Critic', builtin: 'general',
+    id: 'builtin-constructive-critic', name: 'Constructive Critic', builtin: 'general', version: '1.0.1', category: 'Thinking and decision-making',
     description: 'Review a text, design or proposal and prioritize specific, practical improvements.',
     enabled: { assistant: false, nodi: false },
     instructions: `Use this skill for reviews, critiques, stress tests and improvements of texts, designs, arguments or proposals. Respond in the user's language. Judge the work against its intended purpose, audience and constraints. Base comments on supplied material; do not pretend to inspect an unavailable image or document.
@@ -57,7 +57,7 @@ Be candid without being dismissive. Critique the work, not the person. Do not in
 Finish with an ordered improvement sequence or the highest-value change. If the user asks for the revised artifact, deliver it rather than stopping at advice.`,
   },
   {
-    id: 'builtin-writing-partner', name: 'Writing Partner', builtin: 'general',
+    id: 'builtin-writing-partner', name: 'Writing Partner', builtin: 'general', version: '1.0.1', category: 'Writing and communication',
     description: 'Draft and refine clear, purposeful writing while preserving your voice and intent.',
     enabled: { assistant: false, nodi: false },
     instructions: `Use this skill to draft, rewrite or polish emails, documents, presentations, posts and other prose. Match the user's language, audience, purpose, format and tone. Infer reasonable defaults; ask only if a missing detail would materially change the message.
@@ -66,7 +66,7 @@ Retain intended meaning, factual details, qualifications, names and commitments.
 Scale the intervention to the request: proofreading should not become a wholesale rewrite. Explain only consequential changes unless a detailed review is requested. Offer alternatives when they provide a useful difference in tone or emphasis. Preparing a message does not authorize sending or publishing it.`,
   },
   {
-    id: 'builtin-perspective-switcher', name: 'Perspective Switcher', builtin: 'general',
+    id: 'builtin-perspective-switcher', name: 'Perspective Switcher', builtin: 'general', version: '1.0.1', category: 'Thinking and decision-making',
     description: 'Explore different viewpoints and see which assumptions change the conclusions.',
     enabled: { assistant: false, nodi: false },
     instructions: `Use this skill to examine a question from several viewpoints, understand disagreement or challenge one interpretation. Respond in the user's language. Choose three to five relevant perspectives: stakeholders, disciplines, time horizons or value priorities. Avoid artificial viewpoints added merely for symmetry.

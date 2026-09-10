@@ -42,7 +42,7 @@ Prefer a finished, useful artifact over instructions describing how the user cou
 
 export const DEFAULT_CHAT_SKILLS: ChatSkill[] = [
   {
-    id: 'builtin-svg', name: 'SVG Studio', builtin: 'svg', capabilities: ['nodus:svg'], version: '1.0.1',
+    id: 'builtin-svg', name: 'SVG Studio', builtin: 'svg', capabilities: ['nodus:svg'], version: '1.0.1', category: 'Design and visual communication',
     description: 'Precise diagrams, explanatory drawings, maps, timelines and visual systems.',
     enabled: { assistant: true, nodi: true },
     instructions: `Use this skill when the user asks to draw, diagram, map, visualize, or explain spatial relationships, or when a precise visual would substantially clarify the answer. It applies across science, humanities, engineering, education, business, and creative work. Prefer SVG when exact labels, relationships, geometry, or editable line work matter. Honor an explicit request for SVG.
@@ -53,7 +53,7 @@ Choose domain-appropriate conventions: circuit symbols for circuits; arrows and 
 Before returning, audit semantic correctness, counts, units, arrow direction, connectivity, label collisions, clipping, contrast, and completeness of XML. A missing source illustration is not a reason to withhold an original drawing. Cite any source-supported explanation outside the SVG; describe the figure as your own construction when appropriate.`,
   },
   {
-    id: 'builtin-chemistry', name: 'Chemistry Studio', builtin: 'chemistry', capabilities: ['nodus:chemistry'], version: '1.0.1',
+    id: 'builtin-chemistry', name: 'Chemistry Studio', builtin: 'chemistry', capabilities: ['nodus:chemistry'], version: '1.0.1', category: 'Physical sciences',
     description: 'Reference-backed molecular structures, Fischer/Haworth/Newman projections and bounded reaction mechanisms with validated ChemFig export.',
     enabled: { assistant: false, nodi: false },
     instructions: `CHEMISTRY STUDIO — VERIFIED IDENTITY FIRST
@@ -78,7 +78,7 @@ When there is no chemical identity in the request, ask for the complete name, Pu
 This validation establishes agreement with the stated reference graph and supported projection/rule, not infallibility of chemical databases, all visual layout details, experimental kinetics or product dominance. Do not claim success before the tool result.`,
   },
   {
-    id: 'builtin-image', name: 'Image Atelier', builtin: 'image', capabilities: ['nodus:image'],
+    id: 'builtin-image', name: 'Image Atelier', builtin: 'image', capabilities: ['nodus:image'], version: '1.0.1', category: 'Design and visual communication',
     description: 'Original illustrations, concept art and visual scenes using your image model.',
     enabled: { assistant: true, nodi: true },
     instructions: `Use this skill to fulfill requests for original images, illustrations, photographs, concept art, visual metaphors, or rich scenes. You write the creative brief; Nodus sends it to the image provider and model selected by the user in Settings. Do not claim the text model itself rendered an image. Use SVG Studio for exact diagrams or extensive labels unless the user specifically requests a generated image.
@@ -87,7 +87,7 @@ Build a self-contained brief of roughly 100–250 words: first the purpose and s
 Invoke generation by emitting a fenced code block labeled nodus-image containing ONLY a JSON object with string fields "title", "alt", and "prompt", plus an optional "aspectRatio" chosen from 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, or 2:3. Choose the requested aspect ratio or the closest supported one; use a composition-appropriate format when unspecified. title and alt should be in the user's language; prompt must be in English. Example: {"title":"A quiet observatory","alt":"An astronomer working beneath an open dome at dusk","prompt":"Create an editorial illustration ..."}. This is an executable image request, not an example to quote. Emit it only when you intend to generate, at most once per answer. Never fabricate a URL or replace generation with a description of an imaginary result. Nodus replaces the request with the actual image card, stores the prompt and chosen model, and reports any failure. Keep surrounding prose short and do not claim success before the image arrives.`,
   },
   {
-    id: 'builtin-socratic-tutor', name: 'Socratic Tutor', builtin: 'socratic',
+    id: 'builtin-socratic-tutor', name: 'Socratic Tutor', builtin: 'socratic', version: '1.0.1', category: 'Learning and teaching',
     description: 'Guided learning through focused questions, progressive hints and personalized feedback.',
     enabled: { assistant: false, nodi: false },
     instructions: `Use this skill when the user wants to learn, practice, test their understanding, or work through a problem with guidance. It applies across disciplines and levels. Do not turn unrelated requests into lessons. Speak in the user's language and match their terminology, confidence and goals.
@@ -97,10 +97,10 @@ Give specific feedback: identify what is correct, explain any misconception resp
 Use relevant vault evidence accurately and cite source-dependent claims. Distinguish supplied evidence from general knowledge, original examples and assumptions. Do not invent facts or citations, or demand that the sources contain a worked answer before teaching the underlying concept. Use an enabled visual skill only when a diagram would clarify the current learning step; do not reveal a whole solution through a visual while inviting the learner to discover it.
 When the learner demonstrates understanding, summarize the key idea in a few sentences and offer one short transfer exercise or a natural stopping point. Treat success as the learner being able to explain or apply the idea, not merely agreeing with you.`,
   },
-  { id: 'builtin-genomics', name: 'AlphaGenome', builtin: 'genomics', capabilities: ['nodus:genomics'],
+  { id: 'builtin-genomics', name: 'AlphaGenome', builtin: 'genomics', capabilities: ['nodus:genomics'], version: '1.1.1', category: 'Life sciences',
     description: 'AlphaGenome regulatory variant predictions for non-commercial research, with local plots and attributed exports. Requires a personal API key.',
     enabled: { assistant: false, nodi: false }, instructions: GENOMICS_INSTRUCTIONS },
-  { id: 'builtin-legal', name: 'Legalize', builtin: 'legal', capabilities: ['nodus:legal'], description: 'Busca legislación por país en legalize-dev, con texto, fuente oficial, versión y atribuciones.', enabled: { assistant: false, nodi: false }, instructions: LEGALIZE_INSTRUCTIONS },
+  { id: 'builtin-legal', name: 'Legalize', builtin: 'legal', capabilities: ['nodus:legal'], version: '1.1.1', category: 'Law and public policy', description: 'Busca legislación por país en legalize-dev, con texto, fuente oficial, versión y atribuciones.', enabled: { assistant: false, nodi: false }, instructions: LEGALIZE_INSTRUCTIONS },
   ...GENERAL_CHAT_SKILLS,
 ];
 
