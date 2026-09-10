@@ -3,7 +3,7 @@
 ## Unreleased
 
 - The Marketplace now shows which skills you already have. Skills included in Nodus appear as installed instead of being offered again, an All / Installed / Available filter reviews your library from the catalog, and each installed skill can be uninstalled from its card or its detail page.
-- Installing a catalog entry that Nodus already includes restores the version shipped with your build instead of adding a duplicate skill with the same name. AlphaGenome and Legalize can be restored this way too.
+- Installing a catalog entry that Nodus already includes restores the version shipped with your build instead of adding a duplicate skill with the same name, and removes a duplicate a previous version had already installed. AlphaGenome and Legalize can be restored this way too.
 - Uninstalling affects the skill only. Native capabilities stay in Nodus and come back with the skill, and My skills now explains that a built-in skill can be reinstalled from the Marketplace.
 
 ## 5.3.0 — 2026-09-09

@@ -58,6 +58,8 @@ export function validateSkillPackage(value: SkillPackage): SkillPackage {
   }
   return { manifest, files };
 }
+/** Identifier the official repository is stored under, so packages installed from it are recognizable. */
+export const officialSkillSourceId = () => normalizeSkillSource(DEFAULT_SKILL_SOURCE).id;
 export function normalizeSkillSource(input: string): { id: string; url: string; owner: string; repo: string } {
   const url = new URL(input.trim());
   const match = /^\/([a-zA-Z0-9-]+)\/([a-zA-Z0-9_.-]+)\/?$/.exec(url.pathname);

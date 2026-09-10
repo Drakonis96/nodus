@@ -175,3 +175,27 @@ test('official listings of built-in skills reinstall the bundled skill instead o
     lib.removeSkillSource(community.id);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test('a duplicate installed by an earlier build is consolidated instead of surviving beside the built-in', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = builtinFetch;
+  try {
+    const official = lib.getSkillMarketplace().sources.find(source => lib.isOfficialSkillSource(source.url));
+    lib.restoreChatSkills();
+    // Exactly the library an earlier build produced: the built-in plus a downloaded copy of it.
+    const legacy = lib.installChatSkillPackage(builtinPackages['svg-studio'],
+      { sourceId: lib.officialSkillSourceId(), path: 'svg-studio', commit, packageId: 'svg-studio', version: '1.0.0', digest: lib.packageDigest(builtinPackages['svg-studio']) })
+      .find(skill => skill.origin?.packageId === 'svg-studio');
+    assert.equal(lib.listChatSkills().filter(skill => skill.name === 'SVG Studio').length, 2);
+    const consolidated = lib.installMarketplaceSkill(official.id, 'svg-studio', commit);
+    assert.deepEqual(consolidated.filter(skill => skill.name === 'SVG Studio'), [lib.DEFAULT_CHAT_SKILLS[0]], 'the downloaded duplicate is removed, leaving one built-in');
+    assert.equal(fs.existsSync(path.join(temporary, 'skills', legacy.id)), false, 'its package directory goes with it');
+    // A copy from another repository is a different skill and is never touched.
+    const community = lib.addSkillSource('https://github.com/community/nodus-skills').sources.at(-1);
+    await lib.updateSkillSource(community.id);
+    const external = lib.installMarketplaceSkill(community.id, 'svg-studio', commit).find(skill => skill.origin?.sourceId === community.id);
+    assert.equal(lib.installMarketplaceSkill(official.id, 'svg-studio', commit).some(skill => skill.id === external.id), true);
+    lib.deleteChatSkill(external.id);
+    lib.removeSkillSource(community.id);
+  } finally { globalThis.fetch = originalFetch; }
+});

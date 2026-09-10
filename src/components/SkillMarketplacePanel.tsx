@@ -34,13 +34,18 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
   // The official catalog publishes this build's own built-ins, so a listed package can already be
   // part of Nodus. A community source reusing the identifier is a different, downloadable skill.
   const builtinId = (manifest: SkillManifest) => official ? BUILTIN_SKILL_PACKAGES[manifest.id] : undefined;
-  const installedSkill = (manifest: SkillManifest) => skills.find(s => s.origin?.sourceId === source?.id && s.origin?.packageId === manifest.id)
-    ?? skills.find(s => !!builtinId(manifest) && s.id === builtinId(manifest));
-  const uninstall = (skill: ChatSkill) => run(async () => {
-    await window.nodus.deleteChatSkill(skill.id);
+  // A profile from an earlier build can hold both the built-in and a downloaded copy of the same
+  // official package, so one catalog entry is uninstalled as a unit rather than one skill at a time.
+  const installedSkills = (manifest: SkillManifest) => skills.filter(s => (s.origin?.sourceId === source?.id && s.origin.packageId === manifest.id)
+    || (!!builtinId(manifest) && s.id === builtinId(manifest)));
+  const uninstall = (targets: ChatSkill[]) => run(async () => {
+    for (const skill of targets) await window.nodus.deleteChatSkill(skill.id);
     setRemoveId('');
-    setNotice(skill.builtin ? 'Skill uninstalled. Its native capabilities stay in Nodus and return with the skill.' : 'Skill uninstalled. Reinstall it here whenever you want.');
+    setNotice(targets.some(skill => skill.builtin) ? 'Skill uninstalled. Its native capabilities stay in Nodus and return with the skill.' : 'Skill uninstalled. Reinstall it here whenever you want.');
   });
+  const confirmText = (name: string, targets: ChatSkill[], included: boolean) => included
+    ? `Uninstall ${name}${targets.length > 1 ? ` and ${targets.length - 1} copy installed from this repository` : ''}? Its native capabilities stay in Nodus.`
+    : `Uninstall ${name} and its local edits?`;
   const install = (entry: MarketplaceEntry) => run(async () => {
     await window.nodus.installMarketplaceSkill(source!.id, entry.path, source!.commit!);
     setReview(null);
@@ -49,16 +54,16 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
   const categories = [...new Set(source?.entries.map(e => e.package.manifest.category) ?? [])].sort();
   const entries = (source?.entries ?? []).filter(e => {
     const m = e.package.manifest;
-    return (!category || m.category === category) && (filter === 'all' || (filter === 'installed') === !!installedSkill(m))
+    return (!category || m.category === category) && (filter === 'all' || (filter === 'installed') === !!installedSkills(m).length)
       && `${m.name} ${m.description} ${m.author} ${m.category}`.toLowerCase().includes(query.toLowerCase());
   });
-  const installedCount = (source?.entries ?? []).filter(e => installedSkill(e.package.manifest)).length;
+  const installedCount = (source?.entries ?? []).filter(e => installedSkills(e.package.manifest).length).length;
   const counts: Record<InstalledFilter, number> = { all: source?.entries.length ?? 0, installed: installedCount, available: (source?.entries.length ?? 0) - installedCount };
   const manifest = review?.package.manifest;
   const builtin = manifest ? builtinId(manifest) : undefined;
   // A built-in is restored from this build, so a capability no package may declare is never a blocker.
   const unsupported = builtin ? [] : unsupportedSkillCapabilities(manifest?.capabilities ?? []);
-  const installed = manifest ? installedSkill(manifest) : undefined;
+  const installed = manifest ? installedSkills(manifest) : [];
   return <div className="skill-marketplace" aria-label="Skill marketplace">
     <div className="skill-marketplace-brand"><img src={`data:image/svg+xml,${encodeURIComponent(marketplaceLogoSvg(accent))}`} data-testid="marketplace-logo" alt="Nodus Marketplace" /><div><b>Discover your next skill</b><p>Methods and tools, made by the community.</p></div></div>
     <label>Repository<select aria-label="Skill repository" value={source?.id ?? ''} disabled={busy} onChange={e => setSourceId(e.target.value)}>{state.sources.map(s => <option key={s.id} value={s.id}>{s.id}</option>)}</select></label>
@@ -76,10 +81,10 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
           ? 'Included in Nodus. Reinstalling restores the instructions and default activation of the version shipped with this build, replacing your local edits.'
           : 'Included in Nodus. Installing restores the version shipped with this build instead of downloading the published copy.'
         : installed ? 'Reinstalling replaces your local edits and disables this skill on both surfaces.' : 'Installed skills start disabled. Enable them in My skills for Assistant or Nodi.'}</p>
-      <button className="chat-skill-primary" type="button" disabled={busy || !!unsupported.length} onClick={() => void install(review)}>{installed ? (builtin ? 'Reinstall included skill' : 'Replace installed skill') : 'Install skill'}</button>
-      {installed && (removeId === installed.id
-        ? <div className="chat-skill-confirm"><span>{builtin ? 'Uninstall this included skill? Its native capabilities stay in Nodus.' : 'Uninstall this skill and its local edits?'}</span><button type="button" disabled={busy} onClick={() => void uninstall(installed)}>Uninstall</button><button type="button" onClick={() => setRemoveId('')}>Cancel</button></div>
-        : <button type="button" onClick={() => setRemoveId(installed.id)}>Uninstall skill</button>)}
+      <button className="chat-skill-primary" type="button" disabled={busy || !!unsupported.length} onClick={() => void install(review)}>{installed.length ? (builtin ? 'Reinstall included skill' : 'Replace installed skill') : 'Install skill'}</button>
+      {!!installed.length && (removeId === installed[0].id
+        ? <div className="chat-skill-confirm"><span>{confirmText(manifest.name, installed, !!builtin)}</span><button type="button" disabled={busy} onClick={() => void uninstall(installed)}>Uninstall</button><button type="button" onClick={() => setRemoveId('')}>Cancel</button></div>
+        : <button type="button" onClick={() => setRemoveId(installed[0].id)}>Uninstall skill</button>)}
     </article> : <>
       <label>Find a skill<input type="search" aria-label="Search marketplace" placeholder="Name, creator or description" value={query} onChange={e => setQuery(e.target.value)} /></label>
       <label>Category<select aria-label="Marketplace category" value={category} onChange={e => setCategory(e.target.value)}><option value="">All categories</option>{categories.map(c => <option key={c}>{c}</option>)}</select></label>
@@ -87,12 +92,12 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
         <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}>{value === 'all' ? 'All' : value === 'installed' ? 'Installed' : 'Available'} {counts[value]}</button>)}</div>
       {!entries.length && <p className="chat-skills-empty">{!source?.updatedAt ? 'Update a repository to load its catalog.' : filter === 'installed' ? 'No skills from this repository are installed.' : filter === 'available' ? 'Every skill in this repository is already installed.' : 'No matching skills.'}</p>}
       {categories.filter(c => entries.some(e => e.package.manifest.category === c)).map(c => <section key={c}><h4>{c}</h4>{entries.filter(e => e.package.manifest.category === c).map(entry => {
-        const m = entry.package.manifest; const present = installedSkill(m); const included = !!builtinId(m);
-        return <article className={`chat-skill-item ${present ? 'installed' : ''}`} key={entry.path}><b>{m.name}</b><small>@{m.author} · {m.version}{present ? ` · ${included ? 'Included in Nodus' : `Installed ${present.origin?.version}`}` : ''}</small><p>{m.description}</p>
-          {present && removeId === present.id
-            ? <div className="chat-skill-confirm"><span>{included ? `Uninstall ${m.name}? Its native capabilities stay in Nodus.` : `Uninstall ${m.name} and its local edits?`}</span><button type="button" disabled={busy} onClick={() => void uninstall(present)}>Uninstall</button><button type="button" onClick={() => setRemoveId('')}>Cancel</button></div>
-            : <div className="skill-marketplace-entry-actions"><button type="button" disabled={busy} onClick={() => { setRemoveId(''); setReview(entry); }}>{present ? (included ? 'Manage skill' : 'Review update') : 'Review skill'}</button>
-              {present && <button type="button" disabled={busy} aria-label={`Uninstall ${m.name}`} onClick={() => setRemoveId(present.id)}>Uninstall</button>}</div>}
+        const m = entry.package.manifest; const present = installedSkills(m); const included = !!builtinId(m);
+        return <article className={`chat-skill-item ${present.length ? 'installed' : ''}`} key={entry.path}><b>{m.name}</b><small>@{m.author} · {m.version}{present.length ? ` · ${included ? 'Included in Nodus' : `Installed ${present[0].origin?.version}`}` : ''}</small><p>{m.description}</p>
+          {present.length && removeId === present[0].id
+            ? <div className="chat-skill-confirm"><span>{confirmText(m.name, present, included)}</span><button type="button" disabled={busy} onClick={() => void uninstall(present)}>Uninstall</button><button type="button" onClick={() => setRemoveId('')}>Cancel</button></div>
+            : <div className="skill-marketplace-entry-actions"><button type="button" disabled={busy} onClick={() => { setRemoveId(''); setReview(entry); }}>{present.length ? (included ? 'Manage skill' : 'Review update') : 'Review skill'}</button>
+              {!!present.length && <button type="button" disabled={busy} aria-label={`Uninstall ${m.name}`} onClick={() => setRemoveId(present[0].id)}>Uninstall</button>}</div>}
         </article>;
       })}</section>)}
     </>}
