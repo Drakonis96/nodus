@@ -20,7 +20,9 @@ import {
 } from './skillPlugins';
 
 const file = () => path.join(app.getPath('userData'), 'chat-skills.json');
-const LIBRARY_VERSION = 13;
+const LIBRARY_VERSION = 14;
+const LEGACY_SVG_V12_SHA256 = '8a8629caa2db26ab2d86ad7b2ee3daae72bd4156d198a8da01b639218c328570';
+const LEGACY_CHEMISTRY_V12_SHA256 = '72d01438357e6e4a591a0a067c62cbfbe6e2aa7fc801b30ace8d6c1a470fb725';
 const LEGACY_CHEMISTRY_V8_SHA256 = '876f9cf3d84a695540625bc79865b5f1d9026f6e577dbbbfd78a970e5552db94';
 const LEGACY_CHEMISTRY_V7_SHA256 = '752f1a771d090e09a2ac564421e563167fc89b858d9167eba50eb2327ce1c5ef';
 const LEGACY_CHEMISTRY_V6_SHA256 = '2fcb5625341467d5724b42ef1ac37d2429eb48779237e0593f7f75a605f00d5c';
@@ -39,26 +41,36 @@ export function listChatSkills(): ChatSkill[] {
   if (!fs.existsSync(file())) return write(structuredClone(DEFAULT_CHAT_SKILLS));
   let parsed: { version?: number; skills?: ChatSkill[] };
   try { parsed = JSON.parse(fs.readFileSync(file(), 'utf8')); } catch { throw new Error('The skills library could not be read.'); }
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');
   if (parsed.version! < LIBRARY_VERSION) {
     // Each release adds only newly introduced defaults. Never restore a skill
     // deleted in an earlier version or overwrite its edited instructions/flags.
+    const latestSvg = DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'svg');
     const latestChemistry = DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'chemistry');
     const renamed = parsed.skills.map(skill => skill.builtin === 'genomics'
       ? { ...skill, name: skill.name === 'Genomics Studio' ? 'AlphaGenome' : skill.name,
         instructions: skill.instructions.replaceAll('Genomics Studio', 'AlphaGenome') }
       : skill);
-    const existing = renamed.map(skill => skill.builtin === 'chemistry'
-      && ((parsed.version === 4 && createHash('sha256').update(skill.instructions).digest('hex') === LEGACY_CHEMISTRY_V4_SHA256)
-        || (parsed.version === 5 && createHash('sha256').update(skill.instructions).digest('hex') === LEGACY_CHEMISTRY_V5_SHA256)
-        || (parsed.version === 6 && createHash('sha256').update(skill.instructions).digest('hex') === LEGACY_CHEMISTRY_V6_SHA256)
-        || (parsed.version === 7 && createHash('sha256').update(skill.instructions).digest('hex') === LEGACY_CHEMISTRY_V7_SHA256)
-        || (parsed.version === 8 && createHash('sha256').update(skill.instructions).digest('hex') === LEGACY_CHEMISTRY_V8_SHA256))
-      && latestChemistry
-      ? { ...skill, instructions: latestChemistry.instructions }
-      : skill).map(skill => skill.builtin && ['svg','image','chemistry','genomics','legal'].includes(skill.builtin)
-        ? { ...skill, capabilities: [`nodus:${skill.builtin}`] }
-        : skill);
+    const existing = renamed.map(skill => {
+      const digest = typeof skill.instructions === 'string' ? createHash('sha256').update(skill.instructions).digest('hex') : '';
+      let updated = skill;
+      if (skill.builtin === 'svg' && digest === LEGACY_SVG_V12_SHA256 && latestSvg) {
+        updated = { ...skill, instructions: latestSvg.instructions, version: latestSvg.version };
+      }
+      else if (skill.builtin === 'chemistry'
+        && ((parsed.version === 4 && digest === LEGACY_CHEMISTRY_V4_SHA256)
+          || (parsed.version === 5 && digest === LEGACY_CHEMISTRY_V5_SHA256)
+          || (parsed.version === 6 && digest === LEGACY_CHEMISTRY_V6_SHA256)
+          || (parsed.version === 7 && digest === LEGACY_CHEMISTRY_V7_SHA256)
+          || (parsed.version === 8 && digest === LEGACY_CHEMISTRY_V8_SHA256)
+          || digest === LEGACY_CHEMISTRY_V12_SHA256)
+        && latestChemistry) {
+        updated = { ...skill, instructions: latestChemistry.instructions, version: latestChemistry.version };
+      }
+      return updated.builtin && ['svg','image','chemistry','genomics','legal'].includes(updated.builtin)
+        ? { ...updated, capabilities: [`nodus:${updated.builtin}`] }
+        : updated;
+    });
     const additions = DEFAULT_CHAT_SKILLS.filter(skill =>
       ((parsed.version! < 2 && skill.builtin === 'socratic')
         || (parsed.version! < 3 && skill.builtin === 'general')

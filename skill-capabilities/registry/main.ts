@@ -91,6 +91,7 @@ export async function executeRegisteredChatSkills(answer: string, execution: Cha
     result.push(serializeChatVisualPart(part));
   }
   current();
+  if (chemistry.unverifiedSvg) result.unshift('> **Chemistry Studio — unverified drawing:** no validated identity, projection or mechanism was produced. This model-authored SVG was not checked by the chemistry resolver; verify structures, charges, products and curved arrows against a trusted source.\n\n');
   return result.join('');
 }
 
