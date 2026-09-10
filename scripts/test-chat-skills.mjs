@@ -436,3 +436,14 @@ test('a built-in can be uninstalled and reinstalled alone, keeping every other s
   assert.throws(() => lib.installBuiltinChatSkill('descriptive-statistics'), /not a built-in/);
   lib.deleteChatSkill(personal.id);
 });
+
+test('the panel reset never outranks the switch track color', () => {
+  // The standalone Nodi window has no Tailwind base reset, so the shared panel
+  // normalizes its own buttons. A bare `.chat-skills-panel button` rule beats the
+  // later `.chat-skill-switch` class and blanks the unchecked #45454f track; the
+  // reset must stay at the class specificity via :where(button).
+  const css = fs.readFileSync(path.join(root, 'src/components/chatSkills.css'), 'utf8');
+  assert.match(css, /\.chat-skills-panel :where\(button\)\s*\{/, 'the button reset must not outrank component classes');
+  assert.doesNotMatch(css, /\.chat-skills-panel button\s*\{[^}]*background:\s*transparent/, 'a bare .chat-skills-panel button reset would blank the unchecked switch track');
+  assert.match(css, /\.chat-skill-switch \{[^}]*background:\s*#45454f/, 'the unchecked switch keeps an explicit track color');
+});

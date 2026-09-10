@@ -336,11 +336,13 @@ try {
     const close = panel.querySelector('.chat-skills-heading > button');
     const search = panel.querySelector('.chat-skills-search input');
     const toggle = panel.querySelector('.chat-skill-switch');
+    const uncheckedToggle = panel.querySelector('.chat-skill-switch[aria-checked="false"]');
     const knob = panel.querySelector('.chat-skill-switch span');
     const style = (element) => {
       if (!(element instanceof HTMLElement)) throw new Error('missing Skills control');
       const computed = getComputedStyle(element);
       return {
+        background: computed.backgroundColor,
         border: computed.borderWidth,
         fontFamily: computed.fontFamily,
         fontSize: computed.fontSize,
@@ -360,6 +362,7 @@ try {
       close: style(close),
       search: style(search),
       toggle: style(toggle),
+      uncheckedToggle: style(uncheckedToggle),
       knob: style(knob),
     };
   });
@@ -367,6 +370,11 @@ try {
   assert.equal(skillAppearance.close.border, '0px');
   assert.equal(skillAppearance.search.border, '0px');
   assert.equal(skillAppearance.toggle.border, '0px');
+  assert.equal(
+    skillAppearance.uncheckedToggle.background,
+    'rgb(69, 69, 79)',
+    'an unchecked Skills switch keeps its #45454f track instead of inheriting the reset transparent background',
+  );
   assert.equal(skillAppearance.tab.fontFamily, skillAppearance.panelFont);
   assert.equal(skillAppearance.search.fontFamily, skillAppearance.panelFont);
   assert.deepEqual(

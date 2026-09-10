@@ -12,7 +12,7 @@
   letter-spacing: inherit;
   color: inherit;
 }
-.chat-skills-panel button {
+.chat-skills-panel :where(button) {
   appearance: none;
   -webkit-appearance: none;
   border: 0;
