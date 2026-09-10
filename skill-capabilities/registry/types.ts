@@ -9,3 +9,9 @@ export interface ChatSkillExecution {
   version: number;
   isCurrent: () => boolean;
 }
+
+/** Calls already charged in this reply, split by lane. See SANDBOXED_CALL_LIMIT. */
+export interface ChatCallBudget {
+  sandboxed: number;
+  metered: number;
+}

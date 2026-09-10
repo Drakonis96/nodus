@@ -1,9 +1,9 @@
 import { serializeChatVisualPart, skillHasCapability, type ChatSkill } from '../../shared/chatSkills';
-import { normalizeCapabilityId, type CapabilityChatResult, type CapabilityInvocation } from '../contracts';
+import { METERED_CALL_LIMIT, SANDBOXED_CALL_LIMIT, capabilityIsMetered, normalizeCapabilityId, type CapabilityChatResult, type CapabilityInvocation } from '../contracts';
 import { resolveInstalledCapability } from '../../electron/skillPlugins';
 import { chatAssetVersion, storeCapabilityFile, storeChatImage } from '../../electron/chatAssets';
 import { runCapabilitySandbox } from '../sandbox/runtime';
-import type { ChatSkillExecution } from '../registry/types';
+import type { ChatCallBudget, ChatSkillExecution } from '../registry/types';
 
 export function externalCapabilityPrompt(skills: ChatSkill[]): string[] {
   const lines: string[] = [];
@@ -16,7 +16,7 @@ export function externalCapabilityPrompt(skills: ChatSkill[]): string[] {
   return lines;
 }
 
-export async function executeExternalCapability(content: string, complete: boolean, execution: ChatSkillExecution, signal?: AbortSignal): Promise<string> {
+export async function executeExternalCapability(content: string, complete: boolean, execution: ChatSkillExecution, budget: ChatCallBudget, signal?: AbortSignal): Promise<string> {
   try {
     if (!complete) throw new Error('The capability request was interrupted. Retry the response.');
     if (content.length > 64_000) throw new Error('Capability request is too large.');
@@ -25,6 +25,10 @@ export async function executeExternalCapability(content: string, complete: boole
     const skill = execution.skills.find(item => item.id === invocation.skillId), capabilityId = normalizeCapabilityId(invocation.capabilityId);
     if (!skill || capabilityId.startsWith('nodus:') || !skillHasCapability(skill, capabilityId)) throw new Error('This capability is not enabled for this reply.');
     const runtime = resolveInstalledCapability(capabilityId, skill.plugin ? { version: skill.plugin.version, digest: skill.plugin.digest } : undefined); if (!runtime) throw new Error('The capability runtime is unavailable.');
+    // The lane is chosen from what this capability actually declared, not from the request.
+    if (capabilityIsMetered(runtime.manifest.permissions)) {
+      if (++budget.metered > METERED_CALL_LIMIT) throw new Error(`At most ${METERED_CALL_LIMIT} capability calls that use the network, secrets or storage are allowed per reply.`);
+    } else if (++budget.sandboxed > SANDBOXED_CALL_LIMIT) throw new Error(`At most ${SANDBOXED_CALL_LIMIT} sandboxed tool and capability calls are allowed per reply.`);
     const result = await runCapabilitySandbox(runtime, { ...invocation, capabilityId }, signal);
     signal?.throwIfAborted();
     if (!execution.isCurrent() || execution.owner && chatAssetVersion(execution.owner) !== execution.version) throw new DOMException('The chat was deleted or changed.', 'AbortError');
