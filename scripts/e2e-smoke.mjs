@@ -4096,9 +4096,12 @@ try {
     await page.getByPlaceholder('Buscar en todo el mundo…').fill('cicatriz');
     const footer = page.getByTestId('encyclopedia-fulltext');
     await footer.waitFor({ timeout: 15_000 });
-    await footer.getByRole('button').first().click();
-    const hit = page.getByTestId('encyclopedia-fulltext').getByRole('button').first();
-    await hit.waitFor({ timeout: 20_000 });
+    // The trigger keeps its place while the query runs, only saying «Buscando…», so waiting
+    // for "a button in the footer" matches the trigger itself and races the search. Wait for
+    // the trigger to be replaced by its outcome — the hit list, or the "no aparece" line.
+    const trigger = footer.getByRole('button', { name: /texto completo|Buscando/ });
+    await trigger.click();
+    await trigger.waitFor({ state: 'detached', timeout: 20_000 });
     assert.match(
       await page.getByTestId('encyclopedia-fulltext').textContent(),
       /Kaelen Vor/,
