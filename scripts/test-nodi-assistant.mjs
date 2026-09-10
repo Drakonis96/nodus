@@ -204,8 +204,11 @@ test('Nodi chat keeps model selection inside settings and exposes deletable hist
   assert.match(component, /clearNodiConversations\(\)/);
   assert.match(component, /role="dialog" aria-modal="true"/);
   assert.match(component, /<ModelPicker[^>]* menu /);
-  assert.match(css, /nodi-chat-msgs::-webkit-scrollbar/);
-  assert.match(css, /nodi-chat-input::-webkit-scrollbar/);
+  // Scrollbars are themed once for the whole companion instead of per element,
+  // so every present and future scroll container inherits the same tokens.
+  assert.match(css, /\.nodi-companion \*::-webkit-scrollbar \{/);
+  assert.match(css, /scrollbar-color: var\(--nodi-scrollbar-thumb\) var\(--nodi-scrollbar-track\)/);
+  assert.match(css, /\.nodi-theme-light \{\s*\n\s*--nodi-scrollbar-track: #eef2f7;/);
   assert.match(css, /\.nodi-msg \.md table/);
   assert.match(css, /\.nodi-history-delete:hover/);
   assert.match(css, /\.nodi-confirm-overlay/);

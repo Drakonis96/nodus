@@ -1,4 +1,25 @@
 .chat-skills-control,.chat-skills-control * { box-sizing: border-box; }
+/*
+ * The standalone Nodi window intentionally does not load the application's
+ * Tailwind base layer. Keep this shared panel independent from that global
+ * reset so native button borders, form fonts and block margins cannot leak
+ * into the compact Nodi rendering.
+ */
+.chat-skills-panel :where(h1,h2,h3,h4,p,pre,fieldset) { margin: 0; }
+.chat-skills-panel :where(button,input,select,textarea) {
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+.chat-skills-panel :where(button) {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.chat-skills-panel :where(img,svg) { display: block; }
 .chat-skills-panel { font-weight: 400; font-size: 12px; line-height: 1.5; }
 .chat-skills-control { position: relative; flex-shrink: 0; color: #e4e4e7; }
 .chat-skills-trigger { display: flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid color-mix(in srgb, var(--vault-accent, #6366f1) 27.1%, transparent); background: color-mix(in srgb, var(--vault-accent, #6366f1) 5.5%, transparent); border-radius: 9px; font-size: 12px; color: color-mix(in srgb, var(--vault-accent, #6366f1) 55%, white); }

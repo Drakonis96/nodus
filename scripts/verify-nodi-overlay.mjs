@@ -323,6 +323,110 @@ try {
     opacity: '1',
   }, 'quoted document text must retain the readable foreground of the user bubble');
   await overlay.screenshot({ path: `${shots}/overlay-4-chat-quote.png` });
+
+  // Skills is shared with the main Assistant, but the standalone mascot entry
+  // does not load Tailwind's base reset. Verify the panel supplies its own
+  // control normalization instead of inheriting Chromium's native borders and
+  // oversized form typography in this window.
+  await overlay.getByTestId('chat-skills-nodi').click();
+  const skillsPanel = overlay.getByRole('region', { name: 'Skills', exact: true });
+  await skillsPanel.waitFor();
+  const skillAppearance = await skillsPanel.evaluate((panel) => {
+    const tab = panel.querySelector('.skill-marketplace-tabs button');
+    const close = panel.querySelector('.chat-skills-heading > button');
+    const search = panel.querySelector('.chat-skills-search input');
+    const toggle = panel.querySelector('.chat-skill-switch');
+    const uncheckedToggle = panel.querySelector('.chat-skill-switch[aria-checked="false"]');
+    const knob = panel.querySelector('.chat-skill-switch span');
+    const style = (element) => {
+      if (!(element instanceof HTMLElement)) throw new Error('missing Skills control');
+      const computed = getComputedStyle(element);
+      return {
+        background: computed.backgroundColor,
+        border: computed.borderWidth,
+        fontFamily: computed.fontFamily,
+        fontSize: computed.fontSize,
+        height: computed.height,
+        margin: computed.margin,
+        width: computed.width,
+      };
+    };
+    return {
+      panelFont: getComputedStyle(panel).fontFamily,
+      scrollbar: {
+        standard: getComputedStyle(panel).scrollbarColor,
+        track: getComputedStyle(panel, '::-webkit-scrollbar-track').backgroundColor,
+        thumb: getComputedStyle(panel, '::-webkit-scrollbar-thumb').backgroundColor,
+      },
+      tab: style(tab),
+      close: style(close),
+      search: style(search),
+      toggle: style(toggle),
+      uncheckedToggle: style(uncheckedToggle),
+      knob: style(knob),
+    };
+  });
+  assert.equal(skillAppearance.tab.border, '0px');
+  assert.equal(skillAppearance.close.border, '0px');
+  assert.equal(skillAppearance.search.border, '0px');
+  assert.equal(skillAppearance.toggle.border, '0px');
+  assert.equal(
+    skillAppearance.uncheckedToggle.background,
+    'rgb(69, 69, 79)',
+    'an unchecked Skills switch keeps its #45454f track instead of inheriting the reset transparent background',
+  );
+  assert.equal(skillAppearance.tab.fontFamily, skillAppearance.panelFont);
+  assert.equal(skillAppearance.search.fontFamily, skillAppearance.panelFont);
+  assert.deepEqual(
+    [skillAppearance.toggle.width, skillAppearance.toggle.height, skillAppearance.knob.width, skillAppearance.knob.height],
+    ['29px', '17px', '13px', '13px'],
+    'Nodi rendered the Skills switch with native button geometry',
+  );
+  assert.equal(skillAppearance.tab.margin, '0px');
+  assert.deepEqual(skillAppearance.scrollbar, {
+    standard: 'rgb(203, 213, 225) rgb(238, 242, 247)',
+    track: 'rgb(238, 242, 247)',
+    thumb: 'rgb(203, 213, 225)',
+  });
+  console.log('[verify] Nodi Skills normalized controls ->', JSON.stringify(skillAppearance));
+  await overlay.screenshot({ path: `${shots}/overlay-4-chat-skills-light.png` });
+  await skillsPanel.getByRole('button', { name: 'Marketplace', exact: true }).click();
+  await skillsPanel.locator('.skill-marketplace').waitFor();
+  await overlay.screenshot({ path: `${shots}/overlay-4-chat-skills-marketplace-light.png` });
+  await skillsPanel.getByRole('button', { name: 'My skills', exact: true }).click();
+  await page.evaluate(() => window.nodus.updateSettings({ theme: 'dark' }));
+  await overlay.waitForFunction(() => !document.querySelector('.nodi-companion')?.classList.contains('nodi-theme-light'));
+  await overlay.waitForTimeout(250);
+  // Re-render the tab content after Chromium repaints the transparent native
+  // window's theme; this keeps the visual artifact deterministic on macOS.
+  await skillsPanel.getByRole('button', { name: 'Marketplace', exact: true }).click();
+  await skillsPanel.getByRole('button', { name: 'My skills', exact: true }).click();
+  await overlay.mouse.move(0, 0);
+  await overlay.waitForTimeout(50);
+  const darkAppearance = await skillsPanel.evaluate((panel) => {
+    const tab = panel.querySelector('.skill-marketplace-tabs button[aria-pressed="true"]');
+    if (!(tab instanceof HTMLElement)) throw new Error('missing active Skills tab');
+    return {
+      activeTab: { text: tab.textContent, color: getComputedStyle(tab).color },
+      scrollbar: {
+        standard: getComputedStyle(panel).scrollbarColor,
+        track: getComputedStyle(panel, '::-webkit-scrollbar-track').backgroundColor,
+        thumb: getComputedStyle(panel, '::-webkit-scrollbar-thumb').backgroundColor,
+      },
+    };
+  });
+  assert.deepEqual(darkAppearance, {
+    activeTab: { text: 'My skills', color: 'rgb(255, 255, 255)' },
+    scrollbar: {
+      standard: 'rgb(89, 101, 121) rgb(17, 24, 36)',
+      track: 'rgb(17, 24, 36)',
+      thumb: 'rgb(89, 101, 121)',
+    },
+  });
+  await overlay.screenshot({ path: `${shots}/overlay-4-chat-skills-dark.png` });
+  await page.evaluate(() => window.nodus.updateSettings({ theme: 'light' }));
+  await overlay.waitForFunction(() => document.querySelector('.nodi-companion')?.classList.contains('nodi-theme-light'));
+  await skillsPanel.getByRole('button', { name: 'Cerrar', exact: true }).click();
   await overlay.locator('.nodi-panel textarea').first().fill('Hola Nodi');
   await overlay.waitForFunction(() => {
     const send = document.querySelector('.nodi-chat-send');
