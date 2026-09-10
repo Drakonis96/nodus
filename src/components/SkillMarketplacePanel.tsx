@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BUILTIN_SKILL_PACKAGES, type ChatSkill } from '@shared/chatSkills';
 import { unsupportedSkillCapabilities, DEFAULT_SKILL_SOURCE, isOfficialSkillSource, type MarketplaceEntry, type PluginMarketplaceEntry, type SkillManifest, type SkillMarketplace } from '@shared/skillMarketplace';
+import { compareSemver } from '../../skill-capabilities/contracts';
 import type { InboxPluginSummary, InstalledPluginSummary } from '../../skill-capabilities/contracts';
 import { marketplaceLogoSvg } from '@shared/marketplaceLogo';
 
@@ -26,9 +27,11 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
   const [pluginReview, setPluginReview] = useState<PluginMarketplaceEntry | null>(null);
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPluginSummary[]>([]);
   const [inboxPlugins, setInboxPlugins] = useState<InboxPluginSummary[]>([]);
+  const [appVersion, setAppVersion] = useState('');
   useEffect(() => {
     let alive = true;
     const refresh = () => { void window.nodus.getSkillMarketplace().then(value => { if (alive) setState(value); }).catch(e => { if (alive) setError(String(e)); }); void window.nodus.listInstalledPlugins().then(value => { if (alive) setInstalledPlugins(value); }).catch(() => undefined); void window.nodus.listInboxPlugins().then(value => { if (alive) setInboxPlugins(value); }).catch(() => undefined); };
+    void window.nodus.getAppInfo().then(info => { if (alive) setAppVersion(info.version); }).catch(() => undefined);
     refresh(); const off = window.nodus.onChatSkillsChanged(refresh);
     return () => { alive = false; off(); };
   }, []);
@@ -86,7 +89,16 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
       {(() => { const capabilities = pluginReview.package.manifest.capabilities.map(file => JSON.parse(pluginReview.package.files[file])); const networks = capabilities.flatMap(capability => capability.permissions?.network ?? []); const secrets = capabilities.flatMap(capability => capability.permissions?.secrets ?? []); const storage = capabilities.reduce((sum, capability) => sum + (capability.permissions?.storage?.maxBytes ?? 0), 0); return <div><b>Requested permissions</b><ul><li>HTTPS endpoints: {networks.length ? networks.map(endpoint => endpoint.origin).join(', ') : 'none'}</li><li>Secrets: {secrets.length ? secrets.map(secret => secret.label).join(', ') : 'none'}</li><li>Storage: {storage ? `${storage} bytes` : 'none'}</li></ul></div>; })()}
       <small>Capability code runs in an ephemeral Chromium sandbox without Node, filesystem, navigation, WebRTC or direct network access. Only the permissions above are mediated by Nodus.</small>
       {Object.entries(pluginReview.package.files).map(([name, content]) => <details key={name}><summary>{name}</summary><pre>{content}</pre></details>)}
-      <button className="chat-skill-primary" type="button" disabled={busy} onClick={() => void run(async () => { await window.nodus.installMarketplacePlugin(source.id, pluginReview.path, source.commit!, true); setPluginReview(null); setInstalledPlugins(await window.nodus.listInstalledPlugins()); setNotice('Plugin installed. New skills start disabled.'); })}>Approve permissions and install</button>
+      {(() => {
+        // A skill review already warns before install; a plugin can also be refused for
+        // being newer than the build, and that must be visible before permissions are given.
+        const floor = pluginReview.package.manifest.compatibility.minNodusVersion;
+        const tooOld = !!appVersion && compareSemver(appVersion, floor) < 0;
+        return <>
+          {tooOld && <p role="status">Requires Nodus {floor} or newer; this build is {appVersion}. It can be installed, but it stays inactive until you update.</p>}
+          <button className="chat-skill-primary" type="button" disabled={busy} onClick={() => void run(async () => { await window.nodus.installMarketplacePlugin(source.id, pluginReview.path, source.commit!, true); setPluginReview(null); setInstalledPlugins(await window.nodus.listInstalledPlugins()); setNotice(tooOld ? `Plugin saved. It stays inactive until Nodus ${floor}.` : 'Plugin installed. New skills start disabled.'); })}>Approve permissions and install</button>
+        </>;
+      })()}
     </article> : review && manifest && source ? <article className="skill-marketplace-review">
       <button type="button" onClick={() => { setReview(null); setRemoveId(''); }}>← Back to catalog</button><h4>{manifest.name}</h4><p>@{manifest.author} · {manifest.version} · {manifest.license}</p>
       <p>{manifest.description}</p><p><b>Capabilities:</b> {manifest.capabilities.join(', ') || 'No native capabilities'}{manifest.tools.length ? ` · ${manifest.tools.length} sandboxed JavaScript tools` : ''}</p>

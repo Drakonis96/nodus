@@ -63,6 +63,7 @@ export const NODI_WINDOW_METHODS = [
   'getChatImageMetadata',
   'copyChatImage',
   'downloadCapabilityFile',
+  'getAppInfo',
   'listInstalledPlugins',
   'listInboxPlugins',
   'approveInboxPlugin',
