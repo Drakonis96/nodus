@@ -14,6 +14,13 @@ import { SERVER_DEFAULT_MODELS, serverModelsFor } from "./modelCatalog";
 import { PROVIDER_LABELS } from "@shared/providers";
 import { getActiveLang, t, tx } from "./i18nShim";
 import { serverLabel, serverPrompt } from "./serverAiPrompts";
+import { DeepResearchSectionLengthField } from "../components/DeepResearchSectionLengthField";
+import { deepResearchLengthPromptPack } from "@shared/deepResearchLengthPromptPacks";
+import {
+  deepResearchSectionLengthWords,
+  type DeepResearchSectionLength,
+} from "@shared/deepResearchSectionLength";
+import type { PromptLanguage } from "@shared/types";
 
 type DbColumn = { id: string; name: string; type?: string };
 type DbRow = { id: string; cells: Record<string, unknown> };
@@ -350,6 +357,8 @@ export function DatabaseDeepResearchServerView({
   const [model, setModel] = useState(DEFAULT_MODELS.openai);
   const [preferences, setPreferences] = useState<AIPreferences>({});
   const [promptLanguage, setPromptLanguage] = useState("en");
+  const [sectionLength, setSectionLength] = useState<DeepResearchSectionLength>("auto");
+  const [sectionLengthValid, setSectionLengthValid] = useState(true);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -444,6 +453,10 @@ export function DatabaseDeepResearchServerView({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (busy || !objective.trim() || !selectedIds.length) return;
+    if (!sectionLengthValid) {
+      setError(t("Corrige la extensión orientativa de cada sección antes de generar el informe."));
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -452,6 +465,7 @@ export function DatabaseDeepResearchServerView({
       if (!context.databases.some((database) => database.rows.length))
         throw new Error(t("La selección no contiene filas utilizables."));
       const title = objective.trim().slice(0, 240);
+      const sectionLengthWords = deepResearchSectionLengthWords(sectionLength);
       const provenance = {
         vaultId: spaceId,
         revision,
@@ -473,7 +487,12 @@ export function DatabaseDeepResearchServerView({
           messages: [
             {
               role: "system",
-              content: serverPrompt(promptLanguage, "databaseDeepResearch"),
+              // The steer travels in the REPORT's language, not the interface's:
+              // a Spanish sentence appended to a Turkish prompt changes both the
+              // guidance and the language the model answers in.
+              content: sectionLengthWords === null
+                ? serverPrompt(promptLanguage, "databaseDeepResearch")
+                : `${serverPrompt(promptLanguage, "databaseDeepResearch")}\n${deepResearchLengthPromptPack(promptLanguage as PromptLanguage).section(sectionLengthWords)}`,
             },
             {
               role: "user",
@@ -716,10 +735,19 @@ export function DatabaseDeepResearchServerView({
                     )}
                   </select>
                 </label>
+                <DeepResearchSectionLengthField
+                  value={sectionLength}
+                  onChange={setSectionLength}
+                  onValidityChange={setSectionLengthValid}
+                  className="block min-w-0 text-xs text-neutral-500"
+                  labelClassName="block text-xs text-neutral-500"
+                  selectClassName="input mt-1 w-full text-xs"
+                  testIdPrefix="database-deep-research-section-length"
+                />
               </div>
               <button
                 className="btn btn-primary mt-3"
-                disabled={busy || !objective.trim() || !selectedIds.length}
+                disabled={busy || !objective.trim() || !selectedIds.length || !sectionLengthValid}
               >
                 {busy ? t("Enviando…") : t("Iniciar investigación")}
               </button>

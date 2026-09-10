@@ -20,6 +20,11 @@ import type {
   SupportAuditEntry,
 } from '@shared/types';
 import {
+  normalizeDeepResearchSectionLength,
+  planDeepResearchSectionLength,
+  type DeepResearchSectionLengthPlan,
+} from '@shared/deepResearchSectionLength';
+import {
   assessDeepResearchReport,
   assessDeepResearchSection,
   qualityPasses,
@@ -252,10 +257,16 @@ export interface PlanInput {
   coverageQuestions: string[];
   language: PromptLanguage;
   audience?: string;
-  /** Soft target number of sections the planner should aim for. */
+  /**
+   * How many sections the planner may return. In `'user'` mode this is a hard
+   * MAXIMUM (the "Máx. N secciones" control); in `'auto'` mode it is the
+   * evidence-derived target.
+   */
   sectionCount: number;
   /** Whether the user pinned a section cap ('user') or left it to the model ('auto'). */
   sectionMode: 'auto' | 'user';
+  /** Guideline words per section, so the planner sizes each section's mandate. */
+  sectionLength?: DeepResearchSectionLengthPlan;
   ideas: { id: string; label: string; type: string; statement: string; works: string }[];
   themes: { id: string; label: string; summary: string }[];
   gaps: { id: string; label: string; summary: string }[];
@@ -348,6 +359,13 @@ export interface SectionInput {
   /** Evidence-bounded status of the plan's propositions after section-specific
    * idea/passage retrieval. Plan claims are hypotheses until this audit runs. */
   claimAudit?: SectionClaimAudit;
+  /**
+   * The user's guideline words-per-section, already split into bounded generation
+   * passes. `targetWords === null` is auto mode: the writer behaves exactly as it
+   * did before this control existed. It is guidance, never a quota — the writer
+   * must stop early rather than pad, repeat, invent or overstate to reach it.
+   */
+  sectionLength?: DeepResearchSectionLengthPlan;
 }
 
 export type DeepResearchProofRole = 'fact' | 'actor_time' | 'mechanism' | 'causality' | 'comparison_side' | 'agreement' | 'contradiction' | 'effect' | 'reception' | 'limit' | 'method';
@@ -650,6 +668,10 @@ export async function orchestrateDeepResearch(
   }
   const sectionPlan = resolveSectionPlan(snapshot, request.sectionLimit ?? 'auto', request.objective, coverageQuestions);
   const sectionCount = sectionPlan.target;
+  // Normalized once here so a legacy request, a persisted queue job and an MCP
+  // payload all reach the writers — and the report metadata — as the same value.
+  const requestedSectionLength = normalizeDeepResearchSectionLength(request.sectionLength);
+  const sectionLengthPlan = planDeepResearchSectionLength(requestedSectionLength);
 
   emit({ phase: 'planning', message: L.planning(sectionCount) });
   // Ideas and their relationships still choose the thesis and progression. Atomic
@@ -1397,6 +1419,7 @@ export async function orchestrateDeepResearch(
     qualityAssessment,
     limitations: [...finalize.limitations, ...coherenceIssues.map((issue) => L.coherenceLimitation(issue))],
     deepResearchStructure: singleNarrative ? 'single' : 'sectioned',
+    deepResearchSectionLength: requestedSectionLength,
     stats: {
       selectedIdeas: coveredIdeaIds.size,
       selectedThemes: 0,
@@ -1413,6 +1436,16 @@ export async function orchestrateDeepResearch(
   const meta: DeepResearchMeta = {
     deepResearchVersion: request.deepResearchVersion ?? 'v1',
     structure: singleNarrative ? 'single' : 'sectioned',
+    sectionLength: requestedSectionLength,
+    // Recorded per section rather than as one report total: the guidance is per
+    // section, and a report where the corpus filled two sections and ran dry on
+    // three is a different fact from one that simply came out short.
+    sectionLengthOutcome: sectionLengthPlan.targetWords === null ? null : {
+      targetWords: sectionLengthPlan.targetWords,
+      sections: written.length,
+      reached: written.filter((item) => countWords(item.markdown) >= Math.round(sectionLengthPlan.targetWords! * 0.92)).length,
+      short: written.filter((item) => countWords(item.markdown) < Math.round(sectionLengthPlan.targetWords! * 0.92)).length,
+    },
     sections: singleNarrative ? 1 : written.length,
     words: totalWords,
     pages: pagesFromWords(totalWords),
@@ -1505,6 +1538,7 @@ function sectionInput(
         title: candidate.title,
         responsibilities: [...candidate.keyClaims, ...(candidate.coverageQuestions ?? [])].slice(0, 8),
       })),
+    sectionLength: planDeepResearchSectionLength(request.sectionLength),
   };
 }
 
@@ -1649,17 +1683,30 @@ export interface SectionPlan {
   mode: 'auto' | 'user';
 }
 
-/** The planner may use one extra broad movement only when an explicit coverage
- * contract exists. This is an architectural safety bound, not a content cutoff:
- * normalizePlan folds every discarded assignment into a retained section. */
+/**
+ * The planner may use one extra broad movement only when an explicit coverage
+ * contract exists AND the architecture is auto-sized. This is an architectural
+ * safety bound, not a content cutoff: normalizePlan folds every discarded
+ * assignment into a retained section.
+ *
+ * The `mode === 'auto'` condition is load-bearing. The control says "Máx. N
+ * secciones", so a coverage question must never buy an N+1st section behind the
+ * user's back; in auto mode nobody named a number, so the grace slot is free.
+ */
 export function sectionPlanMaximum(sectionPlan: SectionPlan, coverageQuestions: string[]): number {
-  return sectionPlan.target + (coverageQuestions.length > 0 ? 1 : 0);
+  return sectionPlan.target + (sectionPlan.mode === 'auto' && coverageQuestions.length > 0 ? 1 : 0);
 }
 
 /**
  * Decide how many broad argumentative movements the retrieved evidence warrants.
- * A numeric preference controls organization only; coverage questions and distinct
- * debates may increase the plan so the preference can never discard evidence.
+ *
+ * A numeric preference is a CEILING, matching the "Máx. N secciones" control: the
+ * report publishes at most that many sections, and an over-sized provider plan is
+ * compacted to fit — deterministically reassigning every dropped idea, work, gap,
+ * contradiction and coverage question to a retained section, so capping the
+ * architecture never discards evidence. The evidence heuristic still decides when
+ * it asks for FEWER sections than the requested maximum; `MIN_SECTIONS` remains the
+ * floor because an argument still needs a framing, a body and a synthesis.
  */
 export function resolveSectionPlan(
   snapshot: Pick<WritingWorkshopSnapshot, 'ideas' | 'gaps' | 'contradictions' | 'works'>,
@@ -1676,9 +1723,8 @@ export function resolveSectionPlan(
     Math.ceil(Math.max(coverageQuestions.length, explicitMechanisms) / 2) + 2,
   );
   if (typeof sectionLimit === 'number' && Number.isFinite(sectionLimit) && sectionLimit > 0) {
-    const preferred = Math.max(MIN_SECTIONS, Math.round(sectionLimit));
-    const target = Math.max(preferred, evidenceClusters);
-    return { target, mode: 'user' };
+    const ceiling = Math.max(MIN_SECTIONS, Math.round(sectionLimit));
+    return { target: Math.min(ceiling, evidenceClusters), mode: 'user' };
   }
   return { target: evidenceClusters, mode: 'auto' };
 }
@@ -1698,6 +1744,7 @@ export function buildPlanInput(
     audience: request.audience,
     sectionCount: sectionPlan.target,
     sectionMode: sectionPlan.mode,
+    sectionLength: planDeepResearchSectionLength(request.sectionLength),
     ideas: snapshot.ideas.slice(0, POOL_LIMITS.ideas).map((i) => ({
       id: i.id,
       label: i.label,

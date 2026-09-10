@@ -34,6 +34,8 @@ import {
 } from './deepResearchApproaches';
 import { assembleContinuousNarrative, deepResearchNarrativeRules, MAX_COVERAGE_QUESTIONS } from './deepResearchCore';
 import { studyDeepResearchPromptPack as studyDeepResearchRulesPromptPack } from '@shared/studyDeepResearchPromptPacks';
+import { deepResearchLengthPromptPack, isEmptyContinuation } from '@shared/deepResearchLengthPromptPacks';
+import { countDeepResearchWords, extendDeepResearchSection, planDeepResearchSectionLength } from '@shared/deepResearchSectionLength';
 
 export { normalizeStudyDeepResearchAudience };
 
@@ -663,6 +665,10 @@ export async function generateStudyDeepResearchReport(
     .filter((edge) => edge.from && edge.to);
   const requestedOutline = normalizeUnitOutline(request.outline);
   const count = sectionCount(request, sources.length, knowledge.ideas.length, request.coverageQuestions?.length ?? 0);
+  // Guideline words per part. Auto (and every job queued before the control existed)
+  // leaves the study/teaching writer exactly as it was.
+  const lengthPlan = planDeepResearchSectionLength(request.sectionLength);
+  const lengthPack = deepResearchLengthPromptPack(language);
   emit({
     phase: 'planning',
     message: copy.progress.planning(Boolean(requestedOutline.length), teacherPlan, unitMode, count),
@@ -675,6 +681,7 @@ export async function generateStudyDeepResearchReport(
       prompts.plan,
       ...copy.plannerRules,
       ...(approachContext?.rules.planner ?? []),
+      ...(lengthPlan.targetWords === null ? [] : [lengthPack.plan(lengthPlan.targetWords)]),
       ...(requestedOutline.length ? [FIXED_OUTLINE_RULE] : []),
     ].join('\n'),
     user: JSON.stringify({
@@ -733,35 +740,60 @@ export async function generateStudyDeepResearchReport(
       sectionTotal: sections.length,
       sectionTitle: section.title,
     });
+    // A teacher focus is also last and therefore authoritative inside its section.
+    const writerSystem = [
+      prompts.write,
+      ...copy.writerRules,
+      ...deepResearchNarrativeRules(language),
+      ...(approachContext?.rules.writer ?? []),
+      ...(lengthPlan.targetWords === null ? [] : [lengthPack.section(lengthPlan.targetWords)]),
+      ...(section.focus ? [SECTION_FOCUS_RULE] : []),
+    ].join('\n');
+    const writerPayload = {
+      objective: request.objective,
+      audience,
+      language,
+      section: {
+        title: section.title,
+        purpose: section.purpose,
+        keyClaims: section.keyClaims,
+        coverageQuestions: section.coverageQuestions,
+        ...(section.focus ? { teacherFocus: section.focus } : {}),
+      },
+      ...(sectionIdeas.length ? { extractedIdeas: sectionIdeas } : {}),
+      allowedSources: sectionSources.map((source) => ({ id: source.id, exactCitation: source.token, title: source.title, location: source.location, extract: source.text })),
+      previousSections: written.map((markdown) => markdown.replace(/^##[^\n]+/, '').slice(0, 900)),
+      ...(approachContext ? { researchApproach: approachContext.approach, retrievalPlan: approachContext.retrieval } : {}),
+    };
     const raw = await completeText({
-      // A teacher focus is also last and therefore authoritative inside its section.
-      system: [
-        prompts.write,
-        ...copy.writerRules,
-        ...deepResearchNarrativeRules(language),
-        ...(approachContext?.rules.writer ?? []),
-        ...(section.focus ? [SECTION_FOCUS_RULE] : []),
-      ].join('\n'),
-      user: JSON.stringify({
-        objective: request.objective,
-        audience,
-        language,
-        section: {
-          title: section.title,
-          purpose: section.purpose,
-          keyClaims: section.keyClaims,
-          coverageQuestions: section.coverageQuestions,
-          ...(section.focus ? { teacherFocus: section.focus } : {}),
-        },
-        ...(sectionIdeas.length ? { extractedIdeas: sectionIdeas } : {}),
-        allowedSources: sectionSources.map((source) => ({ id: source.id, exactCitation: source.token, title: source.title, location: source.location, extract: source.text })),
-        previousSections: written.map((markdown) => markdown.replace(/^##[^\n]+/, '').slice(0, 900)),
-        ...(approachContext ? { researchApproach: approachContext.approach, retrievalPlan: approachContext.retrieval } : {}),
-      }, null, 2),
+      system: writerSystem,
+      user: JSON.stringify(writerPayload, null, 2),
       temperature: 0.25,
-      maxTokens: 5_200,
+      maxTokens: lengthPlan.targetWords === null ? 5_200 : Math.max(5_200, lengthPlan.maxTokensPerPass),
     }, model);
-    let markdown = normalizeSectionMarkdown(raw, section.title, sectionSources);
+    // A long part is grown by bounded continuations that keep the same allowed
+    // sources and the same citation contract, never by one oversized request.
+    const grown = lengthPlan.targetWords === null ? raw : (await extendDeepResearchSection({
+      plan: lengthPlan,
+      initial: raw,
+      signal,
+      countWords: countDeepResearchWords,
+      writeContinuation: async (context) => {
+        const continuation = await completeText({
+          system: `${writerSystem}\n${lengthPack.continuation(context.remainingWords, context.passWords)}\n${lengthPack.continuationStop}`,
+          user: JSON.stringify({
+            ...writerPayload,
+            sectionSoFar: context.produced.slice(-4_000),
+            wordsWritten: context.wordsSoFar,
+            wordsRemaining: context.remainingWords,
+          }, null, 2),
+          temperature: 0.25,
+          maxTokens: lengthPlan.maxTokensPerPass,
+        }, model);
+        return isEmptyContinuation(continuation) ? '' : continuation;
+      },
+    })).markdown;
+    let markdown = normalizeSectionMarkdown(grown, section.title, sectionSources);
     const qualityMode: DeepResearchQualityMode = teacherPlan ? 'teaching' : 'study';
     const qualitySources = studyQualitySources(sectionSources);
     const beforeQuality = assessDeepResearchSection({

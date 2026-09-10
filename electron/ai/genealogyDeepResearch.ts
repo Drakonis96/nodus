@@ -53,6 +53,13 @@ import { getWork } from '../db/worksRepo';
 import { resolveWorkText } from '../extraction/textExtractor';
 import { LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { completeJson, completeText, embed } from './aiClient';
+import { deepResearchLengthPromptPack, isEmptyContinuation } from '@shared/deepResearchLengthPromptPacks';
+import {
+  countDeepResearchWords,
+  extendDeepResearchSection,
+  planDeepResearchSectionLength,
+  type DeepResearchSectionLengthPlan,
+} from '@shared/deepResearchSectionLength';
 import {
   approachRules,
   planApproachRetrieval,
@@ -241,6 +248,8 @@ export interface GenPlanInput {
   sources: { id: string; kind: string; title: string; label: string; persons: string[]; snippet: string }[];
   family: FamilyFacts;
   focusPerson: FocusPerson | null;
+  /** Guideline words per section, so each section's mandate is sized for it. */
+  sectionLength?: DeepResearchSectionLengthPlan;
 }
 export interface GenSectionInput {
   objective: string;
@@ -252,6 +261,8 @@ export interface GenSectionInput {
   focusPerson: FocusPerson | null;
   evidence: { persona: string; cita: string; localizacion: string | null }[];
   priorSummary: string;
+  /** Guideline words per section, already split into bounded passes. Absent = auto. */
+  sectionLength?: DeepResearchSectionLengthPlan;
 }
 export interface GenFinalizeInput {
   objective: string;
@@ -324,6 +335,7 @@ export async function orchestrateGenealogyDeepResearch(
         sources: sources.map((s) => ({ id: s.id, kind: s.kind, title: s.title, label: s.label, persons: s.persons, snippet: s.snippet })),
         family,
         focusPerson,
+        sectionLength: planDeepResearchSectionLength(request.sectionLength),
       }),
       sourceById,
       sectionTarget,
@@ -382,7 +394,18 @@ export async function orchestrateGenealogyDeepResearch(
 
     let raw = '';
     try {
-      raw = await deps.writeSection({ objective: request.objective, language, section, isConclusion, sources: sectionSources, family, focusPerson, evidence, priorSummary: summarizePrior(written) });
+      raw = await deps.writeSection({
+        objective: request.objective,
+        language,
+        section,
+        isConclusion,
+        sources: sectionSources,
+        family,
+        focusPerson,
+        evidence,
+        priorSummary: summarizePrior(written),
+        sectionLength: planDeepResearchSectionLength(request.sectionLength),
+      });
     } catch {
       raw = degradedSection(section, sectionSources, language);
       if (!stoppedReason) stoppedReason = runtimeCopy.degraded;
@@ -566,7 +589,7 @@ export async function generateGenealogyDeepResearchReport(
   const focusPerson = request.focusPersonId ? buildFocusPerson(request.focusPersonId, family) : null;
   // The historical General path remains byte-for-byte the same after source gathering.
   if (approach === 'general') {
-    return orchestrateGenealogyDeepResearch(request, ordinarySources, family, realDeps(model), onProgress, focusPerson, signal);
+    return orchestrateGenealogyDeepResearch(request, ordinarySources, family, realDeps(model, signal), onProgress, focusPerson, signal);
   }
   const retrieval = await planApproachRetrieval({
     approach,
@@ -590,7 +613,7 @@ export async function generateGenealogyDeepResearchReport(
     request,
     sources,
     family,
-    specializedGenealogyDeps(model, approach, retrieval, language),
+    specializedGenealogyDeps(model, approach, retrieval, language, signal),
     onProgress,
     focusPerson,
     signal,
@@ -615,10 +638,10 @@ function mergeGenealogyApproachSources(
   return merged;
 }
 
-function realDeps(model: ModelRef | null): GenDeepDeps {
+function realDeps(model: ModelRef | null, signal?: AbortSignal): GenDeepDeps {
   return {
     planReport: (input) => aiPlan(input, model),
-    writeSection: (input) => aiWriteSection(input, model),
+    writeSection: (input) => aiWriteSection(input, model, undefined, signal),
     reviseSection: (input) => aiReviseGenealogySection(input, model),
     finalize: (input) => aiFinalize(input, model),
     auditFinalSummary: (input, draft) => aiAuditGenealogyFinalSummary(input, draft, model),
@@ -651,13 +674,14 @@ function specializedGenealogyDeps(
   approach: DeepResearchApproach,
   retrieval: ApproachRetrievalPlan,
   language: ReturnType<typeof normalizePromptLanguage>,
+  signal?: AbortSignal,
 ): GenDeepDeps {
   const context: GenealogyApproachContext = {
     approach,
     retrieval,
     rules: approachRules(approach, 'genealogy', language),
   };
-  const base = realDeps(model);
+  const base = realDeps(model, signal);
   return {
     ...base,
     planReport: (input) => aiPlan(input, model, context),
@@ -666,7 +690,7 @@ function specializedGenealogyDeps(
     // only citations whose ids are in this section's allowed source menu. General's
     // historical writer and citation path remain untouched.
     writeSection: async (input) => repairMalformedGenealogyCitations(
-      await aiWriteSection(input, model, context),
+      await aiWriteSection(input, model, context, signal),
       input.sources,
     ),
     finalize: (input) => aiFinalize(input, model, context),
@@ -684,9 +708,12 @@ function isAiPlan(v: unknown): v is AiPlanShape {
 async function aiPlan(input: GenPlanInput, model: ModelRef | null, approach?: GenealogyApproachContext): Promise<GenPlan> {
   const copy = genealogyDeepResearchPromptPack(input.language);
   const runtimeCopy = genealogyDeepResearchRuntimeCopy(input.language);
+  const lengthPlan = input.sectionLength ?? planDeepResearchSectionLength('auto');
+  const lengthPack = deepResearchLengthPromptPack(normalizePromptLanguage(input.language));
   const system = [
     copy.planner(input.sectionTarget, input.focusPerson?.nombre),
     ...(approach?.rules.planner ?? []),
+    ...(lengthPlan.targetWords === null ? [] : [lengthPack.plan(lengthPlan.targetWords)]),
   ].filter(Boolean).join('\n');
   const user = JSON.stringify(
     {
@@ -694,6 +721,7 @@ async function aiPlan(input: GenPlanInput, model: ModelRef | null, approach?: Ge
       preguntas_de_cobertura: input.coverageQuestions,
       idioma: input.language,
       secciones_objetivo: input.sectionTarget,
+      ...(lengthPlan.targetWords === null ? {} : { palabras_orientativas_por_seccion: lengthPlan.targetWords }),
       fuentes: input.sources,
       familia: input.family,
       persona_en_foco: input.focusPerson,
@@ -717,29 +745,64 @@ async function aiPlan(input: GenPlanInput, model: ModelRef | null, approach?: Ge
   };
 }
 
-async function aiWriteSection(input: GenSectionInput, model: ModelRef | null, approach?: GenealogyApproachContext): Promise<string> {
+async function aiWriteSection(
+  input: GenSectionInput,
+  model: ModelRef | null,
+  approach?: GenealogyApproachContext,
+  signal?: AbortSignal,
+): Promise<string> {
   const copy = genealogyDeepResearchPromptPack(input.language);
   const runtimeCopy = genealogyDeepResearchRuntimeCopy(input.language);
+  const promptLanguage = normalizePromptLanguage(input.language);
+  const lengthPlan = input.sectionLength ?? planDeepResearchSectionLength('auto');
+  const lengthPack = deepResearchLengthPromptPack(promptLanguage);
   const system = [
-    copy.writer(input.focusPerson?.nombre, deepResearchNarrativeRules(normalizePromptLanguage(input.language))),
+    copy.writer(input.focusPerson?.nombre, deepResearchNarrativeRules(promptLanguage)),
     ...(approach?.rules.writer ?? []),
+    ...(lengthPlan.targetWords === null ? [] : [lengthPack.section(lengthPlan.targetWords)]),
   ].filter(Boolean).join('\n');
-  const user = JSON.stringify(
-    {
-      objetivo: input.objective,
-      idioma: input.language,
-      seccion: { titulo: input.section.title, proposito: input.section.purpose, puntos_clave: input.section.keyPoints, preguntas_de_cobertura: input.section.coverageQuestions ?? [] },
-      fuentes_asignadas: input.sources,
-      familia_relevante: input.family,
-      persona_en_foco: input.focusPerson,
-      evidencia: input.evidence,
-      resumen_secciones_previas: input.priorSummary || runtimeCopy.firstSection,
-      ...(approach ? { enfoque_de_investigacion: approach.approach, plan_de_recuperacion: approach.retrieval } : {}),
+  const payload = {
+    objetivo: input.objective,
+    idioma: input.language,
+    seccion: { titulo: input.section.title, proposito: input.section.purpose, puntos_clave: input.section.keyPoints, preguntas_de_cobertura: input.section.coverageQuestions ?? [] },
+    fuentes_asignadas: input.sources,
+    familia_relevante: input.family,
+    persona_en_foco: input.focusPerson,
+    evidencia: input.evidence,
+    resumen_secciones_previas: input.priorSummary || runtimeCopy.firstSection,
+    ...(approach ? { enfoque_de_investigacion: approach.approach, plan_de_recuperacion: approach.retrieval } : {}),
+  };
+  const user = JSON.stringify(payload, null, 2);
+  const first = await completeText({
+    system,
+    user,
+    temperature: 0.3,
+    maxTokens: lengthPlan.targetWords === null ? 5200 : Math.max(5200, lengthPlan.maxTokensPerPass),
+  }, model);
+  if (lengthPlan.targetWords === null) return first;
+  // Family history is documentary: a long section is grown by bounded continuations
+  // over the SAME assigned sources, and stops the moment the documents run out.
+  const outcome = await extendDeepResearchSection({
+    plan: lengthPlan,
+    initial: first,
+    signal,
+    countWords: countDeepResearchWords,
+    writeContinuation: async (context) => {
+      const continuation = await completeText({
+        system: `${system}\n${lengthPack.continuation(context.remainingWords, context.passWords)}\n${lengthPack.continuationStop}`,
+        user: JSON.stringify({
+          ...payload,
+          seccion_escrita_hasta_ahora: context.produced.slice(-4_000),
+          palabras_escritas: context.wordsSoFar,
+          palabras_restantes: context.remainingWords,
+        }, null, 2),
+        temperature: 0.3,
+        maxTokens: lengthPlan.maxTokensPerPass,
+      }, model);
+      return isEmptyContinuation(continuation) ? '' : continuation;
     },
-    null,
-    2
-  );
-  return completeText({ system, user, temperature: 0.3, maxTokens: 5200 }, model);
+  });
+  return outcome.markdown;
 }
 
 async function aiReviseGenealogySection(

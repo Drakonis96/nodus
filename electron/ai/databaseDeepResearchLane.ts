@@ -22,6 +22,11 @@ import { getVault } from '../vaults/vaultRegistry';
 import { assertChatGptSubscriptionConnected } from './codexSubscription';
 import { completeJson } from './aiClient';
 import {
+  normalizeDeepResearchSectionLength,
+  planDeepResearchSectionLength,
+  type DeepResearchSectionLength,
+} from '@shared/deepResearchSectionLength';
+import {
   processDatabaseResearchRun,
   type DatabaseResearchAgentDeps,
   type DatabaseResearchEvidence,
@@ -115,6 +120,7 @@ function rolePrompt(
   language: string | null = 'es',
   objective = '',
   context = '',
+  sectionLength: DeepResearchSectionLength = 'auto',
 ) {
   const promptRole: DatabaseDeepResearchPromptRole =
     role === 'synthesizer' ? 'writer' : role;
@@ -124,11 +130,12 @@ function rolePrompt(
     language: (language ?? 'es') as never,
     objective,
     context,
+    sectionLength,
   });
 }
 
 function agentCompletion(): NonNullable<DatabaseResearchAgentDeps['complete']> {
-  return async ({ role, objective, evidence, model, reportType, language, columnTypes, modelContext, narrativeDraft }) => {
+  return async ({ role, objective, evidence, model, reportType, language, columnTypes, modelContext, narrativeDraft, sectionLength }) => {
     if (!model) throw new Error('Selecciona un modelo para Deep Research antes de iniciar la investigación.');
     if (model.provider === 'codex') await assertChatGptSubscriptionConnected();
     const schemaContext = modelContext ? JSON.stringify({
@@ -148,12 +155,18 @@ function agentCompletion(): NonNullable<DatabaseResearchAgentDeps['complete']> {
         `APPROVED_ARTIFACTS\n${compactEvidence(evidence, columnTypes)}`,
         role === 'editor' && narrativeDraft ? `VALIDATED_DRAFT_AST\n${JSON.stringify(narrativeDraft)}` : '',
       ].filter(Boolean).join('\n\n'),
+      normalizeDeepResearchSectionLength(sectionLength),
     );
+    const lengthPlan = planDeepResearchSectionLength(sectionLength);
     const call = {
       system: prompt.system,
       user: prompt.user,
       temperature: role === 'synthesizer' ? 0.2 : 0,
-      maxTokens: role === 'synthesizer' ? 5_200 : 1_800,
+      // The prose roles may need a wider window for a longer narrative AST, but
+      // stay inside the shared per-pass cap the cost reservation is computed from.
+      maxTokens: role === 'synthesizer' || role === 'writer' || role === 'editor'
+        ? Math.max(5_200, lengthPlan.targetWords === null ? 5_200 : lengthPlan.maxTokensPerPass)
+        : 1_800,
       reasoning: 'off' as const,
       plainContext: true,
       noRetry: true,
@@ -328,6 +341,9 @@ export async function enqueueDatabaseDeepResearch(
       model: selectedModel,
       options: {
         ...input,
+        // Normalized at the durable boundary: whatever the renderer, MCP or the
+        // Server sent, the stored run carries a value the writer can trust.
+        sectionLength: normalizeDeepResearchSectionLength(input.sectionLength),
         budget: {
           maxRows: input.budget?.maxRows,
           maxSteps: input.budget?.maxTasks,

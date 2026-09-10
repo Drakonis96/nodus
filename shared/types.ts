@@ -6912,6 +6912,12 @@ export interface WritingWorkshopDraft {
   deepResearchVersion?: import('./deepResearchVersions').DeepResearchVersion;
   /** Persisted presentation structure. Missing reports use ordinary headed sections. */
   deepResearchStructure?: 'sectioned' | 'single';
+  /**
+   * Persisted guideline words per section, so reusing a prompt restores the length
+   * the report was written to. Missing reports were written before the control and
+   * are read back as `'auto'`.
+   */
+  deepResearchSectionLength?: import('./deepResearchSectionLength').DeepResearchSectionLength;
   /** Exact generation-time model. Null means no Nodus writing model was used or recorded. */
   generationModel?: ModelRef | null;
   /**
@@ -7073,6 +7079,13 @@ export interface WritingWorkshopStreamHandlers {
 export type DeepResearchSectionLimit = 'auto' | 'single' | number;
 
 /**
+ * Re-exported so every Deep Research surface can reach the structure control and the
+ * length control from the same place. The implementation (normalization, validation,
+ * the option list, the continuation arithmetic) lives in ./deepResearchSectionLength.
+ */
+export type { DeepResearchSectionLength } from './deepResearchSectionLength';
+
+/**
  * One section of a teacher-authored outline (teaching vaults, Unit design).
  *
  * A blank `title` still reserves the slot: the teacher fixes HOW MANY parts the unit
@@ -7103,9 +7116,17 @@ export interface DeepResearchRequest {
   /**
    * Visible report structure. `'auto'` (default) sizes headed sections from the
    * corpus; `'single'` publishes the same evidence-led research as one continuous
-   * narrative; a number expresses a preferred section ceiling.
+   * narrative; a number is a hard MAXIMUM number of published sections — an
+   * over-sized plan is compacted into it without discarding any evidence.
    */
   sectionLimit?: DeepResearchSectionLimit;
+  /**
+   * "Extensión orientativa de cada sección": how many WORDS each section should aim
+   * for. `'auto'` (the default, and what every request without the field means)
+   * leaves it to the model exactly as before. It is editorial guidance, never a
+   * quota — no writer may pad, repeat, invent or drop evidence to reach it.
+   */
+  sectionLength?: import('./deepResearchSectionLength').DeepResearchSectionLength;
   model?: ModelRef | null;
   decorativeImage?: DecorativeImageOption;
   /** Study vaults: use the indexed learning corpus and the pedagogical report prompts. */
@@ -7167,6 +7188,8 @@ export interface DeepResearchJobRecord {
   deepResearchVersion?: import('./deepResearchVersions').DeepResearchVersion;
   /** Requested visible structure, available while the report is still queued. */
   structure?: 'sectioned' | 'single';
+  /** Requested guideline words per section. Missing on jobs queued before the control existed. */
+  sectionLength?: import('./deepResearchSectionLength').DeepResearchSectionLength;
   /** Exact model selection captured when the job was enqueued, when one was explicit. */
   model?: ModelRef | null;
   status: DeepResearchJobStatus;
@@ -7188,6 +7211,18 @@ export interface DeepResearchMeta {
   deepResearchVersion: import('./deepResearchVersions').DeepResearchVersion;
   /** Visible report structure; internal evidence planning may still use movements. */
   structure?: 'sectioned' | 'single';
+  /**
+   * The guideline words-per-section the report was written to, so a finished report
+   * can be inspected and the setting reused. Missing means `'auto'`.
+   */
+  sectionLength?: import('./deepResearchSectionLength').DeepResearchSectionLength;
+  /**
+   * How the guideline length actually landed. `short` counts sections that ended
+   * below the target because the supported evidence ran out — the expected, correct
+   * outcome of a target the corpus cannot honestly fill, and the number that keeps
+   * a "why is my 20.000-word section 4.000 words?" question answerable.
+   */
+  sectionLengthOutcome?: { targetWords: number; sections: number; reached: number; short: number } | null;
   sections: number;
   words: number;
   pages: number;

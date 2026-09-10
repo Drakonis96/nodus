@@ -9,6 +9,7 @@ import type {
 } from '@shared/types';
 import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
 import { normalizeDeepResearchMetadataVersion, parseDeepResearchRequestVersion } from '@shared/deepResearchVersions';
+import { normalizeDeepResearchSectionLength } from '@shared/deepResearchSectionLength';
 
 export type { DeepResearchJobOrigin, DeepResearchJobRecord, DeepResearchJobStatus };
 
@@ -298,6 +299,9 @@ function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listen
       deepResearchApproach: normalizeDeepResearchApproach(input.request.approach),
       deepResearchVersion,
       structure: input.request.sectionLimit === 'single' ? 'single' : 'sectioned',
+      // Normalized at the queue boundary so a persisted job, an MCP payload and a
+      // job queued before the control existed all resolve the same way on drain.
+      sectionLength: normalizeDeepResearchSectionLength(input.request.sectionLength),
       model: input.request.model ? { ...input.request.model } : null,
       status: 'queued',
       progress: null,
@@ -313,6 +317,7 @@ function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listen
       ...input.request,
       approach: normalizeDeepResearchApproach(input.request.approach),
       deepResearchVersion,
+      sectionLength: normalizeDeepResearchSectionLength(input.request.sectionLength),
       model: input.request.model ? { ...input.request.model } : input.request.model,
     },
     save: input.save,

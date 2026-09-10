@@ -244,6 +244,13 @@ const INDIRECT_KEY_SOURCES = [
   // t(option.label)/t(option.description) by the database research view. Keep this
   // indirect source explicit so adding a mode cannot silently ship Spanish copy.
   { file: 'shared/databaseDeepResearch.ts', pattern: /\b(?:label|description):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // "Extensión orientativa de cada sección": the option labels and the custom-value
+  // validation messages live in shared code because three composers (Deep Research,
+  // Database Deep Research and its Server Web twin) render the same control through
+  // t(option.label) / t(check.message). Without this entry a new option or a new
+  // validation message would ship in Spanish to every other locale.
+  { file: 'shared/deepResearchSectionLength.ts', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  { file: 'shared/deepResearchSectionLength.ts', pattern: /^\s{2}(?:'[\w-]+'|\w+):\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
   // El vocabulario visible de Testimonios: estados del flujo, del acuerdo y del acceso,
   // usos documentados, papeles, tipos de transcripción y motivos de denegación. TODO
   // llega a la interfaz como t(LABEL[x]) — nunca como literal dentro de un t() — así que

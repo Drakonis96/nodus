@@ -4,6 +4,11 @@ import {
   type DatabaseDeepResearchPromptLanguage,
   type DatabaseDeepResearchReportType,
 } from './databaseDeepResearch';
+import { deepResearchLengthPromptPack } from './deepResearchLengthPromptPacks';
+import {
+  deepResearchSectionLengthWords,
+  type DeepResearchSectionLength,
+} from './deepResearchSectionLength';
 
 /** Bump whenever a prompt contract changes; it is stored in provenance. */
 export const DATABASE_DEEP_RESEARCH_PROMPT_VERSION = '1.0.0';
@@ -22,6 +27,16 @@ export interface DatabaseDeepResearchPromptInput {
   role: DatabaseDeepResearchPromptRole;
   objective: string;
   context?: string;
+  /**
+   * Guideline WORDS per narrative section ("Extensión orientativa de cada sección"),
+   * or `'auto'`. Only the writer and editor roles receive it: the planner, critic,
+   * verifier and judge answer fixed contracts whose length is not the user's to set.
+   *
+   * The database pipeline is AST-gated — every empirical statement is a placeholder
+   * bound to a deterministic artifact — so length here means MORE EXPLANATION of the
+   * artifacts already computed, never more findings and never invented numbers.
+   */
+  sectionLength?: DeepResearchSectionLength;
 }
 
 export interface DatabaseDeepResearchPrompt {
@@ -397,7 +412,13 @@ export function buildDatabaseDeepResearchPrompt(input: DatabaseDeepResearchPromp
   const copy = COPY[input.language];
   const mode = copy.modes[input.reportType];
   const role = copy.roles[input.role];
-  const system = `${copy.common}\n\n${mode}\n${role}\n${copy.name}.`;
+  const lengthWords = deepResearchSectionLengthWords(input.sectionLength);
+  // Length guidance is meaningless for the JSON-contract roles and dangerous for the
+  // verifier, whose job is to reject over-claiming: only prose roles receive it.
+  const lengthGuidance = lengthWords !== null && (input.role === 'writer' || input.role === 'editor')
+    ? `\n${deepResearchLengthPromptPack(input.language).section(lengthWords)}`
+    : '';
+  const system = `${copy.common}\n\n${mode}\n${role}${lengthGuidance}\n${copy.name}.`;
   const outputContracts: Record<DatabaseDeepResearchPromptRole, string> = {
     planner: '{"questions":string[],"hypotheses":string[],"priorities":string[],"risks":string[],"requestedOperations":string[]}',
     critic: '{"issues":[{"kind":string,"severity":"low|medium|high","description":string,"artifactRefs":string[]}],"sensitivities":string[],"verdict":"accept|revise|reject"}',
@@ -420,6 +441,7 @@ export function buildDatabaseDeepResearchPrompt(input: DatabaseDeepResearchPromp
     objective: input.objective.slice(0, 20_000),
     reportType: input.reportType,
     context: input.context ?? '',
+    ...(lengthGuidance ? { guidelineWordsPerSection: lengthWords } : {}),
     outputContract: outputContracts[input.role],
     constraints: constraints[input.language],
   });

@@ -7,6 +7,10 @@ import { AI_PROVIDERS as SHARED_AI_PROVIDERS } from '@shared/providers';
 import { PROMPT_LANGUAGES } from '@shared/types';
 import { DEEP_RESEARCH_APPROACHES } from '@shared/deepResearchApproaches';
 import { DEEP_RESEARCH_VERSIONS } from '@shared/deepResearchVersions';
+import {
+  DEEP_RESEARCH_SECTION_LENGTH_MAX,
+  DEEP_RESEARCH_SECTION_LENGTH_MIN,
+} from '@shared/deepResearchSectionLength';
 import type {
   AiProvider,
   Debate,
@@ -447,7 +451,17 @@ const writingSelectionSchema = z.object({
 const deepResearchSectionLimitSchema = z
   .union([z.literal('auto'), z.literal('single'), z.number().int().min(1).max(20)])
   .default('auto')
-  .describe('Report structure. "auto" lets Nodus choose headed sections; "single" publishes one continuous narrative without internal headings; a number is a preferred section maximum.');
+  .describe('Report structure. "auto" lets Nodus choose headed sections; "single" publishes one continuous narrative without internal headings; a number is a hard MAXIMUM number of published sections — an over-sized plan is compacted into it and no evidence is dropped.');
+
+const deepResearchSectionLengthSchema = z
+  .union([
+    z.literal('auto'),
+    z.number().int().min(DEEP_RESEARCH_SECTION_LENGTH_MIN).max(DEEP_RESEARCH_SECTION_LENGTH_MAX),
+  ])
+  .default('auto')
+  .describe(
+    `Guideline length of EACH section, in WORDS (not tokens, and not words of the whole report). "auto" (the default) leaves it to Nodus, exactly as before this option existed. A number between ${DEEP_RESEARCH_SECTION_LENGTH_MIN} and ${DEEP_RESEARCH_SECTION_LENGTH_MAX} is editorial guidance, never a quota: long targets are produced by bounded continuation passes, and a section stops early rather than repeat, pad, invent or overstate when the corpus runs out.`,
+  );
 
 const writingDraftSchema = z.object({
   generatedAt: z.string().min(1),
@@ -2424,6 +2438,7 @@ export function registerTools(server: McpServer): void {
         language: promptLanguageSchema.optional(),
         audience: z.string().trim().max(1_000).optional(),
         sectionLimit: deepResearchSectionLimitSchema,
+        sectionLength: deepResearchSectionLengthSchema,
         writer: z
           .enum(['nodus', 'client'])
           .default('nodus')
@@ -2434,10 +2449,10 @@ export function registerTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ objective, approach, deepResearchVersion, language, audience, sectionLimit, writer, model, save, title }, extra) =>
+    ({ objective, approach, deepResearchVersion, language, audience, sectionLimit, sectionLength, writer, model, save, title }, extra) =>
       tool(async () => {
         if (writer === 'client') {
-          return buildDeepResearchBrief({ objective, approach, deepResearchVersion, language, audience, sectionLimit });
+          return buildDeepResearchBrief({ objective, approach, deepResearchVersion, language, audience, sectionLimit, sectionLength });
         }
         const notify = progressNotifier(extra);
         ensureDeepResearchLane();
@@ -2446,7 +2461,7 @@ export function registerTools(server: McpServer): void {
         // response shape (the full saved draft, not just its id).
         const report = await runDeepResearchJob(
           {
-            request: { objective, approach, deepResearchVersion, language, audience, sectionLimit, model: asModel(model) ?? null },
+            request: { objective, approach, deepResearchVersion, language, audience, sectionLimit, sectionLength, model: asModel(model) ?? null },
             origin: 'mcp',
             save: false,
           },
@@ -2475,6 +2490,7 @@ export function registerTools(server: McpServer): void {
         language: promptLanguageSchema.optional(),
         audience: z.string().trim().max(1_000).optional(),
         sectionLimit: deepResearchSectionLimitSchema,
+        sectionLength: deepResearchSectionLengthSchema,
         sectionsMarkdown: z.string().trim().min(1).max(200_000),
         title: z.string().trim().min(1).max(2_000).optional(),
         abstract: z.string().trim().max(20_000).optional(),
@@ -2485,7 +2501,7 @@ export function registerTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ objective, approach, deepResearchVersion, language, audience, sectionLimit, sectionsMarkdown, title, abstract, limitations, nextSteps, generationModel, save }) =>
+    ({ objective, approach, deepResearchVersion, language, audience, sectionLimit, sectionLength, sectionsMarkdown, title, abstract, limitations, nextSteps, generationModel, save }) =>
       tool(async () => {
         const report = await assembleClientDeepResearchReport({
           objective,
@@ -2494,6 +2510,7 @@ export function registerTools(server: McpServer): void {
           language,
           audience,
           sectionLimit,
+          sectionLength,
           sectionsMarkdown,
           title,
           abstract,
@@ -2522,17 +2539,18 @@ export function registerTools(server: McpServer): void {
         language: promptLanguageSchema.optional(),
         audience: z.string().trim().max(1_000).optional(),
         sectionLimit: deepResearchSectionLimitSchema,
+        sectionLength: deepResearchSectionLengthSchema,
         model: modelSchema.optional(),
         save: z.boolean().default(true).describe('Store the finished report as a Nodus writing draft. Leave true unless the user only wants to read it here.'),
         title: z.string().trim().min(1).max(2_000).optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ objective, approach, deepResearchVersion, language, audience, sectionLimit, model, save, title }) =>
+    ({ objective, approach, deepResearchVersion, language, audience, sectionLimit, sectionLength, model, save, title }) =>
       tool(() => {
         ensureDeepResearchLane();
         const job = enqueueDeepResearchJob({
-          request: { objective, approach, deepResearchVersion, language, audience, sectionLimit, model: asModel(model) ?? null },
+          request: { objective, approach, deepResearchVersion, language, audience, sectionLimit, sectionLength, model: asModel(model) ?? null },
           origin: 'mcp',
           save,
           title,

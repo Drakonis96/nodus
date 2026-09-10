@@ -307,6 +307,70 @@ try {
     );
   }
 
+  // ── The writing kit names a chosen maximum, and carries the length steer ────
+  //
+  // The MCP client writes the prose itself, so both controls have to reach it as
+  // INSTRUCTIONS. Without this the kit said "roughly N movements, neither a quota
+  // nor a limit" for a number the user had chosen as a hard maximum.
+  {
+    const snap = makeSnapshot(90);
+    const auto = await buildDeepResearchBrief({ objective: 'Tema', language: 'es' }, async () => snap);
+    assert.equal(auto.sections.mode, 'auto');
+    assert.equal(auto.sections.maximum, null, 'no maximum is claimed when the user set none');
+    assert.equal(auto.sectionLength, 'auto', 'a request without the field is auto');
+    assert.ok(!auto.method.some((rule) => /palabras por sección/iu.test(rule)), 'auto sends no length instruction at all');
+
+    const capped = await buildDeepResearchBrief(
+      { objective: 'Tema', language: 'es', sectionLimit: 4, sectionLength: 5_000 },
+      async () => snap,
+    );
+    assert.equal(capped.sections.mode, 'user');
+    assert.ok(capped.sections.suggested <= 4, `the ceiling is respected (got ${capped.sections.suggested})`);
+    assert.equal(capped.sections.maximum, capped.sections.suggested, 'and is named as a maximum');
+    assert.ok(
+      capped.method.some((rule) => /MÁXIMO de \d+ secciones/u.test(rule)),
+      'the client writer is told the number is a maximum, not a suggestion',
+    );
+    assert.equal(capped.sectionLength, 5_000, 'the guideline length reaches the kit');
+    assert.ok(
+      // Spanish does not group four-digit numbers, so the steer reads "5000".
+      capped.method.some((rule) => /5\.?000 palabras por sección/u.test(rule) && /no una cuota/u.test(rule)),
+      'and reaches the writer as guidance, explicitly not a quota',
+    );
+
+    // A hostile MCP payload is clamped, never trusted through to the writer.
+    const hostile = await buildDeepResearchBrief(
+      { objective: 'Tema', language: 'es', sectionLength: 900_000 },
+      async () => snap,
+    );
+    assert.equal(hostile.sectionLength, 40_000, 'an out-of-range length is clamped at the boundary');
+
+    // English gets the English steer, not a Spanish sentence bolted onto it.
+    const english = await buildDeepResearchBrief(
+      { objective: 'Topic', language: 'en', sectionLength: 2_500 },
+      async () => snap,
+    );
+    assert.ok(english.method.some((rule) => /2,500 words per section/u.test(rule)), 'native English length guidance');
+    assert.ok(!english.method.some((rule) => /palabras por sección/iu.test(rule)), 'no Spanish leaks into an English kit');
+
+    // The assembled report records the length so it can be inspected and reused.
+    const report = await assembleClientDeepResearchReport({
+      objective: 'Tema',
+      language: 'es',
+      sectionLength: 5_000,
+      sectionsMarkdown: '## Síntesis\n\nRelación [Autor0](nodus://idea/g-0).',
+    }, async () => snap);
+    assert.equal(report.meta.sectionLength, 5_000, 'the report meta remembers the requested length');
+    assert.equal(report.draft.deepResearchSectionLength, 5_000, 'and so does the saved draft, for reuse');
+
+    const legacy = await assembleClientDeepResearchReport({
+      objective: 'Tema',
+      language: 'es',
+      sectionsMarkdown: '## Síntesis\n\nRelación [Autor0](nodus://idea/g-0).',
+    }, async () => snap);
+    assert.equal(legacy.meta.sectionLength, 'auto', 'a report finalized without the field stays auto');
+  }
+
   console.log('deep research client (Option B) test passed');
 } finally {
   await rm(tmp, { recursive: true, force: true });

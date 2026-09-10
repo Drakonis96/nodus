@@ -365,6 +365,51 @@ try {
     assert.equal(all[all.length - 1].title, 'report 24', 'the newest report is the last one kept');
   }
 
+  // ── The guideline section length travels, and legacy jobs stay auto ───────
+  //
+  // The lane is where a request stops being renderer state and becomes durable
+  // work: an MCP payload, a queued job restored from disk and a request written
+  // before the control existed all have to resolve to something the writers can
+  // trust, without changing the length of any report queued in the old world.
+  {
+    queue.__resetDeepResearchQueueForTest();
+    const seen = [];
+    queue.configureDeepResearchQueue({
+      generate: (request) => {
+        seen.push({ objective: request.objective, sectionLength: request.sectionLength });
+        return Promise.resolve(fakeReport(request.objective));
+      },
+      saveDraft: () => 'draft-1',
+      activeVault: () => ({ id: 'v1', name: 'Corpus' }),
+    });
+
+    await queue.runDeepResearchJob({ request: { objective: 'legacy' }, origin: 'app', save: false });
+    await queue.runDeepResearchJob({ request: { objective: 'preset', sectionLength: 10_000 }, origin: 'app', save: false });
+    await queue.runDeepResearchJob({ request: { objective: 'custom', sectionLength: 7_300 }, origin: 'mcp', save: false });
+    // A hostile / mistaken MCP payload must not buy an unbounded generation.
+    await queue.runDeepResearchJob({ request: { objective: 'hostile', sectionLength: 900_000 }, origin: 'mcp', save: false });
+    await queue.runDeepResearchJob({ request: { objective: 'nonsense', sectionLength: 'muy largo' }, origin: 'mcp', save: false });
+
+    assert.deepEqual(
+      seen,
+      [
+        { objective: 'legacy', sectionLength: 'auto' },
+        { objective: 'preset', sectionLength: 10_000 },
+        { objective: 'custom', sectionLength: 7_300 },
+        { objective: 'hostile', sectionLength: 40_000 },
+        { objective: 'nonsense', sectionLength: 'auto' },
+      ],
+      'the lane normalizes the guideline length once, at the durable boundary',
+    );
+
+    const records = queue.listDeepResearchJobs();
+    assert.equal(records.find((job) => job.title === 'legacy').sectionLength, 'auto', 'a legacy job reads back as auto');
+    assert.equal(records.find((job) => job.title === 'custom').sectionLength, 7_300, 'a queued job carries its length for the UI');
+    // Records are serialized to disk and restored: the field has to survive that.
+    const restored = JSON.parse(JSON.stringify(records));
+    assert.equal(restored.find((job) => job.title === 'preset').sectionLength, 10_000);
+  }
+
   console.log('deep research queue test passed');
 } finally {
   await rm(tmp, { recursive: true, force: true });

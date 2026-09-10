@@ -70,6 +70,10 @@ import {
   dateValues,
 } from "@shared/stats";
 import { formulaDependencies } from "@shared/databaseFormula";
+import {
+  normalizeDeepResearchSectionLength,
+  type DeepResearchSectionLength,
+} from "@shared/deepResearchSectionLength";
 import { comparisonMajorityValue } from "@shared/databaseComparison";
 import {
   isDatabaseDeepResearchCriticOutput,
@@ -1870,6 +1874,13 @@ export interface DatabaseResearchAgentDeps {
     modelContext?: DatabaseResearchModelContext;
     /** Already validated writer AST supplied only to the single editor pass. */
     narrativeDraft?: NarrativeAst | null;
+    /**
+     * Guideline words per narrative section, or `'auto'`. The AST gate and the
+     * bounded call budget (maxModelCalls) mean this pipeline never runs
+     * continuation passes: the steer asks the writer to EXPLAIN the computed
+     * artifacts more fully, never to produce more findings or numbers.
+     */
+    sectionLength?: DeepResearchSectionLength;
   }) => Promise<string>;
   now?: () => string;
   onProgress?: (progress: DatabaseResearchProgress) => void;
@@ -2985,6 +2996,9 @@ export async function processDatabaseResearchRun(
       (step) => step.kind === kind && step.status === "completed",
     ) ?? null;
   const options = run.options ?? {};
+  // Persisted with the run, so resuming a job written before the control existed
+  // reads back as 'auto' instead of throwing or silently changing length.
+  const requestedSectionLength = normalizeDeepResearchSectionLength(options.sectionLength);
   const budget = (
     options.budget && typeof options.budget === "object" ? options.budget : {}
   ) as DatabaseResearchBudget;
@@ -3934,6 +3948,7 @@ export async function processDatabaseResearchRun(
           language: run.language,
           columnTypes: modelColumnTypes,
           modelContext,
+          sectionLength: requestedSectionLength,
         });
       if (rawWriter) {
         synthesizerOutput = modelOutputDigest(rawWriter);
@@ -3956,6 +3971,7 @@ export async function processDatabaseResearchRun(
         columnTypes: modelColumnTypes,
         modelContext,
         narrativeDraft: writerDraft,
+        sectionLength: requestedSectionLength,
       });
       if (rawEditor) {
         editorOutput = modelOutputDigest(rawEditor);
