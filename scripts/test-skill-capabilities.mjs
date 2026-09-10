@@ -15,7 +15,7 @@ process.on('exit', () => fs.rmSync(scratch, { recursive: true, force: true }));
 
 const bundle = path.join(scratch, 'registry.cjs');
 await build({
-  stdin: { contents: `export * from './skill-capabilities/contracts'; export * from './skill-capabilities/pluginPackage'; export * from './electron/skillPlugins'; export * from './electron/chatSkills'; export * from './electron/skillMarketplace'; export * from './electron/skillPluginUpdates';`, resolveDir: root, loader: 'ts' },
+  stdin: { contents: `export * from './skill-capabilities/contracts'; export * from './skill-capabilities/pluginPackage'; export * from './electron/skillPlugins'; export * from './electron/chatSkills'; export * from './electron/skillMarketplace'; export * from './electron/skillPluginUpdates'; export * from './electron/chatAssets';`, resolveDir: root, loader: 'ts' },
   outfile: bundle, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent',
   plugins: [{ name: 'electron-profile', setup(api) {
     api.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'mock' }));
@@ -219,4 +219,34 @@ test('inbox packages are reviewable, path-bounded and never active before approv
   lib.discardInboxPlugin(inbox);
   assert.equal(fs.existsSync(inbox), false);
   assert.equal(lib.listInboxPlugins().some(plugin => plugin.id === 'inbox-kit'), false);
+});
+
+test('an overlay can be reset to the author version, and results outlive the plugin that made them', () => {
+  const directory = path.join(scratch, 'overlay-kit');
+  writePlugin(directory, pluginFiles('1.0.0', {}, 'overlay-kit'));
+  let skill = lib.installChatPluginDirectory(directory, { sourceId: 'local', approvePermissions: true }).find(item => item.plugin?.id === 'overlay-kit');
+  const authored = skill.instructions;
+  assert.equal(authored, 'Use the 1.0.0 calculator.');
+
+  // A local edit is an overlay over the author's text, and it can be given back.
+  skill = lib.saveChatSkill({ ...skill, instructions: 'My own wording.' }).find(item => item.id === skill.id);
+  assert.equal(skill.instructions, 'My own wording.');
+  skill = lib.restorePluginSkillAuthorVersion(skill.id).find(item => item.id === skill.id);
+  assert.equal(skill.instructions, authored, 'the author version comes back');
+
+  // A capability result is an opaque handle on the chat, not on the plugin.
+  const owner = lib.chatAssetOwner('assistant', 'overlay-chat', 'vault');
+  const source = lib.storeCapabilityFile(owner, { bytes: Buffer.from('report'), mimeType: 'text/plain', name: 'report.txt', title: 'Report' });
+  assert.equal(lib.getCapabilityFile(source).blob.toString(), 'report');
+
+  // Disabling the skill does not touch it.
+  lib.saveChatSkill({ ...skill, enabled: { assistant: false, nodi: false } });
+  assert.equal(lib.getCapabilityFile(source).blob.toString(), 'report');
+
+  // Neither does uninstalling the plugin outright.
+  const remaining = lib.removeChatPlugin('overlay-kit');
+  assert.equal(remaining.some(item => item.plugin?.id === 'overlay-kit'), false, 'the plugin and its skills are gone');
+  assert.equal(lib.readPluginState('overlay-kit'), null);
+  assert.equal(lib.resolveInstalledCapability('overlay-kit:calculate'), null, 'its capability no longer resolves');
+  assert.equal(lib.getCapabilityFile(source).blob.toString(), 'report', 'the result it produced stays readable');
 });
