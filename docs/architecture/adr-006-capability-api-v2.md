@@ -86,3 +86,40 @@ equivalencia pixel a pixel, porque las vistas pasan de React a declarativas.
 El catálogo v1 del marketplace se conserva mientras haya usuarios en 5.3.1: las
 tres skills v1 siguen en la raíz del repositorio y los plugins v2 viven bajo
 `plugins/`, ubicación que el escáner de 5.3.1 ignora.
+
+
+## Decisiones añadidas durante la implementación
+
+9. **Las migraciones son ficheros declarados, no un método del worker.** El
+   manifiesto lista `migrations/NNN-….cjs` en orden y esa lista *es* la escalera
+   de versiones de datos: el enésimo script lleva el perfil de la versión n-1 a
+   la n. Los ejecuta el bootstrap, uno a uno, en el worker del propio paquete.
+   La razón es concreta: mientras fue un método del módulo, un paquete podía
+   cumplir el contrato devolviendo el número que se le pedía, y dos de los tres
+   no lo implementaban en absoluto. La versión que se registra es la que los
+   scripts alcanzaron de verdad, nunca la que se les pidió.
+10. **Una capability no se anuncia hasta estar instalada, migrada y
+    registrada.** Si la versión de datos registrada es menor que la que el
+    paquete declara, el registro lo omite y dice por qué. Instalada no es lo
+    mismo que utilizable: ofrecerla con el estado a medio mover es ofrecer algo
+    que se usará sobre datos que no puede leer. Como corolario, el paso de datos
+    no puede resolverse a través del registro —sería esperar a sí mismo— y se
+    resuelve desde el paquete instalado.
+11. **Las respuestas antiguas no se reescriben.** Un bloque que 5.3.1 dejó en una
+    conversación se entrega al paquete que hoy reclama ese fence, junto con el
+    fichero al que apuntaba cuando el tipo de artifact declara que sabe
+    decodificar ese formato. Ni el mensaje ni el fichero se convierten: una
+    respuesta que el usuario ya recibió no es de la migración.
+12. **Un lock por intérprete, no uno por plataforma.** Un wheel se construye para
+    una versión concreta de Python, así que no existe un conjunto fijado que
+    valga para cualquier intérprete que el usuario tenga. El paquete publica un
+    lock por cada versión que soporta y el host elige el que corresponde; no
+    tener ninguno para esa versión se responde con claridad en lugar de resolver
+    algo que nadie ha revisado.
+13. **La firma cubre la release entera, y quien firma no construye.** Los
+    targets se construyen en una matriz, cada uno en su plataforma, y un trabajo
+    aparte —sin capacidad de construir nada— los reúne, firma una sola vez el
+    manifiesto completo, lo verifica como lo verificará Nodus y publica todos los
+    assets a la vez. Que esa separación se mantenga lo comprueba un script sobre
+    el texto de los workflows en cada push, porque es la única propiedad de este
+    pipeline que una ejecución en verde no demuestra.
