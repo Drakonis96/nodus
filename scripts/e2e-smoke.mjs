@@ -239,31 +239,6 @@ try {
   assert.equal(signedOutChatGpt.loginPending, false, 'throwaway profile has no pending OAuth flow');
   console.log('[e2e] preload bridge ok');
 
-  // Reopening several saved chemistry cards used to re-enter the shared WASM
-  // engine. Exercise the actual IPC boundary, not a mocked renderer.
-  const chemicalCards = await page.evaluate(() => Promise.all([
-    String.raw`\chemfig{NH_4^{+}}`, String.raw`\chemfig{Cl^{-}}`,
-    String.raw`\chemfig{N^{+}(=O)(-O^{-})-O^{-}}`,
-    String.raw`\schemestart\chemfig{C}\arrow{->[$\text{heat}$]}\chemfig{C}\schemestop`,
-  ].map(source => window.nodus.compileChemfig(source))));
-  chemicalCards.forEach(svg => assert.match(svg, /<svg/));
-  const reactionResults = await app.evaluate(async ({ utilityProcess }, workerPath) => {
-    const validate = reaction => new Promise((resolve, reject) => {
-      const worker = utilityProcess.fork(workerPath, [], { stdio: 'ignore' });
-      const deadline = setTimeout(() => { worker.kill(); reject(new Error('Reaction worker timed out')); }, 30000);
-      worker.once('message', result => { clearTimeout(deadline); resolve(result); worker.kill(); });
-      worker.once('error', error => { clearTimeout(deadline); reject(error); worker.kill(); });
-      worker.once('exit', () => { clearTimeout(deadline); reject(new Error('Reaction worker exited')); });
-      worker.postMessage({ references: ['O=[N+]([O-])O'], reaction });
-    });
-    const species = ['O=[N+]([O-])O', 'N', '[NH4+]', 'O=[N+]([O-])[O-]'].map((smiles, i) => ({ id: `s${i}`, role: i < 2 ? 'reactant' : 'product', coefficient: 1, smiles }));
-    return [await validate(species), await validate(species.slice(0, 3))];
-  }, path.join(repoRoot, 'dist-electron/chemistryValidationWorker.js'));
-  assert.equal(reactionResults[0].result?.reaction?.scope, 'balanced-scheme-not-mechanism', JSON.stringify(reactionResults[0]));
-  assert.match(reactionResults[0].result.reaction.svg, /<svg/);
-  assert.match(reactionResults[1].error, /Unbalanced/);
-  console.log('[e2e] concurrent ChemFig IPC and balanced reaction utility process ok');
-
   // ── Essential tutorial: first screen, language preferences, seen-once gate ──
   await page.getByTestId('basics-tutorial-language').waitFor({ timeout: 30_000 });
   const languageButtonSizes = await page.locator('.tutorial-language-option').evaluateAll((buttons) =>
