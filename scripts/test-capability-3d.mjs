@@ -230,3 +230,58 @@ test('reaching the 3D services is a declared permission, and widening it needs a
 test('the host channel exists and is spelled the same on both sides', () => {
   assert.ok(sdk.HOST_CHANNELS.includes('models'));
 });
+
+// ---------------------------------------------------------------- what survives a tidy-up
+
+test('an attachment a saved result points at is not collected', async () => {
+  const profile = path.join(scratch, 'reconcile');
+  fs.mkdirSync(profile, { recursive: true });
+  const assets = path.join(scratch, 'assets.cjs');
+  await build({
+    stdin: { contents: `export * from './electron/chatAssets';`, resolveDir: root, loader: 'ts' },
+    outfile: assets, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent',
+    plugins: [{
+      name: 'test-environment',
+      setup(api) {
+        api.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'mock' }));
+        api.onLoad({ filter: /.*/, namespace: 'mock' }, () => ({
+          contents: `export const app = { getPath: () => ${JSON.stringify(profile)} };`
+            + 'export const nativeImage = { createFromBuffer: () => ({ isEmpty: () => true }) };',
+          loader: 'js',
+        }));
+        api.onResolve({ filter: /^@shared\// }, ({ path: value }) => ({ path: path.join(root, 'shared', `${value.slice(8)}.ts`) }));
+      },
+    }],
+  });
+  const lib = createRequire(import.meta.url)(assets);
+
+  const owner = 'b'.repeat(64);
+  const dir = path.join(profile, 'chat-assets', owner);
+  fs.mkdirSync(dir, { recursive: true });
+
+  // A capability result: the message refers to the artifact, and the artifact refers to
+  // the model. Nothing in the message names the model at all.
+  const artifactId = '11111111-2222-4333-8444-555555555555';
+  const modelId = '66666666-7777-4888-8999-aaaaaaaaaaaa';
+  const orphanId = 'cccccccc-dddd-4eee-8fff-000000000000';
+  fs.writeFileSync(path.join(dir, `${modelId}.capability`), 'glb bytes');
+  fs.writeFileSync(path.join(dir, `${modelId}.capability.json`), JSON.stringify({ mimeType: GLB, name: 'scan.glb', title: 'scan.glb' }));
+  fs.writeFileSync(path.join(dir, `${orphanId}.capability`), 'nothing points here');
+  fs.writeFileSync(path.join(dir, `${orphanId}.capability.json`), '{}');
+  fs.writeFileSync(path.join(dir, `${artifactId}.artifact`), JSON.stringify({
+    schemaVersion: 1, capabilityId: 'nodus:genomics', artifactType: 'scan', artifactVersion: 1,
+    data: { view: { nodes: [{ kind: 'model', attachmentId: modelId }] } },
+  }));
+  fs.writeFileSync(path.join(dir, `${artifactId}.artifact.json`), JSON.stringify({ source: `nodus-artifact://chat/${owner}/${artifactId}` }));
+
+  lib.reconcileChatAssets(owner, [{ content: `Here it is.\n\n\`\`\`nodus-artifact\n{"source":"nodus-artifact://chat/${owner}/${artifactId}"}\n\`\`\`` }]);
+
+  assert.equal(fs.existsSync(path.join(dir, `${modelId}.capability`)), true, 'the model a live artifact points at was collected');
+  assert.equal(fs.existsSync(path.join(dir, `${artifactId}.artifact`)), true, 'the artifact the message points at was collected');
+  assert.equal(fs.existsSync(path.join(dir, `${orphanId}.capability`)), false, 'an attachment nothing refers to is still collected');
+
+  // And when the message loses the artifact, everything it held goes with it.
+  lib.reconcileChatAssets(owner, [{ content: 'The result was removed from this conversation.' }]);
+  assert.equal(fs.existsSync(path.join(dir, `${artifactId}.artifact`)), false);
+  assert.equal(fs.existsSync(path.join(dir, `${modelId}.capability`)), false, 'an attachment whose artifact is gone is collected too');
+});
