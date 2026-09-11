@@ -17,21 +17,19 @@ import { createHash, generateKeyPairSync, sign as signBytes } from 'node:crypto'
 import { build } from 'esbuild';
 
 const root = path.resolve(import.meta.dirname, '..');
-// A checkout may be the repository itself or a worktree nested inside it, so the sibling
-// marketplace is found by walking up rather than by counting directories.
-function findMarketplace() {
-  if (process.env.NODUS_MARKETPLACE_DIR) return process.env.NODUS_MARKETPLACE_DIR;
-  for (let current = root; ; current = path.dirname(current)) {
-    const candidate = path.join(path.dirname(current), 'nodus-research-skill-marketplace');
-    if (fs.existsSync(path.join(candidate, '.git'))) return candidate;
-    if (path.dirname(current) === current) return candidate;
-  }
-}
-const marketplace = findMarketplace();
+// Named, or not at all. Walking up to a sibling directory found a marketplace on exactly
+// one machine and quietly skipped everywhere else, which is the shape of a check that
+// reports a pass it never made.
+const marketplace = process.env.NODUS_MARKETPLACE_DIR;
 const packageId = process.argv[2] ?? 'legalize';
 
-if (!fs.existsSync(path.join(marketplace, '.git'))) {
-  console.log(`SKIP: no marketplace checkout at ${marketplace}. Set NODUS_MARKETPLACE_DIR to run this.`);
+if (!marketplace || !fs.existsSync(path.join(marketplace, 'plugins'))) {
+  // Silent only where there is genuinely nothing to check against: a developer machine
+  // with no second checkout. In CI the checkout is part of the job, so its absence is a
+  // failure rather than a skip.
+  const message = 'set NODUS_MARKETPLACE_DIR to a marketplace checkout to run this';
+  if (process.env.CI) throw new Error(`Cannot verify a capability package: ${message}.`);
+  console.log(`SKIP: ${message}. The cross-repository job is what runs it in CI.`);
   process.exit(0);
 }
 
@@ -86,7 +84,7 @@ try {
       import { app } from 'electron';
       import assert from 'node:assert/strict';
       import fs from 'node:fs';
-      import { initializeCapabilityPluginStore, installVerifiedPlugin, resolveTrustedCapability, listInstalledPluginsV2, removePluginV2 } from './electron/capabilities/pluginStoreV2';
+      import { initializeCapabilityPluginStore, installVerifiedPlugin, pluginMigrationScripts, recordPluginDataVersion, resolveTrustedCapability, listInstalledPluginsV2, readPluginStateV2, removePluginV2 } from './electron/capabilities/pluginStoreV2';
       import { rebuildCapabilityRegistry, capabilityRegistry, capabilityIsAvailable } from './electron/capabilities/registry';
       import { CapabilityWorkerHandle } from './electron/capabilities/workerHost';
       import { createCapabilityHostServices } from './electron/capabilities/hostServices';
@@ -107,6 +105,32 @@ try {
         }, { approvePermissions: true });
         assert.equal(outcome.activated, true, 'the signed package installed');
         assert.equal(outcome.state.trust.verified, true);
+
+        stage = 'migration before announcement';
+        // A package is not announced until the migrations it declares have run. Installing
+        // and expecting a capability immediately is exactly the race this refuses — and the
+        // migration itself is the package's own scripts, run in its own worker.
+        const declared = pluginMigrationScripts(payload.packageId);
+        if (declared.length) {
+          const waiting = rebuildCapabilityRegistry();
+          assert.equal([...waiting.providers.values()].some(entry => entry.plugin?.id === payload.packageId), false, 'announced before its data was migrated');
+          assert.ok(waiting.problems.some(problem => problem.pluginId === payload.packageId), 'and says why');
+
+          // Resolved from what was just installed rather than from the registry, which is
+          // precisely what has not happened yet.
+          const migrating = new CapabilityWorkerHandle(
+            resolveTrustedCapability(outcome.package.capabilities[0].manifest.provides),
+            { services: createCapabilityHostServices({}), bootstrapPath: ${JSON.stringify(bootstrap)} },
+          );
+          const climbed = await migrating.call('migrate', {
+            fromDataVersion: 0, toDataVersion: declared.length, legacy: {}, scripts: declared,
+          }, { timeoutMs: 120_000 });
+          await migrating.stop();
+          assert.equal(climbed.failed, undefined, 'a declared migration failed: ' + climbed.failed);
+          assert.equal(climbed.dataVersion, declared.length, 'the ladder did not reach the top');
+          recordPluginDataVersion(payload.packageId, climbed.dataVersion);
+          assert.equal(readPluginStateV2(payload.packageId).dataVersion, declared.length, 'the version reached is recorded');
+        }
 
         stage = 'registry';
         const registry = rebuildCapabilityRegistry();
@@ -188,7 +212,7 @@ try {
   const electron = createRequire(import.meta.url)('electron');
   await promisify(execFile)(electron, [outfile], { env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' } });
   if (fs.readFileSync(verdict, 'utf8') !== 'pass') throw new Error('The package verification did not report a pass.');
-  console.log(`CAPABILITY PACKAGE PASS (${asset}): signature, archive, manifests, registry, worker handshake, chat hook, permission gating and uninstall.`);
+  console.log(`CAPABILITY PACKAGE PASS (${asset}): signature, archive, manifests, declared migrations, registry, worker handshake, chat hook, permission gating and uninstall.`);
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });
 }

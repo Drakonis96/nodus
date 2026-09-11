@@ -4,10 +4,8 @@ import { app, safeStorage } from 'electron';
 import type { ChatSkill } from '@shared/chatSkills';
 import { listChatSkills, profilePredatesSkillLibrary, replaceChatSkills } from '../chatSkills';
 import { migrationBaseline } from './migrationBaselines';
-import { pluginMigrationScripts, readPluginStateV2, recordPluginDataVersion, resolveTrustedCapability, listInstalledPluginsV2 } from './pluginStoreV2';
-import { rebuildCapabilityRegistry } from './registry';
-import { acquireCapabilityWorker } from './workerHost';
-import { createCapabilityHostServices } from './hostServices';
+import { readPluginStateV2, listInstalledPluginsV2 } from './pluginStoreV2';
+import { runPluginDataMigrations as runPackageMigrations } from './dataMigrations';
 import { createCapabilityAdapters } from './runner';
 import { installCatalogPlugin } from './marketplaceV2';
 import { runCapabilityMigration, pinnedPluginSkill, type MigrationOutcome } from './migration';
@@ -58,42 +56,17 @@ function legacyData(pluginId: string): unknown {
   return {};
 }
 
-/** Runs the package's own declared migrations inside its worker, and records how far
- *  they actually got.
- *
- *  The version the profile is at is written here, from what the worker reports finished —
- *  not from what it was asked to do. A package whose second migration fails ends the run
- *  at version 1, keeps everything version 1 gave it, and is retried from there; nothing
- *  rolls the data back, because each rung is written to be re-runnable. */
+/** The profile migration's own data step: the package's declared migrations, run with the
+ *  adapters a capability has at runtime rather than a bare host. */
 export async function runPluginDataMigrations(pluginId: string, legacy: unknown = {}): Promise<void> {
   const state = readPluginStateV2(pluginId);
   if (!state?.active) throw new Error(`${pluginId} is not active.`);
-  const scripts = pluginMigrationScripts(pluginId);
-  // A package with nothing to migrate is already at its own data version.
-  if (state.dataVersion >= scripts.length) { recordPluginDataVersion(pluginId, scripts.length); return; }
-
-  const provider = [...rebuildCapabilityRegistry().providers.values()].find(entry => entry.plugin?.id === pluginId);
-  if (!provider) throw new Error(`${pluginId} registered no capability.`);
-  const runtime = resolveTrustedCapability(provider.id, { version: state.active.version, digest: state.active.digest });
-  if (!runtime) throw new Error(`${pluginId} could not be resolved.`);
-  const services = createCapabilityHostServices(createCapabilityAdapters({
+  const result = await runPackageMigrations(pluginId, legacy, createCapabilityAdapters({
     locale: 'en',
-    pins: { revision: 0, pins: new Map([[provider.id, { version: state.active.version, digest: state.active.digest }]]) },
+    pins: { revision: 0, pins: new Map() },
     runCoreStages: async answer => answer,
   }));
-  const handle = acquireCapabilityWorker(runtime, { services });
-  const result = await handle.call('migrate', {
-    fromDataVersion: state.dataVersion,
-    toDataVersion: scripts.length,
-    legacy,
-    scripts,
-  }, { timeoutMs: 300_000 }) as { dataVersion?: number; notes?: string; failed?: string };
-
-  const reached = Number.isInteger(result?.dataVersion) ? Math.min(Number(result!.dataVersion), scripts.length) : state.dataVersion;
-  if (reached > state.dataVersion) recordPluginDataVersion(pluginId, reached);
-  if (result?.notes) console.info(`[capabilities] ${pluginId}: ${result.notes}`);
-  if (result?.failed) throw new Error(result.failed);
-  if (reached < scripts.length) throw new Error(`${pluginId} stopped at data version ${reached} of ${scripts.length}.`);
+  if (result.notes) console.info(`[capabilities] ${pluginId}: ${result.notes}`);
 }
 
 /** One migration at a time.

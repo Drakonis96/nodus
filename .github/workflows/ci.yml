@@ -96,18 +96,30 @@ jobs:
       - name: Checkout Nodus
         uses: actions/checkout@v7
 
-      # The marketplace's own checkout: the verification refuses to run without one, and
-      # never falls back to whatever happens to be next to it on someone's machine.
+      # The marketplace's own checkout. Not optional and not conditional: without it this
+      # job fails, rather than turning into a green run that compared nothing.
       - name: Checkout the marketplace
         uses: actions/checkout@v7
         with:
           repository: NodusResearch/nodus-research-skill-marketplace
-          ref: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.head_ref || 'main' }}
           path: .marketplace
-          # A branch that exists only in Nodus is not an error: the default branch of the
-          # marketplace is what a released Nodus installs from.
-          fetch-depth: 1
-        continue-on-error: true
+
+      # A change that spans both repositories is developed on a branch of the same name in
+      # each, so if one exists here it is what this Nodus branch should be checked against.
+      # Its absence is ordinary — most Nodus branches touch no package — and then the
+      # marketplace's default branch is used, which is what a released Nodus installs from.
+      - name: Use a matching marketplace branch when there is one
+        working-directory: .marketplace
+        run: |
+          set -euo pipefail
+          BRANCH='${{ github.head_ref || github.ref_name }}'
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            git fetch --depth 1 origin "$BRANCH"
+            git checkout FETCH_HEAD
+            echo "Checking against the marketplace branch $BRANCH."
+          else
+            echo "No marketplace branch named $BRANCH; checking against its default branch."
+          fi
 
       - name: Set up Node
         uses: actions/setup-node@v7
@@ -120,7 +132,22 @@ jobs:
 
       - name: Both repositories agree, and a signed package installs
         env:
-          # Present when the step above found a matching branch; absent otherwise, and the
-          # verification clones the marketplace itself rather than skipping.
-          NODUS_MARKETPLACE_DIR: ${{ hashFiles('.marketplace/plugins/**') != '' && format('{0}/.marketplace', github.workspace) || '' }}
+          NODUS_MARKETPLACE_DIR: ${{ format('{0}/.marketplace', github.workspace) }}
         run: npm run verify:cross-repo
+
+      # The rest needs a real Electron, and a real display for it to refuse to open.
+      - name: Install Electron runtime
+        run: node node_modules/electron/install.js
+
+      # These two run the packages' own workers in real utility processes: the migration
+      # ladder, the registry gate, the journal, and the refusals. They need the packages
+      # built, which the step above has just done in the marketplace checkout.
+      - name: Each package installs, migrates, registers and uninstalls
+        env:
+          NODUS_MARKETPLACE_DIR: ${{ format('{0}/.marketplace', github.workspace) }}
+        run: xvfb-run --auto-servernum npm run verify:capability-packages
+
+      - name: A 5.3.1 profile migrates, fails and retries
+        env:
+          NODUS_MARKETPLACE_DIR: ${{ format('{0}/.marketplace', github.workspace) }}
+        run: xvfb-run --auto-servernum npm run verify:capability-migration
