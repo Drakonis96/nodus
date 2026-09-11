@@ -20,7 +20,7 @@ import { Exploration } from "./exploration";
 import { workScopedSource, type StellarGraphSource } from "./source";
 import { StellarSearch } from "./StellarSearch";
 import { STELLAR_LAYOUT_VERSION } from "./layout";
-import { relation, RELATIONS } from "./palette";
+import { relation, relationColor, RELATIONS } from "./palette";
 import { ThemesOverview } from "./ThemesOverview";
 import { capRelations, neighbourhood } from "./themes";
 import { errorText, t, tx } from "../i18n";
@@ -987,7 +987,7 @@ function StellarGraphTab({
                 <div className="stellar-step-ideas">
                   <button className="stellar-step-node" title={engine?.nodes.get(step.source)?.statement || engine?.nodes.get(step.source)?.label}
                     data-step-node={step.source} onClick={() => openNode(step.source)}>{engine?.nodes.get(step.source)?.label}</button>
-                  <button className="stellar-step-relation" style={{ color: relation(step.type).color }} onClick={() => openEdge(step.id)}>
+                  <button className="stellar-step-relation" style={{ color: relationColor(step.type) }} onClick={() => openEdge(step.id)}>
                     <span>{t(relation(step.type).label)}</span>
                     <svg width="28" height="8" viewBox="0 0 28 8" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true">
                       <path d="M1 4h26m-3-3 3 3-3 3" />
@@ -1012,7 +1012,7 @@ function StellarGraphTab({
                 .filter(([type]) => view.edges.some((e) => e.type === type))
                 .map(([type, r]) => (
                   <span key={type}>
-                    <i style={{ background: r.color }} />
+                    <i style={{ background: relationColor(type) }} />
                     {t(r.label)}
                   </span>
                 ))}

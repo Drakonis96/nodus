@@ -1,22 +1,47 @@
 /* Shared UI surfaces and vault accents. Node and relationship palettes stay separate. */
 .stellar-workspace,
 .stellar-tabs-workspace {
-  --stellar-accent: var(--vault-accent, #6366f1);
-  --stellar-accent-soft: color-mix(in srgb, var(--stellar-accent) 60%, #ffffff);
-  --stellar-accent-quiet: color-mix(in srgb, var(--stellar-accent) 65%, var(--app-text));
-  --stellar-accent-fill: color-mix(in srgb, var(--stellar-accent) 78%, #171717);
-  --stellar-accent-ink: #ffffff;
+  --stellar-accent: var(--vault-accent, var(--a-500, #6366f1));
+  --stellar-accent-soft: color-mix(in srgb, var(--a-300, var(--stellar-accent)) 70%, var(--stellar-text) 30%);
+  --stellar-accent-quiet: color-mix(in srgb, var(--a-300, var(--stellar-accent)) 68%, var(--stellar-text) 32%);
+  --stellar-accent-fill: color-mix(in srgb, var(--a-600, var(--stellar-accent)) 82%, var(--stellar-panel) 18%);
+  --stellar-accent-ink: var(--theme-text-dark, #ffffff);
   --stellar-accent-wash: color-mix(in srgb, var(--stellar-accent) 10%, transparent);
   --stellar-accent-veil: color-mix(in srgb, var(--stellar-accent) 33%, transparent);
-  --stellar-bg: var(--app-canvas);
-  --stellar-panel: var(--app-panel);
-  --stellar-line: var(--app-border);
-  --stellar-text: var(--app-text);
-  --stellar-muted: var(--app-muted);
-  /* Preserve existing node captions independently of the surrounding interface. */
-  --stellar-node-text: #e6eaf8;
-  --stellar-node-panel: rgba(15, 19, 37, 0.94);
-  --stellar-node-muted: #929cb8;
+  --stellar-bg: var(--n-950, var(--app-canvas, #0a0a0a));
+  --stellar-panel: var(--n-900, var(--app-panel, #171717));
+  --stellar-line: var(--theme-border-dark, var(--n-800, var(--app-border, #262626)));
+  --stellar-text: var(--theme-text-dark, var(--n-100, var(--app-text, #f5f5f5)));
+  --stellar-muted: var(--theme-text-dark-muted, var(--n-400, var(--app-muted, #a3a3a3)));
+  --stellar-node-text: var(--theme-text-dark, var(--stellar-text));
+  --stellar-node-panel: color-mix(in srgb, var(--stellar-panel) 92%, var(--stellar-accent) 8%);
+  --stellar-node-muted: var(--theme-text-dark-muted, var(--stellar-muted));
+  --stellar-canvas-star: color-mix(in srgb, var(--stellar-text) 68%, var(--stellar-accent) 32%);
+  --stellar-canvas-context: color-mix(in srgb, var(--stellar-muted) 72%, var(--stellar-accent) 28%);
+  /* Relationship and node colors retain meaning while following the active accent. */
+  --stellar-edge-supports: color-mix(in srgb, var(--a-300, #a5b4fc) 62%, #34d399 38%);
+  --stellar-edge-refutes: color-mix(in srgb, var(--a-300, #a5b4fc) 50%, #fb7185 50%);
+  --stellar-edge-contradicts: color-mix(in srgb, var(--a-300, #a5b4fc) 45%, #fb923c 55%);
+  --stellar-edge-extends: color-mix(in srgb, var(--a-300, #a5b4fc) 65%, #60a5fa 35%);
+  --stellar-edge-refines: color-mix(in srgb, var(--a-300, #a5b4fc) 64%, #c084fc 36%);
+  --stellar-edge-applies_to: color-mix(in srgb, var(--a-300, #a5b4fc) 52%, #facc15 48%);
+  --stellar-edge-shares_method: color-mix(in srgb, var(--a-300, #a5b4fc) 55%, #22d3ee 45%);
+  --stellar-edge-precondition_of: color-mix(in srgb, var(--a-300, #a5b4fc) 48%, #f0abfc 52%);
+  --stellar-edge-measures_same: color-mix(in srgb, var(--a-300, #a5b4fc) 60%, #5eead4 40%);
+  --stellar-edge-variant_of: color-mix(in srgb, var(--a-300, #a5b4fc) 70%, #c4b5fd 30%);
+  --stellar-edge-contains: color-mix(in srgb, var(--a-300, #a5b4fc) 64%, #cbd5e1 36%);
+  --stellar-edge-causes: var(--stellar-edge-applies_to);
+  --stellar-edge-depends_on: var(--stellar-edge-precondition_of);
+  --stellar-edge-part_of: var(--stellar-edge-contains);
+  --stellar-edge-contrasts: var(--stellar-edge-contradicts);
+  --stellar-edge-applies: var(--stellar-edge-applies_to);
+  --stellar-edge-related: var(--stellar-edge-variant_of);
+  --stellar-node-theme: color-mix(in srgb, var(--a-300, #a5b4fc) 62%, #5eead4 38%);
+  --stellar-node-claim: color-mix(in srgb, var(--a-300, #a5b4fc) 60%, #c4b5fd 40%);
+  --stellar-node-finding: color-mix(in srgb, var(--a-300, #a5b4fc) 56%, #2dd4bf 44%);
+  --stellar-node-construct: color-mix(in srgb, var(--a-300, #a5b4fc) 65%, #60a5fa 35%);
+  --stellar-node-method: color-mix(in srgb, var(--a-300, #a5b4fc) 54%, #facc15 46%);
+  --stellar-node-framework: color-mix(in srgb, var(--a-300, #a5b4fc) 55%, #f0abfc 45%);
 }
 .stellar-workspace {
   position: relative;
@@ -186,7 +211,7 @@
   display: inline-block;
   width: 5px;
   height: 5px;
-  background: #8ecabc;
+  background: var(--stellar-accent-soft);
   border-radius: 50%;
   margin-right: 9px;
 }
@@ -378,15 +403,47 @@
 }
 .light .stellar-workspace,
 .light .stellar-tabs-workspace {
-  --stellar-accent-soft: color-mix(in srgb, var(--stellar-accent) 78%, #241d3d);
-  --stellar-accent-quiet: color-mix(in srgb, var(--stellar-accent) 76%, var(--app-text));
+  --stellar-accent-soft: color-mix(in srgb, var(--a-700, var(--stellar-accent)) 72%, var(--stellar-text) 28%);
+  --stellar-accent-quiet: color-mix(in srgb, var(--a-700, var(--stellar-accent)) 72%, var(--stellar-text) 28%);
   --stellar-accent-veil: color-mix(in srgb, var(--stellar-accent) 40%, transparent);
-  --stellar-node-text: #26283e;
-  --stellar-node-panel: rgba(255, 255, 255, 0.95);
-  --stellar-node-muted: #6c7089;
+  --stellar-accent-fill: color-mix(in srgb, var(--a-600, var(--stellar-accent)) 88%, var(--stellar-panel) 12%);
+  --stellar-accent-ink: var(--theme-text-light, #171717);
+  --stellar-bg: var(--n-50, var(--app-canvas, #fafafa));
+  --stellar-panel: var(--n-50, var(--app-panel, #ffffff));
+  --stellar-line: var(--theme-border-light, var(--n-200, var(--app-border, #e5e5e5)));
+  --stellar-text: var(--theme-text-light, var(--n-900, var(--app-text, #171717)));
+  --stellar-muted: var(--theme-text-light-muted, var(--n-600, var(--app-muted, #525252)));
+  --stellar-node-text: var(--theme-text-light, var(--stellar-text));
+  --stellar-node-panel: color-mix(in srgb, var(--stellar-panel) 94%, var(--stellar-accent) 6%);
+  --stellar-node-muted: var(--theme-text-light-muted, var(--stellar-muted));
+  --stellar-canvas-star: color-mix(in srgb, var(--stellar-text) 66%, var(--stellar-accent) 34%);
+  --stellar-canvas-context: color-mix(in srgb, var(--stellar-muted) 74%, var(--stellar-accent) 26%);
+  --stellar-edge-supports: color-mix(in srgb, var(--a-700, #4338ca) 68%, #047857 32%);
+  --stellar-edge-refutes: color-mix(in srgb, var(--a-700, #4338ca) 60%, #be123c 40%);
+  --stellar-edge-contradicts: color-mix(in srgb, var(--a-700, #4338ca) 55%, #c2410c 45%);
+  --stellar-edge-extends: color-mix(in srgb, var(--a-700, #4338ca) 68%, #1d4ed8 32%);
+  --stellar-edge-refines: color-mix(in srgb, var(--a-700, #4338ca) 68%, #7e22ce 32%);
+  --stellar-edge-applies_to: color-mix(in srgb, var(--a-700, #4338ca) 58%, #a16207 42%);
+  --stellar-edge-shares_method: color-mix(in srgb, var(--a-700, #4338ca) 60%, #0e7490 40%);
+  --stellar-edge-precondition_of: color-mix(in srgb, var(--a-700, #4338ca) 56%, #a21caf 44%);
+  --stellar-edge-measures_same: color-mix(in srgb, var(--a-700, #4338ca) 62%, #0f766e 38%);
+  --stellar-edge-variant_of: color-mix(in srgb, var(--a-700, #4338ca) 72%, #6d28d9 28%);
+  --stellar-edge-contains: color-mix(in srgb, var(--a-700, #4338ca) 68%, #475569 32%);
+  --stellar-edge-causes: var(--stellar-edge-applies_to);
+  --stellar-edge-depends_on: var(--stellar-edge-precondition_of);
+  --stellar-edge-part_of: var(--stellar-edge-contains);
+  --stellar-edge-contrasts: var(--stellar-edge-contradicts);
+  --stellar-edge-applies: var(--stellar-edge-applies_to);
+  --stellar-edge-related: var(--stellar-edge-variant_of);
+  --stellar-node-theme: color-mix(in srgb, var(--a-700, #4338ca) 68%, #0f766e 32%);
+  --stellar-node-claim: color-mix(in srgb, var(--a-700, #4338ca) 66%, #6d28d9 34%);
+  --stellar-node-finding: color-mix(in srgb, var(--a-700, #4338ca) 62%, #0f766e 38%);
+  --stellar-node-construct: color-mix(in srgb, var(--a-700, #4338ca) 70%, #1d4ed8 30%);
+  --stellar-node-method: color-mix(in srgb, var(--a-700, #4338ca) 60%, #a16207 40%);
+  --stellar-node-framework: color-mix(in srgb, var(--a-700, #4338ca) 60%, #a21caf 40%);
 }
 .light .stellar-node-label small {
-  color: color-mix(in srgb, var(--stellar-accent) 72%, #241d3d);
+  color: var(--node-color);
 }
 
 @media (max-width: 800px) {
@@ -455,14 +512,14 @@
 }
 .stellar-source-ring i {
   display: block;
-  border: 1px solid #9facd1;
+  border: 1px solid var(--stellar-accent-soft);
   border-radius: 50%;
   width: 18px;
   height: 18px;
   margin: 0 auto 8px;
   box-shadow:
-    0 0 0 5px #96a9e112,
-    0 0 30px #96a9e133;
+    0 0 0 5px var(--stellar-accent-wash),
+    0 0 30px var(--stellar-accent-veil);
   background: var(--stellar-bg);
 }
 .stellar-source-ring span {
@@ -483,7 +540,7 @@
   border: 1px solid color-mix(in srgb, var(--node-color) 45%, transparent);
   border-radius: 10px;
   background: var(--stellar-node-panel) !important;
-  box-shadow: 0 6px 24px #0003;
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--stellar-bg) 72%, transparent);
   width: 230px;
   font-size: 12px;
 }

@@ -5,7 +5,7 @@ import type { StellarPosition, StellarSession } from "@shared/stellarGraph";
 import { StellarGPU } from "./gpu";
 import { hash } from "./layout";
 import { arrowGeometry, frameConnection, interpolateCamera } from "./presentation";
-import { NODE_COLORS, NODE_LABELS, relation } from "./palette";
+import { NODE_COLORS, NODE_LABELS, RELATIONS, relation, relationColor, nodeColor } from "./palette";
 import { t } from "../i18n";
 import "./stellar.css";
 import type { CorpusLayer } from "./CorpusContext";
@@ -55,8 +55,46 @@ const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 8;
 export const ZOOM_STEP = 1.55;
 const clampZoom = (zoom: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
-const rgb = (hex: string) =>
-  [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+const parseColor = (value: string, fallback: number[]) => {
+  const color = value.trim();
+  if (color.startsWith("#")) {
+    const hex = color.slice(1);
+    const expanded = hex.length === 3 ? hex.split("").map((part) => part + part).join("") : hex;
+    if (/^[0-9a-f]{6}$/i.test(expanded))
+      return [1, 3, 5].map((i) => parseInt(expanded.slice(i - 1, i + 1), 16) / 255);
+  }
+  const match = color.match(/^rgba?\(([^)]+)\)$/i);
+  if (match) {
+    const channels = match[1].replace(/\//g, " ").split(/[\s,]+/).filter(Boolean).slice(0, 3);
+    if (channels.length === 3) {
+      const values = channels.map((channel) => {
+        const number = Number.parseFloat(channel);
+        return channel.endsWith("%") ? number / 100 : number / 255;
+      });
+      if (values.every((channel) => Number.isFinite(channel))) return values;
+    }
+  }
+  const srgb = color.match(/^color\(srgb\s+([^)]*)\)$/i);
+  if (srgb) {
+    const channels = srgb[1].replace(/\//g, " ").split(/[\s,]+/).filter(Boolean).slice(0, 3);
+    if (channels.length === 3) {
+      const values = channels.map((channel) => {
+        const number = Number.parseFloat(channel);
+        return channel.endsWith("%") ? number / 100 : number;
+      });
+      if (values.every((channel) => Number.isFinite(channel))) return values;
+    }
+  }
+  return fallback;
+};
+const fallbackColor = (value: string) => parseColor(value, [0.65, 0.73, 0.98]);
+interface CanvasPalette {
+  star: number[];
+  context: number[];
+  nodes: Record<string, number[]>;
+  edges: Record<string, number[]>;
+  edgeDefault: number[];
+}
 export function StellarCanvas(props: Props) {
   const host = useRef<HTMLDivElement>(null),
     canvas = useRef<HTMLCanvasElement>(null),
@@ -65,6 +103,13 @@ export function StellarCanvas(props: Props) {
   const [size, setSize] = useState({ w: 1000, h: 700, footer: 150 }),
     [error, setError] = useState(""),
     [generation, setGeneration] = useState(0);
+  const palette = useRef<CanvasPalette>({
+    star: fallbackColor("#a4bbfa"),
+    context: fallbackColor("#a6a8d1"),
+    nodes: Object.fromEntries(Object.entries(NODE_COLORS).map(([type, color]) => [type, fallbackColor(color)])),
+    edges: Object.fromEntries(Object.entries(RELATIONS).map(([type, value]) => [type, fallbackColor(value.color)])),
+    edgeDefault: fallbackColor("#adb8d9"),
+  });
   const worker = useRef<Worker>(),
     seq = useRef(0),
     paint = useRef<() => void>(() => {});
@@ -226,10 +271,28 @@ export function StellarCanvas(props: Props) {
   }, [size.w, size.h, props.onApi]);
   useEffect(() => {
     const el = canvas.current!;
+    const readPalette = () => {
+      const styles = getComputedStyle(host.current || el);
+      const read = (name: string, fallback: string) => parseColor(styles.getPropertyValue(name), fallbackColor(fallback));
+      palette.current = {
+        star: read("--stellar-canvas-star", "#a4bbfa"),
+        context: read("--stellar-canvas-context", "#a6a8d1"),
+        nodes: Object.fromEntries(Object.entries(NODE_COLORS).map(([type, color]) => [type, read(`--stellar-node-${type}`, color)])),
+        edges: Object.fromEntries(Object.entries(RELATIONS).map(([type, value]) => [type, read(`--stellar-edge-${type}`, value.color)])),
+        edgeDefault: read("--stellar-accent-soft", "#adb8d9"),
+      };
+    };
+    readPalette();
+    const themeObserver = new MutationObserver(() => {
+      readPalette();
+      paint.current();
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style"] });
     let gpu: StellarGPU;
     try {
       gpu = new StellarGPU(el);
     } catch (e) {
+      themeObserver.disconnect();
       setError(String(e));
       return;
     }
@@ -276,7 +339,7 @@ export function StellarCanvas(props: Props) {
         vertex(
           stars,
           { x, y },
-          [0.64, 0.69, 0.91],
+          palette.current.star,
           0.25,
           2 + hash(`s${i}`) * 3,
         );
@@ -298,8 +361,8 @@ export function StellarCanvas(props: Props) {
               Math.max(s.y, target.y) < 0 || Math.min(s.y, target.y) > h) continue;
           // A separate inexpensive pass: background links do not route around labels,
           // capture clicks or join playback. Stronger bridges reveal outside connections.
-          const color = bridge ? rgb(relation(edge.type).color) : [.46, .48, .64];
-          const alpha = opacity * (bridge ? 1.6 : .48);
+          const color = bridge ? (palette.current.edges[edge.type] || palette.current.edgeDefault) : palette.current.context;
+          const alpha = opacity * (bridge ? 1.6 : .58);
           vertex(lines, s, color, alpha); vertex(lines, target, color, alpha);
         }
         for (const node of p.context.data.nodes) {
@@ -309,9 +372,9 @@ export function StellarCanvas(props: Props) {
           const s = screen(pos);
           if (s.x < -20 || s.x > w + 20 || s.y < -20 || s.y > h + 20) continue;
           const bridge = near.has(node.id);
-          vertex(stars, s, rgb(NODE_COLORS[node.type] || "#a4bbfa"), opacity * (bridge ? 2 : 1),
+          vertex(stars, s, palette.current.nodes[node.type] || palette.current.edgeDefault, opacity * (bridge ? 2 : 1),
             (bridge ? 34 : 20) * Math.max(.35, Math.min(1, p.camera.zoom)));
-          vertex(stars, s, [.65, .66, .82], opacity * (bridge ? 2 : 1), bridge ? 6 : 3);
+          vertex(stars, s, palette.current.context, opacity * (bridge ? 2 : 1), bridge ? 6 : 3);
         }
       }
       for (const e of p.data.edges) {
@@ -332,8 +395,8 @@ export function StellarCanvas(props: Props) {
           e.source === p.selected ||
           e.target === p.selected;
         const current = e.id === p.activeEdge;
-        const color = rgb(relation(e.type).color);
-        const alpha = active ? current ? 1 : .08 : p.selected && !hot ? .08 : hot ? 1 : .55;
+        const color = palette.current.edges[e.type] || palette.current.edgeDefault;
+        const alpha = active ? current ? 1 : .12 : p.selected && !hot ? .1 : hot ? 1 : .68;
         const steps = current ? 32 : p.camera.zoom < 0.3 ? 1 : 20;
         const points = routeConnection(
           s,
@@ -352,13 +415,13 @@ export function StellarCanvas(props: Props) {
             lines,
             points[i - 1],
             color,
-            alpha, current ? 2.7 : 1,
+            alpha, current ? 2.7 : 1.2,
           );
           vertex(
             lines,
             points[i],
             color,
-            alpha, current ? 2.7 : 1,
+            alpha, current ? 2.7 : 1.2,
           );
         }
         // Arrowhead retains the original direction even during reverse traversal.
@@ -366,7 +429,7 @@ export function StellarCanvas(props: Props) {
           const arrow = arrowGeometry(points)!;
           const { angle, tip } = arrow;
           for (const turn of [-0.55, 0.55]) {
-            vertex(lines, tip, color, alpha, current ? 2.7 : 1);
+            vertex(lines, tip, color, alpha, current ? 2.7 : 1.2);
             vertex(
               lines,
               {
@@ -374,7 +437,7 @@ export function StellarCanvas(props: Props) {
                 y: tip.y - Math.sin(angle + turn) * (current ? 12 : 8),
               },
               color,
-              alpha, current ? 2.7 : 1,
+              alpha, current ? 2.7 : 1.2,
             );
           }
         }
@@ -392,7 +455,7 @@ export function StellarCanvas(props: Props) {
         const s = screen(pos);
         if (s.x < -150 || s.x > w + 150 || s.y < -100 || s.y > h + 100)
           continue;
-        const color = rgb(NODE_COLORS[n.type] || "#a4bbfa");
+        const color = palette.current.nodes[n.type] || palette.current.edgeDefault;
         const featured = active && (n.id === active.source || n.id === active.target);
         const alpha = (active || p.selected) && !neighborhood.has(n.id) ? 0.18 : 1;
         vertex(
@@ -430,6 +493,7 @@ export function StellarCanvas(props: Props) {
     el.addEventListener("webglcontextlost", lost);
     return () => {
       cancelAnimationFrame(raf);
+      themeObserver.disconnect();
       gpu.dispose();
       el.removeEventListener("webglcontextlost", lost);
     };
@@ -694,7 +758,7 @@ export function StellarCanvas(props: Props) {
               {
                 left: labelX,
                 top: labelY,
-                "--node-color": NODE_COLORS[n.type] || "#a4bbfa",
+                "--node-color": nodeColor(n.type),
               } as React.CSSProperties
             }
             onKeyDown={(e) => {
@@ -735,7 +799,7 @@ export function StellarCanvas(props: Props) {
               <button
                 key={`edge:${e.id}`}
                 className="stellar-edge-label"
-                style={{ left: x, top: y, color: relation(e.type).color }}
+                style={{ left: x, top: y, color: relationColor(e.type) }}
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={() => props.onEdge(e.id)}
               >
