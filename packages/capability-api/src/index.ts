@@ -10,6 +10,7 @@ export * from './json';
 export * from './identifiers';
 export * from './localized';
 export * from './permissions';
+export * from './models';
 export * from './views';
 export * from './artifacts';
 export * from './chat';

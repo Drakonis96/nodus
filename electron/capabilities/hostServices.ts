@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { assertPublicHost } from '../../skill-capabilities/publicHost';
+import { validateModelAsset } from '../../packages/capability-api/src/models';
 import type { TrustedNetworkPermission, TrustedPermissionSetV2 } from '../../packages/capability-api/src/permissions';
 import type { CapabilityHostServices, TrustedWorkerRuntime } from './workerHost';
 
@@ -286,6 +287,23 @@ export function createCapabilityHostServices(adapters: CapabilityServiceAdapters
         : undefined;
       if (secretId && !secret) throw new Error('That capability credential is not configured.');
       return adapters.python.run(runtime, { runtimeId, args, stdin: typeof value.stdin === 'string' ? value.stdin : undefined, secret, timeoutMs: Number(value.timeoutMs ?? 120_000) }, signal);
+    }
+
+    // `nodus:3d`. The core owns the format check and the storage; the capability owns
+    // nothing but the bytes it produced. A model that would not open on a user's machine
+    // is refused here, where the capability can still say something useful about it.
+    if (channel === 'models') {
+      if (!runtime.permissions.models) throw new Error('Capability 3D access is not permitted.');
+      const bytes = value.bytes instanceof Uint8Array ? Buffer.from(value.bytes) : Buffer.from(String(value.bytes ?? ''), 'base64');
+      const mimeType = String(value.mimeType ?? '');
+      const info = validateModelAsset(bytes, mimeType);
+      if (method === 'validate') return info;
+      if (method !== 'store') throw new Error('Unknown capability 3D operation.');
+      if (!adapters.attachments) throw new Error('Attachments are unavailable in this context.');
+      const name = String(value.name ?? '');
+      if (!/^[\w][\w .()-]{0,120}$/.test(name) || name.includes('..')) throw new Error('Invalid 3D model name.');
+      const stored = await adapters.attachments(runtime, { bytes, name, mimeType });
+      return { ...stored, info };
     }
 
     if (channel === 'attachments') {

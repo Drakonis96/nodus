@@ -1,0 +1,21 @@
+/* The 3D viewer inside a conversation.
+   Sized in the flow rather than floated over it: a model is part of the answer, not a
+   lightbox. The stage keeps a fixed aspect so opening one does not make the message jump. */
+
+.capability-view-model { display: grid; gap: 8px; margin: 10px 0; padding: 12px; border: 1px solid #71809655; border-radius: 10px; }
+.capability-view-model figcaption { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.capability-view-model-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; }
+.capability-view-model-meta { font-size: 11px; opacity: .7; }
+.capability-view-model-open { justify-self: start; }
+
+/* The canvas fills this; the aspect ratio is what stops a tall model from taking over the
+   column and a wide one from becoming a letterbox slit. */
+.capability-view-model-stage { position: relative; width: 100%; aspect-ratio: 4 / 3; min-height: 220px; max-height: 60vh; border-radius: 8px; overflow: hidden; background: #7180961a; touch-action: none; }
+.capability-view-model-stage canvas { display: block; width: 100%; height: 100%; }
+
+.capability-view-model-status { margin: 0; font-size: 12px; }
+.capability-view-model[data-state='failed'] .capability-view-model-status { color: #f87171; }
+.capability-view-model-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.capability-view-model-hint { margin: 0; font-size: 11px; opacity: .65; }
+
+.light .capability-view-model-stage { background: #71809614; }

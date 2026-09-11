@@ -123,3 +123,14 @@ tres skills v1 siguen en la raíz del repositorio y los plugins v2 viven bajo
     assets a la vez. Que esa separación se mantenga lo comprueba un script sobre
     el texto de los workflows en cada push, porque es la única propiedad de este
     pipeline que una ejecución en verde no demuestra.
+
+14. **`nodus:3d` es del núcleo y es genérica.** Un modelo glTF o GLB se valida, se guarda
+    y se dibuja en la aplicación; el paquete entrega bytes y recibe una referencia, y no
+    aporta visor, shader ni script. La alternativa —una capability por disciplina, del
+    tipo `nodus:anatomy`— sería exactamente el acoplamiento que este cambio quita: la
+    anatomía, la química, la arqueología y el patrimonio muestran el mismo tipo de fichero
+    y no necesitan cada una su propio visor. La regla que la sostiene es que el asset sea
+    autocontenido: glTF puede referenciar buffers, imágenes y shaders por URI, y un visor
+    que los siguiera convertiría cualquier conversación antigua en una petición a donde
+    dijera el documento. Se comprueba al entregarlo, al revisarlo en el marketplace y otra
+    vez al leerlo. Ver `docs/capability-3d.md`.

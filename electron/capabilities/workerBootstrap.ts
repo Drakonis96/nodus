@@ -61,6 +61,10 @@ const host: CapabilityHostV2 = {
     inspect: svg => hostCall('svg', 'inspect', { svg }) as ReturnType<CapabilityHostV2['svg']['inspect']>,
     refine: request => hostCall('svg', 'refine', request) as Promise<string>,
   },
+  models: {
+    validate: asset => hostCall('models', 'validate', asset) as ReturnType<CapabilityHostV2['models']['validate']>,
+    store: asset => hostCall('models', 'store', asset) as ReturnType<CapabilityHostV2['models']['store']>,
+  },
   subworker: { run: request => hostCall('subworker', 'run', request) },
   python: {
     ensureRuntime: runtimeId => hostCall('python', 'ensureRuntime', { runtimeId }) as ReturnType<CapabilityHostV2['python']['ensureRuntime']>,

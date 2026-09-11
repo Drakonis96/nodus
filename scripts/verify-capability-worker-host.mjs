@@ -15,6 +15,31 @@ import { build } from 'esbuild';
 const root = path.resolve(import.meta.dirname, '..');
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-capability-worker-host-'));
 
+/** A GLB container, assembled by hand so the fixture is a real file rather than a
+ *  library's idea of one. */
+function makeGlb(json) {
+  const pad = (bytes, filler) => {
+    const remainder = bytes.length % 4;
+    if (!remainder) return bytes;
+    return Buffer.concat([bytes, Buffer.alloc(4 - remainder, filler)]);
+  };
+  const jsonChunk = pad(Buffer.from(JSON.stringify(json)), 0x20);
+  const binChunk = pad(Buffer.alloc(12), 0);
+  const length = 12 + 8 + jsonChunk.length + 8 + binChunk.length;
+  const out = Buffer.alloc(length);
+  out.writeUInt32LE(0x46546c67, 0);
+  out.writeUInt32LE(2, 4);
+  out.writeUInt32LE(length, 8);
+  out.writeUInt32LE(jsonChunk.length, 12);
+  out.writeUInt32LE(0x4e4f534a, 16);
+  jsonChunk.copy(out, 20);
+  const at = 20 + jsonChunk.length;
+  out.writeUInt32LE(binChunk.length, at);
+  out.writeUInt32LE(0x004e4942, at + 4);
+  binChunk.copy(out, at + 8);
+  return out;
+}
+
 try {
   const verdict = path.join(temporary, 'verdict.txt');
   const bootstrap = path.join(temporary, 'bootstrap.cjs');
@@ -35,6 +60,13 @@ try {
         if (toolId === 'reach') { await host.network.fetch(input.endpointId, { path: input.path, method: input.method }); return { view: { schemaVersion: 1, summary: 'reached', nodes: [{ kind: 'code', text: 'ok' }] } }; }
         if (toolId === 'peek') return { view: { schemaVersion: 1, summary: 'peek', nodes: [{ kind: 'code', text: JSON.stringify({ has: await host.secrets.has('api-key'), keys: Object.keys(host.secrets) }) }] } };
         if (toolId === 'read') return { view: { schemaVersion: 1, summary: 'read', nodes: [{ kind: 'code', text: JSON.stringify(await host.storage.state.get(input.key) ?? null) }] } };
+        if (toolId === 'model') {
+          const bytes = Uint8Array.from(Buffer.from(input.base64, 'base64'));
+          const stored = input.storeIt
+            ? await host.models.store({ bytes, mimeType: input.mimeType, name: input.name })
+            : { info: await host.models.validate({ bytes, mimeType: input.mimeType }) };
+          return { view: { schemaVersion: 1, summary: 'model', nodes: [{ kind: 'code', text: JSON.stringify(stored) }] } };
+        }
         if (toolId === 'hang') return new Promise(() => {});
         if (toolId === 'crash') { process.exit(7); }
         if (toolId === 'garbage') { process.parentPort.postMessage({ type: 'not-a-real-frame' }); return { view: { schemaVersion: 1, summary: 'survived', nodes: [{ kind: 'code', text: 'ok' }] } }; }
@@ -70,6 +102,18 @@ try {
       await host.storage.state.set('runs', ((await host.storage.state.get('runs')) ?? 0) + 1);
     };
   `);
+
+  // Two model fixtures: one self-contained GLB, and one glTF that points at a file next
+  // to it. The second is the one that must never be stored.
+  const glbBase64 = makeGlb({
+    asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0 }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }], buffers: [{ byteLength: 12 }],
+  }).toString('base64');
+  const externalBase64 = Buffer.from(JSON.stringify({
+    asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0 }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+    buffers: [{ byteLength: 12, uri: 'scene.bin' }],
+  })).toString('base64');
 
   const outfile = path.join(temporary, 'main.cjs');
   await build({ stdin: { contents: `
@@ -220,6 +264,43 @@ try {
       assert.equal(text(await migrating.call('invoke', { invocationId: 'm3', toolId: 'read', input: { key: 'runs' }, locale: 'en' }, { timeoutMs: 10_000 })), 'null', 'a rung already below the current version is never re-run');
       await migrating.stop();
 
+      // nodus:3d — a capability hands over an asset and gets back a reference. The
+      // format rule is the core's, and a capability that never declared the permission
+      // does not reach it at all.
+      stage = '3D models';
+      const glbBase64 = ${JSON.stringify(glbBase64)};
+      const externalBase64 = ${JSON.stringify(externalBase64)};
+
+      const modelling = handleFor({ models: true, storage: { stateBytes: 1024, cacheBytes: 1024, tempBytes: 0 } }, {
+        attachments: async (_runtime, request) => ({ attachmentId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', bytes: request.bytes.length }),
+      });
+      const validated = JSON.parse(text(await modelling.call('invoke', { invocationId: 'm1', toolId: 'model', input: { base64: glbBase64, mimeType: 'model/gltf-binary', name: 'probe.glb', storeIt: false }, locale: 'en' }, { timeoutMs: 20_000 })));
+      assert.equal(validated.info.format, 'glb');
+      assert.equal(validated.info.selfContained, true);
+
+      const storedModel = JSON.parse(text(await modelling.call('invoke', { invocationId: 'm2', toolId: 'model', input: { base64: glbBase64, mimeType: 'model/gltf-binary', name: 'probe.glb', storeIt: true }, locale: 'en' }, { timeoutMs: 20_000 })));
+      assert.match(storedModel.attachmentId, /^[a-z0-9][a-z0-9-]{7,63}$/, 'the capability gets back a reference it can put in a view');
+      assert.ok(storedModel.bytes > 0);
+
+      stage = '3D models that reach outside themselves';
+      assert.match(
+        await failure(modelling.call('invoke', { invocationId: 'm3', toolId: 'model', input: { base64: externalBase64, mimeType: 'model/gltf+json', name: 'probe.gltf', storeIt: true }, locale: 'en' }, { timeoutMs: 20_000 })),
+        /outside itself/,
+      );
+      assert.match(
+        await failure(modelling.call('invoke', { invocationId: 'm4', toolId: 'model', input: { base64: Buffer.from('not a model').toString('base64'), mimeType: 'model/gltf-binary', name: 'probe.glb', storeIt: true }, locale: 'en' }, { timeoutMs: 20_000 })),
+        /readable GLB/,
+      );
+      await modelling.stop();
+
+      stage = '3D without permission';
+      const unmodelled = handleFor();
+      assert.match(
+        await failure(unmodelled.call('invoke', { invocationId: 'm5', toolId: 'model', input: { base64: glbBase64, mimeType: 'model/gltf-binary', name: 'probe.glb', storeIt: false }, locale: 'en' }, { timeoutMs: 10_000 })),
+        /3D access is not permitted/,
+      );
+      await unmodelled.stop();
+
       fs.writeFileSync(${JSON.stringify(verdict)}, 'pass');
       app.exit(0);
     } catch (error) {
@@ -233,7 +314,7 @@ try {
   const electron = createRequire(import.meta.url)('electron');
   await promisify(execFile)(electron, [outfile], { env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' } });
   if (fs.readFileSync(verdict, 'utf8') !== 'pass') throw new Error('The capability worker host verification did not report a pass.');
-  console.log('CAPABILITY WORKER HOST PASS: handshake, host-call gating, storage quota, network allowlist, secret isolation, deadline, cancellation, crash recovery, migration ladder.');
+  console.log('CAPABILITY WORKER HOST PASS: handshake, host-call gating, storage quota, network allowlist, secret isolation, 3D validation and storage, deadline, cancellation, crash recovery, migration ladder.');
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });
 }

@@ -8,7 +8,7 @@ export type CapabilityId = NodusCapabilityId | `self:${string}` | `${string}:${s
 /** Short names authored before the `nodus:` prefix existed. They still normalize, but
  *  normalizing is not resolving: a reserved id only works while a provider is active. */
 const LEGACY: Record<string, NodusCapabilityId> = {
-  svg: 'nodus:svg', image: 'nodus:image',
+  svg: 'nodus:svg', image: 'nodus:image', '3d': 'nodus:3d',
   chemistry: 'nodus:chemistry', legal: 'nodus:legal', genomics: 'nodus:genomics',
 };
 

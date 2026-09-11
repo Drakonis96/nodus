@@ -1,5 +1,6 @@
 import { LIMITS } from './limits';
 import { SLUG, exactKeys, plainText } from './json';
+import { isModelMimeType } from './models';
 
 /** The only thing a worker may return for display. It is data, not markup: there is no
  *  HTML, no script, no CSS and no component reference anywhere in the tree, so a plugin
@@ -26,6 +27,10 @@ export type ViewNode =
   | { kind: 'links'; items: Array<{ href: string; label: string; description?: string }> }
   | { kind: 'details'; summary: string; children: ViewNode[] }
   | { kind: 'download'; attachmentId: string; label: string; name: string; mimeType: string; bytes: number }
+  /** An interactive 3D model, drawn by the core viewer. The bytes were stored as an
+   *  attachment and validated when the capability handed them over; this refers to them.
+   *  `alt` is what a reader who cannot see it is told, and is not optional. */
+  | { kind: 'model'; attachmentId: string; title: string; alt: string; name: string; mimeType: string; bytes: number }
   | { kind: 'status'; state: 'ok' | 'pending' | 'failed'; label: string; description?: string };
 
 export interface ViewDocumentV1 {
@@ -133,6 +138,16 @@ function validateNode(input: unknown, budget: { nodes: number }, depth: number):
         || !/^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/i.test(String(node.mimeType))
         || !Number.isInteger(node.bytes) || node.bytes < 0) throw new Error('Invalid view download.');
       return structuredClone(node);
+    case 'model':
+      // Same rule as a download: bytes are never inline. What is different is that the
+      // core will open this one, so the format it claims has to be one the core opens.
+      if (!exactKeys(node, ['kind', 'attachmentId', 'title', 'alt', 'name', 'mimeType', 'bytes'])
+        || !/^[a-z0-9][a-z0-9-]{7,63}$/.test(String(node.attachmentId)) || !plainText(node.title, 200)
+        || !plainText(node.alt, 1_000) || !plainText(node.name, 200)
+        || node.name.includes('/') || node.name.includes('\\')
+        || !isModelMimeType(node.mimeType)
+        || !Number.isInteger(node.bytes) || node.bytes < 1 || node.bytes > LIMITS.modelBytes) throw new Error('Invalid view model.');
+      return structuredClone(node);
     case 'status':
       if (!exactKeys(node, ['kind', 'state', 'label', 'description']) && !exactKeys(node, ['kind', 'state', 'label'])) throw new Error('Invalid view status.');
       if (!['ok', 'pending', 'failed'].includes(node.state) || !plainText(node.label, 200)
@@ -176,6 +191,7 @@ export function viewToText(document: ViewDocumentV1): string {
       case 'links': return node.items.map(item => `${item.label}: ${item.href}`);
       case 'details': return [node.summary, ...walk(node.children)];
       case 'download': return [`${node.label} (${node.name}, ${node.bytes} bytes)`];
+      case 'model': return [`[${node.title}] ${node.alt}`];
       case 'status': return [[node.label, node.description].filter(Boolean).join(' — ')];
     }
   });

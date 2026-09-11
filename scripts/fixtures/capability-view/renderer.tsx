@@ -24,6 +24,10 @@ const view: ViewDocumentV1 = {
     { kind: 'details', summary: 'Fuentes consultadas', children: [{ kind: 'links', items: [{ href: 'https://pubchem.ncbi.nlm.nih.gov/compound/702', label: 'PubChem 702', description: 'Registro canónico' }] }] },
     { kind: 'download', attachmentId: '3f8a1c0e-9b2d-4e77-8a10-5c6d7e8f9a0b', label: 'Descargar ChemFig', name: 'etanol.tex', mimeType: 'text/x-tex', bytes: 412 },
     { kind: 'status', state: 'ok', label: 'Identidad verificada', description: 'Dos fuentes independientes coinciden.' },
+    // `nodus:3d`. The stage is only mounted once a reader asks for it, so what this
+    // fixture shows is the closed state: the part of it that has to survive a narrow
+    // column and both themes.
+    { kind: 'model', attachmentId: '5c6d7e8f-9a0b-4c1d-8e2f-3a4b5c6d7e8f', title: 'Modelo escaneado', alt: 'Un escaneo tridimensional que se puede girar.', name: 'objeto.glb', mimeType: 'model/gltf-binary', bytes: 1_248_576 },
     { kind: 'code', language: 'latex', text: '\\chemfig{H_3C-CH_2-OH}' },
   ],
 };
@@ -102,6 +106,7 @@ window.nodus = {
   renderLegacyCapabilityResult: async () => ({ available: true as const, capabilityId: 'nodus:chemistry', pluginId: 'chemistry-studio', view }),
   renderCapabilityArtifact: async () => ({ available: true as const, sidecar: { source: 'nodus-artifact://chat/' + 'a'.repeat(64) + '/3f8a1c0e-9b2d-4e77-8a10-5c6d7e8f9a0b', capabilityId: 'nodus:chemistry', plugin: { id: 'chemistry-studio', version: '2.0.0', digest: 'a'.repeat(64) }, artifactType: 'chemistry-document', artifactVersion: 1, summary: 'Etanol, CID 702.', modelVisibility: 'projection' as const, sha256: 'c'.repeat(64), bytes: 1024, createdAt: '2026-09-11T10:00:00.000Z' }, view }),
   downloadCapabilityFile: async () => {},
+  readCapabilityModel: async () => { throw new Error('no model is opened in this fixture'); },
   getChatImageMetadata: async () => null,
   copyChatImage: async () => {},
 } as unknown as NodusApi;

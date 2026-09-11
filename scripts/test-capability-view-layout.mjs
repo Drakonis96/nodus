@@ -37,6 +37,7 @@ test('capability views render in both themes without overflowing the message col
       await readFile(cssFile, 'utf8'),
       await readFile(path.join(root, 'src/components/chatVisuals.css'), 'utf8'),
       await readFile(path.join(root, 'src/components/capabilityPackages.css'), 'utf8'),
+      await readFile(path.join(root, 'src/components/chatModelViewer.css'), 'utf8'),
     ].join('\n');
 
     for (const theme of ['dark', 'light']) {
@@ -64,8 +65,16 @@ test('capability views render in both themes without overflowing the message col
         assert.equal(await legacy.locator('.chat-visual-pending').count(), 0, `${theme}/${width}: a finished legacy result was shown as work in progress`);
         assert.ok((await legacy.textContent()).includes('Etanol'), `${theme}/${width}: the legacy block rendered its package's view`);
 
+        // A 3D result is a viewer, not a blob of data: it names itself, says how large it
+        // is, and offers to open — without starting a WebGL context nobody asked for.
+        const model = page.getByTestId('artifact').locator('.capability-view-model');
+        await model.waitFor();
+        assert.equal(await page.locator('.capability-view-model-stage').count(), 0, `${theme}/${width}: a model opened a canvas before anyone asked`);
+        assert.ok((await model.textContent()).includes('objeto.glb'), `${theme}/${width}: the model names its file`);
+        assert.equal(await model.locator('.capability-view-model-open').count(), 1, `${theme}/${width}: the model offers to open`);
+
         // Every node kind the contract defines actually reaches the DOM.
-        for (const selector of ['.capability-view-badges', '.capability-view-table table', '.capability-view-notice', '.capability-view-details', '.capability-view-download', '.capability-view-status', '.capability-view-code', '.capability-view-links']) {
+        for (const selector of ['.capability-view-badges', '.capability-view-table table', '.capability-view-notice', '.capability-view-details', '.capability-view-download', '.capability-view-status', '.capability-view-code', '.capability-view-links', '.capability-view-model']) {
           assert.ok(await page.locator(selector).count() > 0, `${theme}/${width}: ${selector} is rendered`);
         }
 

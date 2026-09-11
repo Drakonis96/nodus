@@ -1,6 +1,7 @@
 import type { ViewDocumentV1, ViewNode, ViewSpan } from '@shared/capabilities';
 import { ChatVisual } from './ChatVisual';
 import { Icon } from './ui';
+import { ChatModelViewer } from './ChatModelViewer';
 import { t } from '../i18n';
 
 /** Renders a declarative view a capability returned.
@@ -69,6 +70,10 @@ function Node({ node, owner }: { node: ViewNode; owner?: string }) {
         <Icon name="download" size={15} />{node.label}
         <span className="capability-view-download-meta">{node.name} · {formatBytes(node.bytes)}</span>
       </button>;
+    case 'model':
+      // `nodus:3d`. The package supplied bytes the core validated and stored; what draws
+      // them is the core's own viewer, never anything that came with the package.
+      return <ChatModelViewer node={node} owner={owner} />;
     case 'status':
       return <p className="capability-view-status" data-state={node.state} role="status">
         <Icon name={node.state === 'ok' ? 'check' : node.state === 'failed' ? 'alert' : 'clock'} size={14} />

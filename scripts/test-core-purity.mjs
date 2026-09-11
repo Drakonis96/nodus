@@ -107,7 +107,12 @@ test('the capability ids the packages provide are reserved, not implemented', as
   for (const id of ['nodus:chemistry', 'nodus:legal', 'nodus:genomics']) {
     assert.ok(!catalogue.includes(id), `${id} is still registered as a built-in capability`);
   }
-  assert.ok(catalogue.includes('nodus:svg') && catalogue.includes('nodus:image'), 'the two core capabilities are still built in');
+  assert.ok(['nodus:svg', 'nodus:image', 'nodus:3d'].every(id => catalogue.includes(id)), 'the core capabilities are still built in');
+
+  // 3D is core on purpose, and generic on purpose: the viewer is the application's, and
+  // the capability names no discipline. A `nodus:anatomy`, `nodus:heritage` or any other
+  // subject-specific identifier here would be the thing this whole change removed.
+  assert.ok(!/nodus:(anatomy|heritage|archaeology|medicine|biology)/.test(catalogue), 'a discipline-specific 3D capability crept into the core');
 });
 
 test('no default skill belongs to a discipline', async () => {

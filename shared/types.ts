@@ -8816,6 +8816,7 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   getChatImageMetadata(source: string): Promise<Record<string, string> | null>;
   copyChatImage(source: string): Promise<void>;
   downloadCapabilityFile(source: string): Promise<void>;
+  readCapabilityModel(source: string): Promise<{ bytes: Uint8Array; mimeType: string; name: string; info: import('../packages/capability-api/src/models').ModelAssetInfo }>;
   listCapabilities(): Promise<import('./capabilities').CapabilityListPayload>;
   onCapabilityRegistryChanged(cb: (payload: import('./capabilities').CapabilityRegistryPayload) => void): () => void;
   capabilityHealth(capabilityId: string): Promise<import('./capabilities').CapabilityHealthPayload>;

@@ -41,6 +41,7 @@ export interface CapabilityRegistrySnapshot {
 const CORE_PROVIDERS: CapabilityProvider[] = [
   { id: 'nodus:svg', version: '1.0.0', description: 'Sanitized SVG rendering and quality review.', source: 'core', tools: [], artifacts: [], hasSettings: false },
   { id: 'nodus:image', version: '1.0.0', description: 'Image generation using the configured provider.', source: 'core', tools: [], artifacts: [], hasSettings: false },
+  { id: 'nodus:3d', version: '1.0.0', description: 'Validation, storage and interactive viewing of glTF and GLB models.', source: 'core', tools: [], artifacts: [], hasSettings: false },
 ];
 
 let snapshot: CapabilityRegistrySnapshot = emptySnapshot();

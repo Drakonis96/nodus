@@ -14,9 +14,9 @@ export const WORKER_METHODS: readonly WorkerMethod[] = [
   'projectArtifactForModel', 'getSettings', 'applySettings', 'runAction', 'migrate', 'renderLegacyResult', 'shutdown',
 ];
 
-export type HostChannel = 'network' | 'storage' | 'secrets' | 'model' | 'svg' | 'subworker' | 'python' | 'attachments';
+export type HostChannel = 'network' | 'storage' | 'secrets' | 'model' | 'svg' | 'models' | 'subworker' | 'python' | 'attachments';
 
-export const HOST_CHANNELS: readonly HostChannel[] = ['network', 'storage', 'secrets', 'model', 'svg', 'subworker', 'python', 'attachments'];
+export const HOST_CHANNELS: readonly HostChannel[] = ['network', 'storage', 'secrets', 'model', 'svg', 'models', 'subworker', 'python', 'attachments'];
 
 export type HostToWorkerMessage =
   | { type: 'call'; callId: string; method: WorkerMethod; payload: unknown }

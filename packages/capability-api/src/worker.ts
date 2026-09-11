@@ -3,6 +3,7 @@ import type { ViewDocumentV1 } from './views';
 import type { WorkerArtifactV1 } from './artifacts';
 import type { ChatAstNode, FinalMutation, PrepareMutation } from './chat';
 import type { SettingsActionInput, SettingsStateV1, SettingsSubmissionV1 } from './settings';
+import type { ModelAssetInfo } from './models';
 
 /** The interface a trusted worker module default-exports. The host calls nothing else.
  *
@@ -127,6 +128,15 @@ export interface CapabilityHostV2 {
     validate(svg: string): Promise<{ ok: boolean; errors: string[] }>;
     inspect(svg: string): Promise<{ width?: number; height?: number; elements: number }>;
     refine(request: { svg: string; instruction: string }): Promise<string>;
+  };
+  /** `nodus:3d`. A capability hands over a glTF or GLB asset and gets back the
+   *  attachment id to put in a `model` view node; the core validates it, stores it and
+   *  draws it. There is no renderer on this side of the boundary. */
+  models: {
+    /** Checks an asset without storing it: format, version, self-containment, size. */
+    validate(asset: { bytes: Uint8Array; mimeType: string }): Promise<ModelAssetInfo>;
+    /** Validates and stores in one step, returning what a `model` node needs. */
+    store(asset: { bytes: Uint8Array; mimeType: string; name: string }): Promise<{ attachmentId: string; bytes: number; info: ModelAssetInfo }>;
   };
   subworker: {
     run(request: { entry: string; input: unknown; timeoutMs: number }): Promise<unknown>;

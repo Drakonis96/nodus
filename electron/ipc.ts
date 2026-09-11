@@ -3,6 +3,7 @@ import { listChatSkills, saveChatSkill, deleteChatSkill, restoreChatSkills, impo
 import { configurePluginSecret, discardInboxPlugin, listInboxPlugins, listInstalledPlugins, readInboxPlugin, readPluginDirectory, setPluginAutoUpdate } from './skillPlugins';
 import { mergedPluginPermissions } from '../skill-capabilities/pluginPackage';
 import { getCapabilityFile } from './chatAssets';
+import { validateModelAsset } from '../packages/capability-api/src/models';
 import { getChatImageMetadata } from './chatAssets';
 import { originalImagePayloadFromUrl } from './imageProtocol';
 import path from 'node:path';
@@ -613,6 +614,19 @@ export function registerIpc(
     if (image.isEmpty()) throw new Error('The image could not be copied.');
     clipboard.writeImage(image);
   });
+  /** The bytes of a stored 3D model, for the built-in viewer.
+   *
+   *  Read back through the same validation the capability's asset passed on the way in.
+   *  The file has not changed since, so this is not about distrusting it — it is that a
+   *  viewer should never be the first thing to look at bytes it is about to parse, and a
+   *  profile restored from a mismatched backup is a real way for that to happen. */
+  h('capabilityFiles:model', async (_e, source: string) => {
+    const payload = getCapabilityFile(String(source));
+    if (!payload) throw new Error('The 3D model is no longer available.');
+    const info = validateModelAsset(new Uint8Array(payload.blob), payload.mimeType);
+    return { bytes: payload.blob, mimeType: payload.mimeType, name: payload.name, info };
+  });
+
   h('capabilityFiles:download', async (_e, source: string) => {
     const payload = getCapabilityFile(String(source)); if (!payload) throw new Error('The capability file is no longer available.');
     const result = await dialog.showSaveDialog({ title: 'Save capability file', defaultPath: path.join(app.getPath('downloads'), payload.name) });

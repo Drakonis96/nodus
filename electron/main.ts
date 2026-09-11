@@ -949,8 +949,10 @@ app.whenReady().then(async () => {
     .catch(error => console.warn('[capabilities] migration could not run:', error))
     // Updates come after the move, never during it: an update mid-migration would change
     // the version the migration is halfway through. Delayed, because a launch has better
-    // things to do with its first seconds than talk to GitHub.
-    .finally(() => setTimeout(() => {
+    // things to do with its first seconds than talk to GitHub — and skipped entirely when
+    // this build was told not to update itself, which is what a test harness says when it
+    // means "do not go near the network".
+    .finally(() => process.env.NODUS_DISABLE_AUTO_UPDATE === '1' ? undefined : setTimeout(() => {
       void checkForCapabilityUpdates()
         .then(results => {
           for (const result of results) {

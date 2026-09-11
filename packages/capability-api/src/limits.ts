@@ -7,7 +7,7 @@ export const TRUSTED_PROTOCOL = 1 as const;
 export const TRUSTED_PUBLISHER = 'NodusResearch' as const;
 
 /** Capabilities the core owns outright. A plugin may depend on these; none may provide them. */
-export const CORE_CAPABILITY_IDS = ['nodus:svg', 'nodus:image'] as const;
+export const CORE_CAPABILITY_IDS = ['nodus:svg', 'nodus:image', 'nodus:3d'] as const;
 /** `nodus:*` identifiers a signed NodusResearch package may claim, and nobody else. */
 export const RESERVED_CAPABILITY_IDS = ['nodus:chemistry', 'nodus:legal', 'nodus:genomics'] as const;
 
@@ -26,6 +26,12 @@ export const LIMITS = {
   packageCompressedBytes: 128 * 1024 * 1024,
   packageExpandedBytes: 512 * 1024 * 1024,
   packageEntries: 25_000,
+
+  /** Interactive 3D models. One asset, stored like any other attachment and rendered by
+   *  the core viewer; a capability never ships a renderer of its own. */
+  modelBytes: 64 * 1024 * 1024,
+  modelJsonBytes: 16 * 1024 * 1024,
+  modelNodes: 200_000,
 
   /** Declarative views. */
   viewNodes: 512,
