@@ -17,8 +17,17 @@ import { createHash, generateKeyPairSync, sign as signBytes } from 'node:crypto'
 import { build } from 'esbuild';
 
 const root = path.resolve(import.meta.dirname, '..');
-const marketplace = process.env.NODUS_MARKETPLACE_DIR
-  ?? path.resolve(root, '../../../nodus-research-skill-marketplace');
+// A checkout may be the repository itself or a worktree nested inside it, so the sibling
+// marketplace is found by walking up rather than by counting directories.
+function findMarketplace() {
+  if (process.env.NODUS_MARKETPLACE_DIR) return process.env.NODUS_MARKETPLACE_DIR;
+  for (let current = root; ; current = path.dirname(current)) {
+    const candidate = path.join(path.dirname(current), 'nodus-research-skill-marketplace');
+    if (fs.existsSync(path.join(candidate, '.git'))) return candidate;
+    if (path.dirname(current) === current) return candidate;
+  }
+}
+const marketplace = findMarketplace();
 const packageId = process.argv[2] ?? 'legalize';
 
 if (!fs.existsSync(path.join(marketplace, '.git'))) {
