@@ -136,14 +136,23 @@ try {
 
         stage = 'chat hook';
         if (provider.chat.hooks.prepare) {
-          // A fabricated citation must be refused by the package, not retrieved.
-          const invented = await handle.call('prepareChat', {
-            locale: 'en',
-            question: 'Tell me about contract law.',
-            nodes: [{ id: 'n0', kind: 'fence', fence: provider.chat.requestProtocols[0].fence, content: JSON.stringify({ version: 1, country: 'es', query: 'Ley Inventada 99/2099' }), complete: true }],
-          }, { timeoutMs: 30_000 });
-          assert.ok(invented.some(mutation => mutation.op === 'remove'), 'an ungrounded request is dropped');
-          assert.ok(!invented.some(mutation => mutation.op === 'promote-request'), 'and never promoted to a real call');
+          // What a package decides about a given request is its own business — each one's
+          // tests cover that. What has to hold for every package is that the hook answers
+          // with well-formed mutations, names only its own nodes and its own tools, and
+          // never invents either.
+          const nodes = [
+            { id: 'n0', kind: 'prose', content: 'A question the package did not ask for.', complete: true },
+            { id: 'n1', kind: 'fence', fence: provider.chat.requestProtocols[0].fence, content: '{"version":1}', complete: true },
+          ];
+          const mutations = await handle.call('prepareChat', { locale: 'en', question: 'A question the package did not ask for.', nodes }, { timeoutMs: 30_000 });
+          assert.ok(Array.isArray(mutations), 'prepareChat returns a list of mutations');
+          const ids = new Set(nodes.map(node => node.id));
+          const tools = new Set(provider.tools.map(tool => tool.id));
+          for (const mutation of mutations) {
+            assert.ok(['remove', 'promote-request', 'notice', 'claim'].includes(mutation.op), 'unknown mutation: ' + mutation.op);
+            if (mutation.nodeId) assert.ok(ids.has(mutation.nodeId), 'the hook addressed a node it was not given: ' + mutation.nodeId);
+            if (mutation.op === 'promote-request') assert.ok(tools.has(mutation.toolId), 'the hook named an undeclared tool: ' + mutation.toolId);
+          }
         }
 
         stage = 'permission gating';
