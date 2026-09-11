@@ -124,6 +124,12 @@ try {
       // The application looks for its bundled packages beside its own app path.
       app.setPath('userData', path.join(profiles, 'initial'));
       app.on('window-all-closed', () => {});
+      // A harness that does not look like the application it stands in for would make every
+      // install refuse for a reason that has nothing to do with the packages.
+      if (app.getVersion().split('.')[0] !== '5') {
+        console.error('FAILED: this harness reports version ' + app.getVersion() + ', so no package would install.');
+        app.exit(1);
+      }
 
       let failed = false;
       const check = async (name, body) => {
@@ -443,7 +449,13 @@ try {
   // The worker host looks for its bootstrap beside the built main process, which is where
   // a packaged build puts it.
   fs.copyFileSync(bootstrapBundle, path.join(temporary, 'app', 'capabilityWorkerBootstrap.js'));
-  fs.writeFileSync(path.join(temporary, 'app', 'package.json'), JSON.stringify({ name: 'nodus-migration-e2e', main: 'main.cjs' }));
+  // The version matters: an install refuses a package whose `minNodusVersion` is higher
+  // than the application's, and an app directory with no version of its own does not
+  // report one the same way on every platform.
+  fs.writeFileSync(path.join(temporary, 'app', 'package.json'), JSON.stringify({
+    name: 'nodus-migration-e2e', main: 'main.cjs',
+    version: JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version,
+  }));
 
   const electron = createRequire(import.meta.url)('electron');
   const { stdout } = await promisify(execFile)(electron, [path.join(temporary, 'app')], {
