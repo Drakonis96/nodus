@@ -1,0 +1,177 @@
+// Real Electron verification for the trusted capability worker host: a plugin module is
+// loaded in its own utility process and exercised through the actual protocol. No
+// credentials and no external network.
+//
+// Electron exits 0 on SIGTERM, so a hang would otherwise read as a pass: the child
+// reports through a verdict file, and its absence is the failure.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { createRequire } from 'node:module';
+import { build } from 'esbuild';
+
+const root = path.resolve(import.meta.dirname, '..');
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-capability-worker-host-'));
+
+try {
+  const verdict = path.join(temporary, 'verdict.txt');
+  const bootstrap = path.join(temporary, 'bootstrap.cjs');
+  await build({
+    entryPoints: [path.join(root, 'electron/capabilities/workerBootstrap.ts')],
+    outfile: bootstrap, bundle: true, platform: 'node', format: 'cjs', external: ['electron'], logLevel: 'silent',
+  });
+
+  // A plausible plugin: it only ever talks to the host through the injected proxy.
+  const plugin = path.join(temporary, 'plugin.cjs');
+  fs.writeFileSync(plugin, `
+    module.exports = host => ({
+      async health() { return { status: 'ready', dataVersion: 1 }; },
+      async invoke({ toolId, input }) {
+        if (toolId === 'echo') return { view: { schemaVersion: 1, summary: 'echo', nodes: [{ kind: 'code', text: JSON.stringify(input) }] } };
+        if (toolId === 'store') { await host.storage.state.set('count', input.count); return { view: { schemaVersion: 1, summary: 'stored', nodes: [{ kind: 'code', text: String(await host.storage.state.get('count')) }] } }; }
+        if (toolId === 'cache') { await host.storage.cache.set('blob', 'x'.repeat(input.size)); return { view: { schemaVersion: 1, summary: 'cached', nodes: [{ kind: 'code', text: 'ok' }] } }; }
+        if (toolId === 'reach') { await host.network.fetch(input.endpointId, { path: input.path, method: input.method }); return { view: { schemaVersion: 1, summary: 'reached', nodes: [{ kind: 'code', text: 'ok' }] } }; }
+        if (toolId === 'peek') return { view: { schemaVersion: 1, summary: 'peek', nodes: [{ kind: 'code', text: JSON.stringify({ has: await host.secrets.has('api-key'), keys: Object.keys(host.secrets) }) }] } };
+        if (toolId === 'hang') return new Promise(() => {});
+        if (toolId === 'crash') { process.exit(7); }
+        if (toolId === 'garbage') { process.parentPort.postMessage({ type: 'not-a-real-frame' }); return { view: { schemaVersion: 1, summary: 'survived', nodes: [{ kind: 'code', text: 'ok' }] } }; }
+        throw new Error('Unknown tool: ' + toolId);
+      },
+      async renderArtifact() { return { schemaVersion: 1, summary: 'rendered', nodes: [{ kind: 'code', text: 'artifact' }] }; },
+      async shutdown() {},
+    });
+  `);
+
+  const outfile = path.join(temporary, 'main.cjs');
+  await build({ stdin: { contents: `
+    import { app } from 'electron';
+    import assert from 'node:assert/strict';
+    import fs from 'node:fs';
+    import { CapabilityWorkerHandle } from './electron/capabilities/workerHost';
+    import { createCapabilityHostServices, writeCapabilitySecret } from './electron/capabilities/hostServices';
+
+    app.setPath('userData', ${JSON.stringify(temporary)});
+    app.on('window-all-closed', () => {});
+
+    const manifest = (permissions = {}) => ({
+      schemaVersion: 2, id: 'probe', provides: 'probe-kit:probe', version: '2.0.0', description: 'Probe.',
+      runtime: { kind: 'nodus-trusted-worker-v1', protocol: 1, entry: 'worker.js' }, requires: [],
+      tools: [], artifacts: [], permissions,
+    });
+    const runtimeFor = (permissions = {}) => ({
+      capabilityId: 'probe-kit:probe',
+      plugin: { id: 'probe-kit', version: '2.0.0', digest: 'a'.repeat(64) },
+      manifest: manifest(permissions), entryPath: ${JSON.stringify(plugin)}, permissions,
+    });
+    const handleFor = (permissions = {}, adapters = {}) => new CapabilityWorkerHandle(runtimeFor(permissions), {
+      services: createCapabilityHostServices(adapters), bootstrapPath: ${JSON.stringify(bootstrap)},
+    });
+    const text = result => result.view.nodes[0].text;
+    const failure = async promise => { try { await promise; return 'allowed'; } catch (error) { return error.message; } };
+
+    let stage = 'start';
+    app.whenReady().then(async () => { try {
+      // A plugin ships a module; the bootstrap turns it into a process that speaks the protocol.
+      stage = 'handshake and round trip';
+      const basic = handleFor();
+      assert.deepEqual(await basic.call('health', { nodusVersion: '5.3.2', locale: 'en', platform: process.platform, arch: process.arch, dataVersion: 0 }, { timeoutMs: 10_000 }), { status: 'ready', dataVersion: 1 });
+      assert.equal(text(await basic.call('invoke', { invocationId: 'i1', toolId: 'echo', input: { a: 1 }, locale: 'en' }, { timeoutMs: 10_000 })), '{"a":1}');
+      assert.equal(basic.alive, true);
+
+      // A method the module never implemented is an error the caller can act on.
+      stage = 'unimplemented method';
+      assert.match(await failure(basic.call('migrate', { fromDataVersion: 0, toDataVersion: 1 }, { timeoutMs: 5_000 })), /does not implement migrate/);
+
+      // A frame the host cannot parse is dropped; the call in flight still completes.
+      stage = 'malformed frame';
+      assert.equal(text(await basic.call('invoke', { invocationId: 'i2', toolId: 'garbage', input: {}, locale: 'en' }, { timeoutMs: 10_000 })), 'ok');
+      await basic.stop();
+
+      // Storage is namespaced, quota'd by the host and refused when undeclared.
+      stage = 'storage';
+      const stored = handleFor({ storage: { stateBytes: 4096, cacheBytes: 64, tempBytes: 0 } });
+      assert.equal(text(await stored.call('invoke', { invocationId: 'i3', toolId: 'store', input: { count: 7 }, locale: 'en' }, { timeoutMs: 10_000 })), '7');
+      assert.match(await failure(stored.call('invoke', { invocationId: 'i4', toolId: 'cache', input: { size: 4096 }, locale: 'en' }, { timeoutMs: 10_000 })), /storage quota exceeded/);
+      await stored.stop();
+
+      stage = 'storage without permission';
+      const unstored = handleFor();
+      assert.match(await failure(unstored.call('invoke', { invocationId: 'i5', toolId: 'store', input: { count: 1 }, locale: 'en' }, { timeoutMs: 10_000 })), /storage is not permitted/);
+      await unstored.stop();
+
+      // The network allowlist is the manifest's, not the request's.
+      stage = 'network allowlist';
+      const net = handleFor({ network: [{ id: 'api', origin: 'https://example.com', pathPrefixes: ['/v1/'], methods: ['GET'], maxResponseBytes: 65536, timeoutMs: 5000 }] });
+      assert.match(await failure(net.call('invoke', { invocationId: 'i6', toolId: 'reach', input: { endpointId: 'other', path: '/v1/x' }, locale: 'en' }, { timeoutMs: 10_000 })), /endpoint is not permitted/);
+      assert.match(await failure(net.call('invoke', { invocationId: 'i7', toolId: 'reach', input: { endpointId: 'api', path: '/admin' }, locale: 'en' }, { timeoutMs: 10_000 })), /exceeds its permission/);
+      assert.match(await failure(net.call('invoke', { invocationId: 'i8', toolId: 'reach', input: { endpointId: 'api', path: '/v1/x', method: 'DELETE' }, locale: 'en' }, { timeoutMs: 10_000 })), /method is not permitted/);
+      await net.stop();
+
+      stage = 'private hosts stay unreachable';
+      const local = handleFor({ network: [{ id: 'local', origin: 'https://localhost', pathPrefixes: ['/'], methods: ['GET'], maxResponseBytes: 65536, timeoutMs: 5000 }] });
+      assert.match(await failure(local.call('invoke', { invocationId: 'i9', toolId: 'reach', input: { endpointId: 'local', path: '/' }, locale: 'en' }, { timeoutMs: 10_000 })), /not public/);
+      await local.stop();
+
+      // A worker learns that a credential exists. It never gets a way to read one.
+      stage = 'secrets are never handed to the worker';
+      const secretPermissions = {
+        network: [{ id: 'api', origin: 'https://example.com', pathPrefixes: ['/v1/'], methods: ['GET'], maxResponseBytes: 65536, timeoutMs: 5000 }],
+        secrets: [{ id: 'api-key', label: 'API key', required: true, injection: { kind: 'header', endpointId: 'api', header: 'Authorization', prefix: 'Bearer ' } }],
+      };
+      writeCapabilitySecret('probe-kit', 'probe', 'api-key', 'sk-live-not-a-real-key');
+      const secret = handleFor(secretPermissions);
+      const peeked = JSON.parse(text(await secret.call('invoke', { invocationId: 'i10', toolId: 'peek', input: {}, locale: 'en' }, { timeoutMs: 10_000 })));
+      assert.equal(peeked.has, true, 'the worker can ask whether a credential is configured');
+      assert.deepEqual(peeked.keys.sort(), ['delete', 'has', 'store'], 'and that is the whole secrets surface it is given');
+      await secret.stop();
+
+      // A worker past its deadline is cancelled, then killed; pending calls never dangle.
+      stage = 'deadline';
+      const slow = handleFor();
+      const started = Date.now();
+      assert.match(await failure(slow.call('invoke', { invocationId: 'i11', toolId: 'hang', input: {}, locale: 'en' }, { timeoutMs: 1_000 })), /exceeded 1 seconds/);
+      assert.ok(Date.now() - started < 10_000, 'the deadline is enforced by the host, not by the worker');
+      await new Promise(resolve => setTimeout(resolve, 3_000));
+      assert.equal(slow.alive, false, 'a worker that ignores cancel is terminated after the grace period');
+
+      // And the capability is not poisoned by it: the next call gets a fresh process.
+      stage = 'restart after termination';
+      assert.equal(text(await slow.call('invoke', { invocationId: 'i12', toolId: 'echo', input: { again: true }, locale: 'en' }, { timeoutMs: 10_000 })), '{"again":true}');
+      await slow.stop();
+
+      // An explicit cancellation surfaces as an AbortError, not as a generic failure.
+      stage = 'cancellation';
+      const cancelled = handleFor();
+      const controller = new AbortController();
+      const pending = cancelled.call('invoke', { invocationId: 'i13', toolId: 'hang', input: {}, locale: 'en' }, { timeoutMs: 30_000, signal: controller.signal });
+      setTimeout(() => controller.abort(), 200);
+      await assert.rejects(pending, error => error.name === 'AbortError');
+      await cancelled.stop();
+
+      // A crashed worker rejects what was in flight rather than leaving it unresolved.
+      stage = 'crash';
+      const crashing = handleFor();
+      assert.match(await failure(crashing.call('invoke', { invocationId: 'i14', toolId: 'crash', input: {}, locale: 'en' }, { timeoutMs: 10_000 })), /exited \\(code 7\\)/);
+      assert.equal(crashing.alive, false);
+      assert.equal(text(await crashing.call('invoke', { invocationId: 'i15', toolId: 'echo', input: { recovered: true }, locale: 'en' }, { timeoutMs: 10_000 })), '{"recovered":true}');
+      await crashing.stop();
+
+      fs.writeFileSync(${JSON.stringify(verdict)}, 'pass');
+      app.exit(0);
+    } catch (error) {
+      console.error('FAILED at ' + stage + ': ' + (error && error.stack || error));
+      app.exit(1);
+    } });
+  `, resolveDir: root, loader: 'ts' }, outfile, bundle: true, platform: 'node', format: 'cjs', external: ['electron'], logLevel: 'silent',
+    plugins: [{ name: 'shared-alias', setup(api) { api.onResolve({ filter: /^@shared\// }, ({ path: value }) => ({ path: path.join(root, 'shared', `${value.slice(8)}.ts`) })); } }],
+  });
+
+  const electron = createRequire(import.meta.url)('electron');
+  await promisify(execFile)(electron, [outfile], { env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' } });
+  if (fs.readFileSync(verdict, 'utf8') !== 'pass') throw new Error('The capability worker host verification did not report a pass.');
+  console.log('CAPABILITY WORKER HOST PASS: handshake, host-call gating, storage quota, network allowlist, secret isolation, deadline, cancellation, crash recovery.');
+} finally {
+  fs.rmSync(temporary, { recursive: true, force: true });
+}

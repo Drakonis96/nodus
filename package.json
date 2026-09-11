@@ -27,7 +27,7 @@
     "build:server-web": "vite build --config vite.server-web.config.ts",
     "pretest": "node scripts/prepare-electron-tests.mjs",
     "test": "node --test scripts/test-*.mjs",
-    "test:skill-capabilities": "node --test scripts/test-capability-api-v2.mjs scripts/test-skill-capabilities.mjs scripts/test-chat-skills.mjs scripts/test-skill-marketplace.mjs scripts/test-skill-capability-matrix.mjs scripts/test-chat-skills-surfaces.mjs && node scripts/verify-skill-capability-sandbox.mjs && node scripts/verify-marketplace-plugin-install.mjs && node scripts/verify-skill-tool-sandbox.mjs",
+    "test:skill-capabilities": "node --test scripts/test-capability-api-v2.mjs scripts/test-skill-capabilities.mjs scripts/test-chat-skills.mjs scripts/test-skill-marketplace.mjs scripts/test-skill-capability-matrix.mjs scripts/test-chat-skills-surfaces.mjs && node scripts/verify-skill-capability-sandbox.mjs && node scripts/verify-capability-worker-host.mjs && node scripts/verify-marketplace-plugin-install.mjs && node scripts/verify-skill-tool-sandbox.mjs",
     "test:cloudflare": "node --test scripts/test-cloudflare-contract.mjs",
     "blog:pages": "node scripts/build-blog-pages.mjs",
     "blog:feed": "node scripts/build-blog-feed.mjs",

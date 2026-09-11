@@ -341,6 +341,8 @@ export default defineConfig({
       vectorScanWorkerBuild,
       utilityBuild('backupUtilityWorker', 'electron/export/backupUtilityWorker.ts'),
       utilityBuild('chemistryValidationWorker', 'electron/chemistryValidationWorker.ts'),
+      // One bootstrap for every trusted capability: a plugin ships a module, not a process.
+      utilityBuild('capabilityWorkerBootstrap', 'electron/capabilities/workerBootstrap.ts'),
       utilityBuild('recoveryProbeUtilityWorker', 'electron/recovery/recoveryProbeUtilityWorker.ts'),
       utilityBuild('migrationRecoveryUtilityWorker', 'electron/db/migrationRecoveryUtilityWorker.ts'),
       utilityBuild('serverPublishWorker', 'electron/serverSync/serverPublishWorker.ts'),
