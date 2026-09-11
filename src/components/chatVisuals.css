@@ -41,3 +41,12 @@
 .chat-visual-modal { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 .chat-visual-modal button { font: inherit; color: inherit; background: transparent; cursor: pointer; }
 .chat-visual-modal button:disabled { opacity: .4; cursor: default; }
+
+.chat-chem-notice { display: flex; align-items: flex-start; gap: 10px; padding: 11px 14px; margin: 14px 0; border: 1px solid; border-radius: 12px; font-size: 12px; line-height: 1.45; }
+.chat-chem-notice>svg { flex: 0 0 auto; margin-top: 1px; }
+.chat-chem-notice>div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.chat-chem-notice small { font-size: 11px; opacity: .72; overflow-wrap: anywhere; }
+.chat-chem-notice-warn { border-color: #f59e0b4a; background: #f59e0b12; color: #fcd34d; }
+.chat-chem-notice-info { border-color: #818cf83a; background: #6366f112; color: #a5b4fc; }
+:is(.light, .nodi-theme-light) .chat-chem-notice-warn { color: #92400e; background: #f59e0b18; }
+:is(.light, .nodi-theme-light) .chat-chem-notice-info { color: #4338ca; background: #6366f110; }

@@ -8,7 +8,9 @@ export function ChatChemistryDocument({ source }: { source: string }) {
   try {
     if (source.length > 2_000_000) throw new Error();
     document = JSON.parse(source);
-    if (!document || document.version !== 2 || document.status !== 'verified' || document.scope !== 'reference-graph-and-molfile-roundtrip'
+    if (!document || document.version !== 2
+      || !(document.status === 'verified' && document.scope === 'reference-graph-and-molfile-roundtrip'
+        || document.status === 'partial' && document.scope === 'graph-valid-validation-incomplete')
       || !Array.isArray(document.species) || document.species.length < 1 || document.species.length > (document.reaction ? 12 : 4)
       || document.species.some(s => !s || !s.input || typeof s.input.value !== 'string' || typeof s.svg !== 'string' || !Array.isArray(s.references)
         || s.references.some(ref => !ref || !['user', 'opsin', 'pubchem'].includes(ref.provider)))
@@ -42,27 +44,31 @@ export function ChatChemistryDocument({ source }: { source: string }) {
   const mechanism = document.mechanism;
   const reaction = document.reaction;
   const mechanismTitle = (rule: string) => ({ sn2: t("SN2: mecanismo condicional"), e2: t("E2: alternativas anti-periplanares"), aldol: t("Adición aldólica: mecanismo por etapas"), 'diels-alder': t("Diels–Alder: cicloadición suprafacial"), 'amide-resonance': t("Contribuyentes de resonancia de amida") }[rule] ?? t("Mecanismo químico"));
+  // A partial document is drawn by the same renderer, so only the badge may claim
+  // less: never let a partially validated drawing wear a "checked" label.
+  const partial = document.status === 'partial';
+  const provenance = (checked: string) => partial ? t("Grafo válido; verificación incompleta") : checked;
   return <section aria-label="Chemistry Studio" className="space-y-3">
     {reaction && <div>
-      <ChatVisual svg={reaction.svg} alt={t("Esquema balanceado; mecanismo no verificado")} kindLabel="Chemistry Studio" provenanceLabel={t("Esquema balanceado; mecanismo no verificado")} />
+      <ChatVisual svg={reaction.svg} alt={t("Esquema balanceado; mecanismo no verificado")} kindLabel="Chemistry Studio" provenanceLabel={provenance(t("Esquema balanceado; mecanismo no verificado"))} />
       {reaction.limitations.map((text, i) => <p key={i}>{text}</p>)}
       {chemfigButton(reaction.chemfig)}
     </div>}
     {mechanism && typeof mechanism.svg === 'string' && Array.isArray(mechanism.limitations) && <div>
-      {!mechanism.panels && <ChatVisual svg={mechanism.svg} alt={mechanismTitle(mechanism.rule)} kindLabel="Chemistry Studio" provenanceLabel={t("Regla y balance contrastados")} />}
+      {!mechanism.panels && <ChatVisual svg={mechanism.svg} alt={mechanismTitle(mechanism.rule)} kindLabel="Chemistry Studio" provenanceLabel={provenance(t("Regla y balance contrastados"))} />}
       {mechanism.limitations.map((text, i) => <p key={i}>{text}</p>)}
       {/^https:\/\/openstax\.org\/books\/organic-chemistry\/pages\//.test(mechanism.source) && <p><a href={mechanism.source} target="_blank" rel="noreferrer">{t("Fundamento de la regla")}</a></p>}
       {chemfigButton(mechanism.chemfig)}
       {mechanism.panels?.map((panel, i) => <div key={i}>
         <p>{panel.title ?? t('Panel {number}').replace('{number}', String(i + 1))}</p>
-        <ChatVisual svg={panel.svg} alt={panel.title ?? t('Panel {number}').replace('{number}', String(i + 1))} kindLabel="Chemistry Studio" provenanceLabel={t("Etapa o alternativa contrastada")} />
+        <ChatVisual svg={panel.svg} alt={panel.title ?? t('Panel {number}').replace('{number}', String(i + 1))} kindLabel="Chemistry Studio" provenanceLabel={provenance(t("Etapa o alternativa contrastada"))} />
         {chemfigButton(panel.chemfig)}
       </div>)}
     </div>}
     {document.species.map((species, i) => <div key={i}>
       {reaction && <p>{reaction.species[i].coefficient} × {species.input.value} ({reaction.species[i].role === 'reactant' ? t("Reactivo") : reaction.species[i].role === 'product' ? t("Producto") : t("Agente; excluido del balance")})</p>}
       {!mechanism && !reaction && <>
-      <ChatVisual svg={species.svg} alt={species.input.value} kindLabel="Chemistry Studio" provenanceLabel={t("Grafo contrastado")} />
+      <ChatVisual svg={species.svg} alt={species.input.value} kindLabel="Chemistry Studio" provenanceLabel={provenance(t("Grafo contrastado"))} />
       {species.depiction && species.depiction !== 'skeletal' && <p>{species.depiction === 'newman' ? species.projection?.convention : species.depiction === 'fischer' ? t("Fischer: enlaces horizontales hacia el observador; verticales hacia atrás.") : t("Haworth: sustituyentes verticales por encima o por debajo del plano idealizado del anillo.")}</p>}
       {chemfigButton(species.chemfig)}
       </>}

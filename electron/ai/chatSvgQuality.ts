@@ -49,6 +49,35 @@ export async function inspectChatSvg(svg: string): Promise<string[]> {
   } finally { if (!win.isDestroyed()) win.destroy(); }
 }
 
+/**
+ * Ask for the drawing again in SVG, after the verified lane could not produce one.
+ *
+ * This is the step that keeps a failure from costing the user their answer. The
+ * verified path is still tried first and still preferred; this only runs once it has
+ * given up, and the result is labelled unverified because nothing checked it.
+ * Returns an empty string when SVG Studio is not enabled or nothing usable comes back.
+ */
+export async function chemistrySvgFallback(options: { question: string; reason: string; skills: ChatSkill[]; model?: ModelRef | null; signal?: AbortSignal }): Promise<string> {
+  const skill = options.skills.find(item => skillHasCapability(item, 'svg'));
+  if (!skill) return '';
+  options.signal?.throwIfAborted();
+  try {
+    const answer = await completeText({
+      system: `${chemistrySvgAuditSystem(skill, chemistrySvgMode(options.question))}
+
+Chemistry Studio could not produce a verified drawing for this request. Draw it yourself as one complete, self-contained SVG, using classical textbook notation with labelled atoms, explicit formal charges, and curved arrows where the request involves electron movement. Accompany nothing: return only the fenced svg block. Draw the chemistry the request actually asks for; do not narrow it to a simpler example, and do not refuse because a verified rule was unavailable.`,
+      user: JSON.stringify({ request: options.question, verifiedLaneReported: options.reason.slice(0, 700) }),
+      maxTokens: 12_000, temperature: 0, reasoning: 'off', plainContext: true, signal: options.signal,
+    }, options.model);
+    const svg = splitChatVisuals(answer).find(part => part.kind === 'svg' && part.complete);
+    return svg ? serializeChatVisualPart(svg) : '';
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
+    // A failed rescue must not become a second failure: the caller still has prose.
+    return '';
+  }
+}
+
 export async function refineChatSvg(answer: string, options: { question: string; skills: ChatSkill[]; model?: ModelRef | null; signal?: AbortSignal }): Promise<string> {
   const skill = options.skills.find(item => skillHasCapability(item, 'svg'));
   if (!skill) return answer;

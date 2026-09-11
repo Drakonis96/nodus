@@ -17,6 +17,8 @@ export interface CheckedMechanism {
   limitations: string[];
   title?: string;
   geometry?: { description: string; molfile3D: string; dihedralDegrees?: number };
+  /** Contributors of one species rather than a transformation; drawn with a double-headed arrow. */
+  resonance?: boolean;
 }
 
 function inventory(scene: ChemicalScene, kit: RDKitModule): Record<string, number> {
