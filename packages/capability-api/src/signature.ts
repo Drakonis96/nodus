@@ -83,19 +83,26 @@ export function verifyReleaseManifest(
   return parsed;
 }
 
-/** Second half of the check: the bytes actually downloaded are the ones the manifest
- *  pinned, and the package inside agrees about who it is. */
+/** The bytes actually downloaded are the ones the manifest pinned. This runs before the
+ *  archive is opened: a substituted download must be refused by its digest, not by
+ *  whatever the decompressor happens to say about a corrupt stream. */
+export function assertArchiveMatchesRelease(release: PluginReleaseManifest, target: PluginTarget, archive: Uint8Array): ReleaseTarget {
+  const entry = release.targets.find(candidate => candidate.target === target);
+  if (!entry) throw new Error(`The release has no ${target} package.`);
+  if (archive.byteLength !== entry.bytes) throw new Error('Downloaded package size does not match the signed manifest.');
+  if (sha256Hex(archive) !== entry.sha256) throw new Error('Downloaded package digest does not match the signed manifest.');
+  return entry;
+}
+
+/** Second half of the check, once the archive is open: the package inside agrees about
+ *  who it is, which version it is and who published it. */
 export function assertPackageMatchesRelease(
   release: PluginReleaseManifest,
   target: PluginTarget,
   archive: Uint8Array,
   inner: PluginManifestV2,
 ): ReleaseTarget {
-  const entry = release.targets.find(candidate => candidate.target === target);
-  if (!entry) throw new Error(`The release has no ${target} package.`);
-  if (archive.byteLength !== entry.bytes) throw new Error('Downloaded package size does not match the signed manifest.');
-  const digest = sha256Hex(archive);
-  if (digest !== entry.sha256) throw new Error('Downloaded package digest does not match the signed manifest.');
+  const entry = assertArchiveMatchesRelease(release, target, archive);
   if (inner.id !== release.plugin) throw new Error('Package identifier does not match the signed manifest.');
   if (inner.version !== release.version) throw new Error('Package version does not match the signed manifest.');
   if (inner.publisher.id !== release.publisher.id || inner.publisher.keyId !== release.publisher.keyId) throw new Error('Package publisher does not match the signed manifest.');
