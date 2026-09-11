@@ -9,7 +9,11 @@
 // all three, none at all — and then the ways the move fails, because a migration that
 // cannot finish must leave the skill the user had, a reason, and something to retry.
 //
-// Electron exits 0 on SIGTERM, so the child reports through a verdict file.
+// Electron's exit code says nothing useful in either direction: it exits 0 on SIGTERM, so a
+// hang would look like a pass, and on Windows it exits non-zero after a perfectly clean run
+// (`PostQueuedCompletionStatus: The handle is invalid`), so a pass would look like a
+// failure. The child therefore reports through a verdict file, and the verdict is what
+// decides here — a missing one is a failure, which is what a crash or a hang produces.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -481,12 +485,21 @@ try {
   }));
 
   const electron = createRequire(import.meta.url)('electron');
-  const { stdout } = await promisify(execFile)(electron, [path.join(temporary, 'app')], {
+  const run = await promisify(execFile)(electron, [path.join(temporary, 'app')], {
     env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' },
     maxBuffer: 16 * 1024 * 1024,
-  });
-  console.log(stdout);
-  if (fs.readFileSync(verdict, 'utf8') !== 'pass') throw new Error('The migration verification did not report a pass.');
+  }).catch(error => error);
+  console.log(run.stdout ?? '');
+
+  // Read after the run either way. Nothing is written unless every scenario passed, so this
+  // cannot turn a real failure into a pass; it only stops the exit code from overruling a
+  // verdict the child already reported.
+  const reported = fs.existsSync(verdict) ? fs.readFileSync(verdict, 'utf8') : '';
+  if (reported !== 'pass') {
+    const detail = run.code !== undefined ? ` The child exited with ${run.code}.` : '';
+    console.error(run.stderr ?? '');
+    throw new Error(`The migration verification did not report a pass.${detail}`);
+  }
   console.log('CAPABILITY MIGRATION PASS: clean install, each discipline alone, all three, pre-library profile, adoption of legacy data, refusal of a wrong key, a tampered archive and a corrupt package, offline and online sources, interruption and retry, recovery at the next launch, rollback and removal.');
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

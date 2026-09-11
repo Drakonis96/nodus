@@ -66,7 +66,7 @@ function install(id, network = [{ origin: 'https://iiif.example.org', methods: [
 
 const reset = () => { globalThis.__installed.clear(); globalThis.__runtimes.clear(); };
 const allowed = (overrides = {}) => assertTileRequestAllowed({ capabilityId: 'x:tiles', service: SERVICE, path: TILE, ...overrides });
-const refused = (overrides, hint) => assert.rejects(() => allowed(overrides), hint);
+const refused = (overrides, hint, because) => assert.rejects(() => allowed(overrides), hint, because ?? JSON.stringify(overrides));
 
 test('a tile is fetched only for a capability that is installed now', async () => {
   reset();
