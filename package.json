@@ -146,7 +146,8 @@
     "test:radar": "node --test scripts/test-radar.mjs",
     "test:e2e:radar": "npm run build && node scripts/e2e-radar.mjs",
     "test:e2e:compass": "npm run build && node scripts/e2e-compass.mjs",
-    "capabilities:bootstrap": "node scripts/prepare-capability-bootstrap.mjs"
+    "capabilities:bootstrap": "node scripts/prepare-capability-bootstrap.mjs",
+    "verify:cross-repo": "node scripts/verify-cross-repo.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

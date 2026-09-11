@@ -82,3 +82,45 @@ jobs:
       - name: Argument map E2E (isolated demonstration profile)
         timeout-minutes: 5
         run: npm run test:e2e:argument-map
+
+  # Capability API v2 is a contract split across two repositories, and everything that can
+  # drift between them fails silently in both. This job checks them against each other:
+  # the shared contract, the trusted keys, the catalog, a reproducible build of the real
+  # packages, and installing them — signed with a key generated for the run — through the
+  # application's own store. It is a separate required job rather than a step, so the
+  # marketplace checkout is visibly part of the gate rather than an optional extra.
+  cross-repo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout Nodus
+        uses: actions/checkout@v7
+
+      # The marketplace's own checkout: the verification refuses to run without one, and
+      # never falls back to whatever happens to be next to it on someone's machine.
+      - name: Checkout the marketplace
+        uses: actions/checkout@v7
+        with:
+          repository: NodusResearch/nodus-research-skill-marketplace
+          ref: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.head_ref || 'main' }}
+          path: .marketplace
+          # A branch that exists only in Nodus is not an error: the default branch of the
+          # marketplace is what a released Nodus installs from.
+          fetch-depth: 1
+        continue-on-error: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Both repositories agree, and a signed package installs
+        env:
+          # Present when the step above found a matching branch; absent otherwise, and the
+          # verification clones the marketplace itself rather than skipping.
+          NODUS_MARKETPLACE_DIR: ${{ hashFiles('.marketplace/plugins/**') != '' && format('{0}/.marketplace', github.workspace) || '' }}
+        run: npm run verify:cross-repo

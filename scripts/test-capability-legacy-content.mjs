@@ -190,3 +190,46 @@ test('a finished legacy block is a result, and a claimed request fence is still 
   assert.match(roundTripped, /```genomics-result\nnodus-genomics:\/\/chat\/x\/y\n```/);
   assert.match(roundTripped, /```genomics-plan\n/);
 });
+
+// ------------------------------------------------ what a release build must carry
+
+test('the release build bundles the capability packages before it packages the application', () => {
+  const workflow = fs.readFileSync(path.join(root, '.github/workflows/release-build.yml'), 'utf8');
+
+  const bootstrap = workflow.indexOf('npm run capabilities:bootstrap');
+  const packaging = workflow.indexOf('electron-builder ${{ matrix.platform }}');
+  assert.ok(bootstrap !== -1, 'the release build never assembles the capability bootstrap');
+  assert.ok(packaging !== -1, 'the release build no longer packages the application');
+  assert.ok(bootstrap < packaging, 'the bootstrap must be assembled before the application is packaged, or it is packaged empty');
+
+  // An upgrade from 5.3.1 has to work with no network, so a build that could not carry
+  // the packages fails here rather than shipping and discovering it on a train.
+  assert.match(workflow.slice(bootstrap - 300, bootstrap), /NODUS_REQUIRE_BOOTSTRAP: '1'/);
+
+  // And what it bundles is what the application looks for.
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  assert.ok(
+    manifest.build.extraResources.some(entry => entry.from === 'build/capability-bootstrap' && entry.to === 'capability-bootstrap'),
+    'the packaged application does not carry the bootstrap directory',
+  );
+});
+
+test('the bootstrap pins exactly the packages the migration can need', () => {
+  const bootstrap = JSON.parse(fs.readFileSync(path.join(root, 'electron/capabilities/bootstrap.json'), 'utf8'));
+  assert.deepEqual(
+    bootstrap.packages.map(entry => entry.id).sort(),
+    ['alphagenome', 'chemistry-studio', 'legalize'],
+  );
+  for (const entry of bootstrap.packages) {
+    // Until a release exists the entry carries no URL and no assets; once it does, both
+    // are required, because a pinned release with nothing pinned is not pinned.
+    if (entry.releaseUrl === null) { assert.deepEqual(entry.assets, []); continue; }
+    assert.match(entry.releaseUrl, /^https:\/\/github\.com\/NodusResearch\/[^/]+\/releases\/download\//);
+    assert.ok(entry.assets.length, `${entry.id} names a release but pins no asset`);
+    for (const asset of entry.assets) {
+      assert.match(asset.sha256, /^[a-f0-9]{64}$/);
+      assert.ok(Number.isInteger(asset.bytes) && asset.bytes > 0);
+      assert.match(asset.asset, /\.nodus-plugin$/);
+    }
+  }
+});
