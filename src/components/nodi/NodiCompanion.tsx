@@ -1,4 +1,5 @@
 import { ChatMarkdown } from '../ChatMarkdown';
+import { ChatAbortedNotice } from '../ChatAbortedNotice';
 import { ChatSkillsControl } from '../ChatSkillsControl';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { deriveNodiNoteTitle } from '@shared/nodiNotes';
@@ -182,6 +183,12 @@ export function NodiCompanion({
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [chatTool, setChatTool] = useState<'none' | 'history' | 'contexts' | 'settings'>('none');
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
+  // Index of the assistant message the user stopped. Its partial text stays and the
+  // red notice renders under it instead of replacing the whole answer.
+  const [stoppedMessageIndex, setStoppedMessageIndex] = useState<number | null>(null);
+  // Set by the stop button and read when the stream settles, so a cancellation that
+  // still rejects is not mistaken for a genuine generation failure.
+  const stopRequestedRef = useRef(false);
   // The source detail opened from an inline citation in an answer (idea/work/passage/…).
   const [citation, setCitation] = useState<MarkdownCitation | null>(null);
   const [nodiModel, setNodiModel] = useState<ModelRef | null>(null);
@@ -788,6 +795,7 @@ export function NodiCompanion({
     setActiveConversationId(null);
     setMessages([]);
     setInput('');
+    setStoppedMessageIndex(null);
     setQuotedSelection(null);
     setCopiedMessageIndex(null);
     setChatTool('none');
@@ -798,6 +806,7 @@ export function NodiCompanion({
     if (streaming) return;
     setActiveConversationId(conversation.id);
     setMessages(conversation.messages);
+    setStoppedMessageIndex(null);
     setQuotedSelection(null);
     setContexts(conversation.contexts);
     setNodiModel(conversation.model ?? settings?.nodiModel ?? settings?.synthesisModel ?? null);
@@ -852,6 +861,8 @@ export function NodiCompanion({
       ? `> ${quotation.replace(/\n/g, '\n> ')}\n\n${question}`
       : question;
     const next: NodiChatMessage[] = [...messages, { role: 'user', content: text }];
+    stopRequestedRef.current = false;
+    setStoppedMessageIndex(null);
     setMessages([...next, { role: 'assistant', content: '' }]);
     // Bring the new question and the beginning of Nodi's answer into view once.
     // From here on the scroll position stays fixed while streaming deltas arrive.
@@ -884,10 +895,17 @@ export function NodiCompanion({
       );
       assistantText = answer || assistantText;
     } catch (err) {
-      assistantText ||= `⚠️ ${err instanceof Error ? errorText(err) : t('No se pudo responder.')}`;
+      // A user-triggered stop keeps the partial answer; only a genuine failure
+      // gets the warning line.
+      if (!stopRequestedRef.current) assistantText ||= `⚠️ ${err instanceof Error ? errorText(err) : t('No se pudo responder.')}`;
     } finally {
-      const finalMessages: NodiChatMessage[] = [...next, { role: 'assistant', content: assistantText }];
+      // A stop with nothing streamed yet leaves no answer to show: drop the empty
+      // placeholder instead of persisting an empty assistant turn.
+      const finalMessages: NodiChatMessage[] = assistantText.trim() || !stopRequestedRef.current
+        ? [...next, { role: 'assistant', content: assistantText }]
+        : next;
       setMessages(finalMessages);
+      if (stopRequestedRef.current && assistantText.trim()) setStoppedMessageIndex(finalMessages.length - 1);
       if (conversationId) {
         await window.nodus.saveNodiConversation({ id: conversationId, messages: finalMessages, contexts, model: nodiModel }).catch(() => undefined);
       }
@@ -1183,6 +1201,7 @@ export function NodiCompanion({
                       />
                     ) : m.content.startsWith('> ') ? <Markdown content={m.content} verify={false} /> : m.content
                     : streaming && i === messages.length - 1 ? <ChatTypingIndicator label={t('escribiendo…')} /> : ''}
+                  {m.role === 'assistant' && i === stoppedMessageIndex && m.content.trim() ? <ChatAbortedNotice /> : null}
                 </div>
               ))}
             </div>
@@ -1210,7 +1229,7 @@ export function NodiCompanion({
                   }}
                 />
                 {streaming ? (
-                  <button className="nodi-chat-send" onClick={() => window.nodus.cancelNodiChat()} title={t('Detener')}>■</button>
+                  <button className="nodi-chat-send" onClick={() => { stopRequestedRef.current = true; void window.nodus.cancelNodiChat(); }} title={t('Detener')}>■</button>
                 ) : (
                   <button className="nodi-chat-send" onClick={() => void send()} disabled={!input.trim()} title={t('Enviar')}>
                     <IconSend />

@@ -8653,4 +8653,5 @@ export const EN: Record<string, string> = {
   "Usa un número entero de palabras, sin decimales.": "Use a whole number of words, no decimals.",
   "El mínimo son {min} palabras por sección.": "The minimum is {min} words per section.",
   "El máximo son {max} palabras por sección.": "The maximum is {max} words per section.",
+  "Solicitud cancelada por el usuario.": "User aborted the request.",
 };

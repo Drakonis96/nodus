@@ -294,10 +294,15 @@ export async function streamWorldChat(
     facts.citable.map((ref) => `${ref.kind}:${ref.id}`)
   );
   const validated = transformChatProse(raw, prose => validateCitations(prose, allowed));
+  const repaired = ensureWorldCitations(validated, facts.citable, language);
+  // A user-triggered stop keeps the partial answer: running the skill tools now would
+  // throw an AbortError and discard everything that already streamed.
+  const aborted = Boolean(signal?.aborted);
   return {
-    text: await executeChatSkills(ensureWorldCitations(validated, facts.citable, language), { skills, owner, version, model, question: request.question, isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getWorldChatConversation(request.conversationId)) }, signal),
+    text: aborted ? repaired : await executeChatSkills(repaired, { skills, owner, version, model, question: request.question, isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getWorldChatConversation(request.conversationId)) }, signal),
     focus: facts.focus,
     noMaterial: false,
+    ...(aborted ? { aborted: true } : {}),
   };
 }
 

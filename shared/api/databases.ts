@@ -226,7 +226,7 @@ export interface DatabasesApi {
     options: import('../databaseDeepResearch').DatabaseDeepResearchExportOptions,
   ): Promise<{ canceled: boolean; path: string | null }>;
   onDatabaseDeepResearchProgress(cb: (progress: DatabaseResearchProgress) => void): () => void;
-  dbChatStream(request: DatabaseChatRequest, handlers: { onDelta: (delta: string) => void }): Promise<{ text: string }>;
+  dbChatStream(request: DatabaseChatRequest, handlers: { onDelta: (delta: string) => void }): Promise<{ text: string; aborted?: boolean }>;
   cancelDbChat(): Promise<void>;
   listDatabaseChatConversations(): Promise<DatabaseChatConversationSummary[]>;
   getDatabaseChatConversation(id: string): Promise<DatabaseChatConversation | null>;

@@ -1,4 +1,5 @@
 import { ChatSkillsControl } from '../components/ChatSkillsControl';
+import { ChatAbortedNotice } from '../components/ChatAbortedNotice';
 import { ChatMarkdown } from '../components/ChatMarkdown';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/ui';
@@ -47,6 +48,12 @@ export function DatabasesChatView({ initialDatabaseId }: { initialDatabaseId: st
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState('');
   const [busy, setBusy] = useState(false);
+  // Set by the stop button and read when the stream settles, so a cancellation that
+  // still rejects is not mistaken for a genuine generation failure. The refs mirror
+  // the streamed text and the stop request for the async callback and the catch.
+  const [stoppedIndex, setStoppedIndex] = useState<number | null>(null);
+  const stopRequestedRef = useRef(false);
+  const streamingRef = useRef('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const refreshHistory = useCallback(async () => setHistory(await window.nodus.listDatabaseChatConversations()), []);
@@ -75,11 +82,11 @@ export function DatabasesChatView({ initialDatabaseId }: { initialDatabaseId: st
     localStorage.setItem('nodus.databaseChatHistoryOpen', open ? '0' : '1');
     return !open;
   });
-  const resetChat = () => { if (busy) return; setConversationId(null); setConversationTitle(null); setMessages([]); setStreaming(''); setInput(''); };
+  const resetChat = () => { if (busy) return; setConversationId(null); setConversationTitle(null); setMessages([]); setStreaming(''); streamingRef.current = ''; setStoppedIndex(null); setInput(''); };
   const openConversation = async (id: string) => {
     if (busy) return;
     const conversation = await window.nodus.getDatabaseChatConversation(id); if (!conversation) return;
-    setConversationId(conversation.id); setConversationTitle(conversation.title); setMessages(conversation.messages); setSelected(new Set(conversation.databaseIds)); setStreaming(''); setInput('');
+    setConversationId(conversation.id); setConversationTitle(conversation.title); setMessages(conversation.messages); setSelected(new Set(conversation.databaseIds)); setStreaming(''); streamingRef.current = ''; setStoppedIndex(null); setInput('');
   };
   const removeConversation = async () => {
     if (!pendingDelete) return;
@@ -94,6 +101,9 @@ export function DatabasesChatView({ initialDatabaseId }: { initialDatabaseId: st
     setInput('');
     setBusy(true);
     setStreaming('');
+    streamingRef.current = '';
+    stopRequestedRef.current = false;
+    setStoppedIndex(null);
     let activeId = conversationId;
     if (!activeId) {
       const created = await window.nodus.createDatabaseChatConversation({ title: q.slice(0, 80), databaseIds: [...selected] });
@@ -105,15 +115,31 @@ export function DatabasesChatView({ initialDatabaseId }: { initialDatabaseId: st
     try {
       const res = await window.nodus.dbChatStream(
         { conversationId: activeId, question: q, databaseIds: [...selected], history: previous },
-        { onDelta: (delta) => setStreaming((s) => s + delta) }
+        { onDelta: (delta) => { streamingRef.current += delta; setStreaming((s) => s + delta); } }
       );
-      const next: DbChatTurn[] = [...withUser, { role: 'assistant', content: res.text }];
-      setMessages(next); await window.nodus.saveDatabaseChatConversation(activeId, next, [...selected]);
+      const text = res.text;
+      const aborted = stopRequestedRef.current || Boolean(res.aborted);
+      const next: DbChatTurn[] = text.trim() ? [...withUser, { role: 'assistant', content: text }] : withUser;
+      setMessages(next);
+      if (aborted && text.trim()) setStoppedIndex(next.length - 1);
+      await window.nodus.saveDatabaseChatConversation(activeId, next, [...selected]);
     } catch (e) {
-      const next: DbChatTurn[] = [...withUser, { role: 'assistant', content: t('No se pudo generar la respuesta.') + ` (${(e as Error).message})` }];
-      setMessages(next); await window.nodus.saveDatabaseChatConversation(activeId, next, [...selected]);
+      if (stopRequestedRef.current) {
+        // The user stopped the stream: keep the text that already arrived instead
+        // of replacing the whole answer with the cancellation error.
+        const partial = streamingRef.current.trim();
+        const next: DbChatTurn[] = partial ? [...withUser, { role: 'assistant', content: partial }] : withUser;
+        setMessages(next);
+        if (partial) setStoppedIndex(next.length - 1);
+        await window.nodus.saveDatabaseChatConversation(activeId, next, [...selected]);
+      } else {
+        const next: DbChatTurn[] = [...withUser, { role: 'assistant', content: t('No se pudo generar la respuesta.') + ` (${(e as Error).message})` }];
+        setMessages(next); await window.nodus.saveDatabaseChatConversation(activeId, next, [...selected]);
+      }
     } finally {
       setStreaming('');
+      streamingRef.current = '';
+      stopRequestedRef.current = false;
       setBusy(false);
       await refreshHistory();
     }
@@ -172,6 +198,7 @@ export function DatabasesChatView({ initialDatabaseId }: { initialDatabaseId: st
             ) : (
               <div key={i} className="self-start max-w-[95%] rounded-2xl border border-neutral-200 bg-white px-3.5 py-2 dark:border-neutral-800 dark:bg-neutral-900">
                 <AssistantMessage text={m.content} />
+                {i === stoppedIndex && m.content.trim() ? <ChatAbortedNotice /> : null}
               </div>
             )
           )}
@@ -197,7 +224,7 @@ export function DatabasesChatView({ initialDatabaseId }: { initialDatabaseId: st
             disabled={busy || selected.size === 0}
           />
           {busy ? (
-            <button className="btn btn-ghost border border-neutral-700" onClick={() => void window.nodus.cancelDbChat()}>
+            <button className="btn btn-ghost border border-neutral-700" onClick={() => { stopRequestedRef.current = true; void window.nodus.cancelDbChat(); }}>
               <Icon name="stop" /> {t('Detener')}
             </button>
           ) : (

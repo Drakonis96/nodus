@@ -8175,4 +8175,5 @@ export const TR: Record<string, string> = {
   "Usa un número entero de palabras, sin decimales.": "Ondalık kullanmadan tam sayı bir kelime sayısı girin.",
   "El mínimo son {min} palabras por sección.": "Bölüm başına en az {min} kelime olmalıdır.",
   "El máximo son {max} palabras por sección.": "Bölüm başına en fazla {max} kelime olabilir.",
+  "Solicitud cancelada por el usuario.": "Kullanıcı isteği iptal etti.",
 };
