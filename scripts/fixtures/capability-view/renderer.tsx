@@ -11,6 +11,8 @@ import { setActiveLang } from '../../../src/i18n';
 
 setActiveLang('es');
 
+const bytes = (base64: string) => Uint8Array.from(atob(base64), character => character.charCodeAt(0));
+
 const view: ViewDocumentV1 = {
   schemaVersion: 1,
   title: 'Etanol',
@@ -29,6 +31,61 @@ const view: ViewDocumentV1 = {
     // column and both themes.
     { kind: 'model', attachmentId: '5c6d7e8f-9a0b-4c1d-8e2f-3a4b5c6d7e8f', title: 'Modelo escaneado', alt: 'Un escaneo tridimensional que se puede girar.', name: 'objeto.glb', mimeType: 'model/gltf-binary', bytes: 1_248_576 },
     { kind: 'code', language: 'latex', text: '\\chemfig{H_3C-CH_2-OH}' },
+  ],
+};
+
+/** The result kinds the core draws or opens itself. Grouped into one view because what
+ *  matters here is that they share a column: a formula, a chart and a map have very
+ *  different natural widths, and all three have to sit in a message without pushing it. */
+const results: ViewDocumentV1 = {
+  schemaVersion: 1,
+  title: 'Resultados',
+  summary: 'Un ejemplo de cada tipo de resultado.',
+  nodes: [
+    { kind: 'math', tex: '\\Delta G^\\circ = -RT \\ln K', alt: 'La energía libre estándar es menos R por T por el logaritmo natural de K.' },
+    {
+      kind: 'chart', chartType: 'line', title: 'Solubilidad frente a temperatura', alt: 'La solubilidad sube con la temperatura.',
+      xLabel: 'Temperatura (°C)', yLabel: 'g/100 ml',
+      series: [
+        { label: 'KNO₃', points: [[0, 13], [20, 32], [40, 64], [60, 110], [80, 169]] },
+        { label: 'NaCl', points: [[0, 35.7], [20, 36], [40, 36.4], [60, 37], [80, 38]] },
+      ],
+    },
+    {
+      kind: 'tree', title: 'Clasificación', alt: 'Una jerarquía de tres niveles.',
+      roots: [{ label: 'Alcoholes', children: [
+        { label: 'Primarios', detail: 'el carbono unido al OH lleva un solo carbono más', children: [{ label: 'Etanol', tone: 'success' }] },
+        { label: 'Secundarios', children: [{ label: 'Propan-2-ol' }] },
+      ] }],
+    },
+    {
+      kind: 'passage', title: 'Fragmento anotado',
+      text: 'El ferroceno fue descrito en 1951 por Kealy y Pauson, y su estructura de sándwich se resolvió al año siguiente.',
+      marks: [
+        { start: 3, end: 12, label: 'compuesto', tone: 'info' },
+        { start: 29, end: 33, label: 'año', tone: 'neutral' },
+        { start: 38, end: 52, label: 'autores', tone: 'success' },
+      ],
+    },
+    {
+      kind: 'comparison', title: 'Dos redacciones', granularity: 'word',
+      before: { label: 'Borrador', text: 'La reacción se completa en dos horas a temperatura ambiente.' },
+      after: { label: 'Revisión', text: 'La reacción se completa en dos horas a 25 °C, con agitación constante.' },
+    },
+    {
+      kind: 'map', title: 'Yacimientos', alt: 'Tres puntos en la península ibérica.',
+      geojson: {
+        type: 'FeatureCollection',
+        features: [
+          { type: 'Feature', geometry: { type: 'Point', coordinates: [-3.7038, 40.4168] }, properties: { nombre: 'Madrid', hallazgos: 12 } },
+          { type: 'Feature', geometry: { type: 'Point', coordinates: [2.1734, 41.3851] }, properties: { nombre: 'Barcelona', hallazgos: 7 } },
+          { type: 'Feature', geometry: { type: 'LineString', coordinates: [[-3.7038, 40.4168], [2.1734, 41.3851]] }, properties: {} },
+        ],
+      },
+    },
+    { kind: 'image', attachmentId: '7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d', title: 'Espectro', alt: 'Un espectro de infrarrojo.', name: 'espectro.png', mimeType: 'image/png', bytes: 475, width: 320, height: 180 },
+    { kind: 'audio', attachmentId: '8b9c0d1e-2f3a-4b4c-8d5e-6f7a8b9c0d1e', title: 'Lectura del testimonio', alt: 'Doce segundos de voz grabada.', name: 'testimonio.wav', mimeType: 'audio/wav', bytes: 236 },
+    { kind: 'imageTiles', service: 'https://iiif.example.org/iiif/2/folio-3r', title: 'Folio 3r', alt: 'Un folio manuscrito ampliable.', width: 8000, height: 12000 },
   ],
 };
 
@@ -106,6 +163,12 @@ window.nodus = {
   renderLegacyCapabilityResult: async () => ({ available: true as const, capabilityId: 'nodus:chemistry', pluginId: 'chemistry-studio', view }),
   renderCapabilityArtifact: async () => ({ available: true as const, sidecar: { source: 'nodus-artifact://chat/' + 'a'.repeat(64) + '/3f8a1c0e-9b2d-4e77-8a10-5c6d7e8f9a0b', capabilityId: 'nodus:chemistry', plugin: { id: 'chemistry-studio', version: '2.0.0', digest: 'a'.repeat(64) }, artifactType: 'chemistry-document', artifactVersion: 1, summary: 'Etanol, CID 702.', modelVisibility: 'projection' as const, sha256: 'c'.repeat(64), bytes: 1024, createdAt: '2026-09-11T10:00:00.000Z' }, view }),
   downloadCapabilityFile: async () => {},
+  // Real bytes of real formats: an image the browser will actually decode and a WAV it
+  // will actually load, so the fixture measures the element and not a broken one.
+  readCapabilityMedia: async (source: string) => (source.split('/').pop() === '7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d'
+    ? { bytes: bytes('iVBORw0KGgoAAAANSUhEUgAAAUAAAAC0CAIAAABqhmJGAAABoklEQVR42u3TQQ0AIAwAselDBQrQAP9pRAdPdGxpUgWXXMyVQFEhARgYMDBgYDAwYGDAwICBwcCAgQEDg4EBAwMGBgwMBgYMDBgYMDAYGDAwYGAwMGBgwMCAgcHAgIEBAwMGBgMDBgYMDAYGDAwYGDAwGBgwMGBgMLAKYGDAwICBwcCAgQEDAwYGAwMGBgwMBgYMDBgYMDAYGDAwYGDAwNBi4JMPKMrAYGDAwICBwcCAgQEDAwYGAwMGBgwMBgYMDBgYMDAYGDAwYGDAwGBgwMCAgcHAgIEBAwMGBgMDBgYMDBgYDAwYGDAwGBgwMGBgwMBgYMDAgIHBwCqAgQEDAwYGAwMGBgwMGBgMDBgYMDAYGDAwYGDAwGBgwMCAgQEDQ4+Bx91AUQYGAwMGBgwMBgYMDBgYMDAYGDAwYGAwMGBgwMCAgcHAgIEBAwMGBgMDBgYMDAYGDAwYGDAwGBgwMGBgwMBgYMDAgIHBwICBAQMDBgYDAwYGDAwGVgEMDBgYMDAYGDAwYGDAwGBgwMCAgcHAgIEBAwMGBgMDBgYMDBgYWvgueCMYU7f1rgAAAABJRU5ErkJggg=='), mimeType: 'image/png' }
+    : { bytes: bytes('UklGRuwAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YcgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=='), mimeType: 'audio/wav' }),
+  fetchCapabilityTile: async () => { throw new Error('no tiled image is opened in this fixture'); },
   readCapabilityModel: async () => { throw new Error('no model is opened in this fixture'); },
   getChatImageMetadata: async () => null,
   copyChatImage: async () => {},
@@ -120,6 +183,11 @@ const inlineView = serializeChatVisualPart({
   content: JSON.stringify({ capabilityId: 'nodus:chemistry', plugin: { id: 'chemistry-studio', version: '2.0.0' }, owner: 'a'.repeat(64), view: { ...view, title: undefined, nodes: view.nodes.slice(4, 8) } }),
 });
 
+const resultsView = serializeChatVisualPart({
+  kind: 'capability-view', complete: true,
+  content: JSON.stringify({ capabilityId: 'nodus:chemistry', plugin: { id: 'chemistry-studio', version: '2.0.0' }, owner: 'a'.repeat(64), view: results }),
+});
+
 // A block written by 5.3.1, exactly as it sits in an old conversation: the fence the
 // package still claims, and a reference to the file beside the chat.
 const legacyBlock = '\n\n```genomics-result\nnodus-genomics://chat/' + 'a'.repeat(64) + '/3f8a1c0e-9b2d-4e77-8a10-5c6d7e8f9a0b\n```\n\n';
@@ -128,6 +196,7 @@ function Harness() {
   return <div style={{ padding: 24 }}>
     <div data-testid="artifact"><ChatMarkdown content={artifactReference} /></div>
     <div data-testid="inline"><ChatMarkdown content={inlineView} /></div>
+    <div data-testid="results"><ChatMarkdown content={resultsView} /></div>
     <div data-testid="legacy"><ChatMarkdown content={legacyBlock} /></div>
     <div data-testid="panel"><CapabilityPackagesPanel /></div>
   </div>;

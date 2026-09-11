@@ -4,6 +4,7 @@ import { configurePluginSecret, discardInboxPlugin, listInboxPlugins, listInstal
 import { mergedPluginPermissions } from '../skill-capabilities/pluginPackage';
 import { getCapabilityFile } from './chatAssets';
 import { validateModelAsset } from '../packages/capability-api/src/models';
+import { validateMediaAsset } from '../packages/capability-api/src/media';
 import { getChatImageMetadata } from './chatAssets';
 import { originalImagePayloadFromUrl } from './imageProtocol';
 import path from 'node:path';
@@ -624,6 +625,16 @@ export function registerIpc(
     const payload = getCapabilityFile(String(source));
     if (!payload) throw new Error('The 3D model is no longer available.');
     const info = validateModelAsset(new Uint8Array(payload.blob), payload.mimeType);
+    return { bytes: payload.blob, mimeType: payload.mimeType, name: payload.name, info };
+  });
+
+  /** The bytes of a stored image or sound file, checked again on the way out for the same
+   *  reason a model is: a viewer should not be the first thing to look at bytes it is
+   *  about to decode. */
+  h('capabilityFiles:media', async (_e, source: string) => {
+    const payload = getCapabilityFile(String(source));
+    if (!payload) throw new Error('That file is no longer available.');
+    const info = validateMediaAsset(new Uint8Array(payload.blob), payload.mimeType);
     return { bytes: payload.blob, mimeType: payload.mimeType, name: payload.name, info };
   });
 

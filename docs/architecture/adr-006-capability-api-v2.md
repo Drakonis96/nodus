@@ -134,3 +134,18 @@ tres skills v1 siguen en la raíz del repositorio y los plugins v2 viven bajo
     que los siguiera convertiría cualquier conversación antigua en una petición a donde
     dijera el documento. Se comprueba al entregarlo, al revisarlo en el marketplace y otra
     vez al leerlo. Ver `docs/capability-3d.md`.
+
+15. **Los tipos de resultado los dibuja el núcleo, no el paquete.** A los nodos de vista
+    existentes se añaden nueve: `math`, `chart`, `tree`, `passage`, `comparison`, `map`,
+    `image`, `audio` e `imageTiles`. Ninguno admite HTML, script ni CSS; el paquete declara
+    valores o entrega bytes, y el resultado lo pinta el mismo código para todos, de modo que
+    una gráfica de química y una de genómica se leen igual y heredan el tema de la
+    aplicación. Se agrupan por lo que cada uno puede alcanzar, y ese reparto es lo que
+    importa: los cinco primeros no tocan nada fuera de sí mismos; `image` y `audio` pasan
+    por el permiso `media`, y los bytes se comprueban por su firma real y no por el tipo que
+    declaran; `map` usa GeoJSON, que es el formato espacial sin mecanismo de URI, así que es
+    seguro por construcción y no por saneado; y sólo `imageTiles` llega a la red, contra el
+    origen que el propio manifiesto del paquete ya declaraba y a través del proceso
+    principal, nunca de la página. Las bibliotecas añadidas —three.js (MIT), Leaflet
+    (BSD-2-Clause) y KaTeX (MIT)— son compatibles con AGPL-3.0-only. Ver
+    `docs/capability-results.md`.

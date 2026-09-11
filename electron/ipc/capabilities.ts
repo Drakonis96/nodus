@@ -11,6 +11,7 @@ import { createCapabilityAdapters } from '../capabilities/runner';
 import { artifactSidecar, readCapabilityArtifact } from '../capabilities/artifactStore';
 import { fetchCapabilityCatalog, installCatalogPlugin, readCachedCatalog } from '../capabilities/marketplaceV2';
 import { legacyResultRequest } from '../capabilities/legacyResults';
+import { fetchCapabilityTile } from '../capabilities/tileProxy';
 import { checkForCapabilityUpdates, setCapabilityAutoUpdate } from '../capabilities/updates';
 import { migrationSettled, readMigrationJournal } from '../capabilities/migration';
 import { capabilityMigrationRunning, migrateCapabilitiesForThisProfile, runPluginDataMigrations } from '../capabilities/migrationRunner';
@@ -160,6 +161,15 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
   /** What the migration is doing, in terms the interface can show without interpreting a
    *  journal. A package is only `complete` once it is installed, migrated and registered:
    *  anything short of that is still in progress or still retryable. */
+  /** One tile of a IIIF image, fetched by the host.
+   *
+   *  The renderer gets bytes and never a URL it could load itself, so a tiled image
+   *  cannot become a way for a page to reach an origin on its own. */
+  h('capabilities:tile', async (_event, capabilityId: string, service: string, tilePath: string) => {
+    const tile = await fetchCapabilityTile({ capabilityId: String(capabilityId), service: String(service), path: String(tilePath) });
+    return { bytes: tile.bytes, mimeType: tile.mimeType };
+  });
+
   h('capabilities:migrationStatus', async () => {
     const journal = readMigrationJournal();
     const registry = capabilityRegistry();

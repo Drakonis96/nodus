@@ -19,3 +19,79 @@
 .capability-view-model-hint { margin: 0; font-size: 11px; opacity: .65; }
 
 .light .capability-view-model-stage { background: #71809614; }
+
+/* ── Data-shaped results ──────────────────────────────────────────────────────
+   A formula, a chart, a hierarchy, a marked-up passage, two versions of a text.
+   Drawn by the core from values a capability supplied, so they theme with the rest of
+   the interface instead of each package inventing its own look. */
+
+.capability-view-math { margin: 8px 0; overflow-x: auto; }
+.capability-view-math[data-display='inline'] { display: inline-block; margin: 0 2px; }
+.capability-view-math-error { margin: 6px 0; font-size: 12px; opacity: .8; font-style: italic; }
+
+.capability-view-chart { margin: 10px 0; display: grid; gap: 6px; }
+.capability-view-chart figcaption { font-weight: 600; font-size: 13px; }
+.capability-view-chart svg { width: 100%; height: auto; overflow: visible; }
+.capability-view-chart-grid line { stroke: #71809644; stroke-width: 1; }
+.capability-view-chart-grid text, .capability-view-chart-axis text { fill: currentColor; font-size: 11px; opacity: .7; }
+.capability-view-chart-axis line { stroke: #71809688; stroke-width: 1; }
+.capability-view-chart-axis-label { font-size: 11px; opacity: .85; }
+.capability-view-chart-legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; list-style: none; font-size: 11px; }
+.capability-view-chart-legend li { display: inline-flex; align-items: center; gap: 5px; }
+.capability-view-chart-legend span { width: 10px; height: 10px; border-radius: 2px; }
+
+.capability-view-tree { margin: 10px 0; font-size: 13px; }
+.capability-view-tree h4 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+.capability-view-tree ul { margin: 0; padding-left: 16px; list-style: none; }
+.capability-view-tree ul ul { border-left: 1px solid #71809644; margin-left: 4px; padding-left: 12px; }
+.capability-view-tree li { padding: 2px 0; }
+.capability-view-tree-label { font-weight: 500; }
+.capability-view-tree-detail { margin-left: 8px; opacity: .7; font-size: 12px; }
+.capability-view-tree li[data-tone='success'] .capability-view-tree-label { color: #4ade80; }
+.capability-view-tree li[data-tone='warning'] .capability-view-tree-label { color: #fbbf24; }
+.capability-view-tree li[data-tone='danger'] .capability-view-tree-label { color: #f87171; }
+.capability-view-tree li[data-tone='info'] .capability-view-tree-label { color: #60a5fa; }
+
+.capability-view-passage { margin: 10px 0; }
+.capability-view-passage figcaption { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.capability-view-passage p { margin: 0; white-space: pre-wrap; line-height: 1.7; }
+.capability-view-passage mark { background: #60a5fa33; color: inherit; border-radius: 3px; padding: 1px 2px; }
+.capability-view-passage mark[data-tone='success'] { background: #4ade8033; }
+.capability-view-passage mark[data-tone='warning'] { background: #fbbf2433; }
+.capability-view-passage mark[data-tone='danger'] { background: #f8717133; }
+.capability-view-passage mark[data-tone='neutral'] { background: #94a3b833; }
+.capability-view-passage-label { font-size: 9px; text-transform: uppercase; letter-spacing: .04em; opacity: .75; margin-left: 3px; vertical-align: super; }
+
+.capability-view-comparison { margin: 10px 0; display: grid; gap: 6px; }
+.capability-view-comparison figcaption { font-weight: 600; font-size: 13px; }
+.capability-view-comparison-heads { display: flex; gap: 16px; font-size: 11px; opacity: .75; }
+.capability-view-comparison-identical { margin: 0; font-size: 12px; opacity: .75; }
+.capability-view-comparison-body { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.6; border: 1px solid #71809644; border-radius: 8px; padding: 10px; overflow-x: auto; }
+.capability-view-comparison-body span[data-change='added'] { background: #4ade8033; }
+.capability-view-comparison-body span[data-change='removed'] { background: #f8717133; text-decoration: line-through; }
+
+/* ── Asset-shaped results ─────────────────────────────────────────────────── */
+
+.capability-view-image { margin: 10px 0; display: grid; gap: 4px; }
+.capability-view-image img { max-width: 100%; height: auto; border-radius: 8px; }
+.capability-view-image figcaption, .capability-view-audio figcaption { font-size: 12px; opacity: .8; display: inline-flex; align-items: center; gap: 6px; }
+
+.capability-view-audio { margin: 10px 0; display: grid; gap: 6px; }
+.capability-view-audio audio { width: 100%; }
+.capability-view-asset-meta { font-size: 11px; opacity: .65; }
+.capability-view-asset-status { margin: 0; font-size: 12px; opacity: .8; }
+
+.capability-view-map, .capability-view-tiles { margin: 10px 0; display: grid; gap: 6px; }
+.capability-view-map figcaption, .capability-view-tiles figcaption { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; font-weight: 600; font-size: 13px; }
+/* Leaflet paints its own `#ddd` on the container it takes over, which in a dark message is
+   a lit slab. The token wins here, and the height is capped tighter than the model's: a map
+   is usually read alongside the text, not instead of it. */
+.capability-view-map-canvas, .capability-view-tiles-canvas { width: 100%; aspect-ratio: 4 / 3; min-height: 220px; max-height: 420px; border-radius: 8px; overflow: hidden; }
+.capability-view-map-canvas.leaflet-container, .capability-view-tiles-canvas.leaflet-container { background: #71809626; }
+.light .capability-view-map-canvas.leaflet-container, .light .capability-view-tiles-canvas.leaflet-container { background: #71809614; }
+.capability-view-map-properties { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
+.capability-view-map-properties dt { font-weight: 600; }
+.capability-view-map-properties dd { margin: 0; }
+.capability-view-tiles-controls { display: flex; gap: 8px; }
+/* A grid item stretches by default, which centred the label across the column. */
+.capability-view-tiles > button { justify-self: start; }

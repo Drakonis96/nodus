@@ -6,10 +6,13 @@ import type { ArtifactTypeManifestV1 } from '../packages/capability-api/src/arti
 import type { CapabilityChatContractV2 } from '../packages/capability-api/src/chat';
 import type { CapabilityCatalogV2 } from '../packages/capability-api/src/catalog';
 import type { SettingsFieldV1, SettingsManifestV1, SettingsStateV1, SettingsSubmissionV1 } from '../packages/capability-api/src/settings';
-import type { ViewDocumentV1, ViewNode, ViewSpan, ViewTone } from '../packages/capability-api/src/views';
+import type { ViewChartSeries, ViewChartType, ViewDocumentV1, ViewNode, ViewPassageMark, ViewSpan, ViewTone, ViewTreeItem } from '../packages/capability-api/src/views';
 import type { JsonSchema } from '../packages/capability-api/src/json';
 
-export type { ArtifactTypeManifestV1, CapabilityCatalogV2, SettingsFieldV1, SettingsManifestV1, SettingsStateV1, SettingsSubmissionV1, ViewDocumentV1, ViewNode, ViewSpan, ViewTone };
+export type {
+  ArtifactTypeManifestV1, CapabilityCatalogV2, SettingsFieldV1, SettingsManifestV1, SettingsStateV1, SettingsSubmissionV1,
+  ViewChartSeries, ViewChartType, ViewDocumentV1, ViewNode, ViewPassageMark, ViewSpan, ViewTone, ViewTreeItem,
+};
 
 export interface CapabilityProviderSummary {
   id: string;

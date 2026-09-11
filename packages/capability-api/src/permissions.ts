@@ -54,13 +54,17 @@ export interface TrustedPermissionSetV2 {
   /** Access to the core 3D services: validating a glTF or GLB asset and handing it over
    *  for the built-in viewer to draw. A capability never renders anything itself. */
   models?: boolean;
+  /** Access to the core media services: handing over a raster image or a sound file for
+   *  the core to check and show. Separate from 3D because what is checked, and what it
+   *  would mean to get it wrong, are different in each case. */
+  media?: boolean;
   /** Auxiliary workers spawned from the plugin's own bundle, killable by the host. */
   subworkers?: { max: number };
   runtimes?: TrustedRuntimePermission[];
 }
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
-const KEYS = ['network', 'secrets', 'storage', 'model', 'svg', 'models', 'subworkers', 'runtimes'];
+const KEYS = ['network', 'secrets', 'storage', 'model', 'svg', 'models', 'media', 'subworkers', 'runtimes'];
 
 export function validateTrustedPermissions(input: unknown): TrustedPermissionSetV2 {
   if (!input || typeof input !== 'object' || Array.isArray(input) || !exactKeys(input, KEYS)) throw new Error('Invalid capability permissions.');
@@ -111,6 +115,7 @@ export function validateTrustedPermissions(input: unknown): TrustedPermissionSet
 
   if (value.svg !== undefined && typeof value.svg !== 'boolean') throw new Error('Invalid capability svg permission.');
   if (value.models !== undefined && typeof value.models !== 'boolean') throw new Error('Invalid capability 3D permission.');
+  if (value.media !== undefined && typeof value.media !== 'boolean') throw new Error('Invalid capability media permission.');
 
   if (value.subworkers !== undefined) {
     if (!value.subworkers || !exactKeys(value.subworkers, ['max']) || !Number.isInteger(value.subworkers.max) || value.subworkers.max < 1 || value.subworkers.max > 8) throw new Error('Invalid capability subworker permission.');
@@ -147,6 +152,7 @@ function permissionAtoms(permissions: TrustedPermissionSetV2): string[] {
   if (permissions.model) atoms.push(`model|${permissions.model.maxCalls}`);
   if (permissions.svg) atoms.push('svg');
   if (permissions.models) atoms.push('models');
+  if (permissions.media) atoms.push('media');
   if (permissions.subworkers) atoms.push(`subworkers|${permissions.subworkers.max}`);
   for (const runtime of permissions.runtimes ?? []) atoms.push(`runtime|${runtime.id}|${runtime.kind}|${runtime.minVersion}`);
   return atoms;

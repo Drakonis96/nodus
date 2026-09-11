@@ -4,6 +4,7 @@ import type { WorkerArtifactV1 } from './artifacts';
 import type { ChatAstNode, FinalMutation, PrepareMutation } from './chat';
 import type { SettingsActionInput, SettingsStateV1, SettingsSubmissionV1 } from './settings';
 import type { ModelAssetInfo } from './models';
+import type { MediaAssetInfo } from './media';
 
 /** The interface a trusted worker module default-exports. The host calls nothing else.
  *
@@ -137,6 +138,12 @@ export interface CapabilityHostV2 {
     validate(asset: { bytes: Uint8Array; mimeType: string }): Promise<ModelAssetInfo>;
     /** Validates and stores in one step, returning what a `model` node needs. */
     store(asset: { bytes: Uint8Array; mimeType: string; name: string }): Promise<{ attachmentId: string; bytes: number; info: ModelAssetInfo }>;
+  };
+  /** `nodus:media`. A raster or a sound file: handed over, checked, stored, and shown by
+   *  the core. The capability gets back the attachment id its view node refers to. */
+  media: {
+    validate(asset: { bytes: Uint8Array; mimeType: string }): Promise<MediaAssetInfo>;
+    store(asset: { bytes: Uint8Array; mimeType: string; name: string }): Promise<{ attachmentId: string; bytes: number; info: MediaAssetInfo }>;
   };
   subworker: {
     run(request: { entry: string; input: unknown; timeoutMs: number }): Promise<unknown>;

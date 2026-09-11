@@ -2,6 +2,8 @@ import type { ViewDocumentV1, ViewNode, ViewSpan } from '@shared/capabilities';
 import { ChatVisual } from './ChatVisual';
 import { Icon } from './ui';
 import { ChatModelViewer } from './ChatModelViewer';
+import { ViewChart, ViewComparison, ViewMath, ViewPassage, ViewTree } from './capabilityViewData';
+import { ViewAudio, ViewImage, ViewImageTiles, ViewMap } from './capabilityViewAssets';
 import { t } from '../i18n';
 
 /** Renders a declarative view a capability returned.
@@ -25,7 +27,7 @@ function Spans({ spans }: { spans: ViewSpan[] }) {
   })}</>;
 }
 
-function Node({ node, owner }: { node: ViewNode; owner?: string }) {
+function Node({ node, owner, capabilityId }: { node: ViewNode; owner?: string; capabilityId?: string }) {
   switch (node.kind) {
     case 'heading': {
       const Tag = (['h3', 'h4', 'h5', 'h6'] as const)[node.level - 1];
@@ -74,6 +76,24 @@ function Node({ node, owner }: { node: ViewNode; owner?: string }) {
       // `nodus:3d`. The package supplied bytes the core validated and stored; what draws
       // them is the core's own viewer, never anything that came with the package.
       return <ChatModelViewer node={node} owner={owner} />;
+    case 'image':
+      return <ViewImage node={node} owner={owner} />;
+    case 'audio':
+      return <ViewAudio node={node} owner={owner} />;
+    case 'math':
+      return <ViewMath node={node} />;
+    case 'chart':
+      return <ViewChart node={node} />;
+    case 'tree':
+      return <ViewTree node={node} />;
+    case 'passage':
+      return <ViewPassage node={node} />;
+    case 'comparison':
+      return <ViewComparison node={node} />;
+    case 'map':
+      return <ViewMap node={node} />;
+    case 'imageTiles':
+      return <ViewImageTiles node={node} capabilityId={capabilityId} />;
     case 'status':
       return <p className="capability-view-status" data-state={node.state} role="status">
         <Icon name={node.state === 'ok' ? 'check' : node.state === 'failed' ? 'alert' : 'clock'} size={14} />
@@ -90,10 +110,10 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function CapabilityView({ view, owner }: { view: ViewDocumentV1; owner?: string }) {
+export function CapabilityView({ view, owner, capabilityId }: { view: ViewDocumentV1; owner?: string; capabilityId?: string }) {
   return <div className="capability-view" aria-label={view.summary}>
     {view.title && <h3 className="capability-view-title">{view.title}</h3>}
-    {view.nodes.map((node, index) => <Node key={index} node={node} owner={owner} />)}
+    {view.nodes.map((node, index) => <Node key={index} node={node} owner={owner} capabilityId={capabilityId} />)}
   </div>;
 }
 
@@ -111,6 +131,6 @@ export function ChatCapabilityView({ source }: { source: string }) {
       <span className="chat-visual-kind"><Icon name="sparkles" size={13} />{payload.capabilityId}</span>
       {payload.plugin && <span className="chat-visual-original">{payload.plugin.id} {payload.plugin.version}</span>}
     </span>
-    <CapabilityView view={payload.view} owner={payload.owner} />
+    <CapabilityView view={payload.view} owner={payload.owner} capabilityId={payload.capabilityId} />
   </section>;
 }

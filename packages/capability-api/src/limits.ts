@@ -33,6 +33,30 @@ export const LIMITS = {
   modelJsonBytes: 16 * 1024 * 1024,
   modelNodes: 200_000,
 
+  /** Raster images and sound a capability produced. Same rule as a model: the bytes are
+   *  stored as an attachment, checked by the core, and drawn or played by the core. */
+  imageBytes: 32 * 1024 * 1024,
+  imagePixels: 80_000_000,
+  audioBytes: 128 * 1024 * 1024,
+
+  /** Result kinds that are pure data. None of these needs a host service, a permission or
+   *  an attachment: a capability returns the values and the core draws them. */
+  mathChars: 4_000,
+  chartSeries: 12,
+  chartPoints: 5_000,
+  treeNodes: 2_000,
+  treeDepth: 12,
+  passageChars: 200_000,
+  passageMarks: 5_000,
+  comparisonChars: 200_000,
+  geoFeatures: 5_000,
+  geoPositions: 200_000,
+
+  /** Tiled imagery served over the IIIF Image API. The tiles are fetched by the host,
+   *  from an origin the package was already permitted to reach, and never by the page. */
+  tileBytes: 8 * 1024 * 1024,
+  tilePixels: 4_096,
+
   /** Declarative views. */
   viewNodes: 512,
   viewDepth: 8,

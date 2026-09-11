@@ -65,6 +65,10 @@ const host: CapabilityHostV2 = {
     validate: asset => hostCall('models', 'validate', asset) as ReturnType<CapabilityHostV2['models']['validate']>,
     store: asset => hostCall('models', 'store', asset) as ReturnType<CapabilityHostV2['models']['store']>,
   },
+  media: {
+    validate: asset => hostCall('media', 'validate', asset) as ReturnType<CapabilityHostV2['media']['validate']>,
+    store: asset => hostCall('media', 'store', asset) as ReturnType<CapabilityHostV2['media']['store']>,
+  },
   subworker: { run: request => hostCall('subworker', 'run', request) },
   python: {
     ensureRuntime: runtimeId => hostCall('python', 'ensureRuntime', { runtimeId }) as ReturnType<CapabilityHostV2['python']['ensureRuntime']>,

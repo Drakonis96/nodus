@@ -4,6 +4,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { assertPublicHost } from '../../skill-capabilities/publicHost';
 import { validateModelAsset } from '../../packages/capability-api/src/models';
+import { validateMediaAsset } from '../../packages/capability-api/src/media';
 import type { TrustedNetworkPermission, TrustedPermissionSetV2 } from '../../packages/capability-api/src/permissions';
 import type { CapabilityHostServices, TrustedWorkerRuntime } from './workerHost';
 
@@ -302,6 +303,21 @@ export function createCapabilityHostServices(adapters: CapabilityServiceAdapters
       if (!adapters.attachments) throw new Error('Attachments are unavailable in this context.');
       const name = String(value.name ?? '');
       if (!/^[\w][\w .()-]{0,120}$/.test(name) || name.includes('..')) throw new Error('Invalid 3D model name.');
+      const stored = await adapters.attachments(runtime, { bytes, name, mimeType });
+      return { ...stored, info };
+    }
+
+    // Raster and sound. The declared type is a claim; the bytes decide.
+    if (channel === 'media') {
+      if (!runtime.permissions.media) throw new Error('Capability media access is not permitted.');
+      const bytes = value.bytes instanceof Uint8Array ? Buffer.from(value.bytes) : Buffer.from(String(value.bytes ?? ''), 'base64');
+      const mimeType = String(value.mimeType ?? '');
+      const info = validateMediaAsset(bytes, mimeType);
+      if (method === 'validate') return info;
+      if (method !== 'store') throw new Error('Unknown capability media operation.');
+      if (!adapters.attachments) throw new Error('Attachments are unavailable in this context.');
+      const name = String(value.name ?? '');
+      if (!/^[\w][\w .()-]{0,120}$/.test(name) || name.includes('..')) throw new Error('Invalid media file name.');
       const stored = await adapters.attachments(runtime, { bytes, name, mimeType });
       return { ...stored, info };
     }

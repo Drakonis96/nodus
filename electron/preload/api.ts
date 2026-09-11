@@ -119,6 +119,8 @@ export const nodusApi: NodusApi = {
   copyChatImage: (source) => ipcRenderer.invoke('chatImages:copy', source),
   downloadCapabilityFile: (source) => ipcRenderer.invoke('capabilityFiles:download', source),
   readCapabilityModel: (source) => ipcRenderer.invoke('capabilityFiles:model', source),
+  readCapabilityMedia: (source) => ipcRenderer.invoke('capabilityFiles:media', source),
+  fetchCapabilityTile: (capabilityId, service, tilePath) => ipcRenderer.invoke('capabilities:tile', capabilityId, service, tilePath),
   listCapabilities: () => ipcRenderer.invoke('capabilities:list'),
   onCapabilityRegistryChanged: (cb) => {
     const listener = (_event: unknown, payload: unknown) => cb(payload as never);
