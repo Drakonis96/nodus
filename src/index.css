@@ -4297,7 +4297,8 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
   flex-direction: column;
   gap: 3px;
   width: max-content;
-  max-width: 320px;
+  max-width: min(320px, calc(100vw - 24px));
+  box-sizing: border-box;
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid rgb(64 64 64);
@@ -4306,6 +4307,11 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
   pointer-events: none;
   font-size: 12px;
   line-height: 1.35;
+  /* Citation groups stay on one line, but the preview is nested inside that
+     group. Reset the inherited value so long titles and snippets wrap inside
+     the card instead of painting beyond its background. */
+  white-space: normal;
+  overflow-wrap: anywhere;
   color: rgb(212 212 212);
   animation: fade-in 0.12s ease-out;
 }
