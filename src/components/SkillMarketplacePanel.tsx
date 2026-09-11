@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { BUILTIN_SKILL_PACKAGES, type ChatSkill } from '@shared/chatSkills';
 import { unsupportedSkillCapabilities, DEFAULT_SKILL_SOURCE, isOfficialSkillSource, type MarketplaceEntry, type PluginMarketplaceEntry, type SkillManifest, type SkillMarketplace } from '@shared/skillMarketplace';
 import { compareSemver } from '../../skill-capabilities/contracts';
 import type { InboxPluginSummary, InstalledPluginSummary } from '../../skill-capabilities/contracts';
 import { marketplaceLogoSvg } from '@shared/marketplaceLogo';
+import { Icon } from './ui';
+import { skillGlyph } from './skillGlyph';
 
 type InstalledFilter = 'all' | 'installed' | 'available';
 
@@ -28,6 +30,8 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPluginSummary[]>([]);
   const [inboxPlugins, setInboxPlugins] = useState<InboxPluginSummary[]>([]);
   const [appVersion, setAppVersion] = useState('');
+  // One card's details at a time, like the library.
+  const [details, setDetails] = useState('');
   useEffect(() => {
     let alive = true;
     const refresh = () => { void window.nodus.getSkillMarketplace().then(value => { if (alive) setState(value); }).catch(e => { if (alive) setError(String(e)); }); void window.nodus.listInstalledPlugins().then(value => { if (alive) setInstalledPlugins(value); }).catch(() => undefined); void window.nodus.listInboxPlugins().then(value => { if (alive) setInboxPlugins(value); }).catch(() => undefined); };
@@ -64,11 +68,13 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
     setNotice(builtinId(entry.package.manifest) ? 'Included skill restored. Check its activation in My skills.' : 'Skill installed. Enable it in My skills.');
   });
   const categories = [...new Set(source?.entries.map(e => e.package.manifest.category) ?? [])].sort();
+  // Alphabetical rather than grouped by category: a catalogue is something you look a name
+  // up in, and the category is a filter for when you do not have one.
   const entries = (source?.entries ?? []).filter(e => {
     const m = e.package.manifest;
     return (!category || m.category === category) && (filter === 'all' || (filter === 'installed') === !!installedSkills(m).length)
       && `${m.name} ${m.description} ${m.author} ${m.category}`.toLowerCase().includes(query.toLowerCase());
-  });
+  }).sort((a, b) => a.package.manifest.name.localeCompare(b.package.manifest.name, undefined, { sensitivity: 'base', numeric: true }));
   const installedCount = (source?.entries ?? []).filter(e => installedSkills(e.package.manifest).length).length;
   const counts: Record<InstalledFilter, number> = { all: source?.entries.length ?? 0, installed: installedCount, available: (source?.entries.length ?? 0) - installedCount };
   const manifest = review?.package.manifest;
@@ -78,10 +84,18 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
   const installed = manifest ? installedSkills(manifest) : [];
   return <div className="skill-marketplace" aria-label="Skill marketplace">
     <div className="skill-marketplace-brand"><img src={`data:image/svg+xml,${encodeURIComponent(marketplaceLogoSvg(accent))}`} data-testid="marketplace-logo" alt="Nodus Marketplace" /><div><b>Discover your next skill</b><p>Methods and tools, made by the community.</p></div></div>
-    <label>Repository<select aria-label="Skill repository" value={source?.id ?? ''} disabled={busy} onChange={e => setSourceId(e.target.value)}>{state.sources.map(s => <option key={s.id} value={s.id}>{s.id}</option>)}</select></label>
-    {source && <><div className="skill-marketplace-actions"><button type="button" disabled={busy} onClick={() => void run(async () => { setState(await window.nodus.updateSkillSource(source.id)); setNotice('Catalog updated. Installed skills are unchanged.'); })}>{busy ? 'Working…' : 'Update catalog'}</button><button type="button" disabled={busy} onClick={() => void run(async () => { setState(await window.nodus.removeSkillSource(source.id)); setNotice('Repository removed. Installed skills remain available.'); })}>Remove source</button></div>
-      <small>{official ? 'Official Nodus repository' : 'Community source · not reviewed by Nodus'}{source.updatedAt ? ` · Updated ${new Date(source.updatedAt).toLocaleString()}` : ' · Update to discover skills'}</small></>}
-    <form onSubmit={e => { e.preventDefault(); void run(async () => { const value = await window.nodus.addSkillSource(url); setState(value); setSourceId(value.sources[value.sources.length - 1].id); setUrl(''); }); }} className="skill-marketplace-source"><label>Add a repository<input aria-label="Repository URL" type="url" required placeholder="https://github.com/owner/repository" value={url} onChange={e => setUrl(e.target.value)} /></label><button type="submit" disabled={busy || !url.trim()}>Add source</button></form>
+    {/* Where the skills come from, folded away. It is answered once and then rarely asked
+        again, and open by default it put five controls between the reader and the first
+        skill. The line stays visible, so which repository this is never becomes a mystery. */}
+    <details className="skill-marketplace-sources">
+      <summary>
+        <span>{official ? 'Official Nodus repository' : 'Community source · not reviewed by Nodus'}{source?.updatedAt ? ` · Updated ${new Date(source.updatedAt).toLocaleDateString()}` : source ? ' · Update to discover skills' : ''}</span>
+        <span className="skill-marketplace-sources-hint">Repositories</span>
+      </summary>
+      <label>Repository<select aria-label="Skill repository" value={source?.id ?? ''} disabled={busy} onChange={e => setSourceId(e.target.value)}>{state.sources.map(s => <option key={s.id} value={s.id}>{s.id}</option>)}</select></label>
+      {source && <div className="skill-marketplace-actions"><button type="button" disabled={busy} onClick={() => void run(async () => { setState(await window.nodus.updateSkillSource(source.id)); setNotice('Catalog updated. Installed skills are unchanged.'); })}>{busy ? 'Working…' : 'Update catalog'}</button><button type="button" disabled={busy} onClick={() => void run(async () => { setState(await window.nodus.removeSkillSource(source.id)); setNotice('Repository removed. Installed skills remain available.'); })}>Remove source</button></div>}
+      <form onSubmit={e => { e.preventDefault(); void run(async () => { const value = await window.nodus.addSkillSource(url); setState(value); setSourceId(value.sources[value.sources.length - 1].id); setUrl(''); }); }} className="skill-marketplace-source"><label>Add a repository<input aria-label="Repository URL" type="url" required placeholder="https://github.com/owner/repository" value={url} onChange={e => setUrl(e.target.value)} /></label><button type="submit" disabled={busy || !url.trim()}>Add source</button></form>
+    </details>
     {pluginReview && source ? <article className="skill-marketplace-review">
       <button type="button" onClick={() => setPluginReview(null)}>← Back to catalog</button><h4>{pluginReview.package.manifest.name}</h4>
       <p>{pluginReview.package.manifest.author} · {pluginReview.package.manifest.version} · {pluginReview.package.manifest.license}</p><p>{pluginReview.package.manifest.description}</p>
@@ -115,20 +129,44 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
         ? <div className="chat-skill-confirm"><span>{confirmText(manifest.name, installed, !!builtin)}</span><button type="button" disabled={busy} onClick={() => void uninstall(installed)}>Uninstall</button><button type="button" onClick={() => setRemoveId('')}>Cancel</button></div>
         : <button type="button" onClick={() => setRemoveId(installed[0].id)}>Uninstall skill</button>)}
     </article> : <>
-      <label>Find a skill<input type="search" aria-label="Search marketplace" placeholder="Name, creator or description" value={query} onChange={e => setQuery(e.target.value)} /></label>
-      <label>Category<select aria-label="Marketplace category" value={category} onChange={e => setCategory(e.target.value)}><option value="">All categories</option>{categories.map(c => <option key={c}>{c}</option>)}</select></label>
-      <div className="skill-marketplace-filter" role="group" aria-label="Installed filter">{(['all', 'installed', 'available'] as const).map(value =>
-        <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}>{value === 'all' ? 'All' : value === 'installed' ? 'Installed' : 'Available'} {counts[value]}</button>)}</div>
+      <div className="chat-skills-search">
+        <Icon name="search" size={16} />
+        <input type="search" aria-label="Search marketplace" placeholder="Name, creator or description" value={query} onChange={e => setQuery(e.target.value)} autoComplete="off" spellCheck={false} />
+        {query && <button type="button" aria-label="Clear marketplace search" title="Clear marketplace search" onClick={() => setQuery('')}><Icon name="x" size={14} /></button>}
+      </div>
+      <div className="skill-marketplace-filters">
+        <label>Category<select aria-label="Marketplace category" value={category} onChange={e => setCategory(e.target.value)}><option value="">All categories</option>{categories.map(c => <option key={c}>{c}</option>)}</select></label>
+        <div className="skill-marketplace-filter" role="group" aria-label="Installed filter">{(['all', 'installed', 'available'] as const).map(value =>
+          <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}>{value === 'all' ? 'All' : value === 'installed' ? 'Installed' : 'Available'} {counts[value]}</button>)}</div>
+      </div>
       {!entries.length && <p className="chat-skills-empty">{!source?.updatedAt ? 'Update a repository to load its catalog.' : filter === 'installed' ? 'No skills from this repository are installed.' : filter === 'available' ? 'Every skill in this repository is already installed.' : 'No matching skills.'}</p>}
-      {categories.filter(c => entries.some(e => e.package.manifest.category === c)).map(c => <section key={c}><h4>{c}</h4>{entries.filter(e => e.package.manifest.category === c).map(entry => {
+      <div className="chat-skills-list">{entries.map(entry => {
         const m = entry.package.manifest; const present = installedSkills(m); const included = !!builtinId(m);
-        return <article className={`chat-skill-item ${present.length ? 'installed' : ''}`} key={entry.path}><b>{m.name}</b><small>@{m.author} · {m.version}{present.length ? ` · ${included ? 'Included in Nodus' : `Installed ${present[0].origin?.version}`}` : ''}</small><p>{m.description}</p>
+        const glyph = skillGlyph({ packageId: m.id, name: m.name, description: m.description, category: m.category });
+        const open = details === entry.path;
+        return <article className={`chat-skill-item ${present.length ? 'installed' : ''} ${open ? 'open' : ''}`} key={entry.path} style={{ '--skill-hue': glyph.hue } as CSSProperties}>
+          <div className="chat-skill-main">
+            <span className="chat-skill-symbol" aria-hidden="true"><Icon name={glyph.icon} size={18} /></span>
+            <div className="chat-skill-text">
+              <span className="chat-skill-heading"><b>{m.name}</b>{!!present.length && <span className="chat-skill-tool-badge">{included ? 'Included' : 'Installed'}</span>}</span>
+              <p>{m.description}</p>
+            </div>
+            <button type="button" className="chat-skill-details-toggle" aria-expanded={open} aria-label={`${open ? 'Hide details of' : 'Show details of'} ${m.name}`}
+              title={open ? 'Hide details' : 'Show details'} onClick={() => setDetails(open ? '' : entry.path)}><Icon name={open ? 'chevronUp' : 'chevronDown'} size={14} /></button>
+          </div>
+
+          {open && <div className="chat-skill-details">
+            <p>{m.description}</p>
+            <small>@{m.author} · {m.version} · {m.category}{present.length ? ` · ${included ? 'Included in Nodus' : `Installed ${present[0].origin?.version}`}` : ''}</small>
+            <small>{m.capabilities.length ? `Capabilities: ${m.capabilities.join(', ')}` : 'No native capabilities'}{m.tools.length ? ` · ${m.tools.length} sandboxed tools` : ''}</small>
+          </div>}
+
           {present.length && removeId === present[0].id
             ? <div className="chat-skill-confirm"><span>{confirmText(m.name, present, included)}</span><button type="button" disabled={busy} onClick={() => void uninstall(present)}>Uninstall</button><button type="button" onClick={() => setRemoveId('')}>Cancel</button></div>
             : <div className="skill-marketplace-entry-actions"><button type="button" disabled={busy} onClick={() => { setRemoveId(''); setReview(entry); }}>{present.length ? (included ? 'Manage skill' : 'Review update') : 'Review skill'}</button>
-              {!!present.length && <button type="button" disabled={busy} aria-label={`Uninstall ${m.name}`} onClick={() => setRemoveId(present[0].id)}>Uninstall</button>}</div>}
+              {!!present.length && <button type="button" className="chat-skill-remove" disabled={busy} aria-label={`Uninstall ${m.name}`} onClick={() => setRemoveId(present[0].id)}>Uninstall</button>}</div>}
         </article>;
-      })}</section>)}
+      })}</div>
     </>}
     {!!source?.plugins?.length && <section><h4>Plugins</h4>{source.plugins.map(entry => { const present = installedPlugins.find(plugin => plugin.id === entry.package.manifest.id); return <article className="chat-skill-item" key={entry.path}><b>{entry.package.manifest.name}</b><small>{entry.package.manifest.author} · {entry.package.manifest.version}{present ? ` · Installed ${present.activeVersion || 'pending'}` : ''}</small><p>{entry.package.manifest.description}</p><button type="button" disabled={busy} onClick={() => setPluginReview(entry)}>Review {present ? 'update' : 'plugin'}</button></article>; })}</section>}
     {!!inboxPlugins.length && <section><h4>Waiting for review</h4><small>Dropped into the plugin inbox. Nothing runs until you approve the permissions below.</small>{inboxPlugins.map(plugin => <article className="chat-skill-item" key={plugin.directory}><b>{plugin.name}</b><small>{plugin.author} · {plugin.version}{plugin.installed ? ' · Update to an installed plugin' : ''}</small><p>{plugin.description}</p><ul><li>{plugin.skills} skills · {plugin.capabilities} sandboxed capabilities</li><li>HTTPS endpoints: {plugin.permissions.network?.map(endpoint => endpoint.origin).join(', ') || 'none'}</li><li>Secrets: {plugin.permissions.secrets?.map(secret => secret.label).join(', ') || 'none'}</li><li>Storage: {plugin.permissions.storage?.maxBytes ? `${plugin.permissions.storage.maxBytes} bytes` : 'none'}</li></ul><button className="chat-skill-primary" type="button" disabled={busy} onClick={() => void run(async () => { await window.nodus.approveInboxPlugin(plugin.directory); setInboxPlugins(await window.nodus.listInboxPlugins()); setInstalledPlugins(await window.nodus.listInstalledPlugins()); setNotice('Plugin reviewed. New skills start disabled.'); })}>Review permissions and install</button> <button type="button" disabled={busy} onClick={() => void run(async () => { setInboxPlugins(await window.nodus.discardInboxPlugin(plugin.directory)); })}>Discard</button></article>)}</section>}

@@ -7,8 +7,14 @@
 .capability-packages-warning { margin: 0; font-size: 12px; color: #fcd34d; }
 .capability-packages-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .capability-packages-item { display: flex; flex-direction: column; gap: 8px; padding: 13px 15px; border: 1px solid #818cf838; border-radius: 14px; }
-.capability-packages-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
-.capability-packages-item-head>div:first-child { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+/* The same header as a skill card: plate, text, chevron. The description is clamped to two
+   lines so a package with a paragraph and one with a sentence occupy the same row. */
+.capability-packages-item-head { display: flex; align-items: flex-start; gap: 12px; }
+.capability-packages-item-text { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.capability-packages-item-text b { font-size: 13px; font-weight: 600; }
+.capability-packages-item-text p { flex-basis: 100%; margin: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; min-height: calc(1.45em * 2); }
+.capability-packages-item.open .capability-packages-item-text p { display: none; }
+.capability-packages-details { display: grid; gap: 10px; border-top: 1px solid #818cf826; padding-top: 10px; }
 .capability-packages-publisher { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; border: 1px solid #34d3994a; background: #10b98112; color: #6ee7b7; font-size: 11px; }
 .capability-packages-version { font-size: 11px; opacity: .65; font-variant-numeric: tabular-nums; }
 .capability-packages-actions { display: flex; gap: 7px; flex-wrap: wrap; }

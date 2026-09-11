@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 import type { CapabilityListPayload, CapabilityMigrationStatus, CapabilityProviderSummary, CapabilitySettingsPayload, InstalledCapabilityPlugin, SettingsFieldV1 } from '@shared/capabilities';
 import { DEFAULT_SKILL_SOURCE } from '@shared/skillMarketplace';
 import { CapabilityView } from './CapabilityView';
 import { Icon } from './ui';
+import { skillGlyph } from './skillGlyph';
 import { t, getActiveLang } from '../i18n';
 import './capabilityPackages.css';
 
@@ -179,7 +180,9 @@ export function CapabilityPackagesPanel() {
 
   const installed = new Map(payload.plugins.map(plugin => [plugin.id, plugin]));
   const providersOf = (pluginId: string) => payload.providers.filter(provider => provider.plugin?.id === pluginId);
-  const catalogue = payload.catalog?.catalog.plugins ?? [];
+  // Alphabetical, like the skills below them: one order for everything in this panel.
+  const catalogue = [...(payload.catalog?.catalog.plugins ?? [])]
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
 
   return <section className="capability-packages">
     <header className="capability-packages-head">
@@ -220,33 +223,45 @@ export function CapabilityPackagesPanel() {
       {catalogue.map(entry => {
         const state = installed.get(entry.id);
         const providers = providersOf(entry.id);
-        return <li key={entry.id} className="capability-packages-item">
+        const glyph = skillGlyph({ packageId: entry.id, name: entry.name, description: label(entry.description) });
+        const open = expanded === entry.id;
+        // The same card as a skill: a package is one more thing in this list, and giving it
+        // its own shape only made the panel look like two panels stacked.
+        return <li key={entry.id} className={`capability-packages-item ${open ? 'open' : ''}`} style={{ '--skill-hue': glyph.hue } as CSSProperties}>
           <div className="capability-packages-item-head">
-            <div>
-              <b>{entry.name}</b>
-              <span className="capability-packages-publisher"><Icon name="check" size={12} />NodusResearch</span>
-              <span className="capability-packages-version">{state?.active && state.active.version !== entry.version ? `${state.active.version} → ${entry.version}` : entry.version}</span>
+            <span className="chat-skill-symbol" aria-hidden="true"><Icon name={glyph.icon} size={18} /></span>
+            <div className="capability-packages-item-text">
+              <span className="chat-skill-heading">
+                <b>{entry.name}</b>
+                <span className="capability-packages-publisher"><Icon name="check" size={12} />NodusResearch</span>
+                <span className="capability-packages-version">{state?.active && state.active.version !== entry.version ? `${state.active.version} → ${entry.version}` : entry.version}</span>
+              </span>
+              <p className="capability-packages-muted">{label(entry.description)}</p>
             </div>
-            <PackageActions entry={entry} state={state} busy={busy} run={run} />
+            <button type="button" className="chat-skill-details-toggle" aria-expanded={open}
+              aria-label={`${t(open ? 'Ocultar detalles de' : 'Ver detalles de')} ${entry.name}`}
+              title={t(open ? 'Ocultar detalles' : 'Ver detalles')} onClick={() => setExpanded(open ? '' : entry.id)}>
+              <Icon name={open ? 'chevronUp' : 'chevronDown'} size={14} />
+            </button>
           </div>
-          <p className="capability-packages-muted">{label(entry.description)}</p>
-          <PackageFacts entry={entry} state={state} providers={providers} />
-          {state?.active && <label className="capability-packages-autoupdate">
-            <input type="checkbox" checked={state.autoUpdate}
-              onChange={event => void run(entry.id, () => window.nodus.setCapabilityAutoUpdate(entry.id, event.target.checked))} />
-            <span>{t('Actualizar este paquete automáticamente')}</span>
-          </label>}
+
           {state?.pending?.reason === 'permissions' && <p className="capability-packages-warning" role="status">
             {t('La actualización pide permisos nuevos. Revísalos y apruébala para instalarla.')}
           </p>}
-          {providers.some(provider => provider.hasSettings) && <>
-            <button type="button" className="capability-packages-toggle"
-              onClick={() => setExpanded(expanded === entry.id ? '' : entry.id)}>
-              <Icon name={expanded === entry.id ? 'chevronUp' : 'chevronDown'} size={14} />{t('Configuración')}
-            </button>
-            {expanded === entry.id && providers.filter(provider => provider.hasSettings).map(provider =>
+
+          {open && <div className="capability-packages-details">
+            <p className="capability-packages-muted">{label(entry.description)}</p>
+            <PackageFacts entry={entry} state={state} providers={providers} />
+            {state?.active && <label className="capability-packages-autoupdate">
+              <input type="checkbox" checked={state.autoUpdate}
+                onChange={event => void run(entry.id, () => window.nodus.setCapabilityAutoUpdate(entry.id, event.target.checked))} />
+              <span>{t('Actualizar este paquete automáticamente')}</span>
+            </label>}
+            {providers.filter(provider => provider.hasSettings).map(provider =>
               <SettingsForm key={provider.id} capabilityId={provider.id} onChanged={refresh} />)}
-          </>}
+          </div>}
+
+          <PackageActions entry={entry} state={state} busy={busy} run={run} />
         </li>;
       })}
     </ul>

@@ -122,6 +122,9 @@ const rows = [
   ["Descargar texto con atribuciones", "Download text with attribution", "Télécharger le texte avec attribution", "Text mit Quellenangaben herunterladen", "Descarregar texto com atribuições", "Baixar texto com atribuições", "Scarica testo con attribuzioni", "Atıflarıyla metni indir"],
   ["Las leyes conservan las condiciones de su fuente oficial. La licencia MIT del código no se aplica a todos los datos.", "Laws retain their official source terms. The code’s MIT licence does not apply to all data.", "Les lois conservent les conditions de leur source officielle. La licence MIT du code ne couvre pas toutes les données.", "Für Gesetze gelten die Bedingungen ihrer amtlichen Quelle. Die MIT-Code-Lizenz gilt nicht für alle Daten.", "As leis mantêm as condições da fonte oficial. A licença MIT do código não abrange todos os dados.", "As leis mantêm as condições da fonte oficial. A licença MIT do código não cobre todos os dados.", "Le leggi mantengono le condizioni della fonte ufficiale. La licenza MIT del codice non copre tutti i dati.", "Yasalar resmî kaynaklarının koşullarını korur. Kodun MIT lisansı tüm verileri kapsamaz."],
 
+  ["Ver detalles de", "Show details of", "Afficher les détails de", "Details anzeigen für", "Mostrar detalhes de", "Mostrar detalhes de", "Mostra i dettagli di", "Ayrıntıları göster:"],
+  ["Ocultar detalles de", "Hide details of", "Masquer les détails de", "Details ausblenden für", "Ocultar detalhes de", "Ocultar detalhes de", "Nascondi i dettagli di", "Ayrıntıları gizle:"],
+  ["Ocultar detalles", "Hide details", "Masquer les détails", "Details ausblenden", "Ocultar detalhes", "Ocultar detalhes", "Nascondi i dettagli", "Ayrıntıları gizle"],
 ];
 export const CHAT_SKILLS_TRANSLATIONS = Object.fromEntries(
   ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'].map((language, index) => [language, Object.fromEntries(rows.map(row => [row[0], row[index + 1]]))]),

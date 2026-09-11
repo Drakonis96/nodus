@@ -72,6 +72,14 @@ try {
     await overlay.getByRole('button', { name: 'Save skill', exact: true }).click();
     const custom = (await overlay.evaluate(() => window.nodus.listChatSkills())).find(skill => skill.name === 'Executive brief');
     assert.ok(custom);
+    // Edit and delete sit behind the card's details toggle, so the row stays a name, a
+    // description and a switch whatever the skill is. Opened only when it is not already:
+    // the card keeps its state across an edit, and clicking again would close it.
+    const openDetails = async () => {
+      if (await overlay.getByRole('button', { name: 'Edit Executive brief', exact: true }).count()) return;
+      await overlay.getByRole('button', { name: 'Show details of Executive brief', exact: true }).click();
+    };
+    await openDetails();
     await overlay.getByRole('button', { name: 'Edit Executive brief', exact: true }).click();
     await overlay.getByLabel('Instructions', { exact: true }).fill('For a concise decision brief, begin with the exact line Executive brief · Nodus. Use exactly three headings: Recommendation, Evidence, Next step. Give one recommendation, two pieces of evidence, and one concrete next step.');
     await overlay.getByRole('button', { name: 'Save skill', exact: true }).click();
@@ -91,6 +99,7 @@ try {
     await overlay.getByRole('switch', { name: /Executive brief/ }).click();
     const updated = (await overlay.evaluate(() => window.nodus.listChatSkills())).find(skill => skill.id === custom.id);
     assert.equal(updated.enabled.nodi, false); assert.equal(updated.enabled.assistant, true);
+    await openDetails();
     await overlay.getByRole('button', { name: 'Delete Executive brief', exact: true }).click();
     await overlay.locator('.chat-skill-confirm').getByRole('button', { name: 'Delete', exact: true }).click();
     await overlay.getByTestId('chat-skills-nodi').click();

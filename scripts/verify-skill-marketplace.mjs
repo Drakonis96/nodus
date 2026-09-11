@@ -59,6 +59,9 @@ try {
   await page.getByTestId('header-actions').getByRole('button', { name: 'Assistant', exact: true }).click();
   await page.getByTestId('chat-skills-assistant').click();
   await page.getByRole('button', { name: 'Marketplace', exact: true }).click();
+  // Which repository the skills come from is folded away until asked for.
+  const sources = page.locator('.skill-marketplace-sources');
+  await sources.getByText('Repositories', { exact: true }).click();
   if (!checkout) await page.getByRole('button', { name: 'Update catalog', exact: true }).click();
   // waitForFunction treats the pending promise of an async predicate as a truthy result, so it
   // returned before the first scan finished; page.evaluate awaits the value it is polling.
@@ -72,14 +75,16 @@ try {
   // Skills this build already includes are listed as installed, never offered as a second copy.
   const installedFilter = page.getByRole('group', { name: 'Installed filter' });
   await installedFilter.getByRole('button', { name: /^Installed / }).click();
-  await page.getByRole('button', { name: 'Uninstall Legalize', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Uninstall Socratic Tutor', exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'Uninstall Descriptive Statistics', exact: true }).count(), 0);
   await installedFilter.getByRole('button', { name: /^Available / }).click();
   await page.getByRole('button', { name: 'Review skill', exact: true }).first().waitFor();
-  assert.equal(await page.getByRole('button', { name: 'Uninstall Legalize', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: 'Uninstall Socratic Tutor', exact: true }).count(), 0);
   await page.screenshot({ path: path.join(artifacts, 'installed-filter.png') });
   await installedFilter.getByRole('button', { name: /^All / }).click();
-  for (const name of ['AlphaGenome', 'Legalize']) {
+  // The skills this build includes. Chemistry, legal and genomics are capability packages
+  // now, not built-in skills, so they are installed from the packages panel above.
+  for (const name of ['SVG Studio', 'Socratic Tutor']) {
     await page.getByRole('searchbox', { name: 'Search marketplace' }).fill(name);
     await page.getByRole('button', { name: 'Manage skill', exact: true }).click();
     await page.getByText(/Included in Nodus/).waitFor();
@@ -89,21 +94,24 @@ try {
     await page.getByRole('button', { name: '← Back to catalog', exact: true }).click();
   }
   // Uninstall an included skill from the catalog and restore it, leaving the rest of the library alone.
-  await page.getByRole('searchbox', { name: 'Search marketplace' }).fill('Legalize');
-  await page.getByRole('button', { name: 'Uninstall Legalize', exact: true }).click();
-  await page.getByText('Uninstall Legalize? Its native capabilities stay in Nodus.', { exact: true }).waitFor();
+  // Counted before rather than written down: how many skills a build includes is a product
+  // decision that changes, and what this step is about is the other ones not moving.
+  const builtinsBefore = await page.evaluate(async () => (await window.nodus.listChatSkills()).filter(skill => skill.builtin).length);
+  await page.getByRole('searchbox', { name: 'Search marketplace' }).fill('Socratic Tutor');
+  await page.getByRole('button', { name: 'Uninstall Socratic Tutor', exact: true }).click();
+  await page.getByText('Uninstall Socratic Tutor? Its native capabilities stay in Nodus.', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Uninstall', exact: true }).click();
   await page.getByText(/Its native capabilities stay in Nodus/).waitFor();
-  await page.waitForFunction(async () => !(await window.nodus.listChatSkills()).some(skill => skill.builtin === 'legal'));
+  await page.waitForFunction(async () => !(await window.nodus.listChatSkills()).some(skill => skill.builtin === 'socratic'));
   await page.getByRole('button', { name: 'Review skill', exact: true }).click();
   await page.getByRole('button', { name: 'Install skill', exact: true }).click();
   await page.getByText('Included skill restored. Check its activation in My skills.', { exact: true }).waitFor();
   const restoredBuiltin = await page.evaluate(async () => {
     const skills = await window.nodus.listChatSkills();
-    return { legal: skills.find(skill => skill.builtin === 'legal'), builtins: skills.filter(skill => skill.builtin).length };
+    return { socratic: skills.find(skill => skill.builtin === 'socratic'), builtins: skills.filter(skill => skill.builtin).length };
   });
-  assert.equal(restoredBuiltin.legal.name, 'Legalize'); assert.equal(restoredBuiltin.legal.origin, undefined);
-  assert.equal(restoredBuiltin.builtins, 14, 'restoring one included skill leaves the rest of the library alone');
+  assert.equal(restoredBuiltin.socratic.name, 'Socratic Tutor'); assert.equal(restoredBuiltin.socratic.origin, undefined);
+  assert.equal(restoredBuiltin.builtins, builtinsBefore, 'restoring one included skill leaves the rest of the library alone');
   await page.getByRole('searchbox', { name: 'Search marketplace' }).fill('Descriptive Statistics');
   await page.getByRole('button', { name: 'Review skill', exact: true }).click();
   await page.screenshot({ path: path.join(artifacts, 'review.png') });
@@ -111,6 +119,14 @@ try {
   await page.getByText('Skill installed. Enable it in My skills.', { exact: true }).waitFor();
   installedId = await page.evaluate(async () => (await window.nodus.listChatSkills()).find(s => s.origin?.packageId === 'descriptive-statistics').id);
   await page.getByRole('button', { name: 'My skills', exact: true }).click();
+  // The library: one row per skill, all the same height, in alphabetical order.
+  const libraryNames = await page.locator('.chat-skills-list .chat-skill-item .chat-skill-text b').allTextContents();
+  assert.deepEqual(libraryNames, [...libraryNames].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true })), 'the library is alphabetical');
+  const heights = await page.locator('.chat-skills-list .chat-skill-item').evaluateAll(cards => cards.map(card => Math.round(card.getBoundingClientRect().height)));
+  assert.equal(new Set(heights).size, 1, `every collapsed card is the same height (${[...new Set(heights)].join(', ')})`);
+  const glyphs = await page.locator('.chat-skills-list .chat-skill-symbol svg').evaluateAll(nodes => nodes.map(node => node.innerHTML));
+  assert.ok(new Set(glyphs).size >= Math.min(5, glyphs.length), `skills are told apart by their icons (${new Set(glyphs).size} of ${glyphs.length})`);
+  await page.screenshot({ path: path.join(artifacts, 'my-skills.png') });
   await page.getByRole('switch', { name: 'Enable Descriptive Statistics', exact: true }).click();
   await page.getByRole('region', { name: 'Skills', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
   console.log('Installed and enabled', installedId);
@@ -127,6 +143,7 @@ try {
   assert.match(nodiEnabled, /"mean":5/); assert.match(nodiEnabled, /"count":4/);
   // Source management through the visible UI, using an empty public repository catalog.
   await page.getByTestId('chat-skills-assistant').click(); await page.getByRole('button', { name: 'Marketplace', exact: true }).click();
+  await page.locator('.skill-marketplace-sources').getByText('Repositories', { exact: true }).click();
   await page.getByRole('textbox', { name: 'Repository URL' }).fill('https://github.com/NodusResearch/nodus-research-skill-marketplace');
   await page.getByRole('button', { name: 'Add source', exact: true }).click();
   await page.getByRole('alert').filter({ hasText: /already added/ }).waitFor();
@@ -150,6 +167,9 @@ try {
   await page.getByLabel('Tool description', { exact: true }).fill('Input { value: number }. Return twice the value.');
   await page.getByLabel('JavaScript function', { exact: true }).fill('(input) => ({ value: input.value * 2 })');
   await page.getByRole('button', { name: 'Save skill', exact: true }).click();
+  // Export, edit and delete live behind the card's details toggle: the row itself stays a
+  // name, a description and a switch, whatever the skill is.
+  await page.getByRole('button', { name: 'Show details of QA Tool', exact: true }).click();
   await page.getByRole('button', { name: 'Export QA Tool', exact: true }).waitFor();
   const exportParent = path.join(profile, 'exports'); fs.mkdirSync(exportParent);
   await app.evaluate(({ dialog }, directory) => { globalThis.__marketplaceOriginalDialog = dialog.showOpenDialog; dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [directory] }); }, exportParent);

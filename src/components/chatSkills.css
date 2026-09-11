@@ -45,10 +45,34 @@
 .chat-skill-item { border: 1px solid #ffffff12; border-radius: 12px; padding: 14px; background: #ffffff02; }
 .chat-skill-item.enabled { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 20.0%, transparent); background: linear-gradient(135deg,color-mix(in srgb, var(--vault-accent, #6366f1) 3.1%, transparent),color-mix(in srgb, var(--vault-accent, #6366f1) 1.6%, transparent)); }
 .chat-skill-main { display: flex; align-items: flex-start; gap: 12px; }
-.chat-skill-symbol { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; border-radius: 10px; background: color-mix(in srgb, var(--vault-accent, #6366f1) 9.8%, transparent); color: color-mix(in srgb, var(--vault-accent, #6366f1) 55%, white); }.chat-skill-symbol.image { color: color-mix(in srgb, var(--vault-accent, #6366f1) 55%, white); background: color-mix(in srgb, var(--vault-accent, #6366f1) 8.2%, transparent); }
+.chat-skill-symbol { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; border-radius: 10px; background: color-mix(in srgb, var(--vault-accent, #6366f1) 9.8%, transparent); color: color-mix(in srgb, var(--vault-accent, #6366f1) 55%, white); }
 .chat-skill-main>div { flex: 1; min-width: 0; }.chat-skill-main b { font-size: 13px; font-weight: 600; }.chat-skill-main p { font-size: 11px; color: #a1a1aa; line-height: 1.55; margin: 5px 0 0; }
+
+/* One card, one height. A skill with a long description and a skill with a short one take
+   the same room, because a column of rows that all start in the same place is one you can
+   run your eye down; everything past the second line is behind the chevron.
+   `--skill-hue` is set per card, so a skill is recognisable before it is read. */
+.chat-skill-text { flex: 1; min-width: 0; }
+/* Name and badge on one line, always: a badge that wrapped made that one card taller than
+   every other card in the list. The name gives way first, because the badge is one word. */
+.chat-skill-heading { display: flex; align-items: center; gap: 7px; min-width: 0; min-height: 20px; }
+/* The badge used to sit on its own line, and brought its top margin with it. */
+.chat-skill-heading .chat-skill-tool-badge { display: inline-flex; align-items: center; margin: 0; line-height: 1.4; }
+.chat-skill-heading b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-skill-heading > span { flex-shrink: 0; }
+/* Two lines exactly: the clamp is the ceiling and the min-height is the floor, or a skill
+   described in one line would sit in a shorter card than the one below it. */
+.chat-skill-text p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; min-height: calc(1.55em * 2); }
+.chat-skill-item.open .chat-skill-text p { display: none; }
+.chat-skill-symbol { color: hsl(var(--skill-hue, 250) 72% 74%); background: hsl(var(--skill-hue, 250) 60% 60% / .16); }
+.chat-skill-details-toggle { display: grid; place-items: center; flex-shrink: 0; width: 26px; height: 26px; padding: 0; border-radius: 7px; color: #858591; }
+.chat-skill-details-toggle:hover { background: #ffffff0f; color: #eeeef4; }
+.chat-skill-details { border-top: 1px solid #ffffff09; margin-top: 10px; padding-top: 9px; display: grid; gap: 5px; }
+.chat-skill-details p { margin: 0; font-size: 11px; line-height: 1.55; color: #a1a1aa; }
+.chat-skill-details small { font-size: 9px; color: #858591; overflow-wrap: anywhere; }
+.chat-skill-remove:hover { color: #f87171; }
 .chat-skill-switch { width: 29px; height: 17px; padding: 2px; background: #45454f; border-radius: 10px; flex-shrink: 0; margin-top: 3px; }.chat-skill-switch span { display: block; width: 13px; height: 13px; background: #fff; border-radius: 50%; transition: transform .15s; }.chat-skill-switch[aria-checked='true'] { background: var(--vault-accent, #6366f1); }.chat-skill-switch[aria-checked='true'] span { transform: translateX(12px); }
-.chat-skill-item-foot { display: flex; align-items: center; gap: 7px; border-top: 1px solid #ffffff09; margin-top: 12px; padding-top: 8px; }.chat-skill-item-foot small { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 9px; color: #858591; }.chat-skill-item-foot button { padding: 4px; color: #a1a1aa; }
+.chat-skill-item-foot { display: flex; align-items: center; gap: 7px; margin-top: 3px; }.chat-skill-item-foot button { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; }.chat-skill-item-foot small { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 9px; color: #858591; }.chat-skill-item-foot button { padding: 4px; color: #a1a1aa; }
 .chat-skills-add { display: flex; gap: 8px; margin-top: 16px; }.chat-skills-add button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px; font-size: 11px; border: 1px solid #ffffff18; border-radius: 8px; }.chat-skill-primary { background: var(--vault-accent, #6366f1) !important; color: #fff; border-color: var(--vault-accent, #6366f1) !important; }
 .chat-skills-restore { display: block; margin: 14px auto 0; font-size: 10px; color: #858591; }
 .chat-skill-editor { display: flex; flex-direction: column; gap: 13px; margin-top: 18px; }.chat-skill-editor>label { display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: #b4b4bf; }.chat-skill-editor input:not([type='checkbox']),.chat-skill-editor textarea { width: 100%; padding: 9px 10px; background: #111218; color: #eeeef4; border: 1px solid #ffffff1c; border-radius: 8px; font-size: 12px; }.chat-skill-editor input:focus,.chat-skill-editor textarea:focus { outline: 2px solid color-mix(in srgb, var(--vault-accent, #6366f1) 47.8%, transparent); outline-offset: 1px; }.chat-skill-editor .chat-skill-prompt { font-family: ui-monospace, monospace; line-height: 1.6; font-size: 11px; resize: vertical; min-height: 130px; }.chat-skill-editor>small { font-size: 10px; color: #858591; line-height: 1.5; }
@@ -71,7 +95,9 @@
 :is(.light, .nodi-theme-light) .chat-skills-eyebrow,:is(.light, .nodi-theme-light) .chat-skills-intro span,:is(.light, .nodi-theme-light) .chat-skill-confirm button { color: var(--vault-accent, #6366f1); }
 :is(.light, .nodi-theme-light) .chat-skills-intro,:is(.light, .nodi-theme-light) .chat-skill-main p,:is(.light, .nodi-theme-light) .chat-skill-item-foot small,:is(.light, .nodi-theme-light) .chat-skills-restore,:is(.light, .nodi-theme-light) .chat-skill-editor>small { color: #656575; }
 :is(.light, .nodi-theme-light) .chat-skill-item { border-color: #e4e4ed; }:is(.light, .nodi-theme-light) .chat-skill-item.enabled { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 55%, white); }
-:is(.light, .nodi-theme-light) .chat-skill-symbol { color: var(--vault-accent, #6366f1); }:is(.light, .nodi-theme-light) .chat-skill-symbol.image { color: var(--vault-accent, #6366f1); }
+:is(.light, .nodi-theme-light) .chat-skill-symbol { color: hsl(var(--skill-hue, 250) 58% 42%); background: hsl(var(--skill-hue, 250) 62% 52% / .13); }
+:is(.light, .nodi-theme-light) .chat-skill-details-toggle { color: #71717a; }:is(.light, .nodi-theme-light) .chat-skill-details-toggle:hover { background: #00000008; color: #27272a; }
+:is(.light, .nodi-theme-light) .chat-skill-details { border-color: #e4e4ed; }:is(.light, .nodi-theme-light) .chat-skill-details p,:is(.light, .nodi-theme-light) .chat-skill-details small { color: #656575; }
 :is(.light, .nodi-theme-light) .chat-skill-item-foot,:is(.light, .nodi-theme-light) .chat-skills-add button { border-color: #e4e4ed; }
 :is(.light, .nodi-theme-light) .chat-skill-editor>label,:is(.light, .nodi-theme-light) .chat-skill-confirm { color: #52525b; }
 :is(.light, .nodi-theme-light) .chat-skill-editor input:not([type='checkbox']),:is(.light, .nodi-theme-light) .chat-skill-editor textarea { color: #27272a; background: #fafafa; border-color: #d4d4df; }
@@ -81,12 +107,11 @@
 .chat-skills-panel,.chat-skills-panel * { box-sizing: border-box; }
 .chat-skill-item.tool-skill { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 25.9%, transparent); background: color-mix(in srgb, var(--vault-accent, #6366f1) 2.4%, transparent); }
 .chat-skill-item.tool-skill.enabled { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 45.9%, transparent); background: linear-gradient(135deg,color-mix(in srgb, var(--vault-accent, #6366f1) 7.5%, transparent),color-mix(in srgb, var(--vault-accent, #6366f1) 2.0%, transparent)); }
-.chat-skill-item.tool-skill .chat-skill-symbol { color: color-mix(in srgb, var(--vault-accent, #6366f1) 55%, white); background: color-mix(in srgb, var(--vault-accent, #6366f1) 12.5%, transparent); }
 .chat-skill-tool-badge { display: table; margin-top: 5px; padding: 1px 6px; border-radius: 5px; font-size: 9px; line-height: 1.6; font-weight: 600; color: color-mix(in srgb, var(--vault-accent, #6366f1) 55%, white); background: color-mix(in srgb, var(--vault-accent, #6366f1) 9.4%, transparent); border: 1px solid color-mix(in srgb, var(--vault-accent, #6366f1) 18.8%, transparent); }
 .tool-skill .chat-skill-switch[aria-checked='true'] { background: var(--vault-accent, #6366f1); }
 :is(.light, .nodi-theme-light) .chat-skill-item.tool-skill { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 45%, white); background: color-mix(in srgb, var(--vault-accent, #6366f1) 8%, white); }
 :is(.light, .nodi-theme-light) .chat-skill-item.tool-skill.enabled { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 45%, white); background: color-mix(in srgb, var(--vault-accent, #6366f1) 8%, white); }
-:is(.light, .nodi-theme-light) .tool-skill .chat-skill-symbol,:is(.light, .nodi-theme-light) .chat-skill-tool-badge { color: var(--vault-accent, #6366f1); background: color-mix(in srgb, var(--vault-accent, #6366f1) 8%, white); }
+:is(.light, .nodi-theme-light) .chat-skill-tool-badge { color: var(--vault-accent, #6366f1); background: color-mix(in srgb, var(--vault-accent, #6366f1) 8%, white); }
 
 .skill-marketplace-tabs { display: flex; gap: 6px; margin: 16px 0; padding: 4px; border-radius: 10px; background: color-mix(in srgb, var(--vault-accent, #6366f1) 6.3%, transparent); }
 .skill-marketplace-tabs button { flex: 1; padding: 8px; border-radius: 7px; }
@@ -103,7 +128,21 @@
 .skill-marketplace small { display: block; opacity: .75; overflow-wrap: anywhere; }
 .skill-marketplace-source { display: grid; gap: 8px; border-bottom: 1px solid color-mix(in srgb, var(--vault-accent, #6366f1) 18.8%, transparent); padding-bottom: 16px; }
 .skill-marketplace section { display: grid; gap: 8px; }.skill-marketplace h4 { font-size: 14px; margin: 4px 0; }
-.skill-marketplace .chat-skill-item { display: grid; gap: 7px; }.skill-marketplace .chat-skill-item p { margin: 0; }
+.skill-marketplace .chat-skill-item p { margin: 5px 0 0; }
+.skill-marketplace-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: end; gap: 8px 10px; margin-bottom: 12px; }
+.skill-marketplace-filters label { margin: 0; }
+
+/* Source management, folded. The summary keeps saying which repository this is. */
+.skill-marketplace-sources { border: 1px solid #ffffff12; border-radius: 10px; padding: 0 11px; margin-bottom: 12px; }
+.skill-marketplace-sources > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; cursor: pointer; font-size: 11px; color: #a1a1aa; list-style: none; }
+.skill-marketplace-sources > summary::-webkit-details-marker { display: none; }
+.skill-marketplace-sources-hint { flex-shrink: 0; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; opacity: .6; }
+.skill-marketplace-sources[open] > summary { border-bottom: 1px solid #ffffff0d; margin-bottom: 10px; }
+.skill-marketplace-sources > :not(summary) { margin-bottom: 10px; }
+:is(.light, .nodi-theme-light) .skill-marketplace-sources { border-color: #e4e4ed; }
+:is(.light, .nodi-theme-light) .skill-marketplace-sources > summary { color: #656575; }
+.skill-marketplace-entry-actions { display: flex; gap: 7px; margin-top: 10px; }
+.skill-marketplace-entry-actions button { flex: 1; justify-content: center; }
 .skill-marketplace-review { display: grid; gap: 10px; }.skill-marketplace pre { max-height: 220px; white-space: pre-wrap; overflow: auto; overflow-wrap: anywhere; background: color-mix(in srgb, var(--vault-accent, #6366f1) 6.3%, transparent); border-radius: 8px; padding: 10px; font-size: 10px; }
 .skill-marketplace-filter { display: flex; gap: 6px; }.skill-marketplace-filter button { flex: 1; }
 .skill-marketplace-filter button[aria-pressed=true] { border-color: var(--vault-accent, #6366f1); background: color-mix(in srgb, var(--vault-accent, #6366f1) 12.5%, transparent); }
