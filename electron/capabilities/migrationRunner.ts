@@ -65,7 +65,7 @@ function legacyData(pluginId: string): unknown {
  *  not from what it was asked to do. A package whose second migration fails ends the run
  *  at version 1, keeps everything version 1 gave it, and is retried from there; nothing
  *  rolls the data back, because each rung is written to be re-runnable. */
-async function migrateData(pluginId: string, legacy: unknown): Promise<void> {
+export async function runPluginDataMigrations(pluginId: string, legacy: unknown = {}): Promise<void> {
   const state = readPluginStateV2(pluginId);
   if (!state?.active) throw new Error(`${pluginId} is not active.`);
   const scripts = pluginMigrationScripts(pluginId);
@@ -96,14 +96,32 @@ async function migrateData(pluginId: string, legacy: unknown): Promise<void> {
   if (reached < scripts.length) throw new Error(`${pluginId} stopped at data version ${reached} of ${scripts.length}.`);
 }
 
-export async function migrateCapabilitiesForThisProfile(): Promise<MigrationOutcome> {
+/** One migration at a time.
+ *
+ *  The run starts in the background at launch and the interface offers a retry, so two of
+ *  them can be asked for at once. They would install the same package twice, race on the
+ *  journal and disagree about what the library says, so the second caller joins the first
+ *  instead of starting a second. */
+let inFlight: Promise<MigrationOutcome> | null = null;
+
+export const capabilityMigrationRunning = (): boolean => inFlight !== null;
+
+export function migrateCapabilitiesForThisProfile(): Promise<MigrationOutcome> {
+  if (inFlight) return inFlight;
+  const run = runProfileMigration();
+  inFlight = run;
+  void run.catch(() => undefined).finally(() => { if (inFlight === run) inFlight = null; });
+  return run;
+}
+
+function runProfileMigration(): Promise<MigrationOutcome> {
   return runCapabilityMigration({
     readSkills: () => listChatSkills(),
     writeSkills: (skills: ChatSkill[]) => { replaceChatSkills(skills); },
     baseline: migrationBaseline,
     packaged: pinnedPluginSkill,
     legacyData,
-    migrateData,
+    migrateData: runPluginDataMigrations,
     preLibraryProfile: profilePredatesSkillLibrary(),
     installer: { online: pluginId => installCatalogPlugin(pluginId, { approvePermissions: true }) },
   });

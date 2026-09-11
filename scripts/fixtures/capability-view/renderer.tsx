@@ -75,6 +75,21 @@ window.nodus = {
   removeCapabilityPlugin: async () => [],
   rollbackCapabilityPlugin: async () => null as never,
   approveCapabilityPlugin: async () => null as never,
+  capabilityMigrationStatus: async () => ({
+    running: false,
+    settled: false,
+    journal: null,
+    // One package still moving and one that could not: both states are on screen, because
+    // both are what a user sees while the 5.3.1 move is unfinished.
+    entries: [
+      { pluginId: 'alphagenome', phase: 'data-migrated', reason: 'builtin-enabled', attempts: 1, updatedAt: '2026-09-11T10:00:00.000Z', installed: true, dataVersion: 0, registered: false },
+      { pluginId: 'legalize', phase: 'package-staged', reason: 'custom-skill-depends', attempts: 2, updatedAt: '2026-09-11T10:00:00.000Z', failure: 'The package source could not be reached.', installed: false, dataVersion: 0, registered: false },
+    ],
+    problems: [],
+  }),
+  onCapabilityMigrationChanged: () => () => {},
+  retryCapabilityMigration: async () => ({ installed: [], adopted: [], preserved: [], failed: [] }),
+  renderLegacyCapabilityResult: async () => ({ available: true as const, capabilityId: 'nodus:chemistry', pluginId: 'chemistry-studio', view }),
   renderCapabilityArtifact: async () => ({ available: true as const, sidecar: { source: 'nodus-artifact://chat/' + 'a'.repeat(64) + '/3f8a1c0e-9b2d-4e77-8a10-5c6d7e8f9a0b', capabilityId: 'nodus:chemistry', plugin: { id: 'chemistry-studio', version: '2.0.0', digest: 'a'.repeat(64) }, artifactType: 'chemistry-document', artifactVersion: 1, summary: 'Etanol, CID 702.', modelVisibility: 'projection' as const, sha256: 'c'.repeat(64), bytes: 1024, createdAt: '2026-09-11T10:00:00.000Z' }, view }),
   downloadCapabilityFile: async () => {},
   getChatImageMetadata: async () => null,

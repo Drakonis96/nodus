@@ -131,6 +131,11 @@ export const nodusApi: NodusApi = {
   renderCapabilityArtifact: (source, locale) => ipcRenderer.invoke('artifacts:render', source, locale),
   renderLegacyCapabilityResult: (fence, payload, locale) => ipcRenderer.invoke('capabilities:renderLegacyResult', fence, payload, locale),
   capabilityMigrationStatus: () => ipcRenderer.invoke('capabilities:migrationStatus'),
+  onCapabilityMigrationChanged: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on('capabilities:migrationChanged', listener);
+    return () => ipcRenderer.removeListener('capabilities:migrationChanged', listener);
+  },
   retryCapabilityMigration: () => ipcRenderer.invoke('capabilities:retryMigration'),
   refreshCapabilityCatalog: (sourceUrl) => ipcRenderer.invoke('capabilities:refreshCatalog', sourceUrl),
   installCapabilityPlugin: (pluginId, approvePermissions) => ipcRenderer.invoke('capabilities:installPlugin', pluginId, approvePermissions),

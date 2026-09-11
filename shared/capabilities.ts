@@ -76,6 +76,31 @@ export type LegacyResultRenderResult =
   | { available: true; capabilityId: string; pluginId?: string; view: ViewDocumentV1 }
   | { available: false; reason: 'no-provider' };
 
+/** Where the 5.3.1 -> 5.3.2 move has got to, per package.
+ *
+ *  `phase` is the journal's, and the three booleans are what the interface actually needs
+ *  to tell the states apart: installed but not migrated is "migrating", migrated but not
+ *  registered is a problem worth showing, and a failure with a phase is retryable. */
+export interface CapabilityMigrationEntry {
+  pluginId: string;
+  phase: string;
+  reason: string;
+  attempts: number;
+  updatedAt: string;
+  failure?: string;
+  installed: boolean;
+  dataVersion: number;
+  registered: boolean;
+}
+
+export interface CapabilityMigrationStatus {
+  running: boolean;
+  settled: boolean;
+  journal: unknown;
+  entries: CapabilityMigrationEntry[];
+  problems: Array<{ pluginId: string; detail: string }>;
+}
+
 export interface CapabilitySettingsPayload { manifest: SettingsManifestV1; state: SettingsStateV1 }
 
 export interface CapabilityHealthPayload { status: 'ready' | 'degraded' | 'needs-setup' | 'needs-migration'; detail?: Record<string, string>; dataVersion: number }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { CapabilityListPayload, CapabilityProviderSummary, CapabilitySettingsPayload, InstalledCapabilityPlugin, SettingsFieldV1 } from '@shared/capabilities';
+import type { CapabilityListPayload, CapabilityMigrationStatus, CapabilityProviderSummary, CapabilitySettingsPayload, InstalledCapabilityPlugin, SettingsFieldV1 } from '@shared/capabilities';
 import { DEFAULT_SKILL_SOURCE } from '@shared/skillMarketplace';
 import { CapabilityView } from './CapabilityView';
 import { Icon } from './ui';
@@ -94,6 +94,65 @@ function SettingsForm({ capabilityId, onChanged }: { capabilityId: string; onCha
   </form>;
 }
 
+/** What the 5.3.1 move is doing, while it is doing it.
+ *
+ *  The migration runs in the background so a failure cannot hold up the window, which
+ *  means the only way a user learns it did not finish is here. Each package says which of
+ *  the four things it is waiting on, and a failure offers the retry rather than describing
+ *  one. */
+function MigrationBanner({ onChanged }: { onChanged: () => void }) {
+  const [status, setStatus] = useState<CapabilityMigrationStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const refresh = useCallback(() => {
+    void window.nodus.capabilityMigrationStatus().then(setStatus).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    refresh();
+    const stopMigration = window.nodus.onCapabilityMigrationChanged(refresh);
+    const stopRegistry = window.nodus.onCapabilityRegistryChanged(refresh);
+    return () => { stopMigration(); stopRegistry(); };
+  }, [refresh]);
+
+  if (!status?.entries.length) return null;
+  const unfinished = status.entries.filter(entry => entry.phase !== 'complete' || !entry.registered);
+  if (!unfinished.length) return null;
+
+  const stageOf = (entry: CapabilityMigrationStatus['entries'][number]) => {
+    if (entry.failure) return t('No se pudo completar');
+    if (status.running && !entry.installed) return t('Instalando…');
+    if (status.running) return t('Migrando tus datos…');
+    if (!entry.installed) return t('Pendiente de instalar');
+    if (!entry.registered) return t('Pendiente de migrar');
+    return t('Pendiente');
+  };
+
+  return <div className="capability-packages-migration" role="status">
+    <p><b>{t('Traslado desde la versión anterior')}</b></p>
+    <p className="capability-packages-muted">{t('Tus disciplinas ahora son paquetes. Nodus las instala y traslada sus datos sin tocar lo que ya tenías.')}</p>
+    <ul>
+      {unfinished.map(entry => <li key={entry.pluginId}>
+        <b>{entry.pluginId}</b>
+        <span>{stageOf(entry)}</span>
+        {entry.failure && <span className="capability-packages-error">{entry.failure}</span>}
+        {entry.attempts > 1 && <span className="capability-packages-muted">{t('Intentos')}: {entry.attempts}</span>}
+      </li>)}
+    </ul>
+    {error && <p className="capability-packages-error" role="alert">{error}</p>}
+    <button type="button" className="chat-skill-primary" disabled={busy || status.running}
+      onClick={() => {
+        setBusy(true); setError('');
+        void window.nodus.retryCapabilityMigration()
+          .then(() => { refresh(); onChanged(); })
+          .catch(thrown => setError(thrown instanceof Error ? thrown.message : String(thrown)))
+          .finally(() => setBusy(false));
+      }}>
+      <Icon name="refresh" size={14} />{busy || status.running ? t('Reintentando…') : t('Reintentar')}
+    </button>
+  </div>;
+}
+
 export function CapabilityPackagesPanel() {
   const [payload, setPayload] = useState<CapabilityListPayload | null>(null);
   const [busy, setBusy] = useState('');
@@ -133,6 +192,8 @@ export function CapabilityPackagesPanel() {
         <Icon name="refresh" size={14} />{t('Actualizar catálogo')}
       </button>
     </header>
+
+    <MigrationBanner onChanged={refresh} />
 
     {error && <p className="capability-packages-error" role="alert">{error}</p>}
     {notice && <p className="capability-packages-notice" role="status">{notice}</p>}

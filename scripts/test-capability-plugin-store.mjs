@@ -396,6 +396,50 @@ test('uninstalling keeps the work and removes the credentials, and a reinstall f
   assert.equal(fs.existsSync(data), false, 'the second, explicit removal takes the data too');
 });
 
+test('a package is not announced until its data has climbed its own migration ladder', () => {
+  reset();
+  const plugin = pluginManifest({ migrations: ['migrations/001-adopt.cjs', 'migrations/002-rename.cjs'] });
+  const files = {
+    ...defaultFiles(plugin),
+    'migrations/001-adopt.cjs': 'module.exports = async () => ({});',
+    'migrations/002-rename.cjs': 'module.exports = async () => ({});',
+  };
+  const outcome = lib.installVerifiedPlugin(download(files), { approvePermissions: true });
+  assert.equal(outcome.activated, true);
+  assert.equal(outcome.state.dataVersion, 0);
+
+  // Installed, verified, active — and deliberately invisible. Announcing it here is how a
+  // capability gets used against data it has not finished moving.
+  let registry = lib.rebuildCapabilityRegistry();
+  assert.equal(lib.capabilityIsAvailable('nodus:chemistry'), false);
+  assert.match(registry.problems[0].detail, /Waiting for its data migration \(0 of 2\)/);
+
+  // Halfway is still not ready.
+  lib.recordPluginDataVersion('chemistry-studio', 1);
+  registry = lib.rebuildCapabilityRegistry();
+  assert.equal(lib.capabilityIsAvailable('nodus:chemistry'), false);
+  assert.match(registry.problems[0].detail, /\(1 of 2\)/);
+
+  lib.recordPluginDataVersion('chemistry-studio', 2);
+  registry = lib.rebuildCapabilityRegistry();
+  assert.equal(lib.capabilityIsAvailable('nodus:chemistry'), true);
+  assert.deepEqual(registry.problems, []);
+
+  // The recorded version is the host's to raise, never to lower: an older build reporting
+  // a smaller number is describing what it can read, not what is on disk.
+  lib.recordPluginDataVersion('chemistry-studio', 1);
+  assert.equal(lib.readPluginStateV2('chemistry-studio').dataVersion, 2);
+  rejects(() => lib.recordPluginDataVersion('chemistry-studio', -1), /Invalid data version/);
+
+  // And the scripts handed to a worker are the ones inside the installed package.
+  const scripts = lib.pluginMigrationScripts('chemistry-studio');
+  assert.equal(scripts.length, 2);
+  for (const script of scripts) {
+    assert.ok(script.includes(path.join('installed', 'chemistry-studio', 'versions')), 'a migration is read from the signed package');
+    assert.ok(fs.existsSync(script));
+  }
+});
+
 test('a build with no publishing key installs nothing at all', async () => {
   const keyless = path.join(scratch, 'keyless.cjs');
   await build({

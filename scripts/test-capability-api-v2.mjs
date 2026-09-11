@@ -60,7 +60,7 @@ const plugin = (overrides = {}) => ({
   replacesSkills: ['builtin-chemistry'],
   skills: ['skills/chemistry-studio/skill.json'],
   capabilities: ['capabilities/chemistry/capability.json'],
-  migrations: ['migrations/001-adopt-outcome-log.js'],
+  migrations: ['migrations/001-adopt-outcome-log.cjs'],
   ...overrides,
 });
 
@@ -150,6 +150,22 @@ test('plugin targets are explicit and a portable package cannot also be platform
   rejects(() => sdk.validatePluginManifestV2(plugin({ compatibility: { capabilityApi: 2, minNodusVersion: '5.3.2', targets: ['solaris-x64'] } })), /compatibility/);
   rejects(() => sdk.validatePluginManifestV2(plugin({ capabilities: ['capabilities/../../etc/capability.json'] })), /capability path/);
   rejects(() => sdk.validatePluginManifestV2(plugin({ capabilities: [] })), /capability list/);
+
+  // The migration list is the data version ladder: the nth script is what takes a profile
+  // to version n. Numbering that skips or repeats would make one version number mean two
+  // different things in two installs.
+  assert.deepEqual(
+    sdk.validatePluginManifestV2(plugin({ migrations: ['migrations/001-first.cjs', 'migrations/002-second.cjs'] })).migrations,
+    ['migrations/001-first.cjs', 'migrations/002-second.cjs'],
+  );
+  assert.deepEqual(sdk.validatePluginManifestV2(plugin({ migrations: [] })).migrations, [], 'a package may have nothing to migrate');
+  rejects(() => sdk.validatePluginManifestV2(plugin({ migrations: ['migrations/002-second.cjs'] })), /numbered 001/);
+  rejects(() => sdk.validatePluginManifestV2(plugin({ migrations: ['migrations/001-a.cjs', 'migrations/003-c.cjs'] })), /numbered 001/);
+  rejects(() => sdk.validatePluginManifestV2(plugin({ migrations: ['migrations/002-b.cjs', 'migrations/001-a.cjs'] })), /numbered 001/);
+  // A migration is required from wherever the package was extracted, so the extension has
+  // to settle what it is rather than leaving it to a package.json that may not be there.
+  rejects(() => sdk.validatePluginManifestV2(plugin({ migrations: ['migrations/001-adopt.js'] })), /migration path/);
+  rejects(() => sdk.validatePluginManifestV2(plugin({ migrations: ['migrations/../../evil.cjs'] })), /migration path/);
 });
 
 // ---------------------------------------------------------------- permissions

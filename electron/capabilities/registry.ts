@@ -94,6 +94,16 @@ export function rebuildCapabilityRegistry(): CapabilityRegistrySnapshot {
         path.join(app.getPath('userData'), 'plugins', 'installed', state.id, 'versions', `${state.active.version}-${state.active.digest}`),
         state.active.digest, state.active.target,
       );
+      // Installed is not the same as usable. A package whose data has not finished
+      // climbing its own migration ladder is not announced at all: a capability that is
+      // offered while its state is half-moved is a capability that will be used on data
+      // it cannot read. It appears the moment the migration finishes and the table is
+      // rebuilt — which is the only race that matters here, and it is settled in this
+      // direction on purpose.
+      if (state.dataVersion < staged.manifest.migrations.length) {
+        problems.push({ pluginId: state.id, detail: `Waiting for its data migration (${state.dataVersion} of ${staged.manifest.migrations.length}).` });
+        continue;
+      }
       candidates = staged.capabilities.map(entry => providerFor(state, entry.manifest));
     } catch (error) {
       problems.push({ pluginId: state.id, detail: error instanceof Error ? error.message : String(error) });

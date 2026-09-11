@@ -11,8 +11,8 @@ import { createCapabilityAdapters } from '../capabilities/runner';
 import { artifactSidecar, readCapabilityArtifact } from '../capabilities/artifactStore';
 import { fetchCapabilityCatalog, installCatalogPlugin, readCachedCatalog } from '../capabilities/marketplaceV2';
 import { legacyResultRequest } from '../capabilities/legacyResults';
-import { pendingMigrations, readMigrationJournal } from '../capabilities/migration';
-import { migrateCapabilitiesForThisProfile } from '../capabilities/migrationRunner';
+import { migrationSettled, pendingMigrations, readMigrationJournal } from '../capabilities/migration';
+import { capabilityMigrationRunning, migrateCapabilitiesForThisProfile, runPluginDataMigrations } from '../capabilities/migrationRunner';
 import { pinCapabilitiesForTurn } from '../capabilities/registry';
 import type { IpcContext } from './context';
 
@@ -156,14 +156,39 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
     };
   });
 
-  h('capabilities:migrationStatus', async () => ({
-    journal: readMigrationJournal(),
-    pending: pendingMigrations(),
-  }));
+  /** What the migration is doing, in terms the interface can show without interpreting a
+   *  journal. A package is only `complete` once it is installed, migrated and registered:
+   *  anything short of that is still in progress or still retryable. */
+  h('capabilities:migrationStatus', async () => {
+    const journal = readMigrationJournal();
+    const registry = capabilityRegistry();
+    const registered = new Set([...registry.providers.values()].flatMap(provider => provider.plugin ? [provider.plugin.id] : []));
+    return {
+      running: capabilityMigrationRunning(),
+      settled: migrationSettled(),
+      journal,
+      entries: (journal?.entries ?? []).map(entry => {
+        const state = listInstalledPluginsV2().find(candidate => candidate.id === entry.pluginId);
+        return {
+          pluginId: entry.pluginId,
+          phase: entry.phase,
+          reason: entry.reason,
+          attempts: entry.attempts,
+          updatedAt: entry.updatedAt,
+          ...(entry.failure ? { failure: entry.failure } : {}),
+          installed: Boolean(state?.active),
+          dataVersion: state?.dataVersion ?? 0,
+          registered: registered.has(entry.pluginId),
+        };
+      }),
+      problems: registry.problems,
+    };
+  });
 
   h('capabilities:retryMigration', async () => {
     const outcome = await migrateCapabilitiesForThisProfile();
     rebuildCapabilityRegistry();
+    broadcastMigrationChanged();
     return outcome;
   });
 
@@ -171,14 +196,19 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
 
   h('capabilities:installPlugin', async (_event, pluginId: string, approvePermissions = false) => {
     const outcome = await installCatalogPlugin(pluginId, { approvePermissions });
-    return { state: outcome.state, activated: outcome.activated };
+    // A freshly installed package climbs its own ladder before it is announced. Without
+    // this, a package that declares migrations would sit unregistered until the next
+    // launch, and the first thing a user did with it would run against version 0 data.
+    if (outcome.activated) await activateAfterMigration(pluginId);
+    return { state: listInstalledPluginsV2().find(state => state.id === pluginId) ?? outcome.state, activated: outcome.activated };
   });
 
   h('capabilities:approvePlugin', async (_event, pluginId: string) => {
     const state = approvePendingPluginV2(pluginId);
     await stopCapabilityWorkers(key => key.includes(pluginId));
     rebuildCapabilityRegistry();
-    return state;
+    await activateAfterMigration(pluginId);
+    return listInstalledPluginsV2().find(candidate => candidate.id === pluginId) ?? state;
   });
 
   h('capabilities:rollbackPlugin', async (_event, pluginId: string) => {
@@ -188,12 +218,30 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
     return state;
   });
 
+  /** Runs a newly active version's migrations, then rebuilds. A failure here leaves the
+   *  package installed and unannounced with something to retry, which is the same state a
+   *  failed profile migration leaves, and never takes the rest of the application with it. */
+  async function activateAfterMigration(pluginId: string): Promise<void> {
+    try { await runPluginDataMigrations(pluginId); }
+    catch (error) { console.warn(`[capabilities] ${pluginId} could not finish its data migration:`, error); }
+    rebuildCapabilityRegistry();
+    broadcastMigrationChanged();
+  }
+
   h('capabilities:removePlugin', async (_event, pluginId: string, purgeData = false) => {
     await stopCapabilityWorkers(key => key.includes(pluginId));
     removePluginV2(pluginId, { purgeData });
     rebuildCapabilityRegistry();
     return listInstalledPluginsV2();
   });
+}
+
+/** Tells every window that the migration moved, so a panel showing it does not have to
+ *  poll to find out. */
+function broadcastMigrationChanged(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('capabilities:migrationChanged');
+  }
 }
 
 function summarize(provider: CapabilityProvider) {

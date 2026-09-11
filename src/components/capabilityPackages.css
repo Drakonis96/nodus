@@ -32,3 +32,11 @@
 :is(.light, .nodi-theme-light) .capability-packages-publisher { color: #047857; }
 /* The shared chat-skill buttons are used here with a leading icon. */
 .capability-packages button { display: inline-flex; align-items: center; gap: 7px; }
+
+/* The 5.3.1 move, while it is still moving. Kept in the same visual family as a package
+   card: it is about the same packages, seen a moment earlier. */
+.capability-packages-migration { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid #71809655; border-radius: 10px; background: #7180961a; }
+.capability-packages-migration p { margin: 0; }
+.capability-packages-migration ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.capability-packages-migration li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 12px; }
+.capability-packages-migration button { justify-self: start; }
