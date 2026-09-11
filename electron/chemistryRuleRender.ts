@@ -23,9 +23,12 @@ export async function renderCheckedMechanism(checked: CheckedMechanism, kit: RDK
     } else if (checked.rule === 'e2') { start = end = -90; radius = 40; }
     return `\\draw[->](${anchor(flow.from)}).. controls +(${start.toFixed(3)}:${radius}mm) and +(${end.toFixed(3)}:${radius}mm).. (${anchor(flow.to)});`;
   }).join('');
-  const labels: Record<ChemistryRule, string> = { sn2: 'SN2', e2: 'E2', aldol: 'aldol', 'diels-alder': 'Diels-Alder', 'amide-resonance': '' };
+  const labels: Record<ChemistryRule, string> = { sn2: 'SN2', e2: 'E2', aldol: 'aldol', 'diels-alder': 'Diels-Alder', 'amide-resonance': '', 'electron-flow': '' };
   const suffix = checked.rule === 'diels-alder' ? (checked.title?.endsWith(': endo') ? ' endo' : checked.title?.endsWith(': exo') ? ' exo' : '') : checked.rule === 'aldol' ? ` ${checked.title?.match(/^[123]/)?.[0] ?? ''}` : checked.rule === 'e2' ? ` (${checked.title?.match(/\d+$/)?.[0] ?? '1'})` : '';
-  const source = `\\schemestart ${group(checked.reactants)} \\arrow{${checked.rule === 'amide-resonance' ? '<->' : `->[${labels[checked.rule]}${suffix}]`}} ${group(checked.products)} \\schemestop\\chemmove{${flows}}`;
+  // Resonance contributors are one species drawn two ways, so they take the
+  // double-headed arrow; anything else is a transformation and takes a forward one.
+  const resonanceArrow = checked.rule === 'amide-resonance' || checked.resonance;
+  const source = `\\schemestart ${group(checked.reactants)} \\arrow{${resonanceArrow ? '<->' : `->[${labels[checked.rule]}${suffix}]`}} ${group(checked.products)} \\schemestop\\chemmove{${flows}}`;
   const svg = await compileChemfig(source);
   const { scenes: _scenes, reactants: _reactants, products: _products, ...metadata } = checked;
   const molecules = checked.scenes.map((s, i) => ({ id: `m${i}`, role: checked.reactants.includes(i) ? 'reactant' as const : 'product' as const, canonicalSmiles: canonicalScene(s, kit), molfile: sceneMolfile(s) }));

@@ -20,8 +20,9 @@ import {
 } from './skillPlugins';
 
 const file = () => path.join(app.getPath('userData'), 'chat-skills.json');
-const LIBRARY_VERSION = 14;
+const LIBRARY_VERSION = 15;
 const LEGACY_SVG_V12_SHA256 = '8a8629caa2db26ab2d86ad7b2ee3daae72bd4156d198a8da01b639218c328570';
+const LEGACY_CHEMISTRY_V14_SHA256 = '11748993bb6510e37f9e89822670b83beeb0f703dd423f052a117a57757fced0';
 const LEGACY_CHEMISTRY_V12_SHA256 = '72d01438357e6e4a591a0a067c62cbfbe6e2aa7fc801b30ace8d6c1a470fb725';
 const LEGACY_CHEMISTRY_V8_SHA256 = '876f9cf3d84a695540625bc79865b5f1d9026f6e577dbbbfd78a970e5552db94';
 const LEGACY_CHEMISTRY_V7_SHA256 = '752f1a771d090e09a2ac564421e563167fc89b858d9167eba50eb2327ce1c5ef';
@@ -41,7 +42,7 @@ export function listChatSkills(): ChatSkill[] {
   if (!fs.existsSync(file())) return write(structuredClone(DEFAULT_CHAT_SKILLS));
   let parsed: { version?: number; skills?: ChatSkill[] };
   try { parsed = JSON.parse(fs.readFileSync(file(), 'utf8')); } catch { throw new Error('The skills library could not be read.'); }
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');
   if (parsed.version! < LIBRARY_VERSION) {
     // Each release adds only newly introduced defaults. Never restore a skill
     // deleted in an earlier version or overwrite its edited instructions/flags.
@@ -63,7 +64,8 @@ export function listChatSkills(): ChatSkill[] {
           || (parsed.version === 6 && digest === LEGACY_CHEMISTRY_V6_SHA256)
           || (parsed.version === 7 && digest === LEGACY_CHEMISTRY_V7_SHA256)
           || (parsed.version === 8 && digest === LEGACY_CHEMISTRY_V8_SHA256)
-          || digest === LEGACY_CHEMISTRY_V12_SHA256)
+          || digest === LEGACY_CHEMISTRY_V12_SHA256
+          || digest === LEGACY_CHEMISTRY_V14_SHA256)
         && latestChemistry) {
         updated = { ...skill, instructions: latestChemistry.instructions, version: latestChemistry.version };
       }

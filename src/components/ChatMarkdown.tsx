@@ -5,6 +5,7 @@ import { Markdown } from './Markdown';
 import { ChatVisual } from './ChatVisual';
 import { ChatFormula } from './ChatFormula';
 import { ChatChemistryDocument } from './ChatChemistryDocument';
+import { ChatChemistryNotice } from './ChatChemistryNotice';
 import { ChatGenomicsResult } from './ChatGenomicsResult';
 import { ChatCapabilityResult } from './ChatCapabilityResult';
 import { Icon } from './ui';
@@ -27,6 +28,8 @@ export function ChatMarkdown({ content, streaming = false, ...props }: Component
     if (part.kind === 'capability-request' || part.kind === 'capability-result') return <div key={index} role="status" className="chat-visual-pending"><Icon name="sparkles" size={22} /><div><b>Capability</b><span>{streaming ? t('Cargando…') : t('La generación se interrumpió. Vuelve a intentarlo.')}</span></div></div>;
     if (part.kind === 'svg' && part.complete && !streaming) return <ChatVisual key={index} svg={part.content} />;
     if (part.kind === 'chemistry-document' && part.complete && !streaming) return <ChatChemistryDocument key={index} source={part.content} />;
+    // A notice is chrome, not a visual: it never shows a pending placeholder.
+    if (part.kind === 'chemistry-notice') return part.complete ? <ChatChemistryNotice key={index} source={part.content} /> : null;
     if ((part.kind === 'smiles' || part.kind === 'chemfig' || part.kind === 'lewis') && part.complete && !streaming) return <ChatFormula key={index} kind={part.kind} source={part.content} />;
     const chemistry = ['smiles', 'chemfig', 'lewis', 'chemistry-plan', 'chemistry-document'].includes(part.kind);
     return <div className="chat-visual-pending" role="status" key={index}><Icon name={part.kind === 'image-request' ? 'image' : 'code'} size={22} /><div><b>{chemistry ? 'Chemistry Studio' : part.kind === 'svg' ? 'SVG Studio' : 'Image Atelier'}</b><span>{streaming ? (chemistry ? t('Dibujando tu estructura…') : part.kind === 'svg' ? t('Dibujando tu visual…') : t('Creando tu imagen…')) : t('La generación se interrumpió. Vuelve a intentarlo.')}</span></div>{streaming && <span className="chat-visual-pulse" />}</div>;

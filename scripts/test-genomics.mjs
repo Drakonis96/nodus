@@ -25,12 +25,13 @@ await build({ stdin: { contents: `export * from './shared/genomics'; export * fr
   api.onResolve({ filter: /\/genomics$/ }, args => (args.path === '../genomics'
     || (args.path.endsWith('electron/genomics') && args.importer.includes(`${path.sep}skill-capabilities${path.sep}`)))
     ? { path: 'predict', namespace: 'test' } : undefined);
-  for (const [filter, name] of [[/skillToolSandbox$/, 'tools'], [/sandbox\/runtime$/, 'capability'], [/chatSvgQuality$/, 'svg'], [/decorativeImages$/, 'image'], [/db\/settingsRepo$/, 'settings'], [/chemistryIdentity$/, 'chemistry'], [/chemistryValidationHost$/, 'validate']]) api.onResolve({ filter }, () => ({ path: name, namespace: 'test' }));
+  for (const [filter, name] of [[/skillToolSandbox$/, 'tools'], [/sandbox\/runtime$/, 'capability'], [/chatSvgQuality$/, 'svg'], [/decorativeImages$/, 'image'], [/db\/settingsRepo$/, 'settings'], [/chemistryIdentity$/, 'chemistry'], [/chemistryValidationHost$/, 'validate'], [/chemistryRepair$/, 'repair']]) api.onResolve({ filter }, () => ({ path: name, namespace: 'test' }));
   api.onLoad({ filter: /.*/, namespace: 'test' }, ({ path: name }) => ({ loader: 'js', contents: name === 'electron' ? `export const app = { getPath: () => ${JSON.stringify(scratch)}, getAppPath: () => ${JSON.stringify(root)}, isPackaged: false }; export const safeStorage = globalThis.__genomicsSafeStorage;`
     : name === 'predict' ? 'export const predictGenomics = (...args) => globalThis.__genomicsPredict(...args);'
     : name === 'tools' ? 'export const runSkillTool = () => { throw Error("Unexpected custom skill tool"); };'
     : name === 'capability' ? 'export const runCapabilitySandbox = () => { throw Error("Unexpected external capability"); };'
-    : name === 'svg' ? 'export const refineChatSvg = async a => a;'
+    : name === 'svg' ? 'export const refineChatSvg = async a => a; export const chemistrySvgFallback = async () => "";'
+    : name === 'repair' ? 'export const repairChemistryIntent = async () => undefined;'
     : name === 'image' ? 'export const callImageProvider = () => { throw Error("Unexpected image generation") }; export const prepareGeneratedImage = () => {};'
     : name === 'settings' ? 'export const getSettings = () => ({});'
     : name === 'chemistry' ? 'export const resolveChemistryIntent = () => { throw Error("Unexpected chemistry") };'

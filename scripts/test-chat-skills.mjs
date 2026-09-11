@@ -20,6 +20,7 @@ await build({
     api.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'mock' }));
     api.onResolve({ filter: /chatSvgQuality$/ }, () => ({ path: 'svg-quality', namespace: 'mock' }));
     api.onResolve({ filter: /chemistryIdentity$/ }, () => ({ path: 'chemistry-identity', namespace: 'mock' }));
+    api.onResolve({ filter: /chemistryRepair$/ }, () => ({ path: 'chemistry-repair', namespace: 'mock' }));
     api.onResolve({ filter: /chemistryValidationHost$/ }, () => ({ path: 'chemistry-validator', namespace: 'mock' }));
     api.onResolve({ filter: /decorativeImages$/ }, () => ({ path: 'images', namespace: 'mock' }));
     api.onResolve({ filter: /db\/settingsRepo$/ }, () => ({ path: 'settings', namespace: 'mock' }));
@@ -27,8 +28,9 @@ await build({
       ? `export const safeStorage = { isEncryptionAvailable: () => false }; export const app = { getPath: () => ${JSON.stringify(temporary)}, getVersion: () => '5.3.0' };`
       : name === 'tools' ? `export const runSkillTool = (...args) => globalThis.__skillToolRunner(...args);`
       : name === 'capability-runtime' ? `export const runCapabilitySandbox = (...args) => globalThis.__capabilityRunner(...args);`
-      : name === 'svg-quality' ? `export const refineChatSvg = async answer => answer;`
+      : name === 'svg-quality' ? `export const refineChatSvg = async answer => answer; export const chemistrySvgFallback = (...args) => globalThis.__skillChemistrySvgFallback?.(...args) ?? '';`
       : name === 'chemistry-identity' ? `export const resolveChemistryIntent = (...args) => globalThis.__skillChemistryResolver(...args);`
+      : name === 'chemistry-repair' ? `export const repairChemistryIntent = (...args) => globalThis.__skillChemistryRepair?.(...args);`
       : name === 'chemistry-validator' ? `export const validateChemistryInUtility = () => { throw new Error('Unexpected validator'); };`
       : name === 'settings' ? `export const getSettings = () => ({ imageProvider: 'google', imageModel: 'user-selected-image-model' });`
       : `export const callImageProvider = (...args) => globalThis.__skillImageProvider(...args); export const prepareGeneratedImage = (image) => ({ image: image.bytes, mimeType: image.mimeType });`, loader: 'js' }));
@@ -68,9 +70,14 @@ test('Chemistry Studio is separate from general SVG routing', () => {
   assert.match(chemistry.instructions, /SMILES/i);
   assert.match(chemistry.instructions, /version-2 intent/i);
   assert.match(chemistry.instructions, /Do not invent SMILES/i);
-  assert.match(chemistry.instructions, /current verified scope/i);
+  // The contract the rewrite established: any element, arrows declared rather than
+  // looked up in a rule, and a scope limit that never becomes a refusal.
+  assert.match(chemistry.instructions, /There is no element restriction/i);
+  assert.match(chemistry.instructions, /A scope limit is never a reason to refuse/i);
+  assert.match(chemistry.instructions, /electronFlow/);
+  assert.match(chemistry.instructions, /kind "resonance"/i);
   assert.match(lib.chatSkillsOutputContract([svg, chemistry]), /Chemistry Studio takes precedence over SVG Studio/i);
-  assert.match(lib.chatSkillsOutputContract([svg, chemistry]), /model-authored SVG fallback/i);
+  assert.match(lib.chatSkillsOutputContract([svg, chemistry]), /clearly labeled fallback drawing/i);
   assert.match(lib.buildChatSkillsPrompt([chemistry]), /SVG Studio is not enabled/i);
   assert.match(svg.description, /maps, timelines and visual systems/i);
 });
@@ -81,7 +88,7 @@ test('chemical documents contribute identities rather than SVG JSON to conversat
   assert.equal(lib.chemistryTitleSummary('Ordinary prose'), 'Ordinary prose');
 });
 
-test('chemical intents become application-authored documents without model prose or a second model pass', async () => {
+test('a chemical intent becomes an application-authored document and keeps the surrounding prose', async () => {
   const plan = '{"version":2,"kind":"structure"}';
   let received;
   globalThis.__skillChemistryResolver = async (...args) => { received = args; return { version: 2, status: 'verified', species: [] }; };
@@ -91,15 +98,18 @@ test('chemical intents become application-authored documents without model prose
   assert.equal(received[0], plan);
   assert.equal(received[1], 'Draw ethanol');
   assert.doesNotMatch(result, /chemistry-plan/);
-  assert.doesNotMatch(result, /Before|After/);
+  // The drawing replaces the plan, never the explanation around it.
+  assert.match(result, /Before/); assert.match(result, /After/);
   assert.equal(lib.splitChatVisuals(result).find(part => part.kind === 'chemistry-document')?.complete, true);
 });
 
 test('model-authored documents and legacy chemistry cannot bypass the identity resolver', async () => {
   for (const kind of ['chemistry-document', 'chemfig', 'smiles', 'lewis']) {
-    const answer = await lib.executeChatSkills(`\`\`\`${kind}\n{"status":"verified"}\n\`\`\``, { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, isCurrent: () => true });
-    assert.ok(lib.splitChatVisuals(answer).every(p => p.kind === 'markdown'));
+    const answer = await lib.executeChatSkills(`Keep this sentence.\n\`\`\`${kind}\n{"status":"verified"}\n\`\`\``, { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, isCurrent: () => true });
+    // The unverified payload is still never rendered, but the reply survives it.
     assert.doesNotMatch(answer, /"status":"verified"/);
+    assert.match(answer, /Keep this sentence\./);
+    assert.equal(lib.splitChatVisuals(answer).find(p => p.kind === 'chemistry-notice')?.content, '{"code":"legacy-format"}');
   }
 });
 
@@ -109,31 +119,37 @@ test('whole-answer generic JSON chemical intents still pass through the full ide
   const execution = { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, isCurrent: () => true };
   const result = await lib.executeChatSkills('```json\n{"version":2,"kind":"structure","depiction":"skeletal","species":[]}\n```', execution);
   assert.equal(calls, 1);
-  assert.match(result, /needs-clarification/);
+  assert.match(result, /"code":"not-drawn"/);
+  assert.match(result, /Unspecified stereocentre\./);
   const ordinary = '```json\n{"version":2,"name":"unrelated"}\n```';
   assert.equal(await lib.executeChatSkills(ordinary, execution), ordinary);
   assert.equal(calls, 1);
   const chemical = '```json\n{"version":2,"kind":"structure","depiction":"newman","species":[]}\n```';
   const repeated = await lib.executeChatSkills(`Unverified claim\n${chemical}\nI changed my mind\n${chemical}`, execution);
-  assert.equal(calls, 2); assert.match(repeated, /needs-clarification/); assert.doesNotMatch(repeated, /Unverified|changed my mind/);
+  // Only one plan compiles, but neither sentence is deleted to say so.
+  assert.equal(calls, 2); assert.match(repeated, /"code":"not-drawn"/);
+  assert.match(repeated, /Unverified claim/); assert.match(repeated, /I changed my mind/);
   const conflicting = await lib.executeChatSkills(chemical + '\n' + chemical.replace('newman', 'skeletal'), execution);
-  assert.match(conflicting, /conflicting chemical intents/); assert.equal(calls, 2);
+  assert.match(conflicting, /"code":"conflicting-intents"/); assert.equal(calls, 2);
 });
 
 test('unsupported chemistry degrades to a labeled SVG but still refuses images and legacy formats', async () => {
   const execution = { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, question: 'Draw a verified E2 mechanism with validated ChemFig export.', isCurrent: () => true };
   const svg = await lib.executeChatSkills('The major product is guaranteed.\n```svg\n<svg><text>Unverified product</text></svg>\n```', execution);
-  assert.match(svg, /unverified drawing/i);
+  assert.match(svg, /"code":"unverified-svg"/);
   assert.match(svg, /<svg/);
-  assert.doesNotMatch(svg, /unsupported/);
-  assert.ok(svg.indexOf('unverified drawing') < svg.indexOf('major product'), 'the warning precedes model-authored chemistry claims');
+  assert.ok(svg.indexOf('unverified-svg') < svg.indexOf('major product'), 'the warning precedes model-authored chemistry claims');
   for (const visual of ['```nodus-image\n{"title":"E2","alt":"E2","prompt":"Draw an unverified chemical reaction."}\n```', '![Mechanism](https://example.com/drawing.png)', '```svg\n<svg><text>C</text></svg>\n```\n```nodus-image\n{"title":"E2","alt":"E2","prompt":"Draw an unverified chemical reaction."}\n```', '```svg\n<svg><text>C</text></svg>\n```\n```chemfig\n\\chemfig{C-C}\n```']) {
     const answer = await lib.executeChatSkills('The major product is guaranteed.\n' + visual, execution);
-    assert.match(answer, /unsupported/);
-    assert.doesNotMatch(answer, /guaranteed|<svg|example.com|nodus-image/);
+    // A generated image or a legacy block is still never adopted as chemistry…
+    assert.doesNotMatch(answer, /example\.com/);
+    assert.ok(!lib.splitChatVisuals(answer).some(p => p.kind === 'image-request'), 'a generated image is never adopted as chemistry');
+    // …but refusing the drawing no longer costs the user the sentence they wrote it around.
+    assert.match(answer, /guaranteed/);
   }
   const chemistry = lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'chemistry');
-  assert.match(await lib.executeChatSkills('```svg\n<svg><text>C</text></svg>\n```', { ...execution, skills: [chemistry] }), /requires SVG Studio/);
+  const withoutSvgStudio = await lib.executeChatSkills('Prose worth keeping.\n```svg\n<svg><text>C</text></svg>\n```', { ...execution, skills: [chemistry] });
+  assert.match(withoutSvgStudio, /Prose worth keeping\./);
   const ordinary = '```svg\n<svg><text>Energy</text></svg>\n```';
   assert.equal((await lib.executeChatSkills(ordinary, { ...execution, question: 'Draw an energy diagram for E2.' })).trim(), ordinary);
   const orbital = '```svg\n<svg><text>C</text><text>p orbital</text></svg>\n```';
@@ -208,7 +224,7 @@ test('existing libraries receive the disabled tutor once without overwriting use
     assert.equal(migrated.some(skill => skill.builtin === 'image'), false, 'deleted image skill stays deleted');
     const tutor = migrated.find(skill => skill.builtin === 'socratic');
     assert.deepEqual(tutor.enabled, { assistant: false, nodi: false });
-    assert.equal(JSON.parse(fs.readFileSync(location)).version, 14);
+    assert.equal(JSON.parse(fs.readFileSync(location)).version, 15);
     assert.equal(lib.listChatSkills().length, 14, 'migration is idempotent');
     lib.deleteChatSkill(tutor.id);
     assert.equal(lib.listChatSkills().some(skill => skill.builtin === 'socratic'), false, 'deleted tutor does not reappear');
@@ -265,7 +281,7 @@ test('version 3 migration adds Chemistry Studio once and preserves existing skil
     const migrated = lib.listChatSkills();
     assert.deepEqual(migrated[0], edited);
     assert.equal(migrated.filter(skill => skill.builtin === 'chemistry').length, 1);
-    assert.equal(JSON.parse(fs.readFileSync(location)).version, 14);
+    assert.equal(JSON.parse(fs.readFileSync(location)).version, 15);
     assert.deepEqual(lib.listChatSkills(), migrated, 'version 6 migration is idempotent');
   } finally { fs.writeFileSync(location, original); }
 });
@@ -278,7 +294,7 @@ test('historical migrations preserve user-edited Chemistry Studio instructions',
     for (const version of [4, 5, 6, 7, 8]) {
       fs.writeFileSync(location, JSON.stringify({ version, skills: [chemistry] }));
       assert.deepEqual(lib.listChatSkills().filter(s => !['genomics', 'legal'].includes(s.builtin)), [chemistry]);
-      assert.equal(JSON.parse(fs.readFileSync(location)).version, 14);
+      assert.equal(JSON.parse(fs.readFileSync(location)).version, 15);
     }
   } finally { fs.writeFileSync(location, original); }
 });
@@ -299,45 +315,55 @@ test('untouched v8 chemistry instructions upgrade once without resetting flags o
   } finally { fs.writeFileSync(location, original); }
 });
 
-test('version 13 upgrades untouched SVG and Chemistry instructions but preserves user edits', () => {
+test('an untouched built-in is upgraded across library versions while user edits survive', () => {
   const location = path.join(temporary, 'chat-skills.json'), original = fs.readFileSync(location);
   try {
     const latestSvg = lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'svg');
     const latestChemistry = lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'chemistry');
-    const oldSvgText = 'Choose domain-appropriate conventions: circuit symbols for circuits; arrows and labeled dependencies for processes; and oriented and labeled axes for plots. When Chemistry Studio is enabled, leave molecular structures, reactions and mechanisms to that skill, even if the requested export is SVG. SVG Studio may draw non-molecular orbital/energy diagrams or explanatory infographics, but must never replace an unsupported molecular mechanism or projection.';
-    const newSvgText = latestSvg.instructions.match(/Choose domain-appropriate conventions:[^\n]+/)[0];
-    const oldChemistryOpening = 'For a molecular drawing, return exactly one fenced chemistry-plan block containing ONLY a version-2 intent. Do not invent SMILES, formulae, stereochemical direction arrays, reference URLs, verification status or a drawing.';
-    const newChemistryOpening = latestChemistry.instructions.split('\n')[1];
-    const oldChemistryFallback = 'Submit supported conditional rule intents even when uncertain; the application validates substrate scope. Nitration, chair/cyclic E2, asymmetric/substituted Diels–Alder partners beyond the listed family, and aldol dehydration remain unsupported. Do not substitute another rule or generate an SVG/image fallback. Do not return legacy version-1, smiles, chemfig, lewis or hand-authored SVG molecular blocks. Legacy saved drawings remain viewable but are not retrospectively verified.';
-    const newChemistryFallback = latestChemistry.instructions.match(/Submit supported conditional rule intents[^\n]+/)[0];
-    const previousSvg = latestSvg.instructions.replace(newSvgText, oldSvgText);
-    const previousChemistry = latestChemistry.instructions.replace(newChemistryOpening, oldChemistryOpening).replace(newChemistryFallback, oldChemistryFallback);
+    // Previous default texts are kept verbatim as fixtures. Reconstructing them by
+    // patching the current text made every prompt rewrite break this test, which says
+    // nothing about whether the upgrade path still works.
+    const legacy = JSON.parse(fs.readFileSync(path.join(root, 'scripts/fixtures/chat-skills-legacy-instructions.json'), 'utf8'));
+    const previousSvg = latestSvg.instructions.replace(
+      latestSvg.instructions.match(/Choose domain-appropriate conventions:[^\n]+/)[0],
+      'Choose domain-appropriate conventions: circuit symbols for circuits; arrows and labeled dependencies for processes; and oriented and labeled axes for plots. When Chemistry Studio is enabled, leave molecular structures, reactions and mechanisms to that skill, even if the requested export is SVG. SVG Studio may draw non-molecular orbital/energy diagrams or explanatory infographics, but must never replace an unsupported molecular mechanism or projection.');
+    const previousChemistry = legacy.chemistry.instructions;
+    // The registered digests are what the migration actually matches on.
     assert.equal(createHash('sha256').update(previousSvg).digest('hex'), '8a8629caa2db26ab2d86ad7b2ee3daae72bd4156d198a8da01b639218c328570');
-    assert.equal(createHash('sha256').update(previousChemistry).digest('hex'), '72d01438357e6e4a591a0a067c62cbfbe6e2aa7fc801b30ace8d6c1a470fb725');
-    fs.writeFileSync(location, JSON.stringify({ version: 13, skills: [
+    assert.equal(createHash('sha256').update(previousChemistry).digest('hex'), legacy.chemistry.sha256);
+    assert.notEqual(previousChemistry, latestChemistry.instructions, 'the fixture must be the older text, not a copy of the current one');
+
+    fs.writeFileSync(location, JSON.stringify({ version: legacy.chemistry.libraryVersion, skills: [
       { ...latestSvg, version: undefined, instructions: previousSvg, enabled: { assistant: false, nodi: true } },
       { ...latestChemistry, version: undefined, instructions: previousChemistry, enabled: { assistant: true, nodi: false } },
     ] }));
     const upgraded = lib.listChatSkills();
-    assert.equal(upgraded[0].instructions, latestSvg.instructions); assert.equal(upgraded[0].version, '1.0.1');
-    assert.equal(upgraded[1].instructions, latestChemistry.instructions); assert.equal(upgraded[1].version, '1.0.1');
+    assert.equal(upgraded[0].instructions, latestSvg.instructions); assert.equal(upgraded[0].version, latestSvg.version);
+    assert.equal(upgraded[1].instructions, latestChemistry.instructions); assert.equal(upgraded[1].version, latestChemistry.version);
     assert.deepEqual(upgraded.map(skill => skill.enabled), [{ assistant: false, nodi: true }, { assistant: true, nodi: false }]);
+
     const custom = [
       { ...latestSvg, instructions: 'Keep my custom SVG workflow.', enabled: { assistant: false, nodi: true } },
       { ...latestChemistry, instructions: 'Keep my custom chemistry workflow.', enabled: { assistant: true, nodi: false } },
     ];
-    fs.writeFileSync(location, JSON.stringify({ version: 13, skills: custom }));
+    fs.writeFileSync(location, JSON.stringify({ version: legacy.chemistry.libraryVersion, skills: custom }));
     assert.deepEqual(lib.listChatSkills(), custom);
   } finally { fs.writeFileSync(location, original); }
 });
 
-test('reaction JSON reaches the same resolver and untrusted claims are removed', async () => {
+test('reaction JSON reaches the same resolver and an abstention is stated rather than hidden', async () => {
   const intent = { version: 2, kind: 'reaction', depiction: 'skeletal', reactionSmiles: 'N>>N' };
   let calls = 0;
   globalThis.__skillChemistryResolver = async source => { assert.deepEqual(JSON.parse(source), intent); calls++; return { version: 2, status: 'unsupported', reason: 'Test abstention.' }; };
   const execution = { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, isCurrent: () => true };
   const result = await lib.executeChatSkills('Guaranteed reaction!\n```json\n' + JSON.stringify(intent) + '\n```', execution);
-  assert.equal(calls, 1); assert.match(result, /Test abstention/); assert.doesNotMatch(result, /Guaranteed/);
+  assert.equal(calls, 1);
+  assert.match(result, /Test abstention/);
+  // An overclaim is answered with a notice saying nothing was drawn, not by deleting
+  // the model's text: no verified artifact exists here to lend it false authority.
+  assert.match(result, /"code":"not-drawn"/);
+  assert.match(result, /Guaranteed reaction!/);
+  assert.ok(result.indexOf('not-drawn') < result.indexOf('Guaranteed'), 'the notice precedes the claim');
 });
 
 test('image requests use the exact model and prompt, persist metadata, and return real local URLs', async () => {
@@ -559,4 +585,118 @@ test('a capability that declares permissions is budgeted apart from deterministi
   const mixed = await lib.executeChatSkills([...Array(5).fill(block('paid')), ...Array(3).fill(block('free'))].join('\n'), session());
   assert.equal(runs, 7, 'four metered plus three sandboxed still run');
   assert.equal(lib.splitChatVisuals(mixed).filter(part => part.kind === 'capability-result').length, 7);
+});
+
+test('when the verified lane abstains, the drawing is asked for again in SVG', async () => {
+  const execution = { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, question: 'Draw a chemical reaction between HCl and aluminum.', model: { provider: 'deepseek', model: 'deepseek-v4-flash' }, isCurrent: () => true };
+  globalThis.__skillChemistryResolver = async () => ({ version: 2, status: 'needs-clarification', reason: 'Test abstention.' });
+  let asked;
+  globalThis.__skillChemistrySvgFallback = async options => { asked = options; return '\n\n```svg\n<svg><text>Al</text></svg>\n```\n\n'; };
+  const result = await lib.executeChatSkills('Aluminium dissolves in hydrochloric acid.\n```chemistry-plan\n{"version":2,"kind":"reaction"}\n```', execution);
+  // The rescue is given the request and the reason the verified lane gave up.
+  assert.equal(asked.question, 'Draw a chemical reaction between HCl and aluminum.');
+  assert.match(asked.reason, /Test abstention/);
+  // The user ends up with a drawing, the prose, and an honest label — never a bare notice.
+  assert.match(result, /<svg/);
+  assert.match(result, /Aluminium dissolves/);
+  assert.match(result, /"code":"unverified-svg"/);
+  assert.doesNotMatch(result, /"code":"not-drawn"/);
+
+  // A rescue that comes back empty leaves the abstention standing, and still the prose.
+  globalThis.__skillChemistrySvgFallback = async () => '';
+  const empty = await lib.executeChatSkills('Aluminium dissolves in hydrochloric acid.\n```chemistry-plan\n{"version":2,"kind":"reaction"}\n```', execution);
+  assert.match(empty, /"code":"not-drawn"/);
+  assert.match(empty, /Aluminium dissolves/);
+
+  // A verified drawing never pays for a second model call.
+  let called = false;
+  globalThis.__skillChemistrySvgFallback = async () => { called = true; return ''; };
+  globalThis.__skillChemistryResolver = async () => ({ version: 2, status: 'verified', species: [] });
+  await lib.executeChatSkills('```chemistry-plan\n{"version":2,"kind":"structure"}\n```', execution);
+  assert.equal(called, false, 'the rescue only runs once the verified lane has abstained');
+  globalThis.__skillChemistrySvgFallback = undefined;
+});
+
+test('a structural rejection is repaired; a chemical one is not re-prompted', async () => {
+  const execution = { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, question: 'Draw ethanol', model: { provider: 'deepseek', model: 'deepseek-v4-flash' }, isCurrent: () => true };
+  globalThis.__skillChemistrySvgFallback = async () => '';
+
+  // A field-shaped problem: the repair is given the exact error and its output is retried.
+  let seen = [];
+  globalThis.__skillChemistryResolver = async source => seen.push(source) === 1
+    ? { version: 2, status: 'unsupported', reason: 'species[0].id must be lower-case kebab-case starting with a letter, for example "substrate".' }
+    : { version: 2, status: 'verified', species: [] };
+  let repairInput;
+  globalThis.__skillChemistryRepair = async options => { repairInput = options; return '{"version":2,"kind":"structure","repaired":true}'; };
+  const fixed = await lib.executeChatSkills('```chemistry-plan\n{"version":2,"kind":"structure"}\n```', execution);
+  assert.equal(seen.length, 2, 'the repaired intent is resolved again');
+  assert.equal(seen[1], '{"version":2,"kind":"structure","repaired":true}');
+  assert.match(repairInput.problem, /species\[0\]\.id/);
+  assert.equal(repairInput.final, false, 'the first of two attempts is not the final one');
+  assert.equal(lib.splitChatVisuals(fixed).find(p => p.kind === 'chemistry-document')?.complete, true);
+
+  // A chemical abstention is never sent to the repair loop: no field can fix it.
+  seen = []; let repaired = 0;
+  globalThis.__skillChemistryRepair = async () => { repaired++; return '{}'; };
+  globalThis.__skillChemistryResolver = async source => { seen.push(source); return { version: 2, status: 'needs-clarification', reason: 'A stereocentre is unspecified.' }; };
+  const abstained = await lib.executeChatSkills('```chemistry-plan\n{"version":2,"kind":"structure"}\n```', execution);
+  assert.equal(repaired, 0, 're-prompting cannot make a reference specify a stereocentre');
+  assert.equal(seen.length, 1);
+  assert.match(abstained, /A stereocentre is unspecified/);
+
+  // Repair is bounded: a model that keeps failing stops costing calls.
+  seen = []; repaired = 0;
+  globalThis.__skillChemistryResolver = async source => { seen.push(source); return { version: 2, status: 'unsupported', reason: 'species[0].id must be lower-case kebab-case.' }; };
+  globalThis.__skillChemistryRepair = async () => { repaired++; return '{"version":2,"still":"wrong"}'; };
+  await lib.executeChatSkills('```chemistry-plan\n{"version":2,"kind":"structure"}\n```', execution);
+  assert.equal(repaired, 2, 'at most two repair attempts');
+  assert.equal(seen.length, 3, 'the original intent plus two repairs');
+
+  globalThis.__skillChemistryRepair = undefined;
+  globalThis.__skillChemistrySvgFallback = undefined;
+});
+
+test('no chemistry outcome ever returns less than the model wrote', async () => {
+  // The invariant the whole cascade exists to guarantee: whatever happens — the
+  // resolver abstains, the schema is wrong, the format is legacy, two intents
+  // conflict, the rescue fails — the user keeps their explanation.
+  const prose = 'Aluminium dissolves in hydrochloric acid to give hydrogen.';
+  const outcomes = {
+    verified: async () => ({ version: 2, status: 'verified', species: [] }),
+    partial: async () => ({ version: 2, status: 'partial', reason: 'Element outside the organic set.', species: [] }),
+    abstains: async () => ({ version: 2, status: 'needs-clarification', reason: 'A stereocentre is unspecified.' }),
+    unsupported: async () => ({ version: 2, status: 'unsupported', reason: 'species[0].id must be lower-case kebab-case.' }),
+    throws: async () => { throw new Error('The chemistry worker died.'); },
+  };
+  // `attempted` marks the answers where the model actually tried to produce chemistry.
+  // Plain prose with no chemical output is not a failure to explain anything.
+  const answers = [
+    { attempted: true, text: `${prose}\n\`\`\`chemistry-plan\n{"version":2,"kind":"reaction"}\n\`\`\`` },
+    { attempted: true, text: `${prose}\n\`\`\`json\n{"version":2,"kind":"structure","depiction":"skeletal","species":[]}\n\`\`\`` },
+    { attempted: true, text: `${prose}\n\`\`\`chemfig\n\\chemfig{C-C}\n\`\`\`` },
+    { attempted: true, text: `${prose}\n\`\`\`svg\n<svg><text>Al</text></svg>\n\`\`\`` },
+    { attempted: true, text: `${prose}\n\`\`\`json\n{"version":2,"kind":"structure","depiction":"skeletal","species":[]}\n\`\`\`\n\`\`\`json\n{"version":2,"kind":"structure","depiction":"newman","species":[]}\n\`\`\`` },
+    { attempted: false, text: prose },
+  ];
+  for (const [label, resolver] of Object.entries(outcomes)) {
+    globalThis.__skillChemistryResolver = resolver;
+    globalThis.__skillChemistryRepair = async () => undefined;
+    for (const rescue of [async () => '', async () => '\n\n```svg\n<svg><text>rescued</text></svg>\n```\n\n']) {
+      globalThis.__skillChemistrySvgFallback = rescue;
+      for (const { attempted, text: answer } of answers) {
+        const result = await lib.executeChatSkills(answer, {
+          version: 0, skills: lib.DEFAULT_CHAT_SKILLS, question: 'Draw a chemical reaction between HCl and aluminum.',
+          model: { provider: 'deepseek', model: 'deepseek-v4-flash' }, isCurrent: () => true,
+        });
+        assert.match(result, /Aluminium dissolves in hydrochloric acid/, `${label} lost the prose for: ${answer.slice(0, 60)}`);
+        // And whatever was dropped is always accounted for, never dropped in silence.
+        const parts = lib.splitChatVisuals(result);
+        const drew = parts.some(part => ['chemistry-document', 'svg'].includes(part.kind));
+        const explained = parts.some(part => part.kind === 'chemistry-notice');
+        if (attempted) assert.ok(drew || explained, `${label} produced neither a drawing nor an explanation for: ${answer.slice(0, 60)}`);
+      }
+    }
+  }
+  globalThis.__skillChemistryRepair = undefined;
+  globalThis.__skillChemistrySvgFallback = undefined;
 });

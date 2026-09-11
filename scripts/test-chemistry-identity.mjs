@@ -37,7 +37,7 @@ test('intent rejects model-authored evidence, guessed structures and shortened n
   assert.equal(lib.parseChemistryIntent(intent('pubchem-cid', '702'), 'Draw PubChem CID 702.').species[0].input.value, '702');
   const forged = JSON.parse(intent('name', 'ethanol'));
   forged.status = 'verified';
-  assert.throws(() => lib.parseChemistryIntent(JSON.stringify(forged), 'ethanol'), /schema/);
+  assert.throws(() => lib.parseChemistryIntent(JSON.stringify(forged), 'ethanol'), /Unexpected field\(s\) status/);
   forged.version = 1;
   assert.throws(() => lib.parseChemistryIntent(JSON.stringify(forged), 'ethanol'), /version-2/);
 });
@@ -64,7 +64,7 @@ test('projection and mechanism intents cannot substitute a weaker depiction or m
   const mechanism = { version: 2, kind: 'mechanism', depiction: 'skeletal', rule: 'sn2', species: [{ id: 'substrate', input: { kind: 'smiles', value: 'CBr' } }, { id: 'nucleophile', input: { kind: 'smiles', value: '[OH-]' } }] };
   assert.equal(lib.parseChemistryIntent(JSON.stringify(mechanism), 'SN2 mechanism CBr and [OH-]').rule, 'sn2');
   assert.throws(() => lib.parseChemistryIntent(JSON.stringify(mechanism), 'Draw CBr and [OH-]'), /explicitly requested/);
-  assert.throws(() => lib.parseChemistryIntent(JSON.stringify({ ...mechanism, products: ['CO'] }), 'SN2 CBr and [OH-]'), /schema/);
+  assert.throws(() => lib.parseChemistryIntent(JSON.stringify({ ...mechanism, products: ['CO'] }), 'SN2 CBr and [OH-]'), /Unexpected field\(s\) products/);
   assert.throws(() => lib.parseChemistryIntent(JSON.stringify(mechanism), 'E2 mechanism CBr and [OH-]'), /explicitly requested/);
   assert.throws(() => lib.parseChemistryIntent(intent('smiles', 'CBr'), 'SN2 mechanism CBr and [OH-]'), /must not be replaced/);
 });
@@ -86,10 +86,12 @@ test('new rule intents preserve conformations, ordered inputs and endo/exo reque
   assert.throws(() => lib.parseChemistryIntent(JSON.stringify(newman), 'Newman eclipsada 120 grados CCCC'), /Numeric/);
 });
 
-test('abstains on unspecified tetrahedral and alkene stereochemistry, radicals and impossible valence', async () => {
+test('abstains on unspecified tetrahedral and alkene stereochemistry and impossible valence', async () => {
   await assert.rejects(validate({ references: ['CC(O)C(=O)O'] }), /stereocentre is unspecified/);
   await assert.rejects(validate({ references: ['CC=CC'] }), /Bond stereochemistry is unspecified/);
-  await assert.rejects(validate({ references: ['[CH3]'] }), /Radicals/);
+  // A radical is ordinary chemistry, not an error: the methyl radical draws. Rules that
+  // must not *create* one still guard themselves; see chemistryRuleUtils.
+  assert.ok((await validate({ references: ['[CH3]'] })).svg.includes('<svg'));
   await assert.rejects(validate({ references: ['C(C)(C)(C)(C)C'] }), /rejected/);
   await assert.rejects(validate({ references: ['CC=[C@AL1]=CC'] }), /outside the validated scope/);
   await assert.rejects(validate({ references: ['CC=C=CC'] }), /outside the validated stereochemical scope/);
