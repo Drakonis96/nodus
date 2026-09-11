@@ -40,3 +40,4 @@
 .capability-packages-migration ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .capability-packages-migration li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 12px; }
 .capability-packages-migration button { justify-self: start; }
+.capability-packages-autoupdate { display: flex; align-items: center; gap: 8px; font-size: 12px; }

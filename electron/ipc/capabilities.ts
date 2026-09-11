@@ -11,6 +11,7 @@ import { createCapabilityAdapters } from '../capabilities/runner';
 import { artifactSidecar, readCapabilityArtifact } from '../capabilities/artifactStore';
 import { fetchCapabilityCatalog, installCatalogPlugin, readCachedCatalog } from '../capabilities/marketplaceV2';
 import { legacyResultRequest } from '../capabilities/legacyResults';
+import { checkForCapabilityUpdates, setCapabilityAutoUpdate } from '../capabilities/updates';
 import { migrationSettled, readMigrationJournal } from '../capabilities/migration';
 import { capabilityMigrationRunning, migrateCapabilitiesForThisProfile, runPluginDataMigrations } from '../capabilities/migrationRunner';
 import { pinCapabilitiesForTurn } from '../capabilities/registry';
@@ -193,6 +194,16 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
   });
 
   h('capabilities:refreshCatalog', async (_event, sourceUrl: string) => fetchCapabilityCatalog(sourceUrl));
+
+  /** Checks the catalog and applies what may be applied without asking. An update that
+   *  wants more than the installed version was allowed is staged, not installed. */
+  h('capabilities:checkUpdates', async (_event, pluginId?: string) => {
+    const results = await checkForCapabilityUpdates(pluginId ? { only: pluginId } : {});
+    broadcastMigrationChanged();
+    return results;
+  });
+
+  h('capabilities:setAutoUpdate', async (_event, pluginId: string, autoUpdate: boolean) => setCapabilityAutoUpdate(pluginId, autoUpdate));
 
   h('capabilities:installPlugin', async (_event, pluginId: string, approvePermissions = false) => {
     const outcome = await installCatalogPlugin(pluginId, { approvePermissions });

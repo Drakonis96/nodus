@@ -138,6 +138,8 @@ export const nodusApi: NodusApi = {
   },
   retryCapabilityMigration: () => ipcRenderer.invoke('capabilities:retryMigration'),
   refreshCapabilityCatalog: (sourceUrl) => ipcRenderer.invoke('capabilities:refreshCatalog', sourceUrl),
+  checkCapabilityUpdates: (pluginId) => ipcRenderer.invoke('capabilities:checkUpdates', pluginId),
+  setCapabilityAutoUpdate: (pluginId, autoUpdate) => ipcRenderer.invoke('capabilities:setAutoUpdate', pluginId, autoUpdate),
   installCapabilityPlugin: (pluginId, approvePermissions) => ipcRenderer.invoke('capabilities:installPlugin', pluginId, approvePermissions),
   approveCapabilityPlugin: (pluginId) => ipcRenderer.invoke('capabilities:approvePlugin', pluginId),
   rollbackCapabilityPlugin: (pluginId) => ipcRenderer.invoke('capabilities:rollbackPlugin', pluginId),

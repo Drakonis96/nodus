@@ -8825,6 +8825,8 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   renderCapabilityArtifact(source: string, locale?: string): Promise<import('./capabilities').ArtifactRenderResult>;
   renderLegacyCapabilityResult(fence: string, payload: string, locale?: string): Promise<import('./capabilities').LegacyResultRenderResult>;
   onCapabilityMigrationChanged(cb: () => void): () => void;
+  checkCapabilityUpdates(pluginId?: string): Promise<Array<{ pluginId: string; state: 'updated' | 'awaiting-approval' | 'incompatible' | 'current' | 'skipped' | 'failed'; from?: string; to?: string; detail?: string }>>;
+  setCapabilityAutoUpdate(pluginId: string, autoUpdate: boolean): Promise<import('./capabilities').InstalledCapabilityPlugin>;
   capabilityMigrationStatus(): Promise<import('./capabilities').CapabilityMigrationStatus>;
   retryCapabilityMigration(): Promise<{ installed: string[]; adopted: string[]; preserved: string[]; failed: Array<{ pluginId: string; phase: string; detail: string }> }>;
   refreshCapabilityCatalog(sourceUrl: string): Promise<import('./capabilities').CapabilityListPayload['catalog']>;

@@ -3,6 +3,7 @@ import { initializePluginStore } from './skillPlugins';
 import { initializeCapabilityPluginStore } from './capabilities/pluginStoreV2';
 import { rebuildCapabilityRegistry } from './capabilities/registry';
 import { migrateCapabilitiesForThisProfile } from './capabilities/migrationRunner';
+import { checkForCapabilityUpdates } from './capabilities/updates';
 import { startPluginUpdates, stopPluginUpdates } from './skillPluginUpdates';
 import { app, BrowserWindow, dialog, nativeTheme, session, shell } from 'electron';
 import path from 'node:path';
@@ -942,7 +943,20 @@ app.whenReady().then(async () => {
       if (outcome.installed.length || outcome.adopted.length) rebuildCapabilityRegistry();
       for (const failure of outcome.failed) console.warn(`[capabilities] ${failure.pluginId} stopped at ${failure.phase}: ${failure.detail}`);
     })
-    .catch(error => console.warn('[capabilities] migration could not run:', error));
+    .catch(error => console.warn('[capabilities] migration could not run:', error))
+    // Updates come after the move, never during it: an update mid-migration would change
+    // the version the migration is halfway through. Delayed, because a launch has better
+    // things to do with its first seconds than talk to GitHub.
+    .finally(() => setTimeout(() => {
+      void checkForCapabilityUpdates()
+        .then(results => {
+          for (const result of results) {
+            if (result.state === 'updated') console.info(`[capabilities] ${result.pluginId} updated ${result.from} -> ${result.to}`);
+            if (result.state === 'awaiting-approval') console.info(`[capabilities] ${result.pluginId} ${result.to} is waiting for permission approval`);
+          }
+        })
+        .catch(error => console.warn('[capabilities] update check could not run:', error));
+    }, 30_000).unref?.());
   removeDisplacedMacBundle();
   restorePersistedDockIcon();
   // YouTube (embedded by the PDF Presenter's audience overlay) flags Electron's

@@ -372,6 +372,14 @@ export function pluginMigrationScripts(id: string): string[] {
   });
 }
 
+/** Whether this package may update itself. The only field of the state a user sets
+ *  directly, so it is written on its own rather than as part of an install. */
+export function writePluginAutoUpdate(id: string, autoUpdate: boolean): InstalledPluginStateV2 {
+  const state = readPluginStateV2(id);
+  if (!state) throw new Error(`${id} is not installed.`);
+  return writeStateV2({ ...state, autoUpdate });
+}
+
 export function pluginTombstone(id: string): { id: string; source: InstalledPluginStateV2['source']; autoUpdate: boolean; dataVersion: number } | null {
   try { return JSON.parse(fs.readFileSync(path.join(tombstonesRoot(), `${assertId(id)}.json`), 'utf8')); } catch { return null; }
 }

@@ -187,10 +187,23 @@ export function CapabilityPackagesPanel() {
         <h3>{t('Paquetes oficiales')}</h3>
         <p className="capability-packages-muted">{t('Publicados y firmados por NodusResearch. Cada paquete trae sus propias capabilities y su propia configuración.')}</p>
       </div>
-      <button type="button" className="chat-skill-secondary" disabled={busy === 'catalog'}
-        onClick={() => void run('catalog', () => window.nodus.refreshCapabilityCatalog(DEFAULT_SKILL_SOURCE), t('Catálogo actualizado.'))}>
-        <Icon name="refresh" size={14} />{t('Actualizar catálogo')}
-      </button>
+      <div className="capability-packages-actions">
+        <button type="button" className="chat-skill-secondary" disabled={busy === 'catalog'}
+          onClick={() => void run('catalog', () => window.nodus.refreshCapabilityCatalog(DEFAULT_SKILL_SOURCE), t('Catálogo actualizado.'))}>
+          <Icon name="refresh" size={14} />{t('Actualizar catálogo')}
+        </button>
+        <button type="button" className="chat-skill-secondary" disabled={busy === 'updates'}
+          onClick={() => void run('updates', async () => {
+            const results = await window.nodus.checkCapabilityUpdates();
+            const updated = results.filter(result => result.state === 'updated');
+            const waiting = results.filter(result => result.state === 'awaiting-approval');
+            setNotice(updated.length ? `${t('Actualizado')}: ${updated.map(result => `${result.pluginId} ${result.to}`).join(', ')}`
+              : waiting.length ? t('Hay una actualización esperando a que apruebes sus permisos.')
+                : t('Todo está al día.'));
+          })}>
+          <Icon name="download" size={14} />{busy === 'updates' ? t('Buscando…') : t('Buscar actualizaciones')}
+        </button>
+      </div>
     </header>
 
     <MigrationBanner onChanged={refresh} />
@@ -218,6 +231,11 @@ export function CapabilityPackagesPanel() {
           </div>
           <p className="capability-packages-muted">{label(entry.description)}</p>
           <PackageFacts entry={entry} state={state} providers={providers} />
+          {state?.active && <label className="capability-packages-autoupdate">
+            <input type="checkbox" checked={state.autoUpdate}
+              onChange={event => void run(entry.id, () => window.nodus.setCapabilityAutoUpdate(entry.id, event.target.checked))} />
+            <span>{t('Actualizar este paquete automáticamente')}</span>
+          </label>}
           {state?.pending?.reason === 'permissions' && <p className="capability-packages-warning" role="status">
             {t('La actualización pide permisos nuevos. Revísalos y apruébala para instalarla.')}
           </p>}
