@@ -43,7 +43,10 @@ try {
   // A throwaway key stands in for the release key, which lives in a protected environment
   // and is never present on a development machine or in CI.
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
-  const trustedKeys = { keys: [{ keyId: 'nr01', publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }).toString() }] };
+  // The key id follows the packages, so a rotation is exercised here rather than breaking
+  // this check.
+  const keyId = JSON.parse(fs.readFileSync(path.join(marketplace, 'plugins', index[0].manifest.id, 'plugin.json'), 'utf8')).publisher.keyId;
+  const trustedKeys = { keys: [{ keyId, publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }).toString() }] };
 
   // The bootstrap layout the application looks for inside its own build, staged outside it
   // so each scenario can copy the tree it wants into place.
@@ -55,7 +58,7 @@ try {
       schemaVersion: 1,
       plugin: entry.manifest.id,
       version: entry.manifest.version,
-      publisher: { id: 'NodusResearch', keyId: 'nr01' },
+      publisher: { id: 'NodusResearch', keyId },
       createdAt: new Date().toISOString(),
       targets: [{ target: entry.target, asset: entry.asset, bytes: archive.byteLength, sha256: createHash('sha256').update(archive).digest('hex') }],
     };

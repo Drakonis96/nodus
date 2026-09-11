@@ -137,7 +137,10 @@ try {
 
   step('signing with a key generated for this run');
   const ephemeral = generateKeyPairSync('ed25519');
-  const testKeys = { keys: [{ keyId: 'nr01', publicKeyPem: ephemeral.publicKey.export({ type: 'spki', format: 'pem' }).toString() }] };
+  // The key id follows the packages rather than being written here, so a rotation is
+  // exercised by this check instead of breaking it.
+  const keyId = sdk.validatePluginManifestV2(JSON.parse(marketplaceRead(`plugins/${published[0]}/plugin.json`))).publisher.keyId;
+  const testKeys = { keys: [{ keyId, publicKeyPem: ephemeral.publicKey.export({ type: 'spki', format: 'pem' }).toString() }] };
 
   const releases = new Map();
   for (const entry of index) {
@@ -145,7 +148,7 @@ try {
       schemaVersion: 1,
       plugin: entry.manifest.id,
       version: entry.manifest.version,
-      publisher: { id: 'NodusResearch', keyId: 'nr01' },
+      publisher: { id: 'NodusResearch', keyId },
       createdAt: new Date().toISOString(),
       targets: [{ target: entry.target, asset: entry.asset, bytes: entry.bytes, sha256: entry.sha256 }],
     };
