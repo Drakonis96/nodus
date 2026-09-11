@@ -9,6 +9,8 @@ import { writeCapabilitySecret } from '../capabilities/hostServices';
 import { createCapabilityAdapters } from '../capabilities/runner';
 import { artifactSidecar, readCapabilityArtifact } from '../capabilities/artifactStore';
 import { fetchCapabilityCatalog, installCatalogPlugin, readCachedCatalog } from '../capabilities/marketplaceV2';
+import { pendingMigrations, readMigrationJournal } from '../capabilities/migration';
+import { migrateCapabilitiesForThisProfile } from '../capabilities/migrationRunner';
 import { pinCapabilitiesForTurn } from '../capabilities/registry';
 import type { IpcContext } from './context';
 
@@ -123,6 +125,17 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
       data: envelope.data, locale,
     }, { timeoutMs: 60_000 });
     return { available: true as const, sidecar, view: validateViewDocument(view) };
+  });
+
+  h('capabilities:migrationStatus', async () => ({
+    journal: readMigrationJournal(),
+    pending: pendingMigrations(),
+  }));
+
+  h('capabilities:retryMigration', async () => {
+    const outcome = await migrateCapabilitiesForThisProfile();
+    rebuildCapabilityRegistry();
+    return outcome;
   });
 
   h('capabilities:refreshCatalog', async (_event, sourceUrl: string) => fetchCapabilityCatalog(sourceUrl));

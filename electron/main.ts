@@ -2,6 +2,7 @@ import { initializeChatSkillDefaults } from './chatSkills';
 import { initializePluginStore } from './skillPlugins';
 import { initializeCapabilityPluginStore } from './capabilities/pluginStoreV2';
 import { rebuildCapabilityRegistry } from './capabilities/registry';
+import { migrateCapabilitiesForThisProfile } from './capabilities/migrationRunner';
 import { startPluginUpdates, stopPluginUpdates } from './skillPluginUpdates';
 import { app, BrowserWindow, dialog, nativeTheme, session, shell } from 'electron';
 import path from 'node:path';
@@ -932,6 +933,16 @@ app.whenReady().then(async () => {
   rebuildCapabilityRegistry();
   initializeChatSkillDefaults();
   initializePluginStore();
+  // The three disciplines that became packages are adopted in the background. A profile
+  // that needs one keeps the skill it already had until the package is in place, and a
+  // migration that cannot finish must never hold up the window or turn a skill off: it
+  // leaves a retry in the journal and says so in the interface.
+  void migrateCapabilitiesForThisProfile()
+    .then(outcome => {
+      if (outcome.installed.length || outcome.adopted.length) rebuildCapabilityRegistry();
+      for (const failure of outcome.failed) console.warn(`[capabilities] ${failure.pluginId} stopped at ${failure.phase}: ${failure.detail}`);
+    })
+    .catch(error => console.warn('[capabilities] migration could not run:', error));
   removeDisplacedMacBundle();
   restorePersistedDockIcon();
   // YouTube (embedded by the PDF Presenter's audience overlay) flags Electron's

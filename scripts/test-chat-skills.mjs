@@ -228,7 +228,7 @@ test('existing libraries receive the disabled tutor once without overwriting use
     assert.equal(migrated.some(skill => skill.builtin === 'image'), false, 'deleted image skill stays deleted');
     const tutor = migrated.find(skill => skill.builtin === 'socratic');
     assert.deepEqual(tutor.enabled, { assistant: false, nodi: false });
-    assert.equal(JSON.parse(fs.readFileSync(location)).version, 15);
+    assert.equal(JSON.parse(fs.readFileSync(location)).version, 16);
     assert.equal(lib.listChatSkills().length, 14, 'migration is idempotent');
     lib.deleteChatSkill(tutor.id);
     assert.equal(lib.listChatSkills().some(skill => skill.builtin === 'socratic'), false, 'deleted tutor does not reappear');
@@ -285,7 +285,7 @@ test('version 3 migration adds Chemistry Studio once and preserves existing skil
     const migrated = lib.listChatSkills();
     assert.deepEqual(migrated[0], edited);
     assert.equal(migrated.filter(skill => skill.builtin === 'chemistry').length, 1);
-    assert.equal(JSON.parse(fs.readFileSync(location)).version, 15);
+    assert.equal(JSON.parse(fs.readFileSync(location)).version, 16);
     assert.deepEqual(lib.listChatSkills(), migrated, 'version 6 migration is idempotent');
   } finally { fs.writeFileSync(location, original); }
 });
@@ -298,7 +298,7 @@ test('historical migrations preserve user-edited Chemistry Studio instructions',
     for (const version of [4, 5, 6, 7, 8]) {
       fs.writeFileSync(location, JSON.stringify({ version, skills: [chemistry] }));
       assert.deepEqual(lib.listChatSkills().filter(s => !['genomics', 'legal'].includes(s.builtin)), [chemistry]);
-      assert.equal(JSON.parse(fs.readFileSync(location)).version, 15);
+      assert.equal(JSON.parse(fs.readFileSync(location)).version, 16);
     }
   } finally { fs.writeFileSync(location, original); }
 });

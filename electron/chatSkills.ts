@@ -22,7 +22,7 @@ import {
 } from './skillPlugins';
 
 const file = () => path.join(app.getPath('userData'), 'chat-skills.json');
-const LIBRARY_VERSION = 15;
+const LIBRARY_VERSION = 16;
 const LEGACY_SVG_V12_SHA256 = '8a8629caa2db26ab2d86ad7b2ee3daae72bd4156d198a8da01b639218c328570';
 const LEGACY_CHEMISTRY_V14_SHA256 = '11748993bb6510e37f9e89822670b83beeb0f703dd423f052a117a57757fced0';
 const LEGACY_CHEMISTRY_V12_SHA256 = '72d01438357e6e4a591a0a067c62cbfbe6e2aa7fc801b30ace8d6c1a470fb725';
@@ -44,7 +44,7 @@ export function listChatSkills(): ChatSkill[] {
   if (!fs.existsSync(file())) return write(structuredClone(DEFAULT_CHAT_SKILLS));
   let parsed: { version?: number; skills?: ChatSkill[] };
   try { parsed = JSON.parse(fs.readFileSync(file(), 'utf8')); } catch { throw new Error('The skills library could not be read.'); }
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');
   if (parsed.version! < LIBRARY_VERSION) {
     // Each release adds only newly introduced defaults. Never restore a skill
     // deleted in an earlier version or overwrite its edited instructions/flags.
@@ -88,6 +88,10 @@ export function listChatSkills(): ChatSkill[] {
   for (const skill of parsed.skills) if (!fs.existsSync(path.join(skillDirectory(skill.id), 'skill.json'))) writeSkillDirectory(skill);
   return parsed.skills;
 }
+/** Replaces the whole library at once. Only the capability migration uses this: every
+ *  other change goes through the functions that reason about one skill at a time. */
+export function replaceChatSkills(skills: ChatSkill[]): ChatSkill[] { return write(skills); }
+
 function write(skills: ChatSkill[]): ChatSkill[] {
   fs.mkdirSync(path.dirname(file()), { recursive: true });
   for (const skill of skills) writeSkillDirectory(skill);
