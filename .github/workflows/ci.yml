@@ -104,22 +104,29 @@ jobs:
           repository: NodusResearch/nodus-research-skill-marketplace
           path: .marketplace
 
-      # A change that spans both repositories is developed on a branch of the same name in
-      # each, so if one exists here it is what this Nodus branch should be checked against.
-      # Its absence is ordinary — most Nodus branches touch no package — and then the
-      # marketplace's default branch is used, which is what a released Nodus installs from.
-      - name: Use a matching marketplace branch when there is one
+      # A change can span both repositories, and then this branch has to be checked against
+      # the marketplace branch that carries the other half. `.github/marketplace-ref` names
+      # it, and only a pull request may use it: a push to main is always checked against
+      # the marketplace's default branch, which is what a released Nodus installs from. So
+      # a paired change that merges here before it merges there fails on main, loudly,
+      # instead of being carried by a pairing nobody remembered to remove.
+      - name: Use the paired marketplace branch on a pull request
+        if: github.event_name == 'pull_request'
         working-directory: .marketplace
         run: |
           set -euo pipefail
-          BRANCH='${{ github.head_ref || github.ref_name }}'
-          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-            git fetch --depth 1 origin "$BRANCH"
-            git checkout FETCH_HEAD
-            echo "Checking against the marketplace branch $BRANCH."
-          else
-            echo "No marketplace branch named $BRANCH; checking against its default branch."
+          REF_FILE="$GITHUB_WORKSPACE/.github/marketplace-ref"
+          [ -f "$REF_FILE" ] || { echo "No paired marketplace branch; checking against its default branch."; exit 0; }
+          BRANCH=$(tr -d ' \t\r\n' < "$REF_FILE")
+          [ -n "$BRANCH" ] && [ "$BRANCH" != 'main' ] || { echo "Paired with main; nothing to switch."; exit 0; }
+          if ! git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo ".github/marketplace-ref names $BRANCH, which does not exist in the marketplace." >&2
+            echo "Point it at an existing branch, or delete it once the paired change has merged." >&2
+            exit 1
           fi
+          git fetch --depth 1 origin "$BRANCH"
+          git checkout FETCH_HEAD
+          echo "Checking against the marketplace branch $BRANCH."
 
       - name: Set up Node
         uses: actions/setup-node@v7

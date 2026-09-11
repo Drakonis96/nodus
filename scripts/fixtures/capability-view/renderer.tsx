@@ -45,7 +45,17 @@ const catalog = {
 
 const providers = [
   { id: 'nodus:chemistry', version: '2.0.0', description: 'Identidad, dibujo y exportación química verificados.', source: 'plugin' as const, plugin: { id: 'chemistry-studio', version: '2.0.0', digest: 'a'.repeat(64) }, tools: [{ id: 'compile', description: 'Compila un plan.', metered: true }], artifacts: [], hasSettings: false },
-  { id: 'nodus:genomics', version: '2.0.0', description: 'Predicción genómica.', source: 'plugin' as const, plugin: { id: 'alphagenome', version: '2.0.0', digest: 'b'.repeat(64) }, tools: [{ id: 'predict', description: 'Una predicción.', metered: true }], artifacts: [], hasSettings: true },
+  {
+    id: 'nodus:genomics', version: '2.0.0', description: 'Predicción genómica.', source: 'plugin' as const,
+    plugin: { id: 'alphagenome', version: '2.0.0', digest: 'b'.repeat(64) },
+    tools: [{ id: 'predict', description: 'Una predicción.', metered: true }], artifacts: [], hasSettings: true,
+    chat: {
+      priority: 200,
+      pendingLabel: { en: 'Consulting AlphaGenome…', es: 'Consultando AlphaGenome…' },
+      fences: ['genomics-plan', 'genomics-result'],
+      legacyFences: ['genomics-result'],
+    },
+  },
 ];
 
 const settings = {
@@ -105,10 +115,15 @@ const inlineView = serializeChatVisualPart({
   content: JSON.stringify({ capabilityId: 'nodus:chemistry', plugin: { id: 'chemistry-studio', version: '2.0.0' }, owner: 'a'.repeat(64), view: { ...view, title: undefined, nodes: view.nodes.slice(4, 8) } }),
 });
 
+// A block written by 5.3.1, exactly as it sits in an old conversation: the fence the
+// package still claims, and a reference to the file beside the chat.
+const legacyBlock = '\n\n```genomics-result\nnodus-genomics://chat/' + 'a'.repeat(64) + '/3f8a1c0e-9b2d-4e77-8a10-5c6d7e8f9a0b\n```\n\n';
+
 function Harness() {
   return <div style={{ padding: 24 }}>
     <div data-testid="artifact"><ChatMarkdown content={artifactReference} /></div>
     <div data-testid="inline"><ChatMarkdown content={inlineView} /></div>
+    <div data-testid="legacy"><ChatMarkdown content={legacyBlock} /></div>
     <div data-testid="panel"><CapabilityPackagesPanel /></div>
   </div>;
 }

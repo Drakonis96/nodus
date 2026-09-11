@@ -56,6 +56,14 @@ test('capability views render in both themes without overflowing the message col
 
         assert.deepEqual(errors, [], `${theme}/${width}: the fixture rendered without page errors`);
 
+        // A result a discipline wrote before it was a package renders as the finished
+        // answer it is. The failure this guards against is the opposite: the reply shows
+        // "the generation was interrupted" for something that finished months ago.
+        const legacy = page.getByTestId('legacy');
+        await legacy.locator('.capability-view').waitFor();
+        assert.equal(await legacy.locator('.chat-visual-pending').count(), 0, `${theme}/${width}: a finished legacy result was shown as work in progress`);
+        assert.ok((await legacy.textContent()).includes('Etanol'), `${theme}/${width}: the legacy block rendered its package's view`);
+
         // Every node kind the contract defines actually reaches the DOM.
         for (const selector of ['.capability-view-badges', '.capability-view-table table', '.capability-view-notice', '.capability-view-details', '.capability-view-download', '.capability-view-status', '.capability-view-code', '.capability-view-links']) {
           assert.ok(await page.locator(selector).count() > 0, `${theme}/${width}: ${selector} is rendered`);
