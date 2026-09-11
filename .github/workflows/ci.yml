@@ -146,6 +146,14 @@ jobs:
       - name: Install Electron runtime
         run: node node_modules/electron/install.js
 
+      # Electron refuses to start on Linux unless its setuid sandbox helper is owned by
+      # root, and npm cannot install it that way. Fixed here rather than by passing
+      # --no-sandbox, which would run these checks under weaker isolation than a user gets.
+      - name: Let Electron use its sandbox helper
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
       # These two run the packages' own workers in real utility processes: the migration
       # ladder, the registry gate, the journal, and the refusals. They need the packages
       # built, which the step above has just done in the marketplace checkout.
