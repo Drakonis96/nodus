@@ -74,13 +74,19 @@ export function createCapabilityAdapters(context: TrustedTurnContext): Capabilit
       async ensureRuntime(runtime, runtimeId, signal) {
         const declared = runtime.permissions.runtimes?.find(entry => entry.id === runtimeId);
         if (!declared) return { ready: false, detail: 'That runtime is not declared by the package.' };
-        const lockPath = path.join(path.dirname(runtime.entryPath), 'runtimes', runtimeId, 'lock.json');
-        let lock;
-        try { lock = validateRuntimeLock(JSON.parse(fs.readFileSync(lockPath, 'utf8'))); }
-        catch (error) { return { ready: false, detail: error instanceof Error ? error.message : String(error) }; }
+        // One lock per interpreter version the package supports, named for it. A package
+        // that supports only one ships `lock.json` and gets it whatever the interpreter is.
+        const locks = path.join(path.dirname(runtime.entryPath), 'runtimes', runtimeId);
+        const selectLock = (pythonVersion: string) => {
+          for (const file of [`lock-${pythonVersion}.json`, 'lock.json']) {
+            try { return validateRuntimeLock(JSON.parse(fs.readFileSync(path.join(locks, file), 'utf8'))); }
+            catch { /* try the next */ }
+          }
+          return null;
+        };
         return ensurePythonRuntime(runtime, runtimeId, {
           download: lockDownloader(runtime, services!, signal),
-          minVersion: declared.minVersion, lock, signal,
+          minVersion: declared.minVersion, selectLock, signal,
         });
       },
       run: (runtime, request, signal) => runInPythonRuntime(runtime, request, signal),
