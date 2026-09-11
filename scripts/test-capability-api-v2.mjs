@@ -258,8 +258,11 @@ test('the reply is parsed once into a generic tree and serializes back unchanged
   assert.equal(sdk.serializeChatAst(nodes), answer);
   assert.equal(new Set(nodes.map(node => node.id)).size, nodes.length, 'node ids are unique');
 
-  const truncated = sdk.parseChatAst('```legal-plan\n{"country":"es"');
+  const cut = '```legal-plan\n{"country":"es"';
+  const truncated = sdk.parseChatAst(cut);
   assert.equal(truncated[0].complete, false, 'a reply cut off mid-fence is reported incomplete');
+  // Closing it on the way out would make a truncated reply look executable on the next pass.
+  assert.equal(sdk.serializeChatAst(truncated), cut);
 });
 
 test('a chat hook returns typed mutations and may only address the nodes it was given', () => {

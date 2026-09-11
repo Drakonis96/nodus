@@ -167,8 +167,14 @@ export function parseChatAst(answer: string): ChatAstNode[] {
   return nodes;
 }
 
+/** Faithful inverse of the parse, incompleteness included: closing a fence the model never
+ *  closed would turn a truncated reply into one that looks executable on the next pass. */
 export function serializeChatAst(nodes: readonly ChatAstNode[]): string {
-  return nodes.map(node => node.kind === 'prose' ? node.content : `\`\`\`${node.fence}\n${node.content}\n\`\`\``).join('');
+  return nodes.map(node => {
+    if (node.kind === 'prose') return node.content;
+    const opened = `\`\`\`${node.fence}\n${node.content}`;
+    return node.complete ? `${opened}\n\`\`\`` : opened;
+  }).join('');
 }
 
 export const pendingLabelText = (contract: CapabilityChatContractV2, locale: string): string =>
