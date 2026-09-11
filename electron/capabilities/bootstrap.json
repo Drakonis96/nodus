@@ -1,0 +1,8 @@
+{
+  "comment": "The signed capability releases this build carries for the 5.3.1 to 5.3.2 migration. Each entry is pinned by asset name, size and SHA-256; `releaseUrl` is filled in once a release exists, and until then a development build takes the package from a local marketplace checkout and refuses to bundle it unsigned. Later releases keep this list while direct upgrades from 5.3.1 are supported.",
+  "packages": [
+    { "id": "chemistry-studio", "version": "2.0.0", "releaseUrl": null, "assets": [] },
+    { "id": "legalize", "version": "2.0.0", "releaseUrl": null, "assets": [] },
+    { "id": "alphagenome", "version": "2.0.0", "releaseUrl": null, "assets": [] }
+  ]
+}
