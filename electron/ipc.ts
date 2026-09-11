@@ -34,6 +34,7 @@ import { createIpcContext } from './ipc/context';
 import { registerProsopographyIpc } from './ipc/prosopography';
 import { registerTestimoniesIpc } from './ipc/testimonies';
 import { registerToolkitIpc } from './ipc/toolkit';
+import { registerCapabilitiesIpc } from './ipc/capabilities';
 import { registerTeachingIpc } from './ipc/teaching';
 import { registerDatabasesIpc } from './ipc/databases';
 import { registerPagesIpc } from './ipc/pages';
@@ -245,6 +246,7 @@ export function registerIpc(
   registerPagesIpc(context);
   registerTeachingIpc(context);
   registerToolkitIpc(context);
+  registerCapabilitiesIpc(context);
   registerTestimoniesIpc(context);
 
   const nodiChatAborters = new Map<string, AbortController>();

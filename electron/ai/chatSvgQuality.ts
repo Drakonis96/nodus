@@ -1,22 +1,15 @@
 import { skillHasCapability } from '@shared/chatSkills';
-import { BrowserWindow } from 'electron';
 import { sanitizeChatSvg } from '@shared/chatSvg';
 import { serializeChatVisualPart, splitChatVisuals, type ChatSkill } from '@shared/chatSkills';
 import type { ModelRef } from '@shared/types';
 import { completeText } from './aiClient';
 import { chemistrySvgAuditSystem, chemistrySvgMarkupIssues, chemistrySvgMode, isChemistrySvgRequest } from './chatChemistrySvg';
+import { evaluateInSvgSandbox } from './svgSandboxWindow';
 
 /** Inspect actual font metrics in an isolated, offscreen document whose CSP blocks page scripts. */
 export async function inspectChatSvg(svg: string): Promise<string[]> {
   if (svg.length > 300_000) return ['SVG exceeds the 300 KB preview limit.'];
-  const win = new BrowserWindow({ show: false, focusable: false, skipTaskbar: true, width: 1200, height: 1000, webPreferences: {
-    sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true,
-    partition: `chat-svg-qa-${crypto.randomUUID()}`,
-  } });
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  try {
-    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent('<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\';"><body style="margin:0">'));
-    return await win.webContents.executeJavaScript(`(() => {
+  return evaluateInSvgSandbox<string[]>(`(() => {
       const clean = (${sanitizeChatSvg.toString()})(${JSON.stringify(svg)});
       if (!clean) return ['Invalid or incomplete SVG XML. Return one complete valid SVG.'];
       const parsed = new DOMParser().parseFromString(clean.svg, 'image/svg+xml');
@@ -46,7 +39,6 @@ export async function inspectChatSvg(svg: string): Promise<string[]> {
       }
       return issues.slice(0, 16);
     })()`);
-  } finally { if (!win.isDestroyed()) win.destroy(); }
 }
 
 /**

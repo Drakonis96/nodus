@@ -9,6 +9,9 @@ import { executeLegal } from '../builtins/legal/main';
 import { refineSvg, rescueChemistryWithSvg } from '../builtins/svg/main';
 import { executeExternalCapability } from '../external/main';
 import { SANDBOXED_CALL_LIMIT } from '../contracts';
+import { capabilityRegistry, pinCapabilitiesForTurn } from '../../electron/capabilities/registry';
+import { runTrustedChatPipeline } from '../../electron/capabilities/chatPipeline';
+import { createTrustedCapabilityRunner } from '../../electron/capabilities/runner';
 import type { ChatCallBudget, ChatSkillExecution } from './types';
 
 export function assertChatSkillSession(execution: ChatSkillExecution, signal?: AbortSignal): void {
@@ -18,8 +21,28 @@ export function assertChatSkillSession(execution: ChatSkillExecution, signal?: A
   }
 }
 
-/** Provider-independent registry dispatcher shared by every chat surface. */
+/** Provider-independent registry dispatcher shared by every chat surface.
+ *
+ *  Installed capability packages get their declared stages around the core's own; with
+ *  none installed this is exactly `runCoreChatStages`, which is the shape of a clean
+ *  install and of every build before capability API v2. */
 export async function executeRegisteredChatSkills(answer: string, execution: ChatSkillExecution, signal?: AbortSignal): Promise<string> {
+  const registry = capabilityRegistry();
+  if (!registry.chatOrder.length) return runCoreChatStages(answer, execution, { suppressSvgRefinement: false }, signal);
+  const runner = createTrustedCapabilityRunner({
+    owner: execution.owner,
+    question: execution.question,
+    locale: 'en',
+    model: execution.model,
+    pins: pinCapabilitiesForTurn(),
+    signal,
+    runCoreStages: (text, options) => runCoreChatStages(text, execution, options, signal),
+  });
+  return runTrustedChatPipeline(answer, registry, runner, { signal });
+}
+
+/** The built-in cascade. Everything disciplinary still in here leaves with its plugin. */
+export async function runCoreChatStages(answer: string, execution: ChatSkillExecution, options: { suppressSvgRefinement: boolean }, signal?: AbortSignal): Promise<string> {
   const current = () => assertChatSkillSession(execution, signal);
   current();
   const legal = await executeLegal(answer, execution, signal);
@@ -59,7 +82,7 @@ export async function executeRegisteredChatSkills(answer: string, execution: Cha
   }
   answer = processed + answer.slice(cursor);
 
-  if (!chemistry.initialIntent) answer = await refineSvg(answer, execution, signal);
+  if (!chemistry.initialIntent && !options.suppressSvgRefinement) answer = await refineSvg(answer, execution, signal);
   const parts = splitChatVisuals(answer);
   const hasChemistryIntent = parts.some(part => part.kind === 'chemistry-plan');
   let imageRequested = false, chemistryRequested = false, chemistryDrawn = false;

@@ -68,8 +68,10 @@ function runnerOf(overrides = {}) {
       calls.push(`view:${provider.id}`);
       return `\n\n[view ${view.summary}]\n\n`;
     },
-    async refineCoreSvg(answer) { calls.push('core:svg'); return overrides.refineCoreSvg ? overrides.refineCoreSvg(answer) : answer; },
-    async runLegacyStages(answer) { calls.push('core:legacy'); return overrides.runLegacyStages ? overrides.runLegacyStages(answer) : answer; },
+    async runCoreStages(answer, options) {
+      calls.push(options.suppressSvgRefinement ? 'core:stages(no-svg)' : 'core:stages');
+      return overrides.runCoreStages ? overrides.runCoreStages(answer, options) : answer;
+    },
   };
 }
 
@@ -82,7 +84,7 @@ test('a clean install runs the core stages and nothing else', async () => {
   const answer = 'Plain prose with no fences.';
   const output = await runTrustedChatPipeline(answer, { providers: new Map(), fences: new Map(), chatOrder: [], problems: [], revision: 0 }, runner);
   assert.equal(output, answer);
-  assert.deepEqual(runner.calls, ['core:svg', 'core:legacy']);
+  assert.deepEqual(runner.calls, ['core:stages']);
 });
 
 test('a claimed fence becomes an artifact, and the request block does not survive', async () => {
@@ -97,7 +99,7 @@ test('a claimed fence becomes an artifact, and the request block does not surviv
   assert.match(output, /\[artifact compile-result "compile done"\]/);
   assert.match(output, /After\./);
   assert.doesNotMatch(output, /chemistry-plan/, 'the request block is consumed, not left for the next turn to read');
-  assert.deepEqual(runner.calls, ['core:svg', 'core:legacy', 'invoke:nodus:chemistry:compile', 'persist:nodus:chemistry:compile-result']);
+  assert.deepEqual(runner.calls, ['core:stages', 'invoke:nodus:chemistry:compile', 'persist:nodus:chemistry:compile-result']);
 });
 
 test('a stored result fence is not a request and is never executed', async () => {
@@ -142,13 +144,12 @@ test('a prepare hook can claim the drawing lane, and the core then leaves SVG al
     requests: [{ fence: 'chemistry-plan', toolId: 'compile', maxPerReply: 1, answerMode: 'replace-block' }],
     hooks: { prepare: true },
   });
-  let refined = false;
   const runner = runnerOf({
     hook: () => [{ op: 'claim', suppressSvgRefinement: true }, { op: 'notice', position: 'before', view: noticeView('Drawing with the verified lane.') }],
-    refineCoreSvg: answer => { refined = true; return answer; },
   });
   const output = await runTrustedChatPipeline('```chemistry-plan\n{"draw":"benzene"}\n```', registryOf(chemistry), runner);
-  assert.equal(refined, false, 'the core does not second-guess a lane a provider has claimed');
+  assert.ok(runner.calls.includes('core:stages(no-svg)'), 'the core does not second-guess a lane a provider has claimed');
+  assert.ok(!runner.calls.includes('core:stages'));
   assert.match(output, /\[view Drawing with the verified lane\.\]/);
 });
 

@@ -1,5 +1,7 @@
 import { initializeChatSkillDefaults } from './chatSkills';
 import { initializePluginStore } from './skillPlugins';
+import { initializeCapabilityPluginStore } from './capabilities/pluginStoreV2';
+import { rebuildCapabilityRegistry } from './capabilities/registry';
 import { startPluginUpdates, stopPluginUpdates } from './skillPluginUpdates';
 import { app, BrowserWindow, dialog, nativeTheme, session, shell } from 'electron';
 import path from 'node:path';
@@ -924,6 +926,10 @@ app.on('second-instance', (_event, argv) => {
 app.whenReady().then(async () => {
   // Losing the lock queues a quit; do not open the database or a window.
   if (!hasSingleInstanceLock) return;
+  // Which capabilities exist has to be settled before the skill library is read: a skill
+  // that depends on one cannot be judged available until its provider has registered.
+  initializeCapabilityPluginStore();
+  rebuildCapabilityRegistry();
   initializeChatSkillDefaults();
   initializePluginStore();
   removeDisplacedMacBundle();

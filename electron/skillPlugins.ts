@@ -13,6 +13,7 @@ import {
 } from '../skill-capabilities/contracts';
 import { mergedPluginPermissions, permissionsExpand, validatePluginPackage, type ValidatedPluginPackage } from '../skill-capabilities/pluginPackage';
 import { REGISTERED_BUILTIN_CAPABILITY_IDS } from '../skill-capabilities/registry/catalog';
+import { capabilityIsAvailable } from './capabilities/registry';
 
 const pluginsRoot = () => path.join(app.getPath('userData'), 'plugins');
 const installedRoot = () => path.join(pluginsRoot(), 'installed');
@@ -220,8 +221,12 @@ export function resolveInstalledCapability(id: string, snapshot?: { version: str
   } catch { return null; }
 }
 
+/** Normalizing a short name is not resolving it: `chemistry` still reads as
+ *  `nodus:chemistry` with no package installed, and still is not available. */
 export function installedCapabilityAvailable(id: string): boolean {
-  return REGISTERED_BUILTIN_CAPABILITY_IDS.includes(id as typeof REGISTERED_BUILTIN_CAPABILITY_IDS[number]) || Boolean(resolveInstalledCapability(id));
+  return REGISTERED_BUILTIN_CAPABILITY_IDS.includes(id as typeof REGISTERED_BUILTIN_CAPABILITY_IDS[number])
+    || capabilityIsAvailable(id)
+    || Boolean(resolveInstalledCapability(id));
 }
 
 function secretsPath(id: string) { return path.join(pluginDir(id), 'secrets.bin'); }

@@ -24,9 +24,9 @@ export interface TrustedCapabilityRunner {
   persistArtifact(request: { provider: CapabilityProvider; artifact: WorkerArtifactV1 }): Promise<string>;
   /** Renders a plugin-authored view into the reply. */
   renderView(request: { provider: CapabilityProvider; view: ViewDocumentV1 }): string;
-  /** Everything the core still does itself between the provider stages. */
-  refineCoreSvg(answer: string): Promise<string>;
-  runLegacyStages(answer: string): Promise<string>;
+  /** Everything the core still does itself between the provider stages, told whether a
+   *  provider has claimed the drawing lane for this reply. */
+  runCoreStages(answer: string, options: { suppressSvgRefinement: boolean }): Promise<string>;
 }
 
 export interface TrustedChatOptions {
@@ -54,7 +54,7 @@ export async function runTrustedChatPipeline(
 ): Promise<string> {
   // With nothing registered there is no v2 stage to run, and the reply is whatever the
   // core already makes of it. This is the shape of a clean install.
-  if (!registry.chatOrder.length) return runner.runLegacyStages(await runner.refineCoreSvg(answer));
+  if (!registry.chatOrder.length) return runner.runCoreStages(answer, { suppressSvgRefinement: false });
 
   const signal = options.signal;
   signal?.throwIfAborted();
@@ -144,11 +144,9 @@ export async function runTrustedChatPipeline(
     }
   }
 
-  // 4-6. The core's own stages, then the block-level requests. SVG refinement is skipped
-  //      only when a provider said it has taken the drawing lane for this reply.
-  let body = serialize(nodes, removed, placement);
-  if (!suppressSvgRefinement) body = await runner.refineCoreSvg(body);
-  body = await runner.runLegacyStages(body);
+  // 4-6. The core's own stages, then the block-level requests. The core skips its own
+  //      drawing pass only when a provider said it has taken that lane for this reply.
+  const body = await runner.runCoreStages(serialize(nodes, removed, placement), { suppressSvgRefinement });
 
   // The core stages rewrite the text, so the tree is rebuilt before the last stage rather
   // than pretending the node ids from step 1 still describe what is there.

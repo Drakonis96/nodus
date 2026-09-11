@@ -20,3 +20,4 @@ export * from './signature';
 export * from './worker';
 export * from './define';
 export * from './conformance';
+export * from './catalog';

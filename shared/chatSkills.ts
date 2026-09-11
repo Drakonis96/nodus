@@ -174,7 +174,7 @@ export function chatSkillsOutputContract(skills: ChatSkill[]): string {
   ].filter(Boolean).join('\n');
 }
 
-export interface ChatVisualPart { kind: 'markdown' | 'svg' | 'chemfig' | 'chemistry-plan' | 'chemistry-document' | 'chemistry-notice' | 'genomics-plan' | 'genomics-result' | 'legal-plan' | 'legal-result' | 'capability-request' | 'capability-result' | 'smiles' | 'lewis' | 'image-request' | 'image-error'; content: string; complete: boolean }
+export interface ChatVisualPart { kind: 'markdown' | 'svg' | 'chemfig' | 'chemistry-plan' | 'chemistry-document' | 'chemistry-notice' | 'genomics-plan' | 'genomics-result' | 'legal-plan' | 'legal-result' | 'capability-request' | 'capability-result' | 'capability-artifact' | 'capability-view' | 'smiles' | 'lewis' | 'image-request' | 'image-error'; content: string; complete: boolean }
 
 /**
  * A Chemistry Studio notice travels as structured data, never as prose. The main
@@ -237,6 +237,8 @@ export function splitChatVisuals(content: string): ChatVisualPart[] {
       kind = language === 'nodus-image-error' ? 'image-error' : language === 'nodus-image' ? 'image-request'
         : language === 'nodus-capability' ? 'capability-request'
         : language === 'nodus-capability-result' ? 'capability-result'
+        : language === 'nodus-artifact' ? 'capability-artifact'
+        : language === 'nodus-view' ? 'capability-view'
         : language === 'smiles' ? 'smiles'
         : language === 'lewis' ? 'lewis'
         : language === 'chemistry-plan' ? 'chemistry-plan'
@@ -270,7 +272,9 @@ export function serializeChatVisualPart(part: ChatVisualPart): string {
   const language = part.kind === 'image-request' ? 'nodus-image'
     : part.kind === 'image-error' ? 'nodus-image-error'
       : part.kind === 'capability-request' ? 'nodus-capability'
-        : part.kind === 'capability-result' ? 'nodus-capability-result' : part.kind;
+        : part.kind === 'capability-result' ? 'nodus-capability-result'
+          : part.kind === 'capability-artifact' ? 'nodus-artifact'
+            : part.kind === 'capability-view' ? 'nodus-view' : part.kind;
   return `\n\n\`\`\`${language}\n${part.content}\n${part.complete ? '```' : ''}\n\n`;
 }
 

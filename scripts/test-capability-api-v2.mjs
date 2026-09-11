@@ -192,7 +192,7 @@ test('a view document carries data, never markup or behaviour', () => {
       { kind: 'table', columns: [{ label: 'Property' }, { label: 'Value', align: 'end' }], rows: [['CID', 702]] },
       { kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg"></svg>', title: 'Ethanol', alt: 'Skeletal formula of ethanol.' },
       { kind: 'details', summary: 'Sources', children: [{ kind: 'links', items: [{ href: 'https://opsin.ch.cam.ac.uk/', label: 'OPSIN' }] }] },
-      { kind: 'download', attachmentId: 'a1b2c3d4e5f6', label: 'Download ChemFig', name: 'ethanol.tex', mimeType: 'text/x-tex', bytes: 412 },
+      { kind: 'download', attachmentId: '3f8a1c0e-9b2d-4e77-8a10-5c6d7e8f9a0b', label: 'Download ChemFig', name: 'ethanol.tex', mimeType: 'text/x-tex', bytes: 412 },
       { kind: 'status', state: 'ok', label: 'Verified' },
     ],
   });
@@ -206,6 +206,8 @@ test('a view document carries data, never markup or behaviour', () => {
   bad({ kind: 'links', items: [{ href: 'file:///etc/passwd', label: 'x' }] });
   bad({ kind: 'svg', svg: 'not an svg', title: 't', alt: 'a' });
   bad({ kind: 'download', attachmentId: '../../escape', label: 'x', name: 'x.txt', mimeType: 'text/plain', bytes: 1 });
+  bad({ kind: 'download', attachmentId: 'has.a.dot', label: 'x', name: 'x.txt', mimeType: 'text/plain', bytes: 1 });
+  bad({ kind: 'download', attachmentId: 'short', label: 'x', name: 'x.txt', mimeType: 'text/plain', bytes: 1 });
   bad({ kind: 'download', attachmentId: 'a1b2c3d4e5f6', label: 'x', name: '../x.txt', mimeType: 'text/plain', bytes: 1 });
   bad({ kind: 'paragraph', spans: [{ text: 'x', onClick: 'doThing()' }] });
   bad({ kind: 'table', columns: [{ label: 'a' }], rows: [['a', 'b']] });

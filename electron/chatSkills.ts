@@ -5,6 +5,8 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { DEFAULT_CHAT_SKILLS, builtinSkillForPackage, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
 import { normalizeCapabilityId } from '../skill-capabilities/contracts';
+import { capabilityRegistry } from './capabilities/registry';
+import { resolveInstalledCapability } from './skillPlugins';
 import { resolvePluginCapabilityReference, type ValidatedPluginPackage } from '../skill-capabilities/pluginPackage';
 import {
   approvePendingPlugin,
@@ -93,9 +95,28 @@ function write(skills: ChatSkill[]): ChatSkill[] {
   fs.renameSync(`${file()}.tmp`, file());
   return skills;
 }
+/** The tools a skill can actually reach, read from whatever provides its capabilities
+ *  right now. Persisting this list let an update or an uninstall leave a skill advertising
+ *  tools that no longer existed. */
+export function deriveCapabilityTools(skill: ChatSkill): ChatSkill['capabilityTools'] {
+  const snapshot = capabilityRegistry();
+  const tools = (skill.capabilities ?? []).flatMap(reference => {
+    const capabilityId = normalizeCapabilityId(reference);
+    const provider = snapshot.providers.get(capabilityId);
+    if (provider?.source === 'plugin') {
+      return provider.tools.map(tool => ({ capabilityId, toolId: tool.id, description: tool.description, inputSchema: tool.inputSchema, resultKinds: [] as string[] }));
+    }
+    const runtime = capabilityId.startsWith('nodus:') ? null : resolveInstalledCapability(capabilityId, skill.plugin ? { version: skill.plugin.version, digest: skill.plugin.digest } : undefined);
+    return (runtime?.manifest.tools ?? []).map(tool => ({ capabilityId, toolId: tool.id, description: tool.description, inputSchema: tool.inputSchema, resultKinds: tool.resultKinds as string[] }));
+  });
+  return tools.length ? tools : undefined;
+}
+
 export function enabledChatSkills(surface: ChatSkillSurface): ChatSkill[] {
-  return listChatSkills().filter(skill => skill.enabled[surface]
-    && (skill.capabilities ?? []).every(capability => installedCapabilityAvailable(normalizeCapabilityId(capability))));
+  return listChatSkills()
+    .filter(skill => skill.enabled[surface]
+      && (skill.capabilities ?? []).every(capability => installedCapabilityAvailable(normalizeCapabilityId(capability))))
+    .map(skill => { const capabilityTools = deriveCapabilityTools(skill); return capabilityTools ? { ...skill, capabilityTools } : { ...skill, capabilityTools: undefined }; });
 }
 export function saveChatSkill(input: ChatSkill): ChatSkill[] {
   const skills = listChatSkills();

@@ -128,7 +128,7 @@ function validateNode(input: unknown, budget: { nodes: number }, depth: number):
     case 'download':
       // Bytes are never inline: the worker stored an attachment first and refers to it.
       if (!exactKeys(node, ['kind', 'attachmentId', 'label', 'name', 'mimeType', 'bytes'])
-        || !/^[a-z0-9]{8,64}$/.test(String(node.attachmentId)) || !plainText(node.label, 200)
+        || !/^[a-z0-9][a-z0-9-]{7,63}$/.test(String(node.attachmentId)) || !plainText(node.label, 200)
         || !plainText(node.name, 200) || node.name.includes('/') || node.name.includes('\\')
         || !/^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/i.test(String(node.mimeType))
         || !Number.isInteger(node.bytes) || node.bytes < 0) throw new Error('Invalid view download.');
