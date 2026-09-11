@@ -66,16 +66,18 @@ const runtime = {
   },
 };
 
-/** A runtime directory shaped the way the host builds one, around the interpreter that is
- *  already here: what is being tested is how the host talks to it, not how pip works. */
+/** A runtime directory shaped the way the host builds one: a real virtual environment at
+ *  the path the host expects, around the interpreter this machine already has. Nothing is
+ *  installed into it — what is being tested is how the host talks to an interpreter, not
+ *  how pip resolves — but the interpreter is a real one, which a shim pretending to be a
+ *  `python.exe` could not be on Windows. */
 function installFakeRuntime() {
   const dir = path.join(profile, 'plugins', 'runtimes', 'alphagenome', 'alphagenome');
-  const bin = path.join(dir, 'venv', process.platform === 'win32' ? 'Scripts' : 'bin');
-  fs.mkdirSync(bin, { recursive: true });
-  const target = path.join(bin, process.platform === 'win32' ? 'python.exe' : 'python');
-  fs.writeFileSync(target, process.platform === 'win32'
-    ? `@echo off\r\n"${execFileSync(interpreter, ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8' }).trim()}" %*\r\n`
-    : `#!/bin/sh\nexec "${execFileSync(interpreter, ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8' }).trim()}" "$@"\n`, { mode: 0o755 });
+  const venv = path.join(dir, 'venv');
+  fs.mkdirSync(dir, { recursive: true });
+  // Built once and reused, and rebuilt if a test removed it: a virtual environment takes
+  // a few seconds and this asks for one several times.
+  if (!fs.existsSync(venv)) execFileSync(interpreter, ['-m', 'venv', venv], { stdio: 'pipe' });
   fs.writeFileSync(path.join(dir, 'READY'), 'ready');
   return dir;
 }
