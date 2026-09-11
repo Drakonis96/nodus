@@ -116,7 +116,7 @@ try {
       import { initializeCapabilityPluginStore, listInstalledPluginsV2, readPluginStateV2, removePluginV2, rollbackPluginV2 } from './electron/capabilities/pluginStoreV2';
       import { rebuildCapabilityRegistry, capabilityIsAvailable } from './electron/capabilities/registry';
       import { runCapabilityMigration, readMigrationJournal, detectMigrationTargets, pendingMigrations, MIGRATION_MAP } from './electron/capabilities/migration';
-      import { runPluginDataMigrations } from './electron/capabilities/dataMigrations';
+      import { runPluginDataMigrations, settleInstalledPluginMigrations } from './electron/capabilities/dataMigrations';
       import { stopCapabilityWorkers } from './electron/capabilities/workerHost';
 
       const payload = JSON.parse(fs.readFileSync(${JSON.stringify(payload)}, 'utf8'));
@@ -407,6 +407,29 @@ try {
           assert.deepEqual(pendingMigrations(), []);
         });
 
+        await check('a package left half-migrated by a crash is finished at the next launch', async () => {
+          if (!available.has('legalize')) return;
+          const fixture = profile('crashed', { enabled: ['legal'] });
+          useBootstrap(payload.bootstrapRoot);
+
+          // A crash between installing the package and running its migrations: installed,
+          // unannounced, and with nothing left that would start it again — the profile
+          // migration is done with it, and an install happens once.
+          await runCapabilityMigration({ ...fixture.context, migrateData: async () => { throw new Error('the application was closed'); } });
+          assert.ok(readPluginStateV2('legalize')?.active, 'the package is installed');
+          assert.equal(readPluginStateV2('legalize').dataVersion, 0, 'and its data has not moved');
+          rebuildCapabilityRegistry();
+          assert.equal(capabilityIsAvailable('nodus:legal'), false, 'a package below its data version is not announced');
+
+          const settled = await settleInstalledPluginMigrations();
+          assert.deepEqual(settled, ['legalize'], 'the next launch finishes it');
+          rebuildCapabilityRegistry();
+          assert.equal(capabilityIsAvailable('nodus:legal'), true);
+
+          // And a launch with nothing outstanding does nothing at all.
+          assert.deepEqual(await settleInstalledPluginMigrations(), []);
+        });
+
         await check('a package with no previous version cannot be rolled back to one', async () => {
           if (!available.has('legalize')) return;
           assert.throws(() => rollbackPluginV2('legalize'), /No previous version/);
@@ -464,7 +487,7 @@ try {
   });
   console.log(stdout);
   if (fs.readFileSync(verdict, 'utf8') !== 'pass') throw new Error('The migration verification did not report a pass.');
-  console.log('CAPABILITY MIGRATION PASS: clean install, each discipline alone, all three, pre-library profile, adoption of legacy data, refusal of a wrong key, a tampered archive and a corrupt package, offline and online sources, interruption and retry, rollback and removal.');
+  console.log('CAPABILITY MIGRATION PASS: clean install, each discipline alone, all three, pre-library profile, adoption of legacy data, refusal of a wrong key, a tampered archive and a corrupt package, offline and online sources, interruption and retry, recovery at the next launch, rollback and removal.');
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });
 }

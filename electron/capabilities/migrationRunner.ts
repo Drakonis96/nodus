@@ -4,8 +4,8 @@ import { app, safeStorage } from 'electron';
 import type { ChatSkill } from '@shared/chatSkills';
 import { listChatSkills, profilePredatesSkillLibrary, replaceChatSkills } from '../chatSkills';
 import { migrationBaseline } from './migrationBaselines';
-import { readPluginStateV2, listInstalledPluginsV2 } from './pluginStoreV2';
-import { runPluginDataMigrations as runPackageMigrations } from './dataMigrations';
+import { listInstalledPluginsV2, readPluginStateV2 } from './pluginStoreV2';
+import { runPluginDataMigrations as runPackageMigrations, settleInstalledPluginMigrations as settlePackages } from './dataMigrations';
 import { createCapabilityAdapters } from './runner';
 import { installCatalogPlugin } from './marketplaceV2';
 import { runCapabilityMigration, pinnedPluginSkill, type MigrationOutcome } from './migration';
@@ -68,6 +68,13 @@ export async function runPluginDataMigrations(pluginId: string, legacy: unknown 
   }));
   if (result.notes) console.info(`[capabilities] ${pluginId}: ${result.notes}`);
 }
+
+/** The launch-time settle, with the adapters a capability has at runtime. */
+export const settleInstalledPluginMigrations = (): Promise<string[]> => settlePackages(createCapabilityAdapters({
+  locale: 'en',
+  pins: { revision: 0, pins: new Map() },
+  runCoreStages: async answer => answer,
+}));
 
 /** One migration at a time.
  *

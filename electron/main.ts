@@ -2,7 +2,7 @@ import { initializeChatSkillDefaults } from './chatSkills';
 import { initializePluginStore } from './skillPlugins';
 import { initializeCapabilityPluginStore } from './capabilities/pluginStoreV2';
 import { rebuildCapabilityRegistry } from './capabilities/registry';
-import { migrateCapabilitiesForThisProfile } from './capabilities/migrationRunner';
+import { migrateCapabilitiesForThisProfile, settleInstalledPluginMigrations } from './capabilities/migrationRunner';
 import { checkForCapabilityUpdates } from './capabilities/updates';
 import { startPluginUpdates, stopPluginUpdates } from './skillPluginUpdates';
 import { app, BrowserWindow, dialog, nativeTheme, session, shell } from 'electron';
@@ -938,6 +938,9 @@ app.whenReady().then(async () => {
   // that needs one keeps the skill it already had until the package is in place, and a
   // migration that cannot finish must never hold up the window or turn a skill off: it
   // leaves a retry in the journal and says so in the interface.
+  void settleInstalledPluginMigrations()
+    .then(settled => { if (settled.length) rebuildCapabilityRegistry(); })
+    .catch(error => console.warn('[capabilities] outstanding data migrations could not be settled:', error));
   void migrateCapabilitiesForThisProfile()
     .then(outcome => {
       if (outcome.installed.length || outcome.adopted.length) rebuildCapabilityRegistry();

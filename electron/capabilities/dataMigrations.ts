@@ -1,4 +1,4 @@
-import { pluginMigrationScripts, readPluginStateV2, readStagedPackage, recordPluginDataVersion, resolveTrustedCapability, activePluginRoot } from './pluginStoreV2';
+import { listInstalledPluginsV2, pluginMigrationScripts, readPluginStateV2, readStagedPackage, recordPluginDataVersion, resolveTrustedCapability, activePluginRoot } from './pluginStoreV2';
 import { createCapabilityHostServices, type CapabilityServiceAdapters } from './hostServices';
 import { acquireCapabilityWorker } from './workerHost';
 
@@ -58,4 +58,26 @@ export async function runPluginDataMigrations(
   if (result?.failed) throw new Error(result.failed);
   if (reached < scripts.length) throw new Error(`${pluginId} stopped at data version ${reached} of ${scripts.length}.`);
   return { dataVersion: reached, ...(result?.notes ? { notes: result.notes } : {}) };
+}
+
+/** Finishes any package whose data was left behind.
+ *
+ *  A package is installed, then its migrations run, then it is announced. A crash between
+ *  the first two leaves it installed, unannounced, and with nothing that would start it
+ *  again — the profile migration knows only about the three disciplines, and an install
+ *  happens once. So every launch settles what is outstanding, which for a profile with
+ *  nothing outstanding costs one manifest read per installed package. */
+export async function settleInstalledPluginMigrations(adapters: CapabilityServiceAdapters = {}): Promise<string[]> {
+  const settled: string[] = [];
+  for (const state of listInstalledPluginsV2()) {
+    if (!state.active) continue;
+    try {
+      if (state.dataVersion >= pluginMigrationScripts(state.id).length) continue;
+      await runPluginDataMigrations(state.id, {}, adapters);
+      settled.push(state.id);
+    } catch (error) {
+      console.warn(`[capabilities] ${state.id} could not finish its data migration:`, error);
+    }
+  }
+  return settled;
 }
