@@ -51,29 +51,47 @@ const secretsFile = (pluginId: string) => {
   return path.join(pluginsRoot(), 'secrets', `${pluginId}.bin`);
 };
 
-function readJsonFile(file: string): Record<string, unknown> {
+/** One file per key rather than one document holding every key.
+ *
+ *  A capability's cache can be hundreds of megabytes — a country legislation index, a
+ *  compiled dependency tree — and rewriting the whole store to set one entry would be
+ *  both slow and a way to lose everything to one interrupted write. The quota is applied
+ *  across the lane's directory, so the limit still means what it says. */
+
+const keyFile = (dir: string, key: string) => path.join(dir, `${key}.json`);
+
+function laneBytes(dir: string, except?: string): number {
   try {
-    const value = JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
-    return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
-  } catch { return {}; }
+    return fs.readdirSync(dir, { withFileTypes: true }).reduce((total, entry) => {
+      if (!entry.isFile() || entry.name === except) return total;
+      try { return total + fs.statSync(path.join(dir, entry.name)).size; } catch { return total; }
+    }, 0);
+  } catch { return 0; }
 }
 
-function writeJsonFile(file: string, value: Record<string, unknown>, quota: number): void {
-  const encoded = JSON.stringify(value);
-  if (Buffer.byteLength(encoded) > quota) throw new Error('Capability storage quota exceeded.');
-  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  const temporary = `${file}.${randomUUID()}.tmp`;
-  fs.writeFileSync(temporary, encoded, { mode: 0o600 });
-  fs.renameSync(temporary, file);
-}
-
-function storageLane(runtime: TrustedWorkerRuntime, lane: 'state' | 'cache'): { file: string; quota: number } {
+function storageLane(runtime: TrustedWorkerRuntime, lane: 'state' | 'cache'): { dir: string; quota: number } {
   const permission = runtime.permissions.storage;
   if (!permission) throw new Error('Capability storage is not permitted.');
   const quota = lane === 'state' ? permission.stateBytes : permission.cacheBytes;
   if (quota <= 0) throw new Error(`Capability ${lane} storage is not permitted.`);
-  const dir = lane === 'state' ? capabilityDataDir(runtime) : capabilityCacheDir(runtime);
-  return { file: path.join(dir, `${lane}.json`), quota };
+  const base = lane === 'state' ? capabilityDataDir(runtime) : capabilityCacheDir(runtime);
+  return { dir: path.join(base, lane), quota };
+}
+
+function readKey(dir: string, key: string): unknown {
+  try { return JSON.parse(fs.readFileSync(keyFile(dir, key), 'utf8')); } catch { return null; }
+}
+
+function writeKey(dir: string, key: string, value: unknown, quota: number): void {
+  const encoded = JSON.stringify(value ?? null);
+  const file = keyFile(dir, key);
+  if (laneBytes(dir, `${key}.json`) + Buffer.byteLength(encoded) > quota) throw new Error('Capability storage quota exceeded.');
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const temporary = `${file}.${randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(temporary, encoded, { mode: 0o600 });
+    fs.renameSync(temporary, file);
+  } finally { fs.rmSync(temporary, { force: true }); }
 }
 
 export function readCapabilitySecret(pluginId: string, capabilityId: string, secretId: string): string | undefined {
@@ -180,12 +198,14 @@ export function createCapabilityHostServices(adapters: CapabilityServiceAdapters
       if (method === 'temp.clear') { fs.rmSync(capabilityTempDir(runtime), { recursive: true, force: true }); return null; }
       const [lane, operation] = method.split('.');
       if (lane !== 'state' && lane !== 'cache') throw new Error('Unknown capability storage lane.');
-      const { file, quota } = storageLane(runtime, lane);
-      const contents = readJsonFile(file);
-      if (operation === 'get') return contents[key()] ?? null;
-      if (operation === 'keys') return Object.keys(contents);
-      if (operation === 'set') { contents[key()] = value.value; writeJsonFile(file, contents, quota); return null; }
-      if (operation === 'delete') { delete contents[key()]; writeJsonFile(file, contents, quota); return null; }
+      const { dir, quota } = storageLane(runtime, lane);
+      if (operation === 'get') return readKey(dir, key());
+      if (operation === 'keys') {
+        try { return fs.readdirSync(dir).filter(name => name.endsWith('.json')).map(name => name.slice(0, -5)); }
+        catch { return []; }
+      }
+      if (operation === 'set') { writeKey(dir, key(), value.value, quota); return null; }
+      if (operation === 'delete') { fs.rmSync(keyFile(dir, key()), { force: true }); return null; }
       throw new Error('Unknown capability storage operation.');
     }
 
