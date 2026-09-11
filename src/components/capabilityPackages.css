@@ -24,7 +24,6 @@
 .capability-packages-facts div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .capability-packages-facts dt { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; opacity: .55; }
 .capability-packages-facts dd { margin: 0; font-size: 12px; overflow-wrap: anywhere; }
-.capability-packages-toggle { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 0; background: none; border: 0; color: inherit; font-size: 12px; opacity: .8; cursor: pointer; }
 .capability-settings { display: flex; flex-direction: column; gap: 11px; padding: 12px 0 2px; border-top: 1px solid #818cf826; }
 .capability-settings-field { display: flex; flex-direction: column; gap: 4px; }
 .capability-settings-label { display: flex; align-items: baseline; gap: 8px; font-size: 12px; font-weight: 600; }
