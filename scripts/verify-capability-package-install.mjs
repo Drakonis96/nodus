@@ -88,6 +88,7 @@ try {
       import { rebuildCapabilityRegistry, capabilityRegistry, capabilityIsAvailable } from './electron/capabilities/registry';
       import { CapabilityWorkerHandle } from './electron/capabilities/workerHost';
       import { createCapabilityHostServices } from './electron/capabilities/hostServices';
+      import { createCapabilityAdapters } from './electron/capabilities/runner';
 
       app.setPath('userData', ${JSON.stringify(temporary)});
       app.on('window-all-closed', () => {});
@@ -147,8 +148,16 @@ try {
         const runtime = resolveTrustedCapability(provider.id);
         assert.ok(runtime, 'the worker entry resolves inside the installed version');
         assert.ok(fs.existsSync(runtime.entryPath), 'the bundled worker is on disk');
+        // The adapters a capability has in the application: the subworker lane a validator
+        // runs in, the SVG services, the Python runtime. Without them a live request fails
+        // for a reason that says nothing about the package.
+        const adapters = createCapabilityAdapters({
+          locale: 'en',
+          pins: { revision: 0, pins: new Map() },
+          runCoreStages: async answer => answer,
+        });
         const handle = new CapabilityWorkerHandle(runtime, {
-          services: createCapabilityHostServices({}),
+          services: createCapabilityHostServices(adapters),
           bootstrapPath: ${JSON.stringify(bootstrap)},
         });
         const health = await handle.call('health', { nodusVersion: '5.3.2', locale: 'en', platform: process.platform, arch: process.arch, dataVersion: 0 }, { timeoutMs: 30_000 });
@@ -179,6 +188,25 @@ try {
           }
         }
 
+        // A real request, against the real services the package declares — off by default,
+        // because a check that depends on somebody else's uptime fails for reasons that
+        // have nothing to do with this repository. Run with NODUS_LIVE_CAPABILITY=1.
+        if (process.env.NODUS_LIVE_CAPABILITY === '1' && provider.chat.requestProtocols.length) {
+          stage = 'a real request';
+          const live = {
+            'chemistry-studio': { toolId: 'compile', input: { plan: JSON.stringify({ version: 2, kind: 'structure', depiction: 'skeletal', species: [{ id: 's1', input: { kind: 'name', value: 'ethanol' } }] }), question: 'Draw ethanol.' } },
+            legalize: { toolId: 'retrieve', input: { version: 1, country: 'es', query: 'BOE-A-1978-31229' } },
+          }[payload.packageId];
+          if (live) {
+            const produced = await handle.call('invoke', { invocationId: 'live', locale: 'en', ...live }, { timeoutMs: 300_000 });
+            const artifact = produced.artifacts?.[0];
+            assert.ok(artifact, 'the package produced nothing: ' + JSON.stringify(produced.notices ?? produced.view ?? {}).slice(0, 400));
+            assert.ok(provider.artifacts.some(entry => entry.type === artifact.artifactType), 'it produced an artifact type it never declared');
+            assert.ok(artifact.summary.length > 0);
+            console.log('  live request produced: ' + artifact.summary.slice(0, 120));
+          }
+        }
+
         stage = 'permission gating';
         // The worker may only reach what its manifest declared; this asks for something else.
         await assert.rejects(
@@ -200,6 +228,9 @@ try {
       } });
     `, resolveDir: root, loader: 'ts' },
     outfile, bundle: true, platform: 'node', format: 'cjs', external: ['electron'], logLevel: 'silent',
+    // The application's adapters reach the model client, which carries native bindings
+    // this verification never calls. They play no part in what is being checked.
+    loader: { '.node': 'empty' },
     plugins: [
       { name: 'trusted-keys', setup(api) {
         api.onResolve({ filter: /trustedKeys\.json$/ }, () => ({ path: 'keys', namespace: 'test' }));
@@ -210,7 +241,8 @@ try {
   });
 
   const electron = createRequire(import.meta.url)('electron');
-  await promisify(execFile)(electron, [outfile], { env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' } });
+  const { stdout } = await promisify(execFile)(electron, [outfile], { env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' }, maxBuffer: 16 * 1024 * 1024 });
+  if (stdout.trim()) console.log(stdout.trim());
   if (fs.readFileSync(verdict, 'utf8') !== 'pass') throw new Error('The package verification did not report a pass.');
   console.log(`CAPABILITY PACKAGE PASS (${asset}): signature, archive, manifests, declared migrations, registry, worker handshake, chat hook, permission gating and uninstall.`);
 } finally {
