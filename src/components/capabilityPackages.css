@@ -18,6 +18,7 @@
 .capability-packages-publisher { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; border: 1px solid #34d3994a; background: #10b98112; color: #6ee7b7; font-size: 11px; }
 .capability-packages-version { font-size: 11px; opacity: .65; font-variant-numeric: tabular-nums; }
 .capability-packages-actions { display: flex; gap: 7px; flex-wrap: wrap; }
+.capability-packages-item-actions { display: flex; gap: 7px; flex-wrap: wrap; }
 /* The facts a package is judged on, side by side rather than buried in prose. */
 .capability-packages-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; margin: 2px 0 0; }
 .capability-packages-facts div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }

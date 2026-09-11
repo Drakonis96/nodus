@@ -5,6 +5,9 @@ import { CapabilityView } from './CapabilityView';
 import { Icon } from './ui';
 import { skillGlyph } from './skillGlyph';
 import { t, getActiveLang } from '../i18n';
+// The card shape, the glyph plate and the chevron are shared with the skill cards this
+// panel sits above; imported rather than inherited from whoever renders it.
+import './chatSkills.css';
 import './capabilityPackages.css';
 
 /** Official capability packages: what is installed, what the catalog offers, and the
@@ -289,13 +292,17 @@ function PackageActions({ entry, state, busy, run }: {
   run: (id: string, action: () => Promise<unknown>, success?: string) => Promise<void>;
 }) {
   const working = busy === entry.id;
+  // Always a row, even for one button: a bare button is a flex child of the card and
+  // stretches to its full width, which made Install a banner across the bottom.
   if (!state?.active) {
-    return <button type="button" className="chat-skill-primary" disabled={working}
-      onClick={() => void run(entry.id, () => window.nodus.installCapabilityPlugin(entry.id, false), t('Paquete instalado.'))}>
-      <Icon name="download" size={14} />{working ? t('Instalando…') : t('Instalar')}
-    </button>;
+    return <div className="capability-packages-item-actions">
+      <button type="button" className="chat-skill-primary" disabled={working}
+        onClick={() => void run(entry.id, () => window.nodus.installCapabilityPlugin(entry.id, false), t('Paquete instalado.'))}>
+        <Icon name="download" size={14} />{working ? t('Instalando…') : t('Instalar')}
+      </button>
+    </div>;
   }
-  return <div className="capability-packages-actions">
+  return <div className="capability-packages-item-actions">
     {state.pending?.reason === 'permissions' && <button type="button" className="chat-skill-primary" disabled={working}
       onClick={() => void run(entry.id, () => window.nodus.approveCapabilityPlugin(entry.id), t('Actualización aplicada.'))}>{t('Aprobar permisos')}</button>}
     {state.active.version !== entry.version && !state.pending && <button type="button" className="chat-skill-primary" disabled={working}

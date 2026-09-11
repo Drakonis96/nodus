@@ -36,6 +36,7 @@ test('capability views render in both themes without overflowing the message col
     const css = [
       await readFile(cssFile, 'utf8'),
       await readFile(path.join(root, 'src/components/chatVisuals.css'), 'utf8'),
+      await readFile(path.join(root, 'src/components/chatSkills.css'), 'utf8'),
       await readFile(path.join(root, 'src/components/capabilityPackages.css'), 'utf8'),
       await readFile(path.join(root, 'src/components/chatModelViewer.css'), 'utf8'),
       // The map and the tiled image are Leaflet, and Leaflet without its stylesheet is a
@@ -83,6 +84,10 @@ test('capability views render in both themes without overflowing the message col
           assert.ok(await page.locator(selector).count() > 0, `${theme}/${width}: ${selector} is rendered`);
         }
 
+        // A card's action is a button, not a banner: a bare flex child stretches.
+        const actionWidths = await page.getByTestId('panel').evaluate(node =>
+          [...node.querySelectorAll('.capability-packages-item button')].map(button => Math.round(button.getBoundingClientRect().width)));
+        assert.ok(actionWidths.every(value => value < 300), `${theme}/${width}: a package action stretched across the card (${actionWidths.join(', ')})`);
         const results = page.getByTestId('results');
 
         // The formula is typeset rather than shown as source: if KaTeX refused it, the
@@ -234,6 +239,7 @@ test('capability views render in both themes without overflowing the message col
           await results.screenshot({ path: path.join(process.env.NODUS_CAPABILITY_QA_DIR, `results-${theme}-${width}.png`) });
           // Per-kind captures too: a tall page reviewed as one image hides exactly the
           // detail — a clipped axis, a formula that fell back to source — worth looking at.
+          await page.getByTestId('panel').screenshot({ path: path.join(process.env.NODUS_CAPABILITY_QA_DIR, `packages-${theme}-${width}.png`) });
           for (const kind of ['math', 'chart', 'tree', 'passage', 'comparison', 'map', 'image', 'audio', 'tiles']) {
             await results.locator(`.capability-view-${kind}`).screenshot({ path: path.join(process.env.NODUS_CAPABILITY_QA_DIR, `${kind}-${theme}-${width}.png`) });
           }
