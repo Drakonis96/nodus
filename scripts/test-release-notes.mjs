@@ -25,21 +25,30 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.3.1');
-  assert.equal(currentRelease?.date, '2026-09-10');
-  assert.equal(currentRelease?.highlights.length, 8);
+  assert.equal(currentRelease?.version, '5.3.2');
+  assert.equal(currentRelease?.date, '2026-09-11');
+  assert.equal(currentRelease?.highlights.length, 6);
   assert.deepEqual(currentRelease.highlights.map((h) => h.scope), [
-    'marketplace', 'marketplace', 'plugin', 'plugin', 'academic', 'ai', 'languages', 'general',
+    'marketplace', 'general', 'general', 'plugin', 'plugin', 'ai',
   ]);
   for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
     assert.ok(currentRelease.highlights.every((h) => h[language]?.length > 80));
   }
   for (const phrase of [
-    /knows which skills you already have/, /needs a newer Nodus/, /arrive as plugins/,
-    /update as one unit/, /number of sections you choose/, /corpus context picker/,
-    /Italian is offered/, /three visible details/,
+    /official packages you install yourself/, /moves across on its own/,
+    /takes up less room/, /configures itself on its own card/,
+    /only arrives signed by NodusResearch/, /each package decides what the model sees/,
   ]) {
-    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.3.1 is missing ${phrase}`);
+    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.3.2 is missing ${phrase}`);
+  }
+
+  // 5.3.1 keeps the modal it shipped with.
+  const release531 = RELEASE_NOTES[1];
+  assert.equal(release531?.version, '5.3.1');
+  assert.equal(release531?.date, '2026-09-10');
+  assert.equal(release531?.highlights.length, 8);
+  for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+    assert.ok(release531.highlights.every((h) => h[language]?.length > 80));
   }
 
   // 5.3.0 keeps the modal it shipped with: the Marketplace debut and the two

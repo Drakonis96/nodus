@@ -1,5 +1,25 @@
 # Changelog
 
+## 5.3.2 — 2026-09-11
+
+Nodus 5.3.2 takes chemistry, law and genomics out of the application. They are
+official capability packages now, signed by NodusResearch and installed like any
+other, and the application that ships to someone who never draws a molecule no
+longer carries the machinery to draw one.
+
+- Chemistry Studio, Legalize and AlphaGenome are installable packages rather than built-in skills. The Skills view shows each one's verified publisher, permissions, size, the platforms it runs on and the capabilities it provides, and any of them can be installed, updated, rolled back or removed.
+- A profile upgrading from 5.3.1 moves across on its own. A built-in that was enabled, an enabled copy downloaded from the official catalog, a skill of your own that depends on one of these capabilities, or a profile predating the skills library all cause the matching package to be installed. A default left untouched, deleted or switched off causes nothing: the migration does not overrule a decision you already made.
+- Adoption keeps the identity. A migrated skill keeps its local id, its place in the list and its per-surface activation, instructions you edited become an overlay on the package's text, and an edit that cannot be expressed that way survives as its own disabled skill rather than being discarded. Two identical copies of one package become one skill, enabled wherever either was.
+- The migration is resumable and works offline. Every phase is recorded before the next begins, so a crash resumes rather than restarts, and the signed packages travel inside the update itself so an upgrade with no connection still completes. A failure leaves the skill with the activation you chose, the previous data intact and a retry, and never holds up the window.
+- Capability API v2 adds `nodus-trusted-worker-v1`, reserved to packages signed by NodusResearch. `javascript-sandbox-v1` is unchanged and remains the only route for community plugins. The signature is the security boundary: a v2 worker runs in its own utility process for fault isolation, cancellation and hard limits, not as a sandbox.
+- A package only installs if its release manifest verifies against a publishing key built into Nodus, and if the bytes downloaded match the size and digest that manifest pinned, checked before the archive is opened. Downgrades and different content published under the same version are refused, and an update that widens permissions waits for approval.
+- The chat pipeline no longer knows a discipline by name. A reply is parsed once into a generic tree, and installed packages claim fenced protocols by declaration and run in the order they declare. Hooks return typed mutations rather than text, a stored result is never executed, and no hook can turn a result into the next request.
+- Results are stored as artifacts beside the conversation, with their own hash. What the model may see of one is read from the package's own declaration instead of a rule written into Nodus, so an AlphaGenome prediction still never leaves the device. A result whose package has been removed keeps its summary and offers to reinstall the provider.
+- Package settings are declarative. The AlphaGenome key, its terms and its Python runtime are configured on the package's own card, the key is kept in the system credential store and reaches the interpreter through stdin, and the runtime is built from a lock that pins every wheel by URL, size and digest and installs with `--no-index --require-hashes`.
+- RDKit, OpenChemLib and the TeX engine are no longer dependencies of Nodus, and the AlphaGenome Python worker is no longer a packaged resource. A test builds the real main-process and renderer bundles and fails if any of it comes back.
+- A skill that declares a capability nothing provides yet can be installed and keeps the activation you chose. It simply does not run until its provider is installed, so the order of two installs no longer matters.
+- Added the complete 5.3.2 What's New modal in all eight interface languages.
+
 ## 5.3.1 — 2026-09-10
 
 Nodus 5.3.1 turns the Skills Marketplace into a view of the library you actually

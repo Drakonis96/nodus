@@ -2677,6 +2677,71 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * v5.3.2 — the three disciplines leave the application and become packages you install.
+ *
+ * Written for someone who never asked for chemistry: what changes for THEM is that Nodus
+ * got smaller and nothing they were using went away. The migration entry comes early
+ * because the first question anyone with a configured AlphaGenome key will have is
+ * whether they have to set it up again.
+ */
+const RELEASE_5_3_2_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'marketplace',
+    es: "Chemistry Studio, Legalize y AlphaGenome ya son paquetes oficiales que instalas tú. Aparecen en Skills con su editor verificado, sus permisos, su tamaño y las plataformas en las que funcionan, y puedes instalarlos, actualizarlos, volver a la versión anterior o quitarlos cuando quieras. Lo que hacen no ha cambiado.",
+    en: "Chemistry Studio, Legalize and AlphaGenome are now official packages you install yourself. They appear in Skills with their verified publisher, their permissions, their size and the platforms they run on, and you can install, update, roll back or remove any of them whenever you like. What they do has not changed.",
+    fr: "Chemistry Studio, Legalize et AlphaGenome sont désormais des paquets officiels que vous installez vous-même. Ils apparaissent dans Skills avec leur éditeur vérifié, leurs permissions, leur taille et les plateformes prises en charge, et vous pouvez les installer, les mettre à jour, revenir en arrière ou les retirer quand vous voulez. Ce qu'ils font n'a pas changé.",
+    de: "Chemistry Studio, Legalize und AlphaGenome sind jetzt offizielle Pakete, die Sie selbst installieren. Sie erscheinen unter Skills mit ihrem verifizierten Herausgeber, ihren Berechtigungen, ihrer Größe und den unterstützten Plattformen, und Sie können sie jederzeit installieren, aktualisieren, zurücksetzen oder entfernen. Was sie tun, hat sich nicht geändert.",
+    pt: "O Chemistry Studio, o Legalize e o AlphaGenome são agora pacotes oficiais que instalas tu. Aparecem em Skills com o editor verificado, as permissões, o tamanho e as plataformas em que funcionam, e podes instalá-los, atualizá-los, voltar à versão anterior ou removê-los quando quiseres. O que fazem não mudou.",
+    'pt-BR': "Chemistry Studio, Legalize e AlphaGenome agora são pacotes oficiais que você instala. Aparecem em Skills com o editor verificado, as permissões, o tamanho e as plataformas em que funcionam, e você pode instalar, atualizar, voltar à versão anterior ou remover quando quiser. O que eles fazem não mudou.",
+  },
+  {
+    scope: 'general',
+    es: "Tu configuración se muda sola al actualizar. Si tenías Chemistry Studio activado, o una clave de AlphaGenome guardada, o una skill tuya que necesita una de estas capacidades, Nodus instala el paquete que corresponde y adopta la skill conservando su sitio en la lista, dónde la tenías activada y las instrucciones que hubieras editado. Funciona sin conexión porque los paquetes viajan dentro de la propia actualización.",
+    en: "Your setup moves across on its own when you update. If Chemistry Studio was switched on, or you had an AlphaGenome key saved, or a skill of your own needs one of these capabilities, Nodus installs the matching package and adopts the skill with its place in the list, the surfaces it was enabled on and any instructions you had edited. It works with no connection because the packages travel inside the update itself.",
+    fr: "Votre configuration migre toute seule à la mise à jour. Si Chemistry Studio était activé, si une clé AlphaGenome était enregistrée ou si une de vos skills a besoin de ces capacités, Nodus installe le paquet correspondant et adopte la skill en conservant sa place dans la liste, les surfaces où elle était activée et les instructions que vous aviez modifiées. Cela fonctionne sans connexion car les paquets voyagent dans la mise à jour elle-même.",
+    de: "Ihre Einrichtung zieht beim Update von selbst mit um. War Chemistry Studio eingeschaltet, lag ein AlphaGenome-Schlüssel gespeichert vor oder braucht ein eigener Skill eine dieser Capabilities, installiert Nodus das passende Paket und übernimmt den Skill samt seinem Platz in der Liste, den Oberflächen, auf denen er aktiv war, und Ihren bearbeiteten Anweisungen. Das funktioniert ohne Verbindung, weil die Pakete im Update selbst mitreisen.",
+    pt: "A tua configuração muda-se sozinha ao atualizar. Se tinhas o Chemistry Studio ligado, uma chave do AlphaGenome guardada ou uma skill tua que precisa destas capacidades, o Nodus instala o pacote correspondente e adota a skill mantendo o seu lugar na lista, as superfícies onde estava ligada e as instruções que tenhas editado. Funciona sem ligação porque os pacotes viajam dentro da própria atualização.",
+    'pt-BR': "Sua configuração se muda sozinha ao atualizar. Se o Chemistry Studio estava ligado, havia uma chave do AlphaGenome salva ou uma skill sua precisa dessas capacidades, o Nodus instala o pacote correspondente e adota a skill mantendo seu lugar na lista, as superfícies onde estava ligada e as instruções que você tenha editado. Funciona sem conexão porque os pacotes viajam dentro da própria atualização.",
+  },
+  {
+    scope: 'general',
+    es: "Nodus ocupa menos si no dibujas moléculas. Los motores químicos, el compilador de TeX y el resto de dependencias de estas tres áreas ya no viajan con la aplicación, sino dentro del paquete que las necesita. Una instalación limpia no descarga ni carga ninguna de las tres mientras no las pidas.",
+    en: "Nodus takes up less room if you do not draw molecules. The chemistry engines, the TeX compiler and the rest of the dependencies these three areas need no longer travel with the application, only inside the package that needs them. A clean install neither downloads nor loads any of the three until you ask for one.",
+    fr: "Nodus prend moins de place si vous ne dessinez pas de molécules. Les moteurs de chimie, le compilateur TeX et les autres dépendances de ces trois domaines ne voyagent plus avec l'application, mais dans le paquet qui en a besoin. Une installation propre ne télécharge ni ne charge aucun des trois tant que vous n'en demandez pas un.",
+    de: "Nodus braucht weniger Platz, wenn Sie keine Moleküle zeichnen. Die Chemie-Engines, der TeX-Compiler und die übrigen Abhängigkeiten dieser drei Bereiche reisen nicht mehr mit der Anwendung, sondern in dem Paket, das sie braucht. Eine saubere Installation lädt und startet keines der drei, solange Sie keines anfordern.",
+    pt: "O Nodus ocupa menos espaço se não desenhas moléculas. Os motores de química, o compilador de TeX e as restantes dependências destas três áreas já não viajam com a aplicação, apenas dentro do pacote que precisa delas. Uma instalação limpa não descarrega nem carrega nenhuma das três enquanto não pedires.",
+    'pt-BR': "O Nodus ocupa menos espaço se você não desenha moléculas. Os motores de química, o compilador de TeX e as demais dependências dessas três áreas não viajam mais com o aplicativo, apenas dentro do pacote que precisa delas. Uma instalação limpa não baixa nem carrega nenhuma das três enquanto você não pedir.",
+  },
+  {
+    scope: 'plugin',
+    es: "Cada paquete se configura en su propia ficha. La clave de AlphaGenome, la aceptación de sus términos y la instalación de su runtime de Python están ahora dentro del paquete, no repartidas por los ajustes de Nodus. Tu clave se guarda en el almacén de credenciales del sistema y llega al intérprete por su entrada estándar, nunca en una línea de comandos ni en un registro.",
+    en: "Every package configures itself on its own card. The AlphaGenome key, accepting its terms and installing its Python runtime now live inside the package rather than scattered through the Nodus settings. Your key is kept in the system credential store and reaches the interpreter through its standard input, never on a command line or in a log.",
+    fr: "Chaque paquet se configure sur sa propre fiche. La clé AlphaGenome, l'acceptation de ses conditions et l'installation de son runtime Python vivent désormais dans le paquet plutôt qu'éparpillées dans les réglages de Nodus. Votre clé est conservée dans le trousseau du système et parvient à l'interpréteur par son entrée standard, jamais sur une ligne de commande ni dans un journal.",
+    de: "Jedes Paket richtet sich auf seiner eigenen Karte ein. Der AlphaGenome-Schlüssel, die Zustimmung zu seinen Bedingungen und die Installation seiner Python-Umgebung liegen nun im Paket statt verstreut in den Nodus-Einstellungen. Ihr Schlüssel bleibt im Anmeldeinformationsspeicher des Systems und erreicht den Interpreter über dessen Standardeingabe, nie über eine Befehlszeile oder ein Protokoll.",
+    pt: "Cada pacote configura-se na sua própria ficha. A chave do AlphaGenome, a aceitação dos seus termos e a instalação do seu runtime de Python vivem agora dentro do pacote, em vez de espalhadas pelas definições do Nodus. A tua chave fica no armazém de credenciais do sistema e chega ao interpretador pela entrada padrão, nunca numa linha de comandos nem num registo.",
+    'pt-BR': "Cada pacote se configura no seu próprio cartão. A chave do AlphaGenome, a aceitação dos seus termos e a instalação do seu runtime de Python agora ficam dentro do pacote, em vez de espalhadas pelas configurações do Nodus. Sua chave fica no armazenamento de credenciais do sistema e chega ao interpretador pela entrada padrão, nunca em uma linha de comando nem em um log.",
+  },
+  {
+    scope: 'plugin',
+    es: "Un paquete solo llega firmado por NodusResearch. Nodus comprueba la firma y la huella exacta de lo que descarga antes de abrirlo, rechaza una versión más antigua que la instalada y rechaza un contenido distinto publicado con el mismo número. Una actualización que pida más permisos de los que aprobaste espera a que la revises en lugar de aplicarse sola.",
+    en: "A package only arrives signed by NodusResearch. Nodus checks the signature and the exact fingerprint of what it downloads before opening it, refuses a version older than the one installed, and refuses different content published under the same number. An update that asks for more than you approved waits for you to review it instead of applying itself.",
+    fr: "Un paquet n'arrive que signé par NodusResearch. Nodus vérifie la signature et l'empreinte exacte de ce qu'il télécharge avant de l'ouvrir, refuse une version plus ancienne que celle installée et refuse un contenu différent publié sous le même numéro. Une mise à jour qui demande plus que ce que vous aviez approuvé attend votre examen au lieu de s'appliquer seule.",
+    de: "Ein Paket kommt nur signiert von NodusResearch an. Nodus prüft die Signatur und den genauen Fingerabdruck des Downloads, bevor es ihn öffnet, lehnt eine ältere Version als die installierte ab und lehnt abweichende Inhalte unter derselben Nummer ab. Ein Update, das mehr verlangt als Sie genehmigt haben, wartet auf Ihre Prüfung, statt sich selbst anzuwenden.",
+    pt: "Um pacote só chega assinado pela NodusResearch. O Nodus verifica a assinatura e a impressão digital exata do que descarrega antes de o abrir, recusa uma versão mais antiga do que a instalada e recusa um conteúdo diferente publicado com o mesmo número. Uma atualização que peça mais do que aprovaste espera pela tua revisão em vez de se aplicar sozinha.",
+    'pt-BR': "Um pacote só chega assinado pela NodusResearch. O Nodus verifica a assinatura e a impressão digital exata do que baixa antes de abri-lo, recusa uma versão mais antiga do que a instalada e recusa um conteúdo diferente publicado com o mesmo número. Uma atualização que peça mais do que você aprovou espera pela sua revisão em vez de se aplicar sozinha.",
+  },
+  {
+    scope: 'ai',
+    es: "Los resultados se guardan junto a la conversación y cada paquete decide qué ve el modelo. Una predicción de AlphaGenome sigue sin salir de tu dispositivo, y ahora esa regla la declara el propio paquete en lugar de estar escrita dentro de Nodus. Si desinstalas un paquete, los resultados que ya tenías en tus chats se conservan y puedes volver a instalarlo desde el propio mensaje.",
+    en: "Results are stored beside the conversation and each package decides what the model sees. An AlphaGenome prediction still never leaves your device, and that rule is now declared by the package itself instead of being written into Nodus. If you uninstall a package, the results already in your chats are kept and you can reinstall it from the message itself.",
+    fr: "Les résultats sont conservés à côté de la conversation et chaque paquet décide de ce que voit le modèle. Une prédiction AlphaGenome ne quitte toujours pas votre appareil, et cette règle est désormais déclarée par le paquet lui-même au lieu d'être inscrite dans Nodus. Si vous désinstallez un paquet, les résultats déjà présents dans vos conversations sont conservés et vous pouvez le réinstaller depuis le message.",
+    de: "Ergebnisse liegen neben der Unterhaltung, und jedes Paket entscheidet, was das Modell sieht. Eine AlphaGenome-Vorhersage verlässt Ihr Gerät weiterhin nicht, und diese Regel erklärt nun das Paket selbst, statt in Nodus einprogrammiert zu sein. Wenn Sie ein Paket deinstallieren, bleiben die Ergebnisse in Ihren Chats erhalten und Sie können es direkt aus der Nachricht neu installieren.",
+    pt: "Os resultados ficam guardados junto à conversa e cada pacote decide o que o modelo vê. Uma previsão do AlphaGenome continua a não sair do teu dispositivo, e essa regra passa a ser declarada pelo próprio pacote em vez de estar escrita dentro do Nodus. Se desinstalares um pacote, os resultados que já tinhas nos teus chats mantêm-se e podes reinstalá-lo a partir da própria mensagem.",
+    'pt-BR': "Os resultados ficam guardados junto da conversa e cada pacote decide o que o modelo vê. Uma previsão do AlphaGenome continua não saindo do seu dispositivo, e essa regra agora é declarada pelo próprio pacote em vez de estar escrita dentro do Nodus. Se você desinstalar um pacote, os resultados que já tinha nos seus chats são mantidos e você pode reinstalá-lo a partir da própria mensagem.",
+  },
+];
+
+/**
  * v5.3.1 — the Skills Marketplace learns what you already have, and skills start
  * arriving as plugins.
  *
@@ -2884,6 +2949,11 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.3.2',
+    date: '2026-09-11',
+    highlights: RELEASE_5_3_2_HIGHLIGHTS,
+  },
   {
     version: '5.3.1',
     date: '2026-09-10',
