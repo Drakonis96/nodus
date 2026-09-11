@@ -205,5 +205,5 @@ export async function streamLibraryReaderChat(
     readerGrounding: grounding.readerGrounding,
   };
   const answer = await streamNodiChat(nodiRequest, (delta) => onDelta(delta, 'content'), signal, execution);
-  return { answer: answer.trim(), model };
+  return { answer: answer.trim(), model, aborted: Boolean(signal?.aborted) };
 }

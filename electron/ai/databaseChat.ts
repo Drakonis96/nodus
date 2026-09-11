@@ -118,7 +118,7 @@ export async function streamDatabaseChat(
   onDelta: (delta: string) => void,
   signal?: AbortSignal,
   deps: DatabaseChatDeps = {}
-): Promise<{ text: string }> {
+): Promise<{ text: string; aborted?: boolean }> {
   if (!request.databaseIds.length) throw new Error('Elige al menos una base de datos.');
   const settings = getSettings();
   const execution = vaultChatSkillSession('database', request.conversationId, request.question, settings.chatModel ?? settings.synthesisModel, getDatabaseChatConversation);
@@ -144,5 +144,8 @@ export async function streamDatabaseChat(
     onDelta,
     signal
   );
+  // A user-triggered stop keeps the partial answer: running the skill tools now would
+  // throw an AbortError and discard everything that already streamed.
+  if (signal?.aborted) return { text, aborted: true };
   return { text: await executeChatSkills(text, execution, signal) };
 }

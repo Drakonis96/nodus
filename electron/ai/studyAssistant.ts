@@ -271,8 +271,11 @@ export async function streamStudyAssistant(
   assertChatSkillSession(execution, signal);
   const raw = await completeTextStream({ system: `${prompt.system}\n\n${buildChatSkillsPrompt(skills)}`, user: `${prompt.user}\n\n${chatSkillsOutputContract(skills)}`, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.18, maxTokens: skills.length ? 10_000 : 3200 }, onDelta, effectiveModel, signal);
   const validated = validateStudyAssistantAnswer(raw, availableCitations, insufficientAnswer);
+  // A user-triggered stop keeps the partial answer: running the skill tools now would
+  // throw an AbortError and discard everything that already streamed.
+  const interrupted = Boolean(signal?.aborted);
   return {
-    ...validated, answer: await executeChatSkills(validated.answer, execution, signal), availableCitations, insufficientInformation: !raw.trim(), interrupted: Boolean(signal?.aborted), stats,
+    ...validated, answer: interrupted ? validated.answer : await executeChatSkills(validated.answer, execution, signal), availableCitations, insufficientInformation: !raw.trim(), interrupted, stats,
   };
 }
 

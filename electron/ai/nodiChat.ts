@@ -362,7 +362,9 @@ export async function streamNodiChat(
     request.model ?? settings.nodiModel ?? settings.chatModel,
     signal
   );
-  answer = await executeChatSkills(answer, execution, signal);
+  // A user-triggered stop keeps the partial answer: running the skill tools now would
+  // throw an AbortError and discard everything that already streamed.
+  if (!signal?.aborted) answer = await executeChatSkills(answer, execution, signal);
   // Deterministically repair citation labels (bare ids → "Autor, Año", bracketed ids →
   // proper nodus:// links) so weaker/local models still produce clickable sources. The
   // frontend re-renders with this returned answer, replacing the streamed deltas.
