@@ -11,7 +11,7 @@ import { createCapabilityAdapters } from '../capabilities/runner';
 import { artifactSidecar, readCapabilityArtifact } from '../capabilities/artifactStore';
 import { fetchCapabilityCatalog, installCatalogPlugin, readCachedCatalog } from '../capabilities/marketplaceV2';
 import { legacyResultRequest } from '../capabilities/legacyResults';
-import { migrationSettled, pendingMigrations, readMigrationJournal } from '../capabilities/migration';
+import { migrationSettled, readMigrationJournal } from '../capabilities/migration';
 import { capabilityMigrationRunning, migrateCapabilitiesForThisProfile, runPluginDataMigrations } from '../capabilities/migrationRunner';
 import { pinCapabilitiesForTurn } from '../capabilities/registry';
 import type { IpcContext } from './context';
