@@ -14,7 +14,8 @@ const profile = path.join(scratch, 'profile');
 fs.mkdirSync(profile, { recursive: true });
 process.on('exit', () => fs.rmSync(scratch, { recursive: true, force: true }));
 
-// One publishing key for the whole run, injected in place of the committed (empty) list.
+// One ephemeral publishing key for the whole run, injected in place of the committed
+// production list so tests never need the matching production private key.
 const signing = generateKeyPairSync('ed25519');
 const retired = generateKeyPairSync('ed25519');
 const impostor = generateKeyPairSync('ed25519');
@@ -46,7 +47,7 @@ await build({
         contents: `export const app={getPath:()=>${JSON.stringify(profile)},getVersion:()=>"5.3.2"};export const safeStorage={isEncryptionAvailable:()=>true,encryptString:v=>Buffer.from(v),decryptString:v=>v.toString("utf8")};`,
         loader: 'js',
       }));
-      // The shipped build carries no publishing key; the test supplies its own.
+      // Tests supply their own publishing key and never use the production key.
       api.onResolve({ filter: /trustedKeys\.json$/ }, () => ({ path: 'trusted-keys', namespace: 'keys' }));
       api.onLoad({ filter: /.*/, namespace: 'keys' }, () => ({ contents: JSON.stringify(trustedKeys), loader: 'json' }));
       api.onResolve({ filter: /^@shared\// }, ({ path: value }) => ({ path: path.join(root, 'shared', `${value.slice(8)}.ts`) }));
@@ -400,8 +401,15 @@ test('a build with no publishing key installs nothing at all', async () => {
   await build({
     stdin: { contents: `export * from './electron/capabilities/trustedKeys';`, resolveDir: root, loader: 'ts' },
     outfile: keyless, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent',
+    plugins: [{
+      name: 'keyless-build',
+      setup(api) {
+        api.onResolve({ filter: /trustedKeys\.json$/ }, () => ({ path: 'trusted-keys', namespace: 'keyless' }));
+        api.onLoad({ filter: /.*/, namespace: 'keyless' }, () => ({ contents: JSON.stringify({ keys: [] }), loader: 'json' }));
+      },
+    }],
   });
   const shipped = createRequire(import.meta.url)(keyless);
-  assert.deepEqual(shipped.trustedPublishingKeys(), [], 'the committed key list is empty until a key is generated');
+  assert.deepEqual(shipped.trustedPublishingKeys(), [], 'a keyless build carries no trusted publisher');
   rejects(() => shipped.assertPublishingKeysConfigured(), /no capability publishing key/);
 });
