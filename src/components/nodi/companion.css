@@ -1051,7 +1051,8 @@
   flex-direction: column;
   gap: 3px;
   width: max-content;
-  max-width: 300px;
+  max-width: min(300px, calc(100vw - 24px));
+  box-sizing: border-box;
   padding: 8px 10px;
   border-radius: 10px;
   border: 0.5px solid rgba(212, 175, 55, 0.35);
@@ -1060,6 +1061,10 @@
   pointer-events: none;
   font-size: 12px;
   line-height: 1.35;
+  /* The enclosing citation group deliberately uses nowrap for the pill. The
+     preview must opt out or its prose overflows the fixed-width card. */
+  white-space: normal;
+  overflow-wrap: anywhere;
   color: #cbd3df;
   animation: nodi-panel-pop 0.14s ease-out;
 }

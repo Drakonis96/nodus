@@ -241,9 +241,6 @@ export function ResearchAssistantModal({
   const contextTriggerRef = useRef<HTMLButtonElement>(null);
   const focusTriggerRef = useRef<HTMLButtonElement>(null);
   const contextPanelRef = useRef<HTMLDivElement>(null);
-  // Whether new stream deltas should keep the view pinned to the bottom. Starts
-  // true on send and flips off as soon as the user scrolls up to read back.
-  const stickToBottomRef = useRef(true);
   const lastInitialTargetRef = useRef<number | null>(null);
   // Mirrors `messages` so async stream callbacks can persist the final array without
   // racing React state updates.
@@ -355,10 +352,6 @@ export function ResearchAssistantModal({
     const el = scrollRef.current;
     if (!el) return;
     const onScroll = () => {
-      // The user driving the scrollbar decides whether we keep following the
-      // stream: reading back (scrolling up) releases the pin; returning to the
-      // bottom re-engages it.
-      stickToBottomRef.current = isNearBottom();
       updateJumpIndicator();
     };
     el.addEventListener('scroll', onScroll, { passive: true });
@@ -500,7 +493,10 @@ export function ResearchAssistantModal({
     setMessages([...priorMessages, userMessage, { id: assistantId, role: 'assistant', content: '', selectionKey }]);
     setSending(true);
     setStreamingId(assistantId);
-    stickToBottomRef.current = true;
+    // Reveal the question and the beginning of the answer once. Streaming
+    // deltas must not chase the bottom: keeping this position stable lets the
+    // user read from the start and scroll through the reply at their own pace,
+    // matching Nodi's chat behaviour.
     window.setTimeout(() => scrollToBottom('auto'), 0);
 
     try {
@@ -514,8 +510,7 @@ export function ResearchAssistantModal({
                 message.id === assistantId ? { ...message, content: message.content + delta } : message
               )
             );
-            if (stickToBottomRef.current) scrollToBottom('auto');
-            else window.setTimeout(updateJumpIndicator, 0);
+            window.setTimeout(updateJumpIndicator, 0);
           },
           onReasoning: (delta) => {
             if (activeIdRef.current !== conversationId) return;
