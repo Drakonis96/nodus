@@ -1,4 +1,5 @@
 import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
+import { CAPABILITIES_TRANSLATIONS } from './i18n.capabilities';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
@@ -54,6 +55,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
   ...CHAT_SKILLS_TRANSLATIONS['tr'],
+  ...CAPABILITIES_TRANSLATIONS['tr'],
   ...STELLAR_GRAPH_TRANSLATIONS["tr"],
   ...ACADEMIC_TOUR_TRANSLATIONS.tr,
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS.tr,

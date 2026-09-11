@@ -50,3 +50,55 @@
 .chat-chem-notice-info { border-color: #818cf83a; background: #6366f112; color: #a5b4fc; }
 :is(.light, .nodi-theme-light) .chat-chem-notice-warn { color: #92400e; background: #f59e0b18; }
 :is(.light, .nodi-theme-light) .chat-chem-notice-info { color: #4338ca; background: #6366f110; }
+
+/* Declarative capability views. The node kinds are fixed by the view contract, so this
+   is a closed set of styles rather than anything a package can extend. */
+.capability-view { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.5; }
+.capability-view>*:first-child { margin-top: 0; }
+.capability-view p { margin: 0; }
+.capability-view-title { margin: 0; font-size: 14px; font-weight: 600; }
+.capability-view-heading { margin: 4px 0 0; font-size: 13px; font-weight: 600; opacity: .9; }
+.capability-view-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 3px; }
+.capability-view-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.capability-view-badge { padding: 2px 9px; border-radius: 999px; border: 1px solid #818cf83a; background: #6366f112; font-size: 11px; }
+.capability-view-badge[data-tone='success'] { border-color: #34d3994a; background: #10b98112; color: #6ee7b7; }
+.capability-view-badge[data-tone='warning'] { border-color: #f59e0b4a; background: #f59e0b12; color: #fcd34d; }
+.capability-view-badge[data-tone='danger'] { border-color: #f871714a; background: #ef444412; color: #fca5a5; }
+.capability-view-badge[data-tone='info'] { border-color: #60a5fa4a; background: #3b82f612; color: #93c5fd; }
+.capability-view-notice { display: flex; flex-direction: column; gap: 3px; padding: 9px 12px; border: 1px solid #818cf83a; border-radius: 10px; background: #6366f110; font-size: 12px; }
+.capability-view-notice[data-tone='warning'] { border-color: #f59e0b4a; background: #f59e0b12; color: #fcd34d; }
+.capability-view-notice[data-tone='danger'] { border-color: #f871714a; background: #ef444412; color: #fca5a5; }
+.capability-view-notice[data-tone='success'] { border-color: #34d3994a; background: #10b98112; color: #6ee7b7; }
+/* Wide content scrolls inside its own box; the message column never scrolls sideways. */
+.capability-view-table { overflow-x: auto; }
+.capability-view-table table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.capability-view-table th,.capability-view-table td { padding: 5px 9px; border-bottom: 1px solid #818cf826; text-align: left; white-space: nowrap; }
+.capability-view-table th { font-weight: 600; opacity: .8; }
+.capability-view-table caption { padding-bottom: 6px; text-align: left; font-size: 12px; opacity: .75; }
+.capability-view-code { margin: 0; padding: 10px 12px; border-radius: 10px; background: #0000002e; overflow-x: auto; font-size: 12px; }
+.capability-view-links { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.capability-view-links li { display: flex; flex-direction: column; gap: 1px; }
+.capability-view-links span { font-size: 11px; opacity: .7; }
+.capability-view-details summary { cursor: pointer; font-size: 12px; opacity: .85; }
+.capability-view-details>*:not(summary) { margin-top: 8px; }
+.capability-view-download { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; }
+.capability-view-download-meta { font-size: 11px; opacity: .65; }
+.capability-view-status { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.capability-view-status[data-state='ok'] { color: #6ee7b7; }
+.capability-view-status[data-state='failed'] { color: #fca5a5; }
+.capability-view-status[data-state='pending'] { opacity: .78; }
+.capability-view-status span { opacity: .75; }
+.capability-view-summary { padding: 12px 14px 0; font-size: 13px; }
+.capability-view-note { padding: 6px 14px 12px; font-size: 12px; opacity: .78; }
+.chat-capability-orphan .chat-skill-primary { margin: 0 14px 14px; }
+
+:is(.light, .nodi-theme-light) .capability-view-badge[data-tone='success'] { color: #047857; }
+:is(.light, .nodi-theme-light) .capability-view-badge[data-tone='warning'] { color: #92400e; }
+:is(.light, .nodi-theme-light) .capability-view-badge[data-tone='danger'] { color: #b91c1c; }
+:is(.light, .nodi-theme-light) .capability-view-badge[data-tone='info'] { color: #1d4ed8; }
+:is(.light, .nodi-theme-light) .capability-view-notice[data-tone='warning'] { color: #92400e; }
+:is(.light, .nodi-theme-light) .capability-view-notice[data-tone='danger'] { color: #b91c1c; }
+:is(.light, .nodi-theme-light) .capability-view-notice[data-tone='success'] { color: #047857; }
+:is(.light, .nodi-theme-light) .capability-view-code { background: #0000000d; }
+:is(.light, .nodi-theme-light) .capability-view-status[data-state='ok'] { color: #047857; }
+:is(.light, .nodi-theme-light) .capability-view-status[data-state='failed'] { color: #b91c1c; }

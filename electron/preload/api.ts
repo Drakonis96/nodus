@@ -126,6 +126,22 @@ export const nodusApi: NodusApi = {
   getChatImageMetadata: (source) => ipcRenderer.invoke('chatImages:metadata', source),
   copyChatImage: (source) => ipcRenderer.invoke('chatImages:copy', source),
   downloadCapabilityFile: (source) => ipcRenderer.invoke('capabilityFiles:download', source),
+  listCapabilities: () => ipcRenderer.invoke('capabilities:list'),
+  onCapabilityRegistryChanged: (cb) => {
+    const listener = (_event: unknown, payload: unknown) => cb(payload as never);
+    ipcRenderer.on('capabilities:registryChanged', listener);
+    return () => ipcRenderer.removeListener('capabilities:registryChanged', listener);
+  },
+  capabilityHealth: (capabilityId) => ipcRenderer.invoke('capabilities:health', capabilityId),
+  getCapabilitySettings: (capabilityId) => ipcRenderer.invoke('capabilities:getSettings', capabilityId),
+  applyCapabilitySettings: (capabilityId, submission) => ipcRenderer.invoke('capabilities:applySettings', capabilityId, submission),
+  runCapabilityAction: (capabilityId, actionId) => ipcRenderer.invoke('capabilities:runAction', capabilityId, actionId),
+  renderCapabilityArtifact: (source, locale) => ipcRenderer.invoke('artifacts:render', source, locale),
+  refreshCapabilityCatalog: (sourceUrl) => ipcRenderer.invoke('capabilities:refreshCatalog', sourceUrl),
+  installCapabilityPlugin: (pluginId, approvePermissions) => ipcRenderer.invoke('capabilities:installPlugin', pluginId, approvePermissions),
+  approveCapabilityPlugin: (pluginId) => ipcRenderer.invoke('capabilities:approvePlugin', pluginId),
+  rollbackCapabilityPlugin: (pluginId) => ipcRenderer.invoke('capabilities:rollbackPlugin', pluginId),
+  removeCapabilityPlugin: (pluginId, purgeData) => ipcRenderer.invoke('capabilities:removePlugin', pluginId, purgeData),
   listInstalledPlugins: () => ipcRenderer.invoke('plugins:list'),
   installMarketplacePlugin: (sourceId, packagePath, commit, approvePermissions) => ipcRenderer.invoke('skillMarketplace:installPlugin', sourceId, packagePath, commit, approvePermissions),
   listInboxPlugins: () => ipcRenderer.invoke('plugins:inbox'),

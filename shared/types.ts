@@ -8825,6 +8825,18 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   getChatImageMetadata(source: string): Promise<Record<string, string> | null>;
   copyChatImage(source: string): Promise<void>;
   downloadCapabilityFile(source: string): Promise<void>;
+  listCapabilities(): Promise<import('./capabilities').CapabilityListPayload>;
+  onCapabilityRegistryChanged(cb: (payload: import('./capabilities').CapabilityRegistryPayload) => void): () => void;
+  capabilityHealth(capabilityId: string): Promise<import('./capabilities').CapabilityHealthPayload>;
+  getCapabilitySettings(capabilityId: string): Promise<import('./capabilities').CapabilitySettingsPayload>;
+  applyCapabilitySettings(capabilityId: string, submission: import('./capabilities').SettingsSubmissionV1): Promise<import('./capabilities').SettingsStateV1>;
+  runCapabilityAction(capabilityId: string, actionId: string): Promise<import('./capabilities').SettingsStateV1>;
+  renderCapabilityArtifact(source: string, locale?: string): Promise<import('./capabilities').ArtifactRenderResult>;
+  refreshCapabilityCatalog(sourceUrl: string): Promise<import('./capabilities').CapabilityListPayload['catalog']>;
+  installCapabilityPlugin(pluginId: string, approvePermissions?: boolean): Promise<{ state: import('./capabilities').InstalledCapabilityPlugin; activated: boolean }>;
+  approveCapabilityPlugin(pluginId: string): Promise<import('./capabilities').InstalledCapabilityPlugin>;
+  rollbackCapabilityPlugin(pluginId: string): Promise<import('./capabilities').InstalledCapabilityPlugin>;
+  removeCapabilityPlugin(pluginId: string, purgeData?: boolean): Promise<import('./capabilities').InstalledCapabilityPlugin[]>;
   listInstalledPlugins(): Promise<InstalledPluginSummary[]>;
   listInboxPlugins(): Promise<InboxPluginSummary[]>;
   approveInboxPlugin(directory: string): Promise<ChatSkill[]>;

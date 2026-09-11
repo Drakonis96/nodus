@@ -127,26 +127,26 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
 
   h('capabilities:refreshCatalog', async (_event, sourceUrl: string) => fetchCapabilityCatalog(sourceUrl));
 
-  h('plugins:install', async (_event, pluginId: string, approvePermissions = false) => {
+  h('capabilities:installPlugin', async (_event, pluginId: string, approvePermissions = false) => {
     const outcome = await installCatalogPlugin(pluginId, { approvePermissions });
     return { state: outcome.state, activated: outcome.activated };
   });
 
-  h('plugins:approvePending', async (_event, pluginId: string) => {
+  h('capabilities:approvePlugin', async (_event, pluginId: string) => {
     const state = approvePendingPluginV2(pluginId);
     await stopCapabilityWorkers(key => key.includes(pluginId));
     rebuildCapabilityRegistry();
     return state;
   });
 
-  h('plugins:rollback', async (_event, pluginId: string) => {
+  h('capabilities:rollbackPlugin', async (_event, pluginId: string) => {
     const state = rollbackPluginV2(pluginId);
     await stopCapabilityWorkers(key => key.includes(pluginId));
     rebuildCapabilityRegistry();
     return state;
   });
 
-  h('plugins:remove', async (_event, pluginId: string, purgeData = false) => {
+  h('capabilities:removePlugin', async (_event, pluginId: string, purgeData = false) => {
     await stopCapabilityWorkers(key => key.includes(pluginId));
     removePluginV2(pluginId, { purgeData });
     rebuildCapabilityRegistry();

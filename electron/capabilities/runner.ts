@@ -137,7 +137,9 @@ export function createTrustedCapabilityRunner(context: TrustedTurnContext): Trus
   const renderView = ({ provider, view }: { provider: CapabilityProvider; view: ViewDocumentV1 }): string =>
     serializeChatVisualPart({
       kind: 'capability-view', complete: true,
-      content: JSON.stringify({ capabilityId: provider.id, plugin: provider.plugin, view: validateViewDocument(view) }),
+      // The owner travels with the view so a download node can be resolved against the
+      // conversation that owns the attachment, never against a path the view chose.
+      content: JSON.stringify({ capabilityId: provider.id, plugin: provider.plugin, owner: context.owner, view: validateViewDocument(view) }),
     });
 
   return {

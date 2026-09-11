@@ -1,5 +1,6 @@
 import { vaultTypeColor } from '@shared/vaultTypes';
 import { SkillMarketplacePanel } from './SkillMarketplacePanel';
+import { CapabilityPackagesPanel } from './CapabilityPackagesPanel';
 import { SUPPORTED_SKILL_CAPABILITIES } from '@shared/skillMarketplace';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
@@ -119,7 +120,7 @@ export function ChatSkillsControl({ surface, disabled = false, compact = false }
     {open && renderPanel(<div ref={panelRef} style={compact ? undefined : panelStyle} className="chat-skills-panel" data-nodi-interactive role="region" aria-label="Skills">
       <div className="chat-skills-heading"><div><span className="chat-skills-eyebrow">NODUS SKILLS</span><h3>{draft ? (draft.id ? t('Editar skill') : t('Nueva skill')) : t('De la idea a la creación')}</h3></div><button type="button" aria-label={t('Cerrar')} onClick={() => { setOpen(false); setDraft(null); }}><Icon name="x" size={16} /></button></div>
       {!draft && <div className="skill-marketplace-tabs"><button type="button" aria-pressed={!marketplace} onClick={() => setMarketplace(false)}>My skills</button><button type="button" aria-pressed={marketplace} onClick={() => setMarketplace(true)}>Marketplace</button></div>}
-      {marketplace && !draft ? <SkillMarketplacePanel skills={skills} accent={accent} /> : draft ? <form className="chat-skill-editor" onSubmit={event => { event.preventDefault(); void mutate(() => window.nodus.saveChatSkill(draft)).then(saved => { if (saved) { setDraft(null); setQuery(''); } }); }}>
+      {marketplace && !draft ? <><CapabilityPackagesPanel /><SkillMarketplacePanel skills={skills} accent={accent} /></> : draft ? <form className="chat-skill-editor" onSubmit={event => { event.preventDefault(); void mutate(() => window.nodus.saveChatSkill(draft)).then(saved => { if (saved) { setDraft(null); setQuery(''); } }); }}>
         <label>{t('Nombre de la skill')}<input ref={nameRef} required maxLength={80} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} placeholder={t('Mi narrador visual')} /></label>
         <label>{t('Cuándo usarla')}<textarea aria-label={t('Cuándo usarla')} required rows={2} maxLength={500} value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} placeholder={t('Usar cuando el usuario necesite…')} /></label>
         <label>{t('Instrucciones')}<textarea aria-label={t('Instrucciones')} required className="chat-skill-prompt" rows={9} maxLength={16000} value={draft.instructions} onChange={event => setDraft({ ...draft, instructions: event.target.value })} placeholder={t('Describe el enfoque, el formato y los criterios de calidad…')} spellCheck={false} /></label>
