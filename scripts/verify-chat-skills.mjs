@@ -68,6 +68,11 @@ try {
     await overlay.getByLabel('Skill name', { exact: true }).fill('Executive brief');
     await overlay.getByLabel('When to use it', { exact: true }).fill('Use when the user asks for a concise decision brief.');
     await overlay.getByLabel('Instructions', { exact: true }).fill('Summarize the decision in three sections: recommendation, evidence, and next step. Keep each section under 40 words.');
+    // Enabled for both surfaces, as the editor asks: a new skill is saved disabled, so
+    // without this the reply below could not have followed it and the switch further down
+    // had nothing to turn off.
+    await overlay.getByRole('checkbox', { name: 'Assistant', exact: true }).check();
+    await overlay.getByRole('checkbox', { name: 'Nodi', exact: true }).check();
     await overlay.screenshot({ path: path.join(shots, '05b-custom-skill.png') });
     await overlay.getByRole('button', { name: 'Save skill', exact: true }).click();
     const custom = (await overlay.evaluate(() => window.nodus.listChatSkills())).find(skill => skill.name === 'Executive brief');

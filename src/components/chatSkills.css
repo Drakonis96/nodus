@@ -119,11 +119,16 @@
 .skill-marketplace { display: grid; gap: 12px; }
 .skill-marketplace-brand { display: flex; align-items: center; gap: 12px; }
 .skill-marketplace-brand img { width: 62px; height: 62px; }
+.skill-marketplace-logo-light { display: none; }
+:is(.light, .nodi-theme-light) .skill-marketplace-logo-dark { display: none; }
+:is(.light, .nodi-theme-light) .skill-marketplace-logo-light { display: block; }
 .skill-marketplace-brand b { font-size: 16px; }.skill-marketplace-brand p { opacity: .7; margin-top: 3px; }
 .skill-marketplace label,.skill-author-fields label,.skill-tool-editor label { display: grid; gap: 5px; font-size: 11px; }
 .skill-marketplace input,.skill-marketplace select,.skill-author-fields input,.skill-tool-editor input,.skill-tool-editor textarea { width: 100%; min-width: 0; padding: 9px; color: inherit; background: color-mix(in srgb, var(--vault-accent, #6366f1) 3.9%, transparent); border: 1px solid color-mix(in srgb, var(--vault-accent, #6366f1) 27.1%, transparent); border-radius: 7px; font: inherit; }
 .skill-marketplace select option { color: #27272a; background: white; }
-.skill-marketplace button,.skill-tool-editor button { border: 1px solid color-mix(in srgb, var(--vault-accent, #6366f1) 27.1%, transparent); padding: 7px 10px; border-radius: 7px; font-size: 11px; }
+/* `:not()` because the chevron is an icon in a 26px box, not a labelled control: the
+   border and the 7px/10px padding below squeezed its 14px glyph off centre. */
+.skill-marketplace button:not(.chat-skill-details-toggle),.skill-tool-editor button { border: 1px solid color-mix(in srgb, var(--vault-accent, #6366f1) 27.1%, transparent); padding: 7px 10px; border-radius: 7px; font-size: 11px; }
 .skill-marketplace-actions { display: flex; gap: 8px; }.skill-marketplace-actions button { flex: 1; }
 .skill-marketplace small { display: block; opacity: .75; overflow-wrap: anywhere; }
 .skill-marketplace-source { display: grid; gap: 8px; border-bottom: 1px solid color-mix(in srgb, var(--vault-accent, #6366f1) 18.8%, transparent); padding-bottom: 16px; }

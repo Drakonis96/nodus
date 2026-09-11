@@ -83,7 +83,14 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
   const unsupported = builtin ? [] : unsupportedSkillCapabilities(manifest?.capabilities ?? []);
   const installed = manifest ? installedSkills(manifest) : [];
   return <div className="skill-marketplace" aria-label="Skill marketplace">
-    <div className="skill-marketplace-brand"><img src={`data:image/svg+xml,${encodeURIComponent(marketplaceLogoSvg(accent))}`} data-testid="marketplace-logo" alt="Nodus Marketplace" /><div><b>Discover your next skill</b><p>Methods and tools, made by the community.</p></div></div>
+    {/* Both variants, swapped by the stylesheet: which theme this panel is in is a CSS
+        fact here — it is rendered into a portal that carries the class — and asking
+        JavaScript for it would mean re-asking every time the theme changed. */}
+    <div className="skill-marketplace-brand">
+      <img className="skill-marketplace-logo-dark" src={`data:image/svg+xml,${encodeURIComponent(marketplaceLogoSvg(accent))}`} data-testid="marketplace-logo" alt="Nodus Marketplace" />
+      <img className="skill-marketplace-logo-light" src={`data:image/svg+xml,${encodeURIComponent(marketplaceLogoSvg(accent, { plate: false }))}`} alt="" aria-hidden="true" />
+      <div><b>Discover your next skill</b><p>Methods and tools, made by the community.</p></div>
+    </div>
     {/* Where the skills come from, folded away. It is answered once and then rarely asked
         again, and open by default it put five controls between the reader and the first
         skill. The line stays visible, so which repository this is never becomes a mystery. */}

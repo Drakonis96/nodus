@@ -81,6 +81,19 @@ try {
   await page.getByRole('button', { name: 'Review skill', exact: true }).first().waitFor();
   assert.equal(await page.getByRole('button', { name: 'Uninstall Socratic Tutor', exact: true }).count(), 0);
   await page.screenshot({ path: path.join(artifacts, 'installed-filter.png') });
+
+  // The chevron that opens a card's details is an icon in a 26px box. The panel's generic
+  // button rules — a border and 7px/10px of padding — used to apply to it too, which left
+  // the glyph off centre inside a box that looked like a control it is not.
+  for (const scope of ['.chat-skills-list', '.skill-marketplace']) {
+    const toggle = await page.locator(`${scope} .chat-skill-details-toggle`).first().evaluate(node => {
+      const button = node.getBoundingClientRect(), icon = node.querySelector('svg').getBoundingClientRect();
+      return { padding: getComputedStyle(node).padding, border: getComputedStyle(node).borderWidth,
+        dx: Math.round((icon.x + icon.width / 2) - (button.x + button.width / 2)),
+        dy: Math.round((icon.y + icon.height / 2) - (button.y + button.height / 2)) };
+    });
+    assert.deepEqual(toggle, { padding: '0px', border: '0px', dx: 0, dy: 0 }, `${scope}: the details chevron sits in the middle of its own button`);
+  }
   await installedFilter.getByRole('button', { name: /^All / }).click();
   // The skills this build includes. Chemistry, legal and genomics are capability packages
   // now, not built-in skills, so they are installed from the packages panel above.
@@ -213,8 +226,29 @@ try {
     await page.screenshot({ path: path.join(artifacts, `vault-${type}-dark.png`) });
     themeChecks.push(type);
   }
+  // The send button belongs to the field beside it, so it is centred on it rather than
+  // hung from its bottom edge, where a 44px button against a 60px field sat 8px low.
+  const sendOffset = async () => page.evaluate(() => {
+    const field = document.querySelector('textarea.input')?.getBoundingClientRect();
+    const button = document.querySelector('.btn.h-11.w-11')?.getBoundingClientRect();
+    return field && button ? Math.round((button.y + button.height / 2) - (field.y + field.height / 2)) : null;
+  });
+  await page.locator('.chat-skills-heading > button').click();
+  assert.equal(await sendOffset(), 0, 'the send button is centred on the composer field');
+
   await page.evaluate(() => window.nodus.updateSettings({ theme: 'light' }));
   await page.waitForFunction(() => document.documentElement.classList.contains('light'));
+  assert.equal(await sendOffset(), 0, 'and stays centred in the light theme');
+
+  // The mark sits on a near-black plate, which reads as a logo on a dark panel and as a
+  // hole punched in a light one. Both variants ship; the stylesheet picks.
+  await page.getByTestId('chat-skills-assistant').click();
+  await page.getByRole('button', { name: 'Marketplace', exact: true }).click();
+  const logos = await page.locator('.skill-marketplace-brand').evaluate(node => [...node.querySelectorAll('img')].map(image => ({
+    shown: getComputedStyle(image).display !== 'none',
+    plate: /<rect[^>]*fill="([^"]+)"/.test(decodeURIComponent(image.src)),
+  })));
+  assert.deepEqual(logos.filter(logo => logo.shown), [{ shown: true, plate: false }], 'the light theme shows the logo without its dark plate');
   await page.screenshot({ path: path.join(artifacts, 'vault-docencia-light.png') });
   assert.deepEqual(errors, []);
   fs.writeFileSync(path.join(artifacts, 'verification.json'), JSON.stringify({ catalogMode, sourceCommit: catalog.sources[0].commit, packages: catalog.sources[0].entries.length, provider: 'deterministic local fixture', providerCalls, assistant: 'pass', nodiEnabled: 'pass', nodiDisabled: 'pass', sourceManagement: 'pass', authoringExportImport: 'pass', includedSkills: 'listed, uninstalled and restored', themeChecks, rendererErrors: errors }, null, 2));
