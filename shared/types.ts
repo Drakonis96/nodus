@@ -1,7 +1,6 @@
 import type { SkillMarketplace } from './skillMarketplace';
 import type { InboxPluginSummary, InstalledPluginSummary } from '../skill-capabilities/contracts';
 import type { ChatSkill } from './chatSkills';
-import type { GenomicsStatus, GenomicsSettingsInput, GenomicsResult } from './genomics';
 // Shared domain types used by both the Electron main process and the React renderer.
 // Keep this file free of any runtime imports from either side.
 // Per-domain slices of the window.nodus contract. NodusApi extends them, so the
@@ -8810,18 +8809,10 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   importSkillPackage(): Promise<ChatSkill[]>;
   exportSkillPackage(id: string): Promise<string | null>;
   listChatSkills(): Promise<ChatSkill[]>;
-  getGenomicsStatus(): Promise<GenomicsStatus>;
-  configureGenomics(input: GenomicsSettingsInput): Promise<GenomicsStatus>;
-  clearGenomicsConfiguration(): Promise<GenomicsStatus>;
-  installGenomicsRuntime(): Promise<GenomicsStatus>;
-  getGenomicsResult(source: string): Promise<GenomicsResult | null>;
   saveChatSkill(skill: ChatSkill): Promise<ChatSkill[]>;
   deleteChatSkill(id: string): Promise<ChatSkill[]>;
   restoreChatSkills(): Promise<ChatSkill[]>;
   onChatSkillsChanged(cb: () => void): () => void;
-  compileChemfig(source: string): Promise<string>;
-  compileLewis(source: string): Promise<string>;
-  compileSmiles(source: string): Promise<string>;
   getChatImageMetadata(source: string): Promise<Record<string, string> | null>;
   copyChatImage(source: string): Promise<void>;
   downloadCapabilityFile(source: string): Promise<void>;

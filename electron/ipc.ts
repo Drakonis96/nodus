@@ -2,10 +2,8 @@ import { getSkillMarketplace, addSkillSource, removeSkillSource, updateSkillSour
 import { listChatSkills, saveChatSkill, deleteChatSkill, restoreChatSkills, importSkillDirectory, exportSkillDirectory, approvePendingChatPlugin, rollbackChatPlugin, removeChatPlugin, installChatPluginPackage, restorePluginSkillAuthorVersion } from './chatSkills';
 import { configurePluginSecret, discardInboxPlugin, listInboxPlugins, listInstalledPlugins, readInboxPlugin, readPluginDirectory, setPluginAutoUpdate } from './skillPlugins';
 import { mergedPluginPermissions } from '../skill-capabilities/pluginPackage';
-import { getGenomicsStatus, configureGenomics, clearGenomicsConfiguration, installGenomicsRuntime } from './genomics';
-import { getCapabilityFile, getGenomicsResult } from './chatAssets';
+import { getCapabilityFile } from './chatAssets';
 import { getChatImageMetadata } from './chatAssets';
-import { compileChemfig, compileLewis, compileSmiles } from './chemistry';
 import { originalImagePayloadFromUrl } from './imageProtocol';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -585,16 +583,6 @@ export function registerIpc(
     return result.canceled ? null : exportSkillDirectory(id, result.filePaths[0]);
   });
   h('chatSkills:list', async () => listChatSkills());
-  h('genomics:status', async () => getGenomicsStatus());
-  h('genomics:configure', async (_e, input) => configureGenomics(input));
-  h('genomics:clear', async () => {
-    const status = clearGenomicsConfiguration();
-    const skill = listChatSkills().find(s => s.builtin === 'genomics');
-    if (skill) skillsChanged(saveChatSkill({ ...skill, enabled: { assistant: false, nodi: false } }));
-    return status;
-  });
-  h('genomics:install', async () => installGenomicsRuntime());
-  h('genomics:result', async (_e, source: string) => typeof source === 'string' ? getGenomicsResult(source) : null);
   h('chatSkills:save', async (_e, skill) => skillsChanged(saveChatSkill(skill)));
   h('chatSkills:delete', async (_e, id: string) => skillsChanged(deleteChatSkill(id)));
   h('chatSkills:restore', async () => skillsChanged(restoreChatSkills()));
@@ -616,9 +604,6 @@ export function registerIpc(
   h('plugins:remove', async (_e, id: string) => skillsChanged(removeChatPlugin(String(id))));
   h('plugins:secret', async (_e, pluginId: string, capabilityId: string, secretId: string, value: string) => configurePluginSecret(String(pluginId), String(capabilityId), String(secretId), String(value)));
   h('plugins:restoreSkill', async (_e, id: string) => skillsChanged(restorePluginSkillAuthorVersion(String(id))));
-  h('chemistry:compileChemfig', async (_e, source: string) => compileChemfig(source));
-  h('chemistry:compileLewis', async (_e, source: string) => compileLewis(source));
-  h('chemistry:compileSmiles', async (_e, source: string) => compileSmiles(source));
   h('chatImages:metadata', async (_e, source: string) => getChatImageMetadata(source));
   h('chatImages:copy', async (_e, source: string) => {
     if (!source.startsWith('nodus-image://chat/')) throw new Error('Invalid chat image.');

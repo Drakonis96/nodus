@@ -2,7 +2,6 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { validateGenomicsResult, type GenomicsResult } from '@shared/genomics';
 
 const versions = new Map<string, number>();
 const root = () => path.join(app.getPath('userData'), 'chat-assets');
@@ -44,19 +43,6 @@ export function getChatImageMetadata(source: string): Record<string, string> | n
 export function deleteChatAssets(owner: string): void {
   versions.set(owner, chatAssetVersion(owner) + 1);
   fs.rmSync(directory(owner), { recursive: true, force: true });
-}
-export function storeGenomicsResult(owner: string, result: GenomicsResult): string {
-  validateGenomicsResult(result);
-  const id = randomUUID();
-  const dir = directory(owner);
-  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  fs.writeFileSync(path.join(dir, `${id}.genomics`), JSON.stringify(result), { mode: 0o600 });
-  return `nodus-genomics://chat/${owner}/${id}`;
-}
-export function getGenomicsResult(source: string): GenomicsResult | null {
-  const match = /^nodus-genomics:\/\/chat\/([a-f0-9]{64}\/[a-f0-9-]{36})$/.exec(source);
-  if (!match) return null;
-  try { return validateGenomicsResult(JSON.parse(fs.readFileSync(path.join(root(), `${match[1]}.genomics`), 'utf8'))); } catch { return null; }
 }
 export function storeCapabilityFile(owner: string, input: { bytes: Buffer; mimeType: string; name: string; title?: string }): string {
   if (input.bytes.length > 10_000_000 || !input.bytes.length) throw new Error('Capability file exceeds its size limit.');

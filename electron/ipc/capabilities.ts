@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron';
 import { validateSettingsSubmission, validateSettingsState } from '../../packages/capability-api/src/settings';
 import { validateViewDocument } from '../../packages/capability-api/src/views';
 import { capabilityRegistry, onCapabilityRegistryChanged, rebuildCapabilityRegistry, type CapabilityProvider } from '../capabilities/registry';
+import { contractFences } from '../../packages/capability-api/src/chat';
 import { approvePendingPluginV2, listInstalledPluginsV2, removePluginV2, resolveTrustedCapability, rollbackPluginV2 } from '../capabilities/pluginStoreV2';
 import { acquireCapabilityWorker, stopCapabilityWorkers } from '../capabilities/workerHost';
 import { createCapabilityHostServices } from '../capabilities/hostServices';
@@ -173,7 +174,7 @@ function summarize(provider: CapabilityProvider) {
     source: provider.source, plugin: provider.plugin,
     tools: provider.tools.map(tool => ({ id: tool.id, description: tool.description, metered: tool.metered })),
     artifacts: provider.artifacts,
-    chat: provider.chat ? { priority: provider.chat.priority, pendingLabel: provider.chat.pendingLabel } : undefined,
+    chat: provider.chat ? { priority: provider.chat.priority, pendingLabel: provider.chat.pendingLabel, fences: contractFences(provider.chat) } : undefined,
     hasSettings: provider.hasSettings,
   };
 }

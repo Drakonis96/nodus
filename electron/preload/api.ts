@@ -107,11 +107,6 @@ export const nodusApi: NodusApi = {
   importSkillPackage: () => ipcRenderer.invoke('skillMarketplace:import'),
   exportSkillPackage: (id) => ipcRenderer.invoke('skillMarketplace:export', id),
   listChatSkills: () => ipcRenderer.invoke('chatSkills:list'),
-  getGenomicsStatus: () => ipcRenderer.invoke('genomics:status'),
-  configureGenomics: (input) => ipcRenderer.invoke('genomics:configure', input),
-  clearGenomicsConfiguration: () => ipcRenderer.invoke('genomics:clear'),
-  installGenomicsRuntime: () => ipcRenderer.invoke('genomics:install'),
-  getGenomicsResult: (source) => ipcRenderer.invoke('genomics:result', source),
   saveChatSkill: (skill) => ipcRenderer.invoke('chatSkills:save', skill),
   deleteChatSkill: (id) => ipcRenderer.invoke('chatSkills:delete', id),
   restoreChatSkills: () => ipcRenderer.invoke('chatSkills:restore'),
@@ -120,9 +115,6 @@ export const nodusApi: NodusApi = {
     ipcRenderer.on('chatSkills:changed', listener);
     return () => ipcRenderer.removeListener('chatSkills:changed', listener);
   },
-  compileChemfig: (source) => ipcRenderer.invoke('chemistry:compileChemfig', source),
-  compileLewis: (source) => ipcRenderer.invoke('chemistry:compileLewis', source),
-  compileSmiles: (source) => ipcRenderer.invoke('chemistry:compileSmiles', source),
   getChatImageMetadata: (source) => ipcRenderer.invoke('chatImages:metadata', source),
   copyChatImage: (source) => ipcRenderer.invoke('chatImages:copy', source),
   downloadCapabilityFile: (source) => ipcRenderer.invoke('capabilityFiles:download', source),

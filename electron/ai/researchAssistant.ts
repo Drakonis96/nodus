@@ -1,5 +1,5 @@
 import { skillHasCapability } from '@shared/chatSkills';
-import { buildChatSkillsPrompt, chatSkillsOutputContract, chemistryTitleSummary, splitChatVisuals, transformChatProse } from '@shared/chatSkills';
+import { buildChatSkillsPrompt, chatSkillsOutputContract, chatVisualTitleSummary, splitChatVisuals, transformChatProse } from '@shared/chatSkills';
 import { enabledChatSkills } from '../chatSkills';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getConversation } from '../db/chatRepo';
@@ -237,7 +237,7 @@ export async function generateChatTitle(messages: ChatMessageRecord[], model?: M
   const relevant = messages
     .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content.trim() && !m.error)
     .slice(0, 6)
-    .map((m) => `${m.role === 'user' ? prompt.titleLabels.user : prompt.titleLabels.assistant}: ${chemistryTitleSummary(m.content).trim().slice(0, 600)}`);
+    .map((m) => `${m.role === 'user' ? prompt.titleLabels.user : prompt.titleLabels.assistant}: ${chatVisualTitleSummary(m.content).trim().slice(0, 600)}`);
   const firstUser = messages.find((m) => m.role === 'user' && m.content.trim())?.content.trim() ?? '';
   const fallback = firstUser ? truncateTitle(firstUser) : prompt.titleLabels.untitled;
   if (relevant.length === 0) return fallback;

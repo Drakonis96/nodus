@@ -19,7 +19,7 @@ export interface CapabilityProviderSummary {
   plugin?: { id: string; version: string; digest: string };
   tools: Array<{ id: string; description: string; metered: boolean }>;
   artifacts: ArtifactTypeManifestV1[];
-  chat?: { priority: number; pendingLabel: CapabilityChatContractV2['pendingLabel'] };
+  chat?: { priority: number; pendingLabel: CapabilityChatContractV2['pendingLabel']; fences: string[] };
   hasSettings: boolean;
 }
 
