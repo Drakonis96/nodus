@@ -10,6 +10,7 @@ import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
 import { readSource, ipcCensus } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,6 +30,32 @@ const allFiles = sourceFiles(path.join(repoRoot, 'src')).map((file) => ({
   code: readFileSync(file, 'utf8'),
 }));
 
+/** Every source file a window's bundle actually contains.
+ *
+ *  Asked of the bundler rather than described with a pattern here. A pattern names the
+ *  files somebody thought of: `ChatMarkdown.tsx` was named, and the module it imports to
+ *  ask which fences each capability claims was not, so a call that took the whole Nodi
+ *  chat panel down with a TypeError passed this test unnoticed. An import graph has no
+ *  such blind spot — it is the same graph the window loads. */
+async function bundledSources(entry) {
+  const result = await build({
+    entryPoints: [path.join(repoRoot, entry)],
+    bundle: true, write: false, metafile: true, platform: 'browser', jsx: 'automatic', logLevel: 'silent',
+    alias: { '@shared': path.join(repoRoot, 'shared') },
+    loader: { '.css': 'empty', '.png': 'empty', '.jpg': 'empty', '.svg': 'empty', '.woff': 'empty', '.woff2': 'empty', '.ttf': 'empty' },
+    plugins: [{
+      // Vite's `?url` and `?raw` suffixes: an asset reference, never code that could call
+      // the bridge, so a stub keeps the graph walkable without changing what it contains.
+      name: 'vite-asset-queries',
+      setup(api) {
+        api.onResolve({ filter: /\?(url|raw|worker|inline)$/ }, ({ path: value }) => ({ path: value, namespace: 'vite-asset' }));
+        api.onLoad({ filter: /.*/, namespace: 'vite-asset' }, () => ({ contents: 'export default ""', loader: 'js' }));
+      },
+    }],
+  });
+  return new Set(Object.keys(result.metafile.inputs).filter(file => /^src\/.*\.tsx?$/.test(file)));
+}
+
 /** The bridge methods called by the files a window class loads. */
 function methodsUsedBy(owns) {
   const used = new Map();
@@ -41,6 +68,12 @@ function methodsUsedBy(owns) {
   return used;
 }
 
+const overlaySources = await bundledSources('src/mascot.tsx');
+const presenterSources = new Set([
+  ...await bundledSources('src/presenter/presenterView.tsx'),
+  ...await bundledSources('src/presenter/audience.tsx'),
+]);
+
 /** The names in a `X_WINDOW_METHODS` tuple in shared/api/windows.ts. */
 function declaredMethods(constName) {
   const source = readFileSync(path.join(repoRoot, 'shared/api/windows.ts'), 'utf8');
@@ -52,24 +85,18 @@ function declaredMethods(constName) {
 
 test('the Nodi overlay declares every bridge method its code calls', () => {
   const declared = new Set(declaredMethods('NODI_WINDOW_METHODS'));
-  // mascot.html loads src/mascot.tsx, whose own tree is the Nodi components. Anything
-  // else in the bundle is dead code the overlay never renders.
-  //
-  // NotificationsPanel is named for the header, but the overlay imports its
-  // useAnnouncements hook — and a bridge call the overlay makes through a file this
-  // pattern does not name is exactly the failure this test exists to catch.
-  const used = methodsUsedBy((rel) => /nodi|mascot/i.test(rel) || rel === 'src/components/NotificationsPanel.tsx' || /^src\/components\/(Markdown|ChatMarkdown|ChatVisual|ChatSkillsControl)\.tsx$/.test(rel));
+  // mascot.html loads src/mascot.tsx; this is everything that ends up in that bundle.
+  const used = methodsUsedBy((rel) => overlaySources.has(rel));
   const missing = [...used].filter(([name]) => !declared.has(name)).map(([name, rel]) => `${name} (${rel})`);
   assert.deepEqual(missing, [], 'Nodi calls methods its preload does not expose');
 });
 
 test('the Presenter windows declare every bridge method their code calls', () => {
   const declared = new Set(declaredMethods('PRESENTER_WINDOW_METHODS'));
-  // presenterAudience.html and presenterView.html, plus the deck and PDF helpers
-  // they share. src/presenter/remote/ is the phone remote: served over HTTP by the
-  // cast server, with no preload at all, so it is not a window class here.
-  const used = methodsUsedBy((rel) =>
-    (rel.startsWith('src/presenter/') || rel.startsWith('src/lib/presenter/')) && !rel.startsWith('src/presenter/remote/'));
+  // presenterAudience.html and presenterView.html. src/presenter/remote/ is the phone
+  // remote: served over HTTP by the cast server, with no preload at all, so it is not a
+  // window class here and nothing imports it into these two.
+  const used = methodsUsedBy((rel) => presenterSources.has(rel));
   const missing = [...used].filter(([name]) => !declared.has(name)).map(([name, rel]) => `${name} (${rel})`);
   assert.deepEqual(missing, [], 'the Presenter calls methods its preload does not expose');
 });
