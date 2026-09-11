@@ -128,7 +128,10 @@ try {
           bootstrapPath: ${JSON.stringify(bootstrap)},
         });
         const health = await handle.call('health', { nodusVersion: '5.3.2', locale: 'en', platform: process.platform, arch: process.arch, dataVersion: 0 }, { timeoutMs: 30_000 });
-        assert.equal(health.status, 'ready', 'the package reports itself ready');
+        // A package that needs a key or a runtime is entitled to say so on a clean
+        // profile; what must not happen is an unrecognised status or a silent default.
+        assert.ok(['ready', 'degraded', 'needs-setup', 'needs-migration'].includes(health.status), 'the package reports a known status, got ' + health.status);
+        if (!provider.hasSettings) assert.equal(health.status, 'ready', 'a package with nothing to configure is ready on a clean profile');
         assert.ok(Number.isInteger(health.dataVersion));
 
         stage = 'chat hook';
