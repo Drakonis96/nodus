@@ -140,6 +140,22 @@ try {
   const glyphs = await page.locator('.chat-skills-list .chat-skill-symbol svg').evaluateAll(nodes => nodes.map(node => node.innerHTML));
   assert.ok(new Set(glyphs).size >= Math.min(5, glyphs.length), `skills are told apart by their icons (${new Set(glyphs).size} of ${glyphs.length})`);
   await page.screenshot({ path: path.join(artifacts, 'my-skills.png') });
+
+  // Opened: the clamped description gives way to the whole of it, and the actions that are
+  // easy to press by accident live here rather than on every row.
+  const firstCard = page.locator('.chat-skills-list .chat-skill-item').first();
+  const cardName = await firstCard.locator('.chat-skill-text b').textContent();
+  await firstCard.getByRole('button', { name: `Show details of ${cardName}`, exact: true }).click();
+  await firstCard.locator('.chat-skill-details').waitFor();
+  assert.equal(await firstCard.locator('.chat-skill-text p:visible').count(), 0, 'the clamped description is replaced, not repeated');
+  for (const action of [`Export ${cardName}`, `Edit ${cardName}`]) {
+    await firstCard.getByRole('button', { name: action, exact: true }).waitFor();
+  }
+  // Included skills are uninstalled rather than deleted: they come back from the catalogue.
+  await firstCard.getByRole('button', { name: new RegExp(`^(Delete|Uninstall) ${cardName}$`) }).waitFor();
+  await page.screenshot({ path: path.join(artifacts, 'my-skills-expanded.png') });
+  await firstCard.getByRole('button', { name: `Hide details of ${cardName}`, exact: true }).click();
+  assert.equal(await firstCard.locator('.chat-skill-details').count(), 0, 'and folds away again');
   await page.getByRole('switch', { name: 'Enable Descriptive Statistics', exact: true }).click();
   await page.getByRole('region', { name: 'Skills', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
   console.log('Installed and enabled', installedId);
