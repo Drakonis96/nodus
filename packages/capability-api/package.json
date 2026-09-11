@@ -1,0 +1,13 @@
+{
+  "name": "@nodusresearch/capability-api",
+  "version": "2.0.0",
+  "description": "Contracts, schemas and validators shared by Nodus and every NodusResearch capability plugin.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "private": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": ["src", "README.md"],
+  "sideEffects": false
+}
