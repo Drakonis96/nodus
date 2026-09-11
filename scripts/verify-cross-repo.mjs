@@ -30,9 +30,11 @@ const profile = path.join(scratch, 'profile');
 fs.mkdirSync(profile, { recursive: true });
 
 const step = name => console.log(`\n— ${name}`);
-// `npm` is a shell script everywhere except Windows, where it is `npm.cmd` and cannot be
-// spawned by the name a Unix machine would use.
+// `npm` is a shell script everywhere except Windows, where it is `npm.cmd` — and Node
+// refuses to spawn a `.cmd` at all without going through a shell, so on Windows this one
+// call does. The arguments are fixed here; nothing the marketplace provides reaches them.
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const npmOptions = process.platform === 'win32' ? { shell: true } : {};
 const run = (command, args, options = {}) => execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], ...options });
 
 let failed = false;
@@ -129,7 +131,7 @@ try {
   // ---------------------------------------------------------------- the real bytes
 
   step('building the packages the marketplace publishes');
-  run(npm, ['ci'], { cwd: marketplace, stdio: 'inherit' });
+  run(npm, ['ci'], { cwd: marketplace, stdio: 'inherit', ...npmOptions });
   run('node', ['scripts/validate-plugins.mjs'], { cwd: marketplace, stdio: 'inherit' });
   run('node', ['scripts/build-plugins.mjs'], { cwd: marketplace, stdio: 'inherit' });
   const first = fs.readFileSync(path.join(marketplace, 'build/index.json'), 'utf8');
