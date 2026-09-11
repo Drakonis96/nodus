@@ -22,21 +22,54 @@ import {
 } from './skillPlugins';
 
 const file = () => path.join(app.getPath('userData'), 'chat-skills.json');
+const originFile = () => path.join(app.getPath('userData'), 'profile-migrations', 'library-origin.json');
 const LIBRARY_VERSION = 16;
 const LEGACY_SVG_V12_SHA256 = '8a8629caa2db26ab2d86ad7b2ee3daae72bd4156d198a8da01b639218c328570';
+/** Whether this profile was in use before the skills library existed, written down once,
+ *  before any default is created.
+ *
+ *  It has to be recorded rather than inferred later: the moment defaults are written there
+ *  is a `chat-skills.json` on disk, and from then on a profile that predates the library
+ *  is indistinguishable from one that never had a skill in it. The capability migration
+ *  reads this to decide whether chemistry was on by the behaviour of the time — so getting
+ *  it from the file's existence would mean either never honouring a real prior state, or
+ *  installing a package into a clean install nobody asked for. */
+function noteLibraryOrigin(): void {
+  if (fs.existsSync(originFile())) return;
+  const userData = app.getPath('userData');
+  const hadLibrary = fs.existsSync(file());
+  // A profile with a database or preferences but no library is one from before the
+  // library. A profile with neither is a clean install and carries no prior state at all.
+  const preLibraryProfile = !hadLibrary
+    && ['app-prefs.json', 'vaults.json', 'nodus.sqlite'].some(name => fs.existsSync(path.join(userData, name)));
+  fs.mkdirSync(path.dirname(originFile()), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(originFile(), JSON.stringify({ schemaVersion: 1, hadLibrary, preLibraryProfile, recordedAt: new Date().toISOString() }, null, 2), { mode: 0o600 });
+}
+
+/** True when this profile was already in use before skills had a library, so an implicit
+ *  activation of the time is a real prior state rather than an absence. */
+export function profilePredatesSkillLibrary(): boolean {
+  try {
+    const value = JSON.parse(fs.readFileSync(originFile(), 'utf8')) as { preLibraryProfile?: boolean };
+    return value.preLibraryProfile === true;
+  } catch {
+    // No marker means nothing wrote one yet, which only happens before the first library
+    // is created. Recording it now is what keeps the answer stable from here on.
+    noteLibraryOrigin();
+    try { return (JSON.parse(fs.readFileSync(originFile(), 'utf8')) as { preLibraryProfile?: boolean }).preLibraryProfile === true; }
+    catch { return false; }
+  }
+}
+
 /** Run before first-launch database/preferences initialization. Older profiles without
  * an explicit library retain the previously implicit Chemistry activation. */
 export function initializeChatSkillDefaults(): void {
+  noteLibraryOrigin();
   if (fs.existsSync(file())) return;
-  const olderProfile = ['app-prefs.json', 'vaults.json', 'nodus.sqlite'].some(name => fs.existsSync(path.join(app.getPath('userData'), name)));
-  // A profile that predates the library had chemistry on by the behaviour of the time.
-  // That is now the capability migration's business — it installs the package and adopts
-  // the skill — so nothing is enabled here on its behalf.
-  void olderProfile;
   write(structuredClone(DEFAULT_CHAT_SKILLS));
 }
 export function listChatSkills(): ChatSkill[] {
-  if (!fs.existsSync(file())) return write(structuredClone(DEFAULT_CHAT_SKILLS));
+  if (!fs.existsSync(file())) { noteLibraryOrigin(); return write(structuredClone(DEFAULT_CHAT_SKILLS)); }
   let parsed: { version?: number; skills?: ChatSkill[] };
   try { parsed = JSON.parse(fs.readFileSync(file(), 'utf8')); } catch { throw new Error('The skills library could not be read.'); }
   if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');

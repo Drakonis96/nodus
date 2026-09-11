@@ -19,7 +19,10 @@ export interface CapabilityWorkerV2 {
   getSettings?(): Promise<SettingsStateV1>;
   applySettings?(input: SettingsSubmissionV1): Promise<SettingsStateV1>;
   runAction?(input: SettingsActionInput): Promise<SettingsStateV1>;
-  migrate?(input: MigrationInputV1): Promise<MigrationResultV1>;
+  /** Renders a result saved by a version of this discipline that predates capability API
+   *  v2, so an old conversation still shows its answer instead of a broken placeholder.
+   *  The package knows those formats; the application only knows which fence claimed them. */
+  renderLegacyResult?(input: RenderLegacyInput): Promise<ViewDocumentV1>;
   shutdown(): Promise<void>;
 }
 
@@ -59,8 +62,45 @@ export interface PrepareChatInput { nodes: ChatAstNode[]; question?: string; loc
 export interface FinalizeChatInput { nodes: ChatAstNode[]; locale: string }
 export interface RenderArtifactInput { artifactType: string; artifactVersion: number; data: unknown; locale: string }
 export interface ArtifactProjectionInput { artifactType: string; artifactVersion: number; data: unknown }
-export interface MigrationInputV1 { fromDataVersion: number; toDataVersion: number }
-export interface MigrationResultV1 { dataVersion: number; notes?: string }
+export interface RenderLegacyInput {
+  fence: string;
+  artifactType: string;
+  artifactVersion: number;
+  /** The block exactly as the old reply saved it, plus the asset it pointed at when the
+   *  package declared one. Neither is trusted: it is data the package parses. */
+  payload: string;
+  asset?: string;
+  locale: string;
+}
+
+export interface MigrationInputV1 {
+  fromDataVersion: number;
+  toDataVersion: number;
+  /** What the built-in left behind in the profile, handed over once. */
+  legacy?: unknown;
+  /** Absolute paths to the migration scripts the manifest declared, in ladder order,
+   *  resolved by the host inside the installed package. The nth entry raises the data
+   *  version to n. */
+  scripts: string[];
+}
+
+export interface MigrationResultV1 {
+  /** The version actually reached. A failed script leaves this at the last one that
+   *  finished, so a retry resumes rather than repeating work that already succeeded. */
+  dataVersion: number;
+  notes?: string;
+  /** Why the ladder stopped, when it did. The host records it and keeps the old state. */
+  failed?: string;
+}
+
+/** What a `migrations/NNN-name.js` file exports. It runs inside the package's own worker
+ *  process, with the same host it has at runtime and nothing more. */
+export type MigrationScriptV1 = (context: {
+  host: CapabilityHostV2;
+  legacy: unknown;
+  fromDataVersion: number;
+  toDataVersion: number;
+}) => Promise<{ dataVersion?: number; notes?: string } | void> | { dataVersion?: number; notes?: string } | void;
 
 /** What the host offers back. Every method is permission-gated by the capability manifest;
  *  calling one the manifest did not declare is an error, not a silent no-op. */

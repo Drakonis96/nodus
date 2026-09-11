@@ -108,11 +108,12 @@ export function chatSkillsOutputContract(skills: ChatSkill[]): string {
 }
 
 export interface ChatVisualPart {
-  kind: 'markdown' | 'svg' | 'capability-request' | 'capability-result' | 'capability-artifact' | 'capability-view' | 'capability-pending' | 'image-request' | 'image-error';
+  kind: 'markdown' | 'svg' | 'capability-request' | 'capability-result' | 'capability-artifact' | 'capability-view' | 'capability-pending' | 'capability-legacy' | 'image-request' | 'image-error';
   content: string;
   complete: boolean;
-  /** For `capability-pending`: the fence tag a provider claimed, so the interface can name
-   *  the package that is working rather than showing a generic spinner. */
+  /** For `capability-pending` and `capability-legacy`: the fence tag a provider claimed,
+   *  so the interface can name the package that is working — or ask the one that owns an
+   *  old block to render it — rather than showing a generic spinner. */
   fence?: string;
 }
 
@@ -122,7 +123,7 @@ export interface ChatVisualPart {
  *  `claimed` is the set of fences installed packages have registered. The core knows no
  *  fence names of its own beyond its own three; a package's fence is recognised because
  *  the registry says someone claimed it, not because this file was edited. */
-export function splitChatVisuals(content: string, claimed: ReadonlySet<string> = new Set()): ChatVisualPart[] {
+export function splitChatVisuals(content: string, claimed: ReadonlySet<string> = new Set(), legacy: ReadonlySet<string> = new Set()): ChatVisualPart[] {
   // Some text providers return the requested JSON object without its language fence.
   // Accept only the complete, exact image-brief shape; arbitrary JSON remains code.
   const trimmed = content.trim();
@@ -155,7 +156,11 @@ export function splitChatVisuals(content: string, claimed: ReadonlySet<string> =
         : language === 'nodus-capability-result' ? 'capability-result'
         : language === 'nodus-artifact' ? 'capability-artifact'
         : language === 'nodus-view' ? 'capability-view'
-        : claimed.has(language) ? (claimedFence = language, 'capability-pending')
+        // A legacy fence is a result an earlier release already finished writing. Reading
+        // it as work in progress is what turns an old answer into "the generation was
+        // interrupted", so it is recognised before the pending case.
+        : legacy.has(language) ? (claimedFence = language, 'capability-legacy')
+          : claimed.has(language) ? (claimedFence = language, 'capability-pending')
         : /^(svg|xml|html)?$/.test(language) && /^<svg\b/i.test(body) ? 'svg' : 'markdown';
       if (kind === 'markdown') { pattern.lastIndex = end; continue; }
     } else {
@@ -176,6 +181,9 @@ export function splitChatVisuals(content: string, claimed: ReadonlySet<string> =
 
 export function serializeChatVisualPart(part: ChatVisualPart): string {
   if (part.kind === 'markdown') return part.content;
+  // A block recognised because a package claimed its fence is written back under that
+  // same fence. Anything else would rename a saved result every time a reply is rewritten.
+  if (part.fence) return `\n\n\`\`\`${part.fence}\n${part.content}\n${part.complete ? '```' : ''}\n\n`;
   const language = part.kind === 'image-request' ? 'nodus-image'
     : part.kind === 'image-error' ? 'nodus-image-error'
       : part.kind === 'capability-request' ? 'nodus-capability'

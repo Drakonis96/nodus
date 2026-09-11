@@ -10,6 +10,7 @@ import { writeCapabilitySecret } from '../capabilities/hostServices';
 import { createCapabilityAdapters } from '../capabilities/runner';
 import { artifactSidecar, readCapabilityArtifact } from '../capabilities/artifactStore';
 import { fetchCapabilityCatalog, installCatalogPlugin, readCachedCatalog } from '../capabilities/marketplaceV2';
+import { legacyResultRequest } from '../capabilities/legacyResults';
 import { pendingMigrations, readMigrationJournal } from '../capabilities/migration';
 import { migrateCapabilitiesForThisProfile } from '../capabilities/migrationRunner';
 import { pinCapabilitiesForTurn } from '../capabilities/registry';
@@ -128,6 +129,33 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
     return { available: true as const, sidecar, view: validateViewDocument(view) };
   });
 
+  /** One historical block, rendered by whichever package now owns that fence.
+   *
+   *  An answer the user already received keeps being an answer: the reply is not rewritten
+   *  and the old file beside it is not converted, they are simply read and handed to the
+   *  package that understands them. With nothing installed the renderer is told so, and
+   *  shows what the block was with a way to get the provider back — never a placeholder
+   *  that pretends the result is still being produced. */
+  h('capabilities:renderLegacyResult', async (_event, fence: string, payload: string, locale = 'en') => {
+    const request = legacyResultRequest(fence, payload);
+    if (!request) return { available: false as const, reason: 'no-provider' as const };
+    const { handle } = detachedWorker(request.provider.id);
+    const view = await handle.call('renderLegacyResult', {
+      fence: request.fence,
+      artifactType: request.artifactType,
+      artifactVersion: request.artifactVersion,
+      payload: request.payload,
+      ...(request.asset !== undefined ? { asset: request.asset } : {}),
+      locale,
+    }, { timeoutMs: 60_000 });
+    return {
+      available: true as const,
+      capabilityId: request.provider.id,
+      pluginId: request.provider.plugin?.id,
+      view: validateViewDocument(view),
+    };
+  });
+
   h('capabilities:migrationStatus', async () => ({
     journal: readMigrationJournal(),
     pending: pendingMigrations(),
@@ -174,7 +202,15 @@ function summarize(provider: CapabilityProvider) {
     source: provider.source, plugin: provider.plugin,
     tools: provider.tools.map(tool => ({ id: tool.id, description: tool.description, metered: tool.metered })),
     artifacts: provider.artifacts,
-    chat: provider.chat ? { priority: provider.chat.priority, pendingLabel: provider.chat.pendingLabel, fences: contractFences(provider.chat) } : undefined,
+    chat: provider.chat ? {
+      priority: provider.chat.priority,
+      pendingLabel: provider.chat.pendingLabel,
+      fences: contractFences(provider.chat),
+      // Split out, because the two mean opposite things to a reader: a request fence is
+      // something still being produced, a legacy fence is an answer that was produced long
+      // ago and only needs rendering.
+      legacyFences: provider.chat.legacyResults.map(entry => entry.fence),
+    } : undefined,
     hasSettings: provider.hasSettings,
   };
 }

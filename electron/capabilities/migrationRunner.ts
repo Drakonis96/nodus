@@ -2,9 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { app, safeStorage } from 'electron';
 import type { ChatSkill } from '@shared/chatSkills';
-import { listChatSkills, replaceChatSkills } from '../chatSkills';
+import { listChatSkills, profilePredatesSkillLibrary, replaceChatSkills } from '../chatSkills';
 import { migrationBaseline } from './migrationBaselines';
-import { readPluginStateV2, resolveTrustedCapability, listInstalledPluginsV2 } from './pluginStoreV2';
+import { pluginMigrationScripts, readPluginStateV2, recordPluginDataVersion, resolveTrustedCapability, listInstalledPluginsV2 } from './pluginStoreV2';
 import { rebuildCapabilityRegistry } from './registry';
 import { acquireCapabilityWorker } from './workerHost';
 import { createCapabilityHostServices } from './hostServices';
@@ -49,17 +49,29 @@ function legacyData(pluginId: string): unknown {
       const file = profileFile('genomics', 'credentials.bin');
       if (!safeStorage.isEncryptionAvailable() || !fs.existsSync(file)) return { genomics: null };
       const stored = JSON.parse(safeStorage.decryptString(fs.readFileSync(file))) as { apiKey?: string; terms?: string };
-      return { genomics: { apiKey: stored.apiKey, termsVersion: stored.terms }, currentTermsVersion: stored.terms };
+      // The accepted-terms string is handed over as it was recorded. Whether it still
+      // counts as consent is the package's judgement, not the application's: only the
+      // package knows which terms document its own version asks people to accept.
+      return { genomics: { apiKey: stored.apiKey, termsVersion: stored.terms } };
     } catch { return { genomics: null }; }
   }
   return {};
 }
 
-/** Runs one package's own data migration inside its worker. */
+/** Runs the package's own declared migrations inside its worker, and records how far
+ *  they actually got.
+ *
+ *  The version the profile is at is written here, from what the worker reports finished —
+ *  not from what it was asked to do. A package whose second migration fails ends the run
+ *  at version 1, keeps everything version 1 gave it, and is retried from there; nothing
+ *  rolls the data back, because each rung is written to be re-runnable. */
 async function migrateData(pluginId: string, legacy: unknown): Promise<void> {
   const state = readPluginStateV2(pluginId);
   if (!state?.active) throw new Error(`${pluginId} is not active.`);
-  rebuildCapabilityRegistry();
+  const scripts = pluginMigrationScripts(pluginId);
+  // A package with nothing to migrate is already at its own data version.
+  if (state.dataVersion >= scripts.length) { recordPluginDataVersion(pluginId, scripts.length); return; }
+
   const provider = [...rebuildCapabilityRegistry().providers.values()].find(entry => entry.plugin?.id === pluginId);
   if (!provider) throw new Error(`${pluginId} registered no capability.`);
   const runtime = resolveTrustedCapability(provider.id, { version: state.active.version, digest: state.active.digest });
@@ -70,12 +82,21 @@ async function migrateData(pluginId: string, legacy: unknown): Promise<void> {
     runCoreStages: async answer => answer,
   }));
   const handle = acquireCapabilityWorker(runtime, { services });
-  await handle.call('migrate', { fromDataVersion: state.dataVersion, toDataVersion: 1, legacy }, { timeoutMs: 120_000 });
+  const result = await handle.call('migrate', {
+    fromDataVersion: state.dataVersion,
+    toDataVersion: scripts.length,
+    legacy,
+    scripts,
+  }, { timeoutMs: 300_000 }) as { dataVersion?: number; notes?: string; failed?: string };
+
+  const reached = Number.isInteger(result?.dataVersion) ? Math.min(Number(result!.dataVersion), scripts.length) : state.dataVersion;
+  if (reached > state.dataVersion) recordPluginDataVersion(pluginId, reached);
+  if (result?.notes) console.info(`[capabilities] ${pluginId}: ${result.notes}`);
+  if (result?.failed) throw new Error(result.failed);
+  if (reached < scripts.length) throw new Error(`${pluginId} stopped at data version ${reached} of ${scripts.length}.`);
 }
 
 export async function migrateCapabilitiesForThisProfile(): Promise<MigrationOutcome> {
-  const library = profileFile('chat-skills.json');
-  const hadLibrary = fs.existsSync(library);
   return runCapabilityMigration({
     readSkills: () => listChatSkills(),
     writeSkills: (skills: ChatSkill[]) => { replaceChatSkills(skills); },
@@ -83,7 +104,7 @@ export async function migrateCapabilitiesForThisProfile(): Promise<MigrationOutc
     packaged: pinnedPluginSkill,
     legacyData,
     migrateData,
-    hadLibrary,
+    preLibraryProfile: profilePredatesSkillLibrary(),
     installer: { online: pluginId => installCatalogPlugin(pluginId, { approvePermissions: true }) },
   });
 }

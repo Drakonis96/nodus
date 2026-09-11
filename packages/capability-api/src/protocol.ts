@@ -7,11 +7,11 @@ import { SLUG, exactKeys } from './json';
 
 export type WorkerMethod =
   | 'health' | 'prepareChat' | 'invoke' | 'finalizeChat' | 'renderArtifact'
-  | 'projectArtifactForModel' | 'getSettings' | 'applySettings' | 'runAction' | 'migrate' | 'shutdown';
+  | 'projectArtifactForModel' | 'getSettings' | 'applySettings' | 'runAction' | 'migrate' | 'renderLegacyResult' | 'shutdown';
 
 export const WORKER_METHODS: readonly WorkerMethod[] = [
   'health', 'prepareChat', 'invoke', 'finalizeChat', 'renderArtifact',
-  'projectArtifactForModel', 'getSettings', 'applySettings', 'runAction', 'migrate', 'shutdown',
+  'projectArtifactForModel', 'getSettings', 'applySettings', 'runAction', 'migrate', 'renderLegacyResult', 'shutdown',
 ];
 
 export type HostChannel = 'network' | 'storage' | 'secrets' | 'model' | 'svg' | 'subworker' | 'python' | 'attachments';

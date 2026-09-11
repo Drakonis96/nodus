@@ -8,7 +8,7 @@
 import { createRequire } from 'node:module';
 import { validateHostToWorker, type HostChannel, type WorkerToHostMessage } from '../../packages/capability-api/src/protocol';
 import { TRUSTED_PROTOCOL } from '../../packages/capability-api/src/limits';
-import type { CapabilityHostV2, CapabilityWorkerFactory, CapabilityWorkerV2, KeyValueStore } from '../../packages/capability-api/src/worker';
+import type { CapabilityHostV2, CapabilityWorkerFactory, CapabilityWorkerV2, KeyValueStore, MigrationInputV1, MigrationResultV1, MigrationScriptV1 } from '../../packages/capability-api/src/worker';
 
 interface InitMessage { type: 'init'; capabilityId: string; entryPath: string }
 
@@ -126,6 +126,12 @@ port.on('message', event => {
   const { callId, method, payload } = message;
   void (async () => {
     if (!worker) throw new Error('The capability worker is not loaded.');
+    // Migrations are the package's, not the module's: they are the numbered scripts the
+    // manifest declared, and they run here, one rung at a time, with the same host the
+    // capability has at runtime. Keeping them out of the worker module is what stops a
+    // package from quietly implementing `migrate` as a no-op while its `migrations/`
+    // directory says otherwise.
+    if (method === 'migrate') return runMigrations(payload as MigrationInputV1);
     const implementation = worker[method] as ((input: unknown) => Promise<unknown>) | undefined;
     // A method the manifest advertised but the module never implemented is an error the
     // caller can act on, not a silent undefined that looks like an empty result.
@@ -140,3 +146,34 @@ port.on('message', event => {
     }),
   );
 });
+
+/** Climbs the data version ladder, stopping at the first rung that fails.
+ *
+ *  Each script moves the data from version n-1 to n and is expected to be idempotent: a
+ *  retry re-runs only the rung that did not finish. Nothing is reported as migrated that
+ *  did not complete, so the host persists a version the data actually has — a half-applied
+ *  step that claimed success is how a profile ends up believing it holds data it lost. */
+async function runMigrations(input: MigrationInputV1): Promise<MigrationResultV1> {
+  if (!input || !Array.isArray(input.scripts)) throw new Error('Malformed migration request.');
+  const notes: string[] = [];
+  let reached = input.fromDataVersion;
+
+  for (let rung = input.fromDataVersion; rung < input.scripts.length; rung++) {
+    const file = input.scripts[rung];
+    try {
+      const loaded = createRequire(file)(file) as { default?: MigrationScriptV1 } | MigrationScriptV1;
+      const script = typeof loaded === 'function' ? loaded : loaded.default;
+      if (typeof script !== 'function') throw new Error('A migration must export a function.');
+      const result = await script({ host, legacy: input.legacy, fromDataVersion: rung, toDataVersion: rung + 1 });
+      if (result?.notes) notes.push(String(result.notes).slice(0, 500));
+      reached = rung + 1;
+    } catch (error) {
+      return {
+        dataVersion: reached,
+        ...(notes.length ? { notes: notes.join(' ') } : {}),
+        failed: `${file.split('/').pop()}: ${error instanceof Error ? error.message : String(error)}`.slice(0, 500),
+      };
+    }
+  }
+  return { dataVersion: reached, ...(notes.length ? { notes: notes.join(' ') } : {}) };
+}

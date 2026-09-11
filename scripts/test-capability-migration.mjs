@@ -96,7 +96,7 @@ function migrationContext(skills, overrides = {}) {
       packaged: pluginId => PACKAGED[pluginId],
       legacyData: pluginId => ({ pluginId, sample: true }),
       migrateData: async (pluginId, legacy) => { migrated.push([pluginId, legacy]); },
-      hadLibrary: true,
+      preLibraryProfile: false,
       ...overrides,
     },
   };
@@ -121,34 +121,34 @@ function bootstrapFor(ids) {
 
 test('a package is installed only when something in the profile actually asked for it', () => {
   const untouched = [builtinChemistry({ assistant: false, nodi: false }), builtinLegal(), builtinGenomics()];
-  assert.deepEqual(lib.detectMigrationTargets(untouched, { hadLibrary: true }), [], 'a default nobody enabled is not a request');
+  assert.deepEqual(lib.detectMigrationTargets(untouched, { preLibraryProfile: false }), [], 'a default nobody enabled is not a request');
 
-  assert.deepEqual(lib.detectMigrationTargets([], { hadLibrary: true }), [], 'a default the user deleted stays deleted');
+  assert.deepEqual(lib.detectMigrationTargets([], { preLibraryProfile: false }), [], 'a default the user deleted stays deleted');
 
-  const enabled = lib.detectMigrationTargets([builtinChemistry({ assistant: true, nodi: false })], { hadLibrary: true });
+  const enabled = lib.detectMigrationTargets([builtinChemistry({ assistant: true, nodi: false })], { preLibraryProfile: false });
   assert.deepEqual(enabled.map(target => target.pluginId), ['chemistry-studio']);
   assert.equal(enabled[0].reason, 'builtin-enabled');
 
-  const nodiOnly = lib.detectMigrationTargets([builtinGenomics({ assistant: false, nodi: true })], { hadLibrary: true });
+  const nodiOnly = lib.detectMigrationTargets([builtinGenomics({ assistant: false, nodi: true })], { preLibraryProfile: false });
   assert.deepEqual(nodiOnly.map(target => target.pluginId), ['alphagenome'], 'enabled on either surface counts');
 
   const all = lib.detectMigrationTargets(
     [builtinChemistry({ assistant: true, nodi: true }), builtinLegal({ assistant: true, nodi: false }), builtinGenomics({ assistant: false, nodi: true })],
-    { hadLibrary: true },
+    { preLibraryProfile: false },
   );
   assert.deepEqual(all.map(target => target.pluginId).sort(), ['alphagenome', 'chemistry-studio', 'legalize']);
 });
 
 test('a skill the user wrote keeps working, even with every default switched off', () => {
   const custom = skill({ id: 'mine', name: 'My analysis', capabilities: ['nodus:legal'], enabled: { assistant: true, nodi: false } });
-  const targets = lib.detectMigrationTargets([builtinLegal({ assistant: false, nodi: false }), custom], { hadLibrary: true });
+  const targets = lib.detectMigrationTargets([builtinLegal({ assistant: false, nodi: false }), custom], { preLibraryProfile: false });
   assert.deepEqual(targets.map(target => target.pluginId), ['legalize']);
   assert.equal(targets[0].reason, 'custom-skill-depends');
   assert.deepEqual(targets[0].skills, [], 'nothing is adopted; the package is installed so the dependency resolves');
 
   // The short name is the same dependency written the older way.
   const legacyName = skill({ id: 'mine2', capabilities: ['chemistry'], enabled: { assistant: true, nodi: false } });
-  assert.deepEqual(lib.detectMigrationTargets([legacyName], { hadLibrary: true }).map(target => target.pluginId), ['chemistry-studio']);
+  assert.deepEqual(lib.detectMigrationTargets([legacyName], { preLibraryProfile: false }).map(target => target.pluginId), ['chemistry-studio']);
 });
 
 test('a downloaded copy of an official skill is the same package by another route', () => {
@@ -156,14 +156,14 @@ test('a downloaded copy of an official skill is the same package by another rout
     id: 'downloaded', name: 'Legalize', capabilities: ['nodus:legal'], enabled: { assistant: true, nodi: false },
     origin: { sourceId: 'nodusresearch/nodus-research-skill-marketplace', path: 'legalize', commit: 'x', packageId: 'legalize', version: '1.1.1', digest: 'e'.repeat(64) },
   });
-  const targets = lib.detectMigrationTargets([builtinLegal({ assistant: false, nodi: false }), downloaded], { hadLibrary: true });
+  const targets = lib.detectMigrationTargets([builtinLegal({ assistant: false, nodi: false }), downloaded], { preLibraryProfile: false });
   assert.deepEqual(targets.map(target => target.pluginId), ['legalize']);
   assert.equal(targets[0].reason, 'downloaded-copy-enabled');
   assert.deepEqual(targets[0].skills.map(entry => entry.id), ['downloaded']);
 });
 
 test('a profile from before the library existed had chemistry on, and that is honoured', () => {
-  const targets = lib.detectMigrationTargets([], { hadLibrary: false });
+  const targets = lib.detectMigrationTargets([], { preLibraryProfile: true });
   assert.deepEqual(targets.map(target => target.pluginId), ['chemistry-studio']);
   assert.equal(targets[0].reason, 'implicit-legacy-chemistry');
 });
@@ -321,7 +321,7 @@ test('the bundled packages are inert until something asks for one', async () => 
   resetJournal();
   const store = stubStore();
   // A clean install: no library, no enabled defaults, nothing that ever used chemistry.
-  const { context } = migrationContext([builtinChemistry({ assistant: false, nodi: false })], { hadLibrary: true });
+  const { context } = migrationContext([builtinChemistry({ assistant: false, nodi: false })], { preLibraryProfile: false });
   const outcome = await lib.runCapabilityMigration(context);
   assert.deepEqual(outcome.installed, [], 'a clean install registers, extracts and loads none of them');
   assert.deepEqual(store.attempts, []);

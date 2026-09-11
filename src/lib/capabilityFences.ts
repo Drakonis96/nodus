@@ -9,7 +9,7 @@ import { getActiveLang } from '../i18n';
  *  package that declares a new protocol gets a correctly labelled placeholder without the
  *  application knowing anything about it. */
 
-interface Claim { capabilityId: string; pluginId?: string; label: Record<string, string>; fences: string[] }
+interface Claim { capabilityId: string; pluginId?: string; label: Record<string, string>; fences: string[]; legacyFences: string[] }
 
 let claims = new Map<string, Claim>();
 const listeners = new Set<() => void>();
@@ -18,7 +18,10 @@ function adopt(providers: CapabilityProviderSummary[]): void {
   const next = new Map<string, Claim>();
   for (const provider of providers) {
     if (!provider.chat) continue;
-    next.set(provider.id, { capabilityId: provider.id, pluginId: provider.plugin?.id, label: provider.chat.pendingLabel, fences: provider.chat.fences });
+    next.set(provider.id, {
+      capabilityId: provider.id, pluginId: provider.plugin?.id, label: provider.chat.pendingLabel,
+      fences: provider.chat.fences, legacyFences: provider.chat.legacyFences ?? [],
+    });
   }
   claims = next;
   for (const listener of listeners) listener();
@@ -34,6 +37,8 @@ function start(): void {
 
 export interface FenceClaims {
   fences: ReadonlySet<string>;
+  /** The subset that carries results written before capability API v2. */
+  legacyFences: ReadonlySet<string>;
   label: (fence: string) => { title: string; pending: string } | undefined;
 }
 
@@ -50,6 +55,7 @@ export function useCapabilityFences(): FenceClaims {
   for (const claim of claims.values()) for (const fence of claim.fences) byFence.set(fence, claim);
   return {
     fences: new Set(byFence.keys()),
+    legacyFences: new Set([...claims.values()].flatMap(claim => claim.legacyFences)),
     label: fence => {
       const claim = byFence.get(fence);
       if (!claim) return undefined;

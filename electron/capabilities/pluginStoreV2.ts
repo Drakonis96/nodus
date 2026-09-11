@@ -335,6 +335,43 @@ export function removePluginV2(id: string, options: { purgeData?: boolean } = {}
   if (options.purgeData) fs.rmSync(path.join(pluginsDataRoot(), assertId(id)), { recursive: true, force: true });
 }
 
+/** The data version a package's own migrations actually reached.
+ *
+ *  Written by the host after the worker reports what completed, never by the package: a
+ *  number that says "this profile holds version 3 data" is only worth anything if the
+ *  process that failed halfway cannot also write it. */
+export function recordPluginDataVersion(id: string, dataVersion: number): InstalledPluginStateV2 {
+  const state = readPluginStateV2(id);
+  if (!state) throw new Error(`${id} is not installed.`);
+  if (!Number.isInteger(dataVersion) || dataVersion < 0 || dataVersion > 1000) throw new Error('Invalid data version.');
+  // A migration never walks data backwards: an older build that reports a lower number is
+  // describing what it can read, not what is on disk.
+  if (dataVersion <= state.dataVersion) return state;
+  return writeStateV2({ ...state, dataVersion });
+}
+
+/** Where the active version of a package was installed. */
+export function activePluginRoot(id: string): string | null {
+  const state = readPluginStateV2(id);
+  return state?.active ? versionDir(id, state.active.version, state.active.digest) : null;
+}
+
+/** The migration scripts a package declares, as absolute paths inside the installed
+ *  version. Resolved here, by the host, so a worker can only ever be handed files that
+ *  came out of the signed archive. */
+export function pluginMigrationScripts(id: string): string[] {
+  const root = activePluginRoot(id);
+  if (!root) return [];
+  const manifest = validatePluginManifestV2(JSON.parse(fs.readFileSync(path.join(root, 'plugin.json'), 'utf8')));
+  return manifest.migrations.map(relative => {
+    const file = path.join(root, ...relative.split('/'));
+    const stat = fs.lstatSync(file);
+    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`Missing migration: ${relative}`);
+    if (path.relative(root, file).startsWith('..')) throw new Error(`Migration outside the package: ${relative}`);
+    return file;
+  });
+}
+
 export function pluginTombstone(id: string): { id: string; source: InstalledPluginStateV2['source']; autoUpdate: boolean; dataVersion: number } | null {
   try { return JSON.parse(fs.readFileSync(path.join(tombstonesRoot(), `${assertId(id)}.json`), 'utf8')); } catch { return null; }
 }

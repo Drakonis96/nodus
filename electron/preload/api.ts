@@ -129,6 +129,7 @@ export const nodusApi: NodusApi = {
   applyCapabilitySettings: (capabilityId, submission) => ipcRenderer.invoke('capabilities:applySettings', capabilityId, submission),
   runCapabilityAction: (capabilityId, actionId) => ipcRenderer.invoke('capabilities:runAction', capabilityId, actionId),
   renderCapabilityArtifact: (source, locale) => ipcRenderer.invoke('artifacts:render', source, locale),
+  renderLegacyCapabilityResult: (fence, payload, locale) => ipcRenderer.invoke('capabilities:renderLegacyResult', fence, payload, locale),
   capabilityMigrationStatus: () => ipcRenderer.invoke('capabilities:migrationStatus'),
   retryCapabilityMigration: () => ipcRenderer.invoke('capabilities:retryMigration'),
   refreshCapabilityCatalog: (sourceUrl) => ipcRenderer.invoke('capabilities:refreshCatalog', sourceUrl),

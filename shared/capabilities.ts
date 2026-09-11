@@ -19,7 +19,14 @@ export interface CapabilityProviderSummary {
   plugin?: { id: string; version: string; digest: string };
   tools: Array<{ id: string; description: string; metered: boolean }>;
   artifacts: ArtifactTypeManifestV1[];
-  chat?: { priority: number; pendingLabel: CapabilityChatContractV2['pendingLabel']; fences: string[] };
+  chat?: {
+    priority: number;
+    pendingLabel: CapabilityChatContractV2['pendingLabel'];
+    fences: string[];
+    /** The subset of `fences` that carry results saved before capability API v2. They are
+     *  finished answers to be rendered, not work still in progress. */
+    legacyFences: string[];
+  };
   hasSettings: boolean;
 }
 
@@ -64,6 +71,10 @@ export type ArtifactRenderResult =
   | { available: true; sidecar: ArtifactSidecarSummary; view: ViewDocumentV1 }
   | { available: false; reason: 'missing' }
   | { available: false; reason: 'no-provider' | 'unreadable'; sidecar: ArtifactSidecarSummary };
+
+export type LegacyResultRenderResult =
+  | { available: true; capabilityId: string; pluginId?: string; view: ViewDocumentV1 }
+  | { available: false; reason: 'no-provider' };
 
 export interface CapabilitySettingsPayload { manifest: SettingsManifestV1; state: SettingsStateV1 }
 

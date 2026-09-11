@@ -5,6 +5,7 @@ import { ChatVisual } from './ChatVisual';
 import { ChatCapabilityResult } from './ChatCapabilityResult';
 import { ChatCapabilityArtifact } from './ChatCapabilityArtifact';
 import { ChatCapabilityView } from './CapabilityView';
+import { ChatLegacyResult } from './ChatLegacyResult';
 import { Icon } from './ui';
 import { localizeRuntimeError } from '@shared/uiLanguage';
 import { t, getActiveLang } from '../i18n';
@@ -12,8 +13,11 @@ import { useCapabilityFences } from '../lib/capabilityFences';
 
 export function ChatMarkdown({ content, streaming = false, ...props }: ComponentProps<typeof Markdown> & { streaming?: boolean }) {
   const claims = useCapabilityFences();
-  return <div className="chat-rich-answer">{splitChatVisuals(content, claims.fences).map((part, index) => {
-    if (part.kind === 'capability-pending') {
+  return <div className="chat-rich-answer">{splitChatVisuals(content, claims.fences, claims.legacyFences).map((part, index) => {
+    // A block an earlier release already finished. It is rendered by whoever owns that
+    // fence now, never shown as work in progress.
+    if (part.kind === 'capability-legacy' && part.complete) return <ChatLegacyResult key={index} fence={part.fence!} source={part.content} />;
+    if (part.kind === 'capability-pending' || part.kind === 'capability-legacy') {
       // A package that is still producing its answer names itself, in its own words.
       const label = part.fence ? claims.label(part.fence) : undefined;
       return <div key={index} role="status" className="chat-visual-pending"><Icon name="sparkles" size={22} /><div><b>{label?.title ?? 'Capability'}</b><span>{streaming ? (label?.pending ?? t('Cargando…')) : t('La generación se interrumpió. Vuelve a intentarlo.')}</span></div>{streaming && <span className="chat-visual-pulse" />}</div>;

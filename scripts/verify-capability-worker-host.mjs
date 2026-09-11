@@ -34,6 +34,7 @@ try {
         if (toolId === 'cache') { await host.storage.cache.set('blob', 'x'.repeat(input.size)); return { view: { schemaVersion: 1, summary: 'cached', nodes: [{ kind: 'code', text: 'ok' }] } }; }
         if (toolId === 'reach') { await host.network.fetch(input.endpointId, { path: input.path, method: input.method }); return { view: { schemaVersion: 1, summary: 'reached', nodes: [{ kind: 'code', text: 'ok' }] } }; }
         if (toolId === 'peek') return { view: { schemaVersion: 1, summary: 'peek', nodes: [{ kind: 'code', text: JSON.stringify({ has: await host.secrets.has('api-key'), keys: Object.keys(host.secrets) }) }] } };
+        if (toolId === 'read') return { view: { schemaVersion: 1, summary: 'read', nodes: [{ kind: 'code', text: JSON.stringify(await host.storage.state.get(input.key) ?? null) }] } };
         if (toolId === 'hang') return new Promise(() => {});
         if (toolId === 'crash') { process.exit(7); }
         if (toolId === 'garbage') { process.parentPort.postMessage({ type: 'not-a-real-frame' }); return { view: { schemaVersion: 1, summary: 'survived', nodes: [{ kind: 'code', text: 'ok' }] } }; }
@@ -42,6 +43,32 @@ try {
       async renderArtifact() { return { schemaVersion: 1, summary: 'rendered', nodes: [{ kind: 'code', text: 'artifact' }] }; },
       async shutdown() {},
     });
+  `);
+
+  // Four migration scripts, exactly as a package ships them: plain CommonJS files that
+  // get the host and whatever the built-in left behind.
+  const migrationOne = path.join(temporary, '001-one.js');
+  fs.writeFileSync(migrationOne, `
+    module.exports = async ({ host, legacy }) => {
+      await host.storage.state.set('one', legacy.carried ?? 'nothing');
+      return { notes: 'adopted from 5.3.1' };
+    };
+  `);
+  const migrationTwo = path.join(temporary, '002-two.js');
+  fs.writeFileSync(migrationTwo, `
+    module.exports = async ({ host, toDataVersion }) => {
+      await host.storage.state.set('two', toDataVersion);
+    };
+  `);
+  const migrationBroken = path.join(temporary, '002-broken.js');
+  fs.writeFileSync(migrationBroken, `
+    module.exports = async () => { throw new Error('deliberately unfinished'); };
+  `);
+  const migrationCounting = path.join(temporary, '001-counting.js');
+  fs.writeFileSync(migrationCounting, `
+    module.exports = async ({ host }) => {
+      await host.storage.state.set('runs', ((await host.storage.state.get('runs')) ?? 0) + 1);
+    };
   `);
 
   const outfile = path.join(temporary, 'main.cjs');
@@ -82,7 +109,7 @@ try {
 
       // A method the module never implemented is an error the caller can act on.
       stage = 'unimplemented method';
-      assert.match(await failure(basic.call('migrate', { fromDataVersion: 0, toDataVersion: 1 }, { timeoutMs: 5_000 })), /does not implement migrate/);
+      assert.match(await failure(basic.call('getSettings', {}, { timeoutMs: 5_000 })), /does not implement getSettings/);
 
       // A frame the host cannot parse is dropped; the call in flight still completes.
       stage = 'malformed frame';
@@ -158,6 +185,41 @@ try {
       assert.equal(text(await crashing.call('invoke', { invocationId: 'i15', toolId: 'echo', input: { recovered: true }, locale: 'en' }, { timeoutMs: 10_000 })), '{"recovered":true}');
       await crashing.stop();
 
+      // Migrations are the package's declared scripts, run one rung at a time. This is the
+      // claim the whole 5.3.1 -> 5.3.2 move rests on, so it is exercised against the real
+      // bootstrap rather than a stub: a package cannot satisfy it by implementing a
+      // migrate method that returns the number it was asked for.
+      stage = 'migration ladder';
+      const migrating = handleFor({ storage: { stateBytes: 4096, cacheBytes: 64, tempBytes: 0 } });
+      const ladder = await migrating.call('migrate', {
+        fromDataVersion: 0, toDataVersion: 2, legacy: { carried: 'from 5.3.1' },
+        scripts: [${JSON.stringify(migrationOne)}, ${JSON.stringify(migrationTwo)}],
+      }, { timeoutMs: 20_000 });
+      assert.equal(ladder.dataVersion, 2, 'both declared migrations ran');
+      assert.match(ladder.notes, /adopted from 5.3.1/, 'a migration receives what the built-in left behind');
+      assert.equal(ladder.failed, undefined);
+      assert.equal(text(await migrating.call('invoke', { invocationId: 'm1', toolId: 'read', input: { key: 'one' }, locale: 'en' }, { timeoutMs: 10_000 })), '"from 5.3.1"', 'the first rung wrote through the real host');
+      assert.equal(text(await migrating.call('invoke', { invocationId: 'm2', toolId: 'read', input: { key: 'two' }, locale: 'en' }, { timeoutMs: 10_000 })), '2', 'and so did the second');
+
+      // Nothing above the rung that failed is claimed, and what already succeeded stands.
+      stage = 'migration stops at the rung that failed';
+      const partial = await migrating.call('migrate', {
+        fromDataVersion: 0, toDataVersion: 2, legacy: {},
+        scripts: [${JSON.stringify(migrationOne)}, ${JSON.stringify(migrationBroken)}],
+      }, { timeoutMs: 20_000 });
+      assert.equal(partial.dataVersion, 1, 'the version reported is the one the data actually reached');
+      assert.match(partial.failed, /deliberately unfinished/, 'and the reason travels back to the host');
+
+      // A retry starts at the rung that did not finish; the ones below are not re-run.
+      stage = 'migration resumes';
+      const resumed = await migrating.call('migrate', {
+        fromDataVersion: 1, toDataVersion: 2, legacy: {},
+        scripts: [${JSON.stringify(migrationCounting)}, ${JSON.stringify(migrationTwo)}],
+      }, { timeoutMs: 20_000 });
+      assert.equal(resumed.dataVersion, 2);
+      assert.equal(text(await migrating.call('invoke', { invocationId: 'm3', toolId: 'read', input: { key: 'runs' }, locale: 'en' }, { timeoutMs: 10_000 })), 'null', 'a rung already below the current version is never re-run');
+      await migrating.stop();
+
       fs.writeFileSync(${JSON.stringify(verdict)}, 'pass');
       app.exit(0);
     } catch (error) {
@@ -171,7 +233,7 @@ try {
   const electron = createRequire(import.meta.url)('electron');
   await promisify(execFile)(electron, [outfile], { env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' } });
   if (fs.readFileSync(verdict, 'utf8') !== 'pass') throw new Error('The capability worker host verification did not report a pass.');
-  console.log('CAPABILITY WORKER HOST PASS: handshake, host-call gating, storage quota, network allowlist, secret isolation, deadline, cancellation, crash recovery.');
+  console.log('CAPABILITY WORKER HOST PASS: handshake, host-call gating, storage quota, network allowlist, secret isolation, deadline, cancellation, crash recovery, migration ladder.');
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });
 }

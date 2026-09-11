@@ -170,6 +170,13 @@ export function validatePluginManifestV2(input: unknown): PluginManifestV2 {
   assertPaths(value.skills, /^skills\/([a-z0-9]+(?:-[a-z0-9]+)*)\/skill\.json$/, 40, 'skill');
   assertPaths(value.capabilities, /^capabilities\/([a-z0-9]+(?:-[a-z0-9]+)*)\/capability\.json$/, 20, 'capability');
   assertPaths(value.migrations, /^migrations\/(\d{3})-[a-z0-9]+(?:-[a-z0-9]+)*\.js$/, 40, 'migration', false);
+  // The list is the data version ladder: the nth script is what takes a profile from
+  // data version n-1 to n. Numbering that skips, repeats or runs out of order would make
+  // "this profile is at version 3" mean different things in two installs, so it is
+  // rejected here rather than discovered halfway through a migration.
+  value.migrations.forEach((entry, index) => {
+    if (Number(/^migrations\/(\d{3})-/.exec(entry)![1]) !== index + 1) throw new Error('Plugin migrations must be numbered 001, 002, … in order.');
+  });
 
   return structuredClone(value);
 }

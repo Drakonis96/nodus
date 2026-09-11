@@ -106,7 +106,7 @@ export interface MigrationTarget {
  *  untouched, a default the user deleted, and a default the user turned off all mean the
  *  same thing here — nobody asked for this — and installing anyway would be the
  *  migration overruling a decision the user already made. */
-export function detectMigrationTargets(skills: readonly ChatSkill[], options: { hadLibrary: boolean }): MigrationTarget[] {
+export function detectMigrationTargets(skills: readonly ChatSkill[], options: { preLibraryProfile: boolean }): MigrationTarget[] {
   const targets: MigrationTarget[] = [];
 
   for (const entry of MIGRATION_MAP) {
@@ -134,8 +134,10 @@ export function detectMigrationTargets(skills: readonly ChatSkill[], options: { 
     if (dependants.length) reason ??= 'custom-skill-depends';
 
     // A profile from before the library existed had chemistry on by the behaviour of the
-    // time. That is a real prior state, not an absence, so it is honoured.
-    if (!options.hadLibrary && entry.builtin === 'chemistry') reason ??= 'implicit-legacy-chemistry';
+    // time. That is a real prior state, not an absence, so it is honoured — and it is a
+    // fact recorded before any default was written, never the mere absence of a file a
+    // clean install also lacks.
+    if (options.preLibraryProfile && entry.builtin === 'chemistry') reason ??= 'implicit-legacy-chemistry';
 
     if (reason) targets.push({ pluginId: entry.pluginId, capabilityId: entry.capabilityId, reason, skills: adopted });
   }
@@ -291,7 +293,8 @@ export interface MigrationContext {
   /** Runs the package's own data migration inside its worker. */
   migrateData: (pluginId: string, legacy: unknown) => Promise<void>;
   installer?: MigrationInstaller;
-  hadLibrary: boolean;
+  /** Whether this profile was in use before skills had a library. */
+  preLibraryProfile: boolean;
 }
 
 export interface MigrationOutcome {
@@ -309,7 +312,7 @@ export interface MigrationOutcome {
  *  cannot finish must not become a silent deactivation. */
 export async function runCapabilityMigration(context: MigrationContext): Promise<MigrationOutcome> {
   const outcome: MigrationOutcome = { installed: [], adopted: [], preserved: [], failed: [] };
-  const targets = detectMigrationTargets(context.readSkills(), { hadLibrary: context.hadLibrary });
+  const targets = detectMigrationTargets(context.readSkills(), { preLibraryProfile: context.preLibraryProfile });
   if (!targets.length) return outcome;
 
   for (const target of targets) {
