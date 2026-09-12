@@ -17,3 +17,7 @@ The academic source filter remains opt-in. Native source panels keep their exist
 - `npm run build` includes renderer and Electron type checks.
 
 These checks use local fixtures and simulated generation; they make no paid inference calls.
+
+## File attachments
+
+Research chat alone exposes an integrated + button for conversation-owned files. All four native engines consume the same extracted document/table content and provider-specific vision parts. See [Research chat attachments](research-chat-attachments.md) for formats, persistence, bounds and the verification matrix.

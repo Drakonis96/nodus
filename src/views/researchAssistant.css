@@ -310,3 +310,61 @@
 .research-prompt-delete-modal h2 { font-size: 18px; font-weight: 600; }
 .research-prompt-delete-name { font-weight: 600; color: var(--prompt-ink); overflow-wrap: anywhere; }
 .research-prompt-delete-modal #research-prompt-delete-description { color: var(--prompt-muted); font-size: 13px; line-height: 1.6; }
+
+/* Opaque file cards remain legible both in the composer and on a vault-colored
+   message bubble. Theme colors never depend on the surrounding bubble's ink. */
+.research-chat-surface {
+  --research-file-bg: #ffffff;
+  --research-file-border: #7b8799;
+  --research-file-text: #20242c;
+  --research-file-muted: #525d6c;
+  --research-file-badge-bg: color-mix(in srgb, var(--vault-accent) 12%, #ffffff);
+  --research-file-badge-ink: color-mix(in srgb, var(--vault-accent) 55%, #171717);
+}
+.dark .research-chat-surface {
+  --research-file-bg: #24262d;
+  --research-file-border: #7d8798;
+  --research-file-text: #f4f6fa;
+  --research-file-muted: #c0c7d3;
+  --research-file-badge-bg: color-mix(in srgb, var(--vault-accent) 18%, #24262d);
+  --research-file-badge-ink: color-mix(in srgb, var(--vault-accent) 45%, #ffffff);
+}
+
+/* Attachments and controls share one textbox frame, on Research chat only. */
+.research-composer-shell {
+  border: 1px solid #ffffff18;
+  border-radius: 34px;
+  background: #202126;
+  box-shadow: 0 3px 20px #00000018;
+}
+.research-composer-shell:focus-within { border-color: color-mix(in srgb, var(--vault-accent) 55%, transparent); }
+.research-composer-shell .research-composer { border: 0; box-shadow: none; background: transparent; padding-left: 10px; }
+.research-composer-attach { flex: 0 0 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #a1a1aa; background: transparent; }
+.research-composer-attach:hover:not(:disabled) { background: #8882; color: var(--vault-accent); }
+.research-composer-attach:disabled { opacity: .4; cursor: wait; }
+.research-attachments { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; max-width: 100%; }
+.research-composer-shell > .research-attachments { padding: 14px 16px 0; margin-bottom: 0; max-height: 180px; overflow-y: auto; }
+.research-attachment { min-width: 0; max-width: 280px; display: flex; align-items: center; gap: 9px; border: 1px solid var(--research-file-border); border-radius: 13px; padding: 8px 10px; background: var(--research-file-bg); color: var(--research-file-text); white-space: normal; box-shadow: 0 1px 2px #00000018; }
+.research-attachment-type { flex-shrink: 0; width: 36px; height: 38px; display: grid; place-items: center; font-size: 9px; font-weight: 700; letter-spacing: .3px; border-radius: 7px; background: var(--research-file-badge-bg); color: var(--research-file-badge-ink); }
+.research-attachment-name { color: var(--research-file-text); display: flex; flex-direction: column; min-width: 0; text-align: left; }
+.research-attachment-name strong { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; }
+.research-attachment-name span { font-size: 10px; color: var(--research-file-muted); margin-top: 2px; }
+.research-attachment-remove { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; color: var(--research-file-muted); font-size: 18px; }
+.research-attachment-remove:hover { background: var(--research-file-badge-bg); color: var(--research-file-badge-ink); }
+.research-attachment :is(button):focus-visible { outline: 2px solid var(--research-file-badge-ink); outline-offset: 2px; }
+.research-attachment-warning { border-color: #d9770680; }
+.research-attachment-error { white-space: pre-wrap; color: #d97706; font-size: 12px; margin: 0 4px 8px; }
+.research-attachment-status { color: #8b8b95; font-size: 12px; margin: 0 4px 8px; }
+.light .research-composer-shell { background: #fff; border-color: #e7e7e9; }
+.light .research-composer-shell .research-composer { background: transparent; }
+@media (max-width: 640px) {
+  .research-composer-shell .research-composer-input { flex-basis: calc(100% - 55px); }
+  .research-attachment { max-width: 100%; }
+}
+.research-chat-surface .research-composer-input:focus-visible { outline: none; box-shadow: none; }
+.research-accent-solid .research-attachment-name:hover strong { text-decoration: underline; }
+
+/* Scoped to the Research chat window; file drags do not cover other app views. */
+.research-file-drop-overlay { position: absolute; inset: 8px; z-index: 40; display: grid; place-items: center; pointer-events: none; border: 2px dashed var(--vault-accent); border-radius: 16px; background: color-mix(in srgb, var(--research-file-bg) 92%, transparent); }
+.research-file-drop-label { display: flex; align-items: center; gap: 12px; max-width: calc(100% - 32px); padding: 20px 24px; border: 1px solid var(--vault-accent); border-radius: 16px; background: var(--research-file-bg); color: var(--research-file-text); text-align: center; box-shadow: 0 4px 24px #0002; }
+.research-file-drop-label svg { flex-shrink: 0; color: var(--research-file-badge-ink); }

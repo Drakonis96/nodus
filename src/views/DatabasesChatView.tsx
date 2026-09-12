@@ -39,7 +39,7 @@ export function DatabasesChatView({ settings, initialDatabaseId }: { settings: A
     createConversation: input => window.nodus.createDatabaseChatConversation({ title: input.title ?? 'Research chat', databaseIds: selected }),
     saveConversationMessages: (id, messages) => window.nodus.saveDatabaseChatConversation(id, messages, selected),
     deleteConversation: id => window.nodus.deleteDatabaseChatConversation(id),
-    researchChatStream: async (request, handlers) => { const result = await window.nodus.dbChatStream({ conversationId: request.conversationId, question: request.messages.at(-1)!.content, databaseIds: selected, history: request.messages.slice(0, -1), model: request.model, thinkingEffort: request.thinkingEffort, systemPromptId: request.systemPromptId }, handlers); return { answer: result.text, aborted: result.aborted }; },
+    researchChatStream: async (request, handlers) => { const result = await window.nodus.dbChatStream({ conversationId: request.conversationId, attachmentIds: request.attachmentIds, question: request.messages.at(-1)!.content, databaseIds: selected, history: request.messages.slice(0, -1), model: request.model, thinkingEffort: request.thinkingEffort, systemPromptId: request.systemPromptId }, handlers); return { answer: result.text, aborted: result.aborted }; },
     cancelResearchChat: () => window.nodus.cancelDbChat(),
     renderMessage: (message, streaming) => <AssistantMessage text={message.content} streaming={streaming} />,
   }), [databases, selected]);

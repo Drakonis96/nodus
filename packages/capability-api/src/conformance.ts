@@ -37,7 +37,7 @@ export async function runConformanceSuite(
   await record('manifest validates', () => { validateCapabilityManifestV2(manifest); });
 
   await record('health reports a status and a data version', async () => {
-    const health = await worker.health({ nodusVersion: options.nodusVersion ?? '5.3.2', locale, platform: process.platform, arch: process.arch, dataVersion: 0 });
+    const health = await worker.health({ nodusVersion: options.nodusVersion ?? '5.4.0', locale, platform: process.platform, arch: process.arch, dataVersion: 0 });
     if (!['ready', 'degraded', 'needs-setup', 'needs-migration'].includes(health?.status)) throw new Error(`Unexpected health status: ${String(health?.status)}.`);
     if (!Number.isInteger(health.dataVersion) || health.dataVersion < 0) throw new Error('health must report an integer dataVersion.');
   });

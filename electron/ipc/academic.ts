@@ -1,3 +1,4 @@
+import { registerResearchAttachmentIpc } from './researchAttachments';
 import { getResearchSystemPrompts, saveResearchSystemPrompt, selectResearchSystemPrompt, deleteResearchSystemPrompt } from '../db/researchSystemPromptsRepo';
 import { mergeHybridResults, searchSnippet } from '@shared/hybridSearch';
 import { searchVaultContent } from '../ai/vaultContentSearch';
@@ -410,7 +411,9 @@ function announceLibraryReaderAnnotations(nodusId: string | null): void {
   }
 }
 
-export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext): void {
+export function registerAcademicIpc(context: IpcContext): void {
+  const { h, getWindow, chatAborters } = context;
+  registerResearchAttachmentIpc(context);
   const studyImproveAborters = new Map<string, AbortController>();
   const studyAssistantAborters = new Map<string, AbortController>();
   const libraryReaderChatAborters = new Map<string, AbortController>();

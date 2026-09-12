@@ -1690,7 +1690,7 @@ async function rawCompleteStreamTransport(
         ...researchBody(model, opts),
           system: opts.system,
           stream: true,
-          messages: [{ role: 'user', content: opts.user }],
+          messages: [{ role: 'user', content: opts.images?.length ? anthropicVisionContent(opts.user, opts.images) : opts.user }],
         }, { signal });
         for await (const event of stream as AsyncIterable<any>) {
           if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') emitContent(event.delta.text);

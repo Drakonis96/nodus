@@ -9306,6 +9306,7 @@ export const migrations: Migration[] = [
         );
     `,
   },
+  { version: 176, up: `ALTER TABLE chat_messages ADD COLUMN attachments_json TEXT;` },
   { version: 175, up: `CREATE TABLE IF NOT EXISTS stellar_sessions (context TEXT PRIMARY KEY, state TEXT NOT NULL, updated_at TEXT NOT NULL);` },
 ];
 

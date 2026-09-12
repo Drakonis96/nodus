@@ -5,7 +5,7 @@ HTML, no script, no CSS and no callback anywhere in the contract, so what a pack
 supplies is always a value the core draws or a file the core opens — never a fragment of
 interface that behaves differently from the rest of the application.
 
-This page covers the kinds added in 5.3.2 alongside [`nodus:3d`](capability-3d.md). The
+This page covers the kinds added in 5.4.0 alongside [`nodus:3d`](capability-3d.md). The
 earlier ones — `paragraph`, `badges`, `table`, `notice`, `details`, `links`, `download`,
 `status`, `code`, `svg` — are described in
 [ADR-006](architecture/adr-006-capability-api-v2.md).

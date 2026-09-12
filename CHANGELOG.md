@@ -1,8 +1,10 @@
 # Changelog
 
-## 5.3.2 — 2026-09-11
+## 5.4.0 — 2026-09-12
 
-Nodus 5.3.2 takes chemistry, law and genomics out of the application. They are
+Nodus 5.4.0 includes everything prepared for the unpublished 5.3.2, plus unified
+Research chat and search, file attachments, visual report Skills and the fixes below.
+It takes chemistry, law and genomics out of the application. They are
 official capability packages now, signed by NodusResearch and installed like any
 other, and the application that ships to someone who never draws a molecule no
 longer carries the machinery to draw one.
@@ -18,7 +20,22 @@ longer carries the machinery to draw one.
 - Package settings are declarative. The AlphaGenome key, its terms and its Python runtime are configured on the package's own card, the key is kept in the system credential store and reaches the interpreter through stdin, and the runtime is built from a lock that pins every wheel by URL, size and digest and installs with `--no-index --require-hashes`.
 - RDKit, OpenChemLib and the TeX engine are no longer dependencies of Nodus, and the AlphaGenome Python worker is no longer a packaged resource. A test builds the real main-process and renderer bundles and fails if any of it comes back.
 - A skill that declares a capability nothing provides yet can be installed and keeps the activation you chose. It simply does not run until its provider is installed, so the order of two installs no longer matters.
-- Added the complete 5.3.2 What's New modal in all eight interface languages.
+- Updated the complete 5.4.0 What's New modal in all eight interface languages, preserving all nine notes prepared for 5.3.2.
+
+- Research chat is shared across all nine vault types with collapsible history/context panels while preserving native conversations, citations, source selection and tools.
+- Added provider-aware reasoning effort, searchable author/work corpus filters with persisted history boundaries, and vault-local custom system prompts that can change without resetting the conversation.
+- Research chat accepts file attachments through the integrated + button or drag and drop. DOC/DOCX, PDF, spreadsheets, CSV/TSV, XML, images and other supported formats use the selected model, with vision where required. Originals and extracted resources belong to the conversation and are deleted with it. File cards have readable light/dark outlines and vault accents. Unsupported formats and processing limits are explicit.
+- Reading position and citation previews are fixed in Research chat. Stopping a streamed answer keeps the received partial text in history.
+- Deep Research and Immersion gain per-document visual Skills, explicit paid-call ceilings, figures for new/existing reports, interactive views, downloads, removal/undo and PDF export. Database Deep Research is outside this visual-report change.
+- Native cartography builds downloadable maps from real geographic sources and attributed boundaries, layers, routes, markers and legends. Compatible Skills can also request bounded thumbnail relevance review using the selected vision model, with explicit unavailable/no-match results.
+- Plugins gain verified read-only packaged assets, interactive glTF/GLB model views and rich native results including formulas, charts, trees, comparisons, annotated passages, maps, images, audio and zoomable documents. Saved results retain their referenced resources.
+- Unified lexical/semantic search across all desktop vaults, with native content-type filters and saved searches.
+- Skills Marketplace has a dedicated header entry. Skills and packages share one ordered card with clearer actions, installation errors are translated, and migration installs all Skills in each bundled package while preserving user preferences and author workflows.
+- PDF Presenter uses tags with filtering and confirmed deletion that preserves presentations, downloads library PDFs and imports recovered-notes TXT files as well as native exports.
+- Valid SVG comments no longer discard drawings. Chemistry Studio keeps drawable portions when full verification is unavailable and makes the limitations visible. The update carries Chemistry Studio 2.2.0.
+- Browser bookmarks use compact cards and recover site favicons, including after editing.
+- Word alternatives preserve selection whitespace and make a bounded second attempt when the first response lacks enough distinct suggestions.
+- Graph actions and the Tutor sidebar have clearer icons and contrast. Chat context respects light mode, the send button is centered and the light-mode logo background is fixed. Teaching hides deferred sections from navigation.
 
 ## 5.3.1 — 2026-09-10
 

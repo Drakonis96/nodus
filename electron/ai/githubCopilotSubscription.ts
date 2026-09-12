@@ -350,7 +350,7 @@ export async function completeWithGitHubCopilotSubscription(options: CompletionO
   const models = await copilotModels();
   const selected = models.find((model) => model.id === options.model);
   if (!selected) throw new Error(`El modelo «${options.model}» no está disponible en tu suscripción de GitHub Copilot.`);
-  if (options.images?.length && !selected.capabilities?.supports?.vision) {
+  if (options.images?.length && selected.capabilities?.supports?.vision === false) {
     throw new Error(`El modelo «${options.model}» de GitHub Copilot no admite imágenes.`);
   }
 

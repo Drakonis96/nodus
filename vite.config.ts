@@ -33,6 +33,8 @@ const mainExternals = [
   'electron',
   'pdfjs-dist',
   'mammoth',
+  'word-extractor',
+  'xlsx',
   'adm-zip',
   'tesseract.js',
   '@napi-rs/canvas',

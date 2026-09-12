@@ -1,6 +1,6 @@
 // Every chat surface routes every core capability through the registry, exactly once.
 //
-// The three disciplinary protocols became packages in 5.3.2 and are exercised by their
+// The three disciplinary protocols became packages in 5.4.0 and are exercised by their
 // own suites and by verify-capability-package-install.mjs; what stays here is the lanes
 // the application still owns.
 //

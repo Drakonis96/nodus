@@ -154,7 +154,7 @@ try {
       // A plugin ships a module; the bootstrap turns it into a process that speaks the protocol.
       stage = 'handshake and round trip';
       const basic = handleFor();
-      assert.deepEqual(await basic.call('health', { nodusVersion: '5.3.2', locale: 'en', platform: process.platform, arch: process.arch, dataVersion: 0 }, { timeoutMs: 10_000 }), { status: 'ready', dataVersion: 1 });
+      assert.deepEqual(await basic.call('health', { nodusVersion: '5.4.0', locale: 'en', platform: process.platform, arch: process.arch, dataVersion: 0 }, { timeoutMs: 10_000 }), { status: 'ready', dataVersion: 1 });
       assert.equal(text(await basic.call('invoke', { invocationId: 'i1', toolId: 'echo', input: { a: 1 }, locale: 'en' }, { timeoutMs: 10_000 })), '{"a":1}');
       assert.equal(basic.alive, true);
 
@@ -285,7 +285,7 @@ try {
       await crashing.stop();
 
       // Migrations are the package's declared scripts, run one rung at a time. This is the
-      // claim the whole 5.3.1 -> 5.3.2 move rests on, so it is exercised against the real
+      // claim the whole 5.3.1 -> 5.4.0 move rests on, so it is exercised against the real
       // bootstrap rather than a stub: a package cannot satisfy it by implementing a
       // migrate method that returns the number it was asked for.
       stage = 'migration ladder';

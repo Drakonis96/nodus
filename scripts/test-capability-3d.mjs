@@ -91,7 +91,7 @@ test('3D is a core capability, named for what it does and not for a discipline',
   assert.equal(sdk.isCapabilityReference('nodus:3d'), true);
 
   // A package may depend on it and may never provide it, exactly like SVG.
-  const manifest = { schemaVersion: 2, id: 'anything', name: 'Anything', version: '2.0.0', author: 'NodusResearch', description: 'x', license: 'AGPL-3.0-only', publisher: { id: 'NodusResearch', keyId: 'nr02' }, compatibility: { capabilityApi: 2, minNodusVersion: '5.3.2', targets: ['any'] }, replacesSkills: [], skills: ['skills/a/skill.json'], capabilities: ['capabilities/a/capability.json'], migrations: [] };
+  const manifest = { schemaVersion: 2, id: 'anything', name: 'Anything', version: '2.0.0', author: 'NodusResearch', description: 'x', license: 'AGPL-3.0-only', publisher: { id: 'NodusResearch', keyId: 'nr02' }, compatibility: { capabilityApi: 2, minNodusVersion: '5.4.0', targets: ['any'] }, replacesSkills: [], skills: ['skills/a/skill.json'], capabilities: ['capabilities/a/capability.json'], migrations: [] };
   assert.throws(() => sdk.assertMayProvide(manifest, 'nodus:3d'), /cannot provide a core capability/);
 });
 

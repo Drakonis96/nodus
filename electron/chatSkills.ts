@@ -78,7 +78,7 @@ export function listChatSkills(): ChatSkill[] {
     // Each release adds only newly introduced defaults. Never restore a skill
     // deleted in an earlier version or overwrite its edited instructions/flags.
     const latestSvg = DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'svg');
-    // The three disciplines left the application in 5.3.2. Their skills stay in an old
+    // The three disciplines left the application in 5.4.0. Their skills stay in an old
     // profile exactly as they were — the capability migration is what adopts them — so
     // nothing here refreshes their text or restores them as defaults.
     const existing = parsed.skills.map(skill => {

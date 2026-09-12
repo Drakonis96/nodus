@@ -1,3 +1,4 @@
+import { openAiVisionContent, anthropicVisionContent } from '@shared/imageAnalysis';
 import { researchReasoningBody, researchOmitsTemperature, type ResearchEffort } from '@shared/researchReasoning';
 import type { ReasoningEffort } from '@shared/types';
 import type { VisionImagePart } from '@shared/imageAnalysis';
@@ -270,7 +271,7 @@ async function completeResponses(options: OpenCodeGoCompletionOptions, url: stri
     {
       model: options.model,
       instructions: responsesInstructions(options),
-      input: options.user,
+      input: options.images?.length ? [{ role: 'user', content: [{ type: 'input_text', text: options.user }, ...options.images.map(image => ({ type: 'input_image', image_url: `data:${image.mediaType};base64,${image.base64}` }))] }] : options.user,
       max_output_tokens: options.maxTokens ?? 8_000,
       ...researchGoBody(options, true),
       stream: streaming,
@@ -334,7 +335,7 @@ async function completeOpenAi(options: OpenCodeGoCompletionOptions, url: string,
       ...(streaming ? { stream_options: { include_usage: true } } : {}),
       messages: [
         { role: 'system', content: options.system },
-        { role: 'user', content: options.user },
+        { role: 'user', content: options.images?.length ? openAiVisionContent(options.user, options.images) : options.user },
       ],
     },
     {
@@ -405,7 +406,7 @@ async function completeAnthropic(options: OpenCodeGoCompletionOptions, url: stri
       // Anthropic-compatible disabled form for Qwen; do not send it to unrelated
       // Messages models whose gateways may reject the extension.
       ...(options.researchEffort === undefined && isQwen && options.reasoning === 'off' ? { thinking: { type: 'disabled' } } : {}),
-      messages: [{ role: 'user', content: options.user }],
+      messages: [{ role: 'user', content: options.images?.length ? anthropicVisionContent(options.user, options.images) : options.user }],
     }),
   });
   if (!response.ok) return readError(response);
@@ -450,9 +451,6 @@ async function completeAnthropic(options: OpenCodeGoCompletionOptions, url: stri
 /** Direct use of OpenCode's documented Go endpoints. No OpenCode CLI, browser
  * session or private Console cookie is involved. */
 export async function completeWithOpenCodeGo(options: OpenCodeGoCompletionOptions): Promise<OpenCodeGoCompletionResult> {
-  if (options.images?.length) {
-    throw new Error('El catálogo público de OpenCode Go no anuncia entrada de imágenes para estos modelos.');
-  }
   const linked = linkedSignal(options.signal, options.timeoutMs ?? 180_000);
   const baseUrl = (options.baseUrl ?? 'https://opencode.ai/zen/go').replace(/\/+$/, '');
   try {

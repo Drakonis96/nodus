@@ -44,7 +44,7 @@ await build({
     setup(api) {
       api.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'mock' }));
       api.onLoad({ filter: /.*/, namespace: 'mock' }, () => ({
-        contents: `export const app={getPath:()=>${JSON.stringify(profile)},getVersion:()=>"5.3.2"};export const safeStorage={isEncryptionAvailable:()=>true,encryptString:v=>Buffer.from(v),decryptString:v=>v.toString("utf8")};`,
+        contents: `export const app={getPath:()=>${JSON.stringify(profile)},getVersion:()=>"5.4.0"};export const safeStorage={isEncryptionAvailable:()=>true,encryptString:v=>Buffer.from(v),decryptString:v=>v.toString("utf8")};`,
         loader: 'js',
       }));
       // Tests supply their own publishing key and never use the production key.
@@ -90,7 +90,7 @@ const pluginManifest = (overrides = {}) => ({
   schemaVersion: 2, id: 'chemistry-studio', name: 'Chemistry Studio', version: '2.0.0',
   author: 'NodusResearch', description: 'Draw and verify chemical structures.', license: 'AGPL-3.0-only',
   publisher: { id: 'NodusResearch', keyId: 'nr01' },
-  compatibility: { capabilityApi: 2, minNodusVersion: '5.3.2', targets: [target] },
+  compatibility: { capabilityApi: 2, minNodusVersion: '5.4.0', targets: [target] },
   replacesSkills: ['builtin-chemistry'],
   skills: ['skills/chemistry-studio/skill.json'],
   capabilities: ['capabilities/chemistry/capability.json'],
@@ -232,7 +232,7 @@ test('a package published for another platform is not installed here', () => {
   reset();
   const foreign = target.startsWith('win32') ? 'linux-x64' : 'win32-x64';
   rejects(
-    () => lib.installVerifiedPlugin(download(defaultFiles(pluginManifest({ compatibility: { capabilityApi: 2, minNodusVersion: '5.3.2', targets: [foreign] } })), { targets: [{ target: foreign, asset: `chemistry-studio-2.0.0-${foreign}.nodus-plugin`, bytes: 1, sha256: 'a'.repeat(64) }] }), { approvePermissions: true }),
+    () => lib.installVerifiedPlugin(download(defaultFiles(pluginManifest({ compatibility: { capabilityApi: 2, minNodusVersion: '5.4.0', targets: [foreign] } })), { targets: [{ target: foreign, asset: `chemistry-studio-2.0.0-${foreign}.nodus-plugin`, bytes: 1, sha256: 'a'.repeat(64) }] }), { approvePermissions: true }),
     /does not publish a package for/,
   );
 });
