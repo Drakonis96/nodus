@@ -106,15 +106,16 @@ for (const entry of pinned.packages) {
 
   // A package whose archive carries unsigned Mach-O cannot travel inside a notarized macOS
   // build. The notary opens the zip, finds code nothing signed, and refuses the whole
-  // application — which is what rejected both v5.4.0 macOS builds. The bytes cannot be
-  // repaired here either: they are pinned by digest against a manifest the publisher
+  // application — which is what rejected the first v5.4.0 macOS builds. The bytes cannot
+  // be repaired here either: they are pinned by digest against a manifest the publisher
   // signed, so stripping the dead prebuilds would make the package fail to install.
   //
-  // So it is withheld rather than bundled, and only on macOS. The migration is already
-  // built for a package it has no bundled copy of: it installs that one from the
-  // catalogue, and a run with no connection leaves it pending and retries. Offline
-  // migration stays whole on Windows and Linux, and the fix is upstream — a package whose
-  // vendor tree does not carry prebuilt binaries for five platforms it never runs on.
+  // The repair belonged upstream and happened there: Chemistry Studio 2.2.1 no longer
+  // vendors prebuilt binaries, so every pinned package is bundled on every platform today.
+  // This stays for the next one. A package that would fail notarization is withheld on
+  // macOS rather than failing the release, because the migration is already built for a
+  // package it has no bundled copy of: it installs that one from the catalogue, and a run
+  // with no connection leaves it pending and retries.
   const unnotarizable = unnotarizablePayload(archive);
   if (unnotarizable.length) {
     withheld.push({ id: entry.id, files: unnotarizable.length, first: unnotarizable[0] });
