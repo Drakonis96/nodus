@@ -117,6 +117,25 @@ jobs:
       # the marketplace's default branch, which is what a released Nodus installs from. So
       # a paired change that merges here before it merges there fails on main, loudly,
       # instead of being carried by a pairing nobody remembered to remove.
+      # A pairing outlives its purpose silently. `.github/marketplace-ref` reached main with
+      # the change it was paired to, and every pull request afterwards was checked against a
+      # marketplace branch frozen at that moment — still comparing, still green, no longer
+      # meaning anything. It surfaced only because a bootstrap pinned a version that branch
+      # had never heard of, and it read as a version mismatch rather than as a stale pairing.
+      #
+      # The rule that prevents it is the one the file already implies: a pairing is for the
+      # pull request that needs it, so it must be gone before that pull request merges.
+      - name: A pairing never reaches main
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          if [ -f .github/marketplace-ref ]; then
+            echo ".github/marketplace-ref is a pull-request-only pairing and is still here on $GITHUB_REF_NAME." >&2
+            echo "Delete it in the pull request that paired the two repositories; until then every" >&2
+            echo "later pull request is checked against a marketplace branch that has stopped moving." >&2
+            exit 1
+          fi
+
       - name: Use the paired marketplace branch on a pull request
         if: github.event_name == 'pull_request'
         working-directory: .marketplace
