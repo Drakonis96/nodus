@@ -1,3 +1,4 @@
+import { materializeTrustedPluginSkills } from './skillLibrary';
 import { compareSemver } from '../../packages/capability-api/src/json';
 import { DEFAULT_SKILL_SOURCE } from '@shared/skillMarketplace';
 import { fetchCapabilityCatalog, installCatalogEntry, readCachedCatalog, type CachedCatalog } from './marketplaceV2';
@@ -88,6 +89,7 @@ export async function checkForCapabilityUpdates(options: CapabilityUpdateOptions
       // The old process is running the old bytes; it goes before the new version is used.
       await stopCapabilityWorkers(key => key.includes(state.id));
       await runPluginDataMigrations(state.id);
+      materializeTrustedPluginSkills(state.id);
       results.push({ pluginId: state.id, state: 'updated', from, to: entry.version });
     } catch (error) {
       results.push({ pluginId: state.id, state: 'failed', from, to: entry.version, detail: message(error) });

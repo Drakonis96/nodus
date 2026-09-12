@@ -1,3 +1,4 @@
+import { materializeTrustedPluginSkills } from '../capabilities/skillLibrary';
 import { BrowserWindow } from 'electron';
 import { validateSettingsSubmission, validateSettingsState } from '../../packages/capability-api/src/settings';
 import { validateViewDocument } from '../../packages/capability-api/src/views';
@@ -242,6 +243,8 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
     const state = rollbackPluginV2(pluginId);
     await stopCapabilityWorkers(key => key.includes(pluginId));
     rebuildCapabilityRegistry();
+    materializeTrustedPluginSkills(pluginId);
+    broadcastMigrationChanged();
     return state;
   });
 
@@ -252,6 +255,7 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
     try { await runPluginDataMigrations(pluginId); }
     catch (error) { console.warn(`[capabilities] ${pluginId} could not finish its data migration:`, error); }
     rebuildCapabilityRegistry();
+    materializeTrustedPluginSkills(pluginId);
     broadcastMigrationChanged();
   }
 
@@ -267,7 +271,10 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
  *  poll to find out. */
 function broadcastMigrationChanged(): void {
   for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) win.webContents.send('capabilities:migrationChanged');
+    if (!win.isDestroyed()) {
+      win.webContents.send('capabilities:migrationChanged');
+      win.webContents.send('chatSkills:changed');
+    }
   }
 }
 

@@ -84,13 +84,16 @@ try {
       import { app } from 'electron';
       import assert from 'node:assert/strict';
       import fs from 'node:fs';
-      import { initializeCapabilityPluginStore, installVerifiedPlugin, pluginMigrationScripts, recordPluginDataVersion, resolveTrustedCapability, listInstalledPluginsV2, readPluginStateV2, removePluginV2 } from './electron/capabilities/pluginStoreV2';
+      import path from 'node:path';
+      import { activePluginRoot, initializeCapabilityPluginStore, installVerifiedPlugin, pluginMigrationScripts, recordPluginDataVersion, resolveTrustedCapability, listInstalledPluginsV2, readPluginStateV2, removePluginV2 } from './electron/capabilities/pluginStoreV2';
       import { rebuildCapabilityRegistry, capabilityRegistry, capabilityIsAvailable, pinCapabilitiesForTurn } from './electron/capabilities/registry';
       import { CapabilityWorkerHandle } from './electron/capabilities/workerHost';
       import { createCapabilityHostServices } from './electron/capabilities/hostServices';
       import { createCapabilityAdapters, createTrustedCapabilityRunner } from './electron/capabilities/runner';
       import { runTrustedChatPipeline } from './electron/capabilities/chatPipeline';
       import { chatAssetOwner } from './electron/chatAssets';
+      import { materializeTrustedPluginSkills } from './electron/capabilities/skillLibrary';
+      import { listChatSkills, saveChatSkill, enabledChatSkills } from './electron/chatSkills';
 
       app.setPath('userData', ${JSON.stringify(temporary)});
       app.on('window-all-closed', () => {});
@@ -210,6 +213,29 @@ try {
         }
 
         if (payload.packageId === 'research-visuals') {
+          stage = 'all bundled workflows appear in the Skill library';
+          const bundled = materializeTrustedPluginSkills(payload.packageId).filter(skill => skill.plugin?.id === payload.packageId);
+          assert.equal(bundled.length, 3, 'all three workflows are installed');
+          assert.deepEqual(bundled.map(skill => skill.origin.packageId).sort(), ['general-maps','historical-maps','research-images']);
+          assert.ok(bundled.every(skill => !skill.enabled.assistant && !skill.enabled.nodi), 'new workflows start independently disabled');
+          assert.ok(bundled.every(skill => skill.capabilities.every(id => id.startsWith('research-visuals:'))), 'self references resolve to the actual provider');
+          const chosen = bundled[0];
+          saveChatSkill({...chosen, instructions: chosen.instructions + ' Custom local instruction.', enabled: {assistant: true,nodi: false}});
+          materializeTrustedPluginSkills(payload.packageId);
+          const again = listChatSkills().filter(skill => skill.plugin?.id === payload.packageId);
+          assert.equal(again.length,3,'reinstall does not duplicate workflows');
+          assert.equal(again.find(skill=>skill.id===chosen.id).enabled.assistant,true);
+          assert.ok(again.find(skill=>skill.id===chosen.id).instructions.endsWith('Custom local instruction.'),'local edits survive');
+          assert.ok(enabledChatSkills('assistant').some(skill=>skill.id===chosen.id),'the enabled workflow reaches the chat prompt');
+          assert.ok(!enabledChatSkills('nodi').some(skill=>skill.id===chosen.id),'Nodi activation is independent');
+          const workflowPath = path.join(activePluginRoot(payload.packageId), 'skills/research-images/skill.json');
+          const originalWorkflow = fs.readFileSync(workflowPath, 'utf8');
+          const beforeInvalid = JSON.stringify(listChatSkills());
+          try {
+            fs.writeFileSync(workflowPath, JSON.stringify({...JSON.parse(originalWorkflow), version: '99.0.0'}));
+            assert.throws(() => materializeTrustedPluginSkills(payload.packageId), /identity.version/);
+            assert.equal(JSON.stringify(listChatSkills()), beforeInvalid, 'invalid final workflow cannot partially rewrite the library');
+          } finally { fs.writeFileSync(workflowPath, originalWorkflow); }
           stage = 'all Research Visuals tools through saved chat pipelines';
           const imageRuntime = resolveTrustedCapability('research-visuals:images');
           const imageHandle = new CapabilityWorkerHandle(imageRuntime, { services: createCapabilityHostServices({}), bootstrapPath: ${JSON.stringify(bootstrap)} });

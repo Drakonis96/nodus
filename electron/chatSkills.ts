@@ -105,7 +105,7 @@ export function listChatSkills(): ChatSkill[] {
   for (const skill of parsed.skills) if (!fs.existsSync(path.join(skillDirectory(skill.id), 'skill.json'))) writeSkillDirectory(skill);
   return parsed.skills;
 }
-/** Replaces the whole library at once. Only the capability migration uses this: every
+/** Replaces the whole library at once. Capability migration and signed package installation use this: every
  *  other change goes through the functions that reason about one skill at a time. */
 export function replaceChatSkills(skills: ChatSkill[]): ChatSkill[] { return write(skills); }
 
