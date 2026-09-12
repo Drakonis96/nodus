@@ -110,7 +110,7 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
     readFile(path.join(repoRoot, 'src/i18n.en.ts'), 'utf8'),
   ]);
   // The whole promised structure stays visible while it is built one section at a time.
-  for (const label of ['Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Familias', 'Dinastías', 'Chat del mundo', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Continuidad', 'Preguntas abiertas', 'Notas', 'Escenas', 'Manuscrito']) {
+  for (const label of ['Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Familias', 'Dinastías', 'Research chat', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Continuidad', 'Preguntas abiertas', 'Notas', 'Escenas', 'Manuscrito']) {
     assert.match(sidebar, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${label} appears in the worldbuilding sidebar`);
   }
   // Every announced section is now wired up: nothing in this sidebar is inert. Enciclopedia, Personajes and

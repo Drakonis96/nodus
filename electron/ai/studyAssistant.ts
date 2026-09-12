@@ -1,3 +1,5 @@
+import { withResearchSystemPrompt } from './researchSystemPrompt';
+import { researchGenerationOptions } from './researchGenerationOptions';
 import { skillHasCapability } from '@shared/chatSkills';
 import { buildChatSkillsPrompt, chatSkillsOutputContract } from '@shared/chatSkills';
 import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from '../chatAssets';
@@ -269,7 +271,7 @@ export async function streamStudyAssistant(
   const effectiveModel = resolveModelRef(configuredModel);
   const prompt = buildStudyAssistantPrompt(request, availableCitations);
   assertChatSkillSession(execution, signal);
-  const raw = await completeTextStream({ system: `${prompt.system}\n\n${buildChatSkillsPrompt(skills)}`, user: `${prompt.user}\n\n${chatSkillsOutputContract(skills)}`, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.18, maxTokens: skills.length ? 10_000 : 3200 }, onDelta, effectiveModel, signal);
+  const raw = await completeTextStream({ system: withResearchSystemPrompt(`${prompt.system}\n\n${buildChatSkillsPrompt(skills)}`, request.systemPromptId), user: `${prompt.user}\n\n${chatSkillsOutputContract(skills)}`, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.18, ...(request.thinkingEffort === undefined ? { maxTokens: skills.length ? 10_000 : 3200 } : await researchGenerationOptions({ ...request, model: effectiveModel }, skills.length ? 10_000 : 3200, false, signal)) }, onDelta, effectiveModel, signal);
   const validated = validateStudyAssistantAnswer(raw, availableCitations, insufficientAnswer);
   // A user-triggered stop keeps the partial answer: running the skill tools now would
   // throw an AbortError and discard everything that already streamed.

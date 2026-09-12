@@ -26,23 +26,24 @@ test('world chat has the same conversation, model, context and streaming control
   ]) {
     for (const source of [view, types, preload, ipc]) assert.match(source, new RegExp(contract));
   }
-  assert.match(view, /world-chat-history-sidebar/);
-  assert.match(view, /world-chat-context-sidebar/);
-  assert.match(view, /<ModelPicker/);
-  assert.match(view, /useFeatureModel\(settings, 'chatModel'\)/);
-  assert.match(view, /<ConfirmModal/);
+  assert.match(view, /<ResearchAssistantModal settings=\{settings\} embedded adapter=\{adapter\}/);
+  const shared = await read('src/views/ResearchAssistantModal.tsx');
+  assert.match(shared, /research-history-sidebar/);
+  assert.match(shared, /research-context-sidebar/);
+  assert.match(shared, /useFeatureModel/);
+  assert.match(shared, /<ConfirmModal/);
   assert.match(view, /selection\.scope === 'manual'/);
   assert.match(view, /entrySearch/);
   assert.match(view, /selection\.keepFocus/);
   assert.match(view, /cancelWorldChat/);
-  assert.match(view, /event\.key === 'Enter' && !event\.shiftKey/);
-  assert.match(view, /<textarea/);
+  assert.match(shared, /e\.key === 'Enter' && !e\.shiftKey/);
+  assert.match(shared, /<textarea/);
 });
 
 test('the global assistant action is mode-aware in worldbuilding', async () => {
   const app = await read('@shell');
-  assert.match(app, /if \(isWorldbuilding\)[\s\S]{0,160}setView\('worldChat'\)/);
-  assert.match(app, /isWorldbuilding \? 'Chat del mundo' : 'Asistente de investigación'/);
-  assert.match(app, /isWorldbuilding \? 'Abrir chat del mundo' : 'Abrir asistente de investigación'/);
-  assert.match(app, /<WorldChatView settings=\{settings\}/);
+  assert.match(app, /setView\(researchChatView\(activeVault\?\.type\)\)/);
+  assert.match(app, /label: 'Research chat'/);
+  const navigation = await read('src/navigation.ts');
+  assert.match(navigation, /case 'worldbuilding': return 'worldChat'/);
 });

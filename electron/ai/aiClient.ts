@@ -1,3 +1,4 @@
+import { researchReasoningBody, researchOmitsTemperature, type ResearchEffort } from '@shared/researchReasoning';
 import { getSettings } from '../db/settingsRepo';
 import { excludeInvisibleArtifacts } from '../capabilities/modelHistory';
 import { getApiKey } from '../secrets/secretStore';
@@ -209,6 +210,7 @@ function providerRequestHash(model: ModelRef, opts: CallOpts): string {
     temperature: opts.temperature ?? null,
     maxTokens: opts.maxTokens ?? null,
     reasoning: opts.reasoning ?? null,
+    ...(opts.researchEffort !== undefined ? { researchEffort: opts.researchEffort } : {}),
     deterministic: opts.deterministic ?? false,
     images: opts.images?.map((part) => ({
       mediaType: part.mediaType,
@@ -413,6 +415,9 @@ function nodusLocalMaxTokens(model: ModelRef, opts: CallOpts, requestedMax: numb
 }
 
 interface CallOpts {
+  /** Set exclusively by Research Assistant; absent preserves every other surface. */
+  researchEffort?: ResearchEffort;
+  researchModelInfo?: import('@shared/types').ModelInfo;
   /** Image-tool production prompts stay English while visible prose follows the UI language. */
   englishImagePrompts?: boolean;
   system: string;
@@ -508,6 +513,7 @@ async function tryLocalNativeCompletion(
       timeoutMs: opts.timeoutMs ?? completionTimeoutMs(model),
       signal: opts.signal,
       deterministic: opts.deterministic,
+      researchBody: opts.researchEffort === undefined ? undefined : researchBody(model, opts),
     }));
     recordLocalAiDiagnostic({
       provider,
@@ -537,7 +543,12 @@ async function tryLocalNativeCompletion(
     }
     return result.text;
   } catch (error) {
-    if (error instanceof LocalNativeUnavailableError) return null;
+    if (error instanceof LocalNativeUnavailableError) {
+      if (opts.researchEffort !== undefined && Object.keys(researchBody(model, opts)).length) {
+        throw new AiError('El servidor local no dispone de la API nativa necesaria para controlar thinking. Actualiza el servidor o elige otro modelo.', false, true);
+      }
+      return null;
+    }
     if (error instanceof AiError) throw error;
     throw wrapProviderError(error);
   }
@@ -574,6 +585,7 @@ async function tryLocalNativeStreaming(
       model: model.model, system: opts.system, user: opts.user,
       temperature: opts.temperature ?? 0.15, contextTokens: plan.contextTokens,
       outputTokens: plan.outputTokens, jsonMode: false,
+      researchBody: opts.researchEffort === undefined ? undefined : researchBody(model, opts),
       timeoutMs: opts.timeoutMs ?? completionTimeoutMs(model), signal,
     }, onDelta));
     recordLocalAiDiagnostic({
@@ -587,7 +599,12 @@ async function tryLocalNativeStreaming(
     });
     return result.text;
   } catch (error) {
-    if (error instanceof LocalNativeUnavailableError) return null;
+    if (error instanceof LocalNativeUnavailableError) {
+      if (opts.researchEffort !== undefined && Object.keys(researchBody(model, opts)).length) {
+        throw new AiError('El servidor local no dispone de la API nativa necesaria para controlar thinking. Actualiza el servidor o elige otro modelo.', false, true);
+      }
+      return null;
+    }
     if (error instanceof AiError) throw error;
     throw wrapProviderError(error);
   }
@@ -716,15 +733,15 @@ export async function localModelContextWindow(model: ModelRef): Promise<number |
  * call: JSON mode, reasoning control, and OpenRouter throughput routing. These can
  * be rejected by some models, so callers retry once without them on a 400.
  */
-function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEffort): Record<string, unknown> {
+function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEffort, opts: CallOpts): Record<string, unknown> {
   const auditedOpenRouterProvider = process.env.NODUS_AUDIT_OPENROUTER_PROVIDER?.trim();
   return {
     ...(jsonMode && supportsJsonMode(model.provider) ? { response_format: { type: 'json_object' as const } } : {}),
-    ...reasoningBody(model.provider, reasoning, model.model),
+    ...(opts.researchEffort === undefined ? reasoningBody(model.provider, reasoning, model.model) : {}),
     // Groq's reasoning models (gpt-oss/qwen3) reason at medium by default, which slows scans and
     // burns tokens. reasoningBody can't send it (no model id), so minimise it here. Groq rejects
     // reasoning_effort:'none' — 'low' is its floor; non-reasoning models 400 and the caller strips it.
-    ...(model.provider === 'groq' && reasoning === 'off' && isGroqReasoningModel(model.model)
+    ...(opts.researchEffort === undefined && model.provider === 'groq' && reasoning === 'off' && isGroqReasoningModel(model.model)
       ? { reasoning_effort: 'low' as const }
       : {}),
     ...(model.provider === 'openrouter'
@@ -733,6 +750,15 @@ function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEf
         : openRouterRoutingBody(getSettings().openRouterThroughput)
       : {}),
   };
+}
+
+function researchBody(model: ModelRef, opts: CallOpts): Record<string, unknown> {
+  return opts.researchEffort === undefined ? {} : researchReasoningBody(model, opts.researchEffort, opts.maxTokens ?? 8000, opts.researchModelInfo);
+}
+
+function requestSamplingBody(model: ModelRef, opts: CallOpts, reasoning: ReasoningEffort): Record<string, number> {
+  if (opts.researchEffort !== undefined && researchOmitsTemperature(model, opts.researchEffort, opts.researchModelInfo)) return {};
+  return samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15, reasoning);
 }
 
 /** Whether the user flagged this provider as free-tier (so requests get shaped to its limits). */
@@ -970,7 +996,10 @@ async function rawCompleteTransport(
         model: model.model,
         system: withJsonModeDirective(opts.system, jsonMode),
         user: opts.user,
-        reasoning: codexReasoning === undefined ? reasoning : codexReasoning,
+        reasoning: opts.researchEffort !== undefined
+          ? opts.researchEffort === 'standard' || opts.researchEffort === 'on' ? 'off' : opts.researchEffort
+          : codexReasoning === undefined ? reasoning : codexReasoning,
+        researchEffort: opts.researchEffort,
         timeoutMs: opts.timeoutMs,
         images: opts.images,
         signal: opts.signal,
@@ -986,6 +1015,7 @@ async function rawCompleteTransport(
         system: withJsonModeDirective(opts.system, jsonMode),
         user: opts.user,
         reasoning,
+        researchEffort: opts.researchEffort,
         timeoutMs: opts.timeoutMs,
         images: opts.images,
         signal: opts.signal,
@@ -1013,6 +1043,7 @@ async function rawCompleteTransport(
         temperature: opts.temperature,
         maxTokens: opts.maxTokens,
         reasoning,
+        researchEffort: opts.researchEffort,
         jsonMode,
         timeoutMs: opts.timeoutMs,
         images: opts.images,
@@ -1046,7 +1077,8 @@ async function rawCompleteTransport(
       const res = await scheduleProviderRequest(model, opts, key, 'anthropic', () => client.messages.create({
         model: model.model,
         max_tokens: opts.maxTokens ?? 8000,
-        ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15, reasoning),
+        ...requestSamplingBody(model, opts, reasoning),
+        ...researchBody(model, opts),
         system: opts.system,
         messages: [
           { role: 'user', content: opts.images?.length ? (anthropicVisionContent(opts.user, opts.images) as any) : opts.user },
@@ -1155,14 +1187,15 @@ async function rawCompleteTransport(
     });
   const baseBody = {
     model: model.model,
-    ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15, reasoning),
+    ...requestSamplingBody(model, opts, reasoning),
+        ...researchBody(model, opts),
     ...completionTokensBody(model.provider, model.model, maxTokens),
     messages: [
       { role: 'system' as const, content: opts.system },
       { role: 'user' as const, content: opts.images?.length ? (openAiVisionContent(opts.user, opts.images) as any) : opts.user },
     ],
   };
-  const extras = optionalBody(model, jsonMode, reasoning);
+  const extras = optionalBody(model, jsonMode, reasoning, opts);
   const compatStarted = Date.now();
   try {
     let res;
@@ -1558,7 +1591,10 @@ async function rawCompleteStreamTransport(
         model: model.model,
         system: opts.system,
         user: opts.user,
-        reasoning: codexReasoning === undefined ? reasoning : codexReasoning,
+        reasoning: opts.researchEffort !== undefined
+          ? opts.researchEffort === 'standard' || opts.researchEffort === 'on' ? 'off' : opts.researchEffort
+          : codexReasoning === undefined ? reasoning : codexReasoning,
+        researchEffort: opts.researchEffort,
         timeoutMs: opts.timeoutMs,
         images: opts.images,
         signal,
@@ -1579,6 +1615,7 @@ async function rawCompleteStreamTransport(
         system: opts.system,
         user: opts.user,
         reasoning,
+        researchEffort: opts.researchEffort,
         timeoutMs: opts.timeoutMs,
         images: opts.images,
         signal,
@@ -1620,6 +1657,7 @@ async function rawCompleteStreamTransport(
         temperature: opts.temperature,
         maxTokens: opts.maxTokens,
         reasoning,
+        researchEffort: opts.researchEffort,
         jsonMode: false,
         timeoutMs: opts.timeoutMs,
         images: opts.images,
@@ -1645,7 +1683,8 @@ async function rawCompleteStreamTransport(
         const stream = await (client.messages.create as any)({
           model: model.model,
           max_tokens: opts.maxTokens ?? 8000,
-          ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15, reasoning),
+          ...requestSamplingBody(model, opts, reasoning),
+        ...researchBody(model, opts),
           system: opts.system,
           stream: true,
           messages: [{ role: 'user', content: opts.user }],
@@ -1692,7 +1731,8 @@ async function rawCompleteStreamTransport(
   });
   const baseBody = {
     model: model.model,
-    ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15, reasoning),
+    ...requestSamplingBody(model, opts, reasoning),
+        ...researchBody(model, opts),
     ...completionTokensBody(model.provider, model.model, maxTokens),
     stream: true as const,
     messages: [
@@ -1701,7 +1741,7 @@ async function rawCompleteStreamTransport(
     ],
   };
   // Streaming is plain text (no JSON mode); only reasoning + routing apply.
-  const extras = optionalBody(model, false, reasoning);
+  const extras = optionalBody(model, false, reasoning, opts);
   const schedulerEndpoint = model.provider === 'nodus' ? 'nodus-local-runtime' : baseURL;
   const compatStarted = Date.now();
   const consumeStream = async (

@@ -1,3 +1,6 @@
+import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
+import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
+import { RESEARCH_REASONING_TRANSLATIONS } from './i18n.researchReasoning';
 import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
 import { CAPABILITIES_TRANSLATIONS } from './i18n.capabilities';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
@@ -54,6 +57,11 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
+  "Research chat": "Research chat",
+  "Elige al menos una base de datos.": "En az bir veritabanı seçin.",
+  ...RESEARCH_PROMPT_TRANSLATIONS["tr"],
+  ...RESEARCH_SOURCE_TRANSLATIONS["tr"],
+  ...RESEARCH_REASONING_TRANSLATIONS["tr"],
   ...CHAT_SKILLS_TRANSLATIONS['tr'],
   ...CAPABILITIES_TRANSLATIONS['tr'],
   ...STELLAR_GRAPH_TRANSLATIONS["tr"],

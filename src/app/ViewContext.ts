@@ -86,6 +86,7 @@ export interface ViewContext extends VaultFlags {
   studyRecordingTarget: { id: string; timestamp?: number | null } | null;
   studyGraphTarget: Nonced<PendingGraphNavigationTarget> | null;
   studyChatTarget: { prompt: string; nonce: number } | null;
+  assistantTarget: Nonced<PendingAssistantNavigationTarget> | null;
   radarTarget: { updateId?: string; nonce: number } | null;
 
   /**

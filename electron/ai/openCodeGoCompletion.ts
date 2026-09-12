@@ -1,3 +1,4 @@
+import { researchReasoningBody, researchOmitsTemperature, type ResearchEffort } from '@shared/researchReasoning';
 import type { ReasoningEffort } from '@shared/types';
 import type { VisionImagePart } from '@shared/imageAnalysis';
 import { nodusUserAgent, openCodeGoSessionId } from './clientIdentity';
@@ -27,6 +28,7 @@ export interface OpenCodeGoCompletionOptions {
   temperature?: number;
   maxTokens?: number;
   reasoning?: ReasoningEffort;
+  researchEffort?: ResearchEffort;
   jsonMode?: boolean;
   timeoutMs?: number;
   images?: VisionImagePart[];
@@ -247,6 +249,18 @@ function responsesTruncated(body: any): boolean {
  * OpenAI Responses surface, not Chat Completions. Keep this transport distinct:
  * silently sending those models to /chat/completions produces misleading 404/400
  * failures and prevents a fair provider benchmark. */
+function researchGoBody(options: OpenCodeGoCompletionOptions, responses = false): Record<string, unknown> {
+  if (options.researchEffort === undefined) return {};
+  const body = researchReasoningBody({ provider: 'opencode-go', model: options.model }, options.researchEffort, options.maxTokens ?? 8000);
+  if (responses && body.reasoning_effort) return { reasoning: { effort: body.reasoning_effort } };
+  return body;
+}
+
+function goTemperature(options: OpenCodeGoCompletionOptions): Record<string, number> {
+  return options.researchEffort !== undefined && researchOmitsTemperature({ provider: 'opencode-go', model: options.model }, options.researchEffort)
+    ? {} : { temperature: options.temperature ?? 0.15 };
+}
+
 async function completeResponses(options: OpenCodeGoCompletionOptions, url: string, signal: AbortSignal): Promise<OpenCodeGoCompletionResult> {
   const streaming = Boolean(options.onDelta);
   const response = await postWithOptionalExtras(
@@ -258,11 +272,12 @@ async function completeResponses(options: OpenCodeGoCompletionOptions, url: stri
       instructions: responsesInstructions(options),
       input: options.user,
       max_output_tokens: options.maxTokens ?? 8_000,
+      ...researchGoBody(options, true),
       stream: streaming,
     },
     {
-      ...(options.temperature == null ? {} : { temperature: options.temperature }),
-      ...(!options.reasoning || options.reasoning === 'off'
+      ...(options.temperature == null ? {} : goTemperature(options)),
+      ...(options.researchEffort !== undefined || !options.reasoning || options.reasoning === 'off'
         ? {}
         : { reasoning: { effort: options.reasoning } }),
     },
@@ -312,7 +327,8 @@ async function completeOpenAi(options: OpenCodeGoCompletionOptions, url: string,
     signal,
     {
       model: options.model,
-      temperature: options.temperature ?? 0.15,
+      ...goTemperature(options),
+      ...researchGoBody(options),
       max_tokens: options.maxTokens ?? 8_000,
       stream: streaming,
       ...(streaming ? { stream_options: { include_usage: true } } : {}),
@@ -322,7 +338,7 @@ async function completeOpenAi(options: OpenCodeGoCompletionOptions, url: string,
       ],
     },
     {
-      ...reasoningExtras(options.reasoning),
+      ...(options.researchEffort === undefined ? reasoningExtras(options.reasoning) : {}),
       ...(options.jsonMode ? { response_format: { type: 'json_object' } } : {}),
     }
   );
@@ -378,7 +394,8 @@ async function completeAnthropic(options: OpenCodeGoCompletionOptions, url: stri
       system: options.jsonMode
         ? `${options.system}\n\nReturn only a single valid JSON value. No prose, no explanation, no Markdown code fences.`
         : options.system,
-      temperature: options.temperature ?? 0.15,
+      ...goTemperature(options),
+      ...researchGoBody(options),
       max_tokens: options.maxTokens ?? 8_000,
       stream: streaming,
       // Qwen's hybrid-thinking mode is enabled by default on OpenCode Go. If the
@@ -387,7 +404,7 @@ async function completeAnthropic(options: OpenCodeGoCompletionOptions, url: stri
       // truncate an otherwise valid structured response. OpenCode accepts the
       // Anthropic-compatible disabled form for Qwen; do not send it to unrelated
       // Messages models whose gateways may reject the extension.
-      ...(isQwen && options.reasoning === 'off' ? { thinking: { type: 'disabled' } } : {}),
+      ...(options.researchEffort === undefined && isQwen && options.reasoning === 'off' ? { thinking: { type: 'disabled' } } : {}),
       messages: [{ role: 'user', content: options.user }],
     }),
   });

@@ -537,6 +537,11 @@ export const academicApi: AcademicApi = {
   deleteResearchQuestion: (id) => ipcRenderer.invoke('research:rq:delete', id).then(() => undefined),
   exportResearchCoverage: (request) => ipcRenderer.invoke('research:rq:export', request),
   generateHypothesisLab: (request) => ipcRenderer.invoke('hypothesis:generate', request),
+  getResearchSystemPrompts: (key) => ipcRenderer.invoke('research:prompts:list', key),
+  saveResearchSystemPrompt: (input) => ipcRenderer.invoke('research:prompts:save', input),
+  selectResearchSystemPrompt: (key, id) => ipcRenderer.invoke('research:prompts:select', key, id),
+  deleteResearchSystemPrompt: (id) => ipcRenderer.invoke('research:prompts:delete', id),
+  listResearchContextSources: () => ipcRenderer.invoke('research:contextSources'),
   researchChat: (request) => ipcRenderer.invoke('research:chat', request),
   researchChatStream: async (request, handlers) => {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;

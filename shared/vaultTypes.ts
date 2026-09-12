@@ -316,6 +316,7 @@ export function isPreviewVaultType(value: unknown): boolean {
  * by phase C.
  */
 export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
+  researchChat: ['academic', 'genealogy', 'primary_sources', 'prosopography', 'testimonios'],
   dictionary: ['academic'],
   // La ruta Espacio de trabajo sigue siendo académica. Los demás vaults conservan la
   // ruta Notas, aunque ambas rutas comparten ahora la misma experiencia de catálogo.
@@ -469,7 +470,7 @@ export function isViewAllowedForVaultType(viewId: string, type: unknown): boolea
   if (normalizeVaultType(type) === 'prosopography') {
     return [
       'home', 'settings', 'prosopSearch', 'prosopPopulation', 'prosopPersons',
-      'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'library', 'notes', 'browser', 'radar', 'compass', 'toolkit',
+      'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'researchChat', 'library', 'notes', 'browser', 'radar', 'compass', 'toolkit',
     ].includes(viewId);
   }
   const allowed = VAULT_TYPE_SCOPED_VIEWS[viewId];

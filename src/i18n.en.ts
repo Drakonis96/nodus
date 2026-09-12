@@ -1,3 +1,6 @@
+import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
+import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
+import { RESEARCH_REASONING_TRANSLATIONS } from './i18n.researchReasoning';
 import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
 import { CAPABILITIES_TRANSLATIONS } from './i18n.capabilities';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
@@ -58,6 +61,11 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  "Research chat": "Research chat",
+  "Elige al menos una base de datos.": "Choose at least one database.",
+  ...RESEARCH_PROMPT_TRANSLATIONS.en,
+  ...RESEARCH_SOURCE_TRANSLATIONS["en"],
+  ...RESEARCH_REASONING_TRANSLATIONS["en"],
   ...CHAT_SKILLS_TRANSLATIONS['en'],
   ...CAPABILITIES_TRANSLATIONS['en'],
   ...STELLAR_GRAPH_TRANSLATIONS["en"],

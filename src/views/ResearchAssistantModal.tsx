@@ -1,3 +1,10 @@
+import { ResearchSystemPromptControl } from '../components/ResearchSystemPromptControl';
+import { useResearchSystemPrompts } from '../hooks/useResearchSystemPrompts';
+import type { ResearchChatAdapter, ResearchUiMessage } from './researchChatAdapter';
+import { ResearchSourceFilterControl } from '../components/ResearchSourceFilterControl';
+import { normalizeResearchSourceFilter } from '@shared/researchContextFilters';
+import { ResearchEffortControl } from '../components/ResearchEffortControl';
+import type { ResearchEffort } from '@shared/researchReasoning';
 import { ChatMarkdown } from '../components/ChatMarkdown';
 import { ChatAbortedNotice } from '../components/ChatAbortedNotice';
 import { ChatSkillsControl } from '../components/ChatSkillsControl';
@@ -196,34 +203,46 @@ const GENEALOGY_SUGGESTIONS = [
   '¿Qué datos faltan y qué fuente podría aportarlos?',
 ];
 
-interface UiMessage extends ChatMessageRecord {
-  id: string;
-  /** Live reasoning/thinking trace from the model. Transient — never persisted. */
-  reasoning?: string;
-}
+type UiMessage = ResearchUiMessage;
 
 export function ResearchAssistantModal({
   settings,
   initialTarget,
   isGenealogy = false,
   onClose,
+  embedded = false,
+  adapter,
 }: {
   settings: AppSettings;
   initialTarget?: AssistantNavigationTarget | null;
   /** Genealogy vault: the assistant answers over the family (people, kinship, events,
    *  documents, evidence), so the academic context selector is not shown. */
   isGenealogy?: boolean;
-  onClose: () => void;
+  onClose?: () => void;
+  embedded?: boolean;
+  adapter?: ResearchChatAdapter;
 }) {
+  const api = adapter ?? window.nodus;
+  const apiRef = useRef(api);
+  apiRef.current = api;
+  const panelKey = adapter?.id ?? 'research';
+  const [historyOpen, setHistoryOpen] = useState(() => !embedded || localStorage.getItem(`nodus.${panelKey}ChatHistoryOpen`) === '1');
+  const [contextOpen, setContextOpen] = useState(() => embedded && localStorage.getItem(`nodus.${panelKey}ChatContextOpen`) === '1');
+  const toggleHistory = () => setHistoryOpen(open => { localStorage.setItem(`nodus.${panelKey}ChatHistoryOpen`, open ? '0' : '1'); return !open; });
+  const toggleContext = () => setContextOpen(open => { localStorage.setItem(`nodus.${panelKey}ChatContextOpen`, open ? '0' : '1'); return !open; });
   const [selection, setSelection] = useState<ResearchContextSelection>(() => cloneSelection(SYNTHESIS_SELECTION));
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
   const [contextTitle, setContextTitle] = useState<string | null>(null);
   const [activeModeId, setActiveModeId] = useState<ActiveAssistantModeId>('synthesis');
-  const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'chatModel');
+  const [selectedModel, setSelectedModel] = useFeatureModel(settings, adapter?.modelFeature ?? 'chatModel', adapter?.modelFeature === 'studyModel' ? 'chatModel' : undefined);
   const [sending, setSending] = useState(false);
+  const [thinkingEffort, setThinkingEffort] = useState<ResearchEffort>('standard');
+  useEffect(() => { setThinkingEffort('standard'); }, [selectedModel?.provider, selectedModel?.model]);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const promptConversationKey = activeId ? `${adapter?.id ?? 'research'}:${activeId}` : null;
+  const systemPrompts = useResearchSystemPrompts(promptConversationKey);
   const [showArchived, setShowArchived] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ChatConversationSummary | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
@@ -245,6 +264,7 @@ export function ResearchAssistantModal({
   const stopRequestedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const contextAnchorRef = useRef<HTMLButtonElement | null>(null);
   const contextTriggerRef = useRef<HTMLButtonElement>(null);
   const focusTriggerRef = useRef<HTMLButtonElement>(null);
   const contextPanelRef = useRef<HTMLDivElement>(null);
@@ -273,7 +293,7 @@ export function ResearchAssistantModal({
   }, [settings.chatModel, settings.favorites, settings.synthesisModel, selectedModel]);
 
   const refreshConversations = useCallback(async () => {
-    setConversations(await window.nodus.listConversations(true));
+    setConversations(await apiRef.current.listConversations(true));
   }, []);
 
   useEffect(() => {
@@ -293,13 +313,14 @@ export function ResearchAssistantModal({
   useLayoutEffect(() => {
     if (!showContext) return;
     const place = () => {
-      const rect = (contextTriggerRef.current ?? focusTriggerRef.current)?.getBoundingClientRect();
+      const rect = (contextAnchorRef.current ?? contextTriggerRef.current ?? focusTriggerRef.current)?.getBoundingClientRect();
       if (!rect) return;
       const width = Math.min(420, window.innerWidth - 24);
       const below = window.innerHeight - rect.bottom - 20;
       const above = rect.top - 20;
       const upwards = below < 360 && above > below;
       setContextPanelStyle({
+        '--vault-accent': getComputedStyle((contextAnchorRef.current ?? contextTriggerRef.current ?? focusTriggerRef.current)!).getPropertyValue('--vault-accent'),
         position: 'fixed',
         width,
         left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
@@ -307,7 +328,7 @@ export function ResearchAssistantModal({
         bottom: upwards ? window.innerHeight - rect.top + 8 : 'auto',
         maxHeight: Math.min(720, Math.max(200, upwards ? above : below)),
         zIndex: 10050,
-      });
+      } as CSSProperties);
     };
     place();
     window.addEventListener('resize', place);
@@ -399,7 +420,7 @@ export function ResearchAssistantModal({
     [selection]
   );
 
-  const updateSelection = (key: keyof Omit<ResearchContextSelection, 'graphParts'>, value: boolean) => {
+  const updateSelection = (key: keyof Omit<ResearchContextSelection, 'graphParts' | 'sourceFilter'>, value: boolean) => {
     setSelection((current) => ({ ...current, [key]: value }));
   };
 
@@ -409,12 +430,16 @@ export function ResearchAssistantModal({
 
   const applyMode = (mode: (typeof ASSISTANT_MODES)[number]) => {
     setActiveModeId(mode.id);
-    setSelection(cloneSelection(mode.selection));
+    setSelection(current => ({ ...cloneSelection(mode.selection), sourceFilter: current.sourceFilter }));
     setContextTitle(t(mode.label));
     if (!input.trim()) setInput(t(mode.starter));
   };
 
   const startNewConversation = () => {
+    setSelection(current => { const { sourceFilter, ...rest } = current; return rest; });
+    setThinkingEffort('standard');
+    adapter?.reset?.();
+    if (!activeId) void systemPrompts.select(null);
     setActiveId(null);
     setMessages([]);
     setInput('');
@@ -432,14 +457,15 @@ export function ResearchAssistantModal({
     setStoppedMessageId(null);
     setContextTitle(initialTarget.title ?? null);
     setActiveModeId('custom');
-    if (initialTarget.selection) setSelection(cloneSelection(initialTarget.selection));
+    setSelection(current => cloneSelection(initialTarget.selection ?? { ...current, sourceFilter: undefined }));
     if (initialTarget.prompt) setInput(initialTarget.prompt);
     setShowJumpToBottom(false);
     setCopiedMessageId(null);
   }, [initialTarget]);
 
   const loadConversation = async (id: string) => {
-    const conversation = await window.nodus.getConversation(id);
+    setThinkingEffort('standard');
+    const conversation = await api.getConversation(id);
     if (!conversation) {
       await refreshConversations();
       return;
@@ -447,7 +473,7 @@ export function ResearchAssistantModal({
     setActiveId(conversation.id);
     setMessages(conversation.messages.map((m) => ({ ...m, id: m.id || crypto.randomUUID() })));
     setStoppedMessageId(null);
-    if (conversation.selection) setSelection(cloneSelection(conversation.selection));
+    setSelection(cloneSelection(conversation.selection ?? SYNTHESIS_SELECTION));
     if (conversation.model) setSelectedModel(conversation.model);
     setContextTitle(null);
     setInput('');
@@ -455,13 +481,14 @@ export function ResearchAssistantModal({
   };
 
   const archiveConversation = async (conversation: ChatConversationSummary) => {
-    await window.nodus.archiveConversation(conversation.id, !conversation.archived);
+    await api.archiveConversation?.(conversation.id, !conversation.archived);
     await refreshConversations();
   };
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;
-    await window.nodus.deleteConversation(pendingDelete.id);
+    await api.deleteConversation(pendingDelete.id);
+    await window.nodus.selectResearchSystemPrompt(`${adapter?.id ?? 'research'}:${pendingDelete.id}`, null);
     if (pendingDelete.id === activeId) startNewConversation();
     setPendingDelete(null);
     await refreshConversations();
@@ -469,7 +496,9 @@ export function ResearchAssistantModal({
 
   const persist = useCallback(
     async (conversationId: string, finalMessages: UiMessage[], shouldTitle: boolean) => {
-      const records: ChatMessageRecord[] = finalMessages.map((m) => ({
+      const records: UiMessage[] = finalMessages.map((m) => ({
+        interrupted: m.interrupted,
+        study: m.study,
         id: m.id,
         role: m.role,
         content: m.content,
@@ -477,13 +506,13 @@ export function ResearchAssistantModal({
         stats: m.stats ?? null,
         error: m.error ?? false,
       }));
-      await window.nodus.saveConversationMessages(conversationId, records, { model: selectedModel, selection });
+      await api.saveConversationMessages(conversationId, records, { model: selectedModel, selection });
       if (shouldTitle) {
-        await window.nodus.generateConversationTitle(conversationId, selectedModel).catch(() => '');
+        await api.generateConversationTitle?.(conversationId, selectedModel)?.catch(() => '');
       }
       await refreshConversations();
     },
-    [refreshConversations, selectedModel, selection]
+    [api, refreshConversations, selectedModel, selection]
   );
 
   // Runs one assistant turn against `priorMessages` + a fresh user turn. Shared by
@@ -491,12 +520,12 @@ export function ResearchAssistantModal({
   // pick the prior history and the user prompt.
   const generate = async (conversationId: string, priorMessages: UiMessage[], content: string) => {
     if (!selectedModel) return;
-    const selectionKey = serializeSelection(selection);
+    const selectionKey = adapter?.contextKey ?? serializeSelection(selection);
     const isFirstExchange = priorMessages.length === 0;
     const userMessage: UiMessage = { id: crypto.randomUUID(), role: 'user', content, selectionKey };
     const assistantId = crypto.randomUUID();
     const requestMessages: ResearchChatMessage[] = [
-      ...priorMessages.filter((m) => m.selectionKey === selectionKey && m.content.trim()),
+      ...priorMessages.filter((m) => (m.selectionKey === selectionKey || (adapter && !m.selectionKey)) && !m.error && m.content.trim()),
       userMessage,
     ].map((m) => ({ role: m.role, content: m.content }));
 
@@ -513,8 +542,8 @@ export function ResearchAssistantModal({
 
     let streamed = '';
     try {
-      const response = await window.nodus.researchChatStream(
-        { messages: requestMessages, selection, model: selectedModel, conversationId },
+      const response = await api.researchChatStream(
+        { messages: requestMessages, selection, model: selectedModel, conversationId, thinkingEffort, systemPromptId: systemPrompts.selectedId },
         {
           onDelta: (delta) => {
             streamed += delta;
@@ -544,7 +573,7 @@ export function ResearchAssistantModal({
         ? [
             ...priorMessages,
             userMessage,
-            { id: assistantId, role: 'assistant', content: answer, selectionKey, stats: response.stats },
+            { id: assistantId, role: 'assistant', content: answer, selectionKey, stats: response.stats, ...('message' in response ? response.message : {}), interrupted: aborted },
           ]
         : [...priorMessages, userMessage];
       if (activeIdRef.current === conversationId) {
@@ -590,13 +619,14 @@ export function ResearchAssistantModal({
 
   const send = async (explicit?: string) => {
     const content = (explicit ?? input).trim();
-    if (!content || sending || !selectedModel) return;
+    if (!content || sending || !selectedModel || !systemPrompts.ready || adapter?.canSend === false) return;
 
     // Lazily create the conversation on the first message so empty chats never clutter history.
     let conversationId = activeId;
     if (!conversationId) {
-      const created = await window.nodus.createConversation({ model: selectedModel, selection });
+      const created = await api.createConversation({ model: selectedModel, selection, title: content.slice(0, 80) });
       conversationId = created.id;
+      await window.nodus.selectResearchSystemPrompt(`${adapter?.id ?? 'research'}:${created.id}`, systemPrompts.selectedId);
       setActiveId(created.id);
     }
     // Only the composer's own text is cleared on send; an explicit prompt (a
@@ -608,7 +638,7 @@ export function ResearchAssistantModal({
   // Re-answer the most recent user turn (dropping the answer it produced). Uses the
   // current model + context selection, so it doubles as "try again with this context".
   const regenerateLast = async () => {
-    if (sending || !selectedModel) return;
+    if (sending || !selectedModel || !systemPrompts.ready) return;
     const current = messagesRef.current;
     let lastUserIdx = -1;
     for (let i = current.length - 1; i >= 0; i--) {
@@ -624,7 +654,7 @@ export function ResearchAssistantModal({
 
   const handleStop = () => {
     stopRequestedRef.current = true;
-    void window.nodus.cancelResearchChat();
+    void api.cancelResearchChat();
   };
 
   const serializedModel = selectedModel ? serializeModel(selectedModel) : '';
@@ -638,16 +668,18 @@ export function ResearchAssistantModal({
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 p-4 flex items-center justify-center">
+    <div className={embedded ? "research-chat-surface research-chat-view h-full min-h-0 flex flex-col" : "research-chat-surface fixed inset-0 z-50 bg-black/70 p-4 flex items-center justify-center"} data-testid={embedded ? "research-chat-view" : undefined}>
       <div
-        role="dialog"
-        aria-modal="true"
-        className="w-full max-w-7xl h-[86vh] bg-neutral-950 border border-neutral-800 rounded-lg shadow-2xl flex flex-col overflow-hidden"
+        role={embedded ? "region" : "dialog"}
+        aria-label="Research chat"
+        aria-modal={embedded ? undefined : true}
+        className={embedded ? "w-full h-full min-h-0 bg-neutral-950 flex flex-col overflow-hidden" : "w-full max-w-7xl h-[86vh] bg-neutral-950 border border-neutral-800 rounded-lg shadow-2xl flex flex-col overflow-hidden"}
       >
-        <header className="px-4 py-3 border-b border-neutral-800 flex items-center gap-3">
+        <header className="research-assistant-header px-4 py-3 border-b border-neutral-800 flex items-center gap-3">
+          {embedded && <button className="btn btn-ghost" data-testid="research-history-toggle" aria-label={t('Historial de chats')} title={t('Historial de chats')} aria-expanded={historyOpen} onClick={toggleHistory}><Icon name="clock" size={16} /></button>}
           <div className="flex items-center gap-2 font-semibold">
-            <Icon name="chat" className="text-indigo-300" />
-            {t('Asistente de investigación')}
+            <Icon name="chat" className="research-accent-text" />
+            {embedded ? 'Research chat' : t('Asistente de investigación')}
           </div>
           <select
             className="input text-xs py-1 max-w-xs"
@@ -663,9 +695,9 @@ export function ResearchAssistantModal({
             ))}
           </select>
           <div className="research-assistant-actions">
-          {isGenealogy ? (
+          {adapter ? <button className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1" disabled={sending} onClick={toggleContext}><Icon name="layers" size={15} />{t('Contexto')}</button> : isGenealogy ? (
             <span
-              className="inline-flex items-center gap-1.5 rounded-md border border-amber-900/60 bg-amber-950/20 px-2 py-1 text-xs text-amber-200"
+              className="inline-flex items-center gap-1.5 rounded-md border research-accent-soft px-2 py-1 text-xs research-accent-text"
               title={t('El asistente usa el contexto familiar: personas, parentescos, eventos, documentos y evidencia.')}
             >
               <Icon name="tree" size={13} /> <span className="hidden sm:inline">{t('Contexto familiar')}</span>
@@ -679,24 +711,31 @@ export function ResearchAssistantModal({
               title={t('Elegir qué partes del corpus ve el asistente')}
               aria-haspopup="dialog"
               aria-expanded={showContext}
-              onClick={() => setShowContext((value) => !value)}
+              onClick={(event) => { contextAnchorRef.current = event.currentTarget; setShowContext((value) => !value); }}
             >
-              <Icon name="layers" size={15} className="text-indigo-300" />
+              <Icon name="layers" size={15} className="research-accent-text" />
               <span className="hidden sm:inline">{activeMode ? t(activeMode.label) : t('Contexto')}</span>
               <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
             </button>
           )}
+          {!adapter && !isGenealogy && <ResearchSourceFilterControl key={activeId ?? 'new'} value={selection.sourceFilter} disabled={sending} onChange={async sourceFilter => {
+            const next = { ...selection, sourceFilter };
+            if (activeId) await api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
+            setSelection(next);
+            setShowContext(false);
+          }} />}
+          <ResearchSystemPromptControl prompts={systemPrompts.prompts} selectedId={systemPrompts.selectedId} disabled={sending || !systemPrompts.ready} onSelect={systemPrompts.select} refresh={systemPrompts.refresh} />
           <ChatSkillsControl surface="assistant" disabled={sending} />
-          {!isGenealogy && contextTitle && (
+          {!adapter && !isGenealogy && contextTitle && (
             <button
               type="button"
               ref={focusTriggerRef}
               data-testid="research-focus-trigger"
-              className="hidden md:inline-flex items-center gap-1.5 rounded-md border border-indigo-900/70 bg-indigo-950/25 px-2 py-1 text-xs text-indigo-200"
+              className="hidden md:inline-flex items-center gap-1.5 rounded-md border research-accent-soft px-2 py-1 text-xs research-accent-text"
               title={t('Elegir qué partes del corpus ve el asistente')}
               aria-haspopup="dialog"
               aria-expanded={showContext}
-              onClick={() => setShowContext((value) => !value)}
+              onClick={(event) => { contextAnchorRef.current = event.currentTarget; setShowContext((value) => !value); }}
             >
               <Icon name="fit" size={15} />
               <span className="truncate">{contextTitle}</span>
@@ -704,14 +743,15 @@ export function ResearchAssistantModal({
           )}
           </div>
           <div className="flex-1" />
-          <button className="btn btn-ghost" onClick={onClose} title={t('Cerrar')}>
+          {embedded && <><button className="btn btn-ghost" aria-label={t('Nueva conversación')} title={t('Nueva conversación')} disabled={sending} onClick={startNewConversation}><Icon name="plus" /></button><button className="btn btn-ghost" data-testid="research-context-toggle" aria-label={t('Ámbito y fuentes')} title={t('Ámbito y fuentes')} aria-expanded={contextOpen} onClick={toggleContext}><Icon name="columns" size={16} /></button></>}
+          {!embedded && <button className="btn btn-ghost" onClick={onClose} title={t('Cerrar')}>
             <Icon name="x" />
-          </button>
+          </button>}
         </header>
 
         <div className="flex-1 min-h-0 flex flex-col md:flex-row">
           {/* Conversation history */}
-          <aside className="w-full md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-neutral-800 flex flex-col max-h-48 md:max-h-none">
+          <aside hidden={!historyOpen} data-testid="research-history-sidebar" className="research-chat-history w-full md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-neutral-800 flex flex-col max-h-48 md:max-h-none">
             <div className="p-3 border-b border-neutral-800">
               <button className="btn btn-primary w-full gap-1.5" onClick={startNewConversation} disabled={sending}>
                 <Icon name="plus" /> {t('Nueva conversación')}
@@ -732,8 +772,8 @@ export function ResearchAssistantModal({
                   <ConversationRow
                     conversation={conversation}
                     active={conversation.id === activeId}
-                    onOpen={() => void loadConversation(conversation.id)}
-                    onArchive={() => void archiveConversation(conversation)}
+                    onOpen={() => { if (!sending) void loadConversation(conversation.id); }}
+                    onArchive={api.archiveConversation ? () => void archiveConversation(conversation) : undefined}
                     onDelete={() => setPendingDelete(conversation)}
                   />
                 </div>
@@ -750,27 +790,27 @@ export function ResearchAssistantModal({
             )}
           </aside>
 
-          <section className="flex-1 min-w-0 flex flex-col">
+          <section className="flex-1 min-w-0 min-h-0 flex flex-col">
             <div className="relative flex-1 min-h-0">
               <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-3">
                 {messages.length === 0 && (
                   <div className="h-full flex flex-col items-center justify-center gap-5 px-4 text-center">
                     <div className="flex flex-col items-center gap-2">
-                      <span className="grid h-12 w-12 place-items-center rounded-full border border-indigo-900/70 bg-indigo-950/30 text-indigo-300">
+                      <span className="grid h-12 w-12 place-items-center rounded-full border research-accent-soft research-accent-text">
                         <Icon name="chat" size={22} />
                       </span>
                       <p className="max-w-md text-sm text-neutral-400">
-                        {isGenealogy
+                        {adapter ? t(adapter.subtitle) : isGenealogy
                           ? t('Pregunta sobre personas, parentescos, eventos, documentos y evidencia de la familia.')
                           : t('Pregunta sobre ideas, autores, temas, contradicciones o documentos.')}
                       </p>
                     </div>
                     <div className="flex max-w-xl flex-wrap justify-center gap-2">
-                      {(isGenealogy ? GENEALOGY_SUGGESTIONS : CHAT_SUGGESTIONS).map((suggestion) => (
+                      {(adapter?.suggestions ?? (isGenealogy ? GENEALOGY_SUGGESTIONS : CHAT_SUGGESTIONS)).map((suggestion) => (
                         <button
                           key={suggestion}
                           className="suggestion-chip"
-                          disabled={sending || !selectedModel}
+                          disabled={sending || !selectedModel || !systemPrompts.ready || adapter?.canSend === false}
                           onClick={() => void send(t(suggestion))}
                         >
                           {t(suggestion)}
@@ -786,9 +826,9 @@ export function ResearchAssistantModal({
                     className={`msg-in flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`group relative max-w-[78%] rounded-lg border px-3 py-2 pr-16 text-sm ${
+                      className={`research-message group relative max-w-[78%] rounded-lg border px-3 py-2 text-sm ${message.role === 'assistant' ? 'pr-24' : 'pr-16'} ${
                         message.role === 'user'
-                          ? 'bg-indigo-600 border-indigo-500 text-white whitespace-pre-wrap'
+                          ? 'research-accent-solid text-white whitespace-pre-wrap'
                           : message.error
                             ? 'bg-red-950/40 border-red-800 text-red-200 whitespace-pre-wrap'
                             : 'bg-neutral-900 border-neutral-800 text-neutral-200'
@@ -801,7 +841,7 @@ export function ResearchAssistantModal({
                           message.id !== streamingId &&
                           message.content.trim() && (
                             <button
-                              className="rounded p-1 text-neutral-500 opacity-70 transition hover:bg-neutral-800 hover:text-indigo-300 hover:opacity-100 disabled:opacity-40"
+                              className="rounded p-1 text-neutral-500 opacity-70 transition hover:bg-neutral-800 research-accent-hover hover:opacity-100 disabled:opacity-40"
                               title={t('Regenerar respuesta')}
                               onClick={() => void regenerateLast()}
                               disabled={sending}
@@ -811,7 +851,7 @@ export function ResearchAssistantModal({
                           )}
                         {message.role === 'assistant' && !message.error && message.content.trim() && (
                           <button
-                            className="rounded p-1 text-neutral-500 opacity-70 transition hover:bg-neutral-800 hover:text-indigo-300 hover:opacity-100"
+                            className="rounded p-1 text-neutral-500 opacity-70 transition hover:bg-neutral-800 research-accent-hover hover:opacity-100"
                             title={t('Guardar en notas')}
                             onClick={() =>
                               setNoteTarget({ content: message.content, title: deriveNoteTitle(message.content, contextTitle) })
@@ -823,7 +863,7 @@ export function ResearchAssistantModal({
                         <button
                           className={`rounded p-1 opacity-70 transition hover:opacity-100 ${
                             message.role === 'user'
-                              ? 'text-indigo-100 hover:bg-indigo-500 hover:text-white'
+                              ? 'text-white hover:bg-white/10'
                               : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
                           }`}
                           title={copiedMessageId === message.id ? t('Copiado') : t('Copiar en Markdown')}
@@ -846,7 +886,7 @@ export function ResearchAssistantModal({
                       {message.role === 'assistant' && !message.error ? (
                         message.content ? (
                           <div className={message.id === streamingId ? 'stream-body' : undefined}>
-                            <ChatMarkdown content={message.content} onCitation={handleCitation} streaming={message.id === streamingId} />
+                            {adapter ? adapter.renderMessage(message, message.id === streamingId) : <ChatMarkdown content={message.content} onCitation={handleCitation} streaming={message.id === streamingId} />}
                             {message.id === streamingId && <span aria-hidden className="stream-caret" />}
                           </div>
                         ) : message.id === streamingId ? (
@@ -855,7 +895,7 @@ export function ResearchAssistantModal({
                       ) : (
                         message.content
                       )}
-                      {message.role === 'assistant' && message.id === stoppedMessageId && <ChatAbortedNotice />}
+                      {message.role === 'assistant' && (message.id === stoppedMessageId || message.interrupted) && <ChatAbortedNotice />}
                       {message.error && message.id === lastMessageId && !sending && (
                         <button
                           className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-red-800/70 px-2 py-1 text-xs text-red-200 transition hover:bg-red-900/40"
@@ -886,28 +926,29 @@ export function ResearchAssistantModal({
               )}
             </div>
 
-            <footer className="border-t border-neutral-800 p-3">
-              {/* Centred, not bottom-aligned: the button is 44px against a 60px box, so
-                  aligning their bottoms left it sitting 8px below the middle of the field
-                  it belongs to. It stays centred as the field grows. */}
-              <div className="flex items-center gap-2">
+            <footer className="research-composer-footer">
+              {systemPrompts.error && <p className="text-xs text-red-500 mb-2" role="alert">{systemPrompts.error}</p>}
+              <div className="research-composer">
                 <textarea
                   ref={inputRef}
-                  className="input flex-1 min-h-[52px] max-h-56 resize-none"
-                  rows={2}
+                  className="research-composer-input"
+                  aria-label={t('Pregunta al asistente...')}
+                  rows={1}
                   value={input}
-                  placeholder={activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
+                  placeholder={!adapter && activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                       e.preventDefault();
                       void send();
                     }
                   }}
                 />
+                <ResearchEffortControl model={selectedModel} value={thinkingEffort} onChange={setThinkingEffort} disabled={sending} />
                 {sending ? (
                   <button
-                    className="btn h-11 w-11 shrink-0 px-0 border border-red-800 bg-red-950/40 text-red-200 transition hover:bg-red-900/50"
+                    className="research-composer-send research-composer-stop"
+                    aria-label={t('Detener generación')}
                     title={t('Detener generación')}
                     onClick={handleStop}
                   >
@@ -915,12 +956,13 @@ export function ResearchAssistantModal({
                   </button>
                 ) : (
                   <button
-                    className="btn btn-primary h-11 w-11 shrink-0 px-0"
+                    className="research-composer-send"
+                    aria-label={t('Enviar')}
                     title={t('Enviar')}
                     onClick={() => void send()}
-                    disabled={!input.trim() || !selectedModel}
+                    disabled={!input.trim() || !selectedModel || !systemPrompts.ready || adapter?.canSend === false}
                   >
-                    <Icon name="arrowUp" />
+                    <Icon name="arrowUp" size={23} />
                   </button>
                 )}
               </div>
@@ -935,6 +977,13 @@ export function ResearchAssistantModal({
               </div>
             </footer>
           </section>
+          {embedded && contextOpen && <aside className="research-chat-context w-72 shrink-0 overflow-y-auto border-l border-neutral-800 p-4" data-testid="research-context-sidebar">
+            <div className="mb-4 flex items-center gap-2"><h2 className="text-xs font-semibold">{t('Ámbito y fuentes')}</h2><button className="btn btn-ghost ml-auto" title={t('Ocultar ámbito y fuentes')} onClick={toggleContext}><Icon name="x" size={14} /></button></div>
+            <fieldset disabled={sending} className="min-w-0 space-y-3">{adapter ? adapter.contextPanel : <>
+              <p className="text-xs text-neutral-400">{isGenealogy ? t('El asistente usa el contexto familiar: personas, parentescos, eventos, documentos y evidencia.') : t('Elegir qué partes del corpus ve el asistente')}</p>
+              {!isGenealogy && ASSISTANT_MODES.map(mode => <button key={mode.id} className="btn btn-ghost w-full justify-start" onClick={() => applyMode(mode)}><Icon name={mode.icon} size={15} />{t(mode.label)}{activeModeId === mode.id && <Icon name="check" size={14} />}</button>)}
+            </>}</fieldset>
+          </aside>}
         </div>
       </div>
 
@@ -948,7 +997,7 @@ export function ResearchAssistantModal({
             className="research-context-panel"
           >
             <header className="flex items-center gap-2 border-b border-neutral-800 px-4 py-3">
-              <Icon name="layers" className="text-indigo-300" />
+              <Icon name="layers" className="research-accent-text" />
               <span className="text-sm font-semibold">{t('Contexto del asistente')}</span>
               <span className="text-xs text-neutral-500">
                 {tx('{n} seleccionados', { n: selectedCount })}
@@ -970,7 +1019,7 @@ export function ResearchAssistantModal({
                       key={mode.id}
                       className={`rounded-md border px-2.5 py-2 text-left transition-colors ${
                         activeModeId === mode.id
-                          ? 'border-indigo-700 bg-indigo-950/35'
+                          ? 'research-accent-soft'
                           : 'border-neutral-800 hover:bg-neutral-900'
                       }`}
                       title={t(mode.description)}
@@ -980,7 +1029,7 @@ export function ResearchAssistantModal({
                         <Icon
                           name={mode.icon}
                           size={13}
-                          className={activeModeId === mode.id ? 'text-indigo-300' : 'text-neutral-500'}
+                          className={activeModeId === mode.id ? 'research-accent-text' : 'text-neutral-500'}
                         />
                         <span>{t(mode.label)}</span>
                       </div>
@@ -995,7 +1044,7 @@ export function ResearchAssistantModal({
                   onClick={() => {
                     setActiveModeId('custom');
                     setContextTitle(t('Todo'));
-                    setSelection(cloneSelection(ALL_SELECTION));
+                    setSelection(current => ({ ...cloneSelection(ALL_SELECTION), sourceFilter: current.sourceFilter }));
                   }}
                 >
                   {t('Todo')}
@@ -1005,7 +1054,7 @@ export function ResearchAssistantModal({
                   onClick={() => {
                     setActiveModeId('custom');
                     setContextTitle(t('Manual'));
-                    setSelection(cloneSelection(DEFAULT_SELECTION));
+                    setSelection(current => ({ ...cloneSelection(DEFAULT_SELECTION), sourceFilter: current.sourceFilter }));
                   }}
                 >
                   {t('Nada')}
@@ -1051,7 +1100,7 @@ export function ResearchAssistantModal({
                 />
               </div>
             </div>
-            <footer className="border-t border-neutral-800 p-3">
+            <footer className="research-composer-footer">
               <button className="btn btn-primary w-full" onClick={() => setShowContext(false)}>
                 {t('Listo')}
               </button>
@@ -1115,23 +1164,23 @@ function ConversationRow({
   conversation: ChatConversationSummary;
   active: boolean;
   onOpen: () => void;
-  onArchive: () => void;
+  onArchive?: () => void;
   onDelete: () => void;
 }) {
   return (
     <div
       className={`group rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${
-        active ? 'bg-indigo-600/15 border-indigo-700' : 'border-transparent hover:bg-neutral-900'
+        active ? 'research-accent-soft' : 'border-transparent hover:bg-neutral-900'
       }`}
       onClick={onOpen}
     >
       <div className="flex items-center gap-1.5">
-        <Icon name="chat" size={13} className={`shrink-0 ${active ? 'text-indigo-300' : 'text-neutral-500'}`} />
+        <Icon name="chat" size={13} className={`shrink-0 ${active ? 'research-accent-text' : 'text-neutral-500'}`} />
         <span className={`flex-1 min-w-0 truncate text-sm ${conversation.archived ? 'text-neutral-500 italic' : ''}`}>
           {conversation.title}
         </span>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
+          {onArchive && <button
             className="p-1 rounded text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800"
             title={conversation.archived ? t('Desarchivar') : t('Archivar')}
             onClick={(e) => {
@@ -1140,7 +1189,7 @@ function ConversationRow({
             }}
           >
             <Icon name="archive" size={13} />
-          </button>
+          </button>}
           <button
             className="p-1 rounded text-neutral-500 hover:text-red-400 hover:bg-neutral-800"
             title={t('Eliminar')}
@@ -1175,7 +1224,7 @@ function ContextCheckbox({
     <label className={`flex items-center gap-2 text-sm ${disabled ? 'cursor-not-allowed text-neutral-600' : 'text-neutral-300'}`}>
       <input
         type="checkbox"
-        className="h-4 w-4 accent-indigo-500"
+        className="h-4 w-4 research-accent-checkbox"
         checked={checked}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
@@ -1227,5 +1276,7 @@ function formatRelative(iso: string): string {
 }
 
 function serializeSelection(selection: ResearchContextSelection): string {
-  return JSON.stringify(selection);
+  const { sourceFilter, ...sections } = selection;
+  const filter = normalizeResearchSourceFilter(sourceFilter);
+  return JSON.stringify(filter.enabled ? { ...sections, sourceFilter: filter } : sections);
 }

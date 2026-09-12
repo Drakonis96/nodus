@@ -1,3 +1,4 @@
+import { getResearchSystemPrompts, saveResearchSystemPrompt, selectResearchSystemPrompt, deleteResearchSystemPrompt } from '../db/researchSystemPromptsRepo';
 import { mergeHybridResults, searchSnippet } from '@shared/hybridSearch';
 import { searchVaultContent } from '../ai/vaultContentSearch';
 import { stellarPage, stellarThemes, getStellarSession, saveStellarSession } from '../graph/stellarService';
@@ -185,6 +186,7 @@ import { extractFromPath } from '../extraction/textExtractor';
 import { runDeepScan } from '../ai/deepScan';
 import { summaryContentHash } from '../ai/summaryScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from '../ai/researchAssistant';
+import { listResearchContextSources } from '../ai/researchSourceScope';
 import { answerTutorStep, buildTutorPlan, streamTutorStep } from '../ai/tutor';
 import { buildArgumentMap, discoverArgumentRoutes } from '../ai/argumentMap';
 import { listAuthors, listAuthorsPage, buildAuthorDossier, synthesizeAuthorDossier } from '../ai/authorDossier';
@@ -1603,6 +1605,11 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('argumentMap:discover', async () => discoverArgumentRoutes());
 
   // research chat history
+  h('research:prompts:list', (_e, key?: string | null) => getResearchSystemPrompts(key));
+  h('research:prompts:save', (_e, input: import('@shared/researchSystemPrompts').ResearchSystemPromptInput) => saveResearchSystemPrompt(input));
+  h('research:prompts:select', (_e, key: string, id: string | null) => selectResearchSystemPrompt(key, id));
+  h('research:prompts:delete', (_e, id: string) => deleteResearchSystemPrompt(id));
+  h('research:contextSources', async () => listResearchContextSources());
   h('chat:list', async (_e, includeArchived?: boolean) => chat.listConversations(includeArchived ?? false));
   h('chat:get', async (_e, id: string) => chat.getConversation(id));
   h('chat:create', async (_e, input: { model?: ModelRef | null; selection?: ResearchContextSelection | null }) =>
