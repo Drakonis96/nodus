@@ -348,6 +348,14 @@ try {
     'invented and policy-ineligible source links are stripped from model answers',
   );
 
+  const semanticIds = research.primarySourceSemanticItemIds({ query: 'concepto ausente' });
+  assert.ok(semanticIds.includes(item.itemId), 'semantic candidates do not require literal query overlap');
+  assert.ok(!semanticIds.includes(restricted.itemId), 'restricted source vectors stay out of semantic retrieval');
+  assert.deepEqual(research.primarySourceSemanticItemIds({ query: 'concepto ausente', filters: { repositoryId: 'nonexistent' } }), [], 'repository filters apply before vector top-k');
+  const semanticOnly = research.searchPrimarySourceCorpus({ query: 'concepto ausente', filters: { layers: ['metadata'] } }, new Map([[item.itemId, .9]]));
+  assert.ok(semanticOnly.results.some((row) => row.itemId === item.itemId), 'semantic-only sources can enter the unified ranking');
+  assert.ok(semanticOnly.results.every((row) => row.layer === 'metadata'), 'semantic matches keep the layer filter');
+
   const dashboard = research.getPrimarySourceOperationalDashboard();
   assert.ok(dashboard.metrics.descriptionUnits >= 2);
   assert.equal(dashboard.metrics.citationReadySources, 1);

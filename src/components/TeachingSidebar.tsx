@@ -5,6 +5,7 @@ import { orderSidebarItems } from '../navigation';
 
 /** Views the teaching vault has already wired up (reused from the study workspace). */
 export type TeachingView =
+  | 'studySearch'
   | 'studyCourses'
   | 'studySchedule'
   | 'studyCalendar'
@@ -35,6 +36,7 @@ export function teachingItemId(item: TeachingItem): string {
  */
 export const TEACHING_GROUPS: TeachingGroup[] = [
   { id: 'teaching-organization', label: 'Organización', items: [
+    { label: 'Buscar', icon: 'search', view: 'studySearch' },
     { label: 'Cursos, asignaturas y grupos', icon: 'graduation', view: 'studyCourses' },
     { label: 'Grupos', icon: 'users', view: 'teachingGroups' },
     { label: 'Horarios', icon: 'clock', view: 'studySchedule' },

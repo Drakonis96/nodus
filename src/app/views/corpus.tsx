@@ -15,6 +15,7 @@ const ReadingPathView = lazy(() => import('../../views/ReadingPathView').then((m
 const DeepResearchView = lazy(() => import('../../views/DeepResearchView').then((module) => ({ default: module.DeepResearchView })));
 const ImmersionView = lazy(() => import('../../views/ImmersionView').then((module) => ({ default: module.ImmersionView })));
 const WorkspaceView = lazy(() => import('../../views/WorkspaceView').then((module) => ({ default: module.WorkspaceView })));
+const WorldSearchView = lazy(() => import('../../views/WorldSearchView').then((module) => ({ default: module.WorldSearchView })));
 const SearchView = lazy(() => import('../../views/SearchView').then((module) => ({ default: module.SearchView })));
 const PrimarySourcesSearchView = lazy(() => import('../../views/PrimarySourcesSearchView').then((module) => ({ default: module.PrimarySourcesSearchView })));
 const PrimarySourcesNotesView = lazy(() => import('../../views/PrimarySourcesNotesView').then((module) => ({ default: module.PrimarySourcesNotesView })));
@@ -160,6 +161,7 @@ export const corpusViews = {
   // found are passages with their speaker, their minute and their access condition.
   // Same sidebar section, different engine behind it.
   search: ({ activeVault, isPrimarySources, isTestimonios, navigate, openNoteFromSearch, openPrimarySourceTarget, openTestimonyInterview, setNoteTarget, setPersonsTarget, setView }) => {
+    if (activeVault?.type === 'worldbuilding') return <WorldSearchView onNavigate={setView} />;
     if (isTestimonios) {
       return (
         <TestimonySearchView

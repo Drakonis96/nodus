@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright-core';
+import fs from 'node:fs/promises';
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const errors = [];
+page.on('pageerror', (error) => errors.push(String(error)));
+const root = 'http://127.0.0.1:5193/visual-tests/unified-search-harness.html';
+const counts = { academic: 7, genealogy: 6, primary_sources: 11, estudio: 5, docencia: 5, testimonios: 6, databases: 2, prosopography: 4, worldbuilding: 8 };
+try {
+  for (const [vault, count] of Object.entries(counts)) {
+    await page.goto(`${root}?vault=${vault}`);
+    await page.getByRole('group', { name: 'Tipo de contenido' }).waitFor();
+    const filters = page.getByRole('group', { name: 'Tipo de contenido' }).getByRole('button');
+    assert.equal(await filters.count(), count, `${vault} filters`);
+    assert.equal(await page.getByRole('button', { name: 'Texto', exact: true }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Significado', exact: true }).count(), 0);
+    await page.locator('input').first().fill('memoria oral');
+    await page.waitForTimeout(500);
+    await filters.first().click();
+    assert.equal(await filters.first().getAttribute('aria-pressed'), 'false');
+    await page.waitForTimeout(400);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, `${vault} horizontal overflow`);
+    console.log(`PASS ${vault}: ${count} filters, query, toggle, layout`);
+  }
+  await page.goto(root);
+  await page.locator('input').first().fill('memoria oral');
+  await page.getByText('Recuerdos compartidos', { exact: true }).waitFor();
+  const titles = await page.locator('li button .truncate.text-sm').allTextContents();
+  assert.deepEqual(titles, ['Memoria oral', 'Archivo de memoria oral', 'Recuerdos compartidos']);
+  assert.equal(await page.getByText('Archivo de memoria oral', { exact: true }).count(), 1);
+  await page.locator('input').first().fill('antigua');
+  await page.waitForTimeout(300);
+  await page.locator('input').first().fill('memoria oral');
+  await page.waitForTimeout(1000);
+  assert.equal(await page.getByText('RESPUESTA ANTIGUA').count(), 0);
+  await fs.mkdir('docs/verification/unified-search', { recursive: true });
+  await page.screenshot({ path: 'docs/verification/unified-search/academic-light.png', fullPage: true });
+  await page.goto(`${root}?vault=databases&dark`);
+  await page.locator('input').first().fill('memoria oral');
+  await page.getByText('Recuerdos compartidos', { exact: true }).waitFor();
+  await page.screenshot({ path: 'docs/verification/unified-search/databases-dark.png', fullPage: true });
+  await page.goto(`${root}?fail`);
+  await page.locator('input').first().fill('memoria oral');
+  await page.getByText('Memoria oral', { exact: true }).waitFor();
+  await page.waitForTimeout(400);
+  assert.equal(await page.getByText('Archivo de memoria oral', { exact: true }).count(), 1);
+  assert.equal(errors.length, 0, errors.join('\n'));
+  console.log('PASS deduplication, cross-kind order, stale responses, provider failure, no browser errors');
+} finally { await browser.close(); }

@@ -1,3 +1,4 @@
+import { searchPrimarySourceHybrid } from '../ai/primarySourceSearch';
 // primarySources channels, moved verbatim out of the monolithic registerIpc.
 // The channel names are unchanged; scripts/test-ipc-contract.mjs is what proves it.
 import type { IpcContext } from './context';
@@ -372,7 +373,7 @@ export function registerPrimarySourcesIpc({ h, getWindow }: IpcContext): void {
     const started = performance.now();
     let success = false;
     try {
-      const response = searchPrimarySourceCorpus(request);
+      const response = await searchPrimarySourceHybrid(request);
       success = true;
       return response;
     } finally {

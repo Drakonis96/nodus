@@ -61,153 +61,182 @@ function parseAuthors(json: string | null): string[] {
   return [];
 }
 
-export function globalSearch(query: string, limitPerKind = 8): GlobalSearchResult[] {
+export function globalSearch(query: string, limitPerKind = 8, browse = false, kinds?: ReadonlySet<SearchResultKind>): GlobalSearchResult[] {
   const q = query.trim();
-  if (q.length < 2) return [];
+  if (q.length < 2 && !browse) return [];
   const like = likeParam(q);
   const db = getDb();
   const results: GlobalSearchResult[] = [];
 
-  const ideas = db
-    .prepare(
-      `SELECT global_id, type, label, statement FROM ideas
-        WHERE orphaned_at IS NULL
-          AND (label LIKE ? ESCAPE '\\' OR statement LIKE ? ESCAPE '\\')
-        ORDER BY length(label) ASC LIMIT ?`
-    )
-    .all(like, like, limitPerKind) as IdeaRow[];
-  for (const r of ideas) {
-    results.push({
-      kind: 'idea',
-      id: r.global_id,
-      title: r.label,
-      snippet: snippet(r.statement),
-      ideaType: r.type,
-    });
+  if (!kinds || kinds.has('idea')) {
+    const ideas = db
+      .prepare(
+        `SELECT global_id, type, label, statement FROM ideas
+          WHERE orphaned_at IS NULL
+            AND (label LIKE ? ESCAPE '\\' OR statement LIKE ? ESCAPE '\\')
+          ORDER BY length(label) ASC LIMIT ?`
+      )
+      .all(like, like, limitPerKind) as IdeaRow[];
+    for (const r of ideas) {
+      results.push({
+        kind: 'idea',
+        id: r.global_id,
+        title: r.label,
+        snippet: snippet(r.statement, browse ? Number.MAX_SAFE_INTEGER : 140),
+        ideaType: r.type,
+      });
+    }
   }
 
-  const works = db
-    .prepare(
-      `SELECT nodus_id, title, authors_json, year, zotero_key FROM works
-        WHERE archived = 0 AND (title LIKE ? ESCAPE '\\' OR authors_json LIKE ? ESCAPE '\\')
-        ORDER BY length(title) ASC LIMIT ?`
-    )
-    .all(like, like, limitPerKind) as WorkRow[];
-  for (const r of works) {
-    const authors = parseAuthors(r.authors_json);
-    const sub = [authors.slice(0, 3).join('; ') || null, r.year ? String(r.year) : null]
-      .filter(Boolean)
-      .join(' · ');
-    results.push({
-      kind: 'work',
-      id: r.nodus_id,
-      title: r.title || '(sin título)',
-      subtitle: sub || null,
-      zoteroKey: r.zotero_key,
-    });
+  if (!kinds || kinds.has('work')) {
+    const works = db
+      .prepare(
+        `SELECT nodus_id, title, authors_json, year, zotero_key FROM works
+          WHERE archived = 0 AND (title LIKE ? ESCAPE '\\' OR authors_json LIKE ? ESCAPE '\\')
+          ORDER BY length(title) ASC LIMIT ?`
+      )
+      .all(like, like, limitPerKind) as WorkRow[];
+    for (const r of works) {
+      const authors = parseAuthors(r.authors_json);
+      const sub = [authors.slice(0, 3).join('; ') || null, r.year ? String(r.year) : null]
+        .filter(Boolean)
+        .join(' · ');
+      results.push({
+        kind: 'work',
+        id: r.nodus_id,
+        title: r.title || '(sin título)',
+        subtitle: sub || null,
+        zoteroKey: r.zotero_key,
+      });
+    }
   }
 
-  const gaps = db
-    .prepare(
-      `SELECT id, kind, statement FROM gaps
-        WHERE statement LIKE ? ESCAPE '\\'
-        ORDER BY confidence DESC LIMIT ?`
-    )
-    .all(like, limitPerKind) as GapRow[];
-  for (const r of gaps) {
-    results.push({
-      kind: 'gap',
-      id: r.id,
-      title: snippet(r.statement, 120) ?? r.statement,
-      gapKind: r.kind as GapKind,
-    });
+  if (!kinds || kinds.has('gap')) {
+    const gaps = db
+      .prepare(
+        `SELECT id, kind, statement FROM gaps
+          WHERE statement LIKE ? ESCAPE '\\'
+          ORDER BY confidence DESC LIMIT ?`
+      )
+      .all(like, limitPerKind) as GapRow[];
+    for (const r of gaps) {
+      results.push({
+        kind: 'gap',
+        id: r.id,
+        title: snippet(r.statement, 120) ?? r.statement,
+        snippet: snippet(r.statement, browse ? Number.MAX_SAFE_INTEGER : 140),
+        gapKind: r.kind as GapKind,
+      });
+    }
   }
 
-  const themes = db
-    .prepare(
-      `SELECT theme_id, label FROM themes
-        WHERE label LIKE ? ESCAPE '\\'
-        ORDER BY length(label) ASC LIMIT ?`
-    )
-    .all(like, limitPerKind) as ThemeRow[];
-  for (const r of themes) {
-    results.push({ kind: 'theme', id: r.theme_id, title: r.label, themeLabel: r.label });
+  if (!kinds || kinds.has('theme')) {
+    const themes = db
+      .prepare(
+        `SELECT theme_id, label FROM themes
+          WHERE label LIKE ? ESCAPE '\\'
+          ORDER BY length(label) ASC LIMIT ?`
+      )
+      .all(like, limitPerKind) as ThemeRow[];
+    for (const r of themes) {
+      results.push({ kind: 'theme', id: r.theme_id, title: r.label, themeLabel: r.label });
+    }
   }
 
-  const authors = db
-    .prepare(
-      `SELECT author_id, name, affiliation FROM authors
-        WHERE name LIKE ? ESCAPE '\\'
-        ORDER BY length(name) ASC LIMIT ?`
-    )
-    .all(like, limitPerKind) as AuthorRow[];
-  for (const r of authors) {
-    results.push({
-      kind: 'author',
-      id: r.author_id,
-      title: r.name,
-      subtitle: r.affiliation || null,
-    });
+  if (!kinds || kinds.has('author')) {
+    const authors = db
+      .prepare(
+        `SELECT author_id, name, affiliation FROM authors
+          WHERE name LIKE ? ESCAPE '\\'
+          ORDER BY length(name) ASC LIMIT ?`
+      )
+      .all(like, limitPerKind) as AuthorRow[];
+    for (const r of authors) {
+      results.push({
+        kind: 'author',
+        id: r.author_id,
+        title: r.name,
+        subtitle: r.affiliation || null,
+      });
+    }
   }
 
-  const notes = db
-    .prepare(
-      `SELECT id, title, kind, content FROM notes
-        WHERE trashed_at IS NULL AND (title LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\')
-        ORDER BY updated_at DESC LIMIT ?`
-    )
-    .all(like, like, limitPerKind) as NoteRow[];
-  for (const r of notes) {
-    results.push({
-      kind: 'note',
-      id: r.id,
-      title: r.title || '(nota sin título)',
-      snippet: snippet(r.content),
-    });
+  if (!kinds || kinds.has('note')) {
+    const notes = db
+      .prepare(
+        `SELECT id, title, kind, content FROM notes
+          WHERE trashed_at IS NULL AND (title LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\')
+          ORDER BY updated_at DESC LIMIT ?`
+      )
+      .all(like, like, limitPerKind) as NoteRow[];
+    for (const r of notes) {
+      results.push({
+        kind: 'note',
+        id: r.id,
+        title: r.title || '(nota sin título)',
+        snippet: snippet(r.content, browse ? Number.MAX_SAFE_INTEGER : 140),
+      });
+    }
+
+    // ── Records / genealogy (empty and cheap in academic vaults) ────────────────
   }
 
-  // ── Records / genealogy (empty and cheap in academic vaults) ────────────────
-  const persons = db
-    .prepare(
-      `SELECT p.person_id, p.display_name, p.national_id, p.birth_date, p.death_date FROM persons p
-        LEFT JOIN person_names n ON n.person_id = p.person_id
-        WHERE p.display_name LIKE ? ESCAPE '\\' OR p.national_id LIKE ? ESCAPE '\\' OR n.name LIKE ? ESCAPE '\\'
-        GROUP BY p.person_id ORDER BY length(p.display_name) ASC LIMIT ?`
-    )
-    .all(like, like, like, limitPerKind) as { person_id: string; display_name: string; national_id: string | null; birth_date: string | null; death_date: string | null }[];
-  for (const r of persons) {
-    const life = [r.birth_date, r.death_date].map((d) => d?.trim()).filter(Boolean).join(' – ');
-    results.push({ kind: 'person', id: r.person_id, title: r.display_name, subtitle: [r.national_id, life].filter(Boolean).join(' · ') || null });
+  if (!kinds || kinds.has('person')) {
+    const persons = db
+      .prepare(
+        `SELECT p.person_id, p.display_name, p.national_id, p.birth_date, p.death_date FROM persons p
+          LEFT JOIN person_names n ON n.person_id = p.person_id
+          WHERE p.display_name LIKE ? ESCAPE '\\' OR p.national_id LIKE ? ESCAPE '\\' OR n.name LIKE ? ESCAPE '\\'
+          GROUP BY p.person_id ORDER BY length(p.display_name) ASC LIMIT ?`
+      )
+      .all(like, like, like, limitPerKind) as { person_id: string; display_name: string; national_id: string | null; birth_date: string | null; death_date: string | null }[];
+    for (const r of persons) {
+      const life = [r.birth_date, r.death_date].map((d) => d?.trim()).filter(Boolean).join(' – ');
+      results.push({ kind: 'person', id: r.person_id, title: r.display_name, subtitle: [r.national_id, life].filter(Boolean).join(' · ') || null });
+    }
   }
 
-  const events = db
-    .prepare(
-      `SELECT e.event_id, e.type, e.label, e.date, pl.name AS place_name FROM events e
-        LEFT JOIN places pl ON pl.place_id = e.place_id
-        WHERE e.label LIKE ? ESCAPE '\\' OR e.date LIKE ? ESCAPE '\\' OR pl.name LIKE ? ESCAPE '\\'
-        ORDER BY (e.date_sort IS NULL), e.date_sort ASC LIMIT ?`
-    )
-    .all(like, like, like, limitPerKind) as { event_id: string; type: string; label: string | null; date: string | null; place_name: string | null }[];
-  for (const r of events) {
-    const title = r.label?.trim() || [searchEventTypeLabel(r.type), r.date?.trim()].filter(Boolean).join(' · ');
-    results.push({ kind: 'event', id: r.event_id, title, subtitle: r.place_name || null });
+  if (!kinds || kinds.has('event')) {
+    const events = db
+      .prepare(
+        `SELECT e.event_id, e.type, e.label, e.date, pl.name AS place_name FROM events e
+          LEFT JOIN places pl ON pl.place_id = e.place_id
+          WHERE e.label LIKE ? ESCAPE '\\' OR e.date LIKE ? ESCAPE '\\' OR pl.name LIKE ? ESCAPE '\\'
+          ORDER BY (e.date_sort IS NULL), e.date_sort ASC LIMIT ?`
+      )
+      .all(like, like, like, limitPerKind) as { event_id: string; type: string; label: string | null; date: string | null; place_name: string | null }[];
+    for (const r of events) {
+      const title = r.label?.trim() || [searchEventTypeLabel(r.type), r.date?.trim()].filter(Boolean).join(' · ');
+      results.push({ kind: 'event', id: r.event_id, title, subtitle: r.place_name || null });
+    }
   }
 
-  const archive = db
-    .prepare(
-      `SELECT item_id, title, doc_type, extracted_text, description FROM archive_items
-        WHERE title LIKE ? ESCAPE '\\' OR extracted_text LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\'
-        ORDER BY updated_at DESC LIMIT ?`
-    )
-    .all(like, like, like, limitPerKind) as { item_id: string; title: string; doc_type: string | null; extracted_text: string | null; description: string | null }[];
-  for (const r of archive) {
-    results.push({
-      kind: 'archive',
-      id: r.item_id,
-      title: r.title || '(documento sin título)',
-      subtitle: r.doc_type || null,
-      snippet: snippet(r.extracted_text ?? r.description),
-    });
+  if (!kinds || kinds.has('archive')) {
+    const archive = db
+      .prepare(
+        `SELECT item_id, title, doc_type, extracted_text, description FROM archive_items
+          WHERE title LIKE ? ESCAPE '\\' OR extracted_text LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\'
+          ORDER BY updated_at DESC LIMIT ?`
+      )
+      .all(like, like, like, limitPerKind) as { item_id: string; title: string; doc_type: string | null; extracted_text: string | null; description: string | null }[];
+    for (const r of archive) {
+      results.push({
+        kind: 'archive',
+        id: r.item_id,
+        title: r.title || '(documento sin título)',
+        subtitle: r.doc_type || null,
+        snippet: snippet(r.extracted_text ?? r.description, browse ? Number.MAX_SAFE_INTEGER : 140),
+      });
+    }
+  }
+
+  if (!kinds || kinds.has('passage')) {
+    const passages = db.prepare(`SELECT p.passage_id, p.nodus_id, p.text, p.page_label, w.title, w.zotero_key
+      FROM passages p JOIN works w ON w.nodus_id=p.nodus_id
+      WHERE w.archived=0 AND p.text LIKE ? ESCAPE '\\' ORDER BY length(p.text) LIMIT ?`)
+      .all(like, limitPerKind) as Array<{ passage_id: string; nodus_id: string; text: string; page_label: string | null; title: string; zotero_key: string | null }>;
+    for (const row of passages) results.push({ kind: 'passage', id: row.passage_id, nodusId: row.nodus_id,
+      title: row.title, snippet: snippet(row.text, browse ? Number.MAX_SAFE_INTEGER : 200), pageLabel: row.page_label, zoteroKey: row.zotero_key });
   }
 
   return results;

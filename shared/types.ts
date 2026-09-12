@@ -6196,6 +6196,8 @@ export interface GlobalSearchResult {
   gapKind?: GapKind | null;
   /** Themes only: the theme label used as a graph filter. */
   themeLabel?: string | null;
+  /** Unified relevance used to order literal and semantic matches together. */
+  relevance?: number;
   /** Semantic results only: cosine similarity in [0,1]. */
   similarity?: number | null;
 }
@@ -6217,7 +6219,7 @@ export interface GlobalSearchResponse {
 }
 
 /** Which retrieval strategy the search box uses. */
-export type SearchMode = 'text' | 'semantic';
+export type SearchMode = 'text' | 'semantic' | 'hybrid';
 
 export interface SemanticSearchOptions {
   /** Which result kinds to include. Empty/undefined ⇒ ideas, passages and works. */
