@@ -8753,6 +8753,7 @@ export interface BrowserApi {
   clearAllBrowserData(): Promise<import('./browser').BrowserStorageReport>;
   /** Global Nodus data. Never exposed to the untrusted Browser-page preload. */
   getBrowserBookmarks(): Promise<import('./browserBookmarks').BrowserBookmarkStore>;
+  resolveBrowserBookmarkFavicons(ids: string[]): Promise<void>;
   getCurrentBrowserBookmarkCandidate(): Promise<import('./browserBookmarks').BrowserBookmarkCandidate | null>;
   createBrowserBookmark(draft: import('./browserBookmarks').BrowserBookmarkDraft): Promise<{
     store: import('./browserBookmarks').BrowserBookmarkStore;

@@ -26,6 +26,10 @@ export function BrowserBookmarksManager({ store, onClose, onEdit, onCreate, onNo
   }, [busy, onClose]);
 
   const visibleIds = useMemo(() => new Set(searchBrowserBookmarks(store, query).map((hit) => hit.bookmark.id)), [query, store]);
+  const missingFaviconKey = store.bookmarks.filter((bookmark) => !bookmark.faviconDataUrl).map((bookmark) => bookmark.id).join('\n');
+  useEffect(() => {
+    if (missingFaviconKey) void window.nodus.resolveBrowserBookmarkFavicons(missingFaviconKey.split('\n'));
+  }, [missingFaviconKey]);
   const saveFolder = async () => {
     if (!folderEditor?.name.trim()) return;
     setBusy(true);
