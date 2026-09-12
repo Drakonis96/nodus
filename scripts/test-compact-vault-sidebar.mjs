@@ -36,6 +36,21 @@ test('a sufficiently narrow vault sidebar becomes an accessible icon rail', asyn
   );
   assert.doesNotMatch(app, /sidebarCompact && IS_MAC \? 'pt-8'/);
   assert.match(app, /<span className=\{sidebarCompact \? 'sr-only' : undefined\}>\{t\(n\.label\)\}<\/span>/);
+  assert.match(
+    app,
+    /<Tooltip key=\{n\.id\} label=\{t\(n\.label\)\} placement="right">\{button\}<\/Tooltip>/,
+    'compact sidebar nav items show a shared tooltip instead of a native title',
+  );
+  assert.match(
+    app,
+    /<Tooltip label=\{t\('Nueva base de datos'\)\} placement=\{sidebarCompact \? 'right' : 'bottom'\}>/,
+    'the databases new-database button keeps a tooltip when the sidebar collapses',
+  );
+  assert.doesNotMatch(
+    app,
+    /title=\{sidebarCompact \?/,
+    'compact sidebar buttons no longer rely on native titles',
+  );
   assert.match(app, /<TeachingSidebar\s+compact=\{sidebarCompact\}/s);
   assert.match(app, /<StudySidebar\s+compact=\{sidebarCompact\}/s);
   assert.match(app, /<WorldbuildingSidebar\s+compact=\{sidebarCompact\}/s);
@@ -48,5 +63,8 @@ test('a sufficiently narrow vault sidebar becomes an accessible icon rail', asyn
     assert.match(source, /compact = false/);
     assert.match(source, /compact \? 'sr-only'/);
     assert.match(source, /aria-label=\{compact \?/);
+    assert.match(source, /<Tooltip .*placement="right">\{button\}<\/Tooltip>/);
+    assert.doesNotMatch(source, /title=\{compact \? t\(/, 'collapsed sidebar buttons no longer use native title labels');
+    assert.doesNotMatch(source, /title=\{compact \? db\.name/);
   }
 });
