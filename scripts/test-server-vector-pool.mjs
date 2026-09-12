@@ -43,33 +43,36 @@ test('a search on worker threads leaves the event loop free, and inline does not
   assert.equal(inline.pool.threads, 0, 'NODUS_VECTOR_WORKERS=0 must not start a thread');
 
   assert.ok(pooled.pool.threads >= 1, 'the pooled arm must actually have used a thread');
-  assert.ok(pooled.ticks > 0, 'the pooled search must leave the loop running at all');
 
-  // Not a tick count: how many times a loop comes around in a given window is a property of
-  // the machine, and on a loaded build runner the same healthy loop manages a fraction of
-  // what an idle laptop does — which is how a threshold of ten came to fail at eight.
+  // No threshold on how much of the loop was left, because there is no honest one.
   //
-  // What the fix was actually for is that the server keeps answering, so that is what is
-  // measured: the longest the loop went unable to run anything. Compared against the arm
-  // that blocks outright, on the same machine in the same run, so a slow host slows both.
-  // Against what this machine manages with nothing running, not against a number written
-  // here. How many times a loop comes around in a given window belongs to the host: an idle
-  // laptop and a build runner sharing its cores differ by more than the margin any fixed
-  // threshold can hold, which is how "at least ten" came to fail at eight on a green tree.
+  // Two have now been tried and both failed on a healthy tree. "At least ten ticks" failed
+  // at eight. Its replacement compared the search against what the same machine manages
+  // idle, on the reasoning that a ratio survives a slow host -- and it failed at 8% on a
+  // macOS runner whose longest pause was 3.9 ms, which is a loop answering every four
+  // milliseconds reported as a defect.
   //
-  // The ratio does not have that problem. Blocked is zero however slow the host is, and a
-  // loop that is merely busy keeps a large share of its own capacity: measured at 0.84 idle
-  // and 0.43 with four of these running at once, against a tenth required here.
-  const shareOf = arm => arm.ticks / Math.max(arm.idleTicks, 1);
-  // The control for the threshold, from the arm that is the defect: it is zero, and stays
-  // zero on any host, because no macrotask runs while synchronous code holds the thread.
-  assert.equal(shareOf(inline), 0, 'the blocked arm is what this threshold is drawn to exclude');
-
-  const share = shareOf(pooled);
+  // The ratio was wrong for a specific reason worth keeping: the two windows are not
+  // comparable. The search window has a worker saturating a core and the idle window has
+  // nothing, so where cores are already spoken for the ratio measures how many are free
+  // rather than whether the loop was blocked. The longest pause is no better -- measured
+  // here under deliberate oversubscription it reached 72.8 ms on a run whose loop ticked
+  // 883 times, because the operating system descheduled the whole process, which is not a
+  // property of this code. Under that same load the share ranged from 0.26 to 1.33.
+  //
+  // What is exact on every host is the boundary, and it is asserted above in both
+  // directions: blocked is zero ticks, and it is zero because no macrotask can run while
+  // synchronous code holds the thread -- not nearly zero, not usually zero. Off the thread
+  // is more than zero. That is the defect and its fix, and it is the whole of what a shared
+  // build runner can be asked. The numbers below travel with a failure so a real regression
+  // can be read, and they are reported rather than thresholded.
+  const shareOfIdle = pooled.ticks / Math.max(pooled.idleTicks, 1);
   assert.ok(
-    share >= 0.1,
-    `the pooled search left the loop ${(share * 100).toFixed(0)}% of the capacity it has when idle`
-    + ` (${pooled.ticks} ticks against ${pooled.idleTicks}, longest pause ${pooled.longestGapMs.toFixed(1)} ms)`,
+    pooled.ticks > 0,
+    `the pooled search blocked the loop as completely as the inline one:`
+    + ` ${pooled.ticks} ticks against ${pooled.idleTicks} idle`
+    + ` (${(shareOfIdle * 100).toFixed(0)}% of idle capacity, longest pause`
+    + ` ${pooled.longestGapMs.toFixed(1)} ms, search ${pooled.elapsedMs.toFixed(0)} ms)`,
   );
 });
 
