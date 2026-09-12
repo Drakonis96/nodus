@@ -50,6 +50,22 @@ Its strongest tools include semantic search, an idea graph, author profiles, cov
 
 ![Academic vault demo with a twelve-theme knowledge graph in Nodus Research](docs/screenshots/readme-academic-demo.jpg)
 
+Open a theme to explore how its ideas connect, following relationships from one idea to the next.
+
+![Relationships between ideas in the Retrieval practice theme in Nodus Research](docs/screenshots/readme-academic-theme-relations.jpg)
+
+The argument map arranges connected claims into visual branches, making supporting, extending and conflicting ideas easier to follow.
+
+![Nodus Research argument map with connected claims and color-coded relationship branches](docs/screenshots/readme-academic-argument-map.jpg)
+
+Deep Research brings findings, limitations and future questions into a saved report, shown here with an AI-generated illustration.
+
+![Nodus Research Deep Research report on learning science with an AI-generated illustration](docs/screenshots/readme-academic-deep-research.jpg)
+
+Immersion turns a topic into a guided learning route with explanations, author perspectives and practice questions, with an optional image to introduce the session.
+
+![Nodus Research Immersion learning route with an AI-generated illustration](docs/screenshots/readme-academic-immersion.jpg)
+
 ### Genealogy vault
 
 Document people, relationships and evidence in a research-led family archive. The tree, timeline, map and records library stay connected so that a family story never loses its documentary basis.
