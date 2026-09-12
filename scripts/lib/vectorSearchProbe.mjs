@@ -38,9 +38,11 @@ const set = corpus();
 // could have answered somebody else while this search was in flight.
 //
 // The count alone is a throughput number, and throughput depends on the machine — a busy
-// build runner turns "how many" into a coin toss. So the gaps between beats are recorded
-// too: the longest one is how long the server went unable to answer, which is the thing the
-// defect was about, and it can be compared against the arm that blocks outright.
+// build runner turns "how many" into a coin toss. The gaps between beats are recorded too,
+// and so is what this loop manages with nothing running. Neither is a threshold: both were
+// tried as one and both failed on a healthy tree, for reasons the test sets out. They are
+// reported so that a failure of the one thing that is exact — blocked is zero, off-thread is
+// not — can be read without guessing at the machine it happened on.
 let ticks = 0;
 let beating = true;
 let last = performance.now();
