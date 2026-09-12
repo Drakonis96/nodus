@@ -1032,7 +1032,6 @@ function Sidebar({
         sidebarOrder={sidebarOrder}
         sidebarHidden={[...sidebarHidden, ...SERVER_TOOL_VIEWS]}
         onNavigate={(view) => onNavigate(view)}
-        onOpenRoadmap={() => onNavigate("settings")}
       />
     ) : null;
   if (specialized) {
