@@ -35,7 +35,7 @@ await build({
       export * from './electron/capabilities/marketplaceV2';
       export * from './electron/capabilities/updates';
       export * from './electron/capabilities/skillLibrary';
-      export { listChatSkills, saveChatSkill, replaceChatSkills } from './electron/chatSkills';
+      export { listChatSkills, saveChatSkill, replaceChatSkills, restorePluginSkillAuthorVersion } from './electron/chatSkills';
     `,
     resolveDir: root, loader: 'ts',
   },
@@ -345,4 +345,9 @@ test('bundled workflows wait for migrations, then survive updates and rollback w
   assert.equal(rolledBack.version, '2.0.0');
   assert.equal(rolledBack.instructions, 'My edited workflow.');
   assert.deepEqual(rolledBack.enabled, { assistant: true, nodi: false });
+  const [restored] = lib.restorePluginSkillAuthorVersion(skill.id);
+  assert.equal(restored.instructions, 'Ask for a country.');
+  assert.equal(restored.id, skill.id);
+  assert.deepEqual(restored.enabled, rolledBack.enabled);
+  assert.equal(restored.overrides, undefined);
 });

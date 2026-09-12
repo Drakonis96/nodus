@@ -93,7 +93,7 @@ try {
       import { runTrustedChatPipeline } from './electron/capabilities/chatPipeline';
       import { chatAssetOwner } from './electron/chatAssets';
       import { materializeTrustedPluginSkills } from './electron/capabilities/skillLibrary';
-      import { listChatSkills, saveChatSkill, enabledChatSkills } from './electron/chatSkills';
+      import { listChatSkills, saveChatSkill, enabledChatSkills, restorePluginSkillAuthorVersion } from './electron/chatSkills';
 
       app.setPath('userData', ${JSON.stringify(temporary)});
       app.on('window-all-closed', () => {});
@@ -236,6 +236,9 @@ try {
             assert.throws(() => materializeTrustedPluginSkills(payload.packageId), /identity.version/);
             assert.equal(JSON.stringify(listChatSkills()), beforeInvalid, 'invalid final workflow cannot partially rewrite the library');
           } finally { fs.writeFileSync(workflowPath, originalWorkflow); }
+          const restored = restorePluginSkillAuthorVersion(chosen.id).find(skill => skill.id === chosen.id);
+          assert.equal(restored.instructions, chosen.instructions, 'the author restore action reads signed v2 content');
+          assert.equal(restored.enabled.assistant, true, 'restoring text preserves activation');
           stage = 'all Research Visuals tools through saved chat pipelines';
           const imageRuntime = resolveTrustedCapability('research-visuals:images');
           const imageHandle = new CapabilityWorkerHandle(imageRuntime, { services: createCapabilityHostServices({}), bootstrapPath: ${JSON.stringify(bootstrap)} });
