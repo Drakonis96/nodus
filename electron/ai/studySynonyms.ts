@@ -10,6 +10,7 @@ import { normalizePromptLanguage, synonymSystem } from '@shared/editorAiPrompts'
 const MAX_SENTENCE_CHARS = 4_000;
 const ALTERNATIVE_COUNT = 5;
 const CANDIDATE_COUNT = 8;
+const MAX_GENERATION_ATTEMPTS = 2;
 
 interface SynonymPayload {
   alternatives: Array<{ target?: string; replacement: string }>;
@@ -52,19 +53,28 @@ function normalizeAlternatives(
   const previous = new Set((request.previousAlternatives ?? []).map(comparisonKey).filter(Boolean));
   const seen = new Set<string>();
   const alternatives: StudySynonymAlternative[] = [];
+  // Word commonly includes a trailing space in a word selection. Resolve the
+  // meaningful text first, then restore the complete selection and its exact
+  // whitespace so applying a suggestion cannot join neighbouring words.
+  const contentFrom = request.selectionFrom + request.selectedText.length - request.selectedText.trimStart().length;
+  const contentTo = request.selectionTo - (request.selectedText.length - request.selectedText.trimEnd().length);
   for (const candidate of payload.alternatives) {
     // Smaller/less strict models sometimes copy the selection markers into
     // `target`, or return a bare replacement string. Both still have an
     // unambiguous, safe range: the exact selection supplied by the caller.
-    const target = (candidate.target ?? request.selectedText)
+    const candidateTarget = (candidate.target ?? request.selectedText)
       .replace(/<<<(?:SELECCIÓN|FIN_SELECCIÓN)>>>/giu, '')
       .trim();
-    const replacement = candidate.replacement.trim();
-    const range = resolveStudySynonymTarget(request.sentence, target, request.selectionFrom, request.selectionTo);
-    const key = comparisonKey(replacement);
-    if (!range || !replacement || key === comparisonKey(target) || previous.has(key) || seen.has(key)) continue;
+    const candidateReplacement = candidate.replacement.trim();
+    const range = resolveStudySynonymTarget(request.sentence, candidateTarget, contentFrom, contentTo);
+    const key = comparisonKey(candidateReplacement);
+    if (!range || !candidateReplacement || key === comparisonKey(candidateTarget) || previous.has(key) || seen.has(key)) continue;
+    const from = Math.min(range.from, request.selectionFrom);
+    const to = Math.max(range.to, request.selectionTo);
+    const target = request.sentence.slice(from, to);
+    const replacement = request.sentence.slice(from, range.from) + candidateReplacement + request.sentence.slice(range.to, to);
     seen.add(key);
-    alternatives.push({ target, replacement, ...range });
+    alternatives.push({ target, replacement, from, to });
     if (alternatives.length === ALTERNATIVE_COUNT) break;
   }
   return alternatives;
@@ -101,20 +111,34 @@ function normalizedSynonymRequest(request: StudySynonymRequest): StudySynonymReq
 }
 
 async function generateAlternatives(request: StudySynonymRequest, model: ModelRef): Promise<StudySynonymAlternative[]> {
-  const prompt = buildStudySynonymPrompt(request);
-  const raw = await completeTextNeutral({
-    system: prompt.system,
-    user: prompt.user,
-    temperature: 0.65,
-    maxTokens: 1_200,
-    reasoning: 'off',
-    plainContext: true,
-  }, model);
-  const alternatives = normalizeAlternatives(request, parsePayload(raw));
-  if (alternatives.length !== ALTERNATIVE_COUNT) {
-    throw new Error('La IA no pudo proponer cinco alternativas distintas. Regenera para intentarlo de nuevo.');
+  const alternatives: StudySynonymAlternative[] = [];
+  for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS; attempt += 1) {
+    const nextRequest = {
+      ...request,
+      previousAlternatives: [...(request.previousAlternatives ?? []), ...alternatives.map((entry) => entry.replacement)],
+    };
+    const prompt = buildStudySynonymPrompt(nextRequest);
+    const raw = await completeTextNeutral({
+      system: prompt.system,
+      user: prompt.user,
+      temperature: 0.65,
+      // Whole-sentence alternatives repeat the source in each JSON target.
+      maxTokens: Math.min(16_000, Math.max(1_200, request.sentence.length * CANDIDATE_COUNT)),
+      reasoning: 'off',
+      plainContext: true,
+    }, model);
+    let payload: SynonymPayload;
+    try {
+      payload = parsePayload(raw);
+    } catch {
+      // Retry malformed model output, but let provider/auth/network errors
+      // above propagate without spending a second request on them.
+      continue;
+    }
+    alternatives.push(...normalizeAlternatives(nextRequest, payload).slice(0, ALTERNATIVE_COUNT - alternatives.length));
+    if (alternatives.length === ALTERNATIVE_COUNT) return alternatives;
   }
-  return alternatives;
+  throw new Error('La IA no pudo proponer cinco alternativas distintas. Regenera para intentarlo de nuevo.');
 }
 
 export async function suggestStudySynonyms(request: StudySynonymRequest): Promise<StudySynonymResult> {
