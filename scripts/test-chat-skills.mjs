@@ -327,6 +327,20 @@ test('the panel reset never outranks the switch track color', () => {
   assert.match(css, /\.chat-skill-switch \{[^}]*background:\s*#45454f/, 'the unchecked switch keeps an explicit track color');
 });
 
+test('the capability panel gives its buttons a shape, not just a colour', () => {
+  // That same reset takes padding, border and radius off every button in the panel, and
+  // `.chat-skill-primary` only paints the accent: the retry under a failed migration
+  // rendered as a run of highlighted text, indistinguishable from a selection. Its shape
+  // is the catalogue's, so the two halves of the Marketplace tab agree.
+  const css = fs.readFileSync(path.join(root, 'src/components/capabilityPackages.css'), 'utf8');
+  const rule = /\.capability-packages button:not\(\.chat-skill-details-toggle\) \{([^}]*)\}/.exec(css);
+  assert.ok(rule, 'the panel styles its own buttons');
+  for (const property of ['padding', 'border-radius', 'border']) {
+    assert.match(rule[1], new RegExp(`\\b${property}:`), `a button needs a ${property}`);
+  }
+  assert.match(css, /\.capability-packages button:not\(\.chat-skill-details-toggle\):disabled/, 'a disabled button says so');
+});
+
 test('a capability that declares permissions is budgeted apart from deterministic work', async () => {
   const directory = path.join(temporary, 'lane-plugin');
   const plugin = { schemaVersion: 1, id: 'lane-kit', name: 'Lane Kit', version: '1.0.0', author: 'researcher', description: 'Two lanes.', license: 'MIT', compatibility: { capabilityApi: 1, minNodusVersion: '0.0.0' }, skills: ['skills/lane/skill.json'], capabilities: ['capabilities/free/capability.json', 'capabilities/paid/capability.json'] };
