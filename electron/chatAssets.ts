@@ -1,5 +1,4 @@
 import { validateModelAsset, isModelMimeType } from '../packages/capability-api/src/models';
-import { LIMITS } from '../packages/capability-api/src/limits';
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';

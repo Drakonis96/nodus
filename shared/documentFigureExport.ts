@@ -33,7 +33,7 @@ export function documentMarkdownWithFigures(markdown: string, field: string, man
     const figures = ready.filter(figure => html.includes(figure.poster!));
     return block.markdown + figures.map(figure => {
       const name = `figure-${figure.id}.png`; files.push({ name, base64: figure.poster!.split(',')[1] });
-      const caption = figure.caption.replace(/[\r\n]/g, ' ').replace(/[\\`*_{}\[\]<>]/g, '\\$&');
+      const caption = figure.caption.replace(/[\r\n]/g, ' ').replace(/[\\`*_{}[\]<>]/g, '\\$&');
       return `\n\n![${caption}](${directory}/${name})\n\n*${caption}*${figure.sources.map((source,index) => ` [${index+1}](${source})`).join('')}`;
     }).join('');
   }).join('\n\n');

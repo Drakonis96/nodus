@@ -39,7 +39,7 @@ export const mapSourceTransport: MapSourceTransport = {
     return Buffer.concat(chunks);
   },
 };
-function sourceText(value: unknown, max=500): string { if(typeof value !== 'string' || !value.trim() || value.length>max || /[<>\u0000-\u001f]/.test(value)) throw new Error('Invalid map source metadata.'); return value; }
+function sourceText(value: unknown, max=500): string { if(typeof value !== 'string' || !value.trim() || value.length>max || (/[<>]/.test(value) || [...value].some(char => char.charCodeAt(0) < 32))) throw new Error('Invalid map source metadata.'); return value; }
 const https = (value: unknown): string => { const s=sourceText(value,1500); const u=new URL(s.startsWith('https://')?s:`https://${s}`); if(u.protocol!=='https:' || u.username || u.password) throw new Error('Invalid map source link.'); return u.href; };
 
 /** Allow known terms only. gbOpen is a catalogue, not a licence override for its

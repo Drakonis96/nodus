@@ -147,7 +147,7 @@ No OSM tile server is integrated. The [OSM tile policy](https://operations.osmfo
 is not treated as permission to use community servers as an application backend.
 [OpenHistoricalMap](https://www.openhistoricalmap.org/copyright) was reviewed but is
 not integrated: feature-specific licences and temporal semantics require a separate
-adapter. `query.period: {from, to}` validates ISO dates and **fails before any network
+adapter. `query.period: {from, to}` validates ISO dates (including expanded signed BCE years, such as `-000500-01-01`) and **fails before any network
 request** for both present providers. Modern polygons are never substituted for a
 historical request. Caller-supplied verified historical GeoJSON can carry `source.period`;
 Nodus still marks that provenance as caller-supplied, not provider-verified. No historical
@@ -221,3 +221,7 @@ its normal application release process; it is not a separately signed Marketplac
 package. Existing Ed25519 signing remains in the protected Marketplace release workflow.
 No production keys or signatures are created by this implementation. Human CLA acceptance
 remains the human contributor's action. See the [release runbook](capability-release-runbook.md).
+
+## Marketplace workflows
+
+The signed [Research Visuals package](https://github.com/NodusResearch/nodus-research-skill-marketplace/tree/main/plugins/research-visuals) supplies General Maps and Historical Maps. Both delegate rendering to this service. Historical Maps enforces supplied dated sources and refuses modern provider substitution. [Verification examples](verification/research-visuals/README.md) preserve editable SVG, attribution and visual previews.

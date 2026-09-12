@@ -165,3 +165,9 @@ test('a stalled transport cannot prevent cancellation or later register its resu
   const rejected=assert.rejects(pending,{name:'AbortError'});
   await started;controller.abort();await rejected;release(encode(payload));
 });
+
+test('historical dates support ISO expanded BCE years and chronological ordering',()=>{
+  assert.doesNotThrow(()=>sdk.validateMapSource({...source,period:{from:'-000500-01-01',to:'-000400-12-31'}}));
+  assert.throws(()=>sdk.validateMapSource({...source,period:{from:'-000400-01-01',to:'-000500-12-31'}}));
+  assert.throws(()=>sdk.validateMapSource({...source,period:{from:'1900-02-29',to:'1901-01-01'}}));
+});

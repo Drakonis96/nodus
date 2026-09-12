@@ -61,7 +61,7 @@ export async function prepareDocumentVisualHints(policy: DocumentSkillPolicy | u
     return await completeJson<string[]>({ system: `${DOCUMENT_VISUAL_RULES}\nYou are planning a document. Return a JSON array of brief possible visual opportunities, not finished figures. Zero opportunities is valid.`,
       user: JSON.stringify({ objective, skills: JSON.parse(documentSkillCatalog(options, validated)) }), maxTokens: 1200, temperature: 0.2, noRetry: true, signal,
     }, (value): value is string[] => Array.isArray(value) && value.length <= 20 && value.every(item => typeof item === 'string' && item.length < 1000), model);
-  } catch (error) { signal?.throwIfAborted(); return []; }
+  } catch { signal?.throwIfAborted(); return []; }
 }
 
 export async function enrichDocumentVisuals(target: DocumentVisualTarget, policy: DocumentSkillPolicy, request: { retry?: boolean; hints?: string[]; signal?: AbortSignal; model?: ModelRef | null } = {}): Promise<DocumentVisualManifest> {

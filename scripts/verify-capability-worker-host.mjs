@@ -191,6 +191,14 @@ try {
       const local = handleFor({ network: [{ id: 'local', origin: 'https://localhost', pathPrefixes: ['/'], methods: ['GET'], maxResponseBytes: 65536, timeoutMs: 5000 }] });
       assert.match(await failure(local.call('invoke', { invocationId: 'i9', toolId: 'reach', input: { endpointId: 'local', path: '/' }, locale: 'en' }, { timeoutMs: 10_000 })), /not public/);
       await local.stop();
+      const queryEndpoint = handleFor({ network: [{ id: 'api', origin: 'https://localhost', pathPrefixes: ['/w/api.php'], methods: ['GET'], maxResponseBytes: 65536, timeoutMs: 5000 }] });
+      // Reaching the public-host guard proves an exact endpoint accepts its query string,
+      // without performing an external request or relaxing the private-host restriction.
+      assert.match(await failure(queryEndpoint.call('invoke', { invocationId: 'query', toolId: 'reach', input: { endpointId: 'api', path: '/w/api.php?q=public%20art' }, locale: 'en' })), /not public/);
+      for (const route of ['/w/api.php/../../admin', '/w/api.php/%2e%2e/admin', '/w/api.php%2fsecret', '//elsewhere.invalid/w/api.php', '/w/api.php#fragment']) {
+        assert.match(await failure(queryEndpoint.call('invoke', { invocationId: 'path', toolId: 'reach', input: { endpointId: 'api', path: route }, locale: 'en' })), /permission|path|origin/);
+      }
+      await queryEndpoint.stop();
 
       stage = 'vision permission and host round-trip';
       const deniedVision = handleFor();

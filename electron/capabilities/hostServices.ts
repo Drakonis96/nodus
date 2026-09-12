@@ -133,11 +133,13 @@ async function authorizedRequest(runtime: TrustedWorkerRuntime, payload: unknown
   const endpoint = declaredEndpoint(runtime.permissions, value.endpointId);
   const relative = typeof value.path === 'string' ? value.path : '/';
   const method = String(value.method ?? 'GET').toUpperCase();
-  const allowedPath = endpoint.pathPrefixes.some(prefix => relative === prefix || relative.startsWith(prefix.endsWith('/') ? prefix : `${prefix}/`));
-  if (!relative.startsWith('/') || relative.includes('..') || !allowedPath) throw new Error('Capability network request exceeds its permission.');
-  if (!(endpoint.methods as readonly string[]).includes(method)) throw new Error('Capability network method is not permitted.');
+  if (!relative.startsWith('/') || relative.startsWith('//') || /[\\#]/.test(relative) || [...relative].some(char => char.charCodeAt(0) <= 32)) throw new Error('Invalid capability network path.');
   const url = new URL(relative, endpoint.origin);
-  if (url.origin !== new URL(endpoint.origin).origin) throw new Error('Capability network origin changed.');
+  if (url.origin !== new URL(endpoint.origin).origin || /%(?:25|2f|5c)/i.test(url.pathname)) throw new Error('Capability network origin or path changed.');
+  const pathname = decodeURIComponent(url.pathname);
+  const allowedPath = endpoint.pathPrefixes.some(prefix => pathname === prefix || pathname.startsWith(prefix.endsWith('/') ? prefix : `${prefix}/`));
+  if (!allowedPath) throw new Error('Capability network request exceeds its permission.');
+  if (!(endpoint.methods as readonly string[]).includes(method)) throw new Error('Capability network method is not permitted.');
   await assertPublicHost(url.hostname);
 
   const headers: Record<string, string> = { Accept: 'application/json, text/plain;q=0.9, */*;q=0.5' };

@@ -1,5 +1,5 @@
 import { exactKeys, plainText } from './json';
-import type { FeatureCollection, Feature, Geometry, Position } from 'geojson';
+import type { FeatureCollection, Position } from 'geojson';
 
 /** No fetch URLs, paths, credentials or executable styles. Source links are inert attribution. */
 export const MAP_LIMITS = { calls: 8, retrievals: 4, layers: 4, features: 5000, positions: 200000, inputBytes: 12000000, responseBytes: 16000000, svgChars: 300000, markers: 200, routes: 100, timeoutMs: 30000 } as const;
@@ -45,8 +45,8 @@ export function validateMapPosition(value: unknown): asserts value is [number, n
 function color(value: unknown): void { if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/i.test(value)) throw new Error('Map colors must be six-digit hexadecimal values.'); }
 function period(value: any): void {
   object(value, ['from','to'], 'period');
-  const date = (d: unknown) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && Number.isFinite(Date.parse(d)) && new Date(d).toISOString().slice(0,10) === d;
-  if (!date(value.from) || !date(value.to) || value.from > value.to) throw new Error('Invalid map period.');
+  const date = (d: unknown) => typeof d === 'string' && /^(?:\d{4}|[+-]\d{6})-\d{2}-\d{2}$/.test(d) && Number.isFinite(Date.parse(d)) && new Date(d).toISOString().split('T')[0] === d;
+  if (!date(value.from) || !date(value.to) || Date.parse(value.from) > Date.parse(value.to)) throw new Error('Invalid map period.');
 }
 export function validateMapSource(value: any): MapSourceInput {
   object(value, ['label','attribution','license','url','period'], 'source');

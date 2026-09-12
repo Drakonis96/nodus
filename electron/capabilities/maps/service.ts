@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { MAP_LIMITS, validateMapQuery, validateMapRenderRequest, type MapDataset, type MapProviderId, type MapRenderRequest } from '../../../packages/capability-api/src/maps';
+import { MAP_LIMITS, validateMapQuery, validateMapRenderRequest, type MapDataset, type MapProviderId } from '../../../packages/capability-api/src/maps';
 import { retrieveMapSource, type MapSourceTransport } from './sources';
 import { callerMapSource, renderMap } from './render';
 

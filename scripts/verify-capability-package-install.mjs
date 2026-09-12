@@ -71,7 +71,7 @@ try {
     packageId: inner.id,
   }));
 
-  const bootstrap = path.join(temporary, 'bootstrap.cjs');
+  const bootstrap = path.join(temporary, 'capabilityWorkerBootstrap.js');
   await build({
     entryPoints: [path.join(root, 'electron/capabilities/workerBootstrap.ts')],
     outfile: bootstrap, bundle: true, platform: 'node', format: 'cjs', external: ['electron'], logLevel: 'silent',
@@ -85,10 +85,12 @@ try {
       import assert from 'node:assert/strict';
       import fs from 'node:fs';
       import { initializeCapabilityPluginStore, installVerifiedPlugin, pluginMigrationScripts, recordPluginDataVersion, resolveTrustedCapability, listInstalledPluginsV2, readPluginStateV2, removePluginV2 } from './electron/capabilities/pluginStoreV2';
-      import { rebuildCapabilityRegistry, capabilityRegistry, capabilityIsAvailable } from './electron/capabilities/registry';
+      import { rebuildCapabilityRegistry, capabilityRegistry, capabilityIsAvailable, pinCapabilitiesForTurn } from './electron/capabilities/registry';
       import { CapabilityWorkerHandle } from './electron/capabilities/workerHost';
       import { createCapabilityHostServices } from './electron/capabilities/hostServices';
-      import { createCapabilityAdapters } from './electron/capabilities/runner';
+      import { createCapabilityAdapters, createTrustedCapabilityRunner } from './electron/capabilities/runner';
+      import { runTrustedChatPipeline } from './electron/capabilities/chatPipeline';
+      import { chatAssetOwner } from './electron/chatAssets';
 
       app.setPath('userData', ${JSON.stringify(temporary)});
       app.on('window-all-closed', () => {});
@@ -205,6 +207,30 @@ try {
             assert.ok(artifact.summary.length > 0);
             console.log('  live request produced: ' + artifact.summary.slice(0, 120));
           }
+        }
+
+        if (payload.packageId === 'research-visuals') {
+          stage = 'all Research Visuals tools through saved chat pipelines';
+          const imageRuntime = resolveTrustedCapability('research-visuals:images');
+          const imageHandle = new CapabilityWorkerHandle(imageRuntime, { services: createCapabilityHostServices({}), bootstrapPath: ${JSON.stringify(bootstrap)} });
+          const settings = await imageHandle.call('getSettings', {});
+          assert.equal(settings.fields.wikimedia.value, true);
+          await imageHandle.call('applySettings', { fields: { wikimedia: false, met: false, aic: false } });
+          await imageHandle.stop();
+          const source = { label: 'Synthetic route fixture', attribution: 'Synthetic fixture, not historical evidence', license: 'CC0', url: 'https://example.org/fixture', period: { from: '1850-01-01', to: '1850-12-31' } };
+          const map = { title: 'Synthetic route', alt: 'Two synthetic points linked by an arrow', markers: [{ coordinates: [0,0], label: 'A' }, { coordinates: [1,1], label: 'B' }], routes: [{ coordinates: [[0,0],[1,1]], arrow: true }], overlaySource: source };
+          for (const surface of ['assistant','nodi','deep-research','immersion']) {
+            const runner = createTrustedCapabilityRunner({ owner: chatAssetOwner(surface, 'research-visuals-fixture'), question: 'Draw a synthetic research route and find a plate image.', locale: 'en', pins: pinCapabilitiesForTurn(), runCoreStages: async answer => answer });
+            try {
+              for (const [fence,input] of [['research-map-request',map],['historical-map-request',{...map,period:source.period}],['research-image-request',{query:'synthetic plate'}]]) {
+                const text = String.fromCharCode(96).repeat(3) + fence + String.fromCharCode(10) + JSON.stringify(input) + String.fromCharCode(10) + String.fromCharCode(96).repeat(3);
+                const answer = await runTrustedChatPipeline(text, registry, runner, {onProblem: (_provider,error)=>{throw error;}});
+                assert.match(answer, /nodus-artifact/, surface + ' ' + fence);
+                assert.match(answer, /nodus-view/, surface + ' renders its result');
+              }
+            } finally { await runner.dispose(); }
+          }
+          console.log('  Research Visuals: three real worker tools, native SVG/provenance and disabled-source fallback through Assistant, Nodi, Deep Research and Immersion pipelines.');
         }
 
         stage = 'permission gating';

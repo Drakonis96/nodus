@@ -11,7 +11,7 @@ export function publicImageTarget(source: Extract<VisionCandidateInput['source']
   const endpoint = permissions.network?.find(e => e.id === source.endpointId);
   if (!endpoint || !endpoint.methods.includes('GET') || permissions.secrets?.some(s => s.injection.kind === 'header' && s.injection.endpointId === endpoint.id)) throw new Error('Public image endpoint is not permitted or requires credentials.');
   const relative = source.path;
-  if (!relative.startsWith('/') || relative.startsWith('//') || /[\\#\x00-\x20]/.test(relative)) throw new Error('Invalid public image path.');
+  if (!relative.startsWith('/') || relative.startsWith('//') || (/[\\#]/.test(relative) || [...relative].some(char => char.charCodeAt(0) <= 32))) throw new Error('Invalid public image path.');
   const url = new URL(relative, endpoint.origin);
   if (/%(?:25|2f|5c)/i.test(url.pathname)) throw new Error('Encoded image path traversal is not permitted.');
   const decoded = decodeURIComponent(url.pathname);
