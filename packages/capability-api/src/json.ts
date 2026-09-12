@@ -38,7 +38,7 @@ export function validateJsonSchema(schema: unknown, depth = 0): asserts schema i
   if (value.properties) {
     if (value.type !== 'object' || Object.keys(value.properties).length > 64) throw new Error('Invalid capability object schema.');
     for (const [key, child] of Object.entries(value.properties)) {
-      if (!SLUG.test(key)) throw new Error('Invalid capability schema property.');
+      if ((!SLUG.test(key) && !/^[a-z][a-zA-Z0-9]{0,63}$/.test(key)) || ['__proto__', 'constructor', 'prototype'].includes(key)) throw new Error('Invalid capability schema property.');
       validateJsonSchema(child, depth + 1);
     }
   }

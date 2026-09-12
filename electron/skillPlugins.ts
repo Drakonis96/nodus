@@ -1,9 +1,10 @@
+import { verifyPluginAsset } from './pluginAssets';
 import { app, safeStorage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import {
-  compareSemver,
+  compareSemver, validatePluginManifest, validateCapabilityManifest,
   type CapabilityManifestV1,
   type CapabilityPermissionSet,
   type InboxPluginSummary,
@@ -52,6 +53,7 @@ export interface InstalledCapabilityRuntime {
   manifest: CapabilityManifestV1;
   source: string;
   permissions: CapabilityPermissionSet;
+  readAsset?: (id: string) => { text: string; asset: import('../packages/capability-api/src/pluginAssets').PluginAsset };
 }
 
 export const pluginPackageDigest = (input: PluginPackage | ValidatedPluginPackage) => createHash('sha256').update(JSON.stringify({ manifest: input.manifest, files: Object.fromEntries(Object.entries(input.files).sort(([a], [b]) => a.localeCompare(b))) })).digest('hex');
@@ -79,11 +81,12 @@ function writeState(state: InstalledPluginState): InstalledPluginState {
 
 function writePackage(directory: string, pkg: ValidatedPluginPackage) {
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
-  fs.writeFileSync(path.join(directory, 'plugin.json'), JSON.stringify(pkg.manifest, null, 2), { mode: 0o600 });
+  fs.writeFileSync(path.join(directory, 'plugin.json'), pkg.files['plugin.json'] ?? JSON.stringify(pkg.manifest, null, 2), { mode: 0o400 });
   for (const [file, source] of Object.entries(pkg.files)) {
     if (file === 'plugin.json') continue;
     const target = path.join(directory, ...file.split('/')); fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
-    fs.writeFileSync(target, source, { mode: 0o600 });
+    const binary = pkg.capabilities.some(cap => cap.manifest.assets?.some(asset => asset.mimeType === 'model/gltf-binary' && cap.path.replace('capability.json', asset.path) === file));
+    fs.writeFileSync(target, binary ? Buffer.from(source, 'base64') : source, { mode: 0o400 });
   }
 }
 
@@ -96,16 +99,19 @@ function stagePackage(pkg: ValidatedPluginPackage, digest: string): string {
   return target;
 }
 
-function readRegular(root: string, relative: string, limit: number): string {
+function readRegular(root: string, relative: string, limit: number, encoding: BufferEncoding = 'utf8'): string {
+  if (typeof relative !== 'string' || relative.includes('\\') || relative.startsWith('/') || relative.split('/').some(p => !p || p === '.' || p === '..')) throw new Error('Unsafe plugin path.');
+  let component = root;
+  for (const part of relative.split('/')) { component = path.join(component, part); if (fs.lstatSync(component).isSymbolicLink()) throw new Error('Plugin symlinks are not permitted.'); }
   const target = path.join(root, ...relative.split('/')); const stat = fs.lstatSync(target);
   const realRoot = fs.realpathSync(root), realTarget = fs.realpathSync(target);
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > limit || (realTarget !== realRoot && !realTarget.startsWith(realRoot + path.sep))) throw new Error(`Invalid plugin file: ${relative}`);
-  return fs.readFileSync(target, 'utf8');
+  return fs.readFileSync(target, encoding);
 }
 
 export function readPluginDirectory(directory: string): ValidatedPluginPackage {
   const manifestSource = readRegular(directory, 'plugin.json', 64_000);
-  const manifest = JSON.parse(manifestSource);
+  const manifest = validatePluginManifest(JSON.parse(manifestSource));
   const files: Record<string, string> = { 'plugin.json': manifestSource };
   for (const skillPath of manifest.skills ?? []) {
     const source = readRegular(directory, skillPath, 64_000); files[skillPath] = source;
@@ -114,14 +120,23 @@ export function readPluginDirectory(directory: string): ValidatedPluginPackage {
   }
   for (const capabilityPath of manifest.capabilities ?? []) {
     const source = readRegular(directory, capabilityPath, 64_000); files[capabilityPath] = source;
-    const capability = JSON.parse(source); const base = capabilityPath.slice(0, -'capability.json'.length);
+    const capability = validateCapabilityManifest(JSON.parse(source)); const base = capabilityPath.slice(0, -'capability.json'.length);
     files[base + capability.entry] = readRegular(directory, base + capability.entry, 256_000);
+    for (const asset of capability.assets ?? []) {
+      const text = readRegular(directory, base + asset.path, asset.bytes, asset.mimeType === 'model/gltf-binary' ? 'base64' : 'utf8');
+      verifyPluginAsset(text, asset);
+      files[base + asset.path] = text;
+    }
   }
   return validatePluginPackage({ manifest, files });
 }
 
 export function installPluginPackage(input: PluginPackage | ValidatedPluginPackage, options: PluginInstallOptions): PluginInstallOutcome {
-  const pkg = validatePluginPackage(input as PluginPackage), digest = pluginPackageDigest(pkg), current = readPluginState(pkg.manifest.id);
+  const pkg = validatePluginPackage(input as PluginPackage);
+  for (const capability of pkg.capabilities) for (const asset of capability.manifest.assets ?? []) {
+    verifyPluginAsset(pkg.files[capability.path.replace('capability.json', asset.path)], asset);
+  }
+  const digest = pluginPackageDigest(pkg), current = readPluginState(pkg.manifest.id);
   if (current && current.sourceId !== options.sourceId) throw new Error('A different source already owns this plugin id.');
   const comparison = current?.activeVersion ? compareSemver(pkg.manifest.version, current.activeVersion) : 1;
   if (current?.activeVersion && comparison < 0 && !options.allowRollback) throw new Error('Plugin downgrades require explicit rollback.');
@@ -215,9 +230,15 @@ export function resolveInstalledCapability(id: string, snapshot?: { version: str
   if (!available) return null;
   const root = versionDir(pluginId, selected.version, selected.digest), relative = `capabilities/${capabilityId}/capability.json`;
   try {
-    const manifest = JSON.parse(readRegular(root, relative, 64_000)) as CapabilityManifestV1;
+    const manifest = validateCapabilityManifest(JSON.parse(readRegular(root, relative, 64_000)));
     const source = readRegular(root, `capabilities/${capabilityId}/${manifest.entry}`, 256_000);
-    return { pluginId, pluginVersion: selected.version, pluginDigest: selected.digest, capabilityId: id, manifest, source, permissions: state.approvedPermissions };
+    return { pluginId, pluginVersion: selected.version, pluginDigest: selected.digest, capabilityId: id, manifest, source, permissions: state.approvedPermissions, readAsset: (assetId: string) => {
+      const asset = manifest.assets?.find(item => item.id === assetId);
+      if (!asset) throw new Error('Plugin asset is not declared by this capability.');
+      const text = readRegular(root, `capabilities/${capabilityId}/${asset.path}`, asset.bytes, asset.mimeType === 'model/gltf-binary' ? 'base64' : 'utf8');
+      verifyPluginAsset(text, asset);
+      return { text, asset };
+    } };
   } catch { return null; }
 }
 
