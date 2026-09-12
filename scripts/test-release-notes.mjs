@@ -27,9 +27,10 @@ try {
   const currentRelease = RELEASE_NOTES[0];
   assert.equal(currentRelease?.version, '5.3.2');
   assert.equal(currentRelease?.date, '2026-09-11');
-  assert.equal(currentRelease?.highlights.length, 6);
+  assert.equal(currentRelease?.highlights.length, 9);
   assert.deepEqual(currentRelease.highlights.map((h) => h.scope), [
     'marketplace', 'general', 'general', 'plugin', 'plugin', 'ai',
+    'toolkit', 'toolkit', 'toolkit',
   ]);
   for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
     assert.ok(currentRelease.highlights.every((h) => h[language]?.length > 80));
@@ -38,6 +39,8 @@ try {
     /official packages you install yourself/, /moves across on its own/,
     /takes up less room/, /configures itself on its own card/,
     /only arrives signed by NodusResearch/, /each package decides what the model sees/,
+    // PDF Presenter rides in this release too.
+    /folders are now tags/, /can now leave the library/, /second kind of TXT file/,
   ]) {
     assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.3.2 is missing ${phrase}`);
   }
