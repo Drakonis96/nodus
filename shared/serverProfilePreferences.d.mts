@@ -1,4 +1,4 @@
-import type { AppSettings, ModelRef } from './types';
+import type { AppSettings, CustomAppTheme, ModelRef } from './types';
 
 export const SERVER_PROFILE_PREFERENCES_VERSION: 1;
 export const SERVER_PROFILE_MODEL_FIELDS: readonly string[];
@@ -6,7 +6,7 @@ export const SERVER_PROFILE_MODEL_FIELDS: readonly string[];
 export type ServerProfilePreferences = {
   schemaVersion: 1;
   appearance: {
-    theme: AppSettings['theme']; uiLanguage: AppSettings['uiLanguage']; promptLanguage: AppSettings['promptLanguage'];
+    theme: AppSettings['theme']; appTheme: AppSettings['appTheme']; customThemes: CustomAppTheme[]; uiLanguage: AppSettings['uiLanguage']; promptLanguage: AppSettings['promptLanguage'];
     animationSpeed: number; interfaceScale: number; accessibleFont: boolean; highContrast: boolean;
     reduceMotion: boolean; readingFocusMode: boolean;
     mascot: { enabled: boolean; scale: number; vaultCostumes: boolean; style: AppSettings['mascotStyle']; orbColorMode: AppSettings['mascotOrbColorMode']; orbColor: string };

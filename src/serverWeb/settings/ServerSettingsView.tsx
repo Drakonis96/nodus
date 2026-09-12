@@ -11,7 +11,9 @@ import {
   type ReactNode,
 } from "react";
 import { AI_PROVIDERS, PROVIDER_LABELS } from "@shared/providers";
-import type { AppLanguage } from "@shared/types";
+import type { AppLanguage, CustomAppTheme } from "@shared/types";
+import { APP_THEME_IDS } from "@shared/appThemes";
+import { contrast, deriveThemeTokens, THEMES } from "../../theme/themes.mjs";
 import { Icon } from "../../components/ui";
 import { api, ApiError } from "../api";
 import { setActiveLang, t, tx } from "../i18nShim";
@@ -168,6 +170,33 @@ const SERVER_EXECUTION_PROVIDERS = new Set([
   "cohere",
 ]);
 
+const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
+
+function normalizeThemeColour(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  return HEX_COLOUR.test(normalized) ? normalized : null;
+}
+
+const emptyThemeDraft = (): Omit<CustomAppTheme, "id"> => ({
+  label: "", accent: "#6366f1", deep: "#1e1b4b", pale: "#eef2ff",
+  lightText: "#171717", darkText: "#f5f5f5", tint: 0.05,
+});
+const themeDraftFrom = (theme?: CustomAppTheme): Omit<CustomAppTheme, "id"> => {
+  const defaults = emptyThemeDraft();
+  if (!theme) return defaults;
+  return {
+    label: theme.label,
+    accent: normalizeThemeColour(theme.accent) ?? defaults.accent,
+    deep: normalizeThemeColour(theme.deep) ?? defaults.deep,
+    pale: normalizeThemeColour(theme.pale) ?? defaults.pale,
+    lightText: normalizeThemeColour(theme.lightText) ?? defaults.lightText,
+    darkText: normalizeThemeColour(theme.darkText) ?? defaults.darkText,
+    tint: Number.isFinite(theme.tint) ? theme.tint : defaults.tint,
+  };
+};
+const themeSlug = (label: string) => `custom-${label.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "theme"}`;
+
 function blankProfile(
   theme: "dark" | "light",
   preferences: AIPreferences = {},
@@ -187,6 +216,8 @@ function blankProfile(
     schemaVersion: 1,
     appearance: {
       theme,
+      appTheme: "default",
+      customThemes: [],
       uiLanguage: "en",
       promptLanguage: "en",
       animationSpeed: 1,
@@ -511,6 +542,7 @@ export type ServerSettingsViewProps = {
   theme: "dark" | "light";
   initialTab?: TabId;
   onThemeChange?: (theme: "dark" | "light") => void;
+  onAppThemeChange?: (appTheme: string) => void;
   onLanguageChange?: (language: AppLanguage) => void;
 };
 
@@ -520,6 +552,7 @@ export function ServerSettingsView({
   theme,
   initialTab,
   onThemeChange,
+  onAppThemeChange,
   onLanguageChange,
 }: ServerSettingsViewProps) {
   const requested =
@@ -536,6 +569,10 @@ export function ServerSettingsView({
   const [credentialsAvailable, setCredentialsAvailable] = useState(true);
   const [profileMeta, setProfileMeta] = useState<ServerUserProfile>();
   const [profile, setProfile] = useState<PortableProfileValues>();
+  const [themeEditorOpen, setThemeEditorOpen] = useState(false);
+  const [editingThemeId, setEditingThemeId] = useState<string | null>(null);
+  const [themeDraft, setThemeDraft] = useState<Omit<CustomAppTheme, "id">>(emptyThemeDraft);
+  const [themeError, setThemeError] = useState<string | null>(null);
   const [admin, setAdmin] = useState<ServerAdminOverview>();
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
   const [providerModelQuery, setProviderModelQuery] = useState("");
@@ -636,8 +673,8 @@ export function ServerSettingsView({
   const saveProfile = async (
     next = profile,
     message = t("Preferencias guardadas para todos tus vaults y dispositivos."),
-  ) => {
-    if (!next) return;
+  ): Promise<boolean> => {
+    if (!next) return false;
     next = profileForModelMode(next, next.ai.modelSettingsMode);
     setBusy("profile");
     setError("");
@@ -659,11 +696,14 @@ export function ServerSettingsView({
             : "light"
           : savedTheme,
       );
+      onAppThemeChange?.(saved.appearance.appTheme || "default");
       dispatchEvent(
         new CustomEvent("nodus-profile-updated", { detail: saved }),
       );
+      return true;
     } catch (nextError) {
       setError(errorMessage(nextError));
+      return false;
     } finally {
       setBusy("");
     }
@@ -676,6 +716,64 @@ export function ServerSettingsView({
       mutator(next);
       return next;
     });
+  };
+
+  const openThemeEditor = (theme?: CustomAppTheme) => {
+    setEditingThemeId(theme?.id ?? null);
+    setThemeDraft(themeDraftFrom(theme));
+    setThemeError(null);
+    setThemeEditorOpen(true);
+  };
+
+  const saveCustomTheme = async () => {
+    if (!profile) return;
+    const label = themeDraft.label.trim();
+    if (!label) return setThemeError(t("Escribe un nombre para el tema."));
+    const accent = normalizeThemeColour(themeDraft.accent);
+    const deep = normalizeThemeColour(themeDraft.deep);
+    const pale = normalizeThemeColour(themeDraft.pale);
+    const lightText = normalizeThemeColour(themeDraft.lightText);
+    const darkText = normalizeThemeColour(themeDraft.darkText);
+    if (!accent || !deep || !pale || !lightText || !darkText) {
+      return setThemeError(t("Usa colores hexadecimales completos, por ejemplo #6366f1."));
+    }
+    const id = editingThemeId ?? themeSlug(label);
+    const customThemes = profile.appearance.customThemes ?? [];
+    if (customThemes.some((theme) => theme.id !== editingThemeId && theme.id === id)) {
+      return setThemeError(t("Ya existe un tema con ese nombre."));
+    }
+    const normalizedDraft = {
+      ...themeDraft,
+      label,
+      accent,
+      deep,
+      pale,
+      lightText,
+      darkText,
+    };
+    const tokens = deriveThemeTokens({ anchors: normalizedDraft });
+    if (contrast(tokens.text.dark, tokens.n[950]) < 4.5 || contrast(tokens.text.light, tokens.n[50]) < 4.5 || contrast(tokens.a.light[300], "#ffffff") < 4.5 || contrast(tokens.a.dark[300], tokens.n[950]) < 4.5) {
+      return setThemeError(t("Ajusta los colores para alcanzar el contraste mínimo de lectura."));
+    }
+    const next = structuredClone(profile);
+    const savedTheme: CustomAppTheme = { id, ...normalizedDraft };
+    next.appearance.customThemes = customThemes.some((theme) => theme.id === id)
+      ? customThemes.map((theme) => theme.id === id ? savedTheme : theme)
+      : [...customThemes, savedTheme];
+    next.appearance.appTheme = id;
+    if (!await saveProfile(next)) return;
+    setThemeEditorOpen(false);
+    setEditingThemeId(null);
+    setThemeError(null);
+  };
+
+  const deleteCustomTheme = async (id: string) => {
+    if (!profile) return;
+    const next = structuredClone(profile);
+    next.appearance.customThemes = (next.appearance.customThemes ?? []).filter((theme) => theme.id !== id);
+    if (next.appearance.appTheme === id) next.appearance.appTheme = "default";
+    if (!await saveProfile(next)) return;
+    if (editingThemeId === id) setThemeEditorOpen(false);
   };
 
   const toggleFavorite = async (model: PortableModelRef) => {
@@ -1286,7 +1384,7 @@ export function ServerSettingsView({
       title="Interfaz"
       description="Apariencia y accesibilidad forman parte del perfil portable y se comparten transversalmente."
     >
-      <Row label="Tema">
+      <Row label={t("Modo de color")}>
         <select
           className="ss-select"
           value={profile.appearance.theme}
@@ -1302,6 +1400,54 @@ export function ServerSettingsView({
           <option value="dark">{t("Oscuro")}</option>
           <option value="light">{t("Claro")}</option>
         </select>
+      </Row>
+      <Row label={t("Tema")}>
+        <div className="ss-theme-control">
+          <select
+            className="ss-select"
+            data-testid="app-theme"
+            value={profile.appearance.appTheme || "default"}
+            onChange={(event) => {
+              const value = event.target.value;
+              changeProfile((next) => {
+                next.appearance.appTheme = value as PortableProfileValues["appearance"]["appTheme"];
+              });
+              onAppThemeChange?.(value);
+            }}
+          >
+            {APP_THEME_IDS.map((id) => (
+              <option key={id} value={id}>
+                {id === "default" ? t("Predeterminado") : THEMES.find((theme) => theme.id === id)?.label || id}
+              </option>
+            ))}
+            {(profile.appearance.customThemes ?? []).map((theme) => <option key={theme.id} value={theme.id}>{theme.label}</option>)}
+          </select>
+          <button type="button" className="ss-button" onClick={() => openThemeEditor()}>{t("Crear tema")}</button>
+          {(profile.appearance.customThemes ?? []).map((theme) => (
+            <span className="ss-theme-actions" key={theme.id}>
+              <button type="button" className="ss-button" onClick={() => openThemeEditor(theme)}>{t("Editar")}: {theme.label}</button>
+              <button type="button" className="ss-button" onClick={() => void deleteCustomTheme(theme.id)}>{t("Eliminar")}</button>
+            </span>
+          ))}
+          {themeEditorOpen && <div className="ss-theme-editor" data-testid="theme-editor">
+            <strong>{editingThemeId ? t("Editar tema") : t("Crear tema")}</strong>
+            <input aria-label={t("Nombre del tema personalizado")} value={themeDraft.label} onChange={(event) => setThemeDraft((draft) => ({ ...draft, label: event.target.value }))} placeholder={t("Mi tema")} />
+            <div className="ss-theme-colours">
+              {([['accent', 'Acento'], ['pale', 'Superficie clara'], ['deep', 'Superficie oscura'], ['lightText', 'Texto en modo claro'], ['darkText', 'Texto en modo oscuro']] as const).map(([key, label]) => (
+                <label key={key}><input type="color" value={themeDraft[key]} onChange={(event) => setThemeDraft((draft) => ({ ...draft, [key]: event.target.value }))} />{t(label)}</label>
+              ))}
+            </div>
+            <label>
+              {t("Tintado de superficies")}
+              <input aria-label={t("Tintado de superficies")} type="range" min="0" max="0.2" step="0.01" value={themeDraft.tint} onChange={(event) => setThemeDraft((draft) => ({ ...draft, tint: Number(event.target.value) }))} />
+            </label>
+            {themeError && <span className="ss-error">{themeError}</span>}
+            <div className="ss-actions">
+              <button type="button" className="ss-button" onClick={() => setThemeEditorOpen(false)}>{t("Cancelar")}</button>
+              <button type="button" className="ss-button primary" onClick={() => void saveCustomTheme()}>{t("Guardar tema")}</button>
+            </div>
+          </div>}
+        </div>
       </Row>
       <Row label="Idioma de interfaz">
         <select

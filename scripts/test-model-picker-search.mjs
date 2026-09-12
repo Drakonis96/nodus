@@ -144,7 +144,7 @@ test('real model menus support search, selection, themes and clipped containers'
         await page.evaluate(({ type, theme, accent }) => { document.documentElement.className = `${theme} ${type.replace('_', '-')}`; document.getElementById('shell').style.setProperty('--vault-accent', accent); }, { type, theme, accent });
         await open();
         const styles = await page.locator('.model-picker-options').evaluate((e) => { const s = getComputedStyle(e), b = e.getBoundingClientRect(); return { background: s.backgroundColor, accent: s.getPropertyValue('--vault-accent').trim(), left: b.left, right: b.right, scroll: e.scrollWidth, width: e.clientWidth }; });
-        assert.equal(styles.background, theme === 'light' ? 'rgb(255, 255, 255)' : 'rgb(23, 23, 23)');
+        assert.equal(styles.background, theme === 'light' ? 'rgb(250, 250, 250)' : 'rgb(23, 23, 23)');
         assert.equal(styles.accent, accent); assert.ok(styles.left >= 0 && styles.right <= 360); assert.ok(styles.scroll <= styles.width);
         if (process.env.MODEL_PICKER_QA_DIR && type === 'academic') await page.screenshot({ path: path.join(process.env.MODEL_PICKER_QA_DIR, `${theme}.png`) });
         await search().press('Escape');

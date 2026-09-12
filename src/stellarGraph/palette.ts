@@ -35,3 +35,11 @@ export const NODE_LABELS: Record<string, string> = {
 };
 export const relation = (type: string) =>
   RELATIONS[type] || { color: "#adb8d9", label: type };
+
+const cssToken = (value: string) => value.replace(/[^a-z0-9-]/gi, "-");
+
+/** CSS-backed colors keep labels and the WebGL renderer on the same theme palette. */
+export const relationColor = (type: string) =>
+  `var(--stellar-edge-${cssToken(type)}, ${relation(type).color})`;
+export const nodeColor = (type: string) =>
+  `var(--stellar-node-${cssToken(type)}, ${NODE_COLORS[type] || "#a4bbfa"})`;

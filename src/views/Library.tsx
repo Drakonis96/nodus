@@ -36,6 +36,7 @@ import {
 import { t, tx } from '../i18n';
 import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
 import { vaultTypeColor } from '@shared/vaultTypes';
+
 import { DOCUMENT_INDEX_MANAGER_VISIBLE } from '@shared/documentIndexPolicy';
 import type { LibraryVaultSnapshot, ListPlacement } from '../app/viewSnapshots';
 

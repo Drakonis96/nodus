@@ -25,6 +25,7 @@ import {
   type View,
 } from "../navigation";
 import { HoverLabelButton, Icon } from "../components/ui";
+import { APP_THEME_DEFINITIONS_STORAGE_KEY, APP_THEME_STORAGE_KEY, applyAppTheme as applyRuntimeAppTheme } from "../theme/themeBoot";
 import { vaultTypeIcon, vaultTypeLabel } from "../components/vaultTypeUi";
 import { WorldbuildingSidebar } from "../components/WorldbuildingSidebar";
 import { ProsopographySidebar } from "../components/ProsopographySidebar";
@@ -1758,6 +1759,9 @@ export default function App() {
   const [theme, setTheme] = useState<"dark" | "light">(() =>
     localStorage.getItem("nodus-web-theme") === "light" ? "light" : "dark",
   );
+  const [appTheme, setAppTheme] = useState<string>(
+    () => localStorage.getItem("nodus-app-theme") || "default",
+  );
   const [sidebarWidth, setSidebarWidth] = useState(() =>
     Math.max(
       SERVER_SIDEBAR_MIN_WIDTH,
@@ -1811,6 +1815,20 @@ export default function App() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("nodus-web-theme", theme);
   }, [theme]);
+  useEffect(() => {
+    // Colour palette lives in runtime CSS variables; `data-theme` above remains
+    // reserved for light/dark mode on this build.
+    // Keep the boot-time cached palette in place until the portable profile has
+    // arrived. Applying a custom id with an empty definition list would make
+    // themeBoot correctly fail closed to the default, briefly (and sometimes
+    // permanently for a slow/failed profile request) repainting the app with
+    // the default palette.
+    if (!profile) return;
+    const customThemes = profile?.appearance.customThemes ?? [];
+    applyRuntimeAppTheme(appTheme, customThemes);
+    localStorage.setItem(APP_THEME_STORAGE_KEY, appTheme);
+    localStorage.setItem(APP_THEME_DEFINITIONS_STORAGE_KEY, JSON.stringify(customThemes));
+  }, [appTheme, profile?.appearance.customThemes]);
   const summarySequence = useRef(0);
   const refreshSpaces = useCallback(async () => {
     const value = await api.me();
@@ -1859,6 +1877,7 @@ export default function App() {
         setLanguage(response.profile.values.appearance.uiLanguage || "en");
         profileThemeRef.current = response.profile.values.appearance.theme;
         setTheme(resolveTheme(response.profile.values.appearance.theme));
+        setAppTheme(response.profile.values.appearance.appTheme || "default");
       })
       .catch(() => undefined);
     const listener = (event: Event) => {
@@ -1868,6 +1887,7 @@ export default function App() {
         setLanguage(next.appearance.uiLanguage || "en");
         profileThemeRef.current = next.appearance.theme;
         setTheme(resolveTheme(next.appearance.theme));
+        setAppTheme(next.appearance.appTheme || "default");
       }
     };
     addEventListener("nodus-profile-updated", listener);
@@ -2434,6 +2454,7 @@ export default function App() {
           theme={theme}
           initialTab={settingsTab as TabId}
           onThemeChange={setTheme}
+          onAppThemeChange={setAppTheme}
           onLanguageChange={setLanguage}
         />
       );

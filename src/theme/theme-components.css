@@ -1,0 +1,14 @@
+/* Themed component surfaces. Runtime palette variables are applied to the document root.
+ * Keep exceptional selectors scoped to `.theme-active` so the default palette is untouched. */
+
+/* Native <select> option lists. index.css hard-codes `select.input option` to
+ * #171717 / #ffffff — `@apply` can't reach a bare `option`, so the open dropdown
+ * kept the default neutral while the rest of the field was themed. */
+html.theme-active.dark :is(select.input option, select.input optgroup) {
+  background-color: var(--n-900);
+  color: var(--n-100);
+}
+html.theme-active.light :is(select.input option, select.input optgroup) {
+  background-color: var(--n-50);
+  color: var(--n-900);
+}

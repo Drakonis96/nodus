@@ -133,6 +133,8 @@ export type PortableProfileValues = {
   schemaVersion: 1;
   appearance: {
     theme: 'dark' | 'light' | 'system';
+    appTheme: import('@shared/types').AppTheme;
+    customThemes: import('@shared/types').CustomAppTheme[];
     uiLanguage: 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 'tr';
     promptLanguage: 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 'tr';
     animationSpeed: number;
