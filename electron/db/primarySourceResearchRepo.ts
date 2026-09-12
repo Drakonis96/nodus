@@ -752,14 +752,12 @@ export function searchPrimarySourceCorpus(request: PrimarySourceSearchRequest, s
     .sort((a, b) => score(b) - score(a) || a.title.localeCompare(b.title) || a.targetId.localeCompare(b.targetId));
   const total = all.length;
   const firstTerm = terms[0] ?? '';
-  const materialize = (candidate: SearchCandidate, index: number): PrimarySourceSearchResult => ({
+  const materialize = (candidate: SearchCandidate): PrimarySourceSearchResult => ({
     ...candidate,
     ...snippet(candidate.preferredText || candidate.searchable, firstTerm),
     resultId: `${candidate.layer}:${candidate.targetId}:${candidate.startOffset ?? 0}`,
   });
-  const results = all.slice(0, limit).map((candidate, index): PrimarySourceSearchResult => ({
-    ...materialize(candidate, index),
-  }));
+  const results = all.slice(0, limit).map(materialize);
   const facetRows = matched.slice(0, 5_000).map(materialize);
   const elapsedMs = Math.max(0, performance.now() - started);
   return {

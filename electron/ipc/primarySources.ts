@@ -12,7 +12,7 @@ import { createStableArchiveExcerpt, savePrimarySourceAnalysis, setArchiveExcerp
 import { acceptEntityProposal, decideEntityProposal, revertEntityResolution } from '../db/archiveProposalsRepo';
 import { addPrimarySourcePersonVariant, getPrimarySourcePersonDossier, listPrimarySourcePersons, mergePrimarySourcePersons, revertPrimarySourcePersonMerge } from '../db/primarySourcePersonsRepo';
 import { getPrimarySourceMapWorkspace, getPrimarySourceRelationsWorkspace, getPrimarySourceTimelineWorkspace, resolvePrimarySourceToponym, revertPrimarySourceToponymResolution } from '../db/primarySourceDerivedViewsRepo';
-import { addPrimarySourceNoteLink, createPrimarySourceNote, getPrimarySourceBacklinks, getPrimarySourceNoteWorkspace, getPrimarySourceOperationalDashboard, insertPrimarySourceExcerptCitation, removePrimarySourceNoteLink, searchPrimarySourceCorpus, updatePrimarySourceNoteProfile } from '../db/primarySourceResearchRepo';
+import { addPrimarySourceNoteLink, createPrimarySourceNote, getPrimarySourceBacklinks, getPrimarySourceNoteWorkspace, getPrimarySourceOperationalDashboard, insertPrimarySourceExcerptCitation, removePrimarySourceNoteLink, updatePrimarySourceNoteProfile } from '../db/primarySourceResearchRepo';
 import { getPrimarySourceGovernanceWorkspace, updatePrimarySourceCitationSettings, updatePrimarySourcePolicySettings } from '../db/primarySourceGovernanceRepo';
 import { buildPrimarySourceCitation, previewPrimarySourceToolkitOperation, runPrimarySourceToolkitOperation } from '../primarySources/primarySourceGovernance';
 import { createPrimarySourceResearchPackage, previewPrimarySourceExport, restorePrimarySourceResearchPackage, validatePrimarySourceResearchPackage } from '../primarySources/primarySourceExport';
