@@ -127,10 +127,6 @@ const STEPS: TourStep[] = [
     title: 'Diseño de unidades',
     body: 'Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.',
   },
-  {
-    title: 'Lo que todavía está en diseño',
-    body: 'El resto de secciones del grupo «Crear» —guía docente, situaciones de aprendizaje, adaptaciones— aún no existen: ábrelas para contarme qué necesitas antes de que se construyan. Puedes repetir este tutorial desde Ajustes.',
-  },
 ];
 
 export function TeachingTour({ onClose, onNavigate }: { onClose: () => void; onNavigate: (view: View) => void }) {
