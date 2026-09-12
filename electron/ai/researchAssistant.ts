@@ -213,12 +213,21 @@ export async function streamResearchChat(
     request.model,
     signal
   ), local, user);
+  // A user-triggered stop ends the turn with the text that already streamed. Running
+  // the citation-recovery resample or the skill tools now would either throw an
+  // AbortError or spend another provider call on a reply the user just cancelled.
+  if (signal?.aborted) return { answer, stats, aborted: true };
   for (let attempt = 1; citationRequired && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown') && attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
     signal?.throwIfAborted();
     // Streamed deltas are provisional and the renderer replaces them with the
     // returned answer. Recovery repeats the frozen request without changing any
     // model, prompt, temperature or output-budget parameter.
-    answer = finalizeAnswer(await completeText(opts, request.model), local, user);
+    try {
+      answer = finalizeAnswer(await completeText(opts, request.model), local, user);
+    } catch (error) {
+      if (signal?.aborted) return { answer, stats, aborted: true };
+      throw error;
+    }
   }
   if (citationRequired && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown')) {
     throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');

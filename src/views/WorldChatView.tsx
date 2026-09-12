@@ -13,6 +13,7 @@ import type { View } from '../navigation';
 import { ARTICLE_CATEGORY_LABEL } from '@shared/worldEncyclopedia';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ChatMarkdown } from '../components/ChatMarkdown';
+import { ChatAbortedNotice } from '../components/ChatAbortedNotice';
 import { ChatSkillsControl } from '../components/ChatSkillsControl';
 import { ModelPicker } from '../components/ModelPicker';
 import { Icon } from '../components/ui';
@@ -80,6 +81,12 @@ export function WorldChatView({ settings, onNavigate }: {
   const [streaming, setStreaming] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Index of the assistant message the user stopped. Its partial text stays and the
+  // red notice renders under it instead of replacing the whole answer. The refs mirror
+  // the streamed text and the stop request for the async callback and the catch.
+  const [stoppedIndex, setStoppedIndex] = useState<number | null>(null);
+  const stopRequestedRef = useRef(false);
+  const streamingRef = useRef('');
   const [pendingDelete, setPendingDelete] = useState<WorldChatConversationSummary | null>(null);
   const [model, setModel] = useFeatureModel(settings, 'chatModel');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -118,6 +125,8 @@ export function WorldChatView({ settings, onNavigate }: {
     setFocus([]);
     setInput('');
     setStreaming('');
+    streamingRef.current = '';
+    setStoppedIndex(null);
     setError('');
   };
   const openConversation = async (id: string) => {
@@ -129,6 +138,8 @@ export function WorldChatView({ settings, onNavigate }: {
     if (next.model) setModel(next.model);
     setError('');
     setStreaming('');
+    streamingRef.current = '';
+    setStoppedIndex(null);
   };
   const removeConversation = async () => {
     if (!pendingDelete) return;
@@ -155,6 +166,9 @@ export function WorldChatView({ settings, onNavigate }: {
     setInput('');
     setBusy(true);
     setStreaming('');
+    streamingRef.current = '';
+    stopRequestedRef.current = false;
+    setStoppedIndex(null);
     setError('');
     try {
       const result = await window.nodus.worldChatStream(
@@ -169,13 +183,15 @@ export function WorldChatView({ settings, onNavigate }: {
           history: previous,
           model,
         },
-        { onDelta: (delta) => setStreaming((current) => current + delta) }
+        { onDelta: (delta) => { streamingRef.current += delta; setStreaming((current) => current + delta); } }
       );
+      const aborted = stopRequestedRef.current || Boolean(result.aborted);
       const answer = result.noMaterial
         ? t('No he encontrado nada de tu mundo en esa pregunta. Nombra un personaje, un lugar, una escena o una ley y vuelvo a mirar.')
         : result.text;
-      const finalMessages: DbChatTurn[] = [...withUser, { role: 'assistant', content: answer }];
+      const finalMessages: DbChatTurn[] = answer.trim() ? [...withUser, { role: 'assistant', content: answer }] : withUser;
       setFocus(result.focus);
+      if (aborted && answer.trim()) setStoppedIndex(finalMessages.length - 1);
       const saved = await window.nodus.saveWorldChatConversation(
         active.id,
         finalMessages,
@@ -185,22 +201,40 @@ export function WorldChatView({ settings, onNavigate }: {
       );
       if (saved) setConversation(saved);
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
-      setError(message);
-      const failedMessages: DbChatTurn[] = [
-        ...withUser,
-        { role: 'assistant', content: `${t('No se pudo generar la respuesta.')} (${message})` },
-      ];
-      const saved = await window.nodus.saveWorldChatConversation(
-        active.id,
-        failedMessages,
-        selection,
-        focus,
-        model
-      );
-      if (saved) setConversation(saved);
+      if (stopRequestedRef.current) {
+        // The user stopped the stream: keep the text that already arrived instead
+        // of replacing the whole answer with the cancellation error.
+        const partial = streamingRef.current.trim();
+        const finalMessages: DbChatTurn[] = partial ? [...withUser, { role: 'assistant', content: partial }] : withUser;
+        if (partial) setStoppedIndex(finalMessages.length - 1);
+        const saved = await window.nodus.saveWorldChatConversation(
+          active.id,
+          finalMessages,
+          selection,
+          focus,
+          model
+        );
+        if (saved) setConversation(saved);
+      } else {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        setError(message);
+        const failedMessages: DbChatTurn[] = [
+          ...withUser,
+          { role: 'assistant', content: `${t('No se pudo generar la respuesta.')} (${message})` },
+        ];
+        const saved = await window.nodus.saveWorldChatConversation(
+          active.id,
+          failedMessages,
+          selection,
+          focus,
+          model
+        );
+        if (saved) setConversation(saved);
+      }
     } finally {
       setStreaming('');
+      streamingRef.current = '';
+      stopRequestedRef.current = false;
       setBusy(false);
       await refreshHistory();
     }
@@ -273,7 +307,7 @@ export function WorldChatView({ settings, onNavigate }: {
             {conversation?.messages.map((message, index) => message.role === 'user' ? (
               <div key={index} className="ml-auto max-w-[82%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-violet-600 px-4 py-3 text-sm leading-6 text-white">{message.content}</div>
             ) : (
-              <article key={index} data-testid="world-chat-answer" className="mr-auto max-w-[95%] rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/45">{answer(message.content)}</article>
+              <article key={index} data-testid="world-chat-answer" className="mr-auto max-w-[95%] rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/45">{answer(message.content)}{index === stoppedIndex && message.content.trim() ? <ChatAbortedNotice /> : null}</article>
             ))}
             {streaming && <article className="mr-auto max-w-[95%] rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/45">{answer(streaming)}</article>}
             {busy && !streaming && <div className="mr-auto text-xs text-neutral-500">{t('Pensando…')}</div>}
@@ -300,7 +334,7 @@ export function WorldChatView({ settings, onNavigate }: {
                 placeholder={t('Pregunta por personajes, lugares, escenas o reglas…')}
               />
             </div>
-            {busy ? <button data-testid="world-chat-stop" className="btn btn-secondary h-10 shrink-0 self-stretch" onClick={() => void window.nodus.cancelWorldChat()}><Icon name="stop" size={12} />{t('Detener')}</button> : <button data-testid="world-chat-send" className="btn btn-primary h-10 shrink-0 self-stretch" disabled={!input.trim()} onClick={() => void send()}><Icon name="arrowUp" size={13} />{t('Enviar')}</button>}
+            {busy ? <button data-testid="world-chat-stop" className="btn btn-secondary h-10 shrink-0 self-stretch" onClick={() => { stopRequestedRef.current = true; void window.nodus.cancelWorldChat(); }}><Icon name="stop" size={12} />{t('Detener')}</button> : <button data-testid="world-chat-send" className="btn btn-primary h-10 shrink-0 self-stretch" disabled={!input.trim()} onClick={() => void send()}><Icon name="arrowUp" size={13} />{t('Enviar')}</button>}
           </div>
         </footer>
       </main>

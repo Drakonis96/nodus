@@ -61,3 +61,12 @@
   font-size: 12px;
   line-height: 1.5;
 }
+
+/* The picker portals to <body>, so its own dark surface survives the light
+   theme unless it is overridden here, exactly like the Skills balloon. */
+:is(.light, .nodi-theme-light) .research-context-panel {
+  background: #fff;
+  border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 55%, white);
+  box-shadow: 0 24px 80px #27272a26;
+  color: #27272a;
+}

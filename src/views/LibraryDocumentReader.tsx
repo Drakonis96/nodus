@@ -1,4 +1,5 @@
 import { ChatSkillsControl } from '../components/ChatSkillsControl';
+import { ChatAbortedNotice } from '../components/ChatAbortedNotice';
 import { ChatMarkdown } from '../components/ChatMarkdown';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
@@ -384,6 +385,12 @@ export function LibraryDocumentReader({
   const [chatSending, setChatSending] = useState(false);
   const [chatStreaming, setChatStreaming] = useState('');
   const [chatError, setChatError] = useState<string | null>(null);
+  // Id of the assistant message the user stopped. Its partial text stays and the red
+  // notice renders under it instead of replacing the whole answer. The refs mirror the
+  // streamed text and the stop request for the async callback and the catch.
+  const [chatStoppedId, setChatStoppedId] = useState<string | null>(null);
+  const chatStopRequestedRef = useRef(false);
+  const chatStreamingRef = useRef('');
   const [chatSettings, setChatSettings] = useState<AppSettings | null>(null);
   const [chatModel, setChatModel] = useState<ModelRef | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
@@ -733,25 +740,48 @@ export function LibraryDocumentReader({
     setChatMessages(requestMessages);
     setChatInput('');
     setChatStreaming('');
+    chatStreamingRef.current = '';
+    chatStopRequestedRef.current = false;
+    setChatStoppedId(null);
     setChatError(null);
     setChatSending(true);
     try {
       const response = await window.nodus.libraryReaderChatStream(
         { documentId: reference.id, sourceId: selectedSource, messages: requestMessages, model: chatModel },
-        { onDelta: (delta) => setChatStreaming((current) => current + delta) },
+        { onDelta: (delta) => { chatStreamingRef.current += delta; setChatStreaming((current) => current + delta); } },
       );
-      if (response.answer) setChatMessages((current) => [...current, {
-        id: crypto.randomUUID(), role: 'assistant', content: response.answer, createdAt: new Date().toISOString(),
-      }]);
+      const aborted = chatStopRequestedRef.current || Boolean(response.aborted);
+      if (response.answer.trim()) {
+        const answer: LibraryReaderChatMessage = {
+          id: crypto.randomUUID(), role: 'assistant', content: response.answer, createdAt: new Date().toISOString(),
+        };
+        setChatMessages((current) => [...current, answer]);
+        if (aborted) setChatStoppedId(answer.id);
+      }
     } catch (nextError) {
-      const message = errorText(nextError);
-      setChatError(message);
-      setChatMessages((current) => [...current, {
-        id: crypto.randomUUID(), role: 'assistant', content: message, createdAt: new Date().toISOString(), error: true,
-      }]);
+      if (chatStopRequestedRef.current) {
+        // The user stopped the stream: keep the text that already arrived instead
+        // of replacing the whole answer with the cancellation error.
+        const partial = chatStreamingRef.current.trim();
+        if (partial) {
+          const answer: LibraryReaderChatMessage = {
+            id: crypto.randomUUID(), role: 'assistant', content: partial, createdAt: new Date().toISOString(),
+          };
+          setChatMessages((current) => [...current, answer]);
+          setChatStoppedId(answer.id);
+        }
+      } else {
+        const message = errorText(nextError);
+        setChatError(message);
+        setChatMessages((current) => [...current, {
+          id: crypto.randomUUID(), role: 'assistant', content: message, createdAt: new Date().toISOString(), error: true,
+        }]);
+      }
     } finally {
       setChatSending(false);
       setChatStreaming('');
+      chatStreamingRef.current = '';
+      chatStopRequestedRef.current = false;
     }
   };
 
@@ -1049,6 +1079,7 @@ export function LibraryDocumentReader({
                   {!chatMessages.length && !chatSending && <div className="rounded-xl border border-dashed border-indigo-500/20 bg-indigo-500/5 px-4 py-6 text-center"><p className="text-xs leading-5 text-neutral-500">{t('Pregunta por la tesis, un concepto o la relación entre tus subrayados.')}</p></div>}
                   {chatMessages.map((message) => <article key={message.id} className={message.role === 'user' ? 'ml-5 rounded-xl bg-indigo-600/20 px-3 py-2.5 text-xs leading-5 text-indigo-100' : `mr-1 rounded-xl border px-3 py-2.5 text-xs leading-5 ${message.error ? 'border-red-500/25 bg-red-500/5 text-red-300' : 'border-neutral-800 bg-neutral-950/45 text-neutral-300'}`}>
                     {message.role === 'assistant' && !message.error ? <ChatMarkdown content={message.content} onCitation={(next) => setCitation(next)} onReaderCitation={openReaderCitation} className="text-xs leading-5" /> : <p className="whitespace-pre-wrap">{message.content}</p>}
+                    {message.role === 'assistant' && message.id === chatStoppedId ? <ChatAbortedNotice /> : null}
                   </article>)}
                   {chatSending && <article data-testid="library-reader-chat-stream" className="mr-1 rounded-xl border border-neutral-800 bg-neutral-950/45 px-3 py-2.5 text-xs leading-5 text-neutral-300">{chatStreaming ? <ChatMarkdown streaming content={chatStreaming} verify={false} className="text-xs leading-5" /> : <span className="flex items-center gap-2 text-neutral-500"><Spinner /> {t('Leyendo el documento…')}</span>}</article>}
                 </div>
@@ -1057,7 +1088,7 @@ export function LibraryDocumentReader({
                   <textarea data-testid="library-reader-chat-input" rows={2} className="block w-full resize-none bg-transparent px-1 text-xs leading-5 text-neutral-200 outline-none placeholder:text-neutral-700" value={chatInput} disabled={chatSending} onChange={(event) => setChatInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendChat(); } }} placeholder={t('Pregunta sobre este documento…')} />
                   <div className="mt-2 flex items-center justify-between border-t border-neutral-800 pt-2">
                     <button className="text-[9px] text-neutral-600 hover:text-indigo-300" onClick={openFullAssistant}>{t('Abrir en Asistente')}</button>
-                    {chatSending ? <button data-testid="library-reader-chat-stop" className="btn btn-secondary h-7 px-2 text-[10px]" onClick={() => void window.nodus.cancelLibraryReaderChat()}><Icon name="stop" size={11} /> {t('Detener')}</button> : <button data-testid="library-reader-chat-send" className="btn btn-primary h-7 px-2 text-[10px]" disabled={!chatInput.trim()} onClick={() => void sendChat()}><Icon name="arrowUp" size={11} /> {t('Enviar')}</button>}
+                    {chatSending ? <button data-testid="library-reader-chat-stop" className="btn btn-secondary h-7 px-2 text-[10px]" onClick={() => { chatStopRequestedRef.current = true; void window.nodus.cancelLibraryReaderChat(); }}><Icon name="stop" size={11} /> {t('Detener')}</button> : <button data-testid="library-reader-chat-send" className="btn btn-primary h-7 px-2 text-[10px]" disabled={!chatInput.trim()} onClick={() => void sendChat()}><Icon name="arrowUp" size={11} /> {t('Enviar')}</button>}
                   </div>
                 </div>
               </div>}

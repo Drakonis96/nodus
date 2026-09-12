@@ -8369,4 +8369,5 @@ export const PT: Record<string, string> = {
   "Usa un número entero de palabras, sin decimales.": "Usa um número inteiro de palavras, sem decimais.",
   "El mínimo son {min} palabras por sección.": "O mínimo são {min} palavras por secção.",
   "El máximo son {max} palabras por sección.": "O máximo são {max} palavras por secção.",
+  "Solicitud cancelada por el usuario.": "O utilizador cancelou o pedido.",
 };

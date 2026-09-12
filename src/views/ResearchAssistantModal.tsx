@@ -1,4 +1,5 @@
 import { ChatMarkdown } from '../components/ChatMarkdown';
+import { ChatAbortedNotice } from '../components/ChatAbortedNotice';
 import { ChatSkillsControl } from '../components/ChatSkillsControl';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
@@ -236,14 +237,17 @@ export function ResearchAssistantModal({
   // Id of the assistant message currently streaming — drives the live caret and
   // the "stop" affordance. Null when nothing is in flight.
   const [streamingId, setStreamingId] = useState<string | null>(null);
+  // Id of the last assistant message the user stopped. Its partial text stays and
+  // the red notice renders under it instead of replacing the whole answer.
+  const [stoppedMessageId, setStoppedMessageId] = useState<string | null>(null);
+  // Set by the stop button and read when the stream settles, so a cancellation that
+  // still rejects is not mistaken for a genuine generation failure.
+  const stopRequestedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const contextTriggerRef = useRef<HTMLButtonElement>(null);
   const focusTriggerRef = useRef<HTMLButtonElement>(null);
   const contextPanelRef = useRef<HTMLDivElement>(null);
-  // Whether new stream deltas should keep the view pinned to the bottom. Starts
-  // true on send and flips off as soon as the user scrolls up to read back.
-  const stickToBottomRef = useRef(true);
   const lastInitialTargetRef = useRef<number | null>(null);
   // Mirrors `messages` so async stream callbacks can persist the final array without
   // racing React state updates.
@@ -355,10 +359,6 @@ export function ResearchAssistantModal({
     const el = scrollRef.current;
     if (!el) return;
     const onScroll = () => {
-      // The user driving the scrollbar decides whether we keep following the
-      // stream: reading back (scrolling up) releases the pin; returning to the
-      // bottom re-engages it.
-      stickToBottomRef.current = isNearBottom();
       updateJumpIndicator();
     };
     el.addEventListener('scroll', onScroll, { passive: true });
@@ -418,6 +418,7 @@ export function ResearchAssistantModal({
     setActiveId(null);
     setMessages([]);
     setInput('');
+    setStoppedMessageId(null);
     setContextTitle(t(ASSISTANT_MODES.find((mode) => mode.id === activeModeId)?.label ?? '') || null);
     setShowJumpToBottom(false);
     setCopiedMessageId(null);
@@ -428,6 +429,7 @@ export function ResearchAssistantModal({
     lastInitialTargetRef.current = initialTarget.nonce;
     setActiveId(null);
     setMessages([]);
+    setStoppedMessageId(null);
     setContextTitle(initialTarget.title ?? null);
     setActiveModeId('custom');
     if (initialTarget.selection) setSelection(cloneSelection(initialTarget.selection));
@@ -444,6 +446,7 @@ export function ResearchAssistantModal({
     }
     setActiveId(conversation.id);
     setMessages(conversation.messages.map((m) => ({ ...m, id: m.id || crypto.randomUUID() })));
+    setStoppedMessageId(null);
     if (conversation.selection) setSelection(cloneSelection(conversation.selection));
     if (conversation.model) setSelectedModel(conversation.model);
     setContextTitle(null);
@@ -497,25 +500,31 @@ export function ResearchAssistantModal({
       userMessage,
     ].map((m) => ({ role: m.role, content: m.content }));
 
+    stopRequestedRef.current = false;
+    setStoppedMessageId(null);
     setMessages([...priorMessages, userMessage, { id: assistantId, role: 'assistant', content: '', selectionKey }]);
     setSending(true);
     setStreamingId(assistantId);
-    stickToBottomRef.current = true;
+    // Reveal the question and the beginning of the answer once. Streaming
+    // deltas must not chase the bottom: keeping this position stable lets the
+    // user read from the start and scroll through the reply at their own pace,
+    // matching Nodi's chat behaviour.
     window.setTimeout(() => scrollToBottom('auto'), 0);
 
+    let streamed = '';
     try {
       const response = await window.nodus.researchChatStream(
         { messages: requestMessages, selection, model: selectedModel, conversationId },
         {
           onDelta: (delta) => {
+            streamed += delta;
             if (activeIdRef.current !== conversationId) return; // user switched away
             setMessages((current) =>
               current.map((message) =>
                 message.id === assistantId ? { ...message, content: message.content + delta } : message
               )
             );
-            if (stickToBottomRef.current) scrollToBottom('auto');
-            else window.setTimeout(updateJumpIndicator, 0);
+            window.setTimeout(updateJumpIndicator, 0);
           },
           onReasoning: (delta) => {
             if (activeIdRef.current !== conversationId) return;
@@ -529,6 +538,7 @@ export function ResearchAssistantModal({
       );
       // A user-triggered stop resolves with the partial answer; treat an empty
       // partial as "nothing generated" and drop the placeholder bubble.
+      const aborted = stopRequestedRef.current || Boolean(response.aborted);
       const answer = response.answer.trim();
       const finalMessages: UiMessage[] = answer
         ? [
@@ -539,23 +549,39 @@ export function ResearchAssistantModal({
         : [...priorMessages, userMessage];
       if (activeIdRef.current === conversationId) {
         setMessages(finalMessages);
+        if (aborted && answer) setStoppedMessageId(assistantId);
         window.setTimeout(updateJumpIndicator, 0);
       }
       await persist(conversationId, finalMessages, isFirstExchange);
     } catch (e) {
-      const errorMessage: UiMessage = {
-        id: assistantId,
-        role: 'assistant',
-        content: e instanceof Error ? e.message : String(e),
-        selectionKey,
-        error: true,
-      };
-      const finalMessages = [...priorMessages, userMessage, errorMessage];
-      if (activeIdRef.current === conversationId) {
-        setMessages(finalMessages);
-        window.setTimeout(updateJumpIndicator, 0);
+      if (stopRequestedRef.current) {
+        // The user stopped the stream: keep the text that already arrived and mark
+        // the message as aborted instead of replacing everything with the error.
+        const partial = streamed.trim();
+        const finalMessages: UiMessage[] = partial
+          ? [...priorMessages, userMessage, { id: assistantId, role: 'assistant', content: partial, selectionKey }]
+          : [...priorMessages, userMessage];
+        if (activeIdRef.current === conversationId) {
+          setMessages(finalMessages);
+          if (partial) setStoppedMessageId(assistantId);
+          window.setTimeout(updateJumpIndicator, 0);
+        }
+        await persist(conversationId, finalMessages, false);
+      } else {
+        const errorMessage: UiMessage = {
+          id: assistantId,
+          role: 'assistant',
+          content: e instanceof Error ? e.message : String(e),
+          selectionKey,
+          error: true,
+        };
+        const finalMessages = [...priorMessages, userMessage, errorMessage];
+        if (activeIdRef.current === conversationId) {
+          setMessages(finalMessages);
+          window.setTimeout(updateJumpIndicator, 0);
+        }
+        await persist(conversationId, finalMessages, false);
       }
-      await persist(conversationId, finalMessages, false);
     } finally {
       setSending(false);
       setStreamingId(null);
@@ -597,6 +623,7 @@ export function ResearchAssistantModal({
   };
 
   const handleStop = () => {
+    stopRequestedRef.current = true;
     void window.nodus.cancelResearchChat();
   };
 
@@ -828,6 +855,7 @@ export function ResearchAssistantModal({
                       ) : (
                         message.content
                       )}
+                      {message.role === 'assistant' && message.id === stoppedMessageId && <ChatAbortedNotice />}
                       {message.error && message.id === lastMessageId && !sending && (
                         <button
                           className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-red-800/70 px-2 py-1 text-xs text-red-200 transition hover:bg-red-900/40"

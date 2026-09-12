@@ -8418,4 +8418,5 @@ export const FR: Record<string, string> = {
   "Usa un número entero de palabras, sin decimales.": "Utilisez un nombre entier de mots, sans décimales.",
   "El mínimo son {min} palabras por sección.": "Le minimum est de {min} mots par section.",
   "El máximo son {max} palabras por sección.": "Le maximum est de {max} mots par section.",
+  "Solicitud cancelada por el usuario.": "L’utilisateur a annulé la demande.",
 };

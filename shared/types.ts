@@ -855,6 +855,8 @@ export interface LibraryReaderChatRequest {
 export interface LibraryReaderChatResponse {
   answer: string;
   model: ModelRef;
+  /** The user stopped the stream: `answer` is the partial text that had already arrived. */
+  aborted?: boolean;
 }
 
 export interface LibraryReaderChatStreamHandlers {
@@ -3643,6 +3645,8 @@ export interface WorldChatResult {
   focus: { kind: string; id: string; title: string }[];
   /** True when the question named nothing this world contains — not an error. */
   noMaterial: boolean;
+  /** The user stopped the stream: `text` is the partial answer that had already arrived. */
+  aborted?: boolean;
 }
 
 export interface WorldChatSelection {
@@ -5708,6 +5712,8 @@ export interface ResearchContextStats {
 export interface ResearchChatResponse {
   answer: string;
   stats: ResearchContextStats;
+  /** The user stopped the stream: `answer` is the partial text that had already arrived. */
+  aborted?: boolean;
 }
 
 export interface ResearchChatStreamHandlers {

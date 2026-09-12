@@ -12,6 +12,7 @@ import { ThemesModal } from "./ThemesModal";
 import { IdeaDuplicatesModal } from "./IdeaDuplicatesModal";
 import { EdgeAuditModal } from "./EdgeAuditModal";
 import { t } from "../i18n";
+import { Icon } from "../components/ui";
 import type { StellarWorkspaceSnapshot } from "../stellarGraph/snapshot";
 export function GraphView({
   settings,
@@ -53,6 +54,20 @@ export function GraphView({
     setModal("");
     setRevision((v) => v + 1);
   };
+  const actions = [
+    ...(dataSource.capabilities.tutor
+      ? [{ id: "tutor", label: "Tutor", icon: "tutorOrbit" }]
+      : []),
+    ...(dataSource.capabilities.manageThemes
+      ? [{ id: "themes", label: "Temas", icon: "themePetals" }]
+      : []),
+    ...(dataSource.capabilities.duplicates
+      ? [{ id: "duplicates", label: "Ideas duplicadas", icon: "duplicateConverge" }]
+      : []),
+    ...(dataSource.capabilities.audit
+      ? [{ id: "audit", label: "Auditoría de relaciones", icon: "relationLedger" }]
+      : []),
+  ];
   return (
     <div className="h-full min-h-0" data-testid={testId || "graph-view"}>
       <StellarWorkspace
@@ -73,38 +88,7 @@ export function GraphView({
         saveIdea={dataSource.saveIdea}
         saveEdge={dataSource.saveEdge}
         audit={dataSource.capabilities.audit}
-        toolbar={
-          <>
-            {scopeControl}
-            {(dataSource.capabilities.manageThemes ||
-              dataSource.capabilities.audit ||
-              dataSource.capabilities.duplicates) && (
-              <select
-                className="input text-xs"
-                value=""
-                aria-label={t("Herramientas de investigación")}
-                onChange={(e) => setModal(e.target.value)}
-              >
-                <option value="">{t("Herramientas")}</option>
-                {dataSource.capabilities.tutor && (
-                  <option value="tutor">{t("Tutor")}</option>
-                )}
-                {dataSource.capabilities.manageThemes && (
-                  <option value="themes">{t("Temas")}</option>
-                )}
-                {dataSource.capabilities.duplicates && (
-                  <option value="duplicates">{t("Ideas duplicadas")}</option>
-                )}
-                {dataSource.capabilities.audit && (
-                  <option value="audit">{t("Auditoría de relaciones")}</option>
-                )}
-              </select>
-            )}
-          </>
-        }
-      />
-      {modal === "tutor" && (
-        <div className="absolute right-0 top-0 bottom-0 z-30">
+        sidebar={modal === "tutor" ? (
           <TutorPanel
             settings={settings}
             onClose={close}
@@ -117,8 +101,35 @@ export function GraphView({
               })
             }
           />
-        </div>
-      )}
+        ) : undefined}
+        toolbar={
+          <>
+            {scopeControl}
+            {actions.length > 0 && (
+              <div className="graph-action-strip" role="toolbar" aria-label={t("Herramientas de investigación")}>
+                {actions.map((action) => {
+                  const label = t(action.label);
+                  return (
+                    <button
+                      type="button"
+                      key={action.id}
+                      className={`graph-action-button ${modal === action.id ? "active" : ""}`}
+                      aria-label={label}
+                      aria-pressed={modal === action.id}
+                      title={label}
+                      data-testid={`graph-action-${action.id}`}
+                      onClick={() => setModal(modal === action.id ? "" : action.id)}
+                    >
+                      <Icon name={action.icon} size={16} />
+                      <span className="graph-action-tooltip" role="tooltip">{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        }
+      />
       {modal === "themes" && (
         <ThemesModal
           settings={settings}

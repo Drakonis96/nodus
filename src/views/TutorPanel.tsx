@@ -269,7 +269,7 @@ export function TutorPanel({
   const serializedModel = selectedModel ? `${selectedModel.provider}::${selectedModel.model}` : '';
 
   return (
-    <aside className="w-[26rem] max-w-full shrink-0 border-r border-neutral-800 bg-neutral-950/95 flex flex-col min-h-0">
+    <aside className="graph-tutor-panel w-[26rem] max-w-full shrink-0 border-l border-neutral-800 bg-neutral-900 flex flex-col min-h-0" data-testid="graph-tutor-sidebar">
       <header className="px-4 py-3 border-b border-neutral-800 flex items-center gap-2">
         <Icon name="compass" className="text-indigo-300" />
         <span className="font-semibold">{t('Modo Tutor')}</span>

@@ -20,6 +20,7 @@ export function ThemesOverview({
   source,
   onOpen,
   toolbar,
+  sidebar,
   initialIdeaIds,
   onIdeasChange,
   onOpenIdea,
@@ -29,6 +30,7 @@ export function ThemesOverview({
   source: StellarGraphSource;
   onOpen(theme: StellarTheme): void;
   toolbar?: ReactNode;
+  sidebar?: ReactNode;
   initialIdeaIds?: string[];
   onIdeasChange(ids: string[]): void;
   onOpenIdea(node: GraphNode): void;
@@ -246,6 +248,7 @@ export function ThemesOverview({
             <div className="stellar-empty stellar-empty-hint">{t("Ningún tema coincide con el filtro.")}</div>
           )}
         </div>
+        {sidebar}
       </div>
     </div>
   );
