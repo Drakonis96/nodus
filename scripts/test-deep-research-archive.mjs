@@ -30,6 +30,7 @@ test.after(async () => { await rm(tmp, { recursive: true, force: true }); });
 const hooks = {
   savePath: path.join(tmp, 'informes.zip'),
   drafts: new Map(),
+  visuals: new Map(),
   pdf: async () => (await (await PDFDocument.create()).save()).buffer,
 };
 globalThis.__nodusArchiveHooks = hooks;
@@ -75,6 +76,10 @@ await build({
     virtual(/decorativeImagesRepo$/, `
       export const getDecorativeImage = () => null;
       export const getDecorativeImageData = () => null;
+    `),
+    // Visual generation is not part of an export. Read only the saved manifest.
+    virtual(/ai\/documentVisuals$/, `
+      export const getDocumentVisuals = (target) => globalThis.__nodusArchiveHooks.visuals.get(target.id) ?? null;
     `),
     virtual(/htmlToPdf$/, `
       export const htmlToPdfBytes = async (html) => Buffer.from(await globalThis.__nodusArchiveHooks.pdf(html));

@@ -308,11 +308,10 @@ test('every variant records the requested length through the one metadata seam',
   // there is what makes "reuse this prompt" restore it whichever pipeline wrote it.
   assert.match(source, /const sectionLength = normalizeDeepResearchSectionLength\(request\.sectionLength\);/u);
   assert.match(source, /versionedRequest: DeepResearchRequest = \{ \.\.\.request, deepResearchVersion, sectionLength \}/u);
-  const returns = [...source.matchAll(/withGenerationMetadata\(report, approach, deepResearchVersion, model([^)]*)\)/gu)];
-  assert.ok(returns.length >= 4, `expected every variant to return through the seam (found ${returns.length})`);
-  for (const [, tail] of returns) {
-    assert.equal(tail.trim(), ', sectionLength', 'a variant returns without recording the requested length');
-  }
+  // The shared finish step now also records the visual policy before metadata.
+  assert.match(source, /const finish = \(result: DeepResearchReport\) => \{[^}]*return withGenerationMetadata\(result, approach, deepResearchVersion, model, sectionLength\); \}/u);
+  const returns = [...source.matchAll(/return finish\(report\);/gu)];
+  assert.ok(returns.length >= 4, `expected every variant to return through the shared finish step (found ${returns.length})`);
   assert.match(
     source,
     /deepResearchSectionLength: report\.draft\.deepResearchSectionLength \?\? sectionLength/u,
