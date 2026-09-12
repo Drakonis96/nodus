@@ -46,7 +46,12 @@ function decodeText(bytes: Buffer): string | null {
     if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le', { fatal: true }).decode(bytes);
     if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be', { fatal: true }).decode(bytes);
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    return /[\x00-\x08\x0e-\x1f]/.test(text) ? null : text;
+    // These C0 controls identify binary content. Keep ordinary text whitespace.
+    for (let index = 0; index < text.length; index++) {
+      const code = text.charCodeAt(index);
+      if (code <= 8 || (code >= 14 && code <= 31)) return null;
+    }
+    return text;
   } catch { return null; }
 }
 function checkedZip(bytes: Buffer): AdmZip {

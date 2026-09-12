@@ -94,6 +94,13 @@ try {
     assert.equal(context.images.length,1);assert.equal((await sharp(Buffer.from(context.images[0].base64,'base64')).metadata()).format,'png');chats.deleteConversation(own.conversationId);checks++;
   }
   const own = owner();
+  // Valid UTF-8 may still be binary. Exercise every C0 control independently of
+  // malformed-byte rejection, while preserving tab/newline and text whitespace.
+  for (let code = 0; code < 32; code++) {
+    const file = await store.importResearchAttachment(own, write(`control-${code}.custom`, `before${String.fromCharCode(code)}after`));
+    assert.equal(file.kind, code >= 9 && code <= 13 ? 'text' : 'unsupported', `C0 control ${code}`);
+    store.removeResearchAttachment(own, file.id);
+  }
   const unsupported = await store.importResearchAttachment(own, write('binary.bin', Buffer.from([0,1,2,3,255])));
   assert.equal(unsupported.kind, 'unsupported'); assert.throws(() => store.readResearchAttachmentContext(own, [unsupported.id]), /lector/); store.removeResearchAttachment(own, unsupported.id);
   assert.equal(store.listResearchAttachments(own).length, 0);
@@ -145,5 +152,5 @@ try {
   assert.equal(fallback,'42');assert.equal(retries,2);
   await assert.rejects(()=>helper.withResearchAttachmentFallback({requiresVision:true},options,async()=>{throw new Error('This model does not support image input.');}),/does not support/);
   let failedCalls=0;await assert.rejects(()=>helper.withResearchAttachmentFallback({requiresVision:false},options,async()=>{failedCalls++;throw new Error('Invalid API key');}),/API key/);assert.equal(failedCalls,1);
-  console.log(`PASS: ${checks} extraction/engine cases; 19 document types, 9 image formats, 4 engines × 15 providers × text/vision, drop IPC, mixed/duplicate drops, invalid paths, original bytes, persistence, deletion, isolation, scanned PDF, corrupt files and context limits. Inference intercepted; no paid calls.`);
+  console.log(`PASS: ${checks} extraction/engine cases; 19 document types, 9 image formats, 4 engines × 15 providers × text/vision, 32 C0 text/binary checks, drop IPC, mixed/duplicate drops, invalid paths, original bytes, persistence, deletion, isolation, scanned PDF, corrupt files and context limits. Inference intercepted; no paid calls.`);
 } finally { load('electron/db/database.ts').closeDb(); fs.rmSync(scratch,{recursive:true,force:true}); }
