@@ -8428,4 +8428,11 @@ export const DE: Record<string, string> = {
   "El mínimo son {min} palabras por sección.": "Das Minimum sind {min} Wörter pro Abschnitt.",
   "El máximo son {max} palabras por sección.": "Das Maximum sind {max} Wörter pro Abschnitt.",
   "Solicitud cancelada por el usuario.": "Der Nutzer hat die Anfrage abgebrochen.",
+  // PDF Presenter — tags (renamed from folders) and the PDF download.
+  'Sin etiqueta': 'Kein Tag',
+  'Eliminar etiqueta': 'Tag löschen',
+  'Filtrar por etiqueta': 'Nach Tag filtern',
+  '¿Seguro que quieres eliminar la etiqueta «{name}»? Las presentaciones que la tienen seguirán en la biblioteca, pero sin etiqueta.': 'Das Tag „{name}“ löschen? Die Präsentationen damit bleiben in der Bibliothek, nur ohne Tag.',
+  'Descargar PDF': 'PDF herunterladen',
+  'No se pudo descargar la presentación.': 'Die Präsentation konnte nicht heruntergeladen werden.',
 };

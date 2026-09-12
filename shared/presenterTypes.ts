@@ -1,7 +1,7 @@
 // PDF Presenter — shared, Electron-free data model and pure reducers.
 //
 // The presenter's library is a global Toolkit resource (one shelf of
-// presentations + folders, independent of the active vault, like Convert and
+// presentations + tags, independent of the active vault, like Convert and
 // Protect). Everything here is a pure function over plain data so it can be
 // unit-tested directly (scripts/test-presenter-library.mjs) — the filesystem side
 // (copying the PDF, reading/writing the JSON) lives in electron/toolkit/presenter.
@@ -9,8 +9,9 @@
 // Field names deliberately mirror the reference app's meta.json so the audience,
 // presenter and mobile views can consume a presentation without a translation
 // layer: `notes`/`videos` are keyed by the 1-based slide number as a string
-// (JSON object keys are strings), `folder` is the containing folder id ('' or
-// undefined = root).
+// (JSON object keys are strings), `tag` is the assigned tag id ('' or undefined =
+// untagged). Libraries written before the rename stored the same two fields as
+// `folder`/`folders`; normalizeLibrary migrates them on read.
 
 /** A YouTube overlay pinned to one slide, positioned in percentages of the slide. */
 export interface PresenterVideo {
@@ -34,8 +35,8 @@ export interface Presentation {
   createdAt: string;
   /** ISO timestamp of the last time it was opened; drives "recent-opened" sort. */
   lastOpenedAt?: string;
-  /** Containing folder id; '' or undefined means the library root. */
-  folder?: string;
+  /** Assigned tag id; '' or undefined means untagged. */
+  tag?: string;
   /** Page count, filled in the first time the PDF is opened and its pages counted. */
   totalPages: number;
   /** Presenter notes, keyed by 1-based slide number (as a string). */
@@ -44,16 +45,16 @@ export interface Presentation {
   videos: Record<string, PresenterVideo>;
 }
 
-export interface PresenterFolder {
+export interface PresenterTag {
   id: string;
   name: string;
   createdAt: string;
 }
 
-/** The whole on-disk library: the flat list of presentations plus the folders. */
+/** The whole on-disk library: the flat list of presentations plus the tags. */
 export interface PresenterLibrary {
   presentations: Presentation[];
-  folders: PresenterFolder[];
+  tags: PresenterTag[];
 }
 
 /** Speaker notes extracted from a .pptx (the parser lives in electron/toolkit). */
@@ -102,45 +103,47 @@ export type PresenterImportResult =
 export type PresenterSortMode = 'recent-added' | 'recent-opened' | 'name-asc' | 'name-desc';
 
 export interface PresenterListQuery {
-  /** Folder id to restrict to; '' means the root (all presentations). */
-  folder?: string;
+  /** Tag id to restrict to; '' means no filter (all presentations). */
+  tag?: string;
   /** Case/accent-insensitive name substring. */
   search?: string;
   sort?: PresenterSortMode;
 }
 
 export function emptyLibrary(): PresenterLibrary {
-  return { presentations: [], folders: [] };
+  return { presentations: [], tags: [] };
 }
 
 /**
  * Coerce whatever is on disk into a well-formed {@link PresenterLibrary}. Tolerates
  * a legacy bare array of presentations (mirrors the reference's meta.json backward
- * compat) and fills missing sub-objects so callers never guard for undefined.
+ * compat), migrates the pre-rename `folders`/`folder` fields to `tags`/`tag`, and
+ * fills missing sub-objects so callers never guard for undefined.
  */
 export function normalizeLibrary(raw: unknown): PresenterLibrary {
   if (Array.isArray(raw)) {
-    return { presentations: raw.map(normalizePresentation), folders: [] };
+    return { presentations: raw.map(normalizePresentation), tags: [] };
   }
   if (raw && typeof raw === 'object') {
-    const obj = raw as Partial<PresenterLibrary>;
+    const obj = raw as Partial<PresenterLibrary> & { folders?: PresenterTag[] };
+    const tags = Array.isArray(obj.tags) ? obj.tags : Array.isArray(obj.folders) ? obj.folders : [];
     return {
       presentations: Array.isArray(obj.presentations) ? obj.presentations.map(normalizePresentation) : [],
-      folders: Array.isArray(obj.folders) ? obj.folders : [],
+      tags,
     };
   }
   return emptyLibrary();
 }
 
 function normalizePresentation(raw: unknown): Presentation {
-  const p = (raw ?? {}) as Partial<Presentation>;
+  const p = (raw ?? {}) as Partial<Presentation> & { folder?: string };
   return {
     id: String(p.id ?? ''),
     name: String(p.name ?? ''),
     fileName: String(p.fileName ?? ''),
     createdAt: String(p.createdAt ?? ''),
     lastOpenedAt: p.lastOpenedAt,
-    folder: p.folder ?? '',
+    tag: p.tag ?? p.folder ?? '',
     totalPages: Number(p.totalPages ?? 0) || 0,
     notes: p.notes && typeof p.notes === 'object' ? p.notes : {},
     videos: p.videos && typeof p.videos === 'object' ? p.videos : {},
@@ -153,13 +156,13 @@ function fold(value: string): string {
 }
 
 /**
- * Filter by folder + search and sort, returning a new array (never mutates).
+ * Filter by tag + search and sort, returning a new array (never mutates).
  * Sorting is stable-enough for the UI: locale name compare, ISO-string time
  * compare (lexicographic works because the timestamps are ISO-8601).
  */
 export function queryPresentations(lib: PresenterLibrary, q: PresenterListQuery = {}): Presentation[] {
   let list = [...lib.presentations];
-  if (q.folder) list = list.filter((p) => (p.folder || '') === q.folder);
+  if (q.tag) list = list.filter((p) => (p.tag || '') === q.tag);
   if (q.search && q.search.trim()) {
     const needle = fold(q.search.trim());
     list = list.filter((p) => fold(p.name).includes(needle));
@@ -182,9 +185,9 @@ export function queryPresentations(lib: PresenterLibrary, q: PresenterListQuery 
   return list;
 }
 
-/** How many presentations sit directly in a folder (for the sidebar count). */
-export function folderCount(lib: PresenterLibrary, folderId: string): number {
-  return lib.presentations.filter((p) => (p.folder || '') === folderId).length;
+/** How many presentations carry a tag (for the chip count). */
+export function tagCount(lib: PresenterLibrary, tagId: string): number {
+  return lib.presentations.filter((p) => (p.tag || '') === tagId).length;
 }
 
 // ── Pure reducers: each returns a NEW library, never mutating the input. ──────
@@ -210,22 +213,22 @@ export function renamePresentation(lib: PresenterLibrary, id: string, name: stri
   };
 }
 
-export function moveToFolder(lib: PresenterLibrary, id: string, folderId: string): PresenterLibrary {
+export function assignTag(lib: PresenterLibrary, id: string, tagId: string): PresenterLibrary {
   return {
     ...lib,
-    presentations: lib.presentations.map((p) => (p.id === id ? { ...p, folder: folderId || '' } : p)),
+    presentations: lib.presentations.map((p) => (p.id === id ? { ...p, tag: tagId || '' } : p)),
   };
 }
 
-export function addFolder(lib: PresenterLibrary, folder: PresenterFolder): PresenterLibrary {
-  return { ...lib, folders: [...lib.folders, folder] };
+export function addTag(lib: PresenterLibrary, tag: PresenterTag): PresenterLibrary {
+  return { ...lib, tags: [...lib.tags, tag] };
 }
 
-/** Remove a folder; its presentations fall back to the root (never deleted). */
-export function removeFolder(lib: PresenterLibrary, folderId: string): PresenterLibrary {
+/** Remove a tag; the presentations that carried it stay, untagged (never deleted). */
+export function removeTag(lib: PresenterLibrary, tagId: string): PresenterLibrary {
   return {
-    folders: lib.folders.filter((f) => f.id !== folderId),
-    presentations: lib.presentations.map((p) => (p.folder === folderId ? { ...p, folder: '' } : p)),
+    tags: lib.tags.filter((tg) => tg.id !== tagId),
+    presentations: lib.presentations.map((p) => (p.tag === tagId ? { ...p, tag: '' } : p)),
   };
 }
 

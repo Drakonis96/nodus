@@ -86,7 +86,7 @@ export function importPdf(
     name: fileName.replace(/\.[^.]+$/i, ''),
     fileName,
     createdAt: now.toISOString(),
-    folder: '',
+    tag: '',
     totalPages: 0,
     notes: { ...(options.notes ?? {}) },
     videos: {},
