@@ -1,10 +1,10 @@
 import { Icon } from './ui';
 import { t } from '../i18n';
-import type { RoadmapTopicKey } from '../views/RoadmapFeedbackModal';
 import { orderSidebarItems } from '../navigation';
 
 /** Views the teaching vault has already wired up (reused from the study workspace). */
 export type TeachingView =
+  | 'studySearch'
   | 'studyCourses'
   | 'studySchedule'
   | 'studyCalendar'
@@ -20,21 +20,17 @@ export type TeachingView =
   | 'teachingRubrics'
   | 'teachingUnits';
 
-export interface TeachingItem { label: string; icon: string; view?: TeachingView; topic?: RoadmapTopicKey }
+export interface TeachingItem { label: string; icon: string; view: TeachingView }
 export interface TeachingGroup { id: string; label: string; items: TeachingItem[]; hint?: string }
 
 export function teachingItemId(item: TeachingItem): string {
-  return item.view ?? `teachingRoadmap:${item.topic}`;
+  return item.view;
 }
 
-/**
- * The teacher's workspace. Items with a `view` are configured and navigate to the
- * shared study surface behind them; items with a `topic` are planned but not built,
- * and open the feedback thread for that section instead, so the roadmap is visible
- * and the people who would use it get to shape it before it exists.
- */
+/** Available sections of the teacher's workspace. */
 export const TEACHING_GROUPS: TeachingGroup[] = [
   { id: 'teaching-organization', label: 'Organización', items: [
+    { label: 'Buscar', icon: 'search', view: 'studySearch' },
     { label: 'Cursos, asignaturas y grupos', icon: 'graduation', view: 'studyCourses' },
     { label: 'Grupos', icon: 'users', view: 'teachingGroups' },
     { label: 'Horarios', icon: 'clock', view: 'studySchedule' },
@@ -44,7 +40,7 @@ export const TEACHING_GROUPS: TeachingGroup[] = [
   ] },
   // Shared study-corpus readers, relabelled for a teacher's workspace.
   { id: 'teaching-analyze', label: 'Analizar', items: [
-    { label: 'Chat', icon: 'chat', view: 'studyChat' },
+    { label: 'Research chat', icon: 'chat', view: 'studyChat' },
     { label: 'Ideas', icon: 'bulb', view: 'studyIdeas' },
     { label: 'Grafo', icon: 'layers', view: 'studyGraph' },
   ] },
@@ -55,12 +51,7 @@ export const TEACHING_GROUPS: TeachingGroup[] = [
     { label: 'Calificaciones', icon: 'chartBar', view: 'teachingGrades' },
   ] },
   { id: 'teaching-create', label: 'Crear', items: [
-    { label: 'Guía docente / Programación', icon: 'book', topic: 'guiaDocente' },
     { label: 'Diseño de unidades', icon: 'compass', view: 'teachingUnits' },
-    { label: 'Situaciones de aprendizaje', icon: 'bulb', topic: 'situacionesAprendizaje' },
-    { label: 'Adaptaciones', icon: 'users', topic: 'adaptaciones' },
-    { label: 'Notas', icon: 'notebook', topic: 'notas' },
-    { label: 'Proyectos de innovación', icon: 'flask', topic: 'proyectosInnovacion' },
   ] },
 ];
 
@@ -68,14 +59,12 @@ export function TeachingSidebar({
   compact = false,
   activeView,
   onNavigate,
-  onOpenRoadmap,
   sidebarOrder = [],
   sidebarHidden = [],
 }: {
   compact?: boolean;
   activeView: string;
   onNavigate: (view: TeachingView) => void;
-  onOpenRoadmap: (topic: RoadmapTopicKey) => void;
   sidebarOrder?: string[];
   sidebarHidden?: string[];
 }) {
@@ -94,11 +83,11 @@ export function TeachingSidebar({
             {!compact && group.hint && (
               <p className="px-3 pb-1 text-[10px] leading-snug text-neutral-500">{t(group.hint)}</p>
             )}
-            {items.map((item) => item.view ? (
+            {items.map((item) => (
               <button
                 key={item.id}
                 data-tour={`nav-${item.view}`}
-                onClick={() => onNavigate(item.view!)}
+                onClick={() => onNavigate(item.view)}
                 aria-label={compact ? t(item.label) : undefined}
                 title={compact ? t(item.label) : undefined}
                 className={`flex items-center rounded-lg py-2 text-left text-sm ${compact ? 'justify-center px-2' : 'gap-2 px-3'} ${
@@ -107,26 +96,6 @@ export function TeachingSidebar({
               >
                 <Icon name={item.icon} className="shrink-0" />
                 <span className={compact ? 'sr-only' : undefined}>{t(item.label)}</span>
-              </button>
-            ) : (
-              <button
-                key={item.id}
-                type="button"
-                data-testid={`teaching-roadmap-${item.topic}`}
-                onClick={() => onOpenRoadmap(item.topic!)}
-                aria-label={compact ? t(item.label) : undefined}
-                title={`${t(item.label)} · ${t('En diseño')} · ${t('Cuéntame qué necesitas en esta sección')}`}
-                className={`group flex w-full items-center rounded-lg border border-dashed border-indigo-400 py-2 text-left text-sm text-neutral-500 transition-colors hover:bg-indigo-600/20 hover:text-indigo-700 dark:hover:text-indigo-300 ${compact ? 'justify-center px-2' : 'gap-2 px-3'}`}
-              >
-                <Icon name={item.icon} className="shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
-                <span className={compact ? 'sr-only' : 'min-w-0 flex-1 truncate'}>{t(item.label)}</span>
-                {!compact && (
-                  <Icon
-                    name="sparkles"
-                    size={13}
-                    className="shrink-0 text-indigo-500 opacity-70 transition-opacity group-hover:opacity-100"
-                  />
-                )}
               </button>
             ))}
           </section>

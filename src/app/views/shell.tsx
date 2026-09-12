@@ -6,9 +6,11 @@ const NodusBrowserView = lazy(() => import('../../views/NodusBrowserView').then(
 const RadarView = lazy(() => import('../../views/RadarView').then((module) => ({ default: module.RadarView })));
 const CompassView = lazy(() => import('../../views/CompassView').then((module) => ({ default: module.CompassView })));
 const ToolkitView = lazy(() => import('../../views/ToolkitView').then((module) => ({ default: module.ToolkitView })));
+const ResearchAssistantModal = lazy(() => import('../../views/ResearchAssistantModal').then(module => ({ default: module.ResearchAssistantModal })));
 const Settings = lazy(() => import('../../views/Settings').then((module) => ({ default: module.Settings })));
 
 export const shellViews = {
+  researchChat: ({ settings, assistantTarget, isGenealogy, activeVault }) => <ResearchAssistantModal key={activeVault?.id} settings={settings} embedded initialTarget={assistantTarget} isGenealogy={isGenealogy} />,
   browser: () => <NodusBrowserView />,
   radar: ({ radarTarget }) => <RadarView target={radarTarget} />,
   compass: ({ snapshots }) => <CompassView snapshot={snapshots.read('compass')} onSnapshotChange={(patch) => snapshots.patch('compass', patch)} />,

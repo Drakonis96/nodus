@@ -4,7 +4,6 @@ import type { AnnouncementRefreshResult } from '@shared/announcements';
 import type { CsvImportPlanData } from './views/DatabasesView';
 import type { NotionImportReport } from '@shared/notionImport';
 import { FeedbackModal } from './views/FeedbackModal';
-import { RoadmapFeedbackModal, type RoadmapTopicKey } from './views/RoadmapFeedbackModal';
 import { RoadmapModal } from './views/RoadmapModal';
 import { QueuePanel, useQueueActivity } from './components/QueuePanel';
 import { VaultSwitcher, vaultTypeIcon, vaultTypeLabel } from './components/VaultSwitcher';
@@ -68,7 +67,7 @@ import type {
   SidebarNavItem,
   View,
 } from './navigation';
-import { dedicatedVaultNavIds, groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
+import { researchChatView, dedicatedVaultNavIds, groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
 import type { ToolkitPage } from './navigation';
 import type { LibraryScope } from '@shared/libraryTypes';
 import { placeHeaderBadge, placeHeaderModelAlert, type HeaderBadgePlacement, type HeaderModelAlertPlacement } from './headerLayout';
@@ -89,7 +88,6 @@ import { applyThemeClasses } from './theme';
 const CsvImportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.CsvImportModal })));
 const NotionImportReportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.NotionImportReportModal })));
 const CollectionsModal = lazy(() => import('./views/CollectionsModal').then((module) => ({ default: module.CollectionsModal })));
-const ResearchAssistantModal = lazy(() => import('./views/ResearchAssistantModal').then((module) => ({ default: module.ResearchAssistantModal })));
 const SkillMarketplaceModal = lazy(() => import('./components/SkillMarketplaceModal').then((module) => ({ default: module.SkillMarketplaceModal })));
 
 // Shortcut label for the command palette: ⌘K on macOS, Ctrl K elsewhere.
@@ -257,7 +255,6 @@ export function App() {
     }
   });
   const [collectionsOpen, setCollectionsOpen] = useState(false);
-  const [researchOpen, setResearchOpen] = useState(false);
   // Skills: the catalogue and the installed library, for the whole application rather
   // than for one chat. The per-chat popover opens this one through the registry below,
   // so there is a single modal however you got here.
@@ -269,7 +266,6 @@ export function App() {
   useEffect(() => registerSkillMarketplace(() => setSkillsTab('library')), []);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   // Planned teaching section whose feedback thread is open, if any.
-  const [roadmapTopic, setRoadmapTopic] = useState<RoadmapTopicKey | null>(null);
   const [roadmapOpen, setRoadmapOpen] = useState(false);
   // The trigger element that opened the vault panel (the centre badge or the
   // right-rail vaults icon), or null when closed. The panel anchors under it.
@@ -407,6 +403,7 @@ export function App() {
     return () => window.removeEventListener('nodus:navigate-primary-source', openPrimarySource);
   }, []);
   useEffect(() => { if (view !== 'studyGraph') setStudyGraphTarget(null); }, [view]);
+  useEffect(() => { if (view !== 'researchChat') setAssistantTarget(null); }, [view]);
   useEffect(() => { if (view !== 'studyChat') setStudyChatTarget(null); }, [view]);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<SyncLogEntry | null>(null);
@@ -1157,24 +1154,19 @@ export function App() {
 
   const openAssistant = useCallback(
     (target?: PendingAssistantNavigationTarget) => {
-      if (!(settings?.chatModel ?? settings?.synthesisModel)) {
+      if (!((isEstudio || isDocencia ? settings?.studyModel : null) ?? settings?.chatModel ?? settings?.synthesisModel)) {
         setAiModelRequiredOpen(true);
         return;
       }
-      if (isWorldbuilding) {
-        setResearchOpen(false);
-        setView('worldChat');
-        return;
-      }
       setAssistantTarget(target ? { ...target, nonce: Date.now() } : null);
-      setResearchOpen(true);
+      if ((isEstudio || isDocencia) && target?.prompt) setStudyChatTarget({ prompt: target.prompt, nonce: Date.now() });
+      setView(researchChatView(activeVault?.type));
     },
-    [isWorldbuilding, settings?.chatModel, settings?.synthesisModel]
+    [activeVault?.type, isEstudio, isDocencia, settings?.studyModel, settings?.chatModel, settings?.synthesisModel]
   );
 
   const handleActiveVaultChanged = useCallback(async () => {
     setCollectionsOpen(false);
-    setResearchOpen(false);
     setGraphTarget(null);
     setIdeaTarget(null);
     setAuthorTarget(null);
@@ -1214,7 +1206,7 @@ export function App() {
       // The last resort for the vault panel: the badge that opens it is placed by
       // measurement and can, in a window narrow enough, have nowhere to go.
       { id: 'act:vaults', label: t('Bóvedas'), section: t('Acciones'), icon: 'archive', keywords: 'vaults bovedas boveda cambiar crear renombrar duplicar eliminar', run: () => { const badge = document.querySelector<HTMLElement>('[data-testid="header-vault-badge"]'); if (badge) toggleVaults(badge); } },
-      { id: 'act:assistant', label: t(isWorldbuilding ? 'Chat del mundo' : 'Asistente de investigación'), section: t('Acciones'), icon: 'chat', keywords: 'assistant chat', run: () => openAssistant() },
+      { id: 'act:assistant', label: 'Research chat', section: t('Acciones'), icon: 'chat', keywords: 'assistant chat', run: () => openAssistant() },
       { id: 'act:skills', label: t('Mis skills'), section: t('Acciones'), icon: 'sparkles', keywords: 'skills habilidades biblioteca instalar activar', run: () => setSkillsTab('library') },
       { id: 'act:marketplace', label: 'Marketplace', section: t('Acciones'), icon: 'basket', keywords: 'marketplace tienda skills plugins instalar descargar catalogo catálogo', run: () => setSkillsTab('marketplace') },
       { id: 'act:presenter', label: 'PDF Presenter', section: t('Acciones'), icon: 'presentation', keywords: 'presentar diapositivas slides pdf presenter proyector herramientas toolkit', run: () => { setToolkitPage('presenter'); setView('toolkit'); } },
@@ -1297,6 +1289,7 @@ export function App() {
     studyRecordingTarget,
     studyGraphTarget,
     studyChatTarget,
+    assistantTarget,
     radarTarget,
     setView,
     navigate,
@@ -1467,8 +1460,8 @@ export function App() {
           />
           <HeaderAction
             icon="chat"
-            label={t('Asistente')}
-            title={(settings.chatModel ?? settings.synthesisModel) ? t(isWorldbuilding ? 'Abrir chat del mundo' : 'Abrir asistente de investigación') : t('Configura un modelo de IA')}
+            label="Research chat"
+            title={((isEstudio || isDocencia ? settings.studyModel : null) ?? settings.chatModel ?? settings.synthesisModel) ? 'Research chat' : t('Configura un modelo de IA')}
             onClick={() => openAssistant()}
           />
           <HeaderAction
@@ -1880,7 +1873,6 @@ export function App() {
                       compact={sidebarCompact}
                       activeView={view}
                       onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setStudyGraphTarget(null); setView(targetView); }}
-                      onOpenRoadmap={setRoadmapTopic}
                       sidebarOrder={settings?.sidebarOrder}
                       sidebarHidden={activeSidebarHidden}
                     />
@@ -1975,14 +1967,6 @@ export function App() {
           onClose={() => setCollectionsOpen(false)}
         />
       )}
-      {researchOpen && (
-        <ResearchAssistantModal
-          settings={settings}
-          initialTarget={assistantTarget}
-          isGenealogy={isGenealogy}
-          onClose={() => setResearchOpen(false)}
-        />
-      )}
       {skillsTab && (
         <SkillMarketplaceModal
           initialTab={skillsTab}
@@ -1990,7 +1974,6 @@ export function App() {
         />
       )}
       {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
-      {roadmapTopic && <RoadmapFeedbackModal topic={roadmapTopic} onClose={() => setRoadmapTopic(null)} />}
       {roadmapOpen && <RoadmapModal onClose={() => setRoadmapOpen(false)} />}
 
       {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !settings.tourComplete && !isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isProsopography && !isTestimonios && (

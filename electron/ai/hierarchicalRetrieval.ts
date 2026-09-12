@@ -34,6 +34,8 @@ export interface HierarchicalRetrievalResult {
 }
 
 export interface HierarchicalRetrievalOptions {
+  /** Hard corpus boundary, applied before ranking in every lane. [] matches nothing. */
+  nodusIds?: string[];
   embedding?: number[] | null;
   documentLimit?: number;
   ideaLimit?: number;
@@ -218,6 +220,8 @@ export async function retrieveHierarchical(
   options: HierarchicalRetrievalOptions = {},
 ): Promise<HierarchicalRetrievalResult> {
   const clean = query.trim();
+  if (options.nodusIds?.length === 0) return { embeddingAvailable: false, documents: [], ideas: [], passages: [], routedWorkIds: [] };
+  const corpus = { nodusIds: options.nodusIds };
   const documentLimit = Math.max(0, options.documentLimit ?? 20);
   const ideaLimit = Math.max(0, options.ideaLimit ?? 60);
   const passageLimit = Math.max(0, options.passageLimit ?? 24);
@@ -227,13 +231,13 @@ export async function retrieveHierarchical(
   const vector = options.embedding === undefined ? await embed(clean) : options.embedding;
   const lexical = options.lexicalDocuments === false || !clean || documentLimit === 0
     ? []
-    : lexicalDocumentSearch(clean, documentLimit * 2);
+    : lexicalDocumentSearch(clean, documentLimit * 2, corpus);
   const literalProbes = [...new Set((options.lexicalPassageQueries?.length
     ? options.lexicalPassageQueries
     : [clean]).map((probe) => probe.trim()).filter(Boolean))].slice(0, MAX_LITERAL_PROBES);
   const lexicalLists = options.lexicalPassages === false || passageLimit === 0
     ? []
-    : literalProbes.map((probe) => lexicalPassageSearch(probe, passageLimit));
+    : literalProbes.map((probe) => lexicalPassageSearch(probe, passageLimit, corpus));
   const fuseLexical = (lists: SimilarPassage[][]): SimilarPassage[] => lists.length
     ? reciprocalRankFusion(lists.map((list) => list.map((hit) => ({ key: hit.passage_id, value: hit }))))
       .slice(0, passageLimit)
@@ -253,13 +257,13 @@ export async function retrieveHierarchical(
 
   const [semanticDocuments, ideas, globalPassages] = await Promise.all([
     documentLimit > 0
-      ? findSimilarDocuments(vector, options.minDocumentSimilarity ?? 0.2, documentLimit * 2)
+      ? findSimilarDocuments(vector, options.minDocumentSimilarity ?? 0.2, documentLimit * 2, corpus)
       : Promise.resolve([]),
     ideaLimit > 0
-      ? findSimilarIdeasPaged(vector, options.minIdeaSimilarity ?? -1, ideaLimit)
+      ? findSimilarIdeasPaged(vector, options.minIdeaSimilarity ?? -1, ideaLimit, corpus)
       : Promise.resolve([]),
     passageLimit > 0
-      ? findSimilarPassagesPaged(vector, options.minPassageSimilarity ?? -1, passageLimit)
+      ? findSimilarPassagesPaged(vector, options.minPassageSimilarity ?? -1, passageLimit, corpus)
       : Promise.resolve([]),
   ]);
   const documents = fuseDocuments(semanticDocuments, lexical, documentLimit);

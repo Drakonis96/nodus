@@ -600,6 +600,10 @@ export type {
 export type { ColumnRole, ColumnRoles, KindMeta, RoleColumn } from './analysisCatalog';
 
 export interface DatabaseChatRequest {
+  /** Optional vault-local preference; null/absence keeps the original application prompt. */
+  systemPromptId?: string | null;
+  model?: ModelRef | null;
+  thinkingEffort?: import('./researchReasoning').ResearchEffort;
   conversationId?: string;
   question: string;
   databaseIds: string[];
@@ -1543,6 +1547,8 @@ export interface ModelRef {
 /** One model as returned by a provider's model-list endpoint. */
 export interface ModelInfo {
   id: string;
+  /** Native LM Studio reasoning choices, discovered from /api/v1/models. */
+  researchReasoningLevels?: import('./researchReasoning').NativeResearchEffort[];
   name?: string;
   /** For OpenRouter: the upstream provider segment of the id (e.g. "anthropic"). */
   group?: string;
@@ -3632,6 +3638,9 @@ export interface ManuscriptProgress {
 /** A question for the world chat. `focusKeys` is the author's explicit choice; with none,
  *  the repo resolves the focus from the names the question itself uses. */
 export interface WorldChatRequest {
+  /** Optional vault-local preference; null/absence keeps the original application prompt. */
+  systemPromptId?: string | null;
+  thinkingEffort?: import('./researchReasoning').ResearchEffort;
   conversationId?: string;
   question: string;
   focusKeys?: string[];
@@ -5674,6 +5683,7 @@ export interface ResearchGraphPartsSelection {
 }
 
 export interface ResearchContextSelection {
+  sourceFilter?: import('./researchContextFilters').ResearchSourceFilter;
   ideas: boolean;
   themes: boolean;
   contradictions: boolean;
@@ -5693,7 +5703,11 @@ export interface ResearchChatMessage {
 }
 
 export interface ResearchChatRequest {
+  /** Optional vault-local preference; null/absence keeps the original application prompt. */
+  systemPromptId?: string | null;
   conversationId?: string;
+  /** Isolated from Nodi and global chat defaults. Absence means standard. */
+  thinkingEffort?: import('./researchReasoning').ResearchEffort;
   messages: ResearchChatMessage[];
   selection: ResearchContextSelection;
   model?: ModelRef | null;
@@ -6196,6 +6210,8 @@ export interface GlobalSearchResult {
   gapKind?: GapKind | null;
   /** Themes only: the theme label used as a graph filter. */
   themeLabel?: string | null;
+  /** Unified relevance used to order literal and semantic matches together. */
+  relevance?: number;
   /** Semantic results only: cosine similarity in [0,1]. */
   similarity?: number | null;
 }
@@ -6217,7 +6233,7 @@ export interface GlobalSearchResponse {
 }
 
 /** Which retrieval strategy the search box uses. */
-export type SearchMode = 'text' | 'semantic';
+export type SearchMode = 'text' | 'semantic' | 'hybrid';
 
 export interface SemanticSearchOptions {
   /** Which result kinds to include. Empty/undefined ⇒ ideas, passages and works. */

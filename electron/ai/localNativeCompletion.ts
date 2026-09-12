@@ -14,6 +14,8 @@ export interface LocalNativeRequest {
   timeoutMs: number;
   signal?: AbortSignal;
   deterministic?: boolean;
+  /** Research Assistant-only native controls. Undefined preserves existing policy. */
+  researchBody?: Record<string, unknown>;
 }
 
 export interface LocalNativeResult {
@@ -80,7 +82,7 @@ async function ollama(request: LocalNativeRequest): Promise<LocalNativeResult> {
     ],
     stream: false,
     ...(request.jsonMode ? { format: 'json' } : {}),
-    think: false,
+    ...(request.researchBody ?? { think: false }),
     options: {
       temperature: request.temperature,
       num_ctx: request.contextTokens,
@@ -136,12 +138,12 @@ async function lmStudio(request: LocalNativeRequest): Promise<LocalNativeResult>
     max_output_tokens: request.outputTokens,
     store: false,
   };
-  let handle = await postJson(`${request.baseUrl}/api/v1/chat`, { ...baseBody, reasoning: 'off' }, request);
+  let handle = await postJson(`${request.baseUrl}/api/v1/chat`, { ...baseBody, ...(request.researchBody ?? { reasoning: 'off' }) }, request);
   try {
     if (handle.response.status === 404 || handle.response.status === 405) {
       throw new LocalNativeUnavailableError('LM Studio native chat unavailable');
     }
-    if (handle.response.status === 400) {
+    if (handle.response.status === 400 && request.researchBody === undefined) {
       const detail = await handle.response.clone().text();
       if (/reasoning|unknown field|unexpected/i.test(detail)) {
         handle.cleanup();
@@ -205,7 +207,7 @@ export async function streamLocalNative(
       model: request.model,
       messages: [{ role: 'system', content: request.system }, { role: 'user', content: request.user }],
       stream: true,
-      think: false,
+      ...(request.researchBody ?? { think: false }),
       options: {
         temperature: request.temperature,
         num_ctx: request.contextTokens,
@@ -245,7 +247,7 @@ export async function streamLocalNative(
     temperature: request.temperature,
     context_length: request.contextTokens,
     max_output_tokens: request.outputTokens,
-    reasoning: 'off',
+    ...(request.researchBody ?? { reasoning: 'off' }),
     store: false,
   };
   let handle = await postJson(`${request.baseUrl}/api/v1/chat`, body, request);
@@ -253,11 +255,11 @@ export async function streamLocalNative(
     if (handle.response.status === 404 || handle.response.status === 405) {
       throw new LocalNativeUnavailableError('LM Studio native stream unavailable');
     }
-    if (handle.response.status === 400) {
+    if (handle.response.status === 400 && request.researchBody === undefined) {
       const detail = await handle.response.clone().text();
       if (/reasoning|unknown field|unexpected/i.test(detail)) {
         handle.cleanup();
-        const { reasoning: _reasoning, ...compatibleBody } = body;
+        const { reasoning: _reasoning, ...compatibleBody } = body as typeof body & { reasoning?: unknown };
         handle = await postJson(`${request.baseUrl}/api/v1/chat`, compatibleBody, request);
       }
     }

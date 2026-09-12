@@ -316,7 +316,7 @@ function byId(a: ModelInfo, b: ModelInfo): number {
  * Fetch the live model list for a provider using its stored key. Sorted
  * alphabetically; OpenRouter is additionally grouped/sorted by upstream provider.
  */
-export async function listModels(provider: AiProvider, key: string | null): Promise<ModelInfo[]> {
+export async function listModels(provider: AiProvider, key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
   switch (provider) {
     case 'anthropic':
       return listAnthropic(key);
@@ -331,7 +331,7 @@ export async function listModels(provider: AiProvider, key: string | null): Prom
     case 'deepseek':
       return listOpenAiStyle('https://api.deepseek.com/models', key, false);
     case 'openrouter':
-      return listOpenRouter();
+      return listOpenRouter(signal);
     case 'groq':
       return listOpenAiStyle('https://api.groq.com/openai/v1/models', key, true);
     case 'cerebras':
@@ -547,9 +547,9 @@ async function listOpenAiEmbeddingModels(key: string | null): Promise<ModelInfo[
     .sort(byId);
 }
 
-async function listOpenRouter(): Promise<ModelInfo[]> {
+async function listOpenRouter(signal?: AbortSignal): Promise<ModelInfo[]> {
   // OpenRouter's model list is public (no key required).
-  const res = await fetch('https://openrouter.ai/api/v1/models');
+  const res = await fetch('https://openrouter.ai/api/v1/models', signal ? { signal } : undefined);
   if (!res.ok) throw new Error(`OpenRouter /models HTTP ${res.status}`);
   const data = (await res.json()) as {
     data?: { id: string; name?: string; supported_parameters?: string[]; architecture?: { input_modalities?: string[] } }[];
@@ -725,6 +725,18 @@ async function listLmStudio(key: string | null, embeddingsOnly: boolean): Promis
       } as ModelInfo;
     })
     .filter((m) => m.id && (embeddingsOnly ? m.kind === 'embeddings' : m.kind !== 'embeddings'));
+  if (!embeddingsOnly) {
+    try {
+      const native = await localFetch(`${base}/api/v1/models`, key);
+      if (native.ok) {
+        const payload = await native.json() as { models?: Array<{ key: string; capabilities?: { reasoning?: { allowed_options?: string[] } } }> };
+        for (const model of mapped) {
+          const options = payload.models?.find(m => m.key === model.id)?.capabilities?.reasoning?.allowed_options;
+          if (options) model.researchReasoningLevels = options.filter((x): x is 'off' | 'on' | 'low' | 'medium' | 'high' => ['off', 'on', 'low', 'medium', 'high'].includes(x));
+        }
+      }
+    } catch { /* Older native APIs publish no reasoning choices. */ }
+  }
   // Loaded models first (they answer instantly), then alphabetical.
   return mapped.sort((a, b) => Number(b.loaded) - Number(a.loaded) || a.id.localeCompare(b.id));
 }

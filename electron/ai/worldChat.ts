@@ -1,3 +1,5 @@
+import { withResearchSystemPrompt } from './researchSystemPrompt';
+import { researchGenerationOptions } from './researchGenerationOptions';
 import { skillHasCapability } from '@shared/chatSkills';
 import { enabledChatSkills } from '../chatSkills';
 import { buildChatSkillsPrompt, chatSkillsOutputContract, transformChatProse } from '@shared/chatSkills';
@@ -272,13 +274,13 @@ export async function streamWorldChat(
   const model = request.model ?? settings.chatModel ?? settings.synthesisModel ?? null;
   const raw = await completeTextStream(
     {
-      system: `${worldOperationSystemPrompt('worldChat', settings.promptLanguage ?? 'es')}\n\n${buildChatSkillsPrompt(skills)}\nNew creative proposals are not established world canon. Label them accordingly.`,
+      system: withResearchSystemPrompt(`${worldOperationSystemPrompt('worldChat', settings.promptLanguage ?? 'es')}\n\n${buildChatSkillsPrompt(skills)}\nNew creative proposals are not established world canon. Label them accordingly.`, request.systemPromptId),
       user: `${composeWorldChatContext(facts, language)}\n\n${chatSkillsOutputContract(skills)}`,
       plainContext: true,
       englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')),
       // Keep factual answers grounded and creative proposals clearly identified.
       temperature: 0.3,
-      maxTokens: skills.length ? 10_000 : 1200,
+      ...(request.thinkingEffort === undefined ? { maxTokens: skills.length ? 10_000 : 1200 } : await researchGenerationOptions({ ...request, model }, skills.length ? 10_000 : 1200, false, signal)),
     },
     (delta, kind) => {
       if (kind !== 'reasoning') onDelta(delta);

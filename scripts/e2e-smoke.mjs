@@ -950,9 +950,10 @@ try {
     console.log('[e2e] focused STT Settings + whisper.cpp streaming smoke passed');
     process.exit(0);
   }
-  await page.getByRole('button', { name: 'Asistente', exact: true }).click();
+  await page.locator('header').getByRole('button', { name: 'Research chat', exact: true }).click();
+  await page.getByTestId('research-chat-view').waitFor({ timeout: 30_000 });
   assert.equal(await page.locator('select[title="Modelo del chat"]').inputValue(), 'openrouter::smoke-chat-model');
-  await page.locator('button[title="Cerrar"]').click();
+  await page.locator('[data-tour="nav-settings"]').click();
   console.log('[e2e] header has no global model selector');
 
   // The brand and the collapse chevron used to share one centred flex row. On
@@ -1682,7 +1683,7 @@ try {
   await page.reload();
   await page.waitForFunction(() => document.querySelector('[data-tour="nav-search"]'));
   await page.locator('[data-tour="nav-search"]').click();
-  const searchInput = page.getByPlaceholder('Busca en notas, ideas, obras, huecos, temas y autores…');
+  const searchInput = page.getByPlaceholder('Escribe para buscar…', { exact: true });
   await searchInput.fill('recuperación');
   await page.getByText('Práctica de recuperación y retención a largo plazo', { exact: true }).waitFor({ timeout: 10_000 });
   await page.getByText('Práctica de recuperación y retención a largo plazo', { exact: true }).click();
@@ -2525,8 +2526,14 @@ try {
   await page.getByTestId('study-search-view').waitFor({ timeout: 30_000 });
   const hybridInput = page.getByTestId('study-search-input');
   assert.ok(await hybridInput.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft)) >= 30, 'hybrid search keeps its icon and text separated');
-  await page.getByRole('button', { name: 'Filtros', exact: true }).click();
-  await page.getByTestId('study-search-view').locator('select').first().selectOption('transcript');
+  const contentFilters = page.getByTestId('study-search-view').getByRole('group', { name: 'Tipo de contenido', exact: true });
+  await contentFilters.waitFor({ state: 'visible' });
+  assert.equal(await page.getByTestId('study-search-filters').count(), 0, 'content chips are available with advanced filters collapsed');
+  for (const kind of ['Apunte', 'Material', 'Pregunta', 'Examen']) {
+    await contentFilters.getByRole('button', { name: kind, exact: true, pressed: true }).click();
+  }
+  assert.equal(await contentFilters.getByRole('button', { pressed: true }).count(), 1, 'only transcripts are selected');
+  assert.equal(await contentFilters.getByRole('button', { name: 'Transcripción', exact: true }).getAttribute('aria-pressed'), 'true');
   await hybridInput.fill('memoria de trabajo');
   await page.getByTestId('study-search-result').first().waitFor({ timeout: 30_000 });
   assert.match(await page.getByTestId('study-search-result').first().innerText(), /Definición literal de memoria de trabajo/, 'literal transcript is found through the unified local index');
@@ -3220,8 +3227,8 @@ try {
   const teachingIdeas = page.getByTestId('study-ideas-view');
   await teachingIdeas.waitFor({ timeout: 30_000 });
   await teachingIdeas.getByText('Máquina de vapor', { exact: false }).first().waitFor({ timeout: 30_000 });
-  await page.getByTestId('teaching-sidebar').getByRole('button', { name: 'Chat', exact: true }).click();
-  const teachingChat = page.getByTestId('study-chat-view');
+  await page.getByTestId('teaching-sidebar').getByRole('button', { name: 'Research chat', exact: true }).click();
+  const teachingChat = page.getByTestId('research-chat-view');
   await teachingChat.waitFor({ timeout: 30_000 });
   // The copy has to be the teacher's, not the learner's: same component, other voice.
   await teachingChat.getByText('Pregunta a tus materiales de clase con citas verificables.').waitFor({ timeout: 30_000 });
@@ -3911,11 +3918,18 @@ try {
     // The world chat. Nodus calculates and the model writes, so the half that can be proved
     // without a provider is the half that matters most: it refuses to answer about a world
     // it cannot anchor, instead of composing a plausible one.
-    await openSection('Chat del mundo', 'world-chat-view');
-    await page.getByTestId('world-chat-input').fill('¿Y ahora qué hago?');
-    await page.keyboard.press('Enter');
-    const refusal = page.getByTestId('world-chat-answer').first();
-    await refusal.waitFor({ timeout: 30_000 });
+    await openSection('Research chat', 'research-chat-view');
+    await page.locator('.research-composer-input').fill('¿Y ahora qué hago?');
+    const refusal = page.locator('.research-message').filter({ hasText: /No he encontrado nada de tu mundo/ }).first();
+    try {
+      // The shared chat loads the conversation's prompt selection before enabling send.
+      await page.waitForFunction(() => document.querySelector('.research-composer-send')?.disabled === false);
+      await page.keyboard.press('Enter');
+      await refusal.waitFor({ timeout: 30_000 });
+    } catch (error) {
+      console.error('[e2e] world chat state:', await page.getByTestId('research-chat-view').innerText());
+      throw error;
+    }
     assert.match(
       await refusal.innerText(),
       /No he encontrado nada de tu mundo/,

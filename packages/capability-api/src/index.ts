@@ -25,3 +25,4 @@ export * from './worker';
 export * from './define';
 export * from './conformance';
 export * from './catalog';
+export * from './pluginAssets';

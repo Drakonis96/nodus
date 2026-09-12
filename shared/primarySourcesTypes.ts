@@ -952,6 +952,7 @@ export interface PrimarySourceSearchFacet {
 }
 
 export interface PrimarySourceSearchResponse {
+  semanticAvailable?: boolean;
   queryText: string;
   parsedTerms: string[];
   results: PrimarySourceSearchResult[];

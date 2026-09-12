@@ -228,7 +228,6 @@ Este vault trabaja con entrevistas de historia oral y sus transcripciones. Trata
     // and teaching modes exclude them. `notes` stays visible: the sidebar's
     // "Crear" group points at the real Notes view rather than a placeholder.
     defaultHiddenViews: [
-      'search',
       'library',
       'graph',
       'argument',
@@ -317,6 +316,7 @@ export function isPreviewVaultType(value: unknown): boolean {
  * by phase C.
  */
 export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
+  researchChat: ['academic', 'genealogy', 'primary_sources', 'prosopography', 'testimonios'],
   dictionary: ['academic'],
   // La ruta Espacio de trabajo sigue siendo académica. Los demás vaults conservan la
   // ruta Notas, aunque ambas rutas comparten ahora la misma experiencia de catálogo.
@@ -385,7 +385,7 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   studyCourses: ['estudio', 'docencia'],
   studySchedule: ['estudio', 'docencia'],
   studyCalendar: ['estudio', 'docencia'],
-  studySearch: ['estudio'],
+  studySearch: ['estudio', 'docencia'],
   studyLibrary: ['estudio', 'docencia'],
   studyRecordings: ['estudio', 'docencia'],
   // Chat, Ideas and Graph read the shared study corpus and also power Docencia's
@@ -470,7 +470,7 @@ export function isViewAllowedForVaultType(viewId: string, type: unknown): boolea
   if (normalizeVaultType(type) === 'prosopography') {
     return [
       'home', 'settings', 'prosopSearch', 'prosopPopulation', 'prosopPersons',
-      'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'library', 'notes', 'browser', 'radar', 'compass', 'toolkit',
+      'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'researchChat', 'library', 'notes', 'browser', 'radar', 'compass', 'toolkit',
     ].includes(viewId);
   }
   const allowed = VAULT_TYPE_SCOPED_VIEWS[viewId];

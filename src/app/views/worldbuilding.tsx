@@ -27,7 +27,7 @@ export const worldbuildingViews = {
   arcs: ({ setView }) => <ArcsView onNavigate={setView} />,
   rules: ({ setView }) => <RulesView onNavigate={setView} />,
   questions: ({ setView }) => <QuestionsView onNavigate={setView} />,
-  worldChat: ({ setView, settings }) => <WorldChatView settings={settings} onNavigate={setView} />,
+  worldChat: ({ setView, settings, activeVault }) => <WorldChatView key={activeVault?.id} settings={settings} onNavigate={setView} />,
   manuscript: ({ setView }) => <ManuscriptView onNavigate={setView} />,
   characters: () => <CharactersView />,
   places: () => <PlacesView />,

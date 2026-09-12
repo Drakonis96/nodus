@@ -406,7 +406,7 @@ export async function searchStudyCorpus(query: string, options: StudySearchOptio
   if (clean.length < 2) return { results: [], semanticAvailable: false, correctedQuery: null, suggestions: [], elapsedMs: 0 };
   const store = ensureLexicalIndex();
   const hasVectors = store.entries.some((entry) => entry.embedding?.length);
-  const queryVector = hasVectors ? await embed(clean) : null;
+  const queryVector = hasVectors ? await embed(clean).catch(() => null) : null;
   const results = rankStudySearchEntries(clean, store.entries, options, queryVector);
   const suggestions = results.length < 5 ? suggestStudySearchCorrections(clean, store.entries) : [];
   const correctedQuery = suggestions.length && clean.split(/\s+/).length === 1 ? suggestions[0] : null;

@@ -1,3 +1,7 @@
+import { findArchiveItemsSimilar } from '../db/archiveRepo';
+import { globalSearch } from '../db/searchRepo';
+import { getActiveVault } from '../vaults/vaultRegistry';
+import { searchHybridCorpus } from './hybridCorpusSearch';
 // Meaning-based search over the embedded corpus. The text search in
 // db/searchRepo.ts matches characters (LIKE); this one matches meaning by
 // embedding the query and ranking ideas, passages and works by cosine
@@ -11,7 +15,7 @@ import type {
   SemanticSearchResponse,
 } from '@shared/types';
 import { getDb } from '../db/database';
-import { findSimilarIdeas, getIdea } from '../db/ideasRepo';
+import { currentEmbeddingConfig, findSimilarIdeas, getIdea } from '../db/ideasRepo';
 import { findSimilarPassages } from '../db/passagesRepo';
 import { findSimilarWorks } from '../db/workSummariesRepo';
 import { embed } from './aiClient';
@@ -19,7 +23,7 @@ import { retrieveHierarchical } from './hierarchicalRetrieval';
 import { getSettings } from '../db/settingsRepo';
 
 const DEFAULT_KINDS: SearchResultKind[] = ['idea', 'passage', 'work'];
-const SEMANTIC_KINDS: SearchResultKind[] = ['idea', 'passage', 'work'];
+const SEMANTIC_KINDS: SearchResultKind[] = ['idea', 'passage', 'work', 'note', 'gap', 'theme', 'author', 'person', 'event', 'archive'];
 const DEFAULT_LIMIT = 12;
 const DEFAULT_MIN_SIMILARITY = 0.2;
 
@@ -144,18 +148,23 @@ export async function semanticSearch(
   const q = query.trim();
   if (q.length < 2) return { available: true, results: [] };
 
-  const vector = await embed(q);
-  if (!vector) return { available: false, results: [] };
-
-  const requested = (options.kinds?.length ? options.kinds : DEFAULT_KINDS).filter((k) =>
-    SEMANTIC_KINDS.includes(k)
-  );
-  const kinds = new Set<SearchResultKind>(requested.length ? requested : DEFAULT_KINDS);
+  const db = getDb();
+  const config = JSON.stringify(currentEmbeddingConfig());
+  const vaultType = getActiveVault().type;
+  const allowed: SearchResultKind[] = vaultType === 'genealogy'
+    ? ['person', 'event', 'archive', 'work', 'passage', 'note']
+    : ['idea', 'passage', 'work', 'note', 'gap', 'theme', 'author'];
+  const requested = (options.kinds ?? DEFAULT_KINDS).filter((kind) => SEMANTIC_KINDS.includes(kind) && allowed.includes(kind));
+  if (!requested.length) return { available: true, results: [] };
+  const kinds = new Set<SearchResultKind>(requested);
   const limit = options.limit ?? DEFAULT_LIMIT;
   const threshold = options.minSimilarity ?? DEFAULT_MIN_SIMILARITY;
+  const vector = await embed(q);
+  if (!vector || getDb() !== db || !db.open || JSON.stringify(currentEmbeddingConfig()) !== config) return { available: false, results: [] };
 
   const language = interfaceLanguage();
   const results = rankByVector(vector, kinds, limit, threshold, [], language);
+  let available = true;
   if (kinds.has('work')) {
     // Whole-document and section vectors complement the historical summary vector.
     // Keep one search-result row per work; its snippet may now come from the most
@@ -185,6 +194,18 @@ export async function semanticSearch(
       });
     }
   }
+  if (kinds.has('archive')) {
+    for (const hit of await findArchiveItemsSimilar(vector, { limit, minSimilarity: threshold })) {
+      results.push({ kind: 'archive', id: hit.itemId, title: hit.title, snippet: snippet(hit.description), similarity: hit.similarity });
+    }
+  }
+  const derivedKinds = new Set([...kinds].filter((kind) => !['idea', 'passage', 'work', 'archive'].includes(kind)));
+  if (derivedKinds.size && getDb() === db && db.open) {
+    const derived = await searchHybridCorpus(q, globalSearch('', -1, true, derivedKinds), derivedKinds, limit, vector);
+    available = derived.semanticAvailable;
+    results.push(...derived.results.map((hit) => ({ ...hit, snippet: snippet(hit.snippet) })));
+  }
+  if (getDb() !== db || !db.open) return { available: false, results: [] };
   const unique = new Map<string, GlobalSearchResult>();
   for (const result of results) {
     const key = `${result.kind}:${result.id}`;
@@ -192,7 +213,7 @@ export async function semanticSearch(
     if (!previous || (result.similarity ?? 0) > (previous.similarity ?? 0)) unique.set(key, result);
   }
   return {
-    available: true,
+    available,
     results: [...unique.values()].sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0)).slice(0, limit),
   };
 }

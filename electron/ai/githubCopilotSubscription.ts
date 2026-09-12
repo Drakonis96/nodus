@@ -1,3 +1,4 @@
+import { researchReasoningProfile, resolveResearchEffort, type ResearchEffort } from '@shared/researchReasoning';
 import { app } from 'electron';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -32,6 +33,7 @@ interface CompletionOptions {
   system: string;
   user: string;
   reasoning: ReasoningEffort;
+  researchEffort?: ResearchEffort;
   timeoutMs?: number;
   images?: VisionImagePart[];
   onDelta?: (delta: string) => void;
@@ -340,6 +342,7 @@ export async function listGitHubCopilotSubscriptionModels(): Promise<ModelInfo[]
     contextLength: model.capabilities?.limits?.max_context_window_tokens,
     vision: model.capabilities?.supports?.vision,
     reasoning: model.capabilities?.supports?.reasoningEffort,
+    supportedReasoningEfforts: model.supportedReasoningEfforts?.map(reasoningEffort => ({ reasoningEffort, description: '' })),
   }));
 }
 
@@ -356,6 +359,11 @@ export async function completeWithGitHubCopilotSubscription(options: CompletionO
   try {
     const result = await withCopilotRuntime((runtime) => runIsolatedGitHubCopilotCompletion(runtime, {
         ...options,
+        researchNativeEffort: options.researchEffort === undefined ? undefined : resolveResearchEffort(
+          researchReasoningProfile({ provider: 'github-copilot', model: options.model }, {
+            id: selected.id,
+            supportedReasoningEfforts: selected.supportedReasoningEfforts?.map(reasoningEffort => ({ reasoningEffort, description: '' })),
+          }), options.researchEffort),
         supportsReasoning: Boolean(selected.capabilities?.supports?.reasoningEffort),
         workdir,
       }));

@@ -1,3 +1,4 @@
+import { selectPackagedModel } from '../../electron/pluginAssets';
 import { serializeChatVisualPart, skillHasCapability, type ChatSkill } from '../../shared/chatSkills';
 import { METERED_CALL_LIMIT, SANDBOXED_CALL_LIMIT, capabilityIsMetered, normalizeCapabilityId, type CapabilityChatResult, type CapabilityInvocation } from '../contracts';
 import { resolveInstalledCapability } from '../../electron/skillPlugins';
@@ -34,7 +35,18 @@ export async function executeExternalCapability(content: string, complete: boole
     signal?.throwIfAborted();
     if (!execution.isCurrent() || execution.owner && chatAssetVersion(execution.owner) !== execution.version) throw new DOMException('The chat was deleted or changed.', 'AbortError');
     let chatResult: CapabilityChatResult;
-    if (result.kind === 'image') {
+    if (result.kind === 'model') {
+      if (!skillHasCapability(skill, 'nodus:3d')) throw new Error('The native nodus:3d capability is not enabled for this skill.');
+      if (!execution.owner || !runtime.readAsset) throw new Error('Packaged models need an installed plugin and a saved chat.');
+      // Validate every panel before writing any attachment.
+      const prepared = result.panels.map(panel => { const asset = runtime.readAsset!(panel.assetId); return { panel, mimeType: asset.asset.mimeType as 'model/gltf+json' | 'model/gltf-binary', bytes: selectPackagedModel(asset, panel.nodeIds) }; });
+      signal?.throwIfAborted();
+      chatResult = { kind: 'model', metadata: result.metadata, panels: prepared.map(({ panel, bytes, mimeType }) => {
+        const name = panel.assetId + (mimeType === 'model/gltf-binary' ? '.glb' : '.gltf');
+        const source = storeCapabilityFile(execution.owner!, { bytes, mimeType, name, title: panel.title });
+        return { source, title: panel.title, alt: panel.alt, bytes: bytes.length, name, mimeType };
+      }) };
+    } else if (result.kind === 'image') {
       if (!execution.owner) throw new Error('Start a saved chat before creating capability assets.');
       const source = storeChatImage(execution.owner, { bytes: Buffer.from(result.data, 'base64'), mimeType: result.mimeType }, { title: result.title, alt: result.alt, provider: runtime.pluginId, model: runtime.manifest.id, createdAt: new Date().toISOString() });
       chatResult = { kind: 'image', source, title: result.title, alt: result.alt };

@@ -67,19 +67,12 @@ test('dedicated vaults expose only their own fixed navigation', () => {
   assert.equal(navigation.dedicatedVaultNavIds('genealogy'), null);
 });
 
-test('Docencia exposes every Crear item to the settings editor with stable ids', () => {
+test('Docencia exposes only Unit design under Crear with its stable settings id', () => {
   const create = TEACHING_GROUPS.find((group) => group.label === 'Crear');
   assert.ok(create, 'Crear is present');
   assert.deepEqual(
-    create.items.map((item) => item.label),
-    [
-      'Guía docente / Programación',
-      'Diseño de unidades',
-      'Situaciones de aprendizaje',
-      'Adaptaciones',
-      'Notas',
-      'Proyectos de innovación',
-    ],
+    create.items.map((item) => ({ label: item.label, id: teachingItemId(item) })),
+    [{ label: 'Diseño de unidades', id: 'teachingUnits' }],
   );
   const ids = TEACHING_GROUPS.flatMap((group) => group.items.map(teachingItemId));
   assert.equal(new Set(ids).size, ids.length, 'every configurable teaching item has a unique id');
@@ -95,4 +88,23 @@ test('saved order is applied only to the bounded group supplied by a sidebar', (
     navigation.orderSidebarItems(items, ['foreign', 'c', 'a']).map((item) => item.id),
     ['c', 'a', 'b'],
   );
+});
+
+const vaultTypes = load('shared/vaultTypes.ts');
+const customChats = {
+  primary_sources: load('src/components/PrimarySourcesSidebar.tsx').PRIMARY_SOURCES_SIDEBAR_ITEMS,
+  prosopography: load('src/components/ProsopographySidebar.tsx').PROSOPOGRAPHY_GROUPS.flatMap(group => group.items),
+  testimonios: load('src/components/TestimonySidebar.tsx').TESTIMONY_GROUPS.flatMap(group => group.items),
+  worldbuilding: load('src/components/WorldbuildingSidebar.tsx').WORLDBUILDING_GROUPS.flatMap(group => group.items),
+  docencia: TEACHING_GROUPS.flatMap(group => group.items),
+};
+test('all nine vaults expose exactly one Research chat with a working allowed route', () => {
+  for (const type of ['academic', 'genealogy', 'primary_sources', 'prosopography', 'testimonios', 'databases', 'worldbuilding', 'estudio', 'docencia']) {
+    const route = navigation.researchChatView(type);
+    const hidden = vaultTypes.effectiveSidebarHidden([], false, type);
+    const dedicated = navigation.dedicatedVaultNavIds(type);
+    const visible = navigation.NAV_ITEMS.filter(item => vaultTypes.isViewAllowedForVaultType(item.id, type) && !hidden.includes(item.id) && (!dedicated || dedicated.includes(item.id)));
+    assert.deepEqual(visible.filter(item => item.label === 'Research chat').map(item => item.id), [route], type);
+    if (customChats[type]) assert.deepEqual(customChats[type].filter(item => item.label === 'Research chat').map(item => item.id ?? item.view), [route], type);
+  }
 });

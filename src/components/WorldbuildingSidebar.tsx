@@ -3,7 +3,7 @@ import { t } from '../i18n';
 import { orderSidebarItems } from '../navigation';
 
 /** Views the worldbuilding vault has already wired up. */
-export type WorldbuildingView = 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'map' | 'relations' | 'notes';
+export type WorldbuildingView = 'search' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'map' | 'relations' | 'notes';
 
 export interface WorldbuildingItem { label: string; icon: string; view: WorldbuildingView }
 export interface WorldbuildingGroup { id: string; label: string; items: WorldbuildingItem[] }
@@ -21,6 +21,7 @@ export interface WorldbuildingGroup { id: string; label: string; items: Worldbui
  */
 export const WORLDBUILDING_GROUPS: WorldbuildingGroup[] = [
   { id: 'explore', label: 'Explorar', items: [
+    { label: 'Buscar', icon: 'search', view: 'search' },
     { label: 'Enciclopedia', icon: 'book', view: 'encyclopedia' },
     { label: 'Personajes', icon: 'users', view: 'characters' },
     { label: 'Lugares', icon: 'map', view: 'places' },
@@ -33,7 +34,7 @@ export const WORLDBUILDING_GROUPS: WorldbuildingGroup[] = [
     { label: 'Dinastías', icon: 'shield', view: 'dynasties' },
   ] },
   { id: 'analyze', label: 'Analizar', items: [
-    { label: 'Chat del mundo', icon: 'chat', view: 'worldChat' },
+    { label: 'Research chat', icon: 'chat', view: 'worldChat' },
     { label: 'Reglas del mundo', icon: 'lock', view: 'rules' },
     { label: 'Conflictos', icon: 'scale', view: 'conflicts' },
     { label: 'Arcos narrativos', icon: 'route', view: 'arcs' },

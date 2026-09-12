@@ -1,3 +1,6 @@
+import { getResearchSystemPrompts, saveResearchSystemPrompt, selectResearchSystemPrompt, deleteResearchSystemPrompt } from '../db/researchSystemPromptsRepo';
+import { mergeHybridResults, searchSnippet } from '@shared/hybridSearch';
+import { searchVaultContent } from '../ai/vaultContentSearch';
 import { stellarPage, stellarThemes, getStellarSession, saveStellarSession } from '../graph/stellarService';
 // The academic corpus and the study vault, moved verbatim out of the monolithic
 // registerIpc. The channel names are unchanged; scripts/test-ipc-contract.mjs is
@@ -183,6 +186,7 @@ import { extractFromPath } from '../extraction/textExtractor';
 import { runDeepScan } from '../ai/deepScan';
 import { summaryContentHash } from '../ai/summaryScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from '../ai/researchAssistant';
+import { listResearchContextSources } from '../ai/researchSourceScope';
 import { answerTutorStep, buildTutorPlan, streamTutorStep } from '../ai/tutor';
 import { buildArgumentMap, discoverArgumentRoutes } from '../ai/argumentMap';
 import { listAuthors, listAuthorsPage, buildAuthorDossier, synthesizeAuthorDossier } from '../ai/authorDossier';
@@ -1601,6 +1605,11 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('argumentMap:discover', async () => discoverArgumentRoutes());
 
   // research chat history
+  h('research:prompts:list', (_e, key?: string | null) => getResearchSystemPrompts(key));
+  h('research:prompts:save', (_e, input: import('@shared/researchSystemPrompts').ResearchSystemPromptInput) => saveResearchSystemPrompt(input));
+  h('research:prompts:select', (_e, key: string, id: string | null) => selectResearchSystemPrompt(key, id));
+  h('research:prompts:delete', (_e, id: string) => deleteResearchSystemPrompt(id));
+  h('research:contextSources', async () => listResearchContextSources());
   h('chat:list', async (_e, includeArchived?: boolean) => chat.listConversations(includeArchived ?? false));
   h('chat:get', async (_e, id: string) => chat.getConversation(id));
   h('chat:create', async (_e, input: { model?: ModelRef | null; selection?: ResearchContextSelection | null }) =>
@@ -1711,8 +1720,10 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   });
   h('citations:verify', async (_e, refs: CitationRef[]) => verifyCitations(refs ?? []));
   h('citations:preview', async (_e, ref: CitationRef) => (ref ? previewCitation(ref) : null));
-  h('search:global', async (_e, query: string, limitPerKind?: number) =>
-    globalSearch(query ?? '', limitPerKind ?? 8)
+  h('search:vaultContent', async (_e, query: string, kinds?: string[], semantic?: boolean, limit?: number) => searchVaultContent(query, kinds, semantic, limit));
+  h('search:global', async (_e, query: string, limitPerKind?: number, kinds?: SearchResultKind[]) =>
+    (query ?? '').trim().length < 2 ? [] : mergeHybridResults(query ?? '', globalSearch(query ?? '', -1, true, kinds ? new Set(kinds) : undefined), [], kinds ? new Set(kinds) : undefined, Math.max(1, Math.min(250, limitPerKind ?? 8)) * (kinds?.length ?? 11))
+      .map((hit) => ({ ...hit, snippet: searchSnippet(hit.snippet, query ?? '') }))
   );
   h('search:detail', async (_e, kind: SearchResultKind, id: string) => getSearchResultDetail(kind, id));
   h('search:semantic', async (_e, query: string, options?: SemanticSearchOptions) =>

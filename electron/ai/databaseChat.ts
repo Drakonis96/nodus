@@ -1,3 +1,5 @@
+import { withResearchSystemPrompt } from './researchSystemPrompt';
+import { researchGenerationOptions } from './researchGenerationOptions';
 import { skillHasCapability } from '@shared/chatSkills';
 import { buildChatSkillsPrompt, chatSkillsOutputContract } from '@shared/chatSkills';
 import { vaultChatSkillSession } from './chatSkillSession';
@@ -121,7 +123,7 @@ export async function streamDatabaseChat(
 ): Promise<{ text: string; aborted?: boolean }> {
   if (!request.databaseIds.length) throw new Error('Elige al menos una base de datos.');
   const settings = getSettings();
-  const execution = vaultChatSkillSession('database', request.conversationId, request.question, settings.chatModel ?? settings.synthesisModel, getDatabaseChatConversation);
+  const execution = vaultChatSkillSession('database', request.conversationId, request.question, request.model ?? settings.chatModel ?? settings.synthesisModel, getDatabaseChatConversation);
   assertChatSkillSession(execution, signal);
   const { skills } = execution;
   const language = settings.promptLanguage ?? 'es';
@@ -134,13 +136,13 @@ export async function streamDatabaseChat(
       const { completeTextStream } = await import('./aiClient');
       const { getSettings } = await import('../db/settingsRepo');
       const s = getSettings();
-      return completeTextStream(opts, (delta, kind) => {
+      return completeTextStream({ ...opts, ...(request.thinkingEffort === undefined ? {} : await researchGenerationOptions({ ...request, model: request.model ?? s.chatModel ?? s.synthesisModel }, opts.maxTokens ?? 1500, false, sig)) }, (delta, kind) => {
         if (kind !== 'reasoning') cb(delta);
-      }, s.chatModel ?? s.synthesisModel ?? null, sig);
+      }, request.model ?? s.chatModel ?? s.synthesisModel ?? null, sig);
     });
 
   const text = await stream(
-    { system: `${databaseChatSystem(language)}\n\n${buildChatSkillsPrompt(skills)}`, user: `${user}\n\n${chatSkillsOutputContract(skills)}`, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), plainContext: true, temperature: 0.3, maxTokens: skills.length ? 10_000 : 1500 },
+    { system: withResearchSystemPrompt(`${databaseChatSystem(language)}\n\n${buildChatSkillsPrompt(skills)}`, request.systemPromptId), user: `${user}\n\n${chatSkillsOutputContract(skills)}`, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), plainContext: true, temperature: 0.3, maxTokens: skills.length ? 10_000 : 1500 },
     onDelta,
     signal
   );

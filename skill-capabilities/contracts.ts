@@ -12,9 +12,11 @@ export type { NodusCapabilityId as BuiltinCapabilityId, CapabilityId } from '../
 export { jsonSchemaMatches, compareSemver } from '../packages/capability-api/src/json';
 export type { JsonSchema } from '../packages/capability-api/src/json';
 
+import { validatePluginAssets } from '../packages/capability-api/src/pluginAssets';
 import { SEMVER as semver, SLUG as slug, exactKeys, plainText, validateJsonSchema, type JsonSchema } from '../packages/capability-api/src/json';
 
-export type CapabilityResultKind = 'text' | 'json' | 'table' | 'svg' | 'image' | 'file';
+export type CapabilityResultKind = 'text' | 'json' | 'table' | 'svg' | 'image' | 'file' | 'model';
+export type { PluginAsset } from '../packages/capability-api/src/pluginAssets';
 
 export interface CapabilityNetworkPermission {
   id: string;
@@ -54,6 +56,7 @@ export interface CapabilityManifestV1 {
   entry: 'runtime.js';
   tools: CapabilityToolManifest[];
   permissions: CapabilityPermissionSet;
+  assets?: import('../packages/capability-api/src/pluginAssets').PluginAsset[];
 }
 
 export interface PluginManifestV1 {
@@ -87,12 +90,14 @@ export type CapabilityResult =
   | { kind: 'table'; columns: string[]; rows: Array<Array<string | number | boolean | null>> }
   | { kind: 'svg'; svg: string; title?: string }
   | { kind: 'image'; mimeType: 'image/png' | 'image/jpeg' | 'image/webp'; data: string; title: string; alt: string }
-  | { kind: 'file'; mimeType: string; data: string; name: string; title?: string };
+  | { kind: 'file'; mimeType: string; data: string; name: string; title?: string }
+  | { kind: 'model'; panels: Array<{ assetId: string; nodeIds: string[]; title: string; alt: string }>; metadata: unknown };
 
 export type CapabilityChatResult =
-  | Exclude<CapabilityResult, { kind: 'image' | 'file' }>
+  | Exclude<CapabilityResult, { kind: 'image' | 'file' | 'model' }>
   | { kind: 'image'; source: string; title: string; alt: string }
-  | { kind: 'file'; source: string; mimeType: string; name: string; title?: string };
+  | { kind: 'file'; source: string; mimeType: string; name: string; title?: string }
+  | { kind: 'model'; panels: Array<{ source: string; title: string; alt: string; bytes: number; name: string; mimeType: 'model/gltf+json' | 'model/gltf-binary' }>; metadata: unknown };
 
 export interface InstalledPluginState {
   id: string;
@@ -161,7 +166,7 @@ const plain = (value: unknown, max: number) => plainText(value, max);
 export function validateCapabilityManifest(input: unknown): CapabilityManifestV1 {
   const value = input as CapabilityManifestV1;
   if (!value || typeof value !== 'object' || Array.isArray(value)
-    || !exactKeys(value, ['schemaVersion','id','version','description','runtime','entry','tools','permissions'])
+    || !exactKeys(value, ['schemaVersion','id','version','description','runtime','entry','tools','permissions','assets'])
     || value.schemaVersion !== 1 || !slug.test(value.id) || !semver.test(value.version)
     || !plain(value.description, 500) || value.runtime !== 'javascript-sandbox-v1' || value.entry !== 'runtime.js'
     || !Array.isArray(value.tools) || !value.tools.length || value.tools.length > 12
@@ -171,9 +176,10 @@ export function validateCapabilityManifest(input: unknown): CapabilityManifestV1
   for (const tool of value.tools) {
     if (!tool || !exactKeys(tool, ['id','description','inputSchema','resultKinds']) || !slug.test(tool.id) || ids.has(tool.id)
       || !plain(tool.description, 500) || !Array.isArray(tool.resultKinds) || !tool.resultKinds.length
-      || tool.resultKinds.some(kind => !['text','json','table','svg','image','file'].includes(kind))) throw new Error('Invalid capability tool.');
+      || tool.resultKinds.some(kind => !['text','json','table','svg','image','file','model'].includes(kind))) throw new Error('Invalid capability tool.');
     validateJsonSchema(tool.inputSchema); ids.add(tool.id);
   }
+  validatePluginAssets(value.assets);
   for (const endpoint of value.permissions.network ?? []) {
     let url: URL; try { url = new URL(endpoint.origin); } catch { throw new Error('Invalid capability network origin.'); }
     if (!slug.test(endpoint.id) || url.protocol !== 'https:' || url.pathname !== '/' || url.search || url.hash || url.username || url.password
@@ -209,4 +215,3 @@ export function validatePluginManifest(input: unknown): PluginManifestV1 {
   }
   return structuredClone(value);
 }
-

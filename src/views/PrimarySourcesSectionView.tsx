@@ -2,7 +2,7 @@ import { Icon } from '../components/ui';
 import { t } from '../i18n';
 import type { PrimarySourcesView } from '../components/PrimarySourcesSidebar';
 
-type EmptySection = Exclude<PrimarySourcesView, 'notes'>;
+type EmptySection = Exclude<PrimarySourcesView, 'notes' | 'researchChat'>;
 
 const CONTENT: Record<EmptySection, { title: string; body: string; icon: string; action?: string }> = {
   search: {

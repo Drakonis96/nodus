@@ -217,7 +217,7 @@ function MarkdownComponent({
             }
             const studyEvidence = href?.match(/^nodus:\/\/study\/evidence\/(.+)$/);
             if (studyEvidence && onStudyEvidence) {
-              return <button className="mx-0.5 inline-flex rounded-full border border-teal-800 bg-teal-950/80 px-1.5 py-0.5 text-[10px] font-semibold text-teal-300 hover:border-teal-500" onClick={() => onStudyEvidence(decodeURIComponent(studyEvidence[1]))}>{children}</button>;
+              return <button className="study-evidence-citation mx-0.5 inline-flex rounded-full border border-teal-800 bg-teal-950/80 px-1.5 py-0.5 text-[10px] font-semibold text-teal-300 hover:border-teal-500" onClick={() => onStudyEvidence(decodeURIComponent(studyEvidence[1]))}>{children}</button>;
             }
             const studyDocument = href?.match(/^nodus:\/\/(?:study\/doc|note)\/(.+)$/);
             if (studyDocument && onStudyDocument) {
