@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type {
   PrimarySourceSearchFilters,
   PrimarySourceSearchLayer,
   PrimarySourceSearchResponse,
   PrimarySourceSearchResult,
 } from '@shared/primarySourcesTypes';
+import { SearchKindFilters } from '../components/search/SearchKindFilters';
 import { Icon } from '../components/ui';
 import { t, tx } from '../i18n';
 import type { View } from '../navigation';
@@ -68,38 +69,36 @@ export function PrimarySourcesSearchView({
 }) {
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<PrimarySourceSearchFilters>({});
+  const [layers, setLayers] = useState(() => new Set(Object.keys(LAYER_LABELS) as PrimarySourceSearchLayer[]));
+  const [error, setError] = useState('');
   const [response, setResponse] = useState(EMPTY);
   const [loading, setLoading] = useState(false);
   const [allowPrivate, setAllowPrivate] = useState(false);
   const [allowRestricted, setAllowRestricted] = useState(false);
   const [allowUnknownRights, setAllowUnknownRights] = useState(false);
-  const [grouped, setGrouped] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
+    let active = true;
+    setLoading(false); setResponse(EMPTY); setError('');
     const timer = window.setTimeout(() => {
       if (!query.trim() && !Object.values(filters).some(Boolean)) {
         setResponse(EMPTY);
         setLoading(false);
         return;
       }
+      if (!layers.size) return;
       setLoading(true);
       void (loader?.searchPrimarySourceCorpus ?? window.nodus.searchPrimarySourceCorpus)({
         query,
-        filters,
+        filters: { ...filters, layers: [...layers] },
         allowPrivateContent: allowPrivate,
         allowRestrictedContent: allowRestricted,
         allowUnknownRightsContent: allowUnknownRights,
-      }).then(setResponse).finally(() => setLoading(false));
+      }).then((next) => { if (active) setResponse(next); }).catch((cause) => { if (active) setError(String(cause)); }).finally(() => { if (active) setLoading(false); });
     }, 180);
-    return () => window.clearTimeout(timer);
-  }, [allowPrivate, allowRestricted, allowUnknownRights, filters, query, loader]);
-
-  const groups = useMemo(() => {
-    const result = new Map<PrimarySourceSearchLayer, PrimarySourceSearchResult[]>();
-    for (const row of response.results) result.set(row.layer, [...(result.get(row.layer) ?? []), row]);
-    return [...result.entries()];
-  }, [response.results]);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [allowPrivate, allowRestricted, allowUnknownRights, filters, query, loader, layers]);
 
   const setFilter = <K extends keyof PrimarySourceSearchFilters>(
     key: K,
@@ -107,7 +106,7 @@ export function PrimarySourcesSearchView({
   ) => setFilters((current) => ({ ...current, [key]: value || undefined }));
 
   const clearFilters = () => {
-    setFilters({});
+    setFilters({}); setLayers(new Set(Object.keys(LAYER_LABELS) as PrimarySourceSearchLayer[]));
     setAllowPrivate(false);
     setAllowRestricted(false);
     setAllowUnknownRights(false);
@@ -117,8 +116,6 @@ export function PrimarySourcesSearchView({
     options.find((option) => option.id === id)?.label ?? id;
 
   const activeFilters: Array<{ key: string; label: string; clear: () => void }> = [];
-  const layer = filters.layers?.[0];
-  if (layer) activeFilters.push({ key: 'layer', label: `${t('Tipo de resultado')}: ${t(LAYER_LABELS[layer])}`, clear: () => setFilter('layers', undefined) });
   if (filters.repositoryId) activeFilters.push({ key: 'repository', label: `${t('Repositorio')}: ${facetLabel(response.facets.repositories, filters.repositoryId)}`, clear: () => setFilter('repositoryId', undefined) });
   if (filters.level) activeFilters.push({ key: 'level', label: `${t('Nivel descriptivo')}: ${facetLabel(response.facets.levels, filters.level)}`, clear: () => setFilter('level', undefined) });
   if (filters.format) activeFilters.push({ key: 'format', label: `${t('Formato')}: ${facetLabel(response.facets.formats, filters.format)}`, clear: () => setFilter('format', undefined) });
@@ -158,7 +155,7 @@ export function PrimarySourcesSearchView({
   return (
     <div className="flex h-full min-h-0 flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid="primary-sources-search">
       <header className="shrink-0 border-b border-neutral-200 bg-white/95 px-5 py-4 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/95">
-        <div className="mx-auto max-w-5xl">
+        <div className="mx-auto max-w-3xl">
           <div className="mb-4 flex items-center gap-3">
             <Icon name="search" size={22} className="text-indigo-500 dark:text-indigo-300" />
             <h1 className="text-xl font-semibold">{t('Buscar')}</h1>
@@ -191,10 +188,13 @@ export function PrimarySourcesSearchView({
             {loading && <Icon name="sync" className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-indigo-500" size={17} />}
           </div>
 
+          <SearchKindFilters options={(Object.keys(LAYER_LABELS) as PrimarySourceSearchLayer[]).map((kind) => ({ kind, label: LAYER_LABELS[kind], icon: kind === 'person' ? 'users' : kind === 'place' ? 'map' : kind === 'event' ? 'clock' : kind === 'tag' ? 'tag' : kind === 'note' ? 'notebook' : 'archive' }))} selected={layers} onChange={setLayers} />
+          {error && <p role="alert" className="mt-3 text-xs text-red-500">{error}</p>}
+          {response.semanticAvailable === false && <p role="status" className="mt-3 text-xs text-amber-600 dark:text-amber-400">{t('La búsqueda por significado necesita embeddings. Configura el proveedor y la clave de embeddings en Ajustes e indexa la biblioteca.')}</p>}
           {filtersOpen && (
             <section className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-950/50" data-testid="primary-sources-search-filters">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <FacetSelect label={t('Tipo de resultado')} value={filters.layers?.[0] ?? ''} options={response.facets.layers} onChange={(value) => setFilter('layers', value ? [value as PrimarySourceSearchLayer] : undefined)} />
+
                 <FacetSelect label={t('Repositorio')} value={filters.repositoryId ?? ''} options={response.facets.repositories} onChange={(value) => setFilter('repositoryId', value)} />
                 <FacetSelect label={t('Nivel descriptivo')} value={filters.level ?? ''} options={response.facets.levels} onChange={(value) => setFilter('level', value)} />
                 <FacetSelect label={t('Formato')} value={filters.format ?? ''} options={response.facets.formats} onChange={(value) => setFilter('format', value)} />
@@ -224,9 +224,7 @@ export function PrimarySourcesSearchView({
               n: response.total,
               ms: Math.round(response.elapsedMs),
             })}
-            <button className="text-indigo-600 hover:underline dark:text-indigo-300" onClick={() => setGrouped((value) => !value)}>
-              {grouped ? t('Lista única') : t('Agrupar por capa')}
-            </button>
+
           </div>
 
           {activeFilters.length > 0 && (
@@ -246,7 +244,7 @@ export function PrimarySourcesSearchView({
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-5xl space-y-5 p-5">
+        <div className="mx-auto max-w-3xl space-y-5 p-5">
           {!hasSearchCriteria && response.results.length === 0 && (
             <section className="rounded-2xl border border-dashed border-neutral-300 bg-white p-10 text-center dark:border-neutral-700 dark:bg-neutral-900">
               <Icon name="search" className="mx-auto text-indigo-500" size={28} />
@@ -263,19 +261,9 @@ export function PrimarySourcesSearchView({
               {t('La medición supera el objetivo de latencia. Conviene reconstruir un índice FTS derivado de los datos canónicos.')}
             </p>
           )}
-          {(grouped ? groups : [['metadata' as PrimarySourceSearchLayer, response.results] as const]).map(([layer, results]) => (
-            <section key={layer}>
-              {grouped && (
-                <div className="mb-2 flex items-center gap-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">{t(LAYER_LABELS[layer])}</h2>
-                  <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-[9px] dark:bg-neutral-800">{results.length}</span>
-                </div>
-              )}
-              <div className="space-y-2">
-                {results.map((result) => <SearchResultCard key={result.resultId} result={result} onOpen={() => open(result)} />)}
-              </div>
-            </section>
-          ))}
+          <div className="space-y-2">
+            {response.results.map((result) => <SearchResultCard key={result.resultId} result={result} onOpen={() => open(result)} />)}
+          </div>
         </div>
       </main>
     </div>

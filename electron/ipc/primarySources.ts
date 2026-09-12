@@ -1,3 +1,4 @@
+import { searchPrimarySourceHybrid } from '../ai/primarySourceSearch';
 // primarySources channels, moved verbatim out of the monolithic registerIpc.
 // The channel names are unchanged; scripts/test-ipc-contract.mjs is what proves it.
 import type { IpcContext } from './context';
@@ -11,7 +12,7 @@ import { createStableArchiveExcerpt, savePrimarySourceAnalysis, setArchiveExcerp
 import { acceptEntityProposal, decideEntityProposal, revertEntityResolution } from '../db/archiveProposalsRepo';
 import { addPrimarySourcePersonVariant, getPrimarySourcePersonDossier, listPrimarySourcePersons, mergePrimarySourcePersons, revertPrimarySourcePersonMerge } from '../db/primarySourcePersonsRepo';
 import { getPrimarySourceMapWorkspace, getPrimarySourceRelationsWorkspace, getPrimarySourceTimelineWorkspace, resolvePrimarySourceToponym, revertPrimarySourceToponymResolution } from '../db/primarySourceDerivedViewsRepo';
-import { addPrimarySourceNoteLink, createPrimarySourceNote, getPrimarySourceBacklinks, getPrimarySourceNoteWorkspace, getPrimarySourceOperationalDashboard, insertPrimarySourceExcerptCitation, removePrimarySourceNoteLink, searchPrimarySourceCorpus, updatePrimarySourceNoteProfile } from '../db/primarySourceResearchRepo';
+import { addPrimarySourceNoteLink, createPrimarySourceNote, getPrimarySourceBacklinks, getPrimarySourceNoteWorkspace, getPrimarySourceOperationalDashboard, insertPrimarySourceExcerptCitation, removePrimarySourceNoteLink, updatePrimarySourceNoteProfile } from '../db/primarySourceResearchRepo';
 import { getPrimarySourceGovernanceWorkspace, updatePrimarySourceCitationSettings, updatePrimarySourcePolicySettings } from '../db/primarySourceGovernanceRepo';
 import { buildPrimarySourceCitation, previewPrimarySourceToolkitOperation, runPrimarySourceToolkitOperation } from '../primarySources/primarySourceGovernance';
 import { createPrimarySourceResearchPackage, previewPrimarySourceExport, restorePrimarySourceResearchPackage, validatePrimarySourceResearchPackage } from '../primarySources/primarySourceExport';
@@ -372,7 +373,7 @@ export function registerPrimarySourcesIpc({ h, getWindow }: IpcContext): void {
     const started = performance.now();
     let success = false;
     try {
-      const response = searchPrimarySourceCorpus(request);
+      const response = await searchPrimarySourceHybrid(request);
       success = true;
       return response;
     } finally {

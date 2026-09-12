@@ -7,10 +7,10 @@ import { errorText, t, tx } from '../i18n';
 type Tab = 'catalogue' | 'batches' | 'templates' | 'observations';
 const inputClass = 'w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-neutral-700 dark:bg-neutral-950';
 
-export function ProsopSourcesView() {
+export function ProsopSourcesView({ initialSourceId, initialTab = 'catalogue' }: { initialSourceId?: string; initialTab?: Tab } = {}) {
   const [data, setData] = useState<ProsopSourcesWorkspace | null>(null);
-  const [tab, setTab] = useState<Tab>('catalogue');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>(initialTab);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSourceId ?? null);
   const [draft, setDraft] = useState<ProsopSourceInput>({ title: '', sourceKind: 'document' });
   const [segment, setSegment] = useState({ locatorDisplay: '', quotedText: '', language: '' });
   const [error, setError] = useState('');

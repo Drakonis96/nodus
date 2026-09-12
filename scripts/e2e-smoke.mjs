@@ -1682,7 +1682,7 @@ try {
   await page.reload();
   await page.waitForFunction(() => document.querySelector('[data-tour="nav-search"]'));
   await page.locator('[data-tour="nav-search"]').click();
-  const searchInput = page.getByPlaceholder('Busca en notas, ideas, obras, huecos, temas y autores…');
+  const searchInput = page.getByPlaceholder('Escribe para buscar…', { exact: true });
   await searchInput.fill('recuperación');
   await page.getByText('Práctica de recuperación y retención a largo plazo', { exact: true }).waitFor({ timeout: 10_000 });
   await page.getByText('Práctica de recuperación y retención a largo plazo', { exact: true }).click();
@@ -2525,8 +2525,14 @@ try {
   await page.getByTestId('study-search-view').waitFor({ timeout: 30_000 });
   const hybridInput = page.getByTestId('study-search-input');
   assert.ok(await hybridInput.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft)) >= 30, 'hybrid search keeps its icon and text separated');
-  await page.getByRole('button', { name: 'Filtros', exact: true }).click();
-  await page.getByTestId('study-search-view').locator('select').first().selectOption('transcript');
+  const contentFilters = page.getByTestId('study-search-view').getByRole('group', { name: 'Tipo de contenido', exact: true });
+  await contentFilters.waitFor({ state: 'visible' });
+  assert.equal(await page.getByTestId('study-search-filters').count(), 0, 'content chips are available with advanced filters collapsed');
+  for (const kind of ['Apunte', 'Material', 'Pregunta', 'Examen']) {
+    await contentFilters.getByRole('button', { name: kind, exact: true, pressed: true }).click();
+  }
+  assert.equal(await contentFilters.getByRole('button', { pressed: true }).count(), 1, 'only transcripts are selected');
+  assert.equal(await contentFilters.getByRole('button', { name: 'Transcripción', exact: true }).getAttribute('aria-pressed'), 'true');
   await hybridInput.fill('memoria de trabajo');
   await page.getByTestId('study-search-result').first().waitFor({ timeout: 30_000 });
   assert.match(await page.getByTestId('study-search-result').first().innerText(), /Definición literal de memoria de trabajo/, 'literal transcript is found through the unified local index');
