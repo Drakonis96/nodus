@@ -1,3 +1,4 @@
+import { documentFigureInsertions } from './documentFigureExport';
 /**
  * A Deep Research report, described for the styled document.
  *
@@ -208,12 +209,13 @@ function escapeCellHtml(value: string): string {
 
 export function deepResearchReportInput(
   draft: WritingWorkshopDraft,
-  image: DeepResearchReportImage = { dataUrl: null, credit: null }
+  image: DeepResearchReportImage = { dataUrl: null, credit: null },
+  visuals?: import('./documentSkills').DocumentVisualManifest | null,
 ): ProfessionalReportInput {
   const language = draft.brief.language ?? 'es';
   const labels = DEEP_LABELS[language];
   const body = stripLeadingAbstract(draft.draftMarkdown, draft.abstract);
-  const report = anchoredMarkdown(body, 'report');
+  const report = anchoredMarkdown(body, 'report', documentFigureInsertions(body, 'body', visuals));
   const abstract = anchoredMarkdown(draft.abstract || draft.brief.objective, 'summary');
   const sections: ProfessionalReportSection[] = [
     {

@@ -55,6 +55,13 @@ try {
       async health() { return { status: 'ready', dataVersion: 1 }; },
       async invoke({ toolId, input }) {
         if (toolId === 'echo') return { view: { schemaVersion: 1, summary: 'echo', nodes: [{ kind: 'code', text: JSON.stringify(input) }] } };
+        if (toolId === 'vision') {
+          const prepared = await host.vision.prepareImages(input.candidates);
+          const result = await host.vision.reviewImages({request:input.request,candidates:prepared.map(({id,imageId})=>({id,imageId}))});
+          return {view:{schemaVersion:1,summary:'vision',nodes:[{kind:'code',text:JSON.stringify(result)}]}};
+        }
+        if (toolId === 'maps') { const result = await host.maps.render(input); return { view: {schemaVersion:1,summary:'map',nodes:[{kind:'svg',svg:result.svg,title:input.title,alt:input.alt}]}}; }
+        if (toolId === 'maps-source') { await host.maps.retrieve(input); return {view:{schemaVersion:1,summary:'unexpected',nodes:[]}}; }
         if (toolId === 'store') { await host.storage.state.set('count', input.count); return { view: { schemaVersion: 1, summary: 'stored', nodes: [{ kind: 'code', text: String(await host.storage.state.get('count')) }] } }; }
         if (toolId === 'cache') { await host.storage.cache.set('blob', 'x'.repeat(input.size)); return { view: { schemaVersion: 1, summary: 'cached', nodes: [{ kind: 'code', text: 'ok' }] } }; }
         if (toolId === 'reach') { await host.network.fetch(input.endpointId, { path: input.path, method: input.method }); return { view: { schemaVersion: 1, summary: 'reached', nodes: [{ kind: 'code', text: 'ok' }] } }; }
@@ -184,6 +191,54 @@ try {
       const local = handleFor({ network: [{ id: 'local', origin: 'https://localhost', pathPrefixes: ['/'], methods: ['GET'], maxResponseBytes: 65536, timeoutMs: 5000 }] });
       assert.match(await failure(local.call('invoke', { invocationId: 'i9', toolId: 'reach', input: { endpointId: 'local', path: '/' }, locale: 'en' }, { timeoutMs: 10_000 })), /not public/);
       await local.stop();
+      const queryEndpoint = handleFor({ network: [{ id: 'api', origin: 'https://localhost', pathPrefixes: ['/w/api.php'], methods: ['GET'], maxResponseBytes: 65536, timeoutMs: 5000 }] });
+      // Reaching the public-host guard proves an exact endpoint accepts its query string,
+      // without performing an external request or relaxing the private-host restriction.
+      assert.match(await failure(queryEndpoint.call('invoke', { invocationId: 'query', toolId: 'reach', input: { endpointId: 'api', path: '/w/api.php?q=public%20art' }, locale: 'en' })), /not public/);
+      for (const route of ['/w/api.php/../../admin', '/w/api.php/%2e%2e/admin', '/w/api.php%2fsecret', '//elsewhere.invalid/w/api.php', '/w/api.php#fragment']) {
+        assert.match(await failure(queryEndpoint.call('invoke', { invocationId: 'path', toolId: 'reach', input: { endpointId: 'api', path: route }, locale: 'en' })), /permission|path|origin/);
+      }
+      await queryEndpoint.stop();
+
+      stage = 'vision permission and host round-trip';
+      const deniedVision = handleFor();
+      assert.match(await failure(deniedVision.call('invoke',{invocationId:'vision0',toolId:'vision',input:{candidates:[],request:'fixture'},locale:'en'})),/vision access is not permitted/);
+      await deniedVision.stop();
+      const operations=[];
+      const vision = handleFor({vision:{maxRounds:2}}, {vision:{
+        async prepareImages(value,permission,scope,signal){signal.throwIfAborted();assert.equal(permission.vision.maxRounds,2);operations.push('prepare');return [{id:'candidate',imageId:'host-handle'}];},
+        async reviewImages(value,scope,max,signal){signal.throwIfAborted();assert.equal(max,2);assert.equal(value.candidates[0].imageId,'host-handle');operations.push('review');return {reviewId:'fixture',outcome:'vision_unavailable',status:'skipped',model:null,round:1,remainingRounds:1,selected:[],candidates:[{id:'candidate',imageId:'host-handle',inspected:false,relevance:null,reasoning:''}]};}
+      }});
+      const visionResult=await vision.call('invoke',{invocationId:'vision1',toolId:'vision',input:{candidates:[],request:'fixture'},locale:'en'});
+      assert.equal(JSON.parse(text(visionResult)).outcome,'vision_unavailable');assert.deepEqual(operations,['prepare','review']);await vision.stop();
+      stage = 'native maps through the worker protocol';
+      const mapInput = {title:'Native coordinate map',alt:'A supplied coordinate',markers:[{coordinates:[0,0],label:'Origin'}],overlaySource:{label:'Test data',attribution:'Synthetic coordinates',license:'CC0'}};
+      const noMaps = handleFor();
+      assert.match(await failure(noMaps.call('invoke',{invocationId:'map0',toolId:'maps',input:mapInput,locale:'en'})),/maps access is not permitted/);
+      await noMaps.stop();
+      const maps = handleFor({maps:{maxCalls:2,providers:[]}});
+      const mapResult = await maps.call('invoke',{invocationId:'map1',toolId:'maps',input:mapInput,locale:'en'});
+      assert.match(mapResult.view.nodes[0].svg,/nodus-map-provenance/);
+      assert.match(await failure(maps.call('invoke',{invocationId:'map2',toolId:'maps-source',input:{provider:'natural-earth'},locale:'en'})),/no permission/);
+      assert.match(await failure(maps.call('invoke',{invocationId:'map3',toolId:'maps',input:mapInput,locale:'en'})),/budget exhausted/);
+      await maps.stop();
+
+      stage = 'cancellation reaches a pending maps host service';
+      let serviceSignal, entered, release;
+      const reached = new Promise(resolve => { entered = resolve; });
+      const hostPending = new CapabilityWorkerHandle(runtimeFor({maps:{maxCalls:1,providers:['natural-earth']}}), {
+        bootstrapPath: ${JSON.stringify(bootstrap)},
+        services: async ({channel, signal}) => {
+          assert.equal(channel,'maps'); serviceSignal=signal; entered();
+          return new Promise(resolve => { release=resolve; });
+        },
+      });
+      const mapAbort = new AbortController();
+      const mapPending = hostPending.call('invoke',{invocationId:'map-cancel',toolId:'maps-source',input:{provider:'natural-earth'},locale:'en'}, {signal:mapAbort.signal});
+      const mapRejected = assert.rejects(mapPending,error=>error.name==='AbortError');
+      await reached; mapAbort.abort(); await mapRejected;
+      assert.equal(serviceSignal.aborted,true);
+      await hostPending.stop(); release({late:'discarded'});
 
       // A worker learns that a credential exists. It never gets a way to read one.
       stage = 'secrets are never handed to the worker';
@@ -314,7 +369,7 @@ try {
   const electron = createRequire(import.meta.url)('electron');
   await promisify(execFile)(electron, [outfile], { env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' } });
   if (fs.readFileSync(verdict, 'utf8') !== 'pass') throw new Error('The capability worker host verification did not report a pass.');
-  console.log('CAPABILITY WORKER HOST PASS: handshake, host-call gating, storage quota, network allowlist, secret isolation, 3D validation and storage, deadline, cancellation, crash recovery, migration ladder.');
+  console.log('CAPABILITY WORKER HOST PASS: handshake, host-call gating, storage quota, network allowlist, secret isolation, 3D validation and storage, maps permissions/budget, host-service cancellation, deadline, crash recovery, migration ladder.');
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });
 }

@@ -1,3 +1,7 @@
+import { withDocumentVisualPlanning } from './documentVisualContext';
+import { documentSkillCatalog } from '../../shared/documentSkills';
+import { listDocumentSkills } from '../capabilities/documentCatalog';
+import { prepareDocumentVisualHints } from './documentVisuals';
 import type { DeepResearchProgress, DeepResearchReport, DeepResearchRequest, ModelRef, PromptLanguage } from '@shared/types';
 import { deepResearchPlanningPromptPack } from '@shared/deepResearchPlanningPromptPacks';
 import { deepResearchQualityPromptPack } from '@shared/deepResearchQualityPromptPacks';
@@ -103,10 +107,18 @@ function sectionClaimsForWriting(section: DeepResearchPlanSection): string[] {
 // here we only bind the injected dependencies to real provider/DB calls.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function generateDeepResearchReport(
+export async function generateDeepResearchReport(request: DeepResearchRequest, onProgress?: (p: DeepResearchProgress) => void, signal?: AbortSignal): Promise<DeepResearchReport> {
+  const settings = getSettings();
+  const hints = await prepareDocumentVisualHints(request.documentSkills, request.objective, request.model ?? settings.deepResearchModel ?? settings.synthesisModel, signal);
+  const catalog = request.documentSkills ? documentSkillCatalog(listDocumentSkills(), request.documentSkills) : '[]';
+  return withDocumentVisualPlanning(catalog, hints, () => generateDeepResearchReportWithVisualPlan(request, onProgress, signal, hints));
+}
+
+async function generateDeepResearchReportWithVisualPlan(
   request: DeepResearchRequest,
   onProgress?: (p: DeepResearchProgress) => void,
   signal?: AbortSignal,
+  documentVisualHints: string[] = [],
 ): Promise<DeepResearchReport> {
   signal?.throwIfAborted();
   const settings = getSettings();
@@ -122,6 +134,7 @@ export async function generateDeepResearchReport(
   // Genealogy and both academic engines record the same value on their reports.
   const sectionLength = normalizeDeepResearchSectionLength(request.sectionLength);
   const versionedRequest: DeepResearchRequest = { ...request, deepResearchVersion, sectionLength };
+  const finish = (result: DeepResearchReport) => { result.draft.documentSkills = request.documentSkills; result.draft.documentVisualHints = documentVisualHints; return withGenerationMetadata(result, approach, deepResearchVersion, model, sectionLength); };
   let report: DeepResearchReport;
   // Study and teaching share one pipeline over the local study_* corpus. Teaching adds
   // the extracted idea network and the unit prompts, selected by `unitMode`; the vault
@@ -131,14 +144,14 @@ export async function generateDeepResearchReport(
       ? await requestWithCoverageQuestions(versionedRequest, model, signal)
       : versionedRequest;
     report = await generateStudyDeepResearchReport({ ...routedRequest, unitMode: true }, model, onProgress, signal);
-    return withGenerationMetadata(report, approach, deepResearchVersion, model, sectionLength);
+    return finish(report);
   }
   if (request.studyMode || getActiveVault().type === 'estudio') {
     const routedRequest = deepResearchVersion === 'v2'
       ? await requestWithCoverageQuestions(versionedRequest, model, signal)
       : versionedRequest;
     report = await generateStudyDeepResearchReport(routedRequest, model, onProgress, signal);
-    return withGenerationMetadata(report, approach, deepResearchVersion, model, sectionLength);
+    return finish(report);
   }
   // A genealogy vault has no idea graph; its Deep Research writes a family-history
   // report over the embedding-indexed archive + library instead (own pipeline).
@@ -147,7 +160,7 @@ export async function generateDeepResearchReport(
       ? await requestWithCoverageQuestions(versionedRequest, model, signal)
       : versionedRequest;
     report = await generateGenealogyDeepResearchReport(routedRequest, onProgress, signal);
-    return withGenerationMetadata(report, approach, deepResearchVersion, model, sectionLength);
+    return finish(report);
   }
   // Both academic routes are graph-first. Full-document profiles are prepared and
   // queried only after the orchestrator has frozen the argument.
@@ -159,7 +172,7 @@ export async function generateDeepResearchReport(
       ? realDeps(model, signal)
       : specializedAcademicDeps(model, approach, versionedRequest, signal);
   report = await orchestrateDeepResearch({ ...versionedRequest, model }, deps, onProgress, signal);
-  return withGenerationMetadata(report, approach, deepResearchVersion, model, sectionLength);
+  return finish(report);
 }
 
 /** Exact production planning path without section writing. Used by the isolated

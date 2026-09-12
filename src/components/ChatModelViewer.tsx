@@ -27,12 +27,12 @@ interface Loaded {
 
 const MAX_PIXEL_RATIO = 2;
 
-export function ChatModelViewer({ node, owner }: { node: ModelNode; owner?: string }) {
+export function ChatModelViewer({ node, owner, staticPreview = false }: { node: ModelNode; owner?: string; staticPreview?: boolean }) {
   const mount = useRef<HTMLDivElement | null>(null);
   const loaded = useRef<Loaded | null>(null);
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
   const [detail, setDetail] = useState('');
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(staticPreview);
 
   const teardown = useCallback(() => {
     loaded.current?.dispose();

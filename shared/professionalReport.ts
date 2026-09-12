@@ -14,6 +14,7 @@
  * plain Node process with no dependencies at all, and it builds this file straight from here.
  */
 import { escapeHtml, markdownToHtml } from './toolkitMarkdown';
+import { documentBlocks } from './documentSkills';
 
 export interface ProfessionalReportTheme {
   accent: string;
@@ -106,7 +107,7 @@ function plainInline(value: string): string {
 }
 
 /** Render the app's Markdown subset and attach stable destinations to its headings. */
-export function anchoredMarkdown(markdown: string, prefix: string): AnchoredMarkdown {
+export function anchoredMarkdown(markdown: string, prefix: string, insertions?: Map<number, string>): AnchoredMarkdown {
   const headings: ProfessionalReportTocItem[] = [];
   const ids: string[] = [];
   const seen = new Map<string, number>();
@@ -121,7 +122,8 @@ export function anchoredMarkdown(markdown: string, prefix: string): AnchoredMark
     if (match[1].length <= 3) headings.push({ id, title: plainInline(match[2]) });
   }
   let index = 0;
-  const html = markdownToHtml(markdown).replace(/<h([1-6])>/g, (_match, level: string) => {
+  const sourceHtml = insertions?.size ? documentBlocks({ text: markdown }).map(block => markdownToHtml(block.markdown) + (insertions.get(block.index) ?? '')).join('\n') : markdownToHtml(markdown);
+  const html = sourceHtml.replace(/<h([1-6])>/g, (_match, level: string) => {
     const id = ids[index++] ?? `${prefix}-section-${index}`;
     return `<h${level} id="${escapeHtml(id)}">`;
   });
@@ -324,6 +326,10 @@ export function renderProfessionalReportHtml(input: ProfessionalReportInput): st
     }
     .report-section.exec-summary .section-body { margin-left: 0; }
     .report-section.exec-summary .abstract-box { max-width: 150mm; margin: 0 auto; }
+    .report-figure { margin: 6mm auto; max-width: 100%; break-inside: avoid; text-indent: 0; }
+    .report-figure img { display: block; width: 100%; max-height: 210mm; object-fit: contain; }
+    .report-figure figcaption { margin-top: 2.5mm; font: 8.5pt/1.5 Georgia, serif; color: var(--muted); text-align: left; }
+    .report-figure figcaption b { color: var(--accent); }
     .prose { color: #262d3d; }
     .prose p { text-align: justify; text-indent: 1.35em; hyphens: auto; orphans: 3; widows: 3; }
     .prose h1, .prose h2, .prose h3, .prose h4 {

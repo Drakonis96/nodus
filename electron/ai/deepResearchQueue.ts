@@ -1,3 +1,4 @@
+import { documentVisualProgressLabel } from '../../shared/documentSkills';
 import type {
   DeepResearchJobOrigin,
   DeepResearchJobRecord,
@@ -56,6 +57,7 @@ export interface DeepResearchQueueDeps {
   ) => Promise<DeepResearchReport>;
   /** Persists the finished report and returns the saved draft id. */
   saveDraft: (input: { report: DeepResearchReport; request: DeepResearchRequest; title: string | null }) => string;
+  enrichSaved?: (id: string, report: DeepResearchReport, request: DeepResearchRequest, signal: AbortSignal) => Promise<unknown>;
   activeVault: () => DeepResearchQueueVault;
   /** Called on every state change, so the queue can be mirrored in the app window. */
   onChange?: (jobs: DeepResearchJobRecord[]) => void;
@@ -455,6 +457,10 @@ async function drain(): Promise<void> {
           // say why it was not stored, rather than throwing the generation away.
           job.record.saveError = messageFromError(error);
         }
+      }
+      if (job.record.savedDraftId && job.request.documentSkills?.enabled && requireDeps().enrichSaved) {
+        job.record.progress = { phase: 'assembling', message: documentVisualProgressLabel(job.request.language) }; notifyChange();
+        try { await requireDeps().enrichSaved!(job.record.savedDraftId, report, job.request, job.controller.signal); } catch { /* The verified report is already saved. */ }
       }
       settle(job, { report });
     } catch (error) {

@@ -19,6 +19,8 @@ export async function executeImageRequest(content: string, complete: boolean, ex
     const current = () => execution.isCurrent() && chatAssetVersion(execution.owner!) === execution.version;
     if (!current()) throw new DOMException('The chat was deleted or changed.', 'AbortError');
     const aspectRatio = CHAT_IMAGE_ASPECT_RATIOS.includes(value.aspectRatio as ChatImageAspectRatio) ? value.aspectRatio as ChatImageAspectRatio : undefined;
+    execution.beforeInvoke?.();
+    execution.beforePaidCall?.();
     const generated = await callImageProvider(settings.imageProvider, settings.imageModel, value.prompt.trim(), signal, aspectRatio);
     signal?.throwIfAborted(); if (!current()) throw new DOMException('The chat was deleted or changed.', 'AbortError');
     const prepared = prepareGeneratedImage(generated);

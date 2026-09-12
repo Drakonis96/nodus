@@ -50,6 +50,7 @@ export async function refineCapabilitySvg(
   request: { svg: string; instruction: string },
   model: ModelRef | null | undefined,
   signal?: AbortSignal,
+  noRetry = false,
 ): Promise<string> {
   signal?.throwIfAborted();
   if (typeof request.svg !== 'string' || !request.svg.trim()) throw new Error('There is no SVG to refine.');
@@ -57,7 +58,7 @@ export async function refineCapabilitySvg(
   const answer = await completeText({
     system: 'You improve one SVG drawing. Return exactly one complete, self-contained SVG in a fenced svg block and nothing else. Keep a positive viewBox, keep every element legible and inside the canvas, and preserve the meaning of what is already drawn: this is a revision, not a new drawing.',
     user: JSON.stringify({ instruction: request.instruction.slice(0, 4_000), svg: request.svg }),
-    maxTokens: 12_000, temperature: 0, reasoning: 'off', plainContext: true, signal,
+    maxTokens: 12_000, temperature: 0, reasoning: 'off', plainContext: true, signal, noRetry,
   }, model);
   const part = splitChatVisuals(answer).find(item => item.kind === 'svg' && item.complete);
   if (!part) throw new Error('The refinement did not return a complete SVG.');

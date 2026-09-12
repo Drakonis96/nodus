@@ -56,6 +56,14 @@ const host: CapabilityHostV2 = {
     delete: id => hostCall('secrets', 'delete', { id }) as Promise<void>,
   },
   model: { complete: request => hostCall('model', 'complete', request) as Promise<string> },
+  vision: {
+    prepareImages: candidates => hostCall('vision', 'prepareImages', candidates) as ReturnType<CapabilityHostV2['vision']['prepareImages']>,
+    reviewImages: request => hostCall('vision', 'reviewImages', request) as ReturnType<CapabilityHostV2['vision']['reviewImages']>,
+  },
+  maps: {
+    retrieve: query => hostCall('maps', 'retrieve', query) as ReturnType<CapabilityHostV2['maps']['retrieve']>,
+    render: request => hostCall('maps', 'render', request) as ReturnType<CapabilityHostV2['maps']['render']>,
+  },
   svg: {
     validate: svg => hostCall('svg', 'validate', { svg }) as ReturnType<CapabilityHostV2['svg']['validate']>,
     inspect: svg => hostCall('svg', 'inspect', { svg }) as ReturnType<CapabilityHostV2['svg']['inspect']>,

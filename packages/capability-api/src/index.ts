@@ -12,6 +12,8 @@ export * from './localized';
 export * from './permissions';
 export * from './models';
 export * from './media';
+export * from './maps';
+export * from './vision';
 export * from './views';
 export * from './artifacts';
 export * from './chat';

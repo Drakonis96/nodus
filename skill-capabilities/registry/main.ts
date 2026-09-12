@@ -1,8 +1,12 @@
+import { createChatVisionSession } from '../../electron/capabilities/vision/adapter';
+import type { VisionSession } from '../../electron/capabilities/vision/service';
+import { executeVisionCapability } from '../builtins/vision/main';
 import { chatAssetVersion } from '../../electron/chatAssets';
 import { runSkillTool } from '../../electron/skillToolSandbox';
 import { serializeChatVisualPart, splitChatVisuals, type ChatVisualPart } from '../../shared/chatSkills';
 import { executeImageRequest } from '../builtins/image/main';
 import { refineSvg } from '../builtins/svg/main';
+import { createChatMapService, executeMapCapability } from '../builtins/maps/main';
 import { executeExternalCapability } from '../external/main';
 import { SANDBOXED_CALL_LIMIT } from '../contracts';
 import { capabilityRegistry, pinCapabilitiesForTurn } from '../../electron/capabilities/registry';
@@ -24,22 +28,37 @@ export function assertChatSkillSession(execution: ChatSkillExecution, signal?: A
  *  law and genomics are installed packages now and reach a reply through the protocols
  *  they declare — this file does not know their names. */
 export async function executeRegisteredChatSkills(answer: string, execution: ChatSkillExecution, signal?: AbortSignal): Promise<string> {
-  const registry = capabilityRegistry();
-  if (!registry.chatOrder.length) return runCoreChatStages(answer, execution, { suppressSvgRefinement: false }, signal);
+  // Only execution can create result envelopes. This gate runs before any trusted
+  // hook or core tool, so their genuine outputs are not mistaken for authored claims.
+  answer = splitChatVisuals(answer).map(part => ['capability-result','capability-view','capability-artifact'].includes(part.kind)
+    ? '\n\nCapability error: model-authored capability results are not accepted.\n\n'
+    : serializeChatVisualPart(part)).join('');
+  const registry = execution.registry ?? capabilityRegistry();
+  const vision = createChatVisionSession({...execution,signal,current:()=>assertChatSkillSession(execution,signal)});
+  if (!registry.chatOrder.length) {
+    try { return await runCoreChatStages(answer, execution, { suppressSvgRefinement: false }, signal, vision); }
+    finally { vision.dispose(); }
+  }
   const runner = createTrustedCapabilityRunner({
+    vision,
     owner: execution.owner,
     question: execution.question,
-    locale: 'en',
+    locale: execution.locale ?? 'en',
     model: execution.model,
-    pins: pinCapabilitiesForTurn(),
+    pins: execution.pins ?? pinCapabilitiesForTurn(),
+    beforeInvoke: execution.beforeInvoke,
+    beforePaidCall: execution.beforePaidCall,
+    beforeRepair: execution.beforeRepair,
+    renderStoredArtifacts: execution.renderStoredArtifacts,
     signal,
-    runCoreStages: (text, options) => runCoreChatStages(text, execution, options, signal),
+    runCoreStages: (text, options) => runCoreChatStages(text, execution, options, signal, vision),
   });
-  return runTrustedChatPipeline(answer, registry, runner, { signal });
+  try { return await runTrustedChatPipeline(answer, registry, runner, { signal }); }
+  finally { vision.dispose(); await runner.dispose?.(); }
 }
 
 /** The stages the application owns. Nothing here is specific to a field of study. */
-export async function runCoreChatStages(answer: string, execution: ChatSkillExecution, options: { suppressSvgRefinement: boolean }, signal?: AbortSignal): Promise<string> {
+export async function runCoreChatStages(answer: string, execution: ChatSkillExecution, options: { suppressSvgRefinement: boolean }, signal?: AbortSignal, vision?: VisionSession): Promise<string> {
   const current = () => assertChatSkillSession(execution, signal);
   current();
 
@@ -47,6 +66,7 @@ export async function runCoreChatStages(answer: string, execution: ChatSkillExec
   // a permissionless capability costs the same as a JavaScript tool, and only a capability
   // that declares network, secrets or storage is charged to the strict lane.
   const budget: ChatCallBudget = { sandboxed: 0, metered: 0 };
+  const maps = createChatMapService(budget);
   const toolPattern = /```nodus-tool[ \t]*\r?\n([\s\S]*?)\r?\n```/g;
   let cursor = 0, processed = '';
   for (const match of answer.matchAll(toolPattern)) {
@@ -59,6 +79,7 @@ export async function runCoreChatStages(answer: string, execution: ChatSkillExec
       const skill = execution.skills.find(item => item.id === request.skillId);
       const tool = skill?.tools?.find(item => item.id === request.toolId);
       if (!tool) throw new Error('This tool is not enabled for this reply.');
+      execution.beforeInvoke?.();
       const output = await runSkillTool(tool, request.input, signal);
       current();
       // Output is inert escaped data and is never reparsed as a protocol block.
@@ -83,7 +104,15 @@ export async function runCoreChatStages(answer: string, execution: ChatSkillExec
       continue;
     }
     if (part.kind === 'capability-request') {
-      result.push({ part: part.kind, text: await executeExternalCapability(part.content, part.complete, execution, budget, signal) });
+      let visionRequest = false;
+      try { visionRequest = JSON.parse(part.content)?.capabilityId === 'nodus:vision'; } catch { /* normal validation below */ }
+      if (visionRequest && vision) {
+        result.push({part:part.kind,text:await executeVisionCapability(part.content,part.complete,execution,vision,signal)});
+        continue;
+      }
+      let mapsRequest = false;
+      try { mapsRequest = JSON.parse(part.content)?.capabilityId === 'nodus:maps'; } catch { /* normal validation reports malformed requests */ }
+      result.push({ part: part.kind, text: mapsRequest ? await executeMapCapability(part.content, part.complete, execution, budget, maps, signal) : await executeExternalCapability(part.content, part.complete, execution, budget, signal) });
       continue;
     }
     if (part.kind === 'image-request') {

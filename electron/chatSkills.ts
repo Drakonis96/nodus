@@ -6,6 +6,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { DEFAULT_CHAT_SKILLS, builtinSkillForPackage, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
 import { normalizeCapabilityId } from '../skill-capabilities/contracts';
 import { capabilityRegistry } from './capabilities/registry';
+import { readTrustedPluginSkills } from './capabilities/bundledSkills';
 import { resolveInstalledCapability } from './skillPlugins';
 import { resolvePluginCapabilityReference, type ValidatedPluginPackage } from '../skill-capabilities/pluginPackage';
 import {
@@ -105,7 +106,7 @@ export function listChatSkills(): ChatSkill[] {
   for (const skill of parsed.skills) if (!fs.existsSync(path.join(skillDirectory(skill.id), 'skill.json'))) writeSkillDirectory(skill);
   return parsed.skills;
 }
-/** Replaces the whole library at once. Only the capability migration uses this: every
+/** Replaces the whole library at once. Capability migration and signed package installation use this: every
  *  other change goes through the functions that reason about one skill at a time. */
 export function replaceChatSkills(skills: ChatSkill[]): ChatSkill[] { return write(skills); }
 
@@ -124,7 +125,7 @@ export function deriveCapabilityTools(skill: ChatSkill): ChatSkill['capabilityTo
   const tools = (skill.capabilities ?? []).flatMap(reference => {
     const capabilityId = normalizeCapabilityId(reference);
     const provider = snapshot.providers.get(capabilityId);
-    if (provider?.source === 'plugin') {
+    if (provider?.tools.length) {
       return provider.tools.map(tool => ({ capabilityId, toolId: tool.id, description: tool.description, inputSchema: tool.inputSchema, resultKinds: [] as string[] }));
     }
     const runtime = capabilityId.startsWith('nodus:') ? null : resolveInstalledCapability(capabilityId, skill.plugin ? { version: skill.plugin.version, digest: skill.plugin.digest } : undefined);
@@ -313,7 +314,10 @@ export function removeChatPlugin(id: string): ChatSkill[] {
 export function restorePluginSkillAuthorVersion(id: string): ChatSkill[] {
   const skills = listChatSkills(), existing = skills.find(skill => skill.id === id);
   if (!existing?.plugin || !existing.origin?.packageId) throw new Error('This skill is not supplied by an installed plugin.');
-  const base = pluginSkillBase(readActivePluginPackage(existing.plugin.id), existing.origin.packageId);
+  const trusted = readTrustedPluginSkills(existing.plugin.id);
+  const base = trusted
+    ? trusted.packaged.find(item => item.manifest.id === existing.origin!.packageId)
+    : pluginSkillBase(readActivePluginPackage(existing.plugin.id), existing.origin.packageId);
   if (!base) throw new Error('The author version is no longer available.');
   return write(skills.map(skill => skill.id === id ? { ...skill, name: base.manifest.name, description: base.manifest.description, instructions: base.files['SKILL.md'], overrides: undefined } : skill));
 }

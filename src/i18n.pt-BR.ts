@@ -1,3 +1,4 @@
+import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
 import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
 import { RESEARCH_REASONING_TRANSLATIONS } from './i18n.researchReasoning';
@@ -69,6 +70,7 @@ export const PT_BR: Record<string, string> = {
   ...RESEARCH_REASONING_TRANSLATIONS["pt-BR"],
   ...CHAT_SKILLS_TRANSLATIONS['pt-BR'],
   ...CAPABILITIES_TRANSLATIONS['pt-BR'],
+  ...DOCUMENT_SKILLS_TRANSLATIONS['pt-BR'],
   ...STELLAR_GRAPH_TRANSLATIONS["pt-BR"],
   ...ACADEMIC_TOUR_TRANSLATIONS['pt-BR'],
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS['pt-BR'],

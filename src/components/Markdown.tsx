@@ -1,3 +1,5 @@
+import { DocumentFigure, useDocumentFigures } from './DocumentFigures';
+import { documentBlocks } from '@shared/documentSkills';
 import { ChatVisual } from './ChatVisual';
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
@@ -82,6 +84,16 @@ function MarkdownComponent({
   /** Only for trusted local reader assets already confined by the main process. */
   allowDataImages?: boolean;
 }) {
+  const documentFigures = useDocumentFigures(content);
+  const insertDocumentFigures = () => (tree: any) => {
+    if (!documentFigures.length) return;
+    const ranges = documentBlocks({ text: content });
+    const inserted = new Set<string>();
+    tree.children = tree.children.flatMap((node: any) => {
+      const additions = documentFigures.filter(({ figure, block }) => !inserted.has(figure.id) && node.type === 'element' && node.position?.end?.line >= ranges[block.index]?.endLine);
+      return [node, ...additions.map(({ figure }) => { inserted.add(figure.id); return { type: 'element', tagName: 'figure', properties: { 'dataDocumentFigure': figure.id }, children: [] }; })];
+    });
+  };
   // Validity of each citation, keyed by `${kind}:${id}`. A key absent from the map
   // is still being checked (treated as neutral); `false` means it did not resolve.
   const [validity, setValidity] = useState<Record<string, boolean>>({});
@@ -156,13 +168,18 @@ function MarkdownComponent({
     <div className={`md ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[rehypeKatex, rehypeGroupParenthesizedCitations]}
+        rehypePlugins={[rehypeKatex, rehypeGroupParenthesizedCitations, insertDocumentFigures]}
         urlTransform={(value, key) => {
           if (chatVisuals && key === 'src' && /^nodus-image:\/\/chat\/[a-f0-9]{64}\/[a-f0-9-]{36}$/.test(value)) return value;
           if (allowDataImages && key === 'src' && /^data:image\/(?:png|jpeg|gif|webp|svg\+xml);base64,/i.test(value)) return value;
           return nodusUrlTransform(value);
         }}
         components={{
+          figure: ({ node }) => {
+            const id = (node as any)?.properties?.dataDocumentFigure;
+            const index = documentFigures.findIndex(item => item.figure.id === id);
+            return index >= 0 ? <DocumentFigure figure={documentFigures[index].figure} number={documentFigures[index].number} onSource={source => { const parsed = parseCitation(source); if (parsed) onCitation?.(parsed); }} /> : null;
+          },
           img: ({ src, alt }) => chatVisuals && src?.startsWith('nodus-image://chat/') ? <ChatVisual source={src} alt={alt} /> : <img src={src} alt={alt} />,
           p: ({ node, children, ...props }) => {
             const first = (node as any)?.children?.[0];

@@ -4,6 +4,8 @@ import type { CapabilityRegistryEntry } from '../contracts';
 /** The capabilities the application provides itself. Everything else a build can offer
  *  arrives as an installed package and is listed by the capability registry, not here. */
 export const BUILTIN_CAPABILITY_REGISTRY = [
+  { id: 'nodus:vision', version: '1.0.0', description: 'Bounded visual relevance review with the selected model.', source: 'builtin', tools: [{ id: 'review-images', description: 'Review host-prepared image candidates; unknown or text-only models skip safely.' }] },
+  { id: 'nodus:maps', version: '1.0.0', description: 'Deterministic SVG cartography with approved source retrieval and provenance.', source: 'builtin', tools: [{ id: 'render', description: 'Render geometry, markers and connections as an attributed SVG.' }, { id: 'retrieve', description: 'Retrieve geometry from approved open providers.' }] },
   { id: 'nodus:svg', version: '1.0.0', description: 'Sanitized SVG rendering and quality review.', source: 'builtin', tools: [{ id: 'render', description: 'Render a self-contained SVG.' }] },
   { id: 'nodus:image', version: '1.0.0', description: 'Image generation using the configured provider.', source: 'builtin', tools: [{ id: 'generate', description: 'Generate and persist one image.' }] },
   // Deliberately generic: a molecule, a bone, a pot and a building are the same thing to

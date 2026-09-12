@@ -41,7 +41,7 @@ function writeStorage(runtime: InstalledCapabilityRuntime, value: unknown): null
   const temporary = `${file}.${randomUUID()}.tmp`; fs.writeFileSync(temporary, encoded, { mode: 0o600 }); fs.renameSync(temporary, file); return null;
 }
 
-async function networkRequest(runtime: InstalledCapabilityRuntime, endpointId: string, request: unknown): Promise<unknown> {
+async function networkRequest(runtime: InstalledCapabilityRuntime, endpointId: string, request: unknown, signal?: AbortSignal, beforePaidCall?: () => void): Promise<unknown> {
   const endpoint = runtime.manifest.permissions.network?.find(item => item.id === endpointId);
   if (!endpoint) throw new Error('Capability endpoint is not permitted.');
   const value = request as { path?: unknown; method?: unknown; body?: unknown };
@@ -59,7 +59,9 @@ async function networkRequest(runtime: InstalledCapabilityRuntime, endpointId: s
     if (!stored && secret.required) throw new Error(`Configure ${secret.label} before using this capability.`);
     if (stored) headers[secret.header] = `${secret.prefix ?? ''}${stored}`;
   }
-  const response = await fetch(url, { method, body, headers, redirect: 'error', signal: AbortSignal.timeout(20_000) });
+  signal?.throwIfAborted(); beforePaidCall?.();
+  const timeout = AbortSignal.timeout(20_000);
+  const response = await fetch(url, { method, body, headers, redirect: 'error', signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
   if (!response.ok) throw new Error(`Capability endpoint returned ${response.status}.`);
   if (Number(response.headers.get('content-length') ?? 0) > 2_000_000) { await response.body?.cancel(); throw new Error('Capability response is too large.'); }
   const reader = response.body?.getReader(); if (!reader) return null;
@@ -95,7 +97,7 @@ function validateResult(result: unknown, allowed: string[]): CapabilityResult {
 }
 
 /** External capability code runs in a fresh renderer sandbox. Only this narrow RPC crosses into main. */
-export async function runCapabilitySandbox(runtime: InstalledCapabilityRuntime, invocation: CapabilityInvocation, signal?: AbortSignal): Promise<CapabilityResult> {
+export async function runCapabilitySandbox(runtime: InstalledCapabilityRuntime, invocation: CapabilityInvocation, signal?: AbortSignal, beforePaidCall?: () => void): Promise<CapabilityResult> {
   signal?.throwIfAborted();
   const tool = runtime.manifest.tools.find(item => item.id === invocation.toolId);
   if (!tool || !jsonSchemaMatches(tool.inputSchema, invocation.input)) throw new Error('Capability tool input does not match its schema.');
@@ -127,7 +129,7 @@ export async function runCapabilitySandbox(runtime: InstalledCapabilityRuntime, 
           if (asset.mimeType !== 'application/json' || asset.bytes > 2_000_000) throw new Error('Only bounded JSON assets can enter the sandbox.');
           return JSON.parse(text);
         }
-        if (message.method === 'network.request') return networkRequest(runtime, String(args.endpointId), args.request);
+        if (message.method === 'network.request') return networkRequest(runtime, String(args.endpointId), args.request, signal, beforePaidCall);
         if (message.method === 'storage.get') { if (!runtime.manifest.permissions.storage) throw new Error('Capability storage is not permitted.'); return readStorage(runtime); }
         if (message.method === 'storage.set') return writeStorage(runtime, args.value);
         throw new Error('Unknown capability host operation.');

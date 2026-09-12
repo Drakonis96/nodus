@@ -1,3 +1,4 @@
+import { sanitizeChatSvg, svgImageUrl } from '../lib/chatSvg';
 import type { ViewDocumentV1, ViewNode, ViewSpan } from '@shared/capabilities';
 import { ChatVisual } from './ChatVisual';
 import { Icon } from './ui';
@@ -27,7 +28,7 @@ function Spans({ spans }: { spans: ViewSpan[] }) {
   })}</>;
 }
 
-function Node({ node, owner, capabilityId }: { node: ViewNode; owner?: string; capabilityId?: string }) {
+function Node({ node, owner, capabilityId, presentation = 'chat' }: { node: ViewNode; owner?: string; capabilityId?: string; presentation?: 'chat' | 'document' | 'snapshot' }) {
   switch (node.kind) {
     case 'heading': {
       const Tag = (['h3', 'h4', 'h5', 'h6'] as const)[node.level - 1];
@@ -45,8 +46,10 @@ function Node({ node, owner, capabilityId }: { node: ViewNode; owner?: string; c
       return <div className="capability-view-notice" data-tone={node.tone} role={node.tone === 'danger' ? 'alert' : 'note'}>
         {node.title && <b>{node.title}</b>}<span><Spans spans={node.spans} /></span>
       </div>;
-    case 'svg':
-      return <ChatVisual svg={node.svg} alt={node.alt} kindLabel={node.title} />;
+    case 'svg': {
+      const clean = presentation === 'chat' ? null : sanitizeChatSvg(node.svg);
+      return presentation === 'chat' ? <ChatVisual svg={node.svg} alt={node.alt} kindLabel={node.title} /> : clean ? <img className="document-view-svg" src={svgImageUrl(clean.svg)} alt={node.alt} /> : null;
+    }
     case 'table':
       return <div className="capability-view-table">
         <table>
@@ -62,7 +65,7 @@ function Node({ node, owner, capabilityId }: { node: ViewNode; owner?: string; c
       return <ul className="capability-view-links">{node.items.map((item, index) =>
         <li key={index}><a href={item.href} target="_blank" rel="noreferrer noopener">{item.label}</a>{item.description && <span>{item.description}</span>}</li>)}</ul>;
     case 'details':
-      return <details className="capability-view-details"><summary>{node.summary}</summary>{node.children.map((child, index) => <Node key={index} node={child} owner={owner} />)}</details>;
+      return <details className="capability-view-details" open={presentation === 'snapshot' ? true : undefined}><summary>{node.summary}</summary>{node.children.map((child, index) => <Node key={index} node={child} owner={owner} capabilityId={capabilityId} presentation={presentation} />)}</details>;
     case 'download':
       // The bytes were stored as an attachment when the result was produced; the id is
       // resolved against the conversation that owns it, never against a path the view chose.
@@ -75,7 +78,7 @@ function Node({ node, owner, capabilityId }: { node: ViewNode; owner?: string; c
     case 'model':
       // `nodus:3d`. The package supplied bytes the core validated and stored; what draws
       // them is the core's own viewer, never anything that came with the package.
-      return <ChatModelViewer node={node} owner={owner} />;
+      return <ChatModelViewer node={node} owner={owner} staticPreview={presentation === 'snapshot'} />;
     case 'image':
       return <ViewImage node={node} owner={owner} />;
     case 'audio':
@@ -110,10 +113,10 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function CapabilityView({ view, owner, capabilityId }: { view: ViewDocumentV1; owner?: string; capabilityId?: string }) {
-  return <div className="capability-view" aria-label={view.summary}>
+export function CapabilityView({ view, owner, capabilityId, presentation = 'chat' }: { view: ViewDocumentV1; owner?: string; capabilityId?: string; presentation?: 'chat' | 'document' | 'snapshot' }) {
+  return <div className={`capability-view capability-view-${presentation}`} aria-label={view.summary}>
     {view.title && <h3 className="capability-view-title">{view.title}</h3>}
-    {view.nodes.map((node, index) => <Node key={index} node={node} owner={owner} capabilityId={capabilityId} />)}
+    {view.nodes.map((node, index) => <Node key={index} node={node} owner={owner} capabilityId={capabilityId} presentation={presentation} />)}
   </div>;
 }
 

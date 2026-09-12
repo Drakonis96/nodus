@@ -5,6 +5,8 @@ import type { ChatAstNode, FinalMutation, PrepareMutation } from './chat';
 import type { SettingsActionInput, SettingsStateV1, SettingsSubmissionV1 } from './settings';
 import type { ModelAssetInfo } from './models';
 import type { MediaAssetInfo } from './media';
+import type { VisionCandidateInput, PreparedVisionCandidate, VisionReviewRequest, VisionReviewResult } from './vision';
+import type { MapQuery, MapDataset, MapRenderRequest, MapResult } from './maps';
 
 /** The interface a trusted worker module default-exports. The host calls nothing else.
  *
@@ -107,6 +109,16 @@ export type MigrationScriptV1 = (context: {
 /** What the host offers back. Every method is permission-gated by the capability manifest;
  *  calling one the manifest did not declare is an error, not a silent no-op. */
 export interface CapabilityHostV2 {
+  /** Turn-scoped public/generated thumbnails; no paths, arbitrary URLs or general model prompts. */
+  vision: {
+    prepareImages(candidates: VisionCandidateInput[]): Promise<PreparedVisionCandidate[]>;
+    reviewImages(request: VisionReviewRequest): Promise<VisionReviewResult>;
+  };
+  /** `nodus:maps`. Bounded native tools; no model calls, tiles or arbitrary URLs. */
+  maps: {
+    retrieve(query: MapQuery): Promise<MapDataset>;
+    render(request: MapRenderRequest): Promise<MapResult>;
+  };
   network: {
     fetch(endpointId: string, request: { path: string; method?: string; headers?: Record<string, string>; body?: string | Uint8Array }): Promise<{ status: number; headers: Record<string, string>; body: Uint8Array }>;
     /** Streams to a temp file instead of buffering, for archives too large to hold. */

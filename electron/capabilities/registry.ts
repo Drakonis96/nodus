@@ -5,6 +5,8 @@ import type { CapabilityManifestV2, CapabilityToolV2 } from '../../packages/capa
 import { listInstalledPluginsV2, readStagedPackage, type InstalledPluginStateV2 } from './pluginStoreV2';
 import path from 'node:path';
 import { app } from 'electron';
+import { VISION_TOOLS } from '../../skill-capabilities/builtins/vision/contract';
+import { MAP_TOOLS } from '../../skill-capabilities/builtins/maps/contract';
 
 /** Who provides what, right now.
  *
@@ -39,6 +41,8 @@ export interface CapabilityRegistrySnapshot {
 }
 
 const CORE_PROVIDERS: CapabilityProvider[] = [
+  { id: 'nodus:vision', version: '1.0.0', description: 'Bounded visual relevance review with the selected model.', source: 'core', tools: VISION_TOOLS, artifacts: [], hasSettings: false },
+  { id: 'nodus:maps', version: '1.0.0', description: 'Deterministic SVG cartography with approved source retrieval and provenance.', source: 'core', tools: MAP_TOOLS, artifacts: [], hasSettings: false },
   { id: 'nodus:svg', version: '1.0.0', description: 'Sanitized SVG rendering and quality review.', source: 'core', tools: [], artifacts: [], hasSettings: false },
   { id: 'nodus:image', version: '1.0.0', description: 'Image generation using the configured provider.', source: 'core', tools: [], artifacts: [], hasSettings: false },
   { id: 'nodus:3d', version: '1.0.0', description: 'Validation, storage and interactive viewing of glTF and GLB models.', source: 'core', tools: [], artifacts: [], hasSettings: false },

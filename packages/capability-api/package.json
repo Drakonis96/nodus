@@ -1,6 +1,6 @@
 {
   "name": "@nodusresearch/capability-api",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "description": "Contracts, schemas and validators shared by Nodus and every NodusResearch capability plugin.",
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -8,6 +8,12 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "files": ["src", "README.md"],
-  "sideEffects": false
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "@types/geojson": "^7946.0.16"
+  }
 }

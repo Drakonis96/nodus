@@ -1,3 +1,4 @@
+import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
 import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
 import { RESEARCH_REASONING_TRANSLATIONS } from './i18n.researchReasoning';
@@ -64,6 +65,7 @@ export const TR: Record<string, string> = {
   ...RESEARCH_REASONING_TRANSLATIONS["tr"],
   ...CHAT_SKILLS_TRANSLATIONS['tr'],
   ...CAPABILITIES_TRANSLATIONS['tr'],
+  ...DOCUMENT_SKILLS_TRANSLATIONS['tr'],
   ...STELLAR_GRAPH_TRANSLATIONS["tr"],
   ...ACADEMIC_TOUR_TRANSLATIONS.tr,
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS.tr,

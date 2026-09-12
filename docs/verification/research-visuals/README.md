@@ -1,0 +1,17 @@
+# Research Visuals verification
+
+These checked-in examples preserve the visual work from this implementation. Generated examples are verification artifacts, not claims of production model accuracy.
+
+- [Light creation modal](document-skills/deep-modal-light.png) and [dark creation modal](document-skills/deep-modal-dark.png); [Immersion light](document-skills/immersion-modal-light.png) and [dark](document-skills/immersion-modal-dark.png).
+- Very brief reports: [Deep Research light](document-skills/deep-report-light.png), [dark](document-skills/deep-report-dark.png), [Immersion light](document-skills/immersion-report-light.png), [dark](document-skills/immersion-report-dark.png), [interactive 3D](document-skills/immersion-interactive-3d-light.png).
+- Real provider geometry rendered as editable SVG: [Spain administrative regions](maps/spain-communities.svg), [provinces](maps/spain-provinces.svg), [Castilla-La Mancha](maps/castilla-la-mancha.svg), [Europe with coordinate markers and routes](maps/europe-routes.svg), [world](maps/world.svg). [Provenance and licences](maps/verification.json) apply to those maps, not the repository code licence.
+- [Four deterministic vision scenarios](vision/index.html), [light capture](vision/light.png), [dark capture](vision/dark.png), and [host receipts](vision/results.json): relevant selection, all rejected, text-only fallback and second-batch success. Synthetic fixtures, no paid calls.
+- [Live Wikimedia daguerreotype review](vision/wikimedia/index.html) and [actual model receipt](vision/wikimedia/review.json). This earlier opt-in verification used the configured Gemini 3.1 Flash-Lite model and public-domain images. Creator/source/licence details remain in the saved API response and page. These images are third-party material, not AGPL code.
+
+The package now adds General Maps, Historical Maps and Open Image Finder in [Marketplace PR #27](https://github.com/NodusResearch/nodus-research-skill-marketplace/pull/27). New image adapters were checked against live Wikimedia, Met and Art Institute API searches for “daguerreotype”; all returned admitted candidates. That source check used no paid model call and is distinct from the earlier live visual review.
+
+Historical Maps accepts supplied dated geometry or coordinates and refuses undated/modern substitution. No historical boundary provider is integrated; synthetic dated-route tests do not purport to establish real historical borders.
+
+Local verification after merging current main: full capability suite (208 unit cases plus real sandbox/package installations), provider/model suite (36 cases), lint and application build. The Research Visuals archive additionally passed real signed-install and worker execution for all three tools through Assistant, Nodi, Deep Research and Immersion pipeline contexts. The image integration case disables sources to make the test deterministic; actual review outcomes are separately exercised with synthetic host fixtures. Production archives are signed only by the Marketplace protected workflow.
+
+Signed v2 installation adds every bundled workflow to My skills, initially disabled in both chats. Approval, updates and rollback use the same library materializer, after migrations complete. Real installation tests verify all three entries, independent activation, resolved capability IDs, idempotent reinstall, preservation of edits, no partial library rewrite when a bundled manifest is invalid, and restoring the signed author version without changing activation settings.

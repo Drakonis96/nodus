@@ -1,0 +1,98 @@
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { chromium } from 'playwright-core';
+const base = 'http://127.0.0.1:5197/visual-tests/document-skills-harness.html';
+const out = path.resolve('artifacts/document-skills');
+const browser = await chromium.launch({channel:'chrome',headless:true});
+const page = await browser.newPage({viewport:{width:1440,height:1080},deviceScaleFactor:1});
+const errors=[];page.on('pageerror',e=>errors.push(e.message));
+async function shot(name){await page.waitForTimeout(400);await page.evaluate(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();});await page.screenshot({path:path.join(out,name)});}
+try {
+  await page.goto(base);
+  await page.getByRole('button',{name:'Leer',exact:true}).first().click();
+  await page.waitForSelector('.document-figure');
+  assert.equal(await page.locator('.document-figure').count(),2);
+  await shot('deep-report.png');
+  await page.locator('.document-figure').nth(1).scrollIntoViewIfNeeded();
+  await shot('deep-report-chart.png');
+  // Select prose after an inserted figure: persistent offsets must ignore captions.
+  const selection = await page.evaluate(() => {
+    const root=document.querySelector('[data-testid="deep-research-reader-document"]');
+    const nodes=[];const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
+    while(node=walker.nextNode()) if(!node.parentElement.closest('[data-reader-ignore]')) nodes.push(node);
+    const selected=nodes.find(n=>n.data.startsWith('El primer paso'));
+    const expected=nodes.slice(0,nodes.indexOf(selected)).reduce((total,n)=>total+n.data.length,0);
+    selected.parentElement.scrollIntoView({block:'center'});
+    const range=document.createRange();range.setStart(selected,0);range.setEnd(selected,14);
+    const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
+    const rect=range.getBoundingClientRect();root.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:rect.right,clientY:rect.top+rect.height/2}));
+    return {expected,text:range.toString()};
+  });
+  await page.locator('.reader-selection-actions .reader-selection-color').first().click();
+  await page.waitForFunction(()=>window.testAnnotations.length>0);
+  const annotation=await page.evaluate(()=>window.testAnnotations[0]);
+  assert.equal(annotation.selectedText,selection.text);assert.equal(annotation.startOffset,selection.expected);
+  await page.getByTestId('deep-research-tab-home').click();
+  await page.getByRole('button',{name:'Nuevo informe',exact:true}).click();
+  await page.getByTestId('document-skills').waitFor();
+  console.log('deep modal open');
+  await page.getByRole('dialog').locator('textarea').first().fill('Del archivo al lector: explicar un flujo documental con datos de demostración.');
+  const svgRow=page.locator('.document-skill-row').filter({has:page.getByText('SVG Studio',{exact:true})});
+  await svgRow.locator('select').selectOption('number');
+  await svgRow.locator('input').fill('4');
+  const imageRow=page.locator('.document-skill-row').filter({has:page.getByText('Image Atelier',{exact:true})});
+  await imageRow.getByRole('switch').click();
+  await imageRow.locator('input').fill('2');
+  await page.getByTestId('document-skills').scrollIntoViewIfNeeded();
+  await shot('deep-modal.png');
+  await imageRow.locator('input').fill('');
+  await page.waitForTimeout(100);
+  assert.equal(await imageRow.locator('input').getAttribute('aria-invalid'),'true');
+  assert.equal(await page.getByRole('dialog').locator('footer button').last().isDisabled(),true);
+  await shot('deep-modal-paid-required.png');
+  await page.goto(base+'?section=immersion&theme=light');
+  await page.getByRole('button',{name:'Empezar',exact:true}).first().click();
+  await page.getByRole('button',{name:'Comenzar inmersión',exact:true}).click();
+  await page.waitForSelector('.document-figure');
+  await shot('immersion-report.png');
+  await page.getByRole('button',{name:/Una forma, varias perspectivas/}).last().click();
+  await page.waitForSelector('.document-figure');
+  await shot('immersion-report-3d.png');
+  await page.locator('.document-figure-preview').click();
+  await page.getByRole('button',{name:/Abrir el modelo 3D/}).click();
+  await page.waitForSelector('.capability-view-model[data-state="ready"]');
+  await page.locator('.capability-view-model').scrollIntoViewIfNeeded();
+  await shot('immersion-interactive-3d.png');
+  await page.getByTestId('immersion-tab-home').click();
+  await page.getByRole('button',{name:'Nueva inmersión',exact:true}).click();
+  await page.getByTestId('document-skills').waitFor();
+  await page.locator('.document-skill-row').filter({has:page.getByText('SVG Studio',{exact:true})}).locator('select').selectOption('number');
+  await page.locator('.document-skill-row').filter({has:page.getByText('SVG Studio',{exact:true})}).locator('input').fill('4');
+  await page.getByRole('dialog').locator('input').first().fill('La forma y su representación');
+  const paid=page.locator('.document-skill-row').filter({has:page.getByText('Image Atelier',{exact:true})});
+  await paid.getByRole('switch').click(); await paid.locator('input').fill('2');
+  await page.getByTestId('document-skills').scrollIntoViewIfNeeded();
+  await shot('immersion-modal.png');
+  for(const lang of ['es','en','fr','de','pt','pt-BR','it','tr']) {
+    await page.setViewportSize({width:760,height:850});
+    await page.goto(base+'?section=immersion&theme=light&lang='+lang);
+    await page.waitForFunction(()=>window.testLabels);
+    const labels=await page.evaluate(()=>window.testLabels);
+    await page.getByRole('button',{name:labels.create,exact:true}).click();
+    const dialog=page.getByRole('dialog');
+    await dialog.locator('input').first().fill('Demostración de recursos opcionales');
+    const imageRow=page.locator('.document-skill-row').filter({has:page.getByText('Image Atelier',{exact:true})});
+    await imageRow.getByRole('switch').click();
+    assert.equal(await imageRow.locator('select').count(),0,'paid skills cannot choose Auto: '+lang);
+    await page.waitForFunction(()=>document.querySelector('[role=dialog] footer button:last-child').disabled);
+    assert.equal(await imageRow.locator('.document-skill-warning').innerText(),labels.warning);
+    if(lang!=='es') assert.doesNotMatch(labels.warning,/Esta skill tiene coste/);
+    await imageRow.locator('input').fill('2');
+    await page.waitForFunction(()=>!document.querySelector('[role=dialog] footer button:last-child').disabled);
+    assert.equal(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth),true,'modal fits '+lang);
+    assert.equal(await page.getByTestId('document-skills').evaluate(el=>el.scrollWidth<=el.clientWidth),true,'selector fits '+lang);
+  }
+  assert.deepEqual(errors,[]);
+  console.log('Document skills UI passed.');
+} catch(e) {await shot('ui-debug.png');console.log((await page.locator('body').innerText()).slice(-4000));throw e;}
+finally{await browser.close();}

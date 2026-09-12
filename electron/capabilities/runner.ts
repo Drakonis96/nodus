@@ -1,4 +1,6 @@
+import type { VisionSession } from './vision/service';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import { utilityProcess } from 'electron';
 import type { ModelRef } from '@shared/types';
@@ -8,7 +10,7 @@ import { storeCapabilityFile } from '../chatAssets';
 import { validateViewDocument, type ViewDocumentV1 } from '../../packages/capability-api/src/views';
 import type { WorkerArtifactV1 } from '../../packages/capability-api/src/artifacts';
 import type { ChatAstNode } from '../../packages/capability-api/src/chat';
-import { acquireCapabilityWorker, type TrustedWorkerRuntime } from './workerHost';
+import { acquireCapabilityWorker, stopCapabilityWorkers, type TrustedWorkerRuntime } from './workerHost';
 import { createCapabilityHostServices, type CapabilityServiceAdapters } from './hostServices';
 import { resolveTrustedCapability } from './pluginStoreV2';
 import { serializeArtifactReference, storeCapabilityArtifact } from './artifactStore';
@@ -22,12 +24,17 @@ import type { TrustedCapabilityRunner } from './chatPipeline';
  *  it is allowed to reach, and where its results are stored. */
 
 export interface TrustedTurnContext {
+  vision?: VisionSession;
+  renderStoredArtifacts?: boolean;
   owner?: string;
   question?: string;
   locale: string;
   model?: ModelRef | null;
   pins: TurnPins;
   signal?: AbortSignal;
+  beforeInvoke?: () => void;
+  beforePaidCall?: () => void;
+  beforeRepair?: () => void;
   runCoreStages: (answer: string, options: { suppressSvgRefinement: boolean }) => Promise<string>;
 }
 
@@ -57,18 +64,20 @@ function lockDownloader(runtime: TrustedWorkerRuntime, services: ReturnType<type
 export function createCapabilityAdapters(context: TrustedTurnContext): CapabilityServiceAdapters {
   let services: ReturnType<typeof createCapabilityHostServices> | null = null;
   const adapters: CapabilityServiceAdapters = {
+    vision: context.vision,
+    beforePaidCall: context.beforePaidCall,
     async model(runtime, request, signal) {
       return completeText({
         system: (request.system ?? 'You answer exactly what is asked, with no preamble.').slice(0, 20_000),
         user: request.prompt.slice(0, 200_000),
         maxTokens: Math.min(Math.max(request.maxTokens ?? 4_000, 256), 16_000),
-        temperature: 0, reasoning: 'off', plainContext: true, signal,
+        temperature: 0, reasoning: 'off', plainContext: true, signal, noRetry: Boolean(context.beforePaidCall),
       }, context.model);
     },
     svg: {
       validate: validateCapabilitySvg,
       inspect: inspectCapabilitySvg,
-      refine: (request, signal) => refineCapabilitySvg(request, context.model, signal),
+      refine: (request, signal) => { context.beforeRepair?.(); return refineCapabilitySvg(request, context.model, signal, Boolean(context.beforePaidCall)); },
     },
     python: {
       async ensureRuntime(runtime, runtimeId, signal) {
@@ -134,10 +143,11 @@ export function createCapabilityAdapters(context: TrustedTurnContext): Capabilit
 }
 
 export function createTrustedCapabilityRunner(context: TrustedTurnContext): TrustedCapabilityRunner {
+  const scopeKey = randomUUID();
   const services = createCapabilityHostServices(createCapabilityAdapters(context));
   const workerFor = (provider: CapabilityProvider) => {
     const runtime = runtimeFor(provider, context.pins);
-    return { runtime, handle: acquireCapabilityWorker(runtime, { services }) };
+    return { runtime, handle: acquireCapabilityWorker(runtime, { services, scopeKey }) };
   };
 
   const renderView = ({ provider, view }: { provider: CapabilityProvider; view: ViewDocumentV1 }): string =>
@@ -149,10 +159,12 @@ export function createTrustedCapabilityRunner(context: TrustedTurnContext): Trus
     });
 
   return {
+    dispose: () => stopCapabilityWorkers(key => key.endsWith(`#${scopeKey}`)),
     async invoke({ provider, toolId, input, nodeId }) {
       const tool = provider.tools.find(candidate => candidate.id === toolId);
       if (!tool) throw new Error(`${provider.id} has no tool ${toolId}.`);
       const { handle } = workerFor(provider);
+      context.beforeInvoke?.();
       return handle.call('invoke', {
         invocationId: `i${Math.random().toString(36).slice(2, 10)}`,
         toolId, input, locale: context.locale,
@@ -182,6 +194,14 @@ export function createTrustedCapabilityRunner(context: TrustedTurnContext): Trus
       if (artifact.view) {
         try { pieces.push(renderView({ provider, view: validateViewDocument(artifact.view) })); }
         catch { /* the stored artifact can still be rendered on demand */ }
+      }
+      else if (context.renderStoredArtifacts) {
+        const { handle } = workerFor(provider);
+        const view = await handle.call('renderArtifact', {
+          artifactType: artifact.artifactType, artifactVersion: artifact.artifactVersion,
+          data: artifact.data, locale: context.locale,
+        }, { timeoutMs: 60_000, signal: context.signal });
+        pieces.push(renderView({ provider, view: validateViewDocument(view) }));
       }
       return pieces.join('');
     },

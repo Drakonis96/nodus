@@ -30,7 +30,8 @@ export async function executeExternalCapability(content: string, complete: boole
     if (capabilityIsMetered(runtime.manifest.permissions)) {
       if (++budget.metered > METERED_CALL_LIMIT) throw new Error(`At most ${METERED_CALL_LIMIT} capability calls that use the network, secrets or storage are allowed per reply.`);
     } else if (++budget.sandboxed > SANDBOXED_CALL_LIMIT) throw new Error(`At most ${SANDBOXED_CALL_LIMIT} sandboxed tool and capability calls are allowed per reply.`);
-    const result = await runCapabilitySandbox(runtime, { ...invocation, capabilityId }, signal);
+    execution.beforeInvoke?.();
+    const result = await runCapabilitySandbox(runtime, { ...invocation, capabilityId }, signal, execution.beforePaidCall);
     signal?.throwIfAborted();
     if (!execution.isCurrent() || execution.owner && chatAssetVersion(execution.owner) !== execution.version) throw new DOMException('The chat was deleted or changed.', 'AbortError');
     let chatResult: CapabilityChatResult;

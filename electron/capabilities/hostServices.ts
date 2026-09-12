@@ -7,6 +7,9 @@ import { validateModelAsset } from '../../packages/capability-api/src/models';
 import { validateMediaAsset } from '../../packages/capability-api/src/media';
 import type { TrustedNetworkPermission, TrustedPermissionSetV2 } from '../../packages/capability-api/src/permissions';
 import type { CapabilityHostServices, TrustedWorkerRuntime } from './workerHost';
+import { validateVisionReviewResult } from '../../packages/capability-api/src/vision';
+import type { VisionSession } from './vision/service';
+import { createMapService, type MapService } from './maps/service';
 
 /** The host side of every channel a trusted worker can call.
  *
@@ -17,6 +20,8 @@ import type { CapabilityHostServices, TrustedWorkerRuntime } from './workerHost'
  *  of the process that would otherwise have to hold them. */
 
 export interface CapabilityServiceAdapters {
+  vision?: VisionSession;
+  beforePaidCall?: () => void;
   /** One completion against the conversation's own model. */
   model?: (runtime: TrustedWorkerRuntime, request: { system?: string; prompt: string; maxTokens?: number }, signal: AbortSignal) => Promise<string>;
   svg?: {
@@ -128,11 +133,13 @@ async function authorizedRequest(runtime: TrustedWorkerRuntime, payload: unknown
   const endpoint = declaredEndpoint(runtime.permissions, value.endpointId);
   const relative = typeof value.path === 'string' ? value.path : '/';
   const method = String(value.method ?? 'GET').toUpperCase();
-  const allowedPath = endpoint.pathPrefixes.some(prefix => relative === prefix || relative.startsWith(prefix.endsWith('/') ? prefix : `${prefix}/`));
-  if (!relative.startsWith('/') || relative.includes('..') || !allowedPath) throw new Error('Capability network request exceeds its permission.');
-  if (!(endpoint.methods as readonly string[]).includes(method)) throw new Error('Capability network method is not permitted.');
+  if (!relative.startsWith('/') || relative.startsWith('//') || /[\\#]/.test(relative) || [...relative].some(char => char.charCodeAt(0) <= 32)) throw new Error('Invalid capability network path.');
   const url = new URL(relative, endpoint.origin);
-  if (url.origin !== new URL(endpoint.origin).origin) throw new Error('Capability network origin changed.');
+  if (url.origin !== new URL(endpoint.origin).origin || /%(?:25|2f|5c)/i.test(url.pathname)) throw new Error('Capability network origin or path changed.');
+  const pathname = decodeURIComponent(url.pathname);
+  const allowedPath = endpoint.pathPrefixes.some(prefix => pathname === prefix || pathname.startsWith(prefix.endsWith('/') ? prefix : `${prefix}/`));
+  if (!allowedPath) throw new Error('Capability network request exceeds its permission.');
+  if (!(endpoint.methods as readonly string[]).includes(method)) throw new Error('Capability network method is not permitted.');
   await assertPublicHost(url.hostname);
 
   const headers: Record<string, string> = { Accept: 'application/json, text/plain;q=0.9, */*;q=0.5' };
@@ -181,9 +188,26 @@ async function readBounded(response: Response, limit: number): Promise<Buffer> {
 }
 
 export function createCapabilityHostServices(adapters: CapabilityServiceAdapters = {}): CapabilityHostServices {
+  const mapServices = new Map<string, MapService>();
   return async ({ runtime, channel, method, payload, signal }) => {
     signal.throwIfAborted();
     const value = (payload ?? {}) as Record<string, unknown>;
+    if (channel === 'vision') {
+      if (!runtime.permissions.vision) throw new Error('Capability vision access is not permitted.');
+      if (!adapters.vision) throw new Error('Vision review requires an active conversation.');
+      const scope = `${runtime.plugin.id}:${runtime.capabilityId}:${runtime.plugin.digest}`;
+      if (method === 'prepareImages') return adapters.vision.prepareImages(payload, runtime.permissions, scope, signal);
+      if (method === 'reviewImages') return validateVisionReviewResult(await adapters.vision.reviewImages(payload, scope, runtime.permissions.vision.maxRounds, signal));
+      throw new Error('Unknown capability vision operation.');
+    }
+    if (channel === 'maps') {
+      if (!runtime.permissions.maps) throw new Error('Capability maps access is not permitted.');
+      if (method !== 'render' && method !== 'retrieve') throw new Error('Unknown capability maps operation.');
+      const key = `${runtime.plugin.id}:${runtime.capabilityId}:${runtime.plugin.digest}`;
+      let service = mapServices.get(key);
+      if (!service) { service = createMapService(runtime.permissions.maps); mapServices.set(key, service); }
+      return service[method](payload, signal);
+    }
     const key = () => {
       const name = value.key;
       if (typeof name !== 'string' || !KEY.test(name)) throw new Error('Invalid capability storage key.');
@@ -228,6 +252,7 @@ export function createCapabilityHostServices(adapters: CapabilityServiceAdapters
 
     if (channel === 'network') {
       const { url, method: verb, headers, body, endpoint } = await authorizedRequest(runtime, payload);
+      adapters.beforePaidCall?.();
       const timeout = AbortSignal.timeout(endpoint.timeoutMs);
       const response = await fetch(url, { method: verb, headers, body, redirect: 'error', signal: AbortSignal.any([signal, timeout]) });
       if (method === 'downloadToTemp') {
@@ -250,6 +275,7 @@ export function createCapabilityHostServices(adapters: CapabilityServiceAdapters
       if (!adapters.model) throw new Error('Model access is unavailable in this context.');
       const prompt = value.prompt;
       if (typeof prompt !== 'string' || !prompt.trim()) throw new Error('Invalid capability model request.');
+      adapters.beforePaidCall?.();
       return adapters.model(runtime, { system: typeof value.system === 'string' ? value.system : undefined, prompt, maxTokens: typeof value.maxTokens === 'number' ? value.maxTokens : undefined }, signal);
     }
 
@@ -259,7 +285,7 @@ export function createCapabilityHostServices(adapters: CapabilityServiceAdapters
       const svg = typeof value.svg === 'string' ? value.svg : '';
       if (method === 'validate') return adapters.svg.validate(svg);
       if (method === 'inspect') return adapters.svg.inspect(svg);
-      if (method === 'refine') return adapters.svg.refine({ svg, instruction: String(value.instruction ?? '') }, signal);
+      if (method === 'refine') { adapters.beforePaidCall?.(); return adapters.svg.refine({ svg, instruction: String(value.instruction ?? '') }, signal); }
       throw new Error('Unknown capability SVG operation.');
     }
 

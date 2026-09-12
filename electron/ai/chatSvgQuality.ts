@@ -40,7 +40,7 @@ export async function inspectChatSvg(svg: string): Promise<string[]> {
     })()`);
 }
 
-export async function refineChatSvg(answer: string, options: { question: string; skills: ChatSkill[]; model?: ModelRef | null; signal?: AbortSignal }): Promise<string> {
+export async function refineChatSvg(answer: string, options: { question: string; skills: ChatSkill[]; model?: ModelRef | null; signal?: AbortSignal; beforeRepair?: () => void; maxRepairs?: number }): Promise<string> {
   const skill = options.skills.find(item => skillHasCapability(item, 'svg'));
   if (!skill) return answer;
   const parts = splitChatVisuals(answer);
@@ -51,12 +51,13 @@ export async function refineChatSvg(answer: string, options: { question: string;
     options.signal?.throwIfAborted();
     try {
       let issues = await inspectChatSvg(part.content);
-      for (let attempt = 0; issues.length && attempt < 2; attempt++) {
+      for (let attempt = 0; issues.length && attempt < (options.maxRepairs ?? 2); attempt++) {
         options.signal?.throwIfAborted();
+        options.beforeRepair?.();
         const repaired = await completeText({
           system: `You are the visual quality editor for SVG Studio. Repair the supplied SVG, preserving the user's intended content and all correct relationships. Return only one complete fenced svg block.\n${skill.instructions}\nActual SVG checks found the issues listed below. Fix every listed issue with a simpler, more spacious layout. Prefer a vertical legend with one short explanation per row over a crowded horizontal legend. Increase canvas height or wrap text with tspan when needed; never hide, truncate, shrink to unreadable type, or delete required labels. Use explicit Arial, sans-serif typography. Preserve factual content. No external resources or scripts.`,
           user: JSON.stringify({ request: options.question, issues, svg: part.content }),
-          maxTokens: 10_000, temperature: 0.2, reasoning: 'off', plainContext: true, signal: options.signal,
+          maxTokens: 10_000, temperature: 0.2, reasoning: 'off', plainContext: true, signal: options.signal, noRetry: Boolean(options.beforeRepair),
         }, options.model);
         const replacement = splitChatVisuals(repaired).find(item => item.kind === 'svg' && item.complete);
         if (!replacement) break;

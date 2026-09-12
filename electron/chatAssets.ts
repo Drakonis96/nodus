@@ -1,9 +1,9 @@
 import { validateModelAsset, isModelMimeType } from '../packages/capability-api/src/models';
-import { LIMITS } from '../packages/capability-api/src/limits';
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
+import { LIMITS } from '../packages/capability-api/src/limits';
 
 const versions = new Map<string, number>();
 const root = () => path.join(app.getPath('userData'), 'chat-assets');
@@ -49,7 +49,8 @@ export function deleteChatAssets(owner: string): void {
 export function storeCapabilityFile(owner: string, input: { bytes: Buffer; mimeType: string; name: string; title?: string }): string {
   const isModel = isModelMimeType(input.mimeType);
   if (isModel) validateModelAsset(input.bytes, input.mimeType);
-  if (input.bytes.length > (isModel ? LIMITS.modelBytes : 10_000_000) || !input.bytes.length) throw new Error('Capability file exceeds its size limit.');
+  const maximum = isModel ? LIMITS.modelBytes : input.mimeType.startsWith('image/') ? LIMITS.imageBytes : input.mimeType.startsWith('audio/') ? LIMITS.audioBytes : 10_000_000;
+  if (input.bytes.length > maximum || !input.bytes.length) throw new Error('Capability file exceeds its size limit.');
   if (!input.name || /[\\/\0]/.test(input.name) || input.name.length > 160 || !/^[\w.+-]+\/[\w.+-]+$/i.test(input.mimeType)) throw new Error('Invalid capability file metadata.');
   const id = randomUUID(), dir = directory(owner); fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   try {

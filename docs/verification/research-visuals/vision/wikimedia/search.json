@@ -1,0 +1,275 @@
+{
+  "url": "https://commons.wikimedia.org/w/api.php?action=query&format=json&formatversion=2&generator=search&gsrsearch=daguerreotype+filetype%3Abitmap&gsrnamespace=6&gsrlimit=5&prop=imageinfo&iiprop=url%7Cmime%7Cextmetadata&iiurlwidth=600&iiextmetadatafilter=ImageDescription%7CArtist%7CCredit%7CLicenseShortName%7CLicenseUrl%7CUsageTerms",
+  "retrievedAt": "2026-09-12T15:31:14.624Z",
+  "result": {
+    "batchcomplete": true,
+    "continue": {
+      "gsroffset": 5,
+      "continue": "gsroffset||"
+    },
+    "query": {
+      "pages": [
+        {
+          "pageid": 1462514,
+          "ns": 6,
+          "title": "File:Boulevard du Temple.jpg",
+          "index": 4,
+          "imagerepository": "local",
+          "imageinfo": [
+            {
+              "thumburl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1d/Boulevard_du_Temple.jpg/960px-Boulevard_du_Temple.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+              "thumbwidth": 600,
+              "thumbheight": 430,
+              "responsiveUrls": {
+                "2": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Boulevard_du_Temple.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled"
+              },
+              "thumbattribs": {
+                "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1d/Boulevard_du_Temple.jpg/960px-Boulevard_du_Temple.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+                "decoding": "async",
+                "loading": "lazy",
+                "width": 600,
+                "height": 430,
+                "srcset": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Boulevard_du_Temple.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled 2x"
+              },
+              "url": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Boulevard_du_Temple.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+              "descriptionurl": "https://commons.wikimedia.org/wiki/File:Boulevard_du_Temple.jpg",
+              "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=1462514",
+              "extmetadata": {
+                "ImageDescription": {
+                  "value": "This is \"<a href=\"https://en.wikipedia.org/wiki/Boulevard_du_Temple\" class=\"extiw\" title=\"w:Boulevard du Temple\">Boulevard du Temple</a>\", the first ever photograph of a person. The photo was taken by <a href=\"//commons.wikimedia.org/wiki/Louis_Daguerre\" title=\"Louis Daguerre\">Louis Daguerre</a> in late <a href=\"//commons.wikimedia.org/w/index.php?title=1838&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"1838 (page does not exist)\">1838</a> or early <a href=\"//commons.wikimedia.org/w/index.php?title=1839&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"1839 (page does not exist)\">1839</a> in <a href=\"//commons.wikimedia.org/wiki/Paris\" title=\"Paris\">Paris</a>. It is of a busy street, but because exposure time was over ten minutes, the city traffic was moving too much to appear. The exception is a man in the bottom left corner, who stood still getting his boots polished long enough to show.",
+                  "source": "commons-desc-page"
+                },
+                "Credit": {
+                  "value": "Louis Daguerre",
+                  "source": "commons-desc-page"
+                },
+                "Artist": {
+                  "value": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Louis_Daguerre\" class=\"extiw\" title=\"w:en:Louis Daguerre\"><span title=\"French scientist, artist and photographer (1787–1851)\">Louis Daguerre</span></a></bdi>",
+                  "source": "commons-desc-page"
+                },
+                "LicenseShortName": {
+                  "value": "Public domain",
+                  "source": "commons-desc-page",
+                  "hidden": ""
+                },
+                "UsageTerms": {
+                  "value": "Public domain",
+                  "source": "commons-desc-page"
+                }
+              },
+              "mime": "image/jpeg"
+            }
+          ]
+        },
+        {
+          "pageid": 5005681,
+          "ns": 6,
+          "title": "File:Boulevard du Temple by Daguerre.jpg",
+          "index": 1,
+          "imagerepository": "local",
+          "imageinfo": [
+            {
+              "thumburl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d3/Boulevard_du_Temple_by_Daguerre.jpg/960px-Boulevard_du_Temple_by_Daguerre.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+              "thumbwidth": 600,
+              "thumbheight": 431,
+              "responsiveUrls": {
+                "2": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d3/Boulevard_du_Temple_by_Daguerre.jpg/1280px-Boulevard_du_Temple_by_Daguerre.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+              },
+              "thumbattribs": {
+                "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d3/Boulevard_du_Temple_by_Daguerre.jpg/960px-Boulevard_du_Temple_by_Daguerre.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+                "decoding": "async",
+                "loading": "lazy",
+                "width": 600,
+                "height": 431,
+                "srcset": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d3/Boulevard_du_Temple_by_Daguerre.jpg/1280px-Boulevard_du_Temple_by_Daguerre.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail 2x"
+              },
+              "url": "https://upload.wikimedia.org/wikipedia/commons/d/d3/Boulevard_du_Temple_by_Daguerre.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+              "descriptionurl": "https://commons.wikimedia.org/wiki/File:Boulevard_du_Temple_by_Daguerre.jpg",
+              "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=5005681",
+              "extmetadata": {
+                "Artist": {
+                  "value": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Louis_Daguerre\" class=\"extiw\" title=\"w:en:Louis Daguerre\"><span title=\"French scientist, artist and photographer (1787–1851)\">Louis Daguerre</span></a></bdi>",
+                  "source": "commons-desc-page"
+                },
+                "ImageDescription": {
+                  "value": "<a href=\"https://en.wikipedia.org/wiki/Boulevard_du_Temple\" class=\"extiw\" title=\"en:Boulevard du Temple\">Boulevard du Temple</a>, <a href=\"https://en.wikipedia.org/wiki/Paris\" class=\"extiw\" title=\"en:Paris\">Paris</a>, 3rd arrondissement, <a href=\"https://en.wikipedia.org/wiki/Daguerreotype\" class=\"extiw\" title=\"en:Daguerreotype\">Daguerreotype</a>. Made in 1838 by inventor <a href=\"https://en.wikipedia.org/wiki/Louis_Daguerre\" class=\"extiw\" title=\"en:Louis Daguerre\">Louis Daguerre</a>, this is believed to be the earliest photograph showing a living person. It is a view of a busy street, but because the exposure lasted for 4 to 5 minutes (see <a rel=\"nofollow\" class=\"external text\" href=\"https://www.reclamebeeld.nl/shutter-speed-time-of-the-first-image-human-daguerre-photo-boulevard-du-temple-paris/\">shutter speed Daguerre photo explained</a>) the moving traffic left no trace. Only the two men near the bottom left corner, one apparently having his boots polished by the other, stayed in one place long enough to be visible. As with most daguerreotypes, the image is a <a href=\"https://en.wikipedia.org/wiki/mirror_image\" class=\"extiw\" title=\"en:mirror image\">mirror image</a>.",
+                  "source": "commons-desc-page"
+                },
+                "Credit": {
+                  "value": "Scanned from The Photography Book, Phaidon Press, London, 1997.",
+                  "source": "commons-desc-page"
+                },
+                "LicenseShortName": {
+                  "value": "Public domain",
+                  "source": "commons-desc-page",
+                  "hidden": ""
+                },
+                "UsageTerms": {
+                  "value": "Public domain",
+                  "source": "commons-desc-page"
+                }
+              },
+              "mime": "image/jpeg"
+            }
+          ]
+        },
+        {
+          "pageid": 9521450,
+          "ns": 6,
+          "title": "File:Unidentified woman c1850 daguerreotype by Southworth & Hawes.jpg",
+          "index": 5,
+          "imagerepository": "local",
+          "imageinfo": [
+            {
+              "thumburl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bf/Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg/960px-Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+              "thumbwidth": 600,
+              "thumbheight": 757,
+              "responsiveUrls": {
+                "2": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bf/Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg/1280px-Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+              },
+              "thumbattribs": {
+                "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bf/Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg/960px-Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+                "decoding": "async",
+                "loading": "lazy",
+                "width": 600,
+                "height": 757,
+                "srcset": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bf/Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg/1280px-Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail 2x"
+              },
+              "url": "https://upload.wikimedia.org/wikipedia/commons/b/bf/Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+              "descriptionurl": "https://commons.wikimedia.org/wiki/File:Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg",
+              "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=9521450",
+              "extmetadata": {
+                "ImageDescription": {
+                  "value": "Retouched daguerreotype of unidentified woman. The sitter in this daguerreotype was previously incorrectly identified by the <a href=\"//commons.wikimedia.org/wiki/Metropolitan_Museum_of_Art\" title=\"Metropolitan Museum of Art\">Metropolitan Museum of Art</a> as <a href=\"//commons.wikimedia.org/wiki/Susan_B._Anthony\" title=\"Susan B. Anthony\">Susan B. Anthony</a>.",
+                  "source": "commons-desc-page"
+                },
+                "Credit": {
+                  "value": "The Metropolitan Museum of Art",
+                  "source": "commons-desc-page"
+                },
+                "Artist": {
+                  "value": "Southworth &amp; Hawes<sup><a href=\"https://en.wikipedia.org/wiki/Southworth_%26_Hawes\" class=\"extiw\" title=\"en:Southworth &amp; Hawes\">en</a></sup>",
+                  "source": "commons-desc-page"
+                },
+                "LicenseShortName": {
+                  "value": "Public domain",
+                  "source": "commons-desc-page",
+                  "hidden": ""
+                },
+                "UsageTerms": {
+                  "value": "Public domain",
+                  "source": "commons-desc-page"
+                }
+              },
+              "mime": "image/jpeg"
+            }
+          ]
+        },
+        {
+          "pageid": 77527076,
+          "ns": 6,
+          "title": "File:Edgar Allan Poe, circa 1849, restored, squared off.jpg",
+          "index": 2,
+          "imagerepository": "local",
+          "imageinfo": [
+            {
+              "thumburl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/97/Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg/960px-Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+              "thumbwidth": 600,
+              "thumbheight": 844,
+              "responsiveUrls": {
+                "2": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/97/Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg/1280px-Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+              },
+              "thumbattribs": {
+                "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/97/Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg/960px-Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+                "decoding": "async",
+                "loading": "lazy",
+                "width": 600,
+                "height": 844,
+                "srcset": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/97/Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg/1280px-Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail 2x"
+              },
+              "url": "https://upload.wikimedia.org/wikipedia/commons/9/97/Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+              "descriptionurl": "https://commons.wikimedia.org/wiki/File:Edgar_Allan_Poe,_circa_1849,_restored,_squared_off.jpg",
+              "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=77527076",
+              "extmetadata": {
+                "ImageDescription": {
+                  "value": "<a href=\"https://en.wikipedia.org/wiki/Edgar_Allan_Poe\" class=\"extiw\" title=\"en:Edgar Allan Poe\">Edgar Allan Poe</a>, June 1849. Daguerreotype \"Annie\", given to Poe's friend Mrs. Annie L. Richmond; probably taken in June 1849 in Lowell, Massachusetts, photographer unknown.",
+                  "source": "commons-desc-page"
+                },
+                "Credit": {
+                  "value": "Derived from <a href=\"//commons.wikimedia.org/wiki/File:Edgar_Allan_Poe,_circa_1849,_restored.jpg\" title=\"File:Edgar Allan Poe, circa 1849, restored.jpg\">File:Edgar Allan Poe, circa 1849, restored.jpg</a>; originally from <a rel=\"nofollow\" class=\"external free\" href=\"http://www.getty.edu/art/gettyguide/artObjectDetails?artobj=39406\">http://www.getty.edu/art/gettyguide/artObjectDetails?artobj=39406</a>",
+                  "source": "commons-desc-page"
+                },
+                "Artist": {
+                  "value": "Unknown author<span style=\"display: none;\">Unknown author</span>; Restored by <a href=\"//commons.wikimedia.org/wiki/User:Yann\" title=\"User:Yann\">Yann Forget</a> and <a href=\"//commons.wikimedia.org/wiki/User:Adam_Cuerden\" title=\"User:Adam Cuerden\">Adam Cuerden</a>",
+                  "source": "commons-desc-page"
+                },
+                "LicenseShortName": {
+                  "value": "Public domain",
+                  "source": "commons-desc-page",
+                  "hidden": ""
+                },
+                "UsageTerms": {
+                  "value": "Public domain",
+                  "source": "commons-desc-page"
+                }
+              },
+              "mime": "image/jpeg"
+            }
+          ]
+        },
+        {
+          "pageid": 157814697,
+          "ns": 6,
+          "title": "File:Portrait of a Daguerreotypist, 1845 (with Frame).jpg",
+          "index": 3,
+          "imagerepository": "local",
+          "imageinfo": [
+            {
+              "thumburl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg/960px-Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+              "thumbwidth": 600,
+              "thumbheight": 704,
+              "responsiveUrls": {
+                "2": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg/1280px-Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+              },
+              "thumbattribs": {
+                "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg/960px-Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+                "decoding": "async",
+                "loading": "lazy",
+                "width": 600,
+                "height": 704,
+                "srcset": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg/1280px-Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail 2x"
+              },
+              "url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+              "descriptionurl": "https://commons.wikimedia.org/wiki/File:Portrait_of_a_Daguerreotypist,_1845_(with_Frame).jpg",
+              "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=157814697",
+              "extmetadata": {
+                "ImageDescription": {
+                  "value": "Restored portrait of a Daguerreotypist displaying daguerreotypes and cases",
+                  "source": "commons-desc-page"
+                },
+                "Credit": {
+                  "value": "This file was derived from:  <a href=\"//commons.wikimedia.org/wiki/File:Portrait_of_a_Daguerreotypist,_1845.jpg\" title=\"File:Portrait of a Daguerreotypist, 1845.jpg\">Portrait of a Daguerreotypist, 1845.jpg</a><br>",
+                  "source": "commons-desc-page"
+                },
+                "Artist": {
+                  "value": "<ul><li>Unknown<span style=\"display: none;\">Unknown </span></li>\n<li>Restored by <a href=\"//commons.wikimedia.org/wiki/User:Wcamp9\" title=\"User:Wcamp9\">Wcamp9</a></li></ul>",
+                  "source": "commons-desc-page"
+                },
+                "LicenseShortName": {
+                  "value": "Public domain",
+                  "source": "commons-desc-page",
+                  "hidden": ""
+                },
+                "UsageTerms": {
+                  "value": "Public domain",
+                  "source": "commons-desc-page"
+                }
+              },
+              "mime": "image/jpeg"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

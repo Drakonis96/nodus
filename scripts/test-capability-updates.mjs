@@ -34,6 +34,8 @@ await build({
       export * from './electron/capabilities/registry';
       export * from './electron/capabilities/marketplaceV2';
       export * from './electron/capabilities/updates';
+      export * from './electron/capabilities/skillLibrary';
+      export { listChatSkills, saveChatSkill, replaceChatSkills, restorePluginSkillAuthorVersion } from './electron/chatSkills';
     `,
     resolveDir: root, loader: 'ts',
   },
@@ -160,6 +162,7 @@ const reset = () => {
   fs.rmSync(path.join(profile, 'plugins'), { recursive: true, force: true });
   fs.rmSync(path.join(profile, 'capability-catalog.json'), { force: true });
   lib.initializeCapabilityPluginStore();
+  lib.replaceChatSkills([]);
   globalThis.__migrated = [];
   globalThis.__stopped = [];
 };
@@ -190,6 +193,7 @@ test('an update is fetched, verified, migrated and announced', async () => {
   assert.ok(globalThis.__stopped.length, 'the process running the old bytes is stopped before the new ones are used');
   assert.ok(globalThis.__migrated.includes('legalize'), 'the new version climbs its ladder before it is announced');
   assert.equal(lib.capabilityIsAvailable('nodus:legal'), true);
+  assert.equal(lib.listChatSkills().find(skill => skill.plugin?.id === 'legalize').version, '2.1.0', 'updating also installs the bundled workflow');
 });
 
 test('a package already at the catalog version is left alone', async () => {
@@ -322,4 +326,28 @@ test('an explicit purge is the only thing that takes the data', async () => {
 
   lib.removePluginV2('legalize', { purgeData: true });
   assert.equal(fs.existsSync(data), false);
+});
+
+
+test('bundled workflows wait for migrations, then survive updates and rollback with local edits', async () => {
+  reset();
+  const fetcher = sourceServing('2.0.0');
+  await lib.fetchCapabilityCatalog('https://github.com/NodusResearch/nodus-research-skill-marketplace', fetcher);
+  await lib.installCatalogPlugin('legalize', { approvePermissions: true, fetcher });
+  assert.deepEqual(lib.materializeTrustedPluginSkills('legalize'), [], 'pending migration cannot expose the workflow');
+  lib.recordPluginDataVersion('legalize', 1);
+  const [skill] = lib.materializeTrustedPluginSkills('legalize');
+  lib.saveChatSkill({ ...skill, instructions: 'My edited workflow.', enabled: { assistant: true, nodi: false } });
+  await lib.checkForCapabilityUpdates({ fetcher: sourceServing('2.1.0') });
+  lib.rollbackPluginV2('legalize');
+  const [rolledBack] = lib.materializeTrustedPluginSkills('legalize');
+  assert.equal(rolledBack.id, skill.id);
+  assert.equal(rolledBack.version, '2.0.0');
+  assert.equal(rolledBack.instructions, 'My edited workflow.');
+  assert.deepEqual(rolledBack.enabled, { assistant: true, nodi: false });
+  const [restored] = lib.restorePluginSkillAuthorVersion(skill.id);
+  assert.equal(restored.instructions, 'Ask for a country.');
+  assert.equal(restored.id, skill.id);
+  assert.deepEqual(restored.enabled, rolledBack.enabled);
+  assert.equal(restored.overrides, undefined);
 });
