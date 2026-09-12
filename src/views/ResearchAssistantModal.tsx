@@ -13,7 +13,6 @@ import { createPortal } from 'react-dom';
 import type {
   AppSettings,
   ChatConversationSummary,
-  ChatMessageRecord,
   ModelRef,
   ResearchChatMessage,
   ResearchContextSelection,
@@ -436,7 +435,7 @@ export function ResearchAssistantModal({
   };
 
   const startNewConversation = () => {
-    setSelection(current => { const { sourceFilter, ...rest } = current; return rest; });
+    setSelection(current => { const { sourceFilter: _sourceFilter, ...rest } = current; return rest; });
     setThinkingEffort('standard');
     adapter?.reset?.();
     if (!activeId) void systemPrompts.select(null);
