@@ -32,7 +32,7 @@ execFileSync(
   ],
   { cwd: repoRoot, stdio: 'inherit' }
 );
-const { placeHeaderBadge, HEADER_BADGE_GAP } = require(bundle);
+const { placeHeaderBadge, placeHeaderModelAlert, HEADER_BADGE_GAP, HEADER_MODEL_ALERT_WIDTH } = require(bundle);
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
 /** The real shell at 1400px: 176px sidebar-width logo, a ~140px badge. */
@@ -146,6 +146,49 @@ test('the gap is configurable and is honoured on both sides', () => {
   const placement = placeHeaderBadge(metrics);
   assert.equal(right(placement, metrics), metrics.headerWidth - metrics.actionsWidth - 40);
   assert.equal(HEADER_BADGE_GAP, 12, 'the default gap is the shipped one');
+});
+
+// The "configure an AI model" alert used to sit in the action rail with its label
+// pinned open — ~170px taken from the one band the badge depends on. It now lives in
+// the empty half of the header, centred between the sidebar and the badge, with its
+// label folded away until hover.
+test('the model alert is centred between the sidebar and the badge', () => {
+  const placement = placeHeaderModelAlert({ logoWidth: 176, bandRight: 630 });
+  assert.equal(placement.fits, true);
+  assert.equal(placement.centre, (176 + HEADER_BADGE_GAP + 630 - HEADER_BADGE_GAP) / 2);
+});
+
+test('the alert band ends at the badge, so the two can never overlap', () => {
+  const metrics = { ...BASE, actionsWidth: 480 };
+  const badge = placeHeaderBadge(metrics);
+  const alert = placeHeaderModelAlert({ logoWidth: metrics.logoWidth, bandRight: badge.left });
+  assert.equal(alert.fits, true);
+  assert.ok(
+    alert.centre + HEADER_MODEL_ALERT_WIDTH / 2 <= badge.left,
+    'the alert at rest stays clear of the badge'
+  );
+  assert.ok(alert.centre - HEADER_MODEL_ALERT_WIDTH / 2 >= metrics.logoWidth, 'and clear of the logo');
+});
+
+test('the alert is dropped rather than squeezed when the band cannot hold it', () => {
+  // A sidebar dragged wide enough to leave less than the resting button plus its air.
+  const tight = placeHeaderModelAlert({ logoWidth: 400, bandRight: 400 + HEADER_MODEL_ALERT_WIDTH + 2 * HEADER_BADGE_GAP - 1 });
+  assert.equal(tight.fits, false);
+  const exact = placeHeaderModelAlert({ logoWidth: 400, bandRight: 400 + HEADER_MODEL_ALERT_WIDTH + 2 * HEADER_BADGE_GAP });
+  assert.equal(exact.fits, true);
+});
+
+test('an unmeasured band reports unfit instead of a nonsense coordinate', () => {
+  assert.equal(placeHeaderModelAlert({ logoWidth: 176, bandRight: 0 }).fits, false);
+});
+
+test('the alert is rendered from that centre, folded, outside the action rail', () => {
+  // Translated by half its own width: the label must open into the empty middle.
+  assert.match(appSource, /data-testid="header-model-alert"/);
+  assert.match(appSource, /transform: 'translate\(-50%, -50%\)'/);
+  assert.match(appSource, /modelAlertPlacement\?\.fits/);
+  // No pinned label: the rail's width is the badge's budget.
+  assert.doesNotMatch(appSource, /icon="alert"[\s\S]{0,220}showLabel/);
 });
 
 test('the expanded vault badge has a dedicated light-theme surface', () => {

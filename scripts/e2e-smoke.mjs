@@ -1089,12 +1089,43 @@ try {
   if (headerViewportWidth < 1280) {
     console.log(`[e2e] header centre badge steps skipped: the window is ${headerViewportWidth}px and the resize did not take; geometry covered by scripts/test-header-layout.mjs`);
   } else {
-    // The model warning is pinned open in this profile (no synthesis model yet at
-    // first launch) — the exact state that used to overlap. Force both cases.
+    // The model warning is what used to overlap: it sat in the action rail with its
+    // label pinned open. It now lives in the empty band on the other side of the
+    // header, so this profile (no synthesis model yet at first launch) exercises both
+    // the alert's own placement and the badge's, in the state that used to break.
     const originalSynthesis = (await page.evaluate(() => window.nodus.getSettings())).synthesisModel;
     await page.evaluate(() => window.nodus.updateSettings({ synthesisModel: null }));
     await waitForCondition('aviso de modelo de IA visible', async () =>
-      (await page.getByText('Configura un modelo de IA', { exact: true }).count()) > 0);
+      (await page.getByTestId('header-model-alert').count()) > 0);
+    {
+      const alert = await page.evaluate(() => {
+        const node = document.querySelector('[data-testid="header-model-alert"]');
+        const logo = document.querySelector('[data-testid="sidebar-header-toggle"]');
+        const rail = document.querySelector('[data-testid="header-actions"]');
+        const badge = document.querySelector('[data-testid="header-vault-badge"]');
+        const box = (element) => element && element.getBoundingClientRect();
+        return {
+          inRail: !!rail?.contains(node),
+          alert: box(node),
+          logo: box(logo),
+          rail: box(rail),
+          badge: badge && getComputedStyle(badge).visibility === 'visible' ? box(badge) : null,
+          label: node?.querySelector('span')?.getBoundingClientRect().width ?? null,
+        };
+      });
+      assert.ok(alert.alert, 'the model alert is rendered');
+      assert.equal(alert.inRail, false, 'the model alert no longer spends the action rail');
+      assert.ok(alert.logo && alert.alert.left >= alert.logo.right, 'the alert clears the sidebar rail');
+      const bandRight = alert.badge ? alert.badge.left : alert.rail.left;
+      assert.ok(alert.alert.right <= bandRight, 'the alert clears whatever the band ends at');
+      // Centred in that band, and folded: the label opens on hover, not before.
+      const centre = alert.alert.left + alert.alert.width / 2;
+      assert.ok(
+        Math.abs(centre - (alert.logo.right + bandRight) / 2) <= 14,
+        `the alert sits in the middle of its band (centre ${centre.toFixed(1)}, band ${alert.logo.right.toFixed(1)}–${bandRight.toFixed(1)})`
+      );
+      assert.ok(alert.label !== null && alert.label < 4, `the alert's label stays folded until hover (${alert.label}px)`);
+    }
     // Narrowing the window exercises the responsive rail. Depending on the available
     // native titlebar width, its labels can collapse before the badge needs to move;
     // either a centred or clamped badge is valid as long as it stays clear of both rails.
@@ -1106,7 +1137,7 @@ try {
     await setWindowWidth(1440);
     await page.evaluate((model) => window.nodus.updateSettings({ synthesisModel: model }), originalSynthesis);
     await waitForCondition('aviso de modelo de IA retirado', async () =>
-      (await page.getByText('Configura un modelo de IA', { exact: true }).count()) === 0);
+      (await page.getByTestId('header-model-alert').count()) === 0);
     // With the alert gone there is room again, so the badge must return to the true
     // centre — the resting position the design calls for. Waited for rather than
     // sampled: the clamped spot it is leaving is itself "clear of the rails", so a
@@ -1474,6 +1505,45 @@ try {
   await page.getByTestId('presenter-import').waitFor({ timeout: 10_000 });
   await page.getByTestId('presenter-back').click();
   await page.getByTestId('toolkit-home').waitFor();
+  // Tags: seed a shelf through the same IPC the view writes to, then drive the
+  // chips. A tag is only worth having if clicking it actually narrows the list,
+  // and deleting one must ask first and must not take its presentations with it.
+  await page.evaluate(() => window.nodus.savePresenterLibrary({
+    tags: [{ id: 'tag_smoke', name: 'Seminario', createdAt: '2026-01-01T00:00:00Z' }],
+    presentations: [
+      { id: 'pres_tagged', name: 'Clase etiquetada', fileName: 'a.pdf', createdAt: '2026-01-02T00:00:00Z', tag: 'tag_smoke', totalPages: 2, notes: {}, videos: {} },
+      { id: 'pres_loose', name: 'Clase suelta', fileName: 'b.pdf', createdAt: '2026-01-03T00:00:00Z', tag: '', totalPages: 2, notes: {}, videos: {} },
+    ],
+  }));
+  await page.getByTestId('toolkit-card-presenter').click();
+  await page.getByTestId('presenter-import').waitFor({ timeout: 10_000 });
+  assert.equal(await page.getByTestId('presenter-row').count(), 2, 'the seeded shelf lists both presentations');
+  const smokeTagChip = page.getByTestId('presenter-tag-chip').filter({ hasText: 'Seminario' });
+  await smokeTagChip.waitFor();
+  await smokeTagChip.click();
+  await waitForCondition('la etiqueta filtra a una sola presentación', async () => (await page.getByTestId('presenter-row').count()) === 1, { timeout: 5_000 });
+  assert.match(await page.getByTestId('presenter-row').first().innerText(), /Clase etiquetada/, 'the tag filter keeps only its own presentations');
+  await smokeTagChip.click(); // clicking the active tag clears the filter
+  await waitForCondition('al quitar el filtro vuelven las dos presentaciones', async () => (await page.getByTestId('presenter-row').count()) === 2, { timeout: 5_000 });
+  // Deleting a tag is confirmed, and cancelling really cancels.
+  assert.equal(await page.getByTestId('presenter-delete-tag-modal').count(), 0, 'no confirmation is showing yet');
+  await page.getByTestId('presenter-delete-tag').first().click();
+  await page.getByTestId('presenter-delete-tag-modal').waitFor({ timeout: 5_000 });
+  await page.getByTestId('presenter-delete-tag-modal').getByRole('button', { name: /cancel|cancelar/i }).click();
+  await page.getByTestId('presenter-delete-tag-modal').waitFor({ state: 'detached', timeout: 5_000 });
+  assert.equal(await page.getByTestId('presenter-tag-chip').filter({ hasText: 'Seminario' }).count(), 1, 'cancelling the confirmation keeps the tag');
+  await page.getByTestId('presenter-delete-tag').first().click();
+  await page.getByTestId('presenter-delete-tag-confirm').click();
+  await page.getByTestId('presenter-tags').getByText('Seminario', { exact: true }).waitFor({ state: 'detached', timeout: 5_000 });
+  assert.equal(await page.getByTestId('presenter-row').count(), 2, 'deleting a tag unties it, it does not delete presentations');
+  // Downloading the deck's PDF is offered on the selected presentation.
+  await page.getByTestId('presenter-row').first().click();
+  await page.getByTestId('presenter-download-pdf').waitFor({ timeout: 5_000 });
+  assert.equal(await page.getByTestId('presenter-download-pdf').isDisabled(), false, 'the PDF download button is offered for a selected deck');
+  await page.evaluate(() => window.nodus.savePresenterLibrary({ tags: [], presentations: [] }));
+  await page.getByTestId('presenter-back').click();
+  await page.getByTestId('toolkit-home').waitFor();
+  console.log('[e2e] PDF Presenter tags filter the shelf, deleting one is confirmed and spares its presentations, and the deck offers its PDF');
   // Nodus Convert opens on its empty state: the dropzone plus the catalogue of
   // formats it accepts, so the drop is never a blind guess.
   await page.getByTestId('toolkit-card-convert').click();

@@ -35,6 +35,21 @@ import type { ModelRef } from '@shared/types';
 import { getSettings } from '../db/settingsRepo';
 import * as protect from '../protect/protectService';
 
+/**
+ * A file-name stem the native save dialog will accept on every platform: the
+ * characters Windows forbids and every control character become "_", and an empty
+ * result falls back to "presentation" rather than offering a nameless file.
+ */
+function presenterFileStem(name: unknown): string {
+  const raw = typeof name === 'string' ? name : '';
+  return (
+    Array.from(raw.replace(/[<>:"/\\|?*]/g, '_'))
+      .map((char) => (char.charCodeAt(0) < 32 ? '_' : char))
+      .join('')
+      .trim() || 'presentation'
+  );
+}
+
 export function registerToolkitIpc({ h, getWindow }: IpcContext): void {
   // ── Nodus Toolkit (Convert) ─────────────────────────────────────────────────
   // Native-dialog copy for every toolkit tool, in the current UI language.
@@ -184,7 +199,7 @@ export function registerToolkitIpc({ h, getWindow }: IpcContext): void {
   });
 
   // ── PDF Presenter (Toolkit) ─────────────────────────────────────────────────
-  // A global library of imported PDFs (copies) + folders, independent of the
+  // A global library of imported PDFs (copies) + tags, independent of the
   // active vault, under userData/toolkit/presenter. The pure model + reducers
   // live in @shared/presenterTypes; the filesystem side in toolkit/presenter.
   const presenterDir = () => path.join(app.getPath('userData'), 'toolkit', 'presenter');
@@ -290,16 +305,12 @@ export function registerToolkitIpc({ h, getWindow }: IpcContext): void {
     return extractPptxNotes(fs.readFileSync(picked.filePaths[0]));
   });
   h('presenter:export:txtNotes', async (e, rawPresentation: unknown) => {
-    const presentation = normalizeLibrary({ presentations: [rawPresentation], folders: [] }).presentations[0];
+    const presentation = normalizeLibrary({ presentations: [rawPresentation], tags: [] }).presentations[0];
     if (!presentation?.totalPages) throw new Error('Presentation has no slides');
     const win = BrowserWindow.fromWebContents(e.sender);
-    const safeName = Array.from((presentation.name || 'presentation').replace(/[<>:"/\\|?*]/g, '_'))
-      .map((char) => (char.charCodeAt(0) < 32 ? '_' : char))
-      .join('')
-      .trim() || 'presentation';
     const picked = await dialog.showSaveDialog(win ?? undefined!, {
       title: toolkitCopy('exportPresenterNotes'),
-      defaultPath: `${safeName} - notas.txt`,
+      defaultPath: `${presenterFileStem(presentation.name)} - notas.txt`,
       filters: [{ name: toolkitCopy('text'), extensions: ['txt'] }],
     });
     if (picked.canceled || !picked.filePath) return false;
@@ -309,6 +320,24 @@ export function registerToolkitIpc({ h, getWindow }: IpcContext): void {
       'utf-8',
     );
     return true;
+  });
+  h('presenter:export:pdf', async (e, id: string, name: string) => {
+    // Hand the user their own copy of the deck: the library keeps the PDF it
+    // imported (or converted), and this writes it out wherever they choose. The
+    // library copy is read, never moved, so the shelf is unaffected.
+    const bytes = presenterLibrary.readPdfBytes(presenterDir(), String(id ?? ''));
+    // The three outcomes are distinguished so the renderer can stay silent on a
+    // cancel and still report a deck whose copy has gone missing.
+    if (!bytes) return 'missing' as const;
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const picked = await dialog.showSaveDialog(win ?? undefined!, {
+      title: toolkitCopy('downloadPresentation'),
+      defaultPath: `${presenterFileStem(name)}.pdf`,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    });
+    if (picked.canceled || !picked.filePath) return 'cancelled' as const;
+    fs.writeFileSync(picked.filePath, bytes);
+    return 'saved' as const;
   });
   h('presenter:import:txtNotes', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender);

@@ -16,6 +16,7 @@ export type ToolkitDialogKey =
   | 'presentations'
   | 'importPowerPointNotes'
   | 'exportPresenterNotes'
+  | 'downloadPresentation'
   | 'importTxtNotes'
   | 'text'
   | 'downloadAppPackage'
@@ -41,6 +42,7 @@ const COPY: Record<ToolkitDialogKey, UiTranslations> = {
   presentations: { es: 'Presentaciones', en: 'Presentations', fr: 'Présentations', de: 'Präsentationen', pt: 'Apresentações', 'pt-BR': 'Apresentações', it: 'Presentazioni', tr: 'Sunumlar' },
   importPowerPointNotes: { es: 'Importar notas desde PowerPoint', en: 'Import notes from PowerPoint', fr: 'Importer les notes depuis PowerPoint', de: 'Notizen aus PowerPoint importieren', pt: 'Importar notas do PowerPoint', 'pt-BR': 'Importar notas do PowerPoint', it: 'Importa note da PowerPoint', tr: 'PowerPoint’tan notları içe aktar' },
   exportPresenterNotes: { es: 'Exportar notas del presentador', en: 'Export presenter notes', fr: 'Exporter les notes du présentateur', de: 'Präsentationsnotizen exportieren', pt: 'Exportar notas do apresentador', 'pt-BR': 'Exportar notas do apresentador', it: 'Esporta note del relatore', tr: 'Sunucu notlarını dışa aktar' },
+  downloadPresentation: { es: 'Descargar presentación', en: 'Download presentation', fr: 'Télécharger la présentation', de: 'Präsentation herunterladen', pt: 'Transferir apresentação', 'pt-BR': 'Baixar apresentação', it: 'Scarica presentazione', tr: 'Sunumu indir' },
   importTxtNotes: { es: 'Importar notas desde TXT', en: 'Import notes from TXT', fr: 'Importer les notes depuis un TXT', de: 'Notizen aus TXT importieren', pt: 'Importar notas de TXT', 'pt-BR': 'Importar notas de TXT', it: 'Importa note da TXT', tr: 'TXT’den notları içe aktar' },
   text: { es: 'Texto', en: 'Text', fr: 'Texte', de: 'Text', pt: 'Texto', 'pt-BR': 'Texto', it: 'Testo', tr: 'Metin' },
   downloadAppPackage: { es: 'Descargar paquete de la app', en: 'Download app package', fr: 'Télécharger le paquet de l’app', de: 'App-Paket herunterladen', pt: 'Transferir pacote da app', 'pt-BR': 'Baixar pacote do app', it: 'Scarica pacchetto dell’app', tr: 'Uygulama paketini indir' },

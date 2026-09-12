@@ -56,9 +56,16 @@ try {
     await window.nodus.updateSettings({ onboardingComplete: true, basicsTutorialVersion: 99, recoverySetupVersion: 99, tourComplete: true, advancedTourComplete: true, uiLanguage: 'en', theme: 'dark', mascotEnabled: false, chatModel: { provider: 'lmstudio', model: 'marketplace-test' }, nodiModel: { provider: 'lmstudio', model: 'marketplace-test' }, localProviders: { lmstudio: { baseUrl } } });
   }, { version: require('../package.json').version, baseUrl: `http://127.0.0.1:${server.address().port}` });
   await page.reload();
-  await page.getByTestId('header-actions').getByRole('button', { name: 'Assistant', exact: true }).click();
-  await page.getByTestId('chat-skills-assistant').click();
-  await page.getByRole('button', { name: 'Marketplace', exact: true }).click();
+  // Skills are their own modal now, opened from the header: reaching the catalogue no
+  // longer means opening a chat first, and the per-chat popover only switches skills on.
+  const openSkills = async (tab) => {
+    if (!await page.getByTestId('skill-marketplace-modal').isVisible().catch(() => false)) {
+      await page.getByTestId('header-actions').getByRole('button', { name: 'Skills', exact: true }).click();
+      await page.getByTestId('skill-marketplace-modal').waitFor();
+    }
+    await page.getByRole('button', { name: tab, exact: true }).click();
+  };
+  await openSkills('Marketplace');
   // Which repository the skills come from is folded away until asked for.
   const sources = page.locator('.skill-marketplace-sources');
   await sources.getByText('Repositories', { exact: true }).click();
@@ -156,8 +163,10 @@ try {
   await page.screenshot({ path: path.join(artifacts, 'my-skills-expanded.png') });
   await firstCard.getByRole('button', { name: `Hide details of ${cardName}`, exact: true }).click();
   assert.equal(await firstCard.locator('.chat-skill-details').count(), 0, 'and folds away again');
-  await page.getByRole('switch', { name: 'Enable Descriptive Statistics', exact: true }).click();
-  await page.getByRole('region', { name: 'Skills', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
+  // One switch per surface, because a modal that belongs to no chat cannot leave it unsaid.
+  await page.getByRole('switch', { name: 'Enable Descriptive Statistics \u00b7 Assistant', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Skills and Marketplace', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByTestId('header-actions').getByRole('button', { name: 'Assistant', exact: true }).click();
   console.log('Installed and enabled', installedId);
   const composer = page.locator('textarea').filter({ visible: true }).last();
   await composer.fill('Use Descriptive Statistics to summarize 2, 4, 6, 8.'); await composer.press('Enter');
@@ -171,7 +180,7 @@ try {
   const nodiEnabled = await page.evaluate(() => window.nodus.nodiChatStream({ messages: [{ role: 'user', content: 'Summarize 2, 4, 6, 8.' }], contexts: [] }, { onDelta: () => {} }));
   assert.match(nodiEnabled, /"mean":5/); assert.match(nodiEnabled, /"count":4/);
   // Source management through the visible UI, using an empty public repository catalog.
-  await page.getByTestId('chat-skills-assistant').click(); await page.getByRole('button', { name: 'Marketplace', exact: true }).click();
+  await openSkills('Marketplace');
   await page.locator('.skill-marketplace-sources').getByText('Repositories', { exact: true }).click();
   await page.getByRole('textbox', { name: 'Repository URL' }).fill('https://github.com/NodusResearch/nodus-research-skill-marketplace');
   await page.getByRole('button', { name: 'Add source', exact: true }).click();
@@ -188,7 +197,7 @@ try {
   await page.getByLabel('Skill name', { exact: true }).fill('QA Tool');
   await page.getByLabel('When to use it', { exact: true }).fill('Double a number supplied by the user.');
   await page.getByLabel('Instructions', { exact: true }).fill('Call the double tool with the number supplied by the user.');
-  await page.getByLabel('Creator username', { exact: true }).fill('researcher');
+  await page.getByLabel('Author name', { exact: true }).fill('researcher');
   await page.getByLabel('Category', { exact: true }).fill('Data analysis');
   await page.getByText('Custom JavaScript tools (0)', { exact: true }).click();
   await page.getByRole('button', { name: 'Add tool', exact: true }).click();
@@ -207,7 +216,7 @@ try {
   const authorManifest = JSON.parse(fs.readFileSync(path.join(exportParent, 'qa-tool/skill.json')));
   assert.equal(authorManifest.author, 'researcher'); assert.equal(authorManifest.tools[0].entry, 'tools/double.js');
   await app.evaluate(({ dialog }, directory) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [directory] }); }, path.join(exportParent, 'qa-tool'));
-  await page.getByRole('button', { name: 'Import package directory', exact: true }).click();
+  await page.getByRole('button', { name: 'Import a package from a folder', exact: true }).click();
   await page.waitForFunction(async () => (await window.nodus.listChatSkills()).filter(s => s.name === 'QA Tool').length === 2);
   await app.evaluate(({ dialog }) => { dialog.showOpenDialog = globalThis.__marketplaceOriginalDialog; delete globalThis.__marketplaceOriginalDialog; });
   // Verify every vault accent in the actual portal, then its light-theme variant.
@@ -224,8 +233,7 @@ try {
     await page.waitForFunction(type => document.querySelector('[data-testid="nodus-logo"]')?.getAttribute('data-vault-logo') === type, type);
     // The research modal survives a vault change on some surfaces and closes on others.
     if (!await page.getByTestId('chat-skills-assistant').isVisible()) await page.getByTestId('header-actions').getByRole('button', { name: 'Assistant', exact: true }).click();
-    if (!await page.getByRole('region', { name: 'Skills', exact: true }).isVisible()) await page.getByTestId('chat-skills-assistant').click();
-    await page.getByRole('button', { name: 'Marketplace', exact: true }).click();
+    await openSkills('Marketplace');
     await page.waitForFunction(color => {
       const tab = document.querySelector('.skill-marketplace-tabs button[aria-pressed="true"]');
       return tab && getComputedStyle(tab).getPropertyValue('--vault-accent').trim() === color;
@@ -258,8 +266,7 @@ try {
 
   // The mark sits on a near-black plate, which reads as a logo on a dark panel and as a
   // hole punched in a light one. Both variants ship; the stylesheet picks.
-  await page.getByTestId('chat-skills-assistant').click();
-  await page.getByRole('button', { name: 'Marketplace', exact: true }).click();
+  await openSkills('Marketplace');
   const logos = await page.locator('.skill-marketplace-brand').evaluate(node => [...node.querySelectorAll('img')].map(image => ({
     shown: getComputedStyle(image).display !== 'none',
     plate: /<rect[^>]*fill="([^"]+)"/.test(decodeURIComponent(image.src)),

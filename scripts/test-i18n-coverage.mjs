@@ -729,6 +729,50 @@ test('legacy Spanish Electron errors cannot leak into a non-Spanish interface', 
 });
 
 /**
+ * The package installer's failures reach the reader twice: thrown from an IPC handler,
+ * where `localizeRuntimeError` catches them, and recorded in the migration journal, where
+ * they are shown under a key called `failure` — and `localizeIpcPayload` only walks
+ * `message` and `error`. Authored in English, they were the only sentences on that panel
+ * that nobody read in their own language, Spanish readers included.
+ */
+test('capability package failures name their cause in every language', () => {
+  const { localizeRuntimeError } = loadModule('shared/uiLanguage.ts');
+  const generic = 'The operation could not be completed.';
+  const failures = [
+    'Actualiza el catálogo de paquetes antes de instalar.',
+    'Ese paquete no está en el catálogo.',
+    'No se pudo contactar con el origen del paquete. Revisa tu conexión e inténtalo de nuevo.',
+    'El origen del paquete respondió vacío.',
+    'La descarga supera el tamaño permitido.',
+    'La revisión del repositorio no es válida.',
+    // The value that failed is carried into the message and must survive the translation.
+    'El origen del paquete respondió 503.',
+    'Chemistry Studio no publica un paquete para darwin-arm64.',
+    'Chemistry Studio no tiene un archivo publicado para darwin-arm64.',
+  ];
+  for (const failure of failures) {
+    assert.equal(localizeRuntimeError(failure, 'es'), failure, `Spanish must keep ${failure} verbatim`);
+    for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'unknown']) {
+      const localized = localizeRuntimeError(failure, language);
+      assert.notEqual(localized, generic, `${language} erased "${failure}" into the generic error`);
+      assert.notEqual(localized, failure, `${language} leaked Spanish for "${failure}"`);
+    }
+  }
+  assert.equal(localizeRuntimeError('El origen del paquete respondió 503.', 'en'), 'The package source returned 503.');
+  assert.equal(
+    localizeRuntimeError('Chemistry Studio no publica un paquete para darwin-arm64.', 'de'),
+    'Chemistry Studio veröffentlicht kein Paket für darwin-arm64.',
+  );
+  // The journal's own field, which the payload walker would never have reached.
+  const handler = fs.readFileSync(path.join(repoRoot, 'electron/ipc/capabilities.ts'), 'utf8');
+  assert.match(
+    handler,
+    /failure: localizeRuntimeError\(entry\.failure, getSettings\(\)\.uiLanguage\)/,
+    'the migration journal failure must be localized on its way to the renderer',
+  );
+});
+
+/**
  * A closed Zotero is the commonest failure the global library has, and its sentence
  * is born in the main process in Spanish. Unlisted here it was not translated but
  * erased: every one of these collapsed into "The operation could not be completed.",

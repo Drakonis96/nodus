@@ -36,8 +36,25 @@
 :is(.light, .nodi-theme-light) .capability-packages-notice { color: #047857; }
 :is(.light, .nodi-theme-light) .capability-packages-warning { color: #92400e; }
 :is(.light, .nodi-theme-light) .capability-packages-publisher { color: #047857; }
-/* The shared chat-skill buttons are used here with a leading icon. */
-.capability-packages button:not(.chat-skill-details-toggle) { display: inline-flex; align-items: center; gap: 7px; }
+/* The shared chat-skill buttons are used here with a leading icon — and with the shape
+   they never had. `.chat-skill-primary` only paints the accent and `.chat-skill-secondary`
+   has no rule of its own anywhere, while the panel's reset takes padding, border and
+   radius off every button: the retry under a failed migration therefore rendered as a run
+   of accent-highlighted text, indistinguishable from a selection. The shape restated here
+   is the catalogue's own, a few hundred pixels below in the same modal, so the two halves
+   of the Marketplace tab agree. Accent tints carry both themes, as they do there. */
+.capability-packages button:not(.chat-skill-details-toggle) {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 10px; border-radius: 7px; font-size: 11px;
+  border: 1px solid color-mix(in srgb, var(--vault-accent, #6366f1) 27.1%, transparent);
+  transition: background-color .15s ease, border-color .15s ease, filter .15s ease;
+}
+.capability-packages button:not(.chat-skill-details-toggle, .chat-skill-primary):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 52.2%, transparent);
+  background: color-mix(in srgb, var(--vault-accent, #6366f1) 12.5%, transparent);
+}
+.capability-packages button.chat-skill-primary:hover:not(:disabled) { filter: brightness(1.08); }
+.capability-packages button:not(.chat-skill-details-toggle):disabled { opacity: .55; cursor: default; }
 
 /* The 5.3.1 move, while it is still moving. Kept in the same visual family as a package
    card: it is about the same packages, seen a moment earlier. */

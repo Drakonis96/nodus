@@ -165,3 +165,50 @@
 .genomics-config button, .genomics-config-button { padding: 6px 10px; border: 1px solid #71809655; border-radius: 6px; }
 .genomics-config-button { margin: 8px; }
 .genomics-config button:disabled { opacity: .5; }
+
+/* ── The global Skills modal ───────────────────────────────────────────────────
+   The card is a .chat-skills-panel on purpose. Every rule above — the button reset
+   the Nodi window depends on, the cards, the marketplace, and each one's light-mode
+   override — is written against that class, so the modal inherits the whole theme
+   instead of restating it in a second palette that would drift. Only what a modal
+   changes is restated here: where it sits, how wide it is, and the fact that at this
+   width the list is finally a grid rather than a column. */
+.skill-modal-shell { width: min(1040px, 100%); max-height: 90vh; display: flex; }
+.skill-modal { position: static; width: 100%; max-width: none; max-height: 90vh; padding: 24px 26px; border-radius: 20px; }
+.skill-modal-title { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+.skill-modal-mark { width: 44px; height: 44px; flex-shrink: 0; }
+.skill-modal-subtitle { font-size: 12px; color: #a1a1aa; line-height: 1.6; margin: 6px 0 0; }
+:is(.light, .nodi-theme-light) .skill-modal-subtitle { color: #656575; }
+.skill-modal-body { display: grid; gap: 4px; }
+.skill-modal .chat-skills-intro { margin: 0 0 14px; }
+/* Two columns, not three. A card carries a name, two lines of description and — here —
+   one labelled switch per surface, and at 320px the switches ate the name until it
+   ellipsed to nothing. 380px is the width at which the name survives them. */
+.skill-modal .chat-skills-list { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); align-items: start; }
+/* With room to spare, the name wins the row: left shrinkable, the badge took the space
+   the name needed and "Image Atelier" ellipsed to "Image Ate…". */
+.skill-modal .chat-skill-tool-badge { flex-shrink: 0; }
+/* A pair of tabs stretched across 1040px reads as two banners rather than a switch. */
+.skill-modal .skill-marketplace-tabs { max-width: 460px; }
+/* The mark is already at the top of the modal; the catalogue's own copy of it, 200px
+   below, made the same basket appear twice on one screen. The wording stays. */
+.chat-skills-panel.skill-modal .skill-marketplace-brand img { display: none; }
+.skill-modal .skill-marketplace-filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr); }
+.skill-modal .chat-skill-editor { max-width: 640px; }
+.skill-modal .skill-marketplace-brand img { width: 52px; height: 52px; }
+
+/* Two surfaces, two switches, each saying which one it is. The popover needs no
+   labels because it speaks for the chat it is in; the modal speaks for neither. */
+/* `.chat-skill-main>div { flex: 1 }` was written for the one div that used to sit there,
+   the text column. This is the second, and left to that rule it grew to the same width as
+   the description — half the card for two switches, with the name ellipsed to pay for it. */
+.chat-skill-main > .chat-skill-switches { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; }
+.chat-skill-switches > span { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.chat-skill-switches small { font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: #858591; }
+.chat-skill-switches .chat-skill-switch { margin-top: 0; }
+:is(.light, .nodi-theme-light) .chat-skill-switches small { color: #656575; }
+
+@media (max-width: 720px) {
+  .skill-modal { padding: 18px; }
+  .skill-modal-mark { width: 36px; height: 36px; }
+}

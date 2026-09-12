@@ -26,6 +26,14 @@ await build({
       const clean = await probe.webContents.executeJavaScript('(' + sanitizeChatSvg.toString() + ')(' + JSON.stringify(hostile) + ')');
       assert.doesNotMatch(clean.svg, /script|foreignObject|onclick|https:|file:|@import/);
       assert.match(clean.svg, /Safe/);
+      // A model writing a divider comment emits two dashes inside it, which XML forbids:
+      // the parser rejected the whole drawing over a decoration that never renders.
+      // Checked in a real parser, because that is the only place the rejection happens.
+      const commented = svg('<!-- ---- section ---- --><text x="10" y="30">Kept</text>');
+      const survived = await probe.webContents.executeJavaScript('(' + sanitizeChatSvg.toString() + ')(' + JSON.stringify(commented) + ')');
+      assert.ok(survived, 'a dashed comment must not take the drawing with it');
+      assert.match(survived.svg, /Kept/);
+      assert.doesNotMatch(survived.svg, /section/, 'and the comment itself is gone');
       probe.destroy();
       // Reproduce Electron's generic "Script failed to execute" rejection. A
       // failed optional layout review must not replace the chat answer with it.

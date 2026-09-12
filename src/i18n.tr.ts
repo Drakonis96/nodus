@@ -8178,4 +8178,11 @@ export const TR: Record<string, string> = {
   "El mínimo son {min} palabras por sección.": "Bölüm başına en az {min} kelime olmalıdır.",
   "El máximo son {max} palabras por sección.": "Bölüm başına en fazla {max} kelime olabilir.",
   "Solicitud cancelada por el usuario.": "Kullanıcı isteği iptal etti.",
+  // PDF Presenter — tags (renamed from folders) and the PDF download.
+  "Sin etiqueta": "Etiket yok",
+  "Eliminar etiqueta": "Etiketi sil",
+  "Filtrar por etiqueta": "Etikete göre filtrele",
+  "¿Seguro que quieres eliminar la etiqueta «{name}»? Las presentaciones que la tienen seguirán en la biblioteca, pero sin etiqueta.": "“{name}” etiketi silinsin mi? Bu etikete sahip sunumlar kitaplıkta kalır, yalnızca etiketsiz olur.",
+  "Descargar PDF": "PDF’yi indir",
+  "No se pudo descargar la presentación.": "Sunum indirilemedi.",
 };
