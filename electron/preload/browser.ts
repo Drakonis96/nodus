@@ -148,6 +148,8 @@ export const browserApi = {
     ipcRenderer.invoke('browser:clearData', categories, origins ?? null),
   clearAllBrowserData: (): Promise<BrowserStorageReport> => ipcRenderer.invoke('browser:clearAllData'),
   getBrowserBookmarks: (): Promise<BrowserBookmarkStore> => ipcRenderer.invoke('browser:bookmarks:get'),
+  resolveBrowserBookmarkFavicons: (ids: string[]): Promise<void> =>
+    ipcRenderer.invoke('browser:bookmarks:resolveFavicons', ids).then(() => undefined),
   getCurrentBrowserBookmarkCandidate: (): Promise<BrowserBookmarkCandidate | null> =>
     ipcRenderer.invoke('browser:bookmarks:candidate'),
   createBrowserBookmark: (draft: BrowserBookmarkDraft): Promise<{ store: BrowserBookmarkStore; bookmark: BrowserBookmark; duplicate: boolean }> =>

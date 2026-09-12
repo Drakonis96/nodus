@@ -65,6 +65,7 @@ import {
 import { destroyBrowserSubsystem, restartBrowserSubsystem } from '../browser/lifecycle';
 import { addGlobalLibraryAttachments, createGlobalLibraryItem } from '../library/libraryService';
 import { clearAllBrowserData, clearBrowserData, measureBrowserStorage } from '../browser/storage';
+import { cacheWebsiteFavicon } from '../browser/favicon';
 import { setNodiQuoteSelection, setNodiViewContext } from '../ai/nodiChat';
 import { localizeIpcPayload } from '@shared/uiLanguage';
 import { getSettings } from '../db/settingsRepo';
@@ -182,6 +183,41 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     window.webContents.send('browser:bookmarks', store);
   };
   bookmarks.setNotifier(broadcastBookmarks);
+
+  // Favicon discovery is deliberately bounded and queued: opening a folder may
+  // expose many imported bookmarks at once, but should never create a request
+  // burst or block rendering the local bookmarks page.
+  const faviconQueue: string[] = [];
+  const queuedFavicons = new Set<string>();
+  let activeFaviconJobs = 0;
+  const pumpFaviconQueue = () => {
+    while (activeFaviconJobs < 4) {
+      const id = faviconQueue.shift();
+      if (!id) return;
+      activeFaviconJobs += 1;
+      void (async () => {
+        const bookmark = bookmarks.snapshot().bookmarks.find((entry) => entry.id === id);
+        if (!bookmark || bookmark.faviconDataUrl) return;
+        const faviconDataUrl = await cacheWebsiteFavicon(bookmark.url);
+        if (!faviconDataUrl) return;
+        const current = bookmarks.snapshot().bookmarks.find((entry) => entry.id === id);
+        if (!current || current.faviconDataUrl || current.url !== bookmark.url) return;
+        await bookmarks.editBookmark(id, { faviconDataUrl });
+      })().catch(() => undefined).finally(() => {
+        activeFaviconJobs -= 1;
+        queuedFavicons.delete(id);
+        pumpFaviconQueue();
+      });
+    }
+  };
+  const enqueueFavicons = (ids: string[]) => {
+    for (const id of ids) {
+      if (queuedFavicons.has(id)) continue;
+      queuedFavicons.add(id);
+      faviconQueue.push(id);
+    }
+    pumpFaviconQueue();
+  };
 
   const history = browserHistoryRepository();
   const broadcastHistory = (store: BrowserHistoryStore) => {
@@ -681,6 +717,13 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     return bookmarks.snapshot();
   });
 
+  h('browser:bookmarks:resolveFavicons', async (event, rawIds: unknown) => {
+    assertUiSender(event, getWindow);
+    if (!Array.isArray(rawIds)) return;
+    const ids = [...new Set(rawIds.filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 100))].slice(0, 500);
+    enqueueFavicons(ids);
+  });
+
   h('browser:bookmarks:candidate', async (event) => {
     assertUiSender(event, getWindow);
     const tab = activeTabSummary();
@@ -698,13 +741,18 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   h('browser:bookmarks:create', async (event, raw: unknown) => {
     assertUiSender(event, getWindow);
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('El marcador no es válido.');
-    return bookmarks.createBookmark(raw as BrowserBookmarkDraft);
+    const result = await bookmarks.createBookmark(raw as BrowserBookmarkDraft);
+    if (!result.bookmark.faviconDataUrl) enqueueFavicons([result.bookmark.id]);
+    return result;
   });
 
   h('browser:bookmarks:update', async (event, id: string, raw: unknown) => {
     assertUiSender(event, getWindow);
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Los cambios del marcador no son válidos.');
-    return bookmarks.editBookmark(String(id), raw as Partial<BrowserBookmarkDraft>);
+    const store = await bookmarks.editBookmark(String(id), raw as Partial<BrowserBookmarkDraft>);
+    const bookmark = store.bookmarks.find((entry) => entry.id === String(id));
+    if (bookmark && !bookmark.faviconDataUrl) enqueueFavicons([bookmark.id]);
+    return store;
   });
 
   h('browser:bookmarks:createFolder', async (event, raw: unknown) => {

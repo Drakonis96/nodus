@@ -48,7 +48,13 @@ export function BrowserBookmarkModal({ target, store, onClose, onSaved }: {
     setBusy(true); setError('');
     try {
       if (target.mode === 'edit') {
-        const next = await window.nodus.updateBrowserBookmark(target.bookmark.id, { title, url, description, parentId });
+        const next = await window.nodus.updateBrowserBookmark(target.bookmark.id, {
+          title,
+          url,
+          description,
+          parentId,
+          faviconDataUrl: url === target.bookmark.url ? target.bookmark.faviconDataUrl : null,
+        });
         onSaved(next, false);
       } else {
         const result = await window.nodus.createBrowserBookmark({ title, url, description, parentId, faviconDataUrl: target.candidate.faviconDataUrl });

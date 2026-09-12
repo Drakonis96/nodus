@@ -244,6 +244,10 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
   const bookmarks = query
     ? results.map((entry) => entry.bookmark)
     : childRefs.filter((ref) => ref.kind === 'bookmark').map((ref) => store.bookmarks.find((entry) => entry.id === ref.id)!).filter(Boolean);
+  const missingFaviconKey = bookmarks.filter((entry) => !entry.faviconDataUrl).map((entry) => entry.id).join('\n');
+  useEffect(() => {
+    if (missingFaviconKey) void window.nodus.resolveBrowserBookmarkFavicons(missingFaviconKey.split('\n'));
+  }, [missingFaviconKey]);
   const pathFolders = useMemo(() => {
     const entries = [];
     let cursor = folder;
@@ -302,7 +306,7 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
           onDragLeave={() => setDropId(null)}
           onDrop={(event) => { event.preventDefault(); void move(entry.id); }}
         >
-          <div className="bookmark-heading"><span className="bookmark-folder-icon"><Icon name="folder" size={19} /></span><h2><button type="button" onClick={() => setFolderId(entry.id)}>{entry.name}</button></h2></div>
+          <div className="bookmark-heading"><span className="bookmark-folder-icon"><Icon name="folder" size={19} /></span><h2><button type="button" title={entry.name} onClick={() => setFolderId(entry.id)}>{entry.name}</button></h2></div>
           <div className="atlas-geo">Folder · {browserBookmarkChildren(store, entry.id).length} items</div>
           <p className="atlas-description">Open this folder to browse its saved research resources and nested folders.</p>
           <div className="atlas-card-actions"><button className="atlas-open" type="button" onClick={() => setFolderId(entry.id)}>Open folder <Icon name="chevronRight" size={13} /></button><button className="atlas-open bookmark-delete" type="button" data-testid="browser-bookmark-card-delete" onClick={() => setDeleteConfirmation({ ref: { kind: 'folder', id: entry.id }, label: entry.name })}><Icon name="trash" size={13} /> Delete</button></div>
@@ -312,9 +316,9 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
         const location = browserBookmarkFolderPath(store, entry.parentId);
         return (
           <article key={entry.id} className="card lit atlas-card bookmark-card" draggable onClick={(event) => { if (!(event.target as Element).closest('button')) void window.nodus.openBrowserTab(entry.url); }} onDragStart={() => setDragging({ kind: 'bookmark', id: entry.id })}>
-            <div className="atlas-card-top"><div className="bookmark-heading">{entry.faviconDataUrl ? <img className="bookmark-favicon" src={entry.faviconDataUrl} alt="" /> : <Icon name="globe" size={22} />}<h2><button type="button" onClick={() => void window.nodus.openBrowserTab(entry.url)}>{entry.title}</button></h2></div><span className="atlas-access">Saved</span></div>
-            <div className="atlas-geo">{new URL(entry.url).hostname}{location.length ? ` · ${location.join(' › ')}` : ''}</div>
-            <p className="atlas-description">{entry.description || 'A website saved privately in Nodus Bookmarks.'}</p>
+            <div className="atlas-card-top"><div className="bookmark-heading">{entry.faviconDataUrl ? <img className="bookmark-favicon" src={entry.faviconDataUrl} alt="" /> : <Icon name="globe" size={22} />}<h2><button type="button" title={entry.title} onClick={() => void window.nodus.openBrowserTab(entry.url)}>{entry.title}</button></h2></div><span className="atlas-access">Saved</span></div>
+            <div className="atlas-geo" title={`${new URL(entry.url).hostname}${location.length ? ` · ${location.join(' › ')}` : ''}`}>{new URL(entry.url).hostname}{location.length ? ` · ${location.join(' › ')}` : ''}</div>
+            <p className="atlas-description" title={entry.description || 'A website saved privately in Nodus Bookmarks.'}>{entry.description || 'A website saved privately in Nodus Bookmarks.'}</p>
             <div className="atlas-card-actions">
               <button className="atlas-open" type="button" onClick={() => void window.nodus.openBrowserTab(entry.url)}>Open <Icon name="external" size={13} /></button>
               <button className="atlas-open" type="button" onClick={() => onEditBookmark(entry)}>Edit</button>
