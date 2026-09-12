@@ -64,30 +64,43 @@ try {
     await overlay.getByTestId('chat-skills-nodi').click();
     await overlay.locator('.chat-skills-panel').waitFor();
     await overlay.screenshot({ path: path.join(shots, '05-nodi-skills.png') });
-    await overlay.getByRole('button', { name: 'Create skill', exact: true }).click();
-    await overlay.getByLabel('Skill name', { exact: true }).fill('Executive brief');
-    await overlay.getByLabel('When to use it', { exact: true }).fill('Use when the user asks for a concise decision brief.');
-    await overlay.getByLabel('Instructions', { exact: true }).fill('Summarize the decision in three sections: recommendation, evidence, and next step. Keep each section under 40 words.');
+    // Authoring is not the overlay's job any more: the floating companion switches skills
+    // on, and the library that creates and edits them lives in the main window's Skills
+    // modal. The library is shared, so what is saved there appears in the popover here.
+    const openLibrary = async () => {
+      if (!await page.getByTestId('skill-marketplace-modal').isVisible().catch(() => false)) {
+        await page.getByTestId('header-actions').getByRole('button', { name: 'Skills', exact: true }).click();
+        await page.getByTestId('skill-marketplace-modal').waitFor();
+      }
+      await page.getByRole('button', { name: 'My skills', exact: true }).click();
+    };
+    await openLibrary();
+    await page.getByRole('button', { name: 'Create skill', exact: true }).click();
+    await page.getByLabel('Skill name', { exact: true }).fill('Executive brief');
+    await page.getByLabel('When to use it', { exact: true }).fill('Use when the user asks for a concise decision brief.');
+    await page.getByLabel('Instructions', { exact: true }).fill('Summarize the decision in three sections: recommendation, evidence, and next step. Keep each section under 40 words.');
     // Enabled for both surfaces, as the editor asks: a new skill is saved disabled, so
     // without this the reply below could not have followed it and the switch further down
     // had nothing to turn off.
-    await overlay.getByRole('checkbox', { name: 'Assistant', exact: true }).check();
-    await overlay.getByRole('checkbox', { name: 'Nodi', exact: true }).check();
-    await overlay.screenshot({ path: path.join(shots, '05b-custom-skill.png') });
-    await overlay.getByRole('button', { name: 'Save skill', exact: true }).click();
+    await page.getByRole('checkbox', { name: 'Assistant', exact: true }).check();
+    await page.getByRole('checkbox', { name: 'Nodi', exact: true }).check();
+    await page.screenshot({ path: path.join(shots, '05b-custom-skill.png') });
+    await page.getByRole('button', { name: 'Save skill', exact: true }).click();
     const custom = (await overlay.evaluate(() => window.nodus.listChatSkills())).find(skill => skill.name === 'Executive brief');
     assert.ok(custom);
     // Edit and delete sit behind the card's details toggle, so the row stays a name, a
     // description and a switch whatever the skill is. Opened only when it is not already:
     // the card keeps its state across an edit, and clicking again would close it.
     const openDetails = async () => {
-      if (await overlay.getByRole('button', { name: 'Edit Executive brief', exact: true }).count()) return;
-      await overlay.getByRole('button', { name: 'Show details of Executive brief', exact: true }).click();
+      await openLibrary();
+      if (await page.getByRole('button', { name: 'Edit Executive brief', exact: true }).count()) return;
+      await page.getByRole('button', { name: 'Show details of Executive brief', exact: true }).click();
     };
     await openDetails();
-    await overlay.getByRole('button', { name: 'Edit Executive brief', exact: true }).click();
-    await overlay.getByLabel('Instructions', { exact: true }).fill('For a concise decision brief, begin with the exact line Executive brief · Nodus. Use exactly three headings: Recommendation, Evidence, Next step. Give one recommendation, two pieces of evidence, and one concrete next step.');
-    await overlay.getByRole('button', { name: 'Save skill', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit Executive brief', exact: true }).click();
+    await page.getByLabel('Instructions', { exact: true }).fill('For a concise decision brief, begin with the exact line Executive brief · Nodus. Use exactly three headings: Recommendation, Evidence, Next step. Give one recommendation, two pieces of evidence, and one concrete next step.');
+    await page.getByRole('button', { name: 'Save skill', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Skills and Marketplace', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
     assert.equal((await overlay.evaluate(() => window.nodus.listChatSkills())).find(skill => skill.id === custom.id).instructions, 'For a concise decision brief, begin with the exact line Executive brief · Nodus. Use exactly three headings: Recommendation, Evidence, Next step. Give one recommendation, two pieces of evidence, and one concrete next step.');
     if (process.argv.includes('--custom-only')) {
       await overlay.getByTestId('chat-skills-nodi').click();
@@ -105,8 +118,9 @@ try {
     const updated = (await overlay.evaluate(() => window.nodus.listChatSkills())).find(skill => skill.id === custom.id);
     assert.equal(updated.enabled.nodi, false); assert.equal(updated.enabled.assistant, true);
     await openDetails();
-    await overlay.getByRole('button', { name: 'Delete Executive brief', exact: true }).click();
-    await overlay.locator('.chat-skill-confirm').getByRole('button', { name: 'Delete', exact: true }).click();
+    await page.getByRole('button', { name: 'Delete Executive brief', exact: true }).click();
+    await page.locator('.chat-skill-confirm').getByRole('button', { name: 'Delete', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Skills and Marketplace', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
     await overlay.getByTestId('chat-skills-nodi').click();
     for (const [name, prompt, kind] of [
       ['06-nodi-svg', 'Draw a clean SVG explaining how a heat pump works: outside air, evaporator, compressor, condenser heating a home, and expansion valve. Use clear directional arrows and a readable legend. Create the diagram now.', 'chat-svg'],

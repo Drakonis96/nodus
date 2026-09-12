@@ -1,42 +1,36 @@
-import { vaultTypeColor } from '@shared/vaultTypes';
-import { SkillMarketplacePanel } from './SkillMarketplacePanel';
-import { CapabilityPackagesPanel } from './CapabilityPackagesPanel';
-import { SUPPORTED_SKILL_CAPABILITIES } from '@shared/skillMarketplace';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { skillHasCapability, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
+import type { ChatSkill, ChatSkillSurface } from '@shared/chatSkills';
+import { SkillCard, skillMeta, skillSearchText, useSkillLibrary } from './skillLibrary';
+import { canOpenSkillMarketplace, openSkillMarketplace } from './skillMarketplaceOpener';
 import { Icon } from './ui';
-import { skillGlyph, byName } from './skillGlyph';
+import { byName } from './skillGlyph';
 import { t, getActiveLang } from '../i18n';
 import './chatSkills.css';
 
-const blank = (): ChatSkill => ({ id: '', name: '', description: '', instructions: '', enabled: { assistant: false, nodi: false } });
-const searchText = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
-
-/** Shared library, independent activation per surface; available in the narrowed Nodi bridge. */
+/**
+ * Which skills are on in THIS chat.
+ *
+ * Only that. Installing, authoring, importing, plugin permissions and everything else
+ * that is true of the whole application rather than of one conversation lives in the
+ * Skills modal, one click away through the footer — and reachable without a chat at all,
+ * from the header. What stays here is the single question you actually ask mid-sentence,
+ * which is also the only one that fits a popover: a searchable list of what you have,
+ * with a switch each.
+ *
+ * The library is shared and the activation is per surface, so the same skill can be on
+ * for the assistant and off for Nodi.
+ */
 export function ChatSkillsControl({ surface, disabled = false, compact = false }: { surface: ChatSkillSurface; disabled?: boolean; compact?: boolean }) {
-  const [skills, setSkills] = useState<ChatSkill[]>([]);
-  const [accent, setAccent] = useState(vaultTypeColor('academic'));
-  useEffect(() => {
-    let alive = true;
-    void window.nodus.getActiveVault().then(vault => { if (alive) setAccent(vaultTypeColor(vault?.type)); }).catch(() => {});
-    const off = window.nodus.onVaultChanged(vault => setAccent(vaultTypeColor(vault?.type)));
-    return () => { alive = false; off(); };
-  }, []);
+  const { skills, accent, error, busy, mutate } = useSkillLibrary();
   const accentStyle = { '--vault-accent': accent } as CSSProperties;
-  const [marketplace, setMarketplace] = useState(false);
-  const [exportNotice, setExportNotice] = useState('');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [draft, setDraft] = useState<ChatSkill | null>(null);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [removeId, setRemoveId] = useState<string | null>(null);
-  const [confirmRestore, setConfirmRestore] = useState(false);
-  // One card open at a time: the list is a list again as soon as you look away from it.
   const [details, setDetails] = useState('');
+  const [imageModel, setImageModel] = useState('');
   const root = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
   // A top-level overlay keeps the selector usable inside narrow, clipped chat sidebars.
   useLayoutEffect(() => {
@@ -57,158 +51,46 @@ export function ChatSkillsControl({ surface, disabled = false, compact = false }
     window.addEventListener('scroll', place, true);
     return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
   }, [open, compact]);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const nameRef = useRef<HTMLInputElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const [imageModel, setImageModel] = useState('');
-  useEffect(() => {
-    const refresh = () => { void window.nodus.listChatSkills().then(setSkills).catch(e => setError(String(e))); };
-    refresh();
-    return window.nodus.onChatSkillsChanged(refresh);
-  }, []);
   useEffect(() => { if (open) void window.nodus.getSettings().then(settings => setImageModel(settings.imageModel ? `${settings.imageProvider} · ${settings.imageModel}` : t('Elige un modelo de imagen en Ajustes.'))); }, [open]);
   useEffect(() => {
     if (!open) return;
-    const close = (event: MouseEvent) => { if (!root.current?.contains(event.target as Node) && !panelRef.current?.contains(event.target as Node) && !draft) setOpen(false); };
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopImmediatePropagation(); if (draft) setDraft(null); else setOpen(false); } };
+    const close = (event: MouseEvent) => { if (!root.current?.contains(event.target as Node) && !panelRef.current?.contains(event.target as Node)) setOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopImmediatePropagation(); setOpen(false); } };
     document.addEventListener('mousedown', close);
     document.addEventListener('keydown', escape, true);
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', escape, true); };
-  }, [open, draft]);
-  useEffect(() => { if (draft) nameRef.current?.focus(); }, [!!draft]);
-  const mutate = async (action: () => Promise<ChatSkill[]>) => {
-    setBusy(true); setError('');
-    try { setSkills(await action()); return true; } catch (e) { setError(e instanceof Error ? e.message : String(e)); return false; }
-    finally { setBusy(false); }
-  };
-  const importFile = async (file?: File) => {
-    if (!file) return;
-    setError('');
-    try {
-      if (file.size > 40_000) throw new Error(t('El archivo es demasiado grande. Máximo 40 KB.'));
-      const text = await file.text();
-      if (file.name.toLowerCase().endsWith('.json')) {
-        let value;
-        try { value = JSON.parse(text); } catch { throw new Error(t('El archivo JSON de la skill no es válido.')); }
-        if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(t('El archivo JSON de la skill no es válido.'));
-        setDraft({ ...blank(), name: String(value.name ?? ''), description: String(value.description ?? ''), instructions: String(value.instructions ?? '') });
-      } else {
-        const front = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(text);
-        const field = (name: string) => new RegExp(`^${name}:\\s*(.+)$`, 'm').exec(front?.[1] ?? '')?.[1]?.replace(/^['"]|['"]$/g, '') ?? '';
-        setDraft({ ...blank(), name: field('name') || file.name.replace(/\.md$/i, ''), description: field('description'), instructions: text.slice(front?.[0].length ?? 0).trim() });
-      }
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-  };
+  }, [open]);
   const active = skills.filter(skill => skill.enabled[surface]).length;
-  // A skill whose capability comes from a package is configured in that package's own
-  // panel, so enabling one is just enabling it.
-  const toggle = async (skill: ChatSkill) =>
-    mutate(() => window.nodus.saveChatSkill({ ...skill, enabled: { ...skill.enabled, [surface]: !skill.enabled[surface] } }));
-  const terms = searchText(query).trim().split(/\s+/).filter(Boolean);
+  const toggle = (skill: ChatSkill) =>
+    void mutate(() => window.nodus.saveChatSkill({ ...skill, enabled: { ...skill.enabled, [surface]: !skill.enabled[surface] } }));
+  const terms = skillSearchText(query).trim().split(/\s+/).filter(Boolean);
   // Alphabetical, always: the library is a list you look things up in, and an order that
   // depends on when each skill was installed means hunting for one you know is there.
   const visibleSkills = skills.filter(skill => {
-    const text = searchText(`${skill.name} ${skill.description}`);
+    const text = skillSearchText(`${skill.name} ${skill.description}`);
     return terms.every(term => text.includes(term));
   }).sort(byName(getActiveLang()));
   const renderPanel = (panel: React.ReactNode) => compact ? panel : createPortal(<div style={accentStyle} className={root.current?.closest('.light, .nodi-theme-light') ? 'light' : ''}>{panel}</div>, document.body);
   return <div className={`chat-skills-control ${compact ? 'compact' : ''}`} ref={root} style={accentStyle}>
-    <button type="button" className="chat-skills-trigger" data-testid={`chat-skills-${surface}`} aria-label="Skills" aria-expanded={open} title="Skills" disabled={disabled} onClick={() => { setOpen(!open); setDraft(null); if (!open) setQuery(''); }}><Icon name="sparkles" size={compact ? 14 : 15} />{!compact && <span>Skills</span>}<span className="chat-skills-count">{active}</span></button>
+    <button type="button" className="chat-skills-trigger" data-testid={`chat-skills-${surface}`} aria-label="Skills" aria-expanded={open} title="Skills" disabled={disabled} onClick={() => { setOpen(!open); if (!open) setQuery(''); }}><Icon name="sparkles" size={compact ? 14 : 15} />{!compact && <span>Skills</span>}<span className="chat-skills-count">{active}</span></button>
     {open && renderPanel(<div ref={panelRef} style={compact ? undefined : panelStyle} className="chat-skills-panel" data-nodi-interactive role="region" aria-label="Skills">
-      <div className="chat-skills-heading"><div><span className="chat-skills-eyebrow">NODUS SKILLS</span><h3>{draft ? (draft.id ? t('Editar skill') : t('Nueva skill')) : t('De la idea a la creación')}</h3></div><button type="button" aria-label={t('Cerrar')} onClick={() => { setOpen(false); setDraft(null); }}><Icon name="x" size={16} /></button></div>
-      {!draft && <div className="skill-marketplace-tabs"><button type="button" aria-pressed={!marketplace} onClick={() => setMarketplace(false)}>My skills</button><button type="button" aria-pressed={marketplace} onClick={() => setMarketplace(true)}>Marketplace</button></div>}
-      {marketplace && !draft ? <><CapabilityPackagesPanel /><SkillMarketplacePanel skills={skills} accent={accent} /></> : draft ? <form className="chat-skill-editor" onSubmit={event => { event.preventDefault(); void mutate(() => window.nodus.saveChatSkill(draft)).then(saved => { if (saved) { setDraft(null); setQuery(''); } }); }}>
-        <label>{t('Nombre de la skill')}<input ref={nameRef} required maxLength={80} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} placeholder={t('Mi narrador visual')} /></label>
-        <label>{t('Cuándo usarla')}<textarea aria-label={t('Cuándo usarla')} required rows={2} maxLength={500} value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} placeholder={t('Usar cuando el usuario necesite…')} /></label>
-        <label>{t('Instrucciones')}<textarea aria-label={t('Instrucciones')} required className="chat-skill-prompt" rows={9} maxLength={16000} value={draft.instructions} onChange={event => setDraft({ ...draft, instructions: event.target.value })} placeholder={t('Describe el enfoque, el formato y los criterios de calidad…')} spellCheck={false} /></label>
-        <small>{t('Describe el método y el resultado esperado. El modelo decide cuándo aplicarlo.')}</small>
-        <div className="skill-author-fields"><label>Creator username<input required maxLength={39} value={draft.author ?? 'local'} onChange={e => setDraft({ ...draft, author: e.target.value })} /></label><label>Category<input required maxLength={60} value={draft.category ?? 'Personal'} onChange={e => setDraft({ ...draft, category: e.target.value })} /></label><label>Version<input required pattern="[0-9]+[.][0-9]+[.][0-9]+" value={draft.version ?? '1.0.0'} onChange={e => setDraft({ ...draft, version: e.target.value })} /></label></div>
-        <fieldset><legend>Native capabilities</legend>{SUPPORTED_SKILL_CAPABILITIES.map(capability => <label key={capability}><input type="checkbox" checked={skillHasCapability(draft, capability)} disabled={draft.builtin ? skillHasCapability(draft, capability) : false} onChange={e => setDraft({ ...draft, capabilities: e.target.checked ? [...(draft.capabilities ?? []), capability] : draft.capabilities?.filter(c => c !== capability) })} />{capability.replace('nodus:', '')}</label>)}</fieldset>
-        <details><summary>Custom JavaScript tools ({draft.tools?.length ?? 0})</summary><p>Each entry is a function expression: (input) =&gt; JSON result. Runs without files, network or app access; maximum five seconds.</p>{(draft.tools ?? []).map((tool, index) => <div className="skill-tool-editor" key={index}><label>Tool id<input required value={tool.id} onChange={e => setDraft({ ...draft, tools: draft.tools!.map((t, i) => i === index ? { ...t, id: e.target.value } : t) })} /></label><label>Tool description<input required maxLength={500} value={tool.description} onChange={e => setDraft({ ...draft, tools: draft.tools!.map((t, i) => i === index ? { ...t, description: e.target.value } : t) })} /></label><label>JavaScript function<textarea aria-label="JavaScript function" required rows={6} maxLength={64000} spellCheck={false} value={tool.source} onChange={e => setDraft({ ...draft, tools: draft.tools!.map((t, i) => i === index ? { ...t, source: e.target.value } : t) })} /></label><button type="button" onClick={() => setDraft({ ...draft, tools: draft.tools!.filter((_, i) => i !== index) })}>Remove tool</button></div>)}<button type="button" disabled={(draft.tools?.length ?? 0) >= 12} onClick={() => setDraft({ ...draft, tools: [...(draft.tools ?? []), { id: `tool-${(draft.tools?.length ?? 0) + 1}`, description: '', source: '(input) => ({ result: input })' }] })}>Add tool</button></details>
-        <div className="chat-skill-targets">{(['assistant', 'nodi'] as const).map(target => <label key={target}><input type="checkbox" checked={draft.enabled[target]} onChange={event => setDraft({ ...draft, enabled: { ...draft.enabled, [target]: event.target.checked } })} />{target === 'nodi' ? 'Nodi' : t('Asistente')}</label>)}</div>
-        <div className="chat-skill-editor-actions">{draft.plugin && <button type="button" disabled={busy} onClick={() => void mutate(() => window.nodus.restorePluginSkillAuthorVersion(draft.id)).then(saved => { if (saved) setDraft(null); })}>Restore author version</button>}<button type="button" onClick={() => setDraft(null)}>{t('Cancelar')}</button><button className="chat-skill-primary" type="submit" disabled={busy}>{t('Guardar skill')}</button></div>
-      </form> : <>
-        <p className="chat-skills-intro">{t('Activa capacidades y deja que el modelo elija cuándo usarlas.')}<span>{surface === 'nodi' ? 'Nodi' : t('Asistente')} · {t(surface === 'nodi' ? 'Activación independiente' : 'Compartida entre los chats de la app')}</span></p>
-        <div className="chat-skills-search">
-          <Icon name="search" size={16} />
-          <input ref={searchRef} type="search" aria-label={t('Buscar skills')} placeholder={t('Buscar por nombre o descripción…')} value={query} onChange={event => setQuery(event.target.value)} autoComplete="off" spellCheck={false} />
-          {query && <button type="button" aria-label={t('Limpiar búsqueda de skills')} title={t('Limpiar búsqueda de skills')} onClick={() => { setQuery(''); searchRef.current?.focus(); }}><Icon name="x" size={14} /></button>}
-        </div>
-        {!visibleSkills.length && <div className="chat-skills-empty" role="status"><Icon name="search" size={20} /><span>{t('No se encontraron skills.')}</span></div>}
-        <div className="chat-skills-list">{visibleSkills.map(skill => <SkillCard key={skill.id} skill={skill} surface={surface} busy={busy} expanded={details === skill.id}
-          onToggleDetails={() => setDetails(details === skill.id ? '' : skill.id)}
-          meta={skill.builtin === 'image' ? imageModel : skill.builtin === 'svg' ? t('Vectorial · editable · preciso') : skill.builtin === 'socratic' ? t('Aprendizaje guiado · paso a paso') : skill.builtin ? t('Skill incluida') : skill.origin ? `Marketplace · @${skill.author}` : t('Skill personal')}
-          onEnable={() => void toggle(skill)} onEdit={() => setDraft(structuredClone(skill))}
-          onExport={() => { void window.nodus.exportSkillPackage(skill.id).then(path => { if (path) setExportNotice(`Package exported to ${path}`); }).catch(e => setError(String(e))); }}
-          onRemove={() => setRemoveId(skill.id)}
-          confirm={removeId === skill.id ? { onCancel: () => setRemoveId(null), onConfirm: () => void mutate(() => window.nodus.deleteChatSkill(skill.id)).then(() => setRemoveId(null)) } : undefined} />)}</div>
-        <div className="chat-skills-add"><button className="chat-skill-primary" type="button" onClick={() => setDraft(blank())}><Icon name="plus" size={14} />{t('Crear skill')}</button><button type="button" onClick={() => fileRef.current?.click()}><Icon name="upload" size={14} />{t('Importar .md')}</button><input ref={fileRef} type="file" accept=".md,.json" hidden onChange={event => { void importFile(event.target.files?.[0]); event.target.value = ''; }} /></div>
-        <button type="button" className="chat-skills-restore" disabled={busy} onClick={() => void mutate(() => window.nodus.importSkillPackage())}>Import package directory</button>
-        {exportNotice && <p role="status">{exportNotice}</p>}
-        <button type="button" className="chat-skills-restore" onClick={() => setConfirmRestore(true)}>{t('Restaurar skills iniciales')}</button>
-        {confirmRestore && <div className="chat-skill-confirm"><span>{t('Se restaurarán las instrucciones y la activación de las skills iniciales.')}</span><button type="button" disabled={busy} onClick={() => void mutate(() => window.nodus.restoreChatSkills()).then(() => setConfirmRestore(false))}>{t('Restaurar')}</button><button type="button" onClick={() => setConfirmRestore(false)}>{t('Cancelar')}</button></div>}
-      </>}
+      <div className="chat-skills-heading"><div><span className="chat-skills-eyebrow">NODUS SKILLS</span><h3>{t('De la idea a la creación')}</h3></div><button type="button" aria-label={t('Cerrar')} onClick={() => setOpen(false)}><Icon name="x" size={16} /></button></div>
+      <p className="chat-skills-intro">{t('Activa capacidades y deja que el modelo elija cuándo usarlas.')}<span>{surface === 'nodi' ? 'Nodi' : t('Asistente')} · {t(surface === 'nodi' ? 'Activación independiente' : 'Compartida entre los chats de la app')}</span></p>
+      <div className="chat-skills-search">
+        <Icon name="search" size={16} />
+        <input ref={searchRef} type="search" aria-label={t('Buscar skills')} placeholder={t('Buscar por nombre o descripción…')} value={query} onChange={event => setQuery(event.target.value)} autoComplete="off" spellCheck={false} />
+        {query && <button type="button" aria-label={t('Limpiar búsqueda de skills')} title={t('Limpiar búsqueda de skills')} onClick={() => { setQuery(''); searchRef.current?.focus(); }}><Icon name="x" size={14} /></button>}
+      </div>
+      {!visibleSkills.length && <div className="chat-skills-empty" role="status"><Icon name="search" size={20} /><span>{t('No se encontraron skills.')}</span></div>}
+      <div className="chat-skills-list">{visibleSkills.map(skill => <SkillCard key={skill.id} skill={skill} surfaces={[surface]} busy={busy} expanded={details === skill.id}
+        onToggleDetails={() => setDetails(details === skill.id ? '' : skill.id)}
+        meta={skillMeta(skill, imageModel)}
+        onEnable={() => toggle(skill)} />)}</div>
+      {/* The way to everything this popover no longer does. Hidden in the windows that
+          cannot open it — the standalone Nodi overlay does not mount the modal — rather
+          than offered there as a button that goes nowhere. */}
+      {canOpenSkillMarketplace() && <div className="chat-skills-add"><button type="button" data-testid={`chat-skills-manage-${surface}`} onClick={() => { setOpen(false); openSkillMarketplace(); }}><Icon name="basket" size={14} />{t('Skills y Marketplace')}</button></div>}
       {error && <p className="chat-skill-error" role="alert">{error}</p>}
     </div>)}
-  </div>;
-}
-
-/** One skill in the library.
- *
- *  Every card is the same height whatever the skill is, because a list whose rows jump
- *  around is a list you have to read rather than scan: the name and the first two lines of
- *  the description, a switch, and a glyph that is this skill's and no other's. Everything
- *  else — the rest of the description, where it came from, and what you can do to it — is
- *  behind the chevron, which is also where the buttons that are easy to press by accident
- *  now live. */
-function SkillCard({ skill, surface, busy, expanded, meta, onToggleDetails, onEnable, onEdit, onExport, onRemove, confirm }: {
-  skill: ChatSkill;
-  surface: ChatSkillSurface;
-  busy: boolean;
-  expanded: boolean;
-  meta: string;
-  onToggleDetails: () => void;
-  onEnable: () => void;
-  onEdit: () => void;
-  onExport: () => void;
-  onRemove: () => void;
-  confirm?: { onConfirm: () => void; onCancel: () => void };
-}) {
-  const tools = skill.builtin === 'svg' || skill.builtin === 'image' || !!skill.capabilities?.length || !!skill.tools?.length;
-  const glyph = skillGlyph({ packageId: skill.origin?.packageId, id: skill.id, name: skill.name, description: skill.description, category: skill.category, builtin: skill.builtin });
-  return <div className={`chat-skill-item ${skill.enabled[surface] ? 'enabled' : ''} ${tools ? 'tool-skill' : ''} ${expanded ? 'open' : ''}`}
-    data-skill-kind={tools ? 'tool' : 'prompt'} style={{ '--skill-hue': glyph.hue } as CSSProperties}>
-    <div className="chat-skill-main">
-      <span className="chat-skill-symbol" aria-hidden="true"><Icon name={glyph.icon} size={18} /></span>
-      <div className="chat-skill-text">
-        <span className="chat-skill-heading"><b>{skill.name}</b>{tools && <span className="chat-skill-tool-badge">{t('Con herramientas')}</span>}</span>
-        <p>{skill.description}</p>
-      </div>
-      <button type="button" role="switch" aria-checked={skill.enabled[surface]} aria-label={`${t('Activar')} ${skill.name}`} disabled={busy} className="chat-skill-switch" onClick={onEnable}><span /></button>
-      <button type="button" className="chat-skill-details-toggle" aria-expanded={expanded}
-        aria-label={`${t(expanded ? 'Ocultar detalles de' : 'Ver detalles de')} ${skill.name}`}
-        title={t(expanded ? 'Ocultar detalles' : 'Ver detalles')} onClick={onToggleDetails}>
-        <Icon name={expanded ? 'chevronUp' : 'chevronDown'} size={14} />
-      </button>
-    </div>
-
-    {expanded && <div className="chat-skill-details">
-      <p>{skill.description}</p>
-      <small>{meta}</small>
-      <div className="chat-skill-item-foot">
-        <button type="button" title="Export package directory" aria-label={`Export ${skill.name}`} onClick={onExport}><Icon name="download" size={13} />Export</button>
-        <button type="button" title={t('Editar skill')} aria-label={`${t('Editar')} ${skill.name}`} onClick={onEdit}><Icon name="edit" size={13} />{t('Editar')}</button>
-        <button type="button" className="chat-skill-remove" title={skill.builtin ? t('Desinstalar skill') : t('Eliminar skill')}
-          aria-label={`${skill.builtin ? t('Desinstalar') : t('Eliminar')} ${skill.name}`} onClick={onRemove}>
-          <Icon name="trash" size={13} />{skill.builtin ? t('Desinstalar') : t('Eliminar')}
-        </button>
-      </div>
-    </div>}
-
-    {confirm && <div className="chat-skill-confirm">
-      <span>{skill.builtin ? t('¿Desinstalar esta skill? Puedes volver a instalarla desde el Marketplace.') : t('¿Eliminar esta skill?')}</span>
-      <button type="button" disabled={busy} onClick={confirm.onConfirm}>{skill.builtin ? t('Desinstalar') : t('Eliminar')}</button>
-      <button type="button" onClick={confirm.onCancel}>{t('Cancelar')}</button>
-    </div>}
   </div>;
 }

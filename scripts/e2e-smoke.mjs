@@ -1089,12 +1089,43 @@ try {
   if (headerViewportWidth < 1280) {
     console.log(`[e2e] header centre badge steps skipped: the window is ${headerViewportWidth}px and the resize did not take; geometry covered by scripts/test-header-layout.mjs`);
   } else {
-    // The model warning is pinned open in this profile (no synthesis model yet at
-    // first launch) — the exact state that used to overlap. Force both cases.
+    // The model warning is what used to overlap: it sat in the action rail with its
+    // label pinned open. It now lives in the empty band on the other side of the
+    // header, so this profile (no synthesis model yet at first launch) exercises both
+    // the alert's own placement and the badge's, in the state that used to break.
     const originalSynthesis = (await page.evaluate(() => window.nodus.getSettings())).synthesisModel;
     await page.evaluate(() => window.nodus.updateSettings({ synthesisModel: null }));
     await waitForCondition('aviso de modelo de IA visible', async () =>
-      (await page.getByText('Configura un modelo de IA', { exact: true }).count()) > 0);
+      (await page.getByTestId('header-model-alert').count()) > 0);
+    {
+      const alert = await page.evaluate(() => {
+        const node = document.querySelector('[data-testid="header-model-alert"]');
+        const logo = document.querySelector('[data-testid="sidebar-header-toggle"]');
+        const rail = document.querySelector('[data-testid="header-actions"]');
+        const badge = document.querySelector('[data-testid="header-vault-badge"]');
+        const box = (element) => element && element.getBoundingClientRect();
+        return {
+          inRail: !!rail?.contains(node),
+          alert: box(node),
+          logo: box(logo),
+          rail: box(rail),
+          badge: badge && getComputedStyle(badge).visibility === 'visible' ? box(badge) : null,
+          label: node?.querySelector('span')?.getBoundingClientRect().width ?? null,
+        };
+      });
+      assert.ok(alert.alert, 'the model alert is rendered');
+      assert.equal(alert.inRail, false, 'the model alert no longer spends the action rail');
+      assert.ok(alert.logo && alert.alert.left >= alert.logo.right, 'the alert clears the sidebar rail');
+      const bandRight = alert.badge ? alert.badge.left : alert.rail.left;
+      assert.ok(alert.alert.right <= bandRight, 'the alert clears whatever the band ends at');
+      // Centred in that band, and folded: the label opens on hover, not before.
+      const centre = alert.alert.left + alert.alert.width / 2;
+      assert.ok(
+        Math.abs(centre - (alert.logo.right + bandRight) / 2) <= 14,
+        `the alert sits in the middle of its band (centre ${centre.toFixed(1)}, band ${alert.logo.right.toFixed(1)}–${bandRight.toFixed(1)})`
+      );
+      assert.ok(alert.label !== null && alert.label < 4, `the alert's label stays folded until hover (${alert.label}px)`);
+    }
     // Narrowing the window exercises the responsive rail. Depending on the available
     // native titlebar width, its labels can collapse before the badge needs to move;
     // either a centred or clamped badge is valid as long as it stays clear of both rails.
@@ -1106,7 +1137,7 @@ try {
     await setWindowWidth(1440);
     await page.evaluate((model) => window.nodus.updateSettings({ synthesisModel: model }), originalSynthesis);
     await waitForCondition('aviso de modelo de IA retirado', async () =>
-      (await page.getByText('Configura un modelo de IA', { exact: true }).count()) === 0);
+      (await page.getByTestId('header-model-alert').count()) === 0);
     // With the alert gone there is room again, so the badge must return to the true
     // centre — the resting position the design calls for. Waited for rather than
     // sampled: the clamped spot it is leaving is itself "clear of the rails", so a
