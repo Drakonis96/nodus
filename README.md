@@ -92,6 +92,16 @@ You can open material from disk or from compatible vault sources, then save the 
 
 ![Nodus Toolkit demo showing Convert, Protect, Translate and OCR Workspace](docs/screenshots/readme-toolkit-demo.png)
 
+## Skill marketplace
+
+Open up new possibilities and make Nodus your own. The [Nodus Skill Marketplace](https://github.com/NodusResearch/nodus-research-skill-marketplace) extends the app with community-created research methods, creative tools and specialized workflows, helping you get more from the Assistant, native chats and Nodi. Discover skills and plugins, adapt them to your work, or share your own: every contribution expands what Nodus can do.
+
+Open **Skills → Marketplace** to browse the official catalog, review a package and install it. Use **My skills** to configure your library and enable skills for the Assistant or Nodi. You can also add public GitHub repositories as sources, opening the door to an ever-growing ecosystem of tools for research, teaching and study.
+
+[![Nodus window in English with the Skill Marketplace modal open](docs/screenshots/readme-skill-marketplace.png)](https://github.com/NodusResearch/nodus-research-skill-marketplace)
+
+**Explore and contribute:** [Marketplace repository](https://github.com/NodusResearch/nodus-research-skill-marketplace) · [Browse the catalog](https://github.com/NodusResearch/nodus-research-skill-marketplace#browse-the-catalog) · [Create and contribute](https://github.com/NodusResearch/nodus-research-skill-marketplace/blob/main/CONTRIBUTING.md) · [Package specification](https://github.com/NodusResearch/nodus-research-skill-marketplace/blob/main/SPECIFICATION.md) · [Using skills in Nodus](docs/chat-skills.md) · [Marketplace integration guide](docs/skill-marketplace.md).
+
 ## Zotero plugin
 
 The standalone Zotero plugin supports Zotero 9 and 10. It brings Nodus search into your reference manager and indexes PDF, EPUB and HTML attachments so you can search across them and receive answers grounded in exact passages. PDF citations can jump to their page; EPUB and HTML citations remain clearly marked as non-navigable until Zotero exposes a stable chapter or anchor locator.
