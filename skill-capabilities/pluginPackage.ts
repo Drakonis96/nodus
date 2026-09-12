@@ -31,6 +31,7 @@ export function validatePluginPackage(input: PluginPackage): ValidatedPluginPack
   const manifest = validatePluginManifest(input?.manifest);
   if (!input.files || typeof input.files !== 'object' || Array.isArray(input.files)) throw new Error('Missing plugin files.');
   if (Object.keys(input.files).some(hasUnsafePath)) throw new Error('Unsafe plugin path.');
+  if (input.files['plugin.json'] !== undefined && JSON.stringify(validatePluginManifest(JSON.parse(input.files['plugin.json']))) !== JSON.stringify(manifest)) throw new Error('Plugin manifest and packaged manifest disagree.');
   const expected = new Set(['plugin.json']);
   const capabilities: ValidatedPluginPackage['capabilities'] = [];
   const capabilityIds = new Set<string>();
@@ -47,6 +48,13 @@ export function validatePluginPackage(input: PluginPackage): ValidatedPluginPack
     expected.add(entry);
     const source = input.files[entry];
     if (typeof source !== 'string' || !source.trim() || source.length > 256_000) throw new Error(`Missing or oversized ${entry}.`);
+    for (const asset of capability.assets ?? []) {
+      const file = `${directory}/${asset.path}`;
+      expected.add(file);
+      const text = input.files[file];
+      if (asset.mimeType === 'model/gltf-binary' && (typeof text !== 'string' || text.length !== Math.ceil(asset.bytes / 3) * 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(text) || btoa(atob(text)) !== text)) throw new Error(`Noncanonical binary plugin asset: ${file}`);
+      if (typeof text !== 'string' || (asset.mimeType === 'model/gltf-binary' ? atob(text).length : new TextEncoder().encode(text).length) !== asset.bytes) throw new Error(`Missing or oversized plugin asset: ${file}`);
+    }
     capabilities.push({ path: manifestPath, manifest: capability, source });
   }
   const skills: ValidatedPluginPackage['skills'] = [];

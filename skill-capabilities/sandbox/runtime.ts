@@ -1,3 +1,4 @@
+import { validatePackagedModelResult } from '../../packages/capability-api/src/pluginAssets';
 import { BrowserWindow, protocol, session } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -83,6 +84,8 @@ function validateResult(result: unknown, allowed: string[]): CapabilityResult {
       || JSON.stringify(value).length > TEXT_LIMIT) throw new Error('Invalid capability table result.');
   } else if (value.kind === 'svg') {
     if (typeof value.svg !== 'string' || value.svg.length > 300_000 || !/^\s*<svg\b/i.test(value.svg) || /<!DOCTYPE|<!ENTITY/i.test(value.svg)) throw new Error('Invalid capability SVG result.');
+  } else if (value.kind === 'model') {
+    validatePackagedModelResult(value);
   } else {
     if (typeof value.data !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(value.data) || Buffer.byteLength(value.data, 'base64') > BINARY_LIMIT) throw new Error('Invalid capability binary result.');
     if (value.kind === 'image' && !['image/png','image/jpeg','image/webp'].includes(value.mimeType)) throw new Error('Invalid capability image type.');
@@ -118,6 +121,12 @@ export async function runCapabilitySandbox(runtime: InstalledCapabilityRuntime, 
       const message = JSON.parse(body) as { method?: unknown; args?: Record<string, unknown> };
       const args = message.args ?? {};
       const value = await (async () => {
+        if (message.method === 'assets.read') {
+          if (!runtime.readAsset || typeof args.id !== 'string') throw new Error('Plugin assets are unavailable.');
+          const { text, asset } = runtime.readAsset(args.id);
+          if (asset.mimeType !== 'application/json' || asset.bytes > 2_000_000) throw new Error('Only bounded JSON assets can enter the sandbox.');
+          return JSON.parse(text);
+        }
         if (message.method === 'network.request') return networkRequest(runtime, String(args.endpointId), args.request);
         if (message.method === 'storage.get') { if (!runtime.manifest.permissions.storage) throw new Error('Capability storage is not permitted.'); return readStorage(runtime); }
         if (message.method === 'storage.set') return writeStorage(runtime, args.value);
@@ -142,7 +151,7 @@ export async function runCapabilitySandbox(runtime: InstalledCapabilityRuntime, 
         return win.webContents.executeJavaScript(`(async()=>{
           for(const key of ['RTCPeerConnection','webkitRTCPeerConnection','RTCIceTransport','RTCDtlsTransport'])Object.defineProperty(globalThis,key,{value:undefined,writable:false,configurable:false});
           const call=async(method,args)=>{const response=await fetch(${JSON.stringify(`${CAPABILITY_ORIGIN}/rpc`)},{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({method,args})});const payload=await response.json();if(!payload.ok)throw new Error(payload.error);return payload.value};
-          const host=Object.freeze({network:Object.freeze({request:(endpointId,request)=>call('network.request',{endpointId,request})}),storage:Object.freeze({get:()=>call('storage.get',{}),set:value=>call('storage.set',{value})})});
+          const host=Object.freeze({assets:Object.freeze({read:id=>call('assets.read',{id})}),network:Object.freeze({request:(endpointId,request)=>call('network.request',{endpointId,request})}),storage:Object.freeze({get:()=>call('storage.get',{}),set:value=>call('storage.set',{value})})});
           const runtime=(${runtime.source}\n);
           if(typeof runtime!=='function')throw new Error('Capability runtime must be a function expression.');
           return await runtime(JSON.parse(${JSON.stringify(encoded)}),host);
