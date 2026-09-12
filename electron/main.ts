@@ -1,5 +1,9 @@
 import { initializeChatSkillDefaults } from './chatSkills';
 import { initializePluginStore } from './skillPlugins';
+import { initializeCapabilityPluginStore } from './capabilities/pluginStoreV2';
+import { rebuildCapabilityRegistry } from './capabilities/registry';
+import { migrateCapabilitiesForThisProfile, settleInstalledPluginMigrations } from './capabilities/migrationRunner';
+import { checkForCapabilityUpdates } from './capabilities/updates';
 import { startPluginUpdates, stopPluginUpdates } from './skillPluginUpdates';
 import { app, BrowserWindow, dialog, nativeTheme, session, shell } from 'electron';
 import path from 'node:path';
@@ -924,8 +928,40 @@ app.on('second-instance', (_event, argv) => {
 app.whenReady().then(async () => {
   // Losing the lock queues a quit; do not open the database or a window.
   if (!hasSingleInstanceLock) return;
+  // Which capabilities exist has to be settled before the skill library is read: a skill
+  // that depends on one cannot be judged available until its provider has registered.
+  initializeCapabilityPluginStore();
+  rebuildCapabilityRegistry();
   initializeChatSkillDefaults();
   initializePluginStore();
+  // The three disciplines that became packages are adopted in the background. A profile
+  // that needs one keeps the skill it already had until the package is in place, and a
+  // migration that cannot finish must never hold up the window or turn a skill off: it
+  // leaves a retry in the journal and says so in the interface.
+  void settleInstalledPluginMigrations()
+    .then(settled => { if (settled.length) rebuildCapabilityRegistry(); })
+    .catch(error => console.warn('[capabilities] outstanding data migrations could not be settled:', error));
+  void migrateCapabilitiesForThisProfile()
+    .then(outcome => {
+      if (outcome.installed.length || outcome.adopted.length) rebuildCapabilityRegistry();
+      for (const failure of outcome.failed) console.warn(`[capabilities] ${failure.pluginId} stopped at ${failure.phase}: ${failure.detail}`);
+    })
+    .catch(error => console.warn('[capabilities] migration could not run:', error))
+    // Updates come after the move, never during it: an update mid-migration would change
+    // the version the migration is halfway through. Delayed, because a launch has better
+    // things to do with its first seconds than talk to GitHub — and skipped entirely when
+    // this build was told not to update itself, which is what a test harness says when it
+    // means "do not go near the network".
+    .finally(() => process.env.NODUS_DISABLE_AUTO_UPDATE === '1' ? undefined : setTimeout(() => {
+      void checkForCapabilityUpdates()
+        .then(results => {
+          for (const result of results) {
+            if (result.state === 'updated') console.info(`[capabilities] ${result.pluginId} updated ${result.from} -> ${result.to}`);
+            if (result.state === 'awaiting-approval') console.info(`[capabilities] ${result.pluginId} ${result.to} is waiting for permission approval`);
+          }
+        })
+        .catch(error => console.warn('[capabilities] update check could not run:', error));
+    }, 30_000).unref?.());
   removeDisplacedMacBundle();
   restorePersistedDockIcon();
   // YouTube (embedded by the PDF Presenter's audience overlay) flags Electron's

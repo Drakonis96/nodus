@@ -1,15 +1,26 @@
 /** Versioned package contract shared by local authors, repository scanning and installation. */
-import { isCapabilityReference, normalizeCapabilityId, type BuiltinCapabilityId, type PluginPackage } from '../skill-capabilities/contracts';
+import { isCapabilityReference, normalizeCapabilityId, type PluginPackage } from '../skill-capabilities/contracts';
 import { REGISTERED_BUILTIN_CAPABILITY_IDS } from '../skill-capabilities/registry/catalog';
 export const DEFAULT_SKILL_SOURCE = 'https://github.com/NodusResearch/nodus-research-skill-marketplace';
-export const SKILL_CAPABILITIES = ['svg', 'chemistry', 'image', 'genomics', 'legal'] as const;
+export const SKILL_CAPABILITIES = ['svg', 'image'] as const;
 export type SkillCapability = string;
 /** @deprecated UI compatibility. Runtime support is resolved by the capability registry. */
 export const SUPPORTED_SKILL_CAPABILITIES: readonly SkillCapability[] = REGISTERED_BUILTIN_CAPABILITY_IDS;
-export const unsupportedSkillCapabilities = (capabilities: readonly SkillCapability[]) => capabilities.filter(c => !REGISTERED_BUILTIN_CAPABILITY_IDS.includes(normalizeCapabilityId(c) as BuiltinCapabilityId));
+/** Capabilities nothing currently provides. Not an error at install time: a skill that
+ *  depends on a package may be installed before the package is, and is simply not
+ *  available until its provider arrives. */
+export const unsupportedSkillCapabilities = (capabilities: readonly SkillCapability[]) =>
+  capabilities.filter(c => !(REGISTERED_BUILTIN_CAPABILITY_IDS as readonly string[]).includes(normalizeCapabilityId(c)));
+
+/** What a build genuinely cannot accept: an identifier that is not a capability at all.
+ *
+ *  This used to refuse anything the application did not itself implement, which was the
+ *  same question when every capability was built in. It is not the same question now:
+ *  refusing to install a skill because its package is not installed yet would make the
+ *  order of two installs matter, and would turn a temporary absence into a permanent one. */
 export function assertSkillCapabilitiesSupported(capabilities: readonly SkillCapability[]) {
-  const missing = unsupportedSkillCapabilities(capabilities);
-  if (missing.length) throw new Error(`This Nodus build does not support these native capabilities: ${missing.join(', ')}. A compatible Nodus build is required.`);
+  const invalid = capabilities.filter(capability => !isCapabilityReference(normalizeCapabilityId(capability)));
+  if (invalid.length) throw new Error(`These are not capability identifiers: ${invalid.join(', ')}.`);
 }
 export interface SkillTool { id: string; description: string; source: string }
 export interface SkillManifest {

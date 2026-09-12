@@ -1,13 +1,14 @@
 import { vaultTypeColor } from '@shared/vaultTypes';
 import { SkillMarketplacePanel } from './SkillMarketplacePanel';
+import { CapabilityPackagesPanel } from './CapabilityPackagesPanel';
 import { SUPPORTED_SKILL_CAPABILITIES } from '@shared/skillMarketplace';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { skillHasCapability, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
 import { Icon } from './ui';
-import { t } from '../i18n';
+import { skillGlyph, byName } from './skillGlyph';
+import { t, getActiveLang } from '../i18n';
 import './chatSkills.css';
-import { GenomicsConfig } from './GenomicsConfig';
 
 const blank = (): ChatSkill => ({ id: '', name: '', description: '', instructions: '', enabled: { assistant: false, nodi: false } });
 const searchText = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
@@ -32,8 +33,8 @@ export function ChatSkillsControl({ surface, disabled = false, compact = false }
   const [busy, setBusy] = useState(false);
   const [removeId, setRemoveId] = useState<string | null>(null);
   const [confirmRestore, setConfirmRestore] = useState(false);
-  const [genomicsConfig, setGenomicsConfig] = useState(false);
-  const [activateGenomics, setActivateGenomics] = useState(false);
+  // One card open at a time: the list is a list again as soon as you look away from it.
+  const [details, setDetails] = useState('');
   const root = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
@@ -99,27 +100,24 @@ export function ChatSkillsControl({ surface, disabled = false, compact = false }
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   };
   const active = skills.filter(skill => skill.enabled[surface]).length;
-  const toggle = async (skill: ChatSkill) => {
-    if (skill.builtin === 'genomics' && !skill.enabled[surface]) {
-      try {
-        const status = await window.nodus.getGenomicsStatus();
-        if (!status.hasKey || !status.termsAccepted) { setActivateGenomics(true); setGenomicsConfig(true); return; }
-      } catch (e) { setError(String(e)); return; }
-    }
-    await mutate(() => window.nodus.saveChatSkill({ ...skill, enabled: { ...skill.enabled, [surface]: !skill.enabled[surface] } }));
-  };
+  // A skill whose capability comes from a package is configured in that package's own
+  // panel, so enabling one is just enabling it.
+  const toggle = async (skill: ChatSkill) =>
+    mutate(() => window.nodus.saveChatSkill({ ...skill, enabled: { ...skill.enabled, [surface]: !skill.enabled[surface] } }));
   const terms = searchText(query).trim().split(/\s+/).filter(Boolean);
+  // Alphabetical, always: the library is a list you look things up in, and an order that
+  // depends on when each skill was installed means hunting for one you know is there.
   const visibleSkills = skills.filter(skill => {
     const text = searchText(`${skill.name} ${skill.description}`);
     return terms.every(term => text.includes(term));
-  });
+  }).sort(byName(getActiveLang()));
   const renderPanel = (panel: React.ReactNode) => compact ? panel : createPortal(<div style={accentStyle} className={root.current?.closest('.light, .nodi-theme-light') ? 'light' : ''}>{panel}</div>, document.body);
   return <div className={`chat-skills-control ${compact ? 'compact' : ''}`} ref={root} style={accentStyle}>
     <button type="button" className="chat-skills-trigger" data-testid={`chat-skills-${surface}`} aria-label="Skills" aria-expanded={open} title="Skills" disabled={disabled} onClick={() => { setOpen(!open); setDraft(null); if (!open) setQuery(''); }}><Icon name="sparkles" size={compact ? 14 : 15} />{!compact && <span>Skills</span>}<span className="chat-skills-count">{active}</span></button>
     {open && renderPanel(<div ref={panelRef} style={compact ? undefined : panelStyle} className="chat-skills-panel" data-nodi-interactive role="region" aria-label="Skills">
       <div className="chat-skills-heading"><div><span className="chat-skills-eyebrow">NODUS SKILLS</span><h3>{draft ? (draft.id ? t('Editar skill') : t('Nueva skill')) : t('De la idea a la creación')}</h3></div><button type="button" aria-label={t('Cerrar')} onClick={() => { setOpen(false); setDraft(null); }}><Icon name="x" size={16} /></button></div>
       {!draft && <div className="skill-marketplace-tabs"><button type="button" aria-pressed={!marketplace} onClick={() => setMarketplace(false)}>My skills</button><button type="button" aria-pressed={marketplace} onClick={() => setMarketplace(true)}>Marketplace</button></div>}
-      {marketplace && !draft ? <SkillMarketplacePanel skills={skills} accent={accent} /> : draft ? <form className="chat-skill-editor" onSubmit={event => { event.preventDefault(); void mutate(() => window.nodus.saveChatSkill(draft)).then(saved => { if (saved) { setDraft(null); setQuery(''); } }); }}>
+      {marketplace && !draft ? <><CapabilityPackagesPanel /><SkillMarketplacePanel skills={skills} accent={accent} /></> : draft ? <form className="chat-skill-editor" onSubmit={event => { event.preventDefault(); void mutate(() => window.nodus.saveChatSkill(draft)).then(saved => { if (saved) { setDraft(null); setQuery(''); } }); }}>
         <label>{t('Nombre de la skill')}<input ref={nameRef} required maxLength={80} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} placeholder={t('Mi narrador visual')} /></label>
         <label>{t('Cuándo usarla')}<textarea aria-label={t('Cuándo usarla')} required rows={2} maxLength={500} value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} placeholder={t('Usar cuando el usuario necesite…')} /></label>
         <label>{t('Instrucciones')}<textarea aria-label={t('Instrucciones')} required className="chat-skill-prompt" rows={9} maxLength={16000} value={draft.instructions} onChange={event => setDraft({ ...draft, instructions: event.target.value })} placeholder={t('Describe el enfoque, el formato y los criterios de calidad…')} spellCheck={false} /></label>
@@ -137,12 +135,13 @@ export function ChatSkillsControl({ surface, disabled = false, compact = false }
           {query && <button type="button" aria-label={t('Limpiar búsqueda de skills')} title={t('Limpiar búsqueda de skills')} onClick={() => { setQuery(''); searchRef.current?.focus(); }}><Icon name="x" size={14} /></button>}
         </div>
         {!visibleSkills.length && <div className="chat-skills-empty" role="status"><Icon name="search" size={20} /><span>{t('No se encontraron skills.')}</span></div>}
-        <div className="chat-skills-list">{visibleSkills.map(skill => <div key={skill.id} className={`chat-skill-item ${skill.enabled[surface] ? 'enabled' : ''} ${skill.builtin === 'svg' || skill.builtin === 'image' || skill.builtin === 'chemistry' || skill.builtin === 'genomics' || skill.builtin === 'legal' || skill.capabilities?.length || skill.tools?.length ? 'tool-skill' : ''}`} data-skill-kind={skill.builtin === 'svg' || skill.builtin === 'image' || skill.builtin === 'chemistry' || skill.builtin === 'genomics' || skill.builtin === 'legal' || skill.capabilities?.length || skill.tools?.length ? 'tool' : 'prompt'}>
-          <div className="chat-skill-main"><span className={`chat-skill-symbol ${skill.builtin ?? 'custom'}`}><Icon name={skill.builtin === 'svg' ? 'code' : skill.builtin === 'image' ? 'image' : skill.builtin === 'socratic' ? 'graduation' : 'sparkles'} size={20} /></span><div><b>{skill.name}</b>{(skill.builtin === 'svg' || skill.builtin === 'image' || skill.builtin === 'chemistry' || skill.builtin === 'genomics' || skill.builtin === 'legal' || !!skill.capabilities?.length || !!skill.tools?.length) && <span className="chat-skill-tool-badge">{t('Con herramientas')}</span>}<p>{skill.description}</p></div><button type="button" role="switch" aria-checked={skill.enabled[surface]} aria-label={`${t('Activar')} ${skill.name}`} disabled={busy} className="chat-skill-switch" onClick={() => void toggle(skill)}><span /></button></div>
-          <div className="chat-skill-item-foot"><button type="button" title="Export package directory" aria-label={`Export ${skill.name}`} onClick={() => { void window.nodus.exportSkillPackage(skill.id).then(path => { if (path) setExportNotice(`Package exported to ${path}`); }).catch(e => setError(String(e))); }}>Export</button><small>{skill.builtin === 'image' ? imageModel : skill.builtin === 'svg' ? t('Vectorial · editable · preciso') : skill.builtin === 'socratic' ? t('Aprendizaje guiado · paso a paso') : skill.builtin ? t('Skill incluida') : skill.origin ? `Marketplace · @${skill.author}` : t('Skill personal')}</small><button type="button" title={t('Editar skill')} aria-label={`${t('Editar')} ${skill.name}`} onClick={() => setDraft(structuredClone(skill))}><Icon name="edit" size={13} /></button><button type="button" title={skill.builtin ? t('Desinstalar skill') : t('Eliminar skill')} aria-label={`${skill.builtin ? t('Desinstalar') : t('Eliminar')} ${skill.name}`} onClick={() => setRemoveId(skill.id)}><Icon name="trash" size={13} /></button></div>
-          {skill.builtin === 'genomics' && <><button type="button" className="genomics-config-button" onClick={() => { setActivateGenomics(false); setGenomicsConfig(!genomicsConfig); }}>{t('Configuración de AlphaGenome')}</button>{genomicsConfig && <GenomicsConfig onConfigured={() => { if (activateGenomics) void mutate(() => window.nodus.saveChatSkill({ ...skill, enabled: { ...skill.enabled, [surface]: true } })).then(() => setActivateGenomics(false)); }} />}</>}
-          {removeId === skill.id && <div className="chat-skill-confirm"><span>{skill.builtin ? t('¿Desinstalar esta skill? Puedes volver a instalarla desde el Marketplace.') : t('¿Eliminar esta skill?')}</span><button type="button" disabled={busy} onClick={() => void mutate(() => window.nodus.deleteChatSkill(skill.id)).then(() => setRemoveId(null))}>{skill.builtin ? t('Desinstalar') : t('Eliminar')}</button><button type="button" onClick={() => setRemoveId(null)}>{t('Cancelar')}</button></div>}
-        </div>)}</div>
+        <div className="chat-skills-list">{visibleSkills.map(skill => <SkillCard key={skill.id} skill={skill} surface={surface} busy={busy} expanded={details === skill.id}
+          onToggleDetails={() => setDetails(details === skill.id ? '' : skill.id)}
+          meta={skill.builtin === 'image' ? imageModel : skill.builtin === 'svg' ? t('Vectorial · editable · preciso') : skill.builtin === 'socratic' ? t('Aprendizaje guiado · paso a paso') : skill.builtin ? t('Skill incluida') : skill.origin ? `Marketplace · @${skill.author}` : t('Skill personal')}
+          onEnable={() => void toggle(skill)} onEdit={() => setDraft(structuredClone(skill))}
+          onExport={() => { void window.nodus.exportSkillPackage(skill.id).then(path => { if (path) setExportNotice(`Package exported to ${path}`); }).catch(e => setError(String(e))); }}
+          onRemove={() => setRemoveId(skill.id)}
+          confirm={removeId === skill.id ? { onCancel: () => setRemoveId(null), onConfirm: () => void mutate(() => window.nodus.deleteChatSkill(skill.id)).then(() => setRemoveId(null)) } : undefined} />)}</div>
         <div className="chat-skills-add"><button className="chat-skill-primary" type="button" onClick={() => setDraft(blank())}><Icon name="plus" size={14} />{t('Crear skill')}</button><button type="button" onClick={() => fileRef.current?.click()}><Icon name="upload" size={14} />{t('Importar .md')}</button><input ref={fileRef} type="file" accept=".md,.json" hidden onChange={event => { void importFile(event.target.files?.[0]); event.target.value = ''; }} /></div>
         <button type="button" className="chat-skills-restore" disabled={busy} onClick={() => void mutate(() => window.nodus.importSkillPackage())}>Import package directory</button>
         {exportNotice && <p role="status">{exportNotice}</p>}
@@ -151,5 +150,65 @@ export function ChatSkillsControl({ surface, disabled = false, compact = false }
       </>}
       {error && <p className="chat-skill-error" role="alert">{error}</p>}
     </div>)}
+  </div>;
+}
+
+/** One skill in the library.
+ *
+ *  Every card is the same height whatever the skill is, because a list whose rows jump
+ *  around is a list you have to read rather than scan: the name and the first two lines of
+ *  the description, a switch, and a glyph that is this skill's and no other's. Everything
+ *  else — the rest of the description, where it came from, and what you can do to it — is
+ *  behind the chevron, which is also where the buttons that are easy to press by accident
+ *  now live. */
+function SkillCard({ skill, surface, busy, expanded, meta, onToggleDetails, onEnable, onEdit, onExport, onRemove, confirm }: {
+  skill: ChatSkill;
+  surface: ChatSkillSurface;
+  busy: boolean;
+  expanded: boolean;
+  meta: string;
+  onToggleDetails: () => void;
+  onEnable: () => void;
+  onEdit: () => void;
+  onExport: () => void;
+  onRemove: () => void;
+  confirm?: { onConfirm: () => void; onCancel: () => void };
+}) {
+  const tools = skill.builtin === 'svg' || skill.builtin === 'image' || !!skill.capabilities?.length || !!skill.tools?.length;
+  const glyph = skillGlyph({ packageId: skill.origin?.packageId, id: skill.id, name: skill.name, description: skill.description, category: skill.category, builtin: skill.builtin });
+  return <div className={`chat-skill-item ${skill.enabled[surface] ? 'enabled' : ''} ${tools ? 'tool-skill' : ''} ${expanded ? 'open' : ''}`}
+    data-skill-kind={tools ? 'tool' : 'prompt'} style={{ '--skill-hue': glyph.hue } as CSSProperties}>
+    <div className="chat-skill-main">
+      <span className="chat-skill-symbol" aria-hidden="true"><Icon name={glyph.icon} size={18} /></span>
+      <div className="chat-skill-text">
+        <span className="chat-skill-heading"><b>{skill.name}</b>{tools && <span className="chat-skill-tool-badge">{t('Con herramientas')}</span>}</span>
+        <p>{skill.description}</p>
+      </div>
+      <button type="button" role="switch" aria-checked={skill.enabled[surface]} aria-label={`${t('Activar')} ${skill.name}`} disabled={busy} className="chat-skill-switch" onClick={onEnable}><span /></button>
+      <button type="button" className="chat-skill-details-toggle" aria-expanded={expanded}
+        aria-label={`${t(expanded ? 'Ocultar detalles de' : 'Ver detalles de')} ${skill.name}`}
+        title={t(expanded ? 'Ocultar detalles' : 'Ver detalles')} onClick={onToggleDetails}>
+        <Icon name={expanded ? 'chevronUp' : 'chevronDown'} size={14} />
+      </button>
+    </div>
+
+    {expanded && <div className="chat-skill-details">
+      <p>{skill.description}</p>
+      <small>{meta}</small>
+      <div className="chat-skill-item-foot">
+        <button type="button" title="Export package directory" aria-label={`Export ${skill.name}`} onClick={onExport}><Icon name="download" size={13} />Export</button>
+        <button type="button" title={t('Editar skill')} aria-label={`${t('Editar')} ${skill.name}`} onClick={onEdit}><Icon name="edit" size={13} />{t('Editar')}</button>
+        <button type="button" className="chat-skill-remove" title={skill.builtin ? t('Desinstalar skill') : t('Eliminar skill')}
+          aria-label={`${skill.builtin ? t('Desinstalar') : t('Eliminar')} ${skill.name}`} onClick={onRemove}>
+          <Icon name="trash" size={13} />{skill.builtin ? t('Desinstalar') : t('Eliminar')}
+        </button>
+      </div>
+    </div>}
+
+    {confirm && <div className="chat-skill-confirm">
+      <span>{skill.builtin ? t('¿Desinstalar esta skill? Puedes volver a instalarla desde el Marketplace.') : t('¿Eliminar esta skill?')}</span>
+      <button type="button" disabled={busy} onClick={confirm.onConfirm}>{skill.builtin ? t('Desinstalar') : t('Eliminar')}</button>
+      <button type="button" onClick={confirm.onCancel}>{t('Cancelar')}</button>
+    </div>}
   </div>;
 }

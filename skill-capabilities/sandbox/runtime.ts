@@ -1,12 +1,11 @@
 import { BrowserWindow, protocol, session } from 'electron';
-import { promises as dns } from 'node:dns';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import net from 'node:net';
 import { registerUntrustedSession } from '../../electron/ipc/untrustedSessions';
 import { pluginSecret, pluginStorageFile, type InstalledCapabilityRuntime } from '../../electron/skillPlugins';
 import { jsonSchemaMatches, type CapabilityInvocation, type CapabilityResult } from '../contracts';
+import { assertPublicHost } from '../publicHost';
 
 /** Capability runtimes are served from, and may only talk to, this session-scoped origin. */
 export const NODUS_CAPABILITY_SCHEME = 'nodus-capability';
@@ -26,24 +25,6 @@ const jsonResponse = (payload: unknown) => new Response(JSON.stringify(payload),
 const TEXT_LIMIT = 256_000;
 const BINARY_LIMIT = 10_000_000;
 const EXECUTION_TIMEOUT = process.env.NODUS_CAPABILITY_TEST_TIMEOUT_MS ? Number(process.env.NODUS_CAPABILITY_TEST_TIMEOUT_MS) : 30_000;
-const PRIVATE_HOST = /^(?:localhost|.*\.localhost|.*\.local)$/i;
-
-function privateAddress(address: string): boolean {
-  const normalized = address.replace(/^::ffff:/i, '');
-  if (net.isIP(normalized) === 4) {
-    const [a, b] = normalized.split('.').map(Number);
-    return a === 0 || a === 10 || a === 127 || a >= 224 || a === 169 && b === 254
-      || a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168
-      || a === 100 && b >= 64 && b <= 127 || a === 198 && (b === 18 || b === 19);
-  }
-  return net.isIP(address) !== 6 || !/^[23][0-9a-f]{3}:/i.test(address);
-}
-
-async function assertPublicHost(hostname: string) {
-  if (PRIVATE_HOST.test(hostname)) throw new Error('Capability network target is not public.');
-  const results = await dns.lookup(hostname, { all: true });
-  if (!results.length || results.some(result => privateAddress(result.address))) throw new Error('Capability network target is not public.');
-}
 
 function readStorage(runtime: InstalledCapabilityRuntime): unknown {
   const file = pluginStorageFile(runtime.pluginId, runtime.manifest.id);

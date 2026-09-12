@@ -25,7 +25,10 @@ test('packaging generates and exposes the legal bundle', () => {
       ['server', 'nodus-server'],
       // Reproducible Worker bundle, migrations, pricing catalogue and deployment metadata.
       ['cloudflare/dist', 'nodus-cloudflare'],
-      ['scripts/alphagenome_worker.py', 'genomics/alphagenome_worker.py'],
+      // Signed capability packages for the 5.3.1 migration. Inert: never registered,
+      // extracted or loaded unless a profile actually asked for one, and verified like a
+      // download when it is.
+      ['build/capability-bootstrap', 'capability-bootstrap'],
     ],
   );
   // Whatever else that folder gains, the shipped copy must never carry a live deployment's state:

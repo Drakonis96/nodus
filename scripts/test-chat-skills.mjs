@@ -12,7 +12,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-chat-skills-test-'));
 const bundle = path.join(temporary, 'test.cjs');
 await build({
-  stdin: { contents: `export * from './shared/chatSkills'; export * from './electron/chatSkills'; export * from './electron/chatAssets'; export * from './electron/ai/chatSkillExecution'; export * from './electron/ai/chatChemistrySvg';`, resolveDir: root, loader: 'ts' },
+  stdin: { contents: `export * from './shared/chatSkills'; export * from './electron/chatSkills'; export * from './electron/chatAssets'; export * from './electron/ai/chatSkillExecution';`, resolveDir: root, loader: 'ts' },
   outfile: bundle, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent',
   plugins: [{ name: 'isolated-test', setup(api) {
     api.onResolve({ filter: /skillToolSandbox$/ }, () => ({ path: 'tools', namespace: 'mock' }));
@@ -24,6 +24,9 @@ await build({
     api.onResolve({ filter: /chemistryValidationHost$/ }, () => ({ path: 'chemistry-validator', namespace: 'mock' }));
     api.onResolve({ filter: /decorativeImages$/ }, () => ({ path: 'images', namespace: 'mock' }));
     api.onResolve({ filter: /db\/settingsRepo$/ }, () => ({ path: 'settings', namespace: 'mock' }));
+    // With no capability package installed the dispatcher never builds a trusted runner,
+    // so its graph (and the whole AI client behind it) stays out of this bundle.
+    api.onResolve({ filter: /capabilities\/runner$/ }, () => ({ path: 'trusted-runner', namespace: 'mock' }));
     api.onLoad({ filter: /.*/, namespace: 'mock' }, ({ path: name }) => ({ contents: name === 'electron'
       ? `export const safeStorage = { isEncryptionAvailable: () => false }; export const app = { getPath: () => ${JSON.stringify(temporary)}, getVersion: () => '5.3.0' };`
       : name === 'tools' ? `export const runSkillTool = (...args) => globalThis.__skillToolRunner(...args);`
@@ -33,6 +36,7 @@ await build({
       : name === 'chemistry-repair' ? `export const repairChemistryIntent = (...args) => globalThis.__skillChemistryRepair?.(...args);`
       : name === 'chemistry-validator' ? `export const validateChemistryInUtility = () => { throw new Error('Unexpected validator'); };`
       : name === 'settings' ? `export const getSettings = () => ({ imageProvider: 'google', imageModel: 'user-selected-image-model' });`
+      : name === 'trusted-runner' ? `export const createTrustedCapabilityRunner = () => { throw new Error('Unexpected trusted runner'); }; export const createCapabilityAdapters = () => ({});`
       : `export const callImageProvider = (...args) => globalThis.__skillImageProvider(...args); export const prepareGeneratedImage = (image) => ({ image: image.bytes, mimeType: image.mimeType });`, loader: 'js' }));
     api.onResolve({ filter: /^@shared\// }, ({ path: specifier }) => ({ path: path.join(root, 'shared', `${specifier.slice(8)}.ts`) }));
   } }],
@@ -52,137 +56,24 @@ test('visual parser recognizes raw, SVG, XML and tilde fences, preserving ordina
   assert.deepEqual(lib.splitChatVisuals(code), [{ kind: 'markdown', content: code, complete: true }]);
   assert.equal(lib.splitChatVisuals('```svg\n<svg><path')[0].complete, false);
   assert.equal(lib.splitChatVisuals('```nodus-image\n{"prompt":')[0].kind, 'image-request');
-  assert.equal(lib.splitChatVisuals('```smiles\nCCO\n```')[0].kind, 'smiles');
-  assert.equal(lib.splitChatVisuals('```lewis\n{"structures":[{"label":"water","smiles":"O"}]}\n```')[0].kind, 'lewis');
-  assert.equal(lib.splitChatVisuals('```chemistry-plan\n{"version":1}\n```')[0].kind, 'chemistry-plan');
-  assert.equal(lib.splitChatVisuals('```chemfig\n\\chemfig{H_3C-CH_3}\n```')[0].kind, 'chemfig');
-  assert.equal(lib.splitChatVisuals('```tex\n\\chemfig{H_3C-CH_3}\n```')[0].kind, 'chemfig');
-  assert.deepEqual(lib.splitChatVisuals('CCC'), [{ kind: 'markdown', content: 'CCC', complete: true }], 'bare SMILES is never promoted globally');
-  assert.equal(lib.splitChatVisuals('\\chemfig{H_3C-CH_3}')[0].kind, 'chemfig');
-  assert.equal(lib.splitChatVisuals('\\schemestart \\chemfig{@{a}O^{-}} \\arrow{->} \\chemfig{C} \\schemestop \\chemmove{\\draw[->](a)--(b);}')[0].kind, 'chemfig');
-  assert.match(lib.serializeChatVisualPart({ kind: 'smiles', content: 'CCO', complete: true }), /```smiles\nCCO\n```/);
+  // A fence only becomes a visual when an installed package has claimed it.
+  assert.equal(lib.splitChatVisuals('```chemistry-plan\n{"version":2}\n```')[0].kind, 'markdown');
+  assert.equal(lib.splitChatVisuals('```chemistry-plan\n{"version":2}\n```', new Set(['chemistry-plan']))[0].kind, 'capability-pending');
+  assert.equal(lib.splitChatVisuals('```chemistry-plan\n{"version":2}\n```', new Set(['chemistry-plan']))[0].fence, 'chemistry-plan');
+  assert.deepEqual(lib.splitChatVisuals('CCC'), [{ kind: 'markdown', content: 'CCC', complete: true }], 'bare text is never promoted');
+  // A package's own notation stays ordinary text here: the core knows no notation.
+  assert.equal(lib.splitChatVisuals('\\chemfig{H_3C-CH_3}')[0].kind, 'markdown');
 });
 
-test('Chemistry Studio is separate from general SVG routing', () => {
-  const chemistry = lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'chemistry');
-  const svg = lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'svg');
-  assert.ok(chemistry); assert.ok(svg);
-  assert.match(chemistry.instructions, /SMILES/i);
-  assert.match(chemistry.instructions, /version-2 intent/i);
-  assert.match(chemistry.instructions, /Do not invent SMILES/i);
-  // The contract the rewrite established: any element, arrows declared rather than
-  // looked up in a rule, and a scope limit that never becomes a refusal.
-  assert.match(chemistry.instructions, /There is no element restriction/i);
-  assert.match(chemistry.instructions, /A scope limit is never a reason to refuse/i);
-  assert.match(chemistry.instructions, /electronFlow/);
-  assert.match(chemistry.instructions, /kind "resonance"/i);
-  assert.match(lib.chatSkillsOutputContract([svg, chemistry]), /Chemistry Studio takes precedence over SVG Studio/i);
-  assert.match(lib.chatSkillsOutputContract([svg, chemistry]), /clearly labeled fallback drawing/i);
-  assert.match(lib.buildChatSkillsPrompt([chemistry]), /SVG Studio is not enabled/i);
-  assert.match(svg.description, /maps, timelines and visual systems/i);
-});
 
-test('chemical documents contribute identities rather than SVG JSON to conversation titles', () => {
-  const source = lib.serializeChatVisualPart({ kind: 'chemistry-document', complete: true, content: JSON.stringify({ version: 2, species: [{ input: { value: 'cubane' }, svg: '<svg>large geometry</svg>' }] }) });
-  assert.equal(lib.chemistryTitleSummary(source).trim(), 'Chemical structures: cubane.');
-  assert.equal(lib.chemistryTitleSummary('Ordinary prose'), 'Ordinary prose');
-});
 
-test('a chemical intent becomes an application-authored document and keeps the surrounding prose', async () => {
-  const plan = '{"version":2,"kind":"structure"}';
-  let received;
-  globalThis.__skillChemistryResolver = async (...args) => { received = args; return { version: 2, status: 'verified', species: [] }; };
-  const result = await lib.executeChatSkills(`Before\n\`\`\`chemistry-plan\n${plan}\n\`\`\`\nAfter`, {
-    version: 0, question: 'Draw ethanol', skills: lib.DEFAULT_CHAT_SKILLS, model: { provider: 'deepseek', model: 'deepseek-v4-flash' }, isCurrent: () => true,
-  });
-  assert.equal(received[0], plan);
-  assert.equal(received[1], 'Draw ethanol');
-  assert.doesNotMatch(result, /chemistry-plan/);
-  // The drawing replaces the plan, never the explanation around it.
-  assert.match(result, /Before/); assert.match(result, /After/);
-  assert.equal(lib.splitChatVisuals(result).find(part => part.kind === 'chemistry-document')?.complete, true);
-});
 
-test('model-authored documents and legacy chemistry cannot bypass the identity resolver', async () => {
-  for (const kind of ['chemistry-document', 'chemfig', 'smiles', 'lewis']) {
-    const answer = await lib.executeChatSkills(`Keep this sentence.\n\`\`\`${kind}\n{"status":"verified"}\n\`\`\``, { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, isCurrent: () => true });
-    // The unverified payload is still never rendered, but the reply survives it.
-    assert.doesNotMatch(answer, /"status":"verified"/);
-    assert.match(answer, /Keep this sentence\./);
-    assert.equal(lib.splitChatVisuals(answer).find(p => p.kind === 'chemistry-notice')?.content, '{"code":"legacy-format"}');
-  }
-});
 
-test('whole-answer generic JSON chemical intents still pass through the full identity resolver', async () => {
-  let calls = 0;
-  globalThis.__skillChemistryResolver = async () => { calls++; return { version: 2, status: 'needs-clarification', reason: 'Unspecified stereocentre.' }; };
-  const execution = { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, isCurrent: () => true };
-  const result = await lib.executeChatSkills('```json\n{"version":2,"kind":"structure","depiction":"skeletal","species":[]}\n```', execution);
-  assert.equal(calls, 1);
-  assert.match(result, /"code":"not-drawn"/);
-  assert.match(result, /Unspecified stereocentre\./);
-  const ordinary = '```json\n{"version":2,"name":"unrelated"}\n```';
-  assert.equal(await lib.executeChatSkills(ordinary, execution), ordinary);
-  assert.equal(calls, 1);
-  const chemical = '```json\n{"version":2,"kind":"structure","depiction":"newman","species":[]}\n```';
-  const repeated = await lib.executeChatSkills(`Unverified claim\n${chemical}\nI changed my mind\n${chemical}`, execution);
-  // Only one plan compiles, but neither sentence is deleted to say so.
-  assert.equal(calls, 2); assert.match(repeated, /"code":"not-drawn"/);
-  assert.match(repeated, /Unverified claim/); assert.match(repeated, /I changed my mind/);
-  const conflicting = await lib.executeChatSkills(chemical + '\n' + chemical.replace('newman', 'skeletal'), execution);
-  assert.match(conflicting, /"code":"conflicting-intents"/); assert.equal(calls, 2);
-});
 
-test('unsupported chemistry degrades to a labeled SVG but still refuses images and legacy formats', async () => {
-  const execution = { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, question: 'Draw a verified E2 mechanism with validated ChemFig export.', isCurrent: () => true };
-  const svg = await lib.executeChatSkills('The major product is guaranteed.\n```svg\n<svg><text>Unverified product</text></svg>\n```', execution);
-  assert.match(svg, /"code":"unverified-svg"/);
-  assert.match(svg, /<svg/);
-  assert.ok(svg.indexOf('unverified-svg') < svg.indexOf('major product'), 'the warning precedes model-authored chemistry claims');
-  for (const visual of ['```nodus-image\n{"title":"E2","alt":"E2","prompt":"Draw an unverified chemical reaction."}\n```', '![Mechanism](https://example.com/drawing.png)', '```svg\n<svg><text>C</text></svg>\n```\n```nodus-image\n{"title":"E2","alt":"E2","prompt":"Draw an unverified chemical reaction."}\n```', '```svg\n<svg><text>C</text></svg>\n```\n```chemfig\n\\chemfig{C-C}\n```']) {
-    const answer = await lib.executeChatSkills('The major product is guaranteed.\n' + visual, execution);
-    // A generated image or a legacy block is still never adopted as chemistry…
-    assert.doesNotMatch(answer, /example\.com/);
-    assert.ok(!lib.splitChatVisuals(answer).some(p => p.kind === 'image-request'), 'a generated image is never adopted as chemistry');
-    // …but refusing the drawing no longer costs the user the sentence they wrote it around.
-    assert.match(answer, /guaranteed/);
-  }
-  const chemistry = lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'chemistry');
-  const withoutSvgStudio = await lib.executeChatSkills('Prose worth keeping.\n```svg\n<svg><text>C</text></svg>\n```', { ...execution, skills: [chemistry] });
-  assert.match(withoutSvgStudio, /Prose worth keeping\./);
-  const ordinary = '```svg\n<svg><text>Energy</text></svg>\n```';
-  assert.equal((await lib.executeChatSkills(ordinary, { ...execution, question: 'Draw an energy diagram for E2.' })).trim(), ordinary);
-  const orbital = '```svg\n<svg><text>C</text><text>p orbital</text></svg>\n```';
-  assert.equal((await lib.executeChatSkills(orbital, { ...execution, question: 'Draw an orbital diagram for carbon.' })).trim(), orbital);
-});
 
-test('chemistry SVG audit is scoped to semantic chemical drawings and enforces textbook notation', () => {
-  const molecule = '<svg><text>C</text><text>Cl</text><path aria-label="bond"/></svg>';
-  assert.equal(lib.isChemistrySvgRequest('Draw CHCl3 with wedge and dash bonds.', molecule), true);
-  assert.equal(lib.isChemistrySvgRequest('Draw a molecular line-bond structure.', molecule), true);
-  assert.equal(lib.isChemistrySvgRequest('Draw a reaction mechanism.', molecule), true);
-  assert.equal(lib.isChemistrySvgRequest('Draw the Claisen mechanism.', molecule), true);
-  assert.equal(lib.isChemistrySvgRequest('Show the financial bond market.', '<svg><text>Bonds</text></svg>'), false);
-  assert.equal(lib.isChemistrySvgRequest('Draw a tetrahedral molecule.', '<svg><text>Unrelated process</text></svg>'), false);
-  assert.equal(lib.chemistrySvgMode('Draw CHCl3 with wedge and dash bonds.'), 'tetrahedral');
-  assert.equal(lib.chemistrySvgMode('Show all nonbonding electrons in line-bond structures.'), 'planar-line-bond');
-  assert.equal(lib.chemistrySvgMode('Draw a reaction mechanism.'), 'general');
-  const prompt = lib.chemistrySvgAuditSystem(lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'svg'), 'tetrahedral');
-  assert.match(prompt, /exactly two ordinary in-plane bonds/i);
-  assert.match(prompt, /exactly one filled triangular wedge/i);
-  assert.match(prompt, /exactly one hashed wedge/i);
-  assert.match(prompt, /exact number and ownership of lone pairs/i);
-  assert.match(prompt, /Never label .*109\.5 degrees/i);
-  const planar = lib.chemistrySvgAuditSystem(lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'svg'), 'planar-line-bond');
-  assert.match(planar, /classification is final/i);
-  assert.match(planar, /Use no filled wedge, hashed wedge, dasharray, dashed bond, polygon bond/i);
-  assert.deepEqual(lib.chemistrySvgMarkupIssues('Draw a planar line-bond structure.', '<svg><circle/><polygon points="1,1 2,2 3,3"/><line stroke-dasharray="2,2"/></svg>').length, 3);
-  assert.deepEqual(lib.chemistrySvgMarkupIssues('Draw tetrahedral CHCl3 with wedge and dash bonds.', '<svg><polygon points="1,1 2,2 3,3 4,4" opacity=".5"/></svg>').length, 2);
-  assert.deepEqual(lib.chemistrySvgMarkupIssues('Draw tetrahedral CHCl3 with wedge and dash bonds.', '<svg><polygon points="1,1 2,2 3,3"/></svg>'), []);
-});
 
 test('skills support independent activation, CRUD and explicit built-in restoration', () => {
-  assert.equal(lib.listChatSkills().length, 14);
+  assert.equal(lib.listChatSkills().length, lib.DEFAULT_CHAT_SKILLS.length);
   const built = lib.listChatSkills()[0];
   lib.saveChatSkill({ ...built, enabled: { assistant: false, nodi: true } });
   assert.equal(lib.enabledChatSkills('assistant').length, 1);
@@ -192,7 +83,8 @@ test('skills support independent activation, CRUD and explicit built-in restorat
   assert.ok(custom); assert.notEqual(custom.id, 'untrusted-id');
   lib.deleteChatSkill(built.id);
   assert.equal(lib.listChatSkills().some(item => item.id === built.id), false);
-  assert.equal(lib.restoreChatSkills().length, 15);
+  // Restoring brings the defaults back without touching the skill the user wrote.
+  assert.equal(lib.restoreChatSkills().length, lib.DEFAULT_CHAT_SKILLS.length + 1);
   lib.deleteChatSkill(custom.id);
   assert.throws(() => lib.saveChatSkill({ name: '' }), /name, description/);
 });
@@ -224,8 +116,8 @@ test('existing libraries receive the disabled tutor once without overwriting use
     assert.equal(migrated.some(skill => skill.builtin === 'image'), false, 'deleted image skill stays deleted');
     const tutor = migrated.find(skill => skill.builtin === 'socratic');
     assert.deepEqual(tutor.enabled, { assistant: false, nodi: false });
-    assert.equal(JSON.parse(fs.readFileSync(location)).version, 15);
-    assert.equal(lib.listChatSkills().length, 14, 'migration is idempotent');
+    assert.equal(JSON.parse(fs.readFileSync(location)).version, 16);
+    assert.equal(lib.listChatSkills().length, 11, 'migration is idempotent');
     lib.deleteChatSkill(tutor.id);
     assert.equal(lib.listChatSkills().some(skill => skill.builtin === 'socratic'), false, 'deleted tutor does not reappear');
   } finally { fs.writeFileSync(location, original); }
@@ -255,116 +147,27 @@ test('version 2 migration adds general skills once and preserves edited or delet
     const edited = { ...lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'general'), instructions: 'Keep my imported method.', enabled: { assistant: false, nodi: true } };
     fs.writeFileSync(location, JSON.stringify({ version: 2, skills: [tutor, edited] }));
     const migrated = lib.listChatSkills();
-    assert.equal(migrated.length, 12);
+    assert.equal(migrated.length, 2 + lib.DEFAULT_CHAT_SKILLS.filter(skill => skill.builtin === 'general').length - 1);
     assert.deepEqual(migrated.slice(0, 2), [tutor, edited]);
     assert.equal(migrated.some(skill => ['svg', 'image'].includes(skill.builtin)), false);
     for (const skill of migrated.slice(2).filter(item => item.builtin === 'general')) assert.deepEqual(skill.enabled, { assistant: false, nodi: false });
-    assert.deepEqual(migrated.find(item => item.builtin === 'chemistry').enabled, { assistant: true, nodi: true });
+    assert.equal(migrated.some(item => item.builtin === 'chemistry'), false, 'a discipline that became a package is never restored as a default');
     lib.deleteChatSkill(edited.id);
     assert.equal(lib.listChatSkills().some(skill => skill.id === edited.id), false);
     fs.writeFileSync(location, JSON.stringify({ version: 2, skills: [] }));
     const fromEmpty = lib.listChatSkills();
-    assert.equal(fromEmpty.length, 11);
+    assert.equal(fromEmpty.length, lib.DEFAULT_CHAT_SKILLS.filter(skill => skill.builtin === 'general').length);
     assert.equal(fromEmpty.filter(skill => skill.builtin === 'general').length, 8);
-    assert.equal(fromEmpty.filter(skill => skill.builtin === 'chemistry').length, 1);
+    assert.equal(fromEmpty.some(skill => skill.builtin === 'chemistry'), false, 'a discipline that became a package is never added by a historical migration');
     assert.equal(fromEmpty.some(skill => skill.builtin === 'socratic'), false, 'a previously deleted tutor stays deleted');
     assert.deepEqual(lib.listChatSkills(), fromEmpty, 'migration does not duplicate defaults');
   } finally { fs.writeFileSync(location, original); }
 });
 
-test('version 3 migration adds Chemistry Studio once and preserves existing skills', () => {
-  const location = path.join(temporary, 'chat-skills.json');
-  const original = fs.readFileSync(location);
-  try {
-    const edited = { ...lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'svg'), instructions: 'Keep generic SVG unchanged.', enabled: { assistant: false, nodi: true } };
-    fs.writeFileSync(location, JSON.stringify({ version: 3, skills: [edited] }));
-    const migrated = lib.listChatSkills();
-    assert.deepEqual(migrated[0], edited);
-    assert.equal(migrated.filter(skill => skill.builtin === 'chemistry').length, 1);
-    assert.equal(JSON.parse(fs.readFileSync(location)).version, 15);
-    assert.deepEqual(lib.listChatSkills(), migrated, 'version 6 migration is idempotent');
-  } finally { fs.writeFileSync(location, original); }
-});
 
-test('historical migrations preserve user-edited Chemistry Studio instructions', () => {
-  const location = path.join(temporary, 'chat-skills.json');
-  const original = fs.readFileSync(location);
-  try {
-    const chemistry = { ...lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'chemistry'), instructions: 'Keep my custom chemistry workflow.', enabled: { assistant: false, nodi: true } };
-    for (const version of [4, 5, 6, 7, 8]) {
-      fs.writeFileSync(location, JSON.stringify({ version, skills: [chemistry] }));
-      assert.deepEqual(lib.listChatSkills().filter(s => !['genomics', 'legal'].includes(s.builtin)), [chemistry]);
-      assert.equal(JSON.parse(fs.readFileSync(location)).version, 15);
-    }
-  } finally { fs.writeFileSync(location, original); }
-});
 
-test('untouched v8 chemistry instructions upgrade once without resetting flags or deleted skills', () => {
-  const location = path.join(temporary, 'chat-skills.json'), original = fs.readFileSync(location);
-  try {
-    const instructions = fs.readFileSync(path.join(root, 'scripts/fixtures/chemistry-skill-v8.txt'), 'utf8').trimEnd();
-    assert.equal(createHash('sha256').update(instructions).digest('hex'), '876f9cf3d84a695540625bc79865b5f1d9026f6e577dbbbfd78a970e5552db94');
-    const chemistry = { ...lib.DEFAULT_CHAT_SKILLS.find(s => s.builtin === 'chemistry'), instructions, enabled: { assistant: false, nodi: true } };
-    fs.writeFileSync(location, JSON.stringify({ version: 8, skills: [chemistry] }));
-    const migrated = lib.listChatSkills(); assert.equal(migrated.length, 3);
-    assert.equal(migrated[0].instructions, lib.DEFAULT_CHAT_SKILLS.find(s => s.builtin === 'chemistry').instructions);
-    assert.deepEqual(migrated[0].enabled, chemistry.enabled);
-    assert.deepEqual(lib.listChatSkills(), migrated);
-    fs.writeFileSync(location, JSON.stringify({ version: 8, skills: [] }));
-    assert.deepEqual(lib.listChatSkills().map(s => s.builtin), ['genomics', 'legal']);
-  } finally { fs.writeFileSync(location, original); }
-});
 
-test('an untouched built-in is upgraded across library versions while user edits survive', () => {
-  const location = path.join(temporary, 'chat-skills.json'), original = fs.readFileSync(location);
-  try {
-    const latestSvg = lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'svg');
-    const latestChemistry = lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'chemistry');
-    // Previous default texts are kept verbatim as fixtures. Reconstructing them by
-    // patching the current text made every prompt rewrite break this test, which says
-    // nothing about whether the upgrade path still works.
-    const legacy = JSON.parse(fs.readFileSync(path.join(root, 'scripts/fixtures/chat-skills-legacy-instructions.json'), 'utf8'));
-    const previousSvg = latestSvg.instructions.replace(
-      latestSvg.instructions.match(/Choose domain-appropriate conventions:[^\n]+/)[0],
-      'Choose domain-appropriate conventions: circuit symbols for circuits; arrows and labeled dependencies for processes; and oriented and labeled axes for plots. When Chemistry Studio is enabled, leave molecular structures, reactions and mechanisms to that skill, even if the requested export is SVG. SVG Studio may draw non-molecular orbital/energy diagrams or explanatory infographics, but must never replace an unsupported molecular mechanism or projection.');
-    const previousChemistry = legacy.chemistry.instructions;
-    // The registered digests are what the migration actually matches on.
-    assert.equal(createHash('sha256').update(previousSvg).digest('hex'), '8a8629caa2db26ab2d86ad7b2ee3daae72bd4156d198a8da01b639218c328570');
-    assert.equal(createHash('sha256').update(previousChemistry).digest('hex'), legacy.chemistry.sha256);
-    assert.notEqual(previousChemistry, latestChemistry.instructions, 'the fixture must be the older text, not a copy of the current one');
 
-    fs.writeFileSync(location, JSON.stringify({ version: legacy.chemistry.libraryVersion, skills: [
-      { ...latestSvg, version: undefined, instructions: previousSvg, enabled: { assistant: false, nodi: true } },
-      { ...latestChemistry, version: undefined, instructions: previousChemistry, enabled: { assistant: true, nodi: false } },
-    ] }));
-    const upgraded = lib.listChatSkills();
-    assert.equal(upgraded[0].instructions, latestSvg.instructions); assert.equal(upgraded[0].version, latestSvg.version);
-    assert.equal(upgraded[1].instructions, latestChemistry.instructions); assert.equal(upgraded[1].version, latestChemistry.version);
-    assert.deepEqual(upgraded.map(skill => skill.enabled), [{ assistant: false, nodi: true }, { assistant: true, nodi: false }]);
-
-    const custom = [
-      { ...latestSvg, instructions: 'Keep my custom SVG workflow.', enabled: { assistant: false, nodi: true } },
-      { ...latestChemistry, instructions: 'Keep my custom chemistry workflow.', enabled: { assistant: true, nodi: false } },
-    ];
-    fs.writeFileSync(location, JSON.stringify({ version: legacy.chemistry.libraryVersion, skills: custom }));
-    assert.deepEqual(lib.listChatSkills(), custom);
-  } finally { fs.writeFileSync(location, original); }
-});
-
-test('reaction JSON reaches the same resolver and an abstention is stated rather than hidden', async () => {
-  const intent = { version: 2, kind: 'reaction', depiction: 'skeletal', reactionSmiles: 'N>>N' };
-  let calls = 0;
-  globalThis.__skillChemistryResolver = async source => { assert.deepEqual(JSON.parse(source), intent); calls++; return { version: 2, status: 'unsupported', reason: 'Test abstention.' }; };
-  const execution = { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, isCurrent: () => true };
-  const result = await lib.executeChatSkills('Guaranteed reaction!\n```json\n' + JSON.stringify(intent) + '\n```', execution);
-  assert.equal(calls, 1);
-  assert.match(result, /Test abstention/);
-  // An overclaim is answered with a notice saying nothing was drawn, not by deleting
-  // the model's text: no verified artifact exists here to lend it false authority.
-  assert.match(result, /"code":"not-drawn"/);
-  assert.match(result, /Guaranteed reaction!/);
-  assert.ok(result.indexOf('not-drawn') < result.indexOf('Guaranteed'), 'the notice precedes the claim');
-});
 
 test('image requests use the exact model and prompt, persist metadata, and return real local URLs', async () => {
   const owner = lib.chatAssetOwner('assistant', 'conversation-one', 'vault-one');
@@ -451,7 +254,6 @@ test('raw image briefs retain optional composition format and ordinary JSON rema
 test('custom capabilities use the native output contract without claiming builtin identity', async () => {
   const custom = { id: 'custom-capability', name: 'Custom visual', description: 'Create images', instructions: 'Draw a portrait.', capabilities: ['image', 'svg', 'chemistry'], enabled: { assistant: true, nodi: false } };
   assert.match(lib.chatSkillsOutputContract([custom]), /IMAGE TOOL IS AVAILABLE/);
-  assert.match(lib.chatSkillsOutputContract([custom]), /CHEMISTRY TOOL IS AVAILABLE/);
   const owner = lib.chatAssetOwner('assistant', 'custom-image', 'vault');
   globalThis.__skillImageProvider = async () => ({ bytes: Buffer.from('custom-image'), mimeType: 'image/png' });
   const result = await lib.executeChatSkills('```nodus-image\n{"prompt":"Create a warm portrait of a quiet observatory."}\n```', { owner, version: 0, skills: [custom], isCurrent: () => true });
@@ -513,30 +315,6 @@ test('every built-in is published under the identifier the marketplace export pr
   assert.equal(lib.builtinSkillForPackage('descriptive-statistics'), undefined);
 });
 
-test('a built-in can be uninstalled and reinstalled alone, keeping every other skill as it was', () => {
-  lib.restoreChatSkills();
-  const edited = lib.listChatSkills().find(skill => skill.builtin === 'chemistry');
-  lib.saveChatSkill({ ...edited, instructions: 'Keep my edited chemistry instructions.', enabled: { assistant: true, nodi: false } });
-  const personal = lib.saveChatSkill({ name: 'Personal method', description: 'For reviews', instructions: 'Give two recommendations.', enabled: { assistant: true, nodi: true } }).find(skill => !skill.builtin);
-  const svg = lib.listChatSkills()[0];
-  assert.equal(svg.builtin, 'svg');
-  const removed = lib.deleteChatSkill(svg.id);
-  assert.equal(removed.some(skill => skill.id === svg.id), false);
-  assert.equal(fs.existsSync(path.join(temporary, 'skills', svg.id)), false);
-  assert.equal(lib.enabledChatSkills('assistant').some(skill => skill.builtin === 'svg'), false);
-  const restored = lib.installBuiltinChatSkill('svg-studio');
-  assert.deepEqual(restored[0], lib.DEFAULT_CHAT_SKILLS[0], 'the built-in returns to its shipped definition and position');
-  assert.equal(fs.existsSync(path.join(temporary, 'skills', svg.id, 'SKILL.md')), true);
-  assert.equal(restored.find(skill => skill.builtin === 'chemistry').instructions, 'Keep my edited chemistry instructions.');
-  assert.deepEqual(restored.find(skill => skill.id === personal.id), personal, 'a personal skill is untouched');
-  // Reinstalling one already present restores the shipped text in place instead of duplicating it.
-  lib.saveChatSkill({ ...restored[0], instructions: 'My own drawing rules.' });
-  const again = lib.installBuiltinChatSkill('svg-studio');
-  assert.equal(again.filter(skill => skill.builtin === 'svg').length, 1);
-  assert.deepEqual(again[0], lib.DEFAULT_CHAT_SKILLS[0]);
-  assert.throws(() => lib.installBuiltinChatSkill('descriptive-statistics'), /not a built-in/);
-  lib.deleteChatSkill(personal.id);
-});
 
 test('the panel reset never outranks the switch track color', () => {
   // The standalone Nodi window has no Tailwind base reset, so the shared panel
@@ -587,116 +365,51 @@ test('a capability that declares permissions is budgeted apart from deterministi
   assert.equal(lib.splitChatVisuals(mixed).filter(part => part.kind === 'capability-result').length, 7);
 });
 
-test('when the verified lane abstains, the drawing is asked for again in SVG', async () => {
-  const execution = { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, question: 'Draw a chemical reaction between HCl and aluminum.', model: { provider: 'deepseek', model: 'deepseek-v4-flash' }, isCurrent: () => true };
-  globalThis.__skillChemistryResolver = async () => ({ version: 2, status: 'needs-clarification', reason: 'Test abstention.' });
-  let asked;
-  globalThis.__skillChemistrySvgFallback = async options => { asked = options; return '\n\n```svg\n<svg><text>Al</text></svg>\n```\n\n'; };
-  const result = await lib.executeChatSkills('Aluminium dissolves in hydrochloric acid.\n```chemistry-plan\n{"version":2,"kind":"reaction"}\n```', execution);
-  // The rescue is given the request and the reason the verified lane gave up.
-  assert.equal(asked.question, 'Draw a chemical reaction between HCl and aluminum.');
-  assert.match(asked.reason, /Test abstention/);
-  // The user ends up with a drawing, the prose, and an honest label — never a bare notice.
-  assert.match(result, /<svg/);
-  assert.match(result, /Aluminium dissolves/);
-  assert.match(result, /"code":"unverified-svg"/);
-  assert.doesNotMatch(result, /"code":"not-drawn"/);
+test('an untouched built-in is upgraded across library versions while a user edit survives', () => {
+  const location = path.join(temporary, 'chat-skills.json'), original = fs.readFileSync(location);
+  try {
+    const latestSvg = lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'svg');
+    // The v12 text is kept verbatim as a fixture: the migration matches on its digest, so
+    // reconstructing it by hand would test a different string than the one that ships.
+    const legacy = JSON.parse(fs.readFileSync(path.join(root, 'scripts/fixtures/chat-skills-legacy-instructions.json'), 'utf8'));
+    const previousSvg = legacy.svg.instructions;
+    assert.equal(createHash('sha256').update(previousSvg).digest('hex'), legacy.svg.sha256);
+    assert.notEqual(previousSvg, latestSvg.instructions, 'the fixture must be the older text, not a copy of the current one');
 
-  // A rescue that comes back empty leaves the abstention standing, and still the prose.
-  globalThis.__skillChemistrySvgFallback = async () => '';
-  const empty = await lib.executeChatSkills('Aluminium dissolves in hydrochloric acid.\n```chemistry-plan\n{"version":2,"kind":"reaction"}\n```', execution);
-  assert.match(empty, /"code":"not-drawn"/);
-  assert.match(empty, /Aluminium dissolves/);
+    const edited = { ...lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'socratic'), instructions: 'Keep my tutor.', enabled: { assistant: true, nodi: false } };
+    fs.writeFileSync(location, JSON.stringify({ version: legacy.svg.libraryVersion, skills: [
+      { ...latestSvg, version: undefined, instructions: previousSvg, enabled: { assistant: false, nodi: true } },
+      edited,
+    ] }));
 
-  // A verified drawing never pays for a second model call.
-  let called = false;
-  globalThis.__skillChemistrySvgFallback = async () => { called = true; return ''; };
-  globalThis.__skillChemistryResolver = async () => ({ version: 2, status: 'verified', species: [] });
-  await lib.executeChatSkills('```chemistry-plan\n{"version":2,"kind":"structure"}\n```', execution);
-  assert.equal(called, false, 'the rescue only runs once the verified lane has abstained');
-  globalThis.__skillChemistrySvgFallback = undefined;
+    const migrated = lib.listChatSkills();
+    const svg = migrated.find(skill => skill.builtin === 'svg');
+    assert.equal(svg.instructions, latestSvg.instructions, 'an untouched default is brought up to date');
+    assert.deepEqual(svg.enabled, { assistant: false, nodi: true }, 'without disturbing where it was enabled');
+    assert.equal(svg.version, latestSvg.version);
+    assert.deepEqual(svg.capabilities, ['nodus:svg']);
+    const tutor = migrated.find(skill => skill.builtin === 'socratic');
+    assert.equal(tutor.instructions, 'Keep my tutor.', 'and an edited one is left exactly as the user wrote it');
+    assert.deepEqual(lib.listChatSkills(), migrated, 'running the migration again changes nothing');
+  } finally { fs.writeFileSync(location, original); }
 });
 
-test('a structural rejection is repaired; a chemical one is not re-prompted', async () => {
-  const execution = { version: 0, skills: lib.DEFAULT_CHAT_SKILLS, question: 'Draw ethanol', model: { provider: 'deepseek', model: 'deepseek-v4-flash' }, isCurrent: () => true };
-  globalThis.__skillChemistrySvgFallback = async () => '';
+test('a built-in can be uninstalled and reinstalled alone, keeping every other skill as it was', () => {
+  lib.restoreChatSkills();
+  const edited = lib.listChatSkills().find(skill => skill.builtin === 'svg');
+  lib.saveChatSkill({ ...edited, instructions: 'Keep my edited drawing rules.', enabled: { assistant: true, nodi: false } });
+  const personal = lib.saveChatSkill({ name: 'Personal method', description: 'For reviews', instructions: 'Give two recommendations.', enabled: { assistant: true, nodi: true } }).find(skill => !skill.builtin);
 
-  // A field-shaped problem: the repair is given the exact error and its output is retried.
-  let seen = [];
-  globalThis.__skillChemistryResolver = async source => seen.push(source) === 1
-    ? { version: 2, status: 'unsupported', reason: 'species[0].id must be lower-case kebab-case starting with a letter, for example "substrate".' }
-    : { version: 2, status: 'verified', species: [] };
-  let repairInput;
-  globalThis.__skillChemistryRepair = async options => { repairInput = options; return '{"version":2,"kind":"structure","repaired":true}'; };
-  const fixed = await lib.executeChatSkills('```chemistry-plan\n{"version":2,"kind":"structure"}\n```', execution);
-  assert.equal(seen.length, 2, 'the repaired intent is resolved again');
-  assert.equal(seen[1], '{"version":2,"kind":"structure","repaired":true}');
-  assert.match(repairInput.problem, /species\[0\]\.id/);
-  assert.equal(repairInput.final, false, 'the first of two attempts is not the final one');
-  assert.equal(lib.splitChatVisuals(fixed).find(p => p.kind === 'chemistry-document')?.complete, true);
+  lib.deleteChatSkill(edited.id);
+  const without = lib.listChatSkills();
+  assert.equal(without.some(skill => skill.builtin === 'svg'), false, 'the built-in is gone');
+  assert.ok(without.find(skill => skill.id === personal.id), 'and nothing else went with it');
 
-  // A chemical abstention is never sent to the repair loop: no field can fix it.
-  seen = []; let repaired = 0;
-  globalThis.__skillChemistryRepair = async () => { repaired++; return '{}'; };
-  globalThis.__skillChemistryResolver = async source => { seen.push(source); return { version: 2, status: 'needs-clarification', reason: 'A stereocentre is unspecified.' }; };
-  const abstained = await lib.executeChatSkills('```chemistry-plan\n{"version":2,"kind":"structure"}\n```', execution);
-  assert.equal(repaired, 0, 're-prompting cannot make a reference specify a stereocentre');
-  assert.equal(seen.length, 1);
-  assert.match(abstained, /A stereocentre is unspecified/);
-
-  // Repair is bounded: a model that keeps failing stops costing calls.
-  seen = []; repaired = 0;
-  globalThis.__skillChemistryResolver = async source => { seen.push(source); return { version: 2, status: 'unsupported', reason: 'species[0].id must be lower-case kebab-case.' }; };
-  globalThis.__skillChemistryRepair = async () => { repaired++; return '{"version":2,"still":"wrong"}'; };
-  await lib.executeChatSkills('```chemistry-plan\n{"version":2,"kind":"structure"}\n```', execution);
-  assert.equal(repaired, 2, 'at most two repair attempts');
-  assert.equal(seen.length, 3, 'the original intent plus two repairs');
-
-  globalThis.__skillChemistryRepair = undefined;
-  globalThis.__skillChemistrySvgFallback = undefined;
-});
-
-test('no chemistry outcome ever returns less than the model wrote', async () => {
-  // The invariant the whole cascade exists to guarantee: whatever happens — the
-  // resolver abstains, the schema is wrong, the format is legacy, two intents
-  // conflict, the rescue fails — the user keeps their explanation.
-  const prose = 'Aluminium dissolves in hydrochloric acid to give hydrogen.';
-  const outcomes = {
-    verified: async () => ({ version: 2, status: 'verified', species: [] }),
-    partial: async () => ({ version: 2, status: 'partial', reason: 'Element outside the organic set.', species: [] }),
-    abstains: async () => ({ version: 2, status: 'needs-clarification', reason: 'A stereocentre is unspecified.' }),
-    unsupported: async () => ({ version: 2, status: 'unsupported', reason: 'species[0].id must be lower-case kebab-case.' }),
-    throws: async () => { throw new Error('The chemistry worker died.'); },
-  };
-  // `attempted` marks the answers where the model actually tried to produce chemistry.
-  // Plain prose with no chemical output is not a failure to explain anything.
-  const answers = [
-    { attempted: true, text: `${prose}\n\`\`\`chemistry-plan\n{"version":2,"kind":"reaction"}\n\`\`\`` },
-    { attempted: true, text: `${prose}\n\`\`\`json\n{"version":2,"kind":"structure","depiction":"skeletal","species":[]}\n\`\`\`` },
-    { attempted: true, text: `${prose}\n\`\`\`chemfig\n\\chemfig{C-C}\n\`\`\`` },
-    { attempted: true, text: `${prose}\n\`\`\`svg\n<svg><text>Al</text></svg>\n\`\`\`` },
-    { attempted: true, text: `${prose}\n\`\`\`json\n{"version":2,"kind":"structure","depiction":"skeletal","species":[]}\n\`\`\`\n\`\`\`json\n{"version":2,"kind":"structure","depiction":"newman","species":[]}\n\`\`\`` },
-    { attempted: false, text: prose },
-  ];
-  for (const [label, resolver] of Object.entries(outcomes)) {
-    globalThis.__skillChemistryResolver = resolver;
-    globalThis.__skillChemistryRepair = async () => undefined;
-    for (const rescue of [async () => '', async () => '\n\n```svg\n<svg><text>rescued</text></svg>\n```\n\n']) {
-      globalThis.__skillChemistrySvgFallback = rescue;
-      for (const { attempted, text: answer } of answers) {
-        const result = await lib.executeChatSkills(answer, {
-          version: 0, skills: lib.DEFAULT_CHAT_SKILLS, question: 'Draw a chemical reaction between HCl and aluminum.',
-          model: { provider: 'deepseek', model: 'deepseek-v4-flash' }, isCurrent: () => true,
-        });
-        assert.match(result, /Aluminium dissolves in hydrochloric acid/, `${label} lost the prose for: ${answer.slice(0, 60)}`);
-        // And whatever was dropped is always accounted for, never dropped in silence.
-        const parts = lib.splitChatVisuals(result);
-        const drew = parts.some(part => ['chemistry-document', 'svg'].includes(part.kind));
-        const explained = parts.some(part => part.kind === 'chemistry-notice');
-        if (attempted) assert.ok(drew || explained, `${label} produced neither a drawing nor an explanation for: ${answer.slice(0, 60)}`);
-      }
-    }
-  }
-  globalThis.__skillChemistryRepair = undefined;
-  globalThis.__skillChemistrySvgFallback = undefined;
+  const restored = lib.installBuiltinChatSkill('svg-studio').find(skill => skill.builtin === 'svg');
+  assert.ok(restored, 'reinstalling brings it back');
+  assert.equal(restored.instructions, lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'svg').instructions, 'as the application ships it, not as it was edited');
+  assert.deepEqual(restored.enabled, lib.DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'svg').enabled, 'with the activation the application ships, not the one the deleted copy had');
+  const personalAfter = lib.listChatSkills().find(skill => skill.id === personal.id);
+  assert.deepEqual(personalAfter.enabled, personal.enabled, 'the user\'s own skill is untouched throughout');
+  lib.deleteChatSkill(personal.id);
 });

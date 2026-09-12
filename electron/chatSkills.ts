@@ -5,6 +5,8 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { DEFAULT_CHAT_SKILLS, builtinSkillForPackage, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
 import { normalizeCapabilityId } from '../skill-capabilities/contracts';
+import { capabilityRegistry } from './capabilities/registry';
+import { resolveInstalledCapability } from './skillPlugins';
 import { resolvePluginCapabilityReference, type ValidatedPluginPackage } from '../skill-capabilities/pluginPackage';
 import {
   approvePendingPlugin,
@@ -20,72 +22,93 @@ import {
 } from './skillPlugins';
 
 const file = () => path.join(app.getPath('userData'), 'chat-skills.json');
-const LIBRARY_VERSION = 15;
+const originFile = () => path.join(app.getPath('userData'), 'profile-migrations', 'library-origin.json');
+const LIBRARY_VERSION = 16;
 const LEGACY_SVG_V12_SHA256 = '8a8629caa2db26ab2d86ad7b2ee3daae72bd4156d198a8da01b639218c328570';
-const LEGACY_CHEMISTRY_V14_SHA256 = '11748993bb6510e37f9e89822670b83beeb0f703dd423f052a117a57757fced0';
-const LEGACY_CHEMISTRY_V12_SHA256 = '72d01438357e6e4a591a0a067c62cbfbe6e2aa7fc801b30ace8d6c1a470fb725';
-const LEGACY_CHEMISTRY_V8_SHA256 = '876f9cf3d84a695540625bc79865b5f1d9026f6e577dbbbfd78a970e5552db94';
-const LEGACY_CHEMISTRY_V7_SHA256 = '752f1a771d090e09a2ac564421e563167fc89b858d9167eba50eb2327ce1c5ef';
-const LEGACY_CHEMISTRY_V6_SHA256 = '2fcb5625341467d5724b42ef1ac37d2429eb48779237e0593f7f75a605f00d5c';
-const LEGACY_CHEMISTRY_V5_SHA256 = '52585c98d17188a731ce06b5df8a34f914f63d68ef779fe8212cbe92db77b506';
-const LEGACY_CHEMISTRY_V4_SHA256 = '44b5250ff95674024902f363f3f7964645564774bbfbbeb7073597a8d583b147';
+/** Whether this profile was in use before the skills library existed, written down once,
+ *  before any default is created.
+ *
+ *  It has to be recorded rather than inferred later: the moment defaults are written there
+ *  is a `chat-skills.json` on disk, and from then on a profile that predates the library
+ *  is indistinguishable from one that never had a skill in it. The capability migration
+ *  reads this to decide whether chemistry was on by the behaviour of the time — so getting
+ *  it from the file's existence would mean either never honouring a real prior state, or
+ *  installing a package into a clean install nobody asked for. */
+function noteLibraryOrigin(): void {
+  if (fs.existsSync(originFile())) return;
+  const userData = app.getPath('userData');
+  const hadLibrary = fs.existsSync(file());
+  // A profile with a database or preferences but no library is one from before the
+  // library. A profile with neither is a clean install and carries no prior state at all.
+  const preLibraryProfile = !hadLibrary
+    && ['app-prefs.json', 'vaults.json', 'nodus.sqlite'].some(name => fs.existsSync(path.join(userData, name)));
+  fs.mkdirSync(path.dirname(originFile()), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(originFile(), JSON.stringify({ schemaVersion: 1, hadLibrary, preLibraryProfile, recordedAt: new Date().toISOString() }, null, 2), { mode: 0o600 });
+}
+
+/** True when this profile was already in use before skills had a library, so an implicit
+ *  activation of the time is a real prior state rather than an absence. */
+export function profilePredatesSkillLibrary(): boolean {
+  try {
+    const value = JSON.parse(fs.readFileSync(originFile(), 'utf8')) as { preLibraryProfile?: boolean };
+    return value.preLibraryProfile === true;
+  } catch {
+    // No marker means nothing wrote one yet, which only happens before the first library
+    // is created. Recording it now is what keeps the answer stable from here on.
+    noteLibraryOrigin();
+    try { return (JSON.parse(fs.readFileSync(originFile(), 'utf8')) as { preLibraryProfile?: boolean }).preLibraryProfile === true; }
+    catch { return false; }
+  }
+}
+
 /** Run before first-launch database/preferences initialization. Older profiles without
  * an explicit library retain the previously implicit Chemistry activation. */
 export function initializeChatSkillDefaults(): void {
+  noteLibraryOrigin();
   if (fs.existsSync(file())) return;
-  const olderProfile = ['app-prefs.json', 'vaults.json', 'nodus.sqlite'].some(name => fs.existsSync(path.join(app.getPath('userData'), name)));
-  const defaults = structuredClone(DEFAULT_CHAT_SKILLS);
-  if (olderProfile) { const chemistry = defaults.find(s => s.builtin === 'chemistry')!; chemistry.enabled = { assistant: true, nodi: true }; }
-  write(defaults);
+  write(structuredClone(DEFAULT_CHAT_SKILLS));
 }
 export function listChatSkills(): ChatSkill[] {
-  if (!fs.existsSync(file())) return write(structuredClone(DEFAULT_CHAT_SKILLS));
+  if (!fs.existsSync(file())) { noteLibraryOrigin(); return write(structuredClone(DEFAULT_CHAT_SKILLS)); }
   let parsed: { version?: number; skills?: ChatSkill[] };
   try { parsed = JSON.parse(fs.readFileSync(file(), 'utf8')); } catch { throw new Error('The skills library could not be read.'); }
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, LIBRARY_VERSION].includes(parsed.version ?? 0) || !Array.isArray(parsed.skills)) throw new Error('The skills library could not be read.');
   if (parsed.version! < LIBRARY_VERSION) {
     // Each release adds only newly introduced defaults. Never restore a skill
     // deleted in an earlier version or overwrite its edited instructions/flags.
     const latestSvg = DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'svg');
-    const latestChemistry = DEFAULT_CHAT_SKILLS.find(skill => skill.builtin === 'chemistry');
-    const renamed = parsed.skills.map(skill => skill.builtin === 'genomics'
-      ? { ...skill, name: skill.name === 'Genomics Studio' ? 'AlphaGenome' : skill.name,
-        instructions: skill.instructions.replaceAll('Genomics Studio', 'AlphaGenome') }
-      : skill);
-    const existing = renamed.map(skill => {
+    // The three disciplines left the application in 5.3.2. Their skills stay in an old
+    // profile exactly as they were — the capability migration is what adopts them — so
+    // nothing here refreshes their text or restores them as defaults.
+    const existing = parsed.skills.map(skill => {
+      const builtin = skill.builtin as string | undefined;
       const digest = typeof skill.instructions === 'string' ? createHash('sha256').update(skill.instructions).digest('hex') : '';
       let updated = skill;
-      if (skill.builtin === 'svg' && digest === LEGACY_SVG_V12_SHA256 && latestSvg) {
+      if (builtin === 'svg' && digest === LEGACY_SVG_V12_SHA256 && latestSvg) {
         updated = { ...skill, instructions: latestSvg.instructions, version: latestSvg.version };
       }
-      else if (skill.builtin === 'chemistry'
-        && ((parsed.version === 4 && digest === LEGACY_CHEMISTRY_V4_SHA256)
-          || (parsed.version === 5 && digest === LEGACY_CHEMISTRY_V5_SHA256)
-          || (parsed.version === 6 && digest === LEGACY_CHEMISTRY_V6_SHA256)
-          || (parsed.version === 7 && digest === LEGACY_CHEMISTRY_V7_SHA256)
-          || (parsed.version === 8 && digest === LEGACY_CHEMISTRY_V8_SHA256)
-          || digest === LEGACY_CHEMISTRY_V12_SHA256
-          || digest === LEGACY_CHEMISTRY_V14_SHA256)
-        && latestChemistry) {
-        updated = { ...skill, instructions: latestChemistry.instructions, version: latestChemistry.version };
+      if (builtin === 'genomics' && skill.name === 'Genomics Studio') {
+        updated = { ...updated, name: 'AlphaGenome', instructions: updated.instructions.replaceAll('Genomics Studio', 'AlphaGenome') };
       }
-      return updated.builtin && ['svg','image','chemistry','genomics','legal'].includes(updated.builtin)
-        ? { ...updated, capabilities: [`nodus:${updated.builtin}`] }
+      // The capability declaration is what the migration reads to decide whether a
+      // profile still depends on a discipline, so it is normalized even as it leaves.
+      return builtin && ['svg', 'image', 'chemistry', 'genomics', 'legal'].includes(builtin)
+        ? { ...updated, capabilities: [`nodus:${builtin}`] }
         : updated;
     });
     const additions = DEFAULT_CHAT_SKILLS.filter(skill =>
       ((parsed.version! < 2 && skill.builtin === 'socratic')
-        || (parsed.version! < 3 && skill.builtin === 'general')
-        || (parsed.version! < 4 && skill.builtin === 'chemistry')
-        || (parsed.version! < 10 && skill.builtin === 'genomics')
-        || (parsed.version! < 12 && skill.builtin === 'legal'))
+        || (parsed.version! < 3 && skill.builtin === 'general'))
       && !existing.some(item => item.id === skill.id));
-    return write([...existing, ...structuredClone(additions).map(skill => skill.builtin === 'chemistry'
-      ? { ...skill, enabled: { assistant: true, nodi: true } } : skill)]);
+    return write([...existing, ...structuredClone(additions)]);
   }
   for (const skill of parsed.skills) if (!fs.existsSync(path.join(skillDirectory(skill.id), 'skill.json'))) writeSkillDirectory(skill);
   return parsed.skills;
 }
+/** Replaces the whole library at once. Only the capability migration uses this: every
+ *  other change goes through the functions that reason about one skill at a time. */
+export function replaceChatSkills(skills: ChatSkill[]): ChatSkill[] { return write(skills); }
+
 function write(skills: ChatSkill[]): ChatSkill[] {
   fs.mkdirSync(path.dirname(file()), { recursive: true });
   for (const skill of skills) writeSkillDirectory(skill);
@@ -93,9 +116,28 @@ function write(skills: ChatSkill[]): ChatSkill[] {
   fs.renameSync(`${file()}.tmp`, file());
   return skills;
 }
+/** The tools a skill can actually reach, read from whatever provides its capabilities
+ *  right now. Persisting this list let an update or an uninstall leave a skill advertising
+ *  tools that no longer existed. */
+export function deriveCapabilityTools(skill: ChatSkill): ChatSkill['capabilityTools'] {
+  const snapshot = capabilityRegistry();
+  const tools = (skill.capabilities ?? []).flatMap(reference => {
+    const capabilityId = normalizeCapabilityId(reference);
+    const provider = snapshot.providers.get(capabilityId);
+    if (provider?.source === 'plugin') {
+      return provider.tools.map(tool => ({ capabilityId, toolId: tool.id, description: tool.description, inputSchema: tool.inputSchema, resultKinds: [] as string[] }));
+    }
+    const runtime = capabilityId.startsWith('nodus:') ? null : resolveInstalledCapability(capabilityId, skill.plugin ? { version: skill.plugin.version, digest: skill.plugin.digest } : undefined);
+    return (runtime?.manifest.tools ?? []).map(tool => ({ capabilityId, toolId: tool.id, description: tool.description, inputSchema: tool.inputSchema, resultKinds: tool.resultKinds as string[] }));
+  });
+  return tools.length ? tools : undefined;
+}
+
 export function enabledChatSkills(surface: ChatSkillSurface): ChatSkill[] {
-  return listChatSkills().filter(skill => skill.enabled[surface]
-    && (skill.capabilities ?? []).every(capability => installedCapabilityAvailable(normalizeCapabilityId(capability))));
+  return listChatSkills()
+    .filter(skill => skill.enabled[surface]
+      && (skill.capabilities ?? []).every(capability => installedCapabilityAvailable(normalizeCapabilityId(capability))))
+    .map(skill => { const capabilityTools = deriveCapabilityTools(skill); return capabilityTools ? { ...skill, capabilityTools } : { ...skill, capabilityTools: undefined }; });
 }
 export function saveChatSkill(input: ChatSkill): ChatSkill[] {
   const skills = listChatSkills();

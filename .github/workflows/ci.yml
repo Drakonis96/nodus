@@ -82,3 +82,119 @@ jobs:
       - name: Argument map E2E (isolated demonstration profile)
         timeout-minutes: 5
         run: npm run test:e2e:argument-map
+
+  # Capability API v2 is a contract split across two repositories, and everything that can
+  # drift between them fails silently in both. This job checks them against each other:
+  # the shared contract, the trusted keys, the catalog, a reproducible build of the real
+  # packages, and installing them — signed with a key generated for the run — through the
+  # application's own store. It is a separate required job rather than a step, so the
+  # marketplace checkout is visibly part of the gate rather than an optional extra.
+  cross-repo:
+    # Every platform Nodus ships for, because a package is built per platform and the
+    # checks that matter here — an archive verified and extracted, a worker started, a
+    # migration run — are the ones most likely to differ between them.
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, macos-14, windows-latest]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - name: Checkout Nodus
+        uses: actions/checkout@v7
+
+      # The marketplace's own checkout. Not optional and not conditional: without it this
+      # job fails, rather than turning into a green run that compared nothing.
+      - name: Checkout the marketplace
+        uses: actions/checkout@v7
+        with:
+          repository: NodusResearch/nodus-research-skill-marketplace
+          path: .marketplace
+
+      # A change can span both repositories, and then this branch has to be checked against
+      # the marketplace branch that carries the other half. `.github/marketplace-ref` names
+      # it, and only a pull request may use it: a push to main is always checked against
+      # the marketplace's default branch, which is what a released Nodus installs from. So
+      # a paired change that merges here before it merges there fails on main, loudly,
+      # instead of being carried by a pairing nobody remembered to remove.
+      - name: Use the paired marketplace branch on a pull request
+        if: github.event_name == 'pull_request'
+        working-directory: .marketplace
+        shell: bash
+        run: |
+          set -euo pipefail
+          REF_FILE="$GITHUB_WORKSPACE/.github/marketplace-ref"
+          [ -f "$REF_FILE" ] || { echo "No paired marketplace branch; checking against its default branch."; exit 0; }
+          BRANCH=$(tr -d ' \t\r\n' < "$REF_FILE")
+          [ -n "$BRANCH" ] && [ "$BRANCH" != 'main' ] || { echo "Paired with main; nothing to switch."; exit 0; }
+          if ! git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo ".github/marketplace-ref names $BRANCH, which does not exist in the marketplace." >&2
+            echo "Point it at an existing branch, or delete it once the paired change has merged." >&2
+            exit 1
+          fi
+          git fetch --depth 1 origin "$BRANCH"
+          git checkout FETCH_HEAD
+          echo "Checking against the marketplace branch $BRANCH."
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Both repositories agree, and a signed package installs
+        env:
+          NODUS_MARKETPLACE_DIR: ${{ format('{0}/.marketplace', github.workspace) }}
+        run: npm run verify:cross-repo
+
+      # The rest needs a real Electron, and a real display for it to refuse to open.
+      - name: Install Electron runtime
+        run: node node_modules/electron/install.js
+
+      # Electron refuses to start on Linux unless its setuid sandbox helper is owned by
+      # root, and npm cannot install it that way. Fixed here rather than by passing
+      # --no-sandbox, which would run these checks under weaker isolation than a user gets.
+      - name: Let Electron use its sandbox helper
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
+      # These two run the packages' own workers in real utility processes: the migration
+      # ladder, the registry gate, the journal, and the refusals. They need the packages
+      # built, which the step above has just done in the marketplace checkout.
+      # Linux runners have no display, and Electron wants one even for a process that
+      # never opens a window.
+      - name: Each package installs, migrates, registers and uninstalls
+        if: runner.os == 'Linux'
+        env:
+          NODUS_MARKETPLACE_DIR: ${{ format('{0}/.marketplace', github.workspace) }}
+        run: xvfb-run --auto-servernum npm run verify:capability-packages
+
+      - name: A 5.3.1 profile migrates, fails and retries
+        if: runner.os == 'Linux'
+        env:
+          NODUS_MARKETPLACE_DIR: ${{ format('{0}/.marketplace', github.workspace) }}
+        run: xvfb-run --auto-servernum npm run verify:capability-migration
+
+      - name: Each package installs, migrates, registers and uninstalls
+        if: runner.os != 'Linux'
+        env:
+          NODUS_MARKETPLACE_DIR: ${{ format('{0}/.marketplace', github.workspace) }}
+        run: npm run verify:capability-packages
+
+      - name: A 5.3.1 profile migrates, fails and retries
+        if: runner.os != 'Linux'
+        env:
+          NODUS_MARKETPLACE_DIR: ${{ format('{0}/.marketplace', github.workspace) }}
+        run: npm run verify:capability-migration
+
+      # The credential handling and the runtime locks, on the platform whose credential
+      # store and wheel tags are being relied on.
+      - name: The credential reaches the interpreter and nothing else does
+        env:
+          NODUS_MARKETPLACE_DIR: ${{ format('{0}/.marketplace', github.workspace) }}
+        run: node --test scripts/test-capability-python-runtime.mjs

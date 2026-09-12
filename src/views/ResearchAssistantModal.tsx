@@ -887,7 +887,10 @@ export function ResearchAssistantModal({
             </div>
 
             <footer className="border-t border-neutral-800 p-3">
-              <div className="flex items-end gap-2">
+              {/* Centred, not bottom-aligned: the button is 44px against a 60px box, so
+                  aligning their bottoms left it sitting 8px below the middle of the field
+                  it belongs to. It stays centred as the field grows. */}
+              <div className="flex items-center gap-2">
                 <textarea
                   ref={inputRef}
                   className="input flex-1 min-h-[52px] max-h-56 resize-none"
@@ -904,7 +907,7 @@ export function ResearchAssistantModal({
                 />
                 {sending ? (
                   <button
-                    className="btn self-end h-11 w-11 px-0 border border-red-800 bg-red-950/40 text-red-200 transition hover:bg-red-900/50"
+                    className="btn h-11 w-11 shrink-0 px-0 border border-red-800 bg-red-950/40 text-red-200 transition hover:bg-red-900/50"
                     title={t('Detener generación')}
                     onClick={handleStop}
                   >
@@ -912,7 +915,7 @@ export function ResearchAssistantModal({
                   </button>
                 ) : (
                   <button
-                    className="btn btn-primary self-end h-11 w-11 px-0"
+                    className="btn btn-primary h-11 w-11 shrink-0 px-0"
                     title={t('Enviar')}
                     onClick={() => void send()}
                     disabled={!input.trim() || !selectedModel}

@@ -107,11 +107,6 @@ export const nodusApi: NodusApi = {
   importSkillPackage: () => ipcRenderer.invoke('skillMarketplace:import'),
   exportSkillPackage: (id) => ipcRenderer.invoke('skillMarketplace:export', id),
   listChatSkills: () => ipcRenderer.invoke('chatSkills:list'),
-  getGenomicsStatus: () => ipcRenderer.invoke('genomics:status'),
-  configureGenomics: (input) => ipcRenderer.invoke('genomics:configure', input),
-  clearGenomicsConfiguration: () => ipcRenderer.invoke('genomics:clear'),
-  installGenomicsRuntime: () => ipcRenderer.invoke('genomics:install'),
-  getGenomicsResult: (source) => ipcRenderer.invoke('genomics:result', source),
   saveChatSkill: (skill) => ipcRenderer.invoke('chatSkills:save', skill),
   deleteChatSkill: (id) => ipcRenderer.invoke('chatSkills:delete', id),
   restoreChatSkills: () => ipcRenderer.invoke('chatSkills:restore'),
@@ -120,12 +115,38 @@ export const nodusApi: NodusApi = {
     ipcRenderer.on('chatSkills:changed', listener);
     return () => ipcRenderer.removeListener('chatSkills:changed', listener);
   },
-  compileChemfig: (source) => ipcRenderer.invoke('chemistry:compileChemfig', source),
-  compileLewis: (source) => ipcRenderer.invoke('chemistry:compileLewis', source),
-  compileSmiles: (source) => ipcRenderer.invoke('chemistry:compileSmiles', source),
   getChatImageMetadata: (source) => ipcRenderer.invoke('chatImages:metadata', source),
   copyChatImage: (source) => ipcRenderer.invoke('chatImages:copy', source),
   downloadCapabilityFile: (source) => ipcRenderer.invoke('capabilityFiles:download', source),
+  readCapabilityModel: (source) => ipcRenderer.invoke('capabilityFiles:model', source),
+  readCapabilityMedia: (source) => ipcRenderer.invoke('capabilityFiles:media', source),
+  fetchCapabilityTile: (capabilityId, service, tilePath) => ipcRenderer.invoke('capabilities:tile', capabilityId, service, tilePath),
+  listCapabilities: () => ipcRenderer.invoke('capabilities:list'),
+  onCapabilityRegistryChanged: (cb) => {
+    const listener = (_event: unknown, payload: unknown) => cb(payload as never);
+    ipcRenderer.on('capabilities:registryChanged', listener);
+    return () => ipcRenderer.removeListener('capabilities:registryChanged', listener);
+  },
+  capabilityHealth: (capabilityId) => ipcRenderer.invoke('capabilities:health', capabilityId),
+  getCapabilitySettings: (capabilityId) => ipcRenderer.invoke('capabilities:getSettings', capabilityId),
+  applyCapabilitySettings: (capabilityId, submission) => ipcRenderer.invoke('capabilities:applySettings', capabilityId, submission),
+  runCapabilityAction: (capabilityId, actionId) => ipcRenderer.invoke('capabilities:runAction', capabilityId, actionId),
+  renderCapabilityArtifact: (source, locale) => ipcRenderer.invoke('artifacts:render', source, locale),
+  renderLegacyCapabilityResult: (fence, payload, locale) => ipcRenderer.invoke('capabilities:renderLegacyResult', fence, payload, locale),
+  capabilityMigrationStatus: () => ipcRenderer.invoke('capabilities:migrationStatus'),
+  onCapabilityMigrationChanged: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on('capabilities:migrationChanged', listener);
+    return () => ipcRenderer.removeListener('capabilities:migrationChanged', listener);
+  },
+  retryCapabilityMigration: () => ipcRenderer.invoke('capabilities:retryMigration'),
+  refreshCapabilityCatalog: (sourceUrl) => ipcRenderer.invoke('capabilities:refreshCatalog', sourceUrl),
+  checkCapabilityUpdates: (pluginId) => ipcRenderer.invoke('capabilities:checkUpdates', pluginId),
+  setCapabilityAutoUpdate: (pluginId, autoUpdate) => ipcRenderer.invoke('capabilities:setAutoUpdate', pluginId, autoUpdate),
+  installCapabilityPlugin: (pluginId, approvePermissions) => ipcRenderer.invoke('capabilities:installPlugin', pluginId, approvePermissions),
+  approveCapabilityPlugin: (pluginId) => ipcRenderer.invoke('capabilities:approvePlugin', pluginId),
+  rollbackCapabilityPlugin: (pluginId) => ipcRenderer.invoke('capabilities:rollbackPlugin', pluginId),
+  removeCapabilityPlugin: (pluginId, purgeData) => ipcRenderer.invoke('capabilities:removePlugin', pluginId, purgeData),
   listInstalledPlugins: () => ipcRenderer.invoke('plugins:list'),
   installMarketplacePlugin: (sourceId, packagePath, commit, approvePermissions) => ipcRenderer.invoke('skillMarketplace:installPlugin', sourceId, packagePath, commit, approvePermissions),
   listInboxPlugins: () => ipcRenderer.invoke('plugins:inbox'),

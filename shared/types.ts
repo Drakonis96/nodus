@@ -1,7 +1,6 @@
 import type { SkillMarketplace } from './skillMarketplace';
 import type { InboxPluginSummary, InstalledPluginSummary } from '../skill-capabilities/contracts';
 import type { ChatSkill } from './chatSkills';
-import type { GenomicsStatus, GenomicsSettingsInput, GenomicsResult } from './genomics';
 // Shared domain types used by both the Electron main process and the React renderer.
 // Keep this file free of any runtime imports from either side.
 // Per-domain slices of the window.nodus contract. NodusApi extends them, so the
@@ -8816,21 +8815,34 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   importSkillPackage(): Promise<ChatSkill[]>;
   exportSkillPackage(id: string): Promise<string | null>;
   listChatSkills(): Promise<ChatSkill[]>;
-  getGenomicsStatus(): Promise<GenomicsStatus>;
-  configureGenomics(input: GenomicsSettingsInput): Promise<GenomicsStatus>;
-  clearGenomicsConfiguration(): Promise<GenomicsStatus>;
-  installGenomicsRuntime(): Promise<GenomicsStatus>;
-  getGenomicsResult(source: string): Promise<GenomicsResult | null>;
   saveChatSkill(skill: ChatSkill): Promise<ChatSkill[]>;
   deleteChatSkill(id: string): Promise<ChatSkill[]>;
   restoreChatSkills(): Promise<ChatSkill[]>;
   onChatSkillsChanged(cb: () => void): () => void;
-  compileChemfig(source: string): Promise<string>;
-  compileLewis(source: string): Promise<string>;
-  compileSmiles(source: string): Promise<string>;
   getChatImageMetadata(source: string): Promise<Record<string, string> | null>;
   copyChatImage(source: string): Promise<void>;
   downloadCapabilityFile(source: string): Promise<void>;
+  readCapabilityModel(source: string): Promise<{ bytes: Uint8Array; mimeType: string; name: string; info: import('../packages/capability-api/src/models').ModelAssetInfo }>;
+  readCapabilityMedia(source: string): Promise<{ bytes: Uint8Array; mimeType: string; name: string; info: import('../packages/capability-api/src/media').MediaAssetInfo }>;
+  fetchCapabilityTile(capabilityId: string, service: string, tilePath: string): Promise<{ bytes: Uint8Array; mimeType: string }>;
+  listCapabilities(): Promise<import('./capabilities').CapabilityListPayload>;
+  onCapabilityRegistryChanged(cb: (payload: import('./capabilities').CapabilityRegistryPayload) => void): () => void;
+  capabilityHealth(capabilityId: string): Promise<import('./capabilities').CapabilityHealthPayload>;
+  getCapabilitySettings(capabilityId: string): Promise<import('./capabilities').CapabilitySettingsPayload>;
+  applyCapabilitySettings(capabilityId: string, submission: import('./capabilities').SettingsSubmissionV1): Promise<import('./capabilities').SettingsStateV1>;
+  runCapabilityAction(capabilityId: string, actionId: string): Promise<import('./capabilities').SettingsStateV1>;
+  renderCapabilityArtifact(source: string, locale?: string): Promise<import('./capabilities').ArtifactRenderResult>;
+  renderLegacyCapabilityResult(fence: string, payload: string, locale?: string): Promise<import('./capabilities').LegacyResultRenderResult>;
+  onCapabilityMigrationChanged(cb: () => void): () => void;
+  checkCapabilityUpdates(pluginId?: string): Promise<Array<{ pluginId: string; state: 'updated' | 'awaiting-approval' | 'incompatible' | 'current' | 'skipped' | 'failed'; from?: string; to?: string; detail?: string }>>;
+  setCapabilityAutoUpdate(pluginId: string, autoUpdate: boolean): Promise<import('./capabilities').InstalledCapabilityPlugin>;
+  capabilityMigrationStatus(): Promise<import('./capabilities').CapabilityMigrationStatus>;
+  retryCapabilityMigration(): Promise<{ installed: string[]; adopted: string[]; preserved: string[]; failed: Array<{ pluginId: string; phase: string; detail: string }> }>;
+  refreshCapabilityCatalog(sourceUrl: string): Promise<import('./capabilities').CapabilityListPayload['catalog']>;
+  installCapabilityPlugin(pluginId: string, approvePermissions?: boolean): Promise<{ state: import('./capabilities').InstalledCapabilityPlugin; activated: boolean }>;
+  approveCapabilityPlugin(pluginId: string): Promise<import('./capabilities').InstalledCapabilityPlugin>;
+  rollbackCapabilityPlugin(pluginId: string): Promise<import('./capabilities').InstalledCapabilityPlugin>;
+  removeCapabilityPlugin(pluginId: string, purgeData?: boolean): Promise<import('./capabilities').InstalledCapabilityPlugin[]>;
   listInstalledPlugins(): Promise<InstalledPluginSummary[]>;
   listInboxPlugins(): Promise<InboxPluginSummary[]>;
   approveInboxPlugin(directory: string): Promise<ChatSkill[]>;

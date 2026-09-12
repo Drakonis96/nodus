@@ -1,37 +1,39 @@
-import { ChatLegalResult } from './ChatLegalResult';
 import type { ComponentProps } from 'react';
 import { splitChatVisuals } from '@shared/chatSkills';
 import { Markdown } from './Markdown';
 import { ChatVisual } from './ChatVisual';
-import { ChatFormula } from './ChatFormula';
-import { ChatChemistryDocument } from './ChatChemistryDocument';
-import { ChatChemistryNotice } from './ChatChemistryNotice';
-import { ChatGenomicsResult } from './ChatGenomicsResult';
 import { ChatCapabilityResult } from './ChatCapabilityResult';
+import { ChatCapabilityArtifact } from './ChatCapabilityArtifact';
+import { ChatCapabilityView } from './CapabilityView';
+import { ChatLegacyResult } from './ChatLegacyResult';
 import { Icon } from './ui';
 import { localizeRuntimeError } from '@shared/uiLanguage';
 import { t, getActiveLang } from '../i18n';
+import { useCapabilityFences } from '../lib/capabilityFences';
 
 export function ChatMarkdown({ content, streaming = false, ...props }: ComponentProps<typeof Markdown> & { streaming?: boolean }) {
-  return <div className="chat-rich-answer">{splitChatVisuals(content).map((part, index) => {
+  const claims = useCapabilityFences();
+  return <div className="chat-rich-answer">{splitChatVisuals(content, claims.fences, claims.legacyFences).map((part, index) => {
+    // A block an earlier release already finished. It is rendered by whoever owns that
+    // fence now, never shown as work in progress.
+    if (part.kind === 'capability-legacy' && part.complete) return <ChatLegacyResult key={index} fence={part.fence!} source={part.content} />;
+    if (part.kind === 'capability-pending' || part.kind === 'capability-legacy') {
+      // A package that is still producing its answer names itself, in its own words.
+      const label = part.fence ? claims.label(part.fence) : undefined;
+      return <div key={index} role="status" className="chat-visual-pending"><Icon name="sparkles" size={22} /><div><b>{label?.title ?? 'Capability'}</b><span>{streaming ? (label?.pending ?? t('Cargando…')) : t('La generación se interrumpió. Vuelve a intentarlo.')}</span></div>{streaming && <span className="chat-visual-pulse" />}</div>;
+    }
     if (part.kind === 'image-error') {
       let message = 'Image generation failed. Please retry.';
       try { message = JSON.parse(part.content).message || message; } catch { /* incomplete failure record */ }
       return <div key={index} className="chat-visual-error" role="alert">{localizeRuntimeError(message, getActiveLang())}</div>;
     }
     if (part.kind === 'markdown') return <Markdown key={index} {...props} content={part.content} chatVisuals />;
-    if (part.kind === 'legal-result' && part.complete && !streaming) return <ChatLegalResult key={index} source={part.content} />;
-    if (part.kind === 'legal-plan' || part.kind === 'legal-result') return <div key={index} role="status" className="chat-visual-pending"><b>Legalize</b><span>{streaming ? t('Consultando legislación…') : t('La generación se interrumpió. Vuelve a intentarlo.')}</span></div>;
-    if (part.kind === 'genomics-result' && part.complete && !streaming) return <ChatGenomicsResult key={index} source={part.content} />;
-    if (part.kind === 'genomics-plan' || part.kind === 'genomics-result') return <div key={index} role="status" className="chat-visual-pending"><b>AlphaGenome</b><span>{streaming ? t('Consultando AlphaGenome…') : t('La generación se interrumpió. Vuelve a intentarlo.')}</span></div>;
+    if (part.kind === 'capability-artifact' && part.complete && !streaming) return <ChatCapabilityArtifact key={index} source={part.content} />;
+    if (part.kind === 'capability-view' && part.complete && !streaming) return <ChatCapabilityView key={index} source={part.content} />;
+    if (part.kind === 'capability-artifact' || part.kind === 'capability-view') return <div key={index} role="status" className="chat-visual-pending"><Icon name="sparkles" size={22} /><div><b>Capability</b><span>{streaming ? t('Cargando…') : t('La generación se interrumpió. Vuelve a intentarlo.')}</span></div></div>;
     if (part.kind === 'capability-result' && part.complete && !streaming) return <ChatCapabilityResult key={index} source={part.content} />;
     if (part.kind === 'capability-request' || part.kind === 'capability-result') return <div key={index} role="status" className="chat-visual-pending"><Icon name="sparkles" size={22} /><div><b>Capability</b><span>{streaming ? t('Cargando…') : t('La generación se interrumpió. Vuelve a intentarlo.')}</span></div></div>;
     if (part.kind === 'svg' && part.complete && !streaming) return <ChatVisual key={index} svg={part.content} />;
-    if (part.kind === 'chemistry-document' && part.complete && !streaming) return <ChatChemistryDocument key={index} source={part.content} />;
-    // A notice is chrome, not a visual: it never shows a pending placeholder.
-    if (part.kind === 'chemistry-notice') return part.complete ? <ChatChemistryNotice key={index} source={part.content} /> : null;
-    if ((part.kind === 'smiles' || part.kind === 'chemfig' || part.kind === 'lewis') && part.complete && !streaming) return <ChatFormula key={index} kind={part.kind} source={part.content} />;
-    const chemistry = ['smiles', 'chemfig', 'lewis', 'chemistry-plan', 'chemistry-document'].includes(part.kind);
-    return <div className="chat-visual-pending" role="status" key={index}><Icon name={part.kind === 'image-request' ? 'image' : 'code'} size={22} /><div><b>{chemistry ? 'Chemistry Studio' : part.kind === 'svg' ? 'SVG Studio' : 'Image Atelier'}</b><span>{streaming ? (chemistry ? t('Dibujando tu estructura…') : part.kind === 'svg' ? t('Dibujando tu visual…') : t('Creando tu imagen…')) : t('La generación se interrumpió. Vuelve a intentarlo.')}</span></div>{streaming && <span className="chat-visual-pulse" />}</div>;
+    return <div className="chat-visual-pending" role="status" key={index}><Icon name={part.kind === 'image-request' ? 'image' : 'code'} size={22} /><div><b>{part.kind === 'svg' ? 'SVG Studio' : 'Image Atelier'}</b><span>{streaming ? (part.kind === 'svg' ? t('Dibujando tu visual…') : t('Creando tu imagen…')) : t('La generación se interrumpió. Vuelve a intentarlo.')}</span></div>{streaming && <span className="chat-visual-pulse" />}</div>;
   })}</div>;
 }

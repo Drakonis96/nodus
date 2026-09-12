@@ -1,0 +1,49 @@
+.capability-packages { display: flex; flex-direction: column; gap: 14px; }
+.capability-packages-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.capability-packages-head h3 { margin: 0 0 3px; font-size: 14px; font-weight: 600; }
+.capability-packages-muted { margin: 0; font-size: 12px; opacity: .72; line-height: 1.45; }
+.capability-packages-error { margin: 0; font-size: 12px; color: #fca5a5; }
+.capability-packages-notice { margin: 0; font-size: 12px; color: #6ee7b7; }
+.capability-packages-warning { margin: 0; font-size: 12px; color: #fcd34d; }
+.capability-packages-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.capability-packages-item { display: flex; flex-direction: column; gap: 8px; padding: 13px 15px; border: 1px solid #818cf838; border-radius: 14px; }
+/* The same header as a skill card: plate, text, chevron. The description is clamped to two
+   lines so a package with a paragraph and one with a sentence occupy the same row. */
+.capability-packages-item-head { display: flex; align-items: flex-start; gap: 12px; }
+.capability-packages-item-text { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.capability-packages-item-text b { font-size: 13px; font-weight: 600; }
+.capability-packages-item-text p { flex-basis: 100%; margin: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; min-height: calc(1.45em * 2); }
+.capability-packages-item.open .capability-packages-item-text p { display: none; }
+.capability-packages-details { display: grid; gap: 10px; border-top: 1px solid #818cf826; padding-top: 10px; }
+.capability-packages-publisher { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; border: 1px solid #34d3994a; background: #10b98112; color: #6ee7b7; font-size: 11px; }
+.capability-packages-version { font-size: 11px; opacity: .65; font-variant-numeric: tabular-nums; }
+.capability-packages-actions { display: flex; gap: 7px; flex-wrap: wrap; }
+.capability-packages-item-actions { display: flex; gap: 7px; flex-wrap: wrap; }
+/* The facts a package is judged on, side by side rather than buried in prose. */
+.capability-packages-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; margin: 2px 0 0; }
+.capability-packages-facts div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.capability-packages-facts dt { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; opacity: .55; }
+.capability-packages-facts dd { margin: 0; font-size: 12px; overflow-wrap: anywhere; }
+.capability-settings { display: flex; flex-direction: column; gap: 11px; padding: 12px 0 2px; border-top: 1px solid #818cf826; }
+.capability-settings-field { display: flex; flex-direction: column; gap: 4px; }
+.capability-settings-label { display: flex; align-items: baseline; gap: 8px; font-size: 12px; font-weight: 600; }
+.capability-settings-hint { font-size: 10px; font-weight: 400; text-transform: uppercase; letter-spacing: .04em; opacity: .6; }
+.capability-settings-description { font-size: 11px; opacity: .7; line-height: 1.45; }
+.capability-settings-check { display: flex; align-items: center; gap: 9px; font-size: 12px; }
+.capability-settings-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+:is(.light, .nodi-theme-light) .capability-packages-error { color: #b91c1c; }
+:is(.light, .nodi-theme-light) .capability-packages-notice { color: #047857; }
+:is(.light, .nodi-theme-light) .capability-packages-warning { color: #92400e; }
+:is(.light, .nodi-theme-light) .capability-packages-publisher { color: #047857; }
+/* The shared chat-skill buttons are used here with a leading icon. */
+.capability-packages button:not(.chat-skill-details-toggle) { display: inline-flex; align-items: center; gap: 7px; }
+
+/* The 5.3.1 move, while it is still moving. Kept in the same visual family as a package
+   card: it is about the same packages, seen a moment earlier. */
+.capability-packages-migration { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid #71809655; border-radius: 10px; background: #7180961a; }
+.capability-packages-migration p { margin: 0; }
+.capability-packages-migration ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.capability-packages-migration li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 12px; }
+.capability-packages-migration button { justify-self: start; }
+.capability-packages-autoupdate { display: flex; align-items: center; gap: 8px; font-size: 12px; }

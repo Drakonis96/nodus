@@ -112,3 +112,5 @@ work/stellar-preview/
 !legal/generated/ALPHAGENOME_OUTPUT_TERMS.pdf
 
 !legal/generated/LEGALIZE_*
+capability-signing-key-*.pem
+build/capability-bootstrap/

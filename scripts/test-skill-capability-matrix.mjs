@@ -1,4 +1,8 @@
-// Every chat surface routes every capability through the registry, exactly once.
+// Every chat surface routes every core capability through the registry, exactly once.
+//
+// The three disciplinary protocols became packages in 5.3.2 and are exercised by their
+// own suites and by verify-capability-package-install.mjs; what stays here is the lanes
+// the application still owns.
 //
 // The seven orchestrators and the real stores run here; only the model, the paid
 // providers and the two Chromium sandboxes are simulated. The sandboxes themselves are
@@ -37,27 +41,6 @@ try {
   let imageCalls = 0;
   images.callImageProvider = async () => { imageCalls++; return { bytes: Buffer.from('matrix-image'), mimeType: 'image/png' }; };
   images.prepareGeneratedImage = image => ({ image: image.bytes, mimeType: image.mimeType });
-  let chemistryCalls = 0;
-  load('electron/ai/chemistryIdentity.ts').resolveChemistryIntent = async () => {
-    chemistryCalls++;
-    return { status: 'verified', kind: 'structure', depiction: 'skeletal', species: [{ name: 'water', smiles: 'O' }], chemfig: 'H_2O', reason: '' };
-  };
-  // AlphaGenome results are validated on store, so the fixture is a real, complete one.
-  const genomicsShared = load('shared/genomics.ts');
-  const genomicsPlan = { version: 1, assembly: 'GRCh38', variant: 'chr1:100000:A:T', tissue: 'UBERON:0002048', output: 'RNA_SEQ' };
-  const series = Array.from({ length: 128 }, (_, index) => index / 128);
-  const genomicsFixture = {
-    version: 1, provider: 'Google DeepMind AlphaGenome', sdkRevision: genomicsShared.ALPHAGENOME_REVISION, model: 'ALL_FOLDS',
-    notice: genomicsShared.ALPHAGENOME_NOTICE, citation: genomicsShared.ALPHAGENOME_CITATION,
-    createdAt: new Date().toISOString(), modifications: '', plan: genomicsPlan,
-    interval: { chromosome: 'chr1', start: 91807, end: 108191 },
-    tracks: [{ name: 'matrix track', strand: '.', resolution: 128, reference: series, alternate: series }], totalTracks: 1,
-  };
-  let genomicsCalls = 0;
-  load('electron/genomics.ts').predictGenomics = async () => { genomicsCalls++; return genomicsFixture; };
-  const legalPlan = { version: 1, country: 'es', query: 'Constitucion' };
-  let legalCalls = 0;
-  load('electron/legalize.ts').retrieveLegalize = async () => { legalCalls++; return { version: 1, country: 'es', query: 'Constitucion', results: [] }; };
   let toolCalls = 0;
   load('electron/skillToolSandbox.ts').runSkillTool = async () => { toolCalls++; return '{"doubled":4}'; };
   let capabilityCalls = 0;
@@ -96,9 +79,6 @@ try {
     { name: 'javascript tool', answer: () => fence('nodus-tool', JSON.stringify({ skillId: external.id, toolId: 'double', input: { value: 2 } })), counter: () => toolCalls, expect: text => assert.match(text, /Tool result \(double\)/) },
     { name: 'svg', answer: () => fence('svg', svg), counter: () => 0, expect: text => assert.equal(shared.splitChatVisuals(text).find(p => p.kind === 'svg')?.content, svg) },
     { name: 'image atelier', answer: () => fence('nodus-image', JSON.stringify(brief)), counter: () => imageCalls, expect: text => assert.match(text, /nodus-image:\/\/chat\//) },
-    { name: 'chemistry studio', answer: () => fence('chemistry-plan', JSON.stringify({ version: 2, kind: 'structure', depiction: 'skeletal', species: [{ name: 'water' }] })), counter: () => chemistryCalls, expect: text => assert.ok(shared.splitChatVisuals(text).some(p => p.kind === 'chemistry-document')) },
-    { name: 'alphagenome', answer: () => fence('genomics-plan', JSON.stringify(genomicsPlan)), counter: () => genomicsCalls, expect: text => assert.ok(shared.splitChatVisuals(text).some(p => p.kind === 'genomics-result')) },
-    { name: 'legalize', answer: () => fence('legal-plan', JSON.stringify(legalPlan)), counter: () => legalCalls, expect: text => assert.ok(shared.splitChatVisuals(text).some(p => p.kind === 'legal-result')) },
     { name: 'external capability', answer: () => fence('nodus-capability', capabilityRequest()), counter: () => capabilityCalls, expect: text => assert.ok(shared.splitChatVisuals(text).some(p => p.kind === 'capability-result')) },
   ];
 

@@ -1,49 +1,20 @@
 export const CAPABILITY_API_VERSION = 1 as const;
-export const BUILTIN_CAPABILITY_IDS = [
-  'nodus:svg',
-  'nodus:chemistry',
-  'nodus:image',
-  'nodus:genomics',
-  'nodus:legal',
-] as const;
 
-export type BuiltinCapabilityId = typeof BUILTIN_CAPABILITY_IDS[number];
-export type CapabilityId = BuiltinCapabilityId | `self:${string}` | `${string}:${string}`;
+// Identifiers and the JSON Schema subset live in the capability SDK: v1 and v2 must agree
+// about what a capability id is and what a tool may declare, so there is one implementation.
+export {
+  NODUS_CAPABILITY_IDS as BUILTIN_CAPABILITY_IDS,
+  normalizeCapabilityId,
+  legacyCapabilityId,
+  isCapabilityReference,
+} from '../packages/capability-api/src/identifiers';
+export type { NodusCapabilityId as BuiltinCapabilityId, CapabilityId } from '../packages/capability-api/src/identifiers';
+export { jsonSchemaMatches, compareSemver } from '../packages/capability-api/src/json';
+export type { JsonSchema } from '../packages/capability-api/src/json';
+
+import { SEMVER as semver, SLUG as slug, exactKeys, plainText, validateJsonSchema, type JsonSchema } from '../packages/capability-api/src/json';
+
 export type CapabilityResultKind = 'text' | 'json' | 'table' | 'svg' | 'image' | 'file';
-
-const LEGACY_CAPABILITIES: Record<string, BuiltinCapabilityId> = {
-  svg: 'nodus:svg', chemistry: 'nodus:chemistry', image: 'nodus:image',
-  genomics: 'nodus:genomics', legal: 'nodus:legal',
-};
-
-export function normalizeCapabilityId(id: string): string {
-  return LEGACY_CAPABILITIES[id] ?? id;
-}
-
-export function legacyCapabilityId(id: string): string {
-  const found = Object.entries(LEGACY_CAPABILITIES).find(([, canonical]) => canonical === id);
-  return found?.[0] ?? id;
-}
-
-export function isCapabilityReference(value: unknown): value is CapabilityId {
-  if (typeof value !== 'string' || value.length > 160) return false;
-  if (value in LEGACY_CAPABILITIES || BUILTIN_CAPABILITY_IDS.includes(value as BuiltinCapabilityId)) return true;
-  return /^self:[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
-    || /^[a-z0-9]+(?:[./-][a-z0-9]+)*:[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
-}
-
-export interface JsonSchema {
-  type?: 'null' | 'boolean' | 'number' | 'integer' | 'string' | 'array' | 'object';
-  properties?: Record<string, JsonSchema>;
-  required?: string[];
-  items?: JsonSchema;
-  enum?: Array<string | number | boolean | null>;
-  additionalProperties?: boolean;
-  minLength?: number;
-  maxLength?: number;
-  minimum?: number;
-  maximum?: number;
-}
 
 export interface CapabilityNetworkPermission {
   id: string;
@@ -185,25 +156,7 @@ export interface CapabilityRegistryEntry {
   tools: Array<{ id: string; description: string }>;
 }
 
-const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const semver = /^\d+\.\d+\.\d+$/;
-// eslint-disable-next-line no-control-regex -- plugin manifests are hostile input
-const plain = (value: unknown, max: number) => typeof value === 'string' && value.trim().length > 0 && value.length <= max && !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value);
-const exactKeys = (value: object, allowed: string[]) => Object.keys(value).every(key => allowed.includes(key));
-
-function validateJsonSchema(schema: unknown, depth = 0): asserts schema is JsonSchema {
-  if (!schema || typeof schema !== 'object' || Array.isArray(schema) || depth > 8) throw new Error('Invalid capability JSON schema.');
-  const value = schema as JsonSchema;
-  if (!exactKeys(value, ['type','properties','required','items','enum','additionalProperties','minLength','maxLength','minimum','maximum'])) throw new Error('Invalid capability JSON schema.');
-  if (value.type && !['null','boolean','number','integer','string','array','object'].includes(value.type)) throw new Error('Invalid capability JSON schema type.');
-  if (value.properties) {
-    if (value.type !== 'object' || Object.keys(value.properties).length > 64) throw new Error('Invalid capability object schema.');
-    for (const [key, child] of Object.entries(value.properties)) { if (!slug.test(key)) throw new Error('Invalid capability schema property.'); validateJsonSchema(child, depth + 1); }
-  }
-  if (value.required && (!Array.isArray(value.required) || value.required.some(key => typeof key !== 'string' || !value.properties?.[key]))) throw new Error('Invalid capability required properties.');
-  if (value.items) { if (value.type !== 'array') throw new Error('Invalid capability array schema.'); validateJsonSchema(value.items, depth + 1); }
-  if (value.enum && (!Array.isArray(value.enum) || value.enum.length > 100)) throw new Error('Invalid capability enum.');
-}
+const plain = (value: unknown, max: number) => plainText(value, max);
 
 export function validateCapabilityManifest(input: unknown): CapabilityManifestV1 {
   const value = input as CapabilityManifestV1;
@@ -257,26 +210,3 @@ export function validatePluginManifest(input: unknown): PluginManifestV1 {
   return structuredClone(value);
 }
 
-export function compareSemver(a: string, b: string): number {
-  const left = a.split('.').map(Number), right = b.split('.').map(Number);
-  for (let i = 0; i < 3; i++) if (left[i] !== right[i]) return left[i] - right[i];
-  return 0;
-}
-
-export function jsonSchemaMatches(schema: JsonSchema, value: unknown): boolean {
-  if (schema.enum && !schema.enum.some(item => Object.is(item, value))) return false;
-  if (!schema.type) return true;
-  if (schema.type === 'null') return value === null;
-  if (schema.type === 'boolean') return typeof value === 'boolean';
-  if (schema.type === 'string') return typeof value === 'string' && (schema.minLength === undefined || value.length >= schema.minLength) && (schema.maxLength === undefined || value.length <= schema.maxLength);
-  if (schema.type === 'number' || schema.type === 'integer') return typeof value === 'number' && Number.isFinite(value) && (schema.type !== 'integer' || Number.isInteger(value)) && (schema.minimum === undefined || value >= schema.minimum) && (schema.maximum === undefined || value <= schema.maximum);
-  if (schema.type === 'array') return Array.isArray(value) && (!schema.items || value.every(item => jsonSchemaMatches(schema.items!, item)));
-  if (schema.type === 'object') {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-    const record = value as Record<string, unknown>;
-    if (schema.required?.some(key => !(key in record))) return false;
-    if (schema.additionalProperties === false && Object.keys(record).some(key => !schema.properties?.[key])) return false;
-    return Object.entries(schema.properties ?? {}).every(([key, child]) => !(key in record) || jsonSchemaMatches(child, record[key]));
-  }
-  return false;
-}

@@ -1,14 +1,13 @@
 import { chatAssetVersion } from '../../electron/chatAssets';
 import { runSkillTool } from '../../electron/skillToolSandbox';
-import { serializeChatVisualPart, serializeChemistryNotice, splitChatVisuals, type ChatVisualPart } from '../../shared/chatSkills';
-import { executeChemistryPlan, prepareChemistry } from '../builtins/chemistry/main';
-import { recordChemistryOutcome } from '../../electron/chemistryFailureLog';
-import { executeGenomics } from '../builtins/genomics/main';
+import { serializeChatVisualPart, splitChatVisuals, type ChatVisualPart } from '../../shared/chatSkills';
 import { executeImageRequest } from '../builtins/image/main';
-import { executeLegal } from '../builtins/legal/main';
-import { refineSvg, rescueChemistryWithSvg } from '../builtins/svg/main';
+import { refineSvg } from '../builtins/svg/main';
 import { executeExternalCapability } from '../external/main';
 import { SANDBOXED_CALL_LIMIT } from '../contracts';
+import { capabilityRegistry, pinCapabilitiesForTurn } from '../../electron/capabilities/registry';
+import { runTrustedChatPipeline } from '../../electron/capabilities/chatPipeline';
+import { createTrustedCapabilityRunner } from '../../electron/capabilities/runner';
 import type { ChatCallBudget, ChatSkillExecution } from './types';
 
 export function assertChatSkillSession(execution: ChatSkillExecution, signal?: AbortSignal): void {
@@ -18,18 +17,31 @@ export function assertChatSkillSession(execution: ChatSkillExecution, signal?: A
   }
 }
 
-/** Provider-independent registry dispatcher shared by every chat surface. */
+/** Provider-independent registry dispatcher shared by every chat surface.
+ *
+ *  What the core still does itself is what belongs to no discipline: JavaScript tools,
+ *  sandboxed community capabilities, image generation and the general SVG lane. Chemistry,
+ *  law and genomics are installed packages now and reach a reply through the protocols
+ *  they declare — this file does not know their names. */
 export async function executeRegisteredChatSkills(answer: string, execution: ChatSkillExecution, signal?: AbortSignal): Promise<string> {
+  const registry = capabilityRegistry();
+  if (!registry.chatOrder.length) return runCoreChatStages(answer, execution, { suppressSvgRefinement: false }, signal);
+  const runner = createTrustedCapabilityRunner({
+    owner: execution.owner,
+    question: execution.question,
+    locale: 'en',
+    model: execution.model,
+    pins: pinCapabilitiesForTurn(),
+    signal,
+    runCoreStages: (text, options) => runCoreChatStages(text, execution, options, signal),
+  });
+  return runTrustedChatPipeline(answer, registry, runner, { signal });
+}
+
+/** The stages the application owns. Nothing here is specific to a field of study. */
+export async function runCoreChatStages(answer: string, execution: ChatSkillExecution, options: { suppressSvgRefinement: boolean }, signal?: AbortSignal): Promise<string> {
   const current = () => assertChatSkillSession(execution, signal);
   current();
-  const legal = await executeLegal(answer, execution, signal);
-  if (legal !== null) { current(); return legal; }
-  const genomics = await executeGenomics(answer, execution, current, signal);
-  if (genomics !== null) { current(); return genomics; }
-
-  const chemistry = prepareChemistry(answer, execution);
-  const notices = [...chemistry.notices];
-  answer = chemistry.answer;
 
   // Deterministic sandboxed work and work that can leave the machine are budgeted apart:
   // a permissionless capability costs the same as a JavaScript tool, and only a capability
@@ -59,28 +71,13 @@ export async function executeRegisteredChatSkills(answer: string, execution: Cha
   }
   answer = processed + answer.slice(cursor);
 
-  if (!chemistry.initialIntent) answer = await refineSvg(answer, execution, signal);
-  const parts = splitChatVisuals(answer);
-  const hasChemistryIntent = parts.some(part => part.kind === 'chemistry-plan');
-  let imageRequested = false, chemistryRequested = false, chemistryDrawn = false;
-  // Two passes: the chemistry document decides whether competing visuals are
-  // redundant (drop them) or the only remaining drawing (keep them). Prose is
-  // never dropped in either case.
+  // Skipped only when an installed provider said it has taken the drawing lane for this
+  // reply, so the core does not second-guess a package that is already drawing.
+  if (!options.suppressSvgRefinement) answer = await refineSvg(answer, execution, signal);
+
   const result: Array<{ part: ChatVisualPart['kind']; text: string }> = [];
-  for (const part of parts) {
-    if (part.kind === 'chemistry-plan') {
-      if (process.env.NODUS_CHEMFIG_QA_LOG === '1') console.log('[chemistry-plan]', part.content);
-      if (chemistryRequested) { notices.push({ code: 'one-plan-per-reply' }); continue; }
-      chemistryRequested = true;
-      const outcome = await executeChemistryPlan(part.content, part.complete, execution, current, signal);
-      notices.push(...outcome.notices);
-      if (outcome.rendered) { chemistryDrawn = true; result.push({ part: 'chemistry-document', text: outcome.rendered }); }
-      continue;
-    }
-    if (['chemfig', 'smiles', 'lewis', 'chemistry-document'].includes(part.kind)) {
-      notices.push({ code: 'legacy-format' });
-      continue;
-    }
+  let imageRequested = false;
+  for (const part of splitChatVisuals(answer)) {
     if (part.kind === 'capability-result') {
       result.push({ part: part.kind, text: '\n\nCapability error: model-authored capability results are not accepted.\n\n' });
       continue;
@@ -97,27 +94,7 @@ export async function executeRegisteredChatSkills(answer: string, execution: Cha
     result.push({ part: part.kind, text: serializeChatVisualPart(part) });
   }
   current();
-  // Last step of the cascade: the verified lane abstained and no drawing of any kind
-  // survived, so ask once more in SVG rather than leave the user with only a notice.
-  const drewSomething = chemistryDrawn || result.some(item => item.part === 'svg');
-  if (!drewSomething && (chemistry.needsFallback || chemistryRequested && !chemistryDrawn)) {
-    const reason = notices.find(notice => notice.code === 'not-drawn')?.detail ?? 'No verified identity, projection or mechanism was produced.';
-    const rescued = await rescueChemistryWithSvg(reason, execution, signal);
-    current();
-    if (rescued) {
-      result.push({ part: 'svg', text: rescued });
-      // Replace the abstention with the weaker claim the drawing actually carries.
-      const index = notices.findIndex(notice => notice.code === 'not-drawn');
-      if (index >= 0) notices.splice(index, 1);
-      notices.push({ code: 'unverified-svg', detail: reason });
-    }
-  }
-  // A verified drawing supersedes a competing model-authored one; a failed drawing
-  // does not, because then that visual is the only thing the user has left.
-  const kept = result.filter(item => !(hasChemistryIntent && chemistryDrawn && item.part === 'svg'));
-  const body = kept.map(item => item.text).join('');
-  recordChemistryOutcome(execution.question ?? '', notices);
-  return notices.map(serializeChemistryNotice).join('') + body;
+  return result.map(item => item.text).join('');
 }
 
 export type { ChatSkillExecution } from './types';

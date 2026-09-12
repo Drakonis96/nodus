@@ -101,7 +101,11 @@ test('local imports reject symlink escapes', () => {
   assert.throws(() => lib.importSkillDirectory(dir), /Invalid package file/);
 });
 
-test('AlphaGenome and Legalize are registered capabilities available to compatible external skills', async () => {
+test('a skill can declare a capability no installed package provides yet', async () => {
+  // The three disciplines became packages in 5.3.2, so `nodus:legal` is a real identifier
+  // that nothing currently answers. A skill that needs one still installs and keeps the
+  // activation the user chose; it simply does not run until its provider arrives, which
+  // is what stops an uninstall from silently rewriting the user's library.
   for (const capability of ['genomics', 'legal']) {
     const nativeManifest = { ...manifest, capabilities: [capability], tools: [] };
     const nativePackage = { manifest: nativeManifest, files: { 'SKILL.md': 'Use the required native integration.' } };
@@ -109,15 +113,15 @@ test('AlphaGenome and Legalize are registered capabilities available to compatib
     const scanned = await lib.scanSkillSource(lib.getSkillMarketplace().sources[0], async url => String(url).endsWith('/skill.json')
       ? new Response(JSON.stringify(nativeManifest)) : mockFetch()(url));
     assert.equal(scanned.entries[0].package.manifest.capabilities[0], capability);
+
     const installed = lib.installChatSkillPackage(nativePackage).find(skill => !skill.builtin && skill.capabilities?.includes(capability));
-    assert.ok(installed); assert.deepEqual(installed.enabled, { assistant: false, nodi: false });
-    const directory = path.join(temporary, `unsupported-${capability}`);
-    fs.mkdirSync(directory);
-    fs.writeFileSync(path.join(directory, 'skill.json'), JSON.stringify(nativeManifest));
-    fs.writeFileSync(path.join(directory, 'SKILL.md'), nativePackage.files['SKILL.md']);
-    assert.ok(lib.importSkillDirectory(directory).some(skill => !skill.builtin && skill.capabilities?.includes(capability)));
-    const personal = lib.saveChatSkill({ name: `External ${capability}`, description: 'Requires native integration', instructions: 'Execute native plan', capabilities: [capability], enabled: { assistant: true, nodi: true } }).find(skill => skill.name === `External ${capability}`);
-    assert.ok(personal); assert.ok(lib.enabledChatSkills('assistant').some(skill => skill.id === personal.id));
+    assert.ok(installed, 'the skill installs');
+    assert.deepEqual(installed.enabled, { assistant: false, nodi: false });
+
+    const personal = lib.saveChatSkill({ name: `External ${capability}`, description: 'Requires a capability package', instructions: 'Execute native plan', capabilities: [capability], enabled: { assistant: true, nodi: true } }).find(skill => skill.name === `External ${capability}`);
+    assert.ok(personal, 'and so does one the user writes');
+    assert.deepEqual(personal.enabled, { assistant: true, nodi: true }, 'keeping the activation they chose');
+    assert.equal(lib.enabledChatSkills('assistant').some(skill => skill.id === personal.id), false, 'but it does not run without a provider');
     for (const skill of lib.listChatSkills().filter(skill => !skill.builtin)) lib.deleteChatSkill(skill.id);
   }
 });
@@ -159,22 +163,20 @@ test('official listings of built-in skills reinstall the bundled skill instead o
     assert.equal(lib.listChatSkills().some(skill => skill.builtin === 'svg'), false);
     const reinstalled = lib.installMarketplaceSkill(official.id, 'svg-studio', commit);
     assert.deepEqual(reinstalled[0], lib.DEFAULT_CHAT_SKILLS[0]);
-    // A registered capability is still installed as the bundled built-in from the official listing.
-    lib.deleteChatSkill(reinstalled.find(skill => skill.builtin === 'genomics').id);
-    const genomics = lib.installMarketplaceSkill(official.id, 'alphagenome', commit).filter(skill => skill.name === 'AlphaGenome');
-    assert.equal(genomics.length, 1);
-    assert.equal(genomics[0].builtin, 'genomics');
-    assert.equal(genomics[0].origin, undefined);
+    // AlphaGenome is a capability package now, not a bundled skill, so the official
+    // listing of its v1 skill is an ordinary download rather than a restore.
+    assert.equal(reinstalled.some(skill => skill.builtin === 'genomics'), false);
     // A community source reusing an official identifier stays an ordinary, downloaded package.
     const community = lib.addSkillSource('https://github.com/community/nodus-skills').sources.at(-1);
     await lib.updateSkillSource(community.id);
     const shared = lib.installMarketplaceSkill(community.id, 'svg-studio', commit).filter(skill => skill.name === 'SVG Studio');
     assert.equal(shared.length, 2);
     assert.equal(shared.find(skill => skill.origin)?.instructions, builtinPackages['svg-studio'].files['SKILL.md']);
-    // Now that nodus:genomics is a registered capability, a community copy installs — but as an
-    // ordinary downloaded package beside the built-in, never as the built-in itself.
+    // AlphaGenome is not a built-in any more, so a listing of it — official or community —
+    // installs one ordinary downloaded skill. Its capability stays unavailable until the
+    // package that provides it is installed.
     const communityGenomics = lib.installMarketplaceSkill(community.id, 'alphagenome', commit).filter(skill => skill.name === 'AlphaGenome');
-    assert.equal(communityGenomics.length, 2);
+    assert.equal(communityGenomics.length, 1);
     const downloaded = communityGenomics.find(skill => skill.origin);
     assert.ok(downloaded); assert.equal(downloaded.builtin, undefined);
     assert.deepEqual(downloaded.enabled, { assistant: false, nodi: false });
