@@ -1,4 +1,4 @@
-import { DocumentFigure, useDocumentFigures } from './DocumentVisualScope';
+import { DocumentFigure, useDocumentFigures } from './DocumentFigures';
 import { documentBlocks } from '@shared/documentSkills';
 import { ChatVisual } from './ChatVisual';
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';

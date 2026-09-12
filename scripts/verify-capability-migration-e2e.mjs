@@ -282,7 +282,10 @@ try {
           useBootstrap(payload.bootstrapRoot);
           const outcome = await runCapabilityMigration(fixture.context);
           assert.deepEqual(outcome.failed, []);
-          assert.deepEqual(outcome.installed.sort(), [...available].sort());
+          // Optional Marketplace packages are available, but are not legacy migrations.
+          const migrations = Object.values(BUILTINS).map(entry => entry.plugin).filter(id => available.has(id));
+          assert.deepEqual(outcome.installed.sort(), migrations.sort());
+          assert.ok(!outcome.installed.includes('research-visuals'), 'optional visual Skills are never auto-installed by a legacy migration');
           const registry = rebuildCapabilityRegistry();
           assert.deepEqual(registry.problems, []);
           for (const entry of Object.values(BUILTINS)) {
