@@ -6900,6 +6900,8 @@ export interface SupportAuditEntry {
 }
 
 export interface WritingWorkshopDraft {
+  documentSkills?: import('./documentSkills').DocumentSkillPolicy;
+  documentVisualHints?: string[];
   generatedAt: string;
   brief: WritingWorkshopBrief;
   selection: WritingWorkshopSelection;
@@ -7105,6 +7107,7 @@ export interface DeepResearchOutlineSection {
 }
 
 export interface DeepResearchRequest {
+  documentSkills?: import('./documentSkills').DocumentSkillPolicy;
   /** The research idea/question the whole report must develop. */
   objective: string;
   /**
@@ -7745,6 +7748,7 @@ export interface ImmersionScope {
 }
 
 export interface ImmersionRequest {
+  documentSkills?: import('./documentSkills').DocumentSkillPolicy;
   topic: string;
   language?: 'es' | 'en';
   /** Total time budget for the whole immersion, in minutes. */
@@ -7875,6 +7879,8 @@ export interface ImmersionPlanStats {
 }
 
 export interface ImmersionPlan {
+  documentSkills?: import('./documentSkills').DocumentSkillPolicy;
+  documentVisualHints?: string[];
   topic: string;
   title: string;
   language: 'es' | 'en';
@@ -8816,6 +8822,13 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   importSkillPackage(): Promise<ChatSkill[]>;
   exportSkillPackage(id: string): Promise<string | null>;
   listChatSkills(): Promise<ChatSkill[]>;
+  listDocumentSkills(): Promise<import('./documentSkills').DocumentSkillOption[]>;
+  getDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget): Promise<import('./documentSkills').DocumentVisualManifest | null>;
+  enrichDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget, policy: import('./documentSkills').DocumentSkillPolicy, retry?: boolean): Promise<import('./documentSkills').DocumentVisualManifest>;
+  cancelDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget): Promise<void>;
+  undoDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget): Promise<import('./documentSkills').DocumentVisualManifest | null>;
+  removeDocumentFigure(target: import('./documentSkills').DocumentVisualTarget, figureId: string): Promise<import('./documentSkills').DocumentVisualManifest | null>;
+  onDocumentVisualsChanged(listener: (target: import('./documentSkills').DocumentVisualTarget) => void): () => void;
   saveChatSkill(skill: ChatSkill): Promise<ChatSkill[]>;
   deleteChatSkill(id: string): Promise<ChatSkill[]>;
   restoreChatSkills(): Promise<ChatSkill[]>;

@@ -1,3 +1,5 @@
+import { deleteDocumentVisuals } from '../capabilities/documentStore';
+import { getActiveVault } from '../vaults/vaultRegistry';
 import { v4 as uuid } from 'uuid';
 import type {
   ModelRef,
@@ -259,6 +261,7 @@ export function setWritingWorkshopDraftRead(id: string, read: boolean): WritingW
 }
 
 export function deleteWritingWorkshopDraft(id: string): boolean {
+  deleteDocumentVisuals(getActiveVault().id, { kind: 'deep-research', id });
   deleteDecorativeImageRow('deep_research', id);
   deleteAnnotationsForWritingDraft(id);
   // Before the report, so a mark can never be left pointing at nothing.

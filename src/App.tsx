@@ -84,6 +84,7 @@ import nodusLogoViolet from './assets/nodus-logo-violet.svg';
 import nodusLogoCyan from './assets/nodus-logo-cyan.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
 import { useBrowserNativeOverlayGuard } from './browserOverlay';
+import { applyThemeClasses } from './theme';
 
 const CsvImportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.CsvImportModal })));
 const NotionImportReportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.NotionImportReportModal })));
@@ -102,18 +103,6 @@ const SIDEBAR_COMPACT_THRESHOLD = 144;
 // area. The icon itself remains visible and centred over the compact sidebar; only
 // the decorative word is hidden.
 const MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH = 248;
-
-/** Apply the light/dark root classes for a theme mode. 'system' resolves to the
- *  OS preference at call time; the App re-invokes this when that preference
- *  changes so the "system" mode tracks the OS live. */
-function applyThemeClasses(theme: import('@shared/types').ThemeMode): boolean {
-  const dark = theme === 'system'
-    ? window.matchMedia('(prefers-color-scheme: dark)').matches
-    : theme === 'dark';
-  document.documentElement.classList.toggle('light', !dark);
-  document.documentElement.classList.toggle('dark', dark);
-  return dark;
-}
 
 /** Header action rendered as an icon that reveals its label on hover/focus, so the
  *  top bar's action rail stays a clean row of icons. Every action shares the same

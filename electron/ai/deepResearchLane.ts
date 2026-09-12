@@ -1,3 +1,4 @@
+import { enrichDocumentVisuals } from './documentVisuals';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app, BrowserWindow } from 'electron';
@@ -113,6 +114,7 @@ export function ensureDeepResearchLane(): void {
       if (image) broadcast('images:changed', localizedForUi(image));
       return saved.id;
     },
+    enrichSaved: (id, report, request, signal) => enrichDocumentVisuals({ kind: 'deep-research', id }, request.documentSkills!, { hints: report.draft.documentVisualHints, model: report.draft.generationModel, signal }),
     activeVault: servingVault,
     load: loadDurableQueue,
     persist: persistDurableQueue,

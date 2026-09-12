@@ -361,7 +361,8 @@ export async function listModels(provider: AiProvider, key: string | null): Prom
  * instead — where the user actually asked a question and can act on the answer.
  *
  * Manual slugs come first (the user's own list is the one they are looking for)
- * and win on collision; the remote half stays sorted as listOpenAiStyle returns it.
+ * keep their display names on collision; live capability metadata is preserved.
+ * The remote half stays sorted as listOpenAiStyle returns it.
  */
 async function listCustom(key: string | null): Promise<ModelInfo[]> {
   const manual: ModelInfo[] = customManualModels().map((id) => ({ id, name: id }));
@@ -376,7 +377,7 @@ async function listCustom(key: string | null): Promise<ModelInfo[]> {
     remote = [];
   }
   const typed = new Set(manual.map((model) => model.id));
-  return [...manual, ...remote.filter((model) => !typed.has(model.id))];
+  return [...manual.map(model => ({ ...remote.find(candidate => candidate.id === model.id), ...model })), ...remote.filter((model) => !typed.has(model.id))];
 }
 
 /**

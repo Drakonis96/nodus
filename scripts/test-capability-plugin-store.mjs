@@ -184,7 +184,7 @@ test('a signed package installs, registers its capability and pins its own diges
   assert.equal(outcome.state.rollbackAvailable, false);
 
   const registry = lib.rebuildCapabilityRegistry();
-  assert.deepEqual([...registry.providers.keys()].sort(), ['nodus:3d', 'nodus:chemistry', 'nodus:image', 'nodus:svg']);
+  assert.deepEqual([...registry.providers.keys()].sort(), ['nodus:3d', 'nodus:chemistry', 'nodus:image', 'nodus:maps', 'nodus:svg', 'nodus:vision']);
   assert.equal(registry.providers.get('nodus:chemistry').plugin.id, 'chemistry-studio');
   assert.equal(registry.fences.get('chemistry-plan').kind, 'request');
   assert.equal(registry.fences.get('chemistry-document').kind, 'legacy');

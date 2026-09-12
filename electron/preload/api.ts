@@ -107,6 +107,17 @@ export const nodusApi: NodusApi = {
   importSkillPackage: () => ipcRenderer.invoke('skillMarketplace:import'),
   exportSkillPackage: (id) => ipcRenderer.invoke('skillMarketplace:export', id),
   listChatSkills: () => ipcRenderer.invoke('chatSkills:list'),
+  listDocumentSkills: () => ipcRenderer.invoke('documentSkills:list'),
+  getDocumentVisuals: target => ipcRenderer.invoke('documentVisuals:get', target),
+  enrichDocumentVisuals: (target, policy, retry) => ipcRenderer.invoke('documentVisuals:enrich', target, policy, retry),
+  cancelDocumentVisuals: target => ipcRenderer.invoke('documentVisuals:cancel', target),
+  undoDocumentVisuals: target => ipcRenderer.invoke('documentVisuals:undo', target),
+  removeDocumentFigure: (target, id) => ipcRenderer.invoke('documentVisuals:remove', target, id),
+  onDocumentVisualsChanged: listener => {
+    const handler = (_event: Electron.IpcRendererEvent, target: import('@shared/documentSkills').DocumentVisualTarget) => listener(target);
+    ipcRenderer.on('documentVisuals:changed', handler);
+    return () => ipcRenderer.removeListener('documentVisuals:changed', handler);
+  },
   saveChatSkill: (skill) => ipcRenderer.invoke('chatSkills:save', skill),
   deleteChatSkill: (id) => ipcRenderer.invoke('chatSkills:delete', id),
   restoreChatSkills: () => ipcRenderer.invoke('chatSkills:restore'),

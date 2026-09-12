@@ -1,3 +1,5 @@
+import { getDocumentVisuals } from '../ai/documentVisuals';
+import { documentMarkdownWithFigures } from '@shared/documentFigureExport';
 import AdmZip from 'adm-zip';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -45,13 +47,20 @@ export async function exportWritingWorkshopDraft(
   if (canceled || !filePath) return null;
 
   const format: WritingWorkshopExportFormat = path.extname(filePath).toLowerCase() === '.pdf' ? 'pdf' : 'markdown';
-  const markdown = renderDraftMarkdown(draft);
+  const visuals = request.entityId ? getDocumentVisuals({ kind: 'deep-research', id: request.entityId }) : null;
+  const assetDirectory = `${path.basename(filePath, path.extname(filePath))}-assets`;
+  const enriched = documentMarkdownWithFigures(renderDraftMarkdown(draft), 'body', visuals, assetDirectory);
+  const markdown = enriched.markdown;
   if (format === 'pdf') {
     const bytes = draft.brief.kind === 'deep_research'
       ? await professionalReportPdf(buildDeepResearchPdfInput(draft, request.entityId))
       : await markdownToPdf(markdown, draft.title || 'Informe');
     fs.writeFileSync(filePath, bytes);
   } else {
+    if (enriched.files.length) {
+      const dir = path.join(path.dirname(filePath), assetDirectory); fs.mkdirSync(dir, { recursive: true });
+      for (const file of enriched.files) fs.writeFileSync(path.join(dir, file.name), Buffer.from(file.base64, 'base64'));
+    }
     fs.writeFileSync(filePath, markdown, 'utf8');
   }
   return { path: filePath };
@@ -65,7 +74,9 @@ async function archiveEntries(
 ): Promise<{ name: string; bytes: Buffer }[]> {
   const entries: { name: string; bytes: Buffer }[] = [];
   if (format !== 'pdf') {
-    entries.push({ name: `${base}.md`, bytes: Buffer.from(renderDraftMarkdown(saved.draft), 'utf8') });
+    const enriched = documentMarkdownWithFigures(renderDraftMarkdown(saved.draft), 'body', getDocumentVisuals({ kind: 'deep-research', id: saved.id }), `${base}-assets`);
+    entries.push({ name: `${base}.md`, bytes: Buffer.from(enriched.markdown, 'utf8') });
+    for (const file of enriched.files) entries.push({ name: `${base}-assets/${file.name}`, bytes: Buffer.from(file.base64, 'base64') });
   }
   if (format !== 'markdown') {
     const bytes = saved.draft.brief.kind === 'deep_research'
@@ -163,7 +174,7 @@ export function buildDeepResearchPdfInput(
   imageOverride?: { dataUrl: string | null; credit: string | null }
 ): ProfessionalReportInput {
   const labels = DEEP_LABELS[draft.brief.language ?? 'es'];
-  return deepResearchReportInput(draft, imageOverride ?? reportImage(entityId, labels));
+  return deepResearchReportInput(draft, imageOverride ?? reportImage(entityId, labels), entityId ? getDocumentVisuals({ kind: 'deep-research', id: entityId }) : null);
 }
 
 function renderDraftMarkdown(draft: WritingWorkshopDraft): string {

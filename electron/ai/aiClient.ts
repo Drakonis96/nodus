@@ -1,4 +1,5 @@
 import { getSettings } from '../db/settingsRepo';
+import { documentVisualPlanningPrompt } from './documentVisualContext';
 import { excludeInvisibleArtifacts } from '../capabilities/modelHistory';
 import { getApiKey } from '../secrets/secretStore';
 import {
@@ -669,6 +670,8 @@ export function withVaultTypeContext<T extends { system: string }>(opts: T): T {
  *  override last (highest priority). `plainContext` skips the vault pack so tasks
  *  that need consistent output (image analysis) aren't steered by the vault type. */
 function withPromptContext<T extends { system: string; plainContext?: boolean }>(opts: T): T {
+  const visualPlanning = documentVisualPlanningPrompt();
+  if (visualPlanning) opts = { ...opts, system: `${opts.system}\n\n${visualPlanning}` };
   return opts.plainContext ? withPromptLanguage(opts) : withPromptLanguage(withVaultTypeContext(opts));
 }
 

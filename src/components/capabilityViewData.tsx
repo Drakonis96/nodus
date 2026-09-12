@@ -53,7 +53,7 @@ export function ViewChart({ node }: { node: Node<'chart'> }) {
   const geometry = useMemo(() => chartGeometry(node), [node]);
   if (!geometry) return <p className="capability-view-math-error" role="note">{node.alt}</p>;
 
-  const { width, height, plot, xOf, yOf, ticks, categories } = geometry;
+  const { width, height, plot, xOf, yOf, ticks, categories, slot } = geometry;
   return <figure className="capability-view-chart">
     <figcaption>{node.title}</figcaption>
     <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={node.alt} preserveAspectRatio="xMidYMid meet">
@@ -65,7 +65,7 @@ export function ViewChart({ node }: { node: Node<'chart'> }) {
       </g>
 
       {node.series.map((series, index) => <g key={series.label} className="capability-view-chart-series">
-        {renderSeries(node.chartType, series, index, { plot, xOf, yOf, seriesCount: node.series.length })}
+        {renderSeries(node.chartType, series, index, { plot, xOf, yOf, slot, seriesCount: node.series.length })}
       </g>)}
 
       <g className="capability-view-chart-axis">
@@ -104,19 +104,22 @@ function chartGeometry(node: Node<'chart'>) {
   const ys = node.series.flatMap(series => series.points.map(point => point[1]));
   if (!ys.length) return null;
 
-  const minX = categorical ? 0 : Math.min(...xs);
-  const maxX = categorical ? Math.max(labels.length - 1, 1) : Math.max(...xs);
+  const distinctX = [...new Set(xs)].sort((a,b) => a-b);
+  const spacing = distinctX.length > 1 ? Math.min(...distinctX.slice(1).map((x,i) => x-distinctX[i])) : 1;
+  const padX = node.chartType === 'bar' ? spacing / 2 : 0;
+  const minX = categorical ? 0 : Math.min(...xs) - padX;
+  const maxX = categorical ? Math.max(labels.length - 1, 1) : Math.max(...xs) + padX;
   // A flat series still deserves an axis rather than a division by zero.
   const spanX = maxX - minX || 1;
   const rawMin = Math.min(...ys, 0);
   const rawMax = Math.max(...ys, 0);
   const spanY = rawMax - rawMin || 1;
-  const minY = rawMin - spanY * 0.05;
-  const maxY = rawMax + spanY * 0.05;
+  const minY = rawMin === 0 ? 0 : rawMin - spanY * 0.05;
+  const maxY = rawMax === 0 && rawMin < 0 ? 0 : rawMax + spanY * 0.05;
 
   const xOf = (value: number | string) => {
     const position = categorical ? labels.indexOf(String(value)) : Number(value);
-    const ratio = categorical ? (labels.length > 1 ? position / (labels.length - 1) : 0.5) : (position - minX) / spanX;
+    const ratio = categorical ? (node.chartType === 'bar' ? (position + 0.5) / labels.length : labels.length > 1 ? position / (labels.length - 1) : 0.5) : (position - minX) / spanX;
     return plot.left + ratio * plot.width;
   };
   const yOf = (value: number) => plot.top + plot.height - ((value - minY) / (maxY - minY)) * plot.height;
@@ -130,7 +133,8 @@ function chartGeometry(node: Node<'chart'>) {
     ? labels.map(label => ({ label, x: xOf(label) }))
     : [minX, maxX].map(value => ({ label: formatTick(value), x: xOf(value) }));
 
-  return { width, height, plot, xOf, yOf, ticks, categories };
+  const slot = categorical ? plot.width / labels.length : plot.width * spacing / spanX;
+  return { width, height, plot, xOf, yOf, ticks, categories, slot };
 }
 
 function formatTick(value: number): string {
@@ -142,7 +146,7 @@ function renderSeries(
   chartType: Node<'chart'>['chartType'],
   series: ViewChartSeries,
   index: number,
-  layout: { plot: { left: number; top: number; width: number; height: number }; xOf: (value: number | string) => number; yOf: (value: number) => number; seriesCount: number },
+  layout: { plot: { left: number; top: number; width: number; height: number }; xOf: (value: number | string) => number; yOf: (value: number) => number; slot: number; seriesCount: number },
 ) {
   const colour = colourOf(series, index);
   const points = series.points.map(([x, y]) => ({ x: layout.xOf(x), y: layout.yOf(y) }));
@@ -153,7 +157,7 @@ function renderSeries(
   if (chartType === 'bar') {
     // Bars share the slot between neighbouring x positions, so several series sit beside
     // each other instead of on top of one another.
-    const slot = points.length > 1 ? Math.abs(points[1].x - points[0].x) : layout.plot.width / 2;
+    const slot = layout.slot;
     const barWidth = Math.max((slot * 0.7) / layout.seriesCount, 1);
     const base = layout.yOf(0);
     return points.map((point, at) => <rect

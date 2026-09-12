@@ -7,7 +7,7 @@ export const TRUSTED_PROTOCOL = 1 as const;
 export const TRUSTED_PUBLISHER = 'NodusResearch' as const;
 
 /** Capabilities the core owns outright. A plugin may depend on these; none may provide them. */
-export const CORE_CAPABILITY_IDS = ['nodus:svg', 'nodus:image', 'nodus:3d'] as const;
+export const CORE_CAPABILITY_IDS = ['nodus:svg', 'nodus:image', 'nodus:3d', 'nodus:maps', 'nodus:vision'] as const;
 /** `nodus:*` identifiers a signed NodusResearch package may claim, and nobody else. */
 export const RESERVED_CAPABILITY_IDS = ['nodus:chemistry', 'nodus:legal', 'nodus:genomics'] as const;
 

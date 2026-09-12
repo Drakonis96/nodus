@@ -124,7 +124,7 @@ export function deriveCapabilityTools(skill: ChatSkill): ChatSkill['capabilityTo
   const tools = (skill.capabilities ?? []).flatMap(reference => {
     const capabilityId = normalizeCapabilityId(reference);
     const provider = snapshot.providers.get(capabilityId);
-    if (provider?.source === 'plugin') {
+    if (provider?.tools.length) {
       return provider.tools.map(tool => ({ capabilityId, toolId: tool.id, description: tool.description, inputSchema: tool.inputSchema, resultKinds: [] as string[] }));
     }
     const runtime = capabilityId.startsWith('nodus:') ? null : resolveInstalledCapability(capabilityId, skill.plugin ? { version: skill.plugin.version, digest: skill.plugin.digest } : undefined);

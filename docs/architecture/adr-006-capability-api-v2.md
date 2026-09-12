@@ -149,3 +149,17 @@ tres skills v1 siguen en la raíz del repositorio y los plugins v2 viven bajo
     principal, nunca de la página. Las bibliotecas añadidas —three.js (MIT), Leaflet
     (BSD-2-Clause) y KaTeX (MIT)— son compatibles con AGPL-3.0-only. Ver
     `docs/capability-results.md`.
+
+16. **`nodus:maps` centraliza la cartografía determinista.** El núcleo recibe GeoJSON
+    WGS84, coordenadas y estilos acotados; devuelve SVG autocontenido con atribución
+    visible, geometría y procedencia. La selección territorial y la interpretación
+    disciplinar pertenecen a las Skills. La obtención de geometría usa adaptadores
+    revisados y rutas HTTPS construidas por el host, sin conceder red arbitraria ni
+    acceso a ficheros. La extensión opcional del SDK 2.1 añade el canal `maps` y sus
+    permisos explícitos manteniendo el protocolo v2 y el sandbox comunitario. Las
+    fechas históricas no soportadas fallan sin sustituirse por límites modernos.
+    Ver `docs/capability-maps.md`.
+
+### SDK 2.2: bounded vision service
+
+`nodus:vision` shares a single turn-scoped service between core dispatch and trusted workers. Image registration decodes bounded public/generated rasters into opaque host handles; review pins the selected model and cannot alter prompts, invoke tools or recurse. See [contract and owner-authorized public-image policy exception](../capability-vision.md). The permission, protocol and SDK extend API v2 consistently; the wire version and signed first-party trust boundary stay unchanged.

@@ -231,6 +231,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
+        documentFigure: path.resolve(__dirname, 'documentFigure.html'),
         mascot: path.resolve(__dirname, 'mascot.html'),
         presenterAudience: path.resolve(__dirname, 'presenterAudience.html'),
         presenterView: path.resolve(__dirname, 'presenterView.html'),

@@ -36,6 +36,8 @@ export interface CapabilityWorkerLog {
 }
 
 export interface CapabilityWorkerHandleOptions {
+  /** A turn's services carry its owner and budget; never reuse them across turns. */
+  scopeKey?: string;
   services: CapabilityHostServices;
   onLog?: (runtime: TrustedWorkerRuntime, entry: CapabilityWorkerLog) => void;
   /** Overridable so tests can run the bootstrap without a packaged build. */
@@ -50,7 +52,7 @@ export class CapabilityWorkerHandle {
   private child: UtilityProcess | null = null;
   private ready: Promise<void> | null = null;
   private readonly pending = new Map<string, Pending>();
-  private readonly abort = new AbortController();
+  private abort = new AbortController();
   private killTimer: NodeJS.Timeout | null = null;
   private nextCallId = 0;
 
@@ -88,6 +90,7 @@ export class CapabilityWorkerHandle {
   /** Asks the worker to stop, then kills it if it does not. Pending calls are rejected
    *  either way: whatever the process is still doing, its answer is no longer wanted. */
   cancel(): void {
+    this.abort.abort();
     if (!this.child) return;
     try { this.post({ type: 'cancel' }); } catch { /* the process is already gone */ }
     if (this.killTimer) return;
@@ -96,6 +99,7 @@ export class CapabilityWorkerHandle {
   }
 
   async stop(): Promise<void> {
+    this.abort.abort();
     if (!this.child) return;
     try { this.post({ type: 'shutdown' }); } catch { /* already gone */ }
     const child = this.child;
@@ -113,6 +117,7 @@ export class CapabilityWorkerHandle {
 
   private start(): Promise<void> {
     if (this.ready) return this.ready;
+    if (this.abort.signal.aborted) this.abort = new AbortController();
     const bootstrap = this.options.bootstrapPath ?? path.join(__dirname, 'capabilityWorkerBootstrap.js');
     const child = utilityProcess.fork(bootstrap, [], { serviceName: `Nodus capability ${this.runtime.capabilityId}`, stdio: 'ignore' });
     this.child = child;
@@ -161,16 +166,20 @@ export class CapabilityWorkerHandle {
   }
 
   private async serveHostCall(callId: string, channel: HostChannel, method: string, payload: unknown): Promise<void> {
+    const child = this.child, signal = this.abort.signal;
     try {
-      const value = await this.options.services({ runtime: this.runtime, channel, method, payload, signal: this.abort.signal });
+      const value = await this.options.services({ runtime: this.runtime, channel, method, payload, signal });
+      if (signal.aborted || child !== this.child) return;
       this.post({ type: 'host-result', callId, ok: true, value });
     } catch (error) {
+      if (signal.aborted || child !== this.child) return;
       try { this.post({ type: 'host-result', callId, ok: false, error: error instanceof Error ? error.message : String(error) }); }
       catch { /* the worker is gone; nothing is waiting for this answer */ }
     }
   }
 
   private teardown(reason: Error): void {
+    this.abort.abort();
     if (this.killTimer) { clearTimeout(this.killTimer); this.killTimer = null; }
     const child = this.child;
     this.child = null;
@@ -186,7 +195,7 @@ const handles = new Map<string, CapabilityWorkerHandle>();
 /** One live worker per capability and digest. A package that updates gets a new key, so
  *  a turn already running against the old digest keeps the process it started with. */
 export function acquireCapabilityWorker(runtime: TrustedWorkerRuntime, options: CapabilityWorkerHandleOptions): CapabilityWorkerHandle {
-  const key = `${runtime.capabilityId}@${runtime.plugin.version}+${runtime.plugin.digest}`;
+  const key = `${runtime.capabilityId}@${runtime.plugin.version}+${runtime.plugin.digest}${options.scopeKey ? `#${options.scopeKey}` : ''}`;
   const existing = handles.get(key);
   if (existing) return existing;
   const handle = new CapabilityWorkerHandle(runtime, options);

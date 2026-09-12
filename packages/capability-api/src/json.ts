@@ -11,6 +11,8 @@ export interface JsonSchema {
   additionalProperties?: boolean;
   minLength?: number;
   maxLength?: number;
+  minItems?: number;
+  maxItems?: number;
   minimum?: number;
   maximum?: number;
 }
@@ -28,7 +30,7 @@ export const plainText = (value: unknown, max: number): value is string =>
 export const exactKeys = (value: object, allowed: readonly string[]): boolean =>
   Object.keys(value).every(key => allowed.includes(key));
 
-const SCHEMA_KEYS = ['type', 'properties', 'required', 'items', 'enum', 'additionalProperties', 'minLength', 'maxLength', 'minimum', 'maximum'];
+const SCHEMA_KEYS = ['type', 'properties', 'required', 'items', 'enum', 'additionalProperties', 'minLength', 'maxLength', 'minItems', 'maxItems', 'minimum', 'maximum'];
 
 export function validateJsonSchema(schema: unknown, depth = 0): asserts schema is JsonSchema {
   if (!schema || typeof schema !== 'object' || Array.isArray(schema) || depth > 8) throw new Error('Invalid capability JSON schema.');
@@ -38,12 +40,14 @@ export function validateJsonSchema(schema: unknown, depth = 0): asserts schema i
   if (value.properties) {
     if (value.type !== 'object' || Object.keys(value.properties).length > 64) throw new Error('Invalid capability object schema.');
     for (const [key, child] of Object.entries(value.properties)) {
-      if (!SLUG.test(key)) throw new Error('Invalid capability schema property.');
+      if (!SLUG.test(key) && !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(key)) throw new Error('Invalid capability schema property.');
       validateJsonSchema(child, depth + 1);
     }
   }
   if (value.required && (!Array.isArray(value.required) || value.required.some(key => typeof key !== 'string' || !value.properties?.[key]))) throw new Error('Invalid capability required properties.');
   if (value.items) { if (value.type !== 'array') throw new Error('Invalid capability array schema.'); validateJsonSchema(value.items, depth + 1); }
+  for (const bound of [value.minItems, value.maxItems]) if (bound !== undefined && (value.type !== 'array' || !Number.isInteger(bound) || bound < 0 || bound > 200000)) throw new Error('Invalid capability array limit.');
+  if (value.minItems !== undefined && value.maxItems !== undefined && value.minItems > value.maxItems) throw new Error('Invalid capability array limits.');
   if (value.enum && (!Array.isArray(value.enum) || value.enum.length > 100)) throw new Error('Invalid capability enum.');
 }
 
@@ -54,7 +58,7 @@ export function jsonSchemaMatches(schema: JsonSchema, value: unknown): boolean {
   if (schema.type === 'boolean') return typeof value === 'boolean';
   if (schema.type === 'string') return typeof value === 'string' && (schema.minLength === undefined || value.length >= schema.minLength) && (schema.maxLength === undefined || value.length <= schema.maxLength);
   if (schema.type === 'number' || schema.type === 'integer') return typeof value === 'number' && Number.isFinite(value) && (schema.type !== 'integer' || Number.isInteger(value)) && (schema.minimum === undefined || value >= schema.minimum) && (schema.maximum === undefined || value <= schema.maximum);
-  if (schema.type === 'array') return Array.isArray(value) && (!schema.items || value.every(item => jsonSchemaMatches(schema.items!, item)));
+  if (schema.type === 'array') return Array.isArray(value) && (schema.minItems === undefined || value.length >= schema.minItems) && (schema.maxItems === undefined || value.length <= schema.maxItems) && (!schema.items || value.every(item => jsonSchemaMatches(schema.items!, item)));
   if (schema.type === 'object') {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const record = value as Record<string, unknown>;

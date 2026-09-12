@@ -98,7 +98,7 @@ function textNodeIndex(root: HTMLElement): { text: string; nodes: TextNodeEntry[
   let text = '';
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
-      if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
+      if (!node.nodeValue || node.parentElement?.closest('[data-reader-ignore]')) return NodeFilter.FILTER_REJECT;
       const tag = node.parentElement?.tagName;
       if (tag === 'SCRIPT' || tag === 'STYLE') return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;

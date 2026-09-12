@@ -23,6 +23,7 @@ runtime**: plugins consume it to build and to test.
 | `protocol` | The host ↔ worker wire format. |
 | `signature` | Ed25519 release manifest verification. |
 | `worker` | The `CapabilityWorkerV2` interface and the host proxy it is given. |
+| `maps` | Bounded geographic inputs, approved provider queries, SVG maps and provenance. |
 | `conformance` | Fixtures a plugin runs against its own worker in its own tests. |
 
 ## Two runtimes, one API
@@ -40,7 +41,7 @@ to packages signed by NodusResearch.
 
 A v1 package cannot select the privileged runtime, and no package other than a signed
 NodusResearch one may provide `nodus:chemistry`, `nodus:legal` or `nodus:genomics`.
-`nodus:svg` and `nodus:image` belong to the core: they can be depended on, never
+`nodus:svg`, `nodus:image`, `nodus:3d` and `nodus:maps` belong to the core: they can be depended on, never
 provided.
 
 ## Authoring a capability
@@ -80,7 +81,18 @@ assert.deepEqual(conformanceFailures(findings), []);
 
 ## Versioning
 
-The version of this package **is** the contract version. Any change to a limit, a schema
-or a validator's verdict is a breaking change: bump the major and update the
-`capabilityApi` field it validates. The marketplace pins it as a `devDependency` at an
-exact version.
+Breaking changes to existing limits, wire formats or accepted contracts require a major
+version and an updated `capabilityApi`. Optional host channels and schema features use
+a minor version when existing valid packages remain compatible. The marketplace pins
+the SDK at an exact version and consumes generated validators from the same source.
+
+SDK 2.1 adds `host.maps.retrieve` / `host.maps.render`, explicit `maps` permissions,
+and bounded array schemas (`minItems` / `maxItems`, camelCase field names). The wire
+protocol and `compatibility.capabilityApi: 2` remain unchanged. Depend on `nodus:maps`
+1.x to reject hosts that lack this service; this development implementation is not a
+claim that an already published Nodus 5.3.2 contains it. See
+[the map contract](../../docs/capability-maps.md) for inputs, provenance and restrictions.
+
+## SDK 2.2: native visual review
+
+`host.vision.prepareImages` and `host.vision.reviewImages` add a permission-gated, turn-scoped public/generated image relevance service. Declare `vision: { maxRounds: 1..3 }`; network sources require their own reviewed endpoints. See [the tool contract](../../docs/capability-vision.md). No API v1 network/model privileges change.

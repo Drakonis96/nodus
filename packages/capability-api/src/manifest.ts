@@ -24,6 +24,8 @@ export interface CapabilityToolV2 {
   answerMode: AnswerMode;
   /** True when the tool can reach the network or spend the conversation's model quota. */
   metered: boolean;
+  /** Additional service charges; absence is unknown, not free. */
+  billing?: 'none' | 'per-call' | 'unknown';
 }
 
 export interface CapabilityManifestV2 {
@@ -101,20 +103,22 @@ export function validateCapabilityManifestV2(input: unknown): CapabilityManifest
   if (!Array.isArray(value.tools) || !value.tools.length || value.tools.length > LIMITS.toolsPerCapability) throw new Error('Invalid capability tools.');
   const toolIds = new Set<string>();
   const tools = value.tools.map(tool => {
-    if (!tool || !exactKeys(tool, ['id', 'description', 'inputSchema', 'artifactTypes', 'timeoutMs', 'concurrency', 'maxPerReply', 'answerMode', 'metered'])
+    if (!tool || !exactKeys(tool, ['id', 'description', 'inputSchema', 'artifactTypes', 'timeoutMs', 'concurrency', 'maxPerReply', 'answerMode', 'metered', 'billing'])
       || !SLUG.test(tool.id) || toolIds.has(tool.id) || !plainText(tool.description, 500)
       || !Array.isArray(tool.artifactTypes) || tool.artifactTypes.some(type => !artifactTypes.has(type))
       || !Number.isInteger(tool.timeoutMs) || tool.timeoutMs < LIMITS.toolTimeoutMsMin || tool.timeoutMs > LIMITS.toolTimeoutMsMax
       || !Number.isInteger(tool.concurrency) || tool.concurrency < 1 || tool.concurrency > 8
       || !Number.isInteger(tool.maxPerReply) || tool.maxPerReply < 1 || tool.maxPerReply > LIMITS.chatFenceMaxPerReply
       || !['replace-block', 'replace-answer'].includes(tool.answerMode)
-      || typeof tool.metered !== 'boolean') throw new Error('Invalid capability tool.');
+      || typeof tool.metered !== 'boolean'
+      || tool.billing !== undefined && !['none', 'per-call', 'unknown'].includes(tool.billing)) throw new Error('Invalid capability tool.');
     validateJsonSchema(tool.inputSchema);
     toolIds.add(tool.id);
     return structuredClone(tool);
   });
 
   const permissions = validateTrustedPermissions(value.permissions);
+  if (permissions.vision && tools.some(tool => !tool.metered || tool.billing !== 'per-call')) throw new Error('Tools with vision permission must declare metered per-call billing.');
   const chat = value.chat === undefined ? undefined : validateChatContract(value.chat);
   if (chat) {
     for (const protocol of chat.requestProtocols) {

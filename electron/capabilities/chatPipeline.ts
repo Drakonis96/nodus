@@ -16,6 +16,7 @@ import type { CapabilityProvider, CapabilityRegistrySnapshot } from './registry'
  *  next instruction. */
 
 export interface TrustedCapabilityRunner {
+  dispose?: () => Promise<void>;
   /** Runs one tool and returns what it produced. */
   invoke(request: { provider: CapabilityProvider; toolId: string; input: unknown; nodeId?: string }): Promise<{ artifacts?: WorkerArtifactV1[]; view?: ViewDocumentV1; notices?: ViewDocumentV1[] }>;
   /** Runs a declared chat hook; the pipeline validates whatever comes back. */

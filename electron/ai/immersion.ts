@@ -1,3 +1,7 @@
+import { withDocumentVisualPlanning, withoutDocumentVisualPlanning } from './documentVisualContext';
+import { documentSkillCatalog, documentVisualProgressLabel } from '../../shared/documentSkills';
+import { listDocumentSkills } from '../capabilities/documentCatalog';
+import { prepareDocumentVisualHints, enrichDocumentVisuals } from './documentVisuals';
 import type {
   GraphData,
   ImmersionAnswerRecord,
@@ -434,9 +438,17 @@ export async function buildImmersionScope(request: ImmersionScopeRequest): Promi
   };
 }
 
-export async function generateImmersionSession(
+export async function generateImmersionSession(request: ImmersionRequest, onProgress?: (p: ImmersionBuildProgress) => void): Promise<ImmersionSession> {
+  const settings = getSettings();
+  const hints = await prepareDocumentVisualHints(request.documentSkills, request.topic, request.model ?? settings.immersionModel ?? settings.synthesisModel);
+  const catalog = request.documentSkills ? documentSkillCatalog(listDocumentSkills(), request.documentSkills) : '[]';
+  return withDocumentVisualPlanning(catalog, hints, () => generateImmersionWithVisualPlan(request, onProgress, hints));
+}
+
+async function generateImmersionWithVisualPlan(
   request: ImmersionRequest,
-  onProgress?: (p: ImmersionBuildProgress) => void
+  onProgress?: (p: ImmersionBuildProgress) => void,
+  documentVisualHints: string[] = [],
 ): Promise<ImmersionSession> {
   const settings = getSettings();
   const model = request.model ?? settings.immersionModel ?? settings.synthesisModel ?? null;
@@ -470,7 +482,14 @@ export async function generateImmersionSession(
   // Immersion may consume profiles already prepared by Deep Research or a manual
   // reader action, but it never creates new Documentary Index work itself.
   const plan = await orchestrateImmersion({ ...routedRequest, model }, realDeps(model, material), onProgress);
-  return saveImmersionSession(plan, model);
+  plan.documentSkills = request.documentSkills;
+  plan.documentVisualHints = documentVisualHints;
+  const saved = saveImmersionSession(plan, model);
+  if (request.documentSkills?.enabled) {
+    emit({ phase: 'assembling', message: documentVisualProgressLabel(settings.uiLanguage) });
+    await withoutDocumentVisualPlanning(() => enrichDocumentVisuals({ kind: 'immersion', id: saved.id }, request.documentSkills!, { hints: documentVisualHints, model })).catch(() => undefined);
+  }
+  return saved;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

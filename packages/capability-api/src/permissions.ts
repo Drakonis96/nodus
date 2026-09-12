@@ -1,4 +1,5 @@
 import { SLUG, exactKeys, plainText } from './json';
+import { MAP_PROVIDERS, MAP_LIMITS, type MapProviderId } from './maps';
 
 /** What a trusted worker may reach. Everything absent is denied; there is no implicit
  *  allowance. The set is also what the user is shown and what an update is diffed against. */
@@ -58,13 +59,17 @@ export interface TrustedPermissionSetV2 {
    *  the core to check and show. Separate from 3D because what is checked, and what it
    *  would mean to get it wrong, are different in each case. */
   media?: boolean;
+  /** Deterministic cartography; only these reviewed providers may be retrieved. */
+  /** Public/generated image relevance reviews against the selected model. */
+  vision?: { maxRounds: number };
+  maps?: { maxCalls: number; providers: MapProviderId[] };
   /** Auxiliary workers spawned from the plugin's own bundle, killable by the host. */
   subworkers?: { max: number };
   runtimes?: TrustedRuntimePermission[];
 }
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
-const KEYS = ['network', 'secrets', 'storage', 'model', 'svg', 'models', 'media', 'subworkers', 'runtimes'];
+const KEYS = ['network', 'secrets', 'storage', 'model', 'svg', 'models', 'media', 'maps', 'vision', 'subworkers', 'runtimes'];
 
 export function validateTrustedPermissions(input: unknown): TrustedPermissionSetV2 {
   if (!input || typeof input !== 'object' || Array.isArray(input) || !exactKeys(input, KEYS)) throw new Error('Invalid capability permissions.');
@@ -116,6 +121,10 @@ export function validateTrustedPermissions(input: unknown): TrustedPermissionSet
   if (value.svg !== undefined && typeof value.svg !== 'boolean') throw new Error('Invalid capability svg permission.');
   if (value.models !== undefined && typeof value.models !== 'boolean') throw new Error('Invalid capability 3D permission.');
   if (value.media !== undefined && typeof value.media !== 'boolean') throw new Error('Invalid capability media permission.');
+  if (value.vision !== undefined && (!value.vision || !exactKeys(value.vision,['maxRounds']) || !Number.isInteger(value.vision.maxRounds) || value.vision.maxRounds < 1 || value.vision.maxRounds > 3)) throw new Error('Invalid capability vision permission.');
+  if (value.maps !== undefined) {
+    if (!value.maps || !exactKeys(value.maps, ['maxCalls','providers']) || !Number.isInteger(value.maps.maxCalls) || value.maps.maxCalls < 1 || value.maps.maxCalls > MAP_LIMITS.calls || !Array.isArray(value.maps.providers) || new Set(value.maps.providers).size !== value.maps.providers.length || value.maps.providers.some(p => !MAP_PROVIDERS.includes(p))) throw new Error('Invalid capability maps permission.');
+  }
 
   if (value.subworkers !== undefined) {
     if (!value.subworkers || !exactKeys(value.subworkers, ['max']) || !Number.isInteger(value.subworkers.max) || value.subworkers.max < 1 || value.subworkers.max > 8) throw new Error('Invalid capability subworker permission.');
@@ -153,6 +162,8 @@ function permissionAtoms(permissions: TrustedPermissionSetV2): string[] {
   if (permissions.svg) atoms.push('svg');
   if (permissions.models) atoms.push('models');
   if (permissions.media) atoms.push('media');
+  if (permissions.vision) atoms.push(`vision|${permissions.vision.maxRounds}`);
+  if (permissions.maps) { atoms.push(`maps|${permissions.maps.maxCalls}`); for (const provider of permissions.maps.providers) atoms.push(`maps-provider|${provider}`); }
   if (permissions.subworkers) atoms.push(`subworkers|${permissions.subworkers.max}`);
   for (const runtime of permissions.runtimes ?? []) atoms.push(`runtime|${runtime.id}|${runtime.kind}|${runtime.minVersion}`);
   return atoms;
@@ -162,14 +173,16 @@ function permissionAtoms(permissions: TrustedPermissionSetV2): string[] {
  *  quota counts; narrowing one does not, so a plugin can always give privilege back. */
 export function permissionsExpandV2(previous: TrustedPermissionSetV2, next: TrustedPermissionSetV2): boolean {
   const granted = new Set(permissionAtoms(previous));
-  if (permissionAtoms(next).some(atom => !granted.has(atom) && !atom.startsWith('storage|') && !atom.startsWith('model|') && !atom.startsWith('subworkers|'))) return true;
+  if (permissionAtoms(next).some(atom => !granted.has(atom) && !atom.startsWith('storage|') && !atom.startsWith('model|') && !atom.startsWith('maps|') && !atom.startsWith('vision|') && !atom.startsWith('subworkers|'))) return true;
   const storage = next.storage, priorStorage = previous.storage ?? { stateBytes: 0, cacheBytes: 0, tempBytes: 0 };
   if (storage && (storage.stateBytes > priorStorage.stateBytes || storage.cacheBytes > priorStorage.cacheBytes || storage.tempBytes > priorStorage.tempBytes)) return true;
   if ((next.model?.maxCalls ?? 0) > (previous.model?.maxCalls ?? 0)) return true;
+  if ((next.vision?.maxRounds ?? 0) > (previous.vision?.maxRounds ?? 0)) return true;
+  if ((next.maps?.maxCalls ?? 0) > (previous.maps?.maxCalls ?? 0)) return true;
   return (next.subworkers?.max ?? 0) > (previous.subworkers?.max ?? 0);
 }
 
 /** A capability that can leave the machine, spend quota or persist is charged to the
  *  strict lane. A purely computational one costs no more than a JavaScript tool. */
 export const trustedCapabilityIsMetered = (permissions: TrustedPermissionSetV2): boolean =>
-  Boolean(permissions.network?.length || permissions.secrets?.length || permissions.model || permissions.storage || permissions.runtimes?.length);
+  Boolean(permissions.vision || permissions.network?.length || permissions.maps?.providers.length || permissions.secrets?.length || permissions.model || permissions.storage || permissions.runtimes?.length);

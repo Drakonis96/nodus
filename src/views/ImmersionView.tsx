@@ -1,3 +1,5 @@
+import { DocumentVisualScope, DocumentVisualActions, DocumentVisualFigures } from '../components/DocumentVisualScope';
+import { DocumentSkillsControl, useDocumentSkills } from '../components/DocumentSkillsControl';
 // Inmersión — the fully guided topic-mastery experience.
 //
 // Flow: home (topic + budget) → scope (the territory map, pure embeddings+graph,
@@ -184,6 +186,7 @@ export function ImmersionView({
   const [minutes, setMinutes] = useState(150);
   const [includeQuiz, setIncludeQuiz] = useState(true);
   const [includeImage, setIncludeImage] = useState(false);
+  const documentSkills = useDocumentSkills();
   const [imageStyle, setImageStyle] = useState<DecorativeImageStyle>(settings.imageStyle);
   // The immersion *content* is generated in Spanish or English only; a UI language
   // without a matching content language (French) defaults to English.
@@ -278,6 +281,7 @@ export function ImmersionView({
   }, [generationJob, refreshSessions]);
 
   const exploreScope = async () => {
+    if (!documentSkills.valid) { setError(t('Corregir límites de skills')); return; }
     if (!topic.trim()) return;
     setError(null);
     setScoping(true);
@@ -301,6 +305,7 @@ export function ImmersionView({
       scope,
       request: {
         topic: scope.topic,
+        documentSkills: documentSkills.policy,
         language,
         minutes,
         includeQuiz,
@@ -453,6 +458,7 @@ export function ImmersionView({
           />
           {mode === 'home' && composerOpen && (
             <ImmersionComposerModal
+              documentSkills={documentSkills}
               settings={settings}
               topic={topic}
               minutes={minutes}
@@ -500,6 +506,7 @@ export function ImmersionView({
       {mode === 'player' && !session && <RestoringPane />}
 
       {mode === 'player' && session && (
+        <DocumentVisualScope target={{ kind: 'immersion', id: session.id }}>
         <ImmersionPlayer
           key={session.id}
           session={session}
@@ -511,6 +518,7 @@ export function ImmersionView({
           onCitation={setCitation}
           onSaveToNotes={() => setSavingToNotes(true)}
         />
+        </DocumentVisualScope>
       )}
 
       {citation && (
@@ -930,7 +938,8 @@ function SessionListRow({
 // the scope screen where the immersion is actually generated.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ImmersionComposerModal({
+export function ImmersionComposerModal({
+  documentSkills,
   settings,
   topic,
   minutes,
@@ -952,6 +961,7 @@ function ImmersionComposerModal({
   onExplore,
   onClose,
 }: {
+  documentSkills: ReturnType<typeof useDocumentSkills>;
   settings: AppSettings;
   topic: string;
   minutes: number;
@@ -1070,6 +1080,8 @@ function ImmersionComposerModal({
             <ModelPicker settings={settings} value={model} onChange={onModel} compact menu />
           </div>
 
+          <DocumentSkillsControl value={documentSkills.policy} onChange={documentSkills.setPolicy} onValidityChange={documentSkills.setValid} />
+
           {error && (
             <div className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-xs text-red-300">{error}</div>
           )}
@@ -1082,7 +1094,7 @@ function ImmersionComposerModal({
           <button
             className="btn btn-primary gap-2 !px-5"
             onClick={onExplore}
-            disabled={!topic.trim() || scoping || !hasModel}
+            disabled={!topic.trim() || scoping || !hasModel || !documentSkills.valid}
             title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
           >
             <Icon name={scoping ? 'sync' : 'search'} className={scoping ? 'animate-spin' : ''} />
@@ -1591,6 +1603,7 @@ function ImmersionPlayer({
           </div>
         </div>
         <div className="flex-1" />
+        <DocumentVisualActions />
         <button className="btn btn-ghost gap-1.5 border border-neutral-700 text-xs" disabled={exportingPdf} onClick={() => void exportPdf()}>
           <Icon name={exportingPdf ? 'sync' : 'download'} size={13} className={exportingPdf ? 'animate-spin' : ''} />
           {exportingPdf ? t('Exportando…') : `${t('Exportar')} PDF`}
@@ -2227,6 +2240,7 @@ function ContrastsStep({ session, onCitation }: { session: ImmersionSession; onC
           </table>
         </div>
       )}
+      <DocumentVisualFigures field="contrasts" />
     </div>
   );
 }

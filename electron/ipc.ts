@@ -1,3 +1,5 @@
+import { getDocumentVisuals, enrichDocumentVisuals, cancelDocumentVisuals, undoVisualEnrichment, removeDocumentFigure } from './ai/documentVisuals';
+import { listDocumentSkills } from './capabilities/documentCatalog';
 import { getSkillMarketplace, addSkillSource, removeSkillSource, updateSkillSource, installMarketplaceSkill, installMarketplacePlugin } from './skillMarketplace';
 import { listChatSkills, saveChatSkill, deleteChatSkill, restoreChatSkills, importSkillDirectory, exportSkillDirectory, approvePendingChatPlugin, rollbackChatPlugin, removeChatPlugin, installChatPluginPackage, restorePluginSkillAuthorVersion } from './chatSkills';
 import { configurePluginSecret, discardInboxPlugin, listInboxPlugins, listInstalledPlugins, readInboxPlugin, readPluginDirectory, setPluginAutoUpdate } from './skillPlugins';
@@ -585,6 +587,12 @@ export function registerIpc(
     return result.canceled ? null : exportSkillDirectory(id, result.filePaths[0]);
   });
   h('chatSkills:list', async () => listChatSkills());
+  h('documentSkills:list', async () => listDocumentSkills());
+  h('documentVisuals:get', async (_event, target) => getDocumentVisuals(target));
+  h('documentVisuals:enrich', async (_event, target, policy, retry) => enrichDocumentVisuals(target, policy, { retry: retry === true }));
+  h('documentVisuals:cancel', async (_event, target) => cancelDocumentVisuals(target));
+  h('documentVisuals:undo', async (_event, target) => undoVisualEnrichment(target));
+  h('documentVisuals:remove', async (_event, target, id) => removeDocumentFigure(target, id));
   h('chatSkills:save', async (_e, skill) => skillsChanged(saveChatSkill(skill)));
   h('chatSkills:delete', async (_e, id: string) => skillsChanged(deleteChatSkill(id)));
   h('chatSkills:restore', async () => skillsChanged(restoreChatSkills()));

@@ -26,6 +26,7 @@ await build({
     api.onResolve({ filter: /db\/settingsRepo$/ }, () => ({ path: 'settings', namespace: 'mock' }));
     // With no capability package installed the dispatcher never builds a trusted runner,
     // so its graph (and the whole AI client behind it) stays out of this bundle.
+    api.onResolve({ filter: /vision\/adapter$/ }, () => ({ path: 'vision-adapter', namespace: 'mock' }));
     api.onResolve({ filter: /capabilities\/runner$/ }, () => ({ path: 'trusted-runner', namespace: 'mock' }));
     api.onLoad({ filter: /.*/, namespace: 'mock' }, ({ path: name }) => ({ contents: name === 'electron'
       ? `export const safeStorage = { isEncryptionAvailable: () => false }; export const app = { getPath: () => ${JSON.stringify(temporary)}, getVersion: () => '5.3.0' };`
@@ -36,6 +37,7 @@ await build({
       : name === 'chemistry-repair' ? `export const repairChemistryIntent = (...args) => globalThis.__skillChemistryRepair?.(...args);`
       : name === 'chemistry-validator' ? `export const validateChemistryInUtility = () => { throw new Error('Unexpected validator'); };`
       : name === 'settings' ? `export const getSettings = () => ({ imageProvider: 'google', imageModel: 'user-selected-image-model' });`
+      : name === 'vision-adapter' ? `export const createChatVisionSession = () => ({dispose(){},reviewImages(){throw new Error('Unexpected review');}});`
       : name === 'trusted-runner' ? `export const createTrustedCapabilityRunner = () => { throw new Error('Unexpected trusted runner'); }; export const createCapabilityAdapters = () => ({});`
       : `export const callImageProvider = (...args) => globalThis.__skillImageProvider(...args); export const prepareGeneratedImage = (image) => ({ image: image.bytes, mimeType: image.mimeType });`, loader: 'js' }));
     api.onResolve({ filter: /^@shared\// }, ({ path: specifier }) => ({ path: path.join(root, 'shared', `${specifier.slice(8)}.ts`) }));

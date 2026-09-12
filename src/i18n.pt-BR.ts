@@ -1,3 +1,4 @@
+import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
 import { CAPABILITIES_TRANSLATIONS } from './i18n.capabilities';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
@@ -61,6 +62,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 export const PT_BR: Record<string, string> = {
   ...CHAT_SKILLS_TRANSLATIONS['pt-BR'],
   ...CAPABILITIES_TRANSLATIONS['pt-BR'],
+  ...DOCUMENT_SKILLS_TRANSLATIONS['pt-BR'],
   ...STELLAR_GRAPH_TRANSLATIONS["pt-BR"],
   ...ACADEMIC_TOUR_TRANSLATIONS['pt-BR'],
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS['pt-BR'],
