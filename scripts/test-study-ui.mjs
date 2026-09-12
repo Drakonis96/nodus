@@ -543,7 +543,15 @@ test('study search follows the minimal global-search layout', async () => {
   assert.match(studySearch, /showFilters &&/);
   assert.match(studySearch, /study-search-panel/);
   assert.match(studySearch, /input study-search-filter h-9 text-xs/);
-  assert.equal((studySearch.match(/className="input study-search-filter h-9 text-xs"/g) ?? []).length, 5);
+  assert.deepEqual(
+    [...studySearch.matchAll(/<select\s+aria-label=\{t\('([^']+)'\)\}/g)].map((match) => match[1]),
+    ['Curso', 'Asignatura', 'Tema'],
+    'advanced filters scope the course, subject and topic; content kinds use persistent chips'
+  );
+  assert.match(studySearch, /<SearchKindFilters\b[^\n]*selected=\{kinds\}[^\n]*onChange=\{setKinds\}/);
+  assert.ok(studySearch.indexOf('<SearchKindFilters') < studySearch.indexOf('{showFilters &&'), 'content filters remain outside the collapsible advanced panel');
+  assert.match(studySearch, /sort: 'relevance'/);
+  assert.match(globalSearch, /<SearchKindFilters\b/);
   assert.match(studySearch, /rounded-md border border-neutral-800 bg-neutral-900\/40 px-3 py-2/);
   assert.match(globalSearch, /max-w-3xl/);
   assert.match(css, /\.light \.study-search-panel\s*\{[^}]*background-color:\s*#f8faf9;[^}]*border-color:\s*#d7e3e1/s);
