@@ -7,12 +7,17 @@
 // more code to check, and code nothing in this repository can sign, because the bytes are
 // pinned by digest against a manifest the publisher signed.
 //
-// Chemistry Studio 2.2.0 vendors `tar-fs`, which carries `bare-fs`, `bare-path` and
+// Chemistry Studio 2.2.0 vendored `tar-fs`, which carries `bare-fs`, `bare-path` and
 // `bare-url`. Those ship prebuilt binaries for every platform the Bare runtime supports,
 // macOS and iOS included. Under Node they are never loaded — `tar-fs` resolves the Bare
 // variants only under the `bare` runtime condition — but the notary does not care whether
-// code runs, only whether it is signed. That is what rejected the v5.4.0 macOS builds:
-// fifteen unsigned Mach-O files, five each in three packages nothing ever opens.
+// code runs, only whether it is signed. That is what rejected the first v5.4.0 macOS
+// builds: fifteen unsigned Mach-O files, five each in three packages nothing ever opens.
+//
+// Chemistry Studio 2.2.1 stops vendoring them, so nothing is withheld today. This stays as
+// the check that keeps it that way: no package reaches a macOS build carrying native code
+// that no release here can sign, and a build says so by name rather than dying in the
+// notary twenty minutes later.
 //
 // Nothing here signs anything, and nothing here hides anything. It answers one question,
 // cheaply and before the expensive build: would this archive fail notarization?

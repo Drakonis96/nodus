@@ -3,14 +3,14 @@
   "packages": [
     {
       "id": "chemistry-studio",
-      "version": "2.2.0",
-      "releaseUrl": "https://github.com/NodusResearch/nodus-research-skill-marketplace/releases/download/chemistry-studio-v2.2.0",
+      "version": "2.2.1",
+      "releaseUrl": "https://github.com/NodusResearch/nodus-research-skill-marketplace/releases/download/chemistry-studio-v2.2.1",
       "assets": [
         {
           "target": "any",
-          "asset": "chemistry-studio-2.2.0-any.nodus-plugin",
-          "bytes": 21418041,
-          "sha256": "9615dd1626a33a04d383d4493e4efdf0e90fb639bf72cd415e3265a6afdbf95e"
+          "asset": "chemistry-studio-2.2.1-any.nodus-plugin",
+          "bytes": 19439292,
+          "sha256": "0ea5001b8e19b6ba3442cf29af9c541b9f7f591ae43d3750d70714fd7a174d17"
         }
       ]
     },
