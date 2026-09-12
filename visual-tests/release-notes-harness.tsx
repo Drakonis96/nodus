@@ -1,0 +1,13 @@
+import ReactDOM from 'react-dom/client';
+import { WhatsNewModal } from '../src/components/WhatsNewModal';
+import { setActiveLang } from '../src/i18n';
+import type { AppLanguage, AppSettings } from '../shared/types';
+import pkg from '../package.json';
+import '../src/index.css';
+const params = new URLSearchParams(location.search);
+const language = (params.get('lang') ?? 'es') as AppLanguage;
+Object.assign(window, { __APP_VERSION__: pkg.version, nodus: { openExternal: async () => {} } });
+setActiveLang(language);
+document.documentElement.className = params.get('theme') === 'dark' ? 'dark' : 'light';
+const settings = { uiLanguage: language, mascotStyle: 'orb', mascotEnabled: false, reduceMotion: true } as AppSettings;
+ReactDOM.createRoot(document.getElementById('root')!).render(<WhatsNewModal settings={settings} activeVaultType="academic" uiLanguage={language} showSeenReleaseNotes />);

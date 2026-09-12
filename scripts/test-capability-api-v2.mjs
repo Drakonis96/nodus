@@ -56,7 +56,7 @@ const plugin = (overrides = {}) => ({
   schemaVersion: 2, id: 'chemistry-studio', name: 'Chemistry Studio', version: '2.0.0',
   author: 'NodusResearch', description: 'Draw and verify chemical structures.', license: 'AGPL-3.0-only',
   publisher: { id: 'NodusResearch', keyId: 'nr01' },
-  compatibility: { capabilityApi: 2, minNodusVersion: '5.3.2', targets: ['darwin-arm64', 'darwin-x64', 'win32-x64', 'linux-x64'] },
+  compatibility: { capabilityApi: 2, minNodusVersion: '5.4.0', targets: ['darwin-arm64', 'darwin-x64', 'win32-x64', 'linux-x64'] },
   replacesSkills: ['builtin-chemistry'],
   skills: ['skills/chemistry-studio/skill.json'],
   capabilities: ['capabilities/chemistry/capability.json'],
@@ -146,8 +146,8 @@ test('plugin targets are explicit and a portable package cannot also be platform
   assert.equal(sdk.resolvePluginTarget(['darwin-arm64', 'win32-x64'], 'darwin', 'arm64'), 'darwin-arm64');
   assert.equal(sdk.resolvePluginTarget(['any'], 'linux', 'x64'), 'any');
   assert.equal(sdk.resolvePluginTarget(['win32-x64'], 'darwin', 'arm64'), undefined);
-  rejects(() => sdk.validatePluginManifestV2(plugin({ compatibility: { capabilityApi: 2, minNodusVersion: '5.3.2', targets: ['any', 'darwin-arm64'] } })), /portable plugin/);
-  rejects(() => sdk.validatePluginManifestV2(plugin({ compatibility: { capabilityApi: 2, minNodusVersion: '5.3.2', targets: ['solaris-x64'] } })), /compatibility/);
+  rejects(() => sdk.validatePluginManifestV2(plugin({ compatibility: { capabilityApi: 2, minNodusVersion: '5.4.0', targets: ['any', 'darwin-arm64'] } })), /portable plugin/);
+  rejects(() => sdk.validatePluginManifestV2(plugin({ compatibility: { capabilityApi: 2, minNodusVersion: '5.4.0', targets: ['solaris-x64'] } })), /compatibility/);
   rejects(() => sdk.validatePluginManifestV2(plugin({ capabilities: ['capabilities/../../etc/capability.json'] })), /capability path/);
   rejects(() => sdk.validatePluginManifestV2(plugin({ capabilities: [] })), /capability list/);
 

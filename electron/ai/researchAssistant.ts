@@ -1,3 +1,4 @@
+import { prepareResearchAttachments, withResearchAttachmentFallback } from './researchAttachments';
 import { withResearchSystemPrompt } from './researchSystemPrompt';
 import { resolveResearchSourceScope, type ResearchSourceScope } from './researchSourceScope';
 import { researchGenerationOptions } from './researchGenerationOptions';
@@ -195,11 +196,12 @@ function skillExecution(request: ResearchChatRequest) {
 export async function answerResearchChat(request: ResearchChatRequest): Promise<ResearchChatResponse> {
   const execution = skillExecution(request);
   const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request, execution.skills);
-  const opts = { system, user, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, ...await researchGenerationOptions(request, maxTokens, local) };
+  const attachments = await prepareResearchAttachments(request, 'research', request.model);
+  const opts = { system: system + attachments.system, user: user + attachments.text, images: attachments.images, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, ...await researchGenerationOptions(request, maxTokens, local) };
   let answer = '';
   for (let attempt = 0; attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
-    answer = finalizeAnswer(await completeText(opts, request.model), local, user);
-    if (!citationRequired || extractCitationRefs(answer).length > 0 || splitChatVisuals(answer).some(part => part.kind !== 'markdown')) return { answer: await executeChatSkills(answer, execution), stats };
+    answer = finalizeAnswer(await withResearchAttachmentFallback(attachments, opts, options => completeText(options, request.model)), local, user);
+    if (!citationRequired || attachments.text || extractCitationRefs(answer).length > 0 || splitChatVisuals(answer).some(part => part.kind !== 'markdown')) return { answer: await executeChatSkills(answer, execution), stats };
   }
   throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
 }
@@ -211,30 +213,26 @@ export async function streamResearchChat(
 ): Promise<ResearchChatResponse> {
   const execution = skillExecution(request);
   const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request, execution.skills);
-  const opts = { system, user, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, ...await researchGenerationOptions(request, maxTokens, local, signal), signal };
-  let answer = finalizeAnswer(await completeTextStream(
-    opts,
-    onDelta,
-    request.model,
-    signal
-  ), local, user);
+  const attachments = await prepareResearchAttachments(request, 'research', request.model);
+  const opts = { system: system + attachments.system, user: user + attachments.text, images: attachments.images, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, ...await researchGenerationOptions(request, maxTokens, local, signal), signal };
+  let answer = finalizeAnswer(await withResearchAttachmentFallback(attachments, opts, options => completeTextStream(options, onDelta, request.model, signal)), local, user);
   // A user-triggered stop ends the turn with the text that already streamed. Running
   // the citation-recovery resample or the skill tools now would either throw an
   // AbortError or spend another provider call on a reply the user just cancelled.
   if (signal?.aborted) return { answer, stats, aborted: true };
-  for (let attempt = 1; citationRequired && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown') && attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; citationRequired && !attachments.text && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown') && attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
     signal?.throwIfAborted();
     // Streamed deltas are provisional and the renderer replaces them with the
     // returned answer. Recovery repeats the frozen request without changing any
     // model, prompt, temperature or output-budget parameter.
     try {
-      answer = finalizeAnswer(await completeText(opts, request.model), local, user);
+      answer = finalizeAnswer(await withResearchAttachmentFallback(attachments, opts, options => completeText(options, request.model)), local, user);
     } catch (error) {
       if (signal?.aborted) return { answer, stats, aborted: true };
       throw error;
     }
   }
-  if (citationRequired && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown')) {
+  if (citationRequired && !attachments.text && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown')) {
     throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
   }
   return { answer: await executeChatSkills(answer, execution, signal), stats };

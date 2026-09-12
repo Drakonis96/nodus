@@ -79,7 +79,7 @@ export type LegacyResultRenderResult =
   | { available: true; capabilityId: string; pluginId?: string; view: ViewDocumentV1 }
   | { available: false; reason: 'no-provider' };
 
-/** Where the 5.3.1 -> 5.3.2 move has got to, per package.
+/** Where the 5.3.1 -> 5.4.0 move has got to, per package.
  *
  *  `phase` is the journal's, and the three booleans are what the interface actually needs
  *  to tell the states apart: installed but not migrated is "migrating", migrated but not

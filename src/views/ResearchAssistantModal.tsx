@@ -1,3 +1,4 @@
+import type { ResearchAttachment, ResearchAttachmentSurface } from '@shared/researchAttachments';
 import { ResearchSystemPromptControl } from '../components/ResearchSystemPromptControl';
 import { useResearchSystemPrompts } from '../hooks/useResearchSystemPrompts';
 import type { ResearchChatAdapter, ResearchUiMessage } from './researchChatAdapter';
@@ -8,7 +9,7 @@ import type { ResearchEffort } from '@shared/researchReasoning';
 import { ChatMarkdown } from '../components/ChatMarkdown';
 import { ChatAbortedNotice } from '../components/ChatAbortedNotice';
 import { ChatSkillsControl } from '../components/ChatSkillsControl';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
 import { createPortal } from 'react-dom';
 import type {
   AppSettings,
@@ -232,6 +233,15 @@ export function ResearchAssistantModal({
   const [selection, setSelection] = useState<ResearchContextSelection>(() => cloneSelection(SYNTHESIS_SELECTION));
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
+  const [attachments, setAttachments] = useState<ResearchAttachment[]>([]);
+  const [attaching, setAttaching] = useState(false);
+  const [attachmentError, setAttachmentError] = useState('');
+  const attachmentBusyRef = useRef(false);
+  const dragDepthRef = useRef(0);
+  const [draggingFiles, setDraggingFiles] = useState(false);
+  const attachmentSurface = (adapter?.id ?? 'research') as ResearchAttachmentSurface;
+  const canUseAttachments = attachments.length > 0 || messages.some(message => message.attachments?.length);
+
   const [contextTitle, setContextTitle] = useState<string | null>(null);
   const [activeModeId, setActiveModeId] = useState<ActiveAssistantModeId>('synthesis');
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, adapter?.modelFeature ?? 'chatModel', adapter?.modelFeature === 'studyModel' ? 'chatModel' : undefined);
@@ -435,6 +445,9 @@ export function ResearchAssistantModal({
   };
 
   const startNewConversation = () => {
+    if (attachmentBusyRef.current) return;
+    setAttachments([]);
+    setAttachmentError('');
     setSelection(current => { const { sourceFilter: _sourceFilter, ...rest } = current; return rest; });
     setThinkingEffort('standard');
     adapter?.reset?.();
@@ -451,6 +464,8 @@ export function ResearchAssistantModal({
   useEffect(() => {
     if (!initialTarget || initialTarget.nonce === lastInitialTargetRef.current) return;
     lastInitialTargetRef.current = initialTarget.nonce;
+    setAttachments([]);
+    setAttachmentError('');
     setActiveId(null);
     setMessages([]);
     setStoppedMessageId(null);
@@ -463,12 +478,17 @@ export function ResearchAssistantModal({
   }, [initialTarget]);
 
   const loadConversation = async (id: string) => {
+    if (attachmentBusyRef.current) return;
     setThinkingEffort('standard');
     const conversation = await api.getConversation(id);
     if (!conversation) {
       await refreshConversations();
       return;
     }
+    const storedAttachments = await window.nodus.listResearchAttachments({ surface: attachmentSurface, conversationId: id });
+    const referenced = new Set(conversation.messages.flatMap(message => message.attachments?.map(file => file.id) ?? []));
+    setAttachments((storedAttachments ?? []).filter(file => !referenced.has(file.id)));
+    setAttachmentError('');
     setActiveId(conversation.id);
     setMessages(conversation.messages.map((m) => ({ ...m, id: m.id || crypto.randomUUID() })));
     setStoppedMessageId(null);
@@ -498,6 +518,7 @@ export function ResearchAssistantModal({
       const records: UiMessage[] = finalMessages.map((m) => ({
         interrupted: m.interrupted,
         study: m.study,
+        attachments: m.attachments,
         id: m.id,
         role: m.role,
         content: m.content,
@@ -517,16 +538,16 @@ export function ResearchAssistantModal({
   // Runs one assistant turn against `priorMessages` + a fresh user turn. Shared by
   // the composer (send) and the regenerate action, which only differ in how they
   // pick the prior history and the user prompt.
-  const generate = async (conversationId: string, priorMessages: UiMessage[], content: string) => {
+  const generate = async (conversationId: string, priorMessages: UiMessage[], content: string, files: ResearchAttachment[] = []) => {
     if (!selectedModel) return;
     const selectionKey = adapter?.contextKey ?? serializeSelection(selection);
     const isFirstExchange = priorMessages.length === 0;
-    const userMessage: UiMessage = { id: crypto.randomUUID(), role: 'user', content, selectionKey };
+    const userMessage: UiMessage = { id: crypto.randomUUID(), role: 'user', content, selectionKey, attachments: files };
     const assistantId = crypto.randomUUID();
     const requestMessages: ResearchChatMessage[] = [
       ...priorMessages.filter((m) => (m.selectionKey === selectionKey || (adapter && !m.selectionKey)) && !m.error && m.content.trim()),
       userMessage,
-    ].map((m) => ({ role: m.role, content: m.content }));
+    ].map((m) => ({ role: m.role, content: m.content, attachments: m.attachments }));
 
     stopRequestedRef.current = false;
     setStoppedMessageId(null);
@@ -541,8 +562,9 @@ export function ResearchAssistantModal({
 
     let streamed = '';
     try {
+      if (requestMessages.some(message => message.attachments?.length)) await persist(conversationId, [...priorMessages, userMessage], false);
       const response = await api.researchChatStream(
-        { messages: requestMessages, selection, model: selectedModel, conversationId, thinkingEffort, systemPromptId: systemPrompts.selectedId },
+        { attachmentIds: [...new Set([...priorMessages, userMessage].flatMap(message => message.attachments?.map(file => file.id) ?? []))], messages: requestMessages, selection, model: selectedModel, conversationId, thinkingEffort, systemPromptId: systemPrompts.selectedId },
         {
           onDelta: (delta) => {
             streamed += delta;
@@ -617,8 +639,8 @@ export function ResearchAssistantModal({
   };
 
   const send = async (explicit?: string) => {
-    const content = (explicit ?? input).trim();
-    if (!content || sending || !selectedModel || !systemPrompts.ready || adapter?.canSend === false) return;
+    const content = (explicit ?? input).trim() || (attachments.length ? t('Analiza los archivos adjuntos.') : '');
+    if (!content || sending || attachmentBusyRef.current || attachments.some(file => file.kind === 'unsupported') || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)) return;
 
     // Lazily create the conversation on the first message so empty chats never clutter history.
     let conversationId = activeId;
@@ -626,12 +648,15 @@ export function ResearchAssistantModal({
       const created = await api.createConversation({ model: selectedModel, selection, title: content.slice(0, 80) });
       conversationId = created.id;
       await window.nodus.selectResearchSystemPrompt(`${adapter?.id ?? 'research'}:${created.id}`, systemPrompts.selectedId);
+      activeIdRef.current = created.id;
       setActiveId(created.id);
     }
     // Only the composer's own text is cleared on send; an explicit prompt (a
     // suggestion chip) must not wipe a draft the user may have typed.
     if (!explicit) setInput('');
-    await generate(conversationId, messagesRef.current, content);
+    const files = explicit ? [] : attachments;
+    if (!explicit) setAttachments([]);
+    await generate(conversationId, messagesRef.current, content, files);
   };
 
   // Re-answer the most recent user turn (dropping the answer it produced). Uses the
@@ -648,8 +673,71 @@ export function ResearchAssistantModal({
     }
     const conversationId = activeIdRef.current;
     if (lastUserIdx < 0 || !conversationId) return;
-    await generate(conversationId, current.slice(0, lastUserIdx), current[lastUserIdx].content);
+    await generate(conversationId, current.slice(0, lastUserIdx), current[lastUserIdx].content, current[lastUserIdx].attachments);
   };
+
+  const addAttachments = async (filePaths?: string[]) => {
+    if (sending || attachmentBusyRef.current) return;
+    attachmentBusyRef.current = true; setAttaching(true); setAttachmentError('');
+    try {
+      let id = activeIdRef.current;
+      if (!id) {
+        const created = await api.createConversation({ model: selectedModel, selection });
+        id = created.id; activeIdRef.current = id; setActiveId(id);
+        await window.nodus.selectResearchSystemPrompt(`${attachmentSurface}:${id}`, systemPrompts.selectedId);
+      }
+      const owner = { surface: attachmentSurface, conversationId: id };
+      const result = filePaths
+        ? await window.nodus.importResearchAttachments(owner, filePaths)
+        : await window.nodus.pickResearchAttachments(owner);
+      if (activeIdRef.current === id) {
+        setAttachments(current => [...current, ...result.attachments]);
+        setAttachmentError(result.errors.join('\n'));
+      }
+      await refreshConversations();
+    } catch (error) { setAttachmentError(error instanceof Error ? error.message : String(error)); }
+    finally { attachmentBusyRef.current = false; setAttaching(false); }
+  };
+  const handleFileDrag = (event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = sending || attachmentBusyRef.current ? 'none' : 'copy';
+    if (event.type === 'dragenter') dragDepthRef.current += 1;
+    if (!sending && !attachmentBusyRef.current) setDraggingFiles(true);
+  };
+  const handleFileDrop = (event: DragEvent<HTMLDivElement>) => {
+    dragDepthRef.current = 0;
+    setDraggingFiles(false);
+    if (!event.dataTransfer.types.includes('Files')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (sending || attachmentBusyRef.current) return;
+    try {
+      // Resolve native paths before the drop event's FileList becomes unavailable.
+      const paths = Array.from(event.dataTransfer.files, file => window.nodus.getPathForDroppedFile(file));
+      if (!paths.length || paths.some(path => !path)) throw new Error(t('No se pudieron leer los archivos arrastrados. Usa el botón + para añadirlos.'));
+      void addAttachments(paths);
+    } catch (error) { setAttachmentError(error instanceof Error ? error.message : String(error)); }
+  };
+  const removeAttachment = async (file: ResearchAttachment) => {
+    if (!activeId || attaching) return;
+    try {
+      await window.nodus.removeResearchAttachment({ surface: attachmentSurface, conversationId: activeId }, file.id);
+      setAttachments(current => current.filter(item => item.id !== file.id));
+    } catch (error) { setAttachmentError(String(error)); }
+  };
+  const renderAttachments = (files: ResearchAttachment[], draft = false) => (
+    <div className="research-attachments" aria-label={t('Archivos adjuntos')}>
+      {files.map(file => <div key={file.id} className={`research-attachment ${file.kind === 'unsupported' ? 'research-attachment-warning' : ''}`} title={file.warning ?? file.name}>
+        <span className="research-attachment-type">{file.name.split('.').at(-1)?.slice(0, 5).toUpperCase() || 'FILE'}</span>
+        <button className="research-attachment-name" disabled={draft} onClick={() => { if (activeId) void window.nodus.saveResearchAttachment({ surface: attachmentSurface, conversationId: activeId }, file.id).catch(error => setAttachmentError(String(error))); }}>
+          <strong>{file.name}</strong><span>{file.size < 1024 ? `${file.size} B` : `${Math.ceil(file.size / 1024)} KB`} · {file.kind === 'unsupported' ? t('Sin lector') : file.kind === 'image' ? t('Visión') : t('Documento')}{file.warning ? ' · ⚠' : ''}</span>
+        </button>
+        {draft && <button className="research-attachment-remove" aria-label={`${t('Quitar adjunto')}: ${file.name}`} disabled={attaching || sending} onClick={() => void removeAttachment(file)}>×</button>}
+      </div>)}
+    </div>
+  );
 
   const handleStop = () => {
     stopRequestedRef.current = true;
@@ -671,9 +759,19 @@ export function ResearchAssistantModal({
       <div
         role={embedded ? "region" : "dialog"}
         aria-label="Research chat"
+        onDragEnter={handleFileDrag}
+        onDragOver={handleFileDrag}
+        onDragLeave={() => {
+          dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+          if (!dragDepthRef.current) setDraggingFiles(false);
+        }}
+        onDrop={handleFileDrop}
         aria-modal={embedded ? undefined : true}
-        className={embedded ? "w-full h-full min-h-0 bg-neutral-950 flex flex-col overflow-hidden" : "w-full max-w-7xl h-[86vh] bg-neutral-950 border border-neutral-800 rounded-lg shadow-2xl flex flex-col overflow-hidden"}
+        className={embedded ? "relative w-full h-full min-h-0 bg-neutral-950 flex flex-col overflow-hidden" : "relative w-full max-w-7xl h-[86vh] bg-neutral-950 border border-neutral-800 rounded-lg shadow-2xl flex flex-col overflow-hidden"}
       >
+        {draggingFiles && <div className="research-file-drop-overlay" role="status">
+          <div className="research-file-drop-label"><Icon name="plus" size={28} /><strong>{t('Suelta los archivos para adjuntarlos')}</strong></div>
+        </div>}
         <header className="research-assistant-header px-4 py-3 border-b border-neutral-800 flex items-center gap-3">
           {embedded && <button className="btn btn-ghost" data-testid="research-history-toggle" aria-label={t('Historial de chats')} title={t('Historial de chats')} aria-expanded={historyOpen} onClick={toggleHistory}><Icon name="clock" size={16} /></button>}
           <div className="flex items-center gap-2 font-semibold">
@@ -809,7 +907,7 @@ export function ResearchAssistantModal({
                         <button
                           key={suggestion}
                           className="suggestion-chip"
-                          disabled={sending || !selectedModel || !systemPrompts.ready || adapter?.canSend === false}
+                          disabled={sending || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)}
                           onClick={() => void send(t(suggestion))}
                         >
                           {t(suggestion)}
@@ -872,6 +970,7 @@ export function ResearchAssistantModal({
                           <Icon name={copiedMessageId === message.id ? 'check' : 'copy'} size={13} />
                         </button>
                       </div>
+                      {message.attachments?.length ? renderAttachments(message.attachments) : null}
                       {message.role === 'assistant' && message.reasoning?.trim() && (
                         <details className="mb-2 rounded border border-neutral-800 bg-neutral-950/60" open={!message.content.trim()}>
                           <summary className="cursor-pointer select-none px-2 py-1 text-[11px] text-neutral-400 hover:text-neutral-200">
@@ -927,7 +1026,13 @@ export function ResearchAssistantModal({
 
             <footer className="research-composer-footer">
               {systemPrompts.error && <p className="text-xs text-red-500 mb-2" role="alert">{systemPrompts.error}</p>}
+              {attachmentError && <p className="research-attachment-error" role="alert">{attachmentError}</p>}
+              {attachments.some(file => file.warning) && <p className="research-attachment-error" role="status">{attachments.filter(file => file.warning).map(file => `${file.name}: ${file.warning}`).join(' · ')}</p>}
+              {attaching && <p className="research-attachment-status" role="status">{t('Preparando archivos…')}</p>}
+              <div className="research-composer-shell">
+              {attachments.length > 0 && renderAttachments(attachments, true)}
               <div className="research-composer">
+                <button className="research-composer-attach" aria-label={t('Añadir archivos')} title={t('Añadir archivos')} disabled={sending || attaching} onClick={() => void addAttachments()}><Icon name="plus" size={23} /></button>
                 <textarea
                   ref={inputRef}
                   className="research-composer-input"
@@ -959,11 +1064,12 @@ export function ResearchAssistantModal({
                     aria-label={t('Enviar')}
                     title={t('Enviar')}
                     onClick={() => void send()}
-                    disabled={!input.trim() || !selectedModel || !systemPrompts.ready || adapter?.canSend === false}
+                    disabled={attaching || (!input.trim() && !attachments.length) || attachments.some(file => file.kind === 'unsupported') || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)}
                   >
                     <Icon name="arrowUp" size={23} />
                   </button>
                 )}
+              </div>
               </div>
               <div className="mt-1.5 flex items-center gap-1 px-1 text-[11px] text-neutral-600">
                 <kbd className="composer-kbd">Enter</kbd>
@@ -1113,7 +1219,7 @@ export function ResearchAssistantModal({
           title={t('Eliminar conversación')}
           message={
             <>
-              {t('Se eliminará')} <span className="text-neutral-200">«{pendingDelete.title}»</span> {t('y todo su historial de mensajes. Esta acción no se puede deshacer.')}
+              {t('Se eliminará')} <span className="text-neutral-200">«{pendingDelete.title}»</span> {t('y todo su historial de mensajes y archivos adjuntos. Esta acción no se puede deshacer.')}
             </>
           }
           confirmLabel={t('Eliminar')}

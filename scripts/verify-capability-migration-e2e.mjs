@@ -1,4 +1,4 @@
-// The 5.3.1 to 5.3.2 move, end to end, against real signed packages.
+// The 5.3.1 to 5.4.0 move, end to end, against real signed packages.
 //
 // Everything here runs under Electron because the migrations are the packages' own
 // scripts and they run in the packages' own worker processes. What is exercised is the
@@ -225,7 +225,7 @@ try {
       };
 
       app.whenReady().then(async () => {
-        console.log('\\n— a clean 5.3.2 install');
+        console.log('\\n— a clean 5.4.0 install');
         await check('nothing is installed and nothing is migrated', async () => {
           const fixture = profile('clean');
           useBootstrap(payload.bootstrapRoot);

@@ -7,6 +7,7 @@
 // product notes, not a changelog. Add a new entry at the top whenever the app
 // version bumps.
 
+import { RELEASE_5_4_0_ADDITIONS } from './releaseNotes540';
 import type { VaultType } from './vaultTypes';
 import { RELEASE_NOTES_IT } from './releaseNotes.it';
 import { RELEASE_NOTES_TR } from './releaseNotes.tr';
@@ -2677,14 +2678,11 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
- * v5.3.2 — the three disciplines leave the application and become packages you install.
- *
- * Written for someone who never asked for chemistry: what changes for THEM is that Nodus
- * got smaller and nothing they were using went away. The migration entry comes early
- * because the first question anyone with a configured AlphaGenome key will have is
- * whether they have to set it up again.
+ * v5.4.0 combines the accumulated changes with all nine notes prepared for 5.3.2.
+ * The modal groups scopes by size. Keep the IT/TR arrays aligned with this order.
  */
-const RELEASE_5_3_2_HIGHLIGHTS: RawReleaseHighlight[] = [
+const RELEASE_5_4_0_HIGHLIGHTS: RawReleaseHighlight[] = [
+  ...RELEASE_5_4_0_ADDITIONS,
   {
     scope: 'marketplace',
     es: "Chemistry Studio, Legalize y AlphaGenome ya son paquetes oficiales que instalas tú. Aparecen en Skills con su editor verificado, sus permisos, su tamaño y las plataformas en las que funcionan, y puedes instalarlos, actualizarlos, volver a la versión anterior o quitarlos cuando quieras. Lo que hacen no ha cambiado.",
@@ -2977,9 +2975,9 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
   {
-    version: '5.3.2',
-    date: '2026-09-11',
-    highlights: RELEASE_5_3_2_HIGHLIGHTS,
+    version: '5.4.0',
+    date: '2026-09-12',
+    highlights: RELEASE_5_4_0_HIGHLIGHTS,
   },
   {
     version: '5.3.1',

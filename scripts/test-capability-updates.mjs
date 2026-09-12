@@ -48,7 +48,7 @@ await build({
       api.onResolve({ filter: /workerHost$/ }, () => ({ path: 'workers', namespace: 'mock' }));
       api.onLoad({ filter: /.*/, namespace: 'mock' }, ({ path: name }) => ({
         contents: name === 'electron'
-          ? `export const app={getPath:()=>${JSON.stringify(profile)},getVersion:()=>"5.3.2"};export const safeStorage={isEncryptionAvailable:()=>true,encryptString:v=>Buffer.from(v),decryptString:v=>v.toString("utf8")};`
+          ? `export const app={getPath:()=>${JSON.stringify(profile)},getVersion:()=>"5.4.0"};export const safeStorage={isEncryptionAvailable:()=>true,encryptString:v=>Buffer.from(v),decryptString:v=>v.toString("utf8")};`
           : name === 'migrations'
             // The ladder itself is verified against real Electron elsewhere; here what
             // matters is that an update runs it before the new version is announced.
@@ -90,7 +90,7 @@ const manifest = (version, migrations = ['migrations/001-adopt.cjs']) => ({
   schemaVersion: 2, id: 'legalize', name: 'Legalize', version,
   author: 'NodusResearch', description: 'Find legislation in country repositories.', license: 'AGPL-3.0-only',
   publisher: { id: 'NodusResearch', keyId: 'nr01' },
-  compatibility: { capabilityApi: 2, minNodusVersion: '5.3.2', targets: [target] },
+  compatibility: { capabilityApi: 2, minNodusVersion: '5.4.0', targets: [target] },
   replacesSkills: ['builtin-legal'],
   skills: ['skills/legalize/skill.json'],
   capabilities: ['capabilities/legal/capability.json'],

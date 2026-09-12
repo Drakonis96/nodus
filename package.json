@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "5.3.2",
+  "version": "5.4.0",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": {
     "name": "Jorge P\u00e9rez Burgue\u00f1o",
@@ -13,7 +13,7 @@
     "url": "https://github.com/Drakonis96/nodus.git"
   },
   "releaseMetadata": {
-    "dateReleased": "2026-09-10",
+    "dateReleased": "2026-09-12",
     "conceptDoi": "10.5281/zenodo.21515531",
     "versionDoi": null
   },
@@ -211,7 +211,9 @@
     "topojson-simplify": "^3.0.3",
     "turndown": "^7.2.4",
     "uuid": "^11.0.3",
+    "word-extractor": "^1.0.4",
     "ws": "^8.21.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "yjs": "^13.6.27",
     "zod": "^3.25.76"
   },
@@ -232,6 +234,7 @@
     "@types/topojson-simplify": "^3.0.3",
     "@types/turndown": "^5.0.6",
     "@types/uuid": "^10.0.0",
+    "@types/word-extractor": "^1.0.6",
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.15.0",
     "@typescript-eslint/parser": "^8.15.0",

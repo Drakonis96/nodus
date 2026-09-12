@@ -25,12 +25,12 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.3.2');
-  assert.equal(currentRelease?.date, '2026-09-11');
-  assert.equal(currentRelease?.highlights.length, 9);
+  assert.equal(currentRelease?.version, '5.4.0');
+  assert.equal(currentRelease?.date, '2026-09-12');
+  assert.equal(currentRelease?.highlights.length, 25);
   assert.deepEqual(currentRelease.highlights.map((h) => h.scope), [
-    'marketplace', 'general', 'general', 'plugin', 'plugin', 'ai',
-    'toolkit', 'toolkit', 'toolkit',
+    ...Array(10).fill('ai'), 'general', 'general', 'marketplace', 'plugin', 'browser', 'word',
+    'marketplace', 'general', 'general', 'plugin', 'plugin', 'ai', 'toolkit', 'toolkit', 'toolkit',
   ]);
   for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
     assert.ok(currentRelease.highlights.every((h) => h[language]?.length > 80));
@@ -42,7 +42,19 @@ try {
     // PDF Presenter rides in this release too.
     /folders are now tags/, /can now leave the library/, /second kind of TXT file/,
   ]) {
-    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.3.2 is missing ${phrase}`);
+    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.4.0 is missing ${phrase}`);
+  }
+
+  assert.ok(!RELEASE_NOTES.some(note => note.version === '5.3.2'), 'the unpublished slug must not appear in release history');
+  const packageVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+  assert.equal(currentRelease.version, packageVersion);
+  for (const phrase of [/all nine vault types/, /Choose reasoning effort/, /Narrow corpus sources/,
+    /Save your own Research chat instructions/, /dropping them into the window/, /deleted with it/,
+    /preserves the text already received/, /Visual Skills come to desktop/, /real geographic data/,
+    /review whether an image fits/, /Comments inside a drawing/, /One search experience/,
+    /Teaching hides sections/, /own entry in the Skills header/, /interactive 3D models/,
+    /Browser bookmarks/, /preserve selection whitespace/]) {
+    assert.ok(currentRelease.highlights.some(highlight => phrase.test(highlight.en)), `Missing 5.4.0 change: ${phrase}`);
   }
 
   // 5.3.1 keeps the modal it shipped with.

@@ -1,3 +1,4 @@
+import { deleteResearchAttachments } from '../researchAttachments';
 import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from '../chatAssets';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { v4 as uuid } from 'uuid';
@@ -30,6 +31,7 @@ interface MessageRow {
   content: string;
   selection_key: string | null;
   stats_json: string | null;
+  attachments_json: string | null;
   error: number;
   created_at: string;
 }
@@ -60,6 +62,7 @@ function toMessage(row: MessageRow): ChatMessageRecord {
     id: row.id,
     role: row.role === 'assistant' ? 'assistant' : 'user',
     content: row.content,
+    attachments: parseJson(row.attachments_json) ?? undefined,
     selectionKey: row.selection_key,
     stats: parseJson(row.stats_json),
     error: row.error === 1,
@@ -129,8 +132,8 @@ export function saveMessages(
     if (!exists) return;
     db.prepare('DELETE FROM chat_messages WHERE conversation_id = ?').run(id);
     const insert = db.prepare(
-      `INSERT INTO chat_messages (id, conversation_id, seq, role, content, selection_key, stats_json, error, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO chat_messages (id, conversation_id, seq, role, content, selection_key, stats_json, error, created_at, attachments_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     messages.forEach((message, index) => {
       insert.run(
@@ -142,7 +145,8 @@ export function saveMessages(
         message.selectionKey ?? null,
         message.stats ? JSON.stringify(message.stats) : null,
         message.error ? 1 : 0,
-        now
+        now,
+        message.attachments?.length ? JSON.stringify(message.attachments) : null
       );
     });
     const sets: string[] = ['updated_at = @now'];
@@ -173,6 +177,7 @@ export function setArchived(id: string, archived: boolean): void {
 }
 
 export function deleteConversation(id: string): void {
+  deleteResearchAttachments({ surface: 'research', conversationId: id });
   deleteChatAssets(chatAssetOwner('assistant', id, getActiveVault().id));
   const db = getDb();
   const tx = db.transaction(() => {

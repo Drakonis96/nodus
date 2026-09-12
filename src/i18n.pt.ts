@@ -1,3 +1,4 @@
+import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
 import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
@@ -63,6 +64,7 @@ import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch
 import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const PT: Record<string, string> = {
+  ...RESEARCH_ATTACHMENT_TRANSLATIONS['pt'],
   "Research chat": "Research chat",
   "Elige al menos una base de datos.": "Escolha pelo menos uma base de dados.",
   ...RESEARCH_PROMPT_TRANSLATIONS["pt"],

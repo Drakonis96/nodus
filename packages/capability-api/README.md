@@ -89,8 +89,8 @@ the SDK at an exact version and consumes generated validators from the same sour
 SDK 2.1 adds `host.maps.retrieve` / `host.maps.render`, explicit `maps` permissions,
 and bounded array schemas (`minItems` / `maxItems`, camelCase field names). The wire
 protocol and `compatibility.capabilityApi: 2` remain unchanged. Depend on `nodus:maps`
-1.x to reject hosts that lack this service; this development implementation is not a
-claim that an already published Nodus 5.3.2 contains it. See
+1.x to reject hosts that lack this service. Set the minimum Nodus version to 5.4.0
+or later for workflows using it. See
 [the map contract](../../docs/capability-maps.md) for inputs, provenance and restrictions.
 
 ## SDK 2.2: native visual review

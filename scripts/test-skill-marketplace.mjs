@@ -102,7 +102,7 @@ test('local imports reject symlink escapes', () => {
 });
 
 test('a skill can declare a capability no installed package provides yet', async () => {
-  // The three disciplines became packages in 5.3.2, so `nodus:legal` is a real identifier
+  // The three disciplines became packages in 5.4.0, so `nodus:legal` is a real identifier
   // that nothing currently answers. A skill that needs one still installs and keeps the
   // activation the user chose; it simply does not run until its provider arrives, which
   // is what stops an uninstall from silently rewriting the user's library.

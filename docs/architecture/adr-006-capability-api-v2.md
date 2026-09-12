@@ -71,11 +71,11 @@ descargar y descomprimir cientos de megabytes.
 
 ## Consecuencias
 
-Una instalación limpia de 5.3.2 no registra, extrae ni carga ninguna de las tres
+Una instalación limpia de 5.4.0 no registra, extrae ni carga ninguna de las tres
 disciplinas, y su ASAR no contiene sus engines ni sus dependencias. A cambio, la
 aplicación asume infraestructura que antes no tenía: verificación de firmas
 Ed25519, un host de `utilityProcess` con cancelación y reinicio, un almacén de
-plugins transaccional con rollback, y una migración 5.3.1→5.3.2 que debe
+plugins transaccional con rollback, y una migración 5.3.1→5.4.0 que debe
 funcionar sin conexión mediante bundles bootstrap firmados incluidos en el
 propio build.
 

@@ -1,3 +1,4 @@
+import { deleteResearchAttachments } from '../researchAttachments';
 import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from '../chatAssets';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { v4 as uuid } from 'uuid';
@@ -124,6 +125,7 @@ export function saveWorldChatConversation(
 }
 
 export function deleteWorldChatConversation(id: string): void {
+  deleteResearchAttachments({ surface: 'world', conversationId: id });
   deleteChatAssets(chatAssetOwner('world-assistant', id, getActiveVault().id));
   getDb().prepare('DELETE FROM world_chat_conversations WHERE id = ?').run(id);
 }

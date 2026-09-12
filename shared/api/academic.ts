@@ -665,6 +665,11 @@ export interface AcademicApi {
   selectResearchSystemPrompt(conversationKey: string, id: string | null): Promise<void>;
   deleteResearchSystemPrompt(id: string): Promise<void>;
   listResearchContextSources(): Promise<import('../researchContextFilters').ResearchContextSources>;
+  importResearchAttachments(owner: import('../researchAttachments').ResearchAttachmentOwner, filePaths: string[]): Promise<import('../researchAttachments').ResearchAttachmentImportResult>;
+  pickResearchAttachments(owner: import('../researchAttachments').ResearchAttachmentOwner): Promise<import('../researchAttachments').ResearchAttachmentImportResult>;
+  listResearchAttachments(owner: import('../researchAttachments').ResearchAttachmentOwner): Promise<import('../researchAttachments').ResearchAttachment[]>;
+  removeResearchAttachment(owner: import('../researchAttachments').ResearchAttachmentOwner, id: string): Promise<void>;
+  saveResearchAttachment(owner: import('../researchAttachments').ResearchAttachmentOwner, id: string): Promise<void>;
   researchChat(request: ResearchChatRequest): Promise<ResearchChatResponse>;
   researchChatStream(request: ResearchChatRequest, handlers: ResearchChatStreamHandlers): Promise<ResearchChatResponse>;
   /**

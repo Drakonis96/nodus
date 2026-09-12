@@ -124,7 +124,7 @@ try {
       assert.equal(entry.release.tag, `${entry.id}-v${manifest.version}`);
     });
     check(`${entry.id}: this build would accept the version the catalog offers`, () => {
-      assert.ok(sdk.compareSemver('5.3.2', manifest.compatibility.minNodusVersion) >= 0);
+      assert.ok(sdk.compareSemver('5.4.0', manifest.compatibility.minNodusVersion) >= 0);
     });
   }
 
@@ -187,7 +187,7 @@ try {
       setup(api) {
         api.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'mock' }));
         api.onLoad({ filter: /.*/, namespace: 'mock' }, () => ({
-          contents: `export const app={getPath:()=>${JSON.stringify(profile)},getVersion:()=>"5.3.2",isPackaged:false,getAppPath:()=>${JSON.stringify(scratch)}};`
+          contents: `export const app={getPath:()=>${JSON.stringify(profile)},getVersion:()=>"5.4.0",isPackaged:false,getAppPath:()=>${JSON.stringify(scratch)}};`
             + 'export const safeStorage={isEncryptionAvailable:()=>true,encryptString:v=>Buffer.from(v),decryptString:v=>v.toString("utf8")};',
           loader: 'js',
         }));

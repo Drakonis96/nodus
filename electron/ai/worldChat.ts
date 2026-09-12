@@ -1,3 +1,4 @@
+import { prepareResearchAttachments, withResearchAttachmentFallback } from './researchAttachments';
 import { withResearchSystemPrompt } from './researchSystemPrompt';
 import { researchGenerationOptions } from './researchGenerationOptions';
 import { skillHasCapability } from '@shared/chatSkills';
@@ -266,27 +267,27 @@ export async function streamWorldChat(
   const version = owner ? chatAssetVersion(owner) : 0;
   const language = settings.promptLanguage ?? 'es';
   const facts = buildWorldChatFacts(request, language);
+  const attachments = await prepareResearchAttachments(request, 'world', request.model ?? settings.chatModel ?? settings.synthesisModel);
   // Skills change how grounded material is presented; they do not supply world facts.
-  if (!hasWorldChatMaterial(facts)) {
+  if (!hasWorldChatMaterial(facts) && !attachments.text) {
     return { text: '', focus: facts.focus, noMaterial: true };
   }
 
   const model = request.model ?? settings.chatModel ?? settings.synthesisModel ?? null;
-  const raw = await completeTextStream(
+  const raw = await withResearchAttachmentFallback(attachments,
     {
-      system: withResearchSystemPrompt(`${worldOperationSystemPrompt('worldChat', settings.promptLanguage ?? 'es')}\n\n${buildChatSkillsPrompt(skills)}\nNew creative proposals are not established world canon. Label them accordingly.`, request.systemPromptId),
-      user: `${composeWorldChatContext(facts, language)}\n\n${chatSkillsOutputContract(skills)}`,
+      system: withResearchSystemPrompt(`${worldOperationSystemPrompt('worldChat', settings.promptLanguage ?? 'es')}\n\n${buildChatSkillsPrompt(skills)}\nNew creative proposals are not established world canon. Label them accordingly.`, request.systemPromptId) + attachments.system,
+      images: attachments.images,
+      user: `${composeWorldChatContext(facts, language)}\n\n${chatSkillsOutputContract(skills)}${attachments.text}`,
       plainContext: true,
       englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')),
       // Keep factual answers grounded and creative proposals clearly identified.
       temperature: 0.3,
       ...(request.thinkingEffort === undefined ? { maxTokens: skills.length ? 10_000 : 1200 } : await researchGenerationOptions({ ...request, model }, skills.length ? 10_000 : 1200, false, signal)),
     },
-    (delta, kind) => {
+    options => completeTextStream(options, (delta, kind) => {
       if (kind !== 'reasoning') onDelta(delta);
-    },
-    model,
-    signal
+    }, model, signal)
   );
 
   // Only entries actually supplied in CÓMO SE CITA are allowed. A real but unrelated id

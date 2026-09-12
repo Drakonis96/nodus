@@ -23,7 +23,7 @@ await build({
       api.onResolve({ filter: /pluginStoreV2$/ }, () => ({ path: 'store', namespace: 'mock' }));
       api.onLoad({ filter: /.*/, namespace: 'mock' }, ({ path: name }) => ({
         contents: name === 'electron'
-          ? `export const app = { getPath: () => ${JSON.stringify(profile)}, getVersion: () => '5.3.2', isPackaged: false, getAppPath: () => ${JSON.stringify(scratch)} };`
+          ? `export const app = { getPath: () => ${JSON.stringify(profile)}, getVersion: () => '5.4.0', isPackaged: false, getAppPath: () => ${JSON.stringify(scratch)} };`
           : `export const installVerifiedPlugin = (...args) => globalThis.__install(...args);
              export const listInstalledPluginsV2 = () => globalThis.__installed();
              export const readPluginStateV2 = (id) => globalThis.__state(id);`,

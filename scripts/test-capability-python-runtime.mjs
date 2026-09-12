@@ -42,7 +42,7 @@ await build({
     setup(api) {
       api.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'mock' }));
       api.onLoad({ filter: /.*/, namespace: 'mock' }, () => ({
-        contents: `export const app={getPath:()=>${JSON.stringify(profile)},getVersion:()=>"5.3.2"};`
+        contents: `export const app={getPath:()=>${JSON.stringify(profile)},getVersion:()=>"5.4.0"};`
           + 'export const safeStorage={isEncryptionAvailable:()=>true,encryptString:v=>Buffer.from(v),decryptString:v=>v.toString("utf8")};',
         loader: 'js',
       }));

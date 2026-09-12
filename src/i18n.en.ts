@@ -1,3 +1,4 @@
+import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
 import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
@@ -62,6 +63,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  ...RESEARCH_ATTACHMENT_TRANSLATIONS['en'],
   "Research chat": "Research chat",
   "Elige al menos una base de datos.": "Choose at least one database.",
   ...RESEARCH_PROMPT_TRANSLATIONS.en,

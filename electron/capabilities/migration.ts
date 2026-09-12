@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import type { ChatSkill } from '@shared/chatSkills';
 import { installVerifiedPlugin, listInstalledPluginsV2, readPluginStateV2, type InstallOutcome } from './pluginStoreV2';
 
-/** The 5.3.1 → 5.3.2 migration: three disciplines leave the application and become
+/** The 5.3.1 → 5.4.0 migration: three disciplines leave the application and become
  *  packages, without the user losing what they had.
  *
  *  The hard part is not installing anything. It is that a profile can be in many states —
@@ -54,6 +54,7 @@ export const MIGRATION_MAP: ReadonlyArray<{ builtin: string; skillId: string; pl
   { builtin: 'genomics', skillId: 'builtin-genomics', pluginId: 'alphagenome', capabilityId: 'nodus:genomics' },
 ];
 
+// Stable on-disk identifier used by pre-release builds. Keep it when the release slug changes.
 const journalPath = () => path.join(app.getPath('userData'), 'profile-migrations', '5.3.2-capabilities.json');
 
 export function readMigrationJournal(): MigrationJournal | null {
@@ -304,7 +305,7 @@ export interface MigrationOutcome {
   failed: Array<{ pluginId: string; phase: MigrationPhase; detail: string }>;
 }
 
-/** The whole 5.3.1 → 5.3.2 move, phase by phase and resumable.
+/** The whole 5.3.1 → 5.4.0 move, phase by phase and resumable.
  *
  *  Each phase is idempotent and recorded before the next begins, so a crash anywhere
  *  resumes rather than restarts — and a failure leaves the skill with the activation the

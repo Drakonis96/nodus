@@ -137,6 +137,7 @@ try {
   // v172-v173 upgrade a real v171 vault in place: preserve its sync fingerprint,
   // expose the failure-reason column, and move Zotero markup away from UI text.
   db.exec('ALTER TABLE works DROP COLUMN summary_error; ALTER TABLE works DROP COLUMN zotero_title_markup;');
+  db.exec('ALTER TABLE chat_messages DROP COLUMN attachments_json;');
   const rawRichTitle = '<span style="font-variant:small-caps;">CLE</span> peptides &amp; plant-biotic interactions';
   db.prepare(`INSERT INTO works(nodus_id,zotero_key,zotero_version,zotero_fingerprint,title,summary_status)
     VALUES('migration-173-rich','RICH',0,'stable-fingerprint',?,'failed')`).run(rawRichTitle);
@@ -197,6 +198,7 @@ try {
   for (const column of ['progress_message', 'current_unit', 'total_units']) {
     db.exec(`ALTER TABLE document_index_jobs DROP COLUMN ${column}`);
   }
+  db.exec('ALTER TABLE chat_messages DROP COLUMN attachments_json;');
   db.pragma('user_version = 161');
   runMigrations(db);
   assert.ok(
@@ -245,6 +247,7 @@ try {
   for (const column of ['progress_message', 'current_unit', 'total_units']) {
     db.exec(`ALTER TABLE document_index_jobs DROP COLUMN ${column}`);
   }
+  db.exec('ALTER TABLE chat_messages DROP COLUMN attachments_json;');
   db.pragma('user_version = 163');
   runMigrations(db);
   const recoveredJob = db.prepare("SELECT status, phase, progress, attempts, error FROM document_index_jobs WHERE job_id='migration-164-recover-job'").get();

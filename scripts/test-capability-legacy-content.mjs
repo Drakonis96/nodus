@@ -32,7 +32,7 @@ async function load(entry, profile, extra = '') {
         api.onResolve({ filter: /(?:^\.\/|capabilities\/)registry$/ }, () => ({ path: 'registry', namespace: 'mock' }));
         api.onLoad({ filter: /.*/, namespace: 'mock' }, ({ path: name }) => ({
           contents: name === 'electron'
-            ? `export const app = { getPath: () => ${JSON.stringify(profile)}, getVersion: () => '5.3.2', isPackaged: false, getAppPath: () => ${JSON.stringify(scratch)} };
+            ? `export const app = { getPath: () => ${JSON.stringify(profile)}, getVersion: () => '5.4.0', isPackaged: false, getAppPath: () => ${JSON.stringify(scratch)} };
                export const safeStorage = { isEncryptionAvailable: () => false };
                ${extra}`
             : `export const capabilityRegistry = () => globalThis.__registry();
@@ -63,7 +63,7 @@ const profileFor = (name, seed = {}) => {
 
 // ------------------------------------------------ which profile this actually is
 
-test('a clean 5.3.2 install is never mistaken for a profile that predates the library', async () => {
+test('a clean 5.4.0 install is never mistaken for a profile that predates the library', async () => {
   const profile = profileFor('clean');
   const skills = await load('electron/chatSkills.ts', profile);
   skills.initializeChatSkillDefaults();

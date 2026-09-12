@@ -6,9 +6,9 @@ draws boundaries, chooses coordinates, retrieves credentials, or repairs source
 failures inside this capability. Marketplace Skills supply the workflow; this core
 knows no country-specific selection rules or discipline-specific interpretation.
 
-This implementation does not imply support in already published Nodus 5.3.2 builds.
-Dependent Skills must wait for a release containing it and declare that release as
-their minimum version. No cartographic Marketplace Skill is included here.
+Available in Nodus 5.4.0. Dependent Skills must declare 5.4.0 or later as their
+minimum version. Cartographic workflows are supplied by compatible Marketplace
+Skills rather than embedded as country-specific rules in the application.
 
 ## Entry points
 

@@ -600,6 +600,7 @@ export type {
 export type { ColumnRole, ColumnRoles, KindMeta, RoleColumn } from './analysisCatalog';
 
 export interface DatabaseChatRequest {
+  attachmentIds?: string[];
   /** Optional vault-local preference; null/absence keeps the original application prompt. */
   systemPromptId?: string | null;
   model?: ModelRef | null;
@@ -3638,6 +3639,7 @@ export interface ManuscriptProgress {
 /** A question for the world chat. `focusKeys` is the author's explicit choice; with none,
  *  the repo resolves the focus from the names the question itself uses. */
 export interface WorldChatRequest {
+  attachmentIds?: string[];
   /** Optional vault-local preference; null/absence keeps the original application prompt. */
   systemPromptId?: string | null;
   thinkingEffort?: import('./researchReasoning').ResearchEffort;
@@ -5698,11 +5700,13 @@ export interface ResearchContextSelection {
 }
 
 export interface ResearchChatMessage {
+  attachments?: import('./researchAttachments').ResearchAttachment[];
   role: 'user' | 'assistant';
   content: string;
 }
 
 export interface ResearchChatRequest {
+  attachmentIds?: string[];
   /** Optional vault-local preference; null/absence keeps the original application prompt. */
   systemPromptId?: string | null;
   conversationId?: string;
@@ -5900,6 +5904,7 @@ export interface ArgumentRouteSuggestion {
 
 /** One persisted chat message. `stats`/`selectionKey`/`error` mirror the in-memory UI message. */
 export interface ChatMessageRecord {
+  attachments?: import('./researchAttachments').ResearchAttachment[];
   id: string;
   role: 'user' | 'assistant';
   content: string;
