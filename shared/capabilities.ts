@@ -5,12 +5,14 @@
 import type { ArtifactTypeManifestV1 } from '../packages/capability-api/src/artifacts';
 import type { CapabilityChatContractV2 } from '../packages/capability-api/src/chat';
 import type { CapabilityCatalogV2 } from '../packages/capability-api/src/catalog';
+import type { TrustedPermissionSetV2 } from '../packages/capability-api/src/permissions';
 import type { SettingsFieldV1, SettingsManifestV1, SettingsStateV1, SettingsSubmissionV1 } from '../packages/capability-api/src/settings';
 import type { ViewChartSeries, ViewChartType, ViewDocumentV1, ViewNode, ViewPassageMark, ViewSpan, ViewTone, ViewTreeItem } from '../packages/capability-api/src/views';
 import type { JsonSchema } from '../packages/capability-api/src/json';
 
 export type {
   ArtifactTypeManifestV1, CapabilityCatalogV2, SettingsFieldV1, SettingsManifestV1, SettingsStateV1, SettingsSubmissionV1,
+  TrustedPermissionSetV2,
   ViewChartSeries, ViewChartType, ViewDocumentV1, ViewNode, ViewPassageMark, ViewSpan, ViewTone, ViewTreeItem,
 };
 
@@ -40,6 +42,9 @@ export interface InstalledCapabilityPlugin {
   active?: { version: string; digest: string; target: string; installedAt: string };
   previous?: { version: string; digest: string; target: string; installedAt: string };
   pending?: { version: string; digest: string; target: string; installedAt: string; reason: string };
+  /** What the pending version is asking for, when it is waiting on permissions. Read from
+   *  the staged package itself: the approved fingerprint cannot be turned back into a set. */
+  pendingPermissions?: TrustedPermissionSetV2 | null;
   status: 'ready' | 'degraded' | 'pending-permissions' | 'pending-migration' | 'failed';
   autoUpdate: boolean;
   rollbackAvailable: boolean;

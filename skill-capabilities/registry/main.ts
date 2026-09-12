@@ -78,7 +78,16 @@ export async function runCoreChatStages(answer: string, execution: ChatSkillExec
       const request = JSON.parse(match[1]);
       const skill = execution.skills.find(item => item.id === request.skillId);
       const tool = skill?.tools?.find(item => item.id === request.toolId);
-      if (!tool) throw new Error('This tool is not enabled for this reply.');
+      if (!tool) {
+        // A request under the wrong fence is refused, never rerouted: a protocol that
+        // silently accepts another's requests is a protocol with no boundary. But the
+        // refusal says which fence would have worked, so the next turn can get it right
+        // instead of reading "not enabled" about a tool that is.
+        const capability = skill?.capabilityTools?.find(item => item.toolId === request.toolId);
+        throw new Error(capability
+          ? `${request.toolId} is a capability tool. Request it in a nodus-capability block with capabilityId ${capability.capabilityId}.`
+          : 'This tool is not enabled for this reply.');
+      }
       execution.beforeInvoke?.();
       const output = await runSkillTool(tool, request.input, signal);
       current();

@@ -8874,8 +8874,9 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   capabilityMigrationStatus(): Promise<import('./capabilities').CapabilityMigrationStatus>;
   retryCapabilityMigration(): Promise<{ installed: string[]; adopted: string[]; preserved: string[]; failed: Array<{ pluginId: string; phase: string; detail: string }> }>;
   refreshCapabilityCatalog(sourceUrl: string): Promise<import('./capabilities').CapabilityListPayload['catalog']>;
-  installCapabilityPlugin(pluginId: string, approvePermissions?: boolean): Promise<{ state: import('./capabilities').InstalledCapabilityPlugin; activated: boolean }>;
+  installCapabilityPlugin(pluginId: string, approvePermissions?: boolean): Promise<{ state: import('./capabilities').InstalledCapabilityPlugin; activated: boolean; pendingPermissions: import('./capabilities').TrustedPermissionSetV2 | null }>;
   approveCapabilityPlugin(pluginId: string): Promise<import('./capabilities').InstalledCapabilityPlugin>;
+  discardPendingCapabilityPlugin(pluginId: string): Promise<import('./capabilities').InstalledCapabilityPlugin[]>;
   rollbackCapabilityPlugin(pluginId: string): Promise<import('./capabilities').InstalledCapabilityPlugin>;
   removeCapabilityPlugin(pluginId: string, purgeData?: boolean): Promise<import('./capabilities').InstalledCapabilityPlugin[]>;
   listInstalledPlugins(): Promise<InstalledPluginSummary[]>;

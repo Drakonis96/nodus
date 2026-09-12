@@ -311,6 +311,38 @@ export function approvePendingPluginV2(id: string): InstalledPluginStateV2 {
   return next;
 }
 
+/** What a staged version is actually asking for, read from its own manifests.
+ *
+ *  A fingerprint cannot be reversed into the set it summarizes, so the only honest source
+ *  for what to put in front of the user is the package that is waiting. */
+export function pendingPluginPermissions(id: string): TrustedPermissionSetV2 | null {
+  const state = readPluginStateV2(id);
+  if (!state?.pending) return null;
+  try {
+    return readStagedPackage(versionDir(id, state.pending.version, state.pending.digest), state.pending.digest, state.pending.target).permissions;
+  } catch { return null; }
+}
+
+/** Refusing what a package asked for.
+ *
+ *  Declining an update drops the staged version and leaves the installed one exactly as it
+ *  was. Declining a *first* install has to leave nothing at all: a package the user said no
+ *  to must not survive as a permanent `pending-permissions` row that the interface then has
+ *  to keep explaining, and no tombstone is written either, because nothing was ever here to
+ *  be remembered. */
+export function discardPendingPluginV2(id: string): InstalledPluginStateV2 | null {
+  const state = readPluginStateV2(id);
+  if (!state?.pending) return state;
+  if (!state.active) {
+    fs.rmSync(pluginDir(id), { recursive: true, force: true });
+    fs.rmSync(path.join(pluginsCacheRoot(), assertId(id)), { recursive: true, force: true });
+    return null;
+  }
+  const next = writeStateV2({ ...state, pending: undefined, status: 'ready' });
+  pruneVersions(next);
+  return next;
+}
+
 export function rollbackPluginV2(id: string): InstalledPluginStateV2 {
   const state = readPluginStateV2(id);
   if (!state?.previous || !state.active) throw new Error('No previous version of this plugin is available.');

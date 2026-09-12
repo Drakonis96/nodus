@@ -457,3 +457,62 @@ test('a build with no publishing key installs nothing at all', async () => {
   assert.deepEqual(shipped.trustedPublishingKeys(), [], 'a keyless build carries no trusted publisher');
   rejects(() => shipped.assertPublishingKeysConfigured(), /no capability publishing key/);
 });
+
+// ---------------------------------------------------------------- answering the question
+
+test('a first install that asks for permissions can be answered either way', () => {
+  reset();
+  // What the panel could not do before 5.4.1: a package installed without a blanket
+  // approval pends with no active version, so every control keyed on `active` was absent
+  // and the only reachable move was to install again and pend again.
+  const asked = lib.installVerifiedPlugin(download(), {});
+  assert.equal(asked.activated, false);
+  assert.equal(asked.state.status, 'pending-permissions');
+  assert.equal(asked.state.active, undefined, 'nothing is active before the question is answered');
+
+  // The set the user is shown comes from the staged package: the stored fingerprint is a
+  // hash and cannot be turned back into a list.
+  const permissions = lib.pendingPluginPermissions('chemistry-studio');
+  assert.deepEqual(permissions.network.map(endpoint => endpoint.origin), ['https://opsin.ch.cam.ac.uk']);
+  assert.equal(permissions.svg, true);
+
+  const allowed = lib.approvePendingPluginV2('chemistry-studio');
+  assert.equal(allowed.status, 'ready');
+  assert.equal(allowed.active.version, '2.0.0', 'saying yes to a first install activates it');
+  assert.equal(allowed.pending, undefined);
+});
+
+test('refusing a first install leaves nothing behind', () => {
+  reset();
+  lib.installVerifiedPlugin(download(), {});
+  assert.ok(lib.readPluginStateV2('chemistry-studio'), 'the package is staged while the question stands');
+
+  assert.equal(lib.discardPendingPluginV2('chemistry-studio'), null);
+  assert.equal(lib.readPluginStateV2('chemistry-studio'), null, 'no state survives a refusal');
+  assert.deepEqual(lib.listInstalledPluginsV2().map(state => state.id), [], 'and it is not listed as installed');
+  assert.equal(fs.existsSync(path.join(profile, 'plugins', 'installed', 'chemistry-studio')), false, 'nor left on disk');
+});
+
+test('refusing an update keeps the version that was already running', () => {
+  reset();
+  lib.installVerifiedPlugin(download(), { approvePermissions: true });
+  const wider = capabilityManifest({
+    version: '2.1.0',
+    permissions: {
+      network: [
+        { id: 'opsin', origin: 'https://opsin.ch.cam.ac.uk', pathPrefixes: ['/opsin/'], methods: ['GET'], maxResponseBytes: 1_048_576, timeoutMs: 30_000 },
+        { id: 'pubchem', origin: 'https://pubchem.ncbi.nlm.nih.gov', pathPrefixes: ['/rest/'], methods: ['GET'], maxResponseBytes: 1_048_576, timeoutMs: 30_000 },
+      ],
+      svg: true,
+    },
+  });
+  const files = defaultFiles(pluginManifest({ version: '2.1.0' }), wider);
+  files['skills/chemistry-studio/skill.json'] = JSON.stringify({ ...JSON.parse(files['skills/chemistry-studio/skill.json']), version: '2.1.0' }, null, 2);
+  lib.installVerifiedPlugin(download(files, { version: '2.1.0' }), {});
+
+  const kept = lib.discardPendingPluginV2('chemistry-studio');
+  assert.equal(kept.status, 'ready');
+  assert.equal(kept.active.version, '2.0.0', 'the running version is what a refusal leaves you with');
+  assert.equal(kept.pending, undefined);
+  assert.equal(lib.pendingPluginPermissions('chemistry-studio'), null, 'and nothing is still asking');
+});

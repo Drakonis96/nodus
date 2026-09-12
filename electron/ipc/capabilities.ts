@@ -4,7 +4,7 @@ import { validateSettingsSubmission, validateSettingsState } from '../../package
 import { validateViewDocument } from '../../packages/capability-api/src/views';
 import { capabilityRegistry, onCapabilityRegistryChanged, rebuildCapabilityRegistry, type CapabilityProvider } from '../capabilities/registry';
 import { contractFences } from '../../packages/capability-api/src/chat';
-import { approvePendingPluginV2, listInstalledPluginsV2, removePluginV2, resolveTrustedCapability, rollbackPluginV2 } from '../capabilities/pluginStoreV2';
+import { approvePendingPluginV2, discardPendingPluginV2, listInstalledPluginsV2, pendingPluginPermissions, removePluginV2, resolveTrustedCapability, rollbackPluginV2 } from '../capabilities/pluginStoreV2';
 import { acquireCapabilityWorker, stopCapabilityWorkers } from '../capabilities/workerHost';
 import { createCapabilityHostServices } from '../capabilities/hostServices';
 import { writeCapabilitySecret } from '../capabilities/hostServices';
@@ -66,7 +66,7 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
       revision: snapshot.revision,
       providers: [...snapshot.providers.values()].map(summarize),
       problems: snapshot.problems,
-      plugins: listInstalledPluginsV2(),
+      plugins: installedPluginsWithPendingPermissions(),
       catalog: readCachedCatalog(),
     };
   });
@@ -228,7 +228,13 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
     // this, a package that declares migrations would sit unregistered until the next
     // launch, and the first thing a user did with it would run against version 0 data.
     if (outcome.activated) await activateAfterMigration(pluginId);
-    return { state: listInstalledPluginsV2().find(state => state.id === pluginId) ?? outcome.state, activated: outcome.activated };
+    // A package that stopped at its permissions carries them back with it, so the interface
+    // can ask in the same gesture instead of sending the user looking for where to approve.
+    return {
+      state: listInstalledPluginsV2().find(state => state.id === pluginId) ?? outcome.state,
+      activated: outcome.activated,
+      pendingPermissions: pendingPluginPermissions(pluginId),
+    };
   });
 
   h('capabilities:approvePlugin', async (_event, pluginId: string) => {
@@ -237,6 +243,16 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
     rebuildCapabilityRegistry();
     await activateAfterMigration(pluginId);
     return listInstalledPluginsV2().find(candidate => candidate.id === pluginId) ?? state;
+  });
+
+  /** The other half of asking: a refusal has to be able to undo the staging the question
+   *  needed, or declining would cost the user a package stuck half-installed. */
+  h('capabilities:discardPendingPlugin', async (_event, pluginId: string) => {
+    await stopCapabilityWorkers(key => key.includes(pluginId));
+    discardPendingPluginV2(pluginId);
+    rebuildCapabilityRegistry();
+    broadcastMigrationChanged();
+    return installedPluginsWithPendingPermissions();
   });
 
   h('capabilities:rollbackPlugin', async (_event, pluginId: string) => {
@@ -265,6 +281,13 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
     rebuildCapabilityRegistry();
     return listInstalledPluginsV2();
   });
+}
+
+/** The installed packages, each carrying what a version waiting on approval is asking for.
+ *  Read here rather than left to the renderer, so the question the user answers is always
+ *  the one the store would actually apply. */
+function installedPluginsWithPendingPermissions() {
+  return listInstalledPluginsV2().map(state => ({ ...state, pendingPermissions: pendingPluginPermissions(state.id) }));
 }
 
 /** Tells every window that the migration moved, so a panel showing it does not have to
