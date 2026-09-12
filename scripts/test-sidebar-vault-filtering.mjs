@@ -67,19 +67,12 @@ test('dedicated vaults expose only their own fixed navigation', () => {
   assert.equal(navigation.dedicatedVaultNavIds('genealogy'), null);
 });
 
-test('Docencia exposes every Crear item to the settings editor with stable ids', () => {
+test('Docencia exposes only Unit design under Crear with its stable settings id', () => {
   const create = TEACHING_GROUPS.find((group) => group.label === 'Crear');
   assert.ok(create, 'Crear is present');
   assert.deepEqual(
-    create.items.map((item) => item.label),
-    [
-      'Guía docente / Programación',
-      'Diseño de unidades',
-      'Situaciones de aprendizaje',
-      'Adaptaciones',
-      'Notas',
-      'Proyectos de innovación',
-    ],
+    create.items.map((item) => ({ label: item.label, id: teachingItemId(item) })),
+    [{ label: 'Diseño de unidades', id: 'teachingUnits' }],
   );
   const ids = TEACHING_GROUPS.flatMap((group) => group.items.map(teachingItemId));
   assert.equal(new Set(ids).size, ids.length, 'every configurable teaching item has a unique id');

@@ -293,8 +293,6 @@ export interface StandardNavGroup extends NavGroupDef {
  * Dedicated workspaces replace the generic research navigation instead of merely
  * hiding it by default. Keep their fixed top-level view ids here so both the real
  * sidebar and its Settings editor can exclude sections belonging to another mode.
- * Docencia's roadmap-only buttons live in TeachingSidebar and are added by that
- * component because they are not application Views.
  */
 const DEDICATED_VAULT_NAV_IDS: Partial<Record<ReturnType<typeof normalizeVaultType>, View[]>> = {
   prosopography: [

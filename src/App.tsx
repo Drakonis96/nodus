@@ -4,7 +4,6 @@ import type { AnnouncementRefreshResult } from '@shared/announcements';
 import type { CsvImportPlanData } from './views/DatabasesView';
 import type { NotionImportReport } from '@shared/notionImport';
 import { FeedbackModal } from './views/FeedbackModal';
-import { RoadmapFeedbackModal, type RoadmapTopicKey } from './views/RoadmapFeedbackModal';
 import { RoadmapModal } from './views/RoadmapModal';
 import { QueuePanel, useQueueActivity } from './components/QueuePanel';
 import { VaultSwitcher, vaultTypeIcon, vaultTypeLabel } from './components/VaultSwitcher';
@@ -278,7 +277,6 @@ export function App() {
   useEffect(() => registerSkillMarketplace(() => setSkillsTab('library')), []);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   // Planned teaching section whose feedback thread is open, if any.
-  const [roadmapTopic, setRoadmapTopic] = useState<RoadmapTopicKey | null>(null);
   const [roadmapOpen, setRoadmapOpen] = useState(false);
   // The trigger element that opened the vault panel (the centre badge or the
   // right-rail vaults icon), or null when closed. The panel anchors under it.
@@ -1886,7 +1884,6 @@ export function App() {
                       compact={sidebarCompact}
                       activeView={view}
                       onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setStudyGraphTarget(null); setView(targetView); }}
-                      onOpenRoadmap={setRoadmapTopic}
                       sidebarOrder={settings?.sidebarOrder}
                       sidebarHidden={activeSidebarHidden}
                     />
@@ -1988,7 +1985,6 @@ export function App() {
         />
       )}
       {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
-      {roadmapTopic && <RoadmapFeedbackModal topic={roadmapTopic} onClose={() => setRoadmapTopic(null)} />}
       {roadmapOpen && <RoadmapModal onClose={() => setRoadmapOpen(false)} />}
 
       {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !settings.tourComplete && !isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isProsopography && !isTestimonios && (
