@@ -9,6 +9,7 @@ import { getDatabaseChatConversation } from '../db/databaseChatRepo';
 import { getWorldChatConversation } from '../db/worldChatRepo';
 import { getStudyAssistantConversation } from '../ai/studyAssistant';
 import { importResearchAttachment, listResearchAttachments, removeResearchAttachment, researchAttachmentOriginal } from '../researchAttachments';
+import { showImportOpenDialog } from '../privacy';
 function conversation(owner: ResearchAttachmentOwner): { messages: Array<{ attachments?: Array<{ id: string }> }> } {
   const readers = { research: getConversation, database: getDatabaseChatConversation, world: getWorldChatConversation, study: getStudyAssistantConversation };
   const chat = owner && Object.hasOwn(readers, owner.surface) ? readers[owner.surface](owner.conversationId) : null;
@@ -20,7 +21,10 @@ export function registerResearchAttachmentIpc({ h, getWindow }: IpcContext): voi
     conversation(owner);
     const vaultDir = activeVaultDir();
     const current = () => activeVaultDir() === vaultDir && Boolean(conversation(owner));
-    const result = await dialog.showOpenDialog(getWindow() ?? undefined!, { properties: ['openFile', 'multiSelections'] });
+    const window = getWindow();
+    const result = window
+      ? await showImportOpenDialog(window, { properties: ['openFile', 'multiSelections'] })
+      : await showImportOpenDialog({ properties: ['openFile', 'multiSelections'] });
     return importFiles(owner, result.canceled ? [] : result.filePaths, current);
   });
   h('research:attachments:import', async (_event, owner: ResearchAttachmentOwner, filePaths: string[]) => {
