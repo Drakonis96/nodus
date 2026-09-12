@@ -158,7 +158,7 @@ for search and analysis without duplicating the global copy. See the
 
 ## Cite Nodus Research
 
-If Nodus Research contributes substantially to research that leads to a publication, please cite the version you used. The repository provides machine-readable citation metadata in [`CITATION.cff`](CITATION.cff), which GitHub can render in APA and BibTeX formats. Use the [conceptual Zenodo DOI (10.5281/zenodo.21515531)](https://doi.org/10.5281/zenodo.21515531) for the project across all releases, or the [Nodus Research 4.2.2 DOI (10.5281/zenodo.22041926)](https://doi.org/10.5281/zenodo.22041926) for the current archived version. Ready-to-use formats are available at [nodusresearch.com/cite/](https://nodusresearch.com/cite/).
+If Nodus Research contributes substantially to research that leads to a publication, please cite the version you used and credit **Jorge Pérez Burgueño and Nodus Contributors** as the authors. The repository provides machine-readable citation metadata in [`CITATION.cff`](CITATION.cff), which GitHub can render in APA and BibTeX formats. Use the [conceptual Zenodo DOI (10.5281/zenodo.21515531)](https://doi.org/10.5281/zenodo.21515531) for the project across all releases, or the [Nodus Research 4.2.2 DOI (10.5281/zenodo.22041926)](https://doi.org/10.5281/zenodo.22041926) for the current archived version. Ready-to-use formats are available at [nodusresearch.com/cite/](https://nodusresearch.com/cite/).
 
 ## Explore before importing anything
 
