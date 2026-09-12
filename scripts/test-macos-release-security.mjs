@@ -5,6 +5,8 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import plist from 'plist';
+import AdmZip from 'adm-zip';
+import { machOEntries, unnotarizablePayload } from './notarization-payload.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -156,4 +158,52 @@ test('official verification gates cover signing, Hardened Runtime, stapling and 
   assert.match(artifacts, /ditto/);
   assert.match(artifacts, /hdiutil/);
   assert.match(artifacts, /assertSameApp/);
+});
+
+// The notary service opens archives it finds inside a submitted application and refuses
+// the whole thing over unsigned code in them. v5.4.0's first attempt died exactly there:
+// fifteen `.bare` prebuilds vendored into a bundled capability package, for macOS and iOS
+// platforms the package never runs on. Nothing in this repository can sign them — the
+// bytes are pinned by digest against a manifest the publisher signed — so the check that
+// keeps a release building is the one that refuses to bundle them.
+const zipOf = (files) => {
+  const zip = new AdmZip();
+  for (const [name, bytes] of Object.entries(files)) zip.addFile(name, bytes);
+  return zip.toBuffer();
+};
+const machO = (magic) => Buffer.concat([Buffer.from(magic), Buffer.alloc(64)]);
+
+test('a capability package carrying unsigned Mach-O is withheld from the macOS build only', () => {
+  const packageWithPrebuilds = zipOf({
+    'plugin.json': Buffer.from('{"id":"chemistry-studio"}'),
+    'vendor/node_modules/bare-fs/prebuilds/darwin-arm64/bare-fs.bare': machO([0xcf, 0xfa, 0xed, 0xfe]),
+    'vendor/node_modules/bare-url/prebuilds/ios-arm64/bare-url.bare': machO([0xca, 0xfe, 0xba, 0xbe]),
+  });
+
+  assert.deepEqual(machOEntries(packageWithPrebuilds), [
+    'vendor/node_modules/bare-fs/prebuilds/darwin-arm64/bare-fs.bare',
+    'vendor/node_modules/bare-url/prebuilds/ios-arm64/bare-url.bare',
+  ], 'thin and universal binaries both fail notarization, in either byte order');
+
+  assert.equal(unnotarizablePayload(packageWithPrebuilds, 'darwin').length, 2);
+  for (const platform of ['win32', 'linux']) {
+    assert.deepEqual(unnotarizablePayload(packageWithPrebuilds, platform), [],
+      'only macOS is notarized, so only macOS gives up its bundled copy');
+  }
+
+  const ordinaryPackage = zipOf({
+    'plugin.json': Buffer.from('{"id":"legalize"}'),
+    'skills/legalize/skill.json': Buffer.from('{}'),
+    'vendor/Main.class': Buffer.from([0xca, 0xfe, 0xba, 0xbe, 0x00, 0x00, 0x00, 0x41]),
+  });
+  assert.deepEqual(unnotarizablePayload(ordinaryPackage, 'darwin'), [],
+    'a Java class file shares the universal-binary magic and is not code the notary judges');
+});
+
+test('the capability bootstrap refuses to bundle what macOS cannot notarize', () => {
+  const prepare = read('scripts/prepare-capability-bootstrap.mjs');
+  assert.match(prepare, /unnotarizablePayload\(archive\)/, 'every bundled archive is inspected before it is written');
+  assert.match(prepare, /written \+ withheld\.length !== pinned\.packages\.length/,
+    'a package missing for any other reason still fails a required build');
+  assert.match(prepare, /Withheld \$\{entry\.id\}/, 'a withheld package is named in the build log');
 });

@@ -9,9 +9,12 @@
 // Two sources, in order: the pinned GitHub release (what a real build uses), or a local
 // marketplace checkout (what a development build uses, so the migration can be exercised
 // before a release exists).
+//
+// One package can be withheld, and only on macOS: see the notarization check below.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { unnotarizablePayload } from './notarization-payload.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const out = path.join(root, 'build', 'capability-bootstrap');
@@ -56,6 +59,7 @@ const built = (() => {
 })();
 
 let written = 0;
+const withheld = [];
 for (const entry of pinned.packages) {
   const local = built.filter(candidate => candidate.manifest.id === entry.id)
     .map(candidate => ({ target: candidate.target, asset: candidate.asset, bytes: candidate.bytes, sha256: candidate.sha256 }));
@@ -100,6 +104,24 @@ for (const entry of pinned.packages) {
     signature = fs.readFileSync(signaturePath);
   }
 
+  // A package whose archive carries unsigned Mach-O cannot travel inside a notarized macOS
+  // build. The notary opens the zip, finds code nothing signed, and refuses the whole
+  // application — which is what rejected both v5.4.0 macOS builds. The bytes cannot be
+  // repaired here either: they are pinned by digest against a manifest the publisher
+  // signed, so stripping the dead prebuilds would make the package fail to install.
+  //
+  // So it is withheld rather than bundled, and only on macOS. The migration is already
+  // built for a package it has no bundled copy of: it installs that one from the
+  // catalogue, and a run with no connection leaves it pending and retries. Offline
+  // migration stays whole on Windows and Linux, and the fix is upstream — a package whose
+  // vendor tree does not carry prebuilt binaries for five platforms it never runs on.
+  const unnotarizable = unnotarizablePayload(archive);
+  if (unnotarizable.length) {
+    withheld.push({ id: entry.id, files: unnotarizable.length, first: unnotarizable[0] });
+    fs.rmSync(dir, { recursive: true, force: true });
+    continue;
+  }
+
   fs.writeFileSync(path.join(dir, asset.asset), archive);
   fs.writeFileSync(path.join(dir, 'release-manifest.json'), manifest);
   fs.writeFileSync(path.join(dir, 'release-manifest.sig'), signature);
@@ -107,5 +129,8 @@ for (const entry of pinned.packages) {
 }
 
 fs.mkdirSync(out, { recursive: true });
-if (required && written !== pinned.packages.length) throw new Error(`Only ${written} of ${pinned.packages.length} bootstrap packages were bundled.`);
-console.log(`Bundled ${written} bootstrap package(s) for ${target}.`);
+for (const entry of withheld) {
+  console.warn(`Withheld ${entry.id}: its archive carries ${entry.files} unsigned Mach-O file(s), the first at ${entry.first}. A macOS build carrying it cannot be notarized, so a profile that needs it installs it from the catalogue.`);
+}
+if (required && written + withheld.length !== pinned.packages.length) throw new Error(`Only ${written} of ${pinned.packages.length} bootstrap packages were bundled.`);
+console.log(`Bundled ${written} bootstrap package(s) for ${target}${withheld.length ? `; withheld ${withheld.length} that macOS cannot notarize.` : '.'}`);
