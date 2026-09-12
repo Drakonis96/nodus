@@ -71,7 +71,8 @@ import type {
 import { dedicatedVaultNavIds, groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
 import type { ToolkitPage } from './navigation';
 import type { LibraryScope } from '@shared/libraryTypes';
-import { placeHeaderBadge, type HeaderBadgePlacement } from './headerLayout';
+import { placeHeaderBadge, placeHeaderModelAlert, type HeaderBadgePlacement, type HeaderModelAlertPlacement } from './headerLayout';
+import { registerSkillMarketplace } from './components/skillMarketplaceOpener';
 import { effectiveSidebarHidden, isPreviewVaultType, isViewAllowedForVaultType, normalizeVaultType, viewsDisallowedForType } from '@shared/vaultTypes';
 import { CommandPalette, type Command } from './components/CommandPalette';
 import nodusLogo from './assets/nodus-logo.svg';
@@ -88,6 +89,7 @@ const CsvImportModal = lazy(() => import('./views/DatabasesView').then((module) 
 const NotionImportReportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.NotionImportReportModal })));
 const CollectionsModal = lazy(() => import('./views/CollectionsModal').then((module) => ({ default: module.CollectionsModal })));
 const ResearchAssistantModal = lazy(() => import('./views/ResearchAssistantModal').then((module) => ({ default: module.ResearchAssistantModal })));
+const SkillMarketplaceModal = lazy(() => import('./components/SkillMarketplaceModal').then((module) => ({ default: module.SkillMarketplaceModal })));
 
 // Shortcut label for the command palette: ⌘K on macOS, Ctrl K elsewhere.
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
@@ -267,6 +269,15 @@ export function App() {
   });
   const [collectionsOpen, setCollectionsOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
+  // Skills: the catalogue and the installed library, for the whole application rather
+  // than for one chat. The per-chat popover opens this one through the registry below,
+  // so there is a single modal however you got here.
+  const [skillsTab, setSkillsTab] = useState<'library' | 'marketplace' | null>(null);
+  // The main window is the one that has the Skills modal, so it is the one that says
+  // so. Registering an opener rather than listening for an event is what lets the
+  // popover in the standalone Nodi overlay — a different renderer, where nothing
+  // registers — hide the entry instead of offering a dead button.
+  useEffect(() => registerSkillMarketplace(() => setSkillsTab('library')), []);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   // Planned teaching section whose feedback thread is open, if any.
   const [roadmapTopic, setRoadmapTopic] = useState<RoadmapTopicKey | null>(null);
@@ -309,6 +320,7 @@ export function App() {
   const [headerActionsEl, setHeaderActionsEl] = useState<HTMLElement | null>(null);
   const [vaultBadgeEl, setVaultBadgeEl] = useState<HTMLElement | null>(null);
   const [vaultBadgePlacement, setVaultBadgePlacement] = useState<HeaderBadgePlacement | null>(null);
+  const [modelAlertPlacement, setModelAlertPlacement] = useState<HeaderModelAlertPlacement | null>(null);
   const toggleVaults = useCallback(
     (el: HTMLElement) => setVaultAnchor((cur) => (cur === el ? null : el)),
     []
@@ -1017,27 +1029,41 @@ export function App() {
   // render cycle. The badge is absolutely positioned, so moving it cannot resize
   // the rails back: no feedback loop.
   useLayoutEffect(() => {
-    if (!headerEl || !headerLogoEl || !headerActionsEl || !vaultBadgeEl) {
+    if (!headerEl || !headerLogoEl || !headerActionsEl) {
       setVaultBadgePlacement(null);
+      setModelAlertPlacement(null);
       return undefined;
     }
     const measure = () => {
+      const badge = vaultBadgeEl
+        ? placeHeaderBadge({
+            headerWidth: headerEl.clientWidth,
+            logoWidth: headerLogoEl.offsetWidth,
+            actionsWidth: headerActionsEl.offsetWidth,
+            badgeWidth: vaultBadgeEl.offsetWidth,
+          })
+        : null;
       setVaultBadgePlacement((previous) => {
-        const next = placeHeaderBadge({
-          headerWidth: headerEl.clientWidth,
-          logoWidth: headerLogoEl.offsetWidth,
-          actionsWidth: headerActionsEl.offsetWidth,
-          badgeWidth: vaultBadgeEl.offsetWidth,
-        });
+        if (!badge) return null;
         // Bail out when nothing moved: the observer fires on every frame of the
         // rail's open/close animation and each state write would re-render the app.
-        if (previous && previous.fits === next.fits && Math.abs(previous.left - next.left) < 0.5) return previous;
+        if (previous && previous.fits === badge.fits && Math.abs(previous.left - badge.left) < 0.5) return previous;
+        return badge;
+      });
+      // The alert's band ends wherever the next thing begins — the badge when it is
+      // shown, the action rail when the window is too narrow for one.
+      setModelAlertPlacement((previous) => {
+        const next = placeHeaderModelAlert({
+          logoWidth: headerLogoEl.offsetWidth,
+          bandRight: badge?.fits ? badge.left : headerEl.clientWidth - headerActionsEl.offsetWidth,
+        });
+        if (previous && previous.fits === next.fits && Math.abs(previous.centre - next.centre) < 0.5) return previous;
         return next;
       });
     };
     measure();
     const observer = new ResizeObserver(measure);
-    for (const box of [headerEl, headerLogoEl, headerActionsEl, vaultBadgeEl]) observer.observe(box);
+    for (const box of [headerEl, headerLogoEl, headerActionsEl, vaultBadgeEl]) if (box) observer.observe(box);
     return () => observer.disconnect();
   }, [headerEl, headerLogoEl, headerActionsEl, vaultBadgeEl]);
 
@@ -1200,6 +1226,8 @@ export function App() {
       // measurement and can, in a window narrow enough, have nowhere to go.
       { id: 'act:vaults', label: t('Bóvedas'), section: t('Acciones'), icon: 'archive', keywords: 'vaults bovedas boveda cambiar crear renombrar duplicar eliminar', run: () => { const badge = document.querySelector<HTMLElement>('[data-testid="header-vault-badge"]'); if (badge) toggleVaults(badge); } },
       { id: 'act:assistant', label: t(isWorldbuilding ? 'Chat del mundo' : 'Asistente de investigación'), section: t('Acciones'), icon: 'chat', keywords: 'assistant chat', run: () => openAssistant() },
+      { id: 'act:skills', label: t('Mis skills'), section: t('Acciones'), icon: 'sparkles', keywords: 'skills habilidades biblioteca instalar activar', run: () => setSkillsTab('library') },
+      { id: 'act:marketplace', label: 'Marketplace', section: t('Acciones'), icon: 'basket', keywords: 'marketplace tienda skills plugins instalar descargar catalogo catálogo', run: () => setSkillsTab('marketplace') },
       { id: 'act:presenter', label: 'PDF Presenter', section: t('Acciones'), icon: 'presentation', keywords: 'presentar diapositivas slides pdf presenter proyector herramientas toolkit', run: () => { setToolkitPage('presenter'); setView('toolkit'); } },
       { id: 'act:feedback', label: t('Sugerir función o reportar error'), section: t('Acciones'), icon: 'gitPr', keywords: 'feedback github pr bug feature sugerencia error', run: () => setFeedbackOpen(true) },
       { id: 'act:roadmap', label: t('Roadmap'), section: t('Acciones'), icon: 'route', keywords: 'roadmap hoja ruta futuro próximos pasos', run: () => setRoadmapOpen(true) },
@@ -1412,6 +1440,31 @@ export function App() {
             label on hover/focus so the header reads as a clean row of icons. It
             grows leftwards as labels open, which is why the centre badge measures
             it instead of assuming a fixed clearance. */}
+        {/* "Configure an AI model" lives here rather than in the action rail, where its
+            pinned-open label spent ~170px of the only room the centred badge has and
+            pushed the icons towards it. This half of the header is empty by
+            construction, so the alert is centred between the sidebar and the badge and
+            folds its label away like every other action: amber says something needs
+            attention, hovering (or focusing) says what. Its `left` is the band's
+            CENTRE — the button is translated by half its own width, so the label opens
+            symmetrically into the empty middle instead of growing towards the badge. */}
+        {!settings.synthesisModel && modelAlertPlacement?.fits && (
+          <div
+            data-testid="header-model-alert"
+            className="absolute top-1/2 z-10"
+            style={{ left: `${modelAlertPlacement.centre}px`, transform: 'translate(-50%, -50%)' }}
+          >
+            <HeaderAction
+              dataTour="model"
+              icon="alert"
+              label={t('Configura un modelo de IA')}
+              title={t('Configura un modelo de IA')}
+              tone="text-amber-500 dark:text-amber-400"
+              onClick={() => setView('settings')}
+            />
+          </div>
+        )}
+
         <div ref={setHeaderActionsEl} data-testid="header-actions" className="header-action-rail flex min-w-0 items-center justify-end gap-0.5 overflow-hidden pr-4">
           {/* No Bóvedas button: the centred badge is the way in, and it is now shown at
               every width for exactly that reason (see the badge above). */}
@@ -1423,16 +1476,6 @@ export function App() {
             tone="text-neutral-400"
             onClick={() => setPaletteOpen(true)}
           />
-          {!settings.synthesisModel && (
-            <HeaderAction
-              dataTour="model"
-              icon="alert"
-              label={t('Configura un modelo de IA')}
-              tone="text-amber-500 dark:text-amber-400"
-              showLabel
-              onClick={() => setView('settings')}
-            />
-          )}
           <HeaderAction
             icon="chat"
             label={t('Asistente')}
@@ -1445,6 +1488,17 @@ export function App() {
             label={t('Herramientas')}
             title={t('Abrir Nodus Toolkit')}
             onClick={() => { setToolkitPage('home'); setView('toolkit'); }}
+          />
+          {/* Skills had no way in that was not a chat: the catalogue lived inside the
+              activation popover, so installing one meant opening a conversation first.
+              It sits next to the Toolkit because it answers the same question — what
+              this application can do — for capabilities rather than for tools. */}
+          <HeaderAction
+            dataTour="skills"
+            icon="basket"
+            label={t('Skills')}
+            title={t('Skills y Marketplace')}
+            onClick={() => setSkillsTab('library')}
           />
           {/* Colecciones ya no vive aquí: sigue a un comando de distancia («Colecciones»
               en la paleta) y su sitio natural es la configuración de Zotero. */}
@@ -1938,6 +1992,12 @@ export function App() {
           initialTarget={assistantTarget}
           isGenealogy={isGenealogy}
           onClose={() => setResearchOpen(false)}
+        />
+      )}
+      {skillsTab && (
+        <SkillMarketplaceModal
+          initialTab={skillsTab}
+          onClose={() => setSkillsTab(null)}
         />
       )}
       {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}

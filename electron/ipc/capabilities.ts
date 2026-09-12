@@ -16,6 +16,8 @@ import { checkForCapabilityUpdates, setCapabilityAutoUpdate } from '../capabilit
 import { migrationSettled, readMigrationJournal } from '../capabilities/migration';
 import { capabilityMigrationRunning, migrateCapabilitiesForThisProfile, runPluginDataMigrations } from '../capabilities/migrationRunner';
 import { pinCapabilitiesForTurn } from '../capabilities/registry';
+import { localizeRuntimeError } from '@shared/uiLanguage';
+import { getSettings } from '../db/settingsRepo';
 import type { IpcContext } from './context';
 
 /** One generic surface for every capability, whatever discipline it happens to serve.
@@ -186,7 +188,11 @@ export function registerCapabilitiesIpc(context: IpcContext): void {
           reason: entry.reason,
           attempts: entry.attempts,
           updatedAt: entry.updatedAt,
-          ...(entry.failure ? { failure: entry.failure } : {}),
+          // The journal stores the failure in the language it was thrown in, which is the
+          // source language, because it outlives the setting it was recorded under. It is
+          // translated on the way out instead — `localizeIpcPayload` only walks `message`
+          // and `error`, and this one is called `failure`.
+          ...(entry.failure ? { failure: localizeRuntimeError(entry.failure, getSettings().uiLanguage) } : {}),
           installed: Boolean(state?.active),
           dataVersion: state?.dataVersion ?? 0,
           registered: registered.has(entry.pluginId),

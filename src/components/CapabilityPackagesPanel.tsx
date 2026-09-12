@@ -112,12 +112,17 @@ function MigrationBanner({ onChanged }: { onChanged: () => void }) {
   const refresh = useCallback(() => {
     void window.nodus.capabilityMigrationStatus().then(setStatus).catch(() => undefined);
   }, []);
+  // The failure sentence is translated in the main process, where the journal's source
+  // language meets the current setting, so a language change has to re-ask for it: every
+  // other string on this panel re-evaluates on the render that follows, and this one would
+  // have stayed in the language it was fetched in.
+  const language = getActiveLang();
   useEffect(() => {
     refresh();
     const stopMigration = window.nodus.onCapabilityMigrationChanged(refresh);
     const stopRegistry = window.nodus.onCapabilityRegistryChanged(refresh);
     return () => { stopMigration(); stopRegistry(); };
-  }, [refresh]);
+  }, [refresh, language]);
 
   if (!status?.entries.length) return null;
   const unfinished = status.entries.filter(entry => entry.phase !== 'complete' || !entry.registered);
