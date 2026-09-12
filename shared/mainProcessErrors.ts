@@ -1142,6 +1142,18 @@ export const MAIN_PROCESS_ERRORS: Record<string, MainErrorTranslations> = {
   'El archivo no es una exportación de Nodus Bookmarks.': { en: 'The file is not a Nodus Bookmarks export.', fr: 'Le fichier n’est pas une exportation Nodus Bookmarks.', de: 'Die Datei ist kein Nodus-Bookmarks-Export.', pt: 'O ficheiro não é uma exportação do Nodus Bookmarks.', 'pt-BR': 'O arquivo não é uma exportação do Nodus Bookmarks.', it: 'Il file non è un’esportazione di Nodus Bookmarks.', tr: 'Dosya bir Nodus Bookmarks dışa aktarımı değil.' },
   'El archivo HTML de marcadores es demasiado grande.': { en: 'The bookmarks HTML file is too large.', fr: 'Le fichier HTML de signets est trop volumineux.', de: 'Die HTML-Lesezeichendatei ist zu groß.', pt: 'O ficheiro HTML de marcadores é demasiado grande.', 'pt-BR': 'O arquivo HTML de favoritos é grande demais.', it: 'Il file HTML dei segnalibri è troppo grande.', tr: 'Yer imi HTML dosyası çok büyük.' },
 
+  // ── Capability packages: installing from the catalogue ──────────────────────
+  // Thrown by the package installer, and read in two places: the Marketplace tab, and the
+  // migration banner, which records the last failure in its journal and shows it until the
+  // traslado finishes. Authored in English until now, which made them the only sentences on
+  // that panel that no reader saw in their own language — Spanish readers included.
+  'Actualiza el catálogo de paquetes antes de instalar.': { en: 'Refresh the package catalog before installing.', fr: 'Actualisez le catalogue de paquets avant d’installer.', de: 'Aktualisieren Sie den Paketkatalog vor der Installation.', pt: 'Atualize o catálogo de pacotes antes de instalar.', 'pt-BR': 'Atualize o catálogo de pacotes antes de instalar.', it: 'Aggiorna il catalogo dei pacchetti prima di installare.', tr: 'Kurmadan önce paket kataloğunu güncelleyin.' },
+  'Ese paquete no está en el catálogo.': { en: 'That package is not in the catalog.', fr: 'Ce paquet n’est pas dans le catalogue.', de: 'Dieses Paket ist nicht im Katalog.', pt: 'Esse pacote não está no catálogo.', 'pt-BR': 'Esse pacote não está no catálogo.', it: 'Quel pacchetto non è nel catalogo.', tr: 'Bu paket katalogda yok.' },
+  'No se pudo contactar con el origen del paquete. Revisa tu conexión e inténtalo de nuevo.': { en: 'Could not reach the package source. Check your connection and try again.', fr: 'Impossible de joindre la source du paquet. Vérifiez votre connexion et réessayez.', de: 'Die Paketquelle war nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.', pt: 'Não foi possível contactar a origem do pacote. Verifique a ligação e tente novamente.', 'pt-BR': 'Não foi possível contatar a origem do pacote. Verifique sua conexão e tente novamente.', it: 'Impossibile raggiungere la sorgente del pacchetto. Controlla la connessione e riprova.', tr: 'Paket kaynağına ulaşılamadı. Bağlantınızı kontrol edip yeniden deneyin.' },
+  'El origen del paquete respondió vacío.': { en: 'Empty response from the package source.', fr: 'Réponse vide de la source du paquet.', de: 'Leere Antwort von der Paketquelle.', pt: 'Resposta vazia da origem do pacote.', 'pt-BR': 'Resposta vazia da origem do pacote.', it: 'Risposta vuota dalla sorgente del pacchetto.', tr: 'Paket kaynağından boş yanıt geldi.' },
+  'La descarga supera el tamaño permitido.': { en: 'The download is larger than allowed.', fr: 'Le téléchargement dépasse la taille autorisée.', de: 'Der Download überschreitet die zulässige Größe.', pt: 'A transferência excede o tamanho permitido.', 'pt-BR': 'O download excede o tamanho permitido.', it: 'Il download supera la dimensione consentita.', tr: 'İndirme izin verilen boyutu aşıyor.' },
+  'La revisión del repositorio no es válida.': { en: 'Invalid repository revision.', fr: 'Révision du dépôt non valide.', de: 'Ungültige Repository-Revision.', pt: 'Revisão do repositório inválida.', 'pt-BR': 'Revisão do repositório inválida.', it: 'Revisione del repository non valida.', tr: 'Depo sürümü geçersiz.' },
+
   // ── Shared validation: automations, research, filters and dates ─────────────
   'Valor de automatización no válido.': { en: 'Invalid automation value.', fr: 'Valeur d’automatisation non valide.', de: 'Ungültiger Automatisierungswert.', pt: 'Valor de automatização inválido.', 'pt-BR': 'Valor de automação inválido.', it: 'Valore di automazione non valido.', tr: 'Geçersiz otomasyon değeri.' },
   'El valor de columna no indica una propiedad.': { en: 'The column value does not name a property.', fr: 'La valeur de colonne n’indique pas de propriété.', de: 'Der Spaltenwert benennt keine Eigenschaft.', pt: 'O valor de coluna não indica uma propriedade.', 'pt-BR': 'O valor de coluna não indica uma propriedade.', it: 'Il valore di colonna non indica una proprietà.', tr: 'Sütun değeri bir özellik belirtmiyor.' },
@@ -1225,6 +1237,20 @@ export const MAIN_PROCESS_ERROR_PATTERNS: { pattern: RegExp; translate: (...grou
   {
     pattern: /^HTTP (\d+)\. Activa el servidor local en LM Studio\.$/,
     translate: (status) => localProviderDetail(`HTTP ${status}. Activa el servidor local en LM Studio.`) as MainErrorTranslations,
+  },
+
+  // ── Capability packages: the value that failed is carried into the message ──
+  {
+    pattern: /^El origen del paquete respondió (\d+)\.$/,
+    translate: (status) => ({ en: `The package source returned ${status}.`, fr: `La source du paquet a répondu ${status}.`, de: `Die Paketquelle antwortete mit ${status}.`, pt: `A origem do pacote respondeu ${status}.`, 'pt-BR': `A origem do pacote respondeu ${status}.`, it: `La sorgente del pacchetto ha risposto ${status}.`, tr: `Paket kaynağı ${status} yanıtı verdi.` }),
+  },
+  {
+    pattern: /^(.+) no publica un paquete para (.+)\.$/,
+    translate: (name, platform) => ({ en: `${name} does not publish a package for ${platform}.`, fr: `${name} ne publie pas de paquet pour ${platform}.`, de: `${name} veröffentlicht kein Paket für ${platform}.`, pt: `${name} não publica um pacote para ${platform}.`, 'pt-BR': `${name} não publica um pacote para ${platform}.`, it: `${name} non pubblica un pacchetto per ${platform}.`, tr: `${name}, ${platform} için paket yayımlamıyor.` }),
+  },
+  {
+    pattern: /^(.+) no tiene un archivo publicado para (.+)\.$/,
+    translate: (name, target) => ({ en: `${name} has no published asset for ${target}.`, fr: `${name} n’a aucun fichier publié pour ${target}.`, de: `${name} hat keine veröffentlichte Datei für ${target}.`, pt: `${name} não tem nenhum ficheiro publicado para ${target}.`, 'pt-BR': `${name} não tem nenhum arquivo publicado para ${target}.`, it: `${name} non ha alcun file pubblicato per ${target}.`, tr: `${name} için ${target} hedefine yayımlanmış dosya yok.` }),
   },
 
   // ── Managed subscriptions and local models ──────────────────────────────────

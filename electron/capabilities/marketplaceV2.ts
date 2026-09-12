@@ -26,11 +26,11 @@ export interface CachedCatalog { sourceId: string; url: string; commit: string; 
 async function download(url: string, limit: number, fetcher: typeof fetch): Promise<Buffer> {
   let response: Response;
   try { response = await fetcher(url, { redirect: 'follow', signal: AbortSignal.timeout(120_000), headers: { 'User-Agent': 'Nodus-Capability-Marketplace' } }); }
-  catch { throw new Error('Could not reach the package source. Check your connection and try again.'); }
-  if (!response.ok) throw new Error(`The package source returned ${response.status}.`);
-  if (Number(response.headers.get('content-length') ?? 0) > limit) throw new Error('The download is larger than allowed.');
+  catch { throw new Error('No se pudo contactar con el origen del paquete. Revisa tu conexión e inténtalo de nuevo.'); }
+  if (!response.ok) throw new Error(`El origen del paquete respondió ${response.status}.`);
+  if (Number(response.headers.get('content-length') ?? 0) > limit) throw new Error('La descarga supera el tamaño permitido.');
   const reader = response.body?.getReader();
-  if (!reader) throw new Error('Empty response from the package source.');
+  if (!reader) throw new Error('El origen del paquete respondió vacío.');
   const chunks: Uint8Array[] = [];
   let bytes = 0;
   try {
@@ -38,7 +38,7 @@ async function download(url: string, limit: number, fetcher: typeof fetch): Prom
       const next = await reader.read();
       if (next.done) break;
       bytes += next.value.length;
-      if (bytes > limit) throw new Error('The download is larger than allowed.');
+      if (bytes > limit) throw new Error('La descarga supera el tamaño permitido.');
       chunks.push(next.value);
     }
   } finally { await reader.cancel().catch(() => undefined); }
@@ -50,7 +50,7 @@ export async function fetchCapabilityCatalog(sourceUrl: string, fetcher: typeof 
   const info = JSON.parse((await download(`https://api.github.com/repos/${owner}/${repo}`, 100_000, fetcher)).toString('utf8'));
   const revision = JSON.parse((await download(`https://api.github.com/repos/${owner}/${repo}/commits/${encodeURIComponent(info.default_branch)}`, 1_000_000, fetcher)).toString('utf8'));
   const commit = String(revision.sha);
-  if (!/^[a-f0-9]{40}$/.test(commit)) throw new Error('Invalid repository revision.');
+  if (!/^[a-f0-9]{40}$/.test(commit)) throw new Error('La revisión del repositorio no es válida.');
   const raw = await download(`https://raw.githubusercontent.com/${owner}/${repo}/${commit}/catalog-v2.json`, CATALOG_LIMIT, fetcher);
   const catalog = validateCapabilityCatalog(JSON.parse(raw.toString('utf8')));
   const cached: CachedCatalog = { sourceId: id, url, commit, fetchedAt: new Date().toISOString(), catalog };
@@ -78,9 +78,9 @@ export async function installCatalogPlugin(
   options: { approvePermissions?: boolean; fetcher?: typeof fetch } = {},
 ): Promise<InstallOutcome> {
   const cached = readCachedCatalog();
-  if (!cached) throw new Error('Refresh the package catalog before installing.');
+  if (!cached) throw new Error('Actualiza el catálogo de paquetes antes de instalar.');
   const entry = cached.catalog.plugins.find(candidate => candidate.id === pluginId);
-  if (!entry) throw new Error('That package is not in the catalog.');
+  if (!entry) throw new Error('Ese paquete no está en el catálogo.');
   const outcome = await installCatalogEntry(entry, cached, options);
   rebuildCapabilityRegistry();
   return outcome;
@@ -94,9 +94,9 @@ export async function installCatalogEntry(
   const fetcher = options.fetcher ?? fetch;
   const { owner, repo } = normalizeSkillSource(cached.url);
   const target = resolvePluginTarget(entry.targets, process.platform, process.arch);
-  if (!target) throw new Error(`${entry.name} does not publish a package for ${process.platform}-${process.arch}.`);
+  if (!target) throw new Error(`${entry.name} no publica un paquete para ${process.platform}-${process.arch}.`);
   const asset = entry.release.assets.find(candidate => candidate.target === target);
-  if (!asset) throw new Error(`${entry.name} has no published asset for ${target}.`);
+  if (!asset) throw new Error(`${entry.name} no tiene un archivo publicado para ${target}.`);
 
   const releaseManifestBytes = await download(releaseAsset(owner, repo, entry.release.tag, entry.release.manifest), MANIFEST_LIMIT, fetcher);
   const signature = await download(releaseAsset(owner, repo, entry.release.tag, entry.release.signature), SIGNATURE_LIMIT, fetcher);
