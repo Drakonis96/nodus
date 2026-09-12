@@ -950,9 +950,10 @@ try {
     console.log('[e2e] focused STT Settings + whisper.cpp streaming smoke passed');
     process.exit(0);
   }
-  await page.getByRole('button', { name: 'Asistente', exact: true }).click();
+  await page.locator('header').getByRole('button', { name: 'Research chat', exact: true }).click();
+  await page.getByTestId('research-chat-view').waitFor({ timeout: 30_000 });
   assert.equal(await page.locator('select[title="Modelo del chat"]').inputValue(), 'openrouter::smoke-chat-model');
-  await page.locator('button[title="Cerrar"]').click();
+  await page.locator('[data-tour="nav-settings"]').click();
   console.log('[e2e] header has no global model selector');
 
   // The brand and the collapse chevron used to share one centred flex row. On
@@ -3226,8 +3227,8 @@ try {
   const teachingIdeas = page.getByTestId('study-ideas-view');
   await teachingIdeas.waitFor({ timeout: 30_000 });
   await teachingIdeas.getByText('Máquina de vapor', { exact: false }).first().waitFor({ timeout: 30_000 });
-  await page.getByTestId('teaching-sidebar').getByRole('button', { name: 'Chat', exact: true }).click();
-  const teachingChat = page.getByTestId('study-chat-view');
+  await page.getByTestId('teaching-sidebar').getByRole('button', { name: 'Research chat', exact: true }).click();
+  const teachingChat = page.getByTestId('research-chat-view');
   await teachingChat.waitFor({ timeout: 30_000 });
   // The copy has to be the teacher's, not the learner's: same component, other voice.
   await teachingChat.getByText('Pregunta a tus materiales de clase con citas verificables.').waitFor({ timeout: 30_000 });
@@ -3917,11 +3918,18 @@ try {
     // The world chat. Nodus calculates and the model writes, so the half that can be proved
     // without a provider is the half that matters most: it refuses to answer about a world
     // it cannot anchor, instead of composing a plausible one.
-    await openSection('Chat del mundo', 'world-chat-view');
-    await page.getByTestId('world-chat-input').fill('¿Y ahora qué hago?');
-    await page.keyboard.press('Enter');
-    const refusal = page.getByTestId('world-chat-answer').first();
-    await refusal.waitFor({ timeout: 30_000 });
+    await openSection('Research chat', 'research-chat-view');
+    await page.locator('.research-composer-input').fill('¿Y ahora qué hago?');
+    const refusal = page.locator('.research-message').filter({ hasText: /No he encontrado nada de tu mundo/ }).first();
+    try {
+      // The shared chat loads the conversation's prompt selection before enabling send.
+      await page.waitForFunction(() => document.querySelector('.research-composer-send')?.disabled === false);
+      await page.keyboard.press('Enter');
+      await refusal.waitFor({ timeout: 30_000 });
+    } catch (error) {
+      console.error('[e2e] world chat state:', await page.getByTestId('research-chat-view').innerText());
+      throw error;
+    }
     assert.match(
       await refusal.innerText(),
       /No he encontrado nada de tu mundo/,

@@ -989,11 +989,13 @@ try {
   assert.equal(exp.content[0], 0xef, 'CSV export starts with a UTF-8 BOM');
 
   const chatView = fs.readFileSync(path.join(repoRoot, 'src/views/DatabasesChatView.tsx'), 'utf8');
-  assert.match(chatView, /database-chat-history-toggle/);
-  assert.match(chatView, /database-chat-history-sidebar/);
+  const sharedChat = fs.readFileSync(path.join(repoRoot, 'src/views/ResearchAssistantModal.tsx'), 'utf8');
+  assert.match(chatView, /<ResearchAssistantModal[^>]*adapter=\{adapter\}/);
+  assert.match(sharedChat, /research-history-toggle/);
+  assert.match(sharedChat, /research-history-sidebar/);
   assert.match(chatView, /listDatabaseChatConversations/);
   assert.match(chatView, /saveDatabaseChatConversation/);
-  assert.match(chatView, /<ConfirmModal/);
+  assert.match(sharedChat, /<ConfirmModal/);
   // Asks the census whether the channels are wired, not which file holds them: the
   // handlers moved to electron/ipc/databases.ts and the bindings to
   // electron/preload/databases.ts.
