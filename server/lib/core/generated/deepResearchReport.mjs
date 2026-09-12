@@ -4,25 +4,23 @@
 // document the desktop does without taking on a dependency or a build step. Edit the
 // TypeScript and run `npm run build:server-shared`; scripts/test-server-generated.mjs
 // fails if this file and that source disagree.
-// shared/writingDocument.ts
-function stripLeadingAbstract(markdown, abstract) {
-  const lines = (markdown ?? "").replace(/\r\n?/g, "\n").split("\n");
-  const first = lines.findIndex((line) => line.trim().length > 0);
-  if (first < 0) return markdown;
-  const expected = (abstract ?? "").replace(/\s+/g, " ").trim();
-  if (!/^#{1,3}\s+/.test(lines[first])) {
-    let next2 = first + 1;
-    while (next2 < lines.length && lines[next2].trim().length > 0) next2 += 1;
-    const paragraph = lines.slice(first, next2).join(" ").replace(/\s+/g, " ").trim();
-    if (!expected || !paragraph.includes(expected.slice(0, Math.min(80, expected.length)))) return markdown;
-    while (next2 < lines.length && !lines[next2].trim()) next2 += 1;
-    return lines.slice(next2).join("\n").trim();
-  }
-  let next = first + 1;
-  while (next < lines.length && !/^#{1,3}\s+/.test(lines[next])) next++;
-  const block = lines.slice(first + 1, next).join(" ").replace(/\s+/g, " ").trim();
-  if (!expected || !block || !block.includes(expected.slice(0, Math.min(80, expected.length)))) return markdown;
-  return lines.slice(next).join("\n").trim();
+// shared/documentSkills.ts
+function documentBlocks(fields) {
+  return Object.entries(fields).flatMap(([field, markdown]) => {
+    const chunks = [];
+    let current = [], fence = "";
+    const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
+    for (const [lineIndex, line] of lines.entries()) {
+      const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+      if (marker) fence = fence && marker[0] === fence[0] && marker.length >= fence.length ? "" : fence || marker;
+      if (!fence && !line.trim()) {
+        if (current.length) chunks.push({ markdown: current.join("\n"), endLine: lineIndex });
+        current = [];
+      } else current.push(line);
+    }
+    if (current.length) chunks.push({ markdown: current.join("\n"), endLine: lines.length });
+    return chunks.map((content, index) => ({ id: `${field}:${index}`, field, index, ...content }));
+  });
 }
 
 // shared/toolkitMarkdown.ts
@@ -131,6 +129,48 @@ function markdownToHtml(markdown) {
   return out.join("\n");
 }
 
+// shared/documentFigureExport.ts
+var readyDocumentFigures = (manifest) => manifest?.figures.filter((figure) => figure.state === "ready" && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(figure.poster ?? "")).sort((a, b) => manifest.blocks.findIndex((block) => block.id === a.blockId) - manifest.blocks.findIndex((block) => block.id === b.blockId)) ?? [];
+function figureHtml(figure, number) {
+  return `<figure class="report-figure"><img src="${figure.poster}" alt="${escapeHtml(figure.caption)}"/><figcaption><b>${number}.</b> ${escapeHtml(figure.caption)}${figure.sources.map((source, index) => /^nodus:\/\/[a-z-]+\//.test(source) ? ` <a href="${escapeHtml(source)}">[${index + 1}]</a>` : "").join("")}</figcaption></figure>`;
+}
+function documentFigureInsertions(markdown, field, manifest) {
+  const result = /* @__PURE__ */ new Map();
+  if (!manifest) return result;
+  const blocks = documentBlocks({ [field]: markdown }), saved = manifest.blocks.filter((block) => block.field === field);
+  const ready = readyDocumentFigures(manifest);
+  let cursor = 0;
+  for (const block of blocks) {
+    const index = saved.findIndex((candidate, index2) => index2 >= cursor && candidate.markdown === block.markdown);
+    if (index < 0) continue;
+    cursor = index + 1;
+    const figures = ready.filter((figure) => figure.blockId === saved[index].id);
+    if (figures.length) result.set(block.index, figures.map((figure) => figureHtml(figure, ready.indexOf(figure) + 1)).join(""));
+  }
+  return result;
+}
+
+// shared/writingDocument.ts
+function stripLeadingAbstract(markdown, abstract) {
+  const lines = (markdown ?? "").replace(/\r\n?/g, "\n").split("\n");
+  const first = lines.findIndex((line) => line.trim().length > 0);
+  if (first < 0) return markdown;
+  const expected = (abstract ?? "").replace(/\s+/g, " ").trim();
+  if (!/^#{1,3}\s+/.test(lines[first])) {
+    let next2 = first + 1;
+    while (next2 < lines.length && lines[next2].trim().length > 0) next2 += 1;
+    const paragraph = lines.slice(first, next2).join(" ").replace(/\s+/g, " ").trim();
+    if (!expected || !paragraph.includes(expected.slice(0, Math.min(80, expected.length)))) return markdown;
+    while (next2 < lines.length && !lines[next2].trim()) next2 += 1;
+    return lines.slice(next2).join("\n").trim();
+  }
+  let next = first + 1;
+  while (next < lines.length && !/^#{1,3}\s+/.test(lines[next])) next++;
+  const block = lines.slice(first + 1, next).join(" ").replace(/\s+/g, " ").trim();
+  if (!expected || !block || !block.includes(expected.slice(0, Math.min(80, expected.length)))) return markdown;
+  return lines.slice(next).join("\n").trim();
+}
+
 // shared/professionalReport.ts
 var DEEP_THEME = {
   accent: "#4f46e5",
@@ -155,7 +195,7 @@ function slug(value, fallback) {
 function plainInline(value) {
   return value.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/[*_`]/g, "").replace(/\s+/g, " ").trim();
 }
-function anchoredMarkdown(markdown, prefix) {
+function anchoredMarkdown(markdown, prefix, insertions) {
   const headings = [];
   const ids = [];
   const seen = /* @__PURE__ */ new Map();
@@ -170,7 +210,8 @@ function anchoredMarkdown(markdown, prefix) {
     if (match[1].length <= 3) headings.push({ id, title: plainInline(match[2]) });
   }
   let index = 0;
-  const html = markdownToHtml(markdown).replace(/<h([1-6])>/g, (_match, level) => {
+  const sourceHtml = insertions?.size ? documentBlocks({ text: markdown }).map((block) => markdownToHtml(block.markdown) + (insertions.get(block.index) ?? "")).join("\n") : markdownToHtml(markdown);
+  const html = sourceHtml.replace(/<h([1-6])>/g, (_match, level) => {
     const id = ids[index++] ?? `${prefix}-section-${index}`;
     return `<h${level} id="${escapeHtml(id)}">`;
   });
@@ -353,6 +394,10 @@ function renderProfessionalReportHtml(input) {
     }
     .report-section.exec-summary .section-body { margin-left: 0; }
     .report-section.exec-summary .abstract-box { max-width: 150mm; margin: 0 auto; }
+    .report-figure { margin: 6mm auto; max-width: 100%; break-inside: avoid; text-indent: 0; }
+    .report-figure img { display: block; width: 100%; max-height: 210mm; object-fit: contain; }
+    .report-figure figcaption { margin-top: 2.5mm; font: 8.5pt/1.5 Georgia, serif; color: var(--muted); text-align: left; }
+    .report-figure figcaption b { color: var(--accent); }
     .prose { color: #262d3d; }
     .prose p { text-align: justify; text-indent: 1.35em; hyphens: auto; orphans: 3; widows: 3; }
     .prose h1, .prose h2, .prose h3, .prose h4 {
@@ -752,11 +797,11 @@ function matrixHtml(rows, labels) {
 function escapeCellHtml(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-function deepResearchReportInput(draft, image = { dataUrl: null, credit: null }) {
+function deepResearchReportInput(draft, image = { dataUrl: null, credit: null }, visuals) {
   const language = draft.brief.language ?? "es";
   const labels = DEEP_LABELS[language];
   const body = stripLeadingAbstract(draft.draftMarkdown, draft.abstract);
-  const report = anchoredMarkdown(body, "report");
+  const report = anchoredMarkdown(body, "report", documentFigureInsertions(body, "body", visuals));
   const abstract = anchoredMarkdown(draft.abstract || draft.brief.objective, "summary");
   const sections = [
     {
