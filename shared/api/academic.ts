@@ -660,6 +660,11 @@ export interface AcademicApi {
   generateHypothesisLab(request: HypothesisLabRequest): Promise<HypothesisLabResult>;
 
   // research assistant
+  getResearchSystemPrompts(conversationKey?: string | null): Promise<import('../researchSystemPrompts').ResearchSystemPromptState>;
+  saveResearchSystemPrompt(input: import('../researchSystemPrompts').ResearchSystemPromptInput): Promise<import('../researchSystemPrompts').ResearchSystemPrompt>;
+  selectResearchSystemPrompt(conversationKey: string, id: string | null): Promise<void>;
+  deleteResearchSystemPrompt(id: string): Promise<void>;
+  listResearchContextSources(): Promise<import('../researchContextFilters').ResearchContextSources>;
   researchChat(request: ResearchChatRequest): Promise<ResearchChatResponse>;
   researchChatStream(request: ResearchChatRequest, handlers: ResearchChatStreamHandlers): Promise<ResearchChatResponse>;
   /**

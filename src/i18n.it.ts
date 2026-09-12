@@ -1,3 +1,6 @@
+import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
+import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
+import { RESEARCH_REASONING_TRANSLATIONS } from './i18n.researchReasoning';
 import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
 import { CAPABILITIES_TRANSLATIONS } from './i18n.capabilities';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
@@ -54,6 +57,11 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
+  "Research chat": "Research chat",
+  "Elige al menos una base de datos.": "Scegli almeno un database.",
+  ...RESEARCH_PROMPT_TRANSLATIONS["it"],
+  ...RESEARCH_SOURCE_TRANSLATIONS["it"],
+  ...RESEARCH_REASONING_TRANSLATIONS["it"],
   ...CHAT_SKILLS_TRANSLATIONS['it'],
   ...CAPABILITIES_TRANSLATIONS['it'],
   ...STELLAR_GRAPH_TRANSLATIONS["it"],

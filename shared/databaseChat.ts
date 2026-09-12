@@ -145,6 +145,8 @@ export function buildDbChatContext(parts: DbChatPart[], language: PromptLanguage
 }
 
 export interface DbChatTurn {
+  /** Scope used for this turn; legacy chats inherit their saved conversation scope. */
+  selectionKey?: string | null;
   role: 'user' | 'assistant';
   content: string;
 }

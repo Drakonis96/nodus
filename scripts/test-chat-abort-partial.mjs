@@ -132,7 +132,8 @@ try {
     'src/views/WorldChatView.tsx',
     'src/views/LibraryDocumentReader.tsx',
   ]) {
-    const source = fs.readFileSync(path.join(repoRoot, file), 'utf8');
+    const ownSource = fs.readFileSync(path.join(repoRoot, file), 'utf8');
+    const source = ownSource + (/<ResearchAssistantModal/.test(ownSource) ? fs.readFileSync(path.join(repoRoot, 'src/views/ResearchAssistantModal.tsx'), 'utf8') : '');
     check(`${file}: renders the aborted notice`, /<ChatAbortedNotice/.test(source));
     check(`${file}: stop button records the user's stop`, /[Ss]topRequestedRef\.current = true|interrupted/.test(source));
   }

@@ -19,8 +19,8 @@ export type FeatureModelSettingKey =
   | 'flashcardModel'
   | 'transcriptionModel';
 
-function resolveFeatureModel(settings: AppSettings, key: FeatureModelSettingKey): ModelRef | null {
-  return settings[key] ?? settings.synthesisModel ?? null;
+function resolveFeatureModel(settings: AppSettings, key: FeatureModelSettingKey, fallbackKey?: FeatureModelSettingKey): ModelRef | null {
+  return settings[key] ?? (fallbackKey ? settings[fallbackKey] : null) ?? settings.synthesisModel ?? null;
 }
 
 /**
@@ -31,9 +31,10 @@ function resolveFeatureModel(settings: AppSettings, key: FeatureModelSettingKey)
  */
 export function useFeatureModel(
   settings: AppSettings,
-  key: FeatureModelSettingKey
+  key: FeatureModelSettingKey,
+  fallbackKey?: FeatureModelSettingKey
 ): [ModelRef | null, (model: ModelRef | null) => void] {
-  const [model, setModelState] = useState<ModelRef | null>(() => resolveFeatureModel(settings, key));
+  const [model, setModelState] = useState<ModelRef | null>(() => resolveFeatureModel(settings, key, fallbackKey));
   const changedLocallyRef = useRef(false);
 
   useEffect(() => {
@@ -41,13 +42,13 @@ export function useFeatureModel(
     void window.nodus
       .getSettings()
       .then((fresh) => {
-        if (active && !changedLocallyRef.current) setModelState(resolveFeatureModel(fresh, key));
+        if (active && !changedLocallyRef.current) setModelState(resolveFeatureModel(fresh, key, fallbackKey));
       })
       .catch(() => undefined);
     return () => {
       active = false;
     };
-  }, [key]);
+  }, [key, fallbackKey]);
 
   const setModel = useCallback(
     (next: ModelRef | null) => {

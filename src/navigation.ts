@@ -3,7 +3,7 @@ import type { LibraryScope } from '@shared/libraryTypes';
 import { type VaultType, normalizeVaultType } from '@shared/vaultTypes';
 import type { ToolkitToolPage } from '@shared/toolkitNavigation';
 
-export type View = 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'dictionary' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'pages' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'dbDeepResearch' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'workspace' | 'browser' | 'radar' | 'compass' | 'toolkit' | 'settings';
+export type View = 'researchChat' | 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'dictionary' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'pages' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'dbDeepResearch' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'workspace' | 'browser' | 'radar' | 'compass' | 'toolkit' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -77,7 +77,8 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'arcs', label: 'Arcos narrativos', icon: 'route', group: 'analyze' },
   { id: 'continuity', label: 'Continuidad', icon: 'check', group: 'analyze' },
   { id: 'questions', label: 'Preguntas abiertas', icon: 'help', group: 'analyze' },
-  { id: 'worldChat', label: 'Chat del mundo', icon: 'chat', group: 'analyze' },
+  { id: 'researchChat', label: 'Research chat', icon: 'chat', group: 'analyze' },
+  { id: 'worldChat', label: 'Research chat', icon: 'chat', group: 'analyze' },
   { id: 'scenes', label: 'Escenas', icon: 'image', group: 'create' },
   { id: 'manuscript', label: 'Manuscrito', icon: 'edit', group: 'create' },
   // Databases mode — shown only for the 'databases' vault type (see VAULT_TYPE_SCOPED_VIEWS).
@@ -87,7 +88,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'pages', label: 'Páginas', icon: 'notebook', group: 'explore' },
   { id: 'dbSearch', label: 'Buscar', icon: 'search', group: 'explore' },
   { id: 'dbAnalysis', label: 'Análisis', icon: 'chartBar', group: 'analyze' },
-  { id: 'dbChat', label: 'Chat de datos', icon: 'chat', group: 'analyze' },
+  { id: 'dbChat', label: 'Research chat', icon: 'chat', group: 'analyze' },
   { id: 'dbDeepResearch', label: 'Deep Research', icon: 'telescope', group: 'analyze' },
   // Testimonios — historia oral. Solo tres secciones propias: lo demás que un archivo
   // de entrevistas necesita (grabaciones, transcripciones, códigos, acuerdos) vive
@@ -102,7 +103,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'studySearch', label: 'Buscar en el estudio', icon: 'search', group: 'explore' },
   { id: 'studyLibrary', label: 'Materiales de estudio', icon: 'book', group: 'explore' },
   { id: 'studyRecordings', label: 'Grabaciones', icon: 'microphone', group: 'explore' },
-  { id: 'studyChat', label: 'Chat de estudio', icon: 'chat', group: 'analyze' },
+  { id: 'studyChat', label: 'Research chat', icon: 'chat', group: 'analyze' },
   { id: 'studyIdeas', label: 'Ideas de estudio', icon: 'bulb', group: 'analyze' },
   { id: 'studyGraph', label: 'Grafo de estudio', icon: 'network', group: 'analyze' },
   { id: 'studyQuestions', label: 'Banco de preguntas', icon: 'help', group: 'analyze' },
@@ -246,7 +247,7 @@ export function pinnedToolkitSidebarItems(pages: unknown): ToolkitSidebarNavItem
 
 const VAULT_TYPE_LABELS: Partial<Record<VaultType, Partial<Record<View, string>>>> = {
   docencia: {
-    studyChat: 'Chat',
+    studyChat: 'Research chat',
     studyIdeas: 'Ideas',
     studyGraph: 'Grafo',
   },
@@ -296,10 +297,10 @@ export interface StandardNavGroup extends NavGroupDef {
 const DEDICATED_VAULT_NAV_IDS: Partial<Record<ReturnType<typeof normalizeVaultType>, View[]>> = {
   prosopography: [
     'prosopSearch', 'prosopPopulation', 'prosopPersons', 'prosopSources',
-    'prosopAnalysis', 'prosopNetworks', 'notes', 'browser', 'radar', 'compass', 'toolkit',
+    'prosopAnalysis', 'prosopNetworks', 'researchChat', 'notes', 'browser', 'radar', 'compass', 'toolkit',
   ],
   primary_sources: [
-    'search', 'archive', 'persons', 'timeline', 'map', 'relations', 'notes', 'browser', 'radar', 'compass', 'toolkit',
+    'search', 'archive', 'persons', 'timeline', 'map', 'relations', 'researchChat', 'notes', 'browser', 'radar', 'compass', 'toolkit',
   ],
   estudio: [
     'studyCourses', 'studySchedule', 'studyCalendar', 'studySearch', 'studyLibrary',
@@ -315,7 +316,7 @@ const DEDICATED_VAULT_NAV_IDS: Partial<Record<ReturnType<typeof normalizeVaultTy
   // Las ocho entradas acordadas del vault de Testimonios, menos Inicio y Ajustes, que
   // van fijas fuera de los grupos. Es una lista CERRADA a propósito: la regla de diseño
   // del vault es que solo sale al menú lo que atraviesa varias entrevistas.
-  testimonios: ['search', 'testimonyInterviews', 'testimonyParticipants', 'testimonyContrasts', 'notes', 'browser', 'radar', 'compass', 'toolkit'],
+  testimonios: ['search', 'testimonyInterviews', 'testimonyParticipants', 'testimonyContrasts', 'researchChat', 'notes', 'browser', 'radar', 'compass', 'toolkit'],
   worldbuilding: [
     'encyclopedia', 'characters', 'places', 'factions', 'cultures', 'timeline', 'map',
     'relations', 'tree', 'dynasties', 'worldChat', 'rules', 'conflicts', 'arcs',
@@ -499,3 +500,13 @@ export const ASSISTANT_CONTEXTS: Record<'idea' | 'gap' | 'contradiction' | 'read
     },
   },
 };
+
+/** Keep existing route IDs and histories while exposing one common chat entry. */
+export function researchChatView(vaultType: unknown): View {
+  switch (normalizeVaultType(vaultType)) {
+    case 'databases': return 'dbChat';
+    case 'estudio': case 'docencia': return 'studyChat';
+    case 'worldbuilding': return 'worldChat';
+    default: return 'researchChat';
+  }
+}

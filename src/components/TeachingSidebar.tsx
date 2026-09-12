@@ -40,7 +40,7 @@ export const TEACHING_GROUPS: TeachingGroup[] = [
   ] },
   // Shared study-corpus readers, relabelled for a teacher's workspace.
   { id: 'teaching-analyze', label: 'Analizar', items: [
-    { label: 'Chat', icon: 'chat', view: 'studyChat' },
+    { label: 'Research chat', icon: 'chat', view: 'studyChat' },
     { label: 'Ideas', icon: 'bulb', view: 'studyIdeas' },
     { label: 'Grafo', icon: 'layers', view: 'studyGraph' },
   ] },

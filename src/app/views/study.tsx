@@ -64,6 +64,7 @@ export const studyViews = {
   ),
   studyChat: (ctx) => (
     <StudyChatView
+      key={ctx.activeVault?.id}
       settings={ctx.settings}
       variant={ctx.isDocencia ? 'teaching' : 'study'}
       initialPrompt={ctx.studyChatTarget?.prompt}

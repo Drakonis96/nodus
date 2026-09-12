@@ -1,13 +1,11 @@
-import { ChatSkillsControl } from '../components/ChatSkillsControl';
-import { ChatAbortedNotice } from '../components/ChatAbortedNotice';
+import { useEffect, useMemo, useState } from 'react';
+import type { AppSettings, DatabaseSummary } from '@shared/types';
 import { ChatMarkdown } from '../components/ChatMarkdown';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Icon } from '../components/ui';
-import { ConfirmModal } from '../components/ConfirmModal';
 import { ChartFromSpec } from '../components/DatabaseChart';
-import { t } from '../i18n';
 import { parseChatSegments } from '@shared/chartSpec';
-import type { DatabaseChatConversationSummary, DatabaseSummary, DbChatTurn } from '@shared/types';
+import { t } from '../i18n';
+import { ResearchAssistantModal } from './ResearchAssistantModal';
+import { nativeSummary, type ResearchChatAdapter } from './researchChatAdapter';
 
 const STARTERS = [
   'Resume esta base de datos en 3 puntos.',
@@ -15,14 +13,6 @@ const STARTERS = [
   '¿Qué valores atípicos o problemas de calidad detectas?',
   'Compara los grupos y destaca las diferencias.',
 ];
-
-function relativeDate(value: string): string {
-  const elapsed = Date.now() - new Date(value).getTime();
-  if (elapsed < 60_000) return t('Ahora');
-  if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)} min`;
-  if (elapsed < 86_400_000) return `${Math.floor(elapsed / 3_600_000)} h`;
-  return new Date(value).toLocaleDateString();
-}
 
 /** Renders an assistant message: Markdown prose with any native chart specs inline. */
 function AssistantMessage({ text, streaming = false }: { text: string; streaming?: boolean }) {
@@ -36,206 +26,22 @@ function AssistantMessage({ text, streaming = false }: { text: string; streaming
   );
 }
 
-export function DatabasesChatView({ initialDatabaseId }: { initialDatabaseId: string | null }) {
+export function DatabasesChatView({ settings, initialDatabaseId }: { settings: AppSettings; initialDatabaseId: string | null }) {
   const [databases, setDatabases] = useState<DatabaseSummary[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set(initialDatabaseId ? [initialDatabaseId] : []));
-  const [messages, setMessages] = useState<DbChatTurn[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [conversationTitle, setConversationTitle] = useState<string | null>(null);
-  const [history, setHistory] = useState<DatabaseChatConversationSummary[]>([]);
-  const [historyOpen, setHistoryOpen] = useState(() => localStorage.getItem('nodus.databaseChatHistoryOpen') === '1');
-  const [pendingDelete, setPendingDelete] = useState<DatabaseChatConversationSummary | null>(null);
-  const [input, setInput] = useState('');
-  const [streaming, setStreaming] = useState('');
-  const [busy, setBusy] = useState(false);
-  // Set by the stop button and read when the stream settles, so a cancellation that
-  // still rejects is not mistaken for a genuine generation failure. The refs mirror
-  // the streamed text and the stop request for the async callback and the catch.
-  const [stoppedIndex, setStoppedIndex] = useState<number | null>(null);
-  const stopRequestedRef = useRef(false);
-  const streamingRef = useRef('');
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const refreshHistory = useCallback(async () => setHistory(await window.nodus.listDatabaseChatConversations()), []);
-
-  useEffect(() => {
-    void window.nodus.listDatabases().then((list) => {
-      setDatabases(list);
-      setSelected((cur) => (cur.size ? cur : new Set(list[0] ? [list[0].id] : [])));
-    });
-  }, []);
-  useEffect(() => { void refreshHistory(); }, [refreshHistory]);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, streaming]);
-
-  const toggleDb = (id: string) =>
-    setSelected((cur) => {
-      const next = new Set(cur);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-
-  const toggleHistory = () => setHistoryOpen((open) => {
-    localStorage.setItem('nodus.databaseChatHistoryOpen', open ? '0' : '1');
-    return !open;
-  });
-  const resetChat = () => { if (busy) return; setConversationId(null); setConversationTitle(null); setMessages([]); setStreaming(''); streamingRef.current = ''; setStoppedIndex(null); setInput(''); };
-  const openConversation = async (id: string) => {
-    if (busy) return;
-    const conversation = await window.nodus.getDatabaseChatConversation(id); if (!conversation) return;
-    setConversationId(conversation.id); setConversationTitle(conversation.title); setMessages(conversation.messages); setSelected(new Set(conversation.databaseIds)); setStreaming(''); streamingRef.current = ''; setStoppedIndex(null); setInput('');
-  };
-  const removeConversation = async () => {
-    if (!pendingDelete) return;
-    await window.nodus.deleteDatabaseChatConversation(pendingDelete.id);
-    if (conversationId === pendingDelete.id) resetChat();
-    setPendingDelete(null); await refreshHistory();
-  };
-
-  const send = async (question: string) => {
-    const q = question.trim();
-    if (!q || busy || selected.size === 0) return;
-    setInput('');
-    setBusy(true);
-    setStreaming('');
-    streamingRef.current = '';
-    stopRequestedRef.current = false;
-    setStoppedIndex(null);
-    let activeId = conversationId;
-    if (!activeId) {
-      const created = await window.nodus.createDatabaseChatConversation({ title: q.slice(0, 80), databaseIds: [...selected] });
-      activeId = created.id; setConversationId(created.id); setConversationTitle(created.title);
-    }
-    const previous = messages;
-    const withUser: DbChatTurn[] = [...previous, { role: 'user', content: q }];
-    setMessages(withUser);
-    try {
-      const res = await window.nodus.dbChatStream(
-        { conversationId: activeId, question: q, databaseIds: [...selected], history: previous },
-        { onDelta: (delta) => { streamingRef.current += delta; setStreaming((s) => s + delta); } }
-      );
-      const text = res.text;
-      const aborted = stopRequestedRef.current || Boolean(res.aborted);
-      const next: DbChatTurn[] = text.trim() ? [...withUser, { role: 'assistant', content: text }] : withUser;
-      setMessages(next);
-      if (aborted && text.trim()) setStoppedIndex(next.length - 1);
-      await window.nodus.saveDatabaseChatConversation(activeId, next, [...selected]);
-    } catch (e) {
-      if (stopRequestedRef.current) {
-        // The user stopped the stream: keep the text that already arrived instead
-        // of replacing the whole answer with the cancellation error.
-        const partial = streamingRef.current.trim();
-        const next: DbChatTurn[] = partial ? [...withUser, { role: 'assistant', content: partial }] : withUser;
-        setMessages(next);
-        if (partial) setStoppedIndex(next.length - 1);
-        await window.nodus.saveDatabaseChatConversation(activeId, next, [...selected]);
-      } else {
-        const next: DbChatTurn[] = [...withUser, { role: 'assistant', content: t('No se pudo generar la respuesta.') + ` (${(e as Error).message})` }];
-        setMessages(next); await window.nodus.saveDatabaseChatConversation(activeId, next, [...selected]);
-      }
-    } finally {
-      setStreaming('');
-      streamingRef.current = '';
-      stopRequestedRef.current = false;
-      setBusy(false);
-      await refreshHistory();
-    }
-  };
-
-  return (
-    <div className="flex h-full min-h-0 bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid="database-chat-view">
-      {historyOpen && <aside className="flex w-64 shrink-0 flex-col border-r border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950" data-testid="database-chat-history-sidebar">
-        <div className="flex items-center gap-2 border-b border-neutral-200 p-3 dark:border-neutral-800"><h2 className="text-sm font-semibold">{t('Historial de chats')}</h2><button className="btn btn-ghost ml-auto h-7 w-7 p-0" title={t('Ocultar historial')} onClick={toggleHistory}><Icon name="x" size={13} /></button></div>
-        <div className="p-2"><button data-testid="database-chat-new" className="btn btn-primary w-full" onClick={resetChat}><Icon name="plus" size={13} />{t('Nuevo chat')}</button></div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">{history.map((item) => <article key={item.id} className={`group mb-1 flex items-center rounded-lg ${conversationId === item.id ? 'bg-indigo-50 dark:bg-indigo-950/40' : 'hover:bg-neutral-100 dark:hover:bg-neutral-900'}`}><button className="min-w-0 flex-1 px-2.5 py-2 text-left" onClick={() => void openConversation(item.id)}><span className="block truncate text-xs font-medium">{item.title}</span><span className="mt-0.5 block text-[9px] text-neutral-500">{item.messageCount} {t('mensajes')} · {relativeDate(item.updatedAt)}</span></button><button className="mr-1 grid h-7 w-7 place-items-center rounded text-neutral-400 opacity-0 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/40" title={t('Eliminar chat')} onClick={() => setPendingDelete(item)}><Icon name="trash" size={12} /></button></article>)}{!history.length && <p className="px-3 py-8 text-center text-xs leading-5 text-neutral-500">{t('Tus conversaciones aparecerán aquí.')}</p>}</div>
-      </aside>}
-
-      <main className="flex min-w-0 flex-1 flex-col">
-      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950">
-        <button data-testid="database-chat-history-toggle" className={`btn h-8 w-8 shrink-0 p-0 ${historyOpen ? 'btn-secondary' : 'btn-ghost'}`} aria-label={t('Historial de chats')} title={t('Historial de chats')} onClick={toggleHistory}><Icon name="clock" size={15} /></button>
-        <Icon name="chat" size={18} className="text-indigo-400" />
-        <div className="min-w-0"><h1 className="truncate text-sm font-semibold">{conversationTitle ?? t('Chat de datos')}</h1><p className="text-[10px] text-neutral-500">{t('Pregunta a tus datos y genera gráficos a partir de las filas seleccionadas.')}</p></div>
-        <div className="ml-auto flex min-w-0 flex-wrap justify-end gap-1">
-          {databases.map((d) => <button key={d.id} onClick={() => toggleDb(d.id)} className={`max-w-36 truncate rounded border px-2 py-1 text-xs ${selected.has(d.id) ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-neutral-300 text-neutral-500 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800'}`}>{d.name}</button>)}
-        </div>
-        <ChatSkillsControl surface="assistant" disabled={busy} />
-        <button disabled={busy} className="btn btn-ghost h-8 shrink-0" onClick={resetChat}><Icon name="plus" size={13} />{t('Nuevo chat')}</button>
-      </div>
-
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-4">
-        {messages.length === 0 && !streaming && (
-          <div className="max-w-xl mx-auto text-center mt-10">
-            <Icon name="chat" size={32} className="text-neutral-700 mx-auto mb-2" />
-            <p className="text-sm text-neutral-400 mb-4">
-              {selected.size === 0
-                ? t('Elige al menos una base de datos arriba para empezar.')
-                : t('Pregunta a tus datos. Puede responder con cifras y gráficos, siempre a partir de tus filas.')}
-            </p>
-            <div className="flex flex-col gap-2">
-              {STARTERS.map((s) => (
-                <button
-                  key={s}
-                  className="text-left text-sm px-3 py-2 rounded-lg border border-neutral-800 hover:border-indigo-600/70 hover:bg-neutral-900"
-                  onClick={() => void send(t(s))}
-                  disabled={selected.size === 0}
-                >
-                  {t(s)}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="max-w-3xl mx-auto flex flex-col gap-4">
-          {messages.map((m, i) =>
-            m.role === 'user' ? (
-              <div key={i} className="self-end max-w-[85%] rounded-2xl px-3.5 py-2 bg-indigo-600 text-white text-sm">
-                {m.content}
-              </div>
-            ) : (
-              <div key={i} className="self-start max-w-[95%] rounded-2xl border border-neutral-200 bg-white px-3.5 py-2 dark:border-neutral-800 dark:bg-neutral-900">
-                <AssistantMessage text={m.content} />
-                {i === stoppedIndex && m.content.trim() ? <ChatAbortedNotice /> : null}
-              </div>
-            )
-          )}
-          {streaming && (
-            <div className="self-start max-w-[95%] rounded-2xl border border-neutral-200 bg-white px-3.5 py-2 dark:border-neutral-800 dark:bg-neutral-900">
-              <AssistantMessage text={streaming} streaming />
-            </div>
-          )}
-          {busy && !streaming && <div className="self-start text-xs text-neutral-500">{t('Pensando…')}</div>}
-        </div>
-      </div>
-
-      <div className="border-t border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-950">
-        <div className="max-w-3xl mx-auto flex gap-2">
-          <input
-            className="input flex-1"
-            placeholder={selected.size === 0 ? t('Elige una base de datos…') : t('Pregunta a tus datos…')}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void send(input);
-            }}
-            disabled={busy || selected.size === 0}
-          />
-          {busy ? (
-            <button className="btn btn-ghost border border-neutral-700" onClick={() => { stopRequestedRef.current = true; void window.nodus.cancelDbChat(); }}>
-              <Icon name="stop" /> {t('Detener')}
-            </button>
-          ) : (
-            <button className="btn btn-primary gap-1.5" onClick={() => void send(input)} disabled={selected.size === 0 || !input.trim()}>
-              <Icon name="chat" size={14} /> {t('Enviar')}
-            </button>
-          )}
-        </div>
-      </div>
-      </main>
-      {pendingDelete && <ConfirmModal title={t('Eliminar chat')} message={t('Se eliminará «{title}» y todo su historial. Esta acción no se puede deshacer.').replace('{title}', pendingDelete.title)} confirmLabel={t('Eliminar')} danger onConfirm={() => void removeConversation()} onCancel={() => setPendingDelete(null)} />}
-    </div>
-  );
+  const [selected, setSelected] = useState<string[]>(initialDatabaseId ? [initialDatabaseId] : []);
+  useEffect(() => { void window.nodus.listDatabases().then(list => { setDatabases(list); setSelected(current => current.length ? current : list[0] ? [list[0].id] : []); }); }, []);
+  const adapter = useMemo<ResearchChatAdapter>(() => ({
+    id: 'database', contextKey: JSON.stringify([...selected].sort()), canSend: selected.length > 0,
+    subtitle: 'Pregunta a tus datos. Puede responder con cifras y gráficos, siempre a partir de tus filas.', suggestions: STARTERS,
+    contextPanel: <div className="space-y-2">{databases.map(database => <label key={database.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selected.includes(database.id)} onChange={event => setSelected(current => event.target.checked ? [...current, database.id] : current.filter(id => id !== database.id))} />{database.name}</label>)}{!selected.length && <p className="text-xs text-neutral-500">{t('Elige al menos una base de datos.')}</p>}</div>,
+    listConversations: async () => (await window.nodus.listDatabaseChatConversations()).map(nativeSummary),
+    getConversation: async id => { const chat = await window.nodus.getDatabaseChatConversation(id); if (!chat) return null; setSelected(chat.databaseIds); return { ...nativeSummary(chat), selection: null, messages: chat.messages.map((message, index) => ({ ...message, id: `${id}:${index}`, selectionKey: message.selectionKey ?? JSON.stringify([...chat.databaseIds].sort()) })) }; },
+    createConversation: input => window.nodus.createDatabaseChatConversation({ title: input.title ?? 'Research chat', databaseIds: selected }),
+    saveConversationMessages: (id, messages) => window.nodus.saveDatabaseChatConversation(id, messages, selected),
+    deleteConversation: id => window.nodus.deleteDatabaseChatConversation(id),
+    researchChatStream: async (request, handlers) => { const result = await window.nodus.dbChatStream({ conversationId: request.conversationId, question: request.messages.at(-1)!.content, databaseIds: selected, history: request.messages.slice(0, -1), model: request.model, thinkingEffort: request.thinkingEffort, systemPromptId: request.systemPromptId }, handlers); return { answer: result.text, aborted: result.aborted }; },
+    cancelResearchChat: () => window.nodus.cancelDbChat(),
+    renderMessage: (message, streaming) => <AssistantMessage text={message.content} streaming={streaming} />,
+  }), [databases, selected]);
+  return <ResearchAssistantModal settings={settings} embedded adapter={adapter} />;
 }

@@ -1,3 +1,6 @@
+import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
+import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
+import { RESEARCH_REASONING_TRANSLATIONS } from './i18n.researchReasoning';
 import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
 import { CAPABILITIES_TRANSLATIONS } from './i18n.capabilities';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
@@ -59,6 +62,11 @@ import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch
 import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const DE: Record<string, string> = {
+  "Research chat": "Research chat",
+  "Elige al menos una base de datos.": "Wählen Sie mindestens eine Datenbank aus.",
+  ...RESEARCH_PROMPT_TRANSLATIONS["de"],
+  ...RESEARCH_SOURCE_TRANSLATIONS["de"],
+  ...RESEARCH_REASONING_TRANSLATIONS["de"],
   ...CHAT_SKILLS_TRANSLATIONS['de'],
   ...CAPABILITIES_TRANSLATIONS['de'],
   ...STELLAR_GRAPH_TRANSLATIONS["de"],

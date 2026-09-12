@@ -58,6 +58,7 @@ interface CodexCompletionOptions {
   system: string;
   user: string;
   reasoning: ReasoningEffort | CodexReasoningEffort | null;
+  researchEffort?: import('@shared/researchReasoning').ResearchEffort;
   timeoutMs?: number;
   images?: VisionImagePart[];
   onDelta?: (delta: string) => void;
@@ -350,10 +351,14 @@ export async function completeWithChatGptSubscription(options: CodexCompletionOp
 
   const runtime = getClient();
   const catalog = await readModelCatalog(false);
-  const reasoning = resolveCodexReasoningEffort(
-    catalog.find((model) => model.id === options.model) ?? null,
-    options.reasoning
-  );
+  const selected = catalog.find((model) => model.id === options.model) ?? null;
+  // Research Assistant's standard is the minimum, even when a saved choice was
+  // removed from the live catalogue. Other surfaces keep their existing fallback.
+  const requested = options.researchEffort === undefined ? options.reasoning
+    : !selected?.supportedReasoningEfforts?.length ? null
+    : selected.supportedReasoningEfforts.some(option => option.reasoningEffort === options.researchEffort)
+      ? options.researchEffort as CodexReasoningEffort : 'off';
+  const reasoning = resolveCodexReasoningEffort(selected, requested);
   const tempRoot = path.join(app.getPath('temp') || os.tmpdir(), 'nodus-codex-');
   const workdir = await fs.promises.mkdtemp(tempRoot);
   try { await fs.promises.chmod(workdir, 0o700); } catch { /* Windows */ }

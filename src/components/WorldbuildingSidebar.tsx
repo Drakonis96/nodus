@@ -34,7 +34,7 @@ export const WORLDBUILDING_GROUPS: WorldbuildingGroup[] = [
     { label: 'Dinastías', icon: 'shield', view: 'dynasties' },
   ] },
   { id: 'analyze', label: 'Analizar', items: [
-    { label: 'Chat del mundo', icon: 'chat', view: 'worldChat' },
+    { label: 'Research chat', icon: 'chat', view: 'worldChat' },
     { label: 'Reglas del mundo', icon: 'lock', view: 'rules' },
     { label: 'Conflictos', icon: 'scale', view: 'conflicts' },
     { label: 'Arcos narrativos', icon: 'route', view: 'arcs' },

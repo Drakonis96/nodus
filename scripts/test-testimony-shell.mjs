@@ -49,6 +49,7 @@ const AGREED_SECTIONS = [
   'testimonyInterviews',
   'testimonyParticipants',
   'testimonyContrasts',
+  'researchChat',
   'notes',
   'browser',
   'radar',
@@ -57,11 +58,11 @@ const AGREED_SECTIONS = [
   'settings',
 ];
 
-// Once desde que Nodus Compass existe: es transversal como Browser, Radar y Toolkit — consultar
+// Research chat se suma a las once secciones anteriores: es transversal como Browser, Radar y Toolkit — consultar
 // un archivo o un fondo en la web sirve igual aquí que en cualquier otra bóveda —
 // y como el Toolkit no aporta ninguna superficie de OTRO vault al menú, que es lo
 // que esta lista cerrada protege.
-test('el menú tiene exactamente las once entradas acordadas', () => {
+test('el menú tiene las secciones acordadas y el Research chat compartido', () => {
   const nav = navigation.dedicatedVaultNavIds('testimonios');
   assert.ok(nav, 'testimonios es un workspace dedicado, no el sidebar genérico');
   // Inicio y Ajustes van fijos fuera de los grupos y no forman parte de la lista.
