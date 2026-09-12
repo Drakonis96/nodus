@@ -8370,4 +8370,11 @@ export const PT: Record<string, string> = {
   "El mínimo son {min} palabras por sección.": "O mínimo são {min} palavras por secção.",
   "El máximo son {max} palabras por sección.": "O máximo são {max} palavras por secção.",
   "Solicitud cancelada por el usuario.": "O utilizador cancelou o pedido.",
+  // PDF Presenter — tags (renamed from folders) and the PDF download.
+  'Sin etiqueta': 'Sem etiqueta',
+  'Eliminar etiqueta': 'Eliminar etiqueta',
+  'Filtrar por etiqueta': 'Filtrar por etiqueta',
+  '¿Seguro que quieres eliminar la etiqueta «{name}»? Las presentaciones que la tienen seguirán en la biblioteca, pero sin etiqueta.': 'Eliminar a etiqueta «{name}»? As apresentações que a têm continuam na biblioteca, apenas sem etiqueta.',
+  'Descargar PDF': 'Transferir PDF',
+  'No se pudo descargar la presentación.': 'Não foi possível transferir a apresentação.',
 };
