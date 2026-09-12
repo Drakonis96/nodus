@@ -827,7 +827,8 @@ export interface AcademicApi {
   /** Lightweight preview (title + snippet) of a cited source for its hover-card. Null if it no longer resolves. */
   getCitationPreview(ref: CitationRef): Promise<CitationPreview | null>;
   /** Search across ideas, works, gaps, themes, authors and notes. */
-  globalSearch(query: string, limitPerKind?: number): Promise<GlobalSearchResult[]>;
+  searchVaultContent(query: string, kinds?: string[], semantic?: boolean, limit?: number): Promise<import('../hybridSearch').VaultContentSearchResponse>;
+  globalSearch(query: string, limitPerKind?: number, kinds?: SearchResultKind[]): Promise<GlobalSearchResult[]>;
   getSearchResultDetail(kind: SearchResultKind, id: string): Promise<SearchResultDetail | null>;
   /** Search by meaning over embedded ideas, passages and works. */
   semanticSearch(query: string, options?: SemanticSearchOptions): Promise<SemanticSearchResponse>;

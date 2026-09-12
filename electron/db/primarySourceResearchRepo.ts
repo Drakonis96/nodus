@@ -1,3 +1,4 @@
+import { literalRelevance } from '@shared/hybridSearch';
 import crypto from 'node:crypto';
 import { v4 as uuid } from 'uuid';
 import type {
@@ -726,25 +727,37 @@ function facets(
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
-export function searchPrimarySourceCorpus(request: PrimarySourceSearchRequest): PrimarySourceSearchResponse {
+/** Candidates are authorized and filtered before the vector top-k, so excluded sources cannot crowd out matching ones. */
+export function primarySourceSemanticItemIds(request: PrimarySourceSearchRequest): string[] {
+  const syntax = parsePrimarySourceSearchSyntax(request.query);
+  const contexts = loadItemContexts();
+  return [...new Set(candidatesForSearch(request)
+    .filter((candidate) => candidate.itemId && accessAllowsContent(contexts.get(candidate.itemId), request) && !candidate.restrictedContentHidden && fieldMatch(candidate, syntax) && requestFilterMatch(candidate, request))
+    .map((candidate) => candidate.itemId!))];
+}
+
+export function searchPrimarySourceCorpus(request: PrimarySourceSearchRequest, semanticScores: ReadonlyMap<string, number> = new Map()): PrimarySourceSearchResponse {
   const started = performance.now();
   const syntax = parsePrimarySourceSearchSyntax(request.query);
   const terms = syntax.terms;
   const limit = Math.max(1, Math.min(request.limit ?? 250, 500));
   const matched = candidatesForSearch(request)
-    .filter((candidate) => (terms.length === 0 || searchTermsMatch(candidate.searchable, terms)))
+    .filter((candidate) => (terms.length === 0 || searchTermsMatch(candidate.searchable, terms) || Boolean(candidate.itemId && semanticScores.has(candidate.itemId) && !candidate.restrictedContentHidden)))
     .filter((candidate) => fieldMatch(candidate, syntax));
-  const all = matched.filter((candidate) => requestFilterMatch(candidate, request));
+  const score = (candidate: SearchCandidate) => Math.max(
+    literalRelevance(terms.join(' '), { title: candidate.title, snippet: candidate.searchable }),
+    (candidate.itemId && !candidate.restrictedContentHidden ? semanticScores.get(candidate.itemId) ?? 0 : 0) * 0.85,
+  );
+  const all = matched.filter((candidate) => requestFilterMatch(candidate, request))
+    .sort((a, b) => score(b) - score(a) || a.title.localeCompare(b.title) || a.targetId.localeCompare(b.targetId));
   const total = all.length;
   const firstTerm = terms[0] ?? '';
-  const materialize = (candidate: SearchCandidate, index: number): PrimarySourceSearchResult => ({
+  const materialize = (candidate: SearchCandidate): PrimarySourceSearchResult => ({
     ...candidate,
     ...snippet(candidate.preferredText || candidate.searchable, firstTerm),
-    resultId: `${candidate.layer}:${candidate.targetId}:${index}`,
+    resultId: `${candidate.layer}:${candidate.targetId}:${candidate.startOffset ?? 0}`,
   });
-  const results = all.slice(0, limit).map((candidate, index): PrimarySourceSearchResult => ({
-    ...materialize(candidate, index),
-  }));
+  const results = all.slice(0, limit).map(materialize);
   const facetRows = matched.slice(0, 5_000).map(materialize);
   const elapsedMs = Math.max(0, performance.now() - started);
   return {

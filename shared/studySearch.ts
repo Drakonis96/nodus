@@ -169,7 +169,7 @@ function snippetFor(text: string, terms: string[], max = 260): string {
 
 function matchesOptions(entry: StudySearchIndexEntry, options: StudySearchOptions): boolean {
   if (entry.excluded) return false;
-  if (options.kinds?.length && !options.kinds.includes(entry.kind)) return false;
+  if (options.kinds && !options.kinds.includes(entry.kind)) return false;
   if (options.courseId && entry.scope.courseId !== options.courseId) return false;
   if (options.subjectId && entry.scope.subjectId !== options.subjectId) return false;
   if (options.folderId && entry.scope.folderId !== options.folderId) return false;

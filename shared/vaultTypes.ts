@@ -228,7 +228,6 @@ Este vault trabaja con entrevistas de historia oral y sus transcripciones. Trata
     // and teaching modes exclude them. `notes` stays visible: the sidebar's
     // "Crear" group points at the real Notes view rather than a placeholder.
     defaultHiddenViews: [
-      'search',
       'library',
       'graph',
       'argument',
@@ -385,7 +384,7 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   studyCourses: ['estudio', 'docencia'],
   studySchedule: ['estudio', 'docencia'],
   studyCalendar: ['estudio', 'docencia'],
-  studySearch: ['estudio'],
+  studySearch: ['estudio', 'docencia'],
   studyLibrary: ['estudio', 'docencia'],
   studyRecordings: ['estudio', 'docencia'],
   // Chat, Ideas and Graph read the shared study corpus and also power Docencia's
