@@ -1,8 +1,80 @@
 {
   "comment": "The signed capability releases this build carries for the 5.3.1 to 5.3.2 migration. Each entry is pinned by asset name, size and SHA-256; `releaseUrl` is filled in once a release exists, and until then a development build takes the package from a local marketplace checkout and refuses to bundle it unsigned. Later releases keep this list while direct upgrades from 5.3.1 are supported.",
   "packages": [
-    { "id": "chemistry-studio", "version": "2.0.0", "releaseUrl": null, "assets": [] },
-    { "id": "legalize", "version": "2.0.0", "releaseUrl": null, "assets": [] },
-    { "id": "alphagenome", "version": "2.0.0", "releaseUrl": null, "assets": [] }
+    {
+      "id": "chemistry-studio",
+      "version": "2.0.0",
+      "releaseUrl": "https://github.com/NodusResearch/nodus-research-skill-marketplace/releases/download/chemistry-studio-v2.0.0",
+      "assets": [
+        {
+          "target": "darwin-arm64",
+          "asset": "chemistry-studio-2.0.0-darwin-arm64.nodus-plugin",
+          "bytes": 21412815,
+          "sha256": "48be65a8b258e14ceccbbcc4649f79effb53412107a5e2d80459ca4581ab3ede"
+        },
+        {
+          "target": "darwin-x64",
+          "asset": "chemistry-studio-2.0.0-darwin-x64.nodus-plugin",
+          "bytes": 21412815,
+          "sha256": "48be65a8b258e14ceccbbcc4649f79effb53412107a5e2d80459ca4581ab3ede"
+        },
+        {
+          "target": "linux-x64",
+          "asset": "chemistry-studio-2.0.0-linux-x64.nodus-plugin",
+          "bytes": 21412235,
+          "sha256": "16d1463fc090da247eaabd890338ebf0b686325974132696b634185655d56c20"
+        },
+        {
+          "target": "win32-x64",
+          "asset": "chemistry-studio-2.0.0-win32-x64.nodus-plugin",
+          "bytes": 21412815,
+          "sha256": "14e069214f000e9106ede5c2632866ca46fa0125f27f7caf49ba6749f51c1514"
+        }
+      ]
+    },
+    {
+      "id": "legalize",
+      "version": "2.0.0",
+      "releaseUrl": "https://github.com/NodusResearch/nodus-research-skill-marketplace/releases/download/legalize-v2.0.0",
+      "assets": [
+        {
+          "target": "any",
+          "asset": "legalize-2.0.0-any.nodus-plugin",
+          "bytes": 57411,
+          "sha256": "071e9896716453053df1e158b919436e14fb353f2a75b26023a9d5d69b7912bf"
+        }
+      ]
+    },
+    {
+      "id": "alphagenome",
+      "version": "2.0.0",
+      "releaseUrl": "https://github.com/NodusResearch/nodus-research-skill-marketplace/releases/download/alphagenome-v2.0.0",
+      "assets": [
+        {
+          "target": "darwin-arm64",
+          "asset": "alphagenome-2.0.0-darwin-arm64.nodus-plugin",
+          "bytes": 47565,
+          "sha256": "8845b5e07a6776a49ad0d0b41e5cb4becbd1b566f05c5f3feb54cbd60e4426cb"
+        },
+        {
+          "target": "darwin-x64",
+          "asset": "alphagenome-2.0.0-darwin-x64.nodus-plugin",
+          "bytes": 47595,
+          "sha256": "2e73492c00980c689531651fab434eacc132645bdf0edca97ca19f5f18dd1518"
+        },
+        {
+          "target": "linux-x64",
+          "asset": "alphagenome-2.0.0-linux-x64.nodus-plugin",
+          "bytes": 47765,
+          "sha256": "acedf805235294f5a64d84689e715605e2be04bff0ea1f3093bd971583c5f504"
+        },
+        {
+          "target": "win32-x64",
+          "asset": "alphagenome-2.0.0-win32-x64.nodus-plugin",
+          "bytes": 47355,
+          "sha256": "e8e3b6ccb297e3980df41959f9b9591ad682d821b84222b211211011ccbda76d"
+        }
+      ]
+    }
   ]
 }
