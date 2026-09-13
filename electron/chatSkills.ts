@@ -125,6 +125,12 @@ export function deriveCapabilityTools(skill: ChatSkill): ChatSkill['capabilityTo
   const tools = (skill.capabilities ?? []).flatMap(reference => {
     const capabilityId = normalizeCapabilityId(reference);
     const provider = snapshot.providers.get(capabilityId);
+    // Signed v2 packages own their chat protocol and execute through the trusted
+    // capability pipeline. Advertising those tools through the legacy generic
+    // `nodus-capability` fence sends them to resolveInstalledCapability(), which can
+    // only read v1 plugin state and therefore reports that the runtime is unavailable.
+    // Core providers still use the generic fence, as do legacy v1 plugins below.
+    if (provider?.source === 'plugin') return [];
     if (provider?.tools.length) {
       return provider.tools.map(tool => ({ capabilityId, toolId: tool.id, description: tool.description, inputSchema: tool.inputSchema, resultKinds: [] as string[] }));
     }
