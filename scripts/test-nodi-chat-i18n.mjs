@@ -8,8 +8,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 test('Nodi chat has a complete native prompt pack for every supported prompt language', async () => {
   const source = await readFile(path.join(root, 'shared/nodiChatPromptPacks.ts'), 'utf8');
-  const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
-  const packNames = ['SPANISH', 'ENGLISH', 'FRENCH', 'GERMAN', 'EUROPEAN_PORTUGUESE', 'BRAZILIAN_PORTUGUESE', 'ITALIAN', 'TURKISH'];
+  const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
+  const packNames = ['SPANISH', 'ENGLISH', 'FRENCH', 'GERMAN', 'EUROPEAN_PORTUGUESE', 'BRAZILIAN_PORTUGUESE', 'ITALIAN', 'TURKISH', 'SIMPLIFIED_CHINESE', 'TRADITIONAL_CHINESE', 'VIETNAMESE', 'JAPANESE', 'RUSSIAN', 'UKRAINIAN', 'KOREAN'];
 
   assert.match(source, /export const NODI_CHAT_PROMPT_PACKS: Record<PromptLanguage, NodiChatPromptPack>/);
   for (const language of languages) assert.match(source, new RegExp(`(?:'${language}'|${language}):`));
@@ -58,7 +58,7 @@ test('Nodi documentation and visible roadmap are localized by the prompt/UI lang
   assert.match(documentation, /const LOCALIZED_ROADMAP: Record<PromptLanguage, readonly RoadmapItem\[\]>/);
   assert.match(documentation, /export function buildNodusDocumentation\(language: PromptLanguage/);
   assert.match(documentation, /export const NODUS_DOCUMENTATION_BY_LANGUAGE: Record<PromptLanguage, string>/);
-  for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+  for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko']) {
     assert.match(documentation, new RegExp(`(?:^|\\n)\\s*['"]?${language}['"]?:`), `${language} documentation is missing`);
   }
   assert.match(chat, /buildNodusDocumentation\(documentationLanguage\)/);
@@ -72,12 +72,14 @@ test('localized documentation uses native compact bodies for every non-English l
   const start = source.indexOf('const COMPACT_LOCALIZED_DOCUMENTATION');
   const end = source.indexOf('\n};', start);
   const compact = source.slice(start, end);
-  for (const language of ['fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+  // CJK bodies are 3-6x shorter in characters and must be scaled, not treated as condensed.
+  const minimumBodyLength = (language) => (['zh-Hans', 'zh-Hant', 'ja', 'ko'].includes(language) ? 2_500 : 4_000);
+  for (const language of ['fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko']) {
     const localeStart = compact.search(new RegExp("['\\\"]?" + language + "['\\\"]?: `"));
     const localeEnd = compact.indexOf('`,', localeStart + 1);
     assert.ok(localeStart >= 0 && localeEnd > localeStart, `${language} has a complete native body`);
     const body = compact.slice(localeStart, localeEnd);
-    assert.ok(body.length > 4_000, `${language} body is substantive`);
+    assert.ok(body.length > minimumBodyLength(language), `${language} body is substantive`);
     assert.doesNotMatch(body, /This guide documents|The roadmap distinguishes|Provider keys are configured|At the far right of the header|There are no fixed dates|Guía interna|Esta guía documenta|El roadmap distingue|Las claves de proveedores|En el extremo derecho|No hay fechas cerradas|No puedo verificarlo/);
     assert.match(body, /__ROADMAP_GUIDE__/);
     assert.equal((body.match(/^## /gm) ?? []).length, 18, `${language} must contain the 18 canonical sections plus the title`);

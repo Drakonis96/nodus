@@ -949,6 +949,13 @@ function localizedComposeOutputHint(mode: CopilotComposeMode, language: PromptLa
     'pt-BR': { rewrite: 'Versão reescrita da seleção (substitui a seleção).', expand: '1–3 frases novas que continuam o texto (adicionadas após a seleção).', counter: '1–3 frases de contra-argumento com citação(ões) (adicionadas após a seleção).' },
     it: { rewrite: 'Versione riscritta della selezione (la sostituisce).', expand: '1–3 frasi nuove che continuano il testo (aggiunte dopo la selezione).', counter: '1–3 frasi di controargomentazione con citazione/i (aggiunte dopo la selezione).' },
     tr: { rewrite: 'Seçimin yeniden yazılmış sürümü (seçimin yerini alır).', expand: 'Metni sürdüren 1-3 yeni cümle (seçimin ardından eklenir).', counter: 'Alıntı(lar) içeren 1-3 karşı argüman cümlesi (seçimin ardından eklenir).' },
+    'zh-Hans': { rewrite: '所选内容的改写版本（将替换所选内容）。', expand: '承接原文的 1–3 句新内容（追加于所选内容之后）。', counter: '1–3 句带引用的反驳论述（追加于所选内容之后）。' },
+    'zh-Hant': { rewrite: '所選內容的改寫版本（將取代所選內容）。', expand: '承接原文的 1–3 句新內容（附加於所選內容之後）。', counter: '1–3 句帶引用的反駁論述（附加於所選內容之後）。' },
+    vi: { rewrite: 'Bản viết lại của phần đã chọn (thay thế phần đã chọn).', expand: '1–3 câu mới tiếp nối văn bản (được thêm vào sau phần đã chọn).', counter: '1–3 câu phản biện kèm trích dẫn (được thêm vào sau phần đã chọn).' },
+    ja: { rewrite: '選択範囲を書き直した版（選択範囲を置き換えます）。', expand: 'テキストを続ける新しい文を 1-3 文（選択範囲の後に追加されます）。', counter: '引用を付した反論の文を 1-3 文（選択範囲の後に追加されます）。' },
+    ru: { rewrite: 'Переписанный вариант выделенного фрагмента (заменяет его).', expand: '1–3 новых предложения, продолжающих текст (добавляются после выделенного фрагмента).', counter: '1–3 предложения контраргумента со ссылкой(ами) (добавляются после выделенного фрагмента).' },
+    uk: { rewrite: 'Переписаний варіант виділеного фрагмента (замінює його).', expand: '1–3 нових речення, що продовжують текст (додаються після виділеного фрагмента).', counter: '1–3 речення контраргументу з посиланням(ями) (додаються після виділеного фрагмента).' },
+    ko: { rewrite: '선택한 내용을 다시 쓴 버전(선택한 내용을 대체합니다).', expand: '텍스트를 이어 가는 새 문장 1~3개(선택한 내용 뒤에 추가됩니다).', counter: '인용을 포함한 반론 문장 1~3개(선택한 내용 뒤에 추가됩니다).' },
   };
   return hints[language][mode];
 }
@@ -963,6 +970,13 @@ function citationRequirement(language: PromptLanguage, authorYear: string): stri
     'pt-BR': 'A resposta deve incluir exatamente esta citação entre parênteses em texto simples: (' + authorYear + ').',
     it: 'La risposta deve includere esattamente questa citazione parentetica in testo semplice: (' + authorYear + ').',
     tr: 'Yanıt düz metin olarak tam şu parantez içi alıntıyı içermeli: (' + authorYear + ').',
+    'zh-Hans': '回答必须准确包含以下括号引用，且须为纯文本：(' + authorYear + ')。',
+    'zh-Hant': '回答必須準確包含以下括號引用，且須為純文字：(' + authorYear + ')。',
+    vi: 'Câu trả lời phải chứa chính xác trích dẫn trong ngoặc sau đây dưới dạng văn bản thuần: (' + authorYear + ').',
+    ja: '回答には、次の括弧内引用をプレーンテキストで正確に含めてください：(' + authorYear + ')。',
+    ru: 'Ответ должен содержать ровно эту ссылку в скобках в виде простого текста: (' + authorYear + ').',
+    uk: 'Відповідь має містити саме це посилання в дужках у вигляді простого тексту: (' + authorYear + ').',
+    ko: '응답에는 다음 괄호 인용을 일반 텍스트로 정확히 포함해야 합니다: (' + authorYear + ').',
   };
   return text[language];
 }
@@ -977,6 +991,13 @@ function noCitationRequirement(language: PromptLanguage): string {
     'pt-BR': 'Se não houver autor-ano, não invente uma citação bibliográfica.',
     it: 'Senza autore-anno, non inventare una citazione bibliografica.',
     tr: 'Yazar-yıl yoksa bibliyografik alıntı uydurma.',
+    'zh-Hans': '如果没有作者-年份，不要编造文献引用。',
+    'zh-Hant': '如果沒有作者-年份，請勿杜撰文獻引用。',
+    vi: 'Nếu không có tác giả và năm, đừng bịa ra trích dẫn thư mục.',
+    ja: '著者と年の記載がない場合は、文献の引用を捏造しないでください。',
+    ru: 'Если автор и год не указаны, не выдумывайте библиографическую ссылку.',
+    uk: 'Якщо автор і рік не вказані, не вигадуйте бібліографічне посилання.',
+    ko: '저자와 연도가 없으면 서지 인용을 만들어내지 마십시오.',
   };
   return text[language];
 }

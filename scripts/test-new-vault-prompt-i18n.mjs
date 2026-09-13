@@ -23,13 +23,18 @@ function loadModule(source, name) {
 
 test.after(() => rm(buildDir, { recursive: true, force: true }));
 
+// CJK languages (and Japanese/Korean) pack the same content in far fewer characters.
+const cjkLanguages = ['zh-Hans', 'zh-Hant', 'ja', 'ko'];
+const substantive = (language) => (cjkLanguages.includes(language) ? 110 : 350);
+const substantiveRuntime = (language) => (cjkLanguages.includes(language) ? 140 : 400);
+
 test('every new vault has a substantive native context pack in every prompt language', () => {
   const { PROMPT_LANGUAGES } = loadModule('shared/types.ts', 'types');
   const { NEW_VAULT_PROMPT_PACKS, localizedNewVaultPromptPack } = loadModule(
     'shared/newVaultPromptPacks.ts',
     'newVaultPromptPacks',
   );
-  assert.deepEqual(PROMPT_LANGUAGES, ['es', 'en', 'fr', 'tr', 'de', 'pt', 'pt-BR', 'it']);
+  assert.deepEqual(PROMPT_LANGUAGES, ['es', 'en', 'fr', 'tr', 'de', 'pt', 'pt-BR', 'it', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko']);
 
   for (const vaultType of [
     'primary_sources', 'testimonios', 'prosopography', 'worldbuilding',
@@ -39,7 +44,7 @@ test('every new vault has a substantive native context pack in every prompt lang
     assert.deepEqual(Object.keys(packs).sort(), [...PROMPT_LANGUAGES].sort(), `${vaultType}: exact language set`);
     assert.equal(new Set(Object.values(packs)).size, PROMPT_LANGUAGES.length, `${vaultType}: no language silently reuses another`);
     for (const language of PROMPT_LANGUAGES) {
-      assert.ok(packs[language].length > 400, `${vaultType}/${language}: substantive pack`);
+      assert.ok(packs[language].length > substantive(language), `${vaultType}/${language}: substantive pack`);
       assert.equal(localizedNewVaultPromptPack(vaultType, language), packs[language]);
     }
   }
@@ -65,7 +70,8 @@ test('vault prompt consumers resolve every type and locale without Spanish leaka
         assert.equal(prompt, '', `${vaultType}/${language}: academic remains empty`);
         continue;
       }
-      assert.ok(prompt.length > 400, `${vaultType}/${language}: substantive runtime pack`);
+      // CJK runtime packs carry the same contract in far fewer characters.
+      assert.ok(prompt.length > substantiveRuntime(language), `${vaultType}/${language}: substantive runtime pack`);
       if (language !== 'es') {
         assert.notEqual(prompt, Spanish, `${vaultType}/${language}: reused Spanish pack`);
         assert.doesNotMatch(prompt, /CONTEXTO DEL VAULT|Este vault (reconstruye|se usa|es un gestor|es el espacio)|Tu tarea|No inventes|Cuando falte/i, `${vaultType}/${language}: Spanish prose leaked`);
@@ -80,8 +86,9 @@ test('Testimonies analysis and transcript-correction prompts are native in all l
   assert.deepEqual(Object.keys(TESTIMONY_AI_PROMPTS).sort(), [...PROMPT_LANGUAGES].sort());
   for (const language of PROMPT_LANGUAGES) {
     const prompt = TESTIMONY_AI_PROMPTS[language];
-    assert.ok(prompt.analysisSystem.length > 500, `${language}: substantive analysis prompt`);
-    assert.ok(prompt.improveSystem.length > 250, `${language}: substantive correction prompt`);
+    const cjk = ['zh-Hans', 'zh-Hant', 'ja', 'ko'].includes(language);
+    assert.ok(prompt.analysisSystem.length > (cjk ? 300 : 500), `${language}: substantive analysis prompt`);
+    assert.ok(prompt.improveSystem.length > (cjk ? 140 : 250), `${language}: substantive correction prompt`);
     assert.match(prompt.analysisSystem, /"codes"/);
     assert.match(prompt.analysisSystem, /"passages"/);
     assert.match(prompt.improveSystem, /"segments"/);
@@ -113,7 +120,8 @@ test('every Worldbuilding model operation has a native contract in all languages
     const prompts = WORLD_OPERATION_PROMPTS[language];
     assert.deepEqual(Object.keys(prompts).sort(), [...operations].sort(), `${language}: exact operation set`);
     for (const operation of operations) {
-      assert.ok(prompts[operation].length > 220, `${language}/${operation}: substantive native contract`);
+      const cjk = ['zh-Hans', 'zh-Hant', 'ja', 'ko'].includes(language);
+      assert.ok(prompts[operation].length > (cjk ? 70 : 220), `${language}/${operation}: substantive native contract`);
       assert.ok(worldOperationSystemPrompt(operation, language).includes(prompts[operation]));
     }
   }

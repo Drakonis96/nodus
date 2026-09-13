@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
 const require = createRequire(import.meta.url);
 
 async function load(entry) {
@@ -31,7 +31,7 @@ test('writing workshop has a complete, non-condensed native pack in every locale
     assert.equal(pack.system.split('\n').length, writingWorkshopPromptPack('es').system.split('\n').length, `${language}: clauses were condensed`);
     for (const marker of required) assert.match(pack.system, new RegExp(marker.replace(/[|]/g, '\\|')), `${language}: missing ${marker}`);
     assert.match(pack.system, /2\s*(?:-|–|à|bis|a|e|〜)\s*4/i, `${language}: missing 2-4 paragraph rule`);
-    assert.match(pack.system, /SOLO|ONLY|UNIQUEMENT|NUR|APENAS|SOMENTE|SOLAMENTE|Yalnızca/i, `${language}: missing exclusive-material rule`);
+    assert.match(pack.system, /SOLO|ONLY|UNIQUEMENT|NUR|APENAS|SOMENTE|SOLAMENTE|Yalnızca|只|僅|Chỉ|のみ|ТОЛЬКО|ЛИШЕ|만/i, `${language}: missing exclusive-material rule`);
     for (const uri of ['nodus://idea/', 'nodus://work/', 'nodus://gap/', 'nodus://contradiction/', 'nodus://passage/']) {
       assert.match(pack.system, new RegExp(uri.replace(/[/:]/g, '\\$&')), `${language}: missing ${uri}`);
       assert.match(pack.contextRule, new RegExp(uri.slice(0, -1).replace(/[/:]/g, '\\$&')), `${language}: user rule missing ${uri}`);

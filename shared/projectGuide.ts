@@ -253,6 +253,272 @@ const PROJECT_GUIDE_COPY: Record<PromptLanguage, ProjectGuideCopy> = {
       sectionStatus: { ready: 'Hazır', review: 'İnceleniyor', inProgress: 'Devam ediyor' }, sectionLinks: (status, links) => `${status}, ${links} bağlantı`,
     },
   },
+  'zh-Hans': {
+    kinds: {
+      thesis: '论文引导流程', article: '文章引导流程', chapter: '手稿引导流程',
+      literature_review: '手稿引导流程', theoretical_framework: '手稿引导流程', other: '手稿引导流程',
+    },
+    completeSubtitle: '项目已可供审阅、导出或结项。',
+    steps: {
+      brief: {
+        title: '简介与问题', summary: '目标、范围与阅读标准已明确。',
+        description: '定义目标、范围、主要问题与来源筛选标准。此文本会显示在项目页眉中，在生成建议时作为上下文发送给 AI，并包含在导出内容中。', actionLabel: '编辑简介',
+      },
+      coverage: {
+        title: '覆盖范围', summary: '主要问题已与语料覆盖范围关联。',
+        description: '将你的研究问题与语料库关联起来：指出哪些领域已有覆盖、哪些仍待探索。将此步骤标记为进行中会激活项目中的覆盖范围部分。', actionLabel: '标记覆盖范围',
+      },
+      materials: {
+        title: '语料与材料', summary: '作品、想法、笔记、空白或草稿已准备好整合。',
+        description: '将作品、想法、笔记、空白、争论与草稿加入项目。AI 将使用这些材料来提出带有可验证引用的手稿插入建议。', actionLabel: '准备材料',
+      },
+      outline: {
+        title: '论证结构', summary: '在介入文本之前整理好争论、空白与草稿。',
+        description: '在撰写章节之前，先组织将构成论证的争论、空白与草稿。你可以单独激活每个板块，以标记其可供使用。', actionLabel: '准备结构',
+      },
+      manuscript: {
+        title: '手稿', summary: '章节或文章已作为可编辑、带版本的文本导入。',
+        description: '将章节或文章导入为可编辑文本。Nodus 会自动为其创建版本，并允许将建议应用到草稿上。', actionLabel: '上传章节',
+      },
+      review: {
+        title: '审阅与输出', summary: '关系、可验证建议与最终导出。',
+        description: '针对语料库生成可验证的建议，并在导出或结项之前审阅手稿的引用。', actionLabel: '审阅章节',
+      },
+    },
+    evidence: {
+      briefPending: '待处理', linkedQuestion: '已关联问题', coverageFallback: '未标记覆盖范围', coverageInProgress: '覆盖范围进行中', materialsFallback: '无活动材料', materialsInProgress: '材料进行中', outlineFallback: '结构待处理', manuscriptFallback: '未导入章节', reviewFallback: '未记录审阅', reviewRecorded: '已记录审阅',
+      linkedMaterials: (count) => `${count} 项关联材料`, activeOutlineBlocks: (count) => `${count} 个活动结构板块`, manuscriptCounts: (chapters, words) => `${chapters} 章，${words} 词`, reviewCounts: (suggestions, applied) => `${suggestions} 条建议，已应用 ${applied} 条`,
+      sectionStatus: { ready: '就绪', review: '审阅中', inProgress: '进行中' }, sectionLinks: (status, links) => `${status}，${links} 个链接`,
+    },
+  },
+  'zh-Hant': {
+    kinds: {
+      thesis: '論文引導流程', article: '文章引導流程', chapter: '手稿引導流程',
+      literature_review: '手稿引導流程', theoretical_framework: '手稿引導流程', other: '手稿引導流程',
+    },
+    completeSubtitle: '專案已可供審閱、匯出或結案。',
+    steps: {
+      brief: {
+        title: '簡介與問題', summary: '目標、範圍與閱讀標準已明確。',
+        description: '定義目標、範圍、主要問題與來源篩選標準。此文字會顯示在專案標題中，在產生建議時作為脈絡傳送給 AI，並包含在匯出內容中。', actionLabel: '編輯簡介',
+      },
+      coverage: {
+        title: '涵蓋範圍', summary: '主要問題已與語料涵蓋範圍連結。',
+        description: '將你的研究問題與語料庫連結：指出哪些領域已有涵蓋、哪些仍待探索。將此步驟標記為進行中會啟用專案中的涵蓋範圍區段。', actionLabel: '標記涵蓋範圍',
+      },
+      materials: {
+        title: '語料與材料', summary: '作品、想法、筆記、空缺或草稿已準備好整合。',
+        description: '將作品、想法、筆記、空缺、爭論與草稿加入專案。AI 將使用這些材料，在手稿中提出附有可驗證引用的插入建議。', actionLabel: '準備材料',
+      },
+      outline: {
+        title: '論證結構', summary: '在介入文本之前整理好爭論、空缺與草稿。',
+        description: '在撰寫章節之前，先組織將構成論證的爭論、空缺與草稿。你可以個別啟用每個區塊，以標記其可供使用。', actionLabel: '準備結構',
+      },
+      manuscript: {
+        title: '手稿', summary: '章節或文章已作為可編輯、具版本紀錄的文字匯入。',
+        description: '將章節或文章匯入為可編輯文字。Nodus 會自動為其建立版本，並允許將建議套用到草稿上。', actionLabel: '上傳章節',
+      },
+      review: {
+        title: '審閱與輸出', summary: '關係、可驗證建議與最終匯出。',
+        description: '針對語料庫產生可驗證的建議，並在匯出或結案之前審閱手稿的引用。', actionLabel: '審閱章節',
+      },
+    },
+    evidence: {
+      briefPending: '待處理', linkedQuestion: '已連結問題', coverageFallback: '未標記涵蓋範圍', coverageInProgress: '涵蓋範圍進行中', materialsFallback: '無作用中材料', materialsInProgress: '材料進行中', outlineFallback: '結構待處理', manuscriptFallback: '未匯入章節', reviewFallback: '未記錄審閱', reviewRecorded: '已記錄審閱',
+      linkedMaterials: (count) => `${count} 項連結材料`, activeOutlineBlocks: (count) => `${count} 個作用中結構區塊`, manuscriptCounts: (chapters, words) => `${chapters} 章，${words} 詞`, reviewCounts: (suggestions, applied) => `${suggestions} 則建議，已套用 ${applied} 則`,
+      sectionStatus: { ready: '就緒', review: '審閱中', inProgress: '進行中' }, sectionLinks: (status, links) => `${status}，${links} 個連結`,
+    },
+  },
+  vi: {
+    kinds: {
+      thesis: 'Quy trình luận văn có hướng dẫn', article: 'Quy trình bài báo có hướng dẫn', chapter: 'Quy trình bản thảo có hướng dẫn',
+      literature_review: 'Quy trình bản thảo có hướng dẫn', theoretical_framework: 'Quy trình bản thảo có hướng dẫn', other: 'Quy trình bản thảo có hướng dẫn',
+    },
+    completeSubtitle: 'Dự án đã sẵn sàng để xem xét, xuất hoặc kết thúc.',
+    steps: {
+      brief: {
+        title: 'Đề cương và câu hỏi', summary: 'Mục tiêu, phạm vi và tiêu chí đọc đã được xác định.',
+        description: 'Xác định mục tiêu, phạm vi, câu hỏi chính và tiêu chí chọn nguồn. Văn bản này xuất hiện ở phần đầu dự án, được gửi làm bối cảnh cho AI khi tạo đề xuất và được đưa vào bản xuất.', actionLabel: 'Chỉnh sửa đề cương',
+      },
+      coverage: {
+        title: 'Độ bao quát', summary: 'Câu hỏi chính đã gắn với độ bao quát của kho ngữ liệu.',
+        description: 'Gắn câu hỏi nghiên cứu của bạn với kho ngữ liệu: cho biết những lĩnh vực đã được bao quát và những gì còn cần khám phá. Đánh dấu bước này là đang thực hiện sẽ kích hoạt phần độ bao quát trong dự án.', actionLabel: 'Đánh dấu độ bao quát',
+      },
+      materials: {
+        title: 'Kho ngữ liệu và tư liệu', summary: 'Tác phẩm, ý tưởng, ghi chú, khoảng trống hoặc bản nháp sẵn sàng để tích hợp.',
+        description: 'Thêm tác phẩm, ý tưởng, ghi chú, khoảng trống, tranh luận và bản nháp vào dự án. AI sẽ dùng những tư liệu này để đề xuất các chèn vào bản thảo kèm trích dẫn có thể kiểm chứng.', actionLabel: 'Chuẩn bị tư liệu',
+      },
+      outline: {
+        title: 'Cấu trúc lập luận', summary: 'Các tranh luận, khoảng trống và bản nháp được tổ chức trước khi can thiệp vào văn bản.',
+        description: 'Tổ chức các tranh luận, khoảng trống và bản nháp sẽ định hình lập luận trước khi viết các chương. Bạn có thể kích hoạt từng khối riêng biệt để đánh dấu là sẵn sàng sử dụng.', actionLabel: 'Chuẩn bị cấu trúc',
+      },
+      manuscript: {
+        title: 'Bản thảo', summary: 'Chương hoặc bài báo đã được nhập dưới dạng văn bản có thể chỉnh sửa và có phiên bản.',
+        description: 'Nhập một chương hoặc bài báo dưới dạng văn bản có thể chỉnh sửa. Nodus tự động tạo phiên bản và cho phép áp dụng đề xuất vào bản nháp.', actionLabel: 'Tải lên chương',
+      },
+      review: {
+        title: 'Xem xét và đầu ra', summary: 'Quan hệ, đề xuất có thể kiểm chứng và bản xuất cuối cùng.',
+        description: 'Tạo các đề xuất có thể kiểm chứng dựa trên kho ngữ liệu và xem lại các trích dẫn của bản thảo trước khi xuất hoặc kết thúc dự án.', actionLabel: 'Xem xét chương',
+      },
+    },
+    evidence: {
+      briefPending: 'Đang chờ', linkedQuestion: 'Câu hỏi đã liên kết', coverageFallback: 'Chưa đánh dấu độ bao quát', coverageInProgress: 'Độ bao quát đang thực hiện', materialsFallback: 'Không có tư liệu hoạt động', materialsInProgress: 'Tư liệu đang thực hiện', outlineFallback: 'Cấu trúc đang chờ', manuscriptFallback: 'Chưa nhập chương', reviewFallback: 'Chưa ghi nhận xem xét', reviewRecorded: 'Đã ghi nhận xem xét',
+      linkedMaterials: (count) => `${count} tư liệu được liên kết`, activeOutlineBlocks: (count) => `${count} khối cấu trúc đang hoạt động`, manuscriptCounts: (chapters, words) => `${chapters} chương, ${words} từ`, reviewCounts: (suggestions, applied) => `${suggestions} đề xuất, đã áp dụng ${applied}`,
+      sectionStatus: { ready: 'Sẵn sàng', review: 'Đang xem xét', inProgress: 'Đang thực hiện' }, sectionLinks: (status, links) => `${status}, ${links} liên kết`,
+    },
+  },
+  ja: {
+    kinds: {
+      thesis: '論文ガイドフロー', article: '記事ガイドフロー', chapter: '原稿ガイドフロー',
+      literature_review: '原稿ガイドフロー', theoretical_framework: '原稿ガイドフロー', other: '原稿ガイドフロー',
+    },
+    completeSubtitle: 'プロジェクトは確認、書き出し、または終了できる状態です。',
+    steps: {
+      brief: {
+        title: 'ブリーフと問い', summary: '目的、範囲、読解基準が定義されています。',
+        description: '目的、範囲、主要な問い、資料選定基準を定義してください。このテキストはプロジェクトのヘッダーに表示され、提案を生成する際に AI へ文脈として送信され、書き出しにも含まれます。', actionLabel: 'ブリーフを編集',
+      },
+      coverage: {
+        title: 'カバレッジ', summary: '主要な問いがコーパスのカバレッジと結びついています。',
+        description: '研究の問いをコーパスに結びつけてください。どの領域がすでに網羅され、何がまだ調査されていないかを示します。このステップを進行中にすると、プロジェクトのカバレッジセクションが有効になります。', actionLabel: 'カバレッジを記録',
+      },
+      materials: {
+        title: 'コーパスと資料', summary: '作品、アイデア、ノート、ギャップ、草稿が統合可能な状態です。',
+        description: '作品、アイデア、ノート、ギャップ、議論、草稿をプロジェクトに追加してください。AI はこれらの資料を使って、検証可能な引用を伴う挿入を原稿に提案します。', actionLabel: '資料を準備',
+      },
+      outline: {
+        title: '論証構造', summary: '本文に介入する前に、議論、ギャップ、草稿を整理します。',
+        description: '章を執筆する前に、論証を構成する議論、ギャップ、草稿を整理してください。各ブロックを個別に有効にして、使用可能であることを示せます。', actionLabel: '構造を準備',
+      },
+      manuscript: {
+        title: '原稿', summary: '章または記事を、編集可能で版管理されたテキストとして読み込みました。',
+        description: '章または記事を編集可能なテキストとして読み込んでください。Nodus が自動的に版管理し、草稿に提案を適用できます。', actionLabel: '章をアップロード',
+      },
+      review: {
+        title: '確認と出力', summary: '関係、検証可能な提案、最終書き出し。',
+        description: 'コーパスに対して検証可能な提案を生成し、書き出しまたはプロジェクト終了の前に原稿の引用を確認してください。', actionLabel: '章を確認',
+      },
+    },
+    evidence: {
+      briefPending: '保留中', linkedQuestion: 'リンクされた問い', coverageFallback: 'カバレッジ未記録', coverageInProgress: 'カバレッジ進行中', materialsFallback: '有効な資料なし', materialsInProgress: '資料を進行中', outlineFallback: '構造は保留中', manuscriptFallback: '章が読み込まれていません', reviewFallback: '確認が記録されていません', reviewRecorded: '確認を記録しました',
+      linkedMaterials: (count) => `リンクされた資料 ${count} 件`, activeOutlineBlocks: (count) => `有効な構造ブロック ${count} 件`, manuscriptCounts: (chapters, words) => `${chapters} 章、${words} 語`, reviewCounts: (suggestions, applied) => `提案 ${suggestions} 件、適用済み ${applied} 件`,
+      sectionStatus: { ready: '準備完了', review: '確認中', inProgress: '進行中' }, sectionLinks: (status, links) => `${status}、リンク ${links} 件`,
+    },
+  },
+  ru: {
+    kinds: {
+      thesis: 'Управляемый поток диссертации', article: 'Управляемый поток статьи', chapter: 'Управляемый поток рукописи',
+      literature_review: 'Управляемый поток рукописи', theoretical_framework: 'Управляемый поток рукописи', other: 'Управляемый поток рукописи',
+    },
+    completeSubtitle: 'Проект готов к проверке, экспорту или завершению.',
+    steps: {
+      brief: {
+        title: 'Бриф и вопрос', summary: 'Цель, охват и критерии чтения определены.',
+        description: 'Определите цель, охват, основной вопрос и критерии отбора источников. Этот текст отображается в заголовке проекта, передаётся ИИ как контекст при генерации предложений и включается в экспорт.', actionLabel: 'Изменить бриф',
+      },
+      coverage: {
+        title: 'Охват', summary: 'Основной вопрос связан с охватом корпуса.',
+        description: 'Свяжите исследовательский вопрос с корпусом: укажите, какие области уже охвачены, а что ещё предстоит изучить. Отметка этого шага как выполняемого активирует раздел охвата в проекте.', actionLabel: 'Отметить охват',
+      },
+      materials: {
+        title: 'Корпус и материалы', summary: 'Работы, идеи, заметки, пробелы или черновики готовы к интеграции.',
+        description: 'Добавьте в проект работы, идеи, заметки, пробелы, дискуссии и черновики. ИИ будет использовать эти материалы, чтобы предлагать вставки с проверяемыми цитатами в рукописи.', actionLabel: 'Подготовить материалы',
+      },
+      outline: {
+        title: 'Структура аргумента', summary: 'Дискуссии, пробелы и черновики упорядочены до вмешательства в текст.',
+        description: 'Упорядочьте дискуссии, пробелы и черновики, которые будут формировать аргумент до написания глав. Можно активировать каждый блок отдельно, чтобы отметить его готовность к использованию.', actionLabel: 'Подготовить структуру',
+      },
+      manuscript: {
+        title: 'Рукопись', summary: 'Глава или статья импортирована как редактируемый текст с версиями.',
+        description: 'Импортируйте главу или статью как редактируемый текст. Nodus автоматически версионирует его и позволяет применять предложения к черновику.', actionLabel: 'Загрузить главу',
+      },
+      review: {
+        title: 'Проверка и вывод', summary: 'Связи, проверяемые предложения и финальный экспорт.',
+        description: 'Создайте проверяемые предложения по корпусу и проверьте цитаты рукописи до экспорта или завершения проекта.', actionLabel: 'Проверить главу',
+      },
+    },
+    evidence: {
+      briefPending: 'Ожидает', linkedQuestion: 'Связанный вопрос', coverageFallback: 'Охват не отмечен', coverageInProgress: 'Охват в работе', materialsFallback: 'Нет активных материалов', materialsInProgress: 'Материалы в работе', outlineFallback: 'Структура ожидает', manuscriptFallback: 'Глава не импортирована', reviewFallback: 'Проверка не зарегистрирована', reviewRecorded: 'Проверка зарегистрирована',
+      linkedMaterials: (count) => `Связанных материалов: ${count}`, activeOutlineBlocks: (count) => `Активных блоков структуры: ${count}`, manuscriptCounts: (chapters, words) => `Глав: ${chapters}, слов: ${words}`, reviewCounts: (suggestions, applied) => `Предложений: ${suggestions}, применено: ${applied}`,
+      sectionStatus: { ready: 'Готово', review: 'На проверке', inProgress: 'В работе' }, sectionLinks: (status, links) => `${status}, связей: ${links}`,
+    },
+  },
+  uk: {
+    kinds: {
+      thesis: 'Керований потік дисертації', article: 'Керований потік статті', chapter: 'Керований потік рукопису',
+      literature_review: 'Керований потік рукопису', theoretical_framework: 'Керований потік рукопису', other: 'Керований потік рукопису',
+    },
+    completeSubtitle: 'Проєкт готовий до перевірки, експорту або завершення.',
+    steps: {
+      brief: {
+        title: 'Бриф і питання', summary: 'Мета, обсяг і критерії читання визначені.',
+        description: 'Визначте мету, обсяг, головне питання та критерії відбору джерел. Цей текст відображається в заголовку проєкту, передається ШІ як контекст під час генерації пропозицій і включається до експорту.', actionLabel: 'Редагувати бриф',
+      },
+      coverage: {
+        title: 'Охоплення', summary: 'Головне питання пов’язане з охопленням корпусу.',
+        description: 'Пов’яжіть дослідницьке питання з корпусом: укажіть, які галузі вже охоплені, а що ще потрібно дослідити. Позначення цього кроку як виконуваного активує розділ охоплення в проєкті.', actionLabel: 'Позначити охоплення',
+      },
+      materials: {
+        title: 'Корпус і матеріали', summary: 'Праці, ідеї, нотатки, прогалини або чернетки готові до інтеграції.',
+        description: 'Додайте до проєкту праці, ідеї, нотатки, прогалини, дискусії та чернетки. ШІ використає ці матеріали, щоб пропонувати вставки з перевірними цитатами в рукописі.', actionLabel: 'Підготувати матеріали',
+      },
+      outline: {
+        title: 'Структура аргументу', summary: 'Дискусії, прогалини й чернетки впорядковано до втручання в текст.',
+        description: 'Упорядкуйте дискусії, прогалини й чернетки, які формуватимуть аргумент до написання розділів. Можна активувати кожен блок окремо, щоб позначити його готовність до використання.', actionLabel: 'Підготувати структуру',
+      },
+      manuscript: {
+        title: 'Рукопис', summary: 'Розділ або статтю імпортовано як редагований текст із версіями.',
+        description: 'Імпортуйте розділ або статтю як редагований текст. Nodus автоматично створює версії та дозволяє застосовувати пропозиції до чернетки.', actionLabel: 'Завантажити розділ',
+      },
+      review: {
+        title: 'Перевірка та вивід', summary: 'Зв’язки, перевірні пропозиції та фінальний експорт.',
+        description: 'Створіть перевірні пропозиції щодо корпусу та перегляньте цитати рукопису до експорту або завершення проєкту.', actionLabel: 'Перевірити розділ',
+      },
+    },
+    evidence: {
+      briefPending: 'Очікує', linkedQuestion: 'Пов’язане питання', coverageFallback: 'Охоплення не позначено', coverageInProgress: 'Охоплення в роботі', materialsFallback: 'Немає активних матеріалів', materialsInProgress: 'Матеріали в роботі', outlineFallback: 'Структура очікує', manuscriptFallback: 'Розділ не імпортовано', reviewFallback: 'Перевірку не зареєстровано', reviewRecorded: 'Перевірку зареєстровано',
+      linkedMaterials: (count) => `Пов’язаних матеріалів: ${count}`, activeOutlineBlocks: (count) => `Активних блоків структури: ${count}`, manuscriptCounts: (chapters, words) => `Розділів: ${chapters}, слів: ${words}`, reviewCounts: (suggestions, applied) => `Пропозицій: ${suggestions}, застосовано: ${applied}`,
+      sectionStatus: { ready: 'Готово', review: 'На перевірці', inProgress: 'У роботі' }, sectionLinks: (status, links) => `${status}, зв’язків: ${links}`,
+    },
+  },
+  ko: {
+    kinds: {
+      thesis: '학위논문 안내 흐름', article: '학술 논문 안내 흐름', chapter: '원고 안내 흐름',
+      literature_review: '원고 안내 흐름', theoretical_framework: '원고 안내 흐름', other: '원고 안내 흐름',
+    },
+    completeSubtitle: '프로젝트를 검토, 내보내기 또는 종료할 준비가 되었습니다.',
+    steps: {
+      brief: {
+        title: '브리프와 질문', summary: '목표, 범위, 읽기 기준이 정의되었습니다.',
+        description: '목표, 범위, 주요 질문, 자료 선정 기준을 정의하십시오. 이 텍스트는 프로젝트 머리말에 표시되고, 제안을 생성할 때 AI에 맥락으로 전송되며, 내보내기에도 포함됩니다.', actionLabel: '브리프 편집',
+      },
+      coverage: {
+        title: '범위', summary: '주요 질문이 코퍼스 범위와 연결되었습니다.',
+        description: '연구 질문을 코퍼스와 연결하십시오. 이미 다루어진 영역과 아직 탐구해야 할 부분을 밝히십시오. 이 단계를 진행 중으로 표시하면 프로젝트의 범위 섹션이 활성화됩니다.', actionLabel: '범위 표시',
+      },
+      materials: {
+        title: '코퍼스와 자료', summary: '저작, 아이디어, 노트, 공백 또는 초안이 통합 준비되었습니다.',
+        description: '저작, 아이디어, 노트, 공백, 논쟁, 초안을 프로젝트에 추가하십시오. AI는 이러한 자료를 사용하여 원고에 검증 가능한 인용이 포함된 삽입을 제안합니다.', actionLabel: '자료 준비',
+      },
+      outline: {
+        title: '논증 구조', summary: '텍스트에 개입하기 전에 논쟁, 공백, 초안을 정리했습니다.',
+        description: '장을 집필하기 전에 논증을 구성할 논쟁, 공백, 초안을 정리하십시오. 각 블록을 개별적으로 활성화하여 사용 가능함을 표시할 수 있습니다.', actionLabel: '구조 준비',
+      },
+      manuscript: {
+        title: '원고', summary: '장 또는 논문을 편집 가능하고 버전 관리되는 텍스트로 가져왔습니다.',
+        description: '장 또는 논문을 편집 가능한 텍스트로 가져오십시오. Nodus가 자동으로 버전을 만들고 초안에 제안을 적용할 수 있습니다.', actionLabel: '장 업로드',
+      },
+      review: {
+        title: '검토와 출력', summary: '관계, 검증 가능한 제안, 최종 내보내기.',
+        description: '코퍼스에 대한 검증 가능한 제안을 생성하고, 내보내거나 프로젝트를 종료하기 전에 원고의 인용을 검토하십시오.', actionLabel: '장 검토',
+      },
+    },
+    evidence: {
+      briefPending: '대기 중', linkedQuestion: '연결된 질문', coverageFallback: '범위가 표시되지 않음', coverageInProgress: '범위 진행 중', materialsFallback: '활성 자료 없음', materialsInProgress: '자료 진행 중', outlineFallback: '구조 대기 중', manuscriptFallback: '가져온 장 없음', reviewFallback: '기록된 검토 없음', reviewRecorded: '검토 기록됨',
+      linkedMaterials: (count) => `연결된 자료 ${count}개`, activeOutlineBlocks: (count) => `활성 구조 블록 ${count}개`, manuscriptCounts: (chapters, words) => `${chapters}장, ${words}단어`, reviewCounts: (suggestions, applied) => `제안 ${suggestions}개, 적용 ${applied}개`,
+      sectionStatus: { ready: '준비됨', review: '검토 중', inProgress: '진행 중' }, sectionLinks: (status, links) => `${status}, 링크 ${links}개`,
+    },
+  },
 };
 
 function guideCopy(language: PromptLanguage): ProjectGuideCopy {

@@ -29,6 +29,7 @@ const DEFAULT_MIN_SIMILARITY = 0.2;
 
 const UNTITLED: Record<PromptLanguage, string> = {
   es: '(sin título)', en: '(untitled)', fr: '(sans titre)', de: '(ohne Titel)', pt: '(sem título)', 'pt-BR': '(sem título)', it: '(senza titolo)', tr: '(başlıksız)',
+  'zh-Hans': '(无标题)', 'zh-Hant': '(無標題)', vi: '(không có tiêu đề)', ja: '(無題)', ru: '(без названия)', uk: '(без назви)', ko: '(제목 없음)',
 };
 
 function interfaceLanguage(): PromptLanguage {

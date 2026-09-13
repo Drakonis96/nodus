@@ -631,6 +631,13 @@ const OUTPUT_LANGUAGE_NAME: Record<Exclude<PromptLanguage, 'es'>, string> = {
   pt: 'PORTUGUÊS EUROPEU',
   'pt-BR': 'PORTUGUÊS DO BRASIL',
   it: 'ITALIANO',
+  'zh-Hans': '简体中文',
+  'zh-Hant': '繁體中文',
+  vi: 'TIẾNG VIỆT',
+  ja: '日本語',
+  ru: 'РУССКИЙ',
+  uk: 'УКРАЇНСЬКА',
+  ko: '한국어',
 };
 
 function outputLanguageDirective(lang: Exclude<PromptLanguage, 'es'>): string {
@@ -642,6 +649,13 @@ function outputLanguageDirective(lang: Exclude<PromptLanguage, 'es'>): string {
     pt: 'IDIOMA DE SAÍDA — PRIORIDADE MÁXIMA',
     'pt-BR': 'IDIOMA DE SAÍDA — PRIORIDADE MÁXIMA',
     it: 'LINGUA DI OUTPUT — PRIORITÀ MASSIMA',
+    'zh-Hans': '输出语言 — 最高优先级',
+    'zh-Hant': '輸出語言 — 最高優先級',
+    vi: 'NGÔN NGỮ ĐẦU RA — ƯU TIÊN CAO NHẤT',
+    ja: '出力言語 — 最優先',
+    ru: 'ЯЗЫК ВЫВОДА — НАИВЫСШИЙ ПРИОРИТЕТ',
+    uk: 'МОВА ВИВЕДЕННЯ — НАЙВИЩИЙ ПРІОРИТЕТ',
+    ko: '출력 언어 — 최우선 순위',
   };
   const directives: Record<Exclude<PromptLanguage, 'es'>, string> = {
     en: `Output-language priority: write EVERY free-text/natural-language output field in ${OUTPUT_LANGUAGE_NAME[lang]}, regardless of source-document language or earlier instructions. This includes labels, statements, development, summaries, rationales, explanations, notes, titles, bodies, reasons, and all prose. The ONLY exception is any quote/verbatim-evidence field, which must be copied EXACTLY in the source language; never translate quotes. Keep JSON keys and enum values exactly as specified.`,
@@ -651,6 +665,13 @@ function outputLanguageDirective(lang: Exclude<PromptLanguage, 'es'>): string {
     pt: `Prioridade do idioma de saída: escreve TODOS os campos de texto livre em ${OUTPUT_LANGUAGE_NAME[lang]}, independentemente do idioma da fonte ou de instruções anteriores. Inclui etiquetas, afirmações, desenvolvimentos, resumos, justificações, explicações, notas, títulos, corpo, motivos e toda a prosa. ÚNICA exceção: campos quote/evidência literal devem ser copiados EXATAMENTE no idioma da fonte; nunca traduzas citações. Mantém exatamente as chaves JSON e os valores enum.`,
     'pt-BR': `Prioridade do idioma de saída: escreva TODOS os campos de texto livre em ${OUTPUT_LANGUAGE_NAME[lang]}, independentemente do idioma da fonte ou de instruções anteriores. Isso inclui rótulos, afirmações, desenvolvimentos, resumos, justificativas, explicações, notas, títulos, corpo, motivos e toda prosa. ÚNICA exceção: campos quote/evidência literal devem ser copiados EXATAMENTE no idioma da fonte; nunca traduza citações. Mantenha exatamente as chaves JSON e os valores enum.`,
     it: `Priorità della lingua di output: scrivi TUTTI i campi di testo libero in ${OUTPUT_LANGUAGE_NAME[lang]}, indipendentemente dalla lingua della fonte o da istruzioni precedenti. Include etichette, enunciati, sviluppi, riepiloghi, motivazioni, spiegazioni, note, titoli, corpo, ragioni e ogni prosa. UNICA eccezione: i campi quote/prova letterale vanno copiati ESATTAMENTE nella lingua della fonte; non tradurre mai le citazioni. Mantieni esattamente chiavi JSON e valori enum.`,
+    'zh-Hans': `输出语言优先：无论源文档的语言或先前的指令如何，所有自由文本/自然语言输出字段都必须用${OUTPUT_LANGUAGE_NAME[lang]}撰写。这包括标签、陈述、展开阐述、摘要、理由、说明、注释、标题、正文、原因以及全部行文。唯一例外是 quote/逐字证据字段，必须严格按源语言原样复制；绝不翻译引文。JSON 键名与枚举值必须完全按指定保留。`,
+    'zh-Hant': `輸出語言優先：無論來源文件的語言或先前的指示為何，所有自由文字/自然語言輸出欄位都必須以${OUTPUT_LANGUAGE_NAME[lang]}撰寫。這包括標籤、陳述、闡述、摘要、理由、說明、註釋、標題、正文、原因以及全部行文。唯一例外是 quote/逐字證據欄位，必須嚴格按來源語言原樣複製；絕不翻譯引文。JSON 鍵名與列舉值必須完全按指定保留。`,
+    vi: `Ưu tiên ngôn ngữ đầu ra: hãy viết MỌI trường văn bản tự do/ngôn ngữ tự nhiên bằng ${OUTPUT_LANGUAGE_NAME[lang]}, bất kể ngôn ngữ của tài liệu nguồn hay các hướng dẫn trước đó. Điều này bao gồm nhãn, phát biểu, phần triển khai, tóm tắt, lý do, giải thích, ghi chú, tiêu đề, nội dung, căn cứ và toàn bộ văn xuôi. NGOẠI LỆ DUY NHẤT là các trường quote/trích dẫn nguyên văn: phải sao chép NGUYÊN VĂN theo ngôn ngữ nguồn; tuyệt đối không dịch trích dẫn. Giữ nguyên chính xác các khóa JSON và giá trị enum.`,
+    ja: `出力言語の優先：ソース文書の言語や以前の指示にかかわらず、すべての自由記述／自然言語の出力フィールドを${OUTPUT_LANGUAGE_NAME[lang]}で書いてください。対象にはラベル、記述、展開、要約、根拠、説明、注記、タイトル、本文、理由、およびすべての文章が含まれます。唯一の例外は quote／逐語証拠フィールドで、ソース言語のまま正確にコピーし、引用を翻訳しないでください。JSON のキーと列挙値は指定どおり正確に保ってください。`,
+    ru: `Приоритет языка вывода: пишите ВСЕ поля свободного текста/естественного языка на русском языке (${OUTPUT_LANGUAGE_NAME[lang]}), независимо от языка исходного документа или предыдущих инструкций. Это включает метки, утверждения, развёрнутые пояснения, резюме, обоснования, объяснения, примечания, заголовки, основной текст, причины и всю прозу. ЕДИНСТВЕННОЕ исключение — поля quote/дословных доказательств: их нужно копировать ТОЧНО на языке источника; никогда не переводите цитаты. Сохраняйте ключи JSON и значения перечислений в точности как указано.`,
+    uk: `Пріоритет мови виведення: пишіть УСІ поля вільного тексту/природної мови українською мовою (${OUTPUT_LANGUAGE_NAME[lang]}), незалежно від мови вихідного документа чи попередніх інструкцій. Це охоплює мітки, твердження, розгорнуті пояснення, резюме, обґрунтування, пояснення, примітки, заголовки, основний текст, причини та всю прозу. ЄДИНИЙ виняток — поля quote/дослівних доказів: їх потрібно копіювати ТОЧНО мовою джерела; ніколи не перекладайте цитати. Зберігайте ключі JSON і значення переліків точно як указано.`,
+    ko: `출력 언어 우선: 원본 문서의 언어나 이전 지시와 관계없이 모든 자유 텍스트/자연어 출력 필드를 ${OUTPUT_LANGUAGE_NAME[lang]}로 작성하십시오. 여기에는 레이블, 진술, 전개, 요약, 근거, 설명, 메모, 제목, 본문, 이유 및 모든 산문이 포함됩니다. 유일한 예외는 quote/축자 증거 필드로, 반드시 원문 언어 그대로 정확히 복사해야 하며 인용문을 절대 번역하지 마십시오. JSON 키와 열거형 값은 지정된 그대로 정확히 유지하십시오.`,
   };
   return `\n\n═══ ${headings[lang]} ═══\n${directives[lang]}`;
 }

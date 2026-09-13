@@ -1,5 +1,6 @@
 import type {
   AppLanguage,
+  PromptLanguage,
   ApplyManuscriptCitationRequest,
   ApplyManuscriptCitationResult,
   ManuscriptClaimCheck,
@@ -337,8 +338,8 @@ function sortChecks(checks: ManuscriptClaimCheck[]): ManuscriptClaimCheck[] {
   });
 }
 
-function warn(language: AppLanguage, kind: 'empty' | 'noClaims' | 'noIdeas' | 'noEmbeddings' | 'noAi'): string {
-  const copy: Record<AppLanguage, Record<typeof kind, string>> = {
+function warn(language: PromptLanguage, kind: 'empty' | 'noClaims' | 'noIdeas' | 'noEmbeddings' | 'noAi'): string {
+  const copy: Record<PromptLanguage, Record<typeof kind, string>> = {
     es: { empty: 'El capitulo seleccionado no tiene texto que verificar.', noClaims: 'No se detectaron afirmaciones academicas verificables en este capitulo.', noIdeas: 'No hay ideas listadas del corpus contra las que comparar.', noEmbeddings: 'No hay embeddings disponibles; el verificador uso solo ideas listadas.', noAi: 'La revision con IA no estuvo disponible; se muestran resultados deterministas.' },
     en: { empty: 'The selected chapter has no text to verify.', noClaims: 'No citation-worthy academic claims were detected in this chapter.', noIdeas: 'There are no listed corpus ideas to compare against.', noEmbeddings: 'Embeddings are unavailable, so the verifier used listed ideas only.', noAi: 'AI review was unavailable, so deterministic retrieval results are shown.' },
     fr: { empty: 'Le chapitre sélectionné ne contient aucun texte à vérifier.', noClaims: 'Aucune affirmation universitaire nécessitant une citation n’a été détectée dans ce chapitre.', noIdeas: 'Aucune idée listée du corpus ne permet une comparaison.', noEmbeddings: 'Les embeddings sont indisponibles ; le vérificateur a utilisé uniquement les idées listées.', noAi: 'La vérification par IA est indisponible ; les résultats de récupération déterministes sont affichés.' },
@@ -347,6 +348,13 @@ function warn(language: AppLanguage, kind: 'empty' | 'noClaims' | 'noIdeas' | 'n
     'pt-BR': { empty: 'O capítulo selecionado não contém texto para verificar.', noClaims: 'Nenhuma afirmação acadêmica que exija citação foi detectada neste capítulo.', noIdeas: 'Não há ideias listadas do corpus para comparação.', noEmbeddings: 'Os embeddings não estão disponíveis; o verificador usou apenas as ideias listadas.', noAi: 'A revisão por IA não está disponível; resultados determinísticos de recuperação são exibidos.' },
     it: { empty: 'Il capitolo selezionato non contiene testo da verificare.', noClaims: 'In questo capitolo non sono state rilevate affermazioni accademiche che richiedano una citazione.', noIdeas: 'Non ci sono idee del corpus elencate con cui confrontarsi.', noEmbeddings: 'Gli embedding non sono disponibili; il verificatore ha usato solo le idee elencate.', noAi: 'La revisione tramite IA non è disponibile; vengono mostrati risultati di recupero deterministici.' },
     tr: { empty: 'Seçilen bölümde doğrulanacak metin yok.', noClaims: 'Bu bölümde alıntı gerektiren akademik bir iddia tespit edilmedi.', noIdeas: 'Karşılaştırılacak listelenmiş derlem fikri yok.', noEmbeddings: 'Embedding’ler kullanılamıyor; doğrulayıcı yalnızca listelenen fikirleri kullandı.', noAi: 'Yapay zekâ incelemesi kullanılamadı; deterministik getirme sonuçları gösteriliyor.' },
+    'zh-Hans': { empty: '所选章节没有可验证的文本。', noClaims: '本章未检测到需要引用出处的学术论断。', noIdeas: '没有可供比对的已列出语料库想法。', noEmbeddings: '没有可用的嵌入向量；验证器仅使用了已列出的想法。', noAi: 'AI 审查不可用；现显示确定性检索结果。' },
+    'zh-Hant': { empty: '所選章節沒有可驗證的文字。', noClaims: '本章未偵測到需要引用出處的學術論斷。', noIdeas: '沒有可供比對的已列出語料庫想法。', noEmbeddings: '沒有可用的嵌入向量；驗證器僅使用了已列出的想法。', noAi: 'AI 審查不可用；現顯示確定性檢索結果。' },
+    vi: { empty: 'Chương được chọn không có văn bản để xác minh.', noClaims: 'Không phát hiện luận điểm học thuật nào cần trích dẫn trong chương này.', noIdeas: 'Không có ý tưởng nào của kho ngữ liệu được liệt kê để đối chiếu.', noEmbeddings: 'Không có embedding khả dụng; trình xác minh chỉ dùng các ý tưởng được liệt kê.', noAi: 'Không có đánh giá bằng AI; kết quả truy xuất tất định được hiển thị.' },
+    ja: { empty: '選択した章には検証するテキストがありません。', noClaims: 'この章には引用が必要な学術的主張は検出されませんでした。', noIdeas: '比較対象となるコーパスのアイデアが登録されていません。', noEmbeddings: '埋め込みを利用できないため、検証ツールは登録済みのアイデアのみを使用しました。', noAi: 'AI によるレビューを利用できないため、決定的な検索結果を表示しています。' },
+    ru: { empty: 'В выбранной главе нет текста для проверки.', noClaims: 'В этой главе не обнаружено академических утверждений, требующих ссылки.', noIdeas: 'Нет перечисленных идей корпуса для сравнения.', noEmbeddings: 'Эмбеддинги недоступны; средство проверки использовало только перечисленные идеи.', noAi: 'Проверка с помощью ИИ недоступна; показаны детерминированные результаты поиска.' },
+    uk: { empty: 'У вибраній главі немає тексту для перевірки.', noClaims: 'У цій главі не виявлено академічних тверджень, що потребують посилання.', noIdeas: 'Немає перелічених ідей корпусу для порівняння.', noEmbeddings: 'Ембедінги недоступні; засіб перевірки використав лише перелічені ідеї.', noAi: 'Перевірка ШІ недоступна; показано детерміновані результати пошуку.' },
+    ko: { empty: '선택한 장에는 검증할 텍스트가 없습니다.', noClaims: '이 장에서 인용이 필요한 학술적 주장이 감지되지 않았습니다.', noIdeas: '비교할 말뭉치 아이디어가 나열되어 있지 않습니다.', noEmbeddings: '임베딩을 사용할 수 없어 검증기가 나열된 아이디어만 사용했습니다.', noAi: 'AI 검토를 사용할 수 없어 결정적 검색 결과를 표시합니다.' },
   };
   return copy[language]?.[kind] ?? copy.es[kind];
 }

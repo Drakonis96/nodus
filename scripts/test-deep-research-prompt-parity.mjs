@@ -7,13 +7,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
 const source = fs.readFileSync(path.join(root, 'electron/ai/prompts.ts'), 'utf8');
 const core = fs.readFileSync(path.join(root, 'electron/ai/deepResearchCore.ts'), 'utf8');
 
 // Every supported locale must be represented in the explicit native rule registry.
 for (const language of languages) {
-  const key = language === 'pt-BR' ? "['\"]pt-BR['\"]" : language;
+  const key = language.includes('-') ? `['"]${language}['"]` : language;
   assert.match(core, new RegExp(`\\n  ${key}:`), `missing narrative pack ${language}`);
 }
 assert.equal((core.match(/'Prioriza una narración argumental continua/g) ?? []).length, 1);

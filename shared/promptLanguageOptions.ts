@@ -22,10 +22,20 @@ const LABELS: Record<PromptLanguage, string> = {
   'pt-BR': 'Português (Brasil)',
   it: 'Italiano',
   tr: 'Türkçe',
+  'zh-Hans': '简体中文',
+  'zh-Hant': '繁體中文',
+  vi: 'Tiếng Việt',
+  ja: '日本語',
+  ru: 'Русский',
+  uk: 'Українська',
+  ko: '한국어',
 };
 
 /** Reading order for the pickers: Spanish first, then the rest as declared. */
-const ORDER: readonly PromptLanguage[] = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const ORDER: readonly PromptLanguage[] = [
+  'es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr',
+  'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko',
+];
 
 export interface PromptLanguageOption {
   id: PromptLanguage;
@@ -39,3 +49,11 @@ export const PROMPT_LANGUAGE_OPTIONS: readonly PromptLanguageOption[] = [
   ...ORDER.filter((id) => (PROMPT_LANGUAGES as readonly string[]).includes(id)),
   ...PROMPT_LANGUAGES.filter((id) => !ORDER.includes(id)),
 ].map((id) => ({ id, label: LABELS[id] }));
+
+/** Runtime narrowing for prompt-language values. Unknown values fall back to English,
+ *  matching the existing worldbuilding/office behavior, never to Spanish. */
+export function normalizePromptLanguage(value: unknown): PromptLanguage {
+  return typeof value === 'string' && (PROMPT_LANGUAGES as readonly string[]).includes(value)
+    ? (value as PromptLanguage)
+    : 'en';
+}

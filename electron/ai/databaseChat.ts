@@ -46,6 +46,8 @@ function sampleText(columns: DatabaseColumn[], rows: DatabaseRow[], language: Pr
   const booleanCopy = {
     es: ['sí', 'no'], en: ['yes', 'no'], fr: ['oui', 'non'], de: ['ja', 'nein'],
     pt: ['sim', 'não'], 'pt-BR': ['sim', 'não'], it: ['sì', 'no'], tr: ['evet', 'hayır'],
+    'zh-Hans': ['是', '否'], 'zh-Hant': ['是', '否'], vi: ['có', 'không'], ja: ['はい', 'いいえ'],
+    ru: ['да', 'нет'], uk: ['так', 'ні'], ko: ['예', '아니요'],
   } as const;
   const [yes, no] = booleanCopy[language] ?? booleanCopy.es;
   const cols = columns.filter((c) => c.type !== 'ai').slice(0, SAMPLE_COLS);

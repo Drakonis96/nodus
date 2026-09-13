@@ -23,15 +23,26 @@ const image = load('shared/imageAnalysis.ts');
 const records = load('shared/recordsExtraction.ts');
 const profile = load('shared/dataProfile.ts');
 const catalog = load('shared/analysisCatalog.ts');
-const locales = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const locales = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
+// CJK prompt packs are 3-6x shorter in characters; a Latin-length floor cannot apply.
+const cjk = new Set(['zh-Hans', 'zh-Hant', 'ja', 'ko']);
+const minimumLength = (locale, latinLength) => (cjk.has(locale) ? Math.ceil(latinLength / 3) : latinLength);
 
 test.after(() => rm(out, { recursive: true, force: true }));
 
 test('AI database-cell prompts and row scaffolds are native in all locales', () => {
+  const oneMarkers = {
+    es: /UNA|UN[AO]?\b/i, en: /ONE/i, fr: /UNE/i, de: /EINE/i, pt: /UMA/i, 'pt-BR': /UMA/i, it: /UN[AO]?\b/i, tr: /TEK/i,
+    'zh-Hans': /一个单元格/, 'zh-Hant': /一個儲存格/, vi: /MỘT ô/, ja: /1 つのセル/, ru: /ОДНУ ячейку/, uk: /ОДНУ клітинку/, ko: /셀 하나/,
+  };
+  const emptyMarkers = {
+    es: /vacía/i, en: /empty/i, fr: /vide/i, de: /leer/i, pt: /vazia/i, 'pt-BR': /vazia/i, it: /vuota/i, tr: /boş/i,
+    'zh-Hans': /空响应/, 'zh-Hant': /空回應/, vi: /phản hồi trống/, ja: /空の応答/, ru: /пустой ответ/, uk: /порожню відповідь/, ko: /빈 응답/,
+  };
   for (const locale of locales) {
     const system = ai.aiColumnSystem(locale);
-    assert.match(system, /ONE|UNE|EINE|UMA|UN[AO]?|TEK|UNA/i);
-    assert.match(system, /empty|vide|leer|vazia|vuota|boş|vacía/i);
+    assert.match(system, oneMarkers[locale], `${locale}: single-cell contract`);
+    assert.match(system, emptyMarkers[locale], `${locale}: empty-response contract`);
     const cell = ai.buildAiCellPrompt('DO_IT', '', locale);
     const imagePrompt = ai.buildAiImagePrompt('DRAW_IT', 'name: value', locale);
     assert.match(cell, /DO_IT/);
@@ -50,7 +61,7 @@ test('database-chat contracts preserve every statistical and chart safeguard in 
       assert.ok(system.includes(token), `${locale} missing ${token}`);
     }
     assert.match(system, /1\.[\s\S]+2\./);
-    assert.ok(system.length > 900, `${locale} database-chat contract was condensed`);
+    assert.ok(system.length > minimumLength(locale, 900), `${locale} database-chat contract was condensed`);
     const context = chat.buildDbChatContext([{ name: 'People', profileText: 'rows=12', sample: '', rowCount: 12, sampleSize: 0 }], locale);
     const user = chat.buildDbChatUser(context, 'How many?', [{ role: 'user', content: 'Earlier' }], locale);
     assert.match(user, /People/);
@@ -63,7 +74,7 @@ test('image-analysis prompts retain the complete two-field OCR contract in all l
   for (const locale of locales) {
     const prompt = image.imageAnalysisPrompt(locale);
     for (const token of ['"description"', '"text"', '60', '100', 'JSON', '""']) assert.ok(prompt.system.includes(token), `${locale} missing ${token}`);
-    assert.ok(prompt.system.length > 850, `${locale} image-analysis contract was condensed`);
+    assert.ok(prompt.system.length > minimumLength(locale, 850), `${locale} image-analysis contract was condensed`);
     assert.ok(prompt.user.includes('"description"') && prompt.user.includes('"text"'));
     if (locale !== 'es') assert.doesNotMatch(prompt.system, /Eres un archivero|Analiza la imagen|No añadas/);
   }
@@ -74,7 +85,7 @@ test('record-extraction prompts preserve the full evidence and kinship contract 
   for (const locale of locales) {
     const prompt = records.recordsExtractionPrompt(locale);
     for (const token of invariant) assert.ok(prompt.includes(token), `${locale} record extraction missing ${token}`);
-    assert.ok(prompt.length > 2450, `${locale} record-extraction contract was condensed`);
+    assert.ok(prompt.length > minimumLength(locale, 2450), `${locale} record-extraction contract was condensed`);
     if (locale !== 'es') assert.doesNotMatch(prompt, /Eres un archivero|REGLA DE ORO|Devuelve SOLO|No inventes páginas|Si un dato no consta/);
   }
 });
@@ -91,7 +102,7 @@ test('statistical profiles and analysis catalogs use native scaffolds without ch
     const text = profile.profileToText('Results', sampleProfile, locale);
     const manifest = catalog.catalogManifest(sampleProfile, locale);
     for (const token of ['descriptive', 'numeric', 'category', 'lowCard', 'date', 'n1', 'g1']) assert.ok(manifest.includes(token), `${locale} manifest lost ${token}`);
-    assert.ok(manifest.length > 850, `${locale} analysis catalog was condensed`);
+    assert.ok(manifest.length > minimumLength(locale, 850), `${locale} analysis catalog was condensed`);
     assert.match(text, /Results/);
     assert.match(text, /2/);
     if (locale !== 'es') {

@@ -20,10 +20,10 @@ await build({
 const module = await import(pathToFileURL(outfile).href);
 test.after(() => rm(tmp, { recursive: true, force: true }));
 
-const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
 const fields = ['fixedOutlineRule', 'sectionFocusRule', 'plannerRules', 'writerRules', 'finalizerRules', 'finalAuditRules', 'reviseStudySection'];
 
-test('all eight languages have the same complete study-deep-research contract', () => {
+test('all fifteen languages have the same complete study-deep-research contract', () => {
   const packs = languages.map((language) => module.studyDeepResearchPromptPack(language));
   for (const [index, pack] of packs.entries()) {
     const language = languages[index];

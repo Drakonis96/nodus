@@ -32,7 +32,7 @@ export const EXAM_QUESTION_TYPES = [
 export type ExamQuestionType = (typeof EXAM_QUESTION_TYPES)[number];
 
 /** The document's own language, independent from the interface language. */
-export const EXAM_LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'] as const;
+export const EXAM_LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'] as const;
 export type ExamLanguage = (typeof EXAM_LANGUAGES)[number];
 
 export interface ExamQuestionTypeDef {
@@ -481,6 +481,13 @@ const DOCUMENT_LABELS: Record<ExamLanguage, ExamDocumentLabels> = {
   'pt-BR': { studentName: 'Nome e sobrenome', studentId: 'Matrícula', group: 'Turma', date: 'Data', grade: 'Nota', points: 'pontos', point: 'ponto', duration: 'Duração', minutes: 'minutos', instructions: 'Instruções', question: 'Questão', total: 'Total', answerKey: 'Gabarito', trueLabel: 'Verdadeiro', falseLabel: 'Falso', columnA: 'Coluna A', columnB: 'Coluna B' },
   it: { studentName: 'Nome e cognome', studentId: 'Numero di matricola', group: 'Gruppo', date: 'Data', grade: 'Voto', points: 'punti', point: 'punto', duration: 'Durata', minutes: 'minuti', instructions: 'Istruzioni', question: 'Domanda', total: 'Totale', answerKey: 'Soluzioni', trueLabel: 'Vero', falseLabel: 'Falso', columnA: 'Colonna A', columnB: 'Colonna B' },
   tr: { studentName: 'Adı ve soyadı', studentId: 'Öğrenci numarası', group: 'Grup', date: 'Tarih', grade: 'Not', points: 'puan', point: 'puan', duration: 'Süre', minutes: 'dakika', instructions: 'Talimatlar', question: 'Soru', total: 'Toplam', answerKey: 'Cevap anahtarı', trueLabel: 'Doğru', falseLabel: 'Yanlış', columnA: 'A sütunu', columnB: 'B sütunu' },
+  'zh-Hans': { studentName: '姓名', studentId: '学号', group: '班级', date: '日期', grade: '成绩', points: '分', point: '分', duration: '时长', minutes: '分钟', instructions: '说明', question: '题目', total: '总分', answerKey: '参考答案', trueLabel: '正确', falseLabel: '错误', columnA: 'A 列', columnB: 'B 列' },
+  'zh-Hant': { studentName: '姓名', studentId: '學號', group: '班級', date: '日期', grade: '成績', points: '分', point: '分', duration: '時間', minutes: '分鐘', instructions: '說明', question: '題目', total: '總分', answerKey: '解答', trueLabel: '正確', falseLabel: '錯誤', columnA: 'A 欄', columnB: 'B 欄' },
+  vi: { studentName: 'Họ và tên', studentId: 'Số báo danh', group: 'Lớp', date: 'Ngày', grade: 'Điểm', points: 'điểm', point: 'điểm', duration: 'Thời gian', minutes: 'phút', instructions: 'Hướng dẫn', question: 'Câu hỏi', total: 'Tổng điểm', answerKey: 'Đáp án', trueLabel: 'Đúng', falseLabel: 'Sai', columnA: 'Cột A', columnB: 'Cột B' },
+  ja: { studentName: '氏名', studentId: '学籍番号', group: 'クラス', date: '日付', grade: '成績', points: '点', point: '点', duration: '時間', minutes: '分', instructions: '注意事項', question: '問題', total: '合計', answerKey: '解答', trueLabel: '正しい', falseLabel: '誤り', columnA: 'A 列', columnB: 'B 列' },
+  ru: { studentName: 'Фамилия и имя', studentId: 'Номер студенческого билета', group: 'Группа', date: 'Дата', grade: 'Оценка', points: 'баллов', point: 'балл', duration: 'Продолжительность', minutes: 'минут', instructions: 'Инструкции', question: 'Вопрос', total: 'Итого', answerKey: 'Ответы', trueLabel: 'Верно', falseLabel: 'Неверно', columnA: 'Столбец A', columnB: 'Столбец B' },
+  uk: { studentName: 'Прізвище та ім’я', studentId: 'Номер студентського квитка', group: 'Група', date: 'Дата', grade: 'Оцінка', points: 'балів', point: 'бал', duration: 'Тривалість', minutes: 'хвилин', instructions: 'Інструкції', question: 'Питання', total: 'Разом', answerKey: 'Відповіді', trueLabel: 'Правильно', falseLabel: 'Неправильно', columnA: 'Стовпець A', columnB: 'Стовпець B' },
+  ko: { studentName: '성명', studentId: '학번', group: '반', date: '날짜', grade: '성적', points: '점', point: '점', duration: '시간', minutes: '분', instructions: '유의 사항', question: '문항', total: '총점', answerKey: '정답', trueLabel: '참', falseLabel: '거짓', columnA: 'A 열', columnB: 'B 열' },
 };
 
 export function normalizeExamLanguage(value: unknown): ExamLanguage {
@@ -495,9 +502,10 @@ export function examDocumentLabels(language: unknown): ExamDocumentLabels {
 export function formatExamPoints(points: number, language: ExamLanguage): string {
   const labels = examDocumentLabels(language);
   const rounded = Math.round(points * 100) / 100;
+  const dotDecimal = language === 'en' || language === 'zh-Hans' || language === 'zh-Hant' || language === 'ja' || language === 'ko';
   const text = Number.isInteger(rounded)
     ? String(rounded)
-    : rounded.toFixed(2).replace(/0$/, '').replace('.', language === 'en' ? '.' : ',');
+    : rounded.toFixed(2).replace(/0$/, '').replace('.', dotDecimal ? '.' : ',');
   // "1 punto", but "0,5 puntos" and "2 puntos" — only exactly one takes the singular.
   return `${text} ${rounded === 1 ? labels.point : labels.points}`;
 }

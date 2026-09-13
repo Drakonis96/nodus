@@ -20,12 +20,18 @@ await build({
         ? 'export const completeTextNeutral = (...args) => globalThis.__synonymComplete(...args);'
         : name === './studyAiPolicy'
           ? 'export const runStudyAiTask = async (options, task) => ({ value: await task(options.explicitModel), model: options.explicitModel });'
-          : 'export const getSettings = () => ({ promptLanguage: "en" });' }));
+          : 'export const getSettings = () => ({ promptLanguage: globalThis.__synonymPromptLanguage ?? "en" });' }));
     },
   }],
 });
 const { suggestCopilotAlternatives, suggestStudySynonyms } = await import(pathToFileURL(output));
-test.after(async () => { delete globalThis.__synonymComplete; await rm(directory, { recursive: true, force: true }); });
+const promptOutput = path.join(directory, 'editorAiPrompts.mjs');
+await build({
+  entryPoints: [path.join(root, 'shared/editorAiPrompts.ts')],
+  outfile: promptOutput, bundle: true, format: 'esm', platform: 'node', logLevel: 'silent',
+});
+const { synonymSystem } = await import(pathToFileURL(promptOutput));
+test.after(async () => { delete globalThis.__synonymComplete; delete globalThis.__synonymPromptLanguage; await rm(directory, { recursive: true, force: true }); });
 
 const words = ['robusto', 'consistente', 'firme', 'fundado', 'convincente'];
 function request(selectedText = 'sólido', sentence = `El argumento es ${selectedText}${/\s$/u.test(selectedText) ? '' : ' '}y válido.`) {
@@ -128,4 +134,16 @@ test('whole-sentence rewrites have enough output room for all five alternatives'
   const result = await suggestCopilotAlternatives(request(sentence, sentence));
   assert.deepEqual(result.alternatives.map((option) => option.replacement), variants);
   assert.equal(calls, 1);
+});
+
+test('synonym prompts are native in every configured prompt language', async () => {
+  const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
+  for (const language of languages) {
+    globalThis.__synonymPromptLanguage = language;
+    const calls = provider([{ alternatives: words }]);
+    await suggestCopilotAlternatives(request());
+    assert.equal(calls.length, 1, `${language}: one provider call`);
+    assert.equal(calls[0].options.system, synonymSystem(language, 8), `${language}: native synonym system prompt`);
+  }
+  delete globalThis.__synonymPromptLanguage;
 });

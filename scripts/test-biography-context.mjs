@@ -52,8 +52,11 @@ test('the system prompt forbids invention and bounds length', () => {
 });
 
 test('genealogy biography system and context are native in every prompt language', () => {
-  const personLabels = { es: 'Persona', en: 'Person', fr: 'Personne', de: 'Person', pt: 'Pessoa', 'pt-BR': 'Pessoa', it: 'Persona', tr: 'Kişi' };
-  for (const locale of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+  const personLabels = {
+    es: 'Persona', en: 'Person', fr: 'Personne', de: 'Person', pt: 'Pessoa', 'pt-BR': 'Pessoa', it: 'Persona', tr: 'Kişi',
+    'zh-Hans': '人物', 'zh-Hant': '人物', vi: 'Nhân vật', ja: '人物', ru: 'Персона', uk: 'Персона', ko: '인물',
+  };
+  for (const locale of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko']) {
     const system = bio.biographySystemPrompt(locale);
     const context = bio.composeBiographyContext(base, locale);
     assert.ok(system.includes('120') && system.includes('220'));

@@ -63,7 +63,7 @@ function parseAuthors(value: string): string[] {
 
 function authorYear(authors: string[], year: number | null, language: PromptLanguage = 'es'): string {
   const raw = authors[0]?.replace(/\s+/g, ' ').trim();
-  const surname = raw ? (raw.includes(',') ? raw.slice(0, raw.indexOf(',')) : raw.split(' ').slice(-1)[0]).trim() : ({ es: 'Autor', en: 'Author', fr: 'Auteur', de: 'Autor', pt: 'Autor', 'pt-BR': 'Autor', it: 'Autore', tr: 'Yazar' } as Record<PromptLanguage, string>)[language];
+  const surname = raw ? (raw.includes(',') ? raw.slice(0, raw.indexOf(',')) : raw.split(' ').slice(-1)[0]).trim() : ({ es: 'Autor', en: 'Author', fr: 'Auteur', de: 'Autor', pt: 'Autor', 'pt-BR': 'Autor', it: 'Autore', tr: 'Yazar', 'zh-Hans': '作者', 'zh-Hant': '作者', vi: 'Tác giả', ja: '著者', ru: 'Автор', uk: 'Автор', ko: '저자' } as Record<PromptLanguage, string>)[language];
   return year ? `${surname}, ${year}` : surname;
 }
 
@@ -193,8 +193,8 @@ function disputesAmong(ids: string[], language: PromptLanguage = 'es'): DisputeE
     fromId: r.from_id,
     toId: r.to_id,
     label: r.type === 'refutes'
-      ? ({ es: 'refutación', en: 'refutation', fr: 'réfutation', de: 'Widerlegung', pt: 'refutação', 'pt-BR': 'refutação', it: 'confutazione', tr: 'çürütme' } as Record<PromptLanguage, string>)[language]
-      : ({ es: 'contradicción', en: 'contradiction', fr: 'contradiction', de: 'Widerspruch', pt: 'contradição', 'pt-BR': 'contradição', it: 'contraddizione', tr: 'çelişki' } as Record<PromptLanguage, string>)[language],
+      ? ({ es: 'refutación', en: 'refutation', fr: 'réfutation', de: 'Widerlegung', pt: 'refutação', 'pt-BR': 'refutação', it: 'confutazione', tr: 'çürütme', 'zh-Hans': '反驳', 'zh-Hant': '反駁', vi: 'phản bác', ja: '反証', ru: 'опровержение', uk: 'спростування', ko: '반박' } as Record<PromptLanguage, string>)[language]
+      : ({ es: 'contradicción', en: 'contradiction', fr: 'contradiction', de: 'Widerspruch', pt: 'contradição', 'pt-BR': 'contradição', it: 'contraddizione', tr: 'çelişki', 'zh-Hans': '矛盾', 'zh-Hant': '矛盾', vi: 'mâu thuẫn', ja: '矛盾', ru: 'противоречие', uk: 'суперечність', ko: '모순' } as Record<PromptLanguage, string>)[language],
   }));
 }
 
@@ -228,7 +228,7 @@ function isAiCoverage(value: unknown): value is AiCoverage {
 export async function decomposeQuestion(request: RqDecomposeRequest): Promise<ResearchQuestionDetail> {
   const rq = repo.getResearchQuestion(request.rqId);
   const language = getSettings().promptLanguage ?? 'es';
-  if (!rq) throw new Error(localizedMapText(language, { es: 'No se encontró la pregunta de investigación.', en: 'The research question was not found.', fr: 'La question de recherche est introuvable.', de: 'Die Forschungsfrage wurde nicht gefunden.', pt: 'A pergunta de investigação não foi encontrada.', 'pt-BR': 'A pergunta de pesquisa não foi encontrada.', it: 'La domanda di ricerca non è stata trovata.', tr: 'Araştırma sorusu bulunamadı.' }));
+  if (!rq) throw new Error(localizedMapText(language, { es: 'No se encontró la pregunta de investigación.', en: 'The research question was not found.', fr: 'La question de recherche est introuvable.', de: 'Die Forschungsfrage wurde nicht gefunden.', pt: 'A pergunta de investigação não foi encontrada.', 'pt-BR': 'A pergunta de pesquisa não foi encontrada.', it: 'La domanda di ricerca non è stata trovata.', tr: 'Araştırma sorusu bulunamadı.', 'zh-Hans': '未找到研究问题。', 'zh-Hant': '找不到研究問題。', vi: 'Không tìm thấy câu hỏi nghiên cứu.', ja: '研究課題が見つかりませんでした。', ru: 'Исследовательский вопрос не найден.', uk: 'Дослідницьке питання не знайдено.', ko: '연구 질문을 찾을 수 없습니다.' }));
 
   const user = JSON.stringify({ pregunta: rq.question, notas: rq.notes ?? '' }, null, 2);
   const ai = await completeJson<AiDecomposition>(
@@ -254,7 +254,7 @@ export async function mapCoverage(
 ): Promise<ResearchQuestionDetail> {
   const rq = repo.getResearchQuestion(request.rqId);
   const language = getSettings().promptLanguage ?? 'es';
-  if (!rq) throw new Error(localizedMapText(language, { es: 'No se encontró la pregunta de investigación.', en: 'The research question was not found.', fr: 'La question de recherche est introuvable.', de: 'Die Forschungsfrage wurde nicht gefunden.', pt: 'A pergunta de investigação não foi encontrada.', 'pt-BR': 'A pergunta de pesquisa não foi encontrada.', it: 'La domanda di ricerca non è stata trovata.', tr: 'Araştırma sorusu bulunamadı.' }));
+  if (!rq) throw new Error(localizedMapText(language, { es: 'No se encontró la pregunta de investigación.', en: 'The research question was not found.', fr: 'La question de recherche est introuvable.', de: 'Die Forschungsfrage wurde nicht gefunden.', pt: 'A pergunta de investigação não foi encontrada.', 'pt-BR': 'A pergunta de pesquisa não foi encontrada.', it: 'La domanda di ricerca non è stata trovata.', tr: 'Araştırma sorusu bulunamadı.', 'zh-Hans': '未找到研究问题。', 'zh-Hant': '找不到研究問題。', vi: 'Không tìm thấy câu hỏi nghiên cứu.', ja: '研究課題が見つかりませんでした。', ru: 'Исследовательский вопрос не найден.', uk: 'Дослідницьке питання не знайдено.', ko: '연구 질문을 찾을 수 없습니다.' }));
   const subs = repo.getSubQuestionRows(request.rqId);
 
   // Load lightweight idea rows once for the lexical fallback path.
@@ -274,7 +274,7 @@ export async function mapCoverage(
 
     let coverage: AiCoverage;
     if (candidates.length === 0) {
-      coverage = { status: 'uncovered', justification: localizedMapText(language, { es: 'La biblioteca no contiene ideas que aborden esta sub-pregunta.', en: 'The library contains no ideas that address this sub-question.', fr: 'La bibliothèque ne contient aucune idée répondant à cette sous-question.', de: 'Die Bibliothek enthält keine Ideen, die diese Unterfrage behandeln.', pt: 'A biblioteca não contém ideias que abordem esta subquestão.', 'pt-BR': 'A biblioteca não contém ideias que abordem esta subpergunta.', it: 'La biblioteca non contiene idee che affrontino questa sotto-domanda.', tr: 'Kütüphanede bu alt soruyu ele alan fikir bulunmuyor.' }), ideaIds: [] };
+      coverage = { status: 'uncovered', justification: localizedMapText(language, { es: 'La biblioteca no contiene ideas que aborden esta sub-pregunta.', en: 'The library contains no ideas that address this sub-question.', fr: 'La bibliothèque ne contient aucune idée répondant à cette sous-question.', de: 'Die Bibliothek enthält keine Ideen, die diese Unterfrage behandeln.', pt: 'A biblioteca não contém ideias que abordem esta subquestão.', 'pt-BR': 'A biblioteca não contém ideias que abordem esta subpergunta.', it: 'La biblioteca non contiene idee che affrontino questa sotto-domanda.', tr: 'Kütüphanede bu alt soruyu ele alan fikir bulunmuyor.', 'zh-Hans': '文献库中没有涉及该子问题的观点。', 'zh-Hant': '文獻庫中沒有涉及此子問題的觀點。', vi: 'Thư viện không có ý tưởng nào giải quyết tiểu câu hỏi này.', ja: 'ライブラリには、この小問に取り組むアイデアが含まれていません。', ru: 'Библиотека не содержит идей, отвечающих на этот подвопрос.', uk: 'Бібліотека не містить ідей, які відповідають на це підпитання.', ko: '라이브러리에 이 하위 질문을 다루는 아이디어가 없습니다.' }), ideaIds: [] };
     } else {
       const disputesAll = disputesAmong(candidates.map((c) => c.id), language);
       const payload = {
@@ -300,7 +300,7 @@ export async function mapCoverage(
         // Fall back to a conservative data-only verdict if the model call fails.
         coverage = {
           status: candidates.length >= 2 ? 'partial' : 'uncovered',
-          justification: localizedMapText(language, { es: 'Clasificación automática no disponible; veredicto provisional por recuperación.', en: 'Automatic classification unavailable; provisional verdict based on retrieval.', fr: 'Classification automatique indisponible ; verdict provisoire fondé sur la récupération.', de: 'Automatische Klassifizierung nicht verfügbar; vorläufiges Urteil auf Grundlage des Abrufs.', pt: 'Classificação automática indisponível; veredito provisório baseado na recuperação.', 'pt-BR': 'Classificação automática indisponível; veredito provisório baseado na recuperação.', it: 'Classificazione automatica non disponibile; verdetto provvisorio basato sul recupero.', tr: 'Otomatik sınıflandırma kullanılamıyor; getirmeye dayalı geçici karar.' }),
+          justification: localizedMapText(language, { es: 'Clasificación automática no disponible; veredicto provisional por recuperación.', en: 'Automatic classification unavailable; provisional verdict based on retrieval.', fr: 'Classification automatique indisponible ; verdict provisoire fondé sur la récupération.', de: 'Automatische Klassifizierung nicht verfügbar; vorläufiges Urteil auf Grundlage des Abrufs.', pt: 'Classificação automática indisponível; veredito provisório baseado na recuperação.', 'pt-BR': 'Classificação automática indisponível; veredito provisório baseado na recuperação.', it: 'Classificazione automatica non disponibile; verdetto provvisorio basato sul recupero.', tr: 'Otomatik sınıflandırma kullanılamıyor; getirmeye dayalı geçici karar.', 'zh-Hans': '自动分类不可用；基于检索的临时判定。', 'zh-Hant': '自動分類無法使用；依據檢索的暫定判定。', vi: 'Phân loại tự động không khả dụng; phán quyết tạm thời dựa trên truy xuất.', ja: '自動分類は利用できません。検索結果に基づく暫定的な判定です。', ru: 'Автоматическая классификация недоступна; предварительное заключение на основе поиска.', uk: 'Автоматична класифікація недоступна; попередній висновок на основі пошуку.', ko: '자동 분류를 사용할 수 없습니다. 검색 결과에 기반한 잠정 판정입니다.' }),
           ideaIds: candidates.slice(0, 4).map((c) => c.id),
         };
       }
