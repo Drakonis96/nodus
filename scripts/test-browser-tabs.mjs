@@ -85,6 +85,20 @@ test('only the active tab is attached to the window', () => {
   assert.match(activate, /attach\(tab\)/, 'the new tab must be attached');
 });
 
+test('native bounds include the host renderer zoom factor', () => {
+  const bounds = body('applyBounds');
+  assert.match(bounds, /hostWindow\.webContents\.getZoomFactor\(\)/,
+    'CSS pixels must be converted with the actual host renderer zoom');
+  assert.match(bounds, /viewport\.x \* cssToDip/);
+  assert.match(bounds, /viewport\.y \* cssToDip/);
+  assert.match(bounds, /\(viewport\.x \+ viewport\.width\) \* cssToDip/);
+  assert.match(bounds, /\(viewport\.y \+ viewport\.height\) \* cssToDip/);
+  assert.match(bounds, /width: Math\.max\(0, right - left\)/,
+    'rounding the two edges must not leave a seam on the right');
+  assert.match(bounds, /height: Math\.max\(0, bottom - top\)/,
+    'rounding the two edges must not leave a seam at the bottom');
+});
+
 test('trusted Nodus overlays automatically cover native Browser pages', () => {
   const overlayGuard = readFileSync(path.join(repoRoot, 'src/browserOverlay.ts'), 'utf8');
   const app = readFileSync(path.join(repoRoot, 'src/App.tsx'), 'utf8');
