@@ -1,4 +1,5 @@
 import { RELEASE_5_4_0_ADDITIONS } from './releaseNotes540';
+import { RELEASE_5_4_2_HIGHLIGHTS } from './releaseNotes542';
 // v2.6.0 and v2.6.1 intentionally share this exact Italian list — see the note
 // next to RELEASE_2_6_HIGHLIGHTS in releaseNotes.ts.
 const RELEASE_2_6_IT: string[] = [
@@ -167,6 +168,7 @@ const RELEASE_5_1_0_IT = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.4.2": RELEASE_5_4_2_HIGHLIGHTS.map(highlight => highlight.it),
   "5.4.0": [
     ...RELEASE_5_4_0_ADDITIONS.map(highlight => highlight.it),
     "Chemistry Studio, Legalize e AlphaGenome sono ora pacchetti ufficiali che installi tu. Compaiono in Skills con il loro editore verificato, i permessi, la dimensione e le piattaforme su cui funzionano, e puoi installarli, aggiornarli, tornare alla versione precedente o rimuoverli quando vuoi. Quello che fanno non è cambiato.",

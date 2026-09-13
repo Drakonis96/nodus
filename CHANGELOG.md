@@ -1,5 +1,23 @@
 # Changelog
 
+## 5.4.2 — 2026-09-13
+
+Nodus 5.4.2 rebuilds the Study question bank around bulk management and
+interchange, renders Markdown and LaTeX on every question and flashcard surface,
+and adds seven prompt languages.
+
+- The Study question bank has two tabs for questions and flashcards, search and filters by subject, topic, cognitive level, source, material, document, tag and collection, sorting and multi-select. Status, difficulty, category, tags, collection and spaced-repetition state apply to a whole selection, and each flashcard is created, edited or deleted with its own SRS actions.
+- The bank imports and exports Nodus JSON, CSV, Anki TSV and `.apkg` packages, and Moodle XML and GIFT quizzes from one dialog that previews what will enter.
+- One Markdown pipeline covers every question and flashcard surface: prompts, options, answers, explanations, the review session, AI generation previews, the exam builder, immersion quizzes and worldbuilding questions. Writing fields gain an Edit/Preview toggle, generation is asked for LaTeX, and Nodus Server web typesets published study catalogs and dossiers.
+- Seven prompt languages join the pickers: Simplified and Traditional Chinese, Vietnamese, Japanese, Russian, Ukrainian and Korean, bringing prompt support to fifteen languages. The interface keeps its eight.
+- Saved Research chat answers keep their provenance: the conversation, the model and the sources. From the note you can reopen the conversation and jump to the exact message, and exported notes carry the provenance with them.
+- In Deep Research and Immersion creation dialogs, only Image Atelier is classified as paid per call. Every other installed Skill keeps the optional ceiling and no longer requires a mandatory maximum.
+- The Skills Marketplace lists skills, plugins, signed packages and inbox plugins in one catalogue, one card per item, with the same identity, collapsible details and a single permission review before installing or updating.
+- Signed v2 packages execute through their own trusted capability pipeline instead of advertising their tools through the legacy generic fence.
+- The Nodus Browser follows each document’s colours in dark mode, so unstyled pages and 401 errors are readable without selecting text, and HTTP Basic authentication is answered from a browser bar that stores no credentials. The native view also stays aligned with the renderer zoom.
+- Zotero being unreachable is no longer reported as a missing attachment: text resolution retries, scans fail retriably and the queue requeues them. The Incomplete filter gates on all five analysis steps with a semantic state that matches each row, and a deep fusion resumes only the ideas it did not finish.
+- Added the complete 5.4.2 What’s New modal in all eight interface languages.
+
 ## 5.4.0 — 2026-09-12
 
 Nodus 5.4.0 includes everything prepared for the unpublished 5.3.2, plus unified
