@@ -1,4 +1,5 @@
 import { RELEASE_5_4_0_ADDITIONS } from './releaseNotes540';
+import { RELEASE_5_4_2_HIGHLIGHTS } from './releaseNotes542';
 const RELEASE_3_0_4_TR: string[] = [
   "Bir MCP istemcisi Deep Research raporlarını sıraya alabiliyor. Şimdiye dek rapor isteyen istemci, çağrıyı üretimin tamamı boyunca açık tutmak zorundaydı — her şeyin zaman aşımına uğrayabileceği birkaç dakika — ve uygulamadan sizin başlattığınız bir raporla çakışabiliyordu. Artık raporu sıraya alıp istediği zaman durumunu soruyor: Nodus'un pencereyle paylaştığı tek bir üretim şeridi var, yani asla iki rapor aynı anda çalışmıyor; kuyruk şeridi bir istemciden gelenleri MCP rozetiyle işaretliyor ve Nodi biri bittiğinde ya da başarısız olduğunda sizi uyarıyor, çünkü onu isteyen taraf çoktan bağlantısını kesmiş olabilir. Her iş, sıraya alındığı kasaya bağlı kalıyor ve kasa değiştirmek başka bir kasayı bekleyen ne varsa iptal ediyor.",
   "Başarısız bir görsel başka bir motorla yeniden denenebiliyor. Yeniden deneme, az önce reddeden görselde kayıtlı sağlayıcıyı ve modeli yeniden kullanıyordu; böylece «görsel üretilemedi» durumunda takılı kalan bir rapor hep aynı motora dönüyor, Ayarlar'dan sağlayıcıyı değiştirmek de işe yaramıyordu. Artık motor, istediğiniz şeyden ya da Ayarlar'dan geliyor: başarısız bir görsel güncel varsayılanla açılıyor, üretilmiş olan kendi motorunu koruyor ve tasarım penceresi, tüm kataloğu görsel başına fiyatıyla listeleyen bir model seçici kazanıyor; alt bilgi de düğmenin neyi kullanacağını söylüyor. Ayrıca başarısızlığın gerçek nedeni, kendisiyle çelişen genel bir başlığın altında kalmak yerine mesajın başına geçiyor ve yedi dilin tamamına çevriliyor.",
@@ -107,6 +108,7 @@ const RELEASE_5_1_0_TR = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.4.2": RELEASE_5_4_2_HIGHLIGHTS.map(highlight => highlight.tr),
   "5.4.0": [
     ...RELEASE_5_4_0_ADDITIONS.map(highlight => highlight.tr),
     "Chemistry Studio, Legalize ve AlphaGenome artık kendiniz kurduğunuz resmi paketler. Skills içinde doğrulanmış yayıncısı, izinleri, boyutu ve çalıştığı platformlarla görünür. İstediğiniz zaman kurabilir, güncelleyebilir, önceki sürüme dönebilir veya kaldırabilirsiniz. Yaptıkları iş değişmedi.",
