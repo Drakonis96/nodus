@@ -3861,6 +3861,7 @@ export const IT: Record<string, string> = {
   "Añade la primera desde la ficha de una persona, sección «Relaciones sociales».": "Aggiungi il primo dal record di una persona, nella sezione \"Relazioni sociali\".",
   "Ir a Personas": "Vai a Persone",
   "Vista previa": "Anteprima",
+  "Markdown y LaTeX · fórmulas entre $...$": "Markdown e LaTeX · formule tra $...$",
   "Aún no hay personas. Importa un GEDCOM o añade personas y sus parentescos desde la vista Personas.": "Nessuna persona ancora. Importa un GEDCOM o aggiungi persone e i loro legami di parentela dalla vista Persone.",
   "Árbol genealógico": "Albero genealogico",
   "Centrar el árbol en…": "Centrare l'albero su...",

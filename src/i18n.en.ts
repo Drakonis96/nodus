@@ -4431,6 +4431,7 @@ export const EN: Record<string, string> = {
 
   // ── Markdown notes editor ──────────────────────────────────────────────────
   'Vista previa': 'Preview',
+  'Markdown y LaTeX · fórmulas entre $...$': 'Markdown and LaTeX · formulas between $...$',
 
   // ── Tree view ──────────────────────────────────────────────────────────────
   'Aún no hay personas. Importa un GEDCOM o añade personas y sus parentescos desde la vista Personas.':

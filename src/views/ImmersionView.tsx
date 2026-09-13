@@ -42,6 +42,7 @@ import { WorkspaceTabStrip } from '../components/library/LibraryWorkspaceTabs';
 import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
+import { StudyMarkdown, StudyMarkdownInline } from '../components/StudyMarkdown';
 import { SourceCitationModal, type CitationTarget, type OpenCitationLibraryWork } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { TranslationModal } from '../components/TranslationModal';
@@ -2464,7 +2465,7 @@ function QuizCard({
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
       <div className="flex items-start gap-2">
         <Icon name="help" size={14} className="mt-1 shrink-0 text-indigo-300" />
-        <div className="min-w-0 flex-1 text-sm leading-6 text-neutral-200">{question.question}</div>
+        <div className="min-w-0 flex-1 text-sm leading-6 text-neutral-200"><StudyMarkdown content={question.question} /></div>
       </div>
 
       {question.kind === 'choice' && (
@@ -2486,7 +2487,7 @@ function QuizCard({
                 className={`block w-full rounded-md border px-3 py-2 text-left text-xs leading-5 transition-colors ${cls}`}
               >
                 <span className="mr-2 font-semibold">{String.fromCharCode(65 + i)}.</span>
-                {option}
+                <StudyMarkdownInline content={option} />
                 {revealed && isCorrect && <Icon name="check" size={12} className="ml-1.5 text-emerald-300" />}
               </button>
             );
@@ -2494,7 +2495,7 @@ function QuizCard({
           {saved?.kind === 'choice' && question.explanation && (
             <div className="mt-2 rounded-md border border-neutral-800 bg-neutral-950/60 px-3 py-2 text-xs leading-5 text-neutral-400">
               <Icon name="info" size={12} className="mr-1.5 text-indigo-300" />
-              {question.explanation}
+              <StudyMarkdownInline content={question.explanation} />
             </div>
           )}
         </div>
@@ -2522,7 +2523,7 @@ function QuizCard({
               {question.expected && (
                 <details className="mt-2 text-neutral-400">
                   <summary className="cursor-pointer font-medium text-indigo-300">{t('Ver orientación para contrastarla por tu cuenta')}</summary>
-                  <p className="mt-1 whitespace-pre-wrap">{question.expected}</p>
+                  <div className="mt-1"><StudyMarkdown content={question.expected} /></div>
                 </details>
               )}
             </div>

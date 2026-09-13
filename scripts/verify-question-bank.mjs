@@ -205,7 +205,7 @@ try {
   await page.getByTestId('study-question-save').click();
   await page.waitForFunction(async (q1) => (await window.nodus.getStudyQuestion(q1)).prompt.includes('revisado'), seeded.q1);
   check('editing a question updates its text, cognitive level and subject', true);
-  await page.getByRole('heading', { name: '¿Qué defendió la Ilustración europea (revisado)?' }).waitFor();
+  await page.getByTestId('study-question-detail').getByText('¿Qué defendió la Ilustración europea (revisado)?').first().waitFor();
   await shot(page, '06-question-edited-detail.png');
 
   // ── New question and individual deletion ──────────────────────────────────

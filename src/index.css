@@ -3322,6 +3322,30 @@ select.input optgroup {
   margin: 0.9em 0;
 }
 
+/* Study and teaching content reuses the Markdown pipeline with a tighter rhythm, so
+   a formula or a list never stretches an option row or a flashcard. Inline contexts
+   unwrap paragraphs; display math scrolls instead of widening the card. */
+.study-markdown > *:first-child {
+  margin-top: 0;
+}
+.study-markdown > *:last-child {
+  margin-bottom: 0;
+}
+.study-markdown .katex-display {
+  margin: 0.4em 0;
+  padding: 2px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.study-markdown-inline > p {
+  display: inline;
+  margin: 0;
+}
+.study-markdown-inline > *:not(p) {
+  margin-top: 0.15em;
+  margin-bottom: 0.15em;
+}
+
 /* Deep Research is long-form reading, not a chat bubble. Keep ordinary words
    whole at the right edge (Word-style wrapping) and let only genuinely
    unbreakable material such as URLs and code fall back to character wrapping. */

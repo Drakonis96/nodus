@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api } from '../api';
 import type { JsonRecord } from '../types';
 import { errorText, getActiveLang, t } from '../i18nShim';
+import { MarkdownReader } from '../readers';
 
 const TABLE_FOR_SURFACE: Record<string, string> = {
   'academic-ideas': 'ideas', 'academic-works': 'works', 'academic-authors': 'authors', 'academic-passages': 'passages', 'academic-themes': 'themes', 'academic-gaps': 'gaps',
@@ -137,6 +138,37 @@ export function NativeContentAuthoring({ spaceId, surface, revision, csrfToken, 
   return <div className="relative flex h-full min-h-0 flex-col" data-testid="native-content-surface"><header className="flex shrink-0 items-center gap-3 border-b border-neutral-200 px-5 py-3 dark:border-neutral-800"><div><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-500">{t('Bóveda nativa del servidor')}</p><h1 className="text-base font-semibold">{t(labels.title)}</h1><p className="text-[11px] text-neutral-500">{recordCount} · {t('Revisión')} {currentRevision}</p></div>{canWrite && <div className="ml-auto flex gap-2"><button type="button" className="btn btn-primary text-xs" onClick={() => { setEditing(undefined); setOpen(true); }} data-testid="native-content-create">{newRecordText(labels.singular)}</button><button type="button" className="btn btn-ghost text-xs" onClick={() => { setManage(true); void loadRows(); }} data-testid="native-content-manage">{t('Gestionar')}</button></div>}</header><div className="min-h-0 flex-1 overflow-auto"><div className="min-w-[760px]"><div className="grid border-b border-neutral-200 px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:border-neutral-800" style={{ gridTemplateColumns: `repeat(${Math.max(1, visibleColumns.length)}, minmax(8rem, 1fr))` }}>{visibleColumns.map((column) => <span key={column}>{fieldLabel(column)}</span>)}</div>{rows.length ? rows.map((row, index) => <button type="button" key={String(row[contract.key[0]] ?? index)} className="grid min-h-14 w-full border-b border-neutral-100 px-4 py-2 text-left text-xs hover:bg-neutral-50 dark:border-neutral-900 dark:hover:bg-neutral-900/55" style={{ gridTemplateColumns: `repeat(${Math.max(1, visibleColumns.length)}, minmax(8rem, 1fr))` }} onClick={() => { if (canWrite) { setEditing(row); setOpen(true); } }}>{visibleColumns.map((column) => <span key={column} className="line-clamp-2 pr-3">{String(row[column] ?? '—')}</span>)}</button>) : <p className="p-10 text-center text-sm text-neutral-500">{t('No hay registros todavía.')}{canWrite ? ` ${t('Crea')} ${firstRecordText(labels.singular)} ${t('desde esta vista.')}` : ''}</p>}</div></div>{(open || editing) && canWrite && <NativeRecordEditor spaceId={spaceId} table={table} contract={contract} revision={currentRevision} csrfToken={csrfToken} row={editing} labels={{ ...labels, title: t(labels.title), singular: t(labels.singular) }} onCancel={() => { setOpen(false); setEditing(undefined); }} onSaved={() => void saved()} />}{manage && canWrite && <div className="fixed inset-0 z-40 bg-black/50 p-4" role="dialog" aria-modal="true" aria-label={`${t('Gestionar')} ${t(labels.title)}`}><div className="mx-auto mt-12 max-h-[80vh] w-full max-w-3xl overflow-auto rounded-xl border border-neutral-200 bg-white p-5 text-neutral-900 shadow-2xl dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"><header className="mb-4 flex items-center justify-between"><div><h2 className="text-base font-semibold">{t('Gestionar')} {t(labels.title).toLocaleLowerCase(getActiveLang())}</h2><p className="text-xs text-neutral-500">{t('Revisión')} {currentRevision} · {recordCount}</p></div><button type="button" className="btn btn-ghost" onClick={() => setManage(false)}>{t('Cerrar')}</button></header>{error && <p className="mb-3 rounded border border-red-300 bg-red-50 p-2 text-xs text-red-700 dark:border-red-900 dark:bg-transparent dark:text-red-300" role="alert">{error}</p>}<div className="divide-y divide-neutral-200 rounded border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">{rows.length ? rows.map((row, index) => <div key={String(row[contract.key[0]] ?? index)} className="flex items-center justify-between gap-3 p-3 text-xs"><span className="min-w-0 truncate">{String(row.title ?? row.name ?? row.label ?? row.display_name ?? row[contract.key[0]] ?? t('Registro'))}</span><span className="flex shrink-0 gap-2"><button type="button" className="btn btn-ghost text-xs" onClick={() => { setEditing(row); setManage(false); }}>{t('Editar')}</button><button type="button" className="btn btn-ghost text-xs text-red-600 dark:text-red-300" onClick={() => void remove(row)}>{t('Borrar')}</button></span></div>) : <p className="p-6 text-center text-xs text-neutral-500">{t('No hay registros.')}</p>}</div></div></div>}</div>;
 }
 
+/** Field editor with an optional Markdown/LaTeX preview: question prompts, options
+ *  and answers type set in the same reader as the published surfaces. The toggle
+ *  only appears for values that actually contain rich syntax, so ordinary metadata
+ *  fields stay plain textareas. */
+function looksRich(value: string): boolean {
+  return /\$[^$\n]+\$|\*\*|__|~~|`|^ {0,3}#{1,6}\s|^ {0,3}([-*+]|\d+[.)])\s|^ {0,3}>\s|^\s*\|/m.test(value);
+}
+
+function NativeTextEditor({ value, disabled, onChange }: { value: string; disabled: boolean; onChange: (next: string) => void }) {
+  const [preview, setPreview] = useState(false);
+  const rich = looksRich(value);
+  return (
+    <div>
+      {(rich || preview) && (
+        <div className="mb-1 flex justify-end gap-1 text-[10px]">
+          <span className="mr-auto text-neutral-400">{t('Markdown y LaTeX · fórmulas entre $...$')}</span>
+          <button type="button" className={`rounded px-1.5 py-0.5 ${preview ? 'text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800' : 'bg-indigo-600 text-white'}`} onClick={() => setPreview(false)}>{t('Editar')}</button>
+          <button type="button" className={`rounded px-1.5 py-0.5 ${preview ? 'bg-indigo-600 text-white' : 'text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800'}`} onClick={() => setPreview(true)}>{t('Vista previa')}</button>
+        </div>
+      )}
+      {preview ? (
+        <div className="min-h-10 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs dark:border-neutral-800 dark:bg-neutral-900/40">
+          {value.trim() ? <MarkdownReader value={value} /> : <p className="text-neutral-500">{t('Sin contenido')}</p>}
+        </div>
+      ) : (
+        <textarea className="input w-full bg-white dark:bg-neutral-900" rows={value.length > 100 ? 3 : 1} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+      )}
+    </div>
+  );
+}
+
 export function NativeRecordEditor({ spaceId, table, contract, revision, csrfToken, row, labels, onCancel, onSaved }: {
   spaceId: string; table: string; contract: Contract; revision: number; csrfToken?: string; row?: JsonRecord; labels: { title: string; singular: string }; onCancel: () => void; onSaved: () => void;
 }) {
@@ -159,7 +191,7 @@ export function NativeRecordEditor({ spaceId, table, contract, revision, csrfTok
     finally { setBusy(false); }
   };
   const editorFields = [...(generatedKey ? [] : contract.key), ...fields.filter((field) => !contract.key.includes(field))];
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label={editing ? `${t('Editar')} ${t(labels.singular)}` : newRecordText(labels.singular)}><div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-xl border border-neutral-200 bg-white p-5 text-neutral-900 shadow-2xl dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"><header className="mb-4 flex items-center justify-between"><div><h2 className="text-base font-semibold">{editing ? `${t('Editar')} ${t(labels.singular)}` : newRecordText(labels.singular)}</h2><p className="text-xs text-neutral-500">{t(labels.title)} · {t('Revisión')} {revision}</p></div><button type="button" className="btn btn-ghost" onClick={onCancel}>{t('Cerrar')}</button></header>{error && <p className="mb-3 rounded border border-red-300 bg-red-50 p-2 text-xs text-red-700 dark:border-red-900 dark:bg-transparent dark:text-red-300" role="alert">{error}</p>}<div className="grid gap-3 sm:grid-cols-2">{editorFields.map((column) => <label key={column} className="text-xs"><span className="mb-1 block text-neutral-600 dark:text-neutral-400">{fieldLabel(column)}</span><textarea className="input w-full bg-white dark:bg-neutral-900" rows={String(values[column] ?? '').length > 100 ? 3 : 1} value={String(values[column] ?? '')} disabled={editing && contract.key.includes(column)} onChange={(event) => setValues((current) => ({ ...current, [column]: event.target.value }))} /></label>)}</div><footer className="mt-5 flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={onCancel}>{t('Cancelar')}</button><button type="button" className="btn btn-primary" disabled={busy} onClick={() => void save()}>{busy ? t('Guardando…') : t('Guardar')}</button></footer></div></div>;
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label={editing ? `${t('Editar')} ${t(labels.singular)}` : newRecordText(labels.singular)}><div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-xl border border-neutral-200 bg-white p-5 text-neutral-900 shadow-2xl dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"><header className="mb-4 flex items-center justify-between"><div><h2 className="text-base font-semibold">{editing ? `${t('Editar')} ${t(labels.singular)}` : newRecordText(labels.singular)}</h2><p className="text-xs text-neutral-500">{t(labels.title)} · {t('Revisión')} {revision}</p></div><button type="button" className="btn btn-ghost" onClick={onCancel}>{t('Cerrar')}</button></header>{error && <p className="mb-3 rounded border border-red-300 bg-red-50 p-2 text-xs text-red-700 dark:border-red-900 dark:bg-transparent dark:text-red-300" role="alert">{error}</p>}<div className="grid gap-3 sm:grid-cols-2">{editorFields.map((column) => <div key={column} className="text-xs"><span className="mb-1 block text-neutral-600 dark:text-neutral-400">{fieldLabel(column)}</span><NativeTextEditor value={String(values[column] ?? '')} disabled={editing && contract.key.includes(column)} onChange={(next) => setValues((current) => ({ ...current, [column]: next }))} /></div>)}</div><footer className="mt-5 flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={onCancel}>{t('Cancelar')}</button><button type="button" className="btn btn-primary" disabled={busy} onClick={() => void save()}>{busy ? t('Guardando…') : t('Guardar')}</button></footer></div></div>;
 }
 
 export { TABLE_FOR_SURFACE };
