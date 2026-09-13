@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { completeJson, embedMany, AiError } from './aiClient';
 import { modelRefSupportsExtraction } from '@shared/localAiModels';
 import { deepScanPrompt } from './prompts';
-import { planIdeaFusion, applyFusionPlan, ExtractedIdea } from './fusion';
+import { applyFusionPlan, resolveIdeaFusion, ExtractedIdea, FusionDecision, FusionPlan } from './fusion';
 import {
   upsertOccurrence,
   addEvidence,
@@ -483,6 +483,15 @@ export async function runDeepScan(
     }
 
     if (!text.trim()) {
+      // Zotero was unreachable, so we do not know whether full text exists. Never
+      // persist `skipped_no_text` for this: it would present a transient outage as a
+      // permanent "no PDF". Fail retriably so the queue backs off and tries again.
+      if (doc.blockReason === 'zotero_unavailable') {
+        throw new AiError(
+          'Zotero no está disponible: no se pudo comprobar si la obra tiene texto completo. Vuelve a analizarla cuando Zotero esté abierto.',
+          true,
+        );
+      }
       setDeepResult(work.nodus_id, 'skipped_no_text', hash, doc.sourceType, doc.notes ?? 'Sin texto disponible.');
       totalDone({ status: 'skipped_no_text' });
       return;
@@ -514,7 +523,10 @@ export async function runDeepScan(
       chunkPlan,
       localTokenPolicy: 1,
     });
-    if (options.force) clearCheckpoints(work.nodus_id, checkpointHash, 'deep_chunk');
+    if (options.force) {
+      clearCheckpoints(work.nodus_id, checkpointHash, 'deep_chunk');
+      clearCheckpoints(work.nodus_id, checkpointHash, 'deep_fusion');
+    }
     perfLog('chunking', 0, perf, {
       mode: chunkPlan.mode,
       words: chunkPlan.wordCount,
@@ -740,6 +752,12 @@ export async function runDeepScan(
       embeddingDone({ available: embeddings.filter(Boolean).length });
       await withFusionLock(publishOrdinal, async () => {
         publicationAdvanced = true;
+        // Fusion decisions are checkpointed per idea. A transient model failure
+        // (invalid JSON or a provider hang) therefore costs a retry of only the
+        // ideas that failed, not the whole work — the caller throws a retriable
+        // error and the queue resumes from these checkpoints later.
+        const fusionCheckpoints = loadCheckpoints(work.nodus_id, checkpointHash, 'deep_fusion');
+        const failedFusion: number[] = [];
         const plans = await mapOrderedPool(preparedIdeas, extractionPool, async (prepared, i) => {
           const { labelKey, idea, ideaThemeLabels, embeddingText } = prepared;
           onProgress?.({
@@ -752,23 +770,43 @@ export async function runDeepScan(
             label: idea.label,
             statement: idea.statement,
           };
-          return planIdeaFusion(ext, {
-            model: fusionModel,
-            perf,
-            embedding: embeddings[i] ?? null,
-            embeddingText,
-            themes: ideaThemeLabels,
-          });
+          try {
+            const outcome = await resolveIdeaFusion(ext, {
+              model: fusionModel,
+              perf,
+              embedding: embeddings[i] ?? null,
+              embeddingText,
+              themes: ideaThemeLabels,
+            }, (fusionCheckpoints.get(i) as FusionDecision | undefined) ?? null);
+            if (outcome.decision) saveCheckpoint(work.nodus_id, checkpointHash, 'deep_fusion', i, outcome.decision);
+            return outcome.plan;
+          } catch (error) {
+            // A misconfiguration (missing model / bad key) is not a hiccup: it would
+            // fail identically for every idea. Rethrow so the queue pauses and
+            // surfaces it once, exactly as it did when planIdeaFusion ran unguarded.
+            if (error instanceof AiError && error.config) throw error;
+            // Do not abort the pass: every other decision still makes progress and
+            // gets checkpointed, so the retry only redoes the ideas collected here.
+            failedFusion.push(i);
+            return null;
+          }
         });
+        if (failedFusion.length > 0) {
+          throw new AiError(
+            `No se pudieron fusionar ${failedFusion.length} de ${preparedIdeas.length} ideas (respuesta JSON inválida o tiempo de espera). Se reintentará más tarde reanudando solo esas.`,
+            true,
+          );
+        }
 
         // No user-visible deep row is changed until every model/embedding decision is
         // ready. A write error rolls the whole replacement back to the previous result.
+        const resolvedPlans = plans as FusionPlan[];
         getDb().transaction(() => {
           purgeDeepData(work.nodus_id);
           unionWorkThemes(work.nodus_id, deepThemeLabels, 4);
           for (let i = 0; i < preparedIdeas.length; i++) {
             const { labelKey, idea, ideaThemeLabels } = preparedIdeas[i];
-            const globalId = applyFusionPlan(plans[i], work.nodus_id);
+            const globalId = applyFusionPlan(resolvedPlans[i], work.nodus_id);
             labelToGlobal.set(labelKey, globalId);
             setIdeaThemeLinks(work.nodus_id, globalId, ideaThemeLabels, idea.confidence, 'explicit');
             upsertOccurrence(globalId, work.nodus_id, idea.role, idea.development, idea.confidence);
@@ -832,6 +870,7 @@ export async function runDeepScan(
           });
           recomputeAuthorRelations();
           clearCheckpoints(work.nodus_id, checkpointHash, 'deep_chunk');
+          clearCheckpoints(work.nodus_id, checkpointHash, 'deep_fusion');
           assertDeepDataIntegrity(work.nodus_id);
         })();
       });

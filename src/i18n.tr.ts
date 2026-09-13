@@ -2592,6 +2592,7 @@ export const TR: Record<string, string> = {
   'No aplica': 'Uygulanamaz',
   'Solo abstract': 'Yalnızca özet',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'Nodus okunacak metin bulamadı. PDF veya EPUB dosyasını Zotero’ya ekleyip yeniden analiz et.',
+  'Zotero no está disponible. Ábrelo y vuelve a analizar.': 'Zotero kullanılamıyor. Açın ve yeniden analiz edin.',
   'El análisis solo pudo usar el abstract, así que esta obra no tendrá texto citable. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'Analiz yalnızca özeti kullanabildi, bu yüzden bu eserin alıntılanabilir metni olmayacak. PDF veya EPUB dosyasını Zotero’ya ekleyip yeniden analiz et.',
   'Ver las {n} ideas de esta obra': 'Bu eserin {n} fikrini gör',
   'Analizar: temas, ideas, resumen, indexado y relaciones': 'Analiz et: temalar, fikirler, özet, dizinleme ve ilişkiler',

@@ -662,7 +662,11 @@ export type TextBlockReason =
   | 'file_missing'
   | 'scanned_no_ocr'
   | 'unreadable'
-  | 'unsupported';
+  | 'unsupported'
+  // Zotero's local API could not be reached, so whether an attachment exists is
+  // unknown. Never conflate this with `no_attachment`: the work may well have full
+  // text and must be retried once Zotero is running.
+  | 'zotero_unavailable';
 
 export interface WorkTextSource {
   nodus_id: string;
@@ -6299,7 +6303,7 @@ export type CorpusHealthBucketId = 'withoutText' | 'lightOnly' | 'deepPriority' 
  */
 export type WorkReadiness =
   | 'unstarted'
-  /** Accepted by the queue but not executing yet. Never exposed as a SQL filter. */
+  /** Accepted by the queue but not executing yet. Filterable from persisted markers. */
   | 'pending'
   /** Being processed right now. Live-queue only: never a SQL filter. */
   | 'running'
@@ -9039,9 +9043,9 @@ export interface WorkFilter {
   healthBucket?: CorpusHealthBucketId;
   /**
    * Restrict to one readiness value — what the library's status presets use.
-   * Transient queue states are not accepted: they are renderer-only.
+   * `running` is renderer-only (live queue); persisted `pending` is filterable.
    */
-  readiness?: Exclude<WorkReadiness, 'pending' | 'running'>;
+  readiness?: Exclude<WorkReadiness, 'running'>;
   theme?: string;
   /** Zotero tags to match. Multiple tags can use any-match (default) or all-match. */
   zoteroTags?: string[];

@@ -2441,6 +2441,7 @@ export const PT_BR: Record<string, string> = {
   'No aplica': 'Não aplicável',
   'Solo abstract': 'Apenas resumo',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'O Nodus não encontrou texto para ler. Adicione o PDF ou EPUB no Zotero e analise novamente.',
+  'Zotero no está disponible. Ábrelo y vuelve a analizar.': 'O Zotero não está disponível. Abra-o e analise novamente.',
   'El análisis solo pudo usar el abstract, así que esta obra no tendrá texto citable. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'A análise só pôde usar o resumo, por isso esta obra não terá texto citável. Adicione o PDF ou EPUB no Zotero e analise novamente.',
   'Ver las {n} ideas de esta obra': 'Ver as {n} ideias desta obra',
   'Analizar: temas, ideas, resumen, indexado y relaciones': 'Analisar: temas, ideias, resumo, indexação e relações',

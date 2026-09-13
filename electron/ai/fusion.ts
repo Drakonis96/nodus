@@ -21,7 +21,7 @@ export interface ExtractedIdea {
   statement: string;
 }
 
-interface FusionResult {
+export interface FusionDecision {
   resolution: 'same_as' | 'variant_of' | 'new';
   matched_id: string | null;
   merged_label: string;
@@ -69,7 +69,7 @@ const FUSION_EDGE_TYPES = new Set<EdgeType>([
   'refines',
 ]);
 
-function isFusionResult(v: unknown): v is FusionResult {
+function isFusionResult(v: unknown): v is FusionDecision {
   if (typeof v !== 'object' || v === null) return false;
   const o = v as Record<string, unknown>;
   if (o.resolution !== 'same_as' && o.resolution !== 'variant_of' && o.resolution !== 'new') return false;
@@ -168,11 +168,34 @@ export async function fuseIdea(
   return applyFusionPlan(await planIdeaFusion(idea, optionsOrModel), sourceWork);
 }
 
+export interface FusionOutcome {
+  plan: FusionPlan;
+  /**
+   * The validated model decision, or null when there was nothing to decide (a
+   * fresh idea with no candidates needs no model call). Callers persist this so a
+   * later retry can skip the model for ideas that already resolved.
+   */
+  decision: FusionDecision | null;
+}
+
 /** Resolve a fusion decision without mutating the graph. */
 export async function planIdeaFusion(
   idea: ExtractedIdea,
   optionsOrModel: FuseIdeaOptions | ModelRef | null = {}
 ): Promise<FusionPlan> {
+  return (await resolveIdeaFusion(idea, optionsOrModel)).plan;
+}
+
+/**
+ * Resolve one extracted idea against the global graph, optionally reusing a
+ * previously checkpointed decision. Returns the plan plus the raw decision so the
+ * caller can checkpoint it and skip the model on a later retry.
+ */
+export async function resolveIdeaFusion(
+  idea: ExtractedIdea,
+  optionsOrModel: FuseIdeaOptions | ModelRef | null = {},
+  cachedDecision: FusionDecision | null = null,
+): Promise<FusionOutcome> {
   const opts: FuseIdeaOptions = optionsOrModel && 'provider' in optionsOrModel ? { model: optionsOrModel } : optionsOrModel ?? {};
   const settings = getSettings();
   const fusionModel = opts.model ?? settings.fusionModel ?? settings.synthesisModel ?? null;
@@ -214,7 +237,18 @@ export async function planIdeaFusion(
   // No candidates → straight to a new idea, no model call needed.
   if (candidates.length === 0) {
     perfLog('LLM fusion', 0, opts.perf, { idea: idea.label, status: 'skipped', candidates: 0 });
-    return { idea, embedding, embeddingText, themes: opts.themes ?? [], model: fusionModel, existingId: null, label: idea.label, edge: null };
+    return {
+      plan: { idea, embedding, embeddingText, themes: opts.themes ?? [], model: fusionModel, existingId: null, label: idea.label, edge: null },
+      decision: null,
+    };
+  }
+
+  // A decision checkpointed by an earlier attempt is reused verbatim. Rebuilding the
+  // plan against freshly retrieved candidates keeps `matched_id` honest if the graph
+  // moved on between runs (a vanished target simply degrades to a new idea).
+  if (cachedDecision && isFusionResult(cachedDecision)) {
+    perfLog('LLM fusion', 0, opts.perf, { idea: idea.label, status: 'cached', candidates: candidates.length });
+    return { plan: buildFusionPlan(idea, cachedDecision, candidates, embedding, embeddingText, opts, fusionModel), decision: cachedDecision };
   }
 
   const input = {
@@ -230,7 +264,7 @@ export async function planIdeaFusion(
 
   const fusionDone = startPerf('LLM fusion', opts.perf, { idea: idea.label, candidates: candidates.length });
   try {
-    const result = await completeJson<FusionResult>(
+    const result = await completeJson<FusionDecision>(
       {
         system: coreStructuredPrompt('fusion', getSettings().promptLanguage ?? 'es'),
         user: JSON.stringify(input),
@@ -244,39 +278,52 @@ export async function planIdeaFusion(
       fusionModel
     );
     fusionDone({ resolution: result.resolution, matched: Boolean(result.matched_id) });
-    const matchedCandidate = result.matched_id
-      ? candidates.find((candidate) => candidate.global_id === result.matched_id)
-      : null;
-    if (result.resolution === 'same_as' && matchedCandidate && getIdea(matchedCandidate.global_id)) {
-      return { idea, embedding, embeddingText, themes: opts.themes ?? [], model: fusionModel, existingId: matchedCandidate.global_id, label: idea.label, edge: null };
-    }
-
-    const matched = result.matched_id && result.edge_to_existing && getIdea(result.matched_id)
-      ? matchedCandidate
-      : null;
-    return {
-      idea,
-      embedding,
-      embeddingText,
-      themes: opts.themes ?? [],
-      model: fusionModel,
-      existingId: null,
-      label: result.merged_label || idea.label,
-      edge: matched && result.edge_to_existing ? {
-        to: matched.global_id,
-        type: result.edge_to_existing.type,
-        basis: result.edge_to_existing.basis,
-        confidence: result.edge_to_existing.confidence,
-        similarity: matched.similarity,
-        rationale: result.rationale,
-      } : null,
-    };
+    return { plan: buildFusionPlan(idea, result, candidates, embedding, embeddingText, opts, fusionModel), decision: result };
   } catch (error) {
     // A failed semantic decision cannot be represented as "new": doing so mutates
-    // the graph with a lower-quality answer. Leave the enclosing work checkpointed.
+    // the graph with a lower-quality answer. The caller checkpoints the successes
+    // and retries only this idea, so the work resumes instead of restarting.
     fusionDone({ status: 'error' });
     throw error;
   }
+}
+
+function buildFusionPlan(
+  idea: ExtractedIdea,
+  result: FusionDecision,
+  candidates: { global_id: string; type: string; label: string; statement: string; similarity: number }[],
+  embedding: number[] | null,
+  embeddingText: string,
+  opts: FuseIdeaOptions,
+  fusionModel: ModelRef | null,
+): FusionPlan {
+  const matchedCandidate = result.matched_id
+    ? candidates.find((candidate) => candidate.global_id === result.matched_id)
+    : null;
+  if (result.resolution === 'same_as' && matchedCandidate && getIdea(matchedCandidate.global_id)) {
+    return { idea, embedding, embeddingText, themes: opts.themes ?? [], model: fusionModel, existingId: matchedCandidate.global_id, label: idea.label, edge: null };
+  }
+
+  const matched = result.matched_id && result.edge_to_existing && getIdea(result.matched_id)
+    ? matchedCandidate
+    : null;
+  return {
+    idea,
+    embedding,
+    embeddingText,
+    themes: opts.themes ?? [],
+    model: fusionModel,
+    existingId: null,
+    label: result.merged_label || idea.label,
+    edge: matched && result.edge_to_existing ? {
+      to: matched.global_id,
+      type: result.edge_to_existing.type,
+      basis: result.edge_to_existing.basis,
+      confidence: result.edge_to_existing.confidence,
+      similarity: matched.similarity,
+      rationale: result.rationale,
+    } : null,
+  };
 }
 
 /** Apply a previously planned decision. Callers may compose this inside a transaction. */
