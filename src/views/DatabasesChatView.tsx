@@ -6,6 +6,7 @@ import { parseChatSegments } from '@shared/chartSpec';
 import { t } from '../i18n';
 import { ResearchAssistantModal } from './ResearchAssistantModal';
 import { nativeSummary, type ResearchChatAdapter } from './researchChatAdapter';
+import type { ResearchConversationNavigationTarget } from '../researchNoteProvenance';
 
 const STARTERS = [
   'Resume esta base de datos en 3 puntos.',
@@ -26,7 +27,7 @@ function AssistantMessage({ text, streaming = false }: { text: string; streaming
   );
 }
 
-export function DatabasesChatView({ settings, initialDatabaseId }: { settings: AppSettings; initialDatabaseId: string | null }) {
+export function DatabasesChatView({ settings, initialDatabaseId, conversationTarget, onOpenSavedNote }: { settings: AppSettings; initialDatabaseId: string | null; conversationTarget?: ResearchConversationNavigationTarget | null; onOpenSavedNote?: (id: string) => void }) {
   const [databases, setDatabases] = useState<DatabaseSummary[]>([]);
   const [selected, setSelected] = useState<string[]>(initialDatabaseId ? [initialDatabaseId] : []);
   useEffect(() => { void window.nodus.listDatabases().then(list => { setDatabases(list); setSelected(current => current.length ? current : list[0] ? [list[0].id] : []); }); }, []);
@@ -43,5 +44,5 @@ export function DatabasesChatView({ settings, initialDatabaseId }: { settings: A
     cancelResearchChat: () => window.nodus.cancelDbChat(),
     renderMessage: (message, streaming) => <AssistantMessage text={message.content} streaming={streaming} />,
   }), [databases, selected]);
-  return <ResearchAssistantModal settings={settings} embedded adapter={adapter} />;
+  return <ResearchAssistantModal settings={settings} embedded adapter={adapter} initialConversationTarget={conversationTarget} onOpenSavedNote={onOpenSavedNote} />;
 }

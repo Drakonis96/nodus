@@ -246,10 +246,14 @@ export function pinnedToolkitSidebarItems(pages: unknown): ToolkitSidebarNavItem
 }
 
 const VAULT_TYPE_LABELS: Partial<Record<VaultType, Partial<Record<View, string>>>> = {
+  estudio: {
+    notes: 'Espacio de trabajo',
+  },
   docencia: {
     studyChat: 'Research chat',
     studyIdeas: 'Ideas',
     studyGraph: 'Grafo',
+    notes: 'Espacio de trabajo',
   },
 };
 
@@ -305,12 +309,12 @@ const DEDICATED_VAULT_NAV_IDS: Partial<Record<ReturnType<typeof normalizeVaultTy
   estudio: [
     'studyCourses', 'studySchedule', 'studyCalendar', 'studySearch', 'studyLibrary',
     'studyRecordings', 'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions',
-    'studyReview', 'studyDeepResearch', 'browser', 'radar', 'compass', 'toolkit',
+    'studyReview', 'studyDeepResearch', 'notes', 'browser', 'radar', 'compass', 'toolkit',
   ],
   docencia: [
     'studyCourses', 'teachingGroups', 'studySchedule', 'studyCalendar', 'studyLibrary',
     'studyRecordings', 'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions',
-    'teachingRubrics', 'teachingExams', 'teachingGrades', 'teachingUnits', 'browser', 'radar', 'compass', 'toolkit',
+    'teachingRubrics', 'teachingExams', 'teachingGrades', 'teachingUnits', 'notes', 'browser', 'radar', 'compass', 'toolkit',
   ],
   databases: ['pages', 'dbSearch', 'dbAnalysis', 'dbChat', 'dbDeepResearch', 'notes', 'browser', 'radar', 'compass', 'toolkit'],
   // Las ocho entradas acordadas del vault de Testimonios, menos Inicio y Ajustes, que

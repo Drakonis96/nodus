@@ -24,6 +24,7 @@ import type {
 import type { StudyNavigationTarget } from '../components/StudySidebar';
 import type { DossierTab } from '../components/testimonies/InterviewDossier';
 import type { ViewSnapshotAccess } from './viewSnapshots';
+import type { ResearchConversationNavigationTarget } from '../researchNoteProvenance';
 
 /** A pending navigation carries a nonce so repeating the same target re-triggers it. */
 export type Nonced<T> = T & { nonce: number };
@@ -43,7 +44,7 @@ export interface PrimarySourceTarget {
  * vault type says which.
  */
 export interface VaultFlags {
-  /** La bóveda académica: la de por defecto, y la única con Espacio de trabajo. */
+  /** La bóveda académica: la de por defecto. Estudio y Docencia también nombran así sus notas. */
   isAcademic: boolean;
   isGenealogy: boolean;
   isPrimarySources: boolean;
@@ -87,6 +88,7 @@ export interface ViewContext extends VaultFlags {
   studyGraphTarget: Nonced<PendingGraphNavigationTarget> | null;
   studyChatTarget: { prompt: string; nonce: number } | null;
   assistantTarget: Nonced<PendingAssistantNavigationTarget> | null;
+  researchConversationTarget: ResearchConversationNavigationTarget | null;
   radarTarget: { updateId?: string; nonce: number } | null;
 
   /**
@@ -113,6 +115,7 @@ export interface ViewContext extends VaultFlags {
   openIdea: (ideaId: string) => void;
   openAuthor: (authorId: string, name: string) => void;
   openNoteFromSearch: (id: string) => void;
+  openResearchConversation: (target: Omit<ResearchConversationNavigationTarget, 'nonce'>) => void;
   openPrimarySourceTarget: (target: PrimarySourceTarget) => void;
   openTestimonyInterview: (interviewId: string, tab?: DossierTab) => void;
   openTestimonyLink: (link: TestimonyDeepLink) => void;

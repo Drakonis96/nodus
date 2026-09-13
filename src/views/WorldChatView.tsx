@@ -7,6 +7,7 @@ import { Icon } from '../components/ui';
 import { t } from '../i18n';
 import { ResearchAssistantModal } from './ResearchAssistantModal';
 import { nativeSummary, type ResearchChatAdapter } from './researchChatAdapter';
+import type { ResearchConversationNavigationTarget } from '../researchNoteProvenance';
 
 const SECTION_OF_KIND: Record<string, View> = {
   character: 'characters',
@@ -39,7 +40,7 @@ const STARTERS = [
 
 const BLANK_SELECTION: WorldChatSelection = { scope: 'auto', entryKeys: [], keepFocus: false };
 
-export function WorldChatView({ settings, onNavigate }: { settings: AppSettings; onNavigate?: (view: View) => void }) {
+export function WorldChatView({ settings, onNavigate, conversationTarget, onOpenSavedNote }: { settings: AppSettings; onNavigate?: (view: View) => void; conversationTarget?: ResearchConversationNavigationTarget | null; onOpenSavedNote?: (id: string) => void }) {
   const [selection, setSelection] = useState<WorldChatSelection>(() => ({ ...BLANK_SELECTION, entryKeys: [] }));
   const [focus, setFocus] = useState<WorldChatResult['focus']>([]);
   const focusByConversation = useRef(new Map<string, WorldChatResult['focus']>());
@@ -94,5 +95,5 @@ export function WorldChatView({ settings, onNavigate }: { settings: AppSettings;
     cancelResearchChat: () => window.nodus.cancelWorldChat(),
     renderMessage: (message, streaming) => <ChatMarkdown content={message.content} streaming={streaming} verify={false} onWorldEntry={kind => openWorldEntry(kind)} />,
   };
-  return <ResearchAssistantModal settings={settings} embedded adapter={adapter} />;
+  return <ResearchAssistantModal settings={settings} embedded adapter={adapter} initialConversationTarget={conversationTarget} onOpenSavedNote={onOpenSavedNote} />;
 }

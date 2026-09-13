@@ -67,7 +67,8 @@ import type {
   SidebarNavItem,
   View,
 } from './navigation';
-import { researchChatView, dedicatedVaultNavIds, groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
+import { researchChatView, dedicatedVaultNavIds, groupedNav, navItemLabel, NAV_ITEMS, NAV_GROUPS } from './navigation';
+import type { ResearchConversationNavigationTarget } from './researchNoteProvenance';
 import type { ToolkitPage } from './navigation';
 import type { LibraryScope } from '@shared/libraryTypes';
 import { placeHeaderBadge, placeHeaderModelAlert, type HeaderBadgePlacement, type HeaderModelAlertPlacement } from './headerLayout';
@@ -357,6 +358,7 @@ export function App() {
   const [authorTarget, setAuthorTarget] = useState<PendingAuthorNavigationTarget & { nonce: number } | null>(null);
   const [libraryTarget, setLibraryTarget] = useState<PendingLibraryNavigationTarget & { nonce: number } | null>(null);
   const [assistantTarget, setAssistantTarget] = useState<PendingAssistantNavigationTarget & { nonce: number } | null>(null);
+  const [researchConversationTarget, setResearchConversationTarget] = useState<ResearchConversationNavigationTarget | null>(null);
   // A note the user opened from global search; the nonce re-triggers even if the
   // same note is chosen twice.
   const [noteTarget, setNoteTarget] = useState<{ id: string; nonce: number } | null>(null);
@@ -1152,6 +1154,17 @@ export function App() {
     setView(isAcademic ? 'workspace' : 'notes');
   }, [isAcademic]);
 
+  const openResearchConversation = useCallback((target: Omit<ResearchConversationNavigationTarget, 'nonce'>) => {
+    setResearchConversationTarget({ ...target, nonce: Date.now() });
+    setView(target.surface === 'database'
+      ? 'dbChat'
+      : target.surface === 'study'
+        ? 'studyChat'
+        : target.surface === 'world'
+          ? 'worldChat'
+          : 'researchChat');
+  }, []);
+
   const openAssistant = useCallback(
     (target?: PendingAssistantNavigationTarget) => {
       if (!((isEstudio || isDocencia ? settings?.studyModel : null) ?? settings?.chatModel ?? settings?.synthesisModel)) {
@@ -1173,6 +1186,7 @@ export function App() {
     setStudyGraphTarget(null);
     setStudyChatTarget(null);
     setAssistantTarget(null);
+    setResearchConversationTarget(null);
     setNoteTarget(null);
     setLastSync(null);
     setView('home');
@@ -1197,7 +1211,7 @@ export function App() {
     );
     const navCommands: Command[] = bySection.map((n) => ({
       id: `nav:${n.id}`,
-      label: t(n.label),
+      label: t(navItemLabel(n, activeVault?.type)),
       section: n.group ? groupLabel.get(n.group)! : t('General'),
       icon: n.icon,
       run: () => setView(n.id),
@@ -1290,6 +1304,7 @@ export function App() {
     studyGraphTarget,
     studyChatTarget,
     assistantTarget,
+    researchConversationTarget,
     radarTarget,
     setView,
     navigate,
@@ -1303,6 +1318,7 @@ export function App() {
     openIdea,
     openAuthor,
     openNoteFromSearch,
+    openResearchConversation,
     openPrimarySourceTarget,
     openTestimonyInterview,
     openTestimonyLink,
@@ -1665,14 +1681,15 @@ export function App() {
           >
             <div data-testid="sidebar-scroll-region" className="vault-sidebar-scroll mr-[6px] flex h-full min-h-0 flex-col gap-1 overflow-y-auto p-2">
               {(() => {
+              const navLabel = (n: SidebarNavItem) => t('toolkitPage' in n ? n.label : navItemLabel(n, activeVault?.type));
               const navButton = (n: SidebarNavItem, disabled = false) => (
                 <button
                   key={n.id}
                   data-tour={`nav-${n.id}`}
                   disabled={disabled}
                   aria-disabled={disabled}
-                  aria-label={sidebarCompact ? t(n.label) : undefined}
-                  title={disabled ? `${t(n.label)} · ${t('Próximamente')}` : sidebarCompact ? t(n.label) : undefined}
+                  aria-label={sidebarCompact ? navLabel(n) : undefined}
+                  title={disabled ? `${navLabel(n)} · ${t('Próximamente')}` : sidebarCompact ? navLabel(n) : undefined}
                   onClick={() => {
                     if (disabled) return;
                     if ('toolkitPage' in n) {
@@ -1695,7 +1712,7 @@ export function App() {
                   }`}
                 >
                   <Icon name={n.icon} className="shrink-0 opacity-70" />
-                  <span className={sidebarCompact ? 'sr-only' : undefined}>{t(n.label)}</span>
+                  <span className={sidebarCompact ? 'sr-only' : undefined}>{navLabel(n)}</span>
                   {disabled && !sidebarCompact && <span className="ml-auto text-[9px] font-semibold uppercase tracking-wide">{t('Próximamente')}</span>}
                 </button>
               );

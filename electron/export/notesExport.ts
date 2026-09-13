@@ -16,6 +16,7 @@ interface ExportNote {
   kind: string;
   createdAt: string;
   updatedAt: string;
+  source?: Note['source'];
   summary?: string;
   body?: string;
   works?: ExportWork[];
@@ -129,6 +130,7 @@ function gatherNote(note: Note, options: NotesExportOptions): ExportNote {
     kind: note.kind,
     createdAt: note.createdAt,
     updatedAt: note.updatedAt,
+    source: note.source ?? undefined,
   };
   if (options.includeContent && note.content.trim()) out.body = note.content;
 
@@ -199,6 +201,23 @@ function renderNote(lines: string[], note: ExportNote, depth: number, options: N
   const tag = note.kind === 'idea' ? ' _(idea)_' : '';
   lines.push(`${heading} ${note.title}${tag}`, '');
   if (note.summary) lines.push(`**Resumen:** ${note.summary}`, '');
+
+  if (note.source?.researchChat) {
+    const chat = note.source.researchChat;
+    lines.push('**Procedencia:**');
+    lines.push(`- Origen: ${chat.surface}`);
+    lines.push(`- Conversación: ${chat.conversationTitle}`);
+    lines.push(`- Guardada: ${note.createdAt}`);
+    if (note.source.model) lines.push(`- Modelo: ${note.source.model.provider} / ${note.source.model.model}`);
+    if ((chat.references ?? []).length > 0) {
+      lines.push('- Fuentes:');
+      for (const reference of chat.references ?? []) {
+        const label = reference.citationId ? `${reference.citationId} · ${reference.label}` : reference.label;
+        lines.push(`  - ${reference.href ? `[${label}](${reference.href})` : label}${reference.subtitle ? ` — ${reference.subtitle}` : ''}`);
+      }
+    }
+    lines.push('');
+  }
 
   if (note.works && note.works.length > 0) {
     lines.push('**Obras que la desarrollan:**');

@@ -15,7 +15,7 @@
 // funcionando sin enterarse de que la vista cambió.
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { AppSettings, Note, NoteFolder, NotesTree, WorkspaceLibraryLink } from '@shared/types';
+import type { AppSettings, Note, NoteFolder, NoteResearchChatSource, NotesTree, WorkspaceLibraryLink } from '@shared/types';
 import { MANUAL_IDEA_MARKER } from '@shared/types';
 import type { TestimonyDeepLink } from '@shared/testimonyDeepLinks';
 import type { LibraryScope } from '@shared/libraryTypes';
@@ -28,6 +28,7 @@ import type { PendingGraphNavigationTarget } from '../navigation';
 import type { WorkspaceSnapshot } from '../app/viewSnapshots';
 import { useListPlacement } from '../listPlacement';
 import { t, tx } from '../i18n';
+import { ResearchNoteProvenancePanel } from '../components/ResearchNoteProvenancePanel';
 
 const StudyEditor = lazy(() => import('../components/editor/StudyEditor').then((module) => ({ default: module.StudyEditor })));
 
@@ -406,6 +407,11 @@ export function WorkspaceView({
   onOpenGraph,
   title = 'Espacio de trabajo',
   onTestimonyLink,
+  onOpenResearchConversation,
+  onOpenStudyDocument,
+  onOpenStudyMaterial,
+  onOpenStudyRecording,
+  onOpenWorldEntry,
 }: {
   settings: AppSettings;
   /** Una nota que abrir al entrar (búsqueda global, Nodi); el nonce repite el gesto. */
@@ -418,6 +424,11 @@ export function WorkspaceView({
   title?: 'Espacio de trabajo' | 'Notas';
   /** Los enlaces temporales de una nota testimonial abren su entrevista y minuto. */
   onTestimonyLink?: (link: TestimonyDeepLink) => void;
+  onOpenResearchConversation?: (source: NoteResearchChatSource) => void;
+  onOpenStudyDocument?: (id: string) => void;
+  onOpenStudyMaterial?: (id: string) => void;
+  onOpenStudyRecording?: (id: string, timestamp?: number | null) => void;
+  onOpenWorldEntry?: (kind: string, id: string) => void;
 }) {
   const [tree, setTree] = useState<NotesTree>({ folders: [], notes: [] });
   const [links, setLinks] = useState<WorkspaceLibraryLink[]>([]);
@@ -717,6 +728,14 @@ export function WorkspaceView({
           </select>
         </div>
         <WorkspaceTagsEditor note={active} onChanged={refresh} />
+        <ResearchNoteProvenancePanel
+          note={active}
+          onOpenConversation={onOpenResearchConversation}
+          onOpenStudyDocument={onOpenStudyDocument}
+          onOpenStudyMaterial={onOpenStudyMaterial}
+          onOpenStudyRecording={onOpenStudyRecording}
+          onOpenWorldEntry={onOpenWorldEntry}
+        />
         {itemKind(active) === 'idea' && active.source?.ref && onOpenGraph && (
           <div className="px-3 pb-3">
             <button className="btn btn-ghost w-full text-xs" onClick={() => onOpenGraph({ nodeId: active.source!.ref!, label: active.title })}>
