@@ -1,10 +1,12 @@
 import crypto from 'node:crypto';
 import type {
   StudyQuestion,
+  StudyQuestionBulkAction,
   StudyQuestionCollection,
   StudyQuestionExport,
   StudyQuestionFilters,
   StudyQuestionInput,
+  StudyQuestionSort,
   StudyQuestionVersion,
   StudyQuestionAnalytics,
   StudyQuestionSimilar,
@@ -78,6 +80,17 @@ export function getStudyQuestion(id: string): StudyQuestion | null {
   const row = rowFor(id); return row ? toQuestion(row) : null;
 }
 
+const QUESTION_SORT_SQL: Record<StudyQuestionSort, string> = {
+  updated: 'favorite DESC, updated_at DESC, position',
+  created: 'created_at DESC, position',
+  prompt: 'prompt COLLATE NOCASE ASC',
+  difficulty: "CASE difficulty WHEN 'easy' THEN 0 WHEN 'medium' THEN 1 WHEN 'hard' THEN 2 ELSE 3 END, updated_at DESC",
+  status: "CASE status WHEN 'approved' THEN 0 WHEN 'pending' THEN 1 WHEN 'problematic' THEN 2 ELSE 3 END, updated_at DESC",
+  source: "COALESCE(source_title, '') COLLATE NOCASE ASC, updated_at DESC",
+  usage: 'usage_count DESC, updated_at DESC',
+  answered: 'last_answered_at DESC, updated_at DESC',
+};
+
 export function listStudyQuestions(filters: StudyQuestionFilters = {}): StudyQuestion[] {
   const conditions = ['deleted_at IS NULL']; const params: unknown[] = [];
   if (!filters.archived) conditions.push('archived_at IS NULL');
@@ -85,6 +98,8 @@ export function listStudyQuestions(filters: StudyQuestionFilters = {}): StudyQue
   if (filters.subjectId) { conditions.push('subject_id = ?'); params.push(filters.subjectId); }
   if (filters.folderId) { conditions.push('folder_id = ?'); params.push(filters.folderId); }
   if (filters.topicId) { conditions.push('topic_id = ?'); params.push(filters.topicId); }
+  if (filters.documentId) { conditions.push('document_id = ?'); params.push(filters.documentId); }
+  if (filters.materialId) { conditions.push('material_id = ?'); params.push(filters.materialId); }
   if (filters.type && filters.type !== 'all') { conditions.push('question_type = ?'); params.push(filters.type); }
   if (filters.difficulty && filters.difficulty !== 'all') { conditions.push('difficulty = ?'); params.push(filters.difficulty); }
   if (filters.status && filters.status !== 'all') { conditions.push('status = ?'); params.push(filters.status); }
@@ -92,11 +107,25 @@ export function listStudyQuestions(filters: StudyQuestionFilters = {}): StudyQue
   if (filters.sourceKind === 'document') conditions.push('document_id IS NOT NULL');
   if (filters.sourceKind === 'material') conditions.push('material_id IS NOT NULL');
   if (filters.sourceKind === 'recording') conditions.push('(recording_id IS NOT NULL OR transcript_id IS NOT NULL)');
-  if (filters.search?.trim()) {
-    conditions.push("(prompt LIKE ? ESCAPE '\\' OR explanation LIKE ? ESCAPE '\\' OR tags_json LIKE ? ESCAPE '\\')");
-    const escaped = filters.search.trim().replace(/[\\%_]/g, '\\$&'); params.push(`%${escaped}%`, `%${escaped}%`, `%${escaped}%`);
+  if (filters.collectionId) { conditions.push('id IN (SELECT question_id FROM study_question_collection_items WHERE collection_id = ?)'); params.push(filters.collectionId); }
+  if (filters.tag?.trim()) {
+    conditions.push("EXISTS (SELECT 1 FROM json_each(study_questions.tags_json) WHERE json_each.value = ?)");
+    params.push(filters.tag.trim());
   }
-  return (getDb().prepare(`SELECT * FROM study_questions WHERE ${conditions.join(' AND ')} ORDER BY favorite DESC, updated_at DESC, position`).all(...params) as Row[]).map(toQuestion);
+  if (filters.search?.trim()) {
+    conditions.push("(prompt LIKE ? ESCAPE '\\' OR explanation LIKE ? ESCAPE '\\' OR tags_json LIKE ? ESCAPE '\\' OR source_title LIKE ? ESCAPE '\\')");
+    const escaped = filters.search.trim().replace(/[\\%_]/g, '\\$&'); params.push(`%${escaped}%`, `%${escaped}%`, `%${escaped}%`, `%${escaped}%`);
+  }
+  const order = QUESTION_SORT_SQL[filters.sort ?? 'updated'] ?? QUESTION_SORT_SQL.updated;
+  return (getDb().prepare(`SELECT * FROM study_questions WHERE ${conditions.join(' AND ')} ORDER BY ${order}`).all(...params) as Row[]).map(toQuestion);
+}
+
+/** Distinct tags with how many live questions use them, for the bank's tag filter. */
+export function listStudyQuestionTags(): Array<{ tag: string; count: number }> {
+  const rows = getDb().prepare(`SELECT json_each.value AS tag, COUNT(*) AS count FROM study_questions, json_each(study_questions.tags_json)
+    WHERE deleted_at IS NULL AND json_each.value IS NOT NULL AND TRIM(json_each.value) != ''
+    GROUP BY json_each.value ORDER BY count DESC, tag COLLATE NOCASE ASC`).all() as Row[];
+  return rows.map((row) => ({ tag: String(row.tag), count: Number(row.count) }));
 }
 
 function normalizedInput(input: StudyQuestionInput, current?: StudyQuestion): Required<Pick<StudyQuestionInput, 'prompt' | 'type' | 'difficulty' | 'cognitiveLevel' | 'status' | 'answer' | 'options' | 'explanation' | 'rubric' | 'competence' | 'tags'>> & StudyQuestionInput {
@@ -186,6 +215,64 @@ export function exportStudyQuestions(idsToExport?: string[]): StudyQuestionExpor
 export function importStudyQuestions(payload: StudyQuestionExport): StudyQuestion[] {
   if (payload.format !== 'nodus-study-questions' || payload.version !== 1 || !Array.isArray(payload.questions)) throw new Error('Fichero de preguntas no válido.');
   return payload.questions.map((question) => createStudyQuestion(question, 'import', true));
+}
+
+/**
+ * Applies one metadata action to many questions at once. Bulk metadata edits update
+ * `updated_at` but deliberately do not write a version snapshot per row: a version
+ * history entry is for editing content, and a 200-row move would bury the real edits.
+ */
+export function bulkStudyQuestions(ids: string[], action: StudyQuestionBulkAction): number {
+  const unique = [...new Set(ids.map((id) => String(id)).filter(Boolean))];
+  if (!unique.length) return 0;
+  const db = getDb(); const timestamp = now();
+  const placeholders = unique.map(() => '?').join(',');
+  let affected = 0;
+  db.transaction(() => {
+    if (action.kind === 'status') {
+      affected = db.prepare(`UPDATE study_questions SET status=?, updated_at=? WHERE id IN (${placeholders}) AND deleted_at IS NULL`).run(action.status, timestamp, ...unique).changes;
+    } else if (action.kind === 'difficulty') {
+      affected = db.prepare(`UPDATE study_questions SET difficulty=?, updated_at=? WHERE id IN (${placeholders}) AND deleted_at IS NULL`).run(action.difficulty, timestamp, ...unique).changes;
+    } else if (action.kind === 'favorite') {
+      affected = db.prepare(`UPDATE study_questions SET favorite=?, updated_at=? WHERE id IN (${placeholders}) AND deleted_at IS NULL`).run(action.favorite ? 1 : 0, timestamp, ...unique).changes;
+    } else if (action.kind === 'move') {
+      const assignments: string[] = []; const values: unknown[] = [];
+      const columns: Array<['courseId' | 'subjectId' | 'folderId' | 'topicId' | 'documentId' | 'materialId', string]> = [['courseId', 'course_id'], ['subjectId', 'subject_id'], ['folderId', 'folder_id'], ['topicId', 'topic_id'], ['documentId', 'document_id'], ['materialId', 'material_id']];
+      for (const [key, column] of columns) {
+        if (action[key] === undefined) continue;
+        assignments.push(`${column}=?`); values.push(action[key] || null);
+      }
+      if (assignments.length) {
+        affected = db.prepare(`UPDATE study_questions SET ${assignments.join(', ')}, updated_at=? WHERE id IN (${placeholders}) AND deleted_at IS NULL`).run(...values, timestamp, ...unique).changes;
+      }
+    } else if (action.kind === 'tags') {
+      const add = [...new Set((action.add ?? []).map((tag) => tag.trim()).filter(Boolean))];
+      const remove = new Set((action.remove ?? []).map((tag) => tag.trim()).filter(Boolean));
+      const rows = db.prepare(`SELECT id, tags_json FROM study_questions WHERE id IN (${placeholders}) AND deleted_at IS NULL`).all(...unique) as Row[];
+      const update = db.prepare('UPDATE study_questions SET tags_json=?, updated_at=? WHERE id=?');
+      for (const row of rows) {
+        const current = json<string[]>(row.tags_json, []);
+        const next = [...new Set([...current.filter((tag) => !remove.has(tag)), ...add])];
+        if (next.length !== current.length || next.some((tag, index) => tag !== current[index])) { update.run(JSON.stringify(next), timestamp, String(row.id)); affected += 1; }
+      }
+    } else if (action.kind === 'collections') {
+      for (const collectionId of [...new Set(action.add ?? [])]) {
+        const start = Number((db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS value FROM study_question_collection_items WHERE collection_id=?').get(collectionId) as Row).value);
+        const insert = db.prepare('INSERT OR IGNORE INTO study_question_collection_items (collection_id, question_id, position, created_at) VALUES (?, ?, ?, ?)');
+        unique.forEach((questionId, index) => { affected += insert.run(collectionId, questionId, start + index, timestamp).changes; });
+        db.prepare('UPDATE study_question_collections SET updated_at=? WHERE id=?').run(timestamp, collectionId);
+      }
+      for (const collectionId of [...new Set(action.remove ?? [])]) {
+        affected += db.prepare(`DELETE FROM study_question_collection_items WHERE collection_id=? AND question_id IN (${placeholders})`).run(collectionId, ...unique).changes;
+        db.prepare('UPDATE study_question_collections SET updated_at=? WHERE id=?').run(timestamp, collectionId);
+      }
+    } else if (action.kind === 'lifecycle') {
+      if (action.action === 'delete') affected = db.prepare(`DELETE FROM study_questions WHERE id IN (${placeholders})`).run(...unique).changes;
+      else if (action.action === 'archive' || action.action === 'restore') affected = db.prepare(`UPDATE study_questions SET archived_at=?, updated_at=? WHERE id IN (${placeholders}) AND deleted_at IS NULL`).run(action.action === 'archive' ? timestamp : null, timestamp, ...unique).changes;
+      else affected = db.prepare(`UPDATE study_questions SET deleted_at=?, updated_at=? WHERE id IN (${placeholders})`).run(action.action === 'trash' ? timestamp : null, timestamp, ...unique).changes;
+    }
+  })();
+  return affected;
 }
 
 export function listStudyQuestionCollections(): StudyQuestionCollection[] {

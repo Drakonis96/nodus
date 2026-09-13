@@ -1,6 +1,9 @@
 import { registerResearchAttachmentIpc } from './researchAttachments';
 import { getResearchSystemPrompts, saveResearchSystemPrompt, selectResearchSystemPrompt, deleteResearchSystemPrompt } from '../db/researchSystemPromptsRepo';
 import { mergeHybridResults, searchSnippet } from '@shared/hybridSearch';
+import type { StudyQuestionBulkAction } from '@shared/studyQuestions';
+import type { StudyFlashcardExport, StudyFlashcardBulkAction } from '@shared/studyFlashcards';
+import type { StudyInterchangeExportOptions, StudyInterchangeFormat, StudyInterchangeImportOptions, StudyInterchangeKind } from '@shared/studyInterchange';
 import { searchVaultContent } from '../ai/vaultContentSearch';
 import { stellarPage, stellarThemes, getStellarSession, saveStellarSession } from '../graph/stellarService';
 // The academic corpus and the study vault, moved verbatim out of the monolithic
@@ -214,6 +217,7 @@ import * as studySearch from '../ai/studySearch';
 import * as studyAssistant from '../ai/studyAssistant';
 import * as studyQuestions from '../db/studyQuestionsRepo';
 import * as studyLearning from '../db/studyLearningRepo';
+import { detectStudyInterchangeFormat, exportStudyInterchange, interchangeExtension, parseStudyInterchange, writeStudyInterchange } from '../studyInterchange';
 import * as studyAiUsage from '../db/studyAiUsageRepo';
 import * as studyDataAdmin from '../db/studyDataAdmin';
 import { exportStudyScope } from '../export/studyExport';
@@ -1299,6 +1303,37 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('study:questions:collections:delete', async (_e, id: string) => studyQuestions.deleteStudyQuestionCollection(id));
   h('study:questions:analytics', async (_e, id: string) => studyQuestions.getStudyQuestionAnalytics(id));
   h('study:questions:similar', async (_e, id: string, threshold?: number) => studyQuestions.findSimilarStudyQuestions(id, threshold));
+  h('study:questions:tags', async () => studyQuestions.listStudyQuestionTags());
+  h('study:questions:bulk', async (_e, ids: string[], action: StudyQuestionBulkAction) => studyQuestions.bulkStudyQuestions(ids, action));
+  h('study:interchange:export', async (_e, kind: StudyInterchangeKind, format: StudyInterchangeFormat, options?: StudyInterchangeExportOptions) => {
+    const bytes = exportStudyInterchange(kind, format, options ?? {});
+    const extension = interchangeExtension(kind, format);
+    const defaultName = kind === 'questions' ? `nodus-preguntas.${extension}` : `nodus-flashcards.${extension}`;
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: kind === 'questions' ? 'Exportar banco de preguntas' : 'Exportar flashcards',
+      defaultPath: defaultName,
+      filters: [{ name: format === 'nodus' ? 'Nodus' : format.toUpperCase(), extensions: [extension] }, { name: 'Todos', extensions: ['*'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, bytes);
+    return { path: picked.filePath };
+  });
+  h('study:interchange:import', async (_e, kind: StudyInterchangeKind, options?: StudyInterchangeImportOptions) => {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
+      title: kind === 'questions' ? 'Importar preguntas' : 'Importar flashcards',
+      properties: ['openFile'],
+      filters: kind === 'questions'
+        ? [{ name: 'Preguntas compatibles', extensions: ['json', 'csv', 'xml', 'gift', 'txt', 'tsv', 'apkg'] }, { name: 'Todos', extensions: ['*'] }]
+        : [{ name: 'Flashcards compatibles', extensions: ['json', 'csv', 'txt', 'tsv', 'apkg', 'xml', 'gift'] }, { name: 'Todos', extensions: ['*'] }],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return null;
+    const filePath = picked.filePaths[0];
+    const bytes = fs.readFileSync(filePath);
+    const format = options?.format ?? detectStudyInterchangeFormat(path.basename(filePath), bytes);
+    const parsed = parseStudyInterchange(kind, format, bytes, path.basename(filePath));
+    const written = writeStudyInterchange(kind, parsed, options?.location);
+    return { kind, format, imported: written.imported, skipped: written.skipped, warnings: written.warnings, file: path.basename(filePath), path: filePath };
+  });
   h('study:assessments:list', async (_e, kind?: 'test' | 'exam', includeArchived?: boolean) => studyAssessments.listStudyAssessments(kind, includeArchived));
   h('study:assessments:get', async (_e, id: string) => studyAssessments.getStudyAssessment(id));
   h('study:assessments:create', async (_e, input: StudyAssessmentInput) => studyAssessments.createStudyAssessment(input));
@@ -1334,6 +1369,10 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('study:flashcards:fromQuestions', async (_e, ids: string[]) => studyLearning.createStudyFlashcardsFromQuestions(ids));
   h('study:flashcards:review', async (_e, input) => studyLearning.reviewStudyFlashcard(input));
   h('study:flashcards:state', async (_e, id: string, action) => studyLearning.setStudyFlashcardState(id, action));
+  h('study:flashcards:tags', async () => studyLearning.listStudyFlashcardTags());
+  h('study:flashcards:bulk', async (_e, ids: string[], action: StudyFlashcardBulkAction) => studyLearning.bulkStudyFlashcards(ids, action));
+  h('study:flashcards:export', async (_e, ids?: string[]) => studyLearning.exportStudyFlashcards(ids));
+  h('study:flashcards:import', async (_e, payload: StudyFlashcardExport) => studyLearning.importStudyFlashcards(payload));
   h('study:learning:progress', async () => studyLearning.getStudyProgressDashboard());
   h('study:planner:get', async () => studyLearning.getStudyPlanner());
   h('study:planner:create', async (_e, input) => studyLearning.createStudyPlan(input));
