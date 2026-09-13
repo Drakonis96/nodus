@@ -18,7 +18,8 @@ export type TeachingView =
   | 'teachingGrades'
   | 'teachingExams'
   | 'teachingRubrics'
-  | 'teachingUnits';
+  | 'teachingUnits'
+  | 'notes';
 
 export interface TeachingItem { label: string; icon: string; view: TeachingView }
 export interface TeachingGroup { id: string; label: string; items: TeachingItem[]; hint?: string }
@@ -52,6 +53,7 @@ export const TEACHING_GROUPS: TeachingGroup[] = [
   ] },
   { id: 'teaching-create', label: 'Crear', items: [
     { label: 'Diseño de unidades', icon: 'compass', view: 'teachingUnits' },
+    { label: 'Espacio de trabajo', icon: 'notebook', view: 'notes' },
   ] },
 ];
 

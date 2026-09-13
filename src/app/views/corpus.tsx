@@ -1,7 +1,9 @@
 // The academic corpus: the library, the graph and everything derived from it,
 // plus the two sections whose engine changes with the vault (search, notes).
 import { lazy } from 'react';
-import type { ViewRenderer } from '../ViewContext';
+import type { ViewContext, ViewRenderer } from '../ViewContext';
+import type { NoteResearchChatSource } from '@shared/types';
+import type { View } from '../../navigation';
 
 const GlobalLibraryView = lazy(() => import('../../views/GlobalLibraryView').then((module) => ({ default: module.GlobalLibraryView })));
 const GraphView = lazy(() => import('../../views/GraphView').then((module) => ({ default: module.GraphView })));
@@ -20,6 +22,18 @@ const SearchView = lazy(() => import('../../views/SearchView').then((module) => 
 const PrimarySourcesSearchView = lazy(() => import('../../views/PrimarySourcesSearchView').then((module) => ({ default: module.PrimarySourcesSearchView })));
 const PrimarySourcesNotesView = lazy(() => import('../../views/PrimarySourcesNotesView').then((module) => ({ default: module.PrimarySourcesNotesView })));
 const TestimonySearchView = lazy(() => import('../../views/TestimonySearchView').then((module) => ({ default: module.TestimonySearchView })));
+
+const openOriginConversation = (ctx: ViewContext) => (source: NoteResearchChatSource) => ctx.openResearchConversation({
+  surface: source.surface,
+  conversationId: source.conversationId,
+  messageId: source.messageId,
+  messageIndex: source.messageIndex,
+});
+
+const WORLD_REFERENCE_VIEW: Record<string, View> = {
+  character: 'characters', place: 'places', group: 'factions', scene: 'scenes', article: 'encyclopedia',
+  map: 'map', rule: 'rules', conflict: 'conflicts',
+};
 
 export const corpusViews = {
   // `snapshot` is the same shape as `target` and `initialTab`: a starting value the
@@ -200,27 +214,33 @@ export const corpusViews = {
 
   // Notas, ideas y colecciones con una única experiencia visual. La ruta académica
   // conserva el nombre Espacio de trabajo; el resto entra por su sección Notas.
-  workspace: ({ navigate, noteTarget, settings, snapshots }) => (
+  workspace: ({ navigate, noteTarget, settings, snapshots, openResearchConversation }) => (
     <WorkspaceView
       settings={settings}
       focusNote={noteTarget}
       snapshot={snapshots.read('workspace')}
       onSnapshotChange={(patch) => snapshots.patch('workspace', patch)}
       onOpenGraph={(target) => navigate('graph', target)}
+      onOpenResearchConversation={(source) => openResearchConversation({ surface: source.surface, conversationId: source.conversationId, messageId: source.messageId, messageIndex: source.messageIndex })}
     />
   ),
 
-  notes: ({ isPrimarySources, isTestimonios, navigate, noteTarget, openPrimarySourceTarget, openTestimonyLink, settings, snapshots }) => (isPrimarySources
-    ? <PrimarySourcesNotesView focusNote={noteTarget} onOpenSource={openPrimarySourceTarget} />
+  notes: (ctx) => (ctx.isPrimarySources
+    ? <PrimarySourcesNotesView focusNote={ctx.noteTarget} onOpenSource={ctx.openPrimarySourceTarget} onOpenResearchConversation={openOriginConversation(ctx)} />
     : (
       <WorkspaceView
-        settings={settings}
-        title="Notas"
-        snapshot={snapshots.read('notes')}
-        onSnapshotChange={(patch) => snapshots.patch('notes', patch)}
-        onOpenGraph={(target) => navigate('graph', target)}
-        focusNote={noteTarget}
-        onTestimonyLink={isTestimonios ? openTestimonyLink : undefined}
+        settings={ctx.settings}
+        title={ctx.isEstudio || ctx.isDocencia ? 'Espacio de trabajo' : 'Notas'}
+        snapshot={ctx.snapshots.read('notes')}
+        onSnapshotChange={(patch) => ctx.snapshots.patch('notes', patch)}
+        onOpenGraph={(target) => ctx.navigate('graph', target)}
+        focusNote={ctx.noteTarget}
+        onTestimonyLink={ctx.isTestimonios ? ctx.openTestimonyLink : undefined}
+        onOpenResearchConversation={openOriginConversation(ctx)}
+        onOpenStudyDocument={(id) => { ctx.setStudyTarget({ kind: 'document', id }); ctx.setView('studyCourses'); }}
+        onOpenStudyMaterial={(id) => { ctx.setStudyMaterialTarget(id); ctx.setView('studyLibrary'); }}
+        onOpenStudyRecording={(id, timestamp) => { ctx.setStudyRecordingTarget({ id, timestamp }); ctx.setView('studyRecordings'); }}
+        onOpenWorldEntry={(kind) => { const target = WORLD_REFERENCE_VIEW[kind]; if (target) ctx.setView(target); }}
       />
     )),
 } satisfies Record<string, ViewRenderer>;

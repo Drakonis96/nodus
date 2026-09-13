@@ -5947,12 +5947,34 @@ export interface ChatConversation extends ChatConversationSummary {
 export type NoteKind = 'markdown' | 'assistant' | 'writing' | 'debate' | 'idea' | 'hypothesis';
 
 /** Optional provenance metadata kept alongside a captured note (model, source ids…). */
+export interface NoteResearchReference {
+  /** Citation token used inside the saved Markdown (for example `S1`). */
+  citationId?: string | null;
+  label: string;
+  subtitle?: string | null;
+  quote?: string | null;
+  /** A safe external URL or a durable `nodus://` deep link. */
+  href?: string | null;
+}
+
+export interface NoteResearchChatSource {
+  surface: import('./researchAttachments').ResearchAttachmentSurface;
+  conversationId: string;
+  conversationTitle: string;
+  messageId: string;
+  /** Stable fallback for transports that reconstruct message ids when loading. */
+  messageIndex?: number | null;
+  references: NoteResearchReference[];
+}
+
 export interface NoteSource {
   origin: NoteKind;
   model?: ModelRef | null;
   /** Free-form references back to the originating object (idea id, draft title…). */
   ref?: string | null;
   note?: string | null;
+  /** Structured origin for answers captured from any Research chat surface. */
+  researchChat?: NoteResearchChatSource | null;
 }
 
 export interface NoteFolder {

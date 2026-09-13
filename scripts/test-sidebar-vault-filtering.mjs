@@ -42,6 +42,7 @@ test('dedicated vaults expose only their own fixed navigation', () => {
   const worldbuilding = navigation.dedicatedVaultNavIds('worldbuilding');
 
   assert.ok(study.includes('studyChat'));
+  assert.ok(study.includes('notes'));
   assert.ok(!study.includes('teachingGroups'));
   assert.ok(!study.includes('characters'));
 
@@ -50,6 +51,7 @@ test('dedicated vaults expose only their own fixed navigation', () => {
   assert.ok(teaching.includes('studyIdeas'));
   assert.ok(teaching.includes('studyGraph'));
   assert.ok(teaching.includes('teachingUnits'));
+  assert.ok(teaching.includes('notes'));
   assert.ok(!teaching.includes('studyDeepResearch'));
   assert.ok(!teaching.includes('persons'));
 
@@ -67,12 +69,15 @@ test('dedicated vaults expose only their own fixed navigation', () => {
   assert.equal(navigation.dedicatedVaultNavIds('genealogy'), null);
 });
 
-test('Docencia exposes only Unit design under Crear with its stable settings id', () => {
+test('Docencia exposes Unit design and the Workspace under Crear with stable settings ids', () => {
   const create = TEACHING_GROUPS.find((group) => group.label === 'Crear');
   assert.ok(create, 'Crear is present');
   assert.deepEqual(
     create.items.map((item) => ({ label: item.label, id: teachingItemId(item) })),
-    [{ label: 'Diseño de unidades', id: 'teachingUnits' }],
+    [
+      { label: 'Diseño de unidades', id: 'teachingUnits' },
+      { label: 'Espacio de trabajo', id: 'notes' },
+    ],
   );
   const ids = TEACHING_GROUPS.flatMap((group) => group.items.map(teachingItemId));
   assert.equal(new Set(ids).size, ids.length, 'every configurable teaching item has a unique id');

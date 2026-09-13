@@ -18,6 +18,7 @@ import type {
   ResearchChatMessage,
   ResearchContextSelection,
   ResearchGraphPartsSelection,
+  NoteSource,
 } from '@shared/types';
 import { Icon, modelLabel, sortModelRefs } from '../components/ui';
 import type { MarkdownCitation } from '../components/Markdown';
@@ -29,6 +30,7 @@ import { VirtualList } from '../components/VirtualList';
 import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 import { useFeatureModel } from '../hooks/useFeatureModel';
+import { researchNoteSource, type ResearchConversationNavigationTarget } from '../researchNoteProvenance';
 import './researchAssistant.css';
 
 const DEFAULT_SELECTION: ResearchContextSelection = {
@@ -212,6 +214,9 @@ export function ResearchAssistantModal({
   onClose,
   embedded = false,
   adapter,
+  initialConversationTarget,
+  notesDestinationLabel = 'Notas',
+  onOpenSavedNote,
 }: {
   settings: AppSettings;
   initialTarget?: AssistantNavigationTarget | null;
@@ -221,6 +226,9 @@ export function ResearchAssistantModal({
   onClose?: () => void;
   embedded?: boolean;
   adapter?: ResearchChatAdapter;
+  initialConversationTarget?: ResearchConversationNavigationTarget | null;
+  notesDestinationLabel?: string;
+  onOpenSavedNote?: (noteId: string) => void;
 }) {
   const api = adapter ?? window.nodus;
   const apiRef = useRef(api);
@@ -255,7 +263,9 @@ export function ResearchAssistantModal({
   const [showArchived, setShowArchived] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ChatConversationSummary | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
-  const [noteTarget, setNoteTarget] = useState<{ content: string; title: string } | null>(null);
+  const [noteTarget, setNoteTarget] = useState<{ content: string; title: string; source: NoteSource } | null>(null);
+  const [conversationNotice, setConversationNotice] = useState<string | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showContext, setShowContext] = useState(false);
@@ -278,6 +288,7 @@ export function ResearchAssistantModal({
   const focusTriggerRef = useRef<HTMLButtonElement>(null);
   const contextPanelRef = useRef<HTMLDivElement>(null);
   const lastInitialTargetRef = useRef<number | null>(null);
+  const lastConversationTargetRef = useRef<number | null>(null);
   // Mirrors `messages` so async stream callbacks can persist the final array without
   // racing React state updates.
   const messagesRef = useRef<UiMessage[]>([]);
@@ -477,27 +488,55 @@ export function ResearchAssistantModal({
     setCopiedMessageId(null);
   }, [initialTarget]);
 
-  const loadConversation = async (id: string) => {
-    if (attachmentBusyRef.current) return;
+  const loadConversation = async (id: string, messageId?: string | null, messageIndex?: number | null): Promise<boolean> => {
+    if (attachmentBusyRef.current) return false;
     setThinkingEffort('standard');
     const conversation = await api.getConversation(id);
     if (!conversation) {
       await refreshConversations();
-      return;
+      setConversationNotice(t('La conversación original ya no está disponible.'));
+      return false;
     }
     const storedAttachments = await window.nodus.listResearchAttachments({ surface: attachmentSurface, conversationId: id });
     const referenced = new Set(conversation.messages.flatMap(message => message.attachments?.map(file => file.id) ?? []));
     setAttachments((storedAttachments ?? []).filter(file => !referenced.has(file.id)));
     setAttachmentError('');
     setActiveId(conversation.id);
-    setMessages(conversation.messages.map((m) => ({ ...m, id: m.id || crypto.randomUUID() })));
+    const loadedMessages = conversation.messages.map((m) => ({ ...m, id: m.id || crypto.randomUUID() }));
+    setMessages(loadedMessages);
     setStoppedMessageId(null);
     setSelection(cloneSelection(conversation.selection ?? SYNTHESIS_SELECTION));
     if (conversation.model) setSelectedModel(conversation.model);
-    setContextTitle(null);
+    setContextTitle(conversation.title || null);
     setInput('');
-    window.setTimeout(() => scrollToBottom('auto'), 0);
+    setConversationNotice(null);
+    const resolvedMessageId = loadedMessages.some((message) => message.id === messageId)
+      ? messageId
+      : messageIndex != null
+        ? loadedMessages[messageIndex]?.id
+        : null;
+    if ((messageId || messageIndex != null) && !resolvedMessageId) {
+      setConversationNotice(t('La conversación está disponible, pero el mensaje original ya no existe.'));
+    }
+    if (resolvedMessageId) {
+      setHighlightedMessageId(resolvedMessageId);
+      window.setTimeout(() => {
+        const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(resolvedMessageId) : resolvedMessageId.replace(/["\\]/g, '\\$&');
+        document.querySelector<HTMLElement>(`[data-message-id="${escaped}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 0);
+      window.setTimeout(() => setHighlightedMessageId((current) => current === resolvedMessageId ? null : current), 2400);
+    } else {
+      window.setTimeout(() => scrollToBottom('auto'), 0);
+    }
+    return true;
   };
+
+  useEffect(() => {
+    const target = initialConversationTarget;
+    if (!target || target.surface !== attachmentSurface || target.nonce === lastConversationTargetRef.current) return;
+    lastConversationTargetRef.current = target.nonce;
+    void loadConversation(target.conversationId, target.messageId, target.messageIndex);
+  }, [initialConversationTarget?.nonce]);
 
   const archiveConversation = async (conversation: ChatConversationSummary) => {
     await api.archiveConversation?.(conversation.id, !conversation.archived);
@@ -890,6 +929,11 @@ export function ResearchAssistantModal({
           <section className="flex-1 min-w-0 min-h-0 flex flex-col">
             <div className="relative flex-1 min-h-0">
               <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-3">
+                {conversationNotice && (
+                  <div role="status" className="mx-auto max-w-xl rounded-lg border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
+                    {conversationNotice}
+                  </div>
+                )}
                 {messages.length === 0 && (
                   <div className="h-full flex flex-col items-center justify-center gap-5 px-4 text-center">
                     <div className="flex flex-col items-center gap-2">
@@ -920,7 +964,7 @@ export function ResearchAssistantModal({
                   <div
                     key={message.id}
                     data-message-id={message.id}
-                    className={`msg-in flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`msg-in flex rounded-lg transition-shadow duration-500 ${highlightedMessageId === message.id ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-neutral-950' : ''} ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
                       className={`research-message group relative max-w-[78%] rounded-lg border px-3 py-2 text-sm ${message.role === 'assistant' ? 'pr-24' : 'pr-16'} ${
@@ -950,9 +994,24 @@ export function ResearchAssistantModal({
                           <button
                             className="rounded p-1 text-neutral-500 opacity-70 transition hover:bg-neutral-800 research-accent-hover hover:opacity-100"
                             title={t('Guardar en notas')}
-                            onClick={() =>
-                              setNoteTarget({ content: message.content, title: deriveNoteTitle(message.content, contextTitle) })
-                            }
+                            onClick={() => {
+                              if (!activeId) return;
+                              const summary = conversations.find((conversation) => conversation.id === activeId);
+                              const fallbackTitle = messages.find((candidate) => candidate.role === 'user' && candidate.content.trim())?.content.trim().slice(0, 80);
+                              const conversationTitle = summary?.title || contextTitle || fallbackTitle || t('Research chat');
+                              setNoteTarget({
+                                content: message.content,
+                                title: deriveNoteTitle(message.content, conversationTitle),
+                                source: researchNoteSource({
+                                  surface: attachmentSurface,
+                                  conversationId: activeId,
+                                  conversationTitle,
+                                  message,
+                                  messageIndex: messages.findIndex((candidate) => candidate.id === message.id),
+                                  model: summary?.model ?? selectedModel,
+                                }),
+                              });
+                            }}
                           >
                             <Icon name="notebook" size={13} />
                           </button>
@@ -1241,8 +1300,10 @@ export function ResearchAssistantModal({
           content={noteTarget.content}
           defaultTitle={noteTarget.title}
           kind="assistant"
-          source={{ origin: 'assistant', model: selectedModel, note: contextTitle ?? null }}
+          source={noteTarget.source}
+          destinationLabel={notesDestinationLabel}
           onClose={() => setNoteTarget(null)}
+          onOpenSavedNote={onOpenSavedNote ? (note) => onOpenSavedNote(note.id) : undefined}
         />
       )}
     </div>
