@@ -266,6 +266,22 @@ export async function installForMigration(pluginId: string, installer: Migration
   return installer.online(pluginId);
 }
 
+/** Forgets entries the profile no longer has any reason to want.
+ *
+ *  Targets are re-derived from the library on every run, so an unfinished entry that is no
+ *  longer among them is business that has already ended: the skill it was for was removed,
+ *  or the package arrived by another route. Nothing will ever advance it again. Left in
+ *  place it becomes a banner that cannot be dismissed offering a retry that cannot do
+ *  anything — which is worse than saying nothing, because it describes work that is not
+ *  outstanding. Completed entries stay: they are the record that the move happened. */
+function retireAbandonedEntries(targets: readonly MigrationTarget[]): void {
+  const journal = readMigrationJournal();
+  if (!journal) return;
+  const wanted = new Set(targets.map(target => target.pluginId));
+  const entries = journal.entries.filter(entry => entry.phase === 'complete' || wanted.has(entry.pluginId));
+  if (entries.length !== journal.entries.length) writeMigrationJournal({ ...journal, entries });
+}
+
 /** What is left to do, so a failed migration can be retried without redoing the rest. */
 export function pendingMigrations(): MigrationJournalEntry[] {
   const journal = readMigrationJournal();
@@ -314,6 +330,7 @@ export interface MigrationOutcome {
 export async function runCapabilityMigration(context: MigrationContext): Promise<MigrationOutcome> {
   const outcome: MigrationOutcome = { installed: [], adopted: [], preserved: [], failed: [] };
   const targets = detectMigrationTargets(context.readSkills(), { preLibraryProfile: context.preLibraryProfile });
+  retireAbandonedEntries(targets);
   if (!targets.length) return outcome;
 
   for (const target of targets) {

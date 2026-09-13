@@ -64,3 +64,17 @@
 .capability-packages-migration li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 12px; }
 .capability-packages-migration button { justify-self: start; }
 .capability-packages-autoupdate { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+
+/* The permission question. A dialogue rather than a banner, because it is a decision with
+   two answers and the card underneath is the thing being decided about. */
+.capability-permission-backdrop { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 24px; background: #0b1020b8; backdrop-filter: blur(2px); }
+.capability-permission-review { display: grid; gap: 10px; width: min(520px, 100%); max-height: min(78vh, 640px); overflow: auto; padding: 18px 20px; border: 1px solid #818cf84d; border-radius: 16px; background: var(--panel, #141a2e); box-shadow: 0 24px 64px #00000066; }
+.capability-permission-review h4 { margin: 0; font-size: 14px; font-weight: 600; }
+.capability-permission-list { display: grid; gap: 10px; margin: 4px 0 2px; }
+.capability-permission-list div { display: grid; gap: 2px; }
+.capability-permission-list dt { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; opacity: .55; }
+.capability-permission-list dd { margin: 0; font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.capability-permission-list dd small { display: block; margin-top: 2px; font-size: 11px; opacity: .66; }
+.capability-permission-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+:is(.light, .nodi-theme-light) .capability-permission-backdrop { background: #1e293b5c; }
+:is(.light, .nodi-theme-light) .capability-permission-review { background: #ffffff; border-color: #cbd5f5; box-shadow: 0 24px 64px #0f172a26; }

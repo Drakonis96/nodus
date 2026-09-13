@@ -25,8 +25,10 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.4.0');
-  assert.equal(currentRelease?.date, '2026-09-12');
+  // 5.4.1 repairs what 5.4.0 introduced and deliberately shows the same modal, so the
+  // highlights below are still 5.4.0's — a reader who updates straight to it sees them once.
+  assert.equal(currentRelease?.version, '5.4.1');
+  assert.equal(currentRelease?.date, '2026-09-13');
   assert.equal(currentRelease?.highlights.length, 25);
   assert.deepEqual(currentRelease.highlights.map((h) => h.scope), [
     ...Array(10).fill('ai'), 'general', 'general', 'marketplace', 'plugin', 'browser', 'word',
@@ -57,8 +59,15 @@ try {
     assert.ok(currentRelease.highlights.some(highlight => phrase.test(highlight.en)), `Missing 5.4.0 change: ${phrase}`);
   }
 
+  // 5.4.0 keeps its own entry, and 5.4.1 shows exactly the same highlights: someone already
+  // on 5.4.0 has read them, and someone arriving from 5.3.1 must not miss them.
+  const release540 = RELEASE_NOTES[1];
+  assert.equal(release540?.version, '5.4.0');
+  assert.equal(release540?.date, '2026-09-12');
+  assert.deepEqual(release540?.highlights, currentRelease.highlights);
+
   // 5.3.1 keeps the modal it shipped with.
-  const release531 = RELEASE_NOTES[1];
+  const release531 = RELEASE_NOTES[2];
   assert.equal(release531?.version, '5.3.1');
   assert.equal(release531?.date, '2026-09-10');
   assert.equal(release531?.highlights.length, 8);

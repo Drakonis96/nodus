@@ -78,6 +78,7 @@ export const NODI_WINDOW_METHODS = [
   'removeCapabilityPlugin',
   'rollbackCapabilityPlugin',
   'approveCapabilityPlugin',
+  'discardPendingCapabilityPlugin',
   'setCapabilityAutoUpdate',
   'checkCapabilityUpdates',
   'capabilityMigrationStatus',

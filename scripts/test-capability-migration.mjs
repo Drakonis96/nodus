@@ -326,3 +326,40 @@ test('the bundled packages are inert until something asks for one', async () => 
   assert.deepEqual(outcome.installed, [], 'a clean install registers, extracts and loads none of them');
   assert.deepEqual(store.attempts, []);
 });
+
+test('an entry nothing can still advance is retired, so the retry can finish', async () => {
+  resetJournal();
+  stubStore({ failInstall: id => id === 'chemistry-studio' });
+  bootstrapFor(['chemistry-studio']);
+
+  // A profile that wanted chemistry and could not get it: the failure is recorded, and the
+  // banner that reads the journal offers a retry.
+  const wanting = migrationContext([builtinChemistry({ assistant: true, nodi: false })]);
+  await lib.runCapabilityMigration(wanting.context);
+  assert.equal(lib.pendingMigrations().length, 1, 'the failure is outstanding while the profile still wants the package');
+
+  // The user then removes the skill. Targets are re-derived from the library, so there is
+  // nothing left to install, migrate or adopt — and before this, the retry returned without
+  // touching the journal, leaving a banner that could never be dismissed by anything.
+  const withoutIt = migrationContext([]);
+  const outcome = await lib.runCapabilityMigration(withoutIt.context);
+  assert.deepEqual(outcome.failed, []);
+  assert.deepEqual(lib.pendingMigrations(), [], 'the abandoned entry is gone');
+  assert.ok(lib.migrationSettled(), 'and the profile counts as settled');
+});
+
+test('retiring never forgets a move that actually happened', async () => {
+  resetJournal();
+  stubStore();
+  bootstrapFor(['legalize']);
+  const { context } = migrationContext([builtinLegal({ assistant: true, nodi: false })]);
+  await lib.runCapabilityMigration(context);
+  assert.equal(lib.readMigrationJournal().entries[0].phase, 'complete');
+
+  // The adopted skill is no longer a target — it is a package-provided skill now — but the
+  // record that the migration ran is exactly what stops it running again.
+  await lib.runCapabilityMigration(context);
+  const journal = lib.readMigrationJournal();
+  assert.equal(journal.entries.length, 1, 'the completed entry survives');
+  assert.equal(journal.entries[0].phase, 'complete');
+});

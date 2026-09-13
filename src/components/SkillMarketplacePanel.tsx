@@ -30,14 +30,23 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPluginSummary[]>([]);
   const [inboxPlugins, setInboxPlugins] = useState<InboxPluginSummary[]>([]);
   const [appVersion, setAppVersion] = useState('');
+  /** Ids the capability-package panel above owns, so this catalogue does not offer them a
+   *  second time. Taken from the package catalogue and from what is installed, because a
+   *  profile can hold a package whose catalogue has not been refreshed yet. */
+  const [capabilityPackages, setCapabilityPackages] = useState<ReadonlySet<string>>(new Set());
   // One card's details at a time, like the library.
   const [details, setDetails] = useState('');
   useEffect(() => {
     let alive = true;
     const refresh = () => { void window.nodus.getSkillMarketplace().then(value => { if (alive) setState(value); }).catch(e => { if (alive) setError(String(e)); }); void window.nodus.listInstalledPlugins().then(value => { if (alive) setInstalledPlugins(value); }).catch(() => undefined); void window.nodus.listInboxPlugins().then(value => { if (alive) setInboxPlugins(value); }).catch(() => undefined); };
     void window.nodus.getAppInfo().then(info => { if (alive) setAppVersion(info.version); }).catch(() => undefined);
+    const refreshPackages = () => void window.nodus.listCapabilities()
+      .then(value => { if (alive) setCapabilityPackages(new Set([...(value.catalog?.catalog.plugins ?? []).map(plugin => plugin.id), ...value.plugins.map(plugin => plugin.id)])); })
+      .catch(() => undefined);
+    refreshPackages();
     refresh(); const off = window.nodus.onChatSkillsChanged(refresh);
-    return () => { alive = false; off(); };
+    const offPackages = window.nodus.onCapabilityRegistryChanged(refreshPackages);
+    return () => { alive = false; off(); offPackages(); };
   }, []);
   const source = state.sources.find(s => s.id === sourceId) ?? state.sources[0];
   useEffect(() => { setReview(null); setPluginReview(null); setCategory(''); setFilter('all'); setRemoveId(''); }, [source?.id, source?.commit]);
@@ -67,16 +76,35 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
     setReview(null);
     setNotice(builtinId(entry.package.manifest) ? 'Included skill restored. Check its activation in My skills.' : 'Skill installed. Enable it in My skills.');
   });
+  // A plugin the repository offers and the same plugin already installed are one card in
+  // two states. Anything installed that this repository no longer lists still gets a card:
+  // it simply has no update to review.
+  const pluginCards = [
+    ...(source?.plugins ?? []).map(entry => {
+      const manifest = entry.package.manifest;
+      return { id: manifest.id, name: manifest.name, by: manifest.author, description: manifest.description, entry, installed: installedPlugins.find(plugin => plugin.id === manifest.id) };
+    }),
+    // Installed but absent from this repository's catalogue: there is no manifest to read an
+    // author from, so the card says where it came from instead of inventing one.
+    ...installedPlugins
+      .filter(plugin => !(source?.plugins ?? []).some(entry => entry.package.manifest.id === plugin.id))
+      .map(plugin => ({ id: plugin.id, name: plugin.name, by: plugin.sourceId, description: plugin.description, entry: undefined, installed: plugin })),
+  ].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
+
   const categories = [...new Set(source?.entries.map(e => e.package.manifest.category) ?? [])].sort();
   // Alphabetical rather than grouped by category: a catalogue is something you look a name
   // up in, and the category is a filter for when you do not have one.
-  const entries = (source?.entries ?? []).filter(e => {
+  // A discipline that ships as a signed capability package is managed in Official packages,
+  // which is where its permissions, its settings and its rollback live. Listing it here too
+  // gave it a second Install button that could only ever do half the job.
+  const catalogued = (source?.entries ?? []).filter(e => !(official && capabilityPackages.has(e.package.manifest.id)));
+  const entries = catalogued.filter(e => {
     const m = e.package.manifest;
     return (!category || m.category === category) && (filter === 'all' || (filter === 'installed') === !!installedSkills(m).length)
       && `${m.name} ${m.description} ${m.author} ${m.category}`.toLowerCase().includes(query.toLowerCase());
   }).sort((a, b) => a.package.manifest.name.localeCompare(b.package.manifest.name, undefined, { sensitivity: 'base', numeric: true }));
-  const installedCount = (source?.entries ?? []).filter(e => installedSkills(e.package.manifest).length).length;
-  const counts: Record<InstalledFilter, number> = { all: source?.entries.length ?? 0, installed: installedCount, available: (source?.entries.length ?? 0) - installedCount };
+  const installedCount = catalogued.filter(e => installedSkills(e.package.manifest).length).length;
+  const counts: Record<InstalledFilter, number> = { all: catalogued.length, installed: installedCount, available: catalogued.length - installedCount };
   const manifest = review?.package.manifest;
   const builtin = manifest ? builtinId(manifest) : undefined;
   // A built-in is restored from this build, so a capability no package may declare is never a blocker.
@@ -175,9 +203,30 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
         </article>;
       })}</div>
     </>}
-    {!!source?.plugins?.length && <section><h4>Plugins</h4>{source.plugins.map(entry => { const present = installedPlugins.find(plugin => plugin.id === entry.package.manifest.id); return <article className="chat-skill-item" key={entry.path}><b>{entry.package.manifest.name}</b><small>{entry.package.manifest.author} · {entry.package.manifest.version}{present ? ` · Installed ${present.activeVersion || 'pending'}` : ''}</small><p>{entry.package.manifest.description}</p><button type="button" disabled={busy} onClick={() => setPluginReview(entry)}>Review {present ? 'update' : 'plugin'}</button></article>; })}</section>}
+    {/* One section, not two. A plugin offered by the repository and the same plugin sitting
+        installed are one thing in two states, and listing both put every plugin on the page
+        twice, each copy with half the controls. */}
+    {!!pluginCards.length && <section><h4>Plugins</h4>{pluginCards.map(card => {
+      const present = card.installed;
+      const offered = card.entry?.package.manifest;
+      const updatable = !!offered && !!present?.activeVersion && compareSemver(offered.version, present.activeVersion) > 0;
+      return <article className="chat-skill-item" key={card.id}>
+        <b>{card.name}</b>
+        <small>{card.by} · {offered?.version ?? present?.activeVersion ?? present?.pendingVersion}{present?.activeVersion && offered && offered.version !== present.activeVersion ? ` · Installed ${present.activeVersion}` : present ? ' · Installed' : ''}</small>
+        <p>{present?.pendingReason === 'permissions' ? 'An update is waiting for permission approval.'
+          : present?.pendingReason === 'incompatible' ? `Version ${present.pendingVersion} needs a newer Nodus than this build. It stays here, inactive, until you update.`
+            : card.description}</p>
+        {present && <label><input type="checkbox" checked={present.autoUpdate} onChange={event => void run(async () => { setInstalledPlugins(await window.nodus.setPluginAutoUpdate(present.id, event.target.checked)); })} /> Auto-update</label>}
+        {present?.secrets.map(secret => <PluginSecretForm key={`${secret.capabilityId}:${secret.id}`} plugin={present} secret={secret} refresh={async () => setInstalledPlugins(await window.nodus.listInstalledPlugins())} />)}
+        <div className="skill-marketplace-entry-actions">
+          {card.entry && (!present || updatable) && <button type="button" className="chat-skill-primary" disabled={busy} onClick={() => setPluginReview(card.entry!)}>{present ? 'Review update' : 'Review plugin'}</button>}
+          {present?.pendingReason === 'permissions' && <button type="button" disabled={busy} onClick={() => void run(async () => { await window.nodus.approvePlugin(present.id); setInstalledPlugins(await window.nodus.listInstalledPlugins()); })}>Review accepted · apply update</button>}
+          {present?.previousVersion && <button type="button" disabled={busy} onClick={() => void run(async () => { await window.nodus.rollbackPlugin(present.id); setInstalledPlugins(await window.nodus.listInstalledPlugins()); })}>Rollback to {present.previousVersion}</button>}
+          {present && <button type="button" className="chat-skill-remove" disabled={busy} onClick={() => void run(async () => { await window.nodus.removePlugin(present.id); setInstalledPlugins(await window.nodus.listInstalledPlugins()); setNotice('Plugin uninstalled. The skills it provided are gone with it.'); })}>Uninstall</button>}
+        </div>
+      </article>;
+    })}</section>}
     {!!inboxPlugins.length && <section><h4>Waiting for review</h4><small>Dropped into the plugin inbox. Nothing runs until you approve the permissions below.</small>{inboxPlugins.map(plugin => <article className="chat-skill-item" key={plugin.directory}><b>{plugin.name}</b><small>{plugin.author} · {plugin.version}{plugin.installed ? ' · Update to an installed plugin' : ''}</small><p>{plugin.description}</p><ul><li>{plugin.skills} skills · {plugin.capabilities} sandboxed capabilities</li><li>HTTPS endpoints: {plugin.permissions.network?.map(endpoint => endpoint.origin).join(', ') || 'none'}</li><li>Secrets: {plugin.permissions.secrets?.map(secret => secret.label).join(', ') || 'none'}</li><li>Storage: {plugin.permissions.storage?.maxBytes ? `${plugin.permissions.storage.maxBytes} bytes` : 'none'}</li></ul><button className="chat-skill-primary" type="button" disabled={busy} onClick={() => void run(async () => { await window.nodus.approveInboxPlugin(plugin.directory); setInboxPlugins(await window.nodus.listInboxPlugins()); setInstalledPlugins(await window.nodus.listInstalledPlugins()); setNotice('Plugin reviewed. New skills start disabled.'); })}>Review permissions and install</button> <button type="button" disabled={busy} onClick={() => void run(async () => { setInboxPlugins(await window.nodus.discardInboxPlugin(plugin.directory)); })}>Discard</button></article>)}</section>}
-    {!!installedPlugins.length && <section><h4>Installed plugins</h4>{installedPlugins.map(plugin => <article className="chat-skill-item" key={plugin.id}><b>{plugin.name}</b><small>{plugin.activeVersion || `Pending ${plugin.pendingVersion}`} · {plugin.sourceId}</small><p>{plugin.pendingReason === 'permissions' ? 'An update is waiting for permission approval.' : plugin.pendingReason === 'incompatible' ? `Version ${plugin.pendingVersion} needs a newer Nodus than this build. It stays here, inactive, until you update.` : plugin.description}</p><label><input type="checkbox" checked={plugin.autoUpdate} onChange={event => void run(async () => { setInstalledPlugins(await window.nodus.setPluginAutoUpdate(plugin.id, event.target.checked)); })} /> Auto-update</label>{plugin.secrets.map(secret => <PluginSecretForm key={`${secret.capabilityId}:${secret.id}`} plugin={plugin} secret={secret} refresh={async () => setInstalledPlugins(await window.nodus.listInstalledPlugins())} />)}{plugin.pendingReason === 'permissions' && <button type="button" disabled={busy} onClick={() => void run(async () => { await window.nodus.approvePlugin(plugin.id); setInstalledPlugins(await window.nodus.listInstalledPlugins()); })}>Review accepted · apply update</button>} {plugin.previousVersion && <button type="button" disabled={busy} onClick={() => void run(async () => { await window.nodus.rollbackPlugin(plugin.id); setInstalledPlugins(await window.nodus.listInstalledPlugins()); })}>Rollback to {plugin.previousVersion}</button>} <button type="button" disabled={busy} onClick={() => void run(async () => { await window.nodus.removePlugin(plugin.id); setInstalledPlugins(await window.nodus.listInstalledPlugins()); })}>Uninstall</button></article>)}</section>}
     {!!source?.errors.length && <details><summary>{source.errors.length} invalid packages skipped</summary>{source.errors.map((e, i) => <p key={i}>{e}</p>)}</details>}
     <p className="skill-marketplace-policy">The official marketplace rejects skills that promote illegal activity, piracy, license circumvention, malware or unauthorized access. Independent sources are maintained by their owners.</p>
     <button type="button" onClick={() => void window.nodus.openExternal(`${DEFAULT_SKILL_SOURCE}/blob/main/CONTRIBUTING.md`)}>Create and submit a skill ↗</button>

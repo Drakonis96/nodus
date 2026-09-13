@@ -1,11 +1,11 @@
 import {_electron as electron} from 'playwright-core';
 import {createRequire} from 'node:module';import fs from 'node:fs';import assert from 'node:assert/strict';
-const require=createRequire(import.meta.url),root=process.cwd(),profile=fs.mkdtempSync('/tmp/nodus-stellar-e2e-');fs.mkdirSync(root+'/work/stellar-preview',{recursive:true});
+const require=createRequire(import.meta.url),root=process.cwd(),appVersion=require(root+'/package.json').version,profile=fs.mkdtempSync('/tmp/nodus-stellar-e2e-');fs.mkdirSync(root+'/work/stellar-preview',{recursive:true});
 const app=await electron.launch({executablePath:require('electron'),args:[root],env:{...process.env,NODUS_USERDATA:profile,NODUS_STELLAR_PREVIEW:'1',NODUS_DISABLE_AUTO_UPDATE:'1',NODUS_DISABLE_ANNOUNCEMENTS:'1',NODUS_QA_ROOT:profile,NODUS_QA_DATABASE_AUDIT_LOG:profile+'/database-audit.jsonl'}});
 try{
 const page=await app.firstWindow();page.setDefaultTimeout(30000);const errors=[];page.on('pageerror',e=>errors.push(String(e)));
 await page.waitForFunction(()=>typeof window.nodus?.stellarPage==='function');
-await page.evaluate(async()=>{sessionStorage.setItem('nodus.startupUpdateChecked','1');localStorage.setItem('nodus.lastSeenVersion','5.4.0');localStorage.setItem('nodus.mobileTeaserSeen.5.3.1','1');for(const key of ['nodus.platformHighlightsSeen.2026-07','nodus.tutorialVideosAnnouncementSeen.2026-07', 'nodus.pdfPresenterTutorialSeen.e2js_u-05OA','nodus.toolkitBetaGuideSeen.2.4.0'])localStorage.setItem(key,'1');await window.nodus.updateSettings({onboardingComplete:true,basicsTutorialVersion:5,recoverySetupVersion:1,tourComplete:true,advancedTourComplete:true,mascotEnabled:false,mascotStyle:'orb',mascotStyleChosen:true,uiLanguage:'es',theme:'dark'});});
+await page.evaluate(async(version)=>{sessionStorage.setItem('nodus.startupUpdateChecked','1');localStorage.setItem('nodus.lastSeenVersion',version);localStorage.setItem('nodus.mobileTeaserSeen.5.3.1','1');for(const key of ['nodus.platformHighlightsSeen.2026-07','nodus.tutorialVideosAnnouncementSeen.2026-07', 'nodus.pdfPresenterTutorialSeen.e2js_u-05OA','nodus.toolkitBetaGuideSeen.2.4.0'])localStorage.setItem(key,'1');await window.nodus.updateSettings({onboardingComplete:true,basicsTutorialVersion:5,recoverySetupVersion:1,tourComplete:true,advancedTourComplete:true,mascotEnabled:false,mascotStyle:'orb',mascotStyleChosen:true,uiLanguage:'es',theme:'dark'});},appVersion);
 await page.evaluate(()=>window.nodus.seedDemoData());await page.reload();await page.waitForTimeout(1800);
 // Exercise the short viewport available on CI and smaller laptop displays.
 await app.evaluate(({BrowserWindow})=>{const w=BrowserWindow.getAllWindows()[0];w.setContentSize(1500,700);});

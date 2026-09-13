@@ -2975,6 +2975,14 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
   {
+    version: '5.4.1',
+    date: '2026-09-13',
+    // This fix release intentionally reuses the 5.4.0 What's New modal: it repairs the
+    // capability packages 5.4.0 introduced, and anyone updating straight to it should still
+    // read what that release brought.
+    highlights: RELEASE_5_4_0_HIGHLIGHTS,
+  },
+  {
     version: '5.4.0',
     date: '2026-09-12',
     highlights: RELEASE_5_4_0_HIGHLIGHTS,

@@ -156,6 +156,7 @@ export const nodusApi: NodusApi = {
   setCapabilityAutoUpdate: (pluginId, autoUpdate) => ipcRenderer.invoke('capabilities:setAutoUpdate', pluginId, autoUpdate),
   installCapabilityPlugin: (pluginId, approvePermissions) => ipcRenderer.invoke('capabilities:installPlugin', pluginId, approvePermissions),
   approveCapabilityPlugin: (pluginId) => ipcRenderer.invoke('capabilities:approvePlugin', pluginId),
+  discardPendingCapabilityPlugin: (pluginId) => ipcRenderer.invoke('capabilities:discardPendingPlugin', pluginId),
   rollbackCapabilityPlugin: (pluginId) => ipcRenderer.invoke('capabilities:rollbackPlugin', pluginId),
   removeCapabilityPlugin: (pluginId, purgeData) => ipcRenderer.invoke('capabilities:removePlugin', pluginId, purgeData),
   listInstalledPlugins: () => ipcRenderer.invoke('plugins:list'),

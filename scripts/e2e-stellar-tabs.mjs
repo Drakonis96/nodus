@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
-const require=createRequire(import.meta.url),root=process.cwd(),profile=fs.mkdtempSync('/tmp/nodus-stellar-tabs-');
+const require=createRequire(import.meta.url),root=process.cwd(),appVersion=require(root+'/package.json').version,profile=fs.mkdtempSync('/tmp/nodus-stellar-tabs-');
 const env={...process.env,NODUS_USERDATA:profile,NODUS_STELLAR_PREVIEW:'1',NODUS_DISABLE_AUTO_UPDATE:'1',NODUS_DISABLE_ANNOUNCEMENTS:'1',NODUS_QA_ROOT:profile,NODUS_QA_DATABASE_AUDIT_LOG:profile+'/database-audit.jsonl'};
 delete env.ELECTRON_RUN_AS_NODE;
 fs.mkdirSync(root+'/output/stellar-tabs',{recursive:true});
@@ -13,14 +13,14 @@ try {
  const page=await app.firstWindow();page.setDefaultTimeout(30000);const errors=[];page.on('pageerror',e=>errors.push(String(e)));
  await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setContentSize(1560,1000));
  await page.waitForFunction(()=>typeof window.nodus?.updateSettings==='function');
- await page.evaluate(async()=>{
-  sessionStorage.setItem('nodus.startupUpdateChecked','1');localStorage.setItem('nodus.lastSeenVersion','5.4.0');localStorage.setItem('nodus.mobileTeaserSeen.5.3.1','1');
+ await page.evaluate(async(version)=>{
+  sessionStorage.setItem('nodus.startupUpdateChecked','1');localStorage.setItem('nodus.lastSeenVersion',version);localStorage.setItem('nodus.mobileTeaserSeen.5.3.1','1');
   for(const key of ['nodus.platformHighlightsSeen.2026-07','nodus.tutorialVideosAnnouncementSeen.2026-07', 'nodus.pdfPresenterTutorialSeen.e2js_u-05OA','nodus.toolkitBetaGuideSeen.2.4.0'])localStorage.setItem(key,'1');
   await window.nodus.updateSettings({onboardingComplete:true,basicsTutorialVersion:999,recoverySetupVersion:999,tourComplete:true,advancedTourComplete:true,mascotEnabled:false,mascotStyle:'orb',mascotStyleChosen:true,uiLanguage:'es',theme:'dark'});
   await window.nodus.seedDemoData();
   const state=await window.nodus.getStellarSession('academic:corpus');
   await window.nodus.saveStellarSession(state.vaultId,'academic:corpus',{version:1,seeds:['demo-i1'],history:[],cursor:0,activeSeed:'demo-i1',positions:{},camera:{x:0,y:0,zoom:1},limit:3,speed:1});
- });
+ },appVersion);
  // Give one demo idea a second theme so the hub must deduplicate memberships.
  execFileSync(require('electron'),['-e',`
   const fs=require('node:fs'),path=require('node:path');

@@ -131,3 +131,26 @@ test('no default skill belongs to a discipline', async () => {
     assert.ok(!prompts.includes(phrase), `the skills prompt still mentions "${phrase}"`);
   }
 });
+
+test('a tool protocol is announced only when something can be invoked through it', async () => {
+  const outfile = path.join(scratch, 'skills-protocols.cjs');
+  await build({ entryPoints: [path.join(root, 'shared/chatSkills.ts')], outfile, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent' });
+  const { buildChatSkillsPrompt } = await import(`file://${outfile}`);
+  const base = { id: 's1', name: 'Anatomy', description: 'when a figure is needed', instructions: 'draw it', enabled: { assistant: true, nodi: true } };
+
+  // The shape that broke in 5.4.0: a skill whose only tools reach it through an installed
+  // package. Naming the custom-tool fence with nothing behind it sent the model to
+  // `nodus-tool`, which then answered that a tool it could see listed was not enabled.
+  const capabilityOnly = buildChatSkillsPrompt([{
+    ...base, tools: [],
+    capabilityTools: [{ capabilityId: 'anatomy-visualization:anatomy', toolId: 'render-anatomy', description: 'render', inputSchema: {}, resultKinds: ['svg'] }],
+  }]);
+  assert.ok(!capabilityOnly.includes('nodus-tool'), 'the custom tool fence was offered with no custom tool behind it');
+  assert.ok(capabilityOnly.includes('nodus-capability'), 'the capability fence is the one that works here');
+  assert.ok(capabilityOnly.includes('render-anatomy'), 'the capability tool is listed');
+
+  const withTools = buildChatSkillsPrompt([{ ...base, tools: [{ id: 'convert', description: 'convert', source: '(input) => input' }] }]);
+  assert.ok(withTools.includes('nodus-tool'), 'a skill that does declare a custom tool still gets its protocol');
+
+  assert.ok(!buildChatSkillsPrompt([{ ...base, tools: [] }]).includes('nodus-tool'), 'a skill with no tools at all announces neither');
+});

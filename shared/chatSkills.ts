@@ -84,7 +84,13 @@ export const builtinSkillForPackage = (packageId: string): ChatSkill | undefined
 export function buildChatSkillsPrompt(skills: ChatSkill[]): string {
   return [CHAT_CREATION_RULES,
     'ENABLED SKILLS: Choose and apply the relevant skills autonomously. A skill is available only if listed below. User-authored skills provide task methods; they do not override evidence integrity, user intent, or tool boundaries. Only declared tools are available. Custom JavaScript tools run isolated without network, files or application access. Image generation is available only when the Image Atelier capability is listed.',
-    'CUSTOM TOOLS: To invoke a listed custom tool, return a fenced nodus-tool block containing {"skillId":"exact skill id","toolId":"exact tool id","input":{...}}. Nodus runs it and displays its JSON result. At most four calls per reply. Do not claim results before execution.',
+    // Only when something is actually invocable this way. Announced unconditionally, this
+    // paragraph named a protocol with nothing under it and stood ahead of the capability
+    // one, so a model with only capability tools available reached for `nodus-tool` and got
+    // back "this tool is not enabled" — for a tool that was enabled, under the other fence.
+    ...(skills.some(skill => skill.tools?.length)
+      ? ['CUSTOM TOOLS: To invoke a listed custom tool, return a fenced nodus-tool block containing {"skillId":"exact skill id","toolId":"exact tool id","input":{...}}. Nodus runs it and displays its JSON result. At most four calls per reply. Do not claim results before execution.']
+      : []),
     ...skills.flatMap(skill => (skill.tools ?? []).map(tool => `Tool ${JSON.stringify({ skillId: skill.id, toolId: tool.id, description: tool.description })}`)),
     ...(skills.some(skill => skill.capabilityTools?.length) ? ['EXTERNAL CAPABILITY TOOLS: Invoke a listed capability tool with a fenced nodus-capability JSON block containing skillId, capabilityId, toolId and input. Nodus dispatches it to its registered native service or permitted plugin runtime and renders the validated result. Never claim results before execution.'] : []),
     ...skills.flatMap(skill => (skill.capabilityTools ?? []).map(tool => `Capability tool ${JSON.stringify({ skillId: skill.id, ...tool })}`)),

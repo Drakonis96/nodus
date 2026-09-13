@@ -44,9 +44,37 @@ export interface CapabilityWorkerHandleOptions {
   bootstrapPath?: string;
 }
 
+/** How long a worker has to finish its handshake, counted from the moment it exists. */
 const READY_TIMEOUT_MS = 20_000;
+/** Backstop for a handle that never settles at all. Deliberately far larger than the
+ *  readiness budget: the time before `spawn` belongs to the host, not to the worker. */
+const SPAWN_CEILING_MS = 120_000;
 
 interface Pending { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }
+
+/** A start that failed before the worker said anything at all.
+ *
+ *  The module never ran, so this is not a verdict about the package: a main process busy
+ *  enough for long enough — a launch, typically — loses the new utility process before it
+ *  finishes starting, and it exits having reported nothing. Worth one more attempt once the
+ *  host is free. A module that does load and then fails says so through its init result,
+ *  and that answer is final. */
+class WorkerStartFailure extends Error {}
+
+/** The worker died with the call unanswered, having produced nothing for it. */
+class WorkerLostCall extends Error {}
+
+/** Methods that may simply be asked again.
+ *
+ *  A worker lost before it answers has done an unknown amount of work, so repeating a call
+ *  is only safe where repeating it is meaningless. These read the worker's own state or
+ *  render something already stored; `migrate` belongs here because each rung of the ladder
+ *  is written to be re-runnable and the host records only what the worker reports finished.
+ *  `invoke`, `applySettings` and `runAction` are deliberately absent: they are the ones
+ *  whose second execution is a second execution. */
+const REPEATABLE_METHODS: ReadonlySet<WorkerMethod> = new Set<WorkerMethod>([
+  'health', 'getSettings', 'renderArtifact', 'renderLegacyResult', 'projectArtifactForModel', 'migrate',
+]);
 
 export class CapabilityWorkerHandle {
   private child: UtilityProcess | null = null;
@@ -60,7 +88,28 @@ export class CapabilityWorkerHandle {
 
   get alive(): boolean { return this.child !== null; }
 
+  /** One attempt, and one retry for the failures that are the host's fault.
+   *
+   *  A main process that stalls long enough loses the utility process it just asked for:
+   *  measured on a real profile, a stall of around twenty seconds leaves the child either
+   *  never spawning or spawning, completing its handshake and being torn down in the same
+   *  millisecond. Neither is the package refusing to work, and neither should be reported
+   *  to the user as a capability that will not start. The failed attempt has already
+   *  cleared the handle, so the retry forks afresh — against a host that is by then free.
+   *
+   *  Exactly one, and only for work that may be repeated: a retry that hides a worker
+   *  which genuinely cannot come up, or that runs a tool twice, is worse than the error. */
   async call<T>(method: WorkerMethod, payload: unknown, options: { timeoutMs?: number; signal?: AbortSignal } = {}): Promise<T> {
+    try { return await this.attempt<T>(method, payload, options); }
+    catch (error) {
+      const retryable = error instanceof WorkerStartFailure
+        || (error instanceof WorkerLostCall && REPEATABLE_METHODS.has(method));
+      if (!retryable) throw error;
+      return this.attempt<T>(method, payload, options);
+    }
+  }
+
+  private async attempt<T>(method: WorkerMethod, payload: unknown, options: { timeoutMs?: number; signal?: AbortSignal }): Promise<T> {
     options.signal?.throwIfAborted();
     await this.start();
     const timeoutMs = Math.min(Math.max(options.timeoutMs ?? LIMITS.toolTimeoutMsMax, LIMITS.toolTimeoutMsMin), LIMITS.toolTimeoutMsMax);
@@ -123,14 +172,30 @@ export class CapabilityWorkerHandle {
     this.child = child;
 
     this.ready = new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`${this.runtime.capabilityId} did not start.`)), READY_TIMEOUT_MS);
+      // The readiness budget is armed on `spawn`, never on `fork`.
+      //
+      // Timers and the child's messages are both delivered on the main process's own event
+      // loop, and a launch can block that loop for longer than this deadline. Started at
+      // fork, the budget is spent on the host's backlog rather than on the worker: when the
+      // loop frees, libuv runs the timers phase before the I/O phase, so the deadline fires
+      // first and a worker that had not yet been given the chance to spawn is reported as
+      // one that would not start. Measured from `spawn`, it measures the worker.
+      let timer = setTimeout(() => reject(new Error(`${this.runtime.capabilityId} did not spawn.`)), SPAWN_CEILING_MS);
       const fail = (error: Error) => { clearTimeout(timer); reject(error); };
+      // Whether the worker ever got as far as saying something for itself — a handshake, or
+      // a load error it wants reported. Until it does, an exit is the host's problem.
+      let spoke = false;
+      child.once('spawn', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => reject(new Error(`${this.runtime.capabilityId} did not start.`)), READY_TIMEOUT_MS);
+      });
       child.on('message', raw => {
         let message;
         // A frame the host cannot parse is dropped, not acted on: the worker is
         // first-party but the port is still a boundary worth validating.
         try { message = validateWorkerToHost(raw); } catch { return; }
         if (message.type === 'ready') {
+          spoke = true;
           if (message.protocol !== TRUSTED_PROTOCOL || message.capabilityId !== this.runtime.capabilityId) {
             fail(new Error(`${this.runtime.capabilityId} answered for a different capability.`));
             this.teardown(new Error('Handshake mismatch.'));
@@ -141,7 +206,7 @@ export class CapabilityWorkerHandle {
           return;
         }
         if (message.type === 'result') {
-          if (message.callId === 'init') { fail(new Error(message.ok ? 'The capability failed to load.' : message.error)); return; }
+          if (message.callId === 'init') { spoke = true; fail(new Error(message.ok ? 'The capability failed to load.' : message.error)); return; }
           const pending = this.pending.get(message.callId);
           if (!pending) return;
           if (message.ok) pending.resolve(message.value);
@@ -153,8 +218,10 @@ export class CapabilityWorkerHandle {
       });
       child.once('error', error => { fail(new Error(String(error))); this.teardown(new Error(String(error))); });
       child.once('exit', code => {
-        fail(new Error(`${this.runtime.capabilityId} exited before it was ready.`));
-        this.teardown(new Error(`${this.runtime.capabilityId} exited (code ${code}).`));
+        fail(spoke
+          ? new Error(`${this.runtime.capabilityId} exited before it was ready (code ${code}).`)
+          : new WorkerStartFailure(`${this.runtime.capabilityId} exited before it started (code ${code}).`));
+        this.teardown(new Error(`${this.runtime.capabilityId} exited (code ${code}).`), true);
       });
       try { child.postMessage({ type: 'init', capabilityId: this.runtime.capabilityId, entryPath: this.runtime.entryPath }); }
       catch (error) { fail(error instanceof Error ? error : new Error(String(error))); }
@@ -178,13 +245,15 @@ export class CapabilityWorkerHandle {
     }
   }
 
-  private teardown(reason: Error): void {
+  /** `lost` distinguishes a worker that died from one that was cancelled or stopped: the
+   *  calls it was carrying were never refused, only dropped. */
+  private teardown(reason: Error, lost = false): void {
     this.abort.abort();
     if (this.killTimer) { clearTimeout(this.killTimer); this.killTimer = null; }
     const child = this.child;
     this.child = null;
     this.ready = null;
-    for (const [, pending] of this.pending) { clearTimeout(pending.timer); pending.reject(reason); }
+    for (const [, pending] of this.pending) { clearTimeout(pending.timer); pending.reject(lost ? new WorkerLostCall(reason.message) : reason); }
     this.pending.clear();
     try { child?.kill(); } catch { /* already gone */ }
   }
