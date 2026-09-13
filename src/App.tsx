@@ -1681,7 +1681,7 @@ export function App() {
           >
             <div data-testid="sidebar-scroll-region" className="vault-sidebar-scroll mr-[6px] flex h-full min-h-0 flex-col gap-1 overflow-y-auto p-2">
               {(() => {
-              const navLabel = (n: SidebarNavItem) => t('toolkitPage' in n ? n.label : navItemLabel(n, activeVault?.type));
+              const navLabel = (n: SidebarNavItem) => 'toolkitPage' in n ? t(n.label) : t(navItemLabel(n, activeVault?.type));
               const navButton = (n: SidebarNavItem, disabled = false) => (
                 <button
                   key={n.id}

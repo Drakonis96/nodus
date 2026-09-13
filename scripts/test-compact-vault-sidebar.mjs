@@ -22,7 +22,7 @@ test('a sufficiently narrow vault sidebar becomes an accessible icon rail', asyn
   assert.match(app, /onClick=\{\(event\) => event\.currentTarget\.focus\(\)\}/);
   assert.match(app, /event\.key === 'Home'[\s\S]*?SIDEBAR_MIN_WIDTH/);
   assert.match(app, /event\.currentTarget\.focus\(\);\s*event\.preventDefault\(\)/);
-  assert.match(app, /aria-label=\{sidebarCompact \? t\(n\.label\) : undefined\}/);
+  assert.match(app, /aria-label=\{sidebarCompact \? navLabel\(n\) : undefined\}/);
   assert.match(
     app,
     /className=\{sidebarCompact && IS_MAC[\s\S]*?\? 'h-\[18px\] w-\[18px\]'[\s\S]*?: sidebarCompact \|\| \(IS_MAC && sidebarWidth < MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH\)[\s\S]*?\? 'h-6 w-6'[\s\S]*?: 'h-7 w-7'\}/,
@@ -35,7 +35,7 @@ test('a sufficiently narrow vault sidebar becomes an accessible icon rail', asyn
     'the compact macOS logo clears the native traffic lights while staying centred',
   );
   assert.doesNotMatch(app, /sidebarCompact && IS_MAC \? 'pt-8'/);
-  assert.match(app, /<span className=\{sidebarCompact \? 'sr-only' : undefined\}>\{t\(n\.label\)\}<\/span>/);
+  assert.match(app, /<span className=\{sidebarCompact \? 'sr-only' : undefined\}>\{navLabel\(n\)\}<\/span>/);
   assert.match(app, /<TeachingSidebar\s+compact=\{sidebarCompact\}/s);
   assert.match(app, /<StudySidebar\s+compact=\{sidebarCompact\}/s);
   assert.match(app, /<WorldbuildingSidebar\s+compact=\{sidebarCompact\}/s);
