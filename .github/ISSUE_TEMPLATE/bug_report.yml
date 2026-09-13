@@ -7,7 +7,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for reporting a problem. Do not include API keys, personal data, student data, private vault content, or confidential documents.
+        Thank you for reporting a problem. Write your report in English and attach redacted screenshots whenever they help show the problem.
+
+        Do not include API keys, personal data, student data, private vault content, or confidential documents.
 
         Security vulnerabilities must be reported through the private security form instead of this public issue.
   - type: textarea
