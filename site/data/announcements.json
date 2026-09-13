@@ -2,6 +2,54 @@
   "version": 1,
   "notices": [
     {
+      "id": "contribute-to-nodus",
+      "date": "2026-09-13",
+      "severity": "info",
+      "url": "https://github.com/Drakonis96/nodus",
+      "copy": {
+        "es": {
+          "title": "Ayuda a construir Nodus Research",
+          "body": "Nodus está desarrollado y mantenido casi por completo por un único desarrollador. Si te gusta el proyecto y quieres ayudar a hacerlo crecer, cualquier contribución es bienvenida: código, correcciones, nuevas funciones, documentación, traducciones o ideas.",
+          "linkLabel": "Contribuir en GitHub"
+        },
+        "en": {
+          "title": "Help build Nodus Research",
+          "body": "Nodus is developed and maintained almost entirely by a single developer. If you like the project and want to help it grow, any contribution is welcome: code, fixes, new features, documentation, translations or ideas.",
+          "linkLabel": "Contribute on GitHub"
+        },
+        "fr": {
+          "title": "Aidez à construire Nodus Research",
+          "body": "Nodus est développé et maintenu presque entièrement par un seul développeur. Si vous aimez le projet et souhaitez l'aider à grandir, toute contribution est bienvenue : code, corrections, nouvelles fonctionnalités, documentation, traductions ou idées.",
+          "linkLabel": "Contribuer sur GitHub"
+        },
+        "de": {
+          "title": "Hilf mit, Nodus Research zu entwickeln",
+          "body": "Nodus wird fast vollständig von einem einzigen Entwickler entwickelt und gepflegt. Wenn dir das Projekt gefällt und du es wachsen lassen möchtest, ist jeder Beitrag willkommen: Code, Korrekturen, neue Funktionen, Dokumentation, Übersetzungen oder Ideen.",
+          "linkLabel": "Auf GitHub beitragen"
+        },
+        "pt": {
+          "title": "Ajuda a construir o Nodus Research",
+          "body": "O Nodus é desenvolvido e mantido quase inteiramente por um único programador. Se gostas do projeto e queres ajudar a fazê-lo crescer, qualquer contribuição é bem-vinda: código, correções, novas funcionalidades, documentação, traduções ou ideias.",
+          "linkLabel": "Contribuir no GitHub"
+        },
+        "pt-BR": {
+          "title": "Ajude a construir o Nodus Research",
+          "body": "O Nodus é desenvolvido e mantido quase inteiramente por um único desenvolvedor. Se você gosta do projeto e quer ajudar a fazê-lo crescer, qualquer contribuição é bem-vinda: código, correções, novos recursos, documentação, traduções ou ideias.",
+          "linkLabel": "Contribuir no GitHub"
+        },
+        "it": {
+          "title": "Aiuta a costruire Nodus Research",
+          "body": "Nodus è sviluppato e mantenuto quasi interamente da un solo sviluppatore. Se ti piace il progetto e vuoi aiutarlo a crescere, qualsiasi contributo è benvenuto: codice, correzioni, nuove funzioni, documentazione, traduzioni o idee.",
+          "linkLabel": "Contribuisci su GitHub"
+        },
+        "tr": {
+          "title": "Nodus Research'ün gelişmesine yardımcı olun",
+          "body": "Nodus neredeyse tamamen tek bir geliştirici tarafından geliştirilmekte ve sürdürülmektedir. Projeyi beğeniyor ve büyümesine yardımcı olmak istiyorsanız her türlü katkı memnuniyetle karşılanır: kod, düzeltmeler, yeni özellikler, belgeler, çeviriler veya fikirler.",
+          "linkLabel": "GitHub'da katkıda bulunun"
+        }
+      }
+    },
+    {
       "id": "2026-09-09-github-star",
       "date": "2026-09-09",
       "severity": "info",
