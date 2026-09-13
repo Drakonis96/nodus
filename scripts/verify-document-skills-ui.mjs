@@ -5,7 +5,7 @@ const base = 'http://127.0.0.1:5197/visual-tests/document-skills-harness.html';
 const out = path.resolve('artifacts/document-skills');
 const browser = await chromium.launch({channel:'chrome',headless:true});
 const page = await browser.newPage({viewport:{width:1440,height:1080},deviceScaleFactor:1});
-const errors=[];page.on('pageerror',e=>errors.push(e.message));
+const errors=[];page.on('pageerror',e=>errors.push(e.message));const failures=[];
 async function shot(name){await page.waitForTimeout(400);await page.evaluate(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();});await page.screenshot({path:path.join(out,name)});}
 try {
   await page.goto(base);
@@ -34,6 +34,7 @@ try {
   assert.equal(annotation.selectedText,selection.text);assert.equal(annotation.startOffset,selection.expected);
   await page.getByTestId('deep-research-tab-home').click();
   await page.getByRole('button',{name:'Nuevo informe',exact:true}).click();
+  await page.setViewportSize({width:1440,height:1500});
   await page.getByTestId('document-skills').waitFor();
   console.log('deep modal open');
   await page.getByRole('dialog').locator('textarea').first().fill('Del archivo al lector: explicar un flujo documental con datos de demostración.');
@@ -43,6 +44,18 @@ try {
   const imageRow=page.locator('.document-skill-row').filter({has:page.getByText('Image Atelier',{exact:true})});
   await imageRow.getByRole('switch').click();
   await imageRow.locator('input').fill('2');
+  const paidRow=page.locator('.document-skill-row').filter({has:page.getByText('Vision Lab · paid',{exact:true})});
+  if(await paidRow.getByRole('switch').getAttribute('aria-checked')!=='true') await paidRow.getByRole('switch').click();
+  if(await imageRow.locator('select').count()!==0) failures.push('deep: Image Atelier must keep requiring a numeric maximum');
+  if(await imageRow.locator('.document-skill-warning').count()!==1) failures.push('deep: Image Atelier must keep its per-call notice');
+  if(await paidRow.locator('select').count()!==1) failures.push('deep: a paid non-image Skill lost the SVG Studio limit dropdown');
+  if(await paidRow.locator('select').count()===1 && await paidRow.locator('select').inputValue()!=='auto') failures.push('deep: a paid non-image Skill does not default to Auto');
+  if(await paidRow.locator('.document-skill-warning').count()!==0) failures.push('deep: a paid non-image Skill shows a per-call notice');
+  if(await paidRow.locator('input').count()!==0) failures.push('deep: a paid non-image Skill forces a numeric maximum');
+  await page.waitForTimeout(150);
+  if(await page.getByRole('dialog').locator('footer button').last().isDisabled()) failures.push('deep: public and Auto limits keep the form enabled');
+  await paidRow.scrollIntoViewIfNeeded();
+  await shot('deep-modal-paid-skill.png');
   await page.getByTestId('document-skills').scrollIntoViewIfNeeded();
   await shot('deep-modal.png');
   await imageRow.locator('input').fill('');
@@ -50,6 +63,7 @@ try {
   assert.equal(await imageRow.locator('input').getAttribute('aria-invalid'),'true');
   assert.equal(await page.getByRole('dialog').locator('footer button').last().isDisabled(),true);
   await shot('deep-modal-paid-required.png');
+  await page.setViewportSize({width:1440,height:1080});
   await page.goto(base+'?section=immersion&theme=light');
   await page.getByRole('button',{name:'Empezar',exact:true}).first().click();
   await page.getByRole('button',{name:'Comenzar inmersión',exact:true}).click();
@@ -65,12 +79,17 @@ try {
   await shot('immersion-interactive-3d.png');
   await page.getByTestId('immersion-tab-home').click();
   await page.getByRole('button',{name:'Nueva inmersión',exact:true}).click();
+  await page.setViewportSize({width:1440,height:1500});
   await page.getByTestId('document-skills').waitFor();
   await page.locator('.document-skill-row').filter({has:page.getByText('SVG Studio',{exact:true})}).locator('select').selectOption('number');
   await page.locator('.document-skill-row').filter({has:page.getByText('SVG Studio',{exact:true})}).locator('input').fill('4');
   await page.getByRole('dialog').locator('input').first().fill('La forma y su representación');
   const paid=page.locator('.document-skill-row').filter({has:page.getByText('Image Atelier',{exact:true})});
   await paid.getByRole('switch').click(); await paid.locator('input').fill('2');
+  const paidVision=page.locator('.document-skill-row').filter({has:page.getByText('Vision Lab · paid',{exact:true})});
+  if(await paidVision.getByRole('switch').getAttribute('aria-checked')!=='true') await paidVision.getByRole('switch').click();
+  await paidVision.scrollIntoViewIfNeeded();
+  await shot('immersion-modal-paid-skill.png');
   await page.getByTestId('document-skills').scrollIntoViewIfNeeded();
   await shot('immersion-modal.png');
   for(const lang of ['es','en','fr','de','pt','pt-BR','it','tr']) {
@@ -92,6 +111,7 @@ try {
     assert.equal(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth),true,'modal fits '+lang);
     assert.equal(await page.getByTestId('document-skills').evaluate(el=>el.scrollWidth<=el.clientWidth),true,'selector fits '+lang);
   }
+  assert.deepEqual(failures,[]);
   assert.deepEqual(errors,[]);
   console.log('Document skills UI passed.');
 } catch(e) {await shot('ui-debug.png');console.log((await page.locator('body').innerText()).slice(-4000));throw e;}
