@@ -81,6 +81,8 @@ test('questions and flashcards typeset Markdown and LaTeX in both themes', { tim
       await detail.screenshot({ path: path.join(shotsDir, `${theme}-question-detail.png`) });
 
       // ── Flashcard modal ─────────────────────────────────────────────────────
+      // Flashcards live in their own bank tab now, so open it before picking a card.
+      await page.getByTestId('study-bank-tab-flashcards').click();
       await page.locator('[data-testid^="study-flashcard-"]').first().click();
       const cardModal = page.getByTestId('study-bank-flashcard-modal');
       await cardModal.waitFor();
@@ -91,8 +93,7 @@ test('questions and flashcards typeset Markdown and LaTeX in both themes', { tim
       await cardModal.screenshot({ path: path.join(shotsDir, `${theme}-flashcard-modal.png`) });
       await page.keyboard.press('Escape');
       await cardModal.waitFor({ state: 'detached' });
-
-      // ── Editor preview ──────────────────────────────────────────────────────
+      await page.getByTestId('study-bank-tab-questions').click();
       await page.getByTestId('study-question-edit').click();
       const editor = page.getByTestId('study-question-editor');
       await editor.waitFor();

@@ -137,6 +137,9 @@ const bridge = {
   listStudyAssistantSources: async () => [],
   listStudyQuestionCollections: async () => [],
   listStudyFlashcards: async () => [flashcard],
+  listStudyMaterials: async () => [],
+  listStudyQuestionTags: async () => [],
+  listStudyFlashcardTags: async () => [],
   getStudyQuestionAnalytics: async () => ({
     successRate: 0.67,
     observedDifficulty: 'adequate',

@@ -21,6 +21,7 @@ import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
+import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
@@ -118,6 +119,7 @@ export const PT: Record<string, string> = {
   ...ANNOUNCEMENT_TRANSLATIONS['pt'],
   ...WORLD_CHAT_TRANSLATIONS.pt,
   ...STUDY_SYNONYM_TRANSLATIONS.pt,
+  ...STUDY_BANK_TRANSLATIONS.pt,
   ...STUDY_IMPROVE_TRANSLATIONS.pt,
   ...WORKSPACE_TRANSLATIONS.pt,
   "Lo que cuenta el mapa": "O que conta o mapa",

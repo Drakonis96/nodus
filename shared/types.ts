@@ -335,6 +335,7 @@ export type {
   StudyCognitiveLevel,
   StudyQuestion,
   StudyQuestionAnswer,
+  StudyQuestionBulkAction,
   StudyQuestionCollection,
   StudyQuestionDifficulty,
   StudyQuestionExport,
@@ -343,6 +344,7 @@ export type {
   StudyQuestionGenerationResult,
   StudyQuestionInput,
   StudyQuestionOption,
+  StudyQuestionSort,
   StudyQuestionSource,
   StudyQuestionStatus,
   StudyQuestionType,
@@ -385,7 +387,8 @@ export type {
   StudyRubricCriterion,
   StudyRubricInput,
 } from './studyGrading';
-export type { StudyFlashcard, StudyFlashcardInput, StudyFlashcardType, StudyReviewInput, StudyReviewRecord } from './studyFlashcards';
+export type { StudyFlashcard, StudyFlashcardBulkAction, StudyFlashcardExport, StudyFlashcardFilters, StudyFlashcardInput, StudyFlashcardSort, StudyFlashcardType, StudyReviewInput, StudyReviewRecord } from './studyFlashcards';
+export type { StudyImportLocation, StudyInterchangeExportOptions, StudyInterchangeFormat, StudyInterchangeImportOptions, StudyInterchangeKind, StudyInterchangeParseResult, StudyInterchangeSummary } from './studyInterchange';
 export type { StudySrsRating, StudySrsReviewResult, StudySrsState } from './studySrs';
 export type { StudyPerformanceEvidence, StudyPerformanceSummary, StudyProgressDashboard, StudyProgressScope } from './studyStats';
 export type { StudyCalendarEvent, StudyCalendarEventInput, StudyCalendarEventType, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from './studyPlanner';

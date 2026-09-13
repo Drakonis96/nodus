@@ -65,7 +65,12 @@ jobs:
         run: npm run build:server-web
 
       - name: Unit and integration tests
-        run: npm test
+        # Two files at a time: the heavy tail (Zotero, world databases, Chromium
+        # and Electron-backed suites) already saturates a 3-vCPU/7 GB macOS
+        # runner, and a third concurrent process has killed the whole runner
+        # mid-run with no TAP failure. Two keeps the peak bounded and still
+        # finishes inside the job budget.
+        run: npm run test:ci
 
       - name: E2E smoke (real app boot)
         timeout-minutes: 10

@@ -17,6 +17,39 @@ export interface StudyFlashcardInput {
 export interface StudyReviewInput { cardId: string; rating: 0 | 1 | 2 | 3 | 4 | 5; confidence?: number; elapsedMs?: number }
 export interface StudyReviewRecord { id: string; shortId: string; cardId: string; rating: number; confidence: number | null; correct: boolean; elapsedMs: number; previousIntervalDays: number; nextIntervalDays: number; createdAt: string }
 
+export type StudyFlashcardSort = 'due' | 'created' | 'updated' | 'front' | 'difficulty' | 'interval' | 'lapses';
+export const STUDY_FLASHCARD_SORTS: StudyFlashcardSort[] = ['due', 'created', 'updated', 'front', 'difficulty', 'interval', 'lapses'];
+
+export interface StudyFlashcardFilters {
+  search?: string;
+  courseId?: string;
+  subjectId?: string;
+  topicId?: string;
+  documentId?: string;
+  materialId?: string;
+  questionId?: string;
+  tag?: string;
+  difficulty?: StudyFlashcard['difficulty'];
+  favorite?: boolean;
+  dueOnly?: boolean;
+  includeArchived?: boolean;
+  sort?: StudyFlashcardSort;
+}
+
+export interface StudyFlashcardExport {
+  format: 'nodus-study-flashcards';
+  version: 1;
+  exportedAt: string;
+  cards: StudyFlashcardInput[];
+}
+
+export type StudyFlashcardBulkAction =
+  | { kind: 'difficulty'; difficulty: StudyFlashcard['difficulty'] }
+  | { kind: 'favorite'; favorite: boolean }
+  | { kind: 'move'; courseId?: string | null; subjectId?: string | null; topicId?: string | null; documentId?: string | null; materialId?: string | null }
+  | { kind: 'tags'; add?: string[]; remove?: string[] }
+  | { kind: 'state'; action: 'master' | 'reset' | 'exclude' | 'include' | 'archive' | 'delete' };
+
 export function validateStudyFlashcard(input: StudyFlashcardInput): string[] {
   const errors: string[] = [];
   if (input.front.trim().length < 2) errors.push('La cara frontal no puede estar vacía.');

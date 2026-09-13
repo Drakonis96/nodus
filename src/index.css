@@ -2582,6 +2582,7 @@ body {
 .docencia .hover\:bg-teal-50\/60:hover { background-color: rgba(255, 247, 237, 0.6); }
 .docencia .border-teal-200 { border-color: #fed7aa; }
 .docencia .border-teal-500 { border-color: #f97316; }
+.docencia.dark .dark\:border-teal-500 { border-color: #f97316; }
 /* The chat's starter cards and manual-source checkboxes (Analizar group). */
 .docencia .hover\:border-teal-400:hover { border-color: #fb923c; }
 .docencia .hover\:border-teal-500:hover { border-color: #f97316; }
