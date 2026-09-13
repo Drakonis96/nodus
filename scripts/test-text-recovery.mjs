@@ -30,6 +30,8 @@ try {
     planTextChunks,
     planRetrievalChunks,
     resolvedTextStateFromDoc,
+    resolveWorkText,
+    probeWorkTextAvailability,
   } = require(path.join(repoRoot, 'electron/extraction/textExtractor.ts'));
   const { pageText } = require(path.join(repoRoot, 'electron/extraction/pdfjsLoader.ts'));
   const { cleanExtractedText } = require(path.join(repoRoot, 'electron/extraction/textCleanup.ts'));
@@ -149,6 +151,28 @@ try {
     text: 'Resumen', sourceType: 'abstract_only', notes: 'Mensaje localizado libre', blockReason: 'abstract_only',
   });
   assert.equal(abstractState.blockReason, 'abstract_only', 'block reasons are structured and independent from localized notes');
+
+  // A Zotero outage is unknown availability, never "no attachment". Mislabeling it
+  // made works that had a perfectly good PDF/EPUB read as "no PDF" and get skipped.
+  const zotero = require(path.join(repoRoot, 'electron/zotero/zoteroClient.ts'));
+  const originalItemChildren = zotero.itemChildren;
+  const baseResolveOpts = {
+    unpaywallEmail: '',
+    preferZoteroFulltext: true,
+    ocr: { enabled: false, languages: 'spa+eng', maxPages: 0 },
+  };
+  zotero.itemChildren = async () => {
+    throw new zotero.ZoteroRequestError('No se pudo conectar con Zotero: ECONNREFUSED', 'zotero-closed', null, true);
+  };
+  const unreachable = await resolveWorkText('0', 'PARENTKEY', root, null, null, baseResolveOpts);
+  assert.equal(unreachable.blockReason, 'zotero_unavailable', 'an unreachable Zotero must not be reported as no_attachment');
+  assert.equal((await probeWorkTextAvailability('0', 'PARENTKEY', root, { preferZoteroFulltext: true })).available, false);
+
+  // Zotero answering with no child attachments IS a genuine no_attachment.
+  zotero.itemChildren = async () => [];
+  const genuinelyEmpty = await resolveWorkText('0', 'PARENTKEY', root, null, null, baseResolveOpts);
+  assert.equal(genuinelyEmpty.blockReason, 'no_attachment');
+  zotero.itemChildren = originalItemChildren;
 
   assert.equal(
     shouldQueueDeepAfterSync({

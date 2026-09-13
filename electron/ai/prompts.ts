@@ -1077,7 +1077,7 @@ no la ignores: dos ideas con similarity ≥ 0.7 rara vez son "new".
 - "new": no corresponde a ningún candidato.
 
 ═══ REGLAS ═══
-- "matched_id": global_id del candidato si same_as/variant_of; null si new.
+- "matched_id": global_id del candidato SIEMPRE que resuelvas same_as/variant_of o adjuntes edge_to_existing; null solo para un new sin relación.
 - "merged_label": mejor formulación canónica corta y neutra.
 - "edge_to_existing": SOLO si variant_of (o relación clara aun siendo new); null si no.
   Usa el vocabulario de tipos, "basis" y "confidence". Si la relación es una variante
@@ -1226,7 +1226,7 @@ Over-merging collapses distinct ideas; under-merging fills the graph with duplic
 - "new": does not correspond to any candidate.
 
 ═══ RULES ═══
-- "matched_id": the candidate's global_id if same_as/variant_of; null if new.
+- "matched_id": the candidate's global_id whenever you resolve same_as/variant_of OR attach an edge_to_existing; null only for an unrelated new.
 - "merged_label": the best short, neutral canonical formulation.
 - "edge_to_existing": ONLY if variant_of (or a clear relationship even when new); null otherwise. Use the vocabulary of types, "basis" and "confidence". For a conceptual variant, use type "variant_of"; if the new idea specifies or narrows another, use "refines".
 - CONTRADICTIONS: if it makes the opposite claim about the same object, it is NOT "same_as"; use "variant_of"/"new" with an edge "contradicts". Do not lose this.
@@ -1330,7 +1330,7 @@ Fusionner à l’excès écrase des idées distinctes ; fusionner trop peu rempl
 - "new" : ne correspond à aucun candidat.
 
 ═══ RÈGLES ═══
-- "matched_id" : global_id du candidat si same_as/variant_of ; null si new.
+- "matched_id" : global_id du candidat dès que vous résolvez same_as/variant_of OU joignez un edge_to_existing ; null uniquement pour un new sans relation.
 - "merged_label" : meilleure formulation canonique courte et neutre.
 - "edge_to_existing" : UNIQUEMENT si variant_of (ou relation claire même pour new) ; null sinon. Utilisez le vocabulaire des types, "basis" et "confidence". Pour une variante conceptuelle, utilisez type "variant_of" ; si la nouvelle idée précise ou restreint une autre, utilisez "refines".
 - CONTRADICTIONS : si elle affirme le contraire au sujet du même objet, ce n’est PAS "same_as" ; utilisez "variant_of"/"new" avec une arête "contradicts". Ne perdez pas cette information.
@@ -1434,7 +1434,7 @@ Zu starkes Zusammenführen verschmilzt verschiedene Ideen; zu wenig Zusammenfüh
 - "new": passt zu keinem Kandidaten.
 
 ═══ REGELN ═══
-- "matched_id": global_id des Kandidaten bei same_as/variant_of; null bei new.
+- "matched_id": global_id des Kandidaten, sobald du same_as/variant_of wählst ODER ein edge_to_existing anhängst; null nur bei einem unabhängigen new.
 - "merged_label": die beste kurze, neutrale kanonische Formulierung.
 - "edge_to_existing": NUR bei variant_of (oder einer klaren Beziehung auch bei new); sonst null. Verwende das Vokabular von type, "basis" und "confidence". Bei einer konzeptuellen Variante type "variant_of" verwenden; wenn die neue Idee eine andere präzisiert oder einschränkt, "refines" verwenden.
 - WIDERSPRÜCHE: Behauptet sie das Gegenteil über denselben Gegenstand, ist sie NICHT "same_as"; nutze "variant_of"/"new" mit einer "contradicts"-Kante. Verliere dies nicht.
@@ -1538,7 +1538,7 @@ Fundir em excesso colapsa ideias distintas; fundir de menos enche o grafo de dup
 - "new": não corresponde a nenhum candidato.
 
 ═══ REGRAS ═══
-- "matched_id": global_id do candidato se same_as/variant_of; null se new.
+- "matched_id": global_id do candidato sempre que resolver same_as/variant_of OU anexar um edge_to_existing; null apenas para um new sem relação.
 - "merged_label": melhor formulação canónica curta e neutra.
 - "edge_to_existing": APENAS se variant_of (ou relação clara mesmo sendo new); null caso contrário. Usa o vocabulário de types, "basis" e "confidence". Se for uma variante conceptual, usa type "variant_of"; se a nova ideia especificar ou restringir outra, usa "refines".
 - CONTRADIÇÕES: se afirmar o contrário sobre o mesmo objeto, NÃO é "same_as"; usa "variant_of"/"new" com uma aresta "contradicts". Não percas esta informação.
@@ -1642,7 +1642,7 @@ Fundir demais colapsa ideias distintas; fundir de menos enche o grafo de duplica
 - "new": não corresponde a nenhum candidato.
 
 ═══ REGRAS ═══
-- "matched_id": global_id do candidato se same_as/variant_of; null se new.
+- "matched_id": global_id do candidato sempre que resolver same_as/variant_of OU anexar um edge_to_existing; null apenas para um new sem relação.
 - "merged_label": melhor formulação canônica curta e neutra.
 - "edge_to_existing": SOMENTE se variant_of (ou relação clara mesmo sendo new); null caso contrário. Use o vocabulário de types, "basis" e "confidence". Se for uma variante conceitual, use type "variant_of"; se a nova ideia especificar ou restringir outra, use "refines".
 - CONTRADIÇÕES: se afirmar o contrário sobre o mesmo objeto, NÃO é "same_as"; use "variant_of"/"new" com uma aresta "contradicts". Não perca isso.
@@ -1746,7 +1746,7 @@ Fondere troppo fa collassare idee distinte; fondere troppo poco riempie il grafo
 - "new": non corrisponde ad alcun candidato.
 
 ═══ REGOLE ═══
-- "matched_id": global_id del candidato se same_as/variant_of; null se new.
+- "matched_id": global_id del candidato ogni volta che risolvi same_as/variant_of O colleghi un edge_to_existing; null solo per un new senza relazione.
 - "merged_label": la migliore formulazione canonica breve e neutra.
 - "edge_to_existing": SOLO se variant_of (o relazione chiara anche se new); null altrimenti. Usa il vocabolario di types, "basis" e "confidence". Per una variante concettuale usa type "variant_of"; se la nuova idea specifica o restringe un’altra usa "refines".
 - CONTRADDIZIONI: se afferma il contrario sullo stesso oggetto, NON è "same_as"; usa "variant_of"/"new" con un arco "contradicts". Non perderla.
@@ -1850,7 +1850,7 @@ Fazla birleştirmek farklı fikirleri çökertir; az birleştirmek grafiği kopy
 - "new": hiçbir adayla eşleşmiyor.
 
 ═══ KURALLAR ═══
-- "matched_id": same_as/variant_of ise adayın global_id değeri; new ise null.
+- "matched_id": same_as/variant_of seçtiğinizde VEYA edge_to_existing eklediğinizde adayın global_id değeri; yalnızca ilişkisiz bir new için null.
 - "merged_label": en iyi kısa, tarafsız kanonik ifade.
 - "edge_to_existing": YALNIZCA variant_of için (veya new olsa bile açık bir ilişki varsa); aksi halde null. type, "basis" ve "confidence" söz varlığını kullanın. Kavramsal varyantta type "variant_of"; yeni fikir diğerini belirginleştiriyor ya da daraltıyorsa "refines" kullanın.
 - ÇELİŞKİLER: aynı nesne hakkında tersini savunuyorsa "same_as" DEĞİLDİR; "contradicts" kenarıyla "variant_of"/"new" kullanın. Bunu kaybetmeyin.

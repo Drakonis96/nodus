@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { ModelRef, Work } from '@shared/types';
+import type { ModelRef, TextBlockReason, Work } from '@shared/types';
 import { AiError, completeText, embed } from './aiClient';
 import { coreStructuredPrompt } from './prompts';
 import { getDb } from '../db/database';
@@ -116,6 +116,7 @@ export async function runSummaryScan(work: Work, model?: ModelRef | null, option
   }
 
   let fallbackText: string | null = null;
+  let fallbackBlockReason: TextBlockReason | null = null;
   if (ideas.length === 0 && !abstract?.trim()) {
     try {
       const doc = await resolveWorkText(settings.zoteroUserId, work.zotero_key, settings.zoteroStoragePath, null, work.doi, {
@@ -124,10 +125,16 @@ export async function runSummaryScan(work: Work, model?: ModelRef | null, option
         ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
       });
       fallbackText = clip(doc.text, 24_000) || null;
+      fallbackBlockReason = doc.blockReason ?? null;
     } catch {
       fallbackText = null;
     }
     if (!fallbackText) {
+      // A Zotero outage is not "no text": fail retriably instead of persisting a
+      // false `skipped_no_text` that would read as "no PDF" in the library.
+      if (fallbackBlockReason === 'zotero_unavailable') {
+        throw new AiError('Zotero no está disponible: no se pudo comprobar si la obra tiene texto completo.', true);
+      }
       setSummaryResult(work.nodus_id, 'skipped_no_text', hash);
       return;
     }
