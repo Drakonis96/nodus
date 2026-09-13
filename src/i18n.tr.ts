@@ -8197,4 +8197,9 @@ export const TR: Record<string, string> = {
   "¿Seguro que quieres eliminar la etiqueta «{name}»? Las presentaciones que la tienen seguirán en la biblioteca, pero sin etiqueta.": "“{name}” etiketi silinsin mi? Bu etikete sahip sunumlar kitaplıkta kalır, yalnızca etiketsiz olur.",
   "Descargar PDF": "PDF’yi indir",
   "No se pudo descargar la presentación.": "Sunum indirilemedi.",
+  // Nodus Browser — HTTP authentication prompt.
+  "pide usuario y contraseña.": "kullanıcı adı ve parola istiyor.",
+  "Usuario": "Kullanıcı adı",
+  "Iniciar sesión": "Oturum aç",
+  "Proxy": "Proxy",
 };

@@ -10,7 +10,6 @@
 // controls. Run it after `npm run build`:
 //
 //   npm run verify:browser-fixes
-import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -59,9 +58,27 @@ function tone() {
 }
 const WAV = tone();
 
+const PLAIN_PAGE = '<!doctype html><html><head><title>Plain page</title></head><body><h1>Plain page</h1></body></html>';
+const DARK_PAGE = '<!doctype html><html><head><meta name="color-scheme" content="dark"><title>Dark scheme page</title></head><body><h1>Dark scheme</h1></body></html>';
+const AUTH_HEADER = `Basic ${Buffer.from('nodus:secreto').toString('base64')}`;
+const authAttempts = [];
+
 const server = http.createServer((req, res) => {
-  if (req.url === '/tone.wav') { res.writeHead(200, { 'content-type': 'audio/wav', 'content-length': WAV.length }); return res.end(WAV); }
-  if (req.url === '/second') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end('<!doctype html><title>Second page</title><h1>second</h1>'); }
+  const url = new URL(req.url || '/', 'http://127.0.0.1');
+  if (url.pathname === '/tone.wav') { res.writeHead(200, { 'content-type': 'audio/wav', 'content-length': WAV.length }); return res.end(WAV); }
+  if (url.pathname === '/second') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end('<!doctype html><title>Second page</title><h1>second</h1>'); }
+  if (url.pathname === '/plain') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end(PLAIN_PAGE); }
+  if (url.pathname === '/dark-scheme') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end(DARK_PAGE); }
+  if (url.pathname === '/basic-auth') {
+    const realm = url.searchParams.get('realm') === 'cancel' ? 'Nodus Fix Cancel' : 'Nodus Fix';
+    authAttempts.push(req.headers.authorization ?? null);
+    if (req.headers.authorization !== AUTH_HEADER) {
+      res.writeHead(401, { 'www-authenticate': `Basic realm="${realm}"`, 'content-type': 'text/html' });
+      return res.end('<!doctype html><title>401 Authorization Required</title><h1>401 Authorization Required</h1>');
+    }
+    res.writeHead(200, { 'content-type': 'text/html' });
+    return res.end('<!doctype html><title>Authenticated</title><h1>Authenticated</h1>');
+  }
   res.writeHead(200, { 'content-type': 'text/html' });
   res.end(PAGE);
 });
@@ -274,6 +291,76 @@ try {
   check('the address bar menu is Cortar, Copiar, Pegar and nothing else',
     barMenu.map((i) => i.label).join(',') === 'Cortar,Copiar,Pegar');
   check('right-clicking empty app chrome pops no menu', menus.length === 2, `${menus.length} menus popped`);
+
+  // ---- 8. A page's surface follows the document, not the app theme --------
+  // An unstyled page keeps black default text, so painting Nodus's dark theme
+  // behind it left the text invisible until selection. A page that declares a
+  // dark colour scheme must keep its dark canvas.
+  const surfaceOf = (targetUrl) => app.evaluate(async ({ BrowserWindow }, url) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    const view = win?.contentView.children.find((child) => child.webContents?.getURL?.() === url);
+    if (!view) return null;
+    const bitmap = (await view.webContents.capturePage()).crop({ x: 2, y: 2, width: 1, height: 1 }).toBitmap();
+    return { r: bitmap[0], g: bitmap[1], b: bitmap[2] };
+  }, targetUrl);
+  const waitForSurface = async (targetUrl, predicate) => {
+    const deadline = Date.now() + 6_000;
+    let last = null;
+    while (Date.now() < deadline) {
+      last = await surfaceOf(targetUrl);
+      if (last && predicate(last)) return last;
+      await page.waitForTimeout(120);
+    }
+    return last;
+  };
+
+  await page.evaluate((url) => window.nodus.submitBrowserOmnibox(`${url}/plain`), origin);
+  await page.waitForTimeout(1_200);
+  await page.evaluate(() => window.nodus.updateSettings({ theme: 'dark' }));
+  await page.waitForFunction(() => document.documentElement.classList.contains('dark'));
+  const plainSurface = await waitForSurface(`${origin}/plain`, (p) => p.r > 245 && p.g > 245 && p.b > 245);
+  check('an unstyled page stays on a light surface under the dark theme',
+    plainSurface?.r > 245 && plainSurface?.g > 245 && plainSurface?.b > 245, JSON.stringify(plainSurface));
+
+  await page.evaluate((url) => window.nodus.submitBrowserOmnibox(`${url}/dark-scheme`), origin);
+  await page.waitForTimeout(1_200);
+  const darkSurface = await waitForSurface(`${origin}/dark-scheme`, (p) => p.r < 64 && p.g < 64 && p.b < 64);
+  check('a page declaring a dark colour scheme keeps its dark canvas',
+    darkSurface?.r < 64 && darkSurface?.g < 64 && darkSurface?.b < 64, JSON.stringify(darkSurface));
+  await page.evaluate(() => window.nodus.updateSettings({ theme: 'light' }));
+  await page.screenshot({ path: path.join(shots, '07-surfaces.png') });
+
+  // ---- 9. HTTP Basic auth: prompt, masking, cancellation and credentials --
+  const authBar = page.getByTestId('browser-auth-bar');
+  await page.evaluate((url) => window.nodus.submitBrowserOmnibox(`${url}/basic-auth?realm=cancel`), origin);
+  const cancelBarShown = await authBar.waitFor({ state: 'visible' }).then(() => true).catch(() => false);
+  const cancelBarText = cancelBarShown ? await authBar.innerText() : '';
+  check('an HTTP challenge opens a Nodus-drawn credential bar', cancelBarShown, cancelBarText.replace(/\n/g, ' / '));
+  check('the bar names the host that asked and the server realm',
+    cancelBarText.includes('127.0.0.1') && cancelBarText.includes('Nodus Fix Cancel'));
+  if (cancelBarShown) {
+    await authBar.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await authBar.waitFor({ state: 'detached' }).catch(() => {});
+  }
+  check('cancelling answers Chromium with no credentials', authAttempts.at(-1) === null, JSON.stringify(authAttempts));
+
+  await page.evaluate((url) => window.nodus.submitBrowserOmnibox(`${url}/basic-auth`), origin);
+  const barShown = await authBar.waitFor({ state: 'visible' }).then(() => true).catch(() => false);
+  check('a challenge prompts again after a cancellation', barShown);
+  if (barShown) {
+    await page.getByTestId('browser-auth-username').fill('nodus');
+    await page.getByTestId('browser-auth-password').fill('secreto');
+    const passwordType = await page.getByTestId('browser-auth-password').getAttribute('type');
+    check('the password field is masked', passwordType === 'password', String(passwordType));
+    await page.screenshot({ path: path.join(shots, '08-auth-prompt.png') });
+    await authBar.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
+    await page.waitForFunction(() => !document.querySelector('[data-testid="browser-auth-bar"]'), null, { timeout: 15_000 }).catch(() => {});
+  }
+  const authedState = await page.evaluate(() => window.nodus.getBrowserState());
+  const authedTab = authedState.tabs.find((tab) => tab.id === authedState.activeTabId);
+  check('the credentials reach the server and the authenticated page loads',
+    authedTab?.title === 'Authenticated' && authAttempts.at(-1) === AUTH_HEADER,
+    JSON.stringify({ title: authedTab?.title, authorization: authAttempts.at(-1) }));
 
   await page.screenshot({ path: path.join(shots, '06-final.png') });
 } catch (error) {

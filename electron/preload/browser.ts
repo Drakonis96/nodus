@@ -17,7 +17,7 @@ import type { BrowserMediaCommand, BrowserRestartResult, BrowserState, BrowserVi
 import type { OmniboxResolution } from '@shared/browserOmnibox';
 import type {
   BrowserDataCategory, BrowserDownloadView, BrowserMediaState,
-  BrowserStorageReport, PendingBrowserPermission,
+  BrowserStorageReport, PendingBrowserAuth, PendingBrowserPermission,
 } from '@shared/browser';
 import type { BrowserConnectorCapturePreview, BrowserConnectorCaptureRequest, BrowserConnectorSaveResult } from '@shared/browserConnector';
 import type {
@@ -103,6 +103,17 @@ export const browserApi = {
     ipcRenderer.invoke('browser:resolvePermission', id, granted, remember).then(() => undefined),
   cancelBrowserPermissions: (): Promise<void> =>
     ipcRenderer.invoke('browser:cancelPermissions').then(() => undefined),
+  getPendingBrowserAuth: (): Promise<PendingBrowserAuth | null> =>
+    ipcRenderer.invoke('browser:pendingAuth'),
+  resolveBrowserAuth: (id: string, username: string, password: string): Promise<void> =>
+    ipcRenderer.invoke('browser:resolveAuth', id, username, password).then(() => undefined),
+  cancelBrowserAuth: (id?: string): Promise<void> =>
+    ipcRenderer.invoke('browser:cancelAuth', id).then(() => undefined),
+  onBrowserAuthRequest: (callback: (request: PendingBrowserAuth | null) => void): (() => void) => {
+    const listener = (_event: unknown, request: PendingBrowserAuth | null) => callback(request);
+    ipcRenderer.on('browser:authRequest', listener);
+    return () => ipcRenderer.removeListener('browser:authRequest', listener);
+  },
   onBrowserPermissionRequest: (callback: (request: PendingBrowserPermission | null) => void): (() => void) => {
     const listener = (_event: unknown, request: PendingBrowserPermission | null) => callback(request);
     ipcRenderer.on('browser:permissionRequest', listener);

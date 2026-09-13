@@ -51,6 +51,13 @@ import {
   resolvePermissionRequest,
   setPermissionPromptNotifier,
 } from '../browser/permissionPrompt';
+import {
+  cancelAllBrowserAuthRequests,
+  cancelBrowserAuthRequest,
+  pendingBrowserAuthRequest,
+  resolveBrowserAuthRequest,
+  setBrowserAuthNotifier,
+} from '../browser/authPrompt';
 import { browserMediaStates, setMediaNotifier } from '../browser/media';
 import { getSystemVolume, setSystemVolume } from '../toolkit/presenter/systemAudio';
 import { activePageIsPdf, captureActivePage, importPdfIntoItem, saveCapture } from '../browser/capture';
@@ -162,6 +169,12 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     const window = getWindow();
     if (!window || window.isDestroyed()) return;
     window.webContents.send('browser:permissionRequest', pendingPermissionRequest());
+  };
+
+  const broadcastAuth = () => {
+    const window = getWindow();
+    if (!window || window.isDestroyed()) return;
+    window.webContents.send('browser:authRequest', pendingBrowserAuthRequest());
   };
 
   const broadcastMedia = () => {
@@ -279,6 +292,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     });
     if (wired) return;
     setPermissionPromptNotifier(broadcastPermission);
+    setBrowserAuthNotifier(broadcastAuth);
     setMediaNotifier(broadcastMedia);
     setDownloadNotifier(broadcastDownloads);
     setFoundInPageListener((result) => {
@@ -539,6 +553,37 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   h('browser:cancelPermissions', async (event) => {
     assertUiSender(event, getWindow);
     cancelPermissionRequests();
+  });
+
+  h('browser:pendingAuth', async (event) => {
+    assertUiSender(event, getWindow);
+    return pendingBrowserAuthRequest();
+  });
+
+  /**
+   * Answer an HTTP authentication challenge.
+   *
+   * The credentials go straight to Chromium's pending callback and nowhere
+   * else: no disk, no log, no page. An id that no longer matches is ignored, so
+   * a prompt closed by navigation cannot answer the next challenge by mistake.
+   */
+  h('browser:resolveAuth', async (event, id: string, username: string, password: string) => {
+    assertUiSender(event, getWindow);
+    resolveBrowserAuthRequest(
+      String(id ?? ''),
+      String(username ?? '').slice(0, 8_192),
+      String(password ?? '').slice(0, 8_192),
+    );
+  });
+
+  /**
+   * Dismiss a credential prompt. With an id, only that request; without one,
+   * everything pending — which is what leaving the Browser section does.
+   */
+  h('browser:cancelAuth', async (event, id?: string) => {
+    assertUiSender(event, getWindow);
+    if (typeof id === 'string' && id) cancelBrowserAuthRequest(id);
+    else cancelAllBrowserAuthRequests();
   });
 
   h('browser:media', async (event) => {
