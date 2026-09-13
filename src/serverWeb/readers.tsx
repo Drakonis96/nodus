@@ -1,8 +1,23 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+import { normalizeLatexDelimiters } from '@shared/latexDelimiters';
+import { remarkHardBreaks } from '../markdownHardBreaks';
 
 type ReaderProps = { value?: string; className?: string; onSelection?: (quote: string) => void; assetBaseUrl?: string; onNodusLink?: (href: string) => boolean | void };
+
+/** Compact variant for list rows, options and table cells: paragraphs unwrap so
+ *  inline formatting and formulas flow with the surrounding line. */
+type MarkdownReaderProps = ReaderProps & {
+  inline?: boolean;
+  emptyLabel?: string;
+  /** Study content predates Markdown rendering and kept its line breaks; document
+   *  reading must not, because hard-wrapped source lines would each become a break. */
+  hardBreaks?: boolean;
+};
 
 function serverHrefForNodus(href: string): string | null {
   const encodedId = (raw: string): string | null => {
@@ -75,36 +90,53 @@ function serverHrefForNodus(href: string): string | null {
   return targets[kind] || null;
 }
 
-/** Markdown is rendered through ReactMarkdown and never assigned to innerHTML. */
-export function MarkdownReader({ value, className = '', onSelection, assetBaseUrl, onNodusLink }: ReaderProps) {
+/** Markdown is rendered through ReactMarkdown and never assigned to innerHTML.
+ *  GFM plus `$…$`/`$$…$$` (and `\(…\)`/`\[…\]`) mathematics cover published
+ *  questions, flashcards and study materials alike. */
+export function MarkdownReader({ value, className = '', onSelection, assetBaseUrl, onNodusLink, inline = false, emptyLabel, hardBreaks = false }: MarkdownReaderProps) {
   const captureSelection = () => {
     if (!onSelection) return;
     const selected = window.getSelection()?.toString().trim();
     if (selected) onSelection(selected.slice(0, 4000));
   };
+  const content = normalizeLatexDelimiters(value || emptyLabel || 'No readable text was published for this document.');
+  const markdown = (
+    <ReactMarkdown
+      remarkPlugins={hardBreaks ? [remarkGfm, remarkMath, remarkHardBreaks] : [remarkGfm, remarkMath]}
+      rehypePlugins={[rehypeKatex]}
+      urlTransform={(url) => url.startsWith('nodus://') ? url : defaultUrlTransform(url)}
+      skipHtml
+      components={{
+        a: ({ href, children }) => {
+          if (href?.startsWith('nodus://')) {
+            const internalHref = serverHrefForNodus(href);
+            if (onNodusLink) return <button type="button" className="inline border-0 bg-transparent p-0 font-inherit text-indigo-600 underline decoration-indigo-400/60 underline-offset-2 hover:text-indigo-500 dark:text-indigo-300" onClick={() => { if (onNodusLink(href) === false && internalHref) window.location.assign(internalHref); }}>{children}</button>;
+            return internalHref ? <a href={internalHref} className="text-indigo-600 underline decoration-indigo-400/60 underline-offset-2 hover:text-indigo-500 dark:text-indigo-300">{children}</a> : <span>{children}</span>;
+          }
+          return <a href={href} target="_blank" rel="noreferrer">{children}</a>;
+        },
+        img: ({ src, alt }) => {
+          const safe = typeof src === 'string' && src.startsWith('assets/') && assetBaseUrl
+            ? `${assetBaseUrl}${src.slice('assets/'.length).split('/').map(encodeURIComponent).join('/')}`
+            : src;
+          return <img src={safe} alt={alt || ''} loading="lazy" />;
+        },
+        ...(inline ? { p: ({ children }: { children?: ReactNode }) => <>{children}</> } : {}),
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+  if (inline) {
+    return (
+      <span className={`markdown-reader markdown-reader-inline ${className}`} onMouseUp={captureSelection} onKeyUp={captureSelection} data-testid="markdown-reader">
+        {markdown}
+      </span>
+    );
+  }
   return (
     <div className={`markdown-reader ${className}`} onMouseUp={captureSelection} onKeyUp={captureSelection} data-testid="markdown-reader">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        urlTransform={(url) => url.startsWith('nodus://') ? url : defaultUrlTransform(url)}
-        skipHtml
-        components={{
-          a: ({ href, children }) => {
-            if (href?.startsWith('nodus://')) {
-              const internalHref = serverHrefForNodus(href);
-              if (onNodusLink) return <button type="button" className="inline border-0 bg-transparent p-0 font-inherit text-indigo-600 underline decoration-indigo-400/60 underline-offset-2 hover:text-indigo-500 dark:text-indigo-300" onClick={() => { if (onNodusLink(href) === false && internalHref) window.location.assign(internalHref); }}>{children}</button>;
-              return internalHref ? <a href={internalHref} className="text-indigo-600 underline decoration-indigo-400/60 underline-offset-2 hover:text-indigo-500 dark:text-indigo-300">{children}</a> : <span>{children}</span>;
-            }
-            return <a href={href} target="_blank" rel="noreferrer">{children}</a>;
-          },
-          img: ({ src, alt }) => {
-            const safe = typeof src === 'string' && src.startsWith('assets/') && assetBaseUrl
-              ? `${assetBaseUrl}${src.slice('assets/'.length).split('/').map(encodeURIComponent).join('/')}`
-              : src;
-            return <img src={safe} alt={alt || ''} loading="lazy" />;
-          },
-        }}
-      >{value || 'No readable text was published for this document.'}</ReactMarkdown>
+      {markdown}
     </div>
   );
 }

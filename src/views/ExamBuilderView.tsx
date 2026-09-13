@@ -28,6 +28,7 @@ import { nextIdFor } from '@shared/sequentialIds';
 import { renderExamHtml } from '@shared/examHtml';
 import { Icon, Spinner } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { MarkdownField } from '../components/MarkdownField';
 import { t, tx, errorText, getActiveLang } from '../i18n';
 
 const LANGUAGE_LABELS: Record<ExamLanguage, string> = {
@@ -741,13 +742,15 @@ function QuestionCard({
         <button className="btn btn-ghost h-6 w-6 p-0 text-red-500" title={t('Eliminar')} aria-label={t('Eliminar')} onClick={onDelete}><Icon name="trash" size={12} /></button>
       </div>
 
-      <textarea
-        data-testid={`exam-question-prompt-${number}`}
-        className="input mt-2 min-h-16 w-full resize-y text-sm"
+      <MarkdownField
+        testId={`exam-question-prompt-${number}`}
+        rows={3}
+        textareaClassName="min-h-16 text-sm"
+        className="mt-2"
         placeholder={section ? t('Escribe el texto, el caso o la fuente común…') : t('Escribe el enunciado o genéralo con IA…')}
         value={question.prompt}
-        onChange={(event) => local({ prompt: event.target.value })}
-        onBlur={(event) => onPatch({ prompt: event.target.value })}
+        onChange={(value) => local({ prompt: value })}
+        onBlur={() => onPatch({ prompt: question.prompt })}
       />
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
