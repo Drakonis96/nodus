@@ -222,9 +222,9 @@ export function NodusBrowserView() {
   /**
    * Report the rectangle the page should occupy.
    *
-   * getBoundingClientRect() is already in CSS pixels, which is what setBounds
-   * expects, so no scaling is needed — but the values are rounded in the main
-   * process, because a fractional rectangle leaves a sub-pixel seam.
+   * getBoundingClientRect() reports renderer CSS pixels. The main process turns
+   * them into the native window's DIP coordinates using the host renderer zoom,
+   * then rounds them so a fractional rectangle cannot leave a sub-pixel seam.
    */
   const publishViewport = useCallback(() => {
     const element = viewportRef.current;

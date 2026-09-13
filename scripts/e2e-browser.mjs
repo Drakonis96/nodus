@@ -370,6 +370,48 @@ try {
       width: Math.round(rendererBounds.width),
       height: Math.round(rendererBounds.height),
     }, `native view did not receive the renderer rectangle ${JSON.stringify(rendererBounds)}`);
+
+    // Interface size is a Nodus CSS preference; Chromium's host-renderer zoom
+    // is independent and may still be 110% (the field report that motivated
+    // this regression). Native View bounds are DIPs, so the CSS rectangle has
+    // to be converted with that second scale or the website is shifted left and
+    // leaves an empty strip on the right.
+    await app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1.1);
+    });
+    try {
+      await page.waitForTimeout(150);
+      const zoomedRendererBounds = await viewport.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      });
+      const zoomed = await app.evaluate(({ BrowserWindow }, expectedUrl) => {
+        const window = BrowserWindow.getAllWindows()[0];
+        const view = window.contentView.children.find((candidate) =>
+          'webContents' in candidate && candidate.webContents.getURL() === expectedUrl);
+        return { factor: window.webContents.getZoomFactor(), bounds: view?.getBounds() ?? null };
+      }, `${origin}/`);
+      assert.ok(zoomed.bounds, 'browser view disappeared after host renderer zoom');
+      const left = Math.round(zoomedRendererBounds.x * zoomed.factor);
+      const top = Math.round(zoomedRendererBounds.y * zoomed.factor);
+      const right = Math.round((zoomedRendererBounds.x + zoomedRendererBounds.width) * zoomed.factor);
+      const bottom = Math.round((zoomedRendererBounds.y + zoomedRendererBounds.height) * zoomed.factor);
+      assert.deepEqual(zoomed.bounds, {
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+      }, `110% host zoom misaligned the native view: ${JSON.stringify(zoomed)}`);
+    } finally {
+      await app.evaluate(({ BrowserWindow }) => {
+        BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1);
+      });
+      await page.waitForTimeout(150);
+      await viewport.evaluate(async (element) => {
+        const rect = element.getBoundingClientRect();
+        await window.nodus.setBrowserViewport({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+      });
+    }
   });
 
   await check('a tab opens and loads a real page', async () => {

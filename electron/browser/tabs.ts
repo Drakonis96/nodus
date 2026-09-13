@@ -19,7 +19,7 @@
  *     them. That is what makes a tab cheap enough to have twelve of.
  */
 
-import { nativeTheme, WebContentsView, type BaseWindow, type WebContents } from 'electron';
+import { nativeTheme, WebContentsView, type BrowserWindow, type WebContents } from 'electron';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { BrowserMediaCommand, BrowserState, BrowserTabError, BrowserTabState, BrowserViewport } from '@shared/browser';
@@ -79,7 +79,7 @@ interface Tab {
 
 const tabs = new Map<string, Tab>();
 let activeTabId: string | null = null;
-let hostWindow: BaseWindow | null = null;
+let hostWindow: BrowserWindow | null = null;
 let viewport: BrowserViewport | null = null;
 /**
  * Two INDEPENDENT reasons the page may be hidden, deliberately not one flag.
@@ -317,7 +317,7 @@ export interface BrowserShortcutActions {
 
 /** Wire the host window and the change notifier. Called once, from the IPC layer. */
 export function initBrowserTabs(
-  window: BaseWindow,
+  window: BrowserWindow,
   onChange: () => void,
   menu?: ContextMenuActions,
   shortcuts?: BrowserShortcutActions,
@@ -351,13 +351,25 @@ function patch(tab: Tab, next: Partial<BrowserTabState>): void {
 
 function applyBounds(tab: Tab): void {
   if (!viewport) return;
-  // Integers only: a fractional rectangle leaves a sub-pixel seam between the
-  // native view and the React chrome around it.
+  // getBoundingClientRect() reports renderer CSS pixels. View.setBounds(), on
+  // the other hand, positions a native child in the BrowserWindow's DIP space.
+  // Those units coincide only while the host renderer zoom is exactly 100%.
+  // Chromium zoom can differ from Nodus's own Interface size preference, so a
+  // 110% host zoom used to make the page start too far left and end in a blank
+  // strip on the right. Convert every edge to DIP before rounding.
+  const rawZoom = hostWindow && !hostWindow.isDestroyed()
+    ? hostWindow.webContents.getZoomFactor()
+    : 1;
+  const cssToDip = Number.isFinite(rawZoom) && rawZoom > 0 ? rawZoom : 1;
+  const left = Math.round(viewport.x * cssToDip);
+  const top = Math.round(viewport.y * cssToDip);
+  const right = Math.round((viewport.x + viewport.width) * cssToDip);
+  const bottom = Math.round((viewport.y + viewport.height) * cssToDip);
   tab.view.setBounds({
-    x: Math.round(viewport.x),
-    y: Math.round(viewport.y),
-    width: Math.max(0, Math.round(viewport.width)),
-    height: Math.max(0, Math.round(viewport.height)),
+    x: left,
+    y: top,
+    width: Math.max(0, right - left),
+    height: Math.max(0, bottom - top),
   });
 }
 
