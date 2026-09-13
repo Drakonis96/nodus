@@ -5,7 +5,7 @@ Implementado para Research Chat, Deep Research y Immersion en escritorio. El cat
 - [x] Política por documento, independiente de los interruptores del chat.
 - [x] Selector compartido en ambos modales y en informes existentes.
 - [x] Auto o máximo entero positivo; cero ejecuciones sigue siendo un resultado válido.
-- [x] Skills de pago o coste desconocido desactivadas inicialmente, sin Auto y con máximo explícito obligatorio.
+- [x] Image Atelier, única skill con coste por recurso, desactivada inicialmente, sin Auto y con máximo explícito obligatorio; el resto usa el límite opcional de SVG Studio.
 - [x] Avisos y validación en español, inglés, francés, alemán, portugués, portugués brasileño, italiano y turco.
 - [x] Reserva persistente de intentos y llamadas de pago, incluidas peticiones internas del worker. Fallos y reintentos consumen cupo; deshacer no lo devuelve.
 - [x] Oportunidades visuales al comenzar y contexto aislado para la redacción; selección editorial final sobre el texto guardado y sus fuentes.

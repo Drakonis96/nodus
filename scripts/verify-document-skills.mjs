@@ -26,6 +26,9 @@ const id = 'visual-demo:figures';
 const plugin = { id: 'visual-demo', version: '1.0.0', digest: 'a'.repeat(64) };
 const tool = { id: 'render', description: 'Create a chart or a self-contained 3D model.', inputSchema: { type: 'object' }, artifactTypes: [], timeoutMs: 30_000, concurrency: 1, maxPerReply: 1, answerMode: 'replace-block', metered: false, billing: 'none' };
 const provider = { id, source: 'plugin', version: '1.0.0', description: tool.description, plugin, tools: [tool], artifacts: [], hasSettings: false, chat: { priority: 100, requestProtocols: [{ fence: 'demo-view', toolId: 'render', maxPerReply: 1, answerMode: 'replace-block' }], legacyResults: [], hooks: {}, pendingLabel: { en: 'Preparing a figure', es: 'Preparando una figura' } } };
+const paidId = 'visual-demo:paid';
+const paidTool = { ...tool, id: 'review', description: 'Review prepared image candidates with the selected model.', metered: true, billing: 'per-call', maxPerReply: 3 };
+const paidProvider = { id: paidId, source: 'plugin', version: '1.0.0', description: paidTool.description, plugin, tools: [paidTool], artifacts: [], hasSettings: false, chat: { priority: 100, requestProtocols: [], legacyResults: [], hooks: {}, pendingLabel: { en: 'Reviewing a figure', es: 'Revisando una figura' } } };
 const entryPath = path.join(profile, 'plugin.cjs');
 fs.writeFileSync(entryPath, `module.exports = host => ({
   async health(){return {status:'ready',dataVersion:1}},
@@ -48,6 +51,7 @@ const keeper = new BrowserWindow({ show: false });
 try {
   const registry = load('electron/capabilities/registry.ts').capabilityRegistry();
   registry.providers.set(id, provider); registry.chatOrder.push(provider); registry.fences.set('demo-view', { provider, kind: 'request' });
+  registry.providers.set(paidId, paidProvider);
   const plugins = load('electron/capabilities/pluginStoreV2.ts');
   const resolve = plugins.resolveTrustedCapability;
   plugins.resolveTrustedCapability = (...args) => args[0] === id ? runtime : resolve(...args);
@@ -56,6 +60,7 @@ try {
   workers.acquireCapabilityWorker = (runtime, options) => acquire(runtime, { ...options, bootstrapPath: path.join(root, 'dist-electron/capabilityWorkerBootstrap.js') });
   const skillStore = load('electron/chatSkills.ts');
   const skills = skillStore.saveChatSkill({ name: 'Visual Lab · demo', description: tool.description, instructions: 'Return exactly a demo-view JSON fence with mode chart or model.', capabilities: [id], enabled: { assistant: true, nodi: false } });
+  skillStore.saveChatSkill({ name: 'Vision Lab · paid', description: paidTool.description, instructions: 'Review host-prepared image candidates with the selected model.', capabilities: [paidId], enabled: { assistant: true, nodi: false } });
   const demo = skills.find(skill => skill.name === 'Visual Lab · demo');
   const svg = skills.find(skill => skill.builtin === 'svg');
   assert.ok(svg && demo);
@@ -99,6 +104,8 @@ try {
   assert.notEqual(deepManifest.figures[1].owner, immersionManifest.figures[1].owner);
   for (const [prefix, manifest] of [['deep',deepManifest],['immersion',immersionManifest]]) for (const [index,figure] of manifest.figures.entries()) fs.writeFileSync(path.join(out, `${prefix}-figure-${index+1}.png`), Buffer.from(figure.poster.split(',')[1], 'base64'));
   fs.writeFileSync(path.join(out, 'samples.json'), JSON.stringify({ deep, immersion, deepManifest, immersionManifest, options, policy, modelBase64: cubeGltf().toString('base64') }));
+  assert.equal(options.find(option => option.skill.name === 'Image Atelier')?.billing, 'per-call', 'Image Atelier stays the only metered document Skill');
+  assert.equal(options.find(option => option.skill.name === 'Vision Lab · paid')?.billing, 'none', 'a paid capability tool does not make its Skill metered in documents');
   const pdf = load('electron/export/professionalReportPdf.ts').professionalReportPdf;
   const deepInput = load('electron/export/writingWorkshopExport.ts').buildDeepResearchPdfInput(deep.draft, deep.id);
   const immersionInput = load('electron/export/immersionExport.ts').buildImmersionPdfInput(immersion);
