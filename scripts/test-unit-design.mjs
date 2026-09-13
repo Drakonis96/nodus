@@ -165,9 +165,12 @@ test('coverage questions omitted by the planner are assigned without changing th
 });
 
 test('every supported language has a complete teaching-unit prompt pack', () => {
+  // CJK labels pack the same meaning into far fewer characters.
+  const cjk = new Set(['zh-Hans', 'zh-Hant', 'ja', 'ko']);
   for (const [language, pack] of Object.entries(TEACHING_UNIT_PROMPTS)) {
+    const minimum = cjk.has(language) ? 2 : 8;
     for (const field of ['plan', 'write', 'finalize', 'references', 'limitations']) {
-      assert.ok(pack[field]?.trim().length > 8, `${language}.${field} is missing`);
+      assert.ok(pack[field]?.trim().length > minimum, `${language}.${field} is missing`);
     }
     assert.ok(pack.fallbackSection(2).includes('2'), `${language} fallback title is not numbered`);
     // The unit is written for the teacher to teach from; a pack that slipped back into
