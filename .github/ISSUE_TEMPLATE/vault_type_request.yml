@@ -4,6 +4,10 @@ title: "[Vault type] "
 labels:
   - enhancement
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Write your proposal in English and include mockups or screenshots whenever they help explain the vault.
   - type: input
     id: field
     attributes:
