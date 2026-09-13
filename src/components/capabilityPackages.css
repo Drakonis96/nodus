@@ -67,7 +67,7 @@
 
 /* The permission question. A dialogue rather than a banner, because it is a decision with
    two answers and the card underneath is the thing being decided about. */
-.capability-permission-backdrop { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 24px; background: #0b1020b8; backdrop-filter: blur(2px); }
+.capability-permission-backdrop { position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: 24px; background: #0b1020b8; backdrop-filter: blur(2px); }
 .capability-permission-review { display: grid; gap: 10px; width: min(520px, 100%); max-height: min(78vh, 640px); overflow: auto; padding: 18px 20px; border: 1px solid #818cf84d; border-radius: 16px; background: var(--panel, #141a2e); box-shadow: 0 24px 64px #00000066; }
 .capability-permission-review h4 { margin: 0; font-size: 14px; font-weight: 600; }
 .capability-permission-list { display: grid; gap: 10px; margin: 4px 0 2px; }

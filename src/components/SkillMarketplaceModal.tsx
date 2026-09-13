@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { SUPPORTED_SKILL_CAPABILITIES } from '@shared/skillMarketplace';
 import { skillHasCapability, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
 import { marketplaceLogoSvg } from '@shared/marketplaceLogo';
-import { CapabilityPackagesPanel } from './CapabilityPackagesPanel';
 import { SkillMarketplacePanel } from './SkillMarketplacePanel';
 import { SkillCard, blankSkill, skillMeta, skillSearchText, surfaceLabel, useSkillLibrary } from './skillLibrary';
 import { byName } from './skillGlyph';
@@ -110,11 +109,9 @@ export function SkillMarketplaceModal({ onClose, initialTab = 'library' }: { onC
           <div className="chat-skill-targets">{SURFACES.map(target => <label key={target}><input type="checkbox" checked={draft.enabled[target]} onChange={event => setDraft({ ...draft, enabled: { ...draft.enabled, [target]: event.target.checked } })} />{surfaceLabel(target)}</label>)}</div>
           <div className="chat-skill-editor-actions">{draft.plugin && <button type="button" disabled={busy} onClick={() => void mutate(() => window.nodus.restorePluginSkillAuthorVersion(draft.id)).then(saved => { if (saved) setDraft(null); })}>{t('Restaurar la versión del autor')}</button>}<button type="button" onClick={() => setDraft(null)}>{t('Cancelar')}</button><button className="chat-skill-primary" type="submit" disabled={busy}>{t('Guardar skill')}</button></div>
         </form> : tab === 'marketplace' ? <div className="skill-modal-body">
-          {/* Searching the catalogue is what this tab is for, so it opens on it. The signed
-              packages keep their own section below: they are a short, stable list you come
-              back to, not the thing you arrive looking for. */}
+          {/* Skills, sandboxed plugins and signed packages are one catalogue. The panel owns
+              their shared ordering, filters, cards and permission dialogues. */}
           <SkillMarketplacePanel skills={skills} accent={accent} />
-          <CapabilityPackagesPanel />
         </div> : <div className="skill-modal-body">
           <p className="chat-skills-intro">{t('Tu biblioteca completa. Cada skill se activa por separado en el asistente y en Nodi.')}</p>
           <div className="chat-skills-search">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ArtifactRenderResult } from '@shared/capabilities';
 import { CapabilityView } from './CapabilityView';
+import { PermissionReview, type PendingReview } from './CapabilityPackagesPanel';
 import { Icon } from './ui';
 import { t, getActiveLang } from '../i18n';
 
@@ -18,6 +19,7 @@ export function ChatCapabilityArtifact({ source }: { source: string }) {
   const [result, setResult] = useState<ArtifactRenderResult | null>(null);
   const [error, setError] = useState('');
   const [installing, setInstalling] = useState(false);
+  const [permissionReview, setPermissionReview] = useState<PendingReview | null>(null);
 
   useEffect(() => {
     let parsed: Reference;
@@ -55,13 +57,18 @@ export function ChatCapabilityArtifact({ source }: { source: string }) {
     setInstalling(true);
     setError('');
     try {
-      await window.nodus.installCapabilityPlugin(reference.plugin.id, false);
+      const outcome = await window.nodus.installCapabilityPlugin(reference.plugin.id, false);
+      if (!outcome.activated && outcome.state?.pending?.reason === 'permissions') {
+        setPermissionReview({ id: reference.plugin.id, name: reference.plugin.id, version: outcome.state.pending.version,
+          update: Boolean(outcome.state.active), permissions: outcome.pendingPermissions });
+        return;
+      }
       setResult(await window.nodus.renderCapabilityArtifact(reference.source, getActiveLang()));
     } catch (value) { setError(value instanceof Error ? value.message : String(value)); }
     finally { setInstalling(false); }
   };
 
-  return <section className="chat-visual chat-capability-result chat-capability-orphan">
+  return <><section className="chat-visual chat-capability-result chat-capability-orphan">
     {head}
     <p className="capability-view-summary">{reference.summary}</p>
     {result.reason === 'no-provider' && <>
@@ -72,5 +79,21 @@ export function ChatCapabilityArtifact({ source }: { source: string }) {
     </>}
     {result.reason === 'unreadable' && <p className="capability-view-note" role="alert">{t('El contenido guardado ya no coincide con su huella y no se puede mostrar.')}</p>}
     {result.reason === 'missing' && <p className="capability-view-note" role="alert">{t('El contenido guardado ya no está disponible.')}</p>}
-  </section>;
+  </section>{permissionReview && <PermissionReview review={permissionReview} busy={installing}
+    onAllow={() => {
+      setInstalling(true);
+      void window.nodus.approveCapabilityPlugin(permissionReview.id)
+        .then(() => window.nodus.renderCapabilityArtifact(reference.source, getActiveLang()))
+        .then(setResult)
+        .then(() => setPermissionReview(null))
+        .catch(value => setError(value instanceof Error ? value.message : String(value)))
+        .finally(() => setInstalling(false));
+    }}
+    onRefuse={() => {
+      setInstalling(true);
+      void window.nodus.discardPendingCapabilityPlugin(permissionReview.id)
+        .then(() => setPermissionReview(null))
+        .catch(value => setError(value instanceof Error ? value.message : String(value)))
+        .finally(() => setInstalling(false));
+    }} />}</>;
 }
