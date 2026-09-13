@@ -5475,9 +5475,12 @@ function ExamDetail({
                   {index + 1}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm leading-6">
-                    {value(question.prompt, t("Sin enunciado"))}
-                  </p>
+                  <div className="text-sm leading-6">
+                    <MarkdownReader
+                      hardBreaks
+                      value={value(question.prompt, t("Sin enunciado"))}
+                    />
+                  </div>
                   <div className="mt-2 flex flex-wrap gap-2 text-[10px] uppercase tracking-wider text-neutral-500">
                     <span>{value(question.type, t("Pregunta"))}</span>
                     <span>·</span>
@@ -5491,12 +5494,18 @@ function ExamDetail({
                       {jsonArray(question.options_json ?? question.options).map(
                         (option, optionIndex) => (
                           <li key={optionIndex}>
-                            {typeof option === "object" && option
-                              ? value(
-                                  (option as JsonRecord).text,
-                                  t(`Opción ${optionIndex + 1}`),
-                                )
-                              : value(option, t(`Opción ${optionIndex + 1}`))}
+                            <MarkdownReader
+                              inline
+                              hardBreaks
+                              value={
+                                typeof option === "object" && option
+                                  ? value(
+                                      (option as JsonRecord).text,
+                                      t(`Opción ${optionIndex + 1}`),
+                                    )
+                                  : value(option, t(`Opción ${optionIndex + 1}`))
+                              }
+                            />
                           </li>
                         ),
                       )}
@@ -5854,16 +5863,30 @@ function StudyReviewCatalog({
               {t("Salir")}
             </button>
           </div>
-          <button
-            className="min-h-80 w-full rounded-2xl border border-neutral-200 bg-white p-8 text-center shadow-sm dark:border-neutral-800 dark:bg-neutral-900/45"
+          {/* A reveal surface, not a <button>: question and answer Markdown may contain
+              links, and interactive content cannot nest inside a button. */}
+          <div
+            role="button"
+            tabIndex={0}
+            aria-expanded={revealed}
+            className="min-h-80 w-full cursor-pointer rounded-2xl border border-neutral-200 bg-white p-8 text-center shadow-sm dark:border-neutral-800 dark:bg-neutral-900/45"
             onClick={() => setRevealed(true)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setRevealed(true);
+              }
+            }}
           >
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-teal-600 dark:text-teal-400">
               {t(current.item_kind === "flashcard" ? "Anverso" : "Pregunta")}
             </span>
-            <p className="mt-4 text-xl leading-8">
-              {value(current.front ?? current.prompt, t("Sin enunciado"))}
-            </p>
+            <div className="mt-4 text-xl leading-8">
+              <MarkdownReader
+                hardBreaks
+                value={value(current.front ?? current.prompt, t("Sin enunciado"))}
+              />
+            </div>
             {!revealed ? (
               <p className="mt-10 text-xs text-neutral-500">
                 {t("Pulsa para mostrar la respuesta")}
@@ -5874,12 +5897,15 @@ function StudyReviewCatalog({
                 <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
                   {t("Respuesta")}
                 </span>
-                <p className="mt-4 whitespace-pre-wrap text-lg leading-7 text-emerald-700 dark:text-emerald-300">
-                  {value(currentAnswer, t("No hay respuesta publicada."))}
-                </p>
+                <div className="mt-4 text-lg leading-7 text-emerald-700 dark:text-emerald-300">
+                  <MarkdownReader
+                    hardBreaks
+                    value={value(currentAnswer, t("No hay respuesta publicada."))}
+                  />
+                </div>
               </>
             )}
-          </button>
+          </div>
           {revealed && (
             <div className="mt-4 grid grid-cols-4 gap-2">
               {[
@@ -5984,7 +6010,7 @@ function StudyReviewCatalog({
               >
                 <span className="min-w-0 pr-3">
                   <strong className="block line-clamp-2 font-medium text-neutral-900 dark:text-neutral-200">
-                    {value(row.front ?? row.prompt, t("Sin enunciado"))}
+                    <MarkdownReader inline value={value(row.front ?? row.prompt, t("Sin enunciado"))} />
                   </strong>
                   <span className="mt-1 block truncate text-[10px] text-neutral-500">
                     {value(row.subject_name ?? row.source_title, "")}
@@ -6081,7 +6107,7 @@ function StudyQuestionCatalog({
             >
               <span className="min-w-0 pr-3">
                 <strong className="block line-clamp-2 font-medium text-neutral-900 dark:text-neutral-200">
-                  {value(row.prompt, t("Pregunta sin enunciado"))}
+                  <MarkdownReader inline value={value(row.prompt, t("Pregunta sin enunciado"))} />
                 </strong>
                 {Boolean(row.subject_name || row.source_title) && (
                   <span className="mt-1 block truncate text-[10px] text-neutral-500">
@@ -6149,9 +6175,9 @@ function StudyQuestionDetail({ detail }: { detail: LooseJsonRecord }) {
         <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-teal-600 dark:text-teal-400">
           {t("Pregunta publicada")}
         </p>
-        <h2 className="mt-1 text-xl font-semibold">
-          {value(question.prompt, t("Pregunta sin enunciado"))}
-        </h2>
+        <div className="mt-1 text-xl font-semibold">
+          <MarkdownReader hardBreaks value={value(question.prompt, t("Pregunta sin enunciado"))} />
+        </div>
         <p className="mt-1 text-xs text-neutral-500">
           {STUDY_QUESTION_TYPE_LABEL[
             String(question.question_type ?? question.type ?? "")
@@ -6176,16 +6202,19 @@ function StudyQuestionDetail({ detail }: { detail: LooseJsonRecord }) {
         <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
           {t("Respuesta y explicación")}
         </h3>
-        <p className="mt-3 whitespace-pre-wrap text-sm leading-6">
-          {value(
-            answer.text ?? answer.value ?? question.answer,
-            t("No hay respuesta publicada."),
-          )}
-        </p>
+        <div className="mt-3 text-sm leading-6">
+          <MarkdownReader
+            hardBreaks
+            value={value(
+              answer.text ?? answer.value ?? question.answer,
+              t("No hay respuesta publicada."),
+            )}
+          />
+        </div>
         {Boolean(question.explanation) && (
-          <p className="mt-4 border-t border-neutral-200 pt-4 text-sm leading-6 text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
-            {value(question.explanation)}
-          </p>
+          <div className="mt-4 border-t border-neutral-200 pt-4 text-sm leading-6 text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
+            <MarkdownReader hardBreaks value={value(question.explanation)} />
+          </div>
         )}
       </section>
       {options.length > 0 && (
@@ -6204,10 +6233,14 @@ function StudyQuestionDetail({ detail }: { detail: LooseJsonRecord }) {
                   key={index}
                   className="rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800"
                 >
-                  {value(
-                    record.text ?? record.label ?? option,
-                    `${t("Opción")} ${index + 1}`,
-                  )}
+                  <MarkdownReader
+                    inline
+                    hardBreaks
+                    value={value(
+                      record.text ?? record.label ?? option,
+                      `${t("Opción")} ${index + 1}`,
+                    )}
+                  />
                   {record.correct === true && (
                     <span className="ml-2 text-[10px] uppercase tracking-wider text-teal-600 dark:text-teal-300">
                       {t("Correcta")}
@@ -6228,9 +6261,9 @@ function StudyQuestionDetail({ detail }: { detail: LooseJsonRecord }) {
             {value(source.title, t("Fuente publicada"))}
           </p>
           {Boolean(source.excerpt) && (
-            <p className="mt-1 text-xs leading-5 text-neutral-500">
-              {value(source.excerpt)}
-            </p>
+            <div className="mt-1 text-xs leading-5 text-neutral-500">
+              <MarkdownReader hardBreaks value={value(source.excerpt)} />
+            </div>
           )}
         </section>
       )}
@@ -6262,9 +6295,9 @@ function StudyReviewDetail({ detail }: { detail: LooseJsonRecord }) {
         <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-teal-600 dark:text-teal-400">
           {t("Flashcard publicada")}
         </p>
-        <h2 className="mt-1 text-xl font-semibold">
-          {value(card.front, t("Flashcard sin anverso"))}
-        </h2>
+        <div className="mt-1 text-xl font-semibold">
+          <MarkdownReader hardBreaks value={value(card.front, t("Flashcard sin anverso"))} />
+        </div>
         <p className="mt-1 text-xs text-neutral-500">
           {value(card.short_id ?? card.id, "")} ·{" "}
           {STUDY_QUESTION_DIFFICULTY_LABEL[String(card.difficulty ?? "")]
@@ -6276,25 +6309,25 @@ function StudyReviewDetail({ detail }: { detail: LooseJsonRecord }) {
         <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-teal-600 dark:text-teal-400">
           {t("Anverso")}
         </p>
-        <h3 className="mt-4 text-xl font-semibold leading-8">
-          {value(card.front, t("Sin anverso"))}
-        </h3>
+        <div className="mt-4 text-xl font-semibold leading-8">
+          <MarkdownReader hardBreaks value={value(card.front, t("Sin anverso"))} />
+        </div>
         <div className="mx-auto my-6 h-px max-w-md bg-neutral-200 dark:bg-neutral-800" />
         <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
           {t("Reverso")}
         </p>
-        <p className="mt-4 whitespace-pre-wrap text-lg leading-7 text-emerald-700 dark:text-emerald-300">
-          {value(card.back, t("Sin reverso publicado."))}
-        </p>
+        <div className="mt-4 text-lg leading-7 text-emerald-700 dark:text-emerald-300">
+          <MarkdownReader hardBreaks value={value(card.back, t("Sin reverso publicado."))} />
+        </div>
         {Boolean(card.hint) && (
-          <p className="mt-5 text-sm text-neutral-500">
-            {t("Pista")}: {value(card.hint)}
-          </p>
+          <div className="mt-5 text-sm text-neutral-500">
+            {t("Pista")}: <MarkdownReader inline hardBreaks value={value(card.hint)} />
+          </div>
         )}
       </section>
       {Boolean(card.source_excerpt) && (
         <blockquote className="rounded-xl border border-neutral-200 border-l-4 border-l-teal-500 bg-neutral-50 p-4 text-sm leading-6 text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900/30 dark:text-neutral-400">
-          {value(card.source_excerpt)}
+          <MarkdownReader hardBreaks value={value(card.source_excerpt)} />
         </blockquote>
       )}
       {tags.length > 0 && (

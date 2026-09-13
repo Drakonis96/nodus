@@ -4228,6 +4228,7 @@ export const TR: Record<string, string> = {
   "Añade la primera desde la ficha de una persona, sección «Relaciones sociales».": "Bir kişinin dosyasından ilkini \"Sosyal İlişkiler\" bölümüne ekleyin.",
   "Ir a Personas": "Kişiler'e git",
   "Vista previa": "Önizleme",
+  "Markdown y LaTeX · fórmulas entre $...$": "Markdown ve LaTeX · formüller $...$ arasında",
   "Aún no hay personas. Importa un GEDCOM o añade personas y sus parentescos desde la vista Personas.": "Henüz kimse yok. Bir GEDCOM'u içe aktarın veya Kişiler görünümünden kişileri ve onların ilişkilerini ekleyin.",
   "Árbol genealógico": "Aile ağacı",
   "Centrar el árbol en…": "Ağacı ortalayın…",

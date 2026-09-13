@@ -13,6 +13,8 @@ import type { View } from '../navigation';
 import type { WorldSectionDef } from '../components/world/WorldWorkspace';
 import { WorldWorkspace } from '../components/world/WorldWorkspace';
 import { Icon } from '../components/ui';
+import { MarkdownField } from '../components/MarkdownField';
+import { StudyMarkdown, StudyMarkdownInline } from '../components/StudyMarkdown';
 import { confirm, toast } from '../components/feedback';
 import { PERSON_DOSSIER_SECTION_CLASS } from '../components/personDossierLayout';
 import { notifyDataChanged } from '../hooks';
@@ -182,7 +184,7 @@ function QuestionRow({
         className={`mt-0.5 shrink-0 ${URGENCY_TONE[item.urgency]}`}
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm text-neutral-900 dark:text-neutral-100">{item.question}</span>
+        <span className="block truncate text-sm text-neutral-900 dark:text-neutral-100"><StudyMarkdownInline content={item.question} /></span>
         {!compact && (
           <span className="mt-0.5 block truncate text-[11px] text-neutral-500 dark:text-neutral-600">
             {[
@@ -330,13 +332,14 @@ function QuestionSheet({
           <button className="mb-2 flex items-center gap-1 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200" onClick={onBack}>
             <Icon name="chevronLeft" size={13} /> {t('Volver')}
           </button>
-          <textarea
-            className="input w-full resize-y text-base font-medium"
-            style={{ minHeight: '3.5rem' }}
-            data-testid="question-text"
+          <MarkdownField
+            className="w-full"
+            textareaClassName="text-base font-medium"
+            rows={2}
+            testId="question-text"
             value={draft}
-            aria-label={t('La pregunta')}
-            onChange={(event) => setDraft(event.target.value)}
+            ariaLabel={t('La pregunta')}
+            onChange={setDraft}
             onBlur={() => {
               if (draft.trim() === item.question || !draft.trim()) return;
               void run((questionId) => window.nodus.updateWorldQuestion(questionId, { question: draft.trim() }));
@@ -369,7 +372,7 @@ function QuestionSheet({
           <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-500">
             {t('Dónde está el hueco')}
           </h3>
-          <p className="whitespace-pre-wrap text-xs leading-5 text-neutral-600 dark:text-neutral-400">{item.evidence}</p>
+          <div className="text-xs leading-5 text-neutral-600 dark:text-neutral-400"><StudyMarkdown content={item.evidence} /></div>
           {item.anchor && (
             <button
               className="mt-2 flex items-center gap-1 text-[11px] text-indigo-700 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
@@ -607,9 +610,9 @@ function OptionCard({
         chosen ? 'border-emerald-300 dark:border-emerald-700/70 bg-emerald-50 dark:bg-emerald-950/10' : 'border-neutral-200 dark:border-neutral-800'
       }`}
     >
-      <p className="min-h-0 flex-1 whitespace-pre-wrap text-xs leading-5 text-neutral-800 dark:text-neutral-200">{option.text}</p>
+      <div className="min-h-0 flex-1 text-xs leading-5 text-neutral-800 dark:text-neutral-200"><StudyMarkdown content={option.text} /></div>
       {option.implications && (
-        <p className="text-[10px] leading-4 text-neutral-600 dark:text-neutral-500">{option.implications}</p>
+        <div className="text-[10px] leading-4 text-neutral-600 dark:text-neutral-500"><StudyMarkdownInline content={option.implications} /></div>
       )}
       {option.origin === 'ai' && (
         <span className="text-[9px] uppercase tracking-wide text-amber-700 dark:text-amber-500">{t('Propuesta de la IA')}</span>
