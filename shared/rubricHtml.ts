@@ -38,6 +38,13 @@ const LABELS: Record<string, { criterion: string; weight: string; score: string;
   'pt-BR': { criterion: 'Critério', weight: 'Peso', score: 'Pontuação', total: 'Pontuação total', max: 'máximo' },
   it: { criterion: 'Criterio', weight: 'Peso', score: 'Punteggio', total: 'Punteggio totale', max: 'massimo' },
   tr: { criterion: 'Ölçüt', weight: 'Ağırlık', score: 'Puan', total: 'Toplam puan', max: 'en fazla' },
+  'zh-Hans': { criterion: '标准', weight: '权重', score: '得分', total: '总分', max: '最高' },
+  'zh-Hant': { criterion: '標準', weight: '權重', score: '得分', total: '總分', max: '最高' },
+  vi: { criterion: 'Tiêu chí', weight: 'Trọng số', score: 'Điểm', total: 'Tổng điểm', max: 'tối đa' },
+  ja: { criterion: '評価基準', weight: '重み', score: '得点', total: '合計点', max: '最大' },
+  ru: { criterion: 'Критерий', weight: 'Вес', score: 'Балл', total: 'Итоговый балл', max: 'максимум' },
+  uk: { criterion: 'Критерій', weight: 'Вага', score: 'Бал', total: 'Загальний бал', max: 'максимум' },
+  ko: { criterion: '평가 기준', weight: '가중치', score: '점수', total: '총점', max: '최대' },
 };
 
 export function rubricDocumentLabels(language: string) {

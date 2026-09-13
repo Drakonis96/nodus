@@ -1527,7 +1527,10 @@ export type AppLanguage = 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 't
  *  it, and runtime validators (the MCP tool schemas) enumerate it instead of
  *  re-spelling the list — which is how `tr` once ended up accepted everywhere except
  *  over MCP. Adding a language here forces the exhaustive `Record`s to be filled in. */
-export const PROMPT_LANGUAGES = ['es', 'en', 'fr', 'tr', 'de', 'pt', 'pt-BR', 'it'] as const;
+export const PROMPT_LANGUAGES = [
+  'es', 'en', 'fr', 'tr', 'de', 'pt', 'pt-BR', 'it',
+  'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko',
+] as const;
 export type PromptLanguage = (typeof PROMPT_LANGUAGES)[number];
 
 /** A concrete model selection: which provider + which model id. */

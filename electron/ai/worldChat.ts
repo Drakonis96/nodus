@@ -46,7 +46,7 @@ import { findingsFor } from '@shared/worldFindings';
 import { entryKey, parseEntryKey } from '@shared/worldEncyclopedia';
 import { worldBeatMarkLabel, worldRuleScopeLabel } from '@shared/worldPromptLanguage';
 import { buildStays, buildJourneys, positionAt, presenceKey } from '@shared/worldPresence';
-import type { AppLanguage, WorldChatRequest, WorldChatResult, WorldEntryKind } from '@shared/types';
+import type { PromptLanguage, WorldChatRequest, WorldChatResult, WorldEntryKind } from '@shared/types';
 
 /** Enough of a sheet to answer from; past this the focus stops fitting a local window. */
 const MAX_PROSE_CHARS = 1200;
@@ -83,7 +83,7 @@ function resolveFocus(request: WorldChatRequest): WorldChatRef[] {
     .map((entry) => ({ kind: entry.kind, id: entry.id, title: entry.title }));
 }
 
-export function buildWorldChatFacts(request: WorldChatRequest, language: AppLanguage = 'es'): WorldChatFacts {
+export function buildWorldChatFacts(request: WorldChatRequest, language: PromptLanguage = 'es'): WorldChatFacts {
   const focus = resolveFocus(request);
   const worldDay = readWorldDay(request.question, language);
   const history = (request.history ?? [])

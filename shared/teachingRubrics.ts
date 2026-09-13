@@ -20,7 +20,7 @@
  * (export) and the AI generator all share it, and it is unit-tested on its own.
  */
 
-export const RUBRIC_LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'] as const;
+export const RUBRIC_LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'] as const;
 export type RubricLanguage = (typeof RUBRIC_LANGUAGES)[number];
 
 export function normalizeRubricLanguage(value: unknown): RubricLanguage {
@@ -112,6 +112,13 @@ export const RUBRIC_LEVEL_PRESETS: RubricLevelPreset[] = [
       'pt-BR': ['Excelente', 'Bom', 'Adequado', 'A melhorar'],
       it: ['Eccellente', 'Buono', 'Adeguato', 'Da migliorare'],
       tr: ['Mükemmel', 'İyi', 'Yeterli', 'Geliştirilmeli'],
+      'zh-Hans': ['优秀', '良好', '合格', '待改进'],
+      'zh-Hant': ['優秀', '良好', '合格', '待改進'],
+      vi: ['Xuất sắc', 'Tốt', 'Đạt yêu cầu', 'Cần cải thiện'],
+      ja: ['秀逸', '良好', '適切', '改善が必要'],
+      ru: ['Отлично', 'Хорошо', 'Удовлетворительно', 'Требует улучшения'],
+      uk: ['Відмінно', 'Добре', 'Задовільно', 'Потребує покращення'],
+      ko: ['매우 우수', '우수', '적절', '개선 필요'],
     },
   },
   {
@@ -129,6 +136,13 @@ export const RUBRIC_LEVEL_PRESETS: RubricLevelPreset[] = [
       'pt-BR': ['Especialista', 'Avançado', 'Aprendiz', 'Iniciante'],
       it: ['Esperto', 'Avanzato', 'Apprendista', 'Principiante'],
       tr: ['Uzman', 'İleri düzey', 'Öğrenen', 'Acemi'],
+      'zh-Hans': ['专家', '熟练者', '学徒', '新手'],
+      'zh-Hant': ['專家', '熟練者', '學徒', '新手'],
+      vi: ['Chuyên gia', 'Thành thạo', 'Học việc', 'Mới bắt đầu'],
+      ja: ['エキスパート', '実践者', '見習い', '初心者'],
+      ru: ['Эксперт', 'Практик', 'Ученик', 'Новичок'],
+      uk: ['Експерт', 'Практик', 'Учень', 'Початківець'],
+      ko: ['전문가', '숙련자', '견습생', '초보자'],
     },
   },
   {
@@ -143,6 +157,13 @@ export const RUBRIC_LEVEL_PRESETS: RubricLevelPreset[] = [
       'pt-BR': ['Supera o esperado', 'Atende ao esperado', 'Aproxima-se', 'Abaixo'],
       it: ['Supera le aspettative', 'Soddisfa le aspettative', 'Si avvicina', 'Sotto le aspettative'],
       tr: ['Beklentileri aşıyor', 'Beklentileri karşılıyor', 'Yaklaşıyor', 'Beklentilerin altında'],
+      'zh-Hans': ['超出预期', '达到预期', '接近预期', '低于预期'],
+      'zh-Hant': ['超出預期', '達到預期', '接近預期', '低於預期'],
+      vi: ['Vượt kỳ vọng', 'Đạt kỳ vọng', 'Gần đạt', 'Dưới kỳ vọng'],
+      ja: ['期待を上回る', '期待どおり', '近づいている', '期待を下回る'],
+      ru: ['Превосходит ожидания', 'Соответствует ожиданиям', 'Приближается', 'Ниже ожиданий'],
+      uk: ['Перевищує очікування', 'Відповідає очікуванням', 'Наближається', 'Нижче очікувань'],
+      ko: ['기대 초과', '기대 충족', '기대에 근접', '기대 미달'],
     },
   },
   {
@@ -157,6 +178,13 @@ export const RUBRIC_LEVEL_PRESETS: RubricLevelPreset[] = [
       'pt-BR': ['Exemplar', 'Competente', 'Em desenvolvimento', 'Inicial'],
       it: ['Esemplare', 'Competente', 'In sviluppo', 'Iniziale'],
       tr: ['Örnek düzey', 'Yetkin', 'Gelişiyor', 'Başlangıç'],
+      'zh-Hans': ['典范', '熟练', '发展中', '起步'],
+      'zh-Hant': ['典範', '熟練', '發展中', '起步'],
+      vi: ['Mẫu mực', 'Thành thạo', 'Đang phát triển', 'Khởi đầu'],
+      ja: ['模範的', '熟達', '発展途上', '初期'],
+      ru: ['Образцовый', 'Уверенный', 'Развивающийся', 'Начальный'],
+      uk: ['Зразковий', 'Впевнений', 'У процесі розвитку', 'Початковий'],
+      ko: ['모범적', '능숙', '발전 중', '초기'],
     },
   },
   {
@@ -172,6 +200,13 @@ export const RUBRIC_LEVEL_PRESETS: RubricLevelPreset[] = [
       'pt-BR': ['Alcançado', 'Em progresso', 'Não alcançado'],
       it: ['Raggiunto', 'In corso', 'Non raggiunto'],
       tr: ['Başarıldı', 'Devam ediyor', 'Başarılmadı'],
+      'zh-Hans': ['已达成', '进行中', '未达成'],
+      'zh-Hant': ['已達成', '進行中', '未達成'],
+      vi: ['Đã đạt', 'Đang tiến hành', 'Chưa đạt'],
+      ja: ['達成', '進行中', '未達成'],
+      ru: ['Достигнуто', 'В процессе', 'Не достигнуто'],
+      uk: ['Досягнуто', 'У процесі', 'Не досягнуто'],
+      ko: ['달성', '진행 중', '미달성'],
     },
   },
   {
@@ -187,6 +222,13 @@ export const RUBRIC_LEVEL_PRESETS: RubricLevelPreset[] = [
       'pt-BR': ['Excelente', 'Muito bom', 'Bom', 'Suficiente', 'Insuficiente'],
       it: ['Eccellente', 'Molto buono', 'Buono', 'Sufficiente', 'Insufficiente'],
       tr: ['Üstün', 'Çok iyi', 'İyi', 'Yeterli', 'Yetersiz'],
+      'zh-Hans': ['优秀', '良好', '中等', '及格', '不及格'],
+      'zh-Hant': ['優秀', '良好', '中等', '及格', '不及格'],
+      vi: ['Xuất sắc', 'Rất tốt', 'Tốt', 'Đạt', 'Chưa đạt'],
+      ja: ['秀逸', '非常に良い', '良い', '満足', '不十分'],
+      ru: ['Отлично', 'Очень хорошо', 'Хорошо', 'Удовлетворительно', 'Неудовлетворительно'],
+      uk: ['Відмінно', 'Дуже добре', 'Добре', 'Задовільно', 'Незадовільно'],
+      ko: ['탁월', '매우 우수', '우수', '보통', '미흡'],
     },
   },
   {
@@ -201,6 +243,13 @@ export const RUBRIC_LEVEL_PRESETS: RubricLevelPreset[] = [
       'pt-BR': ['Supera o esperado', 'Critério esperado', 'Precisa melhorar'],
       it: ['Supera le aspettative', 'Criterio atteso', 'Da migliorare'],
       tr: ['Beklentileri aşıyor', 'Beklenen ölçüt', 'Geliştirilmeli'],
+      'zh-Hans': ['超出预期', '达到标准', '需要改进'],
+      'zh-Hant': ['超出預期', '達到標準', '需要改進'],
+      vi: ['Vượt kỳ vọng', 'Đạt tiêu chí', 'Cần cải thiện'],
+      ja: ['期待を上回る', '基準どおり', '改善が必要'],
+      ru: ['Превосходит ожидания', 'Соответствует критерию', 'Требует улучшения'],
+      uk: ['Перевищує очікування', 'Відповідає критерію', 'Потребує покращення'],
+      ko: ['기대 초과', '기준 충족', '개선 필요'],
     },
   },
 ];

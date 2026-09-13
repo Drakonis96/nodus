@@ -189,7 +189,10 @@ try {
 
   // ── 1c. The client writing kit follows the requested prompt language ───────
   {
-    const markers = { es: /Cita CADA/, en: /Cite EVERY/, fr: /Citez CHAQUE/, de: /Belegen Sie JEDE/, pt: /Cita CADA/, 'pt-BR': /Cite CADA/, it: /Cita OGNI/, tr: /HER önemli iddiayı/ };
+    const markers = {
+      es: /Cita CADA/, en: /Cite EVERY/, fr: /Citez CHAQUE/, de: /Belegen Sie JEDE/, pt: /Cita CADA/, 'pt-BR': /Cite CADA/, it: /Cita OGNI/, tr: /HER önemli iddiayı/,
+      'zh-Hans': /为每一处实质性论断引用/, 'zh-Hant': /為每一處實質性論斷引用/, vi: /Trích dẫn MỌI/, ja: /実質的な主張はすべて/, ru: /Цитируйте КАЖДОЕ/, uk: /Цитуйте КОЖНЕ/, ko: /모든 실질적 주장을/,
+    };
     for (const language of Object.keys(markers)) {
       const brief = await buildDeepResearchBrief(
         { objective: 'Topic', language, approach: 'general', sectionLimit: 'single' },

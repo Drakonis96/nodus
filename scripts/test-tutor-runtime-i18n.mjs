@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
 
 test('Tutor deterministic runtime copy follows every requested language', async () => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'nodus-tutor-runtime-'));
@@ -88,6 +88,8 @@ function tutorLabel(language, weight) {
   return {
     es: { 5: 'línea principal' }, en: { 5: 'main line' }, fr: { 5: 'ligne principale' }, de: { 5: 'Hauptlinie' },
     pt: { 5: 'linha principal' }, 'pt-BR': { 5: 'linha principal' }, it: { 5: 'linea principale' }, tr: { 5: 'ana hat' },
+    'zh-Hans': { 5: '主线' }, 'zh-Hant': { 5: '主線' }, vi: { 5: 'dòng chính' }, ja: { 5: 'メインライン' },
+    ru: { 5: 'главная линия' }, uk: { 5: 'головна лінія' }, ko: { 5: '주 노선' },
   }[language][weight];
 }
 
@@ -95,15 +97,23 @@ function tutorError(language) {
   return {
     es: 'Parada de recorrido inválida.', en: 'Invalid route stop.', fr: 'Étape de parcours invalide.', de: 'Ungültige Wegstation.',
     pt: 'Paragem de percurso inválida.', 'pt-BR': 'Parada de percurso inválida.', it: 'Tappa del percorso non valida.', tr: 'Geçersiz güzergâh durağı.',
+    'zh-Hans': '无效的路线站点。', 'zh-Hant': '無效的路線站點。', vi: 'Điểm dừng lộ trình không hợp lệ.', ja: '無効なルート立ち寄り地点です。',
+    ru: 'Недопустимая остановка маршрута.', uk: 'Недопустима зупинка маршруту.', ko: '유효하지 않은 경로 경유지입니다.',
   }[language];
 }
 
 function tutorRoute(language) {
-  return { es: 'Recorrido', en: 'Route', fr: 'Parcours', de: 'Weg', pt: 'Percurso', 'pt-BR': 'Percurso', it: 'Percorso', tr: 'Güzergâh' }[language];
+  return {
+    es: 'Recorrido', en: 'Route', fr: 'Parcours', de: 'Weg', pt: 'Percurso', 'pt-BR': 'Percurso', it: 'Percorso', tr: 'Güzergâh',
+    'zh-Hans': '路线', 'zh-Hant': '路線', vi: 'Lộ trình', ja: 'ルート', ru: 'Маршрут', uk: 'Маршрут', ko: '경로',
+  }[language];
 }
 
 function tutorStop(language) {
-  return { es: 'Parada', en: 'Stop', fr: 'Étape', de: 'Station', pt: 'Paragem', 'pt-BR': 'Parada', it: 'Tappa', tr: 'Durak' }[language];
+  return {
+    es: 'Parada', en: 'Stop', fr: 'Étape', de: 'Station', pt: 'Paragem', 'pt-BR': 'Parada', it: 'Tappa', tr: 'Durak',
+    'zh-Hans': '站点', 'zh-Hant': '站點', vi: 'Điểm dừng', ja: '立ち寄り地点', ru: 'Остановка', uk: 'Зупинка', ko: '경유지',
+  }[language];
 }
 
 function tutorOverview(language) {
@@ -111,11 +121,16 @@ function tutorOverview(language) {
     es: 'Recorrido guiado por tu grafo de ideas.', en: 'Guided route through your idea graph.', fr: "Parcours guidé dans votre graphe d'idées.",
     de: 'Geführter Weg durch Ihren Ideengraphen.', pt: 'Percurso guiado pelo seu grafo de ideias.', 'pt-BR': 'Percurso guiado pelo seu grafo de ideias.',
     it: 'Percorso guidato nel tuo grafo di idee.', tr: 'Fikir grafiğinizde rehberli güzergâh.',
+    'zh-Hans': '贯穿你的观点图谱的引导路线。', 'zh-Hant': '貫穿你的觀點圖譜的引導路線。', vi: 'Lộ trình có hướng dẫn qua đồ thị ý tưởng của bạn.',
+    ja: 'アイデアグラフをたどるガイド付きルート。', ru: 'Управляемый маршрут по графу ваших идей.', uk: 'Керований маршрут графом ваших ідей.', ko: '아이디어 그래프를 따라가는 안내 경로.',
   }[language];
 }
 
 function tutorRelation(language) {
-  return { es: 'apoya', en: 'supports', fr: 'soutient', de: 'stützt', pt: 'apoia', 'pt-BR': 'apoia', it: 'supporta', tr: 'destekler' }[language];
+  return {
+    es: 'apoya', en: 'supports', fr: 'soutient', de: 'stützt', pt: 'apoia', 'pt-BR': 'apoia', it: 'supporta', tr: 'destekler',
+    'zh-Hans': '支持', 'zh-Hant': '支持', vi: 'ủng hộ', ja: '支持する', ru: 'поддерживает', uk: 'підтримує', ko: '지지',
+  }[language];
 }
 
 function tutorCriterion(language) {
@@ -128,6 +143,13 @@ function tutorCriterion(language) {
     'pt-BR': 'Se sua resposta ficar muito abaixo deste mínimo, faltarão nós e você deverá redesenhar percursos mais longos antes de responder.',
     it: 'Se la risposta è molto al di sotto di questo minimo, mancheranno nodi e dovrai ridisegnare percorsi più lunghi prima di rispondere.',
     tr: 'Yanıtınız bu minimumun çok altında kalırsa düğümler eksik kalır; yanıtlamadan önce daha uzun güzergâhları yeniden tasarlamalısınız.',
+    'zh-Hans': '如果你的回答远低于这一下限，就会缺少节点，你必须在回答之前重新设计更长的路线。',
+    'zh-Hant': '如果你的回答遠低於這個下限，就會缺少節點，你必須在回答之前重新設計更長的路線。',
+    vi: 'Nếu câu trả lời của bạn thấp hơn nhiều so với mức tối thiểu này, các nút sẽ bị thiếu và bạn phải thiết kế lại những lộ trình dài hơn trước khi trả lời.',
+    ja: '回答がこの下限を大きく下回る場合、ノードが欠落します。回答する前に、より長いルートを再設計してください。',
+    ru: 'Если ваш ответ намного ниже этого минимума, узлов будет не хватать, и перед ответом вам придётся заново спроектировать более длинные маршруты.',
+    uk: 'Якщо ваша відповідь значно нижча за цей мінімум, вузлів бракуватиме, і перед відповіддю вам доведеться перепроєктувати довші маршрути.',
+    ko: '답변이 이 최소치보다 훨씬 짧으면 노드가 누락되므로, 답변하기 전에 더 긴 경로를 다시 설계해야 합니다.',
   }[language];
 }
 

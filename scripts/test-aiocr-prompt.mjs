@@ -79,7 +79,8 @@ test('OCR_USER_PROMPT is a non-empty trigger', () => {
 });
 
 test('every prompt language keeps the complete OCR contract', () => {
-  const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+  const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
+  const cjk = new Set(['zh-Hans', 'zh-Hant', 'ja', 'ko']);
   for (const language of languages) {
     const base = opts({ promptLanguage: language, singleColumn: false, removeReferences: true });
     const structured = language === 'es' ? buildOcrSystemPrompt(base) : buildLocalizedOcrSystemPrompt(base);
@@ -88,19 +89,19 @@ test('every prompt language keeps the complete OCR contract', () => {
       assert.ok(structured.includes(token), `${language} structured prompt keeps ${token}`);
     }
     assert.match(structured, /0[^\n]*1000/, `${language} structured prompt keeps normalized coordinates`);
-    assert.ok(text.length >= 1100, `${language} text prompt is not a condensed fallback`);
+    assert.ok(text.length >= (cjk.has(language) ? 450 : 1100), `${language} text prompt is not a condensed fallback`);
     assert.match(text, /JSON|json/);
-    assert.match(structured, /Author|Auteur|Autor|Autore|Yazar/, `${language} keeps citation examples`);
+    assert.match(structured, /Author|Auteur|Autor|Autore|Yazar|作者|著者|저자|Tác giả|Автор/, `${language} keeps citation examples`);
     if (language !== 'es') assert.doesNotMatch(structured, /Eres una IA|EXTRACCIÓN LITERAL|SALTOS DE PÁRRAFO REALES/);
     if (language !== 'es') assert.notEqual(ocrUserPrompt(language), OCR_USER_PROMPT, `${language} user prompt is localized`);
   }
 });
 
 test('localized OCR prompts preserve mode flags, custom text, references and column behavior', () => {
-  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko']) {
     const translated = buildLocalizedOcrSystemPrompt(opts({ promptLanguage: language, processingMode: 'translation', targetLanguage: 'TARGET-LANGUAGE', removeReferences: false }));
     assert.match(translated, /TARGET-LANGUAGE/);
-    assert.match(translated, /references|références|verweise|referências|riferimenti|kaynaklar/i);
+    assert.match(translated, /references|références|verweise|referências|riferimenti|kaynaklar|参考文献|參考文獻|tham khảo|参照|ссылк|посиланн|참고/i);
     assert.doesNotMatch(translated, /omit|omets|omita|omiti|atlay/);
     const manual = buildLocalizedOcrTextPrompt(opts({ promptLanguage: language, outputMode: 'text', processingMode: 'manual', customPrompt: 'KEEP_THIS_CUSTOM_INSTRUCTION', singleColumn: true }));
     assert.match(manual, /KEEP_THIS_CUSTOM_INSTRUCTION/);

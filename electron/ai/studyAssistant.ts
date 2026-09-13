@@ -48,7 +48,7 @@ const DEMO_CONVERSATION_IDS = { study: 'demo-study-chat-membrane', teaching: 'de
 type StudyChatDemoVariant = keyof typeof DEMO_CONVERSATION_IDS;
 
 function promptLanguage(value: unknown): PromptLanguage {
-  return value === 'en' || value === 'fr' || value === 'de' || value === 'pt' || value === 'pt-BR' || value === 'it' || value === 'tr' ? value : 'es';
+  return value === 'en' || value === 'fr' || value === 'de' || value === 'pt' || value === 'pt-BR' || value === 'it' || value === 'tr' || value === 'zh-Hans' || value === 'zh-Hant' || value === 'vi' || value === 'ja' || value === 'ru' || value === 'uk' || value === 'ko' ? value : 'es';
 }
 
 function effectivePromptLanguage(requestLanguage: unknown): PromptLanguage {

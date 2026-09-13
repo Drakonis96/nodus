@@ -7,7 +7,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
+const legacyLanguages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const cjk = new Set(['zh-Hans', 'zh-Hant', 'ja', 'ko']);
 const buildDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-deep-scan-prompts-'));
 const output = path.join(buildDir, 'prompts.mjs');
 
@@ -66,10 +68,10 @@ try {
     if (key !== 'fusion') assert.equal(prompts.coreStructuredPrompt(key, 'es'), canonicalCore[key], `${key}: Spanish canonical contract changed`);
     for (const language of languages) {
       const value = prompts.coreStructuredPrompt(key, language);
-      assert.ok(value.length >= canonicalCore[key].length * 0.65, `${language}.${key}: translated contract is unexpectedly short`);
+      assert.ok(value.length >= canonicalCore[key].length * (cjk.has(language) ? 0.25 : 0.65), `${language}.${key}: translated contract is unexpectedly short`);
       for (const token of tokens) assert.ok(value.includes(token), `${language}.${key}: missing ${token}`);
       assert.equal((value.match(/^- /gm) ?? []).length, (canonicalCore[key].match(/^- /gm) ?? []).length, `${language}.${key}: list-rule count changed`);
-      if (key === 'fusion') {
+      if (key === 'fusion' && legacyLanguages.includes(language)) {
         assert.ok(value.includes(fusionGuardAnchors[language]), `${language}.${key}: priority decision guard was lost`);
         assert.ok(value.includes(fusionContractAnchors[language]), `${language}.${key}: operational contract guard was lost`);
         assert.match(value, /similarity >= 0\.7/, `${language}.${key}: high-similarity exception was lost`);
@@ -107,7 +109,7 @@ try {
     '[[src:sN', 'p.N', '0.0-1.0', '1-3', '0-2', '0-3', '0.9-1.0',
   ];
   for (const language of languages) {
-    assert.ok(copies[language].length > 3000, `${language}: complete contract is unexpectedly short`);
+    assert.ok(copies[language].length > (cjk.has(language) ? 1200 : 3000), `${language}: complete contract is unexpectedly short`);
     for (const token of contractTokens) assert.ok(copies[language].includes(token), `${language}: missing contract token ${token}`);
     assert.equal((copies[language].match(/═══/g) ?? []).length, (copies.es.match(/═══/g) ?? []).length, `${language}: section count differs`);
   }

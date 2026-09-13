@@ -20,9 +20,9 @@ execFileSync(path.join(root, 'node_modules/.bin/esbuild'), [
 const prompts = require(output);
 const contract = require(contractOutput);
 
-test('all nine report modes and eight languages have every prompt role', () => {
+test('all nine report modes and fifteen languages have every prompt role', () => {
   assert.equal(contract.DATABASE_DEEP_RESEARCH_REPORT_TYPES.length, 9);
-  assert.equal(contract.DATABASE_DEEP_RESEARCH_PROMPT_LANGUAGES.length, 8);
+  assert.equal(contract.DATABASE_DEEP_RESEARCH_PROMPT_LANGUAGES.length, 15);
   assert.deepEqual(prompts.validateDatabaseDeepResearchPromptRegistry(), []);
   for (const language of contract.DATABASE_DEEP_RESEARCH_PROMPT_LANGUAGES) {
     for (const reportType of contract.DATABASE_DEEP_RESEARCH_REPORT_TYPES) {

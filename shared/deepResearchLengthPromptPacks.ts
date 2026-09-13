@@ -160,6 +160,118 @@ const PACKS: Record<PromptLanguage, DeepResearchLengthPromptPack> = {
     clientKit: (words) =>
       `Yol gösterici uzunluk: bölüm başına yaklaşık ${words.toLocaleString('tr-TR')} kelime. Bu editoryal bir yönlendirmedir, kota değildir; katalog tükenirse daha erken durun ve ona ulaşmak için asla doldurma yapmayın veya tekrarlamayın.`,
   },
+  'zh-Hans': {
+    section: (words) =>
+      `本节参考篇幅：约 ${words.toLocaleString('zh-CN')} 字。这是编辑指引，不是配额：请用它充分展开现有证据确实能够支撑的机制、比较和证据边界。如果材料先一步用尽，就结束本节；不要为了达到数字而重复、凑字数、编造，或把推论写成事实。`,
+    paragraph: (words) =>
+      `本段参考篇幅：约 ${words.toLocaleString('zh-CN')} 字。请通过阐明机制并准确界定所引证据的范围来达到，绝不要靠添加没有依据的论断或重复已说过的内容来凑数。`,
+    evidencePlan: (paragraphs, words) =>
+      `报告要求各节约为 ${words.toLocaleString('zh-CN')} 字，即大约 ${paragraphs} 个各自承担独立推论功能的段落。在证据菜单能够支撑的范围内，设计尽量多彼此不同的段落，直至这一数量级。如果材料只够支撑更少，就少规划：绝不要为了凑够数字而重复同一功能，或把一条证据分配给两个段落。`,
+    plan: (words) =>
+      `每一节都将按约 ${words.toLocaleString('zh-CN')} 字的参考篇幅撰写。为每一节设定足够宽泛的目的和论断，以便用现有证据支撑这一展开，既不把论证切碎，也不承诺语料无法支撑的内容。`,
+    continuation: (remaining, pass) =>
+      `从本节结束处原样继续。距离参考篇幅还差约 ${remaining.toLocaleString('zh-CN')} 字；现在写约 ${pass.toLocaleString('zh-CN')} 字。不要重复标题，不要概括已写内容，也不要重新打开已经结束的论证：补充新的、有依据的材料，附上菜单中确切的引注，并以与上一段衔接的完整段落呈现。`,
+    continuationStop:
+      '如果证据菜单已无法再补充任何实质内容而不重复自己、不凑数、不断言来源并不支持的东西，请只回答 续写为空，不要回答任何其他内容。',
+    clientKit: (words) =>
+      `参考篇幅：每节约 ${words.toLocaleString('zh-CN')} 字。这是编辑指引，不是配额；如果目录用尽就提前停止，绝不为了达到而凑数或重复。`,
+  },
+  'zh-Hant': {
+    section: (words) =>
+      `本節參考篇幅：約 ${words.toLocaleString('zh-TW')} 字。這是編輯指引，不是配額：請用它充分開展現有證據確實能夠支撐的機制、比較和證據邊界。如果材料先一步用盡，就結束本節；不要為了達到數字而重複、湊字數、編造，或把推論寫成事實。`,
+    paragraph: (words) =>
+      `本段參考篇幅：約 ${words.toLocaleString('zh-TW')} 字。請透過闡明機制並準確界定所引證據的範圍來達到，絕不要靠加入沒有依據的論斷或重複已說過的內容來湊數。`,
+    evidencePlan: (paragraphs, words) =>
+      `報告要求各節約為 ${words.toLocaleString('zh-TW')} 字，即大約 ${paragraphs} 個各自承擔獨立推論功能的段落。在證據選單能夠支撐的範圍內，設計盡量多彼此不同的段落，直至這個數量級。如果材料只夠支撐更少，就少規劃：絕不要為了湊夠數字而重複同一功能，或把一項證據分配給兩個段落。`,
+    plan: (words) =>
+      `每一節都將按約 ${words.toLocaleString('zh-TW')} 字的參考篇幅撰寫。為每一節設定足夠寬廣的目的和論斷，以便用現有證據支撐這樣的開展，既不把論證切碎，也不承諾語料無法支撐的內容。`,
+    continuation: (remaining, pass) =>
+      `從本節結束處原樣繼續。距離參考篇幅還差約 ${remaining.toLocaleString('zh-TW')} 字；現在寫約 ${pass.toLocaleString('zh-TW')} 字。不要重複標題，不要概述已寫內容，也不要重新打開已經結束的論證：補充新的、有依據的材料，附上選單中確切的引註，並以與上一段銜接的完整段落呈現。`,
+    continuationStop:
+      '如果證據選單已無法再補充任何實質內容而不重複自己、不湊數、不斷言來源並不支持的東西，請只回答 續寫為空，不要回答任何其他內容。',
+    clientKit: (words) =>
+      `參考篇幅：每節約 ${words.toLocaleString('zh-TW')} 字。這是編輯指引，不是配額；如果目錄用盡就提前停止，絕不為了達到而湊數或重複。`,
+  },
+  vi: {
+    section: (words) =>
+      `Độ dài tham khảo của phần này: khoảng ${words.toLocaleString('vi-VN')} từ. Đây là định hướng biên tập, không phải hạn ngạch: hãy dùng nó để triển khai các cơ chế, so sánh và giới hạn chứng cứ mà nguồn tư liệu hiện có thực sự chống đỡ. Nếu tư liệu cạn trước, hãy kết thúc phần này; đừng lặp lại, viết cho đầy, bịa đặt hay biến một suy luận thành dữ kiện để đạt con số.`,
+    paragraph: (words) =>
+      `Độ dài tham khảo của đoạn này: khoảng ${words.toLocaleString('vi-VN')} từ. Hãy đạt được bằng cách giải thích cơ chế và nêu chính xác phạm vi của chứng cứ được trích dẫn, tuyệt đối không thêm các khẳng định thiếu căn cứ hay nhắc lại điều đã nói.`,
+    evidencePlan: (paragraphs, words) =>
+      `Báo cáo yêu cầu các phần dài khoảng ${words.toLocaleString('vi-VN')} từ, tức vào cỡ ${paragraphs} đoạn, mỗi đoạn có chức năng suy luận riêng. Hãy thiết kế càng nhiều đoạn khác biệt càng tốt trong giới hạn mà menu chứng cứ có thể chống đỡ, tối đa đến bậc độ lớn đó. Nếu tư liệu chỉ đủ cho ít hơn, hãy lập kế hoạch ít hơn: tuyệt đối không lặp lại một chức năng hay gán cùng một chứng cứ cho hai đoạn để đạt con số.`,
+    plan: (words) =>
+      `Mỗi phần sẽ được viết với độ dài tham khảo khoảng ${words.toLocaleString('vi-VN')} từ. Hãy cho mỗi phần một mục đích và những khẳng định đủ rộng để chống đỡ sự triển khai đó bằng chứng cứ hiện có, mà không chia cắt lập luận hay hứa hẹn nội dung mà ngữ liệu không thể chống đỡ.`,
+    continuation: (remaining, pass) =>
+      `Hãy tiếp tục chính phần này đúng từ chỗ nó dừng lại. Còn khoảng ${remaining.toLocaleString('vi-VN')} từ nữa mới đạt độ dài tham khảo; bây giờ hãy viết khoảng ${pass.toLocaleString('vi-VN')} từ. Đừng lặp lại tiêu đề, đừng tóm tắt điều đã viết và đừng mở lại một lập luận đã khép lại: hãy bổ sung tư liệu mới, có căn cứ, kèm các trích dẫn chính xác từ menu, trong những đoạn hoàn chỉnh nối tiếp đoạn cuối.`,
+    continuationStop:
+      'Nếu menu chứng cứ không còn cho phép bổ sung bất cứ điều gì thực chất mà không lặp lại chính mình, không viết cho đầy hay không khẳng định điều mà các nguồn không chống đỡ, hãy trả lời chính xác TIEP_TUC_TRONG và không gì khác.',
+    clientKit: (words) =>
+      `Độ dài tham khảo: khoảng ${words.toLocaleString('vi-VN')} từ mỗi phần. Đây là định hướng biên tập, không phải hạn ngạch; hãy dừng sớm hơn nếu danh mục cạn và tuyệt đối không viết cho đầy hay lặp lại để đạt được nó.`,
+  },
+  ja: {
+    section: (words) =>
+      `この節の目安の長さ：約 ${words.toLocaleString('ja-JP')} 字。これは編集上の目安であり、ノルマではありません。利用可能な証拠が実際に支えられる仕組み・比較・証拠上の限界を展開するために使ってください。資料が先に尽きたら、そこで節を終えてください。数字に合わせるために繰り返したり、水増ししたり、捏造したり、推測を事実に変えたりしないでください。`,
+    paragraph: (words) =>
+      `この段落の目安の長さ：約 ${words.toLocaleString('ja-JP')} 字。仕組みを説明し、引用した証拠の範囲を正確に示すことで達成してください。根拠のない主張を加えたり、すでに述べたことを繰り返したりしてはいけません。`,
+    evidencePlan: (paragraphs, words) =>
+      `報告書は各節およそ ${words.toLocaleString('ja-JP')} 字、つまりそれぞれ独自の推論機能を持つ ${paragraphs} 段落程度を求めています。証拠メニューが支えられる範囲で、できるだけ多くの異なる段落を設計してください。資料がそれより少なくしか支えられない場合は、少なく計画してください。数字に合わせるために同じ機能を重複させたり、一つの証拠を二つの段落に割り当てたりしないでください。`,
+    plan: (words) =>
+      `各節は約 ${words.toLocaleString('ja-JP')} 字の目安の長さで書かれます。利用可能な証拠からその展開を支えられるよう、各節に十分広い目的と主張を与えてください。論証を細切れにしたり、コーパスが支えられない内容を約束したりしないでください。`,
+    continuation: (remaining, pass) =>
+      `この節の終わった箇所からそのまま続けてください。目安の長さまであと約 ${remaining.toLocaleString('ja-JP')} 字です。ここでは約 ${pass.toLocaleString('ja-JP')} 字書いてください。見出しを繰り返さず、すでに書いた内容を要約せず、閉じた論点を再び開かないでください。メニューからの正確な引用を伴う、新しい裏付けのある材料を、前の段落につながる完全な段落で加えてください。`,
+    continuationStop:
+      '証拠メニューが、繰り返しや水増し、出典が支えない主張をすることなく、実質的な内容をこれ以上加えることを許さない場合は、正確に 続きなし とのみ答えてください。',
+    clientKit: (words) =>
+      `目安の長さ：各節あたり約 ${words.toLocaleString('ja-JP')} 字。これは編集上の目安であり、ノルマではありません。カタログが尽きたら早めにやめ、到達するために水増しや繰り返しをしないでください。`,
+  },
+  ru: {
+    section: (words) =>
+      `Ориентировочная длина этого раздела: около ${words.toLocaleString('ru-RU')} слов. Это редакционный ориентир, а не квота: используйте его, чтобы развить механизмы, сравнения и пределы доказательности, которые действительно выдерживает имеющийся материал. Если материал исчерпается раньше, завершите раздел; не повторяйтесь, не заполняйте объём, не выдумывайте и не превращайте вывод в факт, чтобы достичь числа.`,
+    paragraph: (words) =>
+      `Ориентировочная длина этого абзаца: около ${words.toLocaleString('ru-RU')} слов. Достигните её, объясняя механизм и точно указывая охват цитируемых доказательств, а не добавляя необоснованные утверждения или повторяя уже сказанное.`,
+    evidencePlan: (paragraphs, words) =>
+      `Отчёт требует разделов примерно по ${words.toLocaleString('ru-RU')} слов, то есть порядка ${paragraphs} абзацев, каждый со своей функцией вывода. Спроектируйте столько различных абзацев, сколько способно выдержать меню доказательств, вплоть до этого порядка величины. Если материал выдерживает меньше, планируйте меньше: никогда не дублируйте функцию и не назначайте одно доказательство двум абзацам, чтобы достичь числа.`,
+    plan: (words) =>
+      `Каждый раздел будет написан с ориентировочной длиной около ${words.toLocaleString('ru-RU')} слов. Дайте каждому разделу цель и утверждения, достаточно широкие, чтобы выдержать такое развитие на имеющихся доказательствах, не дробя аргумент и не обещая содержание, которое корпус не может подкрепить.`,
+    continuation: (remaining, pass) =>
+      `Продолжите этот же раздел точно с того места, где он заканчивается. До ориентировочной длины остаётся около ${remaining.toLocaleString('ru-RU')} слов; сейчас напишите примерно ${pass.toLocaleString('ru-RU')}. Не повторяйте заголовок, не пересказывайте уже написанное и не открывайте заново закрытый аргумент: добавьте новый, подкреплённый материал с точными цитатами из меню, в полных абзацах, которые продолжают последний.`,
+    continuationStop:
+      'Если меню доказательств больше не позволяет добавить ничего существенного без повторений, заполнения объёма или утверждений, которые источники не поддерживают, ответьте точно ПУСТОЕ_ПРОДОЛЖЕНИЕ и больше ничего.',
+    clientKit: (words) =>
+      `Ориентировочная длина: около ${words.toLocaleString('ru-RU')} слов на раздел. Это редакционный ориентир, а не квота; остановитесь раньше, если каталог исчерпан, и никогда не заполняйте объём и не повторяйтесь, чтобы её достичь.`,
+  },
+  uk: {
+    section: (words) =>
+      `Орієнтовна довжина цього розділу: близько ${words.toLocaleString('uk-UA')} слів. Це редакційний орієнтир, а не квота: використайте його, щоб розгорнути механізми, порівняння та межі доказовості, які справді витримує наявний матеріал. Якщо матеріал вичерпається раніше, завершіть розділ; не повторюйтеся, не заповнюйте обсяг, не вигадуйте й не перетворюйте висновок на факт, щоб досягти числа.`,
+    paragraph: (words) =>
+      `Орієнтовна довжина цього абзацу: близько ${words.toLocaleString('uk-UA')} слів. Досягніть її, пояснюючи механізм і точно зазначаючи обсяг цитованих доказів, а не додаючи необґрунтовані твердження чи повторюючи вже сказане.`,
+    evidencePlan: (paragraphs, words) =>
+      `Звіт вимагає розділів приблизно по ${words.toLocaleString('uk-UA')} слів, тобто близько ${paragraphs} абзаців, кожен зі своєю функцією висновування. Спроєктуйте стільки різних абзаців, скільки здатне витримати меню доказів, до цього порядку величини. Якщо матеріал витримує менше, плануйте менше: ніколи не дублюйте функцію й не призначайте один доказ двом абзацам, щоб досягти числа.`,
+    plan: (words) =>
+      `Кожен розділ буде написано з орієнтовною довжиною близько ${words.toLocaleString('uk-UA')} слів. Дайте кожному розділу мету й твердження, достатньо широкі, щоб витримати таке розгортання на наявних доказах, не подрібнюючи аргумент і не обіцяючи зміст, який корпус не може підкріпити.`,
+    continuation: (remaining, pass) =>
+      `Продовжте цей самий розділ точно з того місця, де він закінчується. До орієнтовної довжини залишається близько ${remaining.toLocaleString('uk-UA')} слів; тепер напишіть приблизно ${pass.toLocaleString('uk-UA')}. Не повторюйте заголовок, не переказуйте вже написане й не відкривайте заново закритий аргумент: додайте новий, підкріплений матеріал з точними цитатами з меню, у повних абзацах, що продовжують останній.`,
+    continuationStop:
+      'Якщо меню доказів більше не дозволяє додати нічого суттєвого без повторень, заповнення обсягу чи тверджень, яких джерела не підтримують, дайте відповідь точно ПОРОЖНЄ_ПРОДОВЖЕННЯ і більше нічого.',
+    clientKit: (words) =>
+      `Орієнтовна довжина: близько ${words.toLocaleString('uk-UA')} слів на розділ. Це редакційний орієнтир, а не квота; зупиніться раніше, якщо каталог вичерпано, і ніколи не заповнюйте обсяг і не повторюйтеся, щоб її досягти.`,
+  },
+  ko: {
+    section: (words) =>
+      `이 절의 참고 분량: 약 ${words.toLocaleString('ko-KR')}단어입니다. 이는 편집 지침이며 할당량이 아닙니다. 확보된 증거가 실제로 뒷받침하는 메커니즘, 비교, 증거의 한계를 전개하는 데 사용하십시오. 자료가 먼저 소진되면 절을 끝내십시오. 숫자를 채우기 위해 반복하거나, 분량을 늘리거나, 날조하거나, 추론을 사실로 바꾸지 마십시오.`,
+    paragraph: (words) =>
+      `이 단락의 참고 분량: 약 ${words.toLocaleString('ko-KR')}단어입니다. 메커니즘을 설명하고 인용된 증거의 범위를 정확히 밝혀 도달하되, 근거 없는 주장을 덧붙이거나 이미 말한 내용을 반복해서는 안 됩니다.`,
+    evidencePlan: (paragraphs, words) =>
+      `보고서는 각 절을 약 ${words.toLocaleString('ko-KR')}단어, 즉 각기 고유한 추론 기능을 지닌 ${paragraphs}개 안팎의 단락으로 요청합니다. 증거 메뉴가 뒷받침할 수 있는 범위에서 서로 다른 단락을 그 규모까지 설계하십시오. 자료가 그보다 적게 뒷받침한다면 더 적게 계획하십시오. 숫자를 채우기 위해 같은 기능을 중복하거나 하나의 증거를 두 단락에 배정하지 마십시오.`,
+    plan: (words) =>
+      `각 절은 약 ${words.toLocaleString('ko-KR')}단어의 참고 분량에 맞춰 작성됩니다. 확보된 증거로 그러한 전개를 뒷받침할 수 있도록 각 절에 충분히 넓은 목적과 주장을 부여하되, 논증을 토막 내거나 코퍼스가 뒷받침할 수 없는 내용을 약속하지 마십시오.`,
+    continuation: (remaining, pass) =>
+      `이 절을 끝나는 지점에서 그대로 이어 가십시오. 참고 분량까지 약 ${remaining.toLocaleString('ko-KR')}단어가 남았습니다. 지금 약 ${pass.toLocaleString('ko-KR')}단어를 쓰십시오. 제목을 반복하지 말고, 이미 쓴 내용을 요약하지 말고, 닫힌 논점을 다시 열지 마십시오. 메뉴에서 정확히 인용한 새롭고 뒷받침되는 자료를, 마지막 단락에 이어지는 완전한 단락으로 추가하십시오.`,
+    continuationStop:
+      '증거 메뉴가 더 이상 반복하거나 분량을 늘리거나 출처가 뒷받침하지 않는 것을 주장하지 않고서는 실질적인 내용을 추가할 수 없다면, 정확히 계속_없음이라고만 답하십시오.',
+    clientKit: (words) =>
+      `참고 분량: 절마다 약 ${words.toLocaleString('ko-KR')}단어입니다. 이는 편집 지침이며 할당량이 아닙니다. 카탈로그가 소진되면 더 일찍 멈추고, 도달하기 위해 분량을 늘리거나 반복하지 마십시오.`,
+  },
 };
 
 /**
@@ -167,7 +279,7 @@ const PACKS: Record<PromptLanguage, DeepResearchLengthPromptPack> = {
  * is only this token counts as zero new words, so the loop stops instead of pasting
  * "EMPTY_CONTINUATION" into the report.
  */
-const EMPTY_CONTINUATION_TOKENS = [
+export const EMPTY_CONTINUATION_TOKENS = [
   'CONTINUACION_VACIA',
   'EMPTY_CONTINUATION',
   'CONTINUATION_VIDE',
@@ -175,6 +287,13 @@ const EMPTY_CONTINUATION_TOKENS = [
   'CONTINUACAO_VAZIA',
   'CONTINUAZIONE_VUOTA',
   'BOS_DEVAM',
+  '续写为空',
+  '續寫為空',
+  'TIEP_TUC_TRONG',
+  '続きなし',
+  'ПУСТОЕ_ПРОДОЛЖЕНИЕ',
+  'ПОРОЖНЄ_ПРОДОВЖЕННЯ',
+  '계속_없음',
 ] as const;
 
 export function deepResearchLengthPromptPack(language: PromptLanguage = 'es'): DeepResearchLengthPromptPack {

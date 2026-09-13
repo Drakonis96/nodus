@@ -26,6 +26,7 @@ import { t, errorText, getActiveLang } from '../i18n';
 
 const LANGUAGE_LABELS: Record<RubricLanguage, string> = {
   es: 'Español', en: 'English', fr: 'Français', de: 'Deutsch', pt: 'Português', 'pt-BR': 'Português (Brasil)', it: 'Italiano', tr: 'Türkçe',
+  'zh-Hans': '简体中文', 'zh-Hant': '繁體中文', vi: 'Tiếng Việt', ja: '日本語', ru: 'Русский', uk: 'Українська', ko: '한국어',
 };
 
 export function RubricsView() {
