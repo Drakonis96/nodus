@@ -250,6 +250,26 @@ export interface PendingBrowserPermission {
   mediaTypes: string[];
 }
 
+/**
+ * An HTTP authentication challenge a page is waiting on.
+ *
+ * Presented by Nodus, never by the page: the fields are drawn in Nodus chrome
+ * from data Chromium reported, so a site can neither imitate the prompt nor
+ * read what was typed. Credentials are answered straight back to Chromium and
+ * are never stored by Nodus.
+ */
+export interface PendingBrowserAuth {
+  id: string;
+  /** The host that answered, with a non-default port when there is one. */
+  host: string;
+  /** The server's own realm, verbatim. Empty when it sent none. */
+  realm: string;
+  /** The page that triggered the challenge. */
+  url: string;
+  /** True when the challenge came from a proxy (HTTP 407). */
+  isProxy: boolean;
+}
+
 /** A download in progress or finished, as the renderer sees it. */
 export interface BrowserDownloadView {
   id: string;

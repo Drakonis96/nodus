@@ -8397,4 +8397,9 @@ export const PT_BR: Record<string, string> = {
   '¿Seguro que quieres eliminar la etiqueta «{name}»? Las presentaciones que la tienen seguirán en la biblioteca, pero sin etiqueta.': 'Excluir a etiqueta “{name}”? As apresentações que a têm continuam na biblioteca, apenas sem etiqueta.',
   'Descargar PDF': 'Baixar PDF',
   'No se pudo descargar la presentación.': 'Não foi possível baixar a apresentação.',
+  // Nodus Browser — HTTP authentication prompt.
+  'pide usuario y contraseña.': 'pede seu nome de usuário e senha.',
+  'Usuario': 'Usuário',
+  'Iniciar sesión': 'Entrar',
+  'Proxy': 'Proxy',
 };

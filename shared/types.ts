@@ -8748,6 +8748,15 @@ export interface BrowserApi {
   onBrowserPermissionRequest(
     cb: (request: import('./browser').PendingBrowserPermission | null) => void,
   ): () => void;
+  /** An HTTP authentication challenge waiting on credentials. */
+  getPendingBrowserAuth(): Promise<import('./browser').PendingBrowserAuth | null>;
+  /** Answer the challenge; credentials are never stored by Nodus. */
+  resolveBrowserAuth(id: string, username: string, password: string): Promise<void>;
+  /** Dismiss one request by id, or every pending request when no id is given. */
+  cancelBrowserAuth(id?: string): Promise<void>;
+  onBrowserAuthRequest(
+    cb: (request: import('./browser').PendingBrowserAuth | null) => void,
+  ): () => void;
   getBrowserMedia(): Promise<import('./browser').BrowserMediaState[]>;
   browserMediaCommand(tabId: string, command: import('./browser').BrowserMediaCommand): Promise<void>;
   setBrowserTabMuted(tabId: string, muted: boolean): Promise<void>;
