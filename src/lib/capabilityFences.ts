@@ -52,7 +52,9 @@ export function useCapabilityFences(): FenceClaims {
   }, []);
 
   const byFence = new Map<string, Claim>();
-  for (const claim of claims.values()) for (const fence of claim.fences) byFence.set(fence, claim);
+  for (const claim of claims.values()) {
+    for (const fence of [...claim.fences, ...claim.legacyFences]) byFence.set(fence, claim);
+  }
   return {
     fences: new Set(byFence.keys()),
     legacyFences: new Set([...claims.values()].flatMap(claim => claim.legacyFences)),

@@ -18,7 +18,7 @@ import './capabilityPackages.css';
 
 const label = (text: { en: string; [locale: string]: string }) => text[getActiveLang()] ?? text[getActiveLang().split('-')[0]] ?? text.en;
 
-function SettingsForm({ capabilityId, onChanged }: { capabilityId: string; onChanged: () => void }) {
+export function SettingsForm({ capabilityId, onChanged }: { capabilityId: string; onChanged: () => void }) {
   const [payload, setPayload] = useState<CapabilitySettingsPayload | null>(null);
   const [draft, setDraft] = useState<Record<string, string | boolean>>({});
   const [busy, setBusy] = useState(false);
@@ -99,7 +99,7 @@ function SettingsForm({ capabilityId, onChanged }: { capabilityId: string; onCha
 }
 
 /** A package that is waiting to be told yes or no, and what it asked for. */
-interface PendingReview { id: string; name: string; version: string; update: boolean; permissions: TrustedPermissionSetV2 | null }
+export interface PendingReview { id: string; name: string; version: string; update: boolean; permissions: TrustedPermissionSetV2 | null }
 
 const megabytes = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(bytes >= 1024 * 1024 ? 1 : 2)} MB`;
 
@@ -147,7 +147,7 @@ function permissionRows(permissions: TrustedPermissionSetV2): Array<{ label: str
  *  installs it, no removes what staging the question needed. Before this, the answer lived
  *  in a button the card only drew for packages that were already active, which no first
  *  install ever is — so the only reachable reply was to install again, and get asked again. */
-function PermissionReview({ review, busy, onAllow, onRefuse }: {
+export function PermissionReview({ review, busy, onAllow, onRefuse }: {
   review: PendingReview;
   busy: boolean;
   onAllow: () => void;
@@ -189,7 +189,7 @@ function PermissionReview({ review, busy, onAllow, onRefuse }: {
  *  means the only way a user learns it did not finish is here. Each package says which of
  *  the four things it is waiting on, and a failure offers the retry rather than describing
  *  one. */
-function MigrationBanner({ onChanged }: { onChanged: () => void }) {
+export function MigrationBanner({ onChanged }: { onChanged: () => void }) {
   const [status, setStatus] = useState<CapabilityMigrationStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -397,7 +397,7 @@ export function CapabilityPackagesPanel() {
   </section>;
 }
 
-function PackageFacts({ entry, state, providers }: {
+export function PackageFacts({ entry, state, providers }: {
   entry: { targets: string[]; release: { assets: Array<{ target: string; bytes: number }> } };
   state?: InstalledCapabilityPlugin;
   providers: CapabilityProviderSummary[];
@@ -411,7 +411,7 @@ function PackageFacts({ entry, state, providers }: {
   </dl>;
 }
 
-function PackageActions({ entry, state, busy, run, install, onReview }: {
+export function PackageActions({ entry, state, busy, run, install, onReview }: {
   entry: { id: string; name: string; version: string };
   state?: InstalledCapabilityPlugin;
   busy: string;
