@@ -93,7 +93,7 @@ try {
       import { runTrustedChatPipeline } from './electron/capabilities/chatPipeline';
       import { chatAssetOwner } from './electron/chatAssets';
       import { materializeTrustedPluginSkills } from './electron/capabilities/skillLibrary';
-      import { listChatSkills, saveChatSkill, enabledChatSkills, restorePluginSkillAuthorVersion } from './electron/chatSkills';
+      import { listChatSkills, saveChatSkill, enabledChatSkills, restorePluginSkillAuthorVersion, deriveCapabilityTools } from './electron/chatSkills';
 
       app.setPath('userData', ${JSON.stringify(temporary)});
       app.on('window-all-closed', () => {});
@@ -147,6 +147,13 @@ try {
         assert.ok(provider.chat, 'it declares a chat contract');
         for (const protocol of provider.chat.requestProtocols) {
           assert.equal(registry.fences.get(protocol.fence).provider.id, provider.id, protocol.fence + ' is claimed by its own provider');
+        }
+
+        stage = 'trusted chat protocol';
+        const packagedSkills = materializeTrustedPluginSkills(payload.packageId).filter(skill => skill.plugin?.id === payload.packageId);
+        assert.ok(packagedSkills.length > 0, 'the package installs at least one workflow');
+        for (const skill of packagedSkills) {
+          assert.equal(deriveCapabilityTools(skill), undefined, 'a trusted v2 workflow is not advertised through the legacy nodus-capability fence');
         }
 
         stage = 'worker';
