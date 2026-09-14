@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { dialogTitle } from '../dialogTitles';
 import path from 'node:path';
 import type { FileFilter } from 'electron';
 import type { IpcContext } from './context';
@@ -7,6 +8,7 @@ import * as pages from '../db/pagesRepo';
 import * as comments from '../db/pageCommentsRepo';
 import * as acl from '../db/aclRepo';
 import { showImportOpenDialog } from '../privacy';
+import { getSettings } from '../db/settingsRepo';
 
 const filters: Record<'image' | 'file' | 'audio' | 'video', FileFilter[]> = {
   image: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'] }],
@@ -125,7 +127,7 @@ export function registerPagesIpc({ h, getWindow }: IpcContext): void {
   h('page:pickAsset', async (_event, kind: 'image' | 'file' | 'audio' | 'video') => {
     if (!filters[kind]) throw new Error('Tipo de archivo no válido.');
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: kind === 'image' ? 'Elegir imagen' : kind === 'audio' ? 'Elegir audio' : kind === 'video' ? 'Elegir vídeo' : 'Elegir archivo',
+      title: kind === 'image' ? dialogTitle('chooseImage', getSettings().uiLanguage) : kind === 'audio' ? dialogTitle('chooseAudio', getSettings().uiLanguage) : kind === 'video' ? dialogTitle('chooseVideo', getSettings().uiLanguage) : dialogTitle('chooseFile', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: filters[kind],
     });

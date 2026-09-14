@@ -16,6 +16,7 @@
  * preload with `ipcRenderer` on it. Defence in depth, deliberately redundant.
  */
 
+import { dialogTitle } from '../dialogTitles';
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
@@ -846,7 +847,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     assertUiSender(event, getWindow);
     const owner = getWindow() ?? undefined;
     const openOptions: Electron.OpenDialogOptions = {
-      title: 'Importar Nodus Bookmarks',
+      title: dialogTitle('importNodusBookmarks', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: [
         { name: 'Marcadores', extensions: ['json', 'html', 'htm'] },
@@ -897,7 +898,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     const format = rawFormat === 'html' ? 'html' as const : 'json' as const;
     const store = bookmarks.snapshot();
     const saveOptions: Electron.SaveDialogOptions = {
-      title: 'Exportar Nodus Bookmarks',
+      title: dialogTitle('exportNodusBookmarks', getSettings().uiLanguage),
       defaultPath: `nodus-bookmarks.${format}`,
       filters: format === 'json'
         ? [{ name: 'Nodus Bookmarks JSON', extensions: ['json'] }]

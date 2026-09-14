@@ -1,4 +1,5 @@
 import { getDocumentVisuals } from '../ai/documentVisuals';
+import { dialogTitle } from '../dialogTitles';
 import { documentMarkdownWithFigures } from '@shared/documentFigureExport';
 import AdmZip from 'adm-zip';
 import fs from 'node:fs';
@@ -20,6 +21,7 @@ import { markdownToPdf } from './markdownRender';
 import { getDecorativeImage, getDecorativeImageData } from '../db/decorativeImagesRepo';
 import { getWritingWorkshopDraft } from '../db/writingDraftsRepo';
 import { professionalReportPdf, type ProfessionalReportInput } from './professionalReportPdf';
+import { getSettings } from '../db/settingsRepo';
 
 
 export async function exportWritingWorkshopDraft(
@@ -29,7 +31,7 @@ export async function exportWritingWorkshopDraft(
   const requested = request.format ?? 'markdown';
   const base = slug(draft.title || 'taller-escritura');
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Exportar informe',
+    title: dialogTitle('exportReport', getSettings().uiLanguage),
     defaultPath: path.join(app.getPath('documents'), `${base}.${requested === 'pdf' ? 'pdf' : 'md'}`),
     // Offer both filters so the user can switch format in the native dialog; the
     // final format is decided by the chosen extension (falling back to `requested`).
@@ -108,7 +110,7 @@ export async function exportDeepResearchArchive(
 
   const stamp = new Date().toISOString().slice(0, 10);
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Descargar informes',
+    title: dialogTitle('downloadReports', getSettings().uiLanguage),
     defaultPath: path.join(app.getPath('downloads'), `nodus-deep-research-${stamp}.zip`),
     filters: [{ name: 'ZIP', extensions: ['zip'] }],
   });

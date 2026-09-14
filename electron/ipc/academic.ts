@@ -1,4 +1,5 @@
 import { registerResearchAttachmentIpc } from './researchAttachments';
+import { dialogTitle } from '../dialogTitles';
 import { getResearchSystemPrompts, saveResearchSystemPrompt, selectResearchSystemPrompt, deleteResearchSystemPrompt } from '../db/researchSystemPromptsRepo';
 import { mergeHybridResults, searchSnippet } from '@shared/hybridSearch';
 import type { StudyQuestionBulkAction } from '@shared/studyQuestions';
@@ -989,7 +990,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('study:stt:whisperCpp:uninstall', async () => uninstallWhisperCpp());
   h('study:stt:whisperCpp:chooseExecutable', async () => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: 'Seleccionar whisper-cli',
+      title: dialogTitle('selectWhisperCli', getSettings().uiLanguage),
       properties: ['openFile'],
     });
     if (picked.canceled || !picked.filePaths[0]) return null;
@@ -1015,7 +1016,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('study:styles:export', async (_e, styleIds?: string[]) => {
     const payload = studyStyles.exportStudyStyles(styleIds);
     const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
-      title: 'Exportar estilos de estudio', defaultPath: 'nodus-study-styles.json', filters: [{ name: 'Nodus Study Styles', extensions: ['json'] }],
+      title: dialogTitle('exportStudyStyles', getSettings().uiLanguage), defaultPath: 'nodus-study-styles.json', filters: [{ name: 'Nodus Study Styles', extensions: ['json'] }],
     });
     if (picked.canceled || !picked.filePath) return null;
     fs.writeFileSync(picked.filePath, JSON.stringify(payload, null, 2), 'utf8');
@@ -1023,7 +1024,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   });
   h('study:styles:import', async () => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: 'Importar estilos de estudio', properties: ['openFile'], filters: [{ name: 'Nodus Study Styles', extensions: ['json'] }],
+      title: dialogTitle('importStudyStyles', getSettings().uiLanguage), properties: ['openFile'], filters: [{ name: 'Nodus Study Styles', extensions: ['json'] }],
     });
     if (picked.canceled || !picked.filePaths[0]) return [];
     const payload = JSON.parse(fs.readFileSync(picked.filePaths[0], 'utf8')) as StudyStyleExport;
@@ -1053,7 +1054,7 @@ export function registerAcademicIpc(context: IpcContext): void {
     const content = studyMaterials.getStudyMaterialContent(id);
     const safeName = path.basename(material.fileName).replace(/[\\/:*?"<>|]+/g, '-') || `material.${material.extension || 'bin'}`;
     const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
-      title: 'Descargar material',
+      title: dialogTitle('downloadMaterial', getSettings().uiLanguage),
       defaultPath: safeName,
       filters: material.extension ? [{ name: material.extension.toUpperCase(), extensions: [material.extension] }] : undefined,
     });
@@ -1063,7 +1064,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   });
   h('study:materials:import', async (_e, input?: StudyMaterialImportInput) => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: 'Añadir materiales de estudio', properties: ['openFile', 'multiSelections'],
+      title: dialogTitle('addStudyMaterials', getSettings().uiLanguage), properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Materiales de estudio', extensions: ['pdf', 'docx', 'md', 'markdown', 'pptx', 'txt', 'html', 'htm', 'epub', 'png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff', 'mp3', 'wav', 'm4a', 'ogg', 'zip'] }],
     });
     if (picked.canceled) return [];
@@ -1073,7 +1074,7 @@ export function registerAcademicIpc(context: IpcContext): void {
     return results;
   });
   h('study:materials:importFolder', async (_e, input?: StudyMaterialImportInput) => {
-    const picked = await showImportOpenDialog(getWindow() ?? undefined!, { title: 'Añadir carpeta de materiales', properties: ['openDirectory'] });
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, { title: dialogTitle('addMaterialsFolder', getSettings().uiLanguage), properties: ['openDirectory'] });
     if (picked.canceled) return [];
     const results = await importStudyMaterialPaths(picked.filePaths, input);
     queueStudyMaterialIndex(results.map((result) => result.material.id));
@@ -1082,9 +1083,9 @@ export function registerAcademicIpc(context: IpcContext): void {
   });
   h('study:materials:choosePaths', async (_e, folder?: boolean) => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, folder ? {
-      title: 'Seleccionar carpeta de materiales', properties: ['openDirectory'],
+      title: dialogTitle('selectMaterialsFolder', getSettings().uiLanguage), properties: ['openDirectory'],
     } : {
-      title: 'Seleccionar materiales de estudio', properties: ['openFile', 'multiSelections'],
+      title: dialogTitle('selectStudyMaterials', getSettings().uiLanguage), properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Materiales de estudio', extensions: ['pdf', 'docx', 'md', 'markdown', 'pptx', 'txt', 'html', 'htm', 'epub', 'png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff', 'mp3', 'wav', 'm4a', 'ogg', 'zip'] }],
     });
     return picked.canceled ? [] : picked.filePaths;
@@ -1132,7 +1133,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   });
   h('study:materials:replace', async (_e, id: string, ocr?: boolean) => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: 'Sustituir fichero del material', properties: ['openFile'],
+      title: dialogTitle('replaceMaterialFile', getSettings().uiLanguage), properties: ['openFile'],
       filters: [{ name: 'Materiales de estudio', extensions: ['pdf', 'docx', 'md', 'markdown', 'pptx', 'txt', 'html', 'htm', 'epub', 'png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff', 'mp3', 'wav', 'm4a', 'ogg'] }],
     });
     if (picked.canceled || !picked.filePaths[0]) return null;
@@ -1177,7 +1178,7 @@ export function registerAcademicIpc(context: IpcContext): void {
     const extension = isPdf ? 'pdf' : 'epub';
     const baseName = path.basename(material.fileName, path.extname(material.fileName)).replace(/[\\/:*?"<>|]+/g, '-') || 'material';
     const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
-      title: 'Descargar material anotado', defaultPath: `${baseName}-anotado.${extension}`,
+      title: dialogTitle('downloadAnnotatedMaterial', getSettings().uiLanguage), defaultPath: `${baseName}-anotado.${extension}`,
       filters: [{ name: isPdf ? 'PDF anotado' : 'EPUB anotado', extensions: [extension] }],
     });
     if (picked.canceled || !picked.filePath) return null;
@@ -1204,7 +1205,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('study:recordings:create', async (_e, input: StudyRecordingCreateInput) => studyRecordings.createStudyRecording(input));
   h('study:recordings:import', async (_e, scope?: Omit<StudyRecordingCreateInput, 'bytes' | 'fileName' | 'mimeType'>) => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: 'Añadir grabaciones de clase', properties: ['openFile', 'multiSelections'],
+      title: dialogTitle('addClassRecordings', getSettings().uiLanguage), properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Grabaciones de audio', extensions: ['mp3', 'wav', 'm4a', 'ogg', 'webm'] }],
     });
     if (picked.canceled) return [];
@@ -1266,7 +1267,7 @@ export function registerAcademicIpc(context: IpcContext): void {
     const conversation = studyAssistant.getStudyAssistantConversation(id); if (!conversation) return null;
     const safeTitle = conversation.title.replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80) || 'chat-estudio';
     const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
-      title: 'Exportar conversación de estudio', defaultPath: `${safeTitle}.md`, filters: [{ name: 'Markdown', extensions: ['md'] }],
+      title: dialogTitle('exportStudyConversation', getSettings().uiLanguage), defaultPath: `${safeTitle}.md`, filters: [{ name: 'Markdown', extensions: ['md'] }],
     });
     if (picked.canceled || !picked.filePath) return null;
     fs.writeFileSync(picked.filePath, studyAssistant.renderStudyAssistantConversation(conversation), 'utf8');
@@ -1284,7 +1285,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('study:questions:export', async (_e, ids?: string[]) => {
     const payload = studyQuestions.exportStudyQuestions(ids);
     const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
-      title: 'Exportar banco de preguntas', defaultPath: 'nodus-preguntas.json', filters: [{ name: 'Nodus Study Questions', extensions: ['json'] }],
+      title: dialogTitle('exportQuestionBank', getSettings().uiLanguage), defaultPath: 'nodus-preguntas.json', filters: [{ name: 'Nodus Study Questions', extensions: ['json'] }],
     });
     if (picked.canceled || !picked.filePath) return null;
     fs.writeFileSync(picked.filePath, JSON.stringify(payload, null, 2), 'utf8');
@@ -1292,7 +1293,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   });
   h('study:questions:import', async () => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: 'Importar banco de preguntas', properties: ['openFile'], filters: [{ name: 'Nodus Study Questions', extensions: ['json'] }],
+      title: dialogTitle('importQuestionBank', getSettings().uiLanguage), properties: ['openFile'], filters: [{ name: 'Nodus Study Questions', extensions: ['json'] }],
     });
     if (picked.canceled || !picked.filePaths[0]) return [];
     return studyQuestions.importStudyQuestions(JSON.parse(fs.readFileSync(picked.filePaths[0], 'utf8')) as StudyQuestionExport);
@@ -1310,7 +1311,7 @@ export function registerAcademicIpc(context: IpcContext): void {
     const extension = interchangeExtension(kind, format);
     const defaultName = kind === 'questions' ? `nodus-preguntas.${extension}` : `nodus-flashcards.${extension}`;
     const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
-      title: kind === 'questions' ? 'Exportar banco de preguntas' : 'Exportar flashcards',
+      title: kind === 'questions' ? dialogTitle('exportQuestionBank', getSettings().uiLanguage) : dialogTitle('exportFlashcards', getSettings().uiLanguage),
       defaultPath: defaultName,
       filters: [{ name: format === 'nodus' ? 'Nodus' : format.toUpperCase(), extensions: [extension] }, { name: 'Todos', extensions: ['*'] }],
     });
@@ -1320,7 +1321,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   });
   h('study:interchange:import', async (_e, kind: StudyInterchangeKind, options?: StudyInterchangeImportOptions) => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: kind === 'questions' ? 'Importar preguntas' : 'Importar flashcards',
+      title: kind === 'questions' ? dialogTitle('importQuestions', getSettings().uiLanguage) : dialogTitle('importFlashcards', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: kind === 'questions'
         ? [{ name: 'Preguntas compatibles', extensions: ['json', 'csv', 'xml', 'gift', 'txt', 'tsv', 'apkg'] }, { name: 'Todos', extensions: ['*'] }]
@@ -1349,7 +1350,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('study:assessments:export', async (_e, id: string, includeAnswers?: boolean) => {
     const assessment = studyAssessments.getStudyAssessment(id); if (!assessment) return null;
     const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
-      title: 'Exportar test de estudio', defaultPath: `${assessment.title.replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80) || 'test'}.md`,
+      title: dialogTitle('exportStudyTest', getSettings().uiLanguage), defaultPath: `${assessment.title.replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80) || 'test'}.md`,
       filters: [{ name: 'Markdown', extensions: ['md'] }],
     });
     if (picked.canceled || !picked.filePath) return null;
@@ -1402,7 +1403,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('study:planner:session:start', async (_e, input) => studyLearning.startStudySession(input));
   h('study:planner:session:finish', async (_e, id: string, input) => studyLearning.finishStudySession(id, input));
   h('study:planner:exportIcs', async () => {
-    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, { title: 'Exportar calendario de estudio', defaultPath: 'nodus-estudio.ics', filters: [{ name: 'iCalendar', extensions: ['ics'] }] });
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, { title: dialogTitle('exportStudyCalendar', getSettings().uiLanguage), defaultPath: 'nodus-estudio.ics', filters: [{ name: 'iCalendar', extensions: ['ics'] }] });
     if (picked.canceled || !picked.filePath) return null;
     fs.writeFileSync(picked.filePath, studyLearning.renderStudyPlannerIcs(), 'utf8'); return { path: picked.filePath };
   });
@@ -1801,7 +1802,7 @@ export function registerAcademicIpc(context: IpcContext): void {
     let filePath = input.filePath?.trim() || null;
     if (!filePath) {
       const result = await showImportOpenDialog({
-        title: 'Importar capítulo',
+        title: dialogTitle('importChapter', getSettings().uiLanguage),
         properties: ['openFile'],
         filters: [
           { name: 'Documentos de texto', extensions: ['docx', 'pdf', 'epub', 'md', 'markdown', 'txt'] },
@@ -1885,7 +1886,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('data:exportSync', async () => {
     if (getActiveVault().type === 'estudio' && !getSettings().studySyncEnabled) throw new Error('La sincronización del vault de estudio está desactivada en Ajustes.');
     const { canceled, filePath } = await dialog.showSaveDialog({
-      title: 'Exportar paquete de sincronización',
+      title: dialogTitle('exportSyncPackage', getSettings().uiLanguage),
       defaultPath: path.join(app.getPath('documents'), `nodus-sync-${new Date().toISOString().slice(0, 10)}.nodussync`),
       filters: [{ name: 'Nodus Sync', extensions: ['nodussync'] }],
     });
@@ -1902,7 +1903,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('data:importSync', async (_e, passphrase?: string) => {
     if (getActiveVault().type === 'estudio' && !getSettings().studySyncEnabled) throw new Error('La sincronización del vault de estudio está desactivada en Ajustes.');
     const { canceled, filePaths } = await showImportOpenDialog({
-      title: 'Importar paquete de sincronización',
+      title: dialogTitle('importSyncPackage', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: [{ name: 'Nodus Sync', extensions: ['nodussync'] }],
     });
@@ -1925,7 +1926,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   });
   h('study:data:diagnostic', async () => {
     const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
-      title: 'Exportar diagnóstico del vault de estudio', defaultPath: 'nodus-estudio-diagnostico.json',
+      title: dialogTitle('exportStudyDiagnostic', getSettings().uiLanguage), defaultPath: 'nodus-estudio-diagnostico.json',
       filters: [{ name: 'JSON', extensions: ['json'] }],
     });
     if (picked.canceled || !picked.filePath) return null;

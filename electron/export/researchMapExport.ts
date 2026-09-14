@@ -1,8 +1,10 @@
 import fs from 'node:fs';
+import { dialogTitle } from '../dialogTitles';
 import path from 'node:path';
 import { app, dialog } from 'electron';
 import type { RqCoverageStatus, RqExportRequest, RqSubQuestion } from '@shared/types';
 import { getResearchQuestionDetail } from '../db/researchMapRepo';
+import { getSettings } from '../db/settingsRepo';
 
 const STATUS_LABEL: Record<RqCoverageStatus, string> = {
   covered: 'Bien cubierta',
@@ -17,7 +19,7 @@ export async function exportResearchCoverage(request: RqExportRequest): Promise<
 
   const filename = `${slug(detail.rq.question || 'mapa-cobertura')}.md`;
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Exportar mapa de cobertura',
+    title: dialogTitle('exportCoverageMap', getSettings().uiLanguage),
     defaultPath: path.join(app.getPath('documents'), filename),
     filters: [{ name: 'Markdown', extensions: ['md'] }],
   });
