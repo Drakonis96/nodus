@@ -133,11 +133,16 @@ async function confirmBrowserPairing(origin: string): Promise<boolean> {
     let settled = false;
     let timeout: NodeJS.Timeout | null = null;
     const onClosed = () => settle(false);
+    const onFocus = () => {
+      if (!win.isDestroyed()) win.flashFrame(false);
+    };
     const settle = (allow: boolean) => {
       if (settled) return;
       settled = true;
       if (timeout) clearTimeout(timeout);
       win.removeListener('closed', onClosed);
+      win.removeListener('focus', onFocus);
+      if (!win.isDestroyed()) win.flashFrame(false);
       pendingBrowserPairingRequests.delete(requestId);
       resolve(allow);
     };
@@ -147,7 +152,18 @@ async function confirmBrowserPairing(origin: string): Promise<boolean> {
     try {
       if (win.isMinimized()) win.restore();
       if (!win.isVisible()) win.show();
+      // Focusing the window is not enough on macOS: while Chrome remains the active
+      // app, the renderer modal stays behind the browser the user paired from. An
+      // explicit activation is what visibly lifts Nodus—and its prompt—to the front.
+      app.focus({ steal: true });
       win.focus();
+      // Wayland compositors may refuse the activation anyway, so fall back to the
+      // platform's own attention signal (taskbar flash, dock bounce). It stops as
+      // soon as the window takes focus, or when the prompt is settled.
+      if (!win.isFocused()) {
+        win.once('focus', onFocus);
+        win.flashFrame(true);
+      }
       win.webContents.send('browserConnector:pairing:request', prompt);
     } catch (error) {
       console.warn('[zotero-plugin] browser pairing modal failed', error);
