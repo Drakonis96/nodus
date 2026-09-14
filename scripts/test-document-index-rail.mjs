@@ -29,7 +29,7 @@ function load(file) {
   return require(bundle);
 }
 
-const { summarizeDocumentIndexRail, compareDocumentIndexJobsForDisplay } = load('shared/documentIndexProgress.ts');
+const { summarizeDocumentIndexRail, documentLaneActivity, compareDocumentIndexJobsForDisplay } = load('shared/documentIndexProgress.ts');
 
 const stamp = '2026-09-14T10:00:00.000Z';
 const job = (overrides) => ({
@@ -130,4 +130,63 @@ test('the rail renders standalone rows with a retry action wired to the enqueue 
   assert.match(source, /data-testid=\{`document-index-rail-cancel-\$\{job\.jobId\}`\}/);
   // The campaign bulk controls must not appear when only standalone jobs are live.
   assert.match(source, /\{liveCampaigns\.length > 0 && <>/);
+});
+
+test('the rail summary exposes the standalone counts the lane needs', () => {
+  const summary = summarizeDocumentIndexRail(progress([
+    job({ jobId: 'live', status: 'running', phase: 'analyzing_sections' }),
+    job({ jobId: 'failed', status: 'failed', phase: 'done' }),
+  ]));
+  assert.deepEqual(summary.standalone.map((entry) => entry.jobId).sort(), ['failed', 'live']);
+  assert.equal(summary.standaloneLive, 1);
+  assert.equal(summary.standaloneFailed, 1);
+});
+
+// A standalone job must reach the three signals the queue panel and the header badge use.
+// They used to be derived from campaigns only, so the panel could show the rail while
+// still claiming "No tasks or queues in progress" and a retry never lit the badge.
+test('the document lane counts a standalone job in visible, active and attention', () => {
+  assert.deepEqual(documentLaneActivity(null), { visible: false, active: false, attention: false });
+
+  const queued = documentLaneActivity(progress([job({ jobId: 'solo', status: 'queued' })]));
+  assert.equal(queued.visible, true);
+  assert.equal(queued.active, true, 'a queued per-work scan must light the badge');
+  assert.equal(queued.attention, false);
+
+  const failed = documentLaneActivity(progress([job({ jobId: 'solo', status: 'failed', phase: 'done', error: 'Connection error.' })]));
+  assert.equal(failed.visible, true);
+  assert.equal(failed.active, false);
+  assert.equal(failed.attention, true, 'a failed per-work scan must raise the error badge');
+
+  const finished = documentLaneActivity(progress([job({ jobId: 'solo', status: 'completed', phase: 'done', progress: 1 })]));
+  assert.deepEqual(finished, { visible: false, active: false, attention: false });
+});
+
+test('the document lane keeps the campaign signals unchanged', () => {
+  const running = documentLaneActivity(progress([], [campaign({ status: 'running', failedJobs: 0 })]));
+  assert.deepEqual(running, { visible: true, active: true, attention: false });
+  const failed = documentLaneActivity(progress([], [campaign({ status: 'failed', failedJobs: 2 })]));
+  assert.deepEqual(failed, { visible: true, active: false, attention: true });
+  // A finished campaign is still history the panel lists, so it keeps the lane visible
+  // without counting as live; a clean one raises nothing.
+  const completed = documentLaneActivity(progress([], [campaign({ status: 'completed', failedJobs: 0 })]));
+  assert.deepEqual(completed, { visible: true, active: false, attention: false });
+  // A cancelled campaign never raises the error badge, even if it has failed jobs.
+  const cancelled = documentLaneActivity(progress([], [campaign({ status: 'cancelled', failedJobs: 3 })]));
+  assert.deepEqual(cancelled, { visible: true, active: false, attention: false });
+});
+
+test('the queue panel counts the document lane and lets a failed standalone job be cleared', () => {
+  const source = readFileSync(path.join(repoRoot, 'src/queueActivity.ts'), 'utf8');
+  assert.match(source, /import \{ documentLaneActivity \} from '@shared\/documentIndexProgress'/);
+  assert.match(source, /const documentLane = documentLaneActivity\(documents \?\? null\)/);
+  assert.match(source, /Number\(documentLane\.visible\)/);
+  assert.match(source, /Number\(documentLane\.active\)/);
+  assert.match(source, /\|\| documentLane\.attention/);
+  assert.doesNotMatch(source, /documentsActive/);
+  // A standalone job is dismissible, or its error badge could never be cleared.
+  assert.match(source, /key: `document-job:\$\{job\.jobId\}`/);
+  // Campaign jobs are never filtered here; only a standalone job goes through the dismissal check.
+  assert.match(source, /jobs: snapshot\.documents\.jobs\.filter\(\(job\) => job\.campaignId \|\|/);
+  assert.match(source, /dismissed\[`document-job:\$\{job\.jobId\}`\] !==/);
 });

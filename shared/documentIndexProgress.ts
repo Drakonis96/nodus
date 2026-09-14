@@ -38,6 +38,12 @@ export interface DocumentIndexRailSummary {
   visible: boolean;
   campaigns: DocumentIndexCampaign[];
   jobs: DocumentIndexJob[];
+  /** Standalone rows the rail renders (live, or failed/unavailable so they can be retried). */
+  standalone: DocumentIndexJob[];
+  /** Standalone rows queued/running/paused right now. */
+  standaloneLive: number;
+  /** Standalone rows failed or unavailable. */
+  standaloneFailed: number;
   current: DocumentIndexJob | null;
   error: string | null;
   total: number;
@@ -49,8 +55,8 @@ export interface DocumentIndexRailSummary {
 }
 
 const EMPTY_RAIL: DocumentIndexRailSummary = {
-  visible: false, campaigns: [], jobs: [], current: null, error: null,
-  total: 0, completed: 0, failed: 0, estimatedUnits: 0, completedUnits: 0, allPaused: false,
+  visible: false, campaigns: [], jobs: [], standalone: [], standaloneLive: 0, standaloneFailed: 0,
+  current: null, error: null, total: 0, completed: 0, failed: 0, estimatedUnits: 0, completedUnits: 0, allPaused: false,
 };
 
 /**
@@ -85,6 +91,9 @@ export function summarizeDocumentIndexRail(progress: DocumentIndexProgress | nul
     visible: campaigns.length > 0 || standalone.length > 0,
     campaigns,
     jobs,
+    standalone,
+    standaloneLive: standalone.filter((job) => LIVE_JOB_STATUSES.has(job.status)).length,
+    standaloneFailed,
     current: jobs.find((job) => job.status === 'running')
       ?? jobs.find((job) => job.status === 'paused')
       ?? jobs.find((job) => job.status === 'queued')
@@ -96,5 +105,35 @@ export function summarizeDocumentIndexRail(progress: DocumentIndexProgress | nul
     estimatedUnits: campaigns.reduce((sum, campaign) => sum + campaign.estimatedUnits, 0) + standalone.length,
     completedUnits: campaigns.reduce((sum, campaign) => sum + campaign.completedUnits, 0) + standaloneCompletedUnits,
     allPaused: campaigns.length > 0 && campaigns.every((campaign) => campaign.status === 'paused'),
+  };
+}
+
+/**
+ * The three signals the queue panel needs from the document lane alone: whether the
+ * lane has anything to show, whether something is live (the header badge count), and
+ * whether something needs attention (the red badge).
+ *
+ * These used to be derived from `documents.campaigns` only, so a standalone job — one
+ * with no campaign, from a per-work scan or Deep Research preparation — was invisible
+ * to all three: the panel could show its rail while still claiming "no tasks or queues
+ * in progress", and a retry never lit the header badge. The lane now answers with the
+ * same selection the rail renders.
+ */
+export function documentLaneActivity(documents: DocumentIndexProgress | null): {
+  visible: boolean;
+  active: boolean;
+  attention: boolean;
+} {
+  if (!documents) return { visible: false, active: false, attention: false };
+  const rail = summarizeDocumentIndexRail(documents);
+  return {
+    // A finished campaign is still history the panel lists, so its raw presence counts;
+    // a standalone job only counts while the rail renders it.
+    visible: documents.campaigns.length > 0 || rail.standalone.length > 0,
+    active: documents.campaigns.some((campaign) => LIVE_CAMPAIGN_STATUSES.has(campaign.status))
+      || rail.standaloneLive > 0,
+    attention: documents.campaigns.some((campaign) =>
+      campaign.status !== 'cancelled' && (campaign.status === 'failed' || campaign.failedJobs > 0 || Boolean(campaign.error)))
+      || rail.standaloneFailed > 0,
   };
 }
