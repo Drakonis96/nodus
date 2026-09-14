@@ -1695,7 +1695,9 @@ export function Library({
               data-testid="library-retry-missing-selected"
             >
               <Icon name="refresh" /> {t('Reintentar lo que falta')}
-              <span className="tabular-nums opacity-80">· {retryPlan.works}</span>
+              {/* The count is works, not steps, so it says so: the button sits next to
+                  a selection count and a bare number would read as the same thing. */}
+              <span className="tabular-nums opacity-80">· {tx('{n} obra(s)', { n: retryPlan.works })}</span>
             </button>
           )}
           {/* Not a pipeline step in records vaults — it is what the view is for. */}
