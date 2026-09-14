@@ -10,7 +10,7 @@ const scratch = await mkdtemp(path.join(os.tmpdir(), 'nodus-summary-resilience-'
 const virtual = new Map([
   ['./aiClient', `
     export class AiError extends Error {
-      constructor(message, retriable = false, config = false) { super(message); this.retriable = retriable; this.config = config; }
+      constructor(message, retriable = false, config = false, code = null) { super(message); this.retriable = retriable; this.config = config; this.code = code; }
     }
     globalThis.__SummaryAiError = AiError;
     export const completeText = (...args) => globalThis.__summaryComplete(...args);
@@ -74,7 +74,7 @@ try {
     zotero_key: 'Z1', doi: null, deep_hash: 'deep-hash', light_hash: 'light-hash',
     deep_status: 'done', summary_status: 'pending', summary_hash: null,
   };
-  const freshEvents = () => ({ results: [], upserts: [], embeddings: [], provenance: [], localProvenance: [], perf: [], transactions: 0 });
+  const freshEvents = () => ({ results: [], upserts: [], embeddings: [], provenance: [], localProvenance: [], perf: [], transactions: 0, completes: [] });
   globalThis.__summaryDb = {
     prepare: () => ({ all: () => [] }),
     transaction: (operation) => () => {
@@ -123,6 +123,45 @@ try {
     await assert.rejects(scan.runSummaryScan(work), /configuration missing/);
     assert.equal(globalThis.__summaryEvents.results.length, 0,
       'a configuration pause remains pending so the queue can resume after settings are fixed');
+
+    // A reasoning model spends the first output ceiling on its thinking trace and stops
+    // mid-sentence. The summary must retry with the app's default ceiling instead of
+    // storing the clipped text as a finished summary (issue #809).
+    globalThis.__summaryEvents = freshEvents();
+    globalThis.__summaryComplete = async (opts) => {
+      globalThis.__summaryEvents.completes.push(opts);
+      if (globalThis.__summaryEvents.completes.length === 1) {
+        throw new globalThis.__SummaryAiError('La respuesta se cortó al alcanzar el límite de 2.400 tokens de salida.', true, false, 'output_truncated');
+      }
+      return 'Un resumen completo tras ampliar el presupuesto.';
+    };
+    globalThis.__summaryEmbed = async () => [1, 0];
+    globalThis.__summaryProvenanceFails = false;
+    await scan.runSummaryScan(work);
+    assert.deepEqual(
+      globalThis.__summaryEvents.completes.map((opts) => opts.maxTokens),
+      [2400, 8000],
+      'a truncated summary is retried once with the app default ceiling',
+    );
+    assert.ok(
+      globalThis.__summaryEvents.completes.every((opts) => opts.requireCompleteOutput === true),
+      'every summary attempt opts into the complete-output contract',
+    );
+    assert.equal(globalThis.__summaryEvents.upserts[0].summary, 'Un resumen completo tras ampliar el presupuesto.');
+    assert.equal(globalThis.__summaryEvents.results[0][1], 'done');
+
+    // If the provider budget is genuinely too small, the reader must see a failure
+    // instead of a silently stored half-sentence.
+    globalThis.__summaryEvents = freshEvents();
+    globalThis.__summaryComplete = async (opts) => {
+      globalThis.__summaryEvents.completes.push(opts);
+      throw new globalThis.__SummaryAiError('La respuesta se cortó al alcanzar el límite de 8.000 tokens de salida.', true, false, 'output_truncated');
+    };
+    await assert.rejects(scan.runSummaryScan(work), /se cortó/);
+    assert.equal(globalThis.__summaryEvents.completes.length, 2, 'only one retry is attempted');
+    assert.equal(globalThis.__summaryEvents.upserts.length, 0, 'a clipped summary is never stored as finished');
+    assert.equal(globalThis.__summaryEvents.results[0][1], 'failed');
+    assert.match(globalThis.__summaryEvents.results[0][3], /se cortó/);
   } finally {
     console.warn = originalWarn;
   }

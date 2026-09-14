@@ -31,6 +31,16 @@ function modelId(model: ModelRef | null): string {
   return model?.provider && model.model ? `${model.provider}/${model.model}` : 'default';
 }
 
+/**
+ * The orientation summary asks for two or three paragraphs. A ceiling of 800 tokens was
+ * sized for models that answer directly; a reasoning model spends part of that same
+ * budget on its thinking trace and then stops mid-sentence, which used to be stored as a
+ * finished summary. The first attempt now asks for real headroom, and a cut-off answer is
+ * retried once at the app's default ceiling before the pipeline records a failure.
+ */
+const SUMMARY_MAX_TOKENS = 2_400;
+const SUMMARY_RETRY_MAX_TOKENS = 8_000;
+
 export function summaryContentHash(
   work: Pick<Work, 'deep_hash' | 'light_hash'>,
   model?: ModelRef | null
@@ -169,16 +179,25 @@ export async function runSummaryScan(work: Work, model?: ModelRef | null, option
 
   let summary: string;
   try {
-    summary = (await completeText({
+    const summaryRequest = {
       system: coreStructuredPrompt('summary', getSettings().promptLanguage ?? 'es'),
       user: JSON.stringify(input),
       temperature: 0.2,
-      maxTokens: 800,
-      task: 'summary',
-      requestClass: 'background',
+      task: 'summary' as const,
+      requestClass: 'background' as const,
       jobId: `${work.nodus_id}:summary`,
       perf,
-    }, scanModel)).trim();
+      requireCompleteOutput: true as const,
+    };
+    try {
+      summary = (await completeText({ ...summaryRequest, maxTokens: SUMMARY_MAX_TOKENS }, scanModel)).trim();
+    } catch (error) {
+      // A reasoning model can spend the first ceiling on its thinking trace. The same
+      // request with more room is the only lever, and it is worth exactly one retry:
+      // a second cut-off means the provider budget, not luck, is the limit.
+      if (!(error instanceof AiError && error.code === 'output_truncated')) throw error;
+      summary = (await completeText({ ...summaryRequest, maxTokens: SUMMARY_RETRY_MAX_TOKENS }, scanModel)).trim();
+    }
     if (!summary) throw new Error('El modelo no devolvió un resumen utilizable.');
 
     // Publish the readable summary and its status atomically. A crash cannot leave

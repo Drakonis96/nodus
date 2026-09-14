@@ -1,0 +1,7 @@
+# Novedades de Nodus 5.4.3
+
+1. Los resúmenes de las obras dejan de guardarse cortados a mitad de frase. En un modelo con razonamiento, el presupuesto de salida se agotaba pensando y la generación terminaba antes de escribir el final, pero el resumen se guardaba como completado. Ahora el primer intento dispone de más espacio y, si aun así se corta, Nodus lo reintenta una vez con el presupuesto más amplio de la aplicación. Si el modelo vuelve a agotarlo, el resumen se marca como fallido en lugar de guardarse incompleto.
+
+2. El emparejamiento del navegador deja de esperar en silencio. En macOS, el aviso para emparejar se abría detrás de Chrome, que seguía siendo la aplicación activa, y la petición terminaba sin que nadie llegara a verlo. Ahora Nodus pasa al frente en cuanto recibe la solicitud y, si el sistema rechaza esa activación, pide atención como lo hace la plataforma, con un parpadeo en la barra de tareas o un rebote en el Dock. La señal se apaga en cuanto la ventana recibe el foco o el emparejamiento se resuelve.
+
+3. Los resultados JSON de una herramienta dejan de ocupar la conversación como si fueran el entregable. Antes se volcaban en un bloque sin estilo y tan alto como la respuesta, así que una consulta de procedencia parecía salida de depuración junto a la figura que habías pedido. Ahora el JSON queda plegado bajo «Evidencia», a un clic, y la figura conserva el centro del mensaje.
