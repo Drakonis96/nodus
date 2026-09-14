@@ -515,3 +515,24 @@ test('metadata management keeps editing focused, supports bulk confirmation and 
   assert.match(dialogs, /Las obras de vault permanecen separadas/);
   assert.match(dialogs, /previewGlobalLibraryMerge/);
 });
+
+test('the add-to-vault dialog stays a bounded panel with a searchable, badged vault list', async () => {
+  const view = await readSource('src/views/GlobalLibraryView.tsx');
+  const dialog = view.slice(view.indexOf('function VaultLinkDialog'), view.indexOf('/** A connected vault only for reading'));
+  assert.ok(dialog.length > 0, 'the add-to-vault dialog is still defined in the global Library view');
+  // Unbounded, the list stretched the panel to the window height on accounts with
+  // many vaults; the panel is capped and its body owns the scroll instead.
+  assert.match(dialog, /max-h-\[min\(86vh,620px\)\][^"]*flex-col/, 'the panel keeps a rectangular, height-capped shape');
+  assert.match(dialog, /min-h-0 flex-1 overflow-y-auto/, 'the vault list scrolls inside the panel');
+  assert.match(dialog, /data-testid="global-library-vault-search"/, 'the vault list is searchable');
+  assert.match(dialog, /shownVaults\.map/, 'the rendered list is the filtered one');
+  assert.match(dialog, /t\('Sin coincidencias\.'\)/, 'an empty search result is stated instead of showing a blank list');
+  // Each vault carries its own mode identity: glyph, accent colour, phase tag and origin.
+  assert.match(dialog, /backgroundColor: accent/, 'every vault is drawn with its type colour');
+  assert.match(dialog, /<Icon name=\{vaultTypeIcon\(vault\.type\)\}/, 'every vault is drawn with its type glyph');
+  assert.match(dialog, /vaultTypeLabel\(vault\.type\)/, 'every vault is labelled by its type');
+  assert.match(dialog, /VaultPhaseBadge phase=\{phase\} compact/, 'beta/alpha vaults keep their phase tag');
+  assert.match(dialog, /isPreviewVaultType\(vault\.type\)/, 'preview vaults keep their tag');
+  assert.match(dialog, /isReadOnlyVault\(vault\)/, 'read-only connected vaults remain listed but unselectable');
+  assert.match(dialog, /data-testid="confirm-global-library-vault-link"/, 'the confirm action stays addressable by the e2e flow');
+});

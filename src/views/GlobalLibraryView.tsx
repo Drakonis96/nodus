@@ -26,7 +26,9 @@ import type {
   ZoteroImportVerificationMismatch,
 } from '@shared/libraryTypes';
 import type { AppSettings, LibraryReaderReference, VaultSummary, VaultType } from '@shared/types';
+import { isPreviewVaultType } from '@shared/vaultTypes';
 import { Icon, Spinner } from '../components/ui';
+import { PreviewBadge, VaultPhaseBadge, VAULT_TYPE_COLOR, vaultTypeIcon, vaultTypeLabel, vaultTypePhase } from '../components/vaultTypeUi';
 import { LibraryCitationExportDialog, LibraryCreateReferenceDialog, LibraryDuplicatesDialog, LibraryMetadataBatchDialog, LibraryMetadataEditor } from '../components/library/LibraryMetadataDialogs';
 import { LibraryItemManager } from '../components/library/LibraryItemManager';
 import { LibrarySettingsDialog } from '../components/library/LibrarySettingsDialog';
@@ -723,14 +725,28 @@ function VaultLinkDialog({ itemIds, onClose, onLinked }: {
 }) {
   const [vaults, setVaults] = useState<VaultSummary[]>([]);
   const [vaultId, setVaultId] = useState('');
+  const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     void window.nodus.listGlobalLibraryVaults().then((entries) => {
       setVaults(entries);
-      setVaultId(entries.find((vault) => !(vault.origin === 'connected' && (vault.remote?.role === 'reader' || vault.remote?.state !== 'active')))?.id ?? '');
+      setVaultId(entries.find((vault) => !isReadOnlyVault(vault))?.id ?? '');
     }).catch((nextError) => setError(nextError instanceof Error ? nextError.message : String(nextError)));
   }, []);
+  // The type label is part of the haystack because that is how the list is read
+  // ("the genealogy one", "Estudio"), not by switching vaults and looking. Filtered
+  // on every render on purpose: the label is translated, so a memoized result would
+  // still be matching the language the query was typed in.
+  const needle = query.trim().toLowerCase();
+  const shownVaults = needle
+    ? vaults.filter((vault) => [
+      vault.name,
+      vaultTypeLabel(vault.type),
+      vault.origin === 'connected' ? vault.remote?.spaceName ?? '' : '',
+    ].some((value) => value.toLowerCase().includes(needle)))
+    : vaults;
+  const selectedVault = vaults.find((vault) => vault.id === vaultId) ?? null;
   const link = async () => {
     if (!vaultId || busy) return;
     setBusy(true); setError(null);
@@ -751,16 +767,52 @@ function VaultLinkDialog({ itemIds, onClose, onLinked }: {
     } catch (nextError) { setError(nextError instanceof Error ? nextError.message : String(nextError)); }
     finally { setBusy(false); }
   };
-  return <div className="fixed inset-0 z-[85] grid place-items-center bg-black/65 p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
-    <section data-testid="global-library-vault-dialog" className="card w-full max-w-lg overflow-hidden shadow-2xl">
-      <header className="flex items-start gap-3 border-b border-neutral-800 p-5"><span className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name="vault" /></span><div className="min-w-0 flex-1"><h2 className="font-semibold">{t('Añadir al vault')}</h2><p className="mt-1 text-xs leading-5 text-neutral-500">{tx('{n} documento(s) conservarán su copia global; el vault recibirá una referencia analizable al Markdown limpio.', { n: itemIds.length })}</p></div><button className="btn btn-ghost" onClick={onClose} disabled={busy} aria-label={t('Cerrar')}><Icon name="x" /></button></header>
-      <div className="space-y-2 p-5">{vaults.map((vault) => {
-        const readOnly = vault.origin === 'connected' && (vault.remote?.role === 'reader' || vault.remote?.state !== 'active');
-        return <label key={vault.id} className={`flex items-center gap-3 rounded-xl border p-3 ${readOnly ? 'border-neutral-900 opacity-55' : vaultId === vault.id ? 'border-indigo-500/50 bg-indigo-500/5' : 'border-neutral-800 hover:bg-neutral-900/50'}`}><input type="radio" name="library-vault" value={vault.id} checked={vaultId === vault.id} disabled={readOnly || busy} onChange={() => setVaultId(vault.id)} /><Icon name="vault" size={15} className="text-neutral-500" /><span className="min-w-0 flex-1"><b className="block truncate text-sm font-medium">{vault.name}</b><span className="text-[10px] text-neutral-600">{vault.type} · {vault.origin === 'connected' ? `${vault.remote?.role ?? 'reader'} · ${vault.remote?.spaceName ?? ''}` : t('local')}</span></span>{vault.active && <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[9px] text-emerald-300">{t('Activo')}</span>}{readOnly && <span className="text-[9px] text-neutral-600">{t('Solo lectura')}</span>}</label>;
-      })}{!vaults.length && !error && <p className="py-5 text-center text-sm text-neutral-500">{t('No hay vaults disponibles.')}</p>}{error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}</div>
-      <footer className="flex justify-end gap-2 border-t border-neutral-800 p-4"><button className="btn btn-ghost" disabled={busy} onClick={onClose}>{t('Cancelar')}</button><button data-testid="confirm-global-library-vault-link" className="btn btn-primary" disabled={!vaultId || busy} onClick={() => void link()}>{busy ? <Spinner /> : <Icon name="plus" />} {t('Añadir')}</button></footer>
+  return <div className="fixed inset-0 z-[85] grid place-items-center bg-black/70 p-5" role="dialog" aria-modal="true" aria-labelledby="global-library-vault-dialog-title" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
+    {/* The body scrolls inside a capped panel. Left to grow with the vault list, the
+        dialog stretched the full height of the window on any account with more than a
+        handful of vaults. */}
+    <section data-testid="global-library-vault-dialog" className="card-modal flex max-h-[min(86vh,620px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl">
+      <header className="flex items-start gap-3 border-b border-neutral-800 px-5 py-4"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name="vault" /></span><div className="min-w-0 flex-1"><h2 id="global-library-vault-dialog-title" className="font-semibold">{t('Añadir al vault')}</h2><p className="mt-1 text-xs leading-5 text-neutral-500">{tx('{n} documento(s) conservarán su copia global; el vault recibirá una referencia analizable al Markdown limpio.', { n: itemIds.length })}</p></div><button className="btn btn-ghost" onClick={onClose} disabled={busy} aria-label={t('Cerrar')}><Icon name="x" /></button></header>
+      <div className="flex items-center gap-2 border-b border-neutral-800 px-4 py-3">
+        <div className="relative min-w-0 flex-1">
+          <Icon name="search" size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+          <input data-testid="global-library-vault-search" className="input input-with-leading-icon h-9 w-full py-1 text-sm" placeholder={t('Buscar bóvedas…')} aria-label={t('Buscar bóvedas…')} value={query} onChange={(event) => setQuery(event.target.value)} />
+        </div>
+        {Boolean(query.trim()) && <span className="shrink-0 tabular-nums text-[10px] text-neutral-500" aria-live="polite">{shownVaults.length}/{vaults.length}</span>}
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {!vaults.length && !error && <p className="py-10 text-center text-sm text-neutral-500">{t('No hay vaults disponibles.')}</p>}
+        {Boolean(vaults.length) && !shownVaults.length && <p className="py-10 text-center text-sm text-neutral-500">{t('Sin coincidencias.')}</p>}
+        <div className="grid gap-2 sm:grid-cols-2">{shownVaults.map((vault) => {
+          const readOnly = isReadOnlyVault(vault);
+          const accent = VAULT_TYPE_COLOR[vault.type] ?? '#6366f1';
+          const selected = vaultId === vault.id;
+          const phase = vaultTypePhase(vault.type);
+          return <label key={vault.id} data-testid={`global-library-vault-option-${vault.id}`} title={readOnly ? t('Solo lectura') : undefined} className={`flex min-w-0 items-center gap-3 rounded-xl border p-3 transition-colors ${readOnly ? 'cursor-not-allowed border-neutral-900 opacity-55' : selected ? 'cursor-pointer border-transparent ring-2' : 'cursor-pointer border-neutral-800 hover:border-neutral-600 hover:bg-neutral-900/50'}`} style={!readOnly && selected ? { boxShadow: `inset 0 0 0 1px ${accent}`, ['--tw-ring-color' as string]: accent } : undefined}>
+            <input type="radio" name="library-vault" value={vault.id} checked={selected} disabled={readOnly || busy} onChange={() => setVaultId(vault.id)} />
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: accent }}><Icon name={vaultTypeIcon(vault.type)} size={17} /></span>
+            <span className="min-w-0 flex-1">
+              <span className="flex min-w-0 items-center gap-1.5"><b className="truncate text-sm font-medium">{vault.name}</b>{vault.active && <span className="shrink-0 rounded bg-indigo-600 px-1 py-0.5 text-[9px] font-semibold uppercase text-white">{t('Activo')}</span>}</span>
+              <span className="mt-1 flex min-w-0 items-center gap-1.5 text-[10px] text-neutral-500"><span className="truncate">{vaultTypeLabel(vault.type)}</span>{phase && <VaultPhaseBadge phase={phase} compact />}{isPreviewVaultType(vault.type) && <PreviewBadge compact />}</span>
+              <span className="mt-0.5 block truncate text-[10px] text-neutral-600">{vault.origin === 'connected' ? `${vault.remote?.role ?? 'reader'} · ${vault.remote?.spaceName ?? ''}` : t('local')}{readOnly ? ` · ${t('Solo lectura')}` : ''}</span>
+            </span>
+          </label>;
+        })}</div>
+        {error && <p role="alert" className="mt-3 rounded-lg bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}
+      </div>
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-800 px-4 py-3">
+        <span className="min-w-0 flex-1 truncate text-xs text-neutral-500" aria-label={selectedVault ? `${t('Añadir al vault')}: ${selectedVault.name}` : undefined}>
+          {selectedVault && <><span className="mr-1.5 inline-block h-2 w-2 -translate-y-px rounded-full align-middle" style={{ backgroundColor: VAULT_TYPE_COLOR[selectedVault.type] ?? '#6366f1' }} />{selectedVault.name}</>}
+        </span>
+        <span className="flex shrink-0 justify-end gap-2"><button className="btn btn-ghost" disabled={busy} onClick={onClose}>{t('Cancelar')}</button><button data-testid="confirm-global-library-vault-link" className="btn btn-primary" disabled={!vaultId || busy} onClick={() => void link()}>{busy ? <Spinner /> : <Icon name="plus" />} {t('Añadir')}</button></span>
+      </footer>
     </section>
   </div>;
+}
+
+/** A connected vault only for reading: it can be listed but never written to. */
+function isReadOnlyVault(vault: VaultSummary): boolean {
+  return vault.origin === 'connected' && (vault.remote?.role === 'reader' || vault.remote?.state !== 'active');
 }
 
 function LibraryScopeControls({
