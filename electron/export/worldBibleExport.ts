@@ -5,6 +5,7 @@
 // an Obsidian-shaped vault of one file per entry is a different product and a different
 // request. Markdown is the AI- and diff-friendly form; the PDF is the one you show.
 
+import { dialogTitle } from '../dialogTitles';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app, dialog } from 'electron';
@@ -19,6 +20,7 @@ import {
 import { markdownToHtml } from './markdownRender';
 import { professionalReportPdf, type ProfessionalReportSection } from './professionalReportPdf';
 import { getWorldEntry, getWorldArticle, listWorldEntries } from '../db/worldEncyclopediaRepo';
+import { getSettings } from '../db/settingsRepo';
 
 /** The vault's own violet, so the artifact looks like the app it came from. */
 const WORLDBUILDING_THEME = {
@@ -57,7 +59,7 @@ export async function exportWorldBible(options: WorldBibleOptions): Promise<{ pa
   const doc = buildWorldBibleDoc(options);
   const extension = options.format === 'pdf' ? 'pdf' : 'md';
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Exportar la biblia del mundo',
+    title: dialogTitle('exportWorldBible', getSettings().uiLanguage),
     defaultPath: path.join(app.getPath('documents'), `${slug(doc.title)}.${extension}`),
     filters: [
       options.format === 'pdf'

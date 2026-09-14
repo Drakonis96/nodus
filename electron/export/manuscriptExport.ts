@@ -6,6 +6,7 @@
 // an internal `nodus://` URL left in the middle of a sentence — is tested without opening a
 // save dialog.
 
+import { dialogTitle } from '../dialogTitles';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app, dialog } from 'electron';
@@ -14,6 +15,7 @@ import { getDb } from '../db/database';
 import { manuscriptSpine } from '../db/worldManuscriptRepo';
 import { markdownToHtml } from './markdownRender';
 import { professionalReportPdf, type ProfessionalReportSection } from './professionalReportPdf';
+import { getSettings } from '../db/settingsRepo';
 
 /** The vault's own violet, so the artifact looks like the app it came from. */
 const WORLDBUILDING_THEME = {
@@ -61,7 +63,7 @@ export async function exportManuscript(
   const markdown = buildManuscriptMarkdown(options);
   const extension = options.format === 'pdf' ? 'pdf' : 'md';
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Exportar el manuscrito',
+    title: dialogTitle('exportManuscript', getSettings().uiLanguage),
     defaultPath: path.join(app.getPath('documents'), `${slug(options.title)}.${extension}`),
     filters: [
       options.format === 'pdf' ? { name: 'PDF', extensions: ['pdf'] } : { name: 'Markdown', extensions: ['md'] },

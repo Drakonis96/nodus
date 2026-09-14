@@ -61,7 +61,7 @@ const KIND_META_SOURCE: Record<SearchKind, { label: string; icon: string }> = {
   place: { label: "Lugares", icon: "map" },
   group: { label: "Grupos", icon: "users" },
   scene: { label: "Escenas", icon: "image" },
-  article: { label: "Artículos", icon: "book" },
+  article: { label: t("Artículos"), icon: "book" },
   thread: { label: "Hilos", icon: "route" },
   rule: { label: "Reglas", icon: "lock" },
   question: { label: "Preguntas", icon: "help" },
@@ -80,7 +80,7 @@ const KIND_META_SOURCE: Record<SearchKind, { label: string; icon: string }> = {
   document: { label: "Documentos", icon: "book" },
   prosopStudy: { label: "Estudios", icon: "compass" },
   prosopVariable: { label: "Variables agregadas", icon: "chartBar" },
-  prosopSource: { label: "Tipos de fuente", icon: "archive" },
+  prosopSource: { label: t("Tipos de fuente"), icon: "archive" },
 };
 // Resolve labels at render/access time so changing the server language updates
 // existing search filters without rebuilding this module.

@@ -102,6 +102,20 @@ const styleManager = {
     'Este estilo personalizado no declara una licencia. Nodus puede usar tu copia local, pero no la redistribuirá.': 'Bu özel stil bir lisans belirtmiyor. Nodus yerel kopyanızı kullanabilir ancak yeniden dağıtmaz.',
     'El estilo padre independiente se descargará y guardará la primera vez que se use.': 'Bağımsız üst stil ilk kullanımda indirilecek ve önbelleğe alınacaktır.',
   },
+  'zh-CN': {
+    'Gestionar estilos': '管理样式', 'se descargará': '将下载', 'Idioma de la cita': '引注语言',
+    'Buscar estilos instalados…': '搜索已安装的样式…', 'Buscar estilos de cita…': '搜索引注样式…', 'Estilo de cita': '引注样式', 'Ningún estilo coincide con «{query}».': '没有与「{query}」匹配的样式。', 'Importar .csl': '导入 .csl', 'Importar de Zotero': '从 Zotero 导入',
+    'Añadir más estilos': '添加更多样式', 'Buscar en el repositorio oficial CSL…': '在 CSL 官方仓库中搜索…', 'Consultando estilos oficiales…': '正在加载官方样式…',
+    'Repositorio': '仓库', 'Disponible sin conexión': '可离线使用', 'Descarga pendiente': '待下载',
+    'Añadir estilo del repositorio': '添加仓库样式', 'Pega el identificador o la URL del estilo en el repositorio de Zotero.': '粘贴 Zotero 仓库中样式的标识符或 URL。',
+    'Estilo CSL instalado.': 'CSL 样式已安装。', '{n} estilo(s) CSL importado(s).': '已导入 {n} 个 CSL 样式。',
+    'Los estilos oficiales pertenecen al proyecto CSL y conservan su autoría y licencia CC BY-SA 3.0. Los estilos privados sin licencia permanecen sólo en tu nodus-library.': '官方样式属于 CSL 项目，保留其署名和 CC BY-SA 3.0 许可。未授权的私有样式仅保留在你的 nodus-library 中。',
+    'Incluido': '内置', 'De Zotero': '来自 Zotero', 'Archivo local': '本地文件', 'Repositorio Zotero': 'Zotero 仓库', 'Repositorio CSL': 'CSL 仓库',
+    'El archivo CSL exacto se guardará desde el repositorio oficial de CSL la primera vez que se use.': '首次使用时，将从 CSL 官方仓库缓存确切的 CSL 文件。',
+    'El archivo CSL exacto se guardará desde el repositorio de estilos de Zotero la primera vez que se use.': '首次使用时，将从 Zotero 样式仓库缓存确切的 CSL 文件。',
+    'Este estilo personalizado no declara una licencia. Nodus puede usar tu copia local, pero no la redistribuirá.': '此自定义样式未声明许可。Nodus 可以使用你的本地副本，但不会重新分发。',
+    'El estilo padre independiente se descargará y guardará la primera vez que se use.': '独立的父样式将在首次使用时下载并缓存。',
+  },
 } as const;
 
 const dateColumns = {
@@ -112,6 +126,7 @@ const dateColumns = {
   'pt-BR': { 'Fecha de acceso': 'Data de acesso', 'Añadido a Zotero': 'Adicionado ao Zotero', 'Modificado en Zotero': 'Modificado no Zotero', 'Añadido a Nodus': 'Adicionado ao Nodus', 'Modificado en Nodus': 'Modificado no Nodus' },
   it: { 'Fecha de acceso': 'Data di accesso', 'Añadido a Zotero': 'Aggiunto a Zotero', 'Modificado en Zotero': 'Modificato in Zotero', 'Añadido a Nodus': 'Aggiunto a Nodus', 'Modificado en Nodus': 'Modificato in Nodus' },
   tr: { 'Fecha de acceso': 'Erişim tarihi', 'Añadido a Zotero': "Zotero'ya eklendi", 'Modificado en Zotero': "Zotero'da değiştirildi", 'Añadido a Nodus': "Nodus'a eklendi", 'Modificado en Nodus': "Nodus'ta değiştirildi" },
+  'zh-CN': { 'Fecha de acceso': '访问日期', 'Añadido a Zotero': '已添加到 Zotero', 'Modificado en Zotero': '已在 Zotero 中修改', 'Añadido a Nodus': '已添加到 Nodus', 'Modificado en Nodus': '已在 Nodus 中修改' },
 } as const;
 
 const en = {
@@ -312,4 +327,32 @@ const tr = {
   'BibLaTeX': 'BibLaTeX', 'EndNote XML': 'EndNote XML', 'Zotero RDF': 'Zotero RDF',
 };
 
-export const LIBRARY_BIBLIOGRAPHY_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr } as const;
+const zhCN = {
+  ...identifiers,
+  ...styleManager['zh-CN'],
+  ...dateColumns['zh-CN'],
+  'Consulta fuentes bibliográficas públicas. Nada se aplica sin tu revisión.': '查询公开的文献来源。未经你审核，不会应用任何内容。',
+  '{n} ficha(s) actualizada(s).': '已更新 {n} 条记录。',
+  'Completar metadatos en lote': '批量补全元数据',
+  'Se prepara una vista previa y sólo se aplican las fichas que confirmes.': '系统会准备预览，仅应用你确认的记录。',
+  '{n} referencia(s) con identificadores compatibles': '{n} 条具有受支持标识符的参考文献',
+  'Las consultas se limitan en velocidad y los resultados parciales se conservan si cancelas.': '请求会限速，取消时保留部分结果。',
+  'Crear vista previa': '创建预览',
+  'Resolviendo metadatos…': '正在解析元数据…',
+  '{n} seleccionada(s)': '已选择 {n} 项',
+  'Cita copiada al portapapeles.': '引注已复制到剪贴板。',
+  '{n} referencia(s) exportada(s).': '已导出 {n} 条参考文献。',
+  'Citas y exportación': '引注与导出',
+  '{n} referencia(s) seleccionada(s)': '已选择 {n} 条参考文献',
+  'Colección o búsqueda actual': '当前集合或搜索',
+  'Entrada bibliográfica': '文献条目',
+  'Cita en el texto': '文内引注',
+  'Exportar referencias': '导出参考文献',
+  'Los campos desconocidos se conservan para poder volver a importar el archivo sin pérdidas.': '保留未知字段，以便重新导入文件时不丢失数据。',
+  'Exportar…': '导出…',
+  'Completar metadatos': '补全元数据',
+  'Citar / exportar': '引注 / 导出',
+  'BibLaTeX': 'BibLaTeX', 'EndNote XML': 'EndNote XML', 'Zotero RDF': 'Zotero RDF',
+};
+
+export const LIBRARY_BIBLIOGRAPHY_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN } as const;

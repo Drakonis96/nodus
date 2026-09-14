@@ -341,19 +341,19 @@ test('the announcement speaks every interface language', async () => {
     read('src/components/TutorialVideosGuide.tsx'),
     read('@api'),
   ]);
-  // Read the languages from the type itself, so an eighth UI language fails here.
+  // Read the languages from the type itself, so a ninth UI language fails here.
   const declared = types.match(/export type AppLanguage = ([^;]+);/)[1]
     .split('|').map((code) => code.trim().replace(/'/g, ''));
-  assert.equal(declared.length, 8);
+  assert.equal(declared.length, 9);
   const table = guide.slice(guide.indexOf('const COPY: Record<AppLanguage, AnnouncementCopy>'), guide.indexOf('export function markTutorialVideosAnnouncementSeen'));
   for (const code of declared) {
     assert.match(table, new RegExp(`\\n  '?${code}'?: \\{`), `${code} has no announcement copy`);
   }
-  // Eight distinct summaries: a table that quietly reused one language would pass every
+  // Nine distinct summaries: a table that quietly reused one language would pass every
   // per-key check above.
   const summaries = [...table.matchAll(/\n    summary: '(.+)',/g)].map((match) => match[1]);
-  assert.equal(summaries.length, 8);
-  assert.equal(new Set(summaries).size, 8, 'one of the languages falls back to another');
+  assert.equal(summaries.length, 9);
+  assert.equal(new Set(summaries).size, 9, 'one of the languages falls back to another');
 });
 
 test('a vault tour with a video offers three ways in', async () => {

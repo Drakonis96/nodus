@@ -72,9 +72,9 @@ export function ChatSkillsControl({ surface, disabled = false, compact = false }
   }).sort(byName(getActiveLang()));
   const renderPanel = (panel: React.ReactNode) => compact ? panel : createPortal(<div style={accentStyle} className={root.current?.closest('.light, .nodi-theme-light') ? 'light' : ''}>{panel}</div>, document.body);
   return <div className={`chat-skills-control ${compact ? 'compact' : ''}`} ref={root} style={accentStyle}>
-    <button type="button" className="chat-skills-trigger" data-testid={`chat-skills-${surface}`} aria-label="Skills" aria-expanded={open} title="Skills" disabled={disabled} onClick={() => { setOpen(!open); if (!open) setQuery(''); }}><Icon name="sparkles" size={compact ? 14 : 15} />{!compact && <span>Skills</span>}<span className="chat-skills-count">{active}</span></button>
-    {open && renderPanel(<div ref={panelRef} style={compact ? undefined : panelStyle} className="chat-skills-panel" data-nodi-interactive role="region" aria-label="Skills">
-      <div className="chat-skills-heading"><div><span className="chat-skills-eyebrow">NODUS SKILLS</span><h3>{t('De la idea a la creación')}</h3></div><button type="button" aria-label={t('Cerrar')} onClick={() => setOpen(false)}><Icon name="x" size={16} /></button></div>
+    <button type="button" className="chat-skills-trigger" data-testid={`chat-skills-${surface}`} aria-label={t('Skills')} aria-expanded={open} title={t('Skills')} disabled={disabled} onClick={() => { setOpen(!open); if (!open) setQuery(''); }}><Icon name="sparkles" size={compact ? 14 : 15} />{!compact && <span>{t('Skills')}</span>}<span className="chat-skills-count">{active}</span></button>
+    {open && renderPanel(<div ref={panelRef} style={compact ? undefined : panelStyle} className="chat-skills-panel" data-nodi-interactive role="region" aria-label={t('Skills')}>
+      <div className="chat-skills-heading"><div><span className="chat-skills-eyebrow">{t('SKILLS DE NODUS')}</span><h3>{t('De la idea a la creación')}</h3></div><button type="button" aria-label={t('Cerrar')} onClick={() => setOpen(false)}><Icon name="x" size={16} /></button></div>
       <p className="chat-skills-intro">{t('Activa capacidades y deja que el modelo elija cuándo usarlas.')}<span>{surface === 'nodi' ? 'Nodi' : t('Asistente')} · {t(surface === 'nodi' ? 'Activación independiente' : 'Compartida entre los chats de la app')}</span></p>
       <div className="chat-skills-search">
         <Icon name="search" size={16} />

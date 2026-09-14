@@ -133,7 +133,7 @@ export type PortableProfileValues = {
   schemaVersion: 1;
   appearance: {
     theme: 'dark' | 'light' | 'system';
-    uiLanguage: 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 'tr';
+    uiLanguage: 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 'tr' | 'zh-CN';
     promptLanguage: 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 'tr';
     animationSpeed: number;
     interfaceScale: number;

@@ -1,5 +1,6 @@
 // archive channels, moved verbatim out of the monolithic registerIpc.
 // The channel names are unchanged; scripts/test-ipc-contract.mjs is what proves it.
+import { dialogTitle } from '../dialogTitles';
 import type { IpcContext } from './context';
 import type { ArchiveItemInput, ArchiveEntryCreateInput, ArchiveIngestSummary, ArchiveListOptions, ZoteroArchiveEntryImportInput } from '@shared/types';
 import { createFolder, listFolders, renameFolder, deleteFolder, listItemFolders, setItemFolders, createItem, getItemBlob, listItems, updateItem, deleteItem, addTag, removeTag, listTags, archiveCounts, linkItemPerson, unlinkItemPerson, listItemsForPerson } from '../db/archiveRepo';
@@ -128,7 +129,7 @@ export function registerArchiveIpc({ h, getWindow }: IpcContext): void {
   h('archive:pickAndIngest', async (_e, folderId?: string | null, docType?: string | null) => {
     const win = getWindow();
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Añadir al archivo de evidencias',
+      title: dialogTitle('addToEvidenceArchive', getSettings().uiLanguage),
       properties: ['openFile', 'multiSelections'],
       filters: [
         { name: 'Documentos y datos', extensions: ['pdf', 'epub', 'txt', 'md', 'csv', 'xlsx'] },
@@ -155,7 +156,7 @@ export function registerArchiveIpc({ h, getWindow }: IpcContext): void {
   });
   h('archive:chooseEntryFiles', async () => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: 'Adjuntar archivos a la entrada genealógica',
+      title: dialogTitle('attachFilesToGenealogyEntry', getSettings().uiLanguage),
       properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Todos los archivos', extensions: ['*'] }],
     });
@@ -200,7 +201,7 @@ export function registerArchiveIpc({ h, getWindow }: IpcContext): void {
     if (!item) throw new Error('Elemento no encontrado.');
     const win = getWindow();
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Reemplazar el archivo adjunto',
+      title: dialogTitle('replaceAttachmentFile', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: [
         { name: 'Documentos y datos', extensions: ['pdf', 'epub', 'txt', 'md', 'csv', 'xlsx'] },

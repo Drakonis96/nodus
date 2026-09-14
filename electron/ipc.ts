@@ -1,4 +1,5 @@
 import { getDocumentVisuals, enrichDocumentVisuals, cancelDocumentVisuals, undoVisualEnrichment, removeDocumentFigure } from './ai/documentVisuals';
+import { dialogTitle } from './dialogTitles';
 import { listDocumentSkills } from './capabilities/documentCatalog';
 import { getSkillMarketplace, addSkillSource, removeSkillSource, updateSkillSource, installMarketplaceSkill, installMarketplacePlugin } from './skillMarketplace';
 import { listChatSkills, saveChatSkill, deleteChatSkill, restoreChatSkills, importSkillDirectory, exportSkillDirectory, approvePendingChatPlugin, rollbackChatPlugin, removeChatPlugin, installChatPluginPackage, restorePluginSkillAuthorVersion } from './chatSkills';
@@ -574,7 +575,7 @@ export function registerIpc(
   h('skillMarketplace:install', async (_e, sourceId: string, packagePath: string, commit: string) => skillsChanged(installMarketplaceSkill(sourceId, packagePath, commit)));
   h('skillMarketplace:installPlugin', async (_e, sourceId: string, packagePath: string, commit: string, approvePermissions: boolean) => skillsChanged(installMarketplacePlugin(sourceId, packagePath, commit, approvePermissions === true)));
   h('skillMarketplace:import', async () => {
-    const result = await showImportOpenDialog({ title: 'Import skill package directory', properties: ['openDirectory'] });
+    const result = await showImportOpenDialog({ title: dialogTitle('importSkillPackageDirectory', getSettings().uiLanguage), properties: ['openDirectory'] });
     if (result.canceled) return listChatSkills();
     const directory = result.filePaths[0];
     if (!fs.existsSync(path.join(directory, 'plugin.json'))) return skillsChanged(importSkillDirectory(directory));
@@ -583,7 +584,7 @@ export function registerIpc(
     return consent.response === 1 ? skillsChanged(installChatPluginPackage(pkg, { sourceId: 'local', sourcePath: directory, approvePermissions: true, autoUpdate: false })) : listChatSkills();
   });
   h('skillMarketplace:export', async (_e, id: string) => {
-    const result = await showImportOpenDialog({ title: 'Export skill package into a directory', properties: ['openDirectory', 'createDirectory'] });
+    const result = await showImportOpenDialog({ title: dialogTitle('exportSkillPackageDirectory', getSettings().uiLanguage), properties: ['openDirectory', 'createDirectory'] });
     return result.canceled ? null : exportSkillDirectory(id, result.filePaths[0]);
   });
   h('chatSkills:list', async () => listChatSkills());
@@ -648,7 +649,7 @@ export function registerIpc(
 
   h('capabilityFiles:download', async (_e, source: string) => {
     const payload = getCapabilityFile(String(source)); if (!payload) throw new Error('The capability file is no longer available.');
-    const result = await dialog.showSaveDialog({ title: 'Save capability file', defaultPath: path.join(app.getPath('downloads'), payload.name) });
+    const result = await dialog.showSaveDialog({ title: dialogTitle('saveCapabilityFile', getSettings().uiLanguage), defaultPath: path.join(app.getPath('downloads'), payload.name) });
     if (!result.canceled && result.filePath) fs.writeFileSync(result.filePath, payload.blob, { mode: 0o600 });
   });
   h('nodi:conversations:list', async () => listNodiConversations());
@@ -904,7 +905,7 @@ export function registerIpc(
   h('backup:hasPassword', async () => hasBackupPassword());
   h('backup:chooseFolder', async () => {
     const { canceled, filePaths } = await showImportOpenDialog({
-      title: 'Elegir carpeta para copias automáticas',
+      title: dialogTitle('chooseBackupFolder', getSettings().uiLanguage),
       properties: ['openDirectory', 'createDirectory'],
     });
     return canceled || filePaths.length === 0 ? null : filePaths[0];
@@ -922,7 +923,7 @@ export function registerIpc(
     const es = language === 'es';
     if (!password) return { ok: false, message: es ? 'No hay contraseña maestra configurada.' : 'No master password is configured.' };
     const { canceled, filePath } = await dialog.showSaveDialog({
-      title: es ? 'Guardar kit de recuperación' : 'Save recovery kit',
+      title: dialogTitle('saveRecoveryKit', getSettings().uiLanguage),
       defaultPath: path.join(app.getPath('documents'), es ? 'nodus-kit-de-recuperacion.txt' : 'nodus-recovery-kit.txt'),
       filters: [{ name: es ? 'Texto' : 'Text', extensions: ['txt'] }],
     });
@@ -966,6 +967,7 @@ export function registerIpc(
       'pt-BR': mode === 'restore' ? 'Selecionar uma pasta de recuperação do Nodus' : 'Selecionar uma pasta vazia para proteger o Nodus',
       it: mode === 'restore' ? 'Seleziona una cartella di ripristino Nodus' : 'Seleziona una cartella vuota per proteggere Nodus',
       tr: mode === 'restore' ? 'Bir Nodus kurtarma klasörü seçin' : 'Nodus\'u korumak için boş bir klasör seçin',
+      'zh-CN': mode === 'restore' ? '选择 Nodus 恢复文件夹' : '选择一个空文件夹以保护 Nodus',
     };
     const { canceled, filePaths } = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: titles[language],

@@ -25,6 +25,7 @@ import type {
 } from '@shared/types';
 import { buildProjectGuide, type ProjectGuide, type ProjectGuideAction, type ProjectGuideStepStatus } from '@shared/projectGuide';
 import { summarizeChecks } from '@shared/manuscriptVerifier';
+import { normalizePromptLanguage } from '@shared/promptLanguageOptions';
 import { Icon } from '../components/ui';
 import { confirm } from '../components/feedback';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
@@ -87,7 +88,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     [detail]
   );
 
-  const guideLanguage = getActiveLang();
+  const guideLanguage = normalizePromptLanguage(getActiveLang());
   const guide = useMemo(() => (detail ? buildProjectGuide(detail, guideLanguage) : null), [detail, guideLanguage]);
 
   const loadProjects = useCallback(async () => {

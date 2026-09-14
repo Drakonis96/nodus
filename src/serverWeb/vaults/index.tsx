@@ -2316,7 +2316,7 @@ function WorldMapCatalog({
                         : row.place_id
                           ? "Mapa de un lugar"
                           : row.notes,
-                      descriptor.description,
+                      t(descriptor.description),
                     )}
                   </span>
                 </div>
@@ -2951,7 +2951,7 @@ function AgendaCatalog({
               <span className="min-w-0">
                 <strong className="block text-sm">{title(row)}</strong>
                 <span className="mt-1 block text-xs text-neutral-500">
-                  {value(row.description, descriptor.description)}
+                  {value(row.description, t(descriptor.description))}
                 </span>
               </span>
             </button>
@@ -4860,7 +4860,7 @@ function GalleryCatalog({
                 <span className="mt-1 block line-clamp-2 text-xs text-neutral-500">
                   {value(
                     row.summary ?? row.description,
-                    descriptor.description,
+                    t(descriptor.description),
                   )}
                 </span>
                 <span className="mt-3 block text-[10px] uppercase tracking-wider text-neutral-400">
@@ -8604,7 +8604,7 @@ function DatabaseDetail({
       <header>
         <h2 className="text-lg font-semibold">{title(database)}</h2>
         <p className="mt-1 text-xs text-neutral-500">
-          {value(database.description, descriptor.description)}
+          {value(database.description, t(descriptor.description))}
         </p>
       </header>
       <div className="overflow-auto rounded-xl border border-neutral-200 dark:border-neutral-800">
@@ -8764,7 +8764,7 @@ function DatabaseDetailRich({
           </div>
         </div>
         <p className="mt-2 text-xs text-neutral-500">
-          {value(database.description, descriptor.description)} · {rows.length}
+          {value(database.description, t(descriptor.description))} · {rows.length}
           {detail.total != null ? ` de ${value(detail.total)}` : ""}{" "}
           {t("registros")}
         </p>
@@ -9037,7 +9037,7 @@ function Detail({
         <p className="mt-1 text-xs text-neutral-500">
           {value(
             entries.description ?? entries.summary,
-            descriptor.description,
+            t(descriptor.description),
           )}
         </p>
       </header>

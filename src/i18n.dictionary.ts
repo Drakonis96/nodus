@@ -433,6 +433,7 @@ export const DICTIONARY_TRANSLATIONS = {
   "pt-BR": {},
   it: {},
   tr: {},
+  "zh-CN": {},
 } as const;
 
 type DictionaryTable = Record<string, string>;
@@ -1361,6 +1362,211 @@ Object.assign(
   }),
 );
 
+Object.assign(
+  DICTIONARY_TRANSLATIONS["zh-CN"] as DictionaryTable,
+  translatedTable({
+    Dictionary: "词典",
+    "New Dictionary entry": "新建词典条目",
+    "Nodus will find the most relevant evidence and generate the definition automatically.":
+      "Nodus将查找最相关的证据并自动生成定义。",
+    "Possible duplicate concepts": "可能重复的概念",
+    "Nothing will be merged automatically.": "不会自动合并任何内容。",
+    Open: "打开",
+    Relate: "关联",
+    Back: "返回",
+    Cancel: "取消",
+    "Generate anyway": "仍然生成",
+    Concept: "概念",
+    "Add concept": "添加概念",
+    "Remove concept": "移除概念",
+    "Each concept will be saved as a separate entry and processed in parallel.":
+      "每个概念都将保存为独立条目并并行处理。",
+    "The batch contains duplicate concepts.": "批次中包含重复的概念。",
+    "Preparing {n} definitions…": "正在准备{n}条定义…",
+    "Generate {n} definitions": "生成{n}条定义",
+    "Generate {n} definitions anyway": "仍然生成{n}条定义",
+    "{n} entries are already saved; retrying will not create duplicates.":
+      "{n}个条目已保存；重试不会创建重复项。",
+    "Aliases or alternative terms": "别名或替代术语",
+    "Separated by commas": "用逗号分隔",
+    "Focus prompt": "聚焦提示词",
+    "Which aspect of the concept should the synthesis prioritize":
+      "合成应优先关注概念的哪个方面",
+    Scope: "范围",
+    "Entire vault": "整个资料库",
+    "Selected authors": "选定的作者",
+    "Selected works": "选定的文献",
+    "Tags or collections": "标签或合集",
+    Tags: "标签",
+    Collections: "合集",
+    "No options available.": "没有可用的选项。",
+    "Output language": "输出语言",
+    "Detail level": "详细程度",
+    Concise: "简洁",
+    Standard: "标准",
+    Detailed: "详细",
+    "Synthesis model": "合成模型",
+    "The entry is already saved; retrying will not create a duplicate.":
+      "条目已保存；重试不会创建重复项。",
+    "Checking for duplicates…": "正在检查重复项…",
+    "Preparing definition…": "正在准备定义…",
+    "Retry generation": "重试生成",
+    "Generate definition": "生成定义",
+    "Dictionary ({n})": "词典（{n}）",
+    "Delete ({n})": "删除（{n}）",
+    "New entry": "新建条目",
+    "Concepts synthesized exclusively from vault evidence.":
+      "仅根据资料库证据合成的概念。",
+    "Delete Dictionary entry": "删除词典条目",
+    "Delete {n} Dictionary entries": "删除{n}个词典条目",
+    "All versions and relations will also be deleted. This action cannot be undone.":
+      "所有版本和关系也将被删除。此操作无法撤销。",
+    "Delete entry": "删除条目",
+    "Delete {n} entries": "删除{n}个条目",
+    "Search concept, alias, description, tag, author or work…":
+      "搜索概念、别名、描述、标签、作者或文献…",
+    "All statuses": "所有状态",
+    Draft: "草稿",
+    Active: "活跃",
+    Archived: "已归档",
+    "All tags": "所有标签",
+    "All authors": "所有作者",
+    "All works": "所有文献",
+    All: "全部",
+    "New evidence": "新证据",
+    "Insufficient evidence": "证据不足",
+    Name: "名称",
+    Created: "创建时间",
+    Updated: "更新时间",
+    Authors: "作者",
+    Works: "文献",
+    Evidence: "证据",
+    Status: "状态",
+    "A description has not been generated yet.": "尚未生成描述。",
+    "{n} new": "{n}个新增",
+    "Loading Dictionary…": "正在加载词典…",
+    "No entries match this filter.": "没有条目符合此筛选条件。",
+    "Opening entry…": "正在打开条目…",
+    Overview: "概况",
+    Versions: "版本",
+    "Dictionary model": "词典模型",
+    Insufficient: "不足",
+    "No aliases": "无别名",
+    "No additional focus.": "无额外聚焦。",
+    "{n} evidence items": "{n}条证据",
+    "{n} authors": "{n}位作者",
+    "{n} works": "{n}篇文献",
+    "Retrieve evidence": "检索证据",
+    "Search for new evidence": "搜索新证据",
+    "Searching…": "正在搜索…",
+    Generate: "生成",
+    Regenerate: "重新生成",
+    "Generating…": "正在生成…",
+    Update: "更新",
+    "Updating…": "正在更新…",
+    "No evidence is included. Review the Evidence tab, include at least one item and try again.":
+      "未包含任何证据。请查看「证据」选项卡，至少包含一个项目后重试。",
+    "Not enough evidence was found to generate automatically. You can inspect the search in Evidence.":
+      "未找到足够的证据来自动生成。你可以在「证据」中检查搜索。",
+    "Concept synthesis": "概念合成",
+    Edit: "编辑",
+    "A definition could not be generated yet. Try again from the Generate button.":
+      "尚未能生成定义。请通过「生成」按钮重试。",
+    Coverage: "覆盖范围",
+    Included: "已包含",
+    Cited: "已引用",
+    Unused: "未使用",
+    Excluded: "已排除",
+    New: "新增",
+    Unavailable: "不可用",
+    Details: "详情",
+    "Last scan": "上次扫描",
+    Notes: "备注",
+    "Retrieved evidence": "已检索的证据",
+    "Nodus automatically selected {n} items for the definition. You can inspect them here or adjust a regeneration.":
+      "Nodus自动为定义选择了{n}个项目。你可以在此检查它们或调整重新生成。",
+    "Regenerate with adjustments": "调整后重新生成",
+    "Search the evidence…": "搜索证据…",
+    "All decisions": "所有决定",
+    Used: "已使用",
+    "Relevant, unused": "相关但未使用",
+    "New only": "仅新增",
+    "Loading evidence…": "正在加载证据…",
+    "No evidence matches these filters.": "没有证据符合这些筛选条件。",
+    PASSAGE: "片段",
+    IDEA: "观点",
+    "Open idea": "打开观点",
+    "Open original passage": "打开原始片段",
+    Include: "包含",
+    "Do not use": "不使用",
+    Exclude: "排除",
+    "Current version": "当前版本",
+    "No specific summary in the current version.":
+      "当前版本中没有特定摘要。",
+    "The current version has no related authors.": "当前版本没有关联作者。",
+    "Author unavailable": "作者不可用",
+    "Nodus Library": "Nodus文献库",
+    Zotero: "Zotero",
+    "The current version has no related works.": "当前版本没有关联文献。",
+    "Proposed update": "建议的更新",
+    "The current version remains unchanged until you accept this proposal.":
+      "在你接受此建议之前，当前版本保持不变。",
+    "Accept proposal": "接受建议",
+    "Restore as new version": "恢复为新版本",
+    "Generation error": "生成错误",
+    "Generation could not be completed.": "生成未能完成。",
+    Generated: "已生成",
+    "Synthesis pending": "合成待处理",
+    "Latest attempt degraded": "最近一次尝试已降级",
+    "The latest attempt did not produce a verifiable synthesis":
+      "最近一次尝试未产生可验证的合成",
+    "The response was truncated before it completed.": "响应在完成前被截断。",
+    "The model returned a response that could not be interpreted.":
+      "模型返回了无法解读的响应。",
+    "The response did not follow the required structure.":
+      "响应未遵循所需的结构。",
+    "The response used invalid evidence references.":
+      "响应使用了无效的证据引用。",
+    "The synthesis did not include verifiable citations.":
+      "合成未包含可验证的引注。",
+    "Verification rejected the generated claims.": "验证拒绝了生成的论断。",
+    "This version came from the previous extractive fallback.":
+      "此版本来自之前的抽取式回退。",
+    "A verifiable synthesis could not be obtained.":
+      "未能获得可验证的合成。",
+    "It was attempted {n} times. The previous version is preserved.":
+      "已尝试{n}次。先前的版本已保留。",
+    "Nodus made {n} automatic attempts.": "Nodus进行了{n}次自动尝试。",
+    "The previous version remains unchanged.": "先前的版本保持不变。",
+    "The extractive evidence is kept in Versions, but it has not been applied as the definition.":
+      "抽取式证据保留在「版本」中，但尚未作为定义应用。",
+    "Degraded generation": "降级生成",
+    "{n} automatic attempts were made.": "已进行{n}次自动尝试。",
+    degraded: "已降级",
+    Queued: "已排队",
+    "Analyzing corpus…": "正在分析语料库…",
+    "Generating definition…": "正在生成定义…",
+    "Writing definition…": "正在撰写定义…",
+    "Checking…": "正在检查…",
+    exact: "精确",
+    alias: "别名",
+    semantic: "语义",
+    "Edit entry": "编辑条目",
+    "Save manual version": "保存手动版本",
+    "Markdown description": "Markdown描述",
+    "{ideas} ideas · {works} works": "{ideas}条观点 · {works}篇文献",
+    "editorial attribution": "编辑归属",
+    Spanish: "西班牙语",
+    English: "英语",
+    French: "法语",
+    Turkish: "土耳其语",
+    German: "德语",
+    Portuguese: "葡萄牙语",
+    "Portuguese (Brazil)": "葡萄牙语（巴西）",
+    Italian: "意大利语",
+  }),
+);
+
 /** Prompt presets are authored as Spanish keys and translated explicitly. */
 Object.assign(DICTIONARY_TRANSLATIONS.en as DictionaryTable, {
   "Preconfiguración del prompt": "Prompt preset",
@@ -1619,4 +1825,41 @@ Object.assign(DICTIONARY_TRANSLATIONS.tr as DictionaryTable, {
     "Varsayımları, gerilimleri, eleştirileri ve açık soruları inceleyin.",
   "Realiza una lectura crítica del concepto: supuestos, tensiones internas, ambigüedades, críticas, límites y cuestiones abiertas señaladas por los autores o visibles en la evidencia.":
     "Kavramı eleştirel biçimde okuyun: yazarların belirttiği veya kanıtlarda görülebilen varsayımları, iç gerilimleri, belirsizlikleri, eleştirileri, sınırları ve açık soruları inceleyin.",
+});
+
+Object.assign(DICTIONARY_TRANSLATIONS["zh-CN"] as DictionaryTable, {
+  "Preconfiguración del prompt": "提示词预设",
+  Personalizado: "自定义",
+  "Escribe o adapta libremente las instrucciones para la síntesis.":
+    "自由编写或调整合成指令。",
+  "Básico · definición y autores": "基础 · 定义与作者",
+  "Define el concepto e identifica a los autores que lo desarrollan.":
+    "定义概念并识别对其进行发展的作者。",
+  "Define el concepto con precisión a partir de la evidencia e identifica a los principales autores que lo desarrollan, explicando brevemente la aportación de cada uno.":
+    "根据证据精确定义概念，并识别对其进行发展的主要作者，简要说明每位作者的贡献。",
+  "Evolución histórica": "历史演变",
+  "Sigue antecedentes, cambios y puntos de inflexión documentados.":
+    "追溯有据可查的先例、变化和转折点。",
+  "Reconstruye la evolución histórica del concepto: antecedentes, primeras formulaciones, cambios de significado y autores u obras que marcan puntos de inflexión.":
+    "重建概念的历史演变：其先例、早期表述、含义变化以及标志转折点的作者或文献。",
+  "Debate entre autores": "作者之间的争论",
+  "Compara acuerdos, desacuerdos y matices entre autores.":
+    "比较作者之间的一致、分歧和细微差别。",
+  "Compara cómo definen y utilizan el concepto los distintos autores. Expón acuerdos, desacuerdos, matices y posiciones intermedias, sin atribuir debates que la evidencia no sostenga.":
+    "比较不同作者如何定义和使用该概念。呈现一致、分歧、细微差别和中间立场，不归因于证据无法支持的争论。",
+  "Genealogía teórica": "理论谱系",
+  "Reconstruye antecedentes, marcos y conceptos relacionados.":
+    "重建先例、框架和相关概念。",
+  "Sitúa el concepto dentro de su genealogía teórica. Explica de qué ideas procede, con qué conceptos se relaciona, qué tradiciones o marcos lo articulan y qué autores realizan esas conexiones.":
+    "将概念置于其理论谱系中。说明它源自哪些观点、与哪些概念相关、哪些传统或框架对其加以阐述，以及哪些作者建立了这些联系。",
+  "Usos y aplicaciones": "用途与应用",
+  "Explica cómo se utiliza el concepto y cuáles son sus límites.":
+    "说明该概念如何使用及其界限。",
+  "Explica cómo se aplica u operacionaliza el concepto en las obras del corpus. Distingue ámbitos de uso, problemas que ayuda a analizar, ejemplos documentados y límites de aplicación.":
+    "说明该概念在语料库文献中如何应用或操作化。区分使用领域、它有助于分析的问题、有据可查的示例以及应用界限。",
+  "Lectura crítica": "批判性阅读",
+  "Examina supuestos, tensiones, críticas y preguntas abiertas.":
+    "审视假设、张力、批评和开放性问题。",
+  "Realiza una lectura crítica del concepto: supuestos, tensiones internas, ambigüedades, críticas, límites y cuestiones abiertas señaladas por los autores o visibles en la evidencia.":
+    "对该概念进行批判性阅读：作者指出或证据中可见的假设、内部张力、歧义、批评、界限和开放性问题。",
 });

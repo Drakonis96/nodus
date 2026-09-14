@@ -11,7 +11,7 @@ export function ChatCapabilityResult({ source }: { source: string }) {
   try {
     value = JSON.parse(source) as Envelope;
     if (!value || typeof value.capabilityId !== 'string' || typeof value.pluginId !== 'string' || !value.result || typeof value.result.kind !== 'string') throw new Error();
-  } catch { return <div className="chat-visual-error" role="alert">The capability result is invalid.</div>; }
+  } catch { return <div className="chat-visual-error" role="alert">{t('El resultado de la capacidad no es válido.')}</div>; }
   const result = value.result;
   if (result.kind === 'svg') return <ChatVisual svg={result.svg} kindLabel={value.capabilityId} provenanceLabel={value.pluginId} />;
   if (result.kind === 'image') return <ChatVisual source={result.source} alt={result.alt} kindLabel={value.capabilityId} provenanceLabel={value.pluginId} />;
@@ -19,8 +19,8 @@ export function ChatCapabilityResult({ source }: { source: string }) {
     <span className="chat-visual-head"><span className="chat-visual-kind"><Icon name="sparkles" size={13} />{value.capabilityId}</span><span className="chat-visual-original">{value.pluginId}</span></span>
     {result.kind === 'model' && <>{result.panels.map(panel => {
       const match = /^nodus-capability:\/\/chat\/([a-f0-9]{64})\/([a-f0-9-]{36})$/.exec(panel.source);
-      return match ? <ChatModelViewer key={panel.source} owner={match[1]} node={{ kind: 'model', attachmentId: match[2], title: panel.title, alt: panel.alt, bytes: panel.bytes, name: panel.name, mimeType: panel.mimeType }} /> : <p role="alert">Invalid model reference.</p>;
-    })}<details><summary>Provenance</summary><pre>{JSON.stringify(result.metadata, null, 2)}</pre></details></>}
+      return match ? <ChatModelViewer key={panel.source} owner={match[1]} node={{ kind: 'model', attachmentId: match[2], title: panel.title, alt: panel.alt, bytes: panel.bytes, name: panel.name, mimeType: panel.mimeType }} /> : <p role="alert">{t('Referencia de modelo no válida.')}</p>;
+    })}<details><summary>{t('Procedencia')}</summary><pre>{JSON.stringify(result.metadata, null, 2)}</pre></details></>}
     {result.kind === 'text' && <pre className="whitespace-pre-wrap">{result.text}</pre>}
     {result.kind === 'json' && <details className="chat-capability-evidence">
       <summary>{t('Evidencia')}</summary>

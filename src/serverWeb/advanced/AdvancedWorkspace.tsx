@@ -343,7 +343,7 @@ function _IdeaDetail({
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-800 px-3 py-2 text-xs"
                 >
                   <span className="text-neutral-300">
-                    {stringValue(entry.type, "relación")}
+                    {stringValue(entry.type, t("relación"))}
                   </span>
                   <span className="text-neutral-500">
                     {stringValue(entry.from_id)} → {stringValue(entry.to_id)}
@@ -882,7 +882,7 @@ function _AuthorDossier({
                     {work.title}
                   </strong>
                   <p className="mt-1 text-xs text-neutral-500">
-                    {stringValue(work.year, "Año desconocido")} ·{" "}
+                    {stringValue(work.year, t("Año desconocido"))} ·{" "}
                     {work.itemType || t("obra")} ·{" "}
                     {work.read ? t("Leída") : t("No marcada como leída")}
                   </p>

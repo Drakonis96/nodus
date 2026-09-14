@@ -1,5 +1,6 @@
 // worldbuilding channels, moved verbatim out of the monolithic registerIpc.
 // The channel names are unchanged; scripts/test-ipc-contract.mjs is what proves it.
+import { dialogTitle } from '../dialogTitles';
 import type { IpcContext } from './context';
 import type { CharacterInput, CharacterFilter, CharacterImage, CharacterImageKind, CharacterAbilityInput, CharacterAffiliationInput } from '@shared/types';
 import { generateCharacterGalleryImage, generateCharacterPortrait, generateWorldEntityImage } from '../ai/decorativeImages';
@@ -48,6 +49,7 @@ import { showImportOpenDialog } from '../privacy';
 import type { DecorativeImageStyle } from '@shared/types';
 import { kinOf } from '../db/relationshipsRepo';
 import { listSocialRelationsForPerson } from '../db/socialRepo';
+import { getSettings } from '../db/settingsRepo';
 
 export function registerWorldbuildingIpc({ h, getWindow, chatAborters }: IpcContext): void {
   // Worldbuilding characters. A character is a person row plus its overlay, so the
@@ -147,7 +149,7 @@ export function registerWorldbuildingIpc({ h, getWindow, chatAborters }: IpcCont
   ) => {
     const win = getWindow();
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Añadir imagen',
+      title: dialogTitle('addImage', getSettings().uiLanguage),
       properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tif', 'tiff'] }],
     });
@@ -199,7 +201,7 @@ export function registerWorldbuildingIpc({ h, getWindow, chatAborters }: IpcCont
   h('maps:importImage', async (_e, mapId: string) => {
     const win = getWindow();
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Elegir la imagen del mapa',
+      title: dialogTitle('chooseMapImage', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tif', 'tiff'] }],
     });
@@ -490,7 +492,7 @@ export function registerWorldbuildingIpc({ h, getWindow, chatAborters }: IpcCont
     const win = getWindow();
     const safeName = character.displayName.replace(/[^\p{L}\p{N} _-]/gu, '').trim() || 'personaje';
     const picked = await dialog.showSaveDialog(win ?? undefined!, {
-      title: 'Exportar ficha del personaje',
+      title: dialogTitle('exportCharacterSheet', getSettings().uiLanguage),
       defaultPath: `${safeName}.md`,
       filters: [{ name: 'Markdown', extensions: ['md'] }],
     });
@@ -535,7 +537,7 @@ export function registerWorldbuildingIpc({ h, getWindow, chatAborters }: IpcCont
   h('characters:addImageFromFile', async (_e, personId: string, kind?: CharacterImageKind) => {
     const win = getWindow();
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Añadir imagen del personaje',
+      title: dialogTitle('addCharacterImage', getSettings().uiLanguage),
       properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tif', 'tiff'] }],
     });

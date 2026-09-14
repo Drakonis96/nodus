@@ -48,7 +48,7 @@ const { localizeRuntimeError, localizeIpcPayload } = load('shared/uiLanguage.ts'
 const { MAIN_PROCESS_ERRORS, MAIN_PROCESS_ERROR_PATTERNS } = load('shared/mainProcessErrors.ts');
 
 /** Every language the interface offers, minus Spanish (the source). */
-const LANGUAGES = ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const LANGUAGES = ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN'];
 
 function sourceFiles() {
   const files = [];

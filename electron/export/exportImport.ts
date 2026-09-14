@@ -1,4 +1,5 @@
 import AdmZip from 'adm-zip';
+import { dialogTitle } from '../dialogTitles';
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -456,7 +457,7 @@ export async function createBackupArchive(options: {
 
 export async function exportData(): Promise<{ path: string; password: string; recoveryKey: string } | null> {
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Exportar biblioteca Nodus',
+    title: dialogTitle('exportNodusLibrary', getSettings().uiLanguage),
     defaultPath: path.join(app.getPath('documents'), `nodus-export-${Date.now()}.nodus`),
     filters: [{ name: 'Nodus', extensions: ['nodus'] }],
   });
@@ -472,7 +473,7 @@ export async function exportData(): Promise<{ path: string; password: string; re
 export async function importData(password: string): Promise<{ ok: boolean; message: string }> {
   if (!password.trim()) return { ok: false, message: 'Importación cancelada: falta la contraseña de la copia.' };
   const { canceled, filePaths } = await showImportOpenDialog({
-    title: 'Importar biblioteca Nodus',
+    title: dialogTitle('importNodusLibrary', getSettings().uiLanguage),
     properties: ['openFile'],
     filters: [{ name: 'Nodus', extensions: ['nodus'] }],
   });

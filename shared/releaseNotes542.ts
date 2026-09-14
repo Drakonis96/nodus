@@ -17,6 +17,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     'pt-BR': 'O banco de questões do Estudo é reconstruído para trabalhar em volume. Questões e flashcards ficam em duas abas, com busca e filtros por disciplina, tema, nível cognitivo, fonte, material, documento, tag ou coleção, ordenação e seleção múltipla. Aplique status, dificuldade, categoria, tags, coleção e revisão a uma seleção inteira, e crie, edite ou exclua cada flashcard com suas próprias ações de revisão espaçada.',
     it: 'Il banco di domande di Studio viene ricostruito per lavorare in volume. Domande e flashcard vivono in due schede, con ricerca e filtri per materia, argomento, livello cognitivo, fonte, materiale, documento, tag o raccolta, ordinamento e selezione multipla. Applica stato, difficoltà, categoria, tag, raccolta e ripasso a un’intera selezione, e crea, modifica o elimina ogni flashcard con le sue azioni di ripetizione dilazionata.',
     tr: 'Çalışma soru bankası yoğun kullanım için yeniden kuruldu. Sorular ve kartlar iki sekmede yaşıyor. Ders, konu, bilişsel düzey, kaynak, materyal, belge, etiket veya koleksiyona göre arama ve filtreler, sıralama ve çoklu seçim var. Durum, zorluk, kategori, etiketler, koleksiyon ve tekrar durumunu tüm seçime uygulayın. Her kartı kendi aralıklı tekrar işlemleriyle oluşturun, düzenleyin veya silin.',
+    'zh-CN': "学习题库为大批量操作而重建。问题与卡片分列两个标签页，支持搜索，以及按学科、主题、认知层级、来源、材料、文档、标签或合集筛选，支持排序和多选。可对整个选择应用状态、难度、类别、标签、合集和复习进度，并通过各自的间隔复习操作创建、编辑或删除每张卡片。",
   },
   {
     scope: 'estudio',
@@ -28,6 +29,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     'pt-BR': 'O banco deixa de ficar preso. Importe e exporte Anki, com pacotes .apkg e TSV, questionários Moodle em XML e GIFT, CSV e o próprio JSON do Nodus em uma única janela, que mostra o que vai entrar antes de tocar nas questões.',
     it: 'Il banco non resta più chiuso. Importa ed esporta Anki, con pacchetti .apkg e TSV, questionari Moodle in XML e GIFT, CSV e il JSON di Nodus da un’unica finestra, che mostra cosa entrerà prima di toccare le domande.',
     tr: 'Soru bankası artık kapalı değil. Anki, .apkg paketleri ve TSV dahil, Moodle sınavları, XML ve GIFT dahil, CSV ve Nodus’un kendi JSON biçimi tek bir pencereden içe ve dışa aktarılıyor. Pencere, sorularınıza dokunmadan önce neyin gireceğini gösteriyor.',
+    'zh-CN': "题库不再封闭。通过一个对话框即可导入和导出Anki（.apkg包和TSV）、Moodle的XML和GIFT测验、CSV以及Nodus自己的JSON，并在改动你的问题之前显示将要导入的内容。",
   },
   {
     scope: 'estudio',
@@ -39,6 +41,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     'pt-BR': 'As questões e os flashcards agora são lidos como foram escritos. Markdown e fórmulas LaTeX são compostos no enunciado, nas opções, na resposta e na explicação em todas as superfícies, do banco e da sessão de revisão à geração com IA, ao gerador de provas e aos questionários. Os campos de escrita ganham pré-visualização e o servidor web também as compõe.',
     it: 'Domande e flashcard ora si leggono come sono stati scritti. Markdown e formule LaTeX vengono composti in consegna, opzioni, risposta e spiegazione su ogni superficie, dal banco alla sessione di ripasso, fino alla generazione con IA, al generatore di esami e ai quiz. I campi di scrittura guadagnano l’anteprima e anche il server web le compone.',
     tr: 'Sorular ve kartlar artık yazıldıkları gibi okunuyor. Markdown ve LaTeX formülleri soru metninde, seçeneklerde, yanıtta ve açıklamada her yüzeyde diziliyor. Soru bankası ve tekrar oturumundan yapay zekâ üretimine, sınav oluşturucuya ve quizlere kadar. Yazma alanları önizleme kazanıyor ve web sunucusu da bunları diziyor.',
+    'zh-CN': "问题和卡片现在能按书写的样子显示。Markdown和LaTeX公式会在题干、选项、答案和解析中排版呈现，覆盖所有界面，从题库和复习会话到AI生成、试卷生成器和测验。书写字段新增预览，Web服务器也会对其进行排版。",
   },
   {
     scope: 'ai',
@@ -50,6 +53,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     'pt-BR': 'Salvar uma resposta do chat nas notas preserva de onde ela veio. A nota lembra a conversa, o modelo e as fontes, e pela própria nota você pode reabrir essa conversa e ir à mensagem exata. Ao exportar as notas, a procedência viaja com elas.',
     it: 'Salvare una risposta della chat nelle note ne conserva l’origine. La nota ricorda la conversazione, il modello e le fonti, e dalla nota stessa puoi riaprire quella conversazione e saltare al messaggio esatto. Esportando le note, la provenienza viaggia con loro.',
     tr: 'Bir sohbet yanıtını notlara kaydetmek nereden geldiğini korur. Not, konuşmayı, modeli ve kaynakları hatırlar. Notun kendisinden o konuşmayı yeniden açıp tam mesaja atlayabilirsiniz. Notları dışa aktardığınızda bu köken bilgisi onlarla birlikte gider.',
+    'zh-CN': "将聊天回答保存到笔记时会保留其来源。笔记会记住对话、模型和来源，并且你可以从笔记本身回到该对话并跳转到确切的消息。导出笔记时，来源信息会随之一起导出。",
   },
   {
     scope: 'ai',
@@ -61,6 +65,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     'pt-BR': 'Nas janelas de criação do Deep Research e do Immersion, apenas o Image Atelier é marcado como pago por chamada. As outras Skills instaladas mantêm o limite opcional do SVG Studio e não exigem mais um máximo obrigatório para confirmar.',
     it: 'Nelle finestre di creazione di Deep Research e Immersion, solo Image Atelier è contrassegnata come a pagamento per chiamata. Le altre Skill installate mantengono il limite opzionale di SVG Studio e non richiedono più un massimo obbligatorio per confermare.',
     tr: 'Deep Research ve Immersion oluşturma pencerelerinde yalnızca Image Atelier çağrı başına ücretli olarak işaretleniyor. Kurulu diğer Skill’ler SVG Studio’nun isteğe bağlı sınırını koruyor ve onaylamadan önce zorunlu bir üst sınır istemiyor.',
+    'zh-CN': "在Deep Research和Immersion的创建对话框中，只有Image Atelier被标记为按调用付费。其他已安装的Skill保留SVG Studio的可选上限，不再要求你填写必填的最大值才能确认。",
   },
   {
     scope: 'languages',
@@ -72,6 +77,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     'pt-BR': 'Sete idiomas novos para o conteúdo gerado. Chinês simplificado e tradicional, vietnamita, japonês, russo, ucraniano e coreano entram nos seletores de idioma dos prompts, que agora oferecem quinze. A interface mantém seus oito idiomas.',
     it: 'Sette nuove lingue per i contenuti generati. Cinese semplificato e tradizionale, vietnamita, giapponese, russo, ucraino e coreano entrano nei selettori di lingua dei prompt, che ora ne offrono quindici. L’interfaccia mantiene le sue otto lingue.',
     tr: 'Üretilen içerik için yedi yeni dil. Basitleştirilmiş ve geleneksel Çince, Vietnamca, Japonca, Rusça, Ukraynaca ve Korece istem dili seçicilerine eklendi ve artık on beş dil sunuluyor. Arayüz kendi sekiz dilini koruyor.',
+    'zh-CN': "新增七种内容生成语言。简体中文、繁体中文、越南语、日语、俄语、乌克兰语和韩语加入提示词语言选择器，该选择器现已提供十五种语言。界面仍保持八种语言。",
   },
   {
     scope: 'marketplace',
@@ -83,6 +89,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     'pt-BR': 'O Marketplace mostra um único catálogo. Skills, plugins, pacotes assinados e plugins aguardando revisão compartilham uma lista, com um cartão cada, a mesma identidade visual, os mesmos detalhes recolhíveis e uma única caixa de diálogo de permissões antes de instalar ou atualizar.',
     it: 'Il Marketplace mostra un solo catalogo. Skill, plugin, pacchetti firmati e plugin in attesa di revisione condividono un unico elenco con una scheda ciascuno, la stessa identità visiva, gli stessi dettagli richiudibili e un’unica finestra dei permessi prima di installare o aggiornare.',
     tr: 'Marketplace tek bir katalog gösteriyor. Skill’ler, eklentiler, imzalı paketler ve inceleme bekleyen eklentiler tek listede toplanıyor. Her biri kendi kartında, aynı görsel kimlikle, aynı daraltılabilir ayrıntılarla ve kurmadan ya da güncellemeden önce tek bir izin penceresiyle gösteriliyor.',
+    'zh-CN': "Marketplace只显示一个统一目录。Skills、插件、已签名包和待审核插件共用一个列表，各自一张卡片，具有相同的视觉标识、相同的可折叠详情，以及安装或更新前唯一的权限对话框。",
   },
   {
     scope: 'plugin',
@@ -94,6 +101,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     'pt-BR': 'Os pacotes assinados versão 2 usam o próprio canal de execução. Suas ferramentas não são mais anunciadas pelo mecanismo genérico anterior e rodam pela via de capacidades confiáveis que declaram, então o chat não procura mais uma ferramenta que o pacote não expõe.',
     it: 'I pacchetti firmati versione 2 usano il proprio canale di esecuzione. I loro strumenti non passano più dal precedente meccanismo generico e vengono eseguiti tramite il percorso di capacità fidate che dichiarano, così la chat non cerca più uno strumento che il pacchetto non espone.',
     tr: 'İmzalı sürüm 2 paketleri kendi yürütme kanalını kullanıyor. Araçları artık önceki genel mekanizma üzerinden duyurulmuyor ve bildirdikleri güvenilir yetenek yolundan çalışıyor. Böylece sohbet, paketin sunmadığı bir aracı aramıyor.',
+    'zh-CN': "版本2的已签名包使用自己的执行通道。其工具不再通过先前的通用机制公布，而是经由它们声明的受信能力路径执行，因此聊天不再去寻找包未公开的工具。",
   },
   {
     scope: 'browser',
@@ -105,6 +113,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     'pt-BR': 'O navegador respeita as páginas que não declaram modo escuro. O fundo segue as cores do próprio documento em vez de impor o tema do aplicativo, então uma página 401 ou sem estilos é legível sem selecionar o texto. Sites com autenticação básica HTTP agora entram por uma barra do navegador, que não guarda suas credenciais.',
     it: 'Il browser rispetta le pagine che non dichiarano un tema scuro. La superficie segue i colori del documento invece di imporre il tema dell’app, quindi una pagina 401 o senza stili si legge senza selezionare il testo. I siti con autenticazione HTTP di base ora accedono da una barra del browser che non conserva le credenziali.',
     tr: 'Tarayıcı, koyu şema bildirmeyen sayfalara saygı gösteriyor. Yüzey, uygulama temasını dayatmak yerine belgenin kendi renklerini izliyor. Böylece 401 sayfası veya biçimsiz bir belge, metin seçmeden okunabiliyor. HTTP Basic kimlik doğrulaması kullanan sitelere artık tarayıcı çubuğundan giriş yapılabiliyor ve kimlik bilgileriniz saklanmıyor.',
+    'zh-CN': "浏览器会尊重未声明深色模式的页面。其背景遵循文档自身的颜色，而不是强加应用主题，因此401页面或无样式页面无需选中文字即可阅读。使用HTTP基本认证的网站现在可以通过浏览器地址栏登录，该栏不会保存你的凭据。",
   },
   {
     scope: 'browser',
@@ -116,6 +125,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     'pt-BR': 'A visualização nativa do navegador se alinha ao zoom da interface. Ao ampliar ou reduzir com o zoom do renderizador, a página e sua moldura não ficam mais desalinhadas e o conteúdo permanece no lugar.',
     it: 'La vista nativa del browser si allinea allo zoom dell’interfaccia. Ingrandendo o riducendo con lo zoom del renderer, la pagina e la sua cornice non restano più disallineate e il contenuto rimane al suo posto.',
     tr: 'Tarayıcının yerel görünümü arayüz yakınlaştırmasıyla hizalanıyor. Görüntüleyici yakınlaştırmasıyla büyütüp küçülttüğünüzde sayfa ve çerçevesi artık kaymıyor ve içerik yerinde kalıyor.',
+    'zh-CN': "浏览器的原生视图与界面缩放对齐。使用渲染器缩放进行放大或缩小时，页面与其边框不再错位，内容保持原位。",
   },
   {
     scope: 'library',
@@ -127,5 +137,6 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     'pt-BR': 'A análise da biblioteca se recupera melhor de falhas passageiras. Se o Zotero não responde, o trabalho volta à fila em vez de ser marcado como sem texto, o filtro «Incompleto» verifica as cinco etapas e o estado semântico bate com o de cada linha, e uma fusão interrompida retoma apenas as ideias que faltam.',
     it: 'L’analisi della biblioteca si riprende meglio dagli errori temporanei. Se Zotero non risponde, il lavoro torna in coda invece di essere segnato come senza testo, il filtro Incompleto controlla tutti e cinque i passaggi e lo stato semantico coincide con quello di ogni riga, e una fusione interrotta riprende solo le idee mancanti.',
     tr: 'Kitaplık analizi geçici hatalardan daha iyi toparlanıyor. Zotero yanıt vermezse çalışma metinsiz olarak işaretlenmek yerine kuyruğa dönüyor. Eksik filtresi beş adımın tamamını denetliyor ve anlamsal durum her satırla uyuşuyor. Yarım kalan bir birleştirme yalnızca eksik fikirlerden devam ediyor.',
+    'zh-CN': "文献库分析能更好地从暂时性故障中恢复。如果Zotero无响应，任务会回到队列，而不是被判为「没有文本」，「不完整」筛选会检查全部五个步骤，语义状态与每一行一致，被中断的融合只针对缺失的观点继续执行。",
   },
 ];

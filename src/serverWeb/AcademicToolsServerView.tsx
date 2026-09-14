@@ -506,7 +506,9 @@ function ReadingEntryCard({
           <p className="mt-2 line-clamp-2 text-xs text-neutral-500">
             {text(
               entry.reason,
-              entry.read ? "Marcada como leída." : "Pendiente de lectura.",
+              entry.read
+                ? t("Marcada como leída.")
+                : t("Pendiente de lectura."),
             )}
           </p>
           {Array.isArray(entry.relatedGaps) && entry.relatedGaps.length > 0 && (
@@ -1290,7 +1292,7 @@ function _WritingView({
       draft.content ??
       active?.draft ??
       active?.content,
-    "Este borrador no tiene contenido publicado.",
+    t("Este borrador no tiene contenido publicado."),
   );
   return (
     <ListDetail

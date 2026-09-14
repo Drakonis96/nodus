@@ -17,6 +17,7 @@ import { getSettings } from '../db/settingsRepo';
 import { completeTextStream } from './aiClient';
 import { runStudyAiTask } from './studyAiPolicy';
 
+import { normalizePromptLanguage } from '@shared/promptLanguageOptions';
 const MAX_SELECTION_CHARS = 48_000;
 
 export function buildStudyImprovePrompt(request: StudyImproveRequest, style: StudyStyle, protectedText: string, language: PromptLanguage = 'es') {
@@ -151,8 +152,8 @@ export async function improveStudyText(
     visibleStreamed = text;
     if (trailingDelta) onDelta(trailingDelta);
   }
-  const warnings = studyImprovementWarnings(original, text, protectedValue.spans, request.mode, aiSettings.uiLanguage);
-  if (request.mode === 'free') warnings.unshift(studyFreeTransformationWarning(aiSettings.uiLanguage));
+  const warnings = studyImprovementWarnings(original, text, protectedValue.spans, request.mode, normalizePromptLanguage(aiSettings.uiLanguage));
+  if (request.mode === 'free') warnings.unshift(studyFreeTransformationWarning(normalizePromptLanguage(aiSettings.uiLanguage)));
   const originalHash = hash(original);
   const resultHash = hash(text);
   const log = recordStudyImprovement({

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { dialogTitle } from '../dialogTitles';
 import path from 'node:path';
 import { app, dialog } from 'electron';
 import { Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx';
@@ -11,13 +12,14 @@ import type {
 } from '@shared/types';
 import * as projects from '../db/projectsRepo';
 import { collectCitations, markdownToPdf, stripInlineMarkdown, stripMarkdownLinks } from './markdownRender';
+import { getSettings } from '../db/settingsRepo';
 
 export async function exportProject(request: ExportProjectRequest): Promise<{ path: string } | null> {
   const detail = projects.getProjectDetail(request.projectId);
   if (!detail) return null;
   const ext = request.format === 'json' ? 'json' : 'md';
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Exportar proyecto',
+    title: dialogTitle('exportProject', getSettings().uiLanguage),
     defaultPath: path.join(app.getPath('documents'), `${slug(detail.project.title)}-proyecto.${ext}`),
     filters: [
       request.format === 'json'
@@ -42,7 +44,7 @@ export async function exportProjectChapter(
   if (!chapter) return null;
   const ext = request.format === 'markdown' ? 'md' : request.format;
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Exportar capítulo',
+    title: dialogTitle('exportChapter', getSettings().uiLanguage),
     defaultPath: path.join(app.getPath('documents'), `${slug(chapter.title)}.${ext}`),
     filters: [filterForChapter(request.format)],
   });
@@ -66,7 +68,7 @@ function filterForChapter(format: ChapterExportFormat): Electron.FileFilter {
     case 'markdown':
       return { name: 'Markdown', extensions: ['md'] };
     case 'txt':
-      return { name: 'Texto plano', extensions: ['txt'] };
+      return { name: dialogTitle('plainText', getSettings().uiLanguage), extensions: ['txt'] };
     case 'docx':
       return { name: 'Word', extensions: ['docx'] };
     case 'pdf':

@@ -81,6 +81,10 @@ await build({
     virtual(/ai\/documentVisuals$/, `
       export const getDocumentVisuals = (target) => globalThis.__nodusArchiveHooks.visuals.get(target.id) ?? null;
     `),
+    // The exporter reads the active interface language for its dialog title.
+    virtual(/db\/settingsRepo$/, `
+      export const getSettings = () => ({ uiLanguage: 'es' });
+    `),
     virtual(/htmlToPdf$/, `
       export const htmlToPdfBytes = async (html) => Buffer.from(await globalThis.__nodusArchiveHooks.pdf(html));
     `),

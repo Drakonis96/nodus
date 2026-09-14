@@ -9,6 +9,7 @@ const LANGUAGE_OPTIONS = [
   ['pt-BR', '🇧🇷', 'Português (Brasil)'],
   ['it', '🇮🇹', 'Italiano'],
   ['tr', '🇹🇷', 'Türkçe'],
+  ['zh-CN', '🇨🇳', '简体中文'],
 ];
 
 export const NODUS_FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">

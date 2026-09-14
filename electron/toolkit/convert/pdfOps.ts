@@ -314,7 +314,16 @@ async function pdfWatermark(input: string, ctx: ToolkitRunContext): Promise<Tool
   const opacity = Math.min(0.9, Math.max(0.05, Number(ctx.options.opacity ?? 0.2)));
   const angle = clampInt(ctx.options.angle, 45, -90, 90);
   const doc = await PDFDocument.load(readBytes(input));
-  const font = await doc.embedFont(StandardFonts.HelveticaBold);
+  // A Chinese watermark cannot be drawn with Helvetica: pdf-lib throws on the first Han
+  // character, so it gets the bundled CJK subset instead.
+  const { hasCjk, subsetCjkFont } = await import('../../export/pdfText');
+  const font = hasCjk(text)
+    ? await (async () => {
+        const fontkit = (await import('@pdf-lib/fontkit')).default;
+        doc.registerFontkit(fontkit);
+        return doc.embedFont(await subsetCjkFont(text), { subset: false });
+      })()
+    : await doc.embedFont(StandardFonts.HelveticaBold);
   doc.getPages().forEach((page) => {
     const w = page.getWidth();
     const h = page.getHeight();

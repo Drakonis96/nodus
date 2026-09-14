@@ -85,4 +85,16 @@ export const STUDY_SYNONYM_TRANSLATIONS = {
     'alternativas en memoria': 'bellekteki alternatif',
     'Regenerar alternativas': 'Alternatifleri yeniden üret',
   },
+  'zh-CN': {
+    'Sinónimos con IA': 'AI同义词',
+    'Alternativas de sinónimos': '同义词备选',
+    'Sinónimos y reformulaciones': '同义词与改写',
+    'Cinco alternativas en el idioma original, elegidas con el contexto de la frase.': '原文语言中的五个备选，根据整句上下文选出。',
+    'Buscando alternativas…': '正在查找备选…',
+    'Alternativas actuales': '当前备选',
+    'Historial de esta apertura': '本次会话的历史记录',
+    'Sustituye': '替换',
+    'alternativas en memoria': '内存中的备选',
+    'Regenerar alternativas': '重新生成备选',
+  },
 } as const;

@@ -177,4 +177,29 @@ export const RESEARCH_PROMPT_TRANSLATIONS: Record<string, Record<string, string>
     "Guardar y usar": "Kaydet ve kullan",
     "Usar prompt": "İstemi kullan"
   },
+  "zh-CN": {
+    "System prompt": "系统提示词",
+    "System prompts": "系统提示词",
+    "Elige cómo quieres que te acompañe el asistente.": "选择你希望助手如何协助你。",
+    "Buscar prompts": "搜索提示词",
+    "Nuevo prompt": "新建提示词",
+    "Prompts guardados": "已保存的提示词",
+    "Prompt original de Nodus": "Nodus原始提示词",
+    "Tus prompts": "你的提示词",
+    "No hay prompts que coincidan.": "没有匹配的提示词。",
+    "Crea un prompt para personalizar tus conversaciones.": "创建提示词以个性化你的对话。",
+    "Las capacidades de Nodus siguen activas": "Nodus功能仍然有效",
+    "Contexto, ideas, citas y skills conservan sus reglas. Tus instrucciones personalizan el enfoque, no sustituyen estas capacidades.": "上下文、观点、引注和技能保留其规则。你的指令只用于个性化处理方式，不会取代这些功能。",
+    "Usa el system prompt original de Nodus, sin instrucciones adicionales.": "使用Nodus原始系统提示词，不附加任何额外指令。",
+    "El prompt base no se modifica y siempre puedes volver a él.": "基础提示词保持不变，你随时可以恢复使用。",
+    "Nombre del prompt": "提示词名称",
+    "Por ejemplo: Revisor crítico": "例如：严格审稿人",
+    "Instrucciones personalizadas": "自定义指令",
+    "Define el rol, el tono y la estructura que prefieres para las respuestas.": "定义你希望回复采用的角色、语气和结构。",
+    "¿Eliminar este prompt? Las conversaciones que lo usan volverán a Default.": "要删除此提示词吗？使用它的对话将恢复为Default。",
+    "Eliminar prompt": "删除提示词",
+    "Usar Default": "使用Default",
+    "Guardar y usar": "保存并使用",
+    "Usar prompt": "使用提示词"
+  }
 };

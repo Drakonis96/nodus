@@ -158,6 +158,7 @@ const LANGUAGE_LABELS: Record<string, string> = {
   "pt-BR": "Português (Brasil)",
   it: "Italiano",
   tr: "Türkçe",
+  "zh-CN": "简体中文",
 };
 const SERVER_EXECUTION_PROVIDERS = new Set([
   "openai",
@@ -1139,7 +1140,7 @@ export function ServerSettingsView({
           }
           data-testid="model-settings-mode"
         >
-          <option value="basic">Básica</option>
+          <option value="basic">{t("Básica")}</option>
           <option value="advanced">Avanzada</option>
         </select>
       </Row>
@@ -1150,7 +1151,7 @@ export function ServerSettingsView({
       </p>
       <Row
         label="Llamadas simultáneas"
-        hint="Automático se adapta en los proveedores certificados; Manual conserva un límite fijo entre 1 y 8."
+        hint={t("Automático se adapta en los proveedores certificados; Manual conserva un límite fijo entre 1 y 8.")}
       >
         <div className="ss-actions">
           <select
@@ -1465,11 +1466,11 @@ export function ServerSettingsView({
           </div>
           <div>
             <strong>{admin?.users.length ?? "—"}</strong>
-            <span>Usuarios</span>
+            <span>{t("Usuarios")}</span>
           </div>
           <div>
             <strong>{admin?.devices.length ?? "—"}</strong>
-            <span>Dispositivos</span>
+            <span>{t("Dispositivos")}</span>
           </div>
         </div>
         <Row label="Nombre">
@@ -1816,7 +1817,7 @@ export function ServerSettingsView({
         >
           <div className="ss-table">
             <div className="ss-table-head">
-              <span>Dispositivo</span>
+              <span>{t("Dispositivo")}</span>
               <span>Vault</span>
               <span>Último uso</span>
               <span />

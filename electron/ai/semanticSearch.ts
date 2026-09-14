@@ -2,6 +2,7 @@ import { findArchiveItemsSimilar } from '../db/archiveRepo';
 import { globalSearch } from '../db/searchRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { searchHybridCorpus } from './hybridCorpusSearch';
+import { normalizePromptLanguage } from '@shared/promptLanguageOptions';
 // Meaning-based search over the embedded corpus. The text search in
 // db/searchRepo.ts matches characters (LIKE); this one matches meaning by
 // embedding the query and ranking ideas, passages and works by cosine
@@ -34,7 +35,7 @@ const UNTITLED: Record<PromptLanguage, string> = {
 
 function interfaceLanguage(): PromptLanguage {
   try {
-    return getSettings().uiLanguage ?? 'es';
+    return normalizePromptLanguage(getSettings().uiLanguage);
   } catch {
     return 'es';
   }

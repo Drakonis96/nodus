@@ -272,6 +272,36 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
     ],
     canonicalLabel: 'Gizlilik politikasının tamamını GitHub’da okuyun',
   },
+  'zh-CN': {
+    title: '隐私与数据控制',
+    intro:
+      'Nodus主要在设备上运行：无需账户，不包含广告、遥测或远程分析，也不运行接收你资料库内容的自有后端。',
+    sections: [
+      {
+        heading: '哪些内容留在你的设备上',
+        bullets: [
+          '数据库、文件、录音、转录、笔记、档案和结果都保存在你的设备上。',
+          '选择文件或开始录音绝不会将其发布或上传到Nodus。',
+        ],
+      },
+      {
+        heading: '数据何时离开设备',
+        bullets: [
+          '只有你明确启用的可选功能才会联系第三方：你选择的云端AI提供商、Zotero、Unpaywall、GitHub（检查更新）或Hugging Face（下载模型）。',
+          '如果你通过OpenAI Secure MCP Tunnel连接ChatGPT，OpenAI会接收工具请求和结果；Nodus服务器仍限于此设备。',
+          '如果你连接可选的自托管Nodus Server，会通过HTTPS发布一份过滤后的资料库副本；其中不包含PDF、凭证、路径、嵌入、学生名单或成绩。',
+          '每项外部服务在使用前都会被标识。',
+        ],
+      },
+      {
+        heading: '学生与教学数据',
+        bullets: [
+          'AI绝不会接收学生名单、笔记或回答，也无法对学生评分、画像或评估。',
+        ],
+      },
+    ],
+    canonicalLabel: '在GitHub上阅读完整隐私政策',
+  },
 };
 
 const GDPR: Record<AppLanguage, LegalDocContent> = {
@@ -459,6 +489,29 @@ const GDPR: Record<AppLanguage, LegalDocContent> = {
     ],
     canonicalLabel: 'GDPR / KVKK dağıtım kontrol listesini GitHub’da açın',
   },
+  'zh-CN': {
+    title: 'Nodus如何支持GDPR合规',
+    intro:
+      '该设计采用数据最小化、默认隐私保护以及在录音前即时提示。这有助于你遵守GDPR，但这并非认证：控制者决定法律依据、保留期限、访问权限和提供商。',
+    sections: [
+      {
+        heading: '设计即隐私',
+        bullets: [
+          '本地处理与可选的外部连接被清晰区分。',
+          '在录音等敏感操作之前会立即显示简短提示。',
+        ],
+      },
+      {
+        heading: '仍由你负责的事项',
+        bullets: [
+          '记录每项目的、法律依据、保留期限和接收方。',
+          '向相关人员提供完整的第13/14条告知。',
+          '为你的组织完成部署清单。',
+        ],
+      },
+    ],
+    canonicalLabel: '在GitHub上打开GDPR部署清单',
+  },
 };
 
 const LICENSES: Record<AppLanguage, LegalDocContent> = {
@@ -629,6 +682,27 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
       },
     ],
     canonicalLabel: 'Üçüncü taraf bildirimlerini GitHub’da görüntüleyin',
+  },
+  'zh-CN': {
+    title: '许可证与署名',
+    intro:
+      'Nodus仅以GNU AGPL v3发布。相应源代码和第三方声明随每个版本一同提供。',
+    sections: [
+      {
+        heading: '开源',
+        bullets: [
+          'Nodus的源代码、历史和法定文档公开且可供审计。',
+        ],
+      },
+      {
+        heading: '第三方声明',
+        bullets: [
+          '每个打包应用都包含一个法律目录，其中有AGPL许可证、源代码提供说明、完整的依赖清单以及要求的上游声明。',
+          '还包含重新构建或替换LGPL组件的说明。',
+        ],
+      },
+    ],
+    canonicalLabel: '在GitHub上查看第三方声明',
   },
 };
 

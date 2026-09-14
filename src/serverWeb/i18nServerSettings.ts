@@ -521,4 +521,88 @@ export const SERVER_SETTINGS_TRANSLATIONS: Record<
     "Las actualizaciones se aplican en el host de Server. Esta vista no simula descargas ni reinicios que el navegador no puede ejecutar.":
       "Güncellemeler Server ana makinesinde uygulanır. Bu görünüm, tarayıcının gerçekleştiremeyeceği indirmeleri veya yeniden başlatmaları taklit etmez.",
   },
+  "zh-CN": {
+    "Las claves y los modelos configurados se comparten entre todas tus bóvedas. Las credenciales siguen siendo privadas de esta cuenta.":
+      "已配置的密钥和模型在你所有资料库之间共享。凭据仍仅属于此账户。",
+    "El operador debe configurar la keyring cifrada del servidor para guardar credenciales.":
+      "运营方必须先配置服务器的加密密钥环，才能保存凭据。",
+    "Abre un proveedor y marca con una estrella los modelos que quieras usar en los selectores.":
+      "打开一个提供商，并将你想在选择器中使用的模型标记为收藏。",
+    "Configurado en Server": "已在Server中配置",
+    "Sin credencial en Server": "Server上无凭据",
+    "Disponible mediante Desktop": "可通过Desktop使用",
+    Sustituir: "替换",
+    Guardar: "保存",
+    Eliminar: "删除",
+    "Este proveedor requiere el runtime o la red local de Nodus Desktop; sus favoritos se conservan, pero Server no intenta ejecutarlo.":
+      "此提供商需要Nodus Desktop的运行时或本地网络；其收藏会保留，但Server不会尝试运行它。",
+    "Actualizando catálogo…": "正在刷新目录…",
+    "Catálogo en vivo del proveedor": "提供商实时目录",
+    "Catálogo compatible integrado": "内置兼容目录",
+    "Buscar modelo…": "搜索模型…",
+    "Ningún modelo coincide con la búsqueda.": "没有模型与搜索匹配。",
+    "Modo básico para un modelo general; modo avanzado para elegir cada tarea de forma independiente.":
+      "基础模式使用一个通用模型；高级模式可独立选择每项任务。",
+    "Hay asignaciones heredadas pendientes ({assignments}). Los modelos locales descargables no se ejecutan en Server ni se sustituyen por un modelo de pago.":
+      "存在待处理的继承分配（{assignments}）。可下载的本地模型不会在Server上运行，也不会替换为付费模型。",
+    "Un modelo general atiende las tareas de texto compatibles.":
+      "由一个通用模型处理兼容的文本任务。",
+    "Cada tarea usa su modelo seleccionado de forma independiente.":
+      "每项任务独立使用其选定的模型。",
+    "Server muestra la misma biblioteca tabular de Desktop usando únicamente los documentos que el propietario decidió publicar.":
+      "Server仅使用所有者选择发布的文档，显示与Desktop相同的表格文献库。",
+    "La publicación es independiente para cada vault.":
+      "每个资料库的发布相互独立。",
+    "PDF, rutas locales y credenciales no se incluyen salvo publicación explícita del contenido permitido.":
+      "除非明确发布允许的内容，否则不包含PDF、本地路径和凭据。",
+    "La cuenta Server conserva la vista publicada. La conexión, storage y sincronización de Zotero se ejecutan en Desktop.":
+      "Server账户保留已发布的视图。Zotero的连接、存储和同步在Desktop上运行。",
+    "Abre Ajustes → Biblioteca en Desktop para cambiar la fuente Zotero. Server aplicará la siguiente publicación a todos los vaults conectados sin inventar una biblioteca distinta.":
+      "在Desktop中打开「设置 → 文献库」以更改Zotero来源。Server会将下一次发布应用到所有已连接的资料库，而不会另外创建一个文献库。",
+    "Estos ajustes dependen de archivos locales y permanecen en Desktop.":
+      "这些设置依赖本地文件，并保留在Desktop中。",
+    "Server consume el texto limpio incluido por el publicador.":
+      "Server使用发布者包含的干净文本。",
+    "Tesseract, idiomas y límites de páginas se ejecutan donde reside el documento.":
+      "Tesseract、语言和页数限制在文档所在的位置运行。",
+    "Apariencia y accesibilidad forman parte del perfil portable y se comparten transversalmente.":
+      "外观和辅助功能属于便携配置的一部分，并在各设备之间共享。",
+    "Conecta ChatGPT, Claude y clientes compatibles con este usuario y sus vaults asignados.":
+      "将ChatGPT、Claude和兼容客户端连接到此用户及其分配的资料库。",
+    "Sincroniza publicación y perfil portable desde Nodus Desktop.":
+      "从Nodus Desktop同步发布和便携配置。",
+    "Los complementos de escritorio conservan su configuración local.":
+      "Desktop附加组件保留其本地配置。",
+    "El navegador integrado requiere Electron y permanece fuera de la barra lateral de Server.":
+      "内置浏览器需要Electron，并位于Server侧边栏之外。",
+    "Cookies, permisos, descargas y almacenamiento web nunca se copian al servidor. La extensión y Nodus Browser se configuran en Desktop.":
+      "Cookie、权限、下载和Web存储绝不会复制到服务器。扩展和Nodus Browser在Desktop中配置。",
+    "Publicar un vault, asignar acceso y consultar la réplica.":
+      "发布资料库、分配访问权限并查看副本。",
+    "Credenciales por usuario, modelos favoritos y privacidad.":
+      "按用户区分的凭据、收藏模型和隐私。",
+    "Connected Vault, MCP y clientes compatibles.":
+      "Connected Vault、MCP和兼容客户端。",
+    "Las copias contienen datos locales, rutas y secretos que nunca cruzan el perfil portable. Se crean y restauran exclusivamente en Desktop o mediante la política de copias del operador de Server.":
+      "备份包含绝不会进入便携配置的本地数据、路径和机密。它们仅在Desktop中或通过Server运营方的备份策略创建和恢复。",
+    "Favoritos, modelos, interfaz y políticas compatibles.":
+      "收藏、模型、界面和兼容策略。",
+    "Local-first · publicación explícita · credenciales aisladas":
+      "本地优先 · 明确发布 · 凭据隔离",
+    "Ayuda sobre {section}": "{section}的帮助",
+    "Resume este servidor y muestra cuántos vaults, usuarios y dispositivos administra, junto con sus direcciones de acceso.":
+      "汇总此服务器，并显示其管理的资料库、用户和设备数量，以及访问地址。",
+    "Crea un vault editable que vive directamente en Server. Elige su nombre, tipo y descripción inicial.":
+      "创建一个直接位于Server上的可编辑资料库。选择其名称、类型和初始描述。",
+    "Muestra los vaults nativos y los publicados desde Desktop. Aquí puedes revisar su estado, ajustar qué se publica y generar códigos de conexión.":
+      "显示原生资料库和从Desktop发布的资料库。在此可查看其状态、调整发布内容并生成连接代码。",
+    "Crea cuentas y decide qué puede hacer cada usuario en cada vault: leer, escribir o administrarlo como propietario.":
+      "创建账户，并控制每个用户在每个资料库中可执行的操作：读取、写入或以所有者身份管理。",
+    "Enumera los dispositivos Desktop autorizados para publicar vaults en este servidor. Puedes revocar un dispositivo que ya no deba sincronizar.":
+      "列出获授权向此服务器发布资料库的Desktop设备。你可以撤销不再需要同步的设备。",
+    "Muestra la cuenta y el rol con los que has iniciado sesión. También permite cambiar la contraseña o cerrar la sesión actual.":
+      "显示你登录时使用的账户和角色。你还可以更改密码或退出当前会话。",
+    "Las actualizaciones se aplican en el host de Server. Esta vista no simula descargas ni reinicios que el navegador no puede ejecutar.":
+      "更新在Server主机上应用。此视图不会模拟浏览器无法执行的下载或重启。",
+  },
 };
