@@ -343,9 +343,9 @@ export interface AcademicApi {
   }>>;
   getDocumentIndexProgress(): Promise<DocumentIndexProgress>;
   startDocumentIndexCampaign(options?: { includeArchived?: boolean; nodusIds?: string[] }): Promise<DocumentIndexCampaign>;
-  enqueueDocumentProfile(nodusId: string): Promise<void>;
+  enqueueDocumentProfile(nodusId: string, vaultId?: string): Promise<void>;
   setDocumentIndexCampaignStatus(vaultId: string, campaignId: string, status: 'running' | 'paused' | 'cancelled'): Promise<void>;
-  cancelDocumentIndexJob(jobId: string): Promise<void>;
+  cancelDocumentIndexJob(jobId: string, vaultId?: string): Promise<void>;
   onDocumentIndexProgress(cb: (p: DocumentIndexProgress) => void): () => void;
 
   // graph

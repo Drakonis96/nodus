@@ -823,14 +823,14 @@ export function registerAcademicIpc(context: IpcContext): void {
     const vault = getActiveVault();
     return documentIndexQueue.startVaultCampaign(vault.id, { ...options, mode: 'manual' });
   });
-  h('documents:index:enqueue', async (_e, nodusId: string) => {
-    await documentIndexQueue.enqueueWork(getActiveVault().id, nodusId, 750, 'manual');
+  h('documents:index:enqueue', async (_e, nodusId: string, vaultId?: string) => {
+    await documentIndexQueue.enqueueWork(vaultId ?? getActiveVault().id, nodusId, 750, 'manual');
   });
   h('documents:index:campaignStatus', async (_e, vaultId: string, campaignId: string, status: 'running' | 'paused' | 'cancelled') => {
     await documentIndexQueue.setCampaignStatus(vaultId, campaignId, status);
   });
-  h('documents:index:cancelJob', async (_e, jobId: string) => {
-    await documentIndexQueue.cancelJob(getActiveVault().id, jobId);
+  h('documents:index:cancelJob', async (_e, jobId: string, vaultId?: string) => {
+    await documentIndexQueue.cancelJob(vaultId ?? getActiveVault().id, jobId);
   });
 
   // Stellar canvas

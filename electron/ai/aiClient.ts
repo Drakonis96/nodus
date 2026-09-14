@@ -1342,6 +1342,11 @@ async function rawCompleteTransport(
     }
     return content;
   } catch (e: any) {
+    // A caller abort (pause/cancel/stop) surfaces from the OpenAI SDK as
+    // APIUserAbortError ("Request was aborted."). It must stay a cancellation:
+    // wrapping it here would record a permanent, scary-looking job failure
+    // instead of letting the queue settle the job as cancelled/paused.
+    if (opts.signal?.aborted) throw opts.signal.reason ?? e;
     if (e instanceof AiError) throw e;
     throw wrapProviderError(e);
   }

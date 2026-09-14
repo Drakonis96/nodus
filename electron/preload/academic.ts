@@ -151,9 +151,9 @@ export const academicApi: AcademicApi = {
   getDocumentProfileStatuses: (nodusIds) => ipcRenderer.invoke('documents:profile:statuses', nodusIds),
   getDocumentIndexProgress: () => ipcRenderer.invoke('documents:index:progress'),
   startDocumentIndexCampaign: (options) => ipcRenderer.invoke('documents:index:startCampaign', options),
-  enqueueDocumentProfile: (nodusId) => ipcRenderer.invoke('documents:index:enqueue', nodusId).then(() => undefined),
+  enqueueDocumentProfile: (nodusId, vaultId?) => ipcRenderer.invoke('documents:index:enqueue', nodusId, vaultId).then(() => undefined),
   setDocumentIndexCampaignStatus: (vaultId, campaignId, status) => ipcRenderer.invoke('documents:index:campaignStatus', vaultId, campaignId, status).then(() => undefined),
-  cancelDocumentIndexJob: (jobId) => ipcRenderer.invoke('documents:index:cancelJob', jobId).then(() => undefined),
+  cancelDocumentIndexJob: (jobId, vaultId?) => ipcRenderer.invoke('documents:index:cancelJob', jobId, vaultId).then(() => undefined),
   onDocumentIndexProgress: (cb) => {
     const listener = (_e: unknown, progress: DocumentIndexProgress) => cb(progress);
     ipcRenderer.on('documents:index:progress', listener);
