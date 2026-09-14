@@ -408,7 +408,7 @@ test('queue dropdown retains and controls every processing lane', { timeout: 240
       const retry = page.getByTestId('document-index-rail-retry-standalone-1');
       await retry.waitFor();
       await retry.click();
-      await action('enqueueDocumentProfile', 'w1');
+      await action('enqueueDocumentProfile', 'w1', 'v1');
 
       // A failed per-work job must be clearable, or the badge it raises never goes away.
       await page.getByRole('button', { name: 'Limpiar terminadas', exact: true }).click();

@@ -3,13 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { DocumentIndexJob, DocumentIndexJobPhase, DocumentIndexProgress } from '@shared/types';
 import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
-import { t, tr, tx } from '../i18n';
+import { t, tr, tx, errorText } from '../i18n';
 import { documentIndexPercentLabel, summarizeDocumentIndexRail } from '@shared/documentIndexProgress';
 import { elapsedTimeLabel } from '@shared/elapsedTime';
 import { useElapsedClock } from '../useElapsedClock';
 
 const TERMINAL = new Set<DocumentIndexJob['status']>(['completed', 'failed', 'unavailable', 'cancelled']);
 const RETRYABLE = new Set<DocumentIndexJob['status']>(['failed', 'unavailable']);
+const LIVE = new Set<DocumentIndexJob['status']>(['queued', 'running', 'paused']);
 
 function phaseLabel(phase: DocumentIndexJobPhase): string {
   return t({
@@ -30,7 +31,10 @@ function phaseLabel(phase: DocumentIndexJobPhase): string {
 
 export function DocumentIndexProgressBar({ progress }: { progress: DocumentIndexProgress | null }) {
   const [expanded, setExpanded] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Per-action pending keys (bulk, retry:<jobId>, cancel:<jobId>): one slow IPC
+  // must never freeze the whole rail, and a failure must be shown, not swallowed.
+  const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
+  const [actionError, setActionError] = useState<string | null>(null);
   const [confirmStop, setConfirmStop] = useState(false);
   // Standalone jobs (a per-work scan, or Deep Research preparation) have no campaign
   // and were invisible here, so a retry could not be seen. The summary includes them.
@@ -51,29 +55,53 @@ export function DocumentIndexProgressBar({ progress }: { progress: DocumentIndex
   const totalElapsed = elapsedTimeLabel(campaignStartedAt, null, now);
   const itemElapsed = elapsedTimeLabel(current?.createdAt, null, now);
 
-  const applyStatus = async (status: 'running' | 'paused' | 'cancelled') => {
-    setBusy(true);
+  const runAction = async (key: string, fn: () => Promise<void>) => {
+    setPending((current) => new Set(current).add(key));
+    setActionError(null);
     try {
+      await fn();
+    } catch (error) {
+      setActionError(errorText(error));
+    } finally {
+      setPending((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
+  const applyStatus = async (status: 'running' | 'paused' | 'cancelled') => {
+    await runAction('bulk', async () => {
       const targets = status === 'running'
         ? liveCampaigns.filter((campaign) => campaign.status === 'paused')
         : liveCampaigns.filter((campaign) => campaign.status !== 'paused' || status === 'cancelled');
       await Promise.all(targets.map((campaign) =>
         window.nodus.setDocumentIndexCampaignStatus(campaign.vaultId, campaign.campaignId, status)
       ));
-    } finally {
-      setBusy(false);
-    }
+      // Standalone jobs (per-work scans, Deep Research preparation) belong to no
+      // campaign, so a bulk stop used to leave them running while the campaigns
+      // disappeared — reading as "stop does nothing". Cancel them explicitly.
+      if (status === 'cancelled') {
+        const standaloneLive = view.standalone.filter((job) => LIVE.has(job.status));
+        await Promise.all(standaloneLive.map((job) =>
+          window.nodus.cancelDocumentIndexJob(job.jobId, job.vaultId)
+        ));
+      }
+    });
   };
 
-  /** Retry one standalone job from the rail; the row flips back to queued in place. */
-  const retryJob = async (nodusId: string) => {
-    setBusy(true);
-    try { await window.nodus.enqueueDocumentProfile(nodusId); } finally { setBusy(false); }
+  /** Retry one job from the rail; the row flips back to queued in place. */
+  const retryJob = async (job: DocumentIndexJob) => {
+    await runAction(`retry:${job.jobId}`, async () => {
+      await window.nodus.enqueueDocumentProfile(job.nodusId, job.vaultId);
+    });
   };
 
-  const cancelJob = async (jobId: string) => {
-    setBusy(true);
-    try { await window.nodus.cancelDocumentIndexJob(jobId); } finally { setBusy(false); }
+  const cancelJob = async (job: DocumentIndexJob) => {
+    await runAction(`cancel:${job.jobId}`, async () => {
+      await window.nodus.cancelDocumentIndexJob(job.jobId, job.vaultId);
+    });
   };
 
   return (
@@ -85,6 +113,15 @@ export function DocumentIndexProgressBar({ progress }: { progress: DocumentIndex
         <div className="document-index-warning mb-2 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-5" role="alert">
           <Icon name="warning" size={14} className="mt-0.5 shrink-0" />
           <span className="min-w-0 flex-1 break-words">{tr(error)}</span>
+        </div>
+      )}
+      {actionError && (
+        <div className="document-index-warning mb-2 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-5" role="alert">
+          <Icon name="warning" size={14} className="mt-0.5 shrink-0" />
+          <span className="min-w-0 flex-1 break-words">{actionError}</span>
+          <button className="btn btn-ghost shrink-0 px-1 py-0" onClick={() => setActionError(null)} aria-label={t('Cerrar')}>
+            <Icon name="x" size={12} />
+          </button>
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3">
@@ -115,15 +152,15 @@ export function DocumentIndexProgressBar({ progress }: { progress: DocumentIndex
         </div>
         {liveCampaigns.length > 0 && <>
           {allPaused ? (
-            <button className="btn btn-ghost" disabled={busy} title={t('Reanudar indexación')} aria-label={t('Reanudar indexación')} onClick={() => void applyStatus('running')}>
+            <button className="btn btn-ghost" disabled={pending.has('bulk')} title={t('Reanudar indexación')} aria-label={t('Reanudar indexación')} onClick={() => void applyStatus('running')}>
               <Icon name="play" size={16} />
             </button>
           ) : (
-            <button className="btn btn-ghost" disabled={busy} title={t('Pausar indexación')} aria-label={t('Pausar indexación')} onClick={() => void applyStatus('paused')}>
+            <button className="btn btn-ghost" disabled={pending.has('bulk')} title={t('Pausar indexación')} aria-label={t('Pausar indexación')} onClick={() => void applyStatus('paused')}>
               <Icon name="pause" size={16} />
             </button>
           )}
-          <button className="btn btn-ghost document-index-danger" disabled={busy} title={t('Detener indexación')} aria-label={t('Detener indexación')} onClick={() => setConfirmStop(true)}>
+          <button className="btn btn-ghost document-index-danger" disabled={pending.has('bulk')} title={t('Detener indexación')} aria-label={t('Detener indexación')} onClick={() => setConfirmStop(true)}>
             <Icon name="stop" size={16} />
           </button>
         </>}
@@ -140,37 +177,37 @@ export function DocumentIndexProgressBar({ progress }: { progress: DocumentIndex
                   </span>
                   <span className="min-w-0 flex-1 truncate">{job.title ?? job.nodusId}</span>
                   <span className={job.status === 'running' ? 'text-cyan-300' : job.status === 'failed' || job.status === 'unavailable' ? 'text-red-500 dark:text-red-300' : 'text-neutral-500'}>{jobStatusText(job)}</span>
-                  <span className="min-w-[5.5rem] text-right tabular-nums text-neutral-500">{elapsedTimeLabel(job.createdAt, null, now)}</span>
+                  <span className="min-w-[5.5rem] text-right tabular-nums text-neutral-500">{elapsedTimeLabel(job.createdAt, TERMINAL.has(job.status) ? job.updatedAt : null, now)}</span>
                   <span className="w-10 text-right tabular-nums text-neutral-500">{Math.round(job.progress * 100)}%</span>
-                  {/* A job with no campaign has no bulk control above, so its actions live on the row. */}
-                  {!job.campaignId && (
-                    <span className="flex shrink-0 items-center">
-                      {RETRYABLE.has(job.status) && (
-                        <button
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-800 hover:text-cyan-300"
-                          disabled={busy}
-                          title={t('Reintentar')}
-                          aria-label={`${t('Reintentar')}: ${job.title ?? job.nodusId}`}
-                          data-testid={`document-index-rail-retry-${job.jobId}`}
-                          onClick={() => void retryJob(job.nodusId)}
-                        >
-                          <Icon name="refresh" size={13} />
-                        </button>
-                      )}
-                      {!TERMINAL.has(job.status) && (
-                        <button
-                          className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-800 hover:text-red-400"
-                          disabled={busy}
-                          title={t('Cancelar')}
-                          aria-label={`${t('Cancelar')}: ${job.title ?? job.nodusId}`}
-                          data-testid={`document-index-rail-cancel-${job.jobId}`}
-                          onClick={() => void cancelJob(job.jobId)}
-                        >
-                          <Icon name="x" size={13} />
-                        </button>
-                      )}
-                    </span>
-                  )}
+                  {/* Every visible row owns its actions: a campaign job cancelled here
+                      leaves its campaign running for the remaining works, and a
+                      failed campaign job retries as a standalone re-scan. */}
+                  <span className="flex shrink-0 items-center">
+                    {RETRYABLE.has(job.status) && (
+                      <button
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-800 hover:text-cyan-300"
+                        disabled={pending.has(`retry:${job.jobId}`)}
+                        title={t('Reintentar')}
+                        aria-label={`${t('Reintentar')}: ${job.title ?? job.nodusId}`}
+                        data-testid={`document-index-rail-retry-${job.jobId}`}
+                        onClick={() => void retryJob(job)}
+                      >
+                        <Icon name="refresh" size={13} />
+                      </button>
+                    )}
+                    {!TERMINAL.has(job.status) && (
+                      <button
+                        className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-800 hover:text-red-400"
+                        disabled={pending.has(`cancel:${job.jobId}`)}
+                        title={t('Cancelar')}
+                        aria-label={`${t('Cancelar')}: ${job.title ?? job.nodusId}`}
+                        data-testid={`document-index-rail-cancel-${job.jobId}`}
+                        onClick={() => void cancelJob(job)}
+                      >
+                        <Icon name="x" size={13} />
+                      </button>
+                    )}
+                  </span>
                 </div>
               ))}
             </div>

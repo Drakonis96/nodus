@@ -120,14 +120,17 @@ test('the rail sorts live rows before terminal ones', () => {
   assert.equal(summary.current?.jobId, 'running');
 });
 
-test('the rail renders standalone rows with a retry action wired to the enqueue endpoint', () => {
+test('the rail renders every row with its own retry/cancel actions wired to the job vault', () => {
   const source = readFileSync(path.join(repoRoot, 'src/components/DocumentIndexProgressBar.tsx'), 'utf8');
   assert.match(source, /summarizeDocumentIndexRail/, 'the rail must use the shared selection');
-  assert.match(source, /!job\.campaignId &&/, 'standalone rows are the ones that carry their own actions');
+  assert.doesNotMatch(source, /!job\.campaignId &&/, 'campaign rows carry their own actions too, not just standalone ones');
   assert.match(source, /data-testid=\{`document-index-rail-retry-\$\{job\.jobId\}`\}/);
-  assert.match(source, /window\.nodus\.enqueueDocumentProfile\(nodusId\)/);
-  assert.match(source, /onClick=\{\(\) => void retryJob\(job\.nodusId\)\}/);
+  assert.match(source, /window\.nodus\.enqueueDocumentProfile\(job\.nodusId, job\.vaultId\)/);
+  assert.match(source, /onClick=\{\(\) => void retryJob\(job\)\}/);
   assert.match(source, /data-testid=\{`document-index-rail-cancel-\$\{job\.jobId\}`\}/);
+  assert.match(source, /window\.nodus\.cancelDocumentIndexJob\(job\.jobId, job\.vaultId\)/);
+  // A bulk stop must also cancel live standalone jobs, otherwise it reads as "stop does nothing".
+  assert.match(source, /standaloneLive/);
   // The campaign bulk controls must not appear when only standalone jobs are live.
   assert.match(source, /\{liveCampaigns\.length > 0 && <>/);
 });
