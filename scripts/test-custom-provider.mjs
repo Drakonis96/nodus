@@ -59,6 +59,8 @@ const {
   normalizeCustomModels,
   normalizeCustomProviderConfig,
   openAiCompatBase,
+  reasoningBody,
+  looksLikeReasoningModelId,
   supportsJsonMode,
   testCustomProvider,
 } = await import(pathToFileURL(outfile).href);
@@ -236,4 +238,50 @@ test('the endpoint is stored app-level, normalised on write, and shared by every
     await rm(workspace, { recursive: true, force: true });
     await rm(userData, { recursive: true, force: true });
   }
+});
+
+// Reasoning control for a custom gateway. The reporter of the Document Understanding
+// failures ran a `:thinking` model through one: Nodus sent no reasoning field, so the
+// private trace consumed the whole output budget and the long non-streaming generation
+// is what the gateway dropped as "Connection error.".
+//
+// The field is added for BACKGROUND SCANS of a model whose id announces the mode, and
+// nowhere else: a custom gateway that refuses it is recovered by the transport, but a
+// conversational turn that is refused has already lost its answer.
+test('a custom background scan asks a thinking model not to think', () => {
+  assert.deepEqual(
+    reasoningBody('custom', 'off', 'DeepSeek V4.1 Flash:thinking', true),
+    { reasoning_effort: 'none' },
+  );
+  assert.deepEqual(reasoningBody('custom', 'off', 'some-model-reasoning', true), { reasoning_effort: 'none' });
+});
+
+test('only an id that announces the mode is asked; a merely capable family is left alone', () => {
+  // qwen3, gpt-oss and the o-series can reason but do not advertise it in the id, so
+  // they keep their default request shape rather than risk a rejected field.
+  assert.deepEqual(reasoningBody('custom', 'off', 'qwen3-max', true), {});
+  assert.deepEqual(reasoningBody('custom', 'off', 'gpt-oss-20b', true), {});
+  assert.deepEqual(reasoningBody('custom', 'off', 'deepseek-r1', true), {});
+  assert.deepEqual(reasoningBody('custom', 'off', 'gpt-4o', true), {});
+  assert.deepEqual(reasoningBody('custom', 'off', undefined, true), {});
+});
+
+test('a custom conversational turn never carries a reasoning field', () => {
+  assert.deepEqual(reasoningBody('custom', 'off', 'DeepSeek V4.1 Flash:thinking', false), {});
+  assert.deepEqual(reasoningBody('custom', 'medium', 'any-model', false), {});
+});
+
+test('a custom explicit effort is forwarded on a background scan', () => {
+  assert.deepEqual(reasoningBody('custom', 'high', 'any-model', true), { reasoning_effort: 'high' });
+});
+
+test('the reasoning-model heuristic only matches ids that announce it', () => {
+  assert.equal(looksLikeReasoningModelId('DeepSeek V4.1 Flash:thinking'), true);
+  assert.equal(looksLikeReasoningModelId('acme-reasoning-v2'), true);
+  assert.equal(looksLikeReasoningModelId('deepseek-r1'), false);
+  assert.equal(looksLikeReasoningModelId('Qwen/QwQ-32B'), false);
+  assert.equal(looksLikeReasoningModelId('gpt-oss-20b'), false);
+  assert.equal(looksLikeReasoningModelId('gpt-4o'), false);
+  assert.equal(looksLikeReasoningModelId(''), false);
+  assert.equal(looksLikeReasoningModelId(undefined), false);
 });

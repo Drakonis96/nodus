@@ -148,6 +148,19 @@ function isOpenRouterMandatoryReasoningModel(modelId: string | undefined): boole
 }
 
 /**
+ * True when a model id explicitly advertises a reasoning/thinking mode.
+ *
+ * Deliberately narrow. Only ids that announce the feature (`:thinking`, `-reasoning`)
+ * receive an explicit reasoning field on a custom endpoint, where Nodus cannot know
+ * whether the gateway accepts one; a family that merely *can* reason (qwen3, gpt-oss,
+ * the o-series) keeps its default request shape. A false negative only means today's
+ * behaviour, which is why the list errs toward silence.
+ */
+export function looksLikeReasoningModelId(modelId: string | undefined): boolean {
+  return Boolean(modelId && /thinking|reasoning/i.test(modelId));
+}
+
+/**
  * Sampling controls are deliberately absent for model families that reject them.
  * Keeping this decision at the transport seam makes non-streaming and streaming
  * calls identical while older models and all other providers keep their current
@@ -185,6 +198,7 @@ export function reasoningBody(
   provider: AiProvider,
   effort: ReasoningEffort,
   modelId?: string,
+  background = false,
 ): Record<string, unknown> {
   switch (provider) {
     case 'openrouter':
@@ -241,9 +255,15 @@ export function reasoningBody(
       // Go serves a mixed OpenAI/Anthropic catalogue through dedicated paths.
       return {};
     case 'custom':
-      // Nodus cannot know what sits behind the user's gateway, and an unsupported
-      // reasoning field is a 400 the caller would have to retry past. Send none.
-      return {};
+      // Nodus cannot know what sits behind the user's gateway, so it only ever adds a
+      // reasoning field to a *background* scan, and only for a model whose id announces
+      // the mode. A gateway that refuses the field cannot make the scan fail: the
+      // transport retries once without it (see `shouldRetryWithoutOptionalFields`).
+      // Conversational turns never carry one — the field's support is unknown, and a
+      // rejected chat turn has already lost its streaming answer.
+      if (!background) return {};
+      if (effort === 'off') return looksLikeReasoningModelId(modelId) ? { reasoning_effort: 'none' } : {};
+      return { reasoning_effort: effort };
   }
 }
 

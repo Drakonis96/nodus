@@ -82,3 +82,99 @@ export function classifyProviderError(error: unknown): ProviderErrorClassificati
   if (CONFIG.test(message)) return { message, retriable: false, config: true };
   return { message, retriable: RETRIABLE.test(message), config: false };
 }
+
+/**
+ * Network-level transport failures, for the OpenAI-compatible path.
+ *
+ * These carry no HTTP status: the socket failed, so every status-based branch in
+ * `wrapProviderError` skips them and they used to reach the generic catch-all,
+ * which marks them permanent. A dropped connection is the textbook transient
+ * failure a background scan should ride out, and `classifyProviderError` above
+ * already treats `connection`/`network`/`socket` as retriable — but that path is
+ * only wired for the subscription runtimes, so a custom or vendor OpenAI-compatible
+ * endpoint failed the whole work on one gateway hiccup.
+ *
+ * Deliberately excluded:
+ *  · an abort — a cancelled or paused job asked for it, and retrying would fight
+ *    the user;
+ *  · a timeout — `wrapProviderError` classifies those separately (and, like the
+ *    transport deadline, must not be replayed blindly);
+ *  · anything carrying a status — another branch owns that decision.
+ */
+const TRANSIENT_NETWORK = /connection error|connection reset|connection refused|connection closed|connection lost|socket hang up|socket closed|network error|fetch failed|other side closed|premature close|terminated|econnreset|econnrefused|econnaborted|enotfound|eai_again|epipe|und_err/i;
+
+export function isTransientNetworkFailure(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as {
+    name?: unknown; message?: unknown; code?: unknown; status?: unknown;
+    cause?: unknown; response?: { status?: unknown } | null;
+  };
+  if (typeof e.status === 'number' || typeof e.response?.status === 'number') return false;
+  const name = typeof e.name === 'string' ? e.name : '';
+  if (/abort|timeout/i.test(name)) return false;
+  const cause = (e.cause && typeof e.cause === 'object' ? e.cause : {}) as Record<string, unknown>;
+  const codes = [e.code, cause.code, cause.name]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ');
+  // Substring, not word-boundary: undici spells its codes UND_ERR_CONNECT_TIMEOUT
+  // and ECONNABORTED, where the trailing word is glued on by an underscore.
+  if (/abort|timeout/i.test(codes)) return false;
+  // The OpenAI SDK's canonical "Connection error." — no status, so nothing else
+  // in `wrapProviderError` can recognise it.
+  if (/APIConnectionError/i.test(name)) return true;
+  const text = [
+    typeof e.message === 'string' ? e.message : '',
+    typeof cause.message === 'string' ? cause.message : '',
+    codes,
+  ].join(' ');
+  return TRANSIENT_NETWORK.test(text);
+}
+
+function statusOf(error: unknown): number | undefined {
+  const e = error as { status?: unknown; response?: { status?: unknown } | null } | null;
+  if (typeof e?.status === 'number') return e.status;
+  const nested = e?.response?.status;
+  return typeof nested === 'number' ? nested : undefined;
+}
+
+function messageOf(error: unknown): string {
+  const e = error as { error?: { message?: unknown } | null; message?: unknown } | null;
+  const nested = e?.error && typeof e.error === 'object' ? e.error.message : undefined;
+  return String((typeof nested === 'string' ? nested : undefined) ?? e?.message ?? '');
+}
+
+/**
+ * A 400 that names an optional transport field it does not accept: JSON mode, the
+ * reasoning hint, or OpenRouter's routing preference. The transport replays the request
+ * once without the optional body on this signal. Keep it strict: only a field the
+ * provider named may be dropped on a *named* rejection.
+ */
+const OPTIONAL_FIELD_REJECTION = /(?:unknown|unrecognized|unsupported|not supported|extra|invalid)\s+(?:field|parameter|argument)|response_format|reasoning_effort|include_reasoning|provider\.only|allow_fallbacks/i;
+
+export function rejectsOptionalTransportField(error: unknown): boolean {
+  return statusOf(error) === 400 && OPTIONAL_FIELD_REJECTION.test(messageOf(error));
+}
+
+/**
+ * Whether one request should be replayed without its optional body fields.
+ *
+ * The second case is why this cannot live inside the transport alone: a custom gateway
+ * may refuse the reasoning hint Nodus added *without naming it* — a proxy in front of
+ * the real API often answers a bare "Bad Request". Nodus added that field, so Nodus
+ * owns the recovery; refusing to replay there would turn a fix that helps some setups
+ * into scans that fail on the ones it does not help.
+ *
+ * A 400/422 is a refusal, not a completed generation: the request was rejected before
+ * running, so a single replay without the extras cannot double-charge. Rejections of
+ * any *other* optional field are still only replayed when the provider names it.
+ */
+export function shouldRetryWithoutOptionalFields(
+  error: unknown,
+  options: { provider?: string; sentReasoning?: boolean } = {},
+): boolean {
+  if (rejectsOptionalTransportField(error)) return true;
+  const status = statusOf(error);
+  return options.provider === 'custom'
+    && options.sentReasoning === true
+    && (status === 400 || status === 422);
+}

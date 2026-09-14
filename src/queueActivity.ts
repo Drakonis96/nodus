@@ -4,6 +4,7 @@ import type { OcrDocProgress } from '@shared/aiOcrTypes';
 import type { DeepResearchJobRecord, DocumentIndexProgress, EmbeddingPipelineProgress, PassageEmbeddingProgress, QueueProgress } from '@shared/types';
 import type { DictionaryProgress } from '@shared/dictionary';
 import type { LibraryExtractionJob, ZoteroImportProgress } from '@shared/libraryTypes';
+import { documentLaneActivity } from '@shared/documentIndexProgress';
 
 export const DOCUMENT_LIVE = new Set(['queued', 'running', 'paused']);
 export const ZOTERO_FINISHED = new Set(['complete', 'canceled', 'failed']);
@@ -58,6 +59,10 @@ function taskStates(snapshot: Partial<QueueSnapshot>) {
   return [
     ...(snapshot.extraction ?? []).map((job) => ({ key: `extraction:${job.id}`, version: `${job.status}:${job.updatedAt}`, active: job.status === 'queued' || job.status === 'processing', settled: job.status === 'canceled' || (job.status === 'done' && !job.error), updatedAt: job.updatedAt })),
     ...(snapshot.documents?.campaigns ?? []).map((job) => ({ key: `documents:${job.campaignId}`, version: `${job.status}:${job.updatedAt}`, active: DOCUMENT_LIVE.has(job.status), settled: job.status === 'cancelled' || (job.status === 'completed' && !job.failedJobs && !job.error), updatedAt: job.updatedAt })),
+    // A standalone job (a per-work scan, or Deep Research preparation) has no campaign row
+    // to hide it, so it carries its own dismissal: a failed one must be clearable, or the
+    // header badge it now raises would never go away.
+    ...(snapshot.documents?.jobs ?? []).filter((job) => !job.campaignId).map((job) => ({ key: `document-job:${job.jobId}`, version: `${job.status}:${job.updatedAt}`, active: DOCUMENT_LIVE.has(job.status), settled: false, updatedAt: job.updatedAt })),
     ...(snapshot.research ?? []).map((job) => ({ key: `research:${job.id}`, version: researchVersion(job), active: job.status === 'queued' || job.status === 'running', settled: !job.saveError && (job.status === 'cancelled' || (job.status === 'completed' && !job.error)), updatedAt: job.finishedAt ?? job.enqueuedAt })),
     ...(snapshot.ocr ?? []).map((job) => ({ key: `ocr:${job.id}`, version: ocrVersion(job), active: job.status === 'pending' || job.status === 'processing', settled: job.status === 'cancelled' || (job.status === 'done' && !job.errorCount && !job.error), updatedAt: job.updatedAt })),
     ...(snapshot.dictionary ?? []).map((job) => ({ key: `dictionary:${job.entryId}`, version: job.phase, active: !DICTIONARY_FINISHED.has(job.phase), settled: job.phase === 'done' && !job.error, updatedAt: undefined })),
@@ -160,21 +165,27 @@ export function useQueueActivity() {
   const queue = snapshot.queue && items.length !== snapshot.queue.items.length
     ? { ...snapshot.queue, items, total: items.length, done: items.filter((job) => job.state === 'done').length, failed: items.filter((job) => job.state === 'failed').length }
     : snapshot.queue;
-  const documents = snapshot.documents && { ...snapshot.documents, campaigns: snapshot.documents.campaigns.filter((job) => dismissed[`documents:${job.campaignId}`] !== `${job.status}:${job.updatedAt}`) };
+  const documents = snapshot.documents && {
+    ...snapshot.documents,
+    campaigns: snapshot.documents.campaigns.filter((job) => dismissed[`documents:${job.campaignId}`] !== `${job.status}:${job.updatedAt}`),
+    // A dismissed standalone job leaves the rail, and with it the lane counters below.
+    // Campaign jobs are never filtered here: their history is dismissed by campaign id.
+    jobs: snapshot.documents.jobs.filter((job) => job.campaignId || dismissed[`document-job:${job.jobId}`] !== `${job.status}:${job.updatedAt}`),
+  };
   const queueActive = Boolean(queue && (queue.maintenanceRunning || queue.items.some((item) => DOCUMENT_LIVE.has(item.state))));
-  const documentsActive = Boolean(documents?.campaigns.some((campaign) => DOCUMENT_LIVE.has(campaign.status)));
+  const documentLane = documentLaneActivity(documents ?? null);
   const visible = Number(Boolean(queue && (queue.total > 0 || queue.maintenanceRunning || queue.maintenanceError)))
-    + Number(Boolean(zotero)) + Number(Boolean(documents?.campaigns.length)) + Number(embeddingVisible(embeddings)) + Number(passageVisible(passages))
+    + Number(Boolean(zotero)) + Number(documentLane.visible) + Number(embeddingVisible(embeddings)) + Number(passageVisible(passages))
     + Number(extraction.length > 0) + Number(research.length > 0) + Number(dictionary.length > 0) + Number(ocr.length > 0) + Number(background.length > 0);
   const live = Number(queueActive) + Number(Boolean(zotero && !ZOTERO_FINISHED.has(zotero.phase)))
-    + Number(documentsActive) + Number(Boolean(embeddings && (embeddings.running || embeddings.paused)))
+    + Number(documentLane.active) + Number(Boolean(embeddings && (embeddings.running || embeddings.paused)))
     + Number(Boolean(passages && (passages.running || passages.paused)))
     + Number(extraction.some((job) => job.status === 'queued' || job.status === 'processing'))
     + Number(research.some((job) => job.status === 'queued' || job.status === 'running'))
     + Number(dictionary.some((job) => !DICTIONARY_FINISHED.has(job.phase)))
     + Number(ocr.some((job) => job.status === 'pending' || job.status === 'processing')) + Number(background.some((job) => job.status === 'running'));
   const attention = Boolean(queue?.maintenanceError || queue?.failed || queue?.pausedReason || embeddings?.error || passages?.error
-    || zotero?.phase === 'failed' || documents?.campaigns.some((job) => job.status !== 'cancelled' && (job.status === 'failed' || job.failedJobs > 0 || job.error))
+    || zotero?.phase === 'failed' || documentLane.attention
     || extraction.some((job) => job.status === 'failed') || research.some((job) => job.status === 'failed' || job.saveError)
     || dictionary.some((job) => job.phase === 'failed' || job.phase === 'degraded') || ocr.some((job) => job.status !== 'cancelled' && (job.status === 'error' || job.errorCount > 0 || job.error)) || background.some((job) => job.status === 'failed' || backgroundFailure(job)));
   const finished = taskStates(snapshot).filter((task) => !task.active && dismissed[task.key] !== task.version);

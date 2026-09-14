@@ -43,7 +43,7 @@ import {
   deanonymizeDeep,
   findResidualNames,
 } from '@shared/studentPseudonyms';
-import { classifyProviderError } from './providerErrors';
+import { classifyProviderError, isTransientNetworkFailure, rejectsOptionalTransportField, shouldRetryWithoutOptionalFields } from './providerErrors';
 import { completeWithChatGptSubscription } from './codexSubscription';
 import { completeWithGitHubCopilotSubscription } from './githubCopilotSubscription';
 import { completeWithOpenCodeGo, OUTPUT_TRUNCATED_MARKER } from './openCodeGoCompletion';
@@ -779,7 +779,7 @@ function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEf
   const auditedOpenRouterProvider = process.env.NODUS_AUDIT_OPENROUTER_PROVIDER?.trim();
   return {
     ...(jsonMode && supportsJsonMode(model.provider) ? { response_format: { type: 'json_object' as const } } : {}),
-    ...(opts.researchEffort === undefined ? reasoningBody(model.provider, reasoning, model.model) : {}),
+    ...(opts.researchEffort === undefined ? reasoningBody(model.provider, reasoning, model.model, opts.requestClass === 'background') : {}),
     // Groq's reasoning models (gpt-oss/qwen3) reason at medium by default, which slows scans and
     // burns tokens. reasoningBody can't send it (no model id), so minimise it here. Groq rejects
     // reasoning_effort:'none' — 'low' is its floor; non-reasoning models 400 and the caller strips it.
@@ -845,14 +845,23 @@ function openAiClientHeaders(model: Pick<ModelRef, 'provider'>): Record<string, 
 }
 
 /**
- * Only retry a 400 when the provider explicitly names an unsupported optional
- * transport field. A generic 400 can be an ambiguous timeout or rejected payload;
- * replaying it would violate the no-blind-retry contract and may double-charge.
+ * The optional body for the one replay after a provider refused it.
+ *
+ * A named rejection drops the optional body wholesale, as it always has. A custom
+ * gateway that refused the reasoning hint *without* naming it gets everything else
+ * back exactly as it was — JSON mode included — so the scan keeps its contract and
+ * only the field Nodus added is removed.
  */
-function rejectsOptionalTransportField(e: any): boolean {
-  if ((e?.status ?? e?.response?.status) !== 400) return false;
-  const message = String(e?.error?.message ?? e?.message ?? '');
-  return /(?:unknown|unrecognized|unsupported|not supported|extra|invalid)\s+(?:field|parameter|argument)|response_format|reasoning_effort|include_reasoning|provider\.only|allow_fallbacks/i.test(message);
+function retryOptionalBody(model: ModelRef, extras: Record<string, unknown>, error: unknown, sentReasoning: boolean): Record<string, unknown> {
+  const auditedProvider = model.provider === 'openrouter' && process.env.NODUS_AUDIT_OPENROUTER_PROVIDER?.trim()
+    ? { provider: (extras as any).provider }
+    : {};
+  if (sentReasoning && !rejectsOptionalTransportField(error)) {
+    const rest = { ...extras };
+    delete rest.reasoning_effort;
+    return { ...rest, ...auditedProvider };
+  }
+  return auditedProvider;
 }
 
 /** True for provider throttling. OpenRouter also uses 529 when the selected
@@ -1252,14 +1261,15 @@ async function rawCompleteTransport(
       ), opts.signal, !opts.noRetry);
     } catch (e: any) {
       // The optional reasoning/JSON/routing params may be unsupported by this model.
-      // Retry once as a plain request before surfacing the error.
-      if (!opts.noRetry && rejectsOptionalTransportField(e) && Object.keys(extras).length > 0) {
+      // Retry once as a plain request before surfacing the error. A custom gateway
+      // that refused our reasoning hint without naming it also lands here, and keeps
+      // the rest of the optional body so the scan does not lose JSON mode.
+      const sentReasoning = (extras as any).reasoning_effort !== undefined;
+      if (!opts.noRetry && shouldRetryWithoutOptionalFields(e, { provider: model.provider, sentReasoning }) && Object.keys(extras).length > 0) {
         res = await withProviderRetries(freeTier, () => scheduleProviderRequest(
           model, opts, key, schedulerEndpoint, () => createCompletion({
             ...baseBody,
-            ...(model.provider === 'openrouter' && process.env.NODUS_AUDIT_OPENROUTER_PROVIDER?.trim()
-              ? { provider: (extras as any).provider }
-              : {}),
+            ...retryOptionalBody(model, extras, e, sentReasoning),
           } as any),
         ), opts.signal, !opts.noRetry);
       } else {
@@ -1377,7 +1387,14 @@ function wrapProviderError(e: any): AiError {
       false
     );
   }
-  return new AiError(e?.message ?? 'Error de IA', false);
+  // A dropped socket has no status, so nothing above classified it and it used to
+  // be marked permanent. One gateway hiccup must not fail the whole work: mark it
+  // retriable and let each caller's bounded retry ride it out (4 attempts in the
+  // scan queue, 5 document attempts), so a dead endpoint still gives up.
+  if (isTransientNetworkFailure(e)) {
+    return new AiError(message || 'Error de conexión con el proveedor de IA.', true, false);
+  }
+  return new AiError(message || 'Error de IA', false);
 }
 
 function errorMessage(e: unknown): string {
@@ -1843,15 +1860,11 @@ async function rawCompleteStreamTransport(
         () => executeStream({ ...baseBody, ...extras } as any),
       ), signal, !opts.noRetry);
     } catch (e: any) {
-      if (rejectsOptionalTransportField(e) && Object.keys(extras).length > 0) {
+      const sentReasoning = (extras as any).reasoning_effort !== undefined;
+      if (shouldRetryWithoutOptionalFields(e, { provider: model.provider, sentReasoning }) && Object.keys(extras).length > 0) {
         await withProviderRetries(freeTier, () => scheduleProviderRequest(
           model, scheduleOpts, key, schedulerEndpoint,
-          () => executeStream({
-            ...baseBody,
-            ...(model.provider === 'openrouter' && process.env.NODUS_AUDIT_OPENROUTER_PROVIDER?.trim()
-              ? { provider: (extras as any).provider }
-              : {}),
-          } as any),
+          () => executeStream({ ...baseBody, ...retryOptionalBody(model, extras, e, sentReasoning) } as any),
         ), signal, !opts.noRetry);
       } else {
         throw e;
