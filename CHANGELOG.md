@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.4.4 — 2026-09-14
+
+Nodus 5.4.4 adds Simplified Chinese as the ninth interface language and makes
+Chinese text survive PDF export.
+
+- Simplified Chinese joins the interface as its ninth language. The whole catalogue is translated with key- and placeholder-parity with English, and so are the native file dialogs, the main-process error patterns and the runtime error tables, the demo study and prosopography vaults, and the Server Web copy. Prompt languages and documentation are deliberately left untouched.
+- Exported PDFs render CJK. The server exporter and the desktop report embed a bundled Noto Sans SC subset, re-subset per document with HarfBuzz so the files stay small, and Latin reports keep Helvetica exactly. Chinese text was stripped to nothing on the server and threw on the desktop stamps. The Toolkit watermark, the OCR invisible text layer and the flattened study annotations use the same font.
+- A custom OpenAI-compatible gateway stops failing long scans with “Connection error.”. A status-less socket failure or a connection reset is now retriable, the provider receives the reasoning effort you chose, and background scans ask a thinking model to skip its private trace. The reasoning hint can no longer break a scan either, because it is only sent to a model that announces the mode, only on background scans, and one replay drops exactly that field on a 400 or 422.
+- The Documentary Index shows standalone jobs. A per-work scan or a Deep Research preparation now has its own row in the rail, with retry and cancel actions, and the queue panel, the header badge and the “no tasks” message all derive from the same selection instead of the campaigns alone.
+- Linking from the global library refreshes the vault's Library list instead of leaving the pre-link page on screen. The extraction queue's progress messages are registered for renderer translation, and a row only paints an error for a genuinely failed job.
+- The Nodus Server image boots again: `subset-font` is declared, so the PDF path resolves and the image health smoke passes.
+- Added the complete 5.4.4 What's New modal in all nine interface languages.
+
 ## 5.4.3 — 2026-09-14
 
 Nodus 5.4.3 fixes three things that happened behind the user's back: a work

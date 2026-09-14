@@ -1,5 +1,8 @@
+import { RELEASE_5_4_4_HIGHLIGHTS } from './releaseNotes544';
+
 /* Simplified Chinese release notes, keyed by version. Mirrors releaseNotes.it.ts / releaseNotes.tr.ts. */
 export const RELEASE_NOTES_ZH: Record<string, string[]> = {
+  "5.4.4": RELEASE_5_4_4_HIGHLIGHTS.map(highlight => highlight['zh-CN']),
   "5.4.3": [
     "文献摘要不再被截断在句子中间保存。使用推理模型时，输出预算在思考阶段就已耗尽，生成在写出结尾之前就停止，但摘要却被标记为已完成并保存。现在首次尝试拥有更多余量，如果仍被截断，Nodus会用应用更大的预算重试一次。若模型再次耗尽预算，摘要会被标记为失败，而不是以不完整状态保存。",
     "浏览器配对不再默默等待。在macOS上，配对提示会打开在Chrome之后，而Chrome仍是活动应用，请求最终超时，无人看到。现在Nodus一收到请求就会置前，如果系统拒绝该激活，它会像平台那样请求关注，通过在任务栏闪烁或在Dock弹跳。窗口获得焦点或配对完成后，该信号立即停止。",
