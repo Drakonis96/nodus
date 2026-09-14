@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import type { DocumentUnderstandingState, WorkView } from '@shared/types';
 import { Icon } from '../components/ui';
 import { notifyDataChanged } from '../hooks';
-import { STEP_ORDER, type StepId, type StepState, type WorkStatus } from '../libraryStatus';
+import { RETRYABLE_STEP_STATES, STEP_ORDER, type StepId, type StepState, type WorkStatus } from '../libraryStatus';
 import { localizeRuntimeError } from '@shared/uiLanguage';
 import { getActiveLang, t, tx } from '../i18n';
 
@@ -44,9 +44,6 @@ const STATE_TONE: Record<StepState, string> = {
   blocked: 'border-neutral-300 bg-neutral-100 text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900/40 dark:text-neutral-500',
   na: 'border-neutral-200 text-neutral-500 dark:border-neutral-800 dark:text-neutral-600',
 };
-
-/** States a reader can act on. `blocked` and `na` are terminal by definition. */
-const RETRYABLE: StepState[] = ['partial', 'missing', 'failed'];
 
 const DOCUMENT_STATUS_LABEL: Record<DocumentUnderstandingState, string> = {
   missing: 'Sin preparar',
@@ -117,7 +114,7 @@ export function WorkStatusModal({
     ? 'queued'
     : documentStatus;
 
-  const retryable = STEP_ORDER.filter((id) => RETRYABLE.includes(status.steps[id].state) && !(id === 'citable' && citableQueued));
+  const retryable = STEP_ORDER.filter((id) => RETRYABLE_STEP_STATES.includes(status.steps[id].state) && !(id === 'citable' && citableQueued));
 
   useEffect(() => {
     if (!citableQueued) return;
@@ -302,7 +299,7 @@ export function WorkStatusModal({
             {STEP_ORDER.map((id) => {
               const step = status.steps[id];
               const displayedState = id === 'citable' && citableQueued ? 'running' : step.state;
-              const canRetry = RETRYABLE.includes(displayedState) || displayedState === 'done';
+              const canRetry = RETRYABLE_STEP_STATES.includes(displayedState) || displayedState === 'done';
               return (
                 <section key={id} className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900/40" data-testid={`work-status-step-${id}`}>
                   <div className="min-w-0 flex-1">

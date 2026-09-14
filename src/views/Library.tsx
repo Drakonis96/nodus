@@ -26,7 +26,7 @@ import { DocumentIndexManager } from './DocumentIndexManager';
 import { VirtualList } from '../components/VirtualList';
 import { anchorStyle, useAnchoredCoords } from '../components/dbGrid';
 import { useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
-import { deriveWorkStatus, queueItemsByWork, type StepId, type WorkReadiness, type WorkStatus } from '../libraryStatus';
+import { deriveWorkStatus, queueItemsByWork, retryableSteps, type StepId, type WorkReadiness, type WorkStatus } from '../libraryStatus';
 import {
   ASSISTANT_CONTEXTS,
   type LibraryNavigationTarget,
@@ -1112,6 +1112,60 @@ export function Library({
     return map;
   }, [works, embeddingStatuses, passageStatuses, queuedByWork]);
 
+  /**
+   * What "retry what is missing" would enqueue, grouped by the call that queues it.
+   *
+   * A work whose themes or ideas are unfinished runs the whole chain instead of its
+   * remaining steps, the same rule the per-work status modal applies: the indexes are
+   * built FROM the ideas, so starting them against ideas that are about to be rebuilt
+   * would index nothing. Everything else is grouped one call per step, so a 200-work
+   * selection costs a handful of IPC calls instead of one per work.
+   */
+  const retryPlan = useMemo(() => {
+    const chain: string[] = [];
+    const summaries: string[] = [];
+    const semantic: string[] = [];
+    const citable: string[] = [];
+    let pending = 0;
+    for (const id of selectedVisibleIds) {
+      const status = statusByWork.get(id);
+      if (!status) continue;
+      const steps = retryableSteps(status);
+      if (steps.length === 0) continue;
+      pending += 1;
+      if (steps.includes('themes') || steps.includes('ideas')) {
+        chain.push(id);
+        continue;
+      }
+      if (steps.includes('summary')) summaries.push(id);
+      if (steps.includes('semantic')) semantic.push(id);
+      if (steps.includes('citable')) citable.push(id);
+    }
+    return { chain, summaries, semantic, citable, works: pending };
+  }, [selectedVisibleIds, statusByWork]);
+
+  /**
+   * Repair only what is unfinished, for every selected work.
+   *
+   * Deliberately does NOT consult the cross-vault reuse checkbox: this is the repair
+   * path, and importing another vault's analysis is not what a reader asking to
+   * finish what is pending expects.
+   */
+  const retryMissingSelected = async () => {
+    const { chain, summaries, semantic, citable, works: targets } = retryPlan;
+    if (targets === 0) {
+      toast(t('No queda nada pendiente en la selección.'));
+      return;
+    }
+    if (chain.length > 0) await window.nodus.processFullBulk(chain);
+    if (summaries.length > 0) await window.nodus.summarizeBulk(summaries);
+    if (semantic.length > 0) await window.nodus.startEmbedding(semantic);
+    if (citable.length > 0) await window.nodus.startPassageEmbedding(citable);
+    setSelected(new Set());
+    await load();
+    toast(tx('Pendientes en cola para {n} obra(s). Verás el progreso en la cola.', { n: targets }));
+  };
+
   const openReader = (work: WorkView) => onOpenReader({
     id: work.nodus_id,
     zoteroKey: work.zotero_key,
@@ -1630,6 +1684,20 @@ export function Library({
           >
             <Icon name="compass" /> {tx('Analizar las {n} seleccionadas', { n: selectedVisibleIds.length })}
           </button>
+          {/* The repair counterpart of the verb above: it never re-runs a step that is
+              already done, so it is offered only while some selected work has something
+              left to finish. */}
+          {retryPlan.works > 0 && (
+            <button
+              className="btn btn-ghost border border-neutral-700"
+              onClick={() => void retryMissingSelected()}
+              title={t('Encola solo los pasos incompletos, pendientes o fallidos de cada obra seleccionada. No vuelve a analizar lo que ya está hecho.')}
+              data-testid="library-retry-missing-selected"
+            >
+              <Icon name="refresh" /> {t('Reintentar lo que falta')}
+              <span className="tabular-nums opacity-80">· {retryPlan.works}</span>
+            </button>
+          )}
           {/* Not a pipeline step in records vaults — it is what the view is for. */}
           {isRecordsVault && (
             <button
