@@ -346,6 +346,12 @@ function truncatedJsonMessage(model: ModelRef, maxTokens: number): string {
   return `${cut} Usa un modelo con mayor límite de salida o reduce el tamaño de la tarea.`;
 }
 
+/** Prose that must not be stored half-written: the same ceiling, without the JSON wording. */
+function truncatedOutputMessage(model: ModelRef, maxTokens: number): string {
+  const label = PROVIDER_LABELS[model.provider] ?? model.provider;
+  return `La respuesta de «${model.model}» (${label}) se cortó al alcanzar el límite de ${maxTokens.toLocaleString('es')} tokens de salida. Un modelo con razonamiento puede gastar ese presupuesto pensando antes de escribir.`;
+}
+
 /**
  * How long one non-streaming completion may take before the transport gives up.
  *
@@ -438,6 +444,13 @@ interface CallOpts {
   timeoutMs?: number;
   /** Cooperative cancellation for long-running corpus jobs. */
   signal?: AbortSignal;
+  /**
+   * A prose caller that PERSISTS the text (the work summary) opts into the JSON
+   * contract: a response the provider cut off at the output ceiling is a retryable
+   * error instead of a silently stored half-sentence. Conversational prose leaves
+   * it off, because a clipped chat answer is still an answer.
+   */
+  requireCompleteOutput?: boolean;
   /** Images to attach for vision models (base64 + media type). */
   images?: VisionImagePart[];
   /** Skip the vault-type prompt pack (keep only the output-language directive). Used
@@ -536,8 +549,13 @@ async function tryLocalNativeCompletion(
       elapsedMs: Date.now() - started,
       timestamp: Date.now(),
     });
-    if (jsonMode && /length|max_tokens|max_output_tokens/i.test(result.finishReason ?? '')) {
-      throw new AiError(truncatedJsonMessage(model, plan.outputTokens), true, false, 'output_truncated');
+    if ((jsonMode || opts.requireCompleteOutput) && /length|max_tokens|max_output_tokens/i.test(result.finishReason ?? '')) {
+      throw new AiError(
+        jsonMode ? truncatedJsonMessage(model, plan.outputTokens) : truncatedOutputMessage(model, plan.outputTokens),
+        true,
+        false,
+        'output_truncated',
+      );
     }
     if (!result.text.trim()) {
       throw new AiError(`Respuesta vacía del proveedor de IA (${result.finishReason ?? 'sin finish_reason'}).`, false);
@@ -1109,8 +1127,13 @@ async function rawCompleteTransport(
         ],
       }, { signal: opts.signal }));
       const block = res.content.find((b: any) => b.type === 'text');
-      if (jsonMode && (res as any).stop_reason === 'max_tokens') {
-        throw new AiError(truncatedJsonMessage(model, opts.maxTokens ?? 8000), true, false, 'output_truncated');
+      if ((jsonMode || opts.requireCompleteOutput) && (res as any).stop_reason === 'max_tokens') {
+        throw new AiError(
+          jsonMode ? truncatedJsonMessage(model, opts.maxTokens ?? 8000) : truncatedOutputMessage(model, opts.maxTokens ?? 8000),
+          true,
+          false,
+          'output_truncated',
+        );
       }
       return (block as any)?.text ?? '';
     } catch (e: any) {
@@ -1281,10 +1304,17 @@ async function rawCompleteTransport(
     // broken data: extractJson's jsonrepair pass closes the dangling braces without a
     // word, so the caller silently stores a fraction of the ideas — or trips the schema
     // guard and reports "el JSON no cumple el esquema esperado", which sends the reader
-    // hunting for a prompt bug that isn't there. Refuse instead. Prose (jsonMode=false)
-    // stays untouched: a clipped sentence is still usable, an unterminated object is not.
-    if (jsonMode && choice?.finish_reason === 'length') {
-      throw new AiError(truncatedJsonMessage(model, maxTokens), true, false, 'output_truncated');
+    // hunting for a prompt bug that isn't there. Refuse instead. Plain prose is kept
+    // as-is unless the caller opts into the same contract, because a chat answer cut
+    // short is still usable while a persisted summary must not be stored clipped.
+    const cutOff = /^(length|max_tokens|max_output_tokens)$/i.test(choice?.finish_reason ?? '');
+    if (cutOff && (jsonMode || opts.requireCompleteOutput)) {
+      throw new AiError(
+        jsonMode ? truncatedJsonMessage(model, maxTokens) : truncatedOutputMessage(model, maxTokens),
+        true,
+        false,
+        'output_truncated',
+      );
     }
     // Some mandatory-reasoning models can spend the complete output allowance before
     // emitting the first JSON character. Test `finish_reason` before the generic empty

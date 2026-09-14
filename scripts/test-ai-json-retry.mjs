@@ -159,6 +159,36 @@ try {
   run([{ content: 'una frase cortada por la mitad', finish_reason: 'length' }]);
   assert.equal(await aiClient.completeText(opts, model), 'una frase cortada por la mitad');
 
+  // 6b. Prose that is PERSISTED opts into the JSON contract. The work summary used to
+  //     store a sentence cut off at the output ceiling as a finished summary; a thinking
+  //     model behind a custom OpenAI-compatible gateway spends that same ceiling on its
+  //     reasoning trace, so the cutoff must surface as a retryable error instead of data.
+  settingsRepo.updateSettings({ customProvider: { baseUrl, models: ['deepseek-v4.1-flash:thinking'] } });
+  const thinkingModel = { provider: 'custom', model: 'deepseek-v4.1-flash:thinking' };
+  run([
+    { content: '요약이 문장 중간에서 잘렸', finish_reason: 'length' },
+    { content: '완전한 요약입니다.', finish_reason: 'stop' },
+  ]);
+  await assert.rejects(
+    () => aiClient.completeText({ ...opts, maxTokens: 2400, requireCompleteOutput: true }, thinkingModel),
+    (e) => {
+      assert.equal(e.code, 'output_truncated');
+      assert.match(e.message, /2400/, 'the error names the ceiling that was hit');
+      return true;
+    },
+  );
+  assert.equal(seen.length, 1, 'the clipped attempt is not replayed with the same ceiling');
+  assert.equal(seen[0].body.max_tokens, 2400, 'the first attempt asks for real headroom');
+  assert.equal(
+    await aiClient.completeText({ ...opts, maxTokens: 8000, requireCompleteOutput: true }, thinkingModel),
+    '완전한 요약입니다.',
+  );
+  assert.equal(seen[1].body.max_tokens, 8000, 'the retry asks the provider for the app default ceiling');
+
+  // 6c. Without the opt-in, conversation keeps accepting a clipped answer unchanged.
+  run([{ content: 'respuesta de chat cortada', finish_reason: 'length' }]);
+  assert.equal(await aiClient.completeText({ ...opts, maxTokens: 2400 }, thinkingModel), 'respuesta de chat cortada');
+
   // 7. Truncation a provider does not admit to. The subscription runtimes (codex,
   //    github-copilot) hand back a bare string with no finish_reason at all, and any
   //    provider can simply be wrong. jsonrepair closes the dangling braces, the shard
