@@ -82,3 +82,50 @@ export function classifyProviderError(error: unknown): ProviderErrorClassificati
   if (CONFIG.test(message)) return { message, retriable: false, config: true };
   return { message, retriable: RETRIABLE.test(message), config: false };
 }
+
+/**
+ * Network-level transport failures, for the OpenAI-compatible path.
+ *
+ * These carry no HTTP status: the socket failed, so every status-based branch in
+ * `wrapProviderError` skips them and they used to reach the generic catch-all,
+ * which marks them permanent. A dropped connection is the textbook transient
+ * failure a background scan should ride out, and `classifyProviderError` above
+ * already treats `connection`/`network`/`socket` as retriable — but that path is
+ * only wired for the subscription runtimes, so a custom or vendor OpenAI-compatible
+ * endpoint failed the whole work on one gateway hiccup.
+ *
+ * Deliberately excluded:
+ *  · an abort — a cancelled or paused job asked for it, and retrying would fight
+ *    the user;
+ *  · a timeout — `wrapProviderError` classifies those separately (and, like the
+ *    transport deadline, must not be replayed blindly);
+ *  · anything carrying a status — another branch owns that decision.
+ */
+const TRANSIENT_NETWORK = /connection error|connection reset|connection refused|connection closed|connection lost|socket hang up|socket closed|network error|fetch failed|other side closed|premature close|terminated|econnreset|econnrefused|econnaborted|enotfound|eai_again|epipe|und_err/i;
+
+export function isTransientNetworkFailure(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as {
+    name?: unknown; message?: unknown; code?: unknown; status?: unknown;
+    cause?: unknown; response?: { status?: unknown } | null;
+  };
+  if (typeof e.status === 'number' || typeof e.response?.status === 'number') return false;
+  const name = typeof e.name === 'string' ? e.name : '';
+  if (/abort|timeout/i.test(name)) return false;
+  const cause = (e.cause && typeof e.cause === 'object' ? e.cause : {}) as Record<string, unknown>;
+  const codes = [e.code, cause.code, cause.name]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ');
+  // Substring, not word-boundary: undici spells its codes UND_ERR_CONNECT_TIMEOUT
+  // and ECONNABORTED, where the trailing word is glued on by an underscore.
+  if (/abort|timeout/i.test(codes)) return false;
+  // The OpenAI SDK's canonical "Connection error." — no status, so nothing else
+  // in `wrapProviderError` can recognise it.
+  if (/APIConnectionError/i.test(name)) return true;
+  const text = [
+    typeof e.message === 'string' ? e.message : '',
+    typeof cause.message === 'string' ? cause.message : '',
+    codes,
+  ].join(' ');
+  return TRANSIENT_NETWORK.test(text);
+}

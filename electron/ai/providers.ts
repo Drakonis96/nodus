@@ -148,6 +148,16 @@ function isOpenRouterMandatoryReasoningModel(modelId: string | undefined): boole
 }
 
 /**
+ * Heuristic for "this model id is a reasoning/thinking model" when the provider
+ * cannot tell us. Only used to decide whether a custom endpoint needs an explicit
+ * disable for background scans; a false negative keeps today's behaviour, so the
+ * list stays conservative and evidence-backed.
+ */
+export function looksLikeReasoningModelId(modelId: string | undefined): boolean {
+  return Boolean(modelId && /thinking|reasoning|deepseek-r1|\br1\b|qwq|qvq|magistral|gpt-oss|qwen3(?:[.-]|$)|^o[134](?:[.-]|$)/i.test(modelId));
+}
+
+/**
  * Sampling controls are deliberately absent for model families that reject them.
  * Keeping this decision at the transport seam makes non-streaming and streaming
  * calls identical while older models and all other providers keep their current
@@ -185,6 +195,7 @@ export function reasoningBody(
   provider: AiProvider,
   effort: ReasoningEffort,
   modelId?: string,
+  background = false,
 ): Record<string, unknown> {
   switch (provider) {
     case 'openrouter':
@@ -241,9 +252,17 @@ export function reasoningBody(
       // Go serves a mixed OpenAI/Anthropic catalogue through dedicated paths.
       return {};
     case 'custom':
-      // Nodus cannot know what sits behind the user's gateway, and an unsupported
-      // reasoning field is a 400 the caller would have to retry past. Send none.
-      return {};
+      // Nodus cannot know what sits behind the user's gateway, so it sends no
+      // reasoning field unless the user asked for one: an unsupported field is a 400
+      // the caller retries once without the optional extras
+      // (see `rejectsOptionalTransportField`). An explicit effort is forwarded as the
+      // standard OpenAI-compatible `reasoning_effort`, which makes the conversational
+      // selector real for custom models. Disabling is best-effort and limited to
+      // background scans of a *thinking* model: its private trace otherwise consumes
+      // the whole output budget, and the resulting long non-streaming generation is
+      // precisely what a gateway drops. Interactive chat keeps the model's default.
+      if (effort !== 'off') return { reasoning_effort: effort };
+      return background && looksLikeReasoningModelId(modelId) ? { reasoning_effort: 'none' } : {};
   }
 }
 

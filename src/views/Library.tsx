@@ -1827,7 +1827,7 @@ export function Library({
                           onClick: () => void summarizeWork(w),
                         },
                         {
-                          label: t('Comprensión documental'),
+                          label: t('Índice documental'),
                           icon: 'layers',
                           onClick: () => setDocumentWork(w),
                         },

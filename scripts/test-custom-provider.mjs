@@ -59,6 +59,8 @@ const {
   normalizeCustomModels,
   normalizeCustomProviderConfig,
   openAiCompatBase,
+  reasoningBody,
+  looksLikeReasoningModelId,
   supportsJsonMode,
   testCustomProvider,
 } = await import(pathToFileURL(outfile).href);
@@ -236,4 +238,40 @@ test('the endpoint is stored app-level, normalised on write, and shared by every
     await rm(workspace, { recursive: true, force: true });
     await rm(userData, { recursive: true, force: true });
   }
+});
+
+// Reasoning control for a custom gateway. The reporter of the Document Understanding
+// failures ran a `:thinking` model through one: Nodus sent no reasoning field, so the
+// private trace consumed the whole output budget and the long non-streaming generation
+// is what the gateway dropped as "Connection error.".
+test('a custom background scan asks a thinking model not to think', () => {
+  assert.deepEqual(
+    reasoningBody('custom', 'off', 'DeepSeek V4.1 Flash:thinking', true),
+    { reasoning_effort: 'none' },
+  );
+  assert.deepEqual(reasoningBody('custom', 'off', 'qwen3-max', true), { reasoning_effort: 'none' });
+});
+
+test('a custom non-thinking model and interactive chat keep their current request shape', () => {
+  // Sending reasoning_effort to a model that does not reason is a 400 Nodus would
+  // have to retry past on every call, so the disable is scoped to thinking models.
+  assert.deepEqual(reasoningBody('custom', 'off', 'gpt-4o', true), {});
+  assert.deepEqual(reasoningBody('custom', 'off', undefined, true), {});
+  // Chat is the user's choice: a :thinking model they picked is allowed to think.
+  assert.deepEqual(reasoningBody('custom', 'off', 'DeepSeek V4.1 Flash:thinking', false), {});
+});
+
+test('a custom explicit effort is forwarded as the standard reasoning_effort', () => {
+  assert.deepEqual(reasoningBody('custom', 'medium', 'any-model', false), { reasoning_effort: 'medium' });
+  assert.deepEqual(reasoningBody('custom', 'high', 'any-model', true), { reasoning_effort: 'high' });
+});
+
+test('the reasoning-model heuristic recognises the ids that need the disable', () => {
+  assert.equal(looksLikeReasoningModelId('DeepSeek V4.1 Flash:thinking'), true);
+  assert.equal(looksLikeReasoningModelId('deepseek-r1'), true);
+  assert.equal(looksLikeReasoningModelId('Qwen/QwQ-32B'), true);
+  assert.equal(looksLikeReasoningModelId('gpt-oss-20b'), true);
+  assert.equal(looksLikeReasoningModelId('gpt-4o'), false);
+  assert.equal(looksLikeReasoningModelId(''), false);
+  assert.equal(looksLikeReasoningModelId(undefined), false);
 });

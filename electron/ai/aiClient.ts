@@ -43,7 +43,7 @@ import {
   deanonymizeDeep,
   findResidualNames,
 } from '@shared/studentPseudonyms';
-import { classifyProviderError } from './providerErrors';
+import { classifyProviderError, isTransientNetworkFailure } from './providerErrors';
 import { completeWithChatGptSubscription } from './codexSubscription';
 import { completeWithGitHubCopilotSubscription } from './githubCopilotSubscription';
 import { completeWithOpenCodeGo, OUTPUT_TRUNCATED_MARKER } from './openCodeGoCompletion';
@@ -779,7 +779,7 @@ function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEf
   const auditedOpenRouterProvider = process.env.NODUS_AUDIT_OPENROUTER_PROVIDER?.trim();
   return {
     ...(jsonMode && supportsJsonMode(model.provider) ? { response_format: { type: 'json_object' as const } } : {}),
-    ...(opts.researchEffort === undefined ? reasoningBody(model.provider, reasoning, model.model) : {}),
+    ...(opts.researchEffort === undefined ? reasoningBody(model.provider, reasoning, model.model, opts.requestClass === 'background') : {}),
     // Groq's reasoning models (gpt-oss/qwen3) reason at medium by default, which slows scans and
     // burns tokens. reasoningBody can't send it (no model id), so minimise it here. Groq rejects
     // reasoning_effort:'none' — 'low' is its floor; non-reasoning models 400 and the caller strips it.
@@ -1377,7 +1377,14 @@ function wrapProviderError(e: any): AiError {
       false
     );
   }
-  return new AiError(e?.message ?? 'Error de IA', false);
+  // A dropped socket has no status, so nothing above classified it and it used to
+  // be marked permanent. One gateway hiccup must not fail the whole work: mark it
+  // retriable and let each caller's bounded retry ride it out (4 attempts in the
+  // scan queue, 5 document attempts), so a dead endpoint still gives up.
+  if (isTransientNetworkFailure(e)) {
+    return new AiError(message || 'Error de conexión con el proveedor de IA.', true, false);
+  }
+  return new AiError(message || 'Error de IA', false);
 }
 
 function errorMessage(e: unknown): string {
