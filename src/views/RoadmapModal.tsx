@@ -2,6 +2,8 @@ import { motion } from 'framer-motion';
 import { useEffect } from 'react';
 import { Icon } from '../components/ui';
 import { getActiveLang, t } from '../i18n';
+import type { PromptLanguage } from '@shared/types';
+import { normalizePromptLanguage } from '@shared/promptLanguageOptions';
 import { getNodusRoadmap, getNodusRoadmapStatusLabel, type RoadmapItem, type RoadmapStatus } from '@shared/nodiDocumentation';
 
 function StatusMarker({ status, compact = false }: { status: RoadmapStatus; compact?: boolean }) {
@@ -16,11 +18,11 @@ function StatusMarker({ status, compact = false }: { status: RoadmapStatus; comp
   );
 }
 
-function StatusLabel({ status, language }: { status: RoadmapStatus; language: ReturnType<typeof getActiveLang> }) {
+function StatusLabel({ status, language }: { status: RoadmapStatus; language: PromptLanguage }) {
   return <span className="roadmap-status-label" data-status={status}>{getNodusRoadmapStatusLabel(status, language)}</span>;
 }
 
-function RoadmapChildren({ items, language }: { items: readonly RoadmapItem[]; language: ReturnType<typeof getActiveLang> }) {
+function RoadmapChildren({ items, language }: { items: readonly RoadmapItem[]; language: PromptLanguage }) {
   return (
     <ul className="roadmap-subitems" data-testid="roadmap-user-suggested-vaults">
       {items.map((item) => (
@@ -40,7 +42,7 @@ function RoadmapChildren({ items, language }: { items: readonly RoadmapItem[]; l
 }
 
 export function RoadmapModal({ onClose }: { onClose: () => void }) {
-  const language = getActiveLang();
+  const language = normalizePromptLanguage(getActiveLang());
   // The Spanish legacy path remains represented by NODUS_ROADMAP.map; other
   // languages use the same verified items through getNodusRoadmap.
   const roadmap = getNodusRoadmap(language);

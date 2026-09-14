@@ -124,5 +124,23 @@ export const RESEARCH_REASONING_TRANSLATIONS = {
     "Este modelo requiere thinking; estándar usa el mínimo disponible.": "Bu model düşünme gerektirir; standart, kullanılabilir en düşük düzeyi kullanır.",
     "Detener dictado": "Dikteyi durdur",
     "Transcribiendo...": "Yazıya dökülüyor..."
+  },
+  "zh-CN": {
+    "Estándar": "标准",
+    "Mínimo": "最低",
+    "Bajo": "低",
+    "Medio": "中",
+    "Alto": "高",
+    "Muy alto": "极高",
+    "Máximo": "最高",
+    "Ultra": "极致",
+    "Thinking activado": "思考已启用",
+    "Esfuerzo de thinking": "思考强度",
+    "Este modelo no publica un control de thinking.": "此模型未提供思考控制选项。",
+    "Más esfuerzo puede mejorar tareas complejas y tardar más.": "更高的强度可能改善复杂任务，但耗时更长。",
+    "Thinking desactivado por defecto.": "默认关闭思考。",
+    "Este modelo requiere thinking; estándar usa el mínimo disponible.": "此模型需要思考；标准模式使用可用的最低级别。",
+    "Detener dictado": "停止听写",
+    "Transcribiendo...": "正在转录…"
   }
 };

@@ -89,10 +89,10 @@ test('essential tutorial teaches the complete novice AI and Nodus foundation in 
   assert.doesNotMatch(spanish, /local-first|VRAM|cuantizaci[oó]n|inferencia|Speech-to-text|Text-to-speech/);
   for (const language of ['fr', 'tr', 'de', 'it', 'pt', 'zh', 'ja', 'ru', 'uk']) assert.match(tutorial, new RegExp(`${language}: \\[`));
   assert.match(tutorial, /'pt-BR': \[/);
-  for (const code of ['es', 'en', 'fr', 'tr', 'de', 'it', 'pt', 'pt-BR', 'zh', 'ja', 'ru', 'uk']) {
+  for (const code of ['es', 'en', 'fr', 'tr', 'de', 'it', 'pt', 'pt-BR', 'zh-CN', 'ja', 'ru', 'uk']) {
     assert.match(tutorial, new RegExp(`code: '${code}'`));
   }
-  for (const label of ['Português do Brasil', '中文', '日本語', 'Русский', 'Українська']) assert.match(tutorial, new RegExp(label));
+  for (const label of ['Português do Brasil', '简体中文', '日本語', 'Русский', 'Українська']) assert.match(tutorial, new RegExp(label));
   for (const nodiTitle of ['Conoce a Nodi', 'Meet Nodi', 'Découvrez Nodi', 'Nodi ile tanışın', 'Lernen Sie Nodi kennen', 'Conosci Nodi', 'Conheça o Nodi', '认识 Nodi', 'Nodiを紹介します', 'Познакомьтесь с Nodi', 'Познайомтеся з Nodi']) {
     assert.match(tutorial, new RegExp(nodiTitle));
   }

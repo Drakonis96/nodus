@@ -966,6 +966,7 @@ export function registerIpc(
       'pt-BR': mode === 'restore' ? 'Selecionar uma pasta de recuperação do Nodus' : 'Selecionar uma pasta vazia para proteger o Nodus',
       it: mode === 'restore' ? 'Seleziona una cartella di ripristino Nodus' : 'Seleziona una cartella vuota per proteggere Nodus',
       tr: mode === 'restore' ? 'Bir Nodus kurtarma klasörü seçin' : 'Nodus\'u korumak için boş bir klasör seçin',
+      'zh-CN': mode === 'restore' ? '选择 Nodus 恢复文件夹' : '选择一个空文件夹以保护 Nodus',
     };
     const { canceled, filePaths } = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: titles[language],

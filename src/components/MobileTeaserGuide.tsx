@@ -297,6 +297,33 @@ const COPY: Record<AppLanguage, TeaserCopy> = {
       model: 'Kendi modeliniz',
     },
   },
+  'zh-CN': {
+    badge: '先睹为快',
+    title: '抢先一睹即将推出的新功能',
+    summary: 'Nodus即将登陆移动端。以下是应用的预览，目前尚无发布日期。',
+    eyebrow: '手机上的Nodus',
+    heading: '把资料库装进口袋',
+    lede: '从桌面端发布资料库，即可随处阅读：文献、观点、主题和作者，以及支撑它们的证据。阅读为只读模式，你在手机上写下的内容也只会留在手机里。',
+    status: '目前尚无法下载。这些截图来自开发中的版本，可能会发生变化。',
+    surveyTitle: '你会使用它吗？',
+    surveyBody: '告诉我们你是否会使用它，以及你对它的期待。只需两分钟，有助于决定优先开发哪些功能。',
+    surveyCta: '参与问卷调查',
+    englishNote: '截图和问卷调查仅提供英文。',
+    previous: '上一个',
+    next: '下一个',
+    finish: '知道了',
+    slides: {
+      home: '资料库首页',
+      library: '文献库',
+      work: '文献详情',
+      idea: '观点及其证据',
+      search: '搜索',
+      argument: '论证图谱',
+      gaps: '空白',
+      deepResearch: 'Deep Research',
+      model: '使用你自己的模型',
+    },
+  },
 };
 
 function shouldPresent(): boolean {

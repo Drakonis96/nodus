@@ -77,4 +77,13 @@ export const DEEP_RESEARCH_VERSION_TRANSLATIONS = {
     '“Yeni rapor”a basıp soruyu veya fikri yazın. Rapor yalnızca derlemin destekleyebildiği katkıları, önceden belirlenmiş bir uzunluk olmadan geliştirir.',
     '“Yeni ünite”ye basıp konuyu yazın. Nodus yalnızca materyallerinizin destekleyebildiği bölümleri, önceden belirlenmiş bir uzunluk olmadan geliştirir.',
   ]),
+  'zh-CN': table([
+    '系统版本',
+    'v1 · 简单检索（默认）',
+    '使用已从语料库中提取的观点和片段，不启动完整文档分析。推荐用于简单查询，通常消耗更少的词元。',
+    'v2 · 扩展分析（更多词元）',
+    '消耗更多词元。在学术资料库中，它从观点和关系出发，最多可分析8篇相关的完整文档：分析尚无完整档案的文档，重建过时的档案，并复用最新的档案。首次运行可能产生显著成本。',
+    '点击「新建报告」并输入问题或观点。报告仅阐述语料库能够支撑的内容，没有预设长度。',
+    '点击「新建单元」并输入主题。Nodus仅展开你的材料能够支撑的部分，没有预设长度。',
+  ]),
 } as const;

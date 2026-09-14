@@ -59,6 +59,7 @@ export async function runStudyAiTask<T>(input: { task: StudyAiTask; explicitMode
         'pt-BR': { title: 'Dados fora do dispositivo', message: 'O Nodus enviará esta solicitação de estudo para', purpose: 'Finalidade', detail: 'Até', chars: 'caracteres serão enviados dentro dos seus limites.', cancel: 'Cancelar', continue: 'Continuar' },
         it: { title: 'Dati fuori dal dispositivo', message: 'Nodus invierà questa richiesta di studio a', purpose: 'Finalità', detail: 'Verranno inviati fino a', chars: 'caratteri entro i tuoi limiti.', cancel: 'Annulla', continue: 'Continua' },
         tr: { title: 'Veriler cihazdan çıkacak', message: 'Nodus bu çalışma isteğini şu sağlayıcıya gönderecek:', purpose: 'Amaç', detail: 'Sınırlarınız dahilinde en fazla', chars: 'karakter gönderilecek.', cancel: 'İptal', continue: 'Devam' },
+        'zh-CN': { title: '数据将离开此设备', message: 'Nodus 会将此学习请求发送至', purpose: '用途', detail: '最多', chars: '个字符将在你的限额内发送。', cancel: '取消', continue: '继续' },
       }[language] ?? null;
       const localized = copy ?? {
         title: 'Data leaving this device', message: 'Nodus will send this study request to', purpose: 'Purpose', detail: 'Up to', chars: 'characters will be sent within your limits.', cancel: 'Cancel', continue: 'Continue',

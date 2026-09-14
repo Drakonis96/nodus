@@ -4,7 +4,7 @@ import { MAIN_PROCESS_ERRORS, MAIN_PROCESS_ERROR_PATTERNS } from './mainProcessE
 
 export type UiTranslations = Partial<Record<AppLanguage, string>> & { en: string };
 
-const UI_LANGUAGES = new Set<AppLanguage>(['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']);
+const UI_LANGUAGES = new Set<AppLanguage>(['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN']);
 
 /** Runtime locale validation. Unknown or future locales must never fall back to Spanish. */
 export function normalizeUiLanguage(language: unknown): AppLanguage {
@@ -18,7 +18,19 @@ export function normalizeBrowserUiLanguage(language: unknown): AppLanguage {
   if (typeof language !== 'string') return 'en';
   const normalized = language.trim().toLowerCase();
   if (normalized === 'pt-br' || normalized.startsWith('pt-br-')) return 'pt-BR';
+  // Simplified Chinese: the explicit script tag and the Mainland/Singapore regions.
+  // Traditional locales (zh-TW/HK/MO, zh-Hant) have no UI table and fall back to English,
+  // matching the Server resolvers, so a Traditional reader is not shown Simplified copy
+  // as if it were their own language.
+  if (normalized === 'zh-tw' || normalized.startsWith('zh-tw-')
+    || normalized === 'zh-hant' || normalized.startsWith('zh-hant-')
+    || normalized === 'zh-hk' || normalized.startsWith('zh-hk-')
+    || normalized === 'zh-mo' || normalized.startsWith('zh-mo-')) return 'en';
+  if (normalized === 'zh-cn' || normalized.startsWith('zh-cn-')
+    || normalized === 'zh-hans' || normalized.startsWith('zh-hans-')
+    || normalized === 'zh-sg' || normalized.startsWith('zh-sg-')) return 'zh-CN';
   const base = normalized.split('-')[0];
+  if (base === 'zh') return 'zh-CN';
   return base === 'es' || base === 'en' || base === 'fr' || base === 'de'
     || base === 'pt' || base === 'it' || base === 'tr'
     ? base

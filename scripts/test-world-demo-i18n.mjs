@@ -13,7 +13,7 @@ const traverse = traverseModule.default;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 const outDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-world-demo-i18n-'));
-const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN'];
 
 function loadModule(file) {
   const bundle = path.join(outDir, `${path.basename(file, '.ts')}.cjs`);
@@ -142,7 +142,10 @@ test('all Worldbuilding AI entry points use a native operation prompt in the sel
     assert.match(source, /settings\.promptLanguage/, `${relative} ignores the selected prompt language`);
   }
   const helper = await readFile(path.join(repoRoot, 'shared/worldOperationPrompts.ts'), 'utf8');
-  for (const language of languages) {
+  // Prompt packs are keyed by PromptLanguage, a wider union than the interface: the
+  // Simplified Chinese prompt catalogue is `zh-Hans`, and `zh-CN` (the interface code)
+  // normalizes to it, so it has no key of its own here.
+  for (const language of languages.filter((code) => code !== 'zh-CN')) {
     assert.match(helper, new RegExp(`['"]?${language.replace('-', '\\-')}['"]?\\s*:`));
   }
 });

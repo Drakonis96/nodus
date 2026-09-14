@@ -20,8 +20,10 @@ import type { AppLanguage } from './types';
 import { parseHistoricalDate } from './genealogyDates';
 import { DOC_FACET_LABEL_IT, DOC_TYPE_LABEL_IT } from './archiveDocTypes.it';
 import { DOC_FACET_LABEL_TR, DOC_TYPE_LABEL_TR } from './archiveDocTypes.tr';
+import { DOC_FACET_LABEL_ZH_CN, DOC_TYPE_LABEL_ZH_CN } from './archiveDocTypes.zh-CN';
 export { DOC_TYPE_LABEL_IT } from './archiveDocTypes.it';
 export { DOC_TYPE_LABEL_TR } from './archiveDocTypes.tr';
+export { DOC_TYPE_LABEL_ZH_CN } from './archiveDocTypes.zh-CN';
 
 // ── Categories (dropdown grouping; ES label via i18n) ───────────────────────────
 export type ArchiveDocCategory =
@@ -76,6 +78,7 @@ export interface FacetValue {
   'pt-BR': string;
   it?: string;
   tr?: string;
+  'zh-CN'?: string;
 }
 export type FacetDimensionId =
   | 'naturaleza'
@@ -150,6 +153,7 @@ export const GENEALOGIA: FacetValue[] = [{ id: 'si', es: 'Útil para genealogía
 for (const value of [...NATURALEZA, ...EPOCA, ...AMBITO, ...FUNCION, ...SOPORTE_MONUMENTAL, ...ESTATUS, ...SOPORTE_FISICO, ...GENEALOGIA]) {
   value.it = DOC_FACET_LABEL_IT[value.en] ?? value.en;
   value.tr = DOC_FACET_LABEL_TR[value.en] ?? value.en;
+  value['zh-CN'] = DOC_FACET_LABEL_ZH_CN[value.en] ?? value.en;
 }
 
 /** Filter-bar dimensions in display order (dimension name via i18n; values in-data). */
@@ -1270,6 +1274,7 @@ function expand(row: RawDocType): ArchiveDocTypeDef {
       'pt-BR': DOC_TYPE_LABEL_PT_BR[id] ?? labelEn,
       it: DOC_TYPE_LABEL_IT[id] ?? labelEn,
       tr: DOC_TYPE_LABEL_TR[id] ?? labelEn,
+      'zh-CN': DOC_TYPE_LABEL_ZH_CN[id] ?? labelEn,
     },
     category,
     fields,

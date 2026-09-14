@@ -161,6 +161,21 @@ const COPY: Record<AppLanguage, AnnouncementCopy> = {
     hint: 'Ayarlar → Yardım menüsünden istediğiniz zaman videolara dönebilirsiniz.',
     finish: 'Anlaşıldı',
   },
+  'zh-CN': {
+    badge: '新增 · 视频教程',
+    title: '教程现在也有视频版了',
+    summary: '你已完成文字版指南。现在，同样的内容在Nodus内还提供视频版。',
+    eyebrow: '就在这里观看',
+    heading: '视频教程',
+    lede: '无需离开应用即可打开，支持暂停、字幕和全屏。每个视频一经打开即标记为已观看。',
+    settingsTitle: '随时可用',
+    settingsBody: '「设置 → 帮助」汇集了完整目录——介绍、资料库、功能与集成——并带有搜索和筛选。',
+    toursTitle: '导览中也有',
+    toursBody: '当某个资料库有视频时，其导览会将它作为第三种入口提供。',
+    offline: '文字版指南不会消失：它仍留在应用内，并可离线使用。',
+    hint: '你可以随时从「设置 → 帮助」返回视频。',
+    finish: '知道了',
+  },
 };
 
 /**
