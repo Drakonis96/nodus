@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.4.3 — 2026-09-14
+
+Nodus 5.4.3 fixes three things that happened behind the user's back: a work
+summary stored clipped at the model's output ceiling, the browser pairing prompt
+on macOS and the JSON a capability tool returned into a chat.
+
+- Work summaries are no longer stored cut off mid-sentence. A reasoning model spends the 800-token output ceiling on its thinking trace and stops before the closing lines, and the clipped text used to be saved as a finished summary. The first attempt now has real headroom and a cut-off answer is retried once at the app's default 8,000-token ceiling. If the model exhausts that as well, the summary is marked failed instead of stored incomplete.
+- The browser connector's pairing prompt now reaches the front. On macOS it opened behind Chrome, which stayed the active application, and the request timed out unseen. Nodus activates itself when the request arrives and, if the system refuses, falls back to the platform's attention signal, a taskbar flash or a dock bounce, cleared as soon as the window takes focus or the pairing settles.
+- JSON results from a capability tool are collapsed under Evidence instead of dumped as an unstyled, full-height block, so the figure or answer they support keeps the centre of the message and the raw payload stays one click away.
+- Added the complete 5.4.3 What's New modal in all eight interface languages.
+
 ## 5.4.2 — 2026-09-13
 
 Nodus 5.4.2 rebuilds the Study question bank around bulk management and
