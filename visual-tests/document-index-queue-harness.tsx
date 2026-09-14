@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import type { DocumentIndexJob, DocumentIndexProgress, DocumentUnderstandingState, NodusApi } from '../shared/types';
 import { DocumentIndexProgressBar } from '../src/components/DocumentIndexProgressBar';
@@ -18,6 +18,14 @@ const queued = (index: number): DocumentIndexJob => ({
   status: 'queued', phase: 'queued', progressMessage: null, currentUnit: null, totalUnits: null,
 });
 
+// A per-work scan carries no campaign. Before the rail learned to show these, a retry
+// here was real work with no visible queue entry.
+const standalone = (jobId: string, title: string, status: DocumentIndexJob['status'], phase: DocumentIndexJob['phase'], progress: number, error: string | null, createdAt: string): DocumentIndexJob => ({
+  ...running(jobId, title, 0, 0, progress, createdAt),
+  campaignId: null, reason: 'manual', status, phase, error,
+  progressMessage: null, currentUnit: null, totalUnits: null, attempts: status === 'queued' ? 0 : 1,
+});
+
 const snapshot: DocumentIndexProgress = {
   campaigns: [{
     campaignId: 'campaign', vaultId: 'vault', mode: 'manual', status: 'running', includeArchived: false,
@@ -29,12 +37,17 @@ const snapshot: DocumentIndexProgress = {
     running('first', 'Imaginarios y representaciones de España durante el franquismo', 2, 14, 0.14, '2026-08-25T20:30:00.000Z'),
     running('second', 'El evangelio fascista: la formación de la cultura política', 1, 10, 0.10, '2026-08-25T20:30:01.000Z'),
     ...Array.from({ length: 8 }, (_, index) => queued(index + 1)),
+    standalone('solo-retry', 'A breakthrough in gas diagnosis with a temperature-modulated sensor', 'queued', 'queued', 0, null, '2026-08-25T20:29:00.000Z'),
+    standalone('solo-failed', 'The irreversible R-T curves of metal oxide gas sensors', 'failed', 'done', 0.62, 'Connection error.', '2026-08-25T20:28:00.000Z'),
   ],
-  active: 2, queued: 1192, failed: 0,
+  active: 2, queued: 1193, failed: 1,
 };
 const listeners = new Set<(progress: DocumentIndexProgress) => void>();
 const emit = () => listeners.forEach((listener) => listener(structuredClone(snapshot)));
 const statuses = Array.from({ length: 14 }, (_, index) => ({ nodusId: `prepared-${index}`, status: 'current' as DocumentUnderstandingState }));
+/** The real rail receives a NEW snapshot on every IPC tick; the harness must too, or a
+ *  memoised summary would keep a failure banner that the retry already cleared. */
+let bump = () => {};
 
 window.nodus = {
   getDocumentIndexProgress: async () => structuredClone(snapshot),
@@ -42,10 +55,21 @@ window.nodus = {
   getDocumentProfileStatuses: async () => statuses,
   setDocumentIndexCampaignStatus: async () => undefined,
   startDocumentIndexCampaign: async () => snapshot.campaigns[0],
+  // Mirrors the real backend: a retry resets the same row to queued and emits.
+  enqueueDocumentProfile: async (nodusId: string) => {
+    const job = snapshot.jobs.find((candidate) => candidate.nodusId === nodusId);
+    if (job) { job.status = 'queued'; job.phase = 'queued'; job.error = null; job.attempts = 0; job.updatedAt = '2026-08-25T20:40:04.000Z'; }
+    emit();
+    bump();
+  },
+  cancelDocumentIndexJob: async () => undefined,
 } as unknown as NodusApi;
 
 function Harness() {
   const [managerOpen, setManagerOpen] = useState(false);
+  const [revision, setRevision] = useState(0);
+  bump = () => setRevision((value) => value + 1);
+  const progress = useMemo(() => structuredClone(snapshot), [revision]);
   const nextChunk = () => {
     const first = snapshot.jobs.find((job) => job.jobId === 'first')!;
     const second = snapshot.jobs.find((job) => job.jobId === 'second')!;
@@ -55,6 +79,7 @@ function Harness() {
     second.updatedAt = '2026-08-25T20:40:03.000Z';
     snapshot.campaigns[0].completedUnits = first.progress + second.progress;
     emit();
+    bump();
   };
 
   return <main className="flex min-h-screen flex-col bg-neutral-50 text-neutral-900">
@@ -70,7 +95,7 @@ function Harness() {
         <span className="library-status-pill library-status-warning inline-flex items-center rounded-md border px-2 py-1 text-xs">Solo texto</span>
       </div>
     </div>
-    <DocumentIndexProgressBar />
+    <DocumentIndexProgressBar progress={progress} />
     {managerOpen && <DocumentIndexManager vaultId="vault" onClose={() => setManagerOpen(false)} />}
   </main>;
 }

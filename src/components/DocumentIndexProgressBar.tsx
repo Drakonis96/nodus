@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { DocumentIndexCampaign, DocumentIndexJob, DocumentIndexJobPhase, DocumentIndexProgress } from '@shared/types';
+import type { DocumentIndexJob, DocumentIndexJobPhase, DocumentIndexProgress } from '@shared/types';
 import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
 import { t, tr, tx } from '../i18n';
-import { compareDocumentIndexJobsForDisplay, documentIndexPercentLabel } from '@shared/documentIndexProgress';
+import { documentIndexPercentLabel, summarizeDocumentIndexRail } from '@shared/documentIndexProgress';
 import { elapsedTimeLabel } from '@shared/elapsedTime';
 import { useElapsedClock } from '../useElapsedClock';
 
-const LIVE = new Set<DocumentIndexCampaign['status']>(['queued', 'running', 'paused']);
 const TERMINAL = new Set<DocumentIndexJob['status']>(['completed', 'failed', 'unavailable', 'cancelled']);
+const RETRYABLE = new Set<DocumentIndexJob['status']>(['failed', 'unavailable']);
 
 function phaseLabel(phase: DocumentIndexJobPhase): string {
   return t({
@@ -32,36 +32,18 @@ export function DocumentIndexProgressBar({ progress }: { progress: DocumentIndex
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
+  // Standalone jobs (a per-work scan, or Deep Research preparation) have no campaign
+  // and were invisible here, so a retry could not be seen. The summary includes them.
+  const view = useMemo(() => summarizeDocumentIndexRail(progress), [progress]);
+  const liveCampaigns = view.campaigns;
+  const now = useElapsedClock(view.visible);
 
+  if (!view.visible) return null;
 
-  const liveCampaigns = useMemo(
-    () => progress?.campaigns.filter((campaign) => LIVE.has(campaign.status)) ?? [],
-    [progress],
-  );
-  const campaignIds = useMemo(() => new Set(liveCampaigns.map((campaign) => campaign.campaignId)), [liveCampaigns]);
-  const jobs = useMemo(
-    () => (progress?.jobs.filter((job) => job.campaignId && campaignIds.has(job.campaignId)) ?? [])
-      .sort(compareDocumentIndexJobsForDisplay),
-    [progress, campaignIds],
-  );
-  const now = useElapsedClock(liveCampaigns.length > 0);
-
-  if (!progress || liveCampaigns.length === 0) return null;
-
-  const total = liveCampaigns.reduce((sum, campaign) => sum + campaign.totalJobs, 0);
-  const completed = liveCampaigns.reduce((sum, campaign) => sum + campaign.completedJobs, 0);
-  const failed = liveCampaigns.reduce((sum, campaign) => sum + campaign.failedJobs, 0);
-  const estimatedUnits = liveCampaigns.reduce((sum, campaign) => sum + campaign.estimatedUnits, 0);
-  const completedUnits = liveCampaigns.reduce((sum, campaign) => sum + campaign.completedUnits, 0);
+  const { jobs, current, error, total, completed, failed, estimatedUnits, completedUnits, allPaused } = view;
   const fraction = estimatedUnits ? Math.max(0, Math.min(1, completedUnits / estimatedUnits)) : 1;
   const pctValue = fraction * 100;
   const pct = documentIndexPercentLabel(fraction);
-  const current = jobs.find((job) => job.status === 'running')
-    ?? jobs.find((job) => job.status === 'paused')
-    ?? jobs.find((job) => job.status === 'queued')
-    ?? null;
-  const allPaused = liveCampaigns.every((campaign) => campaign.status === 'paused');
-  const error = jobs.find((job) => job.error && ['paused', 'failed', 'unavailable'].includes(job.status))?.error ?? null;
   const campaignStartedAt = liveCampaigns.reduce<string | null>(
     (earliest, campaign) => !earliest || campaign.createdAt < earliest ? campaign.createdAt : earliest,
     null,
@@ -81,6 +63,17 @@ export function DocumentIndexProgressBar({ progress }: { progress: DocumentIndex
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Retry one standalone job from the rail; the row flips back to queued in place. */
+  const retryJob = async (nodusId: string) => {
+    setBusy(true);
+    try { await window.nodus.enqueueDocumentProfile(nodusId); } finally { setBusy(false); }
+  };
+
+  const cancelJob = async (jobId: string) => {
+    setBusy(true);
+    try { await window.nodus.cancelDocumentIndexJob(jobId); } finally { setBusy(false); }
   };
 
   return (
@@ -120,33 +113,64 @@ export function DocumentIndexProgressBar({ progress }: { progress: DocumentIndex
           </div>
           <span className="sr-only" aria-live="polite">{pct} · {jobPhaseDetail(current)}</span>
         </div>
-        {allPaused ? (
-          <button className="btn btn-ghost" disabled={busy} title={t('Reanudar indexación')} aria-label={t('Reanudar indexación')} onClick={() => void applyStatus('running')}>
-            <Icon name="play" size={16} />
+        {liveCampaigns.length > 0 && <>
+          {allPaused ? (
+            <button className="btn btn-ghost" disabled={busy} title={t('Reanudar indexación')} aria-label={t('Reanudar indexación')} onClick={() => void applyStatus('running')}>
+              <Icon name="play" size={16} />
+            </button>
+          ) : (
+            <button className="btn btn-ghost" disabled={busy} title={t('Pausar indexación')} aria-label={t('Pausar indexación')} onClick={() => void applyStatus('paused')}>
+              <Icon name="pause" size={16} />
+            </button>
+          )}
+          <button className="btn btn-ghost document-index-danger" disabled={busy} title={t('Detener indexación')} aria-label={t('Detener indexación')} onClick={() => setConfirmStop(true)}>
+            <Icon name="stop" size={16} />
           </button>
-        ) : (
-          <button className="btn btn-ghost" disabled={busy} title={t('Pausar indexación')} aria-label={t('Pausar indexación')} onClick={() => void applyStatus('paused')}>
-            <Icon name="pause" size={16} />
-          </button>
-        )}
-        <button className="btn btn-ghost document-index-danger" disabled={busy} title={t('Detener indexación')} aria-label={t('Detener indexación')} onClick={() => setConfirmStop(true)}>
-          <Icon name="stop" size={16} />
-        </button>
+        </>}
       </div>
 
       <AnimatePresence>
         {expanded && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-            <div className="mt-2 max-h-40 divide-y divide-neutral-800 overflow-y-auto">
-              {jobs.filter((job) => !TERMINAL.has(job.status) || job.status === 'failed' || job.status === 'unavailable').slice(0, 50).map((job) => (
+            <div className="mt-2 max-h-40 divide-y divide-neutral-800 overflow-y-auto" data-testid="document-index-rail-list">
+              {jobs.filter((job) => !TERMINAL.has(job.status) || RETRYABLE.has(job.status)).slice(0, 50).map((job) => (
                 <div key={job.jobId} className={`flex items-center gap-3 py-1.5 text-xs ${job.status === 'running' ? 'text-neutral-100' : ''}`} data-testid={`document-index-rail-job-${job.jobId}`}>
                   <span className={`w-5 shrink-0 text-center font-semibold tabular-nums ${job.status === 'running' ? 'text-cyan-300' : 'text-neutral-500'}`} aria-label={job.status === 'queued' ? `${t('En cola')} ${queuedPosition(jobs, job.jobId)}` : undefined}>
                     {job.status === 'running' ? '●' : job.status === 'queued' ? queuedPosition(jobs, job.jobId) : '—'}
                   </span>
                   <span className="min-w-0 flex-1 truncate">{job.title ?? job.nodusId}</span>
-                  <span className={job.status === 'running' ? 'text-cyan-300' : 'text-neutral-500'}>{jobPhaseDetail(job)}</span>
+                  <span className={job.status === 'running' ? 'text-cyan-300' : job.status === 'failed' || job.status === 'unavailable' ? 'text-red-500 dark:text-red-300' : 'text-neutral-500'}>{jobStatusText(job)}</span>
                   <span className="min-w-[5.5rem] text-right tabular-nums text-neutral-500">{elapsedTimeLabel(job.createdAt, null, now)}</span>
                   <span className="w-10 text-right tabular-nums text-neutral-500">{Math.round(job.progress * 100)}%</span>
+                  {/* A job with no campaign has no bulk control above, so its actions live on the row. */}
+                  {!job.campaignId && (
+                    <span className="flex shrink-0 items-center">
+                      {RETRYABLE.has(job.status) && (
+                        <button
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-800 hover:text-cyan-300"
+                          disabled={busy}
+                          title={t('Reintentar')}
+                          aria-label={`${t('Reintentar')}: ${job.title ?? job.nodusId}`}
+                          data-testid={`document-index-rail-retry-${job.jobId}`}
+                          onClick={() => void retryJob(job.nodusId)}
+                        >
+                          <Icon name="refresh" size={13} />
+                        </button>
+                      )}
+                      {!TERMINAL.has(job.status) && (
+                        <button
+                          className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-800 hover:text-red-400"
+                          disabled={busy}
+                          title={t('Cancelar')}
+                          aria-label={`${t('Cancelar')}: ${job.title ?? job.nodusId}`}
+                          data-testid={`document-index-rail-cancel-${job.jobId}`}
+                          onClick={() => void cancelJob(job.jobId)}
+                        >
+                          <Icon name="x" size={13} />
+                        </button>
+                      )}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -177,4 +201,11 @@ function jobPhaseDetail(job: DocumentIndexJob | null): string {
   const phase = phaseLabel(job.phase);
   if (job.phase !== 'analyzing_sections' || !job.currentUnit || !job.totalUnits) return phase;
   return `${phase} · ${job.currentUnit}/${job.totalUnits}`;
+}
+
+/** A failed job's phase is `done`, so the phase name would read "Completed"; say what happened instead. */
+function jobStatusText(job: DocumentIndexJob): string {
+  if (job.status === 'failed') return t('Falló');
+  if (job.status === 'unavailable') return t('Sin texto completo');
+  return jobPhaseDetail(job);
 }
