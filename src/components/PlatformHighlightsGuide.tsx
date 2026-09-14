@@ -5,6 +5,7 @@ import type { TutorialLanguage } from '@shared/tutorialPreferences';
 import { TOOLKIT_TOOLS } from '../navigation';
 import zoteroLogo from '../assets/brands/zotero.svg';
 import { Icon } from './ui';
+import { t } from '../i18n';
 import { NodiAvatar } from './nodi/NodiAvatar';
 
 export const PLATFORM_HIGHLIGHTS_TUTORIAL_VERSION = 5;
@@ -535,7 +536,7 @@ function ConnectionPanel({ language }: { language: TutorialLanguage }) {
     <p>{copy.body}</p>
     <div className="platform-guide-pair">
       <div><span><Icon name="link" size={20} /></span><div><b>MCP</b><small>{copy.detailA}</small></div></div>
-      <div><span><Icon name="globe" size={20} /></span><div><b>Nodus Server · experimental</b><small>{copy.detailB}</small></div></div>
+      <div><span><Icon name="globe" size={20} /></span><div><b>{t('Nodus Server · experimental')}</b><small>{copy.detailB}</small></div></div>
     </div>
     <Notice>{copy.tip}</Notice>
   </>;
@@ -552,7 +553,7 @@ function ZoteroPanel({ language }: { language: TutorialLanguage }) {
       {[copy.detailA, copy.detailB, copy.detailC].filter(Boolean).map((detail) => <div key={detail}><Icon name="check" size={14} /><span>{detail}</span></div>)}
     </div>
     <Notice>{copy.tip}</Notice>
-    <p className="platform-guide-trademark">Zotero is a trademark of the Corporation for Digital Scholarship. Nodus is independent and is not endorsed by Zotero.</p>
+    <p className="platform-guide-trademark">{t('Zotero es una marca registrada de Corporation for Digital Scholarship. Nodus es independiente y no está respaldado por Zotero.')}</p>
   </>;
 }
 

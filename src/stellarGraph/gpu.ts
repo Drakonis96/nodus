@@ -20,7 +20,7 @@ export class StellarGPU {
       gl.shaderSource(s, source);
       gl.compileShader(s);
       if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
-        throw new Error(gl.getShaderInfoLog(s) || "Shader error");
+        throw new Error(gl.getShaderInfoLog(s) || t("Error del sombreador"));
       return s;
     };
     const vs = shader(
