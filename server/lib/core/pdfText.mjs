@@ -36,8 +36,9 @@ export function hasCjk(value) {
  */
 export function cjkSafe(value) {
   return String(value ?? '')
-    .replace(/\r/g, '')
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+    // Unicode's Control category covers C0/C1 and DEL without spelling them in the pattern;
+    // line breaks survive so callers that split on them still see the same shape.
+    .replace(/[\p{Cc}]/gu, (character) => (character === '\n' ? character : ''))
     .replace(/[ \t]+/g, ' ')
     .trim();
 }

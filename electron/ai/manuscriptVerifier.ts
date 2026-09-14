@@ -1,5 +1,4 @@
 import type {
-  AppLanguage,
   PromptLanguage,
   ApplyManuscriptCitationRequest,
   ApplyManuscriptCitationResult,

@@ -18,21 +18,20 @@ import subsetFont from 'subset-font';
  */
 const FONT_FILE = 'NodusCJK-Regular.ttf';
 
-/** Where the bundled font can live, packaged first. */
+/**
+ * Where the bundled font can live, packaged first.
+ *
+ * `process.resourcesPath` is the packaged app's resource directory (where the embedded
+ * `nodus-server` copy ships), and the working directory is the repository root during
+ * development and tests. Both are read from globals rather than from `electron`, so this
+ * module stays importable from plain Node — a bundler that only stubs part of the Electron
+ * surface can still load the exporters that use it.
+ */
 function fontCandidates(): string[] {
   const relative = path.join('lib', 'assets', 'fonts', FONT_FILE);
   const candidates: string[] = [];
   const resources = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
   if (resources) candidates.push(path.join(resources, 'nodus-server', relative));
-  try {
-    // Resolved lazily so this module stays importable from plain Node (unit tests).
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const electron = require('electron') as typeof import('electron') | undefined;
-    const appPath = electron?.app?.getAppPath?.();
-    if (appPath) candidates.push(path.join(appPath, 'server', relative));
-  } catch {
-    /* not running inside Electron */
-  }
   candidates.push(path.join(process.cwd(), 'server', relative));
   return candidates;
 }
@@ -64,7 +63,9 @@ export function hasCjk(value: unknown): boolean {
  */
 export function cjkSafe(value: string): string {
   return String(value ?? '')
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+    // Unicode's Control category covers C0/C1 and DEL without spelling them in the pattern;
+    // line breaks survive so multi-line copy still splits the way the callers expect.
+    .replace(/[\p{Cc}]/gu, (character) => (character === '\n' ? character : ''))
     .replace(/[ \t]+/g, ' ')
     .trim();
 }
