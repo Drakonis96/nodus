@@ -3,7 +3,7 @@ import {_electron as electron} from 'playwright-core';
 import {createRequire} from 'node:module';
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-const require=createRequire(import.meta.url),root=process.cwd(),profile=fs.mkdtempSync('/tmp/nodus-argument-preview-');
+const require=createRequire(import.meta.url),root=process.cwd(),appVersion=require(root+'/package.json').version,profile=fs.mkdtempSync('/tmp/nodus-argument-preview-');
 const env={...process.env,NODUS_USERDATA:profile,NODUS_STELLAR_PREVIEW:'1',NODUS_DISABLE_AUTO_UPDATE:'1',NODUS_DISABLE_ANNOUNCEMENTS:'1',NODUS_QA_ROOT:profile,NODUS_QA_DATABASE_AUDIT_LOG:profile+'/database-audit.jsonl'};
 delete env.ELECTRON_RUN_AS_NODE;
 fs.mkdirSync(root+'/output/argument-map',{recursive:true});
@@ -29,7 +29,7 @@ try{
  };
  await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setContentSize(1600,1050));
  await page.waitForFunction(()=>typeof window.nodus?.updateSettings==='function');
- await page.evaluate(async()=>{sessionStorage.setItem('nodus.startupUpdateChecked','1');localStorage.setItem('nodus.lastSeenVersion','5.3.1');localStorage.setItem('nodus.mobileTeaserSeen.5.3.1','1');for(const key of ['nodus.platformHighlightsSeen.2026-07','nodus.tutorialVideosAnnouncementSeen.2026-07', 'nodus.pdfPresenterTutorialSeen.e2js_u-05OA','nodus.toolkitBetaGuideSeen.2.4.0'])localStorage.setItem(key,'1');await window.nodus.updateSettings({onboardingComplete:true,basicsTutorialVersion:999,recoverySetupVersion:999,tourComplete:true,advancedTourComplete:true,mascotEnabled:false,mascotStyle:'orb',mascotStyleChosen:true,uiLanguage:'es',theme:'dark'});await window.nodus.seedDemoData();});
+ await page.evaluate(async(version)=>{sessionStorage.setItem('nodus.startupUpdateChecked','1');localStorage.setItem('nodus.lastSeenVersion',version);localStorage.setItem('nodus.mobileTeaserSeen.5.3.1','1');for(const key of ['nodus.platformHighlightsSeen.2026-07','nodus.tutorialVideosAnnouncementSeen.2026-07', 'nodus.pdfPresenterTutorialSeen.e2js_u-05OA','nodus.toolkitBetaGuideSeen.2.4.0'])localStorage.setItem(key,'1');await window.nodus.updateSettings({onboardingComplete:true,basicsTutorialVersion:999,recoverySetupVersion:999,tourComplete:true,advancedTourComplete:true,mascotEnabled:false,mascotStyle:'orb',mascotStyleChosen:true,uiLanguage:'es',theme:'dark'});await window.nodus.seedDemoData();},appVersion);
  await page.reload();
  const dismiss=page.locator('.backup-health-dismiss'); if(await dismiss.isVisible()) await dismiss.click();
  await page.locator('[data-tour="nav-argument"]').click();

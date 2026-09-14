@@ -1,3 +1,5 @@
+import { RELEASE_5_4_0_ADDITIONS } from './releaseNotes540';
+import { RELEASE_5_4_2_HIGHLIGHTS } from './releaseNotes542';
 const RELEASE_3_0_4_TR: string[] = [
   "Bir MCP istemcisi Deep Research raporlarını sıraya alabiliyor. Şimdiye dek rapor isteyen istemci, çağrıyı üretimin tamamı boyunca açık tutmak zorundaydı — her şeyin zaman aşımına uğrayabileceği birkaç dakika — ve uygulamadan sizin başlattığınız bir raporla çakışabiliyordu. Artık raporu sıraya alıp istediği zaman durumunu soruyor: Nodus'un pencereyle paylaştığı tek bir üretim şeridi var, yani asla iki rapor aynı anda çalışmıyor; kuyruk şeridi bir istemciden gelenleri MCP rozetiyle işaretliyor ve Nodi biri bittiğinde ya da başarısız olduğunda sizi uyarıyor, çünkü onu isteyen taraf çoktan bağlantısını kesmiş olabilir. Her iş, sıraya alındığı kasaya bağlı kalıyor ve kasa değiştirmek başka bir kasayı bekleyen ne varsa iptal ediyor.",
   "Başarısız bir görsel başka bir motorla yeniden denenebiliyor. Yeniden deneme, az önce reddeden görselde kayıtlı sağlayıcıyı ve modeli yeniden kullanıyordu; böylece «görsel üretilemedi» durumunda takılı kalan bir rapor hep aynı motora dönüyor, Ayarlar'dan sağlayıcıyı değiştirmek de işe yaramıyordu. Artık motor, istediğiniz şeyden ya da Ayarlar'dan geliyor: başarısız bir görsel güncel varsayılanla açılıyor, üretilmiş olan kendi motorunu koruyor ve tasarım penceresi, tüm kataloğu görsel başına fiyatıyla listeleyen bir model seçici kazanıyor; alt bilgi de düğmenin neyi kullanacağını söylüyor. Ayrıca başarısızlığın gerçek nedeni, kendisiyle çelişen genel bir başlığın altında kalmak yerine mesajın başına geçiyor ve yedi dilin tamamına çevriliyor.",
@@ -106,6 +108,19 @@ const RELEASE_5_1_0_TR = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.4.2": RELEASE_5_4_2_HIGHLIGHTS.map(highlight => highlight.tr),
+  "5.4.0": [
+    ...RELEASE_5_4_0_ADDITIONS.map(highlight => highlight.tr),
+    "Chemistry Studio, Legalize ve AlphaGenome artık kendiniz kurduğunuz resmi paketler. Skills içinde doğrulanmış yayıncısı, izinleri, boyutu ve çalıştığı platformlarla görünür. İstediğiniz zaman kurabilir, güncelleyebilir, önceki sürüme dönebilir veya kaldırabilirsiniz. Yaptıkları iş değişmedi.",
+    "Güncellediğinizde yapılandırmanız kendiliğinden taşınır. Chemistry Studio açıksa, kayıtlı bir AlphaGenome anahtarınız varsa ya da kendi yazdığınız bir skill bu capability'lerden birine ihtiyaç duyuyorsa, Nodus ilgili paketi kurar ve skill'i listedeki yeri, etkin olduğu yüzeyler ve düzenlediğiniz yönergelerle birlikte devralır. Paketler güncellemenin içinde geldiği için bağlantı olmadan da çalışır.",
+    "Molekül çizmiyorsanız Nodus daha az yer kaplar. Kimya motorları, TeX derleyicisi ve bu üç alanın diğer bağımlılıkları artık uygulamayla birlikte değil, yalnızca onlara ihtiyaç duyan paketin içinde taşınır. Temiz bir kurulum, siz istemedikçe üçünden hiçbirini indirmez ve yüklemez.",
+    "Her paket kendi kartında yapılandırılır. AlphaGenome anahtarı, koşullarının kabulü ve Python çalışma zamanının kurulumu artık Nodus ayarlarına dağılmak yerine paketin içinde yaşar. Anahtarınız sistemin kimlik bilgisi deposunda saklanır ve yorumlayıcıya standart girdisi üzerinden ulaşır. Komut satırında ya da günlükte hiçbir zaman görünmez.",
+    "Bir paket yalnızca NodusResearch tarafından imzalanmış olarak gelir. Nodus indirdiği şeyin imzasını ve tam parmak izini açmadan önce doğrular, kurulu olandan eski bir sürümü reddeder ve aynı numarayla yayımlanmış farklı bir içeriği reddeder. Onayladığınızdan fazlasını isteyen bir güncelleme kendiliğinden uygulanmak yerine incelemenizi bekler.",
+    "Sonuçlar konuşmanın yanında saklanır ve modelin ne göreceğine her paket kendi karar verir. Bir AlphaGenome tahmini cihazınızdan hâlâ çıkmaz ve bu kural artık Nodus'un içine yazılmak yerine paketin kendisi tarafından bildirilir. Bir paketi kaldırırsanız sohbetlerinizdeki mevcut sonuçlar korunur ve onu doğrudan mesajdan yeniden kurabilirsiniz.",
+    "PDF Presenter'daki klasörler artık etiket, zaten hep öyleydiler. Bir etikete tıkladığınızda yalnızca o etiketi taşıyan sunumlar görünür, tekrar tıkladığınızda hepsi geri gelir. Bir etiketi silmek önce onay ister ve sunumlarını asla beraberinde götürmez. Sunumlar yalnızca etiketsiz kalır. Bu güncellemeden önce düzenlediğiniz raflar bıraktığınız gibi açılır.",
+    "Bir sunum artık kitaplıktan çıkabilir. PDF'yi indir, Nodus'un sakladığı kopyayı istediğiniz yere kaydeder. Böylece PowerPoint veya Keynote'tan içe aktardığınız bir sunum, orijinali elinizde olmasa bile PDF olarak sizindir. Rafınızdaki kopya yerinde kalır.",
+    "Not içe aktarma ikinci bir TXT dosyası türünü okur. Nodus'un dışa aktardığı biçimin yanı sıra, artık yalnızca notu olan slaytları listeleyen kurtarılmış not dosyalarını da kabul eder. Nodus slayt sayısını dosyanın kendi başlığından okur, böylece 140 slaydın 130'u için not içeren bir dosya artık uyumsuzluk gibi görünmez.",
+  ],
   "5.3.1": [
     "Marketplace artık hangi becerilere sahip olduğunuzu biliyor. Nodus ile birlikte gelen beceriler yeniden sunulmak yerine kurulu olarak görünüyor, Tümü / Kurulu / Kullanılabilir süzgeci kitaplığınızı katalog üzerinden gözden geçiriyor ve kurulu her beceri kendi kartından kaldırılabiliyor. Nodus'un zaten içerdiği bir kaydı kurmak, kopya eklemek yerine yapınızla gelen sürümü geri getiriyor ve önceki bir sürümün bıraktığı kopyayı da temizliyor.",
     "Bir eklentinin daha yeni bir Nodus istediğini kurulumdan önce öğreniyorsunuz. İnceleme ekranı yapınızı eklentinin istediği sürümle karşılaştırıyor ve bunu kurulum düğmesinin üzerinde belirtiyor, onay ekranı da aynısını yineliyor. Zaten bekleyen bir eklenti artık gerekçe vermeden kendi açıklamasını göstermek yerine kartında ihtiyaç duyduğu sürümü yazıyor.",
@@ -592,3 +607,6 @@ RELEASE_NOTES_TR["5.1.5"] = RELEASE_NOTES_TR["5.1.4"];
 
 // 5.2.1 intentionally ships the exact same What's New copy as 5.2.0.
 RELEASE_NOTES_TR["5.2.1"] = RELEASE_NOTES_TR["5.2.0"];
+
+// 5.4.1 intentionally ships the exact same What's New copy as 5.4.0.
+RELEASE_NOTES_TR["5.4.1"] = RELEASE_NOTES_TR["5.4.0"];

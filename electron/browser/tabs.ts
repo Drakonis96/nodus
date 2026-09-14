@@ -19,7 +19,7 @@
  *     them. That is what makes a tab cheap enough to have twelve of.
  */
 
-import { nativeTheme, WebContentsView, type BaseWindow, type WebContents } from 'electron';
+import { nativeTheme, WebContentsView, type BrowserWindow, type WebContents } from 'electron';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { BrowserMediaCommand, BrowserState, BrowserTabError, BrowserTabState, BrowserViewport } from '@shared/browser';
@@ -38,6 +38,11 @@ import { installContextMenu, type ContextMenuActions } from './contextMenu';
 import { browserShortcutFor, historyNeighbourIndex } from '@shared/browserShortcuts';
 import { cachePageFavicon } from './favicon';
 import { recordBrowserHistoryVisit } from './history';
+import {
+  cancelAllBrowserAuthRequests,
+  cancelBrowserAuthRequestsForTab,
+  requestBrowserAuth,
+} from './authPrompt';
 import {
   describeMediaSession,
   dropMediaSession,
@@ -74,7 +79,7 @@ interface Tab {
 
 const tabs = new Map<string, Tab>();
 let activeTabId: string | null = null;
-let hostWindow: BaseWindow | null = null;
+let hostWindow: BrowserWindow | null = null;
 let viewport: BrowserViewport | null = null;
 /**
  * Two INDEPENDENT reasons the page may be hidden, deliberately not one flag.
@@ -92,16 +97,73 @@ let contextMenuActions: ContextMenuActions | null = null;
 let shortcutActions: BrowserShortcutActions | null = null;
 const pageThemeJobs = new WeakMap<WebContents, Promise<void>>();
 
+const LIGHT_PAGE_SURFACE = '#ffffff';
+const DARK_PAGE_SURFACE = '#0a0a0a';
+
+/**
+ * The colour the native surface shows while a document has not spoken yet.
+ *
+ * It is deliberately NOT the colour a document that has spoken gets. Chromium
+ * paints a page's default canvas with the embedder's base background, and a page
+ * that never opts into a dark colour scheme keeps black default text. Painting
+ * the app's dark surface behind such a page is what made 401/plain HTML pages
+ * unreadable until their text was selected — selection repaints it with the
+ * highlight colours. Normal browsers leave those pages white; so does Nodus
+ * once the document tells us which scheme it actually uses (see below).
+ */
 function browserSurfaceColor(): string {
-  return nativeTheme.shouldUseDarkColors ? '#0a0a0a' : '#ffffff';
+  return nativeTheme.shouldUseDarkColors ? DARK_PAGE_SURFACE : LIGHT_PAGE_SURFACE;
+}
+
+/**
+ * Whether the document's own default text is light (so it expects a dark canvas).
+ *
+ * The `CanvasText` system colour is the reliable signal: it reflects the meta
+ * tag, the CSS `color-scheme` property AND the emulated `prefers-color-scheme`
+ * preference, while `getComputedStyle(root).colorScheme` misses the meta tag
+ * entirely (it read `normal` on a page declaring `color-scheme: dark`).
+ * Returns null when the page cannot be probed, in which case the surface is left
+ * as it is rather than guessed at.
+ */
+const PAGE_SURFACE_PROBE = `(() => {
+  try {
+    const probe = document.createElement('span');
+    probe.style.color = 'CanvasText';
+    probe.style.position = 'absolute';
+    probe.style.width = '0';
+    probe.style.height = '0';
+    (document.body || document.documentElement).appendChild(probe);
+    const text = getComputedStyle(probe).color;
+    probe.remove();
+    const match = /rgba?\\s*\\(\\s*(\\d+)\\D+(\\d+)\\D+(\\d+)/.exec(text);
+    if (!match) return null;
+    const r = Number(match[1]);
+    const g = Number(match[2]);
+    const b = Number(match[3]);
+    // Rec. 709 luma. Light default text means a dark canvas is expected.
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 127.5;
+  } catch {
+    return null;
+  }
+})()`;
+
+async function applyDocumentSurfaceColor(tab: Tab): Promise<void> {
+  const contents = tab.view.webContents;
+  if (contents.isDestroyed()) return;
+  let prefersDark: unknown;
+  try {
+    prefersDark = await contents.executeJavaScript(PAGE_SURFACE_PROBE, true);
+  } catch {
+    return;
+  }
+  if (contents.isDestroyed() || typeof prefersDark !== 'boolean') return;
+  tab.view.setBackgroundColor(prefersDark ? DARK_PAGE_SURFACE : LIGHT_PAGE_SURFACE);
 }
 
 function applyBrowserSurfaceColor(): void {
-  const color = browserSurfaceColor();
-  const dark = nativeTheme.shouldUseDarkColors;
   for (const tab of tabs.values()) {
-    tab.view.setBackgroundColor(color);
-    void applyPageColorScheme(tab.view.webContents, dark);
+    tab.view.setBackgroundColor(browserSurfaceColor());
+    void applyPageTheme(tab);
   }
 }
 
@@ -110,11 +172,15 @@ function applyBrowserSurfaceColor(): void {
  * persistent partition can leave an already-open WebContentsView on its former
  * media-query value. Chromium's own Emulation domain makes that preference
  * deterministic without reloading the page or injecting site CSS.
+ *
+ * The document is then asked which surface its own colours assume, so a page
+ * that does not support a dark scheme never inherits Nodus's dark base.
  */
-async function applyPageColorScheme(
-  contents: WebContents,
+async function applyPageTheme(
+  tab: Tab,
   dark = nativeTheme.shouldUseDarkColors,
 ): Promise<void> {
+  const contents = tab.view.webContents;
   const previous = pageThemeJobs.get(contents) ?? Promise.resolve();
   const job = previous.catch(() => undefined).then(async () => {
     if (contents.isDestroyed()) return;
@@ -130,6 +196,7 @@ async function applyPageColorScheme(
     } finally {
       if (attachedHere && contents.debugger.isAttached()) contents.debugger.detach();
     }
+    await applyDocumentSurfaceColor(tab);
   });
   pageThemeJobs.set(contents, job);
   await job;
@@ -207,6 +274,22 @@ function originOf(url: string): string {
   try { return new URL(url).origin; } catch { return ''; }
 }
 
+/**
+ * How the credential prompt names the host that raised the challenge.
+ *
+ * The default ports are omitted because Chromium's own dialogs omit them;
+ * anything else is shown so two services on one machine cannot be mistaken for
+ * each other. Only ever called with the `authInfo` Chromium supplies, never with
+ * anything the page wrote.
+ */
+function authHostLabel(authInfo: Pick<Electron.AuthInfo, 'host' | 'port'>): string {
+  const host = String(authInfo.host ?? '').trim();
+  const port = Number(authInfo.port);
+  if (!host) return '';
+  if (!Number.isInteger(port) || port <= 0 || port === 80 || port === 443) return host;
+  return `${host}:${port}`;
+}
+
 function emptyState(id: string, url: string): BrowserTabState {
   const kind = browserInternalPage(url) ?? 'web';
   return {
@@ -234,7 +317,7 @@ export interface BrowserShortcutActions {
 
 /** Wire the host window and the change notifier. Called once, from the IPC layer. */
 export function initBrowserTabs(
-  window: BaseWindow,
+  window: BrowserWindow,
   onChange: () => void,
   menu?: ContextMenuActions,
   shortcuts?: BrowserShortcutActions,
@@ -268,13 +351,25 @@ function patch(tab: Tab, next: Partial<BrowserTabState>): void {
 
 function applyBounds(tab: Tab): void {
   if (!viewport) return;
-  // Integers only: a fractional rectangle leaves a sub-pixel seam between the
-  // native view and the React chrome around it.
+  // getBoundingClientRect() reports renderer CSS pixels. View.setBounds(), on
+  // the other hand, positions a native child in the BrowserWindow's DIP space.
+  // Those units coincide only while the host renderer zoom is exactly 100%.
+  // Chromium zoom can differ from Nodus's own Interface size preference, so a
+  // 110% host zoom used to make the page start too far left and end in a blank
+  // strip on the right. Convert every edge to DIP before rounding.
+  const rawZoom = hostWindow && !hostWindow.isDestroyed()
+    ? hostWindow.webContents.getZoomFactor()
+    : 1;
+  const cssToDip = Number.isFinite(rawZoom) && rawZoom > 0 ? rawZoom : 1;
+  const left = Math.round(viewport.x * cssToDip);
+  const top = Math.round(viewport.y * cssToDip);
+  const right = Math.round((viewport.x + viewport.width) * cssToDip);
+  const bottom = Math.round((viewport.y + viewport.height) * cssToDip);
   tab.view.setBounds({
-    x: Math.round(viewport.x),
-    y: Math.round(viewport.y),
-    width: Math.max(0, Math.round(viewport.width)),
-    height: Math.max(0, Math.round(viewport.height)),
+    x: left,
+    y: top,
+    width: Math.max(0, right - left),
+    height: Math.max(0, bottom - top),
   });
 }
 
@@ -317,7 +412,7 @@ function wire(tab: Tab): void {
     event.preventDefault();
     if (shortcut === 'newTab') shortcutActions?.newTab();
   }) as never);
-  void applyPageColorScheme(contents);
+  void applyPageTheme(tab);
 
   /**
    * The page preload's media message. Register it on this exact WebContents
@@ -406,6 +501,35 @@ function wire(tab: Tab): void {
     callback('');
   }) as never);
 
+  /**
+   * HTTP Basic / Digest / proxy authentication.
+   *
+   * Chromium's default is to cancel every challenge, which is why a site behind
+   * Basic auth used to answer with a bare 401 page and no way in. The prompt is
+   * drawn by trusted React in the browser chrome, never by the page, and the
+   * credentials go straight back into Chromium's callback — Nodus stores none of
+   * them. An empty `callback()` cancels, which is what a dismissed or superseded
+   * request must do: leaving it unanswered hangs the request instead.
+   */
+  on(tab, contents, 'login', ((
+    event: Electron.Event,
+    _details: Electron.AuthenticationResponseDetails,
+    authInfo: Electron.AuthInfo,
+    callback: (username?: string, password?: string) => void,
+  ) => {
+    event.preventDefault();
+    if (!isWeb()) { callback(); return; }
+    void requestBrowserAuth(tab.id, {
+      host: authHostLabel(authInfo),
+      realm: String(authInfo.realm ?? ''),
+      url: contents.getURL(),
+      isProxy: authInfo.isProxy === true,
+    }).then((credentials) => {
+      if (credentials) callback(credentials.username, credentials.password);
+      else callback();
+    }).catch(() => callback());
+  }) as never);
+
   on(tab, contents, 'will-navigate', ((event: Electron.Event, url: string) => {
     if (interceptGoogleSignIn(tab, url, contents.getURL())) {
       event.preventDefault();
@@ -444,7 +568,7 @@ function wire(tab: Tab): void {
   on(tab, contents, 'did-start-loading', (() => { if (isWeb()) patch(tab, { loading: true, error: null }); }) as never);
   on(tab, contents, 'dom-ready', (() => {
     if (!isWeb()) return;
-    void applyPageColorScheme(contents);
+    void applyPageTheme(tab);
     // Google's JS check also reads navigator.userAgentData.brands; hide Electron
     // there too (request headers are already spoofed in session.ts). Brand
     // versions are rewritten to the Chromium major in navigator.userAgent so the
@@ -524,6 +648,10 @@ function wire(tab: Tab): void {
       title: contents.getTitle() || tab.state.title,
       url: contents.getURL() || tab.state.url,
     });
+    // A stylesheet can declare `color-scheme` after DOMContentLoaded, so the
+    // surface is re-checked once the document is fully loaded. It goes through
+    // the theme chain so a stale probe cannot overwrite a newer one.
+    void applyPageTheme(tab);
   }) as never);
 
   on(tab, contents, 'did-stop-loading', (() => {
@@ -595,6 +723,12 @@ function wire(tab: Tab): void {
       ...(details.isSameDocument ? {} : { loading: true, error: null }),
     });
     if (details.isSameDocument) return;
+    // A new document starts from the theme's surface until it has said which
+    // colours it uses: the previous document's answer does not apply to it.
+    tab.view.setBackgroundColor(browserSurfaceColor());
+    // A challenge belongs to the document that raised it; navigating away
+    // strands it, and an unanswered callback would hang Chromium's request.
+    cancelBrowserAuthRequestsForTab(tab.id);
     if (!hasMediaSession(tab.id)) return;
     dropMediaSession(tab.id);
     patch(tab, { hasMedia: false, mediaPlaying: false, audible: false });
@@ -642,6 +776,7 @@ function wire(tab: Tab): void {
     // on Reload, but discard every document-scoped capability and hide the
     // native view behind Nodus's controlled crash pane. Nodus itself stays up.
     finishPendingCollections(tab);
+    cancelBrowserAuthRequestsForTab(tab.id);
     dropMediaSession(tab.id);
     patch(tab, {
       loading: false,
@@ -775,6 +910,9 @@ function destroyTab(id: string, options: DestroyTabOptions): void {
   // Stop first: close() alone can leave an in-flight navigation completing
   // callbacks while the rest of the tab is already being dismantled.
   if (!tab.view.webContents.isDestroyed()) tab.view.webContents.stop();
+  // Cancel before the contents goes: a challenge this tab raised can never be
+  // answered once the view is gone, and Chromium must not keep waiting on it.
+  cancelBrowserAuthRequestsForTab(id);
   detach(tab);
   // Undo every listener before destroying the contents: a handler firing during
   // teardown would patch state for a tab that no longer exists.
@@ -1161,6 +1299,8 @@ export function closeAllBrowserTabs(options: { preserveViewport?: boolean } = {}
   }
   // Also cancels the ended-grace timers, so none outlives the window.
   clearAllMediaSessions();
+  // Restart paths recreate every tab, so no credential prompt can survive them.
+  cancelAllBrowserAuthRequests();
   notify?.();
 }
 

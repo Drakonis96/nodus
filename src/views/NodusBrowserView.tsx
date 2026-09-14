@@ -9,6 +9,7 @@ import type {
   BrowserRestartResult,
   BrowserState,
   BrowserTabState,
+  PendingBrowserAuth,
   PendingBrowserPermission,
 } from '@shared/browser';
 import type { BrowserConnectorCapturePreview } from '@shared/browserConnector';
@@ -43,6 +44,7 @@ export function NodusBrowserView() {
   const [omniboxFocused, setOmniboxFocused] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [permission, setPermission] = useState<PendingBrowserPermission | null>(null);
+  const [auth, setAuth] = useState<PendingBrowserAuth | null>(null);
   const [capture, setCapture] = useState<BrowserConnectorCapturePreview | null>(null);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
@@ -117,6 +119,17 @@ export function NodusBrowserView() {
     return () => {
       stop();
       void window.nodus.cancelBrowserPermissions();
+    };
+  }, []);
+
+  useEffect(() => {
+    const stop = window.nodus.onBrowserAuthRequest(setAuth);
+    void window.nodus.getPendingBrowserAuth().then(setAuth);
+    // Same reasoning as the permission prompt: a challenge whose bar can no
+    // longer be seen must be cancelled, or Chromium waits on it forever.
+    return () => {
+      stop();
+      void window.nodus.cancelBrowserAuth();
     };
   }, []);
 
@@ -209,9 +222,9 @@ export function NodusBrowserView() {
   /**
    * Report the rectangle the page should occupy.
    *
-   * getBoundingClientRect() is already in CSS pixels, which is what setBounds
-   * expects, so no scaling is needed — but the values are rounded in the main
-   * process, because a fractional rectangle leaves a sub-pixel seam.
+   * getBoundingClientRect() reports renderer CSS pixels. The main process turns
+   * them into the native window's DIP coordinates using the host renderer zoom,
+   * then rounds them so a fractional rectangle cannot leave a sub-pixel seam.
    */
   const publishViewport = useCallback(() => {
     const element = viewportRef.current;
@@ -611,6 +624,15 @@ export function NodusBrowserView() {
         />
       )}
 
+      {auth && (
+        <BrowserAuthBar
+          request={auth}
+          onSubmit={(username, password) =>
+            void window.nodus.resolveBrowserAuth(auth.id, username, password)}
+          onCancel={() => void window.nodus.cancelBrowserAuth(auth.id)}
+        />
+      )}
+
       {/* The page goes here. This div is deliberately empty and never painted
           into: the main process positions the native view over its rectangle. */}
       <div ref={viewportRef} data-browser-viewport className="relative min-h-0 flex-1">
@@ -739,6 +761,78 @@ function permissionLabel(request: PendingBrowserPermission): string {
   }
   if (request.permission === 'geolocation') return t('quiere conocer tu ubicación.');
   return t('pide un permiso adicional.');
+}
+
+/**
+ * The HTTP authentication prompt.
+ *
+ * Rendered as a BAR in the browser chrome, like the permission prompt and for
+ * the same reason: it takes its own vertical space, so the native page is moved
+ * down instead of covered, and a site can neither hide it nor draw a convincing
+ * copy where it appears. The host shown is Chromium's `authInfo`, not page text.
+ */
+function BrowserAuthBar({
+  request, onSubmit, onCancel,
+}: {
+  request: PendingBrowserAuth;
+  onSubmit: (username: string, password: string) => void;
+  onCancel: () => void;
+}) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const usernameRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    usernameRef.current?.focus();
+  }, [request.id]);
+  const field = 'w-40 rounded border border-neutral-300 bg-white px-2 py-0.5 text-xs text-neutral-900 outline-none focus:border-indigo-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100';
+  return (
+    <form
+      data-testid="browser-auth-bar"
+      className="flex flex-wrap items-center gap-2 border-b border-indigo-300 bg-indigo-50 px-3 py-2 text-xs text-indigo-950 dark:border-indigo-500/30 dark:bg-indigo-950/40 dark:text-indigo-100"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(username, password);
+      }}
+    >
+      <Icon name="lock" size={14} className="shrink-0 opacity-70" />
+      <span className="min-w-0 flex-1">
+        {request.isProxy && <>{t('Proxy')}{' · '}</>}
+        <span className="font-semibold">{request.host}</span>{' '}{t('pide usuario y contraseña.')}
+        {request.realm && <span className="block truncate text-[11px] opacity-70">{request.realm}</span>}
+      </span>
+      <label className="flex items-center">
+        <span className="sr-only">{t('Usuario')}</span>
+        <input
+          ref={usernameRef}
+          data-testid="browser-auth-username"
+          className={field}
+          value={username}
+          autoComplete="username"
+          spellCheck={false}
+          placeholder={t('Usuario')}
+          onChange={(event) => setUsername(event.target.value)}
+        />
+      </label>
+      <label className="flex items-center">
+        <span className="sr-only">{t('Contraseña')}</span>
+        <input
+          data-testid="browser-auth-password"
+          className={field}
+          type="password"
+          value={password}
+          autoComplete="current-password"
+          placeholder={t('Contraseña')}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+      </label>
+      <button type="button" className="btn btn-ghost border border-neutral-300 py-0.5 dark:border-neutral-700" onClick={onCancel}>
+        {t('Cancelar')}
+      </button>
+      <button type="submit" className="btn btn-ghost border border-indigo-500/60 py-0.5">
+        {t('Iniciar sesión')}
+      </button>
+    </form>
+  );
 }
 
 function ToolbarButton({

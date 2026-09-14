@@ -29,7 +29,7 @@ function rowToSavedSearch(row: SavedSearchRow): SavedSearch {
     id: row.id,
     name: row.name,
     query: row.query,
-    mode: (row.mode === 'text' ? 'text' : 'semantic') as SearchMode,
+    mode: (['text', 'semantic'].includes(row.mode) ? row.mode : 'hybrid') as SearchMode,
     kinds: parseKinds(row.kinds_json),
     created_at: row.created_at,
   };
@@ -46,7 +46,7 @@ export function saveSearch(input: SaveSearchInput): SavedSearch {
   const id = randomUUID();
   const created_at = new Date().toISOString();
   const name = input.name.trim() || input.query.trim() || 'Búsqueda';
-  const mode: SearchMode = input.mode === 'text' ? 'text' : 'semantic';
+  const mode: SearchMode = input.mode === 'text' || input.mode === 'semantic' ? input.mode : 'hybrid';
   getDb()
     .prepare('INSERT INTO saved_searches (id, name, query, mode, kinds_json, created_at) VALUES (?, ?, ?, ?, ?, ?)')
     .run(id, name, input.query.trim(), mode, JSON.stringify(input.kinds ?? []), created_at);

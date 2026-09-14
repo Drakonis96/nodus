@@ -18,7 +18,7 @@ export async function loadPdfjs(): Promise<any> {
   return dynamicImport(pathToFileURL(entry).href);
 }
 
-export async function openPdf(filePath: string): Promise<any> {
+export async function openPdf(filePath: string, options: { forRendering?: boolean } = {}): Promise<any> {
   const pdfjs = await loadPdfjs();
   const requireFromHere = createRequire(__filename);
   const pdfjsRoot = path.dirname(requireFromHere.resolve('pdfjs-dist/package.json'));
@@ -26,8 +26,9 @@ export async function openPdf(filePath: string): Promise<any> {
   // Supplying PDF.js' bundled standard fonts is essential for raster output.
   // Without it, PDFs using Helvetica/Times can expose a valid text layer while
   // rendering blank glyphs in the Node canvas used by facsimile translation.
-  const standardFontDataUrl = pathToFileURL(path.join(pdfjsRoot, 'standard_fonts') + path.sep).href;
-  const task = pdfjs.getDocument({ data, useSystemFonts: true, standardFontDataUrl, isEvalSupported: false, disableFontFace: true });
+  const fontDirectory = path.join(pdfjsRoot, 'standard_fonts') + path.sep;
+  const standardFontDataUrl = options.forRendering ? fontDirectory : pathToFileURL(fontDirectory).href;
+  const task = pdfjs.getDocument({ data, useSystemFonts: !options.forRendering, standardFontDataUrl, isEvalSupported: false, disableFontFace: true });
   return task.promise;
 }
 

@@ -48,6 +48,11 @@ const PAGES = {
   '/second': `<!doctype html><html><head><title>Second page</title></head>
         <body><main><h1>Second</h1><a id="slow" href="/slow-page">slow page</a></main></body></html>`,
 
+  // Deliberately declares a dark canvas with no stylesheet of its own: the
+  // per-document surface must follow the page, not the app theme.
+  '/dark-scheme': `<!doctype html><html><head><meta name="color-scheme" content="dark">
+        <title>Dark scheme page</title></head><body><main><h1>Dark scheme</h1></main></body></html>`,
+
   // A publisher-shaped page: Highwire tags are the highest-precedence source.
   '/paper': `<!doctype html><html><head><title>Publisher page</title>
         <meta name="citation_title" content="Structures of the Longue Durée">
@@ -185,6 +190,23 @@ async function startFixtures() {
       response.end();
       return;
     }
+    if (url.pathname === '/basic-auth') {
+      // Two realms so cancelling one challenge does not poison the other: once
+      // Chromium accepts credentials it caches them for that realm.
+      const realm = url.searchParams.get('realm') === 'cancel' ? 'Nodus E2E Cancel' : 'Nodus E2E';
+      const expected = `Basic ${Buffer.from('nodus:secreto').toString('base64')}`;
+      if (request.headers.authorization !== expected) {
+        response.writeHead(401, {
+          'WWW-Authenticate': `Basic realm="${realm}"`,
+          'Content-Type': 'text/html; charset=utf-8',
+        });
+        response.end('<!doctype html><html><head><title>401 Authorization Required</title></head><body><h1>401 Authorization Required</h1></body></html>');
+        return;
+      }
+      response.setHeader('Content-Type', 'text/html; charset=utf-8');
+      response.end('<!doctype html><html><head><title>Authenticated</title></head><body><h1>Authenticated</h1></body></html>');
+      return;
+    }
     const body = PAGES[url.pathname];
     if (!body) { response.statusCode = 404; response.end('not found'); return; }
     response.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -284,7 +306,14 @@ try {
   }, require(path.join(repoRoot, 'package.json')).version);
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
+  // The startup check can mount its modal a beat after the reload, so a plain
+  // count() races it and the backdrop then eats every sidebar click. Wait for
+  // the modal to either appear or stay away, then dismiss it if it is there.
   const updateModal = page.getByTestId('startup-update-modal');
+  const modalDeadline = Date.now() + 5_000;
+  while (Date.now() < modalDeadline && (await updateModal.count()) === 0) {
+    await page.waitForTimeout(100);
+  }
   if (await updateModal.count()) {
     await page.waitForFunction(() =>
       document.querySelector('[data-testid="startup-update-modal"]')?.getAttribute('data-update-status') === 'not-available');
@@ -341,6 +370,48 @@ try {
       width: Math.round(rendererBounds.width),
       height: Math.round(rendererBounds.height),
     }, `native view did not receive the renderer rectangle ${JSON.stringify(rendererBounds)}`);
+
+    // Interface size is a Nodus CSS preference; Chromium's host-renderer zoom
+    // is independent and may still be 110% (the field report that motivated
+    // this regression). Native View bounds are DIPs, so the CSS rectangle has
+    // to be converted with that second scale or the website is shifted left and
+    // leaves an empty strip on the right.
+    await app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1.1);
+    });
+    try {
+      await page.waitForTimeout(150);
+      const zoomedRendererBounds = await viewport.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      });
+      const zoomed = await app.evaluate(({ BrowserWindow }, expectedUrl) => {
+        const window = BrowserWindow.getAllWindows()[0];
+        const view = window.contentView.children.find((candidate) =>
+          'webContents' in candidate && candidate.webContents.getURL() === expectedUrl);
+        return { factor: window.webContents.getZoomFactor(), bounds: view?.getBounds() ?? null };
+      }, `${origin}/`);
+      assert.ok(zoomed.bounds, 'browser view disappeared after host renderer zoom');
+      const left = Math.round(zoomedRendererBounds.x * zoomed.factor);
+      const top = Math.round(zoomedRendererBounds.y * zoomed.factor);
+      const right = Math.round((zoomedRendererBounds.x + zoomedRendererBounds.width) * zoomed.factor);
+      const bottom = Math.round((zoomedRendererBounds.y + zoomedRendererBounds.height) * zoomed.factor);
+      assert.deepEqual(zoomed.bounds, {
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+      }, `110% host zoom misaligned the native view: ${JSON.stringify(zoomed)}`);
+    } finally {
+      await app.evaluate(({ BrowserWindow }) => {
+        BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1);
+      });
+      await page.waitForTimeout(150);
+      await viewport.evaluate(async (element) => {
+        const rect = element.getBoundingClientRect();
+        await window.nodus.setBrowserViewport({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+      });
+    }
   });
 
   await check('a tab opens and loads a real page', async () => {
@@ -504,6 +575,77 @@ try {
     await call('updateSettings', { theme: originalTheme });
     const restoredDark = await app.evaluate(({ nativeTheme }) => nativeTheme.shouldUseDarkColors);
     await waitForPageTheme(restoredDark);
+  });
+
+  await check('a page surface follows the document, so dark mode stays readable', async () => {
+    const originalTheme = (await call('getSettings')).theme;
+    // Capture through the ATTACHED view: the suite keeps several tabs alive, and
+    // capturePage() on a detached background tab returns an empty image.
+    const surfaceOf = (url) => app.evaluate(async ({ BrowserWindow }, targetUrl) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      const view = window?.contentView.children.find((child) => 'webContents' in child && child.webContents.getURL() === targetUrl);
+      if (!view) return null;
+      const bitmap = (await view.webContents.capturePage()).crop({ x: 2, y: 2, width: 1, height: 1 }).toBitmap();
+      return { r: bitmap[0], g: bitmap[1], b: bitmap[2] };
+    }, url);
+    const waitForSurface = async (url, predicate, description) => {
+      const deadline = Date.now() + 5_000;
+      let last = null;
+      while (Date.now() < deadline) {
+        last = await surfaceOf(url);
+        if (last && predicate(last)) return last;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      assert.fail(`timed out waiting for ${description}; last pixel ${JSON.stringify(last)}`);
+    };
+
+    await call('updateSettings', { theme: 'dark' });
+    await page.waitForFunction(() => document.documentElement.classList.contains('dark'));
+
+    // The fixture home has no stylesheet: its default text is black, so the
+    // surface behind it must stay white regardless of the app's dark theme.
+    await call('submitBrowserOmnibox', `${origin}/`);
+    await waitFor((s) => s.tabs.some((tab) => tab.url === `${origin}/` && !tab.loading), 'the plain fixture in dark mode');
+    await waitForSurface(`${origin}/`, (pixel) => pixel.r > 245 && pixel.g > 245 && pixel.b > 245,
+      'a page without a dark colour scheme to keep a light surface');
+
+    // A document that declares a dark canvas keeps it.
+    await call('submitBrowserOmnibox', `${origin}/dark-scheme`);
+    await waitFor((s) => s.tabs.some((tab) => tab.url === `${origin}/dark-scheme` && !tab.loading), 'the dark-scheme fixture');
+    await waitForSurface(`${origin}/dark-scheme`, (pixel) => pixel.r < 64 && pixel.g < 64 && pixel.b < 64,
+      'a dark colour scheme to keep a dark canvas');
+
+    await call('updateSettings', { theme: originalTheme });
+  });
+
+  await check('Basic auth prompts in Nodus chrome and reaches Chromium', async () => {
+    const bar = page.getByTestId('browser-auth-bar');
+
+    // Cancel first, from a realm nothing else uses, so the accepted credentials
+    // cached later cannot mask a broken dismissal.
+    await call('submitBrowserOmnibox', `${origin}/basic-auth?realm=cancel`);
+    await bar.waitFor({ state: 'visible' });
+    assert.match(await bar.innerText(), /127\.0\.0\.1/, 'the prompt must name the host that asked');
+    assert.match(await bar.innerText(), /Nodus E2E Cancel/, 'the server realm must be shown');
+    await bar.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await bar.waitFor({ state: 'detached' });
+    await waitFor(
+      (s) => s.tabs.some((tab) => tab.url === `${origin}/basic-auth?realm=cancel` && !tab.loading),
+      'the cancelled 401 page',
+    );
+
+    await call('submitBrowserOmnibox', `${origin}/basic-auth`);
+    await bar.waitFor({ state: 'visible' });
+    await page.getByTestId('browser-auth-username').fill('nodus');
+    await page.getByTestId('browser-auth-password').fill('secreto');
+    const passwordType = await page.getByTestId('browser-auth-password').getAttribute('type');
+    assert.equal(passwordType, 'password', 'the password must never be rendered in the clear');
+    await page.getByTestId('browser-auth-bar').getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
+    await waitFor(
+      (s) => s.tabs.some((tab) => tab.title === 'Authenticated' && !tab.loading),
+      'the authenticated fixture',
+    );
+    await bar.waitFor({ state: 'detached' });
   });
 
   await check('a page gets no bridge, no ipcRenderer and no require', async () => {

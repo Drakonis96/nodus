@@ -102,6 +102,7 @@ try {
   const localeMarkers = {
     es: 'Hipótesis', en: 'hypothesis', fr: 'Hypothèse', de: 'Hypothese',
     pt: 'Hipótese', 'pt-BR': 'Hipótese', it: 'Ipotesi', tr: 'hipotez',
+    'zh-Hans': '假设', 'zh-Hant': '假設', vi: 'Giả thuyết', ja: '仮説', ru: 'гипотеза', uk: 'гіпотеза', ko: '가설',
   };
   for (const [language, marker] of Object.entries(localeMarkers)) {
     const localized = buildHypothesisLabFallback({

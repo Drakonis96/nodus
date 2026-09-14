@@ -1,3 +1,6 @@
+import { prepareResearchAttachments, withResearchAttachmentFallback } from './researchAttachments';
+import { withResearchSystemPrompt } from './researchSystemPrompt';
+import { researchGenerationOptions } from './researchGenerationOptions';
 import { skillHasCapability } from '@shared/chatSkills';
 import { buildChatSkillsPrompt, chatSkillsOutputContract } from '@shared/chatSkills';
 import { vaultChatSkillSession } from './chatSkillSession';
@@ -43,6 +46,8 @@ function sampleText(columns: DatabaseColumn[], rows: DatabaseRow[], language: Pr
   const booleanCopy = {
     es: ['sí', 'no'], en: ['yes', 'no'], fr: ['oui', 'non'], de: ['ja', 'nein'],
     pt: ['sim', 'não'], 'pt-BR': ['sim', 'não'], it: ['sì', 'no'], tr: ['evet', 'hayır'],
+    'zh-Hans': ['是', '否'], 'zh-Hant': ['是', '否'], vi: ['có', 'không'], ja: ['はい', 'いいえ'],
+    ru: ['да', 'нет'], uk: ['так', 'ні'], ko: ['예', '아니요'],
   } as const;
   const [yes, no] = booleanCopy[language] ?? booleanCopy.es;
   const cols = columns.filter((c) => c.type !== 'ai').slice(0, SAMPLE_COLS);
@@ -106,7 +111,7 @@ export function buildDatabaseChatContext(databaseIds: string[], language = getSe
 
 export interface DatabaseChatDeps {
   stream?: (
-    opts: { system: string; user: string; englishImagePrompts?: boolean; plainContext?: boolean; temperature?: number; maxTokens?: number },
+    opts: { images?: import('../../shared/imageAnalysis').VisionImagePart[]; system: string; user: string; englishImagePrompts?: boolean; plainContext?: boolean; temperature?: number; maxTokens?: number },
     onDelta: (delta: string) => void,
     signal?: AbortSignal
   ) => Promise<string>;
@@ -118,12 +123,13 @@ export async function streamDatabaseChat(
   onDelta: (delta: string) => void,
   signal?: AbortSignal,
   deps: DatabaseChatDeps = {}
-): Promise<{ text: string }> {
-  if (!request.databaseIds.length) throw new Error('Elige al menos una base de datos.');
+): Promise<{ text: string; aborted?: boolean }> {
+  if (!request.databaseIds.length && !request.attachmentIds?.length) throw new Error('Elige al menos una base de datos.');
   const settings = getSettings();
-  const execution = vaultChatSkillSession('database', request.conversationId, request.question, settings.chatModel ?? settings.synthesisModel, getDatabaseChatConversation);
+  const execution = vaultChatSkillSession('database', request.conversationId, request.question, request.model ?? settings.chatModel ?? settings.synthesisModel, getDatabaseChatConversation);
   assertChatSkillSession(execution, signal);
   const { skills } = execution;
+  const attachments = await prepareResearchAttachments(request, 'database', request.model ?? settings.chatModel ?? settings.synthesisModel);
   const language = settings.promptLanguage ?? 'es';
   const { context } = buildDatabaseChatContext(request.databaseIds, language);
   const user = buildDbChatUser(context, request.question, request.history ?? [], language);
@@ -134,15 +140,17 @@ export async function streamDatabaseChat(
       const { completeTextStream } = await import('./aiClient');
       const { getSettings } = await import('../db/settingsRepo');
       const s = getSettings();
-      return completeTextStream(opts, (delta, kind) => {
+      return completeTextStream({ ...opts, ...(request.thinkingEffort === undefined ? {} : await researchGenerationOptions({ ...request, model: request.model ?? s.chatModel ?? s.synthesisModel }, opts.maxTokens ?? 1500, false, sig)) }, (delta, kind) => {
         if (kind !== 'reasoning') cb(delta);
-      }, s.chatModel ?? s.synthesisModel ?? null, sig);
+      }, request.model ?? s.chatModel ?? s.synthesisModel ?? null, sig);
     });
 
-  const text = await stream(
-    { system: `${databaseChatSystem(language)}\n\n${buildChatSkillsPrompt(skills)}`, user: `${user}\n\n${chatSkillsOutputContract(skills)}`, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), plainContext: true, temperature: 0.3, maxTokens: skills.length ? 10_000 : 1500 },
-    onDelta,
-    signal
+  const text = await withResearchAttachmentFallback(attachments,
+    { system: withResearchSystemPrompt(`${databaseChatSystem(language)}\n\n${buildChatSkillsPrompt(skills)}`, request.systemPromptId) + attachments.system, images: attachments.images, user: `${user}\n\n${chatSkillsOutputContract(skills)}${attachments.text}`, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), plainContext: true, temperature: 0.3, maxTokens: skills.length ? 10_000 : 1500 },
+    options => stream(options, onDelta, signal)
   );
+  // A user-triggered stop keeps the partial answer: running the skill tools now would
+  // throw an AbortError and discard everything that already streamed.
+  if (signal?.aborted) return { text, aborted: true };
   return { text: await executeChatSkills(text, execution, signal) };
 }

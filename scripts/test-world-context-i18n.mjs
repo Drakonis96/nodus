@@ -16,7 +16,7 @@ const load = (file) => {
   return require(bundle);
 };
 
-const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
 const article = load('shared/worldArticleContext.ts');
 const question = load('shared/worldQuestionContext.ts');
 const missing = load('shared/worldMissingEntries.ts');
@@ -40,7 +40,7 @@ const ruleSources = {
 };
 const chatFacts = { question: 'Where was Ilyra on day 4120?', history: [{ role: 'user', content: 'Previous exact turn.' }], focus: [{ kind: 'character', id: 'i1', title: 'Ilyra' }], prose: [{ ref: { kind: 'character', id: 'i1', title: 'Ilyra' }, field: 'Backstory', text: 'Exact prose.' }], computed: { effectiveRules: [{ rule: 'The Blood Law', ruleId: 'r1', scope: 'The whole world', overriddenBy: ['The Narrow Rule'] }], presenceAt: [{ personName: 'Ilyra', placeName: 'Vaël', worldDay: 4120 }], findings: [{ headline: '«{rule}» no aparece en ninguna parte', severity: 'gap', subjects: ['The Blood Law'] }] }, citable: [{ kind: 'character', id: 'i1', title: 'Ilyra' }], worldDay: 4120 };
 
-test('all eight locales translate every world user-context scaffold and preserve author data', () => {
+test('all prompt languages translate every world user-context scaffold and preserve author data', () => {
   const forbidden = ['TÉRMINOS SIN DEFINIR', 'CALENDARIO DE ESTE MUNDO', 'LO QUE FALTA POR DECIDIR', 'DÍA DEL MUNDO', 'CALCULADO POR NODUS'];
   for (const language of languages) {
     const contexts = [
@@ -68,11 +68,20 @@ test('localized world labels cover kinds, categories, fields, rules and marks', 
 });
 
 test('world-day parsing recognizes each prompt language without changing the number', () => {
-  const phrases = { es: 'día 4 120', en: 'day 4 120', fr: 'jour 4 120', de: 'Tag 4.120', pt: 'dia 4 120', 'pt-BR': 'dia 4.120', it: 'giorno 4 120', tr: 'gün 4 120' };
-  for (const language of languages) assert.equal(chat.readWorldDay(phrases[language], language), 4120, language);
+  const phrases = {
+    es: 'día 4 120', en: 'day 4 120', fr: 'jour 4 120', de: 'Tag 4.120', pt: 'dia 4 120', 'pt-BR': 'dia 4.120', it: 'giorno 4 120', tr: 'gün 4 120',
+    'zh-Hans': '天 4 120', 'zh-Hant': '天 4 120', vi: 'ngày 4 120', ja: '日 4 120', ru: 'день 4 120', uk: 'день 4 120', ko: '일 4 120',
+  };
+  // The parser word mark is a JavaScript \b, which only fires next to ASCII word
+  // characters; non-Latin day words are probed with a leading ASCII letter.
+  const needsLatinBoundary = new Set(['zh-Hans', 'zh-Hant', 'ja', 'ru', 'uk', 'ko']);
+  for (const language of languages) {
+    const probe = needsLatinBoundary.has(language) ? `x${phrases[language]}` : phrases[language];
+    assert.equal(chat.readWorldDay(probe, language), 4120, language);
+  }
 });
 
-test('direct system contracts follow all eight prompt languages and retain parser protocol', () => {
+test('direct system contracts follow all prompt languages and retain parser protocol', () => {
   const systems = [
     [article, 'worldArticleSystemPrompt'], [question, 'worldQuestionOptionsSystemPrompt'], [missing, 'missingEntriesSystemPrompt'],
     [rule, 'worldRuleSystemPrompt'], [chat, 'worldChatSystemPrompt'],

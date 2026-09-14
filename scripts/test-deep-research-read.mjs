@@ -46,6 +46,9 @@ try {
   // The repository asks `./database` for its connection; hand it this one before it is
   // ever loaded, so nothing tries to open the real vault.
   stubModule('electron/db/database.ts', { getDb: () => db });
+  const visualCleanup = [];
+  stubModule('electron/vaults/vaultRegistry.ts', { getActiveVault: () => ({ id: 'fixture-vault' }) });
+  stubModule('electron/capabilities/documentStore.ts', { deleteDocumentVisuals: (vault, target) => visualCleanup.push({ vault, target }) });
   const repo = require(path.join(repoRoot, 'electron/db/writingDraftsRepo.ts'));
 
   const brief = { kind: 'deep_research', objective: 'La memoria de la posguerra' };
@@ -91,6 +94,7 @@ try {
 
   repo.setWritingWorkshopDraftRead(saved.id, true);
   repo.deleteWritingWorkshopDraft(saved.id);
+  assert.deepEqual(visualCleanup, [{ vault: 'fixture-vault', target: { kind: 'deep-research', id: saved.id } }], 'report deletion also requests cleanup of its own visual assets');
   assert.equal(
     db.prepare('SELECT COUNT(*) AS n FROM writing_draft_reads').get().n,
     0,

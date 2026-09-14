@@ -66,10 +66,17 @@ Rivera (2020) muestra que las rutas patrimoniales median la memoria publica en c
     es: 'formulacion', en: 'wording', fr: 'formulation', de: 'Formulierung',
     pt: 'formulação', 'pt-BR': 'formulação', it: 'formulazione', tr: 'İfade',
   };
-  for (const [language, marker] of Object.entries(rationaleMarkers)) {
+  // The deterministic rationale table is typed against the eight UI languages,
+  // so only those carry a native marker; the seven new prompt languages must at
+  // least keep the classification contract and produce a non-empty rationale.
+  const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
+  for (const language of languages) {
     const localized = classifyClaimLocally({ claim: claims[1], evidence: strongEvidence, language });
-    assert.equal(localized.status, 'own_argument');
-    assert.match(localized.rationale, new RegExp(marker, 'i'), `${language} local rationale`);
+    assert.equal(localized.status, 'own_argument', `${language} classification`);
+    assert.ok(localized.rationale.trim().length > 0, `${language} rationale is not empty`);
+    if (rationaleMarkers[language]) {
+      assert.match(localized.rationale, new RegExp(rationaleMarkers[language], 'i'), `${language} local rationale`);
+    }
   }
 
   const covered = classifyClaimLocally({ claim: claims[2], evidence: [], language: 'en' });

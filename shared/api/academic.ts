@@ -9,10 +9,11 @@ import type { StudyMaterialAnnotation, StudyMaterialAnnotationInput, StudyMateri
 import type { StudyAudioMarker, StudyAudioMarkerInput, StudyDiarizationRequest, StudyDiarizationResult, StudyRecordingContent, StudyRecordingCreateInput, StudyRecordingDetail, StudyRecordingImportResult, StudyRecordingListOptions, StudyRecordingSummary, StudyRecordingUpdateInput, StudyTranscript, StudyTranscriptInput, StudyTranscriptSegment, StudyTranscriptSegmentInput } from '../studyRecordings';
 import type { StudySavedSearch, StudySearchHistoryEntry, StudySearchIndexStatus, StudySearchOptions, StudySearchProgress, StudySearchResponse } from '../studySearch';
 import type { StudyAssistantConversation, StudyAssistantConversationInput, StudyAssistantConversationPatch, StudyAssistantConversationSummary, StudyAssistantRequest, StudyAssistantResponse, StudyAssistantSourceOption, StudyAssistantStreamHandlers } from '../studyAssistant';
-import type { StudyQuestion, StudyQuestionCollection, StudyQuestionFilters, StudyQuestionGenerationRequest, StudyQuestionGenerationResult, StudyQuestionInput, StudyQuestionVersion, StudyQuestionAnalytics, StudyQuestionSimilar } from '../studyQuestions';
+import type { StudyQuestion, StudyQuestionBulkAction, StudyQuestionCollection, StudyQuestionFilters, StudyQuestionGenerationRequest, StudyQuestionGenerationResult, StudyQuestionInput, StudyQuestionVersion, StudyQuestionAnalytics, StudyQuestionSimilar } from '../studyQuestions';
 import type { StudyAssessment, StudyAssessmentInput, StudyAttempt, StudyAttemptAnswer, StudyAttemptAnswerInput, StudyAttemptStartInput, StudyTestBuildRequest } from '../studyAssessments';
 import type { StudyGradingRun, StudyRubric, StudyRubricInput } from '../studyGrading';
-import type { StudyFlashcard, StudyFlashcardInput, StudyReviewInput, StudyReviewRecord } from '../studyFlashcards';
+import type { StudyFlashcard, StudyFlashcardBulkAction, StudyFlashcardExport, StudyFlashcardFilters, StudyFlashcardInput, StudyReviewInput, StudyReviewRecord } from '../studyFlashcards';
+import type { StudyInterchangeExportOptions, StudyInterchangeFormat, StudyInterchangeImportOptions, StudyInterchangeKind, StudyInterchangeSummary } from '../studyInterchange';
 import type { StudyProgressDashboard } from '../studyStats';
 import type { StudyCalendarEvent, StudyCalendarEventInput, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from '../studyPlanner';
 import type { StudyAiUsage, StudyAiUsageSummary } from '../studyAi';
@@ -547,6 +548,10 @@ export interface AcademicApi {
   deleteStudyQuestionCollection(id: string): Promise<void>;
   getStudyQuestionAnalytics(id: string): Promise<StudyQuestionAnalytics>;
   findSimilarStudyQuestions(id: string, threshold?: number): Promise<StudyQuestionSimilar[]>;
+  listStudyQuestionTags(): Promise<Array<{ tag: string; count: number }>>;
+  bulkStudyQuestions(ids: string[], action: StudyQuestionBulkAction): Promise<number>;
+  exportStudyInterchange(kind: StudyInterchangeKind, format: StudyInterchangeFormat, options?: StudyInterchangeExportOptions): Promise<{ path: string } | null>;
+  importStudyInterchange(kind: StudyInterchangeKind, options?: StudyInterchangeImportOptions): Promise<StudyInterchangeSummary | null>;
   listStudyAssessments(kind?: StudyAssessment['kind'], includeArchived?: boolean): Promise<StudyAssessment[]>;
   getStudyAssessment(id: string): Promise<StudyAssessment | null>;
   createStudyAssessment(input: StudyAssessmentInput): Promise<StudyAssessment>;
@@ -567,12 +572,16 @@ export interface AcademicApi {
   deleteStudyRubric(id: string): Promise<void>;
   listStudyGradingRuns(attemptAnswerId?: string): Promise<StudyGradingRun[]>;
   setStudyGradingManualScore(id: string, score: number, comment?: string): Promise<StudyGradingRun>;
-  listStudyFlashcards(options?: { subjectId?: string; topicId?: string; dueOnly?: boolean; includeArchived?: boolean; search?: string }): Promise<StudyFlashcard[]>;
+  listStudyFlashcards(options?: StudyFlashcardFilters): Promise<StudyFlashcard[]>;
   createStudyFlashcard(input: StudyFlashcardInput): Promise<StudyFlashcard>;
   updateStudyFlashcard(id: string, patch: Partial<StudyFlashcardInput>): Promise<StudyFlashcard>;
   createStudyFlashcardsFromQuestions(questionIds: string[]): Promise<StudyFlashcard[]>;
   reviewStudyFlashcard(input: StudyReviewInput): Promise<{ card: StudyFlashcard; review: StudyReviewRecord }>;
   setStudyFlashcardState(id: string, action: 'master' | 'reset' | 'exclude' | 'include' | 'archive' | 'delete'): Promise<void>;
+  listStudyFlashcardTags(): Promise<Array<{ tag: string; count: number }>>;
+  bulkStudyFlashcards(ids: string[], action: StudyFlashcardBulkAction): Promise<number>;
+  exportStudyFlashcards(ids?: string[]): Promise<StudyFlashcardExport>;
+  importStudyFlashcards(payload: StudyFlashcardExport): Promise<StudyFlashcard[]>;
   getStudyProgressDashboard(): Promise<StudyProgressDashboard>;
   getStudyPlanner(): Promise<StudyPlannerSnapshot>;
   createStudyPlan(input: { title: string; description?: string; courseId?: string | null; subjectId?: string | null; examAt?: string | null; availableMinutes?: number; config?: Record<string, unknown> }): Promise<StudyPlan>;
@@ -660,6 +669,16 @@ export interface AcademicApi {
   generateHypothesisLab(request: HypothesisLabRequest): Promise<HypothesisLabResult>;
 
   // research assistant
+  getResearchSystemPrompts(conversationKey?: string | null): Promise<import('../researchSystemPrompts').ResearchSystemPromptState>;
+  saveResearchSystemPrompt(input: import('../researchSystemPrompts').ResearchSystemPromptInput): Promise<import('../researchSystemPrompts').ResearchSystemPrompt>;
+  selectResearchSystemPrompt(conversationKey: string, id: string | null): Promise<void>;
+  deleteResearchSystemPrompt(id: string): Promise<void>;
+  listResearchContextSources(): Promise<import('../researchContextFilters').ResearchContextSources>;
+  importResearchAttachments(owner: import('../researchAttachments').ResearchAttachmentOwner, filePaths: string[]): Promise<import('../researchAttachments').ResearchAttachmentImportResult>;
+  pickResearchAttachments(owner: import('../researchAttachments').ResearchAttachmentOwner): Promise<import('../researchAttachments').ResearchAttachmentImportResult>;
+  listResearchAttachments(owner: import('../researchAttachments').ResearchAttachmentOwner): Promise<import('../researchAttachments').ResearchAttachment[]>;
+  removeResearchAttachment(owner: import('../researchAttachments').ResearchAttachmentOwner, id: string): Promise<void>;
+  saveResearchAttachment(owner: import('../researchAttachments').ResearchAttachmentOwner, id: string): Promise<void>;
   researchChat(request: ResearchChatRequest): Promise<ResearchChatResponse>;
   researchChatStream(request: ResearchChatRequest, handlers: ResearchChatStreamHandlers): Promise<ResearchChatResponse>;
   /**
@@ -827,7 +846,8 @@ export interface AcademicApi {
   /** Lightweight preview (title + snippet) of a cited source for its hover-card. Null if it no longer resolves. */
   getCitationPreview(ref: CitationRef): Promise<CitationPreview | null>;
   /** Search across ideas, works, gaps, themes, authors and notes. */
-  globalSearch(query: string, limitPerKind?: number): Promise<GlobalSearchResult[]>;
+  searchVaultContent(query: string, kinds?: string[], semantic?: boolean, limit?: number): Promise<import('../hybridSearch').VaultContentSearchResponse>;
+  globalSearch(query: string, limitPerKind?: number, kinds?: SearchResultKind[]): Promise<GlobalSearchResult[]>;
   getSearchResultDetail(kind: SearchResultKind, id: string): Promise<SearchResultDetail | null>;
   /** Search by meaning over embedded ideas, passages and works. */
   semanticSearch(query: string, options?: SemanticSearchOptions): Promise<SemanticSearchResponse>;

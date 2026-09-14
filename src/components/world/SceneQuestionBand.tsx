@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { SceneQuestionLoad } from '@shared/types';
 import { Icon } from '../ui';
+import { StudyMarkdownInline } from '../StudyMarkdown';
 import { useDataRefresh } from '../../hooks';
 import { t, tx } from '../../i18n';
 
@@ -54,7 +55,7 @@ export function SceneQuestionBand({ sceneId, onOpenQuestions }: { sceneId: strin
       <ul className="space-y-0.5">
         {load.items.slice(0, 4).map((item) => (
           <li key={item.originKey ?? item.questionId} className="truncate text-[11px] text-neutral-300">
-            · {item.question}
+            · <StudyMarkdownInline content={item.question} />
             {item.anchor && <span className="text-neutral-600"> · {item.anchor.title}</span>}
           </li>
         ))}

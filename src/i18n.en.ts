@@ -1,4 +1,10 @@
+import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
+import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
+import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
+import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
+import { RESEARCH_REASONING_TRANSLATIONS } from './i18n.researchReasoning';
 import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
+import { CAPABILITIES_TRANSLATIONS } from './i18n.capabilities';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
@@ -9,6 +15,7 @@ import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
+import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
@@ -58,7 +65,15 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  */
 export const EN: Record<string, string> = {
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Choose light mode, dark mode, or follow the operating system.',
+  ...RESEARCH_ATTACHMENT_TRANSLATIONS['en'],
+  "Research chat": "Research chat",
+  "Elige al menos una base de datos.": "Choose at least one database.",
+  ...RESEARCH_PROMPT_TRANSLATIONS.en,
+  ...RESEARCH_SOURCE_TRANSLATIONS["en"],
+  ...RESEARCH_REASONING_TRANSLATIONS["en"],
   ...CHAT_SKILLS_TRANSLATIONS['en'],
+  ...CAPABILITIES_TRANSLATIONS['en'],
+  ...DOCUMENT_SKILLS_TRANSLATIONS['en'],
   ...STELLAR_GRAPH_TRANSLATIONS["en"],
   ...ACADEMIC_TOUR_TRANSLATIONS.en,
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS.en,
@@ -104,6 +119,7 @@ export const EN: Record<string, string> = {
   ...ANNOUNCEMENT_TRANSLATIONS['en'],
   ...WORLD_CHAT_TRANSLATIONS.en,
   ...STUDY_SYNONYM_TRANSLATIONS.en,
+  ...STUDY_BANK_TRANSLATIONS.en,
   ...STUDY_IMPROVE_TRANSLATIONS.en,
   ...WORKSPACE_TRANSLATIONS.en,
   "Lo que cuenta el mapa": "What the map tells you",
@@ -2511,6 +2527,7 @@ export const EN: Record<string, string> = {
   'No aplica': 'Not applicable',
   'Solo abstract': 'Abstract only',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'Nodus found no text to read. Add the PDF or EPUB in Zotero and analyze again.',
+  'Zotero no está disponible. Ábrelo y vuelve a analizar.': 'Zotero is not available. Open it and analyze again.',
   'El análisis solo pudo usar el abstract, así que esta obra no tendrá texto citable. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'The analysis could only use the abstract, so this work will have no citable text. Add the PDF or EPUB in Zotero and analyze again.',
   'Ver las {n} ideas de esta obra': "See this work's {n} ideas",
   'Analizar: temas, ideas, resumen, indexado y relaciones': 'Analyze: themes, ideas, summary, indexing and relationships',
@@ -4434,6 +4451,7 @@ export const EN: Record<string, string> = {
 
   // ── Markdown notes editor ──────────────────────────────────────────────────
   'Vista previa': 'Preview',
+  'Markdown y LaTeX · fórmulas entre $...$': 'Markdown and LaTeX · formulas between $...$',
 
   // ── Tree view ──────────────────────────────────────────────────────────────
   'Aún no hay personas. Importa un GEDCOM o añade personas y sus parentescos desde la vista Personas.':
@@ -8673,4 +8691,28 @@ export const EN: Record<string, string> = {
   "Usa un número entero de palabras, sin decimales.": "Use a whole number of words, no decimals.",
   "El mínimo son {min} palabras por sección.": "The minimum is {min} words per section.",
   "El máximo son {max} palabras por sección.": "The maximum is {max} words per section.",
+  "Solicitud cancelada por el usuario.": "User aborted the request.",
+  // PDF Presenter — tags (renamed from folders) and the PDF download.
+  'Sin etiqueta': 'No tag',
+  'Eliminar etiqueta': 'Delete tag',
+  'Filtrar por etiqueta': 'Filter by tag',
+  '¿Seguro que quieres eliminar la etiqueta «{name}»? Las presentaciones que la tienen seguirán en la biblioteca, pero sin etiqueta.': 'Delete the tag “{name}”? The presentations that carry it stay in the library, just without a tag.',
+  'Descargar PDF': 'Download PDF',
+  'No se pudo descargar la presentación.': 'The presentation could not be downloaded.',
+  // Nodus Browser — HTTP authentication prompt.
+  'pide usuario y contraseña.': 'is asking for your username and password.',
+  'Usuario': 'Username',
+  'Iniciar sesión': 'Sign in',
+  'Proxy': 'Proxy',
+  'Nota guardada': 'Note saved',
+  'Continuar en el chat': 'Continue in chat',
+  'La nota se guardó, pero no se pudo vincular al proyecto.': 'The note was saved, but it could not be linked to the project.',
+  'Procedencia': 'Provenance',
+  'Volver a la conversación': 'Back to the conversation',
+  'Fuentes citadas': 'Cited sources',
+  'Research chat de bases de datos': 'Research chat: databases',
+  'Research chat de estudio': 'Research chat: study',
+  'Research chat del mundo': 'Research chat: world',
+  'La conversación original ya no está disponible.': 'The original conversation is no longer available.',
+  'La conversación está disponible, pero el mensaje original ya no existe.': 'The conversation is available, but the original message no longer exists.',
 };

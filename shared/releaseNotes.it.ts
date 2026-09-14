@@ -1,3 +1,5 @@
+import { RELEASE_5_4_0_ADDITIONS } from './releaseNotes540';
+import { RELEASE_5_4_2_HIGHLIGHTS } from './releaseNotes542';
 // v2.6.0 and v2.6.1 intentionally share this exact Italian list — see the note
 // next to RELEASE_2_6_HIGHLIGHTS in releaseNotes.ts.
 const RELEASE_2_6_IT: string[] = [
@@ -166,6 +168,19 @@ const RELEASE_5_1_0_IT = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.4.2": RELEASE_5_4_2_HIGHLIGHTS.map(highlight => highlight.it),
+  "5.4.0": [
+    ...RELEASE_5_4_0_ADDITIONS.map(highlight => highlight.it),
+    "Chemistry Studio, Legalize e AlphaGenome sono ora pacchetti ufficiali che installi tu. Compaiono in Skills con il loro editore verificato, i permessi, la dimensione e le piattaforme su cui funzionano, e puoi installarli, aggiornarli, tornare alla versione precedente o rimuoverli quando vuoi. Quello che fanno non è cambiato.",
+    "La tua configurazione si sposta da sola quando aggiorni. Se avevi Chemistry Studio attivo, una chiave AlphaGenome salvata o una tua skill che richiede una di queste capability, Nodus installa il pacchetto corrispondente e adotta la skill mantenendo il suo posto nell'elenco, le superfici su cui era attiva e le istruzioni che avevi modificato. Funziona senza connessione perché i pacchetti viaggiano dentro l'aggiornamento stesso.",
+    "Nodus occupa meno spazio se non disegni molecole. I motori di chimica, il compilatore TeX e le altre dipendenze di queste tre aree non viaggiano più con l'applicazione, ma dentro il pacchetto che ne ha bisogno. Un'installazione pulita non scarica né carica nessuna delle tre finché non ne chiedi una.",
+    "Ogni pacchetto si configura nella propria scheda. La chiave AlphaGenome, l'accettazione dei suoi termini e l'installazione del suo runtime Python vivono ora nel pacchetto invece che sparse nelle impostazioni di Nodus. La tua chiave resta nell'archivio credenziali del sistema e raggiunge l'interprete tramite il suo standard input, mai su una riga di comando o in un registro.",
+    "Un pacchetto arriva solo firmato da NodusResearch. Nodus verifica la firma e l'impronta esatta di ciò che scarica prima di aprirlo, rifiuta una versione più vecchia di quella installata e rifiuta un contenuto diverso pubblicato con lo stesso numero. Un aggiornamento che chiede più di quanto avevi approvato attende la tua revisione invece di applicarsi da solo.",
+    "I risultati restano accanto alla conversazione e ogni pacchetto decide cosa vede il modello. Una previsione AlphaGenome continua a non lasciare il tuo dispositivo, e questa regola ora la dichiara il pacchetto stesso invece di essere scritta dentro Nodus. Se disinstalli un pacchetto, i risultati già presenti nelle tue chat restano e puoi reinstallarlo dal messaggio stesso.",
+    "Le cartelle del PDF Presenter ora sono etichette, che è quello che sono sempre state. Toccarne una mostra solo le presentazioni che la portano, toccarla di nuovo le mostra tutte. Eliminare un'etichetta chiede prima conferma e non porta mai via le sue presentazioni. Restano lì, semplicemente senza etichetta. Gli scaffali che avevi organizzato prima di questo aggiornamento si aprono come li avevi lasciati.",
+    "Una presentazione può finalmente uscire dalla libreria. Scarica PDF salva dove vuoi la copia che Nodus conserva, così una presentazione importata da PowerPoint o Keynote è tua in PDF anche se non hai più l'originale. La copia sul tuo scaffale resta dov'è.",
+    "L'importazione delle note legge un secondo tipo di file TXT. Oltre al formato esportato da Nodus, ora accetta file di note recuperate che elencano solo le diapositive che hanno una nota. Nodus legge il numero di diapositive dall'intestazione del file stesso, così un file con note per 130 diapositive su 140 non sembra più un errore.",
+  ],
   "5.3.1": [
     "Il Marketplace ora sa quali skill possiedi già. Le skill incluse in Nodus appaiono come installate invece di essere proposte di nuovo, un filtro Tutte / Installate / Disponibili controlla la tua libreria dal catalogo e ogni skill installata si può rimuovere dalla sua scheda. Installare una voce che Nodus include già ripristina la versione fornita con la tua build invece di aggiungere un duplicato, e rimuove il duplicato lasciato da una versione precedente.",
     "Scopri prima di installare se un plugin richiede un Nodus più recente. La schermata di verifica confronta la tua build con la versione richiesta dal plugin e lo segnala sopra il pulsante di installazione, e la conferma lo ripete. Un plugin già in attesa indica ora sulla sua scheda la versione che gli serve, invece di mostrare la propria descrizione senza spiegare nulla.",
@@ -593,3 +608,6 @@ RELEASE_NOTES_IT["5.1.5"] = RELEASE_NOTES_IT["5.1.4"];
 
 // 5.2.1 intentionally ships the exact same What's New copy as 5.2.0.
 RELEASE_NOTES_IT["5.2.1"] = RELEASE_NOTES_IT["5.2.0"];
+
+// 5.4.1 intentionally ships the exact same What's New copy as 5.4.0.
+RELEASE_NOTES_IT["5.4.1"] = RELEASE_NOTES_IT["5.4.0"];

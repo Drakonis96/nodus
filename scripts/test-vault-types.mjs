@@ -110,7 +110,7 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
     readFile(path.join(repoRoot, 'src/i18n.en.ts'), 'utf8'),
   ]);
   // The whole promised structure stays visible while it is built one section at a time.
-  for (const label of ['Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Familias', 'Dinastías', 'Chat del mundo', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Continuidad', 'Preguntas abiertas', 'Notas', 'Escenas', 'Manuscrito']) {
+  for (const label of ['Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Familias', 'Dinastías', 'Research chat', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Continuidad', 'Preguntas abiertas', 'Notas', 'Escenas', 'Manuscrito']) {
     assert.match(sidebar, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${label} appears in the worldbuilding sidebar`);
   }
   // Every announced section is now wired up: nothing in this sidebar is inert. Enciclopedia, Personajes and
@@ -127,11 +127,11 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
   );
   assert.deepEqual(
     [...sidebar.matchAll(/\bview: '(\w+)'/g)].map((m) => m[1]).sort(),
-    ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'dynasties', 'encyclopedia', 'factions', 'manuscript', 'map', 'notes', 'places', 'questions', 'relations', 'rules', 'scenes', 'timeline', 'tree', 'worldChat']
+    ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'dynasties', 'encyclopedia', 'factions', 'manuscript', 'map', 'notes', 'places', 'questions', 'relations', 'rules', 'scenes', 'search', 'timeline', 'tree', 'worldChat']
   );
   // Every wired view must actually be allowed for the vault type, or the sidebar offers a
   // button that navigates to a section the scoping then refuses to render.
-  for (const view of ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'dynasties', 'encyclopedia', 'factions', 'manuscript', 'map', 'notes', 'places', 'questions', 'relations', 'rules', 'scenes', 'timeline', 'tree', 'worldChat']) {
+  for (const view of ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'dynasties', 'encyclopedia', 'factions', 'manuscript', 'map', 'notes', 'places', 'questions', 'relations', 'rules', 'scenes', 'search', 'timeline', 'tree', 'worldChat']) {
     assert.equal(
       vt.isViewAllowedForVaultType(view, 'worldbuilding'),
       true,
@@ -139,6 +139,7 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
     );
   }
   assert.match(app, /<WorldbuildingSidebar[\s\S]*?activeView=\{view\}[\s\S]*?onNavigate=/);
+  assert.ok(!vt.defaultHiddenViewsForType('worldbuilding').includes('search'), 'worldbuilding search is visible by default');
   // Its own Inicio, and the generic academic home must not also render for it.
   assert.match(app, /if \(ctx\.isWorldbuilding\) \{\s*return \(\s*<WorldbuildingHome/);
   // The academic home is reached only after every vault flag has declined it,
@@ -327,13 +328,13 @@ test('all dedicated study views are scoped to estudio', () => {
 test('teaching reuses the study organisation and analysis surfaces but hides the research universals', () => {
   for (const view of [
     'studyCourses', 'studySchedule', 'studyCalendar', 'studyLibrary', 'studyRecordings',
-    'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions',
+    'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions', 'studySearch',
   ]) {
     assert.equal(vt.isViewAllowedForVaultType(view, 'estudio'), true, `${view} allowed in estudio`);
     assert.equal(vt.isViewAllowedForVaultType(view, 'docencia'), true, `${view} allowed in docencia`);
   }
   // The study-only surfaces stay exclusive to estudio and never leak into teaching.
-  for (const view of ['studySearch', 'studyReview', 'studyDeepResearch']) {
+  for (const view of ['studyReview', 'studyDeepResearch']) {
     assert.equal(vt.isViewAllowedForVaultType(view, 'estudio'), true, `${view} allowed in estudio`);
     assert.equal(vt.isViewAllowedForVaultType(view, 'docencia'), false, `${view} hidden in docencia`);
   }
@@ -343,6 +344,7 @@ test('teaching reuses the study organisation and analysis surfaces but hides the
   }
   // Teaching hides the same research/authoring universals the study mode hides.
   const hidden = vt.defaultHiddenViewsForType('docencia');
+  assert.ok(!hidden.includes('studySearch'), 'teaching exposes the shared study search');
   for (const h of ['search', 'library', 'graph', 'ideas', 'authors', 'writing', 'projects', 'deepResearch', 'notes']) {
     assert.ok(hidden.includes(h), `${h} hidden in docencia`);
   }

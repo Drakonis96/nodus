@@ -12,6 +12,7 @@ import {
   type ExamQuestion,
   type TeachingExam,
 } from './teachingExams';
+import { renderTeachingMarkdown } from './teachingMarkdown';
 
 /**
  * Renders the exam as a self-contained A4 HTML document.
@@ -36,11 +37,6 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** Preserve the teacher's paragraph breaks without allowing markup through. */
-function escapeMultiline(value: string): string {
-  return escapeHtml(value).replace(/\n/g, '<br />');
-}
-
 function answerLinesHtml(count: number): string {
   if (count <= 0) return '';
   return `<div class="lines">${'<div class="line"></div>'.repeat(count)}</div>`;
@@ -52,7 +48,7 @@ function questionBodyHtml(question: ExamQuestion, exam: TeachingExam): string {
     case 'multiple_choice':
       return `<ol class="options">${question.options
         .filter((option) => option.text.trim())
-        .map((option, index) => `<li><span class="box"></span><span class="letter">${examOptionLetter(index)})</span> ${escapeHtml(option.text)}</li>`)
+        .map((option, index) => `<li><span class="box"></span><span class="letter">${examOptionLetter(index)})</span> ${renderTeachingMarkdown(option.text, { inline: true })}</li>`)
         .join('')}</ol>`;
     case 'true_false':
       return `<div class="tf"><span class="box"></span> ${escapeHtml(labels.trueLabel)} <span class="box tf-gap"></span> ${escapeHtml(labels.falseLabel)}</div>`;
@@ -61,17 +57,17 @@ function questionBodyHtml(question: ExamQuestion, exam: TeachingExam): string {
       // The right column is presented in its stored order; the teacher shuffles it when
       // authoring if they want, so the printed key stays predictable.
       return `<table class="matching"><thead><tr><th>${escapeHtml(labels.columnA)}</th><th></th><th>${escapeHtml(labels.columnB)}</th></tr></thead><tbody>${pairs
-        .map((pair, index) => `<tr><td>${index + 1}. ${escapeHtml(pair.left)}</td><td class="dot">•&nbsp;&nbsp;&nbsp;&nbsp;•</td><td>${examOptionLetter(index)}) ${escapeHtml(pair.right)}</td></tr>`)
+        .map((pair, index) => `<tr><td>${index + 1}. ${renderTeachingMarkdown(pair.left, { inline: true })}</td><td class="dot">•&nbsp;&nbsp;&nbsp;&nbsp;•</td><td>${examOptionLetter(index)}) ${renderTeachingMarkdown(pair.right, { inline: true })}</td></tr>`)
         .join('')}</tbody></table>`;
     }
     case 'ordering':
       return `<ol class="ordering">${question.items
         .filter((item) => item.trim())
-        .map((item) => `<li><span class="num-box"></span> ${escapeHtml(item)}</li>`)
+        .map((item) => `<li><span class="num-box"></span> ${renderTeachingMarkdown(item, { inline: true })}</li>`)
         .join('')}</ol>`;
     case 'image_comment': {
       const image = question.imageDataUrl
-        ? `<figure class="figure"><img src="${escapeHtml(question.imageDataUrl)}" alt="" />${question.imageCaption ? `<figcaption>${escapeHtml(question.imageCaption)}</figcaption>` : ''}</figure>`
+        ? `<figure class="figure"><img src="${escapeHtml(question.imageDataUrl)}" alt="" />${question.imageCaption ? `<figcaption>${renderTeachingMarkdown(question.imageCaption, { inline: true })}</figcaption>` : ''}</figure>`
         : '';
       return `${image}${answerLinesHtml(examAnswerLines(question))}`;
     }
@@ -111,7 +107,7 @@ function headerHtml(exam: TeachingExam, questions: ExamQuestion[]): string {
       ${header.showGradeBox ? `<div class="grade"><span>${escapeHtml(labels.grade)}</span><div class="grade-box"></div></div>` : ''}
     </div>
     ${fields.length ? `<div class="fields">${fields.join('')}</div>` : ''}
-    ${header.instructions.trim() ? `<div class="instructions"><strong>${escapeHtml(labels.instructions)}:</strong> ${escapeMultiline(header.instructions)}</div>` : ''}
+    ${header.instructions.trim() ? `<div class="instructions"><strong>${escapeHtml(labels.instructions)}:</strong> ${renderTeachingMarkdown(header.instructions)}</div>` : ''}
   </header>`;
 }
 
@@ -134,14 +130,14 @@ function answerKeyHtml(exam: TeachingExam, blocks: ReturnType<typeof groupExamQu
   const rows = flattenExamBlocks(blocks)
     .map(({ question, number }) => {
       const def = examQuestionTypeDef(question.type);
-      let answer = escapeMultiline(question.solution);
+      let answer = renderTeachingMarkdown(question.solution, { inline: true });
       if (question.type === 'multiple_choice') {
         // Letter over the SAME list the paper letters: the paper drops blank options
         // before lettering, so indexing the unfiltered array cites the wrong letter as
         // soon as a question has an empty option — and a wrong key is worse than none.
         const shown = question.options.filter((option) => option.text.trim());
         const correct = shown.findIndex((option) => option.correct);
-        const letter = correct >= 0 ? `${examOptionLetter(correct)}) ${escapeHtml(shown[correct]?.text ?? '')}` : '';
+        const letter = correct >= 0 ? `${examOptionLetter(correct)}) ${renderTeachingMarkdown(shown[correct]?.text ?? '', { inline: true })}` : '';
         answer = [letter, answer].filter(Boolean).join(' — ');
       } else if (question.type === 'true_false') {
         answer = [escapeHtml(trueFalseAnswerLabel(question, labels)), answer].filter(Boolean).join(' — ');
@@ -152,7 +148,8 @@ function answerKeyHtml(exam: TeachingExam, blocks: ReturnType<typeof groupExamQu
           .join(', ');
         answer = [escapeHtml(pairs), answer].filter(Boolean).join(' — ');
       } else if (question.type === 'ordering') {
-        answer = [escapeHtml(question.items.filter((item) => item.trim()).join(' → ')), answer].filter(Boolean).join(' — ');
+        const ordered = question.items.filter((item) => item.trim()).map((item) => renderTeachingMarkdown(item, { inline: true })).join(' → ');
+        answer = [ordered, answer].filter(Boolean).join(' — ');
       }
       return `<li><strong>${labels.question} ${escapeHtml(number)}</strong> (${escapeHtml(def.label)}): ${answer || '—'}</li>`;
     })
@@ -282,7 +279,7 @@ export function renderExamHtml(exam: TeachingExam, questions: ExamQuestion[], op
   const questionHtml = (question: ExamQuestion, number: string, nested: boolean): string => {
     const points = exam.header.showPoints ? `<span class="q-points">${escapeHtml(formatExamPoints(question.points, exam.language))}</span>` : '';
     return `<article class="question${nested ? ' sub-question' : ''}">
-      <div class="q-head"><span class="q-num">${escapeHtml(number)}${nested ? ')' : '.'}</span><span class="q-prompt">${escapeMultiline(question.prompt)}</span>${points}</div>
+      <div class="q-head"><span class="q-num">${escapeHtml(number)}${nested ? ')' : '.'}</span><div class="q-prompt">${renderTeachingMarkdown(question.prompt)}</div>${points}</div>
       ${questionBodyHtml(question, exam)}
     </article>`;
   };
@@ -298,10 +295,10 @@ export function renderExamHtml(exam: TeachingExam, questions: ExamQuestion[], op
         ? `<span class="q-points">${escapeHtml(formatExamPoints(block.points, exam.language))}</span>`
         : '';
       const image = block.section.imageDataUrl
-        ? `<figure class="figure"><img src="${escapeHtml(block.section.imageDataUrl)}" alt="" />${block.section.imageCaption ? `<figcaption>${escapeHtml(block.section.imageCaption)}</figcaption>` : ''}</figure>`
+        ? `<figure class="figure"><img src="${escapeHtml(block.section.imageDataUrl)}" alt="" />${block.section.imageCaption ? `<figcaption>${renderTeachingMarkdown(block.section.imageCaption, { inline: true })}</figcaption>` : ''}</figure>`
         : '';
       return `<section class="exercise">
-        <div class="q-head section-head"><span class="q-num">${escapeHtml(block.number)}.</span><span class="q-prompt">${escapeMultiline(block.section.prompt)}</span>${points}</div>
+        <div class="q-head section-head"><span class="q-num">${escapeHtml(block.number)}.</span><div class="q-prompt">${renderTeachingMarkdown(block.section.prompt)}</div>${points}</div>
         ${image}
         <div class="sub-questions">${block.questions.map((entry) => questionHtml(entry.question, entry.number, true)).join('')}</div>
       </section>`;

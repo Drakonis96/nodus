@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { StudyFlashcard, StudyFlashcardInput, StudyReviewInput, StudyReviewRecord } from '@shared/studyFlashcards';
+import type { StudyFlashcard, StudyFlashcardBulkAction, StudyFlashcardExport, StudyFlashcardFilters, StudyFlashcardInput, StudyFlashcardSort, StudyReviewInput, StudyReviewRecord } from '@shared/studyFlashcards';
 import { validateStudyFlashcard } from '@shared/studyFlashcards';
 import type { StudySrsState } from '@shared/studySrs';
 import { initialStudySrsState, scheduleStudySrsReview, studySrsPriority } from '@shared/studySrs';
@@ -25,15 +25,34 @@ function toCard(row: Row): StudyFlashcard {
   return { id: String(row.id), shortId: String(row.short_id), type: String(row.card_type) as StudyFlashcard['type'], front: String(row.front), back: String(row.back), hint: String(row.hint ?? ''), tags: json(row.tags_json, []), courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, topicId: row.topic_id ? String(row.topic_id) : null, documentId: row.document_id ? String(row.document_id) : null, materialId: row.material_id ? String(row.material_id) : null, transcriptId: row.transcript_id ? String(row.transcript_id) : null, questionId: row.question_id ? String(row.question_id) : null, sourceExcerpt: String(row.source_excerpt ?? ''), difficulty: String(row.difficulty) as StudyFlashcard['difficulty'], favorite: bool(row.favorite), position: Number(row.position), archivedAt: row.archived_at ? String(row.archived_at) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at), srs: srsFrom(state) };
 }
 
-export function listStudyFlashcards(options: { subjectId?: string; topicId?: string; dueOnly?: boolean; includeArchived?: boolean; search?: string } = {}): StudyFlashcard[] {
+const CARD_SORT_SQL: Record<StudyFlashcardSort, string> = {
+  due: 'f.favorite DESC, s.due_at, f.position',
+  created: 'f.created_at DESC',
+  updated: 'f.updated_at DESC',
+  front: 'f.front COLLATE NOCASE ASC',
+  difficulty: "CASE f.difficulty WHEN 'easy' THEN 0 WHEN 'medium' THEN 1 WHEN 'hard' THEN 2 ELSE 3 END, f.updated_at DESC",
+  interval: 's.interval_days DESC, f.updated_at DESC',
+  lapses: 's.lapses DESC, f.updated_at DESC',
+};
+
+export function listStudyFlashcards(options: StudyFlashcardFilters = {}): StudyFlashcard[] {
   const conditions = ['f.deleted_at IS NULL']; const params: unknown[] = [];
   if (!options.includeArchived) conditions.push('f.archived_at IS NULL');
   if (options.subjectId) { conditions.push('f.subject_id=?'); params.push(options.subjectId); }
   if (options.topicId) { conditions.push('f.topic_id=?'); params.push(options.topicId); }
+  if (options.courseId) { conditions.push('f.course_id=?'); params.push(options.courseId); }
+  if (options.documentId) { conditions.push('f.document_id=?'); params.push(options.documentId); }
+  if (options.materialId) { conditions.push('f.material_id=?'); params.push(options.materialId); }
+  if (options.questionId) { conditions.push('f.question_id=?'); params.push(options.questionId); }
+  if (options.difficulty) { conditions.push('f.difficulty=?'); params.push(options.difficulty); }
+  if (options.favorite) conditions.push('f.favorite=1');
   if (options.dueOnly) { conditions.push('s.excluded=0 AND s.mastered=0 AND s.due_at<=?'); params.push(now()); }
+  if (options.tag?.trim()) { conditions.push("EXISTS (SELECT 1 FROM json_each(f.tags_json) WHERE json_each.value = ?)"); params.push(options.tag.trim()); }
   if (options.search?.trim()) { conditions.push('(f.front LIKE ? OR f.back LIKE ? OR f.tags_json LIKE ?)'); const value = `%${options.search.trim()}%`; params.push(value, value, value); }
-  const rows = getDb().prepare(`SELECT f.* FROM study_flashcards f JOIN study_srs_state s ON s.card_id=f.id WHERE ${conditions.join(' AND ')} ORDER BY f.favorite DESC, s.due_at, f.position`).all(...params) as Row[];
-  return rows.map(toCard).sort((left, right) => studySrsPriority(right.srs) - studySrsPriority(left.srs));
+  const order = CARD_SORT_SQL[options.sort ?? 'due'] ?? CARD_SORT_SQL.due;
+  const rows = getDb().prepare(`SELECT f.* FROM study_flashcards f JOIN study_srs_state s ON s.card_id=f.id WHERE ${conditions.join(' AND ')} ORDER BY ${order}`).all(...params) as Row[];
+  const sort = options.sort ?? 'due';
+  return rows.map(toCard).sort((left, right) => sort === 'due' ? studySrsPriority(right.srs) - studySrsPriority(left.srs) : 0);
 }
 
 export function createStudyFlashcard(input: StudyFlashcardInput): StudyFlashcard {
@@ -75,6 +94,72 @@ export function setStudyFlashcardState(id: string, action: 'master' | 'reset' | 
   else if (action === 'delete') getDb().prepare('UPDATE study_flashcards SET deleted_at=?,updated_at=? WHERE id=?').run(timestamp, timestamp, id);
   else if (action === 'reset') getDb().prepare('UPDATE study_srs_state SET ease_factor=2.5,interval_days=0,due_at=?,repetitions=0,lapses=0,last_rating=NULL,last_reviewed_at=NULL,mastered=0,updated_at=? WHERE card_id=?').run(timestamp, timestamp, id);
   else getDb().prepare(`UPDATE study_srs_state SET ${action === 'master' ? 'mastered=1' : action === 'exclude' ? 'excluded=1' : 'excluded=0'},updated_at=? WHERE card_id=?`).run(timestamp, id);
+}
+
+function toCardInput(card: StudyFlashcard): StudyFlashcardInput {
+  return {
+    type: card.type, front: card.front, back: card.back, hint: card.hint, tags: card.tags,
+    courseId: card.courseId, subjectId: card.subjectId, topicId: card.topicId, documentId: card.documentId,
+    materialId: card.materialId, transcriptId: card.transcriptId, questionId: card.questionId,
+    sourceExcerpt: card.sourceExcerpt, difficulty: card.difficulty, favorite: card.favorite,
+  };
+}
+
+export function exportStudyFlashcards(idsToExport?: string[]): StudyFlashcardExport {
+  const all = listStudyFlashcards({ includeArchived: true });
+  const selected = idsToExport?.length ? all.filter((card) => idsToExport.includes(card.id)) : all;
+  return { format: 'nodus-study-flashcards', version: 1, exportedAt: now(), cards: selected.map(toCardInput) };
+}
+
+export function importStudyFlashcards(payload: StudyFlashcardExport): StudyFlashcard[] {
+  if (payload.format !== 'nodus-study-flashcards' || payload.version !== 1 || !Array.isArray(payload.cards)) throw new Error('Fichero de flashcards no válido.');
+  return payload.cards.map((card) => createStudyFlashcard(card));
+}
+
+export function listStudyFlashcardTags(): Array<{ tag: string; count: number }> {
+  const rows = getDb().prepare(`SELECT json_each.value AS tag, COUNT(*) AS count FROM study_flashcards, json_each(study_flashcards.tags_json)
+    WHERE deleted_at IS NULL AND json_each.value IS NOT NULL AND TRIM(json_each.value) != ''
+    GROUP BY json_each.value ORDER BY count DESC, tag COLLATE NOCASE ASC`).all() as Row[];
+  return rows.map((row) => ({ tag: String(row.tag), count: Number(row.count) }));
+}
+
+/** Applies one metadata or SRS action to many cards at once. */
+export function bulkStudyFlashcards(ids: string[], action: StudyFlashcardBulkAction): number {
+  const unique = [...new Set(ids.map((id) => String(id)).filter(Boolean))];
+  if (!unique.length) return 0;
+  const db = getDb(); const timestamp = now();
+  const placeholders = unique.map(() => '?').join(',');
+  let affected = 0;
+  db.transaction(() => {
+    if (action.kind === 'difficulty') {
+      affected = db.prepare(`UPDATE study_flashcards SET difficulty=?, updated_at=? WHERE id IN (${placeholders}) AND deleted_at IS NULL`).run(action.difficulty, timestamp, ...unique).changes;
+    } else if (action.kind === 'favorite') {
+      affected = db.prepare(`UPDATE study_flashcards SET favorite=?, updated_at=? WHERE id IN (${placeholders}) AND deleted_at IS NULL`).run(action.favorite ? 1 : 0, timestamp, ...unique).changes;
+    } else if (action.kind === 'move') {
+      const assignments: string[] = []; const values: unknown[] = [];
+      const columns: Array<['courseId' | 'subjectId' | 'topicId' | 'documentId' | 'materialId', string]> = [['courseId', 'course_id'], ['subjectId', 'subject_id'], ['topicId', 'topic_id'], ['documentId', 'document_id'], ['materialId', 'material_id']];
+      for (const [key, column] of columns) {
+        if (action[key] === undefined) continue;
+        assignments.push(`${column}=?`); values.push(action[key] || null);
+      }
+      if (assignments.length) {
+        affected = db.prepare(`UPDATE study_flashcards SET ${assignments.join(', ')}, updated_at=? WHERE id IN (${placeholders}) AND deleted_at IS NULL`).run(...values, timestamp, ...unique).changes;
+      }
+    } else if (action.kind === 'tags') {
+      const add = [...new Set((action.add ?? []).map((tag) => tag.trim()).filter(Boolean))];
+      const remove = new Set((action.remove ?? []).map((tag) => tag.trim()).filter(Boolean));
+      const rows = db.prepare(`SELECT id, tags_json FROM study_flashcards WHERE id IN (${placeholders}) AND deleted_at IS NULL`).all(...unique) as Row[];
+      const update = db.prepare('UPDATE study_flashcards SET tags_json=?, updated_at=? WHERE id=?');
+      for (const row of rows) {
+        const current = json<string[]>(row.tags_json, []);
+        const next = [...new Set([...current.filter((tag) => !remove.has(tag)), ...add])];
+        if (next.length !== current.length || next.some((tag, index) => tag !== current[index])) { update.run(JSON.stringify(next), timestamp, String(row.id)); affected += 1; }
+      }
+    } else if (action.kind === 'state') {
+      for (const id of unique) { try { setStudyFlashcardState(id, action.action); affected += 1; } catch { /* card disappeared mid-action */ } }
+    }
+  })();
+  return affected;
 }
 
 function performanceFor(condition: string, id?: string): ReturnType<typeof summarizeStudyPerformance> {

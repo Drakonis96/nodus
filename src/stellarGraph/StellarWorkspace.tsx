@@ -76,6 +76,8 @@ export interface StellarWorkspaceProps {
   author?: string;
   title?: string;
   toolbar?: ReactNode;
+  /** Optional right-hand panel occupying the same layout slot as idea details. */
+  sidebar?: ReactNode;
   onOpenIdea?(id: string): void;
   openEvidence?(ref: string, location: string | null): void;
   saveIdea?(detail: IdeaDetail): Promise<void>;
@@ -198,7 +200,7 @@ function StellarTabs(props: StellarWorkspaceProps) {
     {fullscreenError && <p role="alert">{t("No se pudo activar la pantalla completa.")}</p>}
     {tabs.map(tab => <div key={tab.id} role="tabpanel" id={`${tabsId}-panel-${tab.id}`} aria-labelledby={`${tabsId}-tab-${tab.id}`} className={active === tab.id ? "stellar-tab-panel" : "hidden"}>
       {tab.mode === "themes" && <div className={tab.themeId ? "hidden" : "stellar-hub-panel"}>
-        <ThemesOverview source={source} toolbar={props.toolbar} initialIdeaIds={tab.hubIdeaIds} active={active === tab.id && !tab.themeId}
+        <ThemesOverview source={source} toolbar={props.toolbar} sidebar={active === tab.id ? props.sidebar : undefined} initialIdeaIds={tab.hubIdeaIds} active={active === tab.id && !tab.themeId}
           onIdeasChange={hubIdeaIds => setTabs(current => current.map(item => item.id === tab.id ? { ...item, hubIdeaIds } : item))}
           onOpenIdea={node => {
             const id = nextId.current++;
@@ -230,6 +232,7 @@ function StellarGraphTab({
   onBack,
   title,
   toolbar,
+  sidebar,
   onOpenIdea,
   openEvidence,
   saveIdea,
@@ -1023,7 +1026,7 @@ function StellarGraphTab({
             </div>
           </details>
         </div>
-        {(idea || edge || detailLoading) && (
+        {active && sidebar ? sidebar : (idea || edge || detailLoading) && (
           <NodeDetailPanel
             readOnly={source.readOnly}
             edgeLabel={edge ? relation(engine?.edges.get(edge.edge.id)?.type || edge.edge.type).label : undefined}

@@ -2611,6 +2611,7 @@ html.theme-active.light .home-dashboard .study-home-icon {
 .docencia .hover\:bg-teal-50\/60:hover { background-color: rgba(255, 247, 237, 0.6); }
 .docencia .border-teal-200 { border-color: #fed7aa; }
 .docencia .border-teal-500 { border-color: #f97316; }
+.docencia.dark .dark\:border-teal-500 { border-color: #f97316; }
 /* The chat's starter cards and manual-source checkboxes (Analizar group). */
 .docencia .hover\:border-teal-400:hover { border-color: #fb923c; }
 .docencia .hover\:border-teal-500:hover { border-color: #f97316; }
@@ -3397,6 +3398,30 @@ select.input optgroup {
   border: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   margin: 0.9em 0;
+}
+
+/* Study and teaching content reuses the Markdown pipeline with a tighter rhythm, so
+   a formula or a list never stretches an option row or a flashcard. Inline contexts
+   unwrap paragraphs; display math scrolls instead of widening the card. */
+.study-markdown > *:first-child {
+  margin-top: 0;
+}
+.study-markdown > *:last-child {
+  margin-bottom: 0;
+}
+.study-markdown .katex-display {
+  margin: 0.4em 0;
+  padding: 2px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.study-markdown-inline > p {
+  display: inline;
+  margin: 0;
+}
+.study-markdown-inline > *:not(p) {
+  margin-top: 0.15em;
+  margin-bottom: 0.15em;
 }
 
 /* Deep Research is long-form reading, not a chat bubble. Keep ordinary words

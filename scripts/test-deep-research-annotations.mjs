@@ -12,6 +12,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { installRuntimeHooks } from './lib/tsRuntimeHooks.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -26,7 +27,7 @@ if (!process.argv.includes('--electron-deep-research-annotations-test')) {
 }
 
 const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-dr-annotations-'));
-installTsHook();
+installRuntimeHooks(root);
 
 try {
   const Database = require('better-sqlite3');
@@ -185,29 +186,4 @@ function stubModule(relative, exports) {
   stub.loaded = true;
   stub.exports = exports;
   require.cache[filename] = stub;
-}
-
-function installTsHook() {
-  const ts = require('typescript');
-  const Module = require('node:module');
-  const originalResolveFilename = Module._resolveFilename;
-  Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {
-    if (request.startsWith('@shared/')) return path.join(repoRoot, `${request.replace('@shared/', 'shared/')}.ts`);
-    return originalResolveFilename.call(this, request, parent, isMain, options);
-  };
-  require.extensions['.ts'] = function loadTs(module, filename) {
-    const source = fs.readFileSync(filename, 'utf8');
-    const output = ts.transpileModule(source, {
-      fileName: filename,
-      compilerOptions: {
-        target: ts.ScriptTarget.ES2022,
-        module: ts.ModuleKind.CommonJS,
-        moduleResolution: ts.ModuleResolutionKind.NodeJs,
-        esModuleInterop: true,
-        resolveJsonModule: true,
-        skipLibCheck: true,
-      },
-    }).outputText;
-    module._compile(output, filename);
-  };
 }

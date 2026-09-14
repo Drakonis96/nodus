@@ -126,6 +126,9 @@ function readinessHint(readiness: WorkReadiness, work?: WorkView): string | null
   if (work?.text_block_reason === 'unsupported') {
     return t('El formato del adjunto no es compatible con la extracción de texto.');
   }
+  if (work?.text_block_reason === 'zotero_unavailable') {
+    return t('Zotero no está disponible. Ábrelo y vuelve a analizar.');
+  }
   if (readiness === 'noText') {
     return t('Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.');
   }
@@ -287,10 +290,12 @@ function StatusFlagsPicker({
 /**
  * The one-click status filters. They run in SQL over the WHOLE library, so what
  * a preset returns is exactly what the pills say — see readinessFilters.ts.
- * 'running' is absent on purpose: it exists only in the live queue.
+ * 'running' is absent on purpose: it exists only in the live queue. Persisted
+ * 'pending' is included so a work waiting to resume is directly filterable.
  */
-const STATUS_PRESETS: Exclude<WorkReadiness, 'pending' | 'running'>[] = [
+const STATUS_PRESETS: Exclude<WorkReadiness, 'running'>[] = [
   'unstarted',
+  'pending',
   'incomplete',
   'ready',
   'abstractOnly',
@@ -964,7 +969,7 @@ export function Library({
   const selectedReadiness = filter.readiness ?? null;
   // Presets and the corpus-health buckets are both whole-corpus status filters;
   // letting them stack would mean two answers to the same question.
-  const setReadiness = (readiness: Exclude<WorkReadiness, 'pending' | 'running'> | null) => {
+  const setReadiness = (readiness: Exclude<WorkReadiness, 'running'> | null) => {
     setPageOffset(0);
     updateFilter((current) => ({ ...current, readiness: readiness ?? undefined, healthBucket: undefined }));
   };

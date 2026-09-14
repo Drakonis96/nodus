@@ -152,12 +152,18 @@ function loadMark(contextId: string): ReaderMark | null {
   }
 }
 
+function sourceRangeText(range: Range): string {
+  const fragment = range.cloneContents();
+  fragment.querySelectorAll('[data-reader-ignore]').forEach(node => node.remove());
+  return fragment.textContent ?? '';
+}
+
 function textNodes(root: HTMLElement): Text[] {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = [];
   let current = walker.nextNode();
   while (current) {
-    if ((current as Text).data.length > 0) nodes.push(current as Text);
+    if ((current as Text).data.length > 0 && !(current.parentElement?.closest('[data-reader-ignore]'))) nodes.push(current as Text);
     current = walker.nextNode();
   }
   return nodes;
@@ -324,7 +330,7 @@ function selectionInside(
     !root.contains(range.endContainer)
   )
     return null;
-  const text = range.toString();
+  const text = sourceRangeText(range);
   return text.trim() ? { range, text } : null;
 }
 
@@ -353,8 +359,8 @@ function selectionOffsets(
   beforeEnd.selectNodeContents(root);
   beforeEnd.setEnd(range.endContainer, range.endOffset);
   return {
-    start: beforeStart.toString().length,
-    end: beforeEnd.toString().length,
+    start: sourceRangeText(beforeStart).length,
+    end: sourceRangeText(beforeEnd).length,
   };
 }
 
@@ -364,7 +370,7 @@ function anchorFromRange(
   selectedText: string,
 ): ReaderAnchor {
   const { start, end } = selectionOffsets(root, range);
-  const content = root.textContent || "";
+  const content = readerTextIndex(root).content;
   return {
     startOffset: start,
     endOffset: end,
@@ -627,7 +633,7 @@ export const ReaderSelectionActions = forwardRef<
     const legacy = loadMark(contextId);
     if (!legacy) return;
     migratedBookmark.current = contextId;
-    const content = targetRef.current?.textContent || "";
+    const content = targetRef.current ? readerTextIndex(targetRef.current).content : "";
     void onCreateAnnotation({
       kind: "bookmark",
       color: null,
@@ -678,7 +684,7 @@ export const ReaderSelectionActions = forwardRef<
       let selected = selectionInside(root);
       if (!selected && event) {
         const range = wordAtPoint(event, root);
-        if (range) selected = { range, text: range.toString() };
+        if (range) selected = { range, text: sourceRangeText(range) };
       }
       if (!selected) return null;
       const anchor = anchorFromRange(root, selected.range, selected.text);

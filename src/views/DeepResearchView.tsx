@@ -1,3 +1,5 @@
+import { DocumentVisualScope, DocumentVisualActions } from '../components/DocumentVisualScope';
+import { DocumentSkillsControl, useDocumentSkills } from '../components/DocumentSkillsControl';
 // Deep Research — a gallery of saved reports (grid/list, search, sort), a
 // chained generation queue, and tabbed readers that expand reports to full width
 // with a persistent route back to the gallery. The heavy lifting (generation,
@@ -312,6 +314,7 @@ export function DeepResearchView({
   const [sectionLengthValid, setSectionLengthValid] = useState(true);
   const [audience, setAudience] = useState<StudyDeepResearchAudience>(isTeaching ? 'teacher' : 'students');
   const [includeImage, setIncludeImage] = useState(false);
+  const documentSkills = useDocumentSkills();
   const [imageStyle, setImageStyle] = useState<DecorativeImageStyle>(settings.imageStyle);
   const [focusPersonId, setFocusPersonId] = useState<string | null>(null);
   const [personsList, setPersonsList] = useState<Person[]>([]);
@@ -529,6 +532,7 @@ export function DeepResearchView({
     }
     // A half-typed custom length must not queue a multi-minute report against a
     // value the composer already refused.
+    if (!documentSkills.valid) { setError(t('Corregir límites de skills')); return; }
     if (!sectionLengthValid) {
       setError(t('Corrige la extensión orientativa de cada sección antes de generar el informe.'));
       return;
@@ -541,6 +545,7 @@ export function DeepResearchView({
       language,
       sectionLimit: deepSectionLimit,
       sectionLength: deepSectionLength,
+      documentSkills: documentSkills.policy,
       ...(isStudy ? { audience } : {}),
       model: selectedModel,
       decorativeImage: { enabled: includeImage, style: imageStyle },
@@ -924,6 +929,7 @@ export function DeepResearchView({
             the window, so the report and its own toolbar are all that is left on
             screen. In the shell, the reader fills the space below the tabs. */}
         <div className={fullscreen ? 'fixed inset-0 z-40 flex flex-col bg-neutral-950' : 'flex flex-col flex-1 min-h-0'} data-testid="deep-research-reader-shell" data-fullscreen={fullscreen ? 'on' : 'off'}>
+          <DocumentVisualScope target={{ kind: 'deep-research', id: openDraft.id }} enabled={!appliedTranslation}>
           <ReaderView
             key={openDraft.id}
             saved={openDraft}
@@ -954,6 +960,7 @@ export function DeepResearchView({
             onOpenStudyMaterial={onOpenStudyMaterial}
             onOpenStudyRecording={onOpenStudyRecording}
           />
+          </DocumentVisualScope>
         </div>
         {translationOpen && (
           <TranslationModal
@@ -1218,6 +1225,7 @@ export function DeepResearchView({
           sectionLength={deepSectionLength}
           onSectionLength={setDeepSectionLength}
           onSectionLengthValid={setSectionLengthValid}
+          documentSkills={documentSkills}
           includeImage={includeImage}
           imageStyle={imageStyle}
           hasModel={hasModel}
@@ -2097,6 +2105,7 @@ function ReaderView({
           onSaveToNotes={onSaveToNotes}
           onExport={onExport}
         />
+        <DocumentVisualActions />
         <ReaderFontControls targetRef={documentRef} scrollerRef={mainRef} initialSize={initialReaderFontSize} />
         <ReaderHighlighterControl value={highlighterColor} onChange={setHighlighterColor} />
         <HoverLabelButton
@@ -2215,7 +2224,8 @@ function ReaderView({
 // Composer — the new-report form (modal)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ComposerModal({
+export function ComposerModal({
+  documentSkills,
   settings,
   isGenealogy = false,
   isTeaching = false,
@@ -2253,6 +2263,7 @@ function ComposerModal({
   onSubmit,
   onClose,
 }: {
+  documentSkills: ReturnType<typeof useDocumentSkills>;
   settings: AppSettings;
   isGenealogy?: boolean;
   isTeaching?: boolean;
@@ -2471,6 +2482,7 @@ function ComposerModal({
               <ModelPicker settings={settings} value={model} onChange={onModel} ariaLabel={t('Modelo')} className="w-full text-sm" menu />
             </label>
           </div>
+          <DocumentSkillsControl value={documentSkills.policy} onChange={documentSkills.setPolicy} onValidityChange={documentSkills.setValid} />
           <div className="flex flex-wrap items-center gap-2">
             <button
               className={`rounded-full border px-2.5 py-1 text-xs ${includeImage ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200' : 'border-neutral-700 text-neutral-500'}`}
@@ -2497,7 +2509,7 @@ function ComposerModal({
           <button
             className="btn btn-primary gap-1.5"
             onClick={onSubmit}
-            disabled={!hasModel || !objective.trim()}
+            disabled={!hasModel || !objective.trim() || !documentSkills.valid}
             title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
           >
             <Icon name="plus" /> {t('Añadir a la cola')}

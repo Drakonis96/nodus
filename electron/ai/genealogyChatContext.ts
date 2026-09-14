@@ -15,6 +15,7 @@ import { getSettings } from '../db/settingsRepo';
 import { embed } from './aiClient';
 import { nameTokens } from '@shared/archiveDiscovery';
 import { deriveTreeKinship, treeKinshipLabel, type TreeKinshipContext } from '@shared/treeKinship';
+import { normalizeUiLanguage } from '@shared/uiLanguage';
 import type { PromptLanguage } from '@shared/types';
 
 const MAX_PERSONS = 250;
@@ -96,7 +97,7 @@ export async function buildGenealogyContext(question: string, language: PromptLa
       conyuges: spouses.get(p.personId) ?? [],
       hijos: children.get(p.personId) ?? [],
       parentesco_tag: relative?.role,
-      parentesco_con_persona_central: relative ? treeKinshipLabel(relative, language) : undefined,
+      parentesco_con_persona_central: relative ? treeKinshipLabel(relative, normalizeUiLanguage(language)) : undefined,
       rama_de_la_persona_central: relative?.branch,
       relevante_para_la_consulta: relevantIds.has(p.personId) || undefined,
     };

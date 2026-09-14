@@ -1,3 +1,5 @@
+import { DocumentVisualScope, DocumentVisualActions, DocumentVisualFigures } from '../components/DocumentVisualScope';
+import { DocumentSkillsControl, useDocumentSkills } from '../components/DocumentSkillsControl';
 // Inmersión — the fully guided topic-mastery experience.
 //
 // Flow: home (topic + budget) → scope (the territory map, pure embeddings+graph,
@@ -40,6 +42,7 @@ import { WorkspaceTabStrip } from '../components/library/LibraryWorkspaceTabs';
 import { SectionHeader } from '../components/SectionHeader';
 import { ModelPicker } from '../components/ModelPicker';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
+import { StudyMarkdown, StudyMarkdownInline } from '../components/StudyMarkdown';
 import { SourceCitationModal, type CitationTarget, type OpenCitationLibraryWork } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { TranslationModal } from '../components/TranslationModal';
@@ -184,6 +187,7 @@ export function ImmersionView({
   const [minutes, setMinutes] = useState(150);
   const [includeQuiz, setIncludeQuiz] = useState(true);
   const [includeImage, setIncludeImage] = useState(false);
+  const documentSkills = useDocumentSkills();
   const [imageStyle, setImageStyle] = useState<DecorativeImageStyle>(settings.imageStyle);
   // The immersion *content* is generated in Spanish or English only; a UI language
   // without a matching content language (French) defaults to English.
@@ -278,6 +282,7 @@ export function ImmersionView({
   }, [generationJob, refreshSessions]);
 
   const exploreScope = async () => {
+    if (!documentSkills.valid) { setError(t('Corregir límites de skills')); return; }
     if (!topic.trim()) return;
     setError(null);
     setScoping(true);
@@ -301,6 +306,7 @@ export function ImmersionView({
       scope,
       request: {
         topic: scope.topic,
+        documentSkills: documentSkills.policy,
         language,
         minutes,
         includeQuiz,
@@ -453,6 +459,7 @@ export function ImmersionView({
           />
           {mode === 'home' && composerOpen && (
             <ImmersionComposerModal
+              documentSkills={documentSkills}
               settings={settings}
               topic={topic}
               minutes={minutes}
@@ -500,6 +507,7 @@ export function ImmersionView({
       {mode === 'player' && !session && <RestoringPane />}
 
       {mode === 'player' && session && (
+        <DocumentVisualScope target={{ kind: 'immersion', id: session.id }}>
         <ImmersionPlayer
           key={session.id}
           session={session}
@@ -511,6 +519,7 @@ export function ImmersionView({
           onCitation={setCitation}
           onSaveToNotes={() => setSavingToNotes(true)}
         />
+        </DocumentVisualScope>
       )}
 
       {citation && (
@@ -930,7 +939,8 @@ function SessionListRow({
 // the scope screen where the immersion is actually generated.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ImmersionComposerModal({
+export function ImmersionComposerModal({
+  documentSkills,
   settings,
   topic,
   minutes,
@@ -952,6 +962,7 @@ function ImmersionComposerModal({
   onExplore,
   onClose,
 }: {
+  documentSkills: ReturnType<typeof useDocumentSkills>;
   settings: AppSettings;
   topic: string;
   minutes: number;
@@ -1070,6 +1081,8 @@ function ImmersionComposerModal({
             <ModelPicker settings={settings} value={model} onChange={onModel} compact menu />
           </div>
 
+          <DocumentSkillsControl value={documentSkills.policy} onChange={documentSkills.setPolicy} onValidityChange={documentSkills.setValid} />
+
           {error && (
             <div className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-xs text-red-300">{error}</div>
           )}
@@ -1082,7 +1095,7 @@ function ImmersionComposerModal({
           <button
             className="btn btn-primary gap-2 !px-5"
             onClick={onExplore}
-            disabled={!topic.trim() || scoping || !hasModel}
+            disabled={!topic.trim() || scoping || !hasModel || !documentSkills.valid}
             title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
           >
             <Icon name={scoping ? 'sync' : 'search'} className={scoping ? 'animate-spin' : ''} />
@@ -1591,6 +1604,7 @@ function ImmersionPlayer({
           </div>
         </div>
         <div className="flex-1" />
+        <DocumentVisualActions />
         <button className="btn btn-ghost gap-1.5 border border-neutral-700 text-xs" disabled={exportingPdf} onClick={() => void exportPdf()}>
           <Icon name={exportingPdf ? 'sync' : 'download'} size={13} className={exportingPdf ? 'animate-spin' : ''} />
           {exportingPdf ? t('Exportando…') : `${t('Exportar')} PDF`}
@@ -2227,6 +2241,7 @@ function ContrastsStep({ session, onCitation }: { session: ImmersionSession; onC
           </table>
         </div>
       )}
+      <DocumentVisualFigures field="contrasts" />
     </div>
   );
 }
@@ -2450,7 +2465,7 @@ function QuizCard({
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
       <div className="flex items-start gap-2">
         <Icon name="help" size={14} className="mt-1 shrink-0 text-indigo-300" />
-        <div className="min-w-0 flex-1 text-sm leading-6 text-neutral-200">{question.question}</div>
+        <div className="min-w-0 flex-1 text-sm leading-6 text-neutral-200"><StudyMarkdown content={question.question} /></div>
       </div>
 
       {question.kind === 'choice' && (
@@ -2472,7 +2487,7 @@ function QuizCard({
                 className={`block w-full rounded-md border px-3 py-2 text-left text-xs leading-5 transition-colors ${cls}`}
               >
                 <span className="mr-2 font-semibold">{String.fromCharCode(65 + i)}.</span>
-                {option}
+                <StudyMarkdownInline content={option} />
                 {revealed && isCorrect && <Icon name="check" size={12} className="ml-1.5 text-emerald-300" />}
               </button>
             );
@@ -2480,7 +2495,7 @@ function QuizCard({
           {saved?.kind === 'choice' && question.explanation && (
             <div className="mt-2 rounded-md border border-neutral-800 bg-neutral-950/60 px-3 py-2 text-xs leading-5 text-neutral-400">
               <Icon name="info" size={12} className="mr-1.5 text-indigo-300" />
-              {question.explanation}
+              <StudyMarkdownInline content={question.explanation} />
             </div>
           )}
         </div>
@@ -2508,7 +2523,7 @@ function QuizCard({
               {question.expected && (
                 <details className="mt-2 text-neutral-400">
                   <summary className="cursor-pointer font-medium text-indigo-300">{t('Ver orientación para contrastarla por tu cuenta')}</summary>
-                  <p className="mt-1 whitespace-pre-wrap">{question.expected}</p>
+                  <div className="mt-1"><StudyMarkdown content={question.expected} /></div>
                 </details>
               )}
             </div>

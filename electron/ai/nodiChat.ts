@@ -58,6 +58,13 @@ const RESPONSE_LANGUAGE: Record<string, string> = {
   'pt-BR': 'Brazilian Portuguese',
   it: 'Italian',
   tr: 'Turkish',
+  'zh-Hans': '简体中文',
+  'zh-Hant': '繁體中文',
+  vi: 'Tiếng Việt',
+  ja: '日本語',
+  ru: 'Русский',
+  uk: 'Українська',
+  ko: '한국어',
 };
 
 const MAX_VIEW_CHARS = 12_000;
@@ -362,7 +369,9 @@ export async function streamNodiChat(
     request.model ?? settings.nodiModel ?? settings.chatModel,
     signal
   );
-  answer = await executeChatSkills(answer, execution, signal);
+  // A user-triggered stop keeps the partial answer: running the skill tools now would
+  // throw an AbortError and discard everything that already streamed.
+  if (!signal?.aborted) answer = await executeChatSkills(answer, execution, signal);
   // Deterministically repair citation labels (bare ids → "Autor, Año", bracketed ids →
   // proper nodus:// links) so weaker/local models still produce clickable sources. The
   // frontend re-renders with this returned answer, replacing the streamed deltas.

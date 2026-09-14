@@ -12,11 +12,19 @@ interface SvgDom {
   XMLSerializer: new () => { serializeToString(document: SvgDocument): string };
 }
 
-/** Static SVG allowlist. Even sanitized SVG is rendered as an image, never live DOM. */
+/** Static SVG allowlist. Even sanitized SVG is rendered as an image, never live DOM.
+ *
+ *  Self-contained on purpose: this function is stringified and evaluated inside an isolated
+ *  window, so anything it called by name would be undefined there. A helper extracted from
+ *  it does not fail at build time — it fails in the one place the sanitizer actually runs. */
 export function sanitizeChatSvg(source: string): { svg: string; title: string } | null {
   if (source.length > 300_000 || /<!DOCTYPE|<!ENTITY/i.test(source)) return null;
   const dom = globalThis as unknown as SvgDom;
-  const doc = new dom.DOMParser().parseFromString(source, 'image/svg+xml');
+  // XML forbids `--` inside a comment, and a model writing a divider — `<!-- ---- -->` —
+  // produces one routinely. The parser rejects the whole document for it, so a drawing
+  // correct in every other respect disappears because of a decoration that never renders.
+  // Comments survive nothing below this line anyway.
+  const doc = new dom.DOMParser().parseFromString(source.replace(/<!--[\s\S]*?-->/g, ''), 'image/svg+xml');
   if (doc.querySelector('parsererror') || doc.documentElement.localName !== 'svg') return null;
   const allowed = new Set(['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'title', 'desc', 'defs', 'linearGradient', 'radialGradient', 'stop', 'clipPath', 'mask', 'marker', 'use', 'style']);
   const safeCss = (value: string) => !/@|expression|javascript:|https?:|data:|\/\/|\\|behavior|binding/i.test(value)

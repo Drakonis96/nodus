@@ -9,6 +9,7 @@ export type ProsopographyView =
   | 'prosopSources'
   | 'prosopAnalysis'
   | 'prosopNetworks'
+  | 'researchChat'
   | 'notes';
 
 interface ProsopographyItem { label: string; icon: string; view: ProsopographyView }
@@ -22,6 +23,7 @@ export const PROSOPOGRAPHY_GROUPS: ProsopographyGroup[] = [
     { label: 'Fuentes', icon: 'archive', view: 'prosopSources' },
   ] },
   { id: 'analyze', label: 'Analizar', items: [
+    { label: 'Research chat', icon: 'chat', view: 'researchChat' },
     { label: 'Análisis', icon: 'chartBar', view: 'prosopAnalysis' },
     { label: 'Redes', icon: 'network', view: 'prosopNetworks' },
   ] },

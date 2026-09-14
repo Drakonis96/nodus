@@ -109,6 +109,10 @@ export interface ToolkitApi {
   exportPresenterNotesTxt(presentation: Presentation): Promise<boolean>;
   /** Open a TXT notes export and parse it; null when cancelled. */
   importPresenterNotesTxt(): Promise<PptxNotes | null>;
+  /** Save the library's PDF copy of a deck wherever the user chooses. `cancelled`
+   *  is the user backing out of the native dialog; `missing` means the internal
+   *  copy is gone and there is nothing to write. */
+  downloadPresenterPdf(id: string, name: string): Promise<'saved' | 'cancelled' | 'missing'>;
   /** Open the audience window (full-screen, external display when present). */
   startPresenter(pdfId: string, startSlide?: number): Promise<void>;
   /** Open the audience + presenter windows together. */

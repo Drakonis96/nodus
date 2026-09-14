@@ -16,6 +16,8 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { WorkspaceTabStrip } from '../components/library/LibraryWorkspaceTabs';
 import { t } from '../i18n';
 import type { PrimarySourceOpenTarget } from './PrimarySourcesSearchView';
+import type { NoteResearchChatSource } from '@shared/types';
+import { ResearchNoteProvenancePanel } from '../components/ResearchNoteProvenancePanel';
 
 const EMPTY: PrimarySourceNoteWorkspace = { notes: [], collections: [], linkTargets: [] };
 
@@ -47,9 +49,11 @@ const RELATION_LABELS: Record<PrimarySourceNoteRelationKind, string> = {
 export function PrimarySourcesNotesView({
   focusNote,
   onOpenSource,
+  onOpenResearchConversation,
 }: {
   focusNote?: { id: string; nonce: number } | null;
   onOpenSource: (target: PrimarySourceOpenTarget) => void;
+  onOpenResearchConversation?: (source: NoteResearchChatSource) => void;
 }) {
   const [workspace, setWorkspace] = useState(EMPTY);
   const [loading, setLoading] = useState(true);
@@ -331,6 +335,7 @@ export function PrimarySourcesNotesView({
       </main>
 
       <aside className="library-theme-panel hidden w-[320px] shrink-0 overflow-y-auto border-l border-neutral-800 bg-neutral-950/80 xl:block">
+        <ResearchNoteProvenancePanel note={active} onOpenConversation={onOpenResearchConversation} />
         <div className="border-b border-neutral-800 p-4">
           <h2 className="text-xs font-semibold">{t('Fuentes enlazadas')}</h2>
           <p className="mt-1 text-[10px] leading-4 text-neutral-500">{t('Los enlaces tipados no convierten la nota en un hecho. Una cita literal conserva su instantánea y su localizador.')}</p>

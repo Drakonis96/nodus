@@ -85,6 +85,20 @@ test('only the active tab is attached to the window', () => {
   assert.match(activate, /attach\(tab\)/, 'the new tab must be attached');
 });
 
+test('native bounds include the host renderer zoom factor', () => {
+  const bounds = body('applyBounds');
+  assert.match(bounds, /hostWindow\.webContents\.getZoomFactor\(\)/,
+    'CSS pixels must be converted with the actual host renderer zoom');
+  assert.match(bounds, /viewport\.x \* cssToDip/);
+  assert.match(bounds, /viewport\.y \* cssToDip/);
+  assert.match(bounds, /\(viewport\.x \+ viewport\.width\) \* cssToDip/);
+  assert.match(bounds, /\(viewport\.y \+ viewport\.height\) \* cssToDip/);
+  assert.match(bounds, /width: Math\.max\(0, right - left\)/,
+    'rounding the two edges must not leave a seam on the right');
+  assert.match(bounds, /height: Math\.max\(0, bottom - top\)/,
+    'rounding the two edges must not leave a seam at the bottom');
+});
+
 test('trusted Nodus overlays automatically cover native Browser pages', () => {
   const overlayGuard = readFileSync(path.join(repoRoot, 'src/browserOverlay.ts'), 'utf8');
   const app = readFileSync(path.join(repoRoot, 'src/App.tsx'), 'utf8');
@@ -188,10 +202,41 @@ test('clear-all reconstructs a usable Browser even when Chromium clearing fails'
 
 test('theme changes are serialised per page so a stale async update cannot win', () => {
   assert.match(code, /pageThemeJobs = new WeakMap/);
-  const themeAt = code.indexOf('async function applyPageColorScheme');
+  const themeAt = code.indexOf('async function applyPageTheme');
   const theme = code.slice(themeAt, code.indexOf('/**', themeAt + 10));
   assert.match(theme, /previous[\s\S]*\.then\(/);
   assert.match(theme, /value: dark \? 'dark' : 'light'/);
+});
+
+test('the native surface follows the document, not the app theme', () => {
+  // A page that never opts into a dark colour scheme keeps BLACK default text.
+  // Painting the theme's dark surface behind it is what made a 401 page and
+  // other unstyled documents unreadable until their text was selected, which
+  // repaints it with the highlight colours.
+  const surface = body('applyDocumentSurfaceColor');
+  assert.match(surface, /executeJavaScript\(PAGE_SURFACE_PROBE/,
+    'the document itself must be asked which surface its colours assume');
+  assert.match(surface, /DARK_PAGE_SURFACE : LIGHT_PAGE_SURFACE/,
+    'the probe must choose between both surfaces');
+  assert.match(code, /probe\.style\.color = 'CanvasText'/,
+    'CanvasText reflects the meta tag, the CSS property and the emulated preference');
+  assert.match(code, /DARK_PAGE_SURFACE = '#0a0a0a'/);
+  assert.match(code, /LIGHT_PAGE_SURFACE = '#ffffff'/);
+
+  const theme = code.slice(code.indexOf('async function applyPageTheme'), code.indexOf('export function setBrowserTheme'));
+  assert.match(theme, /await applyDocumentSurfaceColor\(tab\)/,
+    'every theme pass must end by re-reading the document surface');
+
+  const ready = code.slice(code.indexOf("'dom-ready'"));
+  assert.match(ready, /applyPageTheme\(tab\)/, 'dom-ready must apply the theme and surface');
+
+  const finish = code.slice(code.indexOf("'did-finish-load'"));
+  assert.match(finish.slice(0, finish.indexOf("'did-stop-loading'")), /applyPageTheme\(tab\)/,
+    'a late stylesheet can declare color-scheme, so the surface is rechecked after load');
+
+  const nav = code.slice(code.indexOf("'did-start-navigation'"));
+  assert.match(nav, /setBackgroundColor\(browserSurfaceColor\(\)\)/,
+    'a new document must not inherit the previous document’s surface');
 });
 
 // Back, and the step Chromium does not record.

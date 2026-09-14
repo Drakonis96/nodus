@@ -373,25 +373,23 @@ test('redundant study views are removed while courses, chat, review and the ques
   assert.match(app, /<StudyChatView/);
   assert.doesNotMatch(sidebar, /view: 'studyChat'/);
   assert.doesNotMatch(sidebar, /view: 'studyReview'/);
-  assert.match(chat, /data-testid="study-chat-history-toggle"/);
-  assert.match(chat, /data-testid="study-chat-history-sidebar"/);
-  assert.match(chat, /data-testid="study-chat-context-toggle"/);
-  assert.match(chat, /contextOpen && <aside/);
-  assert.match(chat, /nodus\.studyChatContextOpen/);
-  assert.match(chat, /study-chat-header-new" className="btn btn-ghost relative z-10 h-8 w-8 shrink-0 p-0"/);
-  assert.match(chat, /compact className="w-full min-w-0"/);
-  assert.match(chat, /listStudyAssistantConversations/);
-  assert.match(chat, /createStudyAssistantConversation/);
-  assert.match(chat, /updateStudyAssistantConversation/);
-  assert.match(chat, /deleteStudyAssistantConversation/);
-  assert.match(chat, /<ConfirmModal/);
-  assert.match(chat, /rows=\{1\}/);
-  assert.match(chat, /flex h-10 max-w-3xl items-stretch gap-2/);
-  assert.match(chat, /h-full w-full resize-none/);
-  assert.match(chat, /study-chat-send" className="btn btn-primary h-10 shrink-0 self-stretch"/);
-  assert.match(chat, /max-w-\[42%\]/);
-  assert.doesNotMatch(chat, /min-h-20/);
-  assert.doesNotMatch(chat, /window\.confirm/);
+  const sharedChat = await read('src/views/ResearchAssistantModal.tsx');
+  assert.match(chat, /<ResearchAssistantModal[^>]*adapter=\{adapter\}/);
+  assert.match(chat, /id: 'study', modelFeature: 'studyModel'/);
+  for (const control of ['research-history-toggle', 'research-history-sidebar', 'research-context-toggle', 'research-context-sidebar']) {
+    assert.ok(sharedChat.includes(`data-testid="${control}"`), `shared study chat preserves ${control}`);
+  }
+  assert.match(sharedChat, /contextOpen && <aside/);
+  assert.match(sharedChat, /nodus\.\$\{panelKey\}ChatContextOpen/);
+  for (const method of ['listStudyAssistantConversations', 'createStudyAssistantConversation', 'updateStudyAssistantConversation', 'deleteStudyAssistantConversation']) {
+    assert.ok(chat.includes(method), `study adapter preserves ${method}`);
+  }
+  assert.match(sharedChat, /<ConfirmModal/);
+  assert.match(sharedChat, /rows=\{1\}/);
+  for (const control of ['research-composer-input', 'research-composer-send', 'ResearchEffortControl', 'ResearchSystemPromptControl']) {
+    assert.ok(sharedChat.includes(control), `study chat uses the shared ${control}`);
+  }
+  assert.doesNotMatch(chat + sharedChat, /window\.confirm/);
 });
 
 test('study timetable exposes editable weekdays, periods and subject styling', async () => {
@@ -543,7 +541,15 @@ test('study search follows the minimal global-search layout', async () => {
   assert.match(studySearch, /showFilters &&/);
   assert.match(studySearch, /study-search-panel/);
   assert.match(studySearch, /input study-search-filter h-9 text-xs/);
-  assert.equal((studySearch.match(/className="input study-search-filter h-9 text-xs"/g) ?? []).length, 5);
+  assert.deepEqual(
+    [...studySearch.matchAll(/<select\s+aria-label=\{t\('([^']+)'\)\}/g)].map((match) => match[1]),
+    ['Curso', 'Asignatura', 'Tema'],
+    'advanced filters scope the course, subject and topic; content kinds use persistent chips'
+  );
+  assert.match(studySearch, /<SearchKindFilters\b[^\n]*selected=\{kinds\}[^\n]*onChange=\{setKinds\}/);
+  assert.ok(studySearch.indexOf('<SearchKindFilters') < studySearch.indexOf('{showFilters &&'), 'content filters remain outside the collapsible advanced panel');
+  assert.match(studySearch, /sort: 'relevance'/);
+  assert.match(globalSearch, /<SearchKindFilters\b/);
   assert.match(studySearch, /rounded-md border border-neutral-800 bg-neutral-900\/40 px-3 py-2/);
   assert.match(globalSearch, /max-w-3xl/);
   assert.match(css, /\.light \.study-search-panel\s*\{[^}]*background-color:\s*#f8faf9;[^}]*border-color:\s*#d7e3e1/s);

@@ -34,7 +34,8 @@ function load(file, name) {
 const lib = await import(pathToFileURL(load('shared/deepResearchSectionLength.ts', 'length')).href);
 const packs = await import(pathToFileURL(load('shared/deepResearchLengthPromptPacks.ts', 'packs')).href);
 
-const LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
+const CJK = new Set(['zh-Hans', 'zh-Hant', 'ja', 'ko']);
 
 // ── Normalization, legacy values and clamping ────────────────────────────────
 
@@ -259,7 +260,7 @@ test('every supported language has native length guidance, with no Spanish leaki
         : stage === 'continuation'
           ? pack.continuation(1_200, 900)
           : pack[stage](2_500);
-      assert.ok(text.length > 80, `${language}.${stage} is too short to be real guidance`);
+      assert.ok(text.length > (CJK.has(language) ? 45 : 80), `${language}.${stage} is too short to be real guidance`);
       // The number must actually appear, formatted for that locale.
       assert.match(text, /\d/u, `${language}.${stage} names no number`);
       if (language !== 'es' && language !== 'pt' && language !== 'pt-BR' && language !== 'it') {
@@ -274,10 +275,14 @@ test('the guidance always says words, never tokens, and never a quota', () => {
   const word = {
     es: /palabras/iu, en: /words/iu, fr: /mots/iu, de: /W[oö]rter/iu,
     pt: /palavras/iu, 'pt-BR': /palavras/iu, it: /parole/iu, tr: /kelime/iu,
+    'zh-Hans': /字/iu, 'zh-Hant': /字/iu, vi: /từ/iu, ja: /字/iu,
+    ru: /слов/iu, uk: /слів/iu, ko: /단어/iu,
   };
   const notAQuota = {
     es: /no una cuota/iu, en: /not a quota/iu, fr: /pas un quota/iu, de: /keine Quote/iu,
     pt: /não uma quota/iu, 'pt-BR': /não uma cota/iu, it: /non una quota/iu, tr: /kota değildir/iu,
+    'zh-Hans': /不是配额/iu, 'zh-Hant': /不是配額/iu, vi: /không phải hạn ngạch/iu,
+    ja: /ノルマではありません/iu, ru: /не квота/iu, uk: /не квота/iu, ko: /할당량이 아닙니다/iu,
   };
   for (const language of LANGUAGES) {
     const section = packs.deepResearchLengthPromptPack(language).section(5_000);
@@ -290,7 +295,7 @@ test('the guidance always says words, never tokens, and never a quota', () => {
 test('an "I have nothing left to add" answer is recognised in every language', () => {
   for (const language of LANGUAGES) {
     const pack = packs.deepResearchLengthPromptPack(language);
-    const sentinel = pack.continuationStop.match(/\b([A-Z_]{6,})\b/u)?.[1];
+    const sentinel = packs.EMPTY_CONTINUATION_TOKENS.find((token) => pack.continuationStop.includes(token));
     assert.ok(sentinel, `${language} names no sentinel token`);
     assert.ok(packs.isEmptyContinuation(sentinel), `${language}: bare "${sentinel}" counts as exhausted`);
     assert.ok(packs.isEmptyContinuation(`  ${sentinel}.  `), `${language}: padded sentinel still counts as exhausted`);
@@ -308,11 +313,10 @@ test('every variant records the requested length through the one metadata seam',
   // there is what makes "reuse this prompt" restore it whichever pipeline wrote it.
   assert.match(source, /const sectionLength = normalizeDeepResearchSectionLength\(request\.sectionLength\);/u);
   assert.match(source, /versionedRequest: DeepResearchRequest = \{ \.\.\.request, deepResearchVersion, sectionLength \}/u);
-  const returns = [...source.matchAll(/withGenerationMetadata\(report, approach, deepResearchVersion, model([^)]*)\)/gu)];
-  assert.ok(returns.length >= 4, `expected every variant to return through the seam (found ${returns.length})`);
-  for (const [, tail] of returns) {
-    assert.equal(tail.trim(), ', sectionLength', 'a variant returns without recording the requested length');
-  }
+  // The shared finish step now also records the visual policy before metadata.
+  assert.match(source, /const finish = \(result: DeepResearchReport\) => \{[^}]*return withGenerationMetadata\(result, approach, deepResearchVersion, model, sectionLength\); \}/u);
+  const returns = [...source.matchAll(/return finish\(report\);/gu)];
+  assert.ok(returns.length >= 4, `expected every variant to return through the shared finish step (found ${returns.length})`);
   assert.match(
     source,
     /deepResearchSectionLength: report\.draft\.deepResearchSectionLength \?\? sectionLength/u,

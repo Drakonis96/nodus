@@ -85,6 +85,7 @@ const ICON_PATHS: Record<string, string> = {
   sigma: '<path d="M18 4H6l6 8-6 8h12"/>',
   wand: '<path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8L19 13"/><path d="M15 9h0"/><path d="M17.8 6.2L19 5"/><path d="M3 21l9-9"/><path d="M12.2 6.2L11 5"/>',
   image: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+  cube: '<path d="M12 2 3 7v10l9 5 9-5V7Z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
   save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
@@ -188,6 +189,9 @@ const ICON_PATHS: Record<string, string> = {
   list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
   grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   clock: '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>',
+  // The Marketplace's own mark, reduced to a line glyph: the header rail is a row of
+  // 2px strokes, and the gradient basket would read as a sticker among them.
+  basket: '<path d="M4 9h16l-1.5 10a2 2 0 0 1-2 1.7H7.5a2 2 0 0 1-2-1.7z"/><path d="M3 9h18"/><path d="m7.5 9 3-5"/><path d="m16.5 9-3-5"/>',
   quote: '<path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2-2-2H4c-1.25 0-2 .75-2 2v6c0 1.25.75 2 2 2h2.5"/><path d="M14 21c3 0 7-1 7-8V5c0-1.25-.757-2-2-2h-4c-1.25 0-2 .75-2 2v6c0 1.25.75 2 2 2h2.5"/>',
   code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
   link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
@@ -212,6 +216,12 @@ const ICON_PATHS: Record<string, string> = {
   tree: '<circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5V12"/><path d="M12 12H5v4.5"/><path d="M12 12h7v4.5"/>',
   gitPr: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M6 9v6"/><circle cx="18" cy="18" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M11 4l2 2-2 2"/>',
   tools: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  // Graph research actions. These four glyphs deliberately belong only to the
+  // graph action strip, so each action keeps a unique visual meaning in Nodus.
+  tutorOrbit: '<circle cx="12" cy="12" r="3"/><path d="M4.2 8.2C6.6 3.8 12 1.8 16.6 3.7c4.5 1.9 6.6 7 4.7 11.5"/><path d="m17.6 2.8-1 4 4-1"/><path d="M19.8 15.8C17.4 20.2 12 22.2 7.4 20.3c-4.5-1.9-6.6-7-4.7-11.5"/><path d="m6.4 21.2 1-4-4 1"/>',
+  themePetals: '<path d="M12 12C6 11.2 4.2 7 6.1 4.7 8 2.4 11.5 4.3 12 12Z"/><path d="M12 12c.8-6 5-7.8 7.3-5.9 2.3 1.9.4 5.4-7.3 5.9Z"/><path d="M12 12c6 .8 7.8 5 5.9 7.3-1.9 2.3-5.4.4-5.9-7.3Z"/><path d="M12 12c-.8 6-5 7.8-7.3 5.9-2.3-1.9-.4-5.4 7.3-5.9Z"/>',
+  duplicateConverge: '<circle cx="5" cy="6" r="2.5"/><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="12" r="2.5"/><path d="M7.5 6h2.2a4 4 0 0 1 3.5 2.1l1 1.9M7.5 18h2.2a4 4 0 0 0 3.5-2.1l1-1.9M14 12h2.5"/>',
+  relationLedger: '<path d="M7 3h10a2 2 0 0 1 2 2v16H5V5a2 2 0 0 1 2-2Z"/><path d="M9 8h6M9 12h2M13 12h2M9 16h2M13 16h2"/><path d="m3 7 2 2 3-3"/>',
   swap: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
   scanText: '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/>',
   bug: '<path d="M8 2l1.5 1.5"/><path d="M16 2l-1.5 1.5"/><path d="M9 7a3 3 0 0 1 6 0v1H9V7Z"/><rect x="7" y="8" width="10" height="10" rx="5"/><path d="M12 12v6"/><path d="M7 12H3"/><path d="M21 12h-4"/><path d="M6.5 7 4 5"/><path d="M17.5 7 20 5"/><path d="M6.5 17 4 19"/><path d="M17.5 17 20 19"/>',

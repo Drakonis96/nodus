@@ -1,0 +1,159 @@
+[
+  {
+    "id": "spain-communities",
+    "features": [
+      19
+    ],
+    "svgBytes": 164598,
+    "sources": [
+      {
+        "origin": "provider",
+        "provider": "geoboundaries",
+        "label": "geoBoundaries ESP ADM1",
+        "attribution": "geoBoundaries (geoboundaries.org), Runfola et al. (2020); adapted from Instituto de Geografico Nacional; source year 2017",
+        "license": "geoBoundaries CC BY 4.0; original: CC BY 4.0",
+        "url": "https://creativecommons.org/licenses/by/4.0/",
+        "version": "9469f09 / ESP-ADM1-25490228",
+        "retrievedAt": "2026-09-12T14:50:37.445Z",
+        "modifications": [
+          "Simplified provider geometry; year represented: 2017.",
+          "Original source: https://centrodedescargas.cnig.es/CentroDescargas/index.jsp",
+          "Original licence: https://centrodedescargas.cnig.es/CentroDescargas/index.jsp#",
+          "This is a published snapshot, not a historical-border reconstruction.",
+          "Projected and styled by Nodus.",
+          "Topology-preserving display simplification, minimum planar triangle area 0.00002201651428132371 square degrees. Exported geometry retains source vertices."
+        ],
+        "licenseUrls": [
+          "https://creativecommons.org/licenses/by/4.0/"
+        ],
+        "sha256": "b61a1bf661b90883763f633f5e9dbc27e7356309e42cbe56b60d2ceab5112f63"
+      }
+    ]
+  },
+  {
+    "id": "spain-provinces",
+    "features": [
+      52
+    ],
+    "svgBytes": 292752,
+    "sources": [
+      {
+        "origin": "provider",
+        "provider": "geoboundaries",
+        "label": "geoBoundaries ESP ADM2",
+        "attribution": "geoBoundaries (geoboundaries.org), Runfola et al. (2020); adapted from El Instituto Nacional de Estadstica; source year 2018",
+        "license": "geoBoundaries CC BY 4.0; original: National Institute of Statistics (INE) Data License",
+        "url": "https://www.ine.es/ss/Satellite?L=0&c=Page&cid=1254735849170&p=1254735849170&pagename=Ayuda%2FINELayout",
+        "version": "9469f09 / ESP-ADM2-93216281",
+        "retrievedAt": "2026-09-12T14:50:37.671Z",
+        "modifications": [
+          "Simplified provider geometry; year represented: 2018.",
+          "Original source: https://opendata.esri.es/datasets/inmigraci%C3%B3n-por-provincias-?geometry=-117.728%2C22.781%2C105.778%2C47.535",
+          "Original licence: https://www.ine.es/ss/Satellite?L=0&c=Page&cid=1254735849170&p=1254735849170&pagename=Ayuda%2FINELayout",
+          "This is a published snapshot, not a historical-border reconstruction.",
+          "Projected and styled by Nodus.",
+          "Topology-preserving display simplification, minimum planar triangle area 0.000019813266213969554 square degrees. Exported geometry retains source vertices."
+        ],
+        "licenseUrls": [
+          "https://creativecommons.org/licenses/by/4.0/",
+          "https://www.ine.es/ss/Satellite?L=0&c=Page&cid=1254735849170&p=1254735849170&pagename=Ayuda%2FINELayout"
+        ],
+        "sha256": "40a12d32651a352b59bc88447432421ab80e2d950deb6f552efbae907f7232c2"
+      }
+    ]
+  },
+  {
+    "id": "castilla-la-mancha",
+    "features": [
+      5
+    ],
+    "svgBytes": 59819,
+    "sources": [
+      {
+        "origin": "provider",
+        "provider": "geoboundaries",
+        "label": "geoBoundaries ESP ADM2",
+        "attribution": "geoBoundaries (geoboundaries.org), Runfola et al. (2020); adapted from El Instituto Nacional de Estadstica; source year 2018",
+        "license": "geoBoundaries CC BY 4.0; original: National Institute of Statistics (INE) Data License",
+        "url": "https://www.ine.es/ss/Satellite?L=0&c=Page&cid=1254735849170&p=1254735849170&pagename=Ayuda%2FINELayout",
+        "version": "9469f09 / ESP-ADM2-93216281",
+        "retrievedAt": "2026-09-12T14:50:37.671Z",
+        "modifications": [
+          "Simplified provider geometry; year represented: 2018.",
+          "Original source: https://opendata.esri.es/datasets/inmigraci%C3%B3n-por-provincias-?geometry=-117.728%2C22.781%2C105.778%2C47.535",
+          "Original licence: https://www.ine.es/ss/Satellite?L=0&c=Page&cid=1254735849170&p=1254735849170&pagename=Ayuda%2FINELayout",
+          "This is a published snapshot, not a historical-border reconstruction.",
+          "Projected and styled by Nodus.",
+          "Filtered by exact feature properties.",
+          "Topology-preserving display simplification, minimum planar triangle area 8.095278641926169e-7 square degrees. Exported geometry retains source vertices."
+        ],
+        "licenseUrls": [
+          "https://creativecommons.org/licenses/by/4.0/",
+          "https://www.ine.es/ss/Satellite?L=0&c=Page&cid=1254735849170&p=1254735849170&pagename=Ayuda%2FINELayout"
+        ],
+        "sha256": "40a12d32651a352b59bc88447432421ab80e2d950deb6f552efbae907f7232c2"
+      }
+    ]
+  },
+  {
+    "id": "world",
+    "features": [
+      177
+    ],
+    "svgBytes": 140400,
+    "sources": [
+      {
+        "origin": "provider",
+        "provider": "natural-earth",
+        "label": "Natural Earth · admin 0 · 110m",
+        "attribution": "Made with Natural Earth — naturalearthdata.com",
+        "license": "Public domain",
+        "url": "https://www.naturalearthdata.com/about/terms-of-use/",
+        "version": "5.1.2",
+        "retrievedAt": "2026-09-12T14:50:37.385Z",
+        "modifications": [
+          "Property normalization; cartographic boundaries at 1:110m.",
+          "Projected and styled by Nodus.",
+          "Topology-preserving display simplification, minimum planar triangle area 0.0041582425809312635 square degrees. Exported geometry retains source vertices."
+        ],
+        "sha256": "6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f"
+      }
+    ]
+  },
+  {
+    "id": "europe-routes",
+    "features": [
+      39
+    ],
+    "svgBytes": 18396,
+    "sources": [
+      {
+        "origin": "provider",
+        "provider": "natural-earth",
+        "label": "Natural Earth · admin 0 · 110m",
+        "attribution": "Made with Natural Earth — naturalearthdata.com",
+        "license": "Public domain",
+        "url": "https://www.naturalearthdata.com/about/terms-of-use/",
+        "version": "5.1.2",
+        "retrievedAt": "2026-09-12T14:50:37.385Z",
+        "modifications": [
+          "Property normalization; cartographic boundaries at 1:110m.",
+          "Projected and styled by Nodus.",
+          "Filtered by exact feature properties.",
+          "Topology-preserving display simplification, minimum planar triangle area 0.0012887083766843625 square degrees. Exported geometry retains source vertices."
+        ],
+        "sha256": "6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f"
+      },
+      {
+        "label": "Illustrative city-centre coordinates",
+        "attribution": "Nodus demonstration: supplied city-centre coordinates; illustrative connections",
+        "license": "CC0",
+        "origin": "caller",
+        "sha256": "ee6db458838ba9aa5a9c563aa1e0d212a81c3b365abdfe0383bff5d38a56feae",
+        "modifications": [
+          "Caller-supplied data; provenance not independently verified."
+        ]
+      }
+    ]
+  }
+]

@@ -5,6 +5,8 @@ import { createHash } from 'node:crypto';
 import { DEFAULT_SKILL_SOURCE, isOfficialSkillSource, normalizeSkillSource, validateManifest, validateSkillPackage, type SkillMarketplace, type SkillPackage, type SkillSource } from '@shared/skillMarketplace';
 import { BUILTIN_SKILL_PACKAGES } from '@shared/chatSkills';
 import { installBuiltinChatSkill, installChatPluginPackage, installChatSkillPackage } from './chatSkills';
+import { validateCapabilityManifest } from '../skill-capabilities/contracts';
+import { verifyPluginAsset } from './pluginAssets';
 import { validatePluginPackage } from '../skill-capabilities/pluginPackage';
 const location = () => path.join(app.getPath('userData'), 'skill-marketplace.json');
 export const packageDigest = (pkg: SkillPackage) => createHash('sha256').update(JSON.stringify(validateSkillPackage(pkg))).digest('hex');
@@ -36,7 +38,7 @@ export function removeSkillSource(id: string) {
 }
 class SkillSourceFetchError extends Error {}
 /** Bound both streamed and declared size; refuse redirects and incomplete repository trees. */
-async function request(url: string, fetcher: typeof fetch, limit: number): Promise<string> {
+async function request(url: string, fetcher: typeof fetch, limit: number, encoding: BufferEncoding = 'utf8'): Promise<string> {
   let response: Response;
   try { response = await fetcher(url, { redirect: 'error', signal: AbortSignal.timeout(20000), headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Nodus-Skill-Marketplace' } }); }
   catch { throw new SkillSourceFetchError('Could not reach GitHub. Check your connection and try again; the previous catalog is preserved.'); }
@@ -47,7 +49,7 @@ async function request(url: string, fetcher: typeof fetch, limit: number): Promi
   const chunks: Uint8Array[] = []; let bytes = 0;
   try { for (;;) { const next = await reader.read().catch(() => { throw new SkillSourceFetchError('GitHub download was interrupted. The previous catalog is preserved.'); }); if (next.done) break; bytes += next.value.length; if (bytes > limit) throw new Error('Repository response is too large.'); chunks.push(next.value); } }
   finally { await reader.cancel().catch(() => {}); }
-  return Buffer.concat(chunks).toString('utf8');
+  return Buffer.concat(chunks).toString(encoding);
 }
 export async function scanSkillSource(source: SkillSource, fetcher: typeof fetch = fetch): Promise<SkillSource> {
   const { owner, repo } = normalizeSkillSource(source.url);
@@ -64,13 +66,14 @@ export async function scanSkillSource(source: SkillSource, fetcher: typeof fetch
   const candidates = [...blobs.keys()].filter(p => /^[a-z0-9]+(?:-[a-z0-9]+)*\/skill\.json$/.test(p) && !pluginDirectories.has(p.split('/')[0]));
   if (candidates.length + pluginCandidates.length > 500) throw new Error('A source can contain at most 500 packages.');
   const result: SkillSource = { id: source.id, url: source.url, commit, updatedAt: new Date().toISOString(), entries: [], plugins: [], errors: [] };
-  let total = 0;
-  const read = async (file: string, limit: number) => {
+  let total = 0, assetTotal = 0;
+  const read = async (file: string, limit: number, asset = false, encoding: BufferEncoding = 'utf8') => {
     const blob = blobs.get(file);
     if (!blob || blob.mode !== '100644' || blob.size > limit) throw new Error(`Missing, oversized or non-regular file: ${file}`);
-    total += blob.size;
+    if (asset) assetTotal += blob.size; else total += blob.size;
+    if (assetTotal > 128 * 1024 * 1024) throw new Error('Source assets exceed 128 MB.');
     if (total > 12000000) throw new Error('Source packages exceed 12 MB.');
-    return request(`https://raw.githubusercontent.com/${owner}/${repo}/${commit}/${file}`, fetcher, limit);
+    return request(`https://raw.githubusercontent.com/${owner}/${repo}/${commit}/${file}`, fetcher, limit, encoding);
   };
   for (const candidate of candidates) {
     const directory = candidate.split('/')[0];
@@ -96,9 +99,14 @@ export async function scanSkillSource(source: SkillSource, fetcher: typeof fetch
       }
       for (const capabilityPath of manifest.capabilities ?? []) {
         files[capabilityPath] = await read(`${directory}/${capabilityPath}`, 64_000);
-        const capability = JSON.parse(files[capabilityPath]);
+        const capability = validateCapabilityManifest(JSON.parse(files[capabilityPath]));
         const base = capabilityPath.slice(0, -'capability.json'.length);
         files[base + capability.entry] = await read(`${directory}/${base}${capability.entry}`, 256_000);
+        for (const asset of capability.assets ?? []) {
+          const text = await read(`${directory}/${base}${asset.path}`, asset.bytes, true, asset.mimeType === 'model/gltf-binary' ? 'base64' : 'utf8');
+          verifyPluginAsset(text, asset);
+          files[base + asset.path] = text;
+        }
       }
       const pkg = validatePluginPackage({ manifest, files });
       result.plugins!.push({ path: directory, package: { manifest: pkg.manifest, files: pkg.files } });

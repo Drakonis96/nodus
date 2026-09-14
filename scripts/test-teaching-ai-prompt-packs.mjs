@@ -13,7 +13,8 @@ const outfile = path.join(tmp, 'teachingPromptPacks.mjs');
 await build({ entryPoints: [path.join(repoRoot, 'shared/teachingPromptPacks.ts')], outfile, bundle: true, format: 'esm', platform: 'node', logLevel: 'silent' });
 const { TEACHING_PROMPT_PACKS } = await import(pathToFileURL(outfile).href);
 
-const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
+const cjk = new Set(['zh-Hans', 'zh-Hant', 'ja', 'ko']);
 const types = ['section', 'short_essay', 'medium_essay', 'long_essay', 'short_answer', 'definition', 'multiple_choice', 'true_false', 'matching', 'ordering', 'fill_blank', 'image_comment', 'problem'];
 
 test('every teaching language has every exam label, scope hint, and JSON shape', () => {
@@ -36,7 +37,7 @@ test('every teaching language has every exam label, scope hint, and JSON shape',
 test('exam shape invariants preserve exact counts, bounds, and section semantics in every language', () => {
   for (const language of languages) {
     const pack = TEACHING_PROMPT_PACKS[language].exam;
-    assert.equal((pack.shapeFor('multiple_choice', 7).match(/"(?:option|opción|option|Option|opzione|seçenek|opção) \d+"/g) ?? []).length, 7, `${language}: option count changed`);
+    assert.equal((pack.shapeFor('multiple_choice', 7).match(/"(?:option|Option|opción|opzione|seçenek|opção|选项|選項|phương án|選択肢|вариант|варіант|선택지) \d+"/g) ?? []).length, 7, `${language}: option count changed`);
     assert.match(pack.shapeFor('section', 4), /80|80/);
     assert.match(pack.shapeFor('section', 4), /200/);
     assert.match(pack.shapeFor('matching', 4), /4/);
@@ -50,8 +51,8 @@ test('every teaching language has the complete rubric rule set and JSON contract
   for (const language of languages) {
     const pack = TEACHING_PROMPT_PACKS[language].rubric;
     // The canonical rules contain five independent clauses; each translation must keep all five.
-    assert.ok(pack.descriptorRules.length > 180, `${language}: rubric rules were summarized`);
-    assert.match(pack.descriptorRules, /[.!?]/u);
+    assert.ok(pack.descriptorRules.length > (cjk.has(language) ? 60 : 180), `${language}: rubric rules were summarized`);
+    assert.match(pack.descriptorRules, /[.!?。！？]/u);
     const json = pack.jsonFormat(true);
     for (const key of ['title', 'description', 'levels', 'criteria', 'name', 'weight', 'descriptors']) assert.match(json, new RegExp(`"${key}"`), `${language}: missing ${key}`);
     assert.match(pack.exactCounts(4, 6), /4/);

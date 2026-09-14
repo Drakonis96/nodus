@@ -53,6 +53,13 @@ const TARGET_FALLBACK_COPY: Record<PromptLanguage, { untitledNote: string; note:
   'pt-BR': { untitledNote: '(nota sem título)', note: 'nota', passage: 'trecho' },
   it: { untitledNote: '(nota senza titolo)', note: 'nota', passage: 'passaggio' },
   tr: { untitledNote: '(başlıksız not)', note: 'not', passage: 'pasaj' },
+  'zh-Hans': { untitledNote: '(无标题笔记)', note: '笔记', passage: '段落' },
+  'zh-Hant': { untitledNote: '(無標題筆記)', note: '筆記', passage: '段落' },
+  vi: { untitledNote: '(ghi chú không có tiêu đề)', note: 'ghi chú', passage: 'đoạn trích' },
+  ja: { untitledNote: '(無題のノート)', note: 'ノート', passage: '一節' },
+  ru: { untitledNote: '(заметка без названия)', note: 'заметка', passage: 'фрагмент' },
+  uk: { untitledNote: '(нотатка без назви)', note: 'нотатка', passage: 'фрагмент' },
+  ko: { untitledNote: '(제목 없는 노트)', note: '노트', passage: '구절' },
 };
 
 function targetFallbackCopy(): (typeof TARGET_FALLBACK_COPY)[PromptLanguage] {

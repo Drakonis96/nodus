@@ -69,3 +69,59 @@ export function placeHeaderBadge({
   const left = Math.min(Math.max(centred, bandStart), bandEnd - badgeWidth);
   return { left, fits: true };
 }
+
+/** The alert's resting width: an icon-only header button, before its label opens. */
+export const HEADER_MODEL_ALERT_WIDTH = 36;
+
+export interface HeaderModelAlertMetrics {
+  /** Left edge of the free band — the logo rail's width. */
+  logoWidth: number;
+  /**
+   * Right edge of the free band: the badge's left edge when the badge is shown, and
+   * the action rail's left edge when it is not.
+   */
+  bandRight: number;
+  /** The alert's resting width; its label opens on hover and is not measured here. */
+  alertWidth?: number;
+  /** Minimum air on each side; defaults to {@link HEADER_BADGE_GAP}. */
+  gap?: number;
+}
+
+export interface HeaderModelAlertPlacement {
+  /** Distance from the header's left edge to the button's CENTRE, in px. */
+  centre: number;
+  /** False when the band cannot hold the resting button — the caller hides it. */
+  fits: boolean;
+}
+
+/**
+ * Resolve where the "configure an AI model" alert should sit.
+ *
+ * It used to live in the action rail with its label pinned open, which is the one
+ * thing that rail cannot afford: every pixel it spends is a pixel the centred badge
+ * loses, and a permanently open label is ~170 of them. So the alert moves to the
+ * empty half of the header — the band between the sidebar and the badge — where
+ * nothing else competes for room, and keeps its label folded like every other header
+ * action: the amber icon states that something needs attention, and hovering says
+ * what.
+ *
+ * Centred in that band rather than pinned to either end, because it belongs to
+ * neither rail. The label opens symmetrically from the centre (the button is
+ * translated by half its own width), so the room it needs on hover is the band's
+ * middle, which is the part of the header that is always empty.
+ *
+ * Kept DOM-free alongside {@link placeHeaderBadge} so both rules can be asserted
+ * directly (scripts/test-header-layout.mjs).
+ */
+export function placeHeaderModelAlert({
+  logoWidth,
+  bandRight,
+  alertWidth = HEADER_MODEL_ALERT_WIDTH,
+  gap = HEADER_BADGE_GAP,
+}: HeaderModelAlertMetrics): HeaderModelAlertPlacement {
+  const bandStart = logoWidth + gap;
+  const bandEnd = bandRight - gap;
+  const centre = (bandStart + bandEnd) / 2;
+  if (!(bandRight > 0) || bandEnd - bandStart < alertWidth) return { centre, fits: false };
+  return { centre, fits: true };
+}

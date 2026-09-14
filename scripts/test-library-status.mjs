@@ -41,15 +41,24 @@ const work = (over = {}) => ({
 const embedded = (over = {}) => ({ nodus_id: 'w1', totalIdeas: 10, embeddedIdeas: 10, complete: true, ...over });
 const indexed = (over = {}) => ({ nodus_id: 'w1', totalPassages: 40, status: 'complete', outdatedReason: null, ...over });
 
-test('a fully processed work is ready without a documentary index, and the summary does not gate it', () => {
+test('a fully processed work is ready without a documentary index', () => {
   // deriveWorkStatus deliberately has no document-profile input: an absent beta
   // index cannot turn a completed work amber.
   assert.equal(deriveWorkStatus(work(), embedded(), indexed()).readiness, 'ready');
-  // Summary is an orientation aid, not citable evidence: missing it stays green.
+});
+
+test('a missing summary or stale semantic index keeps a work incomplete', () => {
+  // All five pipeline steps gate the green: a work whose own step breakdown says
+  // "missing"/"partial" must not read as "Listo".
   const noSummary = deriveWorkStatus(work({ summary_status: 'none' }), embedded(), indexed());
-  assert.equal(noSummary.readiness, 'ready');
+  assert.equal(noSummary.readiness, 'incomplete');
   assert.equal(noSummary.steps.summary.state, 'missing');
-  assert.ok(!READY_STEPS.includes('summary'));
+  assert.ok(READY_STEPS.includes('summary'));
+
+  const staleSemantic = deriveWorkStatus(work(), embedded({ embeddedIdeas: 4, totalIdeas: 10, complete: false }), indexed());
+  assert.equal(staleSemantic.readiness, 'incomplete');
+  assert.equal(staleSemantic.steps.semantic.state, 'partial');
+  assert.ok(READY_STEPS.includes('semantic'));
 });
 
 test('an untouched work is unstarted, not incomplete', () => {
@@ -101,10 +110,9 @@ test('partial embeddings and outdated passages are partial, and carry their numb
   assert.equal(s.steps.semantic.done, 31);
   assert.equal(s.steps.semantic.total, 47);
   assert.equal(s.steps.citable.state, 'partial');
-  // The semantic index is shown but does not gate readiness: SQL cannot evaluate
-  // its freshness, so counting it here would make the preset and the pill differ.
-  assert.deepEqual(s.missing, ['citable']);
-  assert.ok(!READY_STEPS.includes('semantic'));
+  // Both unfinished steps gate readiness now, and both are reported.
+  assert.deepEqual(s.missing, ['semantic', 'citable']);
+  assert.ok(READY_STEPS.includes('semantic'));
 });
 
 test('newly indexed passages are current even while the deep analysis still belongs to the previous text', () => {
@@ -171,18 +179,21 @@ test('the SQL presets stay in step with the JS readiness derivation', async () =
   assert.match(sql, /w\.light_status = 'failed' OR w\.deep_status = 'failed' OR w\.deep_error IS NOT NULL OR w\.summary_status = 'failed'/);
   assert.match(sql, /w\.light_status = 'none' AND w\.deep_status = 'none'/);
   assert.match(sql, /w\.deep_status = 'done' AND w\.source_type IN \('abstract_only', 'none'\)/);
-  assert.match(sql, /NOT \$\{FAILED\} AND NOT \$\{UNSTARTED\} AND NOT \$\{ABSTRACT_ONLY\} AND NOT \$\{NO_TEXT\}/);
+  assert.match(sql, /NOT \$\{PENDING\} AND NOT \$\{FAILED\} AND NOT \$\{UNSTARTED\} AND NOT \$\{ABSTRACT_ONLY\} AND NOT \$\{NO_TEXT\}/);
   // ready and incomplete must be exact complements over the analysable set,
   // or a work would fall through both presets and be unreachable.
   assert.match(sql, /case 'ready':[\s\S]{0,120}\$\{ANALYSABLE\} AND \$\{READY_CORE\}/);
   assert.match(sql, /case 'incomplete':[\s\S]{0,140}\$\{ANALYSABLE\} AND NOT \(\$\{READY_CORE\}\)/);
+  // Persisted pending has a preset of its own instead of leaking into incomplete.
+  assert.match(sql, /case 'pending':[\s\S]{0,60}return \{ sql: PENDING/);
 
-  // READY_CORE must cover exactly READY_STEPS: themes, ideas and citable text.
-  assert.match(status, /READY_STEPS: readonly StepId\[\] = \['themes', 'ideas', 'citable'\]/);
-  assert.match(sql, /READY_CORE = `w\.light_status = 'done' AND w\.deep_status = 'done'[\s\S]{0,120}w\.deep_hash = w\.resolved_text_hash[\s\S]{0,80}\$\{HAS_IDEAS\} AND \$\{PASSAGES_COMPLETE\}`/);
-  // The semantic index cannot be evaluated in SQL, so it must not gate readiness
-  // on either side; if it ever appears here the two would silently disagree.
-  assert.doesNotMatch(sql, /embedding_text_hash/);
+  // READY_CORE must cover exactly READY_STEPS: all five pipeline steps.
+  assert.match(status, /READY_STEPS: readonly StepId\[\] = \['themes', 'ideas', 'summary', 'semantic', 'citable'\]/);
+  assert.match(sql, /READY_CORE = `w\.light_status = 'done' AND w\.deep_status = 'done'[\s\S]{0,140}w\.deep_hash = w\.resolved_text_hash[\s\S]{0,120}\$\{SEMANTIC_COMPLETE\} AND w\.summary_status = 'done' AND \$\{PASSAGES_COMPLETE\}`/);
+  // Semantic freshness IS evaluated in SQL now, through a function registered from
+  // the same helper the embedding pipeline uses. If it disappears, the semantic
+  // step silently drops out of "Incompleto" again.
+  assert.match(sql, /idea_embedding_text_hash/);
 
   assert.match(repo, /if \(filter\.readiness\)/);
   assert.match(repo, /Object\.assign\(params, readiness\.params\)/);

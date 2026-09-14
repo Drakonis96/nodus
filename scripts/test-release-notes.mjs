@@ -25,21 +25,73 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.3.1');
-  assert.equal(currentRelease?.date, '2026-09-10');
-  assert.equal(currentRelease?.highlights.length, 8);
+  // 5.4.2 rebuilds the Study question bank, renders Markdown and LaTeX on every
+  // question and flashcard surface, adds seven prompt languages and carries the
+  // fixes merged since the 5.4.1 hotfix.
+  assert.equal(currentRelease?.version, '5.4.2');
+  assert.equal(currentRelease?.date, '2026-09-13');
+  assert.equal(currentRelease?.highlights.length, 11);
   assert.deepEqual(currentRelease.highlights.map((h) => h.scope), [
-    'marketplace', 'marketplace', 'plugin', 'plugin', 'academic', 'ai', 'languages', 'general',
+    'estudio', 'estudio', 'estudio', 'ai', 'ai', 'languages', 'marketplace', 'plugin',
+    'browser', 'browser', 'library',
   ]);
   for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
     assert.ok(currentRelease.highlights.every((h) => h[language]?.length > 80));
   }
   for (const phrase of [
-    /knows which skills you already have/, /needs a newer Nodus/, /arrive as plugins/,
-    /update as one unit/, /number of sections you choose/, /corpus context picker/,
-    /Italian is offered/, /three visible details/,
+    /rebuilt for working in volume/, /shows what will come in/, /read as they were written/,
+    /keeps where it came from/, /only Image Atelier is marked as paid per call/,
+    /Seven new languages for generated content/, /one single catalog/, /own execution channel/,
+    /do not declare a dark scheme/, /native view aligns with the interface zoom/,
+    /recovers better from transient failures/,
   ]) {
-    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.3.1 is missing ${phrase}`);
+    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.4.2 is missing ${phrase}`);
+  }
+
+  assert.ok(!RELEASE_NOTES.some(note => note.version === '5.3.2'), 'the unpublished slug must not appear in release history');
+  const packageVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+  assert.equal(currentRelease.version, packageVersion);
+
+  // 5.4.0 keeps its own entry, and 5.4.1 shows exactly the same highlights: someone
+  // already on 5.4.0 has read them, and someone arriving from 5.3.1 must not miss them.
+  const release541 = RELEASE_NOTES[1];
+  assert.equal(release541?.version, '5.4.1');
+  assert.equal(release541?.date, '2026-09-13');
+  assert.equal(release541?.highlights.length, 25);
+  const release540 = RELEASE_NOTES[2];
+  assert.equal(release540?.version, '5.4.0');
+  assert.equal(release540?.date, '2026-09-12');
+  assert.deepEqual(release540?.highlights, release541?.highlights);
+  assert.deepEqual(release540.highlights.map((h) => h.scope), [
+    ...Array(10).fill('ai'), 'general', 'general', 'marketplace', 'plugin', 'browser', 'word',
+    'marketplace', 'general', 'general', 'plugin', 'plugin', 'ai', 'toolkit', 'toolkit', 'toolkit',
+  ]);
+  for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+    assert.ok(release540.highlights.every((h) => h[language]?.length > 80));
+  }
+  for (const phrase of [
+    /official packages you install yourself/, /moves across on its own/,
+    /takes up less room/, /configures itself on its own card/,
+    /only arrives signed by NodusResearch/, /each package decides what the model sees/,
+    // PDF Presenter rides in this release too.
+    /folders are now tags/, /can now leave the library/, /second kind of TXT file/,
+    /all nine vault types/, /Choose reasoning effort/, /Narrow corpus sources/,
+    /Save your own Research chat instructions/, /dropping them into the window/, /deleted with it/,
+    /preserves the text already received/, /Visual Skills come to desktop/, /real geographic data/,
+    /review whether an image fits/, /Comments inside a drawing/, /One search experience/,
+    /Teaching hides sections/, /own entry in the Skills header/, /interactive 3D models/,
+    /Browser bookmarks/, /preserve selection whitespace/,
+  ]) {
+    assert.ok(release540.highlights.some((h) => phrase.test(h.en)), `5.4.0 is missing ${phrase}`);
+  }
+
+  // 5.3.1 keeps the modal it shipped with.
+  const release531 = RELEASE_NOTES[3];
+  assert.equal(release531?.version, '5.3.1');
+  assert.equal(release531?.date, '2026-09-10');
+  assert.equal(release531?.highlights.length, 8);
+  for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+    assert.ok(release531.highlights.every((h) => h[language]?.length > 80));
   }
 
   // 5.3.0 keeps the modal it shipped with: the Marketplace debut and the two

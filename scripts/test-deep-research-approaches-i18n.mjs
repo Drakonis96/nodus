@@ -37,7 +37,7 @@ await build({
 });
 const approaches = await import(`${pathToFileURL(outfile).href}?i18n=${Date.now()}`);
 const source = await readFile(path.join(repoRoot, 'electron/ai/deepResearchApproaches.ts'), 'utf8');
-const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
 const specialized = ['literature_review', 'state_of_art', 'scholarly_debate', 'comparative', 'chronological', 'conceptual'];
 const variants = ['academic', 'genealogy', 'study', 'unit', 'client'];
 const SpanishRule = /Amplía la |Organiza el |Sintetiza las |Busca diversidad|Da peso adicional|Nunca presentes|Incluye cambios|No inventes|Prioriza obras|Estructura el |Distingue el |Toda comparación|Explicita las|Usa únicamente|No reduzcas|No colapses|Conserva la posición/iu;

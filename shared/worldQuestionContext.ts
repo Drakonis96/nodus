@@ -13,8 +13,8 @@
  * Pure: the composition and, above all, the parser are asserted without a provider.
  */
 
-import type { AppLanguage } from './types';
-import { normalizeUiLanguage, worldEntryKindLabel, worldFieldLabel } from './worldPromptLanguage';
+import type { PromptLanguage } from './types';
+import { normalizePromptLanguage, worldEntryKindLabel, worldFieldLabel } from './worldPromptLanguage';
 import { worldOperationSystemPrompt } from './worldOperationPrompts';
 
 export interface WorldQuestionSources {
@@ -51,8 +51,8 @@ OPCIÓN: <la respuesta>
 IMPLICA: <lo que arrastra>`;
 
 /** Localized system contract for direct users of this pure context module. */
-export function worldQuestionOptionsSystemPrompt(language: AppLanguage = 'es'): string {
-  return worldOperationSystemPrompt('questionOptions', normalizeUiLanguage(language));
+export function worldQuestionOptionsSystemPrompt(language: PromptLanguage = 'es'): string {
+  return worldOperationSystemPrompt('questionOptions', normalizePromptLanguage(language));
 }
 
 /**
@@ -68,8 +68,8 @@ export function hasWorldQuestionMaterial(sources: WorldQuestionSources): boolean
   return words.length >= 3 || sources.anchorProse.length > 0 || sources.neighbours.length > 0;
 }
 
-export function composeWorldQuestionContext(sources: WorldQuestionSources, language: AppLanguage = 'es'): string {
-  const locale = normalizeUiLanguage(language);
+export function composeWorldQuestionContext(sources: WorldQuestionSources, language: PromptLanguage = 'es'): string {
+  const locale = normalizePromptLanguage(language);
   const copy = QUESTION_CONTEXT_COPY[locale];
   const lines: string[] = [];
   lines.push(`${copy.question}: ${sources.question.trim()}`);
@@ -108,7 +108,7 @@ export function composeWorldQuestionContext(sources: WorldQuestionSources, langu
   return lines.join('\n');
 }
 
-const QUESTION_CONTEXT_COPY: Record<AppLanguage, {
+const QUESTION_CONTEXT_COPY: Record<PromptLanguage, {
   question: string; about: string; writtenIn: string; evidence: string; blocksScene: string;
   anchorProse: string; neighbours: string; existing: string; propose: string;
 }> = {
@@ -120,6 +120,13 @@ const QUESTION_CONTEXT_COPY: Record<AppLanguage, {
   'pt-BR': { question: 'O QUE FALTA DECIDIR', about: 'SOBRE', writtenIn: 'será escrito em', evidence: 'A FRASE ONDE ESTÁ A LACUNA', blocksScene: 'BLOQUEIA A CENA', anchorProse: 'O QUE A FICHA JÁ DIZ (respeite; a resposta precisa se encaixar aqui):', neighbours: 'O MUNDO AO REDOR (use-o; não invente além dele):', existing: 'O QUE O AUTOR JÁ ESCREVEU COMO RESPOSTA (não repita):', propose: 'Proponha três respostas possíveis.' },
   it: { question: 'COSA RESTA DA DECIDERE', about: 'RIGUARDO A', writtenIn: 'sarà scritto in', evidence: 'LA FRASE CON IL VUOTO', blocksScene: 'BLOCCA LA SCENA', anchorProse: 'COSA DICE GIÀ LA SCHEDA (rispettalo; la risposta deve adattarsi):', neighbours: 'IL MONDO INTORNO (usalo; non inventare oltre):', existing: 'COSA HA GIÀ SCRITTO L’AUTORE COME RISPOSTA (non ripeterlo):', propose: 'Proponi tre risposte possibili.' },
   tr: { question: 'KARAR VERİLMEYEN KISIM', about: 'HAKKINDA', writtenIn: 'şuraya yazılacak', evidence: 'BOŞLUĞUN BULUNDUĞU CÜMLE', blocksScene: 'SAHNEYİ ENGELLİYOR', anchorProse: 'KAYDIN ZATEN SÖYLEDİKLERİ (uy; yanıt buraya oturmalı):', neighbours: 'ÇEVRESİNDEKİ DÜNYA (kullan; bunun dışında bir şey uydurma):', existing: 'YAZARIN YANIT OLARAK ZATEN YAZDIKLARI (tekrarlama):', propose: 'Üç olası yanıt öner.' },
+  'zh-Hans': { question: '尚未决定的内容', about: '关于', writtenIn: '将写入', evidence: '存在空缺的句子', blocksScene: '阻塞场景', anchorProse: '条目已经写明的（请尊重它；答案必须与此契合）：', neighbours: '周围的世界（请利用它；不要虚构此范围之外的内容）：', existing: '作者已经写下的答案（不要重复）：', propose: '提出三个可能的答案。' },
+  'zh-Hant': { question: '尚未決定的事項', about: '關於', writtenIn: '將寫入', evidence: '存在空缺的句子', blocksScene: '阻塞場景', anchorProse: '條目已經寫明的（請尊重它；答案必須與此契合）：', neighbours: '周圍的世界（請善用它；不要虛構此範圍之外的內容）：', existing: '作者已經寫下的答案（請勿重複）：', propose: '提出三個可能的答案。' },
+  vi: { question: 'ĐIỀU CÒN CHƯA QUYẾT ĐỊNH', about: 'VỀ', writtenIn: 'sẽ được ghi vào', evidence: 'CÂU CHỨA KHOẢNG TRỐNG', blocksScene: 'CHẶN CẢNH', anchorProse: 'NHỮNG GÌ HỒ SƠ ĐÃ GHI (hãy tôn trọng; câu trả lời phải khớp vào đây):', neighbours: 'THẾ GIỚI XUNG QUANH (hãy dùng nó; đừng bịa đặt gì ngoài phạm vi này):', existing: 'NHỮNG GÌ TÁC GIẢ ĐÃ VIẾT NHƯ MỘT CÂU TRẢ LỜI (đừng lặp lại):', propose: 'Đề xuất ba câu trả lời khả thi.' },
+  ja: { question: 'まだ決まっていないこと', about: '対象', writtenIn: '記録先', evidence: '空白を含む文', blocksScene: 'シーンを妨げている', anchorProse: '記録がすでに述べていること（尊重し、答えはここに適合させてください）：', neighbours: '周囲の世界（活用し、それ以外を捏造しないでください）：', existing: '作者がすでに答えとして書いたもの（繰り返さないでください）：', propose: '三つの可能な答えを提案してください。' },
+  ru: { question: 'ЧТО ЕЩЁ НЕ РЕШЕНО', about: 'О', writtenIn: 'будет записано в', evidence: 'ПРЕДЛОЖЕНИЕ С ПРОБЕЛОМ', blocksScene: 'БЛОКИРУЕТ СЦЕНУ', anchorProse: 'ЧТО УЖЕ СКАЗАНО В ЗАПИСИ (уважайте это; ответ должен сюда вписаться):', neighbours: 'МИР ВОКРУГ НЕГО (используйте его; не выдумывайте ничего сверх этого):', existing: 'ЧТО АВТОР УЖЕ НАПИСАЛ КАК ОТВЕТ (не повторяйте):', propose: 'Предложите три возможных ответа.' },
+  uk: { question: 'ЩО ЩЕ НЕ ВИРІШЕНО', about: 'ПРО', writtenIn: 'буде записано в', evidence: 'РЕЧЕННЯ З ПРОГАЛИНОЮ', blocksScene: 'БЛОКУЄ СЦЕНУ', anchorProse: 'ЩО ВЖЕ ЗАЗНАЧЕНО В ЗАПИСІ (поважайте це; відповідь має сюди вписатися):', neighbours: 'СВІТ НАВКОЛО НЬОГО (використовуйте його; не вигадуйте нічого понад це):', existing: 'ЩО АВТОР УЖЕ НАПИСАВ ЯК ВІДПОВІДЬ (не повторюйте):', propose: 'Запропонуйте три можливі відповіді.' },
+  ko: { question: '아직 결정되지 않은 사항', about: '대상', writtenIn: '기록될 위치', evidence: '공백이 있는 문장', blocksScene: '장면을 막고 있음', anchorProse: '기록이 이미 말하는 내용(존중하되, 답은 여기에 맞아야 합니다):', neighbours: '주변 세계(활용하되, 그 밖의 내용을 지어내지 마십시오):', existing: '저자가 이미 답으로 작성한 내용(반복하지 마십시오):', propose: '가능한 답 세 가지를 제안하십시오.' },
 };
 
 // ── Reading the answer back ──────────────────────────────────────────────────

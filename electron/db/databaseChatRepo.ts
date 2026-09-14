@@ -1,3 +1,4 @@
+import { deleteResearchAttachments } from '../researchAttachments';
 import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from '../chatAssets';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { v4 as uuid } from 'uuid';
@@ -51,6 +52,7 @@ export function saveDatabaseChatConversation(id: string, messages: DbChatTurn[],
 }
 
 export function deleteDatabaseChatConversation(id: string): void {
+  deleteResearchAttachments({ surface: 'database', conversationId: id });
   getDb().prepare('DELETE FROM database_chat_conversations WHERE id = ?').run(id);
   deleteChatAssets(chatAssetOwner('database', id, getActiveVault().id));
 }

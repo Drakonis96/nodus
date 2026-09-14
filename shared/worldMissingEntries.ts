@@ -15,8 +15,8 @@
 
 import { normalizeTitle } from './worldEncyclopedia';
 import type { WorldEntry, WorldEntryKey } from './types';
-import type { AppLanguage } from './types';
-import { normalizeUiLanguage } from './worldPromptLanguage';
+import type { PromptLanguage } from './types';
+import { normalizePromptLanguage } from './worldPromptLanguage';
 import { worldOperationSystemPrompt } from './worldOperationPrompts';
 
 export interface CandidateOccurrence {
@@ -205,12 +205,12 @@ Devuelve JSON y nada más, con esta forma:
 {"candidates":[{"term":"...","category":"magic|religion|language|creature|species|artifact|technology|concept|event|organization|flora|fauna|custom|other","why":"una frase corta","suggestedSummary":"una línea que el autor pueda editar","confidence":0.0}]}`;
 
 /** Localized system contract for direct users of this pure context module. */
-export function missingEntriesSystemPrompt(language: AppLanguage = 'es'): string {
-  return worldOperationSystemPrompt('missingEntries', normalizeUiLanguage(language));
+export function missingEntriesSystemPrompt(language: PromptLanguage = 'es'): string {
+  return worldOperationSystemPrompt('missingEntries', normalizePromptLanguage(language));
 }
 
-export function composeMissingEntriesContext(candidates: EntryCandidate[], language: AppLanguage = 'es'): string {
-  const copy = MISSING_CONTEXT_COPY[normalizeUiLanguage(language)];
+export function composeMissingEntriesContext(candidates: EntryCandidate[], language: PromptLanguage = 'es'): string {
+  const copy = MISSING_CONTEXT_COPY[normalizePromptLanguage(language)];
   const lines = [copy.heading, ''];
   for (const candidate of candidates) {
     lines.push(
@@ -223,7 +223,7 @@ export function composeMissingEntriesContext(candidates: EntryCandidate[], langu
   return lines.join('\n');
 }
 
-const MISSING_CONTEXT_COPY: Record<AppLanguage, { heading: string; unresolved: string; appearances: string; inEntry: string }> = {
+const MISSING_CONTEXT_COPY: Record<PromptLanguage, { heading: string; unresolved: string; appearances: string; inEntry: string }> = {
   es: { heading: 'TÉRMINOS SIN DEFINIR, con dónde aparecen:', unresolved: 'el autor lo enlazó y no existe', appearances: 'apariciones', inEntry: 'en' },
   en: { heading: 'UNDEFINED TERMS, with where they appear:', unresolved: 'the author linked it and it does not exist', appearances: 'appearances', inEntry: 'in' },
   fr: { heading: 'TERMES NON DÉFINIS, avec leurs occurrences :', unresolved: 'l’auteur l’a lié mais il n’existe pas', appearances: 'occurrences', inEntry: 'dans' },
@@ -232,4 +232,11 @@ const MISSING_CONTEXT_COPY: Record<AppLanguage, { heading: string; unresolved: s
   'pt-BR': { heading: 'TERMOS NÃO DEFINIDOS, com os locais onde aparecem:', unresolved: 'o autor o vinculou, mas ele não existe', appearances: 'ocorrências', inEntry: 'em' },
   it: { heading: 'TERMINI NON DEFINITI, con i luoghi in cui compaiono:', unresolved: 'l’autore lo ha collegato ma non esiste', appearances: 'occorrenze', inEntry: 'in' },
   tr: { heading: 'TANIMLANMAMIŞ TERİMLER ve göründükleri yerler:', unresolved: 'yazar ona bağlantı verdi ama mevcut değil', appearances: 'görünüm', inEntry: 'şurada' },
+  'zh-Hans': { heading: '未定义的术语及其出现位置：', unresolved: '作者链接了它，但它并不存在', appearances: '次出现', inEntry: '出现在' },
+  'zh-Hant': { heading: '未定義的術語及其出現位置：', unresolved: '作者連結了它，但它並不存在', appearances: '次出現', inEntry: '出現在' },
+  vi: { heading: 'CÁC THUẬT NGỮ CHƯA ĐƯỢC ĐỊNH NGHĨA, kèm nơi chúng xuất hiện:', unresolved: 'tác giả đã liên kết nó nhưng nó không tồn tại', appearances: 'lần xuất hiện', inEntry: 'trong' },
+  ja: { heading: '未定義の用語とその出現箇所：', unresolved: '作者がリンクしたが存在しない', appearances: '回出現', inEntry: '項目' },
+  ru: { heading: 'НЕОПРЕДЕЛЁННЫЕ ТЕРМИНЫ с указанием, где они встречаются:', unresolved: 'автор сослался на него, но его не существует', appearances: 'вхождений', inEntry: 'в' },
+  uk: { heading: 'НЕВИЗНАЧЕНІ ТЕРМІНИ із зазначенням, де вони трапляються:', unresolved: 'автор посилався на нього, але його не існує', appearances: 'входжень', inEntry: 'у' },
+  ko: { heading: '정의되지 않은 용어와 등장 위치:', unresolved: '저자가 링크했지만 존재하지 않음', appearances: '번 등장', inEntry: '항목' },
 };

@@ -1,7 +1,8 @@
 import { getDb } from './database';
 import { scanSimilar } from './vectorScan';
 import { v4 as uuid } from 'uuid';
-import crypto from 'node:crypto';
+import { embeddingTextForIdea, embeddingTextHash } from './ideaEmbeddingText';
+export { embeddingTextForIdea, embeddingTextHash };
 import type {
   Idea,
   IdeaType,
@@ -68,25 +69,6 @@ export function currentEmbeddingConfig(): { provider: EmbeddingProvider; model: 
     provider,
     model: normalizeEmbeddingModel(provider, settings.embeddingModel || DEFAULT_EMBEDDING_MODELS[provider]),
   };
-}
-
-export function embeddingTextForIdea(input: {
-  type?: string | null;
-  label: string;
-  statement: string;
-  themes?: string[] | null;
-}): string {
-  const parts = [
-    input.type ? `tipo: ${input.type}` : '',
-    `etiqueta: ${input.label}`,
-    `enunciado: ${input.statement}`,
-    input.themes?.length ? `temas: ${input.themes.slice(0, 4).join(', ')}` : '',
-  ].filter(Boolean);
-  return parts.join('\n');
-}
-
-export function embeddingTextHash(text: string): string {
-  return crypto.createHash('sha1').update(text.replace(/\s+/g, ' ').trim()).digest('hex');
 }
 
 function embeddingMetaFor(text: string, embedding: number[]): {

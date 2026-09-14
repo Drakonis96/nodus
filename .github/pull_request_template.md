@@ -4,7 +4,7 @@
 
 ## Related issue
 
-<!-- Use "Closes #123" when this pull request should close an issue. -->
+<!-- Required: every pull request must reference an existing issue. Open one first if none exists, and use "Closes #123" when this pull request should close it. -->
 
 ## Type of change
 
@@ -26,7 +26,7 @@
 
 ## Screenshots
 
-<!-- Add before-and-after screenshots for visible UI changes. Remove if not applicable. -->
+<!-- Attach screenshots whenever possible: before-and-after images for visible UI changes and reproduction evidence for bug fixes. Remove only if they are not applicable. -->
 
 ## Privacy and data review
 
@@ -38,6 +38,8 @@
 
 ## Contributor checklist
 
+- [ ] This pull request is written in English and references an existing issue.
+- [ ] I attached screenshots whenever possible (before-and-after for UI changes, reproduction evidence for bug fixes).
 - [ ] I have read [CLA.md](https://github.com/Drakonis96/nodus/blob/main/CLA.md) and accepted it through the **CLA / signature** check. Every author and coauthor must accept separately; this checkbox alone is not acceptance.
 - [ ] I added or updated focused tests.
 - [ ] I updated documentation where behavior changed.

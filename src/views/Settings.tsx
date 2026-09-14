@@ -64,6 +64,7 @@ import { NODI_DEFAULT_SCALE, NODI_SIZE_SCALES } from '@shared/nodiSize';
 import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vaultTypes';
 import { DOCUMENT_INDEX_CONTINUOUS_AVAILABLE } from '@shared/documentIndexPolicy';
 import { validateBackupPassword } from '@shared/backupPasswordPolicy';
+import { PROMPT_LANGUAGE_OPTIONS } from '@shared/promptLanguageOptions';
 import chromeWebStoreLogo from '../assets/brands/chrome-web-store.svg';
 import { contrast, deriveThemeTokens, THEMES } from '../theme/themes.mjs';
 import { applyAppTheme as applyRuntimeAppTheme, applyThemeMode } from '../theme/themeBoot';
@@ -1150,14 +1151,9 @@ export function Settings({
                 value={settings.promptLanguage}
                 onChange={(e) => patch({ promptLanguage: e.target.value as AppSettings['promptLanguage'] })}
               >
-                <option value="es">Español</option>
-                <option value="en">English</option>
-                <option value="fr">Français</option>
-                <option value="de">Deutsch</option>
-                <option value="pt">Português (Portugal)</option>
-                <option value="pt-BR">Português (Brasil)</option>
-                <option value="it">Italiano</option>
-                <option value="tr">Türkçe</option>
+                {PROMPT_LANGUAGE_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
               </select>
             </Row>
             <p className="text-xs text-neutral-500">

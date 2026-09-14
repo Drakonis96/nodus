@@ -3,7 +3,7 @@
 // deterministic.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import fs from "node:fs";
+import fs, { mkdtempSync, rmSync } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import os from "node:os";
@@ -17,21 +17,43 @@ const repoRoot = path.resolve(
 const require = createRequire(import.meta.url);
 
 if (!process.argv.includes("--electron-database-deep-research-test")) {
-  execFileSync(
-    path.join(repoRoot, "node_modules/.bin/electron"),
-    [
-      path.join(
-        repoRoot,
-        "scripts/test-database-deep-research-integration.mjs",
-      ),
-      "--electron-database-deep-research-test",
-    ],
-    {
-      cwd: repoRoot,
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
-      stdio: "inherit",
-    },
-  );
+  // The child gets a temporary directory of its own.
+  //
+  // It checks that the private SQLite snapshot is cleaned up by listing the system
+  // temporary directory before and after, which is only a statement about this code if
+  // nothing else writes there. Under `node --test` several files run at once, and three
+  // sibling harnesses create scratch directories under the very prefix this one filters
+  // on -- `nodus-db-research-model-`, `-privacy-` and `-luna-runtime-`. A sibling's
+  // mkdtemp landing between the two listings is read here as a leak: the run that found
+  // this was holding `nodus-db-research-privacy-3s3mnZ`, a directory belonging to
+  // another test file. Giving the child its own root makes the listing exact instead of
+  // a race, and costs nothing else: `os.tmpdir()` is all the code under test asks for.
+  const childTemp = mkdtempSync(path.join(os.tmpdir(), "nodus-dbr-electron-"));
+  try {
+    execFileSync(
+      path.join(repoRoot, "node_modules/.bin/electron"),
+      [
+        path.join(
+          repoRoot,
+          "scripts/test-database-deep-research-integration.mjs",
+        ),
+        "--electron-database-deep-research-test",
+      ],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          ELECTRON_RUN_AS_NODE: "1",
+          TMPDIR: childTemp,
+          TMP: childTemp,
+          TEMP: childTemp,
+        },
+        stdio: "inherit",
+      },
+    );
+  } finally {
+    rmSync(childTemp, { recursive: true, force: true });
+  }
   process.exit(0);
 }
 

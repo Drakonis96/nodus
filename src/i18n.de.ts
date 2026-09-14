@@ -1,4 +1,10 @@
+import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
+import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
+import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
+import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
+import { RESEARCH_REASONING_TRANSLATIONS } from './i18n.researchReasoning';
 import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
+import { CAPABILITIES_TRANSLATIONS } from './i18n.capabilities';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 /**
  * de translations keyed by the Spanish source string (see {@link ./i18n}).
@@ -15,6 +21,7 @@ import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
+import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
@@ -59,7 +66,15 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const DE: Record<string, string> = {
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Wähle den hellen oder dunklen Modus oder folge dem Betriebssystem.',
+  ...RESEARCH_ATTACHMENT_TRANSLATIONS['de'],
+  "Research chat": "Research chat",
+  "Elige al menos una base de datos.": "Wählen Sie mindestens eine Datenbank aus.",
+  ...RESEARCH_PROMPT_TRANSLATIONS["de"],
+  ...RESEARCH_SOURCE_TRANSLATIONS["de"],
+  ...RESEARCH_REASONING_TRANSLATIONS["de"],
   ...CHAT_SKILLS_TRANSLATIONS['de'],
+  ...CAPABILITIES_TRANSLATIONS['de'],
+  ...DOCUMENT_SKILLS_TRANSLATIONS['de'],
   ...STELLAR_GRAPH_TRANSLATIONS["de"],
   ...ACADEMIC_TOUR_TRANSLATIONS.de,
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS.de,
@@ -105,6 +120,7 @@ export const DE: Record<string, string> = {
   ...ANNOUNCEMENT_TRANSLATIONS['de'],
   ...WORLD_CHAT_TRANSLATIONS.de,
   ...STUDY_SYNONYM_TRANSLATIONS.de,
+  ...STUDY_BANK_TRANSLATIONS.de,
   ...STUDY_IMPROVE_TRANSLATIONS.de,
   ...WORKSPACE_TRANSLATIONS.de,
   "Lo que cuenta el mapa": "Was die Karte erzählt",
@@ -2464,6 +2480,7 @@ export const DE: Record<string, string> = {
   'No aplica': 'Nicht zutreffend',
   'Solo abstract': 'Nur Abstract',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'Nodus hat keinen lesbaren Text gefunden. Füge das PDF oder EPUB in Zotero hinzu und analysiere erneut.',
+  'Zotero no está disponible. Ábrelo y vuelve a analizar.': 'Zotero ist nicht verfügbar. Öffne es und analysiere erneut.',
   'El análisis solo pudo usar el abstract, así que esta obra no tendrá texto citable. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'Die Analyse konnte nur das Abstract verwenden, daher wird dieses Werk keinen zitierfähigen Text haben. Füge das PDF oder EPUB in Zotero hinzu und analysiere erneut.',
   'Ver las {n} ideas de esta obra': 'Die {n} Ideen dieses Werks ansehen',
   'Analizar: temas, ideas, resumen, indexado y relaciones': 'Analysieren: Themen, Ideen, Zusammenfassung, Indexierung und Beziehungen',
@@ -4296,6 +4313,7 @@ export const DE: Record<string, string> = {
     'Fügen Sie die erste über das Dossier einer Person im Bereich „Soziale Beziehungen“ hinzu.',
   'Ir a Personas': 'Zu Personen',
   'Vista previa': 'Vorschau',
+  'Markdown y LaTeX · fórmulas entre $...$': 'Markdown und LaTeX · Formeln zwischen $...$',
   'Aún no hay personas. Importa un GEDCOM o añade personas y sus parentescos desde la vista Personas.':
     'Noch keine Personen. Importieren Sie ein GEDCOM oder fügen Sie Personen und ihre Verwandtschaften über die Ansicht Personen hinzu.',
   'Árbol genealógico': 'Stammbaum',
@@ -8445,4 +8463,28 @@ export const DE: Record<string, string> = {
   "Usa un número entero de palabras, sin decimales.": "Verwenden Sie eine ganze Wortanzahl, ohne Dezimalstellen.",
   "El mínimo son {min} palabras por sección.": "Das Minimum sind {min} Wörter pro Abschnitt.",
   "El máximo son {max} palabras por sección.": "Das Maximum sind {max} Wörter pro Abschnitt.",
+  "Solicitud cancelada por el usuario.": "Der Nutzer hat die Anfrage abgebrochen.",
+  // PDF Presenter — tags (renamed from folders) and the PDF download.
+  'Sin etiqueta': 'Kein Tag',
+  'Eliminar etiqueta': 'Tag löschen',
+  'Filtrar por etiqueta': 'Nach Tag filtern',
+  '¿Seguro que quieres eliminar la etiqueta «{name}»? Las presentaciones que la tienen seguirán en la biblioteca, pero sin etiqueta.': 'Das Tag „{name}“ löschen? Die Präsentationen damit bleiben in der Bibliothek, nur ohne Tag.',
+  'Descargar PDF': 'PDF herunterladen',
+  'No se pudo descargar la presentación.': 'Die Präsentation konnte nicht heruntergeladen werden.',
+  // Nodus Browser — HTTP authentication prompt.
+  'pide usuario y contraseña.': 'verlangt Benutzername und Passwort.',
+  'Usuario': 'Benutzername',
+  'Iniciar sesión': 'Anmelden',
+  'Proxy': 'Proxy',
+  'Nota guardada': 'Notiz gespeichert',
+  'Continuar en el chat': 'Im Chat fortfahren',
+  'La nota se guardó, pero no se pudo vincular al proyecto.': 'Die Notiz wurde gespeichert, konnte aber nicht mit dem Projekt verknüpft werden.',
+  'Procedencia': 'Provenienz',
+  'Volver a la conversación': 'Zurück zur Unterhaltung',
+  'Fuentes citadas': 'Zitierte Quellen',
+  'Research chat de bases de datos': 'Research chat: Datenbanken',
+  'Research chat de estudio': 'Research chat: Studium',
+  'Research chat del mundo': 'Research chat: Welt',
+  'La conversación original ya no está disponible.': 'Die ursprüngliche Unterhaltung ist nicht mehr verfügbar.',
+  'La conversación está disponible, pero el mensaje original ya no existe.': 'Die Unterhaltung ist verfügbar, aber die ursprüngliche Nachricht existiert nicht mehr.',
 };

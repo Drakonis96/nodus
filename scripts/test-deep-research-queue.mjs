@@ -110,7 +110,10 @@ try {
     });
     const running = queue.runDeepResearchJob({ request: { objective: 'running', language: 'es' }, origin: 'app', save: false }).catch((error) => error);
     await waitFor(() => runningSignal instanceof AbortSignal, 'the localization sentinel to start');
-    const expected = { en: /Queued/, fr: /En attente/, de: /Warteschlange/, pt: /Em fila/, 'pt-BR': /Na fila/, it: /In coda/, tr: /Kuyrukta/ };
+    const expected = {
+      en: /Queued/, fr: /En attente/, de: /Warteschlange/, pt: /Em fila/, 'pt-BR': /Na fila/, it: /In coda/, tr: /Kuyrukta/,
+      'zh-Hans': /排队中/, 'zh-Hant': /排隊中/, vi: /Đang chờ/, ja: /待機中/, ru: /В очереди/, uk: /У черзі/, ko: /대기 중/,
+    };
     const queuedJobs = Object.entries(expected).map(([language, marker]) => {
       const record = queue.enqueueDeepResearchJob({ request: { objective: `job-${language}`, language }, origin: 'mcp', save: false });
       const current = queue.getDeepResearchJob(record.id).job;

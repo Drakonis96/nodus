@@ -1,0 +1,460 @@
+import { useCallback, useEffect, useState, type CSSProperties } from 'react';
+import type { CapabilityListPayload, CapabilityMigrationStatus, CapabilityProviderSummary, CapabilitySettingsPayload, InstalledCapabilityPlugin, SettingsFieldV1, TrustedPermissionSetV2 } from '@shared/capabilities';
+import { DEFAULT_SKILL_SOURCE } from '@shared/skillMarketplace';
+import { CapabilityView } from './CapabilityView';
+import { Icon } from './ui';
+import { skillGlyph } from './skillGlyph';
+import { t, getActiveLang } from '../i18n';
+// The card shape, the glyph plate and the chevron are shared with the skill cards this
+// panel sits above; imported rather than inherited from whoever renders it.
+import './chatSkills.css';
+import './capabilityPackages.css';
+
+/** Official capability packages: what is installed, what the catalog offers, and the
+ *  settings each package declares for itself.
+ *
+ *  Nothing here is discipline-specific. The panel asks the registry what exists and asks
+ *  each package for its own settings schema, so adding a discipline adds no interface. */
+
+const label = (text: { en: string; [locale: string]: string }) => text[getActiveLang()] ?? text[getActiveLang().split('-')[0]] ?? text.en;
+
+export function SettingsForm({ capabilityId, onChanged }: { capabilityId: string; onChanged: () => void }) {
+  const [payload, setPayload] = useState<CapabilitySettingsPayload | null>(null);
+  const [draft, setDraft] = useState<Record<string, string | boolean>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(() => {
+    void window.nodus.getCapabilitySettings(capabilityId)
+      .then(value => { setPayload(value); setDraft({}); setError(''); })
+      .catch(value => setError(value instanceof Error ? value.message : String(value)));
+  }, [capabilityId]);
+  useEffect(load, [load]);
+
+  if (error) return <p className="capability-packages-error" role="alert">{error}</p>;
+  if (!payload) return <p className="capability-packages-muted">{t('Cargando…')}</p>;
+
+  const value = (field: SettingsFieldV1): string | boolean => {
+    if (field.id in draft) return draft[field.id];
+    const stored = payload.state.fields[field.id];
+    if (field.kind === 'toggle' || field.kind === 'consent') return stored?.value === true;
+    return typeof stored?.value === 'string' ? stored.value : '';
+  };
+  const configured = (field: SettingsFieldV1) => payload.state.fields[field.id]?.configured === true;
+
+  const run = async (action: () => Promise<unknown>) => {
+    setBusy(true); setError('');
+    try { await action(); load(); onChanged(); }
+    catch (thrown) { setError(thrown instanceof Error ? thrown.message : String(thrown)); }
+    finally { setBusy(false); }
+  };
+
+  return <form className="capability-settings" onSubmit={event => {
+    event.preventDefault();
+    void run(() => window.nodus.applyCapabilitySettings(capabilityId, { fields: draft }));
+  }}>
+    {payload.state.status && <p className="capability-view-status" data-state={payload.state.status.state} role="status">
+      <Icon name={payload.state.status.state === 'ok' ? 'check' : payload.state.status.state === 'failed' ? 'alert' : 'clock'} size={14} />
+      <b>{label(payload.state.status.label)}</b>
+    </p>}
+
+    {payload.manifest.fields.map(field => <label key={field.id} className="capability-settings-field">
+      <span className="capability-settings-label">
+        {label(field.label)}
+        {field.kind === 'secret' && <span className="capability-settings-hint">{configured(field) ? t('Configurada') : field.required ? t('Necesaria') : t('Opcional')}</span>}
+      </span>
+      {field.description && <span className="capability-settings-description">{label(field.description)}</span>}
+      {field.kind === 'secret' && <input type="password" className="input w-full" autoComplete="off" spellCheck={false}
+        placeholder={configured(field) ? '••••••••' : ''}
+        value={typeof draft[field.id] === 'string' ? draft[field.id] as string : ''}
+        onChange={event => setDraft({ ...draft, [field.id]: event.target.value })} />}
+      {field.kind === 'text' && <input type="text" className="input w-full" maxLength={field.maxLength}
+        value={value(field) as string} onChange={event => setDraft({ ...draft, [field.id]: event.target.value })} />}
+      {(field.kind === 'toggle' || field.kind === 'consent') && <span className="capability-settings-check">
+        <input type="checkbox" checked={value(field) === true} onChange={event => setDraft({ ...draft, [field.id]: event.target.checked })} />
+        {field.kind === 'consent' && field.termsUrl && <a href={field.termsUrl} target="_blank" rel="noreferrer noopener">{t('Leer los términos')}</a>}
+      </span>}
+      {field.kind === 'select' && <select className="input w-full" value={value(field) as string}
+        onChange={event => setDraft({ ...draft, [field.id]: event.target.value })}>
+        {field.options.map(option => <option key={option.value} value={option.value}>{label(option.label)}</option>)}
+      </select>}
+    </label>)}
+
+    {payload.state.view && <CapabilityView view={payload.state.view} />}
+
+    <div className="capability-settings-actions">
+      <button type="submit" className="chat-skill-primary" disabled={busy || !Object.keys(draft).length}>{t('Guardar')}</button>
+      {payload.manifest.actions.map(action => {
+        const disabled = payload.state.disabledActions?.[action.id];
+        return <button key={action.id} type="button" className="chat-skill-secondary" disabled={busy || !!disabled}
+          title={disabled ? label(disabled) : undefined}
+          onClick={() => {
+            if (action.confirm && !window.confirm(label(action.confirm))) return;
+            void run(() => window.nodus.runCapabilityAction(capabilityId, action.id));
+          }}>{label(action.label)}</button>;
+      })}
+    </div>
+    {error && <p className="capability-packages-error" role="alert">{error}</p>}
+  </form>;
+}
+
+/** A package that is waiting to be told yes or no, and what it asked for. */
+export interface PendingReview { id: string; name: string; version: string; update: boolean; permissions: TrustedPermissionSetV2 | null }
+
+const megabytes = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(bytes >= 1024 * 1024 ? 1 : 2)} MB`;
+
+/** What a package asked for, in the terms the user is actually deciding about.
+ *
+ *  Read from the staged package rather than from the approved fingerprint, which is a hash
+ *  and cannot be turned back into a list. Core services keep their capability identifiers —
+ *  the same ones the card's own facts show — because a friendly paraphrase of "may call
+ *  nodus:maps" is a paraphrase of exactly the thing being consented to. */
+function permissionRows(permissions: TrustedPermissionSetV2): Array<{ label: string; detail: string; note?: string }> {
+  const rows: Array<{ label: string; detail: string; note?: string }> = [];
+  if (permissions.network?.length) {
+    rows.push({ label: t('Conexiones a internet'), detail: [...new Set(permissions.network.map(endpoint => endpoint.origin))].join(', ') });
+  }
+  if (permissions.secrets?.length) {
+    rows.push({
+      label: t('Credenciales'),
+      detail: permissions.secrets.map(secret => secret.label).join(', '),
+      note: t('Nodus inyecta la credencial por ti; el paquete nunca la ve.'),
+    });
+  }
+  if (permissions.storage) {
+    const storage = permissions.storage;
+    rows.push({ label: t('Almacenamiento'), detail: megabytes(storage.stateBytes + storage.cacheBytes + storage.tempBytes) });
+  }
+  if (permissions.model) rows.push({ label: t('Llamadas al modelo'), detail: `${permissions.model.maxCalls} · ${permissions.model.purpose}` });
+  if (permissions.runtimes?.length) {
+    rows.push({ label: t('Entornos de ejecución'), detail: permissions.runtimes.map(runtime => `${runtime.kind} ${runtime.minVersion}+`).join(', ') });
+  }
+  const core = [
+    permissions.svg && 'nodus:svg',
+    permissions.models && 'nodus:3d',
+    permissions.media && 'nodus:media',
+    permissions.vision && 'nodus:vision',
+    permissions.maps && `nodus:maps (${permissions.maps.providers.join(', ')})`,
+  ].filter(Boolean) as string[];
+  if (core.length) rows.push({ label: t('Dibujo, imágenes y mapas'), detail: core.join(', ') });
+  if (permissions.subworkers) rows.push({ label: t('Procesos auxiliares'), detail: String(permissions.subworkers.max) });
+  return rows;
+}
+
+/** The question, asked once, in the gesture that raised it.
+ *
+ *  Installing a package that wants something is one decision, so it is one dialogue: yes
+ *  installs it, no removes what staging the question needed. Before this, the answer lived
+ *  in a button the card only drew for packages that were already active, which no first
+ *  install ever is — so the only reachable reply was to install again, and get asked again. */
+export function PermissionReview({ review, busy, onAllow, onRefuse }: {
+  review: PendingReview;
+  busy: boolean;
+  onAllow: () => void;
+  onRefuse: () => void;
+}) {
+  // Absent is not the same as empty. A staged package whose manifests cannot be read tells
+  // us nothing about what it wants, and rendering that as "it asks for nothing" would be
+  // the interface inventing the reassurance — so the offer is withdrawn instead.
+  const unreadable = review.permissions === null;
+  const rows = review.permissions ? permissionRows(review.permissions) : [];
+  return <div className="capability-permission-backdrop" role="presentation" onClick={event => { if (event.target === event.currentTarget && !busy) onRefuse(); }}>
+    <div className="capability-permission-review" role="dialog" aria-modal="true" aria-label={review.name}>
+      <h4>{review.update ? t('Esta actualización pide permisos nuevos') : t('Este paquete necesita permisos')}</h4>
+      <p className="capability-packages-muted">{review.name} {review.version}</p>
+      <p className="capability-packages-muted">{review.update
+        ? t('Revisa lo que pide. Si lo rechazas, sigues con la versión instalada.')
+        : t('Revisa lo que pide. Si lo rechazas, no se instala nada.')}</p>
+      {unreadable
+        ? <p className="capability-packages-error" role="alert">{t('No se ha podido leer lo que pide este paquete.')}</p>
+        : rows.length
+          ? <dl className="capability-permission-list">{rows.map(row => <div key={row.label}>
+            <dt>{row.label}</dt>
+            <dd>{row.detail}{row.note && <small>{row.note}</small>}</dd>
+          </div>)}</dl>
+          : <p className="capability-packages-muted">{t('No pide ningún permiso.')}</p>}
+      <div className="capability-permission-actions">
+        {!unreadable && <button type="button" className="chat-skill-primary" disabled={busy} onClick={onAllow}>
+          {review.update ? t('Permitir y actualizar') : t('Permitir e instalar')}
+        </button>}
+        <button type="button" className="chat-skill-secondary" disabled={busy} onClick={onRefuse}>{t('Rechazar')}</button>
+      </div>
+    </div>
+  </div>;
+}
+
+/** What the 5.3.1 move is doing, while it is doing it.
+ *
+ *  The migration runs in the background so a failure cannot hold up the window, which
+ *  means the only way a user learns it did not finish is here. Each package says which of
+ *  the four things it is waiting on, and a failure offers the retry rather than describing
+ *  one. */
+export function MigrationBanner({ onChanged }: { onChanged: () => void }) {
+  const [status, setStatus] = useState<CapabilityMigrationStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const refresh = useCallback(() => {
+    void window.nodus.capabilityMigrationStatus().then(setStatus).catch(() => undefined);
+  }, []);
+  // The failure sentence is translated in the main process, where the journal's source
+  // language meets the current setting, so a language change has to re-ask for it: every
+  // other string on this panel re-evaluates on the render that follows, and this one would
+  // have stayed in the language it was fetched in.
+  const language = getActiveLang();
+  useEffect(() => {
+    refresh();
+    const stopMigration = window.nodus.onCapabilityMigrationChanged(refresh);
+    const stopRegistry = window.nodus.onCapabilityRegistryChanged(refresh);
+    return () => { stopMigration(); stopRegistry(); };
+  }, [refresh, language]);
+
+  if (!status?.entries.length) return null;
+  // Only what the retry below can still act on. A package the journal finished is not
+  // outstanding work even when it is currently unregistered — the registry says why, in
+  // the problems it reports under this banner, and retrying the move would not change it.
+  const unfinished = status.entries.filter(entry => entry.phase !== 'complete');
+  if (!unfinished.length) return null;
+
+  const stageOf = (entry: CapabilityMigrationStatus['entries'][number]) => {
+    if (entry.failure) return t('No se pudo completar');
+    if (status.running && !entry.installed) return t('Instalando…');
+    if (status.running) return t('Migrando tus datos…');
+    if (!entry.installed) return t('Pendiente de instalar');
+    if (!entry.registered) return t('Pendiente de migrar');
+    return t('Pendiente');
+  };
+
+  return <div className="capability-packages-migration" role="status">
+    <p><b>{t('Traslado desde la versión anterior')}</b></p>
+    <p className="capability-packages-muted">{t('Tus disciplinas ahora son paquetes. Nodus las instala y traslada sus datos sin tocar lo que ya tenías.')}</p>
+    <ul>
+      {unfinished.map(entry => <li key={entry.pluginId}>
+        <b>{entry.pluginId}</b>
+        <span>{stageOf(entry)}</span>
+        {entry.failure && <span className="capability-packages-error">{entry.failure}</span>}
+        {entry.attempts > 1 && <span className="capability-packages-muted">{t('Intentos')}: {entry.attempts}</span>}
+      </li>)}
+    </ul>
+    {error && <p className="capability-packages-error" role="alert">{error}</p>}
+    <button type="button" className="chat-skill-primary" disabled={busy || status.running}
+      onClick={() => {
+        setBusy(true); setError('');
+        void window.nodus.retryCapabilityMigration()
+          .then(() => { refresh(); onChanged(); })
+          .catch(thrown => setError(thrown instanceof Error ? thrown.message : String(thrown)))
+          .finally(() => setBusy(false));
+      }}>
+      <Icon name="refresh" size={14} />{busy || status.running ? t('Reintentando…') : t('Reintentar')}
+    </button>
+  </div>;
+}
+
+export function CapabilityPackagesPanel() {
+  const [payload, setPayload] = useState<CapabilityListPayload | null>(null);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [expanded, setExpanded] = useState('');
+  const [review, setReview] = useState<PendingReview | null>(null);
+
+  const refresh = useCallback(() => {
+    void window.nodus.listCapabilities().then(setPayload).catch(value => setError(value instanceof Error ? value.message : String(value)));
+  }, []);
+  useEffect(() => {
+    refresh();
+    return window.nodus.onCapabilityRegistryChanged(refresh);
+  }, [refresh]);
+
+  // An empty `success` leaves the notice to the action: an install that stops to ask for
+  // permissions has not installed anything yet and must not say that it has.
+  const run = async (id: string, action: () => Promise<unknown>, success = '') => {
+    setBusy(id); setError(''); setNotice('');
+    try { await action(); if (success) setNotice(success); refresh(); }
+    catch (thrown) { setError(thrown instanceof Error ? thrown.message : String(thrown)); }
+    finally { setBusy(''); }
+  };
+
+  /** Installs, and asks rather than giving up when the package wants something. */
+  const install = (entry: { id: string; name: string; version: string }, success: string) => run(entry.id, async () => {
+    const result = await window.nodus.installCapabilityPlugin(entry.id, false);
+    if (result.activated) { setNotice(success); return; }
+    if (result.state?.pending?.reason === 'permissions') {
+      setReview({ id: entry.id, name: entry.name, version: result.state.pending.version, update: Boolean(result.state.active), permissions: result.pendingPermissions });
+      return;
+    }
+    setNotice(`${entry.name}: ${result.state?.status ?? ''}`);
+  });
+
+  const openReview = (entry: { id: string; name: string }, state: InstalledCapabilityPlugin) => setReview({
+    id: entry.id, name: entry.name,
+    version: state.pending?.version ?? '',
+    update: Boolean(state.active),
+    permissions: state.pendingPermissions ?? null,
+  });
+
+  if (!payload) return <p className="capability-packages-muted">{t('Cargando…')}</p>;
+
+  const installed = new Map(payload.plugins.map(plugin => [plugin.id, plugin]));
+  const providersOf = (pluginId: string) => payload.providers.filter(provider => provider.plugin?.id === pluginId);
+  // Alphabetical, like the skills below them: one order for everything in this panel.
+  const catalogue = [...(payload.catalog?.catalog.plugins ?? [])]
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
+
+  return <section className="capability-packages">
+    <header className="capability-packages-head">
+      <div>
+        <h3>{t('Paquetes oficiales')}</h3>
+        <p className="capability-packages-muted">{t('Publicados y firmados por NodusResearch. Cada paquete trae sus propias capabilities y su propia configuración.')}</p>
+      </div>
+      <div className="capability-packages-actions">
+        <button type="button" className="chat-skill-secondary" disabled={busy === 'catalog'}
+          onClick={() => void run('catalog', () => window.nodus.refreshCapabilityCatalog(DEFAULT_SKILL_SOURCE), t('Catálogo actualizado.'))}>
+          <Icon name="refresh" size={14} />{t('Actualizar catálogo')}
+        </button>
+        <button type="button" className="chat-skill-secondary" disabled={busy === 'updates'}
+          onClick={() => void run('updates', async () => {
+            const results = await window.nodus.checkCapabilityUpdates();
+            const updated = results.filter(result => result.state === 'updated');
+            const waiting = results.filter(result => result.state === 'awaiting-approval');
+            setNotice(updated.length ? `${t('Actualizado')}: ${updated.map(result => `${result.pluginId} ${result.to}`).join(', ')}`
+              : waiting.length ? t('Hay una actualización esperando a que apruebes sus permisos.')
+                : t('Todo está al día.'));
+          })}>
+          <Icon name="download" size={14} />{busy === 'updates' ? t('Buscando…') : t('Buscar actualizaciones')}
+        </button>
+      </div>
+    </header>
+
+    <MigrationBanner onChanged={refresh} />
+
+    {review && <PermissionReview review={review} busy={busy === review.id}
+      onAllow={() => void run(review.id, async () => {
+        await window.nodus.approveCapabilityPlugin(review.id);
+        setReview(null);
+      }, review.update ? t('Actualización aplicada.') : t('Paquete instalado.'))}
+      onRefuse={() => void run(review.id, async () => {
+        await window.nodus.discardPendingCapabilityPlugin(review.id);
+        setReview(null);
+      }, review.update ? t('La actualización se ha descartado.') : t('No se ha instalado nada.'))} />}
+
+    {error && <p className="capability-packages-error" role="alert">{error}</p>}
+    {notice && <p className="capability-packages-notice" role="status">{notice}</p>}
+    {payload.problems.map(problem => <p key={problem.pluginId} className="capability-packages-error" role="alert">
+      <b>{problem.pluginId}</b> {problem.detail}
+    </p>)}
+
+    {!catalogue.length && !payload.plugins.length && <p className="capability-packages-muted">{t('Actualiza el catálogo para ver los paquetes disponibles.')}</p>}
+
+    <ul className="capability-packages-list">
+      {catalogue.map(entry => {
+        const state = installed.get(entry.id);
+        const providers = providersOf(entry.id);
+        const glyph = skillGlyph({ packageId: entry.id, name: entry.name, description: label(entry.description) });
+        const open = expanded === entry.id;
+        // The same card as a skill: a package is one more thing in this list, and giving it
+        // its own shape only made the panel look like two panels stacked.
+        return <li key={entry.id} className={`capability-packages-item ${open ? 'open' : ''}`} style={{ '--skill-hue': glyph.hue } as CSSProperties}>
+          <div className="capability-packages-item-head">
+            <span className="chat-skill-symbol" aria-hidden="true"><Icon name={glyph.icon} size={18} /></span>
+            <div className="capability-packages-item-text">
+              <span className="chat-skill-heading">
+                <b>{entry.name}</b>
+                <span className="capability-packages-publisher"><Icon name="check" size={12} />NodusResearch</span>
+                <span className="capability-packages-version">{state?.active && state.active.version !== entry.version ? `${state.active.version} → ${entry.version}` : entry.version}</span>
+              </span>
+              <p className="capability-packages-muted">{label(entry.description)}</p>
+            </div>
+            <button type="button" className="chat-skill-details-toggle" aria-expanded={open}
+              aria-label={`${t(open ? 'Ocultar detalles de' : 'Ver detalles de')} ${entry.name}`}
+              title={t(open ? 'Ocultar detalles' : 'Ver detalles')} onClick={() => setExpanded(open ? '' : entry.id)}>
+              <Icon name={open ? 'chevronUp' : 'chevronDown'} size={14} />
+            </button>
+          </div>
+
+          {state?.pending?.reason === 'permissions' && <p className="capability-packages-warning" role="status">
+            {state.active
+              ? t('La actualización pide permisos nuevos. Revísalos y apruébala para instalarla.')
+              : t('Revisa lo que pide. Si lo rechazas, no se instala nada.')}
+          </p>}
+
+          {open && <div className="capability-packages-details">
+            <p className="capability-packages-muted">{label(entry.description)}</p>
+            <PackageFacts entry={entry} state={state} providers={providers} />
+            {state?.active && <label className="capability-packages-autoupdate">
+              <input type="checkbox" checked={state.autoUpdate}
+                onChange={event => void run(entry.id, () => window.nodus.setCapabilityAutoUpdate(entry.id, event.target.checked))} />
+              <span>{t('Actualizar este paquete automáticamente')}</span>
+            </label>}
+            {providers.filter(provider => provider.hasSettings).map(provider =>
+              <SettingsForm key={provider.id} capabilityId={provider.id} onChanged={refresh} />)}
+          </div>}
+
+          <PackageActions entry={entry} state={state} busy={busy} run={run} install={install} onReview={openReview} />
+        </li>;
+      })}
+    </ul>
+  </section>;
+}
+
+export function PackageFacts({ entry, state, providers }: {
+  entry: { targets: string[]; release: { assets: Array<{ target: string; bytes: number }> } };
+  state?: InstalledCapabilityPlugin;
+  providers: CapabilityProviderSummary[];
+}) {
+  const asset = entry.release.assets.find(candidate => candidate.target === state?.active?.target) ?? entry.release.assets[0];
+  return <dl className="capability-packages-facts">
+    <div><dt>{t('Capabilities')}</dt><dd>{providers.length ? providers.map(provider => provider.id).join(', ') : '—'}</dd></div>
+    <div><dt>{t('Tamaño')}</dt><dd>{asset ? `${(asset.bytes / (1024 * 1024)).toFixed(1)} MB` : '—'}</dd></div>
+    <div><dt>{t('Plataformas')}</dt><dd>{entry.targets.join(', ')}</dd></div>
+    <div><dt>{t('Estado')}</dt><dd>{state ? state.status : t('No instalado')}</dd></div>
+  </dl>;
+}
+
+export function PackageActions({ entry, state, busy, run, install, onReview }: {
+  entry: { id: string; name: string; version: string };
+  state?: InstalledCapabilityPlugin;
+  busy: string;
+  run: (id: string, action: () => Promise<unknown>, success?: string) => Promise<void>;
+  install: (entry: { id: string; name: string; version: string }, success: string) => Promise<void>;
+  onReview: (entry: { id: string; name: string }, state: InstalledCapabilityPlugin) => void;
+}) {
+  const working = busy === entry.id;
+  const asking = state?.pending?.reason === 'permissions';
+  // A first install that has never been active: nothing to manage yet, so the row is the
+  // question or the offer, and nothing else.
+  if (!state?.active) {
+    // Always a row, even for one button: a bare button is a flex child of the card and
+    // stretches to its full width, which made Install a banner across the bottom.
+    return <div className="capability-packages-item-actions">
+      {asking
+        ? <>
+          <button type="button" className="chat-skill-primary" disabled={working} onClick={() => onReview(entry, state!)}>
+            <Icon name="shield" size={14} />{t('Revisar permisos')}
+          </button>
+          <button type="button" className="chat-skill-secondary" disabled={working}
+            onClick={() => void run(entry.id, () => window.nodus.discardPendingCapabilityPlugin(entry.id), t('No se ha instalado nada.'))}>{t('Rechazar')}</button>
+        </>
+        : <button type="button" className="chat-skill-primary" disabled={working}
+          onClick={() => void install(entry, t('Paquete instalado.'))}>
+          <Icon name="download" size={14} />{working ? t('Instalando…') : t('Instalar')}
+        </button>}
+    </div>;
+  }
+  return <div className="capability-packages-item-actions">
+    {/* An update waiting on permissions leads the row rather than replacing it: the version
+        that is running is still installed, and must still be rollable back and removable. */}
+    {asking && <button type="button" className="chat-skill-primary" disabled={working} onClick={() => onReview(entry, state)}>
+      <Icon name="shield" size={14} />{t('Revisar permisos')}
+    </button>}
+    {state.active.version !== entry.version && !state.pending && <button type="button" className="chat-skill-primary" disabled={working}
+      onClick={() => void install(entry, t('Paquete actualizado.'))}>{t('Actualizar')}</button>}
+    {state.rollbackAvailable && <button type="button" className="chat-skill-secondary" disabled={working}
+      onClick={() => void run(entry.id, () => window.nodus.rollbackCapabilityPlugin(entry.id), t('Se ha vuelto a la versión anterior.'))}>{t('Volver atrás')}</button>}
+    <button type="button" className="chat-skill-secondary" disabled={working}
+      onClick={() => {
+        if (!window.confirm(t('¿Desinstalar este paquete? Los resultados que ya están en tus chats se conservan; sus credenciales se borran.'))) return;
+        void run(entry.id, () => window.nodus.removeCapabilityPlugin(entry.id, false), t('Paquete desinstalado.'));
+      }}>{t('Desinstalar')}</button>
+  </div>;
+}

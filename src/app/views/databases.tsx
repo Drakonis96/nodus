@@ -30,6 +30,6 @@ export const databasesViews = {
     />
   ),
   dbAnalysis: ({ activeDatabaseId }) => <DatabasesAnalysisView initialDatabaseId={activeDatabaseId} />,
-  dbChat: ({ activeDatabaseId }) => <DatabasesChatView initialDatabaseId={activeDatabaseId} />,
+  dbChat: ({ activeDatabaseId, settings, activeVault, researchConversationTarget, openNoteFromSearch }) => <DatabasesChatView key={activeVault?.id} settings={settings} initialDatabaseId={activeDatabaseId} conversationTarget={researchConversationTarget} onOpenSavedNote={openNoteFromSearch} />,
   dbDeepResearch: ({ settings, snapshots }) => <DatabaseDeepResearchView settings={settings} snapshot={snapshots.read('dbDeepResearch')} onSnapshotChange={(patch) => snapshots.patch('dbDeepResearch', patch)} />,
 } satisfies Record<string, ViewRenderer>;

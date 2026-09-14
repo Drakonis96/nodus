@@ -9,13 +9,14 @@ export type PrimarySourcesView =
   | 'timeline'
   | 'map'
   | 'relations'
+  | 'researchChat'
   | 'notes';
 
 export interface PrimarySourcesSidebarItem {
   id: PrimarySourcesView;
   label: string;
   icon: string;
-  group: 'sources' | 'interpretation';
+  group: 'sources' | 'analyze' | 'interpretation';
 }
 
 export const PRIMARY_SOURCES_SIDEBAR_ITEMS: PrimarySourcesSidebarItem[] = [
@@ -25,11 +26,13 @@ export const PRIMARY_SOURCES_SIDEBAR_ITEMS: PrimarySourcesSidebarItem[] = [
   { id: 'timeline', label: 'Cronología', icon: 'clock', group: 'sources' },
   { id: 'map', label: 'Mapa', icon: 'map', group: 'sources' },
   { id: 'relations', label: 'Relaciones', icon: 'network', group: 'sources' },
+  { id: 'researchChat', label: 'Research chat', icon: 'chat', group: 'analyze' },
   { id: 'notes', label: 'Notas', icon: 'notebook', group: 'interpretation' },
 ];
 
 const GROUPS = [
   { id: 'sources', label: 'Investigar fuentes' },
+  { id: 'analyze', label: 'Analizar' },
   { id: 'interpretation', label: 'Interpretar' },
 ] as const;
 

@@ -1,4 +1,10 @@
+import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
+import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
+import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
+import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
+import { RESEARCH_REASONING_TRANSLATIONS } from './i18n.researchReasoning';
 import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
+import { CAPABILITIES_TRANSLATIONS } from './i18n.capabilities';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 /**
  * pt translations keyed by the Spanish source string (see {@link ./i18n}).
@@ -15,6 +21,7 @@ import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
+import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
@@ -59,7 +66,15 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const PT: Record<string, string> = {
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Escolha o modo claro, escuro ou siga o sistema operativo.',
+  ...RESEARCH_ATTACHMENT_TRANSLATIONS['pt'],
+  "Research chat": "Research chat",
+  "Elige al menos una base de datos.": "Escolha pelo menos uma base de dados.",
+  ...RESEARCH_PROMPT_TRANSLATIONS["pt"],
+  ...RESEARCH_SOURCE_TRANSLATIONS["pt"],
+  ...RESEARCH_REASONING_TRANSLATIONS["pt"],
   ...CHAT_SKILLS_TRANSLATIONS['pt'],
+  ...CAPABILITIES_TRANSLATIONS['pt'],
+  ...DOCUMENT_SKILLS_TRANSLATIONS['pt'],
   ...STELLAR_GRAPH_TRANSLATIONS["pt"],
   ...ACADEMIC_TOUR_TRANSLATIONS.pt,
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS.pt,
@@ -105,6 +120,7 @@ export const PT: Record<string, string> = {
   ...ANNOUNCEMENT_TRANSLATIONS['pt'],
   ...WORLD_CHAT_TRANSLATIONS.pt,
   ...STUDY_SYNONYM_TRANSLATIONS.pt,
+  ...STUDY_BANK_TRANSLATIONS.pt,
   ...STUDY_IMPROVE_TRANSLATIONS.pt,
   ...WORKSPACE_TRANSLATIONS.pt,
   "Lo que cuenta el mapa": "O que conta o mapa",
@@ -2443,6 +2459,7 @@ export const PT: Record<string, string> = {
   'No aplica': 'Não aplicável',
   'Solo abstract': 'Apenas resumo',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'O Nodus não encontrou texto para ler. Adiciona o PDF ou EPUB no Zotero e analisa de novo.',
+  'Zotero no está disponible. Ábrelo y vuelve a analizar.': 'O Zotero não está disponível. Abre-o e volta a analisar.',
   'El análisis solo pudo usar el abstract, así que esta obra no tendrá texto citable. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'A análise só pôde usar o resumo, por isso esta obra não terá texto citável. Adiciona o PDF ou EPUB no Zotero e analisa de novo.',
   'Ver las {n} ideas de esta obra': 'Ver as {n} ideias desta obra',
   'Analizar: temas, ideas, resumen, indexado y relaciones': 'Analisar: temas, ideias, resumo, indexação e relações',
@@ -4257,6 +4274,7 @@ export const PT: Record<string, string> = {
     'Adicione a primeira a partir da ficha de uma pessoa, na secção «Relações sociais».',
   'Ir a Personas': 'Ir para Pessoas',
   'Vista previa': 'Pré-visualização',
+  'Markdown y LaTeX · fórmulas entre $...$': 'Markdown e LaTeX · fórmulas entre $...$',
   'Aún no hay personas. Importa un GEDCOM o añade personas y sus parentescos desde la vista Personas.':
     'Ainda não há pessoas. Importe um GEDCOM ou adicione pessoas e os seus parentescos a partir da vista Pessoas.',
   'Árbol genealógico': 'Árvore genealógica',
@@ -8387,4 +8405,28 @@ export const PT: Record<string, string> = {
   "Usa un número entero de palabras, sin decimales.": "Usa um número inteiro de palavras, sem decimais.",
   "El mínimo son {min} palabras por sección.": "O mínimo são {min} palavras por secção.",
   "El máximo son {max} palabras por sección.": "O máximo são {max} palavras por secção.",
+  "Solicitud cancelada por el usuario.": "O utilizador cancelou o pedido.",
+  // PDF Presenter — tags (renamed from folders) and the PDF download.
+  'Sin etiqueta': 'Sem etiqueta',
+  'Eliminar etiqueta': 'Eliminar etiqueta',
+  'Filtrar por etiqueta': 'Filtrar por etiqueta',
+  '¿Seguro que quieres eliminar la etiqueta «{name}»? Las presentaciones que la tienen seguirán en la biblioteca, pero sin etiqueta.': 'Eliminar a etiqueta «{name}»? As apresentações que a têm continuam na biblioteca, apenas sem etiqueta.',
+  'Descargar PDF': 'Transferir PDF',
+  'No se pudo descargar la presentación.': 'Não foi possível transferir a apresentação.',
+  // Nodus Browser — HTTP authentication prompt.
+  'pide usuario y contraseña.': 'pede o seu nome de utilizador e a palavra-passe.',
+  'Usuario': 'Utilizador',
+  'Iniciar sesión': 'Iniciar sessão',
+  'Proxy': 'Proxy',
+  'Nota guardada': 'Nota guardada',
+  'Continuar en el chat': 'Continuar no chat',
+  'La nota se guardó, pero no se pudo vincular al proyecto.': 'A nota foi guardada, mas não foi possível associá-la ao projeto.',
+  'Procedencia': 'Proveniência',
+  'Volver a la conversación': 'Voltar à conversa',
+  'Fuentes citadas': 'Fontes citadas',
+  'Research chat de bases de datos': 'Research chat: bases de dados',
+  'Research chat de estudio': 'Research chat: estudo',
+  'Research chat del mundo': 'Research chat: mundo',
+  'La conversación original ya no está disponible.': 'A conversa original já não está disponível.',
+  'La conversación está disponible, pero el mensaje original ya no existe.': 'A conversa está disponível, mas a mensagem original já não existe.',
 };

@@ -1,3 +1,6 @@
+import { prepareResearchAttachments, withResearchAttachmentFallback } from './researchAttachments';
+import { withResearchSystemPrompt } from './researchSystemPrompt';
+import { researchGenerationOptions } from './researchGenerationOptions';
 import { skillHasCapability } from '@shared/chatSkills';
 import { enabledChatSkills } from '../chatSkills';
 import { buildChatSkillsPrompt, chatSkillsOutputContract, transformChatProse } from '@shared/chatSkills';
@@ -43,7 +46,7 @@ import { findingsFor } from '@shared/worldFindings';
 import { entryKey, parseEntryKey } from '@shared/worldEncyclopedia';
 import { worldBeatMarkLabel, worldRuleScopeLabel } from '@shared/worldPromptLanguage';
 import { buildStays, buildJourneys, positionAt, presenceKey } from '@shared/worldPresence';
-import type { AppLanguage, WorldChatRequest, WorldChatResult, WorldEntryKind } from '@shared/types';
+import type { PromptLanguage, WorldChatRequest, WorldChatResult, WorldEntryKind } from '@shared/types';
 
 /** Enough of a sheet to answer from; past this the focus stops fitting a local window. */
 const MAX_PROSE_CHARS = 1200;
@@ -80,7 +83,7 @@ function resolveFocus(request: WorldChatRequest): WorldChatRef[] {
     .map((entry) => ({ kind: entry.kind, id: entry.id, title: entry.title }));
 }
 
-export function buildWorldChatFacts(request: WorldChatRequest, language: AppLanguage = 'es'): WorldChatFacts {
+export function buildWorldChatFacts(request: WorldChatRequest, language: PromptLanguage = 'es'): WorldChatFacts {
   const focus = resolveFocus(request);
   const worldDay = readWorldDay(request.question, language);
   const history = (request.history ?? [])
@@ -264,27 +267,27 @@ export async function streamWorldChat(
   const version = owner ? chatAssetVersion(owner) : 0;
   const language = settings.promptLanguage ?? 'es';
   const facts = buildWorldChatFacts(request, language);
+  const attachments = await prepareResearchAttachments(request, 'world', request.model ?? settings.chatModel ?? settings.synthesisModel);
   // Skills change how grounded material is presented; they do not supply world facts.
-  if (!hasWorldChatMaterial(facts)) {
+  if (!hasWorldChatMaterial(facts) && !attachments.text) {
     return { text: '', focus: facts.focus, noMaterial: true };
   }
 
   const model = request.model ?? settings.chatModel ?? settings.synthesisModel ?? null;
-  const raw = await completeTextStream(
+  const raw = await withResearchAttachmentFallback(attachments,
     {
-      system: `${worldOperationSystemPrompt('worldChat', settings.promptLanguage ?? 'es')}\n\n${buildChatSkillsPrompt(skills)}\nNew creative proposals are not established world canon. Label them accordingly.`,
-      user: `${composeWorldChatContext(facts, language)}\n\n${chatSkillsOutputContract(skills)}`,
+      system: withResearchSystemPrompt(`${worldOperationSystemPrompt('worldChat', settings.promptLanguage ?? 'es')}\n\n${buildChatSkillsPrompt(skills)}\nNew creative proposals are not established world canon. Label them accordingly.`, request.systemPromptId) + attachments.system,
+      images: attachments.images,
+      user: `${composeWorldChatContext(facts, language)}\n\n${chatSkillsOutputContract(skills)}${attachments.text}`,
       plainContext: true,
       englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')),
       // Keep factual answers grounded and creative proposals clearly identified.
       temperature: 0.3,
-      maxTokens: skills.length ? 10_000 : 1200,
+      ...(request.thinkingEffort === undefined ? { maxTokens: skills.length ? 10_000 : 1200 } : await researchGenerationOptions({ ...request, model }, skills.length ? 10_000 : 1200, false, signal)),
     },
-    (delta, kind) => {
+    options => completeTextStream(options, (delta, kind) => {
       if (kind !== 'reasoning') onDelta(delta);
-    },
-    model,
-    signal
+    }, model, signal)
   );
 
   // Only entries actually supplied in CÓMO SE CITA are allowed. A real but unrelated id
@@ -294,10 +297,15 @@ export async function streamWorldChat(
     facts.citable.map((ref) => `${ref.kind}:${ref.id}`)
   );
   const validated = transformChatProse(raw, prose => validateCitations(prose, allowed));
+  const repaired = ensureWorldCitations(validated, facts.citable, language);
+  // A user-triggered stop keeps the partial answer: running the skill tools now would
+  // throw an AbortError and discard everything that already streamed.
+  const aborted = Boolean(signal?.aborted);
   return {
-    text: await executeChatSkills(ensureWorldCitations(validated, facts.citable, language), { skills, owner, version, model, question: request.question, isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getWorldChatConversation(request.conversationId)) }, signal),
+    text: aborted ? repaired : await executeChatSkills(repaired, { skills, owner, version, model, question: request.question, isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getWorldChatConversation(request.conversationId)) }, signal),
     focus: facts.focus,
     noMaterial: false,
+    ...(aborted ? { aborted: true } : {}),
   };
 }
 

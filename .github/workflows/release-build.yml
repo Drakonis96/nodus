@@ -120,6 +120,16 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: npm run build
 
+      # The signed capability packages that travel inside the build, so a profile
+      # upgrading from 5.3.1 can adopt its three disciplines with no network at all. They
+      # are inert until a migration asks for one, and verified then exactly like a
+      # download. Required here, so a release that cannot migrate offline fails to build
+      # rather than shipping.
+      - name: Bundle the capability bootstrap
+        env:
+          NODUS_REQUIRE_BOOTSTRAP: '1'
+        run: npm run capabilities:bootstrap
+
       - name: Prepare temporary macOS signing keychain
         if: startsWith(matrix.os, 'macos')
         shell: bash

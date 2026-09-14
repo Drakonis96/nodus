@@ -7,6 +7,8 @@
 // product notes, not a changelog. Add a new entry at the top whenever the app
 // version bumps.
 
+import { RELEASE_5_4_0_ADDITIONS } from './releaseNotes540';
+import { RELEASE_5_4_2_HIGHLIGHTS } from './releaseNotes542';
 import type { VaultType } from './vaultTypes';
 import { RELEASE_NOTES_IT } from './releaseNotes.it';
 import { RELEASE_NOTES_TR } from './releaseNotes.tr';
@@ -2677,6 +2679,95 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
+ * v5.4.0 combines the accumulated changes with all nine notes prepared for 5.3.2.
+ * The modal groups scopes by size. Keep the IT/TR arrays aligned with this order.
+ */
+const RELEASE_5_4_0_HIGHLIGHTS: RawReleaseHighlight[] = [
+  ...RELEASE_5_4_0_ADDITIONS,
+  {
+    scope: 'marketplace',
+    es: "Chemistry Studio, Legalize y AlphaGenome ya son paquetes oficiales que instalas tú. Aparecen en Skills con su editor verificado, sus permisos, su tamaño y las plataformas en las que funcionan, y puedes instalarlos, actualizarlos, volver a la versión anterior o quitarlos cuando quieras. Lo que hacen no ha cambiado.",
+    en: "Chemistry Studio, Legalize and AlphaGenome are now official packages you install yourself. They appear in Skills with their verified publisher, their permissions, their size and the platforms they run on, and you can install, update, roll back or remove any of them whenever you like. What they do has not changed.",
+    fr: "Chemistry Studio, Legalize et AlphaGenome sont désormais des paquets officiels que vous installez vous-même. Ils apparaissent dans Skills avec leur éditeur vérifié, leurs permissions, leur taille et les plateformes prises en charge, et vous pouvez les installer, les mettre à jour, revenir en arrière ou les retirer quand vous voulez. Ce qu'ils font n'a pas changé.",
+    de: "Chemistry Studio, Legalize und AlphaGenome sind jetzt offizielle Pakete, die Sie selbst installieren. Sie erscheinen unter Skills mit ihrem verifizierten Herausgeber, ihren Berechtigungen, ihrer Größe und den unterstützten Plattformen, und Sie können sie jederzeit installieren, aktualisieren, zurücksetzen oder entfernen. Was sie tun, hat sich nicht geändert.",
+    pt: "O Chemistry Studio, o Legalize e o AlphaGenome são agora pacotes oficiais que instalas tu. Aparecem em Skills com o editor verificado, as permissões, o tamanho e as plataformas em que funcionam, e podes instalá-los, atualizá-los, voltar à versão anterior ou removê-los quando quiseres. O que fazem não mudou.",
+    'pt-BR': "Chemistry Studio, Legalize e AlphaGenome agora são pacotes oficiais que você instala. Aparecem em Skills com o editor verificado, as permissões, o tamanho e as plataformas em que funcionam, e você pode instalar, atualizar, voltar à versão anterior ou remover quando quiser. O que eles fazem não mudou.",
+  },
+  {
+    scope: 'general',
+    es: "Tu configuración se muda sola al actualizar. Si tenías Chemistry Studio activado, o una clave de AlphaGenome guardada, o una skill tuya que necesita una de estas capacidades, Nodus instala el paquete que corresponde y adopta la skill conservando su sitio en la lista, dónde la tenías activada y las instrucciones que hubieras editado. Funciona sin conexión porque los paquetes viajan dentro de la propia actualización.",
+    en: "Your setup moves across on its own when you update. If Chemistry Studio was switched on, or you had an AlphaGenome key saved, or a skill of your own needs one of these capabilities, Nodus installs the matching package and adopts the skill with its place in the list, the surfaces it was enabled on and any instructions you had edited. It works with no connection because the packages travel inside the update itself.",
+    fr: "Votre configuration migre toute seule à la mise à jour. Si Chemistry Studio était activé, si une clé AlphaGenome était enregistrée ou si une de vos skills a besoin de ces capacités, Nodus installe le paquet correspondant et adopte la skill en conservant sa place dans la liste, les surfaces où elle était activée et les instructions que vous aviez modifiées. Cela fonctionne sans connexion car les paquets voyagent dans la mise à jour elle-même.",
+    de: "Ihre Einrichtung zieht beim Update von selbst mit um. War Chemistry Studio eingeschaltet, lag ein AlphaGenome-Schlüssel gespeichert vor oder braucht ein eigener Skill eine dieser Capabilities, installiert Nodus das passende Paket und übernimmt den Skill samt seinem Platz in der Liste, den Oberflächen, auf denen er aktiv war, und Ihren bearbeiteten Anweisungen. Das funktioniert ohne Verbindung, weil die Pakete im Update selbst mitreisen.",
+    pt: "A tua configuração muda-se sozinha ao atualizar. Se tinhas o Chemistry Studio ligado, uma chave do AlphaGenome guardada ou uma skill tua que precisa destas capacidades, o Nodus instala o pacote correspondente e adota a skill mantendo o seu lugar na lista, as superfícies onde estava ligada e as instruções que tenhas editado. Funciona sem ligação porque os pacotes viajam dentro da própria atualização.",
+    'pt-BR': "Sua configuração se muda sozinha ao atualizar. Se o Chemistry Studio estava ligado, havia uma chave do AlphaGenome salva ou uma skill sua precisa dessas capacidades, o Nodus instala o pacote correspondente e adota a skill mantendo seu lugar na lista, as superfícies onde estava ligada e as instruções que você tenha editado. Funciona sem conexão porque os pacotes viajam dentro da própria atualização.",
+  },
+  {
+    scope: 'general',
+    es: "Nodus ocupa menos si no dibujas moléculas. Los motores químicos, el compilador de TeX y el resto de dependencias de estas tres áreas ya no viajan con la aplicación, sino dentro del paquete que las necesita. Una instalación limpia no descarga ni carga ninguna de las tres mientras no las pidas.",
+    en: "Nodus takes up less room if you do not draw molecules. The chemistry engines, the TeX compiler and the rest of the dependencies these three areas need no longer travel with the application, only inside the package that needs them. A clean install neither downloads nor loads any of the three until you ask for one.",
+    fr: "Nodus prend moins de place si vous ne dessinez pas de molécules. Les moteurs de chimie, le compilateur TeX et les autres dépendances de ces trois domaines ne voyagent plus avec l'application, mais dans le paquet qui en a besoin. Une installation propre ne télécharge ni ne charge aucun des trois tant que vous n'en demandez pas un.",
+    de: "Nodus braucht weniger Platz, wenn Sie keine Moleküle zeichnen. Die Chemie-Engines, der TeX-Compiler und die übrigen Abhängigkeiten dieser drei Bereiche reisen nicht mehr mit der Anwendung, sondern in dem Paket, das sie braucht. Eine saubere Installation lädt und startet keines der drei, solange Sie keines anfordern.",
+    pt: "O Nodus ocupa menos espaço se não desenhas moléculas. Os motores de química, o compilador de TeX e as restantes dependências destas três áreas já não viajam com a aplicação, apenas dentro do pacote que precisa delas. Uma instalação limpa não descarrega nem carrega nenhuma das três enquanto não pedires.",
+    'pt-BR': "O Nodus ocupa menos espaço se você não desenha moléculas. Os motores de química, o compilador de TeX e as demais dependências dessas três áreas não viajam mais com o aplicativo, apenas dentro do pacote que precisa delas. Uma instalação limpa não baixa nem carrega nenhuma das três enquanto você não pedir.",
+  },
+  {
+    scope: 'plugin',
+    es: "Cada paquete se configura en su propia ficha. La clave de AlphaGenome, la aceptación de sus términos y la instalación de su runtime de Python están ahora dentro del paquete, no repartidas por los ajustes de Nodus. Tu clave se guarda en el almacén de credenciales del sistema y llega al intérprete por su entrada estándar, nunca en una línea de comandos ni en un registro.",
+    en: "Every package configures itself on its own card. The AlphaGenome key, accepting its terms and installing its Python runtime now live inside the package rather than scattered through the Nodus settings. Your key is kept in the system credential store and reaches the interpreter through its standard input, never on a command line or in a log.",
+    fr: "Chaque paquet se configure sur sa propre fiche. La clé AlphaGenome, l'acceptation de ses conditions et l'installation de son runtime Python vivent désormais dans le paquet plutôt qu'éparpillées dans les réglages de Nodus. Votre clé est conservée dans le trousseau du système et parvient à l'interpréteur par son entrée standard, jamais sur une ligne de commande ni dans un journal.",
+    de: "Jedes Paket richtet sich auf seiner eigenen Karte ein. Der AlphaGenome-Schlüssel, die Zustimmung zu seinen Bedingungen und die Installation seiner Python-Umgebung liegen nun im Paket statt verstreut in den Nodus-Einstellungen. Ihr Schlüssel bleibt im Anmeldeinformationsspeicher des Systems und erreicht den Interpreter über dessen Standardeingabe, nie über eine Befehlszeile oder ein Protokoll.",
+    pt: "Cada pacote configura-se na sua própria ficha. A chave do AlphaGenome, a aceitação dos seus termos e a instalação do seu runtime de Python vivem agora dentro do pacote, em vez de espalhadas pelas definições do Nodus. A tua chave fica no armazém de credenciais do sistema e chega ao interpretador pela entrada padrão, nunca numa linha de comandos nem num registo.",
+    'pt-BR': "Cada pacote se configura no seu próprio cartão. A chave do AlphaGenome, a aceitação dos seus termos e a instalação do seu runtime de Python agora ficam dentro do pacote, em vez de espalhadas pelas configurações do Nodus. Sua chave fica no armazenamento de credenciais do sistema e chega ao interpretador pela entrada padrão, nunca em uma linha de comando nem em um log.",
+  },
+  {
+    scope: 'plugin',
+    es: "Un paquete solo llega firmado por NodusResearch. Nodus comprueba la firma y la huella exacta de lo que descarga antes de abrirlo, rechaza una versión más antigua que la instalada y rechaza un contenido distinto publicado con el mismo número. Una actualización que pida más permisos de los que aprobaste espera a que la revises en lugar de aplicarse sola.",
+    en: "A package only arrives signed by NodusResearch. Nodus checks the signature and the exact fingerprint of what it downloads before opening it, refuses a version older than the one installed, and refuses different content published under the same number. An update that asks for more than you approved waits for you to review it instead of applying itself.",
+    fr: "Un paquet n'arrive que signé par NodusResearch. Nodus vérifie la signature et l'empreinte exacte de ce qu'il télécharge avant de l'ouvrir, refuse une version plus ancienne que celle installée et refuse un contenu différent publié sous le même numéro. Une mise à jour qui demande plus que ce que vous aviez approuvé attend votre examen au lieu de s'appliquer seule.",
+    de: "Ein Paket kommt nur signiert von NodusResearch an. Nodus prüft die Signatur und den genauen Fingerabdruck des Downloads, bevor es ihn öffnet, lehnt eine ältere Version als die installierte ab und lehnt abweichende Inhalte unter derselben Nummer ab. Ein Update, das mehr verlangt als Sie genehmigt haben, wartet auf Ihre Prüfung, statt sich selbst anzuwenden.",
+    pt: "Um pacote só chega assinado pela NodusResearch. O Nodus verifica a assinatura e a impressão digital exata do que descarrega antes de o abrir, recusa uma versão mais antiga do que a instalada e recusa um conteúdo diferente publicado com o mesmo número. Uma atualização que peça mais do que aprovaste espera pela tua revisão em vez de se aplicar sozinha.",
+    'pt-BR': "Um pacote só chega assinado pela NodusResearch. O Nodus verifica a assinatura e a impressão digital exata do que baixa antes de abri-lo, recusa uma versão mais antiga do que a instalada e recusa um conteúdo diferente publicado com o mesmo número. Uma atualização que peça mais do que você aprovou espera pela sua revisão em vez de se aplicar sozinha.",
+  },
+  {
+    scope: 'ai',
+    es: "Los resultados se guardan junto a la conversación y cada paquete decide qué ve el modelo. Una predicción de AlphaGenome sigue sin salir de tu dispositivo, y ahora esa regla la declara el propio paquete en lugar de estar escrita dentro de Nodus. Si desinstalas un paquete, los resultados que ya tenías en tus chats se conservan y puedes volver a instalarlo desde el propio mensaje.",
+    en: "Results are stored beside the conversation and each package decides what the model sees. An AlphaGenome prediction still never leaves your device, and that rule is now declared by the package itself instead of being written into Nodus. If you uninstall a package, the results already in your chats are kept and you can reinstall it from the message itself.",
+    fr: "Les résultats sont conservés à côté de la conversation et chaque paquet décide de ce que voit le modèle. Une prédiction AlphaGenome ne quitte toujours pas votre appareil, et cette règle est désormais déclarée par le paquet lui-même au lieu d'être inscrite dans Nodus. Si vous désinstallez un paquet, les résultats déjà présents dans vos conversations sont conservés et vous pouvez le réinstaller depuis le message.",
+    de: "Ergebnisse liegen neben der Unterhaltung, und jedes Paket entscheidet, was das Modell sieht. Eine AlphaGenome-Vorhersage verlässt Ihr Gerät weiterhin nicht, und diese Regel erklärt nun das Paket selbst, statt in Nodus einprogrammiert zu sein. Wenn Sie ein Paket deinstallieren, bleiben die Ergebnisse in Ihren Chats erhalten und Sie können es direkt aus der Nachricht neu installieren.",
+    pt: "Os resultados ficam guardados junto à conversa e cada pacote decide o que o modelo vê. Uma previsão do AlphaGenome continua a não sair do teu dispositivo, e essa regra passa a ser declarada pelo próprio pacote em vez de estar escrita dentro do Nodus. Se desinstalares um pacote, os resultados que já tinhas nos teus chats mantêm-se e podes reinstalá-lo a partir da própria mensagem.",
+    'pt-BR': "Os resultados ficam guardados junto da conversa e cada pacote decide o que o modelo vê. Uma previsão do AlphaGenome continua não saindo do seu dispositivo, e essa regra agora é declarada pelo próprio pacote em vez de estar escrita dentro do Nodus. Se você desinstalar um pacote, os resultados que já tinha nos seus chats são mantidos e você pode reinstalá-lo a partir da própria mensagem.",
+  },
+  {
+    scope: 'toolkit',
+    es: "Las carpetas del PDF Presenter ahora son etiquetas, que es lo que siempre fueron. Al pulsar una verás solo las presentaciones que la llevan, y al volver a pulsarla las verás todas otra vez. Borrar una etiqueta te pregunta antes y nunca se lleva sus presentaciones por delante. Solo dejan de estar etiquetadas. Las estanterías que organizaste antes de esta actualización se abren tal y como las dejaste.",
+    en: "The PDF Presenter's folders are now tags, which is what they always were. Clicking one shows only the presentations that carry it, and clicking it again shows them all. Deleting a tag asks first and never takes its presentations with it. They simply stop being tagged. Shelves you organised before this update open exactly as you left them.",
+    fr: "Les dossiers du PDF Presenter sont désormais des étiquettes, ce qu'ils ont toujours été. Cliquer sur l'une d'elles n'affiche que les présentations qui la portent, et cliquer à nouveau les affiche toutes. Supprimer une étiquette demande confirmation et n'emporte jamais ses présentations. Elles cessent simplement d'être étiquetées. Les étagères que vous aviez organisées avant cette mise à jour s'ouvrent telles que vous les aviez laissées.",
+    de: "Die Ordner des PDF Presenter sind jetzt Tags, was sie immer schon waren. Ein Klick darauf zeigt nur die Präsentationen mit diesem Tag, ein erneuter Klick zeigt wieder alle. Das Löschen eines Tags fragt vorher nach und nimmt seine Präsentationen nie mit. Sie sind danach einfach ohne Tag. Regale, die Sie vor diesem Update sortiert haben, öffnen sich genau so, wie Sie sie verlassen haben.",
+    pt: "As pastas do PDF Presenter são agora etiquetas, que é o que sempre foram. Carregar numa mostra apenas as apresentações que a têm, e carregar outra vez mostra-as todas. Eliminar uma etiqueta pergunta primeiro e nunca leva as suas apresentações atrás. Passam simplesmente a não ter etiqueta. As estantes que organizaste antes desta atualização abrem tal como as deixaste.",
+    'pt-BR': "As pastas do PDF Presenter agora são etiquetas, que é o que sempre foram. Clicar em uma mostra apenas as apresentações que a têm, e clicar de novo mostra todas. Excluir uma etiqueta pergunta antes e nunca leva as apresentações junto. Elas simplesmente deixam de ter etiqueta. As estantes que você organizou antes desta atualização abrem exatamente como você as deixou.",
+  },
+  {
+    scope: 'toolkit',
+    es: "Una presentación ya puede salir de la biblioteca. Descargar PDF guarda donde tú quieras la copia que Nodus conserva, así que una presentación que importaste desde PowerPoint o Keynote es tuya en PDF aunque ya no tengas el original. La copia de tu estantería se queda donde está.",
+    en: "A presentation can now leave the library. Download PDF saves the copy Nodus keeps wherever you choose, so a deck you imported from PowerPoint or Keynote is yours as a PDF even if you no longer have the original. The copy on your shelf stays where it is.",
+    fr: "Une présentation peut enfin quitter la bibliothèque. Télécharger le PDF enregistre où vous voulez la copie que Nodus conserve, donc une présentation importée depuis PowerPoint ou Keynote est à vous en PDF même si vous n'avez plus l'original. La copie de votre étagère reste où elle est.",
+    de: "Eine Präsentation kann die Bibliothek jetzt verlassen. PDF herunterladen speichert die Kopie, die Nodus aufbewahrt, an einem Ort Ihrer Wahl. So gehört Ihnen ein aus PowerPoint oder Keynote importierter Foliensatz als PDF, auch wenn Sie das Original nicht mehr haben. Die Kopie im Regal bleibt, wo sie ist.",
+    pt: "Uma apresentação já pode sair da biblioteca. Transferir PDF guarda onde quiseres a cópia que o Nodus mantém, por isso uma apresentação que importaste do PowerPoint ou do Keynote é tua em PDF mesmo que já não tenhas o original. A cópia da tua estante fica onde está.",
+    'pt-BR': "Uma apresentação já pode sair da biblioteca. Baixar PDF salva onde você quiser a cópia que o Nodus mantém, então uma apresentação que você importou do PowerPoint ou do Keynote é sua em PDF mesmo que não tenha mais o original. A cópia da sua estante continua onde está.",
+  },
+  {
+    scope: 'toolkit',
+    es: "El importador de notas lee un segundo tipo de archivo TXT. Además del formato que exporta Nodus, ahora acepta archivos de notas recuperadas que solo listan las diapositivas que tienen nota. Nodus toma el número de diapositivas de la cabecera del propio archivo, así que un archivo con notas para 130 de 140 ya no parece un descuadre.",
+    en: "The notes importer reads a second kind of TXT file. Alongside the format Nodus exports, it now accepts recovered notes files that list only the slides that have a note. Nodus takes the deck length from the file's own header, so a file with notes for 130 slides out of 140 no longer looks like a mismatch.",
+    fr: "L'importateur de notes lit un second type de fichier TXT. En plus du format exporté par Nodus, il accepte maintenant les fichiers de notes récupérées qui ne listent que les diapositives ayant une note. Nodus lit le nombre de diapositives dans l'en-tête du fichier, donc un fichier avec des notes pour 130 diapositives sur 140 ne ressemble plus à une erreur.",
+    de: "Der Notizen-Import liest eine zweite Art von TXT-Datei. Neben dem Format, das Nodus exportiert, akzeptiert er nun wiederhergestellte Notizdateien, die nur die Folien mit einer Notiz auflisten. Nodus entnimmt die Anzahl der Folien der Kopfzeile der Datei selbst, sodass eine Datei mit Notizen für 130 von 140 Folien nicht mehr wie ein Fehler aussieht.",
+    pt: "O importador de notas lê um segundo tipo de ficheiro TXT. Além do formato que o Nodus exporta, aceita agora ficheiros de notas recuperadas que listam apenas os diapositivos que têm nota. O Nodus lê o número de diapositivos no cabeçalho do próprio ficheiro, por isso um ficheiro com notas para 130 de 140 já não parece um erro.",
+    'pt-BR': "O importador de notas lê um segundo tipo de arquivo TXT. Além do formato que o Nodus exporta, agora aceita arquivos de notas recuperadas que listam apenas os slides que têm nota. O Nodus lê a quantidade de slides no cabeçalho do próprio arquivo, então um arquivo com notas para 130 de 140 não parece mais um erro.",
+  },
+];
+
+/**
  * v5.3.1 — the Skills Marketplace learns what you already have, and skills start
  * arriving as plugins.
  *
@@ -2884,6 +2975,24 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.4.2',
+    date: '2026-09-13',
+    highlights: RELEASE_5_4_2_HIGHLIGHTS,
+  },
+  {
+    version: '5.4.1',
+    date: '2026-09-13',
+    // This fix release intentionally reuses the 5.4.0 What's New modal: it repairs the
+    // capability packages 5.4.0 introduced, and anyone updating straight to it should still
+    // read what that release brought.
+    highlights: RELEASE_5_4_0_HIGHLIGHTS,
+  },
+  {
+    version: '5.4.0',
+    date: '2026-09-12',
+    highlights: RELEASE_5_4_0_HIGHLIGHTS,
+  },
   {
     version: '5.3.1',
     date: '2026-09-10',

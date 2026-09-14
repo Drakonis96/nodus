@@ -27,3 +27,4 @@ export {
   resolvePluginCapabilityReference,
   validatePluginPackage,
 } from './pluginPackage';
+export { validatePluginAssets, validatePackagedModelResult } from '../packages/capability-api/src/pluginAssets';

@@ -109,19 +109,36 @@ export interface StudyQuestionInput {
   locked?: boolean;
 }
 
+export type StudyQuestionSort = 'updated' | 'created' | 'prompt' | 'difficulty' | 'status' | 'source' | 'usage' | 'answered';
+export const STUDY_QUESTION_SORTS: StudyQuestionSort[] = ['updated', 'created', 'prompt', 'difficulty', 'status', 'source', 'usage', 'answered'];
+
 export interface StudyQuestionFilters {
   search?: string;
   courseId?: string;
   subjectId?: string;
   folderId?: string;
   topicId?: string;
+  documentId?: string;
+  materialId?: string;
+  collectionId?: string;
+  tag?: string;
   type?: StudyQuestionType | 'all';
   difficulty?: Exclude<StudyQuestionDifficulty, 'mixed'> | 'all';
   status?: StudyQuestionStatus | 'all';
   favorite?: boolean;
   archived?: boolean;
   sourceKind?: 'document' | 'material' | 'recording' | 'all';
+  sort?: StudyQuestionSort;
 }
+
+export type StudyQuestionBulkAction =
+  | { kind: 'status'; status: StudyQuestionStatus }
+  | { kind: 'difficulty'; difficulty: Exclude<StudyQuestionDifficulty, 'mixed'> }
+  | { kind: 'favorite'; favorite: boolean }
+  | { kind: 'move'; courseId?: string | null; subjectId?: string | null; folderId?: string | null; topicId?: string | null; documentId?: string | null; materialId?: string | null }
+  | { kind: 'tags'; add?: string[]; remove?: string[] }
+  | { kind: 'collections'; add?: string[]; remove?: string[] }
+  | { kind: 'lifecycle'; action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete' };
 
 export interface StudyQuestionGenerationRequest {
   sourceKeys: string[];

@@ -1,4 +1,10 @@
+import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
+import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
+import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
+import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
+import { RESEARCH_REASONING_TRANSLATIONS } from './i18n.researchReasoning';
 import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
+import { CAPABILITIES_TRANSLATIONS } from './i18n.capabilities';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
@@ -9,6 +15,7 @@ import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
+import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
@@ -54,7 +61,15 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Scegli la modalità chiara, scura o segui il sistema operativo.',
+  ...RESEARCH_ATTACHMENT_TRANSLATIONS['it'],
+  "Research chat": "Research chat",
+  "Elige al menos una base de datos.": "Scegli almeno un database.",
+  ...RESEARCH_PROMPT_TRANSLATIONS["it"],
+  ...RESEARCH_SOURCE_TRANSLATIONS["it"],
+  ...RESEARCH_REASONING_TRANSLATIONS["it"],
   ...CHAT_SKILLS_TRANSLATIONS['it'],
+  ...CAPABILITIES_TRANSLATIONS['it'],
+  ...DOCUMENT_SKILLS_TRANSLATIONS['it'],
   ...STELLAR_GRAPH_TRANSLATIONS["it"],
   ...ACADEMIC_TOUR_TRANSLATIONS.it,
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS.it,
@@ -103,6 +118,7 @@ export const IT: Record<string, string> = {
   ...ANNOUNCEMENT_TRANSLATIONS['it'],
   ...WORLD_CHAT_TRANSLATIONS.it,
   ...STUDY_SYNONYM_TRANSLATIONS.it,
+  ...STUDY_BANK_TRANSLATIONS.it,
   ...STUDY_IMPROVE_TRANSLATIONS.it,
   ...WORKSPACE_TRANSLATIONS.it,
   "Lo que cuenta el mapa": "Cosa racconta la mappa",
@@ -2216,6 +2232,7 @@ export const IT: Record<string, string> = {
   'No aplica': 'Non applicabile',
   'Solo abstract': 'Solo abstract',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': "Nodus non ha trovato testo da leggere. Aggiungi il PDF o l'EPUB in Zotero e rianalizza.",
+  'Zotero no está disponible. Ábrelo y vuelve a analizar.': 'Zotero non è disponibile. Aprilo e analizza di nuovo.',
   'El análisis solo pudo usar el abstract, así que esta obra no tendrá texto citable. Añade el PDF o EPUB en Zotero y vuelve a analizar.': "L'analisi ha potuto usare solo l'abstract, quindi quest'opera non avrà testo citabile. Aggiungi il PDF o l'EPUB in Zotero e rianalizza.",
   'Ver las {n} ideas de esta obra': "Vedi le {n} idee di quest'opera",
   'Analizar: temas, ideas, resumen, indexado y relaciones': 'Analizza: temi, idee, sintesi, indicizzazione e relazioni',
@@ -3864,6 +3881,7 @@ export const IT: Record<string, string> = {
   "Añade la primera desde la ficha de una persona, sección «Relaciones sociales».": "Aggiungi il primo dal record di una persona, nella sezione \"Relazioni sociali\".",
   "Ir a Personas": "Vai a Persone",
   "Vista previa": "Anteprima",
+  "Markdown y LaTeX · fórmulas entre $...$": "Markdown e LaTeX · formule tra $...$",
   "Aún no hay personas. Importa un GEDCOM o añade personas y sus parentescos desde la vista Personas.": "Nessuna persona ancora. Importa un GEDCOM o aggiungi persone e i loro legami di parentela dalla vista Persone.",
   "Árbol genealógico": "Albero genealogico",
   "Centrar el árbol en…": "Centrare l'albero su...",
@@ -7850,4 +7868,28 @@ export const IT: Record<string, string> = {
   "Usa un número entero de palabras, sin decimales.": "Usa un numero intero di parole, senza decimali.",
   "El mínimo son {min} palabras por sección.": "Il minimo è di {min} parole per sezione.",
   "El máximo son {max} palabras por sección.": "Il massimo è di {max} parole per sezione.",
+  "Solicitud cancelada por el usuario.": "L’utente ha annullato la richiesta.",
+  // PDF Presenter — tags (renamed from folders) and the PDF download.
+  "Sin etiqueta": "Nessuna etichetta",
+  "Eliminar etiqueta": "Elimina etichetta",
+  "Filtrar por etiqueta": "Filtra per etichetta",
+  "¿Seguro que quieres eliminar la etiqueta «{name}»? Las presentaciones que la tienen seguirán en la biblioteca, pero sin etiqueta.": "Vuoi eliminare l’etichetta «{name}»? Le presentazioni che la usano restano nella libreria, semplicemente senza etichetta.",
+  "Descargar PDF": "Scarica PDF",
+  "No se pudo descargar la presentación.": "Non è stato possibile scaricare la presentazione.",
+  // Nodus Browser — HTTP authentication prompt.
+  "pide usuario y contraseña.": "chiede nome utente e password.",
+  "Usuario": "Nome utente",
+  "Iniciar sesión": "Accedi",
+  "Proxy": "Proxy",
+  "Nota guardada": "Nota salvata",
+  "Continuar en el chat": "Continua nella chat",
+  "La nota se guardó, pero no se pudo vincular al proyecto.": "La nota è stata salvata, ma non è stato possibile collegarla al progetto.",
+  "Procedencia": "Provenienza",
+  "Volver a la conversación": "Torna alla conversazione",
+  "Fuentes citadas": "Fonti citate",
+  "Research chat de bases de datos": "Research chat: database",
+  "Research chat de estudio": "Research chat: studio",
+  "Research chat del mundo": "Research chat: mondo",
+  "La conversación original ya no está disponible.": "La conversazione originale non è più disponibile.",
+  "La conversación está disponible, pero el mensaje original ya no existe.": "La conversazione è disponibile, ma il messaggio originale non esiste più.",
 };

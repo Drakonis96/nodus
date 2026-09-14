@@ -1,15 +1,24 @@
+import type { ResearchAttachment, ResearchAttachmentSurface } from '@shared/researchAttachments';
+import { ResearchSystemPromptControl } from '../components/ResearchSystemPromptControl';
+import { useResearchSystemPrompts } from '../hooks/useResearchSystemPrompts';
+import type { ResearchChatAdapter, ResearchUiMessage } from './researchChatAdapter';
+import { ResearchSourceFilterControl } from '../components/ResearchSourceFilterControl';
+import { normalizeResearchSourceFilter } from '@shared/researchContextFilters';
+import { ResearchEffortControl } from '../components/ResearchEffortControl';
+import type { ResearchEffort } from '@shared/researchReasoning';
 import { ChatMarkdown } from '../components/ChatMarkdown';
+import { ChatAbortedNotice } from '../components/ChatAbortedNotice';
 import { ChatSkillsControl } from '../components/ChatSkillsControl';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
 import { createPortal } from 'react-dom';
 import type {
   AppSettings,
   ChatConversationSummary,
-  ChatMessageRecord,
   ModelRef,
   ResearchChatMessage,
   ResearchContextSelection,
   ResearchGraphPartsSelection,
+  NoteSource,
 } from '@shared/types';
 import { Icon, modelLabel, sortModelRefs } from '../components/ui';
 import type { MarkdownCitation } from '../components/Markdown';
@@ -21,6 +30,7 @@ import { VirtualList } from '../components/VirtualList';
 import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 import { useFeatureModel } from '../hooks/useFeatureModel';
+import { researchNoteSource, type ResearchConversationNavigationTarget } from '../researchNoteProvenance';
 import './researchAssistant.css';
 
 const DEFAULT_SELECTION: ResearchContextSelection = {
@@ -195,38 +205,67 @@ const GENEALOGY_SUGGESTIONS = [
   '¿Qué datos faltan y qué fuente podría aportarlos?',
 ];
 
-interface UiMessage extends ChatMessageRecord {
-  id: string;
-  /** Live reasoning/thinking trace from the model. Transient — never persisted. */
-  reasoning?: string;
-}
+type UiMessage = ResearchUiMessage;
 
 export function ResearchAssistantModal({
   settings,
   initialTarget,
   isGenealogy = false,
   onClose,
+  embedded = false,
+  adapter,
+  initialConversationTarget,
+  notesDestinationLabel = 'Notas',
+  onOpenSavedNote,
 }: {
   settings: AppSettings;
   initialTarget?: AssistantNavigationTarget | null;
   /** Genealogy vault: the assistant answers over the family (people, kinship, events,
    *  documents, evidence), so the academic context selector is not shown. */
   isGenealogy?: boolean;
-  onClose: () => void;
+  onClose?: () => void;
+  embedded?: boolean;
+  adapter?: ResearchChatAdapter;
+  initialConversationTarget?: ResearchConversationNavigationTarget | null;
+  notesDestinationLabel?: string;
+  onOpenSavedNote?: (noteId: string) => void;
 }) {
+  const api = adapter ?? window.nodus;
+  const apiRef = useRef(api);
+  apiRef.current = api;
+  const panelKey = adapter?.id ?? 'research';
+  const [historyOpen, setHistoryOpen] = useState(() => !embedded || localStorage.getItem(`nodus.${panelKey}ChatHistoryOpen`) === '1');
+  const [contextOpen, setContextOpen] = useState(() => embedded && localStorage.getItem(`nodus.${panelKey}ChatContextOpen`) === '1');
+  const toggleHistory = () => setHistoryOpen(open => { localStorage.setItem(`nodus.${panelKey}ChatHistoryOpen`, open ? '0' : '1'); return !open; });
+  const toggleContext = () => setContextOpen(open => { localStorage.setItem(`nodus.${panelKey}ChatContextOpen`, open ? '0' : '1'); return !open; });
   const [selection, setSelection] = useState<ResearchContextSelection>(() => cloneSelection(SYNTHESIS_SELECTION));
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
+  const [attachments, setAttachments] = useState<ResearchAttachment[]>([]);
+  const [attaching, setAttaching] = useState(false);
+  const [attachmentError, setAttachmentError] = useState('');
+  const attachmentBusyRef = useRef(false);
+  const dragDepthRef = useRef(0);
+  const [draggingFiles, setDraggingFiles] = useState(false);
+  const attachmentSurface = (adapter?.id ?? 'research') as ResearchAttachmentSurface;
+  const canUseAttachments = attachments.length > 0 || messages.some(message => message.attachments?.length);
+
   const [contextTitle, setContextTitle] = useState<string | null>(null);
   const [activeModeId, setActiveModeId] = useState<ActiveAssistantModeId>('synthesis');
-  const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'chatModel');
+  const [selectedModel, setSelectedModel] = useFeatureModel(settings, adapter?.modelFeature ?? 'chatModel', adapter?.modelFeature === 'studyModel' ? 'chatModel' : undefined);
   const [sending, setSending] = useState(false);
+  const [thinkingEffort, setThinkingEffort] = useState<ResearchEffort>('standard');
+  useEffect(() => { setThinkingEffort('standard'); }, [selectedModel?.provider, selectedModel?.model]);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const promptConversationKey = activeId ? `${adapter?.id ?? 'research'}:${activeId}` : null;
+  const systemPrompts = useResearchSystemPrompts(promptConversationKey);
   const [showArchived, setShowArchived] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ChatConversationSummary | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
-  const [noteTarget, setNoteTarget] = useState<{ content: string; title: string } | null>(null);
+  const [noteTarget, setNoteTarget] = useState<{ content: string; title: string; source: NoteSource } | null>(null);
+  const [conversationNotice, setConversationNotice] = useState<string | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showContext, setShowContext] = useState(false);
@@ -236,12 +275,20 @@ export function ResearchAssistantModal({
   // Id of the assistant message currently streaming — drives the live caret and
   // the "stop" affordance. Null when nothing is in flight.
   const [streamingId, setStreamingId] = useState<string | null>(null);
+  // Id of the last assistant message the user stopped. Its partial text stays and
+  // the red notice renders under it instead of replacing the whole answer.
+  const [stoppedMessageId, setStoppedMessageId] = useState<string | null>(null);
+  // Set by the stop button and read when the stream settles, so a cancellation that
+  // still rejects is not mistaken for a genuine generation failure.
+  const stopRequestedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const contextAnchorRef = useRef<HTMLButtonElement | null>(null);
   const contextTriggerRef = useRef<HTMLButtonElement>(null);
   const focusTriggerRef = useRef<HTMLButtonElement>(null);
   const contextPanelRef = useRef<HTMLDivElement>(null);
   const lastInitialTargetRef = useRef<number | null>(null);
+  const lastConversationTargetRef = useRef<number | null>(null);
   // Mirrors `messages` so async stream callbacks can persist the final array without
   // racing React state updates.
   const messagesRef = useRef<UiMessage[]>([]);
@@ -266,7 +313,7 @@ export function ResearchAssistantModal({
   }, [settings.chatModel, settings.favorites, settings.synthesisModel, selectedModel]);
 
   const refreshConversations = useCallback(async () => {
-    setConversations(await window.nodus.listConversations(true));
+    setConversations(await apiRef.current.listConversations(true));
   }, []);
 
   useEffect(() => {
@@ -286,13 +333,14 @@ export function ResearchAssistantModal({
   useLayoutEffect(() => {
     if (!showContext) return;
     const place = () => {
-      const rect = (contextTriggerRef.current ?? focusTriggerRef.current)?.getBoundingClientRect();
+      const rect = (contextAnchorRef.current ?? contextTriggerRef.current ?? focusTriggerRef.current)?.getBoundingClientRect();
       if (!rect) return;
       const width = Math.min(420, window.innerWidth - 24);
       const below = window.innerHeight - rect.bottom - 20;
       const above = rect.top - 20;
       const upwards = below < 360 && above > below;
       setContextPanelStyle({
+        '--vault-accent': getComputedStyle((contextAnchorRef.current ?? contextTriggerRef.current ?? focusTriggerRef.current)!).getPropertyValue('--vault-accent'),
         position: 'fixed',
         width,
         left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
@@ -300,7 +348,7 @@ export function ResearchAssistantModal({
         bottom: upwards ? window.innerHeight - rect.top + 8 : 'auto',
         maxHeight: Math.min(720, Math.max(200, upwards ? above : below)),
         zIndex: 10050,
-      });
+      } as CSSProperties);
     };
     place();
     window.addEventListener('resize', place);
@@ -392,7 +440,7 @@ export function ResearchAssistantModal({
     [selection]
   );
 
-  const updateSelection = (key: keyof Omit<ResearchContextSelection, 'graphParts'>, value: boolean) => {
+  const updateSelection = (key: keyof Omit<ResearchContextSelection, 'graphParts' | 'sourceFilter'>, value: boolean) => {
     setSelection((current) => ({ ...current, [key]: value }));
   };
 
@@ -402,15 +450,23 @@ export function ResearchAssistantModal({
 
   const applyMode = (mode: (typeof ASSISTANT_MODES)[number]) => {
     setActiveModeId(mode.id);
-    setSelection(cloneSelection(mode.selection));
+    setSelection(current => ({ ...cloneSelection(mode.selection), sourceFilter: current.sourceFilter }));
     setContextTitle(t(mode.label));
     if (!input.trim()) setInput(t(mode.starter));
   };
 
   const startNewConversation = () => {
+    if (attachmentBusyRef.current) return;
+    setAttachments([]);
+    setAttachmentError('');
+    setSelection(current => { const { sourceFilter: _sourceFilter, ...rest } = current; return rest; });
+    setThinkingEffort('standard');
+    adapter?.reset?.();
+    if (!activeId) void systemPrompts.select(null);
     setActiveId(null);
     setMessages([]);
     setInput('');
+    setStoppedMessageId(null);
     setContextTitle(t(ASSISTANT_MODES.find((mode) => mode.id === activeModeId)?.label ?? '') || null);
     setShowJumpToBottom(false);
     setCopiedMessageId(null);
@@ -419,39 +475,78 @@ export function ResearchAssistantModal({
   useEffect(() => {
     if (!initialTarget || initialTarget.nonce === lastInitialTargetRef.current) return;
     lastInitialTargetRef.current = initialTarget.nonce;
+    setAttachments([]);
+    setAttachmentError('');
     setActiveId(null);
     setMessages([]);
+    setStoppedMessageId(null);
     setContextTitle(initialTarget.title ?? null);
     setActiveModeId('custom');
-    if (initialTarget.selection) setSelection(cloneSelection(initialTarget.selection));
+    setSelection(current => cloneSelection(initialTarget.selection ?? { ...current, sourceFilter: undefined }));
     if (initialTarget.prompt) setInput(initialTarget.prompt);
     setShowJumpToBottom(false);
     setCopiedMessageId(null);
   }, [initialTarget]);
 
-  const loadConversation = async (id: string) => {
-    const conversation = await window.nodus.getConversation(id);
+  const loadConversation = async (id: string, messageId?: string | null, messageIndex?: number | null): Promise<boolean> => {
+    if (attachmentBusyRef.current) return false;
+    setThinkingEffort('standard');
+    const conversation = await api.getConversation(id);
     if (!conversation) {
       await refreshConversations();
-      return;
+      setConversationNotice(t('La conversación original ya no está disponible.'));
+      return false;
     }
+    const storedAttachments = await window.nodus.listResearchAttachments({ surface: attachmentSurface, conversationId: id });
+    const referenced = new Set(conversation.messages.flatMap(message => message.attachments?.map(file => file.id) ?? []));
+    setAttachments((storedAttachments ?? []).filter(file => !referenced.has(file.id)));
+    setAttachmentError('');
     setActiveId(conversation.id);
-    setMessages(conversation.messages.map((m) => ({ ...m, id: m.id || crypto.randomUUID() })));
-    if (conversation.selection) setSelection(cloneSelection(conversation.selection));
+    const loadedMessages = conversation.messages.map((m) => ({ ...m, id: m.id || crypto.randomUUID() }));
+    setMessages(loadedMessages);
+    setStoppedMessageId(null);
+    setSelection(cloneSelection(conversation.selection ?? SYNTHESIS_SELECTION));
     if (conversation.model) setSelectedModel(conversation.model);
-    setContextTitle(null);
+    setContextTitle(conversation.title || null);
     setInput('');
-    window.setTimeout(() => scrollToBottom('auto'), 0);
+    setConversationNotice(null);
+    const resolvedMessageId = loadedMessages.some((message) => message.id === messageId)
+      ? messageId
+      : messageIndex != null
+        ? loadedMessages[messageIndex]?.id
+        : null;
+    if ((messageId || messageIndex != null) && !resolvedMessageId) {
+      setConversationNotice(t('La conversación está disponible, pero el mensaje original ya no existe.'));
+    }
+    if (resolvedMessageId) {
+      setHighlightedMessageId(resolvedMessageId);
+      window.setTimeout(() => {
+        const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(resolvedMessageId) : resolvedMessageId.replace(/["\\]/g, '\\$&');
+        document.querySelector<HTMLElement>(`[data-message-id="${escaped}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 0);
+      window.setTimeout(() => setHighlightedMessageId((current) => current === resolvedMessageId ? null : current), 2400);
+    } else {
+      window.setTimeout(() => scrollToBottom('auto'), 0);
+    }
+    return true;
   };
 
+  useEffect(() => {
+    const target = initialConversationTarget;
+    if (!target || target.surface !== attachmentSurface || target.nonce === lastConversationTargetRef.current) return;
+    lastConversationTargetRef.current = target.nonce;
+    void loadConversation(target.conversationId, target.messageId, target.messageIndex);
+  }, [initialConversationTarget?.nonce]);
+
   const archiveConversation = async (conversation: ChatConversationSummary) => {
-    await window.nodus.archiveConversation(conversation.id, !conversation.archived);
+    await api.archiveConversation?.(conversation.id, !conversation.archived);
     await refreshConversations();
   };
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;
-    await window.nodus.deleteConversation(pendingDelete.id);
+    await api.deleteConversation(pendingDelete.id);
+    await window.nodus.selectResearchSystemPrompt(`${adapter?.id ?? 'research'}:${pendingDelete.id}`, null);
     if (pendingDelete.id === activeId) startNewConversation();
     setPendingDelete(null);
     await refreshConversations();
@@ -459,7 +554,10 @@ export function ResearchAssistantModal({
 
   const persist = useCallback(
     async (conversationId: string, finalMessages: UiMessage[], shouldTitle: boolean) => {
-      const records: ChatMessageRecord[] = finalMessages.map((m) => ({
+      const records: UiMessage[] = finalMessages.map((m) => ({
+        interrupted: m.interrupted,
+        study: m.study,
+        attachments: m.attachments,
         id: m.id,
         role: m.role,
         content: m.content,
@@ -467,29 +565,31 @@ export function ResearchAssistantModal({
         stats: m.stats ?? null,
         error: m.error ?? false,
       }));
-      await window.nodus.saveConversationMessages(conversationId, records, { model: selectedModel, selection });
+      await api.saveConversationMessages(conversationId, records, { model: selectedModel, selection });
       if (shouldTitle) {
-        await window.nodus.generateConversationTitle(conversationId, selectedModel).catch(() => '');
+        await api.generateConversationTitle?.(conversationId, selectedModel)?.catch(() => '');
       }
       await refreshConversations();
     },
-    [refreshConversations, selectedModel, selection]
+    [api, refreshConversations, selectedModel, selection]
   );
 
   // Runs one assistant turn against `priorMessages` + a fresh user turn. Shared by
   // the composer (send) and the regenerate action, which only differ in how they
   // pick the prior history and the user prompt.
-  const generate = async (conversationId: string, priorMessages: UiMessage[], content: string) => {
+  const generate = async (conversationId: string, priorMessages: UiMessage[], content: string, files: ResearchAttachment[] = []) => {
     if (!selectedModel) return;
-    const selectionKey = serializeSelection(selection);
+    const selectionKey = adapter?.contextKey ?? serializeSelection(selection);
     const isFirstExchange = priorMessages.length === 0;
-    const userMessage: UiMessage = { id: crypto.randomUUID(), role: 'user', content, selectionKey };
+    const userMessage: UiMessage = { id: crypto.randomUUID(), role: 'user', content, selectionKey, attachments: files };
     const assistantId = crypto.randomUUID();
     const requestMessages: ResearchChatMessage[] = [
-      ...priorMessages.filter((m) => m.selectionKey === selectionKey && m.content.trim()),
+      ...priorMessages.filter((m) => (m.selectionKey === selectionKey || (adapter && !m.selectionKey)) && !m.error && m.content.trim()),
       userMessage,
-    ].map((m) => ({ role: m.role, content: m.content }));
+    ].map((m) => ({ role: m.role, content: m.content, attachments: m.attachments }));
 
+    stopRequestedRef.current = false;
+    setStoppedMessageId(null);
     setMessages([...priorMessages, userMessage, { id: assistantId, role: 'assistant', content: '', selectionKey }]);
     setSending(true);
     setStreamingId(assistantId);
@@ -499,11 +599,14 @@ export function ResearchAssistantModal({
     // matching Nodi's chat behaviour.
     window.setTimeout(() => scrollToBottom('auto'), 0);
 
+    let streamed = '';
     try {
-      const response = await window.nodus.researchChatStream(
-        { messages: requestMessages, selection, model: selectedModel, conversationId },
+      if (requestMessages.some(message => message.attachments?.length)) await persist(conversationId, [...priorMessages, userMessage], false);
+      const response = await api.researchChatStream(
+        { attachmentIds: [...new Set([...priorMessages, userMessage].flatMap(message => message.attachments?.map(file => file.id) ?? []))], messages: requestMessages, selection, model: selectedModel, conversationId, thinkingEffort, systemPromptId: systemPrompts.selectedId },
         {
           onDelta: (delta) => {
+            streamed += delta;
             if (activeIdRef.current !== conversationId) return; // user switched away
             setMessages((current) =>
               current.map((message) =>
@@ -524,33 +627,50 @@ export function ResearchAssistantModal({
       );
       // A user-triggered stop resolves with the partial answer; treat an empty
       // partial as "nothing generated" and drop the placeholder bubble.
+      const aborted = stopRequestedRef.current || Boolean(response.aborted);
       const answer = response.answer.trim();
       const finalMessages: UiMessage[] = answer
         ? [
             ...priorMessages,
             userMessage,
-            { id: assistantId, role: 'assistant', content: answer, selectionKey, stats: response.stats },
+            { id: assistantId, role: 'assistant', content: answer, selectionKey, stats: response.stats, ...('message' in response ? response.message : {}), interrupted: aborted },
           ]
         : [...priorMessages, userMessage];
       if (activeIdRef.current === conversationId) {
         setMessages(finalMessages);
+        if (aborted && answer) setStoppedMessageId(assistantId);
         window.setTimeout(updateJumpIndicator, 0);
       }
       await persist(conversationId, finalMessages, isFirstExchange);
     } catch (e) {
-      const errorMessage: UiMessage = {
-        id: assistantId,
-        role: 'assistant',
-        content: e instanceof Error ? e.message : String(e),
-        selectionKey,
-        error: true,
-      };
-      const finalMessages = [...priorMessages, userMessage, errorMessage];
-      if (activeIdRef.current === conversationId) {
-        setMessages(finalMessages);
-        window.setTimeout(updateJumpIndicator, 0);
+      if (stopRequestedRef.current) {
+        // The user stopped the stream: keep the text that already arrived and mark
+        // the message as aborted instead of replacing everything with the error.
+        const partial = streamed.trim();
+        const finalMessages: UiMessage[] = partial
+          ? [...priorMessages, userMessage, { id: assistantId, role: 'assistant', content: partial, selectionKey }]
+          : [...priorMessages, userMessage];
+        if (activeIdRef.current === conversationId) {
+          setMessages(finalMessages);
+          if (partial) setStoppedMessageId(assistantId);
+          window.setTimeout(updateJumpIndicator, 0);
+        }
+        await persist(conversationId, finalMessages, false);
+      } else {
+        const errorMessage: UiMessage = {
+          id: assistantId,
+          role: 'assistant',
+          content: e instanceof Error ? e.message : String(e),
+          selectionKey,
+          error: true,
+        };
+        const finalMessages = [...priorMessages, userMessage, errorMessage];
+        if (activeIdRef.current === conversationId) {
+          setMessages(finalMessages);
+          window.setTimeout(updateJumpIndicator, 0);
+        }
+        await persist(conversationId, finalMessages, false);
       }
-      await persist(conversationId, finalMessages, false);
     } finally {
       setSending(false);
       setStreamingId(null);
@@ -558,26 +678,30 @@ export function ResearchAssistantModal({
   };
 
   const send = async (explicit?: string) => {
-    const content = (explicit ?? input).trim();
-    if (!content || sending || !selectedModel) return;
+    const content = (explicit ?? input).trim() || (attachments.length ? t('Analiza los archivos adjuntos.') : '');
+    if (!content || sending || attachmentBusyRef.current || attachments.some(file => file.kind === 'unsupported') || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)) return;
 
     // Lazily create the conversation on the first message so empty chats never clutter history.
     let conversationId = activeId;
     if (!conversationId) {
-      const created = await window.nodus.createConversation({ model: selectedModel, selection });
+      const created = await api.createConversation({ model: selectedModel, selection, title: content.slice(0, 80) });
       conversationId = created.id;
+      await window.nodus.selectResearchSystemPrompt(`${adapter?.id ?? 'research'}:${created.id}`, systemPrompts.selectedId);
+      activeIdRef.current = created.id;
       setActiveId(created.id);
     }
     // Only the composer's own text is cleared on send; an explicit prompt (a
     // suggestion chip) must not wipe a draft the user may have typed.
     if (!explicit) setInput('');
-    await generate(conversationId, messagesRef.current, content);
+    const files = explicit ? [] : attachments;
+    if (!explicit) setAttachments([]);
+    await generate(conversationId, messagesRef.current, content, files);
   };
 
   // Re-answer the most recent user turn (dropping the answer it produced). Uses the
   // current model + context selection, so it doubles as "try again with this context".
   const regenerateLast = async () => {
-    if (sending || !selectedModel) return;
+    if (sending || !selectedModel || !systemPrompts.ready) return;
     const current = messagesRef.current;
     let lastUserIdx = -1;
     for (let i = current.length - 1; i >= 0; i--) {
@@ -588,11 +712,75 @@ export function ResearchAssistantModal({
     }
     const conversationId = activeIdRef.current;
     if (lastUserIdx < 0 || !conversationId) return;
-    await generate(conversationId, current.slice(0, lastUserIdx), current[lastUserIdx].content);
+    await generate(conversationId, current.slice(0, lastUserIdx), current[lastUserIdx].content, current[lastUserIdx].attachments);
   };
 
+  const addAttachments = async (filePaths?: string[]) => {
+    if (sending || attachmentBusyRef.current) return;
+    attachmentBusyRef.current = true; setAttaching(true); setAttachmentError('');
+    try {
+      let id = activeIdRef.current;
+      if (!id) {
+        const created = await api.createConversation({ model: selectedModel, selection });
+        id = created.id; activeIdRef.current = id; setActiveId(id);
+        await window.nodus.selectResearchSystemPrompt(`${attachmentSurface}:${id}`, systemPrompts.selectedId);
+      }
+      const owner = { surface: attachmentSurface, conversationId: id };
+      const result = filePaths
+        ? await window.nodus.importResearchAttachments(owner, filePaths)
+        : await window.nodus.pickResearchAttachments(owner);
+      if (activeIdRef.current === id) {
+        setAttachments(current => [...current, ...result.attachments]);
+        setAttachmentError(result.errors.join('\n'));
+      }
+      await refreshConversations();
+    } catch (error) { setAttachmentError(error instanceof Error ? error.message : String(error)); }
+    finally { attachmentBusyRef.current = false; setAttaching(false); }
+  };
+  const handleFileDrag = (event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = sending || attachmentBusyRef.current ? 'none' : 'copy';
+    if (event.type === 'dragenter') dragDepthRef.current += 1;
+    if (!sending && !attachmentBusyRef.current) setDraggingFiles(true);
+  };
+  const handleFileDrop = (event: DragEvent<HTMLDivElement>) => {
+    dragDepthRef.current = 0;
+    setDraggingFiles(false);
+    if (!event.dataTransfer.types.includes('Files')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (sending || attachmentBusyRef.current) return;
+    try {
+      // Resolve native paths before the drop event's FileList becomes unavailable.
+      const paths = Array.from(event.dataTransfer.files, file => window.nodus.getPathForDroppedFile(file));
+      if (!paths.length || paths.some(path => !path)) throw new Error(t('No se pudieron leer los archivos arrastrados. Usa el botón + para añadirlos.'));
+      void addAttachments(paths);
+    } catch (error) { setAttachmentError(error instanceof Error ? error.message : String(error)); }
+  };
+  const removeAttachment = async (file: ResearchAttachment) => {
+    if (!activeId || attaching) return;
+    try {
+      await window.nodus.removeResearchAttachment({ surface: attachmentSurface, conversationId: activeId }, file.id);
+      setAttachments(current => current.filter(item => item.id !== file.id));
+    } catch (error) { setAttachmentError(String(error)); }
+  };
+  const renderAttachments = (files: ResearchAttachment[], draft = false) => (
+    <div className="research-attachments" aria-label={t('Archivos adjuntos')}>
+      {files.map(file => <div key={file.id} className={`research-attachment ${file.kind === 'unsupported' ? 'research-attachment-warning' : ''}`} title={file.warning ?? file.name}>
+        <span className="research-attachment-type">{file.name.split('.').at(-1)?.slice(0, 5).toUpperCase() || 'FILE'}</span>
+        <button className="research-attachment-name" disabled={draft} onClick={() => { if (activeId) void window.nodus.saveResearchAttachment({ surface: attachmentSurface, conversationId: activeId }, file.id).catch(error => setAttachmentError(String(error))); }}>
+          <strong>{file.name}</strong><span>{file.size < 1024 ? `${file.size} B` : `${Math.ceil(file.size / 1024)} KB`} · {file.kind === 'unsupported' ? t('Sin lector') : file.kind === 'image' ? t('Visión') : t('Documento')}{file.warning ? ' · ⚠' : ''}</span>
+        </button>
+        {draft && <button className="research-attachment-remove" aria-label={`${t('Quitar adjunto')}: ${file.name}`} disabled={attaching || sending} onClick={() => void removeAttachment(file)}>×</button>}
+      </div>)}
+    </div>
+  );
+
   const handleStop = () => {
-    void window.nodus.cancelResearchChat();
+    stopRequestedRef.current = true;
+    void api.cancelResearchChat();
   };
 
   const serializedModel = selectedModel ? serializeModel(selectedModel) : '';
@@ -606,16 +794,28 @@ export function ResearchAssistantModal({
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 p-4 flex items-center justify-center">
+    <div className={embedded ? "research-chat-surface research-chat-view h-full min-h-0 flex flex-col" : "research-chat-surface fixed inset-0 z-50 bg-black/70 p-4 flex items-center justify-center"} data-testid={embedded ? "research-chat-view" : undefined}>
       <div
-        role="dialog"
-        aria-modal="true"
-        className="w-full max-w-7xl h-[86vh] bg-neutral-950 border border-neutral-800 rounded-lg shadow-2xl flex flex-col overflow-hidden"
+        role={embedded ? "region" : "dialog"}
+        aria-label="Research chat"
+        onDragEnter={handleFileDrag}
+        onDragOver={handleFileDrag}
+        onDragLeave={() => {
+          dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+          if (!dragDepthRef.current) setDraggingFiles(false);
+        }}
+        onDrop={handleFileDrop}
+        aria-modal={embedded ? undefined : true}
+        className={embedded ? "relative w-full h-full min-h-0 bg-neutral-950 flex flex-col overflow-hidden" : "relative w-full max-w-7xl h-[86vh] bg-neutral-950 border border-neutral-800 rounded-lg shadow-2xl flex flex-col overflow-hidden"}
       >
-        <header className="px-4 py-3 border-b border-neutral-800 flex items-center gap-3">
+        {draggingFiles && <div className="research-file-drop-overlay" role="status">
+          <div className="research-file-drop-label"><Icon name="plus" size={28} /><strong>{t('Suelta los archivos para adjuntarlos')}</strong></div>
+        </div>}
+        <header className="research-assistant-header px-4 py-3 border-b border-neutral-800 flex items-center gap-3">
+          {embedded && <button className="btn btn-ghost" data-testid="research-history-toggle" aria-label={t('Historial de chats')} title={t('Historial de chats')} aria-expanded={historyOpen} onClick={toggleHistory}><Icon name="clock" size={16} /></button>}
           <div className="flex items-center gap-2 font-semibold">
-            <Icon name="chat" className="text-indigo-300" />
-            {t('Asistente de investigación')}
+            <Icon name="chat" className="research-accent-text" />
+            {embedded ? 'Research chat' : t('Asistente de investigación')}
           </div>
           <select
             className="input text-xs py-1 max-w-xs"
@@ -631,9 +831,9 @@ export function ResearchAssistantModal({
             ))}
           </select>
           <div className="research-assistant-actions">
-          {isGenealogy ? (
+          {adapter ? <button className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1" disabled={sending} onClick={toggleContext}><Icon name="layers" size={15} />{t('Contexto')}</button> : isGenealogy ? (
             <span
-              className="inline-flex items-center gap-1.5 rounded-md border border-amber-900/60 bg-amber-950/20 px-2 py-1 text-xs text-amber-200"
+              className="inline-flex items-center gap-1.5 rounded-md border research-accent-soft px-2 py-1 text-xs research-accent-text"
               title={t('El asistente usa el contexto familiar: personas, parentescos, eventos, documentos y evidencia.')}
             >
               <Icon name="tree" size={13} /> <span className="hidden sm:inline">{t('Contexto familiar')}</span>
@@ -647,24 +847,31 @@ export function ResearchAssistantModal({
               title={t('Elegir qué partes del corpus ve el asistente')}
               aria-haspopup="dialog"
               aria-expanded={showContext}
-              onClick={() => setShowContext((value) => !value)}
+              onClick={(event) => { contextAnchorRef.current = event.currentTarget; setShowContext((value) => !value); }}
             >
-              <Icon name="layers" size={15} className="text-indigo-300" />
+              <Icon name="layers" size={15} className="research-accent-text" />
               <span className="hidden sm:inline">{activeMode ? t(activeMode.label) : t('Contexto')}</span>
               <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
             </button>
           )}
+          {!adapter && !isGenealogy && <ResearchSourceFilterControl key={activeId ?? 'new'} value={selection.sourceFilter} disabled={sending} onChange={async sourceFilter => {
+            const next = { ...selection, sourceFilter };
+            if (activeId) await api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
+            setSelection(next);
+            setShowContext(false);
+          }} />}
+          <ResearchSystemPromptControl prompts={systemPrompts.prompts} selectedId={systemPrompts.selectedId} disabled={sending || !systemPrompts.ready} onSelect={systemPrompts.select} refresh={systemPrompts.refresh} />
           <ChatSkillsControl surface="assistant" disabled={sending} />
-          {!isGenealogy && contextTitle && (
+          {!adapter && !isGenealogy && contextTitle && (
             <button
               type="button"
               ref={focusTriggerRef}
               data-testid="research-focus-trigger"
-              className="hidden md:inline-flex items-center gap-1.5 rounded-md border border-indigo-900/70 bg-indigo-950/25 px-2 py-1 text-xs text-indigo-200"
+              className="hidden md:inline-flex items-center gap-1.5 rounded-md border research-accent-soft px-2 py-1 text-xs research-accent-text"
               title={t('Elegir qué partes del corpus ve el asistente')}
               aria-haspopup="dialog"
               aria-expanded={showContext}
-              onClick={() => setShowContext((value) => !value)}
+              onClick={(event) => { contextAnchorRef.current = event.currentTarget; setShowContext((value) => !value); }}
             >
               <Icon name="fit" size={15} />
               <span className="truncate">{contextTitle}</span>
@@ -672,14 +879,15 @@ export function ResearchAssistantModal({
           )}
           </div>
           <div className="flex-1" />
-          <button className="btn btn-ghost" onClick={onClose} title={t('Cerrar')}>
+          {embedded && <><button className="btn btn-ghost" aria-label={t('Nueva conversación')} title={t('Nueva conversación')} disabled={sending} onClick={startNewConversation}><Icon name="plus" /></button><button className="btn btn-ghost" data-testid="research-context-toggle" aria-label={t('Ámbito y fuentes')} title={t('Ámbito y fuentes')} aria-expanded={contextOpen} onClick={toggleContext}><Icon name="columns" size={16} /></button></>}
+          {!embedded && <button className="btn btn-ghost" onClick={onClose} title={t('Cerrar')}>
             <Icon name="x" />
-          </button>
+          </button>}
         </header>
 
         <div className="flex-1 min-h-0 flex flex-col md:flex-row">
           {/* Conversation history */}
-          <aside className="w-full md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-neutral-800 flex flex-col max-h-48 md:max-h-none">
+          <aside hidden={!historyOpen} data-testid="research-history-sidebar" className="research-chat-history w-full md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-neutral-800 flex flex-col max-h-48 md:max-h-none">
             <div className="p-3 border-b border-neutral-800">
               <button className="btn btn-primary w-full gap-1.5" onClick={startNewConversation} disabled={sending}>
                 <Icon name="plus" /> {t('Nueva conversación')}
@@ -700,8 +908,8 @@ export function ResearchAssistantModal({
                   <ConversationRow
                     conversation={conversation}
                     active={conversation.id === activeId}
-                    onOpen={() => void loadConversation(conversation.id)}
-                    onArchive={() => void archiveConversation(conversation)}
+                    onOpen={() => { if (!sending) void loadConversation(conversation.id); }}
+                    onArchive={api.archiveConversation ? () => void archiveConversation(conversation) : undefined}
                     onDelete={() => setPendingDelete(conversation)}
                   />
                 </div>
@@ -718,27 +926,32 @@ export function ResearchAssistantModal({
             )}
           </aside>
 
-          <section className="flex-1 min-w-0 flex flex-col">
+          <section className="flex-1 min-w-0 min-h-0 flex flex-col">
             <div className="relative flex-1 min-h-0">
               <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-3">
+                {conversationNotice && (
+                  <div role="status" className="mx-auto max-w-xl rounded-lg border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
+                    {conversationNotice}
+                  </div>
+                )}
                 {messages.length === 0 && (
                   <div className="h-full flex flex-col items-center justify-center gap-5 px-4 text-center">
                     <div className="flex flex-col items-center gap-2">
-                      <span className="grid h-12 w-12 place-items-center rounded-full border border-indigo-900/70 bg-indigo-950/30 text-indigo-300">
+                      <span className="grid h-12 w-12 place-items-center rounded-full border research-accent-soft research-accent-text">
                         <Icon name="chat" size={22} />
                       </span>
                       <p className="max-w-md text-sm text-neutral-400">
-                        {isGenealogy
+                        {adapter ? t(adapter.subtitle) : isGenealogy
                           ? t('Pregunta sobre personas, parentescos, eventos, documentos y evidencia de la familia.')
                           : t('Pregunta sobre ideas, autores, temas, contradicciones o documentos.')}
                       </p>
                     </div>
                     <div className="flex max-w-xl flex-wrap justify-center gap-2">
-                      {(isGenealogy ? GENEALOGY_SUGGESTIONS : CHAT_SUGGESTIONS).map((suggestion) => (
+                      {(adapter?.suggestions ?? (isGenealogy ? GENEALOGY_SUGGESTIONS : CHAT_SUGGESTIONS)).map((suggestion) => (
                         <button
                           key={suggestion}
                           className="suggestion-chip"
-                          disabled={sending || !selectedModel}
+                          disabled={sending || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)}
                           onClick={() => void send(t(suggestion))}
                         >
                           {t(suggestion)}
@@ -751,12 +964,12 @@ export function ResearchAssistantModal({
                   <div
                     key={message.id}
                     data-message-id={message.id}
-                    className={`msg-in flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`msg-in flex rounded-lg transition-shadow duration-500 ${highlightedMessageId === message.id ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-neutral-950' : ''} ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`group relative max-w-[78%] rounded-lg border px-3 py-2 pr-16 text-sm ${
+                      className={`research-message group relative max-w-[78%] rounded-lg border px-3 py-2 text-sm ${message.role === 'assistant' ? 'pr-24' : 'pr-16'} ${
                         message.role === 'user'
-                          ? 'bg-indigo-600 border-indigo-500 text-white whitespace-pre-wrap'
+                          ? 'research-accent-solid text-white whitespace-pre-wrap'
                           : message.error
                             ? 'bg-red-950/40 border-red-800 text-red-200 whitespace-pre-wrap'
                             : 'bg-neutral-900 border-neutral-800 text-neutral-200'
@@ -769,7 +982,7 @@ export function ResearchAssistantModal({
                           message.id !== streamingId &&
                           message.content.trim() && (
                             <button
-                              className="rounded p-1 text-neutral-500 opacity-70 transition hover:bg-neutral-800 hover:text-indigo-300 hover:opacity-100 disabled:opacity-40"
+                              className="rounded p-1 text-neutral-500 opacity-70 transition hover:bg-neutral-800 research-accent-hover hover:opacity-100 disabled:opacity-40"
                               title={t('Regenerar respuesta')}
                               onClick={() => void regenerateLast()}
                               disabled={sending}
@@ -779,11 +992,26 @@ export function ResearchAssistantModal({
                           )}
                         {message.role === 'assistant' && !message.error && message.content.trim() && (
                           <button
-                            className="rounded p-1 text-neutral-500 opacity-70 transition hover:bg-neutral-800 hover:text-indigo-300 hover:opacity-100"
+                            className="rounded p-1 text-neutral-500 opacity-70 transition hover:bg-neutral-800 research-accent-hover hover:opacity-100"
                             title={t('Guardar en notas')}
-                            onClick={() =>
-                              setNoteTarget({ content: message.content, title: deriveNoteTitle(message.content, contextTitle) })
-                            }
+                            onClick={() => {
+                              if (!activeId) return;
+                              const summary = conversations.find((conversation) => conversation.id === activeId);
+                              const fallbackTitle = messages.find((candidate) => candidate.role === 'user' && candidate.content.trim())?.content.trim().slice(0, 80);
+                              const conversationTitle = summary?.title || contextTitle || fallbackTitle || t('Research chat');
+                              setNoteTarget({
+                                content: message.content,
+                                title: deriveNoteTitle(message.content, conversationTitle),
+                                source: researchNoteSource({
+                                  surface: attachmentSurface,
+                                  conversationId: activeId,
+                                  conversationTitle,
+                                  message,
+                                  messageIndex: messages.findIndex((candidate) => candidate.id === message.id),
+                                  model: summary?.model ?? selectedModel,
+                                }),
+                              });
+                            }}
                           >
                             <Icon name="notebook" size={13} />
                           </button>
@@ -791,7 +1019,7 @@ export function ResearchAssistantModal({
                         <button
                           className={`rounded p-1 opacity-70 transition hover:opacity-100 ${
                             message.role === 'user'
-                              ? 'text-indigo-100 hover:bg-indigo-500 hover:text-white'
+                              ? 'text-white hover:bg-white/10'
                               : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
                           }`}
                           title={copiedMessageId === message.id ? t('Copiado') : t('Copiar en Markdown')}
@@ -801,6 +1029,7 @@ export function ResearchAssistantModal({
                           <Icon name={copiedMessageId === message.id ? 'check' : 'copy'} size={13} />
                         </button>
                       </div>
+                      {message.attachments?.length ? renderAttachments(message.attachments) : null}
                       {message.role === 'assistant' && message.reasoning?.trim() && (
                         <details className="mb-2 rounded border border-neutral-800 bg-neutral-950/60" open={!message.content.trim()}>
                           <summary className="cursor-pointer select-none px-2 py-1 text-[11px] text-neutral-400 hover:text-neutral-200">
@@ -814,7 +1043,7 @@ export function ResearchAssistantModal({
                       {message.role === 'assistant' && !message.error ? (
                         message.content ? (
                           <div className={message.id === streamingId ? 'stream-body' : undefined}>
-                            <ChatMarkdown content={message.content} onCitation={handleCitation} streaming={message.id === streamingId} />
+                            {adapter ? adapter.renderMessage(message, message.id === streamingId) : <ChatMarkdown content={message.content} onCitation={handleCitation} streaming={message.id === streamingId} />}
                             {message.id === streamingId && <span aria-hidden className="stream-caret" />}
                           </div>
                         ) : message.id === streamingId ? (
@@ -823,6 +1052,7 @@ export function ResearchAssistantModal({
                       ) : (
                         message.content
                       )}
+                      {message.role === 'assistant' && (message.id === stoppedMessageId || message.interrupted) && <ChatAbortedNotice />}
                       {message.error && message.id === lastMessageId && !sending && (
                         <button
                           className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-red-800/70 px-2 py-1 text-xs text-red-200 transition hover:bg-red-900/40"
@@ -853,25 +1083,35 @@ export function ResearchAssistantModal({
               )}
             </div>
 
-            <footer className="border-t border-neutral-800 p-3">
-              <div className="flex items-end gap-2">
+            <footer className="research-composer-footer">
+              {systemPrompts.error && <p className="text-xs text-red-500 mb-2" role="alert">{systemPrompts.error}</p>}
+              {attachmentError && <p className="research-attachment-error" role="alert">{attachmentError}</p>}
+              {attachments.some(file => file.warning) && <p className="research-attachment-error" role="status">{attachments.filter(file => file.warning).map(file => `${file.name}: ${file.warning}`).join(' · ')}</p>}
+              {attaching && <p className="research-attachment-status" role="status">{t('Preparando archivos…')}</p>}
+              <div className="research-composer-shell">
+              {attachments.length > 0 && renderAttachments(attachments, true)}
+              <div className="research-composer">
+                <button className="research-composer-attach" aria-label={t('Añadir archivos')} title={t('Añadir archivos')} disabled={sending || attaching} onClick={() => void addAttachments()}><Icon name="plus" size={23} /></button>
                 <textarea
                   ref={inputRef}
-                  className="input flex-1 min-h-[52px] max-h-56 resize-none"
-                  rows={2}
+                  className="research-composer-input"
+                  aria-label={t('Pregunta al asistente...')}
+                  rows={1}
                   value={input}
-                  placeholder={activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
+                  placeholder={!adapter && activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                       e.preventDefault();
                       void send();
                     }
                   }}
                 />
+                <ResearchEffortControl model={selectedModel} value={thinkingEffort} onChange={setThinkingEffort} disabled={sending} />
                 {sending ? (
                   <button
-                    className="btn self-end h-11 w-11 px-0 border border-red-800 bg-red-950/40 text-red-200 transition hover:bg-red-900/50"
+                    className="research-composer-send research-composer-stop"
+                    aria-label={t('Detener generación')}
                     title={t('Detener generación')}
                     onClick={handleStop}
                   >
@@ -879,14 +1119,16 @@ export function ResearchAssistantModal({
                   </button>
                 ) : (
                   <button
-                    className="btn btn-primary self-end h-11 w-11 px-0"
+                    className="research-composer-send"
+                    aria-label={t('Enviar')}
                     title={t('Enviar')}
                     onClick={() => void send()}
-                    disabled={!input.trim() || !selectedModel}
+                    disabled={attaching || (!input.trim() && !attachments.length) || attachments.some(file => file.kind === 'unsupported') || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)}
                   >
-                    <Icon name="arrowUp" />
+                    <Icon name="arrowUp" size={23} />
                   </button>
                 )}
+              </div>
               </div>
               <div className="mt-1.5 flex items-center gap-1 px-1 text-[11px] text-neutral-600">
                 <kbd className="composer-kbd">Enter</kbd>
@@ -899,6 +1141,13 @@ export function ResearchAssistantModal({
               </div>
             </footer>
           </section>
+          {embedded && contextOpen && <aside className="research-chat-context w-72 shrink-0 overflow-y-auto border-l border-neutral-800 p-4" data-testid="research-context-sidebar">
+            <div className="mb-4 flex items-center gap-2"><h2 className="text-xs font-semibold">{t('Ámbito y fuentes')}</h2><button className="btn btn-ghost ml-auto" title={t('Ocultar ámbito y fuentes')} onClick={toggleContext}><Icon name="x" size={14} /></button></div>
+            <fieldset disabled={sending} className="min-w-0 space-y-3">{adapter ? adapter.contextPanel : <>
+              <p className="text-xs text-neutral-400">{isGenealogy ? t('El asistente usa el contexto familiar: personas, parentescos, eventos, documentos y evidencia.') : t('Elegir qué partes del corpus ve el asistente')}</p>
+              {!isGenealogy && ASSISTANT_MODES.map(mode => <button key={mode.id} className="btn btn-ghost w-full justify-start" onClick={() => applyMode(mode)}><Icon name={mode.icon} size={15} />{t(mode.label)}{activeModeId === mode.id && <Icon name="check" size={14} />}</button>)}
+            </>}</fieldset>
+          </aside>}
         </div>
       </div>
 
@@ -912,7 +1161,7 @@ export function ResearchAssistantModal({
             className="research-context-panel"
           >
             <header className="flex items-center gap-2 border-b border-neutral-800 px-4 py-3">
-              <Icon name="layers" className="text-indigo-300" />
+              <Icon name="layers" className="research-accent-text" />
               <span className="text-sm font-semibold">{t('Contexto del asistente')}</span>
               <span className="text-xs text-neutral-500">
                 {tx('{n} seleccionados', { n: selectedCount })}
@@ -934,7 +1183,7 @@ export function ResearchAssistantModal({
                       key={mode.id}
                       className={`rounded-md border px-2.5 py-2 text-left transition-colors ${
                         activeModeId === mode.id
-                          ? 'border-indigo-700 bg-indigo-950/35'
+                          ? 'research-accent-soft'
                           : 'border-neutral-800 hover:bg-neutral-900'
                       }`}
                       title={t(mode.description)}
@@ -944,7 +1193,7 @@ export function ResearchAssistantModal({
                         <Icon
                           name={mode.icon}
                           size={13}
-                          className={activeModeId === mode.id ? 'text-indigo-300' : 'text-neutral-500'}
+                          className={activeModeId === mode.id ? 'research-accent-text' : 'text-neutral-500'}
                         />
                         <span>{t(mode.label)}</span>
                       </div>
@@ -959,7 +1208,7 @@ export function ResearchAssistantModal({
                   onClick={() => {
                     setActiveModeId('custom');
                     setContextTitle(t('Todo'));
-                    setSelection(cloneSelection(ALL_SELECTION));
+                    setSelection(current => ({ ...cloneSelection(ALL_SELECTION), sourceFilter: current.sourceFilter }));
                   }}
                 >
                   {t('Todo')}
@@ -969,7 +1218,7 @@ export function ResearchAssistantModal({
                   onClick={() => {
                     setActiveModeId('custom');
                     setContextTitle(t('Manual'));
-                    setSelection(cloneSelection(DEFAULT_SELECTION));
+                    setSelection(current => ({ ...cloneSelection(DEFAULT_SELECTION), sourceFilter: current.sourceFilter }));
                   }}
                 >
                   {t('Nada')}
@@ -1015,7 +1264,7 @@ export function ResearchAssistantModal({
                 />
               </div>
             </div>
-            <footer className="border-t border-neutral-800 p-3">
+            <footer className="research-composer-footer">
               <button className="btn btn-primary w-full" onClick={() => setShowContext(false)}>
                 {t('Listo')}
               </button>
@@ -1029,7 +1278,7 @@ export function ResearchAssistantModal({
           title={t('Eliminar conversación')}
           message={
             <>
-              {t('Se eliminará')} <span className="text-neutral-200">«{pendingDelete.title}»</span> {t('y todo su historial de mensajes. Esta acción no se puede deshacer.')}
+              {t('Se eliminará')} <span className="text-neutral-200">«{pendingDelete.title}»</span> {t('y todo su historial de mensajes y archivos adjuntos. Esta acción no se puede deshacer.')}
             </>
           }
           confirmLabel={t('Eliminar')}
@@ -1051,8 +1300,10 @@ export function ResearchAssistantModal({
           content={noteTarget.content}
           defaultTitle={noteTarget.title}
           kind="assistant"
-          source={{ origin: 'assistant', model: selectedModel, note: contextTitle ?? null }}
+          source={noteTarget.source}
+          destinationLabel={notesDestinationLabel}
           onClose={() => setNoteTarget(null)}
+          onOpenSavedNote={onOpenSavedNote ? (note) => onOpenSavedNote(note.id) : undefined}
         />
       )}
     </div>
@@ -1079,23 +1330,23 @@ function ConversationRow({
   conversation: ChatConversationSummary;
   active: boolean;
   onOpen: () => void;
-  onArchive: () => void;
+  onArchive?: () => void;
   onDelete: () => void;
 }) {
   return (
     <div
       className={`group rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${
-        active ? 'bg-indigo-600/15 border-indigo-700' : 'border-transparent hover:bg-neutral-900'
+        active ? 'research-accent-soft' : 'border-transparent hover:bg-neutral-900'
       }`}
       onClick={onOpen}
     >
       <div className="flex items-center gap-1.5">
-        <Icon name="chat" size={13} className={`shrink-0 ${active ? 'text-indigo-300' : 'text-neutral-500'}`} />
+        <Icon name="chat" size={13} className={`shrink-0 ${active ? 'research-accent-text' : 'text-neutral-500'}`} />
         <span className={`flex-1 min-w-0 truncate text-sm ${conversation.archived ? 'text-neutral-500 italic' : ''}`}>
           {conversation.title}
         </span>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
+          {onArchive && <button
             className="p-1 rounded text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800"
             title={conversation.archived ? t('Desarchivar') : t('Archivar')}
             onClick={(e) => {
@@ -1104,7 +1355,7 @@ function ConversationRow({
             }}
           >
             <Icon name="archive" size={13} />
-          </button>
+          </button>}
           <button
             className="p-1 rounded text-neutral-500 hover:text-red-400 hover:bg-neutral-800"
             title={t('Eliminar')}
@@ -1139,7 +1390,7 @@ function ContextCheckbox({
     <label className={`flex items-center gap-2 text-sm ${disabled ? 'cursor-not-allowed text-neutral-600' : 'text-neutral-300'}`}>
       <input
         type="checkbox"
-        className="h-4 w-4 accent-indigo-500"
+        className="h-4 w-4 research-accent-checkbox"
         checked={checked}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
@@ -1191,5 +1442,7 @@ function formatRelative(iso: string): string {
 }
 
 function serializeSelection(selection: ResearchContextSelection): string {
-  return JSON.stringify(selection);
+  const { sourceFilter, ...sections } = selection;
+  const filter = normalizeResearchSourceFilter(sourceFilter);
+  return JSON.stringify(filter.enabled ? { ...sections, sourceFilter: filter } : sections);
 }

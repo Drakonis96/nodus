@@ -76,12 +76,22 @@ try {
   assert.match(prompt.user, /exact_fragment/);
 
   const settingsRepo = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
+  const { studyAssistantPromptPack } = require(path.join(repoRoot, 'shared/studyAssistantPromptPacks.ts'));
+  const promptLanguages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
+  for (const language of promptLanguages) {
+    settingsRepo.updateSettings({ promptLanguage: language });
+    const insufficient = await assistant.streamStudyAssistant({
+      messages: [{ id: 'u-empty', role: 'user', content: 'What is missing?', createdAt: new Date().toISOString() }],
+      selection: { scope: 'manual', sourceKeys: [] }, task: 'answer', level: 'standard', tone: 'clear', language: 'auto', allowExternalKnowledge: false,
+    }, () => {});
+    assert.equal(
+      insufficient.answer,
+      studyAssistantPromptPack(language).insufficientInformation,
+      `${language}: early insufficient-context responses follow the configured prompt language`,
+    );
+    if (language === 'en') assert.match(insufficient.answer, /^There is not enough information/, 'English early insufficient-context response');
+  }
   settingsRepo.updateSettings({ promptLanguage: 'en' });
-  const insufficient = await assistant.streamStudyAssistant({
-    messages: [{ id: 'u-empty', role: 'user', content: 'What is missing?', createdAt: new Date().toISOString() }],
-    selection: { scope: 'manual', sourceKeys: [] }, task: 'answer', level: 'standard', tone: 'clear', language: 'auto', allowExternalKnowledge: false,
-  }, () => {});
-  assert.match(insufficient.answer, /^There is not enough information/, 'early insufficient-context responses follow the configured prompt language');
 
   const conversation = assistant.createStudyAssistantConversation({ selection: { scope: 'topic', topicId: topic.id, sourceKeys: [] } });
   const messages = [

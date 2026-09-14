@@ -1,5 +1,9 @@
 import { initializeChatSkillDefaults } from './chatSkills';
 import { initializePluginStore } from './skillPlugins';
+import { initializeCapabilityPluginStore } from './capabilities/pluginStoreV2';
+import { rebuildCapabilityRegistry } from './capabilities/registry';
+import { migrateCapabilitiesForThisProfile, settleInstalledPluginMigrations } from './capabilities/migrationRunner';
+import { checkForCapabilityUpdates } from './capabilities/updates';
 import { startPluginUpdates, stopPluginUpdates } from './skillPluginUpdates';
 import { app, BrowserWindow, dialog, nativeTheme, session, shell } from 'electron';
 import path from 'node:path';
@@ -188,6 +192,64 @@ const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 const UPDATE_PROGRESS_MIN_INTERVAL_MS = 500;
 /** Long enough that the first window has painted and a vault is open. */
 const ANNOUNCEMENTS_STARTUP_DELAY_MS = 45 * 1000;
+
+/** If the first window never reports itself loaded, the work still has to happen. */
+const FIRST_PAINT_CEILING_MS = 60 * 1000;
+/** A moment past the load event, because the renderer's own first frames are still work. */
+const FIRST_PAINT_SETTLE_MS = 3 * 1000;
+
+/** Defers work until the first window has painted, or until the ceiling above.
+ *
+ *  For anything that needs the main process to be responsive rather than merely awake.
+ *  There is one event loop, and a launch is the moment it is genuinely contended: work
+ *  that competes with it does not just run slowly, it runs against timers and child
+ *  processes that are being starved at the same time. */
+function afterFirstPaint(work: () => void): void {
+  let started = false;
+  const start = () => { if (started) return; started = true; setTimeout(work, FIRST_PAINT_SETTLE_MS).unref?.(); };
+  const ceiling = setTimeout(start, FIRST_PAINT_CEILING_MS);
+  ceiling.unref?.();
+  const watch = (window: BrowserWindow) => {
+    if (!window.webContents.isLoading()) { clearTimeout(ceiling); start(); return; }
+    window.webContents.once('did-finish-load', () => { clearTimeout(ceiling); start(); });
+  };
+  if (mainWindow) { watch(mainWindow); return; }
+  // The main window may be created later in the same ready handler, so this does not depend
+  // on being called after it. The mascot is a window too and loads in no time, so the
+  // listener waits a turn for `mainWindow` to be assigned rather than taking whichever
+  // window appears first — the point is the launch being over, not a window existing.
+  const onCreated = (_event: unknown, window: BrowserWindow) => setImmediate(() => {
+    if (window !== mainWindow) return;
+    app.off('browser-window-created', onCreated);
+    watch(window);
+  });
+  app.on('browser-window-created', onCreated);
+}
+
+/** The 5.3.1 → 5.4.0 move, and the catalogue check that must not overlap it. */
+function runCapabilityProfileMigration(): void {
+  void migrateCapabilitiesForThisProfile()
+    .then(outcome => {
+      if (outcome.installed.length || outcome.adopted.length) rebuildCapabilityRegistry();
+      for (const failure of outcome.failed) console.warn(`[capabilities] ${failure.pluginId} stopped at ${failure.phase}: ${failure.detail}`);
+    })
+    .catch(error => console.warn('[capabilities] migration could not run:', error))
+    // Updates come after the move, never during it: an update mid-migration would change
+    // the version the migration is halfway through. Delayed, because a launch has better
+    // things to do with its first seconds than talk to GitHub — and skipped entirely when
+    // this build was told not to update itself, which is what a test harness says when it
+    // means "do not go near the network".
+    .finally(() => process.env.NODUS_DISABLE_AUTO_UPDATE === '1' ? undefined : setTimeout(() => {
+      void checkForCapabilityUpdates()
+        .then(results => {
+          for (const result of results) {
+            if (result.state === 'updated') console.info(`[capabilities] ${result.pluginId} updated ${result.from} -> ${result.to}`);
+            if (result.state === 'awaiting-approval') console.info(`[capabilities] ${result.pluginId} ${result.to} is waiting for permission approval`);
+          }
+        })
+        .catch(error => console.warn('[capabilities] update check could not run:', error));
+    }, 30_000).unref?.());
+}
 
 function macAppBundlePath(): string | null {
   if (process.platform !== 'darwin') return null;
@@ -924,8 +986,30 @@ app.on('second-instance', (_event, argv) => {
 app.whenReady().then(async () => {
   // Losing the lock queues a quit; do not open the database or a window.
   if (!hasSingleInstanceLock) return;
+  // Which capabilities exist has to be settled before the skill library is read: a skill
+  // that depends on one cannot be judged available until its provider has registered.
+  initializeCapabilityPluginStore();
+  rebuildCapabilityRegistry();
   initializeChatSkillDefaults();
   initializePluginStore();
+  // The three disciplines that became packages are adopted in the background. A profile
+  // that needs one keeps the skill it already had until the package is in place, and a
+  // migration that cannot finish must never hold up the window or turn a skill off: it
+  // leaves a retry in the journal and says so in the interface.
+  //
+  // It waits for the window rather than starting here, because the move needs a utility
+  // process and this is the one moment the main process cannot spare one. Measured on a
+  // real profile: with the loop stalled the child is not serviced, and depending on how
+  // long the stall runs it either never spawns inside its deadline or spawns, completes
+  // its handshake and is torn down in the same millisecond — reported either way as a
+  // capability that would not start, for a worker that comes up in about 100 ms on a free
+  // loop. Nothing here is urgent, and 5.4.0 shipped this in the contended window.
+  void afterFirstPaint(() => {
+    void settleInstalledPluginMigrations()
+      .then(settled => { if (settled.length) rebuildCapabilityRegistry(); })
+      .catch(error => console.warn('[capabilities] outstanding data migrations could not be settled:', error));
+    runCapabilityProfileMigration();
+  });
   removeDisplacedMacBundle();
   restorePersistedDockIcon();
   // YouTube (embedded by the PDF Presenter's audience overlay) flags Electron's

@@ -134,6 +134,20 @@ const promptLanguageLabel = (language: PromptLanguage): string => {
       return t("Português (Brasil)");
     case "it":
       return t("Italiano");
+    case "zh-Hans":
+      return "简体中文";
+    case "zh-Hant":
+      return "繁體中文";
+    case "vi":
+      return "Tiếng Việt";
+    case "ja":
+      return "日本語";
+    case "ru":
+      return "Русский";
+    case "uk":
+      return "Українська";
+    case "ko":
+      return "한국어";
   }
 };
 const dictionaryStatusLabel = (status: DictionaryEntryStatus): string => {
@@ -147,7 +161,14 @@ const dictionaryStatusLabel = (status: DictionaryEntryStatus): string => {
       "pt-BR": "Ativo",
       it: "Attivo",
       tr: "Etkin",
-    });
+      "zh-Hans": "活跃",
+      "zh-Hant": "使用中",
+      vi: "Đang hoạt động",
+      ja: "有効",
+      ru: "Активна",
+      uk: "Активна",
+      ko: "활성",
+    } as Partial<Record<PromptLanguage, string>> & { es: string; en: string });
   }
   if (status === "archived") {
     return pick({
@@ -159,7 +180,14 @@ const dictionaryStatusLabel = (status: DictionaryEntryStatus): string => {
       "pt-BR": "Arquivado",
       it: "Archiviato",
       tr: "Arşivlendi",
-    });
+      "zh-Hans": "已归档",
+      "zh-Hant": "已封存",
+      vi: "Đã lưu trữ",
+      ja: "アーカイブ済み",
+      ru: "В архиве",
+      uk: "В архіві",
+      ko: "보관됨",
+    } as Partial<Record<PromptLanguage, string>> & { es: string; en: string });
   }
   return pick({
     es: "Borrador",
@@ -170,7 +198,14 @@ const dictionaryStatusLabel = (status: DictionaryEntryStatus): string => {
     "pt-BR": "Rascunho",
     it: "Bozza",
     tr: "Taslak",
-  });
+    "zh-Hans": "草稿",
+    "zh-Hant": "草稿",
+    vi: "Bản nháp",
+    ja: "下書き",
+    ru: "Черновик",
+    uk: "Чернетка",
+    ko: "초안",
+  } as Partial<Record<PromptLanguage, string>> & { es: string; en: string });
 };
 const panel =
   "rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950/70";

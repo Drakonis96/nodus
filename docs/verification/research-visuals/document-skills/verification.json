@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "textCalls": 6,
+  "isolatedProfile": true,
+  "zeroFigures": true,
+  "usageCeiling": true,
+  "reopensWithoutCalls": true,
+  "originalsUnchanged": true,
+  "undo": true
+}

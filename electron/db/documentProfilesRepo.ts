@@ -595,8 +595,10 @@ export function documentProfileStatuses(nodusIds?: string[]): Array<{
 }
 
 export async function findSimilarDocuments(
-  queryEmbedding: number[], threshold = 0.24, limit = 20
+  queryEmbedding: number[], threshold = 0.24, limit = 20, opts: { nodusIds?: string[] } = {}
 ): Promise<DocumentSearchHit[]> {
+  if (opts.nodusIds?.length === 0) return [];
+  const scoped = opts.nodusIds ? ' AND dv.nodus_id IN (SELECT value FROM json_each(?))' : '';
   const config = currentEmbeddingConfig();
   // Join state by its indexed work key as well as version: a version-only
   // join scans every profile state for each candidate vector.
@@ -608,8 +610,8 @@ export async function findSimilarDocuments(
             JOIN works w ON w.nodus_id=dv.nodus_id
            WHERE dv.rowid>? AND dv.rowid<=? AND dv.embedding IS NOT NULL
              AND w.archived=0 AND dv.embedding_provider=? AND dv.embedding_model=?
-             AND dv.embedding_dim=?`,
-    params: [config.provider, config.model, queryEmbedding.length],
+             AND dv.embedding_dim=?${scoped}`,
+    params: [config.provider, config.model, queryEmbedding.length, ...(opts.nodusIds ? [JSON.stringify(opts.nodusIds)] : [])],
     query: queryEmbedding,
     threshold,
     limit: Math.max(limit * 3, limit),
@@ -642,7 +644,9 @@ export async function findSimilarDocuments(
   return [...bestBySource.values()].sort((a, b) => b.similarity - a.similarity).slice(0, limit);
 }
 
-export function lexicalDocumentSearch(query: string, limit = 20): DocumentSearchHit[] {
+export function lexicalDocumentSearch(query: string, limit = 20, opts: { nodusIds?: string[] } = {}): DocumentSearchHit[] {
+  if (opts.nodusIds?.length === 0) return [];
+  const scoped = opts.nodusIds ? ' AND f.nodus_id IN (SELECT value FROM json_each(?))' : '';
   // Never pass user punctuation/operators directly to FTS5. Quoted lexical
   // tokens make natural-language questions safe while preserving broad recall.
   const terms = query.normalize('NFKC').toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
@@ -654,8 +658,8 @@ export function lexicalDocumentSearch(query: string, limit = 20): DocumentSearch
             w.authors_json,w.year,s.status
        FROM document_profiles_fts f JOIN works w ON w.nodus_id=f.nodus_id
        JOIN document_profile_state s ON s.current_version_id=f.version_id
-      WHERE document_profiles_fts MATCH ? AND w.archived=0 ORDER BY rank LIMIT ?`
-  ).all(ftsQuery, limit) as Record<string, unknown>[];
+      WHERE document_profiles_fts MATCH ? AND w.archived=0${scoped} ORDER BY rank LIMIT ?`
+  ).all(ftsQuery, ...(opts.nodusIds ? [JSON.stringify(opts.nodusIds)] : []), limit) as Record<string, unknown>[];
   return rows.map((row) => ({
     kind: 'document', nodusId: String(row.nodus_id), title: String(row.title),
     authors: json<string[]>(row.authors_json, []), year: row.year == null ? null : Number(row.year),

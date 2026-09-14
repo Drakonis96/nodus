@@ -1,5 +1,60 @@
 # Changelog
 
+## 5.4.2 — 2026-09-13
+
+Nodus 5.4.2 rebuilds the Study question bank around bulk management and
+interchange, renders Markdown and LaTeX on every question and flashcard surface,
+and adds seven prompt languages.
+
+- The Study question bank has two tabs for questions and flashcards, search and filters by subject, topic, cognitive level, source, material, document, tag and collection, sorting and multi-select. Status, difficulty, category, tags, collection and spaced-repetition state apply to a whole selection, and each flashcard is created, edited or deleted with its own SRS actions.
+- The bank imports and exports Nodus JSON, CSV, Anki TSV and `.apkg` packages, and Moodle XML and GIFT quizzes from one dialog that previews what will enter.
+- One Markdown pipeline covers every question and flashcard surface: prompts, options, answers, explanations, the review session, AI generation previews, the exam builder, immersion quizzes and worldbuilding questions. Writing fields gain an Edit/Preview toggle, generation is asked for LaTeX, and Nodus Server web typesets published study catalogs and dossiers.
+- Seven prompt languages join the pickers: Simplified and Traditional Chinese, Vietnamese, Japanese, Russian, Ukrainian and Korean, bringing prompt support to fifteen languages. The interface keeps its eight.
+- Saved Research chat answers keep their provenance: the conversation, the model and the sources. From the note you can reopen the conversation and jump to the exact message, and exported notes carry the provenance with them.
+- In Deep Research and Immersion creation dialogs, only Image Atelier is classified as paid per call. Every other installed Skill keeps the optional ceiling and no longer requires a mandatory maximum.
+- The Skills Marketplace lists skills, plugins, signed packages and inbox plugins in one catalogue, one card per item, with the same identity, collapsible details and a single permission review before installing or updating.
+- Signed v2 packages execute through their own trusted capability pipeline instead of advertising their tools through the legacy generic fence.
+- The Nodus Browser follows each document’s colours in dark mode, so unstyled pages and 401 errors are readable without selecting text, and HTTP Basic authentication is answered from a browser bar that stores no credentials. The native view also stays aligned with the renderer zoom.
+- Zotero being unreachable is no longer reported as a missing attachment: text resolution retries, scans fail retriably and the queue requeues them. The Incomplete filter gates on all five analysis steps with a semantic state that matches each row, and a deep fusion resumes only the ideas it did not finish.
+- Added the complete 5.4.2 What’s New modal in all eight interface languages.
+
+## 5.4.0 — 2026-09-12
+
+Nodus 5.4.0 includes everything prepared for the unpublished 5.3.2, plus unified
+Research chat and search, file attachments, visual report Skills and the fixes below.
+It takes chemistry, law and genomics out of the application. They are
+official capability packages now, signed by NodusResearch and installed like any
+other, and the application that ships to someone who never draws a molecule no
+longer carries the machinery to draw one.
+
+- Chemistry Studio, Legalize and AlphaGenome are installable packages rather than built-in skills. The Skills view shows each one's verified publisher, permissions, size, the platforms it runs on and the capabilities it provides, and any of them can be installed, updated, rolled back or removed.
+- A profile upgrading from 5.3.1 moves across on its own. A built-in that was enabled, an enabled copy downloaded from the official catalog, a skill of your own that depends on one of these capabilities, or a profile predating the skills library all cause the matching package to be installed. A default left untouched, deleted or switched off causes nothing: the migration does not overrule a decision you already made.
+- Adoption keeps the identity. A migrated skill keeps its local id, its place in the list and its per-surface activation, instructions you edited become an overlay on the package's text, and an edit that cannot be expressed that way survives as its own disabled skill rather than being discarded. Two identical copies of one package become one skill, enabled wherever either was.
+- The migration is resumable and works offline. Every phase is recorded before the next begins, so a crash resumes rather than restarts, and the signed packages travel inside the update itself so an upgrade with no connection still completes. A failure leaves the skill with the activation you chose, the previous data intact and a retry, and never holds up the window.
+- Capability API v2 adds `nodus-trusted-worker-v1`, reserved to packages signed by NodusResearch. `javascript-sandbox-v1` is unchanged and remains the only route for community plugins. The signature is the security boundary: a v2 worker runs in its own utility process for fault isolation, cancellation and hard limits, not as a sandbox.
+- A package only installs if its release manifest verifies against a publishing key built into Nodus, and if the bytes downloaded match the size and digest that manifest pinned, checked before the archive is opened. Downgrades and different content published under the same version are refused, and an update that widens permissions waits for approval.
+- The chat pipeline no longer knows a discipline by name. A reply is parsed once into a generic tree, and installed packages claim fenced protocols by declaration and run in the order they declare. Hooks return typed mutations rather than text, a stored result is never executed, and no hook can turn a result into the next request.
+- Results are stored as artifacts beside the conversation, with their own hash. What the model may see of one is read from the package's own declaration instead of a rule written into Nodus, so an AlphaGenome prediction still never leaves the device. A result whose package has been removed keeps its summary and offers to reinstall the provider.
+- Package settings are declarative. The AlphaGenome key, its terms and its Python runtime are configured on the package's own card, the key is kept in the system credential store and reaches the interpreter through stdin, and the runtime is built from a lock that pins every wheel by URL, size and digest and installs with `--no-index --require-hashes`.
+- RDKit, OpenChemLib and the TeX engine are no longer dependencies of Nodus, and the AlphaGenome Python worker is no longer a packaged resource. A test builds the real main-process and renderer bundles and fails if any of it comes back.
+- A skill that declares a capability nothing provides yet can be installed and keeps the activation you chose. It simply does not run until its provider is installed, so the order of two installs no longer matters.
+- Updated the complete 5.4.0 What's New modal in all eight interface languages, preserving all nine notes prepared for 5.3.2.
+
+- Research chat is shared across all nine vault types with collapsible history/context panels while preserving native conversations, citations, source selection and tools.
+- Added provider-aware reasoning effort, searchable author/work corpus filters with persisted history boundaries, and vault-local custom system prompts that can change without resetting the conversation.
+- Research chat accepts file attachments through the integrated + button or drag and drop. DOC/DOCX, PDF, spreadsheets, CSV/TSV, XML, images and other supported formats use the selected model, with vision where required. Originals and extracted resources belong to the conversation and are deleted with it. File cards have readable light/dark outlines and vault accents. Unsupported formats and processing limits are explicit.
+- Reading position and citation previews are fixed in Research chat. Stopping a streamed answer keeps the received partial text in history.
+- Deep Research and Immersion gain per-document visual Skills, explicit paid-call ceilings, figures for new/existing reports, interactive views, downloads, removal/undo and PDF export. Database Deep Research is outside this visual-report change.
+- Native cartography builds downloadable maps from real geographic sources and attributed boundaries, layers, routes, markers and legends. Compatible Skills can also request bounded thumbnail relevance review using the selected vision model, with explicit unavailable/no-match results.
+- Plugins gain verified read-only packaged assets, interactive glTF/GLB model views and rich native results including formulas, charts, trees, comparisons, annotated passages, maps, images, audio and zoomable documents. Saved results retain their referenced resources.
+- Unified lexical/semantic search across all desktop vaults, with native content-type filters and saved searches.
+- Skills Marketplace has a dedicated header entry. Skills and packages share one ordered card with clearer actions, installation errors are translated, and migration installs all Skills in each bundled package while preserving user preferences and author workflows.
+- PDF Presenter uses tags with filtering and confirmed deletion that preserves presentations, downloads library PDFs and imports recovered-notes TXT files as well as native exports.
+- Valid SVG comments no longer discard drawings. Chemistry Studio keeps drawable portions when full verification is unavailable and makes the limitations visible. The update carries Chemistry Studio 2.2.1.
+- Browser bookmarks use compact cards and recover site favicons, including after editing.
+- Word alternatives preserve selection whitespace and make a bounded second attempt when the first response lacks enough distinct suggestions.
+- Graph actions and the Tutor sidebar have clearer icons and contrast. Chat context respects light mode, the send button is centered and the light-mode logo background is fixed. Teaching hides deferred sections from navigation.
+
 ## 5.3.1 — 2026-09-10
 
 Nodus 5.3.1 turns the Skills Marketplace into a view of the library you actually

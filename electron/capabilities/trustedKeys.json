@@ -1,0 +1,9 @@
+{
+  "comment": "Ed25519 public keys that may sign NodusResearch capability packages. Generate one with `npm run capabilities:keygen`; the matching private key belongs in a protected GitHub Environment and nowhere else. An empty list means no v2 package can be installed, which is the correct state for a build with no publishing key.",
+  "keys": [
+    {
+      "keyId": "nr02",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAIe5vbG3NDyKRYMxkm2D02+chGWiCTvek/XnnvQdFL+c=\n-----END PUBLIC KEY-----\n"
+    }
+  ]
+}

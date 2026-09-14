@@ -1,12 +1,12 @@
+import { validatePackagedModelResult } from '../../packages/capability-api/src/pluginAssets';
 import { BrowserWindow, protocol, session } from 'electron';
-import { promises as dns } from 'node:dns';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import net from 'node:net';
 import { registerUntrustedSession } from '../../electron/ipc/untrustedSessions';
 import { pluginSecret, pluginStorageFile, type InstalledCapabilityRuntime } from '../../electron/skillPlugins';
 import { jsonSchemaMatches, type CapabilityInvocation, type CapabilityResult } from '../contracts';
+import { assertPublicHost } from '../publicHost';
 
 /** Capability runtimes are served from, and may only talk to, this session-scoped origin. */
 export const NODUS_CAPABILITY_SCHEME = 'nodus-capability';
@@ -26,24 +26,6 @@ const jsonResponse = (payload: unknown) => new Response(JSON.stringify(payload),
 const TEXT_LIMIT = 256_000;
 const BINARY_LIMIT = 10_000_000;
 const EXECUTION_TIMEOUT = process.env.NODUS_CAPABILITY_TEST_TIMEOUT_MS ? Number(process.env.NODUS_CAPABILITY_TEST_TIMEOUT_MS) : 30_000;
-const PRIVATE_HOST = /^(?:localhost|.*\.localhost|.*\.local)$/i;
-
-function privateAddress(address: string): boolean {
-  const normalized = address.replace(/^::ffff:/i, '');
-  if (net.isIP(normalized) === 4) {
-    const [a, b] = normalized.split('.').map(Number);
-    return a === 0 || a === 10 || a === 127 || a >= 224 || a === 169 && b === 254
-      || a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168
-      || a === 100 && b >= 64 && b <= 127 || a === 198 && (b === 18 || b === 19);
-  }
-  return net.isIP(address) !== 6 || !/^[23][0-9a-f]{3}:/i.test(address);
-}
-
-async function assertPublicHost(hostname: string) {
-  if (PRIVATE_HOST.test(hostname)) throw new Error('Capability network target is not public.');
-  const results = await dns.lookup(hostname, { all: true });
-  if (!results.length || results.some(result => privateAddress(result.address))) throw new Error('Capability network target is not public.');
-}
 
 function readStorage(runtime: InstalledCapabilityRuntime): unknown {
   const file = pluginStorageFile(runtime.pluginId, runtime.manifest.id);
@@ -59,7 +41,7 @@ function writeStorage(runtime: InstalledCapabilityRuntime, value: unknown): null
   const temporary = `${file}.${randomUUID()}.tmp`; fs.writeFileSync(temporary, encoded, { mode: 0o600 }); fs.renameSync(temporary, file); return null;
 }
 
-async function networkRequest(runtime: InstalledCapabilityRuntime, endpointId: string, request: unknown): Promise<unknown> {
+async function networkRequest(runtime: InstalledCapabilityRuntime, endpointId: string, request: unknown, signal?: AbortSignal, beforePaidCall?: () => void): Promise<unknown> {
   const endpoint = runtime.manifest.permissions.network?.find(item => item.id === endpointId);
   if (!endpoint) throw new Error('Capability endpoint is not permitted.');
   const value = request as { path?: unknown; method?: unknown; body?: unknown };
@@ -77,7 +59,9 @@ async function networkRequest(runtime: InstalledCapabilityRuntime, endpointId: s
     if (!stored && secret.required) throw new Error(`Configure ${secret.label} before using this capability.`);
     if (stored) headers[secret.header] = `${secret.prefix ?? ''}${stored}`;
   }
-  const response = await fetch(url, { method, body, headers, redirect: 'error', signal: AbortSignal.timeout(20_000) });
+  signal?.throwIfAborted(); beforePaidCall?.();
+  const timeout = AbortSignal.timeout(20_000);
+  const response = await fetch(url, { method, body, headers, redirect: 'error', signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
   if (!response.ok) throw new Error(`Capability endpoint returned ${response.status}.`);
   if (Number(response.headers.get('content-length') ?? 0) > 2_000_000) { await response.body?.cancel(); throw new Error('Capability response is too large.'); }
   const reader = response.body?.getReader(); if (!reader) return null;
@@ -102,6 +86,8 @@ function validateResult(result: unknown, allowed: string[]): CapabilityResult {
       || JSON.stringify(value).length > TEXT_LIMIT) throw new Error('Invalid capability table result.');
   } else if (value.kind === 'svg') {
     if (typeof value.svg !== 'string' || value.svg.length > 300_000 || !/^\s*<svg\b/i.test(value.svg) || /<!DOCTYPE|<!ENTITY/i.test(value.svg)) throw new Error('Invalid capability SVG result.');
+  } else if (value.kind === 'model') {
+    validatePackagedModelResult(value);
   } else {
     if (typeof value.data !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(value.data) || Buffer.byteLength(value.data, 'base64') > BINARY_LIMIT) throw new Error('Invalid capability binary result.');
     if (value.kind === 'image' && !['image/png','image/jpeg','image/webp'].includes(value.mimeType)) throw new Error('Invalid capability image type.');
@@ -111,7 +97,7 @@ function validateResult(result: unknown, allowed: string[]): CapabilityResult {
 }
 
 /** External capability code runs in a fresh renderer sandbox. Only this narrow RPC crosses into main. */
-export async function runCapabilitySandbox(runtime: InstalledCapabilityRuntime, invocation: CapabilityInvocation, signal?: AbortSignal): Promise<CapabilityResult> {
+export async function runCapabilitySandbox(runtime: InstalledCapabilityRuntime, invocation: CapabilityInvocation, signal?: AbortSignal, beforePaidCall?: () => void): Promise<CapabilityResult> {
   signal?.throwIfAborted();
   const tool = runtime.manifest.tools.find(item => item.id === invocation.toolId);
   if (!tool || !jsonSchemaMatches(tool.inputSchema, invocation.input)) throw new Error('Capability tool input does not match its schema.');
@@ -137,7 +123,13 @@ export async function runCapabilitySandbox(runtime: InstalledCapabilityRuntime, 
       const message = JSON.parse(body) as { method?: unknown; args?: Record<string, unknown> };
       const args = message.args ?? {};
       const value = await (async () => {
-        if (message.method === 'network.request') return networkRequest(runtime, String(args.endpointId), args.request);
+        if (message.method === 'assets.read') {
+          if (!runtime.readAsset || typeof args.id !== 'string') throw new Error('Plugin assets are unavailable.');
+          const { text, asset } = runtime.readAsset(args.id);
+          if (asset.mimeType !== 'application/json' || asset.bytes > 2_000_000) throw new Error('Only bounded JSON assets can enter the sandbox.');
+          return JSON.parse(text);
+        }
+        if (message.method === 'network.request') return networkRequest(runtime, String(args.endpointId), args.request, signal, beforePaidCall);
         if (message.method === 'storage.get') { if (!runtime.manifest.permissions.storage) throw new Error('Capability storage is not permitted.'); return readStorage(runtime); }
         if (message.method === 'storage.set') return writeStorage(runtime, args.value);
         throw new Error('Unknown capability host operation.');
@@ -161,7 +153,7 @@ export async function runCapabilitySandbox(runtime: InstalledCapabilityRuntime, 
         return win.webContents.executeJavaScript(`(async()=>{
           for(const key of ['RTCPeerConnection','webkitRTCPeerConnection','RTCIceTransport','RTCDtlsTransport'])Object.defineProperty(globalThis,key,{value:undefined,writable:false,configurable:false});
           const call=async(method,args)=>{const response=await fetch(${JSON.stringify(`${CAPABILITY_ORIGIN}/rpc`)},{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({method,args})});const payload=await response.json();if(!payload.ok)throw new Error(payload.error);return payload.value};
-          const host=Object.freeze({network:Object.freeze({request:(endpointId,request)=>call('network.request',{endpointId,request})}),storage:Object.freeze({get:()=>call('storage.get',{}),set:value=>call('storage.set',{value})})});
+          const host=Object.freeze({assets:Object.freeze({read:id=>call('assets.read',{id})}),network:Object.freeze({request:(endpointId,request)=>call('network.request',{endpointId,request})}),storage:Object.freeze({get:()=>call('storage.get',{}),set:value=>call('storage.set',{value})})});
           const runtime=(${runtime.source}\n);
           if(typeof runtime!=='function')throw new Error('Capability runtime must be a function expression.');
           return await runtime(JSON.parse(${JSON.stringify(encoded)}),host);

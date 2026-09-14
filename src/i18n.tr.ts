@@ -1,4 +1,10 @@
+import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
+import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
+import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
+import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
+import { RESEARCH_REASONING_TRANSLATIONS } from './i18n.researchReasoning';
 import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
+import { CAPABILITIES_TRANSLATIONS } from './i18n.capabilities';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
@@ -9,6 +15,7 @@ import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
+import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
@@ -54,7 +61,15 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Açık veya koyu modu seçin ya da işletim sistemini takip edin.',
+  ...RESEARCH_ATTACHMENT_TRANSLATIONS['tr'],
+  "Research chat": "Research chat",
+  "Elige al menos una base de datos.": "En az bir veritabanı seçin.",
+  ...RESEARCH_PROMPT_TRANSLATIONS["tr"],
+  ...RESEARCH_SOURCE_TRANSLATIONS["tr"],
+  ...RESEARCH_REASONING_TRANSLATIONS["tr"],
   ...CHAT_SKILLS_TRANSLATIONS['tr'],
+  ...CAPABILITIES_TRANSLATIONS['tr'],
+  ...DOCUMENT_SKILLS_TRANSLATIONS['tr'],
   ...STELLAR_GRAPH_TRANSLATIONS["tr"],
   ...ACADEMIC_TOUR_TRANSLATIONS.tr,
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS.tr,
@@ -103,6 +118,7 @@ export const TR: Record<string, string> = {
   ...ANNOUNCEMENT_TRANSLATIONS['tr'],
   ...WORLD_CHAT_TRANSLATIONS.tr,
   ...STUDY_SYNONYM_TRANSLATIONS.tr,
+  ...STUDY_BANK_TRANSLATIONS.tr,
   ...STUDY_IMPROVE_TRANSLATIONS.tr,
   ...WORKSPACE_TRANSLATIONS.tr,
   "Lo que cuenta el mapa": "Haritanın anlattıkları",
@@ -2598,6 +2614,7 @@ export const TR: Record<string, string> = {
   'No aplica': 'Uygulanamaz',
   'Solo abstract': 'Yalnızca özet',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'Nodus okunacak metin bulamadı. PDF veya EPUB dosyasını Zotero’ya ekleyip yeniden analiz et.',
+  'Zotero no está disponible. Ábrelo y vuelve a analizar.': 'Zotero kullanılamıyor. Açın ve yeniden analiz edin.',
   'El análisis solo pudo usar el abstract, así que esta obra no tendrá texto citable. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'Analiz yalnızca özeti kullanabildi, bu yüzden bu eserin alıntılanabilir metni olmayacak. PDF veya EPUB dosyasını Zotero’ya ekleyip yeniden analiz et.',
   'Ver las {n} ideas de esta obra': 'Bu eserin {n} fikrini gör',
   'Analizar: temas, ideas, resumen, indexado y relaciones': 'Analiz et: temalar, fikirler, özet, dizinleme ve ilişkiler',
@@ -4233,6 +4250,7 @@ export const TR: Record<string, string> = {
   "Añade la primera desde la ficha de una persona, sección «Relaciones sociales».": "Bir kişinin dosyasından ilkini \"Sosyal İlişkiler\" bölümüne ekleyin.",
   "Ir a Personas": "Kişiler'e git",
   "Vista previa": "Önizleme",
+  "Markdown y LaTeX · fórmulas entre $...$": "Markdown ve LaTeX · formüller $...$ arasında",
   "Aún no hay personas. Importa un GEDCOM o añade personas y sus parentescos desde la vista Personas.": "Henüz kimse yok. Bir GEDCOM'u içe aktarın veya Kişiler görünümünden kişileri ve onların ilişkilerini ekleyin.",
   "Árbol genealógico": "Aile ağacı",
   "Centrar el árbol en…": "Ağacı ortalayın…",
@@ -8195,4 +8213,28 @@ export const TR: Record<string, string> = {
   "Usa un número entero de palabras, sin decimales.": "Ondalık kullanmadan tam sayı bir kelime sayısı girin.",
   "El mínimo son {min} palabras por sección.": "Bölüm başına en az {min} kelime olmalıdır.",
   "El máximo son {max} palabras por sección.": "Bölüm başına en fazla {max} kelime olabilir.",
+  "Solicitud cancelada por el usuario.": "Kullanıcı isteği iptal etti.",
+  // PDF Presenter — tags (renamed from folders) and the PDF download.
+  "Sin etiqueta": "Etiket yok",
+  "Eliminar etiqueta": "Etiketi sil",
+  "Filtrar por etiqueta": "Etikete göre filtrele",
+  "¿Seguro que quieres eliminar la etiqueta «{name}»? Las presentaciones que la tienen seguirán en la biblioteca, pero sin etiqueta.": "“{name}” etiketi silinsin mi? Bu etikete sahip sunumlar kitaplıkta kalır, yalnızca etiketsiz olur.",
+  "Descargar PDF": "PDF’yi indir",
+  "No se pudo descargar la presentación.": "Sunum indirilemedi.",
+  // Nodus Browser — HTTP authentication prompt.
+  "pide usuario y contraseña.": "kullanıcı adı ve parola istiyor.",
+  "Usuario": "Kullanıcı adı",
+  "Iniciar sesión": "Oturum aç",
+  "Proxy": "Proxy",
+  "Nota guardada": "Not kaydedildi",
+  "Continuar en el chat": "Sohbete devam et",
+  "La nota se guardó, pero no se pudo vincular al proyecto.": "Not kaydedildi, ancak projeye bağlanamadı.",
+  "Procedencia": "Köken",
+  "Volver a la conversación": "Görüşmeye dön",
+  "Fuentes citadas": "Atıfta bulunulan kaynaklar",
+  "Research chat de bases de datos": "Research chat: veritabanları",
+  "Research chat de estudio": "Research chat: çalışma",
+  "Research chat del mundo": "Research chat: dünya",
+  "La conversación original ya no está disponible.": "Orijinal görüşme artık kullanılamıyor.",
+  "La conversación está disponible, pero el mensaje original ya no existe.": "Görüşme kullanılabilir, ancak orijinal mesaj artık mevcut değil.",
 };

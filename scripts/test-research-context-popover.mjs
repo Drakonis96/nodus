@@ -24,7 +24,7 @@ test('the assistant context picker opens as an anchored balloon, not a modal', a
   // The old centered dialog is gone: no full-screen backdrop. Only the outer
   // research-assistant window remains a modal; the picker is not one.
   assert.doesNotMatch(assistant, /fixed inset-0 z-\[60\]/, 'the modal backdrop was removed');
-  assert.equal((assistant.match(/aria-modal="true"/g) ?? []).length, 1, 'only the assistant window is a modal');
+  assert.match(assistant, /aria-modal=\{embedded \? undefined : true\}/, 'only the standalone assistant window is a modal');
 
   assert.match(styles, /\.research-context-panel\s*\{/, 'the balloon class is styled');
 });

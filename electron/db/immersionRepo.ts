@@ -1,3 +1,5 @@
+import { deleteDocumentVisuals } from '../capabilities/documentStore';
+import { getActiveVault } from '../vaults/vaultRegistry';
 import { v4 as uuid } from 'uuid';
 import type {
   ImmersionAnswerRecord,
@@ -203,6 +205,7 @@ export function recordImmersionAnswer(id: string, record: ImmersionAnswerRecord)
 }
 
 export function deleteImmersionSession(id: string): void {
+  deleteDocumentVisuals(getActiveVault().id, { kind: 'immersion', id });
   deleteDecorativeImageRow('immersion', id);
   deleteAnnotationsForWritingDraft(immersionAnnotationDocumentId(id));
   getDb().prepare('DELETE FROM immersion_sessions WHERE id = ?').run(id);
