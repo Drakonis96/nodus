@@ -148,13 +148,16 @@ function isOpenRouterMandatoryReasoningModel(modelId: string | undefined): boole
 }
 
 /**
- * Heuristic for "this model id is a reasoning/thinking model" when the provider
- * cannot tell us. Only used to decide whether a custom endpoint needs an explicit
- * disable for background scans; a false negative keeps today's behaviour, so the
- * list stays conservative and evidence-backed.
+ * True when a model id explicitly advertises a reasoning/thinking mode.
+ *
+ * Deliberately narrow. Only ids that announce the feature (`:thinking`, `-reasoning`)
+ * receive an explicit reasoning field on a custom endpoint, where Nodus cannot know
+ * whether the gateway accepts one; a family that merely *can* reason (qwen3, gpt-oss,
+ * the o-series) keeps its default request shape. A false negative only means today's
+ * behaviour, which is why the list errs toward silence.
  */
 export function looksLikeReasoningModelId(modelId: string | undefined): boolean {
-  return Boolean(modelId && /thinking|reasoning|deepseek-r1|\br1\b|qwq|qvq|magistral|gpt-oss|qwen3(?:[.-]|$)|^o[134](?:[.-]|$)/i.test(modelId));
+  return Boolean(modelId && /thinking|reasoning/i.test(modelId));
 }
 
 /**
@@ -252,17 +255,15 @@ export function reasoningBody(
       // Go serves a mixed OpenAI/Anthropic catalogue through dedicated paths.
       return {};
     case 'custom':
-      // Nodus cannot know what sits behind the user's gateway, so it sends no
-      // reasoning field unless the user asked for one: an unsupported field is a 400
-      // the caller retries once without the optional extras
-      // (see `rejectsOptionalTransportField`). An explicit effort is forwarded as the
-      // standard OpenAI-compatible `reasoning_effort`, which makes the conversational
-      // selector real for custom models. Disabling is best-effort and limited to
-      // background scans of a *thinking* model: its private trace otherwise consumes
-      // the whole output budget, and the resulting long non-streaming generation is
-      // precisely what a gateway drops. Interactive chat keeps the model's default.
-      if (effort !== 'off') return { reasoning_effort: effort };
-      return background && looksLikeReasoningModelId(modelId) ? { reasoning_effort: 'none' } : {};
+      // Nodus cannot know what sits behind the user's gateway, so it only ever adds a
+      // reasoning field to a *background* scan, and only for a model whose id announces
+      // the mode. A gateway that refuses the field cannot make the scan fail: the
+      // transport retries once without it (see `shouldRetryWithoutOptionalFields`).
+      // Conversational turns never carry one — the field's support is unknown, and a
+      // rejected chat turn has already lost its streaming answer.
+      if (!background) return {};
+      if (effort === 'off') return looksLikeReasoningModelId(modelId) ? { reasoning_effort: 'none' } : {};
+      return { reasoning_effort: effort };
   }
 }
 
