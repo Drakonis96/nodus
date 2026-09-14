@@ -58,7 +58,7 @@ export function AdditionalQueueTasks({ activity }: { activity: QueueActivity }) 
     {activity.extraction.slice(0, limit).map((job) => {
       const live = job.status === 'queued' || job.status === 'processing';
       return <Task key={job.id} testId={`library-extraction-${job.id}`} title={`${t('Extracción de texto')} · ${titles[job.itemId] ?? t('Documento')}`}
-        detail={job.message ? tr(job.message) : t(job.status === 'canceled' ? 'Cancelado' : EXTRACTION_PHASE[job.phase])} error={job.status === 'canceled' ? null : job.error} percent={job.progress * 100}>
+        detail={job.message ? tr(job.message) : t(job.status === 'canceled' ? 'Cancelado' : EXTRACTION_PHASE[job.phase])} error={job.status === 'failed' ? job.error : null} percent={job.progress * 100}>
         {live ? <Action label={t('Cancelar')} run={() => window.nodus.cancelLibraryExtraction(job.id)} /> : <>
           {(job.status === 'failed' || job.status === 'canceled') && <Action label={t('Reintentar')} run={() => window.nodus.retryLibraryExtraction(job.id)} />}
           <Action label={t('Ocultar')} run={() => activity.dismiss(`extraction:${job.id}`, `${job.status}:${job.updatedAt}`)} />

@@ -38,6 +38,8 @@ import { VirtualList } from '../components/VirtualList';
 import { confirm, promptText, toast } from '../components/feedback';
 import { errorText, t, tr, tx } from '../i18n';
 import { zoteroConnectionHint, zoteroFailureText } from '../lib/zoteroConnection';
+import { notifyDataChanged } from '../hooks';
+import { invalidateVaultQueryCache } from '../vaultQueryCache';
 import type { PendingAssistantNavigationTarget } from '../navigation';
 import type { PendingLibraryNavigationTarget } from '../navigation';
 import type { LibraryGlobalSnapshot, LibrarySnapshot, ListPlacement } from '../app/viewSnapshots';
@@ -739,6 +741,11 @@ function VaultLinkDialog({ itemIds, onClose, onLinked }: {
           ? tx('{n} documento(s) añadidos; {reused} componente(s) reutilizados con huellas exactas.', { n: report.linked, reused: report.reusedComponents })
           : tx('{n} documento(s) añadidos al vault.', { n: report.linked })
         : t('Los documentos ya estaban vinculados a ese vault.'));
+      // The vault's Library list is served from a per-vault, per-filter cache that
+      // this link never invalidated: returning to "This vault" showed the pre-link
+      // page until another filter forced a fresh query.
+      invalidateVaultQueryCache(vaultId);
+      notifyDataChanged();
       onLinked(report.links);
       onClose();
     } catch (nextError) { setError(nextError instanceof Error ? nextError.message : String(nextError)); }

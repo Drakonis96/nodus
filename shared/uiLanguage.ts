@@ -807,9 +807,38 @@ export const ZOTERO_IMPORT_PROGRESS_PATTERNS = [
   /^Verificando .+ contra el inventario…$/,
 ];
 
+/**
+ * The global-library extraction readout, exactly as `electron/library/libraryExtractionQueue.ts`
+ * and `libraryExtractionEngine.ts` write it.
+ *
+ * `broadcastExtraction` runs each progress payload through `localizeIpcPayload`, which
+ * treats an unlisted `message` as an error: a run that finished perfectly announced
+ * "the operation could not be completed" while its bar sat at 100%, and the
+ * interpolated ones leaked Spanish instead. These sentences are keys in
+ * src/i18n.*.ts, translated by tr() where the queue panel renders them.
+ */
+export const EXTRACTION_PROGRESS_MESSAGES = [
+  'Documento añadido a la cola de extracción.',
+  'Documento priorizado para abrirlo en cuanto esté listo.',
+  'Iniciando extracción…',
+  'Extracción completada.',
+  'Extracción cancelada.',
+  'Extrayendo imágenes y figuras…',
+  'Guardando Markdown y trazabilidad…',
+];
+
+/** The same readout while it counts pages or OCR batches, or names the file it reads. */
+export const EXTRACTION_PROGRESS_PATTERNS = [
+  /^Extrayendo página \d+ de \d+…$/,
+  /^OCR local \d+ de \d+…$/,
+  /^OCR remoto \d+ de \d+…$/,
+  /^Analizando .+…$/,
+];
+
 const RENDERER_TRANSLATED_MESSAGES = new Set([
   ...IMAGE_GENERATION_ERROR_MESSAGES,
   ...ZOTERO_IMPORT_PROGRESS_MESSAGES,
+  ...EXTRACTION_PROGRESS_MESSAGES,
   ...PROGRESS_STATE_MESSAGES,
   ...DICTIONARY_PROGRESS_MESSAGES,
   'Bóveda no encontrada.',
@@ -825,6 +854,7 @@ const RENDERER_TRANSLATED_MESSAGES = new Set([
 function isRendererTranslatedMessage(message: string): boolean {
   if (RENDERER_TRANSLATED_MESSAGES.has(message)) return true;
   if (ZOTERO_IMPORT_PROGRESS_PATTERNS.some((pattern) => pattern.test(message))) return true;
+  if (EXTRACTION_PROGRESS_PATTERNS.some((pattern) => pattern.test(message))) return true;
   // A queue item counting down its own retries is a progress readout too.
   if (/^Reintentando \(\d+\/\d+\)…$/.test(message)) return true;
   return /^(?:Esta bóveda ya está cargada\.|Bóveda cargada\.) Claves API copiadas: \d+\.$/.test(message);
