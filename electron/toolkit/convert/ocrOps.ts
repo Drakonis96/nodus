@@ -90,8 +90,8 @@ async function ocrPdfToTxt(input: string, ctx: ToolkitRunContext): Promise<Toolk
   return [{ data: enc.encode(parts.join('\n\n').trim() + '\n'), ext: 'txt' }];
 }
 
-// WinAnsi-safe text for the invisible layer: pd-lib's standard fonts can't encode
-// arbitrary Unicode, and the layer only needs to be searchable, not legible.
+// WinAnsi-safe text for the Latin half of the invisible layer: pdf-lib's standard font
+// can't encode arbitrary Unicode. CJK runs go through the bundled CJK subset instead.
 function sanitizeForFont(text: string): string {
   // ASCII printable + Latin-1 supplement (covers Spanish accents); drop the rest.
   return text.replace(/[^\x20-\x7E\u00A0-\u00FF]/g, '').trim();
@@ -101,35 +101,61 @@ function sanitizeForFont(text: string): string {
  *  invisible OCR text layer positioned by Tesseract word boxes. */
 async function ocrPdfSearchable(input: string, ctx: ToolkitRunContext): Promise<ToolkitProduced[]> {
   const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+  const { hasCjk, subsetCjkFont } = await import('../../export/pdfText');
   const worker = await makeWorker(languagesFrom(ctx));
   const scale = 2;
   const doc = await PDFDocument.load(new Uint8Array(fs.readFileSync(input)));
-  const font = await doc.embedFont(StandardFonts.Helvetica);
   const pdf = await openPdf(input);
   try {
     const pages = doc.getPages();
     const count = Math.min(pages.length, pdf.numPages);
+    // Recognise the whole document first so a single CJK subset can cover every page:
+    // a Chinese scan must keep a real searchable layer, not lose it to the WinAnsi font.
+    const runs: Array<{ page: number; text: string; x: number; y: number; size: number }> = [];
     for (let i = 0; i < count; i++) {
       if (ctx.signal.cancelled) break;
       const pdfjsPage = await pdf.getPage(i + 1);
       const png = await renderPageToPng(pdfjsPage, scale);
       pdfjsPage.cleanup?.();
       const { data } = await worker.recognize(png);
-      const page = pages[i];
-      const heightPts = page.getHeight();
+      const heightPts = pages[i].getHeight();
       for (const word of flattenWords(data)) {
-        const text = sanitizeForFont(word.text);
+        const text = word.text.replace(/\s+/g, ' ').trim();
         if (!text) continue;
-        const x = word.bbox.x0 / scale;
-        const y = heightPts - word.bbox.y1 / scale;
-        const size = Math.max(1, (word.bbox.y1 - word.bbox.y0) / scale);
-        try {
-          page.drawText(text, { x, y, size, font, color: rgb(0, 0, 0), opacity: 0 });
-        } catch {
-          /* skip a word the standard font cannot encode */
-        }
+        runs.push({
+          page: i,
+          text,
+          x: word.bbox.x0 / scale,
+          y: heightPts - word.bbox.y1 / scale,
+          size: Math.max(1, (word.bbox.y1 - word.bbox.y0) / scale),
+        });
       }
       ctx.onPageProgress((i + 1) / count);
+    }
+    if (runs.length) {
+      const cjkText = runs.filter((run) => hasCjk(run.text)).map((run) => run.text).join(' ');
+      const cjkFont = cjkText
+        ? await (async () => {
+            const fontkit = (await import('@pdf-lib/fontkit')).default;
+            doc.registerFontkit(fontkit);
+            return doc.embedFont(await subsetCjkFont(cjkText), { subset: false });
+          })()
+        : null;
+      const latinFont = runs.some((run) => !hasCjk(run.text))
+        ? await doc.embedFont(StandardFonts.Helvetica)
+        : null;
+      for (const run of runs) {
+        const useCjk = Boolean(cjkFont) && hasCjk(run.text);
+        const font = useCjk ? cjkFont : latinFont;
+        if (!font) continue;
+        try {
+          pages[run.page].drawText(useCjk ? run.text : sanitizeForFont(run.text), {
+            x: run.x, y: run.y, size: run.size, font, color: rgb(0, 0, 0), opacity: 0,
+          });
+        } catch {
+          /* skip a run neither font can encode */
+        }
+      }
     }
   } finally {
     await pdf.destroy?.();

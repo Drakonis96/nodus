@@ -1,4 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
+import { cjkSafe, cjkTokens, hasCjk, subsetCjkFont } from './pdfText.mjs';
 
 // Server-side export deliberately uses the already pinned pdf-lib dependency. It does not
 // execute report HTML, load remote URLs, or invoke a browser process: report text is the only
@@ -96,15 +98,45 @@ function reportBlocks(draft, labels) {
   return blocks.length ? blocks : [{ type: 'paragraph', value: labels.empty }];
 }
 
-function wrap(value, font, size, maxWidth) {
-  const words = pdfSafe(value).split(/\s+/).filter(Boolean);
+function measure(font, value, size) {
+  try { return font.widthOfTextAtSize(value, size); } catch { return 0; }
+}
+
+/**
+ * Wrap a line to `maxWidth`. Latin copy wraps on spaces; CJK copy has no spaces, so it
+ * wraps per character (with a whole-word fallback) using the same greedy fill.
+ */
+function wrap(value, font, size, maxWidth, useCjkTokens = false) {
+  const source = useCjkTokens ? cjkSafe(value) : pdfSafe(value);
+  if (!source) return [''];
+  const tokens = useCjkTokens
+    ? cjkTokens(source).map((token) => ({ value: token, cjk: !/\s/.test(token) && hasCjk(token) }))
+    : source.split(/\s+/).filter(Boolean).map((token) => ({ value: token, cjk: false }));
   const lines = [];
   let line = '';
-  for (const word of words) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (line && font.widthOfTextAtSize(candidate, size) > maxWidth) {
-      lines.push(line); line = word;
-    } else line = candidate;
+  let lastCjk = false;
+  for (const token of tokens) {
+    if (!token.value.trim()) continue;
+    const separator = !line || token.cjk || lastCjk ? '' : ' ';
+    const candidate = line + separator + token.value;
+    if (!line || measure(font, candidate, size) <= maxWidth) {
+      if (measure(font, candidate, size) > maxWidth) {
+        // A single token wider than the line (a long word, or CJK with no break point).
+        let chunk = '';
+        for (const char of candidate) {
+          if (chunk && measure(font, chunk + char, size) > maxWidth) { lines.push(chunk); chunk = char; }
+          else chunk += char;
+        }
+        line = chunk;
+      } else {
+        line = candidate;
+      }
+      lastCjk = token.cjk;
+      continue;
+    }
+    lines.push(line);
+    line = token.value;
+    lastCjk = token.cjk;
   }
   if (line) lines.push(line);
   return lines.length ? lines : [''];
@@ -113,13 +145,27 @@ function wrap(value, font, size, maxWidth) {
 /**
  * Produce a valid, text-searchable PDF for a report. This is intentionally a conservative
  * fallback export; the styled HTML document remains available for browser printing.
+ *
+ * Latin copy keeps the StandardFonts typography. Any run containing Han characters (or
+ * kana / CJK punctuation) is rendered with a bundled subset of Noto Sans SC instead, since
+ * the WinAnsi standard fonts cannot encode CJK at all.
  */
 export async function deepResearchPdfBytes(draft, { author = 'Nodus', subject = 'Deep Research', language } = {}) {
   const locale = pdfLanguage(language || draft?.brief?.language || draft?.language);
   const labels = PDF_LABELS[locale];
+  const blocks = reportBlocks(draft, labels);
+  const rawTitle = (hasCjk(draft?.title) ? cjkSafe(draft?.title) : pdfSafe(draft?.title)) || labels.cover;
+
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const cjkText = [rawTitle, 'NODUS · Deep Research', ...blocks.map((block) => block.value), ...Object.values(labels)].join(' ');
+  let cjkFont = null;
+  if (hasCjk(cjkText)) {
+    pdf.registerFontkit(fontkit.default ?? fontkit);
+    cjkFont = await pdf.embedFont(await subsetCjkFont(cjkText), { subset: false });
+  }
+
   const pageWidth = 595.28;
   const pageHeight = 841.89;
   const margin = 54;
@@ -131,27 +177,40 @@ export async function deepResearchPdfBytes(draft, { author = 'Nodus', subject = 
   const ensureSpace = (height = lineHeight) => {
     if (y - height < margin) { page = pdf.addPage([pageWidth, pageHeight]); y = pageHeight - margin; }
   };
-  const drawParagraph = (value, font = regular, size = bodySize, gap = 9, indent = 0, color = rgb(0.12, 0.14, 0.18)) => {
+  const drawParagraph = (value, { bold: wantBold = false, size = bodySize, gap = 9, indent = 0, color = rgb(0.12, 0.14, 0.18) } = {}) => {
+    const isCjk = Boolean(cjkFont) && hasCjk(value);
+    const font = isCjk ? cjkFont : wantBold ? bold : regular;
+    // The bundled font ships one weight; headings keep their hierarchy with a hairline double draw.
+    const fakeBold = isCjk && wantBold;
     for (const line of String(value ?? '').split('\n')) {
-      const lines = wrap(line, font, size, maxWidth - indent);
-      for (const wrapped of lines) { ensureSpace(lineHeight); page.drawText(wrapped, { x: margin + indent, y, size, font, color }); y -= lineHeight; }
+      for (const wrapped of wrap(line, font, size, maxWidth - indent, isCjk)) {
+        ensureSpace(lineHeight);
+        page.drawText(wrapped, { x: margin + indent, y, size, font, color });
+        if (fakeBold) page.drawText(wrapped, { x: margin + indent + 0.35, y, size, font, color });
+        y -= lineHeight;
+      }
       y -= gap / 2;
     }
   };
-  const rawTitle = pdfSafe(draft?.title) || labels.cover;
-  const titleLines = wrap(rawTitle, bold, 22, maxWidth);
-  for (const line of titleLines) { page.drawText(line, { x: margin, y, size: 22, font: bold, color: rgb(0.12, 0.24, 0.46) }); y -= 27; }
+  const titleColor = rgb(0.12, 0.24, 0.46);
+  const cjkTitle = Boolean(cjkFont) && hasCjk(rawTitle);
+  const titleFont = cjkTitle ? cjkFont : bold;
+  for (const line of wrap(rawTitle, titleFont, 22, maxWidth, cjkTitle)) {
+    page.drawText(line, { x: margin, y, size: 22, font: titleFont, color: titleColor });
+    if (cjkTitle) page.drawText(line, { x: margin + 0.5, y, size: 22, font: titleFont, color: titleColor });
+    y -= 27;
+  }
   y -= 8;
   page.drawText('NODUS · Deep Research', { x: margin, y, size: 9, font: bold, color: rgb(0.25, 0.48, 0.55) });
   y -= 25;
-  for (const block of reportBlocks(draft, labels)) {
+  for (const block of blocks) {
     if (block.type === 'heading') {
       ensureSpace(28); y -= 8;
-      drawParagraph(block.value, bold, block.level === 1 ? 16 : 13, 5, 0, rgb(0.12, 0.24, 0.46));
+      drawParagraph(block.value, { bold: true, size: block.level === 1 ? 16 : 13, gap: 5, color: rgb(0.12, 0.24, 0.46) });
     } else if (block.type === 'abstract') {
-      drawParagraph(block.value, regular, 11, 10, 0, rgb(0.28, 0.32, 0.38));
+      drawParagraph(block.value, { size: 11, gap: 10, color: rgb(0.28, 0.32, 0.38) });
     } else if (block.type === 'bullet') {
-      drawParagraph(`• ${block.value}`, regular, bodySize, 4, 8);
+      drawParagraph(`• ${block.value}`, { gap: 4, indent: 8 });
     } else {
       drawParagraph(block.value);
     }

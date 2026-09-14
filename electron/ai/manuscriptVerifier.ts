@@ -20,6 +20,7 @@ import {
 } from '../../shared/manuscriptVerifier';
 import { completeJson, embed } from './aiClient';
 import { manuscriptVerifierPrompt } from '@shared/manuscriptVerifierPromptPacks';
+import { normalizePromptLanguage } from '@shared/promptLanguageOptions';
 import { getSettings } from '../db/settingsRepo';
 import { allIdeaCandidates, findSimilarIdeas } from '../db/ideasRepo';
 import { findSimilarPassages } from '../db/passagesRepo';
@@ -63,6 +64,9 @@ export async function verifyManuscriptCitations(
   const chapter = getChapter(request.chapterId);
   const generatedAt = new Date().toISOString();
   const language = request.language ?? getSettings().uiLanguage ?? 'es';
+  // The local rationales and warning copy are UI copy; the verifier prompt pack and the
+  // warning table are keyed by prompt language, so zh-CN normalizes to zh-Hans there.
+  const promptLanguage = normalizePromptLanguage(language);
   const warnings: string[] = [];
   if (!chapter?.currentMarkdown.trim()) {
     return {
@@ -72,7 +76,7 @@ export async function verifyManuscriptCitations(
       aiReviewed: false,
       summary: summarizeChecks([], 0),
       claims: [],
-      warnings: [warn(language, 'empty')],
+      warnings: [warn(promptLanguage, 'empty')],
     };
   }
 
@@ -86,12 +90,12 @@ export async function verifyManuscriptCitations(
       aiReviewed: false,
       summary: summarizeChecks([], 0),
       claims: [],
-      warnings: [warn(language, 'noClaims')],
+      warnings: [warn(promptLanguage, 'noClaims')],
     };
   }
 
   const ideas = allIdeaCandidates();
-  if (ideas.length === 0) warnings.push(warn(language, 'noIdeas'));
+  if (ideas.length === 0) warnings.push(warn(promptLanguage, 'noIdeas'));
   const indexedIdeas = ideas.map((idea) => ({
     ...idea,
     tokens: new Set(tokenizeForMatch(`${idea.label} ${idea.statement}`)),
@@ -105,9 +109,9 @@ export async function verifyManuscriptCitations(
     checks.push(classifyClaimLocally({ claim, evidence: evidence.candidates, language }));
   }
 
-  if (!embeddingsUsed) warnings.push(warn(language, 'noEmbeddings'));
+  if (!embeddingsUsed) warnings.push(warn(promptLanguage, 'noEmbeddings'));
 
-  const refined = await refineWithAi(checks, request, language, warnings);
+  const refined = await refineWithAi(checks, request, promptLanguage, warnings);
   const finalChecks = sortChecks(refined.checks);
   return {
     chapterId: request.chapterId,
@@ -214,7 +218,7 @@ function upsertCandidate(map: Map<string, ManuscriptEvidenceCandidate>, candidat
 async function refineWithAi(
   checks: ManuscriptClaimCheck[],
   request: ManuscriptVerificationRequest,
-  language: AppLanguage,
+  language: PromptLanguage,
   warnings: string[]
 ): Promise<{ checks: ManuscriptClaimCheck[]; aiReviewed: boolean }> {
   const reviewable = checks.filter((check) => check.suggestedCitations.length > 0 || check.status === 'missing_citation');

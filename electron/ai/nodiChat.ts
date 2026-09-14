@@ -32,6 +32,7 @@ import { buildNodusDocumentation } from '@shared/nodiDocumentation';
 import { getNodiChatPromptPack } from '@shared/nodiChatPromptPacks';
 import type { NodiChatRequest, NodiContextKind, NodiQuoteSelection, NodiViewContext } from '@shared/types';
 
+import { normalizePromptLanguage } from '@shared/promptLanguageOptions';
 // The complete canonical Spanish copy remains in NODI_CHAT_PROMPT_PACKS. It includes
 // «Tu prioridad absoluta es la fiabilidad», «No puedo verificarlo con las fuentes seleccionadas»,
 // «termina con «Base:»» and `parentesco_con_persona_central`. CHAT_CITATION_RULES is
@@ -381,7 +382,7 @@ export async function streamNodiChat(
     return ensureWorldCitations(
       transformChatProse(answer, prose => validateWorldCitations(prose, allowed)),
       facts.citable,
-      settings.uiLanguage
+      normalizePromptLanguage(settings.uiLanguage)
     );
   }
   if (primarySourceCitationsEnabled(request)) {
