@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConfirmModal } from '../ConfirmModal';
 import { Icon } from '../ui';
+import { t, tx } from '../../i18n';
 import atlasCatalogue from '../../../site/data/research-atlas.json';
 import type {
   BrowserBookmark,
@@ -141,37 +142,37 @@ function NodusSiteHeader({ page }: { page: 'atlas' | 'bookmarks' }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   return <header className="nodus-site-header" data-testid="nodus-site-header">
-    <button type="button" className="nodus-site-logo" aria-label="Nodus Research, home" onClick={() => openSitePage(NODUS_SITE)}><img src={NODUS_LOGO} alt="" /> Nodus Research</button>
-    <button type="button" className="nodus-site-nav-toggle" aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} onClick={() => setOpen((value) => !value)}><span /><span /><span /></button>
+    <button type="button" className="nodus-site-logo" aria-label={t('Nodus Research, inicio')} onClick={() => openSitePage(NODUS_SITE)}><img src={NODUS_LOGO} alt="" /> Nodus Research</button>
+    <button type="button" className="nodus-site-nav-toggle" aria-label={open ? t('Cerrar menú') : t('Abrir menú')} aria-expanded={open} onClick={() => setOpen((value) => !value)}><span /><span /><span /></button>
     <nav className={`nodus-site-links${open ? ' open' : ''}`} aria-label="Nodus Research">
-      <SiteLink className="nodus-site-link" label="Home" url={NODUS_SITE} onOpen={close} />
+      <SiteLink className="nodus-site-link" label={t('Inicio')} url={NODUS_SITE} onOpen={close} />
       <SiteLink className="nodus-site-link" label="Atlas" url={NODUS_RESEARCH_ATLAS_URL} current={page === 'atlas'} onOpen={close} />
-      <SiteLink className="nodus-site-link" label="Bookmarks" url={NODUS_BOOKMARKS_URL} current={page === 'bookmarks'} onOpen={close} />
+      <SiteLink className="nodus-site-link" label={t('Marcadores')} url={NODUS_BOOKMARKS_URL} current={page === 'bookmarks'} onOpen={close} />
       <SiteLink className="nodus-site-link" label="Wiki" url={`${NODUS_SITE}wiki/`} onOpen={close} />
       <SiteLink className="nodus-site-link" label="Blog" url={`${NODUS_SITE}blog/`} onOpen={close} />
-      <SiteLink className="nodus-site-link" label="Contribute" url={`${NODUS_SITE}contribute/`} onOpen={close} />
+      <SiteLink className="nodus-site-link" label={t('Colaborar')} url={`${NODUS_SITE}contribute/`} onOpen={close} />
       <SiteLink className="nodus-site-link" label="FAQ" url={`${NODUS_SITE}faq/`} onOpen={close} />
       <span className="nodus-site-nav-sep" aria-hidden="true" />
-      <SiteLink className="nodus-site-badge" label="Star on GitHub" url={NODUS_REPOSITORY} onOpen={close} />
-      <SiteLink className="nodus-site-primary" label="Try the live demo" url={`${NODUS_SITE}demo/`} onOpen={close} />
+      <SiteLink className="nodus-site-badge" label={t('Destacar en GitHub')} url={NODUS_REPOSITORY} onOpen={close} />
+      <SiteLink className="nodus-site-primary" label={t('Probar la demo')} url={`${NODUS_SITE}demo/`} onOpen={close} />
     </nav>
   </header>;
 }
 
 const FOOTER_GROUPS = [
-  { title: 'Research', links: [['Research Atlas', NODUS_RESEARCH_ATLAS_URL], ['Nodus Bookmarks', NODUS_BOOKMARKS_URL], ['The Nodus App', `${NODUS_SITE}app/`], ['Academic research', `${NODUS_SITE}research/`], ['Nodus and Zotero', `${NODUS_SITE}zotero/`]] },
-  { title: 'Product', links: [['The four vaults', `${NODUS_SITE}#vaults`], ['Other vaults', `${NODUS_SITE}#more-vaults`], ['Nodus Toolkit', `${NODUS_SITE}#tools`], ['Live demos', `${NODUS_SITE}demo/`]] },
-  { title: 'Learn', links: [['Wiki', `${NODUS_SITE}wiki/`], ['Blog', `${NODUS_SITE}blog/`], ['FAQ', `${NODUS_SITE}faq/`], ['Video tutorials', `${NODUS_SITE}wiki/#videos`]] },
-  { title: 'Project', links: [['Contribute', `${NODUS_SITE}contribute/`], ['GitHub', NODUS_REPOSITORY], ['Releases', `${NODUS_REPOSITORY}/releases`], ['AGPL-3.0-only', `${NODUS_REPOSITORY}/blob/main/LICENSE`]] },
+  { title: 'Investigación', links: [['Research Atlas', NODUS_RESEARCH_ATLAS_URL], ['Nodus Bookmarks', NODUS_BOOKMARKS_URL], ['La aplicación Nodus', `${NODUS_SITE}app/`], ['Investigación académica', `${NODUS_SITE}research/`], ['Nodus y Zotero', `${NODUS_SITE}zotero/`]] },
+  { title: 'Producto', links: [['Las cuatro bóvedas', `${NODUS_SITE}#vaults`], ['Otras bóvedas', `${NODUS_SITE}#more-vaults`], ['Nodus Toolkit', `${NODUS_SITE}#tools`], ['Demos en vivo', `${NODUS_SITE}demo/`]] },
+  { title: 'Aprender', links: [['Wiki', `${NODUS_SITE}wiki/`], ['Blog', `${NODUS_SITE}blog/`], ['FAQ', `${NODUS_SITE}faq/`], ['Tutoriales en vídeo', `${NODUS_SITE}wiki/#videos`]] },
+  { title: 'Proyecto', links: [['Colaborar', `${NODUS_SITE}contribute/`], ['GitHub', NODUS_REPOSITORY], ['Versiones', `${NODUS_REPOSITORY}/releases`], ['AGPL-3.0-only', `${NODUS_REPOSITORY}/blob/main/LICENSE`]] },
 ] as const;
 
 function NodusSiteFooter() {
   return <footer className="nodus-site-footer" data-testid="nodus-site-footer"><div className="nodus-site-wrap">
     <div className="nodus-site-foot-grid">
-      <div className="nodus-site-foot-brand"><span className="nodus-site-foot-logo"><img src={NODUS_LOGO} alt="" /> Nodus Research</span><p>A free, open-source, local-first research workspace for connecting sources, ideas and evidence. Your corpus stays on your machine.</p></div>
-      {FOOTER_GROUPS.map((group) => <div className="nodus-site-foot-col" key={group.title}><h3>{group.title}</h3>{group.links.map(([label, url]) => <SiteLink key={label} label={label} url={url} />)}</div>)}
+      <div className="nodus-site-foot-brand"><span className="nodus-site-foot-logo"><img src={NODUS_LOGO} alt="" /> Nodus Research</span><p>{t('Un espacio de investigación gratuito, de código abierto y local para conectar fuentes, ideas y pruebas. Tu corpus permanece en tu máquina.')}</p></div>
+      {FOOTER_GROUPS.map((group) => <div className="nodus-site-foot-col" key={group.title}><h3>{t(group.title)}</h3>{group.links.map(([label, url]) => <SiteLink key={label} label={t(label)} url={url} />)}</div>)}
     </div>
-    <div className="nodus-site-foot-base"><span>© 2026 Jorge Pérez Burgueño and Nodus contributors.</span><SiteLink label="Privacy" url={`${NODUS_REPOSITORY}/blob/main/PRIVACY.md`} /><SiteLink label="Code of conduct" url={`${NODUS_REPOSITORY}/blob/main/CODE_OF_CONDUCT.md`} /><SiteLink label="Security" url={`${NODUS_REPOSITORY}/blob/main/SECURITY.md`} /></div>
+    <div className="nodus-site-foot-base"><span>{t('© 2026 Jorge Pérez Burgueño y colaboradores de Nodus.')}</span><SiteLink label={t('Privacidad')} url={`${NODUS_REPOSITORY}/blob/main/PRIVACY.md`} /><SiteLink label={t('Código de conducta')} url={`${NODUS_REPOSITORY}/blob/main/CODE_OF_CONDUCT.md`} /><SiteLink label={t('Seguridad')} url={`${NODUS_REPOSITORY}/blob/main/SECURITY.md`} /></div>
   </div></footer>;
 }
 
@@ -200,13 +201,13 @@ function StartShell({ title, copy, query, onQuery, status, children, toolbar }: 
                   className="atlas-search"
                   type="search"
                   value={query}
-                  aria-label={`Search ${title}`}
-                  placeholder={title === 'Nodus Bookmarks' ? 'Search bookmarks…' : 'Search the research directory…'}
+                  aria-label={tx('Buscar en {title}', { title })}
+                  placeholder={title === 'Nodus Bookmarks' ? t('Buscar marcadores…') : t('Buscar en el directorio de investigación…')}
                   onChange={(event) => onQuery(event.target.value)}
                 />
-                {query && <button className="atlas-clear" type="button" aria-label="Clear search" onClick={() => onQuery('')}>×</button>}
+                {query && <button className="atlas-clear" type="button" aria-label={t('Borrar búsqueda')} onClick={() => onQuery('')}>×</button>}
               </div>
-              <button className="atlas-submit" type="button" aria-label="Search"><Icon name="search" size={18} /></button>
+              <button className="atlas-submit" type="button" aria-label={t('Buscar')}><Icon name="search" size={18} /></button>
             </div>
             {toolbar}
             <p className="atlas-status" aria-live="polite">{status}</p>
@@ -285,14 +286,14 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
       copy="Your private, local research start page. Organise the websites you save in folders without sending bookmark data anywhere."
       query={query}
       onQuery={setQuery}
-      status={query ? `${bookmarks.length} results · global search` : `${folders.length} folders · ${bookmarks.length} bookmarks`}
+      status={query ? tx('{results} resultados · búsqueda global', { results: bookmarks.length }) : tx('{folders} carpetas · {bookmarks} marcadores', { folders: folders.length, bookmarks: bookmarks.length })}
       toolbar={<>
         <div className="atlas-filterbar">
-          <button className="atlas-facet-button" type="button" onClick={() => onNewFolder(folderId)}><Icon name="folderPlus" size={13} /> New folder</button>
-          <button className="atlas-facet-button" type="button" onClick={() => onNewBookmark(folderId)}><Icon name="bookmark" size={13} /> Add bookmark</button>
+          <button className="atlas-facet-button" type="button" onClick={() => onNewFolder(folderId)}><Icon name="folderPlus" size={13} /> {t('Nueva carpeta')}</button>
+          <button className="atlas-facet-button" type="button" onClick={() => onNewBookmark(folderId)}><Icon name="bookmark" size={13} /> {t('Añadir un marcador')}</button>
           <button className="atlas-facet-button" type="button" onClick={() => void window.nodus.openBrowserTab(NODUS_RESEARCH_ATLAS_URL)}><Icon name="globe" size={13} /> Research Atlas</button>
         </div>
-        {!query && <div className="bookmark-breadcrumbs"><button onClick={() => setFolderId(null)}>Bookmarks</button>{pathFolders.map((entry) => <span key={entry.id}> / <button onClick={() => setFolderId(entry.id)}>{entry.name}</button></span>)}</div>}
+        {!query && <div className="bookmark-breadcrumbs"><button onClick={() => setFolderId(null)}>{t('Marcadores')}</button>{pathFolders.map((entry) => <span key={entry.id}> / <button onClick={() => setFolderId(entry.id)}>{entry.name}</button></span>)}</div>}
       </>}
     >
       {folders.map((entry) => (
@@ -307,36 +308,36 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
           onDrop={(event) => { event.preventDefault(); void move(entry.id); }}
         >
           <div className="bookmark-heading"><span className="bookmark-folder-icon"><Icon name="folder" size={19} /></span><h2><button type="button" title={entry.name} onClick={() => setFolderId(entry.id)}>{entry.name}</button></h2></div>
-          <div className="atlas-geo">Folder · {browserBookmarkChildren(store, entry.id).length} items</div>
-          <p className="atlas-description">Open this folder to browse its saved research resources and nested folders.</p>
-          <div className="atlas-card-actions"><button className="atlas-open" type="button" onClick={() => setFolderId(entry.id)}>Open folder <Icon name="chevronRight" size={13} /></button><button className="atlas-open bookmark-delete" type="button" data-testid="browser-bookmark-card-delete" onClick={() => setDeleteConfirmation({ ref: { kind: 'folder', id: entry.id }, label: entry.name })}><Icon name="trash" size={13} /> Delete</button></div>
+          <div className="atlas-geo">{tx('Carpeta · {items} elementos', { items: browserBookmarkChildren(store, entry.id).length })}</div>
+          <p className="atlas-description">{t('Abre esta carpeta para explorar los recursos de investigación guardados y las subcarpetas.')}</p>
+          <div className="atlas-card-actions"><button className="atlas-open" type="button" onClick={() => setFolderId(entry.id)}>{t('Abrir carpeta')} <Icon name="chevronRight" size={13} /></button><button className="atlas-open bookmark-delete" type="button" data-testid="browser-bookmark-card-delete" onClick={() => setDeleteConfirmation({ ref: { kind: 'folder', id: entry.id }, label: entry.name })}><Icon name="trash" size={13} /> {t('Eliminar')}</button></div>
         </article>
       ))}
       {bookmarks.map((entry) => {
         const location = browserBookmarkFolderPath(store, entry.parentId);
         return (
           <article key={entry.id} className="card lit atlas-card bookmark-card" draggable onClick={(event) => { if (!(event.target as Element).closest('button')) void window.nodus.openBrowserTab(entry.url); }} onDragStart={() => setDragging({ kind: 'bookmark', id: entry.id })}>
-            <div className="atlas-card-top"><div className="bookmark-heading">{entry.faviconDataUrl ? <img className="bookmark-favicon" src={entry.faviconDataUrl} alt="" /> : <Icon name="globe" size={22} />}<h2><button type="button" title={entry.title} onClick={() => void window.nodus.openBrowserTab(entry.url)}>{entry.title}</button></h2></div><span className="atlas-access">Saved</span></div>
+            <div className="atlas-card-top"><div className="bookmark-heading">{entry.faviconDataUrl ? <img className="bookmark-favicon" src={entry.faviconDataUrl} alt="" /> : <Icon name="globe" size={22} />}<h2><button type="button" title={entry.title} onClick={() => void window.nodus.openBrowserTab(entry.url)}>{entry.title}</button></h2></div><span className="atlas-access">{t('Guardado')}</span></div>
             <div className="atlas-geo" title={`${new URL(entry.url).hostname}${location.length ? ` · ${location.join(' › ')}` : ''}`}>{new URL(entry.url).hostname}{location.length ? ` · ${location.join(' › ')}` : ''}</div>
-            <p className="atlas-description" title={entry.description || 'A website saved privately in Nodus Bookmarks.'}>{entry.description || 'A website saved privately in Nodus Bookmarks.'}</p>
+            <p className="atlas-description" title={entry.description || t('Una web guardada de forma privada en Nodus Bookmarks.')}>{entry.description || t('Una web guardada de forma privada en Nodus Bookmarks.')}</p>
             <div className="atlas-card-actions">
-              <button className="atlas-open" type="button" onClick={() => void window.nodus.openBrowserTab(entry.url)}>Open <Icon name="external" size={13} /></button>
-              <button className="atlas-open" type="button" onClick={() => onEditBookmark(entry)}>Edit</button>
-              <button className="atlas-open" type="button" onClick={() => void navigator.clipboard.writeText(entry.url)}>Copy URL</button>
-              <button className="atlas-open bookmark-delete" type="button" data-testid="browser-bookmark-card-delete" onClick={() => setDeleteConfirmation({ ref: { kind: 'bookmark', id: entry.id }, label: entry.title })}><Icon name="trash" size={13} /> Delete</button>
+              <button className="atlas-open" type="button" onClick={() => void window.nodus.openBrowserTab(entry.url)}>{t('Abrir')} <Icon name="external" size={13} /></button>
+              <button className="atlas-open" type="button" onClick={() => onEditBookmark(entry)}>{t('Editar')}</button>
+              <button className="atlas-open" type="button" onClick={() => void navigator.clipboard.writeText(entry.url)}>{t('Copiar URL')}</button>
+              <button className="atlas-open bookmark-delete" type="button" data-testid="browser-bookmark-card-delete" onClick={() => setDeleteConfirmation({ ref: { kind: 'bookmark', id: entry.id }, label: entry.title })}><Icon name="trash" size={13} /> {t('Eliminar')}</button>
             </div>
           </article>
         );
       })}
       {!folders.length && !bookmarks.length && (
-        <div className="atlas-empty"><h2>{query ? 'No matching bookmarks' : folder ? 'This folder is empty' : 'No bookmarks yet'}</h2><p>{query ? 'Search includes titles, URLs, descriptions and folder names.' : 'Save websites from Nodus Browser or Research Atlas to build your personal research start page.'}</p><div className="flex justify-center gap-2"><button className="atlas-open" onClick={() => onNewBookmark(folderId)}>Add a bookmark</button><button className="atlas-open" onClick={() => void window.nodus.openBrowserTab(NODUS_RESEARCH_ATLAS_URL)}>Open Research Atlas</button></div></div>
+        <div className="atlas-empty"><h2>{t(query ? 'No hay marcadores que coincidan' : folder ? 'Esta carpeta está vacía' : 'Aún no hay marcadores.')}</h2><p>{t(query ? 'La búsqueda incluye títulos, direcciones, descripciones y nombres de carpetas.' : 'Guarda webs desde el Navegador de Nodus o el Research Atlas para crear tu página de inicio de investigación personal.')}</p><div className="flex justify-center gap-2"><button className="atlas-open" onClick={() => onNewBookmark(folderId)}>{t('Añadir un marcador')}</button><button className="atlas-open" onClick={() => void window.nodus.openBrowserTab(NODUS_RESEARCH_ATLAS_URL)}>{t('Abrir Research Atlas')}</button></div></div>
       )}
       {deleteConfirmation && <ConfirmModal
-        title={`Delete “${deleteConfirmation.label}”?`}
+        title={tx('¿Eliminar «{label}»?', { label: deleteConfirmation.label })}
         message={deleteConfirmation.ref.kind === 'folder'
-          ? 'The folder and everything inside it will be deleted.'
-          : 'This bookmark will be removed from Nodus Bookmarks.'}
-        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+          ? t('Se eliminará la carpeta y todo su contenido.')
+          : t('Este marcador se eliminará de Nodus Bookmarks.')}
+        confirmLabel={deleting ? t('Eliminando…') : t('Eliminar')}
         danger
         zIndex={160}
         onCancel={() => { if (!deleting) setDeleteConfirmation(null); }}
@@ -365,25 +366,25 @@ export function NodusResearchAtlasPage({ store, onSave }: {
     });
   }, [area, kind, query, resources]);
   return (
-    <StartShell title="Research Atlas" copy="Search and filter a curated international directory of research websites, digital libraries, archives, repositories and primary-source collections." query={query} onQuery={setQuery} status={`${visible.length} of ${resources.length} resources`} toolbar={
+    <StartShell title="Research Atlas" copy={t('Explora y filtra un directorio internacional seleccionado de webs de investigación, bibliotecas digitales, archivos, repositorios y colecciones de fuentes primarias.')} query={query} onQuery={setQuery} status={tx('{visible} de {total} recursos', { visible: visible.length, total: resources.length })} toolbar={
       <div className="atlas-filterbar">
-        <select className={`atlas-facet-button${area ? ' is-active' : ''}`} value={area} onChange={(event) => setArea(event.target.value)}><option value="">Knowledge area</option>{areas.map((value) => <option key={value}>{value}</option>)}</select>
-        <select className={`atlas-facet-button${kind ? ' is-active' : ''}`} value={kind} onChange={(event) => setKind(event.target.value)}><option value="">Resource type</option>{kinds.map((value) => <option key={value}>{value}</option>)}</select>
-        {(area || kind || query) && <button className="atlas-reset" onClick={() => { setArea(''); setKind(''); setQuery(''); }}>Clear filters</button>}
-        <button className="atlas-facet-button" type="button" onClick={() => void window.nodus.openBrowserTab(NODUS_RESEARCH_ATLAS_URL)}><Icon name="external" size={13} /> Public Atlas</button>
+        <select className={`atlas-facet-button${area ? ' is-active' : ''}`} value={area} onChange={(event) => setArea(event.target.value)}><option value="">{t('Área de conocimiento')}</option>{areas.map((value) => <option key={value}>{value}</option>)}</select>
+        <select className={`atlas-facet-button${kind ? ' is-active' : ''}`} value={kind} onChange={(event) => setKind(event.target.value)}><option value="">{t('Tipo de recurso')}</option>{kinds.map((value) => <option key={value}>{value}</option>)}</select>
+        {(area || kind || query) && <button className="atlas-reset" onClick={() => { setArea(''); setKind(''); setQuery(''); }}>{t('Limpiar filtros')}</button>}
+        <button className="atlas-facet-button" type="button" onClick={() => void window.nodus.openBrowserTab(NODUS_RESEARCH_ATLAS_URL)}><Icon name="external" size={13} /> {t('Atlas público')}</button>
       </div>}
     >
       {visible.map((entry) => {
         const isSaved = saved.has(canonicalBookmarkUrl(entry.url));
         const geo = [entry.geography?.continent, entry.geography?.country, entry.geography?.region].filter(Boolean).join(' · ');
         return <article key={entry.id} className="card lit atlas-card">
-          <div className="atlas-card-top"><h2><button type="button" onClick={() => void window.nodus.openBrowserTab(entry.url)}>{entry.name}</button></h2><span className="atlas-access">{entry.access_model || 'resource'}</span></div>
+          <div className="atlas-card-top"><h2><button type="button" onClick={() => void window.nodus.openBrowserTab(entry.url)}>{entry.name}</button></h2><span className="atlas-access">{entry.access_model || t('recurso')}</span></div>
           <div className="atlas-geo">{geo}</div><p className="atlas-description">{entry.description}</p>
-          <dl className="atlas-meta"><div className="atlas-meta-row"><dt>Knowledge</dt><dd>{entry.knowledge_domains?.join(' · ')}</dd></div><div className="atlas-meta-row"><dt>Use</dt><dd>{entry.type_of_use?.join(' · ')}</dd></div></dl>
-          <div className="atlas-card-actions"><button className="atlas-open" onClick={() => void window.nodus.openBrowserTab(entry.url)}>Open resource <Icon name="external" size={13} /></button><button className={`atlas-open${isSaved ? ' is-saved' : ''}`} disabled={isSaved} onClick={() => onSave({ title: entry.name, url: entry.url, description: entry.description, faviconDataUrl: null, existingId: null })}><Icon name={isSaved ? 'bookmarkFill' : 'bookmark'} size={13} />{isSaved ? 'Saved' : 'Save'}</button></div>
+          <dl className="atlas-meta"><div className="atlas-meta-row"><dt>{t('Conocimiento')}</dt><dd>{entry.knowledge_domains?.join(' · ')}</dd></div><div className="atlas-meta-row"><dt>{t('Uso')}</dt><dd>{entry.type_of_use?.join(' · ')}</dd></div></dl>
+          <div className="atlas-card-actions"><button className="atlas-open" onClick={() => void window.nodus.openBrowserTab(entry.url)}>{t('Abrir recurso')} <Icon name="external" size={13} /></button><button className={`atlas-open${isSaved ? ' is-saved' : ''}`} disabled={isSaved} onClick={() => onSave({ title: entry.name, url: entry.url, description: entry.description, faviconDataUrl: null, existingId: null })}><Icon name={isSaved ? 'bookmarkFill' : 'bookmark'} size={13} />{isSaved ? t('Guardado') : t('Guardar')}</button></div>
         </article>;
       })}
-      {!visible.length && <div className="atlas-empty">No resources match the current search and filters.</div>}
+      {!visible.length && <div className="atlas-empty">{t('Sin resultados para los filtros actuales.')}</div>}
     </StartShell>
   );
 }

@@ -135,7 +135,7 @@ export type PortableProfileValues = {
     theme: 'dark' | 'light' | 'system';
     appTheme: import('@shared/types').AppTheme;
     customThemes: import('@shared/types').CustomAppTheme[];
-    uiLanguage: 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 'tr';
+    uiLanguage: 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 'tr' | 'zh-CN';
     promptLanguage: 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 'tr';
     animationSpeed: number;
     interfaceScale: number;

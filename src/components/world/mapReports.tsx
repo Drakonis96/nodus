@@ -243,7 +243,7 @@ export async function exportMapPng(
   canvas.width = image.naturalWidth || map.widthPx || 2000;
   canvas.height = image.naturalHeight || map.heightPx || 1000;
   const context = canvas.getContext('2d');
-  if (!context) throw new Error('No se pudo preparar el lienzo de exportación.');
+  if (!context) throw new Error(t('No se pudo preparar el lienzo de exportación.'));
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
   const scale = canvas.width / 1000;
@@ -297,7 +297,7 @@ export async function exportMapPng(
   if (options.scaleBar) drawScaleBar(context, canvas, map, scale);
 
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('No se pudo generar el PNG.'))), 'image/png');
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error(t('No se pudo generar el PNG.')))), 'image/png');
   });
 }
 
@@ -334,7 +334,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('No se pudo cargar la imagen del mapa.'));
+    image.onerror = () => reject(new Error(t('No se pudo cargar la imagen del mapa.')));
     image.src = url;
   });
 }

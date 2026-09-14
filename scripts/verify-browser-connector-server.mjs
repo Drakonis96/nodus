@@ -20,10 +20,12 @@ const port = 4500 + (process.pid % 1000);
 const origin = 'chrome-extension://ilcclajjhofhieoljdjmikmfopfbamej';
 const developmentOrigin = 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 let modalPromptCalls = 0;
+let appFocusCalls = 0;
 const electron = installRuntimeHooks(userData, {
   dialog: {},
   shell: { openExternal: async () => undefined },
 });
+electron.app.focus = () => { appFocusCalls += 1; };
 electron.BrowserWindow.getFocusedWindow = () => null;
 const require = createRequire(import.meta.url);
 
@@ -31,15 +33,25 @@ const settingsRepo = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'))
 const library = require(path.join(repoRoot, 'electron/library/libraryService.ts'));
 const server = require(path.join(repoRoot, 'electron/zotero-plugin/server.ts'));
 const closedListeners = new Set();
+const focusListeners = new Set();
+const flashFrames = [];
 const pairingWindow = {
   isDestroyed: () => false,
   isMinimized: () => false,
   isVisible: () => true,
+  isFocused: () => false,
   restore: () => undefined,
   show: () => undefined,
   focus: () => undefined,
-  once: (event, listener) => { if (event === 'closed') closedListeners.add(listener); },
-  removeListener: (event, listener) => { if (event === 'closed') closedListeners.delete(listener); },
+  flashFrame: (flag) => { flashFrames.push(flag); },
+  once: (event, listener) => {
+    if (event === 'closed') closedListeners.add(listener);
+    if (event === 'focus') focusListeners.add(listener);
+  },
+  removeListener: (event, listener) => {
+    if (event === 'closed') closedListeners.delete(listener);
+    if (event === 'focus') focusListeners.delete(listener);
+  },
   webContents: {
     id: 91,
     isDestroyed: () => false,
@@ -106,6 +118,8 @@ try {
   assert.equal(pair.token, 'browser-test-token');
   assert.equal(pair.official, true);
   assert.equal(modalPromptCalls, 2, 'every unauthenticated token delivery requires renderer-modal confirmation');
+  assert.equal(appFocusCalls, 2, 'every pairing prompt activates the app so the modal is visible over the browser');
+  assert.deepEqual(flashFrames, [true, false, true, false], 'each prompt flashes for attention and clears it once settled');
 
   const wrongExtensionPair = await fetch(`${base}/api/browser/pair`, {
     method: 'POST', headers: { Origin: developmentOrigin, 'Content-Type': 'application/json' },

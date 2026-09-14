@@ -2073,12 +2073,12 @@ function DeepResearchMatrix({
             <span className="truncate text-[11px] text-neutral-500">
               {valueText(
                 entry.sourceLabel || entry.source,
-                "Fuente no especificada",
+                t("Fuente no especificada"),
               )}
             </span>
           </div>
           <p className="mt-2 text-sm leading-5 text-neutral-800 dark:text-neutral-200">
-            {valueText(entry.claim, "Afirmación sin texto")}
+            {valueText(entry.claim, t("Afirmación sin texto"))}
           </p>
           {valueText(entry.evidence) && (
             <p className="mt-1 text-xs leading-5 text-neutral-500">
@@ -2663,7 +2663,7 @@ export function DictionaryServerView({
                           key={`${index}-${entry.id}`}
                           className="mt-3 text-xs text-neutral-500"
                         >
-                          {valueText(entry.trigger, "Generación")} ·{" "}
+                          {valueText(entry.trigger, t("Generación"))} ·{" "}
                           {valueText(entry.generated_at || entry.created_at)}
                         </div>
                       ))
@@ -4152,7 +4152,7 @@ export function DeepResearchServerView({
                       entry.language,
                     "Idioma",
                   )}{" "}
-                  · {valueText(entry.title, "traducción")}
+                  · {valueText(entry.title, t("traducción"))}
                   {entry.privateArtifact === true && (
                     <span className="ml-1 text-teal-600 dark:text-teal-300">
                       · {t("privada")}
@@ -4749,7 +4749,7 @@ export function DeepResearchServerView({
                     </div>
                     <ServerReportTags entry={entry} />
                     <p className="mt-2 line-clamp-2 text-xs text-neutral-500">
-                      {valueText(entry.objective, "Informe publicado")}
+                      {valueText(entry.objective, t("Informe publicado"))}
                     </p>
                     <div className="mt-auto flex items-center gap-2 pt-3">
                       <button
@@ -4799,7 +4799,7 @@ export function DeepResearchServerView({
                       {valueText(entry.title, "Informe")}
                     </strong>
                     <small className="mt-1 block truncate text-neutral-500">
-                      {valueText(entry.objective, "Informe publicado")}
+                      {valueText(entry.objective, t("Informe publicado"))}
                     </small>
                     <ServerReportTags entry={entry} />
                   </span>

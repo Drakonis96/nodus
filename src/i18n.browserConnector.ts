@@ -80,4 +80,13 @@ export const BROWSER_CONNECTOR_TRANSLATIONS = {
     'Chrome Web Mağazası’ndaki resmî Nodus Research uzantısı.',
     'Paketlenmemiş geliştirme uzantısı veya başka bir yerel kurulum.',
   ]),
+  'zh-CN': table([
+    'Nodus Research Connector',
+    '启用Nodus Research Connector',
+    '连接Nodus Research Connector',
+    '是否允许此扩展程序向Nodus发送页面？',
+    '来源',
+    '来自Chrome Web Store的Nodus Research官方扩展程序。',
+    '开发扩展程序（未打包）或其他本地安装。',
+  ]),
 } as const;

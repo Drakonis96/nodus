@@ -64,7 +64,7 @@ window.nodus = {
   ], plugins: [anatomyPlugin], errors: [] }] }),
   listInstalledPlugins: async () => [],
   listInboxPlugins: async () => [{ directory: 'beta-toolkit', id: 'beta-toolkit', name: 'Beta Toolkit', description: 'Turn observations into a compact working dataset.', version: '1.0.0', author: 'labtools', skills: 1, capabilities: 1, installed: false, permissions: {} }],
-  getAppInfo: async () => ({ version: '5.4.2' }),
+  getAppInfo: async () => ({ version: '5.4.3' }),
   listCapabilities: async () => ({ revision: 1, providers: [], problems: [], plugins: [], catalog: capabilityCatalog }),
   onCapabilityRegistryChanged: () => () => {},
   capabilityMigrationStatus: async () => ({ running: false, settled: true, journal: null, entries: [], problems: [] }),

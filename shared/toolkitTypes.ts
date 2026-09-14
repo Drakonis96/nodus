@@ -7,6 +7,8 @@
 // imports, no heavy libraries. Labels are Spanish i18n keys (like navigation.ts
 // labels), wrapped with `t()` by the renderer.
 
+import type { AppLanguage } from './types';
+
 /** Top-level tabs in the Nodus Convert sidebar, in render order. */
 export type ToolkitCategory = 'documents' | 'pdf' | 'ocr' | 'images' | 'text';
 
@@ -149,7 +151,7 @@ export interface ToolkitJobRequest {
   zipName: string | null;
   openFolderOnDone: boolean;
   /** Locale for generated document metadata; content itself remains unchanged. */
-  language?: 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 'tr';
+  language?: AppLanguage;
 }
 
 export interface ToolkitJobProgress {

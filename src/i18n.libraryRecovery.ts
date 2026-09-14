@@ -149,4 +149,27 @@ const tr = {
   'missing-reader': 'Eksik temiz sürüm', 'orphan-folder': 'Sahipsiz klasör', 'invalid-saved-search': 'Geçersiz kayıtlı arama', 'invalid-vault-link': 'Geçersiz kasa bağlantısı',
 };
 
-export const LIBRARY_RECOVERY_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr } as const;
+const zhCN = {
+  'Se conservarán colecciones, adjuntos, Markdown, anotaciones, chats, notas, aliases y relaciones. Las obras de vault permanecen separadas.': '将保留集合、附件、Markdown、注释、聊天、笔记、别名和关系。vault 中的文献保持独立。',
+  'Impacto verificado': '已验证影响', 'anotaciones': '注释', 'notas': '笔记', 'aliases': '别名',
+  '{n} obra(s) de vault se conservan sin fusionar.': '{n} 篇 vault 文献将被保留而不合并。',
+  'Confirmar fusión': '确认合并', 'Revisar impacto': '查看影响',
+  '{n} elemento(s) restaurado(s).': '已恢复 {n} 个条目。', 'Vaciar de forma segura': '安全清空',
+  'Los elementos saldrán del catálogo activo. Nodus conservará una copia de recuperación local y nunca borrará análisis de los vaults.': '这些条目将移出活动目录。Nodus 会保留本地恢复副本，绝不会删除 vault 的分析。',
+  '{n} elemento(s) retirado(s) del catálogo.': '已从目录中移除 {n} 个条目。',
+  'Impacto de la papelera': '回收站影响', 'Revisa todo lo que se conserva, restaura o retira del catálogo.': '查看所有将被保留、恢复或从目录中移除的内容。',
+  'Calculando impacto…': '正在计算影响…', 'Elementos': '条目', 'Chats y notas': '聊天和笔记', 'Aliases': '别名',
+  'Vaults vinculados': '已关联的 vault', 'Copias recuperables': '可恢复副本', 'No se puede vaciar todavía': '尚无法清空',
+  'Hay enlaces activos con vaults. Desvincúlalos explícitamente antes de retirar estas fichas del catálogo.': '存在与 vault 的活动链接。请先显式取消关联，再将这些记录移出目录。',
+  'El catálogo, aliases, búsquedas y enlaces se reconstruyeron desde nodus-library.': '目录、别名、搜索和链接已从 nodus-library 重建。',
+  'Revisión y recuperación': '审查与恢复', 'Audita manifiestos, enlaces y archivos sin modificar los vaults.': '审核清单、链接和文件，不修改 vault。',
+  'Verificando la Biblioteca…': '正在检查文献库…', 'Elementos revisados': '已检查条目', 'Adjuntos revisados': '已检查附件',
+  'Registros inválidos': '无效记录', 'Archivos ausentes': '文件缺失', 'Adjuntos dañados': '损坏的附件', 'Carpetas huérfanas': '孤立文件夹',
+  'No se detectaron incidencias de integridad.': '未检测到完整性问题。', 'Auditar de nuevo': '重新审核', 'Reconstruir catálogo': '重建目录',
+  '{n} elemento(s) recuperable(s)': '{n} 个可恢复条目', 'Volver a la Biblioteca': '返回文献库', 'Revisar y vaciar': '审查并清空',
+  'La papelera está vacía.': '回收站为空。', 'Los elementos enviados aquí podrán restaurarse antes del vaciado manual.': '发送到这里的条目可在手动清空回收站之前恢复。',
+  'conflict': '冲突', 'invalid-record': '无效记录', 'missing-attachment': '附件缺失', 'corrupt-attachment': '附件损坏',
+  'missing-reader': '缺少干净版本', 'orphan-folder': '孤立文件夹', 'invalid-saved-search': '无效的已保存搜索', 'invalid-vault-link': '无效的 vault 链接',
+};
+
+export const LIBRARY_RECOVERY_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN } as const;

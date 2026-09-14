@@ -4,7 +4,7 @@ import { MAIN_PROCESS_ERRORS, MAIN_PROCESS_ERROR_PATTERNS } from './mainProcessE
 
 export type UiTranslations = Partial<Record<AppLanguage, string>> & { en: string };
 
-const UI_LANGUAGES = new Set<AppLanguage>(['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']);
+const UI_LANGUAGES = new Set<AppLanguage>(['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN']);
 
 /** Runtime locale validation. Unknown or future locales must never fall back to Spanish. */
 export function normalizeUiLanguage(language: unknown): AppLanguage {
@@ -18,7 +18,19 @@ export function normalizeBrowserUiLanguage(language: unknown): AppLanguage {
   if (typeof language !== 'string') return 'en';
   const normalized = language.trim().toLowerCase();
   if (normalized === 'pt-br' || normalized.startsWith('pt-br-')) return 'pt-BR';
+  // Simplified Chinese: the explicit script tag and the Mainland/Singapore regions.
+  // Traditional locales (zh-TW/HK/MO, zh-Hant) have no UI table and fall back to English,
+  // matching the Server resolvers, so a Traditional reader is not shown Simplified copy
+  // as if it were their own language.
+  if (normalized === 'zh-tw' || normalized.startsWith('zh-tw-')
+    || normalized === 'zh-hant' || normalized.startsWith('zh-hant-')
+    || normalized === 'zh-hk' || normalized.startsWith('zh-hk-')
+    || normalized === 'zh-mo' || normalized.startsWith('zh-mo-')) return 'en';
+  if (normalized === 'zh-cn' || normalized.startsWith('zh-cn-')
+    || normalized === 'zh-hans' || normalized.startsWith('zh-hans-')
+    || normalized === 'zh-sg' || normalized.startsWith('zh-sg-')) return 'zh-CN';
   const base = normalized.split('-')[0];
+  if (base === 'zh') return 'zh-CN';
   return base === 'es' || base === 'en' || base === 'fr' || base === 'de'
     || base === 'pt' || base === 'it' || base === 'tr'
     ? base
@@ -188,7 +200,8 @@ function zoteroRuntimeError(message: string, language: unknown): string | null {
       'pt-BR': `Não foi possível conectar ao Zotero: ${detail}`,
       it: `Impossibile connettersi a Zotero: ${detail}`,
       tr: `Zotero’ya bağlanılamadı: ${detail}`,
-    });
+      'zh-CN': `无法连接 Zotero：${detail}`,
+     });
   }
   const responded = /^Zotero respondió HTTP (\d+)\.$/.exec(message);
   if (responded) {
@@ -202,7 +215,8 @@ function zoteroRuntimeError(message: string, language: unknown): string | null {
       'pt-BR': `O Zotero respondeu HTTP ${status}.`,
       it: `Zotero ha risposto HTTP ${status}.`,
       tr: `Zotero HTTP ${status} yanıtı verdi.`,
-    });
+      'zh-CN': `Zotero 返回 HTTP ${status}。`,
+     });
   }
   const missing = /^La biblioteca de Zotero ya no existe: .+\.$/.test(message);
   if (missing) {
@@ -215,7 +229,8 @@ function zoteroRuntimeError(message: string, language: unknown): string | null {
       'pt-BR': 'Essa biblioteca do Zotero não existe mais.',
       it: 'Quella libreria Zotero non esiste più.',
       tr: 'Bu Zotero kitaplığı artık mevcut değil.',
-    });
+      'zh-CN': '该 Zotero 文献库已不存在。',
+     });
   }
   return null;
 }
@@ -340,7 +355,8 @@ function truncatedJsonTail(tail: string, language: unknown): string {
       'pt-BR': `O espaço de saída é o que sobra da janela de contexto depois do prompt: aumente-a em ${provider} (${knob}), escolha um modelo local com mais contexto ou use um provedor na nuvem para esta tarefa.`,
       it: `Lo spazio di output è ciò che resta della finestra di contesto dopo il prompt: ampliala in ${provider} (${knob}), scegli un modello locale con più contesto o usa un fornitore cloud per questa attività.`,
       tr: `Çıktı alanı, istemden sonra bağlam penceresinden geriye kalandır: ${provider} içinde genişletin (${knob}), daha fazla bağlamı olan yerel bir model seçin veya bu görev için bir bulut sağlayıcısı kullanın.`,
-    });
+      'zh-CN': `输出空间是提示词之后上下文窗口所剩的部分：在 ${provider} 中放宽它（${knob}）、选择上下文更大的本地模型，或为此任务使用云端提供商。`,
+     });
   }
   return uiText(language, {
     es: tail,
@@ -351,7 +367,8 @@ function truncatedJsonTail(tail: string, language: unknown): string {
     'pt-BR': 'Use um modelo com um limite de saída maior ou reduza o tamanho da tarefa.',
     it: 'Usa un modello con un limite di output più alto o riduci la dimensione dell’attività.',
     tr: 'Daha yüksek çıktı sınırı olan bir model kullanın veya görevin boyutunu küçültün.',
-  });
+    'zh-CN': '请使用输出上限更高的模型，或减小任务规模。',
+   });
 }
 
 function aiProviderRuntimeError(message: string, language: unknown): string | null {
@@ -370,7 +387,8 @@ function aiProviderRuntimeError(message: string, language: unknown): string | nu
       'pt-BR': `Erro do provedor (${status})`,
       it: `Errore del fornitore (${status})`,
       tr: `Sağlayıcı hatası (${status})`,
-    });
+      'zh-CN': `提供商错误（${status}）`,
+     });
   }
 
   const rejected = /^El proveedor rechazó la solicitud \(400\)\. Detalle: (.+)$/.exec(message);
@@ -385,7 +403,8 @@ function aiProviderRuntimeError(message: string, language: unknown): string | nu
       'pt-BR': `O provedor rejeitou a solicitação (400). Detalhe: ${detail}`,
       it: `Il fornitore ha rifiutato la richiesta (400). Dettaglio: ${detail}`,
       tr: `Sağlayıcı isteği (400) reddetti. Ayrıntı: ${detail}`,
-    });
+      'zh-CN': `提供商拒绝了该请求（400）。详情：${detail}`,
+     });
   }
 
   const empty = /^Respuesta vacía del proveedor de IA \((.+)\)\.$/.exec(message);
@@ -394,7 +413,8 @@ function aiProviderRuntimeError(message: string, language: unknown): string | nu
       ? uiText(language, {
         es: 'sin finish_reason', en: 'no finish_reason', fr: 'sans finish_reason', de: 'ohne finish_reason',
         pt: 'sem finish_reason', 'pt-BR': 'sem finish_reason', it: 'senza finish_reason', tr: 'finish_reason yok',
-      })
+        'zh-CN': '没有 finish_reason',
+       })
       : empty[1];
     return uiText(language, {
       es: message,
@@ -405,7 +425,8 @@ function aiProviderRuntimeError(message: string, language: unknown): string | nu
       'pt-BR': `Resposta vazia do provedor de IA (${reason}).`,
       it: `Risposta vuota dal fornitore di IA (${reason}).`,
       tr: `Yapay zekâ sağlayıcısından boş yanıt (${reason}).`,
-    });
+      'zh-CN': `AI 提供商返回了空响应（${reason}）。`,
+     });
   }
 
   const truncated = /^La respuesta de «(.+?)» \((.+?)\) se cortó al alcanzar el límite de (.+?) tokens de salida y el JSON quedó incompleto\. (.+)$/.exec(message);
@@ -421,7 +442,8 @@ function aiProviderRuntimeError(message: string, language: unknown): string | nu
       'pt-BR': `A resposta de «${model}» (${provider}) foi cortada ao atingir o limite de ${tokens} tokens de saída e o JSON ficou incompleto. ${advice}`,
       it: `La risposta di «${model}» (${provider}) si è interrotta al limite di ${tokens} token di output e il JSON è rimasto incompleto. ${advice}`,
       tr: `«${model}» (${provider}) yanıtı ${tokens} çıktı belirteci sınırında kesildi ve JSON eksik kaldı. ${advice}`,
-    });
+      'zh-CN': `来自「${model}」（${provider}）的响应在 ${tokens} 个输出词元上限处被截断，JSON 未完整生成。${advice}`,
+     });
   }
 
   const overflow = /^El modelo local «(.+?)» no tiene suficiente contexto para esta tarea: necesita (.+?)\. Aumenta el contexto del modelo en (.+?) \((.+?)\), elige un modelo con más contexto, reduce el tamaño de la tarea \(menos texto por lote\) o usa un proveedor en la nube para tareas grandes\.$/.exec(message);
@@ -441,7 +463,8 @@ function aiProviderRuntimeError(message: string, language: unknown): string | nu
       'pt-BR': `O modelo local «${model}» não tem contexto suficiente para esta tarefa: precisa de ${need('tokens', 'mais tokens do que cabem')}${currentWindow('janela atual')}. Aumente o contexto do modelo em ${provider} (${knob}), escolha um modelo com mais contexto, reduza o tamanho da tarefa (menos texto por lote) ou use um provedor na nuvem para tarefas grandes.`,
       it: `Il modello locale «${model}» non ha contesto sufficiente per questa attività: richiede ${need('token', 'più token di quelli disponibili')}${currentWindow('finestra attuale')}. Aumenta il contesto del modello in ${provider} (${knob}), scegli un modello con più contesto, riduci la dimensione dell’attività (meno testo per lotto) o usa un fornitore cloud per le attività grandi.`,
       tr: `Yerel model «${model}» bu görev için yeterli bağlama sahip değil: ${need('belirteç', 'sığandan daha fazla belirteç')} gerekiyor${currentWindow('mevcut pencere')}. Modelin bağlamını ${provider} içinde artırın (${knob}), daha fazla bağlamı olan bir model seçin, görevin boyutunu küçültün (parti başına daha az metin) veya büyük görevler için bir bulut sağlayıcısı kullanın.`,
-    });
+      'zh-CN': `本地模型「${model}」的上下文不足以完成此任务：它需要 ${need('词元', '放不下的词元')}${currentWindow('当前窗口')}。请在 ${provider} 中提高模型的上下文（${knob}）、选择上下文更大的模型、缩小任务规模（每批更少的文本），或对大型任务使用云端提供商。`,
+     });
   }
 
   return null;
@@ -476,19 +499,29 @@ export function localizeRuntimeError(message: string, language: unknown): string
   const skillError = localizeChatSkillError(message, normalizeUiLanguage(language));
   if (skillError) return skillError;
   if (message === 'Fallo al sintetizar el audio.') {
-    return uiText(language, { es: message, en: 'Audio synthesis failed.', fr: 'La synthèse audio a échoué.', de: 'Die Audiosynthese ist fehlgeschlagen.', pt: 'A síntese de áudio falhou.', 'pt-BR': 'A síntese de áudio falhou.', it: 'Sintesi audio non riuscita.', tr: 'Ses sentezi başarısız oldu.' });
+    return uiText(language, { es: message, en: 'Audio synthesis failed.', fr: 'La synthèse audio a échoué.', de: 'Die Audiosynthese ist fehlgeschlagen.', pt: 'A síntese de áudio falhou.', 'pt-BR': 'A síntese de áudio falhou.', it: 'Sintesi audio non riuscita.', tr: 'Ses sentezi başarısız oldu.' ,
+      'zh-CN': '音频合成失败。',
+     });
   }
   if (message === 'El worker de audio falló.') {
-    return uiText(language, { es: message, en: 'The audio worker failed.', fr: 'Le worker audio a échoué.', de: 'Der Audio-Worker ist fehlgeschlagen.', pt: 'O worker de áudio falhou.', 'pt-BR': 'O worker de áudio falhou.', it: 'Il worker audio non è riuscito.', tr: 'Ses çalışanı başarısız oldu.' });
+    return uiText(language, { es: message, en: 'The audio worker failed.', fr: 'Le worker audio a échoué.', de: 'Der Audio-Worker ist fehlgeschlagen.', pt: 'O worker de áudio falhou.', 'pt-BR': 'O worker de áudio falhou.', it: 'Il worker audio non è riuscito.', tr: 'Ses çalışanı başarısız oldu.' ,
+      'zh-CN': '音频工作线程失败。',
+     });
   }
   if (message === 'La voz de Hume seleccionada ya no está disponible.') {
-    return uiText(language, { es: message, en: 'The selected Hume voice is no longer available.', fr: 'La voix Hume sélectionnée n’est plus disponible.', de: 'Die ausgewählte Hume-Stimme ist nicht mehr verfügbar.', pt: 'A voz Hume selecionada já não está disponível.', 'pt-BR': 'A voz Hume selecionada não está mais disponível.', it: 'La voce Hume selezionata non è più disponibile.', tr: 'Seçilen Hume sesi artık kullanılamıyor.' });
+    return uiText(language, { es: message, en: 'The selected Hume voice is no longer available.', fr: 'La voix Hume sélectionnée n’est plus disponible.', de: 'Die ausgewählte Hume-Stimme ist nicht mehr verfügbar.', pt: 'A voz Hume selecionada já não está disponível.', 'pt-BR': 'A voz Hume selecionada não está mais disponível.', it: 'La voce Hume selezionata non è più disponibile.', tr: 'Seçilen Hume sesi artık kullanılamıyor.' ,
+      'zh-CN': '所选的 Hume 语音已不再可用。',
+     });
   }
   if (message === 'eSpeak NG devolvió una respuesta sin fonemas') {
-    return uiText(language, { es: message, en: 'eSpeak NG returned a response without phonemes.', fr: 'eSpeak NG a renvoyé une réponse sans phonèmes.', de: 'eSpeak NG hat eine Antwort ohne Phoneme zurückgegeben.', pt: 'O eSpeak NG devolveu uma resposta sem fonemas.', 'pt-BR': 'O eSpeak NG retornou uma resposta sem fonemas.', it: 'eSpeak NG ha restituito una risposta senza fonemi.', tr: 'eSpeak NG fonem içermeyen bir yanıt döndürdü.' });
+    return uiText(language, { es: message, en: 'eSpeak NG returned a response without phonemes.', fr: 'eSpeak NG a renvoyé une réponse sans phonèmes.', de: 'eSpeak NG hat eine Antwort ohne Phoneme zurückgegeben.', pt: 'O eSpeak NG devolveu uma resposta sem fonemas.', 'pt-BR': 'O eSpeak NG retornou uma resposta sem fonemas.', it: 'eSpeak NG ha restituito una risposta senza fonemi.', tr: 'eSpeak NG fonem içermeyen bir yanıt döndürdü.' ,
+      'zh-CN': 'eSpeak NG 返回的响应中没有音素。',
+     });
   }
   if (message === 'eSpeak NG terminó sin devolver fonemas') {
-    return uiText(language, { es: message, en: 'eSpeak NG finished without returning phonemes.', fr: 'eSpeak NG a terminé sans renvoyer de phonèmes.', de: 'eSpeak NG wurde beendet, ohne Phoneme zurückzugeben.', pt: 'O eSpeak NG terminou sem devolver fonemas.', 'pt-BR': 'O eSpeak NG terminou sem retornar fonemas.', it: 'eSpeak NG ha terminato senza restituire fonemi.', tr: 'eSpeak NG fonem döndürmeden tamamlandı.' });
+    return uiText(language, { es: message, en: 'eSpeak NG finished without returning phonemes.', fr: 'eSpeak NG a terminé sans renvoyer de phonèmes.', de: 'eSpeak NG wurde beendet, ohne Phoneme zurückzugeben.', pt: 'O eSpeak NG terminou sem devolver fonemas.', 'pt-BR': 'O eSpeak NG terminou sem retornar fonemas.', it: 'eSpeak NG ha terminato senza restituire fonemi.', tr: 'eSpeak NG fonem döndürmeden tamamlandı.' ,
+      'zh-CN': 'eSpeak NG 结束时没有返回音素。',
+     });
   }
   const phonemizer = /^Error del fonetizador español de eSpeak NG: (.+)$/.exec(message);
   if (phonemizer) {
@@ -501,7 +534,8 @@ export function localizeRuntimeError(message: string, language: unknown): string
       'pt-BR': `Erro do fonetizador espanhol eSpeak NG: ${phonemizer[1]}`,
       it: `Errore del fonemizzatore spagnolo eSpeak NG: ${phonemizer[1]}`,
       tr: `İspanyolca eSpeak NG fonemleştirici hatası: ${phonemizer[1]}`,
-    });
+      'zh-CN': `西班牙语 eSpeak NG 音素化器错误：${phonemizer[1]}`,
+     });
   }
   const unsupportedAudioWorker = /^Proveedor de audio no soportado en el worker: (.+)$/.exec(message);
   if (unsupportedAudioWorker) {
@@ -514,49 +548,74 @@ export function localizeRuntimeError(message: string, language: unknown): string
       'pt-BR': `O provedor de áudio não é compatível com o worker: ${unsupportedAudioWorker[1]}`,
       it: `Il provider audio non è supportato dal worker: ${unsupportedAudioWorker[1]}`,
       tr: `Ses sağlayıcısı worker tarafından desteklenmiyor: ${unsupportedAudioWorker[1]}`,
-    });
+      'zh-CN': `工作线程不支持该音频提供商：${unsupportedAudioWorker[1]}`,
+     });
   }
   if (message === 'Transcripción cancelada.') {
-    return uiText(language, { es: message, en: 'Transcription cancelled.', fr: 'Transcription annulée.', de: 'Transkription abgebrochen.', pt: 'Transcrição cancelada.', 'pt-BR': 'Transcrição cancelada.', it: 'Trascrizione annullata.', tr: 'Transkripsiyon iptal edildi.' });
+    return uiText(language, { es: message, en: 'Transcription cancelled.', fr: 'Transcription annulée.', de: 'Transkription abgebrochen.', pt: 'Transcrição cancelada.', 'pt-BR': 'Transcrição cancelada.', it: 'Trascrizione annullata.', tr: 'Transkripsiyon iptal edildi.' ,
+      'zh-CN': '转写已取消。',
+     });
   }
   if (message === 'Detección de hablantes cancelada.') {
-    return uiText(language, { es: message, en: 'Speaker detection cancelled.', fr: 'Détection des locuteurs annulée.', de: 'Sprechererkennung abgebrochen.', pt: 'Deteção de oradores cancelada.', 'pt-BR': 'Detecção de falantes cancelada.', it: 'Rilevamento degli interlocutori annullato.', tr: 'Konuşmacı algılama iptal edildi.' });
+    return uiText(language, { es: message, en: 'Speaker detection cancelled.', fr: 'Détection des locuteurs annulée.', de: 'Sprechererkennung abgebrochen.', pt: 'Deteção de oradores cancelada.', 'pt-BR': 'Detecção de falantes cancelada.', it: 'Rilevamento degli interlocutori annullato.', tr: 'Konuşmacı algılama iptal edildi.' ,
+      'zh-CN': '说话人检测已取消。',
+     });
   }
   if (message === 'No se encontró el conector integrado. En desarrollo, ejecuta "npm run browser:zip".') {
-    return uiText(language, { es: message, en: 'The bundled connector was not found. In development, run "npm run browser:zip".', fr: 'Le connecteur intégré est introuvable. En développement, exécutez « npm run browser:zip ».', de: 'Der integrierte Connector wurde nicht gefunden. Führen Sie in der Entwicklung „npm run browser:zip“ aus.', pt: 'O conector integrado não foi encontrado. Em desenvolvimento, execute «npm run browser:zip».', 'pt-BR': 'O conector integrado não foi encontrado. Em desenvolvimento, execute "npm run browser:zip".', it: 'Il connettore integrato non è stato trovato. In sviluppo, esegui «npm run browser:zip».', tr: 'Dahili bağlayıcı bulunamadı. Geliştirme sırasında "npm run browser:zip" komutunu çalıştırın.' });
+    return uiText(language, { es: message, en: 'The bundled connector was not found. In development, run "npm run browser:zip".', fr: 'Le connecteur intégré est introuvable. En développement, exécutez « npm run browser:zip ».', de: 'Der integrierte Connector wurde nicht gefunden. Führen Sie in der Entwicklung „npm run browser:zip“ aus.', pt: 'O conector integrado não foi encontrado. Em desenvolvimento, execute «npm run browser:zip».', 'pt-BR': 'O conector integrado não foi encontrado. Em desenvolvimento, execute "npm run browser:zip".', it: 'Il connettore integrato non è stato trovato. In sviluppo, esegui «npm run browser:zip».', tr: 'Dahili bağlayıcı bulunamadı. Geliştirme sırasında "npm run browser:zip" komutunu çalıştırın.' ,
+      'zh-CN': '找不到内置连接器。开发环境下请运行 "npm run browser:zip"。',
+     });
   }
   if (message === 'Las funciones de IA del vault de estudio están desactivadas en Ajustes.') {
-    return uiText(language, { es: message, en: 'Study vault AI features are disabled in Settings.', fr: 'Les fonctions d’IA du coffre d’étude sont désactivées dans les Réglages.', de: 'Die KI-Funktionen des Lernarchivs sind in den Einstellungen deaktiviert.', pt: 'As funções de IA do arquivo de estudo estão desativadas nas Definições.', 'pt-BR': 'Os recursos de IA do vault de estudo estão desativados nas Configurações.', it: 'Le funzioni IA del vault di studio sono disattivate nelle Impostazioni.', tr: 'Çalışma kasasının yapay zekâ özellikleri Ayarlar’da devre dışı.' });
+    return uiText(language, { es: message, en: 'Study vault AI features are disabled in Settings.', fr: 'Les fonctions d’IA du coffre d’étude sont désactivées dans les Réglages.', de: 'Die KI-Funktionen des Lernarchivs sind in den Einstellungen deaktiviert.', pt: 'As funções de IA do arquivo de estudo estão desativadas nas Definições.', 'pt-BR': 'Os recursos de IA do vault de estudo estão desativados nas Configurações.', it: 'Le funzioni IA del vault di studio sono disattivate nelle Impostazioni.', tr: 'Çalışma kasasının yapay zekâ özellikleri Ayarlar’da devre dışı.' ,
+      'zh-CN': '学习资料库的 AI 功能已在设置中关闭。',
+     });
   }
   const localOnly = /^El modo local \(«solo modelos locales»\) impide usar (.+)\.$/.exec(message);
   if (localOnly) {
     const [, provider] = localOnly;
-    return uiText(language, { es: message, en: `Local-only mode cannot use ${provider}.`, fr: `Le mode local uniquement ne peut pas utiliser ${provider}.`, de: `Der Nur-lokal-Modus kann ${provider} nicht verwenden.`, pt: `O modo apenas local não pode usar ${provider}.`, 'pt-BR': `O modo somente local não pode usar ${provider}.`, it: `La modalità solo locale non può usare ${provider}.`, tr: `Yalnızca yerel mod ${provider} sağlayıcısını kullanamaz.` });
+    return uiText(language, { es: message, en: `Local-only mode cannot use ${provider}.`, fr: `Le mode local uniquement ne peut pas utiliser ${provider}.`, de: `Der Nur-lokal-Modus kann ${provider} nicht verwenden.`, pt: `O modo apenas local não pode usar ${provider}.`, 'pt-BR': `O modo somente local não pode usar ${provider}.`, it: `La modalità solo locale non può usare ${provider}.`, tr: `Yalnızca yerel mod ${provider} sağlayıcısını kullanamaz.` ,
+      'zh-CN': `仅本地模式无法使用 ${provider}。`,
+     });
   }
   const externalOnly = /^El modo externo requiere un proveedor remoto; (.+) es local\.$/.exec(message);
   if (externalOnly) {
     const [, provider] = externalOnly;
-    return uiText(language, { es: message, en: `External-only mode requires a remote provider; ${provider} is local.`, fr: `Le mode externe uniquement exige un fournisseur distant ; ${provider} est local.`, de: `Der Nur-extern-Modus erfordert einen entfernten Anbieter; ${provider} ist lokal.`, pt: `O modo apenas externo requer um fornecedor remoto; ${provider} é local.`, 'pt-BR': `O modo somente externo requer um provedor remoto; ${provider} é local.`, it: `La modalità solo esterna richiede un fornitore remoto; ${provider} è locale.`, tr: `Yalnızca harici mod uzak bir sağlayıcı gerektirir; ${provider} yerel.` });
+    return uiText(language, { es: message, en: `External-only mode requires a remote provider; ${provider} is local.`, fr: `Le mode externe uniquement exige un fournisseur distant ; ${provider} est local.`, de: `Der Nur-extern-Modus erfordert einen entfernten Anbieter; ${provider} ist lokal.`, pt: `O modo apenas externo requer um fornecedor remoto; ${provider} é local.`, 'pt-BR': `O modo somente externo requer um provedor remoto; ${provider} é local.`, it: `La modalità solo esterna richiede un fornitore remoto; ${provider} è locale.`, tr: `Yalnızca harici mod uzak bir sağlayıcı gerektirir; ${provider} yerel.` ,
+      'zh-CN': `仅外部模式需要远程提供商；${provider} 是本地模型。`,
+     });
   }
   if (message === 'Esta asignatura está excluida del procesamiento externo. Usa un modelo local o elimina la exclusión en Ajustes.') {
-    return uiText(language, { es: message, en: 'This subject is excluded from external processing. Use a local model or remove the exclusion in Settings.', fr: 'Cette matière est exclue du traitement externe. Utilisez un modèle local ou retirez l’exclusion dans les Réglages.', de: 'Dieses Fach ist von der externen Verarbeitung ausgeschlossen. Verwenden Sie ein lokales Modell oder entfernen Sie den Ausschluss in den Einstellungen.', pt: 'Esta disciplina está excluída do processamento externo. Use um modelo local ou remova a exclusão nas Definições.', 'pt-BR': 'Esta disciplina está excluída do processamento externo. Use um modelo local ou remova a exclusão nas Configurações.', it: 'Questa materia è esclusa dall’elaborazione esterna. Usa un modello locale o rimuovi l’esclusione nelle Impostazioni.', tr: 'Bu ders harici işleme dışında bırakıldı. Yerel bir model kullanın veya Ayarlar’dan dışlamayı kaldırın.' });
+    return uiText(language, { es: message, en: 'This subject is excluded from external processing. Use a local model or remove the exclusion in Settings.', fr: 'Cette matière est exclue du traitement externe. Utilisez un modèle local ou retirez l’exclusion dans les Réglages.', de: 'Dieses Fach ist von der externen Verarbeitung ausgeschlossen. Verwenden Sie ein lokales Modell oder entfernen Sie den Ausschluss in den Einstellungen.', pt: 'Esta disciplina está excluída do processamento externo. Use um modelo local ou remova a exclusão nas Definições.', 'pt-BR': 'Esta disciplina está excluída do processamento externo. Use um modelo local ou remova a exclusão nas Configurações.', it: 'Questa materia è esclusa dall’elaborazione esterna. Usa un modello locale o rimuovi l’esclusione nelle Impostazioni.', tr: 'Bu ders harici işleme dışında bırakıldı. Yerel bir model kullanın veya Ayarlar’dan dışlamayı kaldırın.' ,
+      'zh-CN': '该研究对象被排除在外部处理之外。请使用本地模型，或在设置中移除排除项。',
+     });
   }
   const inputLimit = /^La solicitud supera el límite configurado de (.+) caracteres\.$/.exec(message);
   if (inputLimit) {
     const [, count] = inputLimit;
-    return uiText(language, { es: message, en: `The request exceeds the configured limit of ${count} characters.`, fr: `La demande dépasse la limite configurée de ${count} caractères.`, de: `Die Anfrage überschreitet das konfigurierte Limit von ${count} Zeichen.`, pt: `O pedido excede o limite configurado de ${count} caracteres.`, 'pt-BR': `A solicitação excede o limite configurado de ${count} caracteres.`, it: `La richiesta supera il limite configurato di ${count} caratteri.`, tr: `İstek, yapılandırılmış ${count} karakterlik sınırı aşıyor.` });
+    return uiText(language, { es: message, en: `The request exceeds the configured limit of ${count} characters.`, fr: `La demande dépasse la limite configurée de ${count} caractères.`, de: `Die Anfrage überschreitet das konfigurierte Limit von ${count} Zeichen.`, pt: `O pedido excede o limite configurado de ${count} caracteres.`, 'pt-BR': `A solicitação excede o limite configurado de ${count} caracteres.`, it: `La richiesta supera il limite configurato di ${count} caratteri.`, tr: `İstek, yapılandırılmış ${count} karakterlik sınırı aşıyor.` ,
+      'zh-CN': `该请求超过了配置的 ${count} 字符上限。`,
+     });
   }
   if (message === 'Se ha alcanzado el presupuesto mensual de IA para estudio.') {
-    return uiText(language, { es: message, en: 'The monthly study AI budget has been reached.', fr: 'Le budget mensuel d’IA pour l’étude a été atteint.', de: 'Das monatliche Lern-KI-Budget wurde erreicht.', pt: 'O orçamento mensal de IA para estudo foi atingido.', 'pt-BR': 'O orçamento mensal de IA para estudo foi atingido.', it: 'Il budget mensile per l’IA di studio è stato raggiunto.', tr: 'Aylık çalışma yapay zekâ bütçesine ulaşıldı.' });
+    return uiText(language, { es: message, en: 'The monthly study AI budget has been reached.', fr: 'Le budget mensuel d’IA pour l’étude a été atteint.', de: 'Das monatliche Lern-KI-Budget wurde erreicht.', pt: 'O orçamento mensal de IA para estudo foi atingido.', 'pt-BR': 'O orçamento mensal de IA para estudo foi atingido.', it: 'Il budget mensile per l’IA di studio è stato raggiunto.', tr: 'Aylık çalışma yapay zekâ bütçesine ulaşıldı.' ,
+      'zh-CN': '本月学习 AI 预算已用尽。',
+     });
   }
   if (message === 'Envío externo cancelado por el usuario.') {
-    return uiText(language, { es: message, en: 'External send cancelled by the user.', fr: 'Envoi externe annulé par l’utilisateur.', de: 'Externe Übermittlung vom Nutzer abgebrochen.', pt: 'Envio externo cancelado pelo utilizador.', 'pt-BR': 'Envio externo cancelado pelo usuário.', it: 'Invio esterno annullato dall’utente.', tr: 'Harici gönderim kullanıcı tarafından iptal edildi.' });
+    return uiText(language, { es: message, en: 'External send cancelled by the user.', fr: 'Envoi externe annulé par l’utilisateur.', de: 'Externe Übermittlung vom Nutzer abgebrochen.', pt: 'Envio externo cancelado pelo utilizador.', 'pt-BR': 'Envio externo cancelado pelo usuário.', it: 'Invio esterno annullato dall’utente.', tr: 'Harici gönderim kullanıcı tarafından iptal edildi.' ,
+      'zh-CN': '用户已取消外部发送。',
+     });
   }
   if (message === 'E2E: proveedor de IA no disponible.') {
-    return uiText(language, { es: message, en: 'E2E: AI provider unavailable.', fr: 'E2E : fournisseur d’IA indisponible.', de: 'E2E: KI-Anbieter nicht verfügbar.', pt: 'E2E: fornecedor de IA indisponível.', 'pt-BR': 'E2E: provedor de IA indisponível.', it: 'E2E: fornitore IA non disponibile.', tr: 'E2E: yapay zekâ sağlayıcısı kullanılamıyor.' });
+    return uiText(language, { es: message, en: 'E2E: AI provider unavailable.', fr: 'E2E : fournisseur d’IA indisponible.', de: 'E2E: KI-Anbieter nicht verfügbar.', pt: 'E2E: fornecedor de IA indisponível.', 'pt-BR': 'E2E: provedor de IA indisponível.', it: 'E2E: fornitore IA non disponibile.', tr: 'E2E: yapay zekâ sağlayıcısı kullanılamıyor.' ,
+      'zh-CN': 'E2E：AI 提供商不可用。',
+     });
   }
   if (message === 'No fue posible completar la tarea de IA.') {
-    return uiText(language, { es: message, en: 'The AI task could not be completed.', fr: 'La tâche d’IA n’a pas pu être terminée.', de: 'Die KI-Aufgabe konnte nicht abgeschlossen werden.', pt: 'Não foi possível concluir a tarefa de IA.', 'pt-BR': 'Não foi possível concluir a tarefa de IA.', it: 'Non è stato possibile completare l’attività IA.', tr: 'Yapay zekâ görevi tamamlanamadı.' });
+    return uiText(language, { es: message, en: 'The AI task could not be completed.', fr: 'La tâche d’IA n’a pas pu être terminée.', de: 'Die KI-Aufgabe konnte nicht abgeschlossen werden.', pt: 'Não foi possível concluir a tarefa de IA.', 'pt-BR': 'Não foi possível concluir a tarefa de IA.', it: 'Non è stato possibile completare l’attività IA.', tr: 'Yapay zekâ görevi tamamlanamadı.' ,
+      'zh-CN': 'AI 任务无法完成。',
+     });
   }
   if (message === 'No hay un modelo de IA configurado. Elige uno en Ajustes.') {
     return uiText(language, {
@@ -568,7 +627,8 @@ export function localizeRuntimeError(message: string, language: unknown): string
       'pt-BR': 'Nenhum modelo de IA está configurado. Escolha um nas Configurações.',
       it: 'Non è configurato alcun modello di IA. Scegline uno nelle Impostazioni.',
       tr: 'Yapılandırılmış bir yapay zekâ modeli yok. Ayarlar’dan bir model seçin.',
-    });
+      'zh-CN': '尚未配置 AI 模型。请在设置中选择一个。',
+     });
   }
   if (message === 'Clave de IA inválida. Revísala en Ajustes.') {
     return uiText(language, {
@@ -580,7 +640,8 @@ export function localizeRuntimeError(message: string, language: unknown): string
       'pt-BR': 'A chave de IA é inválida. Verifique-a nas Configurações.',
       it: 'La chiave IA non è valida. Controllala nelle Impostazioni.',
       tr: 'Yapay zekâ anahtarı geçersiz. Ayarlar’dan kontrol edin.',
-    });
+      'zh-CN': 'AI 密钥无效。请在设置中检查。',
+     });
   }
   const missingKey = /^Falta la clave de IA para (.+)\. Configúrala en Ajustes\.$/.exec(message);
   if (missingKey) {
@@ -594,7 +655,8 @@ export function localizeRuntimeError(message: string, language: unknown): string
       'pt-BR': `Falta a chave de IA para ${provider}. Configure-a nas Configurações.`,
       it: `Manca la chiave IA per ${provider}. Configurala nelle Impostazioni.`,
       tr: `${provider} için yapay zekâ anahtarı eksik. Ayarlar’dan yapılandırın.`,
-    });
+      'zh-CN': `缺少 ${provider} 的 AI 密钥。请在设置中配置。`,
+     });
   }
   if (message === 'La fuente cambió repetidamente durante el análisis. La campaña se ha pausado para evitar reintentos indefinidos.') {
     return uiText(language, {
@@ -606,7 +668,8 @@ export function localizeRuntimeError(message: string, language: unknown): string
       'pt-BR': 'A fonte do documento mudou repetidamente durante a análise. A indexação foi pausada para evitar tentativas intermináveis.',
       it: 'La fonte del documento è cambiata ripetutamente durante l’analisi. L’indicizzazione è stata sospesa per evitare tentativi infiniti.',
       tr: 'Belge kaynağı analiz sırasında tekrar tekrar değişti. Sonsuz yeniden denemeleri önlemek için dizin oluşturma duraklatıldı.',
-    });
+      'zh-CN': '分析期间文档来源不断变化。为避免无限重试，索引已暂停。',
+     });
   }
   if (message === 'La fuente sigue cambiando. Reanuda cuando la sincronización haya terminado.') {
     return uiText(language, {
@@ -618,7 +681,8 @@ export function localizeRuntimeError(message: string, language: unknown): string
       'pt-BR': 'A fonte continua mudando. Retome quando a sincronização terminar.',
       it: 'La fonte continua a cambiare. Riprendi al termine della sincronizzazione.',
       tr: 'Kaynak değişmeye devam ediyor. Eşitleme tamamlandıktan sonra devam edin.',
-    });
+      'zh-CN': '来源仍在变化。请在同步完成后继续。',
+     });
   }
   const zoteroFailure = zoteroRuntimeError(message, language);
   if (zoteroFailure) return zoteroFailure;
@@ -636,7 +700,8 @@ export function localizeRuntimeError(message: string, language: unknown): string
     'pt-BR': 'Não foi possível concluir a operação.',
     it: 'Non è stato possibile completare l’operazione.',
     tr: 'İşlem tamamlanamadı.',
-  });
+    'zh-CN': '无法完成该操作。',
+   });
 }
 
 /**

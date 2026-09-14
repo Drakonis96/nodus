@@ -52,6 +52,8 @@ try {
   // This is what made every force quit lose the update: the helper died mid-wait.
   assert.match(script, /trap '' TERM HUP INT/, 'the helper ignores terminating signals');
   assert.match(script, /WAITED/, 'the helper bounds its wait instead of hanging forever');
+  assert.match(script, /\/bin\/mv "\$TARGET" "\$BACKUP"/, 'the running bundle is displaced before the new one lands');
+  assert.match(script, /\/bin\/rm -rf "\$BACKUP"/, 'the displaced bundle is removed after the swap');
 
   const scriptPath = path.join(root, 'helper.sh');
   fs.writeFileSync(scriptPath, script, { mode: 0o700 });
@@ -101,8 +103,18 @@ try {
   assert.equal(readState()?.status, 'installed', `the helper reported: ${JSON.stringify(readState())}`);
   assert.equal(fs.readFileSync(path.join(target, 'Contents', 'version'), 'utf8'), 'NEW',
     'the new bundle is in place after a force quit');
-  assert.equal(fs.readFileSync(path.join(`${target}.previous`, 'Contents', 'version'), 'utf8'), 'OLD',
-    'the previous bundle is kept as a rollback');
+  // The displaced bundle is only a rollback until the swap lands: the helper
+  // unregisters and removes it so LaunchServices cannot show a second Dock icon.
+  // Reading it right after `installed` raced the helper's own cleanup, which is
+  // why this test failed intermittently. Assert the shipped behavior instead:
+  // the old bundle was moved aside (checked in the script below) and is removed.
+  await waitFor(
+    async () => !fs.existsSync(`${target}.previous`),
+    15_000,
+    'the displaced bundle to be removed after the swap',
+  );
+  assert.equal(fs.readFileSync(path.join(target, 'Contents', 'version'), 'utf8'), 'NEW',
+    'removing the displaced bundle does not disturb the installed one');
 
   // ── The quit is not left to chance ─────────────────────────────────────────
   assert.match(source, /function quitForUpdate\(\): void \{[\s\S]*?app\.quit\(\)[\s\S]*?app\.exit\(0\)/,

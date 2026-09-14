@@ -1,6 +1,7 @@
 import { searchPrimarySourceHybrid } from '../ai/primarySourceSearch';
 // primarySources channels, moved verbatim out of the monolithic registerIpc.
 // The channel names are unchanged; scripts/test-ipc-contract.mjs is what proves it.
+import { dialogTitle } from '../dialogTitles';
 import type { IpcContext } from './context';
 import type { PrimarySourceBulkPatch, PrimarySourceFileImportInput, PrimarySourceFileMetadataPatch, PrimarySourceExcerptCreateInput, PrimarySourceIngestInput, PrimarySourceAnalysis, PrimarySourceProposalAcceptanceInput, PrimarySourceProposalDecisionInput, PrimarySourceProposalExtractionInput, PrimarySourceNoteLinkInput, PrimarySourceNoteProfilePatch, PrimarySourcePersonFilter, PrimarySourceSearchRequest, PrimarySourceSearchTargetKind, PrimarySourceCitationBuildRequest, PrimarySourceCitationSettings, PrimarySourceExportRequest, PrimarySourcePolicySettingsPatch, PrimarySourceToolkitRequest, PrimarySourceToponymResolutionInput, PrimarySourceTextVersionCreateInput, PrimarySourceUnitCreateInput } from '@shared/primarySourcesTypes';
 import type { ArchiveReviewStatus, ArchiveTextStatus } from '@shared/archiveTypes';
@@ -65,7 +66,7 @@ export function registerPrimarySourcesIpc({ h, getWindow }: IpcContext): void {
   });
   h('primarySources:chooseFiles', async () => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: 'Añadir fuentes primarias',
+      title: dialogTitle('addPrimarySources', getSettings().uiLanguage),
       properties: ['openFile', 'multiSelections'],
       filters: [
         { name: 'Documentos, imágenes, audio y datos', extensions: ['pdf', 'epub', 'txt', 'md', 'csv', 'xlsx', 'png', 'jpg', 'jpeg', 'tif', 'tiff', 'webp', 'bmp', 'wav', 'mp3', 'm4a', 'mp4', 'mov'] },
@@ -190,7 +191,7 @@ export function registerPrimarySourcesIpc({ h, getWindow }: IpcContext): void {
     if (!file || !blob) throw new Error('El archivo preservado no está disponible.');
     const win = BrowserWindow.fromWebContents(event.sender);
     const picked = await dialog.showSaveDialog(win ?? undefined!, {
-      title: 'Guardar copia del archivo preservado',
+      title: dialogTitle('savePreservedFileCopy', getSettings().uiLanguage),
       defaultPath: file.originalFileName || `fuente-${file.fileId}`,
     });
     if (picked.canceled || !picked.filePath) return null;
@@ -461,7 +462,7 @@ export function registerPrimarySourcesIpc({ h, getWindow }: IpcContext): void {
       ? 'nodus-inventory.zip'
       : 'nodus-research.zip';
     const picked = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender) ?? undefined!, {
-      title: 'Guardar paquete de investigación',
+      title: dialogTitle('saveResearchPackage', getSettings().uiLanguage),
       defaultPath: `${getActiveVault().name.replace(/[\\/:*?"<>|]/g, '_')}.${extension}`,
       filters: [{ name: 'Paquete de investigación Nodus', extensions: ['zip'] }],
     });
@@ -501,7 +502,7 @@ export function registerPrimarySourcesIpc({ h, getWindow }: IpcContext): void {
   });
   h('primarySources:export:validate', async () => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: 'Validar paquete de investigación',
+      title: dialogTitle('validateResearchPackage', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: [{ name: 'Paquete de investigación Nodus', extensions: ['zip'] }],
     });
@@ -510,7 +511,7 @@ export function registerPrimarySourcesIpc({ h, getWindow }: IpcContext): void {
   });
   h('primarySources:export:restore', async (_e, name?: string | null) => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: 'Restaurar paquete como vault nuevo',
+      title: dialogTitle('restorePackageAsNewVault', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: [{ name: 'Paquete de investigación Nodus', extensions: ['zip'] }],
     });

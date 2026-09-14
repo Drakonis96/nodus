@@ -85,7 +85,7 @@ export function SkillMarketplaceModal({ onClose, initialTab = 'library' }: { onC
             <img className="skill-marketplace-logo-dark skill-modal-mark" src={`data:image/svg+xml,${encodeURIComponent(marketplaceLogoSvg(accent))}`} alt="" aria-hidden="true" />
             <img className="skill-marketplace-logo-light skill-modal-mark" src={`data:image/svg+xml,${encodeURIComponent(marketplaceLogoSvg(accent, { plate: false }))}`} alt="" aria-hidden="true" />
             <div>
-              <span className="chat-skills-eyebrow">NODUS SKILLS</span>
+              <span className="chat-skills-eyebrow">{t('SKILLS DE NODUS')}</span>
               <h3>{title}</h3>
               <p className="skill-modal-subtitle">{draft ? t('Describe el método y el resultado esperado. El modelo decide cuándo aplicarlo.') : t('Instala, crea y configura tus skills. Actívalas en cada chat.')}</p>
             </div>
@@ -95,7 +95,7 @@ export function SkillMarketplaceModal({ onClose, initialTab = 'library' }: { onC
 
         {!draft && <div className="skill-marketplace-tabs">
           <button type="button" aria-pressed={tab === 'library'} onClick={() => setTab('library')}>{t('Mis skills')}</button>
-          <button type="button" aria-pressed={tab === 'marketplace'} onClick={() => setTab('marketplace')}>Marketplace</button>
+          <button type="button" aria-pressed={tab === 'marketplace'} onClick={() => setTab('marketplace')}>{t('Marketplace')}</button>
         </div>}
 
         {draft ? <form className="chat-skill-editor" onSubmit={event => { event.preventDefault(); void mutate(() => window.nodus.saveChatSkill(draft)).then(saved => { if (saved) { setDraft(null); setQuery(''); } }); }}>

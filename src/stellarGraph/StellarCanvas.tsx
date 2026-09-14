@@ -487,7 +487,7 @@ export function StellarCanvas(props: Props) {
       e.preventDefault();
       stopCamera();
       setError(
-        "Se ha interrumpido la aceleración gráfica. Recupera el canvas para continuar.",
+        t("Se ha interrumpido la aceleración gráfica. Recupera el canvas para continuar."),
       );
     };
     el.addEventListener("webglcontextlost", lost);

@@ -2,6 +2,7 @@
 // author becomes a section headed by their full name, followed by the central
 // thesis, the "what to remember" bullets and the positioning paragraph. The set
 // is either an explicit selection or every author that currently has a synthesis.
+import { dialogTitle } from '../dialogTitles';
 import { app, dialog } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,6 +10,7 @@ import type { AuthorSynthesisExportRequest } from '@shared/types';
 import { getDb } from '../db/database';
 import { splitName } from '../ai/authorDossier';
 import { markdownToPdf } from './markdownRender';
+import { getSettings } from '../db/settingsRepo';
 
 export interface SynthRow {
   author_id: string;
@@ -82,7 +84,7 @@ export async function exportAuthorSyntheses(
   const ext = request.format === 'pdf' ? 'pdf' : 'md';
 
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Exportar síntesis de autores',
+    title: dialogTitle('exportAuthorSynthesis', getSettings().uiLanguage),
     defaultPath: path.join(app.getPath('documents'), `${baseName}.${ext}`),
     filters: [
       request.format === 'pdf'

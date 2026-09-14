@@ -37,7 +37,7 @@ test('a pairing code can be read aloud and typed back without a second try', () 
 
 test('Nodus Server web translations cover every supported app language', () => {
   assert.deepEqual(missingServerTranslations(), {
-    en: [], es: [], fr: [], de: [], pt: [], 'pt-BR': [], it: [], tr: [],
+    en: [], es: [], fr: [], de: [], pt: [], 'pt-BR': [], it: [], tr: [], 'zh-CN': [],
   });
 });
 
@@ -520,7 +520,7 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
     assert.match(initialSetupHtml, /data-testid="auth-layout"/);
     assert.match(initialSetupHtml, /data-testid="language-picker"/);
     assert.match(initialSetupHtml, /class="help-tip"/);
-    for (const [language, flag] of [['en', '🇬🇧'], ['es', '🇪🇸'], ['fr', '🇫🇷'], ['de', '🇩🇪'], ['pt', '🇵🇹'], ['pt-BR', '🇧🇷'], ['it', '🇮🇹'], ['tr', '🇹🇷']]) {
+    for (const [language, flag] of [['en', '🇬🇧'], ['es', '🇪🇸'], ['fr', '🇫🇷'], ['de', '🇩🇪'], ['pt', '🇵🇹'], ['pt-BR', '🇧🇷'], ['it', '🇮🇹'], ['tr', '🇹🇷'], ['zh-CN', '🇨🇳']]) {
       assert.match(initialSetupHtml, new RegExp(`<option value="${language}"[^>]*>${flag} `));
     }
     assert.match(initialSetupHtml, /<link rel="icon" type="image\/svg\+xml" href="\/favicon\.svg">/);
@@ -820,6 +820,7 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
       ['pt-BR', 'Iniciar sessão no Nodus Server'],
       ['it', 'Accedi a Nodus Server'],
       ['tr', 'Nodus Server’da oturum aç'],
+      ['zh-CN', '登录 Nodus Server'],
       ['en', 'Sign in to Nodus Server'],
     ]) {
       const changed = await fetch(`${origin}/api/v1/settings/language`, {

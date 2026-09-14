@@ -1,6 +1,6 @@
 # Nodus third-party notices
 
-Nodus 5.4.2 is free software distributed exclusively under the GNU Affero
+Nodus 5.4.3 is free software distributed exclusively under the GNU Affero
 General Public License v3.0 (`AGPL-3.0-only`). Versions through 3.2.7 remain
 available under MIT. Nodus includes or interoperates with the components and
 data described below. Those components keep their own licenses and their
@@ -74,6 +74,23 @@ and the first drawn word.
   `site/assets/fonts/Inter-OFL.txt` and `site/assets/fonts/Fraunces-OFL.txt`
 - Changes made by Nodus: none. The `woff2` files are served byte for byte as
   they are published upstream.
+
+## Noto Sans SC — OFL 1.1
+
+The PDF exporters (the desktop professional report stamper and the Nodus Server
+Deep Research export) draw their text with `pdf-lib`, whose bundled fonts are the
+WinAnsi StandardFonts and cannot encode Han characters. A Simplified Chinese
+font is therefore vendored so Chinese reports and labels render instead of being
+stripped, and every exported document embeds only a per-document subset.
+
+- Creators: the Noto Project Authors (https://github.com/notofonts/noto-cjk)
+- Source: `Sans/SubsetOTF/SC/NotoSansSC-Regular.otf`
+- Vendored file: `server/lib/assets/fonts/NodusCJK-Regular.ttf`, with the
+  license text beside it as `server/lib/assets/fonts/OFL.txt`
+- License: SIL Open Font License 1.1
+- Changes made by Nodus: the upstream Simplified Chinese subset was instantiated
+  at weight 400 and reduced with `fontTools` to the BMP CJK blocks, Latin and
+  punctuation. The glyph outlines are unchanged beyond that subsetting.
 
 ## Multilingual E5 small model — MIT
 

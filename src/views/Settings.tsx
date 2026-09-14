@@ -1100,7 +1100,7 @@ export function Settings({
             </Row>
             {activeVault?.type === 'academic' && <>
               <div className="mt-4 border-t border-neutral-800 pt-4">
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Comprensión documental')}</h3>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Índice documental')}</h3>
                 <p className="mb-3 text-xs leading-5 text-neutral-500">{t('Crea una ficha jerárquica auditada de cada obra completa para orientar chat, Nodi, Deep Research e Immersion. Las citas siguen apuntando al texto original.')}</p>
               </div>
               {DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && <>
@@ -1143,6 +1143,7 @@ export function Settings({
                 <option value="pt-BR">Português (Brasil)</option>
                 <option value="it">Italiano</option>
                 <option value="tr">Türkçe</option>
+                <option value="zh-CN">简体中文</option>
               </select>
             </Row>
             <Row label={t('Idioma de los prompts (idioma de las ideas generadas)')}>

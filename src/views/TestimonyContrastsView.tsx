@@ -126,7 +126,7 @@ export function TestimonyContrastsView() {
     for (const fragment of fragments) {
       lines.push(`## ${fragment.speakerName} · ${fragment.interviewTitle} · ${formatTimecode(fragment.tStart)}`);
       lines.push(`> ${fragment.text}`);
-      if (fragment.codes.length > 0) lines.push(`**Códigos:** ${fragment.codes.map((code) => code.label).join(', ')}`);
+      if (fragment.codes.length > 0) lines.push(`${t('**Códigos:**')} ${fragment.codes.map((code) => code.label).join(', ')}`);
       lines.push(testimonyLinkMarkdown(t('Abrir el fragmento en su minuto'), {
         target: 'interview',
         id: fragment.interviewId,

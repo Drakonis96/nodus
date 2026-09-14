@@ -18,6 +18,11 @@ const zotero = (phase = 'attachments') => ({ requestId: 'z1', phase, percent: 72
 const embedding = { running: true, paused: false, cancelled: false, totalIdeas: 100, ideasEmbedded: 30, totalWorks: 5, currentWorkIndex: 1, currentIdeaIndex: 2, currentWorkIdeas: 10, currentWorkTitle: 'Historia comparada', error: null };
 const passages = { running: true, paused: false, cancelled: false, totalPassages: 500, passagesEmbedded: 30, totalWorks: 5, currentWorkIndex: 1, currentPassageIndex: 2, currentWorkPassages: 100, currentWorkTitle: 'Historia comparada', error: null };
 const documents = (status = 'running', phase = 'structuring') => ({ campaigns: [{ campaignId: 'c1', vaultId: 'v1', status, totalJobs: 2, completedJobs: 0, failedJobs: 0, estimatedUnits: 100, completedUnits: 25, createdAt: now, updatedAt: now }], jobs: [{ jobId: 'j1', campaignId: 'c1', vaultId: 'v1', nodusId: 'w1', title: 'Documento en análisis', status: status === 'completed' ? 'completed' : status, phase, progress: .25, createdAt: now, currentUnit: 1, totalUnits: 4 }] });
+/** A per-work scan: real work with no campaign behind it. */
+const standaloneDocument = (status = 'queued', phase = 'queued', error = null) => ({
+  campaigns: [], active: 0, queued: 0, failed: status === 'failed' ? 1 : 0,
+  jobs: [{ jobId: 'standalone-1', campaignId: null, vaultId: 'v1', nodusId: 'w1', title: 'Obra completa', priority: 750, reason: 'manual', status, phase, progress: 0, progressMessage: null, currentUnit: null, totalUnits: null, sourceFingerprint: null, generatorModel: null, auditorModel: null, attempts: 0, maxAttempts: 5, error, createdAt: now, updatedAt: now }],
+});
 
 test('queue dropdown retains and controls every processing lane', { timeout: 240_000 }, async (t) => {
   if (!chrome) { t.skip('Chrome/Chromium not installed'); return; }
@@ -387,6 +392,29 @@ test('queue dropdown retains and controls every processing lane', { timeout: 240
       await page.setViewportSize({ width: 1200, height: 900 });
       await page.keyboard.press('Escape'); await page.getByTestId('header-queue-panel').waitFor({ state: 'detached' });
       await count(5);
+    });
+    await t.test('a standalone document job is visible, counted in the badge and clearable', async () => {
+      await fresh({ getDocumentIndexProgress: standaloneDocument('queued') }); await open();
+      // The rail and the "nothing in progress" message must never coexist.
+      await page.getByTestId('document-index-progress-bar').waitFor();
+      assert.equal(await page.getByTestId('header-queue-empty').count(), 0);
+      await count(1);
+      await page.getByTestId('document-index-progress-bar').locator('button.btn-ghost').first().click();
+      await page.getByTestId('document-index-rail-job-standalone-1').waitFor();
+
+      await emit('onDocumentIndexProgress', standaloneDocument('failed', 'done', 'Connection error.'));
+      await count(0);
+      assert.equal(await page.getByTestId('attention').innerText(), 'true');
+      const retry = page.getByTestId('document-index-rail-retry-standalone-1');
+      await retry.waitFor();
+      await retry.click();
+      await action('enqueueDocumentProfile', 'w1');
+
+      // A failed per-work job must be clearable, or the badge it raises never goes away.
+      await page.getByRole('button', { name: 'Limpiar terminadas', exact: true }).click();
+      await page.getByRole('dialog', { name: 'Limpiar tareas terminadas', exact: true }).getByRole('button', { name: 'Limpiar terminadas', exact: true }).click();
+      await page.getByTestId('header-queue-empty').waitFor();
+      assert.equal(await page.getByTestId('attention').innerText(), 'false');
     });
     assert.deepEqual(errors, [], 'real renderer has no uncaught errors');
   } finally { await browser.close(); await rm(dir, { recursive: true, force: true }); }

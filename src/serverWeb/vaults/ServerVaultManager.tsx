@@ -564,7 +564,7 @@ export function ServerVaultManager({
                             disabled={!editable || busy}
                             onClick={() => setImportTarget(managed)}
                             title={editable ? "Importar" : "Solo lectura"}
-                            aria-label={`Importar en ${space.name}`}
+                            aria-label={tx("Importar en {name}", { name: space.name })}
                             data-testid={`vault-action-import-${space.id}`}
                           >
                             <Icon name="upload" size={14} />

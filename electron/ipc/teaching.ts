@@ -1,5 +1,6 @@
 // teaching channels, moved verbatim out of the monolithic registerIpc.
 // The channel names are unchanged; scripts/test-ipc-contract.mjs is what proves it.
+import { dialogTitle } from '../dialogTitles';
 import type { IpcContext } from './context';
 import * as teachingExams from '../db/teachingExamsRepo';
 import * as teachingRubrics from '../db/teachingRubricsRepo';
@@ -50,7 +51,7 @@ export function registerTeachingIpc({ h, getWindow }: IpcContext): void {
   h('teaching:export:acta', async (_e, format: GradebookExportFormat, input: ActaExportInput, grid?: { columns: unknown[]; rows: unknown[] }) => {
     const base = (input.header.subject || 'acta').replace(/[\\/:*?"<>|]+/g, '-') || 'acta';
     const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
-      title: 'Descargar acta',
+      title: dialogTitle('downloadActa', getSettings().uiLanguage),
       defaultPath: `${base}.${format}`,
       filters: [{ name: format.toUpperCase(), extensions: [format] }],
     });
@@ -64,7 +65,7 @@ export function registerTeachingIpc({ h, getWindow }: IpcContext): void {
   h('teaching:export:boletin', async (_e, input: BoletinExportInput) => {
     const base = (input.student.name || input.student.code || 'boletin').replace(/[\\/:*?"<>|]+/g, '-');
     const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
-      title: 'Descargar boletín',
+      title: dialogTitle('downloadReportCard', getSettings().uiLanguage),
       defaultPath: `${base}.pdf`,
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
     });
@@ -113,7 +114,7 @@ export function registerTeachingIpc({ h, getWindow }: IpcContext): void {
   h('teaching:rubrics:generate', async (_e, request: RubricGenerationRequest) => generateRubric(request));
   h('teaching:rubrics:pickFile', async () => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: 'Elegir el documento con las instrucciones de la tarea',
+      title: dialogTitle('chooseTaskInstructions', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: [{ name: 'Documentos', extensions: ['pdf', 'docx', 'doc', 'txt', 'md', 'rtf', 'odt'] }],
     });
@@ -124,7 +125,7 @@ export function registerTeachingIpc({ h, getWindow }: IpcContext): void {
     const rubric = teachingRubrics.getTeachingRubric(id);
     const baseName = (rubric.title || 'rubrica').replace(/[\\/:*?"<>|]+/g, '-') || 'rubrica';
     const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
-      title: 'Descargar rúbrica',
+      title: dialogTitle('downloadRubric', getSettings().uiLanguage),
       defaultPath: `${baseName}.${format}`,
       filters: [format === 'pdf' ? { name: 'PDF', extensions: ['pdf'] } : { name: 'Word', extensions: ['docx'] }],
     });
@@ -154,7 +155,7 @@ export function registerTeachingIpc({ h, getWindow }: IpcContext): void {
   h('teaching:exams:question:generate', async (_e, request: ExamQuestionGenerationRequest) => generateExamQuestion(request));
   h('teaching:exams:pickImage', async (_e, kind: 'logo' | 'figure') => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: kind === 'logo' ? 'Elegir logotipo' : 'Elegir imagen de la pregunta',
+      title: kind === 'logo' ? dialogTitle('chooseLogo', getSettings().uiLanguage) : dialogTitle('chooseQuestionImage', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tif', 'tiff'] }],
     });
@@ -172,7 +173,7 @@ export function registerTeachingIpc({ h, getWindow }: IpcContext): void {
   h('teaching:logos:add', async (_e, name: string, dataUrl: string) => teachingLogos.addTeachingLogo(name, dataUrl));
   h('teaching:logos:import', async () => {
     const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-      title: 'Añadir logotipo a la biblioteca',
+      title: dialogTitle('addLogoToLibrary', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tif', 'tiff'] }],
     });
@@ -188,7 +189,7 @@ export function registerTeachingIpc({ h, getWindow }: IpcContext): void {
     const exam = teachingExams.getTeachingExam(id);
     const baseName = (exam.header.examTitle?.trim() || exam.title).replace(/[\\/:*?"<>|]+/g, '-') || 'examen';
     const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
-      title: 'Descargar examen',
+      title: dialogTitle('downloadExam', getSettings().uiLanguage),
       defaultPath: `${baseName}.${format}`,
       filters: [format === 'pdf' ? { name: 'PDF', extensions: ['pdf'] } : { name: 'Word', extensions: ['docx'] }],
     });

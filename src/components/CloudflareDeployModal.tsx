@@ -77,9 +77,9 @@ export function CloudflareDeployModal({ onClose, onComplete }: { onClose: () => 
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/65 p-4" onClick={onClose}>
-      <div className="card max-h-[92vh] w-full max-w-3xl overflow-y-auto p-5 sm:p-6" role="dialog" aria-modal="true" aria-label="Deploy to Cloudflare" onClick={(event) => event.stopPropagation()}>
+      <div className="card max-h-[92vh] w-full max-w-3xl overflow-y-auto p-5 sm:p-6" role="dialog" aria-modal="true" aria-label={t('Desplegar en Cloudflare')} onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4">
-          <div><h2 className="text-xl font-semibold">Deploy to Cloudflare</h2><p className="mt-1 text-sm text-neutral-500">{t('Tu vault disponible sin servidor y sin intermediación de Nodus.')}</p></div>
+          <div><h2 className="text-xl font-semibold">{t('Desplegar en Cloudflare')}</h2><p className="mt-1 text-sm text-neutral-500">{t('Tu vault disponible sin servidor y sin intermediación de Nodus.')}</p></div>
           <button className="btn btn-ghost" onClick={onClose} aria-label={t('Cerrar')}><Icon name="x" /></button>
         </div>
 
@@ -116,7 +116,7 @@ export function CloudflareDeployModal({ onClose, onComplete }: { onClose: () => 
         ) : !prepared ? (
           <div className="mt-5">
             <ol className="grid gap-2 text-sm sm:grid-cols-3">
-              <li className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800"><strong>1. Cloudflare</strong><br /><span className="text-neutral-500">{t('Inicia sesión o crea una cuenta gratuita.')}</span></li>
+              <li className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800"><strong>{t('1. Cloudflare')}</strong><br /><span className="text-neutral-500">{t('Inicia sesión o crea una cuenta gratuita.')}</span></li>
               <li className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800"><strong>{t('2. GitHub o GitLab')}</strong><br /><span className="text-neutral-500">{t('Cloudflare guardará allí tu copia actualizable de Nodus Cloud.')}</span></li>
               <li className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800"><strong>{t('3. Conectar')}</strong><br /><span className="text-neutral-500">{withCode(t('Pega aquí la URL workers.dev que recibas.'), 'workers.dev')}</span></li>
             </ol>

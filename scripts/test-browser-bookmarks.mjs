@@ -155,8 +155,8 @@ test('trusted Bookmarks UI reuses Atlas styling and avoids native prompt dialogs
   assert.doesNotMatch(pages, /nodus-start-light|useLightTheme/);
   assert.doesNotMatch(styles, /nodus-start-light/,
     'the public Nodus Research design has no light variant, so neither local start page may invent one');
-  assert.match(pages, /isSaved \? 'Saved' : 'Save'/);
-  assert.match(pages, /global search/);
+  assert.match(pages, /isSaved \? t\('Guardado'\) : t\('Guardar'\)/);
+  assert.match(pages, /búsqueda global/);
   assert.match(pages, /data-testid="nodus-site-header"/);
   assert.match(pages, /data-testid="nodus-site-footer"/);
   assert.match(pages, /label="Atlas" url=\{NODUS_RESEARCH_ATLAS_URL\}/,

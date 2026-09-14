@@ -137,7 +137,7 @@ test('Compass has native copy for every supported locale', async () => {
   try {
     const tables = require(outfile);
     const allowSame = new Set(['Nodus Compass']);
-    for (const name of ['FR', 'DE', 'PT', 'PT_BR', 'IT', 'TR']) {
+    for (const name of ['FR', 'DE', 'PT', 'PT_BR', 'IT', 'TR', 'ZH_CN']) {
       for (const key of Object.keys(tables.EN)) {
         assert.ok(tables[name][key], `${name} is missing Compass key ${key}`);
         if (!allowSame.has(key)) assert.notEqual(tables[name][key], tables.EN[key], `${name} inherits English copy for ${key}`);

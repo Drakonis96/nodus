@@ -1,6 +1,7 @@
 import { localizeRuntimeError } from '@shared/uiLanguage';
 // platform channels, moved verbatim out of the monolithic registerIpc.
 // The channel names are unchanged; scripts/test-ipc-contract.mjs is what proves it.
+import { dialogTitle } from '../dialogTitles';
 import { localizedForUi, type IpcContext } from './context';
 import { BrowserWindow } from 'electron';
 import { originalImagePayloadFromUrl } from '../imageProtocol';
@@ -349,7 +350,7 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
   });
   h('audio:exportClip', async (_e, clipId: string) => {
     const source = audioClipPath(clipId); if (!source) return null;
-    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, { title: 'Guardar audio', defaultPath: path.basename(source), filters: [{ name: 'Audio WAV', extensions: ['wav'] }] });
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, { title: dialogTitle('saveAudio', getSettings().uiLanguage), defaultPath: path.basename(source), filters: [{ name: 'Audio WAV', extensions: ['wav'] }] });
     if (picked.canceled || !picked.filePath) return null; fs.copyFileSync(source, picked.filePath); return { path: picked.filePath };
   });
   h('audio:study:bookmarks', async (_e, kind: AudioEntityKind, id: string) => listStudyAudioBookmarks(kind, id));

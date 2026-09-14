@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, LineCapStyle, type PDFPage } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 // Only what this file uses itself. Everything the old callers imported from here is re-exported
 // below, and a re-export needs no import of its own.
 import {
@@ -7,6 +8,7 @@ import {
   type ProfessionalReportInput,
 } from '@shared/professionalReport';
 import { htmlToPdfBytes } from './htmlToPdf';
+import { cjkSafe, hasCjk, subsetCjkFont } from './pdfText';
 
 // The design moved to `shared/professionalReport.ts` so the Nodus Server can serve the same
 // document to a phone. What stays here is the half that needs this process: a real Chromium
@@ -31,10 +33,25 @@ export type {
 
 function fitText(value: string, font: Awaited<ReturnType<PDFDocument['embedFont']>>, size: number, maxWidth: number): string {
   const text = pdfSafe(value);
+  return clipToWidth(text, font, size, maxWidth, '...');
+}
+
+/** The CJK counterpart of {@link fitText}: keeps the text and clips with a real ellipsis. */
+function fitCjkText(value: string, font: Awaited<ReturnType<PDFDocument['embedFont']>>, size: number, maxWidth: number): string {
+  return clipToWidth(cjkSafe(value), font, size, maxWidth, '…');
+}
+
+function clipToWidth(
+  text: string,
+  font: Awaited<ReturnType<PDFDocument['embedFont']>>,
+  size: number,
+  maxWidth: number,
+  ellipsis: string
+): string {
   if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
   let clipped = text;
-  while (clipped.length > 1 && font.widthOfTextAtSize(`${clipped}...`, size) > maxWidth) clipped = clipped.slice(0, -1);
-  return `${clipped.trim()}...`;
+  while (clipped.length > 1 && font.widthOfTextAtSize(`${clipped}${ellipsis}`, size) > maxWidth) clipped = clipped.slice(0, -1);
+  return `${clipped.trim()}${ellipsis}`;
 }
 
 // The Nodus brand mark: the same stylized "N" as the app icon — bold strokes
@@ -60,6 +77,15 @@ async function stampProfessionalPdf(bytes: Buffer, input: ProfessionalReportInpu
   const doc = await PDFDocument.load(bytes);
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  // The running footer repeats the report's kind label ("Research report", "研究报告", …).
+  // In Chinese that cannot go through Helvetica, so it gets a bundled CJK subset instead.
+  const kindIsCjk = hasCjk(input.kindLabel);
+  const kindFont = kindIsCjk
+    ? await (async () => {
+        doc.registerFontkit(fontkit);
+        return doc.embedFont(await subsetCjkFont(input.kindLabel), { subset: false });
+      })()
+    : bold;
   const accent = rgb(...input.theme.accentRgb);
   const gray = rgb(0.46, 0.49, 0.56);
   const line = rgb(0.84, 0.86, 0.9);
@@ -84,8 +110,10 @@ async function stampProfessionalPdf(bytes: Buffer, input: ProfessionalReportInpu
     drawNodusMark(page, centerX, headerY, accent);
 
     page.drawLine({ start: { x: margin, y: 39 }, end: { x: width - margin, y: 39 }, thickness: 0.45, color: line });
-    const kind = fitText(input.kindLabel.toUpperCase(), bold, 6.5, 145);
-    page.drawText(kind, { x: margin, y: 22, size: 6.5, font: bold, color: gray });
+    const kind = kindIsCjk
+      ? fitCjkText(input.kindLabel, kindFont, 6.5, 145)
+      : fitText(input.kindLabel.toUpperCase(), bold, 6.5, 145);
+    page.drawText(kind, { x: margin, y: 22, size: 6.5, font: kindFont, color: gray });
     const brand = 'NODUS';
     const brandWidth = bold.widthOfTextAtSize(brand, 6.5);
     page.drawText(brand, { x: width - margin - brandWidth, y: 22, size: 6.5, font: bold, color: accent });
