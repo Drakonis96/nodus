@@ -65,8 +65,9 @@
       "ownership": { "data": "private-local-conversation", "generation": "desktop-local-provider", "citations": "nodus-uri" },
       "roles": { "owner": ["read", "chat", "write"], "writer": ["read", "chat", "write"], "reader": ["read", "chat"] },
       "desktop": { "status": "implemented", "evidence": [
-        { "path": "src/views/ResearchAssistantModal.tsx", "line": 420, "symbol": "researchChatStream", "contains": "window.nodus.researchChatStream" },
-        { "path": "src/views/ResearchAssistantModal.tsx", "line": 534, "symbol": "cancel", "contains": "cancelResearchChat" }
+        { "path": "src/views/ResearchAssistantModal.tsx", "line": 224, "symbol": "default desktop API and native vault adapters", "contains": "const api = adapter ?? window.nodus" },
+        { "path": "src/views/ResearchAssistantModal.tsx", "line": 544, "symbol": "researchChatStream", "contains": "api.researchChatStream" },
+        { "path": "src/views/ResearchAssistantModal.tsx", "line": 656, "symbol": "cancel", "contains": "api.cancelResearchChat" }
       ] },
       "server": { "status": "implemented", "evidence": [
         { "path": "server/lib/routes/ai.mjs", "line": 200, "symbol": "durable capability job", "contains": "privateData.createJob" },

@@ -18,6 +18,7 @@ export const RELATIONS: Record<string, { color: string; label: string }> = {
   related: { color: "#b2a2df", label: "Se relaciona" },
 };
 export const NODE_COLORS: Record<string, string> = {
+  theme: "#8fd9c4",
   claim: "#baa5ff",
   finding: "#67e4ce",
   construct: "#7fbdff",
@@ -25,6 +26,7 @@ export const NODE_COLORS: Record<string, string> = {
   framework: "#efaddf",
 };
 export const NODE_LABELS: Record<string, string> = {
+  theme: "Tema",
   claim: "Afirmación",
   finding: "Hallazgo",
   construct: "Concepto",

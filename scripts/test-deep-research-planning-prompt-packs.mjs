@@ -69,7 +69,10 @@ test('Spanish retains the source-stage clause counts, schema tokens, and dynamic
     }
   }
   assert.match(pack.decomposeObjective, /4 y 17 subpreguntas/);
-  assert.match(pack.planReport, /arquitectura de 4 secciones amplias/);
+  // A numeric preference is a CEILING ("Máx. N secciones"), so the planner must be
+  // told the number is a maximum rather than a target it should reach.
+  assert.match(pack.planReport, /MÁXIMO de 4 secciones amplias/);
+  assert.match(pack.planReport, /No devuelvas más de 4/);
 });
 
 test('dynamic approach rules are appended without translation and no non-Spanish pack emits Spanish prose', () => {

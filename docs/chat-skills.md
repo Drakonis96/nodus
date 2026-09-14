@@ -12,6 +12,14 @@ Tool-backed skills have a teal accent and a translated **Uses tools** label.
 
 ## Built-in skills
 
+**AlphaGenome** starts disabled. Its own configuration accepts a personal
+AlphaGenome API key, requires the service/output terms and eligible non-commercial
+use, and installs the official Python client into an isolated runtime. It
+produces local, attributed genomic prediction plots. See
+[AlphaGenome](alphagenome.md) for supported inputs, setup, limitations
+and verification. Prediction data is kept outside model history, sync and
+backups; its exports retain the separate AlphaGenome output terms.
+
 **SVG Studio** and **Image Atelier** start enabled. SVG Studio creates precise
 vector diagrams, schematics and other editable drawings. Image Atelier prepares
 an English production prompt and calls the image provider and model selected in
@@ -23,7 +31,7 @@ and **Perspective Switcher** start disabled. Their instructions are editable.
 Built-in names, descriptions and instructions are currently English; interface
 controls follow all eight supported UI languages.
 
-A skill supplies a method, not unrestricted code execution. The model chooses
+A skill supplies a method and may declare native capabilities or isolated JavaScript tools. See [Skill marketplace](skill-marketplace.md) for package authoring, installation and runtime boundaries. The model chooses
 relevant enabled skills for the current request. Original diagrams can be derived
 from supported concepts without requiring a source to contain the finished SVG.
 Explicit source-only constraints and truthful citation requirements still apply.
@@ -85,3 +93,5 @@ inspection in Electron. `scripts/verify-chat-skills.mjs` is an optional live-pro
 QA harness: it requires an explicitly supplied disposable profile, makes model
 calls, and writes local visual artifacts. Do not point it at a production profile
 or publish its output if it contains private material.
+
+**Legalize** is one opt-in legislation skill for the reviewed country repositories. See [setup, country coverage and verification](legalize.md). New installations enable only SVG Studio and Image Atelier; version-12 migration preserves existing users’ choices, including Chemistry.

@@ -4,18 +4,23 @@
 // a pill and the preset filters by the same word, so a reader who clicks
 // "Incompleto" must get exactly the rows whose pill says "Incompleto".
 //
-// Two deliberate divergences, both forced:
-//   * transient pending/running states have no preset predicate. The renderer
-//     derives them from persisted resumption markers plus the in-memory queue.
-//   * the semantic-index step is not consulted. Whether an idea's embedding is
-//     current depends on a text hash computed in JS (embeddingPipeline), which
-//     SQL cannot evaluate — which is why it does not gate "ready" there either.
+// The only transient state with no SQL predicate is `running`: it exists solely in
+// the live queue, and the renderer overlays it. Persisted `pending` markers DO have
+// a predicate, so a work waiting to resume is filterable instead of leaking into
+// "Incompleto" (which is what happened while it had none).
+//
+// Semantic freshness is evaluated here. `idea_embedding_text_hash` is registered on
+// the connection (see database.ts) from the same pure helper the embedding pipeline
+// uses, so the hash SQL compares against is the one the app itself would compute.
 import type { WorkReadiness } from '@shared/types';
 import { currentEmbeddingConfig } from './ideasRepo';
 
-type Readiness = Exclude<WorkReadiness, 'pending' | 'running'>;
+type Readiness = Exclude<WorkReadiness, 'running'>;
 
-/** Any of the three AI passes reported a failure. Outranks everything below. */
+/** Accepted by the queue but not executing; outranks failure to match deriveWorkStatus. */
+const PENDING = `(w.light_status = 'pending' OR w.deep_status = 'pending' OR w.summary_status = 'pending')`;
+
+/** Any of the three AI passes reported a failure. */
 const FAILED = `(w.light_status = 'failed' OR w.deep_status = 'failed' OR w.deep_error IS NOT NULL OR w.summary_status = 'failed')`;
 
 /** Nothing has been attempted yet. */
@@ -33,7 +38,40 @@ const NO_TEXT = `(
   OR ${EFFECTIVE_SOURCE} IN ('none', 'abstract_only')
 )`;
 
-const HAS_IDEAS = `EXISTS (SELECT 1 FROM idea_occurrences io WHERE io.nodus_id = w.nodus_id)`;
+/**
+ * One idea's embedding is current for the configured provider/model and its exact
+ * source text. Mirrors `getWorkEmbeddingStatuses` in embeddingPipeline.ts.
+ */
+const IDEA_EMBEDDING_CURRENT = `(
+  i.embedding IS NOT NULL
+  AND i.embedding_provider = @readyProv
+  AND i.embedding_model = @readyModel
+  AND i.embedding_dim > 0
+  AND i.embedding_dim = length(i.embedding) / 4
+  AND i.embedding_text_hash = idea_embedding_text_hash(
+    i.type, i.label, i.statement,
+    COALESCE((
+      SELECT GROUP_CONCAT(DISTINCT t.label)
+      FROM idea_theme_links it
+      JOIN themes t ON t.theme_id = it.theme_id
+      WHERE it.global_id = i.global_id
+    ), '')
+  )
+)`;
+
+/**
+ * Every idea of the work is embedded and current. Mirrors embeddingPipeline's
+ * `complete` flag: a work with no ideas is not "missing" its semantic index, so the
+ * predicate is vacuously true when there are none.
+ */
+const SEMANTIC_COMPLETE = `(
+  NOT EXISTS (
+    SELECT 1 FROM idea_occurrences io
+    JOIN ideas i ON i.global_id = io.global_id
+    WHERE io.nodus_id = w.nodus_id
+      AND NOT ${IDEA_EMBEDDING_CURRENT}
+  )
+)`;
 
 /**
  * Every passage of the work is embedded with the CURRENT provider/model and
@@ -64,35 +102,37 @@ const PASSAGES_COMPLETE = `(
 )`;
 
 /** Everything the JS precedence chain rules out before it considers ready/incomplete. */
-const ANALYSABLE = `NOT ${FAILED} AND NOT ${UNSTARTED} AND NOT ${ABSTRACT_ONLY} AND NOT ${NO_TEXT}`;
+const ANALYSABLE = `NOT ${PENDING} AND NOT ${FAILED} AND NOT ${UNSTARTED} AND NOT ${ABSTRACT_ONLY} AND NOT ${NO_TEXT}`;
 
-/** Ready = themes + ideas + citable text, matching READY_STEPS. */
+/** Ready = all five steps, matching READY_STEPS. */
 const READY_CORE = `w.light_status = 'done' AND w.deep_status = 'done'
   AND (w.resolved_text_hash IS NULL OR w.deep_hash = w.resolved_text_hash)
-  AND ${HAS_IDEAS} AND ${PASSAGES_COMPLETE}`;
+  AND ${SEMANTIC_COMPLETE} AND w.summary_status = 'done' AND ${PASSAGES_COMPLETE}`;
 
 /**
  * The WHERE fragment for a readiness preset, plus the bound parameters it needs.
  * Returns null for values with no SQL expression.
  */
 export function readinessWhere(readiness: Readiness): { sql: string; params: Record<string, string> } | null {
-  const needsPassages = readiness === 'ready' || readiness === 'incomplete';
+  const needsEmbedding = readiness === 'ready' || readiness === 'incomplete';
   const params: Record<string, string> = {};
-  if (needsPassages) {
+  if (needsEmbedding) {
     const config = currentEmbeddingConfig();
     params.readyProv = config.provider;
     params.readyModel = config.model;
   }
 
   switch (readiness) {
+    case 'pending':
+      return { sql: PENDING, params };
     case 'failed':
-      return { sql: FAILED, params };
+      return { sql: `NOT ${PENDING} AND ${FAILED}`, params };
     case 'unstarted':
-      return { sql: `NOT ${FAILED} AND ${UNSTARTED}`, params };
+      return { sql: `NOT ${PENDING} AND NOT ${FAILED} AND ${UNSTARTED}`, params };
     case 'abstractOnly':
-      return { sql: `NOT ${FAILED} AND NOT ${UNSTARTED} AND ${ABSTRACT_ONLY}`, params };
+      return { sql: `NOT ${PENDING} AND NOT ${FAILED} AND NOT ${UNSTARTED} AND ${ABSTRACT_ONLY}`, params };
     case 'noText':
-      return { sql: `NOT ${FAILED} AND NOT ${UNSTARTED} AND NOT ${ABSTRACT_ONLY} AND ${NO_TEXT}`, params };
+      return { sql: `NOT ${PENDING} AND NOT ${FAILED} AND NOT ${UNSTARTED} AND NOT ${ABSTRACT_ONLY} AND ${NO_TEXT}`, params };
     case 'ready':
       return { sql: `${ANALYSABLE} AND ${READY_CORE}`, params };
     case 'incomplete':

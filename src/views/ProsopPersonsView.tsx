@@ -5,9 +5,9 @@ import { errorText, t, tx } from '../i18n';
 
 const field = 'w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-neutral-700 dark:bg-neutral-950';
 
-export function ProsopPersonsView() {
+export function ProsopPersonsView({ initialPersonId }: { initialPersonId?: string } = {}) {
   const [data,setData] = useState<ProsopIdentityWorkspace | null>(null);
-  const [selectedId,setSelectedId] = useState<string | null>(null);
+  const [selectedId,setSelectedId] = useState<string | null>(initialPersonId ?? null);
   const [name,setName] = useState(''); const [context,setContext] = useState('');
   const [candidates,setCandidates] = useState<Array<ProsopPersonProfile & { score:number; reasons:string[] }>>([]);
   const [error,setError] = useState(''); const [busy,setBusy] = useState(false);

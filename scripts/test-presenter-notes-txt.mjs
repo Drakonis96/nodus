@@ -68,3 +68,84 @@ test('TXT notes parser rejects unsupported, partial, reordered, and trailing con
     /Unexpected content/,
   );
 });
+
+// ── "Recovered notes" dumps ──────────────────────────────────────────────────
+// The second accepted shape: a `KEY: value` header, one open-ended section per
+// slide that HAS a note, silent slides simply absent, and no escaping. The
+// fixtures below are synthetic — the shape is what matters, not any one file.
+
+const RECOVERED = [
+  'PRESENTACIÓN: Curso de ejemplo',
+  'ARCHIVO ORIGINAL: Curso de ejemplo.pdf',
+  'PÁGINAS: 6',
+  'NOTAS RECUPERADAS: 3',
+  'FECHA DE IMPORTACIÓN: 2026-04-21T13:41:11.067Z',
+  '',
+  '===== DIAPOSITIVA 2 =====',
+  'Primer párrafo de la segunda diapositiva.',
+  '',
+  'Segundo párrafo, separado por una línea en blanco.',
+  '',
+  '===== DIAPOSITIVA 3 =====',
+  'Una sola línea.',
+  '',
+  '===== DIAPOSITIVA 6 =====',
+  'La última diapositiva con nota.',
+  '',
+  '',
+].join('\n');
+
+test('recovered-notes dumps are read: declared length, gaps, and paragraph breaks', () => {
+  const parsed = parsePresenterNotesTxt(RECOVERED);
+
+  // The header's page count is the deck's length, not the number of notes — the
+  // importer compares it against the real PDF, so 6 must not become 3.
+  assert.equal(parsed.totalSlides, 6);
+  assert.deepEqual(Object.keys(parsed.notes).sort(), ['2', '3', '6']);
+  // Slides with no section stay absent rather than becoming empty strings.
+  for (const silent of ['1', '4', '5']) assert.equal(parsed.notes[silent], undefined);
+  // Blank lines BETWEEN paragraphs survive; the ones padding the edges do not.
+  assert.equal(parsed.notes['2'], 'Primer párrafo de la segunda diapositiva.\n\nSegundo párrafo, separado por una línea en blanco.');
+  assert.equal(parsed.notes['3'], 'Una sola línea.');
+  // The last section runs to the end of the file, trailing blank lines and all.
+  assert.equal(parsed.notes['6'], 'La última diapositiva con nota.');
+});
+
+test('recovered notes survive a round trip through the native export', () => {
+  const parsed = parsePresenterNotesTxt(RECOVERED);
+  const reparsed = parsePresenterNotesTxt(serializePresenterNotesTxt(parsed.notes, parsed.totalSlides));
+  assert.deepEqual(reparsed, parsed);
+});
+
+test('recovered dumps accept the English marker, a BOM and Windows line endings', () => {
+  const text = `﻿${['PAGES: 3', '', '===== SLIDE 2 =====', 'English dump.', ''].join('\r\n')}`;
+  assert.deepEqual(parsePresenterNotesTxt(text), { notes: { 2: 'English dump.' }, totalSlides: 3 });
+});
+
+test('a recovered dump with no page-count header falls back to its highest slide', () => {
+  const parsed = parsePresenterNotesTxt('===== DIAPOSITIVA 4 =====\nSin cabecera.\n');
+  assert.deepEqual(parsed, { notes: { 4: 'Sin cabecera.' }, totalSlides: 4 });
+});
+
+test('a damaged native export is refused, not read as a recovered dump', () => {
+  // Closing markers but no magic line: reading this leniently would fold
+  // "===== END SLIDE 1 =====" into the note text instead of admitting the file
+  // is broken.
+  assert.throws(
+    () => parsePresenterNotesTxt('===== SLIDE 1 =====\nNote\n===== END SLIDE 1 =====\n'),
+    /Unsupported/,
+  );
+});
+
+test('recovered dumps refuse to lose a note or name a slide the deck lacks', () => {
+  assert.throws(
+    () => parsePresenterNotesTxt('PÁGINAS: 4\n\n===== DIAPOSITIVA 2 =====\nUna\n\n===== DIAPOSITIVA 2 =====\nOtra\n'),
+    /Duplicate presenter notes section for slide 2/,
+  );
+  assert.throws(
+    () => parsePresenterNotesTxt('PÁGINAS: 3\n\n===== DIAPOSITIVA 9 =====\nFuera de rango\n'),
+    /slide 9 in a deck of 3/,
+  );
+  // A header alone is still not a notes file.
+  assert.throws(() => parsePresenterNotesTxt('PÁGINAS: 3\nNOTAS RECUPERADAS: 0\n'), /Unsupported/);
+});

@@ -323,7 +323,7 @@ try {
     assert.match(pack, language === 'es' ? /mención no equivale/i : /mention|Nennung|menção|menzione|geçişi/i);
   }
 
-  const [view, panel, personsView, cohortsPanel, analysisView, networksView, searchView, mcpTools] = await Promise.all([
+  const [view, panel, personsView, cohortsPanel, analysisView, networksView, searchView, sharedSearchView, mcpTools] = await Promise.all([
     readFile(path.join(repoRoot, 'src/views/ProsopSourcesView.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/components/ProsopObservationsPanel.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/views/ProsopPersonsView.tsx'), 'utf8'),
@@ -331,6 +331,7 @@ try {
     readFile(path.join(repoRoot, 'src/views/ProsopAnalysisView.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/views/ProsopNetworksView.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/views/ProsopSearchView.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/views/VaultContentSearchView.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'electron/mcp/tools.ts'), 'utf8'),
   ]);
   // Asks whether the channel is wired, not which file it lives in: the handlers
@@ -353,7 +354,8 @@ try {
   assert.match(analysisView, /inputFingerprint/);
   assert.match(networksView, /data-testid="prosop-networks-view"/);
   assert.match(networksView, /strokeDasharray/);
-  assert.match(searchView, /data-testid="prosop-search-view"/);
+  assert.match(searchView, /<VaultContentSearchView\b[^>]*testId="prosop-search-view"/);
+  assert.match(sharedSearchView, /data-testid=\{testId\}/);
   assert.match(mcpTools, /nodus_prosop_get_design/);
   assert.match(mcpTools, /nodus_prosop_create_proposal/);
   assert.ok(view.includes('accept=".csv,.tsv,.txt"'));

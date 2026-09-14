@@ -1,0 +1,17 @@
+LEGALIZE — Portugal: legislation as open data
+
+SOFTWARE / PIPELINE
+The software that generates and maintains this repository is open source
+under the MIT License:
+  https://github.com/legalize-dev/legalize-pipeline
+
+LEGISLATIVE CONTENT (DATA)
+Acesso universal e gratuito ao Diário da República, nos termos do artigo 3.º do Decreto-Lei n.º 83/2016, de 16 de dezembro, que abrange a impressão, o arquivo, a pesquisa e o livre acesso ao conteúdo dos atos publicados, em formatos eletrónicos de acesso aberto; e do regime de dados abertos da Lei n.º 68/2021, de 26 de agosto. A edição eletrónica é a que faz fé (eli:legal_value = official).
+These are official public-sector texts reproduced from their official
+source. The original source of each document is recorded in the `source`
+field of that file's YAML front matter.
+
+DISCLAIMER
+Automated reproduction of official sources. This is not an official or
+verified legal text. Always consult the official source for authoritative
+versions.

@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
 const require = createRequire(import.meta.url);
 
 async function loadPack() {
@@ -57,7 +57,7 @@ test('research assistant wires prompt language into all model-facing branches an
   assert.match(assistant, /buildResearchContext\(request\.selection, question, contextBudget, promptLanguage\)/);
   assert.match(assistant, /prompt\.context\.sections/);
   assert.match(genealogy, /language: PromptLanguage = getSettings\(\)\.promptLanguage \?\? 'es'/);
-  assert.match(genealogy, /treeKinshipLabel\(relative, language\)/);
+  assert.match(genealogy, /treeKinshipLabel\(relative, normalizeUiLanguage\(language\)\)/);
   for (const key of ['contexto_familiar', 'conversacion', 'contexto_modular_seleccionado', 'contrato_de_salida_obligatorio']) {
     assert.match(assistant, new RegExp(key), `protocol key ${key} changed`);
   }

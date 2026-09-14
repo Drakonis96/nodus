@@ -13,6 +13,7 @@ import { auditQaDatabaseOpen } from '../qa/databaseAudit';
 import { migrateDatabaseSafely } from './migrationSafety';
 import { scheduleMigrationRecoveryRetention } from './migrationRecoveryUtilityHost';
 import { ensureBackupRevisionTriggers } from '../export/backupVaultRevision';
+import { embeddingTextForIdea, embeddingTextHash } from './ideaEmbeddingText';
 
 let db: Database.Database | null = null;
 const jobDatabase = new AsyncLocalStorage<Database.Database>();
@@ -143,6 +144,24 @@ function openDatabase(file: string): Database.Database {
   next.pragma('wal_autocheckpoint = 1000');
   next.function('vec_cosine', vecCosine);
   next.function('vec_scan', vecScan);
+  // Lets the readiness presets evaluate idea-embedding freshness in SQL exactly as
+  // `getWorkEmbeddingStatuses` does in JS. Without it the "Incomplete" filter could
+  // never see a stale semantic index (its hash is computed here, not stored in a
+  // form SQLite can compare). Registered from the same pure helper the pipeline uses.
+  next.function('idea_embedding_text_hash', (type: unknown, label: unknown, statement: unknown, themeLabels: unknown) => {
+    const themes = typeof themeLabels === 'string' && themeLabels
+      ? themeLabels.split(',').filter(Boolean)
+      : [];
+    // Mirror the JS template semantics `getWorkEmbeddingStatuses` relies on: a NULL
+    // label/statement stringifies to "null" in a template literal, so it must here too.
+    const asJsText = (value: unknown): string => (value == null ? 'null' : String(value));
+    return embeddingTextHash(embeddingTextForIdea({
+      type: type == null ? null : String(type),
+      label: asJsText(label),
+      statement: asJsText(statement),
+      themes,
+    }));
+  });
   const optimizeTimer = setTimeout(() => {
     let previousBusyTimeout: number | null = null;
     try {

@@ -179,8 +179,8 @@ export async function suggestFolderIdeas(folderId: string, requestedLanguage?: P
   }
 
   // ── Stage 3: AI curation + justification ───────────────────────────────────
-  const localizedVia = ({ es: 'mediante conexión', en: 'via connection', fr: 'via une connexion', de: 'über Verbindung', pt: 'através de ligação', 'pt-BR': 'via conexão', it: 'tramite collegamento', tr: 'bağlantı üzerinden' } as const)[language];
-  const localizedAffinity = ({ es: 'similitud', en: 'similarity', fr: 'similarité', de: 'Ähnlichkeit', pt: 'semelhança', 'pt-BR': 'similaridade', it: 'affinità', tr: 'benzerlik' } as const)[language];
+  const localizedVia = ({ es: 'mediante conexión', en: 'via connection', fr: 'via une connexion', de: 'über Verbindung', pt: 'através de ligação', 'pt-BR': 'via conexão', it: 'tramite collegamento', tr: 'bağlantı üzerinden', 'zh-Hans': '通过关联', 'zh-Hant': '透過關聯', vi: 'qua kết nối', ja: '関連経由', ru: 'через связь', uk: 'через зв’язок', ko: '연결을 통해' } as const)[language];
+  const localizedAffinity = ({ es: 'similitud', en: 'similarity', fr: 'similarité', de: 'Ähnlichkeit', pt: 'semelhança', 'pt-BR': 'similaridade', it: 'affinità', tr: 'benzerlik', 'zh-Hans': '相似度', 'zh-Hant': '相似度', vi: 'độ tương đồng', ja: '類似度', ru: 'сходство', uk: 'схожість', ko: '유사도' } as const)[language];
   const list = candidates
     .map((c, i) => {
       const via = c.viaConnection ? ` [${localizedVia}]` : '';

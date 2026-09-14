@@ -15,8 +15,8 @@
  * or a network.
  */
 
-import type { AppLanguage } from './types';
-import { normalizeUiLanguage, worldBeatMarkLabel, worldEntryKindLabel, worldRuleHardnessHint, worldRuleHardnessLabel, worldRuleScopeLabel } from './worldPromptLanguage';
+import type { PromptLanguage } from './types';
+import { normalizePromptLanguage, worldBeatMarkLabel, worldEntryKindLabel, worldRuleHardnessHint, worldRuleHardnessLabel, worldRuleScopeLabel } from './worldPromptLanguage';
 import { worldOperationSystemPrompt } from './worldOperationPrompts';
 
 /** One scene that put the law to the test, as the prompt wants it. */
@@ -61,8 +61,8 @@ Reglas, sin excepción:
 - Empieza directamente por el enunciado: sin preámbulos, sin comillas, sin repetir el título y sin explicar lo que vas a hacer.`;
 
 /** Localized system contract for direct users of this pure context module. */
-export function worldRuleSystemPrompt(language: AppLanguage = 'es'): string {
-  return worldOperationSystemPrompt('ruleDraft', normalizeUiLanguage(language));
+export function worldRuleSystemPrompt(language: PromptLanguage = 'es'): string {
+  return worldOperationSystemPrompt('ruleDraft', normalizePromptLanguage(language));
 }
 
 /**
@@ -87,8 +87,8 @@ export function hasWorldRuleMaterial(sources: WorldRuleSources): boolean {
   );
 }
 
-export function composeWorldRuleContext(sources: WorldRuleSources, language: AppLanguage = 'es'): string {
-  const locale = normalizeUiLanguage(language);
+export function composeWorldRuleContext(sources: WorldRuleSources, language: PromptLanguage = 'es'): string {
+  const locale = normalizePromptLanguage(language);
   const copy = RULE_CONTEXT_COPY[locale];
   const lines: string[] = [];
   lines.push(`${copy.law}: ${sources.title}`);
@@ -139,7 +139,7 @@ export function composeWorldRuleContext(sources: WorldRuleSources, language: App
   return lines.join('\n');
 }
 
-const RULE_CONTEXT_COPY: Record<AppLanguage, {
+const RULE_CONTEXT_COPY: Record<PromptLanguage, {
   law: string; hardness: string; scope: string; currentStatement: string; cost: string; limits: string;
   calendar: string; eras: string; exceptions: string; tests: string; priceAbsent: string; pricePaid: string;
   mentions: string; writeStatement: string;
@@ -152,4 +152,11 @@ const RULE_CONTEXT_COPY: Record<AppLanguage, {
   'pt-BR': { law: 'LEI', hardness: 'RIGIDEZ', scope: 'REGE SOBRE', currentStatement: 'ENUNCIADO ATUAL (melhore-o, não o descarte)', cost: 'CUSTO DE QUEBRÁ-LA (outro campo; não o repita)', limits: 'ATÉ ONDE NÃO ALCANÇA (outro campo; não o repita)', calendar: 'CALENDÁRIO DESTE MUNDO (não use outro)', eras: 'eras', exceptions: 'EXCEÇÕES EXISTENTES (o enunciado não deve contradizê-las):', tests: 'COMO A NARRATIVA A TESTA (o que a lei realmente significa):', priceAbsent: 'o custo NÃO está na página', pricePaid: 'o custo é pago', mentions: 'QUEM A MENCIONA (use-o; não invente além daqui):', writeStatement: 'Escreva o enunciado desta lei.' },
   it: { law: 'LEGGE', hardness: 'RIGIDITÀ', scope: 'VALE PER', currentStatement: 'ENUNCIATO ATTUALE (miglioralo, non eliminarlo)', cost: 'COSTO DELLA VIOLAZIONE (altro campo; non ripeterlo)', limits: 'DOVE NON VALE (altro campo; non ripeterlo)', calendar: 'CALENDARIO DI QUESTO MONDO (non usarne altri)', eras: 'ere', exceptions: 'ECCEZIONI ESISTENTI (l’enunciato non deve contraddirle):', tests: 'COME LA STORIA LA METTE ALLA PROVA (il vero significato della legge):', priceAbsent: 'il prezzo NON è indicato', pricePaid: 'il prezzo viene pagato', mentions: 'CHI LA MENZIONA (usalo; non inventare oltre):', writeStatement: 'Scrivi l’enunciato di questa legge.' },
   tr: { law: 'KURAL', hardness: 'SERTLİK', scope: 'GEÇERLİ OLDUĞU YER', currentStatement: 'MEVCUT İFADE (geliştir, atma)', cost: 'ÇİĞNEME BEDELİ (başka alan; tekrarlama)', limits: 'GEÇERLİ OLMADIĞI SINIR (başka alan; tekrarlama)', calendar: 'BU DÜNYANIN TAKVİMİ (başka takvim kullanma)', eras: 'çağlar', exceptions: 'MEVCUT İSTİSNALAR (ifade bunlarla çelişmemeli):', tests: 'ÖYKÜNÜN ONU SINAMA BİÇİMİ (kuralın gerçek anlamı):', priceAbsent: 'bedel sayfada YOK', pricePaid: 'bedel ödenir', mentions: 'ONDAN SÖZ EDENLER (kullan; bunun dışında uydurma):', writeStatement: 'Bu kuralın ifadesini yaz.' },
+  'zh-Hans': { law: '法则', hardness: '强度', scope: '管辖范围', currentStatement: '当前表述（请改进，不要丢弃）', cost: '打破它的代价（另一个字段；不要重复）', limits: '它触及不到之处（另一个字段；不要重复）', calendar: '本世界的历法（不要使用其他历法）', eras: '纪元', exceptions: '已有的例外（表述不得与之矛盾）：', tests: '故事如何考验它（这才是法则真正的含义）：', priceAbsent: '代价并未写在纸上', pricePaid: '代价已支付', mentions: '谁提及了它（请利用这些信息；不要虚构此范围之外的内容）：', writeStatement: '撰写这条法则的表述。' },
+  'zh-Hant': { law: '法則', hardness: '強度', scope: '管轄範圍', currentStatement: '目前表述（請改進，不要捨棄）', cost: '打破它的代價（另一個欄位；請勿重複）', limits: '它觸及不到之處（另一個欄位；請勿重複）', calendar: '本世界的曆法（請勿使用其他曆法）', eras: '紀元', exceptions: '既有的例外（表述不得與之矛盾）：', tests: '故事如何考驗它（這才是法則真正的含義）：', priceAbsent: '代價並未寫在紙上', pricePaid: '代價已支付', mentions: '誰提及了它（請利用這些資訊；不要虛構此範圍之外的內容）：', writeStatement: '撰寫這條法則的表述。' },
+  vi: { law: 'LUẬT', hardness: 'ĐỘ CỨNG', scope: 'PHẠM VI ÁP DỤNG', currentStatement: 'PHÁT BIỂU HIỆN TẠI (cải thiện, đừng vứt bỏ)', cost: 'CÁI GIÁ KHI PHÁ VỠ (trường khác; đừng lặp lại)', limits: 'NƠI NÓ KHÔNG VƯƠN TỚI (trường khác; đừng lặp lại)', calendar: 'LỊCH CỦA THẾ GIỚI NÀY (không dùng lịch nào khác)', eras: 'kỷ nguyên', exceptions: 'CÁC NGOẠI LỆ HIỆN CÓ (phát biểu không được mâu thuẫn với chúng):', tests: 'CÁCH CÂU CHUYỆN THỬ THÁCH NÓ (ý nghĩa thực sự của luật):', priceAbsent: 'cái giá KHÔNG có trên trang', pricePaid: 'cái giá được trả', mentions: 'NHỮNG NGƯỜI NHẮC ĐẾN NÓ (hãy dùng; đừng bịa đặt gì ngoài đây):', writeStatement: 'Viết phát biểu của luật này.' },
+  ja: { law: '法則', hardness: '強度', scope: '適用範囲', currentStatement: '現在の文面（改善し、破棄しないでください）', cost: '破った代償（別のフィールドです。繰り返さないでください）', limits: '及ばない範囲（別のフィールドです。繰り返さないでください）', calendar: 'この世界の暦（他の暦を使わないでください）', eras: '時代', exceptions: '既存の例外（文面と矛盾しないでください）：', tests: '物語がそれを試す方法（法則が本当に意味するもの）：', priceAbsent: '代償は本文に記されていない', pricePaid: '代償は支払われる', mentions: 'それを言及しているもの（活用し、これ以外を捏造しないでください）：', writeStatement: 'この法則の文面を書いてください。' },
+  ru: { law: 'ЗАКОН', hardness: 'ЖЁСТКОСТЬ', scope: 'РАСПРОСТРАНЯЕТСЯ НА', currentStatement: 'ТЕКУЩАЯ ФОРМУЛИРОВКА (улучшите её, не отбрасывайте)', cost: 'ЦЕНА НАРУШЕНИЯ (другое поле; не повторяйте)', limits: 'ГДЕ ОНО НЕ ДЕЙСТВУЕТ (другое поле; не повторяйте)', calendar: 'КАЛЕНДАРЬ ЭТОГО МИРА (не используйте другой)', eras: 'эпохи', exceptions: 'СУЩЕСТВУЮЩИЕ ИСКЛЮЧЕНИЯ (формулировка не должна им противоречить):', tests: 'КАК ИСТОРИЯ ИСПЫТЫВАЕТ ЕГО (что закон действительно означает):', priceAbsent: 'цена НЕ на странице', pricePaid: 'цена уплачена', mentions: 'КТО УПОМИНАЕТ ЕГО (используйте их; не выдумывайте ничего сверх этого):', writeStatement: 'Напишите формулировку этого закона.' },
+  uk: { law: 'ЗАКОН', hardness: 'ЖОРСТКІСТЬ', scope: 'ПОШИРЮЄТЬСЯ НА', currentStatement: 'ПОТОЧНЕ ФОРМУЛЮВАННЯ (поліпшіть його, не відкидайте)', cost: 'ЦІНА ПОРУШЕННЯ (інше поле; не повторюйте)', limits: 'ДЕ ВОНО НЕ ДІЄ (інше поле; не повторюйте)', calendar: 'КАЛЕНДАР ЦЬОГО СВІТУ (не використовуйте іншого)', eras: 'епохи', exceptions: 'НАЯВНІ ВИНЯТКИ (формулювання не повинно їм суперечити):', tests: 'ЯК ІСТОРІЯ ВИПРОБОВУЄ ЙОГО (що закон насправді означає):', priceAbsent: 'ціна НЕ на сторінці', pricePaid: 'ціна сплачена', mentions: 'ХТО ЗГАДУЄ ЙОГО (використовуйте їх; не вигадуйте нічого понад це):', writeStatement: 'Напишіть формулювання цього закону.' },
+  ko: { law: '법칙', hardness: '강도', scope: '적용 범위', currentStatement: '현재 진술(개선하되 버리지 마십시오)', cost: '위반의 대가(다른 필드이므로 반복하지 마십시오)', limits: '미치지 않는 범위(다른 필드이므로 반복하지 마십시오)', calendar: '이 세계의 달력(다른 달력을 사용하지 마십시오)', eras: '시대', exceptions: '기존 예외(진술이 이와 모순되어서는 안 됩니다):', tests: '이야기가 그것을 시험하는 방식(법칙의 진정한 의미):', priceAbsent: '대가가 본문에 없음', pricePaid: '대가가 지불됨', mentions: '그것을 언급하는 대상(활용하되, 이 밖의 내용을 지어내지 마십시오):', writeStatement: '이 법칙의 진술을 작성하십시오.' },
 };

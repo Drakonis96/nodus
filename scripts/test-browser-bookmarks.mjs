@@ -143,6 +143,7 @@ test('trusted Bookmarks UI reuses Atlas styling and avoids native prompt dialogs
   const pages = readFileSync(path.join(repoRoot, 'src/components/browser/NodusStartPages.tsx'), 'utf8');
   const manager = readFileSync(path.join(repoRoot, 'src/components/browser/BrowserBookmarksManager.tsx'), 'utf8');
   const browserView = readFileSync(path.join(repoRoot, 'src/views/NodusBrowserView.tsx'), 'utf8');
+  const ipc = readFileSync(path.join(repoRoot, 'electron/ipc/browser.ts'), 'utf8');
   assert.match(styles, /@import url\([^)]*research-atlas\.css/);
   assert.match(pages, /site\/assets\/js\/organism\.js/,
     'the local start pages must load the exact Nodus Research organism engine');
@@ -168,6 +169,17 @@ test('trusted Bookmarks UI reuses Atlas styling and avoids native prompt dialogs
     'bookmark rows must not stretch short cards to match taller neighbours');
   assert.match(styles, /\.bookmarks-main \.atlas-card\s*\{\s*min-height:0;\s*padding:20px/,
     'bookmark cards must override the Atlas minimum height and excess padding');
+  assert.match(styles, /\.bookmarks-main \.bookmark-card\s*\{\s*height:171px/,
+    'website and folder cards must keep the same compact desktop height');
+  assert.match(styles, /\.bookmark-card \.atlas-description[\s\S]{0,180}text-overflow:ellipsis/,
+    'long bookmark copy must truncate instead of making one card taller');
+  assert.match(pages, /resolveBrowserBookmarkFavicons\(missingFaviconKey\.split\('\\n'\)\)/,
+    'visible bookmarks must ask the trusted browser process to fill missing favicons');
+  assert.match(ipc, /browser:bookmarks:resolveFavicons/);
+  const favicon = readFileSync(path.join(repoRoot, 'electron/browser/favicon.ts'), 'utf8');
+  assert.match(favicon, /discoverFaviconUrls/);
+  assert.match(favicon, /new URL\('\/favicon\.ico', origin\)/,
+    'favicon discovery must retain the conventional site icon fallback');
   assert.match(pages, /className="card lit atlas-card bookmark-card"[\s\S]{0,260}openBrowserTab\(entry\.url\)/,
     'clicking a website card must open its bookmark');
   assert.match(pages, /className=\{`card lit atlas-card bookmark-card[\s\S]{0,300}setFolderId\(entry\.id\)/,
@@ -184,7 +196,6 @@ test('trusted Bookmarks UI reuses Atlas styling and avoids native prompt dialogs
     'Atlas and Bookmarks must render inside the same Nodus Research site shell');
   assert.match(pages, /navigateBrowserStartPage\('atlas'\)/);
   assert.match(pages, /navigateBrowserStartPage\('bookmarks'\)/);
-  const ipc = readFileSync(path.join(repoRoot, 'electron/ipc/browser.ts'), 'utf8');
   const localNavigation = ipc.indexOf("h('browser:navigateStartPage'");
   assert.ok(localNavigation >= 0);
   assert.match(ipc.slice(localNavigation, localNavigation + 550), /assertUiSender\(event, getWindow\)/);

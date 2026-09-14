@@ -1,3 +1,5 @@
+import { DocumentVisualScope, DocumentVisualActions } from '../components/DocumentVisualScope';
+import { DocumentSkillsControl, useDocumentSkills } from '../components/DocumentSkillsControl';
 // Deep Research — a gallery of saved reports (grid/list, search, sort), a
 // chained generation queue, and tabbed readers that expand reports to full width
 // with a persistent route back to the gallery. The heavy lifting (generation,
@@ -61,6 +63,12 @@ import {
   type ReaderSelectionActionsHandle,
 } from '../components/ReaderSelectionActions';
 import { t, tx, getActiveLang } from '../i18n';
+import { DeepResearchSectionLengthField } from '../components/DeepResearchSectionLengthField';
+import { PROMPT_LANGUAGE_OPTIONS } from '@shared/promptLanguageOptions';
+import {
+  normalizeDeepResearchSectionLength,
+  type DeepResearchSectionLength,
+} from '@shared/deepResearchSectionLength';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 
 const DEEP_SECTION_OPTIONS: { value: DeepResearchSectionLimit; label: string }[] = [
@@ -302,8 +310,11 @@ export function DeepResearchView({
   const [language, setLanguage] = useState<PromptLanguage>('es');
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'deepResearchModel');
   const [deepSectionLimit, setDeepSectionLimit] = useState<DeepResearchSectionLimit>('auto');
+  const [deepSectionLength, setDeepSectionLength] = useState<DeepResearchSectionLength>('auto');
+  const [sectionLengthValid, setSectionLengthValid] = useState(true);
   const [audience, setAudience] = useState<StudyDeepResearchAudience>(isTeaching ? 'teacher' : 'students');
   const [includeImage, setIncludeImage] = useState(false);
+  const documentSkills = useDocumentSkills();
   const [imageStyle, setImageStyle] = useState<DecorativeImageStyle>(settings.imageStyle);
   const [focusPersonId, setFocusPersonId] = useState<string | null>(null);
   const [personsList, setPersonsList] = useState<Person[]>([]);
@@ -519,6 +530,13 @@ export function DeepResearchView({
       setError(t(copy.missingObjective));
       return;
     }
+    // A half-typed custom length must not queue a multi-minute report against a
+    // value the composer already refused.
+    if (!documentSkills.valid) { setError(t('Corregir límites de skills')); return; }
+    if (!sectionLengthValid) {
+      setError(t('Corrige la extensión orientativa de cada sección antes de generar el informe.'));
+      return;
+    }
     const outline = isTeaching && structureMode === 'manual' && deepSectionLimit !== 'single' ? unitOutline : null;
     const request = {
       objective: objective.trim(),
@@ -526,6 +544,8 @@ export function DeepResearchView({
       deepResearchVersion: normalizeDeepResearchRequestVersion(deepResearchVersion),
       language,
       sectionLimit: deepSectionLimit,
+      sectionLength: deepSectionLength,
+      documentSkills: documentSkills.policy,
       ...(isStudy ? { audience } : {}),
       model: selectedModel,
       decorativeImage: { enabled: includeImage, style: imageStyle },
@@ -543,6 +563,8 @@ export function DeepResearchView({
     setObjective('');
     setApproach('general');
     setDeepResearchVersion('v2');
+    setDeepSectionLength('auto');
+    setSectionLengthValid(true);
     setFocusPersonId(null);
     setError(null);
     setMessage(t(copy.queuedToast));
@@ -621,6 +643,8 @@ export function DeepResearchView({
     setApproach(normalizeDeepResearchApproach(saved.draft.deepResearchApproach ?? saved.brief.deepResearchApproach));
     setDeepResearchVersion(normalizeDeepResearchMetadataVersion(saved.draft.deepResearchVersion ?? saved.brief.deepResearchVersion));
     setDeepSectionLimit(saved.draft.deepResearchStructure === 'single' ? 'single' : 'auto');
+    // Reports written before the control existed carry no length and reopen as auto.
+    setDeepSectionLength(normalizeDeepResearchSectionLength(saved.draft.deepResearchSectionLength));
     if (saved.model) setSelectedModel(saved.model);
     if (isTeaching && (saved.brief.audience === 'teacher' || saved.brief.audience === 'students')) {
       setAudience(saved.brief.audience);
@@ -905,6 +929,7 @@ export function DeepResearchView({
             the window, so the report and its own toolbar are all that is left on
             screen. In the shell, the reader fills the space below the tabs. */}
         <div className={fullscreen ? 'fixed inset-0 z-40 flex flex-col bg-neutral-950' : 'flex flex-col flex-1 min-h-0'} data-testid="deep-research-reader-shell" data-fullscreen={fullscreen ? 'on' : 'off'}>
+          <DocumentVisualScope target={{ kind: 'deep-research', id: openDraft.id }} enabled={!appliedTranslation}>
           <ReaderView
             key={openDraft.id}
             saved={openDraft}
@@ -935,6 +960,7 @@ export function DeepResearchView({
             onOpenStudyMaterial={onOpenStudyMaterial}
             onOpenStudyRecording={onOpenStudyRecording}
           />
+          </DocumentVisualScope>
         </div>
         {translationOpen && (
           <TranslationModal
@@ -1196,6 +1222,10 @@ export function DeepResearchView({
           language={language}
           model={selectedModel}
           sectionLimit={deepSectionLimit}
+          sectionLength={deepSectionLength}
+          onSectionLength={setDeepSectionLength}
+          onSectionLengthValid={setSectionLengthValid}
+          documentSkills={documentSkills}
           includeImage={includeImage}
           imageStyle={imageStyle}
           hasModel={hasModel}
@@ -2075,6 +2105,7 @@ function ReaderView({
           onSaveToNotes={onSaveToNotes}
           onExport={onExport}
         />
+        <DocumentVisualActions />
         <ReaderFontControls targetRef={documentRef} scrollerRef={mainRef} initialSize={initialReaderFontSize} />
         <ReaderHighlighterControl value={highlighterColor} onChange={setHighlighterColor} />
         <HoverLabelButton
@@ -2193,7 +2224,8 @@ function ReaderView({
 // Composer — the new-report form (modal)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ComposerModal({
+export function ComposerModal({
+  documentSkills,
   settings,
   isGenealogy = false,
   isTeaching = false,
@@ -2209,6 +2241,9 @@ function ComposerModal({
   language,
   model,
   sectionLimit,
+  sectionLength,
+  onSectionLength,
+  onSectionLengthValid,
   includeImage,
   imageStyle,
   hasModel,
@@ -2228,6 +2263,7 @@ function ComposerModal({
   onSubmit,
   onClose,
 }: {
+  documentSkills: ReturnType<typeof useDocumentSkills>;
   settings: AppSettings;
   isGenealogy?: boolean;
   isTeaching?: boolean;
@@ -2243,6 +2279,9 @@ function ComposerModal({
   language: PromptLanguage;
   model: AppSettings['deepResearchModel'];
   sectionLimit: DeepResearchSectionLimit;
+  sectionLength: DeepResearchSectionLength;
+  onSectionLength: (v: DeepResearchSectionLength) => void;
+  onSectionLengthValid: (valid: boolean) => void;
   includeImage: boolean;
   imageStyle: DecorativeImageStyle;
   hasModel: boolean;
@@ -2421,19 +2460,21 @@ function ComposerModal({
                   ? t('Una narración continua sin encabezados internos; conserva toda la recuperación y el análisis.')
                   : isTeaching && structureMode === 'manual'
                     ? t('El esquema manual fija exactamente las partes y su orden.')
-                    : t('La estructura organiza el informe, pero nunca limita la evidencia relevante.')}
+                    : t('Un número es el máximo de secciones publicadas; la evidencia se reagrupa dentro de ellas, nunca se descarta.')}
               </span>
             </label>
+            <DeepResearchSectionLengthField
+              value={sectionLength}
+              onChange={onSectionLength}
+              onValidityChange={onSectionLengthValid}
+            />
             <label className="block min-w-0">
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">{t('Idioma')}</span>
               <select data-testid="deep-research-language" className="input w-full text-sm" value={language} onChange={(e) => onLanguage(e.target.value as PromptLanguage)}>
-                <option value="es">Español</option>
-                <option value="en">English</option>
-                <option value="fr">Français</option>
-                <option value="de">Deutsch</option>
-                <option value="pt">Português (Portugal)</option>
-                <option value="pt-BR">Português (Brasil)</option>
-                <option value="tr">Türkçe</option>
+                {/* Endonyms, so they are never translated: see PROMPT_LANGUAGE_OPTIONS. */}
+                {PROMPT_LANGUAGE_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
               </select>
             </label>
             <label className="block min-w-0">
@@ -2441,6 +2482,7 @@ function ComposerModal({
               <ModelPicker settings={settings} value={model} onChange={onModel} ariaLabel={t('Modelo')} className="w-full text-sm" menu />
             </label>
           </div>
+          <DocumentSkillsControl value={documentSkills.policy} onChange={documentSkills.setPolicy} onValidityChange={documentSkills.setValid} />
           <div className="flex flex-wrap items-center gap-2">
             <button
               className={`rounded-full border px-2.5 py-1 text-xs ${includeImage ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200' : 'border-neutral-700 text-neutral-500'}`}
@@ -2467,7 +2509,7 @@ function ComposerModal({
           <button
             className="btn btn-primary gap-1.5"
             onClick={onSubmit}
-            disabled={!hasModel || !objective.trim()}
+            disabled={!hasModel || !objective.trim() || !documentSkills.valid}
             title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
           >
             <Icon name="plus" /> {t('Añadir a la cola')}

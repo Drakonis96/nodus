@@ -9,6 +9,7 @@ export type TestimonyView =
   | 'testimonyInterviews'
   | 'testimonyParticipants'
   | 'testimonyContrasts'
+  | 'researchChat'
   | 'notes';
 
 export interface TestimonyItem { label: string; icon: string; view: TestimonyView }
@@ -38,6 +39,7 @@ export const TESTIMONY_GROUPS: TestimonyGroup[] = [
     { label: 'Participantes', icon: 'users', view: 'testimonyParticipants' },
   ] },
   { id: 'analyze', label: 'Analizar', items: [
+    { label: 'Research chat', icon: 'chat', view: 'researchChat' },
     { label: 'Contrastes', icon: 'scale', view: 'testimonyContrasts' },
   ] },
   { id: 'register', label: 'Registrar', items: [

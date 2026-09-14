@@ -9,8 +9,8 @@
  * world's own calendar, so it does not quietly invent a month.
  */
 
-import type { AppLanguage } from './types';
-import { normalizeUiLanguage, worldArticleCategoryLabel, worldEntryKindLabel } from './worldPromptLanguage';
+import type { PromptLanguage } from './types';
+import { normalizePromptLanguage, worldArticleCategoryLabel, worldEntryKindLabel } from './worldPromptLanguage';
 import { worldOperationSystemPrompt } from './worldOperationPrompts';
 
 export interface WorldArticleNeighbour {
@@ -46,8 +46,8 @@ export const WORLD_ARTICLE_EXPAND_SYSTEM = `${WORLD_ARTICLE_SYSTEM}
 - Estás AMPLIANDO una entrada que ya existe: conserva lo escrito, no lo reescribas ni lo reordenes, y añade lo que falte.`;
 
 /** Localized system contract for callers that use this pure context module directly. */
-export function worldArticleSystemPrompt(language: AppLanguage = 'es', expand = false): string {
-  return worldOperationSystemPrompt(expand ? 'articleExpand' : 'articleDraft', normalizeUiLanguage(language));
+export function worldArticleSystemPrompt(language: PromptLanguage = 'es', expand = false): string {
+  return worldOperationSystemPrompt(expand ? 'articleExpand' : 'articleDraft', normalizePromptLanguage(language));
 }
 
 /** True when there is enough to write from. An empty article with no links yields a
@@ -61,8 +61,8 @@ export function hasWorldArticleMaterial(sources: WorldArticleSources): boolean {
   );
 }
 
-export function composeWorldArticleContext(sources: WorldArticleSources, language: AppLanguage = 'es'): string {
-  const locale = normalizeUiLanguage(language);
+export function composeWorldArticleContext(sources: WorldArticleSources, language: PromptLanguage = 'es'): string {
+  const locale = normalizePromptLanguage(language);
   const copy = ARTICLE_CONTEXT_COPY[locale];
   const lines: string[] = [];
   lines.push(`${copy.entry}: ${sources.title}`);
@@ -99,7 +99,7 @@ export function composeWorldArticleContext(sources: WorldArticleSources, languag
   return lines.join('\n');
 }
 
-const ARTICLE_CONTEXT_COPY: Record<AppLanguage, {
+const ARTICLE_CONTEXT_COPY: Record<PromptLanguage, {
   entry: string; category: string; aliases: string; authorSummary: string; calendar: string;
   eras: string; months: string; neighbours: string; outgoing: string; incoming: string;
   currentBody: string; returnExpanded: string; writeEntry: string;
@@ -112,4 +112,11 @@ const ARTICLE_CONTEXT_COPY: Record<AppLanguage, {
   'pt-BR': { entry: 'ARTIGO', category: 'CATEGORIA', aliases: 'TAMBÉM CHAMADO', authorSummary: 'RESUMO DO AUTOR', calendar: 'CALENDÁRIO DESTE MUNDO (não use outro):', eras: 'Eras', months: 'Meses', neighbours: 'O MUNDO AO REDOR DESTE ARTIGO (use-o; não invente além dele):', outgoing: 'este artigo o menciona', incoming: 'ele menciona este artigo', currentBody: 'TEXTO ATUAL DO ARTIGO (preserve-o e amplie-o):', returnExpanded: 'Retorne o artigo COMPLETO, ampliado.', writeEntry: 'Escreva o artigo.' },
   it: { entry: 'VOCE', category: 'CATEGORIA', aliases: 'CHIAMATA ANCHE', authorSummary: 'SOMMARIO DELL’AUTORE', calendar: 'CALENDARIO DI QUESTO MONDO (non usarne altri):', eras: 'Ere', months: 'Mesi', neighbours: 'IL MONDO INTORNO A QUESTA VOCE (usalo; non inventare oltre):', outgoing: 'questa voce lo menziona', incoming: 'menziona questa voce', currentBody: 'TESTO ATTUALE DELLA VOCE (conservalo e amplialo):', returnExpanded: 'Restituisci la voce COMPLETA, ampliata.', writeEntry: 'Scrivi la voce.' },
   tr: { entry: 'MADDE', category: 'KATEGORİ', aliases: 'DİĞER ADI', authorSummary: 'YAZARIN ÖZETİ', calendar: 'BU DÜNYANIN TAKVİMİ (başka takvim kullanma):', eras: 'Çağlar', months: 'Aylar', neighbours: 'BU MADDENİN ÇEVRESİNDEKİ DÜNYA (kullan; bunun dışında bir şey uydurma):', outgoing: 'bu madde ondan söz ediyor', incoming: 'o bu maddeden söz ediyor', currentBody: 'MADDENİN MEVCUT METNİ (koru ve genişlet):', returnExpanded: 'TAMAMEN genişletilmiş maddeyi döndür.', writeEntry: 'Maddeyi yaz.' },
+  'zh-Hans': { entry: '条目', category: '类别', aliases: '又称', authorSummary: '作者摘要', calendar: '本世界的历法（不要使用其他历法）：', eras: '纪元', months: '月份', neighbours: '本条目周围的世界（请利用它；不要虚构此范围之外的内容）：', outgoing: '本条目提及它', incoming: '它提及本条目', currentBody: '条目的当前正文（请保留并扩写）：', returnExpanded: '返回完整扩写后的条目。', writeEntry: '撰写条目。' },
+  'zh-Hant': { entry: '條目', category: '類別', aliases: '又稱', authorSummary: '作者摘要', calendar: '本世界的曆法（請勿使用其他曆法）：', eras: '紀元', months: '月份', neighbours: '本條目周圍的世界（請善用它；不要虛構此範圍之外的內容）：', outgoing: '本條目提及它', incoming: '它提及本條目', currentBody: '條目的目前正文（請保留並擴寫）：', returnExpanded: '回傳完整擴寫後的條目。', writeEntry: '撰寫條目。' },
+  vi: { entry: 'MỤC TỪ', category: 'THỂ LOẠI', aliases: 'CÒN GỌI LÀ', authorSummary: 'TÓM TẮT CỦA TÁC GIẢ', calendar: 'LỊCH CỦA THẾ GIỚI NÀY (không dùng lịch nào khác):', eras: 'Kỷ nguyên', months: 'Tháng', neighbours: 'THẾ GIỚI XUNG QUANH MỤC TỪ NÀY (hãy dùng nó; đừng bịa đặt gì ngoài phạm vi này):', outgoing: 'mục từ này nhắc đến nó', incoming: 'nó nhắc đến mục từ này', currentBody: 'VĂN BẢN HIỆN TẠI CỦA MỤC TỪ (giữ nguyên và mở rộng):', returnExpanded: 'Trả về mục từ ĐẦY ĐỦ, đã mở rộng.', writeEntry: 'Viết mục từ.' },
+  ja: { entry: '項目', category: 'カテゴリ', aliases: '別名', authorSummary: '作者による要約', calendar: 'この世界の暦（他の暦は使わないでください）：', eras: '時代', months: '月', neighbours: 'この項目を取り巻く世界（活用し、それ以外を捏造しないでください）：', outgoing: 'この項目がそれに言及している', incoming: 'それがこの項目に言及している', currentBody: '現在の項目本文（保持して拡張してください）：', returnExpanded: '拡張後の完全な項目を返してください。', writeEntry: '項目を書いてください。' },
+  ru: { entry: 'СТАТЬЯ', category: 'КАТЕГОРИЯ', aliases: 'ТАКЖЕ НАЗЫВАЕТСЯ', authorSummary: 'РЕЗЮМЕ АВТОРА', calendar: 'КАЛЕНДАРЬ ЭТОГО МИРА (не используйте никакой другой):', eras: 'Эпохи', months: 'Месяцы', neighbours: 'МИР ВОКРУГ ЭТОЙ СТАТЬИ (используйте его; не выдумывайте ничего за его пределами):', outgoing: 'эта статья упоминает его', incoming: 'оно упоминает эту статью', currentBody: 'ТЕКУЩИЙ ТЕКСТ СТАТЬИ (сохраните и расширьте его):', returnExpanded: 'Верните ПОЛНУЮ расширенную статью.', writeEntry: 'Напишите статью.' },
+  uk: { entry: 'СТАТТЯ', category: 'КАТЕГОРІЯ', aliases: 'ТАКОЖ НАЗИВАЄТЬСЯ', authorSummary: 'РЕЗЮМЕ АВТОРА', calendar: 'КАЛЕНДАР ЦЬОГО СВІТУ (не використовуйте жодного іншого):', eras: 'Епохи', months: 'Місяці', neighbours: 'СВІТ НАВКОЛО ЦІЄЇ СТАТТІ (використовуйте його; не вигадуйте нічого поза ним):', outgoing: 'ця стаття згадує його', incoming: 'воно згадує цю статтю', currentBody: 'ПОТОЧНИЙ ТЕКСТ СТАТТІ (збережіть і розширте його):', returnExpanded: 'Поверніть ПОВНУ розширену статтю.', writeEntry: 'Напишіть статтю.' },
+  ko: { entry: '항목', category: '분류', aliases: '다른 이름', authorSummary: '저자 요약', calendar: '이 세계의 달력(다른 달력을 사용하지 마십시오):', eras: '시대', months: '월', neighbours: '이 항목을 둘러싼 세계(활용하되, 그 밖의 내용을 지어내지 마십시오):', outgoing: '이 항목이 그것을 언급함', incoming: '그것이 이 항목을 언급함', currentBody: '현재 항목 본문(그대로 유지하고 확장하십시오):', returnExpanded: '확장된 전체 항목을 반환하십시오.', writeEntry: '항목을 작성하십시오.' },
 };

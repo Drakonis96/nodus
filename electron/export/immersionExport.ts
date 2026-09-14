@@ -1,3 +1,6 @@
+import { getDocumentVisuals } from '../ai/documentVisuals';
+import { documentFigureInsertions, readyDocumentFigures, figureHtml } from '@shared/documentFigureExport';
+import type { DocumentVisualManifest } from '@shared/documentSkills';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app, dialog } from 'electron';
@@ -178,9 +181,9 @@ function citationHtml(citation: ImmersionCitation, labels: ImmersionReportLabels
   </article>`;
 }
 
-function stationHtml(session: ImmersionSession, index: number, labels: ImmersionReportLabels): { html: string; headings: ReturnType<typeof anchoredMarkdown>['headings'] } {
+function stationHtml(session: ImmersionSession, index: number, labels: ImmersionReportLabels, visuals?: DocumentVisualManifest | null): { html: string; headings: ReturnType<typeof anchoredMarkdown>['headings'] } {
   const station = session.plan.stations[index];
-  const synthesis = anchoredMarkdown(station.synthesis, `station-${index + 1}`);
+  const synthesis = anchoredMarkdown(station.synthesis, `station-${index + 1}`, documentFigureInsertions(station.synthesis, `station-${station.id}-synthesis`, visuals));
   const readings = station.citations.length
     ? `<h3>${escapeHtml(labels.guidedReading)}</h3>${station.citations.map((citation) => citationHtml(citation, labels)).join('')}`
     : '';
@@ -194,7 +197,7 @@ function stationHtml(session: ImmersionSession, index: number, labels: Immersion
     : '';
   return {
     html: `<div class="question-box"><small>${escapeHtml(labels.guidingQuestion)}</small><p>${escapeHtml(station.question)}</p></div>
-      ${station.context ? `<div class="prose"><p>${escapeHtml(station.context)}</p></div>` : ''}
+      ${station.context ? `<div class="prose">${anchoredMarkdown(station.context, `context-${index}`, documentFigureInsertions(station.context, `station-${station.id}-context`, visuals)).html}</div>` : ''}
       <div class="prose">${synthesis.html}</div>
       ${readings}${positions}${takeaways}`,
     headings: synthesis.headings,
@@ -231,9 +234,11 @@ function sourcesHtml(session: ImmersionSession, labels: ImmersionReportLabels): 
 
 /** Structured report model shared by the save-dialog exporter and PDF visual tests. */
 export function buildImmersionPdfInput(session: ImmersionSession, imageOverride?: { dataUrl: string | null; credit: string | null }): ProfessionalReportInput {
+  let visuals: DocumentVisualManifest | null = null;
+  try { visuals = getDocumentVisuals({ kind: 'immersion', id: session.id }); } catch { /* Unsaved export fixtures have no local manifest. */ }
   const labels = LABELS[session.language];
   const image = imageOverride ?? reportImage(session, labels);
-  const overview = anchoredMarkdown(session.plan.overview, 'overview');
+  const overview = anchoredMarkdown(session.plan.overview, 'overview', documentFigureInsertions(session.plan.overview, 'overview', visuals));
   const sections: ProfessionalReportSection[] = [
     {
       id: 'overview',
@@ -256,7 +261,7 @@ export function buildImmersionPdfInput(session: ImmersionSession, imageOverride?
     });
   }
   session.plan.stations.forEach((station, index) => {
-    const content = stationHtml(session, index, labels);
+    const content = stationHtml(session, index, labels, visuals);
     sections.push({
       id: `station-${index + 1}`,
       number: String(sections.length + 1).padStart(2, '0'),
@@ -274,7 +279,7 @@ export function buildImmersionPdfInput(session: ImmersionSession, imageOverride?
       number: String(sections.length + 1).padStart(2, '0'),
       title: labels.contrasts,
       eyebrow: labels.contrastsEyebrow,
-      html: contrastHtml(session),
+      html: contrastHtml(session) + readyDocumentFigures(visuals).filter(figure => visuals?.blocks.some(block => block.field === 'contrasts' && block.id === figure.blockId)).map(figure => figureHtml(figure, readyDocumentFigures(visuals).indexOf(figure)+1)).join(''),
       pageBreakBefore: true,
     });
   }

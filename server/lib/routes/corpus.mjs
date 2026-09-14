@@ -1083,6 +1083,9 @@ export function createCorpusRoutes({ readSnapshot, readAssetBytes, renderPdf }) 
         const q = String(request.search || '').toLocaleLowerCase();
         ideas = ideas.filter(i => `${i.label} ${i.statement}`.toLocaleLowerCase().includes(q)).sort((a,b)=>String(a.label).localeCompare(String(b.label)) || String(a.global_id).localeCompare(String(b.global_id)));
         edges = [];
+      } else if (request.kind === 'corpus') {
+        ideas.sort((a,b)=>String(a.global_id).localeCompare(String(b.global_id)));
+        edges.sort((a,b)=>String(a.id).localeCompare(String(b.id)));
       } else if (request.kind === 'neighbors') {
         ideas = [];
         edges = edges.filter(e=>e.from_id===request.id || e.to_id===request.id).sort((a,b)=>(a.basis==='explicit'?0:1)-(b.basis==='explicit'?0:1) || Number(b.confidence)-Number(a.confidence) || String(a.id).localeCompare(String(b.id)));

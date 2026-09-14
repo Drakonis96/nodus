@@ -1,3 +1,4 @@
+import { documentVisualProgressLabel } from '../../shared/documentSkills';
 import type {
   DeepResearchJobOrigin,
   DeepResearchJobRecord,
@@ -9,6 +10,7 @@ import type {
 } from '@shared/types';
 import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
 import { normalizeDeepResearchMetadataVersion, parseDeepResearchRequestVersion } from '@shared/deepResearchVersions';
+import { normalizeDeepResearchSectionLength } from '@shared/deepResearchSectionLength';
 
 export type { DeepResearchJobOrigin, DeepResearchJobRecord, DeepResearchJobStatus };
 
@@ -55,6 +57,7 @@ export interface DeepResearchQueueDeps {
   ) => Promise<DeepResearchReport>;
   /** Persists the finished report and returns the saved draft id. */
   saveDraft: (input: { report: DeepResearchReport; request: DeepResearchRequest; title: string | null }) => string;
+  enrichSaved?: (id: string, report: DeepResearchReport, request: DeepResearchRequest, signal: AbortSignal) => Promise<unknown>;
   activeVault: () => DeepResearchQueueVault;
   /** Called on every state change, so the queue can be mirrored in the app window. */
   onChange?: (jobs: DeepResearchJobRecord[]) => void;
@@ -134,6 +137,13 @@ const QUEUE_COPY: Record<PromptLanguage, QueueCopy> = {
   'pt-BR': { untitled: 'Relatório sem título', recovered: 'Recuperado após reiniciar o Nodus…', queued: (ahead) => `Na fila · ${ahead} relatório(s) à frente…`, vaultChanged: (requested, current) => `Este relatório foi solicitado para o vault “${requested}”, mas “${current}” está ativo agora. Ele não foi gerado com outro corpus.`, generationCancelled: 'Geração cancelada pelo usuário.', reportCancelled: 'Relatório cancelado antes de começar.' },
   it: { untitled: 'Rapporto senza titolo', recovered: 'Ripristinato dopo il riavvio di Nodus…', queued: (ahead) => `In coda · ${ahead} rapporto/i davanti…`, vaultChanged: (requested, current) => `Questo rapporto è stato richiesto per il vault «${requested}», ma ora è attivo «${current}». Non è stato generato con un corpus diverso.`, generationCancelled: 'Generazione annullata dall’utente.', reportCancelled: 'Rapporto annullato prima dell’avvio.' },
   tr: { untitled: 'Başlıksız rapor', recovered: 'Nodus yeniden başlatıldıktan sonra kurtarıldı…', queued: (ahead) => `Kuyrukta · önde ${ahead} rapor var…`, vaultChanged: (requested, current) => `Bu rapor “${requested}” kasası için istendi, ancak şu anda “${current}” etkin. Farklı bir derlem üzerinde oluşturulmadı.`, generationCancelled: 'Oluşturma kullanıcı tarafından iptal edildi.', reportCancelled: 'Rapor başlamadan önce iptal edildi.' },
+  'zh-Hans': { untitled: '无标题报告', recovered: 'Nodus 重启后已恢复…', queued: (ahead) => `排队中 · 前方还有 ${ahead} 份报告…`, vaultChanged: (requested, current) => `此报告是针对「${requested}」知识库请求的，但当前活动的是「${current}」。它并未在其他语料库上生成。`, generationCancelled: '用户已取消生成。', reportCancelled: '报告在开始前已取消。' },
+  'zh-Hant': { untitled: '無標題報告', recovered: 'Nodus 重新啟動後已恢復…', queued: (ahead) => `排隊中 · 前方還有 ${ahead} 份報告…`, vaultChanged: (requested, current) => `此報告是針對「${requested}」知識庫請求的，但目前啟用的是「${current}」。它並未在其他語料庫上生成。`, generationCancelled: '使用者已取消生成。', reportCancelled: '報告在開始前已取消。' },
+  vi: { untitled: 'Báo cáo chưa có tiêu đề', recovered: 'Đã khôi phục sau khi khởi động lại Nodus…', queued: (ahead) => `Đang chờ · còn ${ahead} báo cáo phía trước…`, vaultChanged: (requested, current) => `Báo cáo này được yêu cầu cho vault “${requested}”, nhưng hiện tại “${current}” đang hoạt động. Nó không được tạo trên một ngữ liệu khác.`, generationCancelled: 'Người dùng đã hủy tạo.', reportCancelled: 'Báo cáo đã bị hủy trước khi bắt đầu.' },
+  ja: { untitled: '無題のレポート', recovered: 'Nodus の再起動後に復元されました…', queued: (ahead) => `待機中 · 前に ${ahead} 件のレポート…`, vaultChanged: (requested, current) => `このレポートは「${requested}」保管庫に対して要求されましたが、現在は「${current}」が有効です。別のコーパスに対して生成されたものではありません。`, generationCancelled: 'ユーザーによって生成がキャンセルされました。', reportCancelled: 'レポートは開始前にキャンセルされました。' },
+  ru: { untitled: 'Отчёт без названия', recovered: 'Восстановлено после перезапуска Nodus…', queued: (ahead) => `В очереди · впереди ещё ${ahead} отчёт(ов)…`, vaultChanged: (requested, current) => `Этот отчёт был запрошен для хранилища «${requested}», но сейчас активно «${current}». Он не был сгенерирован по другому корпусу.`, generationCancelled: 'Генерация отменена пользователем.', reportCancelled: 'Отчёт отменён до начала.' },
+  uk: { untitled: 'Звіт без назви', recovered: 'Відновлено після перезапуску Nodus…', queued: (ahead) => `У черзі · попереду ще ${ahead} звіт(ів)…`, vaultChanged: (requested, current) => `Цей звіт було запитано для сховища «${requested}», але зараз активне «${current}». Його не було згенеровано за іншим корпусом.`, generationCancelled: 'Генерацію скасовано користувачем.', reportCancelled: 'Звіт скасовано до початку.' },
+  ko: { untitled: '제목 없는 보고서', recovered: 'Nodus 재시작 후 복구되었습니다…', queued: (ahead) => `대기 중 · 앞에 보고서 ${ahead}개…`, vaultChanged: (requested, current) => `이 보고서는 “${requested}” 보관소를 대상으로 요청되었지만, 현재는 “${current}”가 활성 상태입니다. 다른 코퍼스를 대상으로 생성되지 않았습니다.`, generationCancelled: '사용자가 생성을 취소했습니다.', reportCancelled: '보고서가 시작되기 전에 취소되었습니다.' },
 };
 
 function queueCopy(language: PromptLanguage | undefined): QueueCopy {
@@ -298,6 +308,9 @@ function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listen
       deepResearchApproach: normalizeDeepResearchApproach(input.request.approach),
       deepResearchVersion,
       structure: input.request.sectionLimit === 'single' ? 'single' : 'sectioned',
+      // Normalized at the queue boundary so a persisted job, an MCP payload and a
+      // job queued before the control existed all resolve the same way on drain.
+      sectionLength: normalizeDeepResearchSectionLength(input.request.sectionLength),
       model: input.request.model ? { ...input.request.model } : null,
       status: 'queued',
       progress: null,
@@ -313,6 +326,7 @@ function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listen
       ...input.request,
       approach: normalizeDeepResearchApproach(input.request.approach),
       deepResearchVersion,
+      sectionLength: normalizeDeepResearchSectionLength(input.request.sectionLength),
       model: input.request.model ? { ...input.request.model } : input.request.model,
     },
     save: input.save,
@@ -450,6 +464,10 @@ async function drain(): Promise<void> {
           // say why it was not stored, rather than throwing the generation away.
           job.record.saveError = messageFromError(error);
         }
+      }
+      if (job.record.savedDraftId && job.request.documentSkills?.enabled && requireDeps().enrichSaved) {
+        job.record.progress = { phase: 'assembling', message: documentVisualProgressLabel(job.request.language) }; notifyChange();
+        try { await requireDeps().enrichSaved!(job.record.savedDraftId, report, job.request, job.controller.signal); } catch { /* The verified report is already saved. */ }
       }
       settle(job, { report });
     } catch (error) {

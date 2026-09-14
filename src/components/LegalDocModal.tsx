@@ -64,6 +64,7 @@ export function LegalDocModal({
 
         <div className="flex-1 overflow-y-auto p-5">
           <p className="text-sm leading-6 text-neutral-700 dark:text-neutral-300">{content.intro}</p>
+          {doc.id === 'licenses' && <section data-testid="alphagenome-license-notice" className="mt-5 text-sm leading-6"><h3 className="font-medium">AlphaGenome · Google DeepMind</h3><p>{t('Código del cliente: Google LLC, Apache 2.0. El servicio y sus resultados tienen términos independientes. Nodus no está avalado por Google.')}</p><p><a href="https://github.com/google-deepmind/alphagenome" target="_blank" rel="noreferrer">AlphaGenome SDK</a> · <a href="https://deepmind.google.com/science/alphagenome/terms" target="_blank" rel="noreferrer">{t('Términos del servicio')}</a> · <a href="https://deepmind.google.com/science/alphagenome/output-terms" target="_blank" rel="noreferrer">{t('Términos de los resultados')}</a></p><p>Avsec et al. (2026), Nature 649, 1206–1218 · doi:10.1038/s41586-025-10014-0</p></section>}
           <div className="mt-5 space-y-5">
             {content.sections.map((section, index) => (
               <section key={index}>

@@ -159,7 +159,7 @@ try {
   );
   assert.match(coverageIndex, /Fuentes Vega/);
   assert.match(coverageIndex, /Tercera Autora/);
-  const promptLanguages = ["es", "en", "fr", "de", "pt", "pt-BR", "it", "tr"];
+  const promptLanguages = ["es", "en", "fr", "de", "pt", "pt-BR", "it", "tr", "zh-Hans", "zh-Hant", "vi", "ja", "ru", "uk", "ko"];
   const SpanishCoverageMarkers = /ÍNDICE DE COBERTURA \(metadatos para recorrer|AUTORES CON EVIDENCIA DIRECTA|OBRAS CON EVIDENCIA DIRECTA|sin obra identificada|sin autoría identificada|evidencia:/i;
   for (const language of promptLanguages) {
     const localizedCoverage = ai.__dictionaryCoveragePromptForTesting(
@@ -171,7 +171,7 @@ try {
       coverageEvidence,
       language,
     );
-    assert.match(localizedCoverage, language === "es" ? SpanishCoverageMarkers : /coverage|auteurs|autoren|autores|autori|yazarlar|œuvres|werke|obras|opere|eserler/i, `${language}: localized coverage labels`);
+    assert.match(localizedCoverage, language === "es" ? SpanishCoverageMarkers : /coverage|auteurs|autoren|autores|autori|yazarlar|œuvres|werke|obras|opere|eserler|覆盖|覆蓋|bao phủ|カバレッジ|охват|охопл|커버리지/i, `${language}: localized coverage labels`);
     if (language !== "es") {
       assert.doesNotMatch(localizedCoverage, SpanishCoverageMarkers, `${language}: Spanish coverage labels leaked`);
       assert.doesNotMatch(localizedEvidence, /\[fuente\]/, `${language}: Spanish evidence citation label leaked`);

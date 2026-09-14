@@ -54,6 +54,13 @@ try {
     { lang: 'pt', name: 'PORTUGUÊS EUROPEU', heading: 'IDIOMA DE SAÍDA — PRIORIDADE MÁXIMA' },
     { lang: 'pt-BR', name: 'PORTUGUÊS DO BRASIL', heading: 'IDIOMA DE SAÍDA — PRIORIDADE MÁXIMA' },
     { lang: 'it', name: 'ITALIANO', heading: 'LINGUA DI OUTPUT — PRIORITÀ MASSIMA' },
+    { lang: 'zh-Hans', name: '简体中文', heading: '输出语言 — 最高优先级' },
+    { lang: 'zh-Hant', name: '繁體中文', heading: '輸出語言 — 最高優先級' },
+    { lang: 'vi', name: 'TIẾNG VIỆT', heading: 'NGÔN NGỮ ĐẦU RA — ƯU TIÊN CAO NHẤT' },
+    { lang: 'ja', name: '日本語', heading: '出力言語 — 最優先' },
+    { lang: 'ru', name: 'РУССКИЙ', heading: 'ЯЗЫК ВЫВОДА — НАИВЫСШИЙ ПРИОРИТЕТ' },
+    { lang: 'uk', name: 'УКРАЇНСЬКА', heading: 'МОВА ВИВЕДЕННЯ — НАЙВИЩИЙ ПРІОРИТЕТ' },
+    { lang: 'ko', name: '한국어', heading: '출력 언어 — 최우선 순위' },
   ];
   for (const { lang, name, heading } of cases) {
     updateSettings({ promptLanguage: lang });
@@ -77,7 +84,7 @@ try {
     assert.ok(out.includes(heading), `${lang}: must append the localized priority directive`);
     assert.ok(out.includes(name), `${lang}: directive must name the target language (${name})`);
     // The directive must explicitly supersede the inline Spanish instruction.
-    assert.match(out, /free-text|texte libre|freien Text|texto livre|testo libero|serbest metin/i, `${lang}: directive must override prior language instructions`);
+    assert.match(out, /free-text|texte libre|freien Text|texto livre|testo libero|serbest metin|自由文本|自由文字|văn bản tự do|自由記述|свободного текста|вільного тексту|자유 텍스트/i, `${lang}: directive must override prior language instructions`);
   }
 
   // Unknown/undefined prompt language must not throw and must fall back to no directive.

@@ -121,15 +121,17 @@ test('Academic Deep Research freezes an idea-first argument before document enri
     readFile(path.join(repoRoot, 'electron/ai/deepResearch.ts'), 'utf8'),
     readFile(path.join(repoRoot, 'electron/ai/writingWorkshop.ts'), 'utf8'),
   ]);
-  assert.match(source, /deepResearchEnginePath\(deepResearchVersion, approach\) === 'v1-general'[\s\S]*legacyAcademicDeps\(model\)/, 'v1 retains the historical dependency route');
-  assert.match(source, /deepResearchEnginePath\(deepResearchVersion, approach\) === 'v2-general'[\s\S]*realDeps\(model\)/, 'v2 retains the idea-first document-enrichment route');
+  assert.match(source, /deepResearchEnginePath\(deepResearchVersion, approach\) === 'v1-general'[\s\S]*legacyAcademicDeps\(model(?:, signal)?\)/, 'v1 retains the historical dependency route');
+  assert.match(source, /deepResearchEnginePath\(deepResearchVersion, approach\) === 'v2-general'[\s\S]*realDeps\(model(?:, signal)?\)/, 'v2 retains the idea-first document-enrichment route');
   assert.match(source, /orchestrateDeepResearch\(\{ \.\.\.versionedRequest, model \}, deps, onProgress, signal\)/, 'both routes share the versioned cancellable orchestration boundary');
   assert.match(source, /buildIdeaFirstWritingWorkshopSnapshot\(brief, academicObjectiveProbes\(brief\.objective\)\)/, 'General planning uses clause probes over the graph-only snapshot');
   assert.match(source, /function academicObjectiveProbes[\s\S]*split\(\/\[.;\]/, 'graph recall probes are deterministic clauses from the user objective');
   assert.match(source, /planReport: \(input\) => aiPlanReport\(\{ \.\.\.input, relationships \}, model\)/, 'General planning receives explicit graph relationships');
   assert.match(source, /preparePlanEvidence:[\s\S]*prepareRelevantDocumentProfiles/, 'document profiles are prepared through the post-plan seam');
   assert.doesNotMatch(source, /await prepareDeepResearchDocuments\(/, 'there is no pre-plan document preparation');
-  assert.match(source, /writeSection: \(input\) => aiWriteSection\(input, model\)/, 'General writer receives no approach argument');
+  // `undefined` is the approach slot: General never receives one. The trailing
+  // `signal` is the cancellation token a long section continuation aborts on.
+  assert.match(source, /writeSection: \(input\) => aiWriteSection\(input, model, undefined, signal\)/, 'General writer receives no approach argument');
   assert.match(source, /finalize: \(input\) => aiFinalize\(input, model\)/, 'General finalizer receives no approach argument');
   assert.match(
     source,
@@ -191,7 +193,7 @@ test('Genealogy keeps its evidence-first and unproven-kinship rules', async () =
   assert.match(source, /genealogyDeepResearchPromptPack/);
   assert.match(promptPacks, /Sigue el estándar de prueba genealógico/);
   assert.match(promptPacks, /nunca afirmes una identidad o un parentesco sin apoyo documental/);
-  assert.match(source, /if \(approach === 'general'\)[\s\S]*orchestrateGenealogyDeepResearch\(request, ordinarySources, family, realDeps\(model\)/);
+  assert.match(source, /if \(approach === 'general'\)[\s\S]*orchestrateGenealogyDeepResearch\(request, ordinarySources, family, realDeps\(model, signal\)/);
 });
 
 test('all supported UI languages include every approach string', async () => {

@@ -41,6 +41,8 @@ export interface StudyAssistantCitation {
 }
 
 export interface StudyAssistantMessage {
+  attachments?: import('./researchAttachments').ResearchAttachment[];
+  selectionKey?: string | null;
   id: string;
   role: 'user' | 'assistant';
   content: string;
@@ -92,6 +94,9 @@ export interface StudyAssistantConversationPatch {
 }
 
 export interface StudyAssistantRequest {
+  attachmentIds?: string[];
+  systemPromptId?: string | null;
+  thinkingEffort?: import('./researchReasoning').ResearchEffort;
   conversationId?: string;
   messages: StudyAssistantMessage[];
   selection: StudyAssistantSelection;

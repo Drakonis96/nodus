@@ -44,6 +44,21 @@ try {
   assert.equal(collection.sourceRef, null, 'a collection the user made has no provenance');
   const note = notes.createNote({ title: 'Nota inicial', content: '# Nota inicial\n\nPrimer cuerpo.', folderId: collection.id });
   const other = notes.createNote({ title: 'Nota vecina', content: 'Cuerpo vecino.' });
+  const captured = notes.createNote({
+    title: 'Respuesta guardada',
+    content: 'Respuesta exacta con [S1](nodus://study/evidence/S1).',
+    kind: 'assistant',
+    source: {
+      origin: 'assistant',
+      model: { provider: 'openai', model: 'gpt-test' },
+      researchChat: {
+        surface: 'study', conversationId: 'chat-1', conversationTitle: 'Memoria de trabajo',
+        messageId: 'message-2', messageIndex: 1,
+        references: [{ citationId: 'S1', label: 'Tema 1', href: 'nodus://study/doc/doc-1' }],
+      },
+    },
+  });
+  assert.deepEqual(notes.getNote(captured.id).source, captured.source, 'structured Research chat provenance round-trips through source_json');
 
   // ── Catálogo: etiquetas y papelera recuperable ────────────────────────────────
   notes.patchNoteTags([note.id, other.id], { add: ['Método', ' método ', 'Capítulo 1'] });

@@ -7,6 +7,11 @@ code.
 By participating, you agree to follow the
 [Code of Conduct](CODE_OF_CONDUCT.md).
 
+## Language
+
+All issues and pull requests must be written in English, including titles,
+descriptions, comments, and review discussion.
+
 ## Before opening an issue
 
 Search the existing issues first. If a matching issue exists, add useful context
@@ -161,12 +166,18 @@ downgrade or automatic data rollback as a migration strategy.
 
 ## Pull requests
 
+Every pull request must address an existing issue. Open or find the issue first
+and reference it in the pull request. A pull request without a related issue may
+remain unmerged until one is opened.
+
 Keep each pull request focused on one coherent change. In the pull request:
 
 - Explain the problem and the chosen solution.
-- Link related issues with `Closes #123` when appropriate.
+- Reference the issue it addresses with `Closes #123` when the pull request
+  should close it.
 - List the checks you ran.
-- Include before-and-after screenshots for visible UI changes.
+- Attach screenshots whenever possible: before-and-after images for visible UI
+  changes and reproduction evidence for bug fixes.
 - Call out migrations, privacy effects, network access, or compatibility risks.
 - Update documentation and translations when behavior changes.
 

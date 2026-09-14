@@ -173,6 +173,7 @@ try {
   // across the reloads below (same origin).
   await page.evaluate((version) => {
     localStorage.setItem('nodus.lastSeenVersion', version);
+    localStorage.setItem('nodus.pdfPresenterTutorialSeen.e2js_u-05OA', '1');
     // The mobile teaser sits between release notes and everything behind it.
     localStorage.setItem(`nodus.mobileTeaserSeen.${version}`, '1');
   }, appVersion);
@@ -351,6 +352,7 @@ try {
   // seen key exercised here never touches the developer's real Nodus profile.
   await page.evaluate(async (version) => {
     localStorage.removeItem('nodus.lastSeenVersion');
+    localStorage.removeItem('nodus.pdfPresenterTutorialSeen.e2js_u-05OA');
     localStorage.removeItem('nodus.platformHighlightsSeen.2026-07');
     // Walking the tutorial above marked the videos announcement seen, exactly as it
     // does for a real first run. Clear it here so the announcement this existing user
@@ -395,6 +397,13 @@ try {
   }, releaseOriginalWindow);
   await page.evaluate((className) => { document.documentElement.className = className; }, releaseOriginalClasses);
   await whatsNewForExistingUser.getByRole('button', { name: 'Explorar las novedades', exact: true }).click();
+
+  const pdfPresenterAnnouncement = page.getByTestId('pdf-presenter-tutorial-announcement');
+  await pdfPresenterAnnouncement.waitFor();
+  assert.match(await pdfPresenterAnnouncement.locator('iframe').getAttribute('src'), /e2js_u-05OA/);
+  await pdfPresenterAnnouncement.getByRole('button', { name: 'Cerrar', exact: true }).click();
+  await pdfPresenterAnnouncement.waitFor({ state: 'detached' });
+  assert.equal(await page.evaluate(() => localStorage.getItem('nodus.pdfPresenterTutorialSeen.e2js_u-05OA')), '1');
 
   // First behind release notes sat the look at the mobile app, and it was a 3.2.4
   // one-off: it presents only on the version it names, and its seen-key carries that
@@ -941,9 +950,10 @@ try {
     console.log('[e2e] focused STT Settings + whisper.cpp streaming smoke passed');
     process.exit(0);
   }
-  await page.getByRole('button', { name: 'Asistente', exact: true }).click();
+  await page.locator('header').getByRole('button', { name: 'Research chat', exact: true }).click();
+  await page.getByTestId('research-chat-view').waitFor({ timeout: 30_000 });
   assert.equal(await page.locator('select[title="Modelo del chat"]').inputValue(), 'openrouter::smoke-chat-model');
-  await page.locator('button[title="Cerrar"]').click();
+  await page.locator('[data-tour="nav-settings"]').click();
   console.log('[e2e] header has no global model selector');
 
   // The brand and the collapse chevron used to share one centred flex row. On
@@ -1080,12 +1090,43 @@ try {
   if (headerViewportWidth < 1280) {
     console.log(`[e2e] header centre badge steps skipped: the window is ${headerViewportWidth}px and the resize did not take; geometry covered by scripts/test-header-layout.mjs`);
   } else {
-    // The model warning is pinned open in this profile (no synthesis model yet at
-    // first launch) — the exact state that used to overlap. Force both cases.
+    // The model warning is what used to overlap: it sat in the action rail with its
+    // label pinned open. It now lives in the empty band on the other side of the
+    // header, so this profile (no synthesis model yet at first launch) exercises both
+    // the alert's own placement and the badge's, in the state that used to break.
     const originalSynthesis = (await page.evaluate(() => window.nodus.getSettings())).synthesisModel;
     await page.evaluate(() => window.nodus.updateSettings({ synthesisModel: null }));
     await waitForCondition('aviso de modelo de IA visible', async () =>
-      (await page.getByText('Configura un modelo de IA', { exact: true }).count()) > 0);
+      (await page.getByTestId('header-model-alert').count()) > 0);
+    {
+      const alert = await page.evaluate(() => {
+        const node = document.querySelector('[data-testid="header-model-alert"]');
+        const logo = document.querySelector('[data-testid="sidebar-header-toggle"]');
+        const rail = document.querySelector('[data-testid="header-actions"]');
+        const badge = document.querySelector('[data-testid="header-vault-badge"]');
+        const box = (element) => element && element.getBoundingClientRect();
+        return {
+          inRail: !!rail?.contains(node),
+          alert: box(node),
+          logo: box(logo),
+          rail: box(rail),
+          badge: badge && getComputedStyle(badge).visibility === 'visible' ? box(badge) : null,
+          label: node?.querySelector('span')?.getBoundingClientRect().width ?? null,
+        };
+      });
+      assert.ok(alert.alert, 'the model alert is rendered');
+      assert.equal(alert.inRail, false, 'the model alert no longer spends the action rail');
+      assert.ok(alert.logo && alert.alert.left >= alert.logo.right, 'the alert clears the sidebar rail');
+      const bandRight = alert.badge ? alert.badge.left : alert.rail.left;
+      assert.ok(alert.alert.right <= bandRight, 'the alert clears whatever the band ends at');
+      // Centred in that band, and folded: the label opens on hover, not before.
+      const centre = alert.alert.left + alert.alert.width / 2;
+      assert.ok(
+        Math.abs(centre - (alert.logo.right + bandRight) / 2) <= 14,
+        `the alert sits in the middle of its band (centre ${centre.toFixed(1)}, band ${alert.logo.right.toFixed(1)}–${bandRight.toFixed(1)})`
+      );
+      assert.ok(alert.label !== null && alert.label < 4, `the alert's label stays folded until hover (${alert.label}px)`);
+    }
     // Narrowing the window exercises the responsive rail. Depending on the available
     // native titlebar width, its labels can collapse before the badge needs to move;
     // either a centred or clamped badge is valid as long as it stays clear of both rails.
@@ -1097,7 +1138,7 @@ try {
     await setWindowWidth(1440);
     await page.evaluate((model) => window.nodus.updateSettings({ synthesisModel: model }), originalSynthesis);
     await waitForCondition('aviso de modelo de IA retirado', async () =>
-      (await page.getByText('Configura un modelo de IA', { exact: true }).count()) === 0);
+      (await page.getByTestId('header-model-alert').count()) === 0);
     // With the alert gone there is room again, so the badge must return to the true
     // centre — the resting position the design calls for. Waited for rather than
     // sampled: the clamped spot it is leaving is itself "clear of the rails", so a
@@ -1465,6 +1506,45 @@ try {
   await page.getByTestId('presenter-import').waitFor({ timeout: 10_000 });
   await page.getByTestId('presenter-back').click();
   await page.getByTestId('toolkit-home').waitFor();
+  // Tags: seed a shelf through the same IPC the view writes to, then drive the
+  // chips. A tag is only worth having if clicking it actually narrows the list,
+  // and deleting one must ask first and must not take its presentations with it.
+  await page.evaluate(() => window.nodus.savePresenterLibrary({
+    tags: [{ id: 'tag_smoke', name: 'Seminario', createdAt: '2026-01-01T00:00:00Z' }],
+    presentations: [
+      { id: 'pres_tagged', name: 'Clase etiquetada', fileName: 'a.pdf', createdAt: '2026-01-02T00:00:00Z', tag: 'tag_smoke', totalPages: 2, notes: {}, videos: {} },
+      { id: 'pres_loose', name: 'Clase suelta', fileName: 'b.pdf', createdAt: '2026-01-03T00:00:00Z', tag: '', totalPages: 2, notes: {}, videos: {} },
+    ],
+  }));
+  await page.getByTestId('toolkit-card-presenter').click();
+  await page.getByTestId('presenter-import').waitFor({ timeout: 10_000 });
+  assert.equal(await page.getByTestId('presenter-row').count(), 2, 'the seeded shelf lists both presentations');
+  const smokeTagChip = page.getByTestId('presenter-tag-chip').filter({ hasText: 'Seminario' });
+  await smokeTagChip.waitFor();
+  await smokeTagChip.click();
+  await waitForCondition('la etiqueta filtra a una sola presentación', async () => (await page.getByTestId('presenter-row').count()) === 1, { timeout: 5_000 });
+  assert.match(await page.getByTestId('presenter-row').first().innerText(), /Clase etiquetada/, 'the tag filter keeps only its own presentations');
+  await smokeTagChip.click(); // clicking the active tag clears the filter
+  await waitForCondition('al quitar el filtro vuelven las dos presentaciones', async () => (await page.getByTestId('presenter-row').count()) === 2, { timeout: 5_000 });
+  // Deleting a tag is confirmed, and cancelling really cancels.
+  assert.equal(await page.getByTestId('presenter-delete-tag-modal').count(), 0, 'no confirmation is showing yet');
+  await page.getByTestId('presenter-delete-tag').first().click();
+  await page.getByTestId('presenter-delete-tag-modal').waitFor({ timeout: 5_000 });
+  await page.getByTestId('presenter-delete-tag-modal').getByRole('button', { name: /cancel|cancelar/i }).click();
+  await page.getByTestId('presenter-delete-tag-modal').waitFor({ state: 'detached', timeout: 5_000 });
+  assert.equal(await page.getByTestId('presenter-tag-chip').filter({ hasText: 'Seminario' }).count(), 1, 'cancelling the confirmation keeps the tag');
+  await page.getByTestId('presenter-delete-tag').first().click();
+  await page.getByTestId('presenter-delete-tag-confirm').click();
+  await page.getByTestId('presenter-tags').getByText('Seminario', { exact: true }).waitFor({ state: 'detached', timeout: 5_000 });
+  assert.equal(await page.getByTestId('presenter-row').count(), 2, 'deleting a tag unties it, it does not delete presentations');
+  // Downloading the deck's PDF is offered on the selected presentation.
+  await page.getByTestId('presenter-row').first().click();
+  await page.getByTestId('presenter-download-pdf').waitFor({ timeout: 5_000 });
+  assert.equal(await page.getByTestId('presenter-download-pdf').isDisabled(), false, 'the PDF download button is offered for a selected deck');
+  await page.evaluate(() => window.nodus.savePresenterLibrary({ tags: [], presentations: [] }));
+  await page.getByTestId('presenter-back').click();
+  await page.getByTestId('toolkit-home').waitFor();
+  console.log('[e2e] PDF Presenter tags filter the shelf, deleting one is confirmed and spares its presentations, and the deck offers its PDF');
   // Nodus Convert opens on its empty state: the dropzone plus the catalogue of
   // formats it accepts, so the drop is never a blind guess.
   await page.getByTestId('toolkit-card-convert').click();
@@ -1603,7 +1683,7 @@ try {
   await page.reload();
   await page.waitForFunction(() => document.querySelector('[data-tour="nav-search"]'));
   await page.locator('[data-tour="nav-search"]').click();
-  const searchInput = page.getByPlaceholder('Busca en notas, ideas, obras, huecos, temas y autores…');
+  const searchInput = page.getByPlaceholder('Escribe para buscar…', { exact: true });
   await searchInput.fill('recuperación');
   await page.getByText('Práctica de recuperación y retención a largo plazo', { exact: true }).waitFor({ timeout: 10_000 });
   await page.getByText('Práctica de recuperación y retención a largo plazo', { exact: true }).click();
@@ -2446,8 +2526,14 @@ try {
   await page.getByTestId('study-search-view').waitFor({ timeout: 30_000 });
   const hybridInput = page.getByTestId('study-search-input');
   assert.ok(await hybridInput.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft)) >= 30, 'hybrid search keeps its icon and text separated');
-  await page.getByRole('button', { name: 'Filtros', exact: true }).click();
-  await page.getByTestId('study-search-view').locator('select').first().selectOption('transcript');
+  const contentFilters = page.getByTestId('study-search-view').getByRole('group', { name: 'Tipo de contenido', exact: true });
+  await contentFilters.waitFor({ state: 'visible' });
+  assert.equal(await page.getByTestId('study-search-filters').count(), 0, 'content chips are available with advanced filters collapsed');
+  for (const kind of ['Apunte', 'Material', 'Pregunta', 'Examen']) {
+    await contentFilters.getByRole('button', { name: kind, exact: true, pressed: true }).click();
+  }
+  assert.equal(await contentFilters.getByRole('button', { pressed: true }).count(), 1, 'only transcripts are selected');
+  assert.equal(await contentFilters.getByRole('button', { name: 'Transcripción', exact: true }).getAttribute('aria-pressed'), 'true');
   await hybridInput.fill('memoria de trabajo');
   await page.getByTestId('study-search-result').first().waitFor({ timeout: 30_000 });
   assert.match(await page.getByTestId('study-search-result').first().innerText(), /Definición literal de memoria de trabajo/, 'literal transcript is found through the unified local index');
@@ -2653,8 +2739,15 @@ try {
   await page.getByTestId('study-graph-subject').waitFor();
   await page.getByTestId('study-graph-view').getByTestId('stellar-canvas').waitFor();
   await page.getByTestId('study-graph-view').getByRole('combobox', { name: 'Buscar una idea', exact: true }).waitFor();
-  for (const control of ['Anterior', 'Play', 'Siguiente', 'Encuadrar']) await page.getByTestId('study-graph-view').getByRole('button', { name: new RegExp(control) }).first().waitFor();
-  console.log('[e2e] study Ideas reuse the original list and study Graph reuses the Stellar canvas and playback controls');
+  // Memory-backed study graphs now enter through the same permanent themes hub.
+  // Playback belongs to an exploration tab, so exercise that transition explicitly.
+  const studyGraph = page.getByTestId('study-graph-view');
+  await studyGraph.getByTestId('stellar-themes').waitFor();
+  assert.equal(await studyGraph.getByRole('button', { name: 'Play', exact: true }).count(), 0, 'the themes hub does not expose playback');
+  await studyGraph.getByRole('button', { name: 'Nuevo grafo', exact: true }).click();
+  await studyGraph.getByTestId('stellar-workspace').waitFor();
+  for (const control of ['Anterior', 'Play', 'Siguiente', 'Encuadrar']) await studyGraph.getByRole('button', { name: new RegExp(control) }).first().waitFor();
+  console.log('[e2e] study Ideas reuse the original list and study Graph opens its themes hub and independent playback tab');
 
   await page.locator('[data-tour="nav-settings"]').click();
   await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();
@@ -3134,8 +3227,8 @@ try {
   const teachingIdeas = page.getByTestId('study-ideas-view');
   await teachingIdeas.waitFor({ timeout: 30_000 });
   await teachingIdeas.getByText('Máquina de vapor', { exact: false }).first().waitFor({ timeout: 30_000 });
-  await page.getByTestId('teaching-sidebar').getByRole('button', { name: 'Chat', exact: true }).click();
-  const teachingChat = page.getByTestId('study-chat-view');
+  await page.getByTestId('teaching-sidebar').getByRole('button', { name: 'Research chat', exact: true }).click();
+  const teachingChat = page.getByTestId('research-chat-view');
   await teachingChat.waitFor({ timeout: 30_000 });
   // The copy has to be the teacher's, not the learner's: same component, other voice.
   await teachingChat.getByText('Pregunta a tus materiales de clase con citas verificables.').waitFor({ timeout: 30_000 });
@@ -3825,11 +3918,18 @@ try {
     // The world chat. Nodus calculates and the model writes, so the half that can be proved
     // without a provider is the half that matters most: it refuses to answer about a world
     // it cannot anchor, instead of composing a plausible one.
-    await openSection('Chat del mundo', 'world-chat-view');
-    await page.getByTestId('world-chat-input').fill('¿Y ahora qué hago?');
-    await page.keyboard.press('Enter');
-    const refusal = page.getByTestId('world-chat-answer').first();
-    await refusal.waitFor({ timeout: 30_000 });
+    await openSection('Research chat', 'research-chat-view');
+    await page.locator('.research-composer-input').fill('¿Y ahora qué hago?');
+    const refusal = page.locator('.research-message').filter({ hasText: /No he encontrado nada de tu mundo/ }).first();
+    try {
+      // The shared chat loads the conversation's prompt selection before enabling send.
+      await page.waitForFunction(() => document.querySelector('.research-composer-send')?.disabled === false);
+      await page.keyboard.press('Enter');
+      await refusal.waitFor({ timeout: 30_000 });
+    } catch (error) {
+      console.error('[e2e] world chat state:', await page.getByTestId('research-chat-view').innerText());
+      throw error;
+    }
     assert.match(
       await refusal.innerText(),
       /No he encontrado nada de tu mundo/,
@@ -4055,9 +4155,12 @@ try {
     await page.getByPlaceholder('Buscar en todo el mundo…').fill('cicatriz');
     const footer = page.getByTestId('encyclopedia-fulltext');
     await footer.waitFor({ timeout: 15_000 });
-    await footer.getByRole('button').first().click();
-    const hit = page.getByTestId('encyclopedia-fulltext').getByRole('button').first();
-    await hit.waitFor({ timeout: 20_000 });
+    // The trigger keeps its place while the query runs, only saying «Buscando…», so waiting
+    // for "a button in the footer" matches the trigger itself and races the search. Wait for
+    // the trigger to be replaced by its outcome — the hit list, or the "no aparece" line.
+    const trigger = footer.getByRole('button', { name: /texto completo|Buscando/ });
+    await trigger.click();
+    await trigger.waitFor({ state: 'detached', timeout: 20_000 });
     assert.match(
       await page.getByTestId('encyclopedia-fulltext').textContent(),
       /Kaelen Vor/,

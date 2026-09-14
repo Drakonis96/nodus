@@ -77,6 +77,7 @@ try {
     localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
     localStorage.setItem('nodus.toolkitBetaGuideSeen.2.4.0', '1');
     localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
+    localStorage.setItem('nodus.pdfPresenterTutorialSeen.e2js_u-05OA', '1');
     sessionStorage.setItem('nodus.startupUpdateChecked', '1');
     const vaults = await window.nodus.listVaults();
     if (vaults[0]) await window.nodus.setVaultType(vaults[0].id, 'academic');

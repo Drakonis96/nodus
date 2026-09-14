@@ -118,6 +118,13 @@ function localizedRefinementWarning(language: HypothesisLabRequest['language'], 
     'pt-BR': 'O refinamento por IA não está disponível; a versão estrutural local é exibida.',
     it: 'Il perfezionamento tramite IA non è disponibile; viene mostrata la versione strutturale locale.',
     tr: 'Yapay zekâ iyileştirmesi kullanılamadı; yerel yapısal sürüm gösteriliyor.',
+    'zh-Hans': 'AI 优化不可用；现显示本地结构版本。',
+    'zh-Hant': 'AI 優化不可用；現顯示本機結構版本。',
+    vi: 'Không thể tinh chỉnh bằng AI; đang hiển thị phiên bản cấu trúc cục bộ.',
+    ja: 'AI による改良を利用できなかったため、ローカルの構造版を表示しています。',
+    ru: 'Уточнение с помощью ИИ недоступно; показана локальная структурная версия.',
+    uk: 'Уточнення за допомогою ШІ недоступне; показано локальну структурну версію.',
+    ko: 'AI 개선을 사용할 수 없어 로컬 구조 버전을 표시합니다.',
   } as Record<NonNullable<HypothesisLabRequest['language']>, string>)[language ?? 'es'];
   return `${message} ${detail}`;
 }
@@ -295,9 +302,9 @@ function buildAiContext(result: HypothesisLabResult): Record<string, unknown> {
       draftAbstract: candidate.draftAbstract,
     })),
     rules: [
-      ({ es: 'No anadas fuentes nuevas.', en: 'Do not add new sources.', fr: 'N’ajoute aucune nouvelle source.', de: 'Füge keine neuen Quellen hinzu.', pt: 'Não adiciones novas fontes.', 'pt-BR': 'Não adicione novas fontes.', it: 'Non aggiungere nuove fonti.', tr: 'Yeni kaynak eklemeyin.' } as Record<NonNullable<HypothesisLabResult['request']['language']>, string>)[language],
-      ({ es: 'No cambies ids.', en: 'Do not change ids.', fr: 'Ne modifie pas les ids.', de: 'Ändere keine ids.', pt: 'Não alteres os ids.', 'pt-BR': 'Não altere os ids.', it: 'Non modificare gli ids.', tr: 'Kimlikleri değiştirmeyin.' } as Record<NonNullable<HypothesisLabResult['request']['language']>, string>)[language],
-      ({ es: 'Mantén cada hipótesis comprobable y ligada al hueco detectado.', en: 'Keep each hypothesis testable and linked to the detected gap.', fr: 'Garde chaque hypothèse testable et liée à la lacune détectée.', de: 'Halte jede Hypothese prüfbar und mit der erkannten Lücke verknüpft.', pt: 'Mantém cada hipótese testável e ligada à lacuna detetada.', 'pt-BR': 'Mantenha cada hipótese testável e ligada à lacuna detectada.', it: 'Mantieni ogni ipotesi verificabile e collegata alla lacuna individuata.', tr: 'Her hipotezi sınanabilir tutun ve tespit edilen boşluğa bağlayın.' } as Record<NonNullable<HypothesisLabResult['request']['language']>, string>)[language],
+      ({ es: 'No anadas fuentes nuevas.', en: 'Do not add new sources.', fr: 'N’ajoute aucune nouvelle source.', de: 'Füge keine neuen Quellen hinzu.', pt: 'Não adiciones novas fontes.', 'pt-BR': 'Não adicione novas fontes.', it: 'Non aggiungere nuove fonti.', tr: 'Yeni kaynak eklemeyin.', 'zh-Hans': '不要添加新来源。', 'zh-Hant': '請勿新增來源。', vi: 'Không thêm nguồn mới.', ja: '新しい情報源を追加しないでください。', ru: 'Не добавляйте новые источники.', uk: 'Не додавайте нові джерела.', ko: '새로운 출처를 추가하지 마십시오.' } as Record<NonNullable<HypothesisLabResult['request']['language']>, string>)[language],
+      ({ es: 'No cambies ids.', en: 'Do not change ids.', fr: 'Ne modifie pas les ids.', de: 'Ändere keine ids.', pt: 'Não alteres os ids.', 'pt-BR': 'Não altere os ids.', it: 'Non modificare gli ids.', tr: 'Kimlikleri değiştirmeyin.', 'zh-Hans': '不要更改 id。', 'zh-Hant': '請勿變更 id。', vi: 'Không thay đổi id.', ja: 'id を変更しないでください。', ru: 'Не изменяйте id.', uk: 'Не змінюйте id.', ko: 'id를 변경하지 마십시오.' } as Record<NonNullable<HypothesisLabResult['request']['language']>, string>)[language],
+      ({ es: 'Mantén cada hipótesis comprobable y ligada al hueco detectado.', en: 'Keep each hypothesis testable and linked to the detected gap.', fr: 'Garde chaque hypothèse testable et liée à la lacune détectée.', de: 'Halte jede Hypothese prüfbar und mit der erkannten Lücke verknüpft.', pt: 'Mantém cada hipótese testável e ligada à lacuna detetada.', 'pt-BR': 'Mantenha cada hipótese testável e ligada à lacuna detectada.', it: 'Mantieni ogni ipotesi verificabile e collegata alla lacuna individuata.', tr: 'Her hipotezi sınanabilir tutun ve tespit edilen boşluğa bağlayın.', 'zh-Hans': '保持每个假设可检验，并与检测到的缺口相关联。', 'zh-Hant': '保持每個假設可檢驗，並與偵測到的缺口相關聯。', vi: 'Giữ cho mỗi giả thuyết có thể kiểm chứng và gắn với khoảng trống đã phát hiện.', ja: '各仮説を検証可能なまま、検出されたギャップに結び付けてください。', ru: 'Сохраняйте каждую гипотезу проверяемой и связанной с обнаруженным разрывом.', uk: 'Зберігайте кожну гіпотезу перевірюваною та пов’язаною з виявленим розривом.', ko: '각 가설을 검증 가능하게 유지하고 감지된 갭에 연결하십시오.' } as Record<NonNullable<HypothesisLabResult['request']['language']>, string>)[language],
     ],
   };
 }

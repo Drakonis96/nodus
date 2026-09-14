@@ -5,7 +5,7 @@
 // rules the hover-card relies on to never render a blank or overflowing card.
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -76,6 +76,22 @@ try {
   assert.equal(capped.snippet.length, CITATION_PREVIEW_SNIPPET_MAX);
   assert.ok(capped.title.endsWith('…') && capped.subtitle.endsWith('…') && capped.snippet.endsWith('…'));
   assert.equal(capped.kind, 'contradiction');
+
+  // The card lives inside `.citation-group`, whose nowrap keeps a citation pill
+  // together. Both renderers must explicitly reset that inherited value or long
+  // preview prose spills out of the bounded card (the overlay has its own CSS).
+  for (const stylesheet of ['src/index.css', 'src/components/nodi/companion.css']) {
+    const css = await readFile(path.join(repoRoot, stylesheet), 'utf8');
+    const selector = stylesheet.endsWith('index.css')
+      ? '.citation-card {'
+      : '.nodi-companion .citation-card {';
+    const start = css.indexOf(selector);
+    assert.ok(start >= 0, `${stylesheet} defines the citation hover-card`);
+    const rule = css.slice(start, css.indexOf('}', start) + 1);
+    assert.match(rule, /white-space:\s*normal/, `${stylesheet} lets preview prose wrap`);
+    assert.match(rule, /overflow-wrap:\s*anywhere/, `${stylesheet} contains long unbroken text`);
+    assert.match(rule, /max-width:\s*min\([^;]*100vw/, `${stylesheet} keeps the card inside narrow windows`);
+  }
 
   console.log('test-citation-preview: OK');
 } finally {

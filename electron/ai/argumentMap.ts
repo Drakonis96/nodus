@@ -59,6 +59,13 @@ const EDGE_TYPE_LABELS_BY_LANGUAGE: Record<PromptLanguage, Record<string, string
   'pt-BR': { extends: 'estende', variant_of: 'variante de', refines: 'refina', contradicts: 'contradiz', applies_to: 'aplica-se a', shares_method: 'compartilha o método', precondition_of: 'pré-condição de', measures_same: 'mede o mesmo', supports: 'apoia', refutes: 'refuta' },
   it: { extends: 'estende', variant_of: 'variante di', refines: 'perfeziona', contradicts: 'contraddice', applies_to: 'si applica a', shares_method: 'condivide il metodo', precondition_of: 'precondizione di', measures_same: 'misura lo stesso', supports: 'supporta', refutes: 'confuta' },
   tr: { extends: 'genişletir', variant_of: 'şunun varyantı', refines: 'iyileştirir', contradicts: 'çelişir', applies_to: 'şuna uygulanır', shares_method: 'yöntemi paylaşır', precondition_of: 'şunun ön koşulu', measures_same: 'aynı şeyi ölçer', supports: 'destekler', refutes: 'çürütür' },
+  'zh-Hans': { extends: '扩展', variant_of: '变体', refines: '细化', contradicts: '相矛盾', applies_to: '适用于', shares_method: '共享方法', precondition_of: '前提条件', measures_same: '测量相同', supports: '支持', refutes: '反驳' },
+  'zh-Hant': { extends: '擴展', variant_of: '變體', refines: '細化', contradicts: '相矛盾', applies_to: '適用於', shares_method: '共享方法', precondition_of: '前提條件', measures_same: '測量相同', supports: '支持', refutes: '反駁' },
+  vi: { extends: 'mở rộng', variant_of: 'biến thể của', refines: 'tinh chỉnh', contradicts: 'mâu thuẫn', applies_to: 'áp dụng cho', shares_method: 'chia sẻ phương pháp', precondition_of: 'điều kiện tiên quyết của', measures_same: 'đo lường cùng một thứ', supports: 'ủng hộ', refutes: 'bác bỏ' },
+  ja: { extends: '拡張', variant_of: '変種', refines: '改良', contradicts: '矛盾', applies_to: '適用', shares_method: '手法の共有', precondition_of: '前提条件', measures_same: '同じものを測定', supports: '支持', refutes: '反論' },
+  ru: { extends: 'расширяет', variant_of: 'вариант', refines: 'уточняет', contradicts: 'противоречит', applies_to: 'применяется к', shares_method: 'разделяет метод', precondition_of: 'предпосылка', measures_same: 'измеряет то же', supports: 'поддерживает', refutes: 'опровергает' },
+  uk: { extends: 'розширює', variant_of: 'варіант', refines: 'уточнює', contradicts: 'суперечить', applies_to: 'застосовується до', shares_method: 'спільний метод', precondition_of: 'передумова', measures_same: 'вимірює те саме', supports: 'підтримує', refutes: 'спростовує' },
+  ko: { extends: '확장', variant_of: '변형', refines: '정교화', contradicts: '모순', applies_to: '적용 대상', shares_method: '방법 공유', precondition_of: '전제 조건', measures_same: '동일 대상 측정', supports: '지지', refutes: '반박' },
 };
 
 const NO_CONNECTION_COPY: Record<PromptLanguage, { summary: string; overview: string }> = {
@@ -70,6 +77,13 @@ const NO_CONNECTION_COPY: Record<PromptLanguage, { summary: string; overview: st
   'pt-BR': { summary: 'Esta ideia não tem conexões com outras ideias no grafo.', overview: 'A ideia selecionada não tem conexões diretas com outras ideias.' },
   it: { summary: 'Questa idea non ha collegamenti con altre idee nel grafo.', overview: "L'idea selezionata non ha collegamenti diretti con altre idee." },
   tr: { summary: 'Bu fikrin grafikte başka fikirlerle bağlantısı yok.', overview: 'Seçilen fikrin başka fikirlerle doğrudan bağlantısı yok.' },
+  'zh-Hans': { summary: '此想法与图中的其他想法没有任何联系。', overview: '所选想法与其他已分析的想法没有直接联系。' },
+  'zh-Hant': { summary: '此想法與圖中的其他想法沒有任何聯繫。', overview: '所選想法與其他已分析的想法沒有直接聯繫。' },
+  vi: { summary: 'Ý tưởng này không có kết nối nào với các ý tưởng khác trong đồ thị.', overview: 'Ý tưởng được chọn không có kết nối trực tiếp với các ý tưởng khác.' },
+  ja: { summary: 'このアイデアはグラフ内の他のアイデアと接続していません。', overview: '選択したアイデアには、他のアイデアとの直接的な接続がありません。' },
+  ru: { summary: 'У этой идеи нет связей с другими идеями в графе.', overview: 'У выбранной идеи нет прямых связей с другими идеями.' },
+  uk: { summary: 'Ця ідея не має зв’язків з іншими ідеями в графі.', overview: 'У вибраної ідеї немає прямих зв’язків з іншими ідеями.' },
+  ko: { summary: '이 아이디어는 그래프의 다른 아이디어와 연결되어 있지 않습니다.', overview: '선택한 아이디어에는 다른 아이디어와의 직접 연결이 없습니다.' },
 };
 
 function structuralOverview(language: PromptLanguage, degree: number, debates: number, branches: number): string {
@@ -84,6 +98,13 @@ function structuralOverview(language: PromptLanguage, degree: number, debates: n
         'pt-BR': `, sendo ${debates} debates (contradições/refutações)`,
         it: `, di cui ${debates} dibattiti (contraddizioni/confutazioni)`,
         tr: `; bunların ${debates} kadarı tartışma (çelişki/çürütme)`,
+        'zh-Hans': `，其中 ${debates} 个为争论（矛盾/反驳）`,
+        'zh-Hant': `，其中 ${debates} 個為爭論（矛盾/反駁）`,
+        vi: `, trong đó ${debates} là tranh luận (mâu thuẫn/bác bỏ)`,
+        ja: `、うち ${debates} 件は論争（矛盾／反論）`,
+        ru: `, из них ${debates} — споры (противоречия/опровержения)`,
+        uk: `, з них ${debates} — суперечки (протиріччя/спростування)`,
+        ko: `, 그중 ${debates}개는 논쟁(모순/반박)`,
       } as Record<PromptLanguage, string>)[language]
     : '';
   return ({
@@ -95,6 +116,13 @@ function structuralOverview(language: PromptLanguage, degree: number, debates: n
     'pt-BR': `Percurso automático: a ideia central conecta ${degree} conexão(ões)${debatePart}. O mapa abre ${branches} ramo(s) mais fortes e segue cada um pelas conexões reais.`,
     it: `Percorso automatico: l'idea centrale collega ${degree} connessione/i${debatePart}. La mappa apre ${branches} ramo/i più forti e segue ciascuno attraverso i collegamenti reali.`,
     tr: `Otomatik gezinti: merkez fikir ${degree} bağlantı kurar${debatePart}. Harita ${branches} güçlü dalı açar ve her birini gerçek bağlantılar boyunca izler.`,
+    'zh-Hans': `自动导览：中心想法连接了 ${degree} 条联系${debatePart}。图谱会展开最强的 ${branches} 个分支，并沿真实联系逐一追踪。`,
+    'zh-Hant': `自動導覽：中心想法連結了 ${degree} 條聯繫${debatePart}。圖譜會展開最強的 ${branches} 個分支，並沿真實聯繫逐一追蹤。`,
+    vi: `Dạo qua tự động: ý tưởng trung tâm liên kết ${degree} kết nối${debatePart}. Bản đồ mở ${branches} nhánh mạnh nhất và theo dõi từng nhánh qua các kết nối thực tế.`,
+    ja: `自動ウォークスルー：中心となるアイデアは ${degree} 件の接続を結んでいます${debatePart}。マップは最も強い ${branches} 本のブランチを開き、実際の接続をたどってそれぞれを追跡します。`,
+    ru: `Автоматический обход: центральная идея связывает ${degree} связей${debatePart}. Карта раскрывает ${branches} сильнейших ветвей и проходит каждую по реальным связям.`,
+    uk: `Автоматичний огляд: центральна ідея з’єднує ${degree} зв’язків${debatePart}. Карта розкриває ${branches} найсильніших гілок і проходить кожну за реальними зв’язками.`,
+    ko: `자동 둘러보기: 중심 아이디어는 ${degree}개의 연결을 맺고 있습니다${debatePart}. 지도는 가장 강한 ${branches}개의 분기를 펼치고 실제 연결을 따라 각각을 추적합니다.`,
   } as Record<PromptLanguage, string>)[language];
 }
 
@@ -568,6 +596,13 @@ export function buildStructuralArgumentMap(seedIdeaId: string, language: PromptL
     'pt-BR': { connection: 'conexão(ões)', debate: 'debate(s)', derivation: 'derivação(ões)' },
     it: { connection: 'connessione/i', debate: 'dibattito/i', derivation: 'derivazione/i' },
     tr: { connection: 'bağlantı', debate: 'tartışma', derivation: 'türetim' },
+    'zh-Hans': { connection: '连接', debate: '争论', derivation: '推导' },
+    'zh-Hant': { connection: '連結', debate: '爭論', derivation: '推導' },
+    vi: { connection: 'kết nối', debate: 'tranh luận', derivation: 'suy dẫn' },
+    ja: { connection: '接続', debate: '論争', derivation: '派生' },
+    ru: { connection: 'связь(и)', debate: 'спор(ы)', derivation: 'вывод(ы)' },
+    uk: { connection: 'зв’язок(и)', debate: 'суперечка(и)', derivation: 'висновок(и)' },
+    ko: { connection: '연결', debate: '논쟁', derivation: '파생' },
   } as Record<PromptLanguage, { connection: string; debate: string; derivation: string }>)[lang];
   // Counted over the whole graph, not the kept subgraph: the route list promises
   // the real figure, and a map that quietly reported the post-cap one read as if

@@ -7,6 +7,7 @@ import { Icon } from './ui';
 import { t } from '../i18n';
 import { vaultTypeIcon } from './vaultTypeUi';
 import { NodiAvatar } from './nodi/NodiAvatar';
+import marketplaceIcon from '../assets/nodus-marketplace.svg';
 
 // Shown once after the app updates, initially focused on the latest release.
 // Older releases remain available through the hierarchical version picker.
@@ -48,6 +49,7 @@ const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string | null; color:
   nodi: { icon: 'nodi', color: '#d4af37', label: 'Mascota Nodi' },
   toolkit: { icon: 'tools', color: '#059669', label: 'Herramientas' },
   plugin: { icon: 'puzzle', color: '#0ea5e9', label: 'Plugins' },
+  marketplace: { icon: null, color: '#6366f1', label: 'Marketplace de Skills' },
   languages: { icon: 'languages', color: '#db2777', label: 'Idiomas' },
   browser: { icon: 'globe', color: '#2563eb', label: 'Nodus Browser' },
   radar: { icon: 'radar', color: '#f97316', label: 'Nodus Radar' },
@@ -92,6 +94,11 @@ function ZoteroReleaseIcon({ size = 13 }: { size?: number }) {
       <circle cx="48" cy="46" r="5.5" fill="currentColor" />
     </svg>
   );
+}
+
+/** Marketplace news keeps the same basket-and-N mark used by its catalogue. */
+function MarketplaceReleaseIcon({ size = 15 }: { size?: number }) {
+  return <img aria-hidden="true" src={marketplaceIcon} width={size} height={size} />;
 }
 
 // Present every release uniformly: cluster its highlights by scope and order the
@@ -387,6 +394,8 @@ export function WhatsNewModal({
                     >
                       {scope === 'apple'
                         ? <AppleReleaseIcon size={13} />
+                        : scope === 'marketplace'
+                          ? <MarketplaceReleaseIcon size={15} />
                         : scope === 'zotero'
                           ? <ZoteroReleaseIcon size={13} />
                           : <Icon name={scopeMeta.icon!} size={13} />}

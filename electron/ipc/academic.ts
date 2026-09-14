@@ -1,4 +1,11 @@
-import { stellarPage, getStellarSession, saveStellarSession } from '../graph/stellarService';
+import { registerResearchAttachmentIpc } from './researchAttachments';
+import { getResearchSystemPrompts, saveResearchSystemPrompt, selectResearchSystemPrompt, deleteResearchSystemPrompt } from '../db/researchSystemPromptsRepo';
+import { mergeHybridResults, searchSnippet } from '@shared/hybridSearch';
+import type { StudyQuestionBulkAction } from '@shared/studyQuestions';
+import type { StudyFlashcardExport, StudyFlashcardBulkAction } from '@shared/studyFlashcards';
+import type { StudyInterchangeExportOptions, StudyInterchangeFormat, StudyInterchangeImportOptions, StudyInterchangeKind } from '@shared/studyInterchange';
+import { searchVaultContent } from '../ai/vaultContentSearch';
+import { stellarPage, stellarThemes, getStellarSession, saveStellarSession } from '../graph/stellarService';
 // The academic corpus and the study vault, moved verbatim out of the monolithic
 // registerIpc. The channel names are unchanged; scripts/test-ipc-contract.mjs is
 // what proves it.
@@ -183,6 +190,7 @@ import { extractFromPath } from '../extraction/textExtractor';
 import { runDeepScan } from '../ai/deepScan';
 import { summaryContentHash } from '../ai/summaryScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from '../ai/researchAssistant';
+import { listResearchContextSources } from '../ai/researchSourceScope';
 import { answerTutorStep, buildTutorPlan, streamTutorStep } from '../ai/tutor';
 import { buildArgumentMap, discoverArgumentRoutes } from '../ai/argumentMap';
 import { listAuthors, listAuthorsPage, buildAuthorDossier, synthesizeAuthorDossier } from '../ai/authorDossier';
@@ -209,6 +217,7 @@ import * as studySearch from '../ai/studySearch';
 import * as studyAssistant from '../ai/studyAssistant';
 import * as studyQuestions from '../db/studyQuestionsRepo';
 import * as studyLearning from '../db/studyLearningRepo';
+import { detectStudyInterchangeFormat, exportStudyInterchange, interchangeExtension, parseStudyInterchange, writeStudyInterchange } from '../studyInterchange';
 import * as studyAiUsage from '../db/studyAiUsageRepo';
 import * as studyDataAdmin from '../db/studyDataAdmin';
 import { exportStudyScope } from '../export/studyExport';
@@ -406,7 +415,9 @@ function announceLibraryReaderAnnotations(nodusId: string | null): void {
   }
 }
 
-export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext): void {
+export function registerAcademicIpc(context: IpcContext): void {
+  const { h, getWindow, chatAborters } = context;
+  registerResearchAttachmentIpc(context);
   const studyImproveAborters = new Map<string, AbortController>();
   const studyAssistantAborters = new Map<string, AbortController>();
   const libraryReaderChatAborters = new Map<string, AbortController>();
@@ -823,6 +834,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
 
   // Stellar canvas
   h('stellar:page', async (_e, request) => stellarPage(request));
+  h('stellar:themes', async () => stellarThemes());
   h('stellar:session', async (_e, key) => getStellarSession(key));
   h('stellar:save', async (_e, vaultId, key, state) => saveStellarSession(vaultId, key, state));
   // graph
@@ -1291,6 +1303,37 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('study:questions:collections:delete', async (_e, id: string) => studyQuestions.deleteStudyQuestionCollection(id));
   h('study:questions:analytics', async (_e, id: string) => studyQuestions.getStudyQuestionAnalytics(id));
   h('study:questions:similar', async (_e, id: string, threshold?: number) => studyQuestions.findSimilarStudyQuestions(id, threshold));
+  h('study:questions:tags', async () => studyQuestions.listStudyQuestionTags());
+  h('study:questions:bulk', async (_e, ids: string[], action: StudyQuestionBulkAction) => studyQuestions.bulkStudyQuestions(ids, action));
+  h('study:interchange:export', async (_e, kind: StudyInterchangeKind, format: StudyInterchangeFormat, options?: StudyInterchangeExportOptions) => {
+    const bytes = exportStudyInterchange(kind, format, options ?? {});
+    const extension = interchangeExtension(kind, format);
+    const defaultName = kind === 'questions' ? `nodus-preguntas.${extension}` : `nodus-flashcards.${extension}`;
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: kind === 'questions' ? 'Exportar banco de preguntas' : 'Exportar flashcards',
+      defaultPath: defaultName,
+      filters: [{ name: format === 'nodus' ? 'Nodus' : format.toUpperCase(), extensions: [extension] }, { name: 'Todos', extensions: ['*'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, bytes);
+    return { path: picked.filePath };
+  });
+  h('study:interchange:import', async (_e, kind: StudyInterchangeKind, options?: StudyInterchangeImportOptions) => {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
+      title: kind === 'questions' ? 'Importar preguntas' : 'Importar flashcards',
+      properties: ['openFile'],
+      filters: kind === 'questions'
+        ? [{ name: 'Preguntas compatibles', extensions: ['json', 'csv', 'xml', 'gift', 'txt', 'tsv', 'apkg'] }, { name: 'Todos', extensions: ['*'] }]
+        : [{ name: 'Flashcards compatibles', extensions: ['json', 'csv', 'txt', 'tsv', 'apkg', 'xml', 'gift'] }, { name: 'Todos', extensions: ['*'] }],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return null;
+    const filePath = picked.filePaths[0];
+    const bytes = fs.readFileSync(filePath);
+    const format = options?.format ?? detectStudyInterchangeFormat(path.basename(filePath), bytes);
+    const parsed = parseStudyInterchange(kind, format, bytes, path.basename(filePath));
+    const written = writeStudyInterchange(kind, parsed, options?.location);
+    return { kind, format, imported: written.imported, skipped: written.skipped, warnings: written.warnings, file: path.basename(filePath), path: filePath };
+  });
   h('study:assessments:list', async (_e, kind?: 'test' | 'exam', includeArchived?: boolean) => studyAssessments.listStudyAssessments(kind, includeArchived));
   h('study:assessments:get', async (_e, id: string) => studyAssessments.getStudyAssessment(id));
   h('study:assessments:create', async (_e, input: StudyAssessmentInput) => studyAssessments.createStudyAssessment(input));
@@ -1326,6 +1369,10 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('study:flashcards:fromQuestions', async (_e, ids: string[]) => studyLearning.createStudyFlashcardsFromQuestions(ids));
   h('study:flashcards:review', async (_e, input) => studyLearning.reviewStudyFlashcard(input));
   h('study:flashcards:state', async (_e, id: string, action) => studyLearning.setStudyFlashcardState(id, action));
+  h('study:flashcards:tags', async () => studyLearning.listStudyFlashcardTags());
+  h('study:flashcards:bulk', async (_e, ids: string[], action: StudyFlashcardBulkAction) => studyLearning.bulkStudyFlashcards(ids, action));
+  h('study:flashcards:export', async (_e, ids?: string[]) => studyLearning.exportStudyFlashcards(ids));
+  h('study:flashcards:import', async (_e, payload: StudyFlashcardExport) => studyLearning.importStudyFlashcards(payload));
   h('study:learning:progress', async () => studyLearning.getStudyProgressDashboard());
   h('study:planner:get', async () => studyLearning.getStudyPlanner());
   h('study:planner:create', async (_e, input) => studyLearning.createStudyPlan(input));
@@ -1600,6 +1647,11 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('argumentMap:discover', async () => discoverArgumentRoutes());
 
   // research chat history
+  h('research:prompts:list', (_e, key?: string | null) => getResearchSystemPrompts(key));
+  h('research:prompts:save', (_e, input: import('@shared/researchSystemPrompts').ResearchSystemPromptInput) => saveResearchSystemPrompt(input));
+  h('research:prompts:select', (_e, key: string, id: string | null) => selectResearchSystemPrompt(key, id));
+  h('research:prompts:delete', (_e, id: string) => deleteResearchSystemPrompt(id));
+  h('research:contextSources', async () => listResearchContextSources());
   h('chat:list', async (_e, includeArchived?: boolean) => chat.listConversations(includeArchived ?? false));
   h('chat:get', async (_e, id: string) => chat.getConversation(id));
   h('chat:create', async (_e, input: { model?: ModelRef | null; selection?: ResearchContextSelection | null }) =>
@@ -1710,8 +1762,10 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   });
   h('citations:verify', async (_e, refs: CitationRef[]) => verifyCitations(refs ?? []));
   h('citations:preview', async (_e, ref: CitationRef) => (ref ? previewCitation(ref) : null));
-  h('search:global', async (_e, query: string, limitPerKind?: number) =>
-    globalSearch(query ?? '', limitPerKind ?? 8)
+  h('search:vaultContent', async (_e, query: string, kinds?: string[], semantic?: boolean, limit?: number) => searchVaultContent(query, kinds, semantic, limit));
+  h('search:global', async (_e, query: string, limitPerKind?: number, kinds?: SearchResultKind[]) =>
+    (query ?? '').trim().length < 2 ? [] : mergeHybridResults(query ?? '', globalSearch(query ?? '', -1, true, kinds ? new Set(kinds) : undefined), [], kinds ? new Set(kinds) : undefined, Math.max(1, Math.min(250, limitPerKind ?? 8)) * (kinds?.length ?? 11))
+      .map((hit) => ({ ...hit, snippet: searchSnippet(hit.snippet, query ?? '') }))
   );
   h('search:detail', async (_e, kind: SearchResultKind, id: string) => getSearchResultDetail(kind, id));
   h('search:semantic', async (_e, query: string, options?: SemanticSearchOptions) =>

@@ -10,7 +10,7 @@ test('the unified Library keeps the global catalogue independent and the vault c
   assert.match(registry, /vaultId=\{activeVault\?\.id \?\? null\}/, 'the same screen receives the active vault for its compatibility scope');
   assert.match(app, /const libraryItem = NAV_ITEMS\.find/);
   assert.ok((app.match(/navButton\(libraryItem\)/g) ?? []).length >= 8, 'every dedicated and standard sidebar pins the Library');
-  assert.match(vaultTypes, /'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'library'/, 'prosopography allows the global Library route');
+  assert.match(vaultTypes, /'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'researchChat', 'library'/, 'prosopography allows the global Library route');
 });
 
 test('the Library UI exposes hierarchy, search, bulk operations, imports and background state', async () => {

@@ -20,6 +20,11 @@ import type {
   SupportAuditEntry,
 } from '@shared/types';
 import {
+  normalizeDeepResearchSectionLength,
+  planDeepResearchSectionLength,
+  type DeepResearchSectionLengthPlan,
+} from '@shared/deepResearchSectionLength';
+import {
   assessDeepResearchReport,
   assessDeepResearchSection,
   qualityPasses,
@@ -200,6 +205,111 @@ const NATIVE_NARRATIVE_RULES: Record<PromptLanguage, readonly string[]> = {
     'Nokta, virgül ve bağlaçlarla bağlanan tam cümleleri tercih et. “Bağlam:”, “Kanıt:” veya “Sonuç:” gibi etiketlerle başlayan paragraflardan kaçın.',
     'Bilgi sürekli düzyazıyla açıkça ifade edilebiliyorsa liste kullanma.',
   ],
+  'zh-Hans': [
+    '优先展开连贯、衔接紧密且有理据的论述。每一段都必须通过自然的过渡从前一段推进。',
+    '每一段都必须承担新的推论功能。不要用不同的措辞在多个章节中重复核心论点、某一结论或同一方法学上的保留。',
+    '把每一条引注紧接在它所支持的具体分句之后。避免在段末机械地堆砌参考文献；当不同文献各有贡献时，应在相应的句子中逐一标注并说明其贡献。',
+    '精确区分四个层次：有文献记载的事实、作者的解读、报告构建的推论，以及语料库无法解决的问题。不要把因果推论或控制性比喻当作已证事实来呈现。',
+    '在断言某一机制、因果关系、效果或接受情况之前，要核实证据是否支持这一具体关系，以及相应的主题、行动者、尺度和时期。意图不能证明效果，预期的受众也不能证明接受情况。',
+    '存在分歧时，要完整展开争论：每一方主张什么、依据哪些证据或尺度、为何产生分歧，以及哪些数据能够在它们之间作出判断。仅仅宣告存在争论或矛盾是不够的。',
+    '不要凭单方面证据宣称共识、趋同、分歧或矛盾。要分别识别并引用每一方立场；若缺少某一方，应将这一空缺作为证据上的局限呈现。',
+    '如果任务要求讨论史学争论，应将每一立场归到证据清单中的作者或著作，并比较其语料库、分期或尺度。如果没有足够的具名立场，应说明这一局限，而不是凭空发明某个学派或共识。',
+    '使用少量宽泛的标题。在每个章节内不要添加副标题、微章节、主题标签或额外的标题。',
+    '不要把每个观点、文献、作者、时期或细微差别都变成独立的章节。当它们属于同一推理脉络时，应整合进同一条论证主线。',
+    '避免使用冒号、分号和长破折号。仅在绝对必要时使用，例如在逐字引文或必须保留的参考文献中。',
+    '优先使用由句号、逗号和话语连接词连接的完整句子。避免以“背景：”“证据：”或“结论：”之类标签开头的段落。',
+    '除非信息无法用连贯的散文清晰表达，否则不要使用列表。',
+  ],
+  'zh-Hant': [
+    '優先展開連貫、銜接緊密且有理據的論述。每一段都必須透過自然的過渡從前一段推進。',
+    '每一段都必須承擔新的推論功能。不要用不同的措辭在多個章節中重複核心論點、某一結論或同一方法學上的保留。',
+    '把每一條引註緊接在它所支持的具體子句之後。避免在段末機械地堆砌參考文獻；當不同文獻各有貢獻時，應在相應的句子中逐一標註並說明其貢獻。',
+    '精確區分四個層次：有文獻記載的事實、作者的解讀、報告建構的推論，以及語料庫無法解決的問題。不要把因果推論或控制性比喻當作已證實的事實來呈現。',
+    '在斷言某一機制、因果關係、效果或接受情況之前，要核實證據是否支持這一具體關係，以及相應的主題、行動者、尺度和時期。意圖不能證明效果，預期的受眾也不能證明接受情況。',
+    '存在分歧時，要完整展開爭論：每一方主張什麼、依據哪些證據或尺度、為何產生分歧，以及哪些數據能夠在它們之間作出判斷。僅僅宣告存在爭論或矛盾是不夠的。',
+    '不要憑單方面證據宣稱共識、趨同、分歧或矛盾。要分別識別並引用每一方立場；若缺少某一方，應將這一空缺作為證據上的局限呈現。',
+    '如果任務要求討論史學爭論，應將每一立場歸到證據清單中的作者或著作，並比較其語料庫、分期或尺度。如果沒有足夠的具名立場，應說明這一局限，而不是憑空發明某個學派或共識。',
+    '使用少量寬泛的標題。在每個章節內不要添加副標題、微章節、主題標籤或額外的標題。',
+    '不要把每個觀點、文獻、作者、時期或細微差別都變成獨立的章節。當它們屬於同一推理脈絡時，應整合進同一條論證主線。',
+    '避免使用冒號、分號和長破折號。僅在絕對必要時使用，例如在逐字引文或必須保留的參考文獻中。',
+    '優先使用由句號、逗號和話語連接詞連接的完整句子。避免以「背景：」「證據：」或「結論：」之類標籤開頭的段落。',
+    '除非資訊無法用連貫的散文清晰表達，否則不要使用清單。',
+  ],
+  vi: [
+    'Ưu tiên một lập luận liên tục, gắn kết chặt chẽ và có lý lẽ. Mỗi đoạn văn phải tiến triển từ đoạn trước bằng những chuyển tiếp tự nhiên.',
+    'Mỗi đoạn văn phải thực hiện một chức năng suy luận mới. Không lặp lại luận điểm trung tâm, một kết luận hoặc cùng một lưu ý phương pháp luận trong nhiều mục bằng những cách diễn đạt khác nhau.',
+    'Đặt mỗi trích dẫn ngay sau mệnh đề cụ thể mà nó chống đỡ. Tránh những cụm tài liệu tham khảo máy móc ở cuối đoạn; khi các nguồn đóng góp những điều khác nhau, hãy quy nguồn và giải thích từng đóng góp trong câu tương ứng.',
+    'Phân biệt chính xác bốn cấp độ: dữ kiện được ghi nhận, cách giải thích của một tác giả, suy luận do báo cáo dựng lên, và câu hỏi mà ngữ liệu không thể giải quyết. Không trình bày suy luận nhân quả hay ẩn dụ kiểm soát như một sự thật đã được chứng minh.',
+    'Trước khi khẳng định một cơ chế, quan hệ nhân quả, tác động hay sự tiếp nhận, hãy kiểm tra rằng bằng chứng chống đỡ mối quan hệ cụ thể đó cũng như chủ đề, chủ thể, quy mô và thời kỳ. Ý định không chứng minh tác động, và một công chúng dự kiến không chứng minh sự tiếp nhận.',
+    'Khi có bất đồng, hãy triển khai đầy đủ cuộc tranh luận: mỗi quan điểm khẳng định điều gì, dựa trên bằng chứng hay quy mô nào, vì sao chúng khác biệt và dữ liệu nào có thể phân định giữa chúng. Chỉ tuyên bố có tranh luận hay mâu thuẫn là chưa đủ.',
+    'Không tuyên bố đồng thuận, hội tụ, khác biệt hay mâu thuẫn từ bằng chứng một phía. Hãy nhận diện và trích dẫn từng quan điểm riêng biệt; nếu thiếu một quan điểm, hãy trình bày khoảng trống đó như một giới hạn chứng cứ.',
+    'Nếu đề bài yêu cầu một cuộc tranh luận sử học, hãy quy từng quan điểm cho các tác giả hoặc tác phẩm trong danh mục bằng chứng và so sánh ngữ liệu, giai đoạn hoặc quy mô của họ. Nếu không có đủ quan điểm được nêu tên, hãy nêu rõ giới hạn thay vì bịa ra một trường phái hay đồng thuận.',
+    'Dùng một vài tiêu đề khái quát. Trong mỗi mục, không thêm tiêu đề phụ, tiểu mục, nhãn chủ đề hay tiêu đề bổ sung.',
+    'Không biến mỗi ý tưởng, nguồn, tác giả, thời kỳ hay sắc thái thành một mục độc lập. Hãy tích hợp chúng vào cùng một dòng lập luận khi chúng thuộc cùng một bước vận động của lý luận.',
+    'Tránh dấu hai chấm, dấu chấm phẩy và gạch ngang dài. Chỉ dùng chúng khi thật sự cần thiết, chẳng hạn trong một trích dẫn nguyên văn hoặc một tài liệu tham khảo phải giữ nguyên.',
+    'Ưu tiên những câu hoàn chỉnh nối với nhau bằng dấu chấm, dấu phẩy và các từ nối diễn ngôn. Tránh những đoạn văn mở đầu bằng nhãn như “Bối cảnh:”, “Bằng chứng:” hoặc “Kết luận:”.',
+    'Không dùng danh sách trừ khi thông tin không thể được diễn đạt rõ ràng bằng văn xuôi liên tục.',
+  ],
+  ja: [
+    '連続性があり、よくつながった論理的な叙述を優先してください。各段落は自然なつなぎによって前の段落から進展しなければなりません。',
+    '各段落は新たな推論機能を担わなければなりません。中心命題、結論、または同じ方法論上の留保を、異なる表現で複数の節に繰り返さないでください。',
+    '各引用は、それが支える具体的な節の直後に置いてください。段落末に参考文献を機械的にまとめることは避け、複数の資料が異なる貢献をする場合は、それぞれの貢献を該当する文で帰属を示して説明してください。',
+    '四つの水準を正確に区別してください。文書化された事実、著者による解釈、報告書が構築した推論、そしてコーパスでは解決できない問いです。因果的推論や統制の比喩を証明済みの事実として提示しないでください。',
+    '仕組み、因果関係、効果、受容を主張する前に、証拠がその特定の関係を、主題・行為者・規模・時期とともに支えているかを確認してください。意図は効果を証明せず、想定された読者層は受容を証明しません。',
+    '不一致がある場合は、議論を完全に展開してください。各立場が何を主張し、どの証拠や規模に依拠し、なぜ分岐するのか、そして何がそれらを決しうるデータなのかを示します。議論や矛盾の存在を告知するだけでは不十分です。',
+    '一方の側の証拠だけで合意、収束、分岐、矛盾を宣言しないでください。各立場を個別に特定して引用し、一方が欠けている場合は、その空白を証拠上の限界として提示してください。',
+    '依頼が史学論争を求める場合は、各立場を証拠メニューの著者や著作に帰属させ、それらのコーパス、時期区分、規模を比較してください。名指しされた立場が十分にない場合は、学派や合意を捏造せず、限界を明示してください。',
+    '広い見出しを少数使ってください。各節の中に副題、小見出し、テーマ別ラベル、その他の見出しを追加しないでください。',
+    'あらゆる着想、資料、著者、時期、ニュアンスを独立した節にしないでください。同じ推論の流れに属する場合は、一つの論証の筋に統合してください。',
+    'コロン、セミコロン、ダッシュを避けてください。厳密に必要な場合、たとえば逐語引用や保存すべき参考文献の中でのみ使用してください。',
+    '句点、読点、談話標識でつないだ完全な文を優先してください。「背景：」「証拠：」「結論：」のようなラベルで段落を始めることは避けてください。',
+    '情報を連続した散文で明確に表現できない場合を除き、箇条書きを使用しないでください。',
+  ],
+  ru: [
+    'Отдавайте предпочтение непрерывному, хорошо связанному и аргументированному изложению. Каждый абзац должен продвигаться от предыдущего с помощью естественных переходов.',
+    'Каждый абзац должен выполнять новую функцию вывода. Не повторяйте центральный тезис, вывод или одну и ту же методологическую оговорку в нескольких разделах разными словами.',
+    'Ставьте каждую ссылку сразу после конкретного придаточного, которое она подкрепляет. Избегайте механических скоплений ссылок в конце абзаца; когда источники вносят разный вклад, указывайте и объясняйте каждый вклад в соответствующем предложении.',
+    'Точно различайте четыре уровня: документированный факт, интерпретацию автора, вывод, построенный отчётом, и вопрос, который корпус не позволяет решить. Не представляйте причинный вывод или метафору контроля как доказанный факт.',
+    'Прежде чем утверждать механизм, причинность, эффект или рецепцию, проверьте, что доказательства поддерживают именно эту связь, а также тему, действующее лицо, масштаб и период. Намерение не доказывает эффект, а предполагаемая аудитория не доказывает рецепцию.',
+    'При наличии разногласий разверните полемику полностью: что утверждает каждая позиция, на каких доказательствах или масштабе она основывается, почему они расходятся и какие данные позволили бы между ними решить. Просто объявить о споре или противоречии недостаточно.',
+    'Не заявляйте о консенсусе, сближении, расхождении или противоречии на основании односторонних доказательств. Определяйте и цитируйте каждую позицию отдельно; если одна отсутствует, представляйте этот пробел как доказательное ограничение.',
+    'Если задание требует историографической полемики, приписывайте каждую позицию авторам или работам из меню доказательств и сравнивайте их корпусы, периодизации или масштабы. Если названных позиций недостаточно, укажите ограничение, а не изобретайте школу или консенсус.',
+    'Используйте несколько широких заголовков. Внутри каждого раздела не добавляйте подзаголовки, микроразделы, тематические ярлыки или дополнительные заголовки.',
+    'Не превращайте каждую идею, источник, автора, период или нюанс в отдельный раздел. Интегрируйте их в одну линию аргументации, когда они относятся к одному и тому же ходу рассуждения.',
+    'Избегайте двоеточий, точек с запятой и длинных тире. Используйте их только при крайней необходимости, например внутри дословной цитаты или ссылки, которую необходимо сохранить.',
+    'Предпочитайте полные предложения, соединённые точками, запятыми и дискурсивными связками. Избегайте абзацев, начинающихся с ярлыков вроде «Контекст:», «Доказательство:» или «Вывод:».',
+    'Не используйте списки, если информацию невозможно ясно выразить непрерывной прозой.',
+  ],
+  uk: [
+    'Надавайте перевагу безперервному, добре пов’язаному та аргументованому викладу. Кожен абзац має просуватися від попереднього за допомогою природних переходів.',
+    'Кожен абзац має виконувати нову функцію висновування. Не повторюйте центральну тезу, висновок чи ту саму методологічну засторогу в кількох розділах різними словами.',
+    'Ставте кожне посилання одразу після конкретного підрядного речення, яке воно підтверджує. Уникайте механічних скупчень посилань у кінці абзацу; коли джерела роблять різний внесок, зазначайте й пояснюйте кожен внесок у відповідному реченні.',
+    'Точно розрізняйте чотири рівні: задокументований факт, інтерпретацію автора, висновок, побудований звітом, і питання, яке корпус не дає змоги розв’язати. Не подавайте причиновий висновок або метафору контролю як доведений факт.',
+    'Перш ніж стверджувати механізм, причинність, ефект або рецепцію, перевірте, чи докази підтверджують саме цей зв’язок, а також тему, дійову особу, масштаб і період. Намір не доводить ефекту, а передбачувана аудиторія не доводить рецепції.',
+    'Коли є розбіжність, розгорніть повну дискусію: що стверджує кожна позиція, на яких доказах чи масштабі вона ґрунтується, чому вони розходяться і які дані дали б змогу вирішити між ними. Лише оголосити про дискусію чи суперечність недостатньо.',
+    'Не заявляйте про консенсус, зближення, розходження чи суперечність на підставі однобічних доказів. Визначайте й цитуйте кожну позицію окремо; якщо одна відсутня, подавайте цю прогалину як доказове обмеження.',
+    'Якщо завдання вимагає історіографічної дискусії, приписуйте кожну позицію авторам або працям із меню доказів і порівнюйте їхні корпуси, періодизації чи масштаби. Якщо названих позицій недостатньо, зазначте обмеження, а не вигадуйте школу чи консенсус.',
+    'Використовуйте кілька широких заголовків. Усередині кожного розділу не додавайте підзаголовків, мікророзділів, тематичних ярликів чи додаткових заголовків.',
+    'Не перетворюйте кожну ідею, джерело, автора, період чи нюанс на окремий розділ. Інтегруйте їх в одну лінію аргументації, коли вони належать до одного й того самого руху міркування.',
+    'Уникайте двокрапок, крапок з комою та довгих тире. Використовуйте їх лише за крайньої потреби, наприклад у дослівній цитаті або посиланні, яке потрібно зберегти.',
+    'Надавайте перевагу повним реченням, з’єднаним крапками, комами та дискурсивними сполучниками. Уникайте абзаців, що починаються з ярликів на кшталт «Контекст:», «Доказ:» або «Висновок:».',
+    'Не використовуйте списки, якщо інформацію можна ясно висловити безперервною прозою.',
+  ],
+  ko: [
+    '연속적이고 잘 연결된 논리적 진술을 우선하십시오. 각 문단은 자연스러운 전환을 통해 이전 문단에서 발전해야 합니다.',
+    '각 문단은 새로운 추론 기능을 수행해야 합니다. 중심 논제, 결론 또는 동일한 방법론적 유보를 여러 절에서 다른 표현으로 반복하지 마십시오.',
+    '각 인용은 그것이 뒷받침하는 구체적인 절 바로 뒤에 배치하십시오. 문단 끝에 참고문헌을 기계적으로 몰아넣지 말고, 여러 출처가 서로 다른 기여를 할 때에는 해당 문장에서 각 기여를 귀속시켜 설명하십시오.',
+    '네 가지 수준을 정확히 구분하십시오. 문서로 기록된 사실, 저자의 해석, 보고서가 구성한 추론, 그리고 코퍼스로는 해결할 수 없는 질문입니다. 인과적 추론이나 통제 은유를 입증된 사실로 제시하지 마십시오.',
+    '메커니즘, 인과관계, 효과 또는 수용을 주장하기 전에, 증거가 주제·행위자·규모·시기뿐 아니라 그 특정 관계를 뒷받침하는지 확인하십시오. 의도는 효과를 입증하지 못하며, 예상된 독자층은 수용을 입증하지 못합니다.',
+    '의견 차이가 있을 때에는 논쟁을 완전히 전개하십시오. 각 입장이 무엇을 주장하는지, 어떤 증거나 규모에 근거하는지, 왜 갈라지는지, 그리고 무엇이 그것을 판가름할 데이터인지를 밝히십시오. 논쟁이나 모순이 있다고 선언하는 것만으로는 충분하지 않습니다.',
+    '한쪽 증거만으로 합의, 수렴, 분기 또는 모순을 선언하지 마십시오. 각 입장을 개별적으로 식별하고 인용하십시오. 한쪽이 빠져 있다면 그 공백을 증거상의 한계로 제시하십시오.',
+    '요청이 역사서술 논쟁을 요구한다면 각 입장을 증거 목록의 저자나 저작에 귀속시키고 그들의 코퍼스, 시기 구분 또는 규모를 비교하십시오. 이름 붙은 입장이 충분하지 않다면 학파나 합의를 지어내지 말고 한계를 밝히십시오.',
+    '폭넓은 제목을 몇 개만 사용하십시오. 각 절 안에 부제목, 소절, 주제 라벨 또는 추가 제목을 넣지 마십시오.',
+    '모든 아이디어, 출처, 저자, 시기 또는 뉘앙스를 독립된 절로 만들지 마십시오. 같은 추론의 흐름에 속한다면 하나의 논증선으로 통합하십시오.',
+    '콜론, 세미콜론, 긴 줄표를 피하십시오. 꼭 필요한 경우, 예컨대 축어적 인용이나 반드시 보존해야 하는 참고문헌 안에서만 사용하십시오.',
+    '마침표, 쉼표, 담화 연결어로 이어진 완전한 문장을 선호하십시오. “배경:”, “증거:”, “결론:”과 같은 라벨로 문단을 시작하지 마십시오.',
+    '정보를 연속적인 산문으로 명확히 표현할 수 없다면 목록을 사용하지 마십시오.',
+  ],
 };
 
 export function deepResearchNarrativeRules(language: PromptLanguage = 'es'): readonly string[] {
@@ -252,10 +362,16 @@ export interface PlanInput {
   coverageQuestions: string[];
   language: PromptLanguage;
   audience?: string;
-  /** Soft target number of sections the planner should aim for. */
+  /**
+   * How many sections the planner may return. In `'user'` mode this is a hard
+   * MAXIMUM (the "Máx. N secciones" control); in `'auto'` mode it is the
+   * evidence-derived target.
+   */
   sectionCount: number;
   /** Whether the user pinned a section cap ('user') or left it to the model ('auto'). */
   sectionMode: 'auto' | 'user';
+  /** Guideline words per section, so the planner sizes each section's mandate. */
+  sectionLength?: DeepResearchSectionLengthPlan;
   ideas: { id: string; label: string; type: string; statement: string; works: string }[];
   themes: { id: string; label: string; summary: string }[];
   gaps: { id: string; label: string; summary: string }[];
@@ -348,6 +464,13 @@ export interface SectionInput {
   /** Evidence-bounded status of the plan's propositions after section-specific
    * idea/passage retrieval. Plan claims are hypotheses until this audit runs. */
   claimAudit?: SectionClaimAudit;
+  /**
+   * The user's guideline words-per-section, already split into bounded generation
+   * passes. `targetWords === null` is auto mode: the writer behaves exactly as it
+   * did before this control existed. It is guidance, never a quota — the writer
+   * must stop early rather than pad, repeat, invent or overstate to reach it.
+   */
+  sectionLength?: DeepResearchSectionLengthPlan;
 }
 
 export type DeepResearchProofRole = 'fact' | 'actor_time' | 'mechanism' | 'causality' | 'comparison_side' | 'agreement' | 'contradiction' | 'effect' | 'reception' | 'limit' | 'method';
@@ -650,6 +773,10 @@ export async function orchestrateDeepResearch(
   }
   const sectionPlan = resolveSectionPlan(snapshot, request.sectionLimit ?? 'auto', request.objective, coverageQuestions);
   const sectionCount = sectionPlan.target;
+  // Normalized once here so a legacy request, a persisted queue job and an MCP
+  // payload all reach the writers — and the report metadata — as the same value.
+  const requestedSectionLength = normalizeDeepResearchSectionLength(request.sectionLength);
+  const sectionLengthPlan = planDeepResearchSectionLength(requestedSectionLength);
 
   emit({ phase: 'planning', message: L.planning(sectionCount) });
   // Ideas and their relationships still choose the thesis and progression. Atomic
@@ -1397,6 +1524,7 @@ export async function orchestrateDeepResearch(
     qualityAssessment,
     limitations: [...finalize.limitations, ...coherenceIssues.map((issue) => L.coherenceLimitation(issue))],
     deepResearchStructure: singleNarrative ? 'single' : 'sectioned',
+    deepResearchSectionLength: requestedSectionLength,
     stats: {
       selectedIdeas: coveredIdeaIds.size,
       selectedThemes: 0,
@@ -1413,6 +1541,16 @@ export async function orchestrateDeepResearch(
   const meta: DeepResearchMeta = {
     deepResearchVersion: request.deepResearchVersion ?? 'v1',
     structure: singleNarrative ? 'single' : 'sectioned',
+    sectionLength: requestedSectionLength,
+    // Recorded per section rather than as one report total: the guidance is per
+    // section, and a report where the corpus filled two sections and ran dry on
+    // three is a different fact from one that simply came out short.
+    sectionLengthOutcome: sectionLengthPlan.targetWords === null ? null : {
+      targetWords: sectionLengthPlan.targetWords,
+      sections: written.length,
+      reached: written.filter((item) => countWords(item.markdown) >= Math.round(sectionLengthPlan.targetWords! * 0.92)).length,
+      short: written.filter((item) => countWords(item.markdown) < Math.round(sectionLengthPlan.targetWords! * 0.92)).length,
+    },
     sections: singleNarrative ? 1 : written.length,
     words: totalWords,
     pages: pagesFromWords(totalWords),
@@ -1505,6 +1643,7 @@ function sectionInput(
         title: candidate.title,
         responsibilities: [...candidate.keyClaims, ...(candidate.coverageQuestions ?? [])].slice(0, 8),
       })),
+    sectionLength: planDeepResearchSectionLength(request.sectionLength),
   };
 }
 
@@ -1649,17 +1788,30 @@ export interface SectionPlan {
   mode: 'auto' | 'user';
 }
 
-/** The planner may use one extra broad movement only when an explicit coverage
- * contract exists. This is an architectural safety bound, not a content cutoff:
- * normalizePlan folds every discarded assignment into a retained section. */
+/**
+ * The planner may use one extra broad movement only when an explicit coverage
+ * contract exists AND the architecture is auto-sized. This is an architectural
+ * safety bound, not a content cutoff: normalizePlan folds every discarded
+ * assignment into a retained section.
+ *
+ * The `mode === 'auto'` condition is load-bearing. The control says "Máx. N
+ * secciones", so a coverage question must never buy an N+1st section behind the
+ * user's back; in auto mode nobody named a number, so the grace slot is free.
+ */
 export function sectionPlanMaximum(sectionPlan: SectionPlan, coverageQuestions: string[]): number {
-  return sectionPlan.target + (coverageQuestions.length > 0 ? 1 : 0);
+  return sectionPlan.target + (sectionPlan.mode === 'auto' && coverageQuestions.length > 0 ? 1 : 0);
 }
 
 /**
  * Decide how many broad argumentative movements the retrieved evidence warrants.
- * A numeric preference controls organization only; coverage questions and distinct
- * debates may increase the plan so the preference can never discard evidence.
+ *
+ * A numeric preference is a CEILING, matching the "Máx. N secciones" control: the
+ * report publishes at most that many sections, and an over-sized provider plan is
+ * compacted to fit — deterministically reassigning every dropped idea, work, gap,
+ * contradiction and coverage question to a retained section, so capping the
+ * architecture never discards evidence. The evidence heuristic still decides when
+ * it asks for FEWER sections than the requested maximum; `MIN_SECTIONS` remains the
+ * floor because an argument still needs a framing, a body and a synthesis.
  */
 export function resolveSectionPlan(
   snapshot: Pick<WritingWorkshopSnapshot, 'ideas' | 'gaps' | 'contradictions' | 'works'>,
@@ -1676,9 +1828,8 @@ export function resolveSectionPlan(
     Math.ceil(Math.max(coverageQuestions.length, explicitMechanisms) / 2) + 2,
   );
   if (typeof sectionLimit === 'number' && Number.isFinite(sectionLimit) && sectionLimit > 0) {
-    const preferred = Math.max(MIN_SECTIONS, Math.round(sectionLimit));
-    const target = Math.max(preferred, evidenceClusters);
-    return { target, mode: 'user' };
+    const ceiling = Math.max(MIN_SECTIONS, Math.round(sectionLimit));
+    return { target: Math.min(ceiling, evidenceClusters), mode: 'user' };
   }
   return { target: evidenceClusters, mode: 'auto' };
 }
@@ -1698,6 +1849,7 @@ export function buildPlanInput(
     audience: request.audience,
     sectionCount: sectionPlan.target,
     sectionMode: sectionPlan.mode,
+    sectionLength: planDeepResearchSectionLength(request.sectionLength),
     ideas: snapshot.ideas.slice(0, POOL_LIMITS.ideas).map((i) => ({
       id: i.id,
       label: i.label,
@@ -3544,6 +3696,8 @@ const EN: Labels = {
 /** Headings the report itself carries, per language. Progress copy and fallback
  * prose fall back to English rather than leaking Spanish into a foreign report. */
 const HEADINGS: Partial<Record<PromptLanguage, Pick<Labels, 'abstract' | 'limitations' | 'references' | 'noReferences'>>> = {
+  es: { abstract: 'Resumen', limitations: 'Limitaciones', references: 'Referencias', noReferences: 'Sin fuentes citadas.' },
+  en: { abstract: 'Abstract', limitations: 'Limitations', references: 'References', noReferences: 'No sources cited.' },
   fr: { abstract: 'Résumé', limitations: 'Limites', references: 'Références', noReferences: 'Aucune source citée.' },
   tr: { abstract: 'Özet', limitations: 'Sınırlılıklar', references: 'Kaynakça', noReferences: 'Kaynak belirtilmedi.' },
   de: {
@@ -3554,6 +3708,14 @@ const HEADINGS: Partial<Record<PromptLanguage, Pick<Labels, 'abstract' | 'limita
   },
   pt: { abstract: 'Resumo', limitations: 'Limitações', references: 'Bibliografia', noReferences: 'Nenhuma fonte citada.' },
   'pt-BR': { abstract: 'Resumo', limitations: 'Limitações', references: 'Referências', noReferences: 'Nenhuma fonte citada.' },
+  it: { abstract: 'Riassunto', limitations: 'Limitazioni', references: 'Riferimenti bibliografici', noReferences: 'Nessuna fonte citata.' },
+  'zh-Hans': { abstract: '摘要', limitations: '局限性', references: '参考文献', noReferences: '未引用任何来源。' },
+  'zh-Hant': { abstract: '摘要', limitations: '限制', references: '參考文獻', noReferences: '未引用任何來源。' },
+  vi: { abstract: 'Tóm tắt', limitations: 'Hạn chế', references: 'Tài liệu tham khảo', noReferences: 'Không có nguồn nào được trích dẫn.' },
+  ja: { abstract: '要旨', limitations: '限界', references: '参考文献', noReferences: '引用された出典はありません。' },
+  ru: { abstract: 'Аннотация', limitations: 'Ограничения', references: 'Список литературы', noReferences: 'Источники не цитировались.' },
+  uk: { abstract: 'Анотація', limitations: 'Обмеження', references: 'Список літератури', noReferences: 'Джерела не цитовано.' },
+  ko: { abstract: '초록', limitations: '한계', references: '참고문헌', noReferences: '인용된 출처가 없습니다.' },
 };
 
 export function labels(language: PromptLanguage): Labels {

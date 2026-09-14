@@ -13,6 +13,11 @@ import type {
 import type { DeepResearchApproach } from '@shared/deepResearchApproaches';
 import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
 import { parseDeepResearchRequestVersion, type DeepResearchVersion } from '@shared/deepResearchVersions';
+import { deepResearchLengthPromptPack } from '@shared/deepResearchLengthPromptPacks';
+import {
+  normalizeDeepResearchSectionLength,
+  type DeepResearchSectionLength,
+} from '@shared/deepResearchSectionLength';
 import {
   assessDeepResearchReport,
   type DeepResearchQualitySource,
@@ -97,7 +102,10 @@ export interface DeepResearchBrief {
   audience?: string;
   /** Requested visible shape. Internal evidence planning remains unchanged. */
   structure: 'sectioned' | 'single';
-  sections: { suggested: number; mode: 'auto' | 'user' };
+  /** `maximum` is non-null exactly when the user pinned "Máx. N secciones". */
+  sections: { suggested: number; mode: 'auto' | 'user'; maximum: number | null };
+  /** Guideline words per section, or `'auto'`. Editorial guidance, never a quota. */
+  sectionLength: DeepResearchSectionLength;
   materials: CitationCatalog;
   citationPolicy: string[];
   method: string[];
@@ -132,6 +140,8 @@ export async function buildDeepResearchBrief(
   const specializedRules = approach === 'general' ? null : approachRules(approach, 'client', language);
   const singleNarrative = request.sectionLimit === 'single';
   const copy = deepResearchClientPromptPack(language);
+  const sectionLength = normalizeDeepResearchSectionLength(request.sectionLength);
+  const lengthWords = sectionLength === 'auto' ? null : sectionLength;
   return {
     mode: 'client',
     deepResearchVersion,
@@ -140,11 +150,17 @@ export async function buildDeepResearchBrief(
     language,
     audience: request.audience,
     structure: singleNarrative ? 'single' : 'sectioned',
-    sections: { suggested: sectionPlan.target, mode: sectionPlan.mode },
+    // `mode: 'user'` means the number is a MAXIMUM the caller must not exceed, so
+    // the kit names it as one instead of leaving "suggested" to be read as a target.
+    sections: { suggested: sectionPlan.target, mode: sectionPlan.mode, maximum: sectionPlan.mode === 'user' ? sectionPlan.target : null },
+    sectionLength,
     materials: buildCitationCatalog(snapshot),
     citationPolicy: [...copy.citationPolicy],
     method: [
-      copy.evidenceShape(sectionPlan.target),
+      sectionPlan.mode === 'user' && !singleNarrative
+        ? copy.sectionCeiling(sectionPlan.target)
+        : copy.evidenceShape(sectionPlan.target),
+      ...(lengthWords === null ? [] : [deepResearchLengthPromptPack(language).clientKit(lengthWords)]),
       singleNarrative ? copy.singleNarrative : copy.sectionedNarrative,
       ...deepResearchNarrativeRules(language),
       ...(specializedRules?.planner ?? []),
@@ -166,6 +182,8 @@ export interface ClientFinalizeInput {
   audience?: string;
   /** Must match the brief so the assembler can preserve a continuous body. */
   sectionLimit?: DeepResearchRequest['sectionLimit'];
+  /** Recorded on the assembled report so a client-written report is inspectable too. */
+  sectionLength?: DeepResearchRequest['sectionLength'];
   /** The body the caller wrote; headed sections normally, plain prose for `single`. */
   sectionsMarkdown: string;
   title?: string;
@@ -208,6 +226,7 @@ export async function assembleClientDeepResearchReport(
     approach,
     deepResearchVersion,
     sectionLimit: input.sectionLimit,
+    sectionLength: normalizeDeepResearchSectionLength(input.sectionLength),
   };
   const brief = briefFor(request);
   const snapshotBuilder = buildSnapshot ?? snapshotBuilderForVersion(deepResearchVersion);
@@ -295,6 +314,7 @@ export async function assembleClientDeepResearchReport(
     deepResearchApproach: approach,
     deepResearchVersion,
     deepResearchStructure: singleNarrative ? 'single' : 'sectioned',
+    deepResearchSectionLength: request.sectionLength,
     generationModel: input.generationModel ? { ...input.generationModel } : null,
     qualityAssessment,
     stats: {
@@ -320,6 +340,7 @@ export async function assembleClientDeepResearchReport(
     worksCited: citedWorkIds.size,
     deepResearchVersion,
     structure: singleNarrative ? 'single' : 'sectioned',
+    sectionLength: request.sectionLength,
     stoppedReason: null,
   };
 

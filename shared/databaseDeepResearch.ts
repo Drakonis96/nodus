@@ -1,5 +1,6 @@
-import type { AppLanguage } from './types';
+import type { PromptLanguage } from './types';
 import type { DatabaseColumnType } from './databases';
+import type { DeepResearchSectionLength } from './deepResearchSectionLength';
 
 /** Stable, contextual report modes. Keep `general` first for legacy callers. */
 export const DATABASE_DEEP_RESEARCH_REPORT_TYPES = [
@@ -20,7 +21,8 @@ export type DatabaseDeepResearchRequestedReportType = DatabaseDeepResearchReport
 
 export const DATABASE_DEEP_RESEARCH_PROMPT_LANGUAGES = [
   'es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr',
-] as const satisfies readonly AppLanguage[];
+  'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko',
+] as const satisfies readonly PromptLanguage[];
 export type DatabaseDeepResearchPromptLanguage =
   (typeof DATABASE_DEEP_RESEARCH_PROMPT_LANGUAGES)[number];
 
@@ -574,6 +576,12 @@ export interface DatabaseDeepResearchJobInput {
   audience?: string | null;
   includedCellTypes?: string[];
   includeAttachmentContent?: boolean;
+  /**
+   * Guideline WORDS per narrative section. `'auto'` (and every run queued before
+   * the control existed) keeps the historical behaviour. Persisted in the run's
+   * options so a resumed run writes to the same length.
+   */
+  sectionLength?: DeepResearchSectionLength;
 }
 
 export interface DatabaseDeepResearchJob {

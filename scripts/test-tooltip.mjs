@@ -35,7 +35,7 @@ test('top bar actions use the shared tooltip instead of the hover-expanding labe
 test('compact sidebar buttons show tooltips on the right instead of native titles', async () => {
   const app = await readSource('src/App.tsx');
 
-  assert.match(app, /<Tooltip key=\{n\.id\} label=\{t\(n\.label\)\} placement="right">\{button\}<\/Tooltip>/);
+  assert.match(app, /<Tooltip key=\{n\.id\} label=\{label\} placement="right" disabled=\{disabled\}>\{button\}<\/Tooltip>/);
   assert.doesNotMatch(app, /title=\{sidebarCompact \?/);
   assert.match(app, /placement=\{sidebarCompact \? 'right' : 'bottom'\}/);
 });

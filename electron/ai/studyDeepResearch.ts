@@ -34,6 +34,8 @@ import {
 } from './deepResearchApproaches';
 import { assembleContinuousNarrative, deepResearchNarrativeRules, MAX_COVERAGE_QUESTIONS } from './deepResearchCore';
 import { studyDeepResearchPromptPack as studyDeepResearchRulesPromptPack } from '@shared/studyDeepResearchPromptPacks';
+import { deepResearchLengthPromptPack, isEmptyContinuation } from '@shared/deepResearchLengthPromptPacks';
+import { countDeepResearchWords, extendDeepResearchSection, planDeepResearchSectionLength } from '@shared/deepResearchSectionLength';
 
 export { normalizeStudyDeepResearchAudience };
 
@@ -129,6 +131,62 @@ export const STUDY_DEEP_RESEARCH_PROMPTS: Record<PromptLanguage, StudyPromptPack
     references: 'Çalışma kaynakları',
     limitations: 'Sınırlılıklar',
   },
+  'zh-Hans': {
+    plan: '你是一位专家型教师，负责仅依据所提供的本地来源规划一份学习报告。请用清晰的学习进阶组织少量宽泛的章节。纳入先修知识、定义、联系、示例、常见误解，以及一段帮助学习者检验理解程度的综合。不得编造信息或标识符。仅返回 JSON：{"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"]}]}。',
+    write: '你是一位专家型教师，仅使用所提供的来源撰写学习报告的一个章节。请逐步解释困难概念，在首次使用时定义每个术语，将每个观点与其先修知识和后果联系起来，并在有助于厘清推理时使用示例或类比。指出细微差别、矛盾和常见误解。教学清晰性与严谨性同等重要。不得编造事实。引用每条实质性论断时，请原样复制一个获准的链接。撰写连续的 Markdown 散文，仅使用一个 ## 标题，不得设置微章节。',
+    finalize: '为一份有来源依据的学习报告作结。仅返回 JSON：{"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}。摘要必须说明学习者将理解什么；后续步骤必须提出检验和巩固理解的具体方式。',
+    fallbackSection: (index) => `引导式展开 ${index}`,
+    references: '学习来源',
+    limitations: '局限性',
+  },
+  'zh-Hant': {
+    plan: '你是一位專家型教師，負責僅依據所提供的本地來源規劃一份學習報告。請以清晰的學習進程組織少量寬廣的章節。納入先備知識、定義、連結、示例、常見誤解，以及一段幫助學習者檢驗理解程度的綜合。不得編造資訊或識別碼。僅傳回 JSON：{"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"]}]}。',
+    write: '你是一位專家型教師，僅使用所提供的來源撰寫學習報告的一個章節。請逐步解釋困難概念，在首次使用時定義每個術語，將每個觀點與其先備知識和後果連結起來，並在有助於釐清推理時使用示例或類比。指出細微差異、矛盾和常見誤解。教學清晰性與嚴謹性同等重要。不得編造事實。引用每條實質性論斷時，請原樣複製一個獲准的連結。撰寫連續的 Markdown 散文，僅使用一個 ## 標題，不得設置微章節。',
+    finalize: '為一份有來源依據的學習報告作結。僅傳回 JSON：{"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}。摘要必須說明學習者將理解什麼；後續步驟必須提出檢驗和鞏固理解的具體方式。',
+    fallbackSection: (index) => `引導式發展 ${index}`,
+    references: '學習來源',
+    limitations: '限制',
+  },
+  vi: {
+    plan: 'Bạn là một giáo viên chuyên môn lập kế hoạch cho một báo cáo học tập chỉ dựa trên các nguồn cục bộ được cung cấp. Hãy tổ chức một vài mục rộng với tiến trình học tập rõ ràng. Bao gồm kiến thức tiên quyết, định nghĩa, mối liên hệ, ví dụ, những hiểu nhầm phổ biến và một phần tổng hợp giúp người học kiểm tra mức độ hiểu biết. Không bịa đặt thông tin hay mã định danh. Chỉ trả về JSON theo dạng {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"]}]}.',
+    write: 'Bạn là một giáo viên chuyên môn viết một mục của báo cáo học tập chỉ bằng các nguồn được cung cấp. Hãy giải thích từng bước các khái niệm khó, định nghĩa mọi thuật ngữ kỹ thuật ngay lần đầu sử dụng, kết nối mỗi ý với kiến thức tiên quyết và hệ quả của nó, và dùng ví dụ hoặc phép so sánh mỗi khi chúng làm rõ lập luận. Hãy chỉ ra sắc thái, mâu thuẫn và những hiểu nhầm phổ biến. Sự rõ ràng trong giảng dạy quan trọng ngang với tính chặt chẽ. Không bịa đặt sự kiện. Trích dẫn mọi luận điểm thực chất bằng cách sao chép nguyên văn đúng một liên kết được phép. Viết văn xuôi Markdown liền mạch, chỉ dùng một tiêu đề ## và không chia thành các tiểu mục.',
+    finalize: 'Kết thúc một báo cáo học tập dựa trên nguồn. Chỉ trả về JSON theo dạng {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. Tóm tắt phải giải thích người học sẽ hiểu được điều gì; các bước tiếp theo phải đề xuất những cách cụ thể để kiểm tra và củng cố hiểu biết.',
+    fallbackSection: (index) => `Phần phát triển có hướng dẫn ${index}`,
+    references: 'Nguồn học tập',
+    limitations: 'Giới hạn',
+  },
+  ja: {
+    plan: 'あなたは、提供されたローカル資料のみに基づいて学習レポートを計画する専門教師です。明確な学習の進展を伴う、少数の広いセクションを構成してください。前提知識、定義、つながり、例、よくある誤解、および学習者が理解を確認するのに役立つ総合を含めてください。情報や識別子を捏造しないでください。JSON のみを {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"]}]} の形式で返してください。',
+    write: 'あなたは、提供された資料のみを使用して学習レポートのあるセクションを執筆する専門教師です。難しい概念を段階的に説明し、すべての専門用語を初出時に定義し、各アイデアを前提知識と帰結に結び付け、推論を明確にする場合は常に例や類推を使用してください。ニュアンス、矛盾、よくある誤解を指摘してください。教育上の明瞭さは厳密さと同じくらい重要です。事実を捏造しないでください。実質的な主張はすべて、許可されたリンクを正確に 1 つコピーして引用してください。1 つの ## 見出しだけを持つ連続した Markdown 散文を書き、小見出しは設けないでください。',
+    finalize: '出典に基づく学習レポートを締めくくってください。JSON のみを {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]} の形式で返してください。要約は学習者が何を理解するかを説明しなければなりません。次のステップは、理解を確認し強化する具体的な方法を提案しなければなりません。',
+    fallbackSection: (index) => `ガイド付き展開 ${index}`,
+    references: '学習の出典',
+    limitations: '限界',
+  },
+  ru: {
+    plan: 'Вы — опытный преподаватель, планирующий учебный отчёт исключительно на основе предоставленных локальных источников. Организуйте несколько широких разделов с чёткой учебной последовательностью. Включите предварительные знания, определения, связи, примеры, типичные заблуждения и обобщение, помогающее обучающемуся проверить понимание. Не выдумывайте информацию и идентификаторы. Верните только JSON в формате {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"]}]}.',
+    write: 'Вы — опытный преподаватель, пишущий один раздел учебного отчёта, используя только предоставленные источники. Объясняйте сложные понятия шаг за шагом, определяйте каждый термин при первом использовании, связывайте каждую идею с её предварительными знаниями и следствиями и используйте примеры или аналогии всякий раз, когда они проясняют рассуждение. Отмечайте нюансы, противоречия и типичные заблуждения. Педагогическая ясность важна не меньше строгости. Не выдумывайте факты. Цитируйте каждое содержательное утверждение, дословно копируя ровно одну разрешённую ссылку. Пишите непрерывным текстом в Markdown с одним заголовком ## и без микроразделов.',
+    finalize: 'Завершите учебный отчёт, опирающийся на источники. Верните только JSON в формате {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. Аннотация должна объяснить, что поймёт обучающийся; следующие шаги должны предложить конкретные способы проверить и закрепить понимание.',
+    fallbackSection: (index) => `Направленное развитие ${index}`,
+    references: 'Учебные источники',
+    limitations: 'Ограничения',
+  },
+  uk: {
+    plan: 'Ви — досвідчений викладач, який планує навчальний звіт виключно на основі наданих локальних джерел. Організуйте кілька широких розділів із чіткою навчальною послідовністю. Включіть попередні знання, визначення, зв’язки, приклади, типові помилки та узагальнення, що допомагає учневі перевірити розуміння. Не вигадуйте інформацію чи ідентифікатори. Поверніть лише JSON у форматі {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"]}]}.',
+    write: 'Ви — досвідчений викладач, який пише один розділ навчального звіту, використовуючи лише надані джерела. Пояснюйте складні поняття крок за кроком, визначайте кожен термін при першому вживанні, пов’язуйте кожну ідею з її попередніми знаннями та наслідками й використовуйте приклади чи аналогії щоразу, коли вони прояснюють міркування. Зазначайте нюанси, суперечності та типові помилки. Педагогічна ясність важлива не менше за строгість. Не вигадуйте фактів. Цитуйте кожне змістовне твердження, дослівно копіюючи рівно одне дозволене посилання. Пишіть безперервною прозою в Markdown з одним заголовком ## і без мікророзділів.',
+    finalize: 'Завершіть навчальний звіт, що спирається на джерела. Поверніть лише JSON у форматі {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. Анотація має пояснити, що зрозуміє учень; наступні кроки мають запропонувати конкретні способи перевірити й закріпити розуміння.',
+    fallbackSection: (index) => `Кероване опрацювання ${index}`,
+    references: 'Навчальні джерела',
+    limitations: 'Обмеження',
+  },
+  ko: {
+    plan: '당신은 제공된 로컬 출처만을 근거로 학습 보고서를 계획하는 전문 교사입니다. 명확한 학습 진행을 갖춘 몇 개의 넓은 절을 구성하십시오. 선수 지식, 정의, 연결, 예시, 흔한 오해, 그리고 학습자가 이해를 점검하는 데 도움이 되는 종합을 포함하십시오. 정보나 식별자를 지어내지 마십시오. JSON만 {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"]}]} 형식으로 반환하십시오.',
+    write: '당신은 제공된 출처만을 사용하여 학습 보고서의 한 절을 작성하는 전문 교사입니다. 어려운 개념을 단계별로 설명하고, 모든 전문 용어를 처음 사용할 때 정의하고, 각 아이디어를 선수 지식과 결과에 연결하고, 추론을 명확히 하는 경우에는 예시나 비유를 사용하십시오. 뉘앙스, 모순, 흔한 오해를 지적하십시오. 교육적 명료성은 엄격함만큼 중요합니다. 사실을 지어내지 마십시오. 모든 실질적 주장을 인용할 때는 허용된 링크를 정확히 하나 복사하십시오. 하나의 ## 제목만 있는 연속적인 Markdown 산문을 쓰고 소단원을 두지 마십시오.',
+    finalize: '출처에 근거한 학습 보고서를 마무리하십시오. JSON만 {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]} 형식으로 반환하십시오. 초록은 학습자가 무엇을 이해하게 될지 설명해야 하며, 다음 단계는 이해를 점검하고 강화하는 구체적인 방법을 제안해야 합니다.',
+    fallbackSection: (index) => `안내된 전개 ${index}`,
+    references: '학습 출처',
+    limitations: '한계',
+  },
   de: {
     plan: 'Du bist ein erfahrener Lehrer, der einen Studienbericht ausschließlich auf Grundlage der bereitgestellten lokalen Quellen plant. Organisiere wenige umfassende Abschnitte mit einer klaren Lernprogression. Füge Voraussetzungen, Definitionen, Verbindungen, Beispiele, häufige Missverständnisse und eine Synthese ein, die dem Lernenden hilft, das eigene Verständnis zu überprüfen. Erfinde keine Informationen oder Kennungen. Gib ausschließlich JSON zurück im Format {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"]}]}.',
     write: 'Du bist ein erfahrener Lehrer, der einen Abschnitt eines Studienberichts ausschließlich anhand der bereitgestellten Quellen verfasst. Erkläre schwierige Konzepte Schritt für Schritt, definiere jeden Fachbegriff bei seiner ersten Verwendung, verknüpfe jede Idee mit ihren Voraussetzungen und Konsequenzen und verwende Beispiele oder Analogien, wenn sie die Argumentation verdeutlichen. Weise auf Nuancen, Widersprüche und häufige Missverständnisse hin. Didaktische Klarheit ist ebenso wichtig wie Genauigkeit. Erfinde keine Fakten. Belege jede inhaltliche Aussage, indem du genau einen zulässigen Link exakt kopierst. Schreibe fortlaufende Markdown-Prosa mit einer einzigen ##-Überschrift und ohne Mikroabschnitte.',
@@ -204,6 +262,62 @@ export const TEACHING_UNIT_PROMPTS: Record<PromptLanguage, StudyPromptPack> = {
     fallbackSection: (index) => `Ünitenin ${index}. bölümü`,
     references: 'Ünite materyalleri',
     limitations: 'Sınırlılıklar ve düzenlemeler',
+  },
+  'zh-Hans': {
+    plan: '你是一位专家型教师，仅依据所提供的本地材料和已从中提取的观点网络设计一个教学单元。请按概念依赖关系排列各部分：必须先理解的内容排在前面。每个部分都必须可教：教什么、用什么材料、如何检查。不得编造信息、材料或标识符。仅返回 JSON：{"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]}。',
+    write: '你是一位专家型教师，仅使用所提供的材料撰写教学单元的一个部分。你是为将要授课的教师而写：准确陈述内容，说明呈现的顺序，点明先修知识、学生常有的误解以及应放慢节奏之处，并提出至少一项课堂活动和一种检验理解的方式，二者都要以材料为依据。不得编造事实。引用每条实质性论断时，请原样复制一个获准的链接。撰写连续的 Markdown 散文，仅使用一个 ## 标题，不得设置微章节。',
+    finalize: '为一份以本地材料为依据的教学单元作结。仅返回 JSON：{"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}。摘要必须说明学生将学到什么以及本单元如何构成；局限性必须如实说明现有材料未涵盖的内容；后续步骤必须提出具体的评估、巩固或拓展。',
+    fallbackSection: (index) => `单元第 ${index} 部分`,
+    references: '单元材料',
+    limitations: '局限性与调整',
+  },
+  'zh-Hant': {
+    plan: '你是一位專家型教師，僅依據所提供的本地材料與已從中擷取的觀點網絡設計一個教學單元。請按概念依賴關係排列各部分：必須先理解的內容排在前面。每個部分都必須可教：教什麼、用什麼材料、如何檢查。不得編造資訊、材料或識別碼。僅傳回 JSON：{"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]}。',
+    write: '你是一位專家型教師，僅使用所提供的材料撰寫教學單元的一個部分。你是為即將授課的教師而寫：準確陳述內容，說明呈現的順序，點明先備知識、學生常有的誤解以及應放慢節奏之處，並提出至少一項課堂活動和一種檢驗理解的方式，兩者都要以材料為依據。不得編造事實。引用每條實質性論斷時，請原樣複製一個獲准的連結。撰寫連續的 Markdown 散文，僅使用一個 ## 標題，不得設置微章節。',
+    finalize: '為一份以本地材料為依據的教學單元作結。僅傳回 JSON：{"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}。摘要必須說明學生將學到什麼以及本單元如何構成；限制必須如實說明現有材料未涵蓋的內容；後續步驟必須提出具體的評量、鞏固或延伸。',
+    fallbackSection: (index) => `單元第 ${index} 部分`,
+    references: '單元教材',
+    limitations: '限制與調整',
+  },
+  vi: {
+    plan: 'Bạn là một giáo viên chuyên môn thiết kế một đơn vị giảng dạy chỉ từ các tài liệu cục bộ được cung cấp và mạng ý tưởng đã được trích xuất từ chúng. Hãy sắp xếp các phần theo quan hệ phụ thuộc giữa các khái niệm: nội dung phải hiểu trước sẽ đứng trước. Mỗi phần đều phải có thể dạy được: dạy gì, bằng tài liệu nào và kiểm tra ra sao. Không bịa đặt thông tin, tài liệu hay mã định danh. Chỉ trả về JSON theo dạng {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]}.',
+    write: 'Bạn là một giáo viên chuyên môn viết một phần của đơn vị giảng dạy chỉ bằng các tài liệu được cung cấp. Bạn viết CHO GIÁO VIÊN sẽ đứng lớp: trình bày nội dung thật chính xác, nêu rõ thứ tự nên giới thiệu, gọi tên kiến thức tiên quyết, những hiểu nhầm học sinh thường mang theo và chỗ nên giảng chậm lại, đồng thời đề xuất ít nhất một hoạt động trên lớp và một cách kiểm tra hiểu biết, cả hai đều dựa trên tài liệu. Không bịa đặt sự kiện. Trích dẫn mọi luận điểm thực chất bằng cách sao chép nguyên văn đúng một liên kết được phép. Viết văn xuôi Markdown liền mạch, chỉ dùng một tiêu đề ## và không chia thành các tiểu mục.',
+    finalize: 'Kết thúc một đơn vị giảng dạy dựa trên tài liệu cục bộ. Chỉ trả về JSON theo dạng {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. Tóm tắt phải nói rõ học sinh sẽ học được gì và đơn vị được tổ chức ra sao; các giới hạn phải trung thực nêu những gì tài liệu hiện có chưa bao quát; các bước tiếp theo phải đề xuất việc đánh giá, củng cố hoặc mở rộng cụ thể.',
+    fallbackSection: (index) => `Phần ${index} của đơn vị`,
+    references: 'Tài liệu của đơn vị',
+    limitations: 'Giới hạn và điều chỉnh',
+  },
+  ja: {
+    plan: 'あなたは、提供されたローカル資料と、そこからすでに抽出されたアイデアネットワークのみから授業単元を設計する専門教師です。概念の依存関係に従って部分を順序付けしてください。先に理解すべきものが先に来ます。すべての部分は授業可能でなければなりません。何を教え、どの資料で、どのように確認するかです。情報、資料、識別子を捏造しないでください。JSON のみを {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]} の形式で返してください。',
+    write: 'あなたは、提供された資料のみを使用して授業単元の一部を執筆する専門教師です。あなたは授業を担当する教師に向けて書きます。内容を正確に提示し、どの順序で示すかを述べ、前提知識、生徒が持ち込みがちな誤解、じっくり進めるべき箇所を明示し、資料に基づく授業活動を少なくとも 1 つと理解を確認する方法を少なくとも 1 つ提案してください。事実を捏造しないでください。実質的な主張はすべて、許可されたリンクを正確に 1 つコピーして引用してください。1 つの ## 見出しだけを持つ連続した Markdown 散文を書き、小見出しは設けないでください。',
+    finalize: 'ローカル資料に基づく授業単元を締めくくってください。JSON のみを {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]} の形式で返してください。要約は生徒が何を学ぶか、単元がどのように組み立てられているかを述べなければなりません。限界は、利用可能な資料がカバーしていない内容を正直に述べなければなりません。次のステップは、具体的な評価、強化、または発展を提案しなければなりません。',
+    fallbackSection: (index) => `単元の第 ${index} 部`,
+    references: '単元資料',
+    limitations: '限界と調整',
+  },
+  ru: {
+    plan: 'Вы — опытный преподаватель, разрабатывающий учебный модуль исключительно на основе предоставленных локальных материалов и уже извлечённой из них сети идей. Упорядочите части по зависимостям между понятиями: то, что должно быть понято раньше, идёт первым. Каждая часть должна быть пригодна для преподавания: что преподаётся, с какими материалами и как это проверяется. Не выдумывайте информацию, материалы и идентификаторы. Верните только JSON в формате {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]}.',
+    write: 'Вы — опытный преподаватель, пишущий одну часть учебного модуля, используя только предоставленные материалы. Вы пишете ДЛЯ ПРЕПОДАВАТЕЛЯ, который проведёт занятие: точно изложите содержание, укажите, в каком порядке его представлять, назовите предварительные знания, типичные заблуждения учащихся и места, где следует замедлиться, и предложите хотя бы одно аудиторное задание и один способ проверки понимания, оба основанные на материалах. Не выдумывайте факты. Цитируйте каждое содержательное утверждение, дословно копируя ровно одну разрешённую ссылку. Пишите непрерывным текстом в Markdown с одним заголовком ## и без микроразделов.',
+    finalize: 'Завершите учебный модуль, опирающийся на локальные материалы. Верните только JSON в формате {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. Аннотация должна сказать, чему научатся учащиеся и как устроен модуль; ограничения должны честно указать, что не охватывают доступные материалы; следующие шаги должны предложить конкретное оценивание, закрепление или расширение.',
+    fallbackSection: (index) => `Часть ${index} модуля`,
+    references: 'Материалы модуля',
+    limitations: 'Ограничения и корректировки',
+  },
+  uk: {
+    plan: 'Ви — досвідчений викладач, який розробляє навчальний модуль виключно на основі наданих локальних матеріалів і вже вилученої з них мережі ідей. Упорядкуйте частини за залежностями між поняттями: те, що має бути зрозуміле раніше, іде першим. Кожна частина має бути придатною для викладання: що викладається, з якими матеріалами та як це перевіряється. Не вигадуйте інформацію, матеріали чи ідентифікатори. Поверніть лише JSON у форматі {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]}.',
+    write: 'Ви — досвідчений викладач, який пише одну частину навчального модуля, використовуючи лише надані матеріали. Ви пишете ДЛЯ ВИКЛАДАЧА, який проведе заняття: точно викладіть зміст, зазначте, у якому порядку його подавати, назвіть попередні знання, типові помилки учнів і місця, де варто сповільнитися, і запропонуйте щонайменше одне аудиторне завдання та один спосіб перевірки розуміння, обидва на основі матеріалів. Не вигадуйте фактів. Цитуйте кожне змістовне твердження, дослівно копіюючи рівно одне дозволене посилання. Пишіть безперервною прозою в Markdown з одним заголовком ## і без мікророзділів.',
+    finalize: 'Завершіть навчальний модуль, що спирається на локальні матеріали. Поверніть лише JSON у форматі {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. Анотація має сказати, чого навчаться учні та як побудовано модуль; обмеження мають чесно зазначити, чого не охоплюють наявні матеріали; наступні кроки мають запропонувати конкретне оцінювання, закріплення або розширення.',
+    fallbackSection: (index) => `Частина ${index} модуля`,
+    references: 'Матеріали модуля',
+    limitations: 'Обмеження та коригування',
+  },
+  ko: {
+    plan: '당신은 제공된 로컬 자료와 이미 추출된 아이디어 네트워크만을 바탕으로 수업 단원을 설계하는 전문 교사입니다. 개념 의존성에 따라 부분을 배열하십시오. 먼저 이해해야 하는 내용이 먼저 옵니다. 모든 부분은 수업이 가능해야 합니다. 무엇을 가르치고, 어떤 자료로, 어떻게 확인하는지입니다. 정보, 자료, 식별자를 지어내지 마십시오. JSON만 {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]} 형식으로 반환하십시오.',
+    write: '당신은 제공된 자료만을 사용하여 수업 단원의 한 부분을 작성하는 전문 교사입니다. 당신은 수업을 진행할 교사를 위해 씁니다. 내용을 정확하게 제시하고, 어떤 순서로 제시할지 밝히고, 선수 지식, 학생들이 흔히 가져오는 오해, 속도를 늦춰야 할 지점을 명시하고, 자료에 근거한 수업 활동을 최소 하나와 이해를 확인하는 방법을 최소 하나 제안하십시오. 사실을 지어내지 마십시오. 모든 실질적 주장을 인용할 때는 허용된 링크를 정확히 하나 복사하십시오. 하나의 ## 제목만 있는 연속적인 Markdown 산문을 쓰고 소단원을 두지 마십시오.',
+    finalize: '로컬 자료에 근거한 수업 단원을 마무리하십시오. JSON만 {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]} 형식으로 반환하십시오. 초록은 학생들이 무엇을 배우게 될지와 단원이 어떻게 구성되는지를 밝혀야 합니다. 한계는 사용 가능한 자료가 다루지 않는 내용을 솔직하게 밝혀야 합니다. 다음 단계는 구체적인 평가, 강화 또는 심화를 제안해야 합니다.',
+    fallbackSection: (index) => `단원 ${index}부`,
+    references: '단원 자료',
+    limitations: '한계와 조정',
   },
   de: {
     plan: 'Du bist eine erfahrene Lehrkraft, die eine Unterrichtseinheit ausschließlich aus den bereitgestellten lokalen Materialien und dem bereits daraus extrahierten Ideennetz entwirft. Ordne die Teile nach den Abhängigkeiten zwischen den Konzepten: Was zuerst verstanden werden muss, kommt zuerst. Jeder Teil muss unterrichtbar sein: was gelehrt wird, mit welchem Material und wie es überprüft wird. Erfinde keine Informationen, Materialien oder Kennungen. Gib ausschließlich JSON zurück im Format {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]}.',
@@ -663,6 +777,10 @@ export async function generateStudyDeepResearchReport(
     .filter((edge) => edge.from && edge.to);
   const requestedOutline = normalizeUnitOutline(request.outline);
   const count = sectionCount(request, sources.length, knowledge.ideas.length, request.coverageQuestions?.length ?? 0);
+  // Guideline words per part. Auto (and every job queued before the control existed)
+  // leaves the study/teaching writer exactly as it was.
+  const lengthPlan = planDeepResearchSectionLength(request.sectionLength);
+  const lengthPack = deepResearchLengthPromptPack(language);
   emit({
     phase: 'planning',
     message: copy.progress.planning(Boolean(requestedOutline.length), teacherPlan, unitMode, count),
@@ -675,6 +793,7 @@ export async function generateStudyDeepResearchReport(
       prompts.plan,
       ...copy.plannerRules,
       ...(approachContext?.rules.planner ?? []),
+      ...(lengthPlan.targetWords === null ? [] : [lengthPack.plan(lengthPlan.targetWords)]),
       ...(requestedOutline.length ? [FIXED_OUTLINE_RULE] : []),
     ].join('\n'),
     user: JSON.stringify({
@@ -733,35 +852,60 @@ export async function generateStudyDeepResearchReport(
       sectionTotal: sections.length,
       sectionTitle: section.title,
     });
+    // A teacher focus is also last and therefore authoritative inside its section.
+    const writerSystem = [
+      prompts.write,
+      ...copy.writerRules,
+      ...deepResearchNarrativeRules(language),
+      ...(approachContext?.rules.writer ?? []),
+      ...(lengthPlan.targetWords === null ? [] : [lengthPack.section(lengthPlan.targetWords)]),
+      ...(section.focus ? [SECTION_FOCUS_RULE] : []),
+    ].join('\n');
+    const writerPayload = {
+      objective: request.objective,
+      audience,
+      language,
+      section: {
+        title: section.title,
+        purpose: section.purpose,
+        keyClaims: section.keyClaims,
+        coverageQuestions: section.coverageQuestions,
+        ...(section.focus ? { teacherFocus: section.focus } : {}),
+      },
+      ...(sectionIdeas.length ? { extractedIdeas: sectionIdeas } : {}),
+      allowedSources: sectionSources.map((source) => ({ id: source.id, exactCitation: source.token, title: source.title, location: source.location, extract: source.text })),
+      previousSections: written.map((markdown) => markdown.replace(/^##[^\n]+/, '').slice(0, 900)),
+      ...(approachContext ? { researchApproach: approachContext.approach, retrievalPlan: approachContext.retrieval } : {}),
+    };
     const raw = await completeText({
-      // A teacher focus is also last and therefore authoritative inside its section.
-      system: [
-        prompts.write,
-        ...copy.writerRules,
-        ...deepResearchNarrativeRules(language),
-        ...(approachContext?.rules.writer ?? []),
-        ...(section.focus ? [SECTION_FOCUS_RULE] : []),
-      ].join('\n'),
-      user: JSON.stringify({
-        objective: request.objective,
-        audience,
-        language,
-        section: {
-          title: section.title,
-          purpose: section.purpose,
-          keyClaims: section.keyClaims,
-          coverageQuestions: section.coverageQuestions,
-          ...(section.focus ? { teacherFocus: section.focus } : {}),
-        },
-        ...(sectionIdeas.length ? { extractedIdeas: sectionIdeas } : {}),
-        allowedSources: sectionSources.map((source) => ({ id: source.id, exactCitation: source.token, title: source.title, location: source.location, extract: source.text })),
-        previousSections: written.map((markdown) => markdown.replace(/^##[^\n]+/, '').slice(0, 900)),
-        ...(approachContext ? { researchApproach: approachContext.approach, retrievalPlan: approachContext.retrieval } : {}),
-      }, null, 2),
+      system: writerSystem,
+      user: JSON.stringify(writerPayload, null, 2),
       temperature: 0.25,
-      maxTokens: 5_200,
+      maxTokens: lengthPlan.targetWords === null ? 5_200 : Math.max(5_200, lengthPlan.maxTokensPerPass),
     }, model);
-    let markdown = normalizeSectionMarkdown(raw, section.title, sectionSources);
+    // A long part is grown by bounded continuations that keep the same allowed
+    // sources and the same citation contract, never by one oversized request.
+    const grown = lengthPlan.targetWords === null ? raw : (await extendDeepResearchSection({
+      plan: lengthPlan,
+      initial: raw,
+      signal,
+      countWords: countDeepResearchWords,
+      writeContinuation: async (context) => {
+        const continuation = await completeText({
+          system: `${writerSystem}\n${lengthPack.continuation(context.remainingWords, context.passWords)}\n${lengthPack.continuationStop}`,
+          user: JSON.stringify({
+            ...writerPayload,
+            sectionSoFar: context.produced.slice(-4_000),
+            wordsWritten: context.wordsSoFar,
+            wordsRemaining: context.remainingWords,
+          }, null, 2),
+          temperature: 0.25,
+          maxTokens: lengthPlan.maxTokensPerPass,
+        }, model);
+        return isEmptyContinuation(continuation) ? '' : continuation;
+      },
+    })).markdown;
+    let markdown = normalizeSectionMarkdown(grown, section.title, sectionSources);
     const qualityMode: DeepResearchQualityMode = teacherPlan ? 'teaching' : 'study';
     const qualitySources = studyQualitySources(sectionSources);
     const beforeQuality = assessDeepResearchSection({

@@ -1,0 +1,159 @@
+{
+  "fixture": true,
+  "request": "Find a clear image of a red square.",
+  "scenarios": [
+    {
+      "name": "Relevant image selected",
+      "calls": 1,
+      "rounds": [
+        {
+          "reviewId": "8a080ddc-420f-4ab5-8c3b-a614d650a652",
+          "status": "reviewed",
+          "outcome": "selected",
+          "model": {
+            "provider": "fixture",
+            "model": "vision-fixture"
+          },
+          "round": 1,
+          "remainingRounds": 2,
+          "selected": [
+            "red"
+          ],
+          "candidates": [
+            {
+              "id": "red",
+              "imageId": "512e08ef-fc67-46ca-8809-8773eb035dd3",
+              "inspected": true,
+              "relevance": 0.96,
+              "reasoning": "A red square fills the image.",
+              "thumbnailSha256": "71f2ccfdad34a681113b6e535f5a104461a5ffa9412380f90d74782d9be5339e"
+            },
+            {
+              "id": "blue",
+              "imageId": "72b8700c-fb42-4822-9ad1-9cba7313c693",
+              "inspected": true,
+              "relevance": 0.08,
+              "reasoning": "The square is blue, so it does not match the requested color.",
+              "thumbnailSha256": "f039a5b5debd3f1fd5b1185860069c9923eac75b397ef61fbd5ea687981dfab6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "All candidates rejected",
+      "calls": 1,
+      "rounds": [
+        {
+          "reviewId": "3b2e9663-1762-49d1-8799-b87afa0229d5",
+          "status": "reviewed",
+          "outcome": "no_relevant_candidate",
+          "model": {
+            "provider": "fixture",
+            "model": "vision-fixture"
+          },
+          "round": 1,
+          "remainingRounds": 2,
+          "selected": [],
+          "candidates": [
+            {
+              "id": "blue",
+              "imageId": "29e12a40-e7ed-4a6a-869c-e4507802aa3e",
+              "inspected": true,
+              "relevance": 0.08,
+              "reasoning": "The square is blue, so it does not match the requested color.",
+              "thumbnailSha256": "f039a5b5debd3f1fd5b1185860069c9923eac75b397ef61fbd5ea687981dfab6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Text-only model fallback",
+      "calls": 0,
+      "rounds": [
+        {
+          "reviewId": "e4b08f3f-8928-4a0e-bdd7-5d01e09be59a",
+          "status": "skipped",
+          "outcome": "vision_unavailable",
+          "reason": "Text-only fixture model",
+          "model": {
+            "provider": "fixture",
+            "model": "text-only-fixture"
+          },
+          "round": 1,
+          "remainingRounds": 2,
+          "selected": [],
+          "candidates": [
+            {
+              "id": "red",
+              "imageId": "5ddd3a74-b391-41a6-97e2-fa219e2fe97f",
+              "inspected": false,
+              "relevance": null,
+              "reasoning": ""
+            },
+            {
+              "id": "blue",
+              "imageId": "ead22f56-c8c8-4736-950e-86641aec6212",
+              "inspected": false,
+              "relevance": null,
+              "reasoning": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Second-batch success",
+      "calls": 2,
+      "rounds": [
+        {
+          "reviewId": "189fe5bf-e3ae-4abb-99b8-dcecabebac79",
+          "status": "reviewed",
+          "outcome": "no_relevant_candidate",
+          "model": {
+            "provider": "fixture",
+            "model": "vision-fixture"
+          },
+          "round": 1,
+          "remainingRounds": 2,
+          "selected": [],
+          "candidates": [
+            {
+              "id": "blue",
+              "imageId": "661a97d7-9515-4139-bb4f-882fc8994a99",
+              "inspected": true,
+              "relevance": 0.08,
+              "reasoning": "The square is blue, so it does not match the requested color.",
+              "thumbnailSha256": "f039a5b5debd3f1fd5b1185860069c9923eac75b397ef61fbd5ea687981dfab6"
+            }
+          ]
+        },
+        {
+          "reviewId": "252e7096-5de8-49a8-b339-ac53d78bdcd7",
+          "status": "reviewed",
+          "outcome": "selected",
+          "model": {
+            "provider": "fixture",
+            "model": "vision-fixture"
+          },
+          "round": 2,
+          "remainingRounds": 1,
+          "selected": [
+            "red"
+          ],
+          "candidates": [
+            {
+              "id": "red",
+              "imageId": "9bfa104d-261a-4b94-9a7d-5b6f53155aa8",
+              "inspected": true,
+              "relevance": 0.96,
+              "reasoning": "A red square fills the image.",
+              "thumbnailSha256": "71f2ccfdad34a681113b6e535f5a104461a5ffa9412380f90d74782d9be5339e"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

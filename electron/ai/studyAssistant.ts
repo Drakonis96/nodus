@@ -1,3 +1,8 @@
+import { prepareResearchAttachments, withResearchAttachmentFallback } from './researchAttachments';
+import { deleteResearchAttachments } from '../researchAttachments';
+import { withResearchSystemPrompt } from './researchSystemPrompt';
+import { researchGenerationOptions } from './researchGenerationOptions';
+import { skillHasCapability } from '@shared/chatSkills';
 import { buildChatSkillsPrompt, chatSkillsOutputContract } from '@shared/chatSkills';
 import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from '../chatAssets';
 import { getActiveVault } from '../vaults/vaultRegistry';
@@ -43,7 +48,7 @@ const DEMO_CONVERSATION_IDS = { study: 'demo-study-chat-membrane', teaching: 'de
 type StudyChatDemoVariant = keyof typeof DEMO_CONVERSATION_IDS;
 
 function promptLanguage(value: unknown): PromptLanguage {
-  return value === 'en' || value === 'fr' || value === 'de' || value === 'pt' || value === 'pt-BR' || value === 'it' || value === 'tr' ? value : 'es';
+  return value === 'en' || value === 'fr' || value === 'de' || value === 'pt' || value === 'pt-BR' || value === 'it' || value === 'tr' || value === 'zh-Hans' || value === 'zh-Hant' || value === 'vi' || value === 'ja' || value === 'ru' || value === 'uk' || value === 'ko' ? value : 'es';
 }
 
 function effectivePromptLanguage(requestLanguage: unknown): PromptLanguage {
@@ -117,6 +122,7 @@ export function updateStudyAssistantConversation(id: string, patch: StudyAssista
 }
 
 export function deleteStudyAssistantConversation(id: string): void {
+  deleteResearchAttachments({ surface: 'study', conversationId: id });
   const store = readStore(); store.conversations = store.conversations.filter((conversation) => conversation.id !== id); writeStore(store);
   deleteChatAssets(chatAssetOwner('study', id, getActiveVault().id));
 }
@@ -255,6 +261,7 @@ export async function streamStudyAssistant(
   const execution = vaultChatSkillSession('study', request.conversationId, lastUser.content, configuredModel, getStudyAssistantConversation);
   assertChatSkillSession(execution, signal);
   const { skills } = execution;
+  const attachments = await prepareResearchAttachments(request, 'study', configuredModel);
   const { citations: availableCitations, truncated } = await buildCitations(lastUser.content, normalizeSelection(request.selection));
   const sourceChars = availableCitations.reduce((sum, citation) => sum + citation.quote.length, 0);
   const stats = {
@@ -262,16 +269,19 @@ export async function streamStudyAssistant(
     estimatedInputTokens: Math.ceil((sourceChars + request.messages.reduce((sum, message) => sum + message.content.length, 0)) / 3.5),
     truncated, provider: configuredModel?.provider ?? '', model: configuredModel?.model ?? '',
   };
-  if (!availableCitations.length && !request.allowExternalKnowledge) {
+  if (!availableCitations.length && !request.allowExternalKnowledge && !attachments.text) {
     return { answer: insufficientAnswer, citations: [], availableCitations: [], citationWarning: false, insufficientInformation: true, interrupted: false, stats };
   }
   const effectiveModel = resolveModelRef(configuredModel);
   const prompt = buildStudyAssistantPrompt(request, availableCitations);
   assertChatSkillSession(execution, signal);
-  const raw = await completeTextStream({ system: `${prompt.system}\n\n${buildChatSkillsPrompt(skills)}`, user: `${prompt.user}\n\n${chatSkillsOutputContract(skills)}`, englishImagePrompts: skills.some(skill => skill.builtin === 'image'), temperature: 0.18, maxTokens: skills.length ? 10_000 : 3200 }, onDelta, effectiveModel, signal);
+  const raw = await withResearchAttachmentFallback(attachments, { system: withResearchSystemPrompt(`${prompt.system}\n\n${buildChatSkillsPrompt(skills)}`, request.systemPromptId) + attachments.system, images: attachments.images, user: `${prompt.user}\n\n${chatSkillsOutputContract(skills)}${attachments.text}`, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.18, ...(request.thinkingEffort === undefined ? { maxTokens: skills.length ? 10_000 : 3200 } : await researchGenerationOptions({ ...request, model: effectiveModel }, skills.length ? 10_000 : 3200, false, signal)) }, options => completeTextStream(options, onDelta, effectiveModel, signal));
   const validated = validateStudyAssistantAnswer(raw, availableCitations, insufficientAnswer);
+  // A user-triggered stop keeps the partial answer: running the skill tools now would
+  // throw an AbortError and discard everything that already streamed.
+  const interrupted = Boolean(signal?.aborted);
   return {
-    ...validated, answer: await executeChatSkills(validated.answer, execution, signal), availableCitations, insufficientInformation: !raw.trim(), interrupted: Boolean(signal?.aborted), stats,
+    ...validated, answer: interrupted ? validated.answer : await executeChatSkills(validated.answer, execution, signal), availableCitations, insufficientInformation: !raw.trim(), interrupted, stats,
   };
 }
 

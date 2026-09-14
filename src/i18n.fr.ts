@@ -1,4 +1,10 @@
+import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
+import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
+import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
+import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
+import { RESEARCH_REASONING_TRANSLATIONS } from './i18n.researchReasoning';
 import { CHAT_SKILLS_TRANSLATIONS } from './i18n.chatSkills';
+import { CAPABILITIES_TRANSLATIONS } from './i18n.capabilities';
 import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 /**
  * French translations keyed by the Spanish source string (see {@link ./i18n}).
@@ -15,6 +21,7 @@ import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
+import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
@@ -58,7 +65,15 @@ import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch
 import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const FR: Record<string, string> = {
+  ...RESEARCH_ATTACHMENT_TRANSLATIONS['fr'],
+  "Research chat": "Research chat",
+  "Elige al menos una base de datos.": "Choisissez au moins une base de données.",
+  ...RESEARCH_PROMPT_TRANSLATIONS["fr"],
+  ...RESEARCH_SOURCE_TRANSLATIONS["fr"],
+  ...RESEARCH_REASONING_TRANSLATIONS["fr"],
   ...CHAT_SKILLS_TRANSLATIONS['fr'],
+  ...CAPABILITIES_TRANSLATIONS['fr'],
+  ...DOCUMENT_SKILLS_TRANSLATIONS['fr'],
   ...STELLAR_GRAPH_TRANSLATIONS["fr"],
   ...ACADEMIC_TOUR_TRANSLATIONS.fr,
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS.fr,
@@ -104,6 +119,7 @@ export const FR: Record<string, string> = {
   ...ANNOUNCEMENT_TRANSLATIONS['fr'],
   ...WORLD_CHAT_TRANSLATIONS.fr,
   ...STUDY_SYNONYM_TRANSLATIONS.fr,
+  ...STUDY_BANK_TRANSLATIONS.fr,
   ...STUDY_IMPROVE_TRANSLATIONS.fr,
   ...WORKSPACE_TRANSLATIONS.fr,
   "Lo que cuenta el mapa": "Ce que raconte la carte",
@@ -1691,6 +1707,7 @@ export const FR: Record<string, string> = {
   'Versión instalada': 'Version installée',
   'Continuar en segundo plano': 'Continuer en arrière-plan',
   'Servidor MCP': 'Serveur MCP',
+  'Marketplace de Skills': 'Marketplace de Skills',
   'Activar servidor MCP': 'Activer le serveur MCP',
   'Copiloto de escritura (Word)': 'Copilote d\'écriture (Word)',
   '1) Genera el certificado local · 2) Activa el copiloto · 3) Instálalo en Word y ábrelo desde la pestaña Nodus.':
@@ -2441,6 +2458,7 @@ export const FR: Record<string, string> = {
   'No aplica': 'Non applicable',
   'Solo abstract': 'Résumé seul',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': "Nodus n'a trouvé aucun texte à lire. Ajoutez le PDF ou l'EPUB dans Zotero, puis relancez l'analyse.",
+  'Zotero no está disponible. Ábrelo y vuelve a analizar.': 'Zotero n’est pas disponible. Ouvrez-le et relancez l’analyse.',
   'El análisis solo pudo usar el abstract, así que esta obra no tendrá texto citable. Añade el PDF o EPUB en Zotero y vuelve a analizar.': "L'analyse n'a pu utiliser que le résumé : cette œuvre n'aura donc pas de texte citable. Ajoutez le PDF ou l'EPUB dans Zotero, puis relancez l'analyse.",
   'Ver las {n} ideas de esta obra': 'Voir les {n} idées de cette œuvre',
   'Analizar: temas, ideas, resumen, indexado y relaciones': 'Analyser : thèmes, idées, résumé, indexation et relations',
@@ -4269,6 +4287,7 @@ export const FR: Record<string, string> = {
     'Ajoutez la première depuis la fiche d\'une personne, section « Relations sociales ».',
   'Ir a Personas': 'Aller à Personnes',
   'Vista previa': 'Aperçu',
+  'Markdown y LaTeX · fórmulas entre $...$': 'Markdown et LaTeX · formules entre $...$',
   'Aún no hay personas. Importa un GEDCOM o añade personas y sus parentescos desde la vista Personas.':
     'Il n\'y a pas encore de personnes. Importez un GEDCOM ou ajoutez des personnes et leurs liens de parenté depuis la vue Personnes.',
   'Árbol genealógico': 'Arbre généalogique',
@@ -8397,4 +8416,46 @@ export const FR: Record<string, string> = {
   "Quitar todas las ideas y conexiones del lienzo": "Retirer toutes les idées et connexions du canevas",
   "Relaciones por idea": "Relations par idée",
   "No se pudieron cargar todas las conexiones. Vuelve a intentarlo.": "Impossible de charger toutes les connexions. Réessayez.",
+  // Deep Research — "Extensión orientativa de cada sección" (words per section).
+  "Extensión orientativa de cada sección": "Longueur indicative de chaque section",
+  "Palabras por sección": "Mots par section",
+  "Palabras por sección, no del informe entero. Es una orientación: si la evidencia se agota antes, la sección termina antes en lugar de repetirse o rellenar.": "Des mots par section, pas pour le rapport entier. C’est une orientation : si les preuves s’épuisent avant, la section se termine plus tôt au lieu de se répéter ou de remplir.",
+  "Corrige la extensión orientativa de cada sección antes de generar el informe.": "Corrigez la longueur indicative de chaque section avant de générer le rapport.",
+  "Un número es el máximo de secciones publicadas; la evidencia se reagrupa dentro de ellas, nunca se descarta.": "Un nombre est le maximum de sections publiées ; les preuves sont regroupées à l’intérieur, jamais écartées.",
+  "Auto (decide la IA)": "Auto (l’IA décide)",
+  "2.500 palabras": "2 500 mots",
+  "5.000 palabras": "5 000 mots",
+  "10.000 palabras": "10 000 mots",
+  "15.000 palabras": "15 000 mots",
+  "20.000 palabras": "20 000 mots",
+  "Personalizada": "Personnalisée",
+  "Escribe cuántas palabras debe tener cada sección.": "Indiquez combien de mots doit comporter chaque section.",
+  "Introduce un número de palabras válido.": "Saisissez un nombre de mots valide.",
+  "Usa un número entero de palabras, sin decimales.": "Utilisez un nombre entier de mots, sans décimales.",
+  "El mínimo son {min} palabras por sección.": "Le minimum est de {min} mots par section.",
+  "El máximo son {max} palabras por sección.": "Le maximum est de {max} mots par section.",
+  "Solicitud cancelada por el usuario.": "L’utilisateur a annulé la demande.",
+  // PDF Presenter — tags (renamed from folders) and the PDF download.
+  'Sin etiqueta': 'Aucune étiquette',
+  'Eliminar etiqueta': 'Supprimer l’étiquette',
+  'Filtrar por etiqueta': 'Filtrer par étiquette',
+  '¿Seguro que quieres eliminar la etiqueta «{name}»? Las presentaciones que la tienen seguirán en la biblioteca, pero sin etiqueta.': 'Supprimer l’étiquette « {name} » ? Les présentations qui la portent restent dans la bibliothèque, simplement sans étiquette.',
+  'Descargar PDF': 'Télécharger le PDF',
+  'No se pudo descargar la presentación.': 'Impossible de télécharger la présentation.',
+  // Nodus Browser — HTTP authentication prompt.
+  'pide usuario y contraseña.': 'demande votre identifiant et votre mot de passe.',
+  'Usuario': 'Identifiant',
+  'Iniciar sesión': 'Se connecter',
+  'Proxy': 'Proxy',
+  'Nota guardada': 'Note enregistrée',
+  'Continuar en el chat': 'Continuer dans le chat',
+  'La nota se guardó, pero no se pudo vincular al proyecto.': 'La note a été enregistrée, mais il n’a pas été possible de la lier au projet.',
+  'Procedencia': 'Provenance',
+  'Volver a la conversación': 'Retour à la conversation',
+  'Fuentes citadas': 'Sources citées',
+  'Research chat de bases de datos': 'Research chat : bases de données',
+  'Research chat de estudio': 'Research chat : étude',
+  'Research chat del mundo': 'Research chat : monde',
+  'La conversación original ya no está disponible.': 'La conversation d’origine n’est plus disponible.',
+  'La conversación está disponible, pero el mensaje original ya no existe.': 'La conversation est disponible, mais le message d’origine n’existe plus.',
 };

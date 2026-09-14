@@ -42,9 +42,38 @@ test('a search on worker threads leaves the event loop free, and inline does not
   assert.equal(inline.ticks, 0, `inline search let the loop tick ${inline.ticks} times, expected none`);
   assert.equal(inline.pool.threads, 0, 'NODUS_VECTOR_WORKERS=0 must not start a thread');
 
-  // Ten is far below what a healthy loop manages and far above what a blocked one can.
-  assert.ok(pooled.ticks >= 10, `pooled search only let the loop tick ${pooled.ticks} times`);
   assert.ok(pooled.pool.threads >= 1, 'the pooled arm must actually have used a thread');
+
+  // No threshold on how much of the loop was left, because there is no honest one.
+  //
+  // Two have now been tried and both failed on a healthy tree. "At least ten ticks" failed
+  // at eight. Its replacement compared the search against what the same machine manages
+  // idle, on the reasoning that a ratio survives a slow host -- and it failed at 8% on a
+  // macOS runner whose longest pause was 3.9 ms, which is a loop answering every four
+  // milliseconds reported as a defect.
+  //
+  // The ratio was wrong for a specific reason worth keeping: the two windows are not
+  // comparable. The search window has a worker saturating a core and the idle window has
+  // nothing, so where cores are already spoken for the ratio measures how many are free
+  // rather than whether the loop was blocked. The longest pause is no better -- measured
+  // here under deliberate oversubscription it reached 72.8 ms on a run whose loop ticked
+  // 883 times, because the operating system descheduled the whole process, which is not a
+  // property of this code. Under that same load the share ranged from 0.26 to 1.33.
+  //
+  // What is exact on every host is the boundary, and it is asserted above in both
+  // directions: blocked is zero ticks, and it is zero because no macrotask can run while
+  // synchronous code holds the thread -- not nearly zero, not usually zero. Off the thread
+  // is more than zero. That is the defect and its fix, and it is the whole of what a shared
+  // build runner can be asked. The numbers below travel with a failure so a real regression
+  // can be read, and they are reported rather than thresholded.
+  const shareOfIdle = pooled.ticks / Math.max(pooled.idleTicks, 1);
+  assert.ok(
+    pooled.ticks > 0,
+    `the pooled search blocked the loop as completely as the inline one:`
+    + ` ${pooled.ticks} ticks against ${pooled.idleTicks} idle`
+    + ` (${(shareOfIdle * 100).toFixed(0)}% of idle capacity, longest pause`
+    + ` ${pooled.longestGapMs.toFixed(1)} ms, search ${pooled.elapsedMs.toFixed(0)} ms)`,
+  );
 });
 
 test('moving the arithmetic to a thread does not move the answer', async () => {

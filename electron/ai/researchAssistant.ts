@@ -1,4 +1,9 @@
-import { buildChatSkillsPrompt, chatSkillsOutputContract, splitChatVisuals, transformChatProse } from '@shared/chatSkills';
+import { prepareResearchAttachments, withResearchAttachmentFallback } from './researchAttachments';
+import { withResearchSystemPrompt } from './researchSystemPrompt';
+import { resolveResearchSourceScope, type ResearchSourceScope } from './researchSourceScope';
+import { researchGenerationOptions } from './researchGenerationOptions';
+import { skillHasCapability } from '@shared/chatSkills';
+import { buildChatSkillsPrompt, chatSkillsOutputContract, chatVisualTitleSummary, splitChatVisuals, transformChatProse } from '@shared/chatSkills';
 import { enabledChatSkills } from '../chatSkills';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getConversation } from '../db/chatRepo';
@@ -133,6 +138,7 @@ type SectionPayload = Record<string, unknown>;
  * bounded, most-supported selection instead of dumping the corpus.
  */
 interface RelevanceScope {
+  sourceScope: ResearchSourceScope | null;
   queryEmbedding: number[] | null;
   /** Ordered top-K idea ids relevant to the question, or null when no embedding is available. */
   ideaIds: string[] | null;
@@ -186,14 +192,16 @@ function skillExecution(request: ResearchChatRequest) {
     isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getConversation(request.conversationId)) };
 }
 
+
 export async function answerResearchChat(request: ResearchChatRequest): Promise<ResearchChatResponse> {
   const execution = skillExecution(request);
   const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request, execution.skills);
-  const opts = { system, user, englishImagePrompts: execution.skills.some(skill => skill.builtin === 'image'), temperature: 0.2, maxTokens };
+  const attachments = await prepareResearchAttachments(request, 'research', request.model);
+  const opts = { system: system + attachments.system, user: user + attachments.text, images: attachments.images, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, ...await researchGenerationOptions(request, maxTokens, local) };
   let answer = '';
   for (let attempt = 0; attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
-    answer = finalizeAnswer(await completeText(opts, request.model), local, user);
-    if (!citationRequired || extractCitationRefs(answer).length > 0 || splitChatVisuals(answer).some(part => part.kind !== 'markdown')) return { answer: await executeChatSkills(answer, execution), stats };
+    answer = finalizeAnswer(await withResearchAttachmentFallback(attachments, opts, options => completeText(options, request.model)), local, user);
+    if (!citationRequired || attachments.text || extractCitationRefs(answer).length > 0 || splitChatVisuals(answer).some(part => part.kind !== 'markdown')) return { answer: await executeChatSkills(answer, execution), stats };
   }
   throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
 }
@@ -205,21 +213,26 @@ export async function streamResearchChat(
 ): Promise<ResearchChatResponse> {
   const execution = skillExecution(request);
   const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request, execution.skills);
-  const opts = { system, user, englishImagePrompts: execution.skills.some(skill => skill.builtin === 'image'), temperature: 0.2, maxTokens, signal };
-  let answer = finalizeAnswer(await completeTextStream(
-    opts,
-    onDelta,
-    request.model,
-    signal
-  ), local, user);
-  for (let attempt = 1; citationRequired && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown') && attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
+  const attachments = await prepareResearchAttachments(request, 'research', request.model);
+  const opts = { system: system + attachments.system, user: user + attachments.text, images: attachments.images, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, ...await researchGenerationOptions(request, maxTokens, local, signal), signal };
+  let answer = finalizeAnswer(await withResearchAttachmentFallback(attachments, opts, options => completeTextStream(options, onDelta, request.model, signal)), local, user);
+  // A user-triggered stop ends the turn with the text that already streamed. Running
+  // the citation-recovery resample or the skill tools now would either throw an
+  // AbortError or spend another provider call on a reply the user just cancelled.
+  if (signal?.aborted) return { answer, stats, aborted: true };
+  for (let attempt = 1; citationRequired && !attachments.text && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown') && attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
     signal?.throwIfAborted();
     // Streamed deltas are provisional and the renderer replaces them with the
     // returned answer. Recovery repeats the frozen request without changing any
     // model, prompt, temperature or output-budget parameter.
-    answer = finalizeAnswer(await completeText(opts, request.model), local, user);
+    try {
+      answer = finalizeAnswer(await withResearchAttachmentFallback(attachments, opts, options => completeText(options, request.model)), local, user);
+    } catch (error) {
+      if (signal?.aborted) return { answer, stats, aborted: true };
+      throw error;
+    }
   }
-  if (citationRequired && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown')) {
+  if (citationRequired && !attachments.text && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown')) {
     throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
   }
   return { answer: await executeChatSkills(answer, execution, signal), stats };
@@ -236,7 +249,7 @@ export async function generateChatTitle(messages: ChatMessageRecord[], model?: M
   const relevant = messages
     .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content.trim() && !m.error)
     .slice(0, 6)
-    .map((m) => `${m.role === 'user' ? prompt.titleLabels.user : prompt.titleLabels.assistant}: ${m.content.trim().slice(0, 600)}`);
+    .map((m) => `${m.role === 'user' ? prompt.titleLabels.user : prompt.titleLabels.assistant}: ${chatVisualTitleSummary(m.content).trim().slice(0, 600)}`);
   const firstUser = messages.find((m) => m.role === 'user' && m.content.trim())?.content.trim() ?? '';
   const fallback = firstUser ? truncateTitle(firstUser) : prompt.titleLabels.untitled;
   if (relevant.length === 0) return fallback;
@@ -248,6 +261,8 @@ export async function generateChatTitle(messages: ChatMessageRecord[], model?: M
         user: relevant.join('\n'),
         temperature: 0.2,
         maxTokens: 40,
+        reasoning: 'off',
+        researchEffort: 'standard',
       },
       model
     );
@@ -374,7 +389,10 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
   // In a genealogy vault the assistant is a genealogist working over the records
   // ontology (people, kinship, events, documents, evidence), not the idea graph.
   const genealogy = getActiveVault().type === 'genealogy';
-  const system = [genealogy ? buildGenealogyChatSystemPrompt(compact, promptLanguage) : buildChatSystemPrompt(compact, promptLanguage), buildChatSkillsPrompt(skills)].join('\n\n');
+  const system = withResearchSystemPrompt([genealogy ? buildGenealogyChatSystemPrompt(compact, promptLanguage) : buildChatSystemPrompt(compact, promptLanguage), buildChatSkillsPrompt(skills),
+    !genealogy && request.selection.sourceFilter?.enabled === true
+      ? 'Source restriction: use only the supplied context from the selected works. Do not supplement it with other corpus sources or general knowledge. If the selected sources are insufficient, state that explicitly. Continue answering in the configured language.' : '',
+  ].filter(Boolean).join('\n\n'), request.systemPromptId);
 
   // Derive the budget from the window. Cloud (window === null) keeps the cloud-sized cap
   // and the default generation budget; local shrinks both to fit the loaded window.
@@ -487,6 +505,9 @@ function buildGenealogyChatSystemPrompt(compact: boolean, language: PromptLangua
  * bounded, question-relevant slice rather than a full-corpus dump.
  */
 async function buildRelevanceScope(selection: ResearchContextSelection, question: string): Promise<RelevanceScope> {
+  const sourceScope = resolveResearchSourceScope(selection.sourceFilter);
+  const corpus = { nodusIds: sourceScope ? [...sourceScope.workIds] : undefined };
+  if (sourceScope && !sourceScope.workIds.size) return { sourceScope, queryEmbedding: null, ideaIds: [], ideaIdSet: new Set(), workIdSet: new Set(), documentHits: [], passageHits: [] };
   const needsRelevance =
     selection.ideas ||
     selection.themes ||
@@ -513,7 +534,7 @@ async function buildRelevanceScope(selection: ResearchContextSelection, question
     let lexicalHierarchy: Awaited<ReturnType<typeof retrieveHierarchical>> | null = null;
     try {
       lexicalHierarchy = await retrieveHierarchical(question, {
-        embedding: null, documentLimit: MAX_DOCUMENTS, ideaLimit: 0, passageLimit: 0,
+        ...corpus, embedding: null, documentLimit: MAX_DOCUMENTS, ideaLimit: 0, passageLimit: sourceScope ? TOP_K_GLOBAL_PASSAGES : 0,
       });
     } catch {
       /* FTS is optional on legacy/read-only databases. */
@@ -521,9 +542,9 @@ async function buildRelevanceScope(selection: ResearchContextSelection, question
     const documentHits = lexicalHierarchy?.documents ?? [];
     const documentWorkIds = new Set(documentHits.map((hit) => hit.nodusId));
     return {
-      queryEmbedding: null, ideaIds: null, ideaIdSet: null,
-      workIdSet: documentWorkIds.size ? documentWorkIds : null,
-      documentHits, passageHits: [],
+      sourceScope, queryEmbedding: null, ideaIds: null, ideaIdSet: sourceScope?.ideaIds ?? null,
+      workIdSet: sourceScope?.workIds ?? (documentWorkIds.size ? documentWorkIds : null),
+      documentHits, passageHits: sourceScope ? lexicalHierarchy?.passages ?? [] : [],
     };
   }
 
@@ -532,7 +553,7 @@ async function buildRelevanceScope(selection: ResearchContextSelection, question
   // every section down to nothing — so an empty result becomes a null scope,
   // not an empty one. queryEmbedding is kept for documents/passages retrieval.
   const hierarchy = await retrieveHierarchical(question, {
-    embedding: queryEmbedding,
+    ...corpus, embedding: queryEmbedding,
     documentLimit: MAX_DOCUMENTS,
     ideaLimit: TOP_K_IDEAS,
     passageLimit: TOP_K_GLOBAL_PASSAGES,
@@ -552,16 +573,16 @@ async function buildRelevanceScope(selection: ResearchContextSelection, question
     const rows = getDb()
       .prepare(`SELECT DISTINCT nodus_id FROM idea_occurrences WHERE global_id IN (${placeholders})`)
       .all(...ideaIds) as { nodus_id: string }[];
-    for (const row of rows) workIds.add(row.nodus_id);
+    for (const row of rows) if (!sourceScope || sourceScope.workIds.has(row.nodus_id)) workIds.add(row.nodus_id);
   }
-  for (const row of await findSimilarWorksPaged(queryEmbedding, WORK_SIM_THRESHOLD, TOP_K_SCOPE_WORKS)) {
+  for (const row of await findSimilarWorksPaged(queryEmbedding, WORK_SIM_THRESHOLD, TOP_K_SCOPE_WORKS, corpus)) {
     workIds.add(row.nodus_id);
   }
   for (const hit of hierarchy.documents) workIds.add(hit.nodusId);
   const workIdSet = workIds.size ? workIds : null;
 
   return {
-    queryEmbedding, ideaIds, ideaIdSet, workIdSet,
+    sourceScope, queryEmbedding, ideaIds, ideaIdSet: ideaIdSet ?? sourceScope?.ideaIds ?? null, workIdSet: workIdSet ?? sourceScope?.workIds ?? null,
     documentHits: hierarchy.documents,
     passageHits: hierarchy.passages,
   };
@@ -579,15 +600,16 @@ function resolveIdeaIds(scope: RelevanceScope, limit: number): string[] {
       `SELECT i.global_id
          FROM ideas i
          LEFT JOIN idea_occurrences io ON io.global_id = i.global_id
+        WHERE (? IS NULL OR io.nodus_id IN (SELECT value FROM json_each(?)))
         GROUP BY i.global_id
         ORDER BY COUNT(io.nodus_id) DESC, i.created_at DESC
         LIMIT ?`
     )
-    .all(limit) as { global_id: string }[];
+    .all(scope.sourceScope ? JSON.stringify([...scope.sourceScope.workIds]) : null, scope.sourceScope ? JSON.stringify([...scope.sourceScope.workIds]) : null, limit) as { global_id: string }[];
   return rows.map((row) => row.global_id);
 }
 
-async function buildResearchContext(
+export async function buildResearchContext(
   selection: ResearchContextSelection,
   question = '',
   maxContextChars = MAX_TOTAL_CONTEXT_CHARS,
@@ -603,6 +625,7 @@ async function buildResearchContext(
   let truncated = false;
 
   const scope = await buildRelevanceScope(selection, question);
+  if (scope.sourceScope) context.source_filter = { active: true, matched_works: scope.sourceScope.workIds.size, instruction: "Use only evidence from these works. If it is insufficient, say so; do not fill gaps from other sources or prior conversations." };
 
   if (selection.ideas) {
     context.ideas_generadas = listIdeas(linkedWorkIds, scope);
@@ -625,7 +648,14 @@ async function buildResearchContext(
   }
 
   if (selection.readingPath) {
-    const plan = buildReadingPath();
+    // Global reading plans and author relations mix signals from other works.
+    // A filtered reading route is chronological and contains only selected works.
+    const plan = scope.sourceScope ? {
+      order: 'chronological',
+      phases: [{ entries: [...scope.sourceScope.workIds]
+        .map(id => getWorkSummary(id)).filter((work): work is WorkSummary => !!work)
+        .sort((a, b) => (a.year ?? 0) - (b.year ?? 0)).slice(0, MAX_DOCUMENTS) }],
+    } : buildReadingPath();
     for (const phase of plan.phases) {
       for (const entry of phase.entries) linkedWorkIds.add(entry.nodus_id);
     }
@@ -655,7 +685,7 @@ async function buildResearchContext(
   const heavyCap = Math.min(maxContextChars, MAX_TOTAL_CONTEXT_CHARS);
 
   if (selection.documents) {
-    const documentContext = await listDocuments(linkedWorkIds, scope.queryEmbedding, heavyCap);
+    const documentContext = await listDocuments(linkedWorkIds, scope.queryEmbedding, heavyCap, scope.sourceScope);
     context.documentos_relacionados = documentContext.documents;
     context.documentos_resumidos = documentContext.summaries;
     if (documentContext.omitted > 0) {
@@ -673,6 +703,7 @@ async function buildResearchContext(
     sections.push(prompt.context.sections.passages);
   }
 
+  if (scope.sourceScope) for (const id of linkedWorkIds) if (!scope.sourceScope.workIds.has(id)) linkedWorkIds.delete(id);
   const budget = enforceContextBudget(context, maxContextChars);
   truncated = truncated || budget.truncated;
 
@@ -751,8 +782,8 @@ function listIdeas(linkedWorkIds: Set<string>, scope: RelevanceScope) {
     .prepare(`SELECT * FROM evidence WHERE global_id IN (${placeholders}) ORDER BY nodus_id ASC`)
     .all(...ideaIds) as Evidence[];
 
-  const occByIdea = groupBy(occurrences, (o) => o.global_id);
-  const evidenceByIdea = groupBy(evidence, (e) => e.global_id);
+  const occByIdea = groupBy(occurrences.filter(o => !scope.sourceScope || scope.sourceScope.workIds.has(o.nodus_id)), (o) => o.global_id);
+  const evidenceByIdea = groupBy(evidence.filter(e => !scope.sourceScope || scope.sourceScope.workIds.has(e.nodus_id)), (e) => e.global_id);
 
   // Preserve the relevance order returned by resolveIdeaIds.
   return ideaIds
@@ -804,6 +835,7 @@ function listThemes(linkedWorkIds: Set<string>, scope: RelevanceScope) {
     );
     themes = themes.filter((theme) => linkedThemeIds.has(theme.theme_id));
   }
+  if (scope.sourceScope) themes = themes.filter(theme => scope.sourceScope!.themeIds.has(theme.theme_id));
   themes = themes.slice(0, TOP_K_THEMES);
 
   return themes.map((theme) => {
@@ -817,29 +849,29 @@ function listThemes(linkedWorkIds: Set<string>, scope: RelevanceScope) {
            ORDER BY w.year DESC, w.title ASC`
         )
         .all(theme.theme_id) as Array<WorkRow & { authors_json: string }>
-    ).slice(0, MAX_THEME_WORKS);
+    ).filter(work => !scope.sourceScope || scope.sourceScope.workIds.has(work.nodus_id)).slice(0, MAX_THEME_WORKS);
     const allIdeas = db
       .prepare(
         `SELECT DISTINCT i.global_id, i.type, i.label, i.statement
          FROM idea_theme_links it
          JOIN ideas i ON i.global_id = it.global_id
-         WHERE it.theme_id = ?
+         WHERE it.theme_id = ? AND (? IS NULL OR it.nodus_id IN (SELECT value FROM json_each(?)))
          ORDER BY i.label ASC`
       )
-      .all(theme.theme_id) as Array<{ global_id: string; type: string; label: string; statement: string }>;
+      .all(theme.theme_id, scope.sourceScope ? JSON.stringify([...scope.sourceScope.workIds]) : null, scope.sourceScope ? JSON.stringify([...scope.sourceScope.workIds]) : null) as Array<{ global_id: string; type: string; label: string; statement: string }>;
     // Surface the relevant ideas first; fall back to all when none intersect.
     let ideas = allIdeas;
     if (scope.ideaIdSet) {
       const relevant = allIdeas.filter((idea) => scope.ideaIdSet!.has(idea.global_id));
-      ideas = relevant.length ? relevant : allIdeas;
+      ideas = scope.sourceScope ? relevant : relevant.length ? relevant : allIdeas;
     }
     ideas = ideas.slice(0, MAX_THEME_IDEAS);
     for (const work of works) linkedWorkIds.add(work.nodus_id);
     return {
       id: theme.theme_id,
       label: theme.label,
-      work_count: theme.work_count,
-      idea_count: theme.idea_count,
+      work_count: scope.sourceScope ? works.length : theme.work_count,
+      idea_count: scope.sourceScope ? ideas.length : theme.idea_count,
       works: works.map(workSummary),
       ideas: ideas.map((idea) => ({
         id: idea.global_id,
@@ -854,6 +886,11 @@ function listThemes(linkedWorkIds: Set<string>, scope: RelevanceScope) {
 function listContradictions(linkedWorkIds: Set<string>, scope: RelevanceScope) {
   const db = getDb();
   let details = getContradictions();
+  if (scope.sourceScope) {
+    const allowed = scope.sourceScope;
+    details = details.filter(detail => allowed.edgeIds.has(detail.edge.id) && allowed.ideaIds.has(detail.edge.from_id) && allowed.ideaIds.has(detail.edge.to_id))
+      .map(detail => ({ ...detail, evidence: detail.evidence.filter(ev => allowed.workIds.has(ev.nodus_id)) }));
+  }
   // Keep contradictions that touch a query-relevant idea, then cap by confidence.
   if (scope.ideaIdSet) {
     const set = scope.ideaIdSet;
@@ -893,7 +930,7 @@ function listGaps(linkedWorkIds: Set<string>, scope: RelevanceScope) {
     .prepare(
       `SELECT g.*, w.zotero_key, w.title, w.authors_json, w.year, w.item_type, w.doi, w.source_type,
               i.label AS idea_label, i.statement AS idea_statement,
-              e.quote AS evidence_quote, e.location AS evidence_location, e.kind AS evidence_kind
+              e.quote AS evidence_quote, e.location AS evidence_location, e.kind AS evidence_kind, e.nodus_id AS evidence_work_id
        FROM gaps g
        JOIN works w ON w.nodus_id = g.nodus_id
        LEFT JOIN ideas i ON i.global_id = g.related_idea
@@ -914,15 +951,16 @@ function listGaps(linkedWorkIds: Set<string>, scope: RelevanceScope) {
       evidence_quote: string | null;
       evidence_location: string | null;
       evidence_kind: string | null;
+      evidence_work_id: string | null;
     }>;
 
   // Prefer gaps tied to a query-relevant idea; backfill with the highest-
   // confidence remaining gaps. Rows are already confidence-ordered.
-  let selected = rows;
+  let selected = rows.filter(row => !scope.sourceScope || scope.sourceScope.workIds.has(row.nodus_id));
   if (scope.ideaIdSet) {
     const set = scope.ideaIdSet;
-    const linked = rows.filter((row) => row.related_idea != null && set.has(row.related_idea));
-    const rest = rows.filter((row) => !(row.related_idea != null && set.has(row.related_idea)));
+    const linked = selected.filter((row) => row.related_idea != null && set.has(row.related_idea));
+    const rest = selected.filter((row) => !(row.related_idea != null && set.has(row.related_idea)));
     selected = [...linked, ...rest];
   }
   selected = selected.slice(0, TOP_K_GAPS);
@@ -934,7 +972,7 @@ function listGaps(linkedWorkIds: Set<string>, scope: RelevanceScope) {
       kind: row.kind,
       statement: row.statement,
       confidence: row.confidence,
-      related_idea: row.related_idea
+      related_idea: row.related_idea && (!scope.sourceScope || scope.sourceScope.ideaIds.has(row.related_idea))
         ? {
             id: row.related_idea,
             label: row.idea_label,
@@ -942,7 +980,7 @@ function listGaps(linkedWorkIds: Set<string>, scope: RelevanceScope) {
           }
         : null,
       work: workSummary(row),
-      evidence: row.evidence_quote
+      evidence: row.evidence_quote && (!scope.sourceScope || scope.sourceScope.workIds.has(row.evidence_work_id ?? ''))
         ? {
             quote: row.evidence_quote,
             location: row.evidence_location,
@@ -974,6 +1012,7 @@ function listAuthors(linkedWorkIds: Set<string>, scope: RelevanceScope) {
       authors = authors.filter((author) => relevantAuthorIds.has(author.author_id));
     }
   }
+  if (scope.sourceScope) authors = authors.filter(author => scope.sourceScope!.authorIds.has(author.author_id));
   authors = authors.slice(0, TOP_K_AUTHORS);
   const authorIdSet = new Set(authors.map((author) => author.author_id));
 
@@ -1008,21 +1047,21 @@ function listAuthors(linkedWorkIds: Set<string>, scope: RelevanceScope) {
              ORDER BY w.year DESC, w.title ASC`
           )
           .all(author.author_id) as Array<WorkRow & { authors_json: string }>
-      ).slice(0, MAX_AUTHOR_WORKS);
+      ).filter(work => !scope.sourceScope || scope.sourceScope.workIds.has(work.nodus_id)).slice(0, MAX_AUTHOR_WORKS);
       const allIdeas = db
         .prepare(
           `SELECT DISTINCT i.global_id, i.type, i.label, i.statement
            FROM work_attributions wa
            JOIN idea_occurrences io ON io.nodus_id = wa.nodus_id
            JOIN ideas i ON i.global_id = io.global_id
-           WHERE wa.author_id = ?
+           WHERE wa.author_id = ? AND (? IS NULL OR wa.nodus_id IN (SELECT value FROM json_each(?)))
            ORDER BY i.label ASC`
         )
-        .all(author.author_id) as Array<{ global_id: string; type: string; label: string; statement: string }>;
+        .all(author.author_id, scope.sourceScope ? JSON.stringify([...scope.sourceScope.workIds]) : null, scope.sourceScope ? JSON.stringify([...scope.sourceScope.workIds]) : null) as Array<{ global_id: string; type: string; label: string; statement: string }>;
       let ideas = allIdeas;
       if (scope.ideaIdSet) {
         const relevant = allIdeas.filter((idea) => scope.ideaIdSet!.has(idea.global_id));
-        ideas = relevant.length ? relevant : allIdeas;
+        ideas = scope.sourceScope ? relevant : relevant.length ? relevant : allIdeas;
       }
       ideas = ideas.slice(0, MAX_AUTHOR_IDEAS);
       for (const work of works) linkedWorkIds.add(work.nodus_id);
@@ -1039,7 +1078,7 @@ function listAuthors(linkedWorkIds: Set<string>, scope: RelevanceScope) {
         })),
       };
     }),
-    relations,
+    relations: scope.sourceScope ? [] : relations,
   };
 }
 
@@ -1075,18 +1114,26 @@ async function listGraph(selection: ResearchContextSelection, linkedWorkIds: Set
   const parts = selection.graphParts;
   const out: SectionPayload = {};
   const ideaGraph = await buildIdeaGraph();
+  if (scope.sourceScope) {
+    const allowed = scope.sourceScope;
+    ideaGraph.nodes = ideaGraph.nodes.filter(node => node.type === 'theme' ? allowed.themeIds.has(node.id.replace(/^theme:/, '')) : allowed.ideaIds.has(node.id));
+    ideaGraph.edges = ideaGraph.edges.filter(edge => allowed.edgeIds.has(edge.id) && allowed.ideaIds.has(edge.source) && allowed.ideaIds.has(edge.target));
+  }
   const ideaSet = scope.ideaIdSet;
+  const renderNode = (node: GraphNode) => scope.sourceScope
+    ? { id: node.id, label: node.label, type: node.type, statement: node.statement }
+    : slimGraphNode(node);
 
   if (parts.ideaNodes) {
     let nodes = ideaGraph.nodes.filter((node) => node.type !== 'theme');
     if (ideaSet) nodes = nodes.filter((node) => ideaSet.has(node.id));
     nodes = nodes.slice(0, MAX_GRAPH_IDEA_NODES);
-    out.nodos_de_ideas = nodes.map(slimGraphNode);
+    out.nodos_de_ideas = nodes.map(renderNode);
     for (const node of nodes) addIdeaWorkIds(node.id, linkedWorkIds);
   }
   if (parts.themeNodes) {
     const themeNodes = ideaGraph.nodes.filter((node) => node.type === 'theme').slice(0, MAX_GRAPH_THEME_NODES);
-    out.nodos_de_temas = themeNodes.map(slimGraphNode);
+    out.nodos_de_temas = themeNodes.map(renderNode);
     for (const node of themeNodes) {
       if (node.id.startsWith('theme:')) addThemeWorkIds(node.id.slice('theme:'.length), linkedWorkIds);
     }
@@ -1103,10 +1150,10 @@ async function listGraph(selection: ResearchContextSelection, linkedWorkIds: Set
   }
   if (parts.authorGraph) {
     const authorGraph = buildAuthorGraph();
-    const nodes = authorGraph.nodes.slice(0, TOP_K_AUTHORS);
+    const nodes = authorGraph.nodes.filter(node => !scope.sourceScope || scope.sourceScope.authorIds.has(node.id)).slice(0, TOP_K_AUTHORS);
     const nodeIds = new Set(nodes.map((node) => node.id));
     const edges = authorGraph.edges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target));
-    out.grafo_de_autores = { nodes: nodes.map(slimGraphNode), edges: edges.map(slimGraphEdge) };
+    out.grafo_de_autores = { nodes: nodes.map(renderNode), edges: scope.sourceScope ? [] : edges.map(slimGraphEdge) };
     for (const node of nodes) addAuthorWorkIds(node.id, linkedWorkIds);
   }
   return out;
@@ -1115,13 +1162,14 @@ async function listGraph(selection: ResearchContextSelection, linkedWorkIds: Set
 async function listDocuments(
   linkedWorkIds: Set<string>,
   queryEmbedding: number[] | null,
-  budget = MAX_TOTAL_CONTEXT_CHARS
+  budget = MAX_TOTAL_CONTEXT_CHARS,
+  sourceScope: ResearchSourceScope | null = null
 ): Promise<{ documents: unknown[]; summaries: unknown[]; omitted: number; truncated: boolean }> {
   // On a small local budget, cap the total full text pulled — otherwise we do heavy IO
   // (file reads, OCR) for documents that would just be pruned to fit the window.
   const docTotal = Math.min(MAX_DOCUMENT_TOTAL_CHARS, Math.max(0, budget));
   const perDoc = Math.min(MAX_DOCUMENT_CHARS, docTotal || MAX_DOCUMENT_CHARS);
-  const candidateWorks = await selectDocumentWorks(linkedWorkIds, queryEmbedding);
+  const candidateWorks = await selectDocumentWorks(linkedWorkIds, queryEmbedding, sourceScope);
   const works = candidateWorks.slice(0, MAX_DOCUMENTS);
   const omitted = Math.max(0, candidateWorks.length - works.length);
   const settings = getSettings();
@@ -1168,7 +1216,7 @@ async function listDocuments(
   return { documents, summaries, omitted, truncated };
 }
 
-async function selectDocumentWorks(linkedWorkIds: Set<string>, queryEmbedding: number[] | null): Promise<WorkRow[]> {
+async function selectDocumentWorks(linkedWorkIds: Set<string>, queryEmbedding: number[] | null, sourceScope: ResearchSourceScope | null = null): Promise<WorkRow[]> {
   const db = getDb();
   let works: WorkRow[];
   if (linkedWorkIds.size > 0) {
@@ -1181,13 +1229,14 @@ async function selectDocumentWorks(linkedWorkIds: Set<string>, queryEmbedding: n
       .prepare("SELECT * FROM works WHERE archived = 0 ORDER BY deep_status = 'done' DESC, year DESC, title ASC")
       .all() as WorkRow[];
   }
+  if (sourceScope) works = works.filter(work => sourceScope.workIds.has(work.nodus_id));
   const fallback = (a: WorkRow, b: WorkRow) =>
     Number(b.deep_status === 'done') - Number(a.deep_status === 'done') ||
     (b.year ?? 0) - (a.year ?? 0) ||
     a.title.localeCompare(b.title);
   if (!queryEmbedding) return works.sort(fallback);
   const similarities = new Map(
-    (await findSimilarWorksPaged(queryEmbedding, -1, Math.max(works.length, MAX_SUMMARIES))).map((row) => [row.nodus_id, row.similarity])
+    (await findSimilarWorksPaged(queryEmbedding, -1, Math.max(works.length, MAX_SUMMARIES), { nodusIds: sourceScope ? [...sourceScope.workIds] : undefined })).map((row) => [row.nodus_id, row.similarity])
   );
   return works.sort((a, b) => {
     const aSimilarity = similarities.get(a.nodus_id);
@@ -1202,13 +1251,14 @@ async function listRelevantPassages(
   linkedWorkIds: Set<string>,
   budget = MAX_TOTAL_CONTEXT_CHARS
 ): Promise<unknown[]> {
-  if (!scope.queryEmbedding) return [];
+  if (!scope.queryEmbedding && !scope.sourceScope) return [];
   const passageTotal = Math.min(MAX_PASSAGE_CONTEXT_CHARS, Math.max(0, budget));
   const unique = new Map<string, HierarchicalPassageHit>();
   const preferred = linkedWorkIds.size
     ? scope.passageHits.filter((hit) => linkedWorkIds.has(hit.nodus_id))
     : [];
   for (const passage of [...preferred, ...scope.passageHits]) {
+    if (scope.sourceScope && !scope.sourceScope.workIds.has(passage.nodus_id)) continue;
     if (!unique.has(passage.passage_id)) unique.set(passage.passage_id, passage);
   }
 

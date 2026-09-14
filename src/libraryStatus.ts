@@ -40,18 +40,15 @@ export const STEP_ORDER: readonly StepId[] = ['themes', 'ideas', 'summary', 'sem
 /**
  * Steps that must be `done` for a work to count as ready.
  *
- * `summary` is excluded because it is an orientation aid generated from the
- * ideas, not citable evidence: holding a work at amber for a missing summary
- * would nag every reader who does not use summaries.
- *
- * `semantic` is excluded for a harder reason. Whether an idea's embedding is
- * current depends on a text hash computed in JS from its type, label, statement
- * and themes, so SQL cannot evaluate it (see embeddingPipeline.getWorkEmbeddingStatuses).
- * Including it here would make the library's "ready" filter — which runs in SQL
- * over the whole corpus — disagree with the "ready" pill on the row. Both steps
- * are still shown in the per-work breakdown; they just do not gate the green.
+ * All five pipeline steps gate the green. A work whose summary or semantic index is
+ * missing is genuinely not finished, and the earlier exclusions let it read as
+ * "Listo" while its own step breakdown said otherwise. The SQL preset evaluates the
+ * same five (see electron/db/readinessFilters.ts): semantic freshness is available
+ * there through the `idea_embedding_text_hash` function registered on the connection
+ * from the same helper the embedding pipeline uses, so the pill and the preset stay
+ * in step. A step that is `na` (e.g. no ideas to embed) never counts as missing.
  */
-export const READY_STEPS: readonly StepId[] = ['themes', 'ideas', 'citable'];
+export const READY_STEPS: readonly StepId[] = ['themes', 'ideas', 'summary', 'semantic', 'citable'];
 
 export interface StepStatus {
   id: StepId;

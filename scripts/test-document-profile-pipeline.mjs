@@ -74,24 +74,31 @@ await build({
         export class AiError extends Error{constructor(message,retriable=false,config=false){super(message);this.retriable=retriable;this.config=config}}
         export async function embedMany(texts,signal){globalThis.__documentPipeline.onEmbed?.();signal?.throwIfAborted();return texts.map((_,index)=>[1,index+1,0])}
         export async function completeJson(opts){
-          if(globalThis.__documentPipeline.forceSectionSchemaFailure && opts.system.includes('Analiza íntegramente')){
+          const input=(()=>{try{return JSON.parse(opts.user)}catch{return {}}})();
+          // Classify by request shape as well as the Spanish canonical wording so the
+          // same fixture can drive the pipeline in every prompt language.
+          const sectionAnalysis=opts.system.includes('Analiza íntegramente')||(input.section_title!==undefined&&input.fragment!==undefined);
+          const sectionAudit=opts.system.includes('Audita un análisis de sección')||(input.analysis!==undefined&&input.fragment!==undefined);
+          const profileSynthesis=opts.system.includes('Construye una ficha')||(input.metadata!==undefined&&Array.isArray(input.sections)&&input.profile===undefined);
+          const documentAudit=opts.system.includes('Audita una ficha')||(input.profile!==undefined&&input.deterministic!==undefined);
+          if(globalThis.__documentPipeline.forceSectionSchemaFailure && sectionAnalysis){
             throw new AiError('El JSON no cumple el esquema esperado');
           }
-          if(opts.system.includes('Audita un análisis de sección')){globalThis.__documentPipeline.sectionAuditCalls++;const input=JSON.parse(opts.user);return globalThis.__documentPipeline.forceSectionAuditFailure
+          if(sectionAudit){globalThis.__documentPipeline.sectionAuditCalls++;return globalThis.__documentPipeline.forceSectionAuditFailure
             ? {passed:false,issues:['El proveedor insiste en rechazar la sección.'],analysis:input.analysis}
             : {passed:true,issues:[],analysis:input.analysis};
           };
-          if(opts.system.includes('Analiza íntegramente'))return {
+          if(sectionAnalysis)return {
             title:'Capítulo analizado',summary:'Expone una modernización desigual.',role:'argumento',concepts:['modernización'],
             claims:[{text:'El proceso fue desigual.',support_quote:'El proceso avanzó de manera desigual entre las regiones.',page:'p. 2',confidence:0}]
           };
-          if(opts.system.includes('Construye una ficha'))return globalThis.__documentPipeline.forceEmptyProfile
+          if(profileSynthesis)return globalThis.__documentPipeline.forceEmptyProfile
             ? {source_language:'es',overview:'',fields:[]}
             : {source_language:'es',overview:'La obra estudia una modernización desigual.',fields:[
             {kind:'thesis',text:'La modernización avanzó con ritmos regionales distintos.',confidence:0,centrality:1,support_quote:'El proceso avanzó de manera desigual entre las regiones.',page:'p. 2'},
             {kind:'argument',text:'Este campo debe descartarse.',confidence:.2,centrality:.1,support_quote:'Esta cita no existe en el documento.',page:null}
           ]};
-          if(opts.system.includes('Audita una ficha')){globalThis.__documentPipeline.auditCalls++;return globalThis.__documentPipeline.forceDocumentAuditFailure ? {
+          if(documentAudit){globalThis.__documentPipeline.auditCalls++;return globalThis.__documentPipeline.forceDocumentAuditFailure ? {
             passed:false,score:.8,issues:['El auditor discrepa de la paráfrasis.'],field_fixes:[],overview:''
           } : {
             passed:true,score:.95,issues:[],
@@ -345,4 +352,24 @@ test('invalid provider JSON in a section degrades locally instead of failing the
   assert.equal(result, 'published-v1');
   assert.ok(globalThis.__documentPipeline.published.sections.every((section) => section.summary.length > 0));
   assert.ok(globalThis.__documentPipeline.published.audit.passed);
+});
+
+test('the document-profile pipeline runs with a native prompt pack in every prompt language', async () => {
+  const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
+  for (const language of languages) {
+    globalThis.__documentPipeline.sourceReads = 0;
+    globalThis.__documentPipeline.published = null;
+    globalThis.__documentPipeline.text = `# Introducción\n[[p. 1]]\nLa obra plantea su problema con suficiente detalle documental.\n## Desarrollo\n[[p. 2]]\nEl proceso avanzó de manera desigual entre las regiones.\n${'Desarrollo histórico completo. '.repeat(100)}`;
+    const work = {
+      nodus_id:'w1',zotero_key:'Z1',zotero_version:1,title:'Modernización',authors_json:'["Autora"]',year:2024,
+      item_type:'book',doi:null,read_tag:0,manual_deep:0,deep_trigger:null,source_type:'markdown',light_status:'done',
+      light_at:null,light_hash:null,deep_status:'done',deep_at:null,deep_hash:null,summary_status:'none',summary_at:null,
+      summary_hash:null,archived:0,notes:null,
+    };
+    const result = await pipeline.runDocumentProfileScan(work, {
+      jobId:`job-prompt-language-${language}`, language, generatorModel:null, auditorModel:null, onProgress() {},
+    });
+    assert.equal(result, 'published-v1', `${language}: document profile published`);
+    assert.ok(globalThis.__documentPipeline.published.audit.passed, `${language}: audit passed`);
+  }
 });

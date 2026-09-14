@@ -252,6 +252,7 @@ export function WorkStatusModal({
         if (work.text_block_reason === 'scanned_no_ocr') return t('El PDF está escaneado y no tiene capa de texto. Activa OCR y vuelve a analizar.');
         if (work.text_block_reason === 'unreadable') return t('El adjunto no produjo texto utilizable. Revisa el archivo o activa OCR.');
         if (work.text_block_reason === 'unsupported') return t('El formato del adjunto no es compatible con la extracción de texto.');
+        if (work.text_block_reason === 'zotero_unavailable') return t('Zotero no está disponible. Ábrelo y vuelve a analizar.');
         if (step.state === 'partial') {
           if (step.reason === 'text_changed') return t('El texto cambió; vuelve a indexar sus fragmentos.');
           if (step.reason === 'model_changed') return t('Los fragmentos se indexaron con otro modelo de embeddings.');

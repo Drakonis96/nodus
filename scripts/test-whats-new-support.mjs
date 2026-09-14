@@ -79,6 +79,7 @@ assert.match(modal, /mcp: \{ icon: 'plug', color: '#1e3a8a', label: 'Servidor MC
 assert.match(modal, /nodi: \{ icon: 'nodi', color: '#d4af37', label: 'Mascota Nodi' \}/);
 assert.match(modal, /toolkit: \{ icon: 'tools', color: '#059669', label: 'Herramientas' \}/);
 assert.match(modal, /plugin: \{ icon: 'puzzle', color: '#0ea5e9', label: 'Plugins' \}/);
+assert.match(modal, /marketplace: \{ icon: null, color: '#6366f1', label: 'Marketplace de Skills' \}/);
 assert.match(modal, /ai: \{ icon: 'sparkles', color: '#7c3aed', label: 'IA' \}/);
 assert.match(modal, /library: \{ icon: 'library', color: '#0f766e', label: 'Biblioteca' \}/);
 assert.match(modal, /server: \{ icon: 'building', color: '#334155', label: 'Nodus Server' \}/);
@@ -91,7 +92,10 @@ assert.match(modal, /radar: \{ icon: 'radar', color: '#f97316', label: 'Nodus Ra
 assert.match(modal, /apple: \{ icon: null, color: '#111827', label: 'Apple' \}/);
 assert.match(modal, /function AppleReleaseIcon/);
 assert.match(modal, /scope === 'apple'/);
-for (const scope of ['ai', 'library', 'server', 'word', 'zotero', 'connector', 'apple']) {
+assert.match(modal, /function MarketplaceReleaseIcon/);
+assert.match(modal, /nodus-marketplace\.svg/);
+assert.match(modal, /scope === 'marketplace'/);
+for (const scope of ['ai', 'library', 'server', 'word', 'zotero', 'connector', 'apple', 'marketplace']) {
   assert.match(releaseNotes, new RegExp(`\\| '${scope}'`));
 }
 assert.match(releaseNotes, /RELEASE_4_2_0_HIGHLIGHTS[\s\S]*scope: 'browser'[\s\S]*scope: 'radar'/);

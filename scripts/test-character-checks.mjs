@@ -343,7 +343,10 @@ test('the transcript speaks the same language as the task contract', () => {
     { role: 'author', content: 'Hola' },
     { role: 'character', content: 'Look at the edge, traveller. The centre lies.' },
   ];
-  const labels = { es: 'Tú', en: 'You', fr: 'Toi', tr: 'Sen', de: 'Du', pt: 'Tu', 'pt-BR': 'Você', it: 'Tu' };
+  const labels = {
+    es: 'Tú', en: 'You', fr: 'Toi', tr: 'Sen', de: 'Du', pt: 'Tu', 'pt-BR': 'Você', it: 'Tu',
+    'zh-Hans': '你', 'zh-Hant': '你', vi: 'Bạn', ja: 'あなた', ru: 'Ты', uk: 'Ти', ko: '당신',
+  };
   for (const language of PROMPT_LANGUAGES) {
     const prompt = interview.composeInterviewPrompt(history, '¿Y bien?', language);
     assert.ok(

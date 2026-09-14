@@ -3,6 +3,8 @@ import type { PromptLanguage } from './types';
 export interface DeepResearchClientPromptPack {
   citationPolicy: readonly string[];
   evidenceShape(sectionCount: number): string;
+  /** Used instead of `evidenceShape` when the user picked "Máx. N secciones". */
+  sectionCeiling(sectionCount: number): string;
   singleNarrative: string;
   sectionedNarrative: string;
   distributeEvidence: string;
@@ -16,6 +18,7 @@ const PACKS: Record<PromptLanguage, DeepResearchClientPromptPack> = {
   es: {
     citationPolicy: ['Cita CADA afirmación sustantiva con un token del catálogo, copiado EXACTAMENTE (incluido el enlace nodus://) y colocado entre paréntesis.', 'Usa SOLO los tokens de `materials`. Cualquier cita que no esté en el catálogo será eliminada al ensamblar: no inventes autores, obras, años ni ids.', 'Puedes citar el mismo token varias veces. No añadas una sección de Referencias ni bibliografía: Nodus la construye a partir de las obras realmente citadas.'],
     evidenceShape: (count) => `La evidencia sugiere en torno a ${count} movimientos argumentales, pero no es una cuota ni un límite. Desarrolla cada afirmación, relación, contraste y evidencia relevante una sola vez y detente cuando no aporte valor marginal verificable.`,
+    sectionCeiling: (count) => `El usuario ha fijado un MÁXIMO de ${count} secciones. No escribas más de ${count} encabezados "## "; si la evidencia solo justifica menos, escribe menos. Es un límite de arquitectura, nunca de contenido: agrupa el material del catálogo dentro de esas secciones en lugar de descartarlo.`,
     singleNarrative: 'Redacta una única narración continua, sin encabezados, subtítulos ni rótulos internos. Organiza los movimientos del argumento mediante párrafos y transiciones naturales.',
     sectionedNarrative: 'Prefiere POCAS secciones LARGAS y profundas antes que muchas cortas: cada sección agrupa varias ideas afines y las relaciona, no una idea por sección.',
     distributeEvidence: 'Reparte TODAS las ideas relevantes del catálogo entre las secciones. Sitúa los huecos y contradicciones donde aporten tensión argumental. Cierra con una síntesis.',
@@ -27,6 +30,7 @@ const PACKS: Record<PromptLanguage, DeepResearchClientPromptPack> = {
   en: {
     citationPolicy: ['Cite EVERY substantive claim with a catalog token, copied EXACTLY (including the nodus:// link) and placed in parentheses.', 'Use ONLY tokens from `materials`. Any citation absent from the catalog will be removed during assembly: do not invent authors, works, years, or ids.', 'You may cite the same token more than once. Do not add a References or bibliography section: Nodus builds it from the works actually cited.'],
     evidenceShape: (count) => `The evidence suggests roughly ${count} argumentative movements, but this is neither a quota nor a limit. Develop each relevant claim, relationship, contrast, and piece of evidence once, then stop when no verifiable marginal value remains.`,
+    sectionCeiling: (count) => `The user set a MAXIMUM of ${count} sections. Do not write more than ${count} "## " headings; if the evidence only warrants fewer, write fewer. This bounds the architecture, never the content: group the catalog material inside those sections instead of discarding it.`,
     singleNarrative: 'Write one continuous narrative without headings, subheadings, or internal labels. Organize the argument through paragraphs and natural transitions.',
     sectionedNarrative: 'Prefer a FEW LONG, in-depth sections to many short ones: each section should group and relate several connected ideas, not cover one idea per section.',
     distributeEvidence: 'Distribute ALL relevant catalog ideas across the sections. Place gaps and contradictions where they create argumentative tension. End with a synthesis.',
@@ -38,6 +42,7 @@ const PACKS: Record<PromptLanguage, DeepResearchClientPromptPack> = {
   fr: {
     citationPolicy: ['Citez CHAQUE affirmation substantielle avec un jeton du catalogue, copié EXACTEMENT, lien nodus:// compris, et placé entre parenthèses.', 'Utilisez UNIQUEMENT les jetons de `materials`. Toute citation absente du catalogue sera supprimée lors de l’assemblage : n’inventez ni auteurs, ni ouvrages, ni années, ni ids.', 'Vous pouvez citer plusieurs fois le même jeton. N’ajoutez ni section Références ni bibliographie : Nodus la construit à partir des ouvrages réellement cités.'],
     evidenceShape: (count) => `Les preuves suggèrent environ ${count} mouvements argumentatifs, sans que ce soit un quota ni une limite. Développez une seule fois chaque affirmation, relation, contraste et preuve pertinente, puis arrêtez-vous lorsqu’il ne reste plus de valeur marginale vérifiable.`,
+    sectionCeiling: (count) => `L’utilisateur a fixé un MAXIMUM de ${count} sections. N’écrivez pas plus de ${count} titres "## " ; si les preuves n’en justifient que moins, écrivez-en moins. Cette limite porte sur l’architecture, jamais sur le contenu : regroupez la matière du catalogue dans ces sections au lieu de l’écarter.`,
     singleNarrative: 'Rédigez un récit continu unique, sans titres, sous-titres ni libellés internes. Organisez l’argument par paragraphes et transitions naturelles.',
     sectionedNarrative: 'Préférez quelques sections LONGUES et approfondies à de nombreuses sections courtes : chacune regroupe et relie plusieurs idées proches, pas une seule idée.',
     distributeEvidence: 'Répartissez TOUTES les idées pertinentes du catalogue entre les sections. Placez lacunes et contradictions là où elles créent une tension argumentative. Terminez par une synthèse.',
@@ -49,6 +54,7 @@ const PACKS: Record<PromptLanguage, DeepResearchClientPromptPack> = {
   de: {
     citationPolicy: ['Belegen Sie JEDE wesentliche Aussage mit einem Katalog-Token, das EXAKT, einschließlich des nodus://-Links, kopiert und in Klammern gesetzt wird.', 'Verwenden Sie NUR Tokens aus `materials`. Beim Zusammenstellen werden alle nicht im Katalog enthaltenen Zitate entfernt: Erfinden Sie keine Autoren, Werke, Jahre oder ids.', 'Dasselbe Token darf mehrfach zitiert werden. Fügen Sie keinen Abschnitt Quellen oder Literaturverzeichnis hinzu: Nodus erstellt ihn aus den tatsächlich zitierten Werken.'],
     evidenceShape: (count) => `Die Belege legen ungefähr ${count} argumentative Schritte nahe; dies ist weder eine Quote noch eine Grenze. Entwickeln Sie jede relevante Aussage, Beziehung, Gegenüberstellung und Evidenz genau einmal und enden Sie, sobald kein überprüfbarer Mehrwert mehr entsteht.`,
+    sectionCeiling: (count) => `Der Nutzer hat ein MAXIMUM von ${count} Abschnitten festgelegt. Schreiben Sie nicht mehr als ${count} "## "-Überschriften; rechtfertigen die Belege nur weniger, schreiben Sie weniger. Die Grenze betrifft die Architektur, nie den Inhalt: Bündeln Sie das Katalogmaterial in diesen Abschnitten, statt es zu verwerfen.`,
     singleNarrative: 'Verfassen Sie einen durchgehenden Text ohne Überschriften, Untertitel oder interne Bezeichnungen. Gliedern Sie das Argument durch Absätze und natürliche Übergänge.',
     sectionedNarrative: 'Bevorzugen Sie WENIGE LANGE, vertiefte Abschnitte gegenüber vielen kurzen: Jeder Abschnitt bündelt und verknüpft mehrere verwandte Ideen, nicht nur eine Idee.',
     distributeEvidence: 'Verteilen Sie ALLE relevanten Katalogideen auf die Abschnitte. Platzieren Sie Lücken und Widersprüche dort, wo sie argumentative Spannung erzeugen. Schließen Sie mit einer Synthese.',
@@ -60,6 +66,7 @@ const PACKS: Record<PromptLanguage, DeepResearchClientPromptPack> = {
   pt: {
     citationPolicy: ['Cita CADA afirmação substantiva com um token do catálogo, copiado EXATAMENTE, incluindo a ligação nodus://, e colocado entre parênteses.', 'Usa APENAS tokens de `materials`. Qualquer citação ausente do catálogo será removida na composição: não inventes autores, obras, anos ou ids.', 'Podes citar o mesmo token várias vezes. Não acrescentes uma secção de Referências nem bibliografia: o Nodus constrói-a a partir das obras realmente citadas.'],
     evidenceShape: (count) => `A evidência sugere cerca de ${count} movimentos argumentativos, mas isto não é uma quota nem um limite. Desenvolve uma vez cada afirmação, relação, contraste e prova pertinente e termina quando deixar de haver valor marginal verificável.`,
+    sectionCeiling: (count) => `O utilizador fixou um MÁXIMO de ${count} secções. Não escrevas mais de ${count} cabeçalhos "## "; se a evidência só justificar menos, escreve menos. O limite é de arquitetura, nunca de conteúdo: agrupa o material do catálogo dentro dessas secções em vez de o descartares.`,
     singleNarrative: 'Redige uma única narrativa contínua, sem cabeçalhos, subtítulos ou rótulos internos. Organiza o argumento com parágrafos e transições naturais.',
     sectionedNarrative: 'Prefere POUCAS secções LONGAS e aprofundadas a muitas curtas: cada secção reúne e relaciona várias ideias próximas, não apenas uma ideia.',
     distributeEvidence: 'Distribui TODAS as ideias pertinentes do catálogo pelas secções. Coloca lacunas e contradições onde criem tensão argumentativa. Termina com uma síntese.',
@@ -71,6 +78,7 @@ const PACKS: Record<PromptLanguage, DeepResearchClientPromptPack> = {
   'pt-BR': {
     citationPolicy: ['Cite CADA afirmação substantiva com um token do catálogo, copiado EXATAMENTE, incluindo o link nodus://, e colocado entre parênteses.', 'Use SOMENTE tokens de `materials`. Qualquer citação ausente do catálogo será removida na montagem: não invente autores, obras, anos ou ids.', 'Você pode citar o mesmo token várias vezes. Não adicione uma seção de Referências nem bibliografia: o Nodus a constrói a partir das obras realmente citadas.'],
     evidenceShape: (count) => `As evidências sugerem cerca de ${count} movimentos argumentativos, mas isso não é uma cota nem um limite. Desenvolva uma vez cada afirmação, relação, contraste e evidência relevante e pare quando não houver mais valor marginal verificável.`,
+    sectionCeiling: (count) => `O usuário fixou um MÁXIMO de ${count} seções. Não escreva mais de ${count} cabeçalhos "## "; se as evidências só justificarem menos, escreva menos. O limite é de arquitetura, nunca de conteúdo: agrupe o material do catálogo dentro dessas seções em vez de descartá-lo.`,
     singleNarrative: 'Escreva uma única narrativa contínua, sem cabeçalhos, subtítulos ou rótulos internos. Organize o argumento com parágrafos e transições naturais.',
     sectionedNarrative: 'Prefira POUCAS seções LONGAS e aprofundadas a muitas curtas: cada seção reúne e relaciona várias ideias próximas, não apenas uma ideia.',
     distributeEvidence: 'Distribua TODAS as ideias relevantes do catálogo entre as seções. Coloque lacunas e contradições onde criem tensão argumentativa. Termine com uma síntese.',
@@ -82,6 +90,7 @@ const PACKS: Record<PromptLanguage, DeepResearchClientPromptPack> = {
   it: {
     citationPolicy: ['Cita OGNI affermazione sostanziale con un token del catalogo, copiato ESATTAMENTE, incluso il link nodus://, e posto tra parentesi.', 'Usa SOLO token presenti in `materials`. Ogni citazione assente dal catalogo verrà rimossa durante l’assemblaggio: non inventare autori, opere, anni o ids.', 'Puoi citare lo stesso token più volte. Non aggiungere una sezione Riferimenti né una bibliografia: Nodus la costruisce dalle opere effettivamente citate.'],
     evidenceShape: (count) => `Le prove suggeriscono circa ${count} passaggi argomentativi, ma non è una quota né un limite. Sviluppa una sola volta ogni affermazione, relazione, confronto e prova pertinente e fermati quando non resta valore marginale verificabile.`,
+    sectionCeiling: (count) => `L’utente ha fissato un MASSIMO di ${count} sezioni. Non scrivere più di ${count} titoli "## "; se le prove ne giustificano meno, scrivine meno. Il limite riguarda l’architettura, mai il contenuto: raggruppa il materiale del catalogo dentro quelle sezioni invece di scartarlo.`,
     singleNarrative: 'Scrivi un’unica narrazione continua, senza titoli, sottotitoli o etichette interne. Organizza l’argomento con paragrafi e transizioni naturali.',
     sectionedNarrative: 'Preferisci POCHE sezioni LUNGHE e approfondite a molte brevi: ogni sezione raggruppa e collega varie idee affini, non una sola idea.',
     distributeEvidence: 'Distribuisci TUTTE le idee pertinenti del catalogo tra le sezioni. Colloca lacune e contraddizioni dove creano tensione argomentativa. Concludi con una sintesi.',
@@ -93,6 +102,7 @@ const PACKS: Record<PromptLanguage, DeepResearchClientPromptPack> = {
   tr: {
     citationPolicy: ['HER önemli iddiayı katalogdan bir token ile, nodus:// bağlantısı dâhil TAM OLARAK kopyalayarak ve parantez içine yerleştirerek kaynaklandırın.', 'YALNIZCA `materials` içindeki tokenları kullanın. Katalogda bulunmayan alıntılar birleştirme sırasında kaldırılır: yazar, eser, yıl veya id uydurmayın.', 'Aynı tokenı birden fazla kez kaynak gösterebilirsiniz. Kaynakça veya Referanslar bölümü eklemeyin: Nodus bunu gerçekten alıntılanan eserlerden oluşturur.'],
     evidenceShape: (count) => `Kanıtlar yaklaşık ${count} tartışma hareketi öneriyor; ancak bu bir kota ya da sınır değildir. İlgili her iddiayı, ilişkiyi, karşılaştırmayı ve kanıtı bir kez geliştirin; doğrulanabilir ek değer kalmadığında durun.`,
+    sectionCeiling: (count) => `Kullanıcı EN FAZLA ${count} bölüm belirledi. ${count} sayısından fazla "## " başlığı yazmayın; kanıtlar yalnızca daha azını gerektiriyorsa daha azını yazın. Bu sınır mimariye ilişkindir, içeriğe değil: katalog malzemesini atmak yerine bu bölümlerin içinde toplayın.`,
     singleNarrative: 'Başlık, alt başlık veya iç etiket olmadan tek ve kesintisiz bir anlatı yazın. Argümanı paragraflar ve doğal geçişlerle düzenleyin.',
     sectionedNarrative: 'Çok sayıda kısa bölüm yerine AZ sayıda UZUN ve derin bölüm tercih edin: her bölüm tek bir fikir yerine birbiriyle ilişkili birkaç fikri birleştirsin.',
     distributeEvidence: 'Katalogdaki ilgili TÜM fikirleri bölümlere dağıtın. Boşlukları ve çelişkileri tartışmada gerilim yarattıkları yere yerleştirin. Bir sentezle bitirin.',
@@ -100,6 +110,90 @@ const PACKS: Record<PromptLanguage, DeepResearchClientPromptPack> = {
     singleOutput: 'Kesintisiz gövdeyi Markdown başlığı olmadan `sectionsMarkdown` içinde verin. Özeti, sınırlılıkları veya kaynakları eklemeyin; bunları ayrı alanlar olarak iletin ve sonlandırırken `sectionLimit: "single"` değerini koruyun.',
     sectionedOutput: 'Her bölüme "## Başlık" Markdown başlığıyla başlayın. Özeti, sınırlılıkları veya kaynakları `sectionsMarkdown` içine eklemeyin; bunları birleştirme aracına ayrı alanlar olarak iletin.',
     finalize: 'Taslak tamamlandığında alıntıları doğrulamak, kaynakları oluşturmak ve isterseniz taslağı kaydetmek için markdown ile `nodus_finalize_deep_research` çağrısını yapın.',
+  },
+  'zh-Hans': {
+    citationPolicy: ['为每一处实质性论断引用目录中的标记，必须原样复制（包括 nodus:// 链接）并放在括号内。', '只能使用 `materials` 中的标记。任何不在目录中的引用都会在汇编时被删除：不要编造作者、著作、年份或 id。', '同一个标记可以多次引用。不要添加“参考文献”一节或书目：Nodus 会根据实际引用的著作自动生成。'],
+    evidenceShape: (count) => `证据大致支持 ${count} 个论证推进，但这既不是配额也不是上限。每个相关论断、关系、对照和证据只展开一次，当不再产生可核验的边际价值时就停止。`,
+    sectionCeiling: (count) => `用户设定了最多 ${count} 节的上限。不要写超过 ${count} 个 "## " 标题；如果证据只够支撑更少，就写更少。这是对结构的限制，绝不是对内容的限制：请把目录材料归入这些节中，而不是舍弃。`,
+    singleNarrative: '撰写一篇连续叙述，不使用标题、副标题或内部标签。通过段落和自然的过渡来组织论证。',
+    sectionedNarrative: '宁要少量而深入的长节，不要许多短节：每一节应归拢并关联若干相近的观点，而不是每节只讲一个观点。',
+    distributeEvidence: '把目录中所有相关观点分配到各节。把缺口和矛盾放在能形成论证张力的位置。以综合收尾。',
+    catalogSemantics: '每条目录条目都在 `note` 中携带其所引内容的真实文本。段落（passage）以尖引号给出著作的原文：请将其作为文本证据使用，不要延伸其含义。缺口和矛盾会说明其实际主张，因此请依据其内容展开论证，而不是仅仅点名标签。',
+    singleOutput: '把连续正文放入 `sectionsMarkdown`，不要使用任何 Markdown 标题。不要把摘要、局限或参考文献包含在内：将它们作为单独字段传入，并在最终化时保留 `sectionLimit: "single"`。',
+    sectionedOutput: '每一节以 Markdown 标题 "## 标题" 开头。不要把摘要、局限或参考文献放进 `sectionsMarkdown`：将它们作为单独字段传给汇编工具。',
+    finalize: '写作完成后，用你的 markdown 调用 `nodus_finalize_deep_research`，以验证引用、构建参考文献，并可按需保存草稿。',
+  },
+  'zh-Hant': {
+    citationPolicy: ['為每一處實質性論斷引用目錄中的標記，必須原樣複製（包括 nodus:// 連結）並放在括號內。', '只能使用 `materials` 中的標記。任何不在目錄中的引用都會在組裝時被刪除：不要編造作者、著作、年份或 id。', '同一個標記可以多次引用。不要加入「參考文獻」一節或書目：Nodus 會根據實際引用的著作自動建立。'],
+    evidenceShape: (count) => `證據大致支持 ${count} 個論證推進，但這既不是配額也不是上限。每個相關論斷、關係、對照和證據只展開一次，當不再產生可驗證的邊際價值時就停止。`,
+    sectionCeiling: (count) => `使用者設定了最多 ${count} 節的上限。不要寫超過 ${count} 個 "## " 標題；如果證據只夠支撐更少，就寫更少。這是對結構的限制，絕不是對內容的限制：請把目錄材料歸入這些節中，而不是捨棄。`,
+    singleNarrative: '撰寫一篇連續敘述，不使用標題、副標題或內部標籤。透過段落和自然的轉場來組織論證。',
+    sectionedNarrative: '寧要少量而深入的長節，不要許多短節：每一節應歸攏並關聯若干相近的觀點，而不是每節只講一個觀點。',
+    distributeEvidence: '把目錄中所有相關觀點分配到各節。把缺口和矛盾放在能形成論證張力的位置。以綜合收尾。',
+    catalogSemantics: '每條目錄條目都在 `note` 中攜帶其所引內容的真實文本。段落（passage）以尖引號給出著作的原文：請將其作為文本證據使用，不要延伸其含義。缺口和矛盾會說明其實際主張，因此請依據其內容展開論證，而不是僅僅點名標籤。',
+    singleOutput: '把連續正文放入 `sectionsMarkdown`，不要使用任何 Markdown 標題。不要把摘要、局限或參考文獻包含在內：將它們作為單獨欄位傳入，並在最終化時保留 `sectionLimit: "single"`。',
+    sectionedOutput: '每一節以 Markdown 標題 "## 標題" 開頭。不要把摘要、局限或參考文獻放進 `sectionsMarkdown`：將它們作為單獨欄位傳給組裝工具。',
+    finalize: '寫作完成後，用你的 markdown 呼叫 `nodus_finalize_deep_research`，以驗證引用、建立參考文獻，並可按需儲存草稿。',
+  },
+  vi: {
+    citationPolicy: ['Trích dẫn MỌI khẳng định thực chất bằng một mã trích dẫn từ danh mục, sao chép CHÍNH XÁC (kể cả liên kết nodus://) và đặt trong ngoặc đơn.', 'Chỉ dùng các mã trích dẫn trong `materials`. Mọi trích dẫn không có trong danh mục sẽ bị loại khi hợp nhất: không bịa tác giả, tác phẩm, năm hay id.', 'Có thể trích dẫn cùng một mã nhiều lần. Không thêm mục Tài liệu tham khảo hay thư mục: Nodus tự xây dựng từ những tác phẩm thực sự được trích dẫn.'],
+    evidenceShape: (count) => `Bằng chứng gợi ý khoảng ${count} bước lập luận, nhưng đây không phải hạn ngạch cũng không phải giới hạn. Hãy triển khai mỗi khẳng định, quan hệ, đối chiếu và bằng chứng liên quan đúng một lần, rồi dừng khi không còn giá trị gia tăng có thể kiểm chứng.`,
+    sectionCeiling: (count) => `Người dùng đã đặt tối đa ${count} phần. Không viết quá ${count} tiêu đề "## "; nếu bằng chứng chỉ đủ cho ít hơn, hãy viết ít hơn. Đây là giới hạn về cấu trúc, không bao giờ là giới hạn về nội dung: hãy nhóm tư liệu của danh mục vào trong các phần đó thay vì loại bỏ.`,
+    singleNarrative: 'Viết một mạch tự sự liên tục, không có tiêu đề, tiêu đề phụ hay nhãn nội bộ. Tổ chức lập luận bằng các đoạn văn và chuyển ý tự nhiên.',
+    sectionedNarrative: 'Ưu tiên MỘT VÀI phần DÀI và sâu hơn là nhiều phần ngắn: mỗi phần nên nhóm và liên hệ nhiều ý tưởng gần nhau, chứ không phải mỗi phần một ý.',
+    distributeEvidence: 'Phân bổ TẤT CẢ các ý tưởng liên quan của danh mục vào các phần. Đặt các khoảng trống và mâu thuẫn ở nơi chúng tạo ra sức căng lập luận. Kết thúc bằng một tổng hợp.',
+    catalogSemantics: 'Mỗi mục trong danh mục mang nội dung thực sự được trích dẫn trong `note`. Các đoạn trích (passage) chứa nguyên văn tác phẩm trong dấu ngoặc nhọn: hãy dùng làm bằng chứng văn bản và không mở rộng ý nghĩa. Các khoảng trống và mâu thuẫn nêu điều chúng thực sự khẳng định, nên hãy lập luận từ nội dung của chúng thay vì chỉ gọi tên nhãn.',
+    singleOutput: 'Đưa phần thân liên tục vào `sectionsMarkdown`, không có tiêu đề Markdown. Không bao gồm tóm tắt, hạn chế hay tài liệu tham khảo: hãy truyền chúng dưới dạng các trường riêng và giữ `sectionLimit: "single"` khi kết thúc.',
+    sectionedOutput: 'Bắt đầu mỗi phần bằng tiêu đề Markdown "## Tiêu đề". Không đưa tóm tắt, hạn chế hay tài liệu tham khảo vào `sectionsMarkdown`: hãy truyền chúng riêng cho công cụ hợp nhất.',
+    finalize: 'Khi viết xong, hãy gọi `nodus_finalize_deep_research` với markdown của bạn để kiểm tra trích dẫn, xây dựng tài liệu tham khảo và, nếu muốn, lưu bản nháp.',
+  },
+  ja: {
+    citationPolicy: ['実質的な主張はすべて、カタログのトークンで引用し、nodus:// リンクを含めて正確にコピーし、括弧内に置いてください。', '`materials` のトークンのみを使用してください。カタログにない引用は組み立て時に削除されます。著者、著作、年、id を捏造しないでください。', '同じトークンを複数回引用してもかまいません。「参考文献」や文献一覧の節は追加しないでください。Nodus が実際に引用された著作から構築します。'],
+    evidenceShape: (count) => `証拠はおおよそ ${count} の論証の展開を示唆していますが、これはノルマでも上限でもありません。関連する主張、関係、対比、証拠をそれぞれ一度だけ展開し、検証可能な付加価値がなくなったら止めてください。`,
+    sectionCeiling: (count) => `ユーザーは最大 ${count} 節を設定しました。${count} 個を超える "## " 見出しを書かないでください。証拠がそれより少なくしか正当化しない場合は、少なく書いてください。これは構成の上限であり、内容の上限ではありません。カタログの材料を捨てずに、それらの節の中にまとめてください。`,
+    singleNarrative: '見出し、小見出し、内部ラベルを付けず、単一の連続した叙述を書いてください。段落と自然なつなぎで論証を組み立ててください。',
+    sectionedNarrative: '短い節を多くするよりも、長く掘り下げた節を少数にしてください。各節は一つではなく、近い複数の考えをまとめて関連付けてください。',
+    distributeEvidence: 'カタログの関連する考えをすべて節に配分してください。ギャップと矛盾は論証の緊張を生む位置に置いてください。最後に総合で締めくくってください。',
+    catalogSemantics: '各カタログ項目は `note` に実際に引用された内容を保持しています。抜粋（passage）は著作の逐語テキストを山括弧で示します。テキスト証拠として使い、意味を広げないでください。ギャップと矛盾は実際の主張を述べているので、ラベルを名指しするだけでなく、その内容から論じてください。',
+    singleOutput: '連続した本文を `sectionsMarkdown` に入れ、Markdown 見出しは付けないでください。要旨、限界、参考文献は含めず、別々のフィールドとして渡し、確定時に `sectionLimit: "single"` を保持してください。',
+    sectionedOutput: '各節を Markdown 見出し "## タイトル" で始めてください。要旨、限界、参考文献は `sectionsMarkdown` に含めず、組み立てツールに別々のフィールドとして渡してください。',
+    finalize: '執筆が終わったら、markdown を添えて `nodus_finalize_deep_research` を呼び出し、引用を検証し、参考文献を構築し、必要なら下書きを保存してください。',
+  },
+  ru: {
+    citationPolicy: ['Цитируйте КАЖДОЕ существенное утверждение токеном из каталога, скопированным ТОЧНО (включая ссылку nodus://) и поставленным в скобки.', 'Используйте ТОЛЬКО токены из `materials`. Любая цитата, отсутствующая в каталоге, будет удалена при сборке: не выдумывайте авторов, произведения, годы или id.', 'Один и тот же токен можно цитировать несколько раз. Не добавляйте раздел «Ссылки» или библиографию: Nodus строит её из фактически процитированных произведений.'],
+    evidenceShape: (count) => `Доказательства предполагают примерно ${count} аргументативных ходов, но это ни квота, ни предел. Разверните каждое релевантное утверждение, связь, сопоставление и доказательство один раз и остановитесь, когда не останется проверяемой дополнительной ценности.`,
+    sectionCeiling: (count) => `Пользователь задал МАКСИМУМ в ${count} разделов. Не пишите больше ${count} заголовков "## "; если доказательства оправдывают меньше, напишите меньше. Это ограничение архитектуры, а не содержания: сгруппируйте материал каталога внутри этих разделов, а не отбрасывайте его.`,
+    singleNarrative: 'Напишите единое непрерывное повествование без заголовков, подзаголовков и внутренних меток. Организуйте аргумент с помощью абзацев и естественных переходов.',
+    sectionedNarrative: 'Предпочитайте НЕСКОЛЬКО ДЛИННЫХ, глубоких разделов множеству коротких: каждый раздел должен объединять и связывать несколько близких идей, а не одну идею.',
+    distributeEvidence: 'Распределите ВСЕ релевантные идеи каталога по разделам. Разместите пробелы и противоречия там, где они создают аргументативное напряжение. Завершите синтезом.',
+    catalogSemantics: 'Каждая запись каталога содержит в `note` фактически цитируемое содержание. Фрагменты (passage) приводят дословный текст произведения в угловых кавычках: используйте его как текстовое доказательство и не расширяйте его смысл. Пробелы и противоречия содержат своё действительное утверждение, поэтому аргументируйте исходя из их содержания, а не просто называйте ярлыки.',
+    singleOutput: 'Поместите непрерывный текст в `sectionsMarkdown` без заголовков Markdown. Не включайте туда аннотацию, ограничения или ссылки: передавайте их отдельными полями и сохраняйте `sectionLimit: "single"` при финализации.',
+    sectionedOutput: 'Начинайте каждый раздел с заголовка Markdown "## Название". Не включайте аннотацию, ограничения или ссылки в `sectionsMarkdown`: передавайте их отдельными полями инструменту сборки.',
+    finalize: 'Когда черновик готов, вызовите `nodus_finalize_deep_research` с вашим markdown, чтобы проверить цитаты, построить ссылки и при желании сохранить черновик.',
+  },
+  uk: {
+    citationPolicy: ['Цитуйте КОЖНЕ суттєве твердження токеном з каталогу, скопійованим ТОЧНО (включно з посиланням nodus://) і поставленим у дужки.', 'Використовуйте ЛИШЕ токени з `materials`. Будь-яка цитата, відсутня в каталозі, буде видалена під час складання: не вигадуйте авторів, праць, років або id.', 'Той самий токен можна цитувати кілька разів. Не додавайте розділ «Посилання» чи бібліографію: Nodus будує його з фактично цитованих праць.'],
+    evidenceShape: (count) => `Докази припускають приблизно ${count} аргументативних кроків, але це не квота й не межа. Розгорніть кожне релевантне твердження, зв’язок, зіставлення та доказ один раз і зупиніться, коли не залишиться перевірної додаткової цінності.`,
+    sectionCeiling: (count) => `Користувач встановив МАКСИМУМ у ${count} розділів. Не пишіть більше ніж ${count} заголовків "## "; якщо докази виправдовують менше, напишіть менше. Це обмеження архітектури, а не змісту: згрупуйте матеріал каталогу всередині цих розділів, а не відкидайте його.`,
+    singleNarrative: 'Напишіть єдину безперервну розповідь без заголовків, підзаголовків чи внутрішніх позначок. Організуйте аргумент за допомогою абзаців і природних переходів.',
+    sectionedNarrative: 'Надавайте перевагу КІЛЬКОМ ДОВГИМ, глибоким розділам, а не багатьом коротким: кожен розділ має об’єднувати й пов’язувати кілька близьких ідей, а не одну.',
+    distributeEvidence: 'Розподіліть УСІ релевантні ідеї каталогу між розділами. Розмістіть прогалини та суперечності там, де вони створюють аргументативну напругу. Завершіть синтезом.',
+    catalogSemantics: 'Кожен запис каталогу містить у `note` фактично цитований зміст. Фрагменти (passage) подають дослівний текст праці в кутових лапках: використовуйте його як текстове свідчення й не розширюйте його зміст. Прогалини та суперечності містять своє справжнє твердження, тож аргументуйте з їхнього змісту, а не лише називайте позначки.',
+    singleOutput: 'Помістіть безперервний текст у `sectionsMarkdown` без заголовків Markdown. Не включайте анотацію, обмеження чи посилання: передавайте їх окремими полями та зберігайте `sectionLimit: "single"` під час фіналізації.',
+    sectionedOutput: 'Починайте кожен розділ із заголовка Markdown "## Назва". Не включайте анотацію, обмеження чи посилання в `sectionsMarkdown`: передавайте їх окремими полями інструменту складання.',
+    finalize: 'Коли чернетку завершено, викличте `nodus_finalize_deep_research` зі своїм markdown, щоб перевірити цитати, побудувати посилання та за бажанням зберегти чернетку.',
+  },
+  ko: {
+    citationPolicy: ['모든 실질적 주장을 카탈로그의 토큰으로 인용하되, nodus:// 링크를 포함해 정확히 복사하여 괄호 안에 넣으십시오.', '`materials`의 토큰만 사용하십시오. 카탈로그에 없는 인용은 조립 시 제거됩니다. 저자, 저작, 연도, id를 지어내지 마십시오.', '같은 토큰을 여러 번 인용해도 됩니다. “참고 문헌”이나 서지 목록 절을 추가하지 마십시오. Nodus가 실제로 인용된 저작으로 구성합니다.'],
+    evidenceShape: (count) => `증거는 대략 ${count}개의 논증 전개를 시사하지만, 이는 할당량도 한계도 아닙니다. 관련된 각 주장, 관계, 대조, 증거를 한 번씩 전개하고, 검증 가능한 한계 효용이 사라지면 멈추십시오.`,
+    sectionCeiling: (count) => `사용자가 최대 ${count}개 절로 설정했습니다. ${count}개를 초과하는 "## " 제목을 쓰지 마십시오. 증거가 더 적은 분량만 정당화한다면 더 적게 쓰십시오. 이는 구조의 한계일 뿐 내용의 한계가 아닙니다. 카탈로그 자료를 버리지 말고 그 절들 안에 묶으십시오.`,
+    singleNarrative: '제목, 소제목, 내부 라벨 없이 하나의 연속된 서술을 작성하십시오. 단락과 자연스러운 전환으로 논증을 구성하십시오.',
+    sectionedNarrative: '짧은 절을 많이 두기보다 길고 깊이 있는 절을 몇 개 두십시오. 각 절은 하나의 아이디어가 아니라 서로 가까운 여러 아이디어를 묶고 연결해야 합니다.',
+    distributeEvidence: '카탈로그의 모든 관련 아이디어를 절들에 분배하십시오. 갭과 모순은 논증적 긴장을 만드는 위치에 놓으십시오. 종합으로 마무리하십시오.',
+    catalogSemantics: '각 카탈로그 항목은 실제로 인용된 내용을 `note`에 담고 있습니다. 발췌(passage)는 저작의 축자적 텍스트를 홑화살괄호로 제시합니다. 이를 텍스트 증거로 사용하고 의미를 확장하지 마십시오. 갭과 모순은 실제 주장을 담고 있으므로, 라벨을 언급하는 데 그치지 말고 그 내용을 근거로 논증하십시오.',
+    singleOutput: '연속된 본문을 Markdown 제목 없이 `sectionsMarkdown`에 넣으십시오. 초록, 한계, 참고 문헌은 포함하지 말고 별도 필드로 전달하며, 마무리할 때 `sectionLimit: "single"`을 유지하십시오.',
+    sectionedOutput: '각 절을 Markdown 제목 "## 제목"으로 시작하십시오. 초록, 한계, 참고 문헌은 `sectionsMarkdown`에 넣지 말고 조립 도구에 별도 필드로 전달하십시오.',
+    finalize: '초안 작성이 끝나면 markdown과 함께 `nodus_finalize_deep_research`를 호출하여 인용을 검증하고 참고 문헌을 구성하며, 원한다면 초안을 저장하십시오.',
   },
 };
 

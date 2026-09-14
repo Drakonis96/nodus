@@ -44,11 +44,12 @@ test('the teaser belongs to 3.2.4, shows once, and is gated on nothing else', as
   assert.match(guide, /useEffect\(\(\) => \{ if \(!eligible\) onSettled\(\); \}, \[eligible, onSettled\]\);/);
 });
 
-test('it sits directly behind release notes and holds the rest of the chain', async () => {
+test('it sits behind the PDF Presenter announcement and holds the rest of the chain', async () => {
   const app = await read('src/App.tsx');
   assert.match(app, /<MobileTeaserGuide/);
-  assert.match(app, /\{whatsNewSettled && !mobileTeaserSettled && !manualWhatsNewOpen && \(/);
-  assert.ok(app.indexOf('<WhatsNewModal') < app.indexOf('<MobileTeaserGuide'));
+  assert.match(app, /\{whatsNewSettled && pdfPresenterTutorialSettled && !mobileTeaserSettled && !manualWhatsNewOpen && \(/);
+  assert.ok(app.indexOf('<WhatsNewModal') < app.indexOf('<PdfPresenterTutorialAnnouncement'));
+  assert.ok(app.indexOf('<PdfPresenterTutorialAnnouncement') < app.indexOf('<MobileTeaserGuide'));
   assert.ok(app.indexOf('<MobileTeaserGuide') < app.indexOf('<PlatformHighlightsUpdateTour'));
   // Reopening release notes by hand must not drag the teaser back onto the screen.
   assert.match(app, /!mobileTeaserSettled && !manualWhatsNewOpen/);

@@ -20,6 +20,7 @@ export interface GitHubCopilotCompletionOptions {
   system: string;
   user: string;
   reasoning: ReasoningEffort;
+  researchNativeEffort?: import('@shared/researchReasoning').NativeResearchEffort;
   supportsReasoning: boolean;
   workdir: string;
   timeoutMs?: number;
@@ -75,7 +76,8 @@ export async function runIsolatedGitHubCopilotCompletion(
     session = await client.createSession({
       clientName: 'nodus-desktop',
       model: options.model,
-      ...(options.supportsReasoning && options.reasoning !== 'off'
+      ...(options.researchNativeEffort ? { reasoningEffort: options.researchNativeEffort } : {}),
+      ...(!options.researchNativeEffort && options.supportsReasoning && options.reasoning !== 'off'
         ? { reasoningEffort: options.reasoning }
         : {}),
       workingDirectory: options.workdir,

@@ -1,3 +1,4 @@
+import { skillHasCapability } from '@shared/chatSkills';
 import { buildChatSkillsPrompt, chatSkillsOutputContract, transformChatProse } from '@shared/chatSkills';
 import { enabledChatSkills } from '../chatSkills';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
@@ -57,6 +58,13 @@ const RESPONSE_LANGUAGE: Record<string, string> = {
   'pt-BR': 'Brazilian Portuguese',
   it: 'Italian',
   tr: 'Turkish',
+  'zh-Hans': '简体中文',
+  'zh-Hant': '繁體中文',
+  vi: 'Tiếng Việt',
+  ja: '日本語',
+  ru: 'Русский',
+  uk: 'Українська',
+  ko: '한국어',
 };
 
 const MAX_VIEW_CHARS = 12_000;
@@ -356,12 +364,14 @@ export async function streamNodiChat(
   const settings = getSettings();
   assertChatSkillSession(execution, signal);
   let answer = await completeTextStream(
-    { system: `${buildSystemPrompt(request, context.sources)}\n\n${buildChatSkillsPrompt(skills)}`, user, englishImagePrompts: skills.some(skill => skill.builtin === 'image'), maxTokens: skills.length ? 10_000 : 1_200, temperature: 0.2, reasoning: 'off', useConfiguredCodexReasoning: true, plainContext: true },
+    { system: `${buildSystemPrompt(request, context.sources)}\n\n${buildChatSkillsPrompt(skills)}`, user, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), maxTokens: skills.length ? 10_000 : 1_200, temperature: 0.2, reasoning: 'off', useConfiguredCodexReasoning: true, plainContext: true },
     (delta, kind) => { if (kind === 'content') onDelta(delta); },
     request.model ?? settings.nodiModel ?? settings.chatModel,
     signal
   );
-  answer = await executeChatSkills(answer, execution, signal);
+  // A user-triggered stop keeps the partial answer: running the skill tools now would
+  // throw an AbortError and discard everything that already streamed.
+  if (!signal?.aborted) answer = await executeChatSkills(answer, execution, signal);
   // Deterministically repair citation labels (bare ids → "Autor, Año", bracketed ids →
   // proper nodus:// links) so weaker/local models still produce clickable sources. The
   // frontend re-renders with this returned answer, replacing the streamed deltas.

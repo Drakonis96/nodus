@@ -51,6 +51,13 @@ import {
   resolvePermissionRequest,
   setPermissionPromptNotifier,
 } from '../browser/permissionPrompt';
+import {
+  cancelAllBrowserAuthRequests,
+  cancelBrowserAuthRequest,
+  pendingBrowserAuthRequest,
+  resolveBrowserAuthRequest,
+  setBrowserAuthNotifier,
+} from '../browser/authPrompt';
 import { browserMediaStates, setMediaNotifier } from '../browser/media';
 import { getSystemVolume, setSystemVolume } from '../toolkit/presenter/systemAudio';
 import { activePageIsPdf, captureActivePage, importPdfIntoItem, saveCapture } from '../browser/capture';
@@ -65,6 +72,7 @@ import {
 import { destroyBrowserSubsystem, restartBrowserSubsystem } from '../browser/lifecycle';
 import { addGlobalLibraryAttachments, createGlobalLibraryItem } from '../library/libraryService';
 import { clearAllBrowserData, clearBrowserData, measureBrowserStorage } from '../browser/storage';
+import { cacheWebsiteFavicon } from '../browser/favicon';
 import { setNodiQuoteSelection, setNodiViewContext } from '../ai/nodiChat';
 import { localizeIpcPayload } from '@shared/uiLanguage';
 import { getSettings } from '../db/settingsRepo';
@@ -163,6 +171,12 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     window.webContents.send('browser:permissionRequest', pendingPermissionRequest());
   };
 
+  const broadcastAuth = () => {
+    const window = getWindow();
+    if (!window || window.isDestroyed()) return;
+    window.webContents.send('browser:authRequest', pendingBrowserAuthRequest());
+  };
+
   const broadcastMedia = () => {
     const window = getWindow();
     if (!window || window.isDestroyed()) return;
@@ -182,6 +196,41 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     window.webContents.send('browser:bookmarks', store);
   };
   bookmarks.setNotifier(broadcastBookmarks);
+
+  // Favicon discovery is deliberately bounded and queued: opening a folder may
+  // expose many imported bookmarks at once, but should never create a request
+  // burst or block rendering the local bookmarks page.
+  const faviconQueue: string[] = [];
+  const queuedFavicons = new Set<string>();
+  let activeFaviconJobs = 0;
+  const pumpFaviconQueue = () => {
+    while (activeFaviconJobs < 4) {
+      const id = faviconQueue.shift();
+      if (!id) return;
+      activeFaviconJobs += 1;
+      void (async () => {
+        const bookmark = bookmarks.snapshot().bookmarks.find((entry) => entry.id === id);
+        if (!bookmark || bookmark.faviconDataUrl) return;
+        const faviconDataUrl = await cacheWebsiteFavicon(bookmark.url);
+        if (!faviconDataUrl) return;
+        const current = bookmarks.snapshot().bookmarks.find((entry) => entry.id === id);
+        if (!current || current.faviconDataUrl || current.url !== bookmark.url) return;
+        await bookmarks.editBookmark(id, { faviconDataUrl });
+      })().catch(() => undefined).finally(() => {
+        activeFaviconJobs -= 1;
+        queuedFavicons.delete(id);
+        pumpFaviconQueue();
+      });
+    }
+  };
+  const enqueueFavicons = (ids: string[]) => {
+    for (const id of ids) {
+      if (queuedFavicons.has(id)) continue;
+      queuedFavicons.add(id);
+      faviconQueue.push(id);
+    }
+    pumpFaviconQueue();
+  };
 
   const history = browserHistoryRepository();
   const broadcastHistory = (store: BrowserHistoryStore) => {
@@ -243,6 +292,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     });
     if (wired) return;
     setPermissionPromptNotifier(broadcastPermission);
+    setBrowserAuthNotifier(broadcastAuth);
     setMediaNotifier(broadcastMedia);
     setDownloadNotifier(broadcastDownloads);
     setFoundInPageListener((result) => {
@@ -505,6 +555,37 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     cancelPermissionRequests();
   });
 
+  h('browser:pendingAuth', async (event) => {
+    assertUiSender(event, getWindow);
+    return pendingBrowserAuthRequest();
+  });
+
+  /**
+   * Answer an HTTP authentication challenge.
+   *
+   * The credentials go straight to Chromium's pending callback and nowhere
+   * else: no disk, no log, no page. An id that no longer matches is ignored, so
+   * a prompt closed by navigation cannot answer the next challenge by mistake.
+   */
+  h('browser:resolveAuth', async (event, id: string, username: string, password: string) => {
+    assertUiSender(event, getWindow);
+    resolveBrowserAuthRequest(
+      String(id ?? ''),
+      String(username ?? '').slice(0, 8_192),
+      String(password ?? '').slice(0, 8_192),
+    );
+  });
+
+  /**
+   * Dismiss a credential prompt. With an id, only that request; without one,
+   * everything pending — which is what leaving the Browser section does.
+   */
+  h('browser:cancelAuth', async (event, id?: string) => {
+    assertUiSender(event, getWindow);
+    if (typeof id === 'string' && id) cancelBrowserAuthRequest(id);
+    else cancelAllBrowserAuthRequests();
+  });
+
   h('browser:media', async (event) => {
     assertUiSender(event, getWindow);
     ensureWired();
@@ -681,6 +762,13 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     return bookmarks.snapshot();
   });
 
+  h('browser:bookmarks:resolveFavicons', async (event, rawIds: unknown) => {
+    assertUiSender(event, getWindow);
+    if (!Array.isArray(rawIds)) return;
+    const ids = [...new Set(rawIds.filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 100))].slice(0, 500);
+    enqueueFavicons(ids);
+  });
+
   h('browser:bookmarks:candidate', async (event) => {
     assertUiSender(event, getWindow);
     const tab = activeTabSummary();
@@ -698,13 +786,18 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
   h('browser:bookmarks:create', async (event, raw: unknown) => {
     assertUiSender(event, getWindow);
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('El marcador no es válido.');
-    return bookmarks.createBookmark(raw as BrowserBookmarkDraft);
+    const result = await bookmarks.createBookmark(raw as BrowserBookmarkDraft);
+    if (!result.bookmark.faviconDataUrl) enqueueFavicons([result.bookmark.id]);
+    return result;
   });
 
   h('browser:bookmarks:update', async (event, id: string, raw: unknown) => {
     assertUiSender(event, getWindow);
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Los cambios del marcador no son válidos.');
-    return bookmarks.editBookmark(String(id), raw as Partial<BrowserBookmarkDraft>);
+    const store = await bookmarks.editBookmark(String(id), raw as Partial<BrowserBookmarkDraft>);
+    const bookmark = store.bookmarks.find((entry) => entry.id === String(id));
+    if (bookmark && !bookmark.faviconDataUrl) enqueueFavicons([bookmark.id]);
+    return store;
   });
 
   h('browser:bookmarks:createFolder', async (event, raw: unknown) => {

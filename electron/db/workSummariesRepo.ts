@@ -149,8 +149,11 @@ export function findSimilarWorks(
 export async function findSimilarWorksPaged(
   queryEmbedding: number[],
   threshold: number,
-  limit: number
+  limit: number,
+  opts: { nodusIds?: string[] } = {}
 ): Promise<{ nodus_id: string; summary: string; similarity: number }[]> {
+  if (opts.nodusIds?.length === 0) return [];
+  const scoped = opts.nodusIds ? " AND nodus_id IN (SELECT value FROM json_each(?))" : "";
   const config = currentEmbeddingConfig();
   const ranked = await scanSimilar<{ nodus_id: string; rid: number; similarity: number }>({
     table: 'work_summaries',
@@ -160,14 +163,14 @@ export async function findSimilarWorksPaged(
              AND embedding IS NOT NULL
              AND embedding_provider = ?
              AND embedding_model = ?
-             AND embedding_dim = ?
+             AND embedding_dim = ?${scoped}
              AND EXISTS (
                SELECT 1 FROM works w
                 WHERE w.nodus_id = work_summaries.nodus_id
                   AND w.summary_status = 'done'
                   AND w.summary_hash = work_summaries.content_hash
              )`,
-    params: [config.provider, config.model, queryEmbedding.length],
+    params: [config.provider, config.model, queryEmbedding.length, ...(opts.nodusIds ? [JSON.stringify(opts.nodusIds)] : [])],
     query: queryEmbedding,
     threshold,
     limit,

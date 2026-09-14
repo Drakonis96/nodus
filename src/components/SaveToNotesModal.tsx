@@ -15,18 +15,23 @@ export function SaveToNotesModal({
   defaultTitle,
   kind,
   source,
+  destinationLabel = 'Notas',
   allowProjectLink = false,
   onClose,
   onSaved,
+  onOpenSavedNote,
 }: {
   content: string;
   defaultTitle: string;
   kind: NoteKind;
   source?: NoteSource | null;
+  /** User-facing name of the section where this vault exposes saved notes. */
+  destinationLabel?: string;
   /** When true, also offer to link the saved note to a project. */
   allowProjectLink?: boolean;
   onClose: () => void;
   onSaved?: (note: Note) => void;
+  onOpenSavedNote?: (note: Note) => void;
 }) {
   const [folders, setFolders] = useState<NoteFolder[]>([]);
   const [folderId, setFolderId] = useState<string | null>(null);
@@ -36,7 +41,8 @@ export function SaveToNotesModal({
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState<string>('');
   const [saving, setSaving] = useState(false);
-  const [done, setDone] = useState(false);
+  const [savedNote, setSavedNote] = useState<Note | null>(null);
+  const [linkWarning, setLinkWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,6 +61,19 @@ export function SaveToNotesModal({
   }, [allowProjectLink]);
 
   const flat = useMemo(() => flattenFolders(folders), [folders]);
+  const destinationPath = useMemo(() => {
+    if (!folderId) return `${t(destinationLabel)} › ${t('Sin carpeta (raíz)')}`;
+    const byId = new Map(folders.map((folder) => [folder.id, folder]));
+    const names: string[] = [];
+    const visited = new Set<string>();
+    let current = byId.get(folderId);
+    while (current && !visited.has(current.id)) {
+      visited.add(current.id);
+      names.unshift(current.name);
+      current = current.parentId ? byId.get(current.parentId) : undefined;
+    }
+    return [t(destinationLabel), ...names].join(' › ');
+  }, [destinationLabel, folderId, folders]);
 
   const createFolder = async () => {
     const name = newFolderName.trim();
@@ -85,19 +104,23 @@ export function SaveToNotesModal({
         folderId,
         source: source ?? { origin: kind },
       });
-      if (allowProjectLink && projectId) {
-        await window.nodus.addProjectLink({
-          projectId,
-          sectionId: null,
-          kind: 'note',
-          refId: note.id,
-          label: title,
-          role: 'source',
-        });
-      }
-      setDone(true);
+      setSavedNote(note);
       onSaved?.(note);
-      window.setTimeout(onClose, 750);
+      if (allowProjectLink && projectId) {
+        try {
+          await window.nodus.addProjectLink({
+            projectId,
+            sectionId: null,
+            kind: 'note',
+            refId: note.id,
+            label: title,
+            role: 'source',
+          });
+        } catch {
+          setLinkWarning(t('La nota se guardó, pero no se pudo vincular al proyecto.'));
+        }
+      }
+      setSaving(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setSaving(false);
@@ -122,6 +145,19 @@ export function SaveToNotesModal({
         </header>
 
         <div className="p-4 space-y-4">
+          {savedNote ? (
+            <div data-testid="save-note-success" className="rounded-lg border border-emerald-800 bg-emerald-950/30 p-4">
+              <div className="flex items-start gap-3">
+                <Icon name="check" className="mt-0.5 text-emerald-400" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-emerald-200">{t('Nota guardada')}</p>
+                  <p className="mt-1 truncate text-xs text-neutral-300" title={savedNote.title}>{savedNote.title}</p>
+                  <p data-testid="save-note-destination" className="mt-2 text-xs text-neutral-500">{destinationPath}</p>
+                </div>
+              </div>
+              {linkWarning && <p className="mt-3 text-xs text-amber-300">{linkWarning}</p>}
+            </div>
+          ) : <>
           <div>
             <label className="text-xs uppercase text-neutral-500">{t('Título')}</label>
             <input
@@ -200,20 +236,30 @@ export function SaveToNotesModal({
           </div>
 
           {error && <div className="text-xs text-red-400">{error}</div>}
+          </>}
         </div>
 
         <footer className="px-4 py-3 border-t border-neutral-800 flex items-center justify-end gap-2">
-          <button className="btn btn-ghost" onClick={onClose}>
-            {t('Cancelar')}
-          </button>
-          <button
-            className="btn btn-primary gap-1.5"
-            onClick={() => void save()}
-            disabled={saving || done || !content.trim()}
-          >
-            <Icon name={done ? 'check' : saving ? 'sync' : 'save'} className={saving ? 'animate-spin' : ''} />
-            {done ? t('Guardado') : saving ? t('Guardando…') : t('Guardar nota')}
-          </button>
+          {savedNote ? <>
+            <button data-testid="save-note-continue" className="btn btn-ghost" onClick={onClose}>
+              {t(onOpenSavedNote ? 'Continuar en el chat' : 'Cerrar')}
+            </button>
+            {onOpenSavedNote && (
+              <button data-testid="save-note-open" className="btn btn-primary gap-1.5" onClick={() => onOpenSavedNote(savedNote)}>
+                <Icon name="external" /> {t('Abrir nota')}
+              </button>
+            )}
+          </> : <>
+            <button className="btn btn-ghost" onClick={onClose}>{t('Cancelar')}</button>
+            <button
+              className="btn btn-primary gap-1.5"
+              onClick={() => void save()}
+              disabled={saving || !content.trim()}
+            >
+              <Icon name={saving ? 'sync' : 'save'} className={saving ? 'animate-spin' : ''} />
+              {saving ? t('Guardando…') : t('Guardar nota')}
+            </button>
+          </>}
         </footer>
       </div>
     </div>

@@ -48,7 +48,7 @@ for (const requiredPackage of [
   'heic-decode@2.1.0',
   'libheif-js@1.19.8',
   'onnxruntime-node@1.21.0',
-  'sharp@0.34.5',
+  `sharp@${json('package-lock.json').packages['node_modules/sharp'].version}`,
 ]) {
   assert.match(packageLicenses, new RegExp(`Package: ${requiredPackage.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
 }

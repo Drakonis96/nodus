@@ -284,8 +284,27 @@ html {
   font-size: calc(16px * var(--interface-scale));
 }
 
+/* Shared application surfaces: graph chrome and the shell use the same palette. */
+:root {
+  --app-canvas: theme('colors.neutral.950');
+  --app-panel: theme('colors.neutral.900');
+  --app-hover: theme('colors.neutral.800');
+  --app-border: theme('colors.neutral.800');
+  --app-text: theme('colors.neutral.100');
+  --app-muted: theme('colors.neutral.400');
+}
+:root.light {
+  --app-canvas: theme('colors.neutral.50');
+  --app-panel: theme('colors.white');
+  --app-hover: theme('colors.gray.200');
+  --app-border: theme('colors.neutral.300');
+  --app-text: theme('colors.neutral.900');
+  --app-muted: theme('colors.neutral.600');
+}
 body {
-  @apply bg-neutral-950 text-neutral-100 font-sans antialiased;
+  @apply font-sans antialiased;
+  background: var(--app-canvas);
+  color: var(--app-text);
 }
 
 /* Accessibility controls are offline-safe and affect renderer-owned surfaces,
@@ -357,7 +376,8 @@ body {
 }
 
 .light body {
-  @apply bg-neutral-50 text-neutral-900;
+  background: var(--app-canvas);
+  color: var(--app-text);
 }
 
 .light .text-neutral-100,
@@ -2586,6 +2606,7 @@ body {
 .docencia .hover\:bg-teal-50\/60:hover { background-color: rgba(255, 247, 237, 0.6); }
 .docencia .border-teal-200 { border-color: #fed7aa; }
 .docencia .border-teal-500 { border-color: #f97316; }
+.docencia.dark .dark\:border-teal-500 { border-color: #f97316; }
 /* The chat's starter cards and manual-source checkboxes (Analizar group). */
 .docencia .hover\:border-teal-400:hover { border-color: #fb923c; }
 .docencia .hover\:border-teal-500:hover { border-color: #f97316; }
@@ -3323,6 +3344,30 @@ select.input optgroup {
   border: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   margin: 0.9em 0;
+}
+
+/* Study and teaching content reuses the Markdown pipeline with a tighter rhythm, so
+   a formula or a list never stretches an option row or a flashcard. Inline contexts
+   unwrap paragraphs; display math scrolls instead of widening the card. */
+.study-markdown > *:first-child {
+  margin-top: 0;
+}
+.study-markdown > *:last-child {
+  margin-bottom: 0;
+}
+.study-markdown .katex-display {
+  margin: 0.4em 0;
+  padding: 2px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.study-markdown-inline > p {
+  display: inline;
+  margin: 0;
+}
+.study-markdown-inline > *:not(p) {
+  margin-top: 0.15em;
+  margin-bottom: 0.15em;
 }
 
 /* Deep Research is long-form reading, not a chat bubble. Keep ordinary words
@@ -4301,7 +4346,8 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
   flex-direction: column;
   gap: 3px;
   width: max-content;
-  max-width: 320px;
+  max-width: min(320px, calc(100vw - 24px));
+  box-sizing: border-box;
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid rgb(64 64 64);
@@ -4310,6 +4356,11 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
   pointer-events: none;
   font-size: 12px;
   line-height: 1.35;
+  /* Citation groups stay on one line, but the preview is nested inside that
+     group. Reset the inherited value so long titles and snippets wrap inside
+     the card instead of painting beyond its background. */
+  white-space: normal;
+  overflow-wrap: anywhere;
   color: rgb(212 212 212);
   animation: fade-in 0.12s ease-out;
 }

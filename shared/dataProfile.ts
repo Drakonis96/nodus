@@ -187,6 +187,13 @@ const PROFILE_TEXT_COPY: Record<PromptLanguage, { database: string; rows: string
   'pt-BR': { database: 'Banco de dados', rows: 'Linhas', filled: 'preenchido', mean: 'média', median: 'mediana', deviation: 'desvio-padrão', sum: 'soma', checked: 'marcado', unchecked: 'desmarcado', from: 'de', to: 'a', links: 'links', distinct: 'valores distintos' },
   it: { database: 'Database', rows: 'Righe', filled: 'compilato', mean: 'media', median: 'mediana', deviation: 'dev. std.', sum: 'somma', checked: 'selezionato', unchecked: 'non selezionato', from: 'da', to: 'a', links: 'collegamenti', distinct: 'valori distinti' },
   tr: { database: 'Veritabanı', rows: 'Satırlar', filled: 'dolu', mean: 'ortalama', median: 'medyan', deviation: 'std. sapma', sum: 'toplam', checked: 'işaretli', unchecked: 'işaretsiz', from: 'başlangıç', to: 'bitiş', links: 'bağlantı', distinct: 'farklı değer' },
+  'zh-Hans': { database: '数据库', rows: '行数', filled: '已填充', mean: '平均值', median: '中位数', deviation: '标准差', sum: '总和', checked: '已勾选', unchecked: '未勾选', from: '从', to: '至', links: '链接', distinct: '不同值' },
+  'zh-Hant': { database: '資料庫', rows: '列數', filled: '已填充', mean: '平均值', median: '中位數', deviation: '標準差', sum: '總和', checked: '已勾選', unchecked: '未勾選', from: '從', to: '至', links: '連結', distinct: '不同值' },
+  vi: { database: 'Cơ sở dữ liệu', rows: 'Số hàng', filled: 'đã điền', mean: 'trung bình', median: 'trung vị', deviation: 'độ lệch chuẩn', sum: 'tổng', checked: 'đã chọn', unchecked: 'chưa chọn', from: 'từ', to: 'đến', links: 'liên kết', distinct: 'giá trị khác nhau' },
+  ja: { database: 'データベース', rows: '行数', filled: '入力済み', mean: '平均', median: '中央値', deviation: '標準偏差', sum: '合計', checked: 'チェック済み', unchecked: '未チェック', from: '開始', to: '終了', links: 'リンク', distinct: '異なる値' },
+  ru: { database: 'База данных', rows: 'Строки', filled: 'заполнено', mean: 'среднее', median: 'медиана', deviation: 'ст. откл.', sum: 'сумма', checked: 'отмечено', unchecked: 'не отмечено', from: 'с', to: 'по', links: 'связи', distinct: 'различных значений' },
+  uk: { database: 'База даних', rows: 'Рядки', filled: 'заповнено', mean: 'середнє', median: 'медіана', deviation: 'ст. відх.', sum: 'сума', checked: 'позначено', unchecked: 'не позначено', from: 'з', to: 'до', links: 'зв’язки', distinct: 'різних значень' },
+  ko: { database: '데이터베이스', rows: '행', filled: '채움', mean: '평균', median: '중앙값', deviation: '표준편차', sum: '합계', checked: '선택됨', unchecked: '선택 안 됨', from: '시작', to: '종료', links: '링크', distinct: '고유값' },
 };
 
 /** Compact, human-readable profile for the AI report prompt (never the raw rows). */

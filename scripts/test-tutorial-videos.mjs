@@ -41,6 +41,7 @@ test('the published tutorials keep their ids, shelves and vault mapping', () => 
       ['teaching', '5LsojBiM348', 5, 'vaults'],
       ['nodi', '5OTe5CtefME', 6, 'features'],
       ['toolkit', '-xhDw_Y0vpA', 7, 'features'],
+      ['pdf-presenter', 'e2js_u-05OA', 7.5, 'features'],
       ['word', 'GFVOJ0JNPMw', 8, 'integrations'],
       ['zotero', 'lMWW8JJrl2c', 9, 'integrations'],
       ['mcp', 'qa2xPiOmV2c', 10, 'integrations'],
@@ -75,7 +76,7 @@ test('the shelves are ordered vaults → features → integrations, behind the i
   assert.deepEqual(shelves.map((shelf) => shelf.videos.map((video) => video.id)), [
     ['essentials'],
     ['academic', 'genealogy', 'databases', 'teaching'],
-    ['nodi', 'toolkit'],
+    ['nodi', 'toolkit', 'pdf-presenter'],
     ['word', 'zotero', 'mcp'],
   ]);
   // A tab narrows to one shelf; the empty ones are dropped rather than left as headings
@@ -441,7 +442,7 @@ test('the published catalogue can add tutorials and update copy', () => {
   assert.deepEqual(merged.map((video) => video.id), [
     'essentials',
     'academic', 'genealogy', 'databases', 'teaching', 'study',
-    'nodi', 'toolkit',
+    'nodi', 'toolkit', 'pdf-presenter',
     'word', 'zotero', 'mcp',
   ]);
   // A new vault video reaches that vault's tour with no code change.
@@ -559,4 +560,14 @@ test('a packaged renderer still gets the real player, not YouTube error 153', as
   assert.match(main, /onBeforeSendHeaders\(\s*\{ urls: \[`\$\{TUTORIAL_VIDEO_EMBED_ORIGIN\}\/\*`\] \}/);
   assert.match(main, /Referer: 'https:\/\/nodusresearch\.com\/'/);
   assert.match(main, /import \{ TUTORIAL_VIDEO_EMBED_ORIGIN \} from '@shared\/tutorialVideos'/);
+});
+
+test('PDF Presenter queues after release notes and before every other startup announcement', async () => {
+  const app = await read('src/App.tsx');
+  assert.match(app, /whatsNewSettled && !pdfPresenterTutorialSettled && !manualWhatsNewOpen && \(\s*<PdfPresenterTutorialAnnouncement/);
+  for (const component of ['MobileTeaserGuide', 'PlatformHighlightsUpdateTour', 'ToolkitBetaUpdateTour', 'TutorialVideosUpdateTour', 'StartupUpdateModal']) {
+    assert.match(app, new RegExp(`whatsNewSettled && pdfPresenterTutorialSettled &&[^\\n]+\\(\\s*<${component}`));
+  }
+  const wiki = await read('site/wiki/wiki.js');
+  assert.match(wiki, /'pdf-presenter': \['Features', 'PDF Presenter'\]/);
 });

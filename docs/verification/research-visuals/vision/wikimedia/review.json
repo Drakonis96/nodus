@@ -1,0 +1,241 @@
+{
+  "request": "Find pictures of a daguerreotype: examples of the historical photographic object or the daguerreotype photograph itself. Prefer a clearly visible original plate, case or framed object. Historical daguerreotype reproductions are also relevant, but distinguish restoration or cropping from the original object.",
+  "model": {
+    "provider": "gemini",
+    "model": "gemini-3.1-flash-lite"
+  },
+  "support": {
+    "supported": true,
+    "reason": "Documented image support for this available model."
+  },
+  "paidCalls": 1,
+  "candidates": [
+    {
+      "id": "5005681",
+      "metadata": {
+        "title": "File:Boulevard du Temple by Daguerre.jpg",
+        "description": "Boulevard du Temple , Paris , 3rd arrondissement, Daguerreotype . Made in 1838 by inventor Louis Daguerre , this is believed to be the earliest photograph showing a living person. It is a view of a busy street, but because the exposure lasted for 4 to 5 minutes (see shutter speed Daguerre photo explained ) the moving traffic left no trace. Only the two men near the bottom left corner, one apparently having his boots polished by the other, stayed in one place long enough to be visible. As with most daguerreotypes, the image is a mirror image .",
+        "attribution": "Louis Daguerre"
+      },
+      "source": {
+        "kind": "public",
+        "endpointId": "commons-thumbnails",
+        "path": "/wikipedia/commons/thumb/d/d3/Boulevard_du_Temple_by_Daguerre.jpg/960px-Boulevard_du_Temple_by_Daguerre.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+      },
+      "page": "https://commons.wikimedia.org/wiki/File:Boulevard_du_Temple_by_Daguerre.jpg",
+      "thumbnail": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d3/Boulevard_du_Temple_by_Daguerre.jpg/960px-Boulevard_du_Temple_by_Daguerre.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "license": "Public domain"
+    },
+    {
+      "id": "77527076",
+      "metadata": {
+        "title": "File:Edgar Allan Poe, circa 1849, restored, squared off.jpg",
+        "description": "Edgar Allan Poe , June 1849. Daguerreotype \"Annie\", given to Poe's friend Mrs. Annie L. Richmond; probably taken in June 1849 in Lowell, Massachusetts, photographer unknown.",
+        "attribution": "Unknown author Unknown author ; Restored by Yann Forget and Adam Cuerden"
+      },
+      "source": {
+        "kind": "public",
+        "endpointId": "commons-thumbnails",
+        "path": "/wikipedia/commons/thumb/9/97/Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg/960px-Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+      },
+      "page": "https://commons.wikimedia.org/wiki/File:Edgar_Allan_Poe,_circa_1849,_restored,_squared_off.jpg",
+      "thumbnail": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/97/Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg/960px-Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "license": "Public domain"
+    },
+    {
+      "id": "157814697",
+      "metadata": {
+        "title": "File:Portrait of a Daguerreotypist, 1845 (with Frame).jpg",
+        "description": "Restored portrait of a Daguerreotypist displaying daguerreotypes and cases",
+        "attribution": "Unknown Unknown Restored by Wcamp9"
+      },
+      "source": {
+        "kind": "public",
+        "endpointId": "commons-thumbnails",
+        "path": "/wikipedia/commons/thumb/8/8f/Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg/960px-Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+      },
+      "page": "https://commons.wikimedia.org/wiki/File:Portrait_of_a_Daguerreotypist,_1845_(with_Frame).jpg",
+      "thumbnail": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg/960px-Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "license": "Public domain"
+    },
+    {
+      "id": "1462514",
+      "metadata": {
+        "title": "File:Boulevard du Temple.jpg",
+        "description": "This is \" Boulevard du Temple \", the first ever photograph of a person. The photo was taken by Louis Daguerre in late 1838 or early 1839 in Paris . It is of a busy street, but because exposure time was over ten minutes, the city traffic was moving too much to appear. The exception is a man in the bottom left corner, who stood still getting his boots polished long enough to show.",
+        "attribution": "Louis Daguerre"
+      },
+      "source": {
+        "kind": "public",
+        "endpointId": "commons-thumbnails",
+        "path": "/wikipedia/commons/thumb/1/1d/Boulevard_du_Temple.jpg/960px-Boulevard_du_Temple.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+      },
+      "page": "https://commons.wikimedia.org/wiki/File:Boulevard_du_Temple.jpg",
+      "thumbnail": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1d/Boulevard_du_Temple.jpg/960px-Boulevard_du_Temple.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "license": "Public domain"
+    },
+    {
+      "id": "9521450",
+      "metadata": {
+        "title": "File:Unidentified woman c1850 daguerreotype by Southworth & Hawes.jpg",
+        "description": "Retouched daguerreotype of unidentified woman. The sitter in this daguerreotype was previously incorrectly identified by the Metropolitan Museum of Art as Susan B. Anthony .",
+        "attribution": "Southworth &amp; Hawes en"
+      },
+      "source": {
+        "kind": "public",
+        "endpointId": "commons-thumbnails",
+        "path": "/wikipedia/commons/thumb/b/bf/Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg/960px-Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+      },
+      "page": "https://commons.wikimedia.org/wiki/File:Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg",
+      "thumbnail": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bf/Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg/960px-Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "license": "Public domain"
+    }
+  ],
+  "prepared": [
+    {
+      "id": "5005681",
+      "imageId": "b3ddec63-38f0-4152-a1a2-22fd8c2f58c8",
+      "metadata": {
+        "title": "File:Boulevard du Temple by Daguerre.jpg",
+        "description": "Boulevard du Temple , Paris , 3rd arrondissement, Daguerreotype . Made in 1838 by inventor Louis Daguerre , this is believed to be the earliest photograph showing a living person. It is a view of a busy street, but because the exposure lasted for 4 to 5 minutes (see shutter speed Daguerre photo explained ) the moving traffic left no trace. Only the two men near the bottom left corner, one apparently having his boots polished by the other, stayed in one place long enough to be visible. As with most daguerreotypes, the image is a mirror image .",
+        "attribution": "Louis Daguerre"
+      },
+      "provenance": {
+        "kind": "public",
+        "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d3/Boulevard_du_Temple_by_Daguerre.jpg/960px-Boulevard_du_Temple_by_Daguerre.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "sha256": "d48d0a2dc510f875acb572812732500436f079da5a545939e717490fa990f25f",
+        "thumbnailSha256": "a4a68848b5ddb701a4aeb1514e50dd7c80444bbf6862dcaa18d2a3560d499a5f",
+        "width": 768,
+        "height": 552
+      }
+    },
+    {
+      "id": "77527076",
+      "imageId": "b3cf4d7c-79bc-4fda-aba9-a67374715f18",
+      "metadata": {
+        "title": "File:Edgar Allan Poe, circa 1849, restored, squared off.jpg",
+        "description": "Edgar Allan Poe , June 1849. Daguerreotype \"Annie\", given to Poe's friend Mrs. Annie L. Richmond; probably taken in June 1849 in Lowell, Massachusetts, photographer unknown.",
+        "attribution": "Unknown author Unknown author ; Restored by Yann Forget and Adam Cuerden"
+      },
+      "provenance": {
+        "kind": "public",
+        "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/97/Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg/960px-Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "sha256": "393df26fe686b432b07b6f1397201bf690b388d6324c4b882c3711f143793442",
+        "thumbnailSha256": "e1744981d72f719bcf0f7a031a795df5243d050550a7955051eda44b8d0e0245",
+        "width": 546,
+        "height": 768
+      }
+    },
+    {
+      "id": "157814697",
+      "imageId": "a06765dc-382a-4354-a275-0e59637fafc9",
+      "metadata": {
+        "title": "File:Portrait of a Daguerreotypist, 1845 (with Frame).jpg",
+        "description": "Restored portrait of a Daguerreotypist displaying daguerreotypes and cases",
+        "attribution": "Unknown Unknown Restored by Wcamp9"
+      },
+      "provenance": {
+        "kind": "public",
+        "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg/960px-Portrait_of_a_Daguerreotypist%2C_1845_%28with_Frame%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "sha256": "3693df6d2796c09424d8fd59b662581f73df77319eccfaf88f3aabb3b63918b4",
+        "thumbnailSha256": "690b3f107674521565b6f418603ba19079eee11178235b81d4df3b26a5eaa0e6",
+        "width": 655,
+        "height": 768
+      }
+    },
+    {
+      "id": "1462514",
+      "imageId": "829674e4-260a-4e7d-86a3-79411288953d",
+      "metadata": {
+        "title": "File:Boulevard du Temple.jpg",
+        "description": "This is \" Boulevard du Temple \", the first ever photograph of a person. The photo was taken by Louis Daguerre in late 1838 or early 1839 in Paris . It is of a busy street, but because exposure time was over ten minutes, the city traffic was moving too much to appear. The exception is a man in the bottom left corner, who stood still getting his boots polished long enough to show.",
+        "attribution": "Louis Daguerre"
+      },
+      "provenance": {
+        "kind": "public",
+        "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1d/Boulevard_du_Temple.jpg/960px-Boulevard_du_Temple.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "sha256": "7103ace1b9a6644ba32263aacbbe1c4e0e2fbbcf63b0c0c330831808df25736b",
+        "thumbnailSha256": "9446f3240f9949f6e56c0a37988cab857d486be3ec2ad541921671e40a2b9aab",
+        "width": 768,
+        "height": 550
+      }
+    },
+    {
+      "id": "9521450",
+      "imageId": "66a314fa-377b-4491-8e8b-d963d6fbc909",
+      "metadata": {
+        "title": "File:Unidentified woman c1850 daguerreotype by Southworth & Hawes.jpg",
+        "description": "Retouched daguerreotype of unidentified woman. The sitter in this daguerreotype was previously incorrectly identified by the Metropolitan Museum of Art as Susan B. Anthony .",
+        "attribution": "Southworth &amp; Hawes en"
+      },
+      "provenance": {
+        "kind": "public",
+        "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bf/Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg/960px-Unidentified_woman_c1850_daguerreotype_by_Southworth_%26_Hawes.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "sha256": "17696d02ef40bc09730e21de6c9dc576e988e44a7c1161206312e1cdea411a2a",
+        "thumbnailSha256": "2047405cb0333a51b3ed73039f290ad6e99c25ea6b8a8fc1b2c1cad76f00e5aa",
+        "width": 608,
+        "height": 768
+      }
+    }
+  ],
+  "review": {
+    "reviewId": "798e9553-b0e6-4345-a177-90ca6cb441bd",
+    "status": "reviewed",
+    "outcome": "selected",
+    "model": {
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite"
+    },
+    "round": 1,
+    "remainingRounds": 0,
+    "selected": [
+      "157814697",
+      "1462514",
+      "5005681",
+      "77527076",
+      "9521450"
+    ],
+    "candidates": [
+      {
+        "id": "5005681",
+        "imageId": "b3ddec63-38f0-4152-a1a2-22fd8c2f58c8",
+        "inspected": true,
+        "relevance": 0.9,
+        "reasoning": "This is a well-known, high-quality historical daguerreotype showing the original photographic plate image.",
+        "thumbnailSha256": "a4a68848b5ddb701a4aeb1514e50dd7c80444bbf6862dcaa18d2a3560d499a5f"
+      },
+      {
+        "id": "77527076",
+        "imageId": "b3cf4d7c-79bc-4fda-aba9-a67374715f18",
+        "inspected": true,
+        "relevance": 0.7,
+        "reasoning": "This is a daguerreotype portrait; while restored, it remains a clear example of the photographic style.",
+        "thumbnailSha256": "e1744981d72f719bcf0f7a031a795df5243d050550a7955051eda44b8d0e0245"
+      },
+      {
+        "id": "157814697",
+        "imageId": "a06765dc-382a-4354-a275-0e59637fafc9",
+        "inspected": true,
+        "relevance": 1,
+        "reasoning": "This image shows a daguerreotypist holding a cased frame, providing excellent context for the physical object, case, and display.",
+        "thumbnailSha256": "690b3f107674521565b6f418603ba19079eee11178235b81d4df3b26a5eaa0e6"
+      },
+      {
+        "id": "1462514",
+        "imageId": "829674e4-260a-4e7d-86a3-79411288953d",
+        "inspected": true,
+        "relevance": 0.9,
+        "reasoning": "This is the same famous historical daguerreotype as candidate 5005681, providing another clear example of the photographic plate.",
+        "thumbnailSha256": "9446f3240f9949f6e56c0a37988cab857d486be3ec2ad541921671e40a2b9aab"
+      },
+      {
+        "id": "9521450",
+        "imageId": "66a314fa-377b-4491-8e8b-d963d6fbc909",
+        "inspected": true,
+        "relevance": 0.7,
+        "reasoning": "This is a clear daguerreotype portrait, representative of the medium, though retouched.",
+        "thumbnailSha256": "2047405cb0333a51b3ed73039f290ad6e99c25ea6b8a8fc1b2c1cad76f00e5aa"
+      }
+    ]
+  }
+}

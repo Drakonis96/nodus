@@ -20,6 +20,7 @@ import type { StellarWorkspaceSnapshot } from "../stellarGraph/snapshot";
 import {
   dedicatedVaultNavIds,
   groupedNav,
+  navItemLabel,
   NAV_ITEMS,
   type NavItem,
   type View,
@@ -936,7 +937,7 @@ function Sidebar({
   ]);
   const button = (item: NavItem) => {
     const active = activeView === item.id;
-    const label = t(item.label);
+    const label = t(navItemLabel(item, type));
     return (
       <button
         key={item.id}
@@ -1032,7 +1033,6 @@ function Sidebar({
         sidebarOrder={sidebarOrder}
         sidebarHidden={[...sidebarHidden, ...SERVER_TOOL_VIEWS]}
         onNavigate={(view) => onNavigate(view)}
-        onOpenRoadmap={() => onNavigate("settings")}
       />
     ) : null;
   if (specialized) {

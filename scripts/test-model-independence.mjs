@@ -25,7 +25,6 @@ for (const file of ['src/views/Library.tsx', 'src/views/CollectionsModal.tsx', '
 }
 
 const featureBindings = new Map([
-  ['src/views/ResearchAssistantModal.tsx', 'chatModel'],
   ['src/views/DeepResearchView.tsx', 'deepResearchModel'],
   ['src/views/ImmersionView.tsx', 'immersionModel'],
   ['src/views/WritingWorkshopView.tsx', 'writingModel'],
@@ -39,10 +38,13 @@ for (const [file, key] of featureBindings) {
   assert.ok(text.includes(`useFeatureModel(settings, '${key}')`), `${file} must persist ${key}`);
 }
 
+const researchChat = await source('src/views/ResearchAssistantModal.tsx');
+assert.ok(researchChat.includes("useFeatureModel(settings, adapter?.modelFeature ?? 'chatModel', adapter?.modelFeature === 'studyModel' ? 'chatModel' : undefined)"), 'shared research chat uses the adapter-specific model setting and preserves the study-to-chat fallback');
+assert.match(await source('src/views/StudyChatView.tsx'), /modelFeature: 'studyModel'/);
 const hook = await source('src/hooks/useFeatureModel.ts');
 assert.ok(hook.includes("modelSettingsMode: 'advanced'"), 'choosing a feature model must enter advanced mode');
 assert.ok(hook.includes('[key]: next'), 'feature choices must persist in vault settings');
-assert.ok(hook.includes('settings[key] ?? settings.synthesisModel'), 'unselected features must inherit the general model');
+assert.ok(hook.includes('settings[key] ?? (fallbackKey ? settings[fallbackKey] : null) ?? settings.synthesisModel'), 'unselected features must inherit the general model');
 
 const studyModelKeys = ['improveModel', 'questionGenModel', 'gradingModel', 'flashcardModel', 'transcriptionModel'];
 const settingsTypes = await source('shared/types.ts');

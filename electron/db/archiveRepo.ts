@@ -698,7 +698,7 @@ export function archiveEmbeddingCount(): { indexed: number; total: number } {
  */
 export async function findArchiveItemsSimilar(
   queryVec: number[],
-  opts: { limit?: number; minSimilarity?: number; excludePersonId?: string; excludeItemIds?: string[] } = {}
+  opts: { limit?: number; minSimilarity?: number; excludePersonId?: string; excludeItemIds?: string[]; includeItemIds?: string[] } = {}
 ): Promise<(ArchiveItem & { similarity: number })[]> {
   const limit = opts.limit ?? 8;
   const minSim = opts.minSimilarity ?? 0.35;
@@ -711,6 +711,11 @@ export async function findArchiveItemsSimilar(
     'embedding_dim = ?',
   ];
   const params: unknown[] = [config.provider, config.model, queryVec.length];
+  if (opts.includeItemIds) {
+    if (!opts.includeItemIds.length) return [];
+    where.push('item_id IN (SELECT value FROM json_each(?))');
+    params.push(JSON.stringify(opts.includeItemIds));
+  }
   if (opts.excludePersonId) {
     where.push('item_id NOT IN (SELECT item_id FROM archive_item_persons WHERE person_id = ?)');
     params.push(opts.excludePersonId);

@@ -1,7 +1,7 @@
 // PDF Presenter — the library workspace (F0). Imports PDFs and converts externally
 // authored presentations to the same internal PDF representation in a global Toolkit
-// shelf and lets you organise them into folders, search, sort, rename, move and
-// delete, with a lazy thumbnail grid for the selected deck. Presenting, notes and
+// shelf and lets you organise them with tags, search, sort, rename, tag, download
+// and delete, with a lazy thumbnail grid for the selected deck. Presenting, notes and
 // the mobile remote arrive in later phases; the model + reducers are pure
 // (@shared/presenterTypes) and the thumbnail engine is memory-bounded
 // (src/lib/presenter/thumbSession) so even a several-hundred-page deck stays light.
@@ -12,19 +12,20 @@ import { ToolkitAppHero } from '../components/ToolkitAppHero';
 import { confirm } from '../components/feedback';
 import { t, tx } from '../i18n';
 import {
-  addFolder,
-  folderCount,
-  moveToFolder,
+  addTag,
+  assignTag,
   noteCount,
   queryPresentations,
-  removeFolder,
   removePresentation,
+  removeTag,
   renamePresentation,
+  tagCount,
   upsertPresentation,
   videoCount,
   type Presentation,
   type PresenterLibrary,
   type PresenterSortMode,
+  type PresenterTag,
 } from '@shared/presenterTypes';
 import { loadPresenterPdf } from '../lib/presenter/pdf';
 import { createThumbSession, type ThumbSession } from '../lib/presenter/thumbSession';
@@ -38,19 +39,21 @@ const SORT_OPTIONS: { value: PresenterSortMode; label: string }[] = [
   { value: 'name-desc', label: 'Nombre (Z→A)' },
 ];
 
-function makeFolderId(): string {
+function makeTagId(): string {
   return `f_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
 export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
-  const [library, setLibrary] = useState<PresenterLibrary>({ presentations: [], folders: [] });
+  const [library, setLibrary] = useState<PresenterLibrary>({ presentations: [], tags: [] });
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [currentFolder, setCurrentFolder] = useState('');
+  const [currentTag, setCurrentTag] = useState('');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<PresenterSortMode>('recent-added');
-  const [newFolderOpen, setNewFolderOpen] = useState(false);
-  const [newFolderName, setNewFolderName] = useState('');
+  const [newTagOpen, setNewTagOpen] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
   const [pendingDelete, setPendingDelete] = useState<Presentation | null>(null);
+  const [pendingDeleteTag, setPendingDeleteTag] = useState<PresenterTag | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -69,8 +72,8 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
   );
 
   const visible = useMemo(
-    () => queryPresentations(library, { folder: currentFolder, search, sort }),
-    [library, currentFolder, search, sort],
+    () => queryPresentations(library, { tag: currentTag, search, sort }),
+    [library, currentTag, search, sort],
   );
 
   // ── Persistence ────────────────────────────────────────────────────────────
@@ -205,13 +208,15 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
       }
       const created = result.presentation;
       const fresh = await window.nodus.getPresenterLibrary();
-      const next = currentFolder ? moveToFolder(fresh, created.id, currentFolder) : fresh;
+      // Importing while a tag filter is on tags the new deck, so it does not
+      // vanish from the list the moment it lands.
+      const next = currentTag ? assignTag(fresh, created.id, currentTag) : fresh;
       commit(next);
       setSelectedId(created.id);
     } finally {
       setImporting(false);
     }
-  }, [currentFolder, commit]);
+  }, [currentTag, commit]);
 
   const confirmDelete = useCallback(() => {
     if (!pendingDelete) return;
@@ -222,21 +227,40 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
     setPendingDelete(null);
   }, [pendingDelete, selectedId]);
 
-  const createFolder = useCallback(() => {
-    const name = newFolderName.trim();
+  const createTag = useCallback(() => {
+    const name = newTagName.trim();
     if (!name) return;
-    commit(addFolder(library, { id: makeFolderId(), name, createdAt: new Date().toISOString() }));
-    setNewFolderName('');
-    setNewFolderOpen(false);
-  }, [newFolderName, library, commit]);
+    commit(addTag(library, { id: makeTagId(), name, createdAt: new Date().toISOString() }));
+    setNewTagName('');
+    setNewTagOpen(false);
+  }, [newTagName, library, commit]);
 
-  const deleteFolder = useCallback(
-    (folderId: string) => {
-      commit(removeFolder(library, folderId));
-      if (currentFolder === folderId) setCurrentFolder('');
-    },
-    [library, currentFolder, commit],
-  );
+  // Deleting a tag only unties it from its presentations, but it is still
+  // irreversible (the name is gone), so it goes through a confirmation.
+  const confirmDeleteTag = useCallback(() => {
+    if (!pendingDeleteTag) return;
+    const tagId = pendingDeleteTag.id;
+    commit(removeTag(library, tagId));
+    if (currentTag === tagId) setCurrentTag('');
+    setPendingDeleteTag(null);
+  }, [pendingDeleteTag, library, currentTag, commit]);
+
+  const downloadPdf = useCallback(async () => {
+    if (!selected) return;
+    setDownloading(true);
+    try {
+      // Cancelling the native dialog is not a failure, so only a real problem
+      // raises a notice.
+      const result = await window.nodus.downloadPresenterPdf(selected.id, selected.name);
+      if (result === 'missing') {
+        setNotice({ title: t('Error'), body: t('No se pudo descargar la presentación.') });
+      }
+    } catch {
+      setNotice({ title: t('Error'), body: t('No se pudo descargar la presentación.') });
+    } finally {
+      setDownloading(false);
+    }
+  }, [selected]);
 
   const commitRename = useCallback(
     (id: string, name: string) => {
@@ -352,47 +376,59 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
         </select>
       </div>
 
-      {/* Folder chips */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <FolderChip active={currentFolder === ''} label={t('Todas')} count={library.presentations.length} onClick={() => setCurrentFolder('')} />
-        {library.folders.map((f) => (
-          <FolderChip
-            key={f.id}
-            active={currentFolder === f.id}
-            label={f.name}
-            count={folderCount(library, f.id)}
-            onClick={() => setCurrentFolder(currentFolder === f.id ? '' : f.id)}
-            onDelete={() => deleteFolder(f.id)}
+      {/* Tag chips — clicking one filters the list down to that tag. */}
+      <div className="flex flex-wrap items-center gap-1.5" data-testid="presenter-tags">
+        <TagChip
+          active={currentTag === ''}
+          label={t('Todas')}
+          count={library.presentations.length}
+          onClick={() => setCurrentTag('')}
+        />
+        {library.tags.map((tg) => (
+          <TagChip
+            key={tg.id}
+            active={currentTag === tg.id}
+            label={tg.name}
+            count={tagCount(library, tg.id)}
+            onClick={() => setCurrentTag(currentTag === tg.id ? '' : tg.id)}
+            onDelete={() => setPendingDeleteTag(tg)}
           />
         ))}
-        {newFolderOpen ? (
+        {newTagOpen ? (
           <span className="flex items-center gap-1">
             <input
               autoFocus
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') createFolder();
+                if (e.key === 'Enter') createTag();
                 if (e.key === 'Escape') {
-                  setNewFolderOpen(false);
-                  setNewFolderName('');
+                  setNewTagOpen(false);
+                  setNewTagName('');
                 }
               }}
-              placeholder={t('Nombre de la carpeta')}
+              placeholder={t('Nombre de la etiqueta')}
+              data-testid="presenter-new-tag-name"
               className="h-7 w-40 rounded-md border border-neutral-300 bg-white px-2 text-xs outline-none focus:border-amber-400 dark:border-neutral-700 dark:bg-neutral-900"
             />
-            <button type="button" onClick={createFolder} className="btn btn-accent h-7 min-h-7 px-2 text-xs">
+            <button
+              type="button"
+              onClick={createTag}
+              data-testid="presenter-create-tag"
+              className="btn btn-accent h-7 min-h-7 px-2 text-xs"
+            >
               {t('Crear')}
             </button>
           </span>
         ) : (
           <button
             type="button"
-            onClick={() => setNewFolderOpen(true)}
+            onClick={() => setNewTagOpen(true)}
+            data-testid="presenter-new-tag"
             className="flex h-7 items-center gap-1 rounded-full border border-dashed border-neutral-300 px-2.5 text-xs text-neutral-500 hover:border-amber-400 hover:text-amber-600 dark:border-neutral-700"
           >
             <Icon name="plus" size={13} className="shrink-0" />
-            {t('Nueva carpeta')}
+            {t('Nueva etiqueta')}
           </button>
         )}
       </div>
@@ -446,16 +482,17 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
                   </p>
                 </div>
                 <label className="flex items-center gap-1.5 text-xs text-neutral-500">
-                  {t('Carpeta')}
+                  {t('Etiqueta')}
                   <select
-                    value={selected.folder || ''}
-                    onChange={(e) => commit(moveToFolder(library, selected.id, e.target.value))}
+                    value={selected.tag || ''}
+                    onChange={(e) => commit(assignTag(library, selected.id, e.target.value))}
+                    data-testid="presenter-tag-select"
                     className="h-8 rounded-lg border border-neutral-200 bg-white px-2 text-xs outline-none focus:border-amber-400 dark:border-neutral-800 dark:bg-neutral-900/40"
                   >
-                    <option value="">{t('Sin carpeta')}</option>
-                    {library.folders.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
+                    <option value="">{t('Sin etiqueta')}</option>
+                    {library.tags.map((tg) => (
+                      <option key={tg.id} value={tg.id}>
+                        {tg.name}
                       </option>
                     ))}
                   </select>
@@ -481,6 +518,16 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
                 >
                   <Icon name="presentation" size={16} className="shrink-0" />
                   {t('Modo presentador')}
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadPdf}
+                  disabled={downloading}
+                  data-testid="presenter-download-pdf"
+                  className="btn btn-ghost h-9 min-h-9 gap-1.5 px-3 text-sm disabled:opacity-50"
+                >
+                  <Icon name="download" size={16} className="shrink-0" />
+                  {t('Descargar PDF')}
                 </button>
                 <span className="mx-1 h-5 w-px bg-neutral-200 dark:bg-neutral-800" />
                 <button
@@ -543,6 +590,43 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
           )}
         </div>
       </div>
+
+      {/* Tag delete confirmation */}
+      {pendingDeleteTag && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPendingDeleteTag(null);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            data-testid="presenter-delete-tag-modal"
+            className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
+          >
+            <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{t('Eliminar etiqueta')}</h3>
+            <p className="mt-1.5 text-sm text-neutral-500">
+              {tx('¿Seguro que quieres eliminar la etiqueta «{name}»? Las presentaciones que la tienen seguirán en la biblioteca, pero sin etiqueta.', {
+                name: pendingDeleteTag.name,
+              })}
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setPendingDeleteTag(null)} className="btn btn-ghost h-9 min-h-9 px-3 text-sm">
+                {t('Cancelar')}
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteTag}
+                data-testid="presenter-delete-tag-confirm"
+                className="btn h-9 min-h-9 bg-red-600 px-3 text-sm text-white hover:bg-red-700"
+              >
+                {t('Eliminar')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation */}
       {pendingDelete && (
@@ -613,7 +697,9 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
   );
 }
 
-function FolderChip({
+/** One filter chip. Clicking the body filters the list by that tag (clicking the
+ *  active one clears the filter); the × asks for confirmation before deleting. */
+function TagChip({
   active,
   label,
   count,
@@ -634,8 +720,14 @@ function FolderChip({
           : 'border-neutral-200 text-neutral-600 hover:border-neutral-300 dark:border-neutral-800 dark:text-neutral-300'
       }`}
     >
-      <button type="button" onClick={onClick} className="flex items-center gap-1.5">
-        {onDelete && <Icon name="folder" size={13} className="shrink-0" />}
+      <button
+        type="button"
+        onClick={onClick}
+        title={t('Filtrar por etiqueta')}
+        data-testid="presenter-tag-chip"
+        className="flex items-center gap-1.5"
+      >
+        {onDelete && <Icon name="tag" size={13} className="shrink-0" />}
         <span className="max-w-[10rem] truncate">{label}</span>
         <span className="text-[10px] opacity-60">{count}</span>
       </button>
@@ -643,7 +735,8 @@ function FolderChip({
         <button
           type="button"
           onClick={onDelete}
-          title={t('Eliminar carpeta')}
+          title={t('Eliminar etiqueta')}
+          data-testid="presenter-delete-tag"
           className="opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100"
         >
           <Icon name="x" size={12} className="shrink-0" />
@@ -686,6 +779,7 @@ function PresentationRow({
   return (
     <div
       onClick={renaming ? undefined : onSelect}
+      data-testid="presenter-row"
       className={`group flex cursor-pointer items-center gap-2 px-3 py-2.5 transition-colors ${
         active ? 'bg-amber-50 dark:bg-amber-500/10' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
       }`}

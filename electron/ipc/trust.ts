@@ -1,3 +1,4 @@
+import { isUntrustedSession } from './untrustedSessions';
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Jorge Pérez Burgueño and Nodus contributors
 
@@ -28,7 +29,7 @@ export function isBrowserIpcSender(event: Pick<IncomingIpcEvent, 'sender'>): boo
  * predate Browser and therefore have no domain-local sender check of their own.
  */
 export function assertNotBrowserIpcSender(event: Pick<IncomingIpcEvent, 'sender'>): void {
-  if (isBrowserIpcSender(event)) {
+  if (isBrowserIpcSender(event) || isUntrustedSession(event.sender.session)) {
     throw new Error('Nodus Browser pages cannot invoke privileged application IPC.');
   }
 }

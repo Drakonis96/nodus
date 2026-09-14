@@ -19,7 +19,7 @@ try {
     logLevel: 'silent',
   });
   const { buildProjectGuide } = await import(pathToFileURL(outfile).href);
-  const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+  const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
 
   const initial = detail();
   let guide = buildProjectGuide(initial);

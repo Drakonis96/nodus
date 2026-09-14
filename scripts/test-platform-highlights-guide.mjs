@@ -38,7 +38,7 @@ test('new installs learn MCP, Nodus Server, Zotero and the current six-tool cata
   assert.match(guide, /<img src=\{zoteroLogo\} alt="Zotero" \/>/);
 });
 
-test('existing users get the cinematic summary directly after release notes and only mark it seen on completion', async () => {
+test('existing users get the cinematic summary after the PDF Presenter announcement and only mark it seen on completion', async () => {
   const [guide, app, styles] = await Promise.all([
     read('src/components/PlatformHighlightsGuide.tsx'),
     read('src/App.tsx'),
@@ -54,7 +54,7 @@ test('existing users get the cinematic summary directly after release notes and 
   assert.equal((guide.match(/markSeen\(\);/g) ?? []).length, 1, 'seen state is written only by the explicit finish action');
 
   assert.match(app, /<PlatformHighlightsUpdateTour/);
-  assert.match(app, /whatsNewSettled && mobileTeaserSettled && !platformHighlightsSettled/);
+  assert.match(app, /whatsNewSettled && pdfPresenterTutorialSettled && mobileTeaserSettled && !platformHighlightsSettled/);
   assert.match(app, /platformHighlightsSettled && !toolkitBetaTourSettled/);
   assert.ok(app.indexOf('<WhatsNewModal') < app.indexOf('<PlatformHighlightsUpdateTour'));
   assert.ok(app.indexOf('<PlatformHighlightsUpdateTour') < app.indexOf('<ToolkitBetaUpdateTour'));

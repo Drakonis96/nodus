@@ -1,3 +1,5 @@
+import type { SkillMarketplace } from './skillMarketplace';
+import type { InboxPluginSummary, InstalledPluginSummary } from '../skill-capabilities/contracts';
 import type { ChatSkill } from './chatSkills';
 // Shared domain types used by both the Electron main process and the React renderer.
 // Keep this file free of any runtime imports from either side.
@@ -333,6 +335,7 @@ export type {
   StudyCognitiveLevel,
   StudyQuestion,
   StudyQuestionAnswer,
+  StudyQuestionBulkAction,
   StudyQuestionCollection,
   StudyQuestionDifficulty,
   StudyQuestionExport,
@@ -341,6 +344,7 @@ export type {
   StudyQuestionGenerationResult,
   StudyQuestionInput,
   StudyQuestionOption,
+  StudyQuestionSort,
   StudyQuestionSource,
   StudyQuestionStatus,
   StudyQuestionType,
@@ -383,7 +387,8 @@ export type {
   StudyRubricCriterion,
   StudyRubricInput,
 } from './studyGrading';
-export type { StudyFlashcard, StudyFlashcardInput, StudyFlashcardType, StudyReviewInput, StudyReviewRecord } from './studyFlashcards';
+export type { StudyFlashcard, StudyFlashcardBulkAction, StudyFlashcardExport, StudyFlashcardFilters, StudyFlashcardInput, StudyFlashcardSort, StudyFlashcardType, StudyReviewInput, StudyReviewRecord } from './studyFlashcards';
+export type { StudyImportLocation, StudyInterchangeExportOptions, StudyInterchangeFormat, StudyInterchangeImportOptions, StudyInterchangeKind, StudyInterchangeParseResult, StudyInterchangeSummary } from './studyInterchange';
 export type { StudySrsRating, StudySrsReviewResult, StudySrsState } from './studySrs';
 export type { StudyPerformanceEvidence, StudyPerformanceSummary, StudyProgressDashboard, StudyProgressScope } from './studyStats';
 export type { StudyCalendarEvent, StudyCalendarEventInput, StudyCalendarEventType, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from './studyPlanner';
@@ -598,6 +603,11 @@ export type {
 export type { ColumnRole, ColumnRoles, KindMeta, RoleColumn } from './analysisCatalog';
 
 export interface DatabaseChatRequest {
+  attachmentIds?: string[];
+  /** Optional vault-local preference; null/absence keeps the original application prompt. */
+  systemPromptId?: string | null;
+  model?: ModelRef | null;
+  thinkingEffort?: import('./researchReasoning').ResearchEffort;
   conversationId?: string;
   question: string;
   databaseIds: string[];
@@ -655,7 +665,11 @@ export type TextBlockReason =
   | 'file_missing'
   | 'scanned_no_ocr'
   | 'unreadable'
-  | 'unsupported';
+  | 'unsupported'
+  // Zotero's local API could not be reached, so whether an attachment exists is
+  // unknown. Never conflate this with `no_attachment`: the work may well have full
+  // text and must be retried once Zotero is running.
+  | 'zotero_unavailable';
 
 export interface WorkTextSource {
   nodus_id: string;
@@ -853,6 +867,8 @@ export interface LibraryReaderChatRequest {
 export interface LibraryReaderChatResponse {
   answer: string;
   model: ModelRef;
+  /** The user stopped the stream: `answer` is the partial text that had already arrived. */
+  aborted?: boolean;
 }
 
 export interface LibraryReaderChatStreamHandlers {
@@ -1514,7 +1530,10 @@ export type AppLanguage = 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 't
  *  it, and runtime validators (the MCP tool schemas) enumerate it instead of
  *  re-spelling the list — which is how `tr` once ended up accepted everywhere except
  *  over MCP. Adding a language here forces the exhaustive `Record`s to be filled in. */
-export const PROMPT_LANGUAGES = ['es', 'en', 'fr', 'tr', 'de', 'pt', 'pt-BR', 'it'] as const;
+export const PROMPT_LANGUAGES = [
+  'es', 'en', 'fr', 'tr', 'de', 'pt', 'pt-BR', 'it',
+  'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko',
+] as const;
 export type PromptLanguage = (typeof PROMPT_LANGUAGES)[number];
 
 /** A concrete model selection: which provider + which model id. */
@@ -1539,6 +1558,8 @@ export interface ModelRef {
 /** One model as returned by a provider's model-list endpoint. */
 export interface ModelInfo {
   id: string;
+  /** Native LM Studio reasoning choices, discovered from /api/v1/models. */
+  researchReasoningLevels?: import('./researchReasoning').NativeResearchEffort[];
   name?: string;
   /** For OpenRouter: the upstream provider segment of the id (e.g. "anthropic"). */
   group?: string;
@@ -3628,6 +3649,10 @@ export interface ManuscriptProgress {
 /** A question for the world chat. `focusKeys` is the author's explicit choice; with none,
  *  the repo resolves the focus from the names the question itself uses. */
 export interface WorldChatRequest {
+  attachmentIds?: string[];
+  /** Optional vault-local preference; null/absence keeps the original application prompt. */
+  systemPromptId?: string | null;
+  thinkingEffort?: import('./researchReasoning').ResearchEffort;
   conversationId?: string;
   question: string;
   focusKeys?: string[];
@@ -3641,6 +3666,8 @@ export interface WorldChatResult {
   focus: { kind: string; id: string; title: string }[];
   /** True when the question named nothing this world contains — not an error. */
   noMaterial: boolean;
+  /** The user stopped the stream: `text` is the partial answer that had already arrived. */
+  aborted?: boolean;
 }
 
 export interface WorldChatSelection {
@@ -5668,6 +5695,7 @@ export interface ResearchGraphPartsSelection {
 }
 
 export interface ResearchContextSelection {
+  sourceFilter?: import('./researchContextFilters').ResearchSourceFilter;
   ideas: boolean;
   themes: boolean;
   contradictions: boolean;
@@ -5682,12 +5710,18 @@ export interface ResearchContextSelection {
 }
 
 export interface ResearchChatMessage {
+  attachments?: import('./researchAttachments').ResearchAttachment[];
   role: 'user' | 'assistant';
   content: string;
 }
 
 export interface ResearchChatRequest {
+  attachmentIds?: string[];
+  /** Optional vault-local preference; null/absence keeps the original application prompt. */
+  systemPromptId?: string | null;
   conversationId?: string;
+  /** Isolated from Nodi and global chat defaults. Absence means standard. */
+  thinkingEffort?: import('./researchReasoning').ResearchEffort;
   messages: ResearchChatMessage[];
   selection: ResearchContextSelection;
   model?: ModelRef | null;
@@ -5706,6 +5740,8 @@ export interface ResearchContextStats {
 export interface ResearchChatResponse {
   answer: string;
   stats: ResearchContextStats;
+  /** The user stopped the stream: `answer` is the partial text that had already arrived. */
+  aborted?: boolean;
 }
 
 export interface ResearchChatStreamHandlers {
@@ -5878,6 +5914,7 @@ export interface ArgumentRouteSuggestion {
 
 /** One persisted chat message. `stats`/`selectionKey`/`error` mirror the in-memory UI message. */
 export interface ChatMessageRecord {
+  attachments?: import('./researchAttachments').ResearchAttachment[];
   id: string;
   role: 'user' | 'assistant';
   content: string;
@@ -5916,12 +5953,34 @@ export interface ChatConversation extends ChatConversationSummary {
 export type NoteKind = 'markdown' | 'assistant' | 'writing' | 'debate' | 'idea' | 'hypothesis';
 
 /** Optional provenance metadata kept alongside a captured note (model, source ids…). */
+export interface NoteResearchReference {
+  /** Citation token used inside the saved Markdown (for example `S1`). */
+  citationId?: string | null;
+  label: string;
+  subtitle?: string | null;
+  quote?: string | null;
+  /** A safe external URL or a durable `nodus://` deep link. */
+  href?: string | null;
+}
+
+export interface NoteResearchChatSource {
+  surface: import('./researchAttachments').ResearchAttachmentSurface;
+  conversationId: string;
+  conversationTitle: string;
+  messageId: string;
+  /** Stable fallback for transports that reconstruct message ids when loading. */
+  messageIndex?: number | null;
+  references: NoteResearchReference[];
+}
+
 export interface NoteSource {
   origin: NoteKind;
   model?: ModelRef | null;
   /** Free-form references back to the originating object (idea id, draft title…). */
   ref?: string | null;
   note?: string | null;
+  /** Structured origin for answers captured from any Research chat surface. */
+  researchChat?: NoteResearchChatSource | null;
 }
 
 export interface NoteFolder {
@@ -6188,6 +6247,8 @@ export interface GlobalSearchResult {
   gapKind?: GapKind | null;
   /** Themes only: the theme label used as a graph filter. */
   themeLabel?: string | null;
+  /** Unified relevance used to order literal and semantic matches together. */
+  relevance?: number;
   /** Semantic results only: cosine similarity in [0,1]. */
   similarity?: number | null;
 }
@@ -6209,7 +6270,7 @@ export interface GlobalSearchResponse {
 }
 
 /** Which retrieval strategy the search box uses. */
-export type SearchMode = 'text' | 'semantic';
+export type SearchMode = 'text' | 'semantic' | 'hybrid';
 
 export interface SemanticSearchOptions {
   /** Which result kinds to include. Empty/undefined ⇒ ideas, passages and works. */
@@ -6270,7 +6331,7 @@ export type CorpusHealthBucketId = 'withoutText' | 'lightOnly' | 'deepPriority' 
  */
 export type WorkReadiness =
   | 'unstarted'
-  /** Accepted by the queue but not executing yet. Never exposed as a SQL filter. */
+  /** Accepted by the queue but not executing yet. Filterable from persisted markers. */
   | 'pending'
   /** Being processed right now. Live-queue only: never a SQL filter. */
   | 'running'
@@ -6892,6 +6953,8 @@ export interface SupportAuditEntry {
 }
 
 export interface WritingWorkshopDraft {
+  documentSkills?: import('./documentSkills').DocumentSkillPolicy;
+  documentVisualHints?: string[];
   generatedAt: string;
   brief: WritingWorkshopBrief;
   selection: WritingWorkshopSelection;
@@ -6909,6 +6972,12 @@ export interface WritingWorkshopDraft {
   deepResearchVersion?: import('./deepResearchVersions').DeepResearchVersion;
   /** Persisted presentation structure. Missing reports use ordinary headed sections. */
   deepResearchStructure?: 'sectioned' | 'single';
+  /**
+   * Persisted guideline words per section, so reusing a prompt restores the length
+   * the report was written to. Missing reports were written before the control and
+   * are read back as `'auto'`.
+   */
+  deepResearchSectionLength?: import('./deepResearchSectionLength').DeepResearchSectionLength;
   /** Exact generation-time model. Null means no Nodus writing model was used or recorded. */
   generationModel?: ModelRef | null;
   /**
@@ -7070,6 +7139,13 @@ export interface WritingWorkshopStreamHandlers {
 export type DeepResearchSectionLimit = 'auto' | 'single' | number;
 
 /**
+ * Re-exported so every Deep Research surface can reach the structure control and the
+ * length control from the same place. The implementation (normalization, validation,
+ * the option list, the continuation arithmetic) lives in ./deepResearchSectionLength.
+ */
+export type { DeepResearchSectionLength } from './deepResearchSectionLength';
+
+/**
  * One section of a teacher-authored outline (teaching vaults, Unit design).
  *
  * A blank `title` still reserves the slot: the teacher fixes HOW MANY parts the unit
@@ -7084,6 +7160,7 @@ export interface DeepResearchOutlineSection {
 }
 
 export interface DeepResearchRequest {
+  documentSkills?: import('./documentSkills').DocumentSkillPolicy;
   /** The research idea/question the whole report must develop. */
   objective: string;
   /**
@@ -7100,9 +7177,17 @@ export interface DeepResearchRequest {
   /**
    * Visible report structure. `'auto'` (default) sizes headed sections from the
    * corpus; `'single'` publishes the same evidence-led research as one continuous
-   * narrative; a number expresses a preferred section ceiling.
+   * narrative; a number is a hard MAXIMUM number of published sections — an
+   * over-sized plan is compacted into it without discarding any evidence.
    */
   sectionLimit?: DeepResearchSectionLimit;
+  /**
+   * "Extensión orientativa de cada sección": how many WORDS each section should aim
+   * for. `'auto'` (the default, and what every request without the field means)
+   * leaves it to the model exactly as before. It is editorial guidance, never a
+   * quota — no writer may pad, repeat, invent or drop evidence to reach it.
+   */
+  sectionLength?: import('./deepResearchSectionLength').DeepResearchSectionLength;
   model?: ModelRef | null;
   decorativeImage?: DecorativeImageOption;
   /** Study vaults: use the indexed learning corpus and the pedagogical report prompts. */
@@ -7164,6 +7249,8 @@ export interface DeepResearchJobRecord {
   deepResearchVersion?: import('./deepResearchVersions').DeepResearchVersion;
   /** Requested visible structure, available while the report is still queued. */
   structure?: 'sectioned' | 'single';
+  /** Requested guideline words per section. Missing on jobs queued before the control existed. */
+  sectionLength?: import('./deepResearchSectionLength').DeepResearchSectionLength;
   /** Exact model selection captured when the job was enqueued, when one was explicit. */
   model?: ModelRef | null;
   status: DeepResearchJobStatus;
@@ -7185,6 +7272,18 @@ export interface DeepResearchMeta {
   deepResearchVersion: import('./deepResearchVersions').DeepResearchVersion;
   /** Visible report structure; internal evidence planning may still use movements. */
   structure?: 'sectioned' | 'single';
+  /**
+   * The guideline words-per-section the report was written to, so a finished report
+   * can be inspected and the setting reused. Missing means `'auto'`.
+   */
+  sectionLength?: import('./deepResearchSectionLength').DeepResearchSectionLength;
+  /**
+   * How the guideline length actually landed. `short` counts sections that ended
+   * below the target because the supported evidence ran out — the expected, correct
+   * outcome of a target the corpus cannot honestly fill, and the number that keeps
+   * a "why is my 20.000-word section 4.000 words?" question answerable.
+   */
+  sectionLengthOutcome?: { targetWords: number; sections: number; reached: number; short: number } | null;
   sections: number;
   words: number;
   pages: number;
@@ -7702,6 +7801,7 @@ export interface ImmersionScope {
 }
 
 export interface ImmersionRequest {
+  documentSkills?: import('./documentSkills').DocumentSkillPolicy;
   topic: string;
   language?: 'es' | 'en';
   /** Total time budget for the whole immersion, in minutes. */
@@ -7832,6 +7932,8 @@ export interface ImmersionPlanStats {
 }
 
 export interface ImmersionPlan {
+  documentSkills?: import('./documentSkills').DocumentSkillPolicy;
+  documentVisualHints?: string[];
   topic: string;
   title: string;
   language: 'es' | 'en';
@@ -8678,6 +8780,15 @@ export interface BrowserApi {
   onBrowserPermissionRequest(
     cb: (request: import('./browser').PendingBrowserPermission | null) => void,
   ): () => void;
+  /** An HTTP authentication challenge waiting on credentials. */
+  getPendingBrowserAuth(): Promise<import('./browser').PendingBrowserAuth | null>;
+  /** Answer the challenge; credentials are never stored by Nodus. */
+  resolveBrowserAuth(id: string, username: string, password: string): Promise<void>;
+  /** Dismiss one request by id, or every pending request when no id is given. */
+  cancelBrowserAuth(id?: string): Promise<void>;
+  onBrowserAuthRequest(
+    cb: (request: import('./browser').PendingBrowserAuth | null) => void,
+  ): () => void;
   getBrowserMedia(): Promise<import('./browser').BrowserMediaState[]>;
   browserMediaCommand(tabId: string, command: import('./browser').BrowserMediaCommand): Promise<void>;
   setBrowserTabMuted(tabId: string, muted: boolean): Promise<void>;
@@ -8710,6 +8821,7 @@ export interface BrowserApi {
   clearAllBrowserData(): Promise<import('./browser').BrowserStorageReport>;
   /** Global Nodus data. Never exposed to the untrusted Browser-page preload. */
   getBrowserBookmarks(): Promise<import('./browserBookmarks').BrowserBookmarkStore>;
+  resolveBrowserBookmarkFavicons(ids: string[]): Promise<void>;
   getCurrentBrowserBookmarkCandidate(): Promise<import('./browserBookmarks').BrowserBookmarkCandidate | null>;
   createBrowserBookmark(draft: import('./browserBookmarks').BrowserBookmarkDraft): Promise<{
     store: import('./browserBookmarks').BrowserBookmarkStore;
@@ -8764,16 +8876,61 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   listAnnouncements(): Promise<AnnouncementEntry[]>;
   markAnnouncementRead(id: string): Promise<AnnouncementEntry[]>;
   onAnnouncementsChanged(cb: (list: AnnouncementEntry[]) => void): () => void;
+  getSkillMarketplace(): Promise<SkillMarketplace>;
+  addSkillSource(url: string): Promise<SkillMarketplace>;
+  removeSkillSource(id: string): Promise<SkillMarketplace>;
+  updateSkillSource(id: string): Promise<SkillMarketplace>;
+  installMarketplaceSkill(sourceId: string, packagePath: string, commit: string): Promise<ChatSkill[]>;
+  importSkillPackage(): Promise<ChatSkill[]>;
+  exportSkillPackage(id: string): Promise<string | null>;
   listChatSkills(): Promise<ChatSkill[]>;
+  listDocumentSkills(): Promise<import('./documentSkills').DocumentSkillOption[]>;
+  getDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget): Promise<import('./documentSkills').DocumentVisualManifest | null>;
+  enrichDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget, policy: import('./documentSkills').DocumentSkillPolicy, retry?: boolean): Promise<import('./documentSkills').DocumentVisualManifest>;
+  cancelDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget): Promise<void>;
+  undoDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget): Promise<import('./documentSkills').DocumentVisualManifest | null>;
+  removeDocumentFigure(target: import('./documentSkills').DocumentVisualTarget, figureId: string): Promise<import('./documentSkills').DocumentVisualManifest | null>;
+  onDocumentVisualsChanged(listener: (target: import('./documentSkills').DocumentVisualTarget) => void): () => void;
   saveChatSkill(skill: ChatSkill): Promise<ChatSkill[]>;
   deleteChatSkill(id: string): Promise<ChatSkill[]>;
   restoreChatSkills(): Promise<ChatSkill[]>;
   onChatSkillsChanged(cb: () => void): () => void;
-  compileChemfig(source: string): Promise<string>;
-  compileLewis(source: string): Promise<string>;
-  compileSmiles(source: string): Promise<string>;
   getChatImageMetadata(source: string): Promise<Record<string, string> | null>;
   copyChatImage(source: string): Promise<void>;
+  downloadCapabilityFile(source: string): Promise<void>;
+  readCapabilityModel(source: string): Promise<{ bytes: Uint8Array; mimeType: string; name: string; info: import('../packages/capability-api/src/models').ModelAssetInfo }>;
+  readCapabilityMedia(source: string): Promise<{ bytes: Uint8Array; mimeType: string; name: string; info: import('../packages/capability-api/src/media').MediaAssetInfo }>;
+  fetchCapabilityTile(capabilityId: string, service: string, tilePath: string): Promise<{ bytes: Uint8Array; mimeType: string }>;
+  listCapabilities(): Promise<import('./capabilities').CapabilityListPayload>;
+  onCapabilityRegistryChanged(cb: (payload: import('./capabilities').CapabilityRegistryPayload) => void): () => void;
+  capabilityHealth(capabilityId: string): Promise<import('./capabilities').CapabilityHealthPayload>;
+  getCapabilitySettings(capabilityId: string): Promise<import('./capabilities').CapabilitySettingsPayload>;
+  applyCapabilitySettings(capabilityId: string, submission: import('./capabilities').SettingsSubmissionV1): Promise<import('./capabilities').SettingsStateV1>;
+  runCapabilityAction(capabilityId: string, actionId: string): Promise<import('./capabilities').SettingsStateV1>;
+  renderCapabilityArtifact(source: string, locale?: string): Promise<import('./capabilities').ArtifactRenderResult>;
+  renderLegacyCapabilityResult(fence: string, payload: string, locale?: string): Promise<import('./capabilities').LegacyResultRenderResult>;
+  onCapabilityMigrationChanged(cb: () => void): () => void;
+  checkCapabilityUpdates(pluginId?: string): Promise<Array<{ pluginId: string; state: 'updated' | 'awaiting-approval' | 'incompatible' | 'current' | 'skipped' | 'failed'; from?: string; to?: string; detail?: string }>>;
+  setCapabilityAutoUpdate(pluginId: string, autoUpdate: boolean): Promise<import('./capabilities').InstalledCapabilityPlugin>;
+  capabilityMigrationStatus(): Promise<import('./capabilities').CapabilityMigrationStatus>;
+  retryCapabilityMigration(): Promise<{ installed: string[]; adopted: string[]; preserved: string[]; failed: Array<{ pluginId: string; phase: string; detail: string }> }>;
+  refreshCapabilityCatalog(sourceUrl: string): Promise<import('./capabilities').CapabilityListPayload['catalog']>;
+  installCapabilityPlugin(pluginId: string, approvePermissions?: boolean): Promise<{ state: import('./capabilities').InstalledCapabilityPlugin; activated: boolean; pendingPermissions: import('./capabilities').TrustedPermissionSetV2 | null }>;
+  approveCapabilityPlugin(pluginId: string): Promise<import('./capabilities').InstalledCapabilityPlugin>;
+  discardPendingCapabilityPlugin(pluginId: string): Promise<import('./capabilities').InstalledCapabilityPlugin[]>;
+  rollbackCapabilityPlugin(pluginId: string): Promise<import('./capabilities').InstalledCapabilityPlugin>;
+  removeCapabilityPlugin(pluginId: string, purgeData?: boolean): Promise<import('./capabilities').InstalledCapabilityPlugin[]>;
+  listInstalledPlugins(): Promise<InstalledPluginSummary[]>;
+  listInboxPlugins(): Promise<InboxPluginSummary[]>;
+  approveInboxPlugin(directory: string): Promise<ChatSkill[]>;
+  discardInboxPlugin(directory: string): Promise<InboxPluginSummary[]>;
+  installMarketplacePlugin(sourceId: string, packagePath: string, commit: string, approvePermissions: boolean): Promise<ChatSkill[]>;
+  approvePlugin(id: string): Promise<ChatSkill[]>;
+  setPluginAutoUpdate(id: string, enabled: boolean): Promise<InstalledPluginSummary[]>;
+  rollbackPlugin(id: string): Promise<ChatSkill[]>;
+  removePlugin(id: string): Promise<ChatSkill[]>;
+  configurePluginSecret(pluginId: string, capabilityId: string, secretId: string, value: string): Promise<InstalledPluginSummary[]>;
+  restorePluginSkillAuthorVersion(id: string): Promise<ChatSkill[]>;
   listNodiConversations(): Promise<NodiConversation[]>;
   getNodiConversation(id: string): Promise<NodiConversation | null>;
   saveNodiConversation(input: NodiConversationInput): Promise<NodiConversation>;
@@ -8914,9 +9071,9 @@ export interface WorkFilter {
   healthBucket?: CorpusHealthBucketId;
   /**
    * Restrict to one readiness value — what the library's status presets use.
-   * Transient queue states are not accepted: they are renderer-only.
+   * `running` is renderer-only (live queue); persisted `pending` is filterable.
    */
-  readiness?: Exclude<WorkReadiness, 'pending' | 'running'>;
+  readiness?: Exclude<WorkReadiness, 'running'>;
   theme?: string;
   /** Zotero tags to match. Multiple tags can use any-match (default) or all-match. */
   zoteroTags?: string[];

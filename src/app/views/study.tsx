@@ -64,9 +64,12 @@ export const studyViews = {
   ),
   studyChat: (ctx) => (
     <StudyChatView
+      key={ctx.activeVault?.id}
       settings={ctx.settings}
       variant={ctx.isDocencia ? 'teaching' : 'study'}
       initialPrompt={ctx.studyChatTarget?.prompt}
+      conversationTarget={ctx.researchConversationTarget}
+      onOpenSavedNote={ctx.openNoteFromSearch}
       onOpenDocument={openDocument(ctx)}
       onOpenMaterial={openMaterial(ctx)}
       onOpenRecording={openRecording(ctx)}

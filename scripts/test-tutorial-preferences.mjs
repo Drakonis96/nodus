@@ -28,8 +28,9 @@ test('tutorial choice selects the available UI and prompt translations', () => {
   }
   // Italian has complete UI and prompt coverage, so both axes stay in Italian.
   assert.deepEqual(preferencesForTutorialLanguage('it'), { uiLanguage: 'it', promptLanguage: 'it' });
-  // Everything else is tutorial-only: English on both axes.
-  for (const language of ['zh', 'ja', 'ru', 'uk']) {
-    assert.deepEqual(preferencesForTutorialLanguage(language), { uiLanguage: 'en', promptLanguage: 'en' });
+  // Tutorial-only languages keep the English UI but now use their own prompt
+  // translation when Nodus has one (Simplified Chinese, Japanese, Russian, Ukrainian).
+  for (const [language, promptLanguage] of [['zh', 'zh-Hans'], ['ja', 'ja'], ['ru', 'ru'], ['uk', 'uk']]) {
+    assert.deepEqual(preferencesForTutorialLanguage(language), { uiLanguage: 'en', promptLanguage });
   }
 });

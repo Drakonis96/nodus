@@ -621,7 +621,7 @@ test('the Deep Research reader has persistent typography and a live report outli
   assert.match(css, /overflow-wrap: normal;\s*word-break: normal;\s*hyphens: none;/);
   assert.match(css, /\.deep-research-reader-document \.md :is\(a, code, \.citation-link\)[\s\S]*?overflow-wrap: anywhere/);
   assert.match(citationGroups, /function groupParenthesizedCitations\(tree:[\s\S]*?className: \['citation-group'\]/, 'citation punctuation is grouped with its pill');
-  assert.match(markdown, /rehypePlugins=\{\[rehypeKatex, rehypeGroupParenthesizedCitations\]\}/, 'the citation grouping transform runs in rendered Markdown');
+  assert.match(markdown, /rehypePlugins=\{\[rehypeKatex, rehypeGroupParenthesizedCitations, insertDocumentFigures\]\}/, 'the citation grouping transform runs in rendered Markdown');
   assert.match(css, /\.md \.citation-group \{\s*display: inline-block;\s*white-space: nowrap;/, 'a parenthesized citation wraps as one inline unit');
   assert.doesNotMatch(shared, /text-justify hyphens-auto/, 'justified report prose does not hyphenate words behind the reader');
   assert.match(shared, /icon="copyText"\s*label=\{t\('Copiar sin referencias'\)\}/, 'plain-text copy uses a text-copy mark');

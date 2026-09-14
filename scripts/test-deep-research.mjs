@@ -47,6 +47,7 @@ try {
     orderSections,
     normalizeSectionTitle,
     resolveSectionPlan,
+    sectionPlanMaximum,
     countWords,
     normalizeNarrativeSection,
     recoverPlainMenuCitations,
@@ -459,7 +460,27 @@ try {
     assert.ok(resolveSectionPlan(rich, 'auto').target > auto.target, 'richer evidence can warrant more argumentative movements');
     const preferred = resolveSectionPlan(rich, 4, 'Marco; mecanismo uno; mecanismo dos', ['pregunta uno', 'pregunta dos']);
     assert.equal(preferred.mode, 'user', 'user organization preference is reported');
-    assert.ok(preferred.target >= 4, 'the preference is honored without becoming an evidence cutoff');
+    // "Máx. N secciones" means AT MOST N. Abundant evidence and an explicit coverage
+    // contract used to push this above the number the user picked.
+    assert.ok(preferred.target <= 4, `a numeric preference is a ceiling (got ${preferred.target})`);
+    assert.ok(preferred.target >= 3, 'the ceiling never falls below the minimum architecture');
+    // Sparse evidence keeps deciding downwards: the number is a cap, not a quota.
+    assert.equal(
+      resolveSectionPlan(sparse, 10).target,
+      resolveSectionPlan(sparse, 'auto').target,
+      'a generous ceiling never inflates a sparse architecture',
+    );
+    // The coverage grace slot in sectionPlanMaximum belongs to auto mode only.
+    const questions = ['pregunta uno', 'pregunta dos'];
+    assert.equal(sectionPlanMaximum(preferred, questions), preferred.target, 'a user ceiling admits no grace section');
+    assert.equal(sectionPlanMaximum(preferred, []), preferred.target, 'a user ceiling is exact without coverage questions');
+    const automatic = resolveSectionPlan(rich, 'auto', '', questions);
+    assert.equal(sectionPlanMaximum(automatic, questions), automatic.target + 1, 'auto mode keeps the coverage grace section');
+    assert.equal(sectionPlanMaximum(automatic, []), automatic.target, 'no coverage contract, no grace section');
+    // 'single' keeps planning internally and is never treated as a numeric cap.
+    const single = resolveSectionPlan(rich, 'single');
+    assert.equal(single.mode, 'auto', 'a continuous narrative still plans from the evidence');
+    assert.equal(single.target, resolveSectionPlan(rich, 'auto').target, 'single does not change the internal architecture');
   }
 
   // ── 9b. A fragmented provider plan is compacted without losing mandates ───
@@ -539,17 +560,161 @@ try {
     assert.equal(report.meta.sections, expected, 'only bounded sections are published');
   }
 
-  // ── 10. A user section preference remains organizational end-to-end ─────────
+  // ── 10. A user section preference caps the report end-to-end ────────────────
   {
     const snapshot = makeSnapshot(60);
     const report = await orchestrateDeepResearch(
       { objective: 'X', language: 'es',sectionLimit: 4 },
       baseDeps(snapshot)
     );
-    assert.ok(report.meta.sections >= 4, `honors the preferred architecture (got ${report.meta.sections})`);
+    assert.ok(report.meta.sections <= 4, `caps the architecture at the requested maximum (got ${report.meta.sections})`);
+    assert.ok(report.meta.sections >= 3, 'the cap never drops below the minimum architecture');
     // Even capped, references still trace to really-cited works.
     assert.ok(report.draft.bibliography.length > 0, 'capped report still has references');
     assert.ok(!report.draft.draftMarkdown.includes('HALLUCINATED'), 'capped report stays citation-clean');
+  }
+
+  // ── 10b. Coverage questions + an over-sized provider plan cannot break the cap ─
+  //
+  // The two ways a chosen maximum used to be exceeded, together: abundant evidence
+  // pushed resolveSectionPlan above the number, and sectionPlanMaximum's coverage
+  // grace slot bought one more on top of that.
+  {
+    const snapshot = makeSnapshot(60);
+    const deps = baseDeps(snapshot);
+    const coverageQuestions = [
+      '¿Qué mecanismo institucional explica el cambio?',
+      '¿Qué límites documentales conserva la evidencia?',
+      '¿Qué escalas regionales quedan fuera?',
+    ];
+    deps.decomposeObjective = async () => coverageQuestions;
+    deps.planReport = async (input) => ({
+      title: 'Plan del proveedor',
+      abstract: '',
+      sections: Array.from({ length: 9 }, (_, index) => ({
+        id: `p${index + 1}`,
+        title: index === 0 ? 'Introducción' : index === 8 ? 'Síntesis' : `Movimiento ${index}`,
+        purpose: `Mandato ${index + 1}`,
+        keyClaims: [`Clave ${index + 1}`],
+        ideaIds: [input.ideas[index % input.ideas.length].id],
+        workIds: [],
+        gapIds: index === 3 ? [snapshot.gaps[0].id] : [],
+        contradictionIds: index === 4 ? [snapshot.contradictions[0].id] : [],
+        passageIds: [],
+        coverageQuestions: index === 2 ? [coverageQuestions[0]] : index === 6 ? [coverageQuestions[1]] : [],
+        role: index === 0 ? 'intro' : index === 8 ? 'synthesis' : 'body',
+        dependsOn: [],
+      })),
+    });
+    let writes = 0;
+    const inner = deps.writeSection;
+    deps.writeSection = async (input) => {
+      writes += 1;
+      return inner(input);
+    };
+    const report = await orchestrateDeepResearch(
+      { objective: 'X', language: 'es', sectionLimit: 4 },
+      deps,
+    );
+    assert.ok(report.meta.sections <= 4, `a five-plus-section provider plan still publishes at most four (got ${report.meta.sections})`);
+    assert.equal(writes, report.meta.sections, 'no section is generated beyond the published cap');
+    assert.equal(
+      report.meta.coverage?.questions.length,
+      coverageQuestions.length,
+      'every coverage question survives the compaction',
+    );
+  }
+
+  // ── 10c. Compaction reassigns evidence instead of dropping it ───────────────
+  {
+    const snapshot = makeSnapshot(30);
+    const coverageQuestions = ['¿Qué mecanismo?', '¿Qué límites?', '¿Qué escala?'];
+    const sections = Array.from({ length: 11 }, (_, index) => ({
+      id: `c${index + 1}`,
+      title: index === 0 ? 'Introducción' : index === 10 ? 'Síntesis' : `Fragmento ${index}`,
+      purpose: `Mandato ${index + 1}`,
+      keyClaims: [`Afirmación ${index + 1}`],
+      ideaIds: snapshot.ideas.filter((_idea, at) => at % 11 === index).map((idea) => idea.id),
+      workIds: snapshot.works.filter((_work, at) => at % 11 === index).map((work) => work.id),
+      gapIds: snapshot.gaps.filter((_gap, at) => at % 11 === index).map((gap) => gap.id),
+      contradictionIds: snapshot.contradictions.filter((_item, at) => at % 11 === index).map((item) => item.id),
+      passageIds: [],
+      coverageQuestions: index === 5 ? [coverageQuestions[0]] : index === 9 ? [coverageQuestions[2]] : [],
+      role: index === 0 ? 'intro' : index === 10 ? 'synthesis' : 'body',
+      dependsOn: [],
+    }));
+    const capped = normalizePlan({ title: 'T', abstract: '', sections }, snapshot, 4, coverageQuestions);
+    assert.equal(capped.sections.length, 4, 'the requested maximum is the published architecture');
+    const survives = (key, expected) => assert.deepEqual(
+      [...new Set(capped.sections.flatMap((section) => section[key]))].sort(),
+      [...expected].sort(),
+      `${key} survive compaction`,
+    );
+    survives('ideaIds', snapshot.ideas.map((idea) => idea.id));
+    survives('gapIds', snapshot.gaps.map((gap) => gap.id));
+    survives('contradictionIds', snapshot.contradictions.map((item) => item.id));
+    survives('workIds', snapshot.works.map((work) => work.id));
+    survives('coverageQuestions', coverageQuestions);
+    // One primary home each: a duplicated question makes two sections answer it.
+    const homes = capped.sections.flatMap((section) => section.coverageQuestions);
+    assert.equal(homes.length, new Set(homes).size, 'each coverage question keeps exactly one primary home');
+  }
+
+  // ── 10d. The guideline section length reaches the writers and the report ────
+  //
+  // The control is only useful if the writer sees it and the finished report
+  // records it: the metadata is what makes "why is this section 4.000 words?"
+  // answerable, and what the composer restores when the prompt is reused.
+  {
+    const snapshot = makeSnapshot(20);
+    const deps = baseDeps(snapshot);
+    const lengths = [];
+    const inner = deps.writeSection;
+    deps.writeSection = async (input) => {
+      lengths.push(input.sectionLength);
+      return inner(input);
+    };
+    const report = await orchestrateDeepResearch(
+      { objective: 'X', language: 'es', sectionLimit: 4, sectionLength: 5_000 },
+      deps,
+    );
+    assert.ok(lengths.length > 0, 'sections were written');
+    for (const plan of lengths) {
+      assert.equal(plan.targetWords, 5_000, 'every section writer receives the requested word target');
+      assert.ok(plan.maxPasses > 1, 'and a bounded multi-pass budget rather than one huge request');
+      assert.ok(plan.maxTokensPerPass <= 6_000, 'without raising maxTokens out of provider range');
+    }
+    assert.equal(report.meta.sectionLength, 5_000, 'the report records the length it was written to');
+    assert.equal(report.draft.deepResearchSectionLength, 5_000, 'and so does the saved draft, for reuse');
+    assert.equal(report.meta.sectionLengthOutcome.targetWords, 5_000);
+    assert.equal(
+      report.meta.sectionLengthOutcome.reached + report.meta.sectionLengthOutcome.short,
+      report.meta.sections,
+      'every published section is accounted for as reached or short',
+    );
+  }
+
+  // ── 10e. A request without the field behaves exactly as before ──────────────
+  {
+    const snapshot = makeSnapshot(20);
+    const deps = baseDeps(snapshot);
+    const lengths = [];
+    const inner = deps.writeSection;
+    deps.writeSection = async (input) => {
+      lengths.push(input.sectionLength);
+      return inner(input);
+    };
+    const report = await orchestrateDeepResearch({ objective: 'X', language: 'es' }, deps);
+    assert.ok(lengths.every((plan) => plan.targetWords === null), 'a legacy request writes in auto mode');
+    assert.ok(lengths.every((plan) => plan.maxPasses === 1), 'and never spends a continuation call');
+    assert.equal(report.meta.sectionLength, 'auto', 'the metadata says auto rather than inventing a number');
+    assert.equal(report.meta.sectionLengthOutcome, null, 'and records no length accounting');
+    // An unusable value is normalized rather than trusted through to the writer.
+    const hostile = await orchestrateDeepResearch(
+      { objective: 'X', language: 'es', sectionLength: 'muy largo' },
+      baseDeps(snapshot),
+    );
+    assert.equal(hostile.meta.sectionLength, 'auto');
   }
 
   // ── 11. Auto architecture remains finite because the evidence pool is finite ─

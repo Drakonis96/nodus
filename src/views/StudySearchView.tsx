@@ -9,6 +9,7 @@ import type {
   StudySearchResult,
   StudyWorkspace,
 } from '@shared/types';
+import { SearchKindFilters } from '../components/search/SearchKindFilters';
 import { Icon, Spinner } from '../components/ui';
 import { TextInputModal } from '../components/TextInputModal';
 import { formatStudyTimestamp } from '@shared/studyRecordings';
@@ -51,11 +52,10 @@ export function StudySearchView({
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
   const [query, setQuery] = useState('');
   const [response, setResponse] = useState<StudySearchResponse | null>(null);
-  const [kind, setKind] = useState<StudySearchKind | 'all'>('all');
+  const [kinds, setKinds] = useState<Set<StudySearchKind>>(() => new Set(Object.keys(KIND_LABELS) as StudySearchKind[]));
   const [courseId, setCourseId] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [topicId, setTopicId] = useState('');
-  const [sort, setSort] = useState<NonNullable<StudySearchOptions['sort']>>('relevance');
   const [busy, setBusy] = useState(false);
   const [index, setIndex] = useState<StudySearchProgress | null>(null);
   const [saved, setSaved] = useState<StudySavedSearch[]>([]);
@@ -66,9 +66,9 @@ export function StudySearchView({
   const [message, setMessage] = useState('');
 
   const options = useMemo<StudySearchOptions>(() => ({
-    kinds: kind === 'all' ? undefined : [kind], courseId: courseId || undefined, subjectId: subjectId || undefined,
-    topicId: topicId || undefined, sort, limit: 80,
-  }), [kind, courseId, subjectId, topicId, sort]);
+    kinds: [...kinds], courseId: courseId || undefined, subjectId: subjectId || undefined,
+    topicId: topicId || undefined, sort: 'relevance', limit: 80,
+  }), [kinds, courseId, subjectId, topicId]);
 
   const loadMeta = useCallback(async () => {
     const [nextWorkspace, nextIndex, nextSaved, nextHistory] = await Promise.all([
@@ -79,7 +79,8 @@ export function StudySearchView({
 
   useEffect(() => { void loadMeta(); return window.nodus.onStudySearchProgress(setIndex); }, [loadMeta]);
   useEffect(() => {
-    if (query.trim().length < 2) { setResponse(null); return; }
+    setMessage(''); setResponse(null); setBusy(false);
+    if (query.trim().length < 2) return;
     let active = true;
     const timer = window.setTimeout(() => {
       setBusy(true);
@@ -98,8 +99,8 @@ export function StudySearchView({
     else if (result.kind === 'transcript' && result.location.recordingId) onOpenRecording(result.location.recordingId, result.location.timestampSeconds);
   };
   const applySearch = (item: { query: string; options: StudySearchOptions }) => {
-    setQuery(item.query); setKind(item.options.kinds?.[0] ?? 'all'); setCourseId(item.options.courseId ?? '');
-    setSubjectId(item.options.subjectId ?? ''); setTopicId(item.options.topicId ?? ''); setSort(item.options.sort ?? 'relevance');
+    setQuery(item.query); setKinds(new Set(item.options.kinds ?? Object.keys(KIND_LABELS) as StudySearchKind[])); setCourseId(item.options.courseId ?? '');
+    setSubjectId(item.options.subjectId ?? ''); setTopicId(item.options.topicId ?? '');
   };
   const rebuild = async () => {
     setMessage(''); setShowIndex(true);
@@ -113,9 +114,11 @@ export function StudySearchView({
       <div className="mx-auto w-full max-w-3xl shrink-0">
         <div className="mb-4 flex items-center gap-3"><Icon name="search" size={22} className="text-teal-300" /><h1 className="text-xl font-semibold">{t('Buscar en el estudio')}</h1><div className="ml-auto flex items-center gap-1"><button className={`btn btn-ghost h-8 px-2 text-xs ${showFilters ? 'text-teal-300' : ''}`} onClick={() => setShowFilters((value) => !value)}><Icon name="settings" size={13} />{t('Filtros')}</button><button className={`btn btn-ghost h-8 px-2 text-xs ${showIndex ? 'text-teal-300' : ''}`} onClick={() => setShowIndex((value) => !value)}>{t('Índice')}</button></div></div>
         <div className="relative"><Icon name="search" size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" /><input autoFocus data-testid="study-search-input" className="input input-with-leading-icon w-full pr-10" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Busca en apuntes, materiales, transcripciones, preguntas y exámenes…')} />{busy && <span className="absolute right-3 top-1/2 -translate-y-1/2"><Spinner /></span>}</div>
-        {showFilters && <div className="study-search-panel mt-3 grid gap-2 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-5" data-testid="study-search-filters"><select aria-label={t('Tipo de contenido')} className="input study-search-filter h-9 text-xs" value={kind} onChange={(event) => setKind(event.target.value as StudySearchKind | 'all')}><option value="all">{t('Todos los tipos')}</option>{Object.entries(KIND_LABELS).map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}</select><select aria-label={t('Curso')} className="input study-search-filter h-9 text-xs" value={courseId} onChange={(event) => { setCourseId(event.target.value); setSubjectId(''); setTopicId(''); }}><option value="">{t('Todos los cursos')}</option>{workspace?.courses.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}</select><select aria-label={t('Asignatura')} className="input study-search-filter h-9 text-xs" value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setTopicId(''); }}><option value="">{t('Todas las asignaturas')}</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select><select aria-label={t('Tema')} className="input study-search-filter h-9 text-xs" value={topicId} onChange={(event) => setTopicId(event.target.value)}><option value="">{t('Todos los temas')}</option>{topics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select><select aria-label={t('Ordenar por')} className="input study-search-filter h-9 text-xs" value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}><option value="relevance">{t('Relevancia')}</option><option value="date">{t('Fecha')}</option><option value="title">{t('Título')}</option></select></div>}
+        <SearchKindFilters options={(Object.keys(KIND_LABELS) as StudySearchKind[]).map((kind) => ({ kind, label: KIND_LABELS[kind], icon: kind === 'material' ? 'book' : kind === 'transcript' ? 'microphone' : kind === 'question' ? 'help' : 'notebook' }))} selected={kinds} onChange={setKinds} />
+        {showFilters && <div className="study-search-panel mt-3 grid gap-2 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-5" data-testid="study-search-filters"><select aria-label={t('Curso')} className="input study-search-filter h-9 text-xs" value={courseId} onChange={(event) => { setCourseId(event.target.value); setSubjectId(''); setTopicId(''); }}><option value="">{t('Todos los cursos')}</option>{workspace?.courses.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}</select><select aria-label={t('Asignatura')} className="input study-search-filter h-9 text-xs" value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setTopicId(''); }}><option value="">{t('Todas las asignaturas')}</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select><select aria-label={t('Tema')} className="input study-search-filter h-9 text-xs" value={topicId} onChange={(event) => setTopicId(event.target.value)}><option value="">{t('Todos los temas')}</option>{topics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></div>}
         <div className="mt-3 flex flex-wrap items-center gap-1.5">{saved.map((item) => <span key={item.id} className="group inline-flex items-center gap-1 rounded-full border border-neutral-800 bg-neutral-900/50 py-1 pl-2.5 pr-1 text-xs text-neutral-300"><button className="max-w-40 truncate hover:text-neutral-100" onClick={() => applySearch(item)}><Icon name="search" size={11} /> {item.name}</button><button className="text-neutral-600 hover:text-red-400" onClick={() => void window.nodus.deleteStudySavedSearch(item.id).then(loadMeta)}><Icon name="x" size={11} /></button></span>)}{query.trim().length >= 2 && <button className="ml-auto inline-flex items-center gap-1 rounded-full border border-neutral-700 px-2.5 py-1 text-xs text-neutral-400 hover:text-neutral-200" onClick={() => setSaveDialog(true)}><Icon name="star" size={11} />{t('Guardar')}</button>}</div>
         {showIndex && <section className="study-search-panel mt-3 rounded-lg border p-3" data-testid="study-search-index-panel"><div className="flex flex-wrap items-center gap-2 text-xs"><span className="font-medium text-neutral-300">{t('Índice')} · {t(INDEX_STATE_LABELS[index?.state ?? 'empty'])}</span><span className="text-neutral-600">{index?.embeddedEntries ?? 0}/{index?.indexedEntries ?? 0} {t('fragmentos semánticos')}</span>{index?.state === 'indexing' || index?.state === 'paused' ? <><div className="h-1.5 min-w-32 flex-1 overflow-hidden rounded bg-neutral-800"><div className="h-full bg-teal-400" style={{ width: `${index.totalEntries ? index.processedEntries / index.totalEntries * 100 : 0}%` }} /></div><button className="btn btn-ghost h-7 px-2" onClick={() => void (index.state === 'paused' ? window.nodus.resumeStudySearchIndex() : window.nodus.pauseStudySearchIndex())}>{index.state === 'paused' ? t('Reanudar') : t('Pausar')}</button><button className="btn btn-ghost h-7 px-2" onClick={() => void window.nodus.stopStudySearchIndex()}>{t('Detener')}</button></> : <button className="btn btn-ghost ml-auto h-7 px-2" onClick={() => void rebuild()}><Icon name="refresh" size={12} />{t('Reconstruir')}</button>}<button className="btn btn-ghost h-7 px-2 text-red-400" onClick={() => void window.nodus.deleteStudySearchIndex().then(loadMeta)}>{t('Borrar caché')}</button></div></section>}
+        {response?.semanticAvailable === false && <p role="status" className="mt-2 text-xs text-amber-600 dark:text-amber-400">{t('La búsqueda por significado necesita embeddings. Configura el proveedor y la clave de embeddings en Ajustes e indexa la biblioteca.')}</p>}
         {message && <p className="mt-2 text-xs text-amber-300">{message}</p>}
         {response && <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500"><span>{response.results.length} {t('resultados')} · {Math.round(response.elapsedMs)} ms</span>{response.correctedQuery && <button className="text-amber-300" onClick={() => setQuery(response.correctedQuery!)}>{t('¿Querías decir')} “{response.correctedQuery}”?</button>}</div>}
       </div>

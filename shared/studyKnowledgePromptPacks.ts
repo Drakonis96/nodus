@@ -60,6 +60,48 @@ Her fikir kısa bir etiket, kendi başına anlaşılır bir ifade ve bir veya da
 Şu ilişkileri kullan: related, supports, contrasts, causes, depends_on, part_of, applies.
 İlişkiler yalnızca döndürülen fikirlerin anahtarlarına başvurabilir. Sayfa veya alıntı uydurma.
 JSON döndür: ${SCHEMA}`, title: 'BAŞLIK', text: 'METİN', insufficientText: 'Kaynak, fikir çıkarmak için yeterli metin içermiyor.', externalPurpose: 'materyali incelemek ve izlenebilir bir kavram haritası çıkarmak', connection: 'Bağlantı' },
+  'zh-Hans': { system: `分析教学材料并返回可追溯的概念图。仅提取有文本支持的观点。
+每个观点需要一个简短标签、一个自足的陈述，以及一条或多条精确的原文引用。
+使用类型：concept, definition, principle, process, cause, consequence, example, debate。
+使用关系：related, supports, contrasts, causes, depends_on, part_of, applies。
+关系只能引用所返回观点的键。不要编造页码或引文。
+返回 JSON：${SCHEMA}`, title: '标题', text: '文本', insufficientText: '来源没有足够的文本可供提取观点。', externalPurpose: '分析材料并提取可追溯的概念图', connection: '连接' },
+  'zh-Hant': { system: `分析教學材料並回傳可追溯的概念圖。僅擷取有文本支持的觀點。
+每個觀點需要一個簡短標籤、一個自足的陳述，以及一條或多條精確的原文引用。
+使用類型：concept, definition, principle, process, cause, consequence, example, debate。
+使用關係：related, supports, contrasts, causes, depends_on, part_of, applies。
+關係只能引用所回傳觀點的鍵。不要編造頁碼或引文。
+回傳 JSON：${SCHEMA}`, title: '標題', text: '文字', insufficientText: '來源沒有足夠的文字可供擷取觀點。', externalPurpose: '分析材料並擷取可追溯的概念圖', connection: '連結' },
+  vi: { system: `Phân tích tài liệu giảng dạy và trả về một bản đồ khái niệm có thể truy nguyên. Chỉ trích xuất những ý tưởng được văn bản hỗ trợ.
+Mỗi ý tưởng cần một nhãn ngắn, một phát biểu độc lập và một hoặc nhiều trích dẫn nguyên văn chính xác.
+Dùng các loại: concept, definition, principle, process, cause, consequence, example, debate.
+Dùng các quan hệ: related, supports, contrasts, causes, depends_on, part_of, applies.
+Các quan hệ chỉ được tham chiếu đến khóa của những ý tưởng đã trả về. Không bịa đặt số trang hay trích dẫn.
+Trả về JSON: ${SCHEMA}`, title: 'TIÊU ĐỀ', text: 'VĂN BẢN', insufficientText: 'Nguồn không có đủ văn bản để trích xuất ý tưởng.', externalPurpose: 'phân tích tài liệu và trích xuất một bản đồ khái niệm có thể truy nguyên', connection: 'Kết nối' },
+  ja: { system: `教材を分析し、追跡可能な概念マップを返してください。本文に裏付けられたアイデアのみを抽出します。
+各アイデアには、短いラベル、それ自体で完結する記述、および正確な原文引用を 1 つ以上含めてください。
+使用する種類：concept, definition, principle, process, cause, consequence, example, debate。
+使用する関係：related, supports, contrasts, causes, depends_on, part_of, applies。
+関係は返されたアイデアのキーのみを参照できます。ページ番号や引用を捏造しないでください。
+JSON を返してください：${SCHEMA}`, title: 'タイトル', text: '本文', insufficientText: '情報源にはアイデアを抽出するのに十分な本文がありません。', externalPurpose: '教材を分析して追跡可能な概念マップを抽出する', connection: '接続' },
+  ru: { system: `Проанализируйте учебный материал и верните отслеживаемую карту понятий. Извлекайте только идеи, подкреплённые текстом.
+Каждой идее нужны краткая метка, самодостаточное утверждение и одна или несколько точных дословных цитат.
+Используйте типы: concept, definition, principle, process, cause, consequence, example, debate.
+Используйте связи: related, supports, contrasts, causes, depends_on, part_of, applies.
+Связи могут ссылаться только на ключи возвращённых идей. Не выдумывайте страницы или цитаты.
+Верните JSON: ${SCHEMA}`, title: 'НАЗВАНИЕ', text: 'ТЕКСТ', insufficientText: 'Источник не содержит достаточно текста для извлечения идей.', externalPurpose: 'проанализировать материал и извлечь отслеживаемую карту понятий', connection: 'Связь' },
+  uk: { system: `Проаналізуйте навчальний матеріал і поверніть простежувану карту понять. Витягуйте лише ідеї, підкріплені текстом.
+Кожній ідеї потрібна коротка позначка, самодостатнє твердження та один або кілька точних дослівних цитат.
+Використовуйте типи: concept, definition, principle, process, cause, consequence, example, debate.
+Використовуйте зв’язки: related, supports, contrasts, causes, depends_on, part_of, applies.
+Зв’язки можуть посилатися лише на ключі повернутих ідей. Не вигадуйте сторінки чи цитати.
+Поверніть JSON: ${SCHEMA}`, title: 'НАЗВА', text: 'ТЕКСТ', insufficientText: 'Джерело не містить достатньо тексту для вилучення ідей.', externalPurpose: 'проаналізувати матеріал і вилучити простежувану карту понять', connection: 'Зв’язок' },
+  ko: { system: `교육 자료를 분석하고 추적 가능한 개념 지도를 반환하십시오. 텍스트가 뒷받침하는 아이디어만 추출하십시오.
+각 아이디어에는 짧은 레이블, 그 자체로 완결된 진술, 그리고 하나 이상의 정확한 원문 인용이 필요합니다.
+사용할 유형: concept, definition, principle, process, cause, consequence, example, debate.
+사용할 관계: related, supports, contrasts, causes, depends_on, part_of, applies.
+관계는 반환된 아이디어의 키만 참조할 수 있습니다. 페이지나 인용을 날조하지 마십시오.
+JSON을 반환하십시오: ${SCHEMA}`, title: '제목', text: '텍스트', insufficientText: '출처에 아이디어를 추출할 만큼 충분한 텍스트가 없습니다.', externalPurpose: '자료를 분석하고 추적 가능한 개념 지도를 추출하는 것', connection: '연결' },
 };
 
 export function studyKnowledgePromptPack(language: PromptLanguage = 'es'): StudyKnowledgePromptPack {

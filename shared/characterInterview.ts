@@ -141,6 +141,48 @@ const TRANSCRIPT_COPY: Record<PromptLanguage, InterviewTranscriptCopy> = {
     avoidOpenings: (openings) =>
       `[Yanıtlarına daha önce şöyle başladın: ${openings}. Bu yanıta farklı başla ve bu kalıpları yineleme.]`,
   },
+  'zh-Hans': {
+    author: '作者',
+    character: '你',
+    avoidOpenings: (openings) =>
+      `[你已经这样开过几次头：${openings}。这次请换一种开头，不要重复这些套话。]`,
+  },
+  'zh-Hant': {
+    author: '作者',
+    character: '你',
+    avoidOpenings: (openings) =>
+      `[你已經這樣開過幾次頭：${openings}。這次請換一種開頭，不要重複這些套語。]`,
+  },
+  vi: {
+    author: 'Tác giả',
+    character: 'Bạn',
+    avoidOpenings: (openings) =>
+      `[Bạn đã mở đầu câu trả lời như thế này rồi: ${openings}. Hãy bắt đầu câu này theo cách khác và đừng lặp lại những công thức đó.]`,
+  },
+  ja: {
+    author: '作者',
+    character: 'あなた',
+    avoidOpenings: (openings) =>
+      `[あなたはすでに次のように返答を始めています：${openings}。今回は別の形で始め、それらの決まり文句を繰り返さないでください。]`,
+  },
+  ru: {
+    author: 'Автор',
+    character: 'Ты',
+    avoidOpenings: (openings) =>
+      `[Ты уже начинал ответы так: ${openings}. Начни этот иначе и не повторяй эти формулы.]`,
+  },
+  uk: {
+    author: 'Автор',
+    character: 'Ти',
+    avoidOpenings: (openings) =>
+      `[Ти вже починав відповіді так: ${openings}. Почни цю інакше й не повторюй ці формули.]`,
+  },
+  ko: {
+    author: '작가',
+    character: '당신',
+    avoidOpenings: (openings) =>
+      `[당신은 이미 다음과 같이 답변을 시작했습니다: ${openings}. 이번에는 다르게 시작하고 그 표현을 반복하지 마십시오.]`,
+  },
   de: {
     author: 'Autor',
     character: 'Du',

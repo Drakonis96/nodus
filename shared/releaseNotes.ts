@@ -7,6 +7,8 @@
 // product notes, not a changelog. Add a new entry at the top whenever the app
 // version bumps.
 
+import { RELEASE_5_4_0_ADDITIONS } from './releaseNotes540';
+import { RELEASE_5_4_2_HIGHLIGHTS } from './releaseNotes542';
 import type { VaultType } from './vaultTypes';
 import { RELEASE_NOTES_IT } from './releaseNotes.it';
 import { RELEASE_NOTES_TR } from './releaseNotes.tr';
@@ -28,6 +30,7 @@ export type ReleaseNoteScope =
   | 'nodi'
   | 'toolkit'
   | 'plugin'
+  | 'marketplace'
   | 'languages'
   | 'browser'
   | 'radar'
@@ -2675,7 +2678,336 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+/**
+ * v5.4.0 combines the accumulated changes with all nine notes prepared for 5.3.2.
+ * The modal groups scopes by size. Keep the IT/TR arrays aligned with this order.
+ */
+const RELEASE_5_4_0_HIGHLIGHTS: RawReleaseHighlight[] = [
+  ...RELEASE_5_4_0_ADDITIONS,
+  {
+    scope: 'marketplace',
+    es: "Chemistry Studio, Legalize y AlphaGenome ya son paquetes oficiales que instalas tú. Aparecen en Skills con su editor verificado, sus permisos, su tamaño y las plataformas en las que funcionan, y puedes instalarlos, actualizarlos, volver a la versión anterior o quitarlos cuando quieras. Lo que hacen no ha cambiado.",
+    en: "Chemistry Studio, Legalize and AlphaGenome are now official packages you install yourself. They appear in Skills with their verified publisher, their permissions, their size and the platforms they run on, and you can install, update, roll back or remove any of them whenever you like. What they do has not changed.",
+    fr: "Chemistry Studio, Legalize et AlphaGenome sont désormais des paquets officiels que vous installez vous-même. Ils apparaissent dans Skills avec leur éditeur vérifié, leurs permissions, leur taille et les plateformes prises en charge, et vous pouvez les installer, les mettre à jour, revenir en arrière ou les retirer quand vous voulez. Ce qu'ils font n'a pas changé.",
+    de: "Chemistry Studio, Legalize und AlphaGenome sind jetzt offizielle Pakete, die Sie selbst installieren. Sie erscheinen unter Skills mit ihrem verifizierten Herausgeber, ihren Berechtigungen, ihrer Größe und den unterstützten Plattformen, und Sie können sie jederzeit installieren, aktualisieren, zurücksetzen oder entfernen. Was sie tun, hat sich nicht geändert.",
+    pt: "O Chemistry Studio, o Legalize e o AlphaGenome são agora pacotes oficiais que instalas tu. Aparecem em Skills com o editor verificado, as permissões, o tamanho e as plataformas em que funcionam, e podes instalá-los, atualizá-los, voltar à versão anterior ou removê-los quando quiseres. O que fazem não mudou.",
+    'pt-BR': "Chemistry Studio, Legalize e AlphaGenome agora são pacotes oficiais que você instala. Aparecem em Skills com o editor verificado, as permissões, o tamanho e as plataformas em que funcionam, e você pode instalar, atualizar, voltar à versão anterior ou remover quando quiser. O que eles fazem não mudou.",
+  },
+  {
+    scope: 'general',
+    es: "Tu configuración se muda sola al actualizar. Si tenías Chemistry Studio activado, o una clave de AlphaGenome guardada, o una skill tuya que necesita una de estas capacidades, Nodus instala el paquete que corresponde y adopta la skill conservando su sitio en la lista, dónde la tenías activada y las instrucciones que hubieras editado. Funciona sin conexión porque los paquetes viajan dentro de la propia actualización.",
+    en: "Your setup moves across on its own when you update. If Chemistry Studio was switched on, or you had an AlphaGenome key saved, or a skill of your own needs one of these capabilities, Nodus installs the matching package and adopts the skill with its place in the list, the surfaces it was enabled on and any instructions you had edited. It works with no connection because the packages travel inside the update itself.",
+    fr: "Votre configuration migre toute seule à la mise à jour. Si Chemistry Studio était activé, si une clé AlphaGenome était enregistrée ou si une de vos skills a besoin de ces capacités, Nodus installe le paquet correspondant et adopte la skill en conservant sa place dans la liste, les surfaces où elle était activée et les instructions que vous aviez modifiées. Cela fonctionne sans connexion car les paquets voyagent dans la mise à jour elle-même.",
+    de: "Ihre Einrichtung zieht beim Update von selbst mit um. War Chemistry Studio eingeschaltet, lag ein AlphaGenome-Schlüssel gespeichert vor oder braucht ein eigener Skill eine dieser Capabilities, installiert Nodus das passende Paket und übernimmt den Skill samt seinem Platz in der Liste, den Oberflächen, auf denen er aktiv war, und Ihren bearbeiteten Anweisungen. Das funktioniert ohne Verbindung, weil die Pakete im Update selbst mitreisen.",
+    pt: "A tua configuração muda-se sozinha ao atualizar. Se tinhas o Chemistry Studio ligado, uma chave do AlphaGenome guardada ou uma skill tua que precisa destas capacidades, o Nodus instala o pacote correspondente e adota a skill mantendo o seu lugar na lista, as superfícies onde estava ligada e as instruções que tenhas editado. Funciona sem ligação porque os pacotes viajam dentro da própria atualização.",
+    'pt-BR': "Sua configuração se muda sozinha ao atualizar. Se o Chemistry Studio estava ligado, havia uma chave do AlphaGenome salva ou uma skill sua precisa dessas capacidades, o Nodus instala o pacote correspondente e adota a skill mantendo seu lugar na lista, as superfícies onde estava ligada e as instruções que você tenha editado. Funciona sem conexão porque os pacotes viajam dentro da própria atualização.",
+  },
+  {
+    scope: 'general',
+    es: "Nodus ocupa menos si no dibujas moléculas. Los motores químicos, el compilador de TeX y el resto de dependencias de estas tres áreas ya no viajan con la aplicación, sino dentro del paquete que las necesita. Una instalación limpia no descarga ni carga ninguna de las tres mientras no las pidas.",
+    en: "Nodus takes up less room if you do not draw molecules. The chemistry engines, the TeX compiler and the rest of the dependencies these three areas need no longer travel with the application, only inside the package that needs them. A clean install neither downloads nor loads any of the three until you ask for one.",
+    fr: "Nodus prend moins de place si vous ne dessinez pas de molécules. Les moteurs de chimie, le compilateur TeX et les autres dépendances de ces trois domaines ne voyagent plus avec l'application, mais dans le paquet qui en a besoin. Une installation propre ne télécharge ni ne charge aucun des trois tant que vous n'en demandez pas un.",
+    de: "Nodus braucht weniger Platz, wenn Sie keine Moleküle zeichnen. Die Chemie-Engines, der TeX-Compiler und die übrigen Abhängigkeiten dieser drei Bereiche reisen nicht mehr mit der Anwendung, sondern in dem Paket, das sie braucht. Eine saubere Installation lädt und startet keines der drei, solange Sie keines anfordern.",
+    pt: "O Nodus ocupa menos espaço se não desenhas moléculas. Os motores de química, o compilador de TeX e as restantes dependências destas três áreas já não viajam com a aplicação, apenas dentro do pacote que precisa delas. Uma instalação limpa não descarrega nem carrega nenhuma das três enquanto não pedires.",
+    'pt-BR': "O Nodus ocupa menos espaço se você não desenha moléculas. Os motores de química, o compilador de TeX e as demais dependências dessas três áreas não viajam mais com o aplicativo, apenas dentro do pacote que precisa delas. Uma instalação limpa não baixa nem carrega nenhuma das três enquanto você não pedir.",
+  },
+  {
+    scope: 'plugin',
+    es: "Cada paquete se configura en su propia ficha. La clave de AlphaGenome, la aceptación de sus términos y la instalación de su runtime de Python están ahora dentro del paquete, no repartidas por los ajustes de Nodus. Tu clave se guarda en el almacén de credenciales del sistema y llega al intérprete por su entrada estándar, nunca en una línea de comandos ni en un registro.",
+    en: "Every package configures itself on its own card. The AlphaGenome key, accepting its terms and installing its Python runtime now live inside the package rather than scattered through the Nodus settings. Your key is kept in the system credential store and reaches the interpreter through its standard input, never on a command line or in a log.",
+    fr: "Chaque paquet se configure sur sa propre fiche. La clé AlphaGenome, l'acceptation de ses conditions et l'installation de son runtime Python vivent désormais dans le paquet plutôt qu'éparpillées dans les réglages de Nodus. Votre clé est conservée dans le trousseau du système et parvient à l'interpréteur par son entrée standard, jamais sur une ligne de commande ni dans un journal.",
+    de: "Jedes Paket richtet sich auf seiner eigenen Karte ein. Der AlphaGenome-Schlüssel, die Zustimmung zu seinen Bedingungen und die Installation seiner Python-Umgebung liegen nun im Paket statt verstreut in den Nodus-Einstellungen. Ihr Schlüssel bleibt im Anmeldeinformationsspeicher des Systems und erreicht den Interpreter über dessen Standardeingabe, nie über eine Befehlszeile oder ein Protokoll.",
+    pt: "Cada pacote configura-se na sua própria ficha. A chave do AlphaGenome, a aceitação dos seus termos e a instalação do seu runtime de Python vivem agora dentro do pacote, em vez de espalhadas pelas definições do Nodus. A tua chave fica no armazém de credenciais do sistema e chega ao interpretador pela entrada padrão, nunca numa linha de comandos nem num registo.",
+    'pt-BR': "Cada pacote se configura no seu próprio cartão. A chave do AlphaGenome, a aceitação dos seus termos e a instalação do seu runtime de Python agora ficam dentro do pacote, em vez de espalhadas pelas configurações do Nodus. Sua chave fica no armazenamento de credenciais do sistema e chega ao interpretador pela entrada padrão, nunca em uma linha de comando nem em um log.",
+  },
+  {
+    scope: 'plugin',
+    es: "Un paquete solo llega firmado por NodusResearch. Nodus comprueba la firma y la huella exacta de lo que descarga antes de abrirlo, rechaza una versión más antigua que la instalada y rechaza un contenido distinto publicado con el mismo número. Una actualización que pida más permisos de los que aprobaste espera a que la revises en lugar de aplicarse sola.",
+    en: "A package only arrives signed by NodusResearch. Nodus checks the signature and the exact fingerprint of what it downloads before opening it, refuses a version older than the one installed, and refuses different content published under the same number. An update that asks for more than you approved waits for you to review it instead of applying itself.",
+    fr: "Un paquet n'arrive que signé par NodusResearch. Nodus vérifie la signature et l'empreinte exacte de ce qu'il télécharge avant de l'ouvrir, refuse une version plus ancienne que celle installée et refuse un contenu différent publié sous le même numéro. Une mise à jour qui demande plus que ce que vous aviez approuvé attend votre examen au lieu de s'appliquer seule.",
+    de: "Ein Paket kommt nur signiert von NodusResearch an. Nodus prüft die Signatur und den genauen Fingerabdruck des Downloads, bevor es ihn öffnet, lehnt eine ältere Version als die installierte ab und lehnt abweichende Inhalte unter derselben Nummer ab. Ein Update, das mehr verlangt als Sie genehmigt haben, wartet auf Ihre Prüfung, statt sich selbst anzuwenden.",
+    pt: "Um pacote só chega assinado pela NodusResearch. O Nodus verifica a assinatura e a impressão digital exata do que descarrega antes de o abrir, recusa uma versão mais antiga do que a instalada e recusa um conteúdo diferente publicado com o mesmo número. Uma atualização que peça mais do que aprovaste espera pela tua revisão em vez de se aplicar sozinha.",
+    'pt-BR': "Um pacote só chega assinado pela NodusResearch. O Nodus verifica a assinatura e a impressão digital exata do que baixa antes de abri-lo, recusa uma versão mais antiga do que a instalada e recusa um conteúdo diferente publicado com o mesmo número. Uma atualização que peça mais do que você aprovou espera pela sua revisão em vez de se aplicar sozinha.",
+  },
+  {
+    scope: 'ai',
+    es: "Los resultados se guardan junto a la conversación y cada paquete decide qué ve el modelo. Una predicción de AlphaGenome sigue sin salir de tu dispositivo, y ahora esa regla la declara el propio paquete en lugar de estar escrita dentro de Nodus. Si desinstalas un paquete, los resultados que ya tenías en tus chats se conservan y puedes volver a instalarlo desde el propio mensaje.",
+    en: "Results are stored beside the conversation and each package decides what the model sees. An AlphaGenome prediction still never leaves your device, and that rule is now declared by the package itself instead of being written into Nodus. If you uninstall a package, the results already in your chats are kept and you can reinstall it from the message itself.",
+    fr: "Les résultats sont conservés à côté de la conversation et chaque paquet décide de ce que voit le modèle. Une prédiction AlphaGenome ne quitte toujours pas votre appareil, et cette règle est désormais déclarée par le paquet lui-même au lieu d'être inscrite dans Nodus. Si vous désinstallez un paquet, les résultats déjà présents dans vos conversations sont conservés et vous pouvez le réinstaller depuis le message.",
+    de: "Ergebnisse liegen neben der Unterhaltung, und jedes Paket entscheidet, was das Modell sieht. Eine AlphaGenome-Vorhersage verlässt Ihr Gerät weiterhin nicht, und diese Regel erklärt nun das Paket selbst, statt in Nodus einprogrammiert zu sein. Wenn Sie ein Paket deinstallieren, bleiben die Ergebnisse in Ihren Chats erhalten und Sie können es direkt aus der Nachricht neu installieren.",
+    pt: "Os resultados ficam guardados junto à conversa e cada pacote decide o que o modelo vê. Uma previsão do AlphaGenome continua a não sair do teu dispositivo, e essa regra passa a ser declarada pelo próprio pacote em vez de estar escrita dentro do Nodus. Se desinstalares um pacote, os resultados que já tinhas nos teus chats mantêm-se e podes reinstalá-lo a partir da própria mensagem.",
+    'pt-BR': "Os resultados ficam guardados junto da conversa e cada pacote decide o que o modelo vê. Uma previsão do AlphaGenome continua não saindo do seu dispositivo, e essa regra agora é declarada pelo próprio pacote em vez de estar escrita dentro do Nodus. Se você desinstalar um pacote, os resultados que já tinha nos seus chats são mantidos e você pode reinstalá-lo a partir da própria mensagem.",
+  },
+  {
+    scope: 'toolkit',
+    es: "Las carpetas del PDF Presenter ahora son etiquetas, que es lo que siempre fueron. Al pulsar una verás solo las presentaciones que la llevan, y al volver a pulsarla las verás todas otra vez. Borrar una etiqueta te pregunta antes y nunca se lleva sus presentaciones por delante. Solo dejan de estar etiquetadas. Las estanterías que organizaste antes de esta actualización se abren tal y como las dejaste.",
+    en: "The PDF Presenter's folders are now tags, which is what they always were. Clicking one shows only the presentations that carry it, and clicking it again shows them all. Deleting a tag asks first and never takes its presentations with it. They simply stop being tagged. Shelves you organised before this update open exactly as you left them.",
+    fr: "Les dossiers du PDF Presenter sont désormais des étiquettes, ce qu'ils ont toujours été. Cliquer sur l'une d'elles n'affiche que les présentations qui la portent, et cliquer à nouveau les affiche toutes. Supprimer une étiquette demande confirmation et n'emporte jamais ses présentations. Elles cessent simplement d'être étiquetées. Les étagères que vous aviez organisées avant cette mise à jour s'ouvrent telles que vous les aviez laissées.",
+    de: "Die Ordner des PDF Presenter sind jetzt Tags, was sie immer schon waren. Ein Klick darauf zeigt nur die Präsentationen mit diesem Tag, ein erneuter Klick zeigt wieder alle. Das Löschen eines Tags fragt vorher nach und nimmt seine Präsentationen nie mit. Sie sind danach einfach ohne Tag. Regale, die Sie vor diesem Update sortiert haben, öffnen sich genau so, wie Sie sie verlassen haben.",
+    pt: "As pastas do PDF Presenter são agora etiquetas, que é o que sempre foram. Carregar numa mostra apenas as apresentações que a têm, e carregar outra vez mostra-as todas. Eliminar uma etiqueta pergunta primeiro e nunca leva as suas apresentações atrás. Passam simplesmente a não ter etiqueta. As estantes que organizaste antes desta atualização abrem tal como as deixaste.",
+    'pt-BR': "As pastas do PDF Presenter agora são etiquetas, que é o que sempre foram. Clicar em uma mostra apenas as apresentações que a têm, e clicar de novo mostra todas. Excluir uma etiqueta pergunta antes e nunca leva as apresentações junto. Elas simplesmente deixam de ter etiqueta. As estantes que você organizou antes desta atualização abrem exatamente como você as deixou.",
+  },
+  {
+    scope: 'toolkit',
+    es: "Una presentación ya puede salir de la biblioteca. Descargar PDF guarda donde tú quieras la copia que Nodus conserva, así que una presentación que importaste desde PowerPoint o Keynote es tuya en PDF aunque ya no tengas el original. La copia de tu estantería se queda donde está.",
+    en: "A presentation can now leave the library. Download PDF saves the copy Nodus keeps wherever you choose, so a deck you imported from PowerPoint or Keynote is yours as a PDF even if you no longer have the original. The copy on your shelf stays where it is.",
+    fr: "Une présentation peut enfin quitter la bibliothèque. Télécharger le PDF enregistre où vous voulez la copie que Nodus conserve, donc une présentation importée depuis PowerPoint ou Keynote est à vous en PDF même si vous n'avez plus l'original. La copie de votre étagère reste où elle est.",
+    de: "Eine Präsentation kann die Bibliothek jetzt verlassen. PDF herunterladen speichert die Kopie, die Nodus aufbewahrt, an einem Ort Ihrer Wahl. So gehört Ihnen ein aus PowerPoint oder Keynote importierter Foliensatz als PDF, auch wenn Sie das Original nicht mehr haben. Die Kopie im Regal bleibt, wo sie ist.",
+    pt: "Uma apresentação já pode sair da biblioteca. Transferir PDF guarda onde quiseres a cópia que o Nodus mantém, por isso uma apresentação que importaste do PowerPoint ou do Keynote é tua em PDF mesmo que já não tenhas o original. A cópia da tua estante fica onde está.",
+    'pt-BR': "Uma apresentação já pode sair da biblioteca. Baixar PDF salva onde você quiser a cópia que o Nodus mantém, então uma apresentação que você importou do PowerPoint ou do Keynote é sua em PDF mesmo que não tenha mais o original. A cópia da sua estante continua onde está.",
+  },
+  {
+    scope: 'toolkit',
+    es: "El importador de notas lee un segundo tipo de archivo TXT. Además del formato que exporta Nodus, ahora acepta archivos de notas recuperadas que solo listan las diapositivas que tienen nota. Nodus toma el número de diapositivas de la cabecera del propio archivo, así que un archivo con notas para 130 de 140 ya no parece un descuadre.",
+    en: "The notes importer reads a second kind of TXT file. Alongside the format Nodus exports, it now accepts recovered notes files that list only the slides that have a note. Nodus takes the deck length from the file's own header, so a file with notes for 130 slides out of 140 no longer looks like a mismatch.",
+    fr: "L'importateur de notes lit un second type de fichier TXT. En plus du format exporté par Nodus, il accepte maintenant les fichiers de notes récupérées qui ne listent que les diapositives ayant une note. Nodus lit le nombre de diapositives dans l'en-tête du fichier, donc un fichier avec des notes pour 130 diapositives sur 140 ne ressemble plus à une erreur.",
+    de: "Der Notizen-Import liest eine zweite Art von TXT-Datei. Neben dem Format, das Nodus exportiert, akzeptiert er nun wiederhergestellte Notizdateien, die nur die Folien mit einer Notiz auflisten. Nodus entnimmt die Anzahl der Folien der Kopfzeile der Datei selbst, sodass eine Datei mit Notizen für 130 von 140 Folien nicht mehr wie ein Fehler aussieht.",
+    pt: "O importador de notas lê um segundo tipo de ficheiro TXT. Além do formato que o Nodus exporta, aceita agora ficheiros de notas recuperadas que listam apenas os diapositivos que têm nota. O Nodus lê o número de diapositivos no cabeçalho do próprio ficheiro, por isso um ficheiro com notas para 130 de 140 já não parece um erro.",
+    'pt-BR': "O importador de notas lê um segundo tipo de arquivo TXT. Além do formato que o Nodus exporta, agora aceita arquivos de notas recuperadas que listam apenas os slides que têm nota. O Nodus lê a quantidade de slides no cabeçalho do próprio arquivo, então um arquivo com notas para 130 de 140 não parece mais um erro.",
+  },
+];
+
+/**
+ * v5.3.1 — the Skills Marketplace learns what you already have, and skills start
+ * arriving as plugins.
+ *
+ * Written for someone who opened Skills once and closed it again: what is different
+ * for THEM. The plugin entries lead because the sandbox is the promise the rest of the
+ * release rests on, and the last entry keeps the three small visible fixes together
+ * instead of spending a card on each.
+ */
+const RELEASE_5_3_1_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'marketplace',
+    es: "El Marketplace ya sabe qué skills tienes. Las skills incluidas en Nodus aparecen como instaladas en vez de ofrecerse otra vez, un filtro Todas / Instaladas / Disponibles revisa tu biblioteca desde el catálogo y cada skill instalada se puede quitar desde su tarjeta. Instalar una entrada que Nodus ya incluye restaura la versión de tu instalación en lugar de añadir un duplicado, y limpia el duplicado que hubiera dejado una versión anterior.",
+    en: "The Marketplace now knows which skills you already have. Skills included in Nodus appear as installed instead of being offered again, an All / Installed / Available filter reviews your library from the catalog, and every installed skill can be removed from its card. Installing an entry Nodus already includes restores the version shipped with your build instead of adding a duplicate, and clears out a duplicate an earlier build had installed.",
+    fr: "Le Marketplace sait désormais quelles skills vous possédez déjà. Les skills incluses dans Nodus apparaissent comme installées au lieu d’être proposées à nouveau, un filtre Toutes / Installées / Disponibles passe votre bibliothèque en revue depuis le catalogue et chaque skill installée peut être retirée depuis sa fiche. Installer une entrée que Nodus inclut déjà restaure la version livrée avec votre build au lieu d’ajouter un doublon, et supprime le doublon laissé par une version antérieure.",
+    de: "Der Marketplace weiß jetzt, welche Skills Sie bereits haben. In Nodus enthaltene Skills erscheinen als installiert, statt erneut angeboten zu werden. Ein Filter Alle / Installiert / Verfügbar prüft Ihre Bibliothek vom Katalog aus, und jeder installierte Skill lässt sich auf seiner Karte entfernen. Ein Eintrag, den Nodus bereits enthält, stellt bei der Installation die mitgelieferte Fassung wieder her, statt ein Duplikat anzulegen, und räumt ein Duplikat einer früheren Version mit auf.",
+    pt: "O Marketplace já sabe que skills tem. As skills incluídas no Nodus aparecem como instaladas em vez de serem oferecidas de novo, um filtro Todas / Instaladas / Disponíveis revê a sua biblioteca a partir do catálogo e cada skill instalada pode ser retirada no seu cartão. Instalar uma entrada que o Nodus já inclui repõe a versão da sua instalação em vez de acrescentar um duplicado, e limpa o duplicado deixado por uma versão anterior.",
+    'pt-BR': "O Marketplace agora sabe quais skills você já tem. As skills incluídas no Nodus aparecem como instaladas em vez de serem oferecidas de novo, um filtro Todas / Instaladas / Disponíveis revisa sua biblioteca a partir do catálogo e cada skill instalada pode ser removida no seu cartão. Instalar uma entrada que o Nodus já inclui restaura a versão do seu build em vez de acrescentar uma duplicata, e limpa a duplicata deixada por uma versão anterior.",
+  },
+  {
+    scope: 'marketplace',
+    es: "Ahora te enteras antes de instalar si un plugin necesita un Nodus más nuevo. La pantalla de revisión compara tu versión con la que el plugin exige y lo indica encima del botón de instalar, y la confirmación lo repite. Un plugin que ya está esperando indica en su tarjeta la versión que necesita, en lugar de mostrar su propia descripción sin explicar nada.",
+    en: "You find out before installing when a plugin needs a newer Nodus. The review screen compares your build with the version the plugin requires and says so above the install button, and the confirmation repeats it. A plugin that is already waiting now names the version it needs on its card, instead of showing its own description with no reason given.",
+    fr: "Vous savez avant l’installation qu’un plugin exige un Nodus plus récent. L’écran de vérification compare votre build à la version requise par le plugin et l’indique au-dessus du bouton d’installation, et la confirmation le répète. Un plugin déjà en attente indique maintenant sur sa fiche la version dont il a besoin, au lieu d’afficher sa propre description sans donner de raison.",
+    de: "Sie erfahren schon vor der Installation, wenn ein Plugin ein neueres Nodus braucht. Die Prüfansicht vergleicht Ihre Version mit der geforderten und weist über der Schaltfläche darauf hin, und die Bestätigung wiederholt es. Ein bereits wartendes Plugin nennt auf seiner Karte jetzt die benötigte Version, statt ohne Begründung nur die eigene Beschreibung zu zeigen.",
+    pt: "Passa a saber antes de instalar se um plugin precisa de um Nodus mais recente. O ecrã de revisão compara a sua versão com a exigida pelo plugin e indica-o por cima do botão de instalar, e a confirmação repete-o. Um plugin que já está à espera indica no seu cartão a versão de que precisa, em vez de mostrar a própria descrição sem explicação.",
+    'pt-BR': "Você descobre antes de instalar se um plugin precisa de um Nodus mais novo. A tela de revisão compara sua versão com a exigida pelo plugin e informa isso acima do botão de instalar, e a confirmação repete a mensagem. Um plugin que já está aguardando agora indica no seu cartão a versão de que precisa, em vez de mostrar a própria descrição sem explicar nada.",
+  },
+  {
+    scope: 'plugin',
+    es: "Las skills ya pueden llegar como plugins. Un plugin es un paquete con versión que agrupa varias skills junto a sus propias herramientas aisladas. Esas herramientas se ejecutan en una sesión temporal de Chromium sin acceso a tus archivos, a Nodus ni a la red, y solo salen al exterior por las direcciones HTTPS que declara el paquete. Las claves que configures las inserta Nodus en la petición y nunca son visibles para el código del plugin.",
+    en: "Skills can now arrive as plugins. A plugin is one versioned package that bundles several skills together with sandboxed tools of their own. Those tools run in a temporary Chromium session with no access to your files, to Nodus or to the network, and they reach the outside only through the HTTPS addresses the package declares. Keys you configure are inserted by Nodus into the request and are never visible to the plugin's code.",
+    fr: "Les skills peuvent désormais arriver sous forme de plugins. Un plugin est un paquet versionné qui regroupe plusieurs skills avec leurs propres outils isolés. Ces outils s’exécutent dans une session Chromium temporaire sans accès à vos fichiers, à Nodus ni au réseau, et ne sortent que par les adresses HTTPS déclarées par le paquet. Les clés que vous configurez sont insérées par Nodus dans la requête et ne sont jamais visibles pour le code du plugin.",
+    de: "Skills können jetzt als Plugins kommen. Ein Plugin ist ein versioniertes Paket, das mehrere Skills zusammen mit eigenen abgeschotteten Werkzeugen bündelt. Diese Werkzeuge laufen in einer temporären Chromium-Sitzung ohne Zugriff auf Ihre Dateien, auf Nodus oder das Netzwerk und erreichen die Außenwelt nur über die HTTPS-Adressen, die das Paket angibt. Schlüssel, die Sie hinterlegen, fügt Nodus in die Anfrage ein und sie sind für den Code des Plugins nie sichtbar.",
+    pt: "As skills já podem chegar como plugins. Um plugin é um pacote com versão que reúne várias skills e as suas próprias ferramentas isoladas. Essas ferramentas correm numa sessão temporária do Chromium sem acesso aos seus ficheiros, ao Nodus nem à rede, e só saem para o exterior pelos endereços HTTPS que o pacote declara. As chaves que configurar são inseridas pelo Nodus no pedido e nunca ficam visíveis para o código do plugin.",
+    'pt-BR': "As skills agora podem chegar como plugins. Um plugin é um pacote versionado que reúne várias skills junto com suas próprias ferramentas isoladas. Essas ferramentas rodam em uma sessão temporária do Chromium sem acesso aos seus arquivos, ao Nodus nem à rede, e só alcançam o exterior pelos endereços HTTPS que o pacote declara. As chaves que você configurar são inseridas pelo Nodus na requisição e nunca ficam visíveis para o código do plugin.",
+  },
+  {
+    scope: 'plugin',
+    es: "Los plugins se actualizan como una unidad y siempre se pueden deshacer. Una actualización que pide más de lo que aprobaste espera tu aprobación, las instrucciones que hayas editado sobreviven como una capa que puedes restablecer y la versión anterior sigue disponible. Un plugin que dejes en la carpeta del perfil se lista para revisarlo con los permisos exactos que pide, y nada suyo se ejecuta antes de que lo apruebes. Las herramientas locales tienen ahora su propio cupo de dieciséis llamadas por respuesta, aparte de las cuatro de todo lo que sale a la red o toca tus claves.",
+    en: "Plugins update as one unit and can always be undone. An update that asks for more than you approved waits for your approval, instructions you edited locally survive as an overlay you can reset, and the previous version stays available. A plugin dropped into the profile folder is listed for review with the exact permissions it requests, and nothing in it runs before you approve it. Local tools now have their own allowance of sixteen calls per reply, apart from the four for anything that reaches the network or your keys.",
+    fr: "Les plugins se mettent à jour d’un bloc et restent toujours réversibles. Une mise à jour qui demande plus que ce que vous avez approuvé attend votre accord, les instructions que vous avez modifiées survivent comme une couche réinitialisable et la version précédente reste disponible. Un plugin déposé dans le dossier du profil est listé pour vérification avec les autorisations exactes qu’il demande, et rien ne s’y exécute avant votre approbation. Les outils locaux disposent maintenant de leur propre quota de seize appels par réponse, distinct des quatre réservés à tout ce qui atteint le réseau ou vos clés.",
+    de: "Plugins aktualisieren sich als Einheit und lassen sich immer zurücknehmen. Eine Aktualisierung, die mehr verlangt als von Ihnen genehmigt, wartet auf Ihre Zustimmung, lokal bearbeitete Anweisungen bleiben als zurücksetzbare Ebene erhalten und die vorherige Fassung bleibt verfügbar. Ein Plugin im Profilordner wird mit genau den Berechtigungen zur Prüfung aufgeführt, die es verlangt, und nichts daraus läuft vor Ihrer Freigabe. Lokale Werkzeuge haben jetzt ein eigenes Kontingent von sechzehn Aufrufen pro Antwort, getrennt von den vier für alles, was ins Netz geht oder Ihre Schlüssel berührt.",
+    pt: "Os plugins atualizam-se como uma unidade e podem sempre ser desfeitos. Uma atualização que pede mais do que aprovou fica à espera da sua aprovação, as instruções que editou sobrevivem como uma camada que pode repor e a versão anterior continua disponível. Um plugin colocado na pasta do perfil é listado para revisão com as permissões exatas que pede, e nada dele corre antes de o aprovar. As ferramentas locais passam a ter a sua própria quota de dezasseis chamadas por resposta, separada das quatro de tudo o que sai para a rede ou toca nas suas chaves.",
+    'pt-BR': "Os plugins são atualizados como uma unidade e sempre podem ser desfeitos. Uma atualização que pede mais do que você aprovou fica aguardando sua aprovação, as instruções que você editou sobrevivem como uma camada que pode ser restaurada e a versão anterior continua disponível. Um plugin colocado na pasta do perfil é listado para revisão com as permissões exatas que pede, e nada dele é executado antes de você aprovar. As ferramentas locais agora têm sua própria cota de dezesseis chamadas por resposta, separada das quatro de tudo o que sai para a rede ou toca nas suas chaves.",
+  },
+  {
+    scope: 'academic',
+    es: "Deep Research respeta el número de secciones que eliges. El máximo que fijas es ahora un techo y no un mínimo, y no se pierde ninguna evidencia al compactar el plan para ajustarse a él. La nueva Extensión orientativa de cada sección ofrece Automático, 2.500, 5.000, 10.000, 15.000 y 20.000 palabras o la cifra que quieras. Cuenta palabras y no tokens, es una orientación editorial y no una cuota, y se guarda con el informe para volver contigo al reutilizar un prompt.",
+    en: "Deep Research respects the number of sections you choose. The maximum you set is now a ceiling instead of a floor, and no evidence is dropped when the plan is compacted to fit it. A new Guideline section length offers Auto, 2,500, 5,000, 10,000, 15,000 and 20,000 words or a figure of your own. It counts words and not tokens, it is editorial guidance rather than a quota, and it is stored with the report so reusing a prompt brings it back.",
+    fr: "Deep Research respecte le nombre de sections que vous choisissez. Le maximum que vous fixez est désormais un plafond et non un minimum, et aucune preuve n’est perdue lorsque le plan est compacté pour s’y tenir. La nouvelle Longueur indicative de chaque section propose Automatique, 2 500, 5 000, 10 000, 15 000 et 20 000 mots ou le chiffre de votre choix. Elle compte des mots et non des jetons, c’est une orientation éditoriale et non un quota, et elle est enregistrée avec le rapport pour revenir avec un prompt réutilisé.",
+    de: "Deep Research hält sich an die Zahl der Abschnitte, die Sie wählen. Das eingestellte Maximum ist jetzt eine Obergrenze und kein Mindestwert, und beim Verdichten des Plans geht kein Beleg verloren. Die neue Richtlänge je Abschnitt bietet Automatisch, 2.500, 5.000, 10.000, 15.000 und 20.000 Wörter oder einen eigenen Wert. Sie zählt Wörter und keine Token, ist redaktionelle Orientierung und keine Quote, und wird mit dem Bericht gespeichert, sodass sie bei einem wiederverwendeten Prompt zurückkommt.",
+    pt: "O Deep Research respeita o número de secções que escolhe. O máximo que define é agora um teto e não um mínimo, e não se perde nenhuma evidência ao compactar o plano para o cumprir. A nova Extensão orientativa de cada secção oferece Automático, 2.500, 5.000, 10.000, 15.000 e 20.000 palavras ou o valor que quiser. Conta palavras e não tokens, é uma orientação editorial e não uma quota, e fica guardada com o relatório para regressar ao reutilizar um prompt.",
+    'pt-BR': "O Deep Research respeita o número de seções que você escolhe. O máximo que você define agora é um teto e não um mínimo, e nenhuma evidência é perdida ao compactar o plano para caber nele. A nova Extensão orientativa de cada seção oferece Automático, 2.500, 5.000, 10.000, 15.000 e 20.000 palavras ou o valor que você quiser. Ela conta palavras e não tokens, é orientação editorial e não uma cota, e fica salva com o relatório para voltar quando você reutilizar um prompt.",
+  },
+  {
+    scope: 'ai',
+    es: "El selector de contexto del corpus del asistente se abre donde has hecho clic. Síntesis y los demás modos aparecen ahora en un globo anclado a su botón, en lugar de una ventana que tapa la conversación. Se cierra con Escape o con un clic fuera, y se coloca encima del botón cuando no hay sitio debajo.",
+    en: "The assistant's corpus context picker opens where you clicked. Synthesis and the other modes now appear in a balloon anchored to their button, instead of a window covering the conversation. It closes with Escape or a click outside, and it flips above the button when there is no room below.",
+    fr: "Le sélecteur de contexte du corpus de l’assistant s’ouvre là où vous avez cliqué. Synthèse et les autres modes apparaissent maintenant dans une bulle ancrée à leur bouton, au lieu d’une fenêtre qui recouvre la conversation. Elle se ferme avec Échap ou un clic à l’extérieur, et se place au-dessus du bouton quand il n’y a pas de place en dessous.",
+    de: "Die Korpus-Kontextauswahl des Assistenten öffnet sich dort, wo Sie geklickt haben. Synthese und die übrigen Modi erscheinen jetzt in einer Sprechblase an ihrer Schaltfläche, statt in einem Fenster, das das Gespräch verdeckt. Sie schließt mit Escape oder einem Klick daneben und klappt nach oben, wenn darunter kein Platz ist.",
+    pt: "O seletor de contexto do corpus do assistente abre onde clicou. Síntese e os restantes modos aparecem agora num balão ancorado ao seu botão, em vez de uma janela que tapa a conversa. Fecha-se com Escape ou com um clique fora, e coloca-se por cima do botão quando não há espaço em baixo.",
+    'pt-BR': "O seletor de contexto do corpus do assistente abre onde você clicou. Síntese e os demais modos agora aparecem em um balão ancorado ao seu botão, em vez de uma janela que cobre a conversa. Ele fecha com Escape ou com um clique fora, e se posiciona acima do botão quando não há espaço embaixo.",
+  },
+  {
+    scope: 'languages',
+    es: "El italiano se ofrece allí donde se elige el idioma de un informe. El selector del Laboratorio de escritura escribía sus opciones a mano y solo listaba siete de los ocho idiomas admitidos. Todos los compositores usan ahora la misma lista compartida, así que ya no puede faltar un idioma en uno de ellos.",
+    en: "Italian is offered everywhere a report language is chosen. The Writing Workshop picker spelled out its options by hand and listed only seven of the eight supported languages. Every composer now renders the same shared list, so a language cannot go missing from one picker again.",
+    fr: "L’italien est proposé partout où l’on choisit la langue d’un rapport. Le sélecteur du Laboratoire d’écriture écrivait ses options à la main et n’en listait que sept sur les huit langues prises en charge. Tous les compositeurs affichent désormais la même liste partagée, de sorte qu’une langue ne peut plus manquer dans l’un d’eux.",
+    de: "Italienisch steht überall zur Wahl, wo eine Berichtssprache gewählt wird. Die Auswahl im Schreiblabor führte ihre Optionen von Hand auf und nannte nur sieben der acht unterstützten Sprachen. Alle Editoren zeigen jetzt dieselbe gemeinsame Liste, sodass in keinem mehr eine Sprache fehlen kann.",
+    pt: "O italiano é oferecido em todos os sítios onde se escolhe o idioma de um relatório. O seletor do Laboratório de escrita escrevia as suas opções à mão e listava apenas sete dos oito idiomas suportados. Todos os compositores mostram agora a mesma lista partilhada, pelo que já não pode faltar um idioma num deles.",
+    'pt-BR': "O italiano é oferecido em todos os lugares onde se escolhe o idioma de um relatório. O seletor do Laboratório de escrita escrevia suas opções à mão e listava apenas sete dos oito idiomas suportados. Todos os compositores agora mostram a mesma lista compartilhada, então não pode mais faltar um idioma em um deles.",
+  },
+  {
+    scope: 'general',
+    es: "También corregimos tres detalles visibles. Salir del grafo Stellar mientras se dibuja ya no provoca un error. El panel de skills de Nodi mantiene visible la pista de cada interruptor y sus barras de desplazamiento siguen los temas claro y oscuro. Y un dibujo químico que no se puede verificar del todo se muestra ahora con sus etiquetas en lugar de descartarse.",
+    en: "We also fixed three visible details. Leaving the Stellar graph while it is still drawing no longer raises an error. Nodi's skills panel keeps the track of every switch visible and its scrollbars follow the light and dark themes. And a chemical drawing that cannot be fully verified is now shown with its labels instead of being discarded.",
+    fr: "Nous avons aussi corrigé trois détails visibles. Quitter le graphe Stellar pendant qu’il se dessine ne provoque plus d’erreur. Le panneau de skills de Nodi garde visible le rail de chaque interrupteur et ses barres de défilement suivent les thèmes clair et sombre. Et un dessin chimique qui ne peut pas être entièrement vérifié s’affiche désormais avec ses étiquettes au lieu d’être écarté.",
+    de: "Außerdem haben wir drei sichtbare Details behoben. Das Verlassen des Stellar-Graphen während des Zeichnens löst keinen Fehler mehr aus. Das Skills-Panel von Nodi zeigt die Schiene jedes Schalters wieder an, und seine Bildlaufleisten folgen dem hellen und dunklen Design. Und eine chemische Zeichnung, die nicht vollständig geprüft werden kann, erscheint jetzt mit ihren Beschriftungen, statt verworfen zu werden.",
+    pt: "Corrigimos também três detalhes visíveis. Sair do grafo Stellar enquanto está a desenhar já não provoca um erro. O painel de skills do Nodi mantém visível a calha de cada interruptor e as suas barras de deslocamento seguem os temas claro e escuro. E um desenho químico que não pode ser verificado por completo passa a ser mostrado com as suas etiquetas em vez de ser descartado.",
+    'pt-BR': "Também corrigimos três detalhes visíveis. Sair do grafo Stellar enquanto ele está desenhando não provoca mais um erro. O painel de skills do Nodi mantém visível o trilho de cada interruptor e suas barras de rolagem seguem os temas claro e escuro. E um desenho químico que não pode ser verificado por completo passa a ser mostrado com seus rótulos em vez de ser descartado.",
+  },
+];
+
+const RELEASE_5_3_0_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'marketplace',
+    es: 'Estrenamos el Marketplace de Skills. Desde Skills puedes explorar el catálogo oficial, revisar el contenido y las capacidades de cada paquete antes de instalarlo y añadir otros repositorios públicos de GitHub. Actualizar un catálogo no cambia lo que ya tienes instalado, y quitar una fuente tampoco borra sus skills.',
+    en: 'Introducing the Skills Marketplace. From Skills you can explore the official catalog, review the contents and capabilities of every package before installing it, and add other public GitHub repositories. Updating a catalog does not change what you already have installed, and removing a source does not delete its skills either.',
+    fr: 'Découvrez le Marketplace de Skills. Depuis Skills, vous pouvez explorer le catalogue officiel, examiner le contenu et les capacités de chaque paquet avant de l’installer et ajouter d’autres dépôts GitHub publics. La mise à jour d’un catalogue ne modifie pas ce qui est déjà installé, et retirer une source ne supprime pas non plus ses skills.',
+    de: 'Der Skills Marketplace ist da. Unter Skills können Sie den offiziellen Katalog erkunden, Inhalt und Fähigkeiten jedes Pakets vor der Installation prüfen und weitere öffentliche GitHub-Repositories hinzufügen. Eine Katalogaktualisierung verändert bereits installierte Inhalte nicht, und das Entfernen einer Quelle löscht ihre Skills ebenfalls nicht.',
+    pt: 'Estreia o Marketplace de Skills. Em Skills pode explorar o catálogo oficial, rever o conteúdo e as capacidades de cada pacote antes de o instalar e adicionar outros repositórios públicos do GitHub. Atualizar um catálogo não altera o que já tem instalado, e remover uma fonte também não apaga as suas skills.',
+    'pt-BR': 'Estreia o Marketplace de Skills. Em Skills você pode explorar o catálogo oficial, revisar o conteúdo e as capacidades de cada pacote antes de instalá-lo e adicionar outros repositórios públicos do GitHub. Atualizar um catálogo não altera o que já está instalado, e remover uma fonte também não apaga suas skills.',
+  },
+  {
+    scope: 'marketplace',
+    es: 'Las skills ya pueden incluir herramientas JavaScript para cálculos, transformaciones y generadores. Se ejecutan en un entorno aislado sin acceso a tus archivos, credenciales, red ni datos de Nodus. También puedes importar y exportar paquetes completos, mientras el Asistente y Nodi conservan activaciones independientes.',
+    en: 'Skills can now include JavaScript tools for calculations, transformations and generators. They run in an isolated environment without access to your files, credentials, network or Nodus data. You can also import and export complete packages, while the Assistant and Nodi keep independent activation settings.',
+    fr: 'Les skills peuvent désormais inclure des outils JavaScript pour les calculs, les transformations et les générateurs. Ils s’exécutent dans un environnement isolé sans accès à vos fichiers, identifiants, réseau ni données Nodus. Vous pouvez aussi importer et exporter des paquets complets, tandis que l’Assistant et Nodi conservent des activations indépendantes.',
+    de: 'Skills können jetzt JavaScript-Werkzeuge für Berechnungen, Umwandlungen und Generatoren enthalten. Sie laufen in einer isolierten Umgebung ohne Zugriff auf Ihre Dateien, Zugangsdaten, das Netzwerk oder Nodus-Daten. Sie können außerdem vollständige Pakete importieren und exportieren, während Assistent und Nodi getrennte Aktivierungen behalten.',
+    pt: 'As skills já podem incluir ferramentas JavaScript para cálculos, transformações e geradores. São executadas num ambiente isolado sem acesso aos seus ficheiros, credenciais, rede nem dados do Nodus. Também pode importar e exportar pacotes completos, enquanto o Assistente e o Nodi mantêm ativações independentes.',
+    'pt-BR': 'As skills agora podem incluir ferramentas JavaScript para cálculos, transformações e geradores. Elas são executadas em um ambiente isolado sem acesso aos seus arquivos, credenciais, rede nem dados do Nodus. Você também pode importar e exportar pacotes completos, enquanto o Assistente e o Nodi mantêm ativações independentes.',
+  },
+  {
+    scope: 'ai',
+    es: 'AlphaGenome llega como skill opcional para investigación no comercial. Tras añadir tu propia clave e instalar el cliente oficial, puedes pedir predicciones regulatorias de variantes GRCh38 desde los chats de Nodus. Los resultados y sus gráficas se guardan solo en este equipo, y las exportaciones conservan la atribución y las condiciones de uso.',
+    en: 'AlphaGenome arrives as an optional skill for non-commercial research. After adding your own key and installing the official client, you can request regulatory predictions for GRCh38 variants from Nodus chats. Results and plots are stored only on this computer, and exports preserve attribution and the applicable terms of use.',
+    fr: 'AlphaGenome arrive sous forme de skill facultative pour la recherche non commerciale. Après avoir ajouté votre propre clé et installé le client officiel, vous pouvez demander des prédictions régulatrices pour des variants GRCh38 depuis les chats de Nodus. Les résultats et leurs graphiques restent uniquement sur cet ordinateur, et les exportations conservent l’attribution et les conditions d’utilisation.',
+    de: 'AlphaGenome kommt als optionaler Skill für nicht kommerzielle Forschung. Nachdem Sie Ihren eigenen Schlüssel hinterlegt und den offiziellen Client installiert haben, können Sie in Nodus-Chats regulatorische Vorhersagen für GRCh38-Varianten anfordern. Ergebnisse und Diagramme bleiben ausschließlich auf diesem Rechner, und Exporte bewahren Namensnennung und Nutzungsbedingungen.',
+    pt: 'O AlphaGenome chega como skill opcional para investigação não comercial. Depois de adicionar a sua própria chave e instalar o cliente oficial, pode pedir previsões regulatórias de variantes GRCh38 nos chats do Nodus. Os resultados e gráficos ficam guardados apenas neste computador, e as exportações preservam a atribuição e as condições de utilização.',
+    'pt-BR': 'O AlphaGenome chega como skill opcional para pesquisa não comercial. Depois de adicionar sua própria chave e instalar o cliente oficial, você pode pedir previsões regulatórias de variantes GRCh38 nos chats do Nodus. Os resultados e gráficos ficam armazenados apenas neste computador, e as exportações preservam a atribuição e os termos de uso.',
+  },
+  {
+    scope: 'ai',
+    es: 'Legalize permite consultar legislación de 32 repositorios nacionales y de la Unión Europea desde cualquier chat. Indica el país, la norma o su identificador y, si quieres, el artículo. Nodus recupera el texto real con su fuente oficial, revisión y atribuciones. No necesitas Git, cuenta ni clave de API.',
+    en: 'Legalize lets you consult legislation from 32 reviewed national and European Union repositories in any chat. Name the country, the law or its identifier and, if needed, the article. Nodus retrieves the real text with its official source, revision and attribution. No Git installation, account or API key is required.',
+    fr: 'Legalize permet de consulter la législation de 32 dépôts nationaux et de l’Union européenne vérifiés depuis n’importe quel chat. Indiquez le pays, la loi ou son identifiant et, si nécessaire, l’article. Nodus récupère le texte réel avec sa source officielle, sa révision et ses attributions. Aucun Git, compte ni clé API n’est nécessaire.',
+    de: 'Mit Legalize können Sie in jedem Chat Rechtsvorschriften aus 32 geprüften nationalen und EU-Repositories abrufen. Nennen Sie das Land, das Gesetz oder seine Kennung und bei Bedarf den Artikel. Nodus holt den echten Text mit offizieller Quelle, Revision und Namensnennungen. Git, ein Konto oder ein API-Schlüssel sind nicht erforderlich.',
+    pt: 'O Legalize permite consultar legislação de 32 repositórios nacionais e da União Europeia revistos a partir de qualquer chat. Indique o país, a lei ou o seu identificador e, se necessário, o artigo. O Nodus obtém o texto real com a fonte oficial, revisão e atribuições. Não precisa de Git, conta nem chave de API.',
+    'pt-BR': 'O Legalize permite consultar legislação de 32 repositórios nacionais e da União Europeia revisados em qualquer chat. Informe o país, a lei ou seu identificador e, se necessário, o artigo. O Nodus obtém o texto real com a fonte oficial, revisão e atribuições. Você não precisa de Git, conta nem chave de API.',
+  },
+  {
+    scope: 'general',
+    es: 'También pulimos tres detalles visibles. Las importaciones temporales dejan de fallar en Windows al guardar los archivos con seguridad. El control Contexto del grafo permanece en su sitio al activarlo. Y el tutorial de PDF Presenter recupera un icono y un degradado propios de una presentación.',
+    en: 'We also polished three visible details. Temporary imports no longer fail on Windows when files are saved safely. The graph’s Context control stays in place when enabled. And the PDF Presenter tutorial now uses an icon and gradient that clearly identify it as a presentation.',
+    fr: 'Nous avons aussi peaufiné trois détails visibles. Les importations temporaires n’échouent plus sous Windows lors de l’enregistrement sécurisé des fichiers. La commande Contexte du graphe reste en place une fois activée. Et le tutoriel PDF Presenter utilise désormais une icône et un dégradé qui l’identifient clairement comme une présentation.',
+    de: 'Drei sichtbare Details wurden ebenfalls verbessert. Temporäre Importe schlagen unter Windows beim sicheren Speichern der Dateien nicht mehr fehl. Der Kontext-Schalter des Graphen bleibt beim Aktivieren an seinem Platz. Und das PDF-Presenter-Tutorial verwendet jetzt ein Symbol und einen Farbverlauf, die es klar als Präsentation kennzeichnen.',
+    pt: 'Também aperfeiçoámos três detalhes visíveis. As importações temporárias deixam de falhar no Windows ao guardar os ficheiros em segurança. O controlo Contexto do grafo permanece no lugar quando é ativado. E o tutorial do PDF Presenter passa a usar um ícone e um degradado que o identificam claramente como apresentação.',
+    'pt-BR': 'Também refinamos três detalhes visíveis. As importações temporárias não falham mais no Windows ao salvar os arquivos com segurança. O controle Contexto do grafo permanece no lugar quando é ativado. E o tutorial do PDF Presenter agora usa um ícone e um degradê que o identificam claramente como apresentação.',
+  },
+];
+
+const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: "ai",
+    "es": "Chemistry Studio llega al chat. Crea estructuras moleculares a partir de SMILES, diagramas de Lewis y dibujos ChemFig, con controles para ampliar y descargar el resultado. La interfaz está traducida y las instrucciones personalizadas de tus habilidades se conservan.",
+    "en": "Chemistry Studio comes to chat. Create molecular structures from SMILES, Lewis diagrams and ChemFig drawings, with controls to enlarge and download the result. The interface is translated and your customized skill instructions are preserved.",
+    "fr": "Chemistry Studio arrive dans le chat. Créez des structures moléculaires à partir de SMILES, des diagrammes de Lewis et des dessins ChemFig, puis agrandissez et téléchargez le résultat. L’interface est traduite et vos instructions personnalisées sont conservées.",
+    "de": "Chemistry Studio kommt in den Chat. Erstellen Sie Molekülstrukturen aus SMILES, Lewis-Diagramme und ChemFig-Zeichnungen und vergrößern oder laden Sie die Ergebnisse herunter. Die Oberfläche ist übersetzt und Ihre angepassten Skill-Anweisungen bleiben erhalten.",
+    "pt": "O Chemistry Studio chega ao chat. Crie estruturas moleculares a partir de SMILES, diagramas de Lewis e desenhos ChemFig, com controlos para ampliar e descarregar o resultado. A interface está traduzida e as instruções personalizadas das suas competências são preservadas.",
+    "pt-BR": "O Chemistry Studio chega ao chat. Crie estruturas moleculares a partir de SMILES, diagramas de Lewis e desenhos ChemFig, com controles para ampliar e baixar o resultado. A interface está traduzida e as instruções personalizadas das suas habilidades são preservadas.",
+  },
+  {
+    scope: "ai",
+    "es": "Dibujos químicos con comprobaciones explícitas. Nodus valida la identidad molecular y admite proyecciones Fischer, Haworth y Newman y reglas acotadas de SN2, E2, aldol, Diels–Alder y resonancia de amidas. Puedes descargar las evidencias y el ChemFig comprobado. Si no puede verificar una propuesta, lo indica en lugar de inventar un dibujo.",
+    "en": "Chemical drawings gain explicit checks. Nodus validates molecular identity and supports Fischer, Haworth and Newman projections and bounded rules for SN2, E2, aldol, Diels–Alder and amide resonance. Download the evidence and checked ChemFig. When a proposal cannot be verified, Nodus says so instead of inventing a drawing.",
+    "fr": "Les dessins chimiques bénéficient de contrôles explicites. Nodus valide l’identité moléculaire et prend en charge les projections de Fischer, Haworth et Newman ainsi que des règles limitées pour SN2, E2, aldol, Diels–Alder et la résonance des amides. Téléchargez les preuves et le ChemFig vérifié. Une proposition non vérifiable est signalée au lieu d’être dessinée arbitrairement.",
+    "de": "Chemische Zeichnungen erhalten ausdrückliche Prüfungen. Nodus validiert die Molekülidentität und unterstützt Fischer-, Haworth- und Newman-Projektionen sowie begrenzte Regeln für SN2, E2, Aldol, Diels–Alder und Amidresonanz. Laden Sie Prüfnachweise und geprüftes ChemFig herunter. Lässt sich ein Vorschlag nicht verifizieren, meldet Nodus dies, statt eine Zeichnung zu erfinden.",
+    "pt": "Os desenhos químicos passam a ter verificações explícitas. O Nodus valida a identidade molecular e admite projeções Fischer, Haworth e Newman e regras limitadas de SN2, E2, aldol, Diels–Alder e ressonância de amidas. Descarregue as evidências e o ChemFig verificado. Quando não consegue verificar uma proposta, indica-o em vez de inventar um desenho.",
+    "pt-BR": "Os desenhos químicos passam a ter verificações explícitas. O Nodus valida a identidade molecular e aceita projeções Fischer, Haworth e Newman e regras limitadas de SN2, E2, aldol, Diels–Alder e ressonância de amidas. Baixe as evidências e o ChemFig verificado. Quando não consegue verificar uma proposta, informa isso em vez de inventar um desenho.",
+  },
+  {
+    scope: "ai",
+    "es": "Esquemas de reacción completos y equilibrados. Se conservan las especies declaradas, los contraiones y los coeficientes, y los agentes se muestran aparte. Se comprueban elementos, isótopos, hidrógenos y carga, y se compila la exportación ChemFig completa. Un esquema equilibrado no implica un mecanismo verificado ni predice que la reacción sea viable. También mejora la estabilidad al renderizar varios dibujos.",
+    "en": "Complete, balanced reaction schemes preserve declared species, counterions and coefficients, with agents shown separately. Nodus checks elements, isotopes, hydrogens and charge and compiles the complete ChemFig export. A balanced scheme does not mean a verified mechanism or predict reaction feasibility. Rendering several drawings is also more stable.",
+    "fr": "Les schémas réactionnels complets et équilibrés conservent les espèces déclarées, contre-ions et coefficients, avec les agents affichés séparément. Nodus contrôle éléments, isotopes, hydrogènes et charge et compile l’export ChemFig complet. Un schéma équilibré ne prouve ni le mécanisme ni la faisabilité de la réaction. Le rendu de plusieurs dessins est aussi plus stable.",
+    "de": "Vollständige, ausgeglichene Reaktionsschemata bewahren angegebene Spezies, Gegenionen und Koeffizienten. Hilfsstoffe erscheinen separat. Nodus prüft Elemente, Isotope, Wasserstoff und Ladung und kompiliert den vollständigen ChemFig-Export. Ein ausgeglichenes Schema bestätigt weder den Mechanismus noch die Durchführbarkeit der Reaktion. Mehrere Zeichnungen werden zudem stabiler gerendert.",
+    "pt": "Os esquemas de reação completos e equilibrados preservam as espécies declaradas, contra-iões e coeficientes, com os agentes apresentados separadamente. O Nodus verifica elementos, isótopos, hidrogénios e carga e compila a exportação ChemFig completa. Um esquema equilibrado não significa um mecanismo verificado nem prevê a viabilidade da reação. A apresentação de vários desenhos também é mais estável.",
+    "pt-BR": "Os esquemas de reação completos e balanceados preservam as espécies declaradas, contraíons e coeficientes, com os agentes apresentados separadamente. O Nodus verifica elementos, isótopos, hidrogênios e carga e compila a exportação ChemFig completa. Um esquema balanceado não significa um mecanismo verificado nem prevê a viabilidade da reação. A renderização de vários desenhos também está mais estável.",
+  },
+  {
+    scope: "ai",
+    "es": "Menos errores al pedir respuestas a la IA. Las solicitudes se adaptan a los parámetros admitidos por cada modelo, incluidos Claude 4.7 y posteriores, GPT-5, GPT-6 y la serie o. La corrección se aplica tanto a respuestas completas como a las que aparecen mientras se generan, conservando la compatibilidad con modelos anteriores.",
+    "en": "Fewer errors when requesting AI answers. Requests adapt to the parameters each model accepts, including Claude 4.7 and later, GPT-5, GPT-6 and o-series models. The fix covers both complete and streaming responses while preserving compatibility with older models.",
+    "fr": "Moins d’erreurs lors des demandes à l’IA. Les requêtes utilisent les paramètres acceptés par chaque modèle, notamment Claude 4.7 et suivants, GPT-5, GPT-6 et la série o. La correction couvre les réponses complètes et celles affichées progressivement, tout en préservant la compatibilité avec les anciens modèles.",
+    "de": "Weniger Fehler bei KI-Anfragen. Anfragen passen sich an die unterstützten Parameter des jeweiligen Modells an, darunter Claude ab 4.7, GPT-5, GPT-6 und die o-Serie. Die Korrektur gilt für vollständige und schrittweise angezeigte Antworten und erhält die Kompatibilität mit älteren Modellen.",
+    "pt": "Menos erros ao pedir respostas à IA. Os pedidos adaptam-se aos parâmetros aceites por cada modelo, incluindo Claude 4.7 e posteriores, GPT-5, GPT-6 e a série o. A correção abrange respostas completas e progressivas, preservando a compatibilidade com modelos anteriores.",
+    "pt-BR": "Menos erros ao pedir respostas à IA. As solicitações se adaptam aos parâmetros aceitos por cada modelo, incluindo Claude 4.7 e posteriores, GPT-5, GPT-6 e a série o. A correção abrange respostas completas e progressivas, preservando a compatibilidade com modelos anteriores.",
+  },
+  {
+    scope: "academic",
+    "es": "El grafo se abre en un mapa de temas permanente. Entra en un tema y ajusta la profundidad y las relaciones visibles por idea, o abre exploraciones independientes en otras pestañas. Puedes añadir y quitar ideas del mapa y conservar cada exploración al cambiar de vista. Mejoran el zoom, las etiquetas, la selección y los controles, con los colores de tu bóveda en modo claro y oscuro.",
+    "en": "The graph opens on a permanent themes hub. Enter a theme and adjust depth and visible relationships per idea, or open independent explorations in other tabs. Add and remove ideas in the hub and preserve each exploration when navigating. Zoom, captions, selection and controls are clearer, with your vault colors in light and dark mode.",
+    "fr": "Le graphe s’ouvre sur une carte des thèmes permanente. Ouvrez un thème et réglez la profondeur et les relations visibles par idée, ou lancez des explorations indépendantes dans d’autres onglets. Ajoutez et retirez des idées de la carte et conservez chaque exploration pendant la navigation. Zoom, libellés, sélection et commandes sont plus clairs, aux couleurs du coffre en mode clair et sombre.",
+    "de": "Der Graph öffnet sich mit einer dauerhaften Themenübersicht. Öffnen Sie ein Thema und passen Sie Tiefe und sichtbare Beziehungen pro Idee an oder starten Sie unabhängige Erkundungen in weiteren Tabs. Fügen Sie Ideen hinzu oder entfernen Sie sie und behalten Sie jede Erkundung beim Navigieren. Zoom, Beschriftungen, Auswahl und Bedienelemente sind klarer und nutzen Ihre Tresorfarben im hellen und dunklen Modus.",
+    "pt": "O grafo abre num mapa de temas permanente. Entre num tema e ajuste a profundidade e as relações visíveis por ideia, ou abra explorações independentes noutros separadores. Adicione e remova ideias do mapa e preserve cada exploração ao navegar. O zoom, as legendas, a seleção e os controlos ficam mais claros, com as cores do cofre nos modos claro e escuro.",
+    "pt-BR": "O grafo abre em um mapa de temas permanente. Entre em um tema e ajuste a profundidade e as relações visíveis por ideia, ou abra explorações independentes em outras abas. Adicione e remova ideias do mapa e preserve cada exploração ao navegar. O zoom, as legendas, a seleção e os controles ficam mais claros, com as cores do cofre nos modos claro e escuro.",
+  },
+  {
+    scope: "academic",
+    "es": "Ve tu grafo dentro del corpus. Activa un fondo de contexto con intensidad ajustable en el mapa de temas y las exploraciones. Las conexiones externas destacan y puedes pulsar una idea del fondo para incorporarla al trabajo. El contexto no altera el recorrido ni sus recuentos. El total del corpus cuenta ideas únicas, también cuando varios temas las comparten, y la mejora llega a los grafos publicados en Nodus Server.",
+    "en": "See your graph within the corpus. Enable a context background with adjustable intensity in the themes hub and explorations. External connections stand out, and clicking a background idea adds it to your work. Context does not alter playback or working counts. Corpus totals count unique ideas even across overlapping themes, and published Nodus Server graphs gain the same improvements.",
+    "fr": "Situez votre graphe dans le corpus. Activez un fond contextuel d’intensité réglable dans la carte des thèmes et les explorations. Les connexions externes ressortent et un clic sur une idée du fond l’ajoute au travail. Le contexte ne modifie ni le parcours ni ses compteurs. Le total compte les idées uniques même entre thèmes superposés. Les graphes publiés sur Nodus Server en bénéficient aussi.",
+    "de": "Sehen Sie Ihren Graphen im Kontext des Korpus. Aktivieren Sie einen Hintergrund mit einstellbarer Intensität in der Themenübersicht und den Erkundungen. Externe Verbindungen werden hervorgehoben und ein Klick übernimmt eine Hintergrundidee in Ihre Arbeit. Der Kontext verändert weder Wiedergabe noch Arbeitszähler. Korpuswerte zählen eindeutige Ideen auch bei überlappenden Themen. Veröffentlichte Nodus-Server-Graphen erhalten dieselben Verbesserungen.",
+    "pt": "Veja o grafo no contexto do corpus. Ative um fundo com intensidade ajustável no mapa de temas e nas explorações. As ligações externas destacam-se e pode clicar numa ideia do fundo para a incorporar no trabalho. O contexto não altera o percurso nem as contagens de trabalho. O total conta ideias únicas mesmo entre temas sobrepostos. Os grafos publicados no Nodus Server recebem as mesmas melhorias.",
+    "pt-BR": "Veja o grafo no contexto do corpus. Ative um fundo com intensidade ajustável no mapa de temas e nas explorações. As conexões externas se destacam e você pode clicar em uma ideia do fundo para incorporá-la ao trabalho. O contexto não altera o percurso nem as contagens de trabalho. O total conta ideias únicas mesmo entre temas sobrepostos. Os grafos publicados no Nodus Server recebem as mesmas melhorias.",
+  },
+  {
+    scope: "library",
+    "es": "Búsquedas más ágiles en bibliotecas grandes. La consulta de los perfiles de documentos encuentra cada obra mediante su identificador, evitando recorrer repetidamente todos los perfiles. Se mantienen los resultados y mejora el rendimiento a medida que crece la biblioteca.",
+    "en": "Faster searches in large libraries. Document profile queries find each work by its identifier, avoiding repeated scans of all profiles. Results stay the same while performance improves as the library grows.",
+    "fr": "Des recherches plus rapides dans les grandes bibliothèques. Les requêtes sur les profils de documents retrouvent chaque œuvre par son identifiant et évitent de parcourir tous les profils à répétition. Les résultats restent identiques et les performances progressent lorsque la bibliothèque grandit.",
+    "de": "Schnellere Suche in großen Bibliotheken. Abfragen von Dokumentprofilen finden jedes Werk über seine Kennung und vermeiden wiederholtes Durchsuchen aller Profile. Die Ergebnisse bleiben gleich, während die Leistung bei wachsender Bibliothek steigt.",
+    "pt": "Pesquisas mais rápidas em bibliotecas grandes. A consulta dos perfis de documentos encontra cada obra pelo seu identificador, evitando percorrer todos os perfis repetidamente. Os resultados mantêm-se e o desempenho melhora à medida que a biblioteca cresce.",
+    "pt-BR": "Buscas mais rápidas em bibliotecas grandes. A consulta dos perfis de documentos encontra cada obra pelo identificador, evitando percorrer todos os perfis repetidamente. Os resultados são mantidos e o desempenho melhora conforme a biblioteca cresce.",
+  },
+  {
+    scope: "general",
+    "es": "Un nuevo tutorial de PDF Presenter te ayuda a descubrir la herramienta. Está disponible en Funciones, en la web y en la wiki, con título y descripción en doce idiomas. Tras las novedades aparece un aviso con el vídeo, sin reproducción automática. Al cerrarlo queda marcado como visto y no vuelve a aparecer en los siguientes inicios.",
+    "en": "A new PDF Presenter tutorial helps you discover the tool. Find it in Features, on the website and in the wiki, with title and description in twelve languages. An announcement shows the video after the release notes without autoplay. Dismissing it marks it as seen so it does not return on later launches.",
+    "fr": "Un nouveau tutoriel PDF Presenter vous fait découvrir l’outil. Retrouvez-le dans Fonctionnalités, sur le site et dans le wiki, avec titre et description en douze langues. Une annonce affiche la vidéo après les nouveautés, sans lecture automatique. Une fois fermée, elle est marquée comme vue et ne revient plus aux prochains démarrages.",
+    "de": "Ein neues PDF-Presenter-Tutorial stellt Ihnen das Werkzeug vor. Sie finden es unter Funktionen, auf der Website und im Wiki, mit Titel und Beschreibung in zwölf Sprachen. Nach den Versionshinweisen erscheint ein Hinweis mit dem Video ohne automatische Wiedergabe. Nach dem Schließen gilt er als gesehen und erscheint bei späteren Starts nicht erneut.",
+    "pt": "Um novo tutorial do PDF Presenter ajuda a descobrir a ferramenta. Está disponível em Funcionalidades, no site e na wiki, com título e descrição em doze idiomas. Após as novidades aparece um aviso com o vídeo, sem reprodução automática. Ao fechá-lo fica marcado como visto e não volta a aparecer nos arranques seguintes.",
+    "pt-BR": "Um novo tutorial do PDF Presenter ajuda a descobrir a ferramenta. Está disponível em Funcionalidades, no site e na wiki, com título e descrição em doze idiomas. Após as novidades aparece um aviso com o vídeo, sem reprodução automática. Ao fechá-lo, ele fica marcado como visto e não volta a aparecer nas próximas inicializações.",
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.4.2',
+    date: '2026-09-13',
+    highlights: RELEASE_5_4_2_HIGHLIGHTS,
+  },
+  {
+    version: '5.4.1',
+    date: '2026-09-13',
+    // This fix release intentionally reuses the 5.4.0 What's New modal: it repairs the
+    // capability packages 5.4.0 introduced, and anyone updating straight to it should still
+    // read what that release brought.
+    highlights: RELEASE_5_4_0_HIGHLIGHTS,
+  },
+  {
+    version: '5.4.0',
+    date: '2026-09-12',
+    highlights: RELEASE_5_4_0_HIGHLIGHTS,
+  },
+  {
+    version: '5.3.1',
+    date: '2026-09-10',
+    highlights: RELEASE_5_3_1_HIGHLIGHTS,
+  },
+  {
+    version: '5.3.0',
+    date: '2026-09-09',
+    highlights: RELEASE_5_3_0_HIGHLIGHTS,
+  },
+  {
+    version: '5.2.2',
+    date: '2026-09-09',
+    highlights: RELEASE_5_2_2_HIGHLIGHTS,
+  },
   {
     version: '5.2.1',
     date: '2026-09-06',

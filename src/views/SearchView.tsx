@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { GlobalSearchResult, SavedSearch, SearchMode, SearchResultKind, VaultType } from '@shared/types';
+import type { GlobalSearchResult, SavedSearch, SearchResultKind, VaultType } from '@shared/types';
 import { Icon } from '../components/ui';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 import { IdeaDetailModal } from '../components/IdeaDetailModal';
+import { mergeHybridResults } from '@shared/hybridSearch';
+import { SearchKindFilters } from '../components/search/SearchKindFilters';
 import { WorkIdeasModal } from './WorkIdeasModal';
 
-// One search box that spans the whole workspace. Two strategies: text (LIKE,
-// matches characters) and semantic (embeddings, matches meaning). Each result
-// links to the surface that owns it (graph node, reading view, persons, archive…).
 const KIND_META: Record<SearchResultKind, { label: string; icon: string }> = {
   note: { label: 'Notas', icon: 'notebook' },
   idea: { label: 'Ideas', icon: 'bulb' },
@@ -22,19 +21,14 @@ const KIND_META: Record<SearchResultKind, { label: string; icon: string }> = {
   archive: { label: 'Documentos', icon: 'archive' },
 };
 
-const ACADEMIC_TEXT_KINDS: SearchResultKind[] = ['note', 'idea', 'work', 'gap', 'theme', 'author'];
-const SEMANTIC_KINDS: SearchResultKind[] = ['idea', 'passage', 'work'];
+const ACADEMIC_TEXT_KINDS: SearchResultKind[] = ['note', 'idea', 'work', 'passage', 'gap', 'theme', 'author'];
 
 /** Text-search kinds shown for the active vault type — records vaults surface persons,
  *  events and archive documents (and drop the argumentative kinds they don't have). */
 function textKinds(vaultType: VaultType | undefined): SearchResultKind[] {
-  if (vaultType === 'genealogy') return ['person', 'event', 'archive', 'work', 'note'];
+  if (vaultType === 'genealogy') return ['person', 'event', 'archive', 'work', 'passage', 'note'];
   if (vaultType === 'primary_sources') return ['person', 'event', 'archive', 'work', 'idea', 'author', 'note'];
   return ACADEMIC_TEXT_KINDS;
-}
-
-function kindsForMode(mode: SearchMode, vaultType: VaultType | undefined): SearchResultKind[] {
-  return mode === 'semantic' ? SEMANTIC_KINDS : textKinds(vaultType);
 }
 
 interface SimilarTarget {
@@ -60,12 +54,12 @@ export function SearchView({
   onOpenArchive: () => void;
 }) {
   const [query, setQuery] = useState('');
-  const [mode, setMode] = useState<SearchMode>('text');
   const [activeKinds, setActiveKinds] = useState<Set<SearchResultKind>>(() => new Set(textKinds(vaultType)));
   const [results, setResults] = useState<GlobalSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
+  const [error, setError] = useState('');
   const [similar, setSimilar] = useState<SimilarTarget | null>(null);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [ideaModalId, setIdeaModalId] = useState<string | null>(null);
@@ -77,33 +71,17 @@ export function SearchView({
   }, []);
 
   const reloadSaved = useCallback(() => {
-    void window.nodus.listSavedSearches().then(setSavedSearches);
+    void window.nodus.listSavedSearches().then(setSavedSearches).catch(() => setSavedSearches([]));
   }, []);
   useEffect(() => {
     reloadSaved();
   }, [reloadSaved]);
 
-  const switchMode = (next: SearchMode) => {
-    if (next === mode) return;
-    setMode(next);
-    setActiveKinds(new Set(kindsForMode(next, vaultType)));
-    setSimilar(null);
-    setUnavailable(false);
-  };
-
-  const toggleKind = (kind: SearchResultKind) => {
-    setActiveKinds((prev) => {
-      const next = new Set(prev);
-      if (next.has(kind)) next.delete(kind);
-      else next.add(kind);
-      // Never leave the filter empty — that would hide everything.
-      if (next.size === 0) return new Set(kindsForMode(mode, vaultType));
-      return next;
-    });
-  };
+  useEffect(() => { setActiveKinds(new Set(textKinds(vaultType))); setQuery(''); setSimilar(null); }, [vaultType]);
 
   // Debounced live search; ignores stale responses if inputs changed meanwhile.
   useEffect(() => {
+    setError(''); setResults([]);
     // "Ideas parecidas a esta" runs immediately off an idea id, not the query box.
     if (similar) {
       setLoading(true);
@@ -114,14 +92,14 @@ export function SearchView({
         setUnavailable(!res.available);
         setSearched(true);
         setLoading(false);
-      });
+      }).catch((cause) => { if (active) { setError(String(cause)); setLoading(false); } });
       return () => {
         active = false;
       };
     }
 
     const q = query.trim();
-    if (q.length < 2) {
+    if (q.length < 2 || !activeKinds.size) {
       setResults([]);
       setSearched(false);
       setUnavailable(false);
@@ -131,47 +109,35 @@ export function SearchView({
     setLoading(true);
     let active = true;
     const handle = window.setTimeout(() => {
-      if (mode === 'semantic') {
-        void window.nodus
-          .semanticSearch(q, { kinds: [...activeKinds] })
-          .then((res) => {
-            if (!active) return;
-            setResults(res.results);
-            setUnavailable(!res.available);
-            setSearched(true);
-            setLoading(false);
-          });
-      } else {
-        void window.nodus.globalSearch(q).then((res) => {
-          if (!active) return;
-          setResults(res);
-          setUnavailable(false);
-          setSearched(true);
-          setLoading(false);
-        });
-      }
+      const literalRequest = window.nodus.globalSearch(q, 80, [...activeKinds]);
+      void literalRequest.then((literal) => {
+        if (active) { setResults(mergeHybridResults(q, literal, [], activeKinds)); setSearched(true); }
+      }).catch(() => {});
+      void Promise.allSettled([
+        literalRequest,
+        activeKinds.size ? window.nodus.semanticSearch(q, { kinds: [...activeKinds], limit: 80 }) : Promise.resolve({ available: true, results: [] }),
+      ]).then(([literal, semantic]) => {
+        if (!active) return;
+        setResults(mergeHybridResults(q, literal.status === 'fulfilled' ? literal.value : [],
+          semantic.status === 'fulfilled' ? semantic.value.results : [], activeKinds));
+        if (literal.status === 'rejected') setError(String(literal.reason));
+        setUnavailable(semantic.status === 'rejected' || !semantic.value.available);
+        setSearched(true);
+        setLoading(false);
+      });
     }, 220);
     return () => {
       active = false;
       window.clearTimeout(handle);
     };
-  }, [query, mode, activeKinds, similar]);
+  }, [query, activeKinds, similar, vaultType]);
 
   const visible = useMemo(
     () => results.filter((r) => activeKinds.has(r.kind)),
     [results, activeKinds]
   );
 
-  const grouped = useMemo(() => {
-    const order = kindsForMode(mode, vaultType);
-    const map = new Map<SearchResultKind, GlobalSearchResult[]>();
-    for (const r of visible) {
-      const list = map.get(r.kind) ?? [];
-      list.push(r);
-      map.set(r.kind, list);
-    }
-    return order.filter((k) => map.has(k)).map((k) => ({ kind: k, items: map.get(k)! }));
-  }, [visible, mode, vaultType]);
+  const categoryCount = new Set(visible.map((hit) => hit.kind)).size;
 
   const locate = (r: GlobalSearchResult) => {
     switch (r.kind) {
@@ -231,28 +197,26 @@ export function SearchView({
   };
 
   const findSimilar = (r: GlobalSearchResult) => {
-    setMode('semantic');
     setActiveKinds(new Set(['idea']));
     setSimilar({ ideaId: r.id, ideaTitle: r.title });
   };
 
   const clearSimilar = () => {
     setSimilar(null);
-    setActiveKinds(new Set(kindsForMode(mode, vaultType)));
+    setActiveKinds(new Set(textKinds(vaultType)));
   };
 
   const saveCurrent = () => {
     const q = query.trim();
     if (q.length < 2 || similar) return;
     void window.nodus
-      .saveSearch({ name: q, query: q, mode, kinds: [...activeKinds] })
+      .saveSearch({ name: q, query: q, mode: 'hybrid', kinds: [...activeKinds] })
       .then(reloadSaved);
   };
 
   const applySaved = (s: SavedSearch) => {
     setSimilar(null);
-    setMode(s.mode);
-    setActiveKinds(new Set(s.kinds.length ? s.kinds : kindsForMode(s.mode, vaultType)));
+    setActiveKinds(new Set((s.mode === 'hybrid' || s.kinds.length ? s.kinds : textKinds(vaultType)).filter((kind) => textKinds(vaultType).includes(kind))));
     setQuery(s.query);
   };
 
@@ -260,7 +224,7 @@ export function SearchView({
     void window.nodus.deleteSavedSearch(id).then(reloadSaved);
   };
 
-  const availableKinds = kindsForMode(mode, vaultType);
+  const availableKinds = textKinds(vaultType);
   const canSave = query.trim().length >= 2 && !similar;
 
   return (
@@ -269,20 +233,7 @@ export function SearchView({
         <div className="flex items-center gap-3 mb-4">
           <Icon name="search" size={22} className="text-indigo-300" />
           <h1 className="text-xl font-semibold">{t('Búsqueda global')}</h1>
-          <div className="ml-auto inline-flex rounded-md border border-neutral-700 overflow-hidden text-xs">
-            <button
-              className={`px-3 py-1.5 ${mode === 'text' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
-              onClick={() => switchMode('text')}
-            >
-              {t('Texto')}
-            </button>
-            <button
-              className={`px-3 py-1.5 ${mode === 'semantic' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
-              onClick={() => switchMode('semantic')}
-            >
-              {t('Significado')}
-            </button>
-          </div>
+
         </div>
 
         {similar ? (
@@ -305,11 +256,7 @@ export function SearchView({
             <input
               ref={inputRef}
               className="input input-with-leading-icon w-full"
-              placeholder={
-                mode === 'semantic'
-                  ? t('Describe una idea o pregunta; busca por significado en ideas, pasajes y obras…')
-                  : t('Busca en notas, ideas, obras, huecos, temas y autores…')
-              }
+              placeholder={t('Escribe para buscar…')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -327,24 +274,8 @@ export function SearchView({
 
         {/* Kind filters */}
         <div className="flex flex-wrap items-center gap-1.5 mt-3">
-          {availableKinds.map((k) => {
-            const meta = KIND_META[k];
-            const on = activeKinds.has(k);
-            return (
-              <button
-                key={k}
-                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${
-                  on
-                    ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200'
-                    : 'border-neutral-700 text-neutral-500 hover:text-neutral-300'
-                }`}
-                onClick={() => toggleKind(k)}
-                disabled={Boolean(similar)}
-              >
-                <Icon name={meta.icon} size={12} /> {t(meta.label)}
-              </button>
-            );
-          })}
+          <SearchKindFilters options={availableKinds.map((kind) => ({ kind, ...KIND_META[kind] }))}
+            selected={activeKinds} onChange={setActiveKinds} disabled={Boolean(similar)} />
           {canSave && (
             <button
               className="ml-auto inline-flex items-center gap-1 rounded-full border border-neutral-700 px-2.5 py-1 text-xs text-neutral-400 hover:text-neutral-200"
@@ -381,14 +312,15 @@ export function SearchView({
           </div>
         )}
 
+        {error && <p role="alert" className="mt-3 text-xs text-red-500">{error}</p>}
         {unavailable && (
           <p className="text-xs text-amber-400/90 mt-3">
             {t('La búsqueda por significado necesita embeddings. Configura el proveedor y la clave de embeddings en Ajustes e indexa la biblioteca.')}
           </p>
         )}
-        {searched && !unavailable && (
+        {searched && (
           <p className="text-xs text-neutral-500 mt-2">
-            {tx('{n} resultado(s) en {g} categoría(s).', { n: visible.length, g: grouped.length })}
+            {tx('{n} resultado(s) en {g} categoría(s).', { n: visible.length, g: categoryCount })}
           </p>
         )}
       </div>
@@ -397,35 +329,26 @@ export function SearchView({
         <div className="max-w-3xl w-full mx-auto space-y-5">
           {!similar && query.trim().length < 2 && (
             <p className="text-sm text-neutral-600 text-center py-10">
-              {mode === 'semantic'
-                ? t('Describe una idea para encontrar pasajes, ideas y obras con significado parecido.')
-                : t('Escribe al menos dos caracteres para buscar en todo el espacio de trabajo.')}
+              {t('Escribe al menos dos caracteres para buscar en todo el espacio de trabajo.')}
             </p>
           )}
-          {searched && !unavailable && visible.length === 0 && (
+          {searched && visible.length === 0 && (
             <p className="text-sm text-neutral-500 text-center py-10">{t('Sin resultados.')}</p>
           )}
-          {grouped.map(({ kind, items }) => {
-            const meta = KIND_META[kind];
-            return (
-              <section key={kind}>
-                <div className="flex items-center gap-2 mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  <Icon name={meta.icon} size={14} />
-                  {t(meta.label)}
-                  <span className="text-neutral-600">({items.length})</span>
-                </div>
-                <ul className="space-y-1">
-                  {items.map((r) => (
-                    <li key={`${r.kind}:${r.id}`}>
+          <ul className="space-y-1">
+          {visible.map((r) => {
+            const meta = KIND_META[r.kind];
+            return <li key={`${r.kind}:${r.id}`}>
                       <div className="group flex w-full items-start gap-3 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 py-2 transition-colors hover:border-neutral-700 hover:bg-neutral-900">
                         <button className="flex min-w-0 flex-1 items-start gap-3 text-left" onClick={() => openResult(r)}>
                           <Icon name={meta.icon} size={15} className="mt-0.5 shrink-0 text-neutral-500" />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="truncate text-sm text-neutral-100">{r.title}</span>
-                              {typeof r.similarity === 'number' && (
-                                <span className="shrink-0 rounded bg-indigo-900/50 px-1.5 py-0.5 text-[10px] tabular-nums text-indigo-300">
-                                  {Math.round(r.similarity * 100)}%
+                              <span className="text-[10px] text-neutral-500">{t(meta.label)}</span>
+                              {typeof (r.relevance ?? r.similarity) === 'number' && (
+                                <span title={t('Relevancia')} className="shrink-0 rounded bg-indigo-900/50 px-1.5 py-0.5 text-[10px] tabular-nums text-indigo-300">
+                                  {Math.round((r.relevance ?? r.similarity ?? 0) * 100)}%
                                 </span>
                               )}
                               {r.subtitle && (
@@ -445,12 +368,9 @@ export function SearchView({
                           </button>
                         )}
                       </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            );
+            </li>;
           })}
+          </ul>
         </div>
       </div>
       {ideaModalId && (

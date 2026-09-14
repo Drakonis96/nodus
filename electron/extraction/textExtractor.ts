@@ -12,7 +12,7 @@ import type {
   WorkTextSource,
   TextBlockReason,
 } from '@shared/types';
-import { itemChildren, itemAsAttachment, getFulltext, attachmentFilePath, ZoteroAttachment } from '../zotero/zoteroClient';
+import { itemChildren, itemAsAttachment, getFulltext, attachmentFilePath, ZoteroAttachment, ZoteroRequestError } from '../zotero/zoteroClient';
 import { openPdf, pageText } from './pdfjsLoader';
 import { analyzePdf } from './pdfAnalyzer';
 import { ocrPdfPages, ocrImageFile } from './ocr';
@@ -747,12 +747,21 @@ export interface TextAvailabilityProbe {
 async function textAttachmentsFor(userId: string, zoteroKey: string, itemType?: string | null): Promise<ZoteroAttachment[]> {
   let attachments: ZoteroAttachment[] = [];
   if ((itemType ?? '').toLowerCase() === 'attachment') {
-    const self = await itemAsAttachment(userId, zoteroKey).catch(() => null);
+    const self = await itemAsAttachment(userId, zoteroKey);
     if (self) attachments = [self];
   } else {
-    attachments = await itemChildren(userId, zoteroKey).catch(() => [] as ZoteroAttachment[]);
+    // Do NOT swallow a connection failure here: an unreachable Zotero is not
+    // evidence that the item has no attachment. Callers must distinguish the two
+    // (see `isZoteroUnreachable`) so a transient outage is never recorded as
+    // `no_attachment` and the work is retried instead of skipped.
+    attachments = await itemChildren(userId, zoteroKey);
   }
   return attachments.filter(isTextAttachment);
+}
+
+/** True when the failure means "we could not ask Zotero", not "Zotero said no". */
+export function isZoteroUnreachable(error: unknown): boolean {
+  return error instanceof ZoteroRequestError && error.retryable;
 }
 
 /**
@@ -766,7 +775,16 @@ export async function probeWorkTextAvailability(
   storagePath: string,
   opts: { preferZoteroFulltext: boolean; itemType?: string | null }
 ): Promise<TextAvailabilityProbe> {
-  const textAttachments = await textAttachmentsFor(userId, zoteroKey, opts.itemType);
+  let textAttachments: ZoteroAttachment[];
+  try {
+    textAttachments = await textAttachmentsFor(userId, zoteroKey, opts.itemType);
+  } catch {
+    // Zotero unreachable (or an unreadable response): availability is unknown.
+    // Report "not available now" without recording anything: the next sync will
+    // probe again once the local API answers, rather than poisoning the work with
+    // a false negative.
+    return { available: false, sourceType: null, reason: 'none' };
+  }
   const effectiveStorage = storagePath || defaultZoteroStorage();
   for (const att of textAttachments) {
     let filePath = await attachmentFilePath(userId, att.key).catch(() => null);
@@ -902,6 +920,10 @@ export async function resolveWorkText(
   let hadTextAttachment = false;
   let scanNote: string | null = null;
   let blockReason: TextBlockReason | null = null;
+  // A Zotero outage leaves attachment availability unknown. Track it separately so
+  // the final reason is `zotero_unavailable`, never `no_attachment`, and the caller
+  // can retry instead of persisting a false "no full text".
+  let zoteroUnreachable = false;
   // A `nodus-library:` key is not a Zotero item key. Its canonical clean copy is
   // resolved by the Library fallback immediately below, so do not spend retries
   // querying Zotero before reading the source Nodus already owns locally.
@@ -913,8 +935,12 @@ export async function resolveWorkText(
     const metadataDone = startPerf('Zotero attachment metadata', opts.perf, { zoteroKey, attempt });
     try {
       textAttachments = await textAttachmentsFor(userId, zoteroKey, itemType);
+      // The latest attempt decides: a later success means Zotero answered, so the
+      // empty list (if any) is authoritative rather than an outage.
+      zoteroUnreachable = false;
       metadataDone({ attachments: textAttachments.length });
     } catch (e) {
+      zoteroUnreachable = isZoteroUnreachable(e);
       metadataDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
     }
     if (textAttachments.length > 0) hadTextAttachment = true;
@@ -925,10 +951,13 @@ export async function resolveWorkText(
     if (result.blockReason) blockReason = result.blockReason;
 
     // Keep retrying only while a brief wait might change the outcome: attachments
-    // were found but not yet readable (file/index settling), or none surfaced yet on
-    // the first try for a normal (non-attachment) item. This costs at most one short
-    // extra wait for works that genuinely have no full text.
-    const worthRetrying = !isAttachmentItem && (textAttachments.length > 0 || attempt === 0);
+    // were found but not yet readable (file/index settling), none surfaced yet on
+    // the first try for a normal (non-attachment) item, or Zotero was unreachable
+    // and may still be starting up. This costs at most one short extra wait for
+    // works that genuinely have no full text.
+    const worthRetrying = zoteroUnreachable
+      ? attempt < attachmentReadAttempts - 1
+      : !isAttachmentItem && (textAttachments.length > 0 || attempt === 0);
     if (!worthRetrying) break;
   }
 
@@ -1005,8 +1034,13 @@ export async function resolveWorkText(
     };
   }
   return {
-    text: '', sourceType: 'none', notes: scanNote ?? 'Sin texto ni abstract disponible.', hadTextAttachment,
-    blockReason: blockReason ?? (hadTextAttachment ? 'unreadable' : 'no_attachment'),
+    text: '', sourceType: 'none',
+    notes: scanNote ?? (zoteroUnreachable
+      ? 'Zotero no está disponible; no se pudo comprobar si la obra tiene texto completo.'
+      : 'Sin texto ni abstract disponible.'),
+    hadTextAttachment,
+    blockReason: blockReason
+      ?? (zoteroUnreachable ? 'zotero_unavailable' : hadTextAttachment ? 'unreadable' : 'no_attachment'),
   };
 }
 

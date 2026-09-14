@@ -99,7 +99,25 @@ export const nodusApi: NodusApi = {
   markNotificationsRead: () => ipcRenderer.invoke('nodi:notifications:markRead'),
   clearNotifications: () => ipcRenderer.invoke('nodi:notifications:clear'),
   openNotification: (id) => ipcRenderer.invoke('nodi:notifications:open', id).then(() => undefined),
+  getSkillMarketplace: () => ipcRenderer.invoke('skillMarketplace:get'),
+  addSkillSource: (url) => ipcRenderer.invoke('skillMarketplace:add', url),
+  removeSkillSource: (id) => ipcRenderer.invoke('skillMarketplace:remove', id),
+  updateSkillSource: (id) => ipcRenderer.invoke('skillMarketplace:update', id),
+  installMarketplaceSkill: (sourceId, packagePath, commit) => ipcRenderer.invoke('skillMarketplace:install', sourceId, packagePath, commit),
+  importSkillPackage: () => ipcRenderer.invoke('skillMarketplace:import'),
+  exportSkillPackage: (id) => ipcRenderer.invoke('skillMarketplace:export', id),
   listChatSkills: () => ipcRenderer.invoke('chatSkills:list'),
+  listDocumentSkills: () => ipcRenderer.invoke('documentSkills:list'),
+  getDocumentVisuals: target => ipcRenderer.invoke('documentVisuals:get', target),
+  enrichDocumentVisuals: (target, policy, retry) => ipcRenderer.invoke('documentVisuals:enrich', target, policy, retry),
+  cancelDocumentVisuals: target => ipcRenderer.invoke('documentVisuals:cancel', target),
+  undoDocumentVisuals: target => ipcRenderer.invoke('documentVisuals:undo', target),
+  removeDocumentFigure: (target, id) => ipcRenderer.invoke('documentVisuals:remove', target, id),
+  onDocumentVisualsChanged: listener => {
+    const handler = (_event: Electron.IpcRendererEvent, target: import('@shared/documentSkills').DocumentVisualTarget) => listener(target);
+    ipcRenderer.on('documentVisuals:changed', handler);
+    return () => ipcRenderer.removeListener('documentVisuals:changed', handler);
+  },
   saveChatSkill: (skill) => ipcRenderer.invoke('chatSkills:save', skill),
   deleteChatSkill: (id) => ipcRenderer.invoke('chatSkills:delete', id),
   restoreChatSkills: () => ipcRenderer.invoke('chatSkills:restore'),
@@ -108,11 +126,50 @@ export const nodusApi: NodusApi = {
     ipcRenderer.on('chatSkills:changed', listener);
     return () => ipcRenderer.removeListener('chatSkills:changed', listener);
   },
-  compileChemfig: (source) => ipcRenderer.invoke('chemistry:compileChemfig', source),
-  compileLewis: (source) => ipcRenderer.invoke('chemistry:compileLewis', source),
-  compileSmiles: (source) => ipcRenderer.invoke('chemistry:compileSmiles', source),
   getChatImageMetadata: (source) => ipcRenderer.invoke('chatImages:metadata', source),
   copyChatImage: (source) => ipcRenderer.invoke('chatImages:copy', source),
+  downloadCapabilityFile: (source) => ipcRenderer.invoke('capabilityFiles:download', source),
+  readCapabilityModel: (source) => ipcRenderer.invoke('capabilityFiles:model', source),
+  readCapabilityMedia: (source) => ipcRenderer.invoke('capabilityFiles:media', source),
+  fetchCapabilityTile: (capabilityId, service, tilePath) => ipcRenderer.invoke('capabilities:tile', capabilityId, service, tilePath),
+  listCapabilities: () => ipcRenderer.invoke('capabilities:list'),
+  onCapabilityRegistryChanged: (cb) => {
+    const listener = (_event: unknown, payload: unknown) => cb(payload as never);
+    ipcRenderer.on('capabilities:registryChanged', listener);
+    return () => ipcRenderer.removeListener('capabilities:registryChanged', listener);
+  },
+  capabilityHealth: (capabilityId) => ipcRenderer.invoke('capabilities:health', capabilityId),
+  getCapabilitySettings: (capabilityId) => ipcRenderer.invoke('capabilities:getSettings', capabilityId),
+  applyCapabilitySettings: (capabilityId, submission) => ipcRenderer.invoke('capabilities:applySettings', capabilityId, submission),
+  runCapabilityAction: (capabilityId, actionId) => ipcRenderer.invoke('capabilities:runAction', capabilityId, actionId),
+  renderCapabilityArtifact: (source, locale) => ipcRenderer.invoke('artifacts:render', source, locale),
+  renderLegacyCapabilityResult: (fence, payload, locale) => ipcRenderer.invoke('capabilities:renderLegacyResult', fence, payload, locale),
+  capabilityMigrationStatus: () => ipcRenderer.invoke('capabilities:migrationStatus'),
+  onCapabilityMigrationChanged: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on('capabilities:migrationChanged', listener);
+    return () => ipcRenderer.removeListener('capabilities:migrationChanged', listener);
+  },
+  retryCapabilityMigration: () => ipcRenderer.invoke('capabilities:retryMigration'),
+  refreshCapabilityCatalog: (sourceUrl) => ipcRenderer.invoke('capabilities:refreshCatalog', sourceUrl),
+  checkCapabilityUpdates: (pluginId) => ipcRenderer.invoke('capabilities:checkUpdates', pluginId),
+  setCapabilityAutoUpdate: (pluginId, autoUpdate) => ipcRenderer.invoke('capabilities:setAutoUpdate', pluginId, autoUpdate),
+  installCapabilityPlugin: (pluginId, approvePermissions) => ipcRenderer.invoke('capabilities:installPlugin', pluginId, approvePermissions),
+  approveCapabilityPlugin: (pluginId) => ipcRenderer.invoke('capabilities:approvePlugin', pluginId),
+  discardPendingCapabilityPlugin: (pluginId) => ipcRenderer.invoke('capabilities:discardPendingPlugin', pluginId),
+  rollbackCapabilityPlugin: (pluginId) => ipcRenderer.invoke('capabilities:rollbackPlugin', pluginId),
+  removeCapabilityPlugin: (pluginId, purgeData) => ipcRenderer.invoke('capabilities:removePlugin', pluginId, purgeData),
+  listInstalledPlugins: () => ipcRenderer.invoke('plugins:list'),
+  installMarketplacePlugin: (sourceId, packagePath, commit, approvePermissions) => ipcRenderer.invoke('skillMarketplace:installPlugin', sourceId, packagePath, commit, approvePermissions),
+  listInboxPlugins: () => ipcRenderer.invoke('plugins:inbox'),
+  approveInboxPlugin: (directory) => ipcRenderer.invoke('plugins:approveInbox', directory),
+  discardInboxPlugin: (directory) => ipcRenderer.invoke('plugins:discardInbox', directory),
+  approvePlugin: (id) => ipcRenderer.invoke('plugins:approve', id),
+  setPluginAutoUpdate: (id, enabled) => ipcRenderer.invoke('plugins:autoUpdate', id, enabled),
+  rollbackPlugin: (id) => ipcRenderer.invoke('plugins:rollback', id),
+  removePlugin: (id) => ipcRenderer.invoke('plugins:remove', id),
+  configurePluginSecret: (pluginId, capabilityId, secretId, value) => ipcRenderer.invoke('plugins:secret', pluginId, capabilityId, secretId, value),
+  restorePluginSkillAuthorVersion: (id) => ipcRenderer.invoke('plugins:restoreSkill', id),
   listNodiConversations: () => ipcRenderer.invoke('nodi:conversations:list'),
   getNodiConversation: (id) => ipcRenderer.invoke('nodi:conversations:get', id),
   saveNodiConversation: (input) => ipcRenderer.invoke('nodi:conversations:save', input),

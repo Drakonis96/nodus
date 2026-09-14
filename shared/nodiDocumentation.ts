@@ -167,7 +167,7 @@ ${ROADMAP_GUIDE}
 - Nodus Translate ya funciona: traduce texto pegado, archivos TXT, Markdown, HTML, DOCX, EPUB y PDF, así como adjuntos importados de Zotero. Permite elegir idioma de destino, modelo, carpeta y formato de salida, además de añadir idioma de origen y glosario opcionales.
 - En DOCX y EPUB, Translate conserva directamente estilos, jerarquía, cabeceras, pies, notas, enlaces e imágenes del archivo original. En PDF ofrece un modo de lectura redistribuida y un modo facsímil rasterizado que mantiene páginas, geometría, fondos e imágenes y sustituye visiblemente el texto en su posición; puede usar visión para escaneados y texto dentro de imágenes. Si una traducción no cabe, reduce el tamaño y avisa de las páginas afectadas.
 - La traducción requiere el proveedor de IA seleccionado y puede enviarle el texto o las páginas que deban reconocerse. El archivo original nunca se modifica: el resultado se guarda como una copia nueva.
-- PDF Presenter ya se puede abrir: importa archivos PDF o presentaciones creadas en PowerPoint, LibreOffice o Keynote a una biblioteca global de Herramientas (con carpetas, búsqueda, orden y miniaturas). Las presentaciones externas se convierten localmente a PDF, tras avisar de que las animaciones y transiciones no se conservan; las notas de los PowerPoint modernos se importan automáticamente. También permite escribir notas por diapositiva, exportarlas e importarlas juntas en TXT y añadir vídeos de YouTube por diapositiva. Al presentar abre la diapositiva a pantalla completa (en la pantalla externa si hay dos) y una vista del presentador con la diapositiva actual, la siguiente, las notas, un temporizador y el reloj; incluye herramientas de anotación en directo (linterna, dibujo, puntero y lupa), pantalla en negro, y control remoto desde el móvil escaneando un código QR protegido por PIN. El único elemento que necesita conexión son los vídeos de YouTube; el resto funciona sin internet.
+- PDF Presenter ya se puede abrir: importa archivos PDF o presentaciones creadas en PowerPoint, LibreOffice o Keynote a una biblioteca global de Herramientas (con etiquetas, búsqueda, orden y miniaturas). Las presentaciones externas se convierten localmente a PDF, tras avisar de que las animaciones y transiciones no se conservan; las notas de los PowerPoint modernos se importan automáticamente. También permite escribir notas por diapositiva, exportarlas e importarlas juntas en TXT, añadir vídeos de YouTube por diapositiva y descargar el PDF de la presentación desde la biblioteca. Al presentar abre la diapositiva a pantalla completa (en la pantalla externa si hay dos) y una vista del presentador con la diapositiva actual, la siguiente, las notas, un temporizador y el reloj; incluye herramientas de anotación en directo (linterna, dibujo, puntero y lupa), pantalla en negro, y control remoto desde el móvil escaneando un código QR protegido por PIN. El único elemento que necesita conexión son los vídeos de YouTube; el resto funciona sin internet.
 - OCR Workspace ya se puede abrir y ofrece un flujo asistido por IA para importar escaneados, revisar y corregir cada página y exportar el resultado.
 - Nodus Convert es determinista y 100 % offline (no hay IA), nunca modifica el archivo original y no sube nada a ningún servicio; la única llamada de red opcional es la descarga de idiomas de OCR de Tesseract, que el usuario decide.
 - El procesamiento documental de Nodus Protect es local y no envía documentos a IA, proveedores ni servicios externos. Esta afirmación se refiere a Protect, no a todas las funciones opcionales de red de Nodus.
@@ -318,6 +318,125 @@ const LOCALIZED_ROADMAP: Record<PromptLanguage, readonly RoadmapItem[]> = {
     { title: 'Nodus PDF Presenter', detail: 'PDF dosyalarını ve harici sunumları sunucu görünümü, mobilden uzaktan kontrol, konuşmacı notları ve canlı açıklama araçlarıyla sunmak.', status: 'implemented' },
     { title: 'Nodus OCR Workspace', detail: 'Taranmış PDF ve görseller için sayfa sayfa inceleme, metin temizleme, yeniden işleme ve Nodus vaultlarıyla doğrudan bütünleşme sunan yapay zekâ destekli OCR.', status: 'implemented' },
   ],
+  'zh-Hans': [
+    { title: '打磨与稳定性', detail: '修复错误、提升性能，并根据用户反馈打磨整体体验。', status: 'inProgress' },
+    { title: '服务器', detail: '为新的连接能力提供的可选基础设施。', status: 'planned' },
+    { title: 'Vault 共享与协作', detail: '共享空间并在掌控数据的前提下开展协作。', status: 'planned' },
+    { title: 'iOS 与 iPadOS 应用', detail: '通过适配各设备的原生应用，将 Nodus 带到 iPhone 和 iPad。', status: 'planned' },
+    { title: '教学 vault', detail: '在保护学生数据的前提下，准备课程、课堂与教学材料。', status: 'implemented' },
+    { title: '原始资料 vault', detail: '整理历史文献，并基于文献证据开展工作。', status: 'implemented' },
+    { title: '口述证词 vault（口述史）', detail: '面向历史学与新闻学的访谈、转录和口述资料。', status: 'implemented' },
+    { title: '用户建议的 vault', detail: '与专家、积极协作者和测试者共同拓展的新领域。', status: 'implemented', children: [
+      { title: '群体传记 vault', detail: '面向历史研究的人物、关系、身份和传记证据。', status: 'implemented' },
+      { title: '世界构建 vault', detail: '叙事世界中的人物、地点、时间线和规则。', status: 'implemented' },
+    ] },
+    { title: 'Nodus Toolkit', detail: '集成在 Nodus 中的实用 local-first 工具，用于转换文件和处理文档。', status: 'implemented' },
+    { title: 'Nodus Translate', detail: '使用所选模型翻译文本、文档和 Zotero 附件，通过摹真模式保留 DOCX 与 EPUB 的结构以及 PDF 的外观。', status: 'implemented' },
+    { title: 'Nodus PDF Presenter', detail: '演示 PDF 文件和外部演示文稿，提供演讲者视图、手机遥控、演讲者备注和实时批注工具。', status: 'implemented' },
+    { title: 'Nodus OCR Workspace', detail: '面向扫描版 PDF 和图像的 AI 辅助 OCR，支持逐页审阅、文本清理、重新处理，并与 Nodus vault 直接集成。', status: 'implemented' },
+  ],
+  'zh-Hant': [
+    { title: '打磨與穩定性', detail: '修正錯誤、提升效能，並依據使用者回饋打磨整體體驗。', status: 'inProgress' },
+    { title: '伺服器', detail: '為全新連線能力提供的選用基礎架構。', status: 'planned' },
+    { title: 'Vault 共享與協作', detail: '共享空間，並在掌控資料的前提下協作。', status: 'planned' },
+    { title: 'iOS 與 iPadOS 應用程式', detail: '透過適配各裝置的原生應用程式，將 Nodus 帶到 iPhone 與 iPad。', status: 'planned' },
+    { title: '教學 vault', detail: '在保護學生資料的前提下，準備課程、課堂與教材。', status: 'implemented' },
+    { title: '原始史料 vault', detail: '整理歷史文件，並以文獻證據進行研究。', status: 'implemented' },
+    { title: '口述見證 vault（口述歷史）', detail: '面向歷史與新聞的訪談、轉錄與口述資料。', status: 'implemented' },
+    { title: '使用者建議的 vault', detail: '與專家、積極協作者與測試者共同拓展的新領域。', status: 'implemented', children: [
+      { title: '群體傳記 vault', detail: '面向歷史研究的人物、關係、身分與傳記證據。', status: 'implemented' },
+      { title: '世界觀建構 vault', detail: '敘事世界的人物、地點、時間軸與規則。', status: 'implemented' },
+    ] },
+    { title: 'Nodus Toolkit', detail: '整合於 Nodus 的實用 local-first 工具，用於轉換檔案與處理文件。', status: 'implemented' },
+    { title: 'Nodus Translate', detail: '以所選模型翻譯文字、文件與 Zotero 附件，透過摹真模式保留 DOCX 與 EPUB 的結構及 PDF 的外觀。', status: 'implemented' },
+    { title: 'Nodus PDF Presenter', detail: '簡報 PDF 檔案與外部簡報，提供簡報者檢視、手機遠端控制、講者備註與即時註記工具。', status: 'implemented' },
+    { title: 'Nodus OCR Workspace', detail: '針對掃描 PDF 與影像的 AI 輔助 OCR，支援逐頁檢閱、文字清理、重新處理，並與 Nodus vault 直接整合。', status: 'implemented' },
+  ],
+  vi: [
+    { title: 'Hoàn thiện và ổn định', detail: 'Sửa lỗi, cải thiện hiệu năng và hoàn thiện trải nghiệm tổng thể dựa trên phản hồi của người dùng.', status: 'inProgress' },
+    { title: 'Máy chủ', detail: 'Hạ tầng tùy chọn cho các khả năng kết nối mới.', status: 'planned' },
+    { title: 'Chia sẻ vault và làm việc cộng tác', detail: 'Chia sẻ không gian và cộng tác trong khi vẫn kiểm soát dữ liệu.', status: 'planned' },
+    { title: 'Ứng dụng iOS và iPadOS', detail: 'Đưa Nodus lên iPhone và iPad bằng các ứng dụng gốc được điều chỉnh cho từng thiết bị.', status: 'planned' },
+    { title: 'Vault giảng dạy', detail: 'Chuẩn bị bài giảng, khóa học và học liệu trong khi bảo vệ dữ liệu học sinh.', status: 'implemented' },
+    { title: 'Vault nguồn sơ cấp', detail: 'Tổ chức tài liệu lịch sử và làm việc với bằng chứng tư liệu.', status: 'implemented' },
+    { title: 'Vault lời chứng (lịch sử truyền khẩu)', detail: 'Phỏng vấn, bản chép lời và nguồn truyền khẩu cho lịch sử và báo chí.', status: 'implemented' },
+    { title: 'Vault do người dùng đề xuất', detail: 'Những lĩnh vực mới với chuyên gia, cộng tác tích cực và tester.', status: 'implemented', children: [
+      { title: 'Vault văn liệu nhân vật', detail: 'Con người, quan hệ, danh tính và bằng chứng tiểu sử cho nghiên cứu lịch sử.', status: 'implemented' },
+      { title: 'Vault worldbuilding', detail: 'Nhân vật, địa điểm, dòng thời gian và quy tắc của thế giới tự sự.', status: 'implemented' },
+    ] },
+    { title: 'Nodus Toolkit', detail: 'Các công cụ local-first thiết thực để chuyển đổi tệp và xử lý tài liệu, được tích hợp trong Nodus.', status: 'implemented' },
+    { title: 'Nodus Translate', detail: 'Dịch văn bản, tài liệu và tệp đính kèm Zotero bằng mô hình đã chọn, giữ nguyên cấu trúc DOCX và EPUB cùng diện mạo PDF nhờ chế độ facsimile.', status: 'implemented' },
+    { title: 'Nodus PDF Presenter', detail: 'Trình bày tệp PDF và bài thuyết trình bên ngoài với chế độ xem người trình bày, điều khiển từ xa bằng điện thoại, ghi chú diễn giả và công cụ chú thích trực tiếp.', status: 'implemented' },
+    { title: 'Nodus OCR Workspace', detail: 'OCR hỗ trợ AI cho PDF quét và hình ảnh, với duyệt từng trang, làm sạch văn bản, xử lý lại và tích hợp trực tiếp với các vault của Nodus.', status: 'implemented' },
+  ],
+  ja: [
+    { title: '磨き込みと安定性', detail: 'エラーの修正、パフォーマンスの向上、ユーザーフィードバックに基づく全体的な体験の磨き込みを行います。', status: 'inProgress' },
+    { title: 'サーバー', detail: '新しい接続機能のためのオプションの基盤です。', status: 'planned' },
+    { title: 'Vault の共有と共同作業', detail: 'データの管理を保ったまま空間を共有し、共同作業を行えます。', status: 'planned' },
+    { title: 'iOS および iPadOS アプリ', detail: '各デバイスに合わせたネイティブアプリで、Nodus を iPhone と iPad に提供します。', status: 'planned' },
+    { title: '教育用 vault', detail: '生徒のデータを保護しながら、授業、コース、教材を準備します。', status: 'implemented' },
+    { title: '一次資料 vault', detail: '歴史文書を整理し、文書証拠に基づいて作業します。', status: 'implemented' },
+    { title: '証言 vault（オーラルヒストリー）', detail: '歴史学とジャーナリズムのためのインタビュー、文字起こし、口述資料です。', status: 'implemented' },
+    { title: 'ユーザー提案の vault', detail: '専門家、活発な協力者、テスターとともに進める新しい領域です。', status: 'implemented', children: [
+      { title: 'プロソポグラフィー vault', detail: '歴史研究のための人物、関係、アイデンティティ、伝記的証拠です。', status: 'implemented' },
+      { title: 'ワールドビルディング vault', detail: '物語世界の人物、場所、年表、ルールです。', status: 'implemented' },
+    ] },
+    { title: 'Nodus Toolkit', detail: 'ファイル変換と文書処理のための実用的な local-first ツールで、Nodus に統合されています。', status: 'implemented' },
+    { title: 'Nodus Translate', detail: '選択したモデルでテキスト、文書、Zotero 添付ファイルを翻訳し、ファクシミリモードで DOCX と EPUB の構造および PDF の見た目を保ちます。', status: 'implemented' },
+    { title: 'Nodus PDF Presenter', detail: 'PDF ファイルや外部プレゼンテーションを、発表者ビュー、スマートフォンからのリモート操作、発表者ノート、ライブ注釈ツールとともに提示します。', status: 'implemented' },
+    { title: 'Nodus OCR Workspace', detail: 'スキャンした PDF と画像に対する AI 支援 OCR で、ページごとの確認、テキスト整理、再処理、Nodus vault との直接統合を提供します。', status: 'implemented' },
+  ],
+  ru: [
+    { title: 'Оттачивание и стабильность', detail: 'Исправление ошибок, повышение производительности и оттачивание общего опыта с учётом отзывов пользователей.', status: 'inProgress' },
+    { title: 'Сервер', detail: 'Опциональная инфраструктура для новых подключаемых возможностей.', status: 'planned' },
+    { title: 'Совместное использование vault и командная работа', detail: 'Делитесь пространствами и работайте вместе, сохраняя контроль над данными.', status: 'planned' },
+    { title: 'Приложения для iOS и iPadOS', detail: 'Перенесите Nodus на iPhone и iPad с помощью нативных приложений, адаптированных к каждому устройству.', status: 'planned' },
+    { title: 'Vault для преподавания', detail: 'Готовьте занятия, курсы и учебные материалы, защищая данные учащихся.', status: 'implemented' },
+    { title: 'Vault первоисточников', detail: 'Организуйте исторические документы и работайте с документальными доказательствами.', status: 'implemented' },
+    { title: 'Vault свидетельств (устная история)', detail: 'Интервью, расшифровки и устные источники для истории и журналистики.', status: 'implemented' },
+    { title: 'Vault, предложенные пользователями', detail: 'Новые области со специалистами, активным сотрудничеством и тестировщиками.', status: 'implemented', children: [
+      { title: 'Vault просопографии', detail: 'Люди, связи, идентичности и биографические доказательства для исторических исследований.', status: 'implemented' },
+      { title: 'Vault миростроения', detail: 'Персонажи, места, хронологии и правила повествовательных миров.', status: 'implemented' },
+    ] },
+    { title: 'Nodus Toolkit', detail: 'Практичные local-first инструменты для преобразования файлов и обработки документов, интегрированные в Nodus.', status: 'implemented' },
+    { title: 'Nodus Translate', detail: 'Переводите текст, документы и вложения Zotero выбранной моделью, сохраняя структуру DOCX и EPUB и внешний вид PDF с помощью факсимильного режима.', status: 'implemented' },
+    { title: 'Nodus PDF Presenter', detail: 'Показывайте PDF-файлы и внешние презентации с режимом докладчика, удалённым управлением с телефона, заметками докладчика и инструментами аннотирования в реальном времени.', status: 'implemented' },
+    { title: 'Nodus OCR Workspace', detail: 'OCR с поддержкой ИИ для отсканированных PDF и изображений: постраничная проверка, очистка текста, повторная обработка и прямая интеграция с vault Nodus.', status: 'implemented' },
+  ],
+  uk: [
+    { title: 'Доопрацювання та стабільність', detail: 'Виправляйте помилки, підвищуйте продуктивність і доопрацьовуйте загальний досвід з урахуванням відгуків користувачів.', status: 'inProgress' },
+    { title: 'Сервер', detail: 'Опційна інфраструктура для нових підключених можливостей.', status: 'planned' },
+    { title: 'Спільне використання vault і командна робота', detail: 'Діліться просторами та працюйте разом, зберігаючи контроль над даними.', status: 'planned' },
+    { title: 'Застосунки для iOS та iPadOS', detail: 'Перенесіть Nodus на iPhone та iPad за допомогою нативних застосунків, адаптованих до кожного пристрою.', status: 'planned' },
+    { title: 'Vault для викладання', detail: 'Готуйте заняття, курси та навчальні матеріали, захищаючи дані учнів.', status: 'implemented' },
+    { title: 'Vault першоджерел', detail: 'Упорядковуйте історичні документи та працюйте з документальними доказами.', status: 'implemented' },
+    { title: 'Vault свідчень (усна історія)', detail: 'Інтерв’ю, розшифровки та усні джерела для історії та журналістики.', status: 'implemented' },
+    { title: 'Vault, запропоновані користувачами', detail: 'Нові галузі зі спеціалістами, активною співпрацею та тестувальниками.', status: 'implemented', children: [
+      { title: 'Vault просопографії', detail: 'Люди, зв’язки, ідентичності та біографічні докази для історичних досліджень.', status: 'implemented' },
+      { title: 'Vault світобудови', detail: 'Персонажі, місця, хронології та правила наративних світів.', status: 'implemented' },
+    ] },
+    { title: 'Nodus Toolkit', detail: 'Практичні local-first інструменти для перетворення файлів і обробки документів, інтегровані в Nodus.', status: 'implemented' },
+    { title: 'Nodus Translate', detail: 'Перекладайте текст, документи та вкладення Zotero вибраною моделлю, зберігаючи структуру DOCX і EPUB та вигляд PDF завдяки факсимільному режиму.', status: 'implemented' },
+    { title: 'Nodus PDF Presenter', detail: 'Показуйте PDF-файли та зовнішні презентації з режимом доповідача, віддаленим керуванням із телефона, нотатками доповідача та інструментами анотування в реальному часі.', status: 'implemented' },
+    { title: 'Nodus OCR Workspace', detail: 'OCR із підтримкою ШІ для сканованих PDF і зображень: посторінковий перегляд, очищення тексту, повторна обробка та пряма інтеграція з vault Nodus.', status: 'implemented' },
+  ],
+  ko: [
+    { title: '다듬기와 안정성', detail: '오류를 수정하고 성능을 개선하며 사용자 피드백을 바탕으로 전반적인 경험을 다듬습니다.', status: 'inProgress' },
+    { title: '서버', detail: '새로운 연결 기능을 위한 선택적 인프라입니다.', status: 'planned' },
+    { title: 'Vault 공유 및 협업', detail: '데이터에 대한 통제를 유지하면서 공간을 공유하고 협업합니다.', status: 'planned' },
+    { title: 'iOS 및 iPadOS 앱', detail: '각 기기에 맞춘 네이티브 앱으로 Nodus를 iPhone과 iPad에 제공합니다.', status: 'planned' },
+    { title: '교육용 vault', detail: '학생 데이터를 보호하면서 수업, 코스 및 교육 자료를 준비합니다.', status: 'implemented' },
+    { title: '1차 사료 vault', detail: '역사 문서를 정리하고 문서 증거를 바탕으로 작업합니다.', status: 'implemented' },
+    { title: '증언 vault(구술 역사)', detail: '역사와 저널리즘을 위한 인터뷰, 전사 및 구술 자료입니다.', status: 'implemented' },
+    { title: '사용자 제안 vault', detail: '전문가, 적극적인 협업자 및 테스터와 함께하는 새로운 분야입니다.', status: 'implemented', children: [
+      { title: '프로소포그래피 vault', detail: '역사 연구를 위한 인물, 관계, 정체성 및 전기적 증거입니다.', status: 'implemented' },
+      { title: '월드빌딩 vault', detail: '서사 세계의 인물, 장소, 연표 및 규칙입니다.', status: 'implemented' },
+    ] },
+    { title: 'Nodus Toolkit', detail: '파일 변환과 문서 처리를 위한 실용적인 local-first 도구로, Nodus에 통합되어 있습니다.', status: 'implemented' },
+    { title: 'Nodus Translate', detail: '선택한 모델로 텍스트, 문서 및 Zotero 첨부 파일을 번역하며, 팩시밀리 모드로 DOCX와 EPUB 구조 및 PDF 모양을 유지합니다.', status: 'implemented' },
+    { title: 'Nodus PDF Presenter', detail: 'PDF 파일과 외부 프레젠테이션을 발표자 보기, 휴대폰 원격 제어, 발표자 노트 및 실시간 주석 도구와 함께 발표합니다.', status: 'implemented' },
+    { title: 'Nodus OCR Workspace', detail: '스캔한 PDF와 이미지를 위한 AI 지원 OCR로, 페이지별 검토, 텍스트 정리, 재처리 및 Nodus vault와의 직접 통합을 제공합니다.', status: 'implemented' },
+  ],
 };
 
 const ROADMAP_STATUS_LABELS: Record<PromptLanguage, Record<RoadmapStatus, string>> = {
@@ -329,6 +448,13 @@ const ROADMAP_STATUS_LABELS: Record<PromptLanguage, Record<RoadmapStatus, string
   'pt-BR': { planned: 'Planejado', inProgress: 'Em desenvolvimento', implemented: 'Implementado' },
   it: { planned: 'Pianificato', inProgress: 'In sviluppo', implemented: 'Implementato' },
   tr: { planned: 'Planlandı', inProgress: 'Geliştiriliyor', implemented: 'Uygulandı' },
+  'zh-Hans': { planned: '已计划', inProgress: '开发中', implemented: '已实现' },
+  'zh-Hant': { planned: '已規劃', inProgress: '開發中', implemented: '已實作' },
+  vi: { planned: 'Đã lên kế hoạch', inProgress: 'Đang phát triển', implemented: 'Đã triển khai' },
+  ja: { planned: '計画済み', inProgress: '開発中', implemented: '実装済み' },
+  ru: { planned: 'Запланировано', inProgress: 'В разработке', implemented: 'Реализовано' },
+  uk: { planned: 'Заплановано', inProgress: 'У розробці', implemented: 'Реалізовано' },
+  ko: { planned: '계획됨', inProgress: '개발 중', implemented: '구현됨' },
 };
 
 function roadmapGuide(language: PromptLanguage): string {
@@ -467,7 +593,7 @@ __ROADMAP_GUIDE__
 - Nodus Translate works: it translates pasted text, TXT, Markdown, HTML, DOCX, EPUB, and PDF files, as well as attachments imported from Zotero. It allows choosing target language, model, folder, and output format, and adding optional source language and glossary.
 - In DOCX and EPUB, Translate directly preserves styles, hierarchy, headers, footers, notes, links, and images from the original. In PDF it offers a reflow reading mode and a rasterized facsimile mode that preserves pages, geometry, backgrounds, and images and visibly replaces text in position; it can use vision for scans and text inside images. If a translation does not fit, it reduces the size and warns about affected pages.
 - Translation requires the selected AI provider and may send it the text or pages that need recognition. The original file is never modified: the result is saved as a new copy.
-- PDF Presenter can be opened: it imports PDF files or presentations made in PowerPoint, LibreOffice, or Keynote into a global Tools library (with folders, search, sorting, and thumbnails). External presentations are converted locally to PDF after warning that animations and transitions are not preserved; modern PowerPoint notes are imported automatically. It also allows writing notes per slide, exporting and importing them together in TXT, and adding YouTube videos per slide. When presenting, it opens the slide full-screen (on the external display if there are two) and a presenter view with the current slide, next slide, notes, timer, and clock; it includes live annotation tools (torch, drawing, pointer, and magnifier), black screen, and remote control from a mobile by scanning a PIN-protected QR code. YouTube videos are the only element that needs a connection; everything else works offline.
+- PDF Presenter can be opened: it imports PDF files or presentations made in PowerPoint, LibreOffice, or Keynote into a global Tools library (with tags, search, sorting, and thumbnails). External presentations are converted locally to PDF after warning that animations and transitions are not preserved; modern PowerPoint notes are imported automatically. It also allows writing notes per slide, exporting and importing them together in TXT, adding YouTube videos per slide, and downloading the deck's PDF back out of the library. When presenting, it opens the slide full-screen (on the external display if there are two) and a presenter view with the current slide, next slide, notes, timer, and clock; it includes live annotation tools (torch, drawing, pointer, and magnifier), black screen, and remote control from a mobile by scanning a PIN-protected QR code. YouTube videos are the only element that needs a connection; everything else works offline.
 - OCR Workspace can be opened and offers an AI-assisted flow to import scans, review and correct each page, and export the result.
 - Nodus Convert is deterministic and 100% offline (there is no AI), never modifies the original file, and uploads nothing to any service; the only optional network call is downloading Tesseract OCR languages, which the user decides.
 - Nodus Protect document processing is local and does not send documents to AI, providers, or external services. This statement concerns Protect, not every optional network feature of Nodus.
@@ -498,7 +624,8 @@ __ROADMAP_GUIDE__
 
 /** Localized headings keep the complete factual copy legible in each language. */
 /* Localized copies below are the sole non-Spanish documentation source. */
-const COMPACT_LOCALIZED_DOCUMENTATION: Record<Exclude<PromptLanguage, 'es' | 'en'>, string> = {
+const COMPACT_LOCALIZED_DOCUMENTATION: Record<Exclude<PromptLanguage, 'es'>, string> = {
+  en: ENGLISH_DOCUMENTATION,
   fr: `# Guide interne vérifiable de Nodus
 
 ## Règles de lecture
@@ -931,6 +1058,510 @@ __ROADMAP_GUIDE__
 - Verwende exakte Namen und die aktuelle Ansicht; unterscheide verfügbar, bedingt, zukünftig und ungeprüft. Bei fehlender Quelle sage „Ich kann dies mit den ausgewählten Quellen nicht überprüfen“.
 - Mache PRE-ALPHA oder ALPHA nie zur Empfehlung für reale Arbeit; bei Orts- oder Bedienfragen gib kurze Schritte und schließe mit „Base: …“.
 `,
+  'zh-Hans': `# Nodus 可验证内部指南
+
+## 阅读规则
+- 本指南记录当前界面与官方可见路线图。不要虚构未在此记录的功能、路径、日期、版本或状态。
+- “已实现”表示功能存在且可以打开，并不表示已经稳定。Nodus 采用 local-first：每个 vault 都把数据保存在用户电脑上。
+
+## 可用 vault 与成熟度
+- 在 Vaults > Add vault 中可创建 Academic、Primary sources、Testimonies、Databases、Teaching、Study、Genealogy、Prosopography 和 Worldbuilding。
+- Primary sources、Testimonies 与 Prosopography 处于 PRE-ALPHA；Worldbuilding 处于 ALPHA；Databases、Teaching、Study 与 Genealogy 处于 BETA。Academic 不显示阶段标签，演示数据不会打开教程。
+
+## 标题栏与全局控件
+- 右侧大致依次为 Commands、Assistant、Tools、vault 控件、Suggest / Report、主题切换、Notifications 和 Settings；在 macOS 上 Commands 的快捷键是 ⌘K。
+- 中央徽章打开 vault 选择器。Notifications 包含 “Nodus notices” 和 “Activity”，即使 Nodi 被禁用也可使用。
+
+## 官方可见路线图
+- 可从 Settings > About Nodus Research > View Nodus Research roadmap 或命令面板打开。顺序与状态如下：
+__ROADMAP_GUIDE__
+
+## 设置
+- 实际选项卡为 Providers、AI Models、Library、Text and OCR、Interface、Integrations、Server、Tutorials、Backup、About Nodus Research 和 Updates and news。
+- Providers 管理密钥与模型；Library 同步 Zotero；Interface 管理语言、主题、无障碍、侧边栏和 Nodi；Server 发布经过筛选的 vault 副本。
+
+## 学术 vault
+- 面向研究与写作；包含 Home、Search、Library、Graph、Argument map、Ideas、Authors、Immersion、Gaps、Debates、Coverage、Hypotheses、Reading path、Deep Research、Writing、Projects、Notes 和 Settings；各区块可在 Settings > Interface > Sidebar 中隐藏或重新排序。
+- Deep Research 从语料库中提取证据，生成报告，并可按 vault 的视觉标识导出为文档或 PDF。
+
+## 家谱 vault
+- 包含 People、Timeline、Family tree、Social relations、Map 和 Archive。关于身份与亲属关系的论断必须以档案或证据为依据；姓氏相同、住址相同或出现在同一份文件中并不能证明亲属关系。
+
+## 数据库 vault
+- 管理带类型列的结构化表格、行、视图、搜索、分析和 Data Chat；用户创建的数据库显示在侧边栏。
+
+## 学习 vault
+- 层级为 Course > Subject，学科内可包含文件夹、主题、子主题、笔记和材料；包含 Schedules、Calendar、Materials、Recordings、Study chat、Ideas、Graph、Question bank 和 Review。
+- Schedules 每个单元格可添加一项活动；Calendar 提供月、周、年视图以及导出到 iCloud 或 Google Calendar；Question bank 包含问题、测验、考试和 flashcards。
+
+## 教学 vault
+- 已实现，处于 BETA；沿用 Course > Subject 结构并增加分组、材料、Chat、Rubrics、Exams、Grades 和 Unit design。Teaching guide / Planning、Learning situations、Adaptations、Notes 和 Innovation projects 仍为 “In design”。
+
+## 原始资料 vault
+- 已实现，处于 PRE-ALPHA，仅用于测试与协作；包含 Search、Archive、People、Timeline、Map、Social relations、Notes、Toolkit 和 Settings；Archive 管理来源与元数据。
+- 自动结果均为待审阅的建议；请区分转录、观察与推断，并保留定位信息、矛盾与不确定性。
+
+## 口述证词 vault
+- 已实现，处于 PRE-ALPHA；Search、Interviews、Participants、Contrasts、Notes、Toolkit 和 Settings 组织会话、媒体、转录、片段、编码、约定和限制。
+- Nodi 尊重访问权限、匿名化、禁阅期与署名，不推断敏感属性、情绪、真诚度或可信度。
+
+## 群体传记 vault
+- 已实现，处于 PRE-ALPHA；Search、Population、People、Sources、Analysis、Networks、Notes、Toolkit 和 Settings 遵循方法、身份、归属、分析与网络。
+- 不要混淆 person、mention、source、factoid 和 statement；未经审阅不得合并身份。
+
+## 世界构建 vault
+- 已实现，处于 ALPHA；包含 Encyclopedia、Characters、Places、Factions、Cultures、Timeline、Map、Relationships、Families、Dynasties、World chat、World rules、Conflicts、Narrative arcs、Continuity、Notes、Scenes 和 Manuscript。
+- 作者是事实的来源；Nodi 区分既定设定与提议。
+
+## 工具（Nodus Toolkit）
+- 中心页包含 Nodus Convert、Nodus Protect、Nodus Translate、PDF Presenter 和 OCR Workspace。Convert 在本地处理 Documents、PDF utilities、light OCR、Images 和 Text。
+- Protect 在不修改原文件的情况下导出 PNG、ZIP 或 PDF；Translate 处理 TXT、Markdown、HTML、DOCX、EPUB、PDF 和 Zotero 附件；PDF Presenter 导入 PowerPoint、LibreOffice 和 Keynote；OCR Workspace 逐页审阅。
+- Convert 是确定性的且 100% 离线；Protect 不向 AI 发送文档。只有可选的 Tesseract OCR 语言下载需要联网。
+
+## 本地 MCP 与 Nodus Server
+- MCP 在 Settings > Integrations > MCP Server 中配置。Nodus Server 相互独立，在 Settings > Server 中配置，每个 vault 使用 HTTPS URL 和一次性代码连接。
+- 发布的副本经过筛选且为出站；OAuth 保护访问。Server 与协作共享仍为 “已计划”。
+
+## 路线图状态摘要
+- 开发中：打磨与稳定性。已计划：Server、vault 共享与协作、iOS 与 iPadOS 应用。已实现：Teaching、Primary sources、Testimonies、用户建议的 vault、Nodus Toolkit、Nodus Translate、PDF Presenter 和 OCR Workspace。
+- 没有固定的日期。
+
+## 界面答复协议
+- 使用准确名称和 Current view；区分可用、有条件、未来与未核实。若缺少来源，请说 “我无法用所选来源核实这一点”。
+- 绝不要把 PRE-ALPHA 或 ALPHA 当作实际工作的推荐；在操作说明中以 “Base: …” 结尾。
+`,
+  'zh-Hant': `# Nodus 可驗證內部指南
+
+## 閱讀規則
+- 本指南記錄目前介面與官方可見藍圖。不得虛構未在此記錄的功能、路徑、日期、版本或狀態。
+- 「已實作」表示功能存在且可以開啟，並不表示已經穩定。Nodus 採 local-first：每個 vault 都將資料保存在使用者電腦上。
+
+## 可用 vault 與成熟度
+- 在 Vaults > Add vault 中可建立 Academic、Primary sources、Testimonies、Databases、Teaching、Study、Genealogy、Prosopography 與 Worldbuilding。
+- Primary sources、Testimonies 與 Prosopography 處於 PRE-ALPHA；Worldbuilding 處於 ALPHA；Databases、Teaching、Study 與 Genealogy 處於 BETA。Academic 不顯示階段標籤，示範資料不會開啟教學導覽。
+
+## 標題列與全域控制項
+- 右側大致依序為 Commands、Assistant、Tools、vault 控制項、Suggest / Report、佈景主題、Notifications 與 Settings；在 macOS 上 Commands 的快速鍵是 ⌘K。
+- 中央徽章會開啟 vault 選擇器。Notifications 包含「Nodus notices」與「Activity」，即使 Nodi 已停用也可使用。
+
+## 官方可見藍圖
+- 可從 Settings > About Nodus Research > View Nodus Research roadmap 或命令面板開啟。順序與狀態如下：
+__ROADMAP_GUIDE__
+
+## 設定
+- 實際索引標籤為 Providers、AI Models、Library、Text and OCR、Interface、Integrations、Server、Tutorials、Backup、About Nodus Research 與 Updates and news。
+- Providers 管理金鑰與模型；Library 同步 Zotero；Interface 管理語言、佈景主題、無障礙、側邊欄與 Nodi；Server 發佈經過篩選的 vault 副本。
+
+## 學術 vault
+- 面向研究與寫作；包含 Home、Search、Library、Graph、Argument map、Ideas、Authors、Immersion、Gaps、Debates、Coverage、Hypotheses、Reading path、Deep Research、Writing、Projects、Notes 與 Settings；各區段可在 Settings > Interface > Sidebar 中隱藏或重新排序。
+- Deep Research 從語料庫擷取證據、產生報告，並可依 vault 的視覺識別匯出為文件或 PDF。
+
+## 族譜 vault
+- 包含 People、Timeline、Family tree、Social relations、Map 與 Archive。關於身分與親屬關係的論斷必須以紀錄或證據為依據；姓氏相同、住址相同或出現在同一份文件中，並不能證明親屬關係。
+
+## 資料庫 vault
+- 管理含型別資料行的結構化表格、資料列、檢視、搜尋、分析與 Data Chat；使用者建立的資料庫會顯示在側邊欄。
+
+## 學習 vault
+- 階層為 Course > Subject，科目內可包含資料夾、主題、子主題、筆記與教材；包含 Schedules、Calendar、Materials、Recordings、Study chat、Ideas、Graph、Question bank 與 Review。
+- Schedules 每個儲存格可新增一項活動；Calendar 提供月、週、年檢視以及匯出至 iCloud 或 Google Calendar；Question bank 包含問題、測驗、考試與 flashcards。
+
+## 教學 vault
+- 已實作，處於 BETA；沿用 Course > Subject 結構並加入群組、教材、Chat、Rubrics、Exams、Grades 與 Unit design。Teaching guide / Planning、Learning situations、Adaptations、Notes 與 Innovation projects 仍為「In design」。
+
+## 原始史料 vault
+- 已實作，處於 PRE-ALPHA，僅供測試與協作；包含 Search、Archive、People、Timeline、Map、Social relations、Notes、Toolkit 與 Settings；Archive 管理來源與詮釋資料。
+- 自動結果都是待審閱的建議；請區分轉錄、觀察與推論，並保留定位資訊、矛盾與不確定性。
+
+## 口述見證 vault
+- 已實作，處於 PRE-ALPHA；Search、Interviews、Participants、Contrasts、Notes、Toolkit 與 Settings 組織場次、媒體、轉錄、片段、編碼、約定與限制。
+- Nodi 尊重存取權、匿名化、禁閱期與姓名標示，不推論敏感屬性、情緒、真誠度或可信度。
+
+## 群體傳記 vault
+- 已實作，處於 PRE-ALPHA；Search、Population、People、Sources、Analysis、Networks、Notes、Toolkit 與 Settings 依循方法、身分、歸屬、分析與網路。
+- 不要混淆 person、mention、source、factoid 與 statement；未經審閱不得合併身分。
+
+## 世界觀建構 vault
+- 已實作，處於 ALPHA；包含 Encyclopedia、Characters、Places、Factions、Cultures、Timeline、Map、Relationships、Families、Dynasties、World chat、World rules、Conflicts、Narrative arcs、Continuity、Notes、Scenes 與 Manuscript。
+- 作者是事實的來源；Nodi 區分既定設定與提議。
+
+## 工具（Nodus Toolkit）
+- 中樞頁面包含 Nodus Convert、Nodus Protect、Nodus Translate、PDF Presenter 與 OCR Workspace。Convert 在本機處理 Documents、PDF utilities、light OCR、Images 與 Text。
+- Protect 在不修改原始檔案的情況下匯出 PNG、ZIP 或 PDF；Translate 處理 TXT、Markdown、HTML、DOCX、EPUB、PDF 與 Zotero 附件；PDF Presenter 匯入 PowerPoint、LibreOffice 與 Keynote；OCR Workspace 逐頁檢閱。
+- Convert 具確定性且 100% 離線；Protect 不會將文件傳送給 AI。只有選用的 Tesseract OCR 語言下載需要連線。
+
+## 本機 MCP 與 Nodus Server
+- MCP 在 Settings > Integrations > MCP Server 中設定。Nodus Server 彼此獨立，在 Settings > Server 中設定，每個 vault 使用 HTTPS URL 與一次性代碼連線。
+- 發佈的副本經過篩選且為對外傳送；OAuth 保護存取。Server 與協作共享仍為「已規劃」。
+
+## 藍圖狀態摘要
+- 開發中：打磨與穩定性。已規劃：Server、vault 共享與協作、iOS 與 iPadOS 應用程式。已實作：Teaching、Primary sources、Testimonies、使用者建議的 vault、Nodus Toolkit、Nodus Translate、PDF Presenter 與 OCR Workspace。
+- 沒有固定日期。
+
+## 介面答覆協定
+- 使用精確名稱與 Current view；區分可用、有條件、未來與未驗證。若缺少來源，請說「我無法用所選來源核實這一點」。
+- 絕不要把 PRE-ALPHA 或 ALPHA 當作實際工作的推薦；在操作說明中以「Base: …」結尾。
+`,
+  vi: `# Hướng dẫn nội bộ có thể kiểm chứng của Nodus
+
+## Quy tắc đọc hướng dẫn
+- Hướng dẫn này mô tả giao diện hiện tại và lộ trình chính thức đang hiển thị. Không được bịa ra tính năng, đường dẫn, ngày tháng, phiên bản hoặc trạng thái không có trong tài liệu.
+- “Đã triển khai” nghĩa là tính năng tồn tại và có thể mở được, không có nghĩa là đã ổn định. Nodus hoạt động theo hướng local-first: mỗi vault lưu dữ liệu trên máy tính của người dùng.
+
+## Các vault khả dụng và mức độ trưởng thành
+- Tại Vaults > Add vault có thể tạo Academic, Primary sources, Testimonies, Databases, Teaching, Study, Genealogy, Prosopography và Worldbuilding.
+- Primary sources, Testimonies và Prosopography ở PRE-ALPHA; Worldbuilding ở ALPHA; Databases, Teaching, Study và Genealogy ở BETA. Academic không hiển thị nhãn giai đoạn và dữ liệu minh họa không mở phần hướng dẫn.
+
+## Thanh tiêu đề và điều khiển toàn cục
+- Ở bên phải, thứ tự chung là Commands, Assistant, Tools, các điều khiển của vault, Suggest / Report, giao diện sáng/tối, Notifications và Settings; trên macOS Commands dùng ⌘K.
+- Huy hiệu ở giữa mở bộ chọn vault. Notifications chứa “Nodus notices” và “Activity”, vẫn hoạt động khi Nodi bị tắt.
+
+## Lộ trình chính thức đang hiển thị
+- Mở từ Settings > About Nodus Research > View Nodus Research roadmap hoặc từ bảng lệnh. Thứ tự và trạng thái:
+__ROADMAP_GUIDE__
+
+## Cài đặt
+- Các thẻ thực tế là Providers, AI Models, Library, Text and OCR, Interface, Integrations, Server, Tutorials, Backup, About Nodus Research và Updates and news.
+- Providers quản lý khóa và mô hình; Library đồng bộ Zotero; Interface quản lý ngôn ngữ, giao diện, trợ năng, thanh bên và Nodi; Server công bố bản sao đã lọc của vault.
+
+## Vault học thuật
+- Phục vụ nghiên cứu và viết học thuật; gồm Home, Search, Library, Graph, Argument map, Ideas, Authors, Immersion, Gaps, Debates, Coverage, Hypotheses, Reading path, Deep Research, Writing, Projects, Notes và Settings; có thể ẩn hoặc sắp xếp lại các mục trong Settings > Interface > Sidebar.
+- Deep Research thu thập chứng cứ từ kho ngữ liệu, tạo báo cáo và cho phép xuất thành tài liệu hoặc PDF theo bản sắc hình ảnh của vault.
+
+## Vault gia phả
+- Gồm People, Timeline, Family tree, Social relations, Map và Archive. Các khẳng định về danh tính và quan hệ huyết thống phải dựa trên sổ sách hoặc chứng cứ; trùng họ, trùng địa chỉ hoặc cùng xuất hiện trong một tài liệu không chứng minh được quan hệ huyết thống.
+
+## Vault cơ sở dữ liệu
+- Quản lý bảng có cấu trúc với cột có kiểu, hàng, chế độ xem, tìm kiếm, phân tích và Data Chat; cơ sở dữ liệu do người dùng tạo xuất hiện ở thanh bên.
+
+## Vault học tập
+- Phân cấp là Course > Subject, trong một môn có thể có thư mục, chủ đề, chủ đề con, ghi chú và tài liệu; gồm Schedules, Calendar, Materials, Recordings, Study chat, Ideas, Graph, Question bank và Review.
+- Schedules cho phép thêm một hoạt động cho mỗi ô; Calendar cung cấp chế độ xem tháng, tuần, năm và xuất sang iCloud hoặc Google Calendar; Question bank chứa câu hỏi, bài kiểm tra, bài thi và flashcards.
+
+## Vault giảng dạy
+- Đã triển khai ở BETA; tái sử dụng cấu trúc Course > Subject và bổ sung nhóm, tài liệu, Chat, Rubrics, Exams, Grades và Unit design. Teaching guide / Planning, Learning situations, Adaptations, Notes và Innovation projects vẫn ở trạng thái “In design”.
+
+## Vault nguồn sơ cấp
+- Đã triển khai ở PRE-ALPHA, chỉ dành cho thử nghiệm và cộng tác; gồm Search, Archive, People, Timeline, Map, Social relations, Notes, Toolkit và Settings; Archive quản lý xuất xứ và siêu dữ liệu.
+- Mọi kết quả tự động đều là đề xuất chờ duyệt; hãy phân biệt bản chép lời, quan sát và suy luận, đồng thời giữ nguyên định vị, mâu thuẫn và bất định.
+
+## Vault lời chứng
+- Đã triển khai ở PRE-ALPHA; Search, Interviews, Participants, Contrasts, Notes, Toolkit và Settings tổ chức phiên, phương tiện, bản chép lời, phân đoạn, mã, thỏa thuận và hạn chế.
+- Nodi tôn trọng quyền truy cập, ẩn danh, thời hạn cấm công bố và ghi công; không suy diễn thuộc tính nhạy cảm, cảm xúc, sự chân thành hay độ tin cậy.
+
+## Vault văn liệu nhân vật
+- Đã triển khai ở PRE-ALPHA; Search, Population, People, Sources, Analysis, Networks, Notes, Toolkit và Settings tuân theo phương pháp, danh tính, tư cách thành viên, phân tích và mạng lưới.
+- Không nhầm lẫn person, mention, source, factoid và statement; không hợp nhất danh tính khi chưa duyệt.
+
+## Vault worldbuilding
+- Đã triển khai ở ALPHA; gồm Encyclopedia, Characters, Places, Factions, Cultures, Timeline, Map, Relationships, Families, Dynasties, World chat, World rules, Conflicts, Narrative arcs, Continuity, Notes, Scenes và Manuscript.
+- Tác giả là nguồn chân lý; Nodi phân biệt rõ canon đã thiết lập với đề xuất.
+
+## Công cụ (Nodus Toolkit)
+- Trang trung tâm gồm Nodus Convert, Nodus Protect, Nodus Translate, PDF Presenter và OCR Workspace. Convert xử lý cục bộ Documents, PDF utilities, light OCR, Images và Text.
+- Protect xuất PNG, ZIP hoặc PDF mà không sửa tệp gốc; Translate xử lý TXT, Markdown, HTML, DOCX, EPUB, PDF và tệp đính kèm Zotero; PDF Presenter nhập PowerPoint, LibreOffice và Keynote; OCR Workspace duyệt từng trang.
+- Convert có tính xác định và 100% ngoại tuyến; Protect không gửi tài liệu cho AI. Chỉ thao tác tải ngôn ngữ OCR của Tesseract (tùy chọn) mới cần mạng.
+
+## MCP cục bộ và Nodus Server
+- MCP được cấu hình tại Settings > Integrations > MCP Server. Nodus Server độc lập, được cấu hình tại Settings > Server, mỗi vault kết nối bằng URL HTTPS và mã dùng một lần.
+- Bản sao được công bố đã lọc và chỉ gửi ra ngoài; OAuth bảo vệ quyền truy cập. Server và chia sẻ cộng tác vẫn ở trạng thái “Đã lên kế hoạch”.
+
+## Tình trạng tóm tắt lộ trình
+- Đang phát triển: Hoàn thiện và ổn định. Đã lên kế hoạch: Server, chia sẻ vault và cộng tác, ứng dụng iOS và iPadOS. Đã triển khai: Teaching, Primary sources, Testimonies, các vault do người dùng đề xuất, Nodus Toolkit, Nodus Translate, PDF Presenter và OCR Workspace.
+- Không có mốc thời gian cố định.
+
+## Giao thức trả lời về giao diện
+- Dùng đúng tên trong hướng dẫn này và Current view khi được chọn; phân biệt khả dụng, có điều kiện, tương lai và chưa kiểm chứng. Nếu thiếu nguồn, hãy nói “Tôi không thể kiểm chứng điều này bằng các nguồn đã chọn”.
+- Đừng bao giờ biến PRE-ALPHA hoặc ALPHA thành khuyến nghị cho công việc thực tế; trong hướng dẫn thao tác, kết thúc bằng “Base: …”.
+`,
+  ja: `# Nodus 検証可能な内部ガイド
+
+## このガイドの読み方
+- このガイドは現在のインターフェースと公式に表示されるロードマップを記載します。ここにない機能、経路、日付、バージョン、状態を創作しないでください。
+- 「実装済み」は機能が存在して開けることを意味し、安定版に達したことを意味しません。Nodus は local-first で、各 vault はデータをユーザーのコンピューターに保存します。
+
+## 利用可能な vault と成熟度
+- Vaults > Add vault から Academic、Primary sources、Testimonies、Databases、Teaching、Study、Genealogy、Prosopography、Worldbuilding を作成できます。
+- Primary sources、Testimonies、Prosopography は PRE-ALPHA、Worldbuilding は ALPHA、Databases、Teaching、Study、Genealogy は BETA です。Academic はフェーズ表示がなく、デモデータでチュートリアルは開きません。
+
+## ヘッダーとグローバルコントロール
+- 右側は概ね Commands、Assistant、Tools、vault のコントロール、Suggest / Report、テーマ、Notifications、Settings の順です。macOS では Commands のショートカットは ⌘K です。
+- 中央のバッジが vault セレクターを開きます。Notifications には「Nodus notices」と「Activity」があり、Nodi を無効にしても動作します。
+
+## 公式に表示されるロードマップ
+- Settings > About Nodus Research > View Nodus Research roadmap またはコマンドパレットから開きます。順序と状態は次のとおりです：
+__ROADMAP_GUIDE__
+
+## 設定
+- 実際のタブは Providers、AI Models、Library、Text and OCR、Interface、Integrations、Server、Tutorials、Backup、About Nodus Research、Updates and news です。
+- Providers はキーとモデルを管理し、Library は Zotero を同期し、Interface は言語、テーマ、アクセシビリティ、サイドバー、Nodi を管理し、Server はフィルター済みの vault コピーを公開します。
+
+## 学術 vault
+- 研究と学術的執筆を目的とし、Home、Search、Library、Graph、Argument map、Ideas、Authors、Immersion、Gaps、Debates、Coverage、Hypotheses、Reading path、Deep Research、Writing、Projects、Notes、Settings を含みます。セクションは Settings > Interface > Sidebar で非表示または並べ替えできます。
+- Deep Research はコーパスから証拠を取得してレポートを生成し、vault のビジュアルアイデンティティで文書または PDF としてエクスポートできます。
+
+## 系譜 vault
+- People、Timeline、Family tree、Social relations、Map、Archive を含みます。身元や親族関係の主張は記録や証拠に基づかなければなりません。姓、住所、同じ文書への登場が一致しても親族関係の証明にはなりません。
+
+## データベース vault
+- 型付き列を持つ構造化テーブル、行、ビュー、検索、分析、Data Chat を管理します。ユーザーが作成したデータベースはサイドバーに表示されます。
+
+## 学習 vault
+- 階層は Course > Subject で、科目内にフォルダー、トピック、サブトピック、ノート、教材を置けます。Schedules、Calendar、Materials、Recordings、Study chat、Ideas、Graph、Question bank、Review を含みます。
+- Schedules はセルごとに活動を追加でき、Calendar は月・週・年の表示と iCloud または Google Calendar へのエクスポートを提供し、Question bank には問題、テスト、試験、flashcards が含まれます。
+
+## 教育 vault
+- BETA で実装済みで、Course > Subject の構成を再利用し、グループ、教材、Chat、Rubrics、Exams、Grades、Unit design を追加します。Teaching guide / Planning、Learning situations、Adaptations、Notes、Innovation projects は「In design」のままです。
+
+## 一次資料 vault
+- PRE-ALPHA で実装済みで、試験と共同作業のみを目的とします。Search、Archive、People、Timeline、Map、Social relations、Notes、Toolkit、Settings を含み、Archive は出所とメタデータを管理します。
+- 自動結果はすべて確認待ちの提案です。文字起こし、観察、推論を区別し、位置情報、矛盾、不確実性を保持してください。
+
+## 証言 vault
+- PRE-ALPHA で実装済みです。Search、Interviews、Participants、Contrasts、Notes、Toolkit、Settings がセッション、メディア、文字起こし、断片、コード、合意、制限を整理します。
+- Nodi はアクセス、匿名化、公開禁止期間、帰属を尊重し、機微な属性、感情、誠実さ、信頼性を推論しません。
+
+## プロソポグラフィー vault
+- PRE-ALPHA で実装済みです。Search、Population、People、Sources、Analysis、Networks、Notes、Toolkit、Settings が方法論、身元、所属、分析、ネットワークに従います。
+- person、mention、source、factoid、statement を混同しないでください。確認なしに身元を統合しないでください。
+
+## ワールドビルディング vault
+- ALPHA で実装済みで、Encyclopedia、Characters、Places、Factions、Cultures、Timeline、Map、Relationships、Families、Dynasties、World chat、World rules、Conflicts、Narrative arcs、Continuity、Notes、Scenes、Manuscript を含みます。
+- 作者が真実の源泉です。Nodi は確立された設定と提案を区別します。
+
+## ツール（Nodus Toolkit）
+- ハブには Nodus Convert、Nodus Protect、Nodus Translate、PDF Presenter、OCR Workspace があります。Convert は Documents、PDF utilities、light OCR、Images、Text をローカルで処理します。
+- Protect は元ファイルを変更せずに PNG、ZIP、PDF をエクスポートし、Translate は TXT、Markdown、HTML、DOCX、EPUB、PDF、Zotero 添付を処理し、PDF Presenter は PowerPoint、LibreOffice、Keynote を取り込み、OCR Workspace は各ページを確認します。
+- Convert は決定的で 100% オフラインです。Protect は文書を AI に送信しません。ネットワークを使うのは任意の Tesseract OCR 言語のダウンロードだけです。
+
+## ローカル MCP と Nodus Server
+- MCP は Settings > Integrations > MCP Server で設定します。Nodus Server は独立しており、Settings > Server で設定し、vault ごとに HTTPS URL とワンタイムコードで接続します。
+- 公開されるコピーはフィルター済みで送信方向のみです。OAuth がアクセスを保護します。Server と共同共有は「計画済み」のままです。
+
+## ロードマップの状態まとめ
+- 開発中：磨き込みと安定性。計画済み：Server、vault の共有と共同作業、iOS および iPadOS アプリ。実装済み：Teaching、Primary sources、Testimonies、ユーザー提案の vault、Nodus Toolkit、Nodus Translate、PDF Presenter、OCR Workspace。
+- 固定された日付はありません。
+
+## インターフェース回答プロトコル
+- 正確な名称と Current view を使い、利用可能、条件付き、将来、未検証を区別してください。情報源がない場合は「選択した情報源ではこれを検証できません」と述べてください。
+- PRE-ALPHA や ALPHA を実務利用の推奨として扱わないでください。手順では「Base: …」で締めくくってください。
+`,
+  ru: `# Проверяемый внутренний справочник Nodus
+
+## Правила чтения справочника
+- Этот справочник описывает текущий интерфейс и официальный видимый план развития. Не придумывайте функции, маршруты, даты, версии или состояния, которых здесь нет.
+- «Реализовано» означает, что функция существует и открывается, а не то, что она достигла стабильной версии. Nodus работает по принципу local-first: каждый vault хранит данные на компьютере пользователя.
+
+## Доступные vault и уровень зрелости
+- Через Vaults > Add vault можно создать Academic, Primary sources, Testimonies, Databases, Teaching, Study, Genealogy, Prosopography и Worldbuilding.
+- Primary sources, Testimonies и Prosopography находятся в PRE-ALPHA; Worldbuilding — в ALPHA; Databases, Teaching, Study и Genealogy — в BETA. Academic не показывает метку фазы, а демонстрационные данные не открывают обучение.
+
+## Заголовок и глобальные элементы управления
+- Справа в общем порядке расположены Commands, Assistant, Tools, элементы управления vault, Suggest / Report, выбор темы, Notifications и Settings; в macOS для Commands используется ⌘K.
+- Центральный значок открывает выбор vault. Notifications содержит «Nodus notices» и «Activity» и работает даже при отключённой Nodi.
+
+## Официальный видимый план развития
+- Он открывается из Settings > About Nodus Research > View Nodus Research roadmap или из палитры команд. Порядок и состояния:
+__ROADMAP_GUIDE__
+
+## Настройки
+- Реальные вкладки: Providers, AI Models, Library, Text and OCR, Interface, Integrations, Server, Tutorials, Backup, About Nodus Research и Updates and news.
+- Providers управляет ключами и моделями; Library синхронизирует Zotero; Interface управляет языком, темой, доступностью, боковой панелью и Nodi; Server публикует отфильтрованную копию vault.
+
+## Академический vault
+- Он предназначен для исследований и научного письма; включает Home, Search, Library, Graph, Argument map, Ideas, Authors, Immersion, Gaps, Debates, Coverage, Hypotheses, Reading path, Deep Research, Writing, Projects, Notes и Settings; разделы можно скрывать или переупорядочивать в Settings > Interface > Sidebar.
+- Deep Research извлекает доказательства из корпуса, формирует отчёт и позволяет экспортировать его как документ или PDF с визуальной идентичностью vault.
+
+## Генеалогический vault
+- Включает People, Timeline, Family tree, Social relations, Map и Archive. Утверждения о личностях и родстве должны опираться на записи или доказательства; совпадение фамилии, адреса или присутствие в одном документе не доказывает родство.
+
+## Vault баз данных
+- Управляет структурированными таблицами с типизированными столбцами, строками, представлениями, поиском, анализом и Data Chat; созданные пользователем базы появляются в боковой панели.
+
+## Учебный vault
+- Иерархия — Course > Subject; внутри предмета могут быть папки, темы, подтемы, заметки и материалы; включает Schedules, Calendar, Materials, Recordings, Study chat, Ideas, Graph, Question bank и Review.
+- В Schedules в каждую ячейку можно добавить занятие; Calendar предлагает месячный, недельный и годовой виды и экспорт в iCloud или Google Calendar; Question bank содержит вопросы, тесты, экзамены и flashcards.
+
+## Преподавательский vault
+- Реализован в BETA; использует структуру Course > Subject и добавляет группы, материалы, Chat, Rubrics, Exams, Grades и Unit design. Teaching guide / Planning, Learning situations, Adaptations, Notes и Innovation projects остаются в состоянии «In design».
+
+## Vault первоисточников
+- Реализован в PRE-ALPHA только для тестирования и совместной работы; включает Search, Archive, People, Timeline, Map, Social relations, Notes, Toolkit и Settings; Archive управляет происхождением и метаданными.
+- Любой автоматический результат — это предложение, ожидающее проверки; различайте транскрипцию, наблюдение и вывод, сохраняя локаторы, противоречия и неопределённость.
+
+## Vault свидетельств
+- Реализован в PRE-ALPHA; Search, Interviews, Participants, Contrasts, Notes, Toolkit и Settings организуют сессии, медиа, расшифровки, фрагменты, коды, соглашения и ограничения.
+- Nodi соблюдает доступ, анонимизацию, эмбарго и атрибуцию и не выводит чувствительные признаки, эмоции, искренность или достоверность.
+
+## Vault просопографии
+- Реализован в PRE-ALPHA; Search, Population, People, Sources, Analysis, Networks, Notes, Toolkit и Settings следуют методологии, идентичностям, принадлежности, анализу и сетям.
+- Не путайте person, mention, source, factoid и statement; не объединяйте идентичности без проверки.
+
+## Vault миростроения
+- Реализован в ALPHA; включает Encyclopedia, Characters, Places, Factions, Cultures, Timeline, Map, Relationships, Families, Dynasties, World chat, World rules, Conflicts, Narrative arcs, Continuity, Notes, Scenes и Manuscript.
+- Автор — источник истины; Nodi чётко разделяет установленный канон и предложения.
+
+## Инструменты (Nodus Toolkit)
+- В центре собраны Nodus Convert, Nodus Protect, Nodus Translate, PDF Presenter и OCR Workspace. Convert локально обрабатывает Documents, PDF utilities, light OCR, Images и Text.
+- Protect экспортирует PNG, ZIP или PDF, не изменяя оригинал; Translate обрабатывает TXT, Markdown, HTML, DOCX, EPUB, PDF и вложения Zotero; PDF Presenter импортирует PowerPoint, LibreOffice и Keynote; OCR Workspace проверяет каждую страницу.
+- Convert детерминирован и работает на 100 % офлайн; Protect не отправляет документы ИИ. Сеть нужна только для необязательной загрузки языков OCR Tesseract.
+
+## Локальный MCP и Nodus Server
+- MCP настраивается в Settings > Integrations > MCP Server. Nodus Server независим, настраивается в Settings > Server, и каждый vault подключается по HTTPS-URL с одноразовым кодом.
+- Публикуемая копия отфильтрована и исходящая; OAuth защищает доступ. Server и совместная работа остаются «Запланировано».
+
+## Сводный статус плана развития
+- В разработке: Оттачивание и стабильность. Запланировано: Server, совместное использование vault и командная работа, приложения для iOS и iPadOS. Реализовано: Teaching, Primary sources, Testimonies, предложенные пользователями vault, Nodus Toolkit, Nodus Translate, PDF Presenter и OCR Workspace.
+- Фиксированных дат нет.
+
+## Протокол ответов об интерфейсе
+- Используйте точные названия и Current view; различайте доступное, условное, будущее и непроверенное. Если источника нет, скажите: «Я не могу проверить это по выбранным источникам».
+- Никогда не превращайте PRE-ALPHA или ALPHA в рекомендацию для реальной работы; в инструкциях завершайте строкой «Base: …».
+`,
+  uk: `# Перевірний внутрішній довідник Nodus
+
+## Правила читання довідника
+- Цей довідник описує поточний інтерфейс і офіційний видимий план розвитку. Не вигадуйте функції, маршрути, дати, версії чи стани, яких тут немає.
+- «Реалізовано» означає, що функція існує й відкривається, а не те, що вона досягла стабільної версії. Nodus працює за принципом local-first: кожен vault зберігає дані на комп’ютері користувача.
+
+## Доступні vault і рівень зрілості
+- Через Vaults > Add vault можна створити Academic, Primary sources, Testimonies, Databases, Teaching, Study, Genealogy, Prosopography і Worldbuilding.
+- Primary sources, Testimonies і Prosopography перебувають у PRE-ALPHA; Worldbuilding — в ALPHA; Databases, Teaching, Study і Genealogy — в BETA. Academic не показує позначку фази, а демонстраційні дані не відкривають навчання.
+
+## Заголовок і глобальні елементи керування
+- Праворуч у загальному порядку розташовані Commands, Assistant, Tools, елементи керування vault, Suggest / Report, вибір теми, Notifications і Settings; у macOS для Commands використовується ⌘K.
+- Центральний значок відкриває вибір vault. Notifications містить «Nodus notices» і «Activity» та працює навіть із вимкненою Nodi.
+
+## Офіційний видимий план розвитку
+- Він відкривається з Settings > About Nodus Research > View Nodus Research roadmap або з палітри команд. Порядок і стани:
+__ROADMAP_GUIDE__
+
+## Налаштування
+- Реальні вкладки: Providers, AI Models, Library, Text and OCR, Interface, Integrations, Server, Tutorials, Backup, About Nodus Research і Updates and news.
+- Providers керує ключами та моделями; Library синхронізує Zotero; Interface керує мовою, темою, доступністю, бічною панеллю та Nodi; Server публікує відфільтровану копію vault.
+
+## Академічний vault
+- Призначений для досліджень і наукового письма; містить Home, Search, Library, Graph, Argument map, Ideas, Authors, Immersion, Gaps, Debates, Coverage, Hypotheses, Reading path, Deep Research, Writing, Projects, Notes і Settings; розділи можна приховувати або впорядковувати в Settings > Interface > Sidebar.
+- Deep Research отримує докази з корпусу, формує звіт і дозволяє експортувати його як документ або PDF із візуальною ідентичністю vault.
+
+## Генеалогічний vault
+- Містить People, Timeline, Family tree, Social relations, Map і Archive. Твердження про особи та спорідненість мають підкріплюватися записами або доказами; збіг прізвища, адреси чи наявність в одному документі не доводить спорідненості.
+
+## Vault баз даних
+- Керує структурованими таблицями з типізованими стовпцями, рядками, поданнями, пошуком, аналізом і Data Chat; створені користувачем бази з’являються на бічній панелі.
+
+## Навчальний vault
+- Ієрархія — Course > Subject; усередині предмета можуть бути теки, теми, підтеми, нотатки й матеріали; містить Schedules, Calendar, Materials, Recordings, Study chat, Ideas, Graph, Question bank і Review.
+- У Schedules до кожної клітинки можна додати заняття; Calendar пропонує місячний, тижневий і річний види та експорт в iCloud або Google Calendar; Question bank містить питання, тести, іспити й flashcards.
+
+## Викладацький vault
+- Реалізовано в BETA; використовує структуру Course > Subject і додає групи, матеріали, Chat, Rubrics, Exams, Grades і Unit design. Teaching guide / Planning, Learning situations, Adaptations, Notes і Innovation projects залишаються в стані «In design».
+
+## Vault першоджерел
+- Реалізовано в PRE-ALPHA лише для тестування та співпраці; містить Search, Archive, People, Timeline, Map, Social relations, Notes, Toolkit і Settings; Archive керує походженням і метаданими.
+- Будь-який автоматичний результат — це пропозиція, що очікує перевірки; розрізняйте транскрипцію, спостереження та висновок, зберігаючи локатори, суперечності та непевність.
+
+## Vault свідчень
+- Реалізовано в PRE-ALPHA; Search, Interviews, Participants, Contrasts, Notes, Toolkit і Settings упорядковують сесії, медіа, розшифровки, фрагменти, коди, домовленості та обмеження.
+- Nodi поважає доступ, анонімізацію, ембарго та атрибуцію й не виводить чутливі ознаки, емоції, щирість чи достовірність.
+
+## Vault просопографії
+- Реалізовано в PRE-ALPHA; Search, Population, People, Sources, Analysis, Networks, Notes, Toolkit і Settings дотримуються методології, ідентичностей, належності, аналізу та мереж.
+- Не плутайте person, mention, source, factoid і statement; не об’єднуйте ідентичності без перевірки.
+
+## Vault світобудови
+- Реалізовано в ALPHA; містить Encyclopedia, Characters, Places, Factions, Cultures, Timeline, Map, Relationships, Families, Dynasties, World chat, World rules, Conflicts, Narrative arcs, Continuity, Notes, Scenes і Manuscript.
+- Автор — джерело істини; Nodi чітко розділяє встановлений канон і пропозиції.
+
+## Інструменти (Nodus Toolkit)
+- У центрі зібрано Nodus Convert, Nodus Protect, Nodus Translate, PDF Presenter і OCR Workspace. Convert локально обробляє Documents, PDF utilities, light OCR, Images і Text.
+- Protect експортує PNG, ZIP або PDF, не змінюючи оригінал; Translate обробляє TXT, Markdown, HTML, DOCX, EPUB, PDF і вкладення Zotero; PDF Presenter імпортує PowerPoint, LibreOffice і Keynote; OCR Workspace переглядає кожну сторінку.
+- Convert детермінований і працює на 100 % офлайн; Protect не надсилає документи ШІ. Мережа потрібна лише для необов’язкового завантаження мов OCR Tesseract.
+
+## Локальний MCP і Nodus Server
+- MCP налаштовується в Settings > Integrations > MCP Server. Nodus Server незалежний, налаштовується в Settings > Server, і кожен vault підключається за HTTPS-URL з одноразовим кодом.
+- Опублікована копія відфільтрована й вихідна; OAuth захищає доступ. Server і спільна робота залишаються «Заплановано».
+
+## Підсумковий стан плану розвитку
+- У розробці: Доопрацювання та стабільність. Заплановано: Server, спільне використання vault і командна робота, застосунки для iOS та iPadOS. Реалізовано: Teaching, Primary sources, Testimonies, запропоновані користувачами vault, Nodus Toolkit, Nodus Translate, PDF Presenter і OCR Workspace.
+- Фіксованих дат немає.
+
+## Протокол відповідей про інтерфейс
+- Використовуйте точні назви та Current view; розрізняйте доступне, умовне, майбутнє й неперевірене. Якщо джерела немає, скажіть: «Я не можу перевірити це за вибраними джерелами».
+- Ніколи не перетворюйте PRE-ALPHA або ALPHA на рекомендацію для реальної роботи; в інструкціях завершуйте рядком «Base: …».
+`,
+  ko: `# Nodus 검증 가능 내부 안내서
+
+## 안내서를 읽는 규칙
+- 이 안내서는 현재 인터페이스와 공식적으로 공개된 로드맵을 설명합니다. 여기에 없는 기능, 경로, 날짜, 버전 또는 상태를 지어내지 마십시오.
+- “구현됨”은 기능이 존재하고 열 수 있다는 뜻이며 안정 버전에 도달했다는 뜻이 아닙니다. Nodus는 local-first 방식으로 동작하며 각 vault는 사용자 컴퓨터에 데이터를 저장합니다.
+
+## 사용 가능한 vault와 성숙도
+- Vaults > Add vault에서 Academic, Primary sources, Testimonies, Databases, Teaching, Study, Genealogy, Prosopography, Worldbuilding을 만들 수 있습니다.
+- Primary sources, Testimonies, Prosopography는 PRE-ALPHA, Worldbuilding은 ALPHA, Databases, Teaching, Study, Genealogy는 BETA입니다. Academic은 단계 표시가 없으며 데모 데이터로는 튜토리얼이 열리지 않습니다.
+
+## 헤더와 전역 컨트롤
+- 오른쪽에는 대체로 Commands, Assistant, Tools, vault 컨트롤, Suggest / Report, 테마, Notifications, Settings 순서로 있습니다. macOS에서 Commands 단축키는 ⌘K입니다.
+- 중앙 배지가 vault 선택기를 엽니다. Notifications에는 “Nodus notices”와 “Activity”가 있으며 Nodi가 비활성화되어도 동작합니다.
+
+## 공식 공개 로드맵
+- Settings > About Nodus Research > View Nodus Research roadmap 또는 명령 팔레트에서 엽니다. 순서와 상태는 다음과 같습니다:
+__ROADMAP_GUIDE__
+
+## 설정
+- 실제 탭은 Providers, AI Models, Library, Text and OCR, Interface, Integrations, Server, Tutorials, Backup, About Nodus Research, Updates and news입니다.
+- Providers는 키와 모델을 관리하고, Library는 Zotero를 동기화하며, Interface는 언어, 테마, 접근성, 사이드바, Nodi를 관리하고, Server는 필터링된 vault 사본을 게시합니다.
+
+## 학술 vault
+- 연구와 학술 작성을 위한 공간이며 Home, Search, Library, Graph, Argument map, Ideas, Authors, Immersion, Gaps, Debates, Coverage, Hypotheses, Reading path, Deep Research, Writing, Projects, Notes, Settings를 포함합니다. 섹션은 Settings > Interface > Sidebar에서 숨기거나 순서를 바꿀 수 있습니다.
+- Deep Research는 코퍼스에서 증거를 가져와 보고서를 생성하고 vault의 시각적 정체성으로 문서 또는 PDF로 내보낼 수 있습니다.
+
+## 계보 vault
+- People, Timeline, Family tree, Social relations, Map, Archive를 포함합니다. 신원과 친족 관계에 대한 주장은 기록이나 증거로 뒷받침되어야 합니다. 성이 같거나 주소가 같거나 같은 문서에 등장한다고 해서 친족 관계가 증명되지는 않습니다.
+
+## 데이터베이스 vault
+- 형식이 지정된 열이 있는 구조화된 표, 행, 보기, 검색, 분석, Data Chat을 관리합니다. 사용자가 만든 데이터베이스는 사이드바에 표시됩니다.
+
+## 학습 vault
+- 계층은 Course > Subject이며 과목 안에 폴더, 주제, 하위 주제, 노트, 자료가 있을 수 있습니다. Schedules, Calendar, Materials, Recordings, Study chat, Ideas, Graph, Question bank, Review를 포함합니다.
+- Schedules는 셀마다 활동을 추가할 수 있고, Calendar는 월간·주간·연간 보기와 iCloud 또는 Google Calendar 내보내기를 제공하며, Question bank에는 문제, 시험지, 시험, flashcards가 들어 있습니다.
+
+## 교육 vault
+- BETA로 구현되었으며 Course > Subject 구조를 재사용하고 그룹, 자료, Chat, Rubrics, Exams, Grades, Unit design을 추가합니다. Teaching guide / Planning, Learning situations, Adaptations, Notes, Innovation projects는 “In design” 상태로 남아 있습니다.
+
+## 1차 사료 vault
+- PRE-ALPHA로 구현되었으며 테스트와 협업 전용입니다. Search, Archive, People, Timeline, Map, Social relations, Notes, Toolkit, Settings를 포함하고 Archive는 출처와 메타데이터를 관리합니다.
+- 모든 자동 결과는 검토 대기 중인 제안입니다. 전사, 관찰, 추론을 구분하고 위치 정보, 모순, 불확실성을 보존하십시오.
+
+## 증언 vault
+- PRE-ALPHA로 구현되었습니다. Search, Interviews, Participants, Contrasts, Notes, Toolkit, Settings가 세션, 미디어, 전사, 단편, 코드, 합의, 제한을 정리합니다.
+- Nodi는 접근, 익명화, 공개 금지 기간, 저작자 표시를 존중하며 민감한 속성, 감정, 진실성, 신뢰성을 추론하지 않습니다.
+
+## 프로소포그래피 vault
+- PRE-ALPHA로 구현되었습니다. Search, Population, People, Sources, Analysis, Networks, Notes, Toolkit, Settings가 방법론, 정체성, 소속, 분석, 네트워크를 따릅니다.
+- person, mention, source, factoid, statement를 혼동하지 마십시오. 검토 없이 정체성을 병합하지 마십시오.
+
+## 월드빌딩 vault
+- ALPHA로 구현되었으며 Encyclopedia, Characters, Places, Factions, Cultures, Timeline, Map, Relationships, Families, Dynasties, World chat, World rules, Conflicts, Narrative arcs, Continuity, Notes, Scenes, Manuscript를 포함합니다.
+- 작가가 진실의 원천입니다. Nodi는 확립된 설정과 제안을 명확히 구분합니다.
+
+## 도구(Nodus Toolkit)
+- 허브에는 Nodus Convert, Nodus Protect, Nodus Translate, PDF Presenter, OCR Workspace가 있습니다. Convert는 Documents, PDF utilities, light OCR, Images, Text를 로컬에서 처리합니다.
+- Protect는 원본을 수정하지 않고 PNG, ZIP, PDF로 내보내고, Translate는 TXT, Markdown, HTML, DOCX, EPUB, PDF, Zotero 첨부 파일을 처리하며, PDF Presenter는 PowerPoint, LibreOffice, Keynote를 가져오고, OCR Workspace는 각 페이지를 검토합니다.
+- Convert는 결정적이며 100% 오프라인으로 동작합니다. Protect는 문서를 AI로 보내지 않습니다. 선택적인 Tesseract OCR 언어 다운로드만 네트워크를 사용합니다.
+
+## 로컬 MCP와 Nodus Server
+- MCP는 Settings > Integrations > MCP Server에서 구성합니다. Nodus Server는 별개이며 Settings > Server에서 구성하고, 각 vault는 HTTPS URL과 일회용 코드로 연결합니다.
+- 게시되는 사본은 필터링된 발신 전용입니다. OAuth가 접근을 보호합니다. Server와 협업 공유는 여전히 “계획됨”입니다.
+
+## 로드맵 상태 요약
+- 개발 중: 다듬기와 안정성. 계획됨: Server, vault 공유 및 협업, iOS 및 iPadOS 앱. 구현됨: Teaching, Primary sources, Testimonies, 사용자 제안 vault, Nodus Toolkit, Nodus Translate, PDF Presenter, OCR Workspace.
+- 고정된 날짜는 없습니다.
+
+## 인터페이스 답변 프로토콜
+- 정확한 이름과 Current view를 사용하고 사용 가능, 조건부, 미래, 미검증을 구분하십시오. 출처가 없으면 “선택한 출처로는 이를 검증할 수 없습니다”라고 말하십시오.
+- PRE-ALPHA 또는 ALPHA를 실제 업무에 권장하지 마십시오. 안내에서는 “Base: …”로 끝내십시오.
+`,
 
 };
 
@@ -952,4 +1583,11 @@ export const NODUS_DOCUMENTATION_BY_LANGUAGE: Record<PromptLanguage, string> = {
   'pt-BR': buildNodusDocumentation('pt-BR'),
   it: buildNodusDocumentation('it'),
   tr: buildNodusDocumentation('tr'),
+  'zh-Hans': buildNodusDocumentation('zh-Hans'),
+  'zh-Hant': buildNodusDocumentation('zh-Hant'),
+  vi: buildNodusDocumentation('vi'),
+  ja: buildNodusDocumentation('ja'),
+  ru: buildNodusDocumentation('ru'),
+  uk: buildNodusDocumentation('uk'),
+  ko: buildNodusDocumentation('ko'),
 };
