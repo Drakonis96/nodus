@@ -195,6 +195,24 @@ const RUNTIME_PATTERNS: RuntimePattern[] = [
     pattern: /^Adjuntos: (.+)$/,
     render: (m) => tx('Adjuntos: {title}', { title: m[1] }),
   },
+  // The global-library extraction readout, handed over untranslated by
+  // EXTRACTION_PROGRESS_MESSAGES so the page counts and the file name survive.
+  {
+    pattern: /^Extrayendo página (\d+) de (\d+)…$/,
+    render: (m) => tx('Extrayendo página {page} de {total}…', { page: m[1], total: m[2] }),
+  },
+  {
+    pattern: /^OCR local (\d+) de (\d+)…$/,
+    render: (m) => tx('OCR local {page} de {total}…', { page: m[1], total: m[2] }),
+  },
+  {
+    pattern: /^OCR remoto (\d+) de (\d+)…$/,
+    render: (m) => tx('OCR remoto {n} de {total}…', { n: m[1], total: m[2] }),
+  },
+  {
+    pattern: /^Analizando (.+)…$/,
+    render: (m) => tx('Analizando {file}…', { file: m[1] }),
+  },
   // Cloudflare deployment progress and failures. The main process builds these with the
   // Worker's own name and status code, so they are prose by the time they reach the modal.
   {
