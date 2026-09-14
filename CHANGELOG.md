@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.4.4 — 2026-09-14
+
+Nodus 5.4.4 speaks Simplified Chinese across the whole interface, keeps Chinese,
+Japanese and Korean text in exported PDFs, survives dropped connections and
+picky gateways in document scans, and keeps the library list fresh after a
+global link.
+
+- Simplified Chinese is a full ninth interface language. Settings, menus, file dialogs, error messages and the seeded demo vaults follow the switch, with nothing left in Spanish or English afterwards.
+- Exported PDFs keep CJK text. Reports, watermarks and study annotations that lost Han characters or failed outright now embed a compact Chinese font on desktop and server, wrapping those lines character by character. Latin reports look exactly as before.
+- Document scans retry dropped connections instead of failing, custom thinking models get explicit control over their private reasoning, and a rejected reasoning hint never fails the scan on its own.
+- Linking documents from the global library refreshes the vault view at once, extraction queue messages are fully translated, and standalone Documentary Index jobs appear with their own retry and count toward the header badge.
+- Added the complete 5.4.4 What's New modal in all nine interface languages.
+
 ## 5.4.3 — 2026-09-14
 
 Nodus 5.4.3 fixes three things that happened behind the user's back: a work

@@ -24,30 +24,48 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
-  // 5.4.3 fixes three things that happened behind the user's back: a work summary
-  // stored clipped at the model's output ceiling, the browser pairing prompt on
-  // macOS, and the JSON a capability tool dumped into a chat.
+  // 5.4.4 speaks Simplified Chinese across the whole interface, keeps CJK text
+  // in exported PDFs on desktop and server, survives dropped connections and
+  // picky gateways in document scans, and keeps the library list fresh after a
+  // global link.
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.4.3');
+  assert.equal(currentRelease?.version, '5.4.4');
   assert.equal(currentRelease?.date, '2026-09-14');
-  assert.equal(currentRelease?.highlights.length, 3);
-  assert.deepEqual(currentRelease.highlights.map((h) => h.scope), ['ai', 'connector', 'plugin']);
+  assert.equal(currentRelease?.highlights.length, 4);
+  assert.deepEqual(currentRelease.highlights.map((h) => h.scope), ['languages', 'general', 'ai', 'library']);
   for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
     assert.ok(currentRelease.highlights.every((h) => h[language]?.length > 80));
   }
+  for (const phrase of [
+    /now speaks Simplified Chinese/, /demo vaults that open on first run/,
+    /now keep Chinese, Japanese and Korean text/, /wrap those lines character by character/,
+    /survive dropped connections and picky gateways/, /never fails the scan on its own/,
+    /stays fresh and the extraction queue speaks your language/, /count toward the header badge/,
+  ]) {
+    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.4.4 is missing ${phrase}`);
+  }
+  assert.ok(currentRelease.highlights.every((h) => h.it !== h.en && h.tr !== h.en), 'the Italian and Turkish translations must not fall back to English');
+
+  // 5.4.3 fixed three things that happened behind the user's back: a work summary
+  // stored clipped at the model's output ceiling, the browser pairing prompt on
+  // macOS, and the JSON a capability tool dumped into a chat.
+  const release543 = RELEASE_NOTES[1];
+  assert.equal(release543?.version, '5.4.3');
+  assert.equal(release543?.date, '2026-09-14');
+  assert.equal(release543?.highlights.length, 3);
+  assert.deepEqual(release543.highlights.map((h) => h.scope), ['ai', 'connector', 'plugin']);
   for (const phrase of [
     /no longer stored cut off mid-sentence/, /retries once at the app’s larger budget/,
     /no longer waits in silence/, /taskbar flash or a dock bounce/,
     /no longer take over the conversation/, /folded under “Evidence”/,
   ]) {
-    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.4.3 is missing ${phrase}`);
+    assert.ok(release543.highlights.some((h) => phrase.test(h.en)), `5.4.3 is missing ${phrase}`);
   }
-  assert.ok(currentRelease.highlights.every((h) => h.it !== h.en && h.tr !== h.en), 'the Italian and Turkish translations must not fall back to English');
 
   // 5.4.2 rebuilt the Study question bank, rendered Markdown and LaTeX on every
   // question and flashcard surface, added seven prompt languages and carried the
   // fixes merged since the 5.4.1 hotfix.
-  const release542 = RELEASE_NOTES[1];
+  const release542 = RELEASE_NOTES[2];
   assert.equal(release542?.version, '5.4.2');
   assert.equal(release542?.date, '2026-09-13');
   assert.equal(release542?.highlights.length, 11);
@@ -74,11 +92,11 @@ try {
 
   // 5.4.0 keeps its own entry, and 5.4.1 shows exactly the same highlights: someone
   // already on 5.4.0 has read them, and someone arriving from 5.3.1 must not miss them.
-  const release541 = RELEASE_NOTES[2];
+  const release541 = RELEASE_NOTES[3];
   assert.equal(release541?.version, '5.4.1');
   assert.equal(release541?.date, '2026-09-13');
   assert.equal(release541?.highlights.length, 25);
-  const release540 = RELEASE_NOTES[3];
+  const release540 = RELEASE_NOTES[4];
   assert.equal(release540?.version, '5.4.0');
   assert.equal(release540?.date, '2026-09-12');
   assert.deepEqual(release540?.highlights, release541?.highlights);
@@ -106,7 +124,7 @@ try {
   }
 
   // 5.3.1 keeps the modal it shipped with.
-  const release531 = RELEASE_NOTES[4];
+  const release531 = RELEASE_NOTES[5];
   assert.equal(release531?.version, '5.3.1');
   assert.equal(release531?.date, '2026-09-10');
   assert.equal(release531?.highlights.length, 8);
