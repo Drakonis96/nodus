@@ -1355,7 +1355,7 @@ function modelMetaParts(m: ModelInfo): string[] {
   if (m.paramSize) parts.push(m.paramSize);
   if (m.quantization) parts.push(m.quantization);
   const trained = m.trainedContextLength ?? m.contextLength;
-  if (trained) parts.push(`${Math.round(trained / 1000)}K ctx máx.`);
+  if (trained) parts.push(`${Math.round(trained / 1000)}${t('K ctx máx.')}`);
   if (m.loadedContextLength) parts.push(`${Math.round(m.loadedContextLength / 1000)}K cargado`);
   const size = formatBytes(m.sizeBytes);
   if (size) parts.push(size);
