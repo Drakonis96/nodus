@@ -14,6 +14,7 @@
     "@pdf-lib/fontkit": "^1.1.1",
     "better-sqlite3": "^12.11.1",
     "esbuild": "^0.28.2",
-    "pdf-lib": "^1.17.1"
+    "pdf-lib": "^1.17.1",
+    "subset-font": "^2.7.0"
   }
 }
