@@ -20,9 +20,7 @@ Each vault is a focused workspace. Researchers can build a connected corpus, his
 Nodus Research is local first. Your vaults and search indexes live on your computer. You decide when a feature may use an online AI provider, and you can also work with compatible local models.
 
 The interface supports independent light/dark modes, built-in colour themes,
-and user-created themes. See the [appearance and themes guide](docs/appearance.md)
-for the runtime token model, custom-theme fields, contrast rules, and contributor
-guidance.
+and user-created themes.
 
 ## Install Nodus Research
 

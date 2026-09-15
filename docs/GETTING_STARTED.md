@@ -8,9 +8,6 @@ every sidebar section so nothing feels unlabeled.
 Everything runs on your machine. The only network calls are to the AI provider
 you configure; your library, keys, and embeddings never leave your computer.
 
-For the complete guide to light/dark modes, built-in palettes, custom themes,
-and the runtime token system, see [Appearance and themes](appearance.md).
-
 > The interface is available in **English and Spanish**; you pick the language on
 > first run. This guide uses the English section names. The screenshots use the
 > built-in demo corpus (a small science-of-learning sample), so they match what
@@ -105,8 +102,7 @@ You can change the look of Nodus at any time from **Settings → Appearance**:
 Appearance changes apply immediately and are remembered the next time you open
 Nodus. They affect the app background, sidebar, workspaces, buttons, icons,
 labels, and dialogs. If a custom theme makes a colour combination unreadable,
-the editor will not save it until the required contrast is met. See
-[Appearance and themes](appearance.md) for the complete reference.
+the editor will not save it until the required contrast is met.
 
 ---
 
@@ -242,8 +238,7 @@ what each one is for:
 
 Pinned outside the groups: **Home** (corpus status and next steps) and
 **Settings** (appearance, providers, models, library automation, integrations,
-data, backups). See [Appearance and themes](appearance.md) for colour modes,
-built-in palettes, and creating a custom theme.
+data, backups).
 
 ---
 
