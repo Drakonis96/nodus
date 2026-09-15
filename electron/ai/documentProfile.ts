@@ -2,6 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import type {
   DocumentIdeaLink,
   DocumentProfileAudit,
+  DocumentProfileConfidenceSource,
+  DocumentProfileFallbackMode,
   DocumentProfileFieldKind,
   DocumentProfileSupport,
   DocumentSection,
@@ -26,7 +28,7 @@ import { planRetrievalChunks, resolveWorkText, resolvedTextStateFromDoc } from '
 import { setResolvedTextState } from '../db/worksRepo';
 import { analysisFingerprint, analysisModelFingerprint, upsertLibraryAnalysisProvenance } from '../db/libraryAnalysisProvenance';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
-import { AiError, completeJson, embedMany } from './aiClient';
+import { AiError, completeJson, embedMany, estimateLocalTokens, localModelContextWindow, resolveModelRef } from './aiClient';
 import { mapOrderedPool } from './orderedPool';
 import { modelRefSupportsCapability } from '@shared/localAiModels';
 import type { PerfContext } from '../perf';
@@ -38,6 +40,14 @@ export const DOCUMENT_PROFILE_SCHEMA_VERSION = 2;
 const ANALYSIS_WORDS = 2_500;
 const MIN_SECTION_WORDS = 80;
 const DIRECT_SUPPORT_CONFIDENCE_FLOOR = 0.8;
+/**
+ * Minimum semantic score the auditor must report for a synthesis to publish with no
+ * caveat. It is a different decision from the direct-support floor above even though
+ * both values are 0.8: the floor says what a literally supported field is worth, this
+ * says how much the auditor must like the prose. Sharing one constant made a rejected
+ * synthesis and a perfect one report the same number, and made "0.8" look like a score.
+ */
+const SEMANTIC_ACCEPTANCE_SCORE = 0.8;
 const CENTRAL_FIELD_KINDS = new Set<DocumentProfileFieldKind>([
   'problem', 'question', 'hypothesis', 'thesis', 'method', 'finding', 'conclusion', 'contribution',
 ]);
@@ -47,7 +57,11 @@ export interface DerivedDocumentSection extends DocumentSection {
 }
 
 interface RawClaim { text: string; support_quote: string; page: string | null; confidence: number }
-interface SectionAnalysis { title: string; summary: string; role: string; concepts: string[]; claims: RawClaim[] }
+/** `degraded` marks an analysis that fell back to literal source text because no model
+ *  synthesis survived its own section audit. Absent means synthesised; it is not persisted
+ *  as such, but the scan counts it so a published profile can say how much of it is
+ *  quotation. */
+interface SectionAnalysis { title: string; summary: string; role: string; concepts: string[]; claims: RawClaim[]; degraded?: boolean }
 interface RawProfileField {
   kind: DocumentProfileFieldKind;
   text: string;
@@ -55,11 +69,15 @@ interface RawProfileField {
   centrality: number;
   support_quote: string;
   page: string | null;
+  /** Set when the published confidence is the deterministic floor rather than a
+   *  value the provider measured (see `retainLiterallySupportedFields`). */
+  confidenceSource?: DocumentProfileConfidenceSource;
 }
 interface ProfileSynthesis { source_language: string; overview: string; fields: RawProfileField[] }
 interface AuditResponse {
   passed: boolean;
-  score: number;
+  /** null when the provider reported no usable score: "no reading", not "scored zero". */
+  score: number | null;
   issues: string[];
   field_fixes: Array<{ index: number; text: string; support_quote: string }>;
   overview: string;
@@ -93,6 +111,13 @@ export interface RunDocumentProfileOptions {
   /** Audit-only timing context; never contains document text. */
   perf?: PerfContext;
   language?: PromptLanguage;
+  /** Prompt budget in tokens for the model that will read it, or null for a cloud model
+   *  whose window is managed server-side. Local servers load a small fixed window and
+   *  reject a prompt that does not fit, so every prompt this pipeline builds is sized
+   *  against it instead of discovering the limit through a failed request. */
+  promptTokenBudget?: number | null;
+  /** The same budget for the auditor model, which is usually a different one. */
+  auditorTokenBudget?: number | null;
 }
 
 const clean = (value: unknown, max = 20_000): string => typeof value === 'string'
@@ -100,6 +125,43 @@ const clean = (value: unknown, max = 20_000): string => typeof value === 'string
 const strings = (value: unknown, max = 24): string[] => Array.isArray(value)
   ? value.map((item) => clean(item, 500)).filter(Boolean).slice(0, max) : [];
 const number01 = (value: unknown): number => Math.max(0, Math.min(1, Number(value) || 0));
+
+/**
+ * Read a provider verdict. The schema asks for a JSON boolean, but providers —
+ * especially small and local models — answer with the affirmatives of their own
+ * language and with 1/0, and a JSON `1` is not a JSON `true`. Reading those as a
+ * rejection used to discard an entire audited synthesis, so anything explicit and
+ * positive counts as an approval; an unrecognised or absent value stays false,
+ * because a missing verdict must never be promoted to passed.
+ */
+function verdictPassed(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim().toLowerCase().replace(/[.!。]$/, '');
+  return [
+    'true', '1', 'yes', 'y', 'sí', 'si', 'verdadero', 'verdadera', 'correcto', 'aprobado',
+    'oui', 'ja', 'sim', 'vero', 'doğru', 'evet',
+    'да', 'так', '예', '네', 'はい', '是', '对', '對', 'đúng',
+  ].includes(normalized);
+}
+
+/**
+ * Read a provider score as a 0-1 fraction. Providers report `0.85`, `"0.85"`,
+ * `"85%"`, `"0,85"` and `85` for the same judgement, and `number01` turned the
+ * last three into a zero, which failed the acceptance gate on a formatting quirk.
+ * Returns null when nothing usable was reported, so a missing score is never read
+ * as "scored zero" — callers distinguish "no reading" from "a low reading".
+ */
+function scoreFraction(value: unknown): number | null {
+  const raw = typeof value === 'number' ? value
+    : typeof value === 'string' ? Number(value.trim().replace(/\s*%\s*$/, '').replace(',', '.'))
+    : Number.NaN;
+  if (!Number.isFinite(raw)) return null;
+  // A value above 1 cannot be a 0-1 fraction, so it is a percentage out of a hundred.
+  const fraction = raw > 1 && raw <= 100 ? raw / 100 : raw;
+  return Math.max(0, Math.min(1, fraction));
+}
 const page = (value: unknown): string | null => {
   const match = clean(value, 30).match(/(?:p\.?|page|página)\s*(\d+)/i);
   return match ? `p. ${match[1]}` : null;
@@ -160,7 +222,7 @@ function normalizeSectionAuditResponse(value: unknown, fallbackTitle: string): S
     : null;
   const item = nested ?? root;
   const rawPassed = item.passed;
-  const passed = rawPassed === true || (typeof rawPassed === 'string' && rawPassed.trim().toLowerCase() === 'true');
+  const passed = verdictPassed(rawPassed);
   const rawIssues = Array.isArray(item.issues) ? item.issues : item.issues == null ? [] : [item.issues];
   const candidate = item.analysis ?? item.corrected_analysis;
   const analysis = candidate && typeof candidate === 'object' && !Array.isArray(candidate)
@@ -201,7 +263,7 @@ function normalizeProfile(value: unknown): ProfileSynthesis {
       const text = clean(field.text, 3_000);
       const support = clean(field.support_quote, 1_200);
       if (!FIELD_KINDS.has(kind) || !text || !support) return [];
-      return [{ kind, text, support_quote: support, page: page(field.page), confidence: number01(field.confidence), centrality: number01(field.centrality) }];
+      return [{ kind, text, support_quote: support, page: page(field.page), confidence: number01(field.confidence), centrality: number01(field.centrality), confidenceSource: 'model' as const }];
     }).slice(0, 80),
   };
 }
@@ -225,12 +287,12 @@ export function normalizeDocumentProfileAuditResponse(value: unknown): AuditResp
     : null;
   const item = nested ?? root;
   const rawPassed = item.passed;
-  const passed = rawPassed === true || (typeof rawPassed === 'string' && rawPassed.trim().toLowerCase() === 'true');
+  const passed = verdictPassed(rawPassed);
   const rawIssues = Array.isArray(item.issues) ? item.issues : item.issues == null ? [] : [item.issues];
   const rawFixes = Array.isArray(item.field_fixes) ? item.field_fixes : [];
   return {
     passed,
-    score: number01(item.score),
+    score: scoreFraction(item.score),
     issues: rawIssues.map((issue) => clean(issue, 1_000)).filter(Boolean).slice(0, 50),
     field_fixes: rawFixes.flatMap((entry) => {
       if (!entry || typeof entry !== 'object') return [];
@@ -247,11 +309,19 @@ function auditFailureMessage(audit: DocumentProfileAudit): string {
   const details = [
     ...audit.issues,
     `veredicto=${audit.passed ? 'aprobado' : 'rechazado'}`,
-    `puntuación=${audit.score.toFixed(2)}`,
+    `puntuación=${audit.score == null ? 'sin puntuación' : audit.score.toFixed(2)}`,
     `apoyos=${audit.supportCoverage.toFixed(2)}`,
     `estructura=${audit.structureCoverage.toFixed(2)}`,
   ];
   return details.join(' · ');
+}
+
+/** A synthesis publishes without a caveat only when the auditor approved it and its
+ *  score cleared the acceptance bar. A missing score is not a zero: the verdict is
+ *  then decided by `passed` alone, and the profile is published with its own mode. */
+function semanticApproved(verdict: AuditResponse | null): boolean {
+  if (!verdict?.passed) return false;
+  return verdict.score == null || verdict.score >= SEMANTIC_ACCEPTANCE_SCORE;
 }
 
 interface SourceLocation {
@@ -310,7 +380,7 @@ export function deriveDocumentStructure(text: string, fallbackTitle: string, sou
       const end = parseSourceLocationAt(text, chunk.end, sourceMap);
       return ({
       sectionId: `section-${sha256(`${fallbackTitle}|${ordinal}|${sha256(chunk.body)}`).slice(0, 24)}`,
-      parentSectionId: null, level: 1, ordinal, title: ordinal === 0 ? fallbackTitle : `Sección ${ordinal + 1}`,
+      parentSectionId: null, level: 1, ordinal, title: ordinal === 0 ? fallbackTitle : '',
       role: null, summary: '', concepts: [], claims: [], pageStart: start.label,
       pageEnd: end.label, sourceRef: start.sourceRef ?? end.sourceRef,
       pageStartNumber: start.pageNumber, pageEndNumber: end.pageNumber,
@@ -321,8 +391,10 @@ export function deriveDocumentStructure(text: string, fallbackTitle: string, sou
   }
   const sections: DerivedDocumentSection[] = [];
   const parents: Array<{ level: number; id: string }> = [];
-  if (headings[0].index > 0 && text.slice(0, headings[0].index).split(/\s+/).length >= MIN_SECTION_WORDS) {
-    const body = text.slice(0, headings[0].index);
+  const preamble = headings[0].index > 0 ? text.slice(0, headings[0].index) : '';
+  const keepsPreambleSection = headings[0].index > 0 && preamble.split(/\s+/).length >= MIN_SECTION_WORDS;
+  if (keepsPreambleSection) {
+    const body = preamble;
     sections.push({
       sectionId: `section-${sha256(`${fallbackTitle}|front|${sha256(body)}`).slice(0, 24)}`,
       parentSectionId: null, level: 1, ordinal: 0, title: fallbackTitle, role: null, summary: '',
@@ -334,21 +406,32 @@ export function deriveDocumentStructure(text: string, fallbackTitle: string, sou
       charStart: 0, charEnd: headings[0].index, contentHash: sha256(body), body,
     });
   }
+  // A short preamble (a title block, an author list) is not worth a section of its
+  // own, but it still belongs to the document. Leaving it out of every section left
+  // a hole that structure coverage counted as missing text, so an otherwise perfect
+  // profile was rejected — and the literal fallback with it — for a reason no model
+  // can influence. The first section absorbs it instead: every character of the
+  // document stays inside exactly one section, whichever branch runs.
+  const absorbPreamble = headings[0].index > 0 && !keepsPreambleSection && preamble.trim().length > 0;
   for (let index = 0; index < headings.length; index += 1) {
     const heading = headings[index];
     const end = headings[index + 1]?.index ?? text.length;
-    const body = text.slice(heading.end, end).trim();
+    const absorb = index === 0 && absorbPreamble;
+    // A section covers its heading too: skip only the heading's own characters when
+    // slicing the body, never when recording the range.
+    const body = text.slice(absorb ? 0 : heading.end, end).trim();
     if (!body) continue;
     while (parents.length && parents.at(-1)!.level >= heading.level) parents.pop();
+    const startLocation = absorb ? parseSourceLocationAt(text, 0, sourceMap) : heading.location;
     const endLocation = parseSourceLocationAt(text, end, sourceMap);
-    const sectionId = `section-${sha256(`${heading.level}|${heading.title}|${heading.location.label ?? ''}|${index}|${sha256(body)}`).slice(0, 24)}`;
+    const sectionId = `section-${sha256(`${heading.level}|${heading.title}|${startLocation.label ?? ''}|${index}|${sha256(body)}`).slice(0, 24)}`;
     sections.push({
       sectionId, parentSectionId: parents.at(-1)?.id ?? null, level: heading.level,
       ordinal: sections.length, title: heading.title, role: null, summary: '', concepts: [], claims: [],
-      pageStart: heading.location.label, pageEnd: endLocation.label,
-      sourceRef: heading.location.sourceRef ?? endLocation.sourceRef,
-      pageStartNumber: heading.location.pageNumber, pageEndNumber: endLocation.pageNumber,
-      charStart: heading.index, charEnd: end,
+      pageStart: startLocation.label, pageEnd: endLocation.label,
+      sourceRef: startLocation.sourceRef ?? endLocation.sourceRef,
+      pageStartNumber: startLocation.pageNumber, pageEndNumber: endLocation.pageNumber,
+      charStart: absorb ? 0 : heading.index, charEnd: end,
       contentHash: sha256(body), body,
     });
     parents.push({ level: heading.level, id: sectionId });
@@ -356,8 +439,48 @@ export function deriveDocumentStructure(text: string, fallbackTitle: string, sou
   return sections;
 }
 
-function splitAnalysisParts(body: string): string[] {
-  return chunksWithOffsets(body, ANALYSIS_WORDS).map((chunk) => chunk.body);
+/**
+ * How many tokens one background request may spend on its prompt before the model's own
+ * window is at risk. Cloud models return null and keep their current sizing. The 60 %
+ * leaves room for the answer, which for these calls is a JSON document of the same order
+ * as the request.
+ */
+async function localPromptTokenBudget(model: ModelRef | null): Promise<number | null> {
+  try {
+    // The pipeline passes an override or null for "the configured model", and it is that
+    // model whose window has to be respected.
+    const window = await localModelContextWindow(model ?? resolveModelRef(null));
+    if (!window) return null;
+    return Math.max(1_000, Math.floor(window * 0.6));
+  } catch {
+    // A provider that cannot be interrogated is treated as a cloud model: the previous
+    // behaviour, rather than a guess that could shrink every request.
+    return null;
+  }
+}
+
+/** Prompt cost of one request, system pack included. Measuring only the payload would
+ *  leave the instruction pack — the larger half for the smallest windows — uncounted. */
+function promptTokens(system: string, body: unknown): number {
+  return estimateLocalTokens(system) + estimateLocalTokens(typeof body === 'string' ? body : JSON.stringify(body));
+}
+
+function promptFits(system: string, body: unknown, budget: number | null | undefined): boolean {
+  return budget == null || promptTokens(system, body) <= budget;
+}
+
+function splitAnalysisParts(body: string, tokenBudget?: number | null): string[] {
+  let wordsPerChunk = ANALYSIS_WORDS;
+  // A local model with a small window would otherwise get a 2,500-word fragment it
+  // cannot hold. Scale the fragment to the window using the text's own density.
+  if (tokenBudget != null) {
+    const words = body.split(/\s+/).filter(Boolean).length;
+    const tokens = estimateLocalTokens(body);
+    if (words > 0 && tokens > tokenBudget) {
+      wordsPerChunk = Math.max(120, Math.min(ANALYSIS_WORDS, Math.floor((words * tokenBudget) / tokens)));
+    }
+  }
+  return chunksWithOffsets(body, wordsPerChunk).map((chunk) => chunk.body);
 }
 
 function providerShapeFailure(error: unknown): boolean {
@@ -369,6 +492,23 @@ function providerShapeFailure(error: unknown): boolean {
 function structuredOutputFailure(error: unknown): boolean {
   return providerShapeFailure(error)
     || (error instanceof AiError && error.code === 'output_truncated');
+}
+
+/** A prompt the model could not hold. It is a sizing problem rather than a bad answer, so
+ *  every stage here can answer it by shrinking (a smaller fragment, a compact audit) or by
+ *  degrading locally — never by failing a whole work because its model loaded a small window. */
+function contextOverflow(error: unknown): boolean {
+  if (!(error instanceof AiError)) return false;
+  return error.code === 'context_overflow'
+    || /not enough context|context length|context window|n_ctx|tokens to keep|maximum context|suficiente contexto/i.test(error.message);
+}
+
+function recoverablePromptFailure(error: unknown): boolean {
+  return structuredOutputFailure(error) || contextOverflow(error);
+}
+
+function describeFailure(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function mergeSectionAnalyses(values: SectionAnalysis[], fallbackTitle: string): SectionAnalysis {
@@ -383,6 +523,8 @@ function mergeSectionAnalyses(values: SectionAnalysis[], fallbackTitle: string):
     role: clean(values.map((value) => value.role).find(Boolean), 300),
     concepts: [...new Set(values.flatMap((value) => value.concepts).filter(Boolean))].slice(0, 24),
     claims: [...claims.values()].slice(0, 16),
+    // Only a merge with no synthesised part at all is a quotation list.
+    degraded: values.length > 0 && values.every((value) => value.degraded),
   };
 }
 
@@ -394,7 +536,7 @@ function literalSectionFallback(evidence: string, title: string): SectionAnalysi
     page: null,
     confidence: DIRECT_SUPPORT_CONFIDENCE_FLOOR,
   }] : [];
-  return { title, summary: quote, role: '', concepts: [], claims };
+  return { title, summary: quote, role: '', concepts: [], claims, degraded: true };
 }
 
 async function auditSectionAnalysis(
@@ -418,7 +560,7 @@ async function auditSectionAnalysis(
         perf: options.perf,
       }, isSectionAuditResponse, options.auditorModel), fallbackTitle);
     } catch (error) {
-      if (structuredOutputFailure(error) && current.claims.length > 1 && splitDepth < 4) {
+      if (recoverablePromptFailure(error) && current.claims.length > 1 && splitDepth < 4) {
         const middle = Math.ceil(current.claims.length / 2);
         const audited = await mapOrderedPool(
           [current.claims.slice(0, middle), current.claims.slice(middle)],
@@ -434,7 +576,7 @@ async function auditSectionAnalysis(
         );
         return mergeSectionAnalyses(audited, fallbackTitle);
       }
-      if (!structuredOutputFailure(error)) throw error;
+      if (!recoverablePromptFailure(error)) throw error;
       break;
     }
     issues = response.issues;
@@ -465,6 +607,7 @@ async function auditSectionAnalysis(
     role: '',
     concepts: [],
     claims,
+    degraded: true,
   };
 }
 
@@ -490,8 +633,8 @@ async function analyzeSectionPart(
     }, isSectionAnalysis, options.generatorModel), title);
   } catch (error) {
     const words = evidence.split(/\s+/).filter(Boolean).length;
-    if (structuredOutputFailure(error) && words >= 400 && depth < 4) {
-      const childWords = Math.max(250, Math.ceil(words / 2));
+    if (recoverablePromptFailure(error) && words >= 400 && depth < 4) {
+      const childWords = Math.max(120, Math.ceil(words / 2));
       const children = chunksWithOffsets(evidence, childWords).map((chunk) => chunk.body);
       if (children.length >= 2) {
         const values = await mapOrderedPool(
@@ -512,7 +655,7 @@ async function analyzeSectionPart(
         return merged;
       }
     }
-    if (!structuredOutputFailure(error)) throw error;
+    if (!recoverablePromptFailure(error)) throw error;
     candidate = literalSectionFallback(evidence, title);
   }
   const literal = { ...candidate, claims: candidate.claims.filter((claim) => quoteOffset(evidence, claim.support_quote) >= 0) };
@@ -522,7 +665,14 @@ async function analyzeSectionPart(
 }
 
 async function analyzeSection(section: DerivedDocumentSection, options: RunDocumentProfileOptions): Promise<SectionAnalysis> {
-  const parts = splitAnalysisParts(section.body);
+  const sectionPack = documentProfilePromptPack(options.language ?? getSettings().promptLanguage ?? 'es').section;
+  // The section audit sends the fragment AND the analysis of it, so the fragment may only
+  // spend part of what is left after the pack; otherwise the audit prompt is the one that
+  // no longer fits.
+  const evidenceBudget = options.promptTokenBudget == null
+    ? null
+    : Math.max(120, Math.floor((options.promptTokenBudget - estimateLocalTokens(sectionPack)) * 0.8));
+  const parts = splitAnalysisParts(section.body, evidenceBudget);
   const settings = getSettings();
   const poolSize = settings.aiConcurrencyMode === 'automatic' ? 8 : Math.max(1, Math.min(8, settings.concurrency));
   const analyses = await mapOrderedPool(parts, poolSize, async (part, index, poolSignal) => {
@@ -542,10 +692,21 @@ async function analyzeSection(section: DerivedDocumentSection, options: RunDocum
       perf: options.perf,
     }, isSectionAnalysis, options.generatorModel), section.title);
   } catch (error) {
-    if (!structuredOutputFailure(error)) throw error;
+    // A merge the model cannot hold is not a reason to fail: the parts were analysed and
+    // audited individually, so merging them here is the smaller, deterministic answer.
+    if (!recoverablePromptFailure(error)) throw error;
     candidate = mergeSectionAnalyses(analyses, section.title);
   }
   const literal = { ...candidate, claims: candidate.claims.filter((claim) => quoteOffset(section.body, claim.support_quote) >= 0) };
+  // Auditing the merged analysis against the whole section body is the largest prompt this
+  // pipeline builds, and there is nothing to shrink: the evidence is the section, not a
+  // fragment. When the model's window cannot hold it, the merged summary is left to the
+  // document-level audit — which receives every section summary with its claims — instead of
+  // failing the work or degrading a section whose parts each passed their own audit.
+  if (!promptFits(sectionPack, { fragment: section.body, analysis: literal }, options.promptTokenBudget)) {
+    saveDocumentCheckpoint(options.jobId, `section:${section.sectionId}:reduced`, reduceHash, literal);
+    return literal;
+  }
   const reduced = await auditSectionAnalysis(section.body, literal, section.title, options);
   saveDocumentCheckpoint(options.jobId, `section:${section.sectionId}:reduced`, reduceHash, reduced);
   return reduced;
@@ -694,22 +855,9 @@ async function synthesizeProfileAdaptive(
   const checkpointType = splitPath === 'root' ? 'profile:synthesis' : `profile:synthesis:${splitPath}`;
   const checkpoint = readDocumentCheckpoint<ProfileSynthesis>(options.jobId, checkpointType, inputHash);
   if (checkpoint) return checkpoint;
-  try {
-    const profile = normalizeProfile(await completeJson<ProfileSynthesis>({
-      system: documentProfilePromptPack(options.language ?? getSettings().promptLanguage ?? 'es').profile,
-      user: JSON.stringify(input),
-      temperature: 0,
-      maxTokens: 8_000,
-      signal: options.signal,
-      requestClass: 'background',
-      jobId: `${options.jobId}:profile:synthesis:${splitPath}`,
-      perf: options.perf,
-    }, isProfileSynthesis, options.generatorModel));
-    saveDocumentCheckpoint(options.jobId, checkpointType, inputHash, profile);
-    return profile;
-  } catch (error) {
-    const inputSections = Array.isArray(input.sections) ? input.sections : [];
-    if (!structuredOutputFailure(error) || inputSections.length < 2 || splitDepth >= 6) throw error;
+  const inputSections = Array.isArray(input.sections) ? input.sections : [];
+  const synthesisPack = documentProfilePromptPack(options.language ?? getSettings().promptLanguage ?? 'es').profile;
+  const splitInput = async (): Promise<ProfileSynthesis> => {
     const middle = Math.ceil(inputSections.length / 2);
     const halves = [inputSections.slice(0, middle), inputSections.slice(middle)];
     const profiles = await mapOrderedPool(
@@ -726,7 +874,56 @@ async function synthesizeProfileAdaptive(
     const merged = mergeProfileSyntheses(profiles);
     saveDocumentCheckpoint(options.jobId, checkpointType, inputHash, merged);
     return merged;
+  };
+  // Proactive: a payload that cannot fit the loaded window is split before the request is
+  // sent, rather than after the provider refuses it or truncates its answer.
+  if (!promptFits(synthesisPack, input, options.promptTokenBudget) && inputSections.length >= 2 && splitDepth < 6) return splitInput();
+  try {
+    const profile = normalizeProfile(await completeJson<ProfileSynthesis>({
+      system: documentProfilePromptPack(options.language ?? getSettings().promptLanguage ?? 'es').profile,
+      user: JSON.stringify(input),
+      temperature: 0,
+      maxTokens: 8_000,
+      signal: options.signal,
+      requestClass: 'background',
+      jobId: `${options.jobId}:profile:synthesis:${splitPath}`,
+      perf: options.perf,
+    }, isProfileSynthesis, options.generatorModel));
+    saveDocumentCheckpoint(options.jobId, checkpointType, inputHash, profile);
+    return profile;
+  } catch (error) {
+    if (!recoverablePromptFailure(error) || inputSections.length < 2 || splitDepth >= 6) throw error;
+    return splitInput();
   }
+}
+
+/** A copy of the audit payload small enough for a provider whose answer to the full one
+ *  ran out of output budget. The response has to echo the corrections it proposes
+ *  (`field_fixes`, `overview`), so it can only be as large as what it was given:
+ *  compacting the request is what makes the answer fit, and it keeps every field and
+ *  section present so the verdict still covers the whole profile. */
+function compactAuditPayload(profile: ProfileSynthesis, sections: unknown): { profile: unknown; sections: unknown[] } {
+  const claim = (value: unknown): unknown => {
+    const record = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+    return { text: clean(record.text, 200), support_quote: clean(record.support_quote, 120) };
+  };
+  return {
+    profile: {
+      ...profile,
+      overview: clean(profile.overview, 800),
+      fields: profile.fields.map((field) => ({
+        ...field, text: clean(field.text, 400), support_quote: clean(field.support_quote, 200),
+      })),
+    },
+    sections: (Array.isArray(sections) ? sections : []).map((value: unknown) => {
+      const record = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+      return {
+        id: record.id, title: clean(record.title, 200), role: record.role,
+        summary: clean(record.summary, 600), page_start: record.page_start, page_end: record.page_end,
+        claims: (Array.isArray(record.claims) ? record.claims : []).slice(0, 4).map(claim),
+      };
+    }),
+  };
 }
 
 function deterministicAudit(text: string, sections: DerivedDocumentSection[], profile: ProfileSynthesis): {
@@ -741,13 +938,22 @@ function deterministicAudit(text: string, sections: DerivedDocumentSection[], pr
   };
 }
 
-function retainLiterallySupportedFields(text: string, profile: ProfileSynthesis): ProfileSynthesis {
+/** Keeps only fields whose support is literal in the source and records whether the
+ *  published confidence was measured. Exported for unit testing. */
+export function retainLiterallySupportedFields(text: string, profile: ProfileSynthesis): ProfileSynthesis {
   return {
     ...profile,
     fields: profile.fields
       .filter((field) => quoteOffset(text, field.support_quote) >= 0)
       .map((field) => ({
         ...field,
+        // The floor is a publication contract (a literal support cannot be worth
+        // nothing), not a measurement. When it replaces what the provider actually
+        // reported, say so: the UI shows a bare percentage otherwise and every
+        // field of a weak profile ends up reading "80 %" as if it had been scored.
+        // This runs again after every audit and repair pass, so an existing floor
+        // mark is sticky: the original reading is already gone from `confidence`.
+        confidenceSource: field.confidenceSource === 'floor' || field.confidence < DIRECT_SUPPORT_CONFIDENCE_FLOOR ? 'floor' : 'model',
         confidence: Math.max(DIRECT_SUPPORT_CONFIDENCE_FLOOR, field.confidence),
       })),
   };
@@ -798,6 +1004,7 @@ function buildExtractiveProfileFallback(
       role: '',
       concepts: [],
       claims: safe,
+      degraded: true,
     });
     section.role = null;
     section.summary = summary;
@@ -813,7 +1020,9 @@ function buildExtractiveProfileFallback(
     fields: sampled.map((item, index) => ({
       kind: 'argument',
       text: item.quote,
+      // No provider measured this field: it *is* a quote, so the floor is the value.
       confidence: DIRECT_SUPPORT_CONFIDENCE_FLOOR,
+      confidenceSource: 'floor' as const,
       centrality: index === 0 ? 0.7 : 0.6,
       support_quote: item.quote,
       page: item.page,
@@ -880,6 +1089,15 @@ function emit(
 export async function runDocumentProfileScan(work: Work, options: RunDocumentProfileOptions): Promise<string> {
   const scanStartedAt = Date.now();
   options = { ...options, perf: options.perf ?? { nodusId: work.nodus_id, title: work.title } };
+  // The profile pipeline's prompts scale with the document, and a local server rejects a
+  // prompt that does not fit the window it loaded. Asking each model up front lets every
+  // request below be sized to it, instead of paying for a failed call first — or, for a
+  // provider that truncates silently, for a plausible-looking answer built on half a prompt.
+  options = {
+    ...options,
+    promptTokenBudget: options.promptTokenBudget ?? await localPromptTokenBudget(options.generatorModel),
+    auditorTokenBudget: options.auditorTokenBudget ?? await localPromptTokenBudget(options.auditorModel),
+  };
   options.signal?.throwIfAborted();
   if (!modelRefSupportsCapability(options.generatorModel, 'documentProfile')
     || !modelRefSupportsCapability(options.auditorModel, 'documentProfile')) {
@@ -945,7 +1163,11 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     const analysis = orderedAnalyses[index];
     sectionAnalyses.set(sections[index].sectionId, analysis);
     sections[index] = {
-      ...sections[index], title: sections[index].title.startsWith('Sección ') ? analysis.title : sections[index].title,
+      // A chunk of a document without headings has no real title. It is kept empty
+      // on purpose: anything stored here becomes user-visible data, is fed back as
+      // `section_title` for the model to echo, and would ship in whatever language
+      // the placeholder was written in. The UI localizes an untitled section.
+      ...sections[index], title: sections[index].title || analysis.title,
       role: analysis.role || null, summary: analysis.summary, concepts: analysis.concepts,
       claims: analysis.claims.map((claim) => claim.text),
     };
@@ -959,7 +1181,7 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
   try {
     profile = await synthesizeProfileAdaptive(synthesisInput, options);
   } catch (error) {
-    if (!structuredOutputFailure(error)) throw error;
+    if (!recoverablePromptFailure(error)) throw error;
     profile = buildExtractiveProfileFallback(work, sections, sectionAnalyses, 'und');
     extractiveFallback = true;
     repaired = true;
@@ -979,25 +1201,59 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
   repaired = repaired || profile.fields.length !== initialFieldCount;
 
   let auditor: AuditResponse | null = null;
+  let compactAudit = false;
+  // Why no verdict could be obtained, when that is what happened. It travels with the
+  // audit issues so the user learns the model could not hold the profile instead of
+  // getting a work that simply failed.
+  let auditFailureNote: string | null = null;
   let deterministic = deterministicAudit(document.text, sections, profile);
+  const auditPack = documentProfilePromptPack(options.language ?? getSettings().promptLanguage ?? 'es').audit;
+  const requestAudit = async (compact: boolean, attempt: number): Promise<AuditResponse> => {
+    const sections = Array.isArray(synthesisInput.sections) ? synthesisInput.sections : [];
+    const withDeterministic = (body: { profile: unknown; sections: unknown[] }) => ({ ...body, deterministic: {
+      support_coverage: deterministic.supportCoverage, structure_coverage: deterministic.structureCoverage,
+    } });
+    const full = withDeterministic({ profile, sections });
+    // A prompt that cannot fit the loaded window fails before it can be truncated, so the
+    // compact projection is used from the start when the full one is too large for it. Its
+    // smaller echo is also what keeps the answer inside the output ceiling.
+    const useCompact = compact || !promptFits(auditPack, full, options.auditorTokenBudget);
+    const body = useCompact ? withDeterministic(compactAuditPayload(profile, sections)) : full;
+    return normalizeDocumentProfileAuditResponse(await completeJson<AuditResponse>({
+      system: auditPack,
+      user: JSON.stringify(body),
+      temperature: 0, maxTokens: 5_000, signal: options.signal,
+      requestClass: 'background', jobId: `${options.jobId}:profile:audit:${attempt}:${useCompact ? 'compact' : 'full'}`,
+      perf: options.perf,
+    }, isAuditResponse, options.auditorModel));
+  };
   for (let attempt = 0; !extractiveFallback && attempt < 3; attempt += 1) {
     emit(options, attempt === 0 ? 'auditing' : 'repairing', 0.7 + attempt * 0.05,
       attempt === 0 ? 'Auditando la ficha contra el texto…' : `Reparando la ficha (${attempt}/2)…`);
     try {
-      auditor = normalizeDocumentProfileAuditResponse(await completeJson<AuditResponse>({
-        system: documentProfilePromptPack(options.language ?? getSettings().promptLanguage ?? 'es').audit,
-        user: JSON.stringify({ profile, sections: synthesisInput.sections, deterministic: {
-          support_coverage: deterministic.supportCoverage, structure_coverage: deterministic.structureCoverage,
-        } }),
-        temperature: 0, maxTokens: 5_000, signal: options.signal,
-        requestClass: 'background', jobId: `${options.jobId}:profile:audit:${attempt}`,
-        perf: options.perf,
-      }, isAuditResponse, options.auditorModel));
+      auditor = await requestAudit(compactAudit, attempt);
     } catch (error) {
-      if (!structuredOutputFailure(error)) throw error;
-      break;
+      if (!recoverablePromptFailure(error)) throw error;
+      // A response that ran out of output budget is not a verdict. Replaying the same
+      // request reproduces it, so retry once with the compact payload instead: one
+      // truncated audit used to end the loop here and hand the whole synthesis to the
+      // extractive fallback. Once the full payload has overflowed it is not tried
+      // again for this profile, which would truncate the same way.
+      if (compactAudit) { auditFailureNote = describeFailure(error); break; }
+      compactAudit = true;
+      try {
+        auditor = await requestAudit(true, attempt);
+      } catch (retryError) {
+        if (!recoverablePromptFailure(retryError)) throw retryError;
+        auditFailureNote = describeFailure(retryError);
+        break;
+      }
     }
-    if (auditor.passed && auditor.field_fixes?.length) {
+    // Corrections are actionable whether or not the verdict was positive: an auditor
+    // that rejects the profile and says exactly which field is wrong and how to fix it
+    // was previously ignored, which forced a full re-synthesis instead of applying the
+    // fix — and often ended in the literal fallback with the fix unused.
+    if (auditor.field_fixes?.length) {
       for (const fix of auditor.field_fixes) {
         const target = profile.fields[Math.trunc(Number(fix.index))];
         if (!target) continue;
@@ -1015,7 +1271,7 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
       repaired = true;
       deterministic = deterministicAudit(document.text, sections, profile);
     }
-    if (auditor.passed && auditor.score >= 0.8 && deterministic.supportCoverage >= 0.95 && deterministic.structureCoverage >= 0.95) break;
+    if (semanticApproved(auditor) && deterministic.supportCoverage >= 0.95 && deterministic.structureCoverage >= 0.95) break;
     if (attempt >= 2) break;
     try {
       profile = normalizeProfile(await completeJson<ProfileSynthesis>({
@@ -1026,7 +1282,7 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
         perf: options.perf,
       }, isProfileSynthesis, options.generatorModel));
     } catch (error) {
-      if (!structuredOutputFailure(error)) throw error;
+      if (!recoverablePromptFailure(error)) throw error;
       break;
     }
     const repairedFieldCount = profile.fields.length;
@@ -1036,28 +1292,65 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     if (profile.fields.length !== repairedFieldCount) repaired = true;
     deterministic = deterministicAudit(document.text, sections, profile);
   }
-  let passed = Boolean(auditor?.passed && (auditor?.score ?? 0) >= 0.8 && deterministic.supportCoverage >= 0.95 && deterministic.structureCoverage >= 0.95);
-  if (!passed) {
-    const semanticIssues = strings(auditor?.issues, 20);
-    profile = buildExtractiveProfileFallback(work, sections, sectionAnalyses, profile.source_language);
-    deterministic = deterministicAudit(document.text, sections, profile);
-    extractiveFallback = true;
+  const deterministicComplete = deterministic.supportCoverage === 1 && deterministic.structureCoverage >= 0.95;
+  const approved = semanticApproved(auditor);
+  // The synthesis is kept whenever the deterministic evidence contract holds, because
+  // retention has already left every published field carrying a literal support: a low
+  // semantic score says the auditor disliked the prose, not that the evidence is
+  // unsupported. Discarding the whole synthesis over a hundredth of a point replaced an
+  // audited profile with a list of raw quotations, which orients retrieval worse.
+  let mode: DocumentProfileFallbackMode | null = null;
+  let publishable = false;
+  let auditPassed = false;
+  if (approved && deterministicComplete) {
+    publishable = true;
+    auditPassed = true;
+  } else if (!extractiveFallback && deterministicComplete && profile.fields.length > 0) {
+    mode = 'partial';
+    publishable = true;
     repaired = true;
+  } else {
+    // Last resort for a synthesis that produced nothing usable: rebuild the profile from
+    // literal quotes. This is deliberately conservative content, not a failed profile.
+    // A profile that already IS that fallback (the synthesis never produced fields) is
+    // left as it is: rebuilding it would produce exactly the same quotes again.
+    if (!extractiveFallback) {
+      profile = buildExtractiveProfileFallback(work, sections, sectionAnalyses, profile.source_language);
+      deterministic = deterministicAudit(document.text, sections, profile);
+      extractiveFallback = true;
+      repaired = true;
+    }
+    mode = 'extractive';
+    // A literal profile is fully supported by construction, so it satisfies the
+    // deterministic contract; `fallback` is what tells consumers it is not a synthesis.
+    publishable = deterministic.supportCoverage === 1 && deterministic.structureCoverage >= 0.95;
+    auditPassed = publishable;
+    // The marker travels with the audit whichever way the fallback was reached, so a
+    // degraded profile stays identifiable in the stored record and not only through
+    // the `fallback` field.
     auditor = {
-      passed: true,
-      score: DIRECT_SUPPORT_CONFIDENCE_FLOOR,
-      issues: ['fallback_extractivo_determinista', ...semanticIssues],
+      passed: auditPassed,
+      // The semantic verdict is kept as it was reported. Replacing it with the
+      // direct-support floor made a rejected synthesis and a perfect one report the
+      // same number, which is how an extractive fallback came to read "80 %".
+      score: auditor?.score ?? null,
+      issues: ['fallback_extractivo_determinista', ...strings(auditor?.issues, 20)],
       field_fixes: [],
       overview: profile.overview,
     };
-    passed = deterministic.supportCoverage === 1 && deterministic.structureCoverage >= 0.95;
   }
+  // How much of the published profile is quotation rather than synthesis. A profile can
+  // be approved as a whole while individual sections were degraded, and nothing else in
+  // the record would say so.
+  const sectionsDegraded = [...sectionAnalyses.values()].filter((analysis) => analysis.degraded).length;
   const audit: DocumentProfileAudit = {
-    passed, score: number01(auditor?.score), supportCoverage: deterministic.supportCoverage,
-    structureCoverage: deterministic.structureCoverage, issues: strings(auditor?.issues, 50),
+    passed: auditPassed, score: auditor?.score ?? null, supportCoverage: deterministic.supportCoverage,
+    structureCoverage: deterministic.structureCoverage,
+    issues: [...strings(auditor?.issues, 50), ...(auditFailureNote ? [auditFailureNote] : [])],
     repaired: repaired || Boolean(auditor && (auditor.field_fixes?.length || auditor.overview)),
+    fallback: mode, sectionsDegraded,
   };
-  if (!passed) {
+  if (!publishable) {
     const error = auditFailureMessage(audit);
     setDocumentProfileState(work.nodus_id, 'failed', { sourceFingerprint, pipelineVersion: DOCUMENT_PROFILE_PIPELINE_VERSION, error });
     throw new Error(error);
@@ -1067,6 +1360,7 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     fieldId: `field-${sha256(`${sourceFingerprint}|${field.kind}|${index}|${field.text}`).slice(0, 24)}`,
     kind: field.kind, ordinal: deterministic.supportedFields.slice(0, index).filter((prior) => prior.kind === field.kind).length,
     text: field.text, confidence: field.confidence, centrality: CENTRAL_FIELD_KINDS.has(field.kind) ? Math.max(0.75, field.centrality) : field.centrality,
+    confidenceSource: field.confidenceSource ?? ('model' as DocumentProfileConfidenceSource),
   }));
   const supports: DocumentProfileSupport[] = [];
   deterministic.supportedFields.forEach((field, index) => {
@@ -1135,11 +1429,16 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     nodusId: work.nodus_id, sourceFingerprint, pipelineVersion: DOCUMENT_PROFILE_PIPELINE_VERSION,
     schemaVersion: DOCUMENT_PROFILE_SCHEMA_VERSION, sourceLanguage: profile.source_language,
     presentationLanguage: settings.promptLanguage, overview: profile.overview,
-    profile: { ...profile, metadata: synthesisInput.metadata, fallbackMode: extractiveFallback ? 'extractive' : null }, fields,
+    profile: { ...profile, metadata: synthesisInput.metadata, fallbackMode: mode }, fields,
     sections: sections.map(({ body: _body, ...section }) => section), supports, ideaLinks,
     vectors, generatorModel: options.generatorModel, auditorModel: options.auditorModel,
     promptHash: sha256(JSON.stringify(documentProfilePromptPack(options.language ?? settings.promptLanguage ?? 'es'))), audit,
-    qualityScore: Math.min(audit.score, audit.supportCoverage, audit.structureCoverage),
+    // Quality is the lowest of the readings, and only exists when the auditor actually
+    // produced one. Without a semantic reading the deterministic coverages are all the
+    // gate requires (so they would read as a perfect score) and the profile already
+    // says it was not approved; reporting "100 %" beside that caveat would be worse
+    // than reporting nothing.
+    qualityScore: audit.score == null ? null : Math.min(audit.score, audit.supportCoverage, audit.structureCoverage),
     expectedWorkRevision: {
       zoteroKey: work.zotero_key,
       zoteroVersion: work.zotero_version,

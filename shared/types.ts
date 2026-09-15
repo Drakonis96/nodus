@@ -952,6 +952,14 @@ export type DocumentProfileFieldKind =
   | 'disciplinary_scope' | 'structure' | 'finding' | 'conclusion' | 'contribution'
   | 'limitation' | 'genre' | 'audience' | 'positioning' | 'original_abstract';
 
+/**
+ * Where a field's `confidence` came from. `floor` means the provider supplied no
+ * usable measurement and the deterministic direct-support floor was substituted,
+ * so the value is a minimum, not a reading. Absent on rows published before the
+ * column existed, where it is read as `model`.
+ */
+export type DocumentProfileConfidenceSource = 'model' | 'floor';
+
 export interface DocumentProfileField {
   fieldId: string;
   kind: DocumentProfileFieldKind;
@@ -960,6 +968,7 @@ export interface DocumentProfileField {
   generatedText?: string;
   confidence: number;
   centrality: number;
+  confidenceSource?: DocumentProfileConfidenceSource;
   overridden?: boolean;
   overrideId?: string;
   verified?: boolean;
@@ -1011,13 +1020,34 @@ export interface DocumentIdeaLink {
   score: number;
 }
 
+/**
+ * How a published profile relates to its audited synthesis.
+ * - `null`: the auditor approved the synthesis, which is what most profiles are.
+ * - `partial`: the audited prose was kept (every field carries a literal support) but
+ *   the semantic verdict did not clear the acceptance bar, or was unusable. Nothing
+ *   about the evidence is in doubt, so the profile is published with the caveat
+ *   instead of being replaced by raw quotes.
+ * - `extractive`: the synthesis itself was unusable, so the profile is assembled from
+ *   literal source quotes. It is published on purpose (a rejected paraphrase must not
+ *   leave a permanent hole in a campaign), but every field is source-language
+ *   evidence, so consumers must treat it as an index of quotes, not as a synthesis.
+ */
+export type DocumentProfileFallbackMode = 'extractive' | 'partial';
+
 export interface DocumentProfileAudit {
+  /** The semantic verdict: whether the auditor approved the synthesis. A profile can
+   *  be published with `passed: false` when it is marked `partial`. */
   passed: boolean;
-  score: number;
+  /** null when the provider reported no usable score: "no reading", not "zero". */
+  score: number | null;
   supportCoverage: number;
   structureCoverage: number;
   issues: string[];
   repaired: boolean;
+  fallback?: DocumentProfileFallbackMode | null;
+  /** Sections published from literal extracts because no synthesis survived their own
+   *  audit. A profile can be approved as a whole and still contain them. */
+  sectionsDegraded?: number;
 }
 
 export interface DocumentProfile {
