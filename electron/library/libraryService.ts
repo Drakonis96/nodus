@@ -27,8 +27,8 @@ import type {
   LibraryBibliographyImportReport,
   LibraryDuplicateGroup,
   LibraryItemMetadata,
-  LibraryMetadataIdentifierKind,
   LibraryMetadataLookupResult,
+  LibraryReferenceKind,
   LibraryIdentifierImportResult,
   LibraryVaultLink,
   LibraryVaultLinkReport,
@@ -1072,12 +1072,12 @@ export function updateGlobalLibraryItemMetadata(itemId: string, patch: Partial<L
   return result;
 }
 
-export function resolveGlobalLibraryMetadata(kind: LibraryMetadataIdentifierKind, value: string): Promise<LibraryMetadataLookupResult> {
+export function resolveGlobalLibraryMetadata(kind: LibraryReferenceKind, value: string): Promise<LibraryMetadataLookupResult> {
   return resolveLibraryMetadata(kind, value);
 }
 
 export async function importGlobalLibraryIdentifier(
-  kind: LibraryMetadataIdentifierKind,
+  kind: LibraryReferenceKind,
   value: string,
   collectionIds: string[] = [],
 ): Promise<LibraryIdentifierImportResult> {
