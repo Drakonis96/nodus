@@ -90,6 +90,10 @@ function normalizeThemeColour(value: unknown): string | null {
   return HEX_COLOUR.test(normalized) ? normalized : null;
 }
 
+function colourPickerValue(value: string): string {
+  return HEX_COLOUR.test(value) ? value : '#000000';
+}
+
 function themeSlug(label: string): string {
   const slug = label.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
   return `custom-${slug || 'theme'}`;
@@ -1239,8 +1243,19 @@ export function Settings({
                       { key: 'dark-text', label: 'Texto en modo oscuro', value: themeDraft.darkText, update: (value: string) => setThemeDraft((draft) => ({ ...draft, darkText: value })) },
                     ].map(({ key, label, value, update }) => (
                       <label key={key} className="flex items-center gap-2 text-xs text-neutral-400">
-                        <input type="color" value={value} onChange={(event) => update(event.target.value)} />
-                        <span>{t(label)}</span>
+                        <input type="color" value={colourPickerValue(value)} onChange={(event) => update(event.target.value)} />
+                        <span className="min-w-0 flex-1">{t(label)}</span>
+                        <input
+                          className="input h-7 w-24 px-2 py-1 font-mono text-[11px]"
+                          type="text"
+                          value={value}
+                          onChange={(event) => update(event.target.value)}
+                          aria-label={`${t(label)} - ${t('Hexadecimal')}`}
+                          placeholder="#6366f1"
+                          inputMode="text"
+                          maxLength={7}
+                          spellCheck={false}
+                        />
                       </label>
                     ))}
                   </div>

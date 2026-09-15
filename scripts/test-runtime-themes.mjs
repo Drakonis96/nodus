@@ -103,6 +103,9 @@ test('runtime theme edge cases are guarded', async () => {
   assert.match(indexCss, /html\.theme-active\.dark \.home-dashboard/);
   assert.match(indexCss, /html\.theme-active\.light \.library-theme-panel/);
   assert.match(indexCss, /\[data-testid="theme-editor"\] input\[type='color'\][\s\S]*appearance: none/);
+  assert.match(settings, /aria-label=\{`\$\{t\(label\)\} - \$\{t\('Hexadecimal'\)\}`\}/);
+  assert.match(serverSettings, /aria-label=\{`\$\{t\(label\)\} - \$\{t\("Hexadecimal"\)\}`\}/);
+  assert.match(serverSettings, /ss-theme-colour-value/);
   assert.match(settingsRepo, /merged\.customThemes = sanitizeCustomThemes\(merged\.customThemes\)/);
   assert.match(profileTypes, /customThemes: CustomAppTheme\[\]/);
 });

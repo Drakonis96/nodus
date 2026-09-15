@@ -1928,6 +1928,7 @@ export const TR: Record<string, string> = {
   "Guardar tema": "Temayı kaydet",
   "Mi tema": "Temam",
   "Nombre del tema personalizado": "Özel tema adı",
+  "Hexadecimal": "Onaltılık",
   "Acento": "Vurgu",
   "Superficie clara": "Açık yüzey",
   "Superficie oscura": "Koyu yüzey",

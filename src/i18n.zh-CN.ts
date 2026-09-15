@@ -1485,6 +1485,7 @@ export const ZH_CN: Record<string, string> = {
   "Guardar tema": "保存主题",
   "Mi tema": "我的主题",
   "Nombre del tema personalizado": "自定义主题名称",
+  "Hexadecimal": "十六进制",
   "Acento": "强调色",
   "Superficie clara": "浅色表面",
   "Superficie oscura": "深色表面",

@@ -1667,6 +1667,7 @@ export const DE: Record<string, string> = {
   'Guardar tema': 'Thema speichern',
   'Mi tema': 'Mein Thema',
   'Nombre del tema personalizado': 'Name des benutzerdefinierten Themas',
+  'Hexadecimal': 'Hexadezimal',
   'Acento': 'Akzent',
   'Superficie clara': 'Helle Oberfläche',
   'Superficie oscura': 'Dunkle Oberfläche',

@@ -1687,6 +1687,7 @@ export const EN: Record<string, string> = {
   'Guardar tema': 'Save theme',
   'Mi tema': 'My theme',
   'Nombre del tema personalizado': 'Custom theme name',
+  'Hexadecimal': 'Hexadecimal',
   'Acento': 'Accent',
   'Superficie clara': 'Light surface',
   'Superficie oscura': 'Dark surface',

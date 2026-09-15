@@ -179,6 +179,10 @@ function normalizeThemeColour(value: unknown): string | null {
   return HEX_COLOUR.test(normalized) ? normalized : null;
 }
 
+function colourPickerValue(value: string): string {
+  return HEX_COLOUR.test(value) ? value : '#000000';
+}
+
 const emptyThemeDraft = (): Omit<CustomAppTheme, "id"> => ({
   label: "", accent: "#6366f1", deep: "#1e1b4b", pale: "#eef2ff",
   appBackground: { light: "#f8fafc", dark: "#080a12" },
@@ -1451,7 +1455,21 @@ export function ServerSettingsView({
                 { key: 'light-text', label: 'Texto en modo claro', value: themeDraft.lightText, update: (value: string) => setThemeDraft((draft) => ({ ...draft, lightText: value })) },
                 { key: 'dark-text', label: 'Texto en modo oscuro', value: themeDraft.darkText, update: (value: string) => setThemeDraft((draft) => ({ ...draft, darkText: value })) },
               ].map(({ key, label, value, update }) => (
-                <label key={key}><input type="color" value={value} onChange={(event) => update(event.target.value)} />{t(label)}</label>
+                <label key={key}>
+                  <input type="color" value={colourPickerValue(value)} onChange={(event) => update(event.target.value)} />
+                  <span>{t(label)}</span>
+                  <input
+                    className="ss-theme-colour-value"
+                    type="text"
+                    value={value}
+                    onChange={(event) => update(event.target.value)}
+                    aria-label={`${t(label)} - ${t("Hexadecimal")}`}
+                    placeholder="#6366f1"
+                    inputMode="text"
+                    maxLength={7}
+                    spellCheck={false}
+                  />
+                </label>
               ))}
             </div>
             <label>

@@ -69,9 +69,12 @@ and rejects incomplete or invalid values. Saved themes can be edited or
 removed from the same Appearance section. Custom themes work in the Desktop
 app and Server Web without generating code or rebuilding the application.
 
-The colour controls show the selected value directly. The visible preview is a
-small circular swatch with a border so very light colours remain identifiable
-against the editor surface.
+The colour controls show the selected value directly. The small circular swatch
+with a border opens the system colour picker, while the adjacent text field
+accepts and displays the canonical six-digit hexadecimal value. This makes it
+possible to paste an exact colour even when the operating system picker exposes
+RGB controls instead. Very light colours remain identifiable against the editor
+surface because the swatch has its own border.
 
 ## Runtime token model
 

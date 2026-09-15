@@ -1655,6 +1655,7 @@ export const PT_BR: Record<string, string> = {
   'Guardar tema': 'Salvar tema',
   'Mi tema': 'Meu tema',
   'Nombre del tema personalizado': 'Nome do tema personalizado',
+  'Hexadecimal': 'Hexadecimal',
   'Acento': 'Destaque',
   'Superficie clara': 'Superfície clara',
   'Superficie oscura': 'Superfície escura',

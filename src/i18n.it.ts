@@ -1538,6 +1538,7 @@ export const IT: Record<string, string> = {
   "Guardar tema": "Salva tema",
   "Mi tema": "Il mio tema",
   "Nombre del tema personalizado": "Nome del tema personalizzato",
+  "Hexadecimal": "Esadecimale",
   "Acento": "Accento",
   "Superficie clara": "Superficie chiara",
   "Superficie oscura": "Superficie scura",
