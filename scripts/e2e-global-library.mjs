@@ -655,7 +655,7 @@ try {
   const magicAdd = page.getByTestId('library-create-reference-dialog');
   await magicAdd.getByTestId('library-magic-identifier').fill('not-an-identifier');
   await magicAdd.getByTestId('confirm-create-library-reference').click();
-  await magicAdd.getByRole('alert').getByText(/DOI, ISBN, ISSN, PMID, PMCID o arXiv/).waitFor();
+  await magicAdd.getByRole('alert').getByText(/No se reconoce el identificador ni la dirección/).waitFor();
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-magic-add-dark-wide.png'), fullPage: true });
   await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
   await page.setViewportSize({ width: 760, height: 900 });
