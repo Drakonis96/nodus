@@ -88,6 +88,26 @@ When the wizard finishes you land in your **Library** with every monitored work
 listed — but "unscanned." That's expected, and it's the subject of the next
 section.
 
+### Choose your appearance
+
+You can change the look of Nodus at any time from **Settings → Appearance**:
+
+- Choose **Light**, **Dark**, or **System** under **Colour mode**. **System**
+  follows your computer's current appearance and changes automatically when
+  the operating system changes.
+- Choose a **Colour theme** from the swatches. The theme changes the palette,
+  while the colour mode stays independent, so you can use the same theme in
+  either light or dark mode.
+- Select **Create theme** to make your own palette. Give it a name, choose the
+  colours for each mode, preview it, and save it when it looks right. Use full
+  six-digit hexadecimal colours such as `#6366f1` when entering colours.
+
+Appearance changes apply immediately and are remembered the next time you open
+Nodus. They affect the app background, sidebar, workspaces, buttons, icons,
+labels, and dialogs. If a custom theme makes a colour combination unreadable,
+the editor will not save it until the required contrast is met. See
+[Appearance and themes](appearance.md) for the complete reference.
+
 ---
 
 ## 4. The core loop: scan → explore → produce
