@@ -30,3 +30,6 @@
 .document-visual-actions{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .document-visual-actions>button{flex-shrink:0}
 .document-visual-actions>details{max-width:260px}
+/* A details panel is narrow, so the reasons read as a short list, one motive per line. */
+.document-visual-discards{margin:4px 0 0;padding-left:14px;list-style:disc}
+.document-visual-discards li{margin:2px 0}

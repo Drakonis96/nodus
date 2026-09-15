@@ -32,6 +32,24 @@ try {
   await page.waitForFunction(()=>window.testAnnotations.length>0);
   const annotation=await page.evaluate(()=>window.testAnnotations[0]);
   assert.equal(annotation.selectedText,selection.text);assert.equal(annotation.startOffset,selection.expected);
+  // The engine that writes the resources is the reader's to choose, and the dialog opens
+  // on the task's current model — not on the one the report was written with.
+  const actions=page.locator('.document-visual-actions');
+  await actions.getByRole('button',{name:'Añadir recursos visuales'}).click();
+  let dialog=page.getByRole('dialog');
+  await dialog.getByTestId('document-visual-model').waitFor();
+  const engineTrigger=dialog.getByRole('button',{name:/^Modelo:/});
+  assert.match(await engineTrigger.getAttribute('aria-label'),/gemini/i,'the reader enriches with the Deep Research model, not the report’s');
+  assert.equal(await dialog.getByText('Los recursos se generan con el modelo elegido aquí, no con el del informe.').count(),1);
+  await shot('deep-enrich-model.png');
+  await engineTrigger.click();
+  await page.getByRole('option',{name:/gpt-5/i}).click();
+  await dialog.locator('footer button').last().click();
+  await page.waitForFunction(()=>window.testEnrichRequest);
+  const enrichRequest=await page.evaluate(()=>window.testEnrichRequest);
+  assert.equal(enrichRequest.target.kind,'deep-research');
+  assert.equal(enrichRequest.options.retry,false);
+  assert.deepEqual(enrichRequest.options.model,{provider:'openai',model:'gpt-5'},'the chosen engine must travel with the request');
   await page.getByTestId('deep-research-tab-home').click();
   await page.getByRole('button',{name:'Nuevo informe',exact:true}).click();
   await page.setViewportSize({width:1440,height:1500});
@@ -113,6 +131,34 @@ try {
   }
   assert.deepEqual(failures,[]);
   assert.deepEqual(errors,[]);
+  // A document whose proposals were all refused must not answer "no figures were needed":
+  // the reader sees how many were discarded and why.
+  await page.setViewportSize({width:1440,height:1080});
+  await page.goto(base+'?discards=1');
+  await page.getByRole('button',{name:'Leer',exact:true}).first().click();
+  await actions.getByRole('button',{name:'Añadir recursos visuales'}).waitFor();
+  const refusal=actions.locator('details').first();
+  await refusal.scrollIntoViewIfNeeded();
+  assert.equal(await refusal.locator('summary').innerText(),'No se añadió ninguna figura: se descartaron 3 propuestas.');
+  const spanishNotice=await refusal.locator('summary').innerText();
+  await refusal.locator('summary').click();
+  const motives=await refusal.locator('li').allInnerTexts();
+  assert.deepEqual(motives,['2 · la fuente citada no está en ese bloque','1 · descartada al elegir las figuras del documento']);
+  assert.equal(await actions.getByText('No se añadieron figuras: no eran necesarias.').count(),0,'a refused run must not claim the figures were unnecessary');
+  await shot('deep-refusals.png');
+  for(const lang of ['en','fr','de','pt','pt-BR','it','tr','zh-CN']) {
+    await page.goto(base+'?discards=1&lang='+lang);
+    await page.waitForFunction(()=>window.testLabels?.read);
+    await page.getByRole('button',{name:await page.evaluate(()=>window.testLabels.read),exact:true}).first().click();
+    const summary=actions.locator('details').first().locator('summary');
+    await summary.waitFor();
+    const text=await summary.innerText();
+    assert.notEqual(text,spanishNotice,`the discarded notice is untranslated in ${lang}`);
+    await summary.click();
+    const items=await actions.locator('li').allInnerTexts();
+    assert.equal(items.length,2,'the motives are listed in '+lang);
+    assert.doesNotMatch(items[0],/la fuente citada|descartada al elegir/,`a motive is untranslated in ${lang}: ${items[0]}`);
+  }
   console.log('Document skills UI passed.');
 } catch(e) {await shot('ui-debug.png');console.log((await page.locator('body').innerText()).slice(-4000));throw e;}
 finally{await browser.close();}

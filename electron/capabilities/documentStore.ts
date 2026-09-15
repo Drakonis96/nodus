@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import type { DocumentVisualManifest, DocumentVisualTarget } from '../../shared/documentSkills';
+import { DOCUMENT_VISUAL_DISCARD_REASONS } from '../../shared/documentSkills';
 import { deleteChatAssets } from '../chatAssets';
 import { validateViewDocument } from '../../packages/capability-api/src/views';
 
@@ -12,6 +13,9 @@ export function readDocumentVisuals(vaultId: string, target: DocumentVisualTarge
   try {
     const value = JSON.parse(fs.readFileSync(path.join(directory(vaultId, target), previous ? 'previous.json' : 'current.json'), 'utf8')) as DocumentVisualManifest;
     if (value.schemaVersion !== 1 || value.vaultId !== vaultId || value.target.kind !== target.kind || value.target.id !== target.id || !Array.isArray(value.blocks) || !Array.isArray(value.figures) || !value.usage || !value.policy || typeof value.revision !== 'string') return null;
+    // Absent on manifests written before refusals were recorded; when present every entry
+    // has to name a motive this build knows, or the panel would show a blank line.
+    if (value.discarded !== undefined && (!Array.isArray(value.discarded) || value.discarded.some(item => !item || typeof item.blockId !== 'string' || typeof item.skillId !== 'string' || !(item.reason in DOCUMENT_VISUAL_DISCARD_REASONS)))) return null;
     for (const figure of value.figures) {
       if (typeof figure.id !== 'string' || typeof figure.caption !== 'string' || !Array.isArray(figure.sources) || figure.sources.some(source => typeof source !== 'string' || !/^nodus:\/\/[a-z-]+\//.test(source)) || !value.blocks.some(block => block.id === figure.blockId)) return null;
       if (figure.owner && !/^[a-f0-9]{64}$/.test(figure.owner)) return null;
