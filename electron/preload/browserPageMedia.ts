@@ -402,9 +402,12 @@ export function resumeTarget(elements: MediaEl[], preferred: MediaEl | null): Me
 /**
  * Move between tracks when the page exposes an actual list of them.
  *
- * Chromium also receives the standard media key from main for players that own
- * their playlist internally; this DOM fallback makes ordinary multi-track pages
- * deterministic without guessing at site-specific buttons.
+ * This is the FALLBACK for a page that registered no Media Session handler — an
+ * ordinary page with several real <audio>/<video> elements. A player that owns
+ * its playlist internally (Spotify, YouTube) publishes a `nexttrack` handler
+ * instead, and that one is asked first: it exposes a single element for every
+ * track, so this walk can only ever restart the current one or move to some
+ * unrelated element on the page.
  */
 function switchTrack(elements: MediaEl[], command: 'previous' | 'next', preferred: MediaEl | null): boolean {
   const candidates = playableMedia(elements);
@@ -437,11 +440,11 @@ function switchTrack(elements: MediaEl[], command: 'previous' | 'next', preferre
 }
 
 /**
- * Run one header command against the page.
+ * Run one header command against the page's media elements.
  *
- * Returns whether the page could act on it. A `false` is what lets main fall
- * back to Chromium's own media key, for players that keep their audio somewhere
- * no DOM query can reach.
+ * Returns whether the elements could act on it. A `false` sends the caller on to
+ * its next channel — the accessible Play/Pause control, or the page's own Media
+ * Session handler — rather than leaving the command unserved.
  */
 export function applyMediaCommand(
   elements: MediaEl[],
@@ -472,4 +475,17 @@ export function applyMediaCommand(
     }
   }
   return running.length > 0;
+}
+
+/**
+ * What a command says the playback state should be afterwards.
+ *
+ * Used to correct the header for a player that emits no media events of its own;
+ * `null` where the command promises nothing about playback — skipping a track
+ * leaves it playing, and the page's own events say the rest.
+ */
+export function playbackAfterCommand(command: MediaCommand): boolean | null {
+  if (command === 'play') return true;
+  if (command === 'pause' || command === 'stop') return false;
+  return null;
 }
