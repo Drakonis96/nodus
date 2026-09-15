@@ -1295,7 +1295,7 @@ export function DictionaryView({
   return (
     <div
       data-testid="dictionary-workspace"
-      className="flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100"
+      className="dictionary-workspace theme-workspace-surface flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100"
     >
       <header className="shrink-0 border-b border-neutral-200 px-5 pt-4 dark:border-neutral-800">
         <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -1465,7 +1465,7 @@ export function DictionaryView({
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <div className="flex flex-wrap gap-1">
                 <button
-                  className={`btn btn-ghost h-7 px-2 ${!letter ? "text-indigo-600 dark:text-indigo-300" : ""}`}
+                  className={`dictionary-filter-button btn btn-ghost h-7 px-2 ${!letter ? "is-selected" : ""}`}
                   onClick={() => setLetter("")}
                 >
                   {t("Todas")}
@@ -1474,7 +1474,7 @@ export function DictionaryView({
                   (item) => (
                     <button
                       key={item}
-                      className={`btn btn-ghost h-7 w-7 p-0 ${letter === item ? "text-indigo-600 dark:text-indigo-300" : ""}`}
+                      className={`dictionary-filter-button btn btn-ghost h-7 w-7 p-0 ${letter === item ? "is-selected" : ""}`}
                       onClick={() => setLetter(letter === item ? "" : item)}
                     >
                       {item}
@@ -1515,7 +1515,10 @@ export function DictionaryView({
                 <option value="evidence">{t("Evidencia")}</option>
               </select>
               <button
-                className="btn btn-ghost h-8 px-2"
+                className="dictionary-sort-button btn btn-ghost h-8 w-8 p-0"
+                type="button"
+                aria-label={t("Cambiar dirección de orden")}
+                title={t("Cambiar dirección de orden")}
                 onClick={() =>
                   setSortDir((current) => (current === "asc" ? "desc" : "asc"))
                 }
@@ -1523,13 +1526,15 @@ export function DictionaryView({
                 <Icon name={sortDir === "asc" ? "arrowUp" : "arrowDown"} />
               </button>
               <button
-                className={`btn btn-ghost h-8 px-2 ${viewMode === "list" ? "text-indigo-600 dark:text-indigo-300" : ""}`}
+                className={`dictionary-view-button btn btn-ghost h-8 px-2 ${viewMode === "list" ? "is-selected" : ""}`}
+                aria-pressed={viewMode === "list"}
                 onClick={() => setViewMode("list")}
               >
                 <Icon name="list" />
               </button>
               <button
-                className={`btn btn-ghost h-8 px-2 ${viewMode === "table" ? "text-indigo-600 dark:text-indigo-300" : ""}`}
+                className={`dictionary-view-button btn btn-ghost h-8 px-2 ${viewMode === "table" ? "is-selected" : ""}`}
+                aria-pressed={viewMode === "table"}
                 onClick={() => setViewMode("table")}
               >
                 <Icon name="table" />

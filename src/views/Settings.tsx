@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type {
   AppSettings,
+  CustomAppTheme,
   AiConcurrencySnapshot,
   BackupCleanupPreview,
   BackupRetentionUnit,
@@ -38,6 +39,7 @@ import { LegalDocModal } from '../components/LegalDocModal';
 import { LEGAL_DOCS, type LegalDocId } from '../legalDocs';
 import { confirm } from '../components/feedback';
 import { Icon } from '../components/ui';
+import { ThemeColourPicker } from '../components/ThemeColourPicker';
 import { ModelPicker, ModelWithReasoning, SubscriptionQuotaNotice, ExtractionCapabilityNotice, SelfAuditNotice } from '../components/ModelPicker';
 import { EmbeddingModelControl } from '../components/EmbeddingModelControl';
 import { GeneralTextModelControl } from '../components/GeneralTextModelControl';
@@ -65,6 +67,60 @@ import { DOCUMENT_INDEX_CONTINUOUS_AVAILABLE } from '@shared/documentIndexPolicy
 import { validateBackupPassword } from '@shared/backupPasswordPolicy';
 import { PROMPT_LANGUAGE_OPTIONS } from '@shared/promptLanguageOptions';
 import chromeWebStoreLogo from '../assets/brands/chrome-web-store.svg';
+import { contrast, deriveThemeTokens, THEMES } from '../theme/themes.mjs';
+import { applyAppTheme as applyRuntimeAppTheme, applyThemeMode } from '../theme/themeBoot';
+
+/** Colour-theme picker options: `default` first, then the curated palettes. Each
+ *  swatch shows a light surface, the accent and a deep surface. */
+type ThemePickerOption = { id: string; label: string; swatch: string[]; custom?: boolean };
+
+const THEME_PICKER_OPTIONS: ThemePickerOption[] = [
+  { id: 'default', label: 'Predeterminado', swatch: ['#fafafa', '#6366f1', '#0a0a0a'] },
+  ...THEMES.map((th) => ({
+    id: th.id as AppSettings['appTheme'],
+    label: th.label,
+    swatch: [th.tokens.appBackground.light, th.tokens.a.dark[500], th.tokens.appBackground.dark],
+  })),
+];
+
+const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
+
+function normalizeThemeColour(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  return HEX_COLOUR.test(normalized) ? normalized : null;
+}
+
+function themeSlug(label: string): string {
+  const slug = label.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+  return `custom-${slug || 'theme'}`;
+}
+
+function emptyThemeDraft(): Omit<CustomAppTheme, 'id'> {
+  return {
+    label: '', accent: '#6366f1', deep: '#1e1b4b', pale: '#eef2ff',
+    appBackground: { light: '#f8fafc', dark: '#080a12' },
+    lightText: '#171717', darkText: '#f5f5f5', tint: 0.05,
+  };
+}
+
+function themeDraftFrom(theme?: CustomAppTheme): Omit<CustomAppTheme, 'id'> {
+  const defaults = emptyThemeDraft();
+  if (!theme) return defaults;
+  return {
+    label: theme.label,
+    accent: normalizeThemeColour(theme.accent) ?? defaults.accent,
+    deep: normalizeThemeColour(theme.deep) ?? defaults.deep,
+    pale: normalizeThemeColour(theme.pale) ?? defaults.pale,
+    appBackground: {
+      light: normalizeThemeColour(theme.appBackground?.light) ?? defaults.appBackground.light,
+      dark: normalizeThemeColour(theme.appBackground?.dark) ?? defaults.appBackground.dark,
+    },
+    lightText: normalizeThemeColour(theme.lightText) ?? defaults.lightText,
+    darkText: normalizeThemeColour(theme.darkText) ?? defaults.darkText,
+    tint: Number.isFinite(theme.tint) ? theme.tint : defaults.tint,
+  };
+}
 
 type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'browser' | 'server' | 'system' | 'data' | 'about' | 'updates';
 
@@ -183,6 +239,19 @@ export function Settings({
   const [resetting, setResetting] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+  const [themeEditorOpen, setThemeEditorOpen] = useState(false);
+  const [editingThemeId, setEditingThemeId] = useState<string | null>(null);
+  const [themeDraft, setThemeDraft] = useState<Omit<CustomAppTheme, 'id'>>(emptyThemeDraft);
+  const [themeError, setThemeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!themeEditorOpen) return;
+    applyRuntimeAppTheme('custom-preview', [{ id: 'custom-preview', ...themeDraft }]);
+  }, [themeEditorOpen, themeDraft]);
+  useEffect(() => {
+    if (themeEditorOpen) return;
+    applyRuntimeAppTheme(settings.appTheme, settings.customThemes ?? []);
+  }, [settings.appTheme, settings.customThemes]);
   const [updateProgress, setUpdateProgress] = useUpdateProgress();
   const [requestingInstall, setRequestingInstall] = useState(false);
   const [confirmBetaUpdates, setConfirmBetaUpdates] = useState(false);
@@ -494,8 +563,90 @@ export function Settings({
   }, [mcpHelpOpen]);
 
   const patch = async (p: Partial<AppSettings>) => {
-    await window.nodus.updateSettings(p);
+    if (p.theme !== undefined) applyThemeMode(p.theme);
+    let next: AppSettings;
+    try {
+      next = await window.nodus.updateSettings(p);
+    } catch (error) {
+      if (p.theme !== undefined) applyThemeMode(settings.theme);
+      throw error;
+    }
+    // Apply palette changes from the authoritative IPC response immediately.
+    // This keeps the desktop renderer from showing the preview/default palette
+    // while the parent shell performs its asynchronous settings refresh.
+    if (p.appTheme !== undefined || p.customThemes !== undefined) {
+      applyRuntimeAppTheme(next.appTheme, next.customThemes ?? []);
+    }
     await onChange();
+  };
+
+  const customThemes = settings.customThemes ?? [];
+  const closeThemeEditor = () => {
+    applyRuntimeAppTheme(settings.appTheme, customThemes);
+    setThemeEditorOpen(false);
+  };
+  const selectTheme = (id: string) => {
+    // Keep the definition alongside the selected id. This is important for a
+    // custom palette: a settings refresh that only carries the id cannot derive
+    // its runtime tokens and would correctly fall back to the default palette.
+    applyRuntimeAppTheme(id, customThemes);
+    void patch({ appTheme: id, customThemes });
+  };
+  const openThemeEditor = (theme?: CustomAppTheme) => {
+    setEditingThemeId(theme?.id ?? null);
+    setThemeDraft(themeDraftFrom(theme));
+    setThemeError(null);
+    setThemeEditorOpen(true);
+  };
+
+  const saveTheme = async () => {
+    const label = themeDraft.label.trim();
+    if (!label) return setThemeError(t('Escribe un nombre para el tema.'));
+    const accent = normalizeThemeColour(themeDraft.accent);
+    const deep = normalizeThemeColour(themeDraft.deep);
+    const pale = normalizeThemeColour(themeDraft.pale);
+    const appBackgroundLight = normalizeThemeColour(themeDraft.appBackground.light);
+    const appBackgroundDark = normalizeThemeColour(themeDraft.appBackground.dark);
+    const lightText = normalizeThemeColour(themeDraft.lightText);
+    const darkText = normalizeThemeColour(themeDraft.darkText);
+    if (!accent || !deep || !pale || !appBackgroundLight || !appBackgroundDark || !lightText || !darkText) {
+      return setThemeError(t('Usa colores hexadecimales completos, por ejemplo #6366f1.'));
+    }
+    const id = editingThemeId ?? themeSlug(label);
+    const duplicate = customThemes.some((theme) => theme.id !== editingThemeId && theme.id === id);
+    if (duplicate) return setThemeError(t('Ya existe un tema con ese nombre.'));
+    const normalizedDraft = {
+      ...themeDraft,
+      label,
+      accent,
+      deep,
+      pale,
+      appBackground: { light: appBackgroundLight, dark: appBackgroundDark },
+      lightText,
+      darkText,
+    };
+    const tokens = deriveThemeTokens({ anchors: normalizedDraft });
+    const readable = contrast(tokens.text.dark, tokens.n[950]) >= 4.5
+      && contrast(tokens.text.light, tokens.n[50]) >= 4.5
+      && contrast(tokens.text.dark, tokens.appBackground.dark) >= 4.5
+      && contrast(tokens.text.light, tokens.appBackground.light) >= 4.5
+      && contrast(tokens.a.light[300], '#ffffff') >= 4.5
+      && contrast(tokens.a.dark[300], tokens.n[950]) >= 4.5;
+    if (!readable) return setThemeError(t('Ajusta los colores para alcanzar el contraste mínimo de lectura.'));
+    const nextTheme: CustomAppTheme = { id, ...normalizedDraft };
+    const nextThemes = customThemes.some((theme) => theme.id === id)
+      ? customThemes.map((theme) => theme.id === id ? nextTheme : theme)
+      : [...customThemes, nextTheme];
+    await patch({ customThemes: nextThemes, appTheme: id });
+    setThemeEditorOpen(false);
+    setEditingThemeId(null);
+    setThemeError(null);
+  };
+
+  const deleteTheme = async (id: string) => {
+    const nextThemes = customThemes.filter((theme) => theme.id !== id);
+    await patch({ customThemes: nextThemes, appTheme: settings.appTheme === id ? 'default' : settings.appTheme });
+    if (editingThemeId === id) setThemeEditorOpen(false);
   };
 
   const flash = (m: string) => {
@@ -1023,14 +1174,88 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('interface', 'Apariencia', 'tema claro oscuro animaciones velocidad') && (
+      {visibleSettingsSection('interface', 'Apariencia', 'tema claro oscuro animaciones velocidad paleta color colores teal ocean forest sunset violet mint amber berry indigo rose') && (
           <Section title={t('Apariencia')}>
-            <Row label={t('Tema')}>
+            <Row label={t('Modo de color')} hint={t('Elige entre modo claro, oscuro o seguir el sistema operativo.')}>
               <select className="input" value={settings.theme} onChange={(e) => patch({ theme: e.target.value as any })}>
                 <option value="system">{t('Sistema')}</option>
                 <option value="dark">{t('Oscuro')}</option>
                 <option value="light">{t('Claro')}</option>
               </select>
+            </Row>
+            <Row label={t('Tema')} hint={t('Paletas de color. El modo claro u oscuro se ajusta arriba.')}>
+              <div className="w-full space-y-3">
+                <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3" data-testid="theme-picker">
+                  {[...THEME_PICKER_OPTIONS, ...customThemes.map((theme) => ({
+                    id: theme.id,
+                    label: theme.label,
+                    custom: true,
+                    swatch: [theme.pale, theme.accent, theme.deep],
+                  }))].map((opt) => {
+                    const active = (settings.appTheme ?? 'default') === opt.id;
+                    const custom = opt.custom ? customThemes.find((theme) => theme.id === opt.id) : undefined;
+                    return (
+                      <div key={opt.id} className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                        active ? 'border-indigo-500 bg-indigo-500/10 text-neutral-100' : 'border-neutral-800 text-neutral-400'
+                      }`}>
+                        <button
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => selectTheme(opt.id)}
+                          className="flex min-w-0 flex-1 items-center gap-2 text-left hover:text-neutral-100"
+                        >
+                          <span className="flex flex-shrink-0 overflow-hidden rounded-md border border-black/20">
+                            {opt.swatch.map((c, i) => <span key={i} className="block h-6 w-3" style={{ background: c }} />)}
+                          </span>
+                          <span className="min-w-0 truncate">{opt.id === 'default' ? t('Predeterminado') : opt.label}</span>
+                        </button>
+                        {custom && <>
+                          <button type="button" className="rounded px-1 text-neutral-500 hover:text-neutral-100" aria-label={t('Editar tema')} onClick={() => openThemeEditor(custom)}>✎</button>
+                          <button type="button" className="rounded px-1 text-neutral-500 hover:text-red-300" aria-label={t('Eliminar tema')} onClick={() => void deleteTheme(custom.id)}>×</button>
+                        </>}
+                      </div>
+                    );
+                  })}
+                </div>
+                <button type="button" className="btn btn-ghost h-8 border border-neutral-300 px-3 text-xs dark:border-neutral-700" onClick={() => openThemeEditor()}>
+                  + {t('Crear tema')}
+                </button>
+                {themeEditorOpen && <div className="space-y-3 rounded-lg border border-neutral-700 bg-neutral-900/50 p-3" data-testid="theme-editor">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-300">{editingThemeId ? t('Editar tema') : t('Crear tema')}</h4>
+                    <button type="button" className="text-xs text-neutral-500 hover:text-neutral-200" onClick={closeThemeEditor}>{t('Cancelar')}</button>
+                  </div>
+                  <label className="block text-xs text-neutral-400">
+                    {t('Nombre del tema personalizado')}
+                    <input className="input mt-1 w-full" value={themeDraft.label} onChange={(event) => setThemeDraft((draft) => ({ ...draft, label: event.target.value }))} placeholder={t('Mi tema')} />
+                  </label>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {[
+                      { key: 'accent', label: 'Acento', value: themeDraft.accent, update: (value: string) => setThemeDraft((draft) => ({ ...draft, accent: value })) },
+                      { key: 'app-background-light', label: 'Fondo de la aplicación (modo claro)', value: themeDraft.appBackground.light, update: (value: string) => setThemeDraft((draft) => ({ ...draft, appBackground: { ...draft.appBackground, light: value } })) },
+                      { key: 'app-background-dark', label: 'Fondo de la aplicación (modo oscuro)', value: themeDraft.appBackground.dark, update: (value: string) => setThemeDraft((draft) => ({ ...draft, appBackground: { ...draft.appBackground, dark: value } })) },
+                      { key: 'pale', label: 'Superficie clara', value: themeDraft.pale, update: (value: string) => setThemeDraft((draft) => ({ ...draft, pale: value })) },
+                      { key: 'deep', label: 'Superficie oscura', value: themeDraft.deep, update: (value: string) => setThemeDraft((draft) => ({ ...draft, deep: value })) },
+                      { key: 'light-text', label: 'Texto en modo claro', value: themeDraft.lightText, update: (value: string) => setThemeDraft((draft) => ({ ...draft, lightText: value })) },
+                      { key: 'dark-text', label: 'Texto en modo oscuro', value: themeDraft.darkText, update: (value: string) => setThemeDraft((draft) => ({ ...draft, darkText: value })) },
+                    ].map(({ key, label, value, update }) => (
+                      <ThemeColourPicker key={key} labelText={t(label)} hexLabel={t('Hexadecimal')} value={value} onChange={update} />
+                    ))}
+                  </div>
+                  <label className="block text-xs text-neutral-400">
+                    {t('Tintado de superficies')}
+                    <input className="mt-1 w-full" type="range" min="0" max="0.2" step="0.01" value={themeDraft.tint} onChange={(event) => setThemeDraft((draft) => ({ ...draft, tint: Number(event.target.value) }))} />
+                  </label>
+                  {themeError && <p className="text-xs text-red-300">{themeError}</p>}
+                  <button
+                    type="button"
+                    className="btn h-8 bg-indigo-100 px-3 text-xs text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-600 dark:text-white dark:hover:bg-indigo-500"
+                    onClick={() => void saveTheme()}
+                  >
+                    {t('Guardar tema')}
+                  </button>
+                </div>}
+              </div>
             </Row>
             <Row label={t('Velocidad de animaciones')}>
               <input

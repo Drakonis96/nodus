@@ -29,7 +29,6 @@ test('closing a tab destroys its WebContents rather than only detaching it', () 
   assert.match(close, /isDestroyed\(\)/, 'destroying twice must be guarded');
   assert.match(close, /webContents\.stop\(\)/, 'in-flight page loads must stop before destruction');
 });
-
 test('closing a tab removes every listener it registered, before destroying it', () => {
   const close = body('destroyTab');
   assert.match(close, /disposers/, 'listeners must be undone through the disposer list');
@@ -374,4 +373,3 @@ test('the tab that becomes active is the one the strip shows', () => {
   assert.match(strip, /scrollIntoView\(\{ block: 'nearest', inline: 'nearest' \}\)/,
     'and brought into view without moving the page around it');
 });
-

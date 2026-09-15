@@ -85,6 +85,27 @@ When the wizard finishes you land in your **Library** with every monitored work
 listed — but "unscanned." That's expected, and it's the subject of the next
 section.
 
+### Choose your appearance
+
+You can change the look of Nodus at any time from **Settings → Appearance**:
+
+- Choose **Light**, **Dark**, or **System** under **Colour mode**. **System**
+  follows your computer's current appearance and changes automatically when
+  the operating system changes.
+- Choose a **Colour theme** from the swatches. The theme changes the palette,
+  while the colour mode stays independent, so you can use the same theme in
+  either light or dark mode.
+- Select **Create theme** to make your own palette. Give it a name, choose the
+  colours for each mode, preview it, and save it when it looks right. Use full
+  six-digit hexadecimal colours such as `#6366f1` in the hex field inside the
+  colour picker. Click a labelled colour control to open the picker; it includes
+  a saturation/lightness palette, hue control, preview, and exact hex field.
+
+Appearance changes apply immediately and are remembered the next time you open
+Nodus. They affect the app background, sidebar, workspaces, buttons, icons,
+labels, and dialogs. If a custom theme makes a colour combination unreadable,
+the editor will not save it until the required contrast is met.
+
 ---
 
 ## 4. The core loop: scan → explore → produce
@@ -218,7 +239,8 @@ what each one is for:
 | **Workspace** | Keep notes, ideas and collections together in a Markdown workspace with live, clickable `nodus://` citations. |
 
 Pinned outside the groups: **Home** (corpus status and next steps) and
-**Settings** (providers, models, library automation, integrations, data, backups).
+**Settings** (appearance, providers, models, library automation, integrations,
+data, backups).
 
 ---
 

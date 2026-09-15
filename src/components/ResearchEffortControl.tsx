@@ -46,7 +46,7 @@ export function ResearchEffortControl({ model, value, onChange, disabled }: {
       const rect = trigger.current?.getBoundingClientRect();
       if (!rect) return;
       const width = Math.min(300, window.innerWidth - 24);
-      setPosition({ '--vault-accent': getComputedStyle(trigger.current!).getPropertyValue('--vault-accent'), position: 'fixed', zIndex: 10060, width,
+      setPosition({ '--vault-accent': getComputedStyle(trigger.current!).getPropertyValue('--vault-accent').trim() || 'var(--a-500)', position: 'fixed', zIndex: 10060, width,
         left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
         bottom: window.innerHeight - rect.top + 12,
       } as CSSProperties);
