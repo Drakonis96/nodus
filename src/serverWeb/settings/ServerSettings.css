@@ -227,3 +227,34 @@ html[data-theme='light'] .server-settings-native .ss-warning { background: #fffb
 @media (prefers-reduced-motion: reduce) {
   .server-settings-native *, .server-settings-native *::before, .server-settings-native *::after { scroll-behavior: auto !important; transition-duration: .001ms !important; }
 }
+
+/* Settings owns a compact semantic token layer so its form controls stay
+   coherent across modes. Bridge that layer to the active app palette; without
+   this, settings remains on its standalone charcoal/white defaults while the
+   rest of Server follows the selected theme. */
+html.theme-active.dark .server-settings-native,
+html.theme-active .server-settings-native[data-theme='dark'] {
+  --ss-bg: var(--app-background-dark, #0a0a0a);
+  --ss-panel: var(--n-900, #111111);
+  --ss-panel-soft: var(--n-800, #171717);
+  --ss-border: var(--theme-border-dark, #2b2b2b);
+  --ss-border-soft: color-mix(in srgb, var(--theme-border-dark, #2b2b2b) 75%, transparent);
+  --ss-text: var(--theme-text-dark, #f5f5f5);
+  --ss-muted: var(--theme-text-dark-muted, #858585);
+  --ss-faint: var(--theme-text-dark-subtle, #5b5b5b);
+  --ss-accent: var(--a-600, #6366f1);
+}
+
+html.theme-active.light .server-settings-native,
+html.theme-active .server-settings-native[data-theme='light'] {
+  --ss-bg: var(--app-background-light, #ffffff);
+  --ss-panel: var(--n-50, #ffffff);
+  --ss-panel-soft: var(--n-100, #f8fafc);
+  --ss-border: var(--theme-border-light, #d8dbe2);
+  --ss-border-soft: color-mix(in srgb, var(--theme-border-light, #d8dbe2) 75%, transparent);
+  --ss-text: var(--theme-text-light, #171717);
+  --ss-muted: var(--theme-text-light-muted, #64748b);
+  --ss-faint: var(--theme-text-light-subtle, #94a3b8);
+  --ss-accent: var(--a-600, #4f46e5);
+  color-scheme: light;
+}

@@ -31,6 +31,15 @@ test('Server Web custom themes drive the shell palette and accents', () => {
   assert.match(appTsx, /THEMES\.some\(\(definition\) => definition\.id === appTheme\)/);
 });
 
+test('Server settings consumes the active custom theme palette', () => {
+  assert.match(settingsCss, /html\.theme-active\.dark \.server-settings-native/);
+  assert.match(settingsCss, /--ss-bg:\s*var\(--app-background-dark/);
+  assert.match(settingsCss, /--ss-bg:\s*var\(--app-background-light/);
+  assert.match(settingsCss, /--ss-text:\s*var\(--theme-text-dark/);
+  assert.match(settingsCss, /--ss-text:\s*var\(--theme-text-light/);
+  assert.match(settingsCss, /--ss-accent:\s*var\(--a-600/);
+});
+
 test('Server settings has theme-scoped tokens and controls', () => {
   assert.match(settingsCss, /\.server-settings-native\[data-theme=['"]light['"]\]/);
   assert.match(settingsCss, /--ss-bg:\s*#fff/);
