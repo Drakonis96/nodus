@@ -12,6 +12,7 @@ import { DocumentIndexProgressBar } from './DocumentIndexProgressBar';
 import { EmbeddingProgressBar } from './EmbeddingProgressBar';
 import { PassageProgressBar } from './PassageProgressBar';
 import { ConfirmModal } from './ConfirmModal';
+import { PipelineLogsModal } from './pipeline-logs/PipelineLogsModal';
 
 interface QueuePanelProps {
   activity: QueueActivity;
@@ -37,6 +38,7 @@ export function QueuePanel({
 }: QueuePanelProps) {
   const open = anchorEl != null;
   const [confirmClear, setConfirmClear] = useState(false);
+  const [logsOpen, setLogsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; width: number; originX: number } | null>(null);
   const [browserSnapshot, setBrowserSnapshot] = useState<{
@@ -78,7 +80,11 @@ export function QueuePanel({
       const target = event.target;
       if (!(target instanceof Node)) return;
       if (panelRef.current?.contains(target)) return;
-      if (target instanceof Element && target.closest('[data-queue-trigger], [aria-modal="true"]')) return;
+      // `[aria-modal="true"]` is the portalled confirmation this panel owns; `[data-modal-layer]`
+      // is any popover a modal opened from here portals beside it. Without the second one, a
+      // dropdown inside the logs modal lands outside the panel and takes the panel — and the
+      // modal with it — down with the first click.
+      if (target instanceof Element && target.closest('[data-queue-trigger], [aria-modal="true"], [data-modal-layer]')) return;
       onClose();
     };
     const onKey = (event: KeyboardEvent) => {
@@ -174,6 +180,14 @@ export function QueuePanel({
         >
           <div className="flex items-center justify-between gap-2 border-b border-neutral-800 px-3 py-2">
             <div className="min-w-0 flex-1 text-sm font-semibold text-neutral-200">{t('Cola y tareas')}</div>
+            <button
+              className="btn btn-ghost shrink-0 px-2 py-1 text-xs"
+              data-testid="header-queue-logs"
+              title={t('Registros de procesamiento')}
+              onClick={() => setLogsOpen(true)}
+            >
+              {t('Logs')}
+            </button>
             <button className="btn btn-ghost shrink-0 px-2 py-1 text-xs" disabled={!activity.canClearFinished} onClick={() => setConfirmClear(true)}>
               {t('Limpiar terminadas')}
             </button>
@@ -203,6 +217,9 @@ export function QueuePanel({
             onConfirm={() => { activity.clearFinished(); setConfirmClear(false); }}
             onCancel={() => setConfirmClear(false)}
           />}
+          {/* The modal is portalled above this panel and the panel stays open behind it, so
+              the browser-overlay freeze this panel owns keeps applying while it is up. */}
+          {logsOpen && <PipelineLogsModal onClose={() => setLogsOpen(false)} />}
         </motion.div>,
       ]}
     </AnimatePresence>,

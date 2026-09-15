@@ -84,6 +84,23 @@ export function tx(es: string, vars: Record<string, string | number>): string {
 }
 
 /**
+ * Translate in a language that is NOT the active interface language, for the processing
+ * log: its lines follow a language the reader chooses beside the filters (English by
+ * default, so a log can be pasted into a GitHub issue as it stands) while the interface
+ * around it stays in the language the app was switched to.
+ *
+ * Unresolved placeholders are dropped rather than left visible: a line whose value is
+ * missing must still read as a sentence, not as `{detail}`.
+ */
+export function txIn(lang: AppLanguage, es: string, vars: Record<string, string | number | boolean | null | undefined> = {}): string {
+  const template = resolveTranslation(lang, es);
+  return template.replace(/\{(\w+)\}/g, (match, name: string) => {
+    const value = vars[name];
+    return value == null ? '' : String(value);
+  }).replace(/\s+([,.;])/g, '$1').trim();
+}
+
+/**
  * Pick an already-built value by language, for text that is not keyed by a Spanish
  * source string — in practice the labels that live inside `shared/` data tables
  * (document types, heritage facets) rather than in the tables above.

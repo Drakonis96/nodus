@@ -21,6 +21,8 @@ import { getExtractionCache, upsertExtractionCache } from '../db/extractionCache
 import { perfLog, startPerf, type PerfContext } from '../perf';
 import { getLibraryReaderRawContent } from '../libraryReader/libraryReaderStore';
 import { cleanExtractedText } from './textCleanup';
+import type { PipelineLogReasonId } from '@shared/pipelineLogMessages';
+import { logPipelineWarning } from '../logging/pipelineLogCore';
 
 export interface ExtractedDoc {
   text: string;
@@ -1016,6 +1018,15 @@ export async function resolveWorkText(
   // disabled) and whether a document attachment existed, so the pipeline can retry
   // works that *should* have full text instead of silently accepting the abstract.
   if (abstract) {
+    // A degradation is not an error, but it is the explanation for a thin analysis later,
+    // so it is recorded with the reason the extractor itself decided on.
+    logPipelineWarning({
+      subject: 'subjectExtraction',
+      code: 'no_legible_text',
+      context: { scope: 'extraction', nodusId: zoteroKey },
+      reason: reasonForBlockReason(blockReason ?? 'abstract_only'),
+      detail: scanNote ?? null,
+    });
     return {
       ...combineSegments([{
       sourceRef: `abstract:${zoteroKey}`,
@@ -1033,15 +1044,34 @@ export async function resolveWorkText(
       blockReason: blockReason ?? 'abstract_only',
     };
   }
+  const finalReason: TextBlockReason = blockReason
+    ?? (zoteroUnreachable ? 'zotero_unavailable' : hadTextAttachment ? 'unreadable' : 'no_attachment');
+  logPipelineWarning({
+    subject: 'subjectExtraction',
+    code: 'extract_failed',
+    context: { scope: 'extraction', nodusId: zoteroKey },
+    reason: reasonForBlockReason(finalReason),
+    detail: scanNote ?? null,
+  });
   return {
     text: '', sourceType: 'none',
     notes: scanNote ?? (zoteroUnreachable
       ? 'Zotero no está disponible; no se pudo comprobar si la obra tiene texto completo.'
       : 'Sin texto ni abstract disponible.'),
     hadTextAttachment,
-    blockReason: blockReason
-      ?? (zoteroUnreachable ? 'zotero_unavailable' : hadTextAttachment ? 'unreadable' : 'no_attachment'),
+    blockReason: finalReason,
   };
+}
+
+/** The catalogue reason that matches the extractor's own block reason. */
+function reasonForBlockReason(reason: TextBlockReason): PipelineLogReasonId {
+  switch (reason) {
+    case 'no_attachment': return 'reasonNoAttachment';
+    case 'unreadable': return 'reasonUnreadable';
+    case 'abstract_only': return 'reasonAbstractOnly';
+    case 'zotero_unavailable': return 'reasonZoteroUnavailable';
+    default: return 'reasonNoLegibleText';
+  }
 }
 
 async function tryUnpaywall(

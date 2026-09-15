@@ -416,6 +416,24 @@ test('queue dropdown retains and controls every processing lane', { timeout: 240
       await page.getByTestId('header-queue-empty').waitFor();
       assert.equal(await page.getByTestId('attention').innerText(), 'false');
     });
+    await t.test('the header offers the processing log without disturbing the panel', async () => {
+      await fresh(); await open();
+      const logs = page.getByTestId('header-queue-logs');
+      await logs.waitFor();
+      // In Spanish the source key IS the label — 'Logs' is the loanword a Spanish reader
+      // expects — while the other eight languages translate it (asserted in
+      // scripts/test-pipeline-logs-i18n.mjs).
+      assert.equal(await logs.innerText(), 'Logs');
+      // The log modal is a separate surface: it opens over the panel, closing it returns to the
+      // panel, and only then does Escape close the panel itself.
+      await logs.click();
+      await page.getByTestId('pipeline-logs-modal').waitFor();
+      await page.getByTestId('pipeline-logs-close').click();
+      await page.getByTestId('pipeline-logs-modal').waitFor({ state: 'detached' });
+      await page.getByTestId('header-queue-panel').waitFor();
+      await page.keyboard.press('Escape');
+      await page.getByTestId('header-queue-panel').waitFor({ state: 'detached' });
+    });
     assert.deepEqual(errors, [], 'real renderer has no uncaught errors');
   } finally { await browser.close(); await rm(dir, { recursive: true, force: true }); }
 });

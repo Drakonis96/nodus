@@ -15,6 +15,7 @@ import { snapshotDocumentFigure } from '../capabilities/documentSnapshot';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { completeJson, completeText } from './aiClient';
 import { normalizeCapabilityId } from '../../skill-capabilities/contracts';
+import { logPipelineFailure } from '../logging/pipelineLogCore';
 
 const running = new Map<string, AbortController>();
 const keyFor = (target: DocumentVisualTarget) => JSON.stringify([getActiveVault().id, target.kind, target.id]);
@@ -158,11 +159,27 @@ export async function enrichDocumentVisuals(target: DocumentVisualTarget, policy
       } catch (error) {
         signal.throwIfAborted();
         figure.state = 'failed'; figure.error = error instanceof Error ? error.message : String(error); persist();
+        // Per figure, not per document: a run that produced 38 of 40 figures is only
+        // diagnosable if the two that failed say which brief and which model produced them.
+        logPipelineFailure({
+          error,
+          code: 'extract_failed',
+          subject: 'subjectFigureAnalysis',
+          context: { scope: 'extraction', nodusId: `${target.kind}:${target.id}`, documentTitle: figure.caption ?? null, jobId: figure.id },
+          detail: figure.brief,
+        });
       }
     }
     manifest.state = manifest.figures.some(figure => figure.state !== 'ready') ? 'partial' : 'ready'; persist();
   } catch (error) {
     manifest.state = signal.aborted ? 'cancelled' : 'failed'; manifest.error = error instanceof Error ? error.message : String(error);
+    logPipelineFailure({
+      error,
+      code: signal.aborted ? 'cancelled' : 'extract_failed',
+      subject: 'subjectFigureAnalysis',
+      context: { scope: 'extraction', nodusId: `${target.kind}:${target.id}` },
+      detail: manifest.error,
+    });
     if (current()) persist();
   } finally { running.delete(key); }
   return manifest;

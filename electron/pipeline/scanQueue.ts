@@ -23,6 +23,7 @@ import { startPerf } from '../perf';
 import { addNotification } from '../notifications';
 import { coalesce } from '../util/coalesce';
 import { nodiText } from '@shared/nodiNotifications';
+import { logPipelineFailure, logPipelineWarning } from '../logging/pipelineLogCore';
 
 type ProgressListener = (p: QueueProgress) => void;
 
@@ -627,6 +628,12 @@ class ScanQueue {
       if (this.cancelAfterCurrent.has(item.id)) {
         item.state = 'cancelled';
         item.error = null;
+        logPipelineWarning({
+          subject: 'subjectScan',
+          code: 'cancelled',
+          reason: 'reasonCancelled',
+          context: { scope: 'scan', nodusId: item.nodus_id, documentTitle: item.title, jobId: item.id },
+        });
       // A misconfiguration (no model / no key / invalid key) fails identically for
       // every job, so pause the queue once and surface it instead of marking the
       // entire library as failed. The job stays queued and resumes after the fix.
@@ -635,6 +642,13 @@ class ScanQueue {
         item.error = null;
         this.pausedReason = (e as Error).message;
         console.error(`[scanQueue] configuración: ${this.pausedReason} — cola en pausa`);
+        logPipelineFailure({
+          error: e,
+          code: 'queue_paused',
+          subject: 'subjectScan',
+          context: { scope: 'scan', nodusId: item.nodus_id, documentTitle: item.title, jobId: item.id },
+          detail: this.pausedReason,
+        });
         this.pause();
         return;
       } else {
@@ -647,11 +661,25 @@ class ScanQueue {
           item.finished_at = null;
           item.error = `Reintentando (${attempts}/${MAX_RETRIES})…`;
           this.emit();
+          logPipelineWarning({
+            subject: 'subjectScan',
+            code: 'unknown',
+            message: { id: 'logRetry', params: { subject: { id: 'subjectScan' }, attempt: attempts + 1, max: MAX_RETRIES + 1 } },
+            context: { scope: 'scan', nodusId: item.nodus_id, documentTitle: item.title, jobId: item.id },
+            detail: (e as Error).message,
+          });
           await delay(backoff);
         } else {
           item.state = 'failed';
           item.error = (e as Error).message;
           console.error(`[scanQueue] ${item.kind} falló: ${item.title} -> ${(e as Error).message}`);
+          logPipelineFailure({
+            error: e,
+            code: 'index_failed',
+            subject: 'subjectScan',
+            context: { scope: 'scan', nodusId: item.nodus_id, documentTitle: item.title, jobId: item.id },
+            detail: (e as Error).message,
+          });
           // Persist deep-scan failure so it's visible in the library and not
           // re-enqueued forever by resumePending(). (Light scans already persist.)
           if (item.kind === 'deep' && !(item.refresh && work.deep_status === 'done')) {

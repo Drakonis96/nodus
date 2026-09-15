@@ -32,6 +32,14 @@ fixture.nodus = new Proxy({}, { get: (_target, name: string) => {
   };
   if (name in fixture.sources) return () => fixture.hold?.includes(name)
     ? new Promise((resolve) => { fixture.pending[name] = resolve; }) : Promise.resolve(fixture.sources[name]);
+  // The processing-log modal answers with an empty store here; its own behaviour is covered by
+  // scripts/test-pipeline-logs-modal.mjs. Without this the panel's Logs button would open a
+  // modal that crashes on a non-page payload.
+  if (name === 'getPipelineLogs') return async () => ({
+    entries: [], total: 0, revision: 0, retention: '10d', maxEntries: 5000,
+    stats: { entries: 0, oldestAt: null, newestAt: null, bytes: 0 },
+    facets: { total: 0, levels: [], categories: [], scopes: [], vaults: [], days: [] },
+  });
   if (name === 'getGlobalLibraryItem') return async (id: string) => ({ metadata: { title: `Documento ${id}` } });
   if (name === 'getDictionaryEntry') return async (id: string) => ({ entry: { name: `Entrada ${id}` } });
   return (...args: unknown[]) => { fixture.actions.push([name, ...args]); return Promise.resolve(true); };

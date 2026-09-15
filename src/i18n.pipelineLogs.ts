@@ -1,0 +1,119 @@
+// The processing log: the catalogue its LINES are built from (shared/pipelineLogMessages.ts,
+// which stores ids and values rather than prose) plus the chrome of the modal that reads it.
+//
+// Every row is [es, en, fr, de, pt, pt-BR, it, tr, zh-CN]. The catalogue half is checked by
+// scripts/test-i18n-coverage.mjs through INDIRECT_KEY_SOURCES, so a new log line without its
+// eight translations fails the suite instead of silently falling back to Spanish.
+//
+// Placeholders are never translated: `{subject}`, `{reason}`, `{detail}`, `{attempt}`,
+// `{max}`, `{title}`, `{words}`, `{figures}`, `{tables}`, `{warnings}`, `{sections}`,
+// `{vectors}`, `{completed}`, `{total}`, `{failed}`, `{done}`, `{count}`, `{path}`.
+// `{subject}` and `{reason}` are themselves catalogue ids, resolved by the renderer.
+const rows = [
+  // ── The subsystems a line can be about ────────────────────────────────────────
+  ['Extracción de texto', 'Text extraction', 'Extraction de texte', 'Textextraktion', 'Extração de texto', 'Extração de texto', 'Estrazione del testo', 'Metin çıkarma', '文本提取'],
+  ['Extracción de la Biblioteca', 'Library extraction', 'Extraction de la bibliothèque', 'Extraktion der Bibliothek', 'Extração da Biblioteca', 'Extração da Biblioteca', 'Estrazione della libreria', 'Kitaplık çıkarma', '库提取'],
+  ['OCR', 'OCR', 'OCR', 'OCR', 'OCR', 'OCR', 'OCR', 'OCR', 'OCR'],
+  ['Llamada al modelo', 'Model call', 'Appel au modèle', 'Modellaufruf', 'Chamada ao modelo', 'Chamada ao modelo', 'Chiamata al modello', 'Model çağrısı', '模型调用'],
+  ['Respuesta JSON del modelo', 'Model JSON response', 'Réponse JSON du modèle', 'JSON-Antwort des Modells', 'Resposta JSON do modelo', 'Resposta JSON do modelo', 'Risposta JSON del modello', 'Model JSON yanıtı', '模型JSON响应'],
+  ['Embeddings', 'Embeddings', 'Embeddings', 'Embeddings', 'Embeddings', 'Embeddings', 'Embeddings', 'Gömlemler', '向量嵌入'],
+  ['Indexado de documentos', 'Document indexing', 'Indexation des documents', 'Dokumentindexierung', 'Indexação de documentos', 'Indexação de documentos', 'Indicizzazione dei documenti', 'Belge indeksleme', '文档索引'],
+  ['Fragmentos de recuperación', 'Retrieval passages', 'Fragments de récupération', 'Abruf Fragmente', 'Fragmentos de recuperação', 'Fragmentos de recuperação', 'Passaggi di recupero', 'Arama parçaları', '检索片段'],
+  ['Análisis del documento', 'Document analysis', 'Analyse du document', 'Dokumentenanalyse', 'Análise do documento', 'Análise do documento', 'Analisi del documento', 'Belge analizi', '文档分析'],
+  ['Análisis de figuras', 'Figure analysis', 'Analyse des figures', 'Abbildungsanalyse', 'Análise de figuras', 'Análise de figuras', 'Analisi delle figure', 'Şekil analizi', '图表分析'],
+  ['Análisis con IA', 'AI analysis', 'Analyse par IA', 'KI-Analyse', 'Análise com IA', 'Análise com IA', 'Analisi con IA', 'Yapay zekâ analizi', 'AI分析'],
+  ['Publicación del índice', 'Index publication', 'Publication de l’index', 'Index-Veröffentlichung', 'Publicação do índice', 'Publicação do índice', 'Pubblicazione dell’indice', 'İndeks yayımlama', '索引发布'],
+  ['Base de datos', 'Database', 'Base de données', 'Datenbank', 'Base de dados', 'Banco de dados', 'Database', 'Veritabanı', '数据库'],
+  ['Cola de trabajos', 'Job queue', 'File de tâches', 'Auftragswarteschlange', 'Fila de tarefas', 'Fila de tarefas', 'Coda dei lavori', 'İş kuyruğu', '任务队列'],
+  ['Aplicación', 'Application', 'Application', 'Anwendung', 'Aplicação', 'Aplicativo', 'Applicazione', 'Uygulama', '应用程序'],
+
+  // ── Why something was skipped, degraded or replaced ───────────────────────────
+  ['el ítem no tiene ningún adjunto legible', 'the item has no readable attachment', 'l’élément n’a aucune pièce jointe lisible', 'der Eintrag hat keinen lesbaren Anhang', 'o item não tem nenhum anexo legível', 'o item não tem nenhum anexo legível', 'l’elemento non ha allegati leggibili', 'öğenin okunabilir eki yok', '该项目没有可读的附件'],
+  ['el adjunto no se pudo leer', 'the attachment could not be read', 'la pièce jointe n’a pas pu être lue', 'der Anhang konnte nicht gelesen werden', 'o anexo não pôde ser lido', 'o anexo não pôde ser lido', 'l’allegato non è stato letto', 'ek okunamadı', '无法读取该附件'],
+  ['solo hay resumen disponible', 'only the abstract is available', 'seul le résumé est disponible', 'nur die Zusammenfassung ist verfügbar', 'só existe o resumo', 'apenas o resumo está disponível', 'è disponibile solo l’abstract', 'yalnızca özet mevcut', '只有摘要可用'],
+  ['Zotero no está disponible', 'Zotero is unavailable', 'Zotero est indisponible', 'Zotero ist nicht verfügbar', 'O Zotero não está disponível', 'O Zotero não está disponível', 'Zotero non è disponibile', 'Zotero kullanılamıyor', 'Zotero 不可用'],
+  ['no se encontró texto legible en el documento', 'no legible text was found in the document', 'aucun texte lisible n’a été trouvé dans le document', 'es wurde kein lesbarer Text im Dokument gefunden', 'não foi encontrado texto legível no documento', 'não foi encontrado texto legível no documento', 'non è stato trovato testo leggibile nel documento', 'belgede okunabilir metin bulunamadı', '文档中没有找到可读文本'],
+  ['la calidad del OCR es insuficiente', 'the OCR quality is insufficient', 'la qualité de l’OCR est insuffisante', 'die OCR-Qualität ist unzureichend', 'a qualidade do OCR é insuficiente', 'a qualidade do OCR é insuficiente', 'la qualità dell’OCR è insufficiente', 'OCR kalitesi yetersiz', 'OCR 质量不足'],
+  ['falta la clave o el modelo de IA', 'the AI key or model is missing', 'la clé ou le modèle d’IA est manquant', 'der KI-Schlüssel oder das Modell fehlt', 'falta a chave ou o modelo de IA', 'falta a chave ou o modelo de IA', 'manca la chiave o il modello di IA', 'yapay zekâ anahtarı veya modeli eksik', '缺少 AI 密钥或模型'],
+  ['el documento de origen cambió', 'the source document changed', 'le document source a changé', 'das Quelldokument hat sich geändert', 'o documento de origem mudou', 'o documento de origem mudou', 'il documento di origine è cambiato', 'kaynak belge değişti', '源文档已更改'],
+  ['el formato del archivo no es compatible', 'the file format is not supported', 'le format du fichier n’est pas pris en charge', 'das Dateiformat wird nicht unterstützt', 'o formato do ficheiro não é compatível', 'o formato do arquivo não é compatível', 'il formato del file non è supportato', 'dosya biçimi desteklenmiyor', '不支持该文件格式'],
+  ['el usuario canceló el trabajo', 'the user cancelled the job', 'l’utilisateur a annulé la tâche', 'der Benutzer hat den Auftrag abgebrochen', 'o utilizador cancelou a tarefa', 'o usuário cancelou a tarefa', 'l’utente ha annullato il lavoro', 'kullanıcı işi iptal etti', '用户已取消该任务'],
+
+  // ── Sentence templates ({subject} is a subsystem, {detail} is runtime prose) ───
+  ['{subject}: completado', '{subject}: completed', '{subject} : terminé', '{subject}: abgeschlossen', '{subject}: concluído', '{subject}: concluído', '{subject}: completato', '{subject}: tamamlandı', '{subject}：已完成'],
+  ['{subject}: error — {detail}', '{subject}: error — {detail}', '{subject} : erreur — {detail}', '{subject}: Fehler — {detail}', '{subject}: erro — {detail}', '{subject}: erro — {detail}', '{subject}: errore — {detail}', '{subject}: hata — {detail}', '{subject}：错误 — {detail}'],
+  ['{subject}: error', '{subject}: error', '{subject} : erreur', '{subject}: Fehler', '{subject}: erro', '{subject}: erro', '{subject}: errore', '{subject}: hata', '{subject}：错误'],
+  ['{subject}: aviso — {reason}', '{subject}: warning — {reason}', '{subject} : avertissement — {reason}', '{subject}: Warnung — {reason}', '{subject}: aviso — {reason}', '{subject}: aviso — {reason}', '{subject}: avviso — {reason}', '{subject}: uyarı — {reason}', '{subject}：警告 — {reason}'],
+  ['{subject}: aviso — {detail}', '{subject}: warning — {detail}', '{subject} : avertissement — {detail}', '{subject}: Warnung — {detail}', '{subject}: aviso — {detail}', '{subject}: aviso — {detail}', '{subject}: avviso — {detail}', '{subject}: uyarı — {detail}', '{subject}：警告 — {detail}'],
+  ['{subject}: aviso', '{subject}: warning', '{subject} : avertissement', '{subject}: Warnung', '{subject}: aviso', '{subject}: aviso', '{subject}: avviso', '{subject}: uyarı', '{subject}：警告'],
+  ['{subject}: {detail}', '{subject}: {detail}', '{subject} : {detail}', '{subject}: {detail}', '{subject}: {detail}', '{subject}: {detail}', '{subject}: {detail}', '{subject}: {detail}', '{subject}：{detail}'],
+  ['{subject}', '{subject}', '{subject}', '{subject}', '{subject}', '{subject}', '{subject}', '{subject}', '{subject}'],
+  ['{subject}: error — reintentando ({attempt}/{max})', '{subject}: error — retrying ({attempt}/{max})', '{subject} : erreur — nouvelle tentative ({attempt}/{max})', '{subject}: Fehler — neuer Versuch ({attempt}/{max})', '{subject}: erro — a repetir ({attempt}/{max})', '{subject}: erro — tentando novamente ({attempt}/{max})', '{subject}: errore — nuovo tentativo ({attempt}/{max})', '{subject}: hata — yeniden deneniyor ({attempt}/{max})', '{subject}：错误 — 正在重试（{attempt}/{max}）'],
+  ['{subject}: en pausa — {reason}', '{subject}: paused — {reason}', '{subject} : en pause — {reason}', '{subject}: pausiert — {reason}', '{subject}: em pausa — {reason}', '{subject}: pausado — {reason}', '{subject}: in pausa — {reason}', '{subject}: duraklatıldı — {reason}', '{subject}：已暂停 — {reason}'],
+  ['{subject}: cancelado', '{subject}: cancelled', '{subject} : annulé', '{subject}: abgebrochen', '{subject}: cancelado', '{subject}: cancelado', '{subject}: annullato', '{subject}: iptal edildi', '{subject}：已取消'],
+  ['{subject}: omitido — {reason}', '{subject}: skipped — {reason}', '{subject} : ignoré — {reason}', '{subject}: übersprungen — {reason}', '{subject}: ignorado — {reason}', '{subject}: ignorado — {reason}', '{subject}: saltato — {reason}', '{subject}: atlandı — {reason}', '{subject}：已跳过 — {reason}'],
+  ['{subject}: alternativa aplicada — {reason}', '{subject}: fallback used — {reason}', '{subject} : solution de repli — {reason}', '{subject}: Ersatz verwendet — {reason}', '{subject}: alternativa aplicada — {reason}', '{subject}: alternativa aplicada — {reason}', '{subject}: alternativa applicata — {reason}', '{subject}: yedek yöntem kullanıldı — {reason}', '{subject}：已使用备用方案 — {reason}'],
+
+  // ── Lines whose numbers are the point ─────────────────────────────────────────
+  ['Documento extraído: {title} · {words} palabras · {figures} figuras · {tables} tablas', 'Document extracted: {title} · {words} words · {figures} figures · {tables} tables', 'Document extrait : {title} · {words} mots · {figures} figures · {tables} tableaux', 'Dokument extrahiert: {title} · {words} Wörter · {figures} Abbildungen · {tables} Tabellen', 'Documento extraído: {title} · {words} palavras · {figures} figuras · {tables} tabelas', 'Documento extraído: {title} · {words} palavras · {figures} figuras · {tables} tabelas', 'Documento estratto: {title} · {words} parole · {figures} figure · {tables} tabelle', 'Belge çıkarıldı: {title} · {words} sözcük · {figures} şekil · {tables} tablo', '文档已提取：{title} · {words} 词 · {figures} 图 · {tables} 表'],
+  ['Documento extraído con avisos: {title} · {warnings}', 'Document extracted with warnings: {title} · {warnings}', 'Document extrait avec avertissements : {title} · {warnings}', 'Dokument mit Warnungen extrahiert: {title} · {warnings}', 'Documento extraído com avisos: {title} · {warnings}', 'Documento extraído com avisos: {title} · {warnings}', 'Documento estratto con avvisi: {title} · {warnings}', 'Belge uyarılarla çıkarıldı: {title} · {warnings}', '文档已提取，但有警告：{title} · {warnings}'],
+  ['Documento indexado: {title} · {sections} secciones · {vectors} vectores', 'Document indexed: {title} · {sections} sections · {vectors} vectors', 'Document indexé : {title} · {sections} sections · {vectors} vecteurs', 'Dokument indexiert: {title} · {sections} Abschnitte · {vectors} Vektoren', 'Documento indexado: {title} · {sections} secções · {vectors} vetores', 'Documento indexado: {title} · {sections} seções · {vectors} vetores', 'Documento indicizzato: {title} · {sections} sezioni · {vectors} vettori', 'Belge indekslendi: {title} · {sections} bölüm · {vectors} vektör', '文档已索引：{title} · {sections} 节 · {vectors} 向量'],
+  ['Indexado terminado: {completed} de {total} documentos ({failed} con errores)', 'Indexing finished: {completed} of {total} documents ({failed} failed)', 'Indexation terminée : {completed} sur {total} documents ({failed} en erreur)', 'Indexierung abgeschlossen: {completed} von {total} Dokumenten ({failed} mit Fehlern)', 'Indexação concluída: {completed} de {total} documentos ({failed} com erros)', 'Indexação concluída: {completed} de {total} documentos ({failed} com erros)', 'Indicizzazione terminata: {completed} di {total} documenti ({failed} con errori)', 'İndeksleme bitti: {total} belgeden {completed} ({failed} hatalı)', '索引完成：{total} 个文档中的 {completed} 个（{failed} 个失败）'],
+  ['Fragmentos indexados: {done} de {total}', 'Passages indexed: {done} of {total}', 'Fragments indexés : {done} sur {total}', 'Passagen indexiert: {done} von {total}', 'Fragmentos indexados: {done} de {total}', 'Fragmentos indexados: {done} de {total}', 'Passaggi indicizzati: {done} di {total}', 'Parçalar indekslendi: {total} içinden {done}', '片段已索引：{total} 中的 {done}'],
+  ['Ideas indexadas: {done} de {total}', 'Ideas indexed: {done} of {total}', 'Idées indexées : {done} sur {total}', 'Ideen indexiert: {done} von {total}', 'Ideias indexadas: {done} de {total}', 'Ideias indexadas: {done} de {total}', 'Idee indicizzate: {done} di {total}', 'Fikirler indekslendi: {total} içinden {done}', '想法已索引：{total} 中的 {done}'],
+  ['Resúmenes indexados: {done} de {total}', 'Summaries indexed: {done} of {total}', 'Résumés indexés : {done} sur {total}', 'Zusammenfassungen indexiert: {done} von {total}', 'Resumos indexados: {done} de {total}', 'Resumos indexados: {done} de {total}', 'Riassunti indicizzati: {done} di {total}', 'Özetler indekslendi: {total} içinden {done}', '摘要已索引：{total} 中的 {done}'],
+  ['Fallo no controlado: {detail}', 'Uncaught failure: {detail}', 'Défaillance non interceptée : {detail}', 'Nicht abgefangener Fehler: {detail}', 'Falha não controlada: {detail}', 'Falha não capturada: {detail}', 'Errore non gestito: {detail}', 'Yakalanmayan hata: {detail}', '未捕获的故障：{detail}'],
+  ['Se agruparon {count} repeticiones idénticas', '{count} identical repetitions were grouped', '{count} répétitions identiques ont été regroupées', '{count} identische Wiederholungen wurden gruppiert', '{count} repetições idênticas foram agrupadas', '{count} repetições idênticas foram agrupadas', '{count} ripetizioni identiche sono state raggruppate', '{count} aynı yineleme gruplandı', '已合并 {count} 条相同记录'],
+  ['Se descartaron {count} entradas por límite de ráfaga', '{count} entries were discarded by the burst limit', '{count} entrées ont été écartées par la limite de rafale', '{count} Einträge wurden wegen der Burst-Grenze verworfen', '{count} entradas foram descartadas pelo limite de rajada', '{count} entradas foram descartadas pelo limite de rajada', '{count} voci sono state scartate per il limite di raffica', '{count} kayıt ani artış sınırı nedeniyle atıldı', '因突发上限丢弃了 {count} 条记录'],
+
+  // ── The modal that reads the log ──────────────────────────────────────────────
+  // Strings that already exist in the tables ('Nivel', 'Bóveda', 'Día', 'Limpiar',
+  // '{count} seleccionados', 'Sin coincidencias', 'Mostrar más', 'Guardado en {path}'…)
+  // are reused as they are, so only what is genuinely new appears below.
+  ['Registros de procesamiento', 'Processing logs', 'Journaux de traitement', 'Verarbeitungsprotokolle', 'Registos de processamento', 'Registros de processamento', 'Registri di elaborazione', 'İşlem kayıtları', '处理日志'],
+  ['Logs', 'Logs', 'Journaux', 'Protokolle', 'Registos', 'Registros', 'Registri', 'Kayıtlar', '日志'],
+  ['Buscar en los registros…', 'Search logs…', 'Rechercher dans les journaux…', 'Protokolle durchsuchen…', 'Pesquisar nos registos…', 'Pesquisar nos registros…', 'Cerca nei registri…', 'Kayıtlarda ara…', '搜索日志…'],
+  ['Más recientes primero', 'Newest first', 'Plus récents d’abord', 'Neueste zuerst', 'Mais recentes primeiro', 'Mais recentes primeiro', 'Più recenti prima', 'En yeniler önce', '最新在前'],
+  ['Más antiguas primero', 'Oldest first', 'Plus anciens d’abord', 'Älteste zuerst', 'Mais antigos primeiro', 'Mais antigos primeiro', 'Più vecchi prima', 'En eskiler önce', '最早在前'],
+  ['Idioma de los registros', 'Log language', 'Langue des journaux', 'Sprache des Protokolls', 'Idioma dos registos', 'Idioma dos registros', 'Lingua dei registri', 'Kayıt dili', '日志语言'],
+  ['Correcto', 'Success', 'Réussi', 'Erfolgreich', 'Concluído', 'Sucesso', 'Riuscito', 'Başarılı', '成功'],
+  ['Advertencia', 'Warning', 'Avertissement', 'Warnung', 'Aviso', 'Aviso', 'Avviso', 'Uyarı', '警告'],
+  ['Informativo', 'Info', 'Information', 'Info', 'Informativo', 'Informativo', 'Informativo', 'Bilgi', '信息'],
+  ['repetido {count} veces', 'repeated {count} times', 'répété {count} fois', '{count} mal wiederholt', 'repetido {count} vezes', 'repetido {count} vezes', 'ripetuto {count} volte', '{count} kez yinelendi', '重复 {count} 次'],
+  ['Primera vez: {at}', 'First: {at}', 'Première fois : {at}', 'Zuerst: {at}', 'Primeira vez: {at}', 'Primeira vez: {at}', 'Prima volta: {at}', 'İlk: {at}', '首次：{at}'],
+  ['Copiar registro', 'Copy log', 'Copier le journal', 'Protokoll kopieren', 'Copiar registo', 'Copiar registro', 'Copia registro', 'Kaydı kopyala', '复制日志'],
+  ['Copiar como JSON', 'Copy as JSON', 'Copier en JSON', 'Als JSON kopieren', 'Copiar como JSON', 'Copiar como JSON', 'Copia come JSON', 'JSON olarak kopyala', '复制为 JSON'],
+  ['Descargar registro (.txt)', 'Download log (.txt)', 'Télécharger le journal (.txt)', 'Protokoll herunterladen (.txt)', 'Transferir registo (.txt)', 'Baixar registro (.txt)', 'Scarica registro (.txt)', 'Kaydı indir (.txt)', '下载日志（.txt）'],
+  ['Copiar lo mostrado', 'Copy shown', 'Copier ce qui est affiché', 'Angezeigte kopieren', 'Copiar o que é mostrado', 'Copiar o que é exibido', 'Copia quanto mostrato', 'Görünenleri kopyala', '复制当前显示'],
+  ['Descargar lo mostrado (.txt)', 'Download shown (.txt)', 'Télécharger l’affiché (.txt)', 'Angezeigte herunterladen (.txt)', 'Transferir o mostrado (.txt)', 'Baixar o exibido (.txt)', 'Scarica quanto mostrato (.txt)', 'Görünenleri indir (.txt)', '下载当前显示（.txt）'],
+  ['Borrar registro', 'Delete log', 'Supprimer le journal', 'Protokoll löschen', 'Eliminar registo', 'Excluir registro', 'Elimina registro', 'Kaydı sil', '删除日志'],
+  ['Borrar los mostrados', 'Delete shown', 'Supprimer l’affiché', 'Angezeigte löschen', 'Eliminar o mostrado', 'Excluir o exibido', 'Elimina quanto mostrato', 'Görünenleri sil', '删除当前显示'],
+  ['Borrar todos los registros', 'Delete all logs', 'Supprimer tous les journaux', 'Alle Protokolle löschen', 'Eliminar todos os registos', 'Excluir todos os registros', 'Elimina tutti i registri', 'Tüm kayıtları sil', '删除所有日志'],
+  ['Se eliminarán {count} entradas y no se podrán recuperar.', '{count} entries will be deleted and cannot be recovered.', '{count} entrées seront supprimées et ne pourront pas être récupérées.', '{count} Einträge werden gelöscht und können nicht wiederhergestellt werden.', '{count} entradas serão eliminadas e não poderão ser recuperadas.', '{count} entradas serão excluídas e não poderão ser recuperadas.', '{count} voci saranno eliminate e non potranno essere recuperate.', '{count} kayıt silinecek ve geri alınamayacak.', '将删除 {count} 条记录，且无法恢复。'],
+  ['Retención', 'Retention', 'Conservation', 'Aufbewahrung', 'Retenção', 'Retenção', 'Conservazione', 'Saklama', '保留期限'],
+  ['Máximo de entradas', 'Maximum entries', 'Nombre maximal d’entrées', 'Maximale Einträge', 'Máximo de entradas', 'Máximo de entradas', 'Voci massime', 'En fazla kayıt', '最多记录数'],
+  ['Eliminar los registros más antiguos que', 'Delete logs older than', 'Supprimer les journaux plus anciens que', 'Protokolle löschen, die älter sind als', 'Eliminar registos com mais de', 'Excluir registros com mais de', 'Elimina registri più vecchi di', 'Şundan eski kayıtları sil:', '删除早于以下时间的日志：'],
+  ['Nunca borrar', 'Never delete', 'Ne jamais supprimer', 'Niemals löschen', 'Nunca eliminar', 'Nunca excluir', 'Mai eliminare', 'Asla silme', '永不删除'],
+  ['1 día', '1 day', '1 jour', '1 Tag', '1 dia', '1 dia', '1 giorno', '1 gün', '1 天'],
+  ['3 días', '3 days', '3 jours', '3 Tage', '3 dias', '3 dias', '3 giorni', '3 gün', '3 天'],
+  ['7 días', '7 days', '7 jours', '7 Tage', '7 dias', '7 dias', '7 giorni', '7 gün', '7 天'],
+  ['10 días', '10 days', '10 jours', '10 Tage', '10 dias', '10 dias', '10 giorni', '10 gün', '10 天'],
+  ['30 días', '30 days', '30 jours', '30 Tage', '30 dias', '30 dias', '30 giorni', '30 gün', '30 天'],
+  ['90 días', '90 days', '90 jours', '90 Tage', '90 dias', '90 dias', '90 giorni', '90 gün', '90 天'],
+  ['{count} entradas', '{count} entries', '{count} entrées', '{count} Einträge', '{count} entradas', '{count} entradas', '{count} voci', '{count} kayıt', '{count} 条记录'],
+  ['Los registros son locales: no se incluyen en las copias de seguridad ni se sincronizan.', 'Logs are local: they are not included in backups or sync.', 'Les journaux sont locaux : ils ne font partie ni des sauvegardes ni de la synchronisation.', 'Protokolle sind lokal: sie sind nicht in Sicherungen oder Synchronisierung enthalten.', 'Os registos são locais: não entram nas cópias de segurança nem na sincronização.', 'Os registros são locais: não entram nos backups nem na sincronização.', 'I registri sono locali: non sono inclusi nei backup né nella sincronizzazione.', 'Kayıtlar yereldir: yedeklere ve eşitlemeye dahil edilmez.', '日志仅保存在本地：不包含在备份或同步中。'],
+  // The only category label the tables were missing: the rest ('Modelo', 'Proveedor',
+  // 'Extracción', 'Indexado', 'Cola', 'Almacenamiento', 'Sistema', 'JSON', 'OCR'…) are reused.
+  ['Conexión', 'Connection', 'Connexion', 'Verbindung', 'Ligação', 'Conexão', 'Connessione', 'Bağlantı', '连接'],
+  ['Descargar (.txt)', 'Download (.txt)', 'Télécharger (.txt)', 'Herunterladen (.txt)', 'Transferir (.txt)', 'Baixar (.txt)', 'Scarica (.txt)', 'İndir (.txt)', '下载（.txt）'],
+  ['No se pudo copiar al portapapeles.', 'Could not copy to the clipboard.', 'Impossible de copier dans le presse-papiers.', 'Kopieren in die Zwischenablage fehlgeschlagen.', 'Não foi possível copiar para a área de transferência.', 'Não foi possível copiar para a área de transferência.', 'Impossibile copiare negli appunti.', 'Panoya kopyalanamadı.', '无法复制到剪贴板。'],
+  ['Sin registros todavía. Ejecuta un análisis o una indexación.', 'No logs yet. Run an analysis or an indexing pass.', 'Aucun journal pour l’instant. Lancez une analyse ou une indexation.', 'Noch keine Protokolle. Starten Sie eine Analyse oder Indexierung.', 'Ainda não há registos. Executa uma análise ou uma indexação.', 'Ainda não há registros. Execute uma análise ou uma indexação.', 'Nessun registro. Avvia un’analisi o un’indicizzazione.', 'Henüz kayıt yok. Bir analiz veya indeksleme çalıştırın.', '暂无日志。请运行分析或索引。'],
+  ['Sin registros que coincidan con los filtros.', 'No logs match the filters.', 'Aucun journal ne correspond aux filtres.', 'Keine Protokolle entsprechen den Filtern.', 'Nenhum registo corresponde aos filtros.', 'Nenhum registro corresponde aos filtros.', 'Nessun registro corrisponde ai filtri.', 'Filtrelere uyan kayıt yok.', '没有符合筛选条件的日志。'],
+];
+
+export const PIPELINE_LOG_TRANSLATIONS = Object.fromEntries(
+  ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN'].map((language, index) => [
+    language,
+    Object.fromEntries(rows.map((row) => [row[0], row[index + 1]])),
+  ]),
+) as Record<string, Record<string, string>>;

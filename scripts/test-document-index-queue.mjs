@@ -18,6 +18,7 @@ globalThis.__documentQueue = {
   ],
   works: new Map([['v1',[{nodus_id:'v1-w',title:'Obra V1'}]],['v2',[{nodus_id:'v2-w',title:'Obra V2'}]]]),
   data: new Map(), runs: [], seq: 0, continuousEnabled: false, failWorks: new Set(),
+  logs: [],
   blockWorks: new Set(), abortedWorks: [], configWorks: new Set(), sourceChangedWorks: new Set(), sourceResetProgress: [],
   failVaultOpen: new Set(),
 };
@@ -59,6 +60,15 @@ await build({
     stub(/\.\.\/ai\/documentProfile$/,'scan',`export async function runDocumentProfileScan(work,options){const vault=globalThis.__documentQueue.storage.getStore();globalThis.__documentQueue.runs.push({vault,work:work.nodus_id});options?.onProgress?.({phase:'analyzing_sections',progress:.4,message:'working'});if(globalThis.__documentQueue.blockWorks.has(work.nodus_id)){await new Promise((resolve,reject)=>{const stop=()=>{globalThis.__documentQueue.blockWorks.delete(work.nodus_id);globalThis.__documentQueue.abortedWorks.push(work.nodus_id);reject(new Error('aborted'))};if(options.signal?.aborted)stop();else options.signal?.addEventListener('abort',stop,{once:true})})}await new Promise(r=>setTimeout(r,5));if(globalThis.__documentQueue.sourceChangedWorks.delete(work.nodus_id))throw new Error('DOCUMENT_SOURCE_CHANGED');if(globalThis.__documentQueue.configWorks.has(work.nodus_id))throw new globalThis.__documentQueue.AiError('Clave inválida',false,true);if(globalThis.__documentQueue.failWorks.has(work.nodus_id))throw new Error('provider rejected this document');return 'version'}`);
     stub(/\.\.\/ai\/aiClient$/,'ai',`export class AiError extends Error{constructor(message,retriable=false,config=false){super(message);this.retriable=retriable;this.config=config}}globalThis.__documentQueue.AiError=AiError`);
     stub(/\.\.\/util\/coalesce$/,'coalesce',`export function coalesce(fn){return {schedule:fn}}`);
+    // The processing log, recorded instead of written. The scope is pushed so the assertions
+    // can prove the attribution (vault + document + job) reaches every line.
+    stub(/\.\.\/logging\/pipelineLogCore$/,'log',`
+      export function withPipelineLogScope(context,work){globalThis.__documentQueue.logs.push({kind:'scope',context});return work()}
+      export function logPipelineSuccess(input){globalThis.__documentQueue.logs.push({kind:'success',...input})}
+      export function logPipelineWarning(input){globalThis.__documentQueue.logs.push({kind:'warning',...input})}
+      export function logPipelineFailure(input){globalThis.__documentQueue.logs.push({kind:'failure',...input})}
+      export function logPipelineEvent(input){globalThis.__documentQueue.logs.push({kind:'event',...input})}
+    `);
   }}]
 });
 
@@ -275,4 +285,54 @@ test('progress snapshots bound historical campaign metadata',async()=>{
   for(let index=0;index<160;index++)data.campaigns.push({campaignId:`history-${index}`,vaultId:'v1',mode:'manual',status:'completed',includeArchived:false,totalJobs:1,completedJobs:1,failedJobs:0,estimatedUnits:1,completedUnits:1,inputTokens:0,outputTokens:0,estimatedCostUsd:null,error:null,createdAt:now,updatedAt:now});
   const snapshot=await documentIndexQueue.snapshot();
   assert.ok(snapshot.campaigns.filter(c=>c.vaultId==='v1'&&c.status==='completed').length<=100);
+});
+
+test('every job outcome reaches the processing log, attributed to its vault and document',async()=>{
+  const drain=async(campaignId)=>{const deadline=Date.now()+3000;let jobs;
+    do{await new Promise(r=>setTimeout(r,10));jobs=globalThis.__documentQueue.data.get('v1').jobs.filter(j=>!campaignId||j.campaignId===campaignId)}while(jobs.some(j=>['queued','running'].includes(j.status))&&Date.now()<deadline)};
+
+  // 1) a provider failure: an error line with the pipeline's own code.
+  globalThis.__documentQueue.logs.length=0;
+  globalThis.__documentQueue.works.get('v1').push({nodus_id:'v1-log-fail',title:'Obra que falla'});
+  globalThis.__documentQueue.failWorks.add('v1-log-fail');
+  const failed=await documentIndexQueue.startVaultCampaign('v1',{mode:'manual',nodusIds:['v1-log-fail']});
+  await drain(failed.campaignId);
+  const failure=globalThis.__documentQueue.logs.find(entry=>entry.kind==='failure'&&entry.code==='index_failed');
+  assert.ok(failure,'a failed document must be recorded');
+  assert.equal(failure.subject,'subjectIndexing');
+  assert.match(failure.detail,/provider rejected this document/,'the cause is kept verbatim');
+  const scope=globalThis.__documentQueue.logs.find(entry=>entry.kind==='scope'&&entry.context.documentTitle==='Obra que falla');
+  assert.ok(scope,'the failing document must open a log scope');
+  assert.equal(scope.context.vaultId,'v1','the line must be attributed to its vault');
+  assert.equal(scope.context.nodusId,'v1-log-fail','…and to its document');
+  assert.ok(scope.context.jobId,'…and to its job');
+  assert.equal(scope.context.model,null,'a job with no per-job model must not invent one');
+
+  // 2) a source change is a warning that says the job was requeued, not a failure.
+  globalThis.__documentQueue.logs.length=0;
+  globalThis.__documentQueue.works.get('v1').push({nodus_id:'v1-log-source',title:'Obra cambiada'});
+  globalThis.__documentQueue.sourceChangedWorks.add('v1-log-source');
+  await documentIndexQueue.startVaultCampaign('v1',{mode:'manual',nodusIds:['v1-log-source']});
+  await drain();
+  assert.ok(globalThis.__documentQueue.logs.some(entry=>entry.kind==='warning'&&entry.code==='source_changed'));
+
+  // 3) a job that fails also settles its campaign, and that summary is the line that answers
+  //    "how much of the corpus made it?" — written once, not once per settling job.
+  const summary=globalThis.__documentQueue.logs.find(entry=>entry.message?.id==='campaignFinished');
+  assert.ok(summary,'a settled campaign must leave its totals in the log');
+  assert.ok(summary.message.params,'the summary must carry the counts');
+  assert.ok(['success','warning'].includes(summary.kind));
+  const before=globalThis.__documentQueue.logs.filter(entry=>entry.message?.id==='campaignFinished').length;
+  await drain(failed.campaignId);
+  assert.equal(globalThis.__documentQueue.logs.filter(entry=>entry.message?.id==='campaignFinished').length,before,
+    'the campaign summary is written once, not on every subsequent settle');
+
+  // 4) a configuration error pauses the queue once, and that pause is in the log.
+  globalThis.__documentQueue.logs.length=0;
+  globalThis.__documentQueue.works.get('v1').push({nodus_id:'v1-log-config',title:'Obra sin clave'});
+  globalThis.__documentQueue.configWorks.add('v1-log-config');
+  const paused=await documentIndexQueue.startVaultCampaign('v1',{mode:'manual',nodusIds:['v1-log-config']});
+  await drain(paused.campaignId);
+  assert.ok(globalThis.__documentQueue.logs.some(entry=>entry.kind==='failure'&&entry.code==='queue_paused'));
+  globalThis.__documentQueue.configWorks.delete('v1-log-config');
 });

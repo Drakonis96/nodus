@@ -14,6 +14,7 @@ import { clearAllPassages } from '../db/passagesRepo';
 import { addNotification } from '../notifications';
 import { nodiText } from '@shared/nodiNotifications';
 import { coalesce } from '../util/coalesce';
+import { logPipelineFailure, logPipelineSuccess, logPipelineWarning } from '../logging/pipelineLogCore';
 
 type ProgressListener = (p: EmbeddingPipelineProgress) => void;
 
@@ -303,6 +304,25 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
           : nodiText('ideaEmbeddingsDoneBody', { ideas: state.ideasEmbedded, works: state.works.length }),
         kind: state.error ? 'warning' : 'success',
         dedupeKey: `idea-embeddings:${state.error ? 'error' : 'complete'}`,
+      });
+    }
+    // The run's outcome belongs in the processing log whether it finished, failed or was
+    // stopped: an interrupted index is exactly what someone opens the log to explain.
+    if (state.stopRequested) {
+      logPipelineWarning({ subject: 'subjectEmbeddings', code: 'cancelled', reason: 'reasonCancelled', context: { scope: 'embeddings' } });
+    } else if (state.error) {
+      logPipelineFailure({
+        error: state.error,
+        code: 'embedding_failed',
+        subject: 'subjectEmbeddings',
+        context: { scope: 'embeddings' },
+        detail: state.error,
+      });
+    } else if (state.totalIdeas > 0) {
+      logPipelineSuccess({
+        subject: 'subjectEmbeddings',
+        context: { scope: 'embeddings' },
+        message: { id: 'ideasEmbedded', params: { done: state.ideasEmbedded, total: state.totalIdeas } },
       });
     }
   }

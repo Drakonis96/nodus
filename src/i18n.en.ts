@@ -34,6 +34,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { PIPELINE_LOG_TRANSLATIONS } from './i18n.pipelineLogs';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
@@ -115,6 +116,7 @@ export const EN: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.en,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.en,
   ...NODI_NOTIFICATION_TRANSLATIONS['en'],
+  ...PIPELINE_LOG_TRANSLATIONS['en'],
   ...ANNOUNCEMENT_TRANSLATIONS['en'],
   ...WORLD_CHAT_TRANSLATIONS.en,
   ...STUDY_SYNONYM_TRANSLATIONS.en,

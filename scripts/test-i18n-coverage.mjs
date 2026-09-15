@@ -159,6 +159,13 @@ const INDIRECT_KEY_SOURCES = [
   // ever appears literally inside a t() call. Leaving one untranslated is what made
   // the centre answer "this message could not be translated".
   { file: 'shared/nodiNotifications.ts', pattern: /^\s{2}\w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // The processing log's catalogue. The main process stores the KEY and its values and the
+  // log modal renders them through txIn(), so — exactly like the notifications above — none
+  // of these sentences is ever a t() literal. This one matters twice over: the log is written
+  // by the pipeline in whichever vault happens to be running, and its reader can pick a
+  // different language for the lines, so a sentence with no translation is stuck in Spanish
+  // for a log that is meant to be pasted into a GitHub issue.
+  { file: 'shared/pipelineLogMessages.ts', pattern: /^\s{2}\w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
   // The six "Deploy to Cloudflare" step labels. They are written in Electron and the modal
   // renders them as t(step.label), so nothing else can see them.
   { file: 'electron/cloudflare/deployment.ts', pattern: /^ {2}(?:'[\w-]+'|\w+):\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
