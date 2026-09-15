@@ -44,12 +44,15 @@ export function ConfirmModal({
     return () => window.removeEventListener('keydown', onKey);
   }, [onCancel]);
 
+  // The dialog uses the opaque modal surface rather than `.card`: in dark mode that one
+  // is 60% translucent, which let the list behind a confirmation read through the wording
+  // of the one action that cannot be undone.
   return createPortal(
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-6" style={{ zIndex }} onClick={onCancel}>
       <motion.div
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="card w-full max-w-sm p-5"
+        className="card-modal w-full max-w-sm p-5"
         role="dialog"
         aria-modal="true"
         aria-label={title}
