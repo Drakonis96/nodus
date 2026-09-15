@@ -8,6 +8,9 @@ every sidebar section so nothing feels unlabeled.
 Everything runs on your machine. The only network calls are to the AI provider
 you configure; your library, keys, and embeddings never leave your computer.
 
+For the complete guide to light/dark modes, built-in palettes, custom themes,
+and the runtime token system, see [Appearance and themes](appearance.md).
+
 > The interface is available in **English and Spanish**; you pick the language on
 > first run. This guide uses the English section names. The screenshots use the
 > built-in demo corpus (a small science-of-learning sample), so they match what
@@ -218,7 +221,9 @@ what each one is for:
 | **Workspace** | Keep notes, ideas and collections together in a Markdown workspace with live, clickable `nodus://` citations. |
 
 Pinned outside the groups: **Home** (corpus status and next steps) and
-**Settings** (providers, models, library automation, integrations, data, backups).
+**Settings** (appearance, providers, models, library automation, integrations,
+data, backups). See [Appearance and themes](appearance.md) for colour modes,
+built-in palettes, and creating a custom theme.
 
 ---
 
