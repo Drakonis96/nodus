@@ -105,7 +105,9 @@ test('runtime theme edge cases are guarded', async () => {
   assert.match(indexCss, /html\.theme-active\.light \.library-theme-panel/);
   assert.match(indexCss, /\[data-testid="theme-editor"\] input\[type='color'\][\s\S]*appearance: none/);
   assert.match(themePicker, /className="theme-colour-picker-popover"/);
+  assert.match(themePicker, /className="theme-colour-picker-preview"/);
   assert.match(themePicker, /className="theme-colour-picker-hex-input"/);
+  assert.match(themePicker, /aria-invalid=\{!HEX_COLOUR\.test\(value\)\}/);
   assert.match(themePicker, /placeholder="#6366f1"/);
   assert.match(settings, /<ThemeColourPicker key=\{key\}/);
   assert.match(serverSettings, /<ThemeColourPicker key=\{key\}/);

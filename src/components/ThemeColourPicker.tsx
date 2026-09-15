@@ -9,11 +9,17 @@ interface ThemeColourPickerProps {
   onChange: (value: string) => void;
 }
 
-/** A compact swatch popover with an exact hex field beside the native picker. */
+/** A compact, dependency-free picker with a preview, native control, and exact hex input. */
 export function ThemeColourPicker({ labelText, hexLabel, value, onChange }: ThemeColourPickerProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const safeValue = HEX_COLOUR.test(value) ? value : '#000000';
+  const lastValidValueRef = useRef(HEX_COLOUR.test(value) ? value : '#000000');
+
+  useEffect(() => {
+    if (HEX_COLOUR.test(value)) lastValidValueRef.current = value;
+  }, [value]);
+
+  const safeValue = lastValidValueRef.current;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -38,6 +44,7 @@ export function ThemeColourPicker({ labelText, hexLabel, value, onChange }: Them
         className="theme-colour-picker-trigger"
         style={{ backgroundColor: safeValue }}
         aria-label={labelText}
+        aria-haspopup="dialog"
         aria-expanded={open}
         title={labelText}
         onClick={() => setOpen((current) => !current)}
@@ -45,6 +52,7 @@ export function ThemeColourPicker({ labelText, hexLabel, value, onChange }: Them
       {open && (
         <div className="theme-colour-picker-popover" role="dialog" aria-label={labelText}>
           <strong>{labelText}</strong>
+          <div className="theme-colour-picker-preview" style={{ backgroundColor: safeValue }} aria-hidden="true" />
           <div className="theme-colour-picker-controls">
             <input
               className="theme-colour-picker-native"
@@ -61,6 +69,7 @@ export function ThemeColourPicker({ labelText, hexLabel, value, onChange }: Them
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
                 aria-label={`${labelText} - ${hexLabel}`}
+                aria-invalid={!HEX_COLOUR.test(value)}
                 placeholder="#6366f1"
                 inputMode="text"
                 maxLength={7}
