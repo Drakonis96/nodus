@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const temp = await mkdtemp(path.join(os.tmpdir(), 'nodus-document-skills-'));
 await build({ entryPoints: ['shared/documentSkills.ts'], bundle: true, platform: 'node', format: 'esm', outfile: path.join(temp, 'policy.mjs') });
-const { validateDocumentSkillPolicy: validate, defaultDocumentSkillPolicy: defaults, DocumentSkillBudget: Budget, documentBlocks, blockSources, DOCUMENT_VISUAL_DISCARD_REASONS, documentVisualDiscardText, documentVisualDiscardTally } = await import(pathToFileURL(path.join(temp, 'policy.mjs')));
+const { validateDocumentSkillPolicy: validate, defaultDocumentSkillPolicy: defaults, DocumentSkillBudget: Budget, documentBlocks, blockSources, DOCUMENT_VISUAL_DISCARD_REASONS, documentVisualDiscardText, documentVisualDiscardTally, repairableDocumentVisualDiscard } = await import(pathToFileURL(path.join(temp, 'policy.mjs')));
 const options = ['svg', 'paid', 'unknown'].map((id,index) => ({ skill: { id, name: id, enabled: { assistant: true } }, billing: ['none', 'per-call', 'unknown'][index], available: true }));
 const policy = (maxCalls = 4, skillId = 'svg') => ({ enabled: true, skills: [{ skillId, enabled: true, maxCalls }] });
 
@@ -89,6 +89,17 @@ test('refusals are counted by motive, in the order they first appeared', () => {
     { reason: 'heading-block', count: 1 },
   ]);
   assert.deepEqual(documentVisualDiscardTally([]), []);
+});
+
+test('only the planner’s own mistakes are worth a second attempt', () => {
+  for (const reason of ['unknown-block', 'heading-block', 'skill-not-enabled', 'source-not-in-block']) {
+    assert.equal(repairableDocumentVisualDiscard(reason), true, `${reason} is the planner's to correct`);
+  }
+  // A duplicate would only be invited again; a ceiling is the reader's limit, not a
+  // mistake; and a proposal left out by the selection is that step doing its job.
+  for (const reason of ['block-already-has-figure', 'ceiling-reached', 'not-selected']) {
+    assert.equal(repairableDocumentVisualDiscard(reason), false, `${reason} is not a mistake to correct`);
+  }
 });
 test.after(async () => rm(temp, { recursive: true, force: true }));
 

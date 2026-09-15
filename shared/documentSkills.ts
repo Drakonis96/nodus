@@ -64,6 +64,18 @@ export function documentVisualDiscardTally(discarded: readonly DocumentVisualDis
   for (const item of discarded) counts.set(item.reason, (counts.get(item.reason) ?? 0) + 1);
   return [...counts].map(([reason, count]) => ({ reason, count }));
 }
+/**
+ * Whether a refusal was the planner's own mistake, and therefore something a second
+ * attempt can correct once it is told what it got wrong.
+ *
+ * The others are not: a block that already has a figure would only invite a duplicate,
+ * a ceiling is the reader's own limit and not a mistake, and a proposal left out by the
+ * global selection is that step doing its job. Asking again about those spends a call to
+ * be told the same thing twice.
+ */
+export function repairableDocumentVisualDiscard(reason: DocumentVisualDiscardReason): boolean {
+  return reason === 'unknown-block' || reason === 'heading-block' || reason === 'skill-not-enabled' || reason === 'source-not-in-block';
+}
 export interface DocumentVisualManifest {
   schemaVersion: 1; target: DocumentVisualTarget; vaultId: string; contentHash: string;
   revision: string; createdAt: string; updatedAt: string;

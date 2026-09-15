@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { BrowserWindow } from 'electron';
-import { blockSources, documentBlocks, documentSkillCatalog, DocumentSkillBudget, DOCUMENT_VISUAL_DISCARD_REASONS, DOCUMENT_VISUAL_RULES, documentVisualDiscardTally, validateDocumentSkillPolicy, type DocumentSkillPolicy, type DocumentVisualDiscard, type DocumentVisualDiscardReason, type DocumentVisualManifest, type DocumentVisualSuggestion, type DocumentVisualTarget } from '../../shared/documentSkills';
+import { blockSources, documentBlocks, documentSkillCatalog, DocumentSkillBudget, DOCUMENT_VISUAL_DISCARD_REASONS, DOCUMENT_VISUAL_RULES, documentVisualDiscardTally, documentVisualDiscardText, repairableDocumentVisualDiscard, validateDocumentSkillPolicy, type DocumentSkillPolicy, type DocumentVisualDiscard, type DocumentVisualDiscardReason, type DocumentVisualManifest, type DocumentVisualSuggestion, type DocumentVisualTarget } from '../../shared/documentSkills';
 import { researchVisualFields, immersionVisualFields } from '../../shared/documentVisualContent';
 import type { ModelRef } from '../../shared/types';
 import { buildChatSkillsPrompt, splitChatVisuals } from '../../shared/chatSkills';
@@ -127,7 +127,10 @@ export async function enrichDocumentVisuals(target: DocumentVisualTarget, policy
   running.set(key, controller);
   try {
     retainPreviousVisuals(vaultId, target); writeDocumentVisuals(manifest); notify(target);
-    if (!request.retry && skills.length) {
+    // A retry with nothing to retry plans again rather than doing nothing: a reader
+    // pressing Retry on a document whose every figure was refused is asking for another
+    // attempt, and there is no finished resource that a fresh plan could waste.
+    if ((!request.retry || !manifest.figures.length) && skills.length) {
       // Partition whole blocks: every section is considered, never silently clipped.
       const batches: typeof manifest.blocks[] = []; let batch: typeof manifest.blocks = [], size = 0;
       for (const block of manifest.blocks) {
@@ -140,24 +143,54 @@ export async function enrichDocumentVisuals(target: DocumentVisualTarget, policy
       // what made a run that discarded everything read exactly like a document that
       // needed no figures at all — same state, same sentence, nothing anywhere.
       const discarded: DocumentVisualDiscard[] = [];
-      const refuse = (item: DocumentVisualSuggestion, reason: DocumentVisualDiscardReason) => discarded.push({ blockId: item.blockId, skillId: item.skillId, reason });
-      for (const blocks of batches) {
-        signal.throwIfAborted();
+      // One entry per proposal the document refused, not per attempt: a repaired attempt
+      // that repeats the same mistake is the same proposal refused again, and counting it
+      // twice would tell the reader two proposals were discarded when only one was offered.
+      const refuse = (item: DocumentVisualSuggestion, refused: DocumentVisualDiscard[], reason: DocumentVisualDiscardReason) => {
+        const entry = { blockId: item.blockId, skillId: item.skillId, reason };
+        const existing = refused.findIndex(candidate => candidate.blockId === entry.blockId && candidate.skillId === entry.skillId);
+        if (existing < 0) refused.push(entry); else refused[existing] = entry;
+      };
+      /** Plan one batch and keep only what the document accepts. A repaired attempt is
+       *  handed back the refusals it made, so the correction is specific. */
+      const planBatch = async (blocks: typeof manifest.blocks, refused: DocumentVisualDiscard[], charged: readonly DocumentVisualDiscard[] = []) => {
         const suggested = await completeJson<DocumentVisualSuggestion[]>({
-          system: `${DOCUMENT_VISUAL_RULES}\nReturn a JSON array. Each item: {blockId,skillId,brief,caption,sources:[],layout:"wide"|"compact"|"side"}. Choose exact supplied block and skill ids. Each block lists in sources the exact nodus:// links it may cite: use only those, or [] for explicitly illustrative constructions. Caption and labels must use the document language. Do not duplicate existing figures. Return [] if nothing is useful.`,
-          user: JSON.stringify({ title: input.title, language: input.language, skills: JSON.parse(documentSkillCatalog(options, validated)), opportunities: request.hints ?? [], existing: manifest.figures.map(({ blockId, caption }) => ({ blockId, caption })), blocks: blocks.map(block => ({ ...block, sources: blockSources(block) })) }),
+          system: `${DOCUMENT_VISUAL_RULES}\nReturn a JSON array. Each item: {blockId,skillId,brief,caption,sources:[],layout:"wide"|"compact"|"side"}. Choose exact supplied block and skill ids. Each block lists in sources the exact nodus:// links it may cite: use only those, or [] for explicitly illustrative constructions. Caption and labels must use the document language. Do not duplicate existing figures. Return [] if nothing is useful.${charged.length ? '\nA previous attempt at these blocks was refused. Correct exactly what each refusal names, using only the supplied evidence.' : ''}`,
+          user: JSON.stringify({ title: input.title, language: input.language, skills: JSON.parse(documentSkillCatalog(options, validated)), opportunities: request.hints ?? [], existing: manifest.figures.map(({ blockId, caption }) => ({ blockId, caption })), blocks: blocks.map(block => ({ ...block, sources: blockSources(block) })), ...(charged.length ? { refused: charged.map(item => ({ blockId: item.blockId, skillId: item.skillId, reason: documentVisualDiscardText(item.reason) })) } : {}) }),
           temperature: 0.2, maxTokens: 4000, noRetry: true, signal,
         }, (value): value is DocumentVisualSuggestion[] => Array.isArray(value) && value.length <= blocks.length && value.every(item => item && typeof item.blockId === 'string' && typeof item.skillId === 'string' && typeof item.brief === 'string' && item.brief.length < 6000 && typeof item.caption === 'string' && item.caption.length < 1200 && Array.isArray(item.sources)), model);
         for (const item of suggested) {
           const block = blocks.find(candidate => candidate.id === item.blockId);
-          if (!block) { refuse(item, 'unknown-block'); continue; }
-          if (/^\s*#{1,6}\s+[^\n]+$/.test(block.markdown)) { refuse(item, 'heading-block'); continue; }
-          if (!skills.some(skill => skill.id === item.skillId)) { refuse(item, 'skill-not-enabled'); continue; }
-          if (budget.remaining(item.skillId) <= proposals.filter(proposal => proposal.skillId === item.skillId).length) { refuse(item, 'ceiling-reached'); continue; }
+          if (!block) { refuse(item, refused, 'unknown-block'); continue; }
+          if (/^\s*#{1,6}\s+[^\n]+$/.test(block.markdown)) { refuse(item, refused, 'heading-block'); continue; }
+          if (!skills.some(skill => skill.id === item.skillId)) { refuse(item, refused, 'skill-not-enabled'); continue; }
+          if (budget.remaining(item.skillId) <= proposals.filter(proposal => proposal.skillId === item.skillId).length) { refuse(item, refused, 'ceiling-reached'); continue; }
           const sources = blockSources(block);
-          if (item.sources.some(source => typeof source !== 'string' || !sources.includes(source))) { refuse(item, 'source-not-in-block'); continue; }
-          if (manifest.figures.some(figure => figure.blockId === item.blockId) || proposals.some(proposal => proposal.blockId === item.blockId)) { refuse(item, 'block-already-has-figure'); continue; }
+          if (item.sources.some(source => typeof source !== 'string' || !sources.includes(source))) { refuse(item, refused, 'source-not-in-block'); continue; }
+          if (manifest.figures.some(figure => figure.blockId === item.blockId) || proposals.some(proposal => proposal.blockId === item.blockId)) { refuse(item, refused, 'block-already-has-figure'); continue; }
           proposals.push({ ...item, id: randomUUID(), layout: ['wide', 'compact', 'side'].includes(item.layout) ? item.layout : 'wide' });
+        }
+      };
+      for (const blocks of batches) { signal.throwIfAborted(); await planBatch(blocks, discarded); }
+      // One repaired attempt, and only when the document would otherwise keep nothing: a
+      // report that already has its figures does not need another call bought for it, and
+      // the editorial selection deserves the last word. A planner that repeats the same
+      // mistake ends here — this round rescues work, it does not keep asking.
+      if (!proposals.length && discarded.some(item => repairableDocumentVisualDiscard(item.reason))) {
+        const firstAttempt = [...discarded];
+        const rescued = new Set<string>();
+        for (const blocks of batches) {
+          signal.throwIfAborted();
+          const refused = firstAttempt.filter(item => blocks.some(block => block.id === item.blockId));
+          if (!refused.length) continue;
+          const before = proposals.length;
+          await planBatch(blocks, discarded, refused);
+          if (proposals.length > before) for (const item of refused) rescued.add(item.blockId);
+        }
+        // A figure the second attempt produced replaces the refusal that explained its
+        // absence: telling the reader it was discarded would contradict the figure.
+        for (let index = discarded.length - 1; index >= 0; index--) {
+          if (firstAttempt.includes(discarded[index]) && rescued.has(discarded[index].blockId)) discarded.splice(index, 1);
         }
       }
       // A global selection sees all proposals for long documents without repeating prose.

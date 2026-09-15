@@ -74,7 +74,9 @@ try {
   let proposal = '';
   let selection = 'all';
   let plannerPrompt = '';
-  const proposalsFor = blocks => {
+  /** Planning calls, so a repaired attempt can be counted instead of assumed. */
+  let plannerCalls = 0;
+  const proposalsFor = (blocks, refused) => {
     const paragraph = blocks.find(block => block.field === 'body' && !block.markdown.startsWith('#'));
     const heading = blocks.find(block => /^\s*#{1,6}\s+[^\n]+$/.test(block.markdown));
     const citing = blocks.find(block => block.markdown.includes('nodus://idea/g-0001'));
@@ -83,6 +85,8 @@ try {
     // with `sources: []` when it does not.
     const target = citing ?? paragraph;
     const one = patch => [{ blockId: target.id, skillId: svg.id, brief: 'diagram', caption: 'Del ingreso a la consulta: tres etapas ilustrativas.', sources: [], layout: 'wide', ...patch }];
+    // Told what it got wrong, the second attempt cites the link that is really there.
+    if (proposal === 'repair-succeeds') return refused ? one({ blockId: citing.id, sources: ['nodus://idea/g-0001'] }) : one({ sources: ['nodus://idea/g-9999'] });
     if (proposal === 'cited') return one({ sources: citing ? ['nodus://idea/g-0001'] : [] });
     if (proposal === 'invented-source') return one({ sources: ['nodus://idea/g-9999'] });
     if (proposal === 'heading-only') return one({ blockId: heading.id });
@@ -94,7 +98,8 @@ try {
     const payload = JSON.parse(args.user);
     // The global selection of a long document gets its own call, with proposals and no blocks.
     if (payload.proposals) return selection === 'one' ? [payload.proposals[0].id] : payload.proposals.map(item => item.id);
-    if (proposal) { plannerPrompt = args.user; return proposalsFor(payload.blocks); }
+    plannerCalls++;
+    if (proposal) { plannerPrompt = args.user; return proposalsFor(payload.blocks, payload.refused); }
     const { blocks } = payload;
     if (zero) return [];
     assert.ok(blocks, 'final editorial sees stable blocks');
@@ -236,13 +241,13 @@ try {
   };
   const outcomes = {};
   const targets = {};
-  for (const kindOfProposal of ['cited', 'invented-source', 'heading-only', 'foreign-skill', 'none']) {
+  for (const kindOfProposal of ['cited', 'invented-source', 'heading-only', 'foreign-skill', 'none', 'repair-succeeds']) {
     proposal = kindOfProposal;
     const report = drafts.saveWritingWorkshopDraft({ draft: linkedDraft(), model: null });
     targets[kindOfProposal] = { kind: 'deep-research', id: report.id };
-    lines.length = 0;
+    lines.length = 0; plannerCalls = 0;
     const run = await service.enrichDocumentVisuals(targets[kindOfProposal], severalSkills);
-    outcomes[kindOfProposal] = { state: run.state, figures: run.figures.length, reason: run.figures[0]?.error ?? run.error ?? null, recorded: lines.map(entry => entry.code), discarded: (run.discarded ?? []).map(item => item.reason), log: lines.map(entry => ({ code: entry.code, level: entry.level, message: entry.message })) };
+    outcomes[kindOfProposal] = { state: run.state, figures: run.figures.length, reason: run.figures[0]?.error ?? run.error ?? null, recorded: lines.map(entry => entry.code), discarded: (run.discarded ?? []).map(item => item.reason), log: lines.map(entry => ({ code: entry.code, level: entry.level, message: entry.message })), planning: plannerCalls };
     console.log('proposal:', kindOfProposal, JSON.stringify(outcomes[kindOfProposal]));
   }
   proposal = '';
@@ -268,10 +273,37 @@ try {
   assert.equal(outcomes['invented-source'].log[0].message.params.reason.id, 'reasonSourceNotInBlock');
   assert.equal(outcomes['heading-only'].log[0].message.params.reason.id, 'reasonHeadingBlock');
   assert.equal(outcomes['foreign-skill'].log[0].message.params.reason.id, 'reasonSkillNotEnabled');
+  // ── The one repaired attempt, and nothing more than one ────────────────────────
+  // Told what it got wrong, the planner can rescue the figure the document was about to
+  // lose; told the same thing twice, it ends the run. Either way it is exactly one extra
+  // call, and only when the document would otherwise keep nothing.
+  assert.equal(outcomes['repair-succeeds'].figures, 1, 'a repaired attempt can produce the figure the first pass refused');
+  assert.deepEqual(outcomes['repair-succeeds'].discarded, [], 'and the refusal that explained its absence is gone');
+  assert.deepEqual(outcomes['repair-succeeds'].recorded, [], 'so a rescued run has nothing to explain');
+  assert.equal(outcomes['repair-succeeds'].planning, 2, 'a repaired attempt is one call, not a loop');
+  assert.equal(outcomes['invented-source'].planning, 2, 'a planner that repeats the mistake is asked exactly once more');
+  assert.deepEqual(outcomes['invented-source'].discarded, ['source-not-in-block']);
+  assert.equal(outcomes.cited.planning, 1, 'a run that kept its figure buys no extra call');
+  assert.equal(outcomes.none.planning, 1, 'and neither does a document that refused nothing: there is nothing to repair');
+  for (const kind of ['heading-only', 'foreign-skill']) assert.equal(outcomes[kind].planning, 2, `${kind} is the planner's mistake to correct`);
+  // ── Retry: it plans again only when there is nothing to preserve ───────────────
+  proposal = 'cited';
+  plannerCalls = 0;
+  const replanned = await service.enrichDocumentVisuals(targets['invented-source'], severalSkills, { retry: true });
+  assert.equal(plannerCalls, 1, 'a retry with no figures kept must plan again, not do nothing');
+  assert.equal(replanned.figures.length, 1, 'and can produce the figure the first run lacked');
+  assert.deepEqual(replanned.discarded, [], 'the new plan replaces the refusal that explained the absence');
+  plannerCalls = 0;
+  const preserved = await service.enrichDocumentVisuals(targets.cited, severalSkills, { retry: true });
+  assert.equal(plannerCalls, 0, 'a retry with finished figures plans nothing: that is what retry is for');
+  assert.equal(preserved.figures.length, 1, 'and keeps them');
+  assert.equal(preserved.figures[0].state, 'ready');
+  assert.deepEqual(service.getDocumentVisuals(targets['invented-source'])?.discarded ?? [], [], 'and a rescued document reads back without the refusal that is no longer true');
+  proposal = '';
   // The refusal has to survive the reopen, or the reader loses the explanation again the
   // moment they leave the document: this reads back through the store's own validation.
-  const reopened = service.getDocumentVisuals(targets['invented-source']);
-  assert.deepEqual(reopened?.discarded?.map(item => item.reason), ['source-not-in-block'], 'the refusals travel with the manifest');
+  const reopened = service.getDocumentVisuals(targets['heading-only']);
+  assert.deepEqual(reopened?.discarded?.map(item => item.reason), ['heading-block'], 'the refusals travel with the manifest');
   assert.equal(reopened?.figures.length, 0);
   assert.equal(reopened?.discarded?.[0].blockId.length > 0, true, 'and name the block they were about');
   // Every skill the reader enabled is offered to the planner, with its ceiling, and no
@@ -301,7 +333,7 @@ try {
   assert.deepEqual(lines[0].message.params, { count: 1, reason: { id: 'reasonDiscardNotSelected' } });
   proposal = ''; selection = 'all';
   await workers.stopCapabilityWorkers();
-  fs.writeFileSync(path.join(out, 'verification.json'), JSON.stringify({ passed: true, textCalls, isolatedProfile: true, zeroFigures: true, usageCeiling: true, reopensWithoutCalls: true, originalsUnchanged: true, undo: true, paidOverflowBlocked: true, captureRetryWithoutCalls: true, resourcesFollowTheConfiguredModel: true, explicitModelWins: true, storedModelOnlyAsFallback: true, perTaskEngines: true, failuresNameTheirEngine: true, enabledSkillsReachThePlanner: true, citedProposalUsed: true, zeroFigureDocumentAllowed: true, refusalsAreNamed: true, refusalsReachTheLog: true, silentSelectionRecorded: true, plannerOfferedExactSources: true, proposalOutcomes: outcomes }, null, 2));
+  fs.writeFileSync(path.join(out, 'verification.json'), JSON.stringify({ passed: true, textCalls, isolatedProfile: true, zeroFigures: true, usageCeiling: true, reopensWithoutCalls: true, originalsUnchanged: true, undo: true, paidOverflowBlocked: true, captureRetryWithoutCalls: true, resourcesFollowTheConfiguredModel: true, explicitModelWins: true, storedModelOnlyAsFallback: true, perTaskEngines: true, failuresNameTheirEngine: true, enabledSkillsReachThePlanner: true, citedProposalUsed: true, zeroFigureDocumentAllowed: true, refusalsAreNamed: true, refusalsReachTheLog: true, silentSelectionRecorded: true, plannerOfferedExactSources: true, oneRepairedAttempt: true, repairedRefusalsSuperseded: true, retryPlansWhenNothingKept: true, proposalOutcomes: outcomes }, null, 2));
   console.log('Document skills verification passed.');
   for (const win of BrowserWindow.getAllWindows()) win.destroy();
   load('electron/db/database.ts').closeDb(); fs.rmSync(profile,{recursive:true,force:true});

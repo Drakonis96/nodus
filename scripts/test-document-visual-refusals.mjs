@@ -31,7 +31,7 @@ test('the planner is handed the links each block may cite', () => {
 test('every refusal is named, and none is an anonymous continue', () => {
   const source = read('electron/ai/documentVisuals.ts');
   for (const reason of ['unknown-block', 'heading-block', 'skill-not-enabled', 'ceiling-reached', 'source-not-in-block', 'block-already-has-figure']) {
-    assert.ok(source.includes(`refuse(item, '${reason}')`), `the ${reason} refusal must be named`);
+    assert.ok(source.includes(`refuse(item, refused, '${reason}')`), `the ${reason} refusal must be named`);
   }
   assert.match(source, /reason: 'not-selected'/, 'and so must the proposal the global selection left out');
   // The old shape: one anonymous guard chain that returned nothing about why.
@@ -58,6 +58,29 @@ test('the refusals travel with the manifest and survive its validation', () => {
   const source = read('electron/ai/documentVisuals.ts');
   assert.match(source, /discarded: request\.retry \? structuredClone\(previous\?\.discarded \?\? \[\]\) : \[\]/,
     'a retry keeps the refusals that still explain the document');
+});
+
+test('one repaired attempt, only when the document would otherwise keep nothing', () => {
+  const source = read('electron/ai/documentVisuals.ts');
+  assert.match(source, /if \(!proposals\.length && discarded\.some\(item => repairableDocumentVisualDiscard\(item\.reason\)\)\)/,
+    'the round fires on an otherwise empty document, never on one that already has figures');
+  assert.match(source, /await planBatch\(blocks, discarded, refused\)/, 'and the planner is handed back what it got wrong');
+  assert.match(source, /refused: charged\.map\(item => \(\{ blockId: item\.blockId, skillId: item\.skillId, reason: documentVisualDiscardText\(item\.reason\) \}\)\)/,
+    'the correction names the refusal in the same words the reader sees');
+  assert.match(source, /A previous attempt at these blocks was refused/);
+  // No loop: the repair is the second pass, and there is no third.
+  assert.equal((source.match(/await planBatch\(/g) ?? []).length, 2, 'there is exactly one first pass and one repaired pass');
+  // A rescued figure must not leave behind the refusal that explained its absence.
+  assert.match(source, /if \(firstAttempt\.includes\(discarded\[index\]\) && rescued\.has\(discarded\[index\]\.blockId\)\) discarded\.splice\(index, 1\)/);
+  // One entry per proposal, not per attempt: asking twice about the same proposal must not
+  // read to the reader as two proposals that were discarded.
+  assert.match(source, /const existing = refused\.findIndex\(candidate => candidate\.blockId === entry\.blockId && candidate\.skillId === entry\.skillId\)/);
+  assert.match(source, /if \(existing < 0\) refused\.push\(entry\); else refused\[existing\] = entry;/);
+});
+
+test('a retry plans again only when there is nothing to preserve', () => {
+  assert.match(read('electron/ai/documentVisuals.ts'), /if \(\(!request\.retry \|\| !manifest\.figures\.length\) && skills\.length\)/,
+    'a retry of a document that kept nothing must plan again, and one with figures must not');
 });
 
 test('the reader is told the difference, in the language they read', () => {
