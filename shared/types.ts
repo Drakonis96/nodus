@@ -1019,21 +1019,34 @@ export interface DocumentIdeaLink {
   score: number;
 }
 
-/** `extractive` marks a profile assembled from literal source quotes because the
- *  semantic synthesis never cleared the audit gate. It is published on purpose (a
- *  rejected paraphrase must not leave a permanent hole in a campaign), but it is
- *  not a synthesis: every field and summary is source-language evidence, so the
- *  UI must say so instead of reporting it as an audited profile. */
-export type DocumentProfileFallbackMode = 'extractive';
+/**
+ * How a published profile relates to its audited synthesis.
+ * - `null`: the auditor approved the synthesis, which is what most profiles are.
+ * - `partial`: the audited prose was kept (every field carries a literal support) but
+ *   the semantic verdict did not clear the acceptance bar, or was unusable. Nothing
+ *   about the evidence is in doubt, so the profile is published with the caveat
+ *   instead of being replaced by raw quotes.
+ * - `extractive`: the synthesis itself was unusable, so the profile is assembled from
+ *   literal source quotes. It is published on purpose (a rejected paraphrase must not
+ *   leave a permanent hole in a campaign), but every field is source-language
+ *   evidence, so consumers must treat it as an index of quotes, not as a synthesis.
+ */
+export type DocumentProfileFallbackMode = 'extractive' | 'partial';
 
 export interface DocumentProfileAudit {
+  /** The semantic verdict: whether the auditor approved the synthesis. A profile can
+   *  be published with `passed: false` when it is marked `partial`. */
   passed: boolean;
-  score: number;
+  /** null when the provider reported no usable score: "no reading", not "zero". */
+  score: number | null;
   supportCoverage: number;
   structureCoverage: number;
   issues: string[];
   repaired: boolean;
   fallback?: DocumentProfileFallbackMode | null;
+  /** Sections published from literal extracts because no synthesis survived their own
+   *  audit. A profile can be approved as a whole and still contain them. */
+  sectionsDegraded?: number;
 }
 
 export interface DocumentProfile {

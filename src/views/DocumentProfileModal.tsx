@@ -68,6 +68,7 @@ export function DocumentProfileModal({ work, vaultId, onClose }: { work: WorkVie
   // The pipeline's own marker for "published from literal extracts": the banner
   // above already states it, so repeating the raw token in the list is noise.
   const auditIssues = (profile?.audit?.issues ?? []).filter((issue) => issue !== 'fallback_extractivo_determinista');
+  const degradedSections = profile?.audit?.sectionsDegraded ?? 0;
 
   const start = async () => {
     setBusy(true);
@@ -138,16 +139,25 @@ export function DocumentProfileModal({ work, vaultId, onClose }: { work: WorkVie
               <p className="mt-2 text-xs leading-5 text-neutral-500">{error ?? t('Nodus leerá la obra completa por secciones, sintetizará su arquitectura y auditará cada campo antes de publicarlo.')}</p>
             </div>
           ) : <div className="space-y-6">
-            {profile.audit?.fallback === 'extractive' && <div className="rounded-lg border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-200">
-              <div className="flex items-center gap-2 font-medium"><Icon name="alert" size={14} />{t('Indexado sin síntesis')}</div>
-              <p className="mt-1 leading-5 text-amber-200/80">{t('Los campos y los resúmenes de sección son citas literales del original: la auditoría semántica no aprobó ninguna síntesis, así que esta ficha solo orienta la recuperación.')}</p>
+            {(profile.audit?.fallback || degradedSections > 0) && <div className="rounded-lg border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-200">
+              <div className="flex items-center gap-2 font-medium"><Icon name="alert" size={14} />{profile.audit?.fallback === 'extractive'
+                ? t('Indexado sin síntesis')
+                : profile.audit?.fallback === 'partial'
+                  ? t('Publicada sin aprobación semántica')
+                  : t('Algunas secciones se publicaron como extractos literales')}</div>
+              <p className="mt-1 leading-5 text-amber-200/80">{profile.audit?.fallback === 'extractive'
+                ? t('Los campos y los resúmenes de sección son citas literales del original: la auditoría semántica no aprobó ninguna síntesis, así que esta ficha solo orienta la recuperación.')
+                : profile.audit?.fallback === 'partial'
+                  ? t('Los campos conservan su apoyo literal, pero el auditor no aprobó la síntesis. Úsala solo para orientar la recuperación.')
+                  : t('La auditoría de esas secciones no aprobó ninguna síntesis, así que sus resúmenes son citas del original.')}</p>
+              {degradedSections > 0 && profile.audit?.fallback !== 'extractive' && <p className="mt-1 leading-5 text-amber-200/70">{tx('Secciones sin síntesis: {n} de {total}', { n: degradedSections, total: profile.sections.length })}</p>}
               {auditIssues.length > 0 && <details className="mt-2">
                 <summary className="cursor-pointer text-amber-300/90">{t('Incidencias de la auditoría')}</summary>
                 <ul className="mt-1 list-disc space-y-1 pl-5 leading-5 text-amber-200/70">{auditIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>
               </details>}
             </div>}
             <section>
-              <div className="mb-2 flex items-center justify-between gap-3"><h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Visión de conjunto')}</h3><div className="flex items-center gap-2"><span className="text-xs text-neutral-500">{tx('Calidad {score}%', { score: Math.round((profile.qualityScore ?? 0) * 100) })}</span><button className="text-xs text-cyan-400 hover:text-cyan-200" onClick={() => setEditing({ path: 'overview', value: profile.overview, generatedValue: profile.generatedOverview ?? profile.overview, overrideId: profile.overviewOverrideId })}>{t('Corregir')}</button></div></div>
+              <div className="mb-2 flex items-center justify-between gap-3"><h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Visión de conjunto')}</h3><div className="flex items-center gap-2"><span className="text-xs text-neutral-500">{profile.qualityScore == null ? t('Sin puntuación semántica') : tx('Calidad {score}%', { score: Math.round(profile.qualityScore * 100) })}</span><button className="text-xs text-cyan-400 hover:text-cyan-200" onClick={() => setEditing({ path: 'overview', value: profile.overview, generatedValue: profile.generatedOverview ?? profile.overview, overrideId: profile.overviewOverrideId })}>{t('Corregir')}</button></div></div>
               <p className={`rounded-lg border bg-neutral-900/40 p-4 text-sm leading-6 text-neutral-200 ${profile.overviewConflict ? 'border-amber-600' : profile.overviewOverridden ? 'border-cyan-800' : 'border-neutral-800'}`}>{profile.overview}{profile.overviewOverridden && <span className="ml-2 text-[10px] uppercase text-cyan-500">{profile.overviewConflict ? t('Revisar corrección') : t('Corregido por ti')}</span>}</p>
             </section>
             <section>

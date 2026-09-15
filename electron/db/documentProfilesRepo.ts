@@ -73,7 +73,7 @@ export interface PublishDocumentProfileInput {
   auditorModel: ModelRef | null;
   promptHash: string;
   audit: DocumentProfileAudit;
-  qualityScore: number;
+  qualityScore: number | null;
   inputTokens?: number;
   outputTokens?: number;
   estimatedCostUsd?: number | null;
@@ -444,7 +444,7 @@ export function publishDocumentProfile(input: PublishDocumentProfileInput): stri
       input.sourceLanguage, input.presentationLanguage, input.overview, JSON.stringify(input.profile),
       input.generatorModel ? JSON.stringify(input.generatorModel) : null,
       input.auditorModel ? JSON.stringify(input.auditorModel) : null,
-      input.promptHash, JSON.stringify(input.audit), clamp01(input.qualityScore),
+      input.promptHash, JSON.stringify(input.audit), input.qualityScore == null ? null : clamp01(input.qualityScore),
       input.inputTokens ?? 0, input.outputTokens ?? 0, input.estimatedCostUsd ?? null, now, now
     );
     const insertField = db.prepare(

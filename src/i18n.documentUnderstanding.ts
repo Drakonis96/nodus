@@ -68,6 +68,12 @@ const KEYS = [
   'Los campos y los resúmenes de sección son citas literales del original: la auditoría semántica no aprobó ninguna síntesis, así que esta ficha solo orienta la recuperación.',
   'Incidencias de la auditoría',
   'mínimo',
+  'Sin puntuación semántica',
+  'Publicada sin aprobación semántica',
+  'Los campos conservan su apoyo literal, pero el auditor no aprobó la síntesis. Úsala solo para orientar la recuperación.',
+  'Algunas secciones se publicaron como extractos literales',
+  'La auditoría de esas secciones no aprobó ninguna síntesis, así que sus resúmenes son citas del original.',
+  'Secciones sin síntesis: {n} de {total}',
 ] as const;
 
 function table(values: readonly string[]): Record<string, string> {
@@ -103,6 +109,12 @@ const en = table([
   'Fields and section summaries are literal quotes from the original: the semantic audit never approved a synthesis, so this profile only guides retrieval.',
   'Audit issues',
   'minimum',
+  'No semantic score',
+  'Published without semantic approval',
+  'Every field keeps its literal support, but the auditor did not approve the synthesis. Use it to guide retrieval only.',
+  'Some sections were published as literal extracts',
+  'The audit of those sections approved no synthesis, so their summaries are quotes from the original.',
+  'Sections without a synthesis: {n} of {total}',
 ]);
 
 const fr = table([
@@ -133,6 +145,12 @@ const fr = table([
   'Les champs et les résumés de section sont des citations littérales de l’original : l’audit sémantique n’a approuvé aucune synthèse, cette fiche ne sert donc qu’à la récupération.',
   'Incidents de l’audit',
   'minimum',
+  'Aucune note sémantique',
+  'Publiée sans approbation sémantique',
+  'Chaque champ conserve sa preuve littérale, mais l’auditeur n’a pas approuvé la synthèse. Utilisez-la uniquement pour guider la récupération.',
+  'Certaines sections ont été publiées sous forme d’extraits littéraux',
+  'L’audit de ces sections n’a approuvé aucune synthèse : leurs résumés sont des citations de l’original.',
+  'Sections sans synthèse : {n} sur {total}',
 ]);
 
 const de = table([
@@ -163,6 +181,12 @@ const de = table([
   'Felder und Abschnittszusammenfassungen sind wörtliche Zitate aus dem Original: Die semantische Prüfung hat keine Synthese freigegeben, daher dient dieses Profil nur der Recherche.',
   'Befunde der Prüfung',
   'Minimum',
+  'Keine semantische Bewertung',
+  'Ohne semantische Freigabe veröffentlicht',
+  'Jedes Feld behält seinen wörtlichen Beleg, aber die Prüfung hat die Synthese nicht freigegeben. Nutze sie nur zur Recherchesteuerung.',
+  'Einige Abschnitte wurden als wörtliche Auszüge veröffentlicht',
+  'Die Prüfung dieser Abschnitte hat keine Synthese freigegeben; ihre Zusammenfassungen sind Zitate aus dem Original.',
+  'Abschnitte ohne Synthese: {n} von {total}',
 ]);
 
 const pt = table([
@@ -193,6 +217,12 @@ const pt = table([
   'Os campos e os resumos de secção são citações literais do original: a auditoria semântica não aprovou qualquer síntese, pelo que esta ficha apenas orienta a recuperação.',
   'Incidentes da auditoria',
   'mínimo',
+  'Sem pontuação semântica',
+  'Publicada sem aprovação semântica',
+  'Cada campo mantém o seu apoio literal, mas o auditor não aprovou a síntese. Use-a apenas para orientar a recuperação.',
+  'Algumas secções foram publicadas como extratos literais',
+  'A auditoria dessas secções não aprovou qualquer síntese, pelo que os seus resumos são citações do original.',
+  'Secções sem síntese: {n} de {total}',
 ]);
 
 const ptBR = table([
@@ -223,6 +253,12 @@ const ptBR = table([
   'Os campos e resumos de seção são citações literais do original: a auditoria semântica não aprovou nenhuma síntese, então esta ficha apenas orienta a recuperação.',
   'Incidentes da auditoria',
   'mínimo',
+  'Sem pontuação semântica',
+  'Publicada sem aprovação semântica',
+  'Cada campo mantém seu apoio literal, mas o auditor não aprovou a síntese. Use-a apenas para orientar a recuperação.',
+  'Algumas seções foram publicadas como extratos literais',
+  'A auditoria dessas seções não aprovou nenhuma síntese, então seus resumos são citações do original.',
+  'Seções sem síntese: {n} de {total}',
 ]);
 
 const it = table([
@@ -253,6 +289,12 @@ const it = table([
   'I campi e i riepiloghi di sezione sono citazioni letterali dell’originale: l’audit semantico non ha approvato alcuna sintesi, quindi questa scheda guida solo il recupero.',
   'Problemi dell’audit',
   'minimo',
+  'Nessun punteggio semantico',
+  'Pubblicata senza approvazione semantica',
+  'Ogni campo conserva la sua prova letterale, ma l’audit non ha approvato la sintesi. Usala solo per guidare il recupero.',
+  'Alcune sezioni sono state pubblicate come estratti letterali',
+  'L’audit di quelle sezioni non ha approvato alcuna sintesi, quindi i loro riepiloghi sono citazioni dell’originale.',
+  'Sezioni senza sintesi: {n} di {total}',
 ]);
 
 const tr = table([
@@ -283,6 +325,12 @@ const tr = table([
   'Alanlar ve bölüm özetleri özgün metinden birebir alıntılardır: anlamsal denetim hiçbir sentezi onaylamadı, bu nedenle bu künye yalnızca erişimi yönlendirir.',
   'Denetim sorunları',
   'asgari',
+  'Anlamsal puan yok',
+  'Anlamsal onay olmadan yayımlandı',
+  'Her alan birebir dayanağını korur, ancak denetçi sentezi onaylamadı. Yalnızca erişimi yönlendirmek için kullanın.',
+  'Bazı bölümler birebir alıntı olarak yayımlandı',
+  'Bu bölümlerin denetimi hiçbir sentezi onaylamadı, bu nedenle özetleri özgün metinden alıntıdır.',
+  'Sentezsiz bölümler: {total} bölümün {n} tanesi',
 ]);
 
 const zhCN = table([
@@ -313,6 +361,12 @@ const zhCN = table([
   '字段与章节摘要均为原文的逐字引用：语义审核未通过任何综述，因此本档案仅用于引导检索。',
   '审核问题',
   '最低值',
+  '无语义评分',
+  '未经语义审核通过即发布',
+  '每个字段都保留其逐字依据，但审核器未通过该综述。仅用于引导检索。',
+  '部分章节以逐字摘录形式发布',
+  '这些章节的审核未通过任何综述，因此其摘要为原文引用。',
+  '无综述章节：{total} 中之 {n}',
 ]);
 
 export const DOCUMENT_UNDERSTANDING_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN } as const;

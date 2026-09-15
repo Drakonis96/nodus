@@ -38,7 +38,7 @@ import { LegalDocModal } from '../components/LegalDocModal';
 import { LEGAL_DOCS, type LegalDocId } from '../legalDocs';
 import { confirm } from '../components/feedback';
 import { Icon } from '../components/ui';
-import { ModelPicker, ModelWithReasoning, SubscriptionQuotaNotice, ExtractionCapabilityNotice } from '../components/ModelPicker';
+import { ModelPicker, ModelWithReasoning, SubscriptionQuotaNotice, ExtractionCapabilityNotice, SelfAuditNotice } from '../components/ModelPicker';
 import { EmbeddingModelControl } from '../components/EmbeddingModelControl';
 import { GeneralTextModelControl } from '../components/GeneralTextModelControl';
 import { NodiStylePicker } from '../components/nodi/NodiStylePicker';
@@ -3062,6 +3062,7 @@ export function Settings({
                   <ExtractionCapabilityNotice model={settings.documentProfileModel ?? settings.summaryModel} />
                   <SubscriptionQuotaNotice model={settings.documentProfileModel ?? settings.summaryModel} />
                   <Row label={t('Auditor de fichas documentales')} hint={t('Revisa soporte, cobertura y fidelidad antes de publicar una versión nueva.')}><ModelWithReasoning settings={settings} value={settings.documentAuditModel} onChange={(documentAuditModel) => void patch({ documentAuditModel })} emptyLabel="Usar modelo de comprensión documental" requiredCapability="documentProfile" menu /></Row>
+                  <SelfAuditNotice generator={settings.documentProfileModel ?? settings.summaryModel} auditor={settings.documentAuditModel} />
                   <SubscriptionQuotaNotice model={settings.documentAuditModel ?? settings.documentProfileModel ?? settings.summaryModel} />
                 </>}
                 <Row label={t('Fusión y deduplicación')} hint={t('Combina resultados equivalentes y elimina duplicados sin perder su evidencia.')}><ModelWithReasoning allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" requiredCapability="fusion" menu /></Row>
