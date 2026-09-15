@@ -200,6 +200,7 @@ import type {
   WorkEmbeddingStatus,
   WorkFilter,
   WorkIdeaSynthesis,
+  WorkDeletionOutcome,
   WorkMeta,
   WorkPage,
   WorkPageRequest,
@@ -260,6 +261,13 @@ export interface AcademicApi {
   /** Run the full chain (themes + ideas + summary + index + relationship discovery) for one work. */
   processFull(nodusId: string, model?: ModelRef | null, options?: AnalysisRunOptions): Promise<void>;
   processFullBulk(nodusIds: string[], model?: ModelRef | null, options?: AnalysisRunOptions): Promise<void>;
+  /**
+   * Remove works from the current vault together with their derived data (ideas, passages,
+   * embeddings, document profiles…). Data belonging to other works is never touched: shared
+   * ideas are kept and merely go dormant. Refuses while any of the works is being analysed
+   * right now, reported through `ok: false` rather than an exception.
+   */
+  deleteWorks(nodusIds: string[]): Promise<WorkDeletionOutcome>;
   /** Re-run the cheap theme scan over the whole library to backfill broad parent themes. */
   reassignThemes(model?: ModelRef | null): Promise<number>;
   rescan(nodusId: string, kind: QueueKind, model?: ModelRef | null): Promise<void>;
@@ -343,9 +351,9 @@ export interface AcademicApi {
   }>>;
   getDocumentIndexProgress(): Promise<DocumentIndexProgress>;
   startDocumentIndexCampaign(options?: { includeArchived?: boolean; nodusIds?: string[] }): Promise<DocumentIndexCampaign>;
-  enqueueDocumentProfile(nodusId: string): Promise<void>;
+  enqueueDocumentProfile(nodusId: string, vaultId?: string): Promise<void>;
   setDocumentIndexCampaignStatus(vaultId: string, campaignId: string, status: 'running' | 'paused' | 'cancelled'): Promise<void>;
-  cancelDocumentIndexJob(jobId: string): Promise<void>;
+  cancelDocumentIndexJob(jobId: string, vaultId?: string): Promise<void>;
   onDocumentIndexProgress(cb: (p: DocumentIndexProgress) => void): () => void;
 
   // graph

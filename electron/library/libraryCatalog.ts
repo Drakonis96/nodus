@@ -970,6 +970,26 @@ export class LibraryCatalog {
     }));
   }
 
+  /**
+   * Drop the links that point at works deleted from `vaultId`.
+   *
+   * A link only exists because a Global Library item was linked INTO that vault, so a
+   * work that no longer exists must stop advertising an analysis it cannot open — and
+   * a stale link also blocks purging the item from the trash (`purgeTrash` refuses
+   * while links remain). Scoped by vault: the same work id in another vault's set is a
+   * different work and its link stays.
+   */
+  deleteVaultLinksForWorks(vaultId: string, workIds: readonly string[]): number {
+    const ids = [...new Set(workIds.filter(Boolean))];
+    if (!vaultId || ids.length === 0) return 0;
+    const placeholders = ids.map(() => '?').join(',');
+    const info = this.handle
+      .prepare(`DELETE FROM library_vault_links WHERE vault_id=? AND work_id IN (${placeholders})`)
+      .run(vaultId, ...ids);
+    if (info.changes > 0) this.persistVaultLinks();
+    return info.changes;
+  }
+
   getImportSource(sourceId: string): LibraryImportSourceState | null {
     const row = this.handle.prepare('SELECT * FROM library_import_sources WHERE source_id=?').get(sourceId) as Record<string, unknown> | undefined;
     if (!row) return null;

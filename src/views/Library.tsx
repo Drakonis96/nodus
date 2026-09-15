@@ -25,8 +25,8 @@ import { DocumentProfileModal } from './DocumentProfileModal';
 import { DocumentIndexManager } from './DocumentIndexManager';
 import { VirtualList } from '../components/VirtualList';
 import { anchorStyle, useAnchoredCoords } from '../components/dbGrid';
-import { useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
-import { deriveWorkStatus, queueItemsByWork, type StepId, type WorkReadiness, type WorkStatus } from '../libraryStatus';
+import { notifyDataChanged, useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
+import { deriveWorkStatus, queueItemsByWork, retryableSteps, type StepId, type WorkReadiness, type WorkStatus } from '../libraryStatus';
 import {
   ASSISTANT_CONTEXTS,
   type LibraryNavigationTarget,
@@ -1113,6 +1113,102 @@ export function Library({
     return map;
   }, [works, embeddingStatuses, passageStatuses, queuedByWork]);
 
+  /**
+   * What "retry what is missing" would enqueue, grouped by the call that queues it.
+   *
+   * A work whose themes or ideas are unfinished runs the whole chain instead of its
+   * remaining steps, the same rule the per-work status modal applies: the indexes are
+   * built FROM the ideas, so starting them against ideas that are about to be rebuilt
+   * would index nothing. Everything else is grouped one call per step, so a 200-work
+   * selection costs a handful of IPC calls instead of one per work.
+   */
+  const retryPlan = useMemo(() => {
+    const chain: string[] = [];
+    const summaries: string[] = [];
+    const semantic: string[] = [];
+    const citable: string[] = [];
+    let pending = 0;
+    for (const id of selectedVisibleIds) {
+      const status = statusByWork.get(id);
+      if (!status) continue;
+      const steps = retryableSteps(status);
+      if (steps.length === 0) continue;
+      pending += 1;
+      if (steps.includes('themes') || steps.includes('ideas')) {
+        chain.push(id);
+        continue;
+      }
+      if (steps.includes('summary')) summaries.push(id);
+      if (steps.includes('semantic')) semantic.push(id);
+      if (steps.includes('citable')) citable.push(id);
+    }
+    return { chain, summaries, semantic, citable, works: pending };
+  }, [selectedVisibleIds, statusByWork]);
+
+  /**
+   * Repair only what is unfinished, for every selected work.
+   *
+   * Deliberately does NOT consult the cross-vault reuse checkbox: this is the repair
+   * path, and importing another vault's analysis is not what a reader asking to
+   * finish what is pending expects.
+   */
+  const retryMissingSelected = async () => {
+    const { chain, summaries, semantic, citable, works: targets } = retryPlan;
+    if (targets === 0) {
+      toast(t('No queda nada pendiente en la selección.'));
+      return;
+    }
+    if (chain.length > 0) await window.nodus.processFullBulk(chain);
+    if (summaries.length > 0) await window.nodus.summarizeBulk(summaries);
+    if (semantic.length > 0) await window.nodus.startEmbedding(semantic);
+    if (citable.length > 0) await window.nodus.startPassageEmbedding(citable);
+    setSelected(new Set());
+    await load();
+    toast(tx('Pendientes en cola para {n} obra(s). Verás el progreso en la cola.', { n: targets }));
+  };
+
+  /**
+   * Remove the selected works from this vault, with their derived data.
+   *
+   * The confirmation spells out both halves, because the half that matters cannot be
+   * seen afterwards: this vault's works and everything derived from them go, while the
+   * analysis other works share with them stays. The main process is the authority on
+   * what "derived" covers — this only asks and reports.
+   */
+  const deleteSelected = async () => {
+    const ids = selectedVisibleIds;
+    if (ids.length === 0) return;
+    const ok = await confirm({
+      title: tx('Eliminar las {n} obras seleccionadas', { n: ids.length }),
+      message: tx(
+        'Se eliminarán del vault actual las {n} obra(s) seleccionada(s), junto con sus ideas extraídas, sus pasajes, sus embeddings y el resto de datos derivados. Las ideas y demás datos que compartan con otras obras se conservan. Esta acción no se puede deshacer.',
+        { n: ids.length }
+      ),
+      confirmLabel: t('Eliminar'),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      const outcome = await window.nodus.deleteWorks(ids);
+      if (!outcome.ok) {
+        // Deleting underneath a running analysis would let its publication re-create
+        // rows for a work that no longer exists, so the main process refuses.
+        toast(
+          tx('No se pueden eliminar obras que se están analizando ahora mismo ({n}). Espera a que terminen o detén la cola.', { n: outcome.running.length }),
+          { tone: 'error' }
+        );
+        return;
+      }
+      setReuseNotice(null);
+      setSelected(new Set());
+      notifyDataChanged();
+      await load();
+      toast(tx('Se eliminaron {n} obra(s) del vault.', { n: outcome.deleted.length }), { tone: 'success' });
+    } catch (error) {
+      toast(error instanceof Error ? error.message : t('No se pudieron eliminar las obras seleccionadas.'), { tone: 'error' });
+    }
+  };
+
   const openReader = (work: WorkView) => onOpenReader({
     id: work.nodus_id,
     zoteroKey: work.zotero_key,
@@ -1631,6 +1727,22 @@ export function Library({
           >
             <Icon name="compass" /> {tx('Analizar las {n} seleccionadas', { n: selectedVisibleIds.length })}
           </button>
+          {/* The repair counterpart of the verb above: it never re-runs a step that is
+              already done, so it is offered only while some selected work has something
+              left to finish. */}
+          {retryPlan.works > 0 && (
+            <button
+              className="btn btn-ghost border border-neutral-700"
+              onClick={() => void retryMissingSelected()}
+              title={t('Encola solo los pasos incompletos, pendientes o fallidos de cada obra seleccionada. No vuelve a analizar lo que ya está hecho.')}
+              data-testid="library-retry-missing-selected"
+            >
+              <Icon name="refresh" /> {t('Reintentar lo que falta')}
+              {/* The count is works, not steps, so it says so: the button sits next to
+                  a selection count and a bare number would read as the same thing. */}
+              <span className="tabular-nums opacity-80">· {tx('{n} obra(s)', { n: retryPlan.works })}</span>
+            </button>
+          )}
           {/* Not a pipeline step in records vaults — it is what the view is for. */}
           {isRecordsVault && (
             <button
@@ -1653,6 +1765,16 @@ export function Library({
               { label: t('Comprender documentos completos'), icon: 'layers', onClick: () => void window.nodus.startDocumentIndexCampaign({ nodusIds: selectedVisibleIds }) },
             ]}
           />
+          {/* Destructive and irreversible, so it sits apart from the verbs above: past
+              the overflow menu, away from the primary action, and red in both themes. */}
+          <button
+            className="btn bg-red-600 text-white hover:bg-red-500"
+            onClick={() => void deleteSelected()}
+            title={t('Elimina estas obras del vault actual con sus ideas, pasajes, embeddings y demás datos derivados. Lo que otras obras comparten no se toca.')}
+            data-testid="library-delete-selected"
+          >
+            <Icon name="trash" /> {t('Eliminar selección')}
+          </button>
           <div className="flex-1" />
           <button
             className="btn btn-ghost"

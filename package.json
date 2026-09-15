@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "5.4.3",
+  "version": "5.4.4",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": {
     "name": "Jorge Pérez Burgueño",
@@ -57,11 +57,15 @@
     "test:e2e:deep-research-annotations": "npm run build && node scripts/e2e-deep-research-annotations.mjs",
     "test:e2e:deep-research-section-length": "node scripts/e2e-deep-research-section-length.mjs",
     "test:e2e:library-reader": "npm run build && node scripts/e2e-library-reader.mjs",
+    "test:e2e:library-delete": "npm run build && node scripts/e2e-library-delete-works.mjs",
     "test:e2e:view-snapshots": "npm run build && node scripts/e2e-view-snapshots.mjs",
     "test:e2e:global-library": "npm run build && node scripts/e2e-global-library.mjs",
     "test:e2e:document-index": "npm run build && node scripts/e2e-document-index-controls.mjs",
     "test:e2e:browser-connector": "node scripts/e2e-browser-connector.mjs",
+    "test:e2e:bookmarks-html": "node scripts/e2e-bookmarks-html.mjs",
+    "verify:bookmarks-import": "node scripts/verify-browser-bookmarks-html-import.mjs",
     "verify:browser-fixes": "node scripts/verify-browser-fixes-live.mjs",
+    "verify:browser-tab-strip": "node scripts/verify-browser-tab-strip.mjs",
     "test:e2e:office-references": "node scripts/e2e-office-references.mjs",
     "test:e2e:local-server": "node scripts/e2e-local-server.mjs",
     "test:e2e:server-web": "npm run build:server-web && node scripts/e2e-server-web.mjs",

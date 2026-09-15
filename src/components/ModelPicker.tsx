@@ -66,6 +66,26 @@ export function ExtractionCapabilityNotice({ model }: { model: ModelRef | null |
   );
 }
 
+/**
+ * Shown beside the document-profile auditor picker when no separate auditor is configured.
+ * The profile is then graded by the same model that wrote it, and that verdict — its
+ * `passed` flag and its score — is the only substantive condition for publishing. The
+ * document-profile pipeline is the one place in the app where a model's opinion of its own
+ * prose decides whether work is published, so it is worth a warning rather than a default.
+ */
+export function SelfAuditNotice({ generator, auditor }: { generator: ModelRef | null | undefined; auditor: ModelRef | null | undefined }) {
+  if (auditor || !generator) return null;
+  return (
+    <p
+      role="note"
+      data-testid="self-audit-notice"
+      className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200"
+    >
+      {t('Sin un auditor propio, cada ficha documental la puntúa el mismo modelo que la redactó. Elige aquí otro modelo para que la revisión sea independiente.')}
+    </p>
+  );
+}
+
 export function codexReasoningLabel(effort: CodexReasoningEffort): string {
   switch (effort) {
     case 'none': return t('Ninguno');

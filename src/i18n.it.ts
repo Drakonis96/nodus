@@ -34,6 +34,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { PIPELINE_LOG_TRANSLATIONS } from './i18n.pipelineLogs';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
@@ -115,6 +116,7 @@ export const IT: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.it,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.it,
   ...NODI_NOTIFICATION_TRANSLATIONS['it'],
+  ...PIPELINE_LOG_TRANSLATIONS['it'],
   ...ANNOUNCEMENT_TRANSLATIONS['it'],
   ...WORLD_CHAT_TRANSLATIONS.it,
   ...STUDY_SYNONYM_TRANSLATIONS.it,
@@ -297,6 +299,17 @@ export const IT: Record<string, string> = {
   "Escaneando pares semánticos…": "Scansione di coppie semantiche…",
   "OCR de imagen…": "Riconoscimento ottico delle immagini...",
   "Analizando PDF…": "Analisi del PDF…",
+  "Iniciando extracción…": "Avvio dell’estrazione…",
+  "Extracción completada.": "Estrazione completata.",
+  "Extracción cancelada.": "Estrazione annullata.",
+  "Documento añadido a la cola de extracción.": "Documento aggiunto alla coda di estrazione.",
+  "Documento priorizado para abrirlo en cuanto esté listo.": "Documento prioritizzato per aprirlo appena sarà pronto.",
+  "Extrayendo imágenes y figuras…": "Estrazione di immagini e figure…",
+  "Guardando Markdown y trazabilidad…": "Salvataggio di Markdown e tracciabilità…",
+  "Extrayendo página {page} de {total}…": "Estrazione della pagina {page} di {total}…",
+  "OCR local {page} de {total}…": "OCR locale {page} di {total}…",
+  "OCR remoto {n} de {total}…": "OCR remoto {n} di {total}…",
+  "Analizando {file}…": "Analisi di {file}…",
   "Comprobando índice de Zotero…": "Controllo dell'indice Zotero...",
   "Buscando texto abierto (Unpaywall)…": "Ricerca di testo aperto (Unpaywall)…",
   "Validando candidatos con IA": "Convalidare i candidati con l'intelligenza artificiale",
@@ -1192,6 +1205,9 @@ export const IT: Record<string, string> = {
   "Pulido y estabilidad": "Polacco e stabilità",
   "Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.": "Correggi bug, migliora le prestazioni e perfeziona l'esperienza complessiva con il feedback degli utenti.",
   "Nodus Toolkit": "Nodus Toolkit",
+  "Nodus Convert": "Nodus Convert",
+  "Nodus Translate": "Nodus Translate",
+  "MCP": "MCP",
   "Nodus Radar": "Nodus Radar",
   "Nodus Compass": "Nodus Compass",
   "Nodus Tools": "Nodus Tools",
@@ -2231,6 +2247,15 @@ export const IT: Record<string, string> = {
   'Faltan {n} paso(s). Se encolarán y verás el progreso en la cola.': '{n} passaggio/i mancante/i. Verranno messi in coda e vedrai i progressi nella coda.',
   'No queda nada pendiente en esta obra.': "Non c'è nulla in sospeso su quest'opera.",
   'Reintentar lo que falta': 'Riprova ciò che manca',
+  'Encola solo los pasos incompletos, pendientes o fallidos de cada obra seleccionada. No vuelve a analizar lo que ya está hecho.': 'Mette in coda solo i passaggi incompleti, in sospeso o non riusciti di ogni opera selezionata. Non rianalizza ciò che è già stato fatto.',
+  'No queda nada pendiente en la selección.': 'Non c’è nulla in sospeso nella selezione.',
+  'Pendientes en cola para {n} obra(s). Verás el progreso en la cola.': 'Passaggi in sospeso messi in coda per {n} opera/e. Vedrai i progressi nella coda.',
+  'Eliminar las {n} obras seleccionadas': 'Elimina le {n} opere selezionate',
+  'Se eliminarán del vault actual las {n} obra(s) seleccionada(s), junto con sus ideas extraídas, sus pasajes, sus embeddings y el resto de datos derivados. Las ideas y demás datos que compartan con otras obras se conservan. Esta acción no se puede deshacer.': 'Le {n} opera/e selezionata/e verranno eliminate dallo spazio attuale, insieme alle loro idee estratte, ai passaggi, agli embedding e agli altri dati derivati. Le idee e gli altri dati condivisi con altre opere vengono conservati. Questa azione non può essere annullata.',
+  'Elimina estas obras del vault actual con sus ideas, pasajes, embeddings y demás datos derivados. Lo que otras obras comparten no se toca.': 'Elimina queste opere dallo spazio attuale con le loro idee, passaggi, embedding e altri dati derivati. Ciò che altre opere condividono non viene toccato.',
+  'No se pueden eliminar obras que se están analizando ahora mismo ({n}). Espera a que terminen o detén la cola.': 'Non è possibile eliminare opere in fase di analisi in questo momento ({n}). Attendi che finiscano o ferma la coda.',
+  'Se eliminaron {n} obra(s) del vault.': '{n} opera/e eliminata/e dallo spazio.',
+  'No se pudieron eliminar las obras seleccionadas.': 'Non è stato possibile eliminare le opere selezionate.',
   'No aplica': 'Non applicabile',
   'Solo abstract': 'Solo abstract',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': "Nodus non ha trovato testo da leggere. Aggiungi il PDF o l'EPUB in Zotero e rianalizza.",
@@ -7641,6 +7666,8 @@ export const IT: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "Nuova scheda",
   "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser consente fino a {n} schede.",
+  "Desplazar las pestañas a la izquierda": "Scorri le schede a sinistra",
+  "Desplazar las pestañas a la derecha": "Scorri le schede a destra",
   // Nodus Browser: media
   "Medios": "Contenuti multimediali",
   "Reproduciéndose en Nodus Browser": "In riproduzione in Nodus Browser",
@@ -8106,6 +8133,14 @@ export const IT: Record<string, string> = {
   "Contraer carpeta": "Comprimi cartella",
   "Expandir carpeta": "Espandi cartella",
   "Añadir un marcador": "Aggiungi un segnalibro",
+  "Exportar HTML": "Esporta HTML",
+  "Exportar todos los marcadores como HTML compatible con Chrome, Edge, Firefox, Brave y Opera": "Esporta tutti i segnalibri come HTML compatibile con Chrome, Edge, Firefox, Brave e Opera",
+  "Exportación cancelada.": "Esportazione annullata.",
+  "Importar HTML": "Importa HTML",
+  "Importar marcadores desde un archivo HTML de Chrome, Edge, Firefox, Brave u Opera": "Importa i segnalibri da un file HTML di Chrome, Edge, Firefox, Brave o Opera",
+  "Importación cancelada.": "Importazione annullata.",
+  "Ningún marcador guardado se sobrescribe: las direcciones repetidas se omiten.": "Nessun segnalibro salvato viene sovrascritto: gli indirizzi ripetuti vengono saltati.",
+  "Se exportaron {bookmarks} marcadores y {folders} carpetas en {file}.": "{bookmarks} segnalibri e {folders} cartelle esportati in {file}.",
   "Añadir subcarpeta": "Aggiungi sottocartella",
   "Copiar URL": "Copia URL",
   "Se importaron {bookmarks} marcadores y {folders} carpetas. Se omitieron {duplicates} duplicados.": "Importati {bookmarks} segnalibri e {folders} cartelle. {duplicates} duplicati ignorati.",

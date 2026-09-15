@@ -73,7 +73,7 @@ export interface PublishDocumentProfileInput {
   auditorModel: ModelRef | null;
   promptHash: string;
   audit: DocumentProfileAudit;
-  qualityScore: number;
+  qualityScore: number | null;
   inputTokens?: number;
   outputTokens?: number;
   estimatedCostUsd?: number | null;
@@ -107,6 +107,7 @@ function fieldRow(row: Record<string, unknown>): DocumentProfileField {
     text: String(row.text),
     confidence: Number(row.confidence),
     centrality: Number(row.centrality),
+    confidenceSource: row.confidence_source === 'floor' ? 'floor' : 'model',
   };
 }
 
@@ -443,16 +444,16 @@ export function publishDocumentProfile(input: PublishDocumentProfileInput): stri
       input.sourceLanguage, input.presentationLanguage, input.overview, JSON.stringify(input.profile),
       input.generatorModel ? JSON.stringify(input.generatorModel) : null,
       input.auditorModel ? JSON.stringify(input.auditorModel) : null,
-      input.promptHash, JSON.stringify(input.audit), clamp01(input.qualityScore),
+      input.promptHash, JSON.stringify(input.audit), input.qualityScore == null ? null : clamp01(input.qualityScore),
       input.inputTokens ?? 0, input.outputTokens ?? 0, input.estimatedCostUsd ?? null, now, now
     );
     const insertField = db.prepare(
-      `INSERT INTO document_profile_fields(field_id,version_id,nodus_id,kind,ordinal,text,confidence,centrality,created_at)
-       VALUES(?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO document_profile_fields(field_id,version_id,nodus_id,kind,ordinal,text,confidence,centrality,confidence_source,created_at)
+       VALUES(?,?,?,?,?,?,?,?,?,?)`
     );
     for (const field of input.fields) insertField.run(
       field.fieldId ?? randomUUID(), versionId, input.nodusId, field.kind, field.ordinal,
-      field.text, clamp01(field.confidence), clamp01(field.centrality), now
+      field.text, clamp01(field.confidence), clamp01(field.centrality), field.confidenceSource ?? 'model', now
     );
     const insertSection = db.prepare(
       `INSERT INTO document_sections(

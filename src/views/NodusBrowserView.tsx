@@ -936,6 +936,30 @@ function SecurityIndicator({ url, error }: { url: string; error: boolean }) {
 }
 
 /**
+ * One width for every tab, and it never changes.
+ *
+ * A strip of tabs reads as a row of slots, not as a list of headings: equal
+ * widths are what let the eye return to "the fourth tab", and what stops one
+ * long page title from pushing every other tab sideways. So a tab is never
+ * narrowed to fit and never widened to show more — a strip with more tabs than
+ * room is scrolled, which is what the arrows at either end are for. 12rem is a
+ * title, a favicon and a close button with room to breathe; the rest truncates.
+ */
+const TAB_WIDTH_CLASS = 'w-48';
+
+/**
+ * How many tabs one arrow click brings in.
+ *
+ * Aligned to whole tabs rather than to a fraction of the viewport. With a cap of
+ * twelve tabs the strip overflows by less than one viewport, so a
+ * viewport-sized step lands on the last tab in a single click — the arrows stop
+ * reading as a way to walk the strip, and the last click moves it by a couple of
+ * pixels while still lighting the arrow. Three tabs keep the tab being read on
+ * screen and reveal the next ones in the order they were opened.
+ */
+const TAB_SCROLL_STEP_TABS = 3;
+
+/**
  * The tab strip.
  *
  * Tabs are cheap because only the ACTIVE one is attached to the window's content
@@ -955,51 +979,113 @@ function BrowserTabStrip({
   onClose: (id: string) => void;
   onNew: () => void;
 }) {
+  const stripRef = useRef<HTMLDivElement | null>(null);
+  const [overflow, setOverflow] = useState({ left: false, right: false });
+
+  /**
+   * Which arrows have somewhere to go, measured from the DOM rather than
+   * predicted from a tab count. Both ends can be true at once (in the middle of
+   * a long strip), and both go false the moment the strip fits.
+   */
+  const measureOverflow = useCallback(() => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    // A pixel of slack at each end: smooth scrolling stops a hair short of the
+    // extreme, and an arrow that stays lit over a strip with nothing left to
+    // show is a control that lies about what a click will do.
+    const max = strip.scrollWidth - strip.clientWidth;
+    setOverflow((previous) => {
+      const left = strip.scrollLeft > 1;
+      const right = strip.scrollLeft < max - 1;
+      return previous.left === left && previous.right === right ? previous : { left, right };
+    });
+  }, []);
+
+  // The strip's width changes without a scroll event: a tab opens, closes or
+  // renames itself, or the window is resized. Every one of those is observed.
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    measureOverflow();
+    const observer = new ResizeObserver(measureOverflow);
+    observer.observe(strip);
+    for (const child of Array.from(strip.children)) observer.observe(child);
+    return () => observer.disconnect();
+  }, [measureOverflow, tabs.length]);
+
+  // The selected tab is the one that has to be on screen. Activation, a new tab
+  // and a title that grew all change which tab that is.
+  useEffect(() => {
+    const selected = stripRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+    selected?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [activeTabId, tabs.length]);
+
   if (tabs.length === 0) return null;
   const full = tabs.length >= MAX_BROWSER_TABS;
+
+  const scrollByStep = (direction: -1 | 1) => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    // Measured as the distance between two tabs — their width plus the gap —
+    // rather than read from the constant, so a step can never disagree with the
+    // layout it is moving.
+    const [first, second] = Array.from(strip.children) as HTMLElement[];
+    const pitch = second && first ? second.offsetLeft - first.offsetLeft : 0;
+    const step = pitch > 0 ? pitch * TAB_SCROLL_STEP_TABS : strip.clientWidth * 0.8;
+    strip.scrollBy({ left: direction * step, behavior: 'smooth' });
+  };
+
   return (
-    <div
-      role="tablist"
-      data-testid="browser-tab-strip"
-      className="flex items-center gap-1 overflow-x-auto border-b border-neutral-300 px-2 py-1 dark:border-neutral-800"
-    >
-      {tabs.map((tab) => {
-        const selected = tab.id === activeTabId;
-        return (
-          <div
-            key={tab.id}
-            role="tab"
-            aria-selected={selected}
-            data-testid="browser-tab"
-            className={`group flex min-w-0 max-w-52 shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors ${
-              selected ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100' : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'
-            }`}
-          >
-            <button
-              type="button"
-              className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
-              onClick={() => onSelect(tab.id)}
-              title={tab.url || tab.title}
+    <div data-testid="browser-tab-bar" className="flex items-center gap-1 border-b border-neutral-300 px-2 py-1 dark:border-neutral-800">
+      {overflow.left && <TabStripArrow direction={-1} onClick={() => scrollByStep(-1)} />}
+      <div
+        ref={stripRef}
+        role="tablist"
+        data-testid="browser-tab-strip"
+        onScroll={measureOverflow}
+        className="browser-tab-strip-scroll flex min-w-0 flex-1 items-center gap-1"
+      >
+        {tabs.map((tab) => {
+          const selected = tab.id === activeTabId;
+          return (
+            <div
+              key={tab.id}
+              role="tab"
+              aria-selected={selected}
+              data-testid="browser-tab"
+              className={`group flex ${TAB_WIDTH_CLASS} shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors ${
+                selected ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100' : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'
+              }`}
             >
-              {tab.faviconDataUrl
-                ? <img src={tab.faviconDataUrl} alt="" className="h-3.5 w-3.5 shrink-0" />
-                : <Icon name="globe" size={13} className="shrink-0 opacity-50" />}
-              <span className="truncate">{tab.title || tab.url || t('Pestaña nueva')}</span>
-              {/* A muted-but-playing tab is otherwise invisible in the strip. */}
-              {tab.audible && <Icon name="volume" size={11} className="shrink-0 opacity-60" />}
-            </button>
-            <button
-              type="button"
-              aria-label={t('Cerrar pestaña')}
-              title={t('Cerrar pestaña')}
-              className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-neutral-300 group-hover:opacity-70 focus:opacity-100 dark:hover:bg-neutral-700"
-              onClick={() => onClose(tab.id)}
-            >
-              <Icon name="x" size={11} />
-            </button>
-          </div>
-        );
-      })}
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                onClick={() => onSelect(tab.id)}
+                title={tab.url || tab.title}
+              >
+                {tab.faviconDataUrl
+                  ? <img src={tab.faviconDataUrl} alt="" className="h-3.5 w-3.5 shrink-0" />
+                  : <Icon name="globe" size={13} className="shrink-0 opacity-50" />}
+                <span className="truncate">{tab.title || tab.url || t('Pestaña nueva')}</span>
+                {/* A muted-but-playing tab is otherwise invisible in the strip. */}
+                {tab.audible && <Icon name="volume" size={11} className="shrink-0 opacity-60" />}
+              </button>
+              <button
+                type="button"
+                aria-label={t('Cerrar pestaña')}
+                title={t('Cerrar pestaña')}
+                className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-neutral-300 group-hover:opacity-70 focus:opacity-100 dark:hover:bg-neutral-700"
+                onClick={() => onClose(tab.id)}
+              >
+                <Icon name="x" size={11} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {/* The arrows and the new-tab button sit outside the scroll viewport, so
+          they hold their place while the tabs move under them. */}
+      {overflow.right && <TabStripArrow direction={1} onClick={() => scrollByStep(1)} />}
       <button
         type="button"
         aria-label={t('Pestaña nueva')}
@@ -1012,6 +1098,32 @@ function BrowserTabStrip({
         <Icon name="plus" size={13} />
       </button>
     </div>
+  );
+}
+
+/**
+ * One end of the strip, drawn only while that end has tabs left to reveal.
+ *
+ * Rendered conditionally rather than kept in place and dimmed: an arrow that is
+ * always there is an arrow the eye stops reading, and the question it answers —
+ * "is there more?" — is exactly the one a permanently visible control fails to
+ * answer.
+ */
+function TabStripArrow({ direction, onClick }: { direction: -1 | 1; onClick: () => void }) {
+  const label = direction < 0
+    ? t('Desplazar las pestañas a la izquierda')
+    : t('Desplazar las pestañas a la derecha');
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      data-testid={direction < 0 ? 'browser-tab-scroll-left' : 'browser-tab-scroll-right'}
+      onClick={onClick}
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 active:bg-neutral-200 dark:text-neutral-400 dark:hover:bg-neutral-900 dark:active:bg-neutral-800"
+    >
+      <Icon name={direction < 0 ? 'chevronLeft' : 'chevronRight'} size={14} />
+    </button>
   );
 }
 

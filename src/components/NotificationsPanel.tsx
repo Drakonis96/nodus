@@ -402,7 +402,7 @@ export function NotificationsPanel({
                                 void window.nodus.openNotification(notification.id);
                               }}
                             >
-                              Nodus Radar <Icon name="arrowRight" size={11} />
+                              {t('Nodus Radar')} <Icon name="arrowRight" size={11} />
                             </button>
                           )}
                           <p className="mt-1 text-[10px] text-neutral-500">

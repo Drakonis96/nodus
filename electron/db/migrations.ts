@@ -119,7 +119,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 176;
+export const SCHEMA_VERSION = 177;
 
 export const migrations: Migration[] = [
   {
@@ -9308,6 +9308,10 @@ export const migrations: Migration[] = [
   },
   { version: 175, up: `CREATE TABLE IF NOT EXISTS stellar_sessions (context TEXT PRIMARY KEY, state TEXT NOT NULL, updated_at TEXT NOT NULL);` },
   { version: 176, up: `ALTER TABLE chat_messages ADD COLUMN attachments_json TEXT;` },
+  // Whether a profile field's confidence was reported by the provider or is the
+  // deterministic direct-support floor standing in for a missing measurement.
+  // Rows written before this column read as 'model', which is what they were.
+  { version: 177, up: `ALTER TABLE document_profile_fields ADD COLUMN confidence_source TEXT;` },
 ];
 
 /**

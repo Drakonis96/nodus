@@ -40,6 +40,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { PIPELINE_LOG_TRANSLATIONS } from './i18n.pipelineLogs';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
@@ -117,6 +118,7 @@ export const FR: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.fr,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.fr,
   ...NODI_NOTIFICATION_TRANSLATIONS['fr'],
+  ...PIPELINE_LOG_TRANSLATIONS['fr'],
   ...ANNOUNCEMENT_TRANSLATIONS['fr'],
   ...WORLD_CHAT_TRANSLATIONS.fr,
   ...STUDY_SYNONYM_TRANSLATIONS.fr,
@@ -309,6 +311,17 @@ export const FR: Record<string, string> = {
   'Escaneando pares semánticos…': 'Analyse des paires sémantiques…',
   'OCR de imagen…': 'OCR de l’image…',
   'Analizando PDF…': 'Analyse du PDF…',
+  'Iniciando extracción…': 'Démarrage de l’extraction…',
+  'Extracción completada.': 'Extraction terminée.',
+  'Extracción cancelada.': 'Extraction annulée.',
+  'Documento añadido a la cola de extracción.': 'Document ajouté à la file d’extraction.',
+  'Documento priorizado para abrirlo en cuanto esté listo.': 'Document priorisé pour s’ouvrir dès qu’il sera prêt.',
+  'Extrayendo imágenes y figuras…': 'Extraction des images et des figures…',
+  'Guardando Markdown y trazabilidad…': 'Enregistrement du Markdown et de la traçabilité…',
+  'Extrayendo página {page} de {total}…': 'Extraction de la page {page} sur {total}…',
+  'OCR local {page} de {total}…': 'OCR local {page} sur {total}…',
+  'OCR remoto {n} de {total}…': 'OCR distant {n} sur {total}…',
+  'Analizando {file}…': 'Analyse de {file}…',
   'Comprobando índice de Zotero…': 'Vérification de l’index Zotero…',
   'Buscando texto abierto (Unpaywall)…': 'Recherche de texte en libre accès (Unpaywall)…',
   'Validando candidatos con IA': 'Validation des candidats avec l’IA',
@@ -1268,6 +1281,9 @@ export const FR: Record<string, string> = {
   'Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.':
     'Corriger les bugs, améliorer les performances et peaufiner l\'expérience générale grâce aux retours des utilisateurs.',
   'Nodus Toolkit': 'Nodus Toolkit',
+  'Nodus Convert': 'Nodus Convert',
+  'Nodus Translate': 'Nodus Translate',
+  'MCP': 'MCP',
   'Nodus Radar': 'Nodus Radar',
   'Nodus Compass': 'Nodus Compass',
   'Nodus Tools': 'Nodus Tools',
@@ -2477,6 +2493,15 @@ export const FR: Record<string, string> = {
   'Faltan {n} paso(s). Se encolarán y verás el progreso en la cola.': '{n} étape(s) manquante(s). Elles seront mises en file et vous verrez la progression dans la file.',
   'No queda nada pendiente en esta obra.': 'Rien n’est en attente sur cette œuvre.',
   'Reintentar lo que falta': 'Relancer ce qui manque',
+  'Encola solo los pasos incompletos, pendientes o fallidos de cada obra seleccionada. No vuelve a analizar lo que ya está hecho.': 'Ne met en file que les étapes incomplètes, en attente ou en échec de chaque œuvre sélectionnée. Elle ne relance pas ce qui est déjà fait.',
+  'No queda nada pendiente en la selección.': 'Rien n’est en attente dans la sélection.',
+  'Pendientes en cola para {n} obra(s). Verás el progreso en la cola.': 'Étapes en attente mises en file pour {n} œuvre(s). Vous verrez la progression dans la file.',
+  'Eliminar las {n} obras seleccionadas': 'Supprimer les {n} œuvres sélectionnées',
+  'Se eliminarán del vault actual las {n} obra(s) seleccionada(s), junto con sus ideas extraídas, sus pasajes, sus embeddings y el resto de datos derivados. Las ideas y demás datos que compartan con otras obras se conservan. Esta acción no se puede deshacer.': 'Les {n} œuvre(s) sélectionnée(s) seront supprimées de l’espace actuel, avec leurs idées extraites, leurs passages, leurs embeddings et le reste de leurs données dérivées. Les idées et autres données partagées avec d’autres œuvres sont conservées. Cette action est irréversible.',
+  'Elimina estas obras del vault actual con sus ideas, pasajes, embeddings y demás datos derivados. Lo que otras obras comparten no se toca.': 'Supprime ces œuvres de l’espace actuel avec leurs idées, passages, embeddings et autres données dérivées. Ce que d’autres œuvres partagent n’est pas touché.',
+  'No se pueden eliminar obras que se están analizando ahora mismo ({n}). Espera a que terminen o detén la cola.': 'Impossible de supprimer des œuvres en cours d’analyse ({n}). Attendez qu’elles se terminent ou arrêtez la file.',
+  'Se eliminaron {n} obra(s) del vault.': '{n} œuvre(s) supprimée(s) de l’espace.',
+  'No se pudieron eliminar las obras seleccionadas.': 'Les œuvres sélectionnées n’ont pas pu être supprimées.',
   'No aplica': 'Non applicable',
   'Solo abstract': 'Résumé seul',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': "Nodus n'a trouvé aucun texte à lire. Ajoutez le PDF ou l'EPUB dans Zotero, puis relancez l'analyse.",
@@ -8227,6 +8252,8 @@ export const FR: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "Nouvel onglet",
   "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser accepte jusqu'à {n} onglets.",
+  "Desplazar las pestañas a la izquierda": "Faire défiler les onglets vers la gauche",
+  "Desplazar las pestañas a la derecha": "Faire défiler les onglets vers la droite",
   // Nodus Browser: media
   "Medios": "Médias",
   "Reproduciéndose en Nodus Browser": "Lecture en cours dans Nodus Browser",
@@ -8692,6 +8719,14 @@ export const FR: Record<string, string> = {
   "Contraer carpeta": "Réduire le dossier",
   "Expandir carpeta": "Développer le dossier",
   "Añadir un marcador": "Ajouter un signet",
+  "Exportar HTML": "Exporter HTML",
+  "Exportar todos los marcadores como HTML compatible con Chrome, Edge, Firefox, Brave y Opera": "Exporter tous les signets au format HTML compatible avec Chrome, Edge, Firefox, Brave et Opera",
+  "Exportación cancelada.": "Exportation annulée.",
+  "Importar HTML": "Importer HTML",
+  "Importar marcadores desde un archivo HTML de Chrome, Edge, Firefox, Brave u Opera": "Importer les signets depuis un fichier HTML de Chrome, Edge, Firefox, Brave ou Opera",
+  "Importación cancelada.": "Importation annulée.",
+  "Ningún marcador guardado se sobrescribe: las direcciones repetidas se omiten.": "Aucun signet enregistré n’est écrasé : les adresses en double sont ignorées.",
+  "Se exportaron {bookmarks} marcadores y {folders} carpetas en {file}.": "{bookmarks} signets et {folders} dossiers exportés vers {file}.",
   "Añadir subcarpeta": "Ajouter un sous-dossier",
   "Copiar URL": "Copier l’URL",
   "Se importaron {bookmarks} marcadores y {folders} carpetas. Se omitieron {duplicates} duplicados.": "{bookmarks} signets et {folders} dossiers importés. {duplicates} doublons ignorés.",

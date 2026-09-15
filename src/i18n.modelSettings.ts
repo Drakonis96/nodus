@@ -36,6 +36,7 @@ const KEYS = [
   'Todavía no hay peticiones registradas en esta sesión.',
   'Relaciones semánticas',
   'Valida pares de ideas y genera las relaciones del grafo.',
+  'Sin un auditor propio, cada ficha documental la puntúa el mismo modelo que la redactó. Elige aquí otro modelo para que la revisión sea independiente.',
 ] as const;
 
 function table(values: readonly string[]): Record<string, string> {
@@ -79,6 +80,7 @@ const en = table([
   'No requests have been recorded in this session yet.',
   'Semantic relationships',
   'Validates idea pairs and generates graph relationships.',
+  'Without a separate auditor, each document profile is graded by the same model that wrote it. Choose another model here so the review is independent.',
 ]);
 
 const fr = table([
@@ -117,6 +119,7 @@ const fr = table([
   'Aucune requête n’a encore été enregistrée pendant cette session.',
   'Relations sémantiques',
   'Valide les paires d’idées et génère les relations du graphe.',
+  'Sans auditeur distinct, chaque fiche documentaire est notée par le modèle qui l’a rédigée. Choisissez ici un autre modèle pour rendre la révision indépendante.',
 ]);
 
 const de = table([
@@ -155,6 +158,7 @@ const de = table([
   'In dieser Sitzung wurden noch keine Anfragen aufgezeichnet.',
   'Semantische Beziehungen',
   'Validiert Ideenpaare und erzeugt die Beziehungen des Graphen.',
+  'Ohne eigenen Prüfer wird jedes Dokumentprofil von demselben Modell bewertet, das es verfasst hat. Wähle hier ein anderes Modell, damit die Prüfung unabhängig ist.',
 ]);
 
 const pt = table([
@@ -193,6 +197,7 @@ const pt = table([
   'Ainda não há pedidos registados nesta sessão.',
   'Relações semânticas',
   'Valida pares de ideias e gera as relações do grafo.',
+  'Sem um auditor próprio, cada ficha documental é avaliada pelo mesmo modelo que a redigiu. Escolhe aqui outro modelo para que a revisão seja independente.',
 ]);
 
 const ptBR = table([
@@ -231,6 +236,7 @@ const ptBR = table([
   'Ainda não há solicitações registradas nesta sessão.',
   'Relações semânticas',
   'Valida pares de ideias e gera as relações do grafo.',
+  'Sem um auditor próprio, cada ficha documental é avaliada pelo mesmo modelo que a redigiu. Escolha aqui outro modelo para que a revisão seja independente.',
 ]);
 
 const it = table([
@@ -269,6 +275,7 @@ const it = table([
   'Non è stata ancora registrata alcuna richiesta in questa sessione.',
   'Relazioni semantiche',
   'Convalida coppie di idee e genera le relazioni del grafo.',
+  'Senza un revisore dedicato, ogni scheda documentale è valutata dallo stesso modello che l’ha redatta. Scegli qui un altro modello perché la revisione sia indipendente.',
 ]);
 
 const tr = table([
@@ -307,6 +314,7 @@ const tr = table([
   'Bu oturumda henüz kayıtlı bir istek yok.',
   'Anlamsal ilişkiler',
   'Fikir çiftlerini doğrular ve grafik ilişkilerini oluşturur.',
+  'Ayrı bir denetçi yoksa her belge künyesi onu yazan modelin kendisi tarafından puanlanır. İncelemenin bağımsız olması için burada başka bir model seçin.',
 ]);
 
 const zhCN = table([
@@ -345,6 +353,7 @@ const zhCN = table([
   '本次会话中尚未记录任何请求。',
   '语义关系',
   '验证观点对并生成图谱关系。',
+  '没有独立的审核器时，每份文档档案都由撰写它的同一个模型评分。请在此选择另一个模型，使审核保持独立。',
 ]);
 
 export const MODEL_SETTINGS_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN } as const;

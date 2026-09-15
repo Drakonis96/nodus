@@ -13,9 +13,11 @@
  * media does: the tab navigates away, the tab closes, or playback finished and
  * stayed finished.
  *
- * Previous/next are commands rather than state: Chromium can route its standard
- * media keys to a page's Media Session handlers, but does not expose whether a
- * page registered those handlers.
+ * Previous/next are commands rather than state: they go to the page's preload,
+ * which asks the page's own Media Session handler before walking its elements.
+ * Nothing here can report whether a page registered one — Chromium does not
+ * expose that, and an injected media key never reaches a page's handlers at all
+ * (see electron/preload/browserPageMediaSession.ts).
  */
 
 import type { BrowserMediaState } from '@shared/browser';

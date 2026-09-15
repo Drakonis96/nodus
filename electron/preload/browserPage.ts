@@ -25,7 +25,7 @@
  * electron/preload/api.ts reads `location` the same way.
  */
 
-import { ipcRenderer } from 'electron';
+import { ipcRenderer, webFrame } from 'electron';
 import { isNodusResearchSiteUrl } from '../../shared/browser';
 // One source of truth for page metadata: the SAME module the Chrome extension
 // loads. It is pure ESM with no Chrome API and no DOM access, so both consumers
@@ -40,12 +40,20 @@ import {
   collectMediaElements,
   isPlayableMedia,
   kindOf,
+  playbackAfterCommand,
   semanticPlaybackState,
   type MediaCommand,
   type MediaEl,
   type MediaRoot,
   type SemanticMediaScope,
 } from './browserPageMedia';
+import {
+  mediaChannels,
+  mediaSessionHookSource,
+  mediaSessionInvokeSource,
+  planMediaCommand,
+  type MediaSessionAction,
+} from './browserPageMediaSession';
 
 interface PageDoc extends MediaRoot {
   addEventListener(type: string, listener: (event: { target?: unknown }) => void, capture?: boolean): void;
@@ -172,51 +180,108 @@ page.document?.addEventListener('pause', (event) => scheduleReport(event.target)
 page.document?.addEventListener('ended', (event) => scheduleReport(event.target), true);
 
 /**
- * Play, pause or stop the page's media on the main process's instruction.
+ * The page's own Media Session handlers, captured at document start.
+ *
+ * Module scope is the point: this file runs before any script the page ships, so
+ * wrapping `navigator.mediaSession.setActionHandler` here is what lets a
+ * `nexttrack` the page registers later be remembered. Installing after the page
+ * had started would only ever see registrations that came in later still.
+ *
+ * The bridge name is random per document and non-enumerable, so a page cannot
+ * find it by guessing and does not see it when enumerating its own globals.
+ */
+const mediaSessionBridge = `__nodusMediaSession_${Math.random().toString(36).slice(2)}`;
+try {
+  void webFrame.executeJavaScript(mediaSessionHookSource(mediaSessionBridge)).catch(() => 'unavailable');
+} catch {
+  // A document that refuses main-world injection keeps every other channel.
+}
+
+/**
+ * Ask the page's own Media Session handler for one action.
+ *
+ * `false` covers every way there is nothing to call: no hook in the document, no
+ * handler registered for that action, or a handler that threw.
+ */
+async function invokeMediaSessionAction(action: MediaSessionAction): Promise<boolean> {
+  try {
+    const outcome = await webFrame.executeJavaScript(mediaSessionInvokeSource(mediaSessionBridge, action));
+    return outcome === 'called';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Run one header command against the page.
  *
  * Only ever driven from the Nodus header. The command set is closed and carries
  * no data from the page, so there is nothing here a site can steer.
  *
- * Two things follow every command. The result tells main whether the page could
- * act at all, so it can fall back to Chromium's own media key for a player whose
- * audio lives somewhere no DOM query reaches. The state report that follows tells
- * the header what actually happened, so a command the page refused — an autoplay
- * policy denying `play()`, say — leaves the button showing the truth instead of
- * silently pretending it worked.
+ * Three channels, in the order `planMediaCommand` picks for each command: the
+ * page's own Media Session handler, its media elements, and the accessible
+ * Play/Pause control of a player that exposes neither. A page that answers none
+ * of them is left alone, which is the honest outcome.
+ *
+ * Two things follow every command. The state report tells the header what
+ * actually happened, so a command the page refused — an autoplay policy denying
+ * `play()`, say — leaves the button showing the truth instead of silently
+ * pretending it worked.
  */
-ipcRenderer.on('nodus-browser:page:mediaCommand', (_event, command: string) => {
+ipcRenderer.on('nodus-browser:page:mediaCommand', async (_event, command: string) => {
   const known: MediaCommand[] = ['previous', 'play', 'pause', 'next', 'stop'];
   if (known.indexOf(command as MediaCommand) < 0) return;
   const elements = mediaElements();
-  const domHandled = applyMediaCommand(elements, command as MediaCommand, lastPlayed);
-  const semantic = domHandled
-    ? { handled: false, scope: lastSemanticScope }
-    : applySemanticMediaCommand(page.document, command as MediaCommand, lastSemanticScope);
-  if (semantic.scope) lastSemanticScope = semantic.scope;
-  const handled = domHandled || semantic.handled;
-  ipcRenderer.send('nodus-browser:page:mediaCommandResult', { command, handled });
-  // An aggregate report is authoritative only when this preload can actually
-  // see media elements. A WebAudio player such as ElevenReader exposes none:
+  const plan = planMediaCommand(command as MediaCommand);
+
+  let sessionHandled = false;
+  let semanticHandled = false;
+
+  // The page's own handler, as the one channel that reaches a playlist kept
+  // inside a single element. A page that registered none answers 'no-handler'
+  // and costs nothing.
+  const sessionChannel = async (): Promise<boolean> => {
+    if (!plan.action) return false;
+    sessionHandled = await invokeMediaSessionAction(plan.action);
+    return sessionHandled;
+  };
+
+  // The elements, then the accessible Play/Pause control of a player that
+  // exposes no element at all (a WebAudio reader, say).
+  const elementChannel = async (): Promise<boolean> => {
+    if (applyMediaCommand(elements, command as MediaCommand, lastPlayed)) return true;
+    const semantic = applySemanticMediaCommand(page.document, command as MediaCommand, lastSemanticScope);
+    if (semantic.scope) lastSemanticScope = semantic.scope;
+    semanticHandled = semantic.handled;
+    return semantic.handled;
+  };
+
+  // Each channel runs at most once, and the first one that acts ends the
+  // command: a handler called twice would skip two tracks on a single press.
+  for (const channel of mediaChannels(plan)) {
+    const handled = channel === 'session' ? await sessionChannel() : await elementChannel();
+    if (handled) break;
+  }
+
+  const reported = playbackAfterCommand(command as MediaCommand);
+  // An aggregate report is authoritative only when this preload can actually see
+  // media elements. A WebAudio player such as ElevenReader exposes none:
   // reporting `false` after its visible Pause button was clicked overwrote
   // Chromium's real event and made the header lie while the audio kept going.
   if (elements.length > 0) {
     // Long enough for a resolved play() to have flipped `paused`, short enough
     // that the button does not sit wrong while the user is looking at it.
     setTimeout(() => reportPlaybackState(), 120);
-  } else if (semantic.handled) {
+  } else if (reported !== null && (semanticHandled || sessionHandled)) {
     // WebAudio/custom players do not emit HTMLMediaElement events, so Chromium
     // may keep reporting the pre-command state forever. Read the replacement
     // Play/Pause control after React has rendered it and update the header from
-    // that. Falling back to the requested state covers players whose accessible
-    // label does not change, while a refused click remains detectable because
-    // the old control is still present.
+    // that. Falling back to what the command asked for covers players whose
+    // accessible label does not change, while a refused click remains detectable
+    // because the old control is still present.
     setTimeout(() => {
       const observed = semanticPlaybackState(page.document, lastSemanticScope);
-      const requested = command === 'play';
-      ipcRenderer.send('nodus-browser:page:media', {
-        playing: observed ?? requested,
-        kind: 'unknown',
-      });
+      ipcRenderer.send('nodus-browser:page:media', { playing: observed ?? reported, kind: 'unknown' });
     }, 120);
   }
 });

@@ -10,6 +10,7 @@
 import { RELEASE_5_4_0_ADDITIONS } from './releaseNotes540';
 import { RELEASE_5_4_2_HIGHLIGHTS } from './releaseNotes542';
 import { RELEASE_5_4_3_HIGHLIGHTS } from './releaseNotes543';
+import { RELEASE_5_4_4_HIGHLIGHTS } from './releaseNotes544';
 import type { VaultType } from './vaultTypes';
 import { RELEASE_NOTES_IT } from './releaseNotes.it';
 import { RELEASE_NOTES_TR } from './releaseNotes.tr';
@@ -2977,6 +2978,11 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.4.4',
+    date: '2026-09-14',
+    highlights: RELEASE_5_4_4_HIGHLIGHTS,
+  },
   {
     version: '5.4.3',
     date: '2026-09-14',

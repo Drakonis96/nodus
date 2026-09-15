@@ -87,6 +87,12 @@ export const GLOBAL_PREF_KEYS = [
   'browserSearchTemplate',
   'browserHistoryRetention',
   'browserClearHistoryOnClose',
+  // The processing log is one global file (a corpus run crosses vaults and the Library), so
+  // its retention, its hard entry cap and the language its lines are rendered in cannot live
+  // per vault — switching vault must not hide half the failures.
+  'pipelineLogRetention',
+  'pipelineLogMaxEntries',
+  'pipelineLogLanguage',
 ] as const;
 export type GlobalPrefKey = (typeof GLOBAL_PREF_KEYS)[number];
 

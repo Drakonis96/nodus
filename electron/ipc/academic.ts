@@ -275,7 +275,7 @@ import os from 'node:os';
 import AdmZip from 'adm-zip';
 import { dialog, app } from 'electron';
 import { showImportOpenDialog } from '../privacy';
-import type { AnalysisRunOptions, ModelRef, StudyMaterialImportInput } from '@shared/types';
+import type { AnalysisRunOptions, ModelRef, StudyMaterialImportInput, WorkDeletionOutcome } from '@shared/types';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { stopMcpServer, stopMcpTunnel } from '../mcp';
 import * as works from '../db/worksRepo';
@@ -292,6 +292,8 @@ import * as chat from '../db/chatRepo';
 import * as notes from '../db/notesRepo';
 import * as workspace from '../db/workspaceRepo';
 import { getDb } from '../db/database';
+import { deleteWorks, worksRunningNow } from '../db/workDeletion';
+import { removeGlobalLibraryLinksForWorks } from '../library/libraryService';
 import { getActiveVault } from '../vaults/vaultRegistry';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -574,6 +576,48 @@ export function registerAcademicIpc(context: IpcContext): void {
       scanQueue.enqueue(id, w.title, 'deep', model);
     }
   });
+  /**
+   * Remove works from the current vault together with their derived data.
+   *
+   * Returns a result object instead of throwing on the one expected refusal, so the
+   * renderer can word it in the reader's language. The refusal is the point: a running
+   * analysis publishes its idea occurrences after the provider call returns, and those
+   * rows have no foreign key to `works`, so deleting underneath it would resurrect
+   * rows for a work that no longer exists.
+   */
+  h('works:delete', async (_e, nodusIds: string[]): Promise<WorkDeletionOutcome> => {
+    const ids = [...new Set((nodusIds ?? []).filter((id) => typeof id === 'string' && id.length > 0))];
+    if (ids.length === 0) return { ok: true, running: [], deleted: [], dormantIdeas: 0, globalLinks: 0 };
+
+    const queueItems = scanQueue.snapshot().items;
+    const running = worksRunningNow(ids, queueItems);
+    if (running.length > 0) return { ok: false, running, deleted: [], dormantIdeas: 0, globalLinks: 0 };
+
+    // Pending jobs go first: the queue must never pick up a work that is about to
+    // disappear, and `removeItem` also asks a job that started meanwhile to settle.
+    for (const item of queueItems) {
+      if (ids.includes(item.nodus_id)) scanQueue.removeItem(item.id);
+    }
+
+    const vaultId = getActiveVault()?.id ?? null;
+    const result = deleteWorks(ids, { vaultId });
+    // The Global Library index lives in its own database and only needs cleanup when it
+    // is configured; a failure there must not undo a delete that already happened.
+    let globalLinks = 0;
+    try {
+      globalLinks = removeGlobalLibraryLinksForWorks(vaultId, result.deleted);
+    } catch (error) {
+      console.error('[works:delete] no se pudieron limpiar los enlaces de la Biblioteca global', error);
+    }
+    // The document index keeps campaigns per vault; its jobs cascade away with the
+    // works, so let it reconcile instead of discovering the gap on its next poll.
+    if (vaultId) {
+      void documentIndexQueue.refreshVault(vaultId).catch((error) => {
+        console.error('[works:delete] no se pudo reconciliar el índice documental', error);
+      });
+    }
+    return { ok: true, running: [], deleted: result.deleted, dormantIdeas: result.dormantIdeas, globalLinks };
+  });
   h('works:processFull', async (_e, nodusId: string, model?: ModelRef | null, options?: AnalysisRunOptions) => {
     processFullChain(nodusId, model, options);
   });
@@ -823,14 +867,14 @@ export function registerAcademicIpc(context: IpcContext): void {
     const vault = getActiveVault();
     return documentIndexQueue.startVaultCampaign(vault.id, { ...options, mode: 'manual' });
   });
-  h('documents:index:enqueue', async (_e, nodusId: string) => {
-    await documentIndexQueue.enqueueWork(getActiveVault().id, nodusId, 750, 'manual');
+  h('documents:index:enqueue', async (_e, nodusId: string, vaultId?: string) => {
+    await documentIndexQueue.enqueueWork(vaultId ?? getActiveVault().id, nodusId, 750, 'manual');
   });
   h('documents:index:campaignStatus', async (_e, vaultId: string, campaignId: string, status: 'running' | 'paused' | 'cancelled') => {
     await documentIndexQueue.setCampaignStatus(vaultId, campaignId, status);
   });
-  h('documents:index:cancelJob', async (_e, jobId: string) => {
-    await documentIndexQueue.cancelJob(getActiveVault().id, jobId);
+  h('documents:index:cancelJob', async (_e, jobId: string, vaultId?: string) => {
+    await documentIndexQueue.cancelJob(vaultId ?? getActiveVault().id, jobId);
   });
 
   // Stellar canvas

@@ -85,6 +85,8 @@ export interface BrowserBookmarksExportResult {
   format: 'json' | 'html';
   bookmarks: number;
   folders: number;
+  /** Base name the user accepted in the native dialog, so the UI can confirm it. */
+  fileName?: string;
 }
 
 export interface BrowserBookmarkCandidate {
@@ -500,21 +502,41 @@ export function searchBrowserBookmarks(store: BrowserBookmarkStore, query: strin
 }
 
 function escapeHtml(value: unknown): string {
-  return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function decodeHtml(value: string): string {
   const named: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
-  return value.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (_all, dec, hex, name) => {
+  // Tags are dropped BEFORE entities are decoded: a title that legitimately
+  // contains "&lt;tag&gt;" must keep those characters, and only markup that was
+  // markup in the file itself is removed.
+  return value.replace(/<[^>]*>/g, '').replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (_all, dec, hex, name) => {
     if (dec) return String.fromCodePoint(Math.min(0x10ffff, Number(dec)));
     if (hex) return String.fromCodePoint(Math.min(0x10ffff, Number.parseInt(hex, 16)));
     return named[String(name).toLowerCase()] ?? '';
-  }).replace(/<[^>]*>/g, '');
+  });
 }
 
 function htmlAttribute(source: string, name: string): string {
   const match = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i').exec(source);
   return decodeHtml(match?.[1] ?? match?.[2] ?? match?.[3] ?? '');
+}
+
+/**
+ * Suggested name for the native save dialog: `nodus-bookmarks-YYYY-MM-DD.<format>`.
+ *
+ * The stamp is the user's LOCAL date, not UTC: the name is read as "the backup I
+ * took today", so a late-evening export must not be dated tomorrow or yesterday.
+ */
+export function browserBookmarksExportFileName(format: 'json' | 'html', date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const stamp = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `nodus-bookmarks-${stamp}.${format}`;
 }
 
 export function exportBrowserBookmarksJson(store: BrowserBookmarkStore): string {

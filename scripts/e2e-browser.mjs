@@ -71,6 +71,32 @@ const PAGES = {
           <source src="/tone.wav" type="audio/wav">
         </audio></main></body></html>`,
 
+  // Spotify/YouTube shaped: ONE media element for every track, with the playlist
+  // owned by the page's own JavaScript and published through Media Session
+  // handlers. The DOM alone cannot move this player — there is no second element
+  // to move to — which is exactly why Previous/Next, sent as Chromium media keys
+  // that never reach a page, could only ever pause it.
+  '/session-player': `<!doctype html><html><head><title>Session player</title></head><body><main>
+        <audio id="track" controls loop></audio>
+        <script>
+          window.__sessionActions = [];
+          window.__trackIndex = 0;
+          const audio = document.getElementById('track');
+          const tracks = ['/tone.wav?one', '/tone.wav?two'];
+          const load = () => { audio.src = tracks[window.__trackIndex]; audio.play().catch(() => {}); };
+          navigator.mediaSession.setActionHandler('nexttrack', () => {
+            window.__sessionActions.push('nexttrack');
+            window.__trackIndex = Math.min(tracks.length - 1, window.__trackIndex + 1);
+            load();
+          });
+          navigator.mediaSession.setActionHandler('previoustrack', () => {
+            window.__sessionActions.push('previoustrack');
+            window.__trackIndex = Math.max(0, window.__trackIndex - 1);
+            load();
+          });
+          load();
+        </script></main></body></html>`,
+
   '/storage': `<!doctype html><html><head><title>Storage page</title></head><body><main>
         <script>
           document.cookie = 'nodus_e2e=1; path=/; max-age=3600';
@@ -1428,6 +1454,84 @@ try {
     assert.equal(await deviceVolume.inputValue(), currentVolume);
     await page.keyboard.press('Escape');
     await popover.waitFor({ state: 'detached' });
+  });
+
+  // The bug this covers: Previous/Next on a player that keeps its whole playlist
+  // in one element (Spotify, YouTube) used to send Chromium media keys, which are
+  // dispatched in the browser process and never reach a page — so the buttons
+  // either did nothing or, through the DOM fallback, only restarted or silenced
+  // the track already playing. Here nothing in the DOM can move this player: the
+  // only channel is the handler it registered on its Media Session.
+  await check('Previous/Next drive a single-element player through its Media Session handlers', async () => {
+    await call('submitBrowserOmnibox', `${origin}/session-player`);
+    await waitFor((s) => s.tabs.some((t) => t.url.endsWith('/session-player') && !t.loading), 'the session player page');
+
+    const readPlayer = () => app.evaluate(async ({ webContents }) => {
+      const target = webContents.getAllWebContents().find((wc) => wc.getURL().endsWith('/session-player'));
+      if (!target) throw new Error('session player tab missing');
+      return target.executeJavaScript(`(() => {
+        const audio = document.getElementById('track');
+        return {
+          actions: [...window.__sessionActions],
+          index: window.__trackIndex,
+          src: String(audio.currentSrc || audio.src),
+          paused: audio.paused,
+        };
+      })()`, true);
+    });
+    const waitForPlayer = async (predicate) => {
+      const timeout = Date.now() + 8000;
+      let last = await readPlayer();
+      while (Date.now() < timeout) {
+        if (predicate(last)) return last;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        last = await readPlayer();
+      }
+      throw new Error(`session player never settled; last: ${JSON.stringify(last)}`);
+    };
+
+    await app.evaluate(async ({ webContents }) => {
+      const target = webContents.getAllWebContents().find((wc) => wc.getURL().endsWith('/session-player'));
+      await target.executeJavaScript('document.getElementById("track").play()', true);
+    });
+    const started = Date.now();
+    let media = [];
+    while (Date.now() - started < 15000) {
+      media = await call('getBrowserMedia');
+      if (media.some((state) => state.playing)) break;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+    assert.ok(media.some((state) => state.playing), 'the session player must raise a media session');
+
+    await page.getByTestId('browser-media-header-action').getByRole('button', { name: 'Medios', exact: true }).click();
+    const popover = page.getByTestId('browser-media-popover');
+    try {
+      await popover.waitFor({ state: 'visible' });
+      const row = popover.getByTestId('browser-media-row').filter({ hasText: 'Session player' });
+      await row.waitFor({ state: 'visible' });
+
+      await row.getByRole('button', { name: 'Siguiente', exact: true }).click();
+      const advanced = await waitForPlayer((player) => player.index === 1);
+      assert.deepEqual(advanced.actions, ['nexttrack'], 'Next must run the handler the page itself registered');
+      assert.match(advanced.src, /\?two$/, 'the player must have moved to its second track');
+
+      await row.getByRole('button', { name: 'Anterior', exact: true }).click();
+      const rewound = await waitForPlayer((player) => player.index === 0);
+      assert.deepEqual(rewound.actions, ['nexttrack', 'previoustrack'], 'Previous must run the handler the page itself registered');
+      assert.match(rewound.src, /\?one$/, 'the player must have moved back to its first track');
+
+      // Play/pause took the element path before this change and must still work.
+      await row.getByRole('button', { name: 'Pausar', exact: true }).click();
+      const paused = await waitForPlayer((player) => player.paused === true);
+      assert.equal(paused.actions.length, 2, 'pausing must not go through the track handlers');
+      await row.getByRole('button', { name: 'Reproducir', exact: true }).click();
+      await waitForPlayer((player) => player.paused === false);
+    } finally {
+      // The popover freezes the page behind an overlay. Leaving it open because
+      // an assertion failed would hide the header from every later check.
+      await page.keyboard.press('Escape').catch(() => undefined);
+      await popover.waitFor({ state: 'detached' }).catch(() => undefined);
+    }
   });
 
   await check('restart warns for media and stops the Browser media session', async () => {

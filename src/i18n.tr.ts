@@ -34,6 +34,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { PIPELINE_LOG_TRANSLATIONS } from './i18n.pipelineLogs';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
@@ -115,6 +116,7 @@ export const TR: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.tr,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.tr,
   ...NODI_NOTIFICATION_TRANSLATIONS['tr'],
+  ...PIPELINE_LOG_TRANSLATIONS['tr'],
   ...ANNOUNCEMENT_TRANSLATIONS['tr'],
   ...WORLD_CHAT_TRANSLATIONS.tr,
   ...STUDY_SYNONYM_TRANSLATIONS.tr,
@@ -695,6 +697,17 @@ export const TR: Record<string, string> = {
   "Escaneando pares semánticos…": "Anlamsal çiftler taranıyor…",
   "OCR de imagen…": "Resim OCR'si…",
   "Analizando PDF…": "PDF analiz ediliyor…",
+  "Iniciando extracción…": "Çıkarma başlatılıyor…",
+  "Extracción completada.": "Çıkarma tamamlandı.",
+  "Extracción cancelada.": "Çıkarma iptal edildi.",
+  "Documento añadido a la cola de extracción.": "Belge çıkarma kuyruğuna eklendi.",
+  "Documento priorizado para abrirlo en cuanto esté listo.": "Belge hazır olur olmaz açılması için önceliklendirildi.",
+  "Extrayendo imágenes y figuras…": "Görseller ve şekiller çıkarılıyor…",
+  "Guardando Markdown y trazabilidad…": "Markdown ve izlenebilirlik kaydediliyor…",
+  "Extrayendo página {page} de {total}…": "Sayfa {page}/{total} çıkarılıyor…",
+  "OCR local {page} de {total}…": "Yerel OCR {page}/{total}…",
+  "OCR remoto {n} de {total}…": "Uzak OCR {n}/{total}…",
+  "Analizando {file}…": "{file} analiz ediliyor…",
   "Comprobando índice de Zotero…": "Zotero endeksi kontrol ediliyor…",
   "Buscando texto abierto (Unpaywall)…": "Açık metin aranıyor (Unpaywall)…",
   "Validando candidatos con IA": "Adayları yapay zeka ile doğrulama",
@@ -1583,6 +1596,9 @@ export const TR: Record<string, string> = {
   "Pulido y estabilidad": "Parlatma ve stabilite",
   "Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.": "Kullanıcı geri bildirimleriyle hataları düzeltin, performansı artırın ve genel deneyimi iyileştirin.",
   "Nodus Toolkit": "Nodus Araç Seti",
+  "Nodus Convert": "Nodus Convert",
+  "Nodus Translate": "Nodus Translate",
+  "MCP": "MCP",
   "Nodus Radar": "Nodus Radar",
   "Nodus Compass": "Nodus Compass",
   "Nodus Tools": "Nodus Tools",
@@ -2613,6 +2629,15 @@ export const TR: Record<string, string> = {
   'Faltan {n} paso(s). Se encolarán y verás el progreso en la cola.': '{n} adım eksik. Kuyruğa alınacaklar ve ilerlemeyi kuyrukta göreceksin.',
   'No queda nada pendiente en esta obra.': 'Bu eserde bekleyen bir şey yok.',
   'Reintentar lo que falta': 'Eksik olanları yeniden dene',
+  'Encola solo los pasos incompletos, pendientes o fallidos de cada obra seleccionada. No vuelve a analizar lo que ya está hecho.': 'Yalnızca seçilen her eserin tamamlanmamış, bekleyen veya başarısız adımlarını kuyruğa alır. Zaten yapılmış olanı yeniden analiz etmez.',
+  'No queda nada pendiente en la selección.': 'Seçimde bekleyen bir şey yok.',
+  'Pendientes en cola para {n} obra(s). Verás el progreso en la cola.': '{n} eser için bekleyen adımlar kuyruğa alındı. İlerlemeyi kuyrukta göreceksin.',
+  'Eliminar las {n} obras seleccionadas': 'Seçili {n} eseri sil',
+  'Se eliminarán del vault actual las {n} obra(s) seleccionada(s), junto con sus ideas extraídas, sus pasajes, sus embeddings y el resto de datos derivados. Las ideas y demás datos que compartan con otras obras se conservan. Esta acción no se puede deshacer.': 'Seçili {n} eser, çıkarılmış fikirleri, pasajları, embedding’leri ve diğer türetilmiş verileriyle birlikte geçerli kasadan silinecek. Diğer eserlerle paylaşılan fikirler ve veriler korunur. Bu işlem geri alınamaz.',
+  'Elimina estas obras del vault actual con sus ideas, pasajes, embeddings y demás datos derivados. Lo que otras obras comparten no se toca.': 'Bu eserleri fikirleri, pasajları, embedding’leri ve diğer türetilmiş verileriyle birlikte geçerli kasadan siler. Diğer eserlerin paylaştıklarına dokunulmaz.',
+  'No se pueden eliminar obras que se están analizando ahora mismo ({n}). Espera a que terminen o detén la cola.': 'Şu anda analiz edilen eserler silinemez ({n}). Bitmelerini bekle veya kuyruğu durdur.',
+  'Se eliminaron {n} obra(s) del vault.': '{n} eser kasadan silindi.',
+  'No se pudieron eliminar las obras seleccionadas.': 'Seçili eserler silinemedi.',
   'No aplica': 'Uygulanamaz',
   'Solo abstract': 'Yalnızca özet',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'Nodus okunacak metin bulamadı. PDF veya EPUB dosyasını Zotero’ya ekleyip yeniden analiz et.',
@@ -7988,6 +8013,8 @@ export const TR: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "Yeni sekme",
   "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser en fazla {n} sekme tutar.",
+  "Desplazar las pestañas a la izquierda": "Sekmeleri sola kaydır",
+  "Desplazar las pestañas a la derecha": "Sekmeleri sağa kaydır",
   // Nodus Browser: media
   "Medios": "Medya",
   "Reproduciéndose en Nodus Browser": "Nodus Browser'da oynatılıyor",
@@ -8451,6 +8478,14 @@ export const TR: Record<string, string> = {
   "Contraer carpeta": "Klasörü daralt",
   "Expandir carpeta": "Klasörü genişlet",
   "Añadir un marcador": "Yer işareti ekle",
+  "Exportar HTML": "HTML dışa aktar",
+  "Exportar todos los marcadores como HTML compatible con Chrome, Edge, Firefox, Brave y Opera": "Tüm yer işaretlerini Chrome, Edge, Firefox, Brave ve Opera ile uyumlu HTML olarak dışa aktar",
+  "Exportación cancelada.": "Dışa aktarma iptal edildi.",
+  "Importar HTML": "HTML içe aktar",
+  "Importar marcadores desde un archivo HTML de Chrome, Edge, Firefox, Brave u Opera": "Chrome, Edge, Firefox, Brave veya Opera HTML dosyasından yer işaretlerini içe aktar",
+  "Importación cancelada.": "İçe aktarma iptal edildi.",
+  "Ningún marcador guardado se sobrescribe: las direcciones repetidas se omiten.": "Kayıtlı hiçbir yer işaretinin üzerine yazılmaz: yinelenen adresler atlanır.",
+  "Se exportaron {bookmarks} marcadores y {folders} carpetas en {file}.": "{bookmarks} yer işareti ve {folders} klasör {file} konumuna aktarıldı.",
   "Añadir subcarpeta": "Alt klasör ekle",
   "Copiar URL": "URL'yi kopyala",
   "Se importaron {bookmarks} marcadores y {folders} carpetas. Se omitieron {duplicates} duplicados.": "{bookmarks} yer işareti ve {folders} klasör içe aktarıldı. {duplicates} yinelenen atlandı.",

@@ -52,6 +52,12 @@ import { recordOpenCodeGoUsage } from './openCodeGoUsage';
 import { AI_MODEL_REQUIRED_ERROR_CODE } from '@shared/aiModelRequired';
 import { createHash } from 'node:crypto';
 import {
+  logPipelineFailure,
+  logPipelineWarning,
+  type PipelineLogCode,
+  type PipelineLogSubjectId,
+} from '../logging/pipelineLogCore';
+import {
   AiRequestScheduler,
   type AiRequestClass,
   type AiRequestDescriptor,
@@ -225,12 +231,17 @@ export class AiError extends Error {
    * @param retriable transient provider error (rate limit / 5xx) — worth a backoff retry.
    * @param config    misconfiguration (no model / no key) — the SAME for every job, so the
    *                  queue should pause and surface it once instead of failing every item.
+   * @param code      which failure this is. The transport branches below fill it in so the
+   *                  processing log can carry a stable, language-neutral badge (and so the
+   *                  recovery strategies can match a tag instead of provider prose).
    */
   constructor(
     message: string,
     public retriable = false,
     public config = false,
-    public code: 'output_truncated' | 'invalid_json' | 'timeout' | 'provider_empty_error' | 'context_overflow' | typeof AI_MODEL_REQUIRED_ERROR_CODE | null = null,
+    public code: 'output_truncated' | 'invalid_json' | 'schema_mismatch' | 'timeout' | 'provider_empty_error'
+      | 'context_overflow' | 'rate_limit' | 'provider_5xx' | 'auth' | 'bad_request' | 'connection'
+      | typeof AI_MODEL_REQUIRED_ERROR_CODE | null = null,
   ) {
     super(message);
   }
@@ -240,7 +251,9 @@ export class AiError extends Error {
  *  them. They classify themselves instead — see `providerErrors.ts`. */
 function subscriptionError(error: unknown): AiError {
   const { message, retriable, config } = classifyProviderError(error);
-  return new AiError(message, retriable, config);
+  const wrapped = new AiError(message, retriable, config);
+  logProviderFailure(wrapped, error);
+  return wrapped;
 }
 
 /**
@@ -937,10 +950,30 @@ async function withProviderRetries<T>(
       return await make();
     } catch (e) {
       if (attempt < maxRateWaits && isRateLimited(e)) {
+        // Recovered, but worth recording: a provider capping the run is the first thing
+        // anyone looks for when indexing crawls, and the wait itself explains the delay.
+        logPipelineWarning({
+          subject: 'subjectModelCall',
+          code: 'rate_limit',
+          message: {
+            id: 'logRetry',
+            params: { subject: { id: 'subjectModelCall' }, attempt: attempt + 2, max: maxRateWaits + 1 },
+          },
+          detail: e instanceof Error ? e.message : String(e),
+        });
         await sleep(retryAfterMs(e), signal);
         continue;
       }
       if (serverRetries < maxServerRetries && isTransientServerError(e)) {
+        logPipelineWarning({
+          subject: 'subjectModelCall',
+          code: 'provider_5xx',
+          message: {
+            id: 'logRetry',
+            params: { subject: { id: 'subjectModelCall' }, attempt: serverRetries + 2, max: maxServerRetries + 1 },
+          },
+          detail: e instanceof Error ? e.message : String(e),
+        });
         await sleep(500 * (serverRetries + 1) ** 2, signal);
         serverRetries += 1;
         continue;
@@ -1342,12 +1375,78 @@ async function rawCompleteTransport(
     }
     return content;
   } catch (e: any) {
+    // A caller abort (pause/cancel/stop) surfaces from the OpenAI SDK as
+    // APIUserAbortError ("Request was aborted."). It must stay a cancellation:
+    // wrapping it here would record a permanent, scary-looking job failure
+    // instead of letting the queue settle the job as cancelled/paused.
+    if (opts.signal?.aborted) throw opts.signal.reason ?? e;
     if (e instanceof AiError) throw e;
     throw wrapProviderError(e);
   }
 }
 
+/**
+ * Wrap a provider/transport failure and record it in the processing log.
+ *
+ * This is the choke point for every model failure in the app: the classifier below is the
+ * only place that knows which branch a provider error took, and it runs once per FINAL
+ * failure (`withProviderRetries` retries the raw error before anything is wrapped). Logging
+ * here rather than at each of the ~16 raise sites is why a provider outage is reported with
+ * its real code — timeout, rate_limit, auth, invalid_json — instead of a generic "AI error".
+ */
 function wrapProviderError(e: any): AiError {
+  const wrapped = classifyToAiError(e);
+  logProviderFailure(wrapped, e);
+  return wrapped;
+}
+
+/** Record one provider failure, with the code the classifier just decided. */
+function logProviderFailure(wrapped: AiError, original: unknown): void {
+  const code = providerLogCode(wrapped);
+  logPipelineFailure({
+    error: wrapped,
+    code,
+    subject: providerLogSubject(code),
+    attempts: null,
+    // The provider's own words, which our Spanish re-wording above replaces: that is what a
+    // maintainer needs in a GitHub issue, and the log line is the translation on top of it.
+    detail: original instanceof Error && original.message ? original.message : wrapped.message,
+  });
+}
+
+/** The log code that matches the AiError the classifier produced. */
+function providerLogCode(error: AiError): PipelineLogCode {
+  switch (error.code) {
+    case 'invalid_json': return 'invalid_json';
+    case 'schema_mismatch': return 'schema_mismatch';
+    case 'output_truncated': return 'output_truncated';
+    case 'timeout': return 'timeout';
+    case 'context_overflow': return 'context_overflow';
+    case 'provider_empty_error': return 'provider_empty';
+    case 'rate_limit': return 'rate_limit';
+    case 'provider_5xx': return 'provider_5xx';
+    case 'auth': return 'auth';
+    case 'bad_request': return 'bad_request';
+    case 'connection': return 'connection';
+    default: break;
+  }
+  if (error.code === AI_MODEL_REQUIRED_ERROR_CODE || error.config) return 'model_missing';
+  return 'unknown';
+}
+
+/** The sentence the log will show, so a JSON failure does not read as a model failure. */
+function providerLogSubject(code: PipelineLogCode): PipelineLogSubjectId {
+  if (code === 'invalid_json' || code === 'schema_mismatch' || code === 'output_truncated') return 'subjectJsonResponse';
+  if (code === 'embedding_failed' || code === 'embedding_count_mismatch') return 'subjectEmbeddings';
+  return 'subjectModelCall';
+}
+
+/**
+ * Map one provider/transport failure onto our own error taxonomy. Pure: it decides, the
+ * wrapper above records. (`classifyProviderError` in providerErrors.ts is the subscription
+ * runtimes' OWN classifier — same idea, different providers.)
+ */
+function classifyToAiError(e: any): AiError {
   // Only OUR OWN cutoff errors are re-typed. Matching prose used to catch anything that
   // said "truncated" — an upstream gateway timeout was enough to send a deep scan
   // doubling its budget and splitting a chunk to chase a network hiccup.
@@ -1360,31 +1459,33 @@ function wrapProviderError(e: any): AiError {
   // (400 from local servers, 400/413 from cloud). Reword it before status-based mapping
   // so the user gets an actionable message instead of a raw "n_keep >= n_ctx".
   if (isContextOverflow(e?.error?.message ?? e?.message)) {
-    return new AiError(genericContextOverflowMessage(), false, true);
+    return new AiError(genericContextOverflowMessage(), false, true, 'context_overflow');
   }
   // Tagged, not merely worded: the deep scan answers a timeout by splitting the chunk
   // (less to generate → it fits), which it must not do for an unrelated failure.
   if (e?.name?.includes('Timeout') || /timeout|timed out/i.test(e?.message ?? '')) {
     return new AiError('Tiempo agotado esperando al proveedor de IA. Prueba con un modelo más rápido o un fragmento menor.', false, false, 'timeout');
   }
-  if (status === 429 || status === 529) return new AiError('Límite de tasa del proveedor de IA', true);
-  if (status >= 500) return new AiError(`Error del proveedor (${status})`, true);
-  if (status === 401 || status === 403) return new AiError('Clave de IA inválida. Revísala en Ajustes.', false, true);
+  if (status === 429 || status === 529) return new AiError('Límite de tasa del proveedor de IA', true, false, 'rate_limit');
+  if (status >= 500) return new AiError(`Error del proveedor (${status})`, true, false, 'provider_5xx');
+  if (status === 401 || status === 403) return new AiError('Clave de IA inválida. Revísala en Ajustes.', false, true, 'auth');
   if (status === 400) {
     const detail = e?.error?.message ?? e?.message;
     const readable = detail && !/no body/i.test(detail) ? detail : null;
     // Not every provider answers a bad key with 401: Gemini returns 400 "Invalid Auth key.".
     if (readable && /invalid auth|api[ _-]?key|API_KEY_INVALID|unauthenticated|invalid credential/i.test(readable)) {
-      return new AiError('Clave de IA inválida. Revísala en Ajustes.', false, true);
+      return new AiError('Clave de IA inválida. Revísala en Ajustes.', false, true, 'auth');
     }
     // With a readable reason, say it. Without one, say only what we know: Gemini returns its
     // error as a JSON array that the OpenAI SDK cannot parse, so its 400s arrive as "no body"
     // — and blaming the context size there sends someone with a mistyped key off to trim their
     // data. A 400 we cannot explain should name the likely causes, not pick one.
-    if (readable) return new AiError(`El proveedor rechazó la solicitud (400). Detalle: ${readable}`, false);
+    if (readable) return new AiError(`El proveedor rechazó la solicitud (400). Detalle: ${readable}`, false, false, 'bad_request');
     return new AiError(
       'El proveedor rechazó la solicitud (400) sin explicar el motivo. Suele ser la clave de IA (revísala en Ajustes) o, con mucho contexto, una petición que supera el límite del modelo.',
-      false
+      false,
+      false,
+      'bad_request'
     );
   }
   // A dropped socket has no status, so nothing above classified it and it used to
@@ -1392,7 +1493,7 @@ function wrapProviderError(e: any): AiError {
   // retriable and let each caller's bounded retry ride it out (4 attempts in the
   // scan queue, 5 document attempts), so a dead endpoint still gives up.
   if (isTransientNetworkFailure(e)) {
-    return new AiError(message || 'Error de conexión con el proveedor de IA.', true, false);
+    return new AiError(message || 'Error de conexión con el proveedor de IA.', true, false, 'connection');
   }
   return new AiError(message || 'Error de IA', false);
 }
@@ -1442,7 +1543,7 @@ function extractJson(text: string): unknown {
   t = t.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
   const first = t.indexOf('{');
   const last = t.lastIndexOf('}');
-  if (first === -1 || last === -1) throw new AiError('La respuesta no contiene JSON');
+  if (first === -1 || last === -1) throw new AiError('La respuesta no contiene JSON', false, false, 'invalid_json');
   const candidate = t.slice(first, last + 1);
   try {
     return JSON.parse(candidate);
@@ -1472,7 +1573,7 @@ async function parseOrRepair<T>(
   if (guard(parsed)) return parsed;
   // Well-formed JSON that misses the schema is also resampled without changing the
   // prompt, model, temperature, context or output budget.
-  throw new AiError('El JSON no cumple el esquema esperado');
+  throw new AiError('El JSON no cumple el esquema esperado', false, false, 'schema_mismatch');
 }
 
 /**
@@ -1531,11 +1632,45 @@ export async function completeJson<T>(
       // input; invariant resampling remains useful only for malformed/schema JSON.
       const outputTruncated = e instanceof AiError && e.code === 'output_truncated';
       retryDone({ status: 'error', error: errorMessage(e), retry: !outputTruncated && i < attempts - 1 });
-      if (outputTruncated) throw e;
+      if (outputTruncated) {
+        logJsonFailure(e);
+        throw e;
+      }
+      // A resample is worth seeing: the model produced malformed JSON and the frozen
+      // request was replayed unchanged. `logRetry` carries the attempt pair.
+      if (i < attempts - 1) {
+        logPipelineWarning({
+          subject: 'subjectJsonResponse',
+          code: e instanceof AiError && e.code ? e.code : 'invalid_json',
+          message: {
+            id: 'logRetry',
+            params: {
+              subject: { id: 'subjectJsonResponse' },
+              attempt: i + 2,
+              max: attempts,
+            },
+          },
+          detail: errorMessage(e),
+        });
+      }
       lastErr = e;
     }
   }
+  logJsonFailure(lastErr);
   throw lastErr instanceof Error ? lastErr : new AiError('Fallo de parseo JSON');
+}
+
+/**
+ * A response that came back but could not be used. Logged once, after the resamples are
+ * exhausted, so a JSON failure is not silently reported as just another failed job.
+ */
+function logJsonFailure(error: unknown): void {
+  const code: PipelineLogCode = error instanceof AiError && error.code === 'output_truncated'
+    ? 'output_truncated'
+    : error instanceof AiError && error.code === 'schema_mismatch'
+      ? 'schema_mismatch'
+      : 'invalid_json';
+  logPipelineFailure({ error, code, subject: 'subjectJsonResponse' });
 }
 
 /** Plain-text completion for conversational assistant responses. */
@@ -2092,6 +2227,13 @@ export async function embedManyStrict(texts: string[], signal?: AbortSignal, opt
     { ...options, jobId: options.jobId ? `${options.jobId}:batch:${index}` : undefined },
   )))).flat();
   if (vectors.length !== texts.length) {
+    // One missing vector publishes a broken index, so this aborts the work — and it is the
+    // kind of provider misbehaviour that is impossible to diagnose without the counts.
+    logPipelineFailure({
+      subject: 'subjectEmbeddings',
+      code: 'embedding_count_mismatch',
+      detail: `expected ${texts.length} vectors, received ${vectors.length}`,
+    });
     throw new AiError(`La indexación produjo ${vectors.length} embeddings para ${texts.length} entradas; no se publicará un índice incompleto.`, false);
   }
   return vectors;

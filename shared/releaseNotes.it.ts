@@ -1,6 +1,7 @@
 import { RELEASE_5_4_0_ADDITIONS } from './releaseNotes540';
 import { RELEASE_5_4_2_HIGHLIGHTS } from './releaseNotes542';
 import { RELEASE_5_4_3_HIGHLIGHTS } from './releaseNotes543';
+import { RELEASE_5_4_4_HIGHLIGHTS } from './releaseNotes544';
 // v2.6.0 and v2.6.1 intentionally share this exact Italian list — see the note
 // next to RELEASE_2_6_HIGHLIGHTS in releaseNotes.ts.
 const RELEASE_2_6_IT: string[] = [
@@ -169,6 +170,7 @@ const RELEASE_5_1_0_IT = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.4.4": RELEASE_5_4_4_HIGHLIGHTS.map(highlight => highlight.it),
   "5.4.3": RELEASE_5_4_3_HIGHLIGHTS.map(highlight => highlight.it),
   "5.4.2": RELEASE_5_4_2_HIGHLIGHTS.map(highlight => highlight.it),
   "5.4.0": [

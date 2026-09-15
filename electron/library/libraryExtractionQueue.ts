@@ -15,6 +15,7 @@ import {
 import { LibraryDiskStore } from './libraryStorage';
 import { failLibraryExtractionRevision, markLibraryExtractionRevision } from './libraryRevision';
 import { disposeLibraryExtractionWorkers, extractLibraryItemInWorker } from './libraryExtractionWorkerHost';
+import { logPipelineFailure, logPipelineSuccess, logPipelineWarning } from '../logging/pipelineLogCore';
 
 type ExtractFn = typeof extractLibraryItem;
 
@@ -188,6 +189,40 @@ export class LibraryExtractionQueue {
       this.catalog.putExtractionJob(job);
       this.catalog.indexItem(extractionResult.item, this.store);
       this.emit(job, 'Extracción completada.');
+      // The green line carries what the quality report measured — words, figures, tables —
+      // because "it worked" is not what someone needs when a document looks empty later.
+      const quality = extractionResult.quality;
+      const context = this.logContext(job);
+      if (quality.status === 'passed' && quality.warnings.length === 0) {
+        logPipelineSuccess({
+          subject: 'subjectLibraryExtraction',
+          context,
+          message: {
+            id: 'documentExtracted',
+            params: {
+              title: context.documentTitle ?? '',
+              words: quality.words,
+              figures: quality.figures,
+              tables: quality.tables,
+            },
+          },
+        });
+      } else {
+        // `needs-review` is not a failure, but it is the reason a reader finds an empty
+        // section two weeks later, so it is recorded with the report's own warnings.
+        logPipelineWarning({
+          subject: 'subjectLibraryExtraction',
+          code: 'no_legible_text',
+          context,
+          message: {
+            id: 'documentExtractedReview',
+            params: {
+              title: context.documentTitle ?? '',
+              warnings: quality.warnings.length ? quality.warnings.join('; ') : quality.status,
+            },
+          },
+        });
+      }
     } catch (error) {
       const live = this.catalog.getExtractionJob(job.id);
       if (controller.signal.aborted || live?.status === 'canceled' || (error instanceof Error && error.name === 'AbortError')) {
@@ -209,6 +244,12 @@ export class LibraryExtractionQueue {
             this.catalog.indexItem(canceledItem, this.store);
           }
         }
+        logPipelineWarning({
+          subject: 'subjectLibraryExtraction',
+          code: 'cancelled',
+          reason: 'reasonCancelled',
+          context: this.logContext(job),
+        });
       } else {
         const message = error instanceof Error ? error.message : String(error);
         job = { ...job, status: 'failed', error: message, updatedAt: new Date().toISOString() };
@@ -227,11 +268,32 @@ export class LibraryExtractionQueue {
           this.catalog.indexItem(failedItem, this.store);
         }
         this.emit(job, message);
+        logPipelineFailure({
+          error,
+          code: 'extract_failed',
+          subject: 'subjectLibraryExtraction',
+          context: this.logContext(job),
+          detail: message,
+        });
       }
     } finally {
       this.active.delete(initial.id);
       this.schedule();
     }
+  }
+
+  /**
+   * Which document a line is about. The Library is not vault-scoped, so the vault stays empty
+   * and the item id plus its title are what make a failure findable later.
+   */
+  private logContext(job: LibraryExtractionJob): { scope: 'library'; nodusId: string; jobId: string; documentTitle: string | null } {
+    const item = this.item(job.itemId);
+    return {
+      scope: 'library',
+      nodusId: job.itemId,
+      jobId: job.id,
+      documentTitle: item?.metadata?.title ?? null,
+    };
   }
 
   async waitForIdle(timeoutMs = 30_000): Promise<void> {

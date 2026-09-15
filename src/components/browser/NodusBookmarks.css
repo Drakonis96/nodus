@@ -103,6 +103,9 @@
 .nodus-start-page.bookmarks-main .atlas-card-actions { margin-top:14px; }
 .nodus-start-page.bookmarks-main .bookmark-delete { color:#fca5a5; border-color:rgba(248,113,113,.2); }
 .nodus-start-page.bookmarks-main .bookmark-delete:hover { color:#fecaca; border-color:rgba(248,113,113,.45); background:rgba(127,29,29,.2); }
+/* Export raises the native save dialog, which owns the window until it closes. */
+.nodus-start-page.bookmarks-main .atlas-facet-button:disabled { opacity:.6; cursor:default; }
+.nodus-start-page.bookmarks-main .atlas-facet-button:disabled:hover { color:var(--ink-2); border-color:var(--membrane); background:rgba(16,13,28,.62); }
 .nodus-start-page .bookmark-favicon { width:22px; height:22px; object-fit:contain; border-radius:5px; }
 .nodus-start-page .bookmark-folder-icon { display:grid; place-items:center; width:36px; height:36px; border:1px solid rgba(167,139,250,.25); border-radius:11px; background:rgba(139,92,246,.12); color:var(--violet-3); }
 .nodus-start-page .bookmark-favicon,

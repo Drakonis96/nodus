@@ -147,8 +147,8 @@ test('previous/next are commands, not guessed capability flags in the state', ()
   reset();
   media.noteMediaPlaying('tab-1', describe());
   const [state] = media.browserMediaStates();
-  // Chromium routes the standard media commands, but does not reveal whether a
-  // page registered handlers for them. The UI therefore sends commands without
+  // Whether a page registered a handler for them is not visible from here — the
+  // page preload finds out per command — so the UI sends commands without
   // inventing capability flags.
   assert.equal('canPrevious' in state, false);
   assert.equal('canNext' in state, false);
