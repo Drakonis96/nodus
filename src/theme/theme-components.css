@@ -196,3 +196,201 @@ html.theme-active.dark .toolkit-workspace :is([class~='border-amber-200'], [clas
 html.theme-active.light .toolkit-workspace :is([class~='border-amber-200'], [class~='border-amber-300'], [class~='border-amber-400'], [class~='border-amber-500'], [class~='border-amber-600']) { border-color: var(--a-600); }
 html.theme-active.dark .toolkit-workspace :is([class~='hover:border-amber-400']:hover, [class~='hover:border-amber-500\/60']:hover) { border-color: var(--a-500); }
 html.theme-active.light .toolkit-workspace :is([class~='hover:border-amber-400']:hover, [class~='hover:border-amber-500\/60']:hover) { border-color: var(--a-600); }
+
+/* Research chat has a few controls that predate the semantic button layer and
+ * several menus that portal directly to <body>. Give the whole surface one
+ * mode-aware accent, then restyle each portalled surface from the same tokens. */
+html.theme-active.dark .research-chat-surface,
+html.theme-active.light .research-chat-surface {
+  --vault-accent: var(--a-500);
+}
+html.theme-active.dark .research-chat-surface > :is([role='region'], [role='dialog']),
+html.theme-active.light .research-chat-surface > :is([role='region'], [role='dialog']) {
+  background-color: var(--n-950);
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .research-chat-surface > :is([role='region'], [role='dialog']) {
+  background-color: var(--n-50);
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .research-chat-surface .research-composer,
+html.theme-active.dark .research-chat-surface .research-composer-shell {
+  background-color: var(--n-900);
+  border-color: var(--theme-border-dark);
+}
+html.theme-active.light .research-chat-surface .research-composer,
+html.theme-active.light .research-chat-surface .research-composer-shell {
+  background-color: var(--n-50);
+  border-color: var(--theme-border-light);
+}
+html.theme-active.dark .research-chat-surface .research-assistant-actions > :is(button, .chat-skills-control),
+html.theme-active.light .research-chat-surface .research-assistant-actions > :is(button, .chat-skills-control) {
+  border-color: var(--theme-border-light-strong);
+}
+html.theme-active.dark .research-chat-surface .research-assistant-actions > :is(button, .chat-skills-control) { border-color: var(--theme-border-dark-strong); }
+html.theme-active.dark .research-chat-surface .research-composer-send { background-color: var(--a-500); }
+html.theme-active.light .research-chat-surface .research-composer-send { background-color: var(--a-600); }
+html.theme-active.dark .research-chat-surface .research-empty-state,
+html.theme-active.light .research-chat-surface .research-empty-state { color: var(--theme-text-dark); }
+html.theme-active.light .research-chat-surface .research-empty-state { color: var(--theme-text-light); }
+html.theme-active.dark .research-chat-surface .research-accent-badge {
+  background-color: color-mix(in srgb, var(--a-500) 20%, var(--n-800));
+  color: var(--a-300);
+}
+html.theme-active.light .research-chat-surface .research-accent-badge {
+  background-color: color-mix(in srgb, var(--a-500) 14%, var(--n-100));
+  color: var(--a-700);
+}
+
+html.theme-active.dark .research-context-panel,
+html.theme-active.dark .research-source-filter-dialog,
+html.theme-active.dark .research-system-prompt-dialog {
+  color-scheme: dark;
+}
+html.theme-active.light .research-context-panel,
+html.theme-active.light .research-source-filter-dialog,
+html.theme-active.light .research-system-prompt-dialog {
+  color-scheme: light;
+}
+html.theme-active.dark .research-context-panel {
+  background-color: var(--n-900);
+  border-color: var(--theme-border-dark-strong);
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .research-context-panel {
+  background-color: var(--n-50);
+  border-color: var(--theme-border-light-strong);
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .research-source-filter-dialog {
+  background-color: var(--n-900);
+  border-color: var(--theme-border-dark-strong);
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .research-source-filter-dialog {
+  background-color: var(--n-50);
+  border-color: var(--theme-border-light-strong);
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .research-source-filter-dialog :is(header, footer),
+html.theme-active.dark .research-source-filter-dialog .research-source-filter-status { border-color: var(--theme-border-dark); }
+html.theme-active.light .research-source-filter-dialog :is(header, footer),
+html.theme-active.light .research-source-filter-dialog .research-source-filter-status { border-color: var(--theme-border-light); }
+html.theme-active.dark .research-source-filter-dialog :is(.input, input:not([type='checkbox'])) {
+  background-color: var(--n-950);
+  border-color: var(--theme-border-dark);
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .research-source-filter-dialog :is(.input, input:not([type='checkbox'])) {
+  background-color: var(--n-50);
+  border-color: var(--theme-border-light);
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .research-source-filter-dialog :is(p, small) { color: var(--theme-text-dark-muted); }
+html.theme-active.light .research-source-filter-dialog :is(p, small) { color: var(--theme-text-light-muted); }
+
+html.theme-active.dark .research-system-prompt-dialog {
+  --prompt-bg: var(--n-900);
+  --prompt-muted-bg: var(--n-950);
+  --prompt-line: var(--theme-border-dark);
+  --prompt-text: var(--theme-text-dark);
+  --prompt-muted: var(--theme-text-dark-muted);
+}
+html.theme-active.light .research-system-prompt-dialog {
+  --prompt-bg: var(--n-50);
+  --prompt-muted-bg: var(--n-100);
+  --prompt-line: var(--theme-border-light);
+  --prompt-text: var(--theme-text-light);
+  --prompt-muted: var(--theme-text-light-muted);
+}
+
+/* The Skills popover is also portalled, so it cannot inherit the chat surface
+ * class. Its hook supplies --a-500 for custom themes and these rules provide
+ * the matching semantic surfaces in both modes. */
+html.theme-active.dark .chat-skills-panel {
+  background-color: var(--n-900);
+  color: var(--theme-text-dark);
+  border-color: var(--theme-border-dark-strong);
+}
+html.theme-active.light .chat-skills-panel {
+  background-color: var(--n-50);
+  color: var(--theme-text-light);
+  border-color: var(--theme-border-light-strong);
+}
+html.theme-active.dark .chat-skills-search { background-color: var(--n-950); border-color: var(--theme-border-dark); }
+html.theme-active.light .chat-skills-search { background-color: var(--n-100); border-color: var(--theme-border-light); }
+
+/* Document skills are used by Immersion and Deep Research composers. */
+html.theme-active.dark .document-skills {
+  background-color: var(--n-900);
+  border-color: var(--theme-border-dark);
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .document-skills {
+  background-color: var(--n-50);
+  border-color: var(--theme-border-light);
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .document-skills :is(p, .document-skills-search) { color: var(--theme-text-dark-muted); }
+html.theme-active.light .document-skills :is(p, .document-skills-search) { color: var(--theme-text-light-muted); }
+html.theme-active.dark .document-skills :is(.document-skills-search, .document-skill-row) { border-color: var(--theme-border-dark); }
+html.theme-active.light .document-skills :is(.document-skills-search, .document-skill-row) { border-color: var(--theme-border-light); }
+html.theme-active.dark .document-skill-title > svg { color: var(--a-300); }
+html.theme-active.light .document-skill-title > svg { color: var(--a-700); }
+html.theme-active.dark .document-skill-switch[aria-checked='true'] { background-color: var(--a-500); }
+html.theme-active.light .document-skill-switch[aria-checked='true'] { background-color: var(--a-600); }
+html.theme-active.dark .document-skill-switch:focus-visible,
+html.theme-active.light .document-skill-switch:focus-visible { outline-color: var(--a-500); }
+html.theme-active.dark .document-skill-limit :is(select, input) {
+  background-color: var(--n-950);
+  border-color: var(--theme-border-dark-strong);
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .document-skill-limit :is(select, input) {
+  background-color: var(--n-50);
+  border-color: var(--theme-border-light-strong);
+  color: var(--theme-text-light);
+}
+
+/* Dictionary controls used to mix neutral buttons with hard-coded indigo
+ * states. The explicit state classes make the selected control legible for
+ * every accent, including pale light-mode ramps. */
+html.theme-active.dark .dictionary-workspace {
+  background-color: var(--n-950) !important;
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .dictionary-workspace {
+  background-color: var(--n-50) !important;
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .dictionary-workspace .dictionary-sort-button,
+html.theme-active.dark .dictionary-workspace .dictionary-filter-button,
+html.theme-active.dark .dictionary-workspace .dictionary-view-button {
+  color: var(--theme-text-dark-muted);
+  border-color: var(--theme-border-dark);
+}
+html.theme-active.light .dictionary-workspace .dictionary-sort-button,
+html.theme-active.light .dictionary-workspace .dictionary-filter-button,
+html.theme-active.light .dictionary-workspace .dictionary-view-button {
+  color: var(--theme-text-light-muted);
+  border-color: var(--theme-border-light);
+}
+html.theme-active.dark .dictionary-workspace .dictionary-sort-button,
+html.theme-active.light .dictionary-workspace .dictionary-sort-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 8px;
+}
+html.theme-active.dark .dictionary-workspace :is(.dictionary-sort-button, .dictionary-filter-button, .dictionary-view-button):is(:hover, .is-selected, [aria-pressed='true']) {
+  background-color: color-mix(in srgb, var(--a-500) 16%, var(--n-900));
+  border-color: var(--a-500);
+  color: var(--a-300);
+}
+html.theme-active.light .dictionary-workspace :is(.dictionary-sort-button, .dictionary-filter-button, .dictionary-view-button):is(:hover, .is-selected, [aria-pressed='true']) {
+  background-color: color-mix(in srgb, var(--a-500) 12%, var(--n-50));
+  border-color: var(--a-600);
+  color: var(--a-700);
+}

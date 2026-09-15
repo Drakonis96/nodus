@@ -998,7 +998,7 @@ export function ImmersionComposerModal({
         role="dialog"
         aria-modal="true"
         aria-label={t('Nueva inmersión')}
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-neutral-700 bg-white shadow-2xl dark:bg-neutral-950"
+        className="immersion-composer-modal theme-workspace-surface flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-neutral-700 bg-white shadow-2xl dark:bg-neutral-950"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="flex items-center gap-3 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
