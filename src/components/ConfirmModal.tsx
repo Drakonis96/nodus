@@ -19,6 +19,7 @@ export function ConfirmModal({
   danger = false,
   autoFocusConfirm = true,
   zIndex = 120,
+  panelClassName,
   onConfirm,
   onCancel,
   onRemember,
@@ -32,6 +33,8 @@ export function ConfirmModal({
   /** Keep security-sensitive dialogs cancel-first while retaining confirm-first elsewhere. */
   autoFocusConfirm?: boolean;
   zIndex?: number;
+  /** Extra panel classes, for hosts whose own surface is not the app's neutral one. */
+  panelClassName?: string;
   onConfirm: () => void;
   onCancel: () => void;
   onRemember?: () => void;
@@ -49,7 +52,7 @@ export function ConfirmModal({
       <motion.div
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="card w-full max-w-sm p-5"
+        className={`card w-full max-w-sm p-5${panelClassName ? ` ${panelClassName}` : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}

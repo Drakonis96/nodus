@@ -8,10 +8,12 @@ import type {
   BrowserBookmarkCandidate,
   BrowserBookmarkNodeRef,
   BrowserBookmarkStore,
+  BrowserBookmarksImportPreview,
 } from '@shared/browserBookmarks';
 import {
   browserBookmarkChildren,
   browserBookmarkFolderPath,
+  browserBookmarksExportFileName,
   canonicalBookmarkUrl,
   searchBrowserBookmarks,
 } from '@shared/browserBookmarks';
@@ -233,6 +235,12 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
   const [dropId, setDropId] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ ref: BrowserBookmarkNodeRef; label: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState<BrowserBookmarksImportPreview | null>(null);
+  // ConfirmModal cannot disable its own confirm button, so the dialog is kept
+  // from committing twice by a ref rather than by the state it renders from.
+  const importBusy = useRef(false);
   const folder = store.folders.find((entry) => entry.id === folderId) ?? null;
   useEffect(() => { if (folderId && !folder) setFolderId(null); }, [folder, folderId]);
   useEffect(() => {
@@ -267,6 +275,30 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
     } finally { setDragging(null); setDropId(null); }
   };
 
+  // The main process writes its own snapshot of the whole collection, so neither
+  // an active search nor the folder on screen can narrow the exported file.
+  const exportHtml = async () => {
+    if (exporting) return;
+    const suggestedName = browserBookmarksExportFileName('html');
+    setExporting(true);
+    try {
+      const result = await window.nodus.exportBrowserBookmarks('html');
+      if (result.canceled) {
+        onNotice(t('Exportación cancelada.'));
+        return;
+      }
+      onNotice(tx('Se exportaron {bookmarks} marcadores y {folders} carpetas en {file}.', {
+        bookmarks: result.bookmarks,
+        folders: result.folders,
+        file: result.fileName ?? suggestedName,
+      }));
+    } catch (cause) {
+      onNotice(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const remove = async () => {
     if (!deleteConfirmation || deleting) return;
     setDeleting(true);
@@ -277,6 +309,45 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
       onNotice(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // Import reuses the trusted preview/commit pair the manager already uses: the
+  // chosen file is parsed and merged to a preview first, and nothing reaches the
+  // collection until the summary is confirmed.
+  const importFile = async () => {
+    if (importBusy.current) return;
+    importBusy.current = true;
+    setImporting(true);
+    try {
+      const preview = await window.nodus.previewBrowserBookmarksImport();
+      if (!preview) onNotice(t('Importación cancelada.'));
+      else setImportPreview(preview);
+    } catch (cause) {
+      onNotice(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      importBusy.current = false;
+      setImporting(false);
+    }
+  };
+
+  const commitImport = async () => {
+    if (!importPreview || importBusy.current) return;
+    importBusy.current = true;
+    setImporting(true);
+    try {
+      const result = await window.nodus.commitBrowserBookmarksImport(importPreview.token);
+      setImportPreview(null);
+      onNotice(tx('Se importaron {bookmarks} marcadores y {folders} carpetas. Se omitieron {duplicates} duplicados.', {
+        bookmarks: result.summary.bookmarks,
+        folders: result.summary.folders,
+        duplicates: result.summary.duplicates,
+      }));
+    } catch (cause) {
+      onNotice(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      importBusy.current = false;
+      setImporting(false);
     }
   };
 
@@ -292,6 +363,26 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
           <button className="atlas-facet-button" type="button" onClick={() => onNewFolder(folderId)}><Icon name="folderPlus" size={13} /> {t('Nueva carpeta')}</button>
           <button className="atlas-facet-button" type="button" onClick={() => onNewBookmark(folderId)}><Icon name="bookmark" size={13} /> {t('Añadir un marcador')}</button>
           <button className="atlas-facet-button" type="button" onClick={() => void window.nodus.openBrowserTab(NODUS_RESEARCH_ATLAS_URL)}><Icon name="globe" size={13} /> Research Atlas</button>
+          <button
+            className="atlas-facet-button"
+            type="button"
+            data-testid="browser-bookmarks-export-html"
+            title={t('Exportar todos los marcadores como HTML compatible con Chrome, Edge, Firefox, Brave y Opera')}
+            aria-label={t('Exportar todos los marcadores como HTML compatible con Chrome, Edge, Firefox, Brave y Opera')}
+            aria-busy={exporting}
+            disabled={exporting}
+            onClick={() => void exportHtml()}
+          ><Icon name="download" size={13} /> {exporting ? t('Exportando…') : t('Exportar HTML')}</button>
+          <button
+            className="atlas-facet-button"
+            type="button"
+            data-testid="browser-bookmarks-import-html"
+            title={t('Importar marcadores desde un archivo HTML de Chrome, Edge, Firefox, Brave u Opera')}
+            aria-label={t('Importar marcadores desde un archivo HTML de Chrome, Edge, Firefox, Brave u Opera')}
+            aria-busy={importing}
+            disabled={importing}
+            onClick={() => void importFile()}
+          ><Icon name="upload" size={13} /> {importing ? t('Importando…') : t('Importar HTML')}</button>
         </div>
         {!query && <div className="bookmark-breadcrumbs"><button onClick={() => setFolderId(null)}>{t('Marcadores')}</button>{pathFolders.map((entry) => <span key={entry.id}> / <button onClick={() => setFolderId(entry.id)}>{entry.name}</button></span>)}</div>}
       </>}
@@ -332,6 +423,23 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
       {!folders.length && !bookmarks.length && (
         <div className="atlas-empty"><h2>{t(query ? 'No hay marcadores que coincidan' : folder ? 'Esta carpeta está vacía' : 'Aún no hay marcadores.')}</h2><p>{t(query ? 'La búsqueda incluye títulos, direcciones, descripciones y nombres de carpetas.' : 'Guarda webs desde el Navegador de Nodus o el Research Atlas para crear tu página de inicio de investigación personal.')}</p><div className="flex justify-center gap-2"><button className="atlas-open" onClick={() => onNewBookmark(folderId)}>{t('Añadir un marcador')}</button><button className="atlas-open" onClick={() => void window.nodus.openBrowserTab(NODUS_RESEARCH_ATLAS_URL)}>{t('Abrir Research Atlas')}</button></div></div>
       )}
+      {importPreview && <ConfirmModal
+        title={tx('Vista previa de importación · {fileName}', { fileName: importPreview.fileName })}
+        message={<>
+          <p>{tx('{bookmarks} marcadores · {folders} carpetas · {duplicates} duplicados · {invalidUrls} URL no válidas omitidas', {
+            bookmarks: importPreview.bookmarks,
+            folders: importPreview.folders,
+            duplicates: importPreview.duplicates,
+            invalidUrls: importPreview.invalidUrls,
+          })}{importPreview.truncated ? ` · ${t('límites aplicados')}` : ''}</p>
+          <p className="mt-2">{t('Ningún marcador guardado se sobrescribe: las direcciones repetidas se omiten.')}</p>
+        </>}
+        confirmLabel={importing ? t('Importando…') : t('Importar sin sobrescribir')}
+        zIndex={160}
+        panelClassName="bookmark-import-panel"
+        onCancel={() => { if (!importing) setImportPreview(null); }}
+        onConfirm={() => void commitImport()}
+      />}
       {deleteConfirmation && <ConfirmModal
         title={tx('¿Eliminar «{label}»?', { label: deleteConfirmation.label })}
         message={deleteConfirmation.ref.kind === 'folder'

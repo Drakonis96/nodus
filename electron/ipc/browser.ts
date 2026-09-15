@@ -36,6 +36,7 @@ import type {
 } from '@shared/browserBookmarks';
 import type { BrowserHistoryStore } from '@shared/browserHistory';
 import {
+  browserBookmarksExportFileName,
   exportBrowserBookmarksHtml,
   exportBrowserBookmarksJson,
   findDuplicateBookmark,
@@ -899,7 +900,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     const store = bookmarks.snapshot();
     const saveOptions: Electron.SaveDialogOptions = {
       title: dialogTitle('exportNodusBookmarks', getSettings().uiLanguage),
-      defaultPath: `nodus-bookmarks.${format}`,
+      defaultPath: browserBookmarksExportFileName(format),
       filters: format === 'json'
         ? [{ name: 'Nodus Bookmarks JSON', extensions: ['json'] }]
         : [{ name: 'Marcadores HTML', extensions: ['html'] }],
@@ -913,7 +914,13 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     }
     const payload = format === 'json' ? exportBrowserBookmarksJson(store) : exportBrowserBookmarksHtml(store);
     await fsp.writeFile(selected.filePath, payload, { encoding: 'utf8', mode: 0o600 });
-    return { canceled: false, format, bookmarks: store.bookmarks.length, folders: store.folders.length };
+    return {
+      canceled: false,
+      format,
+      bookmarks: store.bookmarks.length,
+      folders: store.folders.length,
+      fileName: path.basename(selected.filePath),
+    };
   });
 
   h('browser:askNodiAboutSelection', async (event) => {
