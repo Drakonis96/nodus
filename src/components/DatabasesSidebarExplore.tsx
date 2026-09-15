@@ -1,4 +1,5 @@
 import { Icon } from './ui';
+import { Tooltip } from './Tooltip';
 import { t } from '../i18n';
 import type { DatabaseSummary } from '@shared/types';
 
@@ -25,20 +26,23 @@ export function DatabasesSidebarExplore({
   }
   return (
     <div className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto pr-0.5">
-      {databases.map((db) => (
-        <button
-          key={db.id}
-          onClick={() => onOpen(db.id)}
-          aria-label={compact ? db.name : undefined}
-          title={compact ? db.name : undefined}
-          className={`flex items-center rounded-lg py-2 text-left text-sm transition-colors ${compact ? 'justify-center px-2' : 'gap-2 px-3'} ${
-            isActiveView && activeId === db.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'
-          }`}
-        >
-          <Icon name={db.icon || 'table'} className="shrink-0 opacity-70" />
-          <span className={compact ? 'sr-only' : 'flex-1 truncate'}>{db.name}</span>
-        </button>
-      ))}
+      {databases.map((db) => {
+        const button = (
+          <button
+            key={db.id}
+            onClick={() => onOpen(db.id)}
+            aria-label={compact ? db.name : undefined}
+            className={`flex items-center rounded-lg py-2 text-left text-sm transition-colors ${compact ? 'justify-center px-2' : 'gap-2 px-3'} ${
+              isActiveView && activeId === db.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'
+            }`}
+          >
+            <Icon name={db.icon || 'table'} className="shrink-0 opacity-70" />
+            <span className={compact ? 'sr-only' : 'flex-1 truncate'}>{db.name}</span>
+          </button>
+        );
+        if (!compact) return button;
+        return <Tooltip key={db.id} label={db.name} placement="right">{button}</Tooltip>;
+      })}
     </div>
   );
 }
