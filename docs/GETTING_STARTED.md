@@ -98,8 +98,8 @@ You can change the look of Nodus at any time from **Settings → Appearance**:
 - Select **Create theme** to make your own palette. Give it a name, choose the
   colours for each mode, preview it, and save it when it looks right. Use full
   six-digit hexadecimal colours such as `#6366f1` in the hex field inside the
-  colour picker. Click a swatch to open the picker; it includes both the system
-  colour control and the exact hex field.
+  colour picker. Click a labelled colour control to open the picker; it includes
+  a saturation/lightness palette, hue control, preview, and exact hex field.
 
 Appearance changes apply immediately and are remembered the next time you open
 Nodus. They affect the app background, sidebar, workspaces, buttons, icons,

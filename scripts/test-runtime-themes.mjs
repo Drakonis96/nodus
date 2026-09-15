@@ -79,11 +79,8 @@ test('runtime theme edge cases are guarded', async () => {
   assert.match(settings, /applyRuntimeAppTheme\(next\.appTheme, next\.customThemes/);
   assert.match(settings, /const selectTheme = \(id: string\) =>/);
   assert.match(settings, /void patch\(\{ appTheme: id, customThemes \}\)/);
-  assert.match(indexCss, /input\[type='color'\][\s\S]*box-sizing: border-box/);
-  assert.match(indexCss, /input\[type='color'\][\s\S]*border: 1px solid #111827/);
-  assert.match(indexCss, /::-webkit-color-swatch[\s\S]*border-radius: 50%/);
-  assert.match(indexCss, /::-moz-color-swatch[\s\S]*border-radius: 50%/);
-  assert.match(await readFile(new URL('../src/serverWeb/settings/ServerSettings.css', import.meta.url), 'utf8'), /\.ss-theme-colours input\[type='color'\][^}]*border: 1px solid #111827/);
+  assert.match(indexCss, /\.theme-colour-picker-trigger-swatch[\s\S]*border: 1px solid/);
+  assert.match(await readFile(new URL('../src/serverWeb/settings/ServerSettings.css', import.meta.url), 'utf8'), /\.ss-theme-colours \.theme-colour-picker/);
   assert.match(settings, /normalizeThemeColour\(theme\.lightText\) \?\? defaults\.lightText/);
   assert.match(serverSettings, /\): Promise<boolean> =>/);
   assert.match(serverSettings, /if \(!await saveProfile\(next\)\) return;/);
@@ -103,8 +100,10 @@ test('runtime theme edge cases are guarded', async () => {
   assert.match(utilities, /theme-border-dark-strong/);
   assert.match(indexCss, /html\.theme-active\.dark \.home-dashboard/);
   assert.match(indexCss, /html\.theme-active\.light \.library-theme-panel/);
-  assert.match(indexCss, /\[data-testid="theme-editor"\] input\[type='color'\][\s\S]*appearance: none/);
   assert.match(themePicker, /className="theme-colour-picker-popover"/);
+  assert.match(themePicker, /className="theme-colour-picker-trigger-label"/);
+  assert.match(themePicker, /className="theme-colour-picker-palette"/);
+  assert.match(themePicker, /className="theme-colour-picker-hue"/);
   assert.match(themePicker, /className="theme-colour-picker-preview"/);
   assert.match(themePicker, /className="theme-colour-picker-hex-input"/);
   assert.match(themePicker, /aria-invalid=\{!HEX_COLOUR\.test\(value\)\}/);
