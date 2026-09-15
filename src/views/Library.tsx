@@ -25,7 +25,7 @@ import { DocumentProfileModal } from './DocumentProfileModal';
 import { DocumentIndexManager } from './DocumentIndexManager';
 import { VirtualList } from '../components/VirtualList';
 import { anchorStyle, useAnchoredCoords } from '../components/dbGrid';
-import { useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
+import { notifyDataChanged, useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
 import { deriveWorkStatus, queueItemsByWork, retryableSteps, type StepId, type WorkReadiness, type WorkStatus } from '../libraryStatus';
 import {
   ASSISTANT_CONTEXTS,
@@ -1166,6 +1166,48 @@ export function Library({
     toast(tx('Pendientes en cola para {n} obra(s). Verás el progreso en la cola.', { n: targets }));
   };
 
+  /**
+   * Remove the selected works from this vault, with their derived data.
+   *
+   * The confirmation spells out both halves, because the half that matters cannot be
+   * seen afterwards: this vault's works and everything derived from them go, while the
+   * analysis other works share with them stays. The main process is the authority on
+   * what "derived" covers — this only asks and reports.
+   */
+  const deleteSelected = async () => {
+    const ids = selectedVisibleIds;
+    if (ids.length === 0) return;
+    const ok = await confirm({
+      title: tx('Eliminar las {n} obras seleccionadas', { n: ids.length }),
+      message: tx(
+        'Se eliminarán del vault actual las {n} obra(s) seleccionada(s), junto con sus ideas extraídas, sus pasajes, sus embeddings y el resto de datos derivados. Las ideas y demás datos que compartan con otras obras se conservan. Esta acción no se puede deshacer.',
+        { n: ids.length }
+      ),
+      confirmLabel: t('Eliminar'),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      const outcome = await window.nodus.deleteWorks(ids);
+      if (!outcome.ok) {
+        // Deleting underneath a running analysis would let its publication re-create
+        // rows for a work that no longer exists, so the main process refuses.
+        toast(
+          tx('No se pueden eliminar obras que se están analizando ahora mismo ({n}). Espera a que terminen o detén la cola.', { n: outcome.running.length }),
+          { tone: 'error' }
+        );
+        return;
+      }
+      setReuseNotice(null);
+      setSelected(new Set());
+      notifyDataChanged();
+      await load();
+      toast(tx('Se eliminaron {n} obra(s) del vault.', { n: outcome.deleted.length }), { tone: 'success' });
+    } catch (error) {
+      toast(error instanceof Error ? error.message : t('No se pudieron eliminar las obras seleccionadas.'), { tone: 'error' });
+    }
+  };
+
   const openReader = (work: WorkView) => onOpenReader({
     id: work.nodus_id,
     zoteroKey: work.zotero_key,
@@ -1722,6 +1764,16 @@ export function Library({
               { label: t('Comprender documentos completos'), icon: 'layers', onClick: () => void window.nodus.startDocumentIndexCampaign({ nodusIds: selectedVisibleIds }) },
             ]}
           />
+          {/* Destructive and irreversible, so it sits apart from the verbs above: past
+              the overflow menu, away from the primary action, and red in both themes. */}
+          <button
+            className="btn bg-red-600 text-white hover:bg-red-500"
+            onClick={() => void deleteSelected()}
+            title={t('Elimina estas obras del vault actual con sus ideas, pasajes, embeddings y demás datos derivados. Lo que otras obras comparten no se toca.')}
+            data-testid="library-delete-selected"
+          >
+            <Icon name="trash" /> {t('Eliminar selección')}
+          </button>
           <div className="flex-1" />
           <button
             className="btn btn-ghost"

@@ -67,6 +67,7 @@ export const academicApi: AcademicApi = {
   analyzeBothBulk: (nodusIds, model) => ipcRenderer.invoke('works:analyzeBothBulk', nodusIds, model).then(() => undefined),
   processFull: (nodusId, model, options) => ipcRenderer.invoke('works:processFull', nodusId, model, options).then(() => undefined),
   processFullBulk: (nodusIds, model, options) => ipcRenderer.invoke('works:processFullBulk', nodusIds, model, options).then(() => undefined),
+  deleteWorks: (nodusIds) => ipcRenderer.invoke('works:delete', nodusIds),
   reassignThemes: (model) => ipcRenderer.invoke('works:reassignThemes', model),
   rescan: (nodusId, kind, model) => ipcRenderer.invoke('works:rescan', nodusId, kind, model),
   rescanDegraded: (model) => ipcRenderer.invoke('works:rescanDegraded', model),
