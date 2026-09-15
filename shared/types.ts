@@ -9111,6 +9111,25 @@ export interface WorkPage {
   limit: number;
 }
 
+/**
+ * Result of deleting selected works from the current vault.
+ *
+ * `ok: false` is the one expected refusal, not a failure: the scan queue is analysing
+ * some of those works right now and their analysis would be republished after the
+ * delete. It is returned rather than thrown so the renderer can word it in the
+ * reader's language.
+ */
+export interface WorkDeletionOutcome {
+  ok: boolean;
+  /** Works the queue is analysing right now; only set when `ok` is false. */
+  running: string[];
+  deleted: string[];
+  /** Global ideas left without any occurrence: kept and marked dormant, never deleted. */
+  dormantIdeas: number;
+  /** Index entries removed from the Global Library for the deleted works. */
+  globalLinks: number;
+}
+
 /** A Zotero collection available as a Library filter, flattened with its depth. */
 export interface CollectionFacet {
   key: string;

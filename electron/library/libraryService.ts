@@ -1348,6 +1348,17 @@ export function listGlobalLibraryVaultLinks(itemId?: string): LibraryVaultLink[]
   return service()?.catalog.listVaultLinks(itemId) ?? [];
 }
 
+/**
+ * Forget the Global Library index entries that point at works deleted from a vault.
+ * Best effort by design: a user without the Global Library configured has no catalog to
+ * clean, and that must never make deleting a work fail.
+ */
+export function removeGlobalLibraryLinksForWorks(vaultId: string | null, workIds: readonly string[]): number {
+  const current = service();
+  if (!current || !vaultId || workIds.length === 0) return 0;
+  return current.catalog.deleteVaultLinksForWorks(vaultId, workIds);
+}
+
 function creatorDisplayName(creator: LibraryItemRecord['metadata']['creators'][number]): string {
   return creator.name?.trim() || [creator.firstName, creator.lastName].filter(Boolean).join(' ').trim();
 }

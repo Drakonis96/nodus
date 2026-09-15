@@ -66,6 +66,21 @@ export interface WorkStatus {
   missing: StepId[];
 }
 
+/**
+ * Step states a reader can repair by re-running it.
+ *
+ * `blocked` and `na` are terminal — retrying cannot change the outcome — and
+ * `pending`/`running` are already in the queue, so retrying those would be a
+ * no-op. Shared so the per-work status modal and the Library's bulk action
+ * repair exactly the same set instead of drifting apart.
+ */
+export const RETRYABLE_STEP_STATES: readonly StepState[] = ['partial', 'missing', 'failed'];
+
+/** The retryable steps of one work, in pipeline order. */
+export function retryableSteps(status: WorkStatus): StepId[] {
+  return STEP_ORDER.filter((id) => RETRYABLE_STEP_STATES.includes(status.steps[id].state));
+}
+
 /** Queue kinds map onto the three steps that run through the scan queue. */
 const QUEUE_KIND_STEP: Partial<Record<QueueItem['kind'], StepId>> = {
   light: 'themes',
