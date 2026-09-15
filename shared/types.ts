@@ -21,6 +21,7 @@ import type { TestimoniesApi } from './api/testimonies';
 import type { LibraryApi } from './api/library';
 import type { RadarApi } from './api/radar';
 import type { CompassApi } from './api/compass';
+import type { LogsApi } from './api/logs';
 import type { LibraryAttachmentRecord } from './libraryTypes';
 import type { ToolkitToolPage } from './toolkitNavigation';
 
@@ -951,6 +952,14 @@ export type DocumentProfileFieldKind =
   | 'disciplinary_scope' | 'structure' | 'finding' | 'conclusion' | 'contribution'
   | 'limitation' | 'genre' | 'audience' | 'positioning' | 'original_abstract';
 
+/**
+ * Where a field's `confidence` came from. `floor` means the provider supplied no
+ * usable measurement and the deterministic direct-support floor was substituted,
+ * so the value is a minimum, not a reading. Absent on rows published before the
+ * column existed, where it is read as `model`.
+ */
+export type DocumentProfileConfidenceSource = 'model' | 'floor';
+
 export interface DocumentProfileField {
   fieldId: string;
   kind: DocumentProfileFieldKind;
@@ -959,6 +968,7 @@ export interface DocumentProfileField {
   generatedText?: string;
   confidence: number;
   centrality: number;
+  confidenceSource?: DocumentProfileConfidenceSource;
   overridden?: boolean;
   overrideId?: string;
   verified?: boolean;
@@ -1010,13 +1020,34 @@ export interface DocumentIdeaLink {
   score: number;
 }
 
+/**
+ * How a published profile relates to its audited synthesis.
+ * - `null`: the auditor approved the synthesis, which is what most profiles are.
+ * - `partial`: the audited prose was kept (every field carries a literal support) but
+ *   the semantic verdict did not clear the acceptance bar, or was unusable. Nothing
+ *   about the evidence is in doubt, so the profile is published with the caveat
+ *   instead of being replaced by raw quotes.
+ * - `extractive`: the synthesis itself was unusable, so the profile is assembled from
+ *   literal source quotes. It is published on purpose (a rejected paraphrase must not
+ *   leave a permanent hole in a campaign), but every field is source-language
+ *   evidence, so consumers must treat it as an index of quotes, not as a synthesis.
+ */
+export type DocumentProfileFallbackMode = 'extractive' | 'partial';
+
 export interface DocumentProfileAudit {
+  /** The semantic verdict: whether the auditor approved the synthesis. A profile can
+   *  be published with `passed: false` when it is marked `partial`. */
   passed: boolean;
-  score: number;
+  /** null when the provider reported no usable score: "no reading", not "zero". */
+  score: number | null;
   supportCoverage: number;
   structureCoverage: number;
   issues: string[];
   repaired: boolean;
+  fallback?: DocumentProfileFallbackMode | null;
+  /** Sections published from literal extracts because no synthesis survived their own
+   *  audit. A profile can be approved as a whole and still contain them. */
+  sectionsDegraded?: number;
 }
 
 export interface DocumentProfile {
@@ -1967,6 +1998,15 @@ export interface AppSettings {
   browserHistoryRetention: import('./browserHistory').BrowserHistoryRetention;
   /** Remove the private visit file whenever the Browser subsystem is destroyed. */
   browserClearHistoryOnClose: boolean;
+  /**
+   * Processing log: extraction, OCR, indexing, embeddings and the provider/JSON/connection
+   * failures around them. App-wide because one corpus run crosses vaults and the Library,
+   * and because the file is local diagnostics — it is neither backed up nor synced.
+   */
+  pipelineLogRetention: import('./pipelineLogs').PipelineLogRetention;
+  pipelineLogMaxEntries: number;
+  /** The language the log LINES are rendered in, chosen independently of the interface. */
+  pipelineLogLanguage: AppLanguage;
   // Nodi mascot: show the floating companion (visual/animation only for now — no wired
   // behaviour yet). App-wide preference, on by default.
   mascotEnabled: boolean;
@@ -8853,7 +8893,7 @@ export interface BrowserApi {
   onBrowserFoundInPage(cb: (result: { requestId: number; activeMatchOrdinal: number; matches: number; selectionArea: unknown; finalUpdate: boolean }) => void): () => void;
 }
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, CompassApi, BrowserApi {
+export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, CompassApi, BrowserApi, LogsApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
@@ -9109,6 +9149,25 @@ export interface WorkPage {
   total: number;
   offset: number;
   limit: number;
+}
+
+/**
+ * Result of deleting selected works from the current vault.
+ *
+ * `ok: false` is the one expected refusal, not a failure: the scan queue is analysing
+ * some of those works right now and their analysis would be republished after the
+ * delete. It is returned rather than thrown so the renderer can word it in the
+ * reader's language.
+ */
+export interface WorkDeletionOutcome {
+  ok: boolean;
+  /** Works the queue is analysing right now; only set when `ok` is false. */
+  running: string[];
+  deleted: string[];
+  /** Global ideas left without any occurrence: kept and marked dormant, never deleted. */
+  dormantIdeas: number;
+  /** Index entries removed from the Global Library for the deleted works. */
+  globalLinks: number;
 }
 
 /** A Zotero collection available as a Library filter, flattened with its depth. */

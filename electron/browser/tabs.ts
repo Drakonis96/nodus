@@ -441,29 +441,6 @@ function wire(tab: Tab): void {
   tab.disposers.push(() => contents.ipc.removeListener('nodus-browser:page:media', pageMediaListener));
 
   /**
-   * Whether the page could act on the last header command.
-   *
-   * A `false` means no reachable media element answered — the player keeps its
-   * audio somewhere no DOM query goes (a cross-origin frame, a closed shadow
-   * root, an element the page never attached). Chromium's own media key is the
-   * last resort for those, because it reaches the page's Media Session handlers,
-   * which no amount of DOM walking can.
-   */
-  const pageMediaResultListener = (
-    event: Electron.IpcMainEvent,
-    payload: { command?: unknown; handled?: unknown },
-  ) => {
-    if (!isWeb()) return;
-    if (event.sender !== contents || event.senderFrame !== contents.mainFrame) return;
-    if (payload?.handled !== false) return;
-    const command = payload?.command;
-    if (command !== 'play' && command !== 'pause' && command !== 'stop') return;
-    sendMediaKey(contents, 'MediaPlayPause');
-  };
-  contents.ipc.on('nodus-browser:page:mediaCommandResult', pageMediaResultListener);
-  tab.disposers.push(() => contents.ipc.removeListener('nodus-browser:page:mediaCommandResult', pageMediaResultListener));
-
-  /**
    * The Nodus website has one inert Bookmarks slot. Its isolated preload sends
    * this only for a trusted click; main then repeats every boundary check before
    * changing the active tab into the local React page. No bookmark data crosses
@@ -1255,27 +1232,21 @@ export function stopFindInPage(action: 'clearSelection' | 'keepSelection' | 'act
   tab.view.webContents.stopFindInPage(action);
 }
 
-/** Press one of Chromium's standard media keys in a page. */
-function sendMediaKey(contents: WebContents, keyCode: string): void {
-  if (contents.isDestroyed()) return;
-  try {
-    contents.sendInputEvent({ type: 'keyDown', keyCode });
-    contents.sendInputEvent({ type: 'keyUp', keyCode });
-  } catch {
-    // A view being torn down mid-command is not worth a crash.
-  }
-}
-
-/** Drive one tab's media from the header. */
+/**
+ * Drive one tab's media from the header.
+ *
+ * One instruction, and the page preload owns every channel that can carry it
+ * out: the page's own Media Session handlers, its media elements, and the
+ * accessible Play/Pause control of a player that exposes neither.
+ *
+ * Main used to press Chromium's media keys as well. It never worked, and could
+ * not work: media keys are dispatched in the browser process, so an injected key
+ * arrives in the renderer as an ordinary keydown and never becomes a Media
+ * Session action. The preload calls the page's own handler instead.
+ */
 export function sendMediaCommand(id: string, command: BrowserMediaCommand): void {
   const tab = tabs.get(id);
   if (!tab || tab.state.kind !== 'web' || tab.view.webContents.isDestroyed()) return;
-  if (command === 'previous' || command === 'next') {
-    sendMediaKey(tab.view.webContents, command === 'previous' ? 'MediaPreviousTrack' : 'MediaNextTrack');
-  }
-  // Play/pause deliberately does NOT send its media key up front: on a page the
-  // preload can reach, the key would toggle a second time and undo the command.
-  // The page answers whether it handled it, and only a "no" falls back to the key.
   tab.view.webContents.send('nodus-browser:page:mediaCommand', command);
 }
 

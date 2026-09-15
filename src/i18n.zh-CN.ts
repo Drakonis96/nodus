@@ -34,6 +34,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { PIPELINE_LOG_TRANSLATIONS } from './i18n.pipelineLogs';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
@@ -112,6 +113,7 @@ export const ZH_CN: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS['zh-CN'],
   ...NEW_VAULT_COMPLETION_TRANSLATIONS['zh-CN'],
   ...NODI_NOTIFICATION_TRANSLATIONS['zh-CN'],
+  ...PIPELINE_LOG_TRANSLATIONS['zh-CN'],
   ...ANNOUNCEMENT_TRANSLATIONS['zh-CN'],
   ...WORLD_CHAT_TRANSLATIONS['zh-CN'],
   ...STUDY_SYNONYM_TRANSLATIONS['zh-CN'],
@@ -1161,6 +1163,9 @@ export const ZH_CN: Record<string, string> = {
   "Pulido y estabilidad": "打磨与稳定性",
   "Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.": "修复错误、提升性能，并根据用户反馈打磨整体体验。",
   "Nodus Toolkit": "Nodus Toolkit",
+  "Nodus Convert": "Nodus Convert",
+  "Nodus Translate": "Nodus Translate",
+  "MCP": "MCP",
   "Nodus Radar": "Nodus Radar",
   "Nodus Compass": "Nodus Compass",
   "Nodus Tools": "Nodus Tools",
@@ -2119,6 +2124,15 @@ export const ZH_CN: Record<string, string> = {
   "Faltan {n} paso(s). Se encolarán y verás el progreso en la cola.": "缺少{n}个步骤。它们将加入队列，你可以在队列中查看进度。",
   "No queda nada pendiente en esta obra.": "这篇文献已无待处理项。",
   "Reintentar lo que falta": "重试缺失项",
+  "Encola solo los pasos incompletos, pendientes o fallidos de cada obra seleccionada. No vuelve a analizar lo que ya está hecho.": "只将每篇所选文献中未完成、待处理或失败的步骤加入队列，不会重新分析已完成的内容。",
+  "No queda nada pendiente en la selección.": "所选内容中没有待处理项。",
+  "Pendientes en cola para {n} obra(s). Verás el progreso en la cola.": "已将 {n} 篇文献的待处理步骤加入队列。你可以在队列中查看进度。",
+  "Eliminar las {n} obras seleccionadas": "删除所选的 {n} 篇文献",
+  "Se eliminarán del vault actual las {n} obra(s) seleccionada(s), junto con sus ideas extraídas, sus pasajes, sus embeddings y el resto de datos derivados. Las ideas y demás datos que compartan con otras obras se conservan. Esta acción no se puede deshacer.": "将从当前资料库中删除所选的 {n} 篇文献，以及它们提取的观点、片段、嵌入和其他衍生数据。与其他文献共享的观点和数据会保留。此操作无法撤销。",
+  "Elimina estas obras del vault actual con sus ideas, pasajes, embeddings y demás datos derivados. Lo que otras obras comparten no se toca.": "从当前资料库中删除这些文献及其观点、片段、嵌入和其他衍生数据。其他文献共享的内容不受影响。",
+  "No se pueden eliminar obras que se están analizando ahora mismo ({n}). Espera a que terminen o detén la cola.": "正在分析的文献暂时无法删除（{n}）。请等待其完成或停止队列。",
+  "Se eliminaron {n} obra(s) del vault.": "已从资料库中删除 {n} 篇文献。",
+  "No se pudieron eliminar las obras seleccionadas.": "无法删除所选文献。",
   "No aplica": "不适用",
   "Solo abstract": "仅摘要",
   "Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.": "Nodus未找到可读取的文本。请在Zotero中添加PDF或EPUB，然后重新分析。",
@@ -7246,6 +7260,8 @@ export const ZH_CN: Record<string, string> = {
   "Volver atrás": "返回",
   "Pestaña nueva": "新标签页",
   "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser 最多支持 {n} 个标签页。",
+  "Desplazar las pestañas a la izquierda": "向左滚动标签页",
+  "Desplazar las pestañas a la derecha": "向右滚动标签页",
   "Medios": "媒体",
   "Reproduciéndose en Nodus Browser": "正在 Nodus Browser 中播放",
   "Medios en pausa en Nodus Browser": "Nodus Browser 中的媒体已暂停",

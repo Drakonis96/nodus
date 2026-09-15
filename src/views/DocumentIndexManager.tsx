@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { DocumentIndexJobPhase, DocumentIndexJobStatus, DocumentIndexProgress, DocumentUnderstandingState } from '@shared/types';
 import { Icon } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { t, tx } from '../i18n';
+import { t, tr, tx } from '../i18n';
 import { compareDocumentIndexJobsForDisplay, documentIndexPercentLabel } from '@shared/documentIndexProgress';
 
 export function DocumentIndexManager({ vaultId, onClose }: { vaultId: string | null; onClose: () => void }) {
@@ -91,7 +91,7 @@ function CampaignCard({ live, liveError, busy, setStatus, onCancel }: {
       </div>
       <div className="flex gap-2">{live.status === 'paused' ? <button className="btn btn-primary" disabled={busy} onClick={() => void setStatus('running')}>{t('Reanudar')}</button> : <button className="btn btn-ghost border border-neutral-700" disabled={busy} onClick={() => void setStatus('paused')}>{t('Pausar')}</button>}<button className="btn btn-ghost document-index-danger border" disabled={busy} onClick={onCancel}>{t('Cancelar')}</button></div>
     </div>
-    {liveError && <div className="document-index-warning mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-5" role="alert" data-testid="document-index-manager-warning"><Icon name="warning" size={14} className="mt-0.5 shrink-0" /><span className="min-w-0 flex-1 break-words">{liveError}</span></div>}
+    {liveError && <div className="document-index-warning mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-5" role="alert" data-testid="document-index-manager-warning"><Icon name="warning" size={14} className="mt-0.5 shrink-0" /><span className="min-w-0 flex-1 break-words">{tr(liveError)}</span></div>}
     <div className="mt-3 flex items-center gap-3">
       <div className="h-2 min-w-0 flex-1 overflow-hidden rounded bg-neutral-800" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={fraction * 100} aria-valuetext={percent}>
         <div className="h-full bg-indigo-500 transition-[width] duration-300" style={{ width: `${visiblePercent}%` }} />

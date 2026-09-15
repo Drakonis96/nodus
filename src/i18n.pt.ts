@@ -40,6 +40,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { PIPELINE_LOG_TRANSLATIONS } from './i18n.pipelineLogs';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
@@ -116,6 +117,7 @@ export const PT: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.pt,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.pt,
   ...NODI_NOTIFICATION_TRANSLATIONS['pt'],
+  ...PIPELINE_LOG_TRANSLATIONS['pt'],
   ...ANNOUNCEMENT_TRANSLATIONS['pt'],
   ...WORLD_CHAT_TRANSLATIONS.pt,
   ...STUDY_SYNONYM_TRANSLATIONS.pt,
@@ -1271,6 +1273,9 @@ export const PT: Record<string, string> = {
   'Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.':
     'Corrigir erros, melhorar o desempenho e polir a experiência geral com feedback dos utilizadores.',
   'Nodus Toolkit': 'Nodus Toolkit',
+  'Nodus Convert': 'Nodus Convert',
+  'Nodus Translate': 'Nodus Translate',
+  'MCP': 'MCP',
   'Nodus Radar': 'Nodus Radar',
   'Nodus Compass': 'Nodus Compass',
   'Nodus Tools': 'Nodus Tools',
@@ -2447,6 +2452,15 @@ export const PT: Record<string, string> = {
   'Faltan {n} paso(s). Se encolarán y verás el progreso en la cola.': '{n} passo(s) em falta. Serão colocados na fila e verás o progresso na fila.',
   'No queda nada pendiente en esta obra.': 'Não há nada pendente nesta obra.',
   'Reintentar lo que falta': 'Repetir o que falta',
+  'Encola solo los pasos incompletos, pendientes o fallidos de cada obra seleccionada. No vuelve a analizar lo que ya está hecho.': 'Coloca na fila apenas os passos incompletos, pendentes ou falhados de cada obra selecionada. Não volta a analisar o que já está feito.',
+  'No queda nada pendiente en la selección.': 'Não há nada pendente na seleção.',
+  'Pendientes en cola para {n} obra(s). Verás el progreso en la cola.': 'Passos pendentes na fila para {n} obra(s). Verás o progresso na fila.',
+  'Eliminar las {n} obras seleccionadas': 'Eliminar as {n} obras selecionadas',
+  'Se eliminarán del vault actual las {n} obra(s) seleccionada(s), junto con sus ideas extraídas, sus pasajes, sus embeddings y el resto de datos derivados. Las ideas y demás datos que compartan con otras obras se conservan. Esta acción no se puede deshacer.': 'As {n} obra(s) selecionada(s) serão eliminadas do espaço atual, juntamente com as suas ideias extraídas, passagens, embeddings e os restantes dados derivados. As ideias e outros dados partilhados com outras obras são conservados. Esta ação não pode ser anulada.',
+  'Elimina estas obras del vault actual con sus ideas, pasajes, embeddings y demás datos derivados. Lo que otras obras comparten no se toca.': 'Elimina estas obras do espaço atual com as suas ideias, passagens, embeddings e outros dados derivados. O que outras obras partilham não é tocado.',
+  'No se pueden eliminar obras que se están analizando ahora mismo ({n}). Espera a que terminen o detén la cola.': 'Não é possível eliminar obras que estão a ser analisadas neste momento ({n}). Espera que terminem ou para a fila.',
+  'Se eliminaron {n} obra(s) del vault.': '{n} obra(s) eliminada(s) do espaço.',
+  'No se pudieron eliminar las obras seleccionadas.': 'Não foi possível eliminar as obras selecionadas.',
   'No aplica': 'Não aplicável',
   'Solo abstract': 'Apenas resumo',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'O Nodus não encontrou texto para ler. Adiciona o PDF ou EPUB no Zotero e analisa de novo.',
@@ -8167,6 +8181,8 @@ export const PT: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "Novo separador",
   "Nodus Browser admite hasta {n} pestañas.": "O Nodus Browser admite até {n} separadores.",
+  "Desplazar las pestañas a la izquierda": "Deslocar os separadores para a esquerda",
+  "Desplazar las pestañas a la derecha": "Deslocar os separadores para a direita",
   // Nodus Browser: media
   "Medios": "Multimédia",
   "Reproduciéndose en Nodus Browser": "A reproduzir no Nodus Browser",

@@ -11,6 +11,7 @@ import { addNotification } from '../notifications';
 import { nodiText } from '@shared/nodiNotifications';
 import { recordLinkedLibraryAnalysis } from '../library/libraryVaultProvenance';
 import { coalesce } from '../util/coalesce';
+import { logPipelineFailure, logPipelineSuccess, logPipelineWarning } from '../logging/pipelineLogCore';
 
 type ProgressListener = (progress: PassageEmbeddingProgress) => void;
 
@@ -284,6 +285,25 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
           : nodiText('passageEmbeddingsDoneBody', { passages: state.passagesEmbedded, works: state.works.length }),
         kind: state.error ? 'warning' : 'success',
         dedupeKey: `passage-embeddings:${state.error ? 'error' : 'complete'}`,
+      });
+    }
+    // The run's outcome belongs in the processing log whether it finished, failed or was
+    // stopped: an interrupted retrieval index is exactly what someone opens the log for.
+    if (state.stopRequested) {
+      logPipelineWarning({ subject: 'subjectPassages', code: 'cancelled', reason: 'reasonCancelled', context: { scope: 'embeddings' } });
+    } else if (state.error) {
+      logPipelineFailure({
+        error: state.error,
+        code: 'embedding_failed',
+        subject: 'subjectPassages',
+        context: { scope: 'embeddings' },
+        detail: state.error,
+      });
+    } else if (state.totalPassages > 0) {
+      logPipelineSuccess({
+        subject: 'subjectPassages',
+        context: { scope: 'embeddings' },
+        message: { id: 'passagesEmbedded', params: { done: state.passagesEmbedded, total: state.totalPassages } },
       });
     }
   }

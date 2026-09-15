@@ -285,3 +285,93 @@ test('the toolbar Back button is enabled exactly when Back will do something', (
   const uses = code.match(/canGoBack:\s*canGoBackFrom\(tab\)/g) ?? [];
   assert.ok(uses.length >= 4, `every canGoBack publication must use it, found ${uses.length}`);
 });
+
+// The strip itself: equal widths, and arrows once they no longer fit.
+//
+// A tab sized by its own title makes the strip unreadable as a row — "the fourth
+// tab" stops being a position the eye can return to, and one long title shoves
+// every other tab sideways. Chrome, Edge and Firefox all answer the same way: one
+// width per tab, and the overflow scrolled rather than compressed. These hold the
+// two halves of that answer, and the third thing that follows from it — that the
+// arrows and the new-tab button belong to the strip, not to the scrolling part.
+const stripSource = readFileSync(path.join(repoRoot, 'src/views/NodusBrowserView.tsx'), 'utf8');
+const strip = stripSource.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+const styles = readFileSync(path.join(repoRoot, 'src/index.css'), 'utf8');
+
+test('every tab is the same width, and no title may change it', () => {
+  const declared = strip.match(/const TAB_WIDTH_CLASS = '([^']+)'/);
+  assert.ok(declared, 'the tab width must be one declared constant, not a per-tab decision');
+  assert.match(declared[1], /^w-(?!max)/, `the width must be an explicit one, got ${declared[1]}`);
+  assert.match(strip, /className=\{`group flex \$\{TAB_WIDTH_CLASS\} shrink-0/,
+    'every tab must take that one width, and must not shrink away from it');
+  // The old strip capped a tab and let its title decide the rest.
+  assert.doesNotMatch(strip, /max-w-52/, 'no tab may size itself from its own title any more');
+});
+
+test('a strip with more tabs than room scrolls, and only the arrows move it', () => {
+  // The affordance is the arrows, so the native scrollbar stays hidden: two
+  // scroll indicators in a 24px row is one too many.
+  assert.match(styles, /\.browser-tab-strip-scroll \{[\s\S]{0,400}?overflow-x: auto/,
+    'the viewport must scroll horizontally');
+  assert.match(styles, /\.browser-tab-strip-scroll \{[\s\S]{0,400}?overscroll-behavior-inline: contain/,
+    'scrolling the strip to its end must not carry on into the page');
+  assert.match(styles, /\.browser-tab-strip-scroll \{[\s\S]{0,400}?scrollbar-width: none/);
+  assert.match(styles, /\.browser-tab-strip-scroll::-webkit-scrollbar \{[\s\S]{0,80}?display: none/);
+
+  assert.match(strip, /role="tablist"[\s\S]{0,400}?browser-tab-strip-scroll/,
+    'the tablist itself must be the element that scrolls');
+  assert.doesNotMatch(strip, /className="flex items-center gap-1 border-b[^"]*overflow-x-auto/,
+    'the strip root must not scroll, or the arrows would scroll away with the tabs');
+});
+
+test('each arrow appears only while that end has tabs left to show', () => {
+  // Measured from the DOM, never predicted from a tab count: whether the last
+  // tab fits depends on its width, the window and the zoom.
+  assert.match(strip, /onScroll=\{measureOverflow\}/, 'scrolling is what moves the ends');
+  assert.match(strip, /const max = strip\.scrollWidth - strip\.clientWidth/,
+    'the ends must be measured from real layout, not from a tab count');
+  assert.match(strip, /overflow\.left && <TabStripArrow direction=\{-1\}/,
+    'the left arrow must be conditional on there being tabs to its left');
+  assert.match(strip, /overflow\.right && <TabStripArrow direction=\{1\}/,
+    'the right arrow must be conditional on there being tabs to its right');
+  assert.match(strip, /'browser-tab-scroll-left'/, 'the left arrow needs a testable handle');
+  assert.match(strip, /'browser-tab-scroll-right'/, 'the right arrow needs a testable handle');
+
+  // A tab opens, closes or renames itself, and the window resizes: none of those
+  // is a scroll event, and all of them change whether the ends overflow.
+  assert.match(strip, /new ResizeObserver\(measureOverflow\)/, 'width changes must be observed');
+  assert.match(strip, /Array\.from\(strip\.children\)/, 'so must a tab that grows a longer title');
+
+  // Whole tabs per click, not a fraction of the viewport: with twelve tabs the
+  // overflow is under one viewport, and a viewport step reaches the end in a
+  // single click while still leaving the arrow lit.
+  assert.match(strip, /const TAB_SCROLL_STEP_TABS = \d+/, 'the step must be whole tabs');
+  assert.match(strip, /const pitch = second && first \? second\.offsetLeft - first\.offsetLeft : 0/,
+    'the step must be measured from the layout it is moving');
+  assert.match(strip, /scrollBy\(\{ left: direction \* step, behavior: 'smooth' \}\)/,
+    'the arrows must move the strip by that step, smoothly');
+});
+
+test('the arrows and the new-tab button hold their place while the tabs move', () => {
+  const stripBody = strip.slice(strip.indexOf('function BrowserTabStrip'));
+  const mapped = stripBody.indexOf('{tabs.map(');
+  const rightArrow = stripBody.indexOf('overflow.right &&');
+  const newTab = stripBody.indexOf('browser-new-tab');
+  assert.ok(mapped < rightArrow, 'the arrows belong after the tabs in the strip');
+  assert.ok(rightArrow < newTab, 'the new-tab button must stay pinned past the right arrow');
+  // Siblings of the scrolling viewport, not children of it: anything inside it
+  // would slide out of reach at exactly the moment it was needed.
+  assert.match(strip, /\}\)\}\s*<\/div>[\s\S]{0,300}?overflow\.right &&/,
+    'the arrows must be siblings of the scrolling viewport');
+});
+
+test('the tab that becomes active is the one the strip shows', () => {
+  // Activation from the omnibox, a keyboard shortcut, a link opened in a new tab
+  // and a page renaming itself all land here; a selected tab left off screen makes
+  // the omnibox describe a page whose tab cannot be found.
+  assert.match(strip, /querySelector<HTMLElement>\('\[role="tab"\]\[aria-selected="true"\]'\)/,
+    'the selected tab must be found by its ARIA state');
+  assert.match(strip, /scrollIntoView\(\{ block: 'nearest', inline: 'nearest' \}\)/,
+    'and brought into view without moving the page around it');
+});
+

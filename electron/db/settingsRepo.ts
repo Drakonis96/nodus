@@ -13,6 +13,7 @@ import { lockedApiKeyProviders, providerKeyMap } from '../secrets/secretStore';
 import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
 import { DEFAULT_NODUS_IMAGE_QUALITY, isNodusImageQuality } from '@shared/localImageModels';
 import { EMPTY_CUSTOM_EVENT_TYPES, sanitizeCustomEventTypes } from '@shared/eventTypes';
+import { isPipelineLogMaxEntries, isPipelineLogRetention } from '@shared/pipelineLogs';
 import { normalizeToolkitToolPages } from '@shared/toolkitNavigation';
 import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
 import {
@@ -151,6 +152,11 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   browserSearchTemplate: '',
   browserHistoryRetention: '30d',
   browserClearHistoryOnClose: false,
+  // Ten days of processing log, capped so a provider outage cannot bloat the file, and
+  // rendered in English by default: the log exists to be pasted into a GitHub issue.
+  pipelineLogRetention: '10d',
+  pipelineLogMaxEntries: 5_000,
+  pipelineLogLanguage: 'en',
   mascotEnabled: true,
   mascotScale: NODI_DEFAULT_SCALE,
   mascotAlwaysOnTop: false,
@@ -405,6 +411,18 @@ export function getSettings(): AppSettings {
   if (typeof merged.browserClearHistoryOnClose !== 'boolean') {
     merged.browserClearHistoryOnClose = DEFAULTS.browserClearHistoryOnClose;
     seed.browserClearHistoryOnClose = merged.browserClearHistoryOnClose;
+  }
+  // Same reasoning as the Browser history above: a hand-edited or corrupted retention value
+  // must not reach the pruning code, where an unknown window would mean "delete everything".
+  // The language needs no repair here — `resolveTranslation` normalizes an unknown locale to
+  // English on every read, and the write path validates it.
+  if (!isPipelineLogRetention(merged.pipelineLogRetention)) {
+    merged.pipelineLogRetention = DEFAULTS.pipelineLogRetention;
+    seed.pipelineLogRetention = merged.pipelineLogRetention;
+  }
+  if (!isPipelineLogMaxEntries(merged.pipelineLogMaxEntries)) {
+    merged.pipelineLogMaxEntries = DEFAULTS.pipelineLogMaxEntries;
+    seed.pipelineLogMaxEntries = merged.pipelineLogMaxEntries;
   }
   // Cleanup can delete files, so corrupted or hand-edited global preferences must
   // never be treated as an enabled policy. Repair them to conservative defaults

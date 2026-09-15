@@ -221,7 +221,7 @@ test('STOP pauses and rewinds', () => {
   assert.equal(running.currentTime, 0);
 });
 
-test('PAUSE on a page with nothing running reports unhandled, so main can use the media key', () => {
+test('PAUSE on a page with nothing running reports unhandled, so the next channel can try', () => {
   assert.equal(media.applyMediaCommand([placeholder(), placeholder()], 'pause', null), false);
   assert.equal(media.applyMediaCommand([], 'pause', null), false);
 });
@@ -342,7 +342,8 @@ test('an element that throws on play or pause does not take the others down', ()
 test('an unlistenable page still answers rather than acting on nothing', () => {
   // Every element is a placeholder: the fallback keeps them in play for Pause,
   // because misjudging one and pausing it is harmless, but nothing is running,
-  // so the command reports unhandled and main reaches for the media key.
+  // so the command reports unhandled and the caller reaches for the page's Media
+  // Session handler.
   const nodes = [placeholder(), placeholder()];
   assert.equal(media.applyMediaCommand(nodes, 'play', null), true, 'trying is better than refusing');
   assert.equal(media.applyMediaCommand(nodes, 'previous', null), true);

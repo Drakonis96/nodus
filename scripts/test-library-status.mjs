@@ -18,7 +18,7 @@ const bundle = path.join(outDir, 'libraryStatus.cjs');
 execFileSync(path.join(root, 'node_modules/.bin/esbuild'), [
   path.join(root, 'src/libraryStatus.ts'), '--bundle', '--platform=node', '--format=cjs', '--target=es2022', `--outfile=${bundle}`,
 ], { cwd: root, stdio: 'inherit' });
-const { deriveWorkStatus, queueItemsByWork, hasNoFullText, isAbstractOnly, READY_STEPS } = require(bundle);
+const { deriveWorkStatus, queueItemsByWork, hasNoFullText, isAbstractOnly, READY_STEPS, RETRYABLE_STEP_STATES, retryableSteps } = require(bundle);
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
 /** A fully-analysed work with full text; individual tests override what they exercise. */
@@ -211,9 +211,10 @@ test('the SQL presets stay in step with the JS readiness derivation', async () =
 });
 
 test('the status modal repairs missing steps without wasting work', async () => {
-  const [source, passagePipeline] = await Promise.all([
+  const [source, passagePipeline, status] = await Promise.all([
     readFile(path.join(root, 'src/views/WorkStatusModal.tsx'), 'utf8'),
     readFile(path.join(root, 'electron/ai/passageEmbeddingPipeline.ts'), 'utf8'),
+    readFile(path.join(root, 'src/libraryStatus.ts'), 'utf8'),
   ]);
 
   // Indexes are built FROM the ideas. Firing startEmbedding alongside a pending
@@ -237,13 +238,39 @@ test('the status modal repairs missing steps without wasting work', async () => 
   assert.match(passagePipeline, /if \(state\.running\)[\s\S]{0,1000}state\.works\.push/, 'per-work retries join an existing passage run instead of returning silently');
 
   // Blocked and not-applicable steps are terminal: offering a retry there spends
-  // tokens on something that cannot succeed.
-  assert.match(source, /const RETRYABLE: StepState\[\] = \['partial', 'missing', 'failed'\]/);
+  // tokens on something that cannot succeed. The set is shared with the Library's
+  // bulk repair action rather than declared once per call site, so the two can
+  // never disagree about what "what is missing" means.
+  assert.match(status, /export const RETRYABLE_STEP_STATES: readonly StepState\[\] = \['partial', 'missing', 'failed'\]/);
+  assert.match(source, /RETRYABLE_STEP_STATES\.includes\(status\.steps\[id\]\.state\)/);
+  assert.doesNotMatch(source, /const RETRYABLE: StepState\[\]/);
   assert.match(source, /data-testid="work-status-documentary-index"/);
   assert.match(source, /data-testid="work-status-documentary-beta"[^>]*>BETA</);
   assert.match(source, /enqueueDocumentProfile\(work\.nodus_id\)/, 'the documentary index remains an explicit per-work action');
   assert.match(source, /no afecta al estado general de la obra/, 'the optional index is explained next to its action');
   assert.match(source, /role="dialog"[\s\S]{0,120}aria-modal="true"/);
+});
+
+test('the retry set is exactly the steps a reader can repair', () => {
+  assert.deepEqual(RETRYABLE_STEP_STATES, ['partial', 'missing', 'failed']);
+
+  const mixed = deriveWorkStatus(
+    work({ light_status: 'failed', summary_status: 'none' }),
+    embedded({ embeddedIdeas: 4, totalIdeas: 10, complete: false }),
+    indexed({ status: 'outdated', outdatedReason: 'text_changed' })
+  );
+  assert.deepEqual(retryableSteps(mixed), ['themes', 'summary', 'semantic', 'citable']);
+
+  // Nothing to repair: everything is done, or everything left is terminal.
+  assert.deepEqual(retryableSteps(deriveWorkStatus(work(), embedded(), indexed())), []);
+  assert.deepEqual(retryableSteps(deriveWorkStatus(work({ deep_status: 'skipped_no_text' }), undefined, undefined)), []);
+
+  // A job already waiting in the queue is not offered again — re-enqueueing it
+  // would only move the same work to the back of the line.
+  const queued = deriveWorkStatus(work({ deep_status: 'failed' }), embedded(), indexed(), [
+    { id: 'q1', nodus_id: 'w1', title: 'Obra', kind: 'deep', state: 'queued' },
+  ]);
+  assert.deepEqual(retryableSteps(queued), []);
 });
 
 test('the library row renders the derived status instead of the five pipeline columns', async () => {
@@ -256,6 +283,32 @@ test('the library row renders the derived status instead of the five pipeline co
   assert.doesNotMatch(source, /sortKey="embeddings"/);
   assert.doesNotMatch(source, /sortKey="passages"/);
   assert.doesNotMatch(source, /nodus_id\.slice\(0, 8\)/);
+});
+
+test('the Library repairs what is missing across the whole selection', async () => {
+  const source = await readFile(path.join(root, 'src/views/Library.tsx'), 'utf8');
+
+  // The action is offered while some selected work still has something to finish, and
+  // says how many works that is, so a disabled/no-op button is never what the reader
+  // clicks first.
+  assert.match(source, /data-testid="library-retry-missing-selected"/);
+  assert.match(source, /retryPlan\.works > 0 && \(/);
+  assert.match(source, /\{t\('Reintentar lo que falta'\)\}/);
+
+  // Same rule as the per-work modal: themes/ideas pull the whole chain, because the
+  // indexes are built FROM the ideas.
+  assert.match(source, /steps\.includes\('themes'\) \|\| steps\.includes\('ideas'\)/);
+
+  // The rest is grouped one call per step — a 200-work selection must not become one
+  // IPC round-trip per work.
+  assert.match(source, /processFullBulk\(chain\)/);
+  assert.match(source, /summarizeBulk\(summaries\)/);
+  assert.match(source, /startEmbedding\(semantic\)/);
+  assert.match(source, /startPassageEmbedding\(citable\)/);
+
+  // It is the repair path, not an import path: the cross-vault reuse checkbox is
+  // deliberately not consulted here.
+  assert.doesNotMatch(source, /retryMissingSelected[\s\S]{0,900}reuseSelectedAnalysis/);
 });
 
 test('documentary indexing is limited to Deep Research and explicit reader actions', async () => {

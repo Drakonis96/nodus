@@ -34,6 +34,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { PIPELINE_LOG_TRANSLATIONS } from './i18n.pipelineLogs';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
@@ -115,6 +116,7 @@ export const EN: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.en,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.en,
   ...NODI_NOTIFICATION_TRANSLATIONS['en'],
+  ...PIPELINE_LOG_TRANSLATIONS['en'],
   ...ANNOUNCEMENT_TRANSLATIONS['en'],
   ...WORLD_CHAT_TRANSLATIONS.en,
   ...STUDY_SYNONYM_TRANSLATIONS.en,
@@ -1281,6 +1283,9 @@ export const EN: Record<string, string> = {
   'Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.':
     'Fix bugs, improve performance, and polish the overall experience with user feedback.',
   'Nodus Toolkit': 'Nodus Toolkit',
+  'Nodus Convert': 'Nodus Convert',
+  'Nodus Translate': 'Nodus Translate',
+  'MCP': 'MCP',
   'Nodus Radar': 'Nodus Radar',
   'Nodus Compass': 'Nodus Compass',
   'Nodus Tools': 'Nodus Tools',
@@ -2515,6 +2520,15 @@ export const EN: Record<string, string> = {
   'Faltan {n} paso(s). Se encolarán y verás el progreso en la cola.': '{n} step(s) missing. They will be queued and you will see the progress in the queue.',
   'No queda nada pendiente en esta obra.': 'Nothing is pending on this work.',
   'Reintentar lo que falta': 'Retry what is missing',
+  'Encola solo los pasos incompletos, pendientes o fallidos de cada obra seleccionada. No vuelve a analizar lo que ya está hecho.': 'Queues only the incomplete, pending or failed steps of each selected work. It does not analyze again what is already done.',
+  'No queda nada pendiente en la selección.': 'Nothing is pending in the selection.',
+  'Pendientes en cola para {n} obra(s). Verás el progreso en la cola.': 'Pending steps queued for {n} work(s). You will see the progress in the queue.',
+  'Eliminar las {n} obras seleccionadas': 'Delete the {n} selected works',
+  'Se eliminarán del vault actual las {n} obra(s) seleccionada(s), junto con sus ideas extraídas, sus pasajes, sus embeddings y el resto de datos derivados. Las ideas y demás datos que compartan con otras obras se conservan. Esta acción no se puede deshacer.': 'The {n} selected work(s) will be deleted from the current vault, together with their extracted ideas, passages, embeddings and the rest of their derived data. Ideas and other data shared with other works are kept. This cannot be undone.',
+  'Elimina estas obras del vault actual con sus ideas, pasajes, embeddings y demás datos derivados. Lo que otras obras comparten no se toca.': 'Deletes these works from the current vault along with their ideas, passages, embeddings and other derived data. What other works share is left untouched.',
+  'No se pueden eliminar obras que se están analizando ahora mismo ({n}). Espera a que terminen o detén la cola.': 'Works that are being analyzed right now cannot be deleted ({n}). Wait for them to finish or stop the queue.',
+  'Se eliminaron {n} obra(s) del vault.': '{n} work(s) deleted from the vault.',
+  'No se pudieron eliminar las obras seleccionadas.': 'The selected works could not be deleted.',
   'No aplica': 'Not applicable',
   'Solo abstract': 'Abstract only',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'Nodus found no text to read. Add the PDF or EPUB in Zotero and analyze again.',
@@ -8453,6 +8467,8 @@ export const EN: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "New tab",
   "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser holds up to {n} tabs.",
+  "Desplazar las pestañas a la izquierda": "Scroll tabs left",
+  "Desplazar las pestañas a la derecha": "Scroll tabs right",
   // Nodus Browser: media
   "Medios": "Media",
   "Reproduciéndose en Nodus Browser": "Playing in Nodus Browser",

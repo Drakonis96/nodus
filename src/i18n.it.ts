@@ -34,6 +34,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { PIPELINE_LOG_TRANSLATIONS } from './i18n.pipelineLogs';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
@@ -114,6 +115,7 @@ export const IT: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.it,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.it,
   ...NODI_NOTIFICATION_TRANSLATIONS['it'],
+  ...PIPELINE_LOG_TRANSLATIONS['it'],
   ...ANNOUNCEMENT_TRANSLATIONS['it'],
   ...WORLD_CHAT_TRANSLATIONS.it,
   ...STUDY_SYNONYM_TRANSLATIONS.it,
@@ -1202,6 +1204,9 @@ export const IT: Record<string, string> = {
   "Pulido y estabilidad": "Polacco e stabilità",
   "Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.": "Correggi bug, migliora le prestazioni e perfeziona l'esperienza complessiva con il feedback degli utenti.",
   "Nodus Toolkit": "Nodus Toolkit",
+  "Nodus Convert": "Nodus Convert",
+  "Nodus Translate": "Nodus Translate",
+  "MCP": "MCP",
   "Nodus Radar": "Nodus Radar",
   "Nodus Compass": "Nodus Compass",
   "Nodus Tools": "Nodus Tools",
@@ -2220,6 +2225,15 @@ export const IT: Record<string, string> = {
   'Faltan {n} paso(s). Se encolarán y verás el progreso en la cola.': '{n} passaggio/i mancante/i. Verranno messi in coda e vedrai i progressi nella coda.',
   'No queda nada pendiente en esta obra.': "Non c'è nulla in sospeso su quest'opera.",
   'Reintentar lo que falta': 'Riprova ciò che manca',
+  'Encola solo los pasos incompletos, pendientes o fallidos de cada obra seleccionada. No vuelve a analizar lo que ya está hecho.': 'Mette in coda solo i passaggi incompleti, in sospeso o non riusciti di ogni opera selezionata. Non rianalizza ciò che è già stato fatto.',
+  'No queda nada pendiente en la selección.': 'Non c’è nulla in sospeso nella selezione.',
+  'Pendientes en cola para {n} obra(s). Verás el progreso en la cola.': 'Passaggi in sospeso messi in coda per {n} opera/e. Vedrai i progressi nella coda.',
+  'Eliminar las {n} obras seleccionadas': 'Elimina le {n} opere selezionate',
+  'Se eliminarán del vault actual las {n} obra(s) seleccionada(s), junto con sus ideas extraídas, sus pasajes, sus embeddings y el resto de datos derivados. Las ideas y demás datos que compartan con otras obras se conservan. Esta acción no se puede deshacer.': 'Le {n} opera/e selezionata/e verranno eliminate dallo spazio attuale, insieme alle loro idee estratte, ai passaggi, agli embedding e agli altri dati derivati. Le idee e gli altri dati condivisi con altre opere vengono conservati. Questa azione non può essere annullata.',
+  'Elimina estas obras del vault actual con sus ideas, pasajes, embeddings y demás datos derivados. Lo que otras obras comparten no se toca.': 'Elimina queste opere dallo spazio attuale con le loro idee, passaggi, embedding e altri dati derivati. Ciò che altre opere condividono non viene toccato.',
+  'No se pueden eliminar obras que se están analizando ahora mismo ({n}). Espera a que terminen o detén la cola.': 'Non è possibile eliminare opere in fase di analisi in questo momento ({n}). Attendi che finiscano o ferma la coda.',
+  'Se eliminaron {n} obra(s) del vault.': '{n} opera/e eliminata/e dallo spazio.',
+  'No se pudieron eliminar las obras seleccionadas.': 'Non è stato possibile eliminare le opere selezionate.',
   'No aplica': 'Non applicabile',
   'Solo abstract': 'Solo abstract',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': "Nodus non ha trovato testo da leggere. Aggiungi il PDF o l'EPUB in Zotero e rianalizza.",
@@ -7630,6 +7644,8 @@ export const IT: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "Nuova scheda",
   "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser consente fino a {n} schede.",
+  "Desplazar las pestañas a la izquierda": "Scorri le schede a sinistra",
+  "Desplazar las pestañas a la derecha": "Scorri le schede a destra",
   // Nodus Browser: media
   "Medios": "Contenuti multimediali",
   "Reproduciéndose en Nodus Browser": "In riproduzione in Nodus Browser",

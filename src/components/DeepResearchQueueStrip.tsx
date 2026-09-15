@@ -6,7 +6,7 @@
 import type { DeepResearchProgress } from '@shared/types';
 import { deepResearchProgressPercent } from '@shared/deepResearchProgress';
 import { Icon } from './ui';
-import { errorText, t, tx } from '../i18n';
+import { errorText, t, tr, tx } from '../i18n';
 import { elapsedTimeLabel } from '@shared/elapsedTime';
 import { useElapsedClock } from '../useElapsedClock';
 
@@ -32,7 +32,7 @@ function OriginBadge() {
       className="shrink-0 rounded border border-indigo-800/70 bg-indigo-950/40 px-1 py-px text-[10px] font-semibold uppercase tracking-wide text-indigo-300"
       title={t('Pedido desde un cliente MCP')}
     >
-      MCP
+      {t('MCP')}
     </span>
   );
 }
@@ -56,7 +56,7 @@ export function progressDetail(progress: DeepResearchProgress | null): string | 
       case 'coverage': return t('Ampliando cobertura');
       case 'assembling': return t('Ensamblando y referenciando');
       case 'done': return t('Informe listo');
-      default: return progress.message;
+      default: return tr(progress.message);
     }
   })();
   return progress.pagesSoFar != null ? `${message} · ~${progress.pagesSoFar} ${t('pág.')}` : message;

@@ -76,7 +76,7 @@ test('wrapProviderError marks a transient network failure retriable', () => {
   assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsOptionalTransportField, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
   assert.match(
     source,
-    /if \(isTransientNetworkFailure\(e\)\) \{\s*return new AiError\(message \|\| 'Error de conexión con el proveedor de IA\.', true, false\);/,
-    'the connection failure must reach AiError with retriable=true',
+    /if \(isTransientNetworkFailure\(e\)\) \{\s*return new AiError\(message \|\| 'Error de conexión con el proveedor de IA\.', true, false, 'connection'\);/,
+    'the connection failure must reach AiError with retriable=true and its own log code',
   );
 });

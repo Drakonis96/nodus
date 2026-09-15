@@ -34,6 +34,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { PIPELINE_LOG_TRANSLATIONS } from './i18n.pipelineLogs';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
@@ -114,6 +115,7 @@ export const TR: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.tr,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.tr,
   ...NODI_NOTIFICATION_TRANSLATIONS['tr'],
+  ...PIPELINE_LOG_TRANSLATIONS['tr'],
   ...ANNOUNCEMENT_TRANSLATIONS['tr'],
   ...WORLD_CHAT_TRANSLATIONS.tr,
   ...STUDY_SYNONYM_TRANSLATIONS.tr,
@@ -1593,6 +1595,9 @@ export const TR: Record<string, string> = {
   "Pulido y estabilidad": "Parlatma ve stabilite",
   "Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.": "Kullanıcı geri bildirimleriyle hataları düzeltin, performansı artırın ve genel deneyimi iyileştirin.",
   "Nodus Toolkit": "Nodus Araç Seti",
+  "Nodus Convert": "Nodus Convert",
+  "Nodus Translate": "Nodus Translate",
+  "MCP": "MCP",
   "Nodus Radar": "Nodus Radar",
   "Nodus Compass": "Nodus Compass",
   "Nodus Tools": "Nodus Tools",
@@ -2602,6 +2607,15 @@ export const TR: Record<string, string> = {
   'Faltan {n} paso(s). Se encolarán y verás el progreso en la cola.': '{n} adım eksik. Kuyruğa alınacaklar ve ilerlemeyi kuyrukta göreceksin.',
   'No queda nada pendiente en esta obra.': 'Bu eserde bekleyen bir şey yok.',
   'Reintentar lo que falta': 'Eksik olanları yeniden dene',
+  'Encola solo los pasos incompletos, pendientes o fallidos de cada obra seleccionada. No vuelve a analizar lo que ya está hecho.': 'Yalnızca seçilen her eserin tamamlanmamış, bekleyen veya başarısız adımlarını kuyruğa alır. Zaten yapılmış olanı yeniden analiz etmez.',
+  'No queda nada pendiente en la selección.': 'Seçimde bekleyen bir şey yok.',
+  'Pendientes en cola para {n} obra(s). Verás el progreso en la cola.': '{n} eser için bekleyen adımlar kuyruğa alındı. İlerlemeyi kuyrukta göreceksin.',
+  'Eliminar las {n} obras seleccionadas': 'Seçili {n} eseri sil',
+  'Se eliminarán del vault actual las {n} obra(s) seleccionada(s), junto con sus ideas extraídas, sus pasajes, sus embeddings y el resto de datos derivados. Las ideas y demás datos que compartan con otras obras se conservan. Esta acción no se puede deshacer.': 'Seçili {n} eser, çıkarılmış fikirleri, pasajları, embedding’leri ve diğer türetilmiş verileriyle birlikte geçerli kasadan silinecek. Diğer eserlerle paylaşılan fikirler ve veriler korunur. Bu işlem geri alınamaz.',
+  'Elimina estas obras del vault actual con sus ideas, pasajes, embeddings y demás datos derivados. Lo que otras obras comparten no se toca.': 'Bu eserleri fikirleri, pasajları, embedding’leri ve diğer türetilmiş verileriyle birlikte geçerli kasadan siler. Diğer eserlerin paylaştıklarına dokunulmaz.',
+  'No se pueden eliminar obras que se están analizando ahora mismo ({n}). Espera a que terminen o detén la cola.': 'Şu anda analiz edilen eserler silinemez ({n}). Bitmelerini bekle veya kuyruğu durdur.',
+  'Se eliminaron {n} obra(s) del vault.': '{n} eser kasadan silindi.',
+  'No se pudieron eliminar las obras seleccionadas.': 'Seçili eserler silinemedi.',
   'No aplica': 'Uygulanamaz',
   'Solo abstract': 'Yalnızca özet',
   'Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.': 'Nodus okunacak metin bulamadı. PDF veya EPUB dosyasını Zotero’ya ekleyip yeniden analiz et.',
@@ -7977,6 +7991,8 @@ export const TR: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "Yeni sekme",
   "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser en fazla {n} sekme tutar.",
+  "Desplazar las pestañas a la izquierda": "Sekmeleri sola kaydır",
+  "Desplazar las pestañas a la derecha": "Sekmeleri sağa kaydır",
   // Nodus Browser: media
   "Medios": "Medya",
   "Reproduciéndose en Nodus Browser": "Nodus Browser'da oynatılıyor",
