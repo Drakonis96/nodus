@@ -2954,6 +2954,107 @@ html.theme-active.light .home-dashboard .study-home-icon {
   border: 0;
   border-radius: 50%;
 }
+.theme-colour-picker {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+.theme-colour-picker-trigger {
+  width: 1.75rem;
+  height: 1.75rem;
+  box-sizing: border-box;
+  border: 1px solid #111827;
+  border-radius: 9999px;
+  padding: 0;
+  cursor: pointer;
+}
+.theme-colour-picker-trigger:focus-visible {
+  outline: 2px solid var(--a-400);
+  outline-offset: 2px;
+}
+.theme-colour-picker-popover {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  display: grid;
+  min-width: 12rem;
+  gap: 0.55rem;
+  border: 1px solid var(--theme-border-dark);
+  border-radius: 0.6rem;
+  padding: 0.65rem;
+  background: var(--n-900);
+  color: var(--theme-text-dark);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.22);
+}
+html.light .theme-colour-picker-popover {
+  border-color: var(--theme-border-light);
+  background: var(--n-50);
+  color: var(--theme-text-light);
+}
+.theme-colour-picker-popover strong {
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.theme-colour-picker-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.theme-colour-picker-native {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid #111827;
+  border-radius: 9999px;
+  overflow: hidden;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.theme-colour-picker-native::-webkit-color-swatch-wrapper {
+  padding: 0;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.theme-colour-picker-native::-webkit-color-swatch,
+.theme-colour-picker-native::-moz-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
+.theme-colour-picker-hex-label {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+  color: var(--theme-text-dark-muted);
+  font-size: 0.65rem;
+}
+html.light .theme-colour-picker-hex-label { color: var(--theme-text-light-muted); }
+.theme-colour-picker-hex-input {
+  width: 6rem;
+  min-height: 1.75rem;
+  box-sizing: border-box;
+  border: 1px solid var(--theme-border-dark);
+  border-radius: 0.35rem;
+  padding: 0.25rem 0.4rem;
+  background: var(--n-950);
+  color: var(--theme-text-dark);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+}
+html.light .theme-colour-picker-hex-input {
+  border-color: var(--theme-border-light);
+  background: var(--n-50);
+  color: var(--theme-text-light);
+}
+.theme-colour-picker-hex-input:focus-visible {
+  outline: 2px solid var(--a-400);
+  outline-offset: 1px;
+}
 /* The focus colour above is baked into `.input`'s own rule by `@apply`, so it lands as
    `.input:focus` — a selector no `.<vault> .border-indigo-500` remap can reach, since the
    element never carries that class. Every field in a themed vault therefore lit up indigo

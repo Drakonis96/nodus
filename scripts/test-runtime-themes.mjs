@@ -63,9 +63,10 @@ test('settings exposes mode before the palette editor', async () => {
 });
 
 test('runtime theme edge cases are guarded', async () => {
-  const [settings, serverSettings, themeBoot, settingsRepo, profileTypes, tokens, utilities, indexCss] = await Promise.all([
+  const [settings, serverSettings, themePicker, themeBoot, settingsRepo, profileTypes, tokens, utilities, indexCss] = await Promise.all([
     readFile(new URL('../src/views/Settings.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/serverWeb/settings/ServerSettingsView.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/components/ThemeColourPicker.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/theme/themeBoot.ts', import.meta.url), 'utf8'),
     readFile(new URL('../electron/db/settingsRepo.ts', import.meta.url), 'utf8'),
     readFile(new URL('../shared/serverProfilePreferences.d.mts', import.meta.url), 'utf8'),
@@ -103,9 +104,11 @@ test('runtime theme edge cases are guarded', async () => {
   assert.match(indexCss, /html\.theme-active\.dark \.home-dashboard/);
   assert.match(indexCss, /html\.theme-active\.light \.library-theme-panel/);
   assert.match(indexCss, /\[data-testid="theme-editor"\] input\[type='color'\][\s\S]*appearance: none/);
-  assert.match(settings, /aria-label=\{`\$\{t\(label\)\} - \$\{t\('Hexadecimal'\)\}`\}/);
-  assert.match(serverSettings, /aria-label=\{`\$\{t\(label\)\} - \$\{t\("Hexadecimal"\)\}`\}/);
-  assert.match(serverSettings, /ss-theme-colour-value/);
+  assert.match(themePicker, /className="theme-colour-picker-popover"/);
+  assert.match(themePicker, /className="theme-colour-picker-hex-input"/);
+  assert.match(themePicker, /placeholder="#6366f1"/);
+  assert.match(settings, /<ThemeColourPicker key=\{key\}/);
+  assert.match(serverSettings, /<ThemeColourPicker key=\{key\}/);
   assert.match(settingsRepo, /merged\.customThemes = sanitizeCustomThemes\(merged\.customThemes\)/);
   assert.match(profileTypes, /customThemes: CustomAppTheme\[\]/);
 });

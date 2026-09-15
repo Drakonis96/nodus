@@ -15,6 +15,7 @@ import type { AppLanguage, CustomAppTheme } from "@shared/types";
 import { APP_THEME_IDS } from "@shared/appThemes";
 import { contrast, deriveThemeTokens, THEMES } from "../../theme/themes.mjs";
 import { Icon } from "../../components/ui";
+import { ThemeColourPicker } from "../../components/ThemeColourPicker";
 import { api, ApiError } from "../api";
 import { setActiveLang, t, tx } from "../i18nShim";
 import { SERVER_MODEL_CATALOG } from "../modelCatalog";
@@ -177,10 +178,6 @@ function normalizeThemeColour(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim().toLowerCase();
   return HEX_COLOUR.test(normalized) ? normalized : null;
-}
-
-function colourPickerValue(value: string): string {
-  return HEX_COLOUR.test(value) ? value : '#000000';
 }
 
 const emptyThemeDraft = (): Omit<CustomAppTheme, "id"> => ({
@@ -1455,21 +1452,7 @@ export function ServerSettingsView({
                 { key: 'light-text', label: 'Texto en modo claro', value: themeDraft.lightText, update: (value: string) => setThemeDraft((draft) => ({ ...draft, lightText: value })) },
                 { key: 'dark-text', label: 'Texto en modo oscuro', value: themeDraft.darkText, update: (value: string) => setThemeDraft((draft) => ({ ...draft, darkText: value })) },
               ].map(({ key, label, value, update }) => (
-                <label key={key}>
-                  <input type="color" value={colourPickerValue(value)} onChange={(event) => update(event.target.value)} />
-                  <span>{t(label)}</span>
-                  <input
-                    className="ss-theme-colour-value"
-                    type="text"
-                    value={value}
-                    onChange={(event) => update(event.target.value)}
-                    aria-label={`${t(label)} - ${t("Hexadecimal")}`}
-                    placeholder="#6366f1"
-                    inputMode="text"
-                    maxLength={7}
-                    spellCheck={false}
-                  />
-                </label>
+                <ThemeColourPicker key={key} labelText={t(label)} hexLabel={t("Hexadecimal")} value={value} onChange={update} />
               ))}
             </div>
             <label>

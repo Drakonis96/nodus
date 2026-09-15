@@ -39,6 +39,7 @@ import { LegalDocModal } from '../components/LegalDocModal';
 import { LEGAL_DOCS, type LegalDocId } from '../legalDocs';
 import { confirm } from '../components/feedback';
 import { Icon } from '../components/ui';
+import { ThemeColourPicker } from '../components/ThemeColourPicker';
 import { ModelPicker, ModelWithReasoning, SubscriptionQuotaNotice, ExtractionCapabilityNotice, SelfAuditNotice } from '../components/ModelPicker';
 import { EmbeddingModelControl } from '../components/EmbeddingModelControl';
 import { GeneralTextModelControl } from '../components/GeneralTextModelControl';
@@ -88,10 +89,6 @@ function normalizeThemeColour(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const normalized = value.trim().toLowerCase();
   return HEX_COLOUR.test(normalized) ? normalized : null;
-}
-
-function colourPickerValue(value: string): string {
-  return HEX_COLOUR.test(value) ? value : '#000000';
 }
 
 function themeSlug(label: string): string {
@@ -1242,21 +1239,7 @@ export function Settings({
                       { key: 'light-text', label: 'Texto en modo claro', value: themeDraft.lightText, update: (value: string) => setThemeDraft((draft) => ({ ...draft, lightText: value })) },
                       { key: 'dark-text', label: 'Texto en modo oscuro', value: themeDraft.darkText, update: (value: string) => setThemeDraft((draft) => ({ ...draft, darkText: value })) },
                     ].map(({ key, label, value, update }) => (
-                      <label key={key} className="flex items-center gap-2 text-xs text-neutral-400">
-                        <input type="color" value={colourPickerValue(value)} onChange={(event) => update(event.target.value)} />
-                        <span className="min-w-0 flex-1">{t(label)}</span>
-                        <input
-                          className="input h-7 w-24 px-2 py-1 font-mono text-[11px]"
-                          type="text"
-                          value={value}
-                          onChange={(event) => update(event.target.value)}
-                          aria-label={`${t(label)} - ${t('Hexadecimal')}`}
-                          placeholder="#6366f1"
-                          inputMode="text"
-                          maxLength={7}
-                          spellCheck={false}
-                        />
-                      </label>
+                      <ThemeColourPicker key={key} labelText={t(label)} hexLabel={t('Hexadecimal')} value={value} onChange={update} />
                     ))}
                   </div>
                   <label className="block text-xs text-neutral-400">
