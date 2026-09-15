@@ -13,7 +13,7 @@ export function classifyReleaseAsset(name) {
   const lower = name.toLowerCase();
 
   if (/^latest.*\.ya?ml$/i.test(name) || lower.endsWith('.blockmap')) return null;
-  if (lower.endsWith('.deb') || lower.endsWith('.appimage')) return 'linux';
+  if (lower.endsWith('.deb') || lower.endsWith('.appimage') || lower.endsWith('.rpm')) return 'linux';
   if (lower.endsWith('.dmg') || lower.endsWith('.zip')) return 'macos';
   if (lower.endsWith('.exe')) return 'windows';
   return null;

@@ -387,7 +387,8 @@
     "linux": {
       "target": [
         "deb",
-        "AppImage"
+        "AppImage",
+        "rpm"
       ],
       "category": "Office",
       "maintainer": "Drakonis96 <Drakonis96@users.noreply.github.com>"
