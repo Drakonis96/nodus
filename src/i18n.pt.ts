@@ -8167,6 +8167,8 @@ export const PT: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "Novo separador",
   "Nodus Browser admite hasta {n} pestañas.": "O Nodus Browser admite até {n} separadores.",
+  "Desplazar las pestañas a la izquierda": "Deslocar os separadores para a esquerda",
+  "Desplazar las pestañas a la derecha": "Deslocar os separadores para a direita",
   // Nodus Browser: media
   "Medios": "Multimédia",
   "Reproduciéndose en Nodus Browser": "A reproduzir no Nodus Browser",

@@ -8453,6 +8453,8 @@ export const EN: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "New tab",
   "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser holds up to {n} tabs.",
+  "Desplazar las pestañas a la izquierda": "Scroll tabs left",
+  "Desplazar las pestañas a la derecha": "Scroll tabs right",
   // Nodus Browser: media
   "Medios": "Media",
   "Reproduciéndose en Nodus Browser": "Playing in Nodus Browser",

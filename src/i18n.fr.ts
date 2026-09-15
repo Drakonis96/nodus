@@ -8216,6 +8216,8 @@ export const FR: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "Nouvel onglet",
   "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser accepte jusqu'à {n} onglets.",
+  "Desplazar las pestañas a la izquierda": "Faire défiler les onglets vers la gauche",
+  "Desplazar las pestañas a la derecha": "Faire défiler les onglets vers la droite",
   // Nodus Browser: media
   "Medios": "Médias",
   "Reproduciéndose en Nodus Browser": "Lecture en cours dans Nodus Browser",

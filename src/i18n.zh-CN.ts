@@ -7246,6 +7246,8 @@ export const ZH_CN: Record<string, string> = {
   "Volver atrás": "返回",
   "Pestaña nueva": "新标签页",
   "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser 最多支持 {n} 个标签页。",
+  "Desplazar las pestañas a la izquierda": "向左滚动标签页",
+  "Desplazar las pestañas a la derecha": "向右滚动标签页",
   "Medios": "媒体",
   "Reproduciéndose en Nodus Browser": "正在 Nodus Browser 中播放",
   "Medios en pausa en Nodus Browser": "Nodus Browser 中的媒体已暂停",
