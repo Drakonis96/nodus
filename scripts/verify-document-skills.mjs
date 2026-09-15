@@ -72,22 +72,30 @@ try {
   const engines = [];
   // What the planner asks for, when a case below needs a proposal the app must judge.
   let proposal = '';
+  let selection = 'all';
   let plannerPrompt = '';
   const proposalsFor = blocks => {
     const paragraph = blocks.find(block => block.field === 'body' && !block.markdown.startsWith('#'));
     const heading = blocks.find(block => /^\s*#{1,6}\s+[^\n]+$/.test(block.markdown));
     const citing = blocks.find(block => block.markdown.includes('nodus://idea/g-0001'));
-    const one = patch => [{ blockId: paragraph.id, skillId: svg.id, brief: 'diagram', caption: 'Del ingreso a la consulta: tres etapas ilustrativas.', sources: [], layout: 'wide', ...patch }];
-    if (proposal === 'cited') return one({ blockId: citing.id, sources: ['nodus://idea/g-0001'] });
-    if (proposal === 'invented-source') return one({ blockId: citing.id, sources: ['nodus://idea/g-9999'] });
+    // A batch can legitimately carry no citable block of its own — the tail of a long
+    // document does — so a case cites evidence when its batch has it and stays honest
+    // with `sources: []` when it does not.
+    const target = citing ?? paragraph;
+    const one = patch => [{ blockId: target.id, skillId: svg.id, brief: 'diagram', caption: 'Del ingreso a la consulta: tres etapas ilustrativas.', sources: [], layout: 'wide', ...patch }];
+    if (proposal === 'cited') return one({ sources: citing ? ['nodus://idea/g-0001'] : [] });
+    if (proposal === 'invented-source') return one({ sources: ['nodus://idea/g-9999'] });
     if (proposal === 'heading-only') return one({ blockId: heading.id });
     if (proposal === 'foreign-skill') return one({ skillId: 'no-such-skill' });
     return [];
   };
   ai.completeJson = async (args, _validate, model) => {
     engines.push(model);
-    const { blocks } = JSON.parse(args.user);
-    if (proposal) { plannerPrompt = args.user; return proposalsFor(blocks); }
+    const payload = JSON.parse(args.user);
+    // The global selection of a long document gets its own call, with proposals and no blocks.
+    if (payload.proposals) return selection === 'one' ? [payload.proposals[0].id] : payload.proposals.map(item => item.id);
+    if (proposal) { plannerPrompt = args.user; return proposalsFor(payload.blocks); }
+    const { blocks } = payload;
     if (zero) return [];
     assert.ok(blocks, 'final editorial sees stable blocks');
     const first = blocks.find(block => block.field === (mode === 'deep' ? 'body' : 'overview') && !block.markdown.startsWith('#'));
@@ -227,17 +235,45 @@ try {
     return draft;
   };
   const outcomes = {};
+  const targets = {};
   for (const kindOfProposal of ['cited', 'invented-source', 'heading-only', 'foreign-skill', 'none']) {
     proposal = kindOfProposal;
     const report = drafts.saveWritingWorkshopDraft({ draft: linkedDraft(), model: null });
+    targets[kindOfProposal] = { kind: 'deep-research', id: report.id };
     lines.length = 0;
-    const run = await service.enrichDocumentVisuals({ kind: 'deep-research', id: report.id }, severalSkills);
-    outcomes[kindOfProposal] = { state: run.state, figures: run.figures.length, reason: run.figures[0]?.error ?? run.error ?? null, recorded: lines.map(entry => entry.code) };
+    const run = await service.enrichDocumentVisuals(targets[kindOfProposal], severalSkills);
+    outcomes[kindOfProposal] = { state: run.state, figures: run.figures.length, reason: run.figures[0]?.error ?? run.error ?? null, recorded: lines.map(entry => entry.code), discarded: (run.discarded ?? []).map(item => item.reason), log: lines.map(entry => ({ code: entry.code, level: entry.level, message: entry.message })) };
     console.log('proposal:', kindOfProposal, JSON.stringify(outcomes[kindOfProposal]));
   }
   proposal = '';
   assert.equal(outcomes.cited.figures, 1, 'a proposal citing evidence in its own block is used');
+  assert.deepEqual(outcomes.cited.discarded, [], 'and nothing is refused');
   assert.equal(outcomes.none.figures, 0, 'a document that needs no figures is allowed to stay without them');
+  assert.deepEqual(outcomes.none.discarded, [], 'a document that needed none refuses none');
+  assert.deepEqual(outcomes.none.recorded, [], 'and stays out of the log: there is nothing to explain');
+  // Every refusal is named, in the document and in the log, with the motive that caused it.
+  assert.deepEqual(outcomes['invented-source'].discarded, ['source-not-in-block']);
+  assert.deepEqual(outcomes['heading-only'].discarded, ['heading-block']);
+  assert.deepEqual(outcomes['foreign-skill'].discarded, ['skill-not-enabled']);
+  for (const kind of ['invented-source', 'heading-only', 'foreign-skill']) {
+    assert.equal(outcomes[kind].figures, 0);
+    assert.deepEqual(outcomes[kind].recorded, ['figure_skipped'], `${kind} must be recorded, not swallowed`);
+    const [line] = outcomes[kind].log;
+    assert.equal(line.level, 'warning', 'a run that kept no figure must be a warning, not a quiet success');
+    assert.equal(line.code, 'figure_skipped');
+    assert.equal(line.message.id, 'figuresDiscarded');
+    assert.equal(line.message.params.count, 1);
+    assert.match(line.message.params.reason.id, /^reason[A-Z]/);
+  }
+  assert.equal(outcomes['invented-source'].log[0].message.params.reason.id, 'reasonSourceNotInBlock');
+  assert.equal(outcomes['heading-only'].log[0].message.params.reason.id, 'reasonHeadingBlock');
+  assert.equal(outcomes['foreign-skill'].log[0].message.params.reason.id, 'reasonSkillNotEnabled');
+  // The refusal has to survive the reopen, or the reader loses the explanation again the
+  // moment they leave the document: this reads back through the store's own validation.
+  const reopened = service.getDocumentVisuals(targets['invented-source']);
+  assert.deepEqual(reopened?.discarded?.map(item => item.reason), ['source-not-in-block'], 'the refusals travel with the manifest');
+  assert.equal(reopened?.figures.length, 0);
+  assert.equal(reopened?.discarded?.[0].blockId.length > 0, true, 'and name the block they were about');
   // Every skill the reader enabled is offered to the planner, with its ceiling, and no
   // other: a skill that never reaches the catalogue can never produce a resource.
   const catalogue = JSON.parse(plannerPrompt).skills;
@@ -245,8 +281,27 @@ try {
   assert.ok(catalogue.every(item => Number.isSafeInteger(item.maximum)), 'each offered skill carries its ceiling');
   const disabled = options.find(option => ![svg.id, demo.id].includes(option.skill.id));
   assert.ok(disabled && !catalogue.some(item => item.id === disabled.skill.id), 'a skill left disabled is never offered');
+  // The planner is handed the links each block may cite, so "exact source" is a choice
+  // from a list instead of a guess it has one unretried attempt to get right.
+  const offered = JSON.parse(plannerPrompt).blocks.map(block => block.sources);
+  assert.ok(offered.some(sources => sources.includes('nodus://idea/g-0001')), 'the block that carries the link offers it');
+  assert.ok(offered.every(sources => Array.isArray(sources)), 'every block offers a list, empty when it cites nothing');
+  // A long report is planned in batches and then chosen globally. A proposal the
+  // selection leaves out is the fourth way a figure disappears without a word.
+  proposal = 'cited'; selection = 'one';
+  const longDraft = () => { const draft = linkedDraft(); draft.draftMarkdown = Array.from({ length: 12 }, () => draft.draftMarkdown).join('\n\n'); return draft; };
+  const longReport = drafts.saveWritingWorkshopDraft({ draft: longDraft(), model: null });
+  lines.length = 0;
+  const longRun = await service.enrichDocumentVisuals({ kind: 'deep-research', id: longReport.id }, severalSkills);
+  console.log('long document:', JSON.stringify({ error: longRun.error, figures: longRun.figures.length, discarded: (longRun.discarded ?? []).map(item => item.reason), recorded: lines.map(entry => `${entry.code}/${entry.level}`) }));
+  assert.ok(longRun.blocks.length > 29 && longRun.figures.length === 1, 'a long document is planned in batches and keeps what the selection chose');
+  assert.deepEqual((longRun.discarded ?? []).map(item => item.reason), ['not-selected'], 'the proposals the global selection left out are recorded');
+  assert.deepEqual(lines.map(entry => entry.level), ['info'], 'a run that kept a figure records the same motive quietly');
+  assert.equal(lines[0].message.id, 'figuresDiscarded');
+  assert.deepEqual(lines[0].message.params, { count: 1, reason: { id: 'reasonDiscardNotSelected' } });
+  proposal = ''; selection = 'all';
   await workers.stopCapabilityWorkers();
-  fs.writeFileSync(path.join(out, 'verification.json'), JSON.stringify({ passed: true, textCalls, isolatedProfile: true, zeroFigures: true, usageCeiling: true, reopensWithoutCalls: true, originalsUnchanged: true, undo: true, paidOverflowBlocked: true, captureRetryWithoutCalls: true, resourcesFollowTheConfiguredModel: true, explicitModelWins: true, storedModelOnlyAsFallback: true, perTaskEngines: true, failuresNameTheirEngine: true, enabledSkillsReachThePlanner: true, citedProposalUsed: true, zeroFigureDocumentAllowed: true, proposalOutcomes: outcomes }, null, 2));
+  fs.writeFileSync(path.join(out, 'verification.json'), JSON.stringify({ passed: true, textCalls, isolatedProfile: true, zeroFigures: true, usageCeiling: true, reopensWithoutCalls: true, originalsUnchanged: true, undo: true, paidOverflowBlocked: true, captureRetryWithoutCalls: true, resourcesFollowTheConfiguredModel: true, explicitModelWins: true, storedModelOnlyAsFallback: true, perTaskEngines: true, failuresNameTheirEngine: true, enabledSkillsReachThePlanner: true, citedProposalUsed: true, zeroFigureDocumentAllowed: true, refusalsAreNamed: true, refusalsReachTheLog: true, silentSelectionRecorded: true, plannerOfferedExactSources: true, proposalOutcomes: outcomes }, null, 2));
   console.log('Document skills verification passed.');
   for (const win of BrowserWindow.getAllWindows()) win.destroy();
   load('electron/db/database.ts').closeDb(); fs.rmSync(profile,{recursive:true,force:true});

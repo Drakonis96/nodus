@@ -63,6 +63,7 @@ export const PIPELINE_LOG_CODES = {
   embedding_failed: { category: 'embedding' },
   embedding_count_mismatch: { category: 'embedding' },
   extract_failed: { category: 'extraction' },
+  figure_skipped: { category: 'extraction', level: 'warning' },
   no_legible_text: { category: 'extraction', level: 'warning' },
   ocr_failed: { category: 'ocr' },
   index_failed: { category: 'indexing' },

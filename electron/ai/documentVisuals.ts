@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { BrowserWindow } from 'electron';
-import { documentBlocks, documentSkillCatalog, DocumentSkillBudget, DOCUMENT_VISUAL_RULES, validateDocumentSkillPolicy, type DocumentSkillPolicy, type DocumentVisualManifest, type DocumentVisualSuggestion, type DocumentVisualTarget } from '../../shared/documentSkills';
+import { blockSources, documentBlocks, documentSkillCatalog, DocumentSkillBudget, DOCUMENT_VISUAL_DISCARD_REASONS, DOCUMENT_VISUAL_RULES, documentVisualDiscardTally, validateDocumentSkillPolicy, type DocumentSkillPolicy, type DocumentVisualDiscard, type DocumentVisualDiscardReason, type DocumentVisualManifest, type DocumentVisualSuggestion, type DocumentVisualTarget } from '../../shared/documentSkills';
 import { researchVisualFields, immersionVisualFields } from '../../shared/documentVisualContent';
 import type { ModelRef } from '../../shared/types';
 import { buildChatSkillsPrompt, splitChatVisuals } from '../../shared/chatSkills';
@@ -17,7 +17,8 @@ import { documentVisualModelKey, resolveDocumentVisualModel, type DocumentVisual
 import { getSettings } from '../db/settingsRepo';
 import { completeJson, completeText } from './aiClient';
 import { normalizeCapabilityId } from '../../skill-capabilities/contracts';
-import { logPipelineFailure } from '../logging/pipelineLogCore';
+import { logPipelineFailure, logPipelineInfo, logPipelineWarning } from '../logging/pipelineLogCore';
+import { pipelineLogText } from '../../shared/pipelineLogMessages';
 
 const running = new Map<string, AbortController>();
 const keyFor = (target: DocumentVisualTarget) => JSON.stringify([getActiveVault().id, target.kind, target.id]);
@@ -41,6 +42,28 @@ export function getDocumentVisuals(target: DocumentVisualTarget): DocumentVisual
   return manifest?.contentHash === visualContentHash(input.fields) ? manifest : null;
 }
 const notify = (target: DocumentVisualTarget) => BrowserWindow.getAllWindows().forEach(win => { if (!win.isDestroyed()) win.webContents.send('documentVisuals:changed', target); });
+
+/**
+ * One line per motive, with its count — and louder when nothing survived.
+ *
+ * A run that refused every proposal used to leave no trace at all, so the reader's
+ * "no figures were needed" was the same sentence as "the app discarded what the model
+ * proposed". A run that kept some figures is a normal success and logs quietly; one
+ * that kept none is a warning, because that is the outcome somebody has to explain.
+ */
+function logDiscards(discarded: readonly DocumentVisualDiscard[], figures: number, target: DocumentVisualTarget): void {
+  if (!discarded.length) return;
+  const record = figures > 0 ? logPipelineInfo : logPipelineWarning;
+  for (const { reason, count } of documentVisualDiscardTally(discarded)) {
+    record({
+      code: 'figure_skipped',
+      subject: 'subjectFigureAnalysis',
+      context: { scope: 'extraction', nodusId: `${target.kind}:${target.id}` },
+      message: pipelineLogText('figuresDiscarded', { count, reason: { id: DOCUMENT_VISUAL_DISCARD_REASONS[reason] } }),
+    });
+  }
+}
+
 export function cancelDocumentVisuals(target: DocumentVisualTarget): void { running.get(keyFor(target))?.abort(); }
 export function undoVisualEnrichment(target: DocumentVisualTarget): DocumentVisualManifest | null {
   if (running.has(keyFor(target))) throw new Error('Cancel the current visual task first.');
@@ -91,6 +114,9 @@ export async function enrichDocumentVisuals(target: DocumentVisualTarget, policy
     schemaVersion: 1, target, vaultId, revision: randomUUID(), contentHash: visualContentHash(input.fields), createdAt: now, updatedAt: now,
     state: 'planning', policy: validated, usage: readDocumentVisualUsage(vaultId, target), blocks: documentBlocks(input.fields),
     figures: request.retry ? structuredClone(previous?.figures ?? []).map(figure => figure.state === 'running' ? { ...figure, state: 'failed' as const, error: 'Interrupted request; retry explicitly.' } : figure) : structuredClone(previous?.figures.filter(figure => figure.state === 'ready') ?? []),
+    // Kept across a retry: the refusals that explain why a block has no figure are still
+    // the reason, and a retry only re-runs the figures it did not finish.
+    discarded: request.retry ? structuredClone(previous?.discarded ?? []) : [],
   };
   const current = () => {
     if (getActiveVault().id !== vaultId) return false;
@@ -110,19 +136,27 @@ export async function enrichDocumentVisuals(target: DocumentVisualTarget, policy
       }
       if (batch.length) batches.push(batch);
       const proposals: DocumentVisualSuggestion[] = [];
+      // A proposal the document refuses is kept, with its motive. Dropping it silently is
+      // what made a run that discarded everything read exactly like a document that
+      // needed no figures at all — same state, same sentence, nothing anywhere.
+      const discarded: DocumentVisualDiscard[] = [];
+      const refuse = (item: DocumentVisualSuggestion, reason: DocumentVisualDiscardReason) => discarded.push({ blockId: item.blockId, skillId: item.skillId, reason });
       for (const blocks of batches) {
         signal.throwIfAborted();
         const suggested = await completeJson<DocumentVisualSuggestion[]>({
-          system: `${DOCUMENT_VISUAL_RULES}\nReturn a JSON array. Each item: {blockId,skillId,brief,caption,sources:[],layout:"wide"|"compact"|"side"}. Choose exact supplied block and skill ids. Sources must be exact nodus:// links from those blocks, or [] for explicitly illustrative constructions. Caption and labels must use the document language. Do not duplicate existing figures. Return [] if nothing is useful.`,
-          user: JSON.stringify({ title: input.title, language: input.language, skills: JSON.parse(documentSkillCatalog(options, validated)), opportunities: request.hints ?? [], existing: manifest.figures.map(({ blockId, caption }) => ({ blockId, caption })), blocks }),
+          system: `${DOCUMENT_VISUAL_RULES}\nReturn a JSON array. Each item: {blockId,skillId,brief,caption,sources:[],layout:"wide"|"compact"|"side"}. Choose exact supplied block and skill ids. Each block lists in sources the exact nodus:// links it may cite: use only those, or [] for explicitly illustrative constructions. Caption and labels must use the document language. Do not duplicate existing figures. Return [] if nothing is useful.`,
+          user: JSON.stringify({ title: input.title, language: input.language, skills: JSON.parse(documentSkillCatalog(options, validated)), opportunities: request.hints ?? [], existing: manifest.figures.map(({ blockId, caption }) => ({ blockId, caption })), blocks: blocks.map(block => ({ ...block, sources: blockSources(block) })) }),
           temperature: 0.2, maxTokens: 4000, noRetry: true, signal,
         }, (value): value is DocumentVisualSuggestion[] => Array.isArray(value) && value.length <= blocks.length && value.every(item => item && typeof item.blockId === 'string' && typeof item.skillId === 'string' && typeof item.brief === 'string' && item.brief.length < 6000 && typeof item.caption === 'string' && item.caption.length < 1200 && Array.isArray(item.sources)), model);
         for (const item of suggested) {
           const block = blocks.find(candidate => candidate.id === item.blockId);
-          if (!block || /^\s*#{1,6}\s+[^\n]+$/.test(block.markdown) || !skills.some(skill => skill.id === item.skillId) || budget.remaining(item.skillId) <= proposals.filter(proposal => proposal.skillId === item.skillId).length) continue;
-          const sources = [...block.markdown.matchAll(/\]\((nodus:\/\/[^\s)]+)\)/g)].map(match => match[1]);
-          if (item.sources.some(source => typeof source !== 'string' || !sources.includes(source))) continue;
-          if (manifest.figures.some(figure => figure.blockId === item.blockId) || proposals.some(proposal => proposal.blockId === item.blockId)) continue;
+          if (!block) { refuse(item, 'unknown-block'); continue; }
+          if (/^\s*#{1,6}\s+[^\n]+$/.test(block.markdown)) { refuse(item, 'heading-block'); continue; }
+          if (!skills.some(skill => skill.id === item.skillId)) { refuse(item, 'skill-not-enabled'); continue; }
+          if (budget.remaining(item.skillId) <= proposals.filter(proposal => proposal.skillId === item.skillId).length) { refuse(item, 'ceiling-reached'); continue; }
+          const sources = blockSources(block);
+          if (item.sources.some(source => typeof source !== 'string' || !sources.includes(source))) { refuse(item, 'source-not-in-block'); continue; }
+          if (manifest.figures.some(figure => figure.blockId === item.blockId) || proposals.some(proposal => proposal.blockId === item.blockId)) { refuse(item, 'block-already-has-figure'); continue; }
           proposals.push({ ...item, id: randomUUID(), layout: ['wide', 'compact', 'side'].includes(item.layout) ? item.layout : 'wide' });
         }
       }
@@ -130,9 +164,13 @@ export async function enrichDocumentVisuals(target: DocumentVisualTarget, policy
       let selected = proposals;
       if (batches.length > 1 && proposals.length) {
         const ids = await completeJson<string[]>({ system: `${DOCUMENT_VISUAL_RULES}\nSelect only non-redundant, worthwhile figures across the whole document. Return a JSON array of supplied proposal ids, including [] when appropriate.`, user: JSON.stringify({ title: input.title, proposals }), maxTokens: 2000, noRetry: true, signal }, (value): value is string[] => Array.isArray(value) && value.every(id => typeof id === 'string'), model);
-        selected = proposals.filter(proposal => ids.includes(proposal.id));
+        const kept = new Set(ids.filter(id => typeof id === 'string'));
+        for (const proposal of proposals) if (!kept.has(proposal.id)) discarded.push({ blockId: proposal.blockId, skillId: proposal.skillId, reason: 'not-selected' });
+        selected = proposals.filter(proposal => kept.has(proposal.id));
       }
+      manifest.discarded = discarded;
       manifest.figures.push(...selected.map(item => ({ ...item, state: 'pending' as const })));
+      logDiscards(discarded, manifest.figures.length, target);
     }
     manifest.state = 'generating'; persist();
     for (const figure of manifest.figures) {

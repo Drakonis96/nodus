@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const temp = await mkdtemp(path.join(os.tmpdir(), 'nodus-document-skills-'));
 await build({ entryPoints: ['shared/documentSkills.ts'], bundle: true, platform: 'node', format: 'esm', outfile: path.join(temp, 'policy.mjs') });
-const { validateDocumentSkillPolicy: validate, defaultDocumentSkillPolicy: defaults, DocumentSkillBudget: Budget, documentBlocks } = await import(pathToFileURL(path.join(temp, 'policy.mjs')));
+const { validateDocumentSkillPolicy: validate, defaultDocumentSkillPolicy: defaults, DocumentSkillBudget: Budget, documentBlocks, blockSources, DOCUMENT_VISUAL_DISCARD_REASONS, documentVisualDiscardText, documentVisualDiscardTally } = await import(pathToFileURL(path.join(temp, 'policy.mjs')));
 const options = ['svg', 'paid', 'unknown'].map((id,index) => ({ skill: { id, name: id, enabled: { assistant: true } }, billing: ['none', 'per-call', 'unknown'][index], available: true }));
 const policy = (maxCalls = 4, skillId = 'svg') => ({ enabled: true, skills: [{ skillId, enabled: true, maxCalls }] });
 
@@ -52,6 +52,43 @@ test('blocks preserve fenced resources and deterministic source positions', () =
   assert.equal(blocks[2].endLine,9);
   assert.match(blocks[2].markdown, /<svg>\n\n<\/svg>/);
   assert.equal(blocks[3].id,'body:3');
+});
+test('a block offers exactly the sources it can cite, and nothing else', () => {
+  const [block] = documentBlocks({ body: 'Como sostiene [Pérez (1999)](nodus://idea/g-0001) y [otra](nodus://passage/p-9), el flujo continúa.' });
+  assert.deepEqual(blockSources(block), ['nodus://idea/g-0001', 'nodus://passage/p-9']);
+  assert.deepEqual(blockSources({ ...block, markdown: 'Sin enlaces aquí.' }), [], 'a block without links offers none');
+  // The planner is handed this list and the filter enforces it, so a link outside the
+  // markup — a bare URL, a normalised id — is never among what the model may choose.
+  assert.deepEqual(blockSources({ ...block, markdown: 'Ver nodus://idea/g-0001 suelto.' }), []);
+});
+
+test('every refusal names a motive the log catalogue knows', () => {
+  const reasons = Object.keys(DOCUMENT_VISUAL_DISCARD_REASONS);
+  assert.equal(reasons.length, 7);
+  const texts = new Set();
+  for (const reason of reasons) {
+    // A mistyped catalogue id would resolve to nothing, and the panel would show a blank
+    // line beside a number while the log printed an empty reason.
+    const text = documentVisualDiscardText(reason);
+    assert.equal(typeof text, 'string', `${reason} must resolve to a sentence`);
+    assert.ok(text.length > 10, `${reason} resolves to "${text}", which is not a sentence`);
+    assert.match(DOCUMENT_VISUAL_DISCARD_REASONS[reason], /^reason[A-Z]/, `${reason} must name a reason* id`);
+    texts.add(text);
+  }
+  assert.equal(texts.size, reasons.length, 'two refusals cannot share one wording');
+});
+
+test('refusals are counted by motive, in the order they first appeared', () => {
+  const discarded = [
+    { blockId: 'body:1', skillId: 'svg', reason: 'source-not-in-block' },
+    { blockId: 'body:2', skillId: 'svg', reason: 'heading-block' },
+    { blockId: 'body:3', skillId: 'svg', reason: 'source-not-in-block' },
+  ];
+  assert.deepEqual(documentVisualDiscardTally(discarded), [
+    { reason: 'source-not-in-block', count: 2 },
+    { reason: 'heading-block', count: 1 },
+  ]);
+  assert.deepEqual(documentVisualDiscardTally([]), []);
 });
 test.after(async () => rm(temp, { recursive: true, force: true }));
 

@@ -1,10 +1,11 @@
 import { useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { DocumentVisualManifest, DocumentVisualTarget } from '@shared/documentSkills';
+import type { DocumentVisualDiscard, DocumentVisualManifest, DocumentVisualTarget } from '@shared/documentSkills';
+import { documentVisualDiscardTally, documentVisualDiscardText } from '@shared/documentSkills';
 import type { AppSettings, ModelRef } from '@shared/types';
 import { documentVisualModelFromSettings } from '@shared/documentVisualEnrich';
 import { DocumentSkillsControl, useDocumentSkills } from './DocumentSkillsControl';
 import { ModelPicker, SubscriptionQuotaNotice } from './ModelPicker';
-import { t } from '../i18n';
+import { t, tx } from '../i18n';
 import './documentFigures.css';
 import { Icon } from './ui';
 import { DocumentFigureContext as Context } from './DocumentFigures';
@@ -22,6 +23,15 @@ export function DocumentVisualScope({ target, children, enabled = true, initialM
     return () => { serial.current++; off(); };
   }, [target.id, target.kind, enabled, initialManifest]);
   return <Context.Provider value={enabled ? { manifest, target, refresh, removeFigure: id => void window.nodus.removeDocumentFigure(target, id).then(refresh) } : null}>{children}</Context.Provider>;
+}
+
+/** Why the planner's proposals did not become figures, counted by motive. The wording
+ *  is the processing log's own catalogue, so the panel and the log never disagree. */
+function DiscardReasons({ discarded }: { discarded: readonly DocumentVisualDiscard[] }) {
+  if (!discarded.length) return null;
+  return <ul className="document-visual-discards" data-testid="document-visual-discards">
+    {documentVisualDiscardTally(discarded).map(({ reason, count }) => <li key={reason}>{count} · {t(documentVisualDiscardText(reason))}</li>)}
+  </ul>;
 }
 
 export function DocumentVisualActions() {
@@ -46,6 +56,7 @@ export function DocumentVisualActions() {
   }, [kind]);
   if (!context) return null;
   const { target, manifest, refresh } = context;
+  const discards = manifest?.discarded ?? [];
   const running = busy || manifest?.state === 'planning' || manifest?.state === 'generating';
   const run = async (retry = false) => {
     if (!config.valid && !retry) return;
@@ -61,8 +72,12 @@ export function DocumentVisualActions() {
     {manifest && ['partial', 'failed', 'cancelled'].includes(manifest.state) && !running && <button className="btn btn-ghost text-xs" onClick={() => void run(true)}>{t('Reintentar')}</button>}
     {running && <span className="text-xs text-neutral-500">{t('Preparando recursos visuales…')}</span>}
     {error && <p role="alert" className="text-xs text-red-500">{error}</p>}
-    {manifest?.state === 'ready' && !manifest.figures.length && <p className="text-xs text-neutral-500" role="status">{t('No se añadieron figuras: no eran necesarias.')}</p>}
-    {manifest && !running && ['partial','failed','cancelled'].includes(manifest.state) && <details className="text-xs text-neutral-500"><summary>{t('Algunos recursos no se pudieron generar.')}</summary>{manifest.error && <p>{manifest.error}</p>}{manifest.figures.filter(figure => figure.error).map(figure => <p key={figure.id}>{figure.caption}: {figure.error}</p>)}</details>}
+    {/* A document that needed no figures, and one whose every proposal was refused, asked
+        for the same sentence before: the difference is what the reader needs to know. */}
+    {manifest?.state === 'ready' && !manifest.figures.length && (discards.length
+      ? <details className="text-xs text-neutral-500"><summary>{tx('No se añadió ninguna figura: se descartaron {n} propuestas.', { n: discards.length })}</summary><DiscardReasons discarded={discards} /></details>
+      : <p className="text-xs text-neutral-500" role="status">{t('No se añadieron figuras: no eran necesarias.')}</p>)}
+    {manifest && !running && ['partial','failed','cancelled'].includes(manifest.state) && <details className="text-xs text-neutral-500"><summary>{t('Algunos recursos no se pudieron generar.')}</summary>{manifest.error && <p>{manifest.error}</p>}{manifest.figures.filter(figure => figure.error).map(figure => <p key={figure.id}>{figure.caption}: {figure.error}</p>)}<DiscardReasons discarded={discards} /></details>}
     {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onMouseDown={() => setOpen(false)}><section className="w-full max-w-xl rounded-xl bg-white dark:bg-neutral-950 p-5 max-h-[90vh] overflow-auto" role="dialog" aria-modal="true" aria-label={t('Añadir recursos visuales')} onMouseDown={event => event.stopPropagation()}>
       <h2 className="font-semibold mb-3">{t('Añadir recursos visuales')}</h2>
       <DocumentSkillsControl value={config.policy} onChange={config.setPolicy} onValidityChange={config.setValid} />
