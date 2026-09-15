@@ -177,4 +177,4 @@ and relicense their contributions, including under commercial terms. See
 
 ## Disclaimer
 
-Nodus Research is a personal, independent open-source project developed in Spain. It currently sells no product or service and is not affiliated with, sponsored by or endorsed by any university, research group, company or unrelated software project that uses “Nodus” or a similar name. See the [name and independence notice](NAME_NOTICE.md).
+Nodus Research is a personal, independent open-source project. It currently sells no product or service and is not affiliated with, sponsored by or endorsed by any university, research group, company or unrelated software project that uses “Nodus” or a similar name. See the [name and independence notice](NAME_NOTICE.md).

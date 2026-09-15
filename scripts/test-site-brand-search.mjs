@@ -15,7 +15,7 @@ test('About establishes the Nodus Research entity without targeting unrelated na
   assert.match(html, /<h1[^>]*>About Nodus Research<\/h1>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/nodusresearch\.com\/about\/"\/>/);
   assert.match(html, /<meta property="og:site_name" content="Nodus Research"\/>/);
-  assert.match(html, /Nodus Research is a personal, independent open-source project developed in Spain/);
+  assert.match(html, /Nodus Research is a personal, independent open-source project/);
   assert.match(html, /not a company, university department or academic research group/i);
   assert.match(html, /currently sells no product or service/i);
   assert.match(html, /not affiliated with, sponsored by or endorsed by any university/i);
