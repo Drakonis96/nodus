@@ -1,0 +1,90 @@
+import type { AppLanguage } from '@shared/types';
+
+const ES = {
+  installed: 'Motor local instalado',
+  loading: 'Cargando modelo…',
+  ready: 'Modelo listo',
+  failed: 'El motor local no pudo iniciarse',
+  install: 'Instalar motor local',
+  installing: 'Preparando motor…',
+  update: 'Actualizar motor local',
+  recheck: 'Reinstalar y comprobar GPU',
+  legacy: 'Motor anterior. Actualízalo para comprobar la GPU sin volver a descargar los modelos.',
+  unavailable: 'Este motor no pudo utilizar una GPU compatible. Se usará CPU. Revisa los controladores y vuelve a comprobar.',
+  fallback: 'El arranque con GPU falló. Este modelo usa CPU durante esta sesión.',
+  cpu: 'CPU en uso',
+  layers: 'Capas en GPU: {n}',
+  devices: 'GPU detectada durante la instalación',
+  log: 'Diagnóstico de arranque',
+  network: 'Descarga motores verificados de llama.cpp; conserva los modelos existentes.',
+};
+export type LocalAiRuntimeText = { [K in keyof typeof ES]: string };
+
+/** Selected through the existing i18n pick() helper; every UI language is complete. */
+export const LOCAL_AI_RUNTIME_TEXT: Record<AppLanguage, LocalAiRuntimeText> = {
+  es: ES,
+  en: {
+    installed: 'Local engine installed', loading: 'Loading model…', ready: 'Model ready', failed: 'Local engine failed to start',
+    install: 'Install local engine', installing: 'Preparing engine…', update: 'Update local engine', recheck: 'Reinstall and check GPU',
+    legacy: 'Older engine. Update it to check GPU support without downloading your models again.',
+    unavailable: 'This engine could not use a compatible GPU. CPU will be used. Check your drivers and try again.',
+    fallback: 'GPU startup failed. This model uses CPU for this session.', cpu: 'CPU in use', layers: 'Layers on GPU: {n}',
+    devices: 'GPU detected during setup', log: 'Startup diagnostics', network: 'Downloads verified llama.cpp engines; keeps existing models.',
+  },
+  fr: {
+    installed: 'Moteur local installé', loading: 'Chargement du modèle…', ready: 'Modèle prêt', failed: 'Le moteur local n’a pas pu démarrer',
+    install: 'Installer le moteur local', installing: 'Préparation du moteur…', update: 'Mettre à jour le moteur local', recheck: 'Réinstaller et vérifier le GPU',
+    legacy: 'Ancien moteur. Mettez-le à jour pour vérifier le GPU sans télécharger à nouveau les modèles.',
+    unavailable: 'Ce moteur n’a pas pu utiliser de GPU compatible. Le CPU sera utilisé. Vérifiez les pilotes et réessayez.',
+    fallback: 'Le démarrage sur GPU a échoué. Ce modèle utilise le CPU pour cette session.', cpu: 'CPU utilisé', layers: 'Couches sur GPU : {n}',
+    devices: 'GPU détecté lors de l’installation', log: 'Diagnostic de démarrage', network: 'Télécharge des moteurs llama.cpp vérifiés ; conserve les modèles existants.',
+  },
+  de: {
+    installed: 'Lokale Engine installiert', loading: 'Modell wird geladen…', ready: 'Modell bereit', failed: 'Lokale Engine konnte nicht gestartet werden',
+    install: 'Lokale Engine installieren', installing: 'Engine wird vorbereitet…', update: 'Lokale Engine aktualisieren', recheck: 'Neu installieren und GPU prüfen',
+    legacy: 'Ältere Engine. Aktualisieren Sie sie, um die GPU zu prüfen, ohne Modelle erneut herunterzuladen.',
+    unavailable: 'Diese Engine konnte keine kompatible GPU nutzen. Die CPU wird verwendet. Prüfen Sie die Treiber und versuchen Sie es erneut.',
+    fallback: 'GPU-Start fehlgeschlagen. Dieses Modell nutzt in dieser Sitzung die CPU.', cpu: 'CPU wird verwendet', layers: 'Schichten auf GPU: {n}',
+    devices: 'Bei der Installation erkannte GPU', log: 'Startdiagnose', network: 'Lädt verifizierte llama.cpp-Engines herunter; vorhandene Modelle bleiben erhalten.',
+  },
+  pt: {
+    installed: 'Motor local instalado', loading: 'A carregar o modelo…', ready: 'Modelo pronto', failed: 'Não foi possível iniciar o motor local',
+    install: 'Instalar motor local', installing: 'A preparar o motor…', update: 'Atualizar motor local', recheck: 'Reinstalar e verificar GPU',
+    legacy: 'Motor anterior. Atualize-o para verificar a GPU sem voltar a transferir os modelos.',
+    unavailable: 'Este motor não conseguiu utilizar uma GPU compatível. Será utilizada a CPU. Verifique os controladores e tente novamente.',
+    fallback: 'O arranque com GPU falhou. Este modelo utiliza a CPU nesta sessão.', cpu: 'CPU em utilização', layers: 'Camadas na GPU: {n}',
+    devices: 'GPU detetada durante a instalação', log: 'Diagnóstico de arranque', network: 'Transfere motores llama.cpp verificados; mantém os modelos existentes.',
+  },
+  'pt-BR': {
+    installed: 'Motor local instalado', loading: 'Carregando modelo…', ready: 'Modelo pronto', failed: 'Não foi possível iniciar o motor local',
+    install: 'Instalar motor local', installing: 'Preparando motor…', update: 'Atualizar motor local', recheck: 'Reinstalar e verificar GPU',
+    legacy: 'Motor anterior. Atualize-o para verificar a GPU sem baixar os modelos novamente.',
+    unavailable: 'Este motor não conseguiu usar uma GPU compatível. A CPU será usada. Verifique os drivers e tente novamente.',
+    fallback: 'A inicialização com GPU falhou. Este modelo usa a CPU nesta sessão.', cpu: 'CPU em uso', layers: 'Camadas na GPU: {n}',
+    devices: 'GPU detectada durante a instalação', log: 'Diagnóstico de inicialização', network: 'Baixa motores llama.cpp verificados; mantém os modelos existentes.',
+  },
+  it: {
+    installed: 'Motore locale installato', loading: 'Caricamento del modello…', ready: 'Modello pronto', failed: 'Impossibile avviare il motore locale',
+    install: 'Installa motore locale', installing: 'Preparazione del motore…', update: 'Aggiorna motore locale', recheck: 'Reinstalla e verifica GPU',
+    legacy: 'Motore precedente. Aggiornalo per verificare la GPU senza scaricare di nuovo i modelli.',
+    unavailable: 'Questo motore non ha potuto utilizzare una GPU compatibile. Verrà usata la CPU. Controlla i driver e riprova.',
+    fallback: 'Avvio con GPU non riuscito. Questo modello usa la CPU per questa sessione.', cpu: 'CPU in uso', layers: 'Livelli su GPU: {n}',
+    devices: 'GPU rilevata durante l’installazione', log: 'Diagnostica di avvio', network: 'Scarica motori llama.cpp verificati; conserva i modelli esistenti.',
+  },
+  tr: {
+    installed: 'Yerel motor yüklendi', loading: 'Model yükleniyor…', ready: 'Model hazır', failed: 'Yerel motor başlatılamadı',
+    install: 'Yerel motoru yükle', installing: 'Motor hazırlanıyor…', update: 'Yerel motoru güncelle', recheck: 'Yeniden yükle ve GPU’yu kontrol et',
+    legacy: 'Eski motor. Modelleri yeniden indirmeden GPU desteğini kontrol etmek için güncelleyin.',
+    unavailable: 'Bu motor uyumlu bir GPU kullanamadı. CPU kullanılacak. Sürücüleri kontrol edip tekrar deneyin.',
+    fallback: 'GPU ile başlatma başarısız oldu. Bu model bu oturumda CPU kullanıyor.', cpu: 'CPU kullanılıyor', layers: 'GPU üzerindeki katmanlar: {n}',
+    devices: 'Kurulum sırasında algılanan GPU', log: 'Başlatma tanılaması', network: 'Doğrulanmış llama.cpp motorlarını indirir; mevcut modelleri korur.',
+  },
+  'zh-CN': {
+    installed: '本地引擎已安装', loading: '正在加载模型…', ready: '模型已就绪', failed: '本地引擎启动失败',
+    install: '安装本地引擎', installing: '正在准备引擎…', update: '更新本地引擎', recheck: '重新安装并检测 GPU',
+    legacy: '旧版引擎。更新后可检测 GPU 支持，无需重新下载模型。',
+    unavailable: '此引擎无法使用兼容的 GPU，将使用 CPU。请检查驱动程序后重试。',
+    fallback: 'GPU 启动失败。此模型在本次会话中使用 CPU。', cpu: '正在使用 CPU', layers: 'GPU 层数：{n}',
+    devices: '安装时检测到的 GPU', log: '启动诊断', network: '下载经过验证的 llama.cpp 引擎，保留现有模型。',
+  },
+};

@@ -1,0 +1,42 @@
+name: Local AI runtime
+
+on:
+  pull_request:
+    paths:
+      - 'electron/ai/nodusLocalAi.ts'
+      - 'electron/ai/localAiRuntime.ts'
+      - 'shared/localAi*.ts'
+      - 'src/components/LocalAi*.tsx'
+      - 'src/i18n.localAiRuntime.ts'
+      - 'scripts/*local-ai-runtime*.mjs'
+      - '.github/workflows/local-ai-runtime.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-ai-runtime-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  runtime:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-22.04, windows-latest, macos-14]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      # These tests stub Electron's app boundary and need no native Electron ABI.
+      # The existing main CI still installs/rebuilds everything and runs real E2E.
+      - run: npm ci --ignore-scripts
+      - name: Runtime lifecycle and UI regressions
+        run: node --test scripts/test-local-ai-runtime.mjs scripts/test-local-ai-runtime-ui.mjs
+      - name: Verify real pinned runtime archives
+        run: node scripts/verify-local-ai-runtime.mjs

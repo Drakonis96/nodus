@@ -6,7 +6,6 @@ import { promises as fsp } from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import AdmZip from 'adm-zip';
 import {
   NODUS_LOCAL_MODELS,
   getNodusLocalModel,
@@ -15,8 +14,12 @@ import {
   type NodusLocalModelDefinition,
 } from '@shared/localAiModels';
 import type { ModelInfo } from '@shared/types';
+import type { LocalAiRuntimeDiagnostics } from '@shared/localAiRuntime';
+import {
+  LLAMA_CPP_VERSION, LOCAL_RUNTIME_POLICY, readInstalledRuntime, installManagedRuntime,
+  localRuntimeEnvironment, parseOffloadedLayers, gpuStartupFailure, redactRuntimeLog, waitForRuntimeHealth,
+} from './localAiRuntime';
 
-const LLAMA_CPP_VERSION = 'b10002';
 interface ActiveLocalAiDownload {
   progress: number;
   promise: Promise<NodusLocalAiStatus>;
@@ -28,14 +31,8 @@ const activeDownloads = new Map<string, ActiveLocalAiDownload>();
 let activeRuntimeDownload: ActiveLocalAiDownload | null = null;
 const embeddingPipelines = new Map<string, Promise<any>>();
 const verifiedAssetCache = new Map<string, { size: number; mtimeMs: number; sha256: string }>();
-
-interface RuntimeAsset {
-  name: string;
-  url: string;
-  sha256: string;
-  archive: 'zip' | 'tar.gz';
-  bytes: number;
-}
+const cpuFallbackModels = new Set<string>();
+let lastRuntimeFailure: LocalAiRuntimeDiagnostics | null = null;
 
 interface ActiveServer {
   key: string;
@@ -53,6 +50,7 @@ interface ActiveServer {
   leases: number;
   stopWhenIdle: boolean;
   idleWaiters: Set<() => void>;
+  diagnostics: LocalAiRuntimeDiagnostics;
 }
 
 let activeServer: ActiveServer | null = null;
@@ -81,71 +79,8 @@ function modelDirectory(modelId: string): string {
   return path.join(modelsDirectory(), modelId);
 }
 
-function runtimeDirectory(): string {
-  return path.join(rootDirectory(), 'runtime', LLAMA_CPP_VERSION);
-}
-
-function runtimeAsset(): RuntimeAsset {
-  const base = `https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_CPP_VERSION}`;
-  const key = `${process.platform}-${process.arch}`;
-  const assets: Record<string, Omit<RuntimeAsset, 'url'>> = {
-    'darwin-arm64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-macos-arm64.tar.gz`,
-      sha256: 'b7aca9d4f9c6267a5f389179bd7412c4e991ac7d1b69f52acf065ef99c99345c',
-      archive: 'tar.gz',
-      bytes: 10_749_656,
-    },
-    'darwin-x64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-macos-x64.tar.gz`,
-      sha256: 'c90eaed104ad1c82628d34967def32eaae2516768e10121fbebc4c73a046ac7d',
-      archive: 'tar.gz',
-      bytes: 11_031_400,
-    },
-    'linux-arm64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-ubuntu-arm64.tar.gz`,
-      sha256: '348e880ac43a5df038729f34ac3be6a1c57b5de491504b59b5273d8b1f4dae40',
-      archive: 'tar.gz',
-      bytes: 12_791_141,
-    },
-    'linux-x64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-ubuntu-x64.tar.gz`,
-      sha256: '760dcd8c52be7960bf7487adce4287c151000a41e44f836abdb1a282340c5949',
-      archive: 'tar.gz',
-      bytes: 15_855_822,
-    },
-    'win32-arm64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-win-cpu-arm64.zip`,
-      sha256: '271470732568e8326c58e0a357e5f9085e956de97587358c690ff166edaafb77',
-      archive: 'zip',
-      bytes: 12_159_035,
-    },
-    'win32-x64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-win-cpu-x64.zip`,
-      sha256: 'c4c3dd2e139e3f00f7bdf4993a2f893e8db4dc6ae51140cc25ddd63306c32734',
-      archive: 'zip',
-      bytes: 18_253_272,
-    },
-  };
-  const asset = assets[key];
-  if (!asset) throw new Error(`llama.cpp no ofrece un runtime integrado para ${key}.`);
-  return { ...asset, url: `${base}/${asset.name}` };
-}
-
-async function findFile(directory: string, wanted: string): Promise<string | null> {
-  const entries = await fsp.readdir(directory, { withFileTypes: true }).catch(() => []);
-  for (const entry of entries) {
-    const target = path.join(directory, entry.name);
-    if (entry.isFile() && entry.name === wanted) return target;
-    if (entry.isDirectory()) {
-      const nested = await findFile(target, wanted);
-      if (nested) return nested;
-    }
-  }
-  return null;
-}
-
 async function llamaServerPath(): Promise<string | null> {
-  return findFile(runtimeDirectory(), process.platform === 'win32' ? 'llama-server.exe' : 'llama-server');
+  return (await readInstalledRuntime(rootDirectory()))?.executablePath ?? null;
 }
 
 async function modelStatus(model: NodusLocalModelDefinition) {
@@ -196,7 +131,12 @@ export async function verifyNodusLocalModel(modelId: string): Promise<boolean> {
 }
 
 export async function getNodusLocalAiStatus(): Promise<NodusLocalAiStatus> {
-  const executablePath = await llamaServerPath();
+  const runtime = await readInstalledRuntime(rootDirectory());
+  const executablePath = runtime?.executablePath ?? null;
+  const diagnostics: LocalAiRuntimeDiagnostics | undefined = activeServer?.diagnostics ?? lastRuntimeFailure ?? (runtime ? {
+    backend: runtime.backend, devices: runtime.devices, upgradeRequired: runtime.upgradeRequired,
+    state: 'installed', offloadedLayers: null, fallbackReason: runtime.fallbackReason, startupLog: runtime.probeLog,
+  } : undefined);
   return {
     runtime: {
       version: LLAMA_CPP_VERSION,
@@ -204,6 +144,7 @@ export async function getNodusLocalAiStatus(): Promise<NodusLocalAiStatus> {
       executablePath,
       downloading: Boolean(activeRuntimeDownload),
       progress: activeRuntimeDownload?.progress ?? (executablePath ? 1 : 0),
+      diagnostics,
     },
     models: await Promise.all(NODUS_LOCAL_MODELS.map(modelStatus)),
     activeModelId: activeServer?.modelId ?? null,
@@ -328,41 +269,8 @@ async function downloadFile(
   await fsp.rename(partial, target);
 }
 
-function run(command: string, args: string[], cwd?: string, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(downloadCancelledError());
-      return;
-    }
-    const child = spawn(command, args, { cwd, stdio: ['ignore', 'ignore', 'pipe'] });
-    let stderr = '';
-    let settled = false;
-    const finish = (error?: Error) => {
-      if (settled) return;
-      settled = true;
-      signal?.removeEventListener('abort', abort);
-      if (error) reject(error);
-      else resolve();
-    };
-    const abort = () => {
-      if (child.exitCode == null) child.kill('SIGTERM');
-    };
-    signal?.addEventListener('abort', abort, { once: true });
-    child.stderr?.on('data', (chunk) => { stderr = `${stderr}${String(chunk)}`.slice(-8_000); });
-    child.on('error', (error) => finish(signal?.aborted ? downloadCancelledError() : error));
-    child.on('close', (code) => {
-      if (signal?.aborted) finish(downloadCancelledError());
-      else if (code === 0) finish();
-      else finish(new Error(stderr || `${command} terminó con código ${code}.`));
-    });
-  });
-}
-
 export async function installNodusLocalRuntime(onProgress?: (fraction: number) => void): Promise<NodusLocalAiStatus> {
-  const existing = await llamaServerPath();
-  if (existing) return getNodusLocalAiStatus();
   if (activeRuntimeDownload) return followDownload(activeRuntimeDownload, onProgress);
-
   const job: ActiveLocalAiDownload = {
     progress: 0,
     promise: null as unknown as Promise<NodusLocalAiStatus>,
@@ -371,36 +279,21 @@ export async function installNodusLocalRuntime(onProgress?: (fraction: number) =
   };
   activeRuntimeDownload = job;
   job.promise = (async () => {
-    const asset = runtimeAsset();
-    const root = runtimeDirectory();
-    const archive = path.join(rootDirectory(), asset.name);
-    let installed = false;
-    try {
-      await fsp.rm(root, { recursive: true, force: true });
-      await fsp.mkdir(rootDirectory(), { recursive: true });
-      let downloaded = 0;
-      await downloadFile(asset.url, archive, asset.bytes, asset.sha256, (bytes) => {
-        downloaded += bytes;
-        reportDownloadProgress(job, Math.min(0.9, (downloaded / asset.bytes) * 0.9));
-      }, job.controller.signal);
-      throwIfDownloadCancelled(job.controller.signal);
-      await fsp.mkdir(root, { recursive: true });
-      if (asset.archive === 'zip') {
-        new AdmZip(archive).extractAllTo(root, true);
-        throwIfDownloadCancelled(job.controller.signal);
-      } else {
-        await run('tar', ['-xzf', archive, '-C', root], undefined, job.controller.signal);
-      }
-      const executable = await llamaServerPath();
-      if (!executable) throw new Error('El runtime se descargó, pero no contiene llama-server.');
-      if (process.platform !== 'win32') await fsp.chmod(executable, 0o755);
-      reportDownloadProgress(job, 1);
-      installed = true;
-      return getNodusLocalAiStatus();
-    } finally {
-      if (installed) await fsp.rm(archive, { force: true });
-      if (job.controller.signal.aborted) await fsp.rm(root, { recursive: true, force: true });
-    }
+    await installManagedRuntime(rootDirectory(),
+      (asset, archive, onBytes, signal) => downloadFile(asset.url, archive, asset.bytes, asset.sha256, onBytes, signal),
+      (fraction) => reportDownloadProgress(job, fraction), job.controller.signal,
+      (publish) => serializeLifecycle(async () => {
+        // Preparing an upgrade never stops inference. Publication is refused if a
+        // request acquired the old runtime while the new archives were downloading.
+        if (activeServer?.leases) throw new Error('Local AI requests are still running. Wait for them to finish, then update the engine again.');
+        await stopNodusLocalServerAndWait();
+        await publish();
+        cpuFallbackModels.clear();
+        safeSlotsByModel.clear();
+        lastRuntimeFailure = null;
+        await fsp.rm(path.join(rootDirectory(), 'calibration.json'), { force: true }).catch(() => undefined);
+      }));
+    return getNodusLocalAiStatus();
   })().finally(() => {
     if (activeRuntimeDownload === job) activeRuntimeDownload = null;
   }).then(() => getNodusLocalAiStatus());
@@ -474,11 +367,8 @@ export async function cancelNodusLocalDownloads(): Promise<NodusLocalAiStatus> {
     ...modelJobs.map(([, job]) => job.promise),
     ...(runtimeJob ? [runtimeJob.promise] : []),
   ]);
-  if (runtimeJob) {
-    // The extracted runtime directory may be incomplete, but the verified archive
-    // and its `.download` remain resumable. A later install re-verifies SHA-256.
-    await fsp.rm(runtimeDirectory(), { recursive: true, force: true });
-  }
+  // The installer owns its unpublished generation. Never delete a previously
+  // working runtime when cancelling an upgrade; partial archives remain resumable.
   return getNodusLocalAiStatus();
 }
 
@@ -491,6 +381,7 @@ export async function deleteNodusLocalModel(modelId: string): Promise<NodusLocal
   }
   if (activeServer?.modelId === modelId) stopNodusLocalServer();
   embeddingPipelines.delete(modelId);
+  cpuFallbackModels.delete(modelId);
   for (const asset of model.assets) verifiedAssetCache.delete(path.join(modelDirectory(modelId), asset.file));
   await fsp.rm(modelDirectory(modelId), { recursive: true, force: true });
   return getNodusLocalAiStatus();
@@ -533,21 +424,6 @@ async function freePort(): Promise<number> {
   });
 }
 
-async function waitForServer(baseUrl: string, child: ChildProcess, logs: () => string): Promise<void> {
-  const deadline = Date.now() + 120_000;
-  while (Date.now() < deadline) {
-    if (child.exitCode != null) throw new Error(logs() || `llama-server terminó con código ${child.exitCode}.`);
-    try {
-      const response = await fetch(`${baseUrl}/health`);
-      if (response.ok) return;
-    } catch {
-      // Model loading can take several seconds; keep polling until the deadline.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  throw new Error(`llama-server no estuvo listo a tiempo. ${logs()}`.trim());
-}
-
 export function stopNodusLocalServer(): void {
   const current = activeServer;
   if (current?.leases) {
@@ -570,7 +446,7 @@ export function killNodusLocalServerSync(): void {
 }
 
 async function waitForChildExit(child: ChildProcess, timeoutMs: number): Promise<boolean> {
-  if (child.exitCode != null) return true;
+  if (!child.pid || child.exitCode != null || child.signalCode != null) return true;
   return new Promise((resolve) => {
     let settled = false;
     const finish = (exited: boolean) => {
@@ -593,7 +469,7 @@ async function stopNodusLocalServerAndWait(server = activeServer): Promise<void>
   server.stopWhenIdle = false;
   for (const resolve of server.idleWaiters) resolve();
   server.idleWaiters.clear();
-  if (server.child.exitCode != null) return;
+  if (!server.child.pid || server.child.exitCode != null || server.child.signalCode != null) return;
   server.child.kill('SIGTERM');
   if (await waitForChildExit(server.child, 10_000)) return;
   server.child.kill('SIGKILL');
@@ -609,11 +485,12 @@ interface LocalCalibrationFile {
 
 function hardwareFingerprint(): string {
   return createHash('sha256')
-    .update([process.platform, process.arch, os.cpus()[0]?.model ?? 'cpu', os.totalmem(), LLAMA_CPP_VERSION].join('|'))
+    .update([process.platform, process.arch, os.cpus()[0]?.model ?? 'cpu', os.totalmem(), LLAMA_CPP_VERSION, LOCAL_RUNTIME_POLICY].join('|'))
     .digest('hex').slice(0, 20);
 }
 
 async function calibratedSlots(modelId: string): Promise<1 | 2 | 4> {
+  if (cpuFallbackModels.has(modelId)) return 1;
   try {
     const file = JSON.parse(await fsp.readFile(path.join(rootDirectory(), 'calibration.json'), 'utf8')) as LocalCalibrationFile;
     const calibration = file.version === 1 && file.hardware === hardwareFingerprint() && file.runtime === LLAMA_CPP_VERSION
@@ -630,7 +507,7 @@ async function calibratedSlots(modelId: string): Promise<1 | 2 | 4> {
 }
 
 export function getNodusLocalSafeSlots(modelId: string): 1 | 2 | 4 {
-  return safeSlotsByModel.get(modelId) ?? 1;
+  return cpuFallbackModels.has(modelId) ? 1 : safeSlotsByModel.get(modelId) ?? 1;
 }
 
 export async function recordNodusLocalCalibration(input: {
@@ -667,14 +544,6 @@ export async function recordNodusLocalCalibration(input: {
   await fsp.writeFile(temporary, `${JSON.stringify(existing, null, 2)}\n`, { mode: 0o600 });
   await fsp.rename(temporary, target);
   safeSlotsByModel.set(input.modelId, selected);
-}
-
-async function hasCurrentCalibration(modelId: string): Promise<boolean> {
-  try {
-    const parsed = JSON.parse(await fsp.readFile(path.join(rootDirectory(), 'calibration.json'), 'utf8')) as LocalCalibrationFile;
-    return parsed.version === 1 && parsed.hardware === hardwareFingerprint()
-      && parsed.runtime === LLAMA_CPP_VERSION && Boolean(parsed.models?.[modelId]);
-  } catch { return false; }
 }
 
 function percentile95(values: number[]): number {
@@ -793,11 +662,13 @@ async function benchmarkLocalSlots(
 }
 
 /**
- * Offline, hardware-scoped calibration. Slots 2 and 4 are admitted only after a
- * full-context runtime starts, eight identical health jobs complete, throughput
- * improves by at least 15%, p95 regresses at most 10%, and memory remains safe.
+ * First use is single-slot, without synthetic inference. Downloads, startup and
+ * settings changes only load a previously verified policy. Explicit force=true
+ * retains the offline benchmark for developer/diagnostic use, with lifecycle
+ * exclusion so it cannot race an ordinary model request.
  */
 export function calibrateNodusLocalModelConcurrency(modelId: string, force = false): Promise<void> {
+  if (!force) return calibratedSlots(modelId).then(() => undefined);
   const running = calibrationJobs.get(modelId);
   if (running) return running;
   const previous = calibrationTail;
@@ -805,10 +676,6 @@ export function calibrateNodusLocalModelConcurrency(modelId: string, force = fal
     await previous;
     const model = getNodusLocalModel(modelId);
     if (!model || model.runtime !== 'llama_cpp') return;
-    if (!force && await hasCurrentCalibration(modelId)) {
-      await calibratedSlots(modelId);
-      return;
-    }
     if (!await verifyNodusLocalModel(modelId)) throw new Error('checksum-failed');
     const baseline = await benchmarkLocalSlots(model, 1);
     let selected: 1 | 2 | 4 = 1;
@@ -866,10 +733,8 @@ export function calibrateNodusLocalModelConcurrency(modelId: string, force = fal
 export async function calibrateDownloadedNodusLocalModels(modelIds: string[]): Promise<void> {
   for (const modelId of [...new Set(modelIds)]) {
     const model = getNodusLocalModel(modelId);
-    // calibrateNodusLocalModelConcurrency performs the checksum verification.
-    // Do not await a duplicate verification here: requests could otherwise
-    // acquire a server before calibrationTail is registered.
     if (!model || model.runtime !== 'llama_cpp') continue;
+    // Automatic mode reads cached policy only; it never starts a benchmark.
     await calibrateNodusLocalModelConcurrency(modelId);
   }
 }
@@ -878,7 +743,7 @@ export async function readNodusLocalMetrics(): Promise<string | null> {
   const server = activeServer;
   if (!server || server.child.exitCode != null) return null;
   try {
-    const response = await fetch(`${server.baseUrl}/metrics`);
+    const response = await fetch(`${server.baseUrl}/metrics`, { signal: AbortSignal.timeout(1_500) });
     return response.ok ? await response.text() : null;
   } catch {
     return null;
@@ -898,8 +763,10 @@ async function ensureNodusLocalServerUnlocked(
   if (activeServer?.key === key && activeServer.child.exitCode == null
     && (slotsOverride == null || activeServer.slots === slotsOverride)) return activeServer.apiUrl;
   await stopNodusLocalServerAndWait();
-  const executable = await llamaServerPath();
-  if (!executable) throw new Error('Instala primero el motor local de Nodus desde Ajustes → Modelos IA.');
+  const runtime = await readInstalledRuntime(rootDirectory());
+  if (!runtime) throw new Error('Instala primero el motor local de Nodus desde Ajustes → Modelos IA.');
+  const usingCpu = runtime.backend === 'cpu' || cpuFallbackModels.has(modelId);
+  const executable = usingCpu ? runtime.cpuPath : runtime.executablePath;
   const status = await modelStatus(model);
   if (!status.downloaded) throw new Error(`Descarga primero «${model.label}» desde Ajustes → Modelos IA.`);
   if (!await verifyNodusLocalModel(model.id)) {
@@ -919,12 +786,23 @@ async function ensureNodusLocalServerUnlocked(
     '--ctx-size', String(contextPerSlot * slots),
     '--parallel', String(slots),
     '--threads', String(Math.max(1, Math.min(8, os.cpus().length - 1))),
-    '--n-gpu-layers', '999',
+    '--n-gpu-layers', usingCpu ? '0' : 'auto',
     '--jinja',
     '--metrics',
     '--no-webui',
+    '--offline',
   ];
-  if (model.projectorFile) args.push('--mmproj', path.join(modelDirectory(model.id), model.projectorFile));
+  if (usingCpu) args.push('--device', 'none', '--no-kv-offload', '--no-op-offload');
+  else {
+    // b10002 adjusts only unset arguments. Explicit ctx-size preserves Nodus's
+    // context contract while the layer count fits VRAM with a safety margin.
+    args.push('--fit', 'on', '--fit-target', '1024');
+    if (runtime.deviceIds.length) args.push('--device', runtime.deviceIds.join(','));
+  }
+  if (model.projectorFile) {
+    args.push('--mmproj', path.join(modelDirectory(model.id), model.projectorFile));
+    if (usingCpu) args.push('--no-mmproj-offload');
+  }
   if (mode === 'embedding') {
     // llama.cpp's non-causal embedding path cannot split one input across
     // micro-batches. Its defaults (n_batch=2048, n_ubatch=512) are collapsed to
@@ -939,27 +817,54 @@ async function ensureNodusLocalServerUnlocked(
       '--embedding', '--pooling', 'mean',
     );
   }
-  const child = spawn(executable, args, { cwd: path.dirname(executable), stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(executable, args, { cwd: path.dirname(executable),
+    env: localRuntimeEnvironment(executable), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
-  const capture = (chunk: unknown) => { output = `${output}${String(chunk)}`.slice(-12_000); };
+  let launchError: Error | null = null;
+  let starting = true;
+  const diagnostics: LocalAiRuntimeDiagnostics = {
+    backend: usingCpu ? 'cpu' : runtime.backend, devices: usingCpu ? [] : runtime.devices,
+    upgradeRequired: runtime.upgradeRequired, state: 'loading', offloadedLayers: usingCpu ? 0 : null,
+    fallbackReason: cpuFallbackModels.has(modelId) ? 'gpu-startup-failed' : runtime.fallbackReason,
+    startupLog: cpuFallbackModels.has(modelId) ? lastRuntimeFailure?.startupLog ?? '' : runtime.probeLog,
+  };
+  const capture = (chunk: unknown) => {
+    if (!starting) return; // Never retain inference or user-prompt logs.
+    output = `${output}${String(chunk)}`.slice(-12_000);
+    const layers = parseOffloadedLayers(output);
+    if (layers != null) diagnostics.offloadedLayers = layers;
+  };
   child.stdout?.on('data', capture);
   child.stderr?.on('data', capture);
+  child.once('error', (error) => { launchError = error; });
   const server: ActiveServer = {
-    key, modelId, mode, baseUrl, apiUrl: `${baseUrl}/v1`, child,
+    key, modelId, mode, baseUrl, apiUrl: `${baseUrl}/v1`, child, diagnostics,
     slots, leases: 0, stopWhenIdle: false, idleWaiters: new Set(),
   };
   activeServer = server;
+  lastRuntimeFailure = null;
   child.once('exit', () => {
     server.leases = 0;
     for (const resolve of server.idleWaiters) resolve();
     server.idleWaiters.clear();
-    if (activeServer === server) activeServer = null;
+    if (activeServer === server) {
+      diagnostics.state = 'failed';
+      lastRuntimeFailure = diagnostics;
+      activeServer = null;
+    }
   });
   try {
-    await waitForServer(baseUrl, child, () => output);
+    await waitForRuntimeHealth(baseUrl, child, () => output, () => launchError);
+    starting = false;
+    diagnostics.state = 'ready';
+    diagnostics.startupLog = redactRuntimeLog(`${diagnostics.startupLog}\n${output}`, rootDirectory());
     return server.apiUrl;
   } catch (error) {
-    if (activeServer === server) await stopNodusLocalServerAndWait(server);
+    starting = false;
+    diagnostics.state = 'failed';
+    diagnostics.startupLog = redactRuntimeLog(error instanceof Error ? error.message : String(error), rootDirectory());
+    lastRuntimeFailure = diagnostics;
+    await stopNodusLocalServerAndWait(server);
     if (slotsOverride == null && slots > 1) {
       await recordNodusLocalCalibration({
         modelId,
@@ -968,6 +873,10 @@ async function ensureNodusLocalServerUnlocked(
         p95Change: 1,
         memorySafe: false,
       });
+      return ensureNodusLocalServerUnlocked(modelId, mode);
+    }
+    if (slotsOverride == null && !usingCpu && gpuStartupFailure(diagnostics.startupLog)) {
+      cpuFallbackModels.add(modelId);
       return ensureNodusLocalServerUnlocked(modelId, mode);
     }
     throw error;
