@@ -506,3 +506,17 @@ html.theme-active.light .ideas-theme-pill {
 }
 html.theme-active.dark .ideas-theme-overflow { color: var(--theme-text-dark-muted); }
 html.theme-active.light .ideas-theme-overflow { color: var(--theme-text-light-muted); }
+
+/* Author tags use the same readable semantic treatment as Ideas theme labels.
+ * The neutral utility is intentionally removed here because its muted text can
+ * disappear against a custom palette's dark neutral surface. */
+html.theme-active.dark .authors-tag-pill {
+  border: 1px solid color-mix(in srgb, var(--a-500) 30%, var(--theme-border-dark));
+  background-color: color-mix(in srgb, var(--a-500) 12%, var(--n-800));
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .authors-tag-pill {
+  border: 1px solid color-mix(in srgb, var(--a-600) 26%, var(--theme-border-light));
+  background-color: color-mix(in srgb, var(--a-500) 10%, var(--n-100));
+  color: var(--theme-text-light);
+}

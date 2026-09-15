@@ -165,7 +165,7 @@ export function AuthorsView({
   }, []);
 
   return (
-    <div data-testid="authors-workspace" className="flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+    <div data-testid="authors-workspace" className="authors-workspace theme-workspace-surface flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
       <header className="shrink-0 border-b border-neutral-200 px-5 pt-4 dark:border-neutral-800">
         <div className="mb-3 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
@@ -513,7 +513,7 @@ function AuthorsCatalog({
               <span className="tabular-nums text-neutral-400">{author.workCount}{author.editedCount > 0 && <span className="ml-1 text-[10px] text-cyan-500/80" title={tx('{n} volúmenes editados', { n: author.editedCount })}>+{author.editedCount} {t('ed.')}</span>}</span>
               <span className="tabular-nums text-neutral-400">{author.ideaCount}</span>
               <span className="tabular-nums text-neutral-400">{author.relationCount}</span>
-              <div className="flex min-w-0 flex-wrap gap-1 pr-3">{(author.topTags.length ? author.topTags : author.topThemes).slice(0, 4).map((tag) => <span key={tag} className="max-w-32 truncate rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-neutral-500" title={tag}>{tag}</span>)}</div>
+              <div className="flex min-w-0 flex-wrap gap-1 pr-3">{(author.topTags.length ? author.topTags : author.topThemes).slice(0, 4).map((tag) => <span key={tag} className="authors-tag-pill max-w-32 truncate rounded-full px-2 py-1 text-[10px]" title={tag}>{tag}</span>)}</div>
               <span className={`flex items-center gap-1 text-[10px] ${author.hasSynthesis ? 'text-indigo-300' : 'text-neutral-600'}`}>{author.hasSynthesis ? <><Icon name="wand" size={11} /> {t('Síntesis')}</> : '—'}</span>
               <button data-testid={`author-save-${author.author_id}`} type="button" onClick={() => void toggleAuthorSaved(author.author_id)} disabled={savingAuthorIds.has(author.author_id)} aria-pressed={author.saved} aria-label={t(author.saved ? 'Quitar de autores guardados' : 'Guardar autor')} title={t(author.saved ? 'Quitar de autores guardados' : 'Guardar autor')} className={`grid h-8 w-8 place-items-center rounded-lg disabled:opacity-50 ${author.saved ? 'text-amber-400 hover:bg-amber-500/10' : 'text-neutral-600 hover:bg-neutral-900 hover:text-amber-400'}`}><Icon name="star" size={15} className={author.saved ? 'fill-current' : ''} /></button>
             </div>
