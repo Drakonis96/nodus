@@ -1,7 +1,9 @@
 import { RELEASE_5_4_4_HIGHLIGHTS } from './releaseNotes544';
+import { RELEASE_5_4_5_HIGHLIGHTS } from './releaseNotes545';
 
 /* Simplified Chinese release notes, keyed by version. Mirrors releaseNotes.it.ts / releaseNotes.tr.ts. */
 export const RELEASE_NOTES_ZH: Record<string, string[]> = {
+  "5.4.5": RELEASE_5_4_5_HIGHLIGHTS.map(highlight => highlight['zh-CN']),
   "5.4.4": RELEASE_5_4_4_HIGHLIGHTS.map(highlight => highlight['zh-CN']),
   "5.4.3": [
     "文献摘要不再被截断在句子中间保存。使用推理模型时，输出预算在思考阶段就已耗尽，生成在写出结尾之前就停止，但摘要却被标记为已完成并保存。现在首次尝试拥有更多余量，如果仍被截断，Nodus会用应用更大的预算重试一次。若模型再次耗尽预算，摘要会被标记为失败，而不是以不完整状态保存。",
