@@ -70,10 +70,25 @@ try {
   // Every completion records the engine it was handed: which model writes a document's
   // resources is the thing this verification has to pin down, not an implementation detail.
   const engines = [];
+  // What the planner asks for, when a case below needs a proposal the app must judge.
+  let proposal = '';
+  let plannerPrompt = '';
+  const proposalsFor = blocks => {
+    const paragraph = blocks.find(block => block.field === 'body' && !block.markdown.startsWith('#'));
+    const heading = blocks.find(block => /^\s*#{1,6}\s+[^\n]+$/.test(block.markdown));
+    const citing = blocks.find(block => block.markdown.includes('nodus://idea/g-0001'));
+    const one = patch => [{ blockId: paragraph.id, skillId: svg.id, brief: 'diagram', caption: 'Del ingreso a la consulta: tres etapas ilustrativas.', sources: [], layout: 'wide', ...patch }];
+    if (proposal === 'cited') return one({ blockId: citing.id, sources: ['nodus://idea/g-0001'] });
+    if (proposal === 'invented-source') return one({ blockId: citing.id, sources: ['nodus://idea/g-9999'] });
+    if (proposal === 'heading-only') return one({ blockId: heading.id });
+    if (proposal === 'foreign-skill') return one({ skillId: 'no-such-skill' });
+    return [];
+  };
   ai.completeJson = async (args, _validate, model) => {
     engines.push(model);
-    if (zero) return [];
     const { blocks } = JSON.parse(args.user);
+    if (proposal) { plannerPrompt = args.user; return proposalsFor(blocks); }
+    if (zero) return [];
     assert.ok(blocks, 'final editorial sees stable blocks');
     const first = blocks.find(block => block.field === (mode === 'deep' ? 'body' : 'overview') && !block.markdown.startsWith('#'));
     const second = mode === 'deep' ? blocks.find(block => block.markdown.startsWith('Para ilustrar')) : blocks.find(block => block.field.endsWith('-synthesis'));
@@ -201,8 +216,37 @@ try {
   assert.ok(recorded, 'a failed figure is recorded');
   assert.equal(recorded.provider, 'gemini');
   assert.equal(recorded.model, 'gemini-3.1-flash-lite');
+  // ── A proposal the app refuses, and a document that needed none ────────────────
+  // Enabling skills is permission, never obligation, so a run may legitimately end with
+  // zero figures. What this measures is whether a refused proposal is told apart from
+  // that, or whether both reach the reader as the same sentence.
+  const severalSkills = { enabled: true, skills: [{ skillId: svg.id, enabled: true, maxCalls: 2 }, { skillId: demo.id, enabled: true, maxCalls: 1 }] };
+  const linkedDraft = () => {
+    const draft = draftFixture();
+    draft.draftMarkdown = draft.draftMarkdown.replace('El primer paso registra la procedencia', 'Como sostiene [Pérez (1999)](nodus://idea/g-0001), el primer paso registra la procedencia');
+    return draft;
+  };
+  const outcomes = {};
+  for (const kindOfProposal of ['cited', 'invented-source', 'heading-only', 'foreign-skill', 'none']) {
+    proposal = kindOfProposal;
+    const report = drafts.saveWritingWorkshopDraft({ draft: linkedDraft(), model: null });
+    lines.length = 0;
+    const run = await service.enrichDocumentVisuals({ kind: 'deep-research', id: report.id }, severalSkills);
+    outcomes[kindOfProposal] = { state: run.state, figures: run.figures.length, reason: run.figures[0]?.error ?? run.error ?? null, recorded: lines.map(entry => entry.code) };
+    console.log('proposal:', kindOfProposal, JSON.stringify(outcomes[kindOfProposal]));
+  }
+  proposal = '';
+  assert.equal(outcomes.cited.figures, 1, 'a proposal citing evidence in its own block is used');
+  assert.equal(outcomes.none.figures, 0, 'a document that needs no figures is allowed to stay without them');
+  // Every skill the reader enabled is offered to the planner, with its ceiling, and no
+  // other: a skill that never reaches the catalogue can never produce a resource.
+  const catalogue = JSON.parse(plannerPrompt).skills;
+  assert.deepEqual(catalogue.map(item => item.id).sort(), [svg.id, demo.id].sort(), 'the enabled skills are exactly what the planner is offered');
+  assert.ok(catalogue.every(item => Number.isSafeInteger(item.maximum)), 'each offered skill carries its ceiling');
+  const disabled = options.find(option => ![svg.id, demo.id].includes(option.skill.id));
+  assert.ok(disabled && !catalogue.some(item => item.id === disabled.skill.id), 'a skill left disabled is never offered');
   await workers.stopCapabilityWorkers();
-  fs.writeFileSync(path.join(out, 'verification.json'), JSON.stringify({ passed: true, textCalls, isolatedProfile: true, zeroFigures: true, usageCeiling: true, reopensWithoutCalls: true, originalsUnchanged: true, undo: true, paidOverflowBlocked: true, captureRetryWithoutCalls: true, resourcesFollowTheConfiguredModel: true, explicitModelWins: true, storedModelOnlyAsFallback: true, perTaskEngines: true, failuresNameTheirEngine: true }, null, 2));
+  fs.writeFileSync(path.join(out, 'verification.json'), JSON.stringify({ passed: true, textCalls, isolatedProfile: true, zeroFigures: true, usageCeiling: true, reopensWithoutCalls: true, originalsUnchanged: true, undo: true, paidOverflowBlocked: true, captureRetryWithoutCalls: true, resourcesFollowTheConfiguredModel: true, explicitModelWins: true, storedModelOnlyAsFallback: true, perTaskEngines: true, failuresNameTheirEngine: true, enabledSkillsReachThePlanner: true, citedProposalUsed: true, zeroFigureDocumentAllowed: true, proposalOutcomes: outcomes }, null, 2));
   console.log('Document skills verification passed.');
   for (const win of BrowserWindow.getAllWindows()) win.destroy();
   load('electron/db/database.ts').closeDb(); fs.rmSync(profile,{recursive:true,force:true});
