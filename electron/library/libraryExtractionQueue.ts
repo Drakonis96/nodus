@@ -15,7 +15,7 @@ import {
 import { LibraryDiskStore } from './libraryStorage';
 import { failLibraryExtractionRevision, markLibraryExtractionRevision } from './libraryRevision';
 import { disposeLibraryExtractionWorkers, extractLibraryItemInWorker } from './libraryExtractionWorkerHost';
-import { logPipelineFailure, logPipelineSuccess, logPipelineWarning, withPipelineLogScope } from '../logging/pipelineLogCore';
+import { logPipelineFailure, logPipelineSuccess, logPipelineWarning } from '../logging/pipelineLogCore';
 
 type ExtractFn = typeof extractLibraryItem;
 

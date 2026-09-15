@@ -7,7 +7,7 @@ import { PT_BR } from './i18n.pt-BR';
 import { IT } from './i18n.it';
 import { TR } from './i18n.tr';
 import { ZH_CN } from './i18n.zh-CN';
-import { looksLikeSpanishUiText, normalizeUiLanguage } from '@shared/uiLanguage';
+import { looksLikeSpanishUiText, knownRuntimeErrorText, normalizeUiLanguage } from '@shared/uiLanguage';
 import { NODI_NOTIFICATION_TEXT, type NodiNotificationText } from '@shared/nodiNotifications';
 
 /**
@@ -255,6 +255,15 @@ export function tr(value: string): string {
   if (!value || activeLang === 'es') return value;
   const direct = TABLES[activeLang]?.[value] ?? EN[value];
   if (direct) return direct;
+  // Sentences the main process knows how to translate but that never travel in a field named
+  // `message`/`error` — `pausedReason`, `saveError`, `maintenanceError`, a job's own status
+  // text — reach the renderer as they are, and this is their only gate. Consulting the same
+  // catalogues the main process uses keeps the answer from existing in the wrong process, and
+  // it goes BEFORE the shape patterns below: an exact match beats a heuristic, and the
+  // catch-all `{name}: {warning}` would otherwise swallow a provider sentence whole and put it
+  // back together in the same words.
+  const known = knownRuntimeErrorText(value, activeLang);
+  if (known !== null) return known;
   for (const candidate of RUNTIME_PATTERNS) {
     const match = value.match(candidate.pattern);
     if (match) return candidate.render(match);

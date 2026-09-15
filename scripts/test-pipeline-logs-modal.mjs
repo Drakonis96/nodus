@@ -165,6 +165,18 @@ test('the log modal filters, sorts, copies, downloads and manages retention', { 
       await page.getByTestId('pipeline-logs-levels-option-error').click();
       await settled(2);
       await page.keyboard.press('Escape');
+      // The vault filter: every control the query supports must exist, or the filter is dead
+      // code that only a reader of the source would know about.
+      await page.getByTestId('pipeline-logs-vaults').click();
+      await page.getByTestId('pipeline-logs-vaults-option-v1').click();
+      // The level filter is still applied, so this narrows the two errors to the one in v1.
+      await settled(1);
+      assert.match(await page.getByTestId('pipeline-logs-vaults').innerText(), /Tesis/);
+      await page.keyboard.press('Escape');
+      await page.getByTestId('pipeline-logs-vaults').click();
+      await page.getByTestId('pipeline-logs-vaults-popover').getByRole('button', { name: 'Clear' }).click();
+      await settled(2);
+      await page.keyboard.press('Escape');
       await page.getByTestId('pipeline-logs-days').click();
       await page.getByTestId('pipeline-logs-days-option-2026-09-14').click();
       await settled(1);

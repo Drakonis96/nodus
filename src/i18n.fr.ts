@@ -1280,6 +1280,9 @@ export const FR: Record<string, string> = {
   'Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.':
     'Corriger les bugs, améliorer les performances et peaufiner l\'expérience générale grâce aux retours des utilisateurs.',
   'Nodus Toolkit': 'Nodus Toolkit',
+  'Nodus Convert': 'Nodus Convert',
+  'Nodus Translate': 'Nodus Translate',
+  'MCP': 'MCP',
   'Nodus Radar': 'Nodus Radar',
   'Nodus Compass': 'Nodus Compass',
   'Nodus Tools': 'Nodus Tools',

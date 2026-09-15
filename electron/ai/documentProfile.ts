@@ -908,8 +908,8 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
   setResolvedTextState(work.nodus_id, resolvedTextStateFromDoc(document));
   options.signal?.throwIfAborted();
   if (!document.text.trim() || document.sourceType === 'none' || document.sourceType === 'abstract_only') {
-    setDocumentProfileState(work.nodus_id, 'unavailable', { error: document.notes ?? 'No hay texto completo legible.' });
-    throw new Error(document.notes ?? 'No hay texto completo legible.');
+    setDocumentProfileState(work.nodus_id, 'unavailable', { error: document.notes ?? 'No hay texto completo legible' });
+    throw new Error(document.notes ?? 'No hay texto completo legible');
   }
   const sourceFingerprint = sha256(document.text);
   const sourceContentHash = sha1(document.text);

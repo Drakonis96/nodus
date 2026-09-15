@@ -30,7 +30,7 @@ export function EmbeddingProgressBar({ progress }: { progress: EmbeddingPipeline
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <span className="mr-auto text-xs text-cyan-400 font-medium whitespace-nowrap">Embeddings</span>
+        <span className="mr-auto text-xs text-cyan-400 font-medium whitespace-nowrap">{t('Embeddings')}</span>
         <div className="order-last min-w-0 basis-full">
           <div className="flex flex-wrap justify-between gap-2 text-xs text-neutral-400 mb-1">
             <span className="min-w-0 break-words [overflow-wrap:anywhere]">

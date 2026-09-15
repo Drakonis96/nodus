@@ -491,11 +491,16 @@ function mainProcessRuntimeError(message: string, language: unknown): string | n
 }
 
 /**
- * Last-resort protection for legacy Electron errors that still contain prose rather
- * than a stable error code. Specific messages should be translated by the caller;
- * unknown Spanish prose becomes a localized generic error instead of leaking Spanish.
+ * Every sentence this file knows how to translate, or null.
+ *
+ * Extracted from {@link localizeRuntimeError} so the renderer can consult the SAME catalogues.
+ * That matters for the queue surfaces: `localizeRuntimeError` only runs on IPC fields named
+ * `message` or `error`, and plenty of user-visible failures travel in other fields —
+ * `pausedReason`, `saveError`, `maintenanceError`, `progress.error` — where the renderer's
+ * `tr()` is the only gate. Without this, a sentence translated here reached the screen as
+ * "this message could not be translated": the answer existed, in the wrong process.
  */
-export function localizeRuntimeError(message: string, language: unknown): string {
+export function knownRuntimeErrorText(message: string, language: unknown): string | null {
   const skillError = localizeChatSkillError(message, normalizeUiLanguage(language));
   if (skillError) return skillError;
   if (message === 'Fallo al sintetizar el audio.') {
@@ -690,6 +695,17 @@ export function localizeRuntimeError(message: string, language: unknown): string
   if (providerFailure) return providerFailure;
   const mainProcessFailure = mainProcessRuntimeError(message, language);
   if (mainProcessFailure) return mainProcessFailure;
+  return null;
+}
+
+/**
+ * Last-resort protection for legacy Electron errors that still contain prose rather
+ * than a stable error code. Specific messages should be translated by the caller;
+ * unknown Spanish prose becomes a localized generic error instead of leaking Spanish.
+ */
+export function localizeRuntimeError(message: string, language: unknown): string {
+  const known = knownRuntimeErrorText(message, language);
+  if (known !== null) return known;
   if (!looksLikeSpanishUiText(message)) return message;
   return uiText(language, {
     es: message,
@@ -761,6 +777,11 @@ export const PROGRESS_STATE_MESSAGES = [
   'No hay obras con análisis profundo para indexar.',
   'No hay obras disponibles para indexar.',
   'La obra ya no existe.',
+  // A state, not a failure: the document has no legible full text. It has to be listed here
+  // so `localizeRuntimeError` hands it to the renderer untouched — otherwise it is Spanish
+  // prose to that function, and a reader in any language gets the generic "the operation
+  // could not be completed" instead of "No readable full text is available".
+  'No hay texto completo legible',
 ];
 
 /** Dictionary generation status copy is translated by DictionaryView. */

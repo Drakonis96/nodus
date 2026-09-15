@@ -62,7 +62,7 @@ import {
   ReaderSelectionActions,
   type ReaderSelectionActionsHandle,
 } from '../components/ReaderSelectionActions';
-import { t, tx, getActiveLang } from '../i18n';
+import { errorText, t, tx, getActiveLang } from '../i18n';
 import { DeepResearchSectionLengthField } from '../components/DeepResearchSectionLengthField';
 import { PROMPT_LANGUAGE_OPTIONS } from '@shared/promptLanguageOptions';
 import {
@@ -510,7 +510,7 @@ export function DeepResearchView({
     const unsaved = laneJobs.find((item) => item.saveError && !seenUnsavedRef.current.has(item.id));
     if (!unsaved?.saveError) return;
     seenUnsavedRef.current.add(unsaved.id);
-    setError(unsaved.saveError);
+    setError(errorText(unsaved.saveError));
   }, [laneJobs]);
 
   // Every queued report is saved by the main process, so refresh the gallery once a
@@ -1026,7 +1026,7 @@ export function DeepResearchView({
 
       {(message || error) && (
         <div className={`px-4 py-2 text-sm border-b ${error ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200' : 'border-neutral-200 text-neutral-500 dark:border-neutral-800 dark:text-neutral-400'}`}>
-          {error ?? message}
+          {errorText(error ?? message)}
         </div>
       )}
 

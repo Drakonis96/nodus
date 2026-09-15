@@ -59,7 +59,7 @@ test('a corrupt or missing file never breaks the log', () => {
   writeFileSync(file, '{ this is not json');
   const repository = new store.PipelineLogRepository(file, 0);
   assert.equal(repository.query({}, LIMITS, NOW).total, 0);
-  assert.equal(repository.stats(LIMITS).entries, 0);
+  assert.equal(repository.stats().entries, 0);
   // And an entry can still be recorded afterwards, which is the point of surviving it.
   repository.record(entry('after-corrupt', NOW), LIMITS);
   assert.equal(repository.query({}, LIMITS, NOW).total, 1);
@@ -280,9 +280,9 @@ test('entries are grouped and capped on write, and flushed to disk on demand', (
   assert.equal(written.version, 1);
   assert.equal(written.entries.length, 1);
   assert.equal(written.entries[0].repeat, 2);
-  assert.equal(repository.stats(LIMITS).entries, 1);
-  assert.ok(repository.stats(LIMITS).bytes > 0);
-  assert.ok(repository.stats(LIMITS).newestAt);
+  assert.equal(repository.stats().entries, 1);
+  assert.ok(repository.stats().bytes > 0);
+  assert.ok(repository.stats().newestAt);
   repository.clear();
   repository.flushSync();
   assert.equal(JSON.parse(readFileSync(file, 'utf8')).entries.length, 0);

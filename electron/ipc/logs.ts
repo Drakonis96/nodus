@@ -24,7 +24,7 @@ export function registerLogsIpc({ h, getWindow }: IpcContext): void {
     const result = repository.query(sanitizePipelineLogQuery(query), limits);
     return {
       ...result,
-      stats: repository.stats(limits),
+      stats: repository.stats(),
       retention: limits.retention,
       maxEntries: normalizePipelineLogMaxEntries(limits.maxEntries),
     };
@@ -33,12 +33,11 @@ export function registerLogsIpc({ h, getWindow }: IpcContext): void {
   h('logs:delete', async (_e, filter?: PipelineLogFilter) => {
     const limits = pipelineLogLimits();
     const removed = repository.delete(sanitizePipelineLogFilter(filter), limits);
-    return { removed, total: repository.stats(limits).entries };
+    return { removed, total: repository.stats().entries };
   });
 
   h('logs:clear', async () => {
-    const limits = pipelineLogLimits();
-    const removed = repository.stats(limits).entries;
+    const removed = repository.stats().entries;
     repository.clear();
     return { removed, total: 0 };
   });

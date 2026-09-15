@@ -90,7 +90,7 @@ export function AdditionalQueueTasks({ activity }: { activity: QueueActivity }) 
       const progress = record(job.progress);
       const result = record(job.result);
       const failure = backgroundFailure(job);
-      const title = job.key === 'toolkit:convert' ? 'Nodus Convert' : job.key === 'toolkit:translate' ? 'Nodus Translate'
+      const title = job.key === 'toolkit:convert' ? t('Nodus Convert') : job.key === 'toolkit:translate' ? t('Nodus Translate')
         : job.key.startsWith('audio:') ? t('Audio') : job.key.startsWith('database:') ? t('Bases de datos')
           : job.key.startsWith('deep-research:') ? t('Deep Research') : t('Inmersión');
       const percent = typeof progress.pct === 'number' ? progress.pct * 100

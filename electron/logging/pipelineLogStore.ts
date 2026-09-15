@@ -191,7 +191,7 @@ export class PipelineLogRepository {
     this.notify();
   }
 
-  stats(limits: PipelineLogLimits): PipelineLogStats {
+  stats(): PipelineLogStats {
     this.readOnce();
     const entries = this.store.entries;
     let bytes = 0;

@@ -48,7 +48,7 @@ import {
 import { WorkspaceTabStrip } from "../components/library/LibraryWorkspaceTabs";
 import { Icon, Spinner } from "../components/ui";
 import { useFeatureModel } from "../hooks/useFeatureModel";
-import { getActiveLang, pick, t as appT } from "../i18n";
+import { errorText, getActiveLang, pick, t as appT, tr } from "../i18n";
 import { DICTIONARY_TRANSLATIONS } from "../i18n.dictionary";
 import type { DictionarySnapshot } from "../app/viewSnapshots";
 
@@ -221,8 +221,7 @@ const csv = (value: string) => [
       .filter(Boolean),
   ),
 ];
-const message = (reason: unknown) =>
-  reason instanceof Error ? reason.message : String(reason);
+const message = (reason: unknown) => errorText(reason);
 const date = (value: string | null) =>
   value
     ? new Intl.DateTimeFormat(getActiveLang(), {
@@ -266,7 +265,7 @@ function dictionaryProgressText(value: string): string {
   if (value.startsWith("Generando definición")) return t("Generando definición…");
   if (value.startsWith("Redactando definición")) return t("Redactando definición…");
   if (value.startsWith("Comprobando")) return t("Comprobando…");
-  return value;
+  return tr(value);
 }
 
 function dictionaryVersionText(value: string): string {
@@ -1751,13 +1750,13 @@ function DictionaryGenerationState({
     return (
       <span
         className="min-w-0 text-xs text-red-600 dark:text-red-400"
-        title={progress.error}
+        title={progress.error ? errorText(progress.error) : undefined}
       >
         <span className="flex items-center gap-1.5 font-medium">
           <Icon name="x" size={12} /> {t("Error al generar")}
         </span>
         <span className="mt-0.5 block truncate text-[10px] opacity-80">
-          {progress.error || t("La generación no pudo completarse.")}
+          {progress.error ? errorText(progress.error) : t("La generación no pudo completarse.")}
         </span>
       </span>
     );
@@ -1773,7 +1772,7 @@ function DictionaryGenerationState({
     return (
       <span
         className="min-w-0 text-xs text-amber-700 dark:text-amber-300"
-        title={progress.error}
+        title={progress.error ? errorText(progress.error) : undefined}
       >
         <span className="flex items-center gap-1.5 font-medium">
           <Icon name="warning" size={12} /> {t("Síntesis pendiente")}

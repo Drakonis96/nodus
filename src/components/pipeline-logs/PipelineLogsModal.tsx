@@ -27,7 +27,7 @@ import {
   PIPELINE_LOG_MAX_ENTRIES_OPTIONS,
   PIPELINE_LOG_RETENTION_OPTIONS,
 } from '@shared/pipelineLogs';
-import { t, tx } from '../../i18n';
+import { errorText, t, tx } from '../../i18n';
 import { Icon } from '../ui';
 import { LogMultiSelect } from './LogMultiSelect';
 import { LogContextMenu, type LogContextMenuItem } from './LogContextMenu';
@@ -146,10 +146,9 @@ export function PipelineLogsModal({ onClose }: { onClose: () => void }) {
         setPage(logs as LogsPage);
         setSettings(prefs);
       })
-      .catch((cause) => { if (!cancelled) setNotice(cause instanceof Error ? cause.message : String(cause)); })
+      .catch((cause) => { if (!cancelled) setNotice(errorText(cause)); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- first paint only; later changes go through reload()
   }, []);
 
   const reload = useCallback(() => {
@@ -163,7 +162,6 @@ export function PipelineLogsModal({ onClose }: { onClose: () => void }) {
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
     refreshTimer.current = setTimeout(() => { reload(); }, 180);
     return () => { if (refreshTimer.current) clearTimeout(refreshTimer.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload() already closes over filter/sort/limit
   }, [filter, sort, limit, loading]);
 
   // Live updates: grouping, pruning and deletions all change rows already on screen, so the
@@ -196,7 +194,7 @@ export function PipelineLogsModal({ onClose }: { onClose: () => void }) {
       // Retention and the cap are applied by main on the spot, so the counts come back changed.
       await load();
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : String(cause));
+      setNotice(errorText(cause));
     } finally {
       setBusy(false);
     }
@@ -217,7 +215,7 @@ export function PipelineLogsModal({ onClose }: { onClose: () => void }) {
       const result = await window.nodus.exportPipelineLogs(text, fileName);
       if (!result.canceled && result.path) setNotice(tx('Guardado en {path}', { path: result.path }));
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : String(cause));
+      setNotice(errorText(cause));
     } finally {
       setBusy(false);
     }
@@ -231,7 +229,7 @@ export function PipelineLogsModal({ onClose }: { onClose: () => void }) {
       setNotice(tx('{count} entradas', { count: removed.removed }));
       setLevels([]); setCategories([]); setScopes([]); setVaultIds([]); setDays([]); setSearch('');
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : String(cause));
+      setNotice(errorText(cause));
     } finally {
       setBusy(false);
       // The store also pushes a change, but the view refreshes here as well: a deletion the
@@ -246,7 +244,7 @@ export function PipelineLogsModal({ onClose }: { onClose: () => void }) {
       await window.nodus.clearPipelineLogs();
       setConfirm(null);
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : String(cause));
+      setNotice(errorText(cause));
     } finally {
       setBusy(false);
       reload();
@@ -257,7 +255,7 @@ export function PipelineLogsModal({ onClose }: { onClose: () => void }) {
     try {
       await window.nodus.deletePipelineLogs({ ids: [entry.id] });
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : String(cause));
+      setNotice(errorText(cause));
     }
     reload();
   };
@@ -355,7 +353,7 @@ export function PipelineLogsModal({ onClose }: { onClose: () => void }) {
           </button>
         </header>
 
-        <div className="grid gap-2 border-b border-neutral-200 p-3 dark:border-neutral-800 md:grid-cols-[minmax(200px,1fr)_repeat(4,minmax(120px,150px))_auto]">
+        <div className="grid gap-2 border-b border-neutral-200 p-3 dark:border-neutral-800 md:grid-cols-[minmax(180px,1fr)_repeat(5,minmax(112px,146px))_auto]">
           <label className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-neutral-300 px-2 dark:border-neutral-700">
             <Icon name="search" size={13} className="text-neutral-500" />
             <input
@@ -386,6 +384,14 @@ export function PipelineLogsModal({ onClose }: { onClose: () => void }) {
             selectedIds={scopes}
             onChange={(ids) => setScopes(ids as PipelineLogScope[])}
             placeholder={t('Origen')}
+          />
+          <LogMultiSelect
+            testId="pipeline-logs-vaults"
+            options={vaultOptions}
+            selectedIds={vaultIds}
+            onChange={setVaultIds}
+            placeholder={t('Bóveda')}
+            searchPlaceholder={t('Buscar')}
           />
           <LogMultiSelect
             testId="pipeline-logs-days"
