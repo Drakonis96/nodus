@@ -476,3 +476,19 @@ html.theme-active.dark .global-search-delete { color: var(--theme-text-dark-subt
 html.theme-active.light .global-search-delete { color: var(--theme-text-light-subtle); }
 html.theme-active.dark .global-search-delete:hover { color: #fca5a5; }
 html.theme-active.light .global-search-delete:hover { color: #b91c1c; }
+
+/* Ideas theme labels need a readable foreground even when a custom accent is
+ * very dark or very light. Keep the accent in the surface and border, but
+ * derive the label text from the theme's explicitly readable text token. */
+html.theme-active.dark .ideas-theme-pill {
+  border: 1px solid color-mix(in srgb, var(--a-500) 30%, var(--theme-border-dark));
+  background-color: color-mix(in srgb, var(--a-500) 12%, var(--n-800));
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .ideas-theme-pill {
+  border: 1px solid color-mix(in srgb, var(--a-600) 26%, var(--theme-border-light));
+  background-color: color-mix(in srgb, var(--a-500) 10%, var(--n-100));
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .ideas-theme-overflow { color: var(--theme-text-dark-muted); }
+html.theme-active.light .ideas-theme-overflow { color: var(--theme-text-light-muted); }
