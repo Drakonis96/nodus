@@ -64,6 +64,37 @@ html.light .server-desktop-surface,
   --server-shell-muted: #525252;
 }
 
+/* Unlike the default palette, a selected app theme is represented by runtime
+   variables on <html>. The Server shell has its own local variables so its
+   component CSS remains readable; bridge those variables here or the web
+   build keeps its hard-coded charcoal/indigo palette. The data-theme selectors
+   also cover the first render before the root light/dark class is committed. */
+html.theme-active.dark .server-desktop-surface,
+html.theme-active .server-desktop-surface[data-theme='dark'] {
+  --server-shell-bg: var(--app-background-dark, #0a0a0a);
+  --server-shell-panel: var(--n-900, #111111);
+  --server-shell-panel-soft: var(--n-800, #171717);
+  --server-shell-border: var(--theme-border-dark, #262626);
+  --server-shell-text: var(--theme-text-dark, #f5f5f5);
+  --server-shell-muted: var(--theme-text-dark-muted, #a3a3a3);
+}
+
+html.theme-active.light .server-desktop-surface,
+html.theme-active .server-desktop-surface[data-theme='light'] {
+  --server-shell-bg: var(--app-background-light, #f8fafc);
+  --server-shell-panel: var(--n-50, #ffffff);
+  --server-shell-panel-soft: var(--n-100, #f8fafc);
+  --server-shell-border: var(--theme-border-light, #e5e7eb);
+  --server-shell-text: var(--theme-text-light, #171717);
+  --server-shell-muted: var(--theme-text-light-muted, #525252);
+}
+
+html.theme-active .server-desktop-surface .server-header-action.bg-indigo-600,
+html.theme-active .server-desktop-surface .server-header-action.bg-indigo-600:hover,
+html.theme-active .server-desktop-surface .server-header-action.bg-indigo-600:focus-visible {
+  background: var(--a-600, #4f46e5);
+}
+
 html.light .server-desktop-surface .server-home-intro,
 .server-desktop-surface[data-theme='light'] .server-home-intro {
   border-color: #c7d2fe;
@@ -73,6 +104,15 @@ html.light .server-desktop-surface .server-home-intro,
 html.light .server-desktop-surface .server-home-intro .text-indigo-300,
 .server-desktop-surface[data-theme='light'] .server-home-intro .text-indigo-300 {
   color: #4338ca;
+}
+
+html.theme-active .server-home-intro {
+  border-color: color-mix(in srgb, var(--a-400, #818cf8) 40%, var(--server-shell-border));
+  background: color-mix(in srgb, var(--a-500, #6366f1) 12%, var(--server-shell-panel));
+}
+
+html.theme-active .server-home-intro .text-indigo-300 {
+  color: var(--a-300, #a5b4fc);
 }
 
 .server-desktop-surface .server-main {
@@ -123,6 +163,9 @@ html.light .server-desktop-surface .server-home-intro .text-indigo-300,
 html.light .server-desktop-surface .server-sidebar-nav-item.is-active {
   color: #fff;
   background: #4f46e5;
+}
+html.theme-active .server-desktop-surface .server-sidebar-nav-item.is-active {
+  background: var(--a-600, #4f46e5);
 }
 .server-sidebar-nav-item:focus-visible,
 .server-sidebar-nav-group:focus-visible { outline: 2px solid #818cf8; outline-offset: -2px; }

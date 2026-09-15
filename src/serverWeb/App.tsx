@@ -27,6 +27,7 @@ import {
 } from "../navigation";
 import { HoverLabelButton, Icon } from "../components/ui";
 import { APP_THEME_DEFINITIONS_STORAGE_KEY, APP_THEME_STORAGE_KEY, applyAppTheme as applyRuntimeAppTheme } from "../theme/themeBoot";
+import { THEMES } from "../theme/themes.mjs";
 import { vaultTypeIcon, vaultTypeLabel } from "../components/vaultTypeUi";
 import { WorldbuildingSidebar } from "../components/WorldbuildingSidebar";
 import { ProsopographySidebar } from "../components/ProsopographySidebar";
@@ -1823,7 +1824,16 @@ export default function App() {
     // themeBoot correctly fail closed to the default, briefly (and sometimes
     // permanently for a slow/failed profile request) repainting the app with
     // the default palette.
-    if (!profile) return;
+    // Built-in palettes can be applied immediately, even when a basic Server
+    // has no profile row yet. Custom palettes still wait for their definitions
+    // from the profile so themeBoot can fail closed safely instead of treating
+    // an unloaded custom theme as the default.
+    if (
+      !profile &&
+      appTheme !== "default" &&
+      !THEMES.some((definition) => definition.id === appTheme)
+    )
+      return;
     const customThemes = profile?.appearance.customThemes ?? [];
     applyRuntimeAppTheme(appTheme, customThemes);
     localStorage.setItem(APP_THEME_STORAGE_KEY, appTheme);

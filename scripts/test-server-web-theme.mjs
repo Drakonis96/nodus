@@ -21,6 +21,16 @@ test('Server Web custom shell has an explicit light palette', () => {
   }
 });
 
+test('Server Web custom themes drive the shell palette and accents', () => {
+  assert.match(shellCss, /html\.theme-active\.dark \.server-desktop-surface/);
+  assert.match(shellCss, /--server-shell-bg:\s*var\(--app-background-dark/);
+  assert.match(shellCss, /--server-shell-bg:\s*var\(--app-background-light/);
+  assert.match(shellCss, /--server-shell-text:\s*var\(--theme-text-dark/);
+  assert.match(shellCss, /--server-shell-text:\s*var\(--theme-text-light/);
+  assert.match(shellCss, /server-sidebar-nav-item\.is-active[\s\S]*background:\s*var\(--a-600/);
+  assert.match(appTsx, /THEMES\.some\(\(definition\) => definition\.id === appTheme\)/);
+});
+
 test('Server settings has theme-scoped tokens and controls', () => {
   assert.match(settingsCss, /\.server-settings-native\[data-theme=['"]light['"]\]/);
   assert.match(settingsCss, /--ss-bg:\s*#fff/);
