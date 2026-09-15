@@ -16,6 +16,7 @@ globalThis.__documentPipeline = {
   passages: [], checkpoints: new Map(), published: null, states: [], jobs: [], auditCalls: 0, sectionAuditCalls: 0,
   forceSectionAuditFailure: false, forceDocumentAuditFailure: false, forceEmptyProfile: false,
   forceSectionSchemaFailure: false, onEmbed: null, sourceReads: 0, changedTextAtPublication: null,
+  sectionTitles: [],
 };
 
 await build({
@@ -81,6 +82,7 @@ await build({
           const sectionAudit=opts.system.includes('Audita un análisis de sección')||(input.analysis!==undefined&&input.fragment!==undefined);
           const profileSynthesis=opts.system.includes('Construye una ficha')||(input.metadata!==undefined&&Array.isArray(input.sections)&&input.profile===undefined);
           const documentAudit=opts.system.includes('Audita una ficha')||(input.profile!==undefined&&input.deterministic!==undefined);
+          const sectionReduce=opts.system.includes('Fusiona análisis parciales')||(Array.isArray(input.analyses)&&typeof input.title==='string');
           if(globalThis.__documentPipeline.forceSectionSchemaFailure && sectionAnalysis){
             throw new AiError('El JSON no cumple el esquema esperado');
           }
@@ -88,10 +90,14 @@ await build({
             ? {passed:false,issues:['El proveedor insiste en rechazar la sección.'],analysis:input.analysis}
             : {passed:true,issues:[],analysis:input.analysis};
           };
-          if(sectionAnalysis)return {
-            title:'Capítulo analizado',summary:'Expone una modernización desigual.',role:'argumento',concepts:['modernización'],
-            claims:[{text:'El proceso fue desigual.',support_quote:'El proceso avanzó de manera desigual entre las regiones.',page:'p. 2',confidence:0}]
-          };
+          if(sectionReduce)return input.analyses[0];
+          if(sectionAnalysis){
+            globalThis.__documentPipeline.sectionTitles.push(input.section_title);
+            return {
+              title:'Capítulo analizado',summary:'Expone una modernización desigual.',role:'argumento',concepts:['modernización'],
+              claims:[{text:'El proceso fue desigual.',support_quote:'El proceso avanzó de manera desigual entre las regiones.',page:'p. 2',confidence:0}]
+            };
+          }
           if(profileSynthesis)return globalThis.__documentPipeline.forceEmptyProfile
             ? {source_language:'es',overview:'',fields:[]}
             : {source_language:'es',overview:'La obra estudia una modernización desigual.',fields:[
@@ -123,6 +129,23 @@ test('structure preserves heading hierarchy and full character coverage', () => 
   assert.equal(chapter.parentSectionId, part.sectionId);
   assert.equal(chapter.pageStart, 'p. 1', 'heading precedes the next physical page marker');
   assert.ok(sections.every((section) => section.contentHash.length === 64));
+});
+
+test('a document without headings gets untitled chunks instead of a language-specific placeholder', () => {
+  // PDFs are extracted as "[[p. N]] + text" with no Markdown headings, so this is
+  // the branch nearly every library work takes. A stored "Sección 2" here leaked
+  // Spanish into profiles of users whose prompt language was Korean or English.
+  const sections = pipeline.deriveDocumentStructure('El proceso avanzó de manera desigual entre las regiones. '.repeat(900), 'Obra sin encabezados');
+  assert.ok(sections.length >= 2, 'a long headless document is chunked');
+  assert.equal(sections[0].title, 'Obra sin encabezados', 'the first chunk carries the work title');
+  assert.ok(
+    sections.slice(1).every((section) => section.title === ''),
+    'chunks of a headless document carry no invented title',
+  );
+  assert.ok(
+    sections.every((section) => !/Secci[óo]n/i.test(section.title)),
+    'no chunk is titled with a hard-coded Spanish placeholder',
+  );
 });
 
 test('structure resolves combined source/page markers to durable attachment locators', () => {
@@ -372,4 +395,114 @@ test('the document-profile pipeline runs with a native prompt pack in every prom
     assert.equal(result, 'published-v1', `${language}: document profile published`);
     assert.ok(globalThis.__documentPipeline.published.audit.passed, `${language}: audit passed`);
   }
+});
+
+test('a headless document is published with analysis titles and no language-specific placeholder', async () => {
+  globalThis.__documentPipeline.sourceReads = 0;
+  globalThis.__documentPipeline.published = null;
+  globalThis.__documentPipeline.sectionTitles = [];
+  globalThis.__documentPipeline.text = 'El proceso avanzó de manera desigual entre las regiones. '.repeat(900);
+  const work = {
+    nodus_id:'w1',zotero_key:'Z1',zotero_version:1,title:'Modernización',authors_json:'["Autora"]',year:2024,
+    item_type:'book',doi:null,read_tag:0,manual_deep:0,deep_trigger:null,source_type:'markdown',light_status:'done',
+    light_at:null,light_hash:null,deep_status:'done',deep_at:null,deep_hash:null,summary_status:'none',summary_at:null,
+    summary_hash:null,archived:0,notes:null,
+  };
+  const result = await pipeline.runDocumentProfileScan(work, {
+    jobId:'job-headless-document',generatorModel:null,auditorModel:null,onProgress() {},
+  });
+  assert.equal(result, 'published-v1');
+  const published = globalThis.__documentPipeline.published;
+  assert.ok(published.sections.length >= 2, 'the headless document is sectioned by chunks');
+  assert.equal(published.sections[0].title, 'Modernización', 'the first chunk keeps the work title');
+  assert.ok(
+    published.sections.slice(1).every((section) => section.title === 'Capítulo analizado'),
+    'an untitled chunk takes the analysed title instead of a hard-coded placeholder',
+  );
+  assert.ok(
+    published.sections.every((section) => !/Secci[óo]n/i.test(section.title)),
+    'no published section title carries a language-specific placeholder',
+  );
+  assert.ok(
+    globalThis.__documentPipeline.sectionTitles.every((title) => !/Secci[óo]n/i.test(String(title))),
+    'the placeholder is never handed to the model to echo back',
+  );
+});
+
+test('the extractive fallback reports its own mode and names a floor-derived confidence', async () => {
+  globalThis.__documentPipeline.forceEmptyProfile = true;
+  globalThis.__documentPipeline.published = null;
+  globalThis.__documentPipeline.text = `# Introducción\n[[p. 1]]\nLa obra plantea su problema con detalle suficiente para construir una ficha literal verificable.\n## Desarrollo\n[[p. 2]]\nEl proceso avanzó de manera desigual entre las regiones.\n${'Desarrollo histórico completo. '.repeat(100)}`;
+  const work = {
+    nodus_id:'w1',zotero_key:'Z1',zotero_version:1,title:'Modernización',authors_json:'["Autora"]',year:2024,
+    item_type:'book',doi:null,read_tag:0,manual_deep:0,deep_trigger:null,source_type:'markdown',light_status:'done',
+    light_at:null,light_hash:null,deep_status:'done',deep_at:null,deep_hash:null,summary_status:'none',summary_at:null,
+    summary_hash:null,archived:0,notes:null,
+  };
+  const result = await pipeline.runDocumentProfileScan(work, {
+    jobId:'job-extractive-mode',generatorModel:null,auditorModel:null,onProgress() {},
+  });
+  globalThis.__documentPipeline.forceEmptyProfile = false;
+  assert.equal(result, 'published-v1');
+  const published = globalThis.__documentPipeline.published;
+  assert.equal(published.audit.fallback, 'extractive', 'a published literal fallback declares its mode');
+  assert.equal(published.profile.fallbackMode, 'extractive');
+  assert.ok(
+    published.fields.every((field) => field.confidenceSource === 'floor'),
+    'fields no provider ever scored are marked as floor-derived, not as measured',
+  );
+  assert.equal(
+    published.audit.score, 0,
+    'no synthesis ever cleared the audit, so the profile reports no semantic score instead of the floor',
+  );
+  assert.ok(published.audit.issues.includes('fallback_extractivo_determinista'));
+});
+
+test('an audited synthesis is not flagged as a fallback and names the confidence it substituted', async () => {
+  globalThis.__documentPipeline.sourceReads = 0;
+  globalThis.__documentPipeline.published = null;
+  globalThis.__documentPipeline.text = `# Introducción\n[[p. 1]]\nLa obra plantea su problema.\n## Desarrollo\n[[p. 2]]\nEl proceso avanzó de manera desigual entre las regiones.\n${'Desarrollo histórico completo. '.repeat(100)}`;
+  const work = {
+    nodus_id:'w1',zotero_key:'Z1',zotero_version:1,title:'Modernización',authors_json:'["Autora"]',year:2024,
+    item_type:'book',doi:null,read_tag:0,manual_deep:0,deep_trigger:null,source_type:'markdown',light_status:'done',
+    light_at:null,light_hash:null,deep_status:'done',deep_at:null,deep_hash:null,summary_status:'none',summary_at:null,
+    summary_hash:null,archived:0,notes:null,
+  };
+  const result = await pipeline.runDocumentProfileScan(work, {
+    jobId:'job-confidence-source',generatorModel:null,auditorModel:null,onProgress() {},
+  });
+  assert.equal(result, 'published-v1');
+  const published = globalThis.__documentPipeline.published;
+  assert.equal(published.audit.fallback, null, 'an audited synthesis is not flagged as a fallback');
+  const field = published.fields[0];
+  assert.equal(field.confidence, 0.8);
+  assert.equal(
+    field.confidenceSource, 'floor',
+    'the provider reported zero confidence, so the published number is the deterministic floor',
+  );
+});
+
+test('a retained field names a floor substitution but keeps a measured confidence as measured', () => {
+  const text = 'El proceso avanzó de manera desigual entre las regiones.';
+  const retained = pipeline.retainLiterallySupportedFields(text, {
+    source_language: 'es',
+    overview: '',
+    fields: [
+      { kind: 'thesis', text: 'Síntesis apoyada.', confidence: 0.34, centrality: 1, support_quote: text, page: null },
+      { kind: 'argument', text: 'Formulación medida.', confidence: 0.91, centrality: 0.6, support_quote: text, page: null },
+      { kind: 'finding', text: 'Apoyo inexistente.', confidence: 0.99, centrality: 0.5, support_quote: 'Esta cita no está en el texto.', page: null },
+    ],
+  });
+  assert.equal(retained.fields.length, 2, 'a field without literal support is dropped, never published');
+  assert.deepEqual(
+    retained.fields.map((field) => [field.confidence, field.confidenceSource]),
+    [[0.8, 'floor'], [0.91, 'model']],
+    'the floor is reported as a minimum and a real reading stays a reading',
+  );
+  const repeated = pipeline.retainLiterallySupportedFields(text, retained);
+  assert.deepEqual(
+    repeated.fields.map((field) => [field.confidence, field.confidenceSource]),
+    [[0.8, 'floor'], [0.91, 'model']],
+    're-running retention after an audit pass cannot relabel a substituted floor as measured',
+  );
 });

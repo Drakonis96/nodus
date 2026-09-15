@@ -2,6 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import type {
   DocumentIdeaLink,
   DocumentProfileAudit,
+  DocumentProfileConfidenceSource,
+  DocumentProfileFallbackMode,
   DocumentProfileFieldKind,
   DocumentProfileSupport,
   DocumentSection,
@@ -54,6 +56,9 @@ interface RawProfileField {
   centrality: number;
   support_quote: string;
   page: string | null;
+  /** Set when the published confidence is the deterministic floor rather than a
+   *  value the provider measured (see `retainLiterallySupportedFields`). */
+  confidenceSource?: DocumentProfileConfidenceSource;
 }
 interface ProfileSynthesis { source_language: string; overview: string; fields: RawProfileField[] }
 interface AuditResponse {
@@ -200,7 +205,7 @@ function normalizeProfile(value: unknown): ProfileSynthesis {
       const text = clean(field.text, 3_000);
       const support = clean(field.support_quote, 1_200);
       if (!FIELD_KINDS.has(kind) || !text || !support) return [];
-      return [{ kind, text, support_quote: support, page: page(field.page), confidence: number01(field.confidence), centrality: number01(field.centrality) }];
+      return [{ kind, text, support_quote: support, page: page(field.page), confidence: number01(field.confidence), centrality: number01(field.centrality), confidenceSource: 'model' as const }];
     }).slice(0, 80),
   };
 }
@@ -309,7 +314,7 @@ export function deriveDocumentStructure(text: string, fallbackTitle: string, sou
       const end = parseSourceLocationAt(text, chunk.end, sourceMap);
       return ({
       sectionId: `section-${sha256(`${fallbackTitle}|${ordinal}|${sha256(chunk.body)}`).slice(0, 24)}`,
-      parentSectionId: null, level: 1, ordinal, title: ordinal === 0 ? fallbackTitle : `Sección ${ordinal + 1}`,
+      parentSectionId: null, level: 1, ordinal, title: ordinal === 0 ? fallbackTitle : '',
       role: null, summary: '', concepts: [], claims: [], pageStart: start.label,
       pageEnd: end.label, sourceRef: start.sourceRef ?? end.sourceRef,
       pageStartNumber: start.pageNumber, pageEndNumber: end.pageNumber,
@@ -740,13 +745,22 @@ function deterministicAudit(text: string, sections: DerivedDocumentSection[], pr
   };
 }
 
-function retainLiterallySupportedFields(text: string, profile: ProfileSynthesis): ProfileSynthesis {
+/** Keeps only fields whose support is literal in the source and records whether the
+ *  published confidence was measured. Exported for unit testing. */
+export function retainLiterallySupportedFields(text: string, profile: ProfileSynthesis): ProfileSynthesis {
   return {
     ...profile,
     fields: profile.fields
       .filter((field) => quoteOffset(text, field.support_quote) >= 0)
       .map((field) => ({
         ...field,
+        // The floor is a publication contract (a literal support cannot be worth
+        // nothing), not a measurement. When it replaces what the provider actually
+        // reported, say so: the UI shows a bare percentage otherwise and every
+        // field of a weak profile ends up reading "80 %" as if it had been scored.
+        // This runs again after every audit and repair pass, so an existing floor
+        // mark is sticky: the original reading is already gone from `confidence`.
+        confidenceSource: field.confidenceSource === 'floor' || field.confidence < DIRECT_SUPPORT_CONFIDENCE_FLOOR ? 'floor' : 'model',
         confidence: Math.max(DIRECT_SUPPORT_CONFIDENCE_FLOOR, field.confidence),
       })),
   };
@@ -812,7 +826,9 @@ function buildExtractiveProfileFallback(
     fields: sampled.map((item, index) => ({
       kind: 'argument',
       text: item.quote,
+      // No provider measured this field: it *is* a quote, so the floor is the value.
       confidence: DIRECT_SUPPORT_CONFIDENCE_FLOOR,
+      confidenceSource: 'floor' as const,
       centrality: index === 0 ? 0.7 : 0.6,
       support_quote: item.quote,
       page: item.page,
@@ -943,7 +959,11 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     const analysis = orderedAnalyses[index];
     sectionAnalyses.set(sections[index].sectionId, analysis);
     sections[index] = {
-      ...sections[index], title: sections[index].title.startsWith('Sección ') ? analysis.title : sections[index].title,
+      // A chunk of a document without headings has no real title. It is kept empty
+      // on purpose: anything stored here becomes user-visible data, is fed back as
+      // `section_title` for the model to echo, and would ship in whatever language
+      // the placeholder was written in. The UI localizes an untitled section.
+      ...sections[index], title: sections[index].title || analysis.title,
       role: analysis.role || null, summary: analysis.summary, concepts: analysis.concepts,
       claims: analysis.claims.map((claim) => claim.text),
     };
@@ -1043,17 +1063,22 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     repaired = true;
     auditor = {
       passed: true,
-      score: DIRECT_SUPPORT_CONFIDENCE_FLOOR,
+      // The semantic verdict is kept as it was reported. Replacing it with the
+      // direct-support floor made a rejected synthesis and a perfect one report the
+      // same number, which is how an extractive fallback came to read "80 %".
+      score: number01(auditor?.score),
       issues: ['fallback_extractivo_determinista', ...semanticIssues],
       field_fixes: [],
       overview: profile.overview,
     };
     passed = deterministic.supportCoverage === 1 && deterministic.structureCoverage >= 0.95;
   }
+  const fallbackMode: DocumentProfileFallbackMode | null = extractiveFallback ? 'extractive' : null;
   const audit: DocumentProfileAudit = {
     passed, score: number01(auditor?.score), supportCoverage: deterministic.supportCoverage,
     structureCoverage: deterministic.structureCoverage, issues: strings(auditor?.issues, 50),
     repaired: repaired || Boolean(auditor && (auditor.field_fixes?.length || auditor.overview)),
+    fallback: fallbackMode,
   };
   if (!passed) {
     const error = auditFailureMessage(audit);
@@ -1065,6 +1090,7 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     fieldId: `field-${sha256(`${sourceFingerprint}|${field.kind}|${index}|${field.text}`).slice(0, 24)}`,
     kind: field.kind, ordinal: deterministic.supportedFields.slice(0, index).filter((prior) => prior.kind === field.kind).length,
     text: field.text, confidence: field.confidence, centrality: CENTRAL_FIELD_KINDS.has(field.kind) ? Math.max(0.75, field.centrality) : field.centrality,
+    confidenceSource: field.confidenceSource ?? ('model' as DocumentProfileConfidenceSource),
   }));
   const supports: DocumentProfileSupport[] = [];
   deterministic.supportedFields.forEach((field, index) => {
@@ -1133,7 +1159,7 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     nodusId: work.nodus_id, sourceFingerprint, pipelineVersion: DOCUMENT_PROFILE_PIPELINE_VERSION,
     schemaVersion: DOCUMENT_PROFILE_SCHEMA_VERSION, sourceLanguage: profile.source_language,
     presentationLanguage: settings.promptLanguage, overview: profile.overview,
-    profile: { ...profile, metadata: synthesisInput.metadata, fallbackMode: extractiveFallback ? 'extractive' : null }, fields,
+    profile: { ...profile, metadata: synthesisInput.metadata, fallbackMode }, fields,
     sections: sections.map(({ body: _body, ...section }) => section), supports, ideaLinks,
     vectors, generatorModel: options.generatorModel, auditorModel: options.auditorModel,
     promptHash: sha256(JSON.stringify(documentProfilePromptPack(options.language ?? settings.promptLanguage ?? 'es'))), audit,

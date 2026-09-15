@@ -951,6 +951,14 @@ export type DocumentProfileFieldKind =
   | 'disciplinary_scope' | 'structure' | 'finding' | 'conclusion' | 'contribution'
   | 'limitation' | 'genre' | 'audience' | 'positioning' | 'original_abstract';
 
+/**
+ * Where a field's `confidence` came from. `floor` means the provider supplied no
+ * usable measurement and the deterministic direct-support floor was substituted,
+ * so the value is a minimum, not a reading. Absent on rows published before the
+ * column existed, where it is read as `model`.
+ */
+export type DocumentProfileConfidenceSource = 'model' | 'floor';
+
 export interface DocumentProfileField {
   fieldId: string;
   kind: DocumentProfileFieldKind;
@@ -959,6 +967,7 @@ export interface DocumentProfileField {
   generatedText?: string;
   confidence: number;
   centrality: number;
+  confidenceSource?: DocumentProfileConfidenceSource;
   overridden?: boolean;
   overrideId?: string;
   verified?: boolean;
@@ -1010,6 +1019,13 @@ export interface DocumentIdeaLink {
   score: number;
 }
 
+/** `extractive` marks a profile assembled from literal source quotes because the
+ *  semantic synthesis never cleared the audit gate. It is published on purpose (a
+ *  rejected paraphrase must not leave a permanent hole in a campaign), but it is
+ *  not a synthesis: every field and summary is source-language evidence, so the
+ *  UI must say so instead of reporting it as an audited profile. */
+export type DocumentProfileFallbackMode = 'extractive';
+
 export interface DocumentProfileAudit {
   passed: boolean;
   score: number;
@@ -1017,6 +1033,7 @@ export interface DocumentProfileAudit {
   structureCoverage: number;
   issues: string[];
   repaired: boolean;
+  fallback?: DocumentProfileFallbackMode | null;
 }
 
 export interface DocumentProfile {

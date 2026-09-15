@@ -63,6 +63,11 @@ const KEYS = [
   '{done} de {total} obras',
   'Se detendrá el análisis documental pendiente. Las fichas ya publicadas, las correcciones del usuario y las obras completadas se conservarán.',
   'Es opcional y no afecta al estado general de la obra. Deep Research lo prepara cuando lo necesita; también puedes iniciarlo manualmente.',
+  'Sección {n}',
+  'Indexado sin síntesis',
+  'Los campos y los resúmenes de sección son citas literales del original: la auditoría semántica no aprobó ninguna síntesis, así que esta ficha solo orienta la recuperación.',
+  'Incidencias de la auditoría',
+  'mínimo',
 ] as const;
 
 function table(values: readonly string[]): Record<string, string> {
@@ -93,6 +98,11 @@ const en = table([
   'Checks support, coverage and fidelity before publishing a new version.', 'With issues', 'Document analysis paused', '{done} of {total} works',
   'Pending document analysis will stop. Published profiles, user corrections, and completed works will be preserved.',
   'It is optional and does not affect the work’s overall status. Deep Research prepares it when needed; you can also start it manually.',
+  'Section {n}',
+  'Indexed without synthesis',
+  'Fields and section summaries are literal quotes from the original: the semantic audit never approved a synthesis, so this profile only guides retrieval.',
+  'Audit issues',
+  'minimum',
 ]);
 
 const fr = table([
@@ -118,6 +128,11 @@ const fr = table([
   'Vérifie les preuves, la couverture et la fidélité avant de publier une nouvelle version.', 'Avec incidents', 'Analyse documentaire en pause', '{done} œuvres sur {total}',
   'L’analyse documentaire en attente sera arrêtée. Les fiches publiées, les corrections de l’utilisateur et les œuvres terminées seront conservées.',
   'Il est facultatif et n’affecte pas l’état général de l’œuvre. Deep Research le prépare si nécessaire ; vous pouvez aussi le lancer manuellement.',
+  'Section {n}',
+  'Indexé sans synthèse',
+  'Les champs et les résumés de section sont des citations littérales de l’original : l’audit sémantique n’a approuvé aucune synthèse, cette fiche ne sert donc qu’à la récupération.',
+  'Incidents de l’audit',
+  'minimum',
 ]);
 
 const de = table([
@@ -143,6 +158,11 @@ const de = table([
   'Prüft Belege, Abdeckung und Treue vor der Veröffentlichung einer neuen Version.', 'Mit Problemen', 'Dokumentanalyse pausiert', '{done} von {total} Werken',
   'Die ausstehende Dokumentanalyse wird beendet. Veröffentlichte Profile, Benutzerkorrekturen und abgeschlossene Werke bleiben erhalten.',
   'Er ist optional und hat keinen Einfluss auf den Gesamtstatus des Werks. Deep Research bereitet ihn bei Bedarf vor; du kannst ihn auch manuell starten.',
+  'Abschnitt {n}',
+  'Ohne Synthese indexiert',
+  'Felder und Abschnittszusammenfassungen sind wörtliche Zitate aus dem Original: Die semantische Prüfung hat keine Synthese freigegeben, daher dient dieses Profil nur der Recherche.',
+  'Befunde der Prüfung',
+  'Minimum',
 ]);
 
 const pt = table([
@@ -168,6 +188,11 @@ const pt = table([
   'Verifica o suporte, a cobertura e a fidelidade antes de publicar uma nova versão.', 'Com problemas', 'Análise documental em pausa', '{done} de {total} obras',
   'A análise documental pendente será interrompida. As fichas publicadas, as correções do utilizador e as obras concluídas serão preservadas.',
   'É opcional e não afeta o estado geral da obra. O Deep Research prepara-o quando necessário; também pode iniciá-lo manualmente.',
+  'Secção {n}',
+  'Indexado sem síntese',
+  'Os campos e os resumos de secção são citações literais do original: a auditoria semântica não aprovou qualquer síntese, pelo que esta ficha apenas orienta a recuperação.',
+  'Incidentes da auditoria',
+  'mínimo',
 ]);
 
 const ptBR = table([
@@ -193,6 +218,11 @@ const ptBR = table([
   'Verifica o suporte, a cobertura e a fidelidade antes de publicar uma nova versão.', 'Com problemas', 'Análise documental pausada', '{done} de {total} obras',
   'A análise documental pendente será interrompida. As fichas publicadas, as correções do usuário e as obras concluídas serão preservadas.',
   'É opcional e não afeta o status geral da obra. O Deep Research o prepara quando necessário; você também pode iniciá-lo manualmente.',
+  'Seção {n}',
+  'Indexado sem síntese',
+  'Os campos e resumos de seção são citações literais do original: a auditoria semântica não aprovou nenhuma síntese, então esta ficha apenas orienta a recuperação.',
+  'Incidentes da auditoria',
+  'mínimo',
 ]);
 
 const it = table([
@@ -218,6 +248,11 @@ const it = table([
   'Verifica prove, copertura e fedeltà prima di pubblicare una nuova versione.', 'Con problemi', 'Analisi documentale in pausa', '{done} opere su {total}',
   'L’analisi documentale in sospeso verrà interrotta. Le schede pubblicate, le correzioni dell’utente e le opere completate saranno conservate.',
   'È facoltativo e non influisce sullo stato generale dell’opera. Deep Research lo prepara quando serve; puoi anche avviarlo manualmente.',
+  'Sezione {n}',
+  'Indicizzato senza sintesi',
+  'I campi e i riepiloghi di sezione sono citazioni letterali dell’originale: l’audit semantico non ha approvato alcuna sintesi, quindi questa scheda guida solo il recupero.',
+  'Problemi dell’audit',
+  'minimo',
 ]);
 
 const tr = table([
@@ -243,6 +278,11 @@ const tr = table([
   'Yeni bir sürüm yayımlamadan önce dayanak, kapsam ve sadakati denetler.', 'Sorunlu', 'Belge analizi duraklatıldı', '{total} eserden {done} tanesi',
   'Bekleyen belge analizi durdurulacak. Yayımlanmış profiller, kullanıcı düzeltmeleri ve tamamlanan eserler korunacaktır.',
   'İsteğe bağlıdır ve eserin genel durumunu etkilemez. Deep Research gerektiğinde hazırlar; siz de elle başlatabilirsiniz.',
+  'Bölüm {n}',
+  'Sentez olmadan dizinlendi',
+  'Alanlar ve bölüm özetleri özgün metinden birebir alıntılardır: anlamsal denetim hiçbir sentezi onaylamadı, bu nedenle bu künye yalnızca erişimi yönlendirir.',
+  'Denetim sorunları',
+  'asgari',
 ]);
 
 const zhCN = table([
@@ -268,6 +308,11 @@ const zhCN = table([
   '在发布新版本前检查依据、覆盖率和忠实度。', '有问题', '文档分析已暂停', '{total} 篇文献中已完成 {done} 篇',
   '待处理的文档分析将停止。已发布的档案、用户更正和已完成的文献都会保留。',
   '它是可选的，不影响文献的整体状态。Deep Research 会在需要时准备它；你也可以手动启动。',
+  '第 {n} 节',
+  '未综合作索引',
+  '字段与章节摘要均为原文的逐字引用：语义审核未通过任何综述，因此本档案仅用于引导检索。',
+  '审核问题',
+  '最低值',
 ]);
 
 export const DOCUMENT_UNDERSTANDING_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN } as const;

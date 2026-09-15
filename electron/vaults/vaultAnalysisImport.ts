@@ -499,8 +499,8 @@ function copyDocumentProfile(
   `).run({ versionId, targetId, sourceVersion });
   tableChange(db, tableRows, 'document_profile_versions');
   db.prepare(`
-    INSERT INTO document_profile_fields(field_id,version_id,nodus_id,kind,ordinal,text,confidence,centrality,created_at)
-    SELECT @targetId||':field:'||field_id,@versionId,@targetId,kind,ordinal,text,confidence,centrality,created_at
+    INSERT INTO document_profile_fields(field_id,version_id,nodus_id,kind,ordinal,text,confidence,centrality,confidence_source,created_at)
+    SELECT @targetId||':field:'||field_id,@versionId,@targetId,kind,ordinal,text,confidence,centrality,confidence_source,created_at
       FROM ${SOURCE_ALIAS}.document_profile_fields WHERE version_id=@sourceVersion
   `).run({ targetId, versionId, sourceVersion });
   tableChange(db, tableRows, 'document_profile_fields');
