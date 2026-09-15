@@ -427,6 +427,7 @@ test('the app page documents the current desktop builds and available vaults', (
     'Nodus-win-x64.exe',
     'Nodus-linux-x86_64.AppImage',
     'Nodus-linux-amd64.deb',
+    'Nodus-linux-x86_64.rpm',
   ]) {
     assert.match(app, new RegExp(`https://github\\.com/Drakonis96/nodus/releases/latest/download/${asset.replaceAll('.', '\\.')}`), `${asset} uses the stable release URL`);
   }
