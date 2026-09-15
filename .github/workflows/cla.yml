@@ -18,7 +18,7 @@ on:
 permissions:
   contents: write # Acceptance records on cla-signatures only.
   issues: write # Managed CLA reminder comments on pull requests.
-  pull-requests: read
+  pull-requests: write # Required to write comments on pull request conversations.
   statuses: write
 
 # Every run scans all open PRs, including their acceptance comments, so signatures
