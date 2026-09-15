@@ -394,3 +394,85 @@ html.theme-active.light .dictionary-workspace :is(.dictionary-sort-button, .dict
   border-color: var(--a-600);
   color: var(--a-700);
 }
+
+/* Library's help affordance carries a legacy inline vault colour. A selected
+ * app theme must win over that inline value, while the default palette keeps
+ * the vault-specific colour supplied by Library.tsx. */
+html.theme-active.dark .library-help-button,
+html.theme-active.light .library-help-button {
+  --library-help-accent: var(--a-500) !important;
+}
+
+/* Global search has two implementations: the academic hybrid search and the
+ * content search used by the other vaults. They share these semantic classes
+ * so neither one leaves a neutral/indigo island inside a custom theme. */
+html.theme-active.dark .global-search-workspace {
+  background-color: var(--n-950);
+  color: var(--theme-text-dark);
+  color-scheme: dark;
+}
+html.theme-active.light .global-search-workspace {
+  background-color: var(--n-50);
+  color: var(--theme-text-light);
+  color-scheme: light;
+}
+html.theme-active.dark .global-search-workspace .global-search-accent { color: var(--a-300); }
+html.theme-active.light .global-search-workspace .global-search-accent { color: var(--a-700); }
+html.theme-active.dark .global-search-workspace .input {
+  background-color: var(--n-900);
+  border-color: var(--theme-border-dark-strong);
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .global-search-workspace .input {
+  background-color: var(--n-50);
+  border-color: var(--theme-border-light-strong);
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .search-kind-filter,
+html.theme-active.light .search-kind-filter {
+  border-color: var(--theme-border-dark);
+  color: var(--theme-text-dark-muted);
+}
+html.theme-active.light .search-kind-filter { border-color: var(--theme-border-light); color: var(--theme-text-light-muted); }
+html.theme-active.dark .search-kind-filter:hover:not(:disabled) { background-color: var(--n-800); color: var(--theme-text-dark); }
+html.theme-active.light .search-kind-filter:hover:not(:disabled) { background-color: var(--n-100); color: var(--theme-text-light); }
+html.theme-active.dark .search-kind-filter.is-selected {
+  border-color: var(--a-500);
+  background-color: color-mix(in srgb, var(--a-500) 18%, var(--n-900));
+  color: var(--a-300);
+}
+html.theme-active.light .search-kind-filter.is-selected {
+  border-color: var(--a-600);
+  background-color: color-mix(in srgb, var(--a-500) 12%, var(--n-50));
+  color: var(--a-700);
+}
+html.theme-active.dark .global-search-similar,
+html.theme-active.dark .global-search-saved,
+html.theme-active.dark .global-search-result {
+  border: 1px solid var(--theme-border-dark);
+  background-color: color-mix(in srgb, var(--n-900) 72%, transparent);
+}
+html.theme-active.light .global-search-similar,
+html.theme-active.light .global-search-saved,
+html.theme-active.light .global-search-result {
+  border: 1px solid var(--theme-border-light);
+  background-color: var(--n-50);
+}
+html.theme-active.dark .global-search-similar { background-color: color-mix(in srgb, var(--a-500) 12%, var(--n-900)); border-color: color-mix(in srgb, var(--a-500) 42%, var(--theme-border-dark)); }
+html.theme-active.light .global-search-similar { background-color: color-mix(in srgb, var(--a-500) 9%, var(--n-50)); border-color: color-mix(in srgb, var(--a-600) 38%, var(--theme-border-light)); }
+html.theme-active.dark .global-search-result:hover { background-color: var(--n-900); border-color: var(--theme-border-dark-strong); }
+html.theme-active.light .global-search-result:hover { background-color: var(--n-100); border-color: var(--theme-border-light-strong); }
+html.theme-active.dark .global-search-relevance { background-color: color-mix(in srgb, var(--a-500) 20%, var(--n-900)); color: var(--a-300); }
+html.theme-active.light .global-search-relevance { background-color: color-mix(in srgb, var(--a-500) 13%, var(--n-50)); color: var(--a-700); }
+html.theme-active.dark .global-search-save,
+html.theme-active.dark .global-search-similar-action { color: var(--a-300); }
+html.theme-active.light .global-search-save,
+html.theme-active.light .global-search-similar-action { color: var(--a-700); }
+html.theme-active.dark .global-search-save:hover,
+html.theme-active.dark .global-search-similar-action:hover { background-color: color-mix(in srgb, var(--a-500) 14%, var(--n-900)); color: var(--a-200); }
+html.theme-active.light .global-search-save:hover,
+html.theme-active.light .global-search-similar-action:hover { background-color: color-mix(in srgb, var(--a-500) 12%, var(--n-50)); color: var(--a-800); }
+html.theme-active.dark .global-search-delete { color: var(--theme-text-dark-subtle); }
+html.theme-active.light .global-search-delete { color: var(--theme-text-light-subtle); }
+html.theme-active.dark .global-search-delete:hover { color: #fca5a5; }
+html.theme-active.light .global-search-delete:hover { color: #b91c1c; }
