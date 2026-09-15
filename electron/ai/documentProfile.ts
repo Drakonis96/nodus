@@ -31,6 +31,7 @@ import { mapOrderedPool } from './orderedPool';
 import { modelRefSupportsCapability } from '@shared/localAiModels';
 import type { PerfContext } from '../perf';
 import { documentProfilePromptPack } from '@shared/academicPromptPacks';
+import { logPipelineSuccess } from '../logging/pipelineLogCore';
 
 export const DOCUMENT_PROFILE_PIPELINE_VERSION = 'document-profile/5';
 export const DOCUMENT_PROFILE_SCHEMA_VERSION = 2;
@@ -877,6 +878,7 @@ function emit(
 
 /** Full-text, hierarchical, audited document scan. */
 export async function runDocumentProfileScan(work: Work, options: RunDocumentProfileOptions): Promise<string> {
+  const scanStartedAt = Date.now();
   options = { ...options, perf: options.perf ?? { nodusId: work.nodus_id, title: work.title } };
   options.signal?.throwIfAborted();
   if (!modelRefSupportsCapability(options.generatorModel, 'documentProfile')
@@ -906,8 +908,8 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
   setResolvedTextState(work.nodus_id, resolvedTextStateFromDoc(document));
   options.signal?.throwIfAborted();
   if (!document.text.trim() || document.sourceType === 'none' || document.sourceType === 'abstract_only') {
-    setDocumentProfileState(work.nodus_id, 'unavailable', { error: document.notes ?? 'No hay texto completo legible.' });
-    throw new Error(document.notes ?? 'No hay texto completo legible.');
+    setDocumentProfileState(work.nodus_id, 'unavailable', { error: document.notes ?? 'No hay texto completo legible' });
+    throw new Error(document.notes ?? 'No hay texto completo legible');
   }
   const sourceFingerprint = sha256(document.text);
   const sourceContentHash = sha1(document.text);
@@ -1150,6 +1152,17 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
       resolvedTextHash: sourceContentHash,
     },
     passages: preparedPassages,
+  });
+  // The one green line per indexed document. It carries the numbers a reader cannot get
+  // back afterwards — how many sections were extracted and how many vectors were published
+  // — and inherits vault/document/job from the queue's log scope.
+  logPipelineSuccess({
+    subject: 'subjectIndexing',
+    message: {
+      id: 'documentIndexed',
+      params: { title: work.title, sections: sections.length, vectors: vectors.length },
+    },
+    durationMs: Date.now() - scanStartedAt,
   });
   upsertLibraryAnalysisProvenance({
     workId: work.nodus_id,

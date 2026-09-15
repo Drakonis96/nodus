@@ -21,6 +21,7 @@ import type { TestimoniesApi } from './api/testimonies';
 import type { LibraryApi } from './api/library';
 import type { RadarApi } from './api/radar';
 import type { CompassApi } from './api/compass';
+import type { LogsApi } from './api/logs';
 import type { LibraryAttachmentRecord } from './libraryTypes';
 import type { ToolkitToolPage } from './toolkitNavigation';
 
@@ -1967,6 +1968,15 @@ export interface AppSettings {
   browserHistoryRetention: import('./browserHistory').BrowserHistoryRetention;
   /** Remove the private visit file whenever the Browser subsystem is destroyed. */
   browserClearHistoryOnClose: boolean;
+  /**
+   * Processing log: extraction, OCR, indexing, embeddings and the provider/JSON/connection
+   * failures around them. App-wide because one corpus run crosses vaults and the Library,
+   * and because the file is local diagnostics — it is neither backed up nor synced.
+   */
+  pipelineLogRetention: import('./pipelineLogs').PipelineLogRetention;
+  pipelineLogMaxEntries: number;
+  /** The language the log LINES are rendered in, chosen independently of the interface. */
+  pipelineLogLanguage: AppLanguage;
   // Nodi mascot: show the floating companion (visual/animation only for now — no wired
   // behaviour yet). App-wide preference, on by default.
   mascotEnabled: boolean;
@@ -8853,7 +8863,7 @@ export interface BrowserApi {
   onBrowserFoundInPage(cb: (result: { requestId: number; activeMatchOrdinal: number; matches: number; selectionArea: unknown; finalUpdate: boolean }) => void): () => void;
 }
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, CompassApi, BrowserApi {
+export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, CompassApi, BrowserApi, LogsApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;

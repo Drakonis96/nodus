@@ -7,7 +7,7 @@ import { PT_BR } from './i18n.pt-BR';
 import { IT } from './i18n.it';
 import { TR } from './i18n.tr';
 import { ZH_CN } from './i18n.zh-CN';
-import { looksLikeSpanishUiText, normalizeUiLanguage } from '@shared/uiLanguage';
+import { looksLikeSpanishUiText, knownRuntimeErrorText, normalizeUiLanguage } from '@shared/uiLanguage';
 import { NODI_NOTIFICATION_TEXT, type NodiNotificationText } from '@shared/nodiNotifications';
 
 /**
@@ -81,6 +81,23 @@ export function tx(es: string, vars: Record<string, string | number>): string {
     out = out.split(`{${k}}`).join(String(v));
   }
   return out;
+}
+
+/**
+ * Translate in a language that is NOT the active interface language, for the processing
+ * log: its lines follow a language the reader chooses beside the filters (English by
+ * default, so a log can be pasted into a GitHub issue as it stands) while the interface
+ * around it stays in the language the app was switched to.
+ *
+ * Unresolved placeholders are dropped rather than left visible: a line whose value is
+ * missing must still read as a sentence, not as `{detail}`.
+ */
+export function txIn(lang: AppLanguage, es: string, vars: Record<string, string | number | boolean | null | undefined> = {}): string {
+  const template = resolveTranslation(lang, es);
+  return template.replace(/\{(\w+)\}/g, (match, name: string) => {
+    const value = vars[name];
+    return value == null ? '' : String(value);
+  }).replace(/\s+([,.;])/g, '$1').trim();
 }
 
 /**
@@ -238,6 +255,15 @@ export function tr(value: string): string {
   if (!value || activeLang === 'es') return value;
   const direct = TABLES[activeLang]?.[value] ?? EN[value];
   if (direct) return direct;
+  // Sentences the main process knows how to translate but that never travel in a field named
+  // `message`/`error` — `pausedReason`, `saveError`, `maintenanceError`, a job's own status
+  // text — reach the renderer as they are, and this is their only gate. Consulting the same
+  // catalogues the main process uses keeps the answer from existing in the wrong process, and
+  // it goes BEFORE the shape patterns below: an exact match beats a heuristic, and the
+  // catch-all `{name}: {warning}` would otherwise swallow a provider sentence whole and put it
+  // back together in the same words.
+  const known = knownRuntimeErrorText(value, activeLang);
+  if (known !== null) return known;
   for (const candidate of RUNTIME_PATTERNS) {
     const match = value.match(candidate.pattern);
     if (match) return candidate.render(match);

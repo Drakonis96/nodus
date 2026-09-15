@@ -51,8 +51,10 @@ import { registerLibraryIpc } from './ipc/library';
 import { registerBrowserIpc } from './ipc/browser';
 import { registerRadarIpc } from './ipc/radar';
 import { registerCompassIpc } from './ipc/compass';
+import { registerLogsIpc } from './ipc/logs';
 import { setBrowserTheme } from './browser/tabs';
 import { browserHistoryRepository } from './browser/history';
+import { applyPipelineLogLimits, initPipelineLogs } from './logging/pipelineLogHost';
 import {
   restartMcpServer,
   startMcpServer,
@@ -102,6 +104,8 @@ import {
   runBackupCleanupNow,
 } from './export/autoBackup';
 import { validateBackupPassword } from '@shared/backupPasswordPolicy';
+import { isPipelineLogMaxEntries, isPipelineLogRetention } from '@shared/pipelineLogs';
+import { normalizeUiLanguage } from '@shared/uiLanguage';
 import {
   onChatGptSubscriptionStatusChanged,
 } from './ai/codexSubscription';
@@ -251,6 +255,10 @@ export function registerIpc(
   registerToolkitIpc(context);
   registerCapabilitiesIpc(context);
   registerTestimoniesIpc(context);
+  registerLogsIpc(context);
+  // The processing log has to be listening before any pipeline can run: this wires the
+  // sink, prunes what the previous session left behind and arms the idle prune timer.
+  initPipelineLogs();
 
   const nodiChatAborters = new Map<string, AbortController>();
 
@@ -388,6 +396,18 @@ export function registerIpc(
     if (patch.browserClearHistoryOnClose !== undefined && typeof patch.browserClearHistoryOnClose !== 'boolean') {
       throw new Error('The Browser history close policy is not valid.');
     }
+    if (patch.pipelineLogRetention !== undefined && !isPipelineLogRetention(patch.pipelineLogRetention)) {
+      throw new Error('The processing log retention period is not valid.');
+    }
+    if (patch.pipelineLogMaxEntries !== undefined && !isPipelineLogMaxEntries(patch.pipelineLogMaxEntries)) {
+      throw new Error('The processing log entry limit is not valid.');
+    }
+    if (
+      patch.pipelineLogLanguage !== undefined
+      && normalizeUiLanguage(patch.pipelineLogLanguage) !== patch.pipelineLogLanguage
+    ) {
+      throw new Error('The processing log language is not valid.');
+    }
     if (patch.backupCleanupEnabled !== undefined && typeof patch.backupCleanupEnabled !== 'boolean') {
       throw new Error('El estado de la limpieza automática no es válido.');
     }
@@ -429,6 +449,11 @@ export function registerIpc(
     }
     if (patch.browserHistoryRetention !== undefined) {
       await browserHistoryRepository().list(next.browserHistoryRetention);
+    }
+    // The reader chooses these while looking at the log, so the new horizon has to apply on
+    // the spot instead of at the next scheduled prune.
+    if (patch.pipelineLogRetention !== undefined || patch.pipelineLogMaxEntries !== undefined) {
+      applyPipelineLogLimits();
     }
     if (patch.theme !== undefined && next.theme !== previous.theme) {
       setBrowserTheme(next.theme);

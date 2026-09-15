@@ -44,7 +44,7 @@ export function ZoteroImportProgressBar({ progress, onDismiss }: { progress: Zot
   return (
     <div className="border-t border-neutral-200 bg-neutral-100/80 px-4 py-2 text-sm backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/80" data-testid="zotero-progress-bar">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="mr-auto whitespace-nowrap text-xs font-medium text-amber-500">Zotero</span>
+        <span className="mr-auto whitespace-nowrap text-xs font-medium text-amber-500">{t('Zotero')}</span>
         <div className="order-last min-w-0 basis-full">
           <div className="mb-1 flex flex-col gap-2 text-xs text-neutral-400">
             <span className="min-w-0 break-words [overflow-wrap:anywhere]">

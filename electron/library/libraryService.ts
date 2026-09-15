@@ -85,6 +85,7 @@ import { getSettings } from '../db/settingsRepo';
 import { localizeIpcPayload } from '@shared/uiLanguage';
 import { buildLocalizedOcrTextPrompt, ocrUserPrompt } from '@shared/aiOcrPrompt';
 import { DEFAULT_OCR_OPTIONS } from '@shared/aiOcrTypes';
+import { withPipelineLogScope } from '../logging/pipelineLogCore';
 import { LibraryOperations } from './libraryOperations';
 import { normalizeLibraryCollectionRecord, normalizeLibraryItemRecord } from './libraryRecord';
 import { resolveLibraryMetadata } from './libraryMetadataResolver';
@@ -173,12 +174,18 @@ async function libraryRemoteOcr(input: { image: Buffer; mimeType: 'image/png' })
   const model = settings.visionModel ?? settings.extractionModel ?? null;
   if (!model) throw new Error('No hay un modelo de visión configurado para el OCR remoto explícito.');
   const promptLanguage = settings.promptLanguage ?? 'es';
-  return completeTextNeutral({
+  // The vision call is the one AI step the extraction engine makes per page: without a scope
+  // its failures would arrive in the log with no document behind them.
+  return withPipelineLogScope({
+    scope: 'ocr',
+    provider: model.provider,
+    model: model.model,
+  }, () => completeTextNeutral({
     system: buildLocalizedOcrTextPrompt({ ...DEFAULT_OCR_OPTIONS, outputMode: 'text', promptLanguage }),
     user: ocrUserPrompt(promptLanguage),
     images: [{ base64: input.image.toString('base64'), mediaType: input.mimeType }],
     temperature: 0.1, maxTokens: 8000, plainContext: true,
-  }, model);
+  }, model));
 }
 
 function unavailableStatus(): LibraryStatus {

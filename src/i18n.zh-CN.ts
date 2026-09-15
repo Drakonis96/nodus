@@ -34,6 +34,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { PIPELINE_LOG_TRANSLATIONS } from './i18n.pipelineLogs';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
@@ -112,6 +113,7 @@ export const ZH_CN: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS['zh-CN'],
   ...NEW_VAULT_COMPLETION_TRANSLATIONS['zh-CN'],
   ...NODI_NOTIFICATION_TRANSLATIONS['zh-CN'],
+  ...PIPELINE_LOG_TRANSLATIONS['zh-CN'],
   ...ANNOUNCEMENT_TRANSLATIONS['zh-CN'],
   ...WORLD_CHAT_TRANSLATIONS['zh-CN'],
   ...STUDY_SYNONYM_TRANSLATIONS['zh-CN'],
@@ -1161,6 +1163,9 @@ export const ZH_CN: Record<string, string> = {
   "Pulido y estabilidad": "打磨与稳定性",
   "Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.": "修复错误、提升性能，并根据用户反馈打磨整体体验。",
   "Nodus Toolkit": "Nodus Toolkit",
+  "Nodus Convert": "Nodus Convert",
+  "Nodus Translate": "Nodus Translate",
+  "MCP": "MCP",
   "Nodus Radar": "Nodus Radar",
   "Nodus Compass": "Nodus Compass",
   "Nodus Tools": "Nodus Tools",

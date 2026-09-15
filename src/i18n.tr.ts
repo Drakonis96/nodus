@@ -34,6 +34,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { PIPELINE_LOG_TRANSLATIONS } from './i18n.pipelineLogs';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
@@ -114,6 +115,7 @@ export const TR: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.tr,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.tr,
   ...NODI_NOTIFICATION_TRANSLATIONS['tr'],
+  ...PIPELINE_LOG_TRANSLATIONS['tr'],
   ...ANNOUNCEMENT_TRANSLATIONS['tr'],
   ...WORLD_CHAT_TRANSLATIONS.tr,
   ...STUDY_SYNONYM_TRANSLATIONS.tr,
@@ -1593,6 +1595,9 @@ export const TR: Record<string, string> = {
   "Pulido y estabilidad": "Parlatma ve stabilite",
   "Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.": "Kullanıcı geri bildirimleriyle hataları düzeltin, performansı artırın ve genel deneyimi iyileştirin.",
   "Nodus Toolkit": "Nodus Araç Seti",
+  "Nodus Convert": "Nodus Convert",
+  "Nodus Translate": "Nodus Translate",
+  "MCP": "MCP",
   "Nodus Radar": "Nodus Radar",
   "Nodus Compass": "Nodus Compass",
   "Nodus Tools": "Nodus Tools",
