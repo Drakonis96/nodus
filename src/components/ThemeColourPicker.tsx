@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent } from 'react';
 
 const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
 
@@ -74,7 +74,7 @@ export function ThemeColourPicker({ labelText, hexLabel, value, onChange }: Them
     const closeOnOutsidePointer = (event: globalThis.PointerEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
-    const closeOnEscape = (event: KeyboardEvent) => {
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(false);
     };
     document.addEventListener('pointerdown', closeOnOutsidePointer);
@@ -92,7 +92,7 @@ export function ThemeColourPicker({ labelText, hexLabel, value, onChange }: Them
     onChange(hslToHex({ h: hsl.h, s: saturation, l: lightness }));
   };
 
-  const adjustPalette = (event: KeyboardEvent<HTMLDivElement>) => {
+  const adjustPalette = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const step = event.shiftKey ? 10 : 2;
     let saturation = hsl.s;
     let lightness = hsl.l;
