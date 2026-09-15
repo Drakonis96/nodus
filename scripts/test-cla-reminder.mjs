@@ -83,8 +83,9 @@ test('a resolved reminder is updated to a short acceptance confirmation', async 
   assert.equal(clean.actions.length, 0, 'do not create success-only comments on already compliant PRs');
 });
 
-test('CLA workflow grants only the extra issue permission needed for managed comments', async () => {
+test('CLA workflow grants the permissions required for managed PR comments', async () => {
   const workflow = await readFile(new URL('../.github/workflows/cla.yml', import.meta.url), 'utf8');
   assert.match(workflow, /issues: write/);
+  assert.match(workflow, /pull-requests: write/);
   assert.match(workflow, /scripts\/cla-reminder\.mjs/);
 });
