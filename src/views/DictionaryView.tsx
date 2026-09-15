@@ -1516,7 +1516,10 @@ export function DictionaryView({
                 <option value="evidence">{t("Evidencia")}</option>
               </select>
               <button
-                className="btn btn-ghost h-8 px-2"
+                className="dictionary-sort-button btn btn-ghost h-8 w-8 p-0"
+                type="button"
+                aria-label={t("Cambiar dirección de orden")}
+                title={t("Cambiar dirección de orden")}
                 onClick={() =>
                   setSortDir((current) => (current === "asc" ? "desc" : "asc"))
                 }

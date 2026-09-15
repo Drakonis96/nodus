@@ -424,7 +424,7 @@ export function ImmersionView({
   };
 
   return (
-    <div className="h-full flex flex-col min-h-0">
+    <div className="theme-workspace-surface h-full flex flex-col min-h-0">
       {mode !== 'scope' && <WorkspaceTabStrip
         homeLabel={t('Inmersión')}
         homeIcon="target"
@@ -658,7 +658,7 @@ function ImmersionHome({
   };
 
   return (
-    <div className="h-full flex flex-col min-h-0">
+    <div className="theme-workspace-surface h-full flex flex-col min-h-0">
       <SectionHeader
         icon="target"
         title={t('Inmersión')}
@@ -1047,7 +1047,8 @@ export function ImmersionComposerModal({
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => onIncludeQuiz(!includeQuiz)}
-              className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+              aria-pressed={includeQuiz}
+              className={`theme-toggle-button rounded-lg border px-3 py-1.5 text-xs transition-colors ${
                 includeQuiz
                   ? 'border-emerald-700/60 bg-emerald-900/20 text-emerald-300'
                   : 'border-neutral-700 text-neutral-500 hover:border-neutral-500'
@@ -1059,7 +1060,8 @@ export function ImmersionComposerModal({
             </button>
             <button
               onClick={() => onIncludeImage(!includeImage)}
-              className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+              aria-pressed={includeImage}
+              className={`theme-toggle-button rounded-lg border px-3 py-1.5 text-xs transition-colors ${
                 includeImage
                   ? 'border-indigo-700/60 bg-indigo-900/30 text-indigo-200'
                   : 'border-neutral-700 text-neutral-500 hover:border-neutral-500'

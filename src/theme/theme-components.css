@@ -12,3 +12,92 @@ html.theme-active.light :is(select.input option, select.input optgroup) {
   background-color: var(--n-50);
   color: var(--n-900);
 }
+
+/* Shared semantic primitives for screens that predate the runtime theme layer.
+ * These selectors are intentionally scoped to non-default themes: the default
+ * palette keeps its existing product-specific colours. */
+html.theme-active.dark .btn-primary,
+html.theme-active.light .btn-primary {
+  border-color: var(--a-600);
+  background-color: var(--a-600);
+  color: #fff;
+}
+html.theme-active.dark .btn-primary:hover:not(:disabled),
+html.theme-active.light .btn-primary:hover:not(:disabled) {
+  background-color: var(--a-500);
+  border-color: var(--a-500);
+}
+
+html.theme-active.dark input[type='checkbox'],
+html.theme-active.dark input[type='radio'],
+html.theme-active.dark input[type='range'],
+html.theme-active.light input[type='checkbox'],
+html.theme-active.light input[type='radio'],
+html.theme-active.light input[type='range'] {
+  accent-color: var(--a-500);
+}
+
+html.theme-active.dark .theme-workspace-surface {
+  background-color: var(--n-950);
+  color: var(--theme-text-dark);
+  color-scheme: dark;
+}
+html.theme-active.light .theme-workspace-surface {
+  background-color: var(--n-50);
+  color: var(--theme-text-light);
+  color-scheme: light;
+}
+html.theme-active.dark .theme-workspace-surface :is(.section-header, .section-toolbar),
+html.theme-active.dark .theme-workspace-surface > :is(header, footer) {
+  border-color: var(--theme-border-dark);
+}
+html.theme-active.light .theme-workspace-surface :is(.section-header, .section-toolbar),
+html.theme-active.light .theme-workspace-surface > :is(header, footer) {
+  border-color: var(--theme-border-light);
+}
+
+/* Compact on/off controls in modal composers. Text remains foreground-derived;
+ * only the selected state uses the mode-specific accent ramp. */
+html.theme-active.dark .theme-toggle-button,
+html.theme-active.light .theme-toggle-button {
+  border: 1px solid;
+  border-color: var(--theme-border-dark-strong);
+  background-color: color-mix(in srgb, var(--n-800) 76%, transparent);
+  color: var(--theme-text-dark-muted);
+}
+html.theme-active.light .theme-toggle-button {
+  border-color: var(--theme-border-light-strong);
+  background-color: color-mix(in srgb, var(--n-100) 82%, transparent);
+  color: var(--theme-text-light-muted);
+}
+html.theme-active.dark .theme-toggle-button:hover:not(:disabled) { background-color: var(--n-700); }
+html.theme-active.light .theme-toggle-button:hover:not(:disabled) { background-color: var(--n-200); }
+html.theme-active.dark .theme-toggle-button[aria-pressed='true'],
+html.theme-active.dark .theme-toggle-button[aria-checked='true'] {
+  border-color: var(--a-500);
+  background-color: color-mix(in srgb, var(--a-500) 18%, var(--n-900));
+  color: var(--a-300);
+}
+html.theme-active.light .theme-toggle-button[aria-pressed='true'],
+html.theme-active.light .theme-toggle-button[aria-checked='true'] {
+  border-color: var(--a-600);
+  background-color: color-mix(in srgb, var(--a-500) 13%, var(--n-50));
+  color: var(--a-700);
+}
+
+/* Radar's explanatory source note uses a pale indigo box in the legacy palette.
+ * Keep the note quiet and readable for custom accents, including yellow and pink. */
+html.theme-active.dark .radar-source-note {
+  border-color: color-mix(in srgb, var(--a-500) 45%, var(--theme-border-dark));
+  background-color: color-mix(in srgb, var(--a-500) 10%, var(--n-900));
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .radar-source-note {
+  border-color: color-mix(in srgb, var(--a-600) 36%, var(--theme-border-light));
+  background-color: color-mix(in srgb, var(--a-500) 8%, var(--n-50));
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .radar-source-note strong,
+html.theme-active.dark .radar-source-note p:first-child { color: var(--a-300); }
+html.theme-active.light .radar-source-note strong,
+html.theme-active.light .radar-source-note p:first-child { color: var(--a-700); }
