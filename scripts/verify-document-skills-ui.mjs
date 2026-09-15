@@ -32,6 +32,24 @@ try {
   await page.waitForFunction(()=>window.testAnnotations.length>0);
   const annotation=await page.evaluate(()=>window.testAnnotations[0]);
   assert.equal(annotation.selectedText,selection.text);assert.equal(annotation.startOffset,selection.expected);
+  // The engine that writes the resources is the reader's to choose, and the dialog opens
+  // on the task's current model — not on the one the report was written with.
+  const actions=page.locator('.document-visual-actions');
+  await actions.getByRole('button',{name:'Añadir recursos visuales'}).click();
+  let dialog=page.getByRole('dialog');
+  await dialog.getByTestId('document-visual-model').waitFor();
+  const engineTrigger=dialog.getByRole('button',{name:/^Modelo:/});
+  assert.match(await engineTrigger.getAttribute('aria-label'),/gemini/i,'the reader enriches with the Deep Research model, not the report’s');
+  assert.equal(await dialog.getByText('Los recursos se generan con el modelo elegido aquí, no con el del informe.').count(),1);
+  await shot('deep-enrich-model.png');
+  await engineTrigger.click();
+  await page.getByRole('option',{name:/gpt-5/i}).click();
+  await dialog.locator('footer button').last().click();
+  await page.waitForFunction(()=>window.testEnrichRequest);
+  const enrichRequest=await page.evaluate(()=>window.testEnrichRequest);
+  assert.equal(enrichRequest.target.kind,'deep-research');
+  assert.equal(enrichRequest.options.retry,false);
+  assert.deepEqual(enrichRequest.options.model,{provider:'openai',model:'gpt-5'},'the chosen engine must travel with the request');
   await page.getByTestId('deep-research-tab-home').click();
   await page.getByRole('button',{name:'Nuevo informe',exact:true}).click();
   await page.setViewportSize({width:1440,height:1500});

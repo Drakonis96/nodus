@@ -67,7 +67,11 @@ try {
   const options = load('electron/capabilities/documentCatalog.ts').listDocumentSkills();
   const policy = { enabled: true, skills: options.map(option => ({ skillId: option.skill.id, enabled: [svg.id, demo.id].includes(option.skill.id), maxCalls: option.skill.id === svg.id ? 4 : option.billing === 'none' ? 'auto' : null })) };
   const ai = load('electron/ai/aiClient.ts');
-  ai.completeJson = async args => {
+  // Every completion records the engine it was handed: which model writes a document's
+  // resources is the thing this verification has to pin down, not an implementation detail.
+  const engines = [];
+  ai.completeJson = async (args, _validate, model) => {
+    engines.push(model);
     if (zero) return [];
     const { blocks } = JSON.parse(args.user);
     assert.ok(blocks, 'final editorial sees stable blocks');
@@ -75,7 +79,8 @@ try {
     const second = mode === 'deep' ? blocks.find(block => block.markdown.startsWith('Para ilustrar')) : blocks.find(block => block.field.endsWith('-synthesis'));
     return [{ blockId: first.id, skillId: svg.id, brief: 'diagram', caption: mode === 'deep' ? 'Del ingreso a la consulta: tres etapas de un flujo documental ilustrativo.' : 'Observar, girar y explicar: una secuencia para explorar la forma.', sources: [], layout: 'wide' }, { blockId: second.id, skillId: demo.id, brief: mode === 'deep' ? 'chart' : 'model', caption: mode === 'deep' ? 'Cantidades sintéticas para comparar etapas: 12, 8 y 5 documentos.' : 'El mismo cubo puede observarse desde distintas perspectivas. Modelo interactivo disponible en la aplicación.', sources: [], layout: 'wide' }];
   };
-  ai.completeText = async args => {
+  ai.completeText = async (args, model) => {
+    engines.push(model);
     if(args.user==='budget-probe'){nestedCalls++;return 'ok';}
     textCalls++;
     const { figure } = JSON.parse(args.user);
@@ -146,8 +151,58 @@ try {
   const callsBeforeCaptureRetry = textCalls; snapshots.snapshotDocumentFigure = snapshot;
   const recovered = await service.enrichDocumentVisuals(interruptedTarget,interruptedPolicy,{retry:true});
   assert.equal(recovered.state,'ready'); assert.equal(textCalls,callsBeforeCaptureRetry);
+  // ── Which engine writes the resources of a report somebody else wrote ──────────
+  // A report records who wrote its prose. That must not decide who writes its figures:
+  // a report written with a subscription provider that has since run out of quota kept
+  // asking that provider, and nothing in the app could say otherwise.
+  const settings = load('electron/db/settingsRepo.ts');
+  const logging = load('electron/logging/pipelineLogCore.ts');
+  const lines = []; logging.setPipelineLogSink({ record: entry => lines.push(entry) });
+  const configured = { provider: 'gemini', model: 'gemini-3.1-flash-lite' };
+  const general = { provider: 'deepseek', model: 'deepseek-flash' };
+  const stored = { provider: 'codex', model: 'gpt-5.6-sol' };
+  const requested = { provider: 'openrouter', model: 'xiaomi/mimo-v2.5' };
+  const enginesUsed = () => [...new Set(engines.map(engine => engine ? `${engine.provider}/${engine.model}` : 'unresolved'))];
+  const oneFigurePolicy = { enabled: true, skills: [{ skillId: svg.id, enabled: true, maxCalls: 1 }] };
+  mode = 'deep';
+  settings.updateSettings({ deepResearchModel: configured, immersionModel: general, synthesisModel: general });
+  const legacyReport = drafts.saveWritingWorkshopDraft({ draft: draftFixture(), model: stored });
+  engines.length = 0;
+  const legacyTarget = { kind: 'deep-research', id: legacyReport.id };
+  const legacyRun = await service.enrichDocumentVisuals(legacyTarget, oneFigurePolicy);
+  assert.equal(legacyRun.state, 'ready');
+  assert.deepEqual(enginesUsed(), ['gemini/gemini-3.1-flash-lite'], 'resources follow the task’s current model, not the one the report remembers');
+  settings.updateSettings({ deepResearchModel: null, immersionModel: null, synthesisModel: null });
+  const orphanReport = drafts.saveWritingWorkshopDraft({ draft: draftFixture(), model: stored });
+  engines.length = 0;
+  await service.enrichDocumentVisuals({ kind: 'deep-research', id: orphanReport.id }, oneFigurePolicy);
+  assert.deepEqual(enginesUsed(), ['codex/gpt-5.6-sol'], 'with nothing configured the report’s own engine still runs');
+  settings.updateSettings({ deepResearchModel: configured, immersionModel: general, synthesisModel: configured });
+  const chosenReport = drafts.saveWritingWorkshopDraft({ draft: draftFixture(), model: stored });
+  engines.length = 0;
+  await service.enrichDocumentVisuals({ kind: 'deep-research', id: chosenReport.id }, oneFigurePolicy, { model: requested });
+  assert.deepEqual(enginesUsed(), ['openrouter/xiaomi/mimo-v2.5'], 'a model chosen for this run overrides the settings');
+  mode = 'immersion';
+  const ownTask = immersions.saveImmersionSession(immersionFixture(), stored);
+  engines.length = 0;
+  await service.enrichDocumentVisuals({ kind: 'immersion', id: ownTask.id }, oneFigurePolicy);
+  assert.deepEqual(enginesUsed(), ['deepseek/deepseek-flash'], 'an immersion follows its own task, not Deep Research’s');
+  // The line a failure leaves must name that engine: it is the only place a reader can
+  // see that the quota being reported belongs to a model they are not using any more.
+  mode = 'deep';
+  const failingReport = drafts.saveWritingWorkshopDraft({ draft: draftFixture(), model: stored });
+  const answerFor = ai.completeText;
+  ai.completeText = async () => { throw new Error('You’ve hit your usage limit.'); };
+  lines.length = 0;
+  const failedRun = await service.enrichDocumentVisuals({ kind: 'deep-research', id: failingReport.id }, oneFigurePolicy);
+  ai.completeText = answerFor;
+  assert.equal(failedRun.state, 'partial');
+  const recorded = lines.find(entry => entry.code === 'extract_failed');
+  assert.ok(recorded, 'a failed figure is recorded');
+  assert.equal(recorded.provider, 'gemini');
+  assert.equal(recorded.model, 'gemini-3.1-flash-lite');
   await workers.stopCapabilityWorkers();
-  fs.writeFileSync(path.join(out, 'verification.json'), JSON.stringify({ passed: true, textCalls, isolatedProfile: true, zeroFigures: true, usageCeiling: true, reopensWithoutCalls: true, originalsUnchanged: true, undo: true, paidOverflowBlocked: true, captureRetryWithoutCalls: true }, null, 2));
+  fs.writeFileSync(path.join(out, 'verification.json'), JSON.stringify({ passed: true, textCalls, isolatedProfile: true, zeroFigures: true, usageCeiling: true, reopensWithoutCalls: true, originalsUnchanged: true, undo: true, paidOverflowBlocked: true, captureRetryWithoutCalls: true, resourcesFollowTheConfiguredModel: true, explicitModelWins: true, storedModelOnlyAsFallback: true, perTaskEngines: true, failuresNameTheirEngine: true }, null, 2));
   console.log('Document skills verification passed.');
   for (const win of BrowserWindow.getAllWindows()) win.destroy();
   load('electron/db/database.ts').closeDb(); fs.rmSync(profile,{recursive:true,force:true});

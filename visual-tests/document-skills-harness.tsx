@@ -11,7 +11,7 @@ import '../src/index.css';
 const samples = await fetch('/artifacts/document-skills/samples.json').then(r => r.json());
 const query = new URLSearchParams(location.search);
 const lang = query.get('lang') || 'es';
-const settings = { uiLanguage: lang, imageStyle: 'antique_book', synthesisModel: {provider:'openai',model:'gpt-5'}, openaiKeySet:true } as any;
+const settings = { uiLanguage: lang, imageStyle: 'antique_book', synthesisModel: {provider:'openai',model:'gpt-5'}, deepResearchModel: {provider:'gemini',model:'gemini-3.1-flash-lite'}, favorites: [{provider:'openai',model:'gpt-5'}], openaiKeySet:true } as any;
 let drafts = [samples.deep];
 let sessions = [samples.immersion];
 const annotations: any[] = [];
@@ -23,6 +23,9 @@ const api = {
   getSettings: async () => settings,
   listDocumentSkills: async () => samples.options,
   getDocumentVisuals: async (target: any) => target.kind === 'deep-research' ? samples.deepManifest : samples.immersionManifest,
+  // The enrichment request is recorded rather than executed: which engine the dialog
+  // sends is the subject, not what the figures look like.
+  enrichDocumentVisuals: async (target: any, policy: any, options: any) => { (window as any).testEnrichRequest = { target, policy, options }; return target.kind === 'deep-research' ? samples.deepManifest : samples.immersionManifest; },
   listModels: async () => [{provider:'openai',id:'gpt-5',name:'GPT-5'}],
   readCapabilityModel: async () => ({bytes:Uint8Array.from(atob(samples.modelBase64), c=>c.charCodeAt(0)),mimeType:'model/gltf+json'}),
   getAudioSegments: async () => [],

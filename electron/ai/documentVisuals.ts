@@ -13,6 +13,8 @@ import { executeSkillResources } from '../capabilities/resourceExecution';
 import { readDocumentVisuals, readDocumentVisualUsage, retainPreviousVisuals, visualContentHash, writeDocumentVisuals, undoDocumentVisuals } from '../capabilities/documentStore';
 import { snapshotDocumentFigure } from '../capabilities/documentSnapshot';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
+import { documentVisualModelKey, resolveDocumentVisualModel, type DocumentVisualEnrichOptions } from '../../shared/documentVisualEnrich';
+import { getSettings } from '../db/settingsRepo';
 import { completeJson, completeText } from './aiClient';
 import { normalizeCapabilityId } from '../../skill-capabilities/contracts';
 import { logPipelineFailure } from '../logging/pipelineLogCore';
@@ -65,10 +67,19 @@ export async function prepareDocumentVisualHints(policy: DocumentSkillPolicy | u
   } catch { signal?.throwIfAborted(); return []; }
 }
 
-export async function enrichDocumentVisuals(target: DocumentVisualTarget, policy: DocumentSkillPolicy, request: { retry?: boolean; hints?: string[]; signal?: AbortSignal; model?: ModelRef | null } = {}): Promise<DocumentVisualManifest> {
+export async function enrichDocumentVisuals(target: DocumentVisualTarget, policy: DocumentSkillPolicy, request: DocumentVisualEnrichOptions & { hints?: string[]; signal?: AbortSignal } = {}): Promise<DocumentVisualManifest> {
   const key = keyFor(target);
   if (running.has(key)) throw new Error('This document already has a visual task.');
   const input = visualDocumentInput(target), vaultId = getActiveVault().id;
+  // Resolved once, before any call: every planning and figure call in a run must run on
+  // the same engine, and the reader must be able to see which one from the log if it fails.
+  const settings = getSettings();
+  const model = resolveDocumentVisualModel({
+    requested: request.model,
+    configured: settings[documentVisualModelKey(target.kind)],
+    general: settings.synthesisModel,
+    stored: input.model,
+  });
   const options = listDocumentSkills(), validated = validateDocumentSkillPolicy(policy, options);
   const skills = options.filter(option => validated.enabled && validated.skills.some(item => item.enabled && item.skillId === option.skill.id)).map(option => option.skill);
   const previous = getDocumentVisuals(target);
@@ -105,7 +116,7 @@ export async function enrichDocumentVisuals(target: DocumentVisualTarget, policy
           system: `${DOCUMENT_VISUAL_RULES}\nReturn a JSON array. Each item: {blockId,skillId,brief,caption,sources:[],layout:"wide"|"compact"|"side"}. Choose exact supplied block and skill ids. Sources must be exact nodus:// links from those blocks, or [] for explicitly illustrative constructions. Caption and labels must use the document language. Do not duplicate existing figures. Return [] if nothing is useful.`,
           user: JSON.stringify({ title: input.title, language: input.language, skills: JSON.parse(documentSkillCatalog(options, validated)), opportunities: request.hints ?? [], existing: manifest.figures.map(({ blockId, caption }) => ({ blockId, caption })), blocks }),
           temperature: 0.2, maxTokens: 4000, noRetry: true, signal,
-        }, (value): value is DocumentVisualSuggestion[] => Array.isArray(value) && value.length <= blocks.length && value.every(item => item && typeof item.blockId === 'string' && typeof item.skillId === 'string' && typeof item.brief === 'string' && item.brief.length < 6000 && typeof item.caption === 'string' && item.caption.length < 1200 && Array.isArray(item.sources)), request.model ?? input.model);
+        }, (value): value is DocumentVisualSuggestion[] => Array.isArray(value) && value.length <= blocks.length && value.every(item => item && typeof item.blockId === 'string' && typeof item.skillId === 'string' && typeof item.brief === 'string' && item.brief.length < 6000 && typeof item.caption === 'string' && item.caption.length < 1200 && Array.isArray(item.sources)), model);
         for (const item of suggested) {
           const block = blocks.find(candidate => candidate.id === item.blockId);
           if (!block || /^\s*#{1,6}\s+[^\n]+$/.test(block.markdown) || !skills.some(skill => skill.id === item.skillId) || budget.remaining(item.skillId) <= proposals.filter(proposal => proposal.skillId === item.skillId).length) continue;
@@ -118,7 +129,7 @@ export async function enrichDocumentVisuals(target: DocumentVisualTarget, policy
       // A global selection sees all proposals for long documents without repeating prose.
       let selected = proposals;
       if (batches.length > 1 && proposals.length) {
-        const ids = await completeJson<string[]>({ system: `${DOCUMENT_VISUAL_RULES}\nSelect only non-redundant, worthwhile figures across the whole document. Return a JSON array of supplied proposal ids, including [] when appropriate.`, user: JSON.stringify({ title: input.title, proposals }), maxTokens: 2000, noRetry: true, signal }, (value): value is string[] => Array.isArray(value) && value.every(id => typeof id === 'string'), request.model ?? input.model);
+        const ids = await completeJson<string[]>({ system: `${DOCUMENT_VISUAL_RULES}\nSelect only non-redundant, worthwhile figures across the whole document. Return a JSON array of supplied proposal ids, including [] when appropriate.`, user: JSON.stringify({ title: input.title, proposals }), maxTokens: 2000, noRetry: true, signal }, (value): value is string[] => Array.isArray(value) && value.every(id => typeof id === 'string'), model);
         selected = proposals.filter(proposal => ids.includes(proposal.id));
       }
       manifest.figures.push(...selected.map(item => ({ ...item, state: 'pending' as const })));
@@ -144,12 +155,12 @@ export async function enrichDocumentVisuals(target: DocumentVisualTarget, policy
         const block = manifest.blocks.find(item => item.id === figure.blockId)!;
         const answer = await completeText({ system: `${buildChatSkillsPrompt([skill])}\n${DOCUMENT_VISUAL_RULES}\nProduce exactly ONE insertable resource for the requested figure. Only this skill is enabled. Return its complete output protocol; no additional figures or commentary. Use the supplied evidence only.`,
           user: JSON.stringify({ figure: figure.brief, caption: figure.caption, language: input.language, evidence: block.markdown }), maxTokens: 10_000, temperature: 0.2, noRetry: true, signal,
-        }, request.model ?? input.model);
+        }, model);
         const ids = new Set((skill.capabilities ?? []).map(normalizeCapabilityId));
         const allowed: CapabilityRegistrySnapshot = { ...registry, providers: new Map([...registry.providers].filter(([id]) => ids.has(id))), fences: new Map([...registry.fences].filter(([, value]) => ids.has(value.provider.id))), chatOrder: registry.chatOrder.filter(provider => ids.has(provider.id)) };
         if (splitChatVisuals(answer).filter(part => part.kind === 'svg' || part.kind === 'image-request' || part.kind === 'capability-request').length > 1) throw new Error('One generation may only request one resource.');
         let invocations = 0;
-        const result = await executeSkillResources(answer, { skills: [skill], question: figure.brief, model: request.model ?? input.model, owner: figure.owner, version: chatAssetVersion(figure.owner), isCurrent: current, locale: input.language, pins, registry: allowed,
+        const result = await executeSkillResources(answer, { skills: [skill], question: figure.brief, model, owner: figure.owner, version: chatAssetVersion(figure.owner), isCurrent: current, locale: input.language, pins, registry: allowed,
           beforeInvoke: () => { if (invocations++ > 0) budget.reserve(skill.id); }, beforePaidCall: () => budget.reserve(skill.id, 'paidCalls'), beforeRepair: () => budget.reserve(skill.id), maxSvgRepairs: 1,
         }, signal);
         figure.view = result.view; figure.artifactSources = result.artifactSources;
@@ -165,7 +176,9 @@ export async function enrichDocumentVisuals(target: DocumentVisualTarget, policy
           error,
           code: 'extract_failed',
           subject: 'subjectFigureAnalysis',
-          context: { scope: 'extraction', nodusId: `${target.kind}:${target.id}`, documentTitle: figure.caption ?? null, jobId: figure.id },
+          // A figure that fails says which engine ran it: without this the line named a
+          // quota or a provider the reader had not chosen, with nothing to explain it.
+          context: { scope: 'extraction', nodusId: `${target.kind}:${target.id}`, documentTitle: figure.caption ?? null, jobId: figure.id, provider: model?.provider ?? null, model: model?.model ?? null },
           detail: figure.brief,
         });
       }
@@ -177,7 +190,7 @@ export async function enrichDocumentVisuals(target: DocumentVisualTarget, policy
       error,
       code: signal.aborted ? 'cancelled' : 'extract_failed',
       subject: 'subjectFigureAnalysis',
-      context: { scope: 'extraction', nodusId: `${target.kind}:${target.id}` },
+      context: { scope: 'extraction', nodusId: `${target.kind}:${target.id}`, provider: model?.provider ?? null, model: model?.model ?? null },
       detail: manifest.error,
     });
     if (current()) persist();

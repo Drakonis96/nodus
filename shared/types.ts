@@ -8926,7 +8926,7 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   listChatSkills(): Promise<ChatSkill[]>;
   listDocumentSkills(): Promise<import('./documentSkills').DocumentSkillOption[]>;
   getDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget): Promise<import('./documentSkills').DocumentVisualManifest | null>;
-  enrichDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget, policy: import('./documentSkills').DocumentSkillPolicy, retry?: boolean): Promise<import('./documentSkills').DocumentVisualManifest>;
+  enrichDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget, policy: import('./documentSkills').DocumentSkillPolicy, options?: import('./documentVisualEnrich').DocumentVisualEnrichOptions): Promise<import('./documentSkills').DocumentVisualManifest>;
   cancelDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget): Promise<void>;
   undoDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget): Promise<import('./documentSkills').DocumentVisualManifest | null>;
   removeDocumentFigure(target: import('./documentSkills').DocumentVisualTarget, figureId: string): Promise<import('./documentSkills').DocumentVisualManifest | null>;
