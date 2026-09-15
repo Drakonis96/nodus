@@ -436,7 +436,6 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
         </>}
         confirmLabel={importing ? t('Importando…') : t('Importar sin sobrescribir')}
         zIndex={160}
-        panelClassName="bookmark-import-panel"
         onCancel={() => { if (!importing) setImportPreview(null); }}
         onConfirm={() => void commitImport()}
       />}

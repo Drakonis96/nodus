@@ -106,17 +106,6 @@
 /* Export raises the native save dialog, which owns the window until it closes. */
 .nodus-start-page.bookmarks-main .atlas-facet-button:disabled { opacity:.6; cursor:default; }
 .nodus-start-page.bookmarks-main .atlas-facet-button:disabled:hover { color:var(--ink-2); border-color:var(--membrane); background:rgba(16,13,28,.62); }
-
-/* The shared confirmation panel is a translucent app card, which the live organism
-   behind this page shows straight through. The import preview therefore brings its
-   own surface, in the same dark palette as the page that raises it. */
-.card.bookmark-import-panel {
-  background:linear-gradient(180deg,rgba(20,16,35,.99),rgba(10,8,19,.99));
-  border:1px solid rgba(167,139,250,.28);
-  box-shadow:0 24px 70px -30px rgba(0,0,0,.85);
-}
-.card.bookmark-import-panel h2 { font-family:'Atlas Fraunces',Georgia,serif; letter-spacing:-.01em; color:#f6f4fd; }
-.card.bookmark-import-panel .text-neutral-400 { color:#a9a3c2; }
 .nodus-start-page .bookmark-favicon { width:22px; height:22px; object-fit:contain; border-radius:5px; }
 .nodus-start-page .bookmark-folder-icon { display:grid; place-items:center; width:36px; height:36px; border:1px solid rgba(167,139,250,.25); border-radius:11px; background:rgba(139,92,246,.12); color:var(--violet-3); }
 .nodus-start-page .bookmark-favicon,
