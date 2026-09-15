@@ -586,11 +586,14 @@ function LogRow({
           </span>
         )}
         {entry.repeat > 1 && (
+          // Just the count on screen: "repeated 12 times" beside it only repeated the number.
+          // The sentence lives in the tooltip, next to when the group started.
           <span
             data-testid="pipeline-log-repeat"
+            title={`${tx('repetido {count} veces', { count: entry.repeat })}${entry.firstAt ? ` · ${tx('Primera vez: {at}', { at: entry.firstAt })}` : ''}`}
             className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300"
           >
-            ×{entry.repeat} · {tx('repetido {count} veces', { count: entry.repeat })}
+            ×{entry.repeat}
           </span>
         )}
         {fields.map((chip) => (

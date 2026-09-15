@@ -25,6 +25,10 @@ fixture.sources = {
   listDeepResearchJobs: [],
   listDictionaryGenerationJobs: [],
   listOcrDocs: [],
+  // Whatever the caller seeds on window.initial before the bundle runs, exactly as the
+  // queue-panel fixture does: the screenshots need a panel with work in flight, and a test
+  // should not have to fire an event to get one.
+  ...(fixture.initial ?? {}),
 };
 fixture.emit = (name: string, ...args: unknown[]) => {
   for (const callback of fixture.listeners[name] ?? []) callback(...args);
@@ -50,6 +54,13 @@ fixture.logs = [
     { id: 'logFailed', params: { subject: { id: 'subjectEmbeddings' }, detail: 'timed out' } },
     { code: 'timeout', repeat: 12, firstAt: '2026-09-14T08:00:00.000Z' }),
 ];
+
+/** Category/scope counts, in the order the lines happen to list them. */
+function tally(entries: any[], pick: (entry: any) => string) {
+  const counts = new Map<string, number>();
+  for (const entry of entries) counts.set(pick(entry), (counts.get(pick(entry)) ?? 0) + 1);
+  return [...counts].map(([value, count]) => ({ value, count }));
+}
 
 fixture.page = (query: any = {}) => {
   const filter = query.filter ?? {};
@@ -85,11 +96,16 @@ fixture.page = (query: any = {}) => {
         { value: 'error', count: fixture.logs.filter((entry: any) => entry.level === 'error').length },
         { value: 'warning', count: fixture.logs.filter((entry: any) => entry.level === 'warning').length },
       ],
-      categories: [
-        { value: 'indexing', count: 1 }, { value: 'json', count: 1 }, { value: 'provider', count: 1 }, { value: 'connection', count: 1 },
-      ],
-      scopes: [{ value: 'indexing', count: 4 }],
-      vaults: [{ id: 'v1', label: 'Tesis', count: 3 }],
+      // Computed from the lines rather than hardcoded, so a different dataset (the screenshot
+      // run, or a test that seeds more lines) reports the counts it actually has.
+      categories: tally(fixture.logs, (entry: any) => entry.category),
+      scopes: tally(fixture.logs, (entry: any) => entry.scope),
+      vaults: Object.values(fixture.logs.reduce((accumulator: any, entry: any) => {
+        if (!entry.vaultId) return accumulator;
+        accumulator[entry.vaultId] ??= { id: entry.vaultId, label: entry.vaultName ?? entry.vaultId, count: 0 };
+        accumulator[entry.vaultId].count += 1;
+        return accumulator;
+      }, {})),
       days: [
         { value: '2026-09-15', count: fixture.logs.filter((entry: any) => entry.at.startsWith('2026-09-15')).length },
         { value: '2026-09-14', count: fixture.logs.filter((entry: any) => entry.at.startsWith('2026-09-14')).length },
