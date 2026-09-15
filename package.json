@@ -62,6 +62,8 @@
     "test:e2e:global-library": "npm run build && node scripts/e2e-global-library.mjs",
     "test:e2e:document-index": "npm run build && node scripts/e2e-document-index-controls.mjs",
     "test:e2e:browser-connector": "node scripts/e2e-browser-connector.mjs",
+    "test:e2e:bookmarks-html": "node scripts/e2e-bookmarks-html.mjs",
+    "verify:bookmarks-import": "node scripts/verify-browser-bookmarks-html-import.mjs",
     "verify:browser-fixes": "node scripts/verify-browser-fixes-live.mjs",
     "verify:browser-tab-strip": "node scripts/verify-browser-tab-strip.mjs",
     "test:e2e:office-references": "node scripts/e2e-office-references.mjs",
