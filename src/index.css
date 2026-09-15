@@ -3414,6 +3414,18 @@ select.input optgroup {
 .library-workspace-tabs-scroll::-webkit-scrollbar {
   display: none;
 }
+/* The Browser tab strip scrolls for the same reason, and hides its scrollbar for
+   the same reason: the arrows at either end are the affordance, and a scrollbar
+   would be a second, redundant one crowding a 24px row. */
+.browser-tab-strip-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+.browser-tab-strip-scroll::-webkit-scrollbar {
+  display: none;
+}
 .library-workspace-tab {
   display: flex;
   min-width: 7rem;

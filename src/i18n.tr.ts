@@ -7991,6 +7991,8 @@ export const TR: Record<string, string> = {
   // Nodus Browser: pestañas
   "Pestaña nueva": "Yeni sekme",
   "Nodus Browser admite hasta {n} pestañas.": "Nodus Browser en fazla {n} sekme tutar.",
+  "Desplazar las pestañas a la izquierda": "Sekmeleri sola kaydır",
+  "Desplazar las pestañas a la derecha": "Sekmeleri sağa kaydır",
   // Nodus Browser: media
   "Medios": "Medya",
   "Reproduciéndose en Nodus Browser": "Nodus Browser'da oynatılıyor",
