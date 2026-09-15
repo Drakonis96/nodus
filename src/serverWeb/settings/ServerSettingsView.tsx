@@ -614,16 +614,15 @@ export function ServerSettingsView({
   const load = useCallback(async () => {
     setError("");
     try {
-      const [nextMe, providerResponse, aiResponse, profileResponse] =
-        await Promise.all([
-          api.me(),
-          api.aiProviders(),
-          api.aiPreferences(),
-          api.profilePreferences(),
-        ]);
+      // The core Settings shell must not wait for the optional Server AI
+      // control plane. A keyring/provider request can be slow or unavailable,
+      // but that must not leave every Settings tab on an endless loading state.
+      const [nextMe, aiResponse, profileResponse] = await Promise.all([
+        api.me(),
+        api.aiPreferences(),
+        api.profilePreferences(),
+      ]);
       setMe(nextMe);
-      setProviders(providerResponse.providers);
-      setCredentialsAvailable(providerResponse.credentialsAvailable);
       setProfileMeta(profileResponse.profile);
       setProfile(
         profileResponse.profile.values ||
@@ -634,6 +633,17 @@ export function ServerSettingsView({
           .adminOverview()
           .then(setAdmin)
           .catch(() => undefined);
+
+      // Provider metadata is only needed by the provider panel. Load it after
+      // the shell is ready so an unavailable keyring cannot block navigation
+      // to the other Settings sections.
+      void api
+        .aiProviders()
+        .then((providerResponse) => {
+          setProviders(providerResponse.providers);
+          setCredentialsAvailable(providerResponse.credentialsAvailable);
+        })
+        .catch(() => undefined);
     } catch (next) {
       setError(errorMessage(next));
     }
