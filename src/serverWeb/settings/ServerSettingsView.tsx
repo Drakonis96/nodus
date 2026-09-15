@@ -575,7 +575,12 @@ export function ServerSettingsView({
   const [providers, setProviders] = useState<AIProviderStatus[]>([]);
   const [credentialsAvailable, setCredentialsAvailable] = useState(true);
   const [profileMeta, setProfileMeta] = useState<ServerUserProfile>();
-  const [profile, setProfile] = useState<PortableProfileValues>();
+  // Render the Settings shell immediately. The persisted profile and the
+  // optional legacy AI preferences are hydrated independently below; neither
+  // should be able to strand the whole Settings view on a loading screen.
+  const [profile, setProfile] = useState<PortableProfileValues>(() =>
+    blankProfile(theme),
+  );
   const [themeEditorOpen, setThemeEditorOpen] = useState(false);
   const [editingThemeId, setEditingThemeId] = useState<string | null>(null);
   const [themeDraft, setThemeDraft] = useState<Omit<CustomAppTheme, "id">>(emptyThemeDraft);
@@ -611,42 +616,43 @@ export function ServerSettingsView({
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
+  const load = useCallback(() => {
     setError("");
-    try {
-      // The core Settings shell must not wait for the optional Server AI
-      // control plane. A keyring/provider request can be slow or unavailable,
-      // but that must not leave every Settings tab on an endless loading state.
-      const [nextMe, aiResponse, profileResponse] = await Promise.all([
-        api.me(),
-        api.aiPreferences(),
-        api.profilePreferences(),
-      ]);
-      setMe(nextMe);
-      setProfileMeta(profileResponse.profile);
-      setProfile(
-        profileResponse.profile.values ||
-          blankProfile(theme, aiResponse.preferences),
-      );
-      if (isAdmin)
-        api
-          .adminOverview()
-          .then(setAdmin)
-          .catch(() => undefined);
+    void api.me().then(setMe).catch((next) => setError(errorMessage(next)));
 
-      // Provider metadata is only needed by the provider panel. Load it after
-      // the shell is ready so an unavailable keyring cannot block navigation
-      // to the other Settings sections.
+    // The portable profile is authoritative when it exists. A new account may
+    // not have one yet, in which case preserve legacy AI defaults if available,
+    // without making the Settings shell wait for that optional endpoint.
+    void api
+      .profilePreferences()
+      .then((profileResponse) => {
+        setProfileMeta(profileResponse.profile);
+        if (profileResponse.profile.values) {
+          setProfile(profileResponse.profile.values);
+          return;
+        }
+        void api
+          .aiPreferences()
+          .then((aiResponse) => setProfile(blankProfile(theme, aiResponse.preferences)))
+          .catch(() => undefined);
+      })
+      .catch((next) => setError(errorMessage(next)));
+
+    if (isAdmin)
       void api
-        .aiProviders()
-        .then((providerResponse) => {
-          setProviders(providerResponse.providers);
-          setCredentialsAvailable(providerResponse.credentialsAvailable);
-        })
+        .adminOverview()
+        .then(setAdmin)
         .catch(() => undefined);
-    } catch (next) {
-      setError(errorMessage(next));
-    }
+
+    // Provider metadata is only needed by the provider panel. An unavailable
+    // keyring must not block navigation to the other Settings sections.
+    void api
+      .aiProviders()
+      .then((providerResponse) => {
+        setProviders(providerResponse.providers);
+        setCredentialsAvailable(providerResponse.credentialsAvailable);
+      })
+      .catch(() => undefined);
   }, [isAdmin, theme]);
 
   useEffect(() => {
