@@ -620,21 +620,16 @@ export function ServerSettingsView({
     setError("");
     void api.me().then(setMe).catch((next) => setError(errorMessage(next)));
 
-    // The portable profile is authoritative when it exists. A new account may
-    // not have one yet, in which case preserve legacy AI defaults if available,
-    // without making the Settings shell wait for that optional endpoint.
+    // The portable profile is authoritative when it exists. A new account can
+    // start with the local blank profile; Server AI is optional in basic
+    // deployments, so do not probe its legacy endpoint just to render Settings.
     void api
       .profilePreferences()
       .then((profileResponse) => {
         setProfileMeta(profileResponse.profile);
         if (profileResponse.profile.values) {
           setProfile(profileResponse.profile.values);
-          return;
         }
-        void api
-          .aiPreferences()
-          .then((aiResponse) => setProfile(blankProfile(theme, aiResponse.preferences)))
-          .catch(() => undefined);
       })
       .catch((next) => setError(errorMessage(next)));
 
