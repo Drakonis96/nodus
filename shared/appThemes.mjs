@@ -47,9 +47,13 @@ export function sanitizeCustomThemes(value) {
     const accent = colour(candidate.accent);
     const deep = colour(candidate.deep);
     const pale = colour(candidate.pale);
+    const appBackgroundInput = candidate.appBackground;
+    const appBackground = appBackgroundInput && typeof appBackgroundInput === 'object' && !Array.isArray(appBackgroundInput)
+      ? { light: colour(appBackgroundInput.light), dark: colour(appBackgroundInput.dark) }
+      : null;
     const lightText = colour(candidate.lightText);
     const darkText = colour(candidate.darkText);
-    if (!accent || !deep || !pale || !lightText || !darkText) continue;
+    if (!accent || !deep || !pale || !appBackground?.light || !appBackground.dark || !lightText || !darkText) continue;
     used.add(id);
     result.push({
       id,
@@ -57,6 +61,7 @@ export function sanitizeCustomThemes(value) {
       accent,
       deep,
       pale,
+      appBackground: { light: appBackground.light, dark: appBackground.dark },
       lightText,
       darkText,
       tint: Math.max(0, Math.min(1, Number.isFinite(Number(candidate.tint)) ? Number(candidate.tint) : 0.05)),

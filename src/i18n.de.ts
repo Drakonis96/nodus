@@ -1654,6 +1654,8 @@ export const DE: Record<string, string> = {
   'Acento': 'Akzent',
   'Superficie clara': 'Helle Oberfläche',
   'Superficie oscura': 'Dunkle Oberfläche',
+  'Fondo de la aplicación (modo claro)': 'Heller App-Hintergrund',
+  'Fondo de la aplicación (modo oscuro)': 'Dunkler App-Hintergrund',
   'Texto en modo claro': 'Text im hellen Modus',
   'Texto en modo oscuro': 'Text im dunklen Modus',
   'Tintado de superficies': 'Oberflächenfärbung',

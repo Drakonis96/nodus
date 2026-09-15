@@ -47,6 +47,20 @@ html.theme-active.light .theme-workspace-surface {
   color: var(--theme-text-light);
   color-scheme: light;
 }
+
+/* The app canvas is intentionally separate from workspace surfaces. It gives
+ * each palette a recognizable persistent chrome colour while the mode-specific
+ * values keep the canvas light in light mode and dark in dark mode. */
+html.theme-active.dark:not(.high-contrast) {
+  --app-canvas: var(--app-background-dark);
+}
+html.theme-active.light:not(.high-contrast) {
+  --app-canvas: var(--app-background-light);
+}
+html.theme-active.dark:not(.high-contrast) :is(body, #root, [data-testid='app-shell'], [data-testid='resizable-sidebar'], .app-titlebar),
+html.theme-active.light:not(.high-contrast) :is(body, #root, [data-testid='app-shell'], [data-testid='resizable-sidebar'], .app-titlebar) {
+  background-color: var(--app-canvas);
+}
 html.theme-active.dark .theme-workspace-surface :is(.section-header, .section-toolbar),
 html.theme-active.dark .theme-workspace-surface > :is(header, footer) {
   border-color: var(--theme-border-dark);

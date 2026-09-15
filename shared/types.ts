@@ -1551,6 +1551,8 @@ export interface CustomAppTheme {
   accent: string;
   deep: string;
   pale: string;
+  /** Persistent application chrome/background, with one value per colour mode. */
+  appBackground: { light: string; dark: string };
   /** Foreground used when the UI is in light mode. */
   lightText: string;
   /** Foreground used when the UI is in dark mode. */

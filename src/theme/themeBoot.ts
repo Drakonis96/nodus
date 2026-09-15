@@ -25,7 +25,7 @@ export function applyThemeMode(theme: ThemeMode): boolean {
 type RuntimeTheme = {
   id: string;
   label: string;
-  anchors: { accent: string; deep: string; pale: string; lightText: string; darkText: string; tint?: number };
+  anchors: { accent: string; deep: string; pale: string; appBackground: { light: string; dark: string }; lightText: string; darkText: string; tint?: number };
 };
 
 type CustomTheme = {
@@ -34,6 +34,7 @@ type CustomTheme = {
   accent: string;
   deep: string;
   pale: string;
+  appBackground: { light: string; dark: string };
   lightText: string;
   darkText: string;
   tint: number;
@@ -74,6 +75,8 @@ export function applyAppTheme(id: string | null | undefined, customThemes: Custo
     }
     root.style.setProperty('--theme-text-light', tokens.text.light);
     root.style.setProperty('--theme-text-dark', tokens.text.dark);
+    root.style.setProperty('--app-background-light', tokens.appBackground.light);
+    root.style.setProperty('--app-background-dark', tokens.appBackground.dark);
   } else {
     for (const shade of SHADES) {
       root.style.removeProperty(`--n-${shade}`);
@@ -83,6 +86,8 @@ export function applyAppTheme(id: string | null | undefined, customThemes: Custo
     }
     root.style.removeProperty('--theme-text-light');
     root.style.removeProperty('--theme-text-dark');
+    root.style.removeProperty('--app-background-light');
+    root.style.removeProperty('--app-background-dark');
   }
 }
 

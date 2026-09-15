@@ -1472,6 +1472,8 @@ export const ZH_CN: Record<string, string> = {
   "Acento": "强调色",
   "Superficie clara": "浅色表面",
   "Superficie oscura": "深色表面",
+  "Fondo de la aplicación (modo claro)": "浅色应用背景",
+  "Fondo de la aplicación (modo oscuro)": "深色应用背景",
   "Texto en modo claro": "浅色模式文字",
   "Texto en modo oscuro": "深色模式文字",
   "Tintado de superficies": "表面着色",

@@ -181,6 +181,7 @@ function normalizeThemeColour(value: unknown): string | null {
 
 const emptyThemeDraft = (): Omit<CustomAppTheme, "id"> => ({
   label: "", accent: "#6366f1", deep: "#1e1b4b", pale: "#eef2ff",
+  appBackground: { light: "#f8fafc", dark: "#080a12" },
   lightText: "#171717", darkText: "#f5f5f5", tint: 0.05,
 });
 const themeDraftFrom = (theme?: CustomAppTheme): Omit<CustomAppTheme, "id"> => {
@@ -191,6 +192,10 @@ const themeDraftFrom = (theme?: CustomAppTheme): Omit<CustomAppTheme, "id"> => {
     accent: normalizeThemeColour(theme.accent) ?? defaults.accent,
     deep: normalizeThemeColour(theme.deep) ?? defaults.deep,
     pale: normalizeThemeColour(theme.pale) ?? defaults.pale,
+    appBackground: {
+      light: normalizeThemeColour(theme.appBackground?.light) ?? defaults.appBackground.light,
+      dark: normalizeThemeColour(theme.appBackground?.dark) ?? defaults.appBackground.dark,
+    },
     lightText: normalizeThemeColour(theme.lightText) ?? defaults.lightText,
     darkText: normalizeThemeColour(theme.darkText) ?? defaults.darkText,
     tint: Number.isFinite(theme.tint) ? theme.tint : defaults.tint,
@@ -733,9 +738,11 @@ export function ServerSettingsView({
     const accent = normalizeThemeColour(themeDraft.accent);
     const deep = normalizeThemeColour(themeDraft.deep);
     const pale = normalizeThemeColour(themeDraft.pale);
+    const appBackgroundLight = normalizeThemeColour(themeDraft.appBackground.light);
+    const appBackgroundDark = normalizeThemeColour(themeDraft.appBackground.dark);
     const lightText = normalizeThemeColour(themeDraft.lightText);
     const darkText = normalizeThemeColour(themeDraft.darkText);
-    if (!accent || !deep || !pale || !lightText || !darkText) {
+    if (!accent || !deep || !pale || !appBackgroundLight || !appBackgroundDark || !lightText || !darkText) {
       return setThemeError(t("Usa colores hexadecimales completos, por ejemplo #6366f1."));
     }
     const id = editingThemeId ?? themeSlug(label);
@@ -749,11 +756,12 @@ export function ServerSettingsView({
       accent,
       deep,
       pale,
+      appBackground: { light: appBackgroundLight, dark: appBackgroundDark },
       lightText,
       darkText,
     };
     const tokens = deriveThemeTokens({ anchors: normalizedDraft });
-    if (contrast(tokens.text.dark, tokens.n[950]) < 4.5 || contrast(tokens.text.light, tokens.n[50]) < 4.5 || contrast(tokens.a.light[300], "#ffffff") < 4.5 || contrast(tokens.a.dark[300], tokens.n[950]) < 4.5) {
+    if (contrast(tokens.text.dark, tokens.n[950]) < 4.5 || contrast(tokens.text.light, tokens.n[50]) < 4.5 || contrast(tokens.text.dark, tokens.appBackground.dark) < 4.5 || contrast(tokens.text.light, tokens.appBackground.light) < 4.5 || contrast(tokens.a.light[300], "#ffffff") < 4.5 || contrast(tokens.a.dark[300], tokens.n[950]) < 4.5) {
       return setThemeError(t("Ajusta los colores para alcanzar el contraste mínimo de lectura."));
     }
     const next = structuredClone(profile);
@@ -1434,8 +1442,16 @@ export function ServerSettingsView({
             <strong>{editingThemeId ? t("Editar tema") : t("Crear tema")}</strong>
             <input aria-label={t("Nombre del tema personalizado")} value={themeDraft.label} onChange={(event) => setThemeDraft((draft) => ({ ...draft, label: event.target.value }))} placeholder={t("Mi tema")} />
             <div className="ss-theme-colours">
-              {([['accent', 'Acento'], ['pale', 'Superficie clara'], ['deep', 'Superficie oscura'], ['lightText', 'Texto en modo claro'], ['darkText', 'Texto en modo oscuro']] as const).map(([key, label]) => (
-                <label key={key}><input type="color" value={themeDraft[key]} onChange={(event) => setThemeDraft((draft) => ({ ...draft, [key]: event.target.value }))} />{t(label)}</label>
+              {[
+                { key: 'accent', label: 'Acento', value: themeDraft.accent, update: (value: string) => setThemeDraft((draft) => ({ ...draft, accent: value })) },
+                { key: 'app-background-light', label: 'Fondo de la aplicación (modo claro)', value: themeDraft.appBackground.light, update: (value: string) => setThemeDraft((draft) => ({ ...draft, appBackground: { ...draft.appBackground, light: value } })) },
+                { key: 'app-background-dark', label: 'Fondo de la aplicación (modo oscuro)', value: themeDraft.appBackground.dark, update: (value: string) => setThemeDraft((draft) => ({ ...draft, appBackground: { ...draft.appBackground, dark: value } })) },
+                { key: 'pale', label: 'Superficie clara', value: themeDraft.pale, update: (value: string) => setThemeDraft((draft) => ({ ...draft, pale: value })) },
+                { key: 'deep', label: 'Superficie oscura', value: themeDraft.deep, update: (value: string) => setThemeDraft((draft) => ({ ...draft, deep: value })) },
+                { key: 'light-text', label: 'Texto en modo claro', value: themeDraft.lightText, update: (value: string) => setThemeDraft((draft) => ({ ...draft, lightText: value })) },
+                { key: 'dark-text', label: 'Texto en modo oscuro', value: themeDraft.darkText, update: (value: string) => setThemeDraft((draft) => ({ ...draft, darkText: value })) },
+              ].map(({ key, label, value, update }) => (
+                <label key={key}><input type="color" value={value} onChange={(event) => update(event.target.value)} />{t(label)}</label>
               ))}
             </div>
             <label>

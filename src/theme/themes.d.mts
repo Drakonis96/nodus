@@ -5,6 +5,7 @@ export interface ThemeAnchors {
   accent: string;
   deep: string;
   pale: string;
+  appBackground: { light: string; dark: string };
   lightText: string;
   darkText: string;
   tint?: number;
@@ -17,6 +18,8 @@ export interface ThemeTokens {
   a: { dark: Ramp; light: Ramp };
   /** Explicit mode-specific foreground colours. */
   text: { dark: string; light: string };
+  /** Persistent application chrome/background, with one value per mode. */
+  appBackground: { dark: string; light: string };
 }
 
 export interface ThemeDef {

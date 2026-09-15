@@ -1674,6 +1674,8 @@ export const EN: Record<string, string> = {
   'Acento': 'Accent',
   'Superficie clara': 'Light surface',
   'Superficie oscura': 'Dark surface',
+  'Fondo de la aplicación (modo claro)': 'Light app background',
+  'Fondo de la aplicación (modo oscuro)': 'Dark app background',
   'Texto en modo claro': 'Light-mode text',
   'Texto en modo oscuro': 'Dark-mode text',
   'Tintado de superficies': 'Surface tint',

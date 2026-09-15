@@ -6,14 +6,14 @@ import { deriveThemeTokens, contrast, THEMES } from '../src/theme/themes.mjs';
 
 test('custom theme definitions are normalized and isolated from built-ins', () => {
   const themes = sanitizeCustomThemes([
-    { id: 'custom-paper', label: '  Paper  ', accent: '#D47752', deep: '#201817', pale: '#fff8f2', lightText: '#201817', darkText: '#fff8f2', tint: 0.08 },
+    { id: 'custom-paper', label: '  Paper  ', accent: '#D47752', deep: '#201817', pale: '#fff8f2', appBackground: { light: '#ffffff', dark: '#100c0b' }, lightText: '#201817', darkText: '#fff8f2', tint: 0.08 },
     { id: 'custom-missing-text', label: 'Missing text', accent: '#D47752', deep: '#201817', pale: '#fff8f2', tint: 0.08 },
     { id: 'default', label: 'Override', accent: '#000000', deep: '#000000', pale: '#ffffff', tint: 0 },
     { id: 'bad id', label: 'Bad', accent: '#000000', deep: '#000000', pale: '#ffffff', tint: 0 },
   ]);
   assert.deepEqual(themes, [{
     id: 'custom-paper', label: 'Paper', accent: '#d47752', deep: '#201817', pale: '#fff8f2',
-    lightText: '#201817', darkText: '#fff8f2', tint: 0.08,
+    appBackground: { light: '#ffffff', dark: '#100c0b' }, lightText: '#201817', darkText: '#fff8f2', tint: 0.08,
   }]);
   assert.ok(APP_THEME_IDS.includes('default'));
 });
@@ -23,6 +23,8 @@ test('every built-in theme declares both mode foregrounds', () => {
   for (const theme of THEMES) {
     assert.match(theme.anchors.lightText, /^#[0-9a-f]{6}$/i);
     assert.match(theme.anchors.darkText, /^#[0-9a-f]{6}$/i);
+    assert.match(theme.anchors.appBackground.light, /^#[0-9a-f]{6}$/i);
+    assert.match(theme.anchors.appBackground.dark, /^#[0-9a-f]{6}$/i);
   }
 });
 
@@ -32,6 +34,7 @@ test('runtime derivation preserves contrast guarantees for a custom palette', ()
     label: 'Paper',
     anchors: {
       accent: '#d47752', deep: '#201817', pale: '#fff8f2',
+      appBackground: { light: '#ffffff', dark: '#100c0b' },
       lightText: '#201817', darkText: '#fff8f2', tint: 0.08,
     },
   });
@@ -39,6 +42,8 @@ test('runtime derivation preserves contrast guarantees for a custom palette', ()
   assert.ok(contrast(tokens.a.dark[300], tokens.n[950]) >= 4.5);
   assert.ok(contrast(tokens.text.light, tokens.n[50]) >= 4.5);
   assert.ok(contrast(tokens.text.dark, tokens.n[950]) >= 4.5);
+  assert.ok(contrast(tokens.text.light, tokens.appBackground.light) >= 4.5);
+  assert.ok(contrast(tokens.text.dark, tokens.appBackground.dark) >= 4.5);
   assert.equal(tokens.n[50], '#fff8f2');
 });
 
@@ -53,6 +58,8 @@ test('settings exposes mode before the palette editor', async () => {
   assert.match(source, /bg-indigo-100 px-3 text-xs text-indigo-700.*dark:bg-indigo-600 dark:text-white/s);
   assert.match(source, /Texto en modo claro/);
   assert.match(source, /Texto en modo oscuro/);
+  assert.match(source, /Fondo de la aplicación \(modo claro\)/);
+  assert.match(source, /Fondo de la aplicación \(modo oscuro\)/);
 });
 
 test('runtime theme edge cases are guarded', async () => {
@@ -87,6 +94,8 @@ test('runtime theme edge cases are guarded', async () => {
   assert.match(themeBoot, /sanitizeCustomThemes\(parsed\)/);
   assert.match(themeBoot, /--theme-text-light/);
   assert.match(themeBoot, /--theme-text-dark/);
+  assert.match(themeBoot, /--app-background-light/);
+  assert.match(themeBoot, /--app-background-dark/);
   assert.match(tokens, /--theme-border-light/);
   assert.match(tokens, /--theme-border-dark/);
   assert.match(utilities, /theme-text-light-muted/);

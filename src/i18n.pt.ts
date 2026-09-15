@@ -1640,6 +1640,8 @@ export const PT: Record<string, string> = {
   'Acento': 'Acento',
   'Superficie clara': 'Superfície clara',
   'Superficie oscura': 'Superfície escura',
+  'Fondo de la aplicación (modo claro)': 'Fundo claro da aplicação',
+  'Fondo de la aplicación (modo oscuro)': 'Fundo escuro da aplicação',
   'Texto en modo claro': 'Texto no modo claro',
   'Texto en modo oscuro': 'Texto no modo escuro',
   'Tintado de superficies': 'Tonalidade da superfície',

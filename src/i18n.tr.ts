@@ -1915,6 +1915,8 @@ export const TR: Record<string, string> = {
   "Acento": "Vurgu",
   "Superficie clara": "Açık yüzey",
   "Superficie oscura": "Koyu yüzey",
+  "Fondo de la aplicación (modo claro)": "Açık uygulama arka planı",
+  "Fondo de la aplicación (modo oscuro)": "Koyu uygulama arka planı",
   "Texto en modo claro": "Açık mod metni",
   "Texto en modo oscuro": "Koyu mod metni",
   "Tintado de superficies": "Yüzey tonu",

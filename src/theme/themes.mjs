@@ -140,6 +140,7 @@ function accentRamp(accent, mode) {
  * @property {string} accent   accent hue (maps to --a-500)
  * @property {string} deep     deepest surface (maps to --n-950)
  * @property {string} pale      palest surface (maps to --n-50)
+ * @property {{light:string,dark:string}} appBackground persistent application chrome/background
  * @property {string} lightText foreground used in light mode
  * @property {string} darkText  foreground used in dark mode
  * @property {number} [tint]   0–1, how much accent bleeds into the mid neutrals
@@ -165,9 +166,24 @@ const THEME_DEFS = [
   { id: 'lagoon', label: 'Lagoon', anchors: { accent: '#4ecdc4', deep: '#051215', pale: '#f7fff7', lightText: '#16464c', darkText: '#effffc', tint: 0.05 } },
 ];
 
+/** Keep the persistent app canvas distinct from the workspace extremes while
+ * preserving the palette hue and the light/dark luminance split. */
+function withAppBackground(def) {
+  return {
+    ...def,
+    anchors: {
+      ...def.anchors,
+      appBackground: {
+        light: mix(def.anchors.pale, WHITE, 0.24),
+        dark: mix(def.anchors.deep, BLACK, 0.22),
+      },
+    },
+  };
+}
+
 /** Build the full token set for one theme: one neutral ramp + a per-mode accent ramp. */
 export function deriveThemeTokens(def) {
-  const { accent, deep, pale, lightText, darkText, tint = 0 } = def.anchors;
+  const { accent, deep, pale, appBackground, lightText, darkText, tint = 0 } = def.anchors;
   const neutralTokens = neutralRamp(pale, deep, accent, tint);
   const accentTokens = { dark: accentRamp(accent, 'dark'), light: accentRamp(accent, 'light') };
   accentTokens.dark[300] = ensureLightContrast(accentTokens.dark[300], neutralTokens[950], 4.5);
@@ -179,10 +195,14 @@ export function deriveThemeTokens(def) {
       light: lightText,
       dark: darkText,
     },
+    appBackground,
   };
 }
 
 /** Non-default themes, with derived ramps attached. */
-export const THEMES = THEME_DEFS.map((def) => ({ ...def, tokens: deriveThemeTokens(def) }));
+export const THEMES = THEME_DEFS.map((def) => {
+  const themed = withAppBackground(def);
+  return { ...themed, tokens: deriveThemeTokens(themed) };
+});
 
 export { SHADES };
