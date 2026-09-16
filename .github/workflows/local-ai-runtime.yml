@@ -26,14 +26,14 @@ jobs:
       matrix:
         include:
           - runner: ubuntu-22.04
-            scope: actual runtime startup
-            arguments: ''
+            scope: actual runtime and model inference
+            arguments: '--inference-smoke'
           - runner: windows-latest
-            scope: actual runtime startup
-            arguments: ''
+            scope: actual runtime and model inference
+            arguments: '--inference-smoke'
           - runner: macos-latest
-            scope: actual runtime startup
-            arguments: ''
+            scope: actual runtime and model inference
+            arguments: '--inference-smoke'
           - runner: macos-14
             scope: known incompatibility and rollback
             arguments: '--expect-incompatible-macos'

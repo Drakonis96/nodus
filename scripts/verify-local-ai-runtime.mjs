@@ -1,6 +1,7 @@
 // Opt-in network integration check. Downloads the actual checksum-pinned release
 // archives through the production installer, not through a test downloader.
-// Does not download a model or claim to measure GPU inference performance.
+// --inference-smoke additionally loads a shipped small GGUF and completes a real
+// request. This is a correctness check, not a GPU throughput benchmark.
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
@@ -12,6 +13,7 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tmp = await mkdtemp(path.join(os.tmpdir(), 'nodus-runtime-archive-check-'));
 const stub = path.join(tmp, 'electron.mjs');
 const expectIncompatible = process.argv.includes('--expect-incompatible-macos');
+const inferenceSmoke = process.argv.includes('--inference-smoke');
 let manager;
 try {
   await writeFile(stub, `export const app = { getPath: () => ${JSON.stringify(tmp)}, once: () => {} };`);
@@ -60,12 +62,40 @@ try {
       globalThis.fetch = () => { throw new Error('status must not use the network'); };
       assert.equal((await manager.getNodusLocalAiStatus()).runtime.ready, true);
     } finally { globalThis.fetch = originalFetch; }
+    if (inferenceSmoke) {
+      const model = 'qwen3.5-0.8b-q4';
+      await manager.downloadNodusLocalModel(model);
+      // The same public entry called by automatic onboarding must not benchmark.
+      await manager.calibrateNodusLocalModelConcurrency(model);
+      await manager.withNodusLocalServerLease(model, 'chat', async base => {
+        const response = await fetch(`${base}/chat/completions`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, max_tokens: 16, temperature: 0,
+            chat_template_kwargs: { enable_thinking: false },
+            messages: [{ role: 'user', content: 'Reply with OK.' }] }),
+          signal: AbortSignal.timeout(180_000),
+        });
+        const payload = await response.text();
+        assert.equal(response.ok, true, payload.slice(0, 1_000));
+        const result = JSON.parse(payload);
+        assert.equal(result.choices?.length, 1);
+        assert.ok(result.usage?.completion_tokens > 0, 'the real model must generate tokens');
+        assert.equal(await manager.ensureNodusLocalServer(model, 'chat'), base, 'warm requests retain /v1');
+      });
+      const active = await manager.getNodusLocalAiStatus();
+      assert.equal(active.runtime.diagnostics.state, 'ready');
+      assert.equal(active.activeSlots, 1);
+      assert.equal(active.activeLeases, 0);
+      console.log(JSON.stringify({ model, inference: 'passed', slots: active.activeSlots,
+        backend: active.runtime.diagnostics.backend, offloadedLayers: active.runtime.diagnostics.offloadedLayers }));
+    }
     console.log(JSON.stringify({ platform: `${process.platform}-${process.arch}`, version: status.runtime.version,
       backend: status.runtime.diagnostics.backend, devices: status.runtime.diagnostics.devices,
       fallbackReason: status.runtime.diagnostics.fallbackReason,
-      scope: 'Real archives, SHA-256, extraction, executable startup and device probe. No model inference benchmark.' }, null, 2));
+      scope: inferenceSmoke ? 'Real pinned archives plus shipped GGUF/model-projector loading and one real inference request. Not a throughput benchmark.'
+        : 'Real archives, SHA-256, extraction, executable startup and device probe. No model inference benchmark.' }, null, 2));
   }
 } finally {
   manager?.killNodusLocalServerSync();
-  await rm(tmp, { recursive: true, force: true });
+  await rm(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }

@@ -89,8 +89,11 @@ retained or uploaded. Review any diagnostics before choosing to share them publi
 - `node scripts/verify-local-ai-runtime.mjs` is an explicit network integration
   check. It downloads the actual pinned archives through the production checksum
   path and verifies extraction, executable startup and device detection. It does
-  not download models or measure inference speed.
+  not download models by default. The explicit `--inference-smoke` mode downloads
+  the shipped Qwen3.5-0.8B model/projector,
+  starts one full-context slot and requires a real completion with generated tokens.
 - `.github/workflows/local-ai-runtime.yml` runs both on Linux, Windows and macOS.
+  Supported-platform jobs include `--inference-smoke`.
   A separately named macOS 14 negative compatibility/rollback job covers #856.
   The existing full CI and desktop E2E remain unchanged and required.
 
