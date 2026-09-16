@@ -35,7 +35,7 @@ function load(file) {
   return require(bundle);
 }
 
-const { rejectsOptionalTransportField, shouldRetryWithoutOptionalFields } = load('electron/ai/providerErrors.ts');
+const { rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields } = load('electron/ai/providerErrors.ts');
 
 /** A provider HTTP failure with the shape the OpenAI SDK throws. */
 const failure = (status, message) => Object.assign(new Error(message), { status, error: { message } });
@@ -76,10 +76,46 @@ test('the unnamed fallback stays narrow: custom only, reasoning only, 400/422 on
   assert.equal(shouldRetryWithoutOptionalFields(new Error('Connection error.'), { provider: 'custom', sentReasoning: true }), false, 'transport failures belong to the retry layer');
 });
 
+test('a 400 that names `temperature` as deprecated is recoverable, and nothing else is', () => {
+  // Every shape a provider has used for this refusal, in both word orders.
+  assert.equal(rejectsTemperatureParameter(failure(400, "Unsupported value: 'temperature' does not support 0.15 with this model")), true);
+  assert.equal(rejectsTemperatureParameter(failure(400, 'temperature is deprecated for this model')), true);
+  assert.equal(rejectsTemperatureParameter(failure(400, 'The parameter temperature is not supported by this model')), true);
+  assert.equal(rejectsTemperatureParameter(failure(400, 'temperature is not allowed for reasoning models')), true);
+  assert.equal(rejectsTemperatureParameter(failure(400, 'Invalid parameter: temperature')), true);
+  // Strict on purpose: a refusal that does not name the field is never replayed, and a
+  // refusal is a 400 — a 5xx or a 429 is a different failure with its own retry layer.
+  assert.equal(rejectsTemperatureParameter(failure(400, 'Bad Request')), false, 'an unnamed refusal must not be replayed');
+  assert.equal(rejectsTemperatureParameter(failure(400, 'context length exceeded')), false);
+  assert.equal(rejectsTemperatureParameter(failure(422, 'temperature is deprecated')), false);
+  assert.equal(rejectsTemperatureParameter(failure(500, 'temperature is deprecated')), false);
+  assert.equal(rejectsTemperatureParameter(new Error('socket hang up')), false);
+});
+
+test('both transports drop the knob on that signal and keep the rest of the request', () => {
+  const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
+  const go = readFileSync(path.join(repoRoot, 'electron/ai/openCodeGoCompletion.ts'), 'utf8');
+  // The session memory is shared, not duplicated per transport, so a model learned on one
+  // route does not have to fail again on the other.
+  assert.match(source, /import \{ rememberTemperatureUnsupported, temperatureUnsupported \} from '\.\/samplingSupport';/);
+  assert.match(go, /import \{ rememberTemperatureUnsupported, temperatureUnsupported \} from '\.\/samplingSupport';/);
+  assert.doesNotMatch(source, /const temperatureUnsupportedModels = new Set<string>\(\)/);
+  // The generic transport replays without the field in both the non-streaming and the
+  // streaming path, and both keep the optional body.
+  assert.equal((source.match(/rejectsTemperatureParameter\(e\)/g) ?? []).length, 2);
+  assert.equal((source.match(/bodyFor\(true\)/g) ?? []).length, 2);
+  // OpenCode Go speaks its own HTTP, so it needs its own recovery — the one in aiClient
+  // never ran on that route.
+  assert.match(go, /rememberTemperatureUnsupported\(\{ provider: 'opencode-go', model \}\);/);
+  assert.match(go, /return send\(withoutTemperature\(merged\)\);/);
+  assert.match(go, /function withoutTemperature\(body: Record<string, unknown>\): Record<string, unknown> \{/);
+  assert.match(go, /if \(temperatureUnsupported\(ref\)\) return \{\};/);
+});
+
 test('the transport recovers by dropping only the reasoning field, keeping JSON mode', () => {
   const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
   // The predicate is imported, not reimplemented locally.
-  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsOptionalTransportField, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
+  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
   assert.doesNotMatch(source, /^function rejectsOptionalTransportField/m);
   // Both the non-streaming and the streaming transport mark whether the field was sent…
   assert.equal((source.match(/const sentReasoning = \(extras as any\)\.reasoning_effort !== undefined;/g) ?? []).length, 2);

@@ -441,6 +441,8 @@ const OPENCODE_GO_MODEL_NAMES: Record<string, string> = {
   'deepseek-v4-pro': 'DeepSeek V4 Pro',
   'deepseek-v4-flash': 'DeepSeek V4 Flash',
   'deepseek-v4-flash-vision-exp': 'DeepSeek V4 Flash Vision Exp',
+  'deepseek-flash': 'DeepSeek Flash',
+  'deepseek-pro': 'DeepSeek Pro',
   'muse-spark-1.2-contributor': 'Muse Spark 1.2 Contributor',
   'mimo-v2.5': 'MiMo-V2.5',
   'mimo-v2.5-pro': 'MiMo-V2.5-Pro',

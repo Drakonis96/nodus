@@ -461,6 +461,80 @@ test('a model that rejects the optional params is retried without them', async (
   }
 });
 
+test('a model that deprecates `temperature` is replayed without it, and remembered', async () => {
+  // OpenCode Go speaks its own HTTP, so the recovery in aiClient never ran on this route:
+  // a model that starts rejecting the sampling knob would have failed every call, not one.
+  const bodies = [];
+  const server = await openCodeServer((req, res) => {
+    let raw = '';
+    req.on('data', (chunk) => { raw += chunk; });
+    req.on('end', () => {
+      const body = JSON.parse(raw);
+      bodies.push(body);
+      if ('temperature' in body) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: { message: 'temperature is deprecated for this model' } }));
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }));
+    });
+  });
+  try {
+    const result = await completeWithOpenCodeGo({
+      apiKey: 'k', model: 'deepseek-flash', system: 's', user: 'u',
+      temperature: 0.15, jsonMode: true, baseUrl: server.url,
+    });
+    assert.equal(result.text, '{"ok":true}');
+    assert.equal(bodies.length, 2, 'exactly one retry');
+    assert.equal(bodies[0].temperature, 0.15, 'the first attempt is optimistic');
+    assert.equal(bodies[1].temperature, undefined, 'the replay drops only the offending field');
+    assert.deepEqual(bodies[1].response_format, { type: 'json_object' }, 'the optional body is kept');
+
+    bodies.length = 0;
+    await completeWithOpenCodeGo({
+      apiKey: 'k', model: 'deepseek-flash', system: 's', user: 'u',
+      temperature: 0.15, baseUrl: server.url,
+    });
+    assert.equal(bodies.length, 1, 'the model stays learned for the session');
+    assert.equal(bodies[0].temperature, undefined, 'later calls never send the knob again');
+  } finally {
+    await server.close();
+  }
+});
+
+test('the Messages route recovers from a temperature refusal too', async () => {
+  // Qwen/MiniMax go over /v1/messages, which had its own raw fetch — the same refusal
+  // there would have been fatal even after the Chat Completions route learned to recover.
+  const bodies = [];
+  const server = await openCodeServer((req, res) => {
+    let raw = '';
+    req.on('data', (chunk) => { raw += chunk; });
+    req.on('end', () => {
+      const body = JSON.parse(raw);
+      bodies.push(body);
+      if ('temperature' in body) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: { message: 'temperature is not supported by this model' } }));
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }));
+    });
+  });
+  try {
+    const result = await completeWithOpenCodeGo({
+      apiKey: 'k', model: 'qwen3.8-flash', system: 's', user: 'u',
+      temperature: 0.15, baseUrl: server.url,
+    });
+    assert.equal(result.text, 'ok');
+    assert.equal(bodies.length, 2, 'the Messages route replays without the field');
+    assert.equal(bodies[1].temperature, undefined);
+  } finally {
+    await server.close();
+  }
+});
+
 test('jsonMode is honoured on the Messages route instead of being ignored', async () => {
   // minimax/qwen go over /v1/messages, which has no response_format — the flag was
   // simply dropped there, so the same call behaved differently per model family.

@@ -156,6 +156,23 @@ export function rejectsOptionalTransportField(error: unknown): boolean {
 }
 
 /**
+ * A 400 that names `temperature` as deprecated or unsupported for the model. Newer reasoning
+ * models (DeepSeek's `deepseek-flash`, OpenAI's o-series) reject the sampling knob even though
+ * their siblings accept it, so the transport replays the request once without it and remembers
+ * the model for the session. Kept strict: only a message that names temperature qualifies.
+ *
+ * Probed against the live DeepSeek and OpenCode Go endpoints on 2026-09-16: both still accept
+ * `temperature` on the unversioned DeepSeek ids, so this recovery is dormant for them today —
+ * it exists because a provider can flip that contract between two calls, which is exactly how
+ * the unversioned ids arrived.
+ */
+const TEMPERATURE_REJECTION = /temperature[^\n]{0,60}(?:deprecated|unsupported|not\s+supported|not\s+accepted|not\s+allowed)|(?:unsupported|unknown|invalid|unexpected)[^\n]{0,40}temperature/i;
+
+export function rejectsTemperatureParameter(error: unknown): boolean {
+  return statusOf(error) === 400 && TEMPERATURE_REJECTION.test(messageOf(error));
+}
+
+/**
  * Whether one request should be replayed without its optional body fields.
  *
  * The second case is why this cannot live inside the transport alone: a custom gateway

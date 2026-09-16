@@ -3,6 +3,8 @@ import { researchReasoningBody, researchOmitsTemperature, type ResearchEffort } 
 import type { ReasoningEffort } from '@shared/types';
 import type { VisionImagePart } from '@shared/imageAnalysis';
 import { nodusUserAgent, openCodeGoSessionId } from './clientIdentity';
+import { rejectsTemperatureParameter } from './providerErrors';
+import { rememberTemperatureUnsupported, temperatureUnsupported } from './samplingSupport';
 
 /**
  * Prefix that marks an output-ceiling cutoff. aiClient re-types errors carrying it as
@@ -171,6 +173,12 @@ function reasoningExtras(reasoning: ReasoningEffort | undefined): Record<string,
   return !reasoning || reasoning === 'off' ? {} : { reasoning_effort: reasoning };
 }
 
+/** The same body with the sampling knob removed. */
+function withoutTemperature(body: Record<string, unknown>): Record<string, unknown> {
+  const { temperature: _removed, ...rest } = body;
+  return rest;
+}
+
 /**
  * Send the optional params, and on a 400 retry once without them.
  *
@@ -178,19 +186,39 @@ function reasoningExtras(reasoning: ReasoningEffort | undefined): Record<string,
  * safe to be optimistic about `response_format` and `reasoning_effort` on a mixed
  * catalogue. This branch returned before reaching that fallback, so a single model
  * rejecting an optional field turned every structured call into a hard failure.
+ *
+ * A 400 that names `temperature` is recovered first and differently: the field is dropped
+ * and the model remembered, while the optional body is kept. This route has its own HTTP,
+ * so the recovery in `aiClient` never ran here — a Go model that deprecates the knob would
+ * have failed every call instead of one.
  */
 async function postWithOptionalExtras(
   url: string,
   headers: Record<string, string>,
   signal: AbortSignal,
   body: Record<string, unknown>,
-  extras: Record<string, unknown>
+  extras: Record<string, unknown>,
+  model: string
 ): Promise<Response> {
   const send = (payload: Record<string, unknown>) =>
     fetch(url, { method: 'POST', headers, signal, body: JSON.stringify(payload) });
 
-  const response = await send({ ...body, ...extras });
-  if (response.status !== 400 || Object.keys(extras).length === 0) return response;
+  const merged = { ...body, ...extras };
+  const response = await send(merged);
+  if (response.status !== 400) return response;
+  // Read the refusal once: the classifier needs its message, and a replay needs the
+  // offending field gone. A response that is not a temperature rejection is handed back
+  // rebuilt from those same bytes, so the caller still sees the provider's own error.
+  const raw = await response.text().catch(() => '');
+  let payload: unknown = raw;
+  try { payload = JSON.parse(raw); } catch { /* retain readable text */ }
+  if (rejectsTemperatureParameter(apiError(400, payload))) {
+    rememberTemperatureUnsupported({ provider: 'opencode-go', model });
+    return send(withoutTemperature(merged));
+  }
+  if (Object.keys(extras).length === 0) {
+    return new Response(raw, { status: 400, statusText: response.statusText, headers: response.headers });
+  }
   // Discard the rejected body so the retry does not leak the connection.
   try { await response.body?.cancel(); } catch { /* already closed */ }
   return send(body);
@@ -258,7 +286,9 @@ function researchGoBody(options: OpenCodeGoCompletionOptions, responses = false)
 }
 
 function goTemperature(options: OpenCodeGoCompletionOptions): Record<string, number> {
-  return options.researchEffort !== undefined && researchOmitsTemperature({ provider: 'opencode-go', model: options.model }, options.researchEffort)
+  const ref = { provider: 'opencode-go' as const, model: options.model };
+  if (temperatureUnsupported(ref)) return {};
+  return options.researchEffort !== undefined && researchOmitsTemperature(ref, options.researchEffort)
     ? {} : { temperature: options.temperature ?? 0.15 };
 }
 
@@ -282,6 +312,7 @@ async function completeResponses(options: OpenCodeGoCompletionOptions, url: stri
         ? {}
         : { reasoning: { effort: options.reasoning } }),
     },
+    options.model,
   );
   if (!response.ok) return readError(response);
 
@@ -341,7 +372,8 @@ async function completeOpenAi(options: OpenCodeGoCompletionOptions, url: string,
     {
       ...(options.researchEffort === undefined ? reasoningExtras(options.reasoning) : {}),
       ...(options.jsonMode ? { response_format: { type: 'json_object' } } : {}),
-    }
+    },
+    options.model,
   );
   if (!response.ok) return readError(response);
 
@@ -382,11 +414,11 @@ async function completeOpenAi(options: OpenCodeGoCompletionOptions, url: string,
 async function completeAnthropic(options: OpenCodeGoCompletionOptions, url: string, signal: AbortSignal): Promise<OpenCodeGoCompletionResult> {
   const streaming = Boolean(options.onDelta);
   const isQwen = options.model.toLowerCase().startsWith('qwen');
-  const response = await fetch(`${url}/v1/messages`, {
-    method: 'POST',
-    headers: goHeaders(options, { 'x-api-key': options.apiKey, 'anthropic-version': '2023-06-01' }),
+  const response = await postWithOptionalExtras(
+    `${url}/v1/messages`,
+    goHeaders(options, { 'x-api-key': options.apiKey, 'anthropic-version': '2023-06-01' }),
     signal,
-    body: JSON.stringify({
+    {
       model: options.model,
       // The Messages surface has no `response_format`, so the only way to honour
       // jsonMode on this route is to ask in words. Without it the flag was inert
@@ -407,8 +439,10 @@ async function completeAnthropic(options: OpenCodeGoCompletionOptions, url: stri
       // Messages models whose gateways may reject the extension.
       ...(options.researchEffort === undefined && isQwen && options.reasoning === 'off' ? { thinking: { type: 'disabled' } } : {}),
       messages: [{ role: 'user', content: options.images?.length ? anthropicVisionContent(options.user, options.images) : options.user }],
-    }),
-  });
+    },
+    {},
+    options.model,
+  );
   if (!response.ok) return readError(response);
 
   if (!streaming) {

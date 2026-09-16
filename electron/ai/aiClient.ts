@@ -43,7 +43,8 @@ import {
   deanonymizeDeep,
   findResidualNames,
 } from '@shared/studentPseudonyms';
-import { classifyProviderError, isTransientNetworkFailure, rejectsOptionalTransportField, shouldRetryWithoutOptionalFields } from './providerErrors';
+import { classifyProviderError, isTransientNetworkFailure, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields } from './providerErrors';
+import { rememberTemperatureUnsupported, temperatureUnsupported } from './samplingSupport';
 import { completeWithChatGptSubscription } from './codexSubscription';
 import { completeWithGitHubCopilotSubscription } from './githubCopilotSubscription';
 import { completeWithOpenCodeGo, OUTPUT_TRUNCATED_MARKER } from './openCodeGoCompletion';
@@ -821,7 +822,8 @@ function researchBody(model: ModelRef, opts: CallOpts): Record<string, unknown> 
   return opts.researchEffort === undefined ? {} : researchReasoningBody(model, opts.researchEffort, opts.maxTokens ?? 8000, opts.researchModelInfo);
 }
 
-function requestSamplingBody(model: ModelRef, opts: CallOpts, reasoning: ReasoningEffort): Record<string, number> {
+function requestSamplingBody(model: ModelRef, opts: CallOpts, reasoning: ReasoningEffort, stripTemperature = false): Record<string, number> {
+  if (stripTemperature || temperatureUnsupported(model)) return {};
   if (opts.researchEffort !== undefined && researchOmitsTemperature(model, opts.researchEffort, opts.researchModelInfo)) return {};
   return samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15, reasoning);
 }
@@ -1284,16 +1286,17 @@ async function rawCompleteTransport(
       observeProviderQuota(model, opts, key, schedulerEndpoint, result.response.headers);
       return result.data;
     });
-  const baseBody = {
+  const bodyFor = (stripTemperature: boolean) => ({
     model: model.model,
-    ...requestSamplingBody(model, opts, reasoning),
-        ...researchBody(model, opts),
+    ...requestSamplingBody(model, opts, reasoning, stripTemperature),
+    ...researchBody(model, opts),
     ...completionTokensBody(model.provider, model.model, maxTokens),
     messages: [
       { role: 'system' as const, content: opts.system },
       { role: 'user' as const, content: opts.images?.length ? (openAiVisionContent(opts.user, opts.images) as any) : opts.user },
     ],
-  };
+  });
+  const baseBody = bodyFor(false);
   const extras = optionalBody(model, jsonMode, reasoning, opts);
   const compatStarted = Date.now();
   try {
@@ -1308,7 +1311,14 @@ async function rawCompleteTransport(
       // that refused our reasoning hint without naming it also lands here, and keeps
       // the rest of the optional body so the scan does not lose JSON mode.
       const sentReasoning = (extras as any).reasoning_effort !== undefined;
-      if (!opts.noRetry && shouldRetryWithoutOptionalFields(e, { provider: model.provider, sentReasoning }) && Object.keys(extras).length > 0) {
+      if (!opts.noRetry && rejectsTemperatureParameter(e)) {
+        // A reasoning model that deprecates `temperature`: drop it and remember the model so
+        // later calls go straight through. Everything else in the body is kept.
+        rememberTemperatureUnsupported(model);
+        res = await withProviderRetries(freeTier, () => scheduleProviderRequest(
+          model, opts, key, schedulerEndpoint, () => createCompletion({ ...bodyFor(true), ...extras } as any),
+        ), opts.signal, !opts.noRetry);
+      } else if (!opts.noRetry && shouldRetryWithoutOptionalFields(e, { provider: model.provider, sentReasoning }) && Object.keys(extras).length > 0) {
         res = await withProviderRetries(freeTier, () => scheduleProviderRequest(
           model, opts, key, schedulerEndpoint, () => createCompletion({
             ...baseBody,
@@ -1945,17 +1955,18 @@ async function rawCompleteStreamTransport(
     maxRetries: 0,
     defaultHeaders: openAiClientHeaders(model),
   });
-  const baseBody = {
+  const bodyFor = (stripTemperature: boolean) => ({
     model: model.model,
-    ...requestSamplingBody(model, opts, reasoning),
-        ...researchBody(model, opts),
+    ...requestSamplingBody(model, opts, reasoning, stripTemperature),
+    ...researchBody(model, opts),
     ...completionTokensBody(model.provider, model.model, maxTokens),
     stream: true as const,
     messages: [
       { role: 'system' as const, content: opts.system },
       { role: 'user' as const, content: opts.images?.length ? (openAiVisionContent(opts.user, opts.images) as any) : opts.user },
     ],
-  };
+  });
+  const baseBody = bodyFor(false);
   // Streaming is plain text (no JSON mode); only reasoning + routing apply.
   const extras = optionalBody(model, false, reasoning, opts);
   const schedulerEndpoint = model.provider === 'nodus' ? 'nodus-local-runtime' : baseURL;
@@ -2006,7 +2017,15 @@ async function rawCompleteStreamTransport(
       ), signal, !opts.noRetry);
     } catch (e: any) {
       const sentReasoning = (extras as any).reasoning_effort !== undefined;
-      if (shouldRetryWithoutOptionalFields(e, { provider: model.provider, sentReasoning }) && Object.keys(extras).length > 0) {
+      if (!opts.noRetry && rejectsTemperatureParameter(e)) {
+        // A reasoning model that deprecates `temperature`: drop it, remember the model, retry
+        // once before any content streamed. Everything else in the body is kept.
+        rememberTemperatureUnsupported(model);
+        await withProviderRetries(freeTier, () => scheduleProviderRequest(
+          model, scheduleOpts, key, schedulerEndpoint,
+          () => executeStream({ ...bodyFor(true), ...extras } as any),
+        ), signal, !opts.noRetry);
+      } else if (shouldRetryWithoutOptionalFields(e, { provider: model.provider, sentReasoning }) && Object.keys(extras).length > 0) {
         await withProviderRetries(freeTier, () => scheduleProviderRequest(
           model, scheduleOpts, key, schedulerEndpoint,
           () => executeStream({ ...baseBody, ...retryOptionalBody(model, extras, e, sentReasoning) } as any),
