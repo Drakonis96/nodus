@@ -54,6 +54,8 @@ interface LayoutLine {
   size: number;
   items: PositionedItem[];
   paragraphBreakBefore?: boolean;
+  /** Which column of the page the line belongs to, when the page has a gutter there. */
+  column?: -1 | 0 | 1;
 }
 
 interface OutputBlock {
@@ -206,6 +208,108 @@ function joinLineItems(items: PositionedItem[]): string {
   return cleanInlineText(text);
 }
 
+/**
+ * The empty strip between the columns of a page, and the rows where it exists.
+ *
+ * A text item carries no notion of which column it belongs to, so a page is split into bands
+ * of rows and each band is asked whether it has a gutter: an empty vertical strip near the
+ * middle with text on both sides. Bands are scoped, not the page, because a paper puts its
+ * title, its abstract and its wide tables in rows where a single column of text crosses the
+ * middle — those rows must not be split, and a band that spans the middle finds no gutter.
+ */
+export interface ColumnGutter { top: number; bottom: number; x0: number; x1: number }
+
+const GUTTER_BAND_HEIGHT = 24;
+const GUTTER_BIN = 4;
+
+/** The widest empty strip of a band inside the middle of the page, or null. */
+function bandGutter(items: PositionedItem[], width: number): { x0: number; x1: number } | null {
+  const from = Math.floor(width * 0.25 / GUTTER_BIN);
+  const to = Math.ceil(width * 0.75 / GUTTER_BIN);
+  const occupied = new Array<boolean>(to - from + 1).fill(false);
+  for (const item of items) {
+    const first = Math.max(from, Math.floor(item.x0 / GUTTER_BIN));
+    const last = Math.min(to, Math.ceil(item.x1 / GUTTER_BIN));
+    for (let bin = first; bin <= last; bin += 1) occupied[bin - from] = true;
+  }
+  let best: { x0: number; x1: number } | null = null;
+  let runStart = -1;
+  for (let index = 0; index <= occupied.length; index += 1) {
+    const empty = index < occupied.length && !occupied[index];
+    if (empty) { if (runStart < 0) runStart = index; continue; }
+    if (runStart >= 0) {
+      const x0 = (runStart + from) * GUTTER_BIN;
+      const x1 = (index + from) * GUTTER_BIN;
+      if (x1 - x0 >= Math.max(9, width * 0.015) && (!best || x1 - x0 > best.x1 - best.x0)) best = { x0, x1 };
+      runStart = -1;
+    }
+  }
+  return best;
+}
+
+/**
+ * The rows of a page where two columns coexist, each with the gutter between them.
+ * Exported for its own test: it is the decision that keeps a two-column sentence from being
+ * stitched to the one beside it.
+ */
+export function columnGutters(items: PositionedItem[], width: number, height: number): ColumnGutter[] {
+  const bands: ColumnGutter[] = [];
+  for (let top = 0; top < height; top += GUTTER_BAND_HEIGHT) {
+    const bottom = top + GUTTER_BAND_HEIGHT;
+    const inBand = items.filter((item) => (item.top + item.bottom) / 2 >= top && (item.top + item.bottom) / 2 < bottom);
+    if (inBand.length < 2) continue;
+    const gutter = bandGutter(inBand, width);
+    if (!gutter) continue;
+    const leftItems = inBand.filter((item) => (item.x0 + item.x1) / 2 < gutter.x0);
+    const rightItems = inBand.filter((item) => (item.x0 + item.x1) / 2 > gutter.x1);
+    // Both sides must carry text: a table row inside one column leaves the strip empty on one
+    // side and must not be mistaken for a page gutter.
+    if (!leftItems.length || !rightItems.length) continue;
+    if (Math.min(leftItems.length, rightItems.length) < inBand.length * 0.3) continue;
+    // A column of a page is wide — its lines run to the gutter on one side and to the margin on
+    // the other. A table is not: its cells are short, so the strip between two of its columns
+    // looks empty while both sides stay narrow. Without this, the two-column table of a real
+    // document was read as a page of two columns and its rows were split into pieces.
+    const span = (entries: PositionedItem[]): number =>
+      Math.max(...entries.map((entry) => entry.x1)) - Math.min(...entries.map((entry) => entry.x0));
+    if (span(leftItems) < width * 0.22 || span(rightItems) < width * 0.22) continue;
+    bands.push({ top, bottom, x0: gutter.x0, x1: gutter.x1 });
+  }
+  const merged = bands.reduce<ColumnGutter[]>((accumulated, band) => {
+    const previous = accumulated.at(-1);
+    // The same gutter across two rows: its edges move with the length of the lines on either
+    // side, so what identifies it is that the empty strips overlap, not that they match. A
+    // paragraph break in one column leaves a band with nothing on one side and no gutter of its
+    // own, so bands are also joined across a short vertical gap — a column interrupted by a
+    // break is still the same column, and the line inside that gap was otherwise treated as a
+    // full-width line and reordered to the end of the page.
+    const MAX_BAND_GAP = GUTTER_BAND_HEIGHT * 3;
+    if (previous && band.top - previous.bottom <= MAX_BAND_GAP && band.x0 < previous.x1 && band.x1 > previous.x0) {
+      previous.bottom = band.bottom;
+      previous.x0 = Math.min(previous.x0, band.x0);
+      previous.x1 = Math.max(previous.x1, band.x1);
+      return accumulated;
+    }
+    accumulated.push({ ...band });
+    return accumulated;
+  }, []);
+  // A single band is a coincidence — a wide table, a figure caption beside a label. Two stacked
+  // bands worth of text beside each other is what a column looks like.
+  return merged.filter((band) => band.bottom - band.top >= GUTTER_BAND_HEIGHT * 2);
+}
+
+/** Which side of the gutter an item sits on: -1 left, 1 right, 0 when it crosses it. */
+function gutterSide(item: PositionedItem, gutters: ColumnGutter[]): -1 | 0 | 1 {
+  const center = (item.x0 + item.x1) / 2;
+  for (const gutter of gutters) {
+    if (item.bottom < gutter.top || item.top > gutter.bottom) continue;
+    if (center < gutter.x0) return -1;
+    if (center > gutter.x1) return 1;
+    return 0;
+  }
+  return 0;
+}
+
 async function pageLayout(page: any, number: number): Promise<PageLayout> {
   const viewport = page.getViewport({ scale: 1 });
   const content = await page.getTextContent({ includeMarkedContent: true });
@@ -225,22 +329,31 @@ async function pageLayout(page: any, number: number): Promise<PageLayout> {
     });
   }
   positioned.sort((a, b) => a.top - b.top || a.x0 - b.x0);
-  const groups: PositionedItem[][] = [];
+  // Two fragments on the same visual row are the same line only when they share a column.
+  // Without this, the last words of the left column and the first of the right one were joined
+  // into one sentence — "We introduce two simple global hyper-parameters that trade off
+  // accuracy" arrived as "We introduce two simple global hyperaccuracy" — and the joined line,
+  // too wide to belong to either column, was then emitted as a full-width line by readingOrder.
+  const gutters = columnGutters(positioned, viewport.width, viewport.height);
+  const groups: Array<{ side: -1 | 0 | 1; items: PositionedItem[] }> = [];
   for (const item of positioned) {
+    const side = gutterSide(item, gutters);
     let group: PositionedItem[] | undefined;
     for (let index = groups.length - 1; index >= 0; index -= 1) {
       const candidate = groups[index];
-      const sameTop = Math.abs(median(candidate.map((entry) => entry.top)) - item.top) <= Math.max(2.5, item.size * 0.28);
-      const sameBaseline = Math.abs(median(candidate.map((entry) => entry.baseline)) - item.baseline) <= Math.max(2, item.size * 0.22);
-      if (sameTop || sameBaseline) { group = candidate; break; }
+      if (candidate.side !== side) continue;
+      const sameTop = Math.abs(median(candidate.items.map((entry) => entry.top)) - item.top) <= Math.max(2.5, item.size * 0.28);
+      const sameBaseline = Math.abs(median(candidate.items.map((entry) => entry.baseline)) - item.baseline) <= Math.max(2, item.size * 0.22);
+      if (sameTop || sameBaseline) { group = candidate.items; break; }
     }
-    if (group) group.push(item); else groups.push([item]);
+    if (group) group.push(item); else groups.push({ side, items: [item] });
   }
-  const lines = groups.map((items) => ({
+  const lines = groups.map(({ side, items }) => ({
     text: joinLineItems(items), page: number,
     x0: Math.min(...items.map((entry) => entry.x0)), x1: Math.max(...items.map((entry) => entry.x1)),
     top: Math.min(...items.map((entry) => entry.top)), bottom: Math.max(...items.map((entry) => entry.bottom)),
     size: median(items.map((entry) => entry.size)), items: [...items].sort((a, b) => a.x0 - b.x0),
+    column: side,
   })).filter((line) => line.text);
   return { page: number, width: viewport.width, height: viewport.height, lines };
 }
@@ -261,6 +374,22 @@ function repeatedChrome(pages: PageLayout[]): Set<string> {
 function readingOrder(page: PageLayout): LayoutLine[] {
   const lines = [...page.lines];
   if (page.ocr) return lines;
+  // A page whose columns were found by their gutter is ordered by that: the half-of-the-page
+  // guess below misses the layouts a paper actually prints — an abstract wider than a column,
+  // or a full-width title over the two columns — and used to send such lines to the END of the
+  // page, which is how an abstract's second line ended up beside the introduction.
+  const byColumn = lines.filter((line) => (line.column ?? 0) !== 0);
+  if (byColumn.length >= 8) {
+    const left = byColumn.filter((line) => line.column === -1).sort((a, b) => a.top - b.top || a.x0 - b.x0);
+    const right = byColumn.filter((line) => line.column === 1).sort((a, b) => a.top - b.top || a.x0 - b.x0);
+    if (left.length >= 2 && right.length >= 2) {
+      const spanning = lines.filter((line) => (line.column ?? 0) === 0);
+      const firstColumnTop = Math.min(left[0].top, right[0].top);
+      const header = spanning.filter((line) => line.bottom <= firstColumnTop + 5).sort((a, b) => a.top - b.top || a.x0 - b.x0);
+      const footer = spanning.filter((line) => !header.includes(line)).sort((a, b) => a.top - b.top || a.x0 - b.x0);
+      return [...header, ...left, ...right, ...footer];
+    }
+  }
   const middle = page.width / 2;
   const left = lines.filter((line) => line.x0 < middle - 15 && line.x1 <= middle + 30 && line.x1 - line.x0 < page.width * 0.7);
   const right = lines.filter((line) => line.x0 >= middle - 30 && line.x1 - line.x0 < page.width * 0.7);
