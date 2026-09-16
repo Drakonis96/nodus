@@ -9,6 +9,9 @@ import type { LocalAiBackend } from '@shared/localAiRuntime';
 
 export const LLAMA_CPP_VERSION = 'b10002';
 export const LOCAL_RUNTIME_POLICY = 2;
+// Freshly unpacked binaries can have a slow first launch (observed on macOS CI).
+// Installation probes remain bounded; ordinary model health keeps its own deadline.
+const INSTALL_PROBE_TIMEOUT_MS = 60_000;
 
 export interface RuntimeAsset {
   name: string;
@@ -223,7 +226,7 @@ export function runRuntimeCommand(command: string, args: string[], options: {
     const abort = () => terminate(options.signal?.reason instanceof Error
       ? options.signal.reason : new Error('Descarga cancelada.'));
     const timer = setTimeout(() => terminate(
-      new Error(`llama.cpp runtime probe timed out. ${output}`.trim())
+      new Error(`llama.cpp runtime probe (${path.basename(command)} ${args[0] ?? ''}) timed out. ${output}`.trim())
     ), options.timeoutMs ?? 15_000);
     options.signal?.addEventListener('abort', abort, { once: true });
     child.once('error', (error) => finish(error));
@@ -266,13 +269,13 @@ export async function installManagedRuntime(root: string, download: RuntimeDownl
       if (!executable) throw new Error('El runtime se descargó, pero no contiene llama-server.');
       if (process.platform !== 'win32') await fs.chmod(executable, 0o755);
       if (asset.backend === 'cpu' || asset.backend === 'metal') {
-        await runRuntimeCommand(executable, ['--version'], { signal });
+        await runRuntimeCommand(executable, ['--version'], { signal, timeoutMs: INSTALL_PROBE_TIMEOUT_MS });
         cpu = executable;
         selected = { executable, backend: 'cpu', devices: [] };
       }
       if (asset.backend !== 'cpu') {
         try {
-          const output = await runRuntimeCommand(executable, ['--list-devices'], { signal });
+          const output = await runRuntimeCommand(executable, ['--list-devices'], { signal, timeoutMs: INSTALL_PROBE_TIMEOUT_MS });
           const devices = parseRuntimeDevices(output);
           if (!devices.length) throw new Error('No compatible GPU reported by this runtime.');
           selected = { executable, backend: asset.backend, devices };
