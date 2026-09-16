@@ -434,7 +434,25 @@ export function publishDocumentProfile(input: PublishDocumentProfileInput): stri
   const versionId = input.versionId ?? randomUUID();
   const now = new Date().toISOString();
   const config = input.vectors.some((vector) => vector.embedding) ? currentEmbeddingConfig() : null;
-  db.transaction(() => {
+  // Child ids are derived from the CONTENT (a section is `section-<hash of body>`, a field is
+  // `field-<hash of kind+text>`, a support is `<hash of target+quote>`, a vector names the
+  // source it summarises), and every one of those tables keys on the id alone. Publishing a
+  // second version of a document whose text did not change therefore recomputed the same ids
+  // and the insert died on `UNIQUE constraint failed: document_sections.section_id` — which is
+  // to say no work could ever be re-indexed: not a stale one, not one whose summary the reader
+  // corrected, not one re-run with another model. Superseded versions stay in the database for
+  // history, so the ids are scoped to the version that owns them and every reference to them is
+  // rewritten with the same map, in the same transaction.
+  const scoped = (id: string | null | undefined): string | null => (id == null ? null : `${versionId}:${id}`);
+  const sectionIds = new Map(input.sections.map((section) => [section.sectionId, `${versionId}:${section.sectionId}`]));
+  const fieldIds = new Map(input.fields.map((field, index) => [field.fieldId ?? '', `${versionId}:${field.fieldId ?? `field-${index}`}`]));
+  const fieldIdFor = (field: PublishDocumentProfileInput['fields'][number], index: number): string =>
+    field.fieldId ? fieldIds.get(field.fieldId) ?? `${versionId}:${field.fieldId}` : `${versionId}:field-${index}`;
+  // A reference is rewritten only when it names a row this publication created. `overview` is a
+  // sentinel source, not an id, and must survive as it is; anything else that is not in the maps
+  // was not produced by this publication and is left alone rather than guessed at.
+  const scopedSourceId = (id: string): string =>
+    sectionIds.get(id) ?? fieldIds.get(id) ?? id;  db.transaction(() => {
     ensureDocumentProfileState(input.nodusId);
     const previous = db.prepare(
       'SELECT current_version_id FROM document_profile_state WHERE nodus_id=?'
@@ -458,8 +476,8 @@ export function publishDocumentProfile(input: PublishDocumentProfileInput): stri
       `INSERT INTO document_profile_fields(field_id,version_id,nodus_id,kind,ordinal,text,confidence,centrality,confidence_source,created_at)
        VALUES(?,?,?,?,?,?,?,?,?,?)`
     );
-    for (const field of input.fields) insertField.run(
-      field.fieldId ?? randomUUID(), versionId, input.nodusId, field.kind, field.ordinal,
+    for (const [index, field] of input.fields.entries()) insertField.run(
+      fieldIdFor(field, index), versionId, input.nodusId, field.kind, field.ordinal,
       field.text, clamp01(field.confidence), clamp01(field.centrality), field.confidenceSource ?? 'model', now
     );
     const insertSection = db.prepare(
@@ -470,7 +488,9 @@ export function publishDocumentProfile(input: PublishDocumentProfileInput): stri
        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     );
     for (const section of input.sections) insertSection.run(
-      section.sectionId, versionId, input.nodusId, section.parentSectionId, section.level,
+      sectionIds.get(section.sectionId) ?? section.sectionId, versionId, input.nodusId,
+      section.parentSectionId ? sectionIds.get(section.parentSectionId) ?? section.parentSectionId : null,
+      section.level,
       section.ordinal, section.title, section.role, section.summary, JSON.stringify(section.concepts),
       JSON.stringify(section.claims), section.pageStart, section.pageEnd, section.sourceRef ?? null,
       section.pageStartNumber ?? null, section.pageEndNumber ?? null, section.charStart,
@@ -507,8 +527,9 @@ export function publishDocumentProfile(input: PublishDocumentProfileInput): stri
        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     );
     for (const support of input.supports) insertSupport.run(
-      support.supportId, versionId, input.nodusId, support.targetKind, support.targetId,
-      support.sectionId, support.passageId, support.pageStart, support.pageEnd, support.sourceRef ?? null,
+      scoped(support.supportId), versionId, input.nodusId, support.targetKind, scopedSourceId(support.targetId),
+      support.sectionId ? scopedSourceId(support.sectionId) : null, support.passageId,
+      support.pageStart, support.pageEnd, support.sourceRef ?? null,
       support.pageStartNumber ?? null, support.pageEndNumber ?? null, null, null,
       support.quote, createHash('sha256').update(support.quote).digest('hex'), support.supportKind,
       clamp01(support.confidence), support.validationStatus, now
@@ -520,7 +541,8 @@ export function publishDocumentProfile(input: PublishDocumentProfileInput): stri
        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
     );
     for (const vector of input.vectors) insertVector.run(
-      vector.vectorId ?? randomUUID(), input.nodusId, versionId, vector.kind, vector.sourceId,
+      scoped(vector.vectorId ?? randomUUID()) ?? randomUUID(), input.nodusId, versionId, vector.kind,
+      vector.sourceId == null ? null : scopedSourceId(vector.sourceId),
       vector.text, createHash('sha256').update(vector.text).digest('hex'), vector.weight,
       vector.embedding ? encodeEmbedding(vector.embedding) : null,
       vector.embedding ? (vector.embeddingProvider ?? config?.provider) : null,
@@ -532,7 +554,7 @@ export function publishDocumentProfile(input: PublishDocumentProfileInput): stri
        VALUES(?,?,?,?,?,?,?,?)`
     );
     for (const link of input.ideaLinks ?? []) insertLink.run(
-      versionId, input.nodusId, link.globalId, link.targetKind, link.targetId, link.role, clamp01(link.score), now
+      versionId, input.nodusId, link.globalId, link.targetKind, scopedSourceId(link.targetId), link.role, clamp01(link.score), now
     );
     const generatedByPath = new Map<string, unknown>([
       ['overview', input.overview],
@@ -574,7 +596,7 @@ export function publishDocumentProfile(input: PublishDocumentProfileInput): stri
       'INSERT INTO document_sections_fts(section_id,nodus_id,title,summary,concepts) VALUES(?,?,?,?,?)'
     );
     for (const section of input.sections) ftsSection.run(
-      section.sectionId, input.nodusId, section.title, section.summary, section.concepts.join(' ')
+      sectionIds.get(section.sectionId) ?? section.sectionId, input.nodusId, section.title, section.summary, section.concepts.join(' ')
     );
   })();
   refreshDocumentProfileFts(input.nodusId);

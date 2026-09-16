@@ -115,7 +115,10 @@ try {
   const profile = repo.getDocumentProfile('w1');
   assert.equal(profile.versionId, versionId);
   assert.equal(profile.fields[0].text, 'La modernización fue desigual.');
-  assert.equal(profile.sections[0].sectionId, sectionId);
+  // Section and field ids are opaque, but they are scoped to the version that published them:
+  // the pipeline derives them from the content, so a second version of the same document would
+  // otherwise reuse them and collide with the first (see the re-publication check below).
+  assert.equal(profile.sections[0].sectionId, `${versionId}:${sectionId}`);
   assert.equal(profile.sections[0].sourceRef, 'zotero:user:0:ATTACH');
   assert.equal(profile.sections[0].pageStartNumber, 1);
   assert.equal(profile.supports[0].validationStatus, 'valid');
@@ -123,7 +126,10 @@ try {
   assert.equal(profile.supports[0].pageStartNumber, 4);
   const exactSupport = repo.findDocumentSupportPassages([{
     kind: 'document', nodusId: 'w1', title: 'Modernización española', authors: ['Autora Uno'], year: 2024,
-    versionId, sourceId: fieldId, fieldKind: 'thesis', text: 'La modernización fue desigual.', similarity: 0.8,
+    // A hit's `sourceId` is the id the published version stored for that field — what
+    // `findSimilarDocuments` returns from `document_vectors.source_id`, not the pipeline's
+    // pre-publication id.
+    versionId, sourceId: `${versionId}:${fieldId}`, fieldKind: 'thesis', text: 'La modernización fue desigual.', similarity: 0.8,
     centrality: 1, explanation: 'Coincidencia en tesis', stale: false,
   }], 5);
   assert.equal(exactSupport[0].passage_id, 'w1#0', 'a matched profile field follows its validated support to the original passage');
@@ -386,7 +392,8 @@ try {
   };
   const firstReplayVersion = repo.publishDocumentProfile(replayInput);
   assert.deepEqual(
-    sqlite.prepare("SELECT embedding_provider provider,embedding_model model FROM document_vectors WHERE vector_id='captured-vector'").get(),
+    sqlite.prepare("SELECT embedding_provider provider,embedding_model model FROM document_vectors WHERE vector_id=?")
+      .get(`${nextVersionId}:captured-vector`),
     { provider: 'captured-provider', model: 'captured-model' },
     'publication records the embedding configuration captured when the vector was generated',
   );
@@ -451,6 +458,67 @@ try {
     repo.listDocumentIndexCampaigns().find((item) => item.campaignId === unstableCampaign.campaignId).status,
     'paused',
     'exhausting source-change retries pauses the campaign for explicit user recovery',
+  );
+
+  // Re-indexing a document that already has a profile used to die on
+  // `UNIQUE constraint failed: document_sections.section_id`: child ids are derived from the
+  // content, every one of those tables keys on the id alone, and a superseded version keeps
+  // its rows. So no work could ever be re-indexed — not a stale one, not one re-run with
+  // another model. Publishing the same content twice, with the same ids, must work.
+  const republishedVersionId = repo.publishDocumentProfile({
+    nodusId: 'w1', sourceFingerprint: 'source-2', pipelineVersion: 'document-profile/1', schemaVersion: 1,
+    sourceLanguage: 'es', presentationLanguage: 'es', overview: 'Estudia la modernización española.',
+    profile: { thesis: 'La modernización fue desigual.' },
+    fields: [{ fieldId, kind: 'thesis', ordinal: 0, text: 'La modernización fue desigual.', confidence: 0.96, centrality: 1 }],
+    sections: [{
+      sectionId, parentSectionId: null, level: 1, ordinal: 0, title: 'Introducción', role: 'planteamiento',
+      summary: 'Presenta una modernización territorialmente desigual.', concepts: ['modernización'],
+      claims: ['La modernización fue desigual.'], pageStart: 'p. 1', pageEnd: 'p. 12',
+      sourceRef: 'zotero:user:0:ATTACH', pageStartNumber: 1, pageEndNumber: 12,
+      charStart: 0, charEnd: 1200, contentHash: 'section-hash',
+    }],
+    supports: [{
+      supportId, targetKind: 'field', targetId: fieldId, sectionId, passageId: 'w1#0',
+      pageStart: 'p. 4', pageEnd: 'p. 4', quote: 'El proceso avanzó de manera desigual.',
+      sourceRef: 'zotero:user:0:ATTACH', pageStartNumber: 4, pageEndNumber: 4,
+      supportKind: 'direct', confidence: 0.97, validationStatus: 'valid',
+    }],
+    vectors: [{ vectorId: 'vector-overview', kind: 'overview', sourceId: 'overview', text: 'Perfil estable.', weight: 1, embedding: [1, 0] }],
+    ideaLinks: [], generatorModel: null, auditorModel: null,
+    promptHash: 'prompt-republished',
+    audit: { passed: true, score: 0.9, supportCoverage: 1, structureCoverage: 1, issues: [], repaired: false },
+    qualityScore: 0.9,
+  });
+  assert.notEqual(republishedVersionId, versionId, 'a re-index publishes its own version');
+  assert.equal(repo.getDocumentProfile('w1').versionId, republishedVersionId, 'and becomes current');
+  assert.equal(
+    sqlite.prepare('SELECT COUNT(*) n FROM document_sections WHERE section_id=?').get(`${versionId}:${sectionId}`).n, 1,
+    'the superseded version keeps the section row it published first',
+  );
+  assert.equal(
+    sqlite.prepare('SELECT COUNT(*) n FROM document_sections WHERE version_id=?').get(republishedVersionId).n, 1,
+    'the new version carries its own copy of the section, not a shared row',
+  );
+  const republished = repo.getDocumentProfile('w1');
+  assert.equal(republished.sections.length, 1, 'and the reader sees exactly one section');
+  assert.equal(republished.fields.length, 1, 'and one field');
+  const republishedSupport = sqlite.prepare(
+    'SELECT target_id, section_id FROM document_profile_support WHERE version_id=?'
+  ).get(republishedVersionId);
+  assert.notEqual(republishedSupport.target_id, fieldId, 'a support points at the id its own version published');
+  assert.equal(
+    sqlite.prepare('SELECT version_id FROM document_profile_fields WHERE field_id=?').get(republishedSupport.target_id).version_id,
+    republishedVersionId,
+    'and that id belongs to the same version',
+  );
+  assert.equal(
+    sqlite.prepare('SELECT version_id FROM document_sections WHERE section_id=?').get(republishedSupport.section_id).version_id,
+    republishedVersionId,
+    'the section reference is version-scoped too',
+  );
+  assert.equal(
+    sqlite.prepare("SELECT COUNT(*) n FROM document_vectors WHERE version_id=? AND source_id='overview'").get(republishedVersionId).n, 1,
+    'the overview vector keeps its plain source id',
   );
 
   sqlite.close();

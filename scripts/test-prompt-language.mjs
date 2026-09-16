@@ -91,6 +91,29 @@ try {
   updateSettings({ promptLanguage: undefined });
   assert.equal(withPromptLanguage({ system: BASE }).system, BASE, 'undefined language falls back to es (no directive)');
 
+  // The document-profile pack is the pipeline that came back in English for Spanish prompts:
+  // for 'es' no directive is appended, and unlike the rest of the app's Spanish prompts this
+  // pack never said which language to write in — 2 of 9 profiles of a live run followed the
+  // source document instead of the setting. Every prompt of its Spanish half states it now,
+  // and every language names its own where the composed prompt is built.
+  const { documentProfilePromptPack } = require(path.join(repoRoot, 'shared/academicPromptPacks.ts'));
+  const spanishPack = documentProfilePromptPack('es');
+  for (const field of ['section', 'reduce', 'sectionAudit', 'profile', 'audit', 'repair']) {
+    assert.match(spanishPack[field], /español/, `es pack: ${field} must state the output language`);
+  }
+  for (const field of ['section', 'reduce', 'sectionAudit', 'profile', 'repair']) {
+    assert.match(
+      spanishPack[field],
+      /no traduzcas|sin traducir|tal cual/,
+      `es pack: ${field} must keep quotes in the source language`
+    );
+  }
+  for (const [lang, name] of [['es', 'español'], ['en', 'ENGLISH'], ['ko', '한국어'], ['de', 'DEUTSCH']]) {
+    updateSettings({ promptLanguage: lang });
+    const composed = withPromptLanguage({ system: documentProfilePromptPack(lang).profile }).system;
+    assert.ok(composed.includes(name), `${lang}: the composed profile prompt must name ${name}`);
+  }
+
   console.log('Prompt-language directive test passed!');
 } finally {
   await rm(root, { recursive: true, force: true });
