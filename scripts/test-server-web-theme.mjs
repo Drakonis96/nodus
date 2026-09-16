@@ -28,7 +28,7 @@ test('Server Web custom themes drive the shell palette and accents', () => {
   assert.match(shellCss, /--server-shell-text:\s*var\(--theme-text-dark/);
   assert.match(shellCss, /--server-shell-text:\s*var\(--theme-text-light/);
   assert.match(shellCss, /server-sidebar-nav-item\.is-active[\s\S]*background:\s*var\(--a-600/);
-  assert.match(appTsx, /THEMES\.some\(\(definition\) => definition\.id === appTheme\)/);
+  assert.match(appTsx, /isBuiltInTheme\(appTheme\)/);
 });
 
 test('Server settings consumes the active custom theme palette', () => {

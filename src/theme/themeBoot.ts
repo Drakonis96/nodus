@@ -56,6 +56,11 @@ function definitionFor(id: string, customThemes: CustomTheme[] = []): RuntimeThe
   return custom ? { id: custom.id, label: custom.label, anchors: custom } : null;
 }
 
+/** Whether an id is the default palette or one of the built-in THEMES (as opposed to a custom theme). */
+export function isBuiltInTheme(id: string | null | undefined): boolean {
+  return !id || id === 'default' || THEMES.some((theme) => theme.id === id);
+}
+
 /** Apply a built-in or user-created palette through runtime CSS variables. */
 export function applyAppTheme(id: string | null | undefined, customThemes: CustomTheme[] = []): void {
   const normalized = id || 'default';

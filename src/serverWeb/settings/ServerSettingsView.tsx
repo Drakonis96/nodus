@@ -618,20 +618,33 @@ export function ServerSettingsView({
 
   const load = useCallback(() => {
     setError("");
-    void api.me().then(setMe).catch((next) => setError(errorMessage(next)));
+    void api
+      .me()
+      .then(setMe)
+      .catch((next) => setError((prev) => prev || errorMessage(next)));
 
-    // The portable profile is authoritative when it exists. A new account can
-    // start with the local blank profile; Server AI is optional in basic
-    // deployments, so do not probe its legacy endpoint just to render Settings.
+    // Server AI is optional in basic deployments, so a stalled/unavailable
+    // legacy endpoint must not block Settings from loading. It is only
+    // consulted below, to seed a brand-new profile from an existing legacy
+    // selection.
+    const legacyAiPreferences = api.aiPreferences().catch(() => undefined);
+
+    // The portable profile is authoritative when it exists. A new account
+    // starts from a blank profile seeded with any legacy Server AI
+    // preference, recomputed on every load so a theme correction that
+    // arrives after mount (or after the legacy fetch resolves) is not lost.
     void api
       .profilePreferences()
-      .then((profileResponse) => {
+      .then(async (profileResponse) => {
         setProfileMeta(profileResponse.profile);
         if (profileResponse.profile.values) {
           setProfile(profileResponse.profile.values);
+        } else {
+          const legacy = await legacyAiPreferences;
+          setProfile(blankProfile(theme, legacy?.preferences));
         }
       })
-      .catch((next) => setError(errorMessage(next)));
+      .catch((next) => setError((prev) => prev || errorMessage(next)));
 
     if (isAdmin)
       void api

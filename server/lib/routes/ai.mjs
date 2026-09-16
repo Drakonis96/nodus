@@ -154,7 +154,11 @@ export function createAIRoutes({
   // disabled. Keep this route available independently from the AI control
   // plane so appearance and other non-AI settings can sync everywhere.
   async function handleProfilePreferences(req, res, url) {
-    if (url.pathname !== '/api/v2/me/preferences') return false;
+    if (!url.pathname.startsWith('/api/v2/')) return false;
+    let segments;
+    try { segments = url.pathname.split('/').filter(Boolean).map((value) => decodeURIComponent(value)); }
+    catch { json(res, 400, { error: 'bad_path' }); return true; }
+    if (!(segments[1] === 'v2' && segments[2] === 'me' && segments[3] === 'preferences' && !segments[4])) return false;
     const auth = me(req, res, { mutation: req.method === 'PUT' }); if (!auth) return true;
     if (req.method === 'GET') {
       json(res, 200, { profile: privateData.profilePreferences(auth.user.id) }); return true;
@@ -188,7 +192,9 @@ export function createAIRoutes({
   }
 
   async function handle(req, res, url) {
-    if (await handleProfilePreferences(req, res, url)) return true;
+    // Callers reach this route through server.mjs's route(), which already
+    // calls handleProfilePreferences directly before DEPLOYMENT_MODE gating
+    // ever reaches here. No re-check needed.
     if (!url.pathname.startsWith('/api/v2/')) return false;
     let segments;
     try { segments = url.pathname.split('/').filter(Boolean).map((value) => decodeURIComponent(value)); }

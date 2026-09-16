@@ -26,8 +26,7 @@ import {
   type View,
 } from "../navigation";
 import { HoverLabelButton, Icon } from "../components/ui";
-import { APP_THEME_DEFINITIONS_STORAGE_KEY, APP_THEME_STORAGE_KEY, applyAppTheme as applyRuntimeAppTheme } from "../theme/themeBoot";
-import { THEMES } from "../theme/themes.mjs";
+import { APP_THEME_DEFINITIONS_STORAGE_KEY, APP_THEME_STORAGE_KEY, applyAppTheme as applyRuntimeAppTheme, isBuiltInTheme } from "../theme/themeBoot";
 import { vaultTypeIcon, vaultTypeLabel } from "../components/vaultTypeUi";
 import { WorldbuildingSidebar } from "../components/WorldbuildingSidebar";
 import { ProsopographySidebar } from "../components/ProsopographySidebar";
@@ -1828,12 +1827,7 @@ export default function App() {
     // has no profile row yet. Custom palettes still wait for their definitions
     // from the profile so themeBoot can fail closed safely instead of treating
     // an unloaded custom theme as the default.
-    if (
-      !profile &&
-      appTheme !== "default" &&
-      !THEMES.some((definition) => definition.id === appTheme)
-    )
-      return;
+    if (!profile && !isBuiltInTheme(appTheme)) return;
     const customThemes = profile?.appearance.customThemes ?? [];
     applyRuntimeAppTheme(appTheme, customThemes);
     localStorage.setItem(APP_THEME_STORAGE_KEY, appTheme);
