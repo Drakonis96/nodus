@@ -1661,6 +1661,8 @@ export const FR: Record<string, string> = {
   'Cambiar paleta de tema': 'Changer la palette du thème',
   'Paletas de color. El modo claro u oscuro se ajusta aparte.': 'Palettes de couleurs. Le mode clair ou sombre se règle séparément.',
   'Paletas de color. El modo claro u oscuro se ajusta arriba.': 'Palettes de couleurs. Le mode clair ou sombre se règle ci-dessus.',
+  'Usar la misma paleta en todas las bóvedas': 'Utiliser la même palette dans tous les coffres',
+  'Activado, todas las bóvedas comparten la paleta. Desactivado, cada una recuerda la suya y las nuevas empiezan con la predeterminada. El modo claro u oscuro es común en ambos casos.': 'Activé, tous les coffres partagent la palette. Désactivé, chaque coffre garde la sienne et les nouveaux commencent avec celle par défaut. Le mode clair ou sombre reste commun dans les deux cas.',
   'Crear tema': 'Créer un thème',
   'Editar tema': 'Modifier le thème',
   'Guardar tema': 'Enregistrer le thème',

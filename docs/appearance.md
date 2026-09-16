@@ -142,6 +142,44 @@ is the strongest case, and its gold surface is what brings the muted amber and
 cyan labels closest to unreadable — and add a component rule in
 `theme-components.css` when the utility cannot hold the contrast.
 
+## Palette scope: per vault or shared
+
+The palette is **per vault by default**. `shareAppThemeAcrossVaults` — **Use the
+same palette in every vault** in Settings — is the switch that makes it
+profile-wide, and it is itself always global, because a policy that differed per
+vault would contradict the setting it configures. Light/dark mode is not part of
+this choice: it stays shared either way, since it tracks the display rather than
+the corpus.
+
+The scope is resolved on every read rather than by a schema migration. Both
+`appTheme` and `customThemes` sit in `SHARED_APPEARANCE_KEYS`, which joins the
+profile file only while the switch is on:
+
+- **Off**, the pair is written to, and read from, the vault's own settings blob.
+  A vault created later has no palette stored, so it starts on the default one.
+- **On**, the pair goes to the shared store and is *also* left in the vault's
+  blob. The vault keeps its own record so that turning the switch off restores
+  that vault's palette instead of dropping it to the default.
+
+Two details keep the switch from being destructive:
+
+- Enabling it adopts the palette currently on screen, so "the same in every
+  vault" means the one the user is looking at rather than whatever the file held
+  last.
+- Writes that happen while it is on — including the one that turns it off —
+  preserve the vault's stored palette, because the values on screen come from the
+  shared store and writing those back would erase it.
+
+A vault that predates this scope keeps the palette only in the shared file.
+`getSettings` adopts it into that vault the first time, so making per-vault the
+default never resets a theme somebody already chose. A vault with no settings
+row yet is new, and is left on the default palette.
+
+Server Web has a single space rather than vaults, so it has no switch: the
+portable profile carries the palette in use, and a palette that arrives from the
+server is applied through the same rules — to the shared store when the switch is
+on, to the active vault when it is off.
+
 ## Contrast and semantic components
 
 Custom theme validation checks the important mode-specific combinations before

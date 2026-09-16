@@ -1682,6 +1682,8 @@ export const EN: Record<string, string> = {
   'Cambiar paleta de tema': 'Change theme palette',
   'Paletas de color. El modo claro u oscuro se ajusta aparte.': 'Colour palettes. Light or dark mode is set separately.',
   'Paletas de color. El modo claro u oscuro se ajusta arriba.': 'Colour palettes. Light or dark mode is set above.',
+  'Usar la misma paleta en todas las bóvedas': 'Use the same palette in every vault',
+  'Activado, todas las bóvedas comparten la paleta. Desactivado, cada una recuerda la suya y las nuevas empiezan con la predeterminada. El modo claro u oscuro es común en ambos casos.': 'On, all vaults share the palette. Off, each vault keeps its own and new vaults start on the default one. Light or dark mode is shared either way.',
   'Crear tema': 'Create theme',
   'Editar tema': 'Edit theme',
   'Guardar tema': 'Save theme',

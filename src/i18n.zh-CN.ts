@@ -1480,6 +1480,8 @@ export const ZH_CN: Record<string, string> = {
   "Cambiar paleta de tema": "更换主题配色",
   "Paletas de color. El modo claro u oscuro se ajusta aparte.": "配色方案。浅色或深色模式单独设置。",
   "Paletas de color. El modo claro u oscuro se ajusta arriba.": "配色方案。浅色或深色模式在上方设置。",
+  "Usar la misma paleta en todas las bóvedas": "在所有资料库中使用相同的调色板",
+  "Activado, todas las bóvedas comparten la paleta. Desactivado, cada una recuerda la suya y las nuevas empiezan con la predeterminada. El modo claro u oscuro es común en ambos casos.": "开启后，所有资料库共用同一调色板。关闭后，每个资料库保留自己的调色板，新建资料库从默认调色板开始。浅色或深色模式在两种情况下都共用。",
   "Crear tema": "创建主题",
   "Editar tema": "编辑主题",
   "Guardar tema": "保存主题",

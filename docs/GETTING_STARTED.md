@@ -138,6 +138,15 @@ Nodus. They cover the app background, sidebar, workspaces, cards, buttons,
 icons, labels, dialogs and the graph. Pages you open in **Nodus Browser** keep
 their own colours, because those belong to the website rather than to Nodus.
 
+**Each vault keeps its own palette by default.** The palette you choose applies
+to the vault you are in, and a vault you create later starts on **Default**. If
+you would rather carry one palette everywhere, turn on **Use the same palette in
+every vault** just below the swatches: every vault then shares it, including the
+ones you create afterwards. Turning that setting off again returns each vault to
+the palette it had. Your own custom themes follow the same scope. The light/dark
+mode is separate and is always shared, because it follows your display rather
+than the corpus.
+
 Your appearance choice is part of your local Nodus profile, and selecting a
 theme never sends vault content anywhere. If you use a portable profile with
 Nodus Server, the selected palette and your custom themes travel with it and are

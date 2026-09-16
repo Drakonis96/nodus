@@ -1662,6 +1662,8 @@ export const DE: Record<string, string> = {
   'Cambiar paleta de tema': 'Themenpalette wechseln',
   'Paletas de color. El modo claro u oscuro se ajusta aparte.': 'Farbpaletten. Heller oder dunkler Modus wird separat eingestellt.',
   'Paletas de color. El modo claro u oscuro se ajusta arriba.': 'Farbpaletten. Der helle oder dunkle Modus wird oben eingestellt.',
+  'Usar la misma paleta en todas las bóvedas': 'Dieselbe Palette in allen Tresoren verwenden',
+  'Activado, todas las bóvedas comparten la paleta. Desactivado, cada una recuerda la suya y las nuevas empiezan con la predeterminada. El modo claro u oscuro es común en ambos casos.': 'Aktiviert teilen alle Tresore die Palette. Deaktiviert behält jeder Tresor seine eigene, und neue Tresore starten mit der Standardpalette. Der Hell-/Dunkelmodus ist in beiden Fällen gemeinsam.',
   'Crear tema': 'Thema erstellen',
   'Editar tema': 'Thema bearbeiten',
   'Guardar tema': 'Thema speichern',

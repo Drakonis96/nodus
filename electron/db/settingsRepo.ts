@@ -13,14 +13,18 @@ import { lockedApiKeyProviders, providerKeyMap } from '../secrets/secretStore';
 import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
 import { DEFAULT_NODUS_IMAGE_QUALITY, isNodusImageQuality } from '@shared/localImageModels';
 import { EMPTY_CUSTOM_EVENT_TYPES, sanitizeCustomEventTypes } from '@shared/eventTypes';
-import { sanitizeCustomThemes } from '@shared/appThemes';
+import { sanitizeCustomThemes, coerceAppTheme } from '@shared/appThemes';
 import { isPipelineLogMaxEntries, isPipelineLogRetention } from '@shared/pipelineLogs';
 import { normalizeToolkitToolPages } from '@shared/toolkitNavigation';
 import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
 import {
   GLOBAL_PREF_KEYS,
+  SHARED_APPEARANCE_KEYS,
   SHARED_MODEL_KEYS,
+  isSharedAppearanceKey,
   readGlobalPrefs,
+  sharesAppThemeAcrossVaults,
+  sharedKeysFor,
   splitGlobalPatch,
   writeGlobalPrefs,
   type SharedModelKey,
@@ -136,6 +140,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   theme: 'dark',
   appTheme: 'default',
   customThemes: [],
+  shareAppThemeAcrossVaults: false,
   uiLanguage: 'es',
   promptLanguage: 'es',
   animationSpeed: 1,
@@ -298,6 +303,21 @@ function writeRaw(key: string, value: string): void {
     .run(key, value);
 }
 
+/** This vault's own palette, ignoring whatever the shared store is overlaying. */
+function readVaultStoredPalette(): Partial<Pick<AppSettings, 'appTheme' | 'customThemes'>> {
+  const raw = readRaw('app');
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as Partial<AppSettings>;
+    return {
+      ...(parsed.appTheme === undefined ? {} : { appTheme: parsed.appTheme }),
+      ...(parsed.customThemes === undefined ? {} : { customThemes: parsed.customThemes }),
+    };
+  } catch {
+    return {};
+  }
+}
+
 export function getSettings(): AppSettings {
   const raw = readRaw('app');
   let parsed: Partial<AppSettings> = {};
@@ -392,7 +412,19 @@ export function getSettings(): AppSettings {
   // users keep their preferences when the first new vault is created.
   const globalPrefs = recoverV23SharedModelPrefs() as ReturnType<typeof readGlobalPrefs>;
   const seed: Record<string, unknown> = {};
-  for (const key of GLOBAL_PREF_KEYS) {
+  const sharesAppearance = sharesAppThemeAcrossVaults(globalPrefs as Record<string, unknown>);
+  // The palette is per vault by default, so a vault that already had settings but no
+  // palette of its own predates that scope — it kept the choice only in the shared
+  // file. Adopt it once, so making per-vault the default never resets a theme someone
+  // already chose. A vault with no settings row yet is brand new and starts on the
+  // default palette, which is what the per-vault scope promises for a new vault.
+  if (!sharesAppearance && raw && parsed.appTheme === undefined
+    && (globalPrefs.appTheme !== undefined || globalPrefs.customThemes !== undefined)) {
+    merged.appTheme = coerceAppTheme(globalPrefs.appTheme ?? merged.appTheme);
+    merged.customThemes = sanitizeCustomThemes(globalPrefs.customThemes ?? merged.customThemes);
+    writeRaw('app', JSON.stringify(merged));
+  }
+  for (const key of sharedKeysFor(sharesAppearance)) {
     if (globalPrefs[key] === undefined) seed[key] = merged[key];
     else (merged as Record<string, unknown>)[key] = globalPrefs[key];
   }
@@ -573,16 +605,38 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
     patch = { ...patch, studyAiPrivacyMode: patch.studyAiLocalOnly ? 'local' : 'hybrid' };
   }
   const current = getSettings();
+  const sharesBefore = sharesAppThemeAcrossVaults();
+  const sharesAfter = patch.shareAppThemeAcrossVaults ?? sharesBefore;
+  // Turning the shared palette on adopts the one on screen: "the same in every vault"
+  // has to mean the palette the user is looking at, not whatever the file held last.
+  if (sharesAfter && !sharesBefore) {
+    patch = { ...patch, appTheme: current.appTheme, customThemes: current.customThemes };
+  }
+  // While the palette is shared — and on the write that stops sharing it — the vault
+  // keeps the palette it had. The values on screen come from the shared store, so
+  // writing those back would overwrite this vault's own palette, and switching the
+  // sharing off could never restore it.
+  const vaultOwnedPalette = sharesAfter || sharesBefore ? readVaultStoredPalette() : null;
   // Shared keys (theme/language/favorites + the AI model configuration) go to the global store;
   // everything else stays per-vault. Model keys are also kept in the per-vault blob as a
   // fallback, so switching vaults never loses a value.
-  const { global, local } = splitGlobalPatch(patch);
+  const { global, local } = splitGlobalPatch(patch, sharesAfter);
   if (Object.keys(global).length) writeGlobalPrefs(global);
   // providerKeys is derived from the secret store, never persisted.
   const { providerKeys: _ignore, lockedProviderKeys: _ignoreLocked, ...rest } = { ...current, ...local };
   // Never persist the app-wide keys into the per-vault blob (they'd shadow the
-  // shared store and drift), so keep them exclusively in the global prefs file.
-  for (const key of GLOBAL_PREF_KEYS) delete (rest as Record<string, unknown>)[key];
+  // shared store and drift), so keep them exclusively in the global prefs file. The
+  // palette is exempt either way: it is this vault's own record of what it shows.
+  for (const key of sharedKeysFor(sharesAfter)) {
+    if (isSharedAppearanceKey(key)) continue;
+    delete (rest as Record<string, unknown>)[key];
+  }
+  if (vaultOwnedPalette) {
+    for (const key of SHARED_APPEARANCE_KEYS) {
+      if (vaultOwnedPalette[key] === undefined) delete (rest as Record<string, unknown>)[key];
+      else (rest as Record<string, unknown>)[key] = vaultOwnedPalette[key];
+    }
+  }
   writeRaw('app', JSON.stringify(rest));
   return getSettings();
 }

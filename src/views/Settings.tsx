@@ -1259,6 +1259,17 @@ export function Settings({
                 </div>}
               </div>
             </Row>
+            <Row
+              label={t('Usar la misma paleta en todas las bóvedas')}
+              hint={t('Activado, todas las bóvedas comparten la paleta. Desactivado, cada una recuerda la suya y las nuevas empiezan con la predeterminada. El modo claro u oscuro es común en ambos casos.')}
+            >
+              <input
+                type="checkbox"
+                data-testid="share-app-theme"
+                checked={settings.shareAppThemeAcrossVaults}
+                onChange={(e) => patch({ shareAppThemeAcrossVaults: e.target.checked })}
+              />
+            </Row>
             <Row label={t('Velocidad de animaciones')}>
               <input
                 type="range"

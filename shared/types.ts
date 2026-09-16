@@ -1999,6 +1999,14 @@ export interface AppSettings {
   appTheme: AppTheme;
   /** User-created palettes, persisted with the profile and kept separate from built-ins. */
   customThemes: CustomAppTheme[];
+  /**
+   * Whether {@link AppSettings.appTheme} and {@link AppSettings.customThemes} are one
+   * profile-wide choice or a per-vault one. Off by default: every vault keeps its own
+   * palette, and a vault created later starts on the default one. Light/dark mode is
+   * unaffected — it stays shared either way, because it tracks the display rather than
+   * the corpus.
+   */
+  shareAppThemeAcrossVaults: boolean;
   // Interface language (localizes all UI text).
   uiLanguage: AppLanguage;
   // Language injected into AI prompts → language of generated ideas/themes/answers.
