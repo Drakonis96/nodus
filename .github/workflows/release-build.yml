@@ -235,12 +235,6 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: node scripts/verify-macos-release.cjs release ${{ matrix.mac_arch }}
 
-      # ubuntu-latest does not ship rpmbuild, so the rpm target in
-      # linux.target silently has nothing to shell out to without this.
-      - name: Install rpm packaging tools
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update && sudo apt-get install -y rpm
-
       - name: Build Linux installer
         if: matrix.os == 'ubuntu-latest'
         run: npx electron-builder ${{ matrix.platform }} --publish never --config build/electron-builder.release.cjs
