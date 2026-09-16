@@ -15,8 +15,10 @@ import {
   type NodusLocalModelDefinition,
 } from '@shared/localAiModels';
 import type { ModelInfo } from '@shared/types';
+import { LocalRuntimeManager, runRuntimeProbe } from './localAiRuntime';
+import { LLAMA_CPP_VERSION, runtimeEnvironment, gpuStartupFailure, offloadedLayerCount } from './localAiRuntimePolicy';
+import { LocalCalibrationQueue } from './localAiCalibration';
 
-const LLAMA_CPP_VERSION = 'b10002';
 interface ActiveLocalAiDownload {
   progress: number;
   promise: Promise<NodusLocalAiStatus>;
@@ -28,14 +30,6 @@ const activeDownloads = new Map<string, ActiveLocalAiDownload>();
 let activeRuntimeDownload: ActiveLocalAiDownload | null = null;
 const embeddingPipelines = new Map<string, Promise<any>>();
 const verifiedAssetCache = new Map<string, { size: number; mtimeMs: number; sha256: string }>();
-
-interface RuntimeAsset {
-  name: string;
-  url: string;
-  sha256: string;
-  archive: 'zip' | 'tar.gz';
-  bytes: number;
-}
 
 interface ActiveServer {
   key: string;
@@ -53,13 +47,16 @@ interface ActiveServer {
   leases: number;
   stopWhenIdle: boolean;
   idleWaiters: Set<() => void>;
+  ready: boolean;
+  offloadedLayers: number | null;
 }
 
 let activeServer: ActiveServer | null = null;
 let lifecycleTail: Promise<void> = Promise.resolve();
 const safeSlotsByModel = new Map<string, 1 | 2 | 4>();
-const calibrationJobs = new Map<string, Promise<void>>();
-let calibrationTail: Promise<void> = Promise.resolve();
+const calibrationQueue = new LocalCalibrationQueue();
+const runtimeManager = new LocalRuntimeManager(rootDirectory);
+let lastStartupError = '';
 
 async function serializeLifecycle<T>(task: () => Promise<T>): Promise<T> {
   let release!: () => void;
@@ -81,71 +78,8 @@ function modelDirectory(modelId: string): string {
   return path.join(modelsDirectory(), modelId);
 }
 
-function runtimeDirectory(): string {
-  return path.join(rootDirectory(), 'runtime', LLAMA_CPP_VERSION);
-}
-
-function runtimeAsset(): RuntimeAsset {
-  const base = `https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_CPP_VERSION}`;
-  const key = `${process.platform}-${process.arch}`;
-  const assets: Record<string, Omit<RuntimeAsset, 'url'>> = {
-    'darwin-arm64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-macos-arm64.tar.gz`,
-      sha256: 'b7aca9d4f9c6267a5f389179bd7412c4e991ac7d1b69f52acf065ef99c99345c',
-      archive: 'tar.gz',
-      bytes: 10_749_656,
-    },
-    'darwin-x64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-macos-x64.tar.gz`,
-      sha256: 'c90eaed104ad1c82628d34967def32eaae2516768e10121fbebc4c73a046ac7d',
-      archive: 'tar.gz',
-      bytes: 11_031_400,
-    },
-    'linux-arm64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-ubuntu-arm64.tar.gz`,
-      sha256: '348e880ac43a5df038729f34ac3be6a1c57b5de491504b59b5273d8b1f4dae40',
-      archive: 'tar.gz',
-      bytes: 12_791_141,
-    },
-    'linux-x64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-ubuntu-x64.tar.gz`,
-      sha256: '760dcd8c52be7960bf7487adce4287c151000a41e44f836abdb1a282340c5949',
-      archive: 'tar.gz',
-      bytes: 15_855_822,
-    },
-    'win32-arm64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-win-cpu-arm64.zip`,
-      sha256: '271470732568e8326c58e0a357e5f9085e956de97587358c690ff166edaafb77',
-      archive: 'zip',
-      bytes: 12_159_035,
-    },
-    'win32-x64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-win-cpu-x64.zip`,
-      sha256: 'c4c3dd2e139e3f00f7bdf4993a2f893e8db4dc6ae51140cc25ddd63306c32734',
-      archive: 'zip',
-      bytes: 18_253_272,
-    },
-  };
-  const asset = assets[key];
-  if (!asset) throw new Error(`llama.cpp no ofrece un runtime integrado para ${key}.`);
-  return { ...asset, url: `${base}/${asset.name}` };
-}
-
-async function findFile(directory: string, wanted: string): Promise<string | null> {
-  const entries = await fsp.readdir(directory, { withFileTypes: true }).catch(() => []);
-  for (const entry of entries) {
-    const target = path.join(directory, entry.name);
-    if (entry.isFile() && entry.name === wanted) return target;
-    if (entry.isDirectory()) {
-      const nested = await findFile(target, wanted);
-      if (nested) return nested;
-    }
-  }
-  return null;
-}
-
 async function llamaServerPath(): Promise<string | null> {
-  return findFile(runtimeDirectory(), process.platform === 'win32' ? 'llama-server.exe' : 'llama-server');
+  return (await runtimeManager.resolve())?.executablePath ?? null;
 }
 
 async function modelStatus(model: NodusLocalModelDefinition) {
@@ -172,31 +106,37 @@ async function modelStatus(model: NodusLocalModelDefinition) {
   };
 }
 
-async function sha256Path(target: string): Promise<string> {
+async function sha256Path(target: string, signal?: AbortSignal): Promise<string> {
+  signal?.throwIfAborted();
   const stat = await fsp.stat(target);
   const cached = verifiedAssetCache.get(target);
   if (cached && cached.size === stat.size && cached.mtimeMs === stat.mtimeMs) return cached.sha256;
   const hash = createHash('sha256');
-  for await (const chunk of fs.createReadStream(target)) hash.update(chunk as Buffer);
+  for await (const chunk of fs.createReadStream(target)) {
+    signal?.throwIfAborted();
+    hash.update(chunk as Buffer);
+  }
   const sha256 = hash.digest('hex');
   verifiedAssetCache.set(target, { size: stat.size, mtimeMs: stat.mtimeMs, sha256 });
   return sha256;
 }
 
-export async function verifyNodusLocalModel(modelId: string): Promise<boolean> {
+export async function verifyNodusLocalModel(modelId: string, signal?: AbortSignal): Promise<boolean> {
   const model = getNodusLocalModel(modelId);
   if (!model) throw new Error(`Modelo local no soportado: ${modelId}`);
   for (const asset of model.assets) {
+    signal?.throwIfAborted();
     const target = path.join(modelDirectory(model.id), asset.file);
     const stat = await fsp.stat(target).catch(() => null);
     if (!stat?.isFile() || stat.size !== asset.bytes || !asset.sha256) return false;
-    if (await sha256Path(target) !== asset.sha256) return false;
+    if (await sha256Path(target, signal) !== asset.sha256) return false;
   }
   return true;
 }
 
 export async function getNodusLocalAiStatus(): Promise<NodusLocalAiStatus> {
   const executablePath = await llamaServerPath();
+  const runtime = runtimeManager.snapshot();
   return {
     runtime: {
       version: LLAMA_CPP_VERSION,
@@ -204,6 +144,17 @@ export async function getNodusLocalAiStatus(): Promise<NodusLocalAiStatus> {
       executablePath,
       downloading: Boolean(activeRuntimeDownload),
       progress: activeRuntimeDownload?.progress ?? (executablePath ? 1 : 0),
+      diagnostics: {
+        backend: runtime?.backend ?? null,
+        devices: runtime?.devices ?? [],
+        legacy: runtime?.legacy ?? false,
+        fallbackReason: runtime?.fallbackReason,
+        detail: lastStartupError || runtime?.detail,
+        phase: calibrationQueue.activeKey ? 'calibrating' : activeServer
+          ? activeServer.ready ? 'running' : 'starting'
+          : lastStartupError ? 'error' : executablePath ? 'installed' : 'not-installed',
+        offloadedLayers: activeServer?.offloadedLayers ?? null,
+      },
     },
     models: await Promise.all(NODUS_LOCAL_MODELS.map(modelStatus)),
     activeModelId: activeServer?.modelId ?? null,
@@ -251,7 +202,7 @@ async function downloadFile(
   await fsp.mkdir(path.dirname(target), { recursive: true });
   const completed = await fsp.stat(target).catch(() => null);
   if (completed?.isFile() && (!expectedBytes || completed.size === expectedBytes)) {
-    if (!expectedSha256 || await sha256Path(target) === expectedSha256) {
+    if (!expectedSha256 || await sha256Path(target, signal) === expectedSha256) {
       onBytes(completed.size);
       return;
     }
@@ -275,7 +226,7 @@ async function downloadFile(
     throw error;
   }
   if (response.status === 416 && expectedBytes && resumedBytes === expectedBytes) {
-    const digest = await sha256Path(partial);
+    const digest = await sha256Path(partial, signal);
     if (!expectedSha256 || digest === expectedSha256) {
       await fsp.rename(partial, target);
       return;
@@ -328,41 +279,8 @@ async function downloadFile(
   await fsp.rename(partial, target);
 }
 
-function run(command: string, args: string[], cwd?: string, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(downloadCancelledError());
-      return;
-    }
-    const child = spawn(command, args, { cwd, stdio: ['ignore', 'ignore', 'pipe'] });
-    let stderr = '';
-    let settled = false;
-    const finish = (error?: Error) => {
-      if (settled) return;
-      settled = true;
-      signal?.removeEventListener('abort', abort);
-      if (error) reject(error);
-      else resolve();
-    };
-    const abort = () => {
-      if (child.exitCode == null) child.kill('SIGTERM');
-    };
-    signal?.addEventListener('abort', abort, { once: true });
-    child.stderr?.on('data', (chunk) => { stderr = `${stderr}${String(chunk)}`.slice(-8_000); });
-    child.on('error', (error) => finish(signal?.aborted ? downloadCancelledError() : error));
-    child.on('close', (code) => {
-      if (signal?.aborted) finish(downloadCancelledError());
-      else if (code === 0) finish();
-      else finish(new Error(stderr || `${command} terminó con código ${code}.`));
-    });
-  });
-}
-
 export async function installNodusLocalRuntime(onProgress?: (fraction: number) => void): Promise<NodusLocalAiStatus> {
-  const existing = await llamaServerPath();
-  if (existing) return getNodusLocalAiStatus();
   if (activeRuntimeDownload) return followDownload(activeRuntimeDownload, onProgress);
-
   const job: ActiveLocalAiDownload = {
     progress: 0,
     promise: null as unknown as Promise<NodusLocalAiStatus>,
@@ -370,38 +288,28 @@ export async function installNodusLocalRuntime(onProgress?: (fraction: number) =
     controller: new AbortController(),
   };
   activeRuntimeDownload = job;
-  job.promise = (async () => {
-    const asset = runtimeAsset();
-    const root = runtimeDirectory();
-    const archive = path.join(rootDirectory(), asset.name);
-    let installed = false;
-    try {
-      await fsp.rm(root, { recursive: true, force: true });
-      await fsp.mkdir(rootDirectory(), { recursive: true });
-      let downloaded = 0;
-      await downloadFile(asset.url, archive, asset.bytes, asset.sha256, (bytes) => {
-        downloaded += bytes;
-        reportDownloadProgress(job, Math.min(0.9, (downloaded / asset.bytes) * 0.9));
-      }, job.controller.signal);
-      throwIfDownloadCancelled(job.controller.signal);
-      await fsp.mkdir(root, { recursive: true });
-      if (asset.archive === 'zip') {
-        new AdmZip(archive).extractAllTo(root, true);
-        throwIfDownloadCancelled(job.controller.signal);
-      } else {
-        await run('tar', ['-xzf', archive, '-C', root], undefined, job.controller.signal);
-      }
-      const executable = await llamaServerPath();
-      if (!executable) throw new Error('El runtime se descargó, pero no contiene llama-server.');
-      if (process.platform !== 'win32') await fsp.chmod(executable, 0o755);
-      reportDownloadProgress(job, 1);
-      installed = true;
-      return getNodusLocalAiStatus();
-    } finally {
-      if (installed) await fsp.rm(archive, { force: true });
-      if (job.controller.signal.aborted) await fsp.rm(root, { recursive: true, force: true });
-    }
-  })().finally(() => {
+  // This action also upgrades legacy CPU installs. Never replace an engine that
+  // owns a real request, and never download anything merely to answer status.
+  job.promise = calibrationQueue.runForeground(() => serializeLifecycle(async () => {
+    if (activeServer?.leases) throw new Error('El modelo tiene solicitudes en curso. Espera a que terminen antes de actualizar el motor.');
+    await stopNodusLocalServerAndWait();
+    await runtimeManager.install({
+      download: (asset, destination, onBytes, signal) => downloadFile(asset.url, destination, asset.bytes, asset.sha256, onBytes, signal),
+      extract: async (asset, archive, destination, signal) => {
+        signal.throwIfAborted();
+        if (asset.archive === 'zip') {
+          await new Promise<void>((resolve, reject) => {
+            new AdmZip(archive).extractAllToAsync(destination, true, false, (error?: Error) => error ? reject(error) : resolve());
+          });
+        } else {
+          await runRuntimeProbe('tar', ['-xzf', archive, '-C', destination], signal, 120_000);
+        }
+        signal.throwIfAborted();
+      },
+    }, (fraction) => reportDownloadProgress(job, fraction), job.controller.signal);
+    safeSlotsByModel.clear();
+    lastStartupError = '';
+  })).finally(() => {
     if (activeRuntimeDownload === job) activeRuntimeDownload = null;
   }).then(() => getNodusLocalAiStatus());
   return followDownload(job, onProgress);
@@ -420,7 +328,7 @@ async function downloadModelAssets(
     throwIfDownloadCancelled(signal);
     const target = path.join(directory, asset.file);
     const stat = await fsp.stat(target).catch(() => null);
-    if (stat?.isFile() && stat.size === asset.bytes && asset.sha256 && await sha256Path(target) === asset.sha256) {
+    if (stat?.isFile() && stat.size === asset.bytes && asset.sha256 && await sha256Path(target, signal) === asset.sha256) {
       completed += asset.bytes;
       onProgress?.(completed / total);
       continue;
@@ -453,7 +361,8 @@ export async function downloadNodusLocalModel(
   };
   activeDownloads.set(modelId, job);
   job.promise = (async () => {
-    if (model.runtime === 'llama_cpp' && !(await llamaServerPath())) {
+    if (model.runtime === 'llama_cpp' && (!(await llamaServerPath()) || runtimeManager.snapshot()?.legacy)) {
+      throwIfDownloadCancelled(job.controller.signal);
       await installNodusLocalRuntime((fraction) => reportDownloadProgress(job, fraction * 0.2));
       throwIfDownloadCancelled(job.controller.signal);
       return downloadModelAssets(model, (fraction) => reportDownloadProgress(job, 0.2 + fraction * 0.8), job.controller.signal);
@@ -474,11 +383,8 @@ export async function cancelNodusLocalDownloads(): Promise<NodusLocalAiStatus> {
     ...modelJobs.map(([, job]) => job.promise),
     ...(runtimeJob ? [runtimeJob.promise] : []),
   ]);
-  if (runtimeJob) {
-    // The extracted runtime directory may be incomplete, but the verified archive
-    // and its `.download` remain resumable. A later install re-verifies SHA-256.
-    await fsp.rm(runtimeDirectory(), { recursive: true, force: true });
-  }
+  // The installer owns staging cleanup. Cancellation must not delete the
+  // previous runnable engine, already verified archives, or downloaded models.
   return getNodusLocalAiStatus();
 }
 
@@ -533,17 +439,29 @@ async function freePort(): Promise<number> {
   });
 }
 
-async function waitForServer(baseUrl: string, child: ChildProcess, logs: () => string): Promise<void> {
+async function waitForServer(
+  baseUrl: string, child: ChildProcess, logs: () => string,
+  spawnFailure: () => Error | null, signal?: AbortSignal,
+): Promise<void> {
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
-    if (child.exitCode != null) throw new Error(logs() || `llama-server terminó con código ${child.exitCode}.`);
+    signal?.throwIfAborted();
+    const failure = spawnFailure();
+    if (failure) throw failure;
+    if (child.exitCode != null || child.signalCode != null) {
+      throw new Error(logs() || `llama-server terminó: ${child.signalCode ?? child.exitCode}.`);
+    }
     try {
-      const response = await fetch(`${baseUrl}/health`);
+      const timeout = AbortSignal.timeout(Math.min(1_500, Math.max(1, deadline - Date.now())));
+      const response = await fetch(`${baseUrl}/health`, { signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
+      await response.body?.cancel();
       if (response.ok) return;
     } catch {
-      // Model loading can take several seconds; keep polling until the deadline.
+      signal?.throwIfAborted();
+      // Each probe has its own deadline: an accepted but hung socket cannot
+      // turn the outer 120-second startup budget into an unbounded wait.
     }
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error(`llama-server no estuvo listo a tiempo. ${logs()}`.trim());
 }
@@ -560,6 +478,7 @@ export function stopNodusLocalServer(): void {
 
 /** Process-shutdown backstop. Normal model switches must use leases above. */
 export function killNodusLocalServerSync(): void {
+  calibrationQueue.cancel();
   const current = activeServer;
   activeServer = null;
   if (!current) return;
@@ -570,7 +489,7 @@ export function killNodusLocalServerSync(): void {
 }
 
 async function waitForChildExit(child: ChildProcess, timeoutMs: number): Promise<boolean> {
-  if (child.exitCode != null) return true;
+  if (!child.pid || child.exitCode != null || child.signalCode != null) return true;
   return new Promise((resolve) => {
     let settled = false;
     const finish = (exited: boolean) => {
@@ -593,9 +512,9 @@ async function stopNodusLocalServerAndWait(server = activeServer): Promise<void>
   server.stopWhenIdle = false;
   for (const resolve of server.idleWaiters) resolve();
   server.idleWaiters.clear();
-  if (server.child.exitCode != null) return;
+  if (!server.child.pid || server.child.exitCode != null || server.child.signalCode != null) return;
   server.child.kill('SIGTERM');
-  if (await waitForChildExit(server.child, 10_000)) return;
+  if (await waitForChildExit(server.child, 2_000)) return;
   server.child.kill('SIGKILL');
   await waitForChildExit(server.child, 2_000);
 }
@@ -609,7 +528,8 @@ interface LocalCalibrationFile {
 
 function hardwareFingerprint(): string {
   return createHash('sha256')
-    .update([process.platform, process.arch, os.cpus()[0]?.model ?? 'cpu', os.totalmem(), LLAMA_CPP_VERSION].join('|'))
+    .update([process.platform, process.arch, os.cpus()[0]?.model ?? 'cpu', os.totalmem(), LLAMA_CPP_VERSION,
+      runtimeManager.fingerprint()].join('|'))
     .digest('hex').slice(0, 20);
 }
 
@@ -692,21 +612,14 @@ async function childRssBytes(child: ChildProcess): Promise<number> {
     return Number.isFinite(kib) ? kib * 1024 : 0;
   }
   if (process.platform === 'darwin') {
-    return new Promise((resolve) => {
-      const ps = spawn('ps', ['-o', 'rss=', '-p', String(pid)], { stdio: ['ignore', 'pipe', 'ignore'] });
-      let stdout = '';
-      ps.stdout?.on('data', (chunk) => { stdout += String(chunk); });
-      ps.once('close', () => {
-        const kib = Number(stdout.trim());
-        resolve(Number.isFinite(kib) ? kib * 1024 : 0);
-      });
-      ps.once('error', () => resolve(0));
-    });
+    const stdout = await runRuntimeProbe('ps', ['-o', 'rss=', '-p', String(pid)], undefined, 2_000).catch(() => '');
+    const kib = Number(stdout.trim());
+    return Number.isFinite(kib) ? kib * 1024 : 0;
   }
   return 0;
 }
 
-async function calibrationRequest(model: NodusLocalModelDefinition, apiUrl: string, index: number): Promise<void> {
+async function calibrationRequest(model: NodusLocalModelDefinition, apiUrl: string, index: number, signal: AbortSignal): Promise<void> {
   const endpoint = model.kind === 'embedding' ? 'embeddings' : 'chat/completions';
   const body = model.kind === 'embedding'
     ? { model: model.id, input: `Nodus concurrency calibration sentence ${index}: semantic indexing remains complete and ordered.` }
@@ -726,7 +639,7 @@ async function calibrationRequest(model: NodusLocalModelDefinition, apiUrl: stri
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer local' },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(180_000),
+    signal: AbortSignal.any([signal, AbortSignal.timeout(180_000)]),
   });
   if (!response.ok) throw new Error(`Calibración local HTTP ${response.status}: ${(await response.text()).slice(0, 500)}`);
   const payload = await response.json() as any;
@@ -743,142 +656,138 @@ async function calibrationRequest(model: NodusLocalModelDefinition, apiUrl: stri
 async function benchmarkLocalSlots(
   model: NodusLocalModelDefinition,
   slots: 1 | 2 | 4,
+  signal: AbortSignal,
 ): Promise<{ throughput: number; p95Ms: number; memorySafe: boolean }> {
   const mode = model.kind === 'embedding' ? 'embedding' : 'chat';
-  for (;;) {
-    const acquired = await serializeLifecycle(async () => {
-      const current = activeServer;
-      if (current?.leases) return { wait: new Promise<void>((resolve) => current.idleWaiters.add(resolve)) } as const;
-      const apiUrl = await ensureNodusLocalServerUnlocked(model.id, mode, slots);
-      const server = activeServer!;
-      server.leases += 1;
-      return { apiUrl, server } as const;
+  signal.throwIfAborted();
+  const acquired = await serializeLifecycle(async () => {
+    signal.throwIfAborted();
+    if (activeServer?.leases) throw new Error('Runtime is busy; calibration deferred');
+    const apiUrl = await ensureNodusLocalServerUnlocked(model.id, mode, slots, signal);
+    const server = activeServer!;
+    server.leases += 1;
+    return { apiUrl, server };
+  });
+  let minimumFree = os.freemem();
+  let peakRss = 0;
+  const sample = async () => {
+    minimumFree = Math.min(minimumFree, os.freemem());
+    peakRss = Math.max(peakRss, await childRssBytes(acquired.server.child));
+  };
+  const timer = setInterval(() => { void sample().catch(() => undefined); }, 100);
+  timer.unref?.();
+  try {
+    const started = process.hrtime.bigint();
+    const latencies: number[] = [];
+    // Wait for every synthetic request to settle before releasing/killing its
+    // server. Promise.all used to leave seven requests running after one failed.
+    const results = await Promise.allSettled(Array.from({ length: 8 }, async (_, index) => {
+      const requestStarted = process.hrtime.bigint();
+      await calibrationRequest(model, acquired.apiUrl, index, signal);
+      latencies.push(Number(process.hrtime.bigint() - requestStarted) / 1_000_000);
+    }));
+    signal.throwIfAborted();
+    const failure = results.find((result) => result.status === 'rejected');
+    if (failure?.status === 'rejected') throw failure.reason;
+    await sample();
+    const elapsedSeconds = Number(process.hrtime.bigint() - started) / 1_000_000_000;
+    const memorySafe = acquired.server.child.exitCode == null && acquired.server.child.signalCode == null
+      && minimumFree >= os.totalmem() * 0.05
+      && (peakRss === 0 || peakRss <= os.totalmem() * 0.7);
+    return { throughput: 8 / elapsedSeconds, p95Ms: percentile95(latencies), memorySafe };
+  } finally {
+    clearInterval(timer);
+    await serializeLifecycle(async () => {
+      acquired.server.leases = Math.max(0, acquired.server.leases - 1);
+      for (const resolve of acquired.server.idleWaiters) resolve();
+      acquired.server.idleWaiters.clear();
+      if (activeServer === acquired.server) await stopNodusLocalServerAndWait(acquired.server);
     });
-    if ('wait' in acquired) {
-      await acquired.wait;
-      continue;
-    }
-    let minimumFree = os.freemem();
-    let peakRss = 0;
-    const sample = async () => {
-      minimumFree = Math.min(minimumFree, os.freemem());
-      peakRss = Math.max(peakRss, await childRssBytes(acquired.server.child));
-    };
-    const timer = setInterval(() => { void sample(); }, 100);
-    timer.unref?.();
-    try {
-      const started = process.hrtime.bigint();
-      const latencies: number[] = [];
-      await Promise.all(Array.from({ length: 8 }, async (_, index) => {
-        const requestStarted = process.hrtime.bigint();
-        await calibrationRequest(model, acquired.apiUrl, index);
-        latencies.push(Number(process.hrtime.bigint() - requestStarted) / 1_000_000);
-      }));
-      await sample();
-      const elapsedSeconds = Number(process.hrtime.bigint() - started) / 1_000_000_000;
-      const memorySafe = acquired.server.child.exitCode == null
-        && minimumFree >= os.totalmem() * 0.05
-        && (peakRss === 0 || peakRss <= os.totalmem() * 0.7);
-      return { throughput: 8 / elapsedSeconds, p95Ms: percentile95(latencies), memorySafe };
-    } finally {
-      clearInterval(timer);
-      await serializeLifecycle(async () => {
-        acquired.server.leases = Math.max(0, acquired.server.leases - 1);
-        for (const resolve of acquired.server.idleWaiters) resolve();
-        acquired.server.idleWaiters.clear();
-        if (activeServer === acquired.server) await stopNodusLocalServerAndWait(acquired.server);
-      });
-    }
   }
 }
 
 /**
- * Offline, hardware-scoped calibration. Slots 2 and 4 are admitted only after a
- * full-context runtime starts, eight identical health jobs complete, throughput
- * improves by at least 15%, p95 regresses at most 10%, and memory remains safe.
+ * Opportunistic, hardware/backend-scoped calibration. CPU keeps one full-context
+ * slot without synthetic inference. Foreground requests cancel GPU benchmarks,
+ * including queued models, and cancellation never poisons a saved calibration.
  */
 export function calibrateNodusLocalModelConcurrency(modelId: string, force = false): Promise<void> {
-  const running = calibrationJobs.get(modelId);
-  if (running) return running;
-  const previous = calibrationTail;
-  const job = (async () => {
-    await previous;
+  return calibrationQueue.schedule(modelId, async (signal) => {
     const model = getNodusLocalModel(modelId);
     if (!model || model.runtime !== 'llama_cpp') return;
+    await runtimeManager.resolve();
+    signal.throwIfAborted();
     if (!force && await hasCurrentCalibration(modelId)) {
       await calibratedSlots(modelId);
       return;
     }
-    if (!await verifyNodusLocalModel(modelId)) throw new Error('checksum-failed');
-    const baseline = await benchmarkLocalSlots(model, 1);
-    let selected: 1 | 2 | 4 = 1;
-    let selectedGain = 0;
-    let selectedP95Change = 0;
-    let selectedMemorySafe = baseline.memorySafe;
-    for (const slots of [2, 4] as const) {
-      try {
-        const candidate = await benchmarkLocalSlots(model, slots);
-        const gain = candidate.throughput / baseline.throughput - 1;
-        const p95Change = candidate.p95Ms / baseline.p95Ms - 1;
-        if (!candidate.memorySafe || gain < 0.15 || p95Change > 0.1) break;
-        selected = slots;
-        selectedGain = gain;
-        selectedP95Change = p95Change;
-        selectedMemorySafe = true;
-      } catch {
-        break;
+    try {
+      if (!await verifyNodusLocalModel(modelId, signal)) throw new Error('checksum-failed');
+      signal.throwIfAborted();
+      if (runtimeManager.snapshot()?.backend === 'cpu') {
+        await recordNodusLocalCalibration({ modelId, slots: 1, throughputGain: 0, p95Change: 0, memorySafe: true, reason: 'cpu-single-slot' });
+        return;
       }
+      const baseline = await benchmarkLocalSlots(model, 1, signal);
+      let selected: 1 | 2 | 4 = 1;
+      let selectedGain = 0;
+      let selectedP95Change = 0;
+      let selectedMemorySafe = baseline.memorySafe;
+      if (baseline.memorySafe) for (const slots of [2, 4] as const) {
+        try {
+          signal.throwIfAborted();
+          const candidate = await benchmarkLocalSlots(model, slots, signal);
+          const gain = candidate.throughput / baseline.throughput - 1;
+          const p95Change = candidate.p95Ms / baseline.p95Ms - 1;
+          if (!candidate.memorySafe || gain < 0.15 || p95Change > 0.1) break;
+          selected = slots;
+          selectedGain = gain;
+          selectedP95Change = p95Change;
+          selectedMemorySafe = true;
+        } catch {
+          signal.throwIfAborted();
+          break;
+        }
+      }
+      signal.throwIfAborted();
+      await recordNodusLocalCalibration({
+        modelId,
+        slots: selected,
+        throughputGain: selectedGain,
+        p95Change: selectedP95Change,
+        memorySafe: selectedMemorySafe,
+        reason: !selectedMemorySafe ? 'memory-gate-failed'
+          : selected === 1 ? 'safe-single-slot'
+          : 'throughput-gate-passed',
+      });
+    } catch (error) {
+      if (signal.aborted) return;
+      const message = error instanceof Error ? error.message : String(error);
+      const reason = /checksum-failed/i.test(message) ? 'checksum-failed'
+        : /HTTP\s+(\d+)/i.test(message) ? `runtime-http-${message.match(/HTTP\s+(\d+)/i)?.[1]}`
+        : /embedding inválido/i.test(message) ? 'invalid-embedding'
+        : /respuesta vacía/i.test(message) ? 'empty-response'
+        : /timeout|timed out|aborted/i.test(message) ? 'timeout'
+        : 'runtime-start-or-transport';
+      await recordNodusLocalCalibration({ modelId, slots: 1, throughputGain: 0, p95Change: 1, memorySafe: false, reason }).catch(() => undefined);
+      console.warn(`[local-ai] concurrency calibration failed for ${modelId}: ${reason}`);
+      throw new Error(`La calibración local de «${modelId}» falló (${reason}); se mantendrá un único slot seguro.`);
     }
-    await recordNodusLocalCalibration({
-      modelId,
-      slots: selected,
-      throughputGain: selectedGain,
-      p95Change: selectedP95Change,
-      memorySafe: selectedMemorySafe,
-      reason: !selectedMemorySafe ? 'memory-gate-failed'
-        : selected === 1 ? 'safe-single-slot'
-        : 'throughput-gate-passed',
-    });
-  })().catch(async (error) => {
-    const message = error instanceof Error ? error.message : String(error);
-    const reason = /checksum-failed/i.test(message) ? 'checksum-failed'
-      : /HTTP\s+(\d+)/i.test(message) ? `runtime-http-${message.match(/HTTP\s+(\d+)/i)?.[1]}`
-      : /embedding inválido/i.test(message) ? 'invalid-embedding'
-      : /respuesta vacía/i.test(message) ? 'empty-response'
-      : /timeout|timed out|aborted/i.test(message) ? 'timeout'
-      : 'runtime-start-or-transport';
-    await recordNodusLocalCalibration({
-      modelId,
-      slots: 1,
-      throughputGain: 0,
-      p95Change: 1,
-      memorySafe: false,
-      reason,
-    }).catch(() => undefined);
-    console.warn(`[local-ai] concurrency calibration failed for ${modelId}: ${reason}`);
-    throw new Error(`La calibración local de «${modelId}» falló (${reason}); se mantendrá un único slot seguro.`);
-  }).finally(() => calibrationJobs.delete(modelId));
-  calibrationJobs.set(modelId, job);
-  calibrationTail = job.catch(() => undefined);
-  return job;
+  });
 }
 
 export async function calibrateDownloadedNodusLocalModels(modelIds: string[]): Promise<void> {
-  for (const modelId of [...new Set(modelIds)]) {
-    const model = getNodusLocalModel(modelId);
-    // calibrateNodusLocalModelConcurrency performs the checksum verification.
-    // Do not await a duplicate verification here: requests could otherwise
-    // acquire a server before calibrationTail is registered.
-    if (!model || model.runtime !== 'llama_cpp') continue;
-    await calibrateNodusLocalModelConcurrency(modelId);
-  }
+  // Register the complete batch before yielding so one foreground request can
+  // cancel both the active benchmark and every queued model, not just the first.
+  await Promise.all([...new Set(modelIds)].filter((modelId) => getNodusLocalModel(modelId)?.runtime === 'llama_cpp')
+    .map((modelId) => calibrateNodusLocalModelConcurrency(modelId)));
 }
 
 export async function readNodusLocalMetrics(): Promise<string | null> {
   const server = activeServer;
-  if (!server || server.child.exitCode != null) return null;
+  if (!server || server.child.exitCode != null || server.child.signalCode != null) return null;
   try {
-    const response = await fetch(`${server.baseUrl}/metrics`);
+    const response = await fetch(`${server.baseUrl}/metrics`, { signal: AbortSignal.timeout(2_000) });
     return response.ok ? await response.text() : null;
   } catch {
     return null;
@@ -889,22 +798,26 @@ async function ensureNodusLocalServerUnlocked(
   modelId: string,
   mode: 'chat' | 'embedding',
   slotsOverride?: 1 | 2 | 4,
+  signal?: AbortSignal,
 ): Promise<string> {
+  signal?.throwIfAborted();
   const model = getNodusLocalModel(modelId);
   if (!model || model.runtime !== 'llama_cpp' || model.kind !== mode) {
     throw new Error(`El modelo «${modelId}» no puede ejecutarse como ${mode}.`);
   }
   const key = `${mode}:${modelId}`;
-  if (activeServer?.key === key && activeServer.child.exitCode == null
+  if (activeServer?.key === key && activeServer.ready && activeServer.child.exitCode == null && activeServer.child.signalCode == null
     && (slotsOverride == null || activeServer.slots === slotsOverride)) return activeServer.apiUrl;
   await stopNodusLocalServerAndWait();
   const executable = await llamaServerPath();
   if (!executable) throw new Error('Instala primero el motor local de Nodus desde Ajustes → Modelos IA.');
+  const runtime = runtimeManager.snapshot()!;
   const status = await modelStatus(model);
   if (!status.downloaded) throw new Error(`Descarga primero «${model.label}» desde Ajustes → Modelos IA.`);
-  if (!await verifyNodusLocalModel(model.id)) {
+  if (!await verifyNodusLocalModel(model.id, signal)) {
     throw new Error(`La verificación SHA-256 de «${model.label}» ha fallado. Bórralo y vuelve a descargarlo.`);
   }
+  signal?.throwIfAborted();
   const port = await freePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   const slots = slotsOverride ?? await calibratedSlots(modelId);
@@ -919,11 +832,16 @@ async function ensureNodusLocalServerUnlocked(
     '--ctx-size', String(contextPerSlot * slots),
     '--parallel', String(slots),
     '--threads', String(Math.max(1, Math.min(8, os.cpus().length - 1))),
-    '--n-gpu-layers', '999',
+    // Let b10002 fit GPU layers to available VRAM; never force 999 layers. The
+    // explicit context stays unchanged, preserving the provider's token budget.
+    '--n-gpu-layers', runtime.backend === 'cpu' ? '0' : 'auto',
+    '--fit', 'on',
+    '--offline',
     '--jinja',
     '--metrics',
     '--no-webui',
   ];
+  if (runtime.backend === 'cpu') args.push('--device', 'none', '--no-mmproj-offload');
   if (model.projectorFile) args.push('--mmproj', path.join(modelDirectory(model.id), model.projectorFile));
   if (mode === 'embedding') {
     // llama.cpp's non-causal embedding path cannot split one input across
@@ -939,15 +857,26 @@ async function ensureNodusLocalServerUnlocked(
       '--embedding', '--pooling', 'mean',
     );
   }
-  const child = spawn(executable, args, { cwd: path.dirname(executable), stdio: ['ignore', 'pipe', 'pipe'] });
+  lastStartupError = '';
+  const child = spawn(executable, args, {
+    cwd: path.dirname(executable), env: runtimeEnvironment(executable),
+    windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+  });
   let output = '';
-  const capture = (chunk: unknown) => { output = `${output}${String(chunk)}`.slice(-12_000); };
-  child.stdout?.on('data', capture);
-  child.stderr?.on('data', capture);
+  let spawnError: Error | null = null;
   const server: ActiveServer = {
     key, modelId, mode, baseUrl, apiUrl: `${baseUrl}/v1`, child,
-    slots, leases: 0, stopWhenIdle: false, idleWaiters: new Set(),
+    slots, leases: 0, stopWhenIdle: false, idleWaiters: new Set(), ready: false, offloadedLayers: null,
   };
+  const capture = (chunk: unknown) => {
+    // Keep startup diagnostics only. Inference/prompt output is not a support log.
+    if (server.ready) return;
+    output = `${output}${String(chunk)}`.slice(-12_000);
+    server.offloadedLayers = offloadedLayerCount(output) ?? server.offloadedLayers;
+  };
+  child.stdout?.on('data', capture);
+  child.stderr?.on('data', capture);
+  child.once('error', (error) => { spawnError = error; });
   activeServer = server;
   child.once('exit', () => {
     server.leases = 0;
@@ -956,38 +885,45 @@ async function ensureNodusLocalServerUnlocked(
     if (activeServer === server) activeServer = null;
   });
   try {
-    await waitForServer(baseUrl, child, () => output);
+    await waitForServer(baseUrl, child, () => output, () => spawnError, signal);
+    signal?.throwIfAborted();
+    server.ready = true;
     return server.apiUrl;
   } catch (error) {
     if (activeServer === server) await stopNodusLocalServerAndWait(server);
+    signal?.throwIfAborted();
     if (slotsOverride == null && slots > 1) {
-      await recordNodusLocalCalibration({
-        modelId,
-        slots: 1,
-        throughputGain: 0,
-        p95Change: 1,
-        memorySafe: false,
-      });
+      await recordNodusLocalCalibration({ modelId, slots: 1, throughputGain: 0, p95Change: 1, memorySafe: false });
       return ensureNodusLocalServerUnlocked(modelId, mode);
     }
+    const detail = `${error instanceof Error ? error.message : String(error)}\n${output}`.slice(-12_000);
+    // Only accelerator failures get a single, visible CPU retry. Invalid models,
+    // checksums, ports and unsupported options keep their original error.
+    if (slotsOverride == null && runtime.backend !== 'cpu' && gpuStartupFailure(detail)
+      && await runtimeManager.useCpuFallback(detail)) {
+      safeSlotsByModel.clear();
+      return ensureNodusLocalServerUnlocked(modelId, mode);
+    }
+    lastStartupError = detail;
     throw error;
   }
 }
 
 export async function ensureNodusLocalServer(modelId: string, mode: 'chat' | 'embedding'): Promise<string> {
-  await calibrationTail;
-  const key = `${mode}:${modelId}`;
-  for (;;) {
-    const outcome = await serializeLifecycle(async () => {
-      const current = activeServer;
-      if (current && current.key !== key && current.leases > 0) {
-        return { wait: new Promise<void>((resolve) => current.idleWaiters.add(resolve)) } as const;
-      }
-      return { apiUrl: await ensureNodusLocalServerUnlocked(modelId, mode) } as const;
-    });
-    if ('apiUrl' in outcome && typeof outcome.apiUrl === 'string') return outcome.apiUrl;
-    await outcome.wait;
-  }
+  return calibrationQueue.runForeground(async () => {
+    const key = `${mode}:${modelId}`;
+    for (;;) {
+      const outcome = await serializeLifecycle(async () => {
+        const current = activeServer;
+        if (current && current.key !== key && current.leases > 0) {
+          return { wait: new Promise<void>((resolve) => current.idleWaiters.add(resolve)) } as const;
+        }
+        return { apiUrl: await ensureNodusLocalServerUnlocked(modelId, mode) } as const;
+      });
+      if ('apiUrl' in outcome && typeof outcome.apiUrl === 'string') return outcome.apiUrl;
+      await outcome.wait;
+    }
+  });
 }
 
 /** Hold the selected local runtime/model for the complete network request. */
@@ -996,50 +932,51 @@ export async function withNodusLocalServerLease<T>(
   mode: 'chat' | 'embedding',
   task: (apiUrl: string) => Promise<T>,
 ): Promise<T> {
-  await calibrationTail;
-  const key = `${mode}:${modelId}`;
-  for (;;) {
-    const acquired = await serializeLifecycle(async () => {
-      const current = activeServer;
-      if (current && current.key !== key && current.leases > 0) {
-        return { wait: new Promise<void>((resolve) => current.idleWaiters.add(resolve)) } as const;
-      }
-      const apiUrl = await ensureNodusLocalServerUnlocked(modelId, mode);
-      const server = activeServer!;
-      server.leases += 1;
-      return { server, apiUrl } as const;
-    });
-    if ('wait' in acquired) {
-      await acquired.wait;
-      continue;
-    }
-    try {
-      return await task(acquired.apiUrl);
-    } catch (error) {
-      if (acquired.server.slots > 1 && (
-        acquired.server.child.exitCode != null || /out of memory|oom|memory pressure|allocation failed/i.test(error instanceof Error ? error.message : String(error))
-      )) {
-        await recordNodusLocalCalibration({
-          modelId,
-          slots: 1,
-          throughputGain: 0,
-          p95Change: 1,
-          memorySafe: false,
-        });
-        acquired.server.stopWhenIdle = true;
-      }
-      throw error;
-    } finally {
-      await serializeLifecycle(async () => {
-        acquired.server.leases = Math.max(0, acquired.server.leases - 1);
-        if (acquired.server.leases === 0) {
-          for (const resolve of acquired.server.idleWaiters) resolve();
-          acquired.server.idleWaiters.clear();
-          if (acquired.server.stopWhenIdle && activeServer === acquired.server) stopNodusLocalServer();
+  return calibrationQueue.runForeground(async () => {
+    const key = `${mode}:${modelId}`;
+    for (;;) {
+      const acquired = await serializeLifecycle(async () => {
+        const current = activeServer;
+        if (current && current.key !== key && current.leases > 0) {
+          return { wait: new Promise<void>((resolve) => current.idleWaiters.add(resolve)) } as const;
         }
+        const apiUrl = await ensureNodusLocalServerUnlocked(modelId, mode);
+        const server = activeServer!;
+        server.leases += 1;
+        return { server, apiUrl } as const;
       });
+      if ('wait' in acquired) {
+        await acquired.wait;
+        continue;
+      }
+      try {
+        return await task(acquired.apiUrl);
+      } catch (error) {
+        if (acquired.server.slots > 1 && (
+          acquired.server.child.exitCode != null || acquired.server.child.signalCode != null || /out of memory|oom|memory pressure|allocation failed/i.test(error instanceof Error ? error.message : String(error))
+        )) {
+          await recordNodusLocalCalibration({
+            modelId,
+            slots: 1,
+            throughputGain: 0,
+            p95Change: 1,
+            memorySafe: false,
+          });
+          acquired.server.stopWhenIdle = true;
+        }
+        throw error;
+      } finally {
+        await serializeLifecycle(async () => {
+          acquired.server.leases = Math.max(0, acquired.server.leases - 1);
+          if (acquired.server.leases === 0) {
+            for (const resolve of acquired.server.idleWaiters) resolve();
+            acquired.server.idleWaiters.clear();
+            if (acquired.server.stopWhenIdle && activeServer === acquired.server) stopNodusLocalServer();
+          }
+        });
+      }
     }
-  }
+  });
 }
 
 async function transformersPipeline(model: NodusLocalModelDefinition): Promise<any> {

@@ -1,0 +1,43 @@
+name: Local AI runtime
+
+on:
+  pull_request:
+    paths:
+      - 'electron/ai/localAi*.ts'
+      - 'electron/ai/nodusLocalAi.ts'
+      - 'shared/localAi*.ts'
+      - 'src/components/LocalRuntimeStatus.tsx'
+      - 'src/components/LocalAiModelsSettings.tsx'
+      - 'src/i18n.localAiRuntime.ts'
+      - 'scripts/*local-ai-runtime*'
+      - 'scripts/test-local-ai-calibration-priority.mjs'
+      - '.github/workflows/local-ai-runtime.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-ai-runtime-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  native-runtime:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-22.04, macos-14, windows-latest]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Runtime policy, loader, installation and priority regressions
+        run: node --test scripts/test-local-ai-runtime.mjs scripts/test-local-ai-calibration-priority.mjs
+      - name: Install and probe actual pinned native runtimes
+        run: node scripts/verify-local-ai-runtime.mjs
