@@ -15,7 +15,7 @@
  *
  * Copy is carried per language rather than as t() keys: a notice written after this
  * build shipped has no key for t() to look up. Spanish and English are required (English
- * is the fallback every other language already leans on); the remaining six are enforced
+ * is the fallback every other language already leans on); the remaining seven are enforced
  * by scripts/test-announcements.mjs on the PR that adds the notice, so publishing in one
  * language alone fails CI rather than reaching users half-translated.
  */
@@ -24,13 +24,13 @@
 export const ANNOUNCEMENTS_URL = 'https://nodusresearch.com/data/announcements.json';
 
 /** Every language a notice must be written in before it may be published. */
-export const ANNOUNCEMENT_LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'] as const;
+export const ANNOUNCEMENT_LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN'] as const;
 export type AnnouncementLanguage = (typeof ANNOUNCEMENT_LANGUAGES)[number];
 
 /**
  * The two languages a notice cannot render without. Spanish is the source and English
  * is the fallback for every other interface language, so a notice carrying both is
- * readable by everyone even if a translation is missing. CI still demands all eight.
+ * readable by everyone even if a translation is missing. CI still demands all nine.
  */
 export const REQUIRED_ANNOUNCEMENT_LANGUAGES: readonly AnnouncementLanguage[] = ['es', 'en'];
 
