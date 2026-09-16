@@ -18,7 +18,6 @@ import { isPipelineLogMaxEntries, isPipelineLogRetention } from '@shared/pipelin
 import { normalizeToolkitToolPages } from '@shared/toolkitNavigation';
 import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
 import {
-  GLOBAL_PREF_KEYS,
   SHARED_APPEARANCE_KEYS,
   SHARED_MODEL_KEYS,
   isSharedAppearanceKey,
