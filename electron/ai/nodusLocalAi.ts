@@ -16,7 +16,7 @@ import {
 } from '@shared/localAiModels';
 import type { ModelInfo } from '@shared/types';
 import { LocalRuntimeManager, runRuntimeProbe } from './localAiRuntime';
-import { LLAMA_CPP_VERSION, runtimeEnvironment, gpuStartupFailure, offloadedLayerCount } from './localAiRuntimePolicy';
+import { LLAMA_CPP_VERSION, runtimeVersion, runtimeEnvironment, gpuStartupFailure, offloadedLayerCount } from './localAiRuntimePolicy';
 import { LocalCalibrationQueue } from './localAiCalibration';
 
 interface ActiveLocalAiDownload {
@@ -139,7 +139,7 @@ export async function getNodusLocalAiStatus(): Promise<NodusLocalAiStatus> {
   const runtime = runtimeManager.snapshot();
   return {
     runtime: {
-      version: LLAMA_CPP_VERSION,
+      version: runtime?.version ?? runtimeVersion(process.platform, process.arch),
       ready: Boolean(executablePath),
       executablePath,
       downloading: Boolean(activeRuntimeDownload),
@@ -449,7 +449,7 @@ async function waitForServer(
     const failure = spawnFailure();
     if (failure) throw failure;
     if (child.exitCode != null || child.signalCode != null) {
-      throw new Error(logs() || `llama-server terminó: ${child.signalCode ?? child.exitCode}.`);
+      throw new Error(`${logs()}\nllama-server terminó: ${child.signalCode ?? child.exitCode}.`.trim());
     }
     try {
       const timeout = AbortSignal.timeout(Math.min(1_500, Math.max(1, deadline - Date.now())));

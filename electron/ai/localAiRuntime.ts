@@ -2,10 +2,11 @@ import { spawn } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { LocalRuntimeBackend, LocalRuntimeDevice, LocalRuntimeDiagnostics } from '@shared/localAiRuntime';
-import { LLAMA_CPP_VERSION, parseRuntimeDevices, runtimeEnvironment, runtimeVariants, variantId,
+import { LLAMA_CPP_VERSION, parseRuntimeDevices, runtimeEnvironment, runtimeVariants, runtimeVersion, variantId,
   type RuntimeArchive, type RuntimeVariant } from './localAiRuntimePolicy';
 
 export interface InstalledRuntime {
+  version: string;
   executablePath: string;
   backend: LocalRuntimeBackend;
   devices: LocalRuntimeDevice[];
@@ -87,7 +88,7 @@ export class LocalRuntimeManager {
   ) {}
   private directory(): string {
     // Do not recursively mix legacy CPU installs with backend-specific libraries.
-    return path.join(this.root(), 'runtime-backends', LLAMA_CPP_VERSION, `${this.platform}-${this.arch}`);
+    return path.join(this.root(), 'runtime-backends', runtimeVersion(this.platform, this.arch), `${this.platform}-${this.arch}`);
   }
   private executableName(): string { return this.platform === 'win32' ? 'llama-server.exe' : 'llama-server'; }
   private async installed(variant: RuntimeVariant): Promise<string | null> {
@@ -99,15 +100,16 @@ export class LocalRuntimeManager {
   private async legacy(): Promise<InstalledRuntime | null> {
     const executablePath = await findExecutable(path.join(this.root(), 'runtime', LLAMA_CPP_VERSION), this.executableName());
     if (!executablePath) return null;
-    const backend = this.platform === 'darwin' ? 'metal' : 'cpu';
-    return { executablePath, backend, devices: [], legacy: true, identity: `legacy:${backend}`,
-      ...(backend === 'cpu' ? { fallbackReason: 'legacy-cpu' as const } : {}) };
+    const backend = this.platform === 'darwin' && this.arch === 'arm64' ? 'metal' : 'cpu';
+    return { version: LLAMA_CPP_VERSION, executablePath, backend, devices: [], legacy: true, identity: `legacy:${backend}`,
+      ...(backend === 'cpu' && runtimeVariants(this.platform, this.arch).some((candidate) => candidate.backend !== 'cpu')
+        ? { fallbackReason: 'legacy-cpu' as const } : {}) };
   }
   private async validate(variant: RuntimeVariant, executablePath: string, signal?: AbortSignal): Promise<InstalledRuntime> {
     const output = await this.probe(executablePath, ['--list-devices'], signal);
     const devices = parseRuntimeDevices(output, variant.backend);
     if (variant.backend !== 'cpu' && devices.length === 0) throw new Error(`No usable ${variant.backend} GPU reported by llama-server --list-devices`);
-    return { executablePath, backend: variant.backend, devices, legacy: false,
+    return { version: variant.archives[0].version, executablePath, backend: variant.backend, devices, legacy: false,
       identity: `${variantId(variant)}:${devices.map((device) => `${device.id}:${device.name}`).join('|')}` };
   }
   private async load(): Promise<InstalledRuntime | null> {
@@ -139,12 +141,14 @@ export class LocalRuntimeManager {
   private async cpuRuntime(): Promise<InstalledRuntime | null> {
     if (this.platform === 'darwin') {
       const variant = runtimeVariants(this.platform, this.arch)[0];
-      const executablePath = await this.installed(variant) ?? (await this.legacy())?.executablePath;
-      return executablePath ? { executablePath, backend: 'cpu', devices: [], legacy: false, identity: `${variantId(variant)}:cpu` } : null;
+      const executablePath = await this.installed(variant);
+      if (executablePath) return { version: variant.archives[0].version, executablePath, backend: 'cpu', devices: [], legacy: false, identity: `${variantId(variant)}:cpu` };
+      const legacy = await this.legacy();
+      return legacy ? { ...legacy, backend: 'cpu', devices: [], identity: `${legacy.identity}:cpu` } : null;
     }
     const variant = runtimeVariants(this.platform, this.arch).find((candidate) => candidate.backend === 'cpu')!;
     const executablePath = await this.installed(variant);
-    return executablePath ? { executablePath, backend: 'cpu', devices: [], legacy: false, identity: variantId(variant) } : this.legacy();
+    return executablePath ? { version: variant.archives[0].version, executablePath, backend: 'cpu', devices: [], legacy: false, identity: variantId(variant) } : this.legacy();
   }
   /** Session-only fallback; a driver fix can be detected again on next launch. */
   async useCpuFallback(detail: string): Promise<boolean> {
@@ -185,7 +189,7 @@ export class LocalRuntimeManager {
         // A Metal build can still serve CPU if Metal reports no usable device.
         if (variant.backend === 'metal') {
           await this.probe(executable, ['--version'], signal);
-          chosen = { executablePath: executable, backend: 'cpu', devices: [], legacy: false, identity: `${variantId(variant)}:cpu` };
+          chosen = { version: variant.archives[0].version, executablePath: executable, backend: 'cpu', devices: [], legacy: false, identity: `${variantId(variant)}:cpu` };
           chosenVariant = variant;
         }
         // Do not fail a working GPU installation just because its independent CPU

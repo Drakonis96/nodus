@@ -1,8 +1,15 @@
 import path from 'node:path';
+import { stripVTControlCharacters } from 'node:util';
 import type { LocalRuntimeBackend, LocalRuntimeDevice } from '@shared/localAiRuntime';
 
 export const LLAMA_CPP_VERSION = 'b10002';
+// b10002 arm64 macOS binaries accidentally require macOS 26. b10268 is the
+// upstream deployment-target fix (ggml-org/llama.cpp#26375), not a floating latest.
+export function runtimeVersion(platform: string, arch: string): string {
+  return platform === 'darwin' && arch === 'arm64' ? 'b10268' : LLAMA_CPP_VERSION;
+}
 export interface RuntimeArchive {
+  version: string;
   name: string;
   url: string;
   sha256: string;
@@ -14,22 +21,23 @@ export interface RuntimeVariant {
   archives: RuntimeArchive[];
 }
 
-function archive(name: string, sha256: string, bytes: number): RuntimeArchive {
-  return { name, sha256, bytes, archive: name.endsWith('.zip') ? 'zip' : 'tar.gz',
-    url: `https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_CPP_VERSION}/${name}` };
+function archive(name: string, sha256: string, bytes: number, version = LLAMA_CPP_VERSION): RuntimeArchive {
+  return { name, sha256, bytes, version, archive: name.endsWith('.zip') ? 'zip' : 'tar.gz',
+    url: `https://github.com/ggml-org/llama.cpp/releases/download/${version}/${name}` };
 }
 const a = (suffix: string, sha256: string, bytes: number) => archive(`llama-${LLAMA_CPP_VERSION}-bin-${suffix}`, sha256, bytes);
 // Digests/sizes are the release's immutable asset identities, not guessed URLs.
 // b10002 publishes no Linux CUDA archive: Linux GPU acceleration uses Vulkan.
 const CPU: Record<string, RuntimeArchive> = {
+  // Upstream explicitly disables Metal in the Intel macOS archive.
+  'darwin-x64': a('macos-x64.tar.gz', 'c90eaed104ad1c82628d34967def32eaae2516768e10121fbebc4c73a046ac7d', 11_031_400),
   'linux-x64': a('ubuntu-x64.tar.gz', '760dcd8c52be7960bf7487adce4287c151000a41e44f836abdb1a282340c5949', 15_855_822),
   'linux-arm64': a('ubuntu-arm64.tar.gz', '348e880ac43a5df038729f34ac3be6a1c57b5de491504b59b5273d8b1f4dae40', 12_791_141),
   'win32-x64': a('win-cpu-x64.zip', 'c4c3dd2e139e3f00f7bdf4993a2f893e8db4dc6ae51140cc25ddd63306c32734', 18_253_272),
   'win32-arm64': a('win-cpu-arm64.zip', '271470732568e8326c58e0a357e5f9085e956de97587358c690ff166edaafb77', 12_159_035),
 };
 const METAL: Record<string, RuntimeArchive> = {
-  'darwin-arm64': a('macos-arm64.tar.gz', 'b7aca9d4f9c6267a5f389179bd7412c4e991ac7d1b69f52acf065ef99c99345c', 10_749_656),
-  'darwin-x64': a('macos-x64.tar.gz', 'c90eaed104ad1c82628d34967def32eaae2516768e10121fbebc4c73a046ac7d', 11_031_400),
+  'darwin-arm64': archive('llama-b10268-bin-macos-arm64.tar.gz', '705ea848705728b94dff7b77a6f7685b1c4cb8632246791c781737f73dd5043e', 11_005_123, 'b10268'),
 };
 const VULKAN: Record<string, RuntimeArchive> = {
   'linux-x64': a('ubuntu-vulkan-x64.tar.gz', 'd5da4d5ffc0e7d2ed24d39d3ee482a0e76f5794a5b0b11d972d2e9888a3dca2a', 31_195_148),
@@ -59,7 +67,7 @@ export function variantId(variant: RuntimeVariant): string {
 /** Only the actual --list-devices inventory counts; build banners do not. */
 export function parseRuntimeDevices(output: string, backend: LocalRuntimeBackend): LocalRuntimeDevice[] {
   const devices: LocalRuntimeDevice[] = [];
-  for (const line of output.replace(/\u001b\[[0-9;]*m/g, '').split(/\r?\n/)) {
+  for (const line of stripVTControlCharacters(output).split(/\r?\n/)) {
     const match = line.match(/^\s*((?:CUDA|Vulkan|Metal)\d*):\s+(.+?)\s*$/i);
     if (!match || !match[1].toLowerCase().startsWith(backend)) continue;
     const name = match[2].replace(/\s*\(\d+\s*MiB.*$/i, '').trim().slice(0, 240);

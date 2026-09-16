@@ -54,7 +54,7 @@ async function fixture(t, scenario = 'normal') {
       });
     }).listen(Number(value('--port')), '127.0.0.1');
   `);
-  const engineRoot = path.join(rootAi, 'runtime-backends', 'b10002', `${process.platform}-${process.arch}`);
+  const engineRoot = path.join(rootAi, 'runtime-backends', policy.runtimeVersion(process.platform, process.arch), `${process.platform}-${process.arch}`);
   for (const variant of variants) {
     const destination = path.join(engineRoot, policy.variantId(variant));
     await mkdir(destination, { recursive: true });

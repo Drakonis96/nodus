@@ -9,7 +9,7 @@ test('local runtime policy: pinned platform candidates, real inventory and isola
   const p = await loadRuntimeModule(t, 'electron/ai/localAiRuntimePolicy.ts');
   for (const arch of ['x64', 'arm64']) {
     assert.deepEqual(p.runtimeVariants('linux', arch, true).map((v) => v.backend), ['vulkan', 'cpu']);
-    assert.deepEqual(p.runtimeVariants('darwin', arch).map((v) => v.backend), ['metal']);
+    assert.deepEqual(p.runtimeVariants('darwin', arch).map((v) => v.backend), [arch === 'arm64' ? 'metal' : 'cpu']);
   }
   assert.deepEqual(p.runtimeVariants('win32', 'x64', true).map((v) => v.backend), ['cuda', 'vulkan', 'cpu']);
   assert.deepEqual(p.runtimeVariants('win32', 'x64').map((v) => v.backend), ['vulkan', 'cpu']);
@@ -22,7 +22,7 @@ test('local runtime policy: pinned platform candidates, real inventory and isola
     for (const variant of p.runtimeVariants(platform, arch, true)) for (const asset of variant.archives) {
       assert.match(asset.sha256, /^[a-f0-9]{64}$/);
       assert.ok(Number.isSafeInteger(asset.bytes) && asset.bytes > 0);
-      assert.equal(asset.url, `https://github.com/ggml-org/llama.cpp/releases/download/b10002/${asset.name}`);
+      assert.equal(asset.url, `https://github.com/ggml-org/llama.cpp/releases/download/${asset.version}/${asset.name}`);
     }
   }
   assert.deepEqual(p.parseRuntimeDevices('ggml_vulkan: Found 1 GPU\nAvailable devices:\nVulkan0: NVIDIA GeForce RTX 3060 (12288 MiB, 11000 MiB free)', 'vulkan'),
@@ -165,6 +165,7 @@ test('Apple Metal is retained, supports CPU-only fallback, and ignores injected 
   const f = await fixture(t, 'darwin', 'arm64');
   await f.manager.install(f.installer, () => {}, new AbortController().signal);
   assert.equal(f.manager.snapshot().backend, 'metal');
+  assert.equal(f.manager.snapshot().version, 'b10268');
   const gpuFingerprint = f.manager.fingerprint();
   assert.equal(await f.manager.useCpuFallback('Metal allocation failed'), true);
   assert.equal(f.manager.snapshot().backend, 'cpu');
@@ -173,6 +174,6 @@ test('Apple Metal is retained, supports CPU-only fallback, and ignores injected 
   f.state.gpu = false;
   await f.manager.install(f.installer, () => {}, new AbortController().signal);
   assert.equal(f.manager.snapshot().backend, 'cpu');
-  await writeFile(path.join(f.root, 'runtime-backends', 'b10002', 'darwin-arm64', 'selection.json'), JSON.stringify('/tmp/arbitrary-executable'));
+  await writeFile(path.join(f.root, 'runtime-backends', 'b10268', 'darwin-arm64', 'selection.json'), JSON.stringify('/tmp/arbitrary-executable'));
   assert.equal(await f.restart().resolve(), null);
 });

@@ -5,13 +5,18 @@ installation, and installing a CUDA toolkit alone, do not change that executable
 
 ## Backend selection
 
-The integrated installer pins llama.cpp **b10002** archives by byte size and SHA-256.
+The integrated installer pins llama.cpp **b10002** archives by byte size and SHA-256,
+with **b10268 for Apple Silicon** to include upstream macOS deployment-target fix
+[#26375](https://github.com/ggml-org/llama.cpp/pull/26375). The actual selected version
+is reported in Settings. Native CI caught b10002 failing on macOS 14 before its
+server could start; the older-OS check is retained rather than skipped.
 Linux x64/arm64 tries the official Vulkan build and keeps an independent CPU build
 for offline fallback. The pinned release does **not** publish a Linux CUDA binary;
 Vulkan acceleration must not be described as CUDA. Windows x64 tries CUDA 12.4 when
 `nvidia-smi` reports NVIDIA hardware, including the separate CUDA runtime DLL
-archive, then Vulkan, then CPU. Windows arm64 uses CPU. macOS retains Metal and can
-use the same executable in CPU-only mode if Metal is unavailable.
+archive, then Vulkan, then CPU. Windows arm64 uses CPU. Apple Silicon retains Metal and can
+use the same executable in CPU-only mode if Metal is unavailable. The upstream
+Intel macOS build is CPU-only and is identified as such.
 
 The presence of a toolkit, GPU name, build banner, or `--n-gpu-layers` flag is not
 proof of acceleration. The actual downloaded executable must finish
@@ -29,13 +34,14 @@ All inference endpoints remain bound to `127.0.0.1`; the managed process uses
 
 ## Existing installations and recovery
 
-An older `local-ai/runtime/b10002` installation remains usable. On Linux/Windows,
-Settings explicitly identifies it as CPU-only and offers **Check/update engine**.
-That action upgrades the engine without deleting or downloading existing GGUFs.
+An older `local-ai/runtime/b10002` installation remains usable where its upstream
+binary supports the OS. On Linux/Windows, Settings identifies it as CPU-only and
+offers **Check/update engine**. That action also upgrades an old Apple Silicon
+engine without deleting or downloading existing GGUFs.
 A subsequent user-requested model download also upgrades a legacy engine dependency.
 
 New engines live under
-`local-ai/runtime-backends/b10002/<platform>-<arch>/<backend-and-digests>`.
+`local-ai/runtime-backends/<pinned-version>/<platform>-<arch>/<backend-and-digests>`.
 Each variant has a completion marker and separate libraries. Installation uses a
 staging directory; a selected-engine marker is changed only after validation.
 Cancellation or a failed checksum/download cleans staging, not the previously
@@ -106,3 +112,4 @@ Upstream references:
 - https://github.com/ggml-org/llama.cpp/releases/tag/b10002
 - https://github.com/ggml-org/llama.cpp/blob/b10002/tools/server/README.md
 - https://github.com/ggml-org/llama.cpp/blob/b10002/docs/build.md
+- https://github.com/ggml-org/llama.cpp/releases/tag/b10268
