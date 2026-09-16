@@ -305,13 +305,21 @@ export function normalizeDocumentProfileAuditResponse(value: unknown): AuditResp
   };
 }
 
+/**
+ * The diagnostics of a refused profile, appended to its audit issues.
+ *
+ * The tags are deliberately language-neutral: this sentence is stored as the profile's error,
+ * printed verbatim in the processing log and pasted into a GitHub issue, so it is read by
+ * someone whose interface language is unknown and is never translated. Spanish keys inside an
+ * English log were exactly the kind of fragment the log is supposed to avoid.
+ */
 function auditFailureMessage(audit: DocumentProfileAudit): string {
   const details = [
     ...audit.issues,
-    `veredicto=${audit.passed ? 'aprobado' : 'rechazado'}`,
-    `puntuación=${audit.score == null ? 'sin puntuación' : audit.score.toFixed(2)}`,
-    `apoyos=${audit.supportCoverage.toFixed(2)}`,
-    `estructura=${audit.structureCoverage.toFixed(2)}`,
+    `verdict=${audit.passed ? 'approved' : 'rejected'}`,
+    `score=${audit.score == null ? 'none' : audit.score.toFixed(2)}`,
+    `support=${audit.supportCoverage.toFixed(2)}`,
+    `structure=${audit.structureCoverage.toFixed(2)}`,
   ];
   return details.join(' · ');
 }

@@ -179,6 +179,28 @@ try {
     qualityScore: 0.2,
   }), /auditoría/);
   assert.equal(repo.getDocumentProfile('w1').versionId, nextVersionId, 'failed candidate cannot replace current profile');
+
+  // The acceptance gate publishes a synthesis the auditor did not approve as `partial`, and
+  // the model the auditor wrote is what keeps it: the fields all carry literal support and the
+  // mode is the caveat. Refusing it here — on the verdict alone — threw away exactly the
+  // profiles the gate had just decided to keep, which failed every indexing run whose auditor
+  // disliked the prose.
+  const degradedVersionId = repo.publishDocumentProfile({
+    nodusId: 'w1', sourceFingerprint: 'source-2', pipelineVersion: 'document-profile/1', schemaVersion: 1,
+    sourceLanguage: 'es', presentationLanguage: 'es', overview: 'Síntesis conservada con su apoyo literal.',
+    profile: { thesis: 'La modernización fue desigual.', fallbackMode: 'partial' },
+    fields: [{ fieldId: 'field-partial', kind: 'thesis', ordinal: 0, text: 'La modernización fue desigual.', confidence: 0.8, centrality: 1, confidenceSource: 'floor' }],
+    sections: [], supports: [], ideaLinks: [], vectors: [], generatorModel: null, auditorModel: null,
+    promptHash: 'prompt-3',
+    audit: { passed: false, score: 0.79, supportCoverage: 1, structureCoverage: 1, issues: [], repaired: true, fallback: 'partial' },
+    qualityScore: 0.79,
+  });
+  const degraded = repo.getDocumentProfile('w1');
+  assert.equal(degraded.versionId, degradedVersionId, 'a declared partial profile is published, not discarded');
+  assert.equal(degraded.audit.fallback, 'partial', 'the caveat travels with the published version');
+  assert.equal(degraded.audit.passed, false, 'and the semantic verdict is still reported as it was');
+  assert.equal(degraded.qualityScore, 0.79);
+  assert.equal(degraded.fields[0].text, 'La modernización tuvo ritmos regionales desiguales.', 'a degraded publication preserves the reader correction too');
   assert.equal(repo.listDocumentIndexCampaigns()[0].status, 'completed');
 
   sqlite.prepare("UPDATE works SET title='Modernización española en el siglo XX' WHERE nodus_id='w1'").run();

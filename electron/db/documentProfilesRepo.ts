@@ -362,7 +362,14 @@ function refreshDocumentProfileFts(nodusId: string): void {
 
 /** Publish a complete candidate in one transaction; nothing partial becomes readable. */
 export function publishDocumentProfile(input: PublishDocumentProfileInput): string {
-  if (!input.audit.passed) throw new Error('No se puede publicar una ficha que no superó la auditoría.');
+  // The verdict and the mode say different things. `passed: false` means the semantic auditor
+  // disliked the synthesis, and a profile declaring `partial` or `extractive` is precisely the
+  // outcome the acceptance gate chose to keep: its fields all carry literal support, and the
+  // mode is what tells consumers it was not approved. Refusing it here discarded every profile
+  // the gate had just decided to publish, so a run whose auditor never approved a synthesis
+  // failed as a whole with a sentence that only existed in Spanish. What is still refused is an
+  // undeclared failure — no verdict and no mode — which no caller can reach by accident.
+  if (!input.audit.passed && !input.audit.fallback) throw new Error('No se puede publicar una ficha que no superó la auditoría.');
   const db = getDb();
   if (input.expectedWorkRevision) {
     const work = db.prepare(
