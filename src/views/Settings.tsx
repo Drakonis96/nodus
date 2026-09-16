@@ -1217,14 +1217,11 @@ export function Settings({
                     );
                   })}
                 </div>
-                <button type="button" className="btn btn-ghost h-8 border border-neutral-300 px-3 text-xs dark:border-neutral-700" onClick={() => openThemeEditor()}>
+                <button type="button" className="theme-action-button btn-ghost border-neutral-300 dark:border-neutral-700" onClick={() => openThemeEditor()}>
                   + {t('Crear tema')}
                 </button>
                 {themeEditorOpen && <div className="space-y-3 rounded-lg border border-neutral-700 bg-neutral-900/50 p-3" data-testid="theme-editor">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-300">{editingThemeId ? t('Editar tema') : t('Crear tema')}</h4>
-                    <button type="button" className="text-xs text-neutral-500 hover:text-neutral-200" onClick={closeThemeEditor}>{t('Cancelar')}</button>
-                  </div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-300">{editingThemeId ? t('Editar tema') : t('Crear tema')}</h4>
                   <label className="block text-xs text-neutral-400">
                     {t('Nombre del tema personalizado')}
                     <input className="input mt-1 w-full" value={themeDraft.label} onChange={(event) => setThemeDraft((draft) => ({ ...draft, label: event.target.value }))} placeholder={t('Mi tema')} />
@@ -1247,13 +1244,18 @@ export function Settings({
                     <input className="mt-1 w-full" type="range" min="0" max="0.2" step="0.01" value={themeDraft.tint} onChange={(event) => setThemeDraft((draft) => ({ ...draft, tint: Number(event.target.value) }))} />
                   </label>
                   {themeError && <p className="text-xs text-red-300">{themeError}</p>}
-                  <button
-                    type="button"
-                    className="btn h-8 bg-indigo-100 px-3 text-xs text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-600 dark:text-white dark:hover:bg-indigo-500"
-                    onClick={() => void saveTheme()}
-                  >
-                    {t('Guardar tema')}
-                  </button>
+                  <div className="flex items-center gap-2" data-testid="theme-editor-actions">
+                    <button type="button" className="theme-action-button btn-ghost border-neutral-300 dark:border-neutral-700" onClick={closeThemeEditor}>
+                      {t('Cancelar')}
+                    </button>
+                    <button
+                      type="button"
+                      className="theme-action-button border-transparent bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-600 dark:text-white dark:hover:bg-indigo-500"
+                      onClick={() => void saveTheme()}
+                    >
+                      {t('Guardar tema')}
+                    </button>
+                  </div>
                 </div>}
               </div>
             </Row>

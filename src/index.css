@@ -2066,6 +2066,16 @@ html.theme-active.light .home-dashboard .study-home-icon {
   @apply hover:bg-neutral-100 text-neutral-700;
 }
 
+/* The Appearance theme controls are one left-aligned group, so all three share a
+   single compact size: a fixed height and tight padding keep them equal without
+   stretching a short label into empty space. Mirrors Server Web's `.ss-button`.
+   Declared after `.btn` because both are single-class selectors and `.btn`'s
+   padding and font size would otherwise win on source order. */
+.theme-action-button {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors;
+  min-height: 2rem;
+}
+
 /* Document indexing can pause for a reason that needs action. Keep this warning
    semantic instead of composing dark-first amber utilities: it appears both in
    the global progress rail and inside the light/dark manager modal. */

@@ -54,8 +54,11 @@ test('settings exposes mode before the palette editor', async () => {
   assert.ok(mode >= 0 && palette > mode);
   assert.match(source, /\+ \{t\('Crear tema'\)\}/);
   assert.match(source, /data-testid="theme-editor"/);
-  assert.match(source, /className="btn btn-ghost h-8 border border-neutral-300 px-3 text-xs dark:border-neutral-700"/);
-  assert.match(source, /bg-indigo-100 px-3 text-xs text-indigo-700.*dark:bg-indigo-600 dark:text-white/s);
+  // Create, Cancel and Save form one left-aligned group, so all three carry the
+  // same compact size class. Asserting the count keeps a later button from
+  // drifting back to an ad-hoc size.
+  assert.equal((source.match(/theme-action-button/g) ?? []).length, 3);
+  assert.match(source, /bg-indigo-100 text-indigo-700.*dark:bg-indigo-600 dark:text-white/s);
   assert.match(source, /Texto en modo claro/);
   assert.match(source, /Texto en modo oscuro/);
   assert.match(source, /Fondo de la aplicación \(modo claro\)/);
