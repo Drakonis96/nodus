@@ -88,7 +88,7 @@ test('runtime theme edge cases are guarded', async () => {
   assert.match(serverSettings, /const normalizedDraft =/);
   assert.match(serverSettings, /normalizeThemeColour\(theme\.darkText\) \?\? defaults\.darkText/);
   assert.match(serverSettings, /aria-label=\{t\("Tintado de superficies"\)\}/);
-  assert.match(await readFile(new URL('../src/serverWeb/App.tsx', import.meta.url), 'utf8'), /if \(!profile\) return;/);
+  assert.match(await readFile(new URL('../src/serverWeb/App.tsx', import.meta.url), 'utf8'), /if \(!profile && !isBuiltInTheme\(appTheme\)\) return;/);
   assert.match(themeBoot, /sanitizeCustomThemes\(parsed\)/);
   assert.match(themeBoot, /--theme-text-light/);
   assert.match(themeBoot, /--theme-text-dark/);

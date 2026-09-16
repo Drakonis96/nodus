@@ -3,6 +3,7 @@ export const DICTIONARY_TRANSLATIONS = {
   en: {
     Diccionario: "Dictionary",
     "Nueva entrada del Diccionario": "New Dictionary entry",
+    "Cambiar dirección de orden": "Change sort direction",
     "Nodus buscará la evidencia más relevante y generará la definición automáticamente.":
       "Nodus will find the most relevant evidence and generate the definition automatically.",
     "Posibles conceptos duplicados": "Possible duplicate concepts",
@@ -1569,6 +1570,7 @@ Object.assign(
 
 /** Prompt presets are authored as Spanish keys and translated explicitly. */
 Object.assign(DICTIONARY_TRANSLATIONS.en as DictionaryTable, {
+  "Cambiar dirección de orden": "Change sort direction",
   "Preconfiguración del prompt": "Prompt preset",
   Personalizado: "Custom",
   "Escribe o adapta libremente las instrucciones para la síntesis.":
@@ -1606,6 +1608,7 @@ Object.assign(DICTIONARY_TRANSLATIONS.en as DictionaryTable, {
 });
 
 Object.assign(DICTIONARY_TRANSLATIONS.fr as DictionaryTable, {
+  "Cambiar dirección de orden": "Changer le sens du tri",
   "Preconfiguración del prompt": "Préconfiguration du prompt",
   Personalizado: "Personnalisé",
   "Escribe o adapta libremente las instrucciones para la síntesis.":
@@ -1643,6 +1646,7 @@ Object.assign(DICTIONARY_TRANSLATIONS.fr as DictionaryTable, {
 });
 
 Object.assign(DICTIONARY_TRANSLATIONS.de as DictionaryTable, {
+  "Cambiar dirección de orden": "Sortierrichtung ändern",
   "Preconfiguración del prompt": "Prompt-Voreinstellung",
   Personalizado: "Benutzerdefiniert",
   "Escribe o adapta libremente las instrucciones para la síntesis.":
@@ -1680,6 +1684,7 @@ Object.assign(DICTIONARY_TRANSLATIONS.de as DictionaryTable, {
 });
 
 Object.assign(DICTIONARY_TRANSLATIONS.pt as DictionaryTable, {
+  "Cambiar dirección de orden": "Alterar a direção da ordenação",
   "Preconfiguración del prompt": "Predefinição do prompt",
   Personalizado: "Personalizado",
   "Escribe o adapta libremente las instrucciones para la síntesis.":
@@ -1717,6 +1722,7 @@ Object.assign(DICTIONARY_TRANSLATIONS.pt as DictionaryTable, {
 });
 
 Object.assign(DICTIONARY_TRANSLATIONS["pt-BR"] as DictionaryTable, {
+  "Cambiar dirección de orden": "Alterar a direção da ordenação",
   "Preconfiguración del prompt": "Predefinição do prompt",
   Personalizado: "Personalizado",
   "Escribe o adapta libremente las instrucciones para la síntesis.":
@@ -1754,6 +1760,7 @@ Object.assign(DICTIONARY_TRANSLATIONS["pt-BR"] as DictionaryTable, {
 });
 
 Object.assign(DICTIONARY_TRANSLATIONS.it as DictionaryTable, {
+  "Cambiar dirección de orden": "Cambia direzione di ordinamento",
   "Preconfiguración del prompt": "Preconfigurazione del prompt",
   Personalizado: "Personalizzato",
   "Escribe o adapta libremente las instrucciones para la síntesis.":
@@ -1791,6 +1798,7 @@ Object.assign(DICTIONARY_TRANSLATIONS.it as DictionaryTable, {
 });
 
 Object.assign(DICTIONARY_TRANSLATIONS.tr as DictionaryTable, {
+  "Cambiar dirección de orden": "Sıralama yönünü değiştir",
   "Preconfiguración del prompt": "İstem ön ayarı",
   Personalizado: "Özel",
   "Escribe o adapta libremente las instrucciones para la síntesis.":
@@ -1828,6 +1836,7 @@ Object.assign(DICTIONARY_TRANSLATIONS.tr as DictionaryTable, {
 });
 
 Object.assign(DICTIONARY_TRANSLATIONS["zh-CN"] as DictionaryTable, {
+  "Cambiar dirección de orden": "更改排序方向",
   "Preconfiguración del prompt": "提示词预设",
   Personalizado: "自定义",
   "Escribe o adapta libremente las instrucciones para la síntesis.":
