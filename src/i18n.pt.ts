@@ -1650,6 +1650,7 @@ export const PT: Record<string, string> = {
   'Paletas de color. El modo claro u oscuro se ajusta arriba.': 'Paletas de cores. O modo claro ou escuro é definido acima.',
   'Usar la misma paleta en todas las bóvedas': 'Usar a mesma paleta em todos os cofres',
   'Activado, todas las bóvedas comparten la paleta. Desactivado, cada una recuerda la suya y las nuevas empiezan con la predeterminada. El modo claro u oscuro es común en ambos casos.': 'Ativado, todos os cofres partilham a paleta. Desativado, cada cofre mantém a sua e os novos começam com a predefinida. O modo claro ou escuro é comum em ambos os casos.',
+  'Paleta de la bóveda': 'Paleta do cofre',
   'Crear tema': 'Criar tema',
   'Editar tema': 'Editar tema',
   'Guardar tema': 'Guardar tema',

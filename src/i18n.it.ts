@@ -1535,6 +1535,7 @@ export const IT: Record<string, string> = {
   "Paletas de color. El modo claro u oscuro se ajusta arriba.": "Palette di colori. La modalità chiara o scura si imposta sopra.",
   "Usar la misma paleta en todas las bóvedas": "Usare la stessa palette in tutti i depositi",
   "Activado, todas las bóvedas comparten la paleta. Desactivado, cada una recuerda la suya y las nuevas empiezan con la predeterminada. El modo claro u oscuro es común en ambos casos.": "Attivato, tutti i depositi condividono la palette. Disattivato, ogni deposito mantiene la propria e i nuovi partono da quella predefinita. La modalità chiara o scura è comune in entrambi i casi.",
+  "Paleta de la bóveda": "Palette del deposito",
   "Crear tema": "Crea tema",
   "Editar tema": "Modifica tema",
   "Guardar tema": "Salva tema",

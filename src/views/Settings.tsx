@@ -40,6 +40,7 @@ import { LEGAL_DOCS, type LegalDocId } from '../legalDocs';
 import { confirm } from '../components/feedback';
 import { Icon } from '../components/ui';
 import { ThemeColourPicker } from '../components/ThemeColourPicker';
+import { ThemePalettePicker } from '../components/ThemePalettePicker';
 import { ModelPicker, ModelWithReasoning, SubscriptionQuotaNotice, ExtractionCapabilityNotice, SelfAuditNotice } from '../components/ModelPicker';
 import { EmbeddingModelControl } from '../components/EmbeddingModelControl';
 import { GeneralTextModelControl } from '../components/GeneralTextModelControl';
@@ -67,21 +68,8 @@ import { DOCUMENT_INDEX_CONTINUOUS_AVAILABLE } from '@shared/documentIndexPolicy
 import { validateBackupPassword } from '@shared/backupPasswordPolicy';
 import { PROMPT_LANGUAGE_OPTIONS } from '@shared/promptLanguageOptions';
 import chromeWebStoreLogo from '../assets/brands/chrome-web-store.svg';
-import { contrast, deriveThemeTokens, THEMES } from '../theme/themes.mjs';
+import { contrast, deriveThemeTokens } from '../theme/themes.mjs';
 import { applyAppTheme as applyRuntimeAppTheme, applyThemeMode } from '../theme/themeBoot';
-
-/** Colour-theme picker options: `default` first, then the curated palettes. Each
- *  swatch shows a light surface, the accent and a deep surface. */
-type ThemePickerOption = { id: string; label: string; swatch: string[]; custom?: boolean };
-
-const THEME_PICKER_OPTIONS: ThemePickerOption[] = [
-  { id: 'default', label: 'Predeterminado', swatch: ['#fafafa', '#6366f1', '#0a0a0a'] },
-  ...THEMES.map((th) => ({
-    id: th.id as AppSettings['appTheme'],
-    label: th.label,
-    swatch: [th.tokens.appBackground.light, th.tokens.a.dark[500], th.tokens.appBackground.dark],
-  })),
-];
 
 const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
 
@@ -1185,38 +1173,13 @@ export function Settings({
             </Row>
             <Row label={t('Tema')} hint={t('Paletas de color. El modo claro u oscuro se ajusta arriba.')} stacked>
               <div className="w-full space-y-3">
-                <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2" data-testid="theme-picker">
-                  {[...THEME_PICKER_OPTIONS, ...customThemes.map((theme) => ({
-                    id: theme.id,
-                    label: theme.label,
-                    custom: true,
-                    swatch: [theme.pale, theme.accent, theme.deep],
-                  }))].map((opt) => {
-                    const active = (settings.appTheme ?? 'default') === opt.id;
-                    const custom = opt.custom ? customThemes.find((theme) => theme.id === opt.id) : undefined;
-                    return (
-                      <div key={opt.id} className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs transition-colors ${
-                        active ? 'border-indigo-500 bg-indigo-500/10 text-neutral-100' : 'border-neutral-800 text-neutral-400'
-                      }`}>
-                        <button
-                          type="button"
-                          aria-pressed={active}
-                          onClick={() => selectTheme(opt.id)}
-                          className="flex min-w-0 flex-1 items-center gap-2 text-left hover:text-neutral-100"
-                        >
-                          <span className="flex flex-shrink-0 overflow-hidden rounded-md border border-black/20">
-                            {opt.swatch.map((c, i) => <span key={i} className="block h-6 w-3" style={{ background: c }} />)}
-                          </span>
-                          <span className="min-w-0 truncate">{opt.id === 'default' ? t('Predeterminado') : opt.label}</span>
-                        </button>
-                        {custom && <>
-                          <button type="button" className="rounded px-1 text-neutral-500 hover:text-neutral-100" aria-label={t('Editar tema')} onClick={() => openThemeEditor(custom)}>✎</button>
-                          <button type="button" className="rounded px-1 text-neutral-500 hover:text-red-300" aria-label={t('Eliminar tema')} onClick={() => void deleteTheme(custom.id)}>×</button>
-                        </>}
-                      </div>
-                    );
-                  })}
-                </div>
+                <ThemePalettePicker
+                  value={settings.appTheme}
+                  customThemes={customThemes}
+                  onSelect={selectTheme}
+                  onEditCustom={openThemeEditor}
+                  onDeleteCustom={(id) => void deleteTheme(id)}
+                />
                 <button type="button" className="theme-action-button btn-ghost border-neutral-300 dark:border-neutral-700" onClick={() => openThemeEditor()}>
                   + {t('Crear tema')}
                 </button>

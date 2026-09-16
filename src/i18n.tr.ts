@@ -1925,6 +1925,7 @@ export const TR: Record<string, string> = {
   "Paletas de color. El modo claro u oscuro se ajusta arriba.": "Renk paletleri. Açık veya koyu mod yukarıdan ayarlanır.",
   "Usar la misma paleta en todas las bóvedas": "Tüm kasalarda aynı paleti kullan",
   "Activado, todas las bóvedas comparten la paleta. Desactivado, cada una recuerda la suya y las nuevas empiezan con la predeterminada. El modo claro u oscuro es común en ambos casos.": "Etkinleştirildiğinde tüm kasalar paleti paylaşır. Devre dışı bırakıldığında her kasa kendi paletini korur ve yeni kasalar varsayılanla başlar. Açık veya koyu mod her iki durumda da ortaktır.",
+  "Paleta de la bóveda": "Kasa paleti",
   "Crear tema": "Tema oluştur",
   "Editar tema": "Temayı düzenle",
   "Guardar tema": "Temayı kaydet",

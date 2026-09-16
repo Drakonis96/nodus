@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { RemoteSignIn, VaultSummary, VaultType } from '@shared/types';
+import type { AppSettings, CustomAppTheme, RemoteSignIn, VaultSummary, VaultType } from '@shared/types';
 import { isPreviewVaultType } from '@shared/vaultTypes';
 import { errorText, t, tr, tx } from '../i18n';
 import { clearFilterPreferences } from '../app/filterPreferences';
 import { ConfirmModal } from './ConfirmModal';
+import { ThemePalettePicker, themePickerOptions } from './ThemePalettePicker';
 import { Icon } from './ui';
 import { setBrowserOverlayVisible } from '../browserOverlay';
 import {
@@ -70,6 +71,12 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
   const [addNameError, setAddNameError] = useState<string | null>(null);
   const [addType, setAddType] = useState<VaultType>('academic');
   const [addError, setAddError] = useState<string | null>(null);
+  // Appearance for the vault being created. `null` means the step was left alone, so
+  // creating writes nothing and the vault keeps whatever the scope gives it.
+  const [addPalette, setAddPalette] = useState<AppSettings['appTheme'] | null>(null);
+  const [addSharesPalette, setAddSharesPalette] = useState<boolean | null>(null);
+  const [addPaletteOpen, setAddPaletteOpen] = useState(false);
+  const [addAppearance, setAddAppearance] = useState<{ appTheme: AppSettings['appTheme']; shareAppThemeAcrossVaults: boolean; customThemes: CustomAppTheme[] } | null>(null);
   const [preAlphaConfirmOpen, setPreAlphaConfirmOpen] = useState(false);
 
   // Connected-vault flow. Signing in returns a ticket plus the spaces this account can
@@ -173,10 +180,32 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
     return [...filtered].sort(sortKey === 'created' ? byCreated : sortKey === 'name' ? byName : byRecent);
   }, [vaults, query, typeFilter, sortKey]);
 
+  // What the wizard shows before anything is touched: the shared palette while the
+  // profile shares one, and the default otherwise — a new vault never starts on the
+  // palette of the vault that happened to be open.
+  const addPaletteOptions = useMemo(() => themePickerOptions(addAppearance?.customThemes ?? []), [addAppearance]);
+  const selectedPalette = addPaletteOptions.find((option) => option.id === (
+    addPalette ?? (addAppearance?.shareAppThemeAcrossVaults ? addAppearance.appTheme : 'default')
+  )) ?? addPaletteOptions[0];
+
   const openAddVault = () => {
     setAddNameError(null);
     setAddError(null);
     setShowRemotePassword(false);
+    setAddPaletteOpen(false);
+    // The palette step shows what the vault would get if nothing is touched: the
+    // shared palette while the profile shares one, and the default otherwise, since
+    // a vault never inherits the palette of the vault that happened to be open.
+    setAddPalette(null);
+    setAddSharesPalette(null);
+    setAddAppearance(null);
+    void window.nodus.getSettings()
+      .then((current) => setAddAppearance({
+        appTheme: current.appTheme,
+        shareAppThemeAcrossVaults: current.shareAppThemeAcrossVaults,
+        customThemes: current.customThemes ?? [],
+      }))
+      .catch(() => setAddAppearance(null));
     setAddOpen(true);
   };
 
@@ -279,10 +308,23 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
       const result = await window.nodus.switchVault(created.vault.id);
       if (!result.ok) throw new Error(result.message);
       createdVaultId = null;
+      // The palette step belongs to the vault that is now active: with the palette
+      // shared it lands in the profile store, and otherwise it is stored on the vault
+      // itself rather than inherited from whichever vault was open before.
+      if (addPalette !== null || addSharesPalette !== null) {
+        await window.nodus.updateSettings({
+          ...(addPalette !== null ? { appTheme: addPalette } : {}),
+          ...(addSharesPalette !== null ? { shareAppThemeAcrossVaults: addSharesPalette } : {}),
+        });
+      }
       setAddOpen(false);
       setPreAlphaConfirmOpen(false);
       setAddName('');
       setAddType('academic');
+      setAddPalette(null);
+      setAddSharesPalette(null);
+      setAddAppearance(null);
+      setAddPaletteOpen(false);
       setMessage(tr(result.message));
       await onActiveVaultChanged();
       onClose();
@@ -637,6 +679,49 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
             <div className="mt-3">
               <div className="mb-1.5 text-xs text-neutral-500">{t('Tipo de bóveda')}</div>
               <VaultTypePicker value={addType} onChange={setAddType} disabled={busy} />
+            </div>
+            {/* Palette and scope for the new vault. Collapsed to the current choice: the
+                type list above is already long, and the full grid stays one click away
+                instead of pushing the step out of the modal's first screen. */}
+            <div className="mt-3 rounded-lg border border-neutral-800 px-3 py-2" data-testid="vault-new-appearance">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs text-neutral-500">{t('Paleta de la bóveda')}</span>
+                <button
+                  type="button"
+                  data-testid="vault-new-palette-toggle"
+                  aria-expanded={addPaletteOpen}
+                  disabled={busy}
+                  onClick={() => setAddPaletteOpen((open) => !open)}
+                  className="flex items-center gap-2 rounded-md border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:text-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span className="flex flex-shrink-0 overflow-hidden rounded border border-black/20">
+                    {selectedPalette.swatch.map((colour, index) => <span key={index} className="block h-4 w-2" style={{ background: colour }} />)}
+                  </span>
+                  <span className="min-w-0 truncate">{selectedPalette.id === 'default' ? t('Predeterminado') : selectedPalette.label}</span>
+                  <Icon name={addPaletteOpen ? 'chevronUp' : 'chevronDown'} size={12} />
+                </button>
+              </div>
+              {addPaletteOpen && (
+                <div className="mt-2 max-h-48 overflow-y-auto pr-1">
+                  <ThemePalettePicker
+                    value={selectedPalette.id}
+                    customThemes={addAppearance?.customThemes ?? []}
+                    disabled={busy}
+                    onSelect={(id) => setAddPalette(id as AppSettings['appTheme'])}
+                    testId="vault-new-palette"
+                  />
+                </div>
+              )}
+              <label className="mt-2 flex items-center gap-2 text-xs text-neutral-400">
+                <input
+                  type="checkbox"
+                  data-testid="vault-new-share-palette"
+                  checked={addSharesPalette ?? addAppearance?.shareAppThemeAcrossVaults ?? false}
+                  disabled={busy}
+                  onChange={(event) => setAddSharesPalette(event.target.checked)}
+                />
+                {t('Usar la misma paleta en todas las bóvedas')}
+              </label>
             </div>
             <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-neutral-500" data-testid="vault-models-next-step">
               <Icon name="info" size={14} className="mt-0.5 shrink-0" />

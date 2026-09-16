@@ -601,7 +601,9 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   const sharesAfter = patch.shareAppThemeAcrossVaults ?? sharesBefore;
   // Turning the shared palette on adopts the one on screen: "the same in every vault"
   // has to mean the palette the user is looking at, not whatever the file held last.
-  if (sharesAfter && !sharesBefore) {
+  // A palette sent in the same patch is the user naming one explicitly (the new-vault
+  // wizard sets the switch and the palette together), so it wins over that adoption.
+  if (sharesAfter && !sharesBefore && patch.appTheme === undefined && patch.customThemes === undefined) {
     patch = { ...patch, appTheme: current.appTheme, customThemes: current.customThemes };
   }
   // While the palette is shared — and on the write that stops sharing it — the vault

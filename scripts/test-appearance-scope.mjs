@@ -111,8 +111,50 @@ test('the setting ships off, is exposed in Appearance, and is translated everywh
   // route of a palette written in the same patch follows the NEW scope.
   assert.match(settingsRepo, /const sharesAfter = patch\.shareAppThemeAcrossVaults \?\? sharesBefore/);
   assert.match(settingsRepo, /splitGlobalPatch\(patch, sharesAfter\)/);
+  // Naming a palette while switching the sharing on must not be overwritten by the
+  // palette that happens to be on screen.
+  assert.match(settingsRepo, /sharesAfter && !sharesBefore && patch\.appTheme === undefined/);
   assert.match(settingsView, /data-testid="share-app-theme"/);
   assert.match(settingsView, /checked=\{settings\.shareAppThemeAcrossVaults\}/);
   assert.match(settingsView, /patch\(\{ shareAppThemeAcrossVaults: e\.target\.checked \}\)/);
   assert.match(settingsView, /t\('Usar la misma paleta en todas las bóvedas'\)/);
+});
+
+test('a vault never inherits the palette of another vault', async () => {
+  const settingsRepo = await read('electron/db/settingsRepo.ts');
+  // The palette is read from the vault unless it is shared: no branch may copy the
+  // profile palette into a vault that has none, which is the state every vault is in
+  // while the palette is shared.
+  const adoption = /merged\.appTheme = coerceAppTheme\(/;
+  assert.equal(adoption.test(settingsRepo), false, 'getSettings never adopts the profile palette');
+});
+
+test('both surfaces offer the same palettes through one picker', async () => {
+  const [picker, settingsView, vaultSwitcher] = await Promise.all([
+    read('src/components/ThemePalettePicker.tsx'),
+    read('src/views/Settings.tsx'),
+    read('src/components/VaultSwitcher.tsx'),
+  ]);
+  assert.match(settingsView, /<ThemePalettePicker/);
+  assert.match(vaultSwitcher, /<ThemePalettePicker/);
+  assert.match(picker, /export function themePickerOptions/);
+  // The wizard chooses a palette; editing and deleting themes stay in Settings.
+  assert.match(vaultSwitcher, /testId="vault-new-palette"/);
+  assert.equal(/onEditCustom=\{/.test(vaultSwitcher), false, 'the wizard only chooses a palette');
+  assert.match(picker, /onEditCustom\?: \(theme: CustomAppTheme\) => void/);
+});
+
+test('the new-vault wizard inherits the shared switch and applies the choice to the new vault', async () => {
+  const vaultSwitcher = await read('src/components/VaultSwitcher.tsx');
+  // Inherited, not reset: the wizard opens on the value the profile already uses.
+  assert.match(vaultSwitcher, /checked=\{addSharesPalette \?\? addAppearance\?\.shareAppThemeAcrossVaults \?\? false\}/);
+  assert.match(vaultSwitcher, /data-testid="vault-new-share-palette"/);
+  assert.match(vaultSwitcher, /current\.shareAppThemeAcrossVaults/);
+  // The palette belongs to the vault just created, so it is written after the switch
+  // to it — never before, which would land it on the previous vault.
+  const switchAt = vaultSwitcher.indexOf('await window.nodus.switchVault(created.vault.id)');
+  const applyAt = vaultSwitcher.indexOf('if (addPalette !== null || addSharesPalette !== null)');
+  assert.ok(switchAt >= 0 && applyAt > switchAt, 'the palette is applied once the new vault is active');
+  assert.match(vaultSwitcher, /appTheme: addPalette/);
+  assert.match(vaultSwitcher, /shareAppThemeAcrossVaults: addSharesPalette/);
 });
