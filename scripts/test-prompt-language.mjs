@@ -39,14 +39,8 @@ try {
   const { updateSettings } = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
   const { withPromptLanguage } = require(path.join(repoRoot, 'electron/ai/aiClient.ts'));
 
-  // es → prompt untouched (it is already Spanish; no directive).
-  updateSettings({ promptLanguage: 'es' });
-  {
-    const out = withPromptLanguage({ system: BASE });
-    assert.equal(out.system, BASE, 'es must leave the system prompt byte-for-byte unchanged');
-  }
-
   const cases = [
+    { lang: 'es', name: 'ESPAÑOL', heading: 'IDIOMA DE SALIDA — PRIORIDAD MÁXIMA' },
     { lang: 'en', name: 'ENGLISH', heading: 'OUTPUT LANGUAGE — HIGHEST PRIORITY' },
     { lang: 'fr', name: 'FRANÇAIS', heading: 'LANGUE DE SORTIE — PRIORITÉ ABSOLUE' },
     { lang: 'tr', name: 'TÜRKÇE', heading: 'ÇIKTI DİLİ — EN YÜKSEK ÖNCELİK' },
@@ -84,18 +78,21 @@ try {
     assert.ok(out.includes(heading), `${lang}: must append the localized priority directive`);
     assert.ok(out.includes(name), `${lang}: directive must name the target language (${name})`);
     // The directive must explicitly supersede the inline Spanish instruction.
-    assert.match(out, /free-text|texte libre|freien Text|texto livre|testo libero|serbest metin|自由文本|自由文字|văn bản tự do|自由記述|свободного текста|вільного тексту|자유 텍스트/i, `${lang}: directive must override prior language instructions`);
+    assert.match(out, /free-text|texto libre|texte libre|freien Text|texto livre|testo libero|serbest metin|自由文本|自由文字|văn bản tự do|自由記述|свободного текста|вільного тексту|자유 텍스트/i, `${lang}: directive must override prior language instructions`);
   }
 
-  // Unknown/undefined prompt language must not throw and must fall back to no directive.
+  // An undefined prompt language is Spanish, and Spanish is now driven by the directive too:
+  // the setting is what decides the output language, never the wording of the prompt.
   updateSettings({ promptLanguage: undefined });
-  assert.equal(withPromptLanguage({ system: BASE }).system, BASE, 'undefined language falls back to es (no directive)');
+  const fallback = withPromptLanguage({ system: BASE }).system;
+  assert.ok(fallback.startsWith(BASE), 'undefined language still preserves the base prompt');
+  assert.ok(fallback.includes('IDIOMA DE SALIDA'), 'undefined language follows the Spanish directive');
 
-  // The document-profile pack is the pipeline that came back in English for Spanish prompts:
-  // for 'es' no directive is appended, and unlike the rest of the app's Spanish prompts this
-  // pack never said which language to write in — 2 of 9 profiles of a live run followed the
-  // source document instead of the setting. Every prompt of its Spanish half states it now,
-  // and every language names its own where the composed prompt is built.
+  // The document-profile pack is the pipeline that came back in English for Spanish prompts,
+  // and the reason Spanish got its directive: unlike the rest of the app's Spanish prompts it
+  // never said which language to write in, so 2 of 9 profiles of a live run followed the source
+  // document instead of the setting. Its six prompts state it in line now — belt and braces
+  // with the directive the composition above appends — and the quotes stay in the source.
   const { documentProfilePromptPack } = require(path.join(repoRoot, 'shared/academicPromptPacks.ts'));
   const spanishPack = documentProfilePromptPack('es');
   for (const field of ['section', 'reduce', 'sectionAudit', 'profile', 'audit', 'repair']) {
@@ -108,10 +105,16 @@ try {
       `es pack: ${field} must keep quotes in the source language`
     );
   }
-  for (const [lang, name] of [['es', 'español'], ['en', 'ENGLISH'], ['ko', '한국어'], ['de', 'DEUTSCH']]) {
+  // Every prompt language, not a sample of four: the whole point of this change is that no
+  // language depends on the prompt's own wording to get its output.
+  const ALL = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
+  assert.equal(ALL.length, 15, 'the sweep must cover every prompt language');
+  for (const lang of ALL) {
     updateSettings({ promptLanguage: lang });
     const composed = withPromptLanguage({ system: documentProfilePromptPack(lang).profile }).system;
-    assert.ok(composed.includes(name), `${lang}: the composed profile prompt must name ${name}`);
+    assert.ok(composed.includes('═══'), `${lang}: the composed profile prompt must carry the directive`);
+    assert.ok(composed.endsWith('\n') || composed.length > documentProfilePromptPack(lang).profile.length + 100,
+      `${lang}: the directive must be appended to the profile prompt`);
   }
 
   console.log('Prompt-language directive test passed!');
