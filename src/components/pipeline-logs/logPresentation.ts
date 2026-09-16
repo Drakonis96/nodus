@@ -7,6 +7,7 @@
 import type { AppLanguage } from '@shared/types';
 import type { PipelineLogEntry, PipelineLogLevel, PipelineLogCategory } from '@shared/pipelineLogs';
 import { PIPELINE_LOG_TEXT, type PipelineLogText } from '@shared/pipelineLogMessages';
+import { knownRuntimeErrorText } from '@shared/uiLanguage';
 import { t, txIn } from '../../i18n';
 
 export interface LevelPresentation {
@@ -86,6 +87,17 @@ export const SCOPE_LABEL: Partial<Record<PipelineLogEntry['scope'], string>> = {
 };
 
 /**
+ * The one value in a line that is prose rather than a field: `{detail}` carries the `message`
+ * of the error the main process threw, in whatever language that process wrote it. It is
+ * translated through the SAME catalogue the main process uses — `knownRuntimeErrorText` — so a
+ * Spanish sentence the catalogue knows reaches an English log in English, and a provider's own
+ * wording, a document title or a file path passes through untouched.
+ */
+function localizeLogDetail(detail: string, language: AppLanguage): string {
+  return knownRuntimeErrorText(detail, language) ?? detail;
+}
+
+/**
  * Render one stored line in the reader's chosen language. Values that are themselves
  * catalogue ids (`{subject}`, `{reason}`) are resolved in the SAME language, in one pass, so
  * an English log never carries a Spanish fragment inside an English sentence.
@@ -98,9 +110,23 @@ export function renderPipelineLogLine(text: PipelineLogText, language: AppLangua
       vars[name] = txIn(language, PIPELINE_LOG_TEXT[value.id] ?? value.id);
       continue;
     }
+    if (name === 'detail' && typeof value === 'string') {
+      vars[name] = localizeLogDetail(value, language);
+      continue;
+    }
     vars[name] = value == null ? '' : String(value);
   }
   return txIn(language, source, vars);
+}
+
+/**
+ * The secondary line under an entry: an error sentence in the log's language, or the value it
+ * always was. `detail` holds whatever the line needed — a document title on a warning, the
+ * caught error on a failure — and only the second kind has a translation to reach.
+ */
+export function renderPipelineLogDetail(detail: string | null | undefined, language: AppLanguage): string | null {
+  if (!detail) return null;
+  return localizeLogDetail(detail, language);
 }
 
 /** `YYYY-MM-DD` of an instant, in the reader's own timezone. */

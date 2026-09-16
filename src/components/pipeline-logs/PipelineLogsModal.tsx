@@ -40,6 +40,7 @@ import {
   entryFieldChips,
   entryIdentityChips,
   logTime,
+  renderPipelineLogDetail,
   renderPipelineLogLine,
 } from './logPresentation';
 import {
@@ -611,7 +612,7 @@ function LogRow({
       </p>
       {entry.detail && (
         <p className="mt-0.5 font-mono text-[10px] text-neutral-500 [overflow-wrap:anywhere]" data-testid="pipeline-log-detail">
-          {entry.detail}
+          {renderPipelineLogDetail(entry.detail, language)}
         </p>
       )}
       {identity.length > 0 && (

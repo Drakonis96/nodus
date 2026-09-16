@@ -621,8 +621,16 @@ const EXPORT_RULE = '─'.repeat(78);
  * which the renderer supplies in the language the reader picked for the logs; the field
  * scaffolding stays English on purpose, because the export is an artefact meant to be
  * pasted into a GitHub issue where a stable, parseable shape matters more than locale.
+ *
+ * `translateDetail` applies the same language to the `detail:` line when the caller has a
+ * catalogue for it. Without it the line is printed as stored, which is what the shared
+ * module can do on its own — the renderer is the half that owns the translations.
  */
-export function formatPipelineLogEntry(entry: PipelineLogEntry, translate: (text: PipelineLogText) => string): string {
+export function formatPipelineLogEntry(
+  entry: PipelineLogEntry,
+  translate: (text: PipelineLogText) => string,
+  translateDetail?: (detail: string) => string,
+): string {
   const lines: string[] = [];
   const repeat = entry.repeat > 1 ? `  ×${entry.repeat}${entry.firstAt ? ` (first ${entry.firstAt})` : ''}` : '';
   lines.push(`${entry.at}  ${entry.level.toUpperCase().padEnd(7)}  ${entry.category}${entry.code ? `  [${entry.code}]` : ''}${repeat}`);
@@ -641,7 +649,7 @@ export function formatPipelineLogEntry(entry: PipelineLogEntry, translate: (text
   if (entry.scope !== 'app') fields.push(`scope=${entry.scope}`);
   if (fields.length) lines.push(`  ${fields.join(' · ')}`);
   lines.push(`  ${translate(entry.message)}`);
-  if (entry.detail) lines.push(`  detail: ${entry.detail}`);
+  if (entry.detail) lines.push(`  detail: ${translateDetail ? translateDetail(entry.detail) : entry.detail}`);
   if (entry.stack) lines.push(`  stack:\n${entry.stack.split('\n').map((line) => `    ${line}`).join('\n')}`);
   return lines.join('\n');
 }
@@ -655,6 +663,7 @@ export function formatPipelineLogsText(
   entries: PipelineLogEntry[],
   options: {
     translate: (text: PipelineLogText) => string;
+    translateDetail?: (detail: string) => string;
     generatedAt?: string;
     shown?: number;
     total?: number;
@@ -671,7 +680,7 @@ export function formatPipelineLogsText(
     `Log language: ${options.logLanguage ?? 'en'}`,
     `Filters: ${options.filters?.length ? options.filters.join(' · ') : 'none'}`,
   ];
-  const body = entries.map((entry) => formatPipelineLogEntry(entry, options.translate));
+  const body = entries.map((entry) => formatPipelineLogEntry(entry, options.translate, options.translateDetail));
   return [
     ...parts,
     EXPORT_RULE,

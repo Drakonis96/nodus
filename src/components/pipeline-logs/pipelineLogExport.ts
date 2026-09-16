@@ -11,12 +11,17 @@
 import type { AppLanguage } from '@shared/types';
 import type { PipelineLogEntry, PipelineLogFilter, PipelineLogSort } from '@shared/pipelineLogs';
 import { formatPipelineLogsText } from '@shared/pipelineLogs';
-import { renderPipelineLogLine } from './logPresentation';
+import { renderPipelineLogDetail, renderPipelineLogLine } from './logPresentation';
 import { t, tx } from '../../i18n';
 
 /** The sentence, in the language the reader picked for the log. */
 function translateText(text: PipelineLogEntry['message'], language: AppLanguage): string {
   return renderPipelineLogLine(text, language);
+}
+
+/** The `detail:` line, in the same language. Values with no translation stay as stored. */
+function translateDetail(detail: string, language: AppLanguage): string {
+  return renderPipelineLogDetail(detail, language) ?? detail;
 }
 
 /** A one-line description of the active filters, for the export header. */
@@ -44,6 +49,7 @@ export function buildLogsText(
 ): string {
   return formatPipelineLogsText([...entries], {
     translate: (text) => translateText(text, options.language),
+    translateDetail: (detail) => translateDetail(detail, options.language),
     generatedAt: new Date().toISOString(),
     shown: entries.length,
     total: options.total,
@@ -57,6 +63,7 @@ export function buildLogsText(
 export function buildLogEntryText(entry: PipelineLogEntry, language: AppLanguage): string {
   return formatPipelineLogsText([entry], {
     translate: (text) => translateText(text, language),
+    translateDetail: (detail) => translateDetail(detail, language),
     generatedAt: new Date().toISOString(),
     shown: 1,
     filters: [`entry=${entry.id}`],
@@ -76,7 +83,7 @@ export function buildLogEntryJson(entry: PipelineLogEntry, language: AppLanguage
     scope: entry.scope,
     code: entry.code ?? null,
     message: { id: entry.message.id, text: translateText(entry.message, language), params: entry.message.params ?? {} },
-    detail: entry.detail ?? null,
+    detail: entry.detail ? translateDetail(entry.detail, language) : null,
     httpStatus: entry.httpStatus ?? null,
     retriable: entry.retriable ?? null,
     attempts: entry.attempts ?? null,

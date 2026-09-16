@@ -54,6 +54,51 @@ test('a line renders in the chosen log language, nested subjects included', () =
   assert.equal(presentation.renderPipelineLogLine(degraded, 'it'), 'Estrazione del testo: avviso — l’elemento non ha allegati leggibili');
 });
 
+// The `{detail}` of a failure is the `message` of the error the main process threw, in the
+// language that process wrote it. On an English log it used to arrive as Spanish — the
+// screenshot in issue #830 carries "Document indexing: error — No se puede publicar una ficha
+// que no superó la auditoría." — so the renderer now consults the same catalogue the main
+// process uses, and leaves alone everything that is not one of our sentences.
+test('an error sentence the main process wrote reaches the log in the log’s language', () => {
+  const refused = {
+    id: 'logFailed',
+    params: { subject: { id: 'subjectIndexing' }, detail: 'No se puede publicar una ficha que no superó la auditoría.' },
+  };
+  assert.equal(
+    presentation.renderPipelineLogLine(refused, 'en'),
+    'Document indexing: error — A record that failed the audit cannot be published.',
+  );
+  assert.equal(
+    presentation.renderPipelineLogLine(refused, 'es'),
+    'Indexado de documentos: error — No se puede publicar una ficha que no superó la auditoría.',
+  );
+  assert.equal(
+    presentation.renderPipelineLogLine(refused, 'fr'),
+    'Indexation des documents : erreur — Une fiche qui n’a pas passé l’audit ne peut pas être publiée.',
+  );
+  assert.equal(
+    presentation.renderPipelineLogLine(refused, 'de'),
+    'Dokumentindexierung: Fehler — Ein Datensatz, der die Prüfung nicht bestanden hat, kann nicht veröffentlicht werden.',
+  );
+
+  // A provider's own wording, a document title and a path are not ours to translate: they
+  // travel as they arrived, in every language.
+  const provider = { id: 'logFailed', params: { subject: { id: 'subjectJsonResponse' }, detail: 'Unexpected token <' } };
+  const title = { id: 'logWarningDetail', params: { subject: { id: 'subjectIndexing' }, detail: 'Temperature Cycled Operation' } };
+  for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN']) {
+    assert.ok(presentation.renderPipelineLogLine(provider, language).endsWith('Unexpected token <'), `${language}: a provider sentence is not rewritten`);
+    assert.ok(presentation.renderPipelineLogLine(title, language).endsWith('Temperature Cycled Operation'), `${language}: a document title is not rewritten`);
+  }
+  // The diagnostics a refused profile carries are language-neutral, so they read the same
+  // everywhere instead of leaking Spanish tag names into an English log.
+  const diagnostics = 'verdict=rejected · score=0.79 · support=1.00 · structure=1.00';
+  assert.equal(presentation.renderPipelineLogDetail(diagnostics, 'en'), diagnostics);
+  assert.equal(presentation.renderPipelineLogDetail(diagnostics, 'zh-CN'), diagnostics);
+  assert.equal(presentation.renderPipelineLogDetail('No se puede publicar una ficha que no superó la auditoría.', 'en'),
+    'A record that failed the audit cannot be published.');
+  assert.equal(presentation.renderPipelineLogDetail(null, 'en'), null);
+});
+
 test('counts and titles keep their numbers in every language', () => {
   const indexed = { id: 'documentIndexed', params: { title: 'Historia contemporánea', sections: 12, vectors: 40 } };
   for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN']) {
@@ -95,6 +140,18 @@ test('the exported .txt follows the same language as the lines', async () => {
   assert.equal(json.level, 'error');
   assert.equal(json.message.text, 'Model JSON response: error — Unexpected token <');
   assert.equal(json.vaultName, 'Tesis');
+  // The `detail:` line — the secondary line under a row — follows the same language, whether
+  // it carries one of our sentences or the value it always was.
+  const refused = {
+    ...entry,
+    message: { id: 'logFailedPlain', params: { subject: { id: 'subjectIndexing' } } },
+    detail: 'No se puede publicar una ficha que no superó la auditoría.',
+  };
+  assert.match(exporter.buildLogEntryText(refused, 'en'), /detail: A record that failed the audit cannot be published\./);
+  assert.match(exporter.buildLogEntryText(refused, 'de'), /detail: Ein Datensatz, der die Prüfung nicht bestanden hat, kann nicht veröffentlicht werden\./);
+  assert.equal(JSON.parse(exporter.buildLogEntryJson(refused, 'en')).detail, 'A record that failed the audit cannot be published.');
+  const titled = { ...entry, message: { id: 'logInfo', params: { subject: { id: 'subjectExtraction' }, detail: 'Historia contemporánea' } }, detail: 'Historia contemporánea' };
+  assert.match(exporter.buildLogEntryText(titled, 'en'), /detail: Historia contemporánea/);
 });
 
 test('the colours are the standardised ones, in both themes', () => {

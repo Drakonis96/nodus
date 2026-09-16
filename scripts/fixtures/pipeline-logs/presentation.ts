@@ -5,6 +5,7 @@
 // change would never reach the renderer, so both have to come out of the same entry.
 export {
   renderPipelineLogLine,
+  renderPipelineLogDetail,
   categoryLabel,
   CATEGORY_LABEL,
   CATEGORY_ORDER,
