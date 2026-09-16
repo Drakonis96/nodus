@@ -48,7 +48,11 @@ export function contributors(pr, commits) {
     }
     for (const actor of commit.authors.nodes) {
       // Tool attribution never replaces the accountable human PR author above.
-      if (!isAiAttribution(actor)) add(actor.user, `Commit ${commit.oid}`);
+      if (isAiAttribution(actor)) continue;
+      // Acceptance is only enforceable for accounts that can comment on the PR.
+      // A commit email that no GitHub account claims is covered by the signing
+      // PR author instead of blocking the whole PR.
+      if (actor.user?.id && actor.user.__typename === 'User') users.set(actor.user.id, actor.user);
     }
   }
   return { users: [...users.values()], problems };
