@@ -1,3 +1,5 @@
+import type { LocalRuntimeDiagnostics } from './localAiRuntime';
+
 export type NodusLocalModelKind = 'embedding' | 'chat';
 export type NodusLocalModelRuntime = 'llama_cpp' | 'transformers';
 export type NodusLocalCapability = 'chat' | 'vision' | 'summary' | 'extraction' | 'fusion' | 'documentProfile';
@@ -49,6 +51,8 @@ export interface NodusLocalRuntimeStatus {
   /** Main-process transfer state, retained while renderer views mount/unmount. */
   downloading: boolean;
   progress: number;
+  /** Optional for older server snapshots; capability is not proof of GPU offload. */
+  diagnostics?: LocalRuntimeDiagnostics;
 }
 
 export interface NodusLocalAiStatus {

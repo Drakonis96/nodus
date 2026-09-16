@@ -83,8 +83,8 @@ try {
   assert.match(manager, /for \(const slots of \[2, 4\] as const\)/, 'local calibration tests two slots before four');
   assert.match(manager, /gain < 0\.15 \|\| p95Change > 0\.1/, 'extra slots require the throughput and p95 gates');
   assert.match(manager, /minimumFree >= os\.totalmem\(\) \* 0\.05/, 'local calibration rejects critical memory pressure');
-  assert.match(manager, /ensureNodusLocalServerUnlocked\(model\.id, mode, slots\)/, 'calibration starts the full-context runtime at each candidate slot count');
-  assert.match(manager, /calibrationTail/, 'normal requests cannot race a runtime calibration');
+  assert.match(manager, /ensureNodusLocalServerUnlocked\(model\.id, mode, slots, signal\)/, 'calibration starts a cancellable full-context runtime at each candidate slot count');
+  assert.match(manager, /calibrationQueue\.runForeground/, 'foreground requests preempt calibration and wait for its cleanup, not its benchmark');
   assert.doesNotMatch(manager, /model\.runtime !== 'llama_cpp' \|\| !await verifyNodusLocalModel/,
     'the downloaded-model wrapper registers calibration before any asynchronous checksum yield');
   assert.match(manager, /export function killNodusLocalServerSync/, 'process shutdown has a forceful local-runtime backstop');

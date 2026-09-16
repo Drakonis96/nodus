@@ -7,9 +7,11 @@ import {
   type NodusLocalModelDefinition,
 } from '@shared/localAiModels';
 import { t } from '../i18n';
+import { runtimeText } from '../i18n.localAiRuntime';
 import { ConfirmModal } from './ConfirmModal';
 import { SettingsModelList, settingsModelRowClass } from './SettingsModelList';
 import { Icon } from './ui';
+import { LocalRuntimeStatus } from './LocalRuntimeStatus';
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toLocaleString(undefined, { maximumFractionDigits: 1 })} GB`;
@@ -57,6 +59,21 @@ export function LocalAiModelsSettings({
     return () => window.clearInterval(timer);
   }, [activeTransfer]);
 
+  // Keep startup/calibration/offload diagnostics live after a download completes.
+  // Polling must not rewrite model favourites or initiate any network download.
+  useEffect(() => {
+    if (activeTransfer) return;
+    let mounted = true;
+    let pending = false;
+    const timer = window.setInterval(() => {
+      if (pending) return;
+      pending = true;
+      void window.nodus.getNodusLocalAiStatus().then((next) => { if (mounted) setStatus(next); })
+        .catch(() => undefined).finally(() => { pending = false; });
+    }, 1_000);
+    return () => { mounted = false; window.clearInterval(timer); };
+  }, [activeTransfer]);
+
   const installed = useMemo(() => new Map(status?.models.map((model) => [model.id, model]) ?? []), [status]);
 
   const installRuntime = async () => {
@@ -64,6 +81,11 @@ export function LocalAiModelsSettings({
     try { setStatus(await window.nodus.installNodusLocalRuntime(setProgress)); }
     catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(''); }
+  };
+
+  const cancelRuntime = async () => {
+    try { setStatus(await window.nodus.cancelNodusLocalDownloads()); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
   };
 
   const download = async (model: NodusLocalModelDefinition) => {
@@ -140,11 +162,14 @@ export function LocalAiModelsSettings({
       </div>
       <div className={`rounded-lg border px-3 py-2 text-xs ${status?.runtime.ready ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300' : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300'}`}>
         <div>{status?.runtime.ready
-          ? `${t('Motor local listo')} · llama.cpp ${status.runtime.version}`
+          ? `${runtimeText('Motor instalado')} · llama.cpp ${status.runtime.version}`
           : <button className="inline-flex items-center gap-1" disabled={transferBusy} onClick={() => void installRuntime()}><Icon name={status?.runtime.downloading || busy === 'runtime' ? 'sync' : 'download'} className={status?.runtime.downloading || busy === 'runtime' ? 'animate-spin' : ''} size={12} />{status?.runtime.downloading || busy === 'runtime' ? t('Instalando motor…') : t('Instalar motor local')}</button>}</div>
         <button className="mt-1 text-[10px] underline decoration-dotted underline-offset-2 opacity-80 hover:opacity-100" title={t('Abrir licencia de llama.cpp')} onClick={() => void window.nodus.openExternal('https://github.com/ggml-org/llama.cpp/blob/b10002/LICENSE')}>llama.cpp · MIT</button>
       </div>
     </div>
+
+    <LocalRuntimeStatus runtime={status?.runtime} busy={transferBusy || (status?.runtime.diagnostics?.phase !== 'calibrating' && Boolean(status?.activeLeases))}
+      onCheck={() => void installRuntime()} onCancel={() => void cancelRuntime()} />
 
     <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
       <strong>{t('Importante sobre los embeddings:')}</strong> {t('si cambias de modelo, los embeddings creados con el modelo anterior no son compatibles y deberán regenerarse.')}

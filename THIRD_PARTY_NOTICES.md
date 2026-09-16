@@ -195,9 +195,18 @@ package-license inventory.
 
 ## Engines downloaded at runtime
 
-The local model installer downloads the unmodified `llama.cpp` release b10002
-directly from its GitHub release. llama.cpp is MIT licensed and its source is:
-https://github.com/ggml-org/llama.cpp/tree/b10002
+The local model installer downloads unmodified `llama.cpp` releases directly
+from GitHub: b10002 on Linux, Windows and Intel macOS; b10268 on Apple Silicon
+for the upstream macOS deployment-target compatibility fix. llama.cpp is MIT
+licensed. The version-specific sources are:
+
+- https://github.com/ggml-org/llama.cpp/tree/b10002
+- https://github.com/ggml-org/llama.cpp/tree/b10268
+
+Optional backend dependencies, including the separate Windows CUDA runtime
+archive, retain their own upstream terms; the llama.cpp MIT license does not
+relicense those dependencies. The installer preserves the downloaded archives'
+license and notice files. See `docs/local-ai-runtime.md` for backend selection.
 
 The local image model installer downloads the unmodified `stable-diffusion.cpp`
 release `master-782-b290693` directly from its GitHub release. The runtime and
