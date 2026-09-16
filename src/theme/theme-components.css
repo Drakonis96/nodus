@@ -491,6 +491,12 @@ html.theme-active.light .global-search-delete { color: var(--theme-text-light-su
 html.theme-active.dark .global-search-delete:hover { color: #fca5a5; }
 html.theme-active.light .global-search-delete:hover { color: #b91c1c; }
 
+/* Default palette: the label keeps the neutral foreground it had before the
+ * runtime theme layer, and the more specific theme-active rules below replace it
+ * for every non-default palette. */
+.ideas-theme-pill { color: #525252; }
+.dark .ideas-theme-pill { color: #737373; }
+
 /* Ideas theme labels need a readable foreground even when a custom accent is
  * very dark or very light. Keep the accent in the surface and border, but
  * derive the label text from the theme's explicitly readable text token. */

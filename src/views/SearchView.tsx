@@ -231,18 +231,18 @@ export function SearchView({
     <div className="global-search-workspace theme-workspace-surface h-full flex flex-col min-h-0 p-6">
       <div className="shrink-0 max-w-3xl w-full mx-auto">
         <div className="flex items-center gap-3 mb-4">
-          <Icon name="search" size={22} className="global-search-accent" />
+          <Icon name="search" size={22} className="global-search-accent text-indigo-300" />
           <h1 className="text-xl font-semibold">{t('Búsqueda global')}</h1>
 
         </div>
 
         {similar ? (
-          <div className="global-search-similar flex items-center gap-2 rounded-md px-3 py-2 text-sm">
-            <Icon name="network" size={15} className="global-search-accent" />
+          <div className="global-search-similar flex items-center gap-2 rounded-md border border-indigo-800/60 bg-indigo-950/30 px-3 py-2 text-sm">
+            <Icon name="network" size={15} className="global-search-accent text-indigo-300" />
             <span className="text-neutral-300">
               {t('Ideas parecidas a:')} <span className="text-neutral-100">{similar.ideaTitle}</span>
             </span>
-            <button className="global-search-similar-action ml-auto text-xs" onClick={clearSimilar}>
+            <button className="global-search-similar-action ml-auto text-xs text-neutral-400 hover:text-neutral-200" onClick={clearSimilar}>
               <Icon name="x" size={14} /> {t('Salir')}
             </button>
           </div>
@@ -278,7 +278,7 @@ export function SearchView({
             selected={activeKinds} onChange={setActiveKinds} disabled={Boolean(similar)} />
           {canSave && (
             <button
-              className="global-search-save ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs"
+              className="global-search-save ml-auto inline-flex items-center gap-1 rounded-full border border-neutral-700 px-2.5 py-1 text-xs text-neutral-400 hover:text-neutral-200"
               onClick={saveCurrent}
               title={t('Guardar esta búsqueda y sus filtros')}
             >
@@ -294,14 +294,14 @@ export function SearchView({
             {savedSearches.map((s) => (
               <span
                 key={s.id}
-                className="global-search-saved group inline-flex items-center gap-1 rounded-full pl-2.5 pr-1 py-1 text-xs"
+                className="global-search-saved group inline-flex items-center gap-1 rounded-full border border-neutral-800 bg-neutral-900/50 pl-2.5 pr-1 py-1 text-xs text-neutral-300"
               >
                 <button className="flex items-center gap-1 hover:text-neutral-100" onClick={() => applySaved(s)}>
                   <Icon name={s.mode === 'semantic' ? 'network' : 'search'} size={11} />
                   <span className="max-w-[12rem] truncate">{s.name}</span>
                 </button>
                 <button
-                  className="global-search-delete"
+                  className="global-search-delete text-neutral-600 hover:text-red-400"
                   onClick={() => deleteSaved(s.id)}
                   title={t('Eliminar búsqueda guardada')}
                 >
@@ -347,7 +347,7 @@ export function SearchView({
                               <span className="truncate text-sm text-neutral-100">{r.title}</span>
                               <span className="text-[10px] text-neutral-500">{t(meta.label)}</span>
                               {typeof (r.relevance ?? r.similarity) === 'number' && (
-                                <span title={t('Relevancia')} className="global-search-relevance shrink-0 rounded px-1.5 py-0.5 text-[10px] tabular-nums">
+                                <span title={t('Relevancia')} className="global-search-relevance shrink-0 rounded bg-indigo-900/50 px-1.5 py-0.5 text-[10px] tabular-nums text-indigo-300">
                                   {Math.round((r.relevance ?? r.similarity ?? 0) * 100)}%
                                 </span>
                               )}
@@ -360,7 +360,7 @@ export function SearchView({
                         </button>
                         {r.kind === 'idea' && (
                           <button
-                            className="global-search-similar-action mt-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                            className="global-search-similar-action mt-0.5 shrink-0 text-neutral-600 opacity-0 transition-opacity hover:text-indigo-300 group-hover:opacity-100"
                             onClick={() => findSimilar(r)}
                             title={t('Buscar ideas parecidas a esta')}
                           >

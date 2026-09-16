@@ -874,17 +874,25 @@ html.theme-active.dark .dark\:via-neutral-950 { --tw-gradient-to:transparent var
  * preserve the original shade names, while this final layer gives those names
  * a reliable role in every custom palette. In particular, borders no longer
  * depend on a custom deep/pale pair happening to be far enough apart. */
-html.theme-active.dark :is(.text-neutral-400, .text-neutral-500, .hover\:text-neutral-400:hover, .hover\:text-neutral-500:hover, .dark\:text-neutral-400, .dark\:text-neutral-500) { color:var(--theme-text-dark-muted); }
-html.theme-active.dark :is(.text-neutral-600, .text-neutral-700, .hover\:text-neutral-600:hover, .hover\:text-neutral-700:hover, .dark\:text-neutral-600, .dark\:text-neutral-700) { color:var(--theme-text-dark-subtle); }
+html.theme-active.dark :is(.text-neutral-400, .text-neutral-500, .dark\:text-neutral-400, .dark\:text-neutral-500) { color:var(--theme-text-dark-muted); }
+html.theme-active.dark :is(.hover\:text-neutral-400:hover, .hover\:text-neutral-500:hover) { color:var(--theme-text-dark-muted); }
+html.theme-active.dark :is(.text-neutral-600, .text-neutral-700, .dark\:text-neutral-600, .dark\:text-neutral-700) { color:var(--theme-text-dark-subtle); }
+html.theme-active.dark :is(.hover\:text-neutral-600:hover, .hover\:text-neutral-700:hover) { color:var(--theme-text-dark-subtle); }
 html.theme-active.light :is(.text-neutral-50, .text-neutral-100, .text-neutral-200, .text-neutral-300, .text-neutral-800, .text-neutral-900, .text-neutral-950) { color:var(--theme-text-light); }
-html.theme-active.light :is(.text-neutral-400, .text-neutral-500, .hover\:text-neutral-400:hover, .hover\:text-neutral-500:hover) { color:var(--theme-text-light-muted); }
-html.theme-active.light :is(.text-neutral-600, .text-neutral-700, .hover\:text-neutral-600:hover, .hover\:text-neutral-700:hover) { color:var(--theme-text-light-subtle); }
+html.theme-active.light :is(.text-neutral-400, .text-neutral-500) { color:var(--theme-text-light-muted); }
+html.theme-active.light :is(.hover\:text-neutral-400:hover, .hover\:text-neutral-500:hover) { color:var(--theme-text-light-muted); }
+html.theme-active.light :is(.text-neutral-600, .text-neutral-700) { color:var(--theme-text-light-subtle); }
+html.theme-active.light :is(.hover\:text-neutral-600:hover, .hover\:text-neutral-700:hover) { color:var(--theme-text-light-subtle); }
 
-html.theme-active.dark :is(.border-neutral-700, .border-neutral-800, .border-neutral-900, .hover\:border-neutral-700:hover, .hover\:border-neutral-800:hover, .dark\:border-neutral-700, .dark\:border-neutral-800, .dark\:border-neutral-900) { border-color:var(--theme-border-dark); }
-html.theme-active.dark :is(.border-neutral-600, .hover\:border-neutral-600:hover, .dark\:hover\:border-neutral-600:hover) { border-color:var(--theme-border-dark-strong); }
+html.theme-active.dark :is(.border-neutral-700, .border-neutral-800, .border-neutral-900, .dark\:border-neutral-700, .dark\:border-neutral-800, .dark\:border-neutral-900) { border-color:var(--theme-border-dark); }
+html.theme-active.dark :is(.hover\:border-neutral-700:hover, .hover\:border-neutral-800:hover) { border-color:var(--theme-border-dark); }
+html.theme-active.dark :is(.border-neutral-600) { border-color:var(--theme-border-dark-strong); }
+html.theme-active.dark :is(.hover\:border-neutral-600:hover, .dark\:hover\:border-neutral-600:hover) { border-color:var(--theme-border-dark-strong); }
 html.theme-active.dark :is(.border-neutral-700\/70, .border-neutral-700\/80, .border-neutral-800\/60, .border-neutral-800\/70, .border-neutral-800\/80, .border-neutral-800\/90, .border-neutral-900\/80, .dark\:border-neutral-700\/80, .dark\:border-neutral-800\/60, .dark\:border-neutral-800\/70, .dark\:border-neutral-800\/80) { border-color:color-mix(in srgb, var(--theme-border-dark) 72%, transparent); }
-html.theme-active.light :is(.border-neutral-100, .border-neutral-200, .border-neutral-300, .border-neutral-400, .border-neutral-500, .border-neutral-600, .border-neutral-700, .border-neutral-800, .border-neutral-900, .border-neutral-950, .hover\:border-neutral-300:hover, .hover\:border-neutral-400:hover, .hover\:border-neutral-500:hover, .hover\:border-neutral-600:hover, .hover\:border-neutral-700:hover) { border-color:var(--theme-border-light); }
-html.theme-active.light :is(.border-neutral-500, .border-neutral-600, .border-neutral-700, .border-neutral-800, .border-neutral-900, .border-neutral-950, .hover\:border-neutral-600:hover, .hover\:border-neutral-700:hover) { border-color:var(--theme-border-light-strong); }
+html.theme-active.light :is(.border-neutral-100, .border-neutral-200, .border-neutral-300, .border-neutral-400, .border-neutral-500, .border-neutral-600, .border-neutral-700, .border-neutral-800, .border-neutral-900, .border-neutral-950) { border-color:var(--theme-border-light); }
+html.theme-active.light :is(.hover\:border-neutral-300:hover, .hover\:border-neutral-400:hover, .hover\:border-neutral-500:hover, .hover\:border-neutral-600:hover, .hover\:border-neutral-700:hover) { border-color:var(--theme-border-light); }
+html.theme-active.light :is(.border-neutral-500, .border-neutral-600, .border-neutral-700, .border-neutral-800, .border-neutral-900, .border-neutral-950) { border-color:var(--theme-border-light-strong); }
+html.theme-active.light :is(.hover\:border-neutral-600:hover, .hover\:border-neutral-700:hover) { border-color:var(--theme-border-light-strong); }
 html.theme-active.light :is(.border-neutral-200\/70, .border-neutral-300\/70, .border-neutral-600\/60, .border-neutral-700\/70, .border-neutral-700\/80, .border-neutral-800\/60, .border-neutral-800\/70, .border-neutral-800\/80, .border-neutral-900\/80) { border-color:color-mix(in srgb, var(--theme-border-light) 72%, transparent); }
 
 html.theme-active.dark :is(.ring-neutral-700, .ring-neutral-800, .ring-neutral-900, .dark\:ring-neutral-700, .dark\:ring-neutral-800, .dark\:ring-neutral-900) { --tw-ring-color:var(--theme-border-dark); }

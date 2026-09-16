@@ -1465,7 +1465,7 @@ export function DictionaryView({
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <div className="flex flex-wrap gap-1">
                 <button
-                  className={`dictionary-filter-button btn btn-ghost h-7 px-2 ${!letter ? "is-selected" : ""}`}
+                  className={`dictionary-filter-button btn btn-ghost h-7 px-2 ${!letter ? "is-selected text-indigo-600 dark:text-indigo-300" : ""}`}
                   onClick={() => setLetter("")}
                 >
                   {t("Todas")}
@@ -1474,7 +1474,7 @@ export function DictionaryView({
                   (item) => (
                     <button
                       key={item}
-                      className={`dictionary-filter-button btn btn-ghost h-7 w-7 p-0 ${letter === item ? "is-selected" : ""}`}
+                      className={`dictionary-filter-button btn btn-ghost h-7 w-7 p-0 ${letter === item ? "is-selected text-indigo-600 dark:text-indigo-300" : ""}`}
                       onClick={() => setLetter(letter === item ? "" : item)}
                     >
                       {item}
@@ -1526,14 +1526,14 @@ export function DictionaryView({
                 <Icon name={sortDir === "asc" ? "arrowUp" : "arrowDown"} />
               </button>
               <button
-                className={`dictionary-view-button btn btn-ghost h-8 px-2 ${viewMode === "list" ? "is-selected" : ""}`}
+                className={`dictionary-view-button btn btn-ghost h-8 px-2 ${viewMode === "list" ? "is-selected text-indigo-600 dark:text-indigo-300" : ""}`}
                 aria-pressed={viewMode === "list"}
                 onClick={() => setViewMode("list")}
               >
                 <Icon name="list" />
               </button>
               <button
-                className={`dictionary-view-button btn btn-ghost h-8 px-2 ${viewMode === "table" ? "is-selected" : ""}`}
+                className={`dictionary-view-button btn btn-ghost h-8 px-2 ${viewMode === "table" ? "is-selected text-indigo-600 dark:text-indigo-300" : ""}`}
                 aria-pressed={viewMode === "table"}
                 onClick={() => setViewMode("table")}
               >

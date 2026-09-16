@@ -851,7 +851,7 @@ export function ResearchAssistantModal({
             >
               <Icon name="layers" size={15} className="research-accent-text" />
               <span className="hidden sm:inline">{activeMode ? t(activeMode.label) : t('Contexto')}</span>
-              <span className="research-accent-badge rounded px-1.5 py-0.5 text-[10px]">{selectedCount}</span>
+              <span className="research-accent-badge rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
             </button>
           )}
           {!adapter && !isGenealogy && <ResearchSourceFilterControl key={activeId ?? 'new'} value={selection.sourceFilter} disabled={sending} onChange={async sourceFilter => {
