@@ -87,14 +87,16 @@ export const SCOPE_LABEL: Partial<Record<PipelineLogEntry['scope'], string>> = {
 };
 
 /**
- * The one value in a line that is prose rather than a field: `{detail}` carries the `message`
- * of the error the main process threw, in whatever language that process wrote it. It is
- * translated through the SAME catalogue the main process uses — `knownRuntimeErrorText` — so a
- * Spanish sentence the catalogue knows reaches an English log in English, and a provider's own
- * wording, a document title or a file path passes through untouched.
+ * A value in a line that is prose rather than a field. `{detail}` carries the `message` of the
+ * error the main process threw and `{warnings}` the report the extraction wrote — both in
+ * whatever language that process wrote them. They are translated through the SAME catalogue the
+ * main process uses — `knownRuntimeErrorText` — so a Spanish sentence the catalogue knows
+ * reaches an English log in English, and a provider's own wording, a document title or a file
+ * path passes through untouched. Every string value is offered to it rather than the two names
+ * we know today: the next line that carries a sentence should not need this function changed.
  */
-function localizeLogDetail(detail: string, language: AppLanguage): string {
-  return knownRuntimeErrorText(detail, language) ?? detail;
+function localizeLogValue(value: string, language: AppLanguage): string {
+  return knownRuntimeErrorText(value, language) ?? value;
 }
 
 /**
@@ -110,8 +112,8 @@ export function renderPipelineLogLine(text: PipelineLogText, language: AppLangua
       vars[name] = txIn(language, PIPELINE_LOG_TEXT[value.id] ?? value.id);
       continue;
     }
-    if (name === 'detail' && typeof value === 'string') {
-      vars[name] = localizeLogDetail(value, language);
+    if (typeof value === 'string') {
+      vars[name] = localizeLogValue(value, language);
       continue;
     }
     vars[name] = value == null ? '' : String(value);
@@ -126,7 +128,7 @@ export function renderPipelineLogLine(text: PipelineLogText, language: AppLangua
  */
 export function renderPipelineLogDetail(detail: string | null | undefined, language: AppLanguage): string | null {
   if (!detail) return null;
-  return localizeLogDetail(detail, language);
+  return localizeLogValue(detail, language);
 }
 
 /** `YYYY-MM-DD` of an instant, in the reader's own timezone. */

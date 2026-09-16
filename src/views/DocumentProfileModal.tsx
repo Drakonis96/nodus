@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { DocumentIndexJob, DocumentProfile, DocumentUnderstandingState, WorkView } from '@shared/types';
 import { Icon } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { t, tx } from '../i18n';
+import { knownText, t, tx } from '../i18n';
 
 const STATUS_LABEL: Record<DocumentUnderstandingState, string> = {
   missing: 'Sin preparar', queued: 'En cola', waiting_source: 'Resolviendo texto completo', paused: 'En pausa', structuring: 'Reconstruyendo estructura',
@@ -153,7 +153,10 @@ export function DocumentProfileModal({ work, vaultId, onClose }: { work: WorkVie
               {degradedSections > 0 && profile.audit?.fallback !== 'extractive' && <p className="mt-1 leading-5 text-amber-200/70">{tx('Secciones sin síntesis: {n} de {total}', { n: degradedSections, total: profile.sections.length })}</p>}
               {auditIssues.length > 0 && <details className="mt-2">
                 <summary className="cursor-pointer text-amber-300/90">{t('Incidencias de la auditoría')}</summary>
-                <ul className="mt-1 list-disc space-y-1 pl-5 leading-5 text-amber-200/70">{auditIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>
+                {/* The auditor's own prose stays as it was written; the sentences the pipeline
+                    adds when the audit itself failed (`… was cut off at N tokens`) are ours and
+                    follow the interface language. */}
+                <ul className="mt-1 list-disc space-y-1 pl-5 leading-5 text-amber-200/70">{auditIssues.map((issue, index) => <li key={index}>{knownText(issue)}</li>)}</ul>
               </details>}
             </div>}
             <section>

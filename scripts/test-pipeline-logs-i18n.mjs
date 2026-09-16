@@ -99,6 +99,52 @@ test('an error sentence the main process wrote reaches the log in the log’s la
   assert.equal(presentation.renderPipelineLogDetail(null, 'en'), null);
 });
 
+// The library extraction reports its findings as a list of our own sentences joined with
+// `; `, and the log prints the list as one value — the screenshot of a real run carried
+// "Document extracted with warnings: … · El texto contiene espacios dobles inesperados."
+// No single lookup can match a list, so the renderer translates it item by item, and
+// refuses the list outright when any item is not ours.
+test('a list of extraction warnings reaches the log in the log’s language', () => {
+  // The real line: `documentExtractedReview` carries the report as `{warnings}`, which is why
+  // translating only `{detail}` was not enough.
+  const line = {
+    id: 'documentExtractedReview',
+    params: {
+      subject: { id: 'subjectLibraryExtraction' },
+      title: 'MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications',
+      warnings: 'El texto contiene espacios dobles inesperados.; Hay 2 nota(s) sin referencia bidireccional.',
+    },
+  };
+  assert.equal(
+    presentation.renderPipelineLogLine(line, 'en'),
+    'Document extracted with warnings: MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications · The text contains unexpected double spaces.; 2 note(s) have no two-way reference.',
+  );
+  assert.equal(
+    presentation.renderPipelineLogLine(line, 'es'),
+    'Documento extraído con avisos: MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications · El texto contiene espacios dobles inesperados.; Hay 2 nota(s) sin referencia bidireccional.',
+  );
+  assert.equal(
+    presentation.renderPipelineLogLine(line, 'de'),
+    'Dokument mit Warnungen extrahiert: MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications · Der Text enthält unerwartete doppelte Leerzeichen.; 2 Notiz(en) haben keinen beidseitigen Verweis.',
+  );
+  // One warning is just a sentence, and it follows the same catalogue.
+  const single = { id: 'logWarningDetail', params: { subject: { id: 'subjectLibraryExtraction' }, detail: 'La extracción contiene muy poco texto.' } };
+  assert.equal(presentation.renderPipelineLogLine(single, 'en'), 'Library extraction: warning — The extraction contains very little text.');
+  assert.equal(presentation.renderPipelineLogLine(single, 'fr'), 'Extraction de la bibliothèque : avertissement — L’extraction contient très peu de texte.');
+  // A list with anything that is not ours stays exactly as stored: half-translating it would
+  // put two languages inside one sentence, which is the leak itself.
+  const mixed = { ...line, params: { ...line.params, warnings: 'El texto contiene espacios dobles inesperados.; 42 widgets went missing.' } };
+  assert.equal(
+    presentation.renderPipelineLogLine(mixed, 'en'),
+    'Document extracted with warnings: MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications · El texto contiene espacios dobles inesperados.; 42 widgets went missing.',
+  );
+  // A title is not a sentence of ours, in any language.
+  assert.equal(
+    presentation.renderPipelineLogLine({ id: 'logInfo', params: { subject: { id: 'subjectExtraction' }, detail: 'Historia contemporánea' } }, 'de'),
+    'Textextraktion: Historia contemporánea',
+  );
+});
+
 test('counts and titles keep their numbers in every language', () => {
   const indexed = { id: 'documentIndexed', params: { title: 'Historia contemporánea', sections: 12, vectors: 40 } };
   for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN']) {

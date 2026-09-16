@@ -755,6 +755,26 @@ test('legacy Spanish Electron errors cannot leak into a non-Spanish interface', 
   );
 });
 
+// A stored document profile mixes the pipeline's own sentences with the auditor model's prose,
+// and `tr()` would replace the second kind with "this message could not be translated" — the
+// auditor answers in the prompt language, so its Spanish notes are not a leak, they are the
+// finding. `knownText` is the gate that translates the first kind and leaves the second alone.
+test('a stored audit translates our sentences and keeps the auditor’s own prose', () => {
+  const { knownText, setActiveLang, getActiveLang } = loadModule('src/i18n.ts');
+  setActiveLang('en');
+  assert.equal(
+    knownText('La respuesta de «deepseek-flash» (DeepSeek) se cortó al alcanzar el límite de 5000 tokens de salida y el JSON quedó incompleto. Usa un modelo con mayor límite de salida o reduce el tamaño de la tarea.'),
+    'The response from «deepseek-flash» (DeepSeek) was cut off at the 5000-output-token limit and the JSON was left incomplete. Use a model with a higher output limit or reduce the size of the task.',
+  );
+  assert.equal(knownText('El texto contiene espacios dobles inesperados.'), 'The text contains unexpected double spaces.');
+  const auditorsNote = 'El campo «thesis» mezcla la tesis con resultados teóricos.';
+  assert.equal(knownText(auditorsNote), auditorsNote, 'a model’s own prose must survive untouched');
+  setActiveLang('es');
+  assert.equal(getActiveLang(), 'es');
+  assert.equal(knownText('El texto contiene espacios dobles inesperados.'), 'El texto contiene espacios dobles inesperados.');
+  setActiveLang('en');
+});
+
 /**
  * The package installer's failures reach the reader twice: thrown from an IPC handler,
  * where `localizeRuntimeError` catches them, and recorded in the migration journal, where
