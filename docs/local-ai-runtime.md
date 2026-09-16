@@ -7,8 +7,8 @@ checking status, or starting an already installed model does not download engine
 ## Acceleration and fallback
 
 Linux x64/arm64 and Windows x64 install the separate upstream Vulkan build plus a
-CPU build. macOS uses its upstream Metal-capable build, which also supports CPU.
-Windows arm64 uses the upstream CPU build. Vulkan also supports compatible NVIDIA
+CPU build. Apple-silicon macOS uses the upstream Metal-capable build; Intel macOS
+and Windows arm64 use the upstream CPU builds. Vulkan also supports compatible NVIDIA
 hardware, but it is **not CUDA**. The pinned release does not publish a Linux CUDA
 archive; having a CUDA toolkit installed does not change the backend in a CPU build.
 
@@ -31,6 +31,22 @@ Inherited AppImage library paths are removed only for child runtimes; system dri
 paths and GPU visibility restrictions are preserved. Nodus owns its llama command
 line and clears inherited `LLAMA_ARG_*` settings so a host environment cannot change
 its model, context, loopback binding or logging policy.
+
+## Known older-macOS limitation (separate issue #856)
+
+The pinned Apple-silicon archive was built on macOS 26 without a lower deployment
+target. Real verification on macOS 14.8.9 reproduces a dyld failure for the missing
+`MTLResidencySetDescriptor` Metal symbol, even for `--version`. This predates the
+GPU-selection fix: previous Nodus versions download the same archive. CPU flags
+cannot repair a loader failure before argument parsing. Nodus reports this as a
+specific compatibility error, preserves existing files, and does not call it a
+successful CPU fallback. Use an external local provider with a compatible engine,
+or a compatible newer macOS, until a portable native runtime is distributed.
+
+[Issue #856](https://github.com/Drakonis96/nodus/issues/856) tracks producing and
+shipping a compatible Apple-silicon build. The macOS 14 CI job verifies the exact
+known error and rollback; it does **not** establish native inference support there.
+The current-macOS job separately requires successful real-archive installation.
 
 ## Existing installations
 
@@ -75,6 +91,7 @@ retained or uploaded. Review any diagnostics before choosing to share them publi
   path and verifies extraction, executable startup and device detection. It does
   not download models or measure inference speed.
 - `.github/workflows/local-ai-runtime.yml` runs both on Linux, Windows and macOS.
+  A separately named macOS 14 negative compatibility/rollback job covers #856.
   The existing full CI and desktop E2E remain unchanged and required.
 
 Physical GPU acceptance still requires a real compatible machine. On CachyOS with

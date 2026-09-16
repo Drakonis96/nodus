@@ -1,6 +1,7 @@
 import type { AppLanguage } from '@shared/types';
 
 const ES = {
+  incompatible: 'Esta versión del motor llama.cpp no es compatible con tu macOS. Usa un proveedor local externo con un motor compatible, como Ollama o LM Studio, o actualiza macOS. Tus modelos se conservan.',
   installed: 'Motor local instalado',
   loading: 'Cargando modelo…',
   ready: 'Modelo listo',
@@ -24,6 +25,7 @@ export type LocalAiRuntimeText = { [K in keyof typeof ES]: string };
 export const LOCAL_AI_RUNTIME_TEXT: Record<AppLanguage, LocalAiRuntimeText> = {
   es: ES,
   en: {
+    incompatible: 'This llama.cpp build is incompatible with your macOS version. Use an external local provider with a compatible engine, such as Ollama or LM Studio, or update macOS. Your models are preserved.',
     installed: 'Local engine installed', loading: 'Loading model…', ready: 'Model ready', failed: 'Local engine failed to start',
     install: 'Install local engine', installing: 'Preparing engine…', update: 'Update local engine', recheck: 'Reinstall and check GPU',
     legacy: 'Older engine. Update it to check GPU support without downloading your models again.',
@@ -32,6 +34,7 @@ export const LOCAL_AI_RUNTIME_TEXT: Record<AppLanguage, LocalAiRuntimeText> = {
     devices: 'GPU detected during setup', log: 'Startup diagnostics', network: 'Downloads verified llama.cpp engines; keeps existing models.',
   },
   fr: {
+    incompatible: 'Cette version de llama.cpp est incompatible avec votre macOS. Utilisez un fournisseur local externe avec un moteur compatible, comme Ollama ou LM Studio, ou mettez macOS à jour. Vos modèles sont conservés.',
     installed: 'Moteur local installé', loading: 'Chargement du modèle…', ready: 'Modèle prêt', failed: 'Le moteur local n’a pas pu démarrer',
     install: 'Installer le moteur local', installing: 'Préparation du moteur…', update: 'Mettre à jour le moteur local', recheck: 'Réinstaller et vérifier le GPU',
     legacy: 'Ancien moteur. Mettez-le à jour pour vérifier le GPU sans télécharger à nouveau les modèles.',
@@ -40,6 +43,7 @@ export const LOCAL_AI_RUNTIME_TEXT: Record<AppLanguage, LocalAiRuntimeText> = {
     devices: 'GPU détecté lors de l’installation', log: 'Diagnostic de démarrage', network: 'Télécharge des moteurs llama.cpp vérifiés ; conserve les modèles existants.',
   },
   de: {
+    incompatible: 'Diese llama.cpp-Version ist mit Ihrer macOS-Version nicht kompatibel. Nutzen Sie einen externen lokalen Anbieter mit kompatibler Engine, etwa Ollama oder LM Studio, oder aktualisieren Sie macOS. Ihre Modelle bleiben erhalten.',
     installed: 'Lokale Engine installiert', loading: 'Modell wird geladen…', ready: 'Modell bereit', failed: 'Lokale Engine konnte nicht gestartet werden',
     install: 'Lokale Engine installieren', installing: 'Engine wird vorbereitet…', update: 'Lokale Engine aktualisieren', recheck: 'Neu installieren und GPU prüfen',
     legacy: 'Ältere Engine. Aktualisieren Sie sie, um die GPU zu prüfen, ohne Modelle erneut herunterzuladen.',
@@ -48,6 +52,7 @@ export const LOCAL_AI_RUNTIME_TEXT: Record<AppLanguage, LocalAiRuntimeText> = {
     devices: 'Bei der Installation erkannte GPU', log: 'Startdiagnose', network: 'Lädt verifizierte llama.cpp-Engines herunter; vorhandene Modelle bleiben erhalten.',
   },
   pt: {
+    incompatible: 'Esta versão do motor llama.cpp não é compatível com o seu macOS. Utilize um fornecedor local externo com um motor compatível, como Ollama ou LM Studio, ou atualize o macOS. Os seus modelos são mantidos.',
     installed: 'Motor local instalado', loading: 'A carregar o modelo…', ready: 'Modelo pronto', failed: 'Não foi possível iniciar o motor local',
     install: 'Instalar motor local', installing: 'A preparar o motor…', update: 'Atualizar motor local', recheck: 'Reinstalar e verificar GPU',
     legacy: 'Motor anterior. Atualize-o para verificar a GPU sem voltar a transferir os modelos.',
@@ -56,6 +61,7 @@ export const LOCAL_AI_RUNTIME_TEXT: Record<AppLanguage, LocalAiRuntimeText> = {
     devices: 'GPU detetada durante a instalação', log: 'Diagnóstico de arranque', network: 'Transfere motores llama.cpp verificados; mantém os modelos existentes.',
   },
   'pt-BR': {
+    incompatible: 'Esta versão do motor llama.cpp não é compatível com seu macOS. Use um provedor local externo com um motor compatível, como Ollama ou LM Studio, ou atualize o macOS. Seus modelos são preservados.',
     installed: 'Motor local instalado', loading: 'Carregando modelo…', ready: 'Modelo pronto', failed: 'Não foi possível iniciar o motor local',
     install: 'Instalar motor local', installing: 'Preparando motor…', update: 'Atualizar motor local', recheck: 'Reinstalar e verificar GPU',
     legacy: 'Motor anterior. Atualize-o para verificar a GPU sem baixar os modelos novamente.',
@@ -64,6 +70,7 @@ export const LOCAL_AI_RUNTIME_TEXT: Record<AppLanguage, LocalAiRuntimeText> = {
     devices: 'GPU detectada durante a instalação', log: 'Diagnóstico de inicialização', network: 'Baixa motores llama.cpp verificados; mantém os modelos existentes.',
   },
   it: {
+    incompatible: 'Questa versione di llama.cpp non è compatibile con il tuo macOS. Usa un fornitore locale esterno con un motore compatibile, come Ollama o LM Studio, oppure aggiorna macOS. I tuoi modelli vengono conservati.',
     installed: 'Motore locale installato', loading: 'Caricamento del modello…', ready: 'Modello pronto', failed: 'Impossibile avviare il motore locale',
     install: 'Installa motore locale', installing: 'Preparazione del motore…', update: 'Aggiorna motore locale', recheck: 'Reinstalla e verifica GPU',
     legacy: 'Motore precedente. Aggiornalo per verificare la GPU senza scaricare di nuovo i modelli.',
@@ -72,6 +79,7 @@ export const LOCAL_AI_RUNTIME_TEXT: Record<AppLanguage, LocalAiRuntimeText> = {
     devices: 'GPU rilevata durante l’installazione', log: 'Diagnostica di avvio', network: 'Scarica motori llama.cpp verificati; conserva i modelli esistenti.',
   },
   tr: {
+    incompatible: 'Bu llama.cpp sürümü macOS sürümünüzle uyumlu değil. Ollama veya LM Studio gibi uyumlu bir motor kullanan harici bir yerel sağlayıcı kullanın ya da macOS’u güncelleyin. Modelleriniz korunur.',
     installed: 'Yerel motor yüklendi', loading: 'Model yükleniyor…', ready: 'Model hazır', failed: 'Yerel motor başlatılamadı',
     install: 'Yerel motoru yükle', installing: 'Motor hazırlanıyor…', update: 'Yerel motoru güncelle', recheck: 'Yeniden yükle ve GPU’yu kontrol et',
     legacy: 'Eski motor. Modelleri yeniden indirmeden GPU desteğini kontrol etmek için güncelleyin.',
@@ -80,6 +88,7 @@ export const LOCAL_AI_RUNTIME_TEXT: Record<AppLanguage, LocalAiRuntimeText> = {
     devices: 'Kurulum sırasında algılanan GPU', log: 'Başlatma tanılaması', network: 'Doğrulanmış llama.cpp motorlarını indirir; mevcut modelleri korur.',
   },
   'zh-CN': {
+    incompatible: '此 llama.cpp 版本与你的 macOS 版本不兼容。请使用配有兼容引擎的外部本地提供商（如 Ollama 或 LM Studio），或更新 macOS。现有模型会保留。',
     installed: '本地引擎已安装', loading: '正在加载模型…', ready: '模型已就绪', failed: '本地引擎启动失败',
     install: '安装本地引擎', installing: '正在准备引擎…', update: '更新本地引擎', recheck: '重新安装并检测 GPU',
     legacy: '旧版引擎。更新后可检测 GPU 支持，无需重新下载模型。',

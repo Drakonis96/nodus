@@ -6,7 +6,8 @@ import {
   type NodusLocalAiStatus,
   type NodusLocalModelDefinition,
 } from '@shared/localAiModels';
-import { t } from '../i18n';
+import { pick, t } from '../i18n';
+import { LOCAL_AI_RUNTIME_TEXT } from '../i18n.localAiRuntime';
 import { ConfirmModal } from './ConfirmModal';
 import { SettingsModelList, settingsModelRowClass } from './SettingsModelList';
 import { Icon } from './ui';
@@ -47,7 +48,7 @@ export function LocalAiModelsSettings({
     setStatus(nextStatus);
     if (exposeModels) await exposeDownloadedChatModels(nextStatus);
   };
-  useEffect(() => { void refresh().catch((cause) => setError(cause instanceof Error ? cause.message : String(cause))); }, []);
+  useEffect(() => { void refresh().catch((cause) => setError(runtimeError(cause))); }, []);
 
   const activeTransfer = Boolean(status?.runtime.downloading || status?.models.some((model) => model.downloading));
   useEffect(() => {
@@ -59,7 +60,7 @@ export function LocalAiModelsSettings({
       polling = true;
       // Do not re-add favorites removed by the user on every idle heartbeat.
       void (activeTransfer ? refresh() : refresh(false))
-        .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))
+        .catch((cause) => setError(runtimeError(cause)))
         .finally(() => { polling = false; });
     }, 1000);
     return () => window.clearInterval(timer);
@@ -67,10 +68,16 @@ export function LocalAiModelsSettings({
 
   const installed = useMemo(() => new Map(status?.models.map((model) => [model.id, model]) ?? []), [status]);
 
+  const runtimeError = (cause: unknown) => {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    return message.includes('NODUS_LOCAL_RUNTIME_MACOS_INCOMPATIBLE')
+      ? pick(LOCAL_AI_RUNTIME_TEXT).incompatible : message;
+  };
+
   const installRuntime = async () => {
     setBusy('runtime'); setProgress(0); setError('');
     try { setStatus(await window.nodus.installNodusLocalRuntime(setProgress)); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    catch (cause) { setError(runtimeError(cause)); }
     finally { setBusy(''); }
   };
 
@@ -83,7 +90,7 @@ export function LocalAiModelsSettings({
       setStatus(nextStatus);
       await exposeDownloadedChatModels(nextStatus);
     }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    catch (cause) { setError(runtimeError(cause)); }
     finally { setBusy(''); }
   };
 
@@ -96,7 +103,7 @@ export function LocalAiModelsSettings({
       if (model.kind === 'chat') {
         await patch({ favorites: settings.favorites.filter((favorite) => !(favorite.provider === 'nodus' && favorite.model === model.id)) });
       }
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    } catch (cause) { setError(runtimeError(cause)); }
     finally { setBusy(''); }
   };
 

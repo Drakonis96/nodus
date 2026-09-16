@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { stripVTControlCharacters } from 'node:util';
 import AdmZip from 'adm-zip';
 import type { LocalAiBackend } from '@shared/localAiRuntime';
 
@@ -42,7 +43,7 @@ export function runtimeAssets(platform: string = process.platform, arch: string 
       ['metal', 'macos-arm64.tar.gz', 'b7aca9d4f9c6267a5f389179bd7412c4e991ac7d1b69f52acf065ef99c99345c', 10_749_656],
     ],
     'darwin-x64': [
-      ['metal', 'macos-x64.tar.gz', 'c90eaed104ad1c82628d34967def32eaae2516768e10121fbebc4c73a046ac7d', 11_031_400],
+      ['cpu', 'macos-x64.tar.gz', 'c90eaed104ad1c82628d34967def32eaae2516768e10121fbebc4c73a046ac7d', 11_031_400],
     ],
   };
   const entries = specs[`${platform}-${arch}`];
@@ -127,12 +128,12 @@ export async function readInstalledRuntime(root: string): Promise<InstalledRunti
   } catch { /* Old or interrupted installations remain usable via the legacy path. */ }
   const executablePath = await findRuntimeExecutable(runtimeRoot(root), true);
   if (!executablePath) return null;
-  return { executablePath, cpuPath: executablePath, backend: process.platform === 'darwin' ? 'metal' : 'cpu',
+  return { executablePath, cpuPath: executablePath, backend: process.platform === 'darwin' && process.arch === 'arm64' ? 'metal' : 'cpu',
     devices: [], deviceIds: [], upgradeRequired: true, fallbackReason: 'legacy-runtime', probeLog: '' };
 }
 
 export function redactRuntimeLog(value: string, root = ''): string {
-  let text = String(value).replace(/\u001b\[[0-9;]*m/g, '');
+  let text = stripVTControlCharacters(String(value));
   for (const prefix of [root, os.homedir()].filter(Boolean).sort((a, b) => b.length - a.length)) {
     text = text.split(prefix).join('[local]');
   }
@@ -178,6 +179,16 @@ export function gpuStartupFailure(message: string): boolean {
   return /out of (?:device |gpu |host )?memory|failed to allocate|allocation failed|vk::|vkAllocate|VK_ERROR_|libvulkan|vulkan.*(?:failed|error)|failed to (?:load|initialize).*backend|no usable GPU|device (?:lost|unavailable)/i.test(message);
 }
 
+/** The b10002 Apple-silicon binary links newer Metal APIs before argv is read.
+ * No CPU flag can repair this dyld failure. Keep it distinct from missing GPU
+ * drivers and preserve the existing installation rather than pretend fallback.
+ */
+export function runtimeProcessError(error: Error, platform: string = process.platform): Error {
+  if (platform !== 'darwin' || !/dyld\[/i.test(error.message)
+    || !/Symbol not found:|built for macOS.*newer than running OS/i.test(error.message)) return error;
+  return new Error(`NODUS_LOCAL_RUNTIME_MACOS_INCOMPATIBLE: This llama.cpp build cannot run on this macOS version. Use an external local provider such as Ollama or LM Studio with a compatible engine, or update macOS. Existing models are preserved.\n${redactRuntimeLog(error.message)}`);
+}
+
 /** A real process probe: bounded output, spawn errors, signal exits and timeout. */
 export function runRuntimeCommand(command: string, args: string[], options: {
   signal?: AbortSignal; timeoutMs?: number; cwd?: string;
@@ -199,7 +210,8 @@ export function runRuntimeCommand(command: string, args: string[], options: {
       clearTimeout(timer);
       clearTimeout(killDeadline);
       options.signal?.removeEventListener('abort', abort);
-      error ? reject(error) : resolve(output);
+      if (error) reject(runtimeProcessError(error));
+      else resolve(output);
     };
     const terminate = (error: Error) => {
       if (done || terminationError) return;
@@ -312,7 +324,7 @@ export async function waitForRuntimeHealth(baseUrl: string, child: ChildProcess,
     const error = spawnError();
     if (error) throw new Error(`${error.message} ${logs()}`.trim());
     if (child.exitCode != null || child.signalCode != null) {
-      throw new Error(logs() || `llama-server terminó con código ${child.signalCode ?? child.exitCode}.`);
+      throw runtimeProcessError(new Error(logs() || `llama-server terminó con código ${child.signalCode ?? child.exitCode}.`));
     }
     try {
       const response = await fetch(`${baseUrl}/health`, {

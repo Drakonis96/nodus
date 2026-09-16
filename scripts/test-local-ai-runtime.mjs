@@ -131,6 +131,7 @@ test('platform catalogue pins separate GPU builds and a CPU fallback', () => {
     assert.match(assets[1].name, /vulkan/);
   }
   assert.equal(runtime.runtimeAssets('darwin', 'arm64')[0].backend, 'metal');
+  assert.equal(runtime.runtimeAssets('darwin', 'x64')[0].backend, 'cpu');
   assert.equal(runtime.runtimeAssets('win32', 'arm64')[0].backend, 'cpu');
   assert.throws(() => runtime.runtimeAssets('unknown', 'x64'));
 });
@@ -155,6 +156,14 @@ test('AppImage library isolation preserves system driver paths and visibility re
     assert.equal(env.LD_LIBRARY_PATH, '/opt/local-ai:/usr/local/cuda/lib64');
     assert.equal(env.LD_PRELOAD, '/usr/lib/legitimate.so');
   }
+});
+
+test('macOS loader incompatibility has a distinct actionable error, not a GPU fallback', () => {
+  const error = new Error('dyld[123]: Symbol not found: _OBJC_CLASS_$_MTLResidencySetDescriptor');
+  assert.match(runtime.runtimeProcessError(error, 'darwin').message, /NODUS_LOCAL_RUNTIME_MACOS_INCOMPATIBLE/);
+  assert.match(runtime.runtimeProcessError(error, 'darwin').message, /Existing models are preserved/);
+  assert.equal(runtime.runtimeProcessError(error, 'linux'), error);
+  assert.equal(runtime.gpuStartupFailure(runtime.runtimeProcessError(error, 'darwin').message), false);
 });
 
 test('probes handle real process success, ENOENT, timeout and cancellation', async () => {

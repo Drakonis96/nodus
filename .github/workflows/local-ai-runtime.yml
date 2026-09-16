@@ -24,7 +24,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-22.04, windows-latest, macos-14]
+        include:
+          - runner: ubuntu-22.04
+            scope: actual runtime startup
+            arguments: ''
+          - runner: windows-latest
+            scope: actual runtime startup
+            arguments: ''
+          - runner: macos-latest
+            scope: actual runtime startup
+            arguments: ''
+          - runner: macos-14
+            scope: known incompatibility and rollback
+            arguments: '--expect-incompatible-macos'
+    name: ${{ matrix.runner }} - ${{ matrix.scope }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     steps:
@@ -38,5 +51,5 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Runtime lifecycle and UI regressions
         run: node --test scripts/test-local-ai-runtime.mjs scripts/test-local-ai-runtime-ui.mjs
-      - name: Verify real pinned runtime archives
-        run: node scripts/verify-local-ai-runtime.mjs
+      - name: Verify real pinned archives - ${{ matrix.scope }}
+        run: node scripts/verify-local-ai-runtime.mjs ${{ matrix.arguments }}
