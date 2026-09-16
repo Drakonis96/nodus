@@ -60,6 +60,7 @@
     "test:e2e:library-delete": "npm run build && node scripts/e2e-library-delete-works.mjs",
     "test:e2e:view-snapshots": "npm run build && node scripts/e2e-view-snapshots.mjs",
     "test:e2e:global-library": "npm run build && node scripts/e2e-global-library.mjs",
+    "test:e2e:citation-jump": "npm run build && node scripts/e2e-citation-page-jump.mjs",
     "test:e2e:document-index": "npm run build && node scripts/e2e-document-index-controls.mjs",
     "test:e2e:browser-connector": "node scripts/e2e-browser-connector.mjs",
     "test:e2e:bookmarks-html": "node scripts/e2e-bookmarks-html.mjs",

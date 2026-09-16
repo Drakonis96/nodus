@@ -776,6 +776,8 @@ export interface LibraryReaderReference {
   year: number | null;
   /** One-shot choice used by explicit “open original/clean” actions. */
   preferredSource?: 'clean' | 'original';
+  /** Physical 1-based page to land on once open; absent means the reader's own last position. */
+  page?: number | null;
 }
 
 export type LibraryReaderAttachmentViewer = 'pdf' | 'epub' | 'image' | 'html' | 'text' | 'external';
@@ -1253,6 +1255,23 @@ export interface EvidenceLocator {
   location: string | null;
   sourceRef: string | null;
   pageNumber: number | null;
+}
+
+/**
+ * How an evidence locator was resolved. `pdf-page` and `select` are handled in
+ * the main process (Zotero owns its reader); `local` means a copy in the Nodus
+ * library can be shown at that page, so the renderer opens it in the in-app
+ * reader; `none` means there is nothing to open.
+ */
+export type OpenEvidenceAtPageMode = 'pdf-page' | 'select' | 'local' | 'none';
+
+export interface OpenEvidenceAtPageResult {
+  ok: boolean;
+  mode: OpenEvidenceAtPageMode;
+  /** Physical 1-based page the locator resolved to, when it had one. */
+  page: number | null;
+  /** Document to open in the in-app reader when `mode` is `local`. */
+  local: { itemId: string; scope: import('./libraryTypes').LibraryScope } | null;
 }
 
 export interface Edge {

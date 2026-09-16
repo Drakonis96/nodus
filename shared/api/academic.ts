@@ -294,8 +294,14 @@ export interface AcademicApi {
   /** Live bibliographic metadata for a work (journal/book, pages, publisher, …). */
   getWorkMeta(nodusId: string): Promise<WorkMeta | null>;
   openInZotero(zoteroKey: string): Promise<void>;
-  /** Open a work's PDF in Zotero at the page parsed from an evidence/passage location; falls back to selecting the item. */
-  openEvidenceAtPage(nodusId: string, locator: string | null | import('../types').EvidenceLocator): Promise<{ ok: boolean; mode: 'pdf-page' | 'select' | 'none'; page?: number | null }>;
+  /**
+   * Open an evidence locator at its exact page. Zotero's own reader is preferred
+   * when the work has a PDF attachment there; otherwise the result names the
+   * library copy the renderer should open at that page. Callers must go through
+   * `openEvidenceAtPage` in `src/evidenceJump.ts`, which also handles the `local`
+   * case — a non-`ok` result is not "nothing happened".
+   */
+  openEvidenceAtPage(nodusId: string, locator: string | null | import('../types').EvidenceLocator): Promise<import('../types').OpenEvidenceAtPageResult>;
   /** Clean Markdown reader stored under the configured backup root. */
   getLibraryReaderDocument(nodusId: string): Promise<LibraryReaderDocument | null>;
   getLibraryReaderAttachmentContent(nodusId: string, attachmentId: string): Promise<LibraryReaderAttachmentContent | null>;

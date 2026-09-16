@@ -656,6 +656,25 @@ export function Library({
     onTargetConsumed?.();
   }, [onTargetConsumed, target]);
 
+  // Open one vault work in the reader. A citation jump arrives this way, and it
+  // carries the page it was anchored to so the document does not open on page 1.
+  useEffect(() => {
+    const itemId = target?.readerItemId;
+    if (!itemId) return;
+    const page = target.readerPage ?? null;
+    void window.nodus.getWork(itemId).then((work) => {
+      if (!work) return;
+      onOpenReader({
+        id: work.nodus_id,
+        zoteroKey: work.zotero_key,
+        title: work.title,
+        authors: work.authors,
+        year: work.year,
+        ...(page ? { page } : {}),
+      });
+    });
+  }, [onOpenReader, target?.nonce, target?.readerItemId, target?.readerPage]);
+
   // Debounce the free-text search: push the draft into the filter only after the
   // user pauses, so a burst of keystrokes triggers one DB query instead of one
   // per character.

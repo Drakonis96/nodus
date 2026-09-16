@@ -55,10 +55,12 @@ import type {
   ImportProjectChapterInput,
   LibraryReaderChatMessage,
   LibraryReaderChatRequest,
+  LibraryReaderDocument,
   ManualIdeaPayload,
   ManuscriptVerificationRequest,
   NoteTagPatch,
   NotesExportOptions,
+  OpenEvidenceAtPageResult,
   QueueKind,
   ReadingPathRequest,
   ReprocessConnectionsOptions,
@@ -418,6 +420,34 @@ function announceLibraryReaderAnnotations(nodusId: string | null): void {
   }
 }
 
+/**
+ * The library copy of a work that can actually be shown at a page: either a
+ * preserved PDF original, or clean text whose source map kept the physical page
+ * of each section. A document with neither cannot honour a locator, so it is not
+ * offered as a jump target.
+ */
+function pageCapableLibraryCopy(nodusId: string): OpenEvidenceAtPageResult['local'] {
+  let reader: LibraryReaderDocument | null = null;
+  try {
+    reader = libraryReader.getLibraryReaderDocument(nodusId);
+  } catch {
+    // A missing or unreadable reader document is the same as no local copy.
+  }
+  if (!reader) return null;
+  const pdfOriginal = reader.originalAvailable && reader.originalMimeType === 'application/pdf';
+  if (!pdfOriginal && !reader.sections.some((section) => typeof section.page === 'number')) return null;
+  // The reader resolves its document by id from either library, so the scope only
+  // decides which Library the user lands in: the vault the citation came from when
+  // the work is in it, the transverse catalog otherwise.
+  let inVault = false;
+  try {
+    inVault = Boolean(works.getWork(nodusId));
+  } catch {
+    inVault = false;
+  }
+  return { itemId: nodusId, scope: inVault ? 'vault' : 'global' };
+}
+
 export function registerAcademicIpc(context: IpcContext): void {
   const { h, getWindow, chatAborters } = context;
   registerResearchAttachmentIpc(context);
@@ -722,13 +752,17 @@ export function registerAcademicIpc(context: IpcContext): void {
     await shell.openExternal(zoteroSelectUrl(zoteroKey));
     return zoteroUserId;
   });
-  // Evidence → the exact PDF page in Zotero's reader. The [[p. N]] markers the
-  // extractor writes are physical 1-based page indices, which is exactly what
-  // zotero://open-pdf expects; when the location has no parseable page (or the
-  // work has no PDF attachment) we fall back to selecting the item.
-  h('works:openAtPage', async (_e, nodusId: string, locator: string | null | { location?: string | null; sourceRef?: string | null; pageNumber?: number | null }) => {
+  // Evidence → the exact PDF page. The [[p. N]] markers the extractor writes are
+  // physical 1-based page indices, which is exactly what zotero://open-pdf
+  // expects, so Zotero's reader is tried first whenever the work has a PDF
+  // attachment there. Zotero is not the only possible destination though: a work
+  // can have no item in Zotero at all, or Zotero can be closed (resolving the
+  // attachment then fails), and the corpus copy in the Nodus library can still
+  // show that page. In that case the renderer is told which document to open
+  // instead of silently degrading to "select the item", which is what left every
+  // citation on page 1.
+  h('works:openAtPage', async (_e, nodusId: string, locator: string | null | { location?: string | null; sourceRef?: string | null; pageNumber?: number | null }): Promise<OpenEvidenceAtPageResult> => {
     const work = works.getWork(nodusId);
-    if (!work?.zotero_key) return { ok: false, mode: 'none' as const };
     const structured = locator && typeof locator === 'object' ? locator : null;
     const location = typeof locator === 'string' || locator === null ? locator : structured?.location ?? null;
     const page = structured?.pageNumber ?? parsePageNumber(location);
@@ -736,20 +770,21 @@ export function registerAcademicIpc(context: IpcContext): void {
       ? getDb().prepare('SELECT attachment_key FROM work_text_sources WHERE nodus_id=? AND source_ref=?')
         .get(nodusId, structured.sourceRef) as { attachment_key: string | null } | undefined
       : undefined;
-    if (page !== null) {
+    if (page !== null && work?.zotero_key) {
       const attachmentKey = source?.attachment_key
         ?? await zotero.resolvePdfAttachmentKey(getSettings().zoteroUserId, work.zotero_key);
       if (attachmentKey) {
         await shell.openExternal(zoteroOpenPdfUrl(attachmentKey, page));
-        return { ok: true, mode: 'pdf-page' as const, page };
+        return { ok: true, mode: 'pdf-page', page, local: null };
       }
     }
-    if (source?.attachment_key) {
-      await shell.openExternal(zoteroSelectUrl(source.attachment_key));
-      return { ok: true, mode: 'select' as const, page };
+    const local = page !== null ? pageCapableLibraryCopy(nodusId) : null;
+    if (local) return { ok: false, mode: 'local', page, local };
+    if (work?.zotero_key) {
+      await shell.openExternal(zoteroSelectUrl(source?.attachment_key ?? work.zotero_key));
+      return { ok: true, mode: 'select', page, local: null };
     }
-    await shell.openExternal(zoteroSelectUrl(work.zotero_key));
-    return { ok: true, mode: 'select' as const, page };
+    return { ok: false, mode: 'none', page, local: null };
   });
   h('libraryReader:get', async (_e, nodusId: string) => libraryReader.getLibraryReaderDocument(nodusId));
   h('libraryReader:attachmentContent', async (_e, nodusId: string, attachmentId: string) =>

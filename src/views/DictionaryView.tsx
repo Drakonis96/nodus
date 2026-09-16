@@ -44,6 +44,7 @@ import { ModelPicker } from "../components/ModelPicker";
 import {
   SourceCitationModal,
   type CitationTarget,
+  type OpenCitationLibraryWork,
 } from "../components/SourceCitationModal";
 import { WorkspaceTabStrip } from "../components/library/LibraryWorkspaceTabs";
 import { Icon, Spinner } from "../components/ui";
@@ -1018,7 +1019,7 @@ export function DictionaryView({
   onSnapshotChange?: (patch: Partial<DictionarySnapshot>) => void;
   onOpenIdea: (id: string) => void;
   onOpenAuthor: (id: string, name: string) => void;
-  onOpenLibraryWork: (id: string) => void;
+  onOpenLibraryWork: OpenCitationLibraryWork;
 }) {
   const [model, setModel] = useFeatureModel(settings, "dictionaryModel");
   const [entries, setEntries] = useState<DictionaryEntrySummary[]>([]);
@@ -1820,7 +1821,7 @@ function DictionaryEntryView({
   onRename: (name: string) => void;
   onOpenIdea: (id: string) => void;
   onOpenAuthor: (id: string, name: string) => void;
-  onOpenLibraryWork: (id: string) => void;
+  onOpenLibraryWork: OpenCitationLibraryWork;
 }) {
   const [detail, setDetail] = useState<DictionaryEntryDetail | null>(null);
   const [tab, setTab] = useState<DictionaryDetailTab>(
@@ -2114,7 +2115,7 @@ function DictionaryEntryView({
               onCitation={setCitation}
             />
           ) : tab === "works" ? (
-            <WorksTab detail={detail} onOpenLibraryWork={onOpenLibraryWork} />
+            <WorksTab detail={detail} onOpenLibraryWork={(id) => onOpenLibraryWork(id, "vault")} />
           ) : (
             <VersionsTab
               detail={detail}
@@ -2127,7 +2128,7 @@ function DictionaryEntryView({
       <SourceCitationModal
         target={citation}
         onClose={() => setCitation(null)}
-        onOpenLibraryWork={(id) => onOpenLibraryWork(id)}
+        onOpenLibraryWork={onOpenLibraryWork}
       />
     </div>
   );
@@ -2463,7 +2464,7 @@ function EvidenceTab({
   onCitation: (citation: MarkdownCitation) => void;
   onOpenIdea: (id: string) => void;
   onOpenAuthor: (id: string, name: string) => void;
-  onOpenLibraryWork: (id: string) => void;
+  onOpenLibraryWork: OpenCitationLibraryWork;
 }) {
   const entryId = detail.entry.id;
   const [items, setItems] = useState<DictionaryEvidenceItem[]>([]);
@@ -2681,7 +2682,7 @@ function EvidenceTab({
               onCitation={onCitation}
               onOpenIdea={onOpenIdea}
               onOpenAuthor={onOpenAuthor}
-              onOpenLibraryWork={onOpenLibraryWork}
+              onOpenLibraryWork={(id) => onOpenLibraryWork(id, "vault")}
             />
           ))}
           {!items.length && (
