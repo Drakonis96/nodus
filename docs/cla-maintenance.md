@@ -21,11 +21,14 @@ username, comment ID/URL/timestamp, originating PR, statement, and full agreemen
 with its SHA-256 digest. Records are created once and never overwritten. Later
 comment deletion or account renaming does not lose recorded acceptance.
 
-The check requires the PR author and all human commit authors/coauthors to have
-accepted. Unknown accounts, truncated author lists, API errors, or storage
-failures block verification. No maintainer, collaborator, or general bot allowlist
-exists. A changed PR head must be checked again. PRs sharing a head SHA are
-evaluated together so one cannot overwrite another's failure with success.
+The check requires the PR author and every commit author/coauthor linked to a
+human GitHub account to have accepted. A commit email that no GitHub account
+claims cannot post an acceptance comment, so it is not checked individually; the
+signing PR author stays accountable for those commits. Truncated author lists,
+API errors, or storage failures block verification. No maintainer, collaborator,
+or general bot allowlist exists. A changed PR head must be checked again. PRs
+sharing a head SHA are evaluated together so one cannot overwrite another's
+failure with success.
 
 The required status is **CLA / signature**, published on the PR head SHA. It is
 different from the workflow job named `verify`, which can complete successfully
@@ -49,7 +52,8 @@ the workflow is installed.
 
 AI-assisted contributions are welcome. The human PR author must accept the CLA
 and take responsibility for the submission and their authority to grant rights.
-All other human authors and coauthors must accept as well.
+All other human authors and coauthors linked to GitHub accounts must accept as
+well.
 
 Only these exact tool identity combinations are recognized (case-insensitive):
 
@@ -109,6 +113,8 @@ Merge queues are not configured or supported by this workflow; add and test
   also fails the workflow and needs investigation.
 - A contributor who edited a comment before it was recorded should post a new
   exact acceptance comment. A maintainer cannot sign or edit one for them.
-- Unknown GitHub identities require the actual author to associate the correct
-  commit email with their account or correct erroneous attribution.
+- A commit author whose email is not linked to a GitHub account is not checked
+  individually; the signing PR author covers those commits. Associating the email
+  with the account makes the author an explicitly checked contributor, who must
+  then post the acceptance comment as well.
 - Run `node --test scripts/test-cla.mjs scripts/test-agpl-release.mjs` after changes.

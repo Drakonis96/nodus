@@ -208,6 +208,31 @@ test('a short preamble is absorbed by the first section instead of leaving a cov
   assert.ok(covered / text.length >= 0.95, `the document is fully accounted for (${covered}/${text.length} chars)`);
 });
 
+test('a cover page is not a section of its own', () => {
+  // A journal PDF prints its masthead first and its footnote definitions last, and neither is
+  // a section: at 149 and 36 characters their analyses degraded, their summaries published as
+  // literal extracts, and the whole profile fell back to the extractive mode — which is what a
+  // Korean conference paper did on a live run.
+  const cover = 'KIMYO INTERNATIONAL UNIVERSITY IN TASHKENT «Корееведение Центральной Азии»\n';
+  const body = '한국어 논문의 본문 문장입니다. '.repeat(500);
+  const footnotes = '\n[^1]: 서론 [^2]: 문헌고찰및이론적틀';
+  const text = `${cover}${body}${footnotes}`;
+  const sections = pipeline.deriveDocumentStructure(text, '학술 발표문');
+  assert.equal(sections.length, 1, 'the cover and the footnotes join the body instead of becoming sections');
+  assert.equal(sections[0].charStart, 0, 'the section reaches the beginning of the document');
+  assert.equal(sections[0].charEnd, text.length, 'and the end of it');
+  assert.ok(sections[0].body.includes('KIMYO INTERNATIONAL UNIVERSITY'), 'the cover text is analysed with the body, not dropped');
+
+  // Long documents keep their real structure: only undersized chunks are folded in.
+  const long = `${cover}${'본문 문장입니다. '.repeat(2_500)}\n${'두 번째 부분의 문장입니다. '.repeat(2_500)}`;
+  const split = pipeline.deriveDocumentStructure(long, '학술 발표문');
+  assert.ok(split.length >= 2, 'substantial chunks stay separate');
+  const covered = split.reduce((total, section) => total + Math.max(0, (section.charEnd ?? 0) - (section.charStart ?? 0)), 0);
+  // Chunk ends land on the last word, so trailing inter-chunk whitespace is not counted.
+  assert.ok(covered / long.length >= 0.999, `and the sections still tile the document (${covered}/${long.length})`);
+  assert.equal(split[0].charStart, 0, 'the first section still starts at the cover');
+});
+
 test('structure resolves combined source/page markers to durable attachment locators', () => {
   const text = `[[src:s1 p.7]]\n# Primera\n${'Texto de la primera fuente. '.repeat(90)}\n[[src:s2 p.3]]\n# Segunda\n${'Texto de la segunda fuente. '.repeat(90)}`;
   const sections = pipeline.deriveDocumentStructure(text, 'Libro', { s1: 'zotero:user:0:A', s2: 'zotero:user:0:B' });

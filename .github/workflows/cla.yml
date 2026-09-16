@@ -6,6 +6,7 @@ on:
     paths:
       - CLA.md
       - scripts/cla.mjs
+      - scripts/cla-reminder.mjs
       - .github/workflows/cla.yml
   pull_request_target:
     types: [opened, reopened, closed, synchronize, edited, ready_for_review]
@@ -16,7 +17,8 @@ on:
 # Never check out or execute the PR's code in this privileged workflow.
 permissions:
   contents: write # Acceptance records on cla-signatures only.
-  pull-requests: read
+  issues: write # Managed CLA reminder comments on pull requests.
+  pull-requests: write # Required to write comments on pull request conversations.
   statuses: write
 
 # Every run scans all open PRs, including their acceptance comments, so signatures
@@ -42,6 +44,7 @@ jobs:
           sparse-checkout: |
             CLA.md
             scripts/cla.mjs
+            scripts/cla-reminder.mjs
           sparse-checkout-cone-mode: false
 
       - name: Verify and record CLA acceptance
@@ -49,4 +52,6 @@ jobs:
         with:
           script: |
             const { run } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/cla.mjs`);
+            const { syncClaReminders } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/cla-reminder.mjs`);
             await run({ github, context, core });
+            await syncClaReminders({ github, context, core });

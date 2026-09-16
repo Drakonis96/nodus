@@ -240,6 +240,25 @@ export async function fetchPublicAttachment(raw: string, options: PublicFetchOpt
   return (await fetchPublicResource(raw, options)).response;
 }
 
+/**
+ * Read a response as text, refusing to buffer past `maxBytes`.
+ *
+ * A declared `content-length` is only a promise: a body that streams without one, or that
+ * understates itself, would otherwise be read into memory in full.
+ */
+export async function readBoundedText(response: Response, maxBytes: number, tooLargeMessage = 'The downloaded page is larger than allowed.'): Promise<string> {
+  if (!response.body) return '';
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = '';
+  for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
+    total += chunk.byteLength;
+    if (total > maxBytes) throw new Error(tooLargeMessage);
+    text += decoder.decode(chunk, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
 export async function responseToTemporaryFile(
   response: Response,
   candidate: RemoteFileNameCandidate,

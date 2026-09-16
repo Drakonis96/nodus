@@ -2,6 +2,60 @@
   "version": 1,
   "notices": [
     {
+      "id": "2026-09-local-models-nvidia-gpus",
+      "date": "2026-09-16",
+      "severity": "warning",
+      "url": "https://github.com/Drakonis96/nodus/issues/851",
+      "expiresAt": "2026-10-16",
+      "copy": {
+        "es": {
+          "title": "Modelos locales en equipos con NVIDIA: estamos investigando un problema",
+          "body": "El motor que Nodus instala para los modelos integrados se distribuye en Windows y Linux como una compilación para CPU, así que en un equipo con GPU NVIDIA esos modelos se calculan en el procesador: pueden tardar muchísimo o parecer colgados aunque la tarjeta sea potente y los controladores estén al día. Mientras lo solucionamos, si quieres aceleración por GPU, apunta Nodus a Ollama o LM Studio en Ajustes → Modelos IA; con los integrados, cuenta con velocidad de CPU.",
+          "linkLabel": "Seguir el informe en GitHub"
+        },
+        "en": {
+          "title": "Local models on NVIDIA machines: we are investigating an issue",
+          "body": "The engine Nodus installs for the integrated models ships on Windows and Linux as a CPU build, so on a machine with an NVIDIA GPU those models run on the processor: they can take a very long time or look frozen even with a capable card and up-to-date drivers. While we fix it, if you want GPU acceleration, point Nodus at Ollama or LM Studio in Settings → AI Models; with the integrated models, expect CPU speed.",
+          "linkLabel": "Follow the report on GitHub"
+        },
+        "fr": {
+          "title": "Modèles locaux sur les machines NVIDIA : nous enquêtons sur un problème",
+          "body": "Le moteur que Nodus installe pour les modèles intégrés est distribué sous Windows et Linux en version CPU : sur une machine dotée d’un GPU NVIDIA, ces modèles s’exécutent donc sur le processeur et peuvent être très lents ou sembler bloqués, même avec une carte performante et des pilotes à jour. En attendant la correction, pour profiter de l’accélération GPU, pointez Nodus vers Ollama ou LM Studio dans Réglages → Modèles IA ; avec les modèles intégrés, comptez la vitesse du processeur.",
+          "linkLabel": "Suivre le rapport sur GitHub"
+        },
+        "de": {
+          "title": "Lokale Modelle auf NVIDIA-Rechnern: Wir untersuchen ein Problem",
+          "body": "Die Engine, die Nodus für die integrierten Modelle installiert, wird für Windows und Linux als CPU-Build ausgeliefert. Auf einem Rechner mit NVIDIA-GPU laufen diese Modelle deshalb auf dem Prozessor: Sie können sehr lange brauchen oder eingefroren wirken, auch mit leistungsfähiger Karte und aktuellen Treibern. Bis das behoben ist, kann Nodus in Einstellungen → KI-Modelle auf Ollama oder LM Studio zeigen lassen; wer bei den integrierten Modellen bleibt, rechnet mit CPU-Tempo.",
+          "linkLabel": "Bericht auf GitHub verfolgen"
+        },
+        "pt": {
+          "title": "Modelos locais em equipamentos NVIDIA: estamos a investigar um problema",
+          "body": "O motor que o Nodus instala para os modelos integrados é distribuído no Windows e no Linux como uma compilação para CPU, por isso num equipamento com GPU NVIDIA esses modelos são calculados no processador: podem demorar muito ou parecer bloqueados, mesmo com uma placa potente e controladores atualizados. Até o resolvermos, se quiseres aceleração por GPU, aponta o Nodus para o Ollama ou o LM Studio em Definições → Modelos de IA; com os integrados, conta com a velocidade da CPU.",
+          "linkLabel": "Seguir o relatório no GitHub"
+        },
+        "pt-BR": {
+          "title": "Modelos locais em máquinas NVIDIA: estamos investigando um problema",
+          "body": "O motor que o Nodus instala para os modelos integrados é distribuído no Windows e no Linux como uma compilação para CPU, então em uma máquina com GPU NVIDIA esses modelos rodam no processador: podem demorar muito ou parecer travados, mesmo com uma placa potente e drivers atualizados. Enquanto resolvemos isso, se você quiser aceleração por GPU, aponte o Nodus para o Ollama ou o LM Studio em Configurações → Modelos de IA; com os integrados, conte com a velocidade da CPU.",
+          "linkLabel": "Acompanhar o relatório no GitHub"
+        },
+        "it": {
+          "title": "Modelli locali su macchine NVIDIA: stiamo indagando su un problema",
+          "body": "Il motore che Nodus installa per i modelli integrati è distribuito su Windows e Linux come build per CPU: su una macchina con GPU NVIDIA quei modelli girano quindi sul processore e possono richiedere moltissimo tempo o sembrare bloccati, anche con una scheda potente e driver aggiornati. Mentre lo risolviamo, se vuoi l’accelerazione GPU, punta Nodus su Ollama o LM Studio in Impostazioni → Modelli IA; con i modelli integrati, aspettati la velocità della CPU.",
+          "linkLabel": "Segui il rapporto su GitHub"
+        },
+        "tr": {
+          "title": "NVIDIA makinelerinde yerel modeller: bir sorunu araştırıyoruz",
+          "body": "Nodus’un yerleşik modeller için kurduğu motor, Windows ve Linux’ta CPU derlemesi olarak dağıtılıyor; bu yüzden NVIDIA GPU’lu bir makinede bu modeller işlemcide çalışır: güçlü bir kart ve güncel sürücülerle bile çok uzun sürebilir ya da donmuş görünebilir. Bunu çözene kadar GPU hızlandırması istiyorsanız Nodus’u Ayarlar → Yapay Zeka Modelleri bölümünden Ollama veya LM Studio’ya yönlendirin; yerleşik modellerle kalırsanız CPU hızını bekleyin.",
+          "linkLabel": "Raporu GitHub’da izle"
+        },
+        "zh-CN": {
+          "title": "NVIDIA 设备上的本地模型：我们正在调查一个问题",
+          "body": "Nodus 为内置模型安装的引擎在 Windows 和 Linux 上以 CPU 版本分发，因此在配备 NVIDIA GPU 的设备上，这些模型由处理器完成计算：即使显卡性能强劲、驱动也是最新的，它们也可能耗时极长或看起来卡住。在问题解决之前，如果你想要 GPU 加速，请在「设置 → AI 模型」中把 Nodus 指向 Ollama 或 LM Studio；如果继续使用内置模型，请以 CPU 的速度为准。",
+          "linkLabel": "在 GitHub 上关注报告"
+        }
+      }
+    },
+    {
       "id": "contribute-to-nodus",
       "date": "2026-09-13",
       "severity": "info",
@@ -46,6 +100,11 @@
           "title": "Nodus Research'ün gelişmesine yardımcı olun",
           "body": "Nodus neredeyse tamamen tek bir geliştirici tarafından geliştirilmekte ve sürdürülmektedir. Projeyi beğeniyor ve büyümesine yardımcı olmak istiyorsanız her türlü katkı memnuniyetle karşılanır: kod, düzeltmeler, yeni özellikler, belgeler, çeviriler veya fikirler.",
           "linkLabel": "GitHub'da katkıda bulunun"
+        },
+        "zh-CN": {
+          "title": "帮助构建 Nodus Research",
+          "body": "Nodus 几乎完全由一位开发者开发和维护。如果你喜欢这个项目并希望帮助它成长，任何贡献都欢迎：代码、修复、新功能、文档、翻译或想法。",
+          "linkLabel": "在 GitHub 上贡献"
         }
       }
     },
@@ -94,6 +153,11 @@
           "title": "Nodus'u beğendin mi?",
           "body": "Nodus'u beğeniyorsanız, projeyi desteklemek ve büyütmek için GitHub'da bize bir yıldız verin.",
           "linkLabel": "GitHub'da Nodus'a yıldız ver"
+        },
+        "zh-CN": {
+          "title": "喜欢 Nodus 吗？",
+          "body": "如果你喜欢 Nodus，请在 GitHub 上给我们一颗星，以支持我们并帮助项目成长。",
+          "linkLabel": "在 GitHub 上给我们一颗星"
         }
       }
     },
@@ -142,6 +206,11 @@
           "title": "Nodus'u hangi dilde görmek istersiniz?",
           "body": "Kısa bir ankete katılarak Nodus'a bir sonraki adımda hangi dili ekleyeceğimize karar vermemize yardımcı olun.",
           "linkLabel": "Ankete katılın"
+        },
+        "zh-CN": {
+          "title": "你希望在 Nodus 中看到哪种语言？",
+          "body": "填写一份简短问卷，帮助我们决定接下来为 Nodus 添加哪种语言。",
+          "linkLabel": "填写问卷"
         }
       }
     },
@@ -190,6 +259,11 @@
           "title": "Nodus'u beğendin mi?",
           "body": "Nodus'u beğeniyorsanız, projeyi desteklemek ve büyütmek için GitHub'da bize bir yıldız verin.",
           "linkLabel": "GitHub'da Nodus'a yıldız ver"
+        },
+        "zh-CN": {
+          "title": "喜欢 Nodus 吗？",
+          "body": "如果你喜欢 Nodus，请在 GitHub 上给我们一颗星，以支持我们并帮助项目成长。",
+          "linkLabel": "在 GitHub 上给我们一颗星"
         }
       }
     },
@@ -238,6 +312,11 @@
           "title": "Nodus’un yeni web sitesi yayında",
           "body": "Nodus web sitesinin yeni adresi nodusresearch.com. Wiki, eğitim içerikleri, blog ve etkileşimli demolar artık tek bir yerde.",
           "linkLabel": "nodusresearch.com adresini ziyaret et"
+        },
+        "zh-CN": {
+          "title": "Nodus 启用新网站",
+          "body": "Nodus 的网站有了新地址：nodusresearch.com。它把 wiki、教程、博客和交互式演示汇集在同一处。",
+          "linkLabel": "访问 nodusresearch.com"
         }
       }
     },
@@ -287,6 +366,11 @@
           "title": "Chrome için Nodus Connector artık Chrome Web Mağazası’nda",
           "body": "Chrome için Nodus Connector, açık olan akademik sayfayı veya belgeyi yerel Kitaplığa kaydeder. Gömülü bibliyografik üstverileri, DOI/ISBN bilgisini ve mevcut dosyaları algılar; kaydetmeden önce iç içe bir Nodus koleksiyonu ile var olan veya yeni etiketleri seçmene izin verir. Etkin sekmeyi yalnızca araç çubuğundaki simgesine tıklandıktan sonra okur.",
           "linkLabel": "Chrome Web Mağazası’ndan yükle"
+        },
+        "zh-CN": {
+          "title": "Nodus Connector for Chrome 已上架 Chrome 应用商店",
+          "body": "Nodus Connector for Chrome 会把你当前打开的学术网页或文档保存到本地文献库。它识别页面内嵌的书目元数据、DOI 或 ISBN 以及可用的文件，并让你在保存前选择 Nodus 的嵌套合集以及已有或新建的标签。只有在你点击工具栏中的图标后，它才会读取当前标签页。",
+          "linkLabel": "从 Chrome 应用商店安装"
         }
       }
     },
@@ -336,6 +420,11 @@
           "title": "Nodus 4, AGPL v3 lisansına geçiyor",
           "body": "Nodus, 4. sürümden itibaren GNU Affero General Public License v3 kapsamında dağıtılmaktadır.",
           "linkLabel": "AGPL v3 lisansını görüntüle"
+        },
+        "zh-CN": {
+          "title": "Nodus 4 改用 AGPL v3 许可证",
+          "body": "从第 4 版起，Nodus 在 GNU Affero 通用公共许可证第 3 版下分发。",
+          "linkLabel": "查看 AGPL v3 许可证"
         }
       }
     },
@@ -384,6 +473,11 @@
           "title": "Nodus Mobil Uygulaması | İlgi Anketi",
           "body": "Nodus mobil uygulamasını geliştiriyoruz ve görüşlerinizi duymaktan memnuniyet duyarız.",
           "linkLabel": "Ankete katılın"
+        },
+        "zh-CN": {
+          "title": "Nodus 移动应用 | 兴趣调查",
+          "body": "我们正在开发 Nodus 移动应用，非常希望了解你的想法。",
+          "linkLabel": "填写问卷"
         }
       }
     }

@@ -25,8 +25,8 @@ import type {
   LibraryBibliographyImportReport,
   LibraryDuplicateGroup,
   LibraryItemMetadata,
-  LibraryMetadataIdentifierKind,
   LibraryMetadataLookupResult,
+  LibraryReferenceKind,
   LibraryIdentifierImportResult,
   LibraryVaultLink,
   LibraryVaultLinkReport,
@@ -101,7 +101,9 @@ export interface LibraryApi {
   importDroppedGlobalLibraryFiles(filePaths: string[], collectionId?: string | null): Promise<LibraryLocalImportReport>;
   importGlobalBibliographyFiles(collectionId?: string | null): Promise<LibraryBibliographyImportReport>;
   createGlobalLibraryItem(metadata: LibraryItemMetadata, collectionIds?: string[]): Promise<LibraryItemRecord>;
-  importGlobalLibraryIdentifier(kind: LibraryMetadataIdentifierKind, value: string, collectionIds?: string[]): Promise<LibraryIdentifierImportResult>;
+  /** Add a reference from what the reader pasted: a supported identifier, or a URL that
+   *  names the work (a DOI resolver link, a repository page, a publisher PDF). */
+  importGlobalLibraryIdentifier(kind: LibraryReferenceKind, value: string, collectionIds?: string[]): Promise<LibraryIdentifierImportResult>;
   duplicateGlobalLibraryItem(itemId: string): Promise<LibraryItemRecord>;
   convertGlobalLibraryItemToNodus(itemId: string): Promise<LibraryItemRecord>;
   updateGlobalLibraryItemMetadata(itemId: string, patch: Partial<LibraryItemMetadata>): Promise<LibraryItemRecord>;
@@ -117,7 +119,7 @@ export interface LibraryApi {
   patchGlobalLibraryItemTags(itemIds: string[], patch: LibraryTagPatch): Promise<number>;
   listGlobalLibraryTags(): Promise<LibraryTagRecord[]>;
   setGlobalLibraryTagColor(tag: string, color: string | null): Promise<LibraryTagRecord[]>;
-  resolveGlobalLibraryMetadata(kind: LibraryMetadataIdentifierKind, value: string): Promise<LibraryMetadataLookupResult>;
+  resolveGlobalLibraryMetadata(kind: LibraryReferenceKind, value: string): Promise<LibraryMetadataLookupResult>;
   startGlobalLibraryMetadataBatch(requestId: string, itemIds: string[]): Promise<LibraryMetadataBatchResult>;
   applyGlobalLibraryMetadataBatch(requestId: string, itemIds: string[]): Promise<LibraryMetadataBatchResult>;
   cancelGlobalLibraryMetadataBatch(requestId: string): Promise<boolean>;

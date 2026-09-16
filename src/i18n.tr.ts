@@ -3038,6 +3038,7 @@ export const TR: Record<string, string> = {
   "¿Eliminar este borrador guardado? Esta acción no se puede deshacer.": "Bu kaydedilen taslak silinsin mi? Bu eylem geri alınamaz.",
   "Borrador eliminado.": "Taslak silindi.",
   "Taller de escritura": "Yazma atölyesi",
+  "Recuperado por similitud semántica con esta sección.": "Bu bölümle anlamsal benzerlik üzerinden getirildi.",
   "Del grafo a un borrador con fuentes verificables.": "Grafikten doğrulanabilir kaynaklara sahip bir taslağa.",
   "Deep Research": "Derin Araştırma",
   "Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.": "Sırayla oluşturulan ve tüm derlemin alıntılandığı akademik raporlardan oluşan kütüphaneniz.",

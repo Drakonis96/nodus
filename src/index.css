@@ -429,8 +429,72 @@ body {
   color: #0891b2;
 }
 .light .text-cyan-200,
-.light .text-cyan-400 {
+.light .text-cyan-400,
+.light .text-cyan-100,
+.light .text-cyan-200\/80 {
   color: #0e7490;
+}
+/* The 100–300 shades of a family are readable on #0a0a0a and vanish on white. The table
+   covered the shades the app happened to use first, so a surface built later — the document
+   profile's alert among them — kept its dark-only tone and rendered yellow on yellow or grey
+   on grey. Same value as the shade the family already maps to, alpha included. */
+.light .text-indigo-100,
+.light .text-indigo-200\/75,
+.light .text-indigo-200\/80,
+.light .text-indigo-300\/70,
+.light .text-indigo-300\/90 {
+  color: rgba(79, 70, 229, 0.9);
+}
+.light .text-indigo-100,
+.light .text-indigo-200 {
+  color: #4f46e5;
+}
+.light .text-amber-100,
+.light .text-amber-100\/90,
+.light .text-amber-200\/70,
+.light .text-amber-200\/80,
+.light .text-amber-300\/70,
+.light .text-amber-300\/80,
+.light .text-amber-300\/90 {
+  color: #b45309;
+}
+.light .text-red-100,
+.light .text-red-300\/70,
+.light .text-red-300\/80,
+.light .text-red-300\/90 {
+  color: #dc2626;
+}
+.light .text-rose-100,
+.light .text-rose-200,
+.light .text-rose-300 {
+  color: #be123c;
+}
+.light .text-emerald-100,
+.light .text-emerald-200 {
+  color: #047857;
+}
+.light .text-teal-100,
+.light .text-teal-300\/70,
+.light .text-teal-300\/80 {
+  color: #0f766e;
+}
+.light .text-blue-200,
+.light .text-blue-300 {
+  color: #1d4ed8;
+}
+.light .text-sky-100,
+.light .text-sky-200,
+.light .text-sky-300 {
+  color: #0369a1;
+}
+.light .text-green-300 {
+  color: #15803d;
+}
+.light .text-orange-300 {
+  color: #c2410c;
+}
+.light .text-violet-100 {
+  color: #6d28d9;
 }
 .light .text-violet-200,
 .light .text-violet-300 {
@@ -464,7 +528,8 @@ body {
   border-color: #a3a3a3;
 }
 .light .border-cyan-900,
-.light .border-cyan-900\/70 {
+.light .border-cyan-900\/70,
+.light .border-cyan-900\/60 {
   border-color: #67e8f9;
 }
 .light .border-violet-900\/60,
@@ -489,8 +554,23 @@ body {
 .light .bg-neutral-950\/55,
 .light .bg-neutral-950\/60,
 .light .bg-neutral-950\/70,
-.light .bg-neutral-950\/80 {
+.light .bg-neutral-950\/80,
+.light .bg-neutral-950\/85,
+.light .bg-neutral-950\/90,
+.light .bg-neutral-950\/20 {
   background-color: rgba(248, 250, 252, 0.86);
+}
+.light .bg-slate-950 {
+  background-color: #f8fafc;
+}
+.light .border-neutral-950,
+.light .border-neutral-900\/80 {
+  border-color: #e5e7eb;
+}
+.light .ring-neutral-950,
+.light .ring-neutral-900,
+.light .ring-neutral-800 {
+  --tw-ring-color: #e5e7eb;
 }
 .light .bg-neutral-900,
 .light .bg-neutral-900\/95,
@@ -505,6 +585,17 @@ body {
 .light .bg-neutral-900\/45,
 .light .bg-neutral-900\/40 {
   background-color: rgba(250, 250, 250, 0.92);
+}
+.light .bg-neutral-900\/35,
+.light .bg-neutral-900\/30,
+.light .bg-neutral-900\/25,
+.light .bg-neutral-900\/20,
+.light .bg-neutral-900\/65,
+.light .bg-neutral-900\/75 {
+  background-color: rgba(250, 250, 250, 0.86);
+}
+.light .bg-neutral-800\/70 {
+  background-color: rgba(229, 231, 235, 0.8);
 }
 .light .bg-neutral-800,
 .light .bg-neutral-800\/50,
@@ -621,7 +712,8 @@ body {
   border-color: #fca5a5;
 }
 .light .border-amber-700\/50,
-.light .border-amber-700\/60 {
+.light .border-amber-700\/60,
+.light .border-amber-600 {
   border-color: #fcd34d;
 }
 .light .border-cyan-700\/60 {

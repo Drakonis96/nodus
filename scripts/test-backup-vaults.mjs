@@ -196,8 +196,10 @@ try {
   switchTo(legacy.id);
   assert.ok(entities.getPerson(alice.personId), 'Alice restored in the academic vault');
   assert.equal(documentProfiles.getDocumentProfile('backup-doc').fields[0].text, 'Tesis preservada.', 'the audited document profile is restored');
+  // Vector ids are scoped to the version that published them, so the restored row is found by
+  // its kind and text rather than by the id the pipeline proposed.
   assert.equal(
-    getDb().prepare("SELECT length(embedding) AS bytes FROM document_vectors WHERE vector_id='backup-vector'").get().bytes,
+    getDb().prepare("SELECT length(embedding) AS bytes FROM document_vectors WHERE text='Perfil que debe sobrevivir al backup.'").get().bytes,
     16,
     'the document embedding is restored without reindexing'
   );

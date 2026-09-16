@@ -109,11 +109,19 @@ test('PR authors, commit authors, and human coauthors all need acceptance', () =
   assert.deepEqual(result.users, [alice, bob]);
   assert.deepEqual(result.problems, []);
   assert.equal(contributors({ author: bot }, [commit(alice)]).problems.length, 1);
-  assert.equal(contributors({ author: alice }, [commit(null)]).problems.length, 1);
   assert.equal(contributors({ author: alice }, []).problems.length, 1);
   const truncated = commit(alice);
   truncated.authors.totalCount = 101;
   assert.equal(contributors({ author: alice }, [truncated]).problems.length, 1);
+});
+
+test('commit emails that no GitHub account claims are skipped, not blocking', () => {
+  const unlinked = { name: 'alice', email: 'alice@example.org', user: null };
+  const result = contributors({ author: alice }, [{
+    oid: 'b'.repeat(40), authors: { totalCount: 1, nodes: [unlinked] },
+  }]);
+  assert.deepEqual(result.users, [alice]);
+  assert.deepEqual(result.problems, []);
 });
 
 test('recognized AI attributions are allowed but never exempt the human submitter', () => {
@@ -176,6 +184,22 @@ test('a signed responsible human can merge an AI-assisted contribution', async (
   pr.comments = [signingComment()];
   pr.commits[0].authors.nodes.push({ name: 'Claude Sonnet 5', email: 'noreply@anthropic.com', user: bob });
   pr.commits[0].authors.totalCount = 2;
+  const h = harness([pr]);
+  await h.execute();
+  assert.equal(h.statuses.at(-1).state, 'success');
+  assert.equal(h.writes.length, 1);
+});
+
+test('an unlinked commit email does not block a signed PR author', async () => {
+  const pr = fixture();
+  pr.comments = [signingComment()];
+  pr.commits = [{
+    oid: 'b'.repeat(40),
+    authors: { totalCount: 2, nodes: [
+      { name: 'alice', email: 'alice@example.org', user: null },
+      { name: 'Claude Sonnet 5', email: 'noreply@anthropic.com', user: bob },
+    ] },
+  }];
   const h = harness([pr]);
   await h.execute();
   assert.equal(h.statuses.at(-1).state, 'success');

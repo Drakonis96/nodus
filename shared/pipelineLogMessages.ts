@@ -56,6 +56,16 @@ export const PIPELINE_LOG_REASONS = {
   reasonSourceChanged: 'el documento de origen cambió',
   reasonUnsupportedFormat: 'el formato del archivo no es compatible',
   reasonCancelled: 'el usuario canceló el trabajo',
+  // Why a proposal the planner made never became a figure. A run that produced none
+  // because it refused them all must not read as a document that needed none, so every
+  // refusal names its motive instead of vanishing into an anonymous `continue`.
+  reasonUnknownBlock: 'el bloque indicado no existe',
+  reasonHeadingBlock: 'un título no admite una figura',
+  reasonSkillNotEnabled: 'la skill no estaba habilitada',
+  reasonSkillCeiling: 'se alcanzó el máximo de la skill',
+  reasonSourceNotInBlock: 'la fuente citada no está en ese bloque',
+  reasonBlockAlreadyFigured: 'el bloque ya tiene una figura',
+  reasonDiscardNotSelected: 'descartada al elegir las figuras del documento',
 } as const;
 
 /** Sentence templates. `{subject}` is a `subject*` id; `{detail}` is runtime prose. */
@@ -87,6 +97,7 @@ export const PIPELINE_LOG_EVENTS = {
   uncaughtFailure: 'Fallo no controlado: {detail}',
   repeatedGrouped: 'Se agruparon {count} repeticiones idénticas',
   burstDiscarded: 'Se descartaron {count} entradas por límite de ráfaga',
+  figuresDiscarded: 'Recursos visuales descartados: {count} — {reason}',
 } as const;
 
 /**

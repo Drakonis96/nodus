@@ -7,7 +7,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 `Nodus Research` identifies the personal open-source project, website and ecosystem maintained at [nodusresearch.com](https://nodusresearch.com/). `Nodus` identifies the project's local-first desktop application.
 
-The project was created in Spain by Jorge Pérez Burgueño. Its public identifiers are:
+The project was created by Jorge Pérez Burgueño. Its public identifiers are:
 
 - Domain: `nodusresearch.com`
 - Repository: `Drakonis96/nodus`

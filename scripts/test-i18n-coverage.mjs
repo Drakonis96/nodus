@@ -138,6 +138,14 @@ const CLOUDFLARE_RUNTIME_KEYS = [
   'El Worker devolvió una clave de recuperación inesperada; Nodus no guardará esta conexión.',
 ];
 
+// Why a writing-workshop candidate was retrieved. The sentence is written by the retrieval
+// pass in the main process (`electron/ai/writingWorkshop.ts`) and reaches the badge through
+// the renderer's `tr()`, so no `t()` call anywhere mentions it and a missing table entry
+// would silently show Spanish beside an English interface.
+const WORKSHOP_RUNTIME_KEYS = [
+  'Recuperado por similitud semántica con esta sección.',
+];
+
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
 function walk(dir) {
@@ -686,6 +694,17 @@ test('issue #12 runtime UI payloads have a translation in every language', () =>
   }
 });
 
+test('the writing-workshop retrieval reasons are translated, not printed as written', () => {
+  for (const { name, table } of TRANSLATIONS) {
+    const missing = WORKSHOP_RUNTIME_KEYS.filter((key) => !table[key]?.trim());
+    assert.deepEqual(missing, [], `${name} is missing writing-workshop retrieval reasons`);
+  }
+  // The badge consults tr(), and the reason reaches the renderer in Spanish.
+  const view = fs.readFileSync(path.join(repoRoot, 'src/views/WritingWorkshopView.tsx'), 'utf8');
+  assert.match(view, /\{item\.reason && <Badge color="cyan">\{tr\(item\.reason\)\}<\/Badge>\}/,
+    'the candidate reason must pass through tr(), never render the stored sentence');
+});
+
 test('non-Spanish translations prefer English and preserve unknown dynamic values', () => {
   const { resolveTranslation, setActiveLang, getActiveLang } = loadModule('src/i18n.ts');
   const sparse = { en: { Clave: 'English fallback' }, fr: {}, de: {} };
@@ -734,6 +753,26 @@ test('legacy Spanish Electron errors cannot leak into a non-Spanish interface', 
     localizeRuntimeError('Clave de IA inválida. Revísala en Ajustes.', 'en'),
     'The AI key is invalid. Check it in Settings.',
   );
+});
+
+// A stored document profile mixes the pipeline's own sentences with the auditor model's prose,
+// and `tr()` would replace the second kind with "this message could not be translated" — the
+// auditor answers in the prompt language, so its Spanish notes are not a leak, they are the
+// finding. `knownText` is the gate that translates the first kind and leaves the second alone.
+test('a stored audit translates our sentences and keeps the auditor’s own prose', () => {
+  const { knownText, setActiveLang, getActiveLang } = loadModule('src/i18n.ts');
+  setActiveLang('en');
+  assert.equal(
+    knownText('La respuesta de «deepseek-flash» (DeepSeek) se cortó al alcanzar el límite de 5000 tokens de salida y el JSON quedó incompleto. Usa un modelo con mayor límite de salida o reduce el tamaño de la tarea.'),
+    'The response from «deepseek-flash» (DeepSeek) was cut off at the 5000-output-token limit and the JSON was left incomplete. Use a model with a higher output limit or reduce the size of the task.',
+  );
+  assert.equal(knownText('El texto contiene espacios dobles inesperados.'), 'The text contains unexpected double spaces.');
+  const auditorsNote = 'El campo «thesis» mezcla la tesis con resultados teóricos.';
+  assert.equal(knownText(auditorsNote), auditorsNote, 'a model’s own prose must survive untouched');
+  setActiveLang('es');
+  assert.equal(getActiveLang(), 'es');
+  assert.equal(knownText('El texto contiene espacios dobles inesperados.'), 'El texto contiene espacios dobles inesperados.');
+  setActiveLang('en');
 });
 
 /**

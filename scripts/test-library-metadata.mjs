@@ -28,7 +28,7 @@ try {
   const { exportLibraryBibliography, formatLibraryCitation, generateCitationKey } = require(path.join(repoRoot, 'electron/library/libraryCitation.ts'));
   const { runLibraryMetadataBatch } = require(path.join(repoRoot, 'electron/library/libraryMetadataBatch.ts'));
   const { mergeLibraryMetadataCandidate } = require(path.join(repoRoot, 'shared/libraryMetadata.ts'));
-  const { detectLibraryMetadataIdentifier, LIBRARY_COLUMNS, LIBRARY_ITEM_TYPES } = require(path.join(repoRoot, 'shared/libraryBibliography.ts'));
+  const { detectLibraryMetadataIdentifier, detectLibraryReferenceInput, LIBRARY_COLUMNS, LIBRARY_ITEM_TYPES } = require(path.join(repoRoot, 'shared/libraryBibliography.ts'));
   const languageTables = {
     en: require(path.join(repoRoot, 'src/i18n.en.ts')).EN,
     fr: require(path.join(repoRoot, 'src/i18n.fr.ts')).FR,
@@ -181,6 +181,172 @@ try {
   assert.equal(arxiv.candidates[0].metadata.arxiv, '2401.01234');
   assert.equal(arxiv.candidates[0].metadata.url, 'https://arxiv.org/abs/2401.01234');
   await assert.rejects(resolveLibraryMetadata('pmcid', '7654', { fetcher }), /formato PMC/);
+
+  // ── arXiv: DataCite first, the throttled Atom feed only as a fallback ─────────
+  // arXiv answers the Atom API with `429 Rate exceeded.` to a plain HTTP client, and the
+  // reader then saw the generic "the operation could not be completed" because the status
+  // message had no translation. Every arXiv paper is also registered in DataCite, so that
+  // is the source the resolver asks first.
+  const datacite = (overrides = {}) => ({ data: { attributes: {
+    titles: [{ title: 'Segment Anything' }],
+    creators: [
+      { name: 'Kirillov, Alexander', nameType: 'Personal', givenName: 'Alexander', familyName: 'Kirillov' },
+      { name: 'arXiv Admin', nameType: 'Organizational' },
+    ],
+    publicationYear: 2023, publisher: 'arXiv', url: 'https://arxiv.org/abs/2304.02643',
+    types: { resourceTypeGeneral: 'Preprint' },
+    descriptions: [{ description: 'We  introduce <b>SAM</b>.', descriptionType: 'Abstract' }],
+    dates: [{ date: '2023-04-05T17:59:46Z', dateType: 'Submitted' }],
+    subjects: [{ subject: 'Computer Vision and Pattern Recognition (cs.CV)', subjectScheme: 'arXiv' }],
+    ...overrides,
+  } } });
+  const arxivRequests = [];
+  const dataciteFetcher = async (input) => {
+    const url = new URL(String(input)); arxivRequests.push(url);
+    if (url.hostname === 'api.datacite.org') return jsonResponse(datacite());
+    throw new Error(`unexpected request to ${url.hostname}`);
+  };
+  const fromDatacite = await resolveLibraryMetadata('arxiv', 'arXiv:2304.02643', { fetcher: dataciteFetcher });
+  assert.equal(fromDatacite.candidates[0].source, 'arxiv');
+  assert.equal(fromDatacite.candidates[0].metadata.title, 'Segment Anything');
+  assert.equal(fromDatacite.candidates[0].metadata.itemType, 'preprint');
+  assert.equal(fromDatacite.candidates[0].metadata.creators[0].lastName, 'Kirillov');
+  assert.equal(fromDatacite.candidates[0].metadata.creators[1].name, 'arXiv Admin', 'an organisational creator keeps its single name');
+  assert.equal(fromDatacite.candidates[0].metadata.abstract, 'We introduce SAM.');
+  assert.equal(fromDatacite.candidates[0].metadata.year, 2023);
+  assert.equal(fromDatacite.candidates[0].metadata.date, '2023-04-05T17:59:46Z');
+  assert.deepEqual(fromDatacite.candidates[0].metadata.tags, ['Computer Vision and Pattern Recognition (cs.CV)']);
+  assert.equal(fromDatacite.candidates[0].metadata.url, 'https://arxiv.org/abs/2304.02643');
+  assert.deepEqual(fromDatacite.candidates[0].fullTextLinks, [{
+    url: 'https://arxiv.org/pdf/2304.02643.pdf', mimeType: 'application/pdf', source: 'arxiv',
+  }]);
+  assert.equal(arxivRequests.length, 1, 'the throttled Atom feed is never contacted when DataCite answers');
+  assert.match(decodeURIComponent(arxivRequests[0].pathname), /10\.48550\/arxiv\.2304\.02643$/);
+  await resolveLibraryMetadata('arxiv', '2304.02643v2', { fetcher: dataciteFetcher });
+  assert.match(decodeURIComponent(arxivRequests.at(-1).pathname), /arxiv\.2304\.02643$/, 'the DOI never carries a version suffix');
+
+  const feedOnlyFetcher = async (input) => {
+    const url = new URL(String(input));
+    if (url.hostname === 'api.datacite.org') return new Response('{"errors":[]}', { status: 404, headers: { 'content-type': 'application/json' } });
+    if (url.hostname === 'export.arxiv.org') return new Response('<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom"><entry><id>https://arxiv.org/abs/9901001</id><published>1999-01-05T00:00:00Z</published><title>String junctions</title><author><name>Ana López</name></author></entry></feed>', { status: 200, headers: { 'content-type': 'application/atom+xml' } });
+    throw new Error(`unexpected request to ${url.hostname}`);
+  };
+  const fromFeed = await resolveLibraryMetadata('arxiv', 'hep-th/9901001', { fetcher: feedOnlyFetcher });
+  assert.equal(fromFeed.candidates[0].metadata.title, 'String junctions', 'an identifier with no DOI still resolves through the feed');
+
+  const throttledFetcher = async (input) => {
+    const url = new URL(String(input));
+    if (url.hostname === 'api.datacite.org') return new Response('{}', { status: 404, headers: { 'content-type': 'application/json' } });
+    return new Response('Rate exceeded.', { status: 429, headers: { 'content-type': 'text/plain' } });
+  };
+  await assert.rejects(
+    resolveLibraryMetadata('arxiv', '2401.01234', { fetcher: throttledFetcher }),
+    /limitando las peticiones/,
+    'a throttled arXiv names the wait instead of collapsing into a generic failure',
+  );
+
+  // ── URL import: known hosts go to their metadata API, the rest are read ──────
+  assert.deepEqual(detectLibraryReferenceInput('https://arxiv.org/abs/2304.02643'), { kind: 'arxiv', value: 'https://arxiv.org/abs/2304.02643' });
+  assert.deepEqual(detectLibraryReferenceInput('https://doi.org/10.5555/norma.1'), { kind: 'doi', value: 'https://doi.org/10.5555/norma.1' });
+  assert.deepEqual(detectLibraryReferenceInput('https://journal.example/article/21'), { kind: 'url', value: 'https://journal.example/article/21' });
+  assert.equal(detectLibraryReferenceInput('not an identifier'), null);
+  assert.equal(detectLibraryReferenceInput('ftp://journal.example/article'), null, 'only http(S) links are offered as addresses');
+
+  const routedRequests = [];
+  const routedFetcher = async (input) => {
+    const url = new URL(String(input)); routedRequests.push(`${url.hostname}${url.pathname}`);
+    if (url.hostname === 'api.datacite.org') return jsonResponse(datacite());
+    if (url.hostname === 'api.crossref.org') return jsonResponse({ message: { DOI: '10.5555/norma.1', title: ['Entre norma y deseo'], type: 'journal-article', author: [{ given: 'Mónica', family: 'García' }] } });
+    if (url.hostname === 'eutils.ncbi.nlm.nih.gov') return jsonResponse({ result: { '12345678': { title: 'A PubMed paper', authors: [{ name: 'Pérez M' }], pubdate: '2024 Jan', articleids: [] } } });
+    throw new Error(`unexpected request to ${url.hostname}`);
+  };
+  const viaArxivUrl = await resolveLibraryMetadata('url', 'https://arxiv.org/abs/2304.02643', { fetcher: routedFetcher });
+  assert.equal(viaArxivUrl.kind, 'url');
+  assert.equal(viaArxivUrl.value, 'https://arxiv.org/abs/2304.02643');
+  assert.equal(viaArxivUrl.candidates[0].metadata.title, 'Segment Anything', 'an arXiv link resolves as the paper it names');
+  const viaDoiUrl = await resolveLibraryMetadata('url', 'https://doi.org/10.5555/norma.1', { fetcher: routedFetcher });
+  assert.equal(viaDoiUrl.candidates[0].metadata.doi, '10.5555/norma.1');
+  const viaPubmedUrl = await resolveLibraryMetadata('url', 'https://pubmed.ncbi.nlm.nih.gov/12345678/', { fetcher: routedFetcher });
+  assert.equal(viaPubmedUrl.candidates[0].metadata.title, 'A PubMed paper');
+  assert.ok(!routedRequests.some((entry) => entry.startsWith('pubmed.ncbi.nlm.nih.gov')), 'a PubMed link is read through its API, never scraped');
+
+  const landingHtml = `<!doctype html><html><head>
+    <title>Fallback title</title>
+    <meta name="citation_title" content="Microplastic  accumulation in rivers">
+    <meta name="citation_author" content="García Fernández, Mónica">
+    <meta name="citation_author" content="Ana Pérez">
+    <meta name="citation_journal_title" content="Water Research">
+    <meta name="citation_publication_date" content="2021/03/15">
+    <meta name="citation_volume" content="190">
+    <meta name="citation_firstpage" content="116">
+    <meta name="citation_lastpage" content="124">
+    <meta name="citation_doi" content="10.5555/agua.7">
+    <meta name="citation_pdf_url" content="/articles/7.pdf">
+    <link rel="canonical" href="https://journal.example/articles/7">
+  </head><body></body></html>`;
+  const pageFetcher = async (input) => {
+    const url = new URL(String(input));
+    if (url.hostname === 'api.crossref.org') return jsonResponse({ message: {
+      DOI: '10.5555/agua.7', title: ['Microplastic accumulation in rivers'], type: 'journal-article',
+      author: [{ given: 'Mónica', family: 'García Fernández' }], abstract: '<jats:p>Abstract from Crossref.</jats:p>',
+      issued: { 'date-parts': [[2021, 3, 15]] }, 'container-title': ['Water Research'], ISSN: ['0043-1354'],
+    } });
+    if (url.hostname === 'journal.example') return new Response(landingHtml, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
+    throw new Error(`unexpected request to ${url.hostname}`);
+  };
+  const landed = await resolveLibraryMetadata('url', 'https://journal.example/articles/7', { fetcher: pageFetcher, assertPublic: async (url) => new URL(url) });
+  const landedMetadata = landed.candidates[0].metadata;
+  assert.equal(landed.candidates[0].source, 'landing-page');
+  assert.equal(landedMetadata.title, 'Microplastic accumulation in rivers', 'the page decides the title, with its markup whitespace collapsed');
+  assert.equal(landedMetadata.itemType, 'journal-article');
+  assert.deepEqual(landedMetadata.creators.map((entry) => entry.lastName), ['García Fernández', 'Pérez'], 'Highwire authors keep their inverted form');
+  assert.equal(landedMetadata.publicationTitle, 'Water Research');
+  assert.equal(landedMetadata.date, '2021-03-15');
+  assert.equal(landedMetadata.pages, '116-124');
+  assert.equal(landedMetadata.abstract, 'Abstract from Crossref.', 'the page declares no abstract, so the identifier fills it in');
+  assert.equal(landedMetadata.url, 'https://journal.example/articles/7', 'the canonical link is what gets stored');
+  assert.deepEqual(landed.candidates[0].fullTextLinks, [{
+    url: 'https://journal.example/articles/7.pdf', mimeType: 'application/pdf', source: 'landing-page',
+  }], 'the PDF the page declares is offered to the downloader');
+
+  const jsonLdOnly = await resolveLibraryMetadata('url', 'https://bookshop.example/work/ol-1', {
+    fetcher: async (input) => {
+      const url = new URL(String(input));
+      if (url.hostname !== 'bookshop.example') throw new Error(`unexpected request to ${url.hostname}`);
+      return new Response(`<!doctype html><html><head><script type="application/ld+json">${JSON.stringify({
+        '@context': 'https://schema.org', '@type': 'Book', name: 'Mujeres solas',
+        author: [{ '@type': 'Person', givenName: 'Nuria', familyName: 'Aliaga' }],
+        datePublished: '2017', publisher: { '@type': 'Organization', name: 'Editorial Sur' },
+      })}</script></head><body></body></html>`, { status: 200, headers: { 'content-type': 'text/html' } });
+    },
+    assertPublic: async (url) => new URL(url),
+  });
+  assert.equal(jsonLdOnly.candidates[0].metadata.itemType, 'book');
+  assert.equal(jsonLdOnly.candidates[0].metadata.title, 'Mujeres solas');
+  assert.equal(jsonLdOnly.candidates[0].metadata.creators[0].lastName, 'Aliaga');
+  assert.equal(jsonLdOnly.candidates[0].metadata.year, 2017);
+
+  const directPdf = await resolveLibraryMetadata('url', 'https://journal.example/files/microplastics-2021.pdf', {
+    fetcher: async () => new Response('%PDF-1.7\nsynthetic test document', { status: 200, headers: { 'content-type': 'application/pdf' } }),
+    assertPublic: async (url) => new URL(url),
+  });
+  assert.equal(directPdf.candidates[0].metadata.title, 'microplastics 2021');
+  assert.deepEqual(directPdf.candidates[0].fullTextLinks, [{
+    url: 'https://journal.example/files/microplastics-2021.pdf', mimeType: 'application/pdf', source: 'landing-page',
+  }], 'a URL that is itself a PDF becomes the attachment of its own record');
+
+  await assert.rejects(
+    resolveLibraryMetadata('url', 'https://journal.example/blocked', {
+      fetcher: async () => new Response('<html><head></head><body>Nothing here</body></html>', { status: 200, headers: { 'content-type': 'text/html' } }),
+      assertPublic: async (url) => new URL(url),
+    }),
+    /no publica metadatos bibliográficos/,
+    'a page with nothing citable asks for a manual entry instead of inventing one',
+  );
+  await assert.rejects(resolveLibraryMetadata('url', 'ftp://journal.example/a', { fetcher }), /http o https/);
+  await assert.rejects(resolveLibraryMetadata('url', 'not a link', { fetcher }), /no es una URL válida/);
+
+
   const mergedCandidate = mergeLibraryMetadataCandidate(
     { title: 'Local title', itemType: 'article-journal', creators: [{ creatorType: 'author', name: 'Local Author' }], year: 2020, isbn: ['LOCAL'], issn: [], tags: ['local'], extra: { local: 'kept' } },
     { title: 'Resolved title', itemType: 'article-journal', creators: [], year: 2024, isbn: [], issn: ['REMOTE'], tags: ['remote'], extra: { remote: 'kept' } },

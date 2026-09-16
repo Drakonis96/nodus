@@ -27,7 +27,7 @@ import { SourceCitationModal, type CitationTarget } from '../components/SourceCi
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { DraftResultMain, KIND_LABELS, SavedDraftsPanel, SupportMatrix } from './writingShared';
 import { useFeatureModel } from '../hooks/useFeatureModel';
-import { t, tx } from '../i18n';
+import { t, tr, tx } from '../i18n';
 
 /** Manual workshop kinds shown in the kind selector (deep_research has its own view). */
 const WORKSHOP_KIND_ENTRIES = (Object.entries(KIND_LABELS) as [WritingWorkshopBrief['kind'], string][]).filter(
@@ -724,7 +724,10 @@ function CandidateShell({
           <p className="text-xs text-neutral-400 mt-1 line-clamp-3">{item.summary}</p>
           <div className="flex flex-wrap gap-1 mt-2">
             <Badge>{Math.round(item.score * 100)}%</Badge>
-            <Badge color="cyan">{item.reason}</Badge>
+            {/* Why this candidate was retrieved. The sentence is written by the retrieval
+                pass in the main process, so it arrives in Spanish and `tr()` is the only
+                gate it passes through on its way to the badge. */}
+            {item.reason && <Badge color="cyan">{tr(item.reason)}</Badge>}
           </div>
           {children}
         </div>

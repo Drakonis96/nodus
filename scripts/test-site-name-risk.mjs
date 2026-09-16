@@ -29,12 +29,12 @@ test('project and application remain distinct in structured data', () => {
   }
 });
 
-test('public identity copy records origin, independence and current status', () => {
+test('public identity copy records independence and current status', () => {
   const home = read('index.html');
   const about = read('about/index.html');
 
   for (const [page, html] of [['home', home], ['About', about]]) {
-    assert.match(html, /personal, independent open-source project developed in Spain/i, `${page} states the project's origin and status`);
+    assert.match(html, /personal, independent open-source project/i, `${page} states the project's nature and independence`);
     assert.match(html, /sells no product or service/i, `${page} states that there is no current commercial offer`);
   }
   assert.match(about, /not affiliated with, sponsored by or endorsed by any university, research group, company or other software project/i);
@@ -71,7 +71,7 @@ test('site footers preserve the independence statement and legal notice', () => 
 
   for (const page of pages) {
     const html = read(page);
-    assert.match(html, /A personal, independent open-source project developed in Spain\./, `${page} carries the footer identity`);
+    assert.match(html, /A personal, independent open-source project\./, `${page} carries the footer identity`);
     assert.match(html, />Legal notice<\/a>/, `${page} links the legal notice`);
   }
 });
@@ -83,6 +83,6 @@ test('the repository keeps its identity generic and makes no public donation sol
 
   assert.doesNotMatch(publicIdentity, /(?:®|™)/);
   assert.doesNotMatch(readme, /paypal\.me|ko-fi\.com/i);
-  assert.match(readme, /personal, independent open-source project developed in Spain/i);
+  assert.match(readme, /personal, independent open-source project/i);
   assert.match(notice, /Nodus Research is independent/);
 });

@@ -6,6 +6,7 @@ import path from 'node:path';
 import type { LibraryMetadataCandidate } from '@shared/libraryTypes';
 import {
   fetchPublicResource,
+  readBoundedText,
   responseToTemporaryFile,
   type PublicFetchOptions,
 } from '../network/publicDownload';
@@ -82,16 +83,7 @@ export function extractScholarlyPdfUrls(html: string, baseUrl: string): string[]
 }
 
 async function responseText(response: Response): Promise<string> {
-  if (!response.body) return '';
-  const decoder = new TextDecoder();
-  let total = 0;
-  let text = '';
-  for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
-    total += chunk.byteLength;
-    if (total > MAX_LANDING_PAGE_BYTES) throw new Error('The publisher landing page is larger than 4 MB.');
-    text += decoder.decode(chunk, { stream: true });
-  }
-  return text + decoder.decode();
+  return readBoundedText(response, MAX_LANDING_PAGE_BYTES, 'The publisher landing page is larger than 4 MB.');
 }
 
 function pdfHeader(filePath: string): boolean {

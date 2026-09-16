@@ -2946,6 +2946,7 @@ export const FR: Record<string, string> = {
   '¿Eliminar este borrador guardado? Esta acción no se puede deshacer.': 'Supprimer ce brouillon enregistré ? Cette action est irréversible.',
   'Borrador eliminado.': 'Brouillon supprimé.',
   'Taller de escritura': 'Atelier d\'écriture',
+  'Recuperado por similitud semántica con esta sección.': 'Récupéré par similarité sémantique avec cette section.',
   'Del grafo a un borrador con fuentes verificables.': 'Du graphe à un brouillon aux sources vérifiables.',
   'Deep Research': 'Deep Research',
   'Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.':

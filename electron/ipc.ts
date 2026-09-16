@@ -104,6 +104,7 @@ import {
   runBackupCleanupNow,
 } from './export/autoBackup';
 import { validateBackupPassword } from '@shared/backupPasswordPolicy';
+import { asDocumentVisualModel } from '@shared/documentVisualEnrich';
 import { isPipelineLogMaxEntries, isPipelineLogRetention } from '@shared/pipelineLogs';
 import { normalizeUiLanguage } from '@shared/uiLanguage';
 import {
@@ -615,7 +616,7 @@ export function registerIpc(
   h('chatSkills:list', async () => listChatSkills());
   h('documentSkills:list', async () => listDocumentSkills());
   h('documentVisuals:get', async (_event, target) => getDocumentVisuals(target));
-  h('documentVisuals:enrich', async (_event, target, policy, retry) => enrichDocumentVisuals(target, policy, { retry: retry === true }));
+  h('documentVisuals:enrich', async (_event, target, policy, options) => enrichDocumentVisuals(target, policy, { retry: options?.retry === true, model: asDocumentVisualModel(options?.model) }));
   h('documentVisuals:cancel', async (_event, target) => cancelDocumentVisuals(target));
   h('documentVisuals:undo', async (_event, target) => undoVisualEnrichment(target));
   h('documentVisuals:remove', async (_event, target, id) => removeDocumentFigure(target, id));

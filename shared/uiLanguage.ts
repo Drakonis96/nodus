@@ -695,7 +695,25 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
   if (providerFailure) return providerFailure;
   const mainProcessFailure = mainProcessRuntimeError(message, language);
   if (mainProcessFailure) return mainProcessFailure;
-  return null;
+  return sentenceListRuntimeError(message, language);
+}
+
+/**
+ * A `; `-joined list of our own sentences, translated item by item.
+ *
+ * The library extraction reports its findings as a list of warnings ("…; El texto contiene
+ * espacios dobles inesperados.") and both the processing log and the item's retry reason
+ * print the list as one string, so no single lookup could ever match it. Partial lists are
+ * refused on purpose: translating the half that is ours and leaving the rest would put two
+ * languages inside one sentence, which is the thing this file exists to prevent.
+ */
+function sentenceListRuntimeError(message: string, language: unknown): string | null {
+  if (!message.includes('; ')) return null;
+  const parts = message.split('; ');
+  if (parts.length < 2) return null;
+  const translated = parts.map((part) => knownRuntimeErrorText(part.trim(), language));
+  if (translated.some((part) => part === null)) return null;
+  return translated.join('; ');
 }
 
 /**

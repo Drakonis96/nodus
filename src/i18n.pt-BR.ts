@@ -2929,6 +2929,7 @@ export const PT_BR: Record<string, string> = {
   '¿Eliminar este borrador guardado? Esta acción no se puede deshacer.': 'Excluir este rascunho salvo? Esta ação não pode ser desfeita.',
   'Borrador eliminado.': 'Rascunho excluído.',
   'Taller de escritura': 'Oficina de escrita',
+  'Recuperado por similitud semántica con esta sección.': 'Recuperado por similaridade semântica com esta seção.',
   'Del grafo a un borrador con fuentes verificables.': 'Do grafo a um rascunho com fontes verificáveis.',
   'Deep Research': 'Deep Research',
   'Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.':

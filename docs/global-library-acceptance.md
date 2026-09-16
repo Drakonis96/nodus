@@ -64,7 +64,7 @@ button exists.
 | Catalogue view | Zotero-style bibliography columns can be shown, hidden, drag-reordered, keyboard/button-reordered, resized, and multi-sorted, with the complete view persisting across restart | Verified | `test-library-smart-collections`, `e2e-global-library` |
 | Item management | Empty references, independent duplicates, and Nodus copies work without Zotero | Verified | `test-library-item-management`, `test-global-library-ui` |
 | Item management | All 37 current citeable Zotero types, including canonical `book-chapter`, and ordered personal or institutional creator roles round-trip | Verified | `test-library-item-management`, `test-library-metadata`, `test-zotero-isolated-copy` |
-| Item management | Magic add auto-detects DOI, ISBN, ISSN, PMID, PMCID, and arXiv; manual creation exposes the complete type and metadata flow | Verified | `test-library-metadata`, `verify-library-metadata-live`, `e2e-global-library` |
+| Item management | Magic add auto-detects DOI, ISBN, ISSN, PMID, PMCID, arXiv, and a link to the work; manual creation exposes the complete type and metadata flow | Verified | `test-library-metadata`, `verify-library-metadata-live`, `e2e-global-library` |
 | Attachments | Multiple supported files can be added, opened, revealed, renamed, reordered, classified, replaced, and removed | Verified | `test-library-item-management`, `e2e-global-library` |
 | Attachments | Selecting or replacing the primary file drives revision invalidation and extraction | Verified | `test-library-item-management`, `test-library-revisions` |
 | Notes | Local Markdown notes are editable and Zotero notes remain read-only | Verified | `test-library-item-management`, `test-zotero-library-import` |
@@ -110,7 +110,8 @@ button exists.
 | Chat | The reader model menu exposes the configured featured models and persists the Nodi selection | Verified | `test-global-library-ui`, `e2e-library-reader` |
 | Chat | History persists beside the document and can be cleared | Verified | `test-global-library-reader` |
 | Metadata | Local edits survive future source refreshes | Verified | `test-library-metadata`, `e2e-global-library` |
-| Metadata | DOI/ISSN use Crossref, ISBN uses Open Library, PMID/PMCID use NCBI, and arXiv uses its Atom API | Verified | `test-library-metadata` |
+| Metadata | DOI/ISSN use Crossref, ISBN uses Open Library, PMID/PMCID use NCBI, and arXiv uses DataCite with its Atom feed as the fallback for identifiers that carry no DOI | Verified | `test-library-metadata`, `verify-library-metadata-live` |
+| Metadata | A pasted link resolves through the identifier it names, or by reading the record the page publishes, and a page with no title is refused rather than guessed | Verified | `test-library-metadata`, `verify-library-metadata-live` |
 | Metadata | Candidates require review before being applied | Verified | `test-global-library-ui`, `e2e-global-library` |
 | Metadata | Bulk resolution is rate-limited, cancelable, partial-result safe, and requires a second confirmation | Verified | `test-library-metadata`, `test-global-library-ui`, `e2e-global-library` |
 | Duplicates | Explicit detection and merging preserve derived files | Verified | `test-library-metadata`, `test-global-library-ui` |
