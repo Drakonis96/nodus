@@ -29,6 +29,7 @@ Download the installer for your computer and open it. There is no server to conf
 | macOS with an Intel processor | [Download DMG](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-mac-x64.dmg) |
 | Windows 10 and 11 | [Download EXE](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-win-x64.exe) |
 | Ubuntu and Debian | [Download DEB](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-amd64.deb) |
+| Fedora, openSUSE and other RPM-based distributions | [Download RPM](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-x86_64.rpm) |
 | Other Linux distributions | [Download AppImage](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-x86_64.AppImage) |
 
 The standalone Zotero plugin is available from the same release as [nodus-zotero.xpi](https://github.com/Drakonis96/nodus/releases/latest/download/nodus-zotero.xpi). In Zotero 9 or 10, open **Tools → Plugins**, choose **Install Add-on From File** from the gear menu, and select the downloaded file.

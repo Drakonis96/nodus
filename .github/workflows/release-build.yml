@@ -397,6 +397,7 @@ jobs:
             Nodus-win-x64.exe
             Nodus-linux-amd64.deb
             Nodus-linux-x86_64.AppImage
+            Nodus-linux-x86_64.rpm
           )
           if [[ "$RELEASE_CHANNEL" == latest ]]; then
             # GitHub stable releases keep their existing latest manifests. A beta

@@ -43,6 +43,7 @@ const PUBLISHED = [
   { os: 'win', arch: 'x64', ext: 'exe', name: 'Nodus-win-x64.exe' },
   { os: 'linux', arch: 'amd64', ext: 'deb', name: 'Nodus-linux-amd64.deb' },
   { os: 'linux', arch: 'x86_64', ext: 'AppImage', name: 'Nodus-linux-x86_64.AppImage' },
+  { os: 'linux', arch: 'x86_64', ext: 'rpm', name: 'Nodus-linux-x86_64.rpm' },
 ];
 
 test('THE REGRESSION: the artifact template does not interpolate the product name', () => {
@@ -94,7 +95,7 @@ test('the uploader expects the names the builder produces', () => {
 
 test('the release workflow verifies the same names before publishing', () => {
   const workflow = read('.github/workflows/release-build.yml');
-  for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-mac-x64.dmg', 'Nodus-win-x64.exe', 'Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage']) {
+  for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-mac-x64.dmg', 'Nodus-win-x64.exe', 'Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage', 'Nodus-linux-x86_64.rpm']) {
     assert.ok(workflow.includes(name), `the release workflow must verify ${name}`);
   }
 });
@@ -102,7 +103,7 @@ test('the release workflow verifies the same names before publishing', () => {
 test('the download links the public actually clicks resolve to these names', () => {
   const base = 'https://github.com/Drakonis96/nodus/releases/latest/download/';
   const page = read('site/app/index.html');
-  for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-mac-x64.dmg', 'Nodus-win-x64.exe', 'Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage']) {
+  for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-mac-x64.dmg', 'Nodus-win-x64.exe', 'Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage', 'Nodus-linux-x86_64.rpm']) {
     assert.ok(page.includes(`${base}${name}`), `site/app/index.html links ${name}`);
   }
   const readme = read('README.md');

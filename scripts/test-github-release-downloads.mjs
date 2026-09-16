@@ -22,6 +22,7 @@ function response(body, { status = 200, link = '' } = {}) {
 test('classifies the supported packages by operating system', () => {
   assert.equal(classifyReleaseAsset('nodus-linux-amd64.deb'), 'linux');
   assert.equal(classifyReleaseAsset('Nodus-x86_64.AppImage'), 'linux');
+  assert.equal(classifyReleaseAsset('Nodus-linux-x86_64.rpm'), 'linux');
   assert.equal(classifyReleaseAsset('Nodus-mac-arm64.dmg'), 'macos');
   assert.equal(classifyReleaseAsset('Nodus-mac-arm64.zip'), 'macos');
   assert.equal(classifyReleaseAsset('Nodus-mac-x64.dmg'), 'macos');
