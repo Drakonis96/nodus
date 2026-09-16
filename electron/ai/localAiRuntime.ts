@@ -22,7 +22,7 @@ export interface RuntimeInstaller {
 }
 
 /** A failed spawn, signal termination, or hung loader is always a bounded error. */
-export function runRuntimeProbe(command: string, args: string[], signal?: AbortSignal, timeoutMs = 10_000): Promise<string> {
+export function runRuntimeProbe(command: string, args: string[], signal?: AbortSignal, timeoutMs = 30_000): Promise<string> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) { reject(signal.reason); return; }
     const child = spawn(command, args, {
@@ -49,7 +49,9 @@ export function runRuntimeProbe(command: string, args: string[], signal?: AbortS
       killTimer = setTimeout(() => finish(reason), 1_000);
     };
     const abort = () => stop(signal?.reason ?? new Error('Runtime probe cancelled'));
-    const timer = setTimeout(() => stop(new Error('Runtime probe timed out')), timeoutMs);
+    const timer = setTimeout(() => stop(new Error(
+      `Runtime probe timed out after ${timeoutMs} ms (${path.basename(command)} ${args.join(' ')}).\n${output}`.trim(),
+    )), timeoutMs);
     signal?.addEventListener('abort', abort, { once: true });
     const capture = (chunk: unknown) => { output = `${output}${String(chunk)}`.slice(-16_000); };
     child.stdout?.on('data', capture);
@@ -188,7 +190,11 @@ export class LocalRuntimeManager {
         failures.push(`${variant.backend}: ${detailOf(error)}`);
         // A Metal build can still serve CPU if Metal reports no usable device.
         if (variant.backend === 'metal') {
-          await this.probe(executable, ['--version'], signal);
+          try { await this.probe(executable, ['--version'], signal); }
+          catch (versionError) {
+            signal.throwIfAborted();
+            throw new Error(`${failures.join('\n')}\n${detailOf(versionError)}`);
+          }
           chosen = { version: variant.archives[0].version, executablePath: executable, backend: 'cpu', devices: [], legacy: false, identity: `${variantId(variant)}:cpu` };
           chosenVariant = variant;
         }
