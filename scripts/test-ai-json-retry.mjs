@@ -45,6 +45,12 @@ const server = createServer((req, res) => {
     seen.push({ url: req.url, headers: req.headers, body: JSON.parse(body || '{}') });
     const next = queue.shift() ?? '{}';
     const reply = typeof next === 'string' ? { content: next, finish_reason: 'stop' } : next;
+    // A refusal is a reply too: the transport's own recovery paths are driven from here.
+    if (reply.status) {
+      res.writeHead(reply.status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: { message: reply.error ?? 'rejected' } }));
+      return;
+    }
     res.writeHead(200, { 'content-type': 'application/json' });
     const payload = JSON.stringify({ choices: [{ message: { role: 'assistant', content: reply.content }, finish_reason: reply.finish_reason }] });
     if (reply.bodyDelayMs) {
@@ -281,6 +287,32 @@ try {
     maxTokens: 8000, seed: 123456, images: [],
   });
   assert.equal(gemini3.config.temperature, undefined, 'Gemini 3 keeps provider sampling defaults');
+
+  // 11. A model that deprecates `temperature` costs one refused request per session, not a
+  // failed scan. That is how DeepSeek's unversioned ids arrived: the transport cannot know
+  // in advance, so it learns from a 400 that NAMES the field, replays without it and keeps
+  // every other field of the request intact.
+  const deprecating = { provider: 'lmstudio', model: 'fake-deprecating-model' };
+  run([{ status: 400, error: 'Unsupported parameter: temperature' }, { content: 'hola' }]);
+  assert.equal(await aiClient.completeText({ system: 'system', user: 'user' }, deprecating), 'hola');
+  assert.equal(seen.length, 2, 'a named temperature refusal is replayed exactly once');
+  assert.ok('temperature' in seen[0].body, 'the first attempt still sent the knob');
+  assert.ok(!('temperature' in seen[1].body), 'the replay drops the offending field');
+  assert.deepEqual(
+    { ...seen[1].body, temperature: 0 },
+    { ...seen[0].body, temperature: 0 },
+    'every other request field survives the recovery',
+  );
+  run([{ content: 'hola' }]);
+  assert.equal(await aiClient.completeText({ system: 'system', user: 'user' }, deprecating), 'hola');
+  assert.equal(seen.length, 1, 'the model stays learned for the rest of the session');
+  assert.ok(!('temperature' in seen[0].body), 'later calls never send it again');
+  // A 400 that does NOT name the field must not be replayed: otherwise every refusal for
+  // any other reason would be sent twice.
+  const refused = { provider: 'lmstudio', model: 'fake-other-refusal-model' };
+  run([{ status: 400, error: 'context length exceeded' }]);
+  await assert.rejects(() => aiClient.completeText({ system: 'system', user: 'user' }, refused));
+  assert.equal(seen.length, 1, 'an unnamed 400 is surfaced, not replayed');
 
   console.log('AI JSON retry budget verified.');
 } finally {
