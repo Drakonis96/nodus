@@ -176,7 +176,7 @@ export function parseOffloadedLayers(output: string): number | null {
 }
 
 export function gpuStartupFailure(message: string): boolean {
-  return /out of (?:device |gpu |host )?memory|failed to allocate|allocation failed|vk::|vkAllocate|VK_ERROR_|libvulkan|vulkan.*(?:failed|error)|failed to (?:load|initialize).*backend|no usable GPU|device (?:lost|unavailable)/i.test(message);
+  return /out of (?:device |gpu |host )?memory|failed to allocate|allocation failed|vk::|vkAllocate|VK_ERROR_|libvulkan|vulkan.*(?:failed|error)|failed to (?:load|initialize).*backend|no usable GPU|invalid device:\s*(?:Vulkan\d+|Metal\d*)|device (?:lost|unavailable)/i.test(message);
 }
 
 /** The b10002 Apple-silicon binary links newer Metal APIs before argv is read.

@@ -143,6 +143,9 @@ test('device and offload evidence is not inferred from an installed GPU toolkit'
   assert.equal(runtime.parseOffloadedLayers('offloaded 0/28 layers to GPU'), 0);
   assert.equal(runtime.parseOffloadedLayers('offloaded 28/28 layers to GPU'), 28);
   assert.ok(runtime.gpuStartupFailure('VK_ERROR_OUT_OF_DEVICE_MEMORY'));
+  assert.ok(runtime.gpuStartupFailure('error: invalid device: Vulkan0'), 'a device detected at setup may disappear before launch');
+  assert.ok(runtime.gpuStartupFailure('error: invalid device: Metal'));
+  assert.ok(!runtime.gpuStartupFailure('invalid device: made-up-model-id'));
   assert.ok(!runtime.gpuStartupFailure('unknown model architecture'));
 });
 
