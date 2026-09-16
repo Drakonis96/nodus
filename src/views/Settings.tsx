@@ -1183,9 +1183,9 @@ export function Settings({
                 <option value="light">{t('Claro')}</option>
               </select>
             </Row>
-            <Row label={t('Tema')} hint={t('Paletas de color. El modo claro u oscuro se ajusta arriba.')}>
+            <Row label={t('Tema')} hint={t('Paletas de color. El modo claro u oscuro se ajusta arriba.')} stacked>
               <div className="w-full space-y-3">
-                <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3" data-testid="theme-picker">
+                <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2" data-testid="theme-picker">
                   {[...THEME_PICKER_OPTIONS, ...customThemes.map((theme) => ({
                     id: theme.id,
                     label: theme.label,
@@ -4162,7 +4162,21 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Row({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+function Row({ label, children, hint, stacked = false }: { label: string; children: React.ReactNode; hint?: string; stacked?: boolean }) {
+  // A control that is itself a grid of options reads better under its own label
+  // than beside it: the two-column shape would leave the label column empty for
+  // the height of the grid and push the options into the narrow right side.
+  if (stacked) {
+    return (
+      <div className="grid gap-3">
+        <label className="text-sm text-neutral-300">
+          {label}
+          {hint && <span className="mt-0.5 block text-xs text-neutral-500">{hint}</span>}
+        </label>
+        <div className="min-w-0">{children}</div>
+      </div>
+    );
+  }
   return (
     <div className="grid gap-3 md:grid-cols-[minmax(13rem,0.85fr)_minmax(0,1.55fr)] md:items-start">
       <label className="pt-2 text-sm text-neutral-300">
