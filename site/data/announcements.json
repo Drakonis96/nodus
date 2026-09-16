@@ -46,6 +46,11 @@
           "title": "Nodus Research'ün gelişmesine yardımcı olun",
           "body": "Nodus neredeyse tamamen tek bir geliştirici tarafından geliştirilmekte ve sürdürülmektedir. Projeyi beğeniyor ve büyümesine yardımcı olmak istiyorsanız her türlü katkı memnuniyetle karşılanır: kod, düzeltmeler, yeni özellikler, belgeler, çeviriler veya fikirler.",
           "linkLabel": "GitHub'da katkıda bulunun"
+        },
+        "zh-CN": {
+          "title": "帮助构建 Nodus Research",
+          "body": "Nodus 几乎完全由一位开发者开发和维护。如果你喜欢这个项目并希望帮助它成长，任何贡献都欢迎：代码、修复、新功能、文档、翻译或想法。",
+          "linkLabel": "在 GitHub 上贡献"
         }
       }
     },
@@ -94,6 +99,11 @@
           "title": "Nodus'u beğendin mi?",
           "body": "Nodus'u beğeniyorsanız, projeyi desteklemek ve büyütmek için GitHub'da bize bir yıldız verin.",
           "linkLabel": "GitHub'da Nodus'a yıldız ver"
+        },
+        "zh-CN": {
+          "title": "喜欢 Nodus 吗？",
+          "body": "如果你喜欢 Nodus，请在 GitHub 上给我们一颗星，以支持我们并帮助项目成长。",
+          "linkLabel": "在 GitHub 上给我们一颗星"
         }
       }
     },
@@ -142,6 +152,11 @@
           "title": "Nodus'u hangi dilde görmek istersiniz?",
           "body": "Kısa bir ankete katılarak Nodus'a bir sonraki adımda hangi dili ekleyeceğimize karar vermemize yardımcı olun.",
           "linkLabel": "Ankete katılın"
+        },
+        "zh-CN": {
+          "title": "你希望在 Nodus 中看到哪种语言？",
+          "body": "填写一份简短问卷，帮助我们决定接下来为 Nodus 添加哪种语言。",
+          "linkLabel": "填写问卷"
         }
       }
     },
@@ -190,6 +205,11 @@
           "title": "Nodus'u beğendin mi?",
           "body": "Nodus'u beğeniyorsanız, projeyi desteklemek ve büyütmek için GitHub'da bize bir yıldız verin.",
           "linkLabel": "GitHub'da Nodus'a yıldız ver"
+        },
+        "zh-CN": {
+          "title": "喜欢 Nodus 吗？",
+          "body": "如果你喜欢 Nodus，请在 GitHub 上给我们一颗星，以支持我们并帮助项目成长。",
+          "linkLabel": "在 GitHub 上给我们一颗星"
         }
       }
     },
@@ -238,6 +258,11 @@
           "title": "Nodus’un yeni web sitesi yayında",
           "body": "Nodus web sitesinin yeni adresi nodusresearch.com. Wiki, eğitim içerikleri, blog ve etkileşimli demolar artık tek bir yerde.",
           "linkLabel": "nodusresearch.com adresini ziyaret et"
+        },
+        "zh-CN": {
+          "title": "Nodus 启用新网站",
+          "body": "Nodus 的网站有了新地址：nodusresearch.com。它把 wiki、教程、博客和交互式演示汇集在同一处。",
+          "linkLabel": "访问 nodusresearch.com"
         }
       }
     },
@@ -287,6 +312,11 @@
           "title": "Chrome için Nodus Connector artık Chrome Web Mağazası’nda",
           "body": "Chrome için Nodus Connector, açık olan akademik sayfayı veya belgeyi yerel Kitaplığa kaydeder. Gömülü bibliyografik üstverileri, DOI/ISBN bilgisini ve mevcut dosyaları algılar; kaydetmeden önce iç içe bir Nodus koleksiyonu ile var olan veya yeni etiketleri seçmene izin verir. Etkin sekmeyi yalnızca araç çubuğundaki simgesine tıklandıktan sonra okur.",
           "linkLabel": "Chrome Web Mağazası’ndan yükle"
+        },
+        "zh-CN": {
+          "title": "Nodus Connector for Chrome 已上架 Chrome 应用商店",
+          "body": "Nodus Connector for Chrome 会把你当前打开的学术网页或文档保存到本地文献库。它识别页面内嵌的书目元数据、DOI 或 ISBN 以及可用的文件，并让你在保存前选择 Nodus 的嵌套合集以及已有或新建的标签。只有在你点击工具栏中的图标后，它才会读取当前标签页。",
+          "linkLabel": "从 Chrome 应用商店安装"
         }
       }
     },
@@ -336,6 +366,11 @@
           "title": "Nodus 4, AGPL v3 lisansına geçiyor",
           "body": "Nodus, 4. sürümden itibaren GNU Affero General Public License v3 kapsamında dağıtılmaktadır.",
           "linkLabel": "AGPL v3 lisansını görüntüle"
+        },
+        "zh-CN": {
+          "title": "Nodus 4 改用 AGPL v3 许可证",
+          "body": "从第 4 版起，Nodus 在 GNU Affero 通用公共许可证第 3 版下分发。",
+          "linkLabel": "查看 AGPL v3 许可证"
         }
       }
     },
@@ -384,6 +419,11 @@
           "title": "Nodus Mobil Uygulaması | İlgi Anketi",
           "body": "Nodus mobil uygulamasını geliştiriyoruz ve görüşlerinizi duymaktan memnuniyet duyarız.",
           "linkLabel": "Ankete katılın"
+        },
+        "zh-CN": {
+          "title": "Nodus 移动应用 | 兴趣调查",
+          "body": "我们正在开发 Nodus 移动应用，非常希望了解你的想法。",
+          "linkLabel": "填写问卷"
         }
       }
     }
