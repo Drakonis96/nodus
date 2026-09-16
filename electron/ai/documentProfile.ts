@@ -305,13 +305,21 @@ export function normalizeDocumentProfileAuditResponse(value: unknown): AuditResp
   };
 }
 
+/**
+ * The diagnostics of a refused profile, appended to its audit issues.
+ *
+ * The tags are deliberately language-neutral: this sentence is stored as the profile's error,
+ * printed verbatim in the processing log and pasted into a GitHub issue, so it is read by
+ * someone whose interface language is unknown and is never translated. Spanish keys inside an
+ * English log were exactly the kind of fragment the log is supposed to avoid.
+ */
 function auditFailureMessage(audit: DocumentProfileAudit): string {
   const details = [
     ...audit.issues,
-    `veredicto=${audit.passed ? 'aprobado' : 'rechazado'}`,
-    `puntuación=${audit.score == null ? 'sin puntuación' : audit.score.toFixed(2)}`,
-    `apoyos=${audit.supportCoverage.toFixed(2)}`,
-    `estructura=${audit.structureCoverage.toFixed(2)}`,
+    `verdict=${audit.passed ? 'approved' : 'rejected'}`,
+    `score=${audit.score == null ? 'none' : audit.score.toFixed(2)}`,
+    `support=${audit.supportCoverage.toFixed(2)}`,
+    `structure=${audit.structureCoverage.toFixed(2)}`,
   ];
   return details.join(' · ');
 }
@@ -371,11 +379,56 @@ function chunksWithOffsets(text: string, wordsPerChunk = 3_500): Array<{ start: 
   return chunks;
 }
 
+/**
+ * Fold chunks too short to be a section into their neighbour.
+ *
+ * A PDF that publishes without Markdown headings is chunked by size, and the first thing a
+ * journal PDF prints is a cover: the masthead, the issue, the ISSN, the authors' affiliations.
+ * That page and the block of footnote definitions at the end were becoming sections of their
+ * own — a hundred and fifty characters, sometimes thirty-six — and no model can synthesise a
+ * section out of them, so their analyses degraded, their summaries were published as literal
+ * extracts and the whole profile fell back to the extractive mode. The text is not dropped:
+ * a short chunk joins its neighbour, so the sections still tile the document exactly and
+ * nothing changes for a document whose chunks are all substantial.
+ */
+function mergeUndersizedChunks(
+  text: string,
+  chunks: Array<{ start: number; end: number; body: string }>,
+): Array<{ start: number; end: number; body: string }> {
+  const substantial = (body: string): boolean => body.split(/\s+/).filter(Boolean).length >= MIN_SECTION_WORDS;
+  if (chunks.length <= 1 || chunks.every((chunk) => substantial(chunk.body))) return chunks;
+  const merged: Array<{ start: number; end: number; body: string }> = [];
+  let pendingStart: number | null = null;
+  for (const chunk of chunks) {
+    if (pendingStart != null) {
+      // A short leading chunk waits for the first substantial one to absorb it.
+      if (!substantial(chunk.body)) continue;
+      merged.push({ start: pendingStart, end: chunk.end, body: text.slice(pendingStart, chunk.end) });
+      pendingStart = null;
+      continue;
+    }
+    const previous = merged[merged.length - 1];
+    if (!substantial(chunk.body) && previous) {
+      merged[merged.length - 1] = { start: previous.start, end: chunk.end, body: text.slice(previous.start, chunk.end) };
+      continue;
+    }
+    if (!substantial(chunk.body) && !previous) {
+      pendingStart = chunk.start;
+      continue;
+    }
+    merged.push(chunk);
+  }
+  // Everything was short — a stub document, not a structure to merge. Keep the tiling as it
+  // came, and the profile's own gates decide what can be published from it.
+  if (pendingStart != null) merged.push({ start: pendingStart, end: text.length, body: text.slice(pendingStart) });
+  return merged.length ? merged : chunks;
+}
+
 /** Pure, stable structural pass reused by tests and the scanner. */
 export function deriveDocumentStructure(text: string, fallbackTitle: string, sourceMap: Record<string, string> = {}): DerivedDocumentSection[] {
   const headings = headingMatches(text, sourceMap);
   if (headings.length === 0) {
-    return chunksWithOffsets(text).map((chunk, ordinal) => {
+    return mergeUndersizedChunks(text, chunksWithOffsets(text)).map((chunk, ordinal) => {
       const start = parseSourceLocationAt(text, chunk.start, sourceMap);
       const end = parseSourceLocationAt(text, chunk.end, sourceMap);
       return ({

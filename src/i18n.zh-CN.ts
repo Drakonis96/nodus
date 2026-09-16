@@ -2500,6 +2500,7 @@ export const ZH_CN: Record<string, string> = {
   "¿Eliminar este borrador guardado? Esta acción no se puede deshacer.": "要删除这份已保存的草稿吗？此操作无法撤销。",
   "Borrador eliminado.": "草稿已删除。",
   "Taller de escritura": "写作工坊",
+  "Recuperado por similitud semántica con esta sección.": "因与本节语义相似而检索到。",
   "Del grafo a un borrador con fuentes verificables.": "从图谱到来源可验证的草稿。",
   "Deep Research": "Deep Research",
   "Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.": "你的学术报告库：按队列生成，引用整个语料库。",

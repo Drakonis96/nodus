@@ -2990,6 +2990,7 @@ export const EN: Record<string, string> = {
     'Delete this saved draft? This action cannot be undone.',
   'Borrador eliminado.': 'Draft deleted.',
   'Taller de escritura': 'Writing Workshop',
+  'Recuperado por similitud semántica con esta sección.': 'Retrieved by semantic similarity with this section.',
   'Del grafo a un borrador con fuentes verificables.': 'From the graph to a draft with verifiable sources.',
   // Deep Research
   'Deep Research': 'Deep Research',

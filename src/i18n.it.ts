@@ -2635,6 +2635,7 @@ export const IT: Record<string, string> = {
   "¿Eliminar este borrador guardado? Esta acción no se puede deshacer.": "Eliminare questa bozza salvata? Questa azione non può essere annullata.",
   "Borrador eliminado.": "Bozza eliminata.",
   "Taller de escritura": "Laboratorio di scrittura",
+  "Recuperado por similitud semántica con esta sección.": "Recuperato per similarità semantica con questa sezione.",
   "Del grafo a un borrador con fuentes verificables.": "Dal grafico ad una bozza con fonti verificabili.",
   "Deep Research": "Ricerca approfondita",
   "Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.": "La tua libreria di resoconti accademici, generati in coda e citando l'intero corpus.",

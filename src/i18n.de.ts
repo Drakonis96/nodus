@@ -2923,6 +2923,7 @@ export const DE: Record<string, string> = {
     'Diesen gespeicherten Entwurf löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
   'Borrador eliminado.': 'Entwurf gelöscht.',
   'Taller de escritura': 'Schreibwerkstatt',
+  'Recuperado por similitud semántica con esta sección.': 'Über semantische Ähnlichkeit mit diesem Abschnitt gefunden.',
   'Del grafo a un borrador con fuentes verificables.': 'Vom Graphen zu einem Entwurf mit überprüfbaren Quellen.',
   'Deep Research': 'Deep Research',
   'Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.':

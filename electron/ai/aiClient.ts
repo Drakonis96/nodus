@@ -643,18 +643,27 @@ async function tryLocalNativeStreaming(
 }
 
 /**
- * Output-language control. The prompts are authored in Spanish; when the user picks
- * a non-Spanish prompt language we APPEND a high-priority directive instead of
- * rewriting the prompt, so all generated free-text fields come back in that language.
- * The directive explicitly supersedes the inline "escribe en español" instructions the
- * base prompts carry — the same override mechanism that has always driven the English
- * option — which is far safer than a blind find/replace over hand-tuned prompts (that
- * would also corrupt JSON examples and cases where "español" denotes the source text).
- * `quote`/verbatim evidence always stays in the source language. Applied at the public
- * entry points only (not the internal JSON-repair call, which must not translate
- * existing content).
+ * Output-language control. The prompts are authored in Spanish, and every prompt language
+ * gets a HIGH-PRIORITY directive APPENDED to its system prompt rather than the prompt being
+ * rewritten, so all generated free-text fields come back in the configured language. The
+ * directive explicitly supersedes whatever language an inline instruction or a document's
+ * own language implies — the override mechanism that has always driven the English option,
+ * and far safer than a blind find/replace over hand-tuned prompts (that would also corrupt
+ * JSON examples and cases where "español" denotes the source text).
+ *
+ * Spanish used to be the exception: no directive was appended, on the assumption that a
+ * prompt written in Spanish brings Spanish output. That held for most prompts and failed for
+ * some — the document-profile pack never said which language to write in and two of nine
+ * profiles of a live run followed the source document into English instead. A language the
+ * user chose is a setting, not a property of the prompt text, so Spanish is now driven by the
+ * same directive as the other fourteen.
+ *
+ * `quote`/verbatim evidence always stays in the source language. Applied at the public entry
+ * points only (not the internal JSON-repair call, which must not translate existing content);
+ * tasks that must fully control their own output language call `completeTextNeutral`.
  */
-const OUTPUT_LANGUAGE_NAME: Record<Exclude<PromptLanguage, 'es'>, string> = {
+const OUTPUT_LANGUAGE_NAME: Record<PromptLanguage, string> = {
+  es: 'ESPAÑOL',
   en: 'ENGLISH',
   fr: 'FRANÇAIS',
   tr: 'TÜRKÇE',
@@ -671,8 +680,9 @@ const OUTPUT_LANGUAGE_NAME: Record<Exclude<PromptLanguage, 'es'>, string> = {
   ko: '한국어',
 };
 
-function outputLanguageDirective(lang: Exclude<PromptLanguage, 'es'>): string {
-  const headings: Record<Exclude<PromptLanguage, 'es'>, string> = {
+function outputLanguageDirective(lang: PromptLanguage): string {
+  const headings: Record<PromptLanguage, string> = {
+    es: 'IDIOMA DE SALIDA — PRIORIDAD MÁXIMA',
     en: 'OUTPUT LANGUAGE — HIGHEST PRIORITY',
     fr: 'LANGUE DE SORTIE — PRIORITÉ ABSOLUE',
     tr: 'ÇIKTI DİLİ — EN YÜKSEK ÖNCELİK',
@@ -688,7 +698,8 @@ function outputLanguageDirective(lang: Exclude<PromptLanguage, 'es'>): string {
     uk: 'МОВА ВИВЕДЕННЯ — НАЙВИЩИЙ ПРІОРИТЕТ',
     ko: '출력 언어 — 최우선 순위',
   };
-  const directives: Record<Exclude<PromptLanguage, 'es'>, string> = {
+  const directives: Record<PromptLanguage, string> = {
+    es: `Prioridad de idioma de salida: redacta TODOS los campos de texto libre en ${OUTPUT_LANGUAGE_NAME[lang]}, sea cual sea el idioma del documento de origen o cualquier instrucción anterior. Incluye etiquetas, enunciados, desarrollos, resúmenes, justificaciones, explicaciones, notas, títulos, cuerpos, motivos y toda la prosa. La ÚNICA excepción son los campos quote/prueba literal, que se copian EXACTAMENTE en el idioma de origen; no traduzcas nunca las citas. Conserva exactamente las claves JSON y los valores de enumeración.`,
     en: `Output-language priority: write EVERY free-text/natural-language output field in ${OUTPUT_LANGUAGE_NAME[lang]}, regardless of source-document language or earlier instructions. This includes labels, statements, development, summaries, rationales, explanations, notes, titles, bodies, reasons, and all prose. The ONLY exception is any quote/verbatim-evidence field, which must be copied EXACTLY in the source language; never translate quotes. Keep JSON keys and enum values exactly as specified.`,
     fr: `Priorité de langue de sortie : rédige TOUS les champs de texte libre en ${OUTPUT_LANGUAGE_NAME[lang]}, quelle que soit la langue du document source ou toute instruction précédente. Cela inclut labels, énoncés, développements, résumés, justifications, explications, notes, titres, corps, raisons et toute prose. SEULE exception : les champs quote/preuve littérale doivent être copiés EXACTEMENT dans la langue source ; ne traduis jamais les citations. Conserve exactement les clés JSON et valeurs d’énumération.`,
     tr: `Çıktı dili önceliği: Kaynak belgenin diline veya önceki talimatlara bakılmaksızın TÜM serbest metin alanlarını ${OUTPUT_LANGUAGE_NAME[lang]} yaz. Buna etiketler, ifadeler, geliştirmeler, özetler, gerekçeler, açıklamalar, notlar, başlıklar ve tüm düzyazı dahildir. TEK istisna quote/aynen kanıt alanlarıdır; bunları kaynak dilinde AYNEN kopyala, alıntıları çevirme. JSON anahtarlarını ve enum değerlerini aynen koru.`,
@@ -711,7 +722,6 @@ function outputLanguageDirective(lang: Exclude<PromptLanguage, 'es'>): string {
  *  `promptLanguage` setting without mutating the base prompt. */
 export function withPromptLanguage<T extends { system: string; englishImagePrompts?: boolean }>(opts: T): T {
   const lang = getSettings().promptLanguage ?? 'es';
-  if (lang === 'es') return opts;
   const toolException = opts.englishImagePrompts ? '\nIMAGE TOOL PROTOCOL EXCEPTION: In nodus-image JSON requests, the prompt field is an internal production instruction and MUST be written in English. Visible prose, title and alt still follow the output language above. Keep JSON keys and aspect-ratio values unchanged.' : '';
   return { ...opts, system: `${opts.system}${outputLanguageDirective(lang)}${toolException}` };
 }

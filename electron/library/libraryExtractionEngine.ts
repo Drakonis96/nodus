@@ -1270,7 +1270,9 @@ export async function extractLibraryItem(options: {
     const quality = qualityReport(markdown, blocks, extracted.ocrPages, extracted.blankPages);
     const readableBefore = store.readMaterializedItem(options.item.storageId) ?? options.item;
     if (quality.status === 'failed' && readableBefore.files?.reader) {
-      throw new Error(quality.warnings.join(' ') || 'La extracción no produjo una copia legible.');
+      // `; ` is the separator the renderer's catalogue splits a list of our sentences on, so
+      // this reason and the log line the queue writes stay translatable item by item.
+      throw new Error(quality.warnings.join('; ') || 'La extracción no produjo una copia legible.');
     }
     const sourceSha256 = sha256File(source);
     const cleanContentFingerprint = sha256Buffer(markdown);
@@ -1318,7 +1320,7 @@ export async function extractLibraryItem(options: {
         extraction: {
           ...contentRevision.components.extraction,
           freshness: 'failed',
-          reason: quality.warnings.join(' ') || 'The extraction did not produce a complete readable copy.',
+          reason: quality.warnings.join('; ') || 'The extraction did not produce a complete readable copy.',
         },
       },
     };
@@ -1344,7 +1346,7 @@ export async function extractLibraryItem(options: {
         progress: 1,
         engine: `${LIBRARY_EXTRACTION_PIPELINE} (${settings.ocrMode})`,
         updatedAt: now,
-        ...(quality.status === 'failed' ? { error: quality.warnings.join(' ') } : {
+        ...(quality.status === 'failed' ? { error: quality.warnings.join('; ') } : {
           lastSuccessfulAt: now,
           lastSuccessfulFingerprint: cleanExtractionFingerprint,
         }),

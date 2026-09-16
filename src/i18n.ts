@@ -278,6 +278,22 @@ export function errorText(error: unknown): string {
 }
 
 /**
+ * Translate a sentence one of our catalogues knows, and leave everything else EXACTLY as it
+ * was written.
+ *
+ * {@link tr} is the wrong tool for a list that mixes our sentences with someone else's prose:
+ * it runs the Spanish detector last, so an auditor's own Spanish note — written by a model
+ * answering in the prompt language — would be replaced by the generic "this message could not
+ * be translated", erasing the only description of what was wrong. A stored audit's issues are
+ * exactly that mix, and the pipeline's own contributions to them ("the response was cut off at
+ * N output tokens") are ours and must follow the interface.
+ */
+export function knownText(value: string): string {
+  if (!value) return value;
+  return knownRuntimeErrorText(value, activeLang) ?? value;
+}
+
+/**
  * Every catalogue sentence as a matcher, so a notification stored as Spanish prose by
  * an older build can be read back as the key it would be written with today. A plain
  * table lookup cannot do this: the stored sentence carries its values inline
