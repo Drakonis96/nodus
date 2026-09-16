@@ -170,10 +170,12 @@ Two details keep the switch from being destructive:
   preserve the vault's stored palette, because the values on screen come from the
   shared store and writing those back would erase it.
 
-A vault that predates this scope keeps the palette only in the shared file.
-`getSettings` adopts it into that vault the first time, so making per-vault the
-default never resets a theme somebody already chose. A vault with no settings
-row yet is new, and is left on the default palette.
+A vault shows a palette because it was chosen there, never because the profile
+store happens to hold one: with sharing off, a vault that has no palette of its
+own keeps the default one, even when the shared store still carries a palette
+from a spell of sharing. Turning sharing on therefore applies the shared palette
+to every vault, and turning it off returns each vault to what it had — the
+default for a vault that never had its own.
 
 Server Web has a single space rather than vaults, so it has no switch: the
 portable profile carries the palette in use, and a palette that arrives from the

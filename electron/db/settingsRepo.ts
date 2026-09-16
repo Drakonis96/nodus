@@ -13,7 +13,7 @@ import { lockedApiKeyProviders, providerKeyMap } from '../secrets/secretStore';
 import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
 import { DEFAULT_NODUS_IMAGE_QUALITY, isNodusImageQuality } from '@shared/localImageModels';
 import { EMPTY_CUSTOM_EVENT_TYPES, sanitizeCustomEventTypes } from '@shared/eventTypes';
-import { sanitizeCustomThemes, coerceAppTheme } from '@shared/appThemes';
+import { sanitizeCustomThemes } from '@shared/appThemes';
 import { isPipelineLogMaxEntries, isPipelineLogRetention } from '@shared/pipelineLogs';
 import { normalizeToolkitToolPages } from '@shared/toolkitNavigation';
 import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
@@ -413,17 +413,9 @@ export function getSettings(): AppSettings {
   const globalPrefs = recoverV23SharedModelPrefs() as ReturnType<typeof readGlobalPrefs>;
   const seed: Record<string, unknown> = {};
   const sharesAppearance = sharesAppThemeAcrossVaults(globalPrefs as Record<string, unknown>);
-  // The palette is per vault by default, so a vault that already had settings but no
-  // palette of its own predates that scope — it kept the choice only in the shared
-  // file. Adopt it once, so making per-vault the default never resets a theme someone
-  // already chose. A vault with no settings row yet is brand new and starts on the
-  // default palette, which is what the per-vault scope promises for a new vault.
-  if (!sharesAppearance && raw && parsed.appTheme === undefined
-    && (globalPrefs.appTheme !== undefined || globalPrefs.customThemes !== undefined)) {
-    merged.appTheme = coerceAppTheme(globalPrefs.appTheme ?? merged.appTheme);
-    merged.customThemes = sanitizeCustomThemes(globalPrefs.customThemes ?? merged.customThemes);
-    writeRaw('app', JSON.stringify(merged));
-  }
+  // The palette is never inherited from the profile store: a vault shows a palette
+  // because it was chosen there. With sharing off, a vault that never stored one keeps
+  // the default, even when the profile still holds a palette from a spell of sharing.
   for (const key of sharedKeysFor(sharesAppearance)) {
     if (globalPrefs[key] === undefined) seed[key] = merged[key];
     else (merged as Record<string, unknown>)[key] = globalPrefs[key];
