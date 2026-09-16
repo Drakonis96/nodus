@@ -2,6 +2,60 @@
   "version": 1,
   "notices": [
     {
+      "id": "2026-09-local-models-nvidia-gpus",
+      "date": "2026-09-16",
+      "severity": "warning",
+      "url": "https://github.com/Drakonis96/nodus/issues/851",
+      "expiresAt": "2026-10-16",
+      "copy": {
+        "es": {
+          "title": "Modelos locales en equipos con NVIDIA: estamos investigando un problema",
+          "body": "El motor que Nodus instala para los modelos integrados se distribuye en Windows y Linux como una compilación para CPU, así que en un equipo con GPU NVIDIA esos modelos se calculan en el procesador: pueden tardar muchísimo o parecer colgados aunque la tarjeta sea potente y los controladores estén al día. Mientras lo solucionamos, si quieres aceleración por GPU, apunta Nodus a Ollama o LM Studio en Ajustes → Modelos IA; con los integrados, cuenta con velocidad de CPU.",
+          "linkLabel": "Seguir el informe en GitHub"
+        },
+        "en": {
+          "title": "Local models on NVIDIA machines: we are investigating an issue",
+          "body": "The engine Nodus installs for the integrated models ships on Windows and Linux as a CPU build, so on a machine with an NVIDIA GPU those models run on the processor: they can take a very long time or look frozen even with a capable card and up-to-date drivers. While we fix it, if you want GPU acceleration, point Nodus at Ollama or LM Studio in Settings → AI Models; with the integrated models, expect CPU speed.",
+          "linkLabel": "Follow the report on GitHub"
+        },
+        "fr": {
+          "title": "Modèles locaux sur les machines NVIDIA : nous enquêtons sur un problème",
+          "body": "Le moteur que Nodus installe pour les modèles intégrés est distribué sous Windows et Linux en version CPU : sur une machine dotée d’un GPU NVIDIA, ces modèles s’exécutent donc sur le processeur et peuvent être très lents ou sembler bloqués, même avec une carte performante et des pilotes à jour. En attendant la correction, pour profiter de l’accélération GPU, pointez Nodus vers Ollama ou LM Studio dans Réglages → Modèles IA ; avec les modèles intégrés, comptez la vitesse du processeur.",
+          "linkLabel": "Suivre le rapport sur GitHub"
+        },
+        "de": {
+          "title": "Lokale Modelle auf NVIDIA-Rechnern: Wir untersuchen ein Problem",
+          "body": "Die Engine, die Nodus für die integrierten Modelle installiert, wird für Windows und Linux als CPU-Build ausgeliefert. Auf einem Rechner mit NVIDIA-GPU laufen diese Modelle deshalb auf dem Prozessor: Sie können sehr lange brauchen oder eingefroren wirken, auch mit leistungsfähiger Karte und aktuellen Treibern. Bis das behoben ist, kann Nodus in Einstellungen → KI-Modelle auf Ollama oder LM Studio zeigen lassen; wer bei den integrierten Modellen bleibt, rechnet mit CPU-Tempo.",
+          "linkLabel": "Bericht auf GitHub verfolgen"
+        },
+        "pt": {
+          "title": "Modelos locais em equipamentos NVIDIA: estamos a investigar um problema",
+          "body": "O motor que o Nodus instala para os modelos integrados é distribuído no Windows e no Linux como uma compilação para CPU, por isso num equipamento com GPU NVIDIA esses modelos são calculados no processador: podem demorar muito ou parecer bloqueados, mesmo com uma placa potente e controladores atualizados. Até o resolvermos, se quiseres aceleração por GPU, aponta o Nodus para o Ollama ou o LM Studio em Definições → Modelos de IA; com os integrados, conta com a velocidade da CPU.",
+          "linkLabel": "Seguir o relatório no GitHub"
+        },
+        "pt-BR": {
+          "title": "Modelos locais em máquinas NVIDIA: estamos investigando um problema",
+          "body": "O motor que o Nodus instala para os modelos integrados é distribuído no Windows e no Linux como uma compilação para CPU, então em uma máquina com GPU NVIDIA esses modelos rodam no processador: podem demorar muito ou parecer travados, mesmo com uma placa potente e drivers atualizados. Enquanto resolvemos isso, se você quiser aceleração por GPU, aponte o Nodus para o Ollama ou o LM Studio em Configurações → Modelos de IA; com os integrados, conte com a velocidade da CPU.",
+          "linkLabel": "Acompanhar o relatório no GitHub"
+        },
+        "it": {
+          "title": "Modelli locali su macchine NVIDIA: stiamo indagando su un problema",
+          "body": "Il motore che Nodus installa per i modelli integrati è distribuito su Windows e Linux come build per CPU: su una macchina con GPU NVIDIA quei modelli girano quindi sul processore e possono richiedere moltissimo tempo o sembrare bloccati, anche con una scheda potente e driver aggiornati. Mentre lo risolviamo, se vuoi l’accelerazione GPU, punta Nodus su Ollama o LM Studio in Impostazioni → Modelli IA; con i modelli integrati, aspettati la velocità della CPU.",
+          "linkLabel": "Segui il rapporto su GitHub"
+        },
+        "tr": {
+          "title": "NVIDIA makinelerinde yerel modeller: bir sorunu araştırıyoruz",
+          "body": "Nodus’un yerleşik modeller için kurduğu motor, Windows ve Linux’ta CPU derlemesi olarak dağıtılıyor; bu yüzden NVIDIA GPU’lu bir makinede bu modeller işlemcide çalışır: güçlü bir kart ve güncel sürücülerle bile çok uzun sürebilir ya da donmuş görünebilir. Bunu çözene kadar GPU hızlandırması istiyorsanız Nodus’u Ayarlar → Yapay Zeka Modelleri bölümünden Ollama veya LM Studio’ya yönlendirin; yerleşik modellerle kalırsanız CPU hızını bekleyin.",
+          "linkLabel": "Raporu GitHub’da izle"
+        },
+        "zh-CN": {
+          "title": "NVIDIA 设备上的本地模型：我们正在调查一个问题",
+          "body": "Nodus 为内置模型安装的引擎在 Windows 和 Linux 上以 CPU 版本分发，因此在配备 NVIDIA GPU 的设备上，这些模型由处理器完成计算：即使显卡性能强劲、驱动也是最新的，它们也可能耗时极长或看起来卡住。在问题解决之前，如果你想要 GPU 加速，请在「设置 → AI 模型」中把 Nodus 指向 Ollama 或 LM Studio；如果继续使用内置模型，请以 CPU 的速度为准。",
+          "linkLabel": "在 GitHub 上关注报告"
+        }
+      }
+    },
+    {
       "id": "contribute-to-nodus",
       "date": "2026-09-13",
       "severity": "info",
