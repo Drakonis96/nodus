@@ -6,10 +6,12 @@ import {
   type NodusLocalAiStatus,
   type NodusLocalModelDefinition,
 } from '@shared/localAiModels';
-import { t } from '../i18n';
+import { pick, t } from '../i18n';
+import { LOCAL_AI_RUNTIME_TEXT } from '../i18n.localAiRuntime';
 import { ConfirmModal } from './ConfirmModal';
 import { SettingsModelList, settingsModelRowClass } from './SettingsModelList';
 import { Icon } from './ui';
+import { LocalAiRuntimePanel } from './LocalAiRuntimePanel';
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toLocaleString(undefined, { maximumFractionDigits: 1 })} GB`;
@@ -41,28 +43,41 @@ export function LocalAiModelsSettings({
     if (favorites.length !== settings.favorites.length) await patch({ favorites });
   };
 
-  const refresh = async () => {
+  const refresh = async (exposeModels = true) => {
     const nextStatus = await window.nodus.getNodusLocalAiStatus();
     setStatus(nextStatus);
-    await exposeDownloadedChatModels(nextStatus);
+    if (exposeModels) await exposeDownloadedChatModels(nextStatus);
   };
-  useEffect(() => { void refresh().catch((cause) => setError(cause instanceof Error ? cause.message : String(cause))); }, []);
+  useEffect(() => { void refresh().catch((cause) => setError(runtimeError(cause))); }, []);
 
   const activeTransfer = Boolean(status?.runtime.downloading || status?.models.some((model) => model.downloading));
   useEffect(() => {
-    if (!activeTransfer) return;
+    // Status is a cheap local snapshot: it does not download or probe a GPU.
+    // Keep observing startup/fallback even when no model download is in progress.
+    let polling = false;
     const timer = window.setInterval(() => {
-      void refresh().catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)));
-    }, 500);
+      if (polling) return;
+      polling = true;
+      // Do not re-add favorites removed by the user on every idle heartbeat.
+      void (activeTransfer ? refresh() : refresh(false))
+        .catch((cause) => setError(runtimeError(cause)))
+        .finally(() => { polling = false; });
+    }, 1000);
     return () => window.clearInterval(timer);
-  }, [activeTransfer]);
+  }, [activeTransfer, settings.favorites]);
 
   const installed = useMemo(() => new Map(status?.models.map((model) => [model.id, model]) ?? []), [status]);
+
+  const runtimeError = (cause: unknown) => {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    return message.includes('NODUS_LOCAL_RUNTIME_MACOS_INCOMPATIBLE')
+      ? pick(LOCAL_AI_RUNTIME_TEXT).incompatible : message;
+  };
 
   const installRuntime = async () => {
     setBusy('runtime'); setProgress(0); setError('');
     try { setStatus(await window.nodus.installNodusLocalRuntime(setProgress)); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    catch (cause) { setError(runtimeError(cause)); }
     finally { setBusy(''); }
   };
 
@@ -75,7 +90,7 @@ export function LocalAiModelsSettings({
       setStatus(nextStatus);
       await exposeDownloadedChatModels(nextStatus);
     }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    catch (cause) { setError(runtimeError(cause)); }
     finally { setBusy(''); }
   };
 
@@ -88,7 +103,7 @@ export function LocalAiModelsSettings({
       if (model.kind === 'chat') {
         await patch({ favorites: settings.favorites.filter((favorite) => !(favorite.provider === 'nodus' && favorite.model === model.id)) });
       }
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    } catch (cause) { setError(runtimeError(cause)); }
     finally { setBusy(''); }
   };
 
@@ -138,12 +153,7 @@ export function LocalAiModelsSettings({
         <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-200">{t('Modelos locales integrados')}</h4>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-neutral-500">{t('Los modelos no vienen incluidos. Nodus los descarga bajo demanda, los ejecuta en tu equipo y no envía el contenido a terceros.')}</p>
       </div>
-      <div className={`rounded-lg border px-3 py-2 text-xs ${status?.runtime.ready ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300' : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300'}`}>
-        <div>{status?.runtime.ready
-          ? `${t('Motor local listo')} · llama.cpp ${status.runtime.version}`
-          : <button className="inline-flex items-center gap-1" disabled={transferBusy} onClick={() => void installRuntime()}><Icon name={status?.runtime.downloading || busy === 'runtime' ? 'sync' : 'download'} className={status?.runtime.downloading || busy === 'runtime' ? 'animate-spin' : ''} size={12} />{status?.runtime.downloading || busy === 'runtime' ? t('Instalando motor…') : t('Instalar motor local')}</button>}</div>
-        <button className="mt-1 text-[10px] underline decoration-dotted underline-offset-2 opacity-80 hover:opacity-100" title={t('Abrir licencia de llama.cpp')} onClick={() => void window.nodus.openExternal('https://github.com/ggml-org/llama.cpp/blob/b10002/LICENSE')}>llama.cpp · MIT</button>
-      </div>
+      <LocalAiRuntimePanel status={status?.runtime} busy={transferBusy || Boolean(status?.activeLeases)} install={installRuntime} />
     </div>
 
     <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
