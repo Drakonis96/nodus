@@ -138,6 +138,14 @@ const CLOUDFLARE_RUNTIME_KEYS = [
   'El Worker devolvió una clave de recuperación inesperada; Nodus no guardará esta conexión.',
 ];
 
+// Why a writing-workshop candidate was retrieved. The sentence is written by the retrieval
+// pass in the main process (`electron/ai/writingWorkshop.ts`) and reaches the badge through
+// the renderer's `tr()`, so no `t()` call anywhere mentions it and a missing table entry
+// would silently show Spanish beside an English interface.
+const WORKSHOP_RUNTIME_KEYS = [
+  'Recuperado por similitud semántica con esta sección.',
+];
+
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
 function walk(dir) {
@@ -684,6 +692,17 @@ test('issue #12 runtime UI payloads have a translation in every language', () =>
     const missing = ISSUE_12_RUNTIME_KEYS.filter((key) => !table[key]?.trim());
     assert.deepEqual(missing, [], `${name} is missing issue #12 runtime UI translations`);
   }
+});
+
+test('the writing-workshop retrieval reasons are translated, not printed as written', () => {
+  for (const { name, table } of TRANSLATIONS) {
+    const missing = WORKSHOP_RUNTIME_KEYS.filter((key) => !table[key]?.trim());
+    assert.deepEqual(missing, [], `${name} is missing writing-workshop retrieval reasons`);
+  }
+  // The badge consults tr(), and the reason reaches the renderer in Spanish.
+  const view = fs.readFileSync(path.join(repoRoot, 'src/views/WritingWorkshopView.tsx'), 'utf8');
+  assert.match(view, /\{item\.reason && <Badge color="cyan">\{tr\(item\.reason\)\}<\/Badge>\}/,
+    'the candidate reason must pass through tr(), never render the stored sentence');
 });
 
 test('non-Spanish translations prefer English and preserve unknown dynamic values', () => {
