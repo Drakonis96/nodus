@@ -147,6 +147,13 @@ the palette it had. Your own custom themes follow the same scope. The light/dark
 mode is separate and is always shared, because it follows your display rather
 than the corpus.
 
+**Adding a vault** asks for its palette in the same step as its name and type.
+The row shows the palette the vault will start with and opens the full set of
+swatches; the sharing switch beside it starts on the value your profile already
+uses, so a shared palette keeps applying without having to remember the setting
+each time. Leaving both alone creates the vault on the default palette, or on the
+shared one when sharing is on.
+
 Your appearance choice is part of your local Nodus profile, and selecting a
 theme never sends vault content anywhere. If you use a portable profile with
 Nodus Server, the selected palette and your custom themes travel with it and are

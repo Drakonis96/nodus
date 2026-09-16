@@ -182,6 +182,14 @@ portable profile carries the palette in use, and a palette that arrives from the
 server is applied through the same rules — to the shared store when the switch is
 on, to the active vault when it is off.
 
+The new-vault modal offers the palette too, next to the name and type, through
+`ThemePalettePicker` — the same list and swatches Settings renders, so a palette
+added in one surface appears in both. The step stays collapsed to the current
+choice because the type grid above already fills the modal, and its switch starts
+on the profile's value: creating a vault must not ask the user to remember a
+setting they already made. The chosen palette is written once the new vault is
+active, which is what puts it on that vault instead of the one that was open.
+
 ## Contrast and semantic components
 
 Custom theme validation checks the important mode-specific combinations before
