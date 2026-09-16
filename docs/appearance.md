@@ -97,6 +97,51 @@ the correct palette can be painted before asynchronous profile settings load.
 If a stored custom definition is invalid or missing, Nodus safely uses the
 default palette instead of applying partial tokens.
 
+## Cascade and precedence
+
+Three layers cooperate, and their order is the design rather than an accident:
+
+1. **Per-shade utility mappings** — `runtime-utilities.css` repoints the
+   generated Tailwind utilities at theme variables, for example
+   `html.theme-active.dark .bg-neutral-900 { background-color: var(--n-900) }`.
+2. **The semantic pass** — the same file ends by redirecting the leftover
+   neutral shades to role tokens such as `--theme-text-dark-muted` or
+   `--theme-border-dark`, so a shade name keeps a meaning in every palette.
+3. **Component exceptions** — `theme-components.css` states what one specific
+   component should look like.
+
+`src/index.css` imports them in that order, and all three before
+`@tailwind utilities`, so when two of these rules have equal specificity the
+later one wins and the component layer outranks both utility layers. Two
+mistakes break that silently:
+
+- **Inflating a group's specificity.** Every layer uses single-class selectors.
+  Grouping a `:hover` variant inside `:is()` raises the whole group above the
+  component layer, because `:is()` adopts the specificity of its most specific
+  argument. Keep hover variants in their own rule so the plain-shade group stays
+  at `html.theme-active.<mode> :is(.utility)` and component rules keep winning.
+- **Deleting the default utility from the markup.** A component rule is an
+  override, not the only styling. Keep `bg-neutral-900 text-neutral-500` — or
+  whichever utility expresses the pre-theme appearance — on the element and let
+  the `theme-active` rule replace it. Removing that utility in favour of the
+  scoped class leaves the **default** palette, the one most users keep, with an
+  unstyled element.
+
+## What the utility remapping covers
+
+Only the `neutral` and `indigo` families are remapped, because those are the two
+the interface expresses its surfaces and its accent with. The remaining Tailwind
+families (`cyan`, `amber`, `rose`, `emerald`, …) keep their fixed values: they
+carry meaning rather than palette identity, so a status colour stays a status
+colour.
+
+The consequence is that a fixed colour can lose, on a tinted surface, the
+contrast it had on white. When one of those colours lands on a themed surface,
+check it against the palest and the most saturated `pale` anchor — `burnt-sun`
+is the strongest case, and its gold surface is what brings the muted amber and
+cyan labels closest to unreadable — and add a component rule in
+`theme-components.css` when the utility cannot hold the contrast.
+
 ## Contrast and semantic components
 
 Custom theme validation checks the important mode-specific combinations before
@@ -150,6 +195,23 @@ When adding UI that should follow a theme:
 Keep the default-theme path unchanged where possible. Theme-specific overrides
 should be scoped to `html.theme-active` so the existing default palette remains
 the baseline and high-contrast mode is not weakened.
+
+### Adding a built-in palette
+
+A built-in palette is registered in three places, and the suite keeps them
+honest:
+
+1. `src/theme/themes.mjs` — add the id, label and anchors to `THEME_DEFS`. Every
+   ramp is derived from those anchors; never hand-write a ramp.
+2. `shared/appThemes.mjs` — add the same id to `APP_THEME_IDS`. That module is
+   dependency-free on purpose: the Server build imports it without the renderer.
+3. `shared/types.ts` — add the id to the `AppTheme` union.
+
+`scripts/test-runtime-themes.mjs` asserts that `THEMES` holds exactly one entry
+fewer than `APP_THEME_IDS` — `default` is the extra id, and it keeps the
+pre-theme palette — so a palette registered in one place only fails the suite.
+`scripts/test-theme-contrast.mjs` then walks every registered palette's
+foreground/surface pairs.
 
 ## Current boundaries
 

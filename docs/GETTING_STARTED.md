@@ -87,24 +87,63 @@ section.
 
 ### Choose your appearance
 
-You can change the look of Nodus at any time from **Settings → Appearance**:
+Nodus keeps two choices separate that most applications bundle together: how
+light or dark the interface is, and which palette it uses. Both live in
+**Settings → Appearance** and you can change them at any time.
 
-- Choose **Light**, **Dark**, or **System** under **Colour mode**. **System**
-  follows your computer's current appearance and changes automatically when
-  the operating system changes.
-- Choose a **Colour theme** from the swatches. The theme changes the palette,
-  while the colour mode stays independent, so you can use the same theme in
-  either light or dark mode.
-- Select **Create theme** to make your own palette. Give it a name, choose the
-  colours for each mode, preview it, and save it when it looks right. Use full
-  six-digit hexadecimal colours such as `#6366f1` in the hex field inside the
-  colour picker. Click a labelled colour control to open the picker; it includes
-  a saturation/lightness palette, hue control, preview, and exact hex field.
+**Colour mode** decides the light/dark side:
+
+- **Light** and **Dark** are fixed choices.
+- **System** follows your computer's current appearance and changes
+  automatically when the operating system changes.
+
+**Colour theme** decides the palette family. Nodus ships with sixteen built-in
+palettes — from neutral greys through Amethyst Iris, Deep Ocean, Sage Stone and
+Pine Grove to Lagoon — plus **Default**, the original Nodus palette. Selecting a
+swatch applies it immediately.
+
+Because the two are independent, the same palette works in either mode: the
+palette supplies the surfaces and the accent colour, and the mode decides which
+variant of each is used. Change the mode and the palette stays selected.
+
+To build your own palette, select **Create theme** under the palette swatches:
+
+1. Give the theme a name.
+2. Set a colour for each role. **Accent** drives buttons, links, active states
+   and focus rings. **Pale surface** and **Deep surface** anchor the light and
+   dark neutral ramps. The two **text** colours are the foregrounds used in each
+   mode, and the two **app background** colours paint the outer canvas, the title
+   bar and the sidebar.
+3. Adjust **Surface tint** to let more or less of the accent bleed into the
+   neutral surfaces.
+4. Select **Save theme**.
+
+The editor previews your palette on the interface while you work, so you can
+judge it before saving. Clicking a labelled colour control opens a picker with a
+saturation/lightness palette, a hue slider, a preview and an exact six-digit
+hexadecimal field such as `#6366f1`. Incomplete values are rejected.
+
+Your themes sit alongside the built-in ones. Use the pencil to edit one and the
+cross to delete it; deleting the palette you are using returns the interface to
+**Default**, and selecting **Default** always brings back the original Nodus
+palette.
+
+Nodus refuses to save a theme whose text and surfaces are too close in contrast
+for comfortable reading and tells you so. If you see that message, separate the
+two colours involved — usually the text colour and the surface it sits on —
+until the editor accepts it.
 
 Appearance changes apply immediately and are remembered the next time you open
-Nodus. They affect the app background, sidebar, workspaces, buttons, icons,
-labels, and dialogs. If a custom theme makes a colour combination unreadable,
-the editor will not save it until the required contrast is met.
+Nodus. They cover the app background, sidebar, workspaces, cards, buttons,
+icons, labels, dialogs and the graph. Pages you open in **Nodus Browser** keep
+their own colours, because those belong to the website rather than to Nodus.
+
+Your appearance choice is part of your local Nodus profile, and selecting a
+theme never sends vault content anywhere. If you use a portable profile with
+Nodus Server, the selected palette and your custom themes travel with it and are
+available in Server Web as well. [docs/appearance.md](appearance.md) documents
+every theme value, the contrast rules the editor enforces and how the palettes
+are derived.
 
 ---
 
