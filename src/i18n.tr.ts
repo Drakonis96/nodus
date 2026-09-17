@@ -8528,4 +8528,6 @@ export const TR: Record<string, string> = {
   "Nodus Server · experimental": "Nodus Sunucusu · deneysel",
   "Zotero es una marca registrada de Corporation for Digital Scholarship. Nodus es independiente y no está respaldado por Zotero.": "Zotero, Corporation for Digital Scholarship'in tescilli markasıdır. Nodus bağımsızdır ve Zotero tarafından onaylanmamıştır.",
   "Error del sombreador": "Gölgelendirici hatası",
+  "Ask the model to fix the failed steps": "Modelden başarısız adımları düzeltmesini isteyin",
+  "Sent": "Gönderildi",
 };
