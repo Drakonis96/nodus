@@ -4,12 +4,12 @@
   "windows": 660,
   "total": 1810,
   "installers": {
-    "macosArm64": 353,
-    "macosIntel": 14,
+    "macosArm64": 784,
+    "macosIntel": 16,
     "windows": 660,
     "linuxDeb": 106,
     "linuxRpm": 0,
     "linuxAppImage": 244
   },
-  "updatedAt": "2026-09-17T09:16:05.655Z"
+  "updatedAt": "2026-09-17T09:28:27.454Z"
 }

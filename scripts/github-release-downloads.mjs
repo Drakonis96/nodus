@@ -19,17 +19,18 @@ export function classifyReleaseAsset(name) {
   return null;
 }
 
-// The README download table counts one installer per row, so its counters need
-// the file each row links, not the operating system it belongs to. The platform
-// totals above stay as they are: a macOS update arrives as a .zip the table never
-// links, which is why the row counters can add up to less than `total`.
+// The README download table counts one row per package it offers, and the six
+// counters add up to `total`. A macOS build arrives twice, as the DMG the row
+// links and as the .zip electron-updater fetches by itself, so both count in the
+// row of that build: the Linux AppImage and the Windows installer are installer
+// and update payload at once and never needed the split.
 export const INSTALLER_KEYS = ['macosArm64', 'macosIntel', 'windows', 'linuxDeb', 'linuxRpm', 'linuxAppImage'];
 
 function hasArchToken(lower, token) {
   return new RegExp(`(?:^|[-_.])${token}(?:[-_.]|$)`).test(lower);
 }
 
-/** Which row of the README download table this asset is the download of. */
+/** Which row of the README download table this asset belongs to. */
 export function classifyInstallerAsset(name) {
   if (typeof name !== 'string') return null;
   const lower = name.toLowerCase();
@@ -39,8 +40,8 @@ export function classifyInstallerAsset(name) {
   if (lower.endsWith('.rpm')) return 'linuxRpm';
   if (lower.endsWith('.appimage')) return 'linuxAppImage';
   if (lower.endsWith('.exe')) return 'windows';
-  if (!lower.endsWith('.dmg')) return null;
-  // Every macOS installer published so far names its architecture, including the
+  if (!lower.endsWith('.dmg') && !lower.endsWith('.zip')) return null;
+  // Every macOS package published so far names its architecture, including the
   // version-prefixed ones ("Nodus-2.4.0-arm64.dmg") that a prefix match would miss.
   if (hasArchToken(lower, 'x64') || hasArchToken(lower, 'intel')) return 'macosIntel';
   if (hasArchToken(lower, 'arm64') || hasArchToken(lower, 'aarch64')) return 'macosArm64';
