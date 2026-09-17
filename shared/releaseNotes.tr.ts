@@ -2,6 +2,7 @@ import { RELEASE_5_4_0_ADDITIONS } from './releaseNotes540';
 import { RELEASE_5_4_2_HIGHLIGHTS } from './releaseNotes542';
 import { RELEASE_5_4_3_HIGHLIGHTS } from './releaseNotes543';
 import { RELEASE_5_4_4_HIGHLIGHTS } from './releaseNotes544';
+import { RELEASE_5_5_0_HIGHLIGHTS } from './releaseNotes550';
 import { RELEASE_5_4_5_HIGHLIGHTS } from './releaseNotes545';
 const RELEASE_3_0_4_TR: string[] = [
   "Bir MCP istemcisi Deep Research raporlarını sıraya alabiliyor. Şimdiye dek rapor isteyen istemci, çağrıyı üretimin tamamı boyunca açık tutmak zorundaydı — her şeyin zaman aşımına uğrayabileceği birkaç dakika — ve uygulamadan sizin başlattığınız bir raporla çakışabiliyordu. Artık raporu sıraya alıp istediği zaman durumunu soruyor: Nodus'un pencereyle paylaştığı tek bir üretim şeridi var, yani asla iki rapor aynı anda çalışmıyor; kuyruk şeridi bir istemciden gelenleri MCP rozetiyle işaretliyor ve Nodi biri bittiğinde ya da başarısız olduğunda sizi uyarıyor, çünkü onu isteyen taraf çoktan bağlantısını kesmiş olabilir. Her iş, sıraya alındığı kasaya bağlı kalıyor ve kasa değiştirmek başka bir kasayı bekleyen ne varsa iptal ediyor.",
@@ -111,6 +112,7 @@ const RELEASE_5_1_0_TR = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.5.0": RELEASE_5_5_0_HIGHLIGHTS.map(highlight => highlight.tr),
   "5.4.5": RELEASE_5_4_5_HIGHLIGHTS.map(highlight => highlight.tr),
   "5.4.4": RELEASE_5_4_4_HIGHLIGHTS.map(highlight => highlight.tr),
   "5.4.3": RELEASE_5_4_3_HIGHLIGHTS.map(highlight => highlight.tr),

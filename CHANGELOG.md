@@ -13,6 +13,13 @@ Integrated local models run on the GPU on Windows and Linux instead of the CPU-o
 - When a structured reply is rejected, the log says why: the idea being fused, how many candidates it was judged against and the exact failure (truncated, invalid JSON, schema miss), with a bounded preview of the reply itself.
 - Granite 4.0 Micro is no longer offered for extraction or fusion. Validated end to end on Windows with an RTX 3060 Ti over six arXiv papers, it extracted ideas correctly but violated the fusion decision contract on every large work — a prose explanation where the contract requires `explicit`/`inferred`, and edge types in place of a resolution — which deterministically failed whole works even after their extraction had succeeded. It stays available for conversation, summaries and document profiles. Gemma 4 E2B remained the only local model that completed all six works.
 
+Nodus Research Connector speaks thirteen languages and every message it composes comes from the catalog of the language in use.
+
+- Nodus Research Connector ships the nine interface languages plus Japanese, Korean, Russian and Traditional Chinese, which the extension gains ahead of the desktop interface. The popup, the settings page, the privacy page it opens and the document-type list you review before saving stop being English only, and the privacy page is localized for the first time instead of existing in English alone.
+- Every message the extension writes by itself is translated as well. The 64 MiB transfer notice, a failed download, the sign-in page a publisher returns instead of the PDF, the errors the Manifest V3 worker reports back into the popup and the labels the detector saves when a page brings none now come from the catalog of the language in use, so the Spanish connector stops mixing English into its own interface.
+- The document-type table moves into the shared presentation module with all thirteen languages. Nodus Browser's built-in connector dialog renders the reviewed type in the language you work in, and a legal hearing stops being translated as an audience.
+
+
 ## 5.4.5 — 2026-09-15
 
 Nodus 5.4.5 gives the Library bulk removal and bulk repair, makes the Documentary
