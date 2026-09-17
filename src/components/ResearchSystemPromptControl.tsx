@@ -19,7 +19,7 @@ export function ResearchSystemPromptControl({ prompts, selectedId, disabled, onS
       <Icon name="edit" size={14} /><span className="research-system-prompt-name">{selected?.name ?? 'Default'}</span><Icon name="chevronDown" size={13} />
     </button>
     {open && <PromptDialog prompts={prompts} selectedId={selectedId} refresh={refresh} onSelect={onSelect}
-      accent={trigger.current ? getComputedStyle(trigger.current).getPropertyValue('--vault-accent') : ''}
+      accent={trigger.current ? getComputedStyle(trigger.current).getPropertyValue('--vault-accent').trim() || 'var(--a-500)' : 'var(--a-500)'}
       onClose={() => { setOpen(false); requestAnimationFrame(() => trigger.current?.focus()); }} />}
   </>;
 }

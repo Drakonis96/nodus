@@ -20,7 +20,7 @@ export function ResearchSourceFilterControl({ value, disabled, onChange }: {
       <Icon name="filter" size={15} /><span>{t('Fuentes')}</span>
       {filter.enabled && <span className="research-source-filter-count">{count}</span>}
     </button>
-    {open && <SourceFilterDialog value={filter} accent={trigger.current ? getComputedStyle(trigger.current).getPropertyValue('--vault-accent') : ''}
+    {open && <SourceFilterDialog value={filter} accent={trigger.current ? getComputedStyle(trigger.current).getPropertyValue('--vault-accent').trim() || 'var(--a-500)' : 'var(--a-500)'}
       onClose={close} onApply={async next => { await onChange(next); close(); }} />}
   </>;
 }

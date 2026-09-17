@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -275,7 +275,7 @@ test('the hub cards share one shape and omit development labels', async () => {
   // One ToolCard component renders every card, so they cannot drift apart.
   assert.equal((view.match(/<ToolCard\b/g) ?? []).length, 1, 'a single ToolCard renders the whole catalogue');
   assert.match(view, /grid gap-4 sm:grid-cols-2/, 'the cards use a two-column grid when space permits');
-  assert.match(view, /className=\{`flex h-full w-full flex-col/, 'each card fills its grid cell');
+  assert.match(view, /className=\{`toolkit-card flex h-full w-full flex-col/, 'each card fills its grid cell');
   assert.match(view, /h-12 w-12 shrink-0 items-center justify-center/, 'the card icon sits in a fixed centred tile');
   assert.doesNotMatch(view, /t\('En desarrollo'\)/, 'available apps do not show a development label');
   assert.match(view, /disabled && \(/, 'only unavailable tools render a status label');
@@ -299,7 +299,7 @@ test('a tool page returns to the hub and keeps the shared hero action row unifor
   assert.match(view, /onBack=\{\(\) => onNavigate\('home'\)\}/, 'the hub passes a back handler to the tool');
   // Header actions are icon-only buttons of one height; the toolkit must not be
   // the odd one out.
-  assert.match(app, /icon="tools"\n\s+label=\{t\('Herramientas'\)\}/, 'the header exposes the toolkit');
+  assert.match(app, /<HeaderAction[\s\S]*?icon="tools"[\s\S]*?label=\{t\('Herramientas'\)\}/, 'the header exposes the toolkit');
   assert.match(app, /title=\{t\('Abrir Nodus Toolkit'\)\}/);
   assert.match(
     app,

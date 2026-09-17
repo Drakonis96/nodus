@@ -37,8 +37,10 @@ COPY server/lib ./lib
 COPY electron/db ./electron/db
 COPY shared ./shared
 # Server's per-user preference store and routes deliberately reuse the same portable
-# contract as Desktop. Their relative imports resolve to /shared in the runtime image.
+# contract as Desktop. Keep the preference module and its theme-validation dependency
+# together because their relative imports resolve from /shared in the runtime image.
 COPY shared/serverProfilePreferences.mjs /shared/serverProfilePreferences.mjs
+COPY shared/appThemes.mjs /shared/appThemes.mjs
 COPY LICENSE SOURCE_CODE.md THIRD_PARTY_NOTICES.md ./
 COPY --from=web-build /src/server/dist/web ./dist/web
 

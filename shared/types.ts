@@ -1571,6 +1571,44 @@ export interface DecorativeImageActionRequest {
 export type SyncMode = 'realtime' | 'manual';
 /** 'system' follows the OS light/dark preference and reacts to changes at runtime. */
 export type ThemeMode = 'dark' | 'light' | 'system';
+/** Colour theme (palette family). Orthogonal to {@link ThemeMode}: every theme has a
+ *  light and a dark mode. `default` is the built-in indigo/neutral palette; the rest are
+ *  curated FreeColorPalettes palettes. Keep the built-in IDs in sync with `APP_THEME_IDS` in
+ *  shared/appThemes.mjs. */
+export type AppTheme =
+  | 'default'
+  | 'amethyst-iris'
+  | 'deep-ocean'
+  | 'plum-lilac'
+  | 'sage-stone'
+  | 'azure-night'
+  | 'slate-gray'
+  | 'mint-slate'
+  | 'amber-ember'
+  | 'berry-wine'
+  | 'burnt-sun'
+  | 'rose-quartz'
+  | 'pine-grove'
+  | 'golden-hour'
+  | 'plum-noir'
+  | 'sea-glass'
+  | 'lagoon'
+  | (string & {});
+/** User-created palette definition. The runtime derives the full ramps from these anchors. */
+export interface CustomAppTheme {
+  id: string;
+  label: string;
+  accent: string;
+  deep: string;
+  pale: string;
+  /** Persistent application chrome/background, with one value per colour mode. */
+  appBackground: { light: string; dark: string };
+  /** Foreground used when the UI is in light mode. */
+  lightText: string;
+  /** Foreground used when the UI is in dark mode. */
+  darkText: string;
+  tint: number;
+}
 export type DeepContextMode = 'standard' | 'long';
 /** Languages Nodus can speak. `uiLanguage` localizes the interface; `promptLanguage`
  *  is injected into the AI prompts and so determines the language of generated content
@@ -1976,6 +2014,18 @@ export interface AppSettings {
   zoteroStoragePath: string;
   monitoredCollections: string[]; // collection keys
   theme: ThemeMode;
+  /** Colour palette. Light/dark is still governed by {@link AppSettings.theme}. */
+  appTheme: AppTheme;
+  /** User-created palettes, persisted with the profile and kept separate from built-ins. */
+  customThemes: CustomAppTheme[];
+  /**
+   * Whether {@link AppSettings.appTheme} and {@link AppSettings.customThemes} are one
+   * profile-wide choice or a per-vault one. Off by default: every vault keeps its own
+   * palette, and a vault created later starts on the default one. Light/dark mode is
+   * unaffected — it stays shared either way, because it tracks the display rather than
+   * the corpus.
+   */
+  shareAppThemeAcrossVaults: boolean;
   // Interface language (localizes all UI text).
   uiLanguage: AppLanguage;
   // Language injected into AI prompts → language of generated ideas/themes/answers.

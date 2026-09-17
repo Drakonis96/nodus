@@ -267,7 +267,6 @@ export default defineConfig({
       'graphology',
       'graphology-layout-forceatlas2',
       'graphology-layout-forceatlas2/worker',
-      'graphology-communities-louvain',
       'events',
     ],
   },

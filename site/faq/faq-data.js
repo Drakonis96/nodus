@@ -133,5 +133,11 @@ window.FAQ_ENTRIES = [
     "cat": "features",
     "q": "What does Teaching mode cover?",
     "a": "<p>Teaching mode covers academic years, courses, subjects, groups, timetables, calendars, materials, recordings and question banks. You can build weighted analytic rubrics, compose printable exams, publish an assessment plan, and manage grades while keeping <strong>exempt</strong>, <strong>not assessed</strong> and <strong>not submitted</strong> distinct from a numeric zero.</p><p>AI can generate teaching materials, questions and rubric structures, but Nodus never sends rosters, grades or student answers to a model, and never uses AI to grade, profile or evaluate students. That boundary is a design rule, not a setting you can switch off.</p>"
+  },
+  {
+    "id": "appearance",
+    "cat": "features",
+    "q": "Can I change how Nodus looks?",
+    "a": "<p>Yes, from <strong>Settings → Appearance</strong>, which keeps two choices separate. <strong>Colour mode</strong> sets Light, Dark or System, where System follows your operating system. <strong>Colour theme</strong> selects the palette: sixteen built-in ones plus the original <strong>Default</strong>. The palette stays selected when you switch mode, so the same one works in light and dark.</p><p><strong>Create theme</strong> opens an editor for the accent colour, the pale and deep surfaces, the text colour of each mode and the outer app background, with a tint control for how much accent bleeds into the surfaces. It previews the palette on the interface as you work and refuses to save a combination whose text and surfaces are too close in contrast. Your themes sit beside the built-in ones and can be edited or deleted; removing the one in use returns the interface to Default.</p><p>Appearance applies immediately, is stored in your local profile, and never sends vault content anywhere. With a portable profile the selected palette and your custom themes travel to Nodus Server Web as well.</p>"
   }
 ];

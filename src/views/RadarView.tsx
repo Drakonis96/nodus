@@ -878,7 +878,7 @@ function SourcesTab({ sources }: { sources: RadarSourceStatus[] }) {
           <SourceCard key={source.name} source={source} />
         ))}
       </div>
-      <div className="mt-4 flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 text-indigo-900 dark:border-indigo-900 dark:bg-indigo-500/5 dark:text-indigo-200">
+      <div className="radar-source-note mt-4 flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 text-indigo-900 dark:border-indigo-900 dark:bg-indigo-500/5 dark:text-indigo-200">
         <span className="mt-0.5">
           <Icon name="shield" size={15} />
         </span>

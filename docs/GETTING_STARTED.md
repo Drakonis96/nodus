@@ -85,6 +85,82 @@ When the wizard finishes you land in your **Library** with every monitored work
 listed — but "unscanned." That's expected, and it's the subject of the next
 section.
 
+### Choose your appearance
+
+Nodus keeps two choices separate that most applications bundle together: how
+light or dark the interface is, and which palette it uses. Both live in
+**Settings → Appearance** and you can change them at any time.
+
+**Colour mode** decides the light/dark side:
+
+- **Light** and **Dark** are fixed choices.
+- **System** follows your computer's current appearance and changes
+  automatically when the operating system changes.
+
+**Colour theme** decides the palette family. Nodus ships with sixteen built-in
+palettes — from neutral greys through Amethyst Iris, Deep Ocean, Sage Stone and
+Pine Grove to Lagoon — plus **Default**, the original Nodus palette. Selecting a
+swatch applies it immediately.
+
+Because the two are independent, the same palette works in either mode: the
+palette supplies the surfaces and the accent colour, and the mode decides which
+variant of each is used. Change the mode and the palette stays selected.
+
+To build your own palette, select **Create theme** under the palette swatches:
+
+1. Give the theme a name.
+2. Set a colour for each role. **Accent** drives buttons, links, active states
+   and focus rings. **Pale surface** and **Deep surface** anchor the light and
+   dark neutral ramps. The two **text** colours are the foregrounds used in each
+   mode, and the two **app background** colours paint the outer canvas, the title
+   bar and the sidebar.
+3. Adjust **Surface tint** to let more or less of the accent bleed into the
+   neutral surfaces.
+4. Select **Save theme**.
+
+The editor previews your palette on the interface while you work, so you can
+judge it before saving. Clicking a labelled colour control opens a picker with a
+saturation/lightness palette, a hue slider, a preview and an exact six-digit
+hexadecimal field such as `#6366f1`. Incomplete values are rejected.
+
+Your themes sit alongside the built-in ones. Use the pencil to edit one and the
+cross to delete it; deleting the palette you are using returns the interface to
+**Default**, and selecting **Default** always brings back the original Nodus
+palette.
+
+Nodus refuses to save a theme whose text and surfaces are too close in contrast
+for comfortable reading and tells you so. If you see that message, separate the
+two colours involved — usually the text colour and the surface it sits on —
+until the editor accepts it.
+
+Appearance changes apply immediately and are remembered the next time you open
+Nodus. They cover the app background, sidebar, workspaces, cards, buttons,
+icons, labels, dialogs and the graph. Pages you open in **Nodus Browser** keep
+their own colours, because those belong to the website rather than to Nodus.
+
+**Each vault keeps its own palette by default.** The palette you choose applies
+to the vault you are in, and a vault you create later starts on **Default**. If
+you would rather carry one palette everywhere, turn on **Use the same palette in
+every vault** just below the swatches: every vault then shares it, including the
+ones you create afterwards. Turning that setting off again returns each vault to
+the palette it had. Your own custom themes follow the same scope. The light/dark
+mode is separate and is always shared, because it follows your display rather
+than the corpus.
+
+**Adding a vault** asks for its palette in the same step as its name and type.
+The row shows the palette the vault will start with and opens the full set of
+swatches; the sharing switch beside it starts on the value your profile already
+uses, so a shared palette keeps applying without having to remember the setting
+each time. Leaving both alone creates the vault on the default palette, or on the
+shared one when sharing is on.
+
+Your appearance choice is part of your local Nodus profile, and selecting a
+theme never sends vault content anywhere. If you use a portable profile with
+Nodus Server, the selected palette and your custom themes travel with it and are
+available in Server Web as well. [docs/appearance.md](appearance.md) documents
+every theme value, the contrast rules the editor enforces and how the palettes
+are derived.
+
 ---
 
 ## 4. The core loop: scan → explore → produce
@@ -218,7 +294,8 @@ what each one is for:
 | **Workspace** | Keep notes, ideas and collections together in a Markdown workspace with live, clickable `nodus://` citations. |
 
 Pinned outside the groups: **Home** (corpus status and next steps) and
-**Settings** (providers, models, library automation, integrations, data, backups).
+**Settings** (appearance, providers, models, library automation, integrations,
+data, backups).
 
 ---
 

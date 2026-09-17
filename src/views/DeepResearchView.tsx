@@ -923,7 +923,7 @@ export function DeepResearchView({
 
   if (mode === 'reader' && openDraft) {
     return (
-      <div className="h-full flex flex-col min-h-0">
+      <div className="theme-workspace-surface h-full flex flex-col min-h-0">
         {workspaceTabs}
         {/* Full screen is the same reader lifted out of the shell: a fixed layer over
             the window, so the report and its own toolbar are all that is left on
@@ -996,7 +996,7 @@ export function DeepResearchView({
   }
 
   return (
-    <div className="h-full flex flex-col min-h-0">
+    <div className="theme-workspace-surface h-full flex flex-col min-h-0">
       {workspaceTabs}
       <SectionHeader
         icon="telescope"
@@ -2485,8 +2485,9 @@ export function ComposerModal({
           <DocumentSkillsControl value={documentSkills.policy} onChange={documentSkills.setPolicy} onValidityChange={documentSkills.setValid} />
           <div className="flex flex-wrap items-center gap-2">
             <button
-              className={`rounded-full border px-2.5 py-1 text-xs ${includeImage ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200' : 'border-neutral-700 text-neutral-500'}`}
+              className={`theme-toggle-button rounded-full border px-2.5 py-1 text-xs ${includeImage ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200' : 'border-neutral-700 text-neutral-500'}`}
               onClick={() => onIncludeImage(!includeImage)}
+              aria-pressed={includeImage}
               title={t('La imagen se genera una sola vez después de guardar el informe')}
             >
               <Icon name={includeImage ? 'check' : 'minus'} size={11} className="mr-1" /> {t('Imagen decorativa')}

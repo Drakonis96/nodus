@@ -22,14 +22,20 @@ export const surfaceLabel = (surface: ChatSkillSurface) => surface === 'nodi' ? 
  */
 export function useSkillLibrary() {
   const [skills, setSkills] = useState<ChatSkill[]>([]);
-  const [accent, setAccent] = useState(vaultTypeColor('academic'));
+  const [vaultAccent, setVaultAccent] = useState(vaultTypeColor('academic'));
+  const [runtimeThemeActive, setRuntimeThemeActive] = useState(() =>
+    typeof document !== 'undefined' && document.documentElement.classList.contains('theme-active'),
+  );
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let alive = true;
-    void window.nodus.getActiveVault().then(vault => { if (alive) setAccent(vaultTypeColor(vault?.type)); }).catch(() => {});
-    const off = window.nodus.onVaultChanged(vault => setAccent(vaultTypeColor(vault?.type)));
-    return () => { alive = false; off(); };
+    void window.nodus.getActiveVault().then(vault => { if (alive) setVaultAccent(vaultTypeColor(vault?.type)); }).catch(() => {});
+    const off = window.nodus.onVaultChanged(vault => setVaultAccent(vaultTypeColor(vault?.type)));
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => setRuntimeThemeActive(root.classList.contains('theme-active')));
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+    return () => { alive = false; off(); observer.disconnect(); };
   }, []);
   useEffect(() => {
     const refresh = () => { void window.nodus.listChatSkills().then(setSkills).catch(e => setError(String(e))); };
@@ -42,6 +48,10 @@ export function useSkillLibrary() {
     try { setSkills(await action()); return true; } catch (e) { setError(e instanceof Error ? e.message : String(e)); return false; }
     finally { setBusy(false); }
   };
+  // Custom themes expose a mode-aware accent ramp through --a-500. Returning the
+  // variable instead of a vault-type colour keeps portalled skills menus in sync
+  // with both the active theme and its light/dark mode.
+  const accent = runtimeThemeActive ? 'var(--a-500)' : vaultAccent;
   return { skills, setSkills, accent, error, setError, busy, mutate };
 }
 
