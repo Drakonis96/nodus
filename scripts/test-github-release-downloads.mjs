@@ -57,14 +57,31 @@ test('recognises the version-prefixed installers older releases published', () =
   assert.equal(classifyInstallerAsset('Nodus-Setup-0.1.0.exe'), 'windows');
 });
 
-test('an update payload is not an installer the table offers', () => {
-  // electron-updater fetches these itself; nobody downloads them from the table.
-  assert.equal(classifyInstallerAsset('Nodus-mac-arm64.zip'), null);
+test('the macOS update archive counts in the row of the build it updates', () => {
+  // electron-updater fetches these itself. macOS is the only platform that
+  // publishes the update apart from the installer (the Windows .exe and the Linux
+  // AppImage are both at once), and a row counts what delivers its build.
+  assert.equal(classifyInstallerAsset('Nodus-mac-arm64.zip'), 'macosArm64');
+  assert.equal(classifyInstallerAsset('Nodus-mac-x64.zip'), 'macosIntel');
+  assert.equal(classifyInstallerAsset('Nodus-2.4.0-mac-arm64.zip'), 'macosArm64');
+});
+
+test('the files that are not a download of any build count in no row', () => {
   assert.equal(classifyInstallerAsset('nodus-zotero.xpi'), null);
   assert.equal(classifyInstallerAsset('checksums.txt'), null);
   assert.equal(classifyInstallerAsset('latest-mac.yml'), null);
+  assert.equal(classifyInstallerAsset('updates.json'), null);
   assert.equal(classifyInstallerAsset('Nodus-win-x64.exe.blockmap'), null);
-  assert.equal(classifyInstallerAsset('Nodus-mac-arm64.dmg'), 'macosArm64');
+  assert.equal(classifyInstallerAsset('Nodus-mac-arm64.zip.blockmap'), null);
+});
+
+test('a macOS package that does not name an architecture names no row', () => {
+  // Every package the project has published names one, which is what makes the
+  // six counters add up to `total`. Pinned so the day one does not, this test
+  // fails instead of the README quietly losing the difference.
+  assert.equal(classifyInstallerAsset('Nodus-macos.zip'), null);
+  assert.equal(classifyInstallerAsset('Nodus.dmg'), null);
+  assert.equal(classifyReleaseAsset('Nodus.dmg'), 'macos');
 });
 
 test('sums several releases, skips drafts and keeps the platform breakdown', () => {
@@ -95,16 +112,42 @@ test('sums several releases, skips drafts and keeps the platform breakdown', () 
     total: 150,
     installers: {
       macosArm64: 30,
-      macosIntel: 0,
+      macosIntel: 40,
       windows: 50,
       linuxDeb: 10,
       linuxRpm: 0,
       linuxAppImage: 20,
     },
   });
-  // The macOS update archive counts towards the platform, not towards a row.
-  assert.equal(counts.installers.macosArm64, 30);
-  assert.equal(counts.macos, 70);
+  assert.equal(counts.macos, counts.installers.macosArm64 + counts.installers.macosIntel);
+});
+
+test('the row counters add up to the total', () => {
+  // The property the README table leans on: a reader can add the column and land
+  // on the badge in the header. Only the macOS update archives needed counting to
+  // make it true, since every other package is both the installer and the update.
+  const counts = sumReleaseDownloads([
+    {
+      draft: false,
+      assets: [
+        { name: 'Nodus-mac-arm64.dmg', download_count: 353 },
+        { name: 'Nodus-mac-arm64.zip', download_count: 431 },
+        { name: 'Nodus-mac-x64.dmg', download_count: 14 },
+        { name: 'Nodus-mac-x64.zip', download_count: 2 },
+        { name: 'Nodus-win-x64.exe', download_count: 660 },
+        { name: 'Nodus-linux-amd64.deb', download_count: 106 },
+        { name: 'Nodus-linux-x86_64.AppImage', download_count: 244 },
+        // Ignored by both: metadata, updater manifests and the plugin.
+        { name: 'Nodus-mac-arm64.zip.blockmap', download_count: 248 },
+        { name: 'latest-mac.yml', download_count: 4605 },
+        { name: 'nodus-zotero.xpi', download_count: 790 },
+      ],
+    },
+  ]);
+
+  const rows = Object.values(counts.installers).reduce((sum, count) => sum + count, 0);
+  assert.equal(rows, counts.total);
+  assert.equal(rows, 1810);
 });
 
 test('accepts releases without assets', () => {
