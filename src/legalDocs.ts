@@ -302,6 +302,36 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
     ],
     canonicalLabel: '在GitHub上阅读完整隐私政策',
   },
+  'zh-TW': {
+    title: '隱私與資料控制',
+    intro:
+      'Nodus主要在裝置上執行：無需賬戶，不包含廣告、遙測或遠端分析，也不執行接收你資料庫內容的自有後端。',
+    sections: [
+      {
+        heading: '哪些內容留在你的裝置上',
+        bullets: [
+          '資料庫、檔案、錄音、轉錄、筆記、檔案和結果都儲存在你的裝置上。',
+          '選擇檔案或開始錄音絕不會將其釋出或上傳到Nodus。',
+        ],
+      },
+      {
+        heading: '資料何時離開裝置',
+        bullets: [
+          '只有你明確啟用的可選功能才會聯絡第三方：你選擇的雲端AI提供商、Zotero、Unpaywall、GitHub（檢查更新）或Hugging Face（下載模型）。',
+          '如果你通過OpenAI Secure MCP Tunnel連線ChatGPT，OpenAI會接收工具請求和結果；Nodus伺服器仍限於此裝置。',
+          '如果你連線可選的自託管Nodus Server，會通過HTTPS釋出一份過濾後的資料庫副本；其中不包含PDF、憑證、路徑、嵌入、學生名單或成績。',
+          '每項外部服務在使用前都會被標識。',
+        ],
+      },
+      {
+        heading: '學生與教學資料',
+        bullets: [
+          'AI絕不會接收學生名單、筆記或回答，也無法對學生評分、畫像或評估。',
+        ],
+      },
+    ],
+    canonicalLabel: '在GitHub上閱讀完整隱私政策',
+  },
 };
 
 const GDPR: Record<AppLanguage, LegalDocContent> = {
@@ -512,6 +542,29 @@ const GDPR: Record<AppLanguage, LegalDocContent> = {
     ],
     canonicalLabel: '在GitHub上打开GDPR部署清单',
   },
+  'zh-TW': {
+    title: 'Nodus如何支援GDPR合規',
+    intro:
+      '該設計採用資料最小化、預設隱私保護以及在錄音前即時提示。這有助於你遵守GDPR，但這並非認證：控制者決定法律依據、保留期限、訪問許可權和提供商。',
+    sections: [
+      {
+        heading: '設計即隱私',
+        bullets: [
+          '本地處理與可選的外部連線被清晰區分。',
+          '在錄音等敏感操作之前會立即顯示簡短提示。',
+        ],
+      },
+      {
+        heading: '仍由你負責的事項',
+        bullets: [
+          '記錄每專案的、法律依據、保留期限和接收方。',
+          '向相關人員提供完整的第13/14條告知。',
+          '為你的組織完成部署清單。',
+        ],
+      },
+    ],
+    canonicalLabel: '在GitHub上開啟GDPR部署清單',
+  },
 };
 
 const LICENSES: Record<AppLanguage, LegalDocContent> = {
@@ -703,6 +756,27 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
       },
     ],
     canonicalLabel: '在GitHub上查看第三方声明',
+  },
+  'zh-TW': {
+    title: '許可證與署名',
+    intro:
+      'Nodus僅以GNU AGPL v3釋出。相應原始碼和第三方宣告隨每個版本一同提供。',
+    sections: [
+      {
+        heading: '開源',
+        bullets: [
+          'Nodus的原始碼、歷史和法定文件公開且可供審計。',
+        ],
+      },
+      {
+        heading: '第三方宣告',
+        bullets: [
+          '每個打包應用都包含一個法律目錄，其中有AGPL許可證、原始碼提供說明、完整的依賴清單以及要求的上游宣告。',
+          '還包含重新構建或替換LGPL元件的說明。',
+        ],
+      },
+    ],
+    canonicalLabel: '在GitHub上檢視第三方宣告',
   },
 };
 

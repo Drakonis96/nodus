@@ -241,4 +241,33 @@ export const ACADEMIC_TOUR_TRANSLATIONS: Record<TourLanguage, Record<string, str
     'El menú agrupa funciones por intención: Explorar, Analizar, Escribir y Herramientas. Ábrelas cuando tu investigación las necesite; en Ajustes puedes ocultar o reordenar secciones. Tu primera misión es sencilla: añade una fuente, analízala y verifica una idea.':
       '菜单按用途对功能进行分组：探索、分析、写作和工具。当你的研究需要时再打开它们；在设置中可以隐藏或重新排列各区块。你的第一个任务很简单：添加一个来源，分析它，并核实一个观点。',
   },
+  'zh-TW': {
+    'Bienvenido a tu vault académico': '歡迎使用你的學術資料庫',
+    'Aunque veas muchas opciones, para empezar solo necesitas una ruta: Biblioteca → Ideas → Grafo. En un minuto harás ese recorrido; puedes saltarlo o repetirlo desde Ajustes cuando quieras.':
+      '儘管選項很多，但入門只需一條路徑：文獻庫 → 觀點 → 圖譜。這個一分鐘的引導會帶你走完這條路徑；你可以隨時跳過，或從設定中重新播放。',
+    'Empieza por una sola ruta': '從一條簡單的路徑開始',
+    'Este distintivo indica en qué vault estás. Cada vault separa un proyecto de los demás, para que sus fuentes, análisis y borradores no se mezclen. Úsalo solo cuando quieras cambiar de proyecto o crear otro.':
+      '此標識顯示你當前所在的資料庫。每個資料庫都將一個專案與其他專案隔離，使其來源、分析和草稿不會混淆。僅在想切換專案或建立新專案時才使用它。',
+    'Biblioteca: dos ámbitos, una decisión': '文獻庫：兩種範圍，一個選擇',
+    'Global guarda las fuentes disponibles para todos tus proyectos; «Este vault» muestra solo las que participan aquí. Puedes añadir archivos, DOI, ISBN o referencias manuales, o sincronizar Zotero. No necesitas configurar todas las opciones para comenzar.':
+      '「全域性」儲存所有專案可用的來源；「此資料庫」僅顯示在此處使用的來源。你可以新增檔案、DOI、ISBN或手動引用，也可以同步Zotero。開始前無需配置所有選項。',
+    'Analiza solo lo que necesites': '只分析你需要的內容',
+    'Añade una fuente al vault y cambia a «Este vault». Allí selecciona una o varias obras y pulsa «Analizar». Nodus extraerá temas, ideas, evidencia y relaciones. Empieza con una sola fuente: siempre podrás analizar más después.':
+      '向資料庫新增一個來源並切換到「此資料庫」。在其中選擇一篇或多篇文獻，然後點選「分析」。Nodus將提取主題、觀點、證據和關係。先從單個來源開始：之後隨時可以分析更多。',
+    'La cola te cuenta qué ocurre': '佇列會告訴你正在發生什麼',
+    'La barra inferior muestra el progreso de los análisis. Puedes seguir usando Nodus mientras trabaja. Si falta un modelo o una clave de IA, la tarea se pausa y te indica qué revisar en Ajustes; no tienes que adivinar qué falló.':
+      '底部欄顯示分析進度。Nodus工作時你可以繼續使用。如果缺少模型或AI金鑰，任務會暫停並提示你在設定中檢查什麼；無需猜測哪裡出了問題。',
+    'Comprueba antes de confiar': '先核實，再採信',
+    'Ideas reúne lo extraído de tus lecturas. Abre una idea y revisa la cita o el pasaje que la sostiene. La IA ayuda a leer, pero la fuente sigue siendo la autoridad: esta comprobación es el hábito más importante del vault académico.':
+      '觀點彙集了從閱讀中提取的內容。開啟一個觀點，檢視支撐它的引注或片段。AI幫助閱讀，但來源仍是權威：這項核實是學術資料庫中最重要的習慣。',
+    'Las conexiones aparecen después': '連線稍後才會出現',
+    'Grafo muestra cada idea como un nodo y sus relaciones como enlaces. Al principio puede estar vacío o ser pequeño: es normal. Se vuelve útil a medida que analizas fuentes verificadas, no antes.':
+      '圖譜將每個觀點顯示為一個節點，將其關係顯示為連線。起初可能為空或很小：這很正常。隨著你分析經過核實的來源，它才會變得有用，而不是在此之前。',
+    'Escribe sin salir del corpus': '無需離開語料庫即可寫作',
+    'Espacio de trabajo reúne notas, borradores y proyectos de escritura. Conserva los enlaces internos a fuentes e ideas para que puedas volver a la evidencia mientras redactas. No hace falta usarlo hasta que tengas algo que desarrollar.':
+      '工作區彙集了筆記、草稿和寫作專案。它保留指向來源和觀點的內部連結，讓你在撰寫時能回到證據。除非有內容需要展開，否則無需使用它。',
+    'Lo demás puede esperar': '其餘的一切都可以稍後再說',
+    'El menú agrupa funciones por intención: Explorar, Analizar, Escribir y Herramientas. Ábrelas cuando tu investigación las necesite; en Ajustes puedes ocultar o reordenar secciones. Tu primera misión es sencilla: añade una fuente, analízala y verifica una idea.':
+      '選單按用途對功能進行分組：探索、分析、寫作和工具。當你的研究需要時再開啟它們；在設定中可以隱藏或重新排列各區塊。你的第一個任務很簡單：新增一個來源，分析它，並核實一個觀點。',
+  },
 };

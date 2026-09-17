@@ -605,4 +605,88 @@ export const SERVER_SETTINGS_TRANSLATIONS: Record<
     "Las actualizaciones se aplican en el host de Server. Esta vista no simula descargas ni reinicios que el navegador no puede ejecutar.":
       "更新在Server主机上应用。此视图不会模拟浏览器无法执行的下载或重启。",
   },
+  'zh-TW': {
+    "Las claves y los modelos configurados se comparten entre todas tus bóvedas. Las credenciales siguen siendo privadas de esta cuenta.":
+      "已配置的金鑰和模型在你所有資料庫之間共享。憑據仍僅屬於此賬戶。",
+    "El operador debe configurar la keyring cifrada del servidor para guardar credenciales.":
+      "運營方必須先配置伺服器的加密金鑰環，才能儲存憑據。",
+    "Abre un proveedor y marca con una estrella los modelos que quieras usar en los selectores.":
+      "開啟一個提供商，並將你想在選擇器中使用的模型標記為收藏。",
+    "Configurado en Server": "已在Server中配置",
+    "Sin credencial en Server": "Server上無憑據",
+    "Disponible mediante Desktop": "可通過Desktop使用",
+    Sustituir: "替換",
+    Guardar: "儲存",
+    Eliminar: "刪除",
+    "Este proveedor requiere el runtime o la red local de Nodus Desktop; sus favoritos se conservan, pero Server no intenta ejecutarlo.":
+      "此提供商需要Nodus Desktop的執行時或本地網路；其收藏會保留，但Server不會嘗試執行它。",
+    "Actualizando catálogo…": "正在重新整理目錄…",
+    "Catálogo en vivo del proveedor": "提供商即時目錄",
+    "Catálogo compatible integrado": "內建相容目錄",
+    "Buscar modelo…": "搜尋模型…",
+    "Ningún modelo coincide con la búsqueda.": "沒有模型與搜尋匹配。",
+    "Modo básico para un modelo general; modo avanzado para elegir cada tarea de forma independiente.":
+      "基礎模式使用一個通用模型；高階模式可獨立選擇每項任務。",
+    "Hay asignaciones heredadas pendientes ({assignments}). Los modelos locales descargables no se ejecutan en Server ni se sustituyen por un modelo de pago.":
+      "存在待處理的繼承分配（{assignments}）。可下載的本地模型不會在Server上執行，也不會替換為付費模型。",
+    "Un modelo general atiende las tareas de texto compatibles.":
+      "由一個通用模型處理相容的文本任務。",
+    "Cada tarea usa su modelo seleccionado de forma independiente.":
+      "每項任務獨立使用其選定的模型。",
+    "Server muestra la misma biblioteca tabular de Desktop usando únicamente los documentos que el propietario decidió publicar.":
+      "Server僅使用所有者選擇釋出的文件，顯示與Desktop相同的表格文獻庫。",
+    "La publicación es independiente para cada vault.":
+      "每個資料庫的釋出相互獨立。",
+    "PDF, rutas locales y credenciales no se incluyen salvo publicación explícita del contenido permitido.":
+      "除非明確釋出允許的內容，否則不包含PDF、本地路徑和憑據。",
+    "La cuenta Server conserva la vista publicada. La conexión, storage y sincronización de Zotero se ejecutan en Desktop.":
+      "Server賬戶保留已釋出的檢視。Zotero的連線、儲存和同步在Desktop上執行。",
+    "Abre Ajustes → Biblioteca en Desktop para cambiar la fuente Zotero. Server aplicará la siguiente publicación a todos los vaults conectados sin inventar una biblioteca distinta.":
+      "在Desktop中開啟「設定 → 文獻庫」以更改Zotero來源。Server會將下一次釋出應用到所有已連線的資料庫，而不會另外建立一個文獻庫。",
+    "Estos ajustes dependen de archivos locales y permanecen en Desktop.":
+      "這些設定依賴本地檔案，並保留在Desktop中。",
+    "Server consume el texto limpio incluido por el publicador.":
+      "Server使用釋出者包含的乾淨文本。",
+    "Tesseract, idiomas y límites de páginas se ejecutan donde reside el documento.":
+      "Tesseract、語言和頁數限制在文件所在的位置執行。",
+    "Apariencia y accesibilidad forman parte del perfil portable y se comparten transversalmente.":
+      "外觀和輔助功能屬於便攜配置的一部分，並在各裝置之間共享。",
+    "Conecta ChatGPT, Claude y clientes compatibles con este usuario y sus vaults asignados.":
+      "將ChatGPT、Claude和相容客戶端連線到此使用者及其分配的資料庫。",
+    "Sincroniza publicación y perfil portable desde Nodus Desktop.":
+      "從Nodus Desktop同步釋出和便攜配置。",
+    "Los complementos de escritorio conservan su configuración local.":
+      "Desktop附加元件保留其本地配置。",
+    "El navegador integrado requiere Electron y permanece fuera de la barra lateral de Server.":
+      "內建瀏覽器需要Electron，並位於Server側邊欄之外。",
+    "Cookies, permisos, descargas y almacenamiento web nunca se copian al servidor. La extensión y Nodus Browser se configuran en Desktop.":
+      "Cookie、許可權、下載和Web儲存絕不會複製到伺服器。擴充套件和Nodus Browser在Desktop中配置。",
+    "Publicar un vault, asignar acceso y consultar la réplica.":
+      "釋出資料庫、分配訪問許可權並檢視副本。",
+    "Credenciales por usuario, modelos favoritos y privacidad.":
+      "按使用者區分的憑據、收藏模型和隱私。",
+    "Connected Vault, MCP y clientes compatibles.":
+      "Connected Vault、MCP和相容客戶端。",
+    "Las copias contienen datos locales, rutas y secretos que nunca cruzan el perfil portable. Se crean y restauran exclusivamente en Desktop o mediante la política de copias del operador de Server.":
+      "備份包含絕不會進入便攜配置的本地資料、路徑和機密。它們僅在Desktop中或通過Server運營方的備份策略建立和恢復。",
+    "Favoritos, modelos, interfaz y políticas compatibles.":
+      "收藏、模型、介面和相容策略。",
+    "Local-first · publicación explícita · credenciales aisladas":
+      "本地優先 · 明確釋出 · 憑據隔離",
+    "Ayuda sobre {section}": "{section}的幫助",
+    "Resume este servidor y muestra cuántos vaults, usuarios y dispositivos administra, junto con sus direcciones de acceso.":
+      "彙總此伺服器，並顯示其管理的資料庫、使用者和裝置數量，以及訪問地址。",
+    "Crea un vault editable que vive directamente en Server. Elige su nombre, tipo y descripción inicial.":
+      "建立一個直接位於Server上的可編輯資料庫。選擇其名稱、型別和初始描述。",
+    "Muestra los vaults nativos y los publicados desde Desktop. Aquí puedes revisar su estado, ajustar qué se publica y generar códigos de conexión.":
+      "顯示原生資料庫和從Desktop釋出的資料庫。在此可檢視其狀態、調整發布內容並生成連線程式碼。",
+    "Crea cuentas y decide qué puede hacer cada usuario en cada vault: leer, escribir o administrarlo como propietario.":
+      "建立賬戶，並控制每個使用者在每個資料庫中可執行的操作：讀取、寫入或以所有者身份管理。",
+    "Enumera los dispositivos Desktop autorizados para publicar vaults en este servidor. Puedes revocar un dispositivo que ya no deba sincronizar.":
+      "列出獲授權向此伺服器釋出資料庫的Desktop裝置。你可以撤銷不再需要同步的裝置。",
+    "Muestra la cuenta y el rol con los que has iniciado sesión. También permite cambiar la contraseña o cerrar la sesión actual.":
+      "顯示你登入時使用的賬戶和角色。你還可以更改密碼或退出當前會話。",
+    "Las actualizaciones se aplican en el host de Server. Esta vista no simula descargas ni reinicios que el navegador no puede ejecutar.":
+      "更新在Server主機上應用。此檢視不會模擬瀏覽器無法執行的下載或重啟。",
+  },
 };

@@ -21,6 +21,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     it: 'Il connettore Chrome parla tredici lingue. Giapponese, coreano, russo e cinese tradizionale si aggiungono alle nove che l’interfaccia già aveva, così la finestra, la pagina delle impostazioni, l’informativa sulla privacy che apre e perfino l’elenco dei tipi di documento che controlli prima di salvare non sono più solo in inglese e seguono la lingua del tuo browser.',
     tr: 'Chrome bağlayıcısı on üç dil konuşuyor. Japonca, Korece, Rusça ve geleneksel Çince, arayüzün zaten bildiği dokuz dile katılıyor. Açılır pencere, ayarlar sayfası, oradan açılan gizlilik politikası ve kaydetmeden önce gözden geçirdiğiniz belge türü listesi artık yalnızca İngilizce değil ve tarayıcınızın dilini izliyor.',
     'zh-CN': 'Chrome 连接器现在支持十三种语言。日语、韩语、俄语和繁体中文加入界面原有的九种语言，因此弹窗、设置页、由它打开的隐私政策，甚至你在保存前查看的文档类型列表，都不再只有英文，而是跟随浏览器的语言。',
+    'zh-TW': 'Chrome 聯結器現在支援十三種語言。日語、韓語、俄語和繁體中文加入介面原有的九種語言，因此彈窗、設定頁、由它開啟的隱私政策，甚至你在儲存前檢視的文件型別列表，都不再只有英文，而是跟隨瀏覽器的語言。',
   },
   {
     scope: 'connector',
@@ -33,5 +34,6 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     it: 'Anche i messaggi che il connettore scrive da sé sono tradotti. L’avviso che un file supera i 64 MiB, l’errore di un download che non riesce, la pagina di accesso che un editore restituisce al posto del PDF e le etichette salvate nella tua Biblioteca quando la pagina non ne porta nessuna vengono ora dal catalogo della tua lingua.',
     tr: 'Bağlayıcının kendi yazdığı iletiler de çevriliyor. Bir dosyanın 64 MiB sınırını aştığı uyarısı, başarısız bir indirmenin hatası, bir yayıncının PDF yerine döndürdüğü oturum açma sayfası ve sayfa hiç etiket getirmediğinde Kütüphanenize kaydedilen etiketler artık dilinizin kataloğundan geliyor.',
     'zh-CN': '连接器自己编写的消息也已翻译。文件超过 64 MiB 的提示、下载失败的错误、出版商返回的登录页面而不是 PDF，以及页面没有提供标签时保存到文献库的标签，现在都来自你的语言的目录。',
+    'zh-TW': '聯結器自己編寫的訊息也已翻譯。檔案超過 64 MiB 的提示、下載失敗的錯誤、出版商返回的登入頁面而不是 PDF，以及頁面沒有提供標籤時儲存到文獻庫的標籤，現在都來自你的語言的目錄。',
   },
 ];

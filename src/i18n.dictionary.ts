@@ -435,6 +435,7 @@ export const DICTIONARY_TRANSLATIONS = {
   it: {},
   tr: {},
   "zh-CN": {},
+  'zh-TW': {},
 } as const;
 
 type DictionaryTable = Record<string, string>;

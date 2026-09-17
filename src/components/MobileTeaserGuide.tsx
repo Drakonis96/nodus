@@ -324,6 +324,33 @@ const COPY: Record<AppLanguage, TeaserCopy> = {
       model: '使用你自己的模型',
     },
   },
+  'zh-TW': {
+    badge: '先睹為快',
+    title: '搶先一睹即將推出的新功能',
+    summary: 'Nodus即將登陸移動端。以下是應用的預覽，目前尚無釋出日期。',
+    eyebrow: '手機上的Nodus',
+    heading: '把資料庫裝進口袋',
+    lede: '從桌面端釋出資料庫，即可隨處閱讀：文獻、觀點、主題和作者，以及支撐它們的證據。閱讀為只讀模式，你在手機上寫下的內容也只會留在手機裡。',
+    status: '目前尚無法下載。這些截圖來自開發中的版本，可能會發生變化。',
+    surveyTitle: '你會使用它嗎？',
+    surveyBody: '告訴我們你是否會使用它，以及你對它的期待。只需兩分鐘，有助於決定優先開發哪些功能。',
+    surveyCta: '參與問卷調查',
+    englishNote: '截圖和問卷調查僅提供英文。',
+    previous: '上一個',
+    next: '下一個',
+    finish: '知道了',
+    slides: {
+      home: '資料庫首頁',
+      library: '文獻庫',
+      work: '文獻詳情',
+      idea: '觀點及其證據',
+      search: '搜尋',
+      argument: '論證圖譜',
+      gaps: '空白',
+      deepResearch: 'Deep Research',
+      model: '使用你自己的模型',
+    },
+  },
 };
 
 function shouldPresent(): boolean {

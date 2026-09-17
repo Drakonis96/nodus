@@ -3903,6 +3903,13 @@ export const SERVER_TRANSLATIONS = {
     ...SERVER_WEB_TEXT_EN,
     ...ZH_CN_SERVER,
   },
+  'zh-TW': {
+    ...EN,
+    ...SERVER_READER_EN,
+    ...SERVER_NATIVE_EN,
+    ...SERVER_WEB_TEXT_EN,
+    ...ZH_CN_SERVER,
+  },
   fr: completeWith("fr", {
     Bandeja: "Boîte de réception",
     "1 cambio": "1 modification",

@@ -134,5 +134,22 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
     "{n} obras": "{n}篇文献",
     "1 obra": "1篇文献",
     "El asistente solo consultará esta obra.": "助手只会查阅此文献。"
-  }
+  },
+  'zh-TW': {
+    "Filtrar contexto": "篩選上下文",
+    "Fuentes": "來源",
+    "Limitar el contexto a las fuentes seleccionadas": "將上下文限制為所選來源",
+    "Los autores incluyen sus obras, no los textos que solo los mencionan. Si eliges autores y obras, se usará la intersección.": "作者包含其本人的文獻，而非僅提及他們的文本。若同時選擇作者和文獻，將使用二者的交集。",
+    "Al cambiar las fuentes, las respuestas anteriores con otro contexto no se enviarán al modelo.": "更改來源後，使用其他上下文的先前回復不會再發送給模型。",
+    "Buscar autores": "搜尋作者",
+    "Buscar obras": "搜尋文獻",
+    "Fuente no disponible": "來源不可用",
+    "Afina la búsqueda para ver más resultados.": "請細化搜尋以檢視更多結果。",
+    "El asistente solo consultará {n} obras.": "助手只會查閱{n}篇文獻。",
+    "Ninguna obra coincide. No se recuperará contexto de otras fuentes.": "沒有匹配的文獻。不會從其他來源檢索上下文。",
+    "Filtro desactivado: se consultará todo el corpus.": "篩選已關閉：將查閱整個語料庫。",
+    "{n} obras": "{n}篇文獻",
+    "1 obra": "1篇文獻",
+    "El asistente solo consultará esta obra.": "助手只會查閱此文獻。"
+  },
 } as const;

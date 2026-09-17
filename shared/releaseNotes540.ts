@@ -13,6 +13,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'Research chat è unificato nei nove tipi di vault. Si trova in Analizza, con controlli comuni per modello e messaggi e pannelli richiudibili per cronologia e contesto. Conversazioni, fonti, citazioni e strumenti di ogni vault restano disponibili.',
     tr: 'Research chat dokuz kasa türünde birleşiyor. Analiz bölümünde ortak model kontrolleri, mesaj işlemleri ve daraltılabilir geçmiş ve bağlam panelleriyle açılıyor. Önceki konuşmalar ve her kasanın kaynakları, alıntıları ve araçları korunuyor.',
     'zh-CN': "Research chat在全部九种vault类型中实现统一。可在「分析」中找到它，拥有相同的模型选择器、消息操作，以及可折叠的历史记录和上下文面板。已有的对话以及每种vault各自的来源、引用和工具都会保留。",
+    'zh-TW': "Research chat在全部九種vault型別中實現統一。可在「分析」中找到它，擁有相同的模型選擇器、訊息操作，以及可摺疊的歷史記錄和上下文面板。已有的對話以及每種vault各自的來源、引用和工具都會保留。",
   },
   {
     scope: 'ai',
@@ -25,6 +26,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'Scegli lo sforzo di ragionamento direttamente in Research chat. I livelli disponibili rispettano le capacità del fornitore e del modello selezionati, senza cambiare le impostazioni delle altre chat.',
     tr: 'Akıl yürütme düzeyini Research chat içinden seçin. Kullanılabilir düzeyler seçilen sağlayıcı ve modelin yeteneklerine uyar ve diğer sohbetlerin ayarlarını değiştirmez.',
     'zh-CN': "可直接在Research chat中选择推理强度。可用级别取决于所选提供商和模型的能力，并仅应用于当前对话，不改变其他聊天的设置。",
+    'zh-TW': "可直接在Research chat中選擇推理強度。可用級別取決於所選提供商和模型的能力，並僅應用於當前對話，不改變其他聊天的設定。",
   },
   {
     scope: 'ai',
@@ -37,6 +39,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'Limita le fonti del corpus per autore e opera. Cerca e combina i filtri, salvati con la conversazione. Le fonti escluse non rientrano attraverso la cronologia e la chat segnala quando mancano prove.',
     tr: 'Derlem kaynaklarını yazar ve esere göre daraltın. Aranabilir filtreleri birlikte kullanın ve konuşmayla kaydedin. Dışlanan kaynaklar geçmiş üzerinden geri gelmez. Seçim kanıt sağlamıyorsa sohbet bunu belirtir.',
     'zh-CN': "按作者和文献缩小语料库来源范围。新的选择器支持搜索并组合这两种限制，将其与对话一起保存，并防止被排除的来源通过历史记录重新进入。如果所选内容无法提供证据，聊天会予以说明。",
+    'zh-TW': "按作者和文獻縮小語料庫來源範圍。新的選擇器支援搜尋並組合這兩種限制，將其與對話一起儲存，並防止被排除的來源通過歷史記錄重新進入。如果所選內容無法提供證據，聊天會予以說明。",
   },
   {
     scope: 'ai',
@@ -49,6 +52,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'Salva le tue istruzioni per Research chat. Crea, cerca, modifica e seleziona prompt in ogni vault per guidare tono e struttura. Cambia prompt senza perdere la cronologia o torna a Default.',
     tr: 'Research chat için kendi talimatlarınızı kaydedin. Her kasada yanıtların tonunu ve yapısını yönlendiren istemler oluşturun, arayın, düzenleyin ve seçin. Geçmişi kaybetmeden istem değiştirin veya Default seçeneğine dönün.',
     'zh-CN': "保存你自己的Research chat指令。可在每种vault内创建、搜索、编辑和选择提示词，以引导回答的语气和结构。你可以在已有对话中切换提示词而不丢失其历史记录，并可随时返回Default。",
+    'zh-TW': "儲存你自己的Research chat指令。可在每種vault內建立、搜尋、編輯和選擇提示詞，以引導回答的語氣和結構。你可以在已有對話中切換提示詞而不丟失其歷史記錄，並可隨時返回Default。",
   },
   {
     scope: 'ai',
@@ -61,6 +65,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'Allega file a Research chat con + o trascinandoli nella finestra. DOC, DOCX, PDF, fogli di calcolo, CSV, XML, immagini e altri formati supportati usano fornitore e modello scelti, con visione quando necessaria. I file restano con la conversazione e vengono eliminati con essa. Le schede hanno bordi leggibili nei due temi e usano l’accento del vault.',
     tr: 'Research chat içine + düğmesiyle veya sürükleyerek dosya ekleyin. DOC, DOCX, PDF, tablolar, CSV, XML, resimler ve desteklenen diğer biçimler seçtiğiniz sağlayıcı ve modeli, gerektiğinde görme yeteneğini kullanır. Dosyalar konuşmayla saklanır ve silinir. Kartlar açık ve koyu temada belirgin kenarlara sahiptir ve kasanın vurgu rengini kullanır.',
     'zh-CN': "通过文本框的+按钮或把文件拖入窗口，即可向Research chat添加附件。使用所选的提供商和模型读取DOC、DOCX、PDF、电子表格、CSV、XML、图像和其他受支持的格式，需要时启用视觉能力。附件会随对话保留，并在删除对话时一并删除。其卡片在浅色和深色下都有清晰的轮廓，并使用vault的强调色。",
+    'zh-TW': "通過文本框的+按鈕或把檔案拖入視窗，即可向Research chat新增附件。使用所選的提供商和模型讀取DOC、DOCX、PDF、電子表格、CSV、XML、影像和其他受支援的格式，需要時啟用視覺能力。附件會隨對話保留，並在刪除對話時一併刪除。其卡片在淺色和深色下都有清晰的輪廓，並使用vault的強調色。",
   },
   {
     scope: 'ai',
@@ -73,6 +78,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'Leggere e interrompere le risposte è più comodo. Research chat rispetta la posizione di lettura e apre correttamente le anteprime delle citazioni. Interrompendo una risposta, il testo già ricevuto resta nella cronologia.',
     tr: 'Yanıtları okumak ve durdurmak daha rahat. Research chat yukarı kaydırdığınızda okuma konumunuzu korur ve alıntı önizlemeleri doğru açılır. Yanıt durdurulduğunda alınan metin kaybolmak yerine geçmişte kalır.',
     'zh-CN': "阅读和停止回答更加顺手。当你向上滚动阅读时，Research chat会保持你的位置，引用预览也能正常重新打开。停止回答时，已接收的文本会保留在历史记录中，而不是消失。",
+    'zh-TW': "閱讀和停止回答更加順手。當你向上滾動閱讀時，Research chat會保持你的位置，引用預覽也能正常重新開啟。停止回答時，已接收的文本會保留在歷史記錄中，而不是消失。",
   },
   {
     scope: 'ai',
@@ -85,6 +91,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'Le Skills visive arrivano in Deep Research e Immersion su desktop. Sceglile per rapporto e limita esplicitamente le chiamate a pagamento. Aggiungi figure a rapporti nuovi o esistenti, apri risorse interattive e conserva le figure nei PDF. Puoi rimuovere risorse e annullare la modifica.',
     tr: 'Görsel Skills masaüstünde Deep Research ve Immersion’a geliyor. Her rapor için Skills seçin ve ücretli çağrılara açık bir üst sınır koyun. Yeni veya mevcut raporlara şekiller ekleyin, etkileşimli kaynakları açın ve PDF dışa aktarımlarında koruyun. Kaldırma işlemini geri alabilirsiniz.',
     'zh-CN': "可视化Skill登陆桌面版Deep Research和Immersion。可为每份报告选择可用的Skill并限制其执行次数，付费调用设有明确上限。为新建或已有报告添加图形，打开其交互式资源，下载结果，并在导出为PDF时保留图形。你可以移除资源并撤销更改。",
+    'zh-TW': "視覺化Skill登陸桌面版Deep Research和Immersion。可為每份報告選擇可用的Skill並限制其執行次數，付費呼叫設有明確上限。為新建或已有報告新增圖形，開啟其互動式資源，下載結果，並在匯出為PDF時保留圖形。你可以移除資源並撤銷更改。",
   },
   {
     scope: 'ai',
@@ -97,6 +104,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'Le mappe nascono da dati geografici reali. Le Skills compatibili usano confini amministrativi, livelli, percorsi, indicatori e legende con le relative fonti. Nodus genera mappe vettoriali scaricabili senza chiedere al modello di inventare confini.',
     tr: 'Haritalar gerçek coğrafi verilerden oluşturulur. Uyumlu Skills idari sınırları, katmanları, rotaları, işaretleri ve açıklamaları kaynaklarıyla kullanır. Nodus modelden sınır veya koordinat uydurmasını istemeden indirilebilir vektör haritaları üretir.',
     'zh-CN': "地图基于真实地理数据构建。兼容的Skill可以使用行政边界、图层、路线、标记和图例，并附来源与归属信息。Nodus会根据这些数据生成可下载的矢量地图，而不会要求模型凭空编造边界或坐标。",
+    'zh-TW': "地圖基於真實地理資料構建。相容的Skill可以使用行政邊界、圖層、路線、標記和圖例，並附來源與歸屬資訊。Nodus會根據這些資料生成可下載的向量地圖，而不會要求模型憑空編造邊界或座標。",
   },
   {
     scope: 'ai',
@@ -109,6 +117,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'Le Skills compatibili possono valutare se un’immagine risponde alla richiesta usando miniature e il modello visivo scelto. I rapporti limitano le chiamate a pagamento. Una revisione non disponibile o senza immagini adatte viene segnalata chiaramente.',
     tr: 'Uyumlu Skills küçük resimleri ve seçilen görme modelini kullanarak bir resmin isteğe uygunluğunu değerlendirebilir. Raporlar ücretli çağrıları sınırlar. İnceleme kullanılamıyorsa veya uygun resim bulunamazsa sonuç bunu açıkça belirtir.',
     'zh-CN': "兼容的Skill可以检查图片是否符合你的要求。它们使用缩略图和所选的视觉模型，报告中付费调用设有明确上限。如果审核不可用或未找到合适的图片，结果会予以说明，而不会把某张图片呈现为已核实。",
+    'zh-TW': "相容的Skill可以檢查圖片是否符合你的要求。它們使用縮圖和所選的視覺模型，報告中付費呼叫設有明確上限。如果稽核不可用或未找到合適的圖片，結果會予以說明，而不會把某張圖片呈現為已核實。",
   },
   {
     scope: 'ai',
@@ -121,6 +130,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'I disegni chimici e SVG gestiscono meglio le risposte valide. Un commento non causa più lo scarto del disegno. Chemistry Studio conserva le parti rappresentabili quando non può verificare tutta la proposta e continua a indicare i limiti.',
     tr: 'Kimyasal çizimler ve SVG geçerli yanıtları daha iyi işler. Çizimdeki bir yorum artık reddedilmesine yol açmaz. Chemistry Studio tüm öneriyi doğrulayamadığında gösterebildiği kısımları korur ve sınırlamaları açıkça belirtir.',
     'zh-CN': "化学绘图和SVG对有效响应的容忍度更高。绘图内部的注释不再导致其被丢弃，当无法验证整个方案时，Chemistry Studio会保留能够呈现的部分。局限仍然可见，不会被当作完整验证。",
+    'zh-TW': "化學繪圖和SVG對有效響應的容忍度更高。繪圖內部的註釋不再導致其被丟棄，當無法驗證整個方案時，Chemistry Studio會保留能夠呈現的部分。侷限仍然可見，不會被當作完整驗證。",
   },
   {
     scope: 'general',
@@ -133,6 +143,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'Una ricerca comune a tutti i vault. Combina corrispondenze testuali e ricerca semantica quando disponibile. Filtra per i tipi di contenuto di ogni vault e salva le ricerche per ritrovarle.',
     tr: 'Tüm kasalarda ortak arama. Metin eşleşmelerini kullanılabildiğinde anlamsal aramayla birleştirin. Her kasanın içerik türlerine göre filtreleyin ve aramaları daha sonra dönmek üzere kaydedin.',
     'zh-CN': "为所有vault提供统一的搜索。使用结合文本匹配和语义搜索（在可用时）的查询查找内容。按各vault特有的内容类型筛选，并保存搜索以便再次使用。",
+    'zh-TW': "為所有vault提供統一的搜尋。使用結合文本匹配和語義搜尋（在可用時）的查詢查詢內容。按各vault特有的內容型別篩選，並儲存搜尋以便再次使用。",
   },
   {
     scope: 'general',
@@ -145,6 +156,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'Controlli e navigazione più chiari. Le azioni del grafo e il Tutor migliorano icone e contrasto, mentre il contesto della chat rispetta il tema chiaro. Didattica nasconde sezioni non ancora disponibili. Corretti il pulsante di invio e lo sfondo del logo.',
     tr: 'Daha anlaşılır kontroller ve gezinme. Grafik işlemleri ve Eğitmen panelinin simgeleri ve kontrastı iyileştirildi. Sohbet bağlamı açık temaya uyar. Öğretim henüz kullanılmayan bölümleri gizler. Gönder düğmesi ve logo arka planı düzeltildi.',
     'zh-CN': "控件与导航更加清晰。图谱操作和Tutor面板的图标与对比度得到改善，聊天上下文选择器遵循浅色模式。教学不再显示尚不可用的版块入口。还修正了发送按钮的居中和浅色模式下标志的背景。",
+    'zh-TW': "控制元件與導航更加清晰。圖譜操作和Tutor面板的圖示與對比度得到改善，聊天上下文選擇器遵循淺色模式。教學不再顯示尚不可用的版塊入口。還修正了傳送按鈕的居中和淺色模式下標誌的背景。",
   },
   {
     scope: 'marketplace',
@@ -157,6 +169,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'Il Marketplace ha un accesso dedicato nell’intestazione di Skills. Skills e pacchetti condividono una scheda, un ordine coerente, pulsanti più chiari ed errori di installazione tradotti. Gli elementi installati sono più facili da riconoscere.',
     tr: 'Marketplace, Skills başlığında kendi girişine kavuşuyor. Skills ve paketler ortak sıralama ve görsel kimlikle tek kartta gösteriliyor. Düğmeler daha belirgin, kurulum hataları çevrilmiş ve kurulu öğeleri ayırt etmek daha kolay.',
     'zh-CN': "Marketplace在Skills页首有了独立入口。Skill及其包共用一张卡片，具有统一的排序和视觉标识、更清晰的按钮，以及已翻译的安装错误。更容易区分已安装的内容和可以添加的内容。",
+    'zh-TW': "Marketplace在Skills頁首有了獨立入口。Skill及其包共用一張卡片，具有統一的排序和視覺標識、更清晰的按鈕，以及已翻譯的安裝錯誤。更容易區分已安裝的內容和可以新增的內容。",
   },
   {
     scope: 'plugin',
@@ -169,6 +182,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'I plugin mostrano modelli 3D interattivi e risultati più ricchi. Esplora formule, grafici, confronti, mappe, immagini, audio e documenti ingrandibili in Nodus. Le risorse locali restano disponibili e i file dei pacchetti vengono verificati prima dell’uso.',
     tr: 'Eklentiler etkileşimli 3D modeller ve daha zengin sonuçlar gösterebilir. Nodus görüntüleyicilerinde formülleri, grafikleri, karşılaştırmaları, haritaları, resimleri, sesi ve yakınlaştırılabilir belgeleri inceleyin. Yerel kaynaklar korunur ve paket dosyaları kullanımdan önce doğrulanır.',
     'zh-CN': "插件可以显示交互式3D模型和更丰富的结果。在Nodus查看器中浏览模型、公式、图表、对比、地图、图像、音频和可缩放文档。本地资源会随结果保留，包中包含的文件在使用前会经过验证。",
+    'zh-TW': "外掛可以顯示互動式3D模型和更豐富的結果。在Nodus檢視器中瀏覽模型、公式、圖表、對比、地圖、影像、音訊和可縮放文件。本地資源會隨結果保留，包中包含的檔案在使用前會經過驗證。",
   },
   {
     scope: 'browser',
@@ -181,6 +195,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'I segnalibri del browser occupano meno spazio e si riconoscono meglio. Le schede sono più compatte e recuperano le icone dei siti anche durante la modifica. Le pagine iniziali e il gestore dei segnalibri condividono i miglioramenti.',
     tr: 'Tarayıcı yer imleri daha az yer kaplıyor ve daha kolay tanınıyor. Kartlar daha kompakt ve düzenleme sırasında da site simgelerini getiriyor. Başlangıç sayfaları ve yer imi yöneticisi bu iyileştirmeleri paylaşıyor.',
     'zh-CN': "浏览器书签占用更少空间，也更容易识别。卡片更紧凑，并恢复了网站图标，编辑书签时也是如此。起始页和书签管理器都享有这些改进。",
+    'zh-TW': "瀏覽器書籤佔用更少空間，也更容易識別。卡片更緊湊，並恢復了網站圖示，編輯書籤時也是如此。起始頁和書籤管理器都享有這些改進。",
   },
   {
     scope: 'word',
@@ -193,5 +208,6 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     it: 'Le alternative in Word conservano gli spazi della selezione. Applicare un suggerimento non unisce più parole vicine. Se la prima risposta offre poche alternative distinte, Nodus prova a completare la lista senza ripetizioni.',
     tr: 'Word yazım alternatifleri seçimdeki boşlukları korur. Öneri uygulamak artık komşu kelimeleri birleştirmez. İlk yanıt yeterli sayıda farklı alternatif sunmazsa Nodus önceki önerileri tekrarlamadan listeyi tamamlamayı dener.',
     'zh-CN': "Word中的写作备选会保留所选内容的空格。当Word在选取时包含空格，应用建议不再把相邻词语粘在一起。如果第一次响应提供的不同备选不足，Nodus会尝试补全列表而不重复已有的建议。",
+    'zh-TW': "Word中的寫作備選會保留所選內容的空格。當Word在選取時包含空格，應用建議不再把相鄰詞語粘在一起。如果第一次響應提供的不同備選不足，Nodus會嘗試補全列表而不重複已有的建議。",
   },
 ];

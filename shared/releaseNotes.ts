@@ -17,6 +17,7 @@ import type { VaultType } from './vaultTypes';
 import { RELEASE_NOTES_IT } from './releaseNotes.it';
 import { RELEASE_NOTES_TR } from './releaseNotes.tr';
 import { RELEASE_NOTES_ZH } from './releaseNotes.zh-CN';
+import { RELEASE_NOTES_ZH_TW } from './releaseNotes.zh-TW';
 
 // Beyond the vault types, a highlight can belong to a cross-vault surface with an
 // identity of its own: the MCP server, the Nodi mascot, the tools hub or a new
@@ -52,7 +53,7 @@ interface RawReleaseHighlight {
   scope: ReleaseNoteScope;
 }
 
-export interface ReleaseHighlight extends RawReleaseHighlight { it: string; tr: string; 'zh-CN': string }
+export interface ReleaseHighlight extends RawReleaseHighlight { it: string; tr: string; 'zh-CN': string; 'zh-TW': string }
 
 export interface ReleaseNote {
   version: string;
@@ -4526,6 +4527,7 @@ export const RELEASE_NOTES: ReleaseNote[] = RAW_RELEASE_NOTES.map((note) => ({
     it: RELEASE_NOTES_IT[note.version]?.[index] ?? highlight.en,
     tr: RELEASE_NOTES_TR[note.version]?.[index] ?? highlight.en,
     'zh-CN': RELEASE_NOTES_ZH[note.version]?.[index] ?? highlight.en,
+    'zh-TW': RELEASE_NOTES_ZH_TW[note.version]?.[index] ?? highlight.en,
   })),
 }));
 

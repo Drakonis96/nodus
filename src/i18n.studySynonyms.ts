@@ -97,4 +97,16 @@ export const STUDY_SYNONYM_TRANSLATIONS = {
     'alternativas en memoria': '内存中的备选',
     'Regenerar alternativas': '重新生成备选',
   },
+  'zh-TW': {
+    'Sinónimos con IA': 'AI同義詞',
+    'Alternativas de sinónimos': '同義詞備選',
+    'Sinónimos y reformulaciones': '同義詞與改寫',
+    'Cinco alternativas en el idioma original, elegidas con el contexto de la frase.': '原文語言中的五個備選，根據整句上下文選出。',
+    'Buscando alternativas…': '正在查詢備選…',
+    'Alternativas actuales': '當前備選',
+    'Historial de esta apertura': '本次會話的歷史記錄',
+    'Sustituye': '替換',
+    'alternativas en memoria': '記憶體中的備選',
+    'Regenerar alternativas': '重新生成備選',
+  },
 } as const;

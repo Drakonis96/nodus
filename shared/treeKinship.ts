@@ -283,6 +283,7 @@ export const TREE_KINSHIP_ROLE_LABELS: Record<AppLanguage, Record<TreeKinshipRol
   it: TREE_KINSHIP_ROLE_LABEL_IT as Record<TreeKinshipRole, string>,
   tr: TREE_KINSHIP_ROLE_LABEL_TR,
   'zh-CN': TREE_KINSHIP_ROLE_LABEL_ZH_CN,
+  'zh-TW': TREE_KINSHIP_ROLE_LABEL_ZH_CN,
 };
 
 /** The languages kinship labels exist in; derived so it cannot drift from the tables. */
@@ -305,6 +306,7 @@ const SPOUSE_WORD: Record<AppLanguage, readonly [string, string, string]> = {
   it: ['Marito', 'Moglie', 'Coniuge'],
   tr: ['Koca', 'Eş', 'Eş'],
   'zh-CN': ['丈夫', '妻子', '配偶'],
+  'zh-TW': ['丈夫', '妻子', '配偶'],
 };
 
 const SPOUSE_OF: Record<AppLanguage, (spouse: string, relation: string) => string> = {
@@ -317,6 +319,7 @@ const SPOUSE_OF: Record<AppLanguage, (spouse: string, relation: string) => strin
   it: (spouse, relation) => `${spouse} di ${relation}`,
   tr: (spouse, relation) => `${relation} adlı yakınınızın ${spouse.toLowerCase()}ı`,
   'zh-CN': (spouse, relation) => `其${relation}的${spouse}`,
+  'zh-TW': (spouse, relation) => `其${relation}的${spouse}`,
 };
 
 /** "<relation> of their spouse" — the noun is fixed, so the possessive can agree. */
@@ -330,6 +333,7 @@ const OF_SPOUSE: Record<AppLanguage, (base: string) => string> = {
   it: (base) => `${base} del coniuge`,
   tr: (base) => `Eşinizin ${base.toLowerCase()}ı`,
   'zh-CN': (base) => `其配偶的${base}`,
+  'zh-TW': (base) => `其配偶的${base}`,
 };
 
 const CONNECTION_LABEL: Record<AppLanguage, string> = {
@@ -342,6 +346,7 @@ const CONNECTION_LABEL: Record<AppLanguage, string> = {
   it: 'Legame familiare',
   tr: 'Aile bağlantısı',
   'zh-CN': '家族关联',
+  'zh-TW': '家族關聯',
 };
 
 export interface TreeKinshipContext {
@@ -428,6 +433,7 @@ function descendantContext(sex: string | undefined, depth: number): TreeKinshipC
           de: `Nachkomme der ${ordinalDe(depth)} Generation`,
           it: `Discendente di ${ordinalIt(depth, true)} generazione`,
           'zh-CN': `第${depth}代后代`,
+          'zh-TW': `第${depth}代後代`,
         },
       }
       : {}),
@@ -452,6 +458,7 @@ function niblingContext(sex: string | undefined, depth: number, branch: TreeBran
           de: `Neffe/Nichte der ${ordinalDe(depth)} Generation`,
           it: `Nipote di ${ordinalIt(depth, true)} generazione`,
           'zh-CN': `第${depth}代侄辈`,
+          'zh-TW': `第${depth}代侄輩`,
         },
       }
       : {}),
@@ -493,6 +500,7 @@ function uncleContext(sex: string | undefined, level: number, branch: TreeBranch
           de: `Onkel/Tante${branchDe} der ${ordinalDe(level)} Generation`,
           it: `Zio/zia${branchIt} di ${ordinalIt(level, true)} generazione`,
           'zh-CN': `第${level}代${branchZh}叔伯姑姨`,
+          'zh-TW': `第${level}代${branchZh}叔伯姑姨`,
         },
       }
       : {}),
@@ -527,6 +535,7 @@ function cousinContext(sex: string | undefined, degree: number, removal: number,
       de: `${genderDe} ${ordinalDe(degree)} Grades${removalDe}`,
       it: `${genderIt} di ${ordinalIt(degree)} grado${removalIt}`,
       'zh-CN': `第${degree}代${genderZh}${removalZh}`,
+      'zh-TW': `第${degree}代${genderZh}${removalZh}`,
     },
   };
 }
@@ -644,6 +653,7 @@ export function deriveTreeKinship(input: TreeKinshipInput): Map<string, TreeKins
         de: `Vorfahre${branchDe} der ${ordinalDe(info.distance)} Generation`,
         it: `Ascendente${branchIt} di ${ordinalIt(info.distance, true)} generazione`,
         'zh-CN': `第${info.distance}代${branchZh}祖先`,
+        'zh-TW': `第${info.distance}代${branchZh}祖先`,
       };
     }
     return context;
@@ -787,24 +797,28 @@ export function deriveTreeKinship(input: TreeKinshipInput): Map<string, TreeKins
       de: ['Vater', 'Mutter', 'Elternteil'], pt: ['pai', 'mãe', 'progenitor/a'], 'pt-BR': ['pai', 'mãe', 'genitor/a'],
       it: ['padre', 'madre', 'genitore'], tr: ['baba', 'anne', 'ebeveyn'],
       'zh-CN': ['父亲', '母亲', '父母'],
+      'zh-TW': ['父親', '母親', '父母'],
     },
     child: {
       es: ['hijo', 'hija', 'hijo/a'], en: ['son', 'daughter', 'child'], fr: ['fils', 'fille', 'enfant'],
       de: ['Sohn', 'Tochter', 'Kind'], pt: ['filho', 'filha', 'filho/a'], 'pt-BR': ['filho', 'filha', 'filho/a'],
       it: ['figlio', 'figlia', 'figlio/a'], tr: ['oğul', 'kız', 'çocuk'],
       'zh-CN': ['儿子', '女儿', '子女'],
+      'zh-TW': ['兒子', '女兒', '子女'],
     },
     spouse: {
       es: ['esposo', 'esposa', 'cónyuge'], en: ['husband', 'wife', 'spouse'], fr: ['époux', 'épouse', 'conjoint'],
       de: ['Ehemann', 'Ehefrau', 'Ehepartner'], pt: ['marido', 'esposa', 'cônjuge'], 'pt-BR': ['marido', 'esposa', 'cônjuge'],
       it: ['marito', 'moglie', 'coniuge'], tr: ['koca', 'eş', 'eş'],
       'zh-CN': ['丈夫', '妻子', '配偶'],
+      'zh-TW': ['丈夫', '妻子', '配偶'],
     },
     sibling: {
       es: ['hermano', 'hermana', 'hermano/a'], en: ['brother', 'sister', 'sibling'], fr: ['frère', 'sœur', 'frère/sœur'],
       de: ['Bruder', 'Schwester', 'Geschwister'], pt: ['irmão', 'irmã', 'irmão/ã'], 'pt-BR': ['irmão', 'irmã', 'irmão/ã'],
       it: ['fratello', 'sorella', 'fratello/sorella'], tr: ['erkek kardeş', 'kız kardeş', 'kardeş'],
       'zh-CN': ['兄弟', '姐妹', '兄弟姐妹'],
+      'zh-TW': ['兄弟', '姐妹', '兄弟姐妹'],
     },
   };
   const stepFor = (sex: string | undefined, kind: keyof typeof STEP_WORDS): ConnectionStep => {

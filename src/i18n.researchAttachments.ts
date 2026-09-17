@@ -9,6 +9,7 @@ const translations: Record<string, string[]> = {
   it: ['Aggiungi file', 'Allegati', 'Rimuovi allegato', 'Preparazione dei file…', 'Analizza i file allegati.', 'Nessun lettore', 'Visione', 'Documento', 'e tutti i suoi messaggi e file allegati. Questa azione non può essere annullata.'],
   tr: ['Dosya ekle', 'Ekler', 'Eki kaldır', 'Dosyalar hazırlanıyor…', 'Ekli dosyaları analiz et.', 'Okuyucu yok', 'Görü', 'Belge', 've tüm mesajları ve ekli dosyaları. Bu işlem geri alınamaz.'],
   'zh-CN': ["添加文件","附件","移除附件","正在准备文件…","分析附加的文件。","无阅读器","视觉","文档","以及其所有消息和附件。此操作无法撤销。"],
+  'zh-TW': ["新增檔案","附件","移除附件","正在準備檔案…","分析附加的檔案。","無閱讀器","視覺","文件","以及其所有訊息和附件。此操作無法撤銷。"],
 };
 keys.push('Suelta los archivos para adjuntarlos', 'No se pudieron leer los archivos arrastrados. Usa el botón + para añadirlos.');
 const dropTranslations: Record<string, string[]> = {
@@ -20,6 +21,7 @@ const dropTranslations: Record<string, string[]> = {
   it: ['Rilascia i file per allegarli', 'Impossibile leggere i file trascinati. Usa il pulsante + per aggiungerli.'],
   tr: ['Eklemek için dosyaları bırakın', 'Bırakılan dosyalar okunamadı. Eklemek için + düğmesini kullanın.'],
   'zh-CN': ["拖放文件以添加为附件","无法读取拖入的文件。请使用 + 按钮添加它们。"],
+  'zh-TW': ["拖放檔案以新增為附件","無法讀取拖入的檔案。請使用 + 按鈕新增它們。"],
 };
 for (const [language, values] of Object.entries(dropTranslations)) translations[language].push(...values);
 export const RESEARCH_ATTACHMENT_TRANSLATIONS = Object.fromEntries(Object.entries(translations).map(([language, values]) => [language, Object.fromEntries(keys.map((key, index) => [key, values[index]]))]));

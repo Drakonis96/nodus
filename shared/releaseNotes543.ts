@@ -18,6 +18,7 @@ export const RELEASE_5_4_3_HIGHLIGHTS: ReleaseHighlight[] = [
     it: 'I riepiloghi delle opere non vengono più salvati tagliati a metà frase. Con un modello di ragionamento il budget di output si esauriva pensando e la generazione si fermava prima della fine, ma il riepilogo veniva salvato come completato. Ora il primo tentativo ha spazio reale e, se viene comunque tagliato, Nodus riprova una volta con il budget più ampio dell’app. Se anche quello si esaurisce, il riepilogo viene segnato come fallito invece di essere salvato incompleto.',
     tr: 'Eser özetleri artık cümle ortasında kesilmiş hâlde kaydedilmiyor. Bir akıl yürütme modelinde çıktı bütçesi düşünürken tükeniyor ve üretim sona ermeden duruyordu, ama özet tamamlanmış olarak kaydediliyordu. Artık ilk deneme gerçek bir alana sahip ve yine kesilirse Nodus uygulamanın daha geniş bütçesiyle bir kez daha deniyor. Model onu da tüketirse özet eksik kaydedilmek yerine başarısız olarak işaretleniyor.',
     'zh-CN': "文献摘要不再被截断在句子中间保存。使用推理模型时，输出预算在思考阶段就已耗尽，生成在写出结尾之前就停止，但摘要却被标记为已完成并保存。现在首次尝试拥有更多余量，如果仍被截断，Nodus会用应用更大的预算重试一次。若模型再次耗尽预算，摘要会被标记为失败，而不是以不完整状态保存。",
+    'zh-TW': "文獻摘要不再被截斷在句子中間儲存。使用推理模型時，輸出預算在思考階段就已耗盡，生成在寫出結尾之前就停止，但摘要卻被標記為已完成並儲存。現在首次嘗試擁有更多餘量，如果仍被截斷，Nodus會用應用更大的預算重試一次。若模型再次耗盡預算，摘要會被標記為失敗，而不是以不完整狀態儲存。",
   },
   {
     scope: 'connector',
@@ -30,6 +31,7 @@ export const RELEASE_5_4_3_HIGHLIGHTS: ReleaseHighlight[] = [
     it: 'L’accoppiamento del browser non resta più in attesa nel silenzio. Su macOS, l’avviso di accoppiamento si apriva dietro Chrome, che rimaneva l’app attiva, e la richiesta scadeva senza che nessuno lo vedesse. Ora Nodus passa in primo piano appena arriva la richiesta e, se il sistema rifiuta quell’attivazione, chiede attenzione come fa la piattaforma, con un lampeggio nella barra delle applicazioni o un rimbalzo nel Dock. Il segnale si spegne appena la finestra riceve il focus o l’accoppiamento viene risolto.',
     tr: 'Tarayıcı eşleştirmesi artık sessizce beklemiyor. macOS’ta eşleştirme uyarısı, etkin uygulama olmayı sürdüren Chrome’un arkasında açılıyor ve istek, kimse görmeden zaman aşımına uğruyordu. Nodus artık istek gelir gelmez öne geçiyor ve sistem bu etkinleştirmeyi reddederse platformun yaptığı gibi dikkat çekiyor, görev çubuğunda yanıp sönerek ya da Dock’ta zıplayarak. Sinyal, pencere odağı alır almaz veya eşleştirme sonuçlanınca duruyor.',
     'zh-CN': "浏览器配对不再默默等待。在macOS上，配对提示会打开在Chrome之后，而Chrome仍是活动应用，请求最终超时，无人看到。现在Nodus一收到请求就会置前，如果系统拒绝该激活，它会像平台那样请求关注，通过在任务栏闪烁或在Dock弹跳。窗口获得焦点或配对完成后，该信号立即停止。",
+    'zh-TW': "瀏覽器配對不再默默等待。在macOS上，配對提示會開啟在Chrome之後，而Chrome仍是活動應用，請求最終超時，無人看到。現在Nodus一收到請求就會置前，如果系統拒絕該啟用，它會像平臺那樣請求關注，通過在工作列閃爍或在Dock彈跳。視窗獲得焦點或配對完成後，該訊號立即停止。",
   },
   {
     scope: 'plugin',
@@ -42,5 +44,6 @@ export const RELEASE_5_4_3_HIGHLIGHTS: ReleaseHighlight[] = [
     it: 'I risultati JSON di uno strumento non occupano più la conversazione come se fossero il risultato finale. Comparivano in un blocco senza stile, alto quanto la risposta, così una query di provenienza sembrava output di debug accanto alla figura richiesta. Ora il JSON resta richiuso sotto «Prove», a un clic di distanza, e la figura mantiene il centro del messaggio.',
     tr: 'Bir aracın JSON sonuçları artık son ürünmüş gibi sohbeti kaplamıyor. Yanıt kadar yüksek, biçimsiz bir blok olarak görünüyorlardı ve bu yüzden bir köken sorgusu, istediğiniz şeklin yanında hata ayıklama çıktısı gibi duruyordu. JSON artık «Kanıt» altında katlanmış hâlde, tek tıkla açılıyor ve şekil mesajın merkezinde kalıyor.',
     'zh-CN': "工具的JSON结果不再像最终交付物那样占据整个对话。以前它们会被倾倒进一个没有样式、与回答同样高的区块，于是溯源查询在你请求的图形旁边看起来像调试输出。现在JSON折叠在「证据」下，一点即可展开，图形仍占据消息的中心。",
+    'zh-TW': "工具的JSON結果不再像最終交付物那樣佔據整個對話。以前它們會被傾倒進一個沒有樣式、與回答同樣高的區塊，於是溯源查詢在你請求的圖形旁邊看起來像除錯輸出。現在JSON摺疊在「證據」下，一點即可展開，圖形仍佔據訊息的中心。",
   },
 ];

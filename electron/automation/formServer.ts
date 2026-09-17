@@ -22,6 +22,7 @@ const FORM_CHROME: Record<AppLanguage, FormChrome> = {
   it: { accessToken: 'Token di accesso', access: 'Accedi', choose: 'Seleziona un’opzione', yes: 'Sì', submit: 'Invia risposta', notFound: 'Non trovato', unavailable: 'Modulo non disponibile', invalidToken: 'Il token non è valido.', tooLarge: 'La risposta supera 1 MB.', error: 'Errore' },
   tr: { accessToken: 'Erişim belirteci', access: 'Giriş yap', choose: 'Bir seçenek seçin', yes: 'Evet', submit: 'Yanıtı gönder', notFound: 'Bulunamadı', unavailable: 'Form kullanılamıyor', invalidToken: 'Belirteç geçerli değil.', tooLarge: 'Yanıt 1 MB boyutunu aşıyor.', error: 'Hata' },
   'zh-CN': { accessToken: '访问令牌', access: '登录', choose: '请选择一项', yes: '是', submit: '提交回复', notFound: '未找到', unavailable: '表单不可用', invalidToken: '令牌无效。', tooLarge: '回复超过 1 MB。', error: '错误' },
+  'zh-TW': { accessToken: '訪問令牌', access: '登入', choose: '請選擇一項', yes: '是', submit: '提交回復', notFound: '未找到', unavailable: '表單不可用', invalidToken: '令牌無效。', tooLarge: '回覆超過 1 MB。', error: '錯誤' },
 };
 
 function formLanguage(request: IncomingMessage, url: URL): AppLanguage {

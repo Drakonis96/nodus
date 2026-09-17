@@ -167,4 +167,30 @@ const zhCN = { ...en,
   'Global reúne referencias, archivos y colecciones de todos tus vaults. Este vault conserva el corpus tradicional y sus estados de análisis. Puedes usar solo Nodus, solo Zotero o combinar ambos.': '全局会汇总你所有资料库中的参考文献、文件和收藏。此资料库保留传统语料库及其分析状态。你可以仅使用 Nodus、仅使用 Zotero，或将两者结合。',
 } as const;
 
-export const LIBRARY_ONBOARDING_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN } as const;
+const zhTW = { ...en,
+  'Construye tu biblioteca dentro de Nodus o conecta Zotero. Las dos opciones terminan en el mismo grafo local.': '在 Nodus 中構建你的文獻庫，或連線 Zotero。兩種方式最終都會匯入同一個本地圖譜。',
+  'Elige cómo quieres empezar. Puedes cambiar de método o combinar ambos más adelante desde Biblioteca.': '選擇你想如何開始。之後可以在文獻庫中切換方式，或將兩者結合使用。',
+  'Biblioteca de Nodus': 'Nodus 文獻庫',
+  'Añadir contenido': '新增內容',
+  'Cómo funciona': '工作原理',
+  'Lecturas de Zotero': 'Zotero 閱讀',
+  'Recomendado': '推薦',
+  'Añade archivos, DOI, ISBN o referencias manuales y organiza tus propias colecciones. No necesitas Zotero.': '新增檔案、DOI、ISBN 或手動參考文獻，並整理自己的收藏。無需使用 Zotero。',
+  'Conecta tu biblioteca existente en modo solo lectura y elige qué colecciones monitorizar.': '以只讀方式連線你現有的文獻庫，並選擇要監控的收藏。',
+  'Puedes importar Zotero en cualquier momento sin reemplazar tus colecciones ni tus metadatos de Nodus.': '你可以隨時匯入 Zotero，而不會替換你的收藏或 Nodus 後設資料。',
+  'Añade como prefieras': '按你的方式新增',
+  'Después del asistente podrás arrastrar PDF, EPUB y otros archivos a Biblioteca, añadir una obra por DOI o ISBN, importar referencias o crear una ficha manual.': '完成嚮導後，你可以將 PDF、EPUB 及其他檔案拖入文獻庫，通過 DOI 或 ISBN 新增文獻，匯入參考文獻，或建立手動條目。',
+  'Nodus tratará de completar metadatos y preparar una versión limpia de lectura automáticamente.': 'Nodus 會自動嘗試補全後設資料，並準備一份乾淨的閱讀版本。',
+  'Biblioteca y análisis son independientes': '文獻庫與分析相互獨立',
+  'La Biblioteca conserva referencias y archivos. Cuando añades una obra a este vault, habilitas sus análisis, ideas, pasajes, embeddings y conexiones dentro de este espacio.': '文獻庫儲存參考文獻和檔案。將文獻新增到此資料庫後，即可在此空間內啟用其分析、觀點、片段、嵌入和連線。',
+  'La Biblioteca de Nodus está lista. Añade tu primera obra desde Biblioteca cuando quieras.': 'Nodus 文獻庫已就緒。你可以隨時從文獻庫新增第一篇文獻。',
+  '¿Es tu primera vez? En menos de un minuto te enseño cómo convertir la Biblioteca de Nodus o tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.': '第一次使用嗎？不到一分鐘，我就會演示如何把 Nodus 文獻庫或你的 Zotero 文獻庫變成觀點圖譜。你可以隨時跳過。',
+  'Dos formas de añadir obras': '新增文獻的兩種方式',
+  'Biblioteca acepta archivos, DOI, ISBN, referencias manuales e importaciones. Si ya usas Zotero, este botón sincroniza tus colecciones monitorizadas en modo solo lectura.': '文獻庫支援檔案、DOI、ISBN、手動參考文獻和匯入。如果你已在使用 Zotero，此按鈕會以只讀方式同步你監控的收藏。',
+  'Organiza a tu manera': '按你的方式整理',
+  'Crea colecciones y subcolecciones propias dentro de Biblioteca. También puedes mantener la estructura de Zotero como fuente de solo lectura y combinar ambos sistemas sin perder tus cambios de Nodus.': '在文獻庫中建立自己的收藏和子收藏。你也可以將 Zotero 結構保留為只讀來源，並將兩個系統結合使用，而不會丟失你在 Nodus 中的更改。',
+  'Global reúne referencias, archivos y colecciones de todos tus vaults. Este vault conserva el corpus tradicional y sus estados de análisis. Puedes usar solo Nodus, solo Zotero o combinar ambos.': '全域性會彙總你所有資料庫中的參考文獻、檔案和收藏。此資料庫保留傳統語料庫及其分析狀態。你可以僅使用 Nodus、僅使用 Zotero，或將兩者結合。',
+} as const;
+
+export const LIBRARY_ONBOARDING_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN ,
+  'zh-TW': zhTW, } as const;

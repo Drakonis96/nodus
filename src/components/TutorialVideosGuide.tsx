@@ -176,6 +176,21 @@ const COPY: Record<AppLanguage, AnnouncementCopy> = {
     hint: '你可以随时从「设置 → 帮助」返回视频。',
     finish: '知道了',
   },
+  'zh-TW': {
+    badge: '新增 · 影片教程',
+    title: '教程現在也有影片版了',
+    summary: '你已完成文字版指南。現在，同樣的內容在Nodus內還提供影片版。',
+    eyebrow: '就在這裡觀看',
+    heading: '影片教程',
+    lede: '無需離開應用即可開啟，支援暫停、字幕和全屏。每個影片一經開啟即標記為已觀看。',
+    settingsTitle: '隨時可用',
+    settingsBody: '「設定 → 幫助」彙集了完整目錄——介紹、資料庫、功能與整合——並帶有搜尋和篩選。',
+    toursTitle: '導覽中也有',
+    toursBody: '當某個資料庫有影片時，其導覽會將它作為第三種入口提供。',
+    offline: '文字版指南不會消失：它仍留在應用內，並可離線使用。',
+    hint: '你可以隨時從「設定 → 幫助」返回影片。',
+    finish: '知道了',
+  },
 };
 
 /**

@@ -172,4 +172,28 @@ const zhCN = {
   'missing-reader': '缺少干净版本', 'orphan-folder': '孤立文件夹', 'invalid-saved-search': '无效的已保存搜索', 'invalid-vault-link': '无效的 vault 链接',
 };
 
-export const LIBRARY_RECOVERY_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN } as const;
+const zhTW = {
+  'Se conservarán colecciones, adjuntos, Markdown, anotaciones, chats, notas, aliases y relaciones. Las obras de vault permanecen separadas.': '將保留集合、附件、Markdown、註釋、聊天、筆記、別名和關係。vault 中的文獻保持獨立。',
+  'Impacto verificado': '已驗證影響', 'anotaciones': '註釋', 'notas': '筆記', 'aliases': '別名',
+  '{n} obra(s) de vault se conservan sin fusionar.': '{n} 篇 vault 文獻將被保留而不合並。',
+  'Confirmar fusión': '確認合併', 'Revisar impacto': '檢視影響',
+  '{n} elemento(s) restaurado(s).': '已恢復 {n} 個條目。', 'Vaciar de forma segura': '安全清空',
+  'Los elementos saldrán del catálogo activo. Nodus conservará una copia de recuperación local y nunca borrará análisis de los vaults.': '這些條目將移出活動目錄。Nodus 會保留本地恢復副本，絕不會刪除 vault 的分析。',
+  '{n} elemento(s) retirado(s) del catálogo.': '已從目錄中移除 {n} 個條目。',
+  'Impacto de la papelera': '回收站影響', 'Revisa todo lo que se conserva, restaura o retira del catálogo.': '檢視所有將被保留、恢復或從目錄中移除的內容。',
+  'Calculando impacto…': '正在計算影響…', 'Elementos': '條目', 'Chats y notas': '聊天和筆記', 'Aliases': '別名',
+  'Vaults vinculados': '已關聯的 vault', 'Copias recuperables': '可恢復副本', 'No se puede vaciar todavía': '尚無法清空',
+  'Hay enlaces activos con vaults. Desvincúlalos explícitamente antes de retirar estas fichas del catálogo.': '存在與 vault 的活動連結。請先顯式取消關聯，再將這些記錄移出目錄。',
+  'El catálogo, aliases, búsquedas y enlaces se reconstruyeron desde nodus-library.': '目錄、別名、搜尋和連結已從 nodus-library 重建。',
+  'Revisión y recuperación': '審查與恢復', 'Audita manifiestos, enlaces y archivos sin modificar los vaults.': '稽核清單、連結和檔案，不修改 vault。',
+  'Verificando la Biblioteca…': '正在檢查文獻庫…', 'Elementos revisados': '已檢查條目', 'Adjuntos revisados': '已檢查附件',
+  'Registros inválidos': '無效記錄', 'Archivos ausentes': '檔案缺失', 'Adjuntos dañados': '損壞的附件', 'Carpetas huérfanas': '孤立資料夾',
+  'No se detectaron incidencias de integridad.': '未檢測到完整性問題。', 'Auditar de nuevo': '重新稽核', 'Reconstruir catálogo': '重建目錄',
+  '{n} elemento(s) recuperable(s)': '{n} 個可恢復條目', 'Volver a la Biblioteca': '返回文獻庫', 'Revisar y vaciar': '審查並清空',
+  'La papelera está vacía.': '回收站為空。', 'Los elementos enviados aquí podrán restaurarse antes del vaciado manual.': '傳送到這裡的條目可在手動清空回收站之前恢復。',
+  'conflict': '衝突', 'invalid-record': '無效記錄', 'missing-attachment': '附件缺失', 'corrupt-attachment': '附件損壞',
+  'missing-reader': '缺少乾淨版本', 'orphan-folder': '孤立資料夾', 'invalid-saved-search': '無效的已儲存搜尋', 'invalid-vault-link': '無效的 vault 連結',
+};
+
+export const LIBRARY_RECOVERY_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN ,
+  'zh-TW': zhTW, } as const;

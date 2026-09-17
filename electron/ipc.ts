@@ -980,6 +980,7 @@ export function registerIpc(
       it: mode === 'restore' ? 'Seleziona una cartella di ripristino Nodus' : 'Seleziona una cartella vuota per proteggere Nodus',
       tr: mode === 'restore' ? 'Bir Nodus kurtarma klasörü seçin' : 'Nodus\'u korumak için boş bir klasör seçin',
       'zh-CN': mode === 'restore' ? '选择 Nodus 恢复文件夹' : '选择一个空文件夹以保护 Nodus',
+      'zh-TW': mode === 'restore' ? '選擇 Nodus 恢復資料夾' : '選擇一個空資料夾以保護 Nodus',
     };
     const { canceled, filePaths } = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: titles[language],

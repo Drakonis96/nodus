@@ -425,6 +425,46 @@ const COPY: Record<TutorialLanguage, PlatformCopy> = {
     step: '步骤',
     of: '/',
   },
+  'zh-TW': {
+    slides: [
+      {
+        eyebrow: '連線與共享',
+        title: '本地MCP與Nodus Server',
+        summary: '兩種彼此獨立、邊界清晰的方式，讓你在主視窗之外使用自己的知識。',
+        body: 'MCP伺服器通過受控工具把相容客戶端連線到當前資料庫。Nodus Server則通過網頁向獲授權的人共享資料庫的篩選檢視。',
+        detailA: 'MCP在本機執行，使用令牌，並且只顯示適合當前資料庫型別的工具。',
+        detailB: 'Nodus Server尚屬實驗功能，執行在Docker中，只接收Nodus Desktop發出的HTTPS連線。',
+        tip: '兩套系統彼此獨立：Nodus Server不會公開本地MCP的埠、監聽器或令牌。',
+      },
+      {
+        eyebrow: '在閱讀之處工作',
+        title: 'Nodus for Zotero',
+        summary: '一個測試版外掛，把Nodus上下文帶入Zotero的側欄和閱讀器。',
+        body: '可就當前文件或選中的多個條目提問，發現貫穿文獻庫的關聯，並在自動找到Nodus的對話中使用頁碼引用。',
+        detailA: '總結、解釋、翻譯並討論所選文字，無需離開閱讀器。',
+        detailB: '可自動高亮重要片段，並把對話儲存為Zotero筆記。',
+        detailC: '代理模式會建議建立筆記、高亮、標籤或修改欄位；預設每項操作都需要授權。',
+        tip: '可在「設定 → Nodus for Zotero」中安裝或更新，也可下載 .xpi 檔案。',
+      },
+      {
+        eyebrow: '實用工具',
+        title: '完整的Toolkit',
+        summary: '六個工作區，涵蓋迷你應用、文件、翻譯、隱私、演示和OCR。',
+        body: 'Nodus Apps與Convert、Protect、Translate、PDF Presenter和OCR Workspace共同組成完整工具集。每項工具都有專注的流程，並清楚標出使用AI的步驟。',
+        detailA: 'Nodus Apps可建立適用於研究、學習或教學的可調整工具，並可通過二維碼分享會話。',
+        detailB: 'Presenter匯入PDF和演示檔案；OCR重建複雜的掃描件；Convert、Protect和Translate在不改動原件的情況下生成新輸出。',
+        tip: '在側邊欄開啟「工具」檢視完整目錄。除非某項功能明確說明使用AI提供商，否則處理均在本機完成。',
+      },
+    ],
+    modalBadge: '新增 · 互聯工作流',
+    modalTitle: 'Nodus現在走得更遠',
+    modalSummary: '連線AI客戶端，共享經過篩選的資料庫，在Zotero內工作，並使用完整的Toolkit。',
+    previous: '上一步',
+    next: '下一步',
+    finish: '開始探索',
+    step: '步驟',
+    of: '/',
+  },
   ja: {
     slides: [
       {

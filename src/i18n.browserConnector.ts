@@ -89,4 +89,13 @@ export const BROWSER_CONNECTOR_TRANSLATIONS = {
     '来自Chrome Web Store的Nodus Research官方扩展程序。',
     '开发扩展程序（未打包）或其他本地安装。',
   ]),
+  'zh-TW': table([
+    'Nodus Research Connector',
+    '啟用Nodus Research Connector',
+    '連線Nodus Research Connector',
+    '是否允許此擴充套件程式向Nodus傳送頁面？',
+    '來源',
+    '來自Chrome Web Store的Nodus Research官方擴充套件程式。',
+    '開發擴充套件程式（未打包）或其他本地安裝。',
+  ]),
 } as const;

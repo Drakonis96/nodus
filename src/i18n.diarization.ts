@@ -39,4 +39,9 @@ export const DIARIZATION_TRANSLATIONS = {
     'Analizando voces…': '正在分析声音…',
     'La diarización usa Gemini Flash Lite para distinguir voces y conserva literalmente el texto.': '说话人分离使用 Gemini Flash Lite 区分声音，并逐字保留文本。',
   },
+  'zh-TW': {
+    'Detectar hablantes': '檢測說話人',
+    'Analizando voces…': '正在分析聲音…',
+    'La diarización usa Gemini Flash Lite para distinguir voces y conserva literalmente el texto.': '說話人分離使用 Gemini Flash Lite 區分聲音，並逐字保留文本。',
+  },
 } as const;
