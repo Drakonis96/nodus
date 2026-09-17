@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AiProvider, AppSettings, EmbeddingProvider, ModelRef } from '@shared/types';
+import { useCallback, useEffect, useState } from 'react';
+import type { AiProvider, EmbeddingProvider, ModelRef } from '@shared/types';
 import { PROVIDER_LABELS } from '@shared/providers';
 import { getNodusLocalModel, modelRefSupportsExtraction, type NodusLocalAiStatus } from '@shared/localAiModels';
 import {
@@ -7,7 +7,6 @@ import {
   autoDiscoverableEmbeddingProviders,
   collectDiscovery,
   configuredKeyProviders,
-  pickDefaultChoice,
   providersMissingKey,
   type DiscoveryFailure,
   type DiscoveryOutcome,
@@ -39,11 +38,10 @@ async function listFor(kind: 'ai' | 'embedding', provider: AiProvider): Promise<
  * own: on mount it queries every provider that already answers — the built-in
  * local models, a running local server, and every cloud provider whose key is
  * already stored — and merges the results into one searchable picker per role.
- * The user only picks two models; a key prompt appears only as a way to reach
- * more providers, never as a prerequisite.
+ * The user picks two models and nothing is preselected for them; a key prompt appears
+ * only as a way to reach more providers, never as a prerequisite.
  */
 export function OnboardingModelStep({
-  settings,
   providerKeys,
   aiModel,
   embeddingModel,
@@ -51,7 +49,6 @@ export function OnboardingModelStep({
   onEmbeddingChange,
   disabled,
 }: {
-  settings: AppSettings;
   providerKeys: ProviderKeyMap;
   aiModel: ModelRef | null;
   embeddingModel: ModelRef | null;
@@ -73,11 +70,6 @@ export function OnboardingModelStep({
   const [keyBusy, setKeyBusy] = useState(false);
   const [keyError, setKeyError] = useState('');
 
-  // Read the live selection inside discovery without making it a dependency —
-  // re-running discovery on every keystroke of the picker would be absurd.
-  const selection = useRef({ ai: aiModel, embedding: embeddingModel });
-  selection.current = { ai: aiModel, embedding: embeddingModel };
-
   const discover = useCallback(async (active: ProviderKeyMap) => {
     setLoading(true);
     const [aiOutcomes, embeddingOutcomes] = await Promise.all([
@@ -87,8 +79,8 @@ export function OnboardingModelStep({
     const ai = collectDiscovery(aiOutcomes);
     const embedding = collectDiscovery(embeddingOutcomes);
     // The AI model becomes `synthesisModel`, which runs the scans in basic mode, so it must be able
-    // to extract ideas. Drop vision-only local models (Qwen3.5-0.8B, LFM2.5) — this both hides them
-    // here and, since Gemma is then the first local option, makes Gemma the suggested default.
+    // to extract ideas. Drop vision-only local models (Qwen3.5-0.8B, LFM2.5) rather than offering
+    // them for a role they cannot hold.
     const aiChoicesCapable = ai.choices.filter((choice) => modelRefSupportsExtraction(choice));
     setAiChoices(aiChoicesCapable);
     setEmbeddingChoices(embedding.choices);
@@ -99,12 +91,17 @@ export function OnboardingModelStep({
       seen.add(failure.provider);
       return true;
     }));
-    const nextAi = pickDefaultChoice(aiChoicesCapable, selection.current.ai ?? settings.synthesisModel, settings.favorites);
-    if (nextAi) onAiChange(nextAi);
-    const nextEmbedding = pickDefaultChoice(embedding.choices, selection.current.embedding);
-    if (nextEmbedding) onEmbeddingChange(nextEmbedding);
+    // Neither picker is preselected, here or anywhere: this step exists so the person
+    // decides. Every "helpful" default used to hand a vault a model nobody chose for it —
+    // `choices[0]` is the bundled local Gemma (the built-in provider is queried first), a
+    // favorite was starred in another vault, and the general/embedding settings are shared
+    // app-wide, so their value belongs to whichever vault set it last. A local model is a
+    // deliberate, resource-heavy choice, so it only reaches a vault because it was picked
+    // here by hand — which is when the red warning beside the picker explains the cost.
+    // Discoveries re-run when a key is added, and this leaves the two selections alone:
+    // they belong to the person, not to the listing.
     setLoading(false);
-  }, [onAiChange, onEmbeddingChange, settings.favorites, settings.synthesisModel]);
+  }, []);
 
   useEffect(() => {
     void discover(keys);

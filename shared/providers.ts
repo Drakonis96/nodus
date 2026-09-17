@@ -102,6 +102,22 @@ export function isLocalProvider(provider: AiProvider): provider is LocalProvider
 }
 
 /**
+ * Every provider whose weights run on this machine: the models Nodus bundles and runs
+ * itself (`nodus`) plus whatever a local server (Ollama, LM Studio) serves. Both families
+ * share the same practical limit — the user's CPU/GPU and RAM do the work — which is what
+ * the red local-model warning in the pickers is about. `custom` is deliberately NOT here:
+ * the endpoint is user-supplied and is as likely to be a remote gateway.
+ */
+export function isLocalModelProvider(provider: string | null | undefined): boolean {
+  return provider === 'nodus' || isLocalProvider(provider as AiProvider);
+}
+
+/** True when a stored selection runs on the user's own machine. */
+export function isLocalModelRef(ref: { provider?: string | null } | null | undefined): boolean {
+  return isLocalModelProvider(ref?.provider);
+}
+
+/**
  * Providers billed against a personal ChatGPT / GitHub subscription instead of
  * pay-per-use API credit. Their runtimes are agent protocols that accept a prompt, a
  * model and a reasoning effort and nothing else — which is why the two predicates

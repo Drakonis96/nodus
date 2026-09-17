@@ -3,6 +3,7 @@ import type { ModelRef } from '@shared/types';
 import { choiceKey, filterModelChoices, findChoice, refKey, type ModelChoice } from '@shared/onboardingModels';
 import { t, tx } from '../i18n';
 import { Icon } from './ui';
+import { LocalModelWarning } from './LocalModelWarning';
 import { useModelPickerPopover } from './useModelPickerPopover';
 import './modelPicker.css';
 
@@ -100,36 +101,40 @@ export function SearchableModelSelect({
 
   return (
     <div className="relative" ref={rootRef} data-testid={testId}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className="input flex w-full items-center justify-between gap-2 text-left"
-        data-testid={`${testId}-trigger`}
-        disabled={disabled || loading}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={label}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span className="min-w-0 flex-1 truncate">
-          {loading ? (
-            <span className="text-neutral-500">{t('Buscando modelos disponibles…')}</span>
-          ) : selected ? (
-            <>
-              <span className="text-neutral-500">{selected.providerLabel} · </span>
-              {selected.label}
-            </>
-          ) : value ? (
-            <>
-              <span className="text-neutral-500">{value.provider} · </span>
-              {value.model}
-            </>
-          ) : (
-            <span className="text-neutral-500">{choices.length ? t('Elige un modelo') : emptyLabel}</span>
-          )}
-        </span>
-        <Icon name={loading ? 'sync' : 'chevronDown'} size={14} className={loading ? 'animate-spin' : ''} />
-      </button>
+      <div className="flex items-center gap-1.5">
+        <button
+          ref={triggerRef}
+          type="button"
+          className="input flex w-full min-w-0 flex-1 items-center justify-between gap-2 text-left"
+          data-testid={`${testId}-trigger`}
+          disabled={disabled || loading}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-label={label}
+          onClick={() => setOpen((current) => !current)}
+        >
+          <span className="min-w-0 flex-1 truncate">
+            {loading ? (
+              <span className="text-neutral-500">{t('Buscando modelos disponibles…')}</span>
+            ) : selected ? (
+              <>
+                <span className="text-neutral-500">{selected.providerLabel} · </span>
+                {selected.label}
+              </>
+            ) : value ? (
+              <>
+                <span className="text-neutral-500">{value.provider} · </span>
+                {value.model}
+              </>
+            ) : (
+              <span className="text-neutral-500">{choices.length ? t('Elige un modelo') : emptyLabel}</span>
+            )}
+          </span>
+          <Icon name={loading ? 'sync' : 'chevronDown'} size={14} className={loading ? 'animate-spin' : ''} />
+        </button>
+        {/* Chosen a model that runs on this machine? Its cost is the machine itself. */}
+        <LocalModelWarning provider={value?.provider} testId={`${testId}-local-warning`} />
+      </div>
 
       {open && !disabled && !loading && (
         <div ref={popupRef} className="model-picker-options">

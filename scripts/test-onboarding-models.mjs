@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -23,6 +23,7 @@ await build({
   platform: 'node',
   logLevel: 'silent',
 });
+const onboardingModels = await import(pathToFileURL(outfile).href);
 const {
   autoDiscoverableAiProviders,
   autoDiscoverableEmbeddingProviders,
@@ -31,10 +32,9 @@ const {
   configuredKeyProviders,
   filterModelChoices,
   findChoice,
-  pickDefaultChoice,
   providersMissingKey,
   toModelChoices,
-} = await import(pathToFileURL(outfile).href);
+} = onboardingModels;
 
 test('a provider is queried automatically only when it needs nothing from the user', () => {
   // Built-in models ship with the app and local servers need no key, so they are
@@ -120,37 +120,22 @@ test('the searchbox narrows by model, name and provider together', () => {
   assert.deepEqual(filterModelChoices(choices, 'anthropic gpt').map((c) => c.model), [], 'terms are ANDed, not ORed');
 });
 
-test('the wizard preselects what is already configured, then a favorite, then the first model', () => {
-  const choices = [
-    ...toModelChoices('openai', [{ id: 'gpt-5' }, { id: 'o4-mini' }]),
-    ...toModelChoices('anthropic', [{ id: 'claude-opus-4-8' }]),
-  ];
-  const current = { provider: 'anthropic', model: 'claude-opus-4-8' };
-
-  // What the vault already uses wins: re-running the wizard must not silently
-  // switch the user's model.
-  assert.deepEqual(pickDefaultChoice(choices, current, []), current);
-  // No current choice → a favorite that is actually on offer.
-  assert.deepEqual(
-    pickDefaultChoice(choices, null, [{ provider: 'openai', model: 'o4-mini' }]),
-    { provider: 'openai', model: 'o4-mini' }
-  );
-  // A favorite nobody offers is ignored rather than preselected into an error.
-  assert.deepEqual(pickDefaultChoice(choices, null, [{ provider: 'groq', model: 'gone' }]), { provider: 'openai', model: 'gpt-5' });
-  // Nothing configured and nothing favorited → just the first discovered model.
-  assert.deepEqual(pickDefaultChoice(choices, null, []), { provider: 'openai', model: 'gpt-5' });
-});
-
-test('a configured model survives its provider going quiet, but nothing is invented', () => {
-  const current = { provider: 'anthropic', model: 'claude-opus-4-8' };
-  // Discovery found nothing (offline): keep showing what the vault has.
-  assert.deepEqual(pickDefaultChoice([], current, []), current);
-  // Nothing configured and nothing discovered → null, which is what keeps the
-  // wizard's "Empezar" button disabled instead of saving an empty model.
-  assert.equal(pickDefaultChoice([], null, []), null);
-  // The provider answered but no longer lists the configured model → fall through.
-  const choices = toModelChoices('anthropic', [{ id: 'claude-sonnet-5' }]);
-  assert.deepEqual(pickDefaultChoice(choices, current, []), { provider: 'anthropic', model: 'claude-sonnet-5' });
+test('the wizard preselects no model for either role', async () => {
+  // There is no "default choice" helper any more, and there must not be one again: every
+  // invented default handed a vault a model nobody chose for it. `choices[0]` is the
+  // bundled local Gemma (the built-in provider is queried first), a favorite was starred
+  // in another vault, and the general/embedding settings are shared app-wide, so their
+  // value belongs to whichever vault set it last.
+  assert.equal('pickDefaultChoice' in onboardingModels, false);
+  // The two selections start empty…
+  const onboarding = await readFile(new URL('../src/views/Onboarding.tsx', import.meta.url), 'utf8');
+  assert.match(onboarding, /const \[aiModel, setAiModel\] = useState<ModelRef \| null>\(null\)/);
+  assert.match(onboarding, /const \[embeddingModel, setEmbeddingModel\] = useState<ModelRef \| null>\(null\)/);
+  // …and the step seeds neither picker from the settings, the favorites or the listing.
+  const step = await readFile(new URL('../src/components/OnboardingModelStep.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(step, /settings\.favorites|settings\.synthesisModel|settings\.embedding/);
+  assert.doesNotMatch(step, /pickDefaultChoice/);
+  assert.doesNotMatch(step, /onAiChange\(aiChoices|onEmbeddingChange\(embedding\./);
 });
 
 test('findChoice matches on provider and model together', () => {

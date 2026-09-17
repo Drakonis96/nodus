@@ -16,6 +16,7 @@ import {
 } from '@shared/codexReasoning';
 import { modelLabel, sameModel, sortModelRefs } from './ui';
 import { Icon } from './ui';
+import { LocalModelWarning } from './LocalModelWarning';
 import { t, tx } from '../i18n';
 import './modelPicker.css';
 import { useModelPickerPopover } from './useModelPickerPopover';
@@ -243,6 +244,9 @@ export function ModelWithReasoning({
         menu={menu}
       />
       <ReasoningPicker settings={settings} model={value} onChange={onChange} compact={compact} />
+      {/* A model that runs on this machine is a heavy, deliberate choice — never a
+          silent default. The red mark carries the full caveat on hover/click. */}
+      <LocalModelWarning provider={value?.provider} />
     </div>
   );
 }

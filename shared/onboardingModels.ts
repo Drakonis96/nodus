@@ -1,6 +1,6 @@
 import type { AiProvider, EmbeddingProvider, ModelInfo, ModelRef } from './types';
 import { matchesModelSearch } from './modelSearch';
-import { AI_PROVIDERS, EMBEDDING_PROVIDERS, PROVIDER_LABELS, SECRET_PROVIDERS, isLocalProvider } from './providers';
+import { AI_PROVIDERS, EMBEDDING_PROVIDERS, PROVIDER_LABELS, SECRET_PROVIDERS, isLocalModelProvider, isLocalProvider } from './providers';
 
 // Pure helpers behind the setup wizard's provider step. The wizard asks the user
 // for nothing it can find out on its own: it queries every provider that already
@@ -66,7 +66,7 @@ export function refKey(ref: ModelRef | null): string {
 
 /** True for providers that run on the user's machine (built-in or local server). */
 export function isOnDeviceProvider(provider: AiProvider): boolean {
-  return provider === BUILT_IN_PROVIDER || isLocalProvider(provider);
+  return isLocalModelProvider(provider);
 }
 
 export function toModelChoices(provider: AiProvider, models: ModelInfo[]): ModelChoice[] {
@@ -145,20 +145,3 @@ export function collectDiscovery(outcomes: DiscoveryOutcome[]): Discovery {
   return { choices, failures };
 }
 
-/**
- * What the wizard should preselect once discovery finishes, in order:
- * the value already configured (kept even if the provider went quiet), then a
- * favorite that is still offered, then the first discovered model. Returns null
- * when nothing answered, which is what keeps the "continue" button disabled.
- */
-export function pickDefaultChoice(
-  choices: ModelChoice[],
-  current: ModelRef | null,
-  favorites: ModelRef[] = []
-): ModelRef | null {
-  if (current && (findChoice(choices, current) || choices.length === 0)) return current;
-  const favorite = favorites.find((model) => findChoice(choices, model));
-  if (favorite) return { provider: favorite.provider, model: favorite.model };
-  const first = choices[0];
-  return first ? { provider: first.provider, model: first.model } : null;
-}

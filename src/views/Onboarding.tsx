@@ -39,12 +39,14 @@ export function Onboarding({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [librarySetup, setLibrarySetup] = useState<'nodus' | 'zotero'>('nodus');
   const [readTag, setReadTag] = useState('leído');
-  // The two models the vault needs. Seeded from what this vault already has so a
-  // re-run of the wizard shows the current choice instead of resetting it.
-  const [aiModel, setAiModel] = useState<ModelRef | null>(settings.synthesisModel);
-  const [embeddingModel, setEmbeddingModel] = useState<ModelRef | null>(
-    settings.embeddingModel ? { provider: settings.embeddingProvider, model: settings.embeddingModel } : null
-  );
+  // The two models the vault needs, and the wizard's whole point: they start empty so the
+  // person decides. Nothing is carried over from the settings, which are shared app-wide —
+  // a vault created while another one runs any model (a local one included, and Gemma is
+  // both bundled and first in the listing) would otherwise open with that model already
+  // chosen. A model that runs on this machine is only ever picked here by hand, and the
+  // red mark beside the picker then explains what it costs.
+  const [aiModel, setAiModel] = useState<ModelRef | null>(null);
+  const [embeddingModel, setEmbeddingModel] = useState<ModelRef | null>(null);
   const [modelError, setModelError] = useState<string | null>(null);
   const [storagePath, setStoragePath] = useState('');
   const [finishing, setFinishing] = useState(false);
@@ -446,7 +448,6 @@ export function Onboarding({
         {step === aiStep && (
           <div className="space-y-4">
             <OnboardingModelStep
-              settings={settings}
               providerKeys={providerKeys ?? {}}
               aiModel={aiModel}
               embeddingModel={embeddingModel}
