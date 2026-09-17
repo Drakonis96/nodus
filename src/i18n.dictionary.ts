@@ -1569,6 +1569,211 @@ Object.assign(
   }),
 );
 
+Object.assign(
+  DICTIONARY_TRANSLATIONS['zh-TW'] as DictionaryTable,
+  translatedTable({
+    Dictionary: "詞典",
+    "New Dictionary entry": "新建詞典條目",
+    "Nodus will find the most relevant evidence and generate the definition automatically.":
+      "Nodus將查詢最相關的證據並自動生成定義。",
+    "Possible duplicate concepts": "可能重複的概念",
+    "Nothing will be merged automatically.": "不會自動合併任何內容。",
+    Open: "開啟",
+    Relate: "關聯",
+    Back: "返回",
+    Cancel: "取消",
+    "Generate anyway": "仍然生成",
+    Concept: "概念",
+    "Add concept": "新增概念",
+    "Remove concept": "移除概念",
+    "Each concept will be saved as a separate entry and processed in parallel.":
+      "每個概念都將儲存為獨立條目並並行處理。",
+    "The batch contains duplicate concepts.": "批次中包含重複的概念。",
+    "Preparing {n} definitions…": "正在準備{n}條定義…",
+    "Generate {n} definitions": "生成{n}條定義",
+    "Generate {n} definitions anyway": "仍然生成{n}條定義",
+    "{n} entries are already saved; retrying will not create duplicates.":
+      "{n}個條目已儲存；重試不會建立重複項。",
+    "Aliases or alternative terms": "別名或替代術語",
+    "Separated by commas": "用逗號分隔",
+    "Focus prompt": "聚焦提示詞",
+    "Which aspect of the concept should the synthesis prioritize":
+      "合成應優先關注概念的哪個方面",
+    Scope: "範圍",
+    "Entire vault": "整個資料庫",
+    "Selected authors": "選定的作者",
+    "Selected works": "選定的文獻",
+    "Tags or collections": "標籤或合集",
+    Tags: "標籤",
+    Collections: "合集",
+    "No options available.": "沒有可用的選項。",
+    "Output language": "輸出語言",
+    "Detail level": "詳細程度",
+    Concise: "簡潔",
+    Standard: "標準",
+    Detailed: "詳細",
+    "Synthesis model": "合成模型",
+    "The entry is already saved; retrying will not create a duplicate.":
+      "條目已儲存；重試不會建立重複項。",
+    "Checking for duplicates…": "正在檢查重複項…",
+    "Preparing definition…": "正在準備定義…",
+    "Retry generation": "重試生成",
+    "Generate definition": "生成定義",
+    "Dictionary ({n})": "詞典（{n}）",
+    "Delete ({n})": "刪除（{n}）",
+    "New entry": "新建條目",
+    "Concepts synthesized exclusively from vault evidence.":
+      "僅根據資料庫證據合成的概念。",
+    "Delete Dictionary entry": "刪除詞典條目",
+    "Delete {n} Dictionary entries": "刪除{n}個詞典條目",
+    "All versions and relations will also be deleted. This action cannot be undone.":
+      "所有版本和關係也將被刪除。此操作無法撤銷。",
+    "Delete entry": "刪除條目",
+    "Delete {n} entries": "刪除{n}個條目",
+    "Search concept, alias, description, tag, author or work…":
+      "搜尋概念、別名、描述、標籤、作者或文獻…",
+    "All statuses": "所有狀態",
+    Draft: "草稿",
+    Active: "活躍",
+    Archived: "已歸檔",
+    "All tags": "所有標籤",
+    "All authors": "所有作者",
+    "All works": "所有文獻",
+    All: "全部",
+    "New evidence": "新證據",
+    "Insufficient evidence": "證據不足",
+    Name: "名稱",
+    Created: "建立時間",
+    Updated: "更新時間",
+    Authors: "作者",
+    Works: "文獻",
+    Evidence: "證據",
+    Status: "狀態",
+    "A description has not been generated yet.": "尚未生成描述。",
+    "{n} new": "{n}個新增",
+    "Loading Dictionary…": "正在載入詞典…",
+    "No entries match this filter.": "沒有條目符合此篩選條件。",
+    "Opening entry…": "正在開啟條目…",
+    Overview: "概況",
+    Versions: "版本",
+    "Dictionary model": "詞典模型",
+    Insufficient: "不足",
+    "No aliases": "無別名",
+    "No additional focus.": "無額外聚焦。",
+    "{n} evidence items": "{n}條證據",
+    "{n} authors": "{n}位作者",
+    "{n} works": "{n}篇文獻",
+    "Retrieve evidence": "檢索證據",
+    "Search for new evidence": "搜尋新證據",
+    "Searching…": "正在搜尋…",
+    Generate: "生成",
+    Regenerate: "重新生成",
+    "Generating…": "正在生成…",
+    Update: "更新",
+    "Updating…": "正在更新…",
+    "No evidence is included. Review the Evidence tab, include at least one item and try again.":
+      "未包含任何證據。請檢視「證據」選項卡，至少包含一個專案後重試。",
+    "Not enough evidence was found to generate automatically. You can inspect the search in Evidence.":
+      "未找到足夠的證據來自動生成。你可以在「證據」中檢查搜尋。",
+    "Concept synthesis": "概念合成",
+    Edit: "編輯",
+    "A definition could not be generated yet. Try again from the Generate button.":
+      "尚未能生成定義。請通過「生成」按鈕重試。",
+    Coverage: "覆蓋範圍",
+    Included: "已包含",
+    Cited: "已引用",
+    Unused: "未使用",
+    Excluded: "已排除",
+    New: "新增",
+    Unavailable: "不可用",
+    Details: "詳情",
+    "Last scan": "上次掃描",
+    Notes: "備註",
+    "Retrieved evidence": "已檢索的證據",
+    "Nodus automatically selected {n} items for the definition. You can inspect them here or adjust a regeneration.":
+      "Nodus自動為定義選擇了{n}個專案。你可以在此檢查它們或調整重新生成。",
+    "Regenerate with adjustments": "調整後重新生成",
+    "Search the evidence…": "搜尋證據…",
+    "All decisions": "所有決定",
+    Used: "已使用",
+    "Relevant, unused": "相關但未使用",
+    "New only": "僅新增",
+    "Loading evidence…": "正在載入證據…",
+    "No evidence matches these filters.": "沒有證據符合這些篩選條件。",
+    PASSAGE: "片段",
+    IDEA: "觀點",
+    "Open idea": "開啟觀點",
+    "Open original passage": "開啟原始片段",
+    Include: "包含",
+    "Do not use": "不使用",
+    Exclude: "排除",
+    "Current version": "當前版本",
+    "No specific summary in the current version.":
+      "當前版本中沒有特定摘要。",
+    "The current version has no related authors.": "當前版本沒有關聯作者。",
+    "Author unavailable": "作者不可用",
+    "Nodus Library": "Nodus文獻庫",
+    Zotero: "Zotero",
+    "The current version has no related works.": "當前版本沒有關聯文獻。",
+    "Proposed update": "建議的更新",
+    "The current version remains unchanged until you accept this proposal.":
+      "在你接受此建議之前，當前版本保持不變。",
+    "Accept proposal": "接受建議",
+    "Restore as new version": "恢復為新版本",
+    "Generation error": "生成錯誤",
+    "Generation could not be completed.": "生成未能完成。",
+    Generated: "已生成",
+    "Synthesis pending": "合成待處理",
+    "Latest attempt degraded": "最近一次嘗試已降級",
+    "The latest attempt did not produce a verifiable synthesis":
+      "最近一次嘗試未產生可驗證的合成",
+    "The response was truncated before it completed.": "響應在完成前被截斷。",
+    "The model returned a response that could not be interpreted.":
+      "模型返回了無法解讀的響應。",
+    "The response did not follow the required structure.":
+      "響應未遵循所需的結構。",
+    "The response used invalid evidence references.":
+      "響應使用了無效的證據引用。",
+    "The synthesis did not include verifiable citations.":
+      "合成未包含可驗證的引注。",
+    "Verification rejected the generated claims.": "驗證拒絕了生成的論斷。",
+    "This version came from the previous extractive fallback.":
+      "此版本來自之前的抽取式回退。",
+    "A verifiable synthesis could not be obtained.":
+      "未能獲得可驗證的合成。",
+    "It was attempted {n} times. The previous version is preserved.":
+      "已嘗試{n}次。先前的版本已保留。",
+    "Nodus made {n} automatic attempts.": "Nodus進行了{n}次自動嘗試。",
+    "The previous version remains unchanged.": "先前的版本保持不變。",
+    "The extractive evidence is kept in Versions, but it has not been applied as the definition.":
+      "抽取式證據保留在「版本」中，但尚未作為定義應用。",
+    "Degraded generation": "降級生成",
+    "{n} automatic attempts were made.": "已進行{n}次自動嘗試。",
+    degraded: "已降級",
+    Queued: "已排隊",
+    "Analyzing corpus…": "正在分析語料庫…",
+    "Generating definition…": "正在生成定義…",
+    "Writing definition…": "正在撰寫定義…",
+    "Checking…": "正在檢查…",
+    exact: "精確",
+    alias: "別名",
+    semantic: "語義",
+    "Edit entry": "編輯條目",
+    "Save manual version": "儲存手動版本",
+    "Markdown description": "Markdown描述",
+    "{ideas} ideas · {works} works": "{ideas}條觀點 · {works}篇文獻",
+    "editorial attribution": "編輯歸屬",
+    Spanish: "西班牙語",
+    English: "英語",
+    French: "法語",
+    Turkish: "土耳其語",
+    German: "德語",
+    Portuguese: "葡萄牙語",
+    "Portuguese (Brazil)": "葡萄牙語（巴西）",
+    Italian: "義大利語",
+  }),
+);
+
 /** Prompt presets are authored as Spanish keys and translated explicitly. */
 Object.assign(DICTIONARY_TRANSLATIONS.en as DictionaryTable, {
   "Cambiar dirección de orden": "Change sort direction",
@@ -1872,4 +2077,42 @@ Object.assign(DICTIONARY_TRANSLATIONS["zh-CN"] as DictionaryTable, {
     "审视假设、张力、批评和开放性问题。",
   "Realiza una lectura crítica del concepto: supuestos, tensiones internas, ambigüedades, críticas, límites y cuestiones abiertas señaladas por los autores o visibles en la evidencia.":
     "对该概念进行批判性阅读：作者指出或证据中可见的假设、内部张力、歧义、批评、界限和开放性问题。",
+});
+
+Object.assign(DICTIONARY_TRANSLATIONS['zh-TW'] as DictionaryTable, {
+  "Cambiar dirección de orden": "更改排序方向",
+  "Preconfiguración del prompt": "提示詞預設",
+  Personalizado: "自定義",
+  "Escribe o adapta libremente las instrucciones para la síntesis.":
+    "自由編寫或調整合成指令。",
+  "Básico · definición y autores": "基礎 · 定義與作者",
+  "Define el concepto e identifica a los autores que lo desarrollan.":
+    "定義概念並識別對其進行發展的作者。",
+  "Define el concepto con precisión a partir de la evidencia e identifica a los principales autores que lo desarrollan, explicando brevemente la aportación de cada uno.":
+    "根據證據精確定義概念，並識別對其進行發展的主要作者，簡要說明每位作者的貢獻。",
+  "Evolución histórica": "歷史演變",
+  "Sigue antecedentes, cambios y puntos de inflexión documentados.":
+    "追溯有據可查的先例、變化和轉折點。",
+  "Reconstruye la evolución histórica del concepto: antecedentes, primeras formulaciones, cambios de significado y autores u obras que marcan puntos de inflexión.":
+    "重建概念的歷史演變：其先例、早期表述、含義變化以及標誌轉折點的作者或文獻。",
+  "Debate entre autores": "作者之間的爭論",
+  "Compara acuerdos, desacuerdos y matices entre autores.":
+    "比較作者之間的一致、分歧和細微差別。",
+  "Compara cómo definen y utilizan el concepto los distintos autores. Expón acuerdos, desacuerdos, matices y posiciones intermedias, sin atribuir debates que la evidencia no sostenga.":
+    "比較不同作者如何定義和使用該概念。呈現一致、分歧、細微差別和中間立場，不歸因於證據無法支援的爭論。",
+  "Genealogía teórica": "理論譜系",
+  "Reconstruye antecedentes, marcos y conceptos relacionados.":
+    "重建先例、框架和相關概念。",
+  "Sitúa el concepto dentro de su genealogía teórica. Explica de qué ideas procede, con qué conceptos se relaciona, qué tradiciones o marcos lo articulan y qué autores realizan esas conexiones.":
+    "將概念置於其理論譜系中。說明它源自哪些觀點、與哪些概念相關、哪些傳統或框架對其加以闡述，以及哪些作者建立了這些聯絡。",
+  "Usos y aplicaciones": "用途與應用",
+  "Explica cómo se utiliza el concepto y cuáles son sus límites.":
+    "說明該概念如何使用及其界限。",
+  "Explica cómo se aplica u operacionaliza el concepto en las obras del corpus. Distingue ámbitos de uso, problemas que ayuda a analizar, ejemplos documentados y límites de aplicación.":
+    "說明該概念在語料庫文獻中如何應用或操作化。區分使用領域、它有助於分析的問題、有據可查的示例以及應用界限。",
+  "Lectura crítica": "批判性閱讀",
+  "Examina supuestos, tensiones, críticas y preguntas abiertas.":
+    "審視假設、張力、批評和開放性問題。",
+  "Realiza una lectura crítica del concepto: supuestos, tensiones internas, ambigüedades, críticas, límites y cuestiones abiertas señaladas por los autores o visibles en la evidencia.":
+    "對該概念進行批判性閱讀：作者指出或證據中可見的假設、內部張力、歧義、批評、界限和開放性問題。",
 });
