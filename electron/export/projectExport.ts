@@ -10,7 +10,7 @@ import type {
   ProjectInsertionSuggestion,
 } from '@shared/types';
 import * as projects from '../db/projectsRepo';
-import { markdownToPdf, stripMarkdownLinks } from './markdownRender';
+import { markdownToPdf } from './markdownRender';
 import { markdownToDocx } from './markdownDocx';
 import { getSettings } from '../db/settingsRepo';
 
