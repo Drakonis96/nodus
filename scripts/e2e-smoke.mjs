@@ -1009,9 +1009,9 @@ try {
   console.log('[e2e] sidebar Nodus brand stays centred throughout real resizing');
 
   // ── Header: the centre badge yields to the rails instead of overlapping ────
-  // A hard left:50% badge sat under the action rail as soon as it grew (the AI
-  // alert, a hovered label, a dragged-wide sidebar). Measure the real boxes and
-  // assert the geometry survives every state that widens a rail.
+  // A hard left:50% badge sat under the header controls when the available space
+  // tightened (the model alert or a dragged-wide sidebar). Measure the real boxes
+  // and assert the geometry survives each constrained layout state.
   const HEADER_GAP = 12;
   // The badge only renders from the xl breakpoint up (xl:inline-flex); below it the
   // element is display:none by design and there is nothing to measure. The app asks
@@ -1112,6 +1112,8 @@ try {
           rail: box(rail),
           badge: badge && getComputedStyle(badge).visibility === 'visible' ? box(badge) : null,
           label: node?.querySelector('span')?.getBoundingClientRect().width ?? null,
+          title: node?.querySelector('button')?.getAttribute('title') ?? null,
+          ariaLabel: node?.querySelector('button')?.getAttribute('aria-label') ?? null,
         };
       });
       assert.ok(alert.alert, 'the model alert is rendered');
@@ -1119,17 +1121,20 @@ try {
       assert.ok(alert.logo && alert.alert.left >= alert.logo.right, 'the alert clears the sidebar rail');
       const bandRight = alert.badge ? alert.badge.left : alert.rail.left;
       assert.ok(alert.alert.right <= bandRight, 'the alert clears whatever the band ends at');
-      // Centred in that band, and folded: the label opens on hover, not before.
+      // Centred in that band, with its title available through the native tooltip
+      // instead of adding a label to the layout.
       const centre = alert.alert.left + alert.alert.width / 2;
       assert.ok(
         Math.abs(centre - (alert.logo.right + bandRight) / 2) <= 14,
         `the alert sits in the middle of its band (centre ${centre.toFixed(1)}, band ${alert.logo.right.toFixed(1)}–${bandRight.toFixed(1)})`
       );
-      assert.ok(alert.label !== null && alert.label < 4, `the alert's label stays folded until hover (${alert.label}px)`);
+      assert.equal(alert.label, null, 'the alert title stays out of the layout');
+      assert.ok(alert.title, 'the alert exposes a native title tooltip');
+      assert.equal(alert.title, alert.ariaLabel, 'the native tooltip matches the accessible label');
     }
-    // Narrowing the window exercises the responsive rail. Depending on the available
-    // native titlebar width, its labels can collapse before the badge needs to move;
-    // either a centred or clamped badge is valid as long as it stays clear of both rails.
+    // Narrowing the window exercises the responsive rail. Native tooltips do not add
+    // layout width, so a centred or clamped badge is valid as long as it stays clear
+    // of both rails.
     // The deterministic geometry suite separately fixes the clamp branch itself.
     await setWindowWidth(980);
     const tight = await assertHeaderBadgeSafe('con el aviso de IA abierto y la ventana estrecha');
@@ -1150,10 +1155,11 @@ try {
     const roomy = await assertHeaderBadgeSafe('sin el aviso');
     assert.ok(roomy.visible, 'the badge shows on a roomy header');
 
-    // Hovering a rail button opens its label and widens the rail mid-flight.
+    // Hovering a rail button keeps the label out of the layout; the native title
+    // tooltip is owned by the browser and does not widen the rail.
     await page.locator('[data-tour="toolkit"]').hover();
     await page.waitForTimeout(400);
-    await assertHeaderBadgeSafe('con una etiqueta desplegada al pasar el ratón');
+    await assertHeaderBadgeSafe('con un tooltip nativo sin expandir la barra');
     await page.mouse.move(0, 300);
     await page.waitForTimeout(400);
 
