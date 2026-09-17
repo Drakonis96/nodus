@@ -253,6 +253,7 @@
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
     "eslint": "^8.57.1",
+    "jsdom": "^23.2.0",
     "playwright-core": "^1.61.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",

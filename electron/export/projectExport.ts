@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import { dialogTitle } from '../dialogTitles';
 import path from 'node:path';
 import { app, dialog } from 'electron';
-import { Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx';
 import type {
   ChapterExportFormat,
   ExportProjectChapterRequest,
@@ -11,8 +10,13 @@ import type {
   ProjectInsertionSuggestion,
 } from '@shared/types';
 import * as projects from '../db/projectsRepo';
-import { collectCitations, markdownToPdf, stripInlineMarkdown, stripMarkdownLinks } from './markdownRender';
+import { markdownToPdf } from './markdownRender';
+import { markdownToDocx } from './markdownDocx';
 import { getSettings } from '../db/settingsRepo';
+
+// The Word renderer lives in its own module now; re-exported so the study export and
+// anything else that already imported it from here keeps working.
+export { markdownToDocx, pngSize, type DocxImage, type DocxOptions } from './markdownDocx';
 
 export async function exportProject(request: ExportProjectRequest): Promise<{ path: string } | null> {
   const detail = projects.getProjectDetail(request.projectId);
@@ -140,75 +144,6 @@ export function markdownToPlainText(markdown: string): string {
     .replace(/[*_`>]/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim() + '\n';
-}
-
-export async function markdownToDocx(markdown: string): Promise<Buffer> {
-  const children = markdownToDocxParagraphs(markdown);
-  const refs = collectCitations(markdown);
-  if (refs.length) {
-    children.push(new Paragraph({ text: 'Bibliografia Nodus', heading: HeadingLevel.HEADING_1 }));
-    for (const ref of refs) {
-      children.push(new Paragraph({ text: `${ref.label} - ${ref.url}`, bullet: { level: 0 } }));
-    }
-  }
-  const document = new Document({ sections: [{ children }] });
-  return Packer.toBuffer(document);
-}
-
-function markdownToDocxParagraphs(markdown: string): Paragraph[] {
-  const paragraphs: Paragraph[] = [];
-  const lines = markdown.split(/\r?\n/);
-  let buffer: string[] = [];
-  const flush = () => {
-    const text = buffer.join(' ').trim();
-    if (text) paragraphs.push(new Paragraph({ children: inlineRuns(text) }));
-    buffer = [];
-  };
-
-  for (const line of lines) {
-    const heading = line.match(/^(#{1,6})\s+(.+)$/);
-    const bullet = line.match(/^\s*[-*]\s+(.+)$/);
-    if (!line.trim()) {
-      flush();
-      continue;
-    }
-    if (heading) {
-      flush();
-      paragraphs.push(new Paragraph({ text: stripMarkdownLinks(heading[2]), heading: headingLevel(heading[1].length) }));
-      continue;
-    }
-    if (bullet) {
-      flush();
-      paragraphs.push(new Paragraph({ children: inlineRuns(bullet[1]), bullet: { level: 0 } }));
-      continue;
-    }
-    buffer.push(line.trim());
-  }
-  flush();
-  return paragraphs.length ? paragraphs : [new Paragraph('')];
-}
-
-function inlineRuns(text: string): TextRun[] {
-  const runs: TextRun[] = [];
-  const re = /\[([^\]]+)\]\((nodus:\/\/[^)]+)\)/g;
-  let cursor = 0;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(text)) !== null) {
-    if (match.index > cursor) runs.push(new TextRun(stripInlineMarkdown(text.slice(cursor, match.index))));
-    runs.push(new TextRun({ text: stripInlineMarkdown(match[1]), italics: false }));
-    cursor = match.index + match[0].length;
-  }
-  if (cursor < text.length) runs.push(new TextRun(stripInlineMarkdown(text.slice(cursor))));
-  return runs.length ? runs : [new TextRun('')];
-}
-
-function headingLevel(level: number): (typeof HeadingLevel)[keyof typeof HeadingLevel] {
-  if (level <= 1) return HeadingLevel.HEADING_1;
-  if (level === 2) return HeadingLevel.HEADING_2;
-  if (level === 3) return HeadingLevel.HEADING_3;
-  if (level === 4) return HeadingLevel.HEADING_4;
-  if (level === 5) return HeadingLevel.HEADING_5;
-  return HeadingLevel.HEADING_6;
 }
 
 function slug(value: string): string {

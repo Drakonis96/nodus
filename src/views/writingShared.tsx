@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { DecorativeImageStyle, SupportAuditEntry, WritingWorkshopBrief, WritingWorkshopDraft, WritingWorkshopSavedDraft } from '@shared/types';
+import type { DecorativeImageStyle, SupportAuditEntry, WritingWorkshopBrief, WritingWorkshopDraft, WritingWorkshopExportFormat, WritingWorkshopSavedDraft } from '@shared/types';
 import type { DeepResearchQualityAssessment } from '@shared/deepResearchQuality';
 import { documentBodyForPanels } from '@shared/writingDocument';
 import { Badge, HoverLabelButton, Icon } from '../components/ui';
@@ -84,7 +84,7 @@ export function DraftActionBar({
   onCopyReading?: () => void;
   onSaveDraft?: () => void;
   onSaveToNotes: () => void;
-  onExport: (format: 'markdown' | 'pdf') => void;
+  onExport: (format: WritingWorkshopExportFormat) => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -148,7 +148,7 @@ export function DraftResultMain({
   onCopy: () => void;
   onSaveDraft?: () => void;
   onSaveToNotes: () => void;
-  onExport: (format: 'markdown' | 'pdf') => void;
+  onExport: (format: WritingWorkshopExportFormat) => void;
   onCitation: (citation: MarkdownCitation) => void;
   onStudyDocument?: (id: string) => void;
   onStudyMaterial?: (id: string) => void;
@@ -202,10 +202,10 @@ export function DraftResultMain({
   );
 }
 
-function ExportMenu({ exporting, compact = false, onExport }: { exporting: boolean; compact?: boolean; onExport: (format: 'markdown' | 'pdf') => void }) {
+function ExportMenu({ exporting, compact = false, onExport }: { exporting: boolean; compact?: boolean; onExport: (format: WritingWorkshopExportFormat) => void }) {
   const [open, setOpen] = useState(false);
   const menuRef = useDismissableLayer<HTMLDivElement>({ open, onDismiss: () => setOpen(false) });
-  const choose = (format: 'markdown' | 'pdf') => {
+  const choose = (format: WritingWorkshopExportFormat) => {
     setOpen(false);
     onExport(format);
   };
@@ -235,6 +235,9 @@ function ExportMenu({ exporting, compact = false, onExport }: { exporting: boole
           </button>
           <button className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-800 flex items-center gap-2" onClick={() => choose('pdf')}>
             <Icon name="download" size={14} /> {t('PDF (.pdf)')}
+          </button>
+          <button className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-800 flex items-center gap-2" onClick={() => choose('docx')}>
+            <Icon name="fileText" size={14} /> {t('Word (.docx)')}
           </button>
         </div>
       )}

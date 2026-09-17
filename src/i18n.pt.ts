@@ -5323,8 +5323,10 @@ export const PT: Record<string, string> = {
   'Corregida': 'Corrigida',
   'Apuntes': 'Notas',
   'Apunte': 'Nota',
+  'Apunte de estudio': 'Nota de estudo',
   'Apunte creado en Nodus': 'Nota criada no Nodus',
   'Abrir apunte': 'Abrir nota',
+  'El apunte guarda la respuesta, la conversación de la que viene y sus fuentes citadas.': 'A nota guarda a resposta, a conversa de onde vem e as suas fontes citadas.',
   'Índice de estudio actualizado.': 'Índice de estudo atualizado.',
   'Buscar en el estudio': 'Procurar no estudo',
   'Coincidencia literal, relevancia textual, proximidad y similitud semántica en un único ranking.':
@@ -7980,6 +7982,7 @@ export const PT: Record<string, string> = {
   "Descargar ZIP": "Descarregar ZIP",
   "Texto editable, listo para otro editor. Se prepara al instante.": "Texto editável, pronto para outro editor. Prepara-se num instante.",
   "El informe maquetado, con portada y matriz. Tarda unos segundos por informe.": "O relatório paginado, com capa e matriz de rastreabilidade. Demora alguns segundos por relatório.",
+  "Documento de Word con las figuras incrustadas, para revisar o comentar.": "Um documento do Word com as figuras incorporadas, pronto para rever ou comentar.",
   "Markdown y PDF": "Markdown e PDF",
   "Ambos archivos de cada informe dentro del mismo ZIP.": "Os dois ficheiros de cada relatório dentro do mesmo ZIP.",
   // Por qué no se pudo generar una imagen: el motivo se GUARDA junto a la imagen

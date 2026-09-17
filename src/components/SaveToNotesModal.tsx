@@ -1,8 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Note, NoteFolder, NoteKind, NoteSource, Project } from '@shared/types';
+import type { Note, NoteFolder, NoteKind, NoteSource, Project, StudyDocument, StudyPlacementInput, StudyWorkspace } from '@shared/types';
 import { Icon } from './ui';
 import { flattenFolders } from '../notesTree';
 import { t } from '../i18n';
+import { buildStudyNoteDocument } from '../studyNoteFromChat';
+import { announceStudyWorkspaceChanged } from './StudySidebar';
+
+/**
+ * A second destination for the vaults that keep their own notes. The study and
+ * teaching vaults show `study_docs` under "Apuntes y materiales", a different store
+ * from the workspace notes this dialog writes by default, so an answer captured in
+ * those vaults has to be filed where the vault actually lists it.
+ */
+export interface StudyNoteDestination {
+  /** Placement the dialog opens with; the user can change it before saving. */
+  defaultPlacement?: StudyPlacementInput | null;
+  /** Opens the saved note in the vault that owns it. */
+  onOpenSavedDocument?: (documentId: string) => void;
+}
 
 /**
  * Reusable "save this content to my notes" dialog. The content is Markdown that may
@@ -17,6 +32,7 @@ export function SaveToNotesModal({
   source,
   destinationLabel = 'Notas',
   allowProjectLink = false,
+  studyDocument = null,
   onClose,
   onSaved,
   onOpenSavedNote,
@@ -29,6 +45,8 @@ export function SaveToNotesModal({
   destinationLabel?: string;
   /** When true, also offer to link the saved note to a project. */
   allowProjectLink?: boolean;
+  /** When set, the vault's own notes are offered as a second destination. */
+  studyDocument?: StudyNoteDestination | null;
   onClose: () => void;
   onSaved?: (note: Note) => void;
   onOpenSavedNote?: (note: Note) => void;
@@ -40,10 +58,19 @@ export function SaveToNotesModal({
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState<string>('');
+  const [destination, setDestination] = useState<'note' | 'study'>('note');
+  const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
+  const [courseId, setCourseId] = useState(studyDocument?.defaultPlacement?.courseId ?? '');
+  const [subjectId, setSubjectId] = useState(studyDocument?.defaultPlacement?.subjectId ?? '');
+  const [studyFolderId, setStudyFolderId] = useState(studyDocument?.defaultPlacement?.folderId ?? '');
+  const [topicId, setTopicId] = useState(studyDocument?.defaultPlacement?.topicId ?? '');
   const [saving, setSaving] = useState(false);
   const [savedNote, setSavedNote] = useState<Note | null>(null);
+  const [savedDocument, setSavedDocument] = useState<StudyDocument | null>(null);
   const [linkWarning, setLinkWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Whether this vault offers its own note store as a destination. */
+  const studyEnabled = Boolean(studyDocument);
 
   useEffect(() => {
     let on = true;
@@ -60,6 +87,23 @@ export function SaveToNotesModal({
     };
   }, [allowProjectLink]);
 
+  useEffect(() => {
+    // The destination arrives as a fresh object on every render of the chat, so the
+    // effect keys on whether it is there at all and reads the callback at render time.
+    if (!studyEnabled) return;
+    let on = true;
+    void window.nodus.getStudyWorkspace().then((next) => {
+      if (!on) return;
+      setWorkspace(next);
+      // A single course is the common case; opening on it keeps the subject list
+      // visible instead of asking for a choice that has only one answer.
+      setCourseId((current) => current || next.courses[0]?.id || '');
+    });
+    return () => {
+      on = false;
+    };
+  }, [studyEnabled]);
+
   const flat = useMemo(() => flattenFolders(folders), [folders]);
   const destinationPath = useMemo(() => {
     if (!folderId) return `${t(destinationLabel)} › ${t('Sin carpeta (raíz)')}`;
@@ -74,6 +118,28 @@ export function SaveToNotesModal({
     }
     return [t(destinationLabel), ...names].join(' › ');
   }, [destinationLabel, folderId, folders]);
+
+  const studySubjects = useMemo(
+    () => workspace?.subjects.filter((subject) => subject.courseId === courseId) ?? [],
+    [workspace, courseId],
+  );
+  const studyFolders = useMemo(
+    () => workspace?.folders.filter((folder) => folder.subjectId === subjectId) ?? [],
+    [workspace, subjectId],
+  );
+  const studyTopics = useMemo(
+    () => workspace?.topics.filter((topic) => topic.subjectId === subjectId && (studyFolderId ? topic.folderId === studyFolderId : !topic.folderId)) ?? [],
+    [workspace, subjectId, studyFolderId],
+  );
+  const studyPath = useMemo(() => {
+    const names = [
+      workspace?.courses.find((course) => course.id === courseId)?.name,
+      workspace?.subjects.find((subject) => subject.id === subjectId)?.name,
+      workspace?.folders.find((folder) => folder.id === studyFolderId)?.name,
+      workspace?.topics.find((topic) => topic.id === topicId)?.name,
+    ].filter((name): name is string => Boolean(name));
+    return [t('Apuntes'), ...names].join(' › ');
+  }, [workspace, courseId, subjectId, studyFolderId, topicId]);
 
   const createFolder = async () => {
     const name = newFolderName.trim();
@@ -94,9 +160,24 @@ export function SaveToNotesModal({
 
   const save = async () => {
     if (saving || !content.trim()) return;
+    if (destination === 'study' && !subjectId) return;
     setSaving(true);
     setError(null);
     try {
+      if (destination === 'study') {
+        const document = await window.nodus.createStudyDocument(buildStudyNoteDocument({
+          title,
+          content,
+          source,
+          placement: { courseId: courseId || null, subjectId, folderId: studyFolderId || null, topicId: topicId || null },
+        }));
+        // The vault lists notes from its own workspace snapshot, so it has to hear
+        // about the new one before the dialog closes.
+        announceStudyWorkspaceChanged();
+        setSavedDocument(document);
+        setSaving(false);
+        return;
+      }
       const note = await window.nodus.createNote({
         title,
         content,
@@ -127,6 +208,11 @@ export function SaveToNotesModal({
     }
   };
 
+  const saved = savedNote ?? savedDocument;
+  const openSaved = savedNote
+    ? (onOpenSavedNote ? () => onOpenSavedNote(savedNote) : undefined)
+    : (savedDocument && studyDocument?.onOpenSavedDocument ? () => studyDocument.onOpenSavedDocument?.(savedDocument.id) : undefined);
+
   return (
     <div className="fixed inset-0 z-[70] bg-black/70 p-4 flex items-center justify-center" onClick={onClose}>
       <div
@@ -145,19 +231,45 @@ export function SaveToNotesModal({
         </header>
 
         <div className="p-4 space-y-4">
-          {savedNote ? (
+          {saved ? (
             <div data-testid="save-note-success" className="rounded-lg border border-emerald-800 bg-emerald-950/30 p-4">
               <div className="flex items-start gap-3">
                 <Icon name="check" className="mt-0.5 text-emerald-400" />
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-emerald-200">{t('Nota guardada')}</p>
-                  <p className="mt-1 truncate text-xs text-neutral-300" title={savedNote.title}>{savedNote.title}</p>
-                  <p data-testid="save-note-destination" className="mt-2 text-xs text-neutral-500">{destinationPath}</p>
+                  <p className="mt-1 truncate text-xs text-neutral-300" title={saved.title}>{saved.title}</p>
+                  <p data-testid="save-note-destination" className="mt-2 text-xs text-neutral-500">{savedNote ? destinationPath : studyPath}</p>
                 </div>
               </div>
               {linkWarning && <p className="mt-3 text-xs text-amber-300">{linkWarning}</p>}
             </div>
           ) : <>
+          {studyEnabled && (
+            <div>
+              <label className="text-xs uppercase text-neutral-500">{t('Destino')}</label>
+              <div className="mt-1 flex gap-2">
+                <button
+                  type="button"
+                  data-testid="save-note-destination-note"
+                  aria-pressed={destination === 'note'}
+                  className={`btn flex-1 justify-center ${destination === 'note' ? 'btn-primary' : 'btn-ghost border border-neutral-700'}`}
+                  onClick={() => setDestination('note')}
+                >
+                  {t(destinationLabel)}
+                </button>
+                <button
+                  type="button"
+                  data-testid="save-note-destination-study"
+                  aria-pressed={destination === 'study'}
+                  className={`btn flex-1 justify-center ${destination === 'study' ? 'btn-primary' : 'btn-ghost border border-neutral-700'}`}
+                  onClick={() => setDestination('study')}
+                >
+                  {t('Apunte de estudio')}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="text-xs uppercase text-neutral-500">{t('Título')}</label>
             <input
@@ -168,6 +280,65 @@ export function SaveToNotesModal({
             />
           </div>
 
+          {destination === 'study' ? <>
+            {workspace && workspace.courses.length === 0 && (
+              <p className="rounded-md border border-amber-900/60 bg-amber-950/20 p-2 text-xs text-amber-300">
+                {t('Aún no hay cursos.')} {t('Crea tu primer curso para empezar.')}
+              </p>
+            )}
+            <div>
+              <label className="text-xs uppercase text-neutral-500">{t('Curso')}</label>
+              <select
+                data-testid="save-note-study-course"
+                className="input w-full mt-1"
+                value={courseId}
+                onChange={(e) => { setCourseId(e.target.value); setSubjectId(''); setStudyFolderId(''); setTopicId(''); }}
+              >
+                <option value="">{t('Selecciona un curso')}</option>
+                {(workspace?.courses ?? []).map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs uppercase text-neutral-500">{t('Asignatura')}</label>
+              <select
+                data-testid="save-note-study-subject"
+                className="input w-full mt-1"
+                value={subjectId}
+                onChange={(e) => { setSubjectId(e.target.value); setStudyFolderId(''); setTopicId(''); }}
+              >
+                <option value="">{t('Selecciona una asignatura')}</option>
+                {studySubjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs uppercase text-neutral-500">{t('Carpeta (opcional)')}</label>
+              <select
+                data-testid="save-note-study-folder"
+                className="input w-full mt-1"
+                value={studyFolderId}
+                onChange={(e) => { setStudyFolderId(e.target.value); setTopicId(''); }}
+              >
+                <option value="">{t('Directamente en la asignatura')}</option>
+                {studyFolders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs uppercase text-neutral-500">{t('Tema (opcional)')}</label>
+              <select
+                data-testid="save-note-study-topic"
+                className="input w-full mt-1"
+                value={topicId}
+                onChange={(e) => setTopicId(e.target.value)}
+              >
+                <option value="">{t('Sin tema')}</option>
+                {studyTopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}
+              </select>
+            </div>
+            <div className="rounded-md border border-neutral-800 bg-neutral-900/50 p-2 text-xs text-neutral-400">
+              <Icon name="info" size={12} className="mr-1 text-neutral-500" />
+              {t('El apunte guarda la respuesta, la conversación de la que viene y sus fuentes citadas.')}
+            </div>
+          </> : <>
           <div>
             <label className="text-xs uppercase text-neutral-500">{t('Carpeta')}</label>
             <select
@@ -178,7 +349,7 @@ export function SaveToNotesModal({
               <option value="">{t('Sin carpeta (raíz)')}</option>
               {flat.map(({ folder, depth }) => (
                 <option key={folder.id} value={folder.id}>
-                  {`${'  '.repeat(depth)}${depth > 0 ? '↳ ' : ''}${folder.name}`}
+                  {`${'  '.repeat(depth)}${depth > 0 ? '↳ ' : ''}${folder.name}`}
                 </option>
               ))}
             </select>
@@ -234,30 +405,32 @@ export function SaveToNotesModal({
             <Icon name="info" size={12} className="mr-1 text-neutral-500" />
             {t('Las citas clicables del contenido se conservan al guardar.')}
           </div>
+          </>}
 
           {error && <div className="text-xs text-red-400">{error}</div>}
           </>}
         </div>
 
         <footer className="px-4 py-3 border-t border-neutral-800 flex items-center justify-end gap-2">
-          {savedNote ? <>
+          {saved ? <>
             <button data-testid="save-note-continue" className="btn btn-ghost" onClick={onClose}>
-              {t(onOpenSavedNote ? 'Continuar en el chat' : 'Cerrar')}
+              {t(openSaved ? 'Continuar en el chat' : 'Cerrar')}
             </button>
-            {onOpenSavedNote && (
-              <button data-testid="save-note-open" className="btn btn-primary gap-1.5" onClick={() => onOpenSavedNote(savedNote)}>
-                <Icon name="external" /> {t('Abrir nota')}
+            {openSaved && (
+              <button data-testid="save-note-open" className="btn btn-primary gap-1.5" onClick={openSaved}>
+                <Icon name="external" /> {t(savedNote ? 'Abrir nota' : 'Abrir apunte')}
               </button>
             )}
           </> : <>
             <button className="btn btn-ghost" onClick={onClose}>{t('Cancelar')}</button>
             <button
+              data-testid="save-note-save"
               className="btn btn-primary gap-1.5"
               onClick={() => void save()}
-              disabled={saving || !content.trim()}
+              disabled={saving || !content.trim() || (destination === 'study' && !subjectId)}
             >
               <Icon name={saving ? 'sync' : 'save'} className={saving ? 'animate-spin' : ''} />
-              {saving ? t('Guardando…') : t('Guardar nota')}
+              {saving ? t('Guardando…') : t(destination === 'study' ? 'Guardar' : 'Guardar nota')}
             </button>
           </>}
         </footer>

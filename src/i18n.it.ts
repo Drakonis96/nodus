@@ -4855,8 +4855,10 @@ export const IT: Record<string, string> = {
   "Corregida": "Corretto",
   "Apuntes": "Note",
   "Apunte": "Nota",
+  "Apunte de estudio": "Appunto di studio",
   "Apunte creado en Nodus": "Nota creata in Nodus",
   "Abrir apunte": "Apri nota",
+  "El apunte guarda la respuesta, la conversación de la que viene y sus fuentes citadas.": "L'appunto conserva la risposta, la conversazione da cui proviene e le sue fonti citate.",
   "Índice de estudio actualizado.": "Indice degli studi aggiornato.",
   "Buscar en el estudio": "Cerca nell'area di lavoro dello studio",
   "Coincidencia literal, relevancia textual, proximidad y similitud semántica en un único ranking.": "Corrispondenze esatte, pertinenza del testo, prossimità e somiglianza semantica in un'unica classifica.",
@@ -7442,6 +7444,7 @@ export const IT: Record<string, string> = {
   "Descargar ZIP": "Scarica ZIP",
   "Texto editable, listo para otro editor. Se prepara al instante.": "Testo modificabile, pronto per un altro editor. Si prepara all’istante.",
   "El informe maquetado, con portada y matriz. Tarda unos segundos por informe.": "Il report impaginato, con copertina e matrice di tracciabilità. Richiede qualche secondo per report.",
+  "Documento de Word con las figuras incrustadas, para revisar o comentar.": "Un documento Word con le figure incorporate, pronto da rivedere o commentare.",
   "Markdown y PDF": "Markdown e PDF",
   "Ambos archivos de cada informe dentro del mismo ZIP.": "Entrambi i file di ogni report nello stesso ZIP.",
   // Por qué no se pudo generar una imagen: el motivo se GUARDA junto a la imagen

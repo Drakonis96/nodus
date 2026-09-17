@@ -675,7 +675,7 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
   });
   h('db:deepResearch:report:export', async (_e, id: string, options: DatabaseDeepResearchExportOptions) => {
     const vault = databaseResearchVault();
-    if (!options || !['markdown', 'pdf', 'zip'].includes(options.format)) throw new Error('Formato de exportación no válido.');
+    if (!options || !['markdown', 'pdf', 'docx', 'zip'].includes(options.format)) throw new Error('Formato de exportación no válido.');
     if (options.includeSnapshot && options.format !== 'zip') throw new Error('El snapshot bruto sólo puede incluirse en el ZIP reproducible.');
     const report = await withVaultDatabase(vault.id, () => databaseResearch.getDatabaseResearchReport(id));
     if (!report) return { canceled: true, path: null };

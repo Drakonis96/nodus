@@ -14,6 +14,7 @@ import type {
   DeepResearchSectionLimit,
   Person,
   PromptLanguage,
+  WritingWorkshopExportFormat,
   WritingWorkshopSavedDraft,
   DecorativeImage,
   DecorativeImageStyle,
@@ -790,7 +791,7 @@ export function DeepResearchView({
     setArchiveIds([...selected]);
   };
 
-  const exportDraft = async (format: 'markdown' | 'pdf') => {
+  const exportDraft = async (format: WritingWorkshopExportFormat) => {
     if (!openDraft) return;
     setExporting(true);
     setError(null);
@@ -1572,6 +1573,7 @@ function DraftListRow({
 const ARCHIVE_FORMATS: { value: DeepResearchArchiveFormat; label: string; hint: string }[] = [
   { value: 'markdown', label: 'Markdown (.md)', hint: 'Texto editable, listo para otro editor. Se prepara al instante.' },
   { value: 'pdf', label: 'PDF', hint: 'El informe maquetado, con portada y matriz. Tarda unos segundos por informe.' },
+  { value: 'docx', label: 'Word (.docx)', hint: 'Documento de Word con las figuras incrustadas, para revisar o comentar.' },
   { value: 'both', label: 'Markdown y PDF', hint: 'Ambos archivos de cada informe dentro del mismo ZIP.' },
 ];
 
@@ -1994,7 +1996,7 @@ function ReaderView({
   onSaveToNotes: () => void;
   onToggleRead: () => void;
   onTranslate: () => void;
-  onExport: (format: 'markdown' | 'pdf') => void;
+  onExport: (format: WritingWorkshopExportFormat) => void;
   onCitation: (target: CitationTarget) => void;
   onImageChange: (image: DecorativeImage) => void;
   onOpenStudyDocument?: (id: string) => void;

@@ -24,7 +24,7 @@ import { Icon, modelLabel, sortModelRefs } from '../components/ui';
 import type { MarkdownCitation } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ChatTypingIndicator } from '../components/ChatTypingIndicator';
-import { SaveToNotesModal } from '../components/SaveToNotesModal';
+import { SaveToNotesModal, type StudyNoteDestination } from '../components/SaveToNotesModal';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { VirtualList } from '../components/VirtualList';
 import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget } from '../navigation';
@@ -216,6 +216,7 @@ export function ResearchAssistantModal({
   adapter,
   initialConversationTarget,
   notesDestinationLabel = 'Notas',
+  studyNoteDestination = null,
   onOpenSavedNote,
 }: {
   settings: AppSettings;
@@ -228,6 +229,8 @@ export function ResearchAssistantModal({
   adapter?: ResearchChatAdapter;
   initialConversationTarget?: ResearchConversationNavigationTarget | null;
   notesDestinationLabel?: string;
+  /** Vaults with their own note store (study, teaching) offer it as a destination. */
+  studyNoteDestination?: StudyNoteDestination | null;
   onOpenSavedNote?: (noteId: string) => void;
 }) {
   const api = adapter ?? window.nodus;
@@ -1302,6 +1305,7 @@ export function ResearchAssistantModal({
           kind="assistant"
           source={noteTarget.source}
           destinationLabel={notesDestinationLabel}
+          studyDocument={studyNoteDestination}
           onClose={() => setNoteTarget(null)}
           onOpenSavedNote={onOpenSavedNote ? (note) => onOpenSavedNote(note.id) : undefined}
         />
