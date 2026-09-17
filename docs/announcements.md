@@ -34,12 +34,12 @@ date, newest first, with warnings ahead of infos published the same day.
   "copy": {
     "es": { "title": "…", "body": "…", "linkLabel": "Responder la encuesta" },
     "en": { "title": "…", "body": "…", "linkLabel": "Answer the survey" },
-    "fr": { … }, "de": { … }, "pt": { … }, "pt-BR": { … }, "it": { … }, "tr": { … }, "zh-CN": { … }, "zh-TW": { … }
+    "fr": { … }, "de": { … }, "pt": { … }, "pt-BR": { … }, "it": { … }, "tr": { … }, "zh-CN": { … }, "zh-TW": { … }, "ja": { … }
   }
 }
 ```
 
-**All ten languages are required** — the eight above plus `zh-CN` and `zh-TW`.
+**All eleven languages are required** — the eight above plus `zh-CN`, `zh-TW` and `ja`.
 `scripts/test-announcements.mjs` fails the PR if one is missing, so a notice cannot reach
 users half-translated. At runtime the app is
 more forgiving than CI — it needs only `es` and `en`, and falls back English-then-Spanish
