@@ -381,7 +381,7 @@ const languages: Record<PromptLanguage, { system: string; contextRule: string; k
       '어떤 절에 충분한 증거가 없으면 한계 또는 다음 단계로 밝히고, 빈틈을 채우지 마십시오.',
     ]),
     contextRule: '여기에 포함된 각 id는 nodus://idea, nodus://work, nodus://gap, nodus://contradiction 또는 nodus://passage로 인용할 수 있습니다. 구절은 축자적 증거이며 정확하게 인용해야 합니다.',
-    kindLabels: { literature_review: '문헌 검토', theoretical_framework: '이론적 틀', debate: '저자 간 논쟁', gap_justification: '갭 정당화', chapter_section: '장의 절', research_question: '연구 질문 또는 가설', deep_research: '심층 연구 보고서' }, fallback: koFallback,
+    kindLabels: { literature_review: '문헌 검토', theoretical_framework: '이론적 틀', debate: '저자 간 논쟁', gap_justification: '갭 정당화', chapter_section: '장의 절', research_question: '연구 질문 또는 가설', deep_research: 'Deep Research 보고서' }, fallback: koFallback,
   },
 };
 

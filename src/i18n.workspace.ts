@@ -431,7 +431,7 @@ export const WORKSPACE_TRANSLATIONS = {
     '{n} elemento(s) de biblioteca enlazado(s)': '{n} bağlı kitaplık öğesi',
   },
   'zh-CN': {
-    ...catalogue['zh-TW'],
+    ...catalogue['zh-CN'],
     'Cada afirmación, hallazgo, constructo, método y marco que el análisis extrajo de tus obras, con quién los sostiene.': '分析从你的文献中提取的每项论断、发现、构念、方法与框架，以及它们的提出者。',
     'Quién sostiene qué en tu corpus: una ficha por autoría, su síntesis y la matriz que las enfrenta.': '你的语料库中谁持有什么观点：每位作者一份档案、其综述，以及将它们对照的矩阵。',
     'El esqueleto argumental de tu corpus: qué idea apoya, refina o contradice a cuál, recorrido paso a paso.': '你的语料库的论证骨架：哪个观点支持、完善或反驳哪个观点，逐步展开。',

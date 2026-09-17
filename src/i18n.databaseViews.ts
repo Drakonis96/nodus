@@ -172,7 +172,7 @@ function language(index: number): Record<string, string> {
 }
 
 export const DATABASE_VIEW_TRANSLATIONS = {
-  en: language(1), fr: language(2), de: language(3), pt: language(4), 'pt-BR': language(5), it: language(6), tr: language(7), 'zh-CN': language(9),
+  en: language(1), fr: language(2), de: language(3), pt: language(4), 'pt-BR': language(5), it: language(6), tr: language(7), 'zh-CN': language(8),
   'zh-TW': language(9),
   ko: {
     "Selecciona una vista": "보기 선택",

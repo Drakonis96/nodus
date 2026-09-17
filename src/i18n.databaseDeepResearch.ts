@@ -8,7 +8,7 @@ const catalog = [
     "Deep Research de dados",
     "Deep Research de dados",
     "Deep Research sui dati",
-    "Veri Deep Research", "数据深度研究", "資料深度研究", "データのDeep Research", "데이터 심층 연구"
+    "Veri Deep Research", "数据深度研究", "資料深度研究", "データのDeep Research", "데이터 Deep Research"
   ],
   [
     "Investiga tus tablas con una pregunta clara, trazabilidad de fuentes y control del coste.",
@@ -879,7 +879,7 @@ const catalog = [
     "A API de Deep Research de dados ainda não está disponível.",
     "A API de Deep Research de dados ainda não está disponível.",
     "L’API Deep Research sui dati non è ancora disponibile.",
-    "Veri Deep Research API’si henüz kullanılamıyor.", "数据深度研究API尚不可用。", "資料深度研究API尚不可用。", "データ Deep Research API はまだ利用できません。", "데이터 Deep Research API는 아직 사용할 수 없습니다."
+    "Veri Deep Research API’si henüz kullanılamıyor.", "数据深度研究API尚不可用。", "資料 Deep Research API尚不可用。", "データ Deep Research API はまだ利用できません。", "데이터 Deep Research API는 아직 사용할 수 없습니다."
   ],
   [
     "Formula una pregunta sobre tus tablas y crea un informe con configuración automática; si lo necesitas, ajusta roles y estructura desde Opciones avanzadas.",

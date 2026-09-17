@@ -7,7 +7,7 @@ const catalog = [
 
 function language(index: number): Record<string, string> { return Object.fromEntries(catalog.map((row) => [row[0], row[index]])); }
 export const NOTION_IMPORT_TRANSLATIONS = {
-  en: language(1), fr: language(2), de: language(3), pt: language(4), 'pt-BR': language(5), it: language(6), tr: language(7), 'zh-CN': language(9),
+  en: language(1), fr: language(2), de: language(3), pt: language(4), 'pt-BR': language(5), it: language(6), tr: language(7), 'zh-CN': language(8),
   'zh-TW': language(9),
   ko: {
     "Importar desde Notion": "Notion에서 가져오기",

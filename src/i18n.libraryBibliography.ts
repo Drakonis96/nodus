@@ -420,8 +420,8 @@ const tr = {
 
 const zhCN = {
   ...identifiers,
-  ...styleManager['zh-TW'],
-  ...dateColumns['zh-TW'],
+  ...styleManager['zh-CN'],
+  ...dateColumns['zh-CN'],
   'Consulta fuentes bibliográficas públicas. Nada se aplica sin tu revisión.': '查询公开的文献来源。未经你审核，不会应用任何内容。',
   '{n} ficha(s) actualizada(s).': '已更新 {n} 条记录。',
   'Completar metadatos en lote': '批量补全元数据',

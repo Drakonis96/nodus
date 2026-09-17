@@ -62,7 +62,7 @@ export const PRIMARY_SOURCES_CATALOG_TRANSLATIONS = {
   ptBR: column(4),
   it: column(5),
   tr: column(6),
-  'zh-CN': column(8),
+  'zh-CN': column(7),
   'zh-TW': column(8),
   ko: {
     "Seleccionar icono": "아이콘 선택",

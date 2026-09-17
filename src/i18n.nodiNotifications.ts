@@ -297,7 +297,7 @@ export const NODI_NOTIFICATION_TRANSLATIONS = {
     "La indexación de textos necesita atención": "텍스트 인덱싱에 주의가 필요함",
     "Índice de textos completado": "텍스트 인덱스 완료",
     "{passages} fragmentos indexados en {works} obra(s).": "{works} 작품 전체에 걸쳐 색인된 {passages} 구절.",
-    "Informe de Deep Research listo": "심층 연구 보고서 준비됨",
+    "Informe de Deep Research listo": "Deep Research 보고서 준비됨",
     "«{title}» se pidió desde un cliente MCP y ya está en tu galería.": "\"{title}\"은(는) MCP 클라이언트에서 요청되었으며 현재 갤러리에 있습니다.",
     "Un informe de Deep Research ha fallado": "Deep Research 보고서가 실패했습니다.",
     "No se pudo generar «{title}», pedido desde un cliente MCP.": "MCP 클라이언트에서 요청한 \"{title}\"을(를) 생성할 수 없습니다.",

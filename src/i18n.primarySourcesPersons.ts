@@ -82,7 +82,7 @@ export const PRIMARY_SOURCES_PERSONS_TRANSLATIONS = {
   ptBR: { ...pt },
   it: language(5),
   tr: language(6),
-  'zh-CN': language(8),
+  'zh-CN': language(7),
   'zh-TW': language(8),
   ko: {
     "Provisional": "임시",

@@ -203,7 +203,7 @@ export const PRIMARY_SOURCES_DERIVED_TRANSLATIONS = {
   ptBR: { ...pt },
   it: language(5),
   tr: language(6),
-  'zh-CN': language(8),
+  'zh-CN': language(7),
   'zh-TW': language(8),
   ko: {
     "Cronología documental": "다큐멘터리 타임라인",
