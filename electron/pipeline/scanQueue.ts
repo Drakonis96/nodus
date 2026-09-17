@@ -23,6 +23,7 @@ import { startPerf } from '../perf';
 import { addNotification } from '../notifications';
 import { coalesce } from '../util/coalesce';
 import { nodiText } from '@shared/nodiNotifications';
+import { displayedQueueItem } from '@shared/queueProgress';
 import { logPipelineFailure, logPipelineWarning } from '../logging/pipelineLogCore';
 
 type ProgressListener = (p: QueueProgress) => void;
@@ -31,6 +32,18 @@ const MAX_RETRIES = 4;
 // A deep scan that degraded to abstract-only may simply have raced a just-attached
 // file. Re-scan once after this delay so the full text is picked up automatically
 // once Zotero has finished landing the attachment.
+
+/**
+ * One scale per deep item, shared by the phases that can be measured.
+ *
+ * Each phase used to report a fraction of itself, so the bar climbed to 100% while
+ * reading the pages and fell back to 5% when the analysis started. Extraction owns the
+ * first half and the analysis the second, and the phases the model cannot size (the
+ * required summary, indexing, publishing) report no fraction at all instead of leaving
+ * the previous phase's number parked next to an unrelated label.
+ */
+const EXTRACTION_SHARE = 0.5;
+const ANALYSIS_START = EXTRACTION_SHARE;
 
 class ScanQueue {
   private items: QueueItem[] = [];
@@ -101,12 +114,13 @@ class ScanQueue {
     // One pass rather than two filters plus a find over the same array.
     let done = 0;
     let failed = 0;
-    let current: QueueItem | undefined;
     for (const item of this.items) {
       if (item.state === 'done') done += 1;
       else if (item.state === 'failed') failed += 1;
-      else if (item.state === 'running' && !current) current = item;
     }
+    // The work the bar narrates is the oldest one still running, not the newest: see
+    // displayedQueueItem. The reader's title and detail line must both come from it.
+    const current = displayedQueueItem(this.items);
     return {
       paused: this.paused,
       pausedReason: this.pausedReason,
@@ -510,6 +524,9 @@ class ScanQueue {
     if (this.cancelAfterCurrent.has(item.id)) return;
     if (item.chain || settings.autoSummaryAfterDeep) {
       item.detail = 'Generando el resumen requerido…';
+      // These steps have no measurable fraction: the analysis percentage ends with the
+      // analysis instead of staying parked next to a label about something else.
+      item.subPct = null;
       this.emit();
       setSummaryPending(work.nodus_id);
       await runSummaryScan(work, item.model ?? null, { force: item.refresh });
@@ -517,12 +534,14 @@ class ScanQueue {
     if (this.cancelAfterCurrent.has(item.id)) return;
     if (this.embeddingConfigured()) {
       item.detail = 'Indexando ideas y pasajes requeridos…';
+      item.subPct = null;
       this.emit();
       await startEmbedding([work.nodus_id]);
       if (this.cancelAfterCurrent.has(item.id)) return;
       await startPassageEmbedding([work.nodus_id]);
     } else {
       item.detail = 'Modo léxico: no hay proveedor de embeddings configurado.';
+      item.subPct = null;
       this.emit();
     }
     if (!this.cancelAfterCurrent.has(item.id) && (item.chain || settings.autoBridgeAfterQueue)) {
@@ -750,7 +769,10 @@ class ScanQueue {
           onProgress: (p) => {
             if (this.cancelAfterCurrent.has(queueItem.id)) return;
             queueItem.detail = p.detail;
-            queueItem.subPct = p.pct;
+            // A step with no fraction of its own (checking the Zotero index, the OCR
+            // pass over problem pages) leaves the bar without a percentage instead of
+            // showing one it cannot back.
+            queueItem.subPct = p.pct == null ? null : EXTRACTION_SHARE * p.pct;
             this.emit();
           },
         },
@@ -759,13 +781,13 @@ class ScanQueue {
       setResolvedTextState(work.nodus_id, resolvedTextStateFromDoc(doc));
       if (!this.cancelAfterCurrent.has(queueItem.id)) {
         queueItem.detail = 'Analizando con IA…';
-        queueItem.subPct = null;
+        queueItem.subPct = ANALYSIS_START;
         this.emit();
       }
       await runDeepScan(work, doc, queueItem.model ?? null, (p) => {
         if (this.cancelAfterCurrent.has(queueItem.id)) return;
         queueItem.detail = p.detail;
-        queueItem.subPct = p.pct;
+        queueItem.subPct = ANALYSIS_START + (1 - ANALYSIS_START) * (p.pct ?? 0);
         this.emit();
       }, publicationOrdinal, { force: queueItem.refresh });
     } finally {

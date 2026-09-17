@@ -5,6 +5,7 @@ import { Icon } from './ui';
 import { ConfirmModal } from './ConfirmModal';
 import { t, tr, tx } from '../i18n';
 import { elapsedTimeLabel } from '@shared/elapsedTime';
+import { displayedQueueItem } from '@shared/queueProgress';
 import { useElapsedClock } from '../useElapsedClock';
 
 const KIND_LABELS: Record<QueueKind, string> = {
@@ -52,7 +53,9 @@ export function QueueBar({ progress }: { progress: QueueProgress | null }) {
   const workActive = items.some((item) => item.state === 'queued' || item.state === 'running' || item.state === 'paused');
   const active = workActive || maintenanceRunning;
   const terminal = !active && !maintenanceError;
-  const running = items.find((i) => i.state === 'running');
+  // The same work the snapshot names in `current`: the oldest one still running, so the
+  // title, the detail line and the elapsed time all keep narrating one work at a time.
+  const running = displayedQueueItem(items);
   const totalElapsed = elapsedTimeLabel(startedAt, finishedAt, now);
   const itemElapsed = elapsedTimeLabel(running?.started_at, running?.finished_at, now);
 

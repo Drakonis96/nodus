@@ -5094,7 +5094,12 @@ export interface QueueItem {
   finished_at: string | null;
   /** Sub-step detail for the running item, e.g. "OCR p. 12/340" or "Extrayendo p. 8/22". */
   detail?: string | null;
-  /** 0..1 progress within the current item (extraction/OCR), when known. */
+  /**
+   * 0..1 progress through the item's own plan, when the phase in hand can measure it:
+   * extraction owns the first half and the analysis the second, so the number only ever
+   * advances. Steps with no fraction of their own (the required summary, indexing, the
+   * OCR pass over problem pages) leave it null instead of parking the previous value.
+   */
   subPct?: number | null;
   /** Optional explicit override; null lets the job resolve its workload setting. */
   model?: ModelRef | null;

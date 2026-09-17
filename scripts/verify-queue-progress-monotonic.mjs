@@ -1,14 +1,14 @@
 // Verifies that the numbers on the queue bar's live line never move backwards:
-// the fragment counter (x/y), the inline percentage derived from it, the
-// per-fragment elapsed seconds, and the elapsed time of the work being shown.
+// the fragment counter (x/y), the percentage beside it, the per-fragment elapsed
+// seconds, the elapsed time of the work being shown, and the stability of the row
+// itself while several works run at once.
 //
-// It runs the REAL producers (runDeepScan's chunk fan-out and scanQueue's
+// It drives the REAL producers (runDeepScan's chunk fan-out and scanQueue's
 // scheduler) with a stubbed transport, because that is where the counters are
 // produced; nothing here is a re-implementation of the display maths.
 //
 // Run: node scripts/verify-queue-progress-monotonic.mjs
-// Exit code 0 means every counter is monotonic; 1 means the reported regression
-// is reproducible (see the frame tables printed above the verdict).
+// Exit code 0 means every invariant holds; 1 lists the frames that broke one.
 
 import { build } from 'esbuild';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -42,10 +42,11 @@ async function bundle(entry, name, stubs) {
   return { module: await import(pathToFileURL(outfile)), directory };
 }
 
-// ── Section 1: runDeepScan writes one shared line from N parallel chunk workers ──
-
 const CHUNK_FRAME = /^Analizando fragmento (\d+)\/(\d+) con IA…(?: \((\d+)s\))?$/;
 const FUSION_FRAME = /^Fusionando idea (\d+)\/(\d+)…$/;
+const CHAIN_FRAME = /^(Generando el resumen requerido…|Indexando ideas y pasajes requeridos…|Modo léxico: no hay proveedor de embeddings configurado\.)$/;
+
+// ── Section 1: runDeepScan writes the line once per phase, not once per worker ──
 
 async function deepScanFrames({ concurrencyMode, concurrency, chunkDurations, chunks }) {
   const probe = {
@@ -72,7 +73,7 @@ async function deepScanFrames({ concurrencyMode, concurrency, chunkDurations, ch
       export async function completeJson(request) {
         const probe = globalThis.__deepScanProbe;
         // jobId is "paper-1:deep:<chunk>:<depth>:<hash>". Split, never a regex: this
-        // source travels inside a template literal and "\d" would collapse to "d".
+        // source travels inside a template literal and a backslash-d would collapse.
         const index = Number(String(request.jobId ?? '').split(':')[2] ?? 0) || 0;
         await new Promise((resolve) => setTimeout(resolve, probe.chunkDurations[index] ?? 20));
         return {
@@ -151,24 +152,43 @@ async function deepScanFrames({ concurrencyMode, concurrency, chunkDurations, ch
   }
 }
 
-function checkChunkPhase(frames) {
+/** The counter, the percentage and the seconds all belong to one phase and only advance. */
+function checkDeepScanFrames(frames, section) {
   const regressions = [];
-  let maxIndex = 0;
+  // Fragments and ideas are two counters behind two different labels; each one, and the
+  // shared percentage that runs through both phases, must only move forward.
+  let maxIndex = { fragmento: 0, idea: 0 };
   let maxPct = -1;
   let maxSeconds = 0;
+  let sawFusion = false;
+  let lastChunkPct = -1;
   for (const frame of frames) {
     const chunk = CHUNK_FRAME.exec(frame.detail);
-    if (!chunk) continue;
-    const index = Number(chunk[1]);
-    const seconds = chunk[3] === undefined ? null : Number(chunk[3]);
-    if (index < maxIndex) regressions.push({ kind: 'fragmento', detail: frame.detail, previous: `fragmento ${maxIndex}`, at: frame.at });
-    maxIndex = Math.max(maxIndex, index);
+    const fusion = FUSION_FRAME.exec(frame.detail);
+    const counter = chunk ? 'fragmento' : fusion ? 'idea' : null;
+    const index = counter ? Number((chunk ?? fusion)[1]) : null;
+    const seconds = chunk && chunk[3] !== undefined ? Number(chunk[3]) : null;
+    if (counter && index < maxIndex[counter]) {
+      regressions.push({ section, kind: `contador de ${counter}s`, detail: `«${frame.detail}»`, at: frame.at });
+    }
+    if (counter) maxIndex[counter] = Math.max(maxIndex[counter], index);
     if (typeof frame.pct === 'number') {
-      if (frame.pct < maxPct) regressions.push({ kind: 'porcentaje', detail: frame.detail, previous: `${Math.round(maxPct * 100)}%`, at: frame.at });
+      if (frame.pct < maxPct - 1e-9) {
+        regressions.push({ section, kind: 'porcentaje', detail: `«${frame.detail}» con ${Math.round(frame.pct * 100)}% (venía de ${Math.round(maxPct * 100)}%)`, at: frame.at });
+      }
       maxPct = Math.max(maxPct, frame.pct);
+      if (fusion && !sawFusion) {
+        sawFusion = true;
+        if (lastChunkPct >= 0 && frame.pct < lastChunkPct - 1e-9) {
+          regressions.push({ section, kind: 'salto de fase', detail: `la fusión arranca en ${Math.round(frame.pct * 100)}% tras ${Math.round(lastChunkPct * 100)}%`, at: frame.at });
+        }
+      }
+      if (chunk) lastChunkPct = frame.pct;
     }
     if (seconds !== null) {
-      if (seconds < maxSeconds) regressions.push({ kind: 'segundos', detail: frame.detail, previous: `(${maxSeconds}s)`, at: frame.at });
+      if (seconds < maxSeconds) {
+        regressions.push({ section, kind: 'segundos del fragmento', detail: `«${frame.detail}»`, at: frame.at });
+      }
       maxSeconds = Math.max(maxSeconds, seconds);
     }
   }
@@ -185,18 +205,18 @@ function printFrames(title, frames) {
 
 /** Repeated frames collapse to one entry so the report stays readable. */
 function dedupe(entries) {
-  return [...new Map(entries.map((entry) => [`${entry.kind}|${entry.previous}|${entry.detail}`, entry])).values()];
+  return [...new Map(entries.map((entry) => [`${entry.kind}|${entry.detail}`, entry])).values()];
 }
 
-// ── Section 2: the bar shows the newest-started running work, so the displayed
-// row (title, elapsed, fragment counter) switches while several are in flight ──
+// ── Section 2 and 3: the real scanQueue, with a transport that walks the same
+// phases a deep item walks (extraction pages, fragments, fusion, required tail) ──
 
 async function scanQueueFrames(durations) {
-  const probe = { durations: {} };
+  const probe = { durations: { ...durations } };
   globalThis.__scanQueueProbe = probe;
   const { module, directory } = await bundle('electron/pipeline/scanQueue.ts', 'scan-queue-probe', [
     [/\.\.\/db\/database$/, 'db', `
-      export function getDb() { return { prepare: () => ({ get: (id) => ({ nodus_id: id, zotero_key: 'z1', title: id, doi: null, item_type: 'journalArticle', authors_json: '[]', deep_hash: 'stale', source_type: 'pdf', notes: null }), all: () => [], run: () => ({ changes: 1 }) }) }; }
+      export function getDb() { return { prepare: () => ({ get: (id) => ({ nodus_id: id, zotero_key: id, title: id, doi: null, item_type: 'journalArticle', authors_json: '[]', deep_hash: 'stale', source_type: 'pdf', notes: null }), all: () => [], run: () => ({ changes: 1 }) }) }; }
     `],
     [/\.\.\/db\/settingsRepo$/, 'settings', `export function getSettings() { return { aiConcurrencyMode: 'automatic', concurrency: 1, autoBridgeAfterQueue: false, autoSummaryAfterDeep: false, embeddingProvider: 'openai', providerKeys: { openai: false }, zoteroUserId: '', zoteroStoragePath: '', unpaywallEmail: '', preferZoteroFulltext: false, ocrEnabled: false, ocrLanguages: [], ocrMaxPages: 0, themesLocked: false, synthesisModel: null }; }`],
     [/\.\.\/ai\/lightScan$/, 'light', `export async function runLightScan() {}`],
@@ -205,16 +225,35 @@ async function scanQueueFrames(durations) {
       export function finishDeepScanPublicationOrdinal() {}
       export async function runDeepScan(work, _doc, _model, onProgress) {
         const ms = globalThis.__scanQueueProbe.durations[work.nodus_id] ?? 100;
-        onProgress?.({ detail: 'Analizando fragmento 1/4 con IA…', pct: 0 });
-        await new Promise((resolve) => setTimeout(resolve, Math.round(ms * 0.4)));
-        onProgress?.({ detail: 'Analizando fragmento 4/4 con IA… (1s)', pct: 0.75 });
-        await new Promise((resolve) => setTimeout(resolve, Math.round(ms * 0.6)));
+        // The scale runDeepScan now reports: fragments own 0 → 90%, fusion 90% → 100%.
+        const frames = [
+          { detail: 'Analizando fragmento 1/2 con IA…', pct: 0 },
+          { detail: 'Analizando fragmento 2/2 con IA… (1s)', pct: 0.45 },
+          { detail: 'Fusionando idea 1/1…', pct: 0.9 },
+          { detail: 'Fusionando idea 1/1…', pct: 1 },
+        ];
+        for (const frame of frames) {
+          onProgress?.(frame);
+          await new Promise((resolve) => setTimeout(resolve, Math.max(5, Math.round(ms * 0.05))));
+        }
       }
     `],
     [/\.\.\/ai\/summaryScan$/, 'summary', `export async function runSummaryScan() {}`],
     [/\.\.\/ai\/reprocessConnections$/, 'reprocess', `export async function reprocessConnections() { return { relationsAdded: 0, newThemes: 0 }; }`],
     [/\.\.\/db\/themesRepo$/, 'themes', `export function listThemeLabels() { return []; }`],
-    [/\.\.\/extraction\/textExtractor$/, 'text', `export async function resolveWorkText() { return { text: 'paper text', segments: [] }; } export function resolvedTextStateFromDoc() { return {}; }`],
+    [/\.\.\/extraction\/textExtractor$/, 'text', `
+      export async function resolveWorkText(_userId, zoteroKey, _path, _abstract, _doi, opts) {
+        const ms = globalThis.__scanQueueProbe.durations[zoteroKey] ?? 100;
+        opts.onProgress?.({ phase: 'analyze', detail: 'Analizando PDF…', pct: null });
+        await new Promise((resolve) => setTimeout(resolve, Math.max(5, Math.round(ms * 0.05))));
+        for (let page = 1; page <= 4; page++) {
+          opts.onProgress?.({ phase: 'extract', detail: 'Extrayendo p. ' + page + '/4', pct: page / 4 });
+          await new Promise((resolve) => setTimeout(resolve, Math.max(5, Math.round(ms * 0.1))));
+        }
+        return { text: 'paper text', segments: [] };
+      }
+      export function resolvedTextStateFromDoc() { return {}; }
+    `],
     [/\.\.\/zotero\/zoteroClient$/, 'zotero', `export async function getItem() { return { abstract: 'abstract' }; }`],
     [/\.\.\/db\/worksRepo$/, 'works', `export function clearDeepQueued() {} export function setDeepPending() {} export function setDeepResult() {} export function setResolvedTextState() {} export function setSummaryPending() {}`],
     [/\.\.\/db\/workSummariesRepo$/, 'summaries', `export function failedSummaryWorks() { return []; } export function pendingSummaryWorks() { return []; }`],
@@ -230,19 +269,23 @@ async function scanQueueFrames(durations) {
   try {
     const frames = [];
     const startedAt = Date.now();
-    // Mirrors QueueBar: the work shown is the FIRST running item, and the queue moves
-    // every newly started item to the front of the running block.
-    for (const [nodusId, ms] of Object.entries(durations)) probe.durations[nodusId] = ms;
+    // Mirrors QueueBar: the row shown is the oldest running work, and it narrates the
+    // same item the snapshot calls `current`.
     const off = module.scanQueue.onProgress(() => {
       const snapshot = module.scanQueue.snapshot();
-      const displayed = snapshot.items.find((item) => item.state === 'running');
+      const runningItems = snapshot.items.filter((item) => item.state === 'running');
+      const oldest = runningItems.reduce((oldestSoFar, item) => {
+        if (!oldestSoFar) return item;
+        return (item.started_at ?? item.enqueued_at) < (oldestSoFar.started_at ?? oldestSoFar.enqueued_at) ? item : oldestSoFar;
+      }, undefined);
       frames.push({
         at: Date.now() - startedAt,
-        title: displayed?.title ?? null,
-        detail: displayed?.detail ?? null,
-        subPct: displayed?.subPct ?? null,
-        elapsedMs: displayed?.started_at ? Date.now() - Date.parse(displayed.started_at) : null,
-        running: snapshot.items.filter((item) => item.state === 'running').length,
+        current: snapshot.current?.title ?? null,
+        title: oldest?.title ?? null,
+        detail: oldest?.detail ?? null,
+        subPct: oldest?.subPct ?? null,
+        elapsedMs: oldest?.started_at ? Date.now() - Date.parse(oldest.started_at) : null,
+        runningTitles: runningItems.map((item) => item.title),
       });
     });
     for (const nodusId of Object.keys(durations)) module.scanQueue.enqueue(nodusId, nodusId, 'deep');
@@ -254,34 +297,63 @@ async function scanQueueFrames(durations) {
   }
 }
 
-function checkDisplayedWork(frames) {
+/** One item walks one scale: extraction first half, analysis second, tail no fraction. */
+function checkItemProgress(frames, section) {
   const regressions = [];
-  const seen = new Set();
-  let maxElapsed = 0;
+  let maxSubPct = -1;
+  let previous = null;
   for (const frame of frames) {
-    if (frame.elapsedMs === null) continue;
-    if (frame.elapsedMs + 50 < maxElapsed) {
-      const entry = { kind: 'tiempo de la obra mostrada', detail: `${frame.title} · ${(frame.elapsedMs / 1000).toFixed(1)}s`, previous: `${(maxElapsed / 1000).toFixed(1)}s`, at: frame.at };
-      const key = `${entry.previous}→${entry.detail}`;
-      if (!seen.has(key)) { seen.add(key); regressions.push(entry); }
+    if (frame.title === null) continue;
+    if (typeof frame.subPct === 'number') {
+      if (frame.subPct < maxSubPct - 1e-9) {
+        regressions.push({ section, kind: 'porcentaje del elemento', detail: `${Math.round(frame.subPct * 100)}% tras ${Math.round(maxSubPct * 100)}% con «${frame.detail}»`, at: frame.at });
+      }
+      maxSubPct = Math.max(maxSubPct, frame.subPct);
     }
-    maxElapsed = Math.max(maxElapsed, frame.elapsedMs);
+    if (frame.detail && CHAIN_FRAME.test(frame.detail) && frame.subPct != null && frame.detail !== previous) {
+      regressions.push({ section, kind: 'porcentaje pegado', detail: `«${frame.detail}» conserva ${Math.round(frame.subPct * 100)}% del análisis`, at: frame.at });
+    }
+    previous = frame.detail;
+    if (frame.current !== null && frame.title !== null && frame.current !== frame.title) {
+      regressions.push({ section, kind: 'título y fila discrepan', detail: `snapshot.current=${frame.current} pero la barra muestra ${frame.title}`, at: frame.at });
+    }
   }
   return regressions;
 }
 
-/** Rows where the bar silently re-points at a different work. */
-function displaySwitches(frames) {
-  const switches = [];
-  let previousTitle = null;
+/** The row may only change when the work it was narrating has ended. */
+function checkDisplayedWork(frames, section) {
+  const regressions = [];
+  let previous = null;
+  let maxElapsed = 0;
   for (const frame of frames) {
     if (frame.title === null) continue;
-    if (previousTitle !== null && frame.title !== previousTitle) {
-      switches.push({ at: frame.at, from: previousTitle, to: frame.title, running: frame.running });
+    if (previous && frame.title !== previous.title && frame.runningTitles.includes(previous.title)) {
+      regressions.push({ section, kind: 'cambio de obra', detail: `${previous.title} → ${frame.title} con ${previous.title} aún en curso (${frame.runningTitles.length} en curso)`, at: frame.at });
     }
-    previousTitle = frame.title;
+    if (previous && frame.title === previous.title && frame.elapsedMs !== null && frame.elapsedMs + 50 < maxElapsed) {
+      regressions.push({ section, kind: 'tiempo de la obra mostrada', detail: `${(frame.elapsedMs / 1000).toFixed(1)}s tras ${(maxElapsed / 1000).toFixed(1)}s en «${frame.title}»`, at: frame.at });
+    }
+    if (!previous || frame.title !== previous.title) maxElapsed = 0;
+    maxElapsed = Math.max(maxElapsed, frame.elapsedMs ?? 0);
+    previous = frame;
   }
-  return switches;
+  return regressions;
+}
+
+function report(section, frames, regressions) {
+  console.log(`\n  ${section}`);
+  let previousKey = null;
+  for (const frame of frames) {
+    if (frame.title === null) continue;
+    const key = `${frame.title}|${frame.detail}|${Math.floor((frame.subPct ?? -1) * 20)}`;
+    if (key === previousKey) continue;
+    previousKey = key;
+    const subPct = typeof frame.subPct === 'number' ? ` pct=${Math.round(frame.subPct * 100)}%` : '';
+    const elapsed = frame.elapsedMs === null ? '' : ` obra=${(frame.elapsedMs / 1000).toFixed(1)}s`;
+    console.log(`    [${String(frame.at).padStart(5)}ms] ${frame.title}${elapsed}${subPct}  ${frame.detail ?? ''}`);
+  }
+  console.log(`    → ${regressions.length ? `${regressions.length} fallos` : 'sin retrocesos'}`);
 }
 
 // ── Report ────────────────────────────────────────────────────────────────────
@@ -290,65 +362,63 @@ const failures = [];
 
 console.log('Verificando monotonicidad de los contadores del progreso…');
 
-// 1a. Manual concurrency: two chunk workers overlap, the late one starts its own
-// second counter and restarts the line while the first chunk is still running.
+// 1a. Manual concurrency: two fragment workers overlap, one of them starts late.
 {
   const frames = await deepScanFrames({ concurrencyMode: 'manual', concurrency: 2, chunks: 3, chunkDurations: [3000, 1500, 3000] });
   printFrames('runDeepScan · modo manual (2 fragmentos en paralelo), 3 fragmentos', frames);
-  const regressions = dedupe(checkChunkPhase(frames));
-  for (const regression of regressions) failures.push({ section: 'runDeepScan (paralelo, modo manual)', ...regression });
-  console.log(`    → ${regressions.length} retrocesos: ${regressions.map((entry) => `${entry.kind} (${entry.previous} → ${entry.detail})`).join(' | ') || 'ninguno'}`);
+  const regressions = dedupe(checkDeepScanFrames(frames, 'runDeepScan (manual, 2 en paralelo)'));
+  failures.push(...regressions);
+  console.log(`    → ${regressions.length ? `${regressions.length} retrocesos: ${regressions.map((entry) => `${entry.kind} ${entry.detail}`).join(' | ')}` : 'sin retrocesos'}`);
 }
 
-// 1b. Default automatic mode: the pool is 8 wide, and a fragment that starts late
-// (the document has more fragments than workers) rewrites seconds and counter.
+// 1b. Default automatic mode: the pool is 8 wide and the document has more fragments
+// than workers, so some fragments start minutes after others did.
 {
   const frames = await deepScanFrames({
     concurrencyMode: 'automatic', concurrency: 1, chunks: 12,
     chunkDurations: [1200, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 30, 30, 30, 30],
   });
   printFrames('runDeepScan · modo automático por defecto (8 en paralelo), 12 fragmentos', frames);
-  const regressions = dedupe(checkChunkPhase(frames));
-  for (const regression of regressions) failures.push({ section: 'runDeepScan (paralelo, modo automático)', ...regression });
-  console.log(`    → ${regressions.length} retrocesos: ${regressions.map((entry) => `${entry.kind} (${entry.previous} → ${entry.detail})`).join(' | ') || 'ninguno'}`);
-  const fusion = frames.find((frame) => FUSION_FRAME.test(frame.detail));
-  if (fusion) {
-    const chunkMax = frames.filter((frame) => CHUNK_FRAME.test(frame.detail)).reduce((max, frame) => Math.max(max, frame.pct ?? 0), 0);
-    console.log(`    → observación: la fase de fusión reinicia el % mostrado (${Math.round(chunkMax * 100)}% → ${Math.round((fusion.pct ?? 0) * 100)}%) en la misma línea`);
-  }
+  const regressions = dedupe(checkDeepScanFrames(frames, 'runDeepScan (automático, 8 en paralelo)'));
+  failures.push(...regressions);
+  console.log(`    → ${regressions.length ? `${regressions.length} retrocesos: ${regressions.map((entry) => `${entry.kind} ${entry.detail}`).join(' | ')}` : 'sin retrocesos'}`);
 }
 
-// 2. Several works in flight: the bar re-points at another work and the shown elapsed
-// (and its fragment counter) restarts while the work you were watching still runs.
+// 2. One item, whole plan: extraction, fragments, fusion and the required tail.
+{
+  const frames = await scanQueueFrames({ 'obra-unica': 900 });
+  report('scanQueue · una obra: escala única del porcentaje', frames, []);
+  const regressions = dedupe(checkItemProgress(frames, 'scanQueue (escala del elemento)'));
+  failures.push(...regressions);
+  const last = [...frames].reverse().find((frame) => typeof frame.subPct === 'number');
+  console.log(`    → ${regressions.length ? `${regressions.length} fallos: ${regressions.map((entry) => `${entry.kind} (${entry.detail})`).join(' | ')}` : `sin retrocesos (último porcentaje ${Math.round((last?.subPct ?? 0) * 100)}%)`}`);
+}
+
+// 3. Several works in flight: the row must not hop between them.
 {
   const frames = await scanQueueFrames({ 'obra-a': 800, 'obra-b': 400, 'obra-c': 400, 'obra-d': 400, 'obra-e': 1500, 'obra-f': 1500 });
-  console.log('\n  scanQueue · modo automático (4 obras a la vez): fila mostrada por la barra');
-  let previous = null;
-  for (const frame of frames) {
-    if (frame.title === null) continue;
-    // One row per state change: the wire already batches at 250 ms.
-    const key = `${frame.title}|${frame.detail}|${Math.floor((frame.elapsedMs ?? 0) / 1000)}`;
-    if (key === previous) continue;
-    previous = key;
-    const subPct = typeof frame.subPct === 'number' ? ` pct=${Math.round(frame.subPct * 100)}%` : '';
-    console.log(`    [${String(frame.at).padStart(5)}ms] ${frame.title}  obra=${(frame.elapsedMs / 1000).toFixed(1)}s  en curso=${frame.running}  ${frame.detail ?? ''}${subPct}`);
+  report('scanQueue · varias obras en paralelo: fila estable', frames, []);
+  const regressions = dedupe(checkDisplayedWork(frames, 'scanQueue (varias obras)'));
+  failures.push(...regressions);
+  const switches = [];
+  for (let index = 1; index < frames.length; index++) {
+    const before = frames[index - 1];
+    const after = frames[index];
+    if (before.title && after.title && before.title !== after.title) {
+      switches.push(`${before.title} → ${after.title} (t=${after.at}ms, ${after.runningTitles.length} en curso)`);
+    }
   }
-  const switches = displaySwitches(frames);
-  for (const entry of switches) {
-    console.log(`    · cambio de obra mostrada en t=${entry.at}ms: ${entry.from} → ${entry.to} (${entry.running} obras en curso)`);
-  }
-  const regressions = checkDisplayedWork(frames);
-  for (const regression of regressions) failures.push({ section: 'scanQueue (varias obras en paralelo)', ...regression });
-  console.log(`    → ${regressions.length} retrocesos del tiempo mostrado: ${regressions.map((entry) => `${entry.previous} → ${entry.detail}`).join(' | ') || 'ninguno'}`);
+  console.log(`    → cambios de obra: ${switches.length ? switches.join(' | ') : 'ninguno'}`);
+  console.log(`    → ${regressions.length ? `${regressions.length} fallos: ${regressions.map((entry) => `${entry.kind} (${entry.detail})`).join(' | ')}` : 'sin saltos con la obra en curso'}`);
 }
 
 console.log('\n──────── Resultado ────────');
 if (failures.length === 0) {
-  console.log('OK: todos los contadores son monótonos.');
+  console.log('OK: todos los contadores son monótonos y la fila mostrada es estable.');
   process.exit(0);
 }
-console.log(`FALLO: ${failures.length} retrocesos reproducidos con el código real.`);
+console.log(`FALLO: ${failures.length} inconsistencias reproducidas con el código real.`);
 for (const failure of failures) {
-  console.log(`  · [${failure.section}] ${failure.kind}: ${failure.previous} → ${failure.detail} (t=${failure.at}ms)`);
+  console.log(`  · [${failure.section}] ${failure.kind}: ${failure.detail} (t=${failure.at}ms)`);
 }
 process.exit(1);
