@@ -37,6 +37,11 @@ function formLanguage(request: IncomingMessage, url: URL): AppLanguage {
   if (candidate.startsWith('pt')) return 'pt';
   if (candidate.startsWith('it')) return 'it';
   if (candidate.startsWith('tr')) return 'tr';
+  // Script subtags win; a traditional region (zh-TW/HK/MO) gets the Traditional table.
+  if (candidate === 'zh-tw' || candidate.startsWith('zh-tw-')
+    || candidate === 'zh-hant' || candidate.startsWith('zh-hant-')
+    || candidate === 'zh-hk' || candidate.startsWith('zh-hk-')
+    || candidate === 'zh-mo' || candidate.startsWith('zh-mo-')) return 'zh-TW';
   // Simplified Chinese: zh-CN, zh-Hans, zh-SG and any bare `zh` locale.
   if (candidate === 'zh' || candidate.startsWith('zh-')) return 'zh-CN';
   return 'en';

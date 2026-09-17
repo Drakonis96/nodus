@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-export const SERVER_LANGUAGES = ['en', 'es', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN'];
+export const SERVER_LANGUAGES = ['en', 'es', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW'];
 
 const EN = {
   sourceCode: 'Source code',
@@ -88,7 +88,22 @@ const ZH_CN = {
   deletePublicationHeading: '删除发布', deletePublicationHelp: '{name} 的已发布副本将从服务器中删除。本地资料库不会更改。', deletePermanently: '永久删除', cancel: '取消',
   connectDesktop: '连接 Nodus Desktop', pairingHelp: '在设置 → 服务器中输入此代码：', pairingExpiry: '它将在 15 分钟后过期，且只能使用一次。', back: '返回',
   authorize: '授权', connectClient: '连接 {name}', appCan: '该应用程序将能够：', assignedOnly: '它只能访问分配给 {email} 的空间。', invalidOauth: '无效的 OAuth 请求',
-  error: '错误', sessionExpired: '会话已过期。', readerNotFound: '未找到读者账户。', spaceNotFound: '未找到空间。', internalError: '服务器内部错误。',
+  error: '错误', sessionExpired: '会话已过期。', readerNotFound: '未找到读者账户。', spaceNotFound: '未找到空间。', internalError: '服务器内
+
+const ZH_TW = {
+  sourceCode: '原始碼',
+  language: '語言', applyLanguage: '應用', brandTagline: '你的共享知識，由你掌控。', brandIntro: '向可信讀者釋出選定的資料庫，同時保留本地優先的工作流程。', privateByDesign: '僅限你明確共享的內容', oauthProtected: '安全的 OAuth 訪問', serverReady: '在一個清晰的工作區中管理共享空間、讀者和釋出裝置。', moreInformation: '更多資訊',
+  mcpHelp: '這是 ChatGPT、Claude 及其他相容 MCP 客戶端用於查閱已授權空間的地址。', spacesHelp: '每個空間都是一個 Nodus 資料庫的只讀釋出副本。請在對應行中建立其連線程式碼。', usersHelp: '讀者賬戶只能看到你分配給他們的空間，無法編輯原始資料庫。', devicesHelp: '這些是被授權釋出更新的 Nodus Desktop 安裝。請撤銷任何你不再認識的裝置。', newSpaceHelp: '為每個想要共享的資料庫建立一個遠端目標。', newUserHelp: '建立一個讀者賬戶，並可選擇授予其第一個空間。', setupTokenHelp: '此一次性金鑰來自部署環境，僅在初始設定期間使用。', publicUrlHelp: '讀者和相容客戶端將使用此公共 HTTPS 地址訪問該伺服器。',
+  setupTitle: '初始設定', setupHeading: '設定 Nodus Server', setupIntro: '在網際網路上釋出伺服器之前，請先完成此設定。', setupToken: '設定令牌', serverName: '伺服器名稱', publicUrl: '公共 URL', adminEmail: '管理員郵箱', adminPassword: '管理員密碼', createServer: '建立伺服器',
+  loginTitle: '登入', loginHeading: '登入 Nodus Server', email: '郵箱', password: '密碼', signIn: '登入', invalidLogin: '郵箱或密碼不正確。',
+  accountTitle: '我的賬戶', administration: '管理', signOut: '退出登入', changePassword: '修改密碼', passwordHelp: '請至少使用 12 個字元。修改密碼將退出你的其他會話，並撤銷 ChatGPT 和 Claude 的 OAuth 連線。', currentPassword: '當前密碼', newPassword: '新密碼', repeatPassword: '重複新密碼',
+  resetPassword: '重置密碼', backAdmin: '← 返回管理', resetHelp: '該賬戶將在所有裝置上退出登入，且必須重新連線 ChatGPT 或 Claude。', temporaryPassword: '新的臨時密碼',
+  mcpUrl: 'MCP URL', newSpace: '新建空間', name: '名稱', description: '描述', createSpace: '建立空間', newUser: '新建使用者', temporaryPasswordLabel: '臨時密碼', space: '空間', createReader: '建立讀者賬戶', spaces: '空間', lastPublication: '最近釋出', noSpaces: '還沒有空間。', usersAccess: '使用者與訪問許可權', mcpReadOnly: '當前版本提供只讀 MCP 工具，不會公開評分或遠端寫入。', account: '賬戶', access: '訪問許可權', actions: '操作', publisherDevices: '釋出裝置', device: '裝置', lastUsed: '上次使用', noDevices: '沒有已配對的裝置。', never: '從未', unpublished: '未釋出', createPairing: '建立 Nodus 程式碼', deletePublication: '刪除釋出', grantReader: '授予讀取許可權', revokeAccess: '撤銷訪問許可權', changeMyPassword: '修改我的密碼',
+  deletePublicationHeading: '刪除釋出', deletePublicationHelp: '{name} 的已釋出副本將從伺服器中刪除。本地資料庫不會更改。', deletePermanently: '永久刪除', cancel: '取消',
+  connectDesktop: '連線 Nodus Desktop', pairingHelp: '在設定 → 伺服器中輸入此程式碼：', pairingExpiry: '它將在 15 分鐘後過期，且只能使用一次。', back: '返回',
+  authorize: '授權', connectClient: '連線 {name}', appCan: '該應用程式將能夠：', assignedOnly: '它只能訪問分配給 {email} 的空間。', invalidOauth: '無效的 OAuth 請求',
+  error: '錯誤', sessionExpired: '會話已過期。', readerNotFound: '未找到讀者賬戶。', spaceNotFound: '未找到空間。', internalError: '伺服器內部錯誤。',
+};部错误。',
 };
 
 // Added when space membership stopped being a yes/no and became reader | writer | owner.
@@ -171,6 +186,16 @@ ROLE_KEYS['zh-CN'] = {
   createUser: '创建账户', grantAccess: '授予访问权限', updateRole: '更新', noSpacesYet: '请先创建一个空间。',
 };
 
+ROLE_KEYS['zh-TW'] = {
+  accessLevel: '訪問級別', roleReader: '讀者', roleWriter: '寫入者', roleOwner: '所有者',
+  roleReaderHelp: '閱讀已釋出副本。其撰寫或生成的內容均保留在自己的裝置上。',
+  roleWriterHelp: '可閱讀；當主資料庫的所有者連線時，其筆記和報告會傳回主資料庫。',
+  roleOwnerHelp: '釋出此空間並收集寫入者傳送的內容。',
+  spacesAndRoles: '空間與訪問級別',
+  newUserSpacesHelp: '勾選此賬戶可訪問的每個空間，並選擇其在各空間中的許可權。',
+  createUser: '建立賬戶', grantAccess: '授予訪問許可權', updateRole: '更新', noSpacesYet: '請先建立一個空間。',
+};
+
 const SERVER_UI_KEYS = {
   en: { serverUrl: 'Server URL', copyUrl: 'Copy URL', urlCopied: 'Copied' },
   es: { serverUrl: 'URL del servidor', copyUrl: 'Copiar URL', urlCopied: 'Copiada' },
@@ -181,6 +206,7 @@ const SERVER_UI_KEYS = {
   it: { serverUrl: 'URL del server', copyUrl: 'Copia URL', urlCopied: 'Copiato' },
   tr: { serverUrl: 'Sunucu URL’si', copyUrl: 'URL’yi kopyala', urlCopied: 'Kopyalandı' },
   'zh-CN': { serverUrl: '服务器 URL', copyUrl: '复制 URL', urlCopied: '已复制' },
+  'zh-TW': { serverUrl: '伺服器 URL', copyUrl: '複製 URL', urlCopied: '已複製' },
 };
 
 const ADMIN_UI_KEYS = {
@@ -238,6 +264,12 @@ const ADMIN_UI_KEYS = {
     saveAccess: '保存访问权限', lockedOwner: '必需的所有者', editSpaceName: '编辑名称', saveName: '保存名称',
     copySpaceId: '复制空间 ID', spaceIdCopied: 'ID 已复制', administrator: '管理员', memberAccount: '用户',
   },
+  'zh-TW': {
+    vaultType: '資料庫型別', vaultTypePending: '型別待定', assignedVaults: '資料庫訪問許可權',
+    manageAccessHelp: '選擇此賬戶可訪問的每個資料庫，並分別設定其許可權。',
+    saveAccess: '儲存訪問許可權', lockedOwner: '必需的所有者', editSpaceName: '編輯名稱', saveName: '儲存名稱',
+    copySpaceId: '複製空間 ID', spaceIdCopied: 'ID 已複製', administrator: '管理員', memberAccount: '使用者',
+  },
 };
 
 const VAULT_TYPE_KEYS = {
@@ -250,6 +282,7 @@ const VAULT_TYPE_KEYS = {
   it: { vaultTypeAcademic: 'Accademico', vaultTypePrimarySources: 'Fonti primarie', vaultTypeGenealogy: 'Genealogia', vaultTypeDatabases: 'Banche dati', vaultTypeStudy: 'Studio', vaultTypeTeaching: 'Didattica', vaultTypeTestimonies: 'Testimonianze', vaultTypeProsopography: 'Prosopografia', vaultTypeWorldbuilding: 'Creazione di mondi' },
   tr: { vaultTypeAcademic: 'Akademik', vaultTypePrimarySources: 'Birincil kaynaklar', vaultTypeGenealogy: 'Şecere', vaultTypeDatabases: 'Veritabanları', vaultTypeStudy: 'Çalışma', vaultTypeTeaching: 'Öğretim', vaultTypeTestimonies: 'Tanıklıklar', vaultTypeProsopography: 'Prosopografi', vaultTypeWorldbuilding: 'Dünya inşası' },
   'zh-CN': { vaultTypeAcademic: '学术', vaultTypePrimarySources: '原始资料', vaultTypeGenealogy: '家谱', vaultTypeDatabases: '数据库', vaultTypeStudy: '学习', vaultTypeTeaching: '教学', vaultTypeTestimonies: '证词', vaultTypeProsopography: '人物志', vaultTypeWorldbuilding: '世界构建' },
+  'zh-TW': { vaultTypeAcademic: '學術', vaultTypePrimarySources: '原始資料', vaultTypeGenealogy: '家譜', vaultTypeDatabases: '資料庫', vaultTypeStudy: '學習', vaultTypeTeaching: '教學', vaultTypeTestimonies: '證詞', vaultTypeProsopography: '人物誌', vaultTypeWorldbuilding: '世界構建' },
 };
 
 const EMAIL_ADMIN_KEYS = {
@@ -262,6 +295,7 @@ const EMAIL_ADMIN_KEYS = {
   it: { unlockEmails: 'Mostra e modifica gli indirizzi e-mail', unlockEmailsHelp: 'Per la privacy, gli indirizzi restano nascosti finché non confermi la password di amministratore.', unlockForFiveMinutes: 'Sblocca per 5 minuti', emailAccessUnlocked: 'Gli indirizzi e-mail sono visibili per cinque minuti in questa sessione.', emailUnlockFailed: 'La password di amministratore non è corretta.', emailAccessExpired: 'L’accesso alle e-mail è scaduto. Conferma di nuovo la password.', saveEmail: 'Salva e-mail', emailUpdated: 'E-mail aggiornata. Tutte le sessioni e i dispositivi connessi dell’account sono stati revocati.', emailUnchanged: 'L’indirizzo e-mail non è cambiato.', emailUpdatedSignIn: 'E-mail aggiornata. Accedi di nuovo con il nuovo indirizzo.', environmentEmailReadonly: 'Gestita da NODUS_ADMIN_EMAIL e non modificabile qui.' },
   tr: { unlockEmails: 'E-posta adreslerini göster ve düzenle', unlockEmailsHelp: 'Gizlilik için adresler, yönetici parolanızı doğrulayana kadar gizli kalır.', unlockForFiveMinutes: '5 dakikalığına aç', emailAccessUnlocked: 'E-posta adresleri bu oturumda beş dakika görünür.', emailUnlockFailed: 'Yönetici parolası yanlış.', emailAccessExpired: 'E-posta erişiminin süresi doldu. Parolanızı yeniden doğrulayın.', saveEmail: 'E-postayı kaydet', emailUpdated: 'E-posta güncellendi. Bu hesaba ait tüm oturumlar ve bağlı cihazlar iptal edildi.', emailUnchanged: 'E-posta adresi değişmedi.', emailUpdatedSignIn: 'E-posta güncellendi. Yeni adresle yeniden oturum açın.', environmentEmailReadonly: 'NODUS_ADMIN_EMAIL tarafından yönetilir ve burada düzenlenemez.' },
   'zh-CN': { unlockEmails: '显示并编辑邮箱地址', unlockEmailsHelp: '为保护隐私，地址会保持隐藏，直到你确认管理员密码。', unlockForFiveMinutes: '解锁 5 分钟', emailAccessUnlocked: '邮箱地址将在本次会话中显示五分钟。', emailUnlockFailed: '管理员密码不正确。', emailAccessExpired: '邮箱访问权限已过期。请重新确认你的密码。', saveEmail: '保存邮箱', emailUpdated: '邮箱已更新。该账户的所有会话和已连接设备均已被撤销。', emailUnchanged: '邮箱地址未更改。', emailUpdatedSignIn: '邮箱已更新。请使用新地址重新登录。', environmentEmailReadonly: '由 NODUS_ADMIN_EMAIL 管理，无法在此处编辑。' },
+  'zh-TW': { unlockEmails: '顯示並編輯郵箱地址', unlockEmailsHelp: '為保護隱私，地址會保持隱藏，直到你確認管理員密碼。', unlockForFiveMinutes: '解鎖 5 分鐘', emailAccessUnlocked: '郵箱地址將在本次會話中顯示五分鐘。', emailUnlockFailed: '管理員密碼不正確。', emailAccessExpired: '郵箱訪問許可權已過期。請重新確認你的密碼。', saveEmail: '儲存郵箱', emailUpdated: '郵箱已更新。該賬戶的所有會話和已連線裝置均已被撤銷。', emailUnchanged: '郵箱地址未更改。', emailUpdatedSignIn: '郵箱已更新。請使用新地址重新登入。', environmentEmailReadonly: '由 NODUS_ADMIN_EMAIL 管理，無法在此處編輯。' },
 };
 
 const LIBRARY_ADMIN_KEYS = {
@@ -274,6 +308,7 @@ const LIBRARY_ADMIN_KEYS = {
   it: { publishedLibraryOne: 'Biblioteca pubblicata: 1 documento', publishedLibraryCount: 'Biblioteca pubblicata: {count} documenti', libraryNotShared: 'Biblioteca non condivisa' },
   tr: { publishedLibraryOne: 'Yayınlanmış kitaplık: 1 belge', publishedLibraryCount: 'Yayınlanmış kitaplık: {count} belge', libraryNotShared: 'Kitaplık paylaşılmıyor' },
   'zh-CN': { publishedLibraryOne: '已发布文献库：1 个文档', publishedLibraryCount: '已发布文献库：{count} 个文档', libraryNotShared: '文献库未共享' },
+  'zh-TW': { publishedLibraryOne: '已釋出文獻庫：1 個文件', publishedLibraryCount: '已釋出文獻庫：{count} 個文件', libraryNotShared: '文獻庫未共享' },
 };
 
 const TABLES = {
@@ -286,6 +321,8 @@ const TABLES = {
   it: { ...IT, ...ROLE_KEYS.it, ...SERVER_UI_KEYS.it, ...ADMIN_UI_KEYS.it, ...VAULT_TYPE_KEYS.it, ...EMAIL_ADMIN_KEYS.it, ...LIBRARY_ADMIN_KEYS.it },
   tr: { ...TR, ...ROLE_KEYS.tr, ...SERVER_UI_KEYS.tr, ...ADMIN_UI_KEYS.tr, ...VAULT_TYPE_KEYS.tr, ...EMAIL_ADMIN_KEYS.tr, ...LIBRARY_ADMIN_KEYS.tr },
   'zh-CN': { ...ZH_CN, ...ROLE_KEYS['zh-CN'], ...SERVER_UI_KEYS['zh-CN'], ...ADMIN_UI_KEYS['zh-CN'], ...VAULT_TYPE_KEYS['zh-CN'], ...EMAIL_ADMIN_KEYS['zh-CN'], ...LIBRARY_ADMIN_KEYS['zh-CN'] },
+  'zh-TW': { ...ZH_TW, ...ROLE_KEYS['zh-TW'], ...SERVER_UI_KEYS['zh-TW'], ...ADMIN_UI_KEYS['zh-TW'], ...VAULT_TYPE_KEYS['zh-TW'], ...EMAIL_ADMIN_KEYS['zh-TW'], ...LIBRARY_ADMIN_KEYS['zh-TW'] },
+  'zh-TW': { ...ZH_CN, ...ROLE_KEYS['zh-CN'], ...SERVER_UI_KEYS['zh-CN'], ...ADMIN_UI_KEYS['zh-CN'], ...VAULT_TYPE_KEYS['zh-CN'], ...EMAIL_ADMIN_KEYS['zh-CN'], ...LIBRARY_ADMIN_KEYS['zh-CN'] },
 };
 
 export function missingServerTranslations() {
@@ -295,16 +332,18 @@ export function missingServerTranslations() {
   return Object.fromEntries(SERVER_LANGUAGES.map((language) => [language, keys.filter((key) => TABLES[language][key] == null)]));
 }
 
-// Only Simplified Chinese is shipped, so every Simplified tag collapses onto its canonical
-// catalogue id. Traditional Chinese tags (zh-TW, zh-Hant, zh-HK…) are intentionally left to
-// fall back to English rather than being served an unreviewed Simplified catalogue.
+// Every Chinese tag collapses onto one of the two shipped catalogues. Script subtags
+// decide first, so `zh` alone resolves to the Simplified table rather than guessing from a
+// region; Traditional readers get the Traditional table instead of English.
 const SIMPLIFIED_CHINESE_TAGS = new Set(['zh', 'zh-cn', 'zh-hans', 'zh-sg']);
+const TRADITIONAL_CHINESE_TAGS = new Set(['zh-tw', 'zh-hant', 'zh-hk', 'zh-mo']);
 
 export function normalizeServerLanguage(value) {
   if (SERVER_LANGUAGES.includes(value)) return value;
   if (typeof value === 'string') {
     const tag = value.trim().replace(/_/g, '-').toLowerCase();
     if (SIMPLIFIED_CHINESE_TAGS.has(tag)) return 'zh-CN';
+    if (TRADITIONAL_CHINESE_TAGS.has(tag)) return 'zh-TW';
   }
   return 'en';
 }

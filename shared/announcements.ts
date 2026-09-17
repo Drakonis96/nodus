@@ -24,7 +24,7 @@
 export const ANNOUNCEMENTS_URL = 'https://nodusresearch.com/data/announcements.json';
 
 /** Every language a notice must be written in before it may be published. */
-export const ANNOUNCEMENT_LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN'] as const;
+export const ANNOUNCEMENT_LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW'] as const;
 export type AnnouncementLanguage = (typeof ANNOUNCEMENT_LANGUAGES)[number];
 
 /**
