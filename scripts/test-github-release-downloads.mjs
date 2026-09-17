@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
+  classifyInstallerAsset,
   classifyReleaseAsset,
   fetchAllReleases,
   refreshReleaseDownloadStats,
@@ -39,28 +40,71 @@ test('excludes updater metadata and blockmaps before classifying extensions', ()
   assert.equal(classifyReleaseAsset('Nodus.AppImage.blockmap'), null);
 });
 
+test('names the installer each row of the README download table links', () => {
+  assert.equal(classifyInstallerAsset('Nodus-mac-arm64.dmg'), 'macosArm64');
+  assert.equal(classifyInstallerAsset('Nodus-mac-x64.dmg'), 'macosIntel');
+  assert.equal(classifyInstallerAsset('Nodus-win-x64.exe'), 'windows');
+  assert.equal(classifyInstallerAsset('Nodus-linux-amd64.deb'), 'linuxDeb');
+  assert.equal(classifyInstallerAsset('Nodus-linux-x86_64.rpm'), 'linuxRpm');
+  assert.equal(classifyInstallerAsset('Nodus-linux-x86_64.AppImage'), 'linuxAppImage');
+});
+
+test('recognises the version-prefixed installers older releases published', () => {
+  assert.equal(classifyInstallerAsset('Nodus-2.4.0-mac-arm64.dmg'), 'macosArm64');
+  assert.equal(classifyInstallerAsset('Nodus-2.4.0-arm64.dmg'), 'macosArm64');
+  assert.equal(classifyInstallerAsset('Nodus-2.4.0-linux-amd64.deb'), 'linuxDeb');
+  assert.equal(classifyInstallerAsset('Nodus-2.4.0-win-x64.exe'), 'windows');
+  assert.equal(classifyInstallerAsset('Nodus-Setup-0.1.0.exe'), 'windows');
+});
+
+test('an update payload is not an installer the table offers', () => {
+  // electron-updater fetches these itself; nobody downloads them from the table.
+  assert.equal(classifyInstallerAsset('Nodus-mac-arm64.zip'), null);
+  assert.equal(classifyInstallerAsset('nodus-zotero.xpi'), null);
+  assert.equal(classifyInstallerAsset('checksums.txt'), null);
+  assert.equal(classifyInstallerAsset('latest-mac.yml'), null);
+  assert.equal(classifyInstallerAsset('Nodus-win-x64.exe.blockmap'), null);
+  assert.equal(classifyInstallerAsset('Nodus-mac-arm64.dmg'), 'macosArm64');
+});
+
 test('sums several releases, skips drafts and keeps the platform breakdown', () => {
   const counts = sumReleaseDownloads([
     {
       draft: false,
       assets: [
-        { name: 'one.deb', download_count: 10 },
-        { name: 'one.AppImage', download_count: 20 },
-        { name: 'one.dmg', download_count: 30 },
+        { name: 'Nodus-linux-amd64.deb', download_count: 10 },
+        { name: 'Nodus-linux-x86_64.AppImage', download_count: 20 },
+        { name: 'Nodus-mac-arm64.dmg', download_count: 30 },
       ],
     },
     {
       draft: false,
       assets: [
-        { name: 'two.zip', download_count: 40 },
-        { name: 'two.exe', download_count: 50 },
+        { name: 'Nodus-mac-x64.zip', download_count: 40 },
+        { name: 'Nodus-win-x64.exe', download_count: 50 },
         { name: 'latest.yml', download_count: 999 },
       ],
     },
-    { draft: true, assets: [{ name: 'draft.exe', download_count: 1000 }] },
+    { draft: true, assets: [{ name: 'Nodus-win-x64.exe', download_count: 1000 }] },
   ]);
 
-  assert.deepEqual(counts, { linux: 30, macos: 70, windows: 50, total: 150 });
+  assert.deepEqual(counts, {
+    linux: 30,
+    macos: 70,
+    windows: 50,
+    total: 150,
+    installers: {
+      macosArm64: 30,
+      macosIntel: 0,
+      windows: 50,
+      linuxDeb: 10,
+      linuxRpm: 0,
+      linuxAppImage: 20,
+    },
+  });
+  // The macOS update archive counts towards the platform, not towards a row.
+  assert.equal(counts.installers.macosArm64, 30);
+  assert.equal(counts.macos, 70);
 });
 
 test('accepts releases without assets', () => {
@@ -69,6 +113,14 @@ test('accepts releases without assets', () => {
     macos: 0,
     windows: 0,
     total: 0,
+    installers: {
+      macosArm64: 0,
+      macosIntel: 0,
+      windows: 0,
+      linuxDeb: 0,
+      linuxRpm: 0,
+      linuxAppImage: 0,
+    },
   });
 });
 
@@ -104,6 +156,14 @@ test('keeps the last valid value when GitHub returns an error', async () => {
     macos: 22,
     windows: 33,
     total: 66,
+    installers: {
+      macosArm64: 20,
+      macosIntel: 2,
+      windows: 33,
+      linuxDeb: 6,
+      linuxRpm: 0,
+      linuxAppImage: 5,
+    },
     updatedAt: '2026-07-17T03:17:00.000Z',
   };
 
@@ -119,6 +179,40 @@ test('keeps the last valid value when GitHub returns an error', async () => {
     assert.equal(result.stale, true);
     assert.deepEqual(result.stats, previous);
     assert.equal(await readFile(outputPath, 'utf8'), before);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('a stats file that predates the installer breakdown is still a fallback', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'nodus-release-downloads-'));
+  const outputPath = path.join(directory, 'stats.json');
+  const legacy = {
+    linux: 11,
+    macos: 22,
+    windows: 33,
+    total: 66,
+    updatedAt: '2026-07-17T03:17:00.000Z',
+  };
+
+  try {
+    await writeFile(outputPath, `${JSON.stringify(legacy, null, 2)}\n`, 'utf8');
+    const result = await refreshReleaseDownloadStats({
+      outputPath,
+      fetchImpl: async () => response({ message: 'temporary failure' }, { status: 503 }),
+    });
+
+    assert.equal(result.updated, false);
+    assert.equal(result.stale, true);
+    assert.deepEqual(result.stats.installers, {
+      macosArm64: 0,
+      macosIntel: 0,
+      windows: 0,
+      linuxDeb: 0,
+      linuxRpm: 0,
+      linuxAppImage: 0,
+    });
+    assert.equal(result.stats.total, 66);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

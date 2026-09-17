@@ -19,8 +19,37 @@ export function classifyReleaseAsset(name) {
   return null;
 }
 
+// The README download table counts one installer per row, so its counters need
+// the file each row links, not the operating system it belongs to. The platform
+// totals above stay as they are: a macOS update arrives as a .zip the table never
+// links, which is why the row counters can add up to less than `total`.
+export const INSTALLER_KEYS = ['macosArm64', 'macosIntel', 'windows', 'linuxDeb', 'linuxRpm', 'linuxAppImage'];
+
+function hasArchToken(lower, token) {
+  return new RegExp(`(?:^|[-_.])${token}(?:[-_.]|$)`).test(lower);
+}
+
+/** Which row of the README download table this asset is the download of. */
+export function classifyInstallerAsset(name) {
+  if (typeof name !== 'string') return null;
+  const lower = name.toLowerCase();
+
+  if (/^latest.*\.ya?ml$/i.test(name) || lower.endsWith('.blockmap')) return null;
+  if (lower.endsWith('.deb')) return 'linuxDeb';
+  if (lower.endsWith('.rpm')) return 'linuxRpm';
+  if (lower.endsWith('.appimage')) return 'linuxAppImage';
+  if (lower.endsWith('.exe')) return 'windows';
+  if (!lower.endsWith('.dmg')) return null;
+  // Every macOS installer published so far names its architecture, including the
+  // version-prefixed ones ("Nodus-2.4.0-arm64.dmg") that a prefix match would miss.
+  if (hasArchToken(lower, 'x64') || hasArchToken(lower, 'intel')) return 'macosIntel';
+  if (hasArchToken(lower, 'arm64') || hasArchToken(lower, 'aarch64')) return 'macosArm64';
+  return null;
+}
+
 export function sumReleaseDownloads(releases) {
   const counts = { linux: 0, macos: 0, windows: 0, total: 0 };
+  const installers = Object.fromEntries(INSTALLER_KEYS.map((key) => [key, 0]));
 
   for (const release of Array.isArray(releases) ? releases : []) {
     if (!release || release.draft) continue;
@@ -32,10 +61,12 @@ export function sumReleaseDownloads(releases) {
       if (!platform || !Number.isFinite(downloads) || downloads < 0) continue;
       counts[platform] += downloads;
       counts.total += downloads;
+      const installer = classifyInstallerAsset(asset.name);
+      if (installer) installers[installer] += downloads;
     }
   }
 
-  return counts;
+  return { ...counts, installers };
 }
 
 function hasNextPage(linkHeader) {
@@ -74,18 +105,35 @@ export async function fetchAllReleases({ fetchImpl = fetch, token = process.env.
   throw new Error('GitHub Releases pagination exceeded 1000 pages');
 }
 
+function isCount(value) {
+  return Number.isFinite(value) && value >= 0;
+}
+
+function normalizeInstallers(value) {
+  // A stats file written before the per-installer breakdown existed is still a
+  // usable fallback; it just has nothing to say about individual installers.
+  if (value === undefined) return Object.fromEntries(INSTALLER_KEYS.map((key) => [key, 0]));
+  if (!value || typeof value !== 'object') return null;
+  const counts = {};
+  for (const key of INSTALLER_KEYS) {
+    if (!isCount(value[key])) return null;
+    counts[key] = value[key];
+  }
+  return counts;
+}
+
 function isValidStats(value) {
   return value
-    && ['linux', 'macos', 'windows', 'total'].every(
-      (key) => Number.isFinite(value[key]) && value[key] >= 0,
-    )
-    && typeof value.updatedAt === 'string';
+    && ['linux', 'macos', 'windows', 'total'].every((key) => isCount(value[key]))
+    && typeof value.updatedAt === 'string'
+    && normalizeInstallers(value.installers) !== null;
 }
 
 async function readLastValidStats(outputPath) {
   try {
     const value = JSON.parse(await readFile(outputPath, 'utf8'));
-    return isValidStats(value) ? value : null;
+    if (!isValidStats(value)) return null;
+    return { ...value, installers: normalizeInstallers(value.installers) };
   } catch {
     return null;
   }
