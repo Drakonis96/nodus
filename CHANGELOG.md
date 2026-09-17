@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## 5.5.0 — 2026-09-17
+
+Nodus speaks twelve interface languages, the local engine reaches the GPU on
+Windows and Linux, and the app gains colour palettes.
+
+- Traditional Chinese, Japanese and Korean join the nine interface languages, so the whole application, Nodus Server Web, the server-rendered pages and the pipeline logs render in 繁體中文, 日本語 or 한국어. Every catalogue carries the same keys as English. The Traditional Chinese column is written in Taiwan-standard vocabulary rather than converted glyph by glyph, and the Japanese and Korean columns are a machine-translated first pass that a native speaker has not reviewed yet, with two known stylistic inconsistencies (저자/작성자, 테마/주제). Prompt languages already included all three and are unchanged. The portable-profile allowlist keeps zh-CN, zh-TW, ja and ko, and a zh-TW prompt resolves to zh-Hant.
+
+The application gains colour palettes, chosen independently of the light and dark mode.
+
+- Appearance settings offer sixteen palettes plus the original look, and a theme editor that defines the accent, the application background for each mode, the light and dark surfaces, the two text colours and a surface tint. Saving requires full six-digit hex colours and refuses a combination below the contrast minimum of 4.5 on any of the six checked text and background pairs.
+- A palette belongs to one vault or to all of them, and light and dark stay common either way. The same system drives Server Web, and the last palette is painted before the app starts so the default never flashes on screen.
 
 Integrated local models run on the GPU on Windows and Linux instead of the CPU-only engine the installer used to fetch (issue #851).
 
@@ -40,6 +50,29 @@ Batch judgements no longer fail on a model that reasons before answering.
 
 - The output budget for a batch of judgements — theme assignment, relation validation, semantic bridges and chapter typing — now pays for the trace and the JSON separately. It used to be the item count times a per-item allowance with a floor of 512 for a single item, which assumes a model that answers directly; a model that reasons is charged for its trace out of the same budget, and the JSON only starts after it. Measured on the engine Nodus ships, with Gemma 4 E2B and real ideas from a scanned paper: one relation judgement at the old 512-token floor came back with no content at all and finished at 2.000, and a full batch of fifteen came back empty at the old 3.136-token allowance and finished at 5.000. "Reprocess theme connections" failed on exactly that, and a single pair cannot be split to buy room: the fallback clips the input text, which is not what ran out.
 - A judgement that is cut off anyway is retried once with more room, the same recovery work summaries and idea fusion already had. A reply that parses but misses the schema is not retried that way — more room would not change its shape — and a request that already asks for the ceiling is left to the batch splitter instead of being repeated unchanged.
+
+A citation opens the page it names, and the Library stops corrupting the text of two-column papers.
+
+- The citation dialog turns each anchored row into a "View page N" button, the passage panel names its own page, and every surface that jumps to a work — the graph detail panel, the argument map, the document profile, the debate view, study material and the Nodi overlay — hands the reader the cited page instead of page one. A slide deck opens on its slide, the Library applies `readerPage` once and clears it so switching tabs never bounces the reader back, and a work with no page-capable copy anywhere still offers no button it cannot honour.
+- Library extraction reads a two-column page column by column. The left column's last line no longer joins the right column's first, gutters are tracked across paragraph breaks, and the pipeline moves to `nodus-clean-markdown/11`, so documents already in a library are re-extracted automatically instead of keeping the corrupted text. Verified on three real two-column papers. A paragraph continuing onto the next page is still split at the boundary, a known limit left open on purpose.
+- The Documentary Index publishes the profiles its acceptance gate keeps instead of failing the work. A partial synthesis is accepted and marked as partial, a chunk below `MIN_SECTION_WORDS` merges into a neighbour so a title page cannot degrade a whole profile, the index follows the configured prompt language, the audit score is a defined 0-1 scale against the 0.8 acceptance threshold, and the failure lines shown in the UI are translated. Re-indexing a work is possible again.
+
+Study takes work out of the application in two new ways.
+
+- A chat answer can be saved as a study note. The Save to notes dialog gains a destination that asks for course, subject, optional folder and topic, and the note stores the answer followed by its provenance: the conversation title, the date, the provider and model that wrote it, and the cited sources as links.
+- Reports export to Word (.docx) from the report reader, from the bulk archive — one document per report inside the ZIP, next to the existing Markdown and PDF choices — and from the database research reader, where the export is redacted exactly as the Markdown one is. Figures are embedded in the document instead of left as Markdown, and the bibliography no longer drops study-material citations.
+
+The research assistant inspects molecules with RDKit when Chemistry Studio is enabled.
+
+- SMILES in the question are parsed locally by RDKit, with no drawing and no model call, and injected into the prompt as verified context, so the model reasons from the canonical structure instead of the raw text. A synthesis route gets one drawing per verified step plus a report of the steps the checker refused, and a refused route adds a one-click chip that sends the checker's own correction request as the user's next message. The bootstrap pin moves to Chemistry Studio 2.3.0, the version whose worker performs the route check.
+
+Every model that runs on this machine is marked in red.
+
+- The warning appears beside the text model, the embedding model, every per-task row and both wizard pickers, and explains what to expect from a local model: they may be slow, Gemma is currently the recommended one, and Ollama and LM Studio are supported while cloud providers are the most tested. A profile that already chose a model keeps it, and the new-vault wizard no longer preselects one, so choosing a local model is a deliberate act. `isLocalModelProvider` covers `nodus`, `ollama` and `lmstudio` and deliberately leaves custom endpoints out.
+- Models served as `deepseek-flash` and the pinned `deepseek-v4-*` names get their reasoning-effort control back, on the native route and on OpenCode Go, instead of reporting that the model publishes no thinking control. An endpoint that answers a 400 naming `temperature` as deprecated is replayed once without that field and the model is remembered for the session, while an unnamed refusal, a 5xx or a 429 is never replayed.
+- Visual resources for a document are generated with the model chosen in the enrichment dialog, which opens on the task's model rather than the one stored on the report. The choice travels with the request and with Retry, and a document that keeps no figure now says how many proposals were discarded and why, with the motives persisted in the manifest and counted in the processing log.
+- Release builds add an RPM package to the .deb and the AppImage. `Nodus-linux-x86_64.rpm` installs on Fedora, openSUSE and other RPM-based distributions, and the README, the site's download pages and the download-stats classifier now list it.
+- Added the complete 5.5.0 What's New modal in all twelve interface languages.
 
 ## 5.4.5 — 2026-09-15
 

@@ -6,9 +6,11 @@ const compiled = await build({ entryPoints: ['shared/releaseNotes.ts'], bundle: 
 const { RELEASE_NOTES } = await import('data:text/javascript;base64,' + Buffer.from(compiled.outputFiles[0].text).toString('base64'));
 const current = RELEASE_NOTES[0];
 // Explicit display order, independent of the modal's grouping implementation. The modal
-// orders scope clusters by size (largest first) and then by first appearance, so the two
-// `languages` and `connector` notes keep the order the release array declares.
-const indices = [0, 1];
+// orders scope clusters by size (largest first) and then by first appearance, so the eight
+// `ai` notes lead, the five `general` notes follow, then the three `library` notes, the two
+// `languages` notes, and the single `connector`, `estudio` and `word` notes close the list.
+// Every cluster keeps the order the release array declares, which is also this order.
+const indices = Array.from({ length: current.highlights.length }, (_, index) => index);
 const expected = indices.map(index => current.highlights[index]);
 const output = 'artifacts/release-5.5.0';
 // The modal caps its own height and scrolls its body, and the shell pins html/body/#root
@@ -23,7 +25,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
-  for (const theme of ['light', 'dark']) for (const lang of ['es','en','fr','de','pt','pt-BR','it','tr','zh-CN']) {
+  for (const theme of ['light', 'dark']) for (const lang of ['es','en','fr','de','pt','pt-BR','it','tr','zh-CN','zh-TW','ja','ko']) {
     await page.goto(`http://127.0.0.1:5198/visual-tests/release-notes-harness.html?theme=${theme}&lang=${lang}`);
     const release = page.getByTestId('whats-new-selected-release');
     await release.waitFor();
@@ -43,5 +45,5 @@ try {
   }
   assert.deepEqual(errors, []);
   await fs.writeFile(`${output}/modal-order-es.md`, `# Novedades de Nodus 5.5.0\n\n${expected.map((highlight,index)=>`${index+1}. ${highlight.es}`).join('\n\n')}\n`);
-  console.log('PASS: 2 release notes in exact displayed order, all nine languages in light/dark, v5.5.0 active and unpublished v5.3.2 absent.');
+  console.log(`PASS: ${current.highlights.length} release notes in exact displayed order, all twelve languages in light/dark, v5.5.0 active and unpublished v5.3.2 absent.`);
 } finally { await browser.close(); }

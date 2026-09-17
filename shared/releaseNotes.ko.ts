@@ -1,9 +1,9 @@
 /* Korean release notes, keyed by version. Machine-translated from the English highlights. */
+import { RELEASE_5_5_0_HIGHLIGHTS } from './releaseNotes550';
 export const RELEASE_NOTES_KO: Record<string, string[]> = {
-  "5.5.0": [
-    "Chrome 커넥터는 13개 언어를 구사합니다. 일본어, 한국어, 러시아어 및 중국어 번체는 이미 있는 인터페이스 9개에 추가되므로 팝업, 설정 페이지, 열리는 개인 정보 보호 정책, 심지어 저장하기 전에 검토하는 문서 유형 목록도 영어로만 표시되지 않고 브라우저 언어를 따릅니다.",
-    "커넥터가 자체적으로 작성하는 메시지도 번역됩니다. 파일이 64MiB를 초과한다는 알림, 다운로드 실패 오류, 게시자가 PDF 대신 반환하는 로그인 페이지, 페이지에 아무것도 표시되지 않을 때 라이브러리에 저장된 레이블이 이제 해당 언어 카탈로그에서 제공되므로 커넥터가 인터페이스에 영어를 혼합하는 것을 중지합니다.",
-  ],
+  // 5.5.0 reads its Korean from the release's own highlight columns, the same
+  // way the Italian, Turkish and both Chinese tables do.
+  "5.5.0": RELEASE_5_5_0_HIGHLIGHTS.map(highlight => highlight.ko),
   "5.4.5": [
     "도서관은 현재 저장소에서 선택한 작품과 그 작품에서 파생된 모든 작품을 삭제할 수 있습니다. 작업은 확인을 요청하고 두 부분 모두 이름을 지정합니다. 작업과 자체 분석은 사라지고 다른 작업과 공유하는 분석은 그대로 유지됩니다. 스캐너가 지금 분석 중인 작업은 반쯤 완성된 상태로 삭제되는 대신 거부되고, 문제가 발생하면 전체 배치가 취소되며, 공유된 아이디어와 테마는 그대로 유지됩니다.",
     "한 번의 작업으로 전체 선택 항목을 복구합니다. 선택 표시줄은 완료되지 않았거나 보류 중이거나 실패한 단계만 대기열에 추가하고 이미 완료된 작업은 반복하지 않습니다. 따라서 200개의 작업을 확인하는 것은 각 행을 200번 방문하는 것이 아닙니다. 작업은 완료할 작업이 아직 남아 있는 동안에만 나타납니다.",

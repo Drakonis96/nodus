@@ -24,25 +24,43 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
-  // 5.5.0 brings the Chrome connector to thirteen languages and translates every
-  // message the extension composes on its own.
+  // 5.5.0 renders the app in twelve interface languages, moves the integrated
+  // local engine to the GPU on Windows and Linux, adds colour palettes, keeps
+  // citations on the page they name, reads two-column PDFs by column, saves chat
+  // answers as study notes, exports reports to Word and brings RDKit molecule
+  // inspection. The connector keeps the languages note it already had and its
+  // own translated messages.
   const currentRelease = RELEASE_NOTES[0];
   assert.equal(currentRelease?.version, '5.5.0');
   assert.equal(currentRelease?.date, '2026-09-17');
-  assert.equal(currentRelease?.highlights.length, 2);
-  assert.deepEqual(currentRelease.highlights.map((h) => h.scope), ['languages', 'connector']);
+  assert.equal(currentRelease?.highlights.length, 21);
+  assert.deepEqual(currentRelease.highlights.map((h) => h.scope), [
+    'ai', 'ai', 'ai', 'ai', 'ai', 'ai', 'ai', 'ai',
+    'general', 'general', 'general', 'general', 'general',
+    'library', 'library', 'library',
+    'languages', 'languages',
+    'connector', 'estudio', 'word',
+  ]);
   for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
     assert.ok(currentRelease.highlights.every((h) => h[language]?.length > 80));
   }
   for (const phrase of [
-    /speaks thirteen languages/, /stop being English only/,
-    /messages the connector writes by itself/, /stops mixing English into your interface/,
+    /Local models now run on your graphics card/, /reports the installed engine instead of assuming it/,
+    /no longer look frozen/, /no longer lose their reply/, /gets the local time budget/,
+    /red warning marks every model that runs on this machine/, /check molecules with RDKit/,
+    /enrichment dialog/, /sixteen palettes/, /queue bar only moves forward/,
+    /Graph post-processing says what it is doing/, /RPM package next to the \.deb/,
+    /instead of expanding a label on hover/, /opens the page it names/, /read column by column/,
+    /published instead of ending as a failure/, /interface speaks twelve languages/,
+    /connector speaks thirteen languages/, /messages the connector writes by itself/,
+    /saved as a study note/, /exported to Word/,
   ]) {
     assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.5.0 is missing ${phrase}`);
   }
   assert.ok(
-    currentRelease.highlights.every((h) => h.it !== h.en && h.tr !== h.en && h['zh-CN'] !== h.en),
-    'the Italian, Turkish and Simplified Chinese translations must not fall back to English',
+    currentRelease.highlights.every((h) => ['fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja', 'ko']
+      .every((language) => h[language] !== h.en)),
+    'no 5.5.0 translation may fall back to English',
   );
 
   // 5.4.5 lets the Library delete a selection with its derived data and repair one
