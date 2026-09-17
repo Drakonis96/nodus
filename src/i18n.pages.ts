@@ -107,6 +107,26 @@ const zhCN: Record<string, string> = {
   'La página está bloqueada.': '页面已锁定。',
 };
 
+
+const zhTW: Record<string, string> = {
+  'Párrafo': '段落', 'Encabezado 1': '標題1', 'Encabezado 2': '標題2', 'Encabezado 3': '標題3',
+  'Lista con viñetas': '專案符號列表', 'Lista numerada': '編號列表', 'Tarea': '任務', 'Desplegable': '摺疊塊',
+  'Cita': '引用', 'Destacado': '標註', 'Separador': '分割線', 'Código': '程式碼',
+  'Ecuación': '公式', 'Tabla simple': '簡單表格', 'Columnas': '分欄', 'Imagen': '圖片',
+  'Archivo': '檔案', 'Audio': '音訊', 'Vídeo': '影片', 'Marcador web': '網頁書籤',
+  'Contenido incrustado': '嵌入內容', 'Subpágina': '子頁面', 'Mención': '提及', 'Bloque sincronizado': '同步塊',
+  'Vista enlazada': '關聯檢視', 'Markdown sin convertir': '未轉換的Markdown', 'Contenido de la página': '頁面內容', 'No se encontró la página de esta fila.': '未找到此行對應的頁面。',
+  'Cargando página…': '正在載入頁面…', 'No se pudo abrir la página.': '無法開啟頁面。', 'Guardando…': '正在儲存…', 'Guardado': '已儲存',
+  'Añadir bloque': '新增塊', 'Hay cambios simultáneos en esta página.': '此頁面存在同時進行的更改。', 'Recarga la versión más reciente o conserva tus bloques sobre ella.': '請重新載入最新版本，或將你的塊保留在其上。', 'Recargar cambios': '重新載入更改',
+  'Conservar mi versión': '保留我的版本', 'Arrastrar bloque': '拖動塊', 'Añadir debajo': '在下方新增', 'Eliminar bloque': '刪除塊',
+  'Escribe / o añade otro bloque': '輸入 / 或新增其他塊', 'Escribe algo o pulsa / para insertar…': '輸入內容或按 / 插入…', 'Título del desplegable': '摺疊塊標題', 'Contenido ocultable': '可摺疊內容',
+  'Lenguaje': '語言', 'Reemplazar': '替換', 'Elegir archivo': '選擇檔案', 'Título': '標題',
+  'Pega una URL o código de inserción seguro': '貼上URL或安全的嵌入程式碼', 'Etiqueta': '標籤', 'ID de página': '頁面ID', 'ID del bloque original': '原始塊ID',
+  'ID de la vista': '檢視ID', 'Markdown conservado sin pérdida': '無損保留的Markdown', 'Elegir imagen': '選擇圖片', 'Elegir audio': '選擇音訊',
+  'Elegir vídeo': '選擇影片', 'Tipo de archivo no válido.': '檔案型別無效。', 'Página': '頁面', 'La página no existe.': '頁面不存在。',
+  'La página está bloqueada.': '頁面已鎖定。',
+};
+
 type WikiTranslation = readonly [string, string, string, string, string, string, string, string, string, string];
 const wikiCatalog: WikiTranslation[] = [
   ['Página sin título', 'Untitled page', 'Page sans titre', 'Unbenannte Seite', 'Página sem título', 'Página sem título', 'Pagina senza titolo', 'Başlıksız sayfa', '无标题页面', '無標題頁面'],
@@ -183,22 +203,22 @@ const wikiCatalog: WikiTranslation[] = [
   ['Nuevo comentario', 'New comment', 'Nouveau commentaire', 'Neuer Kommentar', 'Novo comentário', 'Novo comentário', 'Nuovo commento', 'Yeni yorum', '新建评论', '新建評論'],
   ['Comentar', 'Comment', 'Commenter', 'Kommentieren', 'Comentar', 'Comentar', 'Commenta', 'Yorum yap', '评论', '評論'],
   ['Responder', 'Reply', 'Répondre', 'Antworten', 'Responder', 'Responder', 'Rispondi', 'Yanıtla', '回复', '回覆'],
-  ['Acceso', 'Access', 'Accès', 'Zugriff', 'Acesso', 'Acesso', 'Accesso', 'Erişim', '访问权限', '訪問許可權'],
+  ['Acceso', 'Access', 'Accès', 'Zugriff', 'Acesso', 'Acesso', 'Accesso', 'Erişim', '访问权限', '訪問權限'],
   ['Propietario', 'Owner', 'Propriétaire', 'Eigentümer', 'Proprietário', 'Proprietário', 'Proprietario', 'Sahip', '所有者', '所有者'],
-  ['Acceso completo', 'Full access', 'Accès complet', 'Vollzugriff', 'Acesso completo', 'Acesso completo', 'Accesso completo', 'Tam erişim', '完全访问权限', '完全訪問許可權'],
+  ['Acceso completo', 'Full access', 'Accès complet', 'Vollzugriff', 'Acesso completo', 'Acesso completo', 'Accesso completo', 'Tam erişim', '完全访问权限', '完全訪問權限'],
   ['Editar estructura', 'Edit structure', 'Modifier la structure', 'Struktur bearbeiten', 'Editar estrutura', 'Editar estrutura', 'Modifica struttura', 'Yapıyı düzenle', '编辑结构', '編輯結構'],
   ['Editar contenido', 'Edit content', 'Modifier le contenu', 'Inhalt bearbeiten', 'Editar conteúdo', 'Editar conteúdo', 'Modifica contenuto', 'İçeriği düzenle', '编辑内容', '編輯內容'],
   ['Ver', 'View', 'Voir', 'Ansehen', 'Ver', 'Ver', 'Visualizza', 'Görüntüle', '查看', '檢視'],
-  ['Sin acceso', 'No access', 'Aucun accès', 'Kein Zugriff', 'Sem acesso', 'Sem acesso', 'Nessun accesso', 'Erişim yok', '无访问权限', '無訪問許可權'],
-  ['Tu acceso: {role}', 'Your access: {role}', 'Votre accès : {role}', 'Dein Zugriff: {role}', 'O teu acesso: {role}', 'Seu acesso: {role}', 'Il tuo accesso: {role}', 'Erişiminiz: {role}', '你的访问权限：{role}', '你的訪問許可權：{role}'],
+  ['Sin acceso', 'No access', 'Aucun accès', 'Kein Zugriff', 'Sem acesso', 'Sem acesso', 'Nessun accesso', 'Erişim yok', '无访问权限', '無訪問權限'],
+  ['Tu acceso: {role}', 'Your access: {role}', 'Votre accès : {role}', 'Dein Zugriff: {role}', 'O teu acesso: {role}', 'Seu acesso: {role}', 'Il tuo accesso: {role}', 'Erişiminiz: {role}', '你的访问权限：{role}', '你的訪問權限：{role}'],
   ['Heredado de un nivel superior', 'Inherited from a higher level', 'Hérité d’un niveau supérieur', 'Von einer höheren Ebene geerbt', 'Herdado de um nível superior', 'Herdado de um nível superior', 'Ereditato da un livello superiore', 'Üst düzeyden devralındı', '继承自上级', '繼承自上級'],
   ['Rol de {name}', '{name} role', 'Rôle de {name}', 'Rolle von {name}', 'Função de {name}', 'Função de {name}', 'Ruolo di {name}', '{name} rolü', '{name}的角色', '{name}的角色'],
-  ['Quitar acceso a {name}', 'Remove access for {name}', 'Retirer l’accès à {name}', 'Zugriff für {name} entfernen', 'Remover acesso de {name}', 'Remover acesso de {name}', 'Rimuovi accesso a {name}', '{name} erişimini kaldır', '移除{name}的访问权限', '移除{name}的訪問許可權'],
+  ['Quitar acceso a {name}', 'Remove access for {name}', 'Retirer l’accès à {name}', 'Zugriff für {name} entfernen', 'Remover acesso de {name}', 'Remover acesso de {name}', 'Rimuovi accesso a {name}', '{name} erişimini kaldır', '移除{name}的访问权限', '移除{name}的訪問權限'],
   ['Compartir con', 'Share with', 'Partager avec', 'Teilen mit', 'Partilhar com', 'Compartilhar com', 'Condividi con', 'Şununla paylaş', '分享给', '分享給'],
   ['Compartir con…', 'Share with…', 'Partager avec…', 'Teilen mit…', 'Partilhar com…', 'Compartilhar com…', 'Condividi con…', 'Şununla paylaş…', '分享给…', '分享給…'],
   ['Invitado', 'Guest', 'Invité', 'Gast', 'Convidado', 'Convidado', 'Ospite', 'Misafir', '访客', '訪客'],
   ['Rol', 'Role', 'Rôle', 'Rolle', 'Função', 'Função', 'Ruolo', 'Rol', '角色', '角色'],
-  ['Añadir permiso', 'Add permission', 'Ajouter une autorisation', 'Berechtigung hinzufügen', 'Adicionar permissão', 'Adicionar permissão', 'Aggiungi autorizzazione', 'İzin ekle', '添加权限', '新增許可權'],
+  ['Añadir permiso', 'Add permission', 'Ajouter une autorisation', 'Berechtigung hinzufügen', 'Adicionar permissão', 'Adicionar permissão', 'Aggiungi autorizzazione', 'İzin ekle', '添加权限', '新增權限'],
   ['Enlaces compartidos', 'Shared links', 'Liens partagés', 'Geteilte Links', 'Ligações partilhadas', 'Links compartilhados', 'Link condivisi', 'Paylaşılan bağlantılar', '共享链接', '共享連結'],
   ['Revocado', 'Revoked', 'Révoqué', 'Widerrufen', 'Revogado', 'Revogado', 'Revocato', 'İptal edildi', '已撤销', '已撤銷'],
   ['Protegido con contraseña', 'Password protected', 'Protégé par mot de passe', 'Passwortgeschützt', 'Protegido por palavra-passe', 'Protegido por senha', 'Protetto da password', 'Parola korumalı', '密码保护', '密碼保護'],
@@ -222,5 +242,5 @@ export const PAGE_TRANSLATIONS = {
   en: { ...en, ...wikiLanguage(1) }, fr: { ...fr, ...wikiLanguage(2) }, de: { ...de, ...wikiLanguage(3) },
   pt: { ...pt, ...wikiLanguage(4) }, 'pt-BR': { ...ptBR, ...wikiLanguage(5) }, it: { ...it, ...wikiLanguage(6) },
   tr: { ...tr, ...wikiLanguage(7) }, 'zh-CN': { ...zhCN, ...wikiLanguage(8) },
-  'zh-TW': { ...zhCN, ...wikiLanguage(8) },
+  'zh-TW': { ...zhTW, ...wikiLanguage(9) },
 } as const;

@@ -607,7 +607,7 @@ export const SERVER_SETTINGS_TRANSLATIONS: Record<
   },
   'zh-TW': {
     "Las claves y los modelos configurados se comparten entre todas tus bóvedas. Las credenciales siguen siendo privadas de esta cuenta.":
-      "已配置的金鑰和模型在你所有資料庫之間共享。憑據仍僅屬於此賬戶。",
+      "已配置的金鑰和模型在你所有資料庫之間共享。憑據仍僅屬於此帳戶。",
     "El operador debe configurar la keyring cifrada del servidor para guardar credenciales.":
       "運營方必須先配置伺服器的加密金鑰環，才能儲存憑據。",
     "Abre un proveedor y marca con una estrella los modelos que quieras usar en los selectores.":
@@ -640,7 +640,7 @@ export const SERVER_SETTINGS_TRANSLATIONS: Record<
     "PDF, rutas locales y credenciales no se incluyen salvo publicación explícita del contenido permitido.":
       "除非明確釋出允許的內容，否則不包含PDF、本地路徑和憑據。",
     "La cuenta Server conserva la vista publicada. La conexión, storage y sincronización de Zotero se ejecutan en Desktop.":
-      "Server賬戶保留已釋出的檢視。Zotero的連線、儲存和同步在Desktop上執行。",
+      "Server帳戶保留已釋出的檢視。Zotero的連線、儲存和同步在Desktop上執行。",
     "Abre Ajustes → Biblioteca en Desktop para cambiar la fuente Zotero. Server aplicará la siguiente publicación a todos los vaults conectados sin inventar una biblioteca distinta.":
       "在Desktop中開啟「設定 → 文獻庫」以更改Zotero來源。Server會將下一次釋出應用到所有已連線的資料庫，而不會另外建立一個文獻庫。",
     "Estos ajustes dependen de archivos locales y permanecen en Desktop.":
@@ -660,9 +660,9 @@ export const SERVER_SETTINGS_TRANSLATIONS: Record<
     "El navegador integrado requiere Electron y permanece fuera de la barra lateral de Server.":
       "內建瀏覽器需要Electron，並位於Server側邊欄之外。",
     "Cookies, permisos, descargas y almacenamiento web nunca se copian al servidor. La extensión y Nodus Browser se configuran en Desktop.":
-      "Cookie、許可權、下載和Web儲存絕不會複製到伺服器。擴充套件和Nodus Browser在Desktop中配置。",
+      "Cookie、權限、下載和Web儲存絕不會複製到伺服器。擴充套件和Nodus Browser在Desktop中配置。",
     "Publicar un vault, asignar acceso y consultar la réplica.":
-      "釋出資料庫、分配訪問許可權並檢視副本。",
+      "釋出資料庫、分配訪問權限並檢視副本。",
     "Credenciales por usuario, modelos favoritos y privacidad.":
       "按使用者區分的憑據、收藏模型和隱私。",
     "Connected Vault, MCP y clientes compatibles.":
@@ -681,11 +681,11 @@ export const SERVER_SETTINGS_TRANSLATIONS: Record<
     "Muestra los vaults nativos y los publicados desde Desktop. Aquí puedes revisar su estado, ajustar qué se publica y generar códigos de conexión.":
       "顯示原生資料庫和從Desktop釋出的資料庫。在此可檢視其狀態、調整發布內容並生成連線程式碼。",
     "Crea cuentas y decide qué puede hacer cada usuario en cada vault: leer, escribir o administrarlo como propietario.":
-      "建立賬戶，並控制每個使用者在每個資料庫中可執行的操作：讀取、寫入或以所有者身份管理。",
+      "建立帳戶，並控制每個使用者在每個資料庫中可執行的操作：讀取、寫入或以所有者身份管理。",
     "Enumera los dispositivos Desktop autorizados para publicar vaults en este servidor. Puedes revocar un dispositivo que ya no deba sincronizar.":
       "列出獲授權向此伺服器釋出資料庫的Desktop裝置。你可以撤銷不再需要同步的裝置。",
     "Muestra la cuenta y el rol con los que has iniciado sesión. También permite cambiar la contraseña o cerrar la sesión actual.":
-      "顯示你登入時使用的賬戶和角色。你還可以更改密碼或退出當前會話。",
+      "顯示你登入時使用的帳戶和角色。你還可以更改密碼或退出當前會話。",
     "Las actualizaciones se aplican en el host de Server. Esta vista no simula descargas ni reinicios que el navegador no puede ejecutar.":
       "更新在Server主機上應用。此檢視不會模擬瀏覽器無法執行的下載或重啟。",
   },

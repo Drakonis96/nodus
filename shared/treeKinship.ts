@@ -272,6 +272,34 @@ export const TREE_KINSHIP_ROLE_LABEL_ZH_CN: Record<TreeKinshipRole, string> = {
   descendant: '后代', relative_by_marriage: '姻亲', connected_relative: '家族关联', unrelated: '无记录的亲属关系',
 };
 
+
+export const TREE_KINSHIP_ROLE_LABEL_ZH_TW: Record<TreeKinshipRole, string> = {
+  focus: '焦點人物', father: '父親', mother: '母親', parent: '父母',
+  grandfather: '祖父', grandmother: '祖母', grandparent: '祖父母',
+  paternal_grandfather: '祖父', paternal_grandmother: '祖母', paternal_grandparent: '祖父母',
+  maternal_grandfather: '外祖父', maternal_grandmother: '外祖母', maternal_grandparent: '外祖父母',
+  great_grandfather: '曾祖父', great_grandmother: '曾祖母', great_grandparent: '曾祖父母',
+  great_great_grandfather: '高祖父', great_great_grandmother: '高祖母', great_great_grandparent: '高祖父母',
+  paternal_ancestor: '父系祖先', maternal_ancestor: '母系祖先', ancestor: '祖先',
+  brother: '兄弟', sister: '姐妹', sibling: '兄弟姐妹', husband: '丈夫', wife: '妻子', spouse: '配偶',
+  son: '兒子', daughter: '女兒', child: '子女', grandson: '孫子', granddaughter: '孫女', grandchild: '孫輩',
+  great_grandson: '曾孫', great_granddaughter: '曾孫女', great_grandchild: '曾孫輩',
+  great_great_grandson: '玄孫', great_great_granddaughter: '玄孫女', great_great_grandchild: '玄孫輩',
+  paternal_uncle: '伯父/叔父', paternal_aunt: '姑母', maternal_uncle: '舅父', maternal_aunt: '姨母', uncle_aunt: '叔伯姑舅姨',
+  paternal_granduncle: '伯祖父/叔祖父', paternal_grandaunt: '姑祖母', maternal_granduncle: '舅祖父', maternal_grandaunt: '姨祖母', granduncle_aunt: '祖輩叔伯姑舅姨',
+  great_granduncle: '曾伯祖父/曾叔祖父', great_grandaunt: '曾姑祖母', great_granduncle_aunt: '曾伯叔祖父/曾姑祖母',
+  nephew: '侄子/外甥', niece: '侄女/外甥女', nibling: '侄甥',
+  grandnephew: '侄孫/外甥孫', grandniece: '侄孫女/外甥孫女', grandnibling: '侄孫輩',
+  great_grandnephew: '曾侄孫', great_grandniece: '曾侄孫女', great_grandnibling: '曾侄孫輩',
+  male_cousin: '堂表兄弟', female_cousin: '堂表姐妹', cousin: '堂表親',
+  father_in_law: '岳父/公公', mother_in_law: '岳母/婆婆', parent_in_law: '岳父母/公婆',
+  son_in_law: '女婿', daughter_in_law: '兒媳', child_in_law: '女婿/兒媳',
+  brother_in_law: '姻親兄弟', sister_in_law: '姻親姐妹', sibling_in_law: '姻親兄弟姐妹',
+  stepfather: '繼父', stepmother: '繼母', stepparent: '繼父母',
+  stepson: '繼子', stepdaughter: '繼女', stepchild: '繼子女', co_parent: '共同撫養人',
+  descendant: '後代', relative_by_marriage: '姻親', connected_relative: '家族關聯', unrelated: '無記錄的親屬關係',
+};
+
 /** Every role table by language, for {@link treeKinshipLabel}. */
 export const TREE_KINSHIP_ROLE_LABELS: Record<AppLanguage, Record<TreeKinshipRole, string>> = {
   es: TREE_KINSHIP_ROLE_LABEL_ES,
@@ -283,7 +311,7 @@ export const TREE_KINSHIP_ROLE_LABELS: Record<AppLanguage, Record<TreeKinshipRol
   it: TREE_KINSHIP_ROLE_LABEL_IT as Record<TreeKinshipRole, string>,
   tr: TREE_KINSHIP_ROLE_LABEL_TR,
   'zh-CN': TREE_KINSHIP_ROLE_LABEL_ZH_CN,
-  'zh-TW': TREE_KINSHIP_ROLE_LABEL_ZH_CN,
+  'zh-TW': TREE_KINSHIP_ROLE_LABEL_ZH_TW,
 };
 
 /** The languages kinship labels exist in; derived so it cannot drift from the tables. */

@@ -96,7 +96,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     it: 'Il Marketplace mostra un solo catalogo. Skill, plugin, pacchetti firmati e plugin in attesa di revisione condividono un unico elenco con una scheda ciascuno, la stessa identità visiva, gli stessi dettagli richiudibili e un’unica finestra dei permessi prima di installare o aggiornare.',
     tr: 'Marketplace tek bir katalog gösteriyor. Skill’ler, eklentiler, imzalı paketler ve inceleme bekleyen eklentiler tek listede toplanıyor. Her biri kendi kartında, aynı görsel kimlikle, aynı daraltılabilir ayrıntılarla ve kurmadan ya da güncellemeden önce tek bir izin penceresiyle gösteriliyor.',
     'zh-CN': "Marketplace只显示一个统一目录。Skills、插件、已签名包和待审核插件共用一个列表，各自一张卡片，具有相同的视觉标识、相同的可折叠详情，以及安装或更新前唯一的权限对话框。",
-    'zh-TW': "Marketplace只顯示一個統一目錄。Skills、外掛、已簽名包和待稽核外掛共用一個列表，各自一張卡片，具有相同的視覺標識、相同的可摺疊詳情，以及安裝或更新前唯一的許可權對話方塊。",
+    'zh-TW': "Marketplace只顯示一個統一目錄。Skills、外掛、已簽名包和待稽核外掛共用一個列表，各自一張卡片，具有相同的視覺標識、相同的可摺疊詳情，以及安裝或更新前唯一的權限對話方塊。",
   },
   {
     scope: 'plugin',

@@ -387,7 +387,7 @@ export const WORKSPACE_TRANSLATIONS = {
     '{n} elemento(s) de biblioteca enlazado(s)': '{n} bağlı kitaplık öğesi',
   },
   'zh-CN': {
-    ...catalogue['zh-CN'],
+    ...catalogue['zh-TW'],
     'Cada afirmación, hallazgo, constructo, método y marco que el análisis extrajo de tus obras, con quién los sostiene.': '分析从你的文献中提取的每项论断、发现、构念、方法与框架，以及它们的提出者。',
     'Quién sostiene qué en tu corpus: una ficha por autoría, su síntesis y la matriz que las enfrenta.': '你的语料库中谁持有什么观点：每位作者一份档案、其综述，以及将它们对照的矩阵。',
     'El esqueleto argumental de tu corpus: qué idea apoya, refina o contradice a cuál, recorrido paso a paso.': '你的语料库的论证骨架：哪个观点支持、完善或反驳哪个观点，逐步展开。',
@@ -412,7 +412,7 @@ export const WORKSPACE_TRANSLATIONS = {
     '{n} elemento(s) de biblioteca enlazado(s)': '{n}个已关联的文献库项目',
   },
   'zh-TW': {
-    ...catalogue['zh-CN'],
+    ...catalogue['zh-TW'],
     'Cada afirmación, hallazgo, constructo, método y marco que el análisis extrajo de tus obras, con quién los sostiene.': '分析從你的文獻中提取的每項論斷、發現、構念、方法與框架，以及它們的提出者。',
     'Quién sostiene qué en tu corpus: una ficha por autoría, su síntesis y la matriz que las enfrenta.': '你的語料庫中誰持有什麼觀點：每位作者一份檔案、其綜述，以及將它們對照的矩陣。',
     'El esqueleto argumental de tu corpus: qué idea apoya, refina o contradice a cuál, recorrido paso a paso.': '你的語料庫的論證骨架：哪個觀點支援、完善或反駁哪個觀點，逐步展開。',

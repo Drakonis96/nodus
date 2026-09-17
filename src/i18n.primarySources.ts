@@ -222,6 +222,6 @@ export const PRIMARY_SOURCES_TRANSLATIONS = {
     emptyRelationsTitle: '關係來自證據，而非直覺。', emptyRelationsBody: '每個確認的關聯都必須能追溯到一段或多段文獻片段。',
     sourceWorkspaceIntro: '研究原始文件，不要將來源所述與你的解讀混為一談。', sourceWorkspaceBody: '匯入或登記來源，保留其出處和原件，並僅根據已稽核的證據構建人物、時間線、地圖和關係。',
     sourceLayer: '來源內容', observationLayer: '結構化觀察', interpretationLayer: '研究者解讀', sourceLayerBody: '檔案、影像、音訊和逐字轉錄。', observationLayerBody: '有記錄的提及、日期、地點和關係。', interpretationLayerBody: '假設和筆記與文獻原文分開儲存。',
-    noteAccess: '筆記訪問許可權', noteSensitivity: '筆記敏感級別', personal: '個人', highlySensitive: '高度敏感',
+    noteAccess: '筆記訪問權限', noteSensitivity: '筆記敏感級別', personal: '個人', highlySensitive: '高度敏感',
   }),
 } as const;

@@ -305,7 +305,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
   'zh-TW': {
     title: '隱私與資料控制',
     intro:
-      'Nodus主要在裝置上執行：無需賬戶，不包含廣告、遙測或遠端分析，也不執行接收你資料庫內容的自有後端。',
+      'Nodus主要在裝置上執行：無需帳戶，不包含廣告、遙測或遠端分析，也不執行接收你資料庫內容的自有後端。',
     sections: [
       {
         heading: '哪些內容留在你的裝置上',
@@ -545,7 +545,7 @@ const GDPR: Record<AppLanguage, LegalDocContent> = {
   'zh-TW': {
     title: 'Nodus如何支援GDPR合規',
     intro:
-      '該設計採用資料最小化、預設隱私保護以及在錄音前即時提示。這有助於你遵守GDPR，但這並非認證：控制者決定法律依據、保留期限、訪問許可權和提供商。',
+      '該設計採用資料最小化、預設隱私保護以及在錄音前即時提示。這有助於你遵守GDPR，但這並非認證：控制者決定法律依據、保留期限、訪問權限和提供商。',
     sections: [
       {
         heading: '設計即隱私',
