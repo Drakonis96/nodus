@@ -655,22 +655,22 @@ Object.assign(PROSOPOGRAPHY_TRANSLATIONS.tr, {
 });
 
 const observationsEn = {
-  'Editor de observaciones': 'Observation editor',
-  'Un pasaje puede producir varias afirmaciones atómicas sin convertirse en un hecho definitivo.': 'A passage may produce several atomic statements without becoming a definitive fact.',
-  'Revisar y guardar': 'Review and save', 'Selecciona una fuente': 'Select a source',
-  'Segmento citable': 'Citable segment', 'Selecciona un segmento': 'Select a segment',
-  'Resumen del pasaje': 'Passage summary', 'Afirmación {number}': 'Statement {number}',
-  'Eliminar afirmación': 'Delete statement', 'Valor normalizado': 'Normalized value',
-  'Literal de la fuente': 'Source wording', 'Certeza de lectura': 'Reading certainty',
+  'Editor de observaciones': "観測エディター",
+  'Un pasaje puede producir varias afirmaciones atómicas sin convertirse en un hecho definitivo.': "一節は、決定的な事実にならずに、いくつかの原子的なステートメントを生成する可能性があります。",
+  'Revisar y guardar': "確認して保存する", 'Selecciona una fuente': 'Select a source',
+  'Segmento citable': "引用可能なセグメント", 'Selecciona un segmento': "セグメントを選択してください",
+  'Resumen del pasaje': "経過の概要", 'Afirmación {number}': 'Statement {number}',
+  'Eliminar afirmación': "ステートメントの削除", 'Valor normalizado': "正規化された値",
+  'Literal de la fuente': "ソースリテラル", 'Certeza de lectura': "読み取りの確実性",
   'Modalidad': 'Modality', 'Afirmada': 'Asserted', 'Referida': 'Reported',
-  'Inferida por la fuente': 'Inferred by the source', 'Cuestionada': 'Questioned',
-  'La fuente niega esta afirmación': 'The source negates this statement',
-  'Añadir afirmación': 'Add statement', 'Evidencia revisada': 'Reviewed evidence',
-  'Las contradicciones permanecen visibles; una resolución nunca borra sus alternativas.': 'Contradictions remain visible; a resolution never deletes its alternatives.',
-  'Todavía no hay observaciones.': 'There are no observations yet.', 'negada': 'negated',
+  'Inferida por la fuente': "情報源からの推測", 'Cuestionada': 'Questioned',
+  'La fuente niega esta afirmación': "情報筋はこの主張を否定している",
+  'Añadir afirmación': "アファーメーションを追加する", 'Evidencia revisada': "検討された証拠",
+  'Las contradicciones permanecen visibles; una resolución nunca borra sus alternativas.': "矛盾は依然として目に見えています。決議案が代替案を消去することは決してありません。",
+  'Todavía no hay observaciones.': "まだ観測はありません。", 'negada': 'negated',
 };
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.en, observationsEn);
-for (const language of ['fr','de','pt','pt-BR','it','tr','zh-CN', 'zh-TW', 'ja'] as const) Object.assign(PROSOPOGRAPHY_TRANSLATIONS[language], observationsEn);
+for (const language of ['fr','de','pt','pt-BR','it','tr','zh-CN', 'zh-TW'] as const) Object.assign(PROSOPOGRAPHY_TRANSLATIONS[language], observationsEn);
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.fr, {
   'Editor de observaciones': 'Éditeur d’observations', 'Revisar y guardar': 'Réviser et enregistrer',
   'Selecciona una fuente': 'Choisir une source', 'Segmento citable': 'Segment citable',
@@ -709,18 +709,18 @@ Object.assign(PROSOPOGRAPHY_TRANSLATIONS.tr, {
 });
 
 const identityEn = {
-  'Identidad histórica': 'Historical identity', 'Una mención no es una persona: compara, documenta y decide.': 'A mention is not a person: compare, document and decide.',
-  '{count} personas · {mentions} menciones sin resolver': '{count} people · {mentions} unresolved mentions',
-  'menciones': 'mentions', 'Dossier documentado, no biografía inferida.': 'Documented dossier, not an inferred biography.',
-  'Nombres documentados': 'Documented names', 'Sin contexto': 'No context', 'Autoridades': 'Authorities',
-  'Selecciona una persona.': 'Select a person.', 'Individualizar una mención': 'Identify a mention',
-  'Primero conserva la grafía; después busca candidatos.': 'Preserve the spelling first; then search for candidates.',
-  'Nombre tal como aparece': 'Name as it appears', 'Contexto, título, lugar…': 'Context, title, place…',
-  'Buscar candidatos': 'Search candidates', 'Dejar sin resolver': 'Leave unresolved', 'Crear persona': 'Create person',
-  'Organizaciones': 'Organizations', 'Instituciones y variantes se resuelven como autoridades separadas.': 'Institutions and variants are resolved as separate authorities.',
-  'Organización sin nombre': 'Unnamed organization', 'Añadir organización': 'Add organization',
+  'Identidad histórica': "歴史的アイデンティティ", 'Una mención no es una persona: compara, documenta y decide.': "メンションは個人ではありません。比較し、文書化し、決定します。",
+  '{count} personas · {mentions} menciones sin resolver': "{count} 人 · {mentions} 件の未解決のメンション",
+  'menciones': 'mentions', 'Dossier documentado, no biografía inferida.': "推定された伝記ではなく、文書化された文書。",
+  'Nombres documentados': "文書化された名前", 'Sin contexto': "文脈がありません", 'Autoridades': 'Authorities',
+  'Selecciona una persona.': "人を選択してください。", 'Individualizar una mención': "メンションを個別化する",
+  'Primero conserva la grafía; después busca candidatos.': "まずスペルを保持します。それから候補者を探します。",
+  'Nombre tal como aparece': "見た目通りの名前", 'Contexto, título, lugar…': "文脈、タイトル、場所…",
+  'Buscar candidatos': "候補を検索する", 'Dejar sin resolver': "未解決のままにする", 'Crear persona': "人を作成する",
+  'Organizaciones': 'Organizations', 'Instituciones y variantes se resuelven como autoridades separadas.': "制度とバリアントは別個の当局として解決されます。",
+  'Organización sin nombre': "無名の組織", 'Añadir organización': "組織の追加",
 };
-for (const language of ['en','fr','de','pt','pt-BR','it','tr','zh-CN', 'zh-TW', 'ja'] as const) Object.assign(PROSOPOGRAPHY_TRANSLATIONS[language], identityEn);
+for (const language of ['en','fr','de','pt','pt-BR','it','tr','zh-CN', 'zh-TW'] as const) Object.assign(PROSOPOGRAPHY_TRANSLATIONS[language], identityEn);
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.fr, {'Identidad histórica':'Identité historique','menciones':'mentions','Nombres documentados':'Noms documentés','Autoridades':'Autorités','Buscar candidatos':'Chercher des candidats','Dejar sin resolver':'Laisser non résolu','Crear persona':'Créer une personne','Organizaciones':'Organisations','Añadir organización':'Ajouter une organisation'});
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.de, {'Identidad histórica':'Historische Identität','menciones':'Nennungen','Nombres documentados':'Dokumentierte Namen','Autoridades':'Normdaten','Buscar candidatos':'Kandidaten suchen','Dejar sin resolver':'Ungeklärt lassen','Crear persona':'Person erstellen','Organizaciones':'Organisationen','Añadir organización':'Organisation hinzufügen'});
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.pt, {'Identidad histórica':'Identidade histórica','menciones':'menções','Nombres documentados':'Nomes documentados','Autoridades':'Autoridades','Buscar candidatos':'Procurar candidatos','Dejar sin resolver':'Deixar por resolver','Crear persona':'Criar pessoa','Organizaciones':'Organizações','Añadir organización':'Adicionar organização'});
@@ -750,7 +750,7 @@ const advancedEn = {
   'Población antes que fichas':'Population before profiles','Mención antes que identidad':'Mention before identity','Evidencia antes que resumen':'Evidence before summary',
   'Ausencia con razón':'Reasoned missingness','Análisis con denominador':'Analysis with denominator','Redes por origen':'Networks by origin',
 };
-for(const language of ['en','fr','de','pt','pt-BR','it','tr','zh-CN', 'zh-TW', 'ja'] as const)Object.assign(PROSOPOGRAPHY_TRANSLATIONS[language],advancedEn);
+for(const language of ['en','fr','de','pt','pt-BR','it','tr','zh-CN', 'zh-TW'] as const)Object.assign(PROSOPOGRAPHY_TRANSLATIONS[language],advancedEn);
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.fr,{'Cobertura auditable':'Couverture vérifiable','Decisiones de pertenencia':'Décisions d’appartenance','Cohortes reproducibles':'Cohortes reproductibles','Dinámica':'Dynamique','Congelada':'Figée','Crear cohorte':'Créer une cohorte','Proyección reproducible':'Projection reproductible','Frecuencia':'Fréquence','Trayectorias':'Trajectoires','Ejecutar análisis':'Exécuter l’analyse','Denominador':'Dénominateur','Ausencias':'Données manquantes','Atlas relacional estratificado':'Atlas relationnel stratifié','Explícita':'Explicite','Derivada':'Dérivée','Dossier de arista':'Dossier de l’arête','Trazabilidad transversal':'Traçabilité transversale','Crear demo metodológica':'Créer la démo méthodologique'});
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.de,{'Cobertura auditable':'Prüfbare Abdeckung','Decisiones de pertenencia':'Zugehörigkeitsentscheidungen','Cohortes reproducibles':'Reproduzierbare Kohorten','Dinámica':'Dynamisch','Congelada':'Eingefroren','Crear cohorte':'Kohorte erstellen','Proyección reproducible':'Reproduzierbare Projektion','Frecuencia':'Häufigkeit','Trayectorias':'Verläufe','Ejecutar análisis':'Analyse ausführen','Denominador':'Nenner','Ausencias':'Fehlwerte','Atlas relacional estratificado':'Geschichteter Beziehungsatlas','Explícita':'Explizit','Derivada':'Abgeleitet','Dossier de arista':'Kantendossier','Trazabilidad transversal':'Querschnittliche Rückverfolgbarkeit','Crear demo metodológica':'Methodendemo erstellen'});
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.pt,{'Cobertura auditable':'Cobertura auditável','Decisiones de pertenencia':'Decisões de pertença','Cohortes reproducibles':'Coortes reprodutíveis','Dinámica':'Dinâmica','Congelada':'Congelada','Crear cohorte':'Criar coorte','Proyección reproducible':'Projeção reprodutível','Frecuencia':'Frequência','Trayectorias':'Trajetórias','Ejecutar análisis':'Executar análise','Denominador':'Denominador','Ausencias':'Ausências','Atlas relacional estratificado':'Atlas relacional estratificado','Explícita':'Explícita','Derivada':'Derivada','Dossier de arista':'Dossiê da aresta','Trazabilidad transversal':'Rastreabilidade transversal','Crear demo metodológica':'Criar demonstração metodológica'});
