@@ -129,6 +129,8 @@ export const platformApi: PlatformApi = {
   },
   cancelNodusLocalDownloads: () => ipcRenderer.invoke('ai:nodusLocal:cancelDownloads'),
   deleteNodusLocalModel: (model) => ipcRenderer.invoke('ai:nodusLocal:deleteModel', model),
+  recheckNodusLocalRuntime: () => ipcRenderer.invoke('ai:nodusLocal:recheckRuntime'),
+  calibrateNodusLocalModel: (model) => ipcRenderer.invoke('ai:nodusLocal:calibrate', model),
   getNodusLocalImageStatus: () => ipcRenderer.invoke('ai:nodusLocalImage:status'),
   installNodusLocalImageRuntime: async (onProgress) => {
     const requestId = `nodus-local-image-runtime-${Date.now()}-${Math.random().toString(36).slice(2)}`;

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { execFileSync } from 'node:child_process';
+import { buildSync } from 'esbuild';
 import { mkdtemp, rm } from 'node:fs/promises';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -30,11 +30,19 @@ const outDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-i18n-'));
 /** Bundle a TS module so its real exported values can be asserted on. */
 function loadModule(file) {
   const bundle = path.join(outDir, `${path.basename(file, '.ts')}.cjs`);
-  execFileSync(
-    path.join(repoRoot, 'node_modules/.bin/esbuild'),
-    [path.join(repoRoot, file), '--bundle', '--platform=node', '--format=cjs', '--target=es2022', `--outfile=${bundle}`],
-    { cwd: repoRoot, stdio: 'inherit' }
-  );
+  // esbuild's own API, not its command line: `node_modules/.bin/esbuild` is a shell
+  // script Windows cannot execute, and `node_modules/esbuild/bin/esbuild` is the
+  // platform binary on macOS/Linux (handing a Mach-O file to `node` fails). buildSync
+  // behaves identically everywhere and keeps this helper synchronous.
+  buildSync({
+    entryPoints: [path.join(repoRoot, file)],
+    outfile: bundle,
+    bundle: true,
+    format: 'cjs',
+    platform: 'node',
+    target: 'es2022',
+    logLevel: 'silent',
+  });
   return require(bundle);
 }
 

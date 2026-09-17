@@ -63,6 +63,14 @@ audit/adaptive-concurrency/**/raw-campaign*.json
 audit/adaptive-concurrency/**/gate-report*.json
 audit/adaptive-concurrency/**/final-verification*.json
 
+# Local-AI runtime validation runtime data. The harness, the monitor and RESULTS.md
+# stay versioned; the downloaded arXiv corpus and the raw run artifacts do not.
+audit/local-ai-gpu/papers/
+audit/local-ai-gpu/*.log
+audit/local-ai-gpu/report.json
+audit/local-ai-gpu/report.md
+audit/local-ai-gpu/dry-run.json
+
 # Reproducible throwaway profile retained by `npm run qa:notion-parity -- --retain`.
 .qa/notion-parity-userdata/
 

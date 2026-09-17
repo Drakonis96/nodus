@@ -6,7 +6,7 @@ import {
   type NodusLocalAiStatus,
   type NodusLocalModelDefinition,
 } from '@shared/localAiModels';
-import { t } from '../i18n';
+import { t, tx } from '../i18n';
 import { ConfirmModal } from './ConfirmModal';
 import { SettingsModelList, settingsModelRowClass } from './SettingsModelList';
 import { Icon } from './ui';
@@ -62,6 +62,20 @@ export function LocalAiModelsSettings({
   const installRuntime = async () => {
     setBusy('runtime'); setProgress(0); setError('');
     try { setStatus(await window.nodus.installNodusLocalRuntime(setProgress)); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(''); }
+  };
+
+  const recheckRuntime = async () => {
+    setBusy('runtime'); setProgress(0); setError('');
+    try { setStatus(await window.nodus.recheckNodusLocalRuntime()); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(''); }
+  };
+
+  const calibrateModel = async (model: NodusLocalModelDefinition) => {
+    setBusy(`calibrate:${model.id}`); setError('');
+    try { setStatus(await window.nodus.calibrateNodusLocalModel(model.id)); }
     catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(''); }
   };
@@ -125,6 +139,11 @@ export function LocalAiModelsSettings({
             {downloaded
               ? <button className="btn btn-ghost h-7 px-2 text-[10px] text-red-400" disabled={transferBusy} onClick={() => setDeleting(model)}><Icon name="trash" size={10} />{t('Eliminar')}</button>
               : <button className="btn btn-ghost h-7 px-2 text-[10px]" disabled={transferBusy} onClick={() => void download(model)}><Icon name={local?.downloading || busy === model.id ? 'sync' : 'download'} className={local?.downloading || busy === model.id ? 'animate-spin' : ''} size={10} />{local?.downloading && status?.runtime.downloading ? t('Preparando motor…') : local?.downloading || busy === model.id ? t('Descargando…') : t('Descargar')}</button>}
+            {downloaded && model.runtime === 'llama_cpp' && !status?.runtime.processedOnCpu && (
+              <button className="btn btn-ghost h-7 px-2 text-[10px]" disabled={transferBusy} title={t('Mide cuántas peticiones simultáneas admite este equipo. No se ejecuta automáticamente.')} onClick={() => void calibrateModel(model)}>
+                <Icon name={busy === `calibrate:${model.id}` ? 'sync' : 'scale'} className={busy === `calibrate:${model.id}` ? 'animate-spin' : ''} size={10} />{t('Medir concurrencia')}
+              </button>
+            )}
             {downloaded && !runtimeReady && <span className="w-full text-right text-[10px] text-amber-600 dark:text-amber-400">{t('Instala el motor local para poder usar este modelo.')}</span>}
           </div>
         </article>;
@@ -145,6 +164,27 @@ export function LocalAiModelsSettings({
         <button className="mt-1 text-[10px] underline decoration-dotted underline-offset-2 opacity-80 hover:opacity-100" title={t('Abrir licencia de llama.cpp')} onClick={() => void window.nodus.openExternal('https://github.com/ggml-org/llama.cpp/blob/b10002/LICENSE')}>llama.cpp · MIT</button>
       </div>
     </div>
+
+    {status?.runtime.ready && <div className="mt-4 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs dark:border-neutral-800 dark:bg-neutral-900/40" data-testid="nodus-local-runtime-diagnostics">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${status.runtime.processedOnCpu ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'}`}>
+          {status.runtime.processedOnCpu ? t('Ejecutando en CPU') : t('Aceleración por GPU activa')}
+        </span>
+        <span className="text-[11px] text-neutral-600 dark:text-neutral-400">{status.runtime.asset ?? `llama.cpp ${status.runtime.version}`}</span>
+      </div>
+      {status.runtime.device && <p className="mt-1 text-[11px] text-neutral-600 dark:text-neutral-400">{tx('Dispositivo: {device}', { device: `${status.runtime.device.backend}${status.runtime.device.index} · ${status.runtime.device.name} · ${status.runtime.device.totalMiB} MiB` })}</p>}
+      {status.runtime.offload && <p className="mt-1 text-[11px] text-neutral-600 dark:text-neutral-400">{tx('Capas en GPU: {layers} de {total}', { layers: status.runtime.offload.layers, total: status.runtime.offload.totalLayers })}{status.runtime.offload.fitted ? ` · ${t('ajustado a la memoria libre')}` : ''}</p>}
+      {status.runtime.nvidia && <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-500">{status.runtime.nvidia.detected ? tx('GPU NVIDIA detectada · controlador {driver}', { driver: status.runtime.nvidia.driver ?? t('desconocido') }) : t('No se detectó una GPU NVIDIA (no es necesaria)')}</p>}
+      {status.calibration && <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-500">{status.calibration.measured
+        ? `${tx('Concurrencia medida: {slots} ranura(s)', { slots: status.calibration.slots })}${status.calibration.reason ? ` · ${tx('motivo: {reason}', { reason: status.calibration.reason })}` : ''}`
+        : t('Sin medir: se usa 1 ranura')}</p>}
+      {status.runtime.fallbackReason && <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">{tx('Se instaló el motor de CPU: {reason}', { reason: status.runtime.fallbackReason })}</p>}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button className="btn btn-ghost h-7 px-2 text-[10px]" disabled={transferBusy} onClick={() => void recheckRuntime()}><Icon name={busy === 'runtime' ? 'sync' : 'refresh'} className={busy === 'runtime' ? 'animate-spin' : ''} size={10} />{t('Revisar motor')}</button>
+      </div>
+      {status.runtime.logPath && <p className="mt-1 break-all text-[10px] text-neutral-500 dark:text-neutral-500">{tx('Diagnóstico del motor: {path}', { path: status.runtime.logPath })}</p>}
+      <p className="mt-1 text-[10px] text-neutral-500 dark:text-neutral-500">{t('Si el motor no arranca, excluye esa carpeta en tu antivirus.')}</p>
+    </div>}
 
     <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
       <strong>{t('Importante sobre los embeddings:')}</strong> {t('si cambias de modelo, los embeddings creados con el modelo anterior no son compatibles y deberán regenerarse.')}

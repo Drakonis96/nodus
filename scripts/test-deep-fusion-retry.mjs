@@ -22,7 +22,9 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const require = createRequire(import.meta.url);
 
 if (!process.argv.includes('--electron-deep-fusion-retry-test')) {
-  execFileSync(path.join(repoRoot, 'node_modules/.bin/electron'),
+  // `require('electron')` is the executable path itself, which makes this re-exec
+  // work on Windows too (the `.bin/electron` entry is a POSIX shell script).
+  execFileSync(require('electron'),
     [path.join(repoRoot, 'scripts/test-deep-fusion-retry.mjs'), '--electron-deep-fusion-retry-test'],
     { cwd: repoRoot, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, stdio: 'inherit' });
   process.exit(0);
@@ -44,6 +46,22 @@ const fusionReply = (label) => JSON.stringify({
 
 /** Fail every fusion call for this label until the test flips it back. */
 let failLabel = 'alpha';
+/**
+ * Answer every fusion call the way small local models do for a NEW idea — a complete
+ * decision whose optional `merged_label` is null. The validator used to reject it as
+ * "invalid JSON", which left whole works at deep_status=failed after their extraction
+ * had already succeeded (seen on a Windows + RTX machine with Gemma 4 E2B).
+ */
+let nullLabelMode = false;
+/**
+ * Answer the first fusion request for each idea with a reply cut off mid-JSON — what a
+ * reasoning-capable local model does when the output ceiling runs out before the JSON
+ * ends. The scan must detect it (`output_truncated`), retry once with more room, and
+ * finish the work instead of recording an unfinished fusion.
+ */
+let truncateFirstPass = false;
+const seenCeilings = [];
+const truncationAsked = new Set();
 const fusionCalls = [];
 const server = createServer((req, res) => {
   let body = '';
@@ -56,10 +74,26 @@ const server = createServer((req, res) => {
     if (payload?.new_idea) {
       const label = payload.new_idea.label;
       fusionCalls.push(label);
+      const ceiling = parsed.max_tokens ?? parsed.maxTokens ?? parsed.n_predict ?? parsed.options?.num_predict ?? null;
+      if (ceiling != null) seenCeilings.push(ceiling);
       res.writeHead(200, { 'content-type': 'application/json' });
       if (label === failLabel) {
         // Schema-invalid on purpose: no merged_label/rationale/confidence.
         res.end(JSON.stringify({ output_text: JSON.stringify({ resolution: 'new' }), finish_reason: 'stop' }));
+      } else if (truncateFirstPass && !truncationAsked.has(label)) {
+        truncationAsked.add(label);
+        res.end(JSON.stringify({
+          output_text: JSON.stringify({ resolution: 'new', matched_id: null, merged_label: label, edge_to_existing: null, rationale: 'sin relación' }).slice(0, -12),
+          finish_reason: 'length',
+        }));
+      } else if (nullLabelMode) {
+        res.end(JSON.stringify({
+          output_text: JSON.stringify({
+            resolution: 'new', matched_id: null, merged_label: null,
+            edge_to_existing: null, rationale: 'sin relación', confidence: 0.4,
+          }),
+          finish_reason: 'stop',
+        }));
       } else {
         res.end(JSON.stringify({ output_text: fusionReply(label), finish_reason: 'stop' }));
       }
@@ -131,7 +165,48 @@ try {
   const after = worksRepo.getWork('verify-fusion-1');
   assert.equal(after.deep_status, 'done', 'the resumed pass completes the work');
 
-  console.log('\n✅ a bad fusion reply is retriable and the resume only redoes the idea that failed');
+  // Third pass: a decision that is complete except for the optional label must be
+  // accepted, and the published idea inherits the label of the idea being fused.
+  const ideasBefore = getDb().prepare('SELECT count(*) AS c FROM ideas').get().c;
+  nullLabelMode = true;
+  fusionCalls.length = 0;
+  worksRepo.upsertWork({
+    nodus_id: 'verify-fusion-2', zotero_key: 'VERIFYF2', zotero_version: 1,
+    title: 'Obra sintética con decisiones sin etiqueta', authors: ['Autora Sintética'],
+    year: 2026, item_type: 'journalArticle', doi: null, read_tag: true, zoteroTags: [],
+  });
+  await deepScan.runDeepScan(worksRepo.getWork('verify-fusion-2'), { text, sourceType: 'full_text', notes: null }, model);
+  const labeled = worksRepo.getWork('verify-fusion-2');
+  assert.equal(labeled.deep_status, 'done', 'a fusion reply with merged_label: null completes the work instead of failing it');
+  const ideasAfter = getDb().prepare('SELECT count(*) AS c FROM ideas').get().c;
+  assert.equal(ideasAfter - ideasBefore, LABELS.length, 'every accepted new-idea decision published its idea using the extracted label');
+  const publishedLabels = getDb()
+    .prepare("SELECT label FROM ideas WHERE label IN ('alpha','beta','gamma') GROUP BY label ORDER BY label")
+    .all().map((row) => row.label);
+  assert.deepEqual(publishedLabels, ['alpha', 'beta', 'gamma'], 'the fallback label is the extracted one, not an empty string');
+
+  console.log('\n✅ a bad fusion reply is retriable, the resume only redoes the idea that failed, and a missing merged_label is not a failure');
+
+  // Fourth pass: a reply cut off at the output ceiling must be retried with more room.
+  truncateFirstPass = true;
+  nullLabelMode = false;
+  fusionCalls.length = 0;
+  truncationAsked.clear();
+  seenCeilings.length = 0;
+  worksRepo.upsertWork({
+    nodus_id: 'verify-fusion-3', zotero_key: 'VERIFYF3', zotero_version: 1,
+    title: 'Obra sintética con respuestas truncadas', authors: ['Autora Sintética'],
+    year: 2026, item_type: 'journalArticle', doi: null, read_tag: true, zoteroTags: [],
+  });
+  await deepScan.runDeepScan(worksRepo.getWork('verify-fusion-3'), { text, sourceType: 'full_text', notes: null }, model);
+  const truncated = worksRepo.getWork('verify-fusion-3');
+  assert.equal(truncated.deep_status, 'done', 'a reply cut off at the ceiling is recovered by the wider retry');
+  assert.ok(truncationAsked.size === LABELS.length, 'every idea whose first answer was cut off was retried');
+  if (seenCeilings.length) {
+    const distinct = [...new Set(seenCeilings)].sort((a, b) => a - b);
+    assert.ok(distinct.length >= 2, 'the retry asks for a larger output ceiling instead of repeating the same request');
+  }
+  console.log('✅ a reply cut off at the output ceiling is retried with more room and the work completes');
 } finally {
   try { closeDb(); } catch { /* ignore */ }
   server.close();

@@ -32,7 +32,7 @@ import { connectActiveVaultToLocalServer } from '../localServer/connect';
 import { startTailscaleServe, stopTailscaleServe } from '../localServer/tailscale';
 import { holdAwake, holdLid, powerStatus, recordPowerError, releaseAwake, releaseLid } from '../localServer/power';
 import { getAcademicHomeStats } from '../db/homeRepo';
-import { calibrateNodusLocalModelConcurrency, cancelNodusLocalDownloads, deleteNodusLocalModel, downloadNodusLocalModel, getNodusLocalAiStatus, installNodusLocalRuntime } from '../ai/nodusLocalAi';
+import { calibrateNodusLocalRuntimeConcurrency, cancelNodusLocalDownloads, deleteNodusLocalModel, downloadNodusLocalModel, getNodusLocalAiStatus, installNodusLocalRuntime, recheckNodusLocalRuntime } from '../ai/nodusLocalAi';
 import { deleteNodusLocalImageModel, downloadNodusLocalImageModel, getNodusLocalImageStatus, installNodusLocalImageRuntime } from '../ai/nodusLocalImages';
 import { TRANSLATION_LANGUAGES } from '@shared/types';
 import { listLocalAiDiagnostics } from '../ai/localRequestPlanner';
@@ -246,11 +246,12 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
     const status = await downloadNodusLocalModel(model, (fraction) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:nodusLocal:progress', requestId, fraction);
     });
-    if (getSettings().aiConcurrencyMode === 'automatic') {
-      void calibrateNodusLocalModelConcurrency(model).catch(() => undefined);
-    }
+    // No automatic calibration: the first local request must never wait behind a
+    // synthetic benchmark (issue #851). The user can measure concurrency on demand.
     return status;
   });
+  h('ai:nodusLocal:recheckRuntime', async () => recheckNodusLocalRuntime());
+  h('ai:nodusLocal:calibrate', async (_event, model: string) => calibrateNodusLocalRuntimeConcurrency(model));
   h('ai:nodusLocal:cancelDownloads', async () => cancelNodusLocalDownloads());
   h('ai:nodusLocal:deleteModel', async (_event, model: string) => deleteNodusLocalModel(model));
   h('ai:nodusLocalImage:status', async () => getNodusLocalImageStatus());

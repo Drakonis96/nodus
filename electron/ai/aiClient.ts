@@ -1588,11 +1588,16 @@ async function parseOrRepair<T>(
     // extractJson already attempts deterministic local repair. Anything still invalid
     // must be resampled from the frozen request; a remote repair prompt could invent
     // fields and would invalidate manual-versus-automatic comparisons.
+    console.warn(`[ai] structured reply is not JSON (${errorMessage(parseError)}): ${String(text).slice(0, 400)}`);
     throw new AiError(`JSON inválido: ${errorMessage(parseError)}`, false, false, 'invalid_json');
   }
   if (guard(parsed)) return parsed;
   // Well-formed JSON that misses the schema is also resampled without changing the
-  // prompt, model, temperature, context or output budget.
+  // prompt, model, temperature, context or output budget. The caller only ever sees
+  // "invalid JSON", which hides *which* field the model got wrong: without this line
+  // the reason a smaller local model's structured calls fail is unreadable from
+  // outside, and a report can only guess at it.
+  console.warn(`[ai] structured reply rejected by its guard: ${JSON.stringify(parsed).slice(0, 400)}`);
   throw new AiError('El JSON no cumple el esquema esperado', false, false, 'schema_mismatch');
 }
 

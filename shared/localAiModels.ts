@@ -49,6 +49,63 @@ export interface NodusLocalRuntimeStatus {
   /** Main-process transfer state, retained while renderer views mount/unmount. */
   downloading: boolean;
   progress: number;
+  /** Upstream archive the installed runtime came from, when known. */
+  asset?: string | null;
+  /** Backend the installed build was built for, read from its own libraries. */
+  backend?: 'metal' | 'vulkan' | 'cuda' | 'cpu' | null;
+  /** Device the runtime itself reported (`--list-devices`), never inferred from the host. */
+  device?: NodusLocalRuntimeDeviceStatus | null;
+  /** NVIDIA driver presence, reported for diagnostics; CUDA is not the backend. */
+  nvidia?: { detected: boolean; driver: string | null } | null;
+  /** Layer placement of the most recent server start, parsed from llama.cpp's own log. */
+  offload?: NodusLocalOffloadStatus | null;
+  /** Why the CPU build was chosen over a GPU one, when that happened. */
+  fallbackReason?: string | null;
+  /** True when inference is running without a device (explicit, never silent). */
+  processedOnCpu?: boolean;
+  /** Loopback endpoint of the running server (`http://127.0.0.1:<port>`), for diagnostics. */
+  endpoint?: string | null;
+  /** Absolute path of the runtime diagnostics log written by the main process. */
+  logPath?: string;
+  /** Ring buffer of the most recent diagnostics lines, oldest first. */
+  logTail?: string[];
+}
+
+export interface NodusLocalRuntimeDeviceStatus {
+  backend: string;
+  index: number;
+  name: string;
+  totalMiB: number;
+  freeMiB: number;
+}
+
+export interface NodusLocalOffloadStatus {
+  layers: number;
+  totalLayers: number;
+  deviceName: string | null;
+  projectedMiB: number | null;
+  fitted: boolean;
+}
+
+/** Persisted next to the extracted runtime so an install can be audited and upgraded. */
+export interface NodusLocalRuntimeDescriptor {
+  version: 1;
+  llamaCppVersion: string;
+  asset: string;
+  backend: 'metal' | 'vulkan' | 'cuda' | 'cpu';
+  device: NodusLocalRuntimeDeviceStatus | null;
+  nvidia: { detected: boolean; driver: string | null } | null;
+  probedAt: string | null;
+  fallbackReason: string | null;
+}
+
+export interface NodusLocalCalibrationStatus {
+  /** True when a benchmark for this hardware+runtime is on record. */
+  measured: boolean;
+  /** Highest slot count the recorded calibration admitted. */
+  slots: 1 | 2 | 4;
+  /** Reason recorded by the last measurement, e.g. `timeout` or `safe-single-slot`. */
+  reason: string | null;
 }
 
 export interface NodusLocalAiStatus {
@@ -57,6 +114,7 @@ export interface NodusLocalAiStatus {
   activeModelId: string | null;
   activeSlots: number;
   activeLeases: number;
+  calibration?: NodusLocalCalibrationStatus;
 }
 
 const EMBEDDING_CAPABILITIES: NodusLocalCapabilities = {
@@ -68,6 +126,17 @@ const FULL_TEXT_CAPABILITIES: NodusLocalCapabilities = {
 const FULL_VISION_CAPABILITIES: NodusLocalCapabilities = { ...FULL_TEXT_CAPABILITIES, vision: true };
 const RESTRICTED_VISION_CAPABILITIES: NodusLocalCapabilities = {
   chat: true, vision: true, summary: false, extraction: false, fusion: false, documentProfile: false,
+};
+/**
+ * Text-only models kept for conversation, summaries and document profiles. Extraction and
+ * fusion are refused here: validated end to end on Windows + RTX 3060 Ti (Vulkan) over six
+ * arXiv papers, Granite 4.0 Micro extracted fine but violated the fusion decision contract
+ * on every large work — prose in `edge_to_existing.basis` where the prompt requires
+ * `explicit`/`inferred`, and edge types in `resolution` (932 rejected decisions) — which
+ * deterministically failed whole works at `deep_status`. Gemma 4 E2B completed all six.
+ */
+const TEXT_NO_EXTRACTION_CAPABILITIES: NodusLocalCapabilities = {
+  chat: true, vision: false, summary: true, extraction: false, fusion: false, documentProfile: true,
 };
 
 const HF_REVISIONS: Record<string, string> = {
@@ -237,12 +306,12 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     kind: 'chat',
     runtime: 'llama_cpp',
     quantization: 'Q4_K_M',
-    description: 'Modelo de texto compacto con salida JSON fiable; alternativa ligera para extracción de ideas.',
+    description: 'Modelo de texto compacto y rápido para conversación, resúmenes y perfiles. La extracción y la fusión están bloqueadas por fiabilidad: sus decisiones de fusión no cumplen el contrato JSON en obras grandes.',
     sourceUrl: 'https://huggingface.co/ibm-granite/granite-4.0-micro-GGUF',
     licenseLabel: 'Apache-2.0',
     licenseUrl: 'https://huggingface.co/ibm-granite/granite-4.0-micro-GGUF',
     contextLength: 32_768,
-    capabilities: FULL_TEXT_CAPABILITIES,
+    capabilities: TEXT_NO_EXTRACTION_CAPABILITIES,
     modelFile: 'granite-4.0-micro-Q4_K_M.gguf',
     assets: [
       {

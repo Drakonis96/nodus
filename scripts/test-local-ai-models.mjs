@@ -31,9 +31,13 @@ try {
   // Vision chat models must ship their projector; text-only chat models (Granite) must not need one.
   assert.ok(chat.every((model) => (model.vision ? Boolean(model.projectorFile) : !model.projectorFile)),
     'vision models download a projector; text models do not');
-  // The extraction gate that guards the scan roles: only Gemma and Granite are trusted to extract.
+  // The extraction gate that guards the scan roles: after the Windows + RTX validation,
+  // only Gemma is trusted to extract. Granite is kept for chat/summary/document profiles.
   assert.deepEqual(chat.filter((model) => model.capabilities.extraction).map((model) => model.label),
-    ['Gemma 4 E2B Q4', 'Granite 4.0 Micro Q4']);
+    ['Gemma 4 E2B Q4']);
+  assert.deepEqual(chat.find((model) => model.id === 'granite-4.0-micro-q4').capabilities,
+    { chat: true, vision: false, summary: true, extraction: false, fusion: false, documentProfile: true },
+    'Granite stays available for chat, summaries and profiles but is refused for extraction and fusion');
   assert.ok(catalog.NODUS_LOCAL_MODELS.every((model) => model.assets.every((asset) => asset.bytes > 0)), 'every asset has an expected byte size');
   assert.ok(catalog.NODUS_LOCAL_MODELS.every((model) => model.assets.every((asset) => /^[a-f0-9]{64}$/.test(asset.sha256))), 'every asset is pinned by SHA-256');
   assert.deepEqual(chat.find((model) => model.id === 'qwen3.5-0.8b-q4').capabilities,
@@ -67,7 +71,8 @@ try {
   assert.ok(embeddings.find((model) => model.id === 'bge-m3-q8_0').contextLength > 512,
     'the regression fixture exercises a context larger than the old physical batch');
   assert.match(manager, /pipeline\('feature-extraction'/, 'INT8 ONNX models run through Transformers.js');
-  assert.match(manager, /model\.runtime === 'llama_cpp'.*llamaServerPath/s, 'llama.cpp is installed automatically before a dependent model download');
+  assert.match(manager, /if \(model\.runtime === 'llama_cpp'\) \{\s*await installNodusLocalRuntime/s,
+    'llama.cpp is installed (or upgraded) automatically before a dependent model download');
   assert.match(manager, /installNodusLocalRuntime.*downloadModelAssets/s, 'runtime installation continues immediately into the requested model download');
   assert.match(manager, /activeRuntimeDownload.*ActiveLocalAiDownload/s, 'runtime downloads persist in main-process state');
   assert.match(manager, /activeDownloads\.get\(model\.id\)/, 'model status reconnects to a main-process download job');
@@ -84,7 +89,7 @@ try {
   assert.match(manager, /gain < 0\.15 \|\| p95Change > 0\.1/, 'extra slots require the throughput and p95 gates');
   assert.match(manager, /minimumFree >= os\.totalmem\(\) \* 0\.05/, 'local calibration rejects critical memory pressure');
   assert.match(manager, /ensureNodusLocalServerUnlocked\(model\.id, mode, slots\)/, 'calibration starts the full-context runtime at each candidate slot count');
-  assert.match(manager, /calibrationTail/, 'normal requests cannot race a runtime calibration');
+  assert.match(manager, /calibrationTail/, 'a manual calibration still cannot race a live request');
   assert.doesNotMatch(manager, /model\.runtime !== 'llama_cpp' \|\| !await verifyNodusLocalModel/,
     'the downloaded-model wrapper registers calibration before any asynchronous checksum yield');
   assert.match(manager, /export function killNodusLocalServerSync/, 'process shutdown has a forceful local-runtime backstop');
@@ -100,8 +105,9 @@ try {
   assert.match(manager, /max_tokens: 512/,
     'reasoning-capable local models have enough probe budget to emit calibration content');
   assert.match(mainProcess, /killNodusLocalServerSync\(\)/, 'main-process shutdown cannot orphan the integrated llama server');
-  assert.match(ipc, /patch\.aiConcurrencyMode === 'automatic' \|\| patchSelectsLocalModel/,
-    'automatic profiles calibrate even when automatic was already the default, and recalibrate selected local models');
+  assert.doesNotMatch(ipc, /calibrateDownloadedNodusLocalModels/,
+    'selecting a local model must not enqueue a benchmark the first inference then waits behind (issue #851)');
+  assert.match(ipc, /aiConcurrencyMode/, 'the concurrency policy is still refreshed when the mode changes');
   assert.match(aiClient, /ensureNodusLocalServer\(model\.model, 'chat'\)/, 'chat completions start the managed local server');
   assert.match(aiClient, /embedWithNodusLocal/, 'embedding calls route to the integrated runtime');
   assert.match(ipc, /ai:nodusLocal:downloadModel/, 'main IPC exposes model downloads');

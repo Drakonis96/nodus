@@ -41,6 +41,13 @@ test('extraction gate: Gemma passes, the small vision models are blocked, cloud 
   assert.equal(m.nodusLocalModelSupportsExtraction('gemma-4-e2b-q4'), true);
   assert.equal(m.nodusLocalModelSupportsExtraction('qwen3.5-0.8b-q4'), false);
   assert.equal(m.nodusLocalModelSupportsExtraction('lfm2.5-vl-1.6b-q4'), false);
+  // Granite is refused for extraction and fusion after the Windows + RTX validation: its
+  // fusion decisions violated the JSON contract on every large work (932 rejections).
+  assert.equal(m.nodusLocalModelSupportsExtraction('granite-4.0-micro-q4'), false);
+  assert.equal(m.nodusLocalModelSupports('granite-4.0-micro-q4', 'fusion'), false);
+  assert.equal(m.nodusLocalModelSupports('granite-4.0-micro-q4', 'chat'), true);
+  assert.equal(m.nodusLocalModelSupports('granite-4.0-micro-q4', 'summary'), true);
+  assert.equal(m.nodusLocalModelSupports('granite-4.0-micro-q4', 'documentProfile'), true);
   // embedding models can't chat → not extraction-capable
   assert.equal(m.nodusLocalModelSupportsExtraction('bge-m3-q8_0'), false);
   // Unknown built-in ids fail closed until their role matrix is certified.
