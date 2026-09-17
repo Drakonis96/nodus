@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { buildSync } from 'esbuild';
 import { createRequire } from 'node:module';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -34,13 +34,20 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const require = createRequire(import.meta.url);
 const dir = mkdtempSync(path.join(tmpdir(), 'nodus-main-error-i18n-'));
 
+/** Bundle a TS module so its real exported values can be asserted on. esbuild's own API,
+ *  not its command line: `.bin/esbuild` is a shell script Windows cannot execute, and
+ *  `esbuild/bin/esbuild` is a native binary on macOS/Linux. */
 function load(file) {
   const bundle = path.join(dir, `${path.basename(file, '.ts')}.cjs`);
-  execFileSync(
-    path.join(repoRoot, 'node_modules/.bin/esbuild'),
-    [path.join(repoRoot, file), '--bundle', '--platform=node', '--format=cjs', '--target=es2022', `--outfile=${bundle}`],
-    { cwd: repoRoot, stdio: 'inherit' },
-  );
+  buildSync({
+    entryPoints: [path.join(repoRoot, file)],
+    outfile: bundle,
+    bundle: true,
+    format: 'cjs',
+    platform: 'node',
+    target: 'es2022',
+    logLevel: 'silent',
+  });
   return require(bundle);
 }
 
