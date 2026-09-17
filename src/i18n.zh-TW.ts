@@ -65,7 +65,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * every non-Spanish interface language.
  */
 
-/** Simplified Chinese UI table. Keys are the Spanish source strings (see i18n.ts). */
+/** Traditional Chinese UI table. Keys are the Spanish source strings (see i18n.ts). */
 export const ZH_TW: Record<string, string> = {
   "Elige entre modo claro, oscuro o seguir el sistema operativo.": "選擇淺色模式、深色模式，或跟隨作業系統。",
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['zh-TW'],

@@ -109,8 +109,12 @@ test('every guide string is translated into every interface language', async () 
   for (const key of asked) {
     assert.ok(declared.has(key) || borrowed.has(key), `untranslated guide string: ${key}`);
   }
-  for (const lang of ['en', 'fr', 'de', 'pt', "'pt-BR'", 'it', 'tr', "'zh-CN'"]) {
+  for (const lang of ['en', 'fr', 'de', 'pt', "'pt-BR'", 'it', 'tr', "'zh-CN'", "'zh-TW'"]) {
     assert.ok(table.includes(`${lang}: `) || table.includes(`const ${lang} =`), `missing language: ${lang}`);
   }
-  assert.match(table, /export const LIBRARY_TUTORIAL_TRANSLATIONS = \{ en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN \}/);
+  const exported = /export const LIBRARY_TUTORIAL_TRANSLATIONS = \{([\s\S]*?)\}/.exec(table);
+  assert.ok(exported, 'the tutorial catalogue is exported as one object');
+  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW']) {
+    assert.ok(exported[1].includes(`'${language}'`) || new RegExp(`\\b${language.replace('-', '\\-')}\\b`).test(exported[1]), `the exported catalogue omits ${language}`);
+  }
 });

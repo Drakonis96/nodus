@@ -4548,7 +4548,8 @@ export const SERVER_TRANSLATIONS = {
   // where the server reader chrome falls back to Spanish.
   en: { ...EN, ...SERVER_READER_EN, ...SERVER_NATIVE_EN, ...SERVER_WEB_TEXT_EN },
   // Simplified Chinese mirror of the en slice: every Spanish key is translated
-  // below, so the base spreads only keep the shapes identical.
+  // below, so the base spreads only keep the shapes identical. The Traditional
+  // entry mirrors it the same way, over ZH_TW_SERVER.
   'zh-CN': {
     ...EN,
     ...SERVER_READER_EN,
