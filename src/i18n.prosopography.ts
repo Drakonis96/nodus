@@ -101,6 +101,7 @@ export const PROSOPOGRAPHY_TRANSLATIONS: Record<ProsopLanguage, Record<string, s
   'pt-BR': {},
   it: {},
   tr: {},
+  'zh-CN': {},
 };
 
 // Portuguese, Brazilian Portuguese, Italian and Turkish receive complete native
@@ -439,7 +440,7 @@ const observationsEn = {
   'Todavía no hay observaciones.': 'There are no observations yet.', 'negada': 'negated',
 };
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.en, observationsEn);
-for (const language of ['fr','de','pt','pt-BR','it','tr'] as const) Object.assign(PROSOPOGRAPHY_TRANSLATIONS[language], observationsEn);
+for (const language of ['fr','de','pt','pt-BR','it','tr','zh-CN'] as const) Object.assign(PROSOPOGRAPHY_TRANSLATIONS[language], observationsEn);
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.fr, {
   'Editor de observaciones': 'Éditeur d’observations', 'Revisar y guardar': 'Réviser et enregistrer',
   'Selecciona una fuente': 'Choisir une source', 'Segmento citable': 'Segment citable',
@@ -489,7 +490,7 @@ const identityEn = {
   'Organizaciones': 'Organizations', 'Instituciones y variantes se resuelven como autoridades separadas.': 'Institutions and variants are resolved as separate authorities.',
   'Organización sin nombre': 'Unnamed organization', 'Añadir organización': 'Add organization',
 };
-for (const language of ['en','fr','de','pt','pt-BR','it','tr'] as const) Object.assign(PROSOPOGRAPHY_TRANSLATIONS[language], identityEn);
+for (const language of ['en','fr','de','pt','pt-BR','it','tr','zh-CN'] as const) Object.assign(PROSOPOGRAPHY_TRANSLATIONS[language], identityEn);
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.fr, {'Identidad histórica':'Identité historique','menciones':'mentions','Nombres documentados':'Noms documentés','Autoridades':'Autorités','Buscar candidatos':'Chercher des candidats','Dejar sin resolver':'Laisser non résolu','Crear persona':'Créer une personne','Organizaciones':'Organisations','Añadir organización':'Ajouter une organisation'});
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.de, {'Identidad histórica':'Historische Identität','menciones':'Nennungen','Nombres documentados':'Dokumentierte Namen','Autoridades':'Normdaten','Buscar candidatos':'Kandidaten suchen','Dejar sin resolver':'Ungeklärt lassen','Crear persona':'Person erstellen','Organizaciones':'Organisationen','Añadir organización':'Organisation hinzufügen'});
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.pt, {'Identidad histórica':'Identidade histórica','menciones':'menções','Nombres documentados':'Nomes documentados','Autoridades':'Autoridades','Buscar candidatos':'Procurar candidatos','Dejar sin resolver':'Deixar por resolver','Crear persona':'Criar pessoa','Organizaciones':'Organizações','Añadir organización':'Adicionar organização'});
@@ -519,10 +520,127 @@ const advancedEn = {
   'Población antes que fichas':'Population before profiles','Mención antes que identidad':'Mention before identity','Evidencia antes que resumen':'Evidence before summary',
   'Ausencia con razón':'Reasoned missingness','Análisis con denominador':'Analysis with denominator','Redes por origen':'Networks by origin',
 };
-for(const language of ['en','fr','de','pt','pt-BR','it','tr'] as const)Object.assign(PROSOPOGRAPHY_TRANSLATIONS[language],advancedEn);
+for(const language of ['en','fr','de','pt','pt-BR','it','tr','zh-CN'] as const)Object.assign(PROSOPOGRAPHY_TRANSLATIONS[language],advancedEn);
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.fr,{'Cobertura auditable':'Couverture vérifiable','Decisiones de pertenencia':'Décisions d’appartenance','Cohortes reproducibles':'Cohortes reproductibles','Dinámica':'Dynamique','Congelada':'Figée','Crear cohorte':'Créer une cohorte','Proyección reproducible':'Projection reproductible','Frecuencia':'Fréquence','Trayectorias':'Trajectoires','Ejecutar análisis':'Exécuter l’analyse','Denominador':'Dénominateur','Ausencias':'Données manquantes','Atlas relacional estratificado':'Atlas relationnel stratifié','Explícita':'Explicite','Derivada':'Dérivée','Dossier de arista':'Dossier de l’arête','Trazabilidad transversal':'Traçabilité transversale','Crear demo metodológica':'Créer la démo méthodologique'});
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.de,{'Cobertura auditable':'Prüfbare Abdeckung','Decisiones de pertenencia':'Zugehörigkeitsentscheidungen','Cohortes reproducibles':'Reproduzierbare Kohorten','Dinámica':'Dynamisch','Congelada':'Eingefroren','Crear cohorte':'Kohorte erstellen','Proyección reproducible':'Reproduzierbare Projektion','Frecuencia':'Häufigkeit','Trayectorias':'Verläufe','Ejecutar análisis':'Analyse ausführen','Denominador':'Nenner','Ausencias':'Fehlwerte','Atlas relacional estratificado':'Geschichteter Beziehungsatlas','Explícita':'Explizit','Derivada':'Abgeleitet','Dossier de arista':'Kantendossier','Trazabilidad transversal':'Querschnittliche Rückverfolgbarkeit','Crear demo metodológica':'Methodendemo erstellen'});
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.pt,{'Cobertura auditable':'Cobertura auditável','Decisiones de pertenencia':'Decisões de pertença','Cohortes reproducibles':'Coortes reprodutíveis','Dinámica':'Dinâmica','Congelada':'Congelada','Crear cohorte':'Criar coorte','Proyección reproducible':'Projeção reprodutível','Frecuencia':'Frequência','Trayectorias':'Trajetórias','Ejecutar análisis':'Executar análise','Denominador':'Denominador','Ausencias':'Ausências','Atlas relacional estratificado':'Atlas relacional estratificado','Explícita':'Explícita','Derivada':'Derivada','Dossier de arista':'Dossiê da aresta','Trazabilidad transversal':'Rastreabilidade transversal','Crear demo metodológica':'Criar demonstração metodológica'});
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS['pt-BR'],{'Decisiones de pertenencia':'Decisões de pertencimento','Ejecutar análisis':'Executar análise','Crear demo metodológica':'Criar demonstração metodológica'});
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.it,{'Cobertura auditable':'Copertura verificabile','Decisiones de pertenencia':'Decisioni di appartenenza','Cohortes reproducibles':'Coorti riproducibili','Dinámica':'Dinamica','Congelada':'Congelata','Crear cohorte':'Crea coorte','Proyección reproducible':'Proiezione riproducibile','Frecuencia':'Frequenza','Trayectorias':'Traiettorie','Ejecutar análisis':'Esegui analisi','Denominador':'Denominatore','Ausencias':'Dati mancanti','Atlas relacional estratificado':'Atlante relazionale stratificato','Explícita':'Esplicita','Derivada':'Derivata','Dossier de arista':'Dossier dell’arco','Trazabilidad transversal':'Tracciabilità trasversale','Crear demo metodológica':'Crea demo metodologica'});
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.tr,{'Cobertura auditable':'Denetlenebilir kapsam','Decisiones de pertenencia':'Üyelik kararları','Cohortes reproducibles':'Tekrarlanabilir kohortlar','Dinámica':'Dinamik','Congelada':'Dondurulmuş','Crear cohorte':'Kohort oluştur','Proyección reproducible':'Tekrarlanabilir izdüşüm','Frecuencia':'Sıklık','Trayectorias':'Yörüngeler','Ejecutar análisis':'Analizi çalıştır','Denominador':'Payda','Ausencias':'Eksiklik','Atlas relacional estratificado':'Katmanlı ilişki atlası','Explícita':'Açık','Derivada':'Türetilmiş','Dossier de arista':'Kenar dosyası','Trazabilidad transversal':'Çapraz izlenebilirlik','Crear demo metodológica':'Yöntem demosu oluştur'});
+
+// Simplified Chinese (zh-CN) receives a complete native dictionary.
+Object.assign(PROSOPOGRAPHY_TRANSLATIONS['zh-CN'], {
+  'Población': '人口', 'Fuentes': '来源', 'Redes': '网络', 'Registrar': '登记',
+  'Diseña la población antes de convertir observaciones documentales en datos comparables.': '在将文献观察转换为可比数据之前，先设计研究总体。',
+  'Definir la población': '定义研究总体', 'Registrar una fuente': '登记来源', 'Importar menciones': '导入提及',
+  'Estado metodológico': '方法状态', 'Estudio sin definir': '研究未定义',
+  'Define la pregunta, el universo y los límites del estudio.': '定义研究问题、总体范围与研究边界。',
+  'Cuestionario': '问卷', 'Sin versión publicada': '无已发布版本',
+  'Publica un cuestionario común antes de codificar observaciones.': '在编码观察之前发布统一问卷。',
+  'Corpus documental': '文献语料库', 'Sin fuentes': '无来源',
+  'Registra las fuentes previstas y su cobertura.': '登记计划使用的来源及其覆盖范围。',
+  'Requiere atención': '需要关注', 'No hay tareas pendientes.': '没有待处理的任务。',
+  'Flujo de trabajo': '工作流', 'Definir población': '定义研究总体', 'Diseñar cuestionario': '设计问卷',
+  'Registrar fuentes': '登记来源', 'Resolver identidades': '解决身份', 'Analizar cohortes': '分析队列',
+  'Esta sección está preparada para el modelo prosopográfico y se completará en la fase correspondiente.': '本节已为群体传记模型做好准备，将在相应阶段完成。',
+  'Define el universo y el cuestionario': '定义总体与问卷',
+  'Importa menciones o crea una candidata documentada': '导入提及或创建有文献依据的候选对象',
+  'Registra el corpus que permitirá responder': '登记可用于回答问题的语料库',
+  'Publica un cuestionario y revisa observaciones': '发布问卷并审核观察',
+  'Añade relaciones explícitas o crea una capa derivada': '添加显式关系或创建派生层',
+  'Buscar personas, nombres, fuentes y observaciones': '搜索人物、姓名、来源与观察',
+  'Prosopografía estudia una población histórica sin separar los datos de la evidencia que los sostiene.': '群体传记研究历史总体时，不会将数据与其支撑证据分离。',
+  'Una observación no es un hecho': '观察并非事实',
+  'Toda afirmación vuelve a su fuente y conserva incertidumbre, contradicción y literal.': '每条陈述都回溯至其来源，并保留不确定性、矛盾与原文表述。',
+  'Configura el estudio': '设置研究',
+  'Comienza por la pregunta de investigación, la población objetivo y el cuestionario común.': '从研究问题、目标总体和统一问卷开始。',
+  'Abrir Población': '打开人口', 'Buscar en prosopografía': '在群体传记中搜索',
+
+  'v{version} · {status}': 'v{version} · {status}', 'Publicada': '已发布', 'Retirada': '已撤下',
+  'Diseño del estudio': '研究设计',
+  'Define quién entra, qué preguntas se formulan y cómo se codifican las respuestas.': '定义谁被纳入、提出哪些问题以及如何编码答案。',
+  'Metodología sin publicar': '方法未发布', 'Cuestionario sin publicar': '问卷未发布',
+  'Definición del estudio': '研究定义', 'La población, las fuentes y las preguntas se diseñan juntas.': '总体、来源与问题需共同设计。',
+  'Unidad de análisis': '分析单位', 'Afirmación': '陈述', 'Evento': '事件', 'Persona-periodo': '人物-时期',
+  'Definición de la población': '总体定义', 'Ámbito temporal': '时间范围', 'p. ej., 1620–1680': '例如，1620–1680',
+  'Ámbito geográfico': '地理范围', 'Inicio ordenable': '可排序起始', 'Final ordenable': '可排序结束',
+  'Población esperada': '预期总体', 'Política para personas vivas': '在世人物政策',
+  'Excluir': '排除', 'Restringir': '限制', 'Permitir con consentimiento': '经同意后允许',
+  'Estrategia de muestreo': '抽样策略', 'Plan de fuentes': '来源计划', 'Sesgos y límites conocidos': '已知偏差与局限',
+  'Criterios de pertenencia': '归属标准', 'Los pesos ayudan a revisar; nunca incluyen ni excluyen automáticamente.': '权重用于辅助审核；绝不会自动纳入或排除。',
+  'Añade al menos un criterio de inclusión.': '至少添加一条纳入标准。', 'Tipo de criterio': '标准类型',
+  'Inclusión': '纳入', 'Exclusión': '排除', 'Apoyo': '支持', 'Etiqueta del criterio': '标准标签',
+  'Cómo se evalúa y qué evidencia admite': '如何评估以及接受哪些证据', 'Obligatorio': '必填',
+  'Publicar versión': '发布版本', 'Cuestionario común': '统一问卷',
+  'Añade la primera variable del cuestionario.': '添加问卷的第一个变量。', 'Nueva variable': '新变量',
+  'Conserva una pregunta clara, tipo, cardinalidad y razones de ausencia.': '保留清晰的问题、类型、基数以及缺失原因。',
+  'Clave estable': '稳定键', 'Cardinalidad': '基数', 'Un valor': '单值', 'Varios valores': '多值',
+  'Sensibilidad': '敏感度', 'Ordinaria': '普通', 'Sensible': '敏感', 'Restringida': '受限',
+  'Selecciona un vocabulario': '选择词表', 'Añadir variable': '添加变量', 'Nuevo vocabulario': '新词表',
+  'Codificar permite comparar sin perder la expresión histórica.': '编码使比较成为可能，同时不丢失历史表述。',
+  'Crear vocabulario': '创建词表', 'Todavía no hay vocabularios controlados.': '尚无受控词表。',
+  '{count} términos · versión {version}': '{count} 个术语 · 版本 {version}', 'Término preferido': '首选术语',
+  'Vocabularios': '词表', 'Cohortes': '队列',
+
+  'Corpus y captura': '语料与采集', 'Cada observación vuelve a un segmento citable de una fuente.': '每条观察都回溯至来源中可引用的片段。',
+  '{count} fuentes': '{count} 个来源', 'segmentos': '片段', 'observaciones': '观察',
+  'Dossier de fuente': '来源档案', 'Nueva fuente': '新来源',
+  'Conserva cita, cobertura, fiabilidad y restricciones por separado.': '分别保留引注、覆盖范围、可靠性与限制。',
+  'Tipo de fuente': '来源类型', 'Referencia': '参考号', 'Repositorio': '馆藏机构', 'Acceso': '访问',
+  'Restringido': '受限', 'Embargado': '封存', 'Fiabilidad contextual': '语境可靠性',
+  'Segmentos citables': '可引用片段', 'Guarda primero la fuente.': '请先保存来源。',
+  'Sin transcripción': '无转录', 'Localizador: folio, página, tiempo…': '定位符：对开页、页码、时间…',
+  'Transcripción literal': '逐字转录', 'Añadir segmento': '添加片段',
+  'Importación por lotes': '批量导入', 'Cada fila queda en staging; nunca se convierte automáticamente en persona.': '每一行都会保留在暂存区；绝不会自动转换为人物。',
+  'Importar CSV o TSV': '导入 CSV 或 TSV', 'Todavía no hay lotes importados.': '尚未导入任何批次。',
+  '{rows} filas · {accepted} aceptadas · huella {hash}': '{rows} 行 · {accepted} 已接受 · 指纹 {hash}',
+  'Plantillas de vaciado': '采集模板',
+  'Una carta, un padrón y un acta pueden capturarse con formularios distintos sin cambiar el modelo maestro.': '一封信、一份名册和一份会议记录可以使用不同的表单采集，而无需更改主模型。',
+  'Plantilla general': '通用模板', 'Crear plantilla': '创建模板',
+
+  'Editor de observaciones': '观察编辑器',
+  'Un pasaje puede producir varias afirmaciones atómicas sin convertirse en un hecho definitivo.': '一个片段可以产生多条原子陈述，而不会成为确定的事实。',
+  'Revisar y guardar': '审核并保存', 'Selecciona una fuente': '选择来源',
+  'Segmento citable': '可引用片段', 'Selecciona un segmento': '选择片段',
+  'Resumen del pasaje': '片段摘要', 'Afirmación {number}': '陈述 {number}',
+  'Eliminar afirmación': '删除陈述', 'Valor normalizado': '规范化值',
+  'Literal de la fuente': '来源原文', 'Certeza de lectura': '释读确定性',
+  'Modalidad': '模态', 'Afirmada': '断言', 'Referida': '转述',
+  'Inferida por la fuente': '由来源推断', 'Cuestionada': '存疑',
+  'La fuente niega esta afirmación': '来源否认此陈述',
+  'Añadir afirmación': '添加陈述', 'Evidencia revisada': '已审核证据',
+  'Las contradicciones permanecen visibles; una resolución nunca borra sus alternativas.': '矛盾保持可见；任何解决都不会抹去其备选项。',
+  'Todavía no hay observaciones.': '尚无观察。', 'negada': '已否认',
+
+  'Identidad histórica': '历史身份', 'Una mención no es una persona: compara, documenta y decide.': '一次提及并不等于一个人物：请比较、记录并作出判断。',
+  '{count} personas · {mentions} menciones sin resolver': '{count} 个人物 · {mentions} 条未解决的提及',
+  'menciones': '提及', 'Dossier documentado, no biografía inferida.': '有文献依据的档案，而非推断的传记。',
+  'Nombres documentados': '有据可查的姓名', 'Sin contexto': '无上下文', 'Autoridades': '规范档',
+  'Selecciona una persona.': '请选择一个人物。', 'Individualizar una mención': '确认提及所指',
+  'Primero conserva la grafía; después busca candidatos.': '先保留原有拼写；然后查找候选。',
+  'Nombre tal como aparece': '出现时的姓名原文', 'Contexto, título, lugar…': '上下文、头衔、地点…',
+  'Buscar candidatos': '搜索候选', 'Dejar sin resolver': '保持未解决', 'Crear persona': '创建人物',
+  'Organizaciones': '组织', 'Instituciones y variantes se resuelven como autoridades separadas.': '机构与变体作为独立规范档分别解决。',
+  'Organización sin nombre': '未命名组织', 'Añadir organización': '添加组织',
+
+  'Cobertura auditable': '可审计的覆盖范围', 'Distingue falta de investigación, silencio documental y exclusión.': '区分研究不足、文献沉默与排除。',
+  'Decisiones de pertenencia': '归属决策', 'Cada estado queda ligado a la versión metodológica y a una justificación.': '每种状态都与方法版本及理由相关联。',
+  'Justificación y evidencia': '理由与证据', 'Guardar decisión': '保存决策', 'Cohortes reproducibles': '可复现队列',
+  'La dinámica se recalcula; la congelada conserva exactamente sus integrantes.': '动态队列会重新计算；冻结队列则精确保留其成员。',
+  'Nombre de la cohorte': '队列名称', 'Dinámica': '动态', 'Congelada': '冻结', 'Crear cohorte': '创建队列',
+  '{count} integrantes · {kind}': '{count} 名成员 · {kind}', 'Incluidas': '已纳入', 'Excluidas': '已排除', 'Inciertas': '不确定',
+  'Observaciones revisadas': '已审核观察', 'Ausencias razonadas': '有理由的缺失',
+  'Proyección reproducible': '可复现投影', 'Cada resultado declara población, denominador, ausencias y huella de entrada.': '每个结果都声明总体、分母、缺失情况与输入指纹。',
+  'Frecuencia': '频率', 'Trayectorias': '轨迹', 'Ejecutar análisis': '运行分析', 'Ejecuta el primer análisis sobre la población incluida.': '对纳入的总体运行首次分析。',
+  'Huella': '指纹', 'Abrir {count} casos': '打开 {count} 个案例', 'Abrir evidencia': '打开证据', 'Denominador': '分母', 'Ausencias': '缺失',
+  'Atlas relacional estratificado': '分层关系图谱', 'Lo documentado, lo derivado y las hipótesis se muestran con gramáticas visuales distintas.': '有据可查、派生与假设的内容使用不同的视觉语法呈现。',
+  'Copresencia derivada': '派生共现', 'Derivar copresencia': '派生共现', 'Explícita': '显式', 'Derivada': '派生',
+  '{nodes} nodos · {edges} aristas · densidad {density}': '{nodes} 个节点 · {edges} 条边 · 密度 {density}',
+  'explícitas': '显式', 'derivadas': '派生', 'hipótesis': '假设', 'Grafo prosopográfico por capas': '分层群体传记图谱',
+  'Dossier de arista': '边档案', 'Selecciona una conexión para inspeccionar su origen y evidencia.': '选择一条连接以检查其来源与证据。', 'Factoids de apoyo': '支持性事实片段',
+  'Trazabilidad transversal': '跨领域可追溯性', 'Recorre la ruta entre personas, grafías, observaciones y fuentes.': '追溯人物、拼写、观察与来源之间的路径。',
+  'Nombre, literal, cita o referencia…': '姓名、原文、引注或参考号…', '{count} resultados': '{count} 条结果',
+  'Crear demo metodológica': '创建方法演示', 'Tour del método prosopográfico': '群体传记方法导览',
+  'Población antes que fichas': '总体先于档案卡', 'Mención antes que identidad': '提及先于身份', 'Evidencia antes que resumen': '证据先于摘要',
+  'Ausencia con razón': '有理由的缺失', 'Análisis con denominador': '带分母的分析', 'Redes por origen': '按来源划分的网络',
+});

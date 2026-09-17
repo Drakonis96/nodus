@@ -15,4 +15,5 @@ export const WORLDBUILDING_TRANSLATIONS = {
   ptBR: map({ protagonists: 'Protagonistas', alive: 'Vivos' }),
   it: map({ protagonists: 'Protagonisti', alive: 'In vita' }),
   tr: map({ protagonists: 'Başkahramanlar', alive: 'Hayatta' }),
+  'zh-CN': map({ protagonists: '主角', alive: '在世' }),
 } as const;

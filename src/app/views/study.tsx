@@ -3,6 +3,7 @@
 // are written out per view rather than shared, because each carries the target
 // setter its own destination reads.
 import { lazy } from 'react';
+import type { StudySearchLocation } from '@shared/studySearch';
 import type { ViewContext, ViewRenderer } from '../ViewContext';
 
 const StudyOrganizationView = lazy(() => import('../../views/StudyOrganizationView').then((module) => ({ default: module.StudyOrganizationView })));
@@ -23,8 +24,12 @@ const openDocument = (ctx: ViewContext) => (id: string) => {
   ctx.setStudyTarget({ kind: 'document', id });
   ctx.setView('studyCourses');
 };
-const openMaterial = (ctx: ViewContext) => (id: string) => {
-  ctx.setStudyMaterialTarget(id);
+const openMaterial = (ctx: ViewContext) => (id: string, location?: StudySearchLocation | null) => {
+  ctx.setStudyMaterialTarget({
+    id,
+    pageNumber: location?.pageNumber ?? null,
+    slideNumber: location?.slideNumber ?? null,
+  });
   ctx.setView('studyLibrary');
 };
 const openRecording = (ctx: ViewContext) => (id: string, timestamp?: number | null) => {
@@ -53,7 +58,7 @@ export const studyViews = {
     />
   ),
   studyLibrary: (ctx) => (
-    <StudyMaterialsView initialMaterialId={ctx.studyMaterialTarget} onOpenDocument={openDocument(ctx)} />
+    <StudyMaterialsView target={ctx.studyMaterialTarget} onOpenDocument={openDocument(ctx)} />
   ),
   studyRecordings: (ctx) => (
     <StudyRecordingsView

@@ -14,9 +14,11 @@ interface PdfSearchResult { pageNumber: number; snippet: string; occurrence: num
 const PASTELS = ['#fde68a', '#fbcfe8', '#bfdbfe', '#bbf7d0', '#ddd6fe', '#fed7aa'];
 const INKS = ['#ef4444', '#2563eb', '#111827', '#0f766e', '#9333ea', '#f97316'];
 
-export function PdfViewer({ content, material, onAnnotation, onUpdateAnnotation, onDeleteAnnotation, onCreateNote }: {
+export function PdfViewer({ content, material, initialPage = null, onAnnotation, onUpdateAnnotation, onDeleteAnnotation, onCreateNote }: {
   content: StudyMaterialContent;
   material: StudyMaterialDetail;
+  /** Cited page to open on; null keeps the document's first page. */
+  initialPage?: number | null;
   onAnnotation: (input: StudyMaterialAnnotationInput) => Promise<void>;
   onUpdateAnnotation: (id: string, patch: Partial<StudyMaterialAnnotationInput>) => Promise<void>;
   onDeleteAnnotation: (id: string) => Promise<void>;
@@ -51,9 +53,14 @@ export function PdfViewer({ content, material, onAnnotation, onUpdateAnnotation,
     let current: PDFDocumentProxy | null = null;
     setLoading(true); setError(''); pageTextCacheRef.current.clear(); setSearchQuery(''); setSearchResults([]);
     const task = getDocument({ data: new Uint8Array(content.bytes) });
-    void task.promise.then((document) => { current = document; setPdf(document); setJumpPage(1); setLoading(false); }).catch((cause) => { setError(cause instanceof Error ? cause.message : String(cause)); setLoading(false); });
+    void task.promise.then((document) => {
+      current = document;
+      setPdf(document);
+      setJumpPage(initialPage ? Math.max(1, Math.min(document.numPages, initialPage)) : 1);
+      setLoading(false);
+    }).catch((cause) => { setError(cause instanceof Error ? cause.message : String(cause)); setLoading(false); });
     return () => { void task.destroy(); void current?.destroy(); };
-  }, [material.contentHash]);
+  }, [material.contentHash, initialPage]);
 
   const captureSelection = () => {
     if (tool === 'none' || tool === 'brush') return;
@@ -91,6 +98,19 @@ export function PdfViewer({ content, material, onAnnotation, onUpdateAnnotation,
     const next = Math.max(1, Math.min(pdf?.numPages ?? 1, pageNumber)); setJumpPage(next);
     if (viewMode === 'continuous') window.requestAnimationFrame(() => scrollRef.current?.querySelector<HTMLElement>(`[data-pdf-page="${next}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
+
+  // Continuous mode paints every page, so reaching the cited one is a scroll. The
+  // two frames let each page report its real size first; scrolling before that
+  // would land short on documents whose pages differ from the default letter box.
+  const citedPageScrolledRef = useRef(false);
+  useEffect(() => {
+    if (!pdf || !initialPage || viewMode !== 'continuous' || citedPageScrolledRef.current) return;
+    citedPageScrolledRef.current = true;
+    const target = Math.max(1, Math.min(pdf.numPages, initialPage));
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      scrollRef.current?.querySelector<HTMLElement>(`[data-pdf-page="${target}"]`)?.scrollIntoView({ block: 'start' });
+    }));
+  }, [pdf, initialPage, viewMode]);
 
   useEffect(() => { localStorage.setItem('nodus.study.pdfViewMode', viewMode); }, [viewMode]);
 

@@ -1,5 +1,6 @@
 // records channels, moved verbatim out of the monolithic registerIpc.
 // The channel names are unchanged; scripts/test-ipc-contract.mjs is what proves it.
+import { dialogTitle } from '../dialogTitles';
 import type { IpcContext } from './context';
 import type { PersonInput, PlaceInput, GazetteerPlace, PersonPlaceInput, EventInput, ParticipantRole, EventTypeValue, RecordEvidenceInput, RecordEvidenceTargetKind, RelationshipType, RelationshipProvenance, RelationshipSubtype, SocialContactInput, SocialRelationInput } from '@shared/types';
 import { generatePersonPortraitFromDescription } from '../ai/decorativeImages';
@@ -38,7 +39,7 @@ export function registerRecordsIpc({ h, getWindow }: IpcContext): void {
   h('entities:setPersonPortraitFromFile', async (_e, personId: string) => {
     const win = getWindow();
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Elegir retrato',
+      title: dialogTitle('choosePortrait', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tif', 'tiff'] }],
     });
@@ -197,7 +198,7 @@ export function registerRecordsIpc({ h, getWindow }: IpcContext): void {
   h('genealogy:importGedcom', async () => {
     const win = getWindow();
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Importar GEDCOM',
+      title: dialogTitle('importGedcom', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: [{ name: 'GEDCOM', extensions: ['ged', 'gedcom'] }],
     });
@@ -208,7 +209,7 @@ export function registerRecordsIpc({ h, getWindow }: IpcContext): void {
   h('genealogy:exportGedcom', async () => {
     const win = getWindow();
     const picked = await dialog.showSaveDialog(win ?? undefined!, {
-      title: 'Exportar GEDCOM',
+      title: dialogTitle('exportGedcom', getSettings().uiLanguage),
       defaultPath: 'nodus.ged',
       filters: [{ name: 'GEDCOM', extensions: ['ged'] }],
     });

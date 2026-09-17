@@ -6,7 +6,8 @@ import { PT } from './i18n.pt';
 import { PT_BR } from './i18n.pt-BR';
 import { IT } from './i18n.it';
 import { TR } from './i18n.tr';
-import { looksLikeSpanishUiText, normalizeUiLanguage } from '@shared/uiLanguage';
+import { ZH_CN } from './i18n.zh-CN';
+import { looksLikeSpanishUiText, knownRuntimeErrorText, normalizeUiLanguage } from '@shared/uiLanguage';
 import { NODI_NOTIFICATION_TEXT, type NodiNotificationText } from '@shared/nodiNotifications';
 
 /**
@@ -35,6 +36,7 @@ const TABLES: Record<Exclude<AppLanguage, 'es'>, Record<string, string>> = {
   'pt-BR': PT_BR,
   it: IT,
   tr: TR,
+  'zh-CN': ZH_CN,
 };
 
 let activeLang: AppLanguage = 'es';
@@ -79,6 +81,23 @@ export function tx(es: string, vars: Record<string, string | number>): string {
     out = out.split(`{${k}}`).join(String(v));
   }
   return out;
+}
+
+/**
+ * Translate in a language that is NOT the active interface language, for the processing
+ * log: its lines follow a language the reader chooses beside the filters (English by
+ * default, so a log can be pasted into a GitHub issue as it stands) while the interface
+ * around it stays in the language the app was switched to.
+ *
+ * Unresolved placeholders are dropped rather than left visible: a line whose value is
+ * missing must still read as a sentence, not as `{detail}`.
+ */
+export function txIn(lang: AppLanguage, es: string, vars: Record<string, string | number | boolean | null | undefined> = {}): string {
+  const template = resolveTranslation(lang, es);
+  return template.replace(/\{(\w+)\}/g, (match, name: string) => {
+    const value = vars[name];
+    return value == null ? '' : String(value);
+  }).replace(/\s+([,.;])/g, '$1').trim();
 }
 
 /**
@@ -193,6 +212,24 @@ const RUNTIME_PATTERNS: RuntimePattern[] = [
     pattern: /^Adjuntos: (.+)$/,
     render: (m) => tx('Adjuntos: {title}', { title: m[1] }),
   },
+  // The global-library extraction readout, handed over untranslated by
+  // EXTRACTION_PROGRESS_MESSAGES so the page counts and the file name survive.
+  {
+    pattern: /^Extrayendo página (\d+) de (\d+)…$/,
+    render: (m) => tx('Extrayendo página {page} de {total}…', { page: m[1], total: m[2] }),
+  },
+  {
+    pattern: /^OCR local (\d+) de (\d+)…$/,
+    render: (m) => tx('OCR local {page} de {total}…', { page: m[1], total: m[2] }),
+  },
+  {
+    pattern: /^OCR remoto (\d+) de (\d+)…$/,
+    render: (m) => tx('OCR remoto {n} de {total}…', { n: m[1], total: m[2] }),
+  },
+  {
+    pattern: /^Analizando (.+)…$/,
+    render: (m) => tx('Analizando {file}…', { file: m[1] }),
+  },
   // Cloudflare deployment progress and failures. The main process builds these with the
   // Worker's own name and status code, so they are prose by the time they reach the modal.
   {
@@ -218,6 +255,15 @@ export function tr(value: string): string {
   if (!value || activeLang === 'es') return value;
   const direct = TABLES[activeLang]?.[value] ?? EN[value];
   if (direct) return direct;
+  // Sentences the main process knows how to translate but that never travel in a field named
+  // `message`/`error` — `pausedReason`, `saveError`, `maintenanceError`, a job's own status
+  // text — reach the renderer as they are, and this is their only gate. Consulting the same
+  // catalogues the main process uses keeps the answer from existing in the wrong process, and
+  // it goes BEFORE the shape patterns below: an exact match beats a heuristic, and the
+  // catch-all `{name}: {warning}` would otherwise swallow a provider sentence whole and put it
+  // back together in the same words.
+  const known = knownRuntimeErrorText(value, activeLang);
+  if (known !== null) return known;
   for (const candidate of RUNTIME_PATTERNS) {
     const match = value.match(candidate.pattern);
     if (match) return candidate.render(match);
@@ -229,6 +275,22 @@ export function tr(value: string): string {
 export function errorText(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return tr(message);
+}
+
+/**
+ * Translate a sentence one of our catalogues knows, and leave everything else EXACTLY as it
+ * was written.
+ *
+ * {@link tr} is the wrong tool for a list that mixes our sentences with someone else's prose:
+ * it runs the Spanish detector last, so an auditor's own Spanish note — written by a model
+ * answering in the prompt language — would be replaced by the generic "this message could not
+ * be translated", erasing the only description of what was wrong. A stored audit's issues are
+ * exactly that mix, and the pipeline's own contributions to them ("the response was cut off at
+ * N output tokens") are ours and must follow the interface.
+ */
+export function knownText(value: string): string {
+  if (!value) return value;
+  return knownRuntimeErrorText(value, activeLang) ?? value;
 }
 
 /**

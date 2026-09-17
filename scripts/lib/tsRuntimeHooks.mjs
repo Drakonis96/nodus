@@ -38,6 +38,7 @@ export function installRuntimeHooks(userDataPath, overrides = {}) {
       getAppPath() {
         return repoRoot;
       },
+      focus() {},
       isPackaged: false,
     },
     safeStorage: {

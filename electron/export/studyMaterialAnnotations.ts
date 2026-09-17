@@ -1,6 +1,8 @@
 import path from 'node:path';
 import AdmZip from 'adm-zip';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
+import { hasCjk, subsetCjkFont } from './pdfText';
 import type { StudyMaterialAnnotation, StudyMaterialContent, StudyMaterialDetail } from '../../shared/types';
 
 function hexColor(value: string) {
@@ -49,18 +51,31 @@ export async function annotatedPdfBytes(content: StudyMaterialContent, material:
     } else if (annotation.note) notes.push({ annotation, number: notes.length + 1 });
   }
   if (notes.length) {
+    const heading = 'Anotaciones de Nodus';
+    const noteLines = (annotation: StudyMaterialAnnotation, number: number) => [
+      `${number}. ${annotationLabel(annotation)}${annotation.pageNumber ? ` - pagina ${annotation.pageNumber}` : ''}`,
+      ...(annotation.selectedText ? wrap(`Texto: ${annotation.selectedText}`) : []),
+      ...wrap(annotation.note),
+    ];
+    // Annotation notes and quoted passages can be Chinese; one subset covers them all.
+    const cjkText = notes.flatMap(({ annotation, number }) => noteLines(annotation, number)).join(' ');
+    const cjkFont = hasCjk(`${heading} ${cjkText}`)
+      ? await (async () => {
+          pdf.registerFontkit(fontkit);
+          return pdf.embedFont(await subsetCjkFont(`${heading} ${cjkText}`), { subset: false });
+        })()
+      : null;
+    // Per line, so a Chinese note in an otherwise English list still renders.
+    const lineFont = (value: string, wantBold: boolean) =>
+      cjkFont && hasCjk(value) ? cjkFont : wantBold ? bold : font;
     let page = pdf.addPage(); let y = page.getHeight() - 52;
-    page.drawText('Anotaciones de Nodus', { x: 48, y, size: 18, font: bold, color: rgb(0.08, 0.32, 0.32) }); y -= 28;
+    page.drawText(heading, { x: 48, y, size: 18, font: lineFont(heading, true), color: rgb(0.08, 0.32, 0.32) }); y -= 28;
     for (const { annotation, number } of notes) {
-      const lines = [
-        `${number}. ${annotationLabel(annotation)}${annotation.pageNumber ? ` - pagina ${annotation.pageNumber}` : ''}`,
-        ...(annotation.selectedText ? wrap(`Texto: ${annotation.selectedText}`) : []),
-        ...wrap(annotation.note),
-      ];
+      const lines = noteLines(annotation, number);
       const required = lines.length * 14 + 14;
       if (y - required < 45) { page = pdf.addPage(); y = page.getHeight() - 48; }
-      page.drawText(lines[0], { x: 48, y, size: 10, font: bold, color: rgb(0.2, 0.2, 0.2) }); y -= 15;
-      for (const line of lines.slice(1)) { page.drawText(line, { x: 58, y, size: 9, font, color: rgb(0.25, 0.25, 0.25) }); y -= 13; }
+      page.drawText(lines[0], { x: 48, y, size: 10, font: lineFont(lines[0], true), color: rgb(0.2, 0.2, 0.2) }); y -= 15;
+      for (const line of lines.slice(1)) { page.drawText(line, { x: 58, y, size: 9, font: lineFont(line, false), color: rgb(0.25, 0.25, 0.25) }); y -= 13; }
       y -= 10;
     }
   }

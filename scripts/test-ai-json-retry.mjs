@@ -45,6 +45,12 @@ const server = createServer((req, res) => {
     seen.push({ url: req.url, headers: req.headers, body: JSON.parse(body || '{}') });
     const next = queue.shift() ?? '{}';
     const reply = typeof next === 'string' ? { content: next, finish_reason: 'stop' } : next;
+    // A refusal is a reply too: the transport's own recovery paths are driven from here.
+    if (reply.status) {
+      res.writeHead(reply.status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: { message: reply.error ?? 'rejected' } }));
+      return;
+    }
     res.writeHead(200, { 'content-type': 'application/json' });
     const payload = JSON.stringify({ choices: [{ message: { role: 'assistant', content: reply.content }, finish_reason: reply.finish_reason }] });
     if (reply.bodyDelayMs) {
@@ -159,6 +165,36 @@ try {
   run([{ content: 'una frase cortada por la mitad', finish_reason: 'length' }]);
   assert.equal(await aiClient.completeText(opts, model), 'una frase cortada por la mitad');
 
+  // 6b. Prose that is PERSISTED opts into the JSON contract. The work summary used to
+  //     store a sentence cut off at the output ceiling as a finished summary; a thinking
+  //     model behind a custom OpenAI-compatible gateway spends that same ceiling on its
+  //     reasoning trace, so the cutoff must surface as a retryable error instead of data.
+  settingsRepo.updateSettings({ customProvider: { baseUrl, models: ['deepseek-v4.1-flash:thinking'] } });
+  const thinkingModel = { provider: 'custom', model: 'deepseek-v4.1-flash:thinking' };
+  run([
+    { content: '요약이 문장 중간에서 잘렸', finish_reason: 'length' },
+    { content: '완전한 요약입니다.', finish_reason: 'stop' },
+  ]);
+  await assert.rejects(
+    () => aiClient.completeText({ ...opts, maxTokens: 2400, requireCompleteOutput: true }, thinkingModel),
+    (e) => {
+      assert.equal(e.code, 'output_truncated');
+      assert.match(e.message, /2400/, 'the error names the ceiling that was hit');
+      return true;
+    },
+  );
+  assert.equal(seen.length, 1, 'the clipped attempt is not replayed with the same ceiling');
+  assert.equal(seen[0].body.max_tokens, 2400, 'the first attempt asks for real headroom');
+  assert.equal(
+    await aiClient.completeText({ ...opts, maxTokens: 8000, requireCompleteOutput: true }, thinkingModel),
+    '완전한 요약입니다.',
+  );
+  assert.equal(seen[1].body.max_tokens, 8000, 'the retry asks the provider for the app default ceiling');
+
+  // 6c. Without the opt-in, conversation keeps accepting a clipped answer unchanged.
+  run([{ content: 'respuesta de chat cortada', finish_reason: 'length' }]);
+  assert.equal(await aiClient.completeText({ ...opts, maxTokens: 2400 }, thinkingModel), 'respuesta de chat cortada');
+
   // 7. Truncation a provider does not admit to. The subscription runtimes (codex,
   //    github-copilot) hand back a bare string with no finish_reason at all, and any
   //    provider can simply be wrong. jsonrepair closes the dangling braces, the shard
@@ -251,6 +287,32 @@ try {
     maxTokens: 8000, seed: 123456, images: [],
   });
   assert.equal(gemini3.config.temperature, undefined, 'Gemini 3 keeps provider sampling defaults');
+
+  // 11. A model that deprecates `temperature` costs one refused request per session, not a
+  // failed scan. That is how DeepSeek's unversioned ids arrived: the transport cannot know
+  // in advance, so it learns from a 400 that NAMES the field, replays without it and keeps
+  // every other field of the request intact.
+  const deprecating = { provider: 'lmstudio', model: 'fake-deprecating-model' };
+  run([{ status: 400, error: 'Unsupported parameter: temperature' }, { content: 'hola' }]);
+  assert.equal(await aiClient.completeText({ system: 'system', user: 'user' }, deprecating), 'hola');
+  assert.equal(seen.length, 2, 'a named temperature refusal is replayed exactly once');
+  assert.ok('temperature' in seen[0].body, 'the first attempt still sent the knob');
+  assert.ok(!('temperature' in seen[1].body), 'the replay drops the offending field');
+  assert.deepEqual(
+    { ...seen[1].body, temperature: 0 },
+    { ...seen[0].body, temperature: 0 },
+    'every other request field survives the recovery',
+  );
+  run([{ content: 'hola' }]);
+  assert.equal(await aiClient.completeText({ system: 'system', user: 'user' }, deprecating), 'hola');
+  assert.equal(seen.length, 1, 'the model stays learned for the rest of the session');
+  assert.ok(!('temperature' in seen[0].body), 'later calls never send it again');
+  // A 400 that does NOT name the field must not be replayed: otherwise every refusal for
+  // any other reason would be sent twice.
+  const refused = { provider: 'lmstudio', model: 'fake-other-refusal-model' };
+  run([{ status: 400, error: 'context length exceeded' }]);
+  await assert.rejects(() => aiClient.completeText({ system: 'system', user: 'user' }, refused));
+  assert.equal(seen.length, 1, 'an unnamed 400 is surfaced, not replayed');
 
   console.log('AI JSON retry budget verified.');
 } finally {

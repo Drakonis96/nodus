@@ -19,6 +19,8 @@ import type {
 import type { LibraryItemRecord, LibraryScope } from '@shared/libraryTypes';
 import { Badge, EDGE_LABELS, Icon, NODE_LABELS } from './ui';
 import { buildAuthorIndex, lookupAuthor } from '../authorLinks';
+import { evidenceLocator, openEvidenceAtPage, requestLibraryDocumentOpen } from '../evidenceJump';
+import { parsePageNumber } from '@shared/pageLocation';
 import { t, tx } from '../i18n';
 
 export type CitationTarget =
@@ -30,7 +32,8 @@ export type CitationTarget =
   | { kind: 'passage'; id: string }
   | null;
 
-export type OpenCitationLibraryWork = (itemId: string, scope: LibraryScope) => void;
+/** Opens the library copy of a cited work, at `page` when the citation named one. */
+export type OpenCitationLibraryWork = (itemId: string, scope: LibraryScope, page?: number | null) => void;
 
 type NonNullCitationTarget = Exclude<CitationTarget, null>;
 
@@ -541,10 +544,11 @@ function PassagePanel({ passageId, onOpenTarget, onTitle, authors, onOpenLibrary
   }, [passageId, onTitle]);
   if (missing) return <MissingPanel>{t('No se encontró el pasaje citado. Puede haberse reindexado.')}</MissingPanel>;
   if (!detail) return <LoadingPanel />;
+  const page = detail.page_number ?? parsePageNumber(detail.page_label);
   return (
     <div className="space-y-5" data-testid="source-citation-passage">
-      <div className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/10 via-neutral-900/60 to-neutral-950 p-5 sm:p-6"><div className="flex flex-wrap gap-2"><Badge color="green">{t('Pasaje de texto completo')}</Badge>{detail.page_label && <Badge>{detail.page_label}</Badge>}</div><h2 className="mt-3 text-xl font-semibold leading-tight text-neutral-100">{detail.work.title}</h2><div className="mt-2"><AuthorLinks names={detail.work.authors} authors={authors} onOpenTarget={onOpenTarget} /></div></div>
-      <Section icon="book" title={t('Obra enlazada')} count={1}><LinkedWorkCard work={{ id: detail.nodus_id, title: detail.work.title, authors: detail.work.authors, year: detail.work.year, zoteroKey: detail.work.zotero_key }} authorsIndex={authors} onOpenTarget={onOpenTarget} onOpenLibraryWork={onOpenLibraryWork} /></Section>
+      <div className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/10 via-neutral-900/60 to-neutral-950 p-5 sm:p-6"><div className="flex flex-wrap items-center gap-2"><Badge color="green">{t('Pasaje de texto completo')}</Badge>{detail.page_label && <Badge>{detail.page_label}</Badge>}{page !== null && <button type="button" data-testid="source-citation-jump-passage" className="btn btn-ghost h-7 border border-emerald-700/70 px-2 text-[11px] text-emerald-300" title={t('Abrir fuente')} onClick={() => void openEvidenceAtPage(detail.nodus_id, evidenceLocator({ location: detail.page_label, source_ref: detail.source_ref, page_number: detail.page_number }))}><Icon name="external" size={12} /> {tx('Ver página {n}', { n: page })}</button>}</div><h2 className="mt-3 text-xl font-semibold leading-tight text-neutral-100">{detail.work.title}</h2><div className="mt-2"><AuthorLinks names={detail.work.authors} authors={authors} onOpenTarget={onOpenTarget} /></div></div>
+      <Section icon="book" title={t('Obra enlazada')} count={1}><LinkedWorkCard work={{ id: detail.nodus_id, title: detail.work.title, authors: detail.work.authors, year: detail.work.year, zoteroKey: detail.work.zotero_key }} page={page} authorsIndex={authors} onOpenTarget={onOpenTarget} onOpenLibraryWork={onOpenLibraryWork} /></Section>
       <Section icon="quote" title={t('Evidencia anclada')} count={1} testId="source-citation-evidence"><blockquote className="rounded-xl border border-emerald-900/50 bg-emerald-950/10 p-4 text-sm leading-7 text-neutral-200"><Icon name="quote" size={15} className="mb-2 text-emerald-400" /><span className="whitespace-pre-wrap">{detail.text}</span>{detail.page_label && <footer className="mt-3 text-[10px] not-italic text-neutral-500">{detail.page_label}</footer>}</blockquote></Section>
     </div>
   );
@@ -555,13 +559,26 @@ function EvidenceSection({ evidence }: { evidence: Evidence[] }) {
 }
 
 function EvidenceList({ evidence }: { evidence: Evidence[] }) {
-  return <div className="space-y-2">{evidence.map((item) => <blockquote key={item.id} className="rounded-r-xl border-l-2 border-indigo-500 bg-neutral-950/55 py-3 pl-4 pr-3 text-sm leading-6 text-neutral-300">“{item.quote}”<footer className="mt-2 flex flex-wrap gap-2 text-[10px] not-italic text-neutral-600">{item.location && <span>{item.location}</span>}<span>{item.kind}</span></footer></blockquote>)}</div>;
+  return <div className="space-y-2">{evidence.map((item) => {
+    const page = item.page_number ?? parsePageNumber(item.location);
+    return <blockquote key={item.id} className="rounded-r-xl border-l-2 border-indigo-500 bg-neutral-950/55 py-3 pl-4 pr-3 text-sm leading-6 text-neutral-300">“{item.quote}”<footer className="mt-2 flex flex-wrap items-center gap-2 text-[10px] not-italic text-neutral-600">
+      {page !== null && <button
+        type="button"
+        data-testid={`source-citation-jump-${item.id}`}
+        className="inline-flex items-center gap-1 rounded-full border border-indigo-800/70 px-2 py-0.5 font-medium text-indigo-300 hover:border-indigo-500 hover:text-indigo-200"
+        title={t('Abrir fuente')}
+        onClick={() => void openEvidenceAtPage(item.nodus_id, evidenceLocator(item))}
+      ><Icon name="external" size={10} /> {tx('Ver página {n}', { n: page })}</button>}
+      {item.location && <span>{item.location}</span>}
+      <span>{item.kind}</span>
+    </footer></blockquote>;
+  })}</div>;
 }
 
-function LinkedWorkCard({ work, authorsIndex, onOpenTarget, onOpenLibraryWork }: { work: WorkLink; authorsIndex: AuthorSummary[]; onOpenTarget: CitationPanelProps['onOpenTarget']; onOpenLibraryWork?: OpenCitationLibraryWork }) {
+function LinkedWorkCard({ work, page = null, authorsIndex, onOpenTarget, onOpenLibraryWork }: { work: WorkLink; page?: number | null; authorsIndex: AuthorSummary[]; onOpenTarget: CitationPanelProps['onOpenTarget']; onOpenLibraryWork?: OpenCitationLibraryWork }) {
   return (
     <article className="rounded-xl border border-neutral-800 bg-neutral-950/55 p-3.5" data-testid={`source-citation-work-link-${work.id}`}>
-      <div className="flex items-start gap-3"><button className="group min-w-0 flex-1 text-left" onClick={() => onOpenTarget({ kind: 'work', id: work.id }, work.title)}><span className="line-clamp-2 text-sm font-medium leading-5 text-neutral-200 group-hover:text-indigo-700 dark:group-hover:text-indigo-200">{work.title}</span><span className="mt-1 block text-[10px] text-neutral-600">{[work.itemType ? t(ITEM_TYPE_ES[work.itemType] ?? work.itemType) : null, work.year].filter(Boolean).join(' · ')}</span></button><WorkActions compact workId={work.id} zoteroKey={work.zoteroKey} onOpenLibraryWork={onOpenLibraryWork} /></div>
+      <div className="flex items-start gap-3"><button className="group min-w-0 flex-1 text-left" onClick={() => onOpenTarget({ kind: 'work', id: work.id }, work.title)}><span className="line-clamp-2 text-sm font-medium leading-5 text-neutral-200 group-hover:text-indigo-700 dark:group-hover:text-indigo-200">{work.title}</span><span className="mt-1 block text-[10px] text-neutral-600">{[work.itemType ? t(ITEM_TYPE_ES[work.itemType] ?? work.itemType) : null, work.year].filter(Boolean).join(' · ')}</span></button><WorkActions compact workId={work.id} zoteroKey={work.zoteroKey} page={page} onOpenLibraryWork={onOpenLibraryWork} /></div>
       {work.authors.length > 0 && <div className="mt-2"><AuthorLinks names={work.authors} authors={authorsIndex} onOpenTarget={onOpenTarget} /></div>}
       {work.development && <p className="mt-3 border-t border-neutral-900 pt-3 text-xs leading-5 text-neutral-500">{work.development}</p>}
       {(work.role || typeof work.confidence === 'number') && <div className="mt-2 flex gap-2 text-[10px] text-neutral-600">{work.role && <span>{work.role}</span>}{typeof work.confidence === 'number' && <span>{t('conf')} {work.confidence.toFixed(2)}</span>}</div>}
@@ -569,12 +586,12 @@ function LinkedWorkCard({ work, authorsIndex, onOpenTarget, onOpenLibraryWork }:
   );
 }
 
-function WorkActions({ workId, zoteroKey, compact = false, onOpenLibraryWork }: { workId: string; zoteroKey: string | null; compact?: boolean; onOpenLibraryWork?: OpenCitationLibraryWork }) {
+function WorkActions({ workId, zoteroKey, page = null, compact = false, onOpenLibraryWork }: { workId: string; zoteroKey: string | null; page?: number | null; compact?: boolean; onOpenLibraryWork?: OpenCitationLibraryWork }) {
   const local = useLocalWork(workId);
   const buttonClass = compact ? 'btn btn-ghost h-7 px-2 text-[10px]' : 'btn btn-ghost border border-neutral-700 text-xs';
   return <div className="flex shrink-0 flex-wrap gap-1.5" data-testid={`source-citation-work-actions-${workId}`}>
     {zoteroKey && <button className={buttonClass} title={t('Abrir en Zotero')} onClick={() => void window.nodus.openInZotero(zoteroKey)}><Icon name="external" size={compact ? 11 : 13} /> {!compact && 'Zotero'}</button>}
-    {local && <button className={`${buttonClass} text-emerald-300`} data-testid={`source-citation-open-local-${workId}`} title={t('Abrir en la biblioteca local')} onClick={() => { if (onOpenLibraryWork) onOpenLibraryWork(local.id, local.scope); else void window.nodus.openLibraryReaderOriginal(local.id); }}><Icon name="library" size={compact ? 11 : 13} /> {!compact && t('Biblioteca local')}</button>}
+    {local && <button className={`${buttonClass} text-emerald-300`} data-testid={`source-citation-open-local-${workId}`} title={t('Abrir en la biblioteca local')} onClick={() => { if (onOpenLibraryWork) onOpenLibraryWork(local.id, local.scope, page); else requestLibraryDocumentOpen({ itemId: local.id, scope: local.scope, page }); }}><Icon name="library" size={compact ? 11 : 13} /> {!compact && t('Biblioteca local')}</button>}
   </div>;
 }
 

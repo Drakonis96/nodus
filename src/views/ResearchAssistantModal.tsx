@@ -24,7 +24,7 @@ import { Icon, modelLabel, sortModelRefs } from '../components/ui';
 import type { MarkdownCitation } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ChatTypingIndicator } from '../components/ChatTypingIndicator';
-import { SaveToNotesModal } from '../components/SaveToNotesModal';
+import { SaveToNotesModal, type StudyNoteDestination } from '../components/SaveToNotesModal';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { VirtualList } from '../components/VirtualList';
 import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget } from '../navigation';
@@ -216,6 +216,7 @@ export function ResearchAssistantModal({
   adapter,
   initialConversationTarget,
   notesDestinationLabel = 'Notas',
+  studyNoteDestination = null,
   onOpenSavedNote,
 }: {
   settings: AppSettings;
@@ -228,6 +229,8 @@ export function ResearchAssistantModal({
   adapter?: ResearchChatAdapter;
   initialConversationTarget?: ResearchConversationNavigationTarget | null;
   notesDestinationLabel?: string;
+  /** Vaults with their own note store (study, teaching) offer it as a destination. */
+  studyNoteDestination?: StudyNoteDestination | null;
   onOpenSavedNote?: (noteId: string) => void;
 }) {
   const api = adapter ?? window.nodus;
@@ -340,7 +343,7 @@ export function ResearchAssistantModal({
       const above = rect.top - 20;
       const upwards = below < 360 && above > below;
       setContextPanelStyle({
-        '--vault-accent': getComputedStyle((contextAnchorRef.current ?? contextTriggerRef.current ?? focusTriggerRef.current)!).getPropertyValue('--vault-accent'),
+        '--vault-accent': getComputedStyle((contextAnchorRef.current ?? contextTriggerRef.current ?? focusTriggerRef.current)!).getPropertyValue('--vault-accent').trim() || 'var(--a-500)',
         position: 'fixed',
         width,
         left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
@@ -831,7 +834,7 @@ export function ResearchAssistantModal({
             ))}
           </select>
           <div className="research-assistant-actions">
-          {adapter ? <button className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1" disabled={sending} onClick={toggleContext}><Icon name="layers" size={15} />{t('Contexto')}</button> : isGenealogy ? (
+          {adapter ? <button className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1 research-accent-soft research-accent-text" disabled={sending} onClick={toggleContext}><Icon name="layers" size={15} />{t('Contexto')}</button> : isGenealogy ? (
             <span
               className="inline-flex items-center gap-1.5 rounded-md border research-accent-soft px-2 py-1 text-xs research-accent-text"
               title={t('El asistente usa el contexto familiar: personas, parentescos, eventos, documentos y evidencia.')}
@@ -843,7 +846,7 @@ export function ResearchAssistantModal({
               type="button"
               ref={contextTriggerRef}
               data-testid="research-context-trigger"
-              className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1"
+              className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1 research-accent-soft research-accent-text"
               title={t('Elegir qué partes del corpus ve el asistente')}
               aria-haspopup="dialog"
               aria-expanded={showContext}
@@ -851,7 +854,7 @@ export function ResearchAssistantModal({
             >
               <Icon name="layers" size={15} className="research-accent-text" />
               <span className="hidden sm:inline">{activeMode ? t(activeMode.label) : t('Contexto')}</span>
-              <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
+              <span className="research-accent-badge rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
             </button>
           )}
           {!adapter && !isGenealogy && <ResearchSourceFilterControl key={activeId ?? 'new'} value={selection.sourceFilter} disabled={sending} onChange={async sourceFilter => {
@@ -935,7 +938,7 @@ export function ResearchAssistantModal({
                   </div>
                 )}
                 {messages.length === 0 && (
-                  <div className="h-full flex flex-col items-center justify-center gap-5 px-4 text-center">
+                  <div className="research-empty-state h-full flex flex-col items-center justify-center gap-5 px-4 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <span className="grid h-12 w-12 place-items-center rounded-full border research-accent-soft research-accent-text">
                         <Icon name="chat" size={22} />
@@ -1302,6 +1305,7 @@ export function ResearchAssistantModal({
           kind="assistant"
           source={noteTarget.source}
           destinationLabel={notesDestinationLabel}
+          studyDocument={studyNoteDestination}
           onClose={() => setNoteTarget(null)}
           onOpenSavedNote={onOpenSavedNote ? (note) => onOpenSavedNote(note.id) : undefined}
         />

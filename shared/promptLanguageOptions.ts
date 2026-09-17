@@ -51,8 +51,15 @@ export const PROMPT_LANGUAGE_OPTIONS: readonly PromptLanguageOption[] = [
 ].map((id) => ({ id, label: LABELS[id] }));
 
 /** Runtime narrowing for prompt-language values. Unknown values fall back to English,
- *  matching the existing worldbuilding/office behavior, never to Spanish. */
+ *  matching the existing worldbuilding/office behavior, never to Spanish.
+ *
+ *  The interface and prompt languages are separate unions: `zh-CN` is an interface
+ *  language whose prompt counterpart is the Simplified Chinese catalogue `zh-Hans`.
+ *  Mapping it here keeps every caller that passes a UI language into a prompt
+ *  boundary (guides, roadmaps, toolkit jobs) resolved to a real prompt catalogue
+ *  instead of silently falling back to English. */
 export function normalizePromptLanguage(value: unknown): PromptLanguage {
+  if (value === 'zh-CN') return 'zh-Hans';
   return typeof value === 'string' && (PROMPT_LANGUAGES as readonly string[]).includes(value)
     ? (value as PromptLanguage)
     : 'en';

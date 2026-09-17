@@ -16,6 +16,7 @@
  * preload with `ipcRenderer` on it. Defence in depth, deliberately redundant.
  */
 
+import { dialogTitle } from '../dialogTitles';
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
@@ -35,6 +36,7 @@ import type {
 } from '@shared/browserBookmarks';
 import type { BrowserHistoryStore } from '@shared/browserHistory';
 import {
+  browserBookmarksExportFileName,
   exportBrowserBookmarksHtml,
   exportBrowserBookmarksJson,
   findDuplicateBookmark,
@@ -846,7 +848,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     assertUiSender(event, getWindow);
     const owner = getWindow() ?? undefined;
     const openOptions: Electron.OpenDialogOptions = {
-      title: 'Importar Nodus Bookmarks',
+      title: dialogTitle('importNodusBookmarks', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: [
         { name: 'Marcadores', extensions: ['json', 'html', 'htm'] },
@@ -897,8 +899,8 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     const format = rawFormat === 'html' ? 'html' as const : 'json' as const;
     const store = bookmarks.snapshot();
     const saveOptions: Electron.SaveDialogOptions = {
-      title: 'Exportar Nodus Bookmarks',
-      defaultPath: `nodus-bookmarks.${format}`,
+      title: dialogTitle('exportNodusBookmarks', getSettings().uiLanguage),
+      defaultPath: browserBookmarksExportFileName(format),
       filters: format === 'json'
         ? [{ name: 'Nodus Bookmarks JSON', extensions: ['json'] }]
         : [{ name: 'Marcadores HTML', extensions: ['html'] }],
@@ -912,7 +914,13 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     }
     const payload = format === 'json' ? exportBrowserBookmarksJson(store) : exportBrowserBookmarksHtml(store);
     await fsp.writeFile(selected.filePath, payload, { encoding: 'utf8', mode: 0o600 });
-    return { canceled: false, format, bookmarks: store.bookmarks.length, folders: store.folders.length };
+    return {
+      canceled: false,
+      format,
+      bookmarks: store.bookmarks.length,
+      folders: store.folders.length,
+      fileName: path.basename(selected.filePath),
+    };
   });
 
   h('browser:askNodiAboutSelection', async (event) => {

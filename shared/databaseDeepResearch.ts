@@ -755,7 +755,7 @@ export interface DatabaseDeepResearchReport extends DatabaseResearchReport {
   };
 }
 
-export type DatabaseDeepResearchExportFormat = "markdown" | "pdf" | "zip";
+export type DatabaseDeepResearchExportFormat = "markdown" | "pdf" | "docx" | "zip";
 export interface DatabaseDeepResearchExportOptions {
   format: DatabaseDeepResearchExportFormat;
   /** Raw snapshot data is never exported unless this is explicitly true. */

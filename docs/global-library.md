@@ -369,7 +369,16 @@ Identifier lookup uses:
 - Crossref for DOI and ISSN;
 - Open Library for ISBN;
 - NCBI for PMID and PMCID;
-- arXiv for arXiv identifiers.
+- DataCite for arXiv identifiers, which registers every paper's
+  `10.48550/arXiv.<id>` DOI. The arXiv Atom feed remains the fallback for
+  identifiers that carry no DOI.
+
+A pasted link resolves too, by the cheapest route that answers: a `doi.org`,
+`arxiv.org`, `pubmed` or PMC link goes through the identifier it names, while
+any other page is read for the record it publishes (Highwire `citation_*` tags,
+Dublin Core, schema.org JSON-LD, Open Graph) together with the PDF links it
+declares. A page with neither citable metadata nor a title is refused, and the
+reader is asked to add the entry by hand.
 
 Nodus shows candidates and a change preview; nothing is applied without review.
 Corrections live in a Nodus-owned layer and survive future source-manager
@@ -448,12 +457,16 @@ library-wide color registry stored in `.nodus/tags.json`.
 ### Identifiers, citations, and file exchange
 
 The Library toolbar includes a Zotero-style magic-add action. Pasting a DOI,
-ISBN, ISSN, PMID, PMCID, or arXiv identifier detects its kind, retrieves the
-best matching record, and creates it on Enter. The adjacent manual action first
+ISBN, ISSN, PMID, PMCID, arXiv identifier, or a link to the work detects its
+kind, retrieves the best matching record, and creates it on Enter. The adjacent
+manual action first
 selects any supported item type and then opens the complete metadata editor.
 The metadata editor resolves DOI and ISSN through Crossref, ISBN through Open
 Library, PMID and PMCID through the public NCBI services, and arXiv identifiers
-through the arXiv Atom API. The canonical landing page returned by any provider
+through DataCite, falling back to the arXiv Atom feed for identifiers that
+carry no DOI. A link is resolved through the identifier it names when it names
+one, and otherwise by reading the record the page itself publishes. The
+canonical landing page returned by any provider
 is persisted in the item URL field and remains directly accessible from both
 the Library detail panel and the reader's Info tab. A linked catalogue or
 publisher page is not presented as a downloaded full-text file. Every
@@ -624,8 +637,14 @@ local SQLite cache.
 - Cataloging, reading, annotation, local OCR, and rebuilding run on the device.
 - Zotero is accessed locally or through an API already authorized by the user,
   always in read-only mode.
-- Crossref, Open Library, NCBI, and arXiv receive only the identifier selected
+- Crossref, Open Library, NCBI, DataCite (for arXiv identifiers), and the arXiv
+  Atom feed receive only the identifier selected
   for metadata resolution. Bulk resolution is never started implicitly.
+- Adding a reference by link fetches that one page, and only when the reader
+  pastes it. The page host receives an ordinary document request; no identifier,
+  library content, or credential is sent with it. Downloads of a page or a PDF
+  go through the same public-resource fetcher used elsewhere, which pins the
+  resolved public address and refuses private and reserved ones.
 - Remote OCR and chat contact the selected AI provider only when the user runs
   the corresponding action.
 - Linking a Library item to a vault does not publish originals or derived files
@@ -657,10 +676,12 @@ The main tests are:
   notes, symmetric relations, and colored tags;
 - `test-library-smart-collections.mjs`: cycle-safe movement, reversible item
   memberships, nested live rules, facets, and persisted table preferences;
-- `test-library-metadata.mjs`: six identifier kinds, cancelable bulk lookup,
+- `test-library-metadata.mjs`: six identifier kinds, link resolution through
+  both a known host and a publisher page, the DataCite-to-feed fallback for
+  arXiv, cancelable bulk lookup,
   all Zotero record types, eight import/export formats, five local citation
   styles, keys, and duplicates. `verify-library-metadata-live.mjs` is the
-  explicit network smoke test for live DOI and ISBN recovery;
+  explicit network smoke test for live DOI, ISBN, arXiv, and link recovery;
 - `test-library-recovery.mjs`: trash impact, linked-vault purge blocking,
   recoverable emptying, lossless duplicate merges, checksum audits, and rebuilds;
 - `test-pre-v4-recovery.mjs`: first-launch snapshot, disk-full interruption,

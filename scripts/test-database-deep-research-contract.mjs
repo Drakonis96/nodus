@@ -94,12 +94,14 @@ test('engine has exactly eight durable phases and no web/SQL model surface', () 
   assert.match(lane, /model:\s*run\.model|model:\s*selectedModel/);
 });
 
-test('exports include Markdown, professional PDF and reproducible ZIP with opt-in snapshot', () => {
+test('exports include Markdown, Word, professional PDF and reproducible ZIP with opt-in snapshot', () => {
   assert.match(exporter, /format === 'markdown'/);
   assert.match(exporter, /format === 'pdf'/);
+  assert.match(exporter, /format === 'docx'/);
+  assert.match(exporter, /markdownToDocx\(redactDatabaseResearchMarkdown\(report\.markdown\)\)/, 'the Word export is redacted like the Markdown one');
   assert.match(exporter, /new AdmZip/);
   assert.match(exporter, /if \(options\.includeSnapshot\)/);
-  assert.match(ipc, /\['markdown', 'pdf', 'zip'\]/);
+  assert.match(ipc, /\['markdown', 'pdf', 'docx', 'zip'\]/);
 });
 
 test('MCP database research authorization is fail-closed and resource-scoped', () => {

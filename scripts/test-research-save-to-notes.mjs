@@ -64,3 +64,48 @@ test('saved-note provenance is visible and can return to the exact conversation 
   assert.match(notesExport, /source: note\.source \?\? undefined/);
   assert.match(notesExport, /\*\*Procedencia:\*\*/);
 });
+
+test('an answer saved as a study note keeps the answer and carries its provenance', () => {
+  const { buildStudyNoteDocument } = load('src/studyNoteFromChat.ts');
+  const content = '# Tema 2\n\nLa fórmula es $C_nH_{2n}O_2$.';
+  const source = {
+    origin: 'assistant',
+    model: { provider: 'anthropic', model: 'claude-sonnet-4' },
+    researchChat: {
+      surface: 'study', conversationId: 'chat-1', conversationTitle: 'Química orgánica',
+      messageId: 'answer-1', messageIndex: 2,
+      references: [
+        { label: 'Diapositivas', subtitle: 'Tema 2', href: 'nodus://study/material/mat-1' },
+        { label: 'Sin enlace' },
+      ],
+    },
+  };
+  const document = buildStudyNoteDocument({
+    title: 'Tema 2',
+    content,
+    source,
+    placement: { courseId: 'course-1', subjectId: 'subject-1', folderId: 'folder-1', topicId: null },
+    savedAt: '2026-09-17T10:00:00.000Z',
+  });
+  assert.equal(document.kind, 'apunte', 'the captured note is a study note, not a workspace note');
+  assert.deepEqual(document.placement, { courseId: 'course-1', subjectId: 'subject-1', folderId: 'folder-1', topicId: null });
+  assert.ok(document.contentMarkdown.startsWith(content), 'the answer opens the note unchanged');
+  assert.match(document.contentMarkdown, /\n---\n\n\*\*Procedencia:\*\*/);
+  assert.match(document.contentMarkdown, /- Conversación: Química orgánica/);
+  assert.match(document.contentMarkdown, /- Guardada: 2026-09-17T10:00:00\.000Z/);
+  assert.match(document.contentMarkdown, /- Modelo: anthropic \/ claude-sonnet-4/);
+  assert.match(document.contentMarkdown, /\[Diapositivas\]\(nodus:\/\/study\/material\/mat-1\) — Tema 2/);
+  assert.match(document.contentMarkdown, /- Sin enlace/);
+});
+
+test('the study chat offers the vault own notes as a save destination', async () => {
+  const modal = await readFile(path.join(repoRoot, 'src/components/SaveToNotesModal.tsx'), 'utf8');
+  const assistant = await readFile(path.join(repoRoot, 'src/views/ResearchAssistantModal.tsx'), 'utf8');
+  const chat = await readFile(path.join(repoRoot, 'src/views/StudyChatView.tsx'), 'utf8');
+  assert.match(modal, /data-testid="save-note-destination-study"/);
+  assert.match(modal, /data-testid="save-note-study-subject"/);
+  assert.match(modal, /createStudyDocument\(buildStudyNoteDocument\(\{/);
+  assert.match(modal, /announceStudyWorkspaceChanged\(\)/);
+  assert.match(assistant, /studyDocument=\{studyNoteDestination\}/);
+  assert.match(chat, /studyNoteDestination=\{\{ onOpenSavedDocument: onOpenDocument \}\}/);
+});

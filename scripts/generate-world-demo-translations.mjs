@@ -11,8 +11,8 @@ const sourceFiles = [
   'electron/db/worldbuildingDemoNarrative.ts',
 ];
 const targetFile = path.join(repoRoot, 'shared/worldbuildingDemoTranslations.generated.ts');
-const targetLanguages = ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
-const googleLanguage = { en: 'en', fr: 'fr', de: 'de', pt: 'pt-PT', 'pt-BR': 'pt', it: 'it', tr: 'tr' };
+const targetLanguages = ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN'];
+const googleLanguage = { en: 'en', fr: 'fr', de: 'de', pt: 'pt-PT', 'pt-BR': 'pt', it: 'it', tr: 'tr', 'zh-CN': 'zh-CN' };
 
 const pairs = new Map();
 const rawPropertyNames = new Set([

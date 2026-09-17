@@ -30,6 +30,45 @@ function sample() {
   return { store, research: research.folder, archives: archives.folder, france: france.folder, gallica: gallica.bookmark };
 }
 
+/**
+ * The collection the Netscape exporter is hardest to get right on: a nested tree
+ * with an empty branch, Unicode in titles and URLs, a cached favicon, every
+ * character HTML escapes in both a title and a description, and a URL that keeps
+ * query parameters and a fragment.
+ */
+function richStore() {
+  let store = model.emptyBrowserBookmarkStore();
+  const folder = (name, parentId) => { const made = model.insertBrowserBookmarkFolder(store, { name, parentId }, id(), now); store = made.store; return made.folder; };
+  const save = (draft) => { const made = model.insertBrowserBookmark(store, draft, id(), now); store = made.store; return made.bookmark; };
+  const research = folder('Recherche & Sources', null);
+  const archives = folder('Archives «presse»', research.id);
+  const empty = folder('Vide (à trier)', research.id);
+  const first = save({
+    title: 'A & B "quoted" <tag> O\'Hara',
+    url: 'https://example.org/search?q=amour&lang=fr&page=2#results',
+    description: 'Ligne 1 & 2 <b>gras</b> "citée"',
+    parentId: archives.id,
+  });
+  const second = save({
+    title: '中国古代文献 · 漢籍',
+    url: 'https://example.cn/古籍?卷=一&index=2',
+    faviconDataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==',
+    parentId: archives.id,
+  });
+  const third = save({ title: 'Émile Zola — Œuvres', url: 'https://fr.wikisource.org/wiki/Auteur:Émile_Zola', parentId: null });
+  return { store, research, archives, empty, first, second, third };
+}
+
+/** The tree as the file describes it: hierarchy, order, titles, URLs and icons. */
+const project = (source, parentId = null) => model.browserBookmarkChildren(source, parentId).map((ref) => {
+  if (ref.kind === 'folder') {
+    const folder = source.folders.find((entry) => entry.id === ref.id);
+    return { folder: folder.name, children: project(source, ref.id) };
+  }
+  const bookmark = source.bookmarks.find((entry) => entry.id === ref.id);
+  return { title: bookmark.title, url: bookmark.url, description: bookmark.description, faviconDataUrl: bookmark.faviconDataUrl };
+});
+
 test('nested folders retain hierarchy, order and metadata', () => {
   const value = sample();
   assert.deepEqual(model.browserBookmarkFolderPath(value.store, value.france.id), ['Research', 'Archives', 'France']);
@@ -106,6 +145,240 @@ test('standard Netscape HTML roundtrip and malformed imports are safe', () => {
   assert.throws(() => model.parseBrowserBookmarksJson('{broken'), /no es válido/i);
 });
 
+test('the HTML export is a UTF-8 Netscape file with Unix ADD_DATE and escaped text', () => {
+  const { store, first, second } = richStore();
+  const html = model.exportBrowserBookmarksHtml(store);
+  const lines = html.split('\n');
+  assert.equal(lines[0], '<!DOCTYPE NETSCAPE-Bookmark-file-1>');
+  assert.match(lines[1], /charset=UTF-8/i);
+  assert.equal(lines[2], '<TITLE>Nodus Bookmarks</TITLE>');
+  assert.equal(lines[3], '<H1>Nodus Bookmarks</H1>');
+  assert.equal(lines[4], '<DL><p>');
+  assert.ok(html.endsWith('</DL><p>\n'), 'the file must close its root list and end with a newline');
+  assert.ok(!html.startsWith('\ufeff'), 'a BOM would be read as part of the first tag');
+  assert.equal(Buffer.from(html, 'utf8').toString('utf8'), html, 'the payload must survive a UTF-8 round trip');
+
+  // ADD_DATE is Unix seconds, derived from the bookmark's creation time.
+  const stamp = String(Math.floor(Date.parse(first.createdAt) / 1000));
+  assert.match(html, new RegExp(`<DT><A HREF="https://example\\.org/search\\?q=amour&amp;lang=fr&amp;page=2#results" ADD_DATE="${stamp}"[^>]*>`));
+  const icon = model.sanitizeFaviconDataUrl(second.faviconDataUrl);
+  assert.ok(html.includes(`ICON="${icon}"`), 'a cached favicon is carried as a data URL, ready for the browser to store');
+  assert.equal((html.match(/ADD_DATE="\d{10}"/g) ?? []).length, 6,
+    'every folder and bookmark carries a 10-digit ADD_DATE');
+
+  // Escaping: query separators, quotes and angle brackets never leak raw markup.
+  assert.match(html, /q=amour&amp;lang=fr&amp;page=2#results/, 'query parameters must survive, escaped');
+  assert.ok(!html.includes('q=amour&lang=fr'), 'an unescaped & would break the attribute');
+  assert.ok(html.includes('A &amp; B &quot;quoted&quot; &lt;tag&gt; O&#39;Hara'), 'titles must be escaped');
+  assert.ok(html.includes('Ligne 1 &amp; 2 &lt;b&gt;gras&lt;/b&gt; &quot;citée&quot;'), 'descriptions must be escaped');
+  // Unicode is written as itself, not as numeric entities.
+  assert.ok(html.includes('中国古代文献 · 漢籍'));
+  assert.ok(html.includes('Émile Zola — Œuvres'));
+  assert.ok(html.includes('Archives «presse»'));
+});
+
+test('the HTML export keeps folder depth, sibling order and empty folders', () => {
+  const { store, research, archives, empty } = richStore();
+  const html = model.exportBrowserBookmarksHtml(store);
+  const at = (needle) => html.indexOf(needle);
+  const depth = (line) => line.length - line.trimStart().length;
+
+  // A folder two levels deep indents its children four spaces per level.
+  const rootFolder = html.match(/^ *<DT><H3 ADD_DATE="\d+">Recherche &amp; Sources<\/H3>$/m)?.[0];
+  const nestedFolder = html.match(/^ *<DT><H3 ADD_DATE="\d+">Archives «presse»<\/H3>$/m)?.[0];
+  const deepBookmark = html.match(/^ *<DT><A HREF="https:\/\/example\.org\/search[^\n]*$/m)?.[0];
+  assert.ok(rootFolder && nestedFolder && deepBookmark, 'all three levels must be present');
+  assert.equal(depth(nestedFolder) - depth(rootFolder), 4);
+  assert.equal(depth(deepBookmark) - depth(nestedFolder), 4);
+
+  // Siblings keep the manual order they had in the collection.
+  assert.ok(at('Recherche &amp; Sources') < at('Archives «presse»'));
+  assert.ok(at('A &amp; B &quot;quoted&quot;') < at('中国古代文献'), 'bookmarks keep their order inside the folder');
+  assert.ok(at('Émile Zola') > at('Recherche &amp; Sources'), 'a root bookmark follows the root folder that precedes it');
+
+  // A folder with nothing in it is still exported, as an empty list.
+  assert.match(html, /<DT><H3 ADD_DATE="\d+">Vide \(à trier\)<\/H3>\n *<DL><p>\n *<\/DL><p>/);
+  assert.equal(model.browserBookmarkChildren(store, empty.id).length, 0);
+  assert.ok(at(research.id) < 0 && at(archives.id) < 0, 'ids are never written into the file');
+  const escaped = (value) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  for (const bookmark of store.bookmarks) {
+    assert.ok(html.includes(`<A HREF="${escaped(bookmark.url)}"`), `${bookmark.title} must keep its exact stored URL`);
+  }
+});
+
+test('the HTML export round-trips hierarchy, order, Unicode and escaped text', () => {
+  const { store } = richStore();
+  const parsed = model.parseBrowserBookmarksHtml(model.exportBrowserBookmarksHtml(store), id, now);
+  assert.equal(parsed.invalidUrls, 0);
+  assert.deepEqual(project(parsed.store), project(store),
+    'a browser-importable file must carry the same tree, order, titles, URLs and descriptions');
+});
+
+test('the export covers the whole collection whatever the page is showing', () => {
+  const { store } = richStore();
+  // A search that matches nothing, plus a folder the page happens to have open:
+  // both are view state and must never reach the file.
+  assert.equal(model.searchBrowserBookmarks(store, 'zzz-no-match').length, 0);
+  const html = model.exportBrowserBookmarksHtml(store);
+  assert.equal((html.match(/<DT><A HREF=/g) ?? []).length, store.bookmarks.length);
+  assert.equal((html.match(/<DT><H3 /g) ?? []).length, store.folders.length);
+
+  const pages = readFileSync(path.join(repoRoot, 'src/components/browser/NodusStartPages.tsx'), 'utf8');
+  assert.match(pages, /window\.nodus\.exportBrowserBookmarks\('html'\)/,
+    'the toolbar must ask the trusted process for the export, passing only the format');
+  const filterbar = pages.indexOf('className="atlas-filterbar"');
+  const exportButton = pages.indexOf('data-testid="browser-bookmarks-export-html"');
+  const breadcrumbs = pages.indexOf('className="bookmark-breadcrumbs"');
+  assert.ok(filterbar >= 0 && exportButton > filterbar && breadcrumbs > exportButton,
+    'the download action belongs in the toolbar, before the breadcrumbs');
+  const button = pages.slice(exportButton, pages.indexOf('</button>', exportButton));
+  assert.doesNotMatch(button, /query|folderId/,
+    'the export must not be gated on a search or an open folder');
+  assert.match(button, /<Icon name="download"/);
+  for (const attribute of ['title', 'aria-label']) {
+    assert.ok(pages.includes(`${attribute}={t('Exportar todos los marcadores como HTML compatible con Chrome, Edge, Firefox, Brave y Opera')}`),
+      `the visible tooltip and the accessible name must both be translated (${attribute})`);
+  }
+  assert.match(pages.slice(exportButton, exportButton + 700), /disabled=\{exporting\}/,
+    'a second click while the dialog is open must not open another one');
+  assert.match(pages, /if \(exporting\) return;/);
+  assert.match(pages, /result\.canceled[\s\S]{0,80}onNotice\(t\('Exportación cancelada\.'\)\)/,
+    'cancelling the native dialog is reported, not swallowed');
+  assert.match(pages, /catch \(cause\)[\s\S]{0,120}onNotice\(cause instanceof Error \? cause\.message : String\(cause\)\)/,
+    'a failed export must surface its error in the notice area');
+});
+
+test('the suggested file name is dated in local time and the JSON backup is kept', () => {
+  assert.equal(model.browserBookmarksExportFileName('html', new Date(2026, 8, 15, 12, 0)), 'nodus-bookmarks-2026-09-15.html');
+  assert.equal(model.browserBookmarksExportFileName('html', new Date(2026, 0, 1, 12, 0)), 'nodus-bookmarks-2026-01-01.html');
+  assert.equal(model.browserBookmarksExportFileName('json', new Date(2026, 11, 31, 12, 0)), 'nodus-bookmarks-2026-12-31.json');
+  // Late evening local time is the case a UTC stamp gets wrong.
+  const late = new Date(2026, 8, 15, 23, 30);
+  const named = model.browserBookmarksExportFileName('html', late);
+  assert.equal(named, 'nodus-bookmarks-2026-09-15.html');
+  if (late.toISOString().slice(0, 10) !== '2026-09-15') assert.notEqual(named.slice(15, 25), late.toISOString().slice(0, 10));
+  assert.match(model.browserBookmarksExportFileName('html'), /^nodus-bookmarks-\d{4}-\d{2}-\d{2}\.html$/);
+
+  const ipc = readFileSync(path.join(repoRoot, 'electron/ipc/browser.ts'), 'utf8');
+  const start = ipc.indexOf("h('browser:bookmarks:export'");
+  const handler = ipc.slice(start, ipc.indexOf("h('browser:", start + 10));
+  assert.match(handler, /assertUiSender\(event, getWindow\)/);
+  assert.match(handler, /defaultPath: browserBookmarksExportFileName\(format\)/,
+    'the native dialog must offer the dated name');
+  assert.match(handler, /format === 'json' \? exportBrowserBookmarksJson\(store\) : exportBrowserBookmarksHtml\(store\)/,
+    'the existing JSON export is still served by the same handler');
+  assert.match(handler, /fsp\.writeFile\(selected\.filePath, payload, \{ encoding: 'utf8', mode: 0o600 \}\)/);
+  assert.match(handler, /fileName: path\.basename\(selected\.filePath\)/);
+  assert.doesNotMatch(handler, /bookmarks\.replace|bookmarks\.save|normalizeBrowserBookmarkStore/,
+    'exporting must never write back into the stored collection');
+
+  const manager = readFileSync(path.join(repoRoot, 'src/components/browser/BrowserBookmarksManager.tsx'), 'utf8');
+  assert.match(manager, /exportBrowserBookmarks\('json'\)/, 'the JSON backup button stays');
+  assert.match(manager, /exportBrowserBookmarks\('html'\)/);
+});
+
+test('the export and the import are the same format, in both directions', () => {
+  const { store } = richStore();
+  const written = model.exportBrowserBookmarksHtml(store);
+  // Parsing with the collection's own clock: the file dates are the data, so a
+  // file that survives the trip has to come back out byte for byte.
+  const reread = model.parseBrowserBookmarksHtml(written, id, now);
+  assert.equal(model.exportBrowserBookmarksHtml(reread.store), written,
+    'what the export writes must be what the import reads, with nothing lost in between');
+});
+
+test('a browser-written Netscape file imports with its folders, order and icons', () => {
+  // Shaped like a real Chrome/Edge/Firefox export: comment header, attributes the
+  // format allows but Nodus never writes, an empty folder, entities and a favicon.
+  const source = [
+    '<!DOCTYPE NETSCAPE-Bookmark-file-1>',
+    '<!-- This is an automatically generated file.',
+    '     It will be read and overwritten.',
+    '     DO NOT EDIT! -->',
+    '<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">',
+    '<TITLE>Bookmarks</TITLE>',
+    '<H1>Bookmarks</H1>',
+    '<DL><p>',
+    '    <DT><H3 ADD_DATE="1700000000" LAST_MODIFIED="1700000001" PERSONAL_TOOLBAR_FOLDER="true">Marcadores</H3>',
+    '    <DL><p>',
+    '        <DT><A HREF="https://es.wikipedia.org/wiki/Historia" ADD_DATE="1700000002" ICON="data:image/png;base64,iVBORw0KGgo=">Wikipedia &amp; historia</A>',
+    '        <DT><H3 ADD_DATE="1700000003" LAST_MODIFIED="1700000004">Archivo</H3>',
+    '        <DL><p>',
+    '            <DT><A HREF="https://archive.org/details/tractatus?q=logic&amp;page=3" ADD_DATE="1700000005">Tractatus &lt;1921&gt;</A>',
+    '            <DD>Escaneo original',
+    '        </DL><p>',
+    '    </DL><p>',
+    '    <DT><H3 ADD_DATE="1700000006">Otros marcadores</H3>',
+    '    <DL><p>',
+    '    </DL><p>',
+    '</DL><p>',
+    '',
+  ].join('\n');
+  const parsed = model.parseBrowserBookmarksHtml(source, id, now);
+  assert.equal(parsed.invalidUrls, 0);
+  assert.equal(parsed.truncated, false);
+  const folders = parsed.store.folders.map((folder) => folder.name);
+  assert.deepEqual(folders, ['Marcadores', 'Archivo', 'Otros marcadores']);
+  const byTitle = (title) => parsed.store.bookmarks.find((bookmark) => bookmark.title === title);
+  assert.ok(byTitle('Wikipedia & historia'), 'entities in a title must decode');
+  assert.equal(byTitle('Wikipedia & historia').url, 'https://es.wikipedia.org/wiki/Historia');
+  assert.equal(byTitle('Wikipedia & historia').faviconDataUrl, 'data:image/png;base64,iVBORw0KGgo=',
+    'the ICON a browser wrote must be kept as the cached favicon');
+  assert.ok(byTitle('Tractatus <1921>'), 'escaped angle brackets must come back as text, not markup');
+  assert.equal(byTitle('Tractatus <1921>').description, 'Escaneo original');
+  assert.equal(byTitle('Tractatus <1921>').url, 'https://archive.org/details/tractatus?q=logic&page=3');
+  assert.deepEqual(model.browserBookmarkFolderPath(parsed.store, byTitle('Tractatus <1921>').parentId), ['Marcadores', 'Archivo']);
+  assert.deepEqual(model.browserBookmarkFolderPath(parsed.store, byTitle('Wikipedia & historia').parentId), ['Marcadores']);
+  assert.equal(byTitle('Tractatus <1921>').parentId !== byTitle('Wikipedia & historia').parentId, true,
+    'the nested branch must stay nested');
+  const empty = parsed.store.folders.find((folder) => folder.name === 'Otros marcadores');
+  assert.deepEqual(model.browserBookmarkChildren(parsed.store, empty.id), [],
+    'a folder with an empty list imports as an empty folder');
+  assert.equal((model.exportBrowserBookmarksHtml(parsed.store).match(/<DT><A HREF=/g) ?? []).length, 2,
+    'and re-exporting it stays a valid file');
+});
+
+test('the Bookmarks page imports through the same trusted preview and commit pair', () => {
+  const pages = readFileSync(path.join(repoRoot, 'src/components/browser/NodusStartPages.tsx'), 'utf8');
+  assert.match(pages, /window\.nodus\.previewBrowserBookmarksImport\(\)/);
+  assert.match(pages, /window\.nodus\.commitBrowserBookmarksImport\(importPreview\.token\)/,
+    'committing must reuse the token the preview returned, not re-read the file');
+  assert.match(pages, /if \(importBusy\.current\) return;/, 'a second click must not open a second picker');
+  assert.match(pages, /if \(!preview\) onNotice\(t\('Importación cancelada\.'\)\)/,
+    'cancelling the picker is reported, not swallowed');
+  assert.match(pages, /catch \(cause\)[\s\S]{0,120}onNotice\(cause instanceof Error \? cause\.message : String\(cause\)\)/);
+
+  const exportButton = pages.indexOf('data-testid="browser-bookmarks-export-html"');
+  const importButton = pages.indexOf('data-testid="browser-bookmarks-import-html"');
+  const breadcrumbs = pages.indexOf('className="bookmark-breadcrumbs"');
+  assert.ok(importButton > exportButton && breadcrumbs > importButton,
+    'the import action belongs in the toolbar, next to the export');
+  const button = pages.slice(importButton, pages.indexOf('</button>', importButton));
+  assert.doesNotMatch(button, /query|folderId/, 'importing must not be gated on the view');
+  assert.match(button, /<Icon name="upload"/);
+  assert.match(button, /disabled=\{importing\}/);
+  for (const attribute of ['title', 'aria-label']) {
+    assert.ok(pages.includes(`${attribute}={t('Importar marcadores desde un archivo HTML de Chrome, Edge, Firefox, Brave u Opera')}`),
+      `the visible tooltip and the accessible name must both be translated (${attribute})`);
+  }
+  // The summary is shown, and nothing is written until it is confirmed.
+  const preview = pages.slice(importButton, pages.indexOf('{deleteConfirmation &&'));
+  assert.match(preview, /importPreview && <ConfirmModal/);
+  assert.match(preview, /importPreview\.duplicates/);
+  assert.match(preview, /confirmLabel=\{importing \? t\('Importando…'\) : t\('Importar sin sobrescribir'\)\}/);
+  assert.match(preview, /onConfirm=\{\(\) => void commitImport\(\)\}/);
+  assert.doesNotMatch(pages, /window\.nodus\.(?!previewBrowserBookmarksImport|commitBrowserBookmarksImport)[A-Za-z]*BookmarkImport/,
+    'importing must not grow a third channel');
+
+  const ipc = readFileSync(path.join(repoRoot, 'electron/ipc/browser.ts'), 'utf8');
+  const previewHandler = ipc.indexOf("h('browser:bookmarks:previewImport'");
+  assert.ok(previewHandler >= 0);
+  assert.match(ipc.slice(previewHandler, previewHandler + 700), /assertUiSender\(event, getWindow\)/);
+  assert.match(ipc.slice(previewHandler, previewHandler + 700), /showImportOpenDialog/,
+    'the picker must stay behind the shared privacy-gated open dialog');
+  assert.doesNotMatch(ipc, /h\('browser:bookmarks:import'/, 'no second import channel may be added');
+});
+
 test('imports merge without overwriting and report duplicates', () => {
   const { store } = sample();
   let incoming = model.emptyBrowserBookmarkStore();
@@ -155,8 +428,8 @@ test('trusted Bookmarks UI reuses Atlas styling and avoids native prompt dialogs
   assert.doesNotMatch(pages, /nodus-start-light|useLightTheme/);
   assert.doesNotMatch(styles, /nodus-start-light/,
     'the public Nodus Research design has no light variant, so neither local start page may invent one');
-  assert.match(pages, /isSaved \? 'Saved' : 'Save'/);
-  assert.match(pages, /global search/);
+  assert.match(pages, /isSaved \? t\('Guardado'\) : t\('Guardar'\)/);
+  assert.match(pages, /búsqueda global/);
   assert.match(pages, /data-testid="nodus-site-header"/);
   assert.match(pages, /data-testid="nodus-site-footer"/);
   assert.match(pages, /label="Atlas" url=\{NODUS_RESEARCH_ATLAS_URL\}/,

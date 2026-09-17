@@ -43,7 +43,8 @@ import {
   deanonymizeDeep,
   findResidualNames,
 } from '@shared/studentPseudonyms';
-import { classifyProviderError } from './providerErrors';
+import { classifyProviderError, isTransientNetworkFailure, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields } from './providerErrors';
+import { rememberTemperatureUnsupported, temperatureUnsupported } from './samplingSupport';
 import { completeWithChatGptSubscription } from './codexSubscription';
 import { completeWithGitHubCopilotSubscription } from './githubCopilotSubscription';
 import { completeWithOpenCodeGo, OUTPUT_TRUNCATED_MARKER } from './openCodeGoCompletion';
@@ -51,6 +52,12 @@ import { nodusUserAgent, openCodeGoSessionId } from './clientIdentity';
 import { recordOpenCodeGoUsage } from './openCodeGoUsage';
 import { AI_MODEL_REQUIRED_ERROR_CODE } from '@shared/aiModelRequired';
 import { createHash } from 'node:crypto';
+import {
+  logPipelineFailure,
+  logPipelineWarning,
+  type PipelineLogCode,
+  type PipelineLogSubjectId,
+} from '../logging/pipelineLogCore';
 import {
   AiRequestScheduler,
   type AiRequestClass,
@@ -225,12 +232,17 @@ export class AiError extends Error {
    * @param retriable transient provider error (rate limit / 5xx) — worth a backoff retry.
    * @param config    misconfiguration (no model / no key) — the SAME for every job, so the
    *                  queue should pause and surface it once instead of failing every item.
+   * @param code      which failure this is. The transport branches below fill it in so the
+   *                  processing log can carry a stable, language-neutral badge (and so the
+   *                  recovery strategies can match a tag instead of provider prose).
    */
   constructor(
     message: string,
     public retriable = false,
     public config = false,
-    public code: 'output_truncated' | 'invalid_json' | 'timeout' | 'provider_empty_error' | 'context_overflow' | typeof AI_MODEL_REQUIRED_ERROR_CODE | null = null,
+    public code: 'output_truncated' | 'invalid_json' | 'schema_mismatch' | 'timeout' | 'provider_empty_error'
+      | 'context_overflow' | 'rate_limit' | 'provider_5xx' | 'auth' | 'bad_request' | 'connection'
+      | typeof AI_MODEL_REQUIRED_ERROR_CODE | null = null,
   ) {
     super(message);
   }
@@ -240,7 +252,9 @@ export class AiError extends Error {
  *  them. They classify themselves instead — see `providerErrors.ts`. */
 function subscriptionError(error: unknown): AiError {
   const { message, retriable, config } = classifyProviderError(error);
-  return new AiError(message, retriable, config);
+  const wrapped = new AiError(message, retriable, config);
+  logProviderFailure(wrapped, error);
+  return wrapped;
 }
 
 /**
@@ -346,6 +360,12 @@ function truncatedJsonMessage(model: ModelRef, maxTokens: number): string {
   return `${cut} Usa un modelo con mayor límite de salida o reduce el tamaño de la tarea.`;
 }
 
+/** Prose that must not be stored half-written: the same ceiling, without the JSON wording. */
+function truncatedOutputMessage(model: ModelRef, maxTokens: number): string {
+  const label = PROVIDER_LABELS[model.provider] ?? model.provider;
+  return `La respuesta de «${model.model}» (${label}) se cortó al alcanzar el límite de ${maxTokens.toLocaleString('es')} tokens de salida. Un modelo con razonamiento puede gastar ese presupuesto pensando antes de escribir.`;
+}
+
 /**
  * How long one non-streaming completion may take before the transport gives up.
  *
@@ -438,6 +458,13 @@ interface CallOpts {
   timeoutMs?: number;
   /** Cooperative cancellation for long-running corpus jobs. */
   signal?: AbortSignal;
+  /**
+   * A prose caller that PERSISTS the text (the work summary) opts into the JSON
+   * contract: a response the provider cut off at the output ceiling is a retryable
+   * error instead of a silently stored half-sentence. Conversational prose leaves
+   * it off, because a clipped chat answer is still an answer.
+   */
+  requireCompleteOutput?: boolean;
   /** Images to attach for vision models (base64 + media type). */
   images?: VisionImagePart[];
   /** Skip the vault-type prompt pack (keep only the output-language directive). Used
@@ -536,8 +563,13 @@ async function tryLocalNativeCompletion(
       elapsedMs: Date.now() - started,
       timestamp: Date.now(),
     });
-    if (jsonMode && /length|max_tokens|max_output_tokens/i.test(result.finishReason ?? '')) {
-      throw new AiError(truncatedJsonMessage(model, plan.outputTokens), true, false, 'output_truncated');
+    if ((jsonMode || opts.requireCompleteOutput) && /length|max_tokens|max_output_tokens/i.test(result.finishReason ?? '')) {
+      throw new AiError(
+        jsonMode ? truncatedJsonMessage(model, plan.outputTokens) : truncatedOutputMessage(model, plan.outputTokens),
+        true,
+        false,
+        'output_truncated',
+      );
     }
     if (!result.text.trim()) {
       throw new AiError(`Respuesta vacía del proveedor de IA (${result.finishReason ?? 'sin finish_reason'}).`, false);
@@ -612,18 +644,27 @@ async function tryLocalNativeStreaming(
 }
 
 /**
- * Output-language control. The prompts are authored in Spanish; when the user picks
- * a non-Spanish prompt language we APPEND a high-priority directive instead of
- * rewriting the prompt, so all generated free-text fields come back in that language.
- * The directive explicitly supersedes the inline "escribe en español" instructions the
- * base prompts carry — the same override mechanism that has always driven the English
- * option — which is far safer than a blind find/replace over hand-tuned prompts (that
- * would also corrupt JSON examples and cases where "español" denotes the source text).
- * `quote`/verbatim evidence always stays in the source language. Applied at the public
- * entry points only (not the internal JSON-repair call, which must not translate
- * existing content).
+ * Output-language control. The prompts are authored in Spanish, and every prompt language
+ * gets a HIGH-PRIORITY directive APPENDED to its system prompt rather than the prompt being
+ * rewritten, so all generated free-text fields come back in the configured language. The
+ * directive explicitly supersedes whatever language an inline instruction or a document's
+ * own language implies — the override mechanism that has always driven the English option,
+ * and far safer than a blind find/replace over hand-tuned prompts (that would also corrupt
+ * JSON examples and cases where "español" denotes the source text).
+ *
+ * Spanish used to be the exception: no directive was appended, on the assumption that a
+ * prompt written in Spanish brings Spanish output. That held for most prompts and failed for
+ * some — the document-profile pack never said which language to write in and two of nine
+ * profiles of a live run followed the source document into English instead. A language the
+ * user chose is a setting, not a property of the prompt text, so Spanish is now driven by the
+ * same directive as the other fourteen.
+ *
+ * `quote`/verbatim evidence always stays in the source language. Applied at the public entry
+ * points only (not the internal JSON-repair call, which must not translate existing content);
+ * tasks that must fully control their own output language call `completeTextNeutral`.
  */
-const OUTPUT_LANGUAGE_NAME: Record<Exclude<PromptLanguage, 'es'>, string> = {
+const OUTPUT_LANGUAGE_NAME: Record<PromptLanguage, string> = {
+  es: 'ESPAÑOL',
   en: 'ENGLISH',
   fr: 'FRANÇAIS',
   tr: 'TÜRKÇE',
@@ -640,8 +681,9 @@ const OUTPUT_LANGUAGE_NAME: Record<Exclude<PromptLanguage, 'es'>, string> = {
   ko: '한국어',
 };
 
-function outputLanguageDirective(lang: Exclude<PromptLanguage, 'es'>): string {
-  const headings: Record<Exclude<PromptLanguage, 'es'>, string> = {
+function outputLanguageDirective(lang: PromptLanguage): string {
+  const headings: Record<PromptLanguage, string> = {
+    es: 'IDIOMA DE SALIDA — PRIORIDAD MÁXIMA',
     en: 'OUTPUT LANGUAGE — HIGHEST PRIORITY',
     fr: 'LANGUE DE SORTIE — PRIORITÉ ABSOLUE',
     tr: 'ÇIKTI DİLİ — EN YÜKSEK ÖNCELİK',
@@ -657,7 +699,8 @@ function outputLanguageDirective(lang: Exclude<PromptLanguage, 'es'>): string {
     uk: 'МОВА ВИВЕДЕННЯ — НАЙВИЩИЙ ПРІОРИТЕТ',
     ko: '출력 언어 — 최우선 순위',
   };
-  const directives: Record<Exclude<PromptLanguage, 'es'>, string> = {
+  const directives: Record<PromptLanguage, string> = {
+    es: `Prioridad de idioma de salida: redacta TODOS los campos de texto libre en ${OUTPUT_LANGUAGE_NAME[lang]}, sea cual sea el idioma del documento de origen o cualquier instrucción anterior. Incluye etiquetas, enunciados, desarrollos, resúmenes, justificaciones, explicaciones, notas, títulos, cuerpos, motivos y toda la prosa. La ÚNICA excepción son los campos quote/prueba literal, que se copian EXACTAMENTE en el idioma de origen; no traduzcas nunca las citas. Conserva exactamente las claves JSON y los valores de enumeración.`,
     en: `Output-language priority: write EVERY free-text/natural-language output field in ${OUTPUT_LANGUAGE_NAME[lang]}, regardless of source-document language or earlier instructions. This includes labels, statements, development, summaries, rationales, explanations, notes, titles, bodies, reasons, and all prose. The ONLY exception is any quote/verbatim-evidence field, which must be copied EXACTLY in the source language; never translate quotes. Keep JSON keys and enum values exactly as specified.`,
     fr: `Priorité de langue de sortie : rédige TOUS les champs de texte libre en ${OUTPUT_LANGUAGE_NAME[lang]}, quelle que soit la langue du document source ou toute instruction précédente. Cela inclut labels, énoncés, développements, résumés, justifications, explications, notes, titres, corps, raisons et toute prose. SEULE exception : les champs quote/preuve littérale doivent être copiés EXACTEMENT dans la langue source ; ne traduis jamais les citations. Conserve exactement les clés JSON et valeurs d’énumération.`,
     tr: `Çıktı dili önceliği: Kaynak belgenin diline veya önceki talimatlara bakılmaksızın TÜM serbest metin alanlarını ${OUTPUT_LANGUAGE_NAME[lang]} yaz. Buna etiketler, ifadeler, geliştirmeler, özetler, gerekçeler, açıklamalar, notlar, başlıklar ve tüm düzyazı dahildir. TEK istisna quote/aynen kanıt alanlarıdır; bunları kaynak dilinde AYNEN kopyala, alıntıları çevirme. JSON anahtarlarını ve enum değerlerini aynen koru.`,
@@ -680,7 +723,6 @@ function outputLanguageDirective(lang: Exclude<PromptLanguage, 'es'>): string {
  *  `promptLanguage` setting without mutating the base prompt. */
 export function withPromptLanguage<T extends { system: string; englishImagePrompts?: boolean }>(opts: T): T {
   const lang = getSettings().promptLanguage ?? 'es';
-  if (lang === 'es') return opts;
   const toolException = opts.englishImagePrompts ? '\nIMAGE TOOL PROTOCOL EXCEPTION: In nodus-image JSON requests, the prompt field is an internal production instruction and MUST be written in English. Visible prose, title and alt still follow the output language above. Keep JSON keys and aspect-ratio values unchanged.' : '';
   return { ...opts, system: `${opts.system}${outputLanguageDirective(lang)}${toolException}` };
 }
@@ -761,7 +803,7 @@ function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEf
   const auditedOpenRouterProvider = process.env.NODUS_AUDIT_OPENROUTER_PROVIDER?.trim();
   return {
     ...(jsonMode && supportsJsonMode(model.provider) ? { response_format: { type: 'json_object' as const } } : {}),
-    ...(opts.researchEffort === undefined ? reasoningBody(model.provider, reasoning, model.model) : {}),
+    ...(opts.researchEffort === undefined ? reasoningBody(model.provider, reasoning, model.model, opts.requestClass === 'background') : {}),
     // Groq's reasoning models (gpt-oss/qwen3) reason at medium by default, which slows scans and
     // burns tokens. reasoningBody can't send it (no model id), so minimise it here. Groq rejects
     // reasoning_effort:'none' — 'low' is its floor; non-reasoning models 400 and the caller strips it.
@@ -780,7 +822,8 @@ function researchBody(model: ModelRef, opts: CallOpts): Record<string, unknown> 
   return opts.researchEffort === undefined ? {} : researchReasoningBody(model, opts.researchEffort, opts.maxTokens ?? 8000, opts.researchModelInfo);
 }
 
-function requestSamplingBody(model: ModelRef, opts: CallOpts, reasoning: ReasoningEffort): Record<string, number> {
+function requestSamplingBody(model: ModelRef, opts: CallOpts, reasoning: ReasoningEffort, stripTemperature = false): Record<string, number> {
+  if (stripTemperature || temperatureUnsupported(model)) return {};
   if (opts.researchEffort !== undefined && researchOmitsTemperature(model, opts.researchEffort, opts.researchModelInfo)) return {};
   return samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15, reasoning);
 }
@@ -827,14 +870,23 @@ function openAiClientHeaders(model: Pick<ModelRef, 'provider'>): Record<string, 
 }
 
 /**
- * Only retry a 400 when the provider explicitly names an unsupported optional
- * transport field. A generic 400 can be an ambiguous timeout or rejected payload;
- * replaying it would violate the no-blind-retry contract and may double-charge.
+ * The optional body for the one replay after a provider refused it.
+ *
+ * A named rejection drops the optional body wholesale, as it always has. A custom
+ * gateway that refused the reasoning hint *without* naming it gets everything else
+ * back exactly as it was — JSON mode included — so the scan keeps its contract and
+ * only the field Nodus added is removed.
  */
-function rejectsOptionalTransportField(e: any): boolean {
-  if ((e?.status ?? e?.response?.status) !== 400) return false;
-  const message = String(e?.error?.message ?? e?.message ?? '');
-  return /(?:unknown|unrecognized|unsupported|not supported|extra|invalid)\s+(?:field|parameter|argument)|response_format|reasoning_effort|include_reasoning|provider\.only|allow_fallbacks/i.test(message);
+function retryOptionalBody(model: ModelRef, extras: Record<string, unknown>, error: unknown, sentReasoning: boolean): Record<string, unknown> {
+  const auditedProvider = model.provider === 'openrouter' && process.env.NODUS_AUDIT_OPENROUTER_PROVIDER?.trim()
+    ? { provider: (extras as any).provider }
+    : {};
+  if (sentReasoning && !rejectsOptionalTransportField(error)) {
+    const rest = { ...extras };
+    delete rest.reasoning_effort;
+    return { ...rest, ...auditedProvider };
+  }
+  return auditedProvider;
 }
 
 /** True for provider throttling. OpenRouter also uses 529 when the selected
@@ -910,10 +962,30 @@ async function withProviderRetries<T>(
       return await make();
     } catch (e) {
       if (attempt < maxRateWaits && isRateLimited(e)) {
+        // Recovered, but worth recording: a provider capping the run is the first thing
+        // anyone looks for when indexing crawls, and the wait itself explains the delay.
+        logPipelineWarning({
+          subject: 'subjectModelCall',
+          code: 'rate_limit',
+          message: {
+            id: 'logRetry',
+            params: { subject: { id: 'subjectModelCall' }, attempt: attempt + 2, max: maxRateWaits + 1 },
+          },
+          detail: e instanceof Error ? e.message : String(e),
+        });
         await sleep(retryAfterMs(e), signal);
         continue;
       }
       if (serverRetries < maxServerRetries && isTransientServerError(e)) {
+        logPipelineWarning({
+          subject: 'subjectModelCall',
+          code: 'provider_5xx',
+          message: {
+            id: 'logRetry',
+            params: { subject: { id: 'subjectModelCall' }, attempt: serverRetries + 2, max: maxServerRetries + 1 },
+          },
+          detail: e instanceof Error ? e.message : String(e),
+        });
         await sleep(500 * (serverRetries + 1) ** 2, signal);
         serverRetries += 1;
         continue;
@@ -1109,8 +1181,13 @@ async function rawCompleteTransport(
         ],
       }, { signal: opts.signal }));
       const block = res.content.find((b: any) => b.type === 'text');
-      if (jsonMode && (res as any).stop_reason === 'max_tokens') {
-        throw new AiError(truncatedJsonMessage(model, opts.maxTokens ?? 8000), true, false, 'output_truncated');
+      if ((jsonMode || opts.requireCompleteOutput) && (res as any).stop_reason === 'max_tokens') {
+        throw new AiError(
+          jsonMode ? truncatedJsonMessage(model, opts.maxTokens ?? 8000) : truncatedOutputMessage(model, opts.maxTokens ?? 8000),
+          true,
+          false,
+          'output_truncated',
+        );
       }
       return (block as any)?.text ?? '';
     } catch (e: any) {
@@ -1209,16 +1286,17 @@ async function rawCompleteTransport(
       observeProviderQuota(model, opts, key, schedulerEndpoint, result.response.headers);
       return result.data;
     });
-  const baseBody = {
+  const bodyFor = (stripTemperature: boolean) => ({
     model: model.model,
-    ...requestSamplingBody(model, opts, reasoning),
-        ...researchBody(model, opts),
+    ...requestSamplingBody(model, opts, reasoning, stripTemperature),
+    ...researchBody(model, opts),
     ...completionTokensBody(model.provider, model.model, maxTokens),
     messages: [
       { role: 'system' as const, content: opts.system },
       { role: 'user' as const, content: opts.images?.length ? (openAiVisionContent(opts.user, opts.images) as any) : opts.user },
     ],
-  };
+  });
+  const baseBody = bodyFor(false);
   const extras = optionalBody(model, jsonMode, reasoning, opts);
   const compatStarted = Date.now();
   try {
@@ -1229,14 +1307,22 @@ async function rawCompleteTransport(
       ), opts.signal, !opts.noRetry);
     } catch (e: any) {
       // The optional reasoning/JSON/routing params may be unsupported by this model.
-      // Retry once as a plain request before surfacing the error.
-      if (!opts.noRetry && rejectsOptionalTransportField(e) && Object.keys(extras).length > 0) {
+      // Retry once as a plain request before surfacing the error. A custom gateway
+      // that refused our reasoning hint without naming it also lands here, and keeps
+      // the rest of the optional body so the scan does not lose JSON mode.
+      const sentReasoning = (extras as any).reasoning_effort !== undefined;
+      if (!opts.noRetry && rejectsTemperatureParameter(e)) {
+        // A reasoning model that deprecates `temperature`: drop it and remember the model so
+        // later calls go straight through. Everything else in the body is kept.
+        rememberTemperatureUnsupported(model);
+        res = await withProviderRetries(freeTier, () => scheduleProviderRequest(
+          model, opts, key, schedulerEndpoint, () => createCompletion({ ...bodyFor(true), ...extras } as any),
+        ), opts.signal, !opts.noRetry);
+      } else if (!opts.noRetry && shouldRetryWithoutOptionalFields(e, { provider: model.provider, sentReasoning }) && Object.keys(extras).length > 0) {
         res = await withProviderRetries(freeTier, () => scheduleProviderRequest(
           model, opts, key, schedulerEndpoint, () => createCompletion({
             ...baseBody,
-            ...(model.provider === 'openrouter' && process.env.NODUS_AUDIT_OPENROUTER_PROVIDER?.trim()
-              ? { provider: (extras as any).provider }
-              : {}),
+            ...retryOptionalBody(model, extras, e, sentReasoning),
           } as any),
         ), opts.signal, !opts.noRetry);
       } else {
@@ -1281,10 +1367,17 @@ async function rawCompleteTransport(
     // broken data: extractJson's jsonrepair pass closes the dangling braces without a
     // word, so the caller silently stores a fraction of the ideas — or trips the schema
     // guard and reports "el JSON no cumple el esquema esperado", which sends the reader
-    // hunting for a prompt bug that isn't there. Refuse instead. Prose (jsonMode=false)
-    // stays untouched: a clipped sentence is still usable, an unterminated object is not.
-    if (jsonMode && choice?.finish_reason === 'length') {
-      throw new AiError(truncatedJsonMessage(model, maxTokens), true, false, 'output_truncated');
+    // hunting for a prompt bug that isn't there. Refuse instead. Plain prose is kept
+    // as-is unless the caller opts into the same contract, because a chat answer cut
+    // short is still usable while a persisted summary must not be stored clipped.
+    const cutOff = /^(length|max_tokens|max_output_tokens)$/i.test(choice?.finish_reason ?? '');
+    if (cutOff && (jsonMode || opts.requireCompleteOutput)) {
+      throw new AiError(
+        jsonMode ? truncatedJsonMessage(model, maxTokens) : truncatedOutputMessage(model, maxTokens),
+        true,
+        false,
+        'output_truncated',
+      );
     }
     // Some mandatory-reasoning models can spend the complete output allowance before
     // emitting the first JSON character. Test `finish_reason` before the generic empty
@@ -1302,12 +1395,78 @@ async function rawCompleteTransport(
     }
     return content;
   } catch (e: any) {
+    // A caller abort (pause/cancel/stop) surfaces from the OpenAI SDK as
+    // APIUserAbortError ("Request was aborted."). It must stay a cancellation:
+    // wrapping it here would record a permanent, scary-looking job failure
+    // instead of letting the queue settle the job as cancelled/paused.
+    if (opts.signal?.aborted) throw opts.signal.reason ?? e;
     if (e instanceof AiError) throw e;
     throw wrapProviderError(e);
   }
 }
 
+/**
+ * Wrap a provider/transport failure and record it in the processing log.
+ *
+ * This is the choke point for every model failure in the app: the classifier below is the
+ * only place that knows which branch a provider error took, and it runs once per FINAL
+ * failure (`withProviderRetries` retries the raw error before anything is wrapped). Logging
+ * here rather than at each of the ~16 raise sites is why a provider outage is reported with
+ * its real code — timeout, rate_limit, auth, invalid_json — instead of a generic "AI error".
+ */
 function wrapProviderError(e: any): AiError {
+  const wrapped = classifyToAiError(e);
+  logProviderFailure(wrapped, e);
+  return wrapped;
+}
+
+/** Record one provider failure, with the code the classifier just decided. */
+function logProviderFailure(wrapped: AiError, original: unknown): void {
+  const code = providerLogCode(wrapped);
+  logPipelineFailure({
+    error: wrapped,
+    code,
+    subject: providerLogSubject(code),
+    attempts: null,
+    // The provider's own words, which our Spanish re-wording above replaces: that is what a
+    // maintainer needs in a GitHub issue, and the log line is the translation on top of it.
+    detail: original instanceof Error && original.message ? original.message : wrapped.message,
+  });
+}
+
+/** The log code that matches the AiError the classifier produced. */
+function providerLogCode(error: AiError): PipelineLogCode {
+  switch (error.code) {
+    case 'invalid_json': return 'invalid_json';
+    case 'schema_mismatch': return 'schema_mismatch';
+    case 'output_truncated': return 'output_truncated';
+    case 'timeout': return 'timeout';
+    case 'context_overflow': return 'context_overflow';
+    case 'provider_empty_error': return 'provider_empty';
+    case 'rate_limit': return 'rate_limit';
+    case 'provider_5xx': return 'provider_5xx';
+    case 'auth': return 'auth';
+    case 'bad_request': return 'bad_request';
+    case 'connection': return 'connection';
+    default: break;
+  }
+  if (error.code === AI_MODEL_REQUIRED_ERROR_CODE || error.config) return 'model_missing';
+  return 'unknown';
+}
+
+/** The sentence the log will show, so a JSON failure does not read as a model failure. */
+function providerLogSubject(code: PipelineLogCode): PipelineLogSubjectId {
+  if (code === 'invalid_json' || code === 'schema_mismatch' || code === 'output_truncated') return 'subjectJsonResponse';
+  if (code === 'embedding_failed' || code === 'embedding_count_mismatch') return 'subjectEmbeddings';
+  return 'subjectModelCall';
+}
+
+/**
+ * Map one provider/transport failure onto our own error taxonomy. Pure: it decides, the
+ * wrapper above records. (`classifyProviderError` in providerErrors.ts is the subscription
+ * runtimes' OWN classifier — same idea, different providers.)
+ */
+function classifyToAiError(e: any): AiError {
   // Only OUR OWN cutoff errors are re-typed. Matching prose used to catch anything that
   // said "truncated" — an upstream gateway timeout was enough to send a deep scan
   // doubling its budget and splitting a chunk to chase a network hiccup.
@@ -1320,34 +1479,43 @@ function wrapProviderError(e: any): AiError {
   // (400 from local servers, 400/413 from cloud). Reword it before status-based mapping
   // so the user gets an actionable message instead of a raw "n_keep >= n_ctx".
   if (isContextOverflow(e?.error?.message ?? e?.message)) {
-    return new AiError(genericContextOverflowMessage(), false, true);
+    return new AiError(genericContextOverflowMessage(), false, true, 'context_overflow');
   }
   // Tagged, not merely worded: the deep scan answers a timeout by splitting the chunk
   // (less to generate → it fits), which it must not do for an unrelated failure.
   if (e?.name?.includes('Timeout') || /timeout|timed out/i.test(e?.message ?? '')) {
     return new AiError('Tiempo agotado esperando al proveedor de IA. Prueba con un modelo más rápido o un fragmento menor.', false, false, 'timeout');
   }
-  if (status === 429 || status === 529) return new AiError('Límite de tasa del proveedor de IA', true);
-  if (status >= 500) return new AiError(`Error del proveedor (${status})`, true);
-  if (status === 401 || status === 403) return new AiError('Clave de IA inválida. Revísala en Ajustes.', false, true);
+  if (status === 429 || status === 529) return new AiError('Límite de tasa del proveedor de IA', true, false, 'rate_limit');
+  if (status >= 500) return new AiError(`Error del proveedor (${status})`, true, false, 'provider_5xx');
+  if (status === 401 || status === 403) return new AiError('Clave de IA inválida. Revísala en Ajustes.', false, true, 'auth');
   if (status === 400) {
     const detail = e?.error?.message ?? e?.message;
     const readable = detail && !/no body/i.test(detail) ? detail : null;
     // Not every provider answers a bad key with 401: Gemini returns 400 "Invalid Auth key.".
     if (readable && /invalid auth|api[ _-]?key|API_KEY_INVALID|unauthenticated|invalid credential/i.test(readable)) {
-      return new AiError('Clave de IA inválida. Revísala en Ajustes.', false, true);
+      return new AiError('Clave de IA inválida. Revísala en Ajustes.', false, true, 'auth');
     }
     // With a readable reason, say it. Without one, say only what we know: Gemini returns its
     // error as a JSON array that the OpenAI SDK cannot parse, so its 400s arrive as "no body"
     // — and blaming the context size there sends someone with a mistyped key off to trim their
     // data. A 400 we cannot explain should name the likely causes, not pick one.
-    if (readable) return new AiError(`El proveedor rechazó la solicitud (400). Detalle: ${readable}`, false);
+    if (readable) return new AiError(`El proveedor rechazó la solicitud (400). Detalle: ${readable}`, false, false, 'bad_request');
     return new AiError(
       'El proveedor rechazó la solicitud (400) sin explicar el motivo. Suele ser la clave de IA (revísala en Ajustes) o, con mucho contexto, una petición que supera el límite del modelo.',
-      false
+      false,
+      false,
+      'bad_request'
     );
   }
-  return new AiError(e?.message ?? 'Error de IA', false);
+  // A dropped socket has no status, so nothing above classified it and it used to
+  // be marked permanent. One gateway hiccup must not fail the whole work: mark it
+  // retriable and let each caller's bounded retry ride it out (4 attempts in the
+  // scan queue, 5 document attempts), so a dead endpoint still gives up.
+  if (isTransientNetworkFailure(e)) {
+    return new AiError(message || 'Error de conexión con el proveedor de IA.', true, false, 'connection');
+  }
+  return new AiError(message || 'Error de IA', false);
 }
 
 function errorMessage(e: unknown): string {
@@ -1395,7 +1563,7 @@ function extractJson(text: string): unknown {
   t = t.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
   const first = t.indexOf('{');
   const last = t.lastIndexOf('}');
-  if (first === -1 || last === -1) throw new AiError('La respuesta no contiene JSON');
+  if (first === -1 || last === -1) throw new AiError('La respuesta no contiene JSON', false, false, 'invalid_json');
   const candidate = t.slice(first, last + 1);
   try {
     return JSON.parse(candidate);
@@ -1420,12 +1588,17 @@ async function parseOrRepair<T>(
     // extractJson already attempts deterministic local repair. Anything still invalid
     // must be resampled from the frozen request; a remote repair prompt could invent
     // fields and would invalidate manual-versus-automatic comparisons.
+    console.warn(`[ai] structured reply is not JSON (${errorMessage(parseError)}): ${String(text).slice(0, 400)}`);
     throw new AiError(`JSON inválido: ${errorMessage(parseError)}`, false, false, 'invalid_json');
   }
   if (guard(parsed)) return parsed;
   // Well-formed JSON that misses the schema is also resampled without changing the
-  // prompt, model, temperature, context or output budget.
-  throw new AiError('El JSON no cumple el esquema esperado');
+  // prompt, model, temperature, context or output budget. The caller only ever sees
+  // "invalid JSON", which hides *which* field the model got wrong: without this line
+  // the reason a smaller local model's structured calls fail is unreadable from
+  // outside, and a report can only guess at it.
+  console.warn(`[ai] structured reply rejected by its guard: ${JSON.stringify(parsed).slice(0, 400)}`);
+  throw new AiError('El JSON no cumple el esquema esperado', false, false, 'schema_mismatch');
 }
 
 /**
@@ -1484,11 +1657,45 @@ export async function completeJson<T>(
       // input; invariant resampling remains useful only for malformed/schema JSON.
       const outputTruncated = e instanceof AiError && e.code === 'output_truncated';
       retryDone({ status: 'error', error: errorMessage(e), retry: !outputTruncated && i < attempts - 1 });
-      if (outputTruncated) throw e;
+      if (outputTruncated) {
+        logJsonFailure(e);
+        throw e;
+      }
+      // A resample is worth seeing: the model produced malformed JSON and the frozen
+      // request was replayed unchanged. `logRetry` carries the attempt pair.
+      if (i < attempts - 1) {
+        logPipelineWarning({
+          subject: 'subjectJsonResponse',
+          code: e instanceof AiError && e.code ? e.code : 'invalid_json',
+          message: {
+            id: 'logRetry',
+            params: {
+              subject: { id: 'subjectJsonResponse' },
+              attempt: i + 2,
+              max: attempts,
+            },
+          },
+          detail: errorMessage(e),
+        });
+      }
       lastErr = e;
     }
   }
+  logJsonFailure(lastErr);
   throw lastErr instanceof Error ? lastErr : new AiError('Fallo de parseo JSON');
+}
+
+/**
+ * A response that came back but could not be used. Logged once, after the resamples are
+ * exhausted, so a JSON failure is not silently reported as just another failed job.
+ */
+function logJsonFailure(error: unknown): void {
+  const code: PipelineLogCode = error instanceof AiError && error.code === 'output_truncated'
+    ? 'output_truncated'
+    : error instanceof AiError && error.code === 'schema_mismatch'
+      ? 'schema_mismatch'
+      : 'invalid_json';
+  logPipelineFailure({ error, code, subject: 'subjectJsonResponse' });
 }
 
 /** Plain-text completion for conversational assistant responses. */
@@ -1753,17 +1960,18 @@ async function rawCompleteStreamTransport(
     maxRetries: 0,
     defaultHeaders: openAiClientHeaders(model),
   });
-  const baseBody = {
+  const bodyFor = (stripTemperature: boolean) => ({
     model: model.model,
-    ...requestSamplingBody(model, opts, reasoning),
-        ...researchBody(model, opts),
+    ...requestSamplingBody(model, opts, reasoning, stripTemperature),
+    ...researchBody(model, opts),
     ...completionTokensBody(model.provider, model.model, maxTokens),
     stream: true as const,
     messages: [
       { role: 'system' as const, content: opts.system },
       { role: 'user' as const, content: opts.images?.length ? (openAiVisionContent(opts.user, opts.images) as any) : opts.user },
     ],
-  };
+  });
+  const baseBody = bodyFor(false);
   // Streaming is plain text (no JSON mode); only reasoning + routing apply.
   const extras = optionalBody(model, false, reasoning, opts);
   const schedulerEndpoint = model.provider === 'nodus' ? 'nodus-local-runtime' : baseURL;
@@ -1813,15 +2021,19 @@ async function rawCompleteStreamTransport(
         () => executeStream({ ...baseBody, ...extras } as any),
       ), signal, !opts.noRetry);
     } catch (e: any) {
-      if (rejectsOptionalTransportField(e) && Object.keys(extras).length > 0) {
+      const sentReasoning = (extras as any).reasoning_effort !== undefined;
+      if (!opts.noRetry && rejectsTemperatureParameter(e)) {
+        // A reasoning model that deprecates `temperature`: drop it, remember the model, retry
+        // once before any content streamed. Everything else in the body is kept.
+        rememberTemperatureUnsupported(model);
         await withProviderRetries(freeTier, () => scheduleProviderRequest(
           model, scheduleOpts, key, schedulerEndpoint,
-          () => executeStream({
-            ...baseBody,
-            ...(model.provider === 'openrouter' && process.env.NODUS_AUDIT_OPENROUTER_PROVIDER?.trim()
-              ? { provider: (extras as any).provider }
-              : {}),
-          } as any),
+          () => executeStream({ ...bodyFor(true), ...extras } as any),
+        ), signal, !opts.noRetry);
+      } else if (shouldRetryWithoutOptionalFields(e, { provider: model.provider, sentReasoning }) && Object.keys(extras).length > 0) {
+        await withProviderRetries(freeTier, () => scheduleProviderRequest(
+          model, scheduleOpts, key, schedulerEndpoint,
+          () => executeStream({ ...baseBody, ...retryOptionalBody(model, extras, e, sentReasoning) } as any),
         ), signal, !opts.noRetry);
       } else {
         throw e;
@@ -2049,6 +2261,13 @@ export async function embedManyStrict(texts: string[], signal?: AbortSignal, opt
     { ...options, jobId: options.jobId ? `${options.jobId}:batch:${index}` : undefined },
   )))).flat();
   if (vectors.length !== texts.length) {
+    // One missing vector publishes a broken index, so this aborts the work — and it is the
+    // kind of provider misbehaviour that is impossible to diagnose without the counts.
+    logPipelineFailure({
+      subject: 'subjectEmbeddings',
+      code: 'embedding_count_mismatch',
+      detail: `expected ${texts.length} vectors, received ${vectors.length}`,
+    });
     throw new AiError(`La indexación produjo ${vectors.length} embeddings para ${texts.length} entradas; no se publicará un índice incompleto.`, false);
   }
   return vectors;

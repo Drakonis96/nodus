@@ -6,6 +6,7 @@ import type {
   LibraryCreatorRole,
   LibraryItemType,
   LibraryMetadataIdentifierKind,
+  LibraryReferenceKind,
   LibrarySortField,
 } from './libraryTypes';
 
@@ -138,6 +139,26 @@ export function detectLibraryMetadataIdentifier(raw: string): { kind: LibraryMet
   if (/^isbn(?:-1[03])?:/i.test(value) || validIsbn(value)) return { kind: 'isbn', value };
   if (/^\d{1,12}$/.test(value)) return { kind: 'pmid', value };
   return null;
+}
+
+/**
+ * Classifies what the user pasted into the magic-add field: an identifier, or a link.
+ *
+ * Identifiers are recognised first and win, because a DOI-shaped or arXiv-shaped string
+ * resolves against a metadata API and never downloads a page. Everything else that is a
+ * plain http(s) link is handed to the resolver as `url`, which decides there — and only
+ * there — which host is worth asking for a record and which has to be read off the page.
+ */
+export function detectLibraryReferenceInput(raw: string): { kind: LibraryReferenceKind; value: string } | null {
+  const value = raw.trim();
+  if (!value) return null;
+  const detected = detectLibraryMetadataIdentifier(value);
+  if (detected) return detected;
+  if (!/^https?:\/\//i.test(value)) return null;
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) && !!url.hostname ? { kind: 'url', value: url.toString() } : null;
+  } catch { return null; }
 }
 
 export function libraryItemTypeLabel(type: LibraryItemType): string {

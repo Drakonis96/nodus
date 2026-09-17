@@ -65,11 +65,13 @@ import type {
   PendingIdeaNavigationTarget,
   PendingLibraryNavigationTarget,
   SidebarNavItem,
+  StudyMaterialNavigationTarget,
   View,
 } from './navigation';
 import { researchChatView, dedicatedVaultNavIds, groupedNav, navItemLabel, NAV_ITEMS, NAV_GROUPS } from './navigation';
 import type { ResearchConversationNavigationTarget } from './researchNoteProvenance';
 import type { ToolkitPage } from './navigation';
+import { OPEN_LIBRARY_DOCUMENT_EVENT, type OpenLibraryDocumentDetail } from './evidenceJump';
 import type { LibraryScope } from '@shared/libraryTypes';
 import { placeHeaderBadge, placeHeaderModelAlert, type HeaderBadgePlacement, type HeaderModelAlertPlacement } from './headerLayout';
 import { registerSkillMarketplace } from './components/skillMarketplaceOpener';
@@ -83,8 +85,9 @@ import nodusLogoOrange from './assets/nodus-logo-orange.svg';
 import nodusLogoViolet from './assets/nodus-logo-violet.svg';
 import nodusLogoCyan from './assets/nodus-logo-cyan.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
+import { APP_THEME_DEFINITIONS_STORAGE_KEY, APP_THEME_STORAGE_KEY, applyAppTheme as applyRuntimeAppTheme, applyThemeMode } from './theme/themeBoot';
+import { APP_THEME_IDS } from '@shared/appThemes';
 import { useBrowserNativeOverlayGuard } from './browserOverlay';
-import { applyThemeClasses } from './theme';
 
 const CsvImportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.CsvImportModal })));
 const NotionImportReportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.NotionImportReportModal })));
@@ -102,6 +105,16 @@ const SIDEBAR_COMPACT_THRESHOLD = 144;
 // area. The icon itself remains visible and centred over the compact sidebar; only
 // the decorative word is hidden.
 const MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH = 248;
+
+/** Persist + apply the active colour theme (palette). Light/dark is separate — see
+ *  {@link applyThemeMode}. */
+function applyAppTheme(appTheme: import('@shared/types').AppTheme, customThemes: import('@shared/types').CustomAppTheme[] = []): void {
+  applyRuntimeAppTheme(appTheme, customThemes);
+  try {
+    localStorage.setItem(APP_THEME_STORAGE_KEY, appTheme);
+    localStorage.setItem(APP_THEME_DEFINITIONS_STORAGE_KEY, JSON.stringify(customThemes));
+  } catch { /* private mode */ }
+}
 
 /** Header action rendered as an icon with a native title tooltip. The top bar stays
  *  a stable row of actions; pass `showLabel` to keep the text pinned open (e.g. an
@@ -370,7 +383,7 @@ export function App() {
   // A person opened from global search, to preselect in the Personas view.
   const [personsTarget, setPersonsTarget] = useState<{ id: string; nonce: number } | null>(null);
   const [studyTarget, setStudyTarget] = useState<StudyNavigationTarget | null>(null);
-  const [studyMaterialTarget, setStudyMaterialTarget] = useState<string | null>(null);
+  const [studyMaterialTarget, setStudyMaterialTarget] = useState<StudyMaterialNavigationTarget | null>(null);
   const [studyRecordingTarget, setStudyRecordingTarget] = useState<{ id: string; timestamp?: number | null } | null>(null);
   const [studyGraphTarget, setStudyGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
   const [studyChatTarget, setStudyChatTarget] = useState<{ prompt: string; nonce: number } | null>(null);
@@ -408,6 +421,25 @@ export function App() {
     };
     window.addEventListener('nodus:navigate-primary-source', openPrimarySource);
     return () => window.removeEventListener('nodus:navigate-primary-source', openPrimarySource);
+  }, []);
+  // A citation whose exact page has to be shown in the in-app reader (no Zotero
+  // PDF attachment, or a study/global library copy). The page travels with the
+  // target so the reader opens at the cited point instead of at page 1.
+  useEffect(() => {
+    const openLibraryDocument = (event: Event) => {
+      const detail = (event as CustomEvent<OpenLibraryDocumentDetail | null>).detail;
+      if (typeof detail?.itemId !== 'string') return;
+      if (detail.scope !== 'global' && detail.scope !== 'vault') return;
+      setLibraryTarget({
+        scope: detail.scope,
+        readerItemId: detail.itemId,
+        readerPage: typeof detail.page === 'number' && detail.page > 0 ? detail.page : null,
+        nonce: Date.now(),
+      });
+      setView('library');
+    };
+    window.addEventListener(OPEN_LIBRARY_DOCUMENT_EVENT, openLibraryDocument);
+    return () => window.removeEventListener(OPEN_LIBRARY_DOCUMENT_EVENT, openLibraryDocument);
   }, []);
   useEffect(() => { if (view !== 'studyGraph') setStudyGraphTarget(null); }, [view]);
   useEffect(() => { if (view !== 'researchChat') setAssistantTarget(null); }, [view]);
@@ -751,7 +783,8 @@ export function App() {
       setSettings(s);
       setActiveLang(s.uiLanguage);
       document.documentElement.lang = s.uiLanguage;
-      setIsDark(applyThemeClasses(s.theme));
+      setIsDark(applyThemeMode(s.theme));
+      applyAppTheme(s.appTheme, s.customThemes);
       return s;
     } catch (e) {
       setLoadError(tx('No se pudieron cargar los ajustes: {msg}', { msg: (e as Error).message }));
@@ -760,8 +793,15 @@ export function App() {
   }, []);
 
   const toggleTheme = useCallback(async () => {
-    await window.nodus.updateSettings({ theme: isDark ? 'light' : 'dark' });
-    await reloadSettings();
+    const nextTheme = isDark ? 'light' : 'dark';
+    setIsDark(applyThemeMode(nextTheme));
+    try {
+      await window.nodus.updateSettings({ theme: nextTheme });
+      await reloadSettings();
+    } catch (error) {
+      setIsDark(applyThemeMode(isDark ? 'dark' : 'light'));
+      throw error;
+    }
   }, [isDark, reloadSettings]);
 
   useEffect(() => {
@@ -786,12 +826,17 @@ export function App() {
   // Settings may also change outside this React tree (notably from the floating
   // Nodi window). Keep visibility, theme and every settings-backed control in sync.
   useEffect(() => window.nodus?.onSettingsChanged(() => { void reloadSettings(); }), [reloadSettings]);
+  // A vault switch changes which settings apply, and the palette is per vault by
+  // default. The switcher reloads them itself, but it is not the only caller — the
+  // Server inbox and vault creation both switch directly — so re-read here as well
+  // and never depend on who initiated it.
+  useEffect(() => window.nodus?.onVaultChanged(() => { void reloadSettings(); }), [reloadSettings]);
 
   // In "system" theme mode, follow the OS light/dark preference as it changes.
   useEffect(() => {
     if (settings?.theme !== 'system') return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = () => setIsDark(applyThemeClasses('system'));
+    const onChange = () => setIsDark(applyThemeMode('system'));
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, [settings?.theme]);
@@ -1093,8 +1138,8 @@ export function App() {
     setView('library');
   }, []);
 
-  const openLibraryItem = useCallback((itemId: string, scope: LibraryScope) => {
-    setLibraryTarget({ scope, readerItemId: itemId, nonce: Date.now() });
+  const openLibraryItem = useCallback((itemId: string, scope: LibraryScope, page?: number | null) => {
+    setLibraryTarget({ scope, readerItemId: itemId, readerPage: page ?? null, nonce: Date.now() });
     setView('library');
   }, []);
 
@@ -1231,8 +1276,13 @@ export function App() {
       { id: 'act:presenter', label: 'PDF Presenter', section: t('Acciones'), icon: 'presentation', keywords: 'presentar diapositivas slides pdf presenter proyector herramientas toolkit', run: () => { setToolkitPage('presenter'); setView('toolkit'); } },
       { id: 'act:feedback', label: t('Sugerir función o reportar error'), section: t('Acciones'), icon: 'gitPr', keywords: 'feedback github pr bug feature sugerencia error', run: () => setFeedbackOpen(true) },
       { id: 'act:roadmap', label: t('Roadmap'), section: t('Acciones'), icon: 'route', keywords: 'roadmap hoja ruta futuro próximos pasos', run: () => setRoadmapOpen(true) },
-      { id: 'act:theme', label: isDark ? t('Usar tema claro') : t('Usar tema oscuro'), section: t('Acciones'), icon: 'palette', keywords: 'tema theme claro oscuro', run: () => void window.nodus.updateSettings({ theme: isDark ? 'light' : 'dark' }).then(reloadSettings) },
+      { id: 'act:theme', label: isDark ? t('Usar tema claro') : t('Usar tema oscuro'), section: t('Acciones'), icon: 'palette', keywords: 'tema theme claro oscuro', run: () => void toggleTheme() },
       { id: 'act:motion', label: settings?.reduceMotion ? t('Activar animaciones') : t('Reducir animaciones'), section: t('Acciones'), icon: 'settings', keywords: 'accesibilidad movimiento animaciones motion', run: () => void window.nodus.updateSettings({ reduceMotion: !settings?.reduceMotion }).then(reloadSettings) },
+      { id: 'act:apptheme', label: t('Cambiar paleta de tema'), section: t('Acciones'), icon: 'palette', keywords: 'tema theme paleta palette color colores', run: () => {
+        const ids = [...APP_THEME_IDS, ...(settings?.customThemes ?? []).map((theme) => theme.id)];
+        const next = ids[(Math.max(0, ids.indexOf(settings?.appTheme ?? 'default')) + 1) % ids.length];
+        void window.nodus.updateSettings({ appTheme: next }).then(reloadSettings);
+      } },
     ];
     if (isEstudio) {
       actions.unshift({ id: 'act:reading-focus', label: settings?.readingFocusMode ? t('Salir del modo lectura') : t('Entrar en modo lectura'), section: t('Acciones'), icon: 'book', keywords: 'lectura enfoque focus estudio', run: () => void window.nodus.updateSettings({ readingFocusMode: !settings?.readingFocusMode }).then(reloadSettings) });

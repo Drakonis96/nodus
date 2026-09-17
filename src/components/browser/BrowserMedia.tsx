@@ -12,8 +12,10 @@ import type { BrowserMediaState } from '@shared/browser';
  * changing on pause, so an audibility-driven icon would disappear the moment the
  * user pressed Pause — removing the Play button they need to resume.
  *
- * Previous/Next route Chromium's standard media keys and also switch between
- * concrete audio/video elements on ordinary multi-track pages.
+ * Previous/Next ask the page's own Media Session handler first — the only
+ * channel that can skip a track on a player that keeps its whole playlist in one
+ * element (Spotify, YouTube) — and fall back to switching between concrete
+ * audio/video elements on ordinary multi-track pages.
  */
 
 const MediaContext = createContext<BrowserMediaState[]>([]);

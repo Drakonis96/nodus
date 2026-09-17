@@ -44,19 +44,19 @@ function ToolCard({ testid, icon, name, description, state, pinned, pinBusy, onO
         aria-disabled={disabled}
         title={disabled ? t('Próximamente') : undefined}
         onClick={disabled ? undefined : onOpen}
-        className={`flex h-full w-full flex-col items-start gap-3 rounded-xl border p-5 pr-16 text-left transition-colors ${
+        className={`toolkit-card flex h-full w-full flex-col items-start gap-3 rounded-xl border p-5 pr-16 text-left transition-colors ${
           disabled
             ? 'cursor-not-allowed border-neutral-200 bg-neutral-50 opacity-60 dark:border-neutral-800 dark:bg-neutral-900/20'
             : 'border-neutral-200 bg-white hover:border-amber-400 dark:border-neutral-800 dark:bg-neutral-900/40 dark:hover:border-amber-500/60'
         }`}
       >
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+        <span className="toolkit-card-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
           <Icon name={icon} size={22} />
         </span>
-        <span className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{name}</span>
-        <span className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">{description}</span>
+        <span className="toolkit-card-title text-base font-semibold text-neutral-900 dark:text-neutral-100">{name}</span>
+        <span className="toolkit-card-description text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">{description}</span>
         {disabled && (
-          <span className="mt-auto inline-flex items-center gap-1 rounded-md bg-neutral-200 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+          <span className="toolkit-card-status mt-auto inline-flex items-center gap-1 rounded-md bg-neutral-200 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
             {t('Próximamente')}
           </span>
         )}
@@ -69,7 +69,7 @@ function ToolCard({ testid, icon, name, description, state, pinned, pinBusy, onO
         title={t(pinned ? 'Desfijar' : 'Fijar')}
         disabled={disabled || pinBusy}
         onClick={onTogglePinned}
-        className={`absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-lg border transition-colors disabled:cursor-wait disabled:opacity-50 ${
+        className={`toolkit-pin-button absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-lg border transition-colors disabled:cursor-wait disabled:opacity-50 ${
           pinned
             ? 'border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-500/50 dark:bg-amber-500/20 dark:text-amber-300'
             : 'border-neutral-200 bg-white/90 text-neutral-400 hover:border-amber-300 hover:text-amber-600 dark:border-neutral-700 dark:bg-neutral-900/90 dark:hover:border-amber-500/50 dark:hover:text-amber-300'
@@ -119,7 +119,7 @@ export function ToolkitView({
   };
 
   return (
-    <div className="h-full overflow-y-auto px-6 py-6 max-md:px-4">
+    <div className="theme-workspace-surface toolkit-workspace h-full overflow-y-auto px-6 py-6 max-md:px-4">
       {/* Las herramientas tienen página propia; cualquier otra página
           cae en el catálogo en lugar de dejar el panel en blanco. */}
       {page === 'convert' ? (
@@ -137,12 +137,12 @@ export function ToolkitView({
       ) : (
         <div data-testid="toolkit-home" className="mx-auto max-w-5xl space-y-6">
           <header className="flex items-start gap-3">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+            <span className="toolkit-home-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
               <Icon name="tools" size={22} />
             </span>
             <div className="min-w-0">
-              <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{t('Herramientas')}</h1>
-              <p className="text-sm text-neutral-500">
+              <h1 className="toolkit-page-title text-lg font-semibold text-neutral-900 dark:text-neutral-100">{t('Herramientas')}</h1>
+              <p className="toolkit-page-description text-sm text-neutral-500">
                 {t('Utilidades locales para investigación, docencia y estudio: convierte y procesa archivos sin salir de Nodus.')}
               </p>
             </div>

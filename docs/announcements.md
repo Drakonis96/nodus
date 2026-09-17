@@ -34,13 +34,14 @@ date, newest first, with warnings ahead of infos published the same day.
   "copy": {
     "es": { "title": "…", "body": "…", "linkLabel": "Responder la encuesta" },
     "en": { "title": "…", "body": "…", "linkLabel": "Answer the survey" },
-    "fr": { … }, "de": { … }, "pt": { … }, "pt-BR": { … }, "it": { … }, "tr": { … }
+    "fr": { … }, "de": { … }, "pt": { … }, "pt-BR": { … }, "it": { … }, "tr": { … }, "zh-CN": { … }
   }
 }
 ```
 
-**All eight languages are required.** `scripts/test-announcements.mjs` fails the PR if
-one is missing, so a notice cannot reach users half-translated. At runtime the app is
+**All nine languages are required** — the eight above plus `zh-CN`.
+`scripts/test-announcements.mjs` fails the PR if one is missing, so a notice cannot reach
+users half-translated. At runtime the app is
 more forgiving than CI — it needs only `es` and `en`, and falls back English-then-Spanish
 — but that leniency exists for resilience, not as a way around the test.
 

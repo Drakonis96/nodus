@@ -93,6 +93,9 @@ const stubs = {
   '@shared/academicPromptPacks': {
     chapterPromptPack: () => ({ extract: 'extract', type: 'type every pair', embeddingType: 'type', embeddingLabel: 'label', embeddingStatement: 'statement' }),
   },
+  // The module maps an interface language onto a prompt language; this stub keeps the
+  // Spanish path the test exercises.
+  '@shared/promptLanguageOptions': { normalizePromptLanguage: (value) => (typeof value === 'string' ? value : 'en') },
 };
 
 require.extensions['.ts'] = function loadTs(module, filename) {

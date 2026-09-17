@@ -7,19 +7,23 @@ import { MAX_ATTACHMENT_BYTES, readResponseWithLimit } from './lib/upload.js';
 const JOB_KEY = 'nodusPendingUploadJob';
 const activeJobs = new Map();
 
+// Warnings raised here are rendered by the popup, so they use its catalog too.
+const msg = (key, substitutions) => chrome.i18n.getMessage(key, substitutions) || key;
+const attachmentName = (attachment) => attachment.title || msg('attachment');
+
 function baseUrl(port) { return `http://127.0.0.1:${port}`; }
 
 async function uploadAttachment(job, attachment) {
   let sourceUrl;
-  try { sourceUrl = new URL(String(attachment.url)); } catch { throw new Error(`${attachment.title || 'Attachment'}: invalid URL.`); }
-  if (!/^https?:$/.test(sourceUrl.protocol)) throw new Error(`${attachment.title || 'Attachment'}: unsupported URL.`);
+  try { sourceUrl = new URL(String(attachment.url)); } catch { throw new Error(msg('invalidAttachmentUrl', [attachmentName(attachment)])); }
+  if (!/^https?:$/.test(sourceUrl.protocol)) throw new Error(msg('unsupportedAttachmentUrl', [attachmentName(attachment)]));
   const response = await fetch(attachment.url, { credentials: 'include' });
-  if (!response.ok) throw new Error(`${attachment.title}: ${response.status}`);
+  if (!response.ok) throw new Error(msg('downloadFailed', [attachmentName(attachment), String(response.status)]));
   const contentType = (response.headers.get('content-type') || attachment.mimeType || 'application/octet-stream').split(';')[0];
   if (attachment.mimeType === 'application/pdf' && contentType.includes('html')) {
-    throw new Error(`${attachment.title}: the site returned a sign-in page instead of the PDF.`);
+    throw new Error(msg('signInPageInsteadOfPdf', [attachmentName(attachment)]));
   }
-  const bytes = await readResponseWithLimit(response, MAX_ATTACHMENT_BYTES, attachment.title || 'Attachment');
+  const bytes = await readResponseWithLimit(response, MAX_ATTACHMENT_BYTES, msg('fileExceedsLimit', [attachmentName(attachment)]));
   const origin = extensionOrigin(chrome.runtime.getURL);
   const result = await requestLocalJson(`${baseUrl(job.port)}/api/browser/items/${encodeURIComponent(job.itemId)}/attachments`, {
     method: 'POST', body: bytes,
@@ -29,13 +33,13 @@ async function uploadAttachment(job, attachment) {
       'X-Nodus-Extension-Origin': origin,
       'Content-Type': 'application/octet-stream',
       'X-Nodus-File-Name': encodeURIComponent(attachment.fileName || 'document'),
-      'X-Nodus-File-Title': encodeURIComponent(attachment.title || 'Captured document'),
+      'X-Nodus-File-Title': encodeURIComponent(attachment.title || msg('capturedDocument')),
       'X-Nodus-Mime-Type': encodeURIComponent(contentType),
       'X-Nodus-Attachment-Role': attachment.role || 'supplement',
       'X-Nodus-Source-Url': encodeURIComponent(attachment.url),
     },
   });
-  if (!result.ok) throw new Error(result.data.error || `Nodus returned ${result.status}.`);
+  if (!result.ok) throw new Error(result.data.error || msg('nodusReturnedError', [String(result.status)]));
   return result.data;
 }
 

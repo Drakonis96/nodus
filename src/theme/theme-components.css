@@ -1,0 +1,528 @@
+/* Themed component surfaces. Runtime palette variables are applied to the document root.
+ * Keep exceptional selectors scoped to `.theme-active` so the default palette is untouched. */
+
+/* Native <select> option lists. index.css hard-codes `select.input option` to
+ * #171717 / #ffffff — `@apply` can't reach a bare `option`, so the open dropdown
+ * kept the default neutral while the rest of the field was themed. */
+html.theme-active.dark :is(select.input option, select.input optgroup) {
+  background-color: var(--n-900);
+  color: var(--n-100);
+}
+html.theme-active.light :is(select.input option, select.input optgroup) {
+  background-color: var(--n-50);
+  color: var(--n-900);
+}
+
+/* Shared semantic primitives for screens that predate the runtime theme layer.
+ * These selectors are intentionally scoped to non-default themes: the default
+ * palette keeps its existing product-specific colours. */
+html.theme-active.dark .btn-primary,
+html.theme-active.light .btn-primary {
+  border-color: var(--a-600);
+  background-color: var(--a-600);
+  color: #fff;
+}
+html.theme-active.dark .btn-primary:hover:not(:disabled),
+html.theme-active.light .btn-primary:hover:not(:disabled) {
+  background-color: var(--a-500);
+  border-color: var(--a-500);
+}
+
+html.theme-active.dark input[type='checkbox'],
+html.theme-active.dark input[type='radio'],
+html.theme-active.dark input[type='range'],
+html.theme-active.light input[type='checkbox'],
+html.theme-active.light input[type='radio'],
+html.theme-active.light input[type='range'] {
+  accent-color: var(--a-500);
+}
+
+html.theme-active.dark .theme-workspace-surface {
+  background-color: var(--n-950);
+  color: var(--theme-text-dark);
+  color-scheme: dark;
+}
+html.theme-active.light .theme-workspace-surface {
+  background-color: var(--n-50);
+  color: var(--theme-text-light);
+  color-scheme: light;
+}
+
+/* The app canvas is intentionally separate from workspace surfaces. It gives
+ * each palette a recognizable persistent chrome colour while the mode-specific
+ * values keep the canvas light in light mode and dark in dark mode. */
+html.theme-active.dark:not(.high-contrast) {
+  --app-canvas: var(--app-background-dark);
+}
+html.theme-active.light:not(.high-contrast) {
+  --app-canvas: var(--app-background-light);
+}
+html.theme-active.dark:not(.high-contrast) :is(body, #root, [data-testid='app-shell'], [data-testid='resizable-sidebar'], .app-titlebar),
+html.theme-active.light:not(.high-contrast) :is(body, #root, [data-testid='app-shell'], [data-testid='resizable-sidebar'], .app-titlebar) {
+  background-color: var(--app-canvas);
+}
+html.theme-active.dark .theme-workspace-surface :is(.section-header, .section-toolbar),
+html.theme-active.dark .theme-workspace-surface > :is(header, footer) {
+  border-color: var(--theme-border-dark);
+}
+html.theme-active.light .theme-workspace-surface :is(.section-header, .section-toolbar),
+html.theme-active.light .theme-workspace-surface > :is(header, footer) {
+  border-color: var(--theme-border-light);
+}
+
+/* Compact on/off controls in modal composers. Text remains foreground-derived;
+ * only the selected state uses the mode-specific accent ramp. */
+html.theme-active.dark .theme-toggle-button,
+html.theme-active.light .theme-toggle-button {
+  border: 1px solid;
+  border-color: var(--theme-border-dark-strong);
+  background-color: color-mix(in srgb, var(--n-800) 76%, transparent);
+  color: var(--theme-text-dark-muted);
+}
+html.theme-active.light .theme-toggle-button {
+  border-color: var(--theme-border-light-strong);
+  background-color: color-mix(in srgb, var(--n-100) 82%, transparent);
+  color: var(--theme-text-light-muted);
+}
+html.theme-active.dark .theme-toggle-button:hover:not(:disabled) { background-color: var(--n-700); }
+html.theme-active.light .theme-toggle-button:hover:not(:disabled) { background-color: var(--n-200); }
+html.theme-active.dark .theme-toggle-button[aria-pressed='true'],
+html.theme-active.dark .theme-toggle-button[aria-checked='true'] {
+  border-color: var(--a-500);
+  background-color: color-mix(in srgb, var(--a-500) 18%, var(--n-900));
+  color: var(--a-300);
+}
+html.theme-active.light .theme-toggle-button[aria-pressed='true'],
+html.theme-active.light .theme-toggle-button[aria-checked='true'] {
+  border-color: var(--a-600);
+  background-color: color-mix(in srgb, var(--a-500) 13%, var(--n-50));
+  color: var(--a-700);
+}
+
+/* Radar's explanatory source note uses a pale indigo box in the legacy palette.
+ * Keep the note quiet and readable for custom accents, including yellow and pink. */
+html.theme-active.dark .radar-source-note {
+  border-color: color-mix(in srgb, var(--a-500) 45%, var(--theme-border-dark));
+  background-color: color-mix(in srgb, var(--a-500) 10%, var(--n-900));
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .radar-source-note {
+  border-color: color-mix(in srgb, var(--a-600) 36%, var(--theme-border-light));
+  background-color: color-mix(in srgb, var(--a-500) 8%, var(--n-50));
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .radar-source-note strong,
+html.theme-active.dark .radar-source-note p:first-child { color: var(--a-300); }
+html.theme-active.light .radar-source-note strong,
+html.theme-active.light .radar-source-note p:first-child { color: var(--a-700); }
+
+/* Toolkit predates the runtime theme layer and uses amber as its product
+ * accent. Keep the Toolkit identity, but derive its surfaces and highlights
+ * from the selected theme so a purple, rose, or gold palette does not leave a
+ * second unrelated colour system behind. */
+html.theme-active.dark .toolkit-workspace {
+  background-color: var(--n-950);
+  color: var(--theme-text-dark);
+  color-scheme: dark;
+}
+html.theme-active.light .toolkit-workspace {
+  background-color: var(--n-50);
+  color: var(--theme-text-light);
+  color-scheme: light;
+}
+html.theme-active.dark .toolkit-workspace :is(.bg-white, .bg-neutral-50) { background-color: var(--n-900); }
+html.theme-active.light .toolkit-workspace :is(.bg-white, .bg-neutral-50) { background-color: var(--n-50); }
+html.theme-active.dark .toolkit-workspace .bg-neutral-100 { background-color: var(--n-800); }
+html.theme-active.light .toolkit-workspace .bg-neutral-100 { background-color: var(--n-100); }
+html.theme-active.dark .toolkit-workspace .bg-neutral-200 { background-color: var(--n-700); }
+html.theme-active.light .toolkit-workspace .bg-neutral-200 { background-color: var(--n-200); }
+
+html.theme-active.dark .toolkit-workspace :is(.toolkit-card, .toolkit-workspace-card) {
+  border-color: var(--theme-border-dark);
+  background-color: color-mix(in srgb, var(--n-900) 82%, transparent);
+}
+html.theme-active.light .toolkit-workspace :is(.toolkit-card, .toolkit-workspace-card) {
+  border-color: var(--theme-border-light);
+  background-color: var(--n-50);
+}
+html.theme-active.dark .toolkit-workspace :is(.toolkit-card, .toolkit-workspace-card):hover { border-color: var(--a-500); }
+html.theme-active.light .toolkit-workspace :is(.toolkit-card, .toolkit-workspace-card):hover { border-color: var(--a-600); }
+
+html.theme-active.dark .toolkit-workspace :is(.toolkit-card-icon, .toolkit-home-icon) {
+  background-color: color-mix(in srgb, var(--a-500) 18%, var(--n-900));
+  color: var(--a-300);
+}
+html.theme-active.light .toolkit-workspace :is(.toolkit-card-icon, .toolkit-home-icon) {
+  background-color: var(--a-100);
+  color: var(--a-700);
+}
+html.theme-active.dark .toolkit-workspace .toolkit-card-title,
+html.theme-active.dark .toolkit-workspace .toolkit-page-title { color: var(--theme-text-dark); }
+html.theme-active.light .toolkit-workspace .toolkit-card-title,
+html.theme-active.light .toolkit-workspace .toolkit-page-title { color: var(--theme-text-light); }
+html.theme-active.dark .toolkit-workspace :is(.toolkit-card-description, .toolkit-page-description) { color: var(--theme-text-dark-muted); }
+html.theme-active.light .toolkit-workspace :is(.toolkit-card-description, .toolkit-page-description) { color: var(--theme-text-light-muted); }
+html.theme-active.dark .toolkit-workspace .toolkit-card-status { background-color: var(--n-800); color: var(--theme-text-dark-muted); }
+html.theme-active.light .toolkit-workspace .toolkit-card-status { background-color: var(--n-200); color: var(--theme-text-light-muted); }
+html.theme-active.dark .toolkit-workspace .toolkit-pin-button,
+html.theme-active.light .toolkit-workspace .toolkit-pin-button { border-color: var(--theme-border-light-strong); }
+html.theme-active.dark .toolkit-workspace .toolkit-pin-button { border-color: var(--theme-border-dark-strong); }
+html.theme-active.dark .toolkit-workspace .toolkit-pin-button { background-color: color-mix(in srgb, var(--n-900) 90%, transparent); color: var(--theme-text-dark-muted); }
+html.theme-active.light .toolkit-workspace .toolkit-pin-button { background-color: color-mix(in srgb, var(--n-50) 90%, transparent); color: var(--theme-text-light-muted); }
+html.theme-active.dark .toolkit-workspace .toolkit-pin-button[aria-pressed='true'],
+html.theme-active.light .toolkit-workspace .toolkit-pin-button[aria-pressed='true'] {
+  border-color: var(--a-500);
+  background-color: color-mix(in srgb, var(--a-500) 16%, var(--n-50));
+  color: var(--a-600);
+}
+html.theme-active.dark .toolkit-workspace .toolkit-pin-button[aria-pressed='true'] {
+  background-color: color-mix(in srgb, var(--a-500) 16%, var(--n-900));
+  color: var(--a-300);
+}
+
+html.theme-active.dark .toolkit-workspace .toolkit-hero {
+  border-color: var(--theme-border-dark-strong);
+  background-color: color-mix(in srgb, var(--a-500) 13%, var(--n-950));
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--a-500) 22%, var(--n-950)), var(--n-950));
+}
+html.theme-active.light .toolkit-workspace .toolkit-hero {
+  border-color: var(--theme-border-light-strong);
+  background-color: color-mix(in srgb, var(--a-500) 8%, var(--n-50));
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--a-100) 72%, var(--n-50)), var(--n-50));
+}
+html.theme-active.dark .toolkit-workspace .toolkit-hero-glow,
+html.theme-active.light .toolkit-workspace .toolkit-hero-glow { background-color: color-mix(in srgb, var(--a-500) 25%, transparent); }
+html.theme-active.dark .toolkit-workspace .toolkit-hero-badge { background-color: color-mix(in srgb, var(--a-500) 18%, var(--n-950)); color: var(--a-300); }
+html.theme-active.light .toolkit-workspace .toolkit-hero-badge { background-color: var(--a-100); color: var(--a-700); }
+html.theme-active.dark .toolkit-workspace .toolkit-hero-title { color: var(--theme-text-dark); }
+html.theme-active.light .toolkit-workspace .toolkit-hero-title { color: var(--theme-text-light); }
+html.theme-active.dark .toolkit-workspace .toolkit-hero-description { color: var(--theme-text-dark-muted); }
+html.theme-active.light .toolkit-workspace .toolkit-hero-description { color: var(--theme-text-light-muted); }
+
+/* The nested Toolkit pages still contain a few legacy utility classes. Map
+ * their amber highlight utilities locally; red/green status colours remain
+ * intentionally semantic. */
+html.theme-active.dark .toolkit-workspace :is([class~='bg-amber-50'], [class~='bg-amber-100'], [class~='bg-amber-500\/15']) { background-color: color-mix(in srgb, var(--a-500) 16%, var(--n-900)); }
+html.theme-active.light .toolkit-workspace :is([class~='bg-amber-50'], [class~='bg-amber-100'], [class~='bg-amber-500\/15']) { background-color: var(--a-100); }
+html.theme-active.dark .toolkit-workspace :is([class~='text-amber-300'], [class~='text-amber-400'], [class~='text-amber-500'], [class~='text-amber-600'], [class~='text-amber-700']) { color: var(--a-300); }
+html.theme-active.light .toolkit-workspace :is([class~='text-amber-300'], [class~='text-amber-400'], [class~='text-amber-500'], [class~='text-amber-600'], [class~='text-amber-700']) { color: var(--a-700); }
+html.theme-active.dark .toolkit-workspace :is([class~='border-amber-200'], [class~='border-amber-300'], [class~='border-amber-400'], [class~='border-amber-500'], [class~='border-amber-600']) { border-color: var(--a-500); }
+html.theme-active.light .toolkit-workspace :is([class~='border-amber-200'], [class~='border-amber-300'], [class~='border-amber-400'], [class~='border-amber-500'], [class~='border-amber-600']) { border-color: var(--a-600); }
+html.theme-active.dark .toolkit-workspace :is([class~='hover:border-amber-400']:hover, [class~='hover:border-amber-500\/60']:hover) { border-color: var(--a-500); }
+html.theme-active.light .toolkit-workspace :is([class~='hover:border-amber-400']:hover, [class~='hover:border-amber-500\/60']:hover) { border-color: var(--a-600); }
+
+/* Research chat has a few controls that predate the semantic button layer and
+ * several menus that portal directly to <body>. Give the whole surface one
+ * mode-aware accent, then restyle each portalled surface from the same tokens. */
+html.theme-active.dark .research-chat-surface,
+html.theme-active.light .research-chat-surface {
+  --vault-accent: var(--a-500);
+}
+html.theme-active.dark .research-chat-surface > :is([role='region'], [role='dialog']),
+html.theme-active.light .research-chat-surface > :is([role='region'], [role='dialog']) {
+  background-color: var(--n-950);
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .research-chat-surface > :is([role='region'], [role='dialog']) {
+  background-color: var(--n-50);
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .research-chat-surface .research-composer,
+html.theme-active.dark .research-chat-surface .research-composer-shell {
+  background-color: var(--n-900);
+  border-color: var(--theme-border-dark);
+}
+html.theme-active.light .research-chat-surface .research-composer,
+html.theme-active.light .research-chat-surface .research-composer-shell {
+  background-color: var(--n-50);
+  border-color: var(--theme-border-light);
+}
+html.theme-active.dark .research-chat-surface .research-assistant-actions > :is(button, .chat-skills-control),
+html.theme-active.light .research-chat-surface .research-assistant-actions > :is(button, .chat-skills-control) {
+  border-color: var(--theme-border-light-strong);
+}
+html.theme-active.dark .research-chat-surface .research-assistant-actions > :is(button, .chat-skills-control) { border-color: var(--theme-border-dark-strong); }
+html.theme-active.dark .research-chat-surface .research-composer-send { background-color: var(--a-500); }
+html.theme-active.light .research-chat-surface .research-composer-send { background-color: var(--a-600); }
+html.theme-active.dark .research-chat-surface .research-empty-state,
+html.theme-active.light .research-chat-surface .research-empty-state { color: var(--theme-text-dark); }
+html.theme-active.light .research-chat-surface .research-empty-state { color: var(--theme-text-light); }
+html.theme-active.dark .research-chat-surface .research-accent-badge {
+  background-color: color-mix(in srgb, var(--a-500) 20%, var(--n-800));
+  color: var(--a-300);
+}
+html.theme-active.light .research-chat-surface .research-accent-badge {
+  background-color: color-mix(in srgb, var(--a-500) 14%, var(--n-100));
+  color: var(--a-700);
+}
+
+html.theme-active.dark .research-context-panel,
+html.theme-active.dark .research-source-filter-dialog,
+html.theme-active.dark .research-system-prompt-dialog {
+  color-scheme: dark;
+}
+html.theme-active.light .research-context-panel,
+html.theme-active.light .research-source-filter-dialog,
+html.theme-active.light .research-system-prompt-dialog {
+  color-scheme: light;
+}
+html.theme-active.dark .research-context-panel {
+  background-color: var(--n-900);
+  border-color: var(--theme-border-dark-strong);
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .research-context-panel {
+  background-color: var(--n-50);
+  border-color: var(--theme-border-light-strong);
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .research-source-filter-dialog {
+  background-color: var(--n-900);
+  border-color: var(--theme-border-dark-strong);
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .research-source-filter-dialog {
+  background-color: var(--n-50);
+  border-color: var(--theme-border-light-strong);
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .research-source-filter-dialog :is(header, footer),
+html.theme-active.dark .research-source-filter-dialog .research-source-filter-status { border-color: var(--theme-border-dark); }
+html.theme-active.light .research-source-filter-dialog :is(header, footer),
+html.theme-active.light .research-source-filter-dialog .research-source-filter-status { border-color: var(--theme-border-light); }
+html.theme-active.dark .research-source-filter-dialog :is(.input, input:not([type='checkbox'])) {
+  background-color: var(--n-950);
+  border-color: var(--theme-border-dark);
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .research-source-filter-dialog :is(.input, input:not([type='checkbox'])) {
+  background-color: var(--n-50);
+  border-color: var(--theme-border-light);
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .research-source-filter-dialog :is(p, small) { color: var(--theme-text-dark-muted); }
+html.theme-active.light .research-source-filter-dialog :is(p, small) { color: var(--theme-text-light-muted); }
+
+html.theme-active.dark .research-system-prompt-dialog {
+  --prompt-bg: var(--n-900);
+  --prompt-muted-bg: var(--n-950);
+  --prompt-line: var(--theme-border-dark);
+  --prompt-text: var(--theme-text-dark);
+  --prompt-muted: var(--theme-text-dark-muted);
+}
+html.theme-active.light .research-system-prompt-dialog {
+  --prompt-bg: var(--n-50);
+  --prompt-muted-bg: var(--n-100);
+  --prompt-line: var(--theme-border-light);
+  --prompt-text: var(--theme-text-light);
+  --prompt-muted: var(--theme-text-light-muted);
+}
+
+/* The Skills popover is also portalled, so it cannot inherit the chat surface
+ * class. Its hook supplies --a-500 for custom themes and these rules provide
+ * the matching semantic surfaces in both modes. */
+html.theme-active.dark .chat-skills-panel {
+  background-color: var(--n-900);
+  color: var(--theme-text-dark);
+  border-color: var(--theme-border-dark-strong);
+}
+html.theme-active.light .chat-skills-panel {
+  background-color: var(--n-50);
+  color: var(--theme-text-light);
+  border-color: var(--theme-border-light-strong);
+}
+html.theme-active.dark .chat-skills-search { background-color: var(--n-950); border-color: var(--theme-border-dark); }
+html.theme-active.light .chat-skills-search { background-color: var(--n-100); border-color: var(--theme-border-light); }
+
+/* Document skills are used by Immersion and Deep Research composers. */
+html.theme-active.dark .document-skills {
+  background-color: var(--n-900);
+  border-color: var(--theme-border-dark);
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .document-skills {
+  background-color: var(--n-50);
+  border-color: var(--theme-border-light);
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .document-skills :is(p, .document-skills-search) { color: var(--theme-text-dark-muted); }
+html.theme-active.light .document-skills :is(p, .document-skills-search) { color: var(--theme-text-light-muted); }
+html.theme-active.dark .document-skills :is(.document-skills-search, .document-skill-row) { border-color: var(--theme-border-dark); }
+html.theme-active.light .document-skills :is(.document-skills-search, .document-skill-row) { border-color: var(--theme-border-light); }
+html.theme-active.dark .document-skill-title > svg { color: var(--a-300); }
+html.theme-active.light .document-skill-title > svg { color: var(--a-700); }
+html.theme-active.dark .document-skill-switch[aria-checked='true'] { background-color: var(--a-500); }
+html.theme-active.light .document-skill-switch[aria-checked='true'] { background-color: var(--a-600); }
+html.theme-active.dark .document-skill-switch:focus-visible,
+html.theme-active.light .document-skill-switch:focus-visible { outline-color: var(--a-500); }
+html.theme-active.dark .document-skill-limit :is(select, input) {
+  background-color: var(--n-950);
+  border-color: var(--theme-border-dark-strong);
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .document-skill-limit :is(select, input) {
+  background-color: var(--n-50);
+  border-color: var(--theme-border-light-strong);
+  color: var(--theme-text-light);
+}
+
+/* Dictionary controls used to mix neutral buttons with hard-coded indigo
+ * states. The explicit state classes make the selected control legible for
+ * every accent, including pale light-mode ramps. */
+html.theme-active.dark .dictionary-workspace {
+  background-color: var(--n-950) !important;
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .dictionary-workspace {
+  background-color: var(--n-50) !important;
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .dictionary-workspace .dictionary-sort-button,
+html.theme-active.dark .dictionary-workspace .dictionary-filter-button,
+html.theme-active.dark .dictionary-workspace .dictionary-view-button {
+  color: var(--theme-text-dark-muted);
+  border-color: var(--theme-border-dark);
+}
+html.theme-active.light .dictionary-workspace .dictionary-sort-button,
+html.theme-active.light .dictionary-workspace .dictionary-filter-button,
+html.theme-active.light .dictionary-workspace .dictionary-view-button {
+  color: var(--theme-text-light-muted);
+  border-color: var(--theme-border-light);
+}
+html.theme-active.dark .dictionary-workspace .dictionary-sort-button,
+html.theme-active.light .dictionary-workspace .dictionary-sort-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 8px;
+}
+html.theme-active.dark .dictionary-workspace :is(.dictionary-sort-button, .dictionary-filter-button, .dictionary-view-button):is(:hover, .is-selected, [aria-pressed='true']) {
+  background-color: color-mix(in srgb, var(--a-500) 16%, var(--n-900));
+  border-color: var(--a-500);
+  color: var(--a-300);
+}
+html.theme-active.light .dictionary-workspace :is(.dictionary-sort-button, .dictionary-filter-button, .dictionary-view-button):is(:hover, .is-selected, [aria-pressed='true']) {
+  background-color: color-mix(in srgb, var(--a-500) 12%, var(--n-50));
+  border-color: var(--a-600);
+  color: var(--a-700);
+}
+
+/* Library's help affordance carries a legacy inline vault colour. A selected
+ * app theme must win over that inline value, while the default palette keeps
+ * the vault-specific colour supplied by Library.tsx. */
+html.theme-active.dark .library-help-button,
+html.theme-active.light .library-help-button {
+  --library-help-accent: var(--a-500) !important;
+}
+
+/* Global search has two implementations: the academic hybrid search and the
+ * content search used by the other vaults. They share these semantic classes
+ * so neither one leaves a neutral/indigo island inside a custom theme. */
+html.theme-active.dark .global-search-workspace {
+  background-color: var(--n-950);
+  color: var(--theme-text-dark);
+  color-scheme: dark;
+}
+html.theme-active.light .global-search-workspace {
+  background-color: var(--n-50);
+  color: var(--theme-text-light);
+  color-scheme: light;
+}
+html.theme-active.dark .global-search-workspace .global-search-accent { color: var(--a-300); }
+html.theme-active.light .global-search-workspace .global-search-accent { color: var(--a-700); }
+html.theme-active.dark .global-search-workspace .input {
+  background-color: var(--n-900);
+  border-color: var(--theme-border-dark-strong);
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .global-search-workspace .input {
+  background-color: var(--n-50);
+  border-color: var(--theme-border-light-strong);
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .search-kind-filter,
+html.theme-active.light .search-kind-filter {
+  border-color: var(--theme-border-dark);
+  color: var(--theme-text-dark-muted);
+}
+html.theme-active.light .search-kind-filter { border-color: var(--theme-border-light); color: var(--theme-text-light-muted); }
+html.theme-active.dark .search-kind-filter:hover:not(:disabled) { background-color: var(--n-800); color: var(--theme-text-dark); }
+html.theme-active.light .search-kind-filter:hover:not(:disabled) { background-color: var(--n-100); color: var(--theme-text-light); }
+html.theme-active.dark .search-kind-filter.is-selected {
+  border-color: var(--a-500);
+  background-color: color-mix(in srgb, var(--a-500) 18%, var(--n-900));
+  color: var(--a-300);
+}
+html.theme-active.light .search-kind-filter.is-selected {
+  border-color: var(--a-600);
+  background-color: color-mix(in srgb, var(--a-500) 12%, var(--n-50));
+  color: var(--a-700);
+}
+html.theme-active.dark .global-search-similar,
+html.theme-active.dark .global-search-saved,
+html.theme-active.dark .global-search-result {
+  border: 1px solid var(--theme-border-dark);
+  background-color: color-mix(in srgb, var(--n-900) 72%, transparent);
+}
+html.theme-active.light .global-search-similar,
+html.theme-active.light .global-search-saved,
+html.theme-active.light .global-search-result {
+  border: 1px solid var(--theme-border-light);
+  background-color: var(--n-50);
+}
+html.theme-active.dark .global-search-similar { background-color: color-mix(in srgb, var(--a-500) 12%, var(--n-900)); border-color: color-mix(in srgb, var(--a-500) 42%, var(--theme-border-dark)); }
+html.theme-active.light .global-search-similar { background-color: color-mix(in srgb, var(--a-500) 9%, var(--n-50)); border-color: color-mix(in srgb, var(--a-600) 38%, var(--theme-border-light)); }
+html.theme-active.dark .global-search-result:hover { background-color: var(--n-900); border-color: var(--theme-border-dark-strong); }
+html.theme-active.light .global-search-result:hover { background-color: var(--n-100); border-color: var(--theme-border-light-strong); }
+html.theme-active.dark .global-search-relevance { background-color: color-mix(in srgb, var(--a-500) 20%, var(--n-900)); color: var(--a-300); }
+html.theme-active.light .global-search-relevance { background-color: color-mix(in srgb, var(--a-500) 13%, var(--n-50)); color: var(--a-700); }
+html.theme-active.dark .global-search-save,
+html.theme-active.dark .global-search-similar-action { color: var(--a-300); }
+html.theme-active.light .global-search-save,
+html.theme-active.light .global-search-similar-action { color: var(--a-700); }
+html.theme-active.dark .global-search-save:hover,
+html.theme-active.dark .global-search-similar-action:hover { background-color: color-mix(in srgb, var(--a-500) 14%, var(--n-900)); color: var(--a-200); }
+html.theme-active.light .global-search-save:hover,
+html.theme-active.light .global-search-similar-action:hover { background-color: color-mix(in srgb, var(--a-500) 12%, var(--n-50)); color: var(--a-800); }
+html.theme-active.dark .global-search-delete { color: var(--theme-text-dark-subtle); }
+html.theme-active.light .global-search-delete { color: var(--theme-text-light-subtle); }
+html.theme-active.dark .global-search-delete:hover { color: #fca5a5; }
+html.theme-active.light .global-search-delete:hover { color: #b91c1c; }
+
+/* Default palette: the label keeps the neutral foreground it had before the
+ * runtime theme layer, and the more specific theme-active rules below replace it
+ * for every non-default palette. */
+.ideas-theme-pill { color: #525252; }
+.dark .ideas-theme-pill { color: #737373; }
+
+/* Ideas theme labels need a readable foreground even when a custom accent is
+ * very dark or very light. Keep the accent in the surface and border, but
+ * derive the label text from the theme's explicitly readable text token. */
+html.theme-active.dark .ideas-theme-pill {
+  border: 1px solid color-mix(in srgb, var(--a-500) 30%, var(--theme-border-dark));
+  background-color: color-mix(in srgb, var(--a-500) 12%, var(--n-800));
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .ideas-theme-pill {
+  border: 1px solid color-mix(in srgb, var(--a-600) 26%, var(--theme-border-light));
+  background-color: color-mix(in srgb, var(--a-500) 10%, var(--n-100));
+  color: var(--theme-text-light);
+}
+html.theme-active.dark .ideas-theme-overflow { color: var(--theme-text-dark-muted); }
+html.theme-active.light .ideas-theme-overflow { color: var(--theme-text-light-muted); }
+
+/* Author tags use the same readable semantic treatment as Ideas theme labels.
+ * The neutral utility is intentionally removed here because its muted text can
+ * disappear against a custom palette's dark neutral surface. */
+html.theme-active.dark .authors-tag-pill {
+  border: 1px solid color-mix(in srgb, var(--a-500) 30%, var(--theme-border-dark));
+  background-color: color-mix(in srgb, var(--a-500) 12%, var(--n-800));
+  color: var(--theme-text-dark);
+}
+html.theme-active.light .authors-tag-pill {
+  border: 1px solid color-mix(in srgb, var(--a-600) 26%, var(--theme-border-light));
+  background-color: color-mix(in srgb, var(--a-500) 10%, var(--n-100));
+  color: var(--theme-text-light);
+}

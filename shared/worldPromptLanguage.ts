@@ -1,10 +1,13 @@
-import type { AppLanguage, PromptLanguage } from './types';
+import type { PromptLanguage } from './types';
 import { normalizeUiLanguage } from './uiLanguage';
 import { normalizePromptLanguage } from './promptLanguageOptions';
 
 export { normalizePromptLanguage, normalizeUiLanguage };
 
-export type WorldPromptLocale = AppLanguage | PromptLanguage;
+/** The catalogues below are prompt-language data. An interface language that is not
+ *  itself a prompt language (`zh-CN`) is normalized to its prompt counterpart
+ *  (`zh-Hans`) by {@link normalizePromptLanguage} before indexing. */
+export type WorldPromptLocale = PromptLanguage;
 
 type LocalizedRecord<K extends string> = Record<WorldPromptLocale, Record<K, string>>;
 

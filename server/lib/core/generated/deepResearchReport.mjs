@@ -4,6 +4,81 @@
 // document the desktop does without taking on a dependency or a build step. Edit the
 // TypeScript and run `npm run build:server-shared`; scripts/test-server-generated.mjs
 // fails if this file and that source disagree.
+// shared/pipelineLogMessages.ts
+var PIPELINE_LOG_SUBJECTS = {
+  subjectExtraction: "Extracci\xF3n de texto",
+  subjectLibraryExtraction: "Extracci\xF3n de la Biblioteca",
+  subjectOcr: "OCR",
+  subjectModelCall: "Llamada al modelo",
+  subjectJsonResponse: "Respuesta JSON del modelo",
+  subjectEmbeddings: "Embeddings",
+  subjectIndexing: "Indexado de documentos",
+  subjectPassages: "Fragmentos de recuperaci\xF3n",
+  subjectProfileScan: "An\xE1lisis del documento",
+  subjectFigureAnalysis: "An\xE1lisis de figuras",
+  subjectScan: "An\xE1lisis con IA",
+  subjectPublish: "Publicaci\xF3n del \xEDndice",
+  subjectDatabase: "Base de datos",
+  subjectQueue: "Cola de trabajos",
+  subjectApp: "Aplicaci\xF3n"
+};
+var PIPELINE_LOG_REASONS = {
+  reasonNoAttachment: "el \xEDtem no tiene ning\xFAn adjunto legible",
+  reasonUnreadable: "el adjunto no se pudo leer",
+  reasonAbstractOnly: "solo hay resumen disponible",
+  reasonZoteroUnavailable: "Zotero no est\xE1 disponible",
+  reasonNoLegibleText: "no se encontr\xF3 texto legible en el documento",
+  reasonOcrLowQuality: "la calidad del OCR es insuficiente",
+  reasonProviderConfig: "falta la clave o el modelo de IA",
+  reasonSourceChanged: "el documento de origen cambi\xF3",
+  reasonUnsupportedFormat: "el formato del archivo no es compatible",
+  reasonCancelled: "el usuario cancel\xF3 el trabajo",
+  // Why a proposal the planner made never became a figure. A run that produced none
+  // because it refused them all must not read as a document that needed none, so every
+  // refusal names its motive instead of vanishing into an anonymous `continue`.
+  reasonUnknownBlock: "el bloque indicado no existe",
+  reasonHeadingBlock: "un t\xEDtulo no admite una figura",
+  reasonSkillNotEnabled: "la skill no estaba habilitada",
+  reasonSkillCeiling: "se alcanz\xF3 el m\xE1ximo de la skill",
+  reasonSourceNotInBlock: "la fuente citada no est\xE1 en ese bloque",
+  reasonBlockAlreadyFigured: "el bloque ya tiene una figura",
+  reasonDiscardNotSelected: "descartada al elegir las figuras del documento"
+};
+var PIPELINE_LOG_TEMPLATES = {
+  logDone: "{subject}: completado",
+  logFailed: "{subject}: error \u2014 {detail}",
+  logFailedPlain: "{subject}: error",
+  logWarning: "{subject}: aviso \u2014 {reason}",
+  logWarningDetail: "{subject}: aviso \u2014 {detail}",
+  logWarningPlain: "{subject}: aviso",
+  logInfo: "{subject}: {detail}",
+  logInfoPlain: "{subject}",
+  logRetry: "{subject}: error \u2014 reintentando ({attempt}/{max})",
+  logPaused: "{subject}: en pausa \u2014 {reason}",
+  logCancelled: "{subject}: cancelado",
+  logSkipped: "{subject}: omitido \u2014 {reason}",
+  logFallback: "{subject}: alternativa aplicada \u2014 {reason}"
+};
+var PIPELINE_LOG_EVENTS = {
+  documentExtracted: "Documento extra\xEDdo: {title} \xB7 {words} palabras \xB7 {figures} figuras \xB7 {tables} tablas",
+  documentExtractedReview: "Documento extra\xEDdo con avisos: {title} \xB7 {warnings}",
+  documentIndexed: "Documento indexado: {title} \xB7 {sections} secciones \xB7 {vectors} vectores",
+  campaignFinished: "Indexado terminado: {completed} de {total} documentos ({failed} con errores)",
+  passagesEmbedded: "Fragmentos indexados: {done} de {total}",
+  ideasEmbedded: "Ideas indexadas: {done} de {total}",
+  summariesEmbedded: "Res\xFAmenes indexados: {done} de {total}",
+  uncaughtFailure: "Fallo no controlado: {detail}",
+  repeatedGrouped: "Se agruparon {count} repeticiones id\xE9nticas",
+  burstDiscarded: "Se descartaron {count} entradas por l\xEDmite de r\xE1faga",
+  figuresDiscarded: "Recursos visuales descartados: {count} \u2014 {reason}"
+};
+var PIPELINE_LOG_TEXT = {
+  ...PIPELINE_LOG_SUBJECTS,
+  ...PIPELINE_LOG_REASONS,
+  ...PIPELINE_LOG_TEMPLATES,
+  ...PIPELINE_LOG_EVENTS
+};
+
 // shared/documentSkills.ts
 function documentBlocks(fields) {
   return Object.entries(fields).flatMap(([field, markdown]) => {

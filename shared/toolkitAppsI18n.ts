@@ -13,6 +13,7 @@ const INCLUDED_META: Record<string, Record<AppLanguage, IncludedAppMeta>> = {
     'pt-BR': { title: 'Roleta de opções', summary: 'Adicione as alternativas, gire a roleta e deixe o acaso escolher por você.' },
     it: { title: 'Ruota delle opzioni', summary: 'Aggiungi le alternative, gira la ruota e lascia scegliere al caso.' },
     tr: { title: 'Seçenek çarkı', summary: 'Alternatiflerinizi ekleyin, çarkı çevirin ve seçimi şansa bırakın.' },
+    'zh-CN': { title: '选项转盘', summary: '添加你的备选项，转动转盘，让随机为你选择一项。' },
   },
   'Repartidor de temas': {
     es: { title: 'Repartidor de temas', summary: 'Reparte temas únicos entre grupos e incluye temas excepcionales solo cuando los necesites.' },
@@ -23,6 +24,7 @@ const INCLUDED_META: Record<string, Record<AppLanguage, IncludedAppMeta>> = {
     'pt-BR': { title: 'Distribuidor de temas', summary: 'Distribua temas únicos entre os grupos e inclua temas excepcionais somente quando necessário.' },
     it: { title: 'Distributore di argomenti', summary: 'Distribuisci argomenti unici tra i gruppi e includi quelli eccezionali solo quando servono.' },
     tr: { title: 'Konu dağıtıcısı', summary: 'Benzersiz konuları gruplara dağıtın ve özel konuları yalnızca gerektiğinde ekleyin.' },
+    'zh-CN': { title: '主题分配器', summary: '在小组之间分配不重复的主题，仅在需要时加入备用主题。' },
   },
   'Lluvia de ideas': {
     es: { title: 'Lluvia de ideas', summary: 'Recoge ideas del alumnado por QR y muéstralas automáticamente en un mural compartido.' },
@@ -33,6 +35,7 @@ const INCLUDED_META: Record<string, Record<AppLanguage, IncludedAppMeta>> = {
     'pt-BR': { title: 'Chuva de ideias', summary: 'Receba ideias dos estudantes por QR e exiba-as automaticamente em um mural compartilhado.' },
     it: { title: 'Raccolta di idee', summary: 'Raccogli le idee degli studenti tramite QR e mostrale automaticamente su una bacheca condivisa.' },
     tr: { title: 'Fikir fırtınası', summary: 'Öğrencilerin fikirlerini QR ile toplayın ve paylaşılan bir panoda otomatik olarak gösterin.' },
+    'zh-CN': { title: '头脑风暴', summary: '通过二维码收集学生的想法，并自动显示在共享墙板上。' },
   },
 };
 

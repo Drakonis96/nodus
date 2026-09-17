@@ -3,13 +3,21 @@
 
 export const MAX_ATTACHMENT_BYTES = 64 * 1024 * 1024;
 
-/** Read a response without allowing an untrusted remote server to exhaust memory. */
-export async function readResponseWithLimit(response, limit = MAX_ATTACHMENT_BYTES, label = 'Attachment') {
+/** English default; each caller passes the message its own language renders. */
+export const TOO_LARGE_MESSAGE = 'Attachment: file exceeds the 64 MiB limit.';
+
+/**
+ * Read a response without allowing an untrusted remote server to exhaust memory.
+ *
+ * `tooLargeMessage` is already translated by the caller, which is the only side
+ * that knows which language names the file and reports the failure.
+ */
+export async function readResponseWithLimit(response, limit = MAX_ATTACHMENT_BYTES, tooLargeMessage = TOO_LARGE_MESSAGE) {
   const declared = Number(response.headers?.get?.('content-length') || 0);
-  if (declared > limit) throw new Error(`${label}: file exceeds the 64 MiB limit.`);
+  if (declared > limit) throw new Error(tooLargeMessage);
   if (!response.body?.getReader) {
     const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.byteLength > limit) throw new Error(`${label}: file exceeds the 64 MiB limit.`);
+    if (bytes.byteLength > limit) throw new Error(tooLargeMessage);
     return bytes;
   }
   const reader = response.body.getReader();
@@ -21,7 +29,7 @@ export async function readResponseWithLimit(response, limit = MAX_ATTACHMENT_BYT
       if (done) break;
       const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
       total += chunk.byteLength;
-      if (total > limit) throw new Error(`${label}: file exceeds the 64 MiB limit.`);
+      if (total > limit) throw new Error(tooLargeMessage);
       chunks.push(chunk);
     }
   } catch (error) {

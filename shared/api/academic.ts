@@ -200,6 +200,7 @@ import type {
   WorkEmbeddingStatus,
   WorkFilter,
   WorkIdeaSynthesis,
+  WorkDeletionOutcome,
   WorkMeta,
   WorkPage,
   WorkPageRequest,
@@ -260,6 +261,13 @@ export interface AcademicApi {
   /** Run the full chain (themes + ideas + summary + index + relationship discovery) for one work. */
   processFull(nodusId: string, model?: ModelRef | null, options?: AnalysisRunOptions): Promise<void>;
   processFullBulk(nodusIds: string[], model?: ModelRef | null, options?: AnalysisRunOptions): Promise<void>;
+  /**
+   * Remove works from the current vault together with their derived data (ideas, passages,
+   * embeddings, document profiles…). Data belonging to other works is never touched: shared
+   * ideas are kept and merely go dormant. Refuses while any of the works is being analysed
+   * right now, reported through `ok: false` rather than an exception.
+   */
+  deleteWorks(nodusIds: string[]): Promise<WorkDeletionOutcome>;
   /** Re-run the cheap theme scan over the whole library to backfill broad parent themes. */
   reassignThemes(model?: ModelRef | null): Promise<number>;
   rescan(nodusId: string, kind: QueueKind, model?: ModelRef | null): Promise<void>;
@@ -286,8 +294,14 @@ export interface AcademicApi {
   /** Live bibliographic metadata for a work (journal/book, pages, publisher, …). */
   getWorkMeta(nodusId: string): Promise<WorkMeta | null>;
   openInZotero(zoteroKey: string): Promise<void>;
-  /** Open a work's PDF in Zotero at the page parsed from an evidence/passage location; falls back to selecting the item. */
-  openEvidenceAtPage(nodusId: string, locator: string | null | import('../types').EvidenceLocator): Promise<{ ok: boolean; mode: 'pdf-page' | 'select' | 'none'; page?: number | null }>;
+  /**
+   * Open an evidence locator at its exact page. Zotero's own reader is preferred
+   * when the work has a PDF attachment there; otherwise the result names the
+   * library copy the renderer should open at that page. Callers must go through
+   * `openEvidenceAtPage` in `src/evidenceJump.ts`, which also handles the `local`
+   * case — a non-`ok` result is not "nothing happened".
+   */
+  openEvidenceAtPage(nodusId: string, locator: string | null | import('../types').EvidenceLocator): Promise<import('../types').OpenEvidenceAtPageResult>;
   /** Clean Markdown reader stored under the configured backup root. */
   getLibraryReaderDocument(nodusId: string): Promise<LibraryReaderDocument | null>;
   getLibraryReaderAttachmentContent(nodusId: string, attachmentId: string): Promise<LibraryReaderAttachmentContent | null>;
@@ -343,9 +357,9 @@ export interface AcademicApi {
   }>>;
   getDocumentIndexProgress(): Promise<DocumentIndexProgress>;
   startDocumentIndexCampaign(options?: { includeArchived?: boolean; nodusIds?: string[] }): Promise<DocumentIndexCampaign>;
-  enqueueDocumentProfile(nodusId: string): Promise<void>;
+  enqueueDocumentProfile(nodusId: string, vaultId?: string): Promise<void>;
   setDocumentIndexCampaignStatus(vaultId: string, campaignId: string, status: 'running' | 'paused' | 'cancelled'): Promise<void>;
-  cancelDocumentIndexJob(jobId: string): Promise<void>;
+  cancelDocumentIndexJob(jobId: string, vaultId?: string): Promise<void>;
   onDocumentIndexProgress(cb: (p: DocumentIndexProgress) => void): () => void;
 
   // graph

@@ -95,7 +95,7 @@ test('the two library sources carry the same badges in the guide, the menu and t
   assert.match(onboarding, /data-testid="onboarding-library-zotero-recommended"/);
 });
 
-test('every guide string is translated into the seven interface languages', async () => {
+test('every guide string is translated into every interface language', async () => {
   const [modal, table] = await Promise.all([
     read('src/components/LibraryTutorialModal.tsx'),
     read('src/i18n.libraryTutorial.ts'),
@@ -109,8 +109,8 @@ test('every guide string is translated into the seven interface languages', asyn
   for (const key of asked) {
     assert.ok(declared.has(key) || borrowed.has(key), `untranslated guide string: ${key}`);
   }
-  for (const lang of ['en', 'fr', 'de', 'pt', "'pt-BR'", 'it', 'tr']) {
+  for (const lang of ['en', 'fr', 'de', 'pt', "'pt-BR'", 'it', 'tr', "'zh-CN'"]) {
     assert.ok(table.includes(`${lang}: `) || table.includes(`const ${lang} =`), `missing language: ${lang}`);
   }
-  assert.match(table, /export const LIBRARY_TUTORIAL_TRANSLATIONS = \{ en, fr, de, pt, 'pt-BR': ptBR, it, tr \}/);
+  assert.match(table, /export const LIBRARY_TUTORIAL_TRANSLATIONS = \{ en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN \}/);
 });

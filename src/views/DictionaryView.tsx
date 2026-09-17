@@ -44,11 +44,12 @@ import { ModelPicker } from "../components/ModelPicker";
 import {
   SourceCitationModal,
   type CitationTarget,
+  type OpenCitationLibraryWork,
 } from "../components/SourceCitationModal";
 import { WorkspaceTabStrip } from "../components/library/LibraryWorkspaceTabs";
 import { Icon, Spinner } from "../components/ui";
 import { useFeatureModel } from "../hooks/useFeatureModel";
-import { getActiveLang, pick, t as appT } from "../i18n";
+import { errorText, getActiveLang, pick, t as appT, tr } from "../i18n";
 import { DICTIONARY_TRANSLATIONS } from "../i18n.dictionary";
 import type { DictionarySnapshot } from "../app/viewSnapshots";
 
@@ -163,6 +164,7 @@ const dictionaryStatusLabel = (status: DictionaryEntryStatus): string => {
       tr: "Etkin",
       "zh-Hans": "活跃",
       "zh-Hant": "使用中",
+      "zh-CN": "活跃",
       vi: "Đang hoạt động",
       ja: "有効",
       ru: "Активна",
@@ -182,6 +184,7 @@ const dictionaryStatusLabel = (status: DictionaryEntryStatus): string => {
       tr: "Arşivlendi",
       "zh-Hans": "已归档",
       "zh-Hant": "已封存",
+      "zh-CN": "已归档",
       vi: "Đã lưu trữ",
       ja: "アーカイブ済み",
       ru: "В архиве",
@@ -200,6 +203,7 @@ const dictionaryStatusLabel = (status: DictionaryEntryStatus): string => {
     tr: "Taslak",
     "zh-Hans": "草稿",
     "zh-Hant": "草稿",
+    "zh-CN": "草稿",
     vi: "Bản nháp",
     ja: "下書き",
     ru: "Черновик",
@@ -218,8 +222,7 @@ const csv = (value: string) => [
       .filter(Boolean),
   ),
 ];
-const message = (reason: unknown) =>
-  reason instanceof Error ? reason.message : String(reason);
+const message = (reason: unknown) => errorText(reason);
 const date = (value: string | null) =>
   value
     ? new Intl.DateTimeFormat(getActiveLang(), {
@@ -263,7 +266,7 @@ function dictionaryProgressText(value: string): string {
   if (value.startsWith("Generando definición")) return t("Generando definición…");
   if (value.startsWith("Redactando definición")) return t("Redactando definición…");
   if (value.startsWith("Comprobando")) return t("Comprobando…");
-  return value;
+  return tr(value);
 }
 
 function dictionaryVersionText(value: string): string {
@@ -1016,7 +1019,7 @@ export function DictionaryView({
   onSnapshotChange?: (patch: Partial<DictionarySnapshot>) => void;
   onOpenIdea: (id: string) => void;
   onOpenAuthor: (id: string, name: string) => void;
-  onOpenLibraryWork: (id: string) => void;
+  onOpenLibraryWork: OpenCitationLibraryWork;
 }) {
   const [model, setModel] = useFeatureModel(settings, "dictionaryModel");
   const [entries, setEntries] = useState<DictionaryEntrySummary[]>([]);
@@ -1293,7 +1296,7 @@ export function DictionaryView({
   return (
     <div
       data-testid="dictionary-workspace"
-      className="flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100"
+      className="dictionary-workspace theme-workspace-surface flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100"
     >
       <header className="shrink-0 border-b border-neutral-200 px-5 pt-4 dark:border-neutral-800">
         <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -1463,7 +1466,7 @@ export function DictionaryView({
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <div className="flex flex-wrap gap-1">
                 <button
-                  className={`btn btn-ghost h-7 px-2 ${!letter ? "text-indigo-600 dark:text-indigo-300" : ""}`}
+                  className={`dictionary-filter-button btn btn-ghost h-7 px-2 ${!letter ? "is-selected text-indigo-600 dark:text-indigo-300" : ""}`}
                   onClick={() => setLetter("")}
                 >
                   {t("Todas")}
@@ -1472,7 +1475,7 @@ export function DictionaryView({
                   (item) => (
                     <button
                       key={item}
-                      className={`btn btn-ghost h-7 w-7 p-0 ${letter === item ? "text-indigo-600 dark:text-indigo-300" : ""}`}
+                      className={`dictionary-filter-button btn btn-ghost h-7 w-7 p-0 ${letter === item ? "is-selected text-indigo-600 dark:text-indigo-300" : ""}`}
                       onClick={() => setLetter(letter === item ? "" : item)}
                     >
                       {item}
@@ -1513,7 +1516,10 @@ export function DictionaryView({
                 <option value="evidence">{t("Evidencia")}</option>
               </select>
               <button
-                className="btn btn-ghost h-8 px-2"
+                className="dictionary-sort-button btn btn-ghost h-8 w-8 p-0"
+                type="button"
+                aria-label={t("Cambiar dirección de orden")}
+                title={t("Cambiar dirección de orden")}
                 onClick={() =>
                   setSortDir((current) => (current === "asc" ? "desc" : "asc"))
                 }
@@ -1521,13 +1527,15 @@ export function DictionaryView({
                 <Icon name={sortDir === "asc" ? "arrowUp" : "arrowDown"} />
               </button>
               <button
-                className={`btn btn-ghost h-8 px-2 ${viewMode === "list" ? "text-indigo-600 dark:text-indigo-300" : ""}`}
+                className={`dictionary-view-button btn btn-ghost h-8 px-2 ${viewMode === "list" ? "is-selected text-indigo-600 dark:text-indigo-300" : ""}`}
+                aria-pressed={viewMode === "list"}
                 onClick={() => setViewMode("list")}
               >
                 <Icon name="list" />
               </button>
               <button
-                className={`btn btn-ghost h-8 px-2 ${viewMode === "table" ? "text-indigo-600 dark:text-indigo-300" : ""}`}
+                className={`dictionary-view-button btn btn-ghost h-8 px-2 ${viewMode === "table" ? "is-selected text-indigo-600 dark:text-indigo-300" : ""}`}
+                aria-pressed={viewMode === "table"}
                 onClick={() => setViewMode("table")}
               >
                 <Icon name="table" />
@@ -1748,13 +1756,13 @@ function DictionaryGenerationState({
     return (
       <span
         className="min-w-0 text-xs text-red-600 dark:text-red-400"
-        title={progress.error}
+        title={progress.error ? errorText(progress.error) : undefined}
       >
         <span className="flex items-center gap-1.5 font-medium">
           <Icon name="x" size={12} /> {t("Error al generar")}
         </span>
         <span className="mt-0.5 block truncate text-[10px] opacity-80">
-          {progress.error || t("La generación no pudo completarse.")}
+          {progress.error ? errorText(progress.error) : t("La generación no pudo completarse.")}
         </span>
       </span>
     );
@@ -1770,7 +1778,7 @@ function DictionaryGenerationState({
     return (
       <span
         className="min-w-0 text-xs text-amber-700 dark:text-amber-300"
-        title={progress.error}
+        title={progress.error ? errorText(progress.error) : undefined}
       >
         <span className="flex items-center gap-1.5 font-medium">
           <Icon name="warning" size={12} /> {t("Síntesis pendiente")}
@@ -1818,7 +1826,7 @@ function DictionaryEntryView({
   onRename: (name: string) => void;
   onOpenIdea: (id: string) => void;
   onOpenAuthor: (id: string, name: string) => void;
-  onOpenLibraryWork: (id: string) => void;
+  onOpenLibraryWork: OpenCitationLibraryWork;
 }) {
   const [detail, setDetail] = useState<DictionaryEntryDetail | null>(null);
   const [tab, setTab] = useState<DictionaryDetailTab>(
@@ -2112,7 +2120,7 @@ function DictionaryEntryView({
               onCitation={setCitation}
             />
           ) : tab === "works" ? (
-            <WorksTab detail={detail} onOpenLibraryWork={onOpenLibraryWork} />
+            <WorksTab detail={detail} onOpenLibraryWork={(id) => onOpenLibraryWork(id, "vault")} />
           ) : (
             <VersionsTab
               detail={detail}
@@ -2125,7 +2133,7 @@ function DictionaryEntryView({
       <SourceCitationModal
         target={citation}
         onClose={() => setCitation(null)}
-        onOpenLibraryWork={(id) => onOpenLibraryWork(id)}
+        onOpenLibraryWork={onOpenLibraryWork}
       />
     </div>
   );
@@ -2461,7 +2469,7 @@ function EvidenceTab({
   onCitation: (citation: MarkdownCitation) => void;
   onOpenIdea: (id: string) => void;
   onOpenAuthor: (id: string, name: string) => void;
-  onOpenLibraryWork: (id: string) => void;
+  onOpenLibraryWork: OpenCitationLibraryWork;
 }) {
   const entryId = detail.entry.id;
   const [items, setItems] = useState<DictionaryEvidenceItem[]>([]);
@@ -2679,7 +2687,7 @@ function EvidenceTab({
               onCitation={onCitation}
               onOpenIdea={onOpenIdea}
               onOpenAuthor={onOpenAuthor}
-              onOpenLibraryWork={onOpenLibraryWork}
+              onOpenLibraryWork={(id) => onOpenLibraryWork(id, "vault")}
             />
           ))}
           {!items.length && (

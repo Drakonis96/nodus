@@ -21,6 +21,7 @@ import type { TestimoniesApi } from './api/testimonies';
 import type { LibraryApi } from './api/library';
 import type { RadarApi } from './api/radar';
 import type { CompassApi } from './api/compass';
+import type { LogsApi } from './api/logs';
 import type { LibraryAttachmentRecord } from './libraryTypes';
 import type { ToolkitToolPage } from './toolkitNavigation';
 
@@ -775,6 +776,8 @@ export interface LibraryReaderReference {
   year: number | null;
   /** One-shot choice used by explicit “open original/clean” actions. */
   preferredSource?: 'clean' | 'original';
+  /** Physical 1-based page to land on once open; absent means the reader's own last position. */
+  page?: number | null;
 }
 
 export type LibraryReaderAttachmentViewer = 'pdf' | 'epub' | 'image' | 'html' | 'text' | 'external';
@@ -951,6 +954,14 @@ export type DocumentProfileFieldKind =
   | 'disciplinary_scope' | 'structure' | 'finding' | 'conclusion' | 'contribution'
   | 'limitation' | 'genre' | 'audience' | 'positioning' | 'original_abstract';
 
+/**
+ * Where a field's `confidence` came from. `floor` means the provider supplied no
+ * usable measurement and the deterministic direct-support floor was substituted,
+ * so the value is a minimum, not a reading. Absent on rows published before the
+ * column existed, where it is read as `model`.
+ */
+export type DocumentProfileConfidenceSource = 'model' | 'floor';
+
 export interface DocumentProfileField {
   fieldId: string;
   kind: DocumentProfileFieldKind;
@@ -959,6 +970,7 @@ export interface DocumentProfileField {
   generatedText?: string;
   confidence: number;
   centrality: number;
+  confidenceSource?: DocumentProfileConfidenceSource;
   overridden?: boolean;
   overrideId?: string;
   verified?: boolean;
@@ -1010,13 +1022,34 @@ export interface DocumentIdeaLink {
   score: number;
 }
 
+/**
+ * How a published profile relates to its audited synthesis.
+ * - `null`: the auditor approved the synthesis, which is what most profiles are.
+ * - `partial`: the audited prose was kept (every field carries a literal support) but
+ *   the semantic verdict did not clear the acceptance bar, or was unusable. Nothing
+ *   about the evidence is in doubt, so the profile is published with the caveat
+ *   instead of being replaced by raw quotes.
+ * - `extractive`: the synthesis itself was unusable, so the profile is assembled from
+ *   literal source quotes. It is published on purpose (a rejected paraphrase must not
+ *   leave a permanent hole in a campaign), but every field is source-language
+ *   evidence, so consumers must treat it as an index of quotes, not as a synthesis.
+ */
+export type DocumentProfileFallbackMode = 'extractive' | 'partial';
+
 export interface DocumentProfileAudit {
+  /** The semantic verdict: whether the auditor approved the synthesis. A profile can
+   *  be published with `passed: false` when it is marked `partial`. */
   passed: boolean;
-  score: number;
+  /** null when the provider reported no usable score: "no reading", not "zero". */
+  score: number | null;
   supportCoverage: number;
   structureCoverage: number;
   issues: string[];
   repaired: boolean;
+  fallback?: DocumentProfileFallbackMode | null;
+  /** Sections published from literal extracts because no synthesis survived their own
+   *  audit. A profile can be approved as a whole and still contain them. */
+  sectionsDegraded?: number;
 }
 
 export interface DocumentProfile {
@@ -1222,6 +1255,23 @@ export interface EvidenceLocator {
   location: string | null;
   sourceRef: string | null;
   pageNumber: number | null;
+}
+
+/**
+ * How an evidence locator was resolved. `pdf-page` and `select` are handled in
+ * the main process (Zotero owns its reader); `local` means a copy in the Nodus
+ * library can be shown at that page, so the renderer opens it in the in-app
+ * reader; `none` means there is nothing to open.
+ */
+export type OpenEvidenceAtPageMode = 'pdf-page' | 'select' | 'local' | 'none';
+
+export interface OpenEvidenceAtPageResult {
+  ok: boolean;
+  mode: OpenEvidenceAtPageMode;
+  /** Physical 1-based page the locator resolved to, when it had one. */
+  page: number | null;
+  /** Document to open in the in-app reader when `mode` is `local`. */
+  local: { itemId: string; scope: import('./libraryTypes').LibraryScope } | null;
 }
 
 export interface Edge {
@@ -1521,11 +1571,49 @@ export interface DecorativeImageActionRequest {
 export type SyncMode = 'realtime' | 'manual';
 /** 'system' follows the OS light/dark preference and reacts to changes at runtime. */
 export type ThemeMode = 'dark' | 'light' | 'system';
+/** Colour theme (palette family). Orthogonal to {@link ThemeMode}: every theme has a
+ *  light and a dark mode. `default` is the built-in indigo/neutral palette; the rest are
+ *  curated FreeColorPalettes palettes. Keep the built-in IDs in sync with `APP_THEME_IDS` in
+ *  shared/appThemes.mjs. */
+export type AppTheme =
+  | 'default'
+  | 'amethyst-iris'
+  | 'deep-ocean'
+  | 'plum-lilac'
+  | 'sage-stone'
+  | 'azure-night'
+  | 'slate-gray'
+  | 'mint-slate'
+  | 'amber-ember'
+  | 'berry-wine'
+  | 'burnt-sun'
+  | 'rose-quartz'
+  | 'pine-grove'
+  | 'golden-hour'
+  | 'plum-noir'
+  | 'sea-glass'
+  | 'lagoon'
+  | (string & {});
+/** User-created palette definition. The runtime derives the full ramps from these anchors. */
+export interface CustomAppTheme {
+  id: string;
+  label: string;
+  accent: string;
+  deep: string;
+  pale: string;
+  /** Persistent application chrome/background, with one value per colour mode. */
+  appBackground: { light: string; dark: string };
+  /** Foreground used when the UI is in light mode. */
+  lightText: string;
+  /** Foreground used when the UI is in dark mode. */
+  darkText: string;
+  tint: number;
+}
 export type DeepContextMode = 'standard' | 'long';
 /** Languages Nodus can speak. `uiLanguage` localizes the interface; `promptLanguage`
  *  is injected into the AI prompts and so determines the language of generated content
  *  (ideas, themes, tutor narrative, drafts, assistant answers). */
-export type AppLanguage = 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 'tr';
+export type AppLanguage = 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 'tr' | 'zh-CN';
 /** Single source of truth for the prompt languages: the union below is derived from
  *  it, and runtime validators (the MCP tool schemas) enumerate it instead of
  *  re-spelling the list — which is how `tr` once ended up accepted everywhere except
@@ -1926,6 +2014,18 @@ export interface AppSettings {
   zoteroStoragePath: string;
   monitoredCollections: string[]; // collection keys
   theme: ThemeMode;
+  /** Colour palette. Light/dark is still governed by {@link AppSettings.theme}. */
+  appTheme: AppTheme;
+  /** User-created palettes, persisted with the profile and kept separate from built-ins. */
+  customThemes: CustomAppTheme[];
+  /**
+   * Whether {@link AppSettings.appTheme} and {@link AppSettings.customThemes} are one
+   * profile-wide choice or a per-vault one. Off by default: every vault keeps its own
+   * palette, and a vault created later starts on the default one. Light/dark mode is
+   * unaffected — it stays shared either way, because it tracks the display rather than
+   * the corpus.
+   */
+  shareAppThemeAcrossVaults: boolean;
   // Interface language (localizes all UI text).
   uiLanguage: AppLanguage;
   // Language injected into AI prompts → language of generated ideas/themes/answers.
@@ -1967,6 +2067,15 @@ export interface AppSettings {
   browserHistoryRetention: import('./browserHistory').BrowserHistoryRetention;
   /** Remove the private visit file whenever the Browser subsystem is destroyed. */
   browserClearHistoryOnClose: boolean;
+  /**
+   * Processing log: extraction, OCR, indexing, embeddings and the provider/JSON/connection
+   * failures around them. App-wide because one corpus run crosses vaults and the Library,
+   * and because the file is local diagnostics — it is neither backed up nor synced.
+   */
+  pipelineLogRetention: import('./pipelineLogs').PipelineLogRetention;
+  pipelineLogMaxEntries: number;
+  /** The language the log LINES are rendered in, chosen independently of the interface. */
+  pipelineLogLanguage: AppLanguage;
   // Nodi mascot: show the floating companion (visual/animation only for now — no wired
   // behaviour yet). App-wide preference, on by default.
   mascotEnabled: boolean;
@@ -7008,7 +7117,7 @@ export interface WritingWorkshopDraftRequest {
   model?: ModelRef | null;
 }
 
-export type WritingWorkshopExportFormat = 'markdown' | 'pdf';
+export type WritingWorkshopExportFormat = 'markdown' | 'pdf' | 'docx';
 
 export interface WritingWorkshopExportRequest {
   draft: WritingWorkshopDraft;
@@ -7018,8 +7127,12 @@ export interface WritingWorkshopExportRequest {
   entityId?: string;
 }
 
-/** `'both'` writes one `.md` AND one `.pdf` per report into the same archive. */
-export type DeepResearchArchiveFormat = 'markdown' | 'pdf' | 'both';
+/**
+ * `'both'` writes one `.md` AND one `.pdf` per report into the same archive.
+ * `'docx'` is a Word document with the report's figures embedded, so it carries no
+ * loose asset files the way the Markdown entry does.
+ */
+export type DeepResearchArchiveFormat = 'markdown' | 'pdf' | 'docx' | 'both';
 
 /** Bulk download: several saved reports zipped into a single archive the user places. */
 export interface DeepResearchArchiveRequest {
@@ -8853,7 +8966,7 @@ export interface BrowserApi {
   onBrowserFoundInPage(cb: (result: { requestId: number; activeMatchOrdinal: number; matches: number; selectionArea: unknown; finalUpdate: boolean }) => void): () => void;
 }
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, CompassApi, BrowserApi {
+export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, CompassApi, BrowserApi, LogsApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
@@ -8886,7 +8999,7 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   listChatSkills(): Promise<ChatSkill[]>;
   listDocumentSkills(): Promise<import('./documentSkills').DocumentSkillOption[]>;
   getDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget): Promise<import('./documentSkills').DocumentVisualManifest | null>;
-  enrichDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget, policy: import('./documentSkills').DocumentSkillPolicy, retry?: boolean): Promise<import('./documentSkills').DocumentVisualManifest>;
+  enrichDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget, policy: import('./documentSkills').DocumentSkillPolicy, options?: import('./documentVisualEnrich').DocumentVisualEnrichOptions): Promise<import('./documentSkills').DocumentVisualManifest>;
   cancelDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget): Promise<void>;
   undoDocumentVisuals(target: import('./documentSkills').DocumentVisualTarget): Promise<import('./documentSkills').DocumentVisualManifest | null>;
   removeDocumentFigure(target: import('./documentSkills').DocumentVisualTarget, figureId: string): Promise<import('./documentSkills').DocumentVisualManifest | null>;
@@ -9109,6 +9222,25 @@ export interface WorkPage {
   total: number;
   offset: number;
   limit: number;
+}
+
+/**
+ * Result of deleting selected works from the current vault.
+ *
+ * `ok: false` is the one expected refusal, not a failure: the scan queue is analysing
+ * some of those works right now and their analysis would be republished after the
+ * delete. It is returned rather than thrown so the renderer can word it in the
+ * reader's language.
+ */
+export interface WorkDeletionOutcome {
+  ok: boolean;
+  /** Works the queue is analysing right now; only set when `ok` is false. */
+  running: string[];
+  deleted: string[];
+  /** Global ideas left without any occurrence: kept and marked dormant, never deleted. */
+  dormantIdeas: number;
+  /** Index entries removed from the Global Library for the deleted works. */
+  globalLinks: number;
 }
 
 /** A Zotero collection available as a Library filter, flattened with its depth. */

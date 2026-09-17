@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { execFileSync } from 'node:child_process';
+import { buildSync } from 'esbuild';
 import { mkdtemp, rm } from 'node:fs/promises';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -30,11 +30,19 @@ const outDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-i18n-'));
 /** Bundle a TS module so its real exported values can be asserted on. */
 function loadModule(file) {
   const bundle = path.join(outDir, `${path.basename(file, '.ts')}.cjs`);
-  execFileSync(
-    path.join(repoRoot, 'node_modules/.bin/esbuild'),
-    [path.join(repoRoot, file), '--bundle', '--platform=node', '--format=cjs', '--target=es2022', `--outfile=${bundle}`],
-    { cwd: repoRoot, stdio: 'inherit' }
-  );
+  // esbuild's own API, not its command line: `node_modules/.bin/esbuild` is a shell
+  // script Windows cannot execute, and `node_modules/esbuild/bin/esbuild` is the
+  // platform binary on macOS/Linux (handing a Mach-O file to `node` fails). buildSync
+  // behaves identically everywhere and keeps this helper synchronous.
+  buildSync({
+    entryPoints: [path.join(repoRoot, file)],
+    outfile: bundle,
+    bundle: true,
+    format: 'cjs',
+    platform: 'node',
+    target: 'es2022',
+    logLevel: 'silent',
+  });
   return require(bundle);
 }
 
@@ -50,6 +58,7 @@ const TRANSLATIONS = [
   { name: 'Brazilian Portuguese', lang: 'pt-BR', file: 'src/i18n.pt-BR.ts', export: 'PT_BR' },
   { name: 'Italian', lang: 'it', file: 'src/i18n.it.ts', export: 'IT' },
   { name: 'Turkish', lang: 'tr', file: 'src/i18n.tr.ts', export: 'TR' },
+  { name: 'Simplified Chinese', lang: 'zh-CN', file: 'src/i18n.zh-CN.ts', export: 'ZH_CN' },
 ].map((entry) => ({ ...entry, table: loadModule(entry.file)[entry.export] }));
 
 // Server Web renders through its own adapter: t() there walks the server
@@ -137,6 +146,14 @@ const CLOUDFLARE_RUNTIME_KEYS = [
   'El Worker devolvió una clave de recuperación inesperada; Nodus no guardará esta conexión.',
 ];
 
+// Why a writing-workshop candidate was retrieved. The sentence is written by the retrieval
+// pass in the main process (`electron/ai/writingWorkshop.ts`) and reaches the badge through
+// the renderer's `tr()`, so no `t()` call anywhere mentions it and a missing table entry
+// would silently show Spanish beside an English interface.
+const WORKSHOP_RUNTIME_KEYS = [
+  'Recuperado por similitud semántica con esta sección.',
+];
+
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
 function walk(dir) {
@@ -158,6 +175,13 @@ const INDIRECT_KEY_SOURCES = [
   // ever appears literally inside a t() call. Leaving one untranslated is what made
   // the centre answer "this message could not be translated".
   { file: 'shared/nodiNotifications.ts', pattern: /^\s{2}\w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // The processing log's catalogue. The main process stores the KEY and its values and the
+  // log modal renders them through txIn(), so — exactly like the notifications above — none
+  // of these sentences is ever a t() literal. This one matters twice over: the log is written
+  // by the pipeline in whichever vault happens to be running, and its reader can pick a
+  // different language for the lines, so a sentence with no translation is stuck in Spanish
+  // for a log that is meant to be pasted into a GitHub issue.
+  { file: 'shared/pipelineLogMessages.ts', pattern: /^\s{2}\w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
   // The six "Deploy to Cloudflare" step labels. They are written in Electron and the modal
   // renders them as t(step.label), so nothing else can see them.
   { file: 'electron/cloudflare/deployment.ts', pattern: /^ {2}(?:'[\w-]+'|\w+):\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
@@ -678,6 +702,17 @@ test('issue #12 runtime UI payloads have a translation in every language', () =>
   }
 });
 
+test('the writing-workshop retrieval reasons are translated, not printed as written', () => {
+  for (const { name, table } of TRANSLATIONS) {
+    const missing = WORKSHOP_RUNTIME_KEYS.filter((key) => !table[key]?.trim());
+    assert.deepEqual(missing, [], `${name} is missing writing-workshop retrieval reasons`);
+  }
+  // The badge consults tr(), and the reason reaches the renderer in Spanish.
+  const view = fs.readFileSync(path.join(repoRoot, 'src/views/WritingWorkshopView.tsx'), 'utf8');
+  assert.match(view, /\{item\.reason && <Badge color="cyan">\{tr\(item\.reason\)\}<\/Badge>\}/,
+    'the candidate reason must pass through tr(), never render the stored sentence');
+});
+
 test('non-Spanish translations prefer English and preserve unknown dynamic values', () => {
   const { resolveTranslation, setActiveLang, getActiveLang } = loadModule('src/i18n.ts');
   const sparse = { en: { Clave: 'English fallback' }, fr: {}, de: {} };
@@ -726,6 +761,26 @@ test('legacy Spanish Electron errors cannot leak into a non-Spanish interface', 
     localizeRuntimeError('Clave de IA inválida. Revísala en Ajustes.', 'en'),
     'The AI key is invalid. Check it in Settings.',
   );
+});
+
+// A stored document profile mixes the pipeline's own sentences with the auditor model's prose,
+// and `tr()` would replace the second kind with "this message could not be translated" — the
+// auditor answers in the prompt language, so its Spanish notes are not a leak, they are the
+// finding. `knownText` is the gate that translates the first kind and leaves the second alone.
+test('a stored audit translates our sentences and keeps the auditor’s own prose', () => {
+  const { knownText, setActiveLang, getActiveLang } = loadModule('src/i18n.ts');
+  setActiveLang('en');
+  assert.equal(
+    knownText('La respuesta de «deepseek-flash» (DeepSeek) se cortó al alcanzar el límite de 5000 tokens de salida y el JSON quedó incompleto. Usa un modelo con mayor límite de salida o reduce el tamaño de la tarea.'),
+    'The response from «deepseek-flash» (DeepSeek) was cut off at the 5000-output-token limit and the JSON was left incomplete. Use a model with a higher output limit or reduce the size of the task.',
+  );
+  assert.equal(knownText('El texto contiene espacios dobles inesperados.'), 'The text contains unexpected double spaces.');
+  const auditorsNote = 'El campo «thesis» mezcla la tesis con resultados teóricos.';
+  assert.equal(knownText(auditorsNote), auditorsNote, 'a model’s own prose must survive untouched');
+  setActiveLang('es');
+  assert.equal(getActiveLang(), 'es');
+  assert.equal(knownText('El texto contiene espacios dobles inesperados.'), 'El texto contiene espacios dobles inesperados.');
+  setActiveLang('en');
 });
 
 /**
@@ -909,7 +964,7 @@ test('the two Portuguese variants are really different', () => {
 
 // The languages that in-data labels must also carry. Spanish and English are the
 // source pair every table already had.
-const IN_DATA_LANGUAGES = ['fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+const IN_DATA_LANGUAGES = ['fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN'];
 
 test('in-data labels are translated alongside the i18n table', () => {
   // These labels ship inside shared/ data rather than the i18n table, so the
@@ -921,7 +976,7 @@ test('in-data labels are translated alongside the i18n table', () => {
   // Assert against the source maps, not the expanded `labels`: those are
   // `DOC_TYPE_LABEL_XX[id] ?? labelEn`, so a missing id would silently look fine.
   // A label equal to the English one is legitimate ("Illustration", "Notes").
-  const docTypeMaps = { fr: docTypes.DOC_TYPE_LABEL_FR, de: docTypes.DOC_TYPE_LABEL_DE, pt: docTypes.DOC_TYPE_LABEL_PT, 'pt-BR': docTypes.DOC_TYPE_LABEL_PT_BR, it: docTypes.DOC_TYPE_LABEL_IT, tr: docTypes.DOC_TYPE_LABEL_TR };
+  const docTypeMaps = { fr: docTypes.DOC_TYPE_LABEL_FR, de: docTypes.DOC_TYPE_LABEL_DE, pt: docTypes.DOC_TYPE_LABEL_PT, 'pt-BR': docTypes.DOC_TYPE_LABEL_PT_BR, it: docTypes.DOC_TYPE_LABEL_IT, tr: docTypes.DOC_TYPE_LABEL_TR, 'zh-CN': docTypes.DOC_TYPE_LABEL_ZH_CN };
   for (const language of IN_DATA_LANGUAGES) {
     const map = docTypeMaps[language];
     assert.ok(map, `no doc-type label map for ${language}`);
@@ -947,6 +1002,7 @@ test('in-data labels are translated alongside the i18n table', () => {
 
   const { RELEASE_NOTES } = loadModule('shared/releaseNotes.ts');
   const { RELEASE_NOTES_TR } = loadModule('shared/releaseNotes.tr.ts');
+  const { RELEASE_NOTES_ZH } = loadModule('shared/releaseNotes.zh-CN.ts');
   const highlights = RELEASE_NOTES.flatMap((note) => note.highlights.map((h) => [note.version, h]));
   for (const language of IN_DATA_LANGUAGES) {
     const missing = highlights.filter(([, h]) => !h[language]?.trim()).map(([version]) => version);
@@ -956,6 +1012,10 @@ test('in-data labels are translated alongside the i18n table', () => {
     note.highlights.flatMap((_, index) => RELEASE_NOTES_TR[note.version]?.[index]?.trim() ? [] : [`${note.version}#${index}`])
   );
   assert.deepEqual(missingTurkishSources, [], 'Turkish release notes must not silently fall back to English');
+  const missingChineseSources = RELEASE_NOTES.flatMap((note) =>
+    note.highlights.flatMap((_, index) => RELEASE_NOTES_ZH[note.version]?.[index]?.trim() ? [] : [`${note.version}#${index}`])
+  );
+  assert.deepEqual(missingChineseSources, [], 'Simplified Chinese release notes must not silently fall back to English');
 });
 
 test('keys reached indirectly and through ternaries are collected', () => {

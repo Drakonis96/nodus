@@ -36,6 +36,7 @@ const KEYS = [
   'Todavía no hay peticiones registradas en esta sesión.',
   'Relaciones semánticas',
   'Valida pares de ideas y genera las relaciones del grafo.',
+  'Sin un auditor propio, cada ficha documental la puntúa el mismo modelo que la redactó. Elige aquí otro modelo para que la revisión sea independiente.',
 ] as const;
 
 function table(values: readonly string[]): Record<string, string> {
@@ -79,6 +80,7 @@ const en = table([
   'No requests have been recorded in this session yet.',
   'Semantic relationships',
   'Validates idea pairs and generates graph relationships.',
+  'Without a separate auditor, each document profile is graded by the same model that wrote it. Choose another model here so the review is independent.',
 ]);
 
 const fr = table([
@@ -117,6 +119,7 @@ const fr = table([
   'Aucune requête n’a encore été enregistrée pendant cette session.',
   'Relations sémantiques',
   'Valide les paires d’idées et génère les relations du graphe.',
+  'Sans auditeur distinct, chaque fiche documentaire est notée par le modèle qui l’a rédigée. Choisissez ici un autre modèle pour rendre la révision indépendante.',
 ]);
 
 const de = table([
@@ -155,6 +158,7 @@ const de = table([
   'In dieser Sitzung wurden noch keine Anfragen aufgezeichnet.',
   'Semantische Beziehungen',
   'Validiert Ideenpaare und erzeugt die Beziehungen des Graphen.',
+  'Ohne eigenen Prüfer wird jedes Dokumentprofil von demselben Modell bewertet, das es verfasst hat. Wähle hier ein anderes Modell, damit die Prüfung unabhängig ist.',
 ]);
 
 const pt = table([
@@ -193,6 +197,7 @@ const pt = table([
   'Ainda não há pedidos registados nesta sessão.',
   'Relações semânticas',
   'Valida pares de ideias e gera as relações do grafo.',
+  'Sem um auditor próprio, cada ficha documental é avaliada pelo mesmo modelo que a redigiu. Escolhe aqui outro modelo para que a revisão seja independente.',
 ]);
 
 const ptBR = table([
@@ -231,6 +236,7 @@ const ptBR = table([
   'Ainda não há solicitações registradas nesta sessão.',
   'Relações semânticas',
   'Valida pares de ideias e gera as relações do grafo.',
+  'Sem um auditor próprio, cada ficha documental é avaliada pelo mesmo modelo que a redigiu. Escolha aqui outro modelo para que a revisão seja independente.',
 ]);
 
 const it = table([
@@ -269,6 +275,7 @@ const it = table([
   'Non è stata ancora registrata alcuna richiesta in questa sessione.',
   'Relazioni semantiche',
   'Convalida coppie di idee e genera le relazioni del grafo.',
+  'Senza un revisore dedicato, ogni scheda documentale è valutata dallo stesso modello che l’ha redatta. Scegli qui un altro modello perché la revisione sia indipendente.',
 ]);
 
 const tr = table([
@@ -307,6 +314,46 @@ const tr = table([
   'Bu oturumda henüz kayıtlı bir istek yok.',
   'Anlamsal ilişkiler',
   'Fikir çiftlerini doğrular ve grafik ilişkilerini oluşturur.',
+  'Ayrı bir denetçi yoksa her belge künyesi onu yazan modelin kendisi tarafından puanlanır. İncelemenin bağımsız olması için burada başka bir model seçin.',
 ]);
 
-export const MODEL_SETTINGS_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr } as const;
+const zhCN = table([
+  '请先在设置 → AI 模型中配置模型，然后再试。你可以使用基础配置或高级配置。',
+  '前往设置和模型',
+  '为语义搜索和基于相似度的检索表示文本含义。',
+  '在 Nodus 分析语料库时提取主题、观点、证据和关系。',
+  '解析图像和扫描页面，并在需要时获取其文本。',
+  '为每篇文献撰写简短摘要，以引导浏览和检索。',
+  '合并等效结果并移除重复项，同时不丢失其证据。',
+  '在 Nodi 助手中作答，并在你允许时使用当前视图的上下文。',
+  '回答关于语料库的问题，并引用所使用的证据。',
+  '根据来源和关系规划并撰写长篇报告。',
+  '生成引导式阅读和资料研读会话。',
+  '在写作工坊中审阅、扩展和转换草稿。',
+  '构建论点、理由、异议和证据的图谱。',
+  '综合作者画像，并基于语料库撰写传记。',
+  '根据证据生成并更新词典条目。',
+  '根据资料库内容准备学习指南和复习材料。',
+  '在导师中调整讲解、问题和学习路径。',
+  '提出、检验并发展研究假设。',
+  '生成待处理的向量，以便语义搜索使用当前模型。',
+  '限制可同时运行的 AI 请求数量。',
+  '当无法通过其他途径获取文档时，用于恢复学术文本。',
+  '选择每次深度分析在拆分前保留多少文本。',
+  '根据所选上下文模式设置每个分块的大小。',
+  '刷新分析',
+  '将使用当前设置重新计算主题、观点、摘要和关系。如果刷新失败，之前的分析仍会保持可见。',
+  '刷新',
+  '将使用当前设置刷新 {n} 篇已处理文献的分析。如果任何刷新失败，之前的结果都会保留。',
+  '上下文窗口',
+  '自动（推荐，最高 32K）',
+  '上下文包含提示词和回复。最大输出会为每个任务单独计算。自动模式可在深度分析中使用 32K，并拆分无法容纳的批次。',
+  '32K–128K 会大幅增加 RAM/VRAM 占用和延迟；它本身不会增加输出长度。',
+  '最近一次本地请求',
+  '本次会话中尚未记录任何请求。',
+  '语义关系',
+  '验证观点对并生成图谱关系。',
+  '没有独立的审核器时，每份文档档案都由撰写它的同一个模型评分。请在此选择另一个模型，使审核保持独立。',
+]);
+
+export const MODEL_SETTINGS_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN } as const;

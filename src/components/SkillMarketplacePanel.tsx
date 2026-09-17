@@ -8,13 +8,13 @@ import { marketplaceLogoSvg } from '@shared/marketplaceLogo';
 import { Icon } from './ui';
 import { skillGlyph } from './skillGlyph';
 import { MigrationBanner, PackageActions, PackageFacts, PermissionReview, SettingsForm, type PendingReview } from './CapabilityPackagesPanel';
-import { getActiveLang, t } from '../i18n';
+import { getActiveLang, t, tx } from '../i18n';
 
 type InstalledFilter = 'all' | 'installed' | 'available';
 
 function PluginSecretForm({ plugin, secret, refresh }: { plugin: InstalledPluginSummary; secret: InstalledPluginSummary['secrets'][number]; refresh: () => Promise<void> }) {
   const [value, setValue] = useState('');
-  return <form onSubmit={event => { event.preventDefault(); void window.nodus.configurePluginSecret(plugin.id, secret.capabilityId, secret.id, value).then(() => { setValue(''); return refresh(); }); }}><label>{secret.label}{secret.required ? ' (required)' : ''}<input type="password" value={value} placeholder={secret.configured ? 'Configured' : 'Not configured'} onChange={event => setValue(event.target.value)} /></label><button type="submit">{secret.configured ? 'Replace' : 'Save'}</button>{secret.configured && <button type="button" onClick={() => void window.nodus.configurePluginSecret(plugin.id, secret.capabilityId, secret.id, '').then(refresh)}>Clear</button>}</form>;
+  return <form onSubmit={event => { event.preventDefault(); void window.nodus.configurePluginSecret(plugin.id, secret.capabilityId, secret.id, value).then(() => { setValue(''); return refresh(); }); }}><label>{secret.label}{secret.required ? ` (${t('Necesaria')})` : ''}<input type="password" value={value} placeholder={secret.configured ? t('Configurada') : t('Sin configurar')} onChange={event => setValue(event.target.value)} /></label><button type="submit">{secret.configured ? t('Sustituir') : t('Guardar')}</button>{secret.configured && <button type="button" onClick={() => void window.nodus.configurePluginSecret(plugin.id, secret.capabilityId, secret.id, '').then(refresh)}>{t('Limpiar')}</button>}</form>;
 }
 
 interface PluginPermissionPrompt {
@@ -40,20 +40,20 @@ function PluginPermissionReview({ prompt, busy, onAllow, onClose }: {
   const secrets = prompt.permissions.secrets ?? [];
   const storage = prompt.permissions.storage?.maxBytes ?? 0;
   return <div className="capability-permission-backdrop" role="presentation" onClick={event => { if (event.target === event.currentTarget && !busy) onClose(); }}>
-    <div className="capability-permission-review" role="dialog" aria-modal="true" aria-label={`Permissions for ${prompt.name}`}>
-      <h4>{prompt.update ? 'This update requests permissions' : 'This skill needs permissions'}</h4>
+    <div className="capability-permission-review" role="dialog" aria-modal="true" aria-label={tx('Permisos de {name}', { name: prompt.name })}>
+      <h4>{prompt.update ? t('Esta actualización pide permisos nuevos') : t('Esta skill necesita permisos')}</h4>
       <p className="capability-packages-muted"><b>{prompt.name}</b> · {prompt.version}</p>
       <p className="capability-packages-muted">{prompt.description}</p>
-      <p className="capability-packages-muted">Review the access below. Nothing is installed or updated until you allow it here.</p>
+      <p className="capability-packages-muted">{t('Revisa el acceso de abajo. No se instala ni actualiza nada hasta que lo permitas aquí.')}</p>
       <dl className="capability-permission-list">
-        <div><dt>HTTPS endpoints</dt><dd>{networks.length ? networks.map(endpoint => endpoint.origin).join(', ') : 'None'}</dd></div>
-        <div><dt>Credentials</dt><dd>{secrets.length ? secrets.map(secret => secret.label).join(', ') : 'None'}</dd></div>
-        <div><dt>Storage</dt><dd>{storage ? `${storage} bytes` : 'None'}</dd></div>
+        <div><dt>{t('Conexiones HTTPS')}</dt><dd>{networks.length ? networks.map(endpoint => endpoint.origin).join(', ') : t('Ninguno')}</dd></div>
+        <div><dt>{t('Credenciales')}</dt><dd>{secrets.length ? secrets.map(secret => secret.label).join(', ') : t('Ninguno')}</dd></div>
+        <div><dt>{t('Almacenamiento')}</dt><dd>{storage ? tx('{size} bytes', { size: storage }) : t('Ninguno')}</dd></div>
       </dl>
-      <p className="capability-packages-muted">Capability code runs in an isolated sandbox. Nodus mediates only the access listed above.</p>
+      <p className="capability-packages-muted">{t('El código de la capacidad se ejecuta en un entorno aislado. Nodus solo intermedia el acceso indicado arriba.')}</p>
       <div className="capability-permission-actions">
-        <button className="chat-skill-primary" type="button" disabled={busy} onClick={onAllow}>{prompt.update ? 'Allow and update' : 'Allow and install'}</button>
-        <button type="button" className="chat-skill-secondary" disabled={busy} onClick={onClose}>Cancel</button>
+        <button className="chat-skill-primary" type="button" disabled={busy} onClick={onAllow}>{prompt.update ? t('Permitir y actualizar') : t('Permitir e instalar')}</button>
+        <button type="button" className="chat-skill-secondary" disabled={busy} onClick={onClose}>{t('Cancelar')}</button>
       </div>
     </div>
   </div>;
@@ -88,12 +88,12 @@ function MarketplaceCard({ cardKey, name, description, author, category, install
     <div className="chat-skill-main">
       <span className="chat-skill-symbol" aria-hidden="true"><Icon name={glyph.icon} size={18} /></span>
       <div className="chat-skill-text">
-        <span className="chat-skill-heading"><b>{name}</b>{installed && <span className="chat-skill-tool-badge">Installed</span>}</span>
+        <span className="chat-skill-heading"><b>{name}</b>{installed && <span className="chat-skill-tool-badge">{t('Instalada')}</span>}</span>
         <p>{description}</p>
       </div>
       <button type="button" className="chat-skill-details-toggle" aria-expanded={open}
-        aria-label={`${open ? 'Hide details of' : 'Show details of'} ${name}`}
-        title={open ? 'Hide details' : 'Show details'} onClick={onToggle}>
+        aria-label={`${t(open ? 'Ocultar detalles de' : 'Ver detalles de')} ${name}`}
+        title={t(open ? 'Ocultar detalles' : 'Ver detalles')} onClick={onToggle}>
         <Icon name={open ? 'chevronUp' : 'chevronDown'} size={14} />
       </button>
     </div>
@@ -156,15 +156,17 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
   const uninstall = (targets: ChatSkill[]) => run(async () => {
     for (const skill of targets) await window.nodus.deleteChatSkill(skill.id);
     setRemoveId('');
-    setNotice(targets.some(skill => skill.builtin) ? 'Skill uninstalled. Its native capabilities stay in Nodus and return with the skill.' : 'Skill uninstalled. Reinstall it here whenever you want.');
+    setNotice(targets.some(skill => skill.builtin) ? t('Skill desinstalada. Sus capacidades nativas permanecen en Nodus y vuelven con la skill.') : t('Skill desinstalada. Vuelve a instalarla aquí cuando quieras.'));
   });
   const confirmText = (name: string, targets: ChatSkill[], included: boolean) => included
-    ? `Uninstall ${name}${targets.length > 1 ? ` and ${targets.length - 1} copy installed from this repository` : ''}? Its native capabilities stay in Nodus.`
-    : `Uninstall ${name} and its local edits?`;
+    ? targets.length > 1
+      ? tx('¿Desinstalar {name} y {count} copia(s) instalada(s) desde este repositorio? Sus capacidades nativas permanecen en Nodus.', { name, count: targets.length - 1 })
+      : tx('¿Desinstalar {name}? Sus capacidades nativas permanecen en Nodus.', { name })
+    : tx('¿Desinstalar {name} y sus ediciones locales?', { name });
   const install = (entry: MarketplaceEntry) => run(async () => {
     await window.nodus.installMarketplaceSkill(source!.id, entry.path, source!.commit!);
     setReview(null);
-    setNotice(builtinId(entry.package.manifest) ? 'Included skill restored. Check its activation in My skills.' : 'Skill installed. Enable it in My skills.');
+    setNotice(builtinId(entry.package.manifest) ? t('Skill incluida restaurada. Comprueba su activación en Mis skills.') : t('Skill instalada. Actívala en Mis skills.'));
   });
   // A plugin the repository offers and the same plugin already installed are one card in
   // two states. Anything installed that this repository no longer lists still gets a card:
@@ -198,12 +200,12 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
         author: manifest.author, category: manifest.category, installed: !!installedSkills(manifest).length, entry };
     }),
     ...pluginCards.map(card => ({ kind: 'plugin' as const, key: `plugin:${card.id}`, name: card.name,
-      description: card.description, author: card.by, category: 'Extensions', installed: !!card.installed?.activeVersion, card })),
+      description: card.description, author: card.by, category: t('Extensiones'), installed: !!card.installed?.activeVersion, card })),
     ...capabilityEntries.map(entry => ({ kind: 'package' as const, key: `package:${entry.id}`, name: entry.name,
-      description: localized(entry.description), author: 'NodusResearch', category: 'Extensions',
+      description: localized(entry.description), author: 'NodusResearch', category: t('Extensiones'),
       installed: !!installedCapabilityPackages.get(entry.id)?.active, entry })),
     ...inboxPlugins.map(item => ({ kind: 'inbox' as const, key: `inbox:${item.directory}`, name: item.name,
-      description: item.description, author: item.author, category: 'Extensions', installed: item.installed, item })),
+      description: item.description, author: item.author, category: t('Extensiones'), installed: item.installed, item })),
   ];
   const categories = [...new Set(unifiedCards.map(card => card.category))]
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }));
@@ -238,31 +240,31 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
   const openCapabilityReview = (entry: { id: string; name: string }, state: InstalledCapabilityPlugin) => setCapabilityReview({
     id: entry.id, name: entry.name, version: state.pending?.version ?? '', update: Boolean(state.active), permissions: state.pendingPermissions ?? null,
   });
-  return <div className="skill-marketplace" aria-label="Skill marketplace">
+  return <div className="skill-marketplace" aria-label={t('Marketplace de Skills')}>
     {/* Both variants, swapped by the stylesheet: which theme this panel is in is a CSS
         fact here — it is rendered into a portal that carries the class — and asking
         JavaScript for it would mean re-asking every time the theme changed. */}
     <div className="skill-marketplace-brand">
-      <img className="skill-marketplace-logo-dark" src={`data:image/svg+xml,${encodeURIComponent(marketplaceLogoSvg(accent))}`} data-testid="marketplace-logo" alt="Nodus Marketplace" />
+      <img className="skill-marketplace-logo-dark" src={`data:image/svg+xml,${encodeURIComponent(marketplaceLogoSvg(accent))}`} data-testid="marketplace-logo" alt={t('Marketplace de Nodus')} />
       <img className="skill-marketplace-logo-light" src={`data:image/svg+xml,${encodeURIComponent(marketplaceLogoSvg(accent, { plate: false }))}`} alt="" aria-hidden="true" />
-      <div><b>Discover your next skill</b><p>Methods and tools, made by the community.</p></div>
+      <div><b>{t('Descubre tu próxima skill')}</b><p>{t('Métodos y herramientas, hechos por la comunidad.')}</p></div>
     </div>
     {/* Where the skills come from, folded away. It is answered once and then rarely asked
         again, and open by default it put five controls between the reader and the first
         skill. The line stays visible, so which repository this is never becomes a mystery. */}
     <details className="skill-marketplace-sources">
       <summary>
-        <span>{official ? 'Official Nodus repository' : 'Community source · not reviewed by Nodus'}{source?.updatedAt ? ` · Updated ${new Date(source.updatedAt).toLocaleDateString()}` : source ? ' · Update to discover skills' : ''}</span>
-        <span className="skill-marketplace-sources-hint">Repositories</span>
+        <span>{official ? t('Repositorio oficial de Nodus') : t('Fuente comunitaria · no revisada por Nodus')}{source?.updatedAt ? tx(' · Actualizado el {date}', { date: new Date(source.updatedAt).toLocaleDateString() }) : source ? t(' · Actualiza para descubrir skills') : ''}</span>
+        <span className="skill-marketplace-sources-hint">{t('Repositorios')}</span>
       </summary>
-      <label>Repository<select aria-label="Skill repository" value={source?.id ?? ''} disabled={busy} onChange={e => setSourceId(e.target.value)}>{state.sources.map(s => <option key={s.id} value={s.id}>{s.id}</option>)}</select></label>
-      {source && <div className="skill-marketplace-actions"><button type="button" disabled={busy} onClick={() => void run(async () => { setState(await window.nodus.updateSkillSource(source.id)); setNotice('Catalog updated. Installed skills are unchanged.'); })}>{busy ? 'Working…' : 'Update catalog'}</button><button type="button" disabled={busy} onClick={() => void run(async () => { setState(await window.nodus.removeSkillSource(source.id)); setNotice('Repository removed. Installed skills remain available.'); })}>Remove source</button></div>}
+      <label>{t('Repositorio')}<select aria-label={t('Repositorio de skills')} value={source?.id ?? ''} disabled={busy} onChange={e => setSourceId(e.target.value)}>{state.sources.map(s => <option key={s.id} value={s.id}>{s.id}</option>)}</select></label>
+      {source && <div className="skill-marketplace-actions"><button type="button" disabled={busy} onClick={() => void run(async () => { setState(await window.nodus.updateSkillSource(source.id)); setNotice(t('Catálogo actualizado. Las skills instaladas no cambian.')); })}>{busy ? t('Trabajando…') : t('Actualizar catálogo')}</button><button type="button" disabled={busy} onClick={() => void run(async () => { setState(await window.nodus.removeSkillSource(source.id)); setNotice(t('Repositorio eliminado. Las skills instaladas siguen disponibles.')); })}>{t('Quitar fuente')}</button></div>}
       {official && <div className="skill-marketplace-actions"><button type="button" disabled={capabilityBusy === 'catalog'} onClick={() => void runCapability('catalog', () => window.nodus.refreshCapabilityCatalog(DEFAULT_SKILL_SOURCE), t('Catálogo actualizado.'))}><Icon name="refresh" size={14} />{t('Actualizar catálogo')}</button><button type="button" disabled={capabilityBusy === 'updates'} onClick={() => void runCapability('updates', async () => {
         const results = await window.nodus.checkCapabilityUpdates();
         const waiting = results.filter(result => result.state === 'awaiting-approval');
         setNotice(waiting.length ? t('Hay una actualización esperando a que apruebes sus permisos.') : t('Todo está al día.'));
       })}><Icon name="download" size={14} />{t('Buscar actualizaciones')}</button></div>}
-      <form onSubmit={e => { e.preventDefault(); void run(async () => { const value = await window.nodus.addSkillSource(url); setState(value); setSourceId(value.sources[value.sources.length - 1].id); setUrl(''); }); }} className="skill-marketplace-source"><label>Add a repository<input aria-label="Repository URL" type="url" required placeholder="https://github.com/owner/repository" value={url} onChange={e => setUrl(e.target.value)} /></label><button type="submit" disabled={busy || !url.trim()}>Add source</button></form>
+      <form onSubmit={e => { e.preventDefault(); void run(async () => { const value = await window.nodus.addSkillSource(url); setState(value); setSourceId(value.sources[value.sources.length - 1].id); setUrl(''); }); }} className="skill-marketplace-source"><label>{t('Añadir un repositorio')}<input aria-label={t('URL del repositorio')} type="url" required placeholder="https://github.com/owner/repository" value={url} onChange={e => setUrl(e.target.value)} /></label><button type="submit" disabled={busy || !url.trim()}>{t('Añadir fuente')}</button></form>
     </details>
     {pluginReview && <PluginPermissionReview prompt={pluginReview} busy={busy}
       onClose={() => setPluginReview(null)}
@@ -271,11 +273,11 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
           const floor = pluginReview.entry.package.manifest.compatibility.minNodusVersion;
           const tooOld = !!appVersion && compareSemver(appVersion, floor) < 0;
           await window.nodus.installMarketplacePlugin(source.id, pluginReview.entry.path, source.commit!, true);
-          setNotice(tooOld ? `Plugin saved. It stays inactive until Nodus ${floor}.` : 'Plugin installed. New skills start disabled.');
+          setNotice(tooOld ? tx('Plugin guardado. Permanece inactivo hasta Nodus {version}.', { version: floor }) : t('Plugin instalado. Las skills nuevas empiezan desactivadas.'));
         } else if (pluginReview.kind === 'inbox' && pluginReview.inbox) {
           await window.nodus.approveInboxPlugin(pluginReview.inbox.directory);
           setInboxPlugins(await window.nodus.listInboxPlugins());
-          setNotice('Plugin reviewed. New skills start disabled.');
+          setNotice(t('Plugin revisado. Las skills nuevas empiezan desactivadas.'));
         }
         setInstalledPlugins(await window.nodus.listInstalledPlugins());
         setPluginReview(null);
@@ -290,32 +292,32 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
         setCapabilityReview(null);
       }, capabilityReview.update ? t('La actualización se ha descartado.') : t('No se ha instalado nada.'))} />}
     {review && manifest && source ? <article className="skill-marketplace-review">
-      <button type="button" onClick={() => { setReview(null); setRemoveId(''); }}>← Back to catalog</button><h4>{manifest.name}</h4><p>@{manifest.author} · {manifest.version} · {manifest.license}</p>
-      <p>{manifest.description}</p><p><b>Capabilities:</b> {manifest.capabilities.join(', ') || 'No native capabilities'}{manifest.tools.length ? ` · ${manifest.tools.length} sandboxed JavaScript tools` : ''}</p>
-      <small>JavaScript tools cannot access your files, credentials, network or Nodus data. Image generation uses your configured provider and may incur its normal costs.</small>
+      <button type="button" onClick={() => { setReview(null); setRemoveId(''); }}>{t('← Volver al catálogo')}</button><h4>{manifest.name}</h4><p>@{manifest.author} · {manifest.version} · {manifest.license}</p>
+      <p>{manifest.description}</p><p><b>{t('Capabilities')}:</b> {manifest.capabilities.join(', ') || t('Sin capacidades nativas')}{manifest.tools.length ? tx(' · {count} herramientas JavaScript aisladas', { count: manifest.tools.length }) : ''}</p>
+      <small>{t('Las herramientas JavaScript no pueden acceder a tus archivos, credenciales, red ni datos de Nodus. La generación de imágenes usa tu proveedor configurado y puede generar sus costes habituales.')}</small>
       {Object.entries(review.package.files).map(([name, content]) => <details key={name}><summary>{name}</summary><pre>{content}</pre></details>)}
-      {!!unsupported.length && <p role="status">Requires a compatible Nodus build with native support for: {unsupported.join(', ')}. This build cannot install this skill.</p>}
+      {!!unsupported.length && <p role="status">{tx('Requiere una versión de Nodus compatible con soporte nativo para: {list}. Esta versión no puede instalar esta skill.', { list: unsupported.join(', ') })}</p>}
       <p>{builtin
         ? installed
-          ? 'Included in Nodus. Reinstalling restores the instructions and default activation of the version shipped with this build, replacing your local edits.'
-          : 'Included in Nodus. Installing restores the version shipped with this build instead of downloading the published copy.'
-        : installed ? 'Reinstalling replaces your local edits and disables this skill on both surfaces.' : 'Installed skills start disabled. Enable them in My skills for Assistant or Nodi.'}</p>
-      <button className="chat-skill-primary" type="button" disabled={busy || !!unsupported.length} onClick={() => void install(review)}>{installed.length ? (builtin ? 'Reinstall included skill' : 'Replace installed skill') : 'Install skill'}</button>
+          ? t('Incluida en Nodus. Reinstalarla restaura las instrucciones y la activación predeterminada de la versión incluida en esta compilación, y reemplaza tus ediciones locales.')
+          : t('Incluida en Nodus. Instalarla restaura la versión incluida en esta compilación en lugar de descargar la copia publicada.')
+        : installed ? t('Reinstalarla reemplaza tus ediciones locales y desactiva esta skill en las dos superficies.') : t('Las skills instaladas empiezan desactivadas. Actívalas en Mis skills para el Asistente o Nodi.')}</p>
+      <button className="chat-skill-primary" type="button" disabled={busy || !!unsupported.length} onClick={() => void install(review)}>{installed.length ? (builtin ? t('Reinstalar skill incluida') : t('Sustituir skill instalada')) : t('Instalar skill')}</button>
       {!!installed.length && (removeId === installed[0].id
-        ? <div className="chat-skill-confirm"><span>{confirmText(manifest.name, installed, !!builtin)}</span><button type="button" disabled={busy} onClick={() => void uninstall(installed)}>Uninstall</button><button type="button" onClick={() => setRemoveId('')}>Cancel</button></div>
-        : <button type="button" onClick={() => setRemoveId(installed[0].id)}>Uninstall skill</button>)}
+        ? <div className="chat-skill-confirm"><span>{confirmText(manifest.name, installed, !!builtin)}</span><button type="button" disabled={busy} onClick={() => void uninstall(installed)}>{t('Desinstalar')}</button><button type="button" onClick={() => setRemoveId('')}>{t('Cancelar')}</button></div>
+        : <button type="button" onClick={() => setRemoveId(installed[0].id)}>{t('Desinstalar skill')}</button>)}
     </article> : <>
       <div className="chat-skills-search">
         <Icon name="search" size={16} />
-        <input type="search" aria-label="Search marketplace" placeholder="Name, creator or description" value={query} onChange={e => setQuery(e.target.value)} autoComplete="off" spellCheck={false} />
-        {query && <button type="button" aria-label="Clear marketplace search" title="Clear marketplace search" onClick={() => setQuery('')}><Icon name="x" size={14} /></button>}
+        <input type="search" aria-label={t('Buscar en el Marketplace')} placeholder={t('Nombre, autor o descripción')} value={query} onChange={e => setQuery(e.target.value)} autoComplete="off" spellCheck={false} />
+        {query && <button type="button" aria-label={t('Limpiar búsqueda del Marketplace')} title={t('Limpiar búsqueda del Marketplace')} onClick={() => setQuery('')}><Icon name="x" size={14} /></button>}
       </div>
       <div className="skill-marketplace-filters">
-        <label>Category<select aria-label="Marketplace category" value={category} onChange={e => setCategory(e.target.value)}><option value="">All categories</option>{categories.map(c => <option key={c}>{c}</option>)}</select></label>
-        <div className="skill-marketplace-filter" role="group" aria-label="Installed filter">{(['all', 'installed', 'available'] as const).map(value =>
-          <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}>{value === 'all' ? 'All' : value === 'installed' ? 'Installed' : 'Available'} {counts[value]}</button>)}</div>
+        <label>{t('Categoría')}<select aria-label={t('Categoría del Marketplace')} value={category} onChange={e => setCategory(e.target.value)}><option value="">{t('Todas las categorías')}</option>{categories.map(c => <option key={c}>{c}</option>)}</select></label>
+        <div className="skill-marketplace-filter" role="group" aria-label={t('Filtro de instalación')}>{(['all', 'installed', 'available'] as const).map(value =>
+          <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}>{value === 'all' ? t('Todas') : value === 'installed' ? t('Instaladas') : t('Disponibles')} {counts[value]}</button>)}</div>
       </div>
-      {!entries.length && <p className="chat-skills-empty">{!source?.updatedAt && !capabilityEntries.length ? 'Update a repository to load its catalog.' : filter === 'installed' ? 'No matching installed skills.' : filter === 'available' ? 'No matching available skills.' : 'No matching skills.'}</p>}
+      {!entries.length && <p className="chat-skills-empty">{!source?.updatedAt && !capabilityEntries.length ? t('Actualiza un repositorio para cargar su catálogo.') : filter === 'installed' ? t('No hay skills instaladas que coincidan.') : filter === 'available' ? t('No hay skills disponibles que coincidan.') : t('No hay skills que coincidan.')}</p>}
       <MigrationBanner onChanged={refreshCapabilities} />
       {capabilities?.problems.map(problem => <p key={problem.pluginId} className="capability-packages-error" role="alert"><b>{problem.pluginId}</b> {problem.detail}</p>)}
       <div className="chat-skills-list">{entries.map(item => {
@@ -327,11 +329,11 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
         if (item.kind === 'skill') {
           const entry = item.entry; const m = entry.package.manifest; const present = installedSkills(m); const included = !!builtinId(m);
           return shell(<>
-            {open && <div className="marketplace-card-facts"><small>@{m.author} · {m.version}{present.length ? ` · ${included ? 'Included in Nodus' : `Installed ${present[0].origin?.version}`}` : ''}</small><small>{m.capabilities.length ? `Capabilities: ${m.capabilities.join(', ')}` : 'No native capabilities'}{m.tools.length ? ` · ${m.tools.length} sandboxed tools` : ''}</small></div>}
+            {open && <div className="marketplace-card-facts"><small>@{m.author} · {m.version}{present.length ? ` · ${included ? t('Incluida en Nodus') : tx('Instalada {version}', { version: present[0].origin?.version ?? '' })}` : ''}</small><small>{m.capabilities.length ? `${t('Capabilities')}: ${m.capabilities.join(', ')}` : t('Sin capacidades nativas')}{m.tools.length ? tx(' · {count} herramientas aisladas', { count: m.tools.length }) : ''}</small></div>}
             {present.length && removeId === present[0].id
-              ? <div className="chat-skill-confirm"><span>{confirmText(m.name, present, included)}</span><button type="button" disabled={busy} onClick={() => void uninstall(present)}>Uninstall</button><button type="button" onClick={() => setRemoveId('')}>Cancel</button></div>
-              : <div className="skill-marketplace-entry-actions"><button type="button" disabled={busy} onClick={() => { setRemoveId(''); setReview(entry); }}>{present.length ? (included ? 'Manage skill' : 'Review update') : 'Review skill'}</button>
-                {!!present.length && <button type="button" className="chat-skill-remove" disabled={busy} aria-label={`Uninstall ${m.name}`} onClick={() => setRemoveId(present[0].id)}>Uninstall</button>}</div>}
+              ? <div className="chat-skill-confirm"><span>{confirmText(m.name, present, included)}</span><button type="button" disabled={busy} onClick={() => void uninstall(present)}>{t('Desinstalar')}</button><button type="button" onClick={() => setRemoveId('')}>{t('Cancelar')}</button></div>
+              : <div className="skill-marketplace-entry-actions"><button type="button" disabled={busy} onClick={() => { setRemoveId(''); setReview(entry); }}>{present.length ? (included ? t('Gestionar skill') : t('Revisar actualización')) : t('Revisar skill')}</button>
+                {!!present.length && <button type="button" className="chat-skill-remove" disabled={busy} aria-label={tx('Desinstalar {name}', { name: m.name })} onClick={() => setRemoveId(present[0].id)}>{t('Desinstalar')}</button>}</div>}
           </>);
         }
 
@@ -342,16 +344,16 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
             description: card.description, update: !!present?.activeVersion, permissions: pluginPermissions(card.entry), entry: card.entry } : null;
           return shell(<>
             {open && <div className="marketplace-card-facts">
-              <small>{card.by} · {offered?.version ?? present?.activeVersion ?? present?.pendingVersion}{present?.activeVersion && offered && offered.version !== present.activeVersion ? ` · Installed ${present.activeVersion}` : ''}</small>
-              <small>{present?.pendingReason === 'permissions' ? 'An update is waiting for permission review.' : present?.pendingReason === 'incompatible' ? `Version ${present.pendingVersion} needs a newer Nodus.` : `${present?.skills.length ?? offered?.skills.length ?? 0} skills · ${present?.capabilities.length ?? offered?.capabilities.length ?? 0} capabilities`}</small>
-              {present && <label><input type="checkbox" checked={present.autoUpdate} onChange={event => void run(async () => { setInstalledPlugins(await window.nodus.setPluginAutoUpdate(present.id, event.target.checked)); })} /> Auto-update</label>}
+              <small>{card.by} · {offered?.version ?? present?.activeVersion ?? present?.pendingVersion}{present?.activeVersion && offered && offered.version !== present.activeVersion ? tx(' · Instalada {version}', { version: present.activeVersion }) : ''}</small>
+              <small>{present?.pendingReason === 'permissions' ? t('Hay una actualización esperando a que apruebes sus permisos.') : present?.pendingReason === 'incompatible' ? tx('La versión {version} necesita un Nodus más reciente.', { version: present.pendingVersion ?? '' }) : tx('{skills} skills · {capabilities} capacidades', { skills: present?.skills.length ?? offered?.skills.length ?? 0, capabilities: present?.capabilities.length ?? offered?.capabilities.length ?? 0 })}</small>
+              {present && <label><input type="checkbox" checked={present.autoUpdate} onChange={event => void run(async () => { setInstalledPlugins(await window.nodus.setPluginAutoUpdate(present.id, event.target.checked)); })} /> {t('Actualización automática')}</label>}
               {present?.secrets.map(secret => <PluginSecretForm key={`${secret.capabilityId}:${secret.id}`} plugin={present} secret={secret} refresh={async () => setInstalledPlugins(await window.nodus.listInstalledPlugins())} />)}
             </div>}
             <div className="skill-marketplace-entry-actions">
-              {prompt && (!present || updatable || present.pendingReason === 'permissions') && <button type="button" className="chat-skill-primary" disabled={busy} onClick={() => setPluginReview(prompt)}>{present?.activeVersion ? 'Review update' : 'Review skill'}</button>}
-              {present?.pendingReason === 'permissions' && !prompt && <button type="button" disabled title="Refresh its repository to review the requested permissions">Permission review unavailable</button>}
-              {present?.previousVersion && <button type="button" disabled={busy} onClick={() => void run(async () => { await window.nodus.rollbackPlugin(present.id); setInstalledPlugins(await window.nodus.listInstalledPlugins()); })}>Rollback to {present.previousVersion}</button>}
-              {present && <button type="button" className="chat-skill-remove" disabled={busy} onClick={() => void run(async () => { await window.nodus.removePlugin(present.id); setInstalledPlugins(await window.nodus.listInstalledPlugins()); setNotice('Skill uninstalled.'); })}>Uninstall</button>}
+              {prompt && (!present || updatable || present.pendingReason === 'permissions') && <button type="button" className="chat-skill-primary" disabled={busy} onClick={() => setPluginReview(prompt)}>{present?.activeVersion ? t('Revisar actualización') : t('Revisar skill')}</button>}
+              {present?.pendingReason === 'permissions' && !prompt && <button type="button" disabled title={t('Actualiza su repositorio para revisar los permisos solicitados')}>{t('Revisión de permisos no disponible')}</button>}
+              {present?.previousVersion && <button type="button" disabled={busy} onClick={() => void run(async () => { await window.nodus.rollbackPlugin(present.id); setInstalledPlugins(await window.nodus.listInstalledPlugins()); })}>{tx('Volver a la versión {version}', { version: present.previousVersion })}</button>}
+              {present && <button type="button" className="chat-skill-remove" disabled={busy} onClick={() => void run(async () => { await window.nodus.removePlugin(present.id); setInstalledPlugins(await window.nodus.listInstalledPlugins()); setNotice(t('Skill desinstalada.')); })}>{t('Desinstalar')}</button>}
             </div>
           </>);
         }
@@ -361,7 +363,7 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
           const providers = capabilities?.providers.filter(provider => provider.plugin?.id === entry.id) ?? [];
           return shell(<>
             {state?.pending?.reason === 'permissions' && <p className="capability-packages-warning" role="status">{state.active ? t('La actualización pide permisos nuevos. Revísalos y apruébala para instalarla.') : t('Revisa lo que pide. Si lo rechazas, no se instala nada.')}</p>}
-            {open && <div className="marketplace-card-facts"><small>NodusResearch · {state?.active && state.active.version !== entry.version ? `${state.active.version} → ${entry.version}` : entry.version} · verified</small><PackageFacts entry={entry} state={state} providers={providers} />{state?.active && <label><input type="checkbox" checked={state.autoUpdate} onChange={event => void runCapability(entry.id, () => window.nodus.setCapabilityAutoUpdate(entry.id, event.target.checked))} /> {t('Actualizar este paquete automáticamente')}</label>}{providers.filter(provider => provider.hasSettings).map(provider => <SettingsForm key={provider.id} capabilityId={provider.id} onChanged={refreshCapabilities} />)}</div>}
+            {open && <div className="marketplace-card-facts"><small>NodusResearch · {state?.active && state.active.version !== entry.version ? `${state.active.version} → ${entry.version}` : entry.version} · {t('verificado')}</small><PackageFacts entry={entry} state={state} providers={providers} />{state?.active && <label><input type="checkbox" checked={state.autoUpdate} onChange={event => void runCapability(entry.id, () => window.nodus.setCapabilityAutoUpdate(entry.id, event.target.checked))} /> {t('Actualizar este paquete automáticamente')}</label>}{providers.filter(provider => provider.hasSettings).map(provider => <SettingsForm key={provider.id} capabilityId={provider.id} onChanged={refreshCapabilities} />)}</div>}
             <PackageActions entry={entry} state={state} busy={capabilityBusy} run={runCapability} install={installCapability} onReview={openCapabilityReview} />
           </>);
         }
@@ -370,14 +372,14 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
         const prompt: PluginPermissionPrompt = { kind: 'inbox', name: inbox.name, version: inbox.version,
           description: inbox.description, update: inbox.installed, permissions: inbox.permissions, inbox };
         return shell(<>
-          {open && <div className="marketplace-card-facts"><small>{inbox.author} · {inbox.version}{inbox.installed ? ' · Update' : ''}</small><small>{inbox.skills} skills · {inbox.capabilities} capabilities · waiting for review</small></div>}
-          <div className="skill-marketplace-entry-actions"><button className="chat-skill-primary" type="button" disabled={busy} onClick={() => setPluginReview(prompt)}>Review permissions</button><button type="button" disabled={busy} onClick={() => void run(async () => { setInboxPlugins(await window.nodus.discardInboxPlugin(inbox.directory)); })}>Discard</button></div>
+          {open && <div className="marketplace-card-facts"><small>{inbox.author} · {inbox.version}{inbox.installed ? t(' · Actualización') : ''}</small><small>{tx('{skills} skills · {capabilities} capacidades · pendiente de revisión', { skills: inbox.skills, capabilities: inbox.capabilities })}</small></div>}
+          <div className="skill-marketplace-entry-actions"><button className="chat-skill-primary" type="button" disabled={busy} onClick={() => setPluginReview(prompt)}>{t('Revisar permisos')}</button><button type="button" disabled={busy} onClick={() => void run(async () => { setInboxPlugins(await window.nodus.discardInboxPlugin(inbox.directory)); })}>{t('Descartar')}</button></div>
         </>);
       })}</div>
     </>}
-    {!!source?.errors.length && <details><summary>{source.errors.length} invalid packages skipped</summary>{source.errors.map((e, i) => <p key={i}>{e}</p>)}</details>}
-    <p className="skill-marketplace-policy">The official marketplace rejects skills that promote illegal activity, piracy, license circumvention, malware or unauthorized access. Independent sources are maintained by their owners.</p>
-    <button type="button" onClick={() => void window.nodus.openExternal(`${DEFAULT_SKILL_SOURCE}/blob/main/CONTRIBUTING.md`)}>Create and submit a skill ↗</button>
+    {!!source?.errors.length && <details><summary>{tx('{count} paquetes no válidos omitidos', { count: source.errors.length })}</summary>{source.errors.map((e, i) => <p key={i}>{e}</p>)}</details>}
+    <p className="skill-marketplace-policy">{t('El Marketplace oficial rechaza las skills que promueven actividades ilegales, la piratería, la elusión de licencias, el malware o el acceso no autorizado. Las fuentes independientes las mantienen sus propietarios.')}</p>
+    <button type="button" onClick={() => void window.nodus.openExternal(`${DEFAULT_SKILL_SOURCE}/blob/main/CONTRIBUTING.md`)}>{t('Crea y envía una skill ↗')}</button>
     {notice && <p role="status">{notice}</p>}{error && <p className="chat-skill-error" role="alert">{error}</p>}
   </div>;
 }

@@ -22,18 +22,23 @@ export function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** All distinct `nodus://` citations in the document, in first-seen order. */
+/**
+ * All distinct `nodus://` citations in the document, in first-seen order.
+ *
+ * Every kind counts, not only the academic ones: a study report cites
+ * `nodus://study/material/…` and a teaching unit cites its own, and a bibliography
+ * that silently drops them is worse than none. The URL is kept verbatim so a
+ * multi-segment link (`nodus://study/material/x`) survives the round trip.
+ */
 export function collectCitations(markdown: string): { label: string; url: string }[] {
   const out: { label: string; url: string }[] = [];
   const seen = new Set<string>();
-  const re = /\[([^\]]+)\]\(nodus:\/\/(idea|work|gap|contradiction|passage)\/([^)]+)\)/g;
+  const re = /\[([^\]]+)\]\((nodus:\/\/[^)\s]+)\)/g;
   let match: RegExpExecArray | null;
   while ((match = re.exec(markdown)) !== null) {
-    const id = decodeURIComponent(match[3]);
-    const url = `nodus://${match[2]}/${encodeURIComponent(id)}`;
-    const key = `${match[2]}:${id}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const url = match[2];
+    if (seen.has(url)) continue;
+    seen.add(url);
     out.push({ label: stripInlineMarkdown(match[1]), url });
   }
   return out;

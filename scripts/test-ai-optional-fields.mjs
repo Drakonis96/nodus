@@ -1,0 +1,126 @@
+// A custom gateway that refuses the reasoning field must not make the scan fail.
+//
+// Nodus adds `reasoning_effort` to background scans of a thinking model on a custom
+// endpoint, where it cannot know whether the gateway accepts it. Two recoveries keep
+// that safe:
+//   · a rejection that NAMES an optional field is replayed without the optional body
+//     (the pre-existing behaviour, for any provider);
+//   · a 400/422 from a custom endpoint after Nodus sent the reasoning field is replayed
+//     too, even when the gateway does not name it — a proxy in front of the real API
+//     often answers a bare "Bad Request", and without this the field we added would
+//     turn a scan that used to run into one that fails.
+//
+// A 400/422 is a refusal, not a generation, so a single replay cannot double-charge.
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(import.meta.url);
+const dir = mkdtempSync(path.join(tmpdir(), 'nodus-optional-fields-'));
+test.after(() => rmSync(dir, { recursive: true, force: true }));
+
+function load(file) {
+  const bundle = path.join(dir, `${path.basename(file, '.ts')}.cjs`);
+  execFileSync(
+    path.join(repoRoot, 'node_modules/.bin/esbuild'),
+    [path.join(repoRoot, file), '--bundle', '--platform=node', '--format=cjs', '--target=es2022', `--outfile=${bundle}`],
+    { cwd: repoRoot, stdio: 'inherit' },
+  );
+  return require(bundle);
+}
+
+const { rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields } = load('electron/ai/providerErrors.ts');
+
+/** A provider HTTP failure with the shape the OpenAI SDK throws. */
+const failure = (status, message) => Object.assign(new Error(message), { status, error: { message } });
+
+test('a rejection that names an optional field is always replayable', () => {
+  assert.equal(rejectsOptionalTransportField(failure(400, 'Unsupported parameter: reasoning_effort')), true);
+  assert.equal(rejectsOptionalTransportField(failure(400, 'Unknown field response_format')), true);
+  assert.equal(rejectsOptionalTransportField(failure(400, 'Invalid parameter: provider.only')), true);
+  assert.equal(shouldRetryWithoutOptionalFields(failure(400, 'Unsupported parameter: reasoning_effort')), true, 'no options needed');
+});
+
+test('a named rejection is only a 400; other statuses keep their meaning', () => {
+  assert.equal(rejectsOptionalTransportField(failure(422, 'Unknown field response_format')), false);
+  assert.equal(rejectsOptionalTransportField(failure(500, 'Unsupported parameter: reasoning_effort')), false);
+  assert.equal(rejectsOptionalTransportField(failure(429, 'Invalid parameter: reasoning_effort')), false);
+  assert.equal(rejectsOptionalTransportField(new Error('socket hang up')), false);
+});
+
+test('an unnamed custom rejection is replayable once Nodus sent the reasoning field', () => {
+  // The exact shape a proxy returns for a field it does not know: no field named.
+  assert.equal(
+    shouldRetryWithoutOptionalFields(failure(400, 'Bad Request'), { provider: 'custom', sentReasoning: true }),
+    true,
+  );
+  assert.equal(
+    shouldRetryWithoutOptionalFields(failure(422, 'Unprocessable Entity'), { provider: 'custom', sentReasoning: true }),
+    true,
+  );
+});
+
+test('the unnamed fallback stays narrow: custom only, reasoning only, 400/422 only', () => {
+  assert.equal(shouldRetryWithoutOptionalFields(failure(400, 'Bad Request'), { provider: 'custom', sentReasoning: false }), false, 'we added nothing, so we own nothing');
+  assert.equal(shouldRetryWithoutOptionalFields(failure(400, 'Bad Request'), { provider: 'custom' }), false);
+  assert.equal(shouldRetryWithoutOptionalFields(failure(400, 'Bad Request'), { provider: 'openai', sentReasoning: true }), false, 'only a custom gateway is unknown');
+  assert.equal(shouldRetryWithoutOptionalFields(failure(422, 'Bad Request'), { provider: 'openrouter', sentReasoning: true }), false);
+  assert.equal(shouldRetryWithoutOptionalFields(failure(500, 'Bad Request'), { provider: 'custom', sentReasoning: true }), false, 'a 5xx did not refuse the request');
+  assert.equal(shouldRetryWithoutOptionalFields(failure(429, 'Too Many Requests'), { provider: 'custom', sentReasoning: true }), false);
+  assert.equal(shouldRetryWithoutOptionalFields(new Error('Connection error.'), { provider: 'custom', sentReasoning: true }), false, 'transport failures belong to the retry layer');
+});
+
+test('a 400 that names `temperature` as deprecated is recoverable, and nothing else is', () => {
+  // Every shape a provider has used for this refusal, in both word orders.
+  assert.equal(rejectsTemperatureParameter(failure(400, "Unsupported value: 'temperature' does not support 0.15 with this model")), true);
+  assert.equal(rejectsTemperatureParameter(failure(400, 'temperature is deprecated for this model')), true);
+  assert.equal(rejectsTemperatureParameter(failure(400, 'The parameter temperature is not supported by this model')), true);
+  assert.equal(rejectsTemperatureParameter(failure(400, 'temperature is not allowed for reasoning models')), true);
+  assert.equal(rejectsTemperatureParameter(failure(400, 'Invalid parameter: temperature')), true);
+  // Strict on purpose: a refusal that does not name the field is never replayed, and a
+  // refusal is a 400 — a 5xx or a 429 is a different failure with its own retry layer.
+  assert.equal(rejectsTemperatureParameter(failure(400, 'Bad Request')), false, 'an unnamed refusal must not be replayed');
+  assert.equal(rejectsTemperatureParameter(failure(400, 'context length exceeded')), false);
+  assert.equal(rejectsTemperatureParameter(failure(422, 'temperature is deprecated')), false);
+  assert.equal(rejectsTemperatureParameter(failure(500, 'temperature is deprecated')), false);
+  assert.equal(rejectsTemperatureParameter(new Error('socket hang up')), false);
+});
+
+test('both transports drop the knob on that signal and keep the rest of the request', () => {
+  const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
+  const go = readFileSync(path.join(repoRoot, 'electron/ai/openCodeGoCompletion.ts'), 'utf8');
+  // The session memory is shared, not duplicated per transport, so a model learned on one
+  // route does not have to fail again on the other.
+  assert.match(source, /import \{ rememberTemperatureUnsupported, temperatureUnsupported \} from '\.\/samplingSupport';/);
+  assert.match(go, /import \{ rememberTemperatureUnsupported, temperatureUnsupported \} from '\.\/samplingSupport';/);
+  assert.doesNotMatch(source, /const temperatureUnsupportedModels = new Set<string>\(\)/);
+  // The generic transport replays without the field in both the non-streaming and the
+  // streaming path, and both keep the optional body.
+  assert.equal((source.match(/rejectsTemperatureParameter\(e\)/g) ?? []).length, 2);
+  assert.equal((source.match(/bodyFor\(true\)/g) ?? []).length, 2);
+  // OpenCode Go speaks its own HTTP, so it needs its own recovery — the one in aiClient
+  // never ran on that route.
+  assert.match(go, /rememberTemperatureUnsupported\(\{ provider: 'opencode-go', model \}\);/);
+  assert.match(go, /return send\(withoutTemperature\(merged\)\);/);
+  assert.match(go, /function withoutTemperature\(body: Record<string, unknown>\): Record<string, unknown> \{/);
+  assert.match(go, /if \(temperatureUnsupported\(ref\)\) return \{\};/);
+});
+
+test('the transport recovers by dropping only the reasoning field, keeping JSON mode', () => {
+  const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
+  // The predicate is imported, not reimplemented locally.
+  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
+  assert.doesNotMatch(source, /^function rejectsOptionalTransportField/m);
+  // Both the non-streaming and the streaming transport mark whether the field was sent…
+  assert.equal((source.match(/const sentReasoning = \(extras as any\)\.reasoning_effort !== undefined;/g) ?? []).length, 2);
+  // …and both replay through the helper that keeps everything except the field we added.
+  assert.equal((source.match(/retryOptionalBody\(model, extras, e, sentReasoning\)/g) ?? []).length, 2);
+  assert.match(source, /if \(sentReasoning && !rejectsOptionalTransportField\(error\)\) \{/);
+  assert.match(source, /delete rest\.reasoning_effort;/);
+});

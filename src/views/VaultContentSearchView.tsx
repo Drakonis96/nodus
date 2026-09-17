@@ -35,9 +35,9 @@ export function VaultContentSearchView({ options, onOpen, testId }: {
     }, 220);
     return () => { active = false; window.clearTimeout(timer); };
   }, [query, kinds, limit]);
-  return <div className="flex h-full min-h-0 flex-col p-6" data-testid={testId}>
+  return <div className="global-search-workspace theme-workspace-surface flex h-full min-h-0 flex-col p-6" data-testid={testId}>
     <div className="mx-auto w-full max-w-3xl shrink-0">
-      <div className="mb-4 flex items-center gap-3"><Icon name="search" size={22} className="text-indigo-500 dark:text-indigo-300" /><h1 className="text-xl font-semibold">{t('Búsqueda global')}</h1></div>
+      <div className="mb-4 flex items-center gap-3"><Icon name="search" size={22} className="global-search-accent text-indigo-500 dark:text-indigo-300" /><h1 className="text-xl font-semibold">{t('Búsqueda global')}</h1></div>
       <div className="relative"><Icon name="search" size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" /><input autoFocus aria-label={t('Buscar')} className="input input-with-leading-icon w-full pr-10" placeholder={t('Escribe para buscar…')} value={query} onChange={(event) => { setQuery(event.target.value); setLimit(80); }} />{loading && <span className="absolute right-3 top-1/2 -translate-y-1/2"><Icon name="sync" size={15} className="animate-spin text-neutral-500" /></span>}</div>
       <SearchKindFilters options={options} selected={kinds} onChange={(next) => { setKinds(next); setLimit(80); }} />
       {error && <p role="status" className="mt-3 text-xs text-amber-600 dark:text-amber-400">{error}</p>}
@@ -48,7 +48,7 @@ export function VaultContentSearchView({ options, onOpen, testId }: {
       {query.trim().length >= 2 && !loading && !results.length && <p className="py-10 text-center text-sm text-neutral-500">{t('Sin resultados.')}</p>}
       {results.map((hit) => {
         const meta = options.find((option) => option.kind === hit.kind);
-        return <button key={`${hit.kind}:${hit.id}`} onClick={() => onOpen(hit)} className="flex w-full items-start gap-3 rounded-md border border-neutral-200 bg-white px-3 py-2 text-left hover:border-indigo-400 dark:border-neutral-800 dark:bg-neutral-900/40">
+        return <button key={`${hit.kind}:${hit.id}`} onClick={() => onOpen(hit)} className="global-search-result flex w-full items-start gap-3 rounded-md border border-neutral-200 bg-white px-3 py-2 text-left hover:border-indigo-400 dark:border-neutral-800 dark:bg-neutral-900/40">
           <Icon name={meta?.icon ?? 'search'} size={15} className="mt-0.5 shrink-0 text-neutral-500" />
           <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="truncate text-sm font-medium">{hit.title}</span><span className="text-[10px] text-neutral-500">{t(meta?.label ?? hit.kind)}</span></span>{hit.subtitle && <span className="block truncate text-xs text-neutral-500">{hit.subtitle}</span>}{hit.snippet && <span className="mt-0.5 line-clamp-2 block text-xs text-neutral-500">{hit.snippet}</span>}</span>
         </button>;

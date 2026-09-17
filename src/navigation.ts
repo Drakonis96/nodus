@@ -412,8 +412,21 @@ export interface LibraryNavigationTarget {
   healthBucket?: CorpusHealthBucketId;
   /** Open a transverse Library item, entering its clean reader when available. */
   readerItemId?: string;
+  /** Physical 1-based page the reader must jump to once the item is open. */
+  readerPage?: number | null;
   /** Open the installed/downloadable CSL style manager. */
   citationStyles?: boolean;
+}
+
+/**
+ * Navigation into the study library that opens one material. A citation adds the
+ * point it was anchored to, so the viewer opens at that page or slide instead of
+ * at the beginning of the file.
+ */
+export interface StudyMaterialNavigationTarget {
+  id: string;
+  pageNumber?: number | null;
+  slideNumber?: number | null;
 }
 
 /** Navigation into Ideas that opens the complete detail panel for one idea. */

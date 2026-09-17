@@ -14,6 +14,7 @@ import type {
   DeepResearchSectionLimit,
   Person,
   PromptLanguage,
+  WritingWorkshopExportFormat,
   WritingWorkshopSavedDraft,
   DecorativeImage,
   DecorativeImageStyle,
@@ -62,7 +63,7 @@ import {
   ReaderSelectionActions,
   type ReaderSelectionActionsHandle,
 } from '../components/ReaderSelectionActions';
-import { t, tx, getActiveLang } from '../i18n';
+import { errorText, t, tx, getActiveLang } from '../i18n';
 import { DeepResearchSectionLengthField } from '../components/DeepResearchSectionLengthField';
 import { PROMPT_LANGUAGE_OPTIONS } from '@shared/promptLanguageOptions';
 import {
@@ -510,7 +511,7 @@ export function DeepResearchView({
     const unsaved = laneJobs.find((item) => item.saveError && !seenUnsavedRef.current.has(item.id));
     if (!unsaved?.saveError) return;
     seenUnsavedRef.current.add(unsaved.id);
-    setError(unsaved.saveError);
+    setError(errorText(unsaved.saveError));
   }, [laneJobs]);
 
   // Every queued report is saved by the main process, so refresh the gallery once a
@@ -790,7 +791,7 @@ export function DeepResearchView({
     setArchiveIds([...selected]);
   };
 
-  const exportDraft = async (format: 'markdown' | 'pdf') => {
+  const exportDraft = async (format: WritingWorkshopExportFormat) => {
     if (!openDraft) return;
     setExporting(true);
     setError(null);
@@ -923,7 +924,7 @@ export function DeepResearchView({
 
   if (mode === 'reader' && openDraft) {
     return (
-      <div className="h-full flex flex-col min-h-0">
+      <div className="theme-workspace-surface h-full flex flex-col min-h-0">
         {workspaceTabs}
         {/* Full screen is the same reader lifted out of the shell: a fixed layer over
             the window, so the report and its own toolbar are all that is left on
@@ -996,7 +997,7 @@ export function DeepResearchView({
   }
 
   return (
-    <div className="h-full flex flex-col min-h-0">
+    <div className="theme-workspace-surface h-full flex flex-col min-h-0">
       {workspaceTabs}
       <SectionHeader
         icon="telescope"
@@ -1026,7 +1027,7 @@ export function DeepResearchView({
 
       {(message || error) && (
         <div className={`px-4 py-2 text-sm border-b ${error ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200' : 'border-neutral-200 text-neutral-500 dark:border-neutral-800 dark:text-neutral-400'}`}>
-          {error ?? message}
+          {errorText(error ?? message)}
         </div>
       )}
 
@@ -1572,6 +1573,7 @@ function DraftListRow({
 const ARCHIVE_FORMATS: { value: DeepResearchArchiveFormat; label: string; hint: string }[] = [
   { value: 'markdown', label: 'Markdown (.md)', hint: 'Texto editable, listo para otro editor. Se prepara al instante.' },
   { value: 'pdf', label: 'PDF', hint: 'El informe maquetado, con portada y matriz. Tarda unos segundos por informe.' },
+  { value: 'docx', label: 'Word (.docx)', hint: 'Documento de Word con las figuras incrustadas, para revisar o comentar.' },
   { value: 'both', label: 'Markdown y PDF', hint: 'Ambos archivos de cada informe dentro del mismo ZIP.' },
 ];
 
@@ -1994,7 +1996,7 @@ function ReaderView({
   onSaveToNotes: () => void;
   onToggleRead: () => void;
   onTranslate: () => void;
-  onExport: (format: 'markdown' | 'pdf') => void;
+  onExport: (format: WritingWorkshopExportFormat) => void;
   onCitation: (target: CitationTarget) => void;
   onImageChange: (image: DecorativeImage) => void;
   onOpenStudyDocument?: (id: string) => void;
@@ -2485,8 +2487,9 @@ export function ComposerModal({
           <DocumentSkillsControl value={documentSkills.policy} onChange={documentSkills.setPolicy} onValidityChange={documentSkills.setValid} />
           <div className="flex flex-wrap items-center gap-2">
             <button
-              className={`rounded-full border px-2.5 py-1 text-xs ${includeImage ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200' : 'border-neutral-700 text-neutral-500'}`}
+              className={`theme-toggle-button rounded-full border px-2.5 py-1 text-xs ${includeImage ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200' : 'border-neutral-700 text-neutral-500'}`}
               onClick={() => onIncludeImage(!includeImage)}
+              aria-pressed={includeImage}
               title={t('La imagen se genera una sola vez después de guardar el informe')}
             >
               <Icon name={includeImage ? 'check' : 'minus'} size={11} className="mr-1" /> {t('Imagen decorativa')}

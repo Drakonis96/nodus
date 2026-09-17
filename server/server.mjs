@@ -1581,6 +1581,9 @@ async function route(req, res) {
   // in both deployments; the existing advanced-only AI/artifact surfaces retain their gate.
   if (await nativeVaultRoutes.handle(req, res, url)) return;
   if (await nativeVaultRoutes.handleLegacyRead(req, res, url)) return;
+  // Portable profile preferences are needed for appearance/theme sync in both
+  // basic and advanced deployments. Server AI itself remains advanced-only.
+  if (await aiRoutes.handleProfilePreferences(req, res, url)) return;
   if (DEPLOYMENT_MODE === 'advanced' && await artifactRoutes.handle(req, res, url)) return;
   if (DEPLOYMENT_MODE === 'advanced' && await aiRoutes.handle(req, res, url)) return;
 

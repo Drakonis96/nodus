@@ -56,7 +56,10 @@ export function researchReasoningProfile(ref: ModelRef | null | undefined, info?
     return unknown();
   }
   if (ref.provider === 'deepseek') {
-    if (/v4|deepseek-chat|deepseek-reasoner/.test(id)) return profile('toggle', 'none', 'low', 'high', 'max');
+    // DeepSeek's current ids are unversioned (`deepseek-flash`, `deepseek-pro`) alongside the
+    // pinned `deepseek-v4-*` names; both default to thinking-on, so both need the same toggle
+    // and budget. Matching only `/v4/` silently left the unversioned ids unmanaged.
+    if (/v4|deepseek-chat|deepseek-reasoner|deepseek-(?:flash|pro)(?:-|$)/.test(id)) return profile('toggle', 'none', 'low', 'high', 'max');
     return unknown();
   }
   if (ref.provider === 'xiaomi') return /mimo/.test(id) ? profile('toggle', 'none', 'on') : unknown();
@@ -80,7 +83,10 @@ export function researchReasoningProfile(ref: ModelRef | null | undefined, info?
   }
   if (ref.provider === 'opencode-go') {
     if (/^gpt-/.test(id)) return researchReasoningProfile({ provider: 'openai', model: id });
-    if (/^deepseek-v4/.test(id)) return profile('effort', 'low', 'high', 'max');
+    // The unversioned `deepseek-flash`/`deepseek-pro` ids are the same served family as the
+    // pinned `deepseek-v4-*` names, so they take the route's level contract instead of
+    // falling through to `unknown()` and leaving the model with no effort control at all.
+    if (/^deepseek-(?:v4|flash|pro)/.test(id)) return profile('effort', 'low', 'high', 'max');
     if (/^qwen/.test(id)) return profile('toggle', 'none', 'on');
     if (/^glm-5\.3-flash/.test(id)) return profile('effort', 'low', 'medium', 'high', 'max');
     if (/^glm-5/.test(id)) return profile('toggle', 'none', 'on');

@@ -79,7 +79,7 @@ try {
   const embeddedMain = await pdf.embedPng(tile(0, 0, 160, 160));
   const embeddedRight = await pdf.embedPng(tile(160, 0, 60, 220));
   const embeddedBottom = await pdf.embedPng(tile(0, 160, 160, 60));
-  for (let pageNumber = 1; pageNumber <= 3; pageNumber += 1) {
+  for (let pageNumber = 1; pageNumber <= 4; pageNumber += 1) {
     const page = pdf.addPage([595, 842]);
     page.drawText('REVISTA DE HISTORIA · 2026', { x: 80, y: 810, size: 8, font });
     page.drawText(String(pageNumber), { x: 290, y: 18, size: 8, font });
@@ -123,11 +123,33 @@ try {
         page.drawText(`Resultado ${100 + row}`, { x: 350, y: 335 - row * 20, size: 9, font });
       }
       page.drawText('Fuente: elaboración de prueba', { x: 70, y: 120, size: 9, font });
-    } else {
+    } else if (pageNumber === 3) {
       page.drawText('Conclusiones', { x: 70, y: 760, size: 16, font: bold });
       page.drawText('La conclusión mantiene separado el original del texto limpio [1].', { x: 70, y: 725, size: 11, font });
       page.drawText('Referencias', { x: 70, y: 680, size: 16, font: bold });
       page.drawText('[1] Pérez, J. Una referencia de prueba. 2026.', { x: 70, y: 650, size: 10, font });
+    } else {
+      // The layout that broke the Documentary Index on real papers: the tail of a left-column
+      // sentence and the head of the one beside it share a baseline, and grouping fragments by
+      // height alone stitched them together — "We introduce two simple global hyperaccuracy".
+      page.drawText('Two-column fixture', { x: 50, y: 780, size: 16, font: bold });
+      // Lines are as short as a real column's: a column's text never reaches the gutter.
+      const leftColumn = [
+        'LEFT ONE: first words of the left column.',
+        'LEFT TWO: the sentence continues here.',
+        'LEFT THREE: more words in the left column.',
+        'LEFT FOUR: the paragraph nears its end.',
+        'LEFT FIVE: it ends with global hyper',
+      ];
+      const rightColumn = [
+        'accuracy of the right column opens RIGHT ONE.',
+        'Then a second sentence carries RIGHT TWO.',
+        'A third sentence keeps RIGHT THREE going.',
+        'A fourth sentence reaches RIGHT FOUR.',
+        'The last sentence closes RIGHT FIVE.',
+      ];
+      leftColumn.forEach((text, index) => page.drawText(text, { x: 50, y: 720 - index * 18, size: 10, font }));
+      rightColumn.forEach((text, index) => page.drawText(text, { x: 320, y: 720 - index * 18, size: 10, font }));
     }
   }
   const pdfBytes = Buffer.from(await pdf.save());
@@ -176,12 +198,35 @@ try {
   assert.match(markdown, /!\[Table · page 2\]\(assets\/table-p0002-/);
   assert.match(markdown, /<!-- nodus-table-transcription/);
   assert.match(markdown, /!\[Figura 1\. Distribución de resultados\]\(assets\//);
+
+  // A two-column page is read column by column, and a line never crosses the gutter between
+  // them. Before this, "global hyper" at the end of the left column and "accuracy of the right
+  // column opens…" beside it became one sentence, and the corrupted quote reached the profile.
+  // Every fixture line carries its own column marker, so a paragraph that mixes the two is the
+  // bug: "global hyper" closing one column and "accuracy…" opening the next were once joined
+  // into a single sentence, and the corrupted quote reached the profile as literal support.
+  const columnParagraphs = markdown.split(/\n{2,}/).filter((block) => /(LEFT|RIGHT) (ONE|TWO|THREE|FOUR|FIVE)/.test(block));
+  assert.equal(columnParagraphs.length, 2, 'each column is one paragraph');
+  for (const block of columnParagraphs) {
+    const sides = [/LEFT (ONE|TWO|THREE|FOUR|FIVE)/.test(block), /RIGHT (ONE|TWO|THREE|FOUR|FIVE)/.test(block)];
+    assert.ok(!(sides[0] && sides[1]), `a paragraph must not mix the two columns: ${block.slice(0, 90)}`);
+  }
+  const columnOrder = [
+    'Two-column fixture',
+    'LEFT ONE', 'LEFT TWO', 'LEFT THREE', 'LEFT FOUR', 'LEFT FIVE',
+    'accuracy of the right column opens RIGHT ONE', 'RIGHT TWO', 'RIGHT THREE', 'RIGHT FOUR', 'RIGHT FIVE',
+  ].map((marker) => {
+    const at = markdown.indexOf(marker);
+    assert.ok(at >= 0, `the two-column fixture keeps ${marker}`);
+    return at;
+  });
+  assert.deepEqual([...columnOrder].sort((a, b) => a - b), columnOrder, 'the left column is read whole before the right one');
   const assets = await readdir(path.join(path.dirname(path.join(folder, extractedRecord.files.reader)), 'assets'));
   assert.equal(assets.filter((file) => file.startsWith('figure-') && file.endsWith('.png')).length, 1, 'adjacent InDesign image tiles render as one logical figure');
   assert.equal(assets.filter((file) => file.startsWith('table-') && file.endsWith('.png')).length, 1, 'complex tables use one faithful visual while retaining a hidden text transcript');
   const sourceMap = JSON.parse(await readFile(path.join(folder, extractedRecord.files.sourceMap), 'utf8'));
   const quality = JSON.parse(await readFile(path.join(folder, extractedRecord.files.qualityReport), 'utf8'));
-  assert.equal(sourceMap.pages.length, 3);
+  assert.equal(sourceMap.pages.length, 4);
   assert.equal(sourceMap.source.sha256, originalHash);
   assert.equal(sourceMap.reader.sha256, createHash('sha256').update(markdown).digest('hex'));
   assert.ok(sourceMap.blocks.every((block) => markdown.slice(block.markdown.start, block.markdown.end).length > 0));

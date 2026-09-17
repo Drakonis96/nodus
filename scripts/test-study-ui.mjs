@@ -642,7 +642,8 @@ test('study material state reuses database select chips', async () => {
   assert.match(organization, /data-testid=\{`study-organization-material-\$\{material\.id\}`\}/);
   assert.match(organization, /documents\.length \+ scopedMaterials\.length/);
   assert.match(organization, /onOpenMaterial\(material\.id\)/);
-  assert.match(app, /const openMaterial = \(ctx: ViewContext\) => \(id: string\) => \{\s*ctx\.setStudyMaterialTarget\(id\);\s*ctx\.setView\('studyLibrary'\);/);
+  assert.match(app, /const openMaterial = \(ctx: ViewContext\) => \(id: string, location\?: StudySearchLocation \| null\) => \{\s*ctx\.setStudyMaterialTarget\(\{\s*id,\s*pageNumber: location\?\.pageNumber \?\? null,\s*slideNumber: location\?\.slideNumber \?\? null,\s*\}\);\s*ctx\.setView\('studyLibrary'\);/,
+    'a study material jump carries the cited page or slide, not only the material id');
   assert.match(materials, /className="absolute inset-0 z-40 flex flex-col/);
   assert.doesNotMatch(materials, /data-testid="study-material-viewer"[^\n]*fixed/);
   assert.match(materials, /material\.extension === 'md' \|\| material\.extension === 'markdown'/);

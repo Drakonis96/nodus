@@ -91,6 +91,11 @@
 .capability-view-summary { padding: 12px 14px 0; font-size: 13px; }
 .capability-view-note { padding: 6px 14px 12px; font-size: 12px; opacity: .78; }
 .chat-capability-orphan .chat-skill-primary { margin: 0 14px 14px; }
+/* A JSON result is evidence a tool returned, not the deliverable: it stays collapsed
+   so the figure the user asked for keeps the centre of the message. */
+.chat-capability-evidence summary { padding: 10px 15px; font-size: 12px; opacity: .8; cursor: pointer; }
+.chat-capability-evidence summary:hover { opacity: 1; }
+.chat-capability-evidence pre { margin: 0; padding: 0 15px 14px; max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
 
 :is(.light, .nodi-theme-light) .capability-view-badge[data-tone='success'] { color: #047857; }
 :is(.light, .nodi-theme-light) .capability-view-badge[data-tone='warning'] { color: #92400e; }

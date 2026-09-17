@@ -34,4 +34,9 @@ export const DIARIZATION_TRANSLATIONS = {
     'Analizando voces…': 'Sesler analiz ediliyor…',
     'La diarización usa Gemini Flash Lite para distinguir voces y conserva literalmente el texto.': 'Konuşmacı ayrıştırma, sesleri ayırt etmek için Gemini Flash Lite kullanır ve metni harfiyen korur.',
   },
+  'zh-CN': {
+    'Detectar hablantes': '检测说话人',
+    'Analizando voces…': '正在分析声音…',
+    'La diarización usa Gemini Flash Lite para distinguir voces y conserva literalmente el texto.': '说话人分离使用 Gemini Flash Lite 区分声音，并逐字保留文本。',
+  },
 } as const;

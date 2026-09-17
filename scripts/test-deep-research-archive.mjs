@@ -81,6 +81,10 @@ await build({
     virtual(/ai\/documentVisuals$/, `
       export const getDocumentVisuals = (target) => globalThis.__nodusArchiveHooks.visuals.get(target.id) ?? null;
     `),
+    // The exporter reads the active interface language for its dialog title.
+    virtual(/db\/settingsRepo$/, `
+      export const getSettings = () => ({ uiLanguage: 'es' });
+    `),
     virtual(/htmlToPdf$/, `
       export const htmlToPdfBytes = async (html) => Buffer.from(await globalThis.__nodusArchiveHooks.pdf(html));
     `),
@@ -121,6 +125,12 @@ function seed(...drafts) {
 }
 
 const entries = (zipPath) => new AdmZip(zipPath).getEntries().map((entry) => entry.entryName).sort();
+
+/** A 2×2 PNG: real enough for Word to accept, small enough to inline. */
+const FIGURE_POSTER = `data:image/png;base64,${Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEklEQVR42mP8z8BQz0AEYBxVSF8FANHkAwHsoxvFAAAAAElFTkSuQmCC',
+  'base64',
+).toString('base64')}`;
 
 test('a markdown archive holds one file per report, with the report inside it', async () => {
   const ids = seed(savedDraft('a', 'Primer informe', 'Frase reconocible.'), savedDraft('b', 'Segundo informe'));
@@ -181,6 +191,49 @@ test('a report whose PDF fails is reported and leaves no half-written pair behin
     assert.deepEqual(entries(hooks.savePath), ['informe-bueno.md', 'informe-bueno.pdf']);
   } finally {
     hooks.pdf = async () => (await (await PDFDocument.create()).save()).buffer;
+  }
+});
+
+test('a docx archive holds one Word document per report, with the report inside it', async () => {
+  const ids = seed(savedDraft('a', 'Primer informe', 'Frase reconocible.'), savedDraft('b', 'Segundo informe'));
+  hooks.savePath = path.join(tmp, 'docx.zip');
+  const result = await exportDeepResearchArchive({ ids, format: 'docx' });
+
+  assert.equal(result.count, 2);
+  assert.deepEqual(result.failed, []);
+  assert.deepEqual(entries(hooks.savePath), ['primer-informe.docx', 'segundo-informe.docx']);
+  const bytes = new AdmZip(hooks.savePath).getEntry('primer-informe.docx').getData();
+  assert.equal(bytes.subarray(0, 2).toString('latin1'), 'PK', 'a Word document is a zip');
+  const xml = new AdmZip(bytes).readAsText('word/document.xml');
+  assert.match(xml, /Primer informe/);
+  assert.match(xml, /Frase reconocible\./);
+});
+
+test('a report with figures carries them inside its Word document, not beside it', async () => {
+  const [id] = seed(savedDraft('a', 'Informe ilustrado', 'Cuerpo del informe.'));
+  // The manifest matches the rendered body block, so the figure is inserted where
+  // the report says it belongs; the id is the exporter's own block id.
+  hooks.visuals = new Map([[id, {
+    blocks: [{ id: 'body:9', field: 'body', index: 9, markdown: 'Cuerpo del informe.' }],
+    figures: [{ id: 'f1', blockId: 'body:9', state: 'ready', poster: FIGURE_POSTER, caption: 'Una figura', sources: [] }],
+  }]]);
+  hooks.savePath = path.join(tmp, 'figures.zip');
+  try {
+    const result = await exportDeepResearchArchive({ ids: [id], format: 'docx' });
+
+    assert.equal(result.count, 1);
+    assert.deepEqual(entries(hooks.savePath), ['informe-ilustrado.docx'], 'no loose asset files next to it');
+    const bytes = new AdmZip(hooks.savePath).getEntry('informe-ilustrado.docx').getData();
+    const media = new AdmZip(bytes)
+      .getEntries()
+      .filter((entry) => !entry.isDirectory && entry.entryName.startsWith('word/media/'));
+    assert.equal(media.length, 1, 'the figure is embedded in the document');
+    assert.equal(new AdmZip(bytes).readFile(media[0]).toString('base64'), FIGURE_POSTER.split(',')[1]);
+    const xml = new AdmZip(bytes).readAsText('word/document.xml');
+    assert.match(xml, /Cuerpo del informe\./);
+    assert.doesNotMatch(xml, /figure-f1\.png/, 'the asset path never reaches the reader');
+  } finally {
+    hooks.visuals = new Map();
   }
 });
 

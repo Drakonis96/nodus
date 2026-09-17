@@ -151,6 +151,36 @@ try {
   org.deleteStudyTemplate(template.id);
   assert.equal(org.getStudyWorkspace().templates.length, 0, 'template deletion works');
 
+  // An answer saved from the research chat: the dialog builds the note, the repo stores
+  // it, and the vault lists it in the topic the dialog was pointed at.
+  const { buildStudyNoteDocument } = require(path.join(repoRoot, 'src/studyNoteFromChat.ts'));
+  const captured = org.createStudyDocument(buildStudyNoteDocument({
+    title: 'Resumen del chat',
+    content: '# Revoluciones\n\nLa respuesta que el usuario leyó.',
+    source: {
+      origin: 'assistant',
+      researchChat: {
+        surface: 'study', conversationId: 'chat-1', conversationTitle: 'Historia contemporánea',
+        messageId: 'answer-1', messageIndex: 1,
+        references: [{ label: 'Diapositivas', subtitle: 'Tema 2', href: 'nodus://study/material/mat-1' }],
+      },
+    },
+    placement: { courseId: course.id, subjectId: subject.id, folderId: folder.id, topicId: subtopic.id },
+    savedAt: '2026-09-17T10:00:00.000Z',
+  }));
+  assert.equal(captured.kind, 'apunte');
+  assert.match(captured.contentMarkdown, /\*\*Procedencia:\*\*/);
+  const capturedWorkspace = org.getStudyWorkspace();
+  assert.equal(capturedWorkspace.documents.find((item) => item.id === captured.id).title, 'Resumen del chat');
+  const capturedPlacement = capturedWorkspace.placements.find((item) => item.documentId === captured.id);
+  assert.deepEqual(
+    { courseId: capturedPlacement.courseId, subjectId: capturedPlacement.subjectId, folderId: capturedPlacement.folderId, topicId: capturedPlacement.topicId },
+    { courseId: course.id, subjectId: subject.id, folderId: folder.id, topicId: subtopic.id },
+    'the captured note is filed where the dialog said',
+  );
+  const capturedTreeDocs = shared.buildStudyTree(org.getStudyWorkspace())[0].subjects[0].topics[0].children[0].documents.map((item) => item.id);
+  assert.ok(capturedTreeDocs.includes(captured.id), 'the captured note appears in the topic tree');
+
   // Upgrade a genuine v52 database and prove unrelated content survives intact.
   const legacyPath = path.join(root, 'legacy-v52.sqlite');
   const legacy = new Database(legacyPath);

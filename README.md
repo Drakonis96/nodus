@@ -1,10 +1,6 @@
 <p align="center">
-  <img src="site/assets/nodus-logo.png" width="104" alt="Nodus Research logo">
+  <img src="docs/screenshots/readme-banner.png" alt="Nodus Research, an open-source, local-first research workspace for academic research, teaching, study, databases and Zotero integration. Research deeper, teach smarter, study better. Free forever, no account required, on macOS, Windows and Linux.">
 </p>
-
-<h1 align="center">Nodus Research</h1>
-
-<p align="center"><strong>One place for research, teaching and study</strong></p>
 
 <p align="center">
   <a href="https://github.com/Drakonis96/nodus/releases/latest"><img alt="Download Nodus Research" src="https://img.shields.io/badge/Download_Nodus_Research-4f46e5?style=for-the-badge&amp;logo=github&amp;logoColor=white"></a>
@@ -19,17 +15,24 @@ Each vault is a focused workspace. Researchers can build a connected corpus, his
 
 Nodus Research is local first. Your vaults and search indexes live on your computer. You decide when a feature may use an online AI provider, and you can also work with compatible local models.
 
+The interface supports independent light/dark modes, built-in colour themes,
+and user-created themes. See the
+[appearance and themes reference](docs/appearance.md).
+
 ## Install Nodus Research
 
 Download the installer for your computer and open it. There is no server to configure and no account is required to begin.
 
-| Platform | Latest installer |
-| --- | --- |
-| macOS with Apple silicon | [Download DMG](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-mac-arm64.dmg) |
-| macOS with an Intel processor | [Download DMG](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-mac-x64.dmg) |
-| Windows 10 and 11 | [Download EXE](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-win-x64.exe) |
-| Ubuntu and Debian | [Download DEB](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-amd64.deb) |
-| Other Linux distributions | [Download AppImage](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-x86_64.AppImage) |
+| Platform | Latest installer | Downloads |
+| --- | --- | --- |
+| macOS with Apple silicon | [Download DMG](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-mac-arm64.dmg) | <img alt="Downloads of the macOS Apple silicon build" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnodusresearch.com%2Fdata%2Fgithub-release-downloads.json&amp;query=%24.installers.macosArm64&amp;label=downloads&amp;style=flat-square&amp;color=374151"> |
+| macOS with an Intel processor | [Download DMG](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-mac-x64.dmg) | <img alt="Downloads of the macOS Intel build" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnodusresearch.com%2Fdata%2Fgithub-release-downloads.json&amp;query=%24.installers.macosIntel&amp;label=downloads&amp;style=flat-square&amp;color=374151"> |
+| Windows 10 and 11 | [Download EXE](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-win-x64.exe) | <img alt="Downloads of the Windows build" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnodusresearch.com%2Fdata%2Fgithub-release-downloads.json&amp;query=%24.installers.windows&amp;label=downloads&amp;style=flat-square&amp;color=374151"> |
+| Ubuntu and Debian | [Download DEB](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-amd64.deb) | <img alt="Downloads of the Debian and Ubuntu package" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnodusresearch.com%2Fdata%2Fgithub-release-downloads.json&amp;query=%24.installers.linuxDeb&amp;label=downloads&amp;style=flat-square&amp;color=374151"> |
+| Fedora, openSUSE and other RPM-based distributions | [Download RPM](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-x86_64.rpm) | <img alt="Downloads of the RPM package" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnodusresearch.com%2Fdata%2Fgithub-release-downloads.json&amp;query=%24.installers.linuxRpm&amp;label=downloads&amp;style=flat-square&amp;color=374151"> |
+| Other Linux distributions | [Download AppImage](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-x86_64.AppImage) | <img alt="Downloads of the AppImage" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnodusresearch.com%2Fdata%2Fgithub-release-downloads.json&amp;query=%24.installers.linuxAppImage&amp;label=downloads&amp;style=flat-square&amp;color=374151"> |
+
+Each counter counts every download of the build in its row across every release — the installer and the update package that the app fetches on its own alike — so the six add up to the total in the header. They refresh with the same deploy as that total.
 
 The standalone Zotero plugin is available from the same release as [nodus-zotero.xpi](https://github.com/Drakonis96/nodus/releases/latest/download/nodus-zotero.xpi). In Zotero 9 or 10, open **Tools → Plugins**, choose **Install Add-on From File** from the gear menu, and select the downloaded file.
 
@@ -177,4 +180,4 @@ and relicense their contributions, including under commercial terms. See
 
 ## Disclaimer
 
-Nodus Research is a personal, independent open-source project developed in Spain. It currently sells no product or service and is not affiliated with, sponsored by or endorsed by any university, research group, company or unrelated software project that uses “Nodus” or a similar name. See the [name and independence notice](NAME_NOTICE.md).
+Nodus Research is a personal, independent open-source project. It currently sells no product or service and is not affiliated with, sponsored by or endorsed by any university, research group, company or unrelated software project that uses “Nodus” or a similar name. See the [name and independence notice](NAME_NOTICE.md).

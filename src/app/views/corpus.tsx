@@ -82,7 +82,7 @@ export const corpusViews = {
       onSnapshotChange={(patch) => snapshots.patch('dictionary', patch)}
       onOpenIdea={openIdea}
       onOpenAuthor={openAuthor}
-      onOpenLibraryWork={(id) => openLibraryItem(id, 'vault')}
+      onOpenLibraryWork={openLibraryItem}
     />
   ),
   authors: ({ activeVault, authorTarget, navigate, settings, snapshots }) => (
@@ -238,7 +238,7 @@ export const corpusViews = {
         onTestimonyLink={ctx.isTestimonios ? ctx.openTestimonyLink : undefined}
         onOpenResearchConversation={openOriginConversation(ctx)}
         onOpenStudyDocument={(id) => { ctx.setStudyTarget({ kind: 'document', id }); ctx.setView('studyCourses'); }}
-        onOpenStudyMaterial={(id) => { ctx.setStudyMaterialTarget(id); ctx.setView('studyLibrary'); }}
+        onOpenStudyMaterial={(id) => { ctx.setStudyMaterialTarget({ id }); ctx.setView('studyLibrary'); }}
         onOpenStudyRecording={(id, timestamp) => { ctx.setStudyRecordingTarget({ id, timestamp }); ctx.setView('studyRecordings'); }}
         onOpenWorldEntry={(kind) => { const target = WORLD_REFERENCE_VIEW[kind]; if (target) ctx.setView(target); }}
       />

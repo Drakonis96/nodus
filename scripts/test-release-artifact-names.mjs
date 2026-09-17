@@ -19,6 +19,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { INSTALLER_KEYS } from './github-release-downloads.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (relative) => readFileSync(path.join(repoRoot, relative), 'utf8');
@@ -43,6 +44,7 @@ const PUBLISHED = [
   { os: 'win', arch: 'x64', ext: 'exe', name: 'Nodus-win-x64.exe' },
   { os: 'linux', arch: 'amd64', ext: 'deb', name: 'Nodus-linux-amd64.deb' },
   { os: 'linux', arch: 'x86_64', ext: 'AppImage', name: 'Nodus-linux-x86_64.AppImage' },
+  { os: 'linux', arch: 'x86_64', ext: 'rpm', name: 'Nodus-linux-x86_64.rpm' },
 ];
 
 test('THE REGRESSION: the artifact template does not interpolate the product name', () => {
@@ -94,7 +96,7 @@ test('the uploader expects the names the builder produces', () => {
 
 test('the release workflow verifies the same names before publishing', () => {
   const workflow = read('.github/workflows/release-build.yml');
-  for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-mac-x64.dmg', 'Nodus-win-x64.exe', 'Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage']) {
+  for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-mac-x64.dmg', 'Nodus-win-x64.exe', 'Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage', 'Nodus-linux-x86_64.rpm']) {
     assert.ok(workflow.includes(name), `the release workflow must verify ${name}`);
   }
 });
@@ -102,11 +104,39 @@ test('the release workflow verifies the same names before publishing', () => {
 test('the download links the public actually clicks resolve to these names', () => {
   const base = 'https://github.com/Drakonis96/nodus/releases/latest/download/';
   const page = read('site/app/index.html');
-  for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-mac-x64.dmg', 'Nodus-win-x64.exe', 'Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage']) {
+  for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-mac-x64.dmg', 'Nodus-win-x64.exe', 'Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage', 'Nodus-linux-x86_64.rpm']) {
     assert.ok(page.includes(`${base}${name}`), `site/app/index.html links ${name}`);
   }
   const readme = read('README.md');
   for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-mac-x64.dmg']) {
     assert.ok(readme.includes(`${base}${name}`), `README.md links ${name}`);
+  }
+});
+
+test('every README download counter reads a count the deploy publishes', () => {
+  // A counter is an <img> whose src is a shields.io lookup into
+  // site/data/github-release-downloads.json, which scripts/github-release-downloads.mjs
+  // writes at deploy time. Rename a key there and the badges silently read
+  // "no result" instead of failing, so the two sides are checked against each other.
+  const base = 'https://github.com/Drakonis96/nodus/releases/latest/download/';
+  const readme = read('README.md');
+  const rows = readme.split('\n').filter((line) => line.includes(base));
+
+  const ROW_KEYS = [
+    { name: 'Nodus-mac-arm64.dmg', key: 'macosArm64' },
+    { name: 'Nodus-mac-x64.dmg', key: 'macosIntel' },
+    { name: 'Nodus-win-x64.exe', key: 'windows' },
+    { name: 'Nodus-linux-amd64.deb', key: 'linuxDeb' },
+    { name: 'Nodus-linux-x86_64.rpm', key: 'linuxRpm' },
+    { name: 'Nodus-linux-x86_64.AppImage', key: 'linuxAppImage' },
+  ];
+  assert.deepEqual([...INSTALLER_KEYS].sort(), ROW_KEYS.map((row) => row.key).sort(),
+    'every count the deploy publishes belongs to a row of the download table');
+
+  for (const { name, key } of ROW_KEYS) {
+    const row = rows.filter((line) => line.includes(`${base}${name}`));
+    assert.equal(row.length, 1, `README.md offers ${name} in exactly one row`);
+    assert.ok(row[0].includes(`query=%24.installers.${key}`),
+      `the ${name} row counts $.installers.${key}`);
   }
 });

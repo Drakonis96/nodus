@@ -22,6 +22,7 @@ import {
   runPreUpdateBackupNow,
 } from './export/autoBackup';
 import { registerIpc } from './ipc';
+import { flushPipelineLogs } from './logging/pipelineLogHost';
 import { scanQueue } from './pipeline/scanQueue';
 import { getSettings } from './db/settingsRepo';
 import { runDueDatabaseRowTemplates } from './db/databaseTasksRepo';
@@ -1301,6 +1302,9 @@ app.on('before-quit', () => {
   destroyBrowserSubsystem();
   closeGlobalLibraryRuntime();
   documentIndexQueue.stop();
+  // The log coalesces its writes, so the last seconds of a corpus run are still in memory
+  // and this handler cannot await. Flush before the database goes away.
+  flushPipelineLogs();
   closeDb();
 });
 

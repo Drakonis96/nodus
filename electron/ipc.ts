@@ -1,4 +1,5 @@
 import { getDocumentVisuals, enrichDocumentVisuals, cancelDocumentVisuals, undoVisualEnrichment, removeDocumentFigure } from './ai/documentVisuals';
+import { dialogTitle } from './dialogTitles';
 import { listDocumentSkills } from './capabilities/documentCatalog';
 import { getSkillMarketplace, addSkillSource, removeSkillSource, updateSkillSource, installMarketplaceSkill, installMarketplacePlugin } from './skillMarketplace';
 import { listChatSkills, saveChatSkill, deleteChatSkill, restoreChatSkills, importSkillDirectory, exportSkillDirectory, approvePendingChatPlugin, rollbackChatPlugin, removeChatPlugin, installChatPluginPackage, restorePluginSkillAuthorVersion } from './chatSkills';
@@ -30,7 +31,6 @@ import type {
 
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { getAiConcurrencySnapshot, onAiConcurrencySnapshot, refreshAiConcurrencyPolicy } from './ai/aiClient';
-import { calibrateDownloadedNodusLocalModels } from './ai/nodusLocalAi';
 import * as protect from './protect/protectService';
 import { createIpcContext } from './ipc/context';
 import { registerProsopographyIpc } from './ipc/prosopography';
@@ -50,8 +50,10 @@ import { registerLibraryIpc } from './ipc/library';
 import { registerBrowserIpc } from './ipc/browser';
 import { registerRadarIpc } from './ipc/radar';
 import { registerCompassIpc } from './ipc/compass';
+import { registerLogsIpc } from './ipc/logs';
 import { setBrowserTheme } from './browser/tabs';
 import { browserHistoryRepository } from './browser/history';
+import { applyPipelineLogLimits, initPipelineLogs } from './logging/pipelineLogHost';
 import {
   restartMcpServer,
   startMcpServer,
@@ -101,6 +103,9 @@ import {
   runBackupCleanupNow,
 } from './export/autoBackup';
 import { validateBackupPassword } from '@shared/backupPasswordPolicy';
+import { asDocumentVisualModel } from '@shared/documentVisualEnrich';
+import { isPipelineLogMaxEntries, isPipelineLogRetention } from '@shared/pipelineLogs';
+import { normalizeUiLanguage } from '@shared/uiLanguage';
 import {
   onChatGptSubscriptionStatusChanged,
 } from './ai/codexSubscription';
@@ -250,6 +255,10 @@ export function registerIpc(
   registerToolkitIpc(context);
   registerCapabilitiesIpc(context);
   registerTestimoniesIpc(context);
+  registerLogsIpc(context);
+  // The processing log has to be listening before any pipeline can run: this wires the
+  // sink, prunes what the previous session left behind and arms the idle prune timer.
+  initPipelineLogs();
 
   const nodiChatAborters = new Map<string, AbortController>();
 
@@ -387,6 +396,18 @@ export function registerIpc(
     if (patch.browserClearHistoryOnClose !== undefined && typeof patch.browserClearHistoryOnClose !== 'boolean') {
       throw new Error('The Browser history close policy is not valid.');
     }
+    if (patch.pipelineLogRetention !== undefined && !isPipelineLogRetention(patch.pipelineLogRetention)) {
+      throw new Error('The processing log retention period is not valid.');
+    }
+    if (patch.pipelineLogMaxEntries !== undefined && !isPipelineLogMaxEntries(patch.pipelineLogMaxEntries)) {
+      throw new Error('The processing log entry limit is not valid.');
+    }
+    if (
+      patch.pipelineLogLanguage !== undefined
+      && normalizeUiLanguage(patch.pipelineLogLanguage) !== patch.pipelineLogLanguage
+    ) {
+      throw new Error('The processing log language is not valid.');
+    }
     if (patch.backupCleanupEnabled !== undefined && typeof patch.backupCleanupEnabled !== 'boolean') {
       throw new Error('El estado de la limpieza automática no es válido.');
     }
@@ -405,29 +426,21 @@ export function registerIpc(
     if (patch.aiConcurrencyMode !== undefined || patch.concurrency !== undefined) {
       refreshAiConcurrencyPolicy();
     }
-    const patchSelectsLocalModel = Object.values(patch).some((value) => Boolean(
-      value && typeof value === 'object'
-      && (value as any).provider === 'nodus'
-      && typeof (value as any).model === 'string',
-    )) || patch.embeddingProvider === 'nodus'
-      || (patch.embeddingModel !== undefined && next.embeddingProvider === 'nodus');
-    if (next.aiConcurrencyMode === 'automatic'
-      && (patch.aiConcurrencyMode === 'automatic' || patchSelectsLocalModel)) {
-      const selectedLocalModels = Object.values(next)
-        .filter((value): value is { provider: 'nodus'; model: string } => Boolean(
-          value && typeof value === 'object' && (value as any).provider === 'nodus' && typeof (value as any).model === 'string',
-        ))
-        .map((value) => value.model);
-      if (next.embeddingProvider === 'nodus' && next.embeddingModel) selectedLocalModels.push(next.embeddingModel);
-      // Calibration is offline and isolated from user requests by the runtime lease.
-      // Settings persistence must stay responsive while the benchmark runs.
-      void calibrateDownloadedNodusLocalModels(selectedLocalModels).catch(() => undefined);
-    }
+    // Concurrency is deliberately NOT calibrated here. Selecting a local model used
+    // to enqueue a blocking synthetic benchmark that every later local request had
+    // to wait behind, which on a CPU fallback looked like a frozen app (issue #851).
+    // The conservative single slot stays in force until the user asks for a
+    // measurement from Settings → Modelos IA.
     if (patch.documentIndexingEnabled !== undefined || patch.documentIndexIncludeArchived !== undefined) {
       await documentIndexQueue.configureContinuous(getActiveVault().id, next.documentIndexingEnabled);
     }
     if (patch.browserHistoryRetention !== undefined) {
       await browserHistoryRepository().list(next.browserHistoryRetention);
+    }
+    // The reader chooses these while looking at the log, so the new horizon has to apply on
+    // the spot instead of at the next scheduled prune.
+    if (patch.pipelineLogRetention !== undefined || patch.pipelineLogMaxEntries !== undefined) {
+      applyPipelineLogLimits();
     }
     if (patch.theme !== undefined && next.theme !== previous.theme) {
       setBrowserTheme(next.theme);
@@ -574,7 +587,7 @@ export function registerIpc(
   h('skillMarketplace:install', async (_e, sourceId: string, packagePath: string, commit: string) => skillsChanged(installMarketplaceSkill(sourceId, packagePath, commit)));
   h('skillMarketplace:installPlugin', async (_e, sourceId: string, packagePath: string, commit: string, approvePermissions: boolean) => skillsChanged(installMarketplacePlugin(sourceId, packagePath, commit, approvePermissions === true)));
   h('skillMarketplace:import', async () => {
-    const result = await showImportOpenDialog({ title: 'Import skill package directory', properties: ['openDirectory'] });
+    const result = await showImportOpenDialog({ title: dialogTitle('importSkillPackageDirectory', getSettings().uiLanguage), properties: ['openDirectory'] });
     if (result.canceled) return listChatSkills();
     const directory = result.filePaths[0];
     if (!fs.existsSync(path.join(directory, 'plugin.json'))) return skillsChanged(importSkillDirectory(directory));
@@ -583,13 +596,13 @@ export function registerIpc(
     return consent.response === 1 ? skillsChanged(installChatPluginPackage(pkg, { sourceId: 'local', sourcePath: directory, approvePermissions: true, autoUpdate: false })) : listChatSkills();
   });
   h('skillMarketplace:export', async (_e, id: string) => {
-    const result = await showImportOpenDialog({ title: 'Export skill package into a directory', properties: ['openDirectory', 'createDirectory'] });
+    const result = await showImportOpenDialog({ title: dialogTitle('exportSkillPackageDirectory', getSettings().uiLanguage), properties: ['openDirectory', 'createDirectory'] });
     return result.canceled ? null : exportSkillDirectory(id, result.filePaths[0]);
   });
   h('chatSkills:list', async () => listChatSkills());
   h('documentSkills:list', async () => listDocumentSkills());
   h('documentVisuals:get', async (_event, target) => getDocumentVisuals(target));
-  h('documentVisuals:enrich', async (_event, target, policy, retry) => enrichDocumentVisuals(target, policy, { retry: retry === true }));
+  h('documentVisuals:enrich', async (_event, target, policy, options) => enrichDocumentVisuals(target, policy, { retry: options?.retry === true, model: asDocumentVisualModel(options?.model) }));
   h('documentVisuals:cancel', async (_event, target) => cancelDocumentVisuals(target));
   h('documentVisuals:undo', async (_event, target) => undoVisualEnrichment(target));
   h('documentVisuals:remove', async (_event, target, id) => removeDocumentFigure(target, id));
@@ -648,7 +661,7 @@ export function registerIpc(
 
   h('capabilityFiles:download', async (_e, source: string) => {
     const payload = getCapabilityFile(String(source)); if (!payload) throw new Error('The capability file is no longer available.');
-    const result = await dialog.showSaveDialog({ title: 'Save capability file', defaultPath: path.join(app.getPath('downloads'), payload.name) });
+    const result = await dialog.showSaveDialog({ title: dialogTitle('saveCapabilityFile', getSettings().uiLanguage), defaultPath: path.join(app.getPath('downloads'), payload.name) });
     if (!result.canceled && result.filePath) fs.writeFileSync(result.filePath, payload.blob, { mode: 0o600 });
   });
   h('nodi:conversations:list', async () => listNodiConversations());
@@ -904,7 +917,7 @@ export function registerIpc(
   h('backup:hasPassword', async () => hasBackupPassword());
   h('backup:chooseFolder', async () => {
     const { canceled, filePaths } = await showImportOpenDialog({
-      title: 'Elegir carpeta para copias automáticas',
+      title: dialogTitle('chooseBackupFolder', getSettings().uiLanguage),
       properties: ['openDirectory', 'createDirectory'],
     });
     return canceled || filePaths.length === 0 ? null : filePaths[0];
@@ -922,7 +935,7 @@ export function registerIpc(
     const es = language === 'es';
     if (!password) return { ok: false, message: es ? 'No hay contraseña maestra configurada.' : 'No master password is configured.' };
     const { canceled, filePath } = await dialog.showSaveDialog({
-      title: es ? 'Guardar kit de recuperación' : 'Save recovery kit',
+      title: dialogTitle('saveRecoveryKit', getSettings().uiLanguage),
       defaultPath: path.join(app.getPath('documents'), es ? 'nodus-kit-de-recuperacion.txt' : 'nodus-recovery-kit.txt'),
       filters: [{ name: es ? 'Texto' : 'Text', extensions: ['txt'] }],
     });
@@ -966,6 +979,7 @@ export function registerIpc(
       'pt-BR': mode === 'restore' ? 'Selecionar uma pasta de recuperação do Nodus' : 'Selecionar uma pasta vazia para proteger o Nodus',
       it: mode === 'restore' ? 'Seleziona una cartella di ripristino Nodus' : 'Seleziona una cartella vuota per proteggere Nodus',
       tr: mode === 'restore' ? 'Bir Nodus kurtarma klasörü seçin' : 'Nodus\'u korumak için boş bir klasör seçin',
+      'zh-CN': mode === 'restore' ? '选择 Nodus 恢复文件夹' : '选择一个空文件夹以保护 Nodus',
     };
     const { canceled, filePaths } = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: titles[language],

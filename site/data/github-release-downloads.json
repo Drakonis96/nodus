@@ -1,7 +1,15 @@
 {
-  "linux": 229,
-  "macos": 600,
-  "windows": 434,
-  "total": 1263,
-  "updatedAt": "2026-09-05T03:29:35.514Z"
+  "linux": 350,
+  "macos": 800,
+  "windows": 660,
+  "total": 1810,
+  "installers": {
+    "macosArm64": 784,
+    "macosIntel": 16,
+    "windows": 660,
+    "linuxDeb": 106,
+    "linuxRpm": 0,
+    "linuxAppImage": 244
+  },
+  "updatedAt": "2026-09-17T09:28:27.454Z"
 }

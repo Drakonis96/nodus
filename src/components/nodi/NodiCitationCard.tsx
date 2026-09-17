@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { MarkdownCitation } from '../Markdown';
 import { Icon } from '../ui';
-import { t } from '../../i18n';
+import { parsePageNumber } from '@shared/pageLocation';
+import { t, tx } from '../../i18n';
 
 /**
  * Compact source detail for a citation clicked inside a Nodi chat answer. It is the
@@ -19,6 +20,10 @@ interface CiteView {
   meta?: string | null;
   location?: string | null;
   zoteroKey?: string | null;
+  /** Work the anchored quote belongs to; without it there is no page to open. */
+  nodusId?: string | null;
+  sourceRef?: string | null;
+  pageNumber?: number | null;
 }
 
 function badgeFor(kind: MarkdownCitation['kind']): string {
@@ -49,6 +54,27 @@ function missingFor(kind: MarkdownCitation['kind']): string {
     case 'passage':
       return t('No se encontró el pasaje citado. Puede haberse reindexado.');
   }
+}
+
+/** Physical page behind the card's anchor, when it has one. */
+function citedPage(view: CiteView): number | null {
+  return view.pageNumber ?? parsePageNumber(view.location);
+}
+
+/**
+ * Reach the page the card names. Only Zotero's reader is reachable from the
+ * overlay: when the answer is that a library copy would have to be opened, the
+ * in-app reader lives in the main window, so the user continues there. The event
+ * the main window's own jump dispatches would go nowhere in this window.
+ */
+async function openCitedPage(view: CiteView): Promise<void> {
+  if (!view.nodusId) return;
+  const result = await window.nodus.openEvidenceAtPage(view.nodusId, {
+    location: view.location ?? null,
+    sourceRef: view.sourceRef ?? null,
+    pageNumber: view.pageNumber ?? null,
+  }).catch(() => null);
+  if (result?.mode === 'local') await window.nodus.nodiOpenMainWindow();
 }
 
 function authorYear(authors: string[] | undefined, year: number | null | undefined): string {
@@ -104,6 +130,9 @@ export function NodiCitationCard({ citation, isOverlay, onClose }: { citation: M
           location: d.evidence?.location ?? null,
           meta: authorYear(d.work.authors, d.work.year),
           zoteroKey: d.work.zotero_key,
+          nodusId: d.work.nodus_id,
+          sourceRef: d.evidence?.source_ref ?? null,
+          pageNumber: d.evidence?.page_number ?? null,
         });
       }).catch(fail);
     } else if (citation.kind === 'contradiction') {
@@ -115,6 +144,9 @@ export function NodiCitationCard({ citation, isOverlay, onClose }: { citation: M
           statement: d.explanation ?? null,
           quote: d.evidence[0]?.quote ?? null,
           location: d.evidence[0]?.location ?? null,
+          nodusId: d.evidence[0]?.nodus_id ?? null,
+          sourceRef: d.evidence[0]?.source_ref ?? null,
+          pageNumber: d.evidence[0]?.page_number ?? null,
         });
       }).catch(fail);
     } else {
@@ -127,6 +159,9 @@ export function NodiCitationCard({ citation, isOverlay, onClose }: { citation: M
           location: d.page_label,
           meta: authorYear(d.work.authors, d.work.year),
           zoteroKey: d.work.zotero_key,
+          nodusId: d.nodus_id,
+          sourceRef: d.source_ref ?? null,
+          pageNumber: d.page_number ?? null,
         });
       }).catch(fail);
     }
@@ -163,8 +198,17 @@ export function NodiCitationCard({ citation, isOverlay, onClose }: { citation: M
                   {view.location && <span className="nodi-cite-loc"> · {view.location}</span>}
                 </blockquote>
               )}
-              {(view.zoteroKey || isOverlay) && (
+              {(view.zoteroKey || isOverlay || citedPage(view) !== null) && (
                 <div className="nodi-cite-actions">
+                  {citedPage(view) !== null && view.nodusId && (
+                    <button
+                      className="nodi-cite-btn primary"
+                      data-testid="nodi-cite-jump-page"
+                      onClick={() => void openCitedPage(view)}
+                    >
+                      <Icon name="external" size={13} /> {tx('Ver página {n}', { n: citedPage(view)! })}
+                    </button>
+                  )}
                   {view.zoteroKey && (
                     <button className="nodi-cite-btn primary" onClick={() => void window.nodus.openInZotero(view.zoteroKey!)}>
                       <Icon name="external" size={13} /> {t('Abrir en Zotero')}

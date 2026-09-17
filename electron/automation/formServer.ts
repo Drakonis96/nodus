@@ -21,6 +21,7 @@ const FORM_CHROME: Record<AppLanguage, FormChrome> = {
   'pt-BR': { accessToken: 'Token de acesso', access: 'Entrar', choose: 'Selecione uma opção', yes: 'Sim', submit: 'Enviar resposta', notFound: 'Não encontrado', unavailable: 'Formulário indisponível', invalidToken: 'O token não é válido.', tooLarge: 'A resposta excede 1 MB.', error: 'Erro' },
   it: { accessToken: 'Token di accesso', access: 'Accedi', choose: 'Seleziona un’opzione', yes: 'Sì', submit: 'Invia risposta', notFound: 'Non trovato', unavailable: 'Modulo non disponibile', invalidToken: 'Il token non è valido.', tooLarge: 'La risposta supera 1 MB.', error: 'Errore' },
   tr: { accessToken: 'Erişim belirteci', access: 'Giriş yap', choose: 'Bir seçenek seçin', yes: 'Evet', submit: 'Yanıtı gönder', notFound: 'Bulunamadı', unavailable: 'Form kullanılamıyor', invalidToken: 'Belirteç geçerli değil.', tooLarge: 'Yanıt 1 MB boyutunu aşıyor.', error: 'Hata' },
+  'zh-CN': { accessToken: '访问令牌', access: '登录', choose: '请选择一项', yes: '是', submit: '提交回复', notFound: '未找到', unavailable: '表单不可用', invalidToken: '令牌无效。', tooLarge: '回复超过 1 MB。', error: '错误' },
 };
 
 function formLanguage(request: IncomingMessage, url: URL): AppLanguage {
@@ -35,6 +36,8 @@ function formLanguage(request: IncomingMessage, url: URL): AppLanguage {
   if (candidate.startsWith('pt')) return 'pt';
   if (candidate.startsWith('it')) return 'it';
   if (candidate.startsWith('tr')) return 'tr';
+  // Simplified Chinese: zh-CN, zh-Hans, zh-SG and any bare `zh` locale.
+  if (candidate === 'zh' || candidate.startsWith('zh-')) return 'zh-CN';
   return 'en';
 }
 

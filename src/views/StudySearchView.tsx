@@ -13,6 +13,7 @@ import { SearchKindFilters } from '../components/search/SearchKindFilters';
 import { Icon, Spinner } from '../components/ui';
 import { TextInputModal } from '../components/TextInputModal';
 import { formatStudyTimestamp } from '@shared/studyRecordings';
+import type { StudySearchLocation } from '@shared/studySearch';
 import { t } from '../i18n';
 
 const KIND_LABELS: Record<StudySearchKind, string> = {
@@ -46,7 +47,7 @@ export function StudySearchView({
   onOpenRecording,
 }: {
   onOpenDocument: (id: string) => void;
-  onOpenMaterial: (id: string) => void;
+  onOpenMaterial: (id: string, location?: StudySearchLocation | null) => void;
   onOpenRecording: (id: string, timestamp?: number | null) => void;
 }) {
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
@@ -95,7 +96,7 @@ export function StudySearchView({
   const topics = workspace?.topics.filter((topic) => !subjectId || topic.subjectId === subjectId) ?? [];
   const openResult = (result: StudySearchResult) => {
     if (result.kind === 'document' && result.location.documentId) onOpenDocument(result.location.documentId);
-    else if (result.kind === 'material' && result.location.materialId) onOpenMaterial(result.location.materialId);
+    else if (result.kind === 'material' && result.location.materialId) onOpenMaterial(result.location.materialId, result.location);
     else if (result.kind === 'transcript' && result.location.recordingId) onOpenRecording(result.location.recordingId, result.location.timestampSeconds);
   };
   const applySearch = (item: { query: string; options: StudySearchOptions }) => {

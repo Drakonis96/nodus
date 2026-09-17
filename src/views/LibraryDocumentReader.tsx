@@ -346,6 +346,8 @@ export function LibraryDocumentReader({
   initialSource,
   onSourceChange,
   showLibraryBackButton = true,
+  initialPage,
+  onInitialPageApplied,
 }: {
   reference: LibraryReaderReference;
   onBack: () => void;
@@ -353,6 +355,9 @@ export function LibraryDocumentReader({
   initialSource?: string;
   onSourceChange?: (sourceId: string) => void;
   showLibraryBackButton?: boolean;
+  /** Cited page to land on. Applied once, then reported through `onInitialPageApplied`. */
+  initialPage?: number | null;
+  onInitialPageApplied?: () => void;
 }) {
   const scrollRef = useRef<HTMLElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
@@ -697,6 +702,29 @@ export function LibraryDocumentReader({
     if (reader?.originalMimeType === 'application/pdf' && reader.originalUrl) setPreviewPage(page ?? 1);
     else void window.nodus.openLibraryReaderOriginal(reference.id);
   };
+
+  // The exact point a citation named. The preserved PDF page is the literal
+  // answer; without one, the clean text still knows which physical page each
+  // section came from, so the reader scrolls there instead of showing the top of
+  // the document. `openCurrentPage` is deliberately not the fallback: sending a
+  // citation to the system viewer would land on page 1, which is the bug.
+  const jumpToCitedPage = (page: number) => {
+    if (!reader) return;
+    if (reader.originalMimeType === 'application/pdf' && reader.originalUrl) { setPreviewPage(page); return; }
+    const index = reader.sections.findIndex((section) => typeof section.page === 'number' && section.page >= page);
+    if (index >= 0) scrollToSection(index);
+  };
+
+  // Consumed once per mount: leaving the page on the reference would re-jump every
+  // time the reader remounts (tab switch, restart) instead of restoring the
+  // position the user had reached.
+  const citedPageAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!reader || !initialPage || citedPageAppliedRef.current) return;
+    citedPageAppliedRef.current = true;
+    jumpToCitedPage(initialPage);
+    onInitialPageApplied?.();
+  }, [reader, initialPage, onInitialPageApplied]);
 
   const openReaderCitation = (target: MarkdownReaderCitation) => {
     if (!reader || (target.documentId !== reader.workId && target.documentId !== reference.id)) return;

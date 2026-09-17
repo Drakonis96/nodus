@@ -1,0 +1,308 @@
+{
+  "extensionName": {
+    "message": "Nodus Research Connector"
+  },
+  "extensionDescription": {
+    "message": "Salva documentos acadêmicos, metadados, coleções e etiquetas diretamente na sua Biblioteca Nodus local."
+  },
+  "actionTitle": {
+    "message": "Salvar no Nodus"
+  },
+  "connector": {
+    "message": "Conector"
+  },
+  "settings": {
+    "message": "Configurações"
+  },
+  "detecting": {
+    "message": "Detectando este documento…"
+  },
+  "detectingHint": {
+    "message": "Somente a aba ativa é lida depois do seu clique."
+  },
+  "cannotRead": {
+    "message": "Não foi possível ler esta página"
+  },
+  "connectTitle": {
+    "message": "Conectar ao Nodus"
+  },
+  "connectHint": {
+    "message": "Abra o Nodus e ative o conector do Chrome em Configurações → Integrações. Este navegador se conecta automaticamente."
+  },
+  "port": {
+    "message": "Porta"
+  },
+  "connect": {
+    "message": "Conectar"
+  },
+  "cannotReachNodus": {
+    "message": "Não foi possível alcançar o Nodus na porta $PORT$. Abra o Nodus e use a porta mostrada em Configurações → Integrações.",
+    "placeholders": {
+      "port": {
+        "content": "$1"
+      }
+    }
+  },
+  "documentType": {
+    "message": "Tipo de documento"
+  },
+  "enriching": {
+    "message": "Verificando os metadados bibliográficos…"
+  },
+  "saveTo": {
+    "message": "Salvar em"
+  },
+  "libraryRoot": {
+    "message": "Raiz da Biblioteca"
+  },
+  "searchCollections": {
+    "message": "Buscar coleções"
+  },
+  "tags": {
+    "message": "Etiquetas"
+  },
+  "addTags": {
+    "message": "Adicionar ou buscar uma etiqueta"
+  },
+  "files": {
+    "message": "Arquivos"
+  },
+  "file": {
+    "message": "Arquivo"
+  },
+  "webSnapshot": {
+    "message": "Cópia web legível"
+  },
+  "webSnapshotHint": {
+    "message": "Manter uma cópia local desta página com a referência."
+  },
+  "save": {
+    "message": "Salvar no Nodus"
+  },
+  "saving": {
+    "message": "Salvando…"
+  },
+  "saved": {
+    "message": "Salvo no Nodus"
+  },
+  "savedSummary": {
+    "message": "$ATTACHMENTCOUNT$ arquivo(s) foram anexados agora. A preparação da leitura limpa continua no Nodus.",
+    "placeholders": {
+      "attachmentCount": {
+        "content": "$1"
+      }
+    }
+  },
+  "openInNodus": {
+    "message": "Abrir no Nodus"
+  },
+  "done": {
+    "message": "Fechar"
+  },
+  "remove": {
+    "message": "Remover"
+  },
+  "unsupportedPage": {
+    "message": "Abra uma página ou documento normal (HTTP/HTTPS) e clique novamente no ícone do Nodus."
+  },
+  "enableInNodus": {
+    "message": "Ative primeiro o Nodus Research Connector em Nodus → Configurações → Integrações."
+  },
+  "libraryNotReady": {
+    "message": "Escolha primeiro uma pasta de backup no Nodus para que a pasta local nodus-library possa ser criada."
+  },
+  "nodusPort": {
+    "message": "Porta local do Nodus"
+  },
+  "portHint": {
+    "message": "Use a porta mostrada em Nodus → Configurações → Integrações."
+  },
+  "forgetPairing": {
+    "message": "Redefinir conexão local"
+  },
+  "privacy": {
+    "message": "Privacidade"
+  },
+  "sourceCode": {
+    "message": "Código-fonte"
+  },
+  "website": {
+    "message": "Nodus Research"
+  },
+  "savedSetting": {
+    "message": "Salvo"
+  },
+  "pairingForgotten": {
+    "message": "Conexão local redefinida. O conector vai se reconectar automaticamente na próxima vez."
+  },
+  "editMetadata": {
+    "message": "Editar metadados"
+  },
+  "title": {
+    "message": "Título"
+  },
+  "authors": {
+    "message": "Autores"
+  },
+  "authorsHint": {
+    "message": "Um autor por linha; use {Organização} para instituições"
+  },
+  "date": {
+    "message": "Data"
+  },
+  "publication": {
+    "message": "Publicação"
+  },
+  "multipleDetected": {
+    "message": "$COUNT$ referências detectadas",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "multipleHint": {
+    "message": "Escolha quais você quer salvar."
+  },
+  "saveMultiple": {
+    "message": "Salvar $COUNT$ referências",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectAtLeastOne": {
+    "message": "Selecione pelo menos uma referência."
+  },
+  "savedBatchSummary": {
+    "message": "$COUNT$ referências salvas com $FILES$ arquivo(s) anexado(s).",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "files": {
+        "content": "$2"
+      }
+    }
+  },
+  "alreadySaved": {
+    "message": "Já estava no Nodus"
+  },
+  "updatedExisting": {
+    "message": "Referência atualizada"
+  },
+  "duplicateAvoided": {
+    "message": "Nenhuma duplicata foi criada."
+  },
+  "permissionDenied": {
+    "message": "A permissão não foi concedida para $ORIGINS$.",
+    "placeholders": {
+      "origins": {
+        "content": "$1"
+      }
+    }
+  },
+  "attachment": {
+    "message": "Anexo"
+  },
+  "capturedDocument": {
+    "message": "Documento capturado"
+  },
+  "untitledDocument": {
+    "message": "Documento sem título"
+  },
+  "untitledWebPage": {
+    "message": "Página web sem título"
+  },
+  "fullTextPdf": {
+    "message": "PDF do texto completo"
+  },
+  "fullText": {
+    "message": "Texto completo"
+  },
+  "originalDocument": {
+    "message": "Documento original"
+  },
+  "pageCannotBeCaptured": {
+    "message": "Não é possível capturar esta página."
+  },
+  "downloadFailed": {
+    "message": "$NAME$: o download falhou com o status $STATUS$.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "status": {
+        "content": "$2"
+      }
+    }
+  },
+  "signInPageInsteadOfPdf": {
+    "message": "$NAME$: o site retornou uma página de login em vez do PDF.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "invalidAttachmentUrl": {
+    "message": "$NAME$: endereço inválido.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "unsupportedAttachmentUrl": {
+    "message": "$NAME$: endereço não suportado.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "nodusReturnedError": {
+    "message": "O Nodus retornou um erro ($STATUS$).",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "fileExceedsLimit": {
+    "message": "$NAME$: o arquivo excede o limite de 64 MiB.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "backgroundTransferNoResult": {
+    "message": "A transferência de anexos em segundo plano não retornou nenhum resultado."
+  },
+  "optionsTitle": {
+    "message": "Configurações do Nodus Research Connector"
+  },
+  "privacyTitle": {
+    "message": "Privacidade do Nodus Research Connector"
+  },
+  "privacyLocalByDesign": {
+    "message": "Local por princípio"
+  },
+  "privacyLocalBody": {
+    "message": "O Nodus Research Connector só lê uma página depois que você clica no ícone da barra de ferramentas. Ele envia os metadados, os arquivos selecionados, as etiquetas e a coleção escolhida para o aplicativo de desktop Nodus, no seu próprio computador, por meio de 127.0.0.1."
+  },
+  "privacyNoTrackingBody": {
+    "message": "Ele não é executado continuamente, não coleta o histórico de navegação, não usa análises, não exibe publicidade, não vende dados nem envia o conteúdo capturado aos desenvolvedores do Nodus."
+  },
+  "privacySiteAccessBody": {
+    "message": "Se o Nodus não conseguir baixar publicamente um anexo selecionado, o Chrome pode pedir acesso a esse site exato para que um service worker sob demanda o transfira localmente. O acesso recém-concedido é revogado quando a transferência termina. Você também pode redefinir o pareamento com o Nodus nas configurações desta extensão."
+  },
+  "privacyPolicyLink": {
+    "message": "Política de privacidade completa"
+  },
+  "privacySourceLink": {
+    "message": "Código-fonte AGPL"
+  }
+}

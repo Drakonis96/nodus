@@ -3,12 +3,14 @@
 // summary, the works that develop it (with bibliography or Zotero key), its
 // anchored evidence and its connections to other ideas. Output is Markdown or
 // JSON. All data is read locally — no Zotero network calls.
+import { dialogTitle } from '../dialogTitles';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app, dialog } from 'electron';
 import type { Note, NoteFolder, NotesExportOptions } from '@shared/types';
 import { getNotesTree } from '../db/notesRepo';
 import { getIdeaDetail, getIdeaEdges } from '../db/ideasRepo';
+import { getSettings } from '../db/settingsRepo';
 
 interface ExportNote {
   id: string;
@@ -56,7 +58,7 @@ export async function exportNotes(options: NotesExportOptions): Promise<{ path: 
   const ext = options.format === 'json' ? 'json' : 'md';
   const baseName = tree.name ? slug(tree.name) : 'notas';
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Exportar notas',
+    title: dialogTitle('exportNotes', getSettings().uiLanguage),
     defaultPath: path.join(app.getPath('documents'), `${baseName}-export.${ext}`),
     filters: [
       options.format === 'json'

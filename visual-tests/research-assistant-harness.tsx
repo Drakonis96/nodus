@@ -13,6 +13,9 @@ const vaultType = params.get('vault') ?? ({ database: 'databases', study: 'estud
 const settings = { synthesisModel: { provider: 'openai', model: 'gpt-5.4' }, uiLanguage: 'es', chatModel: { provider: 'openai', model: 'gpt-5.4' }, favorites: [
   { provider: 'gemini', model: 'gemini-3-pro-preview' }, { provider: 'xiaomi', model: 'mimo-v2.5' },
   { provider: 'openai', model: 'gpt-4.1' }, { provider: 'codex', model: 'gpt-6-astra' },
+  // The unversioned DeepSeek ids each route serves, so the effort control they publish can be
+  // captured and inspected here rather than only asserted.
+  { provider: 'deepseek', model: 'deepseek-flash' }, { provider: 'opencode-go', model: 'deepseek-flash' },
 ], sttProvider: 'transformers', sttTransformersModel: 'whisper-tiny' } as AppSettings;
 const win = window as any;
 win.requests = []; win.updates = []; win.saved = [];

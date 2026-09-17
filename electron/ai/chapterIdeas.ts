@@ -1,3 +1,4 @@
+import { normalizePromptLanguage } from '@shared/promptLanguageOptions';
 // Phase 1 + 2 of "chapter relations": distil the uploaded chapter into its own
 // ideas (kept apart from the curated graph), embed them, and discover TYPED
 // relations with the whole library (corpus ideas, the user's notes, full-text
@@ -64,7 +65,7 @@ const TARGET_FALLBACK_COPY: Record<PromptLanguage, { untitledNote: string; note:
 
 function targetFallbackCopy(): (typeof TARGET_FALLBACK_COPY)[PromptLanguage] {
   try {
-    return TARGET_FALLBACK_COPY[getSettings().uiLanguage ?? 'es'];
+    return TARGET_FALLBACK_COPY[normalizePromptLanguage(getSettings().uiLanguage)];
   } catch {
     return TARGET_FALLBACK_COPY.es;
   }

@@ -17,6 +17,8 @@
  * otherwise write the same stack to the log forever.
  */
 
+import { logPipelineFailure } from '../logging/pipelineLogCore';
+
 type FaultKind = 'unhandledRejection' | 'uncaughtException';
 
 /** Collapse identical repeat faults, but keep reporting at a decaying rate. */
@@ -53,6 +55,18 @@ function report(kind: FaultKind, error: unknown): void {
   // while the same message from a different site stays visible.
   const key = `${kind}:${stack.split('\n').slice(0, 2).join('|')}`;
   const count = (seen.get(key) ?? 0) + 1;
+  // The console keeps its decaying-rate reporting; the processing log keeps the same rule
+  // through its own grouping, so a fault that repeats every 30 s is one row with a ×N
+  // counter instead of a screenshot of the same stack. That is the "absolutely everything"
+  // the log promises without letting one broken timer bury the corpus run.
+  logPipelineFailure({
+    error,
+    code: 'uncaught',
+    subject: 'subjectApp',
+    detail: `${kind}: ${message}`,
+    stack,
+    attempts: count,
+  });
   if (!shouldReport(key)) return;
   const repeat = count > 1 ? ` (x${count})` : '';
   console.error(`[fault] ${kind}${repeat}: ${message}\n${stack}`);

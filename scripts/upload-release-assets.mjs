@@ -13,7 +13,7 @@ const expectedByPlatform = {
   'mac-arm64': ['Nodus-mac-arm64.dmg', 'Nodus-mac-arm64.zip'],
   'mac-x64': ['Nodus-mac-x64.dmg', 'Nodus-mac-x64.zip'],
   win: ['Nodus-win-x64.exe'],
-  linux: ['Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage'],
+  linux: ['Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage', 'Nodus-linux-x86_64.rpm'],
 };
 
 // Only files under this prefix belong to this runner. Without it a macOS runner

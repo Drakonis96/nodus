@@ -1,4 +1,5 @@
 import AdmZip from 'adm-zip';
+import { dialogTitle } from '../dialogTitles';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app, dialog } from 'electron';
@@ -8,6 +9,7 @@ import { getDb } from '../db/database';
 import { getStudyWorkspace } from '../db/studyOrgRepo';
 import { escapeHtml, markdownToHtml, markdownToPdf } from './markdownRender';
 import { markdownToDocx, markdownToPlainText } from './projectExport';
+import { getSettings } from '../db/settingsRepo';
 
 type DbRow = Record<string, unknown>;
 
@@ -247,8 +249,8 @@ export async function exportStudyScope(scope: StudyExportScope, format: StudyExp
   const built = buildStudyExportMarkdown(scope);
   const ext = extension(format);
   const picked = await dialog.showSaveDialog({
-    title: 'Exportar estudio', defaultPath: path.join(app.getPath('documents'), `${slug(built.title)}.${ext}`),
-    filters: [{ name: format === 'bundle' ? 'Archivo ZIP' : format.toUpperCase(), extensions: [ext] }],
+    title: dialogTitle('exportStudy', getSettings().uiLanguage), defaultPath: path.join(app.getPath('documents'), `${slug(built.title)}.${ext}`),
+    filters: [{ name: format === 'bundle' ? dialogTitle('zipArchive', getSettings().uiLanguage) : format.toUpperCase(), extensions: [ext] }],
   });
   if (picked.canceled || !picked.filePath) return null;
   let bytes: Buffer | string;

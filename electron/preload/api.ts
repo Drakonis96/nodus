@@ -30,6 +30,7 @@ import { libraryApi } from './library';
 import { browserApi } from './browser';
 import { radarApi } from './radar';
 import { compassApi } from './compass';
+import { logsApi } from './logs';
 
 // Tracks the Nodi chat stream currently in flight so `cancelNodiChat` can abort
 // it without the renderer having to juggle request ids. Only one chat stream
@@ -70,6 +71,7 @@ function readInitialOverlayPlacement(): NodiOverlayPlacement {
 export const nodusApi: NodusApi = {
   ...libraryApi,
   ...browserApi,
+  ...logsApi,
   ...radarApi,
   ...compassApi,
   ...prosopographyApi,
@@ -109,7 +111,7 @@ export const nodusApi: NodusApi = {
   listChatSkills: () => ipcRenderer.invoke('chatSkills:list'),
   listDocumentSkills: () => ipcRenderer.invoke('documentSkills:list'),
   getDocumentVisuals: target => ipcRenderer.invoke('documentVisuals:get', target),
-  enrichDocumentVisuals: (target, policy, retry) => ipcRenderer.invoke('documentVisuals:enrich', target, policy, retry),
+  enrichDocumentVisuals: (target, policy, options) => ipcRenderer.invoke('documentVisuals:enrich', target, policy, options),
   cancelDocumentVisuals: target => ipcRenderer.invoke('documentVisuals:cancel', target),
   undoDocumentVisuals: target => ipcRenderer.invoke('documentVisuals:undo', target),
   removeDocumentFigure: (target, id) => ipcRenderer.invoke('documentVisuals:remove', target, id),

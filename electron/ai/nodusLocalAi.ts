@@ -13,10 +13,25 @@ import {
   nodusLocalModelBytes,
   type NodusLocalAiStatus,
   type NodusLocalModelDefinition,
+  type NodusLocalOffloadStatus,
+  type NodusLocalRuntimeDescriptor,
 } from '@shared/localAiModels';
+import {
+  LLAMA_CPP_VERSION,
+  classifyStartupFailure,
+  detectInstalledBackend,
+  parseDeviceList,
+  parseOffloadDecision,
+  runtimeAssetCandidates,
+  shouldReplaceInstalledRuntime,
+  type NodusLocalRuntimeAsset,
+  type NodusLocalRuntimeBackend,
+  type NodusLocalRuntimeDevice,
+} from '@shared/localAiRuntime';
 import type { ModelInfo } from '@shared/types';
 
-const LLAMA_CPP_VERSION = 'b10002';
+export { LLAMA_CPP_VERSION };
+
 interface ActiveLocalAiDownload {
   progress: number;
   promise: Promise<NodusLocalAiStatus>;
@@ -28,14 +43,6 @@ const activeDownloads = new Map<string, ActiveLocalAiDownload>();
 let activeRuntimeDownload: ActiveLocalAiDownload | null = null;
 const embeddingPipelines = new Map<string, Promise<any>>();
 const verifiedAssetCache = new Map<string, { size: number; mtimeMs: number; sha256: string }>();
-
-interface RuntimeAsset {
-  name: string;
-  url: string;
-  sha256: string;
-  archive: 'zip' | 'tar.gz';
-  bytes: number;
-}
 
 interface ActiveServer {
   key: string;
@@ -85,50 +92,208 @@ function runtimeDirectory(): string {
   return path.join(rootDirectory(), 'runtime', LLAMA_CPP_VERSION);
 }
 
-function runtimeAsset(): RuntimeAsset {
-  const base = `https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_CPP_VERSION}`;
-  const key = `${process.platform}-${process.arch}`;
-  const assets: Record<string, Omit<RuntimeAsset, 'url'>> = {
-    'darwin-arm64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-macos-arm64.tar.gz`,
-      sha256: 'b7aca9d4f9c6267a5f389179bd7412c4e991ac7d1b69f52acf065ef99c99345c',
-      archive: 'tar.gz',
-      bytes: 10_749_656,
-    },
-    'darwin-x64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-macos-x64.tar.gz`,
-      sha256: 'c90eaed104ad1c82628d34967def32eaae2516768e10121fbebc4c73a046ac7d',
-      archive: 'tar.gz',
-      bytes: 11_031_400,
-    },
-    'linux-arm64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-ubuntu-arm64.tar.gz`,
-      sha256: '348e880ac43a5df038729f34ac3be6a1c57b5de491504b59b5273d8b1f4dae40',
-      archive: 'tar.gz',
-      bytes: 12_791_141,
-    },
-    'linux-x64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-ubuntu-x64.tar.gz`,
-      sha256: '760dcd8c52be7960bf7487adce4287c151000a41e44f836abdb1a282340c5949',
-      archive: 'tar.gz',
-      bytes: 15_855_822,
-    },
-    'win32-arm64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-win-cpu-arm64.zip`,
-      sha256: '271470732568e8326c58e0a357e5f9085e956de97587358c690ff166edaafb77',
-      archive: 'zip',
-      bytes: 12_159_035,
-    },
-    'win32-x64': {
-      name: `llama-${LLAMA_CPP_VERSION}-bin-win-cpu-x64.zip`,
-      sha256: 'c4c3dd2e139e3f00f7bdf4993a2f893e8db4dc6ae51140cc25ddd63306c32734',
-      archive: 'zip',
-      bytes: 18_253_272,
-    },
+/**
+ * Where a candidate archive is extracted before it replaces the installed
+ * runtime. A sibling of the runtime directory, never inside it, so a half-extracted
+ * upgrade can neither be found by `llamaServerPath()` nor destroy the working
+ * install it is replacing.
+ */
+function runtimeStagingDirectory(): string {
+  return path.join(rootDirectory(), 'runtime', `.staging-${LLAMA_CPP_VERSION}`);
+}
+
+function runtimeDescriptorPath(): string {
+  return path.join(runtimeDirectory(), 'runtime.json');
+}
+
+function runtimeLogPath(): string {
+  return path.join(rootDirectory(), 'runtime.log');
+}
+
+// ── Runtime diagnostics ──────────────────────────────────────────────────────
+// Every backend decision is written here, in order, with the values that drove
+// it. A user report ("it runs on the CPU") must be answerable from this file:
+// which archive was installed, what the probe saw, which device llama.cpp used,
+// how many layers were offloaded and which fallback fired.
+const runtimeLogRing: string[] = [];
+
+function runtimeLog(message: string): void {
+  const line = `${new Date().toISOString()} [local-ai] ${message}`;
+  runtimeLogRing.push(line);
+  if (runtimeLogRing.length > 200) runtimeLogRing.shift();
+  console.log(line);
+  // Best-effort: diagnostics must never fail a download or a model start.
+  void (async () => {
+    try {
+      await fsp.mkdir(rootDirectory(), { recursive: true });
+      const stat = await fsp.stat(runtimeLogPath()).catch(() => null);
+      if (stat && stat.size > 512 * 1024) await fsp.rm(runtimeLogPath(), { force: true });
+      await fsp.appendFile(runtimeLogPath(), `${line}\n`, 'utf8');
+    } catch { /* Diagnostics never own the operation they describe. */ }
+  })();
+}
+
+export function readNodusLocalRuntimeLog(): string[] {
+  return [...runtimeLogRing];
+}
+
+/** Cheap host signals used to avoid downloading a GPU build on a machine that has no graphics stack. */
+function hostRuntimeSignals(): { platform: string; arch: string; vulkanLoader: boolean; renderNode: boolean } {
+  const platform = process.platform;
+  const arch = process.arch;
+  let vulkanLoader = false;
+  let renderNode = false;
+  if (platform === 'win32') {
+    const systemRoot = process.env.SystemRoot ?? 'C:\\Windows';
+    vulkanLoader = fs.existsSync(path.join(systemRoot, 'System32', 'vulkan-1.dll'));
+  } else if (platform === 'linux') {
+    vulkanLoader = [
+      '/usr/lib/x86_64-linux-gnu/libvulkan.so.1',
+      '/usr/lib/aarch64-linux-gnu/libvulkan.so.1',
+      '/usr/lib/libvulkan.so.1',
+      '/usr/lib64/libvulkan.so.1',
+      '/usr/lib/libvulkan.so',
+    ].some((candidate) => fs.existsSync(candidate));
+    try {
+      renderNode = fs.existsSync('/dev/dri') && fs.readdirSync('/dev/dri').some((entry) => entry.startsWith('renderD'));
+    } catch { renderNode = false; }
+  }
+  return { platform, arch, vulkanLoader, renderNode };
+}
+
+/** The build this machine should run, most capable candidate first. */
+export function nodusLocalRuntimeCandidates(): NodusLocalRuntimeAsset[] {
+  return runtimeAssetCandidates(hostRuntimeSignals());
+}
+
+interface RuntimeProbeResult {
+  devices: NodusLocalRuntimeDevice[];
+  nvidia: { detected: boolean; driver: string | null } | null;
+  probedAt: string;
+}
+
+let cachedProbe: RuntimeProbeResult | null = null;
+let cachedDescriptor: NodusLocalRuntimeDescriptor | null = null;
+let cachedDescriptorRead = false;
+
+function nvidiaSmiPath(): string | null {
+  const candidates = process.platform === 'win32'
+    ? [path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'nvidia-smi.exe')]
+    : ['/usr/bin/nvidia-smi', '/usr/local/bin/nvidia-smi', '/opt/cuda/bin/nvidia-smi'];
+  return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
+}
+
+/**
+ * Report whether an NVIDIA GPU/driver is present even when the runtime is a
+ * Vulkan build, so the diagnostics can answer "was CUDA detected?" without ever
+ * claiming CUDA is being used. Best-effort and cached; never fatal.
+ */
+async function probeNvidia(): Promise<{ detected: boolean; driver: string | null } | null> {
+  const executable = nvidiaSmiPath();
+  if (!executable) return null;
+  try {
+    const output = await runCapture(executable, ['--query-gpu=name,driver_version,memory.total', '--format=csv,noheader'], 8_000);
+    const first = output.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
+    if (!first) return { detected: false, driver: null };
+    const [name, driver] = first.split(',').map((part) => part.trim());
+    return { detected: Boolean(name), driver: driver ?? null };
+  } catch {
+    return { detected: false, driver: null };
+  }
+}
+
+/** Spawn a short-lived helper and capture its combined output. */
+function runCapture(command: string, args: string[], timeoutMs: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve(output);
+    };
+    const timer = setTimeout(() => {
+      if (child.exitCode == null) child.kill('SIGKILL');
+      finish(new Error(`${path.basename(command)} agotó el tiempo de espera.`));
+    }, timeoutMs);
+    timer.unref?.();
+    child.stdout?.on('data', (chunk) => { output = `${output}${String(chunk)}`.slice(-32_000); });
+    child.stderr?.on('data', (chunk) => { output = `${output}${String(chunk)}`.slice(-32_000); });
+    child.on('error', (error) => finish(error));
+    child.on('close', () => finish());
+  });
+}
+
+/**
+ * Ask the installed runtime what it can actually use.
+ *
+ * `--list-devices` needs no model and exits by itself, so it is the cheapest
+ * honest answer to "does this build see a GPU on this machine?". A CPU-only
+ * archive prints the header with no devices, which is why the probe — not the
+ * archive name — decides whether a GPU build is kept.
+ */
+async function probeLlamaRuntime(executable: string): Promise<RuntimeProbeResult> {
+  const started = Date.now();
+  let devices: NodusLocalRuntimeDevice[] = [];
+  try {
+    const output = await runCapture(executable, ['--list-devices'], 30_000);
+    devices = parseDeviceList(output);
+    runtimeLog(`probe: ${path.basename(executable)} reported ${devices.length} device(s) in ${Date.now() - started} ms`
+      + (devices.length ? `: ${devices.map((device) => `${device.backend}${device.index} ${device.name} (${device.totalMiB} MiB, ${device.freeMiB} MiB free)`).join('; ')}` : ' (CPU-only)')); 
+  } catch (error) {
+    runtimeLog(`probe: --list-devices failed for ${path.basename(executable)}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const nvidia = await probeNvidia();
+  if (nvidia) runtimeLog(`probe: NVIDIA driver check → detected=${nvidia.detected} driver=${nvidia.driver ?? 'unknown'}`);
+  const result: RuntimeProbeResult = { devices, nvidia, probedAt: new Date().toISOString() };
+  cachedProbe = result;
+  return result;
+}
+
+async function readRuntimeDescriptor(): Promise<NodusLocalRuntimeDescriptor | null> {
+  if (cachedDescriptorRead) return cachedDescriptor;
+  cachedDescriptorRead = true;
+  try {
+    const parsed = JSON.parse(await fsp.readFile(runtimeDescriptorPath(), 'utf8')) as NodusLocalRuntimeDescriptor;
+    cachedDescriptor = parsed?.version === 1 ? parsed : null;
+  } catch {
+    cachedDescriptor = null;
+  }
+  return cachedDescriptor;
+}
+
+async function writeRuntimeDescriptor(descriptor: NodusLocalRuntimeDescriptor): Promise<void> {
+  cachedDescriptor = descriptor;
+  cachedDescriptorRead = true;
+  try {
+    const temporary = `${runtimeDescriptorPath()}.tmp`;
+    await fsp.writeFile(temporary, `${JSON.stringify(descriptor, null, 2)}\n`, 'utf8');
+    await fsp.rename(temporary, runtimeDescriptorPath());
+  } catch (error) {
+    runtimeLog(`descriptor: could not be written: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/** Backend of whatever sits in the runtime directory right now (no download, no spawn). */
+async function installedRuntimeBackend(): Promise<{ backend: NodusLocalRuntimeBackend; files: string[] }> {
+  const files = await listRuntimeFiles(runtimeDirectory());
+  return { backend: detectInstalledBackend(files), files };
+}
+
+async function listRuntimeFiles(directory: string): Promise<string[]> {
+  const names: string[] = [];
+  const walk = async (current: string) => {
+    const entries = await fsp.readdir(current, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (entry.isDirectory()) await walk(path.join(current, entry.name));
+      else names.push(entry.name);
+    }
   };
-  const asset = assets[key];
-  if (!asset) throw new Error(`llama.cpp no ofrece un runtime integrado para ${key}.`);
-  return { ...asset, url: `${base}/${asset.name}` };
+  await walk(directory);
+  return names;
 }
 
 async function findFile(directory: string, wanted: string): Promise<string | null> {
@@ -204,12 +369,128 @@ export async function getNodusLocalAiStatus(): Promise<NodusLocalAiStatus> {
       executablePath,
       downloading: Boolean(activeRuntimeDownload),
       progress: activeRuntimeDownload?.progress ?? (executablePath ? 1 : 0),
+      ...await runtimeDiagnostics(),
     },
     models: await Promise.all(NODUS_LOCAL_MODELS.map(modelStatus)),
     activeModelId: activeServer?.modelId ?? null,
     activeSlots: activeServer?.slots ?? 0,
     activeLeases: activeServer?.leases ?? 0,
+    calibration: await calibrationStatus(),
   };
+}
+
+/**
+ * What the Settings panel and the issue reports need: which build is installed,
+ * which device the probe saw, how the last run offloaded its layers and why any
+ * fallback fired. Everything here is read from cache or a directory listing —
+ * asking for the status never spawns a process and never downloads anything.
+ */
+async function runtimeDiagnostics(): Promise<{
+  asset: string | null;
+  backend: NodusLocalRuntimeBackend | null;
+  device: NodusLocalRuntimeDevice | null;
+  nvidia: { detected: boolean; driver: string | null } | null;
+  offload: NodusLocalOffloadStatus | null;
+  fallbackReason: string | null;
+  processedOnCpu: boolean;
+  endpoint: string | null;
+  logPath: string;
+  logTail: string[];
+}> {
+  const descriptor = await readRuntimeDescriptor();
+  const probedDevice = cachedProbe?.devices[0] ?? null;
+  let backend: NodusLocalRuntimeBackend | null = descriptor?.backend ?? null;
+  if (!backend && probedDevice) backend = inferBackendFromDevice(probedDevice);
+  if (!backend) {
+    const files = await listRuntimeFiles(runtimeDirectory());
+    backend = files.length ? detectInstalledBackend(files) : null;
+  }
+  const device = descriptor?.device ?? probedDevice;
+  const nvidia = descriptor?.nvidia ?? cachedProbe?.nvidia ?? null;
+  const offload: NodusLocalOffloadStatus | null = lastOffload;
+  return {
+    asset: descriptor?.asset ?? null,
+    backend,
+    device,
+    nvidia,
+    offload,
+    fallbackReason: descriptor?.fallbackReason ?? null,
+    // A CPU answer must be explicit: no device, or every layer on the CPU.
+    processedOnCpu: !device || (offload ? offload.layers === 0 : backend === 'cpu'),
+    // The loopback endpoint of the running server, so a diagnostics report can
+    // name the port in use instead of guessing (the CachyOS report asked whether
+    // the failure was a port problem).
+    endpoint: activeServer && activeServer.child.exitCode == null ? activeServer.baseUrl : null,
+    logPath: runtimeLogPath(),
+    logTail: readNodusLocalRuntimeLog().slice(-12),
+  };
+}
+
+function inferBackendFromDevice(device: NodusLocalRuntimeDevice): NodusLocalRuntimeBackend {
+  const backend = device.backend.toLowerCase();
+  if (backend.startsWith('vulkan')) return 'vulkan';
+  if (backend.startsWith('cuda')) return 'cuda';
+  if (backend.startsWith('metal')) return 'metal';
+  return 'cpu';
+}
+
+let lastOffload: NodusLocalOffloadStatus | null = null;
+
+/** Harvest llama.cpp's own layer-placement report from a captured server log. */
+function recordOffloadFromLog(log: string, options: { announce?: boolean } = {}): void {
+  const decision = parseOffloadDecision(log);
+  if (!decision) return;
+  const changed = !lastOffload
+    || lastOffload.layers !== decision.layers
+    || lastOffload.totalLayers !== decision.totalLayers
+    || lastOffload.deviceName !== decision.deviceName;
+  // The runtime announces the layer placement in one line and the device it chose
+  // in another; when the placement line arrives first, name the device from the
+  // probe that already selected this build instead of reporting an unknown one.
+  const probed = cachedProbe?.devices[0] ?? cachedDescriptor?.device ?? null;
+  lastOffload = {
+    layers: decision.layers,
+    totalLayers: decision.totalLayers,
+    deviceName: decision.deviceName ?? (probed ? `${probed.backend}${probed.index}` : null),
+    projectedMiB: decision.projectedMiB,
+    fitted: decision.fitted,
+  };
+  if (changed || options.announce) {
+    runtimeLog(`offload: ${lastOffload.layers}/${lastOffload.totalLayers} layers on ${lastOffload.deviceName ?? 'unknown device'}`
+      + `${decision.projectedMiB ? `, projected ${decision.projectedMiB} MiB` : ''}${decision.fitted ? ' (fitted to device memory)' : ''}`);
+  }
+}
+
+/**
+ * Concurrency health for the Settings panel: whether this machine+hardware+runtime
+ * has a measured calibration at all, the best slot count it admitted, and the last
+ * recorded reason. Unmeasured means the conservative single slot is in force.
+ */
+/**
+ * Keep the startup lines that state what the runtime did with the device in the
+ * diagnostics log. The parsed summary above is compact; these are the raw
+ * sentences a bug report can quote, and they exist only in the child's output.
+ */
+function recordServerStartupDetails(log: string): void {
+  const relevant = log.split(/\r?\n/)
+    .filter((line) => /using device|offloaded \d+\/\d+ layers|projected to use|fit params to|failed to allocate|cannot meet free memory target|context size set by user/.test(line))
+    .slice(-8);
+  for (const line of relevant) runtimeLog(`server: ${line.trim()}`);
+}
+
+async function calibrationStatus(): Promise<{ measured: boolean; slots: 1 | 2 | 4; reason: string | null }> {
+  try {
+    const file = JSON.parse(await fsp.readFile(path.join(rootDirectory(), 'calibration.json'), 'utf8')) as LocalCalibrationFile;
+    if (file.version !== 1 || file.hardware !== hardwareFingerprint() || file.runtime !== LLAMA_CPP_VERSION) {
+      return { measured: false, slots: 1, reason: null };
+    }
+    const entries = Object.values(file.models ?? {});
+    if (!entries.length) return { measured: false, slots: 1, reason: null };
+    const slots = entries.reduce<1 | 2 | 4>((best, entry) => (entry.slots > best ? entry.slots : best), 1);
+    return { measured: true, slots, reason: entries[entries.length - 1]?.reason ?? null };
+  } catch {
+    return { measured: false, slots: 1, reason: null };
+  }
 }
 
 function reportDownloadProgress(job: ActiveLocalAiDownload, fraction: number): void {
@@ -358,10 +639,62 @@ function run(command: string, args: string[], cwd?: string, signal?: AbortSignal
   });
 }
 
-export async function installNodusLocalRuntime(onProgress?: (fraction: number) => void): Promise<NodusLocalAiStatus> {
-  const existing = await llamaServerPath();
-  if (existing) return getNodusLocalAiStatus();
+async function extractRuntimeArchive(asset: NodusLocalRuntimeAsset, archive: string, root: string, signal?: AbortSignal): Promise<string> {
+  await fsp.mkdir(root, { recursive: true });
+  if (asset.archive === 'zip') {
+    new AdmZip(archive).extractAllTo(root, true);
+    throwIfDownloadCancelled(signal);
+  } else {
+    await run('tar', ['-xzf', archive, '-C', root], undefined, signal);
+  }
+  const executable = await findFile(root, process.platform === 'win32' ? 'llama-server.exe' : 'llama-server');
+  if (!executable) throw new Error('El runtime se descargó, pero no contiene llama-server.');
+  if (process.platform !== 'win32') await fsp.chmod(executable, 0o755);
+  return executable;
+}
+
+export interface NodusLocalRuntimeInstallOptions {
+  /** Reinstall even when the installed build already matches this machine. */
+  force?: boolean;
+}
+
+/**
+ * Install the llama.cpp build this machine can actually accelerate with.
+ *
+ * The candidate list is ordered most-capable-first (see `runtimeAssetCandidates`)
+ * and every GPU build is *verified by running it*: a build that cannot see a
+ * device is discarded and the next candidate — ultimately the CPU archive — is
+ * installed instead, with the reason persisted for the Settings panel. This is
+ * what keeps a GPU-less Windows or Linux box working while giving a machine with
+ * a Vulkan-capable driver the accelerated runtime it used to never get.
+ */
+export async function installNodusLocalRuntime(
+  onProgress?: (fraction: number) => void,
+  options: NodusLocalRuntimeInstallOptions = {},
+): Promise<NodusLocalAiStatus> {
   if (activeRuntimeDownload) return followDownload(activeRuntimeDownload, onProgress);
+  const candidates = nodusLocalRuntimeCandidates();
+  if (!candidates.length) {
+    throw new Error(`llama.cpp no ofrece un runtime integrado para ${process.platform}-${process.arch}.`);
+  }
+  const existing = await llamaServerPath();
+  if (existing && !options.force) {
+    const descriptor = await readRuntimeDescriptor();
+    const { backend } = await installedRuntimeBackend();
+    const desired = candidates[0];
+    const replace = shouldReplaceInstalledRuntime({
+      installedBackend: backend,
+      installedAsset: descriptor?.asset ?? null,
+      desired,
+      installedBackendUsable: true,
+    });
+    if (!replace) {
+      runtimeLog(`install: keeping installed runtime (backend=${backend}, asset=${descriptor?.asset ?? 'legacy install'})`);
+      if (!cachedProbe) await probeLlamaRuntime(existing);
+      return getNodusLocalAiStatus();
+    }
+    runtimeLog(`install: replacing runtime (installed backend=${backend}, asset=${descriptor?.asset ?? 'legacy install'}) with ${desired.name}`);
+  }
 
   const job: ActiveLocalAiDownload = {
     progress: 0,
@@ -371,40 +704,124 @@ export async function installNodusLocalRuntime(onProgress?: (fraction: number) =
   };
   activeRuntimeDownload = job;
   job.promise = (async () => {
-    const asset = runtimeAsset();
     const root = runtimeDirectory();
-    const archive = path.join(rootDirectory(), asset.name);
-    let installed = false;
+    const staging = runtimeStagingDirectory();
+    let installed: string | null = null;
+    // Why a GPU candidate was passed over, in the words Settings shows the user. Set
+    // whenever one is skipped or fails, so the CPU engine is never installed silently.
+    let fallbackReason: string | null = null;
+    const failures: string[] = [];
     try {
-      await fsp.rm(root, { recursive: true, force: true });
+      await fsp.rm(staging, { recursive: true, force: true });
       await fsp.mkdir(rootDirectory(), { recursive: true });
-      let downloaded = 0;
-      await downloadFile(asset.url, archive, asset.bytes, asset.sha256, (bytes) => {
-        downloaded += bytes;
-        reportDownloadProgress(job, Math.min(0.9, (downloaded / asset.bytes) * 0.9));
-      }, job.controller.signal);
-      throwIfDownloadCancelled(job.controller.signal);
-      await fsp.mkdir(root, { recursive: true });
-      if (asset.archive === 'zip') {
-        new AdmZip(archive).extractAllTo(root, true);
+      for (const [index, asset] of candidates.entries()) {
         throwIfDownloadCancelled(job.controller.signal);
-      } else {
-        await run('tar', ['-xzf', archive, '-C', root], undefined, job.controller.signal);
+        const archive = path.join(rootDirectory(), asset.name);
+        const base = index / candidates.length;
+        const span = 1 / candidates.length;
+        let executable: string | null = null;
+        try {
+          runtimeLog(`install: candidate ${index + 1}/${candidates.length} ${asset.name} (${asset.backend}, ${asset.bytes} bytes)`);
+          let downloaded = 0;
+          await downloadFile(asset.url, archive, asset.bytes, asset.sha256, (bytes) => {
+            downloaded += bytes;
+            reportDownloadProgress(job, Math.min(0.9 * span, (downloaded / asset.bytes) * 0.9 * span) + base);
+          }, job.controller.signal);
+          throwIfDownloadCancelled(job.controller.signal);
+          runtimeLog(`install: verified SHA-256 for ${asset.name}`);
+          // Extract and probe in the staging directory: the installed runtime keeps
+          // working until a candidate has proven it can see a device.
+          await fsp.rm(staging, { recursive: true, force: true });
+          executable = await extractRuntimeArchive(asset, archive, staging, job.controller.signal);
+          if (asset.backend !== 'cpu') {
+            const probe = await probeLlamaRuntime(executable);
+            throwIfDownloadCancelled(job.controller.signal);
+            if (!probe.devices.length) {
+              failures.push(`${asset.name}: sin dispositivos utilizables`);
+              fallbackReason = `el motor con GPU (${asset.backend}) no encontró ningún dispositivo utilizable`;
+              runtimeLog(`install: ${asset.name} found no usable device; falling back`);
+              await fsp.rm(staging, { recursive: true, force: true });
+              continue;
+            }
+          }
+          await fsp.rm(root, { recursive: true, force: true });
+          await fsp.rename(staging, root);
+          await writeRuntimeDescriptor({
+            version: 1,
+            llamaCppVersion: LLAMA_CPP_VERSION,
+            asset: asset.name,
+            backend: asset.backend,
+            device: cachedProbe?.devices[0] ?? null,
+            nvidia: cachedProbe?.nvidia ?? null,
+            probedAt: cachedProbe?.probedAt ?? null,
+            fallbackReason: fallbackReason ?? null,
+          });
+          installed = asset.name;
+        } catch (error) {
+          if (job.controller.signal.aborted) throw error;
+          failures.push(`${asset.name}: ${error instanceof Error ? error.message : String(error)}`);
+          if (asset.backend !== 'cpu') {
+            fallbackReason = `el motor con GPU (${asset.backend}) no se pudo preparar: ${error instanceof Error ? error.message : String(error)}`;
+          }
+          runtimeLog(`install: ${asset.name} failed: ${error instanceof Error ? error.message : String(error)}`);
+          await fsp.rm(staging, { recursive: true, force: true });
+          continue;
+        } finally {
+          await fsp.rm(archive, { force: true }).catch(() => undefined);
+        }
+        if (installed) {
+          runtimeLog(`install: ${asset.name} installed and verified`);
+          break;
+        }
       }
-      const executable = await llamaServerPath();
-      if (!executable) throw new Error('El runtime se descargó, pero no contiene llama-server.');
-      if (process.platform !== 'win32') await fsp.chmod(executable, 0o755);
+      if (!installed) {
+        throw new Error(`No se pudo instalar un runtime de llama.cpp utilizable. ${failures.join(' | ')}`);
+      }
       reportDownloadProgress(job, 1);
-      installed = true;
       return getNodusLocalAiStatus();
     } finally {
-      if (installed) await fsp.rm(archive, { force: true });
-      if (job.controller.signal.aborted) await fsp.rm(root, { recursive: true, force: true });
+      await fsp.rm(staging, { recursive: true, force: true }).catch(() => undefined);
+      if (job.controller.signal.aborted && !installed) {
+        // A cancelled upgrade must not leave the machine without the runtime it had.
+        runtimeLog('install: cancelled before a candidate was verified; the previous runtime is untouched');
+      }
     }
   })().finally(() => {
     if (activeRuntimeDownload === job) activeRuntimeDownload = null;
   }).then(() => getNodusLocalAiStatus());
   return followDownload(job, onProgress);
+}
+
+/**
+ * Settings action: probe the installed runtime again and reinstall when this
+ * machine's best build changed (a GPU driver appearing after the CPU fallback was
+ * chosen, or a newer runtime after an app update). Never triggers a download by
+ * merely opening Settings.
+ */
+export async function recheckNodusLocalRuntime(): Promise<NodusLocalAiStatus> {
+  cachedProbe = null;
+  const executable = await llamaServerPath();
+  const probe = executable ? await probeLlamaRuntime(executable) : null;
+  const candidates = nodusLocalRuntimeCandidates();
+  const descriptor = await readRuntimeDescriptor();
+  const { backend } = await installedRuntimeBackend();
+  const desired = candidates[0];
+  if (!desired) return getNodusLocalAiStatus();
+  if (backend !== desired.backend) {
+    runtimeLog(`recheck: installed backend=${backend} differs from best available backend=${desired.backend}; reinstalling ${desired.name}`);
+    return installNodusLocalRuntime(undefined, { force: true });
+  }
+  if (descriptor?.fallbackReason) {
+    await writeRuntimeDescriptor({ ...descriptor, fallbackReason: null, device: probe?.devices[0] ?? descriptor.device });
+  }
+  runtimeLog(`recheck: runtime backend=${backend} is the best available for this machine`);
+  return getNodusLocalAiStatus();
+}
+
+/** Explicit "measure concurrency" action; automatic benchmarking is gone (issue #851). */
+export async function calibrateNodusLocalRuntimeConcurrency(modelId: string): Promise<NodusLocalAiStatus> {
+  await calibrateNodusLocalModelConcurrency(modelId, true);
+  return getNodusLocalAiStatus();
 }
 
 async function downloadModelAssets(
@@ -453,7 +870,10 @@ export async function downloadNodusLocalModel(
   };
   activeDownloads.set(modelId, job);
   job.promise = (async () => {
-    if (model.runtime === 'llama_cpp' && !(await llamaServerPath())) {
+    // The runtime is a dependency of every llama.cpp model: install it first, and
+    // let the installer decide whether the installed build still fits this machine
+    // (an old CPU-only install on a GPU box is replaced here, not left in place).
+    if (model.runtime === 'llama_cpp') {
       await installNodusLocalRuntime((fraction) => reportDownloadProgress(job, fraction * 0.2));
       throwIfDownloadCancelled(job.controller.signal);
       return downloadModelAssets(model, (fraction) => reportDownloadProgress(job, 0.2 + fraction * 0.8), job.controller.signal);
@@ -475,9 +895,11 @@ export async function cancelNodusLocalDownloads(): Promise<NodusLocalAiStatus> {
     ...(runtimeJob ? [runtimeJob.promise] : []),
   ]);
   if (runtimeJob) {
-    // The extracted runtime directory may be incomplete, but the verified archive
-    // and its `.download` remain resumable. A later install re-verifies SHA-256.
-    await fsp.rm(runtimeDirectory(), { recursive: true, force: true });
+    // Only the staging directory is discarded. The installed runtime and the
+    // verified archive (with its `.download`) survive: an upgrade cancelled
+    // halfway must not leave the machine without a working engine, and a later
+    // install resumes the transfer and re-verifies SHA-256.
+    await fsp.rm(runtimeStagingDirectory(), { recursive: true, force: true });
   }
   return getNodusLocalAiStatus();
 }
@@ -533,19 +955,59 @@ async function freePort(): Promise<number> {
   });
 }
 
-async function waitForServer(baseUrl: string, child: ChildProcess, logs: () => string): Promise<void> {
-  const deadline = Date.now() + 120_000;
+/**
+ * Wait until llama-server answers /health, bounded twice.
+ *
+ * The per-request deadline matters: a process that accepts the connection and
+ * then never answers (a security product holding the binary, a backend wedged in
+ * a driver call) used to leave `fetch` pending forever, so the outer deadline was
+ * never re-checked and the caller hung with no diagnostic. The whole-startup
+ * deadline scales with the model size, because loading 3 GB of weights on a CPU
+ * fallback legitimately takes longer than loading 500 MB of them.
+ */
+async function waitForServer(baseUrl: string, child: ChildProcess, logs: () => string, modelBytes = 0): Promise<void> {
+  const startedAt = Date.now();
+  const deadline = startedAt + Math.max(120_000, Math.min(600_000, Math.round(modelBytes / 10_000_000) * 1_000));
   while (Date.now() < deadline) {
-    if (child.exitCode != null) throw new Error(logs() || `llama-server terminó con código ${child.exitCode}.`);
+    if (child.exitCode != null || child.signalCode != null) {
+      const failure = classifyStartupFailure({ exitCode: child.exitCode, signal: child.signalCode, log: logs(), elapsedMs: Date.now() - startedAt });
+      throw new Error(describeStartupFailure(failure, logs(), child.exitCode, child.signalCode));
+    }
     try {
-      const response = await fetch(`${baseUrl}/health`);
+      const response = await fetch(`${baseUrl}/health`, { signal: AbortSignal.timeout(5_000) });
       if (response.ok) return;
     } catch {
       // Model loading can take several seconds; keep polling until the deadline.
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`llama-server no estuvo listo a tiempo. ${logs()}`.trim());
+  const failure = classifyStartupFailure({ log: logs(), elapsedMs: Date.now() - startedAt });
+  throw new Error(`llama-server no estuvo listo a tiempo. ${describeStartupFailure(failure, logs(), null, null)}`);
+}
+
+/** Turn a classified startup failure into an error a user can act on. */
+function describeStartupFailure(
+  failure: ReturnType<typeof classifyStartupFailure>,
+  log: string,
+  exitCode: number | null,
+  signal: string | null,
+): string {
+  const tail = log.trim().slice(-1_200);
+  const where = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
+  switch (failure.kind) {
+    case 'blocked-by-security-software':
+      return `El sistema de seguridad de ${where} bloqueó llama-server (${failure.detail}). Añade la carpeta del motor local a las exclusiones del antivirus y vuelve a intentarlo. ${tail}`;
+    case 'exited-without-output':
+      return `llama-server terminó sin escribir nada (código ${exitCode ?? 'desconocido'}${signal ? `, señal ${signal}` : ''}). Suele ser un antivirus o una política de ejecución bloqueando el binario; revisa las exclusiones de la carpeta del motor local. ${tail}`;
+    case 'out-of-memory':
+      return `llama-server no pudo reservar memoria para el modelo y los layers solicitados. ${tail}`;
+    case 'missing-system-library':
+      return `llama-server no pudo cargar una biblioteca del sistema. ${tail}`;
+    case 'no-usable-device':
+      return `llama-server no encontró un dispositivo utilizable. ${tail}`;
+    default:
+      return tail || `llama-server terminó con código ${exitCode ?? 'desconocido'}${signal ? ` (señal ${signal})` : ''}.`;
+  }
 }
 
 export function stopNodusLocalServer(): void {
@@ -863,17 +1325,6 @@ export function calibrateNodusLocalModelConcurrency(modelId: string, force = fal
   return job;
 }
 
-export async function calibrateDownloadedNodusLocalModels(modelIds: string[]): Promise<void> {
-  for (const modelId of [...new Set(modelIds)]) {
-    const model = getNodusLocalModel(modelId);
-    // calibrateNodusLocalModelConcurrency performs the checksum verification.
-    // Do not await a duplicate verification here: requests could otherwise
-    // acquire a server before calibrationTail is registered.
-    if (!model || model.runtime !== 'llama_cpp') continue;
-    await calibrateNodusLocalModelConcurrency(modelId);
-  }
-}
-
 export async function readNodusLocalMetrics(): Promise<string | null> {
   const server = activeServer;
   if (!server || server.child.exitCode != null) return null;
@@ -919,11 +1370,28 @@ async function ensureNodusLocalServerUnlocked(
     '--ctx-size', String(contextPerSlot * slots),
     '--parallel', String(slots),
     '--threads', String(Math.max(1, Math.min(8, os.cpus().length - 1))),
-    '--n-gpu-layers', '999',
+    // llama-server's default verbosity (3) never prints where the layers went, so
+    // "is this run using the GPU?" was unanswerable from its output. Level 4 adds
+    // the model-loading lines we parse for the diagnostics — the placement report
+    // and the fitter's projection — and nothing per-token.
+    '-lv', '4',
     '--jinja',
     '--metrics',
     '--no-webui',
   ];
+  if (process.platform === 'darwin') {
+    // macOS archives are Metal-enabled and use unified memory: ask for every
+    // layer, exactly as before. Never change this path for Apple Silicon.
+    args.push('--n-gpu-layers', '999');
+  } else {
+    // Windows and Linux may run either a GPU build or the CPU archive, and the
+    // VRAM budget is not ours to guess. llama.cpp's own fitter (`--fit`, on by
+    // default and pinned with this runtime) measures the model plus the KV cache
+    // against free device memory and places as many layers as fit; because
+    // `--ctx-size` is set explicitly the context contract is never shrunk to make
+    // room. A CPU-only runtime simply has no device to fit and runs as before.
+    args.push('--fit', 'on');
+  }
   if (model.projectorFile) args.push('--mmproj', path.join(modelDirectory(model.id), model.projectorFile));
   if (mode === 'embedding') {
     // llama.cpp's non-causal embedding path cannot split one input across
@@ -939,11 +1407,20 @@ async function ensureNodusLocalServerUnlocked(
       '--embedding', '--pooling', 'mean',
     );
   }
+  const installed = await installedRuntimeBackend();
+  const device = (await readRuntimeDescriptor())?.device ?? cachedProbe?.devices[0] ?? null;
+  runtimeLog(`server: starting ${model.id} (${mode}) slots=${slots} ctx=${contextPerSlot * slots} backend=${installed.backend}`
+    + `${device ? ` device=${device.backend}${device.index} ${device.name} (${device.freeMiB}/${device.totalMiB} MiB free)` : ' device=none'}`);
   const child = spawn(executable, args, { cwd: path.dirname(executable), stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
-  const capture = (chunk: unknown) => { output = `${output}${String(chunk)}`.slice(-12_000); };
+  const capture = (chunk: unknown) => {
+    output = `${output}${String(chunk)}`.slice(-48_000);
+    recordOffloadFromLog(output);
+  };
   child.stdout?.on('data', capture);
   child.stderr?.on('data', capture);
+  let spawnError: Error | null = null;
+  child.on('error', (error) => { spawnError = error; });
   const server: ActiveServer = {
     key, modelId, mode, baseUrl, apiUrl: `${baseUrl}/v1`, child,
     slots, leases: 0, stopWhenIdle: false, idleWaiters: new Set(),
@@ -956,11 +1433,21 @@ async function ensureNodusLocalServerUnlocked(
     if (activeServer === server) activeServer = null;
   });
   try {
-    await waitForServer(baseUrl, child, () => output);
+    await waitForServer(baseUrl, child, () => output, status.totalBytes ?? 0);
+    recordOffloadFromLog(output, { announce: true });
+    recordServerStartupDetails(output);
     return server.apiUrl;
   } catch (error) {
     if (activeServer === server) await stopNodusLocalServerAndWait(server);
+    if (spawnError && !output.trim()) {
+      const failure = classifyStartupFailure({
+        spawnErrorCode: (spawnError as NodeJS.ErrnoException).code ?? null,
+        log: output,
+      });
+      throw new Error(describeStartupFailure(failure, output, child.exitCode, child.signalCode));
+    }
     if (slotsOverride == null && slots > 1) {
+      runtimeLog(`server: ${model.id} failed with ${slots} slots; recording a single safe slot`);
       await recordNodusLocalCalibration({
         modelId,
         slots: 1,

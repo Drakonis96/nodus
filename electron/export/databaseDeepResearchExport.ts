@@ -17,10 +17,11 @@ import {
 } from '../ai/databaseDeepResearch';
 import { getColumns, listViews } from '../db/databasesRepo';
 import { professionalReportPdf } from './professionalReportPdf';
+import { markdownToDocx } from './markdownDocx';
 
 export interface DatabaseDeepResearchExport {
   bytes: Buffer;
-  extension: 'md' | 'pdf' | 'zip';
+  extension: 'md' | 'pdf' | 'docx' | 'zip';
   mime: string;
 }
 
@@ -95,6 +96,15 @@ export async function buildDatabaseDeepResearchExport(
   }
   if (options.format === 'pdf') {
     return { bytes: await pdfFor(report), extension: 'pdf', mime: 'application/pdf' };
+  }
+  if (options.format === 'docx') {
+    // Redacted exactly like the Markdown export: the same report text leaves the
+    // trusted process either way, so the same rule applies to both.
+    return {
+      bytes: await markdownToDocx(redactDatabaseResearchMarkdown(report.markdown)),
+      extension: 'docx',
+      mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    };
   }
 
   const zip = new AdmZip();

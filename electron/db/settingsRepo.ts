@@ -13,12 +13,17 @@ import { lockedApiKeyProviders, providerKeyMap } from '../secrets/secretStore';
 import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
 import { DEFAULT_NODUS_IMAGE_QUALITY, isNodusImageQuality } from '@shared/localImageModels';
 import { EMPTY_CUSTOM_EVENT_TYPES, sanitizeCustomEventTypes } from '@shared/eventTypes';
+import { sanitizeCustomThemes } from '@shared/appThemes';
+import { isPipelineLogMaxEntries, isPipelineLogRetention } from '@shared/pipelineLogs';
 import { normalizeToolkitToolPages } from '@shared/toolkitNavigation';
 import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
 import {
-  GLOBAL_PREF_KEYS,
+  SHARED_APPEARANCE_KEYS,
   SHARED_MODEL_KEYS,
+  isSharedAppearanceKey,
   readGlobalPrefs,
+  sharesAppThemeAcrossVaults,
+  sharedKeysFor,
   splitGlobalPatch,
   writeGlobalPrefs,
   type SharedModelKey,
@@ -132,6 +137,9 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   zoteroStoragePath: '',
   monitoredCollections: [],
   theme: 'dark',
+  appTheme: 'default',
+  customThemes: [],
+  shareAppThemeAcrossVaults: false,
   uiLanguage: 'es',
   promptLanguage: 'es',
   animationSpeed: 1,
@@ -151,6 +159,11 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   browserSearchTemplate: '',
   browserHistoryRetention: '30d',
   browserClearHistoryOnClose: false,
+  // Ten days of processing log, capped so a provider outage cannot bloat the file, and
+  // rendered in English by default: the log exists to be pasted into a GitHub issue.
+  pipelineLogRetention: '10d',
+  pipelineLogMaxEntries: 5_000,
+  pipelineLogLanguage: 'en',
   mascotEnabled: true,
   mascotScale: NODI_DEFAULT_SCALE,
   mascotAlwaysOnTop: false,
@@ -289,6 +302,21 @@ function writeRaw(key: string, value: string): void {
     .run(key, value);
 }
 
+/** This vault's own palette, ignoring whatever the shared store is overlaying. */
+function readVaultStoredPalette(): Partial<Pick<AppSettings, 'appTheme' | 'customThemes'>> {
+  const raw = readRaw('app');
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as Partial<AppSettings>;
+    return {
+      ...(parsed.appTheme === undefined ? {} : { appTheme: parsed.appTheme }),
+      ...(parsed.customThemes === undefined ? {} : { customThemes: parsed.customThemes }),
+    };
+  } catch {
+    return {};
+  }
+}
+
 export function getSettings(): AppSettings {
   const raw = readRaw('app');
   let parsed: Partial<AppSettings> = {};
@@ -383,10 +411,17 @@ export function getSettings(): AppSettings {
   // users keep their preferences when the first new vault is created.
   const globalPrefs = recoverV23SharedModelPrefs() as ReturnType<typeof readGlobalPrefs>;
   const seed: Record<string, unknown> = {};
-  for (const key of GLOBAL_PREF_KEYS) {
+  const sharesAppearance = sharesAppThemeAcrossVaults(globalPrefs as Record<string, unknown>);
+  // The palette is never inherited from the profile store: a vault shows a palette
+  // because it was chosen there. With sharing off, a vault that never stored one keeps
+  // the default, even when the profile still holds a palette from a spell of sharing.
+  for (const key of sharedKeysFor(sharesAppearance)) {
     if (globalPrefs[key] === undefined) seed[key] = merged[key];
     else (merged as Record<string, unknown>)[key] = globalPrefs[key];
   }
+  // app-prefs.json is user-editable; normalize custom themes after the global
+  // overlay so malformed or legacy values can never reach the renderer.
+  merged.customThemes = sanitizeCustomThemes(merged.customThemes);
   // The global preferences file is user-editable, so validate the shared size again
   // after it has overlaid the vault defaults.
   merged.mascotScale = normalizeNodiScale(merged.mascotScale);
@@ -405,6 +440,18 @@ export function getSettings(): AppSettings {
   if (typeof merged.browserClearHistoryOnClose !== 'boolean') {
     merged.browserClearHistoryOnClose = DEFAULTS.browserClearHistoryOnClose;
     seed.browserClearHistoryOnClose = merged.browserClearHistoryOnClose;
+  }
+  // Same reasoning as the Browser history above: a hand-edited or corrupted retention value
+  // must not reach the pruning code, where an unknown window would mean "delete everything".
+  // The language needs no repair here — `resolveTranslation` normalizes an unknown locale to
+  // English on every read, and the write path validates it.
+  if (!isPipelineLogRetention(merged.pipelineLogRetention)) {
+    merged.pipelineLogRetention = DEFAULTS.pipelineLogRetention;
+    seed.pipelineLogRetention = merged.pipelineLogRetention;
+  }
+  if (!isPipelineLogMaxEntries(merged.pipelineLogMaxEntries)) {
+    merged.pipelineLogMaxEntries = DEFAULTS.pipelineLogMaxEntries;
+    seed.pipelineLogMaxEntries = merged.pipelineLogMaxEntries;
   }
   // Cleanup can delete files, so corrupted or hand-edited global preferences must
   // never be treated as an enabled policy. Repair them to conservative defaults
@@ -524,6 +571,12 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
     // shown to them (nor to be diffed against the next value they type).
     patch = { ...patch, customProvider: normalizeCustomProviderConfig(patch.customProvider) };
   }
+  if (patch.customThemes !== undefined) {
+    patch = { ...patch, customThemes: sanitizeCustomThemes(patch.customThemes) };
+  }
+  if (patch.appTheme !== undefined) {
+    patch = { ...patch, appTheme: typeof patch.appTheme === 'string' ? patch.appTheme.trim().toLowerCase() : 'default' };
+  }
   if (patch.codexReasoningEfforts !== undefined) {
     patch = { ...patch, codexReasoningEfforts: sanitizeCodexReasoningEfforts(patch.codexReasoningEfforts) };
   }
@@ -543,16 +596,40 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
     patch = { ...patch, studyAiPrivacyMode: patch.studyAiLocalOnly ? 'local' : 'hybrid' };
   }
   const current = getSettings();
+  const sharesBefore = sharesAppThemeAcrossVaults();
+  const sharesAfter = patch.shareAppThemeAcrossVaults ?? sharesBefore;
+  // Turning the shared palette on adopts the one on screen: "the same in every vault"
+  // has to mean the palette the user is looking at, not whatever the file held last.
+  // A palette sent in the same patch is the user naming one explicitly (the new-vault
+  // wizard sets the switch and the palette together), so it wins over that adoption.
+  if (sharesAfter && !sharesBefore && patch.appTheme === undefined && patch.customThemes === undefined) {
+    patch = { ...patch, appTheme: current.appTheme, customThemes: current.customThemes };
+  }
+  // While the palette is shared — and on the write that stops sharing it — the vault
+  // keeps the palette it had. The values on screen come from the shared store, so
+  // writing those back would overwrite this vault's own palette, and switching the
+  // sharing off could never restore it.
+  const vaultOwnedPalette = sharesAfter || sharesBefore ? readVaultStoredPalette() : null;
   // Shared keys (theme/language/favorites + the AI model configuration) go to the global store;
   // everything else stays per-vault. Model keys are also kept in the per-vault blob as a
   // fallback, so switching vaults never loses a value.
-  const { global, local } = splitGlobalPatch(patch);
+  const { global, local } = splitGlobalPatch(patch, sharesAfter);
   if (Object.keys(global).length) writeGlobalPrefs(global);
   // providerKeys is derived from the secret store, never persisted.
   const { providerKeys: _ignore, lockedProviderKeys: _ignoreLocked, ...rest } = { ...current, ...local };
   // Never persist the app-wide keys into the per-vault blob (they'd shadow the
-  // shared store and drift), so keep them exclusively in the global prefs file.
-  for (const key of GLOBAL_PREF_KEYS) delete (rest as Record<string, unknown>)[key];
+  // shared store and drift), so keep them exclusively in the global prefs file. The
+  // palette is exempt either way: it is this vault's own record of what it shows.
+  for (const key of sharedKeysFor(sharesAfter)) {
+    if (isSharedAppearanceKey(key)) continue;
+    delete (rest as Record<string, unknown>)[key];
+  }
+  if (vaultOwnedPalette) {
+    for (const key of SHARED_APPEARANCE_KEYS) {
+      if (vaultOwnedPalette[key] === undefined) delete (rest as Record<string, unknown>)[key];
+      else (rest as Record<string, unknown>)[key] = vaultOwnedPalette[key];
+    }
+  }
   writeRaw('app', JSON.stringify(rest));
   return getSettings();
 }

@@ -24,6 +24,7 @@ import {
 import { getVault, listVaults } from '../vaults/vaultRegistry';
 import { runDocumentProfileScan } from '../ai/documentProfile';
 import { AiError } from '../ai/aiClient';
+import { logPipelineFailure, logPipelineSuccess, logPipelineWarning, withPipelineLogScope } from '../logging/pipelineLogCore';
 import { coalesce } from '../util/coalesce';
 import { registerDocumentIndexMaintenanceController } from './documentIndexMaintenance';
 import { compareDocumentIndexJobsForDisplay } from '@shared/documentIndexProgress';
@@ -55,6 +56,8 @@ class DocumentIndexQueue {
   private maintenanceVaults = new Set<string>();
   private maintenancePaused = new Map<string, { campaignIds: string[]; standaloneJobIds: string[] }>();
   private maintenanceAll = false;
+  /** Campaigns whose outcome has already been written to the processing log. */
+  private summarizedCampaigns = new Set<string>();
 
   private emitter = coalesce(() => { void this.emitNow(); }, 250);
 
@@ -492,6 +495,18 @@ class DocumentIndexQueue {
         updateDocumentIndexJob(job.jobId, { status: 'unavailable', phase: 'done', progress: 1, error: 'La obra ya no existe.' });
         return;
       }
+      // Every line the profile scan records now inherits the vault, the document and the job,
+      // so an AI failure deep inside it arrives in the log attributed instead of anonymous.
+      await withPipelineLogScope({
+        scope: 'indexing',
+        vaultId: vault.id,
+        vaultName: vault.name,
+        nodusId: job.nodusId,
+        documentTitle: work.title,
+        jobId: job.jobId,
+        provider: job.generatorModel?.provider ?? null,
+        model: job.generatorModel?.model ?? null,
+      }, async () => {
       try {
         await measurePerf('document profile', { nodusId: work.nodus_id, title: work.title }, () =>
           runDocumentProfileScan(work, {
@@ -513,6 +528,9 @@ class DocumentIndexQueue {
           status: 'completed', phase: 'done', progress: 1, error: null,
           progressMessage: null, currentUnit: null, totalUnits: null,
         });
+        // The document's own green line is written by the profile scan, which is the only
+        // place that knows how many sections and vectors were published.
+        this.logCampaignOutcome(vault, job.campaignId);
       } catch (error) {
         console.error('[document-index] job failed', {
           vaultId: vault.id,
@@ -522,28 +540,72 @@ class DocumentIndexQueue {
         });
         const message = error instanceof Error ? error.message : String(error);
         const current = listDocumentIndexJobs().find((item) => item.jobId === job.jobId) ?? job;
-        if (current.status === 'cancelled' || message === 'DOCUMENT_INDEX_CANCELLED') return;
-        if (current.status === 'paused' || message === 'DOCUMENT_INDEX_PAUSED') return;
+        if (current.status === 'cancelled' || message === 'DOCUMENT_INDEX_CANCELLED') {
+          logPipelineWarning({ subject: 'subjectIndexing', code: 'cancelled', reason: 'reasonCancelled', detail: work.title });
+          return;
+        }
+        if (current.status === 'paused' || message === 'DOCUMENT_INDEX_PAUSED') {
+          logPipelineWarning({ subject: 'subjectIndexing', code: 'queue_paused', reason: 'reasonCancelled', detail: work.title });
+          return;
+        }
         if (message === 'DOCUMENT_SOURCE_CHANGED') {
           requeueDocumentIndexJobForSourceChange(job.jobId);
+          logPipelineWarning({ subject: 'subjectIndexing', code: 'source_changed', reason: 'reasonSourceChanged', detail: work.title });
           return;
         }
         const unavailable = /sin texto|no hay texto|no contiene texto/i.test(message);
         if (unavailable) {
           updateDocumentIndexJob(job.jobId, { status: 'unavailable', phase: 'done', progress: 1, error: message });
           setDocumentProfileState(job.nodusId, 'unavailable', { error: message });
+          logPipelineWarning({ subject: 'subjectIndexing', code: 'no_legible_text', reason: 'reasonNoLegibleText', detail: work.title });
         } else if (error instanceof AiError && error.config && job.campaignId) {
           updateDocumentIndexJob(job.jobId, { status: 'paused', phase: 'paused', progress: current.progress, error: message });
           setDocumentProfileState(job.nodusId, 'paused', { error: message });
           setDocumentCampaignStatus(job.campaignId, 'paused');
+          logPipelineFailure({ error, code: 'queue_paused', subject: 'subjectIndexing', detail: message });
         } else if (error instanceof AiError && error.retriable && current.attempts < current.maxAttempts) {
           updateDocumentIndexJob(job.jobId, { status: 'queued', phase: 'queued', progress: current.progress, error: message });
           setDocumentProfileState(job.nodusId, 'queued', { error: message });
+          logPipelineWarning({
+            subject: 'subjectIndexing',
+            code: 'index_failed',
+            message: {
+              id: 'logRetry',
+              params: { subject: { id: 'subjectIndexing' }, attempt: current.attempts + 1, max: current.maxAttempts },
+            },
+            detail: message,
+          });
         } else {
           updateDocumentIndexJob(job.jobId, { status: 'failed', phase: 'done', progress: current.progress, error: message });
           setDocumentProfileState(job.nodusId, 'failed', { error: message });
+          logPipelineFailure({ error, code: 'index_failed', subject: 'subjectIndexing', detail: message });
         }
+        this.logCampaignOutcome(vault, job.campaignId);
       }
+      });
+    });
+  }
+
+  /**
+   * The line that answers "why is half the corpus missing?" — one summary per campaign once
+   * its last job settles, next to the per-document lines instead of a count the reader has to
+   * reconstruct. `summarizedCampaigns` keeps it to one line per campaign.
+   */
+  private logCampaignOutcome(vault: VaultSummary, campaignId: string | null | undefined): void {
+    if (!campaignId || this.summarizedCampaigns.has(campaignId)) return;
+    const campaign: DocumentIndexCampaign | undefined =
+      listDocumentIndexCampaigns().find((item) => item.campaignId === campaignId);
+    if (!campaign) return;
+    const pending = campaign.completedJobs + campaign.failedJobs;
+    if (pending < campaign.totalJobs) return;
+    this.summarizedCampaigns.add(campaignId);
+    logPipelineSuccess({
+      context: { vaultId: vault.id, vaultName: vault.name },
+      message: {
+        id: 'campaignFinished',
+        params: { completed: campaign.completedJobs, total: campaign.totalJobs, failed: campaign.failedJobs },
+      },
+      ...(campaign.failedJobs > 0 ? { level: 'warning' as const } : {}),
     });
   }
 

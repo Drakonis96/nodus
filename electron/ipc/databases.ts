@@ -1,5 +1,6 @@
 // databases channels, moved verbatim out of the monolithic registerIpc.
 // The channel names are unchanged; scripts/test-ipc-contract.mjs is what proves it.
+import { dialogTitle } from '../dialogTitles';
 import type { IpcContext } from './context';
 import crypto from 'node:crypto';
 import { withVaultDatabase } from '../db/database';
@@ -255,7 +256,7 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
       if (!qaRoot || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) throw new Error('QA abortado: la exportación está fuera del directorio autorizado.');
       fs.mkdirSync(qaExportDir, { recursive: true }); filePath = path.join(qaExportDir, fileName);
     } else {
-      const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, { title: 'Exportar gráfico', defaultPath: fileName,
+      const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, { title: dialogTitle('exportChart', getSettings().uiLanguage), defaultPath: fileName,
         filters: [{ name: input.format.toUpperCase(), extensions: [input.format] }] });
       if (picked.canceled || !picked.filePath) return { canceled: true, path: null }; filePath = picked.filePath;
     }
@@ -287,7 +288,7 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
     if (!att || !blob) return { canceled: true, path: null };
     const win = getWindow();
     const picked = await dialog.showSaveDialog(win ?? undefined!, {
-      title: 'Descargar adjunto',
+      title: dialogTitle('downloadAttachment', getSettings().uiLanguage),
       defaultPath: att.fileName ?? 'adjunto',
     });
     if (picked.canceled || !picked.filePath) return { canceled: true, path: null };
@@ -321,7 +322,7 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
   h('db:pickBulkFiles', async (_e, mode: 'files' | 'folder' = 'files') => {
     const win = getWindow();
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: mode === 'folder' ? 'Elegir una carpeta para subida masiva' : 'Elegir archivos para subida masiva',
+      title: mode === 'folder' ? dialogTitle('chooseBulkUploadFolder', getSettings().uiLanguage) : dialogTitle('chooseBulkUploadFiles', getSettings().uiLanguage),
       properties: mode === 'folder' ? ['openDirectory'] : ['openFile', 'multiSelections'],
       ...(mode === 'folder' ? {} : { filters: [{ name: 'Todos los archivos', extensions: ['*'] }] }),
     });
@@ -435,7 +436,7 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
   h('db:parseCsvForImport', async () => {
     const win = getWindow();
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Importar CSV',
+      title: dialogTitle('importCsv', getSettings().uiLanguage),
       properties: ['openFile'],
       filters: [{ name: 'CSV', extensions: ['csv', 'tsv', 'txt'] }],
     });
@@ -475,7 +476,7 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
       filePath = path.resolve(qaPath);
     } else {
       const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
-        title: 'Importar exportación de Notion', properties: ['openFile'],
+        title: dialogTitle('importNotionExport', getSettings().uiLanguage), properties: ['openFile'],
         filters: [{ name: 'Notion ZIP', extensions: ['zip'] }],
       });
       if (picked.canceled || picked.filePaths.length === 0) return null;
@@ -516,7 +517,7 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
       return { canceled: false, path: filePath, metrics };
     }
     const win = getWindow();
-    const picked = await dialog.showSaveDialog(win ?? undefined!, { title: 'Exportar base de datos', defaultPath: descriptor.fileName });
+    const picked = await dialog.showSaveDialog(win ?? undefined!, { title: dialogTitle('exportDatabase', getSettings().uiLanguage), defaultPath: descriptor.fileName });
     if (picked.canceled || !picked.filePath) return { canceled: true };
     const metrics = await exportDatabaseToFile(databaseId, format, picked.filePath);
     return { canceled: false, path: picked.filePath, metrics };
@@ -674,12 +675,12 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
   });
   h('db:deepResearch:report:export', async (_e, id: string, options: DatabaseDeepResearchExportOptions) => {
     const vault = databaseResearchVault();
-    if (!options || !['markdown', 'pdf', 'zip'].includes(options.format)) throw new Error('Formato de exportación no válido.');
+    if (!options || !['markdown', 'pdf', 'docx', 'zip'].includes(options.format)) throw new Error('Formato de exportación no válido.');
     if (options.includeSnapshot && options.format !== 'zip') throw new Error('El snapshot bruto sólo puede incluirse en el ZIP reproducible.');
     const report = await withVaultDatabase(vault.id, () => databaseResearch.getDatabaseResearchReport(id));
     if (!report) return { canceled: true, path: null };
     const extension = options.format === 'markdown' ? 'md' : options.format;
-    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, { title: 'Exportar informe de Deep Research', defaultPath: `${report.title.replace(/[^\w\-. ]+/g, '').trim() || 'database-research'}.${extension}` });
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, { title: dialogTitle('exportDeepResearchReport', getSettings().uiLanguage), defaultPath: `${report.title.replace(/[^\w\-. ]+/g, '').trim() || 'database-research'}.${extension}` });
     if (picked.canceled || !picked.filePath) return { canceled: true, path: null };
     const exported = await withVaultDatabase(vault.id, () => buildDatabaseDeepResearchExport(id, options));
     fs.writeFileSync(picked.filePath, exported.bytes);
@@ -731,7 +732,7 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
   h('db:pickAndAttach', async (_e, rowId: string, columnId: string) => {
     const win = getWindow();
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Adjuntar archivos',
+      title: dialogTitle('attachFiles', getSettings().uiLanguage),
       properties: ['openFile', 'multiSelections'],
       filters: [
         { name: 'Todos los archivos', extensions: ['*'] },

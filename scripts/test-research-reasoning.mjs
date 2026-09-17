@@ -60,6 +60,15 @@ test('DeepSeek, MiMo and hosted open models expose real levels, including toggle
   assert.deepEqual(request('deepseek', 'deepseek-v4-flash'), { thinking: { type: 'disabled' } });
   assert.deepEqual(request('deepseek', 'deepseek-v4-pro', 'max'), { thinking: { type: 'enabled' }, reasoning_effort: 'max' });
   assert.deepEqual(choices(profile(ref('deepseek', 'deepseek-v4-pro'))), ['standard', 'low', 'high', 'max']);
+  // The unversioned ids are the same served model and must get the same toggle/budget.
+  assert.deepEqual(request('deepseek', 'deepseek-flash'), { thinking: { type: 'disabled' } });
+  assert.deepEqual(request('deepseek', 'deepseek-pro', 'max'), { thinking: { type: 'enabled' }, reasoning_effort: 'max' });
+  assert.deepEqual(choices(profile(ref('deepseek', 'deepseek-flash'))), ['standard', 'low', 'high', 'max']);
+  // The live native catalogue serves exactly these two ids; a served model must never fall
+  // back to "no control published", which is what the `/v4/`-only match did to the new one.
+  for (const model of ['deepseek-flash', 'deepseek-v4-pro']) {
+    assert.ok(choices(profile(ref('deepseek', model))).length > 1, `${model} publishes an effort control`);
+  }
   assert.deepEqual(request('xiaomi', 'mimo-v2.5', 'on'), { thinking: { type: 'enabled' } });
   for (const provider of ['groq', 'cerebras']) {
     assert.equal(request(provider, 'openai/gpt-oss-120b').reasoning_effort, 'low');
@@ -68,6 +77,23 @@ test('DeepSeek, MiMo and hosted open models expose real levels, including toggle
   assert.equal(request('cerebras', 'qwen-3.8-27b').reasoning_effort, 'none');
   assert.deepEqual(request('cerebras', 'kimi-k2.7-code', 'high'), {});
 });
+test('the OpenCode Go route gives the unversioned DeepSeek ids the same levels as the pinned ones', () => {
+  // The Go catalogue lists `deepseek-flash` next to `deepseek-v4-flash`. Matching only
+  // `/^deepseek-v4/` left the unversioned id with no slider and no reasoning field at all,
+  // while the model itself reasons by default.
+  assert.deepEqual(request('opencode-go', 'deepseek-flash'), { reasoning_effort: 'low' });
+  assert.deepEqual(request('opencode-go', 'deepseek-flash', 'max'), { reasoning_effort: 'max' });
+  // "Standard" is the floor on this route — the slider reads Standard/High/Max, exactly
+  // like the pinned sibling's.
+  assert.deepEqual(choices(profile(ref('opencode-go', 'deepseek-flash'))), ['standard', 'high', 'max']);
+  assert.deepEqual(profile(ref('opencode-go', 'deepseek-pro')).levels, profile(ref('opencode-go', 'deepseek-v4-flash')).levels);
+  assert.deepEqual(choices(profile(ref('opencode-go', 'deepseek-flash'))), choices(profile(ref('opencode-go', 'deepseek-v4-flash'))));
+  // The pinned sibling keeps its contract, and the two routes stay distinct: the Go route
+  // speaks levels, the native one speaks the explicit thinking toggle.
+  assert.deepEqual(request('opencode-go', 'deepseek-v4-flash', 'high'), { reasoning_effort: 'high' });
+  assert.deepEqual(request('deepseek', 'deepseek-flash', 'high'), { thinking: { type: 'enabled' }, reasoning_effort: 'high' });
+});
+
 test('subscription and LM Studio catalogues are authoritative and sorted', () => {
   const info = { id: 'model', supportedReasoningEfforts: ['xhigh', 'low', 'high', 'medium'].map(reasoningEffort => ({ reasoningEffort, description: '' })) };
   for (const provider of ['codex', 'github-copilot']) {

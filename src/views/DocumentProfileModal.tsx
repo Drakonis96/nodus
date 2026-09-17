@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { DocumentIndexJob, DocumentProfile, DocumentUnderstandingState, WorkView } from '@shared/types';
 import { Icon } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { t, tx } from '../i18n';
+import { openEvidenceAtPage } from '../evidenceJump';
+import { knownText, t, tx } from '../i18n';
 
 const STATUS_LABEL: Record<DocumentUnderstandingState, string> = {
   missing: 'Sin preparar', queued: 'En cola', waiting_source: 'Resolviendo texto completo', paused: 'En pausa', structuring: 'Reconstruyendo estructura',
@@ -65,6 +66,11 @@ export function DocumentProfileModal({ work, vaultId, onClose }: { work: WorkVie
     return map;
   }, [profile]);
 
+  // The pipeline's own marker for "published from literal extracts": the banner
+  // above already states it, so repeating the raw token in the list is noise.
+  const auditIssues = (profile?.audit?.issues ?? []).filter((issue) => issue !== 'fallback_extractivo_determinista');
+  const degradedSections = profile?.audit?.sectionsDegraded ?? 0;
+
   const start = async () => {
     setBusy(true);
     try { await window.nodus.enqueueDocumentProfile(work.nodus_id); await refresh(); }
@@ -106,12 +112,12 @@ export function DocumentProfileModal({ work, vaultId, onClose }: { work: WorkVie
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 sm:p-8" role="dialog" aria-modal="true" aria-label={t('Comprensión documental')} onClick={() => !busy && onClose()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 sm:p-8" role="dialog" aria-modal="true" aria-label={t('Índice documental')} onClick={() => !busy && onClose()}>
       <div className="card flex max-h-full w-full max-w-5xl flex-col overflow-hidden border border-neutral-700 bg-neutral-950 shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <header className="flex items-start gap-3 border-b border-neutral-800 px-5 py-4">
           <Icon name="book" size={19} className="mt-0.5 text-cyan-300" />
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-base font-semibold">{t('Comprensión documental')}</h2>
+            <h2 className="truncate text-base font-semibold">{t('Índice documental')}</h2>
             <p className="truncate text-xs text-neutral-500">{work.title}</p>
           </div>
           <span className={`rounded-md border px-2 py-1 text-xs ${STATUS_TONE[status]}`}>{t(STATUS_LABEL[status])}</span>
@@ -134,25 +140,45 @@ export function DocumentProfileModal({ work, vaultId, onClose }: { work: WorkVie
               <p className="mt-2 text-xs leading-5 text-neutral-500">{error ?? t('Nodus leerá la obra completa por secciones, sintetizará su arquitectura y auditará cada campo antes de publicarlo.')}</p>
             </div>
           ) : <div className="space-y-6">
+            {(profile.audit?.fallback || degradedSections > 0) && <div className="rounded-lg border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-200">
+              <div className="flex items-center gap-2 font-medium"><Icon name="alert" size={14} />{profile.audit?.fallback === 'extractive'
+                ? t('Indexado sin síntesis')
+                : profile.audit?.fallback === 'partial'
+                  ? t('Publicada sin aprobación semántica')
+                  : t('Algunas secciones se publicaron como extractos literales')}</div>
+              <p className="mt-1 leading-5 text-amber-200/80">{profile.audit?.fallback === 'extractive'
+                ? t('Los campos y los resúmenes de sección son citas literales del original: la auditoría semántica no aprobó ninguna síntesis, así que esta ficha solo orienta la recuperación.')
+                : profile.audit?.fallback === 'partial'
+                  ? t('Los campos conservan su apoyo literal, pero el auditor no aprobó la síntesis. Úsala solo para orientar la recuperación.')
+                  : t('La auditoría de esas secciones no aprobó ninguna síntesis, así que sus resúmenes son citas del original.')}</p>
+              {degradedSections > 0 && profile.audit?.fallback !== 'extractive' && <p className="mt-1 leading-5 text-amber-200/70">{tx('Secciones sin síntesis: {n} de {total}', { n: degradedSections, total: profile.sections.length })}</p>}
+              {auditIssues.length > 0 && <details className="mt-2">
+                <summary className="cursor-pointer text-amber-300/90">{t('Incidencias de la auditoría')}</summary>
+                {/* The auditor's own prose stays as it was written; the sentences the pipeline
+                    adds when the audit itself failed (`… was cut off at N tokens`) are ours and
+                    follow the interface language. */}
+                <ul className="mt-1 list-disc space-y-1 pl-5 leading-5 text-amber-200/70">{auditIssues.map((issue, index) => <li key={index}>{knownText(issue)}</li>)}</ul>
+              </details>}
+            </div>}
             <section>
-              <div className="mb-2 flex items-center justify-between gap-3"><h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Visión de conjunto')}</h3><div className="flex items-center gap-2"><span className="text-xs text-neutral-500">{tx('Calidad {score}%', { score: Math.round((profile.qualityScore ?? 0) * 100) })}</span><button className="text-xs text-cyan-400 hover:text-cyan-200" onClick={() => setEditing({ path: 'overview', value: profile.overview, generatedValue: profile.generatedOverview ?? profile.overview, overrideId: profile.overviewOverrideId })}>{t('Corregir')}</button></div></div>
+              <div className="mb-2 flex items-center justify-between gap-3"><h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Visión de conjunto')}</h3><div className="flex items-center gap-2"><span className="text-xs text-neutral-500">{profile.qualityScore == null ? t('Sin puntuación semántica') : tx('Calidad {score}%', { score: Math.round(profile.qualityScore * 100) })}</span><button className="text-xs text-cyan-400 hover:text-cyan-200" onClick={() => setEditing({ path: 'overview', value: profile.overview, generatedValue: profile.generatedOverview ?? profile.overview, overrideId: profile.overviewOverrideId })}>{t('Corregir')}</button></div></div>
               <p className={`rounded-lg border bg-neutral-900/40 p-4 text-sm leading-6 text-neutral-200 ${profile.overviewConflict ? 'border-amber-600' : profile.overviewOverridden ? 'border-cyan-800' : 'border-neutral-800'}`}>{profile.overview}{profile.overviewOverridden && <span className="ml-2 text-[10px] uppercase text-cyan-500">{profile.overviewConflict ? t('Revisar corrección') : t('Corregido por ti')}</span>}</p>
             </section>
             <section>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Arquitectura de la obra')}</h3>
               <div className="grid gap-2 md:grid-cols-2">
                 {profile.fields.map((field) => <article key={field.fieldId} className="rounded-lg border border-neutral-800 p-3">
-                  <div className="mb-1 flex items-center justify-between gap-2"><span className="text-[11px] font-semibold uppercase tracking-wide text-cyan-400">{field.kind.replaceAll('_', ' ')}</span><div className="flex items-center gap-2"><span className="text-[11px] text-neutral-600">{Math.round(field.confidence * 100)}%</span><button className="text-[11px] text-cyan-500 hover:text-cyan-200" onClick={() => setEditing({ path: `fields.${field.kind}.${field.ordinal}`, value: field.text, generatedValue: field.generatedText ?? field.text, overrideId: field.overrideId })}>{t('Corregir')}</button></div></div>
+                  <div className="mb-1 flex items-center justify-between gap-2"><span className="text-[11px] font-semibold uppercase tracking-wide text-cyan-400">{field.kind.replaceAll('_', ' ')}</span><div className="flex items-center gap-2"><span className="text-[11px] text-neutral-600">{Math.round(field.confidence * 100)}%{field.confidenceSource === 'floor' && <span className="ml-1 normal-case text-neutral-500">({t('mínimo')})</span>}</span><button className="text-[11px] text-cyan-500 hover:text-cyan-200" onClick={() => setEditing({ path: `fields.${field.kind}.${field.ordinal}`, value: field.text, generatedValue: field.generatedText ?? field.text, overrideId: field.overrideId })}>{t('Corregir')}</button></div></div>
                   <p className="text-sm leading-5 text-neutral-300">{field.text}</p>
                   {field.overridden && <span className={`mt-1 block text-[10px] uppercase ${field.conflict ? 'text-amber-400' : 'text-cyan-600'}`}>{field.conflict ? t('Revisar corrección') : t('Corregido por ti')}</span>}
-                  {supportByTarget.get(field.fieldId)?.slice(0, 1).map((support) => <button key={support.supportId} className="mt-2 block text-left text-xs italic leading-5 text-neutral-500 hover:text-cyan-300" onClick={() => void window.nodus.openEvidenceAtPage(work.nodus_id, { location: support.pageStart, sourceRef: support.sourceRef ?? null, pageNumber: support.pageStartNumber ?? null })}>“{support.quote}” {support.pageStart ? `· ${support.pageStart}` : ''}</button>)}
+                  {supportByTarget.get(field.fieldId)?.slice(0, 1).map((support) => <button key={support.supportId} className="mt-2 block text-left text-xs italic leading-5 text-neutral-500 hover:text-cyan-300" onClick={() => void openEvidenceAtPage(work.nodus_id, { location: support.pageStart, sourceRef: support.sourceRef ?? null, pageNumber: support.pageStartNumber ?? null })}>“{support.quote}” {support.pageStart ? `· ${support.pageStart}` : ''}</button>)}
                 </article>)}
               </div>
             </section>
             <section>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{tx('Estructura por secciones · {n}', { n: profile.sections.length })}</h3>
-              <div className="space-y-2">{profile.sections.map((section) => <article key={section.sectionId} className="rounded-lg border border-neutral-800 px-3 py-2" style={{ marginLeft: `${Math.min(3, Math.max(0, section.level - 1)) * 12}px` }}>
-                <div className="flex items-center gap-2"><span className="text-sm font-medium text-neutral-200">{section.title}</span>{section.role && <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-500">{section.role}</span>}<button className="ml-auto text-[11px] text-neutral-600 hover:text-cyan-300" onClick={() => void window.nodus.openEvidenceAtPage(work.nodus_id, { location: section.pageStart, sourceRef: section.sourceRef ?? null, pageNumber: section.pageStartNumber ?? null })}>{[section.pageStart, section.pageEnd].filter(Boolean).join('–')}</button></div>
+              <div className="space-y-2">{profile.sections.map((section, index) => <article key={section.sectionId} className="rounded-lg border border-neutral-800 px-3 py-2" style={{ marginLeft: `${Math.min(3, Math.max(0, section.level - 1)) * 12}px` }}>
+                <div className="flex items-center gap-2"><span className="text-sm font-medium text-neutral-200">{section.title || tx('Sección {n}', { n: index + 1 })}</span>{section.role && <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-500">{section.role}</span>}<button className="ml-auto text-[11px] text-neutral-600 hover:text-cyan-300" onClick={() => void openEvidenceAtPage(work.nodus_id, { location: section.pageStart, sourceRef: section.sourceRef ?? null, pageNumber: section.pageStartNumber ?? null })}>{[section.pageStart, section.pageEnd].filter(Boolean).join('–')}</button></div>
                 <p className="mt-1 text-xs leading-5 text-neutral-500">{section.summary}</p>
               </article>)}</div>
             </section>

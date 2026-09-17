@@ -755,6 +755,16 @@ export interface LibraryLocalImportReport {
 
 export type LibraryMetadataIdentifierKind = 'doi' | 'isbn' | 'issn' | 'pmid' | 'pmcid' | 'arxiv';
 
+/**
+ * How a pasted reference was classified before it was looked up.
+ *
+ * A URL is not an identifier, but it names a work just as precisely — and for the works
+ * that carry no identifier at all, it is the only handle there is. Both reach the same
+ * resolver, so both are described here; `libraryItemIdentifier` reads identifiers back
+ * out of a stored record and stays on the narrower union.
+ */
+export type LibraryReferenceKind = LibraryMetadataIdentifierKind | 'url';
+
 export interface LibraryFullTextLink {
   url: string;
   mimeType: string | null;
@@ -763,7 +773,9 @@ export interface LibraryFullTextLink {
 
 export interface LibraryMetadataCandidate {
   id: string;
-  source: 'crossref' | 'open-library' | 'pubmed' | 'arxiv';
+  /** Where the record came from. `open-library` for ISBN, `arxiv` for DataCite, and
+   *  `landing-page` for a URL whose own markup described the work. */
+  source: 'crossref' | 'open-library' | 'pubmed' | 'arxiv' | 'landing-page';
   confidence: number;
   sourceUrl: string | null;
   fullTextLinks?: LibraryFullTextLink[];
@@ -771,7 +783,7 @@ export interface LibraryMetadataCandidate {
 }
 
 export interface LibraryMetadataLookupResult {
-  kind: LibraryMetadataIdentifierKind;
+  kind: LibraryReferenceKind;
   value: string;
   candidates: LibraryMetadataCandidate[];
   queriedAt: string;

@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { openEvidenceAtPage } from '../evidenceJump';
 import type { Debate, DebateSide, DebateSideKey, DebateTimelineEntry } from '@shared/types';
 import { Badge, EDGE_LABELS, Icon, Spinner } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
@@ -438,8 +439,8 @@ function SideColumn({
             <span className="block line-clamp-2">“{ev.quote}”</span>
             <button
               className="mt-1 inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 not-italic"
-              title={t('Abrir el PDF en Zotero por esta página')}
-              onClick={() => void window.nodus.openEvidenceAtPage(w.nodus_id, {
+              title={t('Abrir fuente')}
+              onClick={() => void openEvidenceAtPage(w.nodus_id, {
                 location: ev.location,
                 sourceRef: ev.source_ref ?? null,
                 pageNumber: ev.page_number ?? null,

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AppSettings, StudyAssistantCitation, StudyAssistantSelection, StudyAssistantSourceOption } from '@shared/types';
 import { DEFAULT_STUDY_ASSISTANT_SELECTION } from '@shared/studyAssistant';
+import type { StudySearchLocation } from '@shared/studySearch';
 import { ChatMarkdown } from '../components/ChatMarkdown';
 import { t } from '../i18n';
 import { ResearchAssistantModal } from './ResearchAssistantModal';
@@ -43,7 +44,7 @@ const COPY: Record<StudyChatVariant, {
 };
 
 export function StudyChatView({ settings, onOpenDocument, onOpenMaterial, onOpenRecording, initialPrompt, conversationTarget, onOpenSavedNote, variant = 'study' }: {
-  settings: AppSettings; onOpenDocument: (id: string) => void; onOpenMaterial: (id: string) => void;
+  settings: AppSettings; onOpenDocument: (id: string) => void; onOpenMaterial: (id: string, location?: StudySearchLocation | null) => void;
   onOpenRecording: (id: string, timestamp?: number | null) => void; initialPrompt?: string | null; conversationTarget?: ResearchConversationNavigationTarget | null; onOpenSavedNote?: (id: string) => void; variant?: StudyChatVariant;
 }) {
   const copy = COPY[variant];
@@ -51,9 +52,12 @@ export function StudyChatView({ settings, onOpenDocument, onOpenMaterial, onOpen
   const [selection, setSelection] = useState<StudyAssistantSelection>(() => ({ ...DEFAULT_STUDY_ASSISTANT_SELECTION, sourceKeys: [] }));
   useEffect(() => { void window.nodus.listStudyAssistantSources().then(setSources); }, []);
   const initialTarget = useMemo(() => initialPrompt ? { prompt: initialPrompt, nonce: Date.now() } : null, [initialPrompt]);
+  // The citation knows the page or slide it came from; passing it along is what
+  // makes the click land on the quoted passage instead of the first page of the
+  // material.
   const openCitation = (citation: StudyAssistantCitation) => {
     if (citation.kind === 'document' && citation.location.documentId) onOpenDocument(citation.location.documentId);
-    else if (citation.kind === 'material' && citation.location.materialId) onOpenMaterial(citation.location.materialId);
+    else if (citation.kind === 'material' && citation.location.materialId) onOpenMaterial(citation.location.materialId, citation.location);
     else if (citation.kind === 'transcript' && citation.location.recordingId) onOpenRecording(citation.location.recordingId, citation.location.timestampSeconds);
   };
   const toNative = (message: ResearchUiMessage) => ({ ...message.study, id: message.id, role: message.role, content: message.content, createdAt: message.study?.createdAt ?? new Date().toISOString(), error: message.error, interrupted: message.interrupted, attachments: message.attachments, selectionKey: message.selectionKey });
@@ -71,5 +75,5 @@ export function StudyChatView({ settings, onOpenDocument, onOpenMaterial, onOpen
     cancelResearchChat: () => window.nodus.cancelStudyAssistant(),
     renderMessage: (message, streaming) => <><ChatMarkdown content={message.content} streaming={streaming} verify={false} onStudyEvidence={id => { const citation = message.study?.citations?.find(item => item.id === id); if (citation) openCitation(citation); }} />{message.study?.citations?.length ? <div className="mt-3 flex flex-wrap gap-1.5 border-t border-neutral-800 pt-3">{message.study.citations.map(citation => <button key={citation.id} className="suggestion-chip text-xs" onClick={() => openCitation(citation)}>{citation.id} · {citation.title}</button>)}</div> : null}</>,
   };
-  return <ResearchAssistantModal settings={settings} embedded adapter={adapter} initialTarget={initialTarget} initialConversationTarget={conversationTarget} notesDestinationLabel="Espacio de trabajo" onOpenSavedNote={onOpenSavedNote} />;
+  return <ResearchAssistantModal settings={settings} embedded adapter={adapter} initialTarget={initialTarget} initialConversationTarget={conversationTarget} notesDestinationLabel="Espacio de trabajo" studyNoteDestination={{ onOpenSavedDocument: onOpenDocument }} onOpenSavedNote={onOpenSavedNote} />;
 }

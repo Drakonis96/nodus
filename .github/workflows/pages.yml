@@ -10,6 +10,9 @@ on:
       - 'scripts/build-site-metadata.mjs'
       - 'scripts/build-sitemap.mjs'
       - 'scripts/build-pages-artifact.mjs'
+      # The counters the README and the site read are written by this script, so a
+      # change to it has to republish the deployed data instead of waiting for cron.
+      - 'scripts/github-release-downloads.mjs'
       - 'scripts/lib/site-metadata.mjs'
       - 'package.json'
       - 'CITATION.cff'

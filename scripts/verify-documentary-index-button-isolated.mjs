@@ -439,7 +439,7 @@ try {
   assert.equal(readinessAfter, readinessBefore, 'Documentary Index changed the work overall status.');
   assert.equal((await page.getByTestId('work-status-documentary-action').innerText()).trim(), 'Abrir la ficha documental completa');
   await page.getByTestId('work-status-documentary-action').click();
-  const documentDialog = page.getByRole('dialog', { name: 'Comprensión documental' });
+  const documentDialog = page.getByRole('dialog', { name: 'Índice documental' });
   await documentDialog.waitFor({ state: 'visible' });
   await documentDialog.getByText('Visión de conjunto', { exact: true }).waitFor({ state: 'visible' });
   assert.match((await documentDialog.innerText()).toLocaleLowerCase('es'), /valdemora/);
