@@ -17,8 +17,11 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
   // Assistants and the platform account show up among GitHub contributors. This
   // page names the people who build Nodus, so none of them ever reaches it.
   const NOT_PEOPLE = /^(claude|chatgpt|openai|copilot|github|github-copilot|codex|gemini)$/i;
-  // The project's owner opens the list, whatever the contribution counts say.
-  const OWNER = 'drakonis96';
+  // The project's owner opens the contributor list, whatever the counts say,
+  // and their own issues and proposals are not community ones: the card that
+  // counts them asks GitHub to leave the owner out.
+  const OWNER_LOGIN = 'Drakonis96';
+  const OWNER = OWNER_LOGIN.toLowerCase();
 
   // A face is 20px wide and overlaps the one before it by 7px; the counter that
   // closes the row needs a little more room than a face. The row is measured
@@ -31,6 +34,9 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
   const SPREAD = 3;   // below this, spreading faces across the card reads as a mistake
 
   const CACHE_TTL = 24 * 60 * 60 * 1000;
+  // The key says what the card counts. It changed meaning when the owner's own
+  // issues stopped being community ones, and an old entry must not outlive that.
+  const ISSUES_CACHE = 'nodus-issues-community';
 
   /* ------------------------------------------------------------ cache */
 
@@ -148,11 +154,12 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
   }
 
   /* ------------------------------------------------------------ issues and proposals
-     Every issue and pull request the project has collected, in one request: the
-     search endpoint reports the total it matched AND the newest few, which is
-     what the card needs for both its number and its faces. The issues endpoint
-     cannot answer this any more — it paginates by cursor now, so it publishes no
-     total and no last page to read. */
+     What the community has raised, in one request: the search endpoint reports
+     the total it matched AND the newest few, which is what the card needs for
+     both its number and its faces. The issues endpoint cannot answer this any
+     more — it paginates by cursor now, so it publishes no total and no last page
+     to read — and the owner's own entries are filtered out by the query itself,
+     so the count and the faces can never disagree about who counts. */
 
   function issues() {
     const count = document.getElementById('issue-count');
@@ -164,7 +171,10 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
       return true;
     };
 
-    const query = encodeURIComponent('repo:Drakonis96/nodus');
+    // The card is the community's, so the owner's own issues and pull requests
+    // are excluded at the source: the qualifier removes them from the total and
+    // from the faces in the same request, and no arithmetic here can drift.
+    const query = encodeURIComponent(`repo:Drakonis96/nodus -author:${OWNER_LOGIN}`);
     // More than the five faces are fetched on purpose: the newest entries can
     // all belong to the same person, and a row of one repeated face says nothing.
     return fetch(`https://api.github.com/search/issues?q=${query}&per_page=${FACES * 6}&sort=created&order=desc`, { cache: 'no-store' })
@@ -178,7 +188,7 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
           if (authors.some((person) => person.login === author.login)) continue;
           authors.push({ login: author.login, avatar_url: author.avatar_url });
         }
-        if (Number.isFinite(total)) writeCache('nodus-issues', { total, authors });
+        if (Number.isFinite(total)) writeCache(ISSUES_CACHE, { total, authors });
         return show(total, authors);
       })
       .catch(() => {
@@ -186,7 +196,7 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
         // visitor already has is redrawn whole — number and faces together, or
         // the row would come back empty while the total looked fine. An unknown
         // total is left unknown rather than shown as a number never reached.
-        const cached = readCache('nodus-issues');
+        const cached = readCache(ISSUES_CACHE);
         if (!cached) return false;
         return show(cached.total, cached.authors || []);
       })

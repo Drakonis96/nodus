@@ -465,7 +465,8 @@ test('Support Nodus takes the money the app takes, and names people only', () =>
 
   // The owner opens the wall whatever the counts say, and no assistant or
   // platform account is ever presented as one of the people who built Nodus.
-  assert.match(script, /const OWNER = 'drakonis96'/, 'the owner is named in the script');
+  assert.match(script, /const OWNER = OWNER_LOGIN\.toLowerCase\(\)/, 'the owner is named once and compared in one case');
+  assert.match(script, /const OWNER_LOGIN = 'Drakonis96'/, 'the owner login is spelled the way GitHub spells it');
   assert.match(script, /Number\(b\.login\.toLowerCase\(\) === OWNER\)[\s\S]*?Number\(a\.login\.toLowerCase\(\) === OWNER\)/,
     'the owner is ranked ahead of every contribution count');
   const source = script.match(/const NOT_PEOPLE = (\/[^\n]+?\/i);/)?.[1];
@@ -478,4 +479,12 @@ test('Support Nodus takes the money the app takes, and names people only', () =>
     assert.ok(!notPeople.test(login), `${login} is a person and must stay visible`);
   }
   assert.match(script, /if \(!people\.length\) return false/, 'an unknown list is reported, never shown as zero');
+
+  // The issues card is the community's: the owner's own issues and pull requests
+  // are excluded by the query itself, so the total and the faces agree on who
+  // counts. The contributor wall is the opposite case and still opens with them.
+  assert.match(script, /repo:Drakonis96\/nodus -author:\$\{OWNER_LOGIN\}/,
+    'the issues query leaves the owner out at the source');
+  assert.match(script, /ISSUES_CACHE = 'nodus-issues-community'/,
+    'the cache key changed with what the card counts');
 });
