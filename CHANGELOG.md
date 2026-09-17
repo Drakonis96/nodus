@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+Integrated local models run on the GPU on Windows and Linux instead of the CPU-only engine the installer used to fetch (issue #851).
+
+- The local engine is now the build this machine can actually accelerate with. Windows and Linux used to install the CPU-only llama.cpp archive even on a machine with a discrete GPU, so every local model ran on the processor while the launcher still asked for `--n-gpu-layers 999`, an option a CPU build ignores. The installer picks the GPU build for the host, runs it once to confirm it can see a device (`--list-devices`), and falls back to the verified CPU archive only when it cannot. Installations made by earlier versions are upgraded on first use, without re-downloading any model.
+- GPU layers are fitted by llama.cpp itself. Windows and Linux stop forcing a layer count and let the pinned runtime's own fitter place as many layers as fit in the device memory it measures, while the context size stays exactly the one Nodus asked for. macOS keeps its Metal path unchanged.
+- Settings → Integrated local models reports the engine instead of assuming it: the installed archive, the backend, the device the runtime itself reported with its memory, how many layers reached the GPU, whether an NVIDIA driver was seen (reported, never claimed as the backend), the recorded concurrency measurement and the reason the CPU engine was chosen when that happened. A "Recheck engine" action re-probes the runtime and installs the best build the machine can use.
+- A local run can no longer look frozen for reasons the user cannot see. Concurrency is no longer measured automatically when a model is downloaded or selected, so the first inference never waits behind a synthetic benchmark; measuring stays available as an explicit action. Each health check is bounded, startup failures name their cause — including a security product blocking the binary, with the folder to exclude — and every backend decision is appended to `local-ai/runtime.log` next to the models.
+- A cancelled runtime upgrade no longer leaves the machine without an engine: the new build is unpacked and probed in a staging directory and only then swapped in.
+- Idea fusion finishes on the integrated runtime. A small model answers a new idea with `merged_label: null`, which the decision validator rejected while the code that consumes the decision already fell back to the idea's own label, so every affected idea was reported as invalid JSON and its whole work ended failed after a successful extraction. The label is now optional and falls back. The output ceiling was also too small: a reasoning-capable model spends part of an 800-token budget before the JSON starts and the reply arrives cut off. Fusion asks for real headroom and retries a cut-off answer once at a larger ceiling, exactly as the summary already did.
+- When a structured reply is rejected, the log says why: the idea being fused, how many candidates it was judged against and the exact failure (truncated, invalid JSON, schema miss), with a bounded preview of the reply itself.
+- Granite 4.0 Micro is no longer offered for extraction or fusion. Validated end to end on Windows with an RTX 3060 Ti over six arXiv papers, it extracted ideas correctly but violated the fusion decision contract on every large work — a prose explanation where the contract requires `explicit`/`inferred`, and edge types in place of a resolution — which deterministically failed whole works even after their extraction had succeeded. It stays available for conversation, summaries and document profiles. Gemma 4 E2B remained the only local model that completed all six works.
+
 ## 5.4.5 — 2026-09-15
 
 Nodus 5.4.5 gives the Library bulk removal and bulk repair, makes the Documentary
