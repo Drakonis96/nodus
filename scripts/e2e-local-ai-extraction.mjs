@@ -71,6 +71,11 @@ const queueTimeoutMs = Number(arg('--queue-timeout-ms', String(6 * 60 * 60 * 100
 // matter of minutes. Through a serial gateway on a laptop's integrated GPU it is not: the
 // budget is a flag so a slow-but-healthy run finishes instead of being recorded as blocked.
 const documentIndexTimeoutMs = Number(arg('--docindex-timeout-ms', String(45 * 60 * 1000)));
+// The document index is minutes per work on a GPU and the better part of an hour through a
+// serial gateway on a laptop. A run that is validating something else can skip it, and then
+// computes the idea embeddings before the relation pass — which is the order the app itself
+// is in by the time a user reprocesses connections.
+const skipDocumentIndex = process.argv.includes('--skip-document-index');
 
 // The provider under test. Everything else in this harness was written for the integrated
 // runtime (`nodus`), which is a provider Nodus owns end to end; the custom
@@ -500,46 +505,16 @@ try {
       }
       profile.works = summarizeWorks(await ipc('listWorks'));
 
-      // Theme + relation reprocessing: the only analysis role that is not gated by
-      // the extraction capability matrix, so the two models Nodus refuses to use
-      // for idea extraction still get a real, persisted inference pass.
-      profile.reprocess = await ipc('reprocessThemeConnections', { relations: true }, modelRef)
-        .then((result) => ({ ok: true, result }))
-        .catch((error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) }));
-
-      // Document index (profiles) for the imported works. Bounded twice: the deadline,
-      // and a stall detector — a vault whose model is blocked for the document-profile
-      // role leaves jobs queued with nothing running, and waiting the full budget would
-      // hide that instead of recording it.
-      const campaign = await ipc('startDocumentIndexCampaign', { includeArchived: false });
-      profile.documentIndexCampaignId = campaign?.campaignId ?? campaign?.id ?? null;
-      let stalledPolls = 0;
-      await waitFor(`índice documental de ${name}`, async () => {
-        const progress = await ipc('getDocumentIndexProgress');
-        profile.documentIndex = { active: progress.active, queued: progress.queued, failed: progress.failed, jobs: progress.jobs?.length ?? 0 };
-        noteOnce(`docindex:${name}`, `${name}: document index active=${progress.active} queued=${progress.queued} jobs=${progress.jobs?.length ?? 0} failed=${progress.failed}`);
-        if (progress.active === 0 && progress.queued === 0) return true;
-        if (progress.active === 0) {
-          stalledPolls += 1;
-          if (stalledPolls >= 5) {
-            profile.documentIndex.blocked = 'queued jobs never started (the document-profile role is refused for this model)';
-            note(`${name}: document index is stalled with ${progress.queued} queued jobs and nothing running; recording it as blocked`);
-            return true;
-          }
-        } else {
-          stalledPolls = 0;
-        }
-        return null;
-      }, { timeout: documentIndexTimeoutMs });
-
       // Embeddings: ideas, then full-text passages (BGE-M3 Q8 through llama.cpp).
       // A vault where extraction was refused has nothing to embed; that is recorded
       // instead of waiting for a pipeline that will never be started.
-      profile.ideasPersisted = (profile.works ?? []).reduce((sum, work) => sum + (work.ideas ?? 0), 0);
-      if (!profile.ideasPersisted) {
-        profile.embeddings = { skipped: 'no ideas persisted (extraction refused by the capability matrix)' };
-        profile.passageEmbeddings = { skipped: 'same' };
-      } else {
+      const runEmbeddings = async () => {
+        profile.ideasPersisted = (profile.works ?? []).reduce((sum, work) => sum + (work.ideas ?? 0), 0);
+        if (!profile.ideasPersisted) {
+          profile.embeddings = { skipped: 'no ideas persisted (extraction refused by the capability matrix)' };
+          profile.passageEmbeddings = { skipped: 'same' };
+          return;
+        }
         await ipc('startEmbedding', nodusIds);
         await waitFor(`embeddings de ideas de ${name}`, async () => {
           const status = await ipc('getEmbeddingStatus');
@@ -555,6 +530,52 @@ try {
           noteOnce(`pass:${name}`, `${name}: passage embeddings ${status.passagesEmbedded}/${status.totalPassages} running=${status.running}`);
           return status.running === false && (status.startedAt != null || status.error != null);
         }, { timeout: 90 * 60 * 1000 });
+      };
+
+      // The relation pass reads idea embeddings to find the pairs it validates, and on the
+      // app's own path they already exist by the time anyone reprocesses connections. A run
+      // that skips the document index below therefore computes them first, so the pass it is
+      // measuring has candidates instead of an empty neighbour list.
+      if (skipDocumentIndex) await runEmbeddings();
+
+      // Theme + relation reprocessing: the only analysis role that is not gated by
+      // the extraction capability matrix, so the two models Nodus refuses to use
+      // for idea extraction still get a real, persisted inference pass.
+      profile.reprocess = await ipc('reprocessThemeConnections', { relations: true }, modelRef)
+        .then((result) => ({ ok: true, result }))
+        .catch((error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+
+      // Document index (profiles) for the imported works. Bounded twice: the deadline,
+      // and a stall detector — a vault whose model is blocked for the document-profile
+      // role leaves jobs queued with nothing running, and waiting the full budget would
+      // hide that instead of recording it.
+      if (skipDocumentIndex) {
+        profile.documentIndex = { skipped: '--skip-document-index' };
+        note(`${name}: document index skipped, as asked`);
+        await runEmbeddings();
+      } else {
+        const campaign = await ipc('startDocumentIndexCampaign', { includeArchived: false });
+        profile.documentIndexCampaignId = campaign?.campaignId ?? campaign?.id ?? null;
+        let stalledPolls = 0;
+        await waitFor(`índice documental de ${name}`, async () => {
+          const progress = await ipc('getDocumentIndexProgress');
+          profile.documentIndex = { active: progress.active, queued: progress.queued, failed: progress.failed, jobs: progress.jobs?.length ?? 0 };
+          noteOnce(`docindex:${name}`, `${name}: document index active=${progress.active} queued=${progress.queued} jobs=${progress.jobs?.length ?? 0} failed=${progress.failed}`);
+          if (progress.active === 0 && progress.queued === 0) return true;
+          if (progress.active === 0) {
+            stalledPolls += 1;
+            if (stalledPolls >= 5) {
+              profile.documentIndex.blocked = 'queued jobs never started (the document-profile role is refused for this model)';
+              note(`${name}: document index is stalled with ${progress.queued} queued jobs and nothing running; recording it as blocked`);
+              return true;
+            }
+          } else {
+            stalledPolls = 0;
+          }
+          return null;
+        }, { timeout: documentIndexTimeoutMs });
+
+        await runEmbeddings();
       }
 
       // Persisted results.

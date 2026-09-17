@@ -67,6 +67,32 @@ const installedProfile = arg(
 
 const log = (message) => console.log(`[e2e-custom] ${message}`);
 
+/**
+ * The pipeline harness launches the built app, so a source change that has not been built is
+ * invisible to the run — a validation pass would measure the previous behaviour and report it
+ * as the current one. Refuse to start instead.
+ */
+async function assertBuildIsCurrent() {
+  const build = await fsp.stat(path.join(root, 'dist-electron/main.js')).catch(() => null);
+  if (!build) throw new Error('Falta el build: ejecuta npm run build antes de validar.');
+  const stale = [];
+  const walk = async (directory) => {
+    for (const entry of await fsp.readdir(directory, { withFileTypes: true })) {
+      const target = path.join(directory, entry.name);
+      if (entry.isDirectory()) { await walk(target); continue; }
+      if (!entry.name.endsWith('.ts') && !entry.name.endsWith('.tsx')) continue;
+      const stat = await fsp.stat(target);
+      if (stat.mtimeMs > build.mtimeMs) stale.push(target);
+    }
+  };
+  await walk(path.join(root, 'electron'));
+  await walk(path.join(root, 'shared'));
+  if (stale.length) {
+    throw new Error(`El build es anterior a ${stale.length} fuente(s), p.ej. ${path.relative(root, stale[0])}. Ejecuta npm run build y repite la validación.`);
+  }
+  log('build is current');
+}
+
 async function findFile(directory, wanted) {
   const entries = await fsp.readdir(directory, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
@@ -115,6 +141,8 @@ for (const id of paperIds.split(',').map((entry) => entry.trim()).filter(Boolean
   const file = path.join(papersDirectory, `${id}.pdf`);
   if (!existsSync(file)) throw new Error(`Falta el PDF del corpus: ${file}`);
 }
+
+await assertBuildIsCurrent();
 
 // ── llama-server, with the same flags the app passes ========================
 const enginePort = await freePort();
@@ -285,6 +313,7 @@ const harnessArgs = [
   `--report=${reportPath}`,
   '--skip-download',
   '--serial',
+  ...(process.argv.includes('--skip-document-index') ? ['--skip-document-index'] : []),
 ];
 log(`running the extraction pipeline: node ${harnessArgs.slice(1).join(' ')}`);
 const harness = spawn(process.execPath, harnessArgs, { cwd: root, stdio: 'inherit' });
@@ -324,6 +353,11 @@ for (const [name, profile] of Object.entries(report?.profiles ?? {})) {
   if (!works.some((work) => (work.ideas ?? 0) > 0)) failures.push(`${name}: no se persistió ninguna idea`);
   if (profile.embeddings?.error) failures.push(`${name}: embeddings de ideas: ${profile.embeddings.error}`);
   if (profile.passageEmbeddings?.error) failures.push(`${name}: embeddings de pasajes: ${profile.passageEmbeddings.error}`);
+  // The relation pass is where a reasoning model used to run out of budget: a single pair
+  // was asked for 512 tokens, the trace ate them, and the whole pass failed.
+  if (profile.reprocess && profile.reprocess.ok !== true) {
+    failures.push(`${name}: el reproceso de conexiones falló: ${profile.reprocess.error}`);
+  }
 }
 if (gatewayMode === 'json' || gatewayMode === 'reasoning') {
   const field = gatewayMode === 'json' ? 'response_format' : 'reasoning_effort';
