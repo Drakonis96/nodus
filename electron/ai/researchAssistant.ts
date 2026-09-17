@@ -8,6 +8,9 @@ import { enabledChatSkills } from '../chatSkills';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getConversation } from '../db/chatRepo';
 import { executeChatSkills } from './chatSkillExecution';
+import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings } from './moleculeInspection';
+import { MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE } from '@shared/moleculeInspection';
+import { SYNTHESIS_TEMPLATE_ADDENDUM, looksLikeSynthesisRequest } from '@shared/synthesisPrompt';
 import type {
   Author,
   ChatMessageRecord,
@@ -192,6 +195,17 @@ function skillExecution(request: ResearchChatRequest) {
     isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getConversation(request.conversationId)) };
 }
 
+/** Runs the reply through its Skills, then appends the RDKit checks: the structure check on
+ *  the species the model proposed and the route check plus a drawing of every verified step.
+ *  The audits are skipped when Chemistry Studio is disabled. */
+async function finalizeWithAudit(answer: string, execution: ReturnType<typeof skillExecution>, signal?: AbortSignal): Promise<string> {
+  const skilled = await executeChatSkills(answer, execution, signal);
+  const chemistryEnabled = execution.skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
+  const options = { model: execution.model, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner };
+  const withStructures = await appendStructureAudit(skilled, answer, options);
+  return appendRouteReportAndDrawings(withStructures, answer, options);
+}
+
 
 export async function answerResearchChat(request: ResearchChatRequest): Promise<ResearchChatResponse> {
   const execution = skillExecution(request);
@@ -201,7 +215,7 @@ export async function answerResearchChat(request: ResearchChatRequest): Promise<
   let answer = '';
   for (let attempt = 0; attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
     answer = finalizeAnswer(await withResearchAttachmentFallback(attachments, opts, options => completeText(options, request.model)), local, user);
-    if (!citationRequired || attachments.text || extractCitationRefs(answer).length > 0 || splitChatVisuals(answer).some(part => part.kind !== 'markdown')) return { answer: await executeChatSkills(answer, execution), stats };
+    if (!citationRequired || attachments.text || extractCitationRefs(answer).length > 0 || splitChatVisuals(answer).some(part => part.kind !== 'markdown')) return { answer: await finalizeWithAudit(answer, execution), stats };
   }
   throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
 }
@@ -235,7 +249,7 @@ export async function streamResearchChat(
   if (citationRequired && !attachments.text && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown')) {
     throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
   }
-  return { answer: await executeChatSkills(answer, execution, signal), stats };
+  return { answer: await finalizeWithAudit(answer, execution, signal), stats };
 }
 
 /**
@@ -389,7 +403,12 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
   // In a genealogy vault the assistant is a genealogist working over the records
   // ontology (people, kinship, events, documents, evidence), not the idea graph.
   const genealogy = getActiveVault().type === 'genealogy';
+  const chemistryEnabled = skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
+  const moleculeDossiers = genealogy || !chemistryEnabled ? [] : await inspectResearchMolecules(question, { model, locale: promptLanguage });
   const system = withResearchSystemPrompt([genealogy ? buildGenealogyChatSystemPrompt(compact, promptLanguage) : buildChatSystemPrompt(compact, promptLanguage), buildChatSkillsPrompt(skills),
+    moleculeDossiers.length ? MOLECULE_DOSSIER_SYSTEM_RULE : '',
+    chemistryEnabled ? ROUTE_CONTINUITY_SYSTEM_RULE : '',
+    chemistryEnabled && !genealogy && looksLikeSynthesisRequest(question) ? SYNTHESIS_TEMPLATE_ADDENDUM : '',
     !genealogy && request.selection.sourceFilter?.enabled === true
       ? 'Source restriction: use only the supplied context from the selected works. Do not supplement it with other corpus sources or general knowledge. If the selected sources are insufficient, state that explicitly. Continue answering in the configured language.' : '',
   ].filter(Boolean).join('\n\n'), request.systemPromptId);
@@ -406,7 +425,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     const promptChars = Math.max(0, window - maxTokens - margin) * LOCAL_CHARS_PER_TOKEN;
     // Reserve what system + history + the JSON wrapper already consume; the rest is the
     // corpus context's budget. Never below the floor — the shrinker then guarantees fit.
-    const reserved = system.length + JSON.stringify(messages).length + 400;
+    const reserved = system.length + JSON.stringify(messages).length + (moleculeDossiers.length ? JSON.stringify(moleculeDossiers).length : 0) + 400;
     contextBudget = Math.max(LOCAL_MIN_CONTEXT_CHARS, Math.floor(promptChars - reserved));
   }
 
@@ -433,6 +452,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     {
       contexto_modular_seleccionado: context,
       conversacion: messages,
+      ...(moleculeDossiers.length ? { estructura_objetivo_verificada: moleculeDossiers } : {}),
       ...(citationContract ? { contrato_de_salida_obligatorio: citationContract } : {}),
       application_output_contract: chatSkillsOutputContract(skills),
     },
