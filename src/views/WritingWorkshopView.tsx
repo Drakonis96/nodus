@@ -8,6 +8,7 @@ import type {
   WritingWorkshopCandidateBase,
   WritingWorkshopContradictionCandidate,
   WritingWorkshopDraft,
+  WritingWorkshopExportFormat,
   WritingWorkshopGapCandidate,
   WritingWorkshopIdeaCandidate,
   WritingWorkshopPassageCandidate,
@@ -184,7 +185,7 @@ export function WritingWorkshopView({
     }
   };
 
-  const exportDraft = async (format: 'markdown' | 'pdf') => {
+  const exportDraft = async (format: WritingWorkshopExportFormat) => {
     if (!draft) return;
     setExporting(true);
     setError(null);

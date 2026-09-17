@@ -18,6 +18,7 @@ import type {
 import { stripLeadingAbstract } from '@shared/writingDocument';
 import { DEEP_LABELS, deepResearchReportInput, type DeepReportLabels } from '@shared/deepResearchReport';
 import { markdownToPdf } from './markdownRender';
+import { markdownToDocx, pngSize, type DocxImage } from './markdownDocx';
 import { getDecorativeImage, getDecorativeImageData } from '../db/decorativeImagesRepo';
 import { getWritingWorkshopDraft } from '../db/writingDraftsRepo';
 import { professionalReportPdf, type ProfessionalReportInput } from './professionalReportPdf';
@@ -30,25 +31,23 @@ export async function exportWritingWorkshopDraft(
   const draft = request.draft;
   const requested = request.format ?? 'markdown';
   const base = slug(draft.title || 'taller-escritura');
+  const extension = requested === 'pdf' ? 'pdf' : requested === 'docx' ? 'docx' : 'md';
+  const filters: Record<WritingWorkshopExportFormat, { name: string; extensions: string[] }> = {
+    markdown: { name: 'Markdown', extensions: ['md'] },
+    pdf: { name: 'PDF', extensions: ['pdf'] },
+    docx: { name: 'Word', extensions: ['docx'] },
+  };
   const { canceled, filePath } = await dialog.showSaveDialog({
     title: dialogTitle('exportReport', getSettings().uiLanguage),
-    defaultPath: path.join(app.getPath('documents'), `${base}.${requested === 'pdf' ? 'pdf' : 'md'}`),
-    // Offer both filters so the user can switch format in the native dialog; the
-    // final format is decided by the chosen extension (falling back to `requested`).
-    filters:
-      requested === 'pdf'
-        ? [
-            { name: 'PDF', extensions: ['pdf'] },
-            { name: 'Markdown', extensions: ['md'] },
-          ]
-        : [
-            { name: 'Markdown', extensions: ['md'] },
-            { name: 'PDF', extensions: ['pdf'] },
-          ],
+    defaultPath: path.join(app.getPath('documents'), `${base}.${extension}`),
+    // Offer every format so the user can switch in the native dialog; the final
+    // format is decided by the chosen extension (falling back to `requested`).
+    filters: [filters[requested], ...Object.entries(filters).filter(([key]) => key !== requested).map(([, filter]) => filter)],
   });
   if (canceled || !filePath) return null;
 
-  const format: WritingWorkshopExportFormat = path.extname(filePath).toLowerCase() === '.pdf' ? 'pdf' : 'markdown';
+  const chosen = path.extname(filePath).toLowerCase();
+  const format: WritingWorkshopExportFormat = chosen === '.pdf' ? 'pdf' : chosen === '.docx' ? 'docx' : 'markdown';
   const visuals = request.entityId ? getDocumentVisuals({ kind: 'deep-research', id: request.entityId }) : null;
   const assetDirectory = `${path.basename(filePath, path.extname(filePath))}-assets`;
   const enriched = documentMarkdownWithFigures(renderDraftMarkdown(draft), 'body', visuals, assetDirectory);
@@ -58,6 +57,9 @@ export async function exportWritingWorkshopDraft(
       ? await professionalReportPdf(buildDeepResearchPdfInput(draft, request.entityId))
       : await markdownToPdf(markdown, draft.title || 'Informe');
     fs.writeFileSync(filePath, bytes);
+  } else if (format === 'docx') {
+    // The figures travel inside the document, so nothing is left beside it.
+    fs.writeFileSync(filePath, await markdownToDocx(markdown, { resolveImage: figureResolver(enriched.files) }));
   } else {
     if (enriched.files.length) {
       const dir = path.join(path.dirname(filePath), assetDirectory); fs.mkdirSync(dir, { recursive: true });
@@ -68,6 +70,22 @@ export async function exportWritingWorkshopDraft(
   return { path: filePath };
 }
 
+/**
+ * The figures a report carries are separate assets referenced by name from its
+ * Markdown, so a Word export resolves each `![…](dir/figure-x.png)` back to the
+ * bytes the manifest produced and embeds them.
+ */
+function figureResolver(files: Array<{ name: string; base64: string }>): (url: string) => DocxImage | null {
+  const byName = new Map(files.map((file) => [file.name, Buffer.from(file.base64, 'base64')]));
+  return (url) => {
+    const name = decodeURIComponent(url.split('/').pop() ?? '');
+    const data = byName.get(name);
+    if (!data) return null;
+    const size = pngSize(data);
+    return size ? { data, width: size.width, height: size.height } : null;
+  };
+}
+
 /** One report rendered to bytes, in every requested format. */
 async function archiveEntries(
   saved: WritingWorkshopSavedDraft,
@@ -75,16 +93,20 @@ async function archiveEntries(
   format: DeepResearchArchiveRequest['format']
 ): Promise<{ name: string; bytes: Buffer }[]> {
   const entries: { name: string; bytes: Buffer }[] = [];
-  if (format !== 'pdf') {
+  if (format === 'markdown' || format === 'both') {
     const enriched = documentMarkdownWithFigures(renderDraftMarkdown(saved.draft), 'body', getDocumentVisuals({ kind: 'deep-research', id: saved.id }), `${base}-assets`);
     entries.push({ name: `${base}.md`, bytes: Buffer.from(enriched.markdown, 'utf8') });
     for (const file of enriched.files) entries.push({ name: `${base}-assets/${file.name}`, bytes: Buffer.from(file.base64, 'base64') });
   }
-  if (format !== 'markdown') {
+  if (format === 'pdf' || format === 'both') {
     const bytes = saved.draft.brief.kind === 'deep_research'
       ? await professionalReportPdf(buildDeepResearchPdfInput(saved.draft, saved.id))
       : await markdownToPdf(renderDraftMarkdown(saved.draft), saved.draft.title || 'Informe');
     entries.push({ name: `${base}.pdf`, bytes });
+  }
+  if (format === 'docx') {
+    const enriched = documentMarkdownWithFigures(renderDraftMarkdown(saved.draft), 'body', getDocumentVisuals({ kind: 'deep-research', id: saved.id }), `${base}-assets`);
+    entries.push({ name: `${base}.docx`, bytes: await markdownToDocx(enriched.markdown, { resolveImage: figureResolver(enriched.files) }) });
   }
   return entries;
 }

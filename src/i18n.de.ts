@@ -7995,6 +7995,7 @@ export const DE: Record<string, string> = {
   "Descargar ZIP": "ZIP herunterladen",
   "Texto editable, listo para otro editor. Se prepara al instante.": "Bearbeitbarer Text, bereit für einen anderen Editor. Sofort fertig.",
   "El informe maquetado, con portada y matriz. Tarda unos segundos por informe.": "Der gesetzte Bericht mit Titelbild und Nachweismatrix. Dauert einige Sekunden pro Bericht.",
+  "Documento de Word con las figuras incrustadas, para revisar o comentar.": "Ein Word-Dokument mit eingebetteten Abbildungen, bereit zum Prüfen oder Kommentieren.",
   "Markdown y PDF": "Markdown und PDF",
   "Ambos archivos de cada informe dentro del mismo ZIP.": "Beide Dateien jedes Berichts in derselben ZIP-Datei.",
   // Por qué no se pudo generar una imagen: el motivo se GUARDA junto a la imagen

@@ -7746,6 +7746,7 @@ export const TR: Record<string, string> = {
   "Descargar ZIP": "ZIP indir",
   "Texto editable, listo para otro editor. Se prepara al instante.": "Düzenlenebilir metin, başka bir editöre hazır. Anında hazırlanır.",
   "El informe maquetado, con portada y matriz. Tarda unos segundos por informe.": "Sayfa düzeni yapılmış rapor, kapak ve kanıt matrisiyle. Rapor başına birkaç saniye sürer.",
+  "Documento de Word con las figuras incrustadas, para revisar o comentar.": "Şekilleri gömülü bir Word belgesi; incelemeye veya yorumlamaya hazır.",
   "Markdown y PDF": "İşaretleme ve PDF",
   "Ambos archivos de cada informe dentro del mismo ZIP.": "Her raporun iki dosyası da aynı ZIP içinde.",
   // Por qué no se pudo generar una imagen: el motivo se GUARDA junto a la imagen

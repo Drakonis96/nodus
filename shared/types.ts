@@ -7048,7 +7048,7 @@ export interface WritingWorkshopDraftRequest {
   model?: ModelRef | null;
 }
 
-export type WritingWorkshopExportFormat = 'markdown' | 'pdf';
+export type WritingWorkshopExportFormat = 'markdown' | 'pdf' | 'docx';
 
 export interface WritingWorkshopExportRequest {
   draft: WritingWorkshopDraft;
@@ -7058,8 +7058,12 @@ export interface WritingWorkshopExportRequest {
   entityId?: string;
 }
 
-/** `'both'` writes one `.md` AND one `.pdf` per report into the same archive. */
-export type DeepResearchArchiveFormat = 'markdown' | 'pdf' | 'both';
+/**
+ * `'both'` writes one `.md` AND one `.pdf` per report into the same archive.
+ * `'docx'` is a Word document with the report's figures embedded, so it carries no
+ * loose asset files the way the Markdown entry does.
+ */
+export type DeepResearchArchiveFormat = 'markdown' | 'pdf' | 'docx' | 'both';
 
 /** Bulk download: several saved reports zipped into a single archive the user places. */
 export interface DeepResearchArchiveRequest {

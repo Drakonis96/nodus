@@ -7937,6 +7937,7 @@ export const PT: Record<string, string> = {
   "Descargar ZIP": "Descarregar ZIP",
   "Texto editable, listo para otro editor. Se prepara al instante.": "Texto editável, pronto para outro editor. Prepara-se num instante.",
   "El informe maquetado, con portada y matriz. Tarda unos segundos por informe.": "O relatório paginado, com capa e matriz de rastreabilidade. Demora alguns segundos por relatório.",
+  "Documento de Word con las figuras incrustadas, para revisar o comentar.": "Um documento do Word com as figuras incorporadas, pronto para rever ou comentar.",
   "Markdown y PDF": "Markdown e PDF",
   "Ambos archivos de cada informe dentro del mismo ZIP.": "Os dois ficheiros de cada relatório dentro do mesmo ZIP.",
   // Por qué no se pudo generar una imagen: el motivo se GUARDA junto a la imagen

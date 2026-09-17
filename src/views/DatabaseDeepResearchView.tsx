@@ -593,7 +593,7 @@ function DatabaseReaderSurface({
         <details className="group relative">
           <summary className="btn btn-ghost h-9 min-h-9 cursor-pointer list-none border border-neutral-700"><Icon name="download" size={14} />{t("Exportar")}</summary>
           <div className="absolute right-0 top-11 z-20 w-56 rounded-xl border border-neutral-800 bg-neutral-950 p-2 shadow-2xl">
-            {(["markdown", "pdf", "zip"] as const).map((format) => <button key={format} className="btn btn-ghost w-full justify-start" onClick={(event) => { onExport(format); event.currentTarget.closest("details")?.removeAttribute("open"); }}>{format === "markdown" ? t("Markdown") : format.toUpperCase()}</button>)}
+            {(["markdown", "pdf", "docx", "zip"] as const).map((format) => <button key={format} className="btn btn-ghost w-full justify-start" onClick={(event) => { onExport(format); event.currentTarget.closest("details")?.removeAttribute("open"); }}>{format === "markdown" ? t("Markdown") : format === "docx" ? t("Word (.docx)") : format.toUpperCase()}</button>)}
             <label className="mt-1 flex items-start gap-2 border-t border-neutral-800 px-2 pt-2 text-[11px] leading-4 text-neutral-400"><input type="checkbox" className="mt-0.5" checked={includeSnapshot} onChange={(event) => onIncludeSnapshot(event.target.checked)} />{t("Incluir snapshot bruto en el ZIP reproducible")}</label>
           </div>
         </details>

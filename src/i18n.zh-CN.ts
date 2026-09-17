@@ -7032,6 +7032,7 @@ export const ZH_CN: Record<string, string> = {
   "Descargar ZIP": "下载 ZIP",
   "Texto editable, listo para otro editor. Se prepara al instante.": "可编辑文本，随时可供其他编辑器使用。即时准备完成。",
   "El informe maquetado, con portada y matriz. Tarda unos segundos por informe.": "排版好的报告，含封面和证据矩阵。每份报告需要几秒钟。",
+  "Documento de Word con las figuras incrustadas, para revisar o comentar.": "内嵌图片的 Word 文档，便于审阅或批注。",
   "Markdown y PDF": "Markdown 和 PDF",
   "Ambos archivos de cada informe dentro del mismo ZIP.": "每份报告的两个文件都在同一个 ZIP 内。",
   "ChatGPT no pudo generar la imagen.": "ChatGPT 无法生成图像。",
