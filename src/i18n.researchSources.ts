@@ -12,7 +12,7 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
     "El asistente solo consultará {n} obras.": "The assistant will only consult {n} works.",
     "Ninguna obra coincide. No se recuperará contexto de otras fuentes.": "No works match. Context from other sources will not be retrieved.",
     "Filtro desactivado: se consultará todo el corpus.": "Filter off: the entire corpus will be searched.",
-    "{n} obras": "{n} works",
+    "{n} obras": "{n} 件の作品",
     "1 obra": "1 work",
     "El asistente solo consultará esta obra.": "The assistant will only consult this work."
   },
@@ -165,7 +165,7 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
     "El asistente solo consultará {n} obras.": "アシスタントは {n} の作品のみを参照します。",
     "Ninguna obra coincide. No se recuperará contexto de otras fuentes.": "一致する作品はありません。他のソースからのコンテキストは取得されません。",
     "Filtro desactivado: se consultará todo el corpus.": "フィルターをオフにすると、コーパス全体が検索されます。",
-    "{n} obras": "{n} は動作します",
+    "{n} obras": "{n} 件の作品",
     "1 obra": "1作品",
     "El asistente solo consultará esta obra.": "アシスタントはこの作業のみを参照します。",
   },

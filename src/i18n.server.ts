@@ -5096,7 +5096,7 @@ export const SERVER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "Volver al registro de origen": "ソースレコードに戻る",
     "Sin enunciado publicado": "公表された声明はありません",
     "ideas extraídas": "抽出されたアイデア",
-    "obra": "仕事",
+    "obra": "作品",
     "No se ha podido completar la operación.": "操作を完了できませんでした。",
     "Sin asignar": "未割り当て",
     "Cargando ajustes…": "設定を読み込み中…",
