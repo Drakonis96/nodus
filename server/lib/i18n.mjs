@@ -88,7 +88,8 @@ const ZH_CN = {
   deletePublicationHeading: '删除发布', deletePublicationHelp: '{name} 的已发布副本将从服务器中删除。本地资料库不会更改。', deletePermanently: '永久删除', cancel: '取消',
   connectDesktop: '连接 Nodus Desktop', pairingHelp: '在设置 → 服务器中输入此代码：', pairingExpiry: '它将在 15 分钟后过期，且只能使用一次。', back: '返回',
   authorize: '授权', connectClient: '连接 {name}', appCan: '该应用程序将能够：', assignedOnly: '它只能访问分配给 {email} 的空间。', invalidOauth: '无效的 OAuth 请求',
-  error: '错误', sessionExpired: '会话已过期。', readerNotFound: '未找到读者账户。', spaceNotFound: '未找到空间。', internalError: '服务器内
+  error: '错误', sessionExpired: '会话已过期。', readerNotFound: '未找到读者账户。', spaceNotFound: '未找到空间。', internalError: '服务器内部错误。',
+};
 
 const ZH_TW = {
   sourceCode: '原始碼',
@@ -103,7 +104,6 @@ const ZH_TW = {
   connectDesktop: '連線 Nodus Desktop', pairingHelp: '在設定 → 伺服器中輸入此程式碼：', pairingExpiry: '它將在 15 分鐘後過期，且只能使用一次。', back: '返回',
   authorize: '授權', connectClient: '連線 {name}', appCan: '該應用程式將能夠：', assignedOnly: '它只能訪問分配給 {email} 的空間。', invalidOauth: '無效的 OAuth 請求',
   error: '錯誤', sessionExpired: '會話已過期。', readerNotFound: '未找到讀者賬戶。', spaceNotFound: '未找到空間。', internalError: '伺服器內部錯誤。',
-};部错误。',
 };
 
 // Added when space membership stopped being a yes/no and became reader | writer | owner.
@@ -322,7 +322,6 @@ const TABLES = {
   tr: { ...TR, ...ROLE_KEYS.tr, ...SERVER_UI_KEYS.tr, ...ADMIN_UI_KEYS.tr, ...VAULT_TYPE_KEYS.tr, ...EMAIL_ADMIN_KEYS.tr, ...LIBRARY_ADMIN_KEYS.tr },
   'zh-CN': { ...ZH_CN, ...ROLE_KEYS['zh-CN'], ...SERVER_UI_KEYS['zh-CN'], ...ADMIN_UI_KEYS['zh-CN'], ...VAULT_TYPE_KEYS['zh-CN'], ...EMAIL_ADMIN_KEYS['zh-CN'], ...LIBRARY_ADMIN_KEYS['zh-CN'] },
   'zh-TW': { ...ZH_TW, ...ROLE_KEYS['zh-TW'], ...SERVER_UI_KEYS['zh-TW'], ...ADMIN_UI_KEYS['zh-TW'], ...VAULT_TYPE_KEYS['zh-TW'], ...EMAIL_ADMIN_KEYS['zh-TW'], ...LIBRARY_ADMIN_KEYS['zh-TW'] },
-  'zh-TW': { ...ZH_CN, ...ROLE_KEYS['zh-CN'], ...SERVER_UI_KEYS['zh-CN'], ...ADMIN_UI_KEYS['zh-CN'], ...VAULT_TYPE_KEYS['zh-CN'], ...EMAIL_ADMIN_KEYS['zh-CN'], ...LIBRARY_ADMIN_KEYS['zh-CN'] },
 };
 
 export function missingServerTranslations() {

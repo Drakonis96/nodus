@@ -52,6 +52,11 @@
           "title": "NVIDIA 设备上的本地模型：我们正在调查一个问题",
           "body": "Nodus 为内置模型安装的引擎在 Windows 和 Linux 上以 CPU 版本分发，因此在配备 NVIDIA GPU 的设备上，这些模型由处理器完成计算：即使显卡性能强劲、驱动也是最新的，它们也可能耗时极长或看起来卡住。在问题解决之前，如果你想要 GPU 加速，请在「设置 → AI 模型」中把 Nodus 指向 Ollama 或 LM Studio；如果继续使用内置模型，请以 CPU 的速度为准。",
           "linkLabel": "在 GitHub 上关注报告"
+        },
+        "zh-TW": {
+          "title": "NVIDIA 裝置上的本地模型：我們正在調查一個問題",
+          "body": "Nodus 為內建模型安裝的引擎在 Windows 和 Linux 上以 CPU 版本分發，因此在配備 NVIDIA GPU 的裝置上，這些模型由處理器完成計算：即使顯示卡效能強勁、驅動也是最新的，它們也可能耗時極長或看起來卡住。在問題解決之前，如果你想要 GPU 加速，請在「設定 → AI 模型」中把 Nodus 指向 Ollama 或 LM Studio；如果繼續使用內建模型，請以 CPU 的速度為準。",
+          "linkLabel": "在 GitHub 上關注報告"
         }
       }
     },
@@ -105,6 +110,11 @@
           "title": "帮助构建 Nodus Research",
           "body": "Nodus 几乎完全由一位开发者开发和维护。如果你喜欢这个项目并希望帮助它成长，任何贡献都欢迎：代码、修复、新功能、文档、翻译或想法。",
           "linkLabel": "在 GitHub 上贡献"
+        },
+        "zh-TW": {
+          "title": "幫助構建 Nodus Research",
+          "body": "Nodus 幾乎完全由一位開發者開發和維護。如果你喜歡這個專案並希望幫助它成長，任何貢獻都歡迎：程式碼、修復、新功能、文件、翻譯或想法。",
+          "linkLabel": "在 GitHub 上貢獻"
         }
       }
     },
@@ -158,6 +168,11 @@
           "title": "喜欢 Nodus 吗？",
           "body": "如果你喜欢 Nodus，请在 GitHub 上给我们一颗星，以支持我们并帮助项目成长。",
           "linkLabel": "在 GitHub 上给我们一颗星"
+        },
+        "zh-TW": {
+          "title": "喜歡 Nodus 嗎？",
+          "body": "如果你喜歡 Nodus，請在 GitHub 上給我們一顆星，以支援我們並幫助專案成長。",
+          "linkLabel": "在 GitHub 上給我們一顆星"
         }
       }
     },
@@ -211,6 +226,11 @@
           "title": "你希望在 Nodus 中看到哪种语言？",
           "body": "填写一份简短问卷，帮助我们决定接下来为 Nodus 添加哪种语言。",
           "linkLabel": "填写问卷"
+        },
+        "zh-TW": {
+          "title": "你希望在 Nodus 中看到哪種語言？",
+          "body": "填寫一份簡短問卷，幫助我們決定接下來為 Nodus 新增哪種語言。",
+          "linkLabel": "填寫問卷"
         }
       }
     },
@@ -264,6 +284,11 @@
           "title": "喜欢 Nodus 吗？",
           "body": "如果你喜欢 Nodus，请在 GitHub 上给我们一颗星，以支持我们并帮助项目成长。",
           "linkLabel": "在 GitHub 上给我们一颗星"
+        },
+        "zh-TW": {
+          "title": "喜歡 Nodus 嗎？",
+          "body": "如果你喜歡 Nodus，請在 GitHub 上給我們一顆星，以支援我們並幫助專案成長。",
+          "linkLabel": "在 GitHub 上給我們一顆星"
         }
       }
     },
@@ -317,6 +342,11 @@
           "title": "Nodus 启用新网站",
           "body": "Nodus 的网站有了新地址：nodusresearch.com。它把 wiki、教程、博客和交互式演示汇集在同一处。",
           "linkLabel": "访问 nodusresearch.com"
+        },
+        "zh-TW": {
+          "title": "Nodus 啟用新網站",
+          "body": "Nodus 的網站有了新地址：nodusresearch.com。它把 wiki、教程、部落格和互動式演示彙集在同一處。",
+          "linkLabel": "訪問 nodusresearch.com"
         }
       }
     },
@@ -371,6 +401,11 @@
           "title": "Nodus Connector for Chrome 已上架 Chrome 应用商店",
           "body": "Nodus Connector for Chrome 会把你当前打开的学术网页或文档保存到本地文献库。它识别页面内嵌的书目元数据、DOI 或 ISBN 以及可用的文件，并让你在保存前选择 Nodus 的嵌套合集以及已有或新建的标签。只有在你点击工具栏中的图标后，它才会读取当前标签页。",
           "linkLabel": "从 Chrome 应用商店安装"
+        },
+        "zh-TW": {
+          "title": "Nodus Connector for Chrome 已上架 Chrome 應用商店",
+          "body": "Nodus Connector for Chrome 會把你當前開啟的學術網頁或文件儲存到本地文獻庫。它識別頁面內嵌的書目後設資料、DOI 或 ISBN 以及可用的檔案，並讓你在儲存前選擇 Nodus 的巢狀合集以及已有或新建的標籤。只有在你點選工具欄中的圖示後，它才會讀取當前標籤頁。",
+          "linkLabel": "從 Chrome 應用商店安裝"
         }
       }
     },
@@ -425,6 +460,11 @@
           "title": "Nodus 4 改用 AGPL v3 许可证",
           "body": "从第 4 版起，Nodus 在 GNU Affero 通用公共许可证第 3 版下分发。",
           "linkLabel": "查看 AGPL v3 许可证"
+        },
+        "zh-TW": {
+          "title": "Nodus 4 改用 AGPL v3 許可證",
+          "body": "從第 4 版起，Nodus 在 GNU Affero 通用公共許可證第 3 版下分發。",
+          "linkLabel": "檢視 AGPL v3 許可證"
         }
       }
     },
@@ -478,6 +518,11 @@
           "title": "Nodus 移动应用 | 兴趣调查",
           "body": "我们正在开发 Nodus 移动应用，非常希望了解你的想法。",
           "linkLabel": "填写问卷"
+        },
+        "zh-TW": {
+          "title": "Nodus 移動應用 | 興趣調查",
+          "body": "我們正在開發 Nodus 移動應用，非常希望瞭解你的想法。",
+          "linkLabel": "填寫問卷"
         }
       }
     }
