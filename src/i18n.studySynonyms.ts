@@ -109,6 +109,18 @@ export const STUDY_SYNONYM_TRANSLATIONS = {
     'alternativas en memoria': '記憶體中的備選',
     'Regenerar alternativas': '重新生成備選',
   },
+  ko: {
+    "Sinónimos con IA": "AI 동의어",
+    "Alternativas de sinónimos": "동의어 대안",
+    "Sinónimos y reformulaciones": "동의어 및 다른 표현",
+    "Cinco alternativas en el idioma original, elegidas con el contexto de la frase.": "전체 문장 문맥을 사용하여 선택한 원어의 다섯 가지 대안.",
+    "Buscando alternativas…": "대안을 찾는 중…",
+    "Alternativas actuales": "현재 대안",
+    "Historial de esta apertura": "이 세션의 기록",
+    "Sustituye": "대체",
+    "alternativas en memoria": "기억 속 대안",
+    "Regenerar alternativas": "대안 재생성",
+  },
   ja: {
     "Sinónimos con IA": "AIの同義語",
     "Alternativas de sinónimos": "同義語の代替案",

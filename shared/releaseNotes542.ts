@@ -19,6 +19,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Çalışma soru bankası yoğun kullanım için yeniden kuruldu. Sorular ve kartlar iki sekmede yaşıyor. Ders, konu, bilişsel düzey, kaynak, materyal, belge, etiket veya koleksiyona göre arama ve filtreler, sıralama ve çoklu seçim var. Durum, zorluk, kategori, etiketler, koleksiyon ve tekrar durumunu tüm seçime uygulayın. Her kartı kendi aralıklı tekrar işlemleriyle oluşturun, düzenleyin veya silin.',
     'zh-CN': "学习题库为大批量操作而重建。问题与卡片分列两个标签页，支持搜索，以及按学科、主题、认知层级、来源、材料、文档、标签或合集筛选，支持排序和多选。可对整个选择应用状态、难度、类别、标签、合集和复习进度，并通过各自的间隔复习操作创建、编辑或删除每张卡片。",
     'zh-TW': "學習題庫為大批次操作而重建。問題與卡片分列兩個標籤頁，支援搜尋，以及按學科、主題、認知層級、來源、材料、文件、標籤或合集篩選，支援排序和多選。可對整個選擇應用狀態、難度、類別、標籤、合集和複習進度，並通過各自的間隔複習操作建立、編輯或刪除每張卡片。",
+    ko: "학습 문제 은행은 대량 작업을 위해 재구성되었습니다. 질문과 플래시카드는 주제, 주제, 인지 수준, 소스, 자료, 문서, 태그 또는 컬렉션별 검색 및 필터, 정렬 및 다중 선택 기능이 있는 두 개의 탭에 있습니다. 상태, 난이도, 카테고리, 태그, 컬렉션 및 검토 상태를 전체 선택 항목에 적용하고 고유한 간격 반복 동작으로 각 플래시카드를 생성, 편집 또는 삭제합니다.",
     ja: "学習用の質問バンクは、大量に作業できるように再構築されています。質問とフラッシュカードは2つのタブに表示され、主題、トピック、認知レベル、ソース、資料、ドキュメント、タグまたはコレクションによる検索とフィルター、並べ替えと複数選択が可能です。ステータス、難易度、カテゴリ、タグ、コレクションおよびレビュー状態を選択全体に適用し、独自の間隔をあけた繰り返しアクションで各フラッシュカードを作成、編集、または削除します。",
   },
   {
@@ -33,6 +34,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Soru bankası artık kapalı değil. Anki, .apkg paketleri ve TSV dahil, Moodle sınavları, XML ve GIFT dahil, CSV ve Nodus’un kendi JSON biçimi tek bir pencereden içe ve dışa aktarılıyor. Pencere, sorularınıza dokunmadan önce neyin gireceğini gösteriyor.',
     'zh-CN': "题库不再封闭。通过一个对话框即可导入和导出Anki（.apkg包和TSV）、Moodle的XML和GIFT测验、CSV以及Nodus自己的JSON，并在改动你的问题之前显示将要导入的内容。",
     'zh-TW': "題庫不再封閉。通過一個對話方塊即可匯入和匯出Anki（.apkg包和TSV）、Moodle的XML和GIFT測驗、CSV以及Nodus自己的JSON，並在改動你的問題之前顯示將要匯入的內容。",
+    ko: "은행은 더 이상 갇혀 있지 않습니다. 질문을 터치하기 전에 무엇이 나올지 보여주는 하나의 대화 상자에서.apkg 패키지와 TSV, XML 및 GIFT, CSV 및 Nodus의 자체 JSON으로 된 Moodle 퀴즈를 사용하여 Anki를 가져오고 내보낼 수 있습니다.",
     ja: "銀行はもうロックインされません。.apkg パッケージと TSV を使用した Anki、XML と GIFT の Moodle クイズ、CSV、および Nodus 独自の JSON を、質問に触れる前に何が表示されるかを示す1つのダイアログからインポートおよびエクスポートします。",
   },
   {
@@ -47,6 +49,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Sorular ve kartlar artık yazıldıkları gibi okunuyor. Markdown ve LaTeX formülleri soru metninde, seçeneklerde, yanıtta ve açıklamada her yüzeyde diziliyor. Soru bankası ve tekrar oturumundan yapay zekâ üretimine, sınav oluşturucuya ve quizlere kadar. Yazma alanları önizleme kazanıyor ve web sunucusu da bunları diziyor.',
     'zh-CN': "问题和卡片现在能按书写的样子显示。Markdown和LaTeX公式会在题干、选项、答案和解析中排版呈现，覆盖所有界面，从题库和复习会话到AI生成、试卷生成器和测验。书写字段新增预览，Web服务器也会对其进行排版。",
     'zh-TW': "問題和卡片現在能按書寫的樣子顯示。Markdown和LaTeX公式會在題幹、選項、答案和解析中排版呈現，覆蓋所有介面，從題庫和複習會話到AI生成、試卷生成器和測驗。書寫欄位新增預覽，Web伺服器也會對其進行排版。",
+    ko: "이제 질문과 플래시카드가 쓰여진 대로 읽혀집니다. Markdown 및 LaTeX 수식은 은행 및 검토 세션부터 AI 생성, 시험 작성기 및 퀴즈에 이르기까지 모든 표면에서 프롬프트, 옵션, 답변 및 설명에 조판됩니다. 쓰기 필드는 미리보기를 얻고 웹 서버도 이를 조판합니다.",
     ja: "質問とフラッシュカードは、書かれたとおりに読み取られるようになりました。 Markdown と LaTeX の数式は、銀行やレビューセッションから AI 生成、試験ビルダーやクイズに至るまで、プロンプト、オプション、解答、説明のあらゆる面にタイプセットされています。書き込みフィールドはプレビューを取得し、Web サーバーもそれらを植字します。",
   },
   {
@@ -61,6 +64,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Bir sohbet yanıtını notlara kaydetmek nereden geldiğini korur. Not, konuşmayı, modeli ve kaynakları hatırlar. Notun kendisinden o konuşmayı yeniden açıp tam mesaja atlayabilirsiniz. Notları dışa aktardığınızda bu köken bilgisi onlarla birlikte gider.',
     'zh-CN': "将聊天回答保存到笔记时会保留其来源。笔记会记住对话、模型和来源，并且你可以从笔记本身回到该对话并跳转到确切的消息。导出笔记时，来源信息会随之一起导出。",
     'zh-TW': "將聊天回答儲存到筆記時會保留其來源。筆記會記住對話、模型和來源，並且你可以從筆記本身回到該對話並跳轉到確切的訊息。匯出筆記時，來源資訊會隨之一起匯出。",
+    ko: "메모에 채팅 답변을 저장하면 해당 답변의 출처가 유지됩니다. 메모는 대화, 모델 및 출처를 기억하며 메모 자체에서 해당 대화를 다시 열고 정확한 메시지로 이동할 수 있습니다. 노트를 내보내면 출처도 함께 이동됩니다.",
     ja: "チャットの回答をメモに保存すると、その回答の出所が維持されます。メモは会話、モデル、ソースを記憶しており、メモ自体からその会話を再度開いて、正確なメッセージにジャンプすることができます。メモをエクスポートすると、出所も一緒に移動します。",
   },
   {
@@ -75,6 +79,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Deep Research ve Immersion oluşturma pencerelerinde yalnızca Image Atelier çağrı başına ücretli olarak işaretleniyor. Kurulu diğer Skill’ler SVG Studio’nun isteğe bağlı sınırını koruyor ve onaylamadan önce zorunlu bir üst sınır istemiyor.',
     'zh-CN': "在Deep Research和Immersion的创建对话框中，只有Image Atelier被标记为按调用付费。其他已安装的Skill保留SVG Studio的可选上限，不再要求你填写必填的最大值才能确认。",
     'zh-TW': "在Deep Research和Immersion的建立對話方塊中，只有Image Atelier被標記為按呼叫付費。其他已安裝的Skill保留SVG Studio的可選上限，不再要求你填寫必填的最大值才能確認。",
+    ko: "Deep Research 및 Immersion 생성 대화 상자에서는 Image Atelier만 통화당 유료로 표시됩니다. 설치된 다른 모든 스킬은 SVG Studio의 선택적 한도를 유지하며 더 이상 확인하기 전에 필수 최대값을 묻지 않습니다.",
     ja: "Deep Research および Immersion 作成ダイアログでは、Image Atelier のみが通話ごとに支払い済みとしてマークされています。インストールされている他のすべてのスキルは、SVG Studio のオプションの上限を維持し、確認する前に必須の最大値を要求することはなくなりました。",
   },
   {
@@ -89,6 +94,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Üretilen içerik için yedi yeni dil. Basitleştirilmiş ve geleneksel Çince, Vietnamca, Japonca, Rusça, Ukraynaca ve Korece istem dili seçicilerine eklendi ve artık on beş dil sunuluyor. Arayüz kendi sekiz dilini koruyor.',
     'zh-CN': "新增七种内容生成语言。简体中文、繁体中文、越南语、日语、俄语、乌克兰语和韩语加入提示词语言选择器，该选择器现已提供十五种语言。界面仍保持八种语言。",
     'zh-TW': "新增七種內容生成語言。簡體中文、繁體中文、越南語、日語、俄語、烏克蘭語和韓語加入提示詞語言選擇器，該選擇器現已提供十五種語言。介面仍保持八種語言。",
+    ko: "생성된 콘텐츠를 위한 7개의 새로운 언어. 간체 및 번체 중국어, 베트남어, 일본어, 러시아어, 우크라이나어 및 한국어가 프롬프트 언어 선택기에 합류하여 현재 15개를 제공합니다. 인터페이스는 8개 언어를 유지합니다.",
     ja: "生成されたコンテンツ用に7つの新しい言語。簡体字および繁体字中国語、ベトナム語、日本語、ロシア語、ウクライナ語、韓国語がプロンプト言語選択ツールに加わり、現在15言語が提供されています。インターフェイスは8つの言語を維持します。",
   },
   {
@@ -103,6 +109,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Marketplace tek bir katalog gösteriyor. Skill’ler, eklentiler, imzalı paketler ve inceleme bekleyen eklentiler tek listede toplanıyor. Her biri kendi kartında, aynı görsel kimlikle, aynı daraltılabilir ayrıntılarla ve kurmadan ya da güncellemeden önce tek bir izin penceresiyle gösteriliyor.',
     'zh-CN': "Marketplace只显示一个统一目录。Skills、插件、已签名包和待审核插件共用一个列表，各自一张卡片，具有相同的视觉标识、相同的可折叠详情，以及安装或更新前唯一的权限对话框。",
     'zh-TW': "Marketplace只顯示一個統一目錄。Skills、外掛、已簽名包和待稽核外掛共用一個列表，各自一張卡片，具有相同的視覺標識、相同的可摺疊詳情，以及安裝或更新前唯一的權限對話方塊。",
+    ko: "Marketplace에는 하나의 단일 카탈로그가 표시됩니다. 검토 대기 중인 기술, 플러그인, 서명된 패키지 및 플러그인은 설치 또는 업데이트 전에 각각 하나의 카드, 동일한 시각적 ID, 동일한 축소 가능한 세부 정보 및 하나의 권한 대화 상자와 하나의 목록을 공유합니다.",
     ja: "マーケットプレイスには1つのカタログが表示されます。スキル、プラグイン、署名済みパッケージ、およびレビュー待ちのプラグインは、インストールまたは更新する前に、それぞれ1枚のカードを含む1つのリスト、同じビジュアルアイデンティティ、同じ折りたたみ可能な詳細、および1つの権限ダイアログを共有します。",
   },
   {
@@ -117,6 +124,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'İmzalı sürüm 2 paketleri kendi yürütme kanalını kullanıyor. Araçları artık önceki genel mekanizma üzerinden duyurulmuyor ve bildirdikleri güvenilir yetenek yolundan çalışıyor. Böylece sohbet, paketin sunmadığı bir aracı aramıyor.',
     'zh-CN': "版本2的已签名包使用自己的执行通道。其工具不再通过先前的通用机制公布，而是经由它们声明的受信能力路径执行，因此聊天不再去寻找包未公开的工具。",
     'zh-TW': "版本2的已簽名包使用自己的執行通道。其工具不再通過先前的通用機制公佈，而是經由它們宣告的受信能力路徑執行，因此聊天不再去尋找包未公開的工具。",
+    ko: "서명된 버전 2 패키지는 자체 실행 채널을 사용합니다. 해당 도구는 더 이상 이전 일반 메커니즘을 통해 광고되지 않으며 선언한 신뢰할 수 있는 기능 경로를 통해 실행되므로 패키지가 노출하지 않는 도구에 대한 채팅이 더 이상 도달하지 않습니다.",
     ja: "署名付きバージョン2パッケージは独自の実行チャネルを使用します。彼らのツールは、以前の汎用メカニズムを通じてアドバタイズされなくなり、宣言された信頼できる機能パスを通じて実行されるため、パッケージが公開していないツールにチャットが到達することはなくなりました。",
   },
   {
@@ -131,6 +139,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Tarayıcı, koyu şema bildirmeyen sayfalara saygı gösteriyor. Yüzey, uygulama temasını dayatmak yerine belgenin kendi renklerini izliyor. Böylece 401 sayfası veya biçimsiz bir belge, metin seçmeden okunabiliyor. HTTP Basic kimlik doğrulaması kullanan sitelere artık tarayıcı çubuğundan giriş yapılabiliyor ve kimlik bilgileriniz saklanmıyor.',
     'zh-CN': "浏览器会尊重未声明深色模式的页面。其背景遵循文档自身的颜色，而不是强加应用主题，因此401页面或无样式页面无需选中文字即可阅读。使用HTTP基本认证的网站现在可以通过浏览器地址栏登录，该栏不会保存你的凭据。",
     'zh-TW': "瀏覽器會尊重未宣告深色模式的頁面。其背景遵循文件自身的顏色，而不是強加應用主題，因此401頁面或無樣式頁面無需選中文字即可閱讀。使用HTTP基本認證的網站現在可以通過瀏覽器位址列登入，該欄不會儲存你的憑據。",
+    ko: "브라우저는 다크 스킴을 선언하지 않은 페이지를 존중합니다. 표면은 앱 테마를 강요하는 대신 문서 고유의 색상을 따르므로 401 페이지나 스타일이 지정되지 않은 문서는 텍스트를 선택하지 않고도 읽을 수 있습니다. HTTP 기본 인증을 사용하는 사이트는 이제 사용자의 자격 증명이 전혀 저장되지 않은 브라우저 표시줄을 통해 로그인할 수 있습니다.",
     ja: "ブラウザーは、ダークスキームを宣言していないページを尊重します。表面はアプリのテーマを押し付けるのではなく、ドキュメント自体の色に従っているため、401ページやスタイルのないドキュメントは、テキストを選択しなくても読むことができます。 HTTP 基本認証を使用するサイトは、資格情報を保存しないブラウザバーからサインインできるようになりました。",
   },
   {
@@ -145,6 +154,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Tarayıcının yerel görünümü arayüz yakınlaştırmasıyla hizalanıyor. Görüntüleyici yakınlaştırmasıyla büyütüp küçülttüğünüzde sayfa ve çerçevesi artık kaymıyor ve içerik yerinde kalıyor.',
     'zh-CN': "浏览器的原生视图与界面缩放对齐。使用渲染器缩放进行放大或缩小时，页面与其边框不再错位，内容保持原位。",
     'zh-TW': "瀏覽器的原生檢視與介面縮放對齊。使用渲染器縮放進行放大或縮小時，頁面與其邊框不再錯位，內容保持原位。",
+    ko: "브라우저의 기본 보기는 인터페이스 확대/축소에 맞춰 정렬됩니다. 렌더러 확대/축소를 사용하여 확대하거나 축소하면 페이지와 해당 프레임이 분리되는 것을 멈추고 콘텐츠가 제자리에 유지됩니다.",
     ja: "ブラウザのネイティブビューはインターフェイスのズームに合わせて調整されます。レンダラーズームを使用してズームインまたはズームアウトすると、ページとそのフレームが離れてしまうことがなくなり、コンテンツは所定の位置に留まります。",
   },
   {
@@ -159,6 +169,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Kitaplık analizi geçici hatalardan daha iyi toparlanıyor. Zotero yanıt vermezse çalışma metinsiz olarak işaretlenmek yerine kuyruğa dönüyor. Eksik filtresi beş adımın tamamını denetliyor ve anlamsal durum her satırla uyuşuyor. Yarım kalan bir birleştirme yalnızca eksik fikirlerden devam ediyor.',
     'zh-CN': "文献库分析能更好地从暂时性故障中恢复。如果Zotero无响应，任务会回到队列，而不是被判为「没有文本」，「不完整」筛选会检查全部五个步骤，语义状态与每一行一致，被中断的融合只针对缺失的观点继续执行。",
     'zh-TW': "文獻庫分析能更好地從暫時性故障中恢復。如果Zotero無響應，任務會回到佇列，而不是被判為「沒有文本」，「不完整」篩選會檢查全部五個步驟，語義狀態與每一行一致，被中斷的融合只針對缺失的觀點繼續執行。",
+    ko: "라이브러리 분석은 일시적인 오류로부터 더 잘 복구됩니다. Zotero에 연결할 수 없는 경우 작업은 텍스트가 없는 것으로 표시되는 대신 대기열로 돌아가고, 불완전 필터는 다섯 단계를 모두 확인하고 의미 상태가 각 행과 일치하며 중단된 융합은 누락된 아이디어만 재개합니다.",
     ja: "ライブラリ分析は、一時的な障害からより適切に回復します。 Zotero に到達できない場合、作業はテキストなしとしてマークされる代わりにキューに戻り、Incomplete フィルターが5つのステップすべてをチェックし、セマンティック状態が各行と一致し、中断されたフュージョンが不足しているアイデアのみを再開します。",
   },
 ];

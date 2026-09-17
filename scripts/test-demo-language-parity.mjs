@@ -14,7 +14,7 @@ import traverseModule from '@babel/traverse';
 
 const traverse = traverseModule.default;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja'];
+const LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja', 'ko'];
 
 function catalogueEntries(file, exportName) {
   const source = fs.readFileSync(path.join(repoRoot, file), 'utf8');

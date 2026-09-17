@@ -24,7 +24,7 @@ const PROMPT_LANGUAGE_BY_TUTORIAL: Partial<Record<TutorialLanguage, PromptLangua
  * tutorial's own language when Nodus has been translated into it, otherwise fall
  * back to English. Generated content follows the tutorial language when Nodus has a
  * matching prompt translation, otherwise English. */
-const UI_LANGUAGES: readonly AppLanguage[] = ['es', 'en', 'fr', 'tr', 'de', 'pt', 'pt-BR', 'it', 'zh-CN', 'zh-TW', 'ja'];
+const UI_LANGUAGES: readonly AppLanguage[] = ['es', 'en', 'fr', 'tr', 'de', 'pt', 'pt-BR', 'it', 'zh-CN', 'zh-TW', 'ja', 'ko'];
 
 
 export function preferencesForTutorialLanguage(language: TutorialLanguage): {

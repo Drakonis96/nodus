@@ -378,6 +378,33 @@ const COPY: Record<AppLanguage, TeaserCopy> = {
     model: "自分のモデルを持ち込む",
   },
   },
+  ko: {
+    badge: '미리보기',
+    title: '앞으로 나올 일에 대한 예고',
+    summary: 'Nodus가 모바일로 출시됩니다. 아직 날짜가 표시되지 않은 앱을 살펴보세요.',
+    eyebrow: '휴대전화의 Nodus',
+    heading: '주머니 속 금고',
+    lede: '데스크톱에서 볼트를 게시하고 작품, 아이디어, 테마, 작가 등 어디에서나 그 뒤에 있는 증거와 함께 읽을 수 있습니다. 읽기는 읽기 전용이며 휴대전화에 쓴 내용은 휴대전화에 그대로 남아 있습니다.',
+    status: '아직 다운로드할 수 없습니다. 이러한 캡처는 진행 중인 빌드에서 제공되며 변경될 수 있습니다.',
+    surveyTitle: '그것을 사용하시겠습니까?',
+    surveyBody: '당신이 그것을 사용할지 여부와 그것으로부터 무엇을 기대하는지 알려주십시오. 2분 정도 소요되며 무엇을 먼저 빌드할지 결정하는 데 도움이 됩니다.',
+    surveyCta: '설문조사에 참여하세요',
+    englishNote: '스크린샷과 설문조사는 영어로만 제공됩니다.',
+    previous: '뒤로',
+    next: '다음',
+    finish: '알았어요',
+    slides: {
+    home: '금고 홈',
+    library: '도서관',
+    work: '작품을 자세히',
+    idea: '아이디어와 그 증거',
+    search: '검색',
+    argument: '인수 맵',
+    gaps: '격차',
+    deepResearch: 'Deep Research',
+    model: '자신의 모델을 가져와',
+  },
+  },
 };
 
 function shouldPresent(): boolean {

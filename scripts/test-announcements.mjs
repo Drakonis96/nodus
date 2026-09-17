@@ -77,7 +77,7 @@ test('the language survey is published with its response button', () => {
   assert.equal(notice.copy.es.linkLabel, 'Responder la encuesta');
 });
 
-test('every published notice is written in all eleven languages', () => {
+test('every published notice is written in all twelve languages', () => {
   for (const notice of published.notices) {
     const missing = ANNOUNCEMENT_LANGUAGES.filter((language) => {
       const copy = notice.copy?.[language];

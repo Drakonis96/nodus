@@ -10,6 +10,7 @@ const translations: Record<string, string[]> = {
   tr: ['Dosya ekle', 'Ekler', 'Eki kaldır', 'Dosyalar hazırlanıyor…', 'Ekli dosyaları analiz et.', 'Okuyucu yok', 'Görü', 'Belge', 've tüm mesajları ve ekli dosyaları. Bu işlem geri alınamaz.'],
   'zh-CN': ["添加文件","附件","移除附件","正在准备文件…","分析附加的文件。","无阅读器","视觉","文档","以及其所有消息和附件。此操作无法撤销。"],
   'zh-TW': ["新增檔案","附件","移除附件","正在準備檔案…","分析附加的檔案。","無閱讀器","視覺","文件","以及其所有訊息和附件。此操作無法撤銷。"],
+  ko: ["파일 추가", "첨부파일", "첨부파일 삭제", "파일 준비 중…", "첨부파일을 분석해 보세요.", "리더 없음", "비전", "문서", "모든 메시지와 첨부 파일. 이 작업은 취소할 수 없습니다."],
   ja: ["ファイルを追加する", "添付ファイル", "添付ファイルを削除する", "ファイルを準備しています…", "添付ファイルを解析します。", "リーダーがいません", "ビジョン", "書類", "およびそのすべてのメッセージと添付ファイル。この操作は元に戻すことができません。"],
 };
 keys.push('Suelta los archivos para adjuntarlos', 'No se pudieron leer los archivos arrastrados. Usa el botón + para añadirlos.');
@@ -23,6 +24,7 @@ const dropTranslations: Record<string, string[]> = {
   tr: ['Eklemek için dosyaları bırakın', 'Bırakılan dosyalar okunamadı. Eklemek için + düğmesini kullanın.'],
   'zh-CN': ["拖放文件以添加为附件","无法读取拖入的文件。请使用 + 按钮添加它们。"],
   'zh-TW': ["拖放檔案以新增為附件","無法讀取拖入的檔案。請使用 + 按鈕新增它們。"],
+  ko: ["첨부할 파일을 드롭하세요.", "삭제된 파일을 읽을 수 없습니다. + 버튼을 사용하여 추가하세요."],
   ja: ["ファイルをドロップして添付します", "ドロップされたファイルを読み取ることができませんでした。 + ボタンを使用して追加します。"],
 };
 for (const [language, values] of Object.entries(dropTranslations)) translations[language].push(...values);

@@ -15,6 +15,10 @@ const INCLUDED_META: Record<string, Record<AppLanguage, IncludedAppMeta>> = {
     tr: { title: 'Seçenek çarkı', summary: 'Alternatiflerinizi ekleyin, çarkı çevirin ve seçimi şansa bırakın.' },
     'zh-CN': { title: '选项转盘', summary: '添加你的备选项，转动转盘，让随机为你选择一项。' },
     'zh-TW': { title: '選項轉盤', summary: '新增你的備選項，轉動轉盤，讓隨機為你選擇一項。' },
+    ko: {
+      title: "옵션 휠",
+      summary: "대안을 추가하고 휠을 돌려 기회에 따라 하나를 선택해 보세요.",
+    },
     ja: {
       title: "オプションホイール",
       summary: "選択肢を追加し、ルーレットを回して、チャンスに1つを選んでもらいましょう。",
@@ -31,6 +35,10 @@ const INCLUDED_META: Record<string, Record<AppLanguage, IncludedAppMeta>> = {
     tr: { title: 'Konu dağıtıcısı', summary: 'Benzersiz konuları gruplara dağıtın ve özel konuları yalnızca gerektiğinde ekleyin.' },
     'zh-CN': { title: '主题分配器', summary: '在小组之间分配不重复的主题，仅在需要时加入备用主题。' },
     'zh-TW': { title: '主題分配器', summary: '在小組之間分配不重複的主題，僅在需要時加入備用主題。' },
+    ko: {
+      title: "주제 배포자",
+      summary: "그룹에 고유한 주제를 할당하고 필요한 경우에만 예외적인 주제를 포함합니다.",
+    },
     ja: {
       title: "トピック配信者",
       summary: "固有のトピックをグループに割り当て、必要な場合にのみ例外的なトピックを含めます。",
@@ -47,6 +55,10 @@ const INCLUDED_META: Record<string, Record<AppLanguage, IncludedAppMeta>> = {
     tr: { title: 'Fikir fırtınası', summary: 'Öğrencilerin fikirlerini QR ile toplayın ve paylaşılan bir panoda otomatik olarak gösterin.' },
     'zh-CN': { title: '头脑风暴', summary: '通过二维码收集学生的想法，并自动显示在共享墙板上。' },
     'zh-TW': { title: '頭腦風暴', summary: '通過二維碼收集學生的想法，並自動顯示在共享牆板上。' },
+    ko: {
+      title: "영감",
+      summary: "QR로 학생들의 아이디어를 수집하고 공유 벽면에 자동으로 표시합니다.",
+    },
     ja: {
       title: "ブレーンストーミング",
       summary: "学生のアイデアをQRで収集し、自動的に共有ウォールに表示します。",

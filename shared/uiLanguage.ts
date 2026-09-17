@@ -4,7 +4,7 @@ import { MAIN_PROCESS_ERRORS, MAIN_PROCESS_ERROR_PATTERNS } from './mainProcessE
 
 export type UiTranslations = Partial<Record<AppLanguage, string>> & { en: string };
 
-const UI_LANGUAGES = new Set<AppLanguage>(['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja']);
+const UI_LANGUAGES = new Set<AppLanguage>(['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja', 'ko']);
 
 /** Runtime locale validation. Unknown or future locales must never fall back to Spanish. */
 export function normalizeUiLanguage(language: unknown): AppLanguage {
@@ -31,7 +31,7 @@ export function normalizeBrowserUiLanguage(language: unknown): AppLanguage {
   const base = normalized.split('-')[0];
   if (base === 'zh') return 'zh-CN';
   return base === 'es' || base === 'en' || base === 'fr' || base === 'de'
-    || base === 'pt' || base === 'it' || base === 'tr' || base === 'ja'
+    || base === 'pt' || base === 'it' || base === 'tr' || base === 'ja' || base === 'ko'
     ? base
     : 'en';
 }
@@ -232,6 +232,7 @@ function zoteroRuntimeError(message: string, language: unknown): string | null {
       tr: 'Bu Zotero kitaplığı artık mevcut değil.',
       'zh-CN': '该 Zotero 文献库已不存在。',
       'zh-TW': '該 Zotero 文獻庫已不存在。',
+      ko: "해당 Zotero 라이브러리는 더 이상 존재하지 않습니다.",
       ja: "そのZoteroライブラリはもう存在しません。",
      });
   }
@@ -373,6 +374,7 @@ function truncatedJsonTail(tail: string, language: unknown): string {
     tr: 'Daha yüksek çıktı sınırı olan bir model kullanın veya görevin boyutunu küçültün.',
     'zh-CN': '请使用输出上限更高的模型，或减小任务规模。',
     'zh-TW': '請使用輸出上限更高的模型，或減小任務規模。',
+    ko: "출력 제한이 더 높은 모델을 사용하거나 작업 크기를 줄이십시오.",
     ja: "より高い出力制限を持つモデルを使用するか、タスクのサイズを小さくしてください。",
    });
 }
@@ -423,6 +425,7 @@ function aiProviderRuntimeError(message: string, language: unknown): string | nu
         pt: 'sem finish_reason', 'pt-BR': 'sem finish_reason', it: 'senza finish_reason', tr: 'finish_reason yok',
         'zh-CN': '没有 finish_reason',
         'zh-TW': '沒有 finish_reason',
+        ko: "완료_이유 없음",
         ja: "いいえ終了理由",
        })
       : empty[1];
@@ -520,6 +523,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
     return uiText(language, { es: message, en: 'Audio synthesis failed.', fr: 'La synthèse audio a échoué.', de: 'Die Audiosynthese ist fehlgeschlagen.', pt: 'A síntese de áudio falhou.', 'pt-BR': 'A síntese de áudio falhou.', it: 'Sintesi audio non riuscita.', tr: 'Ses sentezi başarısız oldu.' ,
       'zh-CN': '音频合成失败。',
       'zh-TW': '音訊合成失敗。',
+      ko: "오디오 합성에 실패했습니다.",
       ja: "音声合成に失敗しました。",
      });
   }
@@ -527,6 +531,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
     return uiText(language, { es: message, en: 'The audio worker failed.', fr: 'Le worker audio a échoué.', de: 'Der Audio-Worker ist fehlgeschlagen.', pt: 'O worker de áudio falhou.', 'pt-BR': 'O worker de áudio falhou.', it: 'Il worker audio non è riuscito.', tr: 'Ses çalışanı başarısız oldu.' ,
       'zh-CN': '音频工作线程失败。',
       'zh-TW': '音訊工作執行緒失敗。',
+      ko: "오디오 작업자가 실패했습니다.",
       ja: "オーディオワーカーが失敗しました。",
      });
   }
@@ -534,6 +539,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
     return uiText(language, { es: message, en: 'The selected Hume voice is no longer available.', fr: 'La voix Hume sélectionnée n’est plus disponible.', de: 'Die ausgewählte Hume-Stimme ist nicht mehr verfügbar.', pt: 'A voz Hume selecionada já não está disponível.', 'pt-BR': 'A voz Hume selecionada não está mais disponível.', it: 'La voce Hume selezionata non è più disponibile.', tr: 'Seçilen Hume sesi artık kullanılamıyor.' ,
       'zh-CN': '所选的 Hume 语音已不再可用。',
       'zh-TW': '所選的 Hume 語音已不再可用。',
+      ko: "선택한 Hume 음성은 더 이상 사용할 수 없습니다.",
       ja: "選択したヒューム音声は使用できなくなりました。",
      });
   }
@@ -541,6 +547,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
     return uiText(language, { es: message, en: 'eSpeak NG returned a response without phonemes.', fr: 'eSpeak NG a renvoyé une réponse sans phonèmes.', de: 'eSpeak NG hat eine Antwort ohne Phoneme zurückgegeben.', pt: 'O eSpeak NG devolveu uma resposta sem fonemas.', 'pt-BR': 'O eSpeak NG retornou uma resposta sem fonemas.', it: 'eSpeak NG ha restituito una risposta senza fonemi.', tr: 'eSpeak NG fonem içermeyen bir yanıt döndürdü.' ,
       'zh-CN': 'eSpeak NG 返回的响应中没有音素。',
       'zh-TW': 'eSpeak NG 返回的響應中沒有音素。',
+      ko: "eSpeak NG가 음소 없이 응답을 반환했습니다.",
       ja: "eSpeak NG は音素なしの応答を返しました。",
      });
   }
@@ -548,6 +555,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
     return uiText(language, { es: message, en: 'eSpeak NG finished without returning phonemes.', fr: 'eSpeak NG a terminé sans renvoyer de phonèmes.', de: 'eSpeak NG wurde beendet, ohne Phoneme zurückzugeben.', pt: 'O eSpeak NG terminou sem devolver fonemas.', 'pt-BR': 'O eSpeak NG terminou sem retornar fonemas.', it: 'eSpeak NG ha terminato senza restituire fonemi.', tr: 'eSpeak NG fonem döndürmeden tamamlandı.' ,
       'zh-CN': 'eSpeak NG 结束时没有返回音素。',
       'zh-TW': 'eSpeak NG 結束時沒有返回音素。',
+      ko: "eSpeak NG가 음소를 반환하지 않고 종료되었습니다.",
       ja: "eSpeak NG は音素を返さずに終了しました。",
      });
   }
@@ -585,6 +593,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
     return uiText(language, { es: message, en: 'Transcription cancelled.', fr: 'Transcription annulée.', de: 'Transkription abgebrochen.', pt: 'Transcrição cancelada.', 'pt-BR': 'Transcrição cancelada.', it: 'Trascrizione annullata.', tr: 'Transkripsiyon iptal edildi.' ,
       'zh-CN': '转写已取消。',
       'zh-TW': '轉寫已取消。',
+      ko: "스크립트 작성이 취소되었습니다.",
       ja: "転写はキャンセルされました。",
      });
   }
@@ -592,6 +601,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
     return uiText(language, { es: message, en: 'Speaker detection cancelled.', fr: 'Détection des locuteurs annulée.', de: 'Sprechererkennung abgebrochen.', pt: 'Deteção de oradores cancelada.', 'pt-BR': 'Detecção de falantes cancelada.', it: 'Rilevamento degli interlocutori annullato.', tr: 'Konuşmacı algılama iptal edildi.' ,
       'zh-CN': '说话人检测已取消。',
       'zh-TW': '說話人檢測已取消。',
+      ko: "스피커 감지가 취소되었습니다.",
       ja: "話者の検出がキャンセルされました。",
      });
   }
@@ -599,6 +609,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
     return uiText(language, { es: message, en: 'The bundled connector was not found. In development, run "npm run browser:zip".', fr: 'Le connecteur intégré est introuvable. En développement, exécutez « npm run browser:zip ».', de: 'Der integrierte Connector wurde nicht gefunden. Führen Sie in der Entwicklung „npm run browser:zip“ aus.', pt: 'O conector integrado não foi encontrado. Em desenvolvimento, execute «npm run browser:zip».', 'pt-BR': 'O conector integrado não foi encontrado. Em desenvolvimento, execute "npm run browser:zip".', it: 'Il connettore integrato non è stato trovato. In sviluppo, esegui «npm run browser:zip».', tr: 'Dahili bağlayıcı bulunamadı. Geliştirme sırasında "npm run browser:zip" komutunu çalıştırın.' ,
       'zh-CN': '找不到内置连接器。开发环境下请运行 "npm run browser:zip"。',
       'zh-TW': '找不到內建聯結器。開發環境下請執行 "npm run browser:zip"。',
+      ko: "번들 커넥터를 찾을 수 없습니다. 개발 중에는 \"npm run browser:zip\"을 실행하세요.",
       ja: "同梱されているコネクタが見つかりませんでした。開発中は、「npm run browser:zip」を実行します。",
      });
   }
@@ -606,6 +617,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
     return uiText(language, { es: message, en: 'Study vault AI features are disabled in Settings.', fr: 'Les fonctions d’IA du coffre d’étude sont désactivées dans les Réglages.', de: 'Die KI-Funktionen des Lernarchivs sind in den Einstellungen deaktiviert.', pt: 'As funções de IA do arquivo de estudo estão desativadas nas Definições.', 'pt-BR': 'Os recursos de IA do vault de estudo estão desativados nas Configurações.', it: 'Le funzioni IA del vault di studio sono disattivate nelle Impostazioni.', tr: 'Çalışma kasasının yapay zekâ özellikleri Ayarlar’da devre dışı.' ,
       'zh-CN': '学习资料库的 AI 功能已在设置中关闭。',
       'zh-TW': '學習資料庫的 AI 功能已在設定中關閉。',
+      ko: "설정에서 Study Vault AI 기능이 비활성화되어 있습니다.",
       ja: "Study Vault AI 機能は設定で無効になっています。",
      });
   }
@@ -629,6 +641,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
     return uiText(language, { es: message, en: 'This subject is excluded from external processing. Use a local model or remove the exclusion in Settings.', fr: 'Cette matière est exclue du traitement externe. Utilisez un modèle local ou retirez l’exclusion dans les Réglages.', de: 'Dieses Fach ist von der externen Verarbeitung ausgeschlossen. Verwenden Sie ein lokales Modell oder entfernen Sie den Ausschluss in den Einstellungen.', pt: 'Esta disciplina está excluída do processamento externo. Use um modelo local ou remova a exclusão nas Definições.', 'pt-BR': 'Esta disciplina está excluída do processamento externo. Use um modelo local ou remova a exclusão nas Configurações.', it: 'Questa materia è esclusa dall’elaborazione esterna. Usa un modello locale o rimuovi l’esclusione nelle Impostazioni.', tr: 'Bu ders harici işleme dışında bırakıldı. Yerel bir model kullanın veya Ayarlar’dan dışlamayı kaldırın.' ,
       'zh-CN': '该研究对象被排除在外部处理之外。请使用本地模型，或在设置中移除排除项。',
       'zh-TW': '該研究物件被排除在外部處理之外。請使用本地模型，或在設定中移除排除項。',
+      ko: "이 주제는 외부 처리에서 제외됩니다. 로컬 모델을 사용하거나 설정에서 제외를 제거하세요.",
       ja: "この主題は外部処理から除外されます。ローカルモデルを使用するか、設定で除外を削除します。",
      });
   }
@@ -644,6 +657,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
     return uiText(language, { es: message, en: 'The monthly study AI budget has been reached.', fr: 'Le budget mensuel d’IA pour l’étude a été atteint.', de: 'Das monatliche Lern-KI-Budget wurde erreicht.', pt: 'O orçamento mensal de IA para estudo foi atingido.', 'pt-BR': 'O orçamento mensal de IA para estudo foi atingido.', it: 'Il budget mensile per l’IA di studio è stato raggiunto.', tr: 'Aylık çalışma yapay zekâ bütçesine ulaşıldı.' ,
       'zh-CN': '本月学习 AI 预算已用尽。',
       'zh-TW': '本月學習 AI 預算已用盡。',
+      ko: "월간 학습 AI 예산에 도달했습니다.",
       ja: "毎月の学習 AI 予算に達しました。",
      });
   }
@@ -651,6 +665,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
     return uiText(language, { es: message, en: 'External send cancelled by the user.', fr: 'Envoi externe annulé par l’utilisateur.', de: 'Externe Übermittlung vom Nutzer abgebrochen.', pt: 'Envio externo cancelado pelo utilizador.', 'pt-BR': 'Envio externo cancelado pelo usuário.', it: 'Invio esterno annullato dall’utente.', tr: 'Harici gönderim kullanıcı tarafından iptal edildi.' ,
       'zh-CN': '用户已取消外部发送。',
       'zh-TW': '使用者已取消外部發送。',
+      ko: "사용자가 외부 전송을 취소했습니다.",
       ja: "外部送信がユーザーによってキャンセルされました。",
      });
   }
@@ -658,6 +673,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
     return uiText(language, { es: message, en: 'E2E: AI provider unavailable.', fr: 'E2E : fournisseur d’IA indisponible.', de: 'E2E: KI-Anbieter nicht verfügbar.', pt: 'E2E: fornecedor de IA indisponível.', 'pt-BR': 'E2E: provedor de IA indisponível.', it: 'E2E: fornitore IA non disponibile.', tr: 'E2E: yapay zekâ sağlayıcısı kullanılamıyor.' ,
       'zh-CN': 'E2E：AI 提供商不可用。',
       'zh-TW': 'E2E：AI 提供商不可用。',
+      ko: "E2E: AI 제공자를 사용할 수 없습니다.",
       ja: "E2E: AI プロバイダーが利用できません。",
      });
   }
@@ -665,6 +681,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
     return uiText(language, { es: message, en: 'The AI task could not be completed.', fr: 'La tâche d’IA n’a pas pu être terminée.', de: 'Die KI-Aufgabe konnte nicht abgeschlossen werden.', pt: 'Não foi possível concluir a tarefa de IA.', 'pt-BR': 'Não foi possível concluir a tarefa de IA.', it: 'Non è stato possibile completare l’attività IA.', tr: 'Yapay zekâ görevi tamamlanamadı.' ,
       'zh-CN': 'AI 任务无法完成。',
       'zh-TW': 'AI 任務無法完成。',
+      ko: "AI 작업을 완료할 수 없습니다.",
       ja: "AI タスクを完了できませんでした。",
      });
   }
@@ -680,6 +697,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
       tr: 'Yapılandırılmış bir yapay zekâ modeli yok. Ayarlar’dan bir model seçin.',
       'zh-CN': '尚未配置 AI 模型。请在设置中选择一个。',
       'zh-TW': '尚未配置 AI 模型。請在設定中選擇一個。',
+      ko: "AI 모델이 구성되지 않았습니다. 설정에서 하나를 선택하세요.",
       ja: "AI モデルが構成されていません。 [設定] でいずれかを選択します。",
      });
   }
@@ -695,6 +713,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
       tr: 'Yapay zekâ anahtarı geçersiz. Ayarlar’dan kontrol edin.',
       'zh-CN': 'AI 密钥无效。请在设置中检查。',
       'zh-TW': 'AI 金鑰無效。請在設定中檢查。',
+      ko: "AI 키가 잘못되었습니다. 설정에서 확인하세요.",
       ja: "AI キーが無効です。設定で確認してください。",
      });
   }
@@ -726,6 +745,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
       tr: 'Belge kaynağı analiz sırasında tekrar tekrar değişti. Sonsuz yeniden denemeleri önlemek için dizin oluşturma duraklatıldı.',
       'zh-CN': '分析期间文档来源不断变化。为避免无限重试，索引已暂停。',
       'zh-TW': '分析期間文件來源不斷變化。為避免無限重試，索引已暫停。',
+      ko: "분석 중에 문서 소스가 계속 변경되었습니다. 끝없는 재시도를 방지하기 위해 인덱싱이 일시 중지되었습니다.",
       ja: "ドキュメントのソースは分析中に変更され続けました。無限の再試行を防ぐために、インデックス作成は一時停止されました。",
      });
   }
@@ -741,6 +761,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
       tr: 'Kaynak değişmeye devam ediyor. Eşitleme tamamlandıktan sonra devam edin.',
       'zh-CN': '来源仍在变化。请在同步完成后继续。',
       'zh-TW': '來源仍在變化。請在同步完成後繼續。',
+      ko: "소스는 계속 바뀌고 있습니다. 동기화가 완료된 후 재개하세요.",
       ja: "ソースはまだ変更中です。同期が完了したら再開します。",
      });
   }
@@ -791,6 +812,7 @@ export function localizeRuntimeError(message: string, language: unknown): string
     tr: 'İşlem tamamlanamadı.',
     'zh-CN': '无法完成该操作。',
     'zh-TW': '無法完成該操作。',
+    ko: "작업을 완료할 수 없습니다.",
     ja: "操作を完了できませんでした。",
    });
 }

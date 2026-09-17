@@ -19,6 +19,7 @@ export const RELEASE_5_4_3_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Eser özetleri artık cümle ortasında kesilmiş hâlde kaydedilmiyor. Bir akıl yürütme modelinde çıktı bütçesi düşünürken tükeniyor ve üretim sona ermeden duruyordu, ama özet tamamlanmış olarak kaydediliyordu. Artık ilk deneme gerçek bir alana sahip ve yine kesilirse Nodus uygulamanın daha geniş bütçesiyle bir kez daha deniyor. Model onu da tüketirse özet eksik kaydedilmek yerine başarısız olarak işaretleniyor.',
     'zh-CN': "文献摘要不再被截断在句子中间保存。使用推理模型时，输出预算在思考阶段就已耗尽，生成在写出结尾之前就停止，但摘要却被标记为已完成并保存。现在首次尝试拥有更多余量，如果仍被截断，Nodus会用应用更大的预算重试一次。若模型再次耗尽预算，摘要会被标记为失败，而不是以不完整状态保存。",
     'zh-TW': "文獻摘要不再被截斷在句子中間儲存。使用推理模型時，輸出預算在思考階段就已耗盡，生成在寫出結尾之前就停止，但摘要卻被標記為已完成並儲存。現在首次嘗試擁有更多餘量，如果仍被截斷，Nodus會用應用更大的預算重試一次。若模型再次耗盡預算，摘要會被標記為失敗，而不是以不完整狀態儲存。",
+    ko: "작업 요약은 더 이상 문장 중간에 잘려 저장되지 않습니다. 추론 모델을 사용하면 마감 라인 전에 생각하고 생성이 중단되는 동안 출력 예산이 소진되었지만 요약이 완료된 것으로 저장되었습니다. 이제 첫 번째 시도에서 실제 여유 공간이 확보되고, 여전히 중단되면 Nodus는 앱의 더 큰 예산으로 한 번 재시도합니다. 모델이 이를 모두 소진하는 경우 요약은 불완전하게 저장되는 대신 실패로 표시됩니다.",
     ja: "作業概要が文の途中で切り取られて保存されることがなくなりました。推論モデルでは、考えている間に出力予算がなくなり、終了行の手前で生成が停止しましたが、概要は完了したものとして保存されました。最初の試行で実際のヘッドルームが得られるようになり、それでも切断された場合、Nodus はアプリのより大きな予算で1回再試行します。モデルがそれも使い果たす場合、概要は不完全に保存されるのではなく、失敗としてマークされます。",
   },
   {
@@ -33,6 +34,7 @@ export const RELEASE_5_4_3_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Tarayıcı eşleştirmesi artık sessizce beklemiyor. macOS’ta eşleştirme uyarısı, etkin uygulama olmayı sürdüren Chrome’un arkasında açılıyor ve istek, kimse görmeden zaman aşımına uğruyordu. Nodus artık istek gelir gelmez öne geçiyor ve sistem bu etkinleştirmeyi reddederse platformun yaptığı gibi dikkat çekiyor, görev çubuğunda yanıp sönerek ya da Dock’ta zıplayarak. Sinyal, pencere odağı alır almaz veya eşleştirme sonuçlanınca duruyor.',
     'zh-CN': "浏览器配对不再默默等待。在macOS上，配对提示会打开在Chrome之后，而Chrome仍是活动应用，请求最终超时，无人看到。现在Nodus一收到请求就会置前，如果系统拒绝该激活，它会像平台那样请求关注，通过在任务栏闪烁或在Dock弹跳。窗口获得焦点或配对完成后，该信号立即停止。",
     'zh-TW': "瀏覽器配對不再默默等待。在macOS上，配對提示會開啟在Chrome之後，而Chrome仍是活動應用，請求最終超時，無人看到。現在Nodus一收到請求就會置前，如果系統拒絕該啟用，它會像平臺那樣請求關注，通過在工作列閃爍或在Dock彈跳。視窗獲得焦點或配對完成後，該訊號立即停止。",
+    ko: "브라우저를 페어링하면 더 이상 조용히 기다리지 않습니다. macOS에서는 활성 앱으로 남아 있던 Chrome 뒤에 페어링 프롬프트가 열렸고 요청 시간이 초과되어 아무도 볼 수 없었습니다. 이제 Nodus는 요청이 도착하자마자 전면에 나서고, 시스템이 해당 활성화를 거부하면 작업 표시줄 플래시 또는 도크 바운스를 통해 플랫폼이 하는 방식대로 주의를 요청합니다. 창이 초점을 맞추거나 페어링이 확정되면 신호가 중지됩니다.",
     ja: "ブラウザのペアリングは、沈黙して待つ必要がなくなりました。 macOS では、アクティブなアプリのままである Chrome の背後でペアリングプロンプトが開き、誰にも表示されずにリクエストがタイムアウトしました。 Nodus はリクエストが到着するとすぐに前面に出てきて、システムがそのアクティブ化を拒否した場合、プラットフォームが行うのと同じように、タスクバーのフラッシュやドックのバウンスで注意を求めます。ウィンドウにフォーカスが移るか、ペアリングが完了するとすぐに信号は停止します。",
   },
   {
@@ -47,6 +49,7 @@ export const RELEASE_5_4_3_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Bir aracın JSON sonuçları artık son ürünmüş gibi sohbeti kaplamıyor. Yanıt kadar yüksek, biçimsiz bir blok olarak görünüyorlardı ve bu yüzden bir köken sorgusu, istediğiniz şeklin yanında hata ayıklama çıktısı gibi duruyordu. JSON artık «Kanıt» altında katlanmış hâlde, tek tıkla açılıyor ve şekil mesajın merkezinde kalıyor.',
     'zh-CN': "工具的JSON结果不再像最终交付物那样占据整个对话。以前它们会被倾倒进一个没有样式、与回答同样高的区块，于是溯源查询在你请求的图形旁边看起来像调试输出。现在JSON折叠在「证据」下，一点即可展开，图形仍占据消息的中心。",
     'zh-TW': "工具的JSON結果不再像最終交付物那樣佔據整個對話。以前它們會被傾倒進一個沒有樣式、與回答同樣高的區塊，於是溯源查詢在你請求的圖形旁邊看起來像除錯輸出。現在JSON摺疊在「證據」下，一點即可展開，圖形仍佔據訊息的中心。",
+    ko: "도구의 JSON 결과는 더 이상 결과물인 것처럼 대화를 이어받지 않습니다. 그들은 답변만큼 높이가 스타일이 지정되지 않은 블록에 도착하곤 했기 때문에 출처 쿼리는 요청한 그림 옆에 있는 디버그 출력처럼 보였습니다. 이제 JSON은 클릭 한 번으로 '증거' 아래에 접힌 상태로 유지되며 그림은 메시지의 중앙에 유지됩니다.",
     ja: "ツールの JSON 結果が成果物であるかのように会話を引き継ぐことはなくなりました。以前は、答えと同じ高さのスタイルのないブロックに到達するため、来歴クエリは、要求した図の隣にあるデバッグ出力のように見えました。 JSON は1クリックで「証拠」の下に折りたたまれたままになり、図がメッセージの中央に表示されます。",
   },
 ];

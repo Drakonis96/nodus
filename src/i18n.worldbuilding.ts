@@ -17,6 +17,10 @@ export const WORLDBUILDING_TRANSLATIONS = {
   tr: map({ protagonists: 'Başkahramanlar', alive: 'Hayatta' }),
   'zh-CN': map({ protagonists: '主角', alive: '在世' }),
   'zh-TW': map({ protagonists: '主角', alive: '在世' }),
+  ko: map({
+    protagonists: "주인공",
+    alive: "살아 있는",
+  }),
   ja: map({
     protagonists: "主人公",
     alive: "生きている",

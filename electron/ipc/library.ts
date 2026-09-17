@@ -159,11 +159,13 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     const options = {
       title: dialogText({ es: 'Importar documentos en la Biblioteca', en: 'Import documents into the Library', fr: 'Importer des documents dans la Bibliothèque', de: 'Dokumente in die Bibliothek importieren', pt: 'Importar documentos para a Biblioteca', 'pt-BR': 'Importar documentos para a Biblioteca', it: 'Importa documenti nella Biblioteca', tr: 'Belgeleri Kütüphaneye aktar', 'zh-CN': '将文档导入文献库' ,
   'zh-TW': '將文件匯入文獻庫',
+  ko: "문서를 라이브러리로 가져오기",
   ja: "ドキュメントをライブラリにインポートする", }),
       properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>,
       filters: [{
         name: dialogText({ es: 'Documentos compatibles', en: 'Supported documents', fr: 'Documents compatibles', de: 'Unterstützte Dokumente', pt: 'Documentos compatíveis', 'pt-BR': 'Documentos compatíveis', it: 'Documenti compatibili', tr: 'Desteklenen belgeler', 'zh-CN': '支持的文档' ,
   'zh-TW': '支援的文件',
+  ko: "지원되는 문서",
   ja: "サポートされているドキュメント", }),
         extensions: ['pdf', 'epub', 'md', 'markdown', 'txt', 'html', 'htm', 'xml', 'jats', 'doc', 'docx', 'odt', 'rtf', 'ppt', 'pptx', 'odp', 'csv', 'tsv', 'xlsx', 'xls', 'ods', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'heic', 'tif', 'tiff'],
       }],
@@ -182,6 +184,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     const options = {
       title: dialogText({ es: 'Importar referencias bibliográficas', en: 'Import bibliographic references', fr: 'Importer des références bibliographiques', de: 'Literaturangaben importieren', pt: 'Importar referências bibliográficas', 'pt-BR': 'Importar referências bibliográficas', it: 'Importa riferimenti bibliografici', tr: 'Kaynakça kayıtlarını içe aktar', 'zh-CN': '导入参考文献' ,
   'zh-TW': '匯入參考文獻',
+  ko: "참고문헌 가져오기",
   ja: "参考文献のインポート", }),
       properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>,
       filters: [{ name: 'RIS, BibTeX, BibLaTeX, CSL JSON, EndNote, Zotero RDF, CSV o Markdown', extensions: ['ris', 'bib', 'bibtex', 'biblatex', 'json', 'xml', 'rdf', 'csv', 'md', 'markdown'] }],
@@ -200,9 +203,11 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     const options = {
       title: dialogText({ es: 'Añadir adjuntos a la referencia', en: 'Add attachments to the reference', fr: 'Ajouter des pièces jointes à la référence', de: 'Anhänge zur Literaturangabe hinzufügen', pt: 'Adicionar anexos à referência', 'pt-BR': 'Adicionar anexos à referência', it: 'Aggiungi allegati al riferimento', tr: 'Kaynak kaydına ek dosyalar ekle', 'zh-CN': '为参考文献添加附件' ,
   'zh-TW': '為參考文獻新增附件',
+  ko: "참고자료에 첨부파일 추가",
   ja: "参照に添付ファイルを追加する", }), properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>,
       filters: [{ name: dialogText({ es: 'Documentos, datos e imágenes', en: 'Documents, data and images', fr: 'Documents, données et images', de: 'Dokumente, Daten und Bilder', pt: 'Documentos, dados e imagens', 'pt-BR': 'Documentos, dados e imagens', it: 'Documenti, dati e immagini', tr: 'Belgeler, veriler ve görseller', 'zh-CN': '文档、数据和图片' ,
   'zh-TW': '文件、資料和圖片',
+  ko: "문서, 데이터 및 이미지",
   ja: "文書、データ、画像", }), extensions: ['pdf', 'epub', 'md', 'markdown', 'txt', 'html', 'htm', 'xml', 'jats', 'doc', 'docx', 'odt', 'rtf', 'ppt', 'pptx', 'odp', 'csv', 'tsv', 'xlsx', 'xls', 'ods', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'heic', 'tif', 'tiff'] }],
     };
     const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
@@ -213,6 +218,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
     const options = { title: dialogText({ es: 'Sustituir adjunto', en: 'Replace attachment', fr: 'Remplacer la pièce jointe', de: 'Anhang ersetzen', pt: 'Substituir anexo', 'pt-BR': 'Substituir anexo', it: 'Sostituisci allegato', tr: 'Ek dosyayı değiştir', 'zh-CN': '替换附件' ,
   'zh-TW': '替換附件',
+  ko: "첨부파일 교체",
   ja: "アタッチメントを交換する", }), properties: ['openFile'] as Array<'openFile'> };
     const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
     return selected.canceled ? existingItem(itemId) : replaceGlobalLibraryAttachment(itemId, attachmentId, selected.filePaths[0]);
@@ -239,6 +245,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
     const options = { title: dialogText({ es: 'Importar estilos CSL', en: 'Import CSL styles', fr: 'Importer des styles CSL', de: 'CSL-Stile importieren', pt: 'Importar estilos CSL', 'pt-BR': 'Importar estilos CSL', it: 'Importa stili CSL', tr: 'CSL stillerini içe aktar', 'zh-CN': '导入CSL样式' ,
   'zh-TW': '匯入CSL樣式',
+  ko: "CSL 스타일 가져오기",
   ja: "CSL スタイルをインポートする", }), properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>, filters: [{ name: 'Citation Style Language', extensions: ['csl'] }] };
     const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
     return selected.canceled ? { imported: 0, updated: 0, skipped: 0, styles: listGlobalLibraryCitationStyles(), warnings: [] } : importGlobalLibraryCitationStyleFiles(selected.filePaths);
@@ -249,6 +256,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
     const options = { title: dialogText({ es: 'Seleccionar la carpeta styles de Zotero', en: 'Select the Zotero styles folder', fr: 'Sélectionner le dossier styles de Zotero', de: 'Zotero-Ordner „styles“ auswählen', pt: 'Selecionar a pasta styles do Zotero', 'pt-BR': 'Selecionar a pasta styles do Zotero', it: 'Seleziona la cartella styles di Zotero', tr: 'Zotero styles klasörünü seç', 'zh-CN': '选择Zotero的styles文件夹' ,
   'zh-TW': '選擇Zotero的styles資料夾',
+  ko: "Zotero 스타일 폴더를 선택하세요.",
   ja: "Zotero スタイルフォルダーを選択します", }), properties: ['openDirectory'] as Array<'openDirectory'> };
     const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
     return selected.canceled ? automatic : importGlobalLibraryZoteroCitationStyles(selected.filePaths);
@@ -265,6 +273,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
     const options = { title: dialogText({ es: 'Exportar referencias bibliográficas', en: 'Export bibliographic references', fr: 'Exporter les références bibliographiques', de: 'Literaturangaben exportieren', pt: 'Exportar referências bibliográficas', 'pt-BR': 'Exportar referências bibliográficas', it: 'Esporta riferimenti bibliografici', tr: 'Kaynakça kayıtlarını dışa aktar', 'zh-CN': '导出参考文献' ,
   'zh-TW': '匯出參考文獻',
+  ko: "참고문헌 내보내기",
   ja: "参考文献のエクスポート", }), defaultPath: `nodus-library.${extension}`, filters: [{ name: request.format, extensions: [extension] }] };
     const selected = owner ? await dialog.showSaveDialog(owner, options) : await dialog.showSaveDialog(options);
     if (selected.canceled || !selected.filePath) return { format: request.format, exported: 0, filePath: null, canceled: true, warnings: [] };

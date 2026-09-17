@@ -344,7 +344,7 @@ test('the announcement speaks every interface language', async () => {
   // Read the languages from the type itself, so a new UI language fails here.
   const declared = types.match(/export type AppLanguage = ([^;]+);/)[1]
     .split('|').map((code) => code.trim().replace(/'/g, ''));
-  assert.equal(declared.length, 11);
+  assert.equal(declared.length, 12);
   const table = guide.slice(guide.indexOf('const COPY: Record<AppLanguage, AnnouncementCopy>'), guide.indexOf('export function markTutorialVideosAnnouncementSeen'));
   for (const code of declared) {
     assert.match(table, new RegExp(`\\n  '?${code}'?: \\{`), `${code} has no announcement copy`);
@@ -354,8 +354,8 @@ test('the announcement speaks every interface language', async () => {
   // Languages the other catalogues render keep single quotes; a generated table may
   // use double quotes, so both are read.
   const summaries = [...table.matchAll(/\n    summary: (['"])(.+)\1,/g)].map((match) => match[2]);
-  assert.equal(summaries.length, 11);
-  assert.equal(new Set(summaries).size, 11, 'one of the languages falls back to another');
+  assert.equal(summaries.length, 12);
+  assert.equal(new Set(summaries).size, 12, 'one of the languages falls back to another');
 });
 
 test('a vault tour with a video offers three ways in', async () => {

@@ -670,6 +670,96 @@ const COPY: Record<TutorialLanguage, TutorialVideoCopy> = {
       mcp: { title: 'MCP與Nodus Server', body: '把你的資料庫開放給其他AI助手，並在你的網路中釋出。' },
     },
   },
+  ko: {
+    chooseTitle: "어떻게 배우는 것을 선호하시나요?",
+    chooseLede: "Nodus를 알아가는 방법을 선택하세요. 다른 옵션은 설정 → 도움말에서 계속 사용할 수 있습니다.",
+    videoOption: {
+    title: "비디오 튜토리얼 보기",
+    body: "Nodus를 떠나지 않고도 일시 중지하고 전체 화면으로 시청할 수 있는 안내 튜토리얼입니다.",
+    badge: "추천",
+  },
+    textOption: {
+    title: "자신의 속도에 맞춰 가이드를 읽어보세요.",
+    body: "앱 내부와 오프라인에서 링크와 경고가 포함된 챕터입니다.",
+  },
+    gridTitle: "비디오 튜토리얼",
+    gridLede: "그 중 하나를여십시오. 각각은 열자마자 시청한 것으로 표시됩니다.",
+    more: "가는 길에 더 많은 튜토리얼이 있습니다.",
+    watched: "시청함",
+    markUnwatched: "시청하지 않음으로 표시",
+    openExternal: "브라우저에서 열기",
+    hosting: "동영상은 YouTube에서 호스팅됩니다. 하나를 열면 해당 서버에 연결됩니다. 서면 가이드는 오프라인으로 작동합니다.",
+    catalogueNote: "이 목록을 열면 Nodus 웹사이트에 새 튜토리얼이 게시되었는지 묻습니다.",
+    close: "닫다",
+    play: "비디오 보기",
+    tourVideo: "비디오 튜토리얼 보기",
+    categories: {
+    introduction: "소개",
+    vaults: "금고",
+    features: "특징",
+    integrations: "통합",
+  },
+    allCategories: "모두",
+    searchPlaceholder: "튜토리얼 검색…",
+    searchLabel: "튜토리얼 검색",
+    noMatches: "검색어와 일치하는 튜토리얼이 없습니다.",
+    startHere: "여기서 시작하세요",
+    startHereLede: "이것이 지금 당장 필요한 유일한 튜토리얼입니다. 나머지 카탈로그는 사용자가 원할 때까지 기다립니다.",
+    whereVaults: {
+    title: "각 Vault의 튜토리얼(생성 시)",
+    body: "학술, 계보, 데이터베이스 또는 교육용 금고를 생성하면 처음 열 때 비디오가 기다리고 있습니다.",
+  },
+    whereSettings: {
+    title: "설정의 모든 튜토리얼",
+    body: "설정 → 도움말에는 검색 및 필터와 함께 소개, Vault, 기능 및 통합 등 전체 카탈로그가 포함되어 있습니다.",
+  },
+    videos: {
+    essentials: {
+    title: "소개 및 첫 번째 단계",
+    body: "Nodus가 무엇인지, Vault가 어떻게 구성되어 있는지, 시작하려면 무엇이 필요한지 알아보세요.",
+  },
+    academic: {
+    title: "학술 금고",
+    body: "도서관에서 아이디어, 작가, 관계의 그래프까지.",
+  },
+    genealogy: {
+    title: "족보 보관소",
+    body: "가계도, 문서 보관소 및 친족 관계는 각각 해당 출처에 의해 뒷받침됩니다.",
+  },
+    databases: {
+    title: "데이터베이스 저장소",
+    body: "테이블, 보기, 수식 및 관계를 통해 원하는 것을 구성할 수 있습니다.",
+  },
+    teaching: {
+    title: "가르치는 금고",
+    body: "코스, 시간표, 그룹, 기준표, 시험 및 성적표.",
+  },
+    nodi: {
+    title: "노디, 당신의 동반자",
+    body: "Nodi를 사용하여 채팅하고, 알림을 확인하고, 도움말을 여는 방법.",
+  },
+    toolkit: {
+    title: "Nodus 툴킷",
+    body: "AI를 사용하여 파일을 변환하고, PDF를 제시하고, 이미지에서 텍스트를 읽어보세요.",
+  },
+    "pdf-presenter": {
+    title: "PDF 발표자",
+    body: "발표자 노트, 실시간 주석, 휴대폰을 리모컨으로 사용하여 PDF를 프레젠테이션하는 방법을 알아보세요.",
+  },
+    word: {
+    title: "Microsoft Word용 Nodus Copilot",
+    body: "코퍼스와 라이브러리의 인용문을 함께 Word로 작성하세요.",
+  },
+    zotero: {
+    title: "조테로",
+    body: "컬렉션을 동기화하고 Zotero 내부의 Nodus 플러그인에서 작업하세요.",
+  },
+    mcp: {
+    title: "MCP 및 Nodus 서버",
+    body: "다른 AI 보조자에게 볼트를 열고 네트워크에 게시하세요.",
+  },
+  },
+  },
   ja: {
     chooseTitle: "どのように学ぶのが好きですか?",
     chooseLede: "Nodus について知りたい方法を選択してください。もう1つのオプションは、[設定] → [ヘルプ] で引き続き利用できます。",

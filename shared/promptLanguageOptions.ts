@@ -62,6 +62,7 @@ export function normalizePromptLanguage(value: unknown): PromptLanguage {
   if (value === 'zh-CN') return 'zh-Hans';
   if (value === 'zh-TW') return 'zh-Hant';
   if (value === 'ja') return 'ja';
+  if (value === 'ko') return 'ko';
   if (value === 'ja') return 'ja';
   return typeof value === 'string' && (PROMPT_LANGUAGES as readonly string[]).includes(value)
     ? (value as PromptLanguage)

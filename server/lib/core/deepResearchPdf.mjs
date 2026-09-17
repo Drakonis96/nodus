@@ -39,6 +39,7 @@ function pdfLanguage(value) {
     if (tag === 'zh' || tag === 'zh-cn' || tag === 'zh-hans' || tag === 'zh-sg') return 'zh-CN';
     if (tag === 'zh-tw' || tag === 'zh-hant' || tag === 'zh-hk' || tag === 'zh-mo') return 'zh-TW';
     if (tag === 'ja' || tag.startsWith('ja-')) return 'ja';
+    if (tag === 'ko' || tag.startsWith('ko-')) return 'ko';
     if (tag === 'ja' || tag.startsWith('ja-')) return 'ja';
   }
   return Object.prototype.hasOwnProperty.call(PDF_LABELS, value) ? value : 'en';

@@ -13,7 +13,7 @@ const traverse = traverseModule.default;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 const outDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-world-demo-i18n-'));
-const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja'];
+const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja', 'ko'];
 
 function loadModule(file) {
   const bundle = path.join(outDir, `${path.basename(file, '.ts')}.cjs`);

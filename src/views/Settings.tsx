@@ -1145,6 +1145,7 @@ export function Settings({
                 <option value="zh-CN">简体中文</option>
                 <option value="zh-TW">繁體中文</option>
                 <option value="ja">日本語</option>
+                <option value="ko">한국어</option>
               </select>
             </Row>
             <Row label={t('Idioma de los prompts (idioma de las ideas generadas)')}>
