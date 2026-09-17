@@ -5566,8 +5566,10 @@ export const EN: Record<string, string> = {
   Corregida: 'Corrected',
   Apuntes: 'Notes',
   Apunte: 'Note',
+  'Apunte de estudio': 'Study note',
   'Apunte creado en Nodus': 'Note created in Nodus',
   'Abrir apunte': 'Open note',
+  'El apunte guarda la respuesta, la conversación de la que viene y sus fuentes citadas.': 'The note keeps the answer, the conversation it came from and its cited sources.',
 
   // ── Study vault · hybrid search ───────────────────────────────────────────
   'Índice de estudio actualizado.': 'Study index updated.',

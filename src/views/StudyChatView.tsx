@@ -71,5 +71,5 @@ export function StudyChatView({ settings, onOpenDocument, onOpenMaterial, onOpen
     cancelResearchChat: () => window.nodus.cancelStudyAssistant(),
     renderMessage: (message, streaming) => <><ChatMarkdown content={message.content} streaming={streaming} verify={false} onStudyEvidence={id => { const citation = message.study?.citations?.find(item => item.id === id); if (citation) openCitation(citation); }} />{message.study?.citations?.length ? <div className="mt-3 flex flex-wrap gap-1.5 border-t border-neutral-800 pt-3">{message.study.citations.map(citation => <button key={citation.id} className="suggestion-chip text-xs" onClick={() => openCitation(citation)}>{citation.id} · {citation.title}</button>)}</div> : null}</>,
   };
-  return <ResearchAssistantModal settings={settings} embedded adapter={adapter} initialTarget={initialTarget} initialConversationTarget={conversationTarget} notesDestinationLabel="Espacio de trabajo" onOpenSavedNote={onOpenSavedNote} />;
+  return <ResearchAssistantModal settings={settings} embedded adapter={adapter} initialTarget={initialTarget} initialConversationTarget={conversationTarget} notesDestinationLabel="Espacio de trabajo" studyNoteDestination={{ onOpenSavedDocument: onOpenDocument }} onOpenSavedNote={onOpenSavedNote} />;
 }

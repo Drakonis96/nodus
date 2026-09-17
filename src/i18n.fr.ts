@@ -5336,8 +5336,10 @@ export const FR: Record<string, string> = {
   'Corregida': 'Corrigée',
   'Apuntes': 'Notes',
   'Apunte': 'Note',
+  'Apunte de estudio': 'Note d\'étude',
   'Apunte creado en Nodus': 'Note créée dans Nodus',
   'Abrir apunte': 'Ouvrir la note',
+  'El apunte guarda la respuesta, la conversación de la que viene y sus fuentes citadas.': 'La note conserve la réponse, la conversation d\'origine et ses sources citées.',
   'Índice de estudio actualizado.': 'Index d\'étude actualisé.',
   'Buscar en el estudio': 'Rechercher dans l\'espace d\'étude',
   'Coincidencia literal, relevancia textual, proximidad y similitud semántica en un único ranking.':
