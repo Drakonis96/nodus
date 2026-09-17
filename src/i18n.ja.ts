@@ -8186,4 +8186,6 @@ export const JA: Record<string, string> = {
   "Nodus Server · experimental": "Nodus サーバー · 実験的",
   "Zotero es una marca registrada de Corporation for Digital Scholarship. Nodus es independiente y no está respaldado por Zotero.": "Zotero は、Corporation for Digital Scholarship の商標です。 Nodus は独立しており、Zotero からは承認されていません。",
   "Error del sombreador": "シェーダエラー",
+  "Ask the model to fix the failed steps": "失敗したステップを修正するようモデルに依頼する",
+  "Sent": "送信済み",
 };

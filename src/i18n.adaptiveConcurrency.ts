@@ -222,6 +222,8 @@ export const ADAPTIVE_CONCURRENCY_TRANSLATIONS = {
     '正在將觀點歸類為主題',
     '正在驗證觀點之間的語義配對',
     '條目',
+    '正在重試圖譜後處理…',
+    '第 {n} 次嘗試',
   ]),
   ko: table([
     "인증되지 않은 역할",
@@ -242,6 +244,8 @@ export const ADAPTIVE_CONCURRENCY_TRANSLATIONS = {
     "아이디어를 테마로 그룹화",
     "아이디어 간의 의미 쌍 검증",
     "목",
+    "그래프 후처리를 다시 시도하는 중…",
+    "시도 {n}",
   ]),
   ja: table([
     "役割が認定されていません",
@@ -262,5 +266,7 @@ export const ADAPTIVE_CONCURRENCY_TRANSLATIONS = {
     "アイデアをテーマにグループ化する",
     "アイデア間のセマンティックペアの検証",
     "アイテム",
+    "グラフの後処理を再試行しています…",
+    "試行 {n}",
   ]),
 } as const;

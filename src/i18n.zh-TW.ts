@@ -7829,4 +7829,6 @@ export const ZH_TW: Record<string, string> = {
   "Nodus Server · experimental": "Nodus Server · 實驗性",
   "Zotero es una marca registrada de Corporation for Digital Scholarship. Nodus es independiente y no está respaldado por Zotero.": "Zotero是Corporation for Digital Scholarship的註冊商標。Nodus為獨立專案，未獲Zotero認可。",
   "Error del sombreador": "著色器錯誤",
+  "Ask the model to fix the failed steps": "請模型修正失敗的步驟",
+  "Sent": "已傳送",
 };

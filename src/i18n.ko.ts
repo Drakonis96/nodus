@@ -8186,4 +8186,6 @@ export const KO: Record<string, string> = {
   "Nodus Server · experimental": "Nodus 서버 · 실험적",
   "Zotero es una marca registrada de Corporation for Digital Scholarship. Nodus es independiente y no está respaldado por Zotero.": "Zotero는 Corporation for Digital Scholarship의 상표입니다. Nodus는 독립적이며 Zotero의 승인을 받지 않습니다.",
   "Error del sombreador": "셰이더 오류",
+  "Ask the model to fix the failed steps": "실패한 단계를 수정하도록 모델에 요청하세요",
+  "Sent": "전송됨",
 };
