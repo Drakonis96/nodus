@@ -14,7 +14,7 @@ import traverseModule from '@babel/traverse';
 
 const traverse = traverseModule.default;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN'];
+const LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW'];
 
 function catalogueEntries(file, exportName) {
   const source = fs.readFileSync(path.join(repoRoot, file), 'utf8');
@@ -59,6 +59,10 @@ for (const { label, file, exportName, accessor, seeder } of CATALOGUES) {
       .filter(([, values]) => values['zh-CN'] !== values.en)
       .filter(([, values]) => !/[\u3400-\u9fff]/.test(values['zh-CN']));
     assert.deepEqual(untranslated.map(([source]) => source), [], `${label} demo copy is not translated into Chinese`);
+    const untranslatedTraditional = [...entries]
+      .filter(([, values]) => values['zh-TW'] !== values.en)
+      .filter(([, values]) => !/[\u3400-\u9fff]/.test(values['zh-TW']));
+    assert.deepEqual(untranslatedTraditional.map(([source]) => source), [], `${label} demo copy is not translated into Traditional Chinese`);
   });
 
   test(`the ${label} demo seeder routes its copy through the catalogue`, () => {

@@ -253,10 +253,10 @@ test('the language selector offers every supported language, ordered like Settin
     .map((match) => `${match[1]}:${match[2]}`);
   const banner = settings.indexOf('value={settings.uiLanguage}');
   const uiLanguageSelect = settings.slice(banner, settings.indexOf('</select>', banner));
-  const fromSelect = [...uiLanguageSelect.matchAll(/<option value="(es|en|fr|de|pt|pt-BR|it|tr|zh-CN)">([^<]+)<\/option>/g)]
+  const fromSelect = [...uiLanguageSelect.matchAll(/<option value="(es|en|fr|de|pt|pt-BR|it|tr|zh-CN|zh-TW)">([^<]+)<\/option>/g)]
     .map((match) => `${match[1]}:${match[2]}`);
-  assert.equal(fromList.length, 9, 'the log language selector must offer all nine languages');
-  assert.equal(fromSelect.length, 9, 'the Settings selector must offer all nine languages');
+  assert.equal(fromList.length, 10, 'the log language selector must offer all ten languages');
+  assert.equal(fromSelect.length, 10, 'the Settings selector must offer all ten languages');
   assert.deepEqual(fromList, fromSelect, 'the order and the labels must match the Settings selector');
   // English is the default, so a log is shareable on GitHub without touching the selector.
   const defaults = readFileSync(path.join(repoRoot, 'electron/db/settingsRepo.ts'), 'utf8');

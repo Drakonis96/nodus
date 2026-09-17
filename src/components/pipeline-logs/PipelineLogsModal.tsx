@@ -61,6 +61,7 @@ const LOG_LANGUAGES: { value: AppLanguage; label: string }[] = [
   { value: 'it', label: 'Italiano' },
   { value: 'tr', label: 'Türkçe' },
   { value: 'zh-CN', label: '简体中文' },
+  { value: 'zh-TW', label: '繁體中文' },
 ];
 
 const RETENTION_LABEL: Record<PipelineLogRetention, string> = {
