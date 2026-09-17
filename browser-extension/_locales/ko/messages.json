@@ -1,0 +1,308 @@
+{
+  "extensionName": {
+    "message": "Nodus Research Connector"
+  },
+  "extensionDescription": {
+    "message": "학술 문서, 메타데이터, 컬렉션, 태그를 로컬 Nodus 라이브러리에 바로 저장합니다."
+  },
+  "actionTitle": {
+    "message": "Nodus에 저장"
+  },
+  "connector": {
+    "message": "커넥터"
+  },
+  "settings": {
+    "message": "설정"
+  },
+  "detecting": {
+    "message": "이 문서를 감지하는 중…"
+  },
+  "detectingHint": {
+    "message": "클릭한 뒤에는 활성 탭만 읽습니다."
+  },
+  "cannotRead": {
+    "message": "이 페이지를 읽을 수 없습니다"
+  },
+  "connectTitle": {
+    "message": "Nodus에 연결"
+  },
+  "connectHint": {
+    "message": "Nodus를 열고 설정 → 연동에서 Chrome 커넥터를 켜세요. 이 브라우저는 자동으로 연결됩니다."
+  },
+  "port": {
+    "message": "포트"
+  },
+  "connect": {
+    "message": "연결"
+  },
+  "cannotReachNodus": {
+    "message": "$PORT$ 포트에서 Nodus에 연결하지 못했습니다. Nodus를 열고 설정 → 연동에 표시된 포트를 사용하세요.",
+    "placeholders": {
+      "port": {
+        "content": "$1"
+      }
+    }
+  },
+  "documentType": {
+    "message": "문서 유형"
+  },
+  "enriching": {
+    "message": "서지 메타데이터를 확인하는 중…"
+  },
+  "saveTo": {
+    "message": "저장 위치"
+  },
+  "libraryRoot": {
+    "message": "라이브러리 루트"
+  },
+  "searchCollections": {
+    "message": "컬렉션 검색"
+  },
+  "tags": {
+    "message": "태그"
+  },
+  "addTags": {
+    "message": "태그 추가 또는 검색"
+  },
+  "files": {
+    "message": "파일"
+  },
+  "file": {
+    "message": "파일"
+  },
+  "webSnapshot": {
+    "message": "읽을 수 있는 웹 스냅샷"
+  },
+  "webSnapshotHint": {
+    "message": "이 페이지의 로컬 사본을 참고문헌과 함께 보관합니다."
+  },
+  "save": {
+    "message": "Nodus에 저장"
+  },
+  "saving": {
+    "message": "저장하는 중…"
+  },
+  "saved": {
+    "message": "Nodus에 저장했습니다"
+  },
+  "savedSummary": {
+    "message": "$ATTACHMENTCOUNT$개 파일을 첨부했습니다. 깨끗한 읽기 준비는 Nodus에서 계속됩니다.",
+    "placeholders": {
+      "attachmentCount": {
+        "content": "$1"
+      }
+    }
+  },
+  "openInNodus": {
+    "message": "Nodus에서 열기"
+  },
+  "done": {
+    "message": "닫기"
+  },
+  "remove": {
+    "message": "제거"
+  },
+  "unsupportedPage": {
+    "message": "일반 웹 페이지나 문서(HTTP/HTTPS)를 연 뒤 Nodus 아이콘을 다시 클릭하세요."
+  },
+  "enableInNodus": {
+    "message": "먼저 Nodus → 설정 → 연동에서 Nodus Research Connector를 켜세요."
+  },
+  "libraryNotReady": {
+    "message": "로컬 nodus-library 폴더를 만들 수 있도록 먼저 Nodus에서 백업 폴더를 선택하세요."
+  },
+  "nodusPort": {
+    "message": "Nodus 로컬 포트"
+  },
+  "portHint": {
+    "message": "Nodus → 설정 → 연동에 표시된 포트를 사용하세요."
+  },
+  "forgetPairing": {
+    "message": "로컬 연결 재설정"
+  },
+  "privacy": {
+    "message": "개인정보"
+  },
+  "sourceCode": {
+    "message": "소스 코드"
+  },
+  "website": {
+    "message": "Nodus Research"
+  },
+  "savedSetting": {
+    "message": "저장했습니다."
+  },
+  "pairingForgotten": {
+    "message": "로컬 연결을 재설정했습니다. 커넥터는 다음에 자동으로 다시 연결됩니다."
+  },
+  "editMetadata": {
+    "message": "메타데이터 편집"
+  },
+  "title": {
+    "message": "제목"
+  },
+  "authors": {
+    "message": "저자"
+  },
+  "authorsHint": {
+    "message": "한 줄에 한 명, 기관은 {기관} 사용"
+  },
+  "date": {
+    "message": "날짜"
+  },
+  "publication": {
+    "message": "출판"
+  },
+  "multipleDetected": {
+    "message": "참고문헌 $COUNT$건을 감지했습니다",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "multipleHint": {
+    "message": "저장할 항목을 선택하세요."
+  },
+  "saveMultiple": {
+    "message": "참고문헌 $COUNT$건 저장",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectAtLeastOne": {
+    "message": "참고문헌을 하나 이상 선택하세요."
+  },
+  "savedBatchSummary": {
+    "message": "참고문헌 $COUNT$건을 저장하고 파일 $FILES$개를 첨부했습니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "files": {
+        "content": "$2"
+      }
+    }
+  },
+  "alreadySaved": {
+    "message": "Nodus에 이미 있음"
+  },
+  "updatedExisting": {
+    "message": "참고문헌을 업데이트했습니다"
+  },
+  "duplicateAvoided": {
+    "message": "중복 항목은 만들지 않았습니다."
+  },
+  "permissionDenied": {
+    "message": "$ORIGINS$에 대한 권한이 허용되지 않았습니다.",
+    "placeholders": {
+      "origins": {
+        "content": "$1"
+      }
+    }
+  },
+  "attachment": {
+    "message": "첨부 파일"
+  },
+  "capturedDocument": {
+    "message": "캡처한 문서"
+  },
+  "untitledDocument": {
+    "message": "제목 없는 문서"
+  },
+  "untitledWebPage": {
+    "message": "제목 없는 웹페이지"
+  },
+  "fullTextPdf": {
+    "message": "전체 텍스트 PDF"
+  },
+  "fullText": {
+    "message": "전체 텍스트"
+  },
+  "originalDocument": {
+    "message": "원본 문서"
+  },
+  "pageCannotBeCaptured": {
+    "message": "이 페이지는 캡처할 수 없습니다."
+  },
+  "downloadFailed": {
+    "message": "$NAME$: 다운로드가 $STATUS$ 상태로 실패했습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "status": {
+        "content": "$2"
+      }
+    }
+  },
+  "signInPageInsteadOfPdf": {
+    "message": "$NAME$: 사이트가 PDF 대신 로그인 페이지를 반환했습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "invalidAttachmentUrl": {
+    "message": "$NAME$: 잘못된 주소입니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "unsupportedAttachmentUrl": {
+    "message": "$NAME$: 지원하지 않는 주소입니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "nodusReturnedError": {
+    "message": "Nodus가 오류를 반환했습니다($STATUS$).",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "fileExceedsLimit": {
+    "message": "$NAME$: 파일이 64 MiB 한도를 초과합니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "backgroundTransferNoResult": {
+    "message": "백그라운드 첨부 파일 전송이 결과를 반환하지 않았습니다."
+  },
+  "optionsTitle": {
+    "message": "Nodus Research Connector 설정"
+  },
+  "privacyTitle": {
+    "message": "Nodus Research Connector 개인정보"
+  },
+  "privacyLocalByDesign": {
+    "message": "설계부터 로컬"
+  },
+  "privacyLocalBody": {
+    "message": "Nodus Research Connector는 도구 모음 아이콘을 클릭한 뒤에만 페이지를 읽습니다. 메타데이터, 선택한 파일, 태그, 선택한 컬렉션을 127.0.0.1을 통해 사용자의 컴퓨터에 있는 Nodus 데스크톱 애플리케이션으로 보냅니다."
+  },
+  "privacyNoTrackingBody": {
+    "message": "항상 실행되지 않고, 방문 기록을 수집하지 않으며, 분석을 사용하지 않고, 광고를 표시하지 않고, 데이터를 판매하지 않고, 캡처한 내용을 Nodus 개발자에게 보내지 않습니다."
+  },
+  "privacySiteAccessBody": {
+    "message": "Nodus가 선택한 첨부 파일을 공개적으로 내려받을 수 없으면 Chrome이 해당 사이트에만 접근을 요청할 수 있습니다. 요청 시 동작하는 서비스 워커가 이를 로컬로 전송하기 위해서입니다. 새로 허용된 접근은 전송이 끝나면 취소됩니다. Nodus 페어링은 이 확장 프로그램의 설정에서 재설정할 수도 있습니다."
+  },
+  "privacyPolicyLink": {
+    "message": "전체 개인정보 처리방침"
+  },
+  "privacySourceLink": {
+    "message": "AGPL 소스 코드"
+  }
+}

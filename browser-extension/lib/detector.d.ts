@@ -36,7 +36,23 @@ export interface DetectedCapture extends BrowserConnectorCaptureRequest {
   snapshotAvailable: boolean;
 }
 
+/**
+ * Labels the detector writes when a page supplies none. Detection is otherwise
+ * language-neutral: each adapter passes the set its UI language renders, and the
+ * English defaults keep the module usable on its own.
+ */
+export interface DetectorLabels {
+  untitledDocument: string;
+  untitledWebPage: string;
+  fullTextPdf: string;
+  fullText: string;
+  originalDocument: string;
+  pageCannotBeCaptured: string;
+}
+
+export const DETECTOR_LABELS: Readonly<DetectorLabels>;
+
 /** Throws when the snapshot has no usable URL. */
-export function detectCapture(snapshot: PageSnapshot): DetectedCapture;
+export function detectCapture(snapshot: PageSnapshot, labels?: DetectorLabels): DetectedCapture;
 
 export const DETECTED_ITEM_TYPES: string[];

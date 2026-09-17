@@ -1,0 +1,308 @@
+{
+  "extensionName": {
+    "message": "Nodus Research Connector"
+  },
+  "extensionDescription": {
+    "message": "学術文書、メタデータ、コレクション、タグをローカルの Nodus ライブラリに直接保存します。"
+  },
+  "actionTitle": {
+    "message": "Nodus に保存"
+  },
+  "connector": {
+    "message": "コネクター"
+  },
+  "settings": {
+    "message": "設定"
+  },
+  "detecting": {
+    "message": "この文書を検出しています…"
+  },
+  "detectingHint": {
+    "message": "クリック後にアクティブなタブだけを読み取ります。"
+  },
+  "cannotRead": {
+    "message": "このページを読み取れません"
+  },
+  "connectTitle": {
+    "message": "Nodus に接続"
+  },
+  "connectHint": {
+    "message": "Nodus を開き、設定 → 連携で Chrome コネクターを有効にしてください。このブラウザーは自動的に接続します。"
+  },
+  "port": {
+    "message": "ポート"
+  },
+  "connect": {
+    "message": "接続"
+  },
+  "cannotReachNodus": {
+    "message": "ポート $PORT$ の Nodus に接続できませんでした。Nodus を開き、設定 → 連携に表示されているポートを使用してください。",
+    "placeholders": {
+      "port": {
+        "content": "$1"
+      }
+    }
+  },
+  "documentType": {
+    "message": "文書の種類"
+  },
+  "enriching": {
+    "message": "書誌メタデータを確認しています…"
+  },
+  "saveTo": {
+    "message": "保存先"
+  },
+  "libraryRoot": {
+    "message": "ライブラリのルート"
+  },
+  "searchCollections": {
+    "message": "コレクションを検索"
+  },
+  "tags": {
+    "message": "タグ"
+  },
+  "addTags": {
+    "message": "タグを追加または検索"
+  },
+  "files": {
+    "message": "ファイル"
+  },
+  "file": {
+    "message": "ファイル"
+  },
+  "webSnapshot": {
+    "message": "読み取り可能なウェブスナップショット"
+  },
+  "webSnapshotHint": {
+    "message": "このページのローカルコピーを参考文献と一緒に保存します。"
+  },
+  "save": {
+    "message": "Nodus に保存"
+  },
+  "saving": {
+    "message": "保存しています…"
+  },
+  "saved": {
+    "message": "Nodus に保存しました"
+  },
+  "savedSummary": {
+    "message": "$ATTACHMENTCOUNT$ 個のファイルを添付しました。クリーンリーディングの準備は Nodus で続きます。",
+    "placeholders": {
+      "attachmentCount": {
+        "content": "$1"
+      }
+    }
+  },
+  "openInNodus": {
+    "message": "Nodus で開く"
+  },
+  "done": {
+    "message": "閉じる"
+  },
+  "remove": {
+    "message": "削除"
+  },
+  "unsupportedPage": {
+    "message": "通常のウェブページまたは文書（HTTP/HTTPS）を開いてから、Nodus のアイコンをもう一度クリックしてください。"
+  },
+  "enableInNodus": {
+    "message": "先に Nodus → 設定 → 連携で Nodus Research Connector を有効にしてください。"
+  },
+  "libraryNotReady": {
+    "message": "ローカルの nodus-library フォルダーを作成できるよう、先に Nodus でバックアップフォルダーを選択してください。"
+  },
+  "nodusPort": {
+    "message": "Nodus のローカルポート"
+  },
+  "portHint": {
+    "message": "Nodus → 設定 → 連携に表示されるポートを使用してください。"
+  },
+  "forgetPairing": {
+    "message": "ローカル接続をリセット"
+  },
+  "privacy": {
+    "message": "プライバシー"
+  },
+  "sourceCode": {
+    "message": "ソースコード"
+  },
+  "website": {
+    "message": "Nodus Research"
+  },
+  "savedSetting": {
+    "message": "保存しました。"
+  },
+  "pairingForgotten": {
+    "message": "ローカル接続をリセットしました。コネクターは次回自動的に再接続します。"
+  },
+  "editMetadata": {
+    "message": "メタデータを編集"
+  },
+  "title": {
+    "message": "タイトル"
+  },
+  "authors": {
+    "message": "著者"
+  },
+  "authorsHint": {
+    "message": "1 行に 1 名。機関には {機関} を使用します"
+  },
+  "date": {
+    "message": "日付"
+  },
+  "publication": {
+    "message": "出版"
+  },
+  "multipleDetected": {
+    "message": "$COUNT$ 件の参考文献を検出しました",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "multipleHint": {
+    "message": "保存する項目を選択してください。"
+  },
+  "saveMultiple": {
+    "message": "$COUNT$ 件の参考文献を保存",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectAtLeastOne": {
+    "message": "少なくとも 1 件の参考文献を選択してください。"
+  },
+  "savedBatchSummary": {
+    "message": "$COUNT$ 件の参考文献を保存し、$FILES$ 個のファイルを添付しました。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "files": {
+        "content": "$2"
+      }
+    }
+  },
+  "alreadySaved": {
+    "message": "Nodus に登録済み"
+  },
+  "updatedExisting": {
+    "message": "参考文献を更新しました"
+  },
+  "duplicateAvoided": {
+    "message": "重複は作成されませんでした。"
+  },
+  "permissionDenied": {
+    "message": "$ORIGINS$ の権限が許可されませんでした。",
+    "placeholders": {
+      "origins": {
+        "content": "$1"
+      }
+    }
+  },
+  "attachment": {
+    "message": "添付ファイル"
+  },
+  "capturedDocument": {
+    "message": "取得した文書"
+  },
+  "untitledDocument": {
+    "message": "無題の文書"
+  },
+  "untitledWebPage": {
+    "message": "無題のウェブページ"
+  },
+  "fullTextPdf": {
+    "message": "全文 PDF"
+  },
+  "fullText": {
+    "message": "全文"
+  },
+  "originalDocument": {
+    "message": "原資料"
+  },
+  "pageCannotBeCaptured": {
+    "message": "このページは取得できません。"
+  },
+  "downloadFailed": {
+    "message": "$NAME$: ダウンロードがステータス $STATUS$ で失敗しました。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "status": {
+        "content": "$2"
+      }
+    }
+  },
+  "signInPageInsteadOfPdf": {
+    "message": "$NAME$: サイトが PDF ではなくサインインページを返しました。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "invalidAttachmentUrl": {
+    "message": "$NAME$: 無効なアドレスです。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "unsupportedAttachmentUrl": {
+    "message": "$NAME$: 対応していないアドレスです。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "nodusReturnedError": {
+    "message": "Nodus がエラーを返しました（$STATUS$）。",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "fileExceedsLimit": {
+    "message": "$NAME$: ファイルが 64 MiB の上限を超えています。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "backgroundTransferNoResult": {
+    "message": "バックグラウンドの添付ファイル転送が結果を返しませんでした。"
+  },
+  "optionsTitle": {
+    "message": "Nodus Research Connector の設定"
+  },
+  "privacyTitle": {
+    "message": "Nodus Research Connector のプライバシー"
+  },
+  "privacyLocalByDesign": {
+    "message": "設計からローカル"
+  },
+  "privacyLocalBody": {
+    "message": "Nodus Research Connector がページを読み取るのは、ツールバーのアイコンをクリックした後だけです。メタデータ、選択したファイル、タグ、選択したコレクションを、お使いのコンピューター上の Nodus デスクトップアプリケーションへ 127.0.0.1 経由で送信します。"
+  },
+  "privacyNoTrackingBody": {
+    "message": "常時実行することはなく、閲覧履歴の収集、解析の使用、広告の表示、データの販売、取得した内容の Nodus 開発者への送信も行いません。"
+  },
+  "privacySiteAccessBody": {
+    "message": "Nodus が選択された添付ファイルを公開ダウンロードできない場合、Chrome はそのサイトだけへのアクセスを求めることがあります。オンデマンドのサービスワーカーがローカルに転送するためです。新たに許可されたアクセスは転送の完了時に取り消されます。Nodus とのペアリングはこの拡張機能の設定からリセットすることもできます。"
+  },
+  "privacyPolicyLink": {
+    "message": "プライバシーポリシー全文"
+  },
+  "privacySourceLink": {
+    "message": "AGPL ソースコード"
+  }
+}

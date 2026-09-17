@@ -24,22 +24,43 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
+  // 5.5.0 brings the Chrome connector to thirteen languages and translates every
+  // message the extension composes on its own.
+  const currentRelease = RELEASE_NOTES[0];
+  assert.equal(currentRelease?.version, '5.5.0');
+  assert.equal(currentRelease?.date, '2026-09-17');
+  assert.equal(currentRelease?.highlights.length, 2);
+  assert.deepEqual(currentRelease.highlights.map((h) => h.scope), ['languages', 'connector']);
+  for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+    assert.ok(currentRelease.highlights.every((h) => h[language]?.length > 80));
+  }
+  for (const phrase of [
+    /speaks thirteen languages/, /stop being English only/,
+    /messages the connector writes by itself/, /stops mixing English into your interface/,
+  ]) {
+    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.5.0 is missing ${phrase}`);
+  }
+  assert.ok(
+    currentRelease.highlights.every((h) => h.it !== h.en && h.tr !== h.en && h['zh-CN'] !== h.en),
+    'the Italian, Turkish and Simplified Chinese translations must not fall back to English',
+  );
+
   // 5.4.5 lets the Library delete a selection with its derived data and repair one
   // in a single action, gives the Documentary Index a log viewer and honest
   // document profiles, takes a link in Add reference, keeps cancellations as
   // cancellations, moves Nodus Browser bookmarks in and out, makes the tab strip
   // and the media controls behave, translates every queue failure and keeps
   // confirmation dialogs opaque in dark mode.
-  const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.4.5');
-  assert.equal(currentRelease?.date, '2026-09-15');
-  assert.equal(currentRelease?.highlights.length, 11);
-  assert.deepEqual(currentRelease.highlights.map((h) => h.scope), [
+  const release545 = RELEASE_NOTES[1];
+  assert.equal(release545?.version, '5.4.5');
+  assert.equal(release545?.date, '2026-09-15');
+  assert.equal(release545?.highlights.length, 11);
+  assert.deepEqual(release545.highlights.map((h) => h.scope), [
     'library', 'library', 'library', 'library', 'library', 'library',
     'browser', 'browser', 'browser', 'languages', 'general',
   ]);
   for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
-    assert.ok(currentRelease.highlights.every((h) => h[language]?.length > 80));
+    assert.ok(release545.highlights.every((h) => h[language]?.length > 80));
   }
   for (const phrase of [
     /delete the works you have selected/, /Repair a whole selection/,
@@ -48,10 +69,10 @@ try {
     /Every browser tab measures the same/, /keep their whole playlist inside one element/,
     /Queue failures appear in your language/, /Confirmation dialogs are opaque in dark mode/,
   ]) {
-    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.4.5 is missing ${phrase}`);
+    assert.ok(release545.highlights.some((h) => phrase.test(h.en)), `5.4.5 is missing ${phrase}`);
   }
   assert.ok(
-    currentRelease.highlights.every((h) => h.it !== h.en && h.tr !== h.en && h['zh-CN'] !== h.en),
+    release545.highlights.every((h) => h.it !== h.en && h.tr !== h.en && h['zh-CN'] !== h.en),
     'the Italian, Turkish and Simplified Chinese translations must not fall back to English',
   );
 
@@ -59,7 +80,7 @@ try {
   // a custom gateway from dropping long scans, shows the Documentary Index's
   // standalone jobs, refreshes the vault list after a global link and boots the
   // Server image again. The languages note is one plain line on purpose.
-  const release544 = RELEASE_NOTES[1];
+  const release544 = RELEASE_NOTES[2];
   assert.equal(release544?.version, '5.4.4');
   assert.equal(release544?.date, '2026-09-14');
   assert.equal(release544?.highlights.length, 5);
@@ -76,7 +97,7 @@ try {
   // 5.4.3 keeps the modal it shipped with: the work summary stored clipped at the
   // model's output ceiling, the browser pairing prompt on macOS and the JSON a
   // capability tool dumped into a chat.
-  const release543 = RELEASE_NOTES[2];
+  const release543 = RELEASE_NOTES[3];
   assert.equal(release543?.version, '5.4.3');
   assert.equal(release543?.date, '2026-09-14');
   assert.equal(release543?.highlights.length, 3);
@@ -85,7 +106,7 @@ try {
   // 5.4.2 rebuilt the Study question bank, rendered Markdown and LaTeX on every
   // question and flashcard surface, added seven prompt languages and carried the
   // fixes merged since the 5.4.1 hotfix.
-  const release542 = RELEASE_NOTES[3];
+  const release542 = RELEASE_NOTES[4];
   assert.equal(release542?.version, '5.4.2');
   assert.equal(release542?.date, '2026-09-13');
   assert.equal(release542?.highlights.length, 11);
@@ -112,11 +133,11 @@ try {
 
   // 5.4.0 keeps its own entry, and 5.4.1 shows exactly the same highlights: someone
   // already on 5.4.0 has read them, and someone arriving from 5.3.1 must not miss them.
-  const release541 = RELEASE_NOTES[4];
+  const release541 = RELEASE_NOTES[5];
   assert.equal(release541?.version, '5.4.1');
   assert.equal(release541?.date, '2026-09-13');
   assert.equal(release541?.highlights.length, 25);
-  const release540 = RELEASE_NOTES[5];
+  const release540 = RELEASE_NOTES[6];
   assert.equal(release540?.version, '5.4.0');
   assert.equal(release540?.date, '2026-09-12');
   assert.deepEqual(release540?.highlights, release541?.highlights);
@@ -144,7 +165,7 @@ try {
   }
 
   // 5.3.1 keeps the modal it shipped with.
-  const release531 = RELEASE_NOTES[6];
+  const release531 = RELEASE_NOTES[7];
   assert.equal(release531?.version, '5.3.1');
   assert.equal(release531?.date, '2026-09-10');
   assert.equal(release531?.highlights.length, 8);
@@ -505,7 +526,8 @@ try {
   assert.equal(readMarkersRelease?.highlights.length, 4);
   for (const highlight of currentRelease.highlights) {
     // Written for the person using Nodus: no module names, no internal vocabulary.
-    // Every 5.4.5 note is a full paragraph, so the floor is the usual one again.
+    // Every note of the current release is a full paragraph, so the floor is the
+    // usual one again.
     for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR']) {
       assert.ok(highlight[language]?.length > 80, `a ${language} highlight is too short to explain anything`);
     }

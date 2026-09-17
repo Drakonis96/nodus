@@ -1,0 +1,308 @@
+{
+  "extensionName": {
+    "message": "Nodus Research Connector"
+  },
+  "extensionDescription": {
+    "message": "将学术文档、元数据、收藏和标签直接保存到本地Nodus文献库。"
+  },
+  "actionTitle": {
+    "message": "保存到 Nodus"
+  },
+  "connector": {
+    "message": "连接器"
+  },
+  "settings": {
+    "message": "设置"
+  },
+  "detecting": {
+    "message": "正在检测此文档…"
+  },
+  "detectingHint": {
+    "message": "只有在你点击后才会读取当前标签页。"
+  },
+  "cannotRead": {
+    "message": "无法读取此页面"
+  },
+  "connectTitle": {
+    "message": "连接到 Nodus"
+  },
+  "connectHint": {
+    "message": "打开Nodus，在设置 → 集成中启用Chrome连接器。此浏览器会自动连接。"
+  },
+  "port": {
+    "message": "端口"
+  },
+  "connect": {
+    "message": "连接"
+  },
+  "cannotReachNodus": {
+    "message": "无法通过端口 $PORT$ 连接到Nodus。请打开Nodus并使用设置 → 集成中显示的端口。",
+    "placeholders": {
+      "port": {
+        "content": "$1"
+      }
+    }
+  },
+  "documentType": {
+    "message": "文档类型"
+  },
+  "enriching": {
+    "message": "正在检查书目元数据…"
+  },
+  "saveTo": {
+    "message": "保存到"
+  },
+  "libraryRoot": {
+    "message": "文献库根目录"
+  },
+  "searchCollections": {
+    "message": "搜索合集"
+  },
+  "tags": {
+    "message": "标签"
+  },
+  "addTags": {
+    "message": "添加或查找标签"
+  },
+  "files": {
+    "message": "文件"
+  },
+  "file": {
+    "message": "文件"
+  },
+  "webSnapshot": {
+    "message": "可读网页快照"
+  },
+  "webSnapshotHint": {
+    "message": "在引用旁保留此页面的本地副本。"
+  },
+  "save": {
+    "message": "保存到 Nodus"
+  },
+  "saving": {
+    "message": "正在保存…"
+  },
+  "saved": {
+    "message": "已保存到 Nodus"
+  },
+  "savedSummary": {
+    "message": "已附加 $ATTACHMENTCOUNT$ 个文件。清晰的阅读准备将在Nodus中继续。",
+    "placeholders": {
+      "attachmentCount": {
+        "content": "$1"
+      }
+    }
+  },
+  "openInNodus": {
+    "message": "在 Nodus 中打开"
+  },
+  "done": {
+    "message": "关闭"
+  },
+  "remove": {
+    "message": "移除"
+  },
+  "unsupportedPage": {
+    "message": "请打开普通的网页或文档（HTTP/HTTPS），然后再次点击Nodus图标。"
+  },
+  "enableInNodus": {
+    "message": "请先在Nodus → 设置 → 集成中启用Nodus Research Connector。"
+  },
+  "libraryNotReady": {
+    "message": "请先在Nodus中选择一个备份文件夹，以便创建本地 nodus-library 文件夹。"
+  },
+  "nodusPort": {
+    "message": "Nodus 本地端口"
+  },
+  "portHint": {
+    "message": "使用Nodus → 设置 → 集成中显示的端口。"
+  },
+  "forgetPairing": {
+    "message": "重置本地连接"
+  },
+  "privacy": {
+    "message": "隐私"
+  },
+  "sourceCode": {
+    "message": "源代码"
+  },
+  "website": {
+    "message": "Nodus Research"
+  },
+  "savedSetting": {
+    "message": "已保存"
+  },
+  "pairingForgotten": {
+    "message": "本地连接已重置。下次连接器会自动重新连接。"
+  },
+  "editMetadata": {
+    "message": "编辑元数据"
+  },
+  "title": {
+    "message": "标题"
+  },
+  "authors": {
+    "message": "作者"
+  },
+  "authorsHint": {
+    "message": "每行一位作者；机构请使用 {机构}"
+  },
+  "date": {
+    "message": "日期"
+  },
+  "publication": {
+    "message": "出版物"
+  },
+  "multipleDetected": {
+    "message": "检测到 $COUNT$ 条参考文献",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "multipleHint": {
+    "message": "选择要保存的条目。"
+  },
+  "saveMultiple": {
+    "message": "保存 $COUNT$ 条参考文献",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectAtLeastOne": {
+    "message": "请至少选择一条参考文献。"
+  },
+  "savedBatchSummary": {
+    "message": "已保存 $COUNT$ 条参考文献，并附加 $FILES$ 个文件。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "files": {
+        "content": "$2"
+      }
+    }
+  },
+  "alreadySaved": {
+    "message": "已在 Nodus 中"
+  },
+  "updatedExisting": {
+    "message": "参考文献已更新"
+  },
+  "duplicateAvoided": {
+    "message": "未创建任何重复项。"
+  },
+  "permissionDenied": {
+    "message": "未授予 $ORIGINS$ 的权限。",
+    "placeholders": {
+      "origins": {
+        "content": "$1"
+      }
+    }
+  },
+  "attachment": {
+    "message": "附件"
+  },
+  "capturedDocument": {
+    "message": "已捕获的文档"
+  },
+  "untitledDocument": {
+    "message": "无标题文档"
+  },
+  "untitledWebPage": {
+    "message": "无标题网页"
+  },
+  "fullTextPdf": {
+    "message": "全文 PDF"
+  },
+  "fullText": {
+    "message": "全文"
+  },
+  "originalDocument": {
+    "message": "原始文档"
+  },
+  "pageCannotBeCaptured": {
+    "message": "无法捕获此页面。"
+  },
+  "downloadFailed": {
+    "message": "$NAME$：下载失败，状态码 $STATUS$。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "status": {
+        "content": "$2"
+      }
+    }
+  },
+  "signInPageInsteadOfPdf": {
+    "message": "$NAME$：网站返回的是登录页面，而不是 PDF。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "invalidAttachmentUrl": {
+    "message": "$NAME$：无效地址。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "unsupportedAttachmentUrl": {
+    "message": "$NAME$：不支持的地址。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "nodusReturnedError": {
+    "message": "Nodus 返回了一个错误（$STATUS$）。",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "fileExceedsLimit": {
+    "message": "$NAME$：文件超过 64 MiB 的限制。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "backgroundTransferNoResult": {
+    "message": "后台附件传输没有返回结果。"
+  },
+  "optionsTitle": {
+    "message": "Nodus Research Connector 设置"
+  },
+  "privacyTitle": {
+    "message": "Nodus Research Connector 隐私"
+  },
+  "privacyLocalByDesign": {
+    "message": "本地优先的设计"
+  },
+  "privacyLocalBody": {
+    "message": "Nodus Research Connector 只会在你点击工具栏图标后读取页面。它通过 127.0.0.1 将元数据、所选文件、标签和所选收藏发送到你电脑上的 Nodus 桌面应用。"
+  },
+  "privacyNoTrackingBody": {
+    "message": "它不会持续运行、不会收集浏览历史、不会使用分析工具、不会展示广告、不会出售数据，也不会将捕获的内容发送给Nodus开发者。"
+  },
+  "privacySiteAccessBody": {
+    "message": "如果Nodus无法公开下载所选的附件，Chrome 可以请求访问该网站，以便按需 Service Worker 在本地传输它。传输完成后，新授予的访问权限会被撤销。你也可以在此扩展程序的设置中重置Nodus配对。"
+  },
+  "privacyPolicyLink": {
+    "message": "完整隐私政策"
+  },
+  "privacySourceLink": {
+    "message": "AGPL 源代码"
+  }
+}

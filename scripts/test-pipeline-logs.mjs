@@ -249,11 +249,11 @@ test('the exported text carries the numbers, the ids and the provider’s own wo
       total: 9,
       filters: ['types=json', 'days=2026-09-15'],
       logLanguage: 'en',
-      appVersion: '5.4.5',
+      appVersion: '5.5.0',
     },
   );
   assert.match(text, /^Nodus processing logs/);
-  assert.match(text, /Generated: 2026-09-15T10:00:00\.000Z · Nodus 5\.4\.5/);
+  assert.match(text, /Generated: 2026-09-15T10:00:00\.000Z · Nodus 5\.5\.0/);
   assert.match(text, /Entries: 2 of 9/);
   assert.match(text, /Log language: en/);
   assert.match(text, /Filters: types=json · days=2026-09-15/);

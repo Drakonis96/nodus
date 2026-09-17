@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Jorge Pérez Burgueño and Nodus contributors
 
-import { detectCapture } from './detector.js';
+import { DETECTOR_LABELS, detectCapture } from './detector.js';
 
 function identity(capture) {
   const metadata = capture?.metadata || {};
@@ -35,13 +35,16 @@ function candidateSnapshot(snapshot, patch) {
 /**
  * Return several bibliographic records when a results page exposes independent
  * COinS or Schema.org entities. A normal article page still produces one record.
+ *
+ * `labels` is forwarded to the detector so each adapter reviews the batch in the
+ * language it renders.
  */
-export function detectCaptureCandidates(snapshot, limit = 50) {
+export function detectCaptureCandidates(snapshot, labels = DETECTOR_LABELS, limit = 50) {
   const candidates = [];
   if ((snapshot?.coins || []).length > 1) {
     for (const coin of snapshot.coins.slice(0, limit)) {
       try {
-        const capture = detectCapture(candidateSnapshot(snapshot, { coins: [coin] }));
+        const capture = detectCapture(candidateSnapshot(snapshot, { coins: [coin] }), labels);
         if (capture.metadataSource === 'coins') candidates.push(capture);
       } catch { /* one malformed result must not hide the others */ }
     }
@@ -50,12 +53,12 @@ export function detectCaptureCandidates(snapshot, limit = 50) {
     candidates.length = 0;
     for (const entity of jsonLdEntities(snapshot?.jsonLd).slice(0, limit)) {
       try {
-        const capture = detectCapture(candidateSnapshot(snapshot, { jsonLd: [JSON.stringify(entity)] }));
+        const capture = detectCapture(candidateSnapshot(snapshot, { jsonLd: [JSON.stringify(entity)] }), labels);
         if (capture.metadataSource === 'json-ld') candidates.push(capture);
       } catch { /* one malformed result must not hide the others */ }
     }
   }
   const unique = [...new Map(candidates.map((capture) => [identity(capture), capture]).filter(([key]) => key)).values()];
   if (unique.length > 1) return unique.slice(0, limit);
-  return [detectCapture(snapshot)];
+  return [detectCapture(snapshot, labels)];
 }

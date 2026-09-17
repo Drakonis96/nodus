@@ -278,7 +278,7 @@ export function BrowserCaptureModal({
             onChange={(event) => setItemType(event.target.value as LibraryItemType)}
             className="max-w-full bg-transparent text-xs font-semibold text-indigo-600 outline-none dark:text-indigo-300"
           >
-            {ITEM_TYPES.map(([value]) => <option key={value} value={value}>{typeLabel(value, getActiveLang() === 'es')}</option>)}
+            {ITEM_TYPES.map(([value]) => <option key={value} value={value}>{typeLabel(value, getActiveLang())}</option>)}
           </select>
           <input
             data-testid="browser-capture-title"

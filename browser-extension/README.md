@@ -61,6 +61,24 @@ extension origin and remains limited to the loopback-only API.
 See [PRIVACY.md](PRIVACY.md) for the Chrome Web Store disclosure and
 [STORE_LISTING.md](STORE_LISTING.md) for release instructions and permission justifications.
 
+## Interface language
+
+The connector ships thirteen languages, one catalog per language under `_locales/`: the nine the
+interface speaks (English, Spanish, French, German, Portuguese (Portugal), Portuguese (Brazil),
+Italian, Turkish and Simplified Chinese) plus Japanese, Korean, Russian and Traditional Chinese,
+which the extension carries ahead of the desktop interface. Every string a user can read lives
+there, including the popup, the settings page, the privacy page and the errors the Manifest V3
+worker reports back into the popup. All thirteen catalogs must define the same messages with the
+same placeholders, and the static markup mirrors the English catalog so the copy can be reviewed in
+place; `scripts/test-browser-connector.mjs` fails when a message, a placeholder, a translation or a
+rendered surface drifts.
+
+The pure `lib/` modules carry no Chrome API, so they cannot read `_locales` themselves. They default
+to English labels and accept the ones the adapter renders (`DETECTOR_LABELS`, `METADATA_LABELS`, and
+the transfer message passed to `readResponseWithLimit`). Document-type names are the exception to the
+catalog rule: they live in `lib/presentation.js` for all thirteen languages because the Chrome popup
+and Nodus Browser's own review dialog share that table.
+
 ## Development and verification
 
 ```bash

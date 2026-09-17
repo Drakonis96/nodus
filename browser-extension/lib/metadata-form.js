@@ -7,6 +7,9 @@
  * list into something a person can edit and back into the Library shape.
  */
 
+/** English default for the one label this module can generate on its own. */
+export const METADATA_LABELS = Object.freeze({ untitledDocument: 'Untitled document' });
+
 function clean(value, limit = 1_000) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, limit);
 }
@@ -35,8 +38,8 @@ export function parseCreators(value, limit = 128) {
     });
 }
 
-export function applyMetadataEdits(metadata, edits) {
-  const title = clean(edits?.title, 10_000) || clean(metadata?.title, 10_000) || 'Untitled document';
+export function applyMetadataEdits(metadata, edits, labels = METADATA_LABELS) {
+  const title = clean(edits?.title, 10_000) || clean(metadata?.title, 10_000) || labels.untitledDocument;
   const doi = clean(edits?.doi, 1_000).replace(/^(?:doi:\s*|https?:\/\/(?:dx\.)?doi\.org\/)/i, '').replace(/[.,;)]+$/g, '');
   const date = clean(edits?.date, 200);
   const publicationTitle = clean(edits?.publicationTitle, 2_000);

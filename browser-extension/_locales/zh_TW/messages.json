@@ -1,0 +1,308 @@
+{
+  "extensionName": {
+    "message": "Nodus Research Connector"
+  },
+  "extensionDescription": {
+    "message": "將學術文件、中繼資料、收藏和標籤直接儲存到本機 Nodus 文獻庫。"
+  },
+  "actionTitle": {
+    "message": "儲存到 Nodus"
+  },
+  "connector": {
+    "message": "連接器"
+  },
+  "settings": {
+    "message": "設定"
+  },
+  "detecting": {
+    "message": "正在偵測此文件…"
+  },
+  "detectingHint": {
+    "message": "只會在您點擊後讀取作用中的分頁。"
+  },
+  "cannotRead": {
+    "message": "無法讀取此頁面"
+  },
+  "connectTitle": {
+    "message": "連線到 Nodus"
+  },
+  "connectHint": {
+    "message": "開啟 Nodus，並在設定 → 整合中啟用 Chrome 連接器。此瀏覽器會自動連線。"
+  },
+  "port": {
+    "message": "連接埠"
+  },
+  "connect": {
+    "message": "連線"
+  },
+  "cannotReachNodus": {
+    "message": "無法在連接埠 $PORT$ 連線到 Nodus。請開啟 Nodus，並使用設定 → 整合中顯示的連接埠。",
+    "placeholders": {
+      "port": {
+        "content": "$1"
+      }
+    }
+  },
+  "documentType": {
+    "message": "文件類型"
+  },
+  "enriching": {
+    "message": "正在檢查書目中繼資料…"
+  },
+  "saveTo": {
+    "message": "儲存到"
+  },
+  "libraryRoot": {
+    "message": "文獻庫根目錄"
+  },
+  "searchCollections": {
+    "message": "搜尋收藏"
+  },
+  "tags": {
+    "message": "標籤"
+  },
+  "addTags": {
+    "message": "新增或尋找標籤"
+  },
+  "files": {
+    "message": "檔案"
+  },
+  "file": {
+    "message": "檔案"
+  },
+  "webSnapshot": {
+    "message": "可讀網頁快照"
+  },
+  "webSnapshotHint": {
+    "message": "將此頁面的本機副本與參考文獻一併保留。"
+  },
+  "save": {
+    "message": "儲存到 Nodus"
+  },
+  "saving": {
+    "message": "正在儲存…"
+  },
+  "saved": {
+    "message": "已儲存到 Nodus"
+  },
+  "savedSummary": {
+    "message": "已附加 $ATTACHMENTCOUNT$ 個檔案。乾淨閱讀的準備會在 Nodus 中繼續。",
+    "placeholders": {
+      "attachmentCount": {
+        "content": "$1"
+      }
+    }
+  },
+  "openInNodus": {
+    "message": "在 Nodus 中開啟"
+  },
+  "done": {
+    "message": "關閉"
+  },
+  "remove": {
+    "message": "移除"
+  },
+  "unsupportedPage": {
+    "message": "請開啟一般網頁或文件（HTTP/HTTPS），然後再次點擊 Nodus 圖示。"
+  },
+  "enableInNodus": {
+    "message": "請先在 Nodus → 設定 → 整合中啟用 Nodus Research Connector。"
+  },
+  "libraryNotReady": {
+    "message": "請先在 Nodus 中選擇備份資料夾，才能建立本機的 nodus-library 資料夾。"
+  },
+  "nodusPort": {
+    "message": "Nodus 本機連接埠"
+  },
+  "portHint": {
+    "message": "請使用 Nodus → 設定 → 整合中顯示的連接埠。"
+  },
+  "forgetPairing": {
+    "message": "重設本機連線"
+  },
+  "privacy": {
+    "message": "隱私權"
+  },
+  "sourceCode": {
+    "message": "原始碼"
+  },
+  "website": {
+    "message": "Nodus Research"
+  },
+  "savedSetting": {
+    "message": "已儲存。"
+  },
+  "pairingForgotten": {
+    "message": "本機連線已重設。連接器下次會自動重新連線。"
+  },
+  "editMetadata": {
+    "message": "編輯中繼資料"
+  },
+  "title": {
+    "message": "標題"
+  },
+  "authors": {
+    "message": "作者"
+  },
+  "authorsHint": {
+    "message": "每行一位作者，機構請使用 {機構}"
+  },
+  "date": {
+    "message": "日期"
+  },
+  "publication": {
+    "message": "出版品"
+  },
+  "multipleDetected": {
+    "message": "偵測到 $COUNT$ 筆參考文獻",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "multipleHint": {
+    "message": "請選擇要儲存的項目。"
+  },
+  "saveMultiple": {
+    "message": "儲存 $COUNT$ 筆參考文獻",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectAtLeastOne": {
+    "message": "請至少選擇一筆參考文獻。"
+  },
+  "savedBatchSummary": {
+    "message": "已儲存 $COUNT$ 筆參考文獻，並附加 $FILES$ 個檔案。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "files": {
+        "content": "$2"
+      }
+    }
+  },
+  "alreadySaved": {
+    "message": "已在 Nodus 中"
+  },
+  "updatedExisting": {
+    "message": "參考文獻已更新"
+  },
+  "duplicateAvoided": {
+    "message": "未建立任何重複項目。"
+  },
+  "permissionDenied": {
+    "message": "未授予 $ORIGINS$ 的權限。",
+    "placeholders": {
+      "origins": {
+        "content": "$1"
+      }
+    }
+  },
+  "attachment": {
+    "message": "附件"
+  },
+  "capturedDocument": {
+    "message": "已擷取的文件"
+  },
+  "untitledDocument": {
+    "message": "無標題文件"
+  },
+  "untitledWebPage": {
+    "message": "無標題網頁"
+  },
+  "fullTextPdf": {
+    "message": "全文 PDF"
+  },
+  "fullText": {
+    "message": "全文"
+  },
+  "originalDocument": {
+    "message": "原始文件"
+  },
+  "pageCannotBeCaptured": {
+    "message": "無法擷取此頁面。"
+  },
+  "downloadFailed": {
+    "message": "$NAME$：下載失敗，狀態 $STATUS$。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "status": {
+        "content": "$2"
+      }
+    }
+  },
+  "signInPageInsteadOfPdf": {
+    "message": "$NAME$：網站傳回登入頁面，而非 PDF。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "invalidAttachmentUrl": {
+    "message": "$NAME$：網址無效。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "unsupportedAttachmentUrl": {
+    "message": "$NAME$：不支援的網址。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "nodusReturnedError": {
+    "message": "Nodus 傳回錯誤（$STATUS$）。",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "fileExceedsLimit": {
+    "message": "$NAME$：檔案超過 64 MiB 的上限。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "backgroundTransferNoResult": {
+    "message": "背景附件傳輸未傳回結果。"
+  },
+  "optionsTitle": {
+    "message": "Nodus Research Connector 設定"
+  },
+  "privacyTitle": {
+    "message": "Nodus Research Connector 隱私權"
+  },
+  "privacyLocalByDesign": {
+    "message": "從設計就是本機"
+  },
+  "privacyLocalBody": {
+    "message": "Nodus Research Connector 只在您點擊工具列圖示後讀取頁面。它會透過 127.0.0.1 將中繼資料、選取的檔案、標籤和選擇的收藏傳送給您電腦上的 Nodus 桌面應用程式。"
+  },
+  "privacyNoTrackingBody": {
+    "message": "它不會持續執行，不會收集瀏覽記錄，不會使用分析工具，不會顯示廣告，不會販售資料，也不會將擷取的內容傳送給 Nodus 開發人員。"
+  },
+  "privacySiteAccessBody": {
+    "message": "如果 Nodus 無法公開下載所選的附件，Chrome 可以要求存取該特定網站，讓隨需的 Service Worker 在本機傳輸該檔案。新授予的存取權會在傳輸完成後撤銷。您也可以在此擴充功能的設定中重設 Nodus 配對。"
+  },
+  "privacyPolicyLink": {
+    "message": "完整隱私權政策"
+  },
+  "privacySourceLink": {
+    "message": "AGPL 原始碼"
+  }
+}

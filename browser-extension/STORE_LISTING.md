@@ -5,7 +5,7 @@
 - **Name:** Nodus Research Connector
 - **Summary:** Save academic pages, documents, metadata, collections, and tags to your local Nodus Library.
 - **Category:** Productivity
-- **Language:** English and Spanish
+- **Language:** English, Spanish, French, German, Portuguese (Portugal), Portuguese (Brazil), Italian, Turkish, Simplified Chinese, Japanese, Korean, Russian and Traditional Chinese
 - **Single purpose:** Save the current user-selected page or document to the locally running Nodus desktop application.
 
 Use the project logo for the store icon. Provide at least one 1280×800 or 640×400 screenshot that
