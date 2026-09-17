@@ -17,6 +17,8 @@ const KEYS = [
   'Agrupando ideas en temas',
   'Validando pares semánticos entre ideas',
   'Elemento',
+  'Reintentando el postprocesado del grafo…',
+  'Intento {n}',
 ] as const;
 
 function table(values: readonly string[]): Record<string, string> {
@@ -44,6 +46,8 @@ export const ADAPTIVE_CONCURRENCY_TRANSLATIONS = {
     'Grouping ideas into themes',
     'Validating semantic pairs between ideas',
     'Item',
+    'Retrying graph post-processing…',
+    'Attempt {n}',
   ]),
   fr: table([
     'rôle non certifié',
@@ -64,6 +68,8 @@ export const ADAPTIVE_CONCURRENCY_TRANSLATIONS = {
     'Regroupement des idées par thèmes',
     'Validation des paires sémantiques entre idées',
     'Élément',
+    'Nouvelle tentative de post-traitement du graphe…',
+    'Tentative {n}',
   ]),
   de: table([
     'Rolle nicht zertifiziert',
@@ -84,6 +90,8 @@ export const ADAPTIVE_CONCURRENCY_TRANSLATIONS = {
     'Ideen werden Themen zugeordnet',
     'Semantische Ideenpaare werden validiert',
     'Element',
+    'Graph-Nachbearbeitung wird erneut versucht…',
+    'Versuch {n}',
   ]),
   pt: table([
     'função não certificada',
@@ -104,6 +112,8 @@ export const ADAPTIVE_CONCURRENCY_TRANSLATIONS = {
     'A agrupar ideias em temas',
     'A validar pares semânticos entre ideias',
     'Item',
+    'A repetir o pós-processamento do grafo…',
+    'Tentativa {n}',
   ]),
   'pt-BR': table([
     'função não certificada',
@@ -124,6 +134,8 @@ export const ADAPTIVE_CONCURRENCY_TRANSLATIONS = {
     'Agrupando ideias em temas',
     'Validando pares semânticos entre ideias',
     'Item',
+    'Repetindo o pós-processamento do grafo…',
+    'Tentativa {n}',
   ]),
   it: table([
     'ruolo non certificato',
@@ -144,6 +156,8 @@ export const ADAPTIVE_CONCURRENCY_TRANSLATIONS = {
     'Raggruppamento delle idee per temi',
     'Validazione delle coppie semantiche tra idee',
     'Elemento',
+    'Nuovo tentativo di post-elaborazione del grafo…',
+    'Tentativo {n}',
   ]),
   tr: table([
     'rol sertifikalı değil',
@@ -164,6 +178,8 @@ export const ADAPTIVE_CONCURRENCY_TRANSLATIONS = {
     'Fikirler temalara göre gruplanıyor',
     'Fikirler arasındaki anlamsal çiftler doğrulanıyor',
     'Öğe',
+    'Graf son işlemesi yeniden deneniyor…',
+    'Deneme {n}',
   ]),
   'zh-CN': table([
     '角色未认证',
@@ -184,5 +200,7 @@ export const ADAPTIVE_CONCURRENCY_TRANSLATIONS = {
     '正在将观点归类为主题',
     '正在验证观点之间的语义配对',
     '条目',
+    '正在重试图谱后处理…',
+    '第 {n} 次尝试',
   ]),
 } as const;

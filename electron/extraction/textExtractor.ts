@@ -431,7 +431,11 @@ export async function extractPdfStreaming(
       const map = await ocrPdfPages(pdf, toOcr, opts.ocr.languages, ({ page, totalPages }) =>
         {
           opts.signal?.throwIfAborted();
-          opts.onProgress?.({ phase: 'ocr', detail: `OCR p. ${page}/${totalPages}`, pct: page / totalPages });
+          // The counter covers the pages this pass re-reads, not the document, and this
+          // pass runs after the sweep that already walked every page: reporting it as a
+          // fraction of `totalPages` made the bar's percentage fall back from 100% to
+          // 1/K. The label still ticks page by page.
+          opts.onProgress?.({ phase: 'ocr', detail: `OCR p. ${page}/${totalPages}`, pct: null });
         }
       );
       opts.signal?.throwIfAborted();

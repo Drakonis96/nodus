@@ -23,6 +23,7 @@ import { startPerf } from '../perf';
 import { addNotification } from '../notifications';
 import { coalesce } from '../util/coalesce';
 import { nodiText } from '@shared/nodiNotifications';
+import { displayedQueueItem } from '@shared/queueProgress';
 import { logPipelineFailure, logPipelineWarning } from '../logging/pipelineLogCore';
 
 type ProgressListener = (p: QueueProgress) => void;
@@ -31,6 +32,18 @@ const MAX_RETRIES = 4;
 // A deep scan that degraded to abstract-only may simply have raced a just-attached
 // file. Re-scan once after this delay so the full text is picked up automatically
 // once Zotero has finished landing the attachment.
+
+/**
+ * One scale per deep item, shared by the phases that can be measured.
+ *
+ * Each phase used to report a fraction of itself, so the bar climbed to 100% while
+ * reading the pages and fell back to 5% when the analysis started. Extraction owns the
+ * first half and the analysis the second, and the phases the model cannot size (the
+ * required summary, indexing, publishing) report no fraction at all instead of leaving
+ * the previous phase's number parked next to an unrelated label.
+ */
+const EXTRACTION_SHARE = 0.5;
+const ANALYSIS_START = EXTRACTION_SHARE;
 
 class ScanQueue {
   private items: QueueItem[] = [];
@@ -49,6 +62,9 @@ class ScanQueue {
   /** Required post-batch work stays visible; the queue is not complete until this clears. */
   private maintenanceRunning = false;
   private maintenanceDetail: string | null = null;
+  /** When the pass in flight began, and how many times this step has been attempted. */
+  private maintenanceStartedAt: string | null = null;
+  private maintenanceAttempt = 0;
   /** Visible, resumable failure from global relation/bridge preparation. */
   private maintenanceError: string | null = null;
   /** Wall-clock bounds for the queue session, including required maintenance. */
@@ -101,18 +117,21 @@ class ScanQueue {
     // One pass rather than two filters plus a find over the same array.
     let done = 0;
     let failed = 0;
-    let current: QueueItem | undefined;
     for (const item of this.items) {
       if (item.state === 'done') done += 1;
       else if (item.state === 'failed') failed += 1;
-      else if (item.state === 'running' && !current) current = item;
     }
+    // The work the bar narrates is the oldest one still running, not the newest: see
+    // displayedQueueItem. The reader's title and detail line must both come from it.
+    const current = displayedQueueItem(this.items);
     return {
       paused: this.paused,
       pausedReason: this.pausedReason,
       maintenanceError: this.maintenanceError,
       maintenanceRunning: this.maintenanceRunning,
       maintenanceDetail: this.maintenanceDetail,
+      maintenanceStartedAt: this.maintenanceStartedAt,
+      maintenanceAttempt: this.maintenanceAttempt,
       startedAt: this.taskStartedAt,
       finishedAt: this.taskFinishedAt,
       total: this.items.length,
@@ -350,6 +369,7 @@ class ScanQueue {
       this.bridgeAfterDrain = false;
       this.deepSinceReprocess = false;
       this.maintenanceError = null;
+      this.maintenanceAttempt = 0;
     }
     this.notifiedTerminalIds.clear();
     this.paused = false;
@@ -463,6 +483,11 @@ class ScanQueue {
     if (this.maintenanceRunning) return;
     this.maintenanceRunning = true;
     this.maintenanceDetail = 'Postprocesando relaciones del grafo…';
+    // A pass is one model call per batch and reports nothing in between, so the bar
+    // needs a clock of its own; the attempt counter is what tells a retry apart from
+    // the first run when it fails the same way again.
+    this.maintenanceStartedAt = new Date().toISOString();
+    this.maintenanceAttempt += 1;
     this.taskFinishedAt = null;
     this.emit();
     const ids = Array.from(this.pendingIndexWorks);
@@ -479,6 +504,7 @@ class ScanQueue {
         if (ids.length > 0) this.maybeEnqueueBridge(ids);
       }
       settledSuccessfully = true;
+      this.maintenanceAttempt = 0;
     } catch (error) {
       for (const id of ids) this.pendingIndexWorks.add(id);
       this.deepSinceReprocess = true;
@@ -493,6 +519,7 @@ class ScanQueue {
     } finally {
       this.maintenanceRunning = false;
       this.maintenanceDetail = null;
+      this.maintenanceStartedAt = null;
       this.emit();
       if (settledSuccessfully) this.notifyDrain();
     }
@@ -510,6 +537,9 @@ class ScanQueue {
     if (this.cancelAfterCurrent.has(item.id)) return;
     if (item.chain || settings.autoSummaryAfterDeep) {
       item.detail = 'Generando el resumen requerido…';
+      // These steps have no measurable fraction: the analysis percentage ends with the
+      // analysis instead of staying parked next to a label about something else.
+      item.subPct = null;
       this.emit();
       setSummaryPending(work.nodus_id);
       await runSummaryScan(work, item.model ?? null, { force: item.refresh });
@@ -517,12 +547,14 @@ class ScanQueue {
     if (this.cancelAfterCurrent.has(item.id)) return;
     if (this.embeddingConfigured()) {
       item.detail = 'Indexando ideas y pasajes requeridos…';
+      item.subPct = null;
       this.emit();
       await startEmbedding([work.nodus_id]);
       if (this.cancelAfterCurrent.has(item.id)) return;
       await startPassageEmbedding([work.nodus_id]);
     } else {
       item.detail = 'Modo léxico: no hay proveedor de embeddings configurado.';
+      item.subPct = null;
       this.emit();
     }
     if (!this.cancelAfterCurrent.has(item.id) && (item.chain || settings.autoBridgeAfterQueue)) {
@@ -750,7 +782,10 @@ class ScanQueue {
           onProgress: (p) => {
             if (this.cancelAfterCurrent.has(queueItem.id)) return;
             queueItem.detail = p.detail;
-            queueItem.subPct = p.pct;
+            // A step with no fraction of its own (checking the Zotero index, the OCR
+            // pass over problem pages) leaves the bar without a percentage instead of
+            // showing one it cannot back.
+            queueItem.subPct = p.pct == null ? null : EXTRACTION_SHARE * p.pct;
             this.emit();
           },
         },
@@ -759,13 +794,13 @@ class ScanQueue {
       setResolvedTextState(work.nodus_id, resolvedTextStateFromDoc(doc));
       if (!this.cancelAfterCurrent.has(queueItem.id)) {
         queueItem.detail = 'Analizando con IA…';
-        queueItem.subPct = null;
+        queueItem.subPct = ANALYSIS_START;
         this.emit();
       }
       await runDeepScan(work, doc, queueItem.model ?? null, (p) => {
         if (this.cancelAfterCurrent.has(queueItem.id)) return;
         queueItem.detail = p.detail;
-        queueItem.subPct = p.pct;
+        queueItem.subPct = ANALYSIS_START + (1 - ANALYSIS_START) * (p.pct ?? 0);
         this.emit();
       }, publicationOrdinal, { force: queueItem.refresh });
     } finally {
