@@ -707,6 +707,8 @@ export async function installNodusLocalRuntime(
     const root = runtimeDirectory();
     const staging = runtimeStagingDirectory();
     let installed: string | null = null;
+    // Why a GPU candidate was passed over, in the words Settings shows the user. Set
+    // whenever one is skipped or fails, so the CPU engine is never installed silently.
     let fallbackReason: string | null = null;
     const failures: string[] = [];
     try {
@@ -736,6 +738,7 @@ export async function installNodusLocalRuntime(
             throwIfDownloadCancelled(job.controller.signal);
             if (!probe.devices.length) {
               failures.push(`${asset.name}: sin dispositivos utilizables`);
+              fallbackReason = `el motor con GPU (${asset.backend}) no encontró ningún dispositivo utilizable`;
               runtimeLog(`install: ${asset.name} found no usable device; falling back`);
               await fsp.rm(staging, { recursive: true, force: true });
               continue;
@@ -757,6 +760,9 @@ export async function installNodusLocalRuntime(
         } catch (error) {
           if (job.controller.signal.aborted) throw error;
           failures.push(`${asset.name}: ${error instanceof Error ? error.message : String(error)}`);
+          if (asset.backend !== 'cpu') {
+            fallbackReason = `el motor con GPU (${asset.backend}) no se pudo preparar: ${error instanceof Error ? error.message : String(error)}`;
+          }
           runtimeLog(`install: ${asset.name} failed: ${error instanceof Error ? error.message : String(error)}`);
           await fsp.rm(staging, { recursive: true, force: true });
           continue;

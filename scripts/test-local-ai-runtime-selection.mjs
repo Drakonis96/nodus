@@ -200,6 +200,10 @@ try {
   assert.match(manager, /'--list-devices'/, 'the probe asks llama.cpp which devices it can actually use');
   assert.match(manager, /if \(!probe\.devices\.length\)/, 'a GPU build that sees no device is discarded instead of installed');
   assert.match(manager, /no usable device; falling back/, 'the candidate loop records and continues past a GPU build with no device');
+  assert.match(manager, /fallbackReason = `el motor con GPU \(\$\{asset\.backend\}\) no encontró ningún dispositivo utilizable`/,
+    'a GPU build that sees no device records why the CPU engine was chosen, so Settings can explain it');
+  assert.match(manager, /fallbackReason = `el motor con GPU \(\$\{asset\.backend\}\) no se pudo preparar/,
+    'a GPU build that fails to download or extract records the same reason');
   assert.match(manager, /if \(!installed\) \{\s*throw new Error\(`No se pudo instalar un runtime de llama\.cpp utilizable/,
     'a machine where even the CPU archive fails gets an actionable error instead of a half-installed runtime');
   assert.match(manager, /writeRuntimeDescriptor/, 'the chosen backend, device and fallback reason are persisted for the UI');
