@@ -4,6 +4,7 @@ import { EDGE_LABELS, NODE_LABELS, Badge, Icon } from './ui';
 import { SaveToNotesModal } from './SaveToNotesModal';
 import { buildEdgeNote, buildIdeaNote } from '../notes';
 import { parsePageNumber } from '@shared/pageLocation';
+import { openEvidenceAtPage } from '../evidenceJump';
 import { t } from '../i18n';
 
 // Persisted detail-panel sizing, shared by the graph view and the argument map.
@@ -330,10 +331,10 @@ export function EvidenceLocationLink({
     <span className="text-neutral-500 not-italic">
       <button
         className="inline-flex items-center gap-0.5 text-indigo-400 hover:text-indigo-300"
-        title={onOpen || page === null ? t('Abrir fuente') : t('Abrir el PDF en Zotero por esta página')}
+        title={t('Abrir fuente')}
         onClick={() => onOpen
           ? onOpen(sourceRef ?? nodusId, location)
-          : void window.nodus.openEvidenceAtPage(nodusId, { location, sourceRef, pageNumber: page })}
+          : void openEvidenceAtPage(nodusId, { location, sourceRef, pageNumber: page })}
       >
         <Icon name="external" size={11} /> {location || t('Abrir fuente')}
       </button>

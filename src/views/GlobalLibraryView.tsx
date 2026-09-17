@@ -1150,6 +1150,7 @@ function GlobalLibraryContent({
   useEffect(() => {
     const itemId = target?.readerItemId;
     if (!itemId) return;
+    const page = target.readerPage ?? null;
     onTargetConsumed?.();
     void window.nodus.getGlobalLibraryItem(itemId).then((item) => {
       if (!item) return;
@@ -1159,10 +1160,11 @@ function GlobalLibraryContent({
         title: item.metadata.title,
         authors: item.metadata.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean),
         year: item.metadata.year ?? null,
+        ...(page ? { page } : {}),
       });
       else setDetailId(item.id);
     });
-  }, [onOpenReader, onTargetConsumed, target?.nonce, target?.readerItemId]);
+  }, [onOpenReader, onTargetConsumed, target?.nonce, target?.readerItemId, target?.readerPage]);
   useEffect(() => {
     if (!target?.citationStyles) return;
     setCitationItems([]);
@@ -1929,6 +1931,16 @@ export function GlobalLibraryView({
   }, []);
   const openVaultReader = useCallback((reference: LibraryReaderReference) => openReaderTab('vault', reference), [openReaderTab]);
   const openGlobalReader = useCallback((reference: LibraryReaderReference) => openReaderTab('global', reference), [openReaderTab]);
+  // The cited page is a one-shot command, not part of the tab's identity: once the
+  // reader has honoured it the reference goes back to carrying no page, so the tab
+  // restores the user's own reading position from then on.
+  const clearReaderPage = useCallback((key: string) => {
+    setWorkspaceTabs((current) => current.map((tab) => (
+      tab.key === key && tab.reference.page
+        ? { ...tab, reference: { ...tab.reference, page: null } }
+        : tab
+    )));
+  }, []);
 
   const activateReaderTab = (key: string) => {
     const tab = workspaceTabs.find((entry) => entry.key === key);
@@ -1996,6 +2008,8 @@ export function GlobalLibraryView({
             reference={activeReader.reference}
             initialSource={activeReader.sourceId}
             showLibraryBackButton={false}
+            initialPage={activeReader.reference.page ?? null}
+            onInitialPageApplied={() => clearReaderPage(activeReader.key)}
             onSourceChange={(sourceId) => setWorkspaceTabs((current) => current.map((tab) => tab.key === activeReader.key ? { ...tab, sourceId } : tab))}
             onBack={() => setActiveReaderKey(null)}
             onOpenAssistant={onOpenAssistant}

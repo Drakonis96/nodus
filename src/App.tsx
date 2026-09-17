@@ -65,11 +65,13 @@ import type {
   PendingIdeaNavigationTarget,
   PendingLibraryNavigationTarget,
   SidebarNavItem,
+  StudyMaterialNavigationTarget,
   View,
 } from './navigation';
 import { researchChatView, dedicatedVaultNavIds, groupedNav, navItemLabel, NAV_ITEMS, NAV_GROUPS } from './navigation';
 import type { ResearchConversationNavigationTarget } from './researchNoteProvenance';
 import type { ToolkitPage } from './navigation';
+import { OPEN_LIBRARY_DOCUMENT_EVENT, type OpenLibraryDocumentDetail } from './evidenceJump';
 import type { LibraryScope } from '@shared/libraryTypes';
 import { placeHeaderBadge, placeHeaderModelAlert, type HeaderBadgePlacement, type HeaderModelAlertPlacement } from './headerLayout';
 import { registerSkillMarketplace } from './components/skillMarketplaceOpener';
@@ -365,7 +367,7 @@ export function App() {
   // A person opened from global search, to preselect in the Personas view.
   const [personsTarget, setPersonsTarget] = useState<{ id: string; nonce: number } | null>(null);
   const [studyTarget, setStudyTarget] = useState<StudyNavigationTarget | null>(null);
-  const [studyMaterialTarget, setStudyMaterialTarget] = useState<string | null>(null);
+  const [studyMaterialTarget, setStudyMaterialTarget] = useState<StudyMaterialNavigationTarget | null>(null);
   const [studyRecordingTarget, setStudyRecordingTarget] = useState<{ id: string; timestamp?: number | null } | null>(null);
   const [studyGraphTarget, setStudyGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
   const [studyChatTarget, setStudyChatTarget] = useState<{ prompt: string; nonce: number } | null>(null);
@@ -403,6 +405,25 @@ export function App() {
     };
     window.addEventListener('nodus:navigate-primary-source', openPrimarySource);
     return () => window.removeEventListener('nodus:navigate-primary-source', openPrimarySource);
+  }, []);
+  // A citation whose exact page has to be shown in the in-app reader (no Zotero
+  // PDF attachment, or a study/global library copy). The page travels with the
+  // target so the reader opens at the cited point instead of at page 1.
+  useEffect(() => {
+    const openLibraryDocument = (event: Event) => {
+      const detail = (event as CustomEvent<OpenLibraryDocumentDetail | null>).detail;
+      if (typeof detail?.itemId !== 'string') return;
+      if (detail.scope !== 'global' && detail.scope !== 'vault') return;
+      setLibraryTarget({
+        scope: detail.scope,
+        readerItemId: detail.itemId,
+        readerPage: typeof detail.page === 'number' && detail.page > 0 ? detail.page : null,
+        nonce: Date.now(),
+      });
+      setView('library');
+    };
+    window.addEventListener(OPEN_LIBRARY_DOCUMENT_EVENT, openLibraryDocument);
+    return () => window.removeEventListener(OPEN_LIBRARY_DOCUMENT_EVENT, openLibraryDocument);
   }, []);
   useEffect(() => { if (view !== 'studyGraph') setStudyGraphTarget(null); }, [view]);
   useEffect(() => { if (view !== 'researchChat') setAssistantTarget(null); }, [view]);
@@ -1088,8 +1109,8 @@ export function App() {
     setView('library');
   }, []);
 
-  const openLibraryItem = useCallback((itemId: string, scope: LibraryScope) => {
-    setLibraryTarget({ scope, readerItemId: itemId, nonce: Date.now() });
+  const openLibraryItem = useCallback((itemId: string, scope: LibraryScope, page?: number | null) => {
+    setLibraryTarget({ scope, readerItemId: itemId, readerPage: page ?? null, nonce: Date.now() });
     setView('library');
   }, []);
 

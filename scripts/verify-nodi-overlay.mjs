@@ -272,7 +272,7 @@ try {
       'nodiOpenMainWindow', 'nodiOpenSettings', 'nodiOpenWorldEntry',
       'getSettings', 'updateSettings', 'onSettingsChanged', 'getActiveVault', 'onVaultChanged',
       'getIdeaDetail', 'getEdgeDetail', 'getGapDetail', 'getWork', 'getPassage', 'openInZotero',
-      'getCitationPreview',
+      'getCitationPreview', 'openEvidenceAtPage',
     ];
     return names.filter((name) => typeof window.nodus?.[name] !== 'function');
   });

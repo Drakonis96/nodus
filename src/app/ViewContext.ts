@@ -18,6 +18,7 @@ import type {
   PendingGraphNavigationTarget,
   PendingIdeaNavigationTarget,
   PendingLibraryNavigationTarget,
+  StudyMaterialNavigationTarget,
   ToolkitPage,
   View,
 } from '../navigation';
@@ -83,7 +84,7 @@ export interface ViewContext extends VaultFlags {
   testimonyTarget: { interviewId: string; tab?: DossierTab; nonce: number } | null;
   primarySourceTarget: Nonced<PrimarySourceTarget> | null;
   studyTarget: StudyNavigationTarget | null;
-  studyMaterialTarget: string | null;
+  studyMaterialTarget: StudyMaterialNavigationTarget | null;
   studyRecordingTarget: { id: string; timestamp?: number | null } | null;
   studyGraphTarget: Nonced<PendingGraphNavigationTarget> | null;
   studyChatTarget: { prompt: string; nonce: number } | null;
@@ -111,7 +112,7 @@ export interface ViewContext extends VaultFlags {
   // Cross-view jumps the shell owns, because they set a target and a view at once.
   openAssistant: (target?: PendingAssistantNavigationTarget) => void;
   openLibraryBucket: (bucket: CorpusHealthBucketId) => void;
-  openLibraryItem: (itemId: string, scope: LibraryScope) => void;
+  openLibraryItem: (itemId: string, scope: LibraryScope, page?: number | null) => void;
   openIdea: (ideaId: string) => void;
   openAuthor: (authorId: string, name: string) => void;
   openNoteFromSearch: (id: string) => void;
@@ -127,7 +128,7 @@ export interface ViewContext extends VaultFlags {
   setPersonsTarget: (target: { id: string; nonce: number } | null) => void;
   setPrimarySourceTarget: (target: Nonced<PrimarySourceTarget> | null) => void;
   setStudyTarget: (target: StudyNavigationTarget | null) => void;
-  setStudyMaterialTarget: (id: string | null) => void;
+  setStudyMaterialTarget: (target: StudyMaterialNavigationTarget | null) => void;
   setStudyRecordingTarget: (target: { id: string; timestamp?: number | null } | null) => void;
   setStudyGraphTarget: (target: Nonced<PendingGraphNavigationTarget> | null) => void;
   setStudyChatTarget: (target: { prompt: string; nonce: number } | null) => void;

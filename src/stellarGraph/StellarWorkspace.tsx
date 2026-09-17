@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { openEvidenceAtPage } from '../evidenceJump';
 import type { GraphData, GraphNode, IdeaDetail, EdgeDetail } from "@shared/types";
 import type { StellarSession, StellarPosition, StellarTheme } from "@shared/stellarGraph";
 import {
@@ -746,7 +747,7 @@ function StellarGraphTab({
               if (openEvidence)
                 openEvidence(ev?.source_ref || id, ev?.location || null);
               else if (window.nodus)
-                void window.nodus.openEvidenceAtPage(id, {
+                void openEvidenceAtPage(id, {
                   location: ev?.location || null,
                   sourceRef: ev?.source_ref || null,
                   pageNumber: ev?.page_number || null,
