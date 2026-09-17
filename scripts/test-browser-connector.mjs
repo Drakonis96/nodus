@@ -13,6 +13,16 @@ import { detectCapture } from '../browser-extension/lib/detector.js';
 import { ITEM_TYPES, byline, typeGlyph, typeLabel } from '../browser-extension/lib/presentation.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/** Every language the connector ships, as the _locales directory names it. */
+const CONNECTOR_LOCALES = ['en', 'es', 'fr', 'de', 'pt_PT', 'pt_BR', 'it', 'tr', 'zh_CN', 'ja', 'ko', 'ru', 'zh_TW'];
+/** The same list as the shared presentation module names a language. */
+const CONNECTOR_LANGUAGE_CODES = ['en', 'es', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'ja', 'ko', 'ru', 'zh-TW'];
+/** A word that is already that language's own for the item type it names. */
+const NATIVE_TYPE_WORDS = {
+  preprint: ['es', 'de', 'it', 'pt', 'pt-BR'], podcast: ['es', 'fr', 'de', 'it', 'pt', 'pt-BR', 'tr'],
+  film: ['fr', 'de', 'it', 'tr'], interview: ['de'], patent: ['de', 'tr'], document: ['fr'],
+};
 const base = { lang: 'en', links: [], anchors: [], coins: [], jsonLd: [], metas: [], html: '' };
 
 test('detects a Highwire journal article and its full-text PDF', () => {
@@ -136,7 +146,21 @@ test('collection paths remain hierarchical and searchable without losing context
 
 test('Connector presentation rules are shared by Chrome and the integrated Browser surface', () => {
   assert.equal(typeLabel('journal-article'), 'Journal article');
-  assert.equal(typeLabel('journal-article', true), 'Artículo académico');
+  assert.equal(typeLabel('journal-article', 'es'), 'Artículo académico');
+  assert.equal(typeLabel('journal-article', 'fr'), 'Article de revue scientifique');
+  assert.equal(typeLabel('hearing', 'zh-CN'), '听证会', 'a legal hearing is not an audience');
+  assert.equal(typeLabel('book', 'xx'), 'Book', 'an unknown language falls back to English');
+  assert.equal(typeLabel('not-a-type', 'fr'), 'not-a-type');
+  for (const locale of CONNECTOR_LANGUAGE_CODES) {
+    for (const [value, english] of ITEM_TYPES) {
+      const label = typeLabel(value, locale);
+      assert.ok(label?.trim(), `${locale} has no label for ${value}`);
+      assert.notEqual(label, value, `${locale} falls back to the raw id of ${value}`);
+      if (locale !== 'en' && !(NATIVE_TYPE_WORDS[value] ?? []).includes(locale)) {
+        assert.notEqual(label, english, `${locale} leaves the label of ${value} in English`);
+      }
+    }
+  }
   assert.equal(typeGlyph('book'), 'B');
   assert.equal(typeGlyph('webpage'), 'W');
   assert.equal(byline({
@@ -205,24 +229,33 @@ test('preserves the installed extension origin on local connector requests', asy
 
 test('Manifest V3 package minimizes permission and contains no remote executable code', () => {
   const manifest = JSON.parse(readFileSync(path.join(root, 'browser-extension/manifest.json'), 'utf8'));
-  const englishMessages = JSON.parse(readFileSync(path.join(root, 'browser-extension/_locales/en/messages.json'), 'utf8'));
-  const spanishMessages = JSON.parse(readFileSync(path.join(root, 'browser-extension/_locales/es/messages.json'), 'utf8'));
   const options = readFileSync(path.join(root, 'browser-extension/options.html'), 'utf8');
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(englishMessages.extensionName.message, 'Nodus Research Connector');
-  assert.equal(spanishMessages.extensionName.message, 'Nodus Research Connector');
+  for (const locale of CONNECTOR_LOCALES) {
+    const catalog = JSON.parse(readFileSync(path.join(root, `browser-extension/_locales/${locale}/messages.json`), 'utf8'));
+    assert.equal(catalog.extensionName.message, 'Nodus Research Connector', `${locale} carries the product name untranslated`);
+  }
   assert.deepEqual(manifest.permissions, ['activeTab', 'scripting', 'storage']);
   assert.equal(manifest.host_permissions.includes('<all_urls>'), false);
   assert.deepEqual(manifest.optional_host_permissions, ['https://*/*', 'http://*/*']);
   assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'/);
   assert.doesNotMatch(manifest.content_security_policy.extension_pages, /https?:/);
   for (const size of [16, 32, 48, 128]) assert.ok(existsSync(path.join(root, `browser-extension/icons/icon-${size}.png`)));
-  for (const locale of ['en', 'es']) JSON.parse(readFileSync(path.join(root, `browser-extension/_locales/${locale}/messages.json`), 'utf8'));
   const popup = readFileSync(path.join(root, 'browser-extension/popup.html'), 'utf8');
   const popupScript = readFileSync(path.join(root, 'browser-extension/popup.js'), 'utf8');
   assert.doesNotMatch(popup, /<script[^>]+src=["']https?:/i);
   assert.match(popupScript, /chrome\.i18n\.getUILanguage\(\)\.split/);
-  assert.match(popupScript, /ITEM_TYPE_LABELS_ES|spanishUi/);
+  for (const [reported, shared] of [
+    ['\x27pt-pt\x27: \x27pt\x27', 'Portuguese (Portugal)'],
+    ['\x27pt-br\x27: \x27pt-BR\x27', 'Portuguese (Brazil)'],
+    ['\x27zh-cn\x27: \x27zh-CN\x27', 'Simplified Chinese'],
+    ['\x27zh-tw\x27: \x27zh-TW\x27', 'Traditional Chinese'],
+    ['ja: \x27ja\x27', 'Japanese'],
+    ['ko: \x27ko\x27', 'Korean'],
+    ['ru: \x27ru\x27', 'Russian'],
+  ]) {
+    assert.ok(popupScript.includes(reported), `${shared} must map to the shared label table`);
+  }
   assert.match(popupScript, /snapshotAvailable && !state\.capture\.attachments\.length/, 'a detected full text keeps the HTML snapshot off by default');
   assert.match(popupScript, /if \(!state\.token\) await pair\(\)/, 'opening the popup establishes the local token automatically');
   assert.match(options, /href="https:\/\/nodusresearch\.com"/);
@@ -261,5 +294,91 @@ test('browser pairing is a cancel-first translated renderer modal', () => {
   assert.match(host, /resolveBrowserConnectorPairingRequest\(requestId, allow\)/);
   for (const locale of ['en', 'fr', 'de', 'pt', "'pt-BR'", 'it', 'tr']) {
     assert.match(translations, new RegExp(`(?:^|\\n)  ${locale.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}: table\\(`));
+  }
+});
+
+test('every Chrome Connector interface message is translated in all thirteen languages', () => {
+  const catalogs = Object.fromEntries(CONNECTOR_LOCALES.map((locale) => [
+    locale,
+    JSON.parse(readFileSync(path.join(root, `browser-extension/_locales/${locale}/messages.json`), 'utf8')),
+  ]));
+  const { en } = catalogs;
+  assert.equal(CONNECTOR_LOCALES.length, 13, 'the connector ships the nine interface languages Nodus supports plus four more');
+
+  // A word that is already that language's own for the message it carries, so an
+  // identical English string is a translation and not a missing one.
+  const NATIVE_MESSAGE_WORDS = new Set(['fr:port', 'de:port', 'fr:date', 'fr:publication', 'it:privacy', 'de:connector']);
+  const BRAND_MESSAGES = new Set(['extensionName', 'website']);
+  // Portuguese and Italian share spelling with Spanish in many words.
+  const SHARED_WITH_SPANISH = new Set(['pt_PT', 'pt_BR', 'it']);
+
+  for (const locale of CONNECTOR_LOCALES) {
+    const catalog = catalogs[locale];
+    assert.deepEqual(Object.keys(catalog), Object.keys(en), `${locale} must define exactly the English messages, in the same order`);
+  }
+  for (const key of Object.keys(en)) {
+    assert.ok(en[key].message?.trim(), `${key} needs English copy`);
+    for (const locale of CONNECTOR_LOCALES) {
+      const entry = catalogs[locale][key];
+      assert.ok(entry.message?.trim(), `${key} needs ${locale} copy`);
+      assert.deepEqual(entry.placeholders ?? {}, en[key].placeholders ?? {}, `${key} must declare the same placeholders in every language`);
+      const declared = Object.keys(entry.placeholders ?? {}).map((name) => name.toLowerCase());
+      const tokens = [...entry.message.matchAll(/\$([A-Za-z_][A-Za-z0-9_]*)\$/g)].map((match) => match[1].toLowerCase());
+      for (const token of new Set(tokens)) {
+        assert.ok(declared.includes(token), `${key} uses $${token}$ without declaring that placeholder in ${locale}`);
+      }
+      if (BRAND_MESSAGES.has(key) || NATIVE_MESSAGE_WORDS.has(`${locale}:${key}`)) continue;
+      if (locale === 'en') continue;
+      assert.notEqual(entry.message, en[key].message, `${locale} still shows the English text of ${key}`);
+      if (SHARED_WITH_SPANISH.has(locale) || locale === 'es') continue;
+      assert.notEqual(entry.message, catalogs.es[key].message, `${locale} still shows the Spanish text of ${key}`);
+    }
+  }
+
+  // popup.html, options.html and privacy.html are the three extension surfaces.
+  // Their static markup mirrors the English catalog so the copy can be reviewed
+  // in place; every value the user sees is still read from _locales at runtime.
+  const html = ['popup.html', 'options.html', 'privacy.html']
+    .map((name) => readFileSync(path.join(root, 'browser-extension', name), 'utf8')).join('\n');
+  for (const match of html.matchAll(/<[a-z0-9]+[^<>]*\sdata-i18n="([^"]+)"[^<>]*>([^<]*)</gi)) {
+    assert.equal(match[2].trim(), en[match[1]]?.message, `the static text of data-i18n="${match[1]}" must match the English catalog`);
+  }
+  for (const [attribute, fallbacks] of [['placeholder', ['placeholder']], ['title', ['title', 'aria-label']]]) {
+    for (const match of html.matchAll(new RegExp(`<[a-z0-9]+[^<>]*\\sdata-i18n-${attribute}="([^"]+)"[^<>]*>`, 'gi'))) {
+      const expected = en[match[1]]?.message;
+      const rendered = fallbacks.map((name) => new RegExp(`\\s${name}="([^"]*)"`).exec(match[0])?.[1]);
+      assert.ok(rendered.includes(expected), `the static ${attribute} of data-i18n-${attribute}="${match[1]}" must match the English catalog`);
+    }
+  }
+
+  // Shared, Chrome-free modules cannot reach _locales themselves: they default to
+  // English labels and the popup hands them the rendered language.
+  const detector = readFileSync(path.join(root, 'browser-extension/lib/detector.js'), 'utf8');
+  const popupScript = readFileSync(path.join(root, 'browser-extension/popup.js'), 'utf8');
+  assert.match(popupScript, /detectCaptureCandidates\(snapshot, captureLabels\(\)\)/, 'the popup must review captures with translated detector labels');
+  const labelBlock = /export const DETECTOR_LABELS = Object\.freeze\(\{([\s\S]*?)\}\)/.exec(detector)?.[1] ?? '';
+  const labelKeys = [...labelBlock.matchAll(/(\w+):/g)].map((match) => match[1]);
+  assert.ok(labelKeys.length, 'the detector must declare the labels it can generate');
+  for (const key of labelKeys) {
+    for (const locale of CONNECTOR_LOCALES) {
+      assert.ok(catalogs[locale][key]?.message, `the detector label ${key} needs a ${locale} catalog entry`);
+    }
+  }
+
+  const scripts = ['popup.js', 'options.js', 'privacy.js', 'service-worker.js']
+    .map((name) => readFileSync(path.join(root, 'browser-extension', name), 'utf8')).join('\n');
+  const manifest = readFileSync(path.join(root, 'browser-extension/manifest.json'), 'utf8');
+  const referenced = new Set();
+  for (const match of html.matchAll(/data-i18n(?:-placeholder|-title)?="([^"]+)"/g)) referenced.add(match[1]);
+  for (const match of scripts.matchAll(/msg\(\s*'([A-Za-z][A-Za-z0-9]*)'/g)) referenced.add(match[1]);
+  for (const match of manifest.matchAll(/__MSG_([A-Za-z][A-Za-z0-9]*)__/g)) referenced.add(match[1]);
+
+  for (const key of referenced) {
+    for (const locale of CONNECTOR_LOCALES) {
+      assert.ok(catalogs[locale][key], `_locales/${locale}/messages.json is missing ${key}`);
+    }
+  }
+  for (const key of Object.keys(en)) {
+    assert.ok(referenced.has(key), `${key} is translated but no Connector surface renders it`);
   }
 });

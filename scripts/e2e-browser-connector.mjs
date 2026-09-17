@@ -7,6 +7,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { typeLabel } from '../browser-extension/lib/presentation.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const extensionRoot = path.join(root, 'browser-extension');
@@ -166,6 +167,99 @@ async function exerciseMultiCapture() {
   await browser.close();
 }
 
+/** Every language the package ships: its _locales directory, the UI language
+ * Chrome reports for it, and the code the shared document-type table names it. */
+const LOCALIZED_SURFACES = [
+  { directory: 'en', uiLanguage: 'en-US', language: 'en' },
+  { directory: 'es', uiLanguage: 'es-ES', language: 'es' },
+  { directory: 'fr', uiLanguage: 'fr-FR', language: 'fr' },
+  { directory: 'de', uiLanguage: 'de-DE', language: 'de' },
+  { directory: 'pt_PT', uiLanguage: 'pt-PT', language: 'pt' },
+  { directory: 'pt_BR', uiLanguage: 'pt-BR', language: 'pt-BR' },
+  { directory: 'it', uiLanguage: 'it-IT', language: 'it' },
+  { directory: 'tr', uiLanguage: 'tr-TR', language: 'tr' },
+  { directory: 'zh_CN', uiLanguage: 'zh-CN', language: 'zh-CN' },
+  { directory: 'ja', uiLanguage: 'ja-JP', language: 'ja' },
+  { directory: 'ko', uiLanguage: 'ko-KR', language: 'ko' },
+  { directory: 'ru', uiLanguage: 'ru-RU', language: 'ru' },
+  { directory: 'zh_TW', uiLanguage: 'zh-TW', language: 'zh-TW' },
+];
+const catalogs = Object.fromEntries(await Promise.all(LOCALIZED_SURFACES.map(async (entry) => [
+  entry.directory,
+  JSON.parse(await readFile(path.join(extensionRoot, `_locales/${entry.directory}/messages.json`), 'utf8')),
+])));
+
+/**
+ * A catalog only matters if the surface renders it. These passes stub each shipped
+ * locale and read every localized node back from real Chrome, so a missing or stale
+ * key fails here instead of reaching a user as an English string.
+ */
+async function exerciseLocalizedSurfaces(browser, { directory, uiLanguage, language }) {
+  const messages = catalogs[directory];
+  const context = await browser.newContext({ viewport: { width: 420, height: 600 }, colorScheme: 'light' });
+  const page = await context.newPage();
+  await page.addInitScript(({ messages, detected, uiLanguage }) => {
+    const values = { port: 4321, token: 'visual-test-token', lastCollectionId: null };
+    globalThis.chrome = {
+      i18n: { getUILanguage: () => uiLanguage, getMessage: (key, substitutions) => {
+        const entry = messages[key]; if (!entry) return key;
+        let value = entry.message; const args = Array.isArray(substitutions) ? substitutions : substitutions == null ? [] : [substitutions];
+        for (const [name, placeholder] of Object.entries(entry.placeholders || {})) {
+          const index = Number(/^\$(\d+)$/.exec(placeholder.content)?.[1] || 0) - 1;
+          if (index >= 0) value = value.replaceAll(`$${name.toUpperCase()}$`, String(args[index] ?? ''));
+        }
+        for (const [index, arg] of args.entries()) value = value.replaceAll(`$${index + 1}`, String(arg));
+        return value;
+      } },
+      tabs: { query: async () => [{ id: 11, title: detected.title, url: detected.url }] },
+      scripting: { executeScript: async () => [{ result: detected }] },
+      storage: { local: { get: async (defaults) => ({ ...defaults, ...values }), set: async (input) => Object.assign(values, input), remove: async (keys) => { for (const key of keys) delete values[key]; } } },
+      permissions: { request: async () => true, contains: async () => true, remove: async () => true },
+      runtime: { getManifest: () => ({ version: '5.5.0' }), getURL: (path = '') => `chrome-extension://abcdefghijklmnopabcdefghijklmnop/${path}`, openOptionsPage: async () => undefined },
+    };
+  }, { messages, detected: snapshot, uiLanguage });
+  await page.route('http://127.0.0.1:4321/api/browser/**', async (route) => {
+    const url = route.request().url();
+    if (url.endsWith('/health')) return route.fulfill({ json: { ok: true, app: 'nodus', enabled: true, paired: true, libraryReady: true } });
+    if (url.endsWith('/catalog')) return route.fulfill({ json: { collections, tags: [] } });
+    if (url.endsWith('/preview')) return route.fulfill({ json: { metadata: snapshotMetadata(), warnings: [] } });
+    return route.fulfill({ status: 404, json: { error: 'not found' } });
+  });
+
+  const languageTag = uiLanguage.split('-')[0];
+  const readStale = (expected) => page.evaluate((catalog) => ({
+    text: [...document.querySelectorAll('[data-i18n]')]
+      .filter((element) => element.textContent !== catalog[element.dataset.i18n]?.message)
+      .map((element) => `${element.dataset.i18n} = ${element.textContent}`),
+    placeholder: [...document.querySelectorAll('[data-i18n-placeholder]')]
+      .filter((element) => element.placeholder !== catalog[element.dataset.i18nPlaceholder]?.message)
+      .map((element) => element.dataset.i18nPlaceholder),
+    title: [...document.querySelectorAll('[data-i18n-title]')]
+      .filter((element) => element.getAttribute('aria-label') !== catalog[element.dataset.i18nTitle]?.message)
+      .map((element) => element.dataset.i18nTitle),
+  }), expected);
+  const nothingStale = { text: [], placeholder: [], title: [] };
+
+  await page.goto(`http://127.0.0.1:${port}/popup.html`);
+  await page.locator('#capture-view:not(.hidden)').waitFor();
+  assert.equal(await page.locator('html').getAttribute('lang'), languageTag, `${directory} must declare the rendered language`);
+  assert.equal(await page.locator('#item-type option:checked').textContent(), typeLabel('journal-article', language), `${directory} names the document type in its own language`);
+  assert.equal(await page.locator('#collection-label').textContent(), messages.libraryRoot.message);
+  assert.equal(await page.locator('#save-button').textContent(), messages.save.message);
+  assert.equal(await page.locator('#snapshot-row small').textContent(), messages.webSnapshotHint.message);
+  assert.deepEqual(await readStale(messages), nothingStale, `popup.html must render only ${directory} copy`);
+  await page.screenshot({ path: path.join(output, `popup-${directory}.png`), fullPage: true });
+
+  for (const [file, titleKey] of [['options.html', 'optionsTitle'], ['privacy.html', 'privacyTitle']]) {
+    await page.goto(`http://127.0.0.1:${port}/${file}`);
+    assert.equal(await page.locator('html').getAttribute('lang'), languageTag, `${file} must declare the rendered language`);
+    assert.equal(await page.title(), messages[titleKey].message, `${file} must translate its tab title`);
+    assert.deepEqual(await readStale(messages), nothingStale, `${file} must render only ${directory} copy`);
+    if (directory === 'es') await page.screenshot({ path: path.join(output, file.replace('.html', '-es.png')), fullPage: true });
+  }
+  await context.close();
+}
+
 function snapshotMetadata() {
   return {
     title: snapshot.title, itemType: 'journal-article', creators: [{ creatorType: 'author', firstName: 'Alicia', lastName: 'Miranda', fieldMode: 0 }],
@@ -178,7 +272,13 @@ try {
   await exercise('light');
   await exercise('dark');
   await exerciseMultiCapture();
-  console.log(`Browser connector popup passed in light and dark mode. Screenshots: ${output}`);
+  const localizedBrowser = await chromium.launch({ executablePath: chrome, headless: true });
+  try {
+    for (const surface of LOCALIZED_SURFACES) await exerciseLocalizedSurfaces(localizedBrowser, surface);
+  } finally {
+    await localizedBrowser.close();
+  }
+  console.log(`Browser connector popup passed in light, dark and all ${LOCALIZED_SURFACES.length} interface languages. Screenshots: ${output}`);
 } finally {
   await new Promise((resolve) => staticServer.close(resolve));
 }

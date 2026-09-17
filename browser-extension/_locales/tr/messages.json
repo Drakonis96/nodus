@@ -1,0 +1,308 @@
+{
+  "extensionName": {
+    "message": "Nodus Research Connector"
+  },
+  "extensionDescription": {
+    "message": "Akademik belgeleri, üst verileri, koleksiyonları ve etiketleri doğrudan yerel Nodus Kütüphanenize kaydedin."
+  },
+  "actionTitle": {
+    "message": "Nodus'a kaydet"
+  },
+  "connector": {
+    "message": "Bağlayıcı"
+  },
+  "settings": {
+    "message": "Ayarlar"
+  },
+  "detecting": {
+    "message": "Bu belge algılanıyor…"
+  },
+  "detectingHint": {
+    "message": "Tıklamanızdan sonra yalnızca etkin sekme okunur."
+  },
+  "cannotRead": {
+    "message": "Bu sayfa okunamadı"
+  },
+  "connectTitle": {
+    "message": "Nodus’a bağlan"
+  },
+  "connectHint": {
+    "message": "Nodus’u açın ve Chrome bağlayıcısını Ayarlar → Entegrasyonlar bölümünde etkinleştirin. Bu tarayıcı otomatik olarak bağlanır."
+  },
+  "port": {
+    "message": "Bağlantı noktası"
+  },
+  "connect": {
+    "message": "Bağlan"
+  },
+  "cannotReachNodus": {
+    "message": "$PORT$ bağlantı noktasında Nodus’a ulaşılamadı. Nodus’u açın ve Ayarlar → Entegrasyonlar bölümünde gösterilen bağlantı noktasını kullanın.",
+    "placeholders": {
+      "port": {
+        "content": "$1"
+      }
+    }
+  },
+  "documentType": {
+    "message": "Belge türü"
+  },
+  "enriching": {
+    "message": "Kaynakça üst verileri denetleniyor…"
+  },
+  "saveTo": {
+    "message": "Şuraya kaydet"
+  },
+  "libraryRoot": {
+    "message": "Kütüphane kökü"
+  },
+  "searchCollections": {
+    "message": "Koleksiyonlarda ara"
+  },
+  "tags": {
+    "message": "Etiketler"
+  },
+  "addTags": {
+    "message": "Etiket ekle veya ara"
+  },
+  "files": {
+    "message": "Dosyalar"
+  },
+  "file": {
+    "message": "Dosya"
+  },
+  "webSnapshot": {
+    "message": "Okunabilir web kopyası"
+  },
+  "webSnapshotHint": {
+    "message": "Bu sayfanın yerel bir kopyasını referansla birlikte sakla."
+  },
+  "save": {
+    "message": "Nodus'a kaydet"
+  },
+  "saving": {
+    "message": "Kaydediliyor…"
+  },
+  "saved": {
+    "message": "Nodus'a kaydedildi"
+  },
+  "savedSummary": {
+    "message": "$ATTACHMENTCOUNT$ dosya artık eklendi. Temiz okuma hazırlığı Nodus’ta sürüyor.",
+    "placeholders": {
+      "attachmentCount": {
+        "content": "$1"
+      }
+    }
+  },
+  "openInNodus": {
+    "message": "Nodus'ta aç"
+  },
+  "done": {
+    "message": "Kapalı"
+  },
+  "remove": {
+    "message": "Kaldır"
+  },
+  "unsupportedPage": {
+    "message": "Normal bir web sayfası veya belge (HTTP/HTTPS) açın ve Nodus simgesine yeniden tıklayın."
+  },
+  "enableInNodus": {
+    "message": "Önce Nodus → Ayarlar → Entegrasyonlar bölümünde Nodus Research Connector’ı etkinleştirin."
+  },
+  "libraryNotReady": {
+    "message": "Yerel nodus-library klasörünün oluşturulabilmesi için önce Nodus’ta bir yedek klasörü seçin."
+  },
+  "nodusPort": {
+    "message": "Nodus yerel bağlantı noktası"
+  },
+  "portHint": {
+    "message": "Nodus → Ayarlar → Entegrasyonlar bölümünde gösterilen bağlantı noktasını kullanın."
+  },
+  "forgetPairing": {
+    "message": "Yerel bağlantıyı sıfırla"
+  },
+  "privacy": {
+    "message": "Gizlilik"
+  },
+  "sourceCode": {
+    "message": "Kaynak kodu"
+  },
+  "website": {
+    "message": "Nodus Research"
+  },
+  "savedSetting": {
+    "message": "Kaydedildi"
+  },
+  "pairingForgotten": {
+    "message": "Yerel bağlantı sıfırlandı. Bağlayıcı bir dahaki sefere otomatik olarak yeniden bağlanacak."
+  },
+  "editMetadata": {
+    "message": "Meta verileri düzenle"
+  },
+  "title": {
+    "message": "Başlık"
+  },
+  "authors": {
+    "message": "Yazarlar"
+  },
+  "authorsHint": {
+    "message": "Her satıra bir yazar; kurumlar için {Kurum} kullanın"
+  },
+  "date": {
+    "message": "Tarih"
+  },
+  "publication": {
+    "message": "Yayın"
+  },
+  "multipleDetected": {
+    "message": "$COUNT$ kaynak bulundu",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "multipleHint": {
+    "message": "Hangilerini kaydedeceğinizi seçin."
+  },
+  "saveMultiple": {
+    "message": "$COUNT$ kaynağı kaydet",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectAtLeastOne": {
+    "message": "En az bir kaynak seçin."
+  },
+  "savedBatchSummary": {
+    "message": "$COUNT$ kaynak, $FILES$ ekli dosyayla kaydedildi.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "files": {
+        "content": "$2"
+      }
+    }
+  },
+  "alreadySaved": {
+    "message": "Zaten Nodus’taydı"
+  },
+  "updatedExisting": {
+    "message": "Kaynak güncellendi"
+  },
+  "duplicateAvoided": {
+    "message": "Yinelenen kayıt oluşturulmadı."
+  },
+  "permissionDenied": {
+    "message": "$ORIGINS$ için izin verilmedi.",
+    "placeholders": {
+      "origins": {
+        "content": "$1"
+      }
+    }
+  },
+  "attachment": {
+    "message": "Ekli"
+  },
+  "capturedDocument": {
+    "message": "Yakalanan belge"
+  },
+  "untitledDocument": {
+    "message": "İsimsiz belge"
+  },
+  "untitledWebPage": {
+    "message": "İsimsiz web sayfası"
+  },
+  "fullTextPdf": {
+    "message": "Tam metin PDF"
+  },
+  "fullText": {
+    "message": "Tam metin"
+  },
+  "originalDocument": {
+    "message": "Özgün belge"
+  },
+  "pageCannotBeCaptured": {
+    "message": "Bu sayfa yakalanamıyor."
+  },
+  "downloadFailed": {
+    "message": "$NAME$: indirme $STATUS$ durumuyla başarısız oldu.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "status": {
+        "content": "$2"
+      }
+    }
+  },
+  "signInPageInsteadOfPdf": {
+    "message": "$NAME$: site PDF yerine bir oturum açma sayfası döndürdü.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "invalidAttachmentUrl": {
+    "message": "$NAME$: geçersiz adres.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "unsupportedAttachmentUrl": {
+    "message": "$NAME$: desteklenmeyen adres.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "nodusReturnedError": {
+    "message": "Nodus bir hata döndürdü ($STATUS$).",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "fileExceedsLimit": {
+    "message": "$NAME$: dosya 64 MiB sınırını aşıyor.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "backgroundTransferNoResult": {
+    "message": "Arka plandaki ek aktarımı bir sonuç döndürmedi."
+  },
+  "optionsTitle": {
+    "message": "Nodus Research Connector ayarları"
+  },
+  "privacyTitle": {
+    "message": "Nodus Research Connector gizliliği"
+  },
+  "privacyLocalByDesign": {
+    "message": "Tasarımı gereği yerel"
+  },
+  "privacyLocalBody": {
+    "message": "Nodus Research Connector bir sayfayı yalnızca araç çubuğundaki simgesine tıkladıktan sonra okur. Üst verileri, seçilen dosyaları, etiketleri ve seçilen koleksiyonu 127.0.0.1 üzerinden kendi bilgisayarınızdaki Nodus masaüstü uygulamasına gönderir."
+  },
+  "privacyNoTrackingBody": {
+    "message": "Sürekli çalışmaz, tarama geçmişini toplamaz, analitik kullanmaz, reklam göstermez, veri satmaz ve yakalanan içeriği Nodus geliştiricilerine göndermez."
+  },
+  "privacySiteAccessBody": {
+    "message": "Nodus seçilen bir eki herkese açık olarak indiremezse, Chrome tam olarak o siteye erişim isteyebilir, böylece isteğe bağlı bir service worker eki yerel olarak aktarır. Yeni verilen erişim aktarım bitince geri alınır. Nodus eşleşmesini bu uzantının ayarlarından da sıfırlayabilirsiniz."
+  },
+  "privacyPolicyLink": {
+    "message": "Tam gizlilik politikası"
+  },
+  "privacySourceLink": {
+    "message": "AGPL kaynak kodu"
+  }
+}

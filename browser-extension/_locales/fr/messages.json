@@ -1,0 +1,308 @@
+{
+  "extensionName": {
+    "message": "Nodus Research Connector"
+  },
+  "extensionDescription": {
+    "message": "Enregistrez documents académiques, métadonnées, collections et étiquettes directement dans votre bibliothèque Nodus locale."
+  },
+  "actionTitle": {
+    "message": "Enregistrer dans Nodus"
+  },
+  "connector": {
+    "message": "Connecteur"
+  },
+  "settings": {
+    "message": "Paramètres"
+  },
+  "detecting": {
+    "message": "Détection de ce document…"
+  },
+  "detectingHint": {
+    "message": "Seul l’onglet actif est lu, après votre clic."
+  },
+  "cannotRead": {
+    "message": "Cette page n’a pas pu être lue"
+  },
+  "connectTitle": {
+    "message": "Se connecter à Nodus"
+  },
+  "connectHint": {
+    "message": "Ouvrez Nodus et activez le connecteur Chrome dans Réglages → Intégrations. Ce navigateur se connecte automatiquement."
+  },
+  "port": {
+    "message": "Port"
+  },
+  "connect": {
+    "message": "Connecter"
+  },
+  "cannotReachNodus": {
+    "message": "Nodus est injoignable sur le port $PORT$. Ouvrez Nodus et utilisez le port indiqué dans Réglages → Intégrations.",
+    "placeholders": {
+      "port": {
+        "content": "$1"
+      }
+    }
+  },
+  "documentType": {
+    "message": "Type de document"
+  },
+  "enriching": {
+    "message": "Vérification des métadonnées bibliographiques…"
+  },
+  "saveTo": {
+    "message": "Enregistrer dans"
+  },
+  "libraryRoot": {
+    "message": "Racine de la Bibliothèque"
+  },
+  "searchCollections": {
+    "message": "Rechercher des collections"
+  },
+  "tags": {
+    "message": "Étiquettes"
+  },
+  "addTags": {
+    "message": "Ajouter ou rechercher une étiquette"
+  },
+  "files": {
+    "message": "Fichiers"
+  },
+  "file": {
+    "message": "Archives"
+  },
+  "webSnapshot": {
+    "message": "Copie web lisible"
+  },
+  "webSnapshotHint": {
+    "message": "Conserver une copie locale de cette page avec la référence."
+  },
+  "save": {
+    "message": "Enregistrer dans Nodus"
+  },
+  "saving": {
+    "message": "Enregistrement…"
+  },
+  "saved": {
+    "message": "Enregistré dans Nodus"
+  },
+  "savedSummary": {
+    "message": "$ATTACHMENTCOUNT$ fichier(s) sont maintenant joints. La préparation de la lecture propre se poursuit dans Nodus.",
+    "placeholders": {
+      "attachmentCount": {
+        "content": "$1"
+      }
+    }
+  },
+  "openInNodus": {
+    "message": "Ouvrir dans Nodus"
+  },
+  "done": {
+    "message": "Fermer"
+  },
+  "remove": {
+    "message": "Retirer"
+  },
+  "unsupportedPage": {
+    "message": "Ouvrez une page web ou un document normal (HTTP/HTTPS), puis cliquez à nouveau sur l’icône Nodus."
+  },
+  "enableInNodus": {
+    "message": "Activez d’abord Nodus Research Connector dans Nodus → Réglages → Intégrations."
+  },
+  "libraryNotReady": {
+    "message": "Choisissez d’abord un dossier de sauvegarde dans Nodus pour que le dossier local nodus-library puisse être créé."
+  },
+  "nodusPort": {
+    "message": "Port local de Nodus"
+  },
+  "portHint": {
+    "message": "Utilisez le port indiqué dans Nodus → Réglages → Intégrations."
+  },
+  "forgetPairing": {
+    "message": "Réinitialiser la connexion locale"
+  },
+  "privacy": {
+    "message": "Confidentialité"
+  },
+  "sourceCode": {
+    "message": "Code source"
+  },
+  "website": {
+    "message": "Nodus Research"
+  },
+  "savedSetting": {
+    "message": "Enregistré"
+  },
+  "pairingForgotten": {
+    "message": "Connexion locale réinitialisée. Le connecteur se reconnectera automatiquement la prochaine fois."
+  },
+  "editMetadata": {
+    "message": "Modifier les métadonnées"
+  },
+  "title": {
+    "message": "Titre"
+  },
+  "authors": {
+    "message": "Auteurs"
+  },
+  "authorsHint": {
+    "message": "Un auteur par ligne ; utilisez {Organisation} pour les institutions"
+  },
+  "date": {
+    "message": "Date"
+  },
+  "publication": {
+    "message": "Publication"
+  },
+  "multipleDetected": {
+    "message": "$COUNT$ références détectées",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "multipleHint": {
+    "message": "Choisissez celles à enregistrer."
+  },
+  "saveMultiple": {
+    "message": "Enregistrer $COUNT$ références",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectAtLeastOne": {
+    "message": "Sélectionnez au moins une référence."
+  },
+  "savedBatchSummary": {
+    "message": "$COUNT$ références enregistrées avec $FILES$ fichier(s) joint(s).",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "files": {
+        "content": "$2"
+      }
+    }
+  },
+  "alreadySaved": {
+    "message": "Déjà dans Nodus"
+  },
+  "updatedExisting": {
+    "message": "Référence mise à jour"
+  },
+  "duplicateAvoided": {
+    "message": "Aucun doublon n’a été créé."
+  },
+  "permissionDenied": {
+    "message": "L’autorisation n’a pas été accordée pour $ORIGINS$.",
+    "placeholders": {
+      "origins": {
+        "content": "$1"
+      }
+    }
+  },
+  "attachment": {
+    "message": "Pièce jointe"
+  },
+  "capturedDocument": {
+    "message": "Document capturé"
+  },
+  "untitledDocument": {
+    "message": "Document sans titre"
+  },
+  "untitledWebPage": {
+    "message": "Page web sans titre"
+  },
+  "fullTextPdf": {
+    "message": "PDF du texte intégral"
+  },
+  "fullText": {
+    "message": "Texte intégral"
+  },
+  "originalDocument": {
+    "message": "Document original"
+  },
+  "pageCannotBeCaptured": {
+    "message": "Cette page ne peut pas être capturée."
+  },
+  "downloadFailed": {
+    "message": "$NAME$ : le téléchargement a échoué avec le statut $STATUS$.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "status": {
+        "content": "$2"
+      }
+    }
+  },
+  "signInPageInsteadOfPdf": {
+    "message": "$NAME$ : le site a renvoyé une page de connexion au lieu du PDF.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "invalidAttachmentUrl": {
+    "message": "$NAME$ : adresse non valide.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "unsupportedAttachmentUrl": {
+    "message": "$NAME$ : adresse non prise en charge.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "nodusReturnedError": {
+    "message": "Nodus a renvoyé une erreur ($STATUS$).",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "fileExceedsLimit": {
+    "message": "$NAME$ : le fichier dépasse la limite de 64 MiB.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "backgroundTransferNoResult": {
+    "message": "Le transfert de pièces jointes en arrière-plan n’a renvoyé aucun résultat."
+  },
+  "optionsTitle": {
+    "message": "Réglages de Nodus Research Connector"
+  },
+  "privacyTitle": {
+    "message": "Confidentialité de Nodus Research Connector"
+  },
+  "privacyLocalByDesign": {
+    "message": "Local par conception"
+  },
+  "privacyLocalBody": {
+    "message": "Nodus Research Connector ne lit une page qu’après un clic sur son icône dans la barre d’outils. Il envoie les métadonnées, les fichiers sélectionnés, les étiquettes et la collection choisie à l’application de bureau Nodus, sur votre propre ordinateur, via 127.0.0.1."
+  },
+  "privacyNoTrackingBody": {
+    "message": "Il ne s’exécute pas en continu, ne collecte pas l’historique de navigation, n’utilise pas d’analytique, n’affiche pas de publicité, ne vend pas de données et n’envoie pas le contenu capturé aux développeurs de Nodus."
+  },
+  "privacySiteAccessBody": {
+    "message": "Si Nodus ne peut pas télécharger publiquement une pièce jointe sélectionnée, Chrome peut demander l’accès à ce site précis pour qu’un service worker à la demande la transfère localement. L’accès nouvellement accordé est révoqué dès la fin du transfert. Vous pouvez aussi réinitialiser l’appairage Nodus depuis les réglages de cette extension."
+  },
+  "privacyPolicyLink": {
+    "message": "Politique de confidentialité complète"
+  },
+  "privacySourceLink": {
+    "message": "Code source AGPL"
+  }
+}
