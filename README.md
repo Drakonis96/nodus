@@ -1,10 +1,6 @@
 <p align="center">
-  <img src="site/assets/nodus-logo.png" width="104" alt="Nodus Research logo">
+  <img src="docs/screenshots/readme-banner.png" alt="Nodus Research, an open-source, local-first research workspace for academic research, teaching, study, databases and Zotero integration. Research deeper, teach smarter, study better. Free forever, no account required, on macOS, Windows and Linux.">
 </p>
-
-<h1 align="center">Nodus Research</h1>
-
-<p align="center"><strong>One place for research, teaching and study</strong></p>
 
 <p align="center">
   <a href="https://github.com/Drakonis96/nodus/releases/latest"><img alt="Download Nodus Research" src="https://img.shields.io/badge/Download_Nodus_Research-4f46e5?style=for-the-badge&amp;logo=github&amp;logoColor=white"></a>
