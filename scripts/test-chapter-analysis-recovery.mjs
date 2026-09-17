@@ -68,6 +68,11 @@ const stubs = {
     completeJson,
     embedMany: async (texts) => texts.map(() => [1, 0]),
   },
+  // The headroom retry a cut-off structured reply gets before the splitter sees it is a
+  // transport-level concern with its own suite (scripts/test-validation-headroom.mjs). Here
+  // it forwards straight to the stubbed call, so this test keeps measuring what it is about:
+  // which batches get bisected and what reaches the publication boundary.
+  './structuredHeadroom': { completeJsonWithHeadroom: (opts, guard, model) => completeJson(opts, guard, model) },
   '../db/projectsRepo': {
     getChapter: () => ({ id: 'chapter-1', projectId: 'project-1', currentMarkdown: 'Changed chapter text' }),
     listChapterChunks: () => [{ headingPath: 'H', text: 'A substantive claim.' }],
@@ -121,7 +126,8 @@ test('chapter extraction and relation typing recover without partial publication
   const ideas = await chapter.extractChapterIdeas(chunks, null, 'es');
   assert.equal(ideas.length, 6);
   assert.equal(calls[0].opts.task, 'chapter-idea-extraction');
-  assert.equal(calls[0].opts.maxTokens, 4500);
+  // Six fragments of JSON plus the trace a reasoning model writes before it (1500 + 750 × 6).
+  assert.equal(calls[0].opts.maxTokens, 6000);
   assert.ok(calls.some((call) => call.payload.fragmentos?.length === 1), 'an oversized extraction batch is bisected');
 
   calls = [];
@@ -135,7 +141,9 @@ test('chapter extraction and relation typing recover without partial publication
   );
   assert.equal(typed.size, 4);
   assert.equal(calls[0].opts.task, 'chapter-relation-typing');
-  assert.equal(calls[0].opts.maxTokens, 896);
+  // Four pairs of JSON (160 each) on top of the trace allowance (see the planner's
+  // VALIDATION_MAX_TOKENS), not the 896 tokens the item count alone justified.
+  assert.equal(calls[0].opts.maxTokens, 2640);
   assert.ok(calls.some((call) => call.payload.ideas_manuscrito?.[0]?.candidatos.length === 1), 'relation pairs are bisected independently');
 
   mode = 'omit';

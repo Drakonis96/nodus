@@ -24,7 +24,7 @@ import {
   normalizeEdgeType,
 } from '../db/ideasRepo';
 import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanCheckpointRepo';
-import { completeJson } from './aiClient';
+import { completeJsonWithHeadroom } from './structuredHeadroom';
 import { computeNearestNeighbors } from '../graph/computeHost';
 import { adaptiveStructuredBatch } from './adaptiveStructuredBatch';
 import { localTaskOutputTokens } from './localRequestPlanner';
@@ -287,7 +287,7 @@ export async function reprocessConnections(
             statement: clip(idea.statement).slice(0, context.textLimit),
           })),
         };
-        return completeJson<ThemeAssignmentResult>(
+        return completeJsonWithHeadroom<ThemeAssignmentResult>(
           {
             system,
             user: JSON.stringify(input),
@@ -524,7 +524,7 @@ async function reprocessRelations(
             similarity: Number(candidate.similarity.toFixed(3)),
           })),
         };
-        return completeJson<RelationExtractionResult>(
+        return completeJsonWithHeadroom<RelationExtractionResult>(
           {
             system: prompt.relationSystem,
             user: JSON.stringify(input),

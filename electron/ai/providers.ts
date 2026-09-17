@@ -94,7 +94,8 @@ export function supportsJsonMode(provider: AiProvider): boolean {
     provider === 'nodus' ||
     // The user's own gateway: response_format is part of the OpenAI contract it
     // claims to implement. A backend that ignores or rejects it is caught by the
-    // caller's 400 retry, which strips the optional params and sends again.
+    // caller's 400 retry, which strips the optional params and sends again — even
+    // when the refusal names nothing, which is the shape a proxy produces.
     provider === 'custom' ||
     // Ollama and LM Studio both accept OpenAI's response_format on their compat
     // surface. A small model that ignores it is caught by the caller's 400 retry.
@@ -257,8 +258,9 @@ export function reasoningBody(
     case 'custom':
       // Nodus cannot know what sits behind the user's gateway, so it only ever adds a
       // reasoning field to a *background* scan, and only for a model whose id announces
-      // the mode. A gateway that refuses the field cannot make the scan fail: the
-      // transport retries once without it (see `shouldRetryWithoutOptionalFields`).
+      // the mode. A gateway that refuses the field cannot make the scan fail: the transport
+      // walks down to the plain OpenAI body without it (see `optionalFieldReplays` in
+      // aiClient.ts), and remembers the refusal so the next chunk starts there.
       // Conversational turns never carry one — the field's support is unknown, and a
       // rejected chat turn has already lost its streaming answer.
       if (!background) return {};

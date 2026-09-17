@@ -187,6 +187,10 @@ async function reprocessBatches() {
     [/^\.\.\/db\/scanCheckpointRepo$/, 'checkpoints', `export function loadCheckpoints() { return new Map(); } export function saveCheckpoint() {} export function clearCheckpoints() {}`],
     [/^\.\.\/graph\/computeHost$/, 'computeHost', `export async function computeNearestNeighbors() { return []; }`],
     [/^\.\/aiClient$/, 'aiClient', `
+      // The recovery that answers a cut-off reply with more room inspects the error's class,
+      // so the stub has to declare it even though this path never throws one: here the plan
+      // refuses (a context overflow) and the batch is split instead.
+      export class AiError extends Error { constructor(message, retriable = false, config = false, code = null) { super(message); this.retriable = retriable; this.config = config; this.code = code; } }
       export async function completeJson(request) {
         const probe = globalThis.__reprocessProbe;
         const { buildLocalRequestPlan } = probe.planner;

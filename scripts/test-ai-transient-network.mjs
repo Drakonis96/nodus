@@ -73,7 +73,7 @@ test('wrapProviderError marks a transient network failure retriable', () => {
   // The heuristic is dead without this call site, and aiClient.ts cannot be imported
   // here (database + native driver), so the wiring is asserted on the source text.
   const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
-  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
+  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
   assert.match(
     source,
     /if \(isTransientNetworkFailure\(e\)\) \{\s*return new AiError\(message \|\| 'Error de conexión con el proveedor de IA\.', true, false, 'connection'\);/,

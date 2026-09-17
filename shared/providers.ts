@@ -183,6 +183,100 @@ export function normalizeCustomProviderConfig(config: Partial<CustomProviderConf
   };
 }
 
+/** Hostnames that are this machine by definition, whatever the DNS suffix situation. */
+const LOCAL_HOSTNAMES = new Set([
+  'localhost',
+  '0.0.0.0',
+  '::',
+  '::1',
+  // Docker Desktop publishes these aliases inside a container so it can reach the host.
+  'host.docker.internal',
+  'gateway.docker.internal',
+  'host.containers.internal',
+]);
+
+/**
+ * Suffixes reserved for private networks: mDNS, the IANA private-use TLDs, and the
+ * MagicDNS name Tailscale hands out. A model server answering on one of these is the
+ * user's own hardware, reached over their own network.
+ */
+const LOCAL_HOST_SUFFIXES = ['.localhost', '.local', '.localdomain', '.lan', '.internal', '.home', '.home.arpa', '.ts.net'];
+
+/** The hostname of a base URL, tolerating a missing scheme ("localhost:8080/v1"). */
+function hostnameOf(rawUrl: string | null | undefined): string | null {
+  const raw = String(rawUrl ?? '').trim();
+  if (!raw) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `http://${raw}`;
+  try {
+    return new URL(withScheme).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  } catch {
+    return null;
+  }
+}
+
+/** Loopback, RFC 1918, link-local, and the CGNAT range Tailscale and friends hand out. */
+function isPrivateIpv4(host: string): boolean {
+  const parts = host.split('.');
+  if (parts.length !== 4) return false;
+  const octets = parts.map((part) => (/^\d{1,3}$/.test(part) ? Number(part) : Number.NaN));
+  if (octets.some((value) => Number.isNaN(value) || value > 255)) return false;
+  const [a, b] = octets;
+  return (
+    a === 0 ||
+    a === 127 ||
+    a === 10 ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 169 && b === 254) ||
+    (a === 100 && b >= 64 && b <= 127)
+  );
+}
+
+/** IPv6 unique-local (fc00::/7) and link-local (fe80::/10). */
+function isPrivateIpv6(host: string): boolean {
+  const firstGroup = host.split(':').find((group) => group.length > 0);
+  if (!firstGroup) return false;
+  const value = Number.parseInt(firstGroup, 16);
+  if (Number.isNaN(value)) return false;
+  return (value & 0xfe00) === 0xfc00 || (value & 0xffc0) === 0xfe80;
+}
+
+/**
+ * An IPv4 address written as an IPv4-mapped IPv6 one, in the hex the URL parser leaves it
+ * in: `::ffff:7f00:1` is 127.0.0.1, which is how a v6-only stack writes loopback.
+ */
+function mappedIpv4(host: string): string | null {
+  const match = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(host);
+  if (!match) return null;
+  const high = Number.parseInt(match[1], 16);
+  const low = Number.parseInt(match[2], 16);
+  return `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`;
+}
+
+/**
+ * Whether a custom endpoint's address is this machine or the user's own network.
+ *
+ * The transport gives an on-device model a far longer completion budget than a cloud one —
+ * nothing is billed by the second there, and the wait IS the work. That budget used to be
+ * decided by provider id alone, so a llama.cpp server at `http://localhost:8080/v1` — the
+ * exact setup the custom provider exists for — was held to the three-minute cloud ceiling
+ * and timed out on every long extraction chunk, with no setting able to say otherwise.
+ *
+ * Deliberately generous about what counts as local: answering "local" for an address that
+ * belongs to nobody only lengthens a request that would otherwise fail, while answering
+ * "cloud" for the user's own machine breaks a scan that works. Anything on loopback, a
+ * private range, a container host alias or a private-network DNS suffix counts.
+ */
+export function isLocalEndpointAddress(rawUrl: string | null | undefined): boolean {
+  const host = hostnameOf(rawUrl);
+  if (!host) return false;
+  if (LOCAL_HOSTNAMES.has(host)) return true;
+  if (LOCAL_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix))) return true;
+  if (!host.includes(':')) return isPrivateIpv4(host);
+  const mapped = mappedIpv4(host);
+  return mapped ? isPrivateIpv4(mapped) : isPrivateIpv6(host);
+}
+
 /** Embedding-capable providers, in the order the Settings selector shows them. */
 export const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ['openai', 'gemini', 'openrouter', 'ollama', 'lmstudio', 'nodus'];
 
