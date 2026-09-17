@@ -451,7 +451,7 @@ function nodusLocalMaxTokens(model: ModelRef, opts: CallOpts, requestedMax: numb
   return Math.min(requestedMax, available);
 }
 
-interface CallOpts {
+export interface CallOpts {
   /** Set exclusively by Research Assistant; absent preserves every other surface. */
   researchEffort?: ResearchEffort;
   researchModelInfo?: import('@shared/types').ModelInfo;

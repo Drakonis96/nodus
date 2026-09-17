@@ -59,12 +59,34 @@ test('65K and 128K manual context never become output limits', () => {
 });
 
 test('chapter tasks use bounded per-batch output budgets instead of context-sized output', () => {
-  assert.equal(planner.localTaskOutputTokens('chapter-idea-extraction', 1), 1500);
-  assert.equal(planner.localTaskOutputTokens('chapter-idea-extraction', 6), 4500);
+  assert.equal(planner.localTaskOutputTokens('chapter-idea-extraction', 1), 2250);
+  assert.equal(planner.localTaskOutputTokens('chapter-idea-extraction', 6), 6000);
   assert.equal(planner.localTaskOutputTokens('chapter-idea-extraction', 100), 6000);
-  assert.equal(planner.localTaskOutputTokens('chapter-relation-typing', 1), 768);
-  assert.equal(planner.localTaskOutputTokens('chapter-relation-typing', 12), 2176);
-  assert.equal(planner.localTaskOutputTokens('chapter-relation-typing', 36), 4000);
+  assert.equal(planner.localTaskOutputTokens('chapter-relation-typing', 1), 2160);
+  assert.equal(planner.localTaskOutputTokens('chapter-relation-typing', 12), 3920);
+  assert.equal(planner.localTaskOutputTokens('chapter-relation-typing', 36), 6000);
+});
+
+// A budget sized for the JSON alone stops mid-object on a model that reasons before answering,
+// because the trace is charged to the same budget and comes first. Measured on the engine
+// Nodus ships with Gemma 4 E2B and real ideas from a scanned paper: one relation judgement at
+// the old 512-token floor came back empty, and so did a full fifteen-pair batch at the old
+// 3.136-token allowance, while 2.000 and 5.000 tokens finished them with valid JSON.
+test('a judgement batch is budgeted for its reasoning trace plus its JSON', () => {
+  for (const task of ['theme-assignment', 'relation-validation', 'semantic-bridge', 'chapter-relation-typing']) {
+    assert.ok(
+      planner.localTaskOutputTokens(task, 1) >= planner.VALIDATION_MAX_TOKENS,
+      `${task} must clear a trace before the JSON starts`,
+    );
+  }
+  assert.equal(planner.VALIDATION_MAX_TOKENS, 2000, 'the floor is the measured trace allowance');
+  assert.ok(planner.VALIDATION_RETRY_MAX_TOKENS > planner.VALIDATION_BATCH_MAX_TOKENS, 'a cut-off answer has somewhere to go');
+  // The standard fifteen-pair batch — what a real reprocess sends — has to fit in one call, or
+  // every work pays the splitter for a budget that was never big enough.
+  assert.equal(planner.localTaskOutputTokens('relation-validation', 15), 4880);
+  assert.ok(planner.localTaskOutputTokens('relation-validation', 15) > 3136, 'the old allowance truncated the whole batch');
+  // Bigger batches are left to the splitter at the batch ceiling.
+  assert.equal(planner.localTaskOutputTokens('relation-validation', 100), planner.VALIDATION_BATCH_MAX_TOKENS);
 });
 
 test('compatibility fallback obeys loaded context and cannot pretend to apply manual context', () => {

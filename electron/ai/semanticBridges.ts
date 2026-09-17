@@ -8,7 +8,7 @@ import {
   ideaVectorsForCompute,
   normalizeEdgeType,
 } from '../db/ideasRepo';
-import { completeJson } from './aiClient';
+import { completeJsonWithHeadroom } from './structuredHeadroom';
 import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanCheckpointRepo';
 import { computeNearestNeighbors } from '../graph/computeHost';
 import { getSettings } from '../db/settingsRepo';
@@ -284,7 +284,7 @@ async function validateCandidates(
             similarity: Number(c.similarity.toFixed(3)),
           })),
         };
-        return completeJson<LlmValidationResult>(
+        return completeJsonWithHeadroom<LlmValidationResult>(
           {
             system: prompt,
             user: JSON.stringify(input),

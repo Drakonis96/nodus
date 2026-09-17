@@ -41,17 +41,42 @@ const AUTO_BUCKETS = [4096, 8192, 16384, 32768] as const;
 export const LOCAL_CONTEXT_VALUES = [4096, 8192, 16384, 32768, 65536, 131072] as const;
 export const MIN_LOCAL_OUTPUT_TOKENS = 512;
 
+/**
+ * Budgets for a batch of judgements: what the trace costs, what the JSON costs, and how far a
+ * cut-off answer may be retried.
+ *
+ * These budgets used to be the item count times a per-item allowance, with a floor of 512 for
+ * a single item — a model that answers directly writes a few hundred tokens of JSON and stops.
+ * A model that reasons before answering does not: the trace comes first and is charged to the
+ * same budget, so the JSON only starts after it. Measured on the engine Nodus ships, with
+ * Gemma 4 E2B and real ideas from a scanned paper:
+ *
+ *   · one relation judgement at 512 tokens came back empty at the ceiling; at 2.000 it
+ *     finished with valid JSON (its trace was ~1.700 characters);
+ *   · a full batch of fifteen judgements at 3.136 tokens (the old per-item allowance) came
+ *     back empty too, while 5.000 finished it — the trace alone was 6.500-11.000 characters.
+ *
+ * So the floor is what a trace costs and the per-item allowance is what the JSON costs, which
+ * is why the two are added instead of one bounding the other. A batch larger than
+ * `VALIDATION_BATCH_MAX_TOKENS` is left to the adaptive splitter, and a reply that is cut off
+ * anyway gets one retry with more room the way fusion and the work summaries do (see
+ * `electron/ai/structuredHeadroom.ts`).
+ */
+export const VALIDATION_MAX_TOKENS = 2_000;
+export const VALIDATION_BATCH_MAX_TOKENS = 6_000;
+export const VALIDATION_RETRY_MAX_TOKENS = 8_000;
+
 export function localTaskOutputTokens(task: LocalAiTask, itemCount = 1): number {
   switch (task) {
     case 'light-extraction': return 1500;
     case 'deep-extraction': return 16000;
     case 'fusion': return 800;
     case 'summary': return 800;
-    case 'theme-assignment': return Math.max(512, Math.min(4000, 256 + 96 * itemCount));
+    case 'theme-assignment': return Math.min(VALIDATION_BATCH_MAX_TOKENS, VALIDATION_MAX_TOKENS + 96 * itemCount);
     case 'relation-validation':
-    case 'semantic-bridge': return Math.max(512, Math.min(4000, 256 + 192 * itemCount));
-    case 'chapter-idea-extraction': return Math.max(1500, Math.min(6000, 750 * itemCount));
-    case 'chapter-relation-typing': return Math.max(768, Math.min(4000, 256 + 160 * itemCount));
+    case 'semantic-bridge': return Math.min(VALIDATION_BATCH_MAX_TOKENS, VALIDATION_MAX_TOKENS + 192 * itemCount);
+    case 'chapter-idea-extraction': return Math.min(VALIDATION_BATCH_MAX_TOKENS, 1500 + 750 * itemCount);
+    case 'chapter-relation-typing': return Math.min(VALIDATION_BATCH_MAX_TOKENS, VALIDATION_MAX_TOKENS + 160 * itemCount);
     case 'chat': return 1200;
     default: return 8000;
   }
