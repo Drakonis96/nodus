@@ -197,7 +197,7 @@ export const DIALOG_TITLE_COPY: Record<DialogTitleKey, Record<AppLanguage, strin
   ja: "データベースのエクスポート", },
   exportDeepResearchReport: { es: 'Exportar informe de Deep Research', en: 'Export Deep Research report', fr: 'Exporter le rapport Deep Research', de: 'Deep-Research-Bericht exportieren', pt: 'Exportar relatório de Deep Research', 'pt-BR': 'Exportar relatório de Deep Research', it: 'Esporta report Deep Research', tr: 'Deep Research raporunu dışa aktar', 'zh-CN': '导出 Deep Research 报告' ,
   'zh-TW': '匯出 Deep Research 報告',
-  ja: "ディープリサーチレポートのエクスポート", },
+  ja: "Deep Researchレポートのエクスポート", },
   attachFiles: { es: 'Adjuntar archivos', en: 'Attach files', fr: 'Joindre des fichiers', de: 'Dateien anhängen', pt: 'Anexar ficheiros', 'pt-BR': 'Anexar arquivos', it: 'Allega file', tr: 'Dosya iliştir', 'zh-CN': '附加文件' ,
   'zh-TW': '附加檔案',
   ja: "ファイルを添付する", },

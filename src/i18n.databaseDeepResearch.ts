@@ -8,7 +8,7 @@ const catalog = [
     "Deep Research de dados",
     "Deep Research de dados",
     "Deep Research sui dati",
-    "Veri Deep Research", "数据深度研究", "資料深度研究", "データのディープリサーチ"
+    "Veri Deep Research", "数据深度研究", "資料深度研究", "データのDeep Research"
   ],
   [
     "Investiga tus tablas con una pregunta clara, trazabilidad de fuentes y control del coste.",

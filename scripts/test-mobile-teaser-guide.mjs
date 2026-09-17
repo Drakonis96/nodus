@@ -113,5 +113,6 @@ test('every interface language is translated, and says the images are not', asyn
   assert.equal([...copy.matchAll(/englishNote:/g)].length, languages.length);
   assert.equal([...copy.matchAll(/surveyCta:/g)].length, languages.length);
   // And each carries its own nine slide labels.
-  assert.equal([...copy.matchAll(/deepResearch: 'Deep Research'/g)].length, languages.length);
+  // The generated tables may quote with double quotes; the label itself must match.
+  assert.equal([...copy.matchAll(/deepResearch: (['"])(.+)\1,/g)].filter((m) => m[2] === 'Deep Research').length, languages.length);
 });

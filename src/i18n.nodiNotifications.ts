@@ -297,7 +297,7 @@ export const NODI_NOTIFICATION_TRANSLATIONS = {
     "La indexación de textos necesita atención": "テキストのインデックス作成には注意が必要です",
     "Índice de textos completado": "テキストインデックスが完成しました",
     "{passages} fragmentos indexados en {works} obra(s).": "{works} 個の作品にわたって {passages} 個のパッセージがインデックス付けされています。",
-    "Informe de Deep Research listo": "ディープリサーチレポートの準備完了",
+    "Informe de Deep Research listo": "Deep Researchレポートの準備完了",
     "«{title}» se pidió desde un cliente MCP y ya está en tu galería.": "「{title}」は MCP クライアントからリクエストされ、現在ギャラリーにあります。",
     "Un informe de Deep Research ha fallado": "Deep Research レポートが失敗しました",
     "No se pudo generar «{title}», pedido desde un cliente MCP.": "MCP クライアントから要求された「{title}」を生成できませんでした。",

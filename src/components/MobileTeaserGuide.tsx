@@ -374,7 +374,7 @@ const COPY: Record<AppLanguage, TeaserCopy> = {
     search: "検索",
     argument: "引数マップ",
     gaps: "ギャップ",
-    deepResearch: "深い研究",
+    deepResearch: "Deep Research",
     model: "自分のモデルを持ち込む",
   },
   },

@@ -315,7 +315,7 @@ const languages: Record<PromptLanguage, { system: string; contextRule: string; k
       'ある節に十分な証拠がない場合は、限界または次のステップとして述べてください。空白を埋めないでください。',
     ]),
     contextRule: 'ここに含まれる各 id は、nodus://idea、nodus://work、nodus://gap、nodus://contradiction、または nodus://passage で引用できます。抜粋は逐語的な証拠であり、正確に引用する必要があります。',
-    kindLabels: { literature_review: '文献レビュー', theoretical_framework: '理論的枠組み', debate: '著者間の議論', gap_justification: 'ギャップの正当化', chapter_section: '章の一節', research_question: '研究上の問いまたは仮説', deep_research: '詳細な調査報告書' }, fallback: jaFallback,
+    kindLabels: { literature_review: '文献レビュー', theoretical_framework: '理論的枠組み', debate: '著者間の議論', gap_justification: 'ギャップの正当化', chapter_section: '章の一節', research_question: '研究上の問いまたは仮説', deep_research: 'Deep Research報告書' }, fallback: jaFallback,
   },
   ru: {
     system: systemPack([

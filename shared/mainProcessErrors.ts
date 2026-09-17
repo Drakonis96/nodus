@@ -2207,7 +2207,7 @@ export const MAIN_PROCESS_ERRORS: Record<string, MainErrorTranslations> = {
   ja: "バックアップには、グローバルライブラリの宣言されたファイルがすべて含まれているわけではありません。", },
   'Informe de Deep Research no encontrado.': { en: 'Deep Research report not found.', fr: 'Rapport Deep Research introuvable.', de: 'Deep-Research-Bericht nicht gefunden.', pt: 'Relatório de Deep Research não encontrado.', 'pt-BR': 'Relatório de Deep Research não encontrado.', it: 'Rapporto Deep Research non trovato.', tr: 'Deep Research raporu bulunamadı.' , "zh-CN": "未找到Deep Research报告。" ,
   'zh-TW': "未找到Deep Research報告。",
-  ja: "ディープリサーチレポートが見つかりません。", },
+  ja: "Deep Researchレポートが見つかりません。", },
   'No se encuentra la ejecución que produjo el informe.': { en: 'The run that produced the report cannot be found.', fr: 'L’exécution qui a produit le rapport est introuvable.', de: 'Der Durchlauf, der den Bericht erzeugt hat, wurde nicht gefunden.', pt: 'Não se encontra a execução que produziu o relatório.', 'pt-BR': 'Não se encontra a execução que produziu o relatório.', it: 'Non si trova l’esecuzione che ha prodotto il rapporto.', tr: 'Raporu üreten çalıştırma bulunamıyor.' , "zh-CN": "找不到生成该报告的运行记录。" ,
   'zh-TW': "找不到生成該報告的執行記錄。",
   ja: "レポートを生成した実行が見つかりません。", },
