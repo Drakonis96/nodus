@@ -284,7 +284,7 @@ export const LIBRARY_RECOVERY_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it
     "Auditar de nuevo": "再度監査する",
     "Reconstruir catálogo": "カタログを再構築する",
     "{n} elemento(s) recuperable(s)": "{n} 個の回復可能なアイテム",
-    "Volver a la Biblioteca": "図書館に戻る",
+    "Volver a la Biblioteca": "ライブラリに戻る",
     "Revisar y vaciar": "レビューして空にする",
     "La papelera está vacía.": "ゴミ箱は空です。",
     "Los elementos enviados aquí podrán restaurarse antes del vaciado manual.": "ここに送信されたアイテムは、ゴミ箱を手動で空にする前に復元できます。",

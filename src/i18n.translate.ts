@@ -836,7 +836,7 @@ export const TRANSLATE_TRANSLATIONS = {
     "Zotero · {count} ライブラリに接続されています",
     "Zotero · {count} ライブラリに接続されています",
     "再接続",
-    "Zotero図書館",
+    "Zoteroライブラリ",
     "ライブラリの選択",
     "タイトル、著者、年で検索…",
     "この検索には結果がありません。",

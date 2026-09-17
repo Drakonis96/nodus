@@ -18,7 +18,7 @@ const rows = [
   ['Respuesta JSON del modelo', 'Model JSON response', 'Réponse JSON du modèle', 'JSON-Antwort des Modells', 'Resposta JSON do modelo', 'Resposta JSON do modelo', 'Risposta JSON del modello', 'Model JSON yanıtı', '模型JSON响应', '模型JSON響應', "モデルの JSON 応答", "모델 JSON 응답"],
   ['Embeddings', 'Embeddings', 'Embeddings', 'Embeddings', 'Embeddings', 'Embeddings', 'Embeddings', 'Gömlemler', '向量嵌入', '向量嵌入', "埋め込み", "임베딩"],
   ['Indexado de documentos', 'Document indexing', 'Indexation des documents', 'Dokumentindexierung', 'Indexação de documentos', 'Indexação de documentos', 'Indicizzazione dei documenti', 'Belge indeksleme', '文档索引', '文件索引', "ドキュメントのインデックス作成", "문서 인덱싱"],
-  ['Fragmentos de recuperación', 'Retrieval passages', 'Fragments de récupération', 'Abruf Fragmente', 'Fragmentos de recuperação', 'Fragmentos de recuperação', 'Passaggi di recupero', 'Arama parçaları', '检索片段', '檢索片段', "回収通路", "검색 구절"],
+  ['Fragmentos de recuperación', 'Retrieval passages', 'Fragments de récupération', 'Abruf Fragmente', 'Fragmentos de recuperação', 'Fragmentos de recuperação', 'Passaggi di recupero', 'Arama parçaları', '检索片段', '檢索片段', "検索パッセージ", "검색 구절"],
   ['Análisis del documento', 'Document analysis', 'Analyse du document', 'Dokumentenanalyse', 'Análise do documento', 'Análise do documento', 'Analisi del documento', 'Belge analizi', '文档分析', '文件分析', "文書分析", "문서분석"],
   ['Análisis de figuras', 'Figure analysis', 'Analyse des figures', 'Abbildungsanalyse', 'Análise de figuras', 'Análise de figuras', 'Analisi delle figure', 'Şekil analizi', '图表分析', '圖表分析', "図形分析", "그림 분석"],
   ['Análisis con IA', 'AI analysis', 'Analyse par IA', 'KI-Analyse', 'Análise com IA', 'Análise com IA', 'Analisi con IA', 'Yapay zekâ analizi', 'AI分析', 'AI分析', "AI分析", "AI 분석"],

@@ -373,7 +373,7 @@ export const LIBRARY_TUTORIAL_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it
     "Analizar las seleccionadas": "선택한 것을 분석",
   },
   ja: {
-    "Guía de la Biblioteca": "図書館案内",
+    "Guía de la Biblioteca": "ライブラリ案内",
     "Dos formas de usar la Biblioteca": "ライブラリの2つの使い方",
     "Analiza obras dentro de este vault o gestiona toda tu bibliografía con Nodus. Esta guía cubre las dos.": "このボールト内の作品を分析したり、Nodus を使用して参考文献全体を管理したりできます。このガイドでは両方について説明します。",
     "Lo que añadas aquí es lo que Nodus analiza": "ここに追加する内容は、Nodus が分析する内容です",
@@ -406,6 +406,6 @@ export const LIBRARY_TUTORIAL_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it
     "Las dos se activan en Ajustes → Integraciones.": "どちらも「設定」→「統合」で有効になります。",
     "Puedes volver a abrir esta guía con el botón ? de la cabecera.": "? を使用してこのガイドを再度開くことができます。ヘッダーのボタン。",
     "Está en beta: en documentos muy largos puede tardar bastante y no siempre acierta con la estructura.": "これはベータ版です。非常に長い文書の場合は時間がかかることがあり、構造が常に正しいとは限りません。",
-    "Cómo funciona la Biblioteca": "図書館の仕組み",
+    "Cómo funciona la Biblioteca": "ライブラリの仕組み",
     "Analizar las seleccionadas": "選択したものを分析する",
   }, } as const;

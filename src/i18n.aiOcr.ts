@@ -785,7 +785,7 @@ export const AI_OCR_TRANSLATIONS = {
   },
   ja: {
     "Nuevo OCR": "新しいOCR",
-    "Biblioteca": "図書館",
+    "Biblioteca": "ライブラリ",
     "Reprocesar página {n}": "ページ {n} を再処理します",
     "Páginas en paralelo": "並列ページ",
     "Envía varias páginas a la vez para transcribir más rápido.": "複数のページを一度に送信して、文字起こしを高速化します。",
@@ -832,7 +832,7 @@ export const AI_OCR_TRANSLATIONS = {
     "Cancelar": "キャンセル",
     "Eliminar": "消去",
     "Revisar": "レビュー",
-    "Volver a la biblioteca": "図書館に戻る",
+    "Volver a la biblioteca": "ライブラリに戻る",
     "Copiar transcripción": "転写のコピー",
     "Reprocesar documento": "ドキュメントを再処理する",
     "Anterior": "前の",

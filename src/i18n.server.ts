@@ -5413,7 +5413,7 @@ export const SERVER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "Ideas": "アイデア",
     "Huecos": "ギャップ",
     "Obras": "作品",
-    "Pasajes": "通路",
+    "Pasajes": "パッセージ",
     "Referencia": "参照",
     "Siguientes pasos": "次のステップ",
     "Limitaciones": "制限事項",

@@ -285,8 +285,8 @@ export const SOURCE_CITATION_TRANSLATIONS = {
     "Posición A": "ポジションA",
     "Posición B": "ポジションB",
     "No hay fragmentos de evidencia anclados.": "確固たる証拠の抜粋はありません。",
-    "Abrir en la biblioteca local": "地元の図書館で開く",
-    "Biblioteca local": "地元の図書館",
+    "Abrir en la biblioteca local": "地元のライブラリで開く",
+    "Biblioteca local": "地元のライブラリ",
     "Abrir en una pestaña nueva": "新しいタブで開く",
   },
 } satisfies Record<string, Record<string, string>>;

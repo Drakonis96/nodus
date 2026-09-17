@@ -2619,7 +2619,7 @@ export const MAIN_PROCESS_ERRORS: Record<string, MainErrorTranslations> = {
   'Pasaje no encontrado.': { en: 'Passage not found.', fr: 'Passage introuvable.', de: 'Passage nicht gefunden.', pt: 'Passagem não encontrada.', 'pt-BR': 'Passagem não encontrada.', it: 'Passaggio non trovato.', tr: 'Pasaj bulunamadı.' , "zh-CN": "未找到片段。" ,
   'zh-TW': "未找到片段。",
   ko: "통로를 찾을 수 없습니다.",
-  ja: "通路が見つかりません。", },
+  ja: "パッセージが見つかりません。", },
   'La resolución necesita una justificación.': { en: 'The resolution needs a justification.', fr: 'La résolution nécessite une justification.', de: 'Die Auflösung benötigt eine Begründung.', pt: 'A resolução precisa de uma justificação.', 'pt-BR': 'A resolução precisa de uma justificativa.', it: 'La risoluzione richiede una giustificazione.', tr: 'Çözümleme bir gerekçe gerektirir.' , "zh-CN": "解析需要理由。" ,
   'zh-TW': "解析需要理由。",
   ko: "결의안에는 정당성이 필요합니다.",

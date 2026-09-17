@@ -221,7 +221,7 @@ export const LIBRARY_ONBOARDING_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, 
   ja: {
     "Construye tu biblioteca dentro de Nodus o conecta Zotero. Las dos opciones terminan en el mismo grafo local.": "Nodus 内でライブラリを構築するか、Zotero に接続します。どちらのオプションも同じローカルグラフにつながります。",
     "Elige cómo quieres empezar. Puedes cambiar de método o combinar ambos más adelante desde Biblioteca.": "開始方法を選択してください。後でライブラリからメソッドを切り替えたり、組み合わせたりすることができます。",
-    "Biblioteca de Nodus": "ノダス図書館",
+    "Biblioteca de Nodus": "ノダスライブラリ",
     "Añadir contenido": "コンテンツの追加",
     "Cómo funciona": "仕組み",
     "Lecturas de Zotero": "Zoteroの読書",

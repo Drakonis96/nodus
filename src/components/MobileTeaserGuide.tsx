@@ -368,7 +368,7 @@ const COPY: Record<AppLanguage, TeaserCopy> = {
     finish: "わかった",
     slides: {
     home: "金庫室ホーム",
-    library: "図書館",
+    library: "ライブラリ",
     work: "詳しい作品",
     idea: "アイデアとその証拠",
     search: "検索",
