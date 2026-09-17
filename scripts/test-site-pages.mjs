@@ -447,3 +447,35 @@ test('every page is reachable by keyboard and readable by a screen reader', () =
     assert.equal((html.match(/<h1[ >]/g) ?? []).length, 1, `${page} has exactly one h1`);
   }
 });
+
+test('Support Nodus takes the money the app takes, and names people only', () => {
+  const html = read('contribute/index.html');
+  const script = read('contribute/contribute.js');
+  const settings = read('../src/views/Settings.tsx');
+  const funding = read('../.github/FUNDING.yml');
+
+  // The three ways in are the destinations the desktop app already opens, so a
+  // renamed handle can never survive on one surface and rot on the other.
+  for (const url of ['https://ko-fi.com/nodus_app', 'https://paypal.me/Jorgepb96']) {
+    assert.ok(html.includes(`href="${url}"`), `the page links to ${url}`);
+    assert.ok(settings.includes(url), `the desktop app opens the same ${url}`);
+  }
+  assert.match(html, /href="https:\/\/github\.com\/sponsors\/drakonis96"/, 'the page links to GitHub Sponsors');
+  assert.match(funding, /^github: drakonis96$/m, 'the sponsor account matches the funding file');
+
+  // The owner opens the wall whatever the counts say, and no assistant or
+  // platform account is ever presented as one of the people who built Nodus.
+  assert.match(script, /const OWNER = 'drakonis96'/, 'the owner is named in the script');
+  assert.match(script, /Number\(b\.login\.toLowerCase\(\) === OWNER\)[\s\S]*?Number\(a\.login\.toLowerCase\(\) === OWNER\)/,
+    'the owner is ranked ahead of every contribution count');
+  const source = script.match(/const NOT_PEOPLE = (\/[^\n]+?\/i);/)?.[1];
+  assert.ok(source, 'the script filters the accounts that are not people');
+  const notPeople = new RegExp(source.slice(1, source.lastIndexOf('/')), 'i');
+  for (const login of ['claude', 'chatgpt', 'github', 'Claude', 'openai', 'copilot']) {
+    assert.ok(notPeople.test(login), `${login} is never shown as a contributor`);
+  }
+  for (const login of ['Drakonis96', 'oguzkarayemis', 'sbvelinga', 'mbradaschia', 'githubber']) {
+    assert.ok(!notPeople.test(login), `${login} is a person and must stay visible`);
+  }
+  assert.match(script, /if \(!people\.length\) return false/, 'an unknown list is reported, never shown as zero');
+});
