@@ -998,7 +998,7 @@ export const CLOUDFLARE_TRANSLATIONS = {
     "Copiar código y abrir Cloudflare": "コードをコピーしてCloudflareを開きます",
     "Paso 2 · Vuelve con la dirección de tu Worker": "ステップ2 · 従業員の住所を持って戻ってきます",
     "Cuando Cloudflare indique que terminó, copia la dirección que acaba en workers.dev. No pegues claves de API ni contraseñas de Cloudflare.": "Cloudflare が完了を報告したら、workers.dev で終わるアドレスをコピーします。 API キーや Cloudflare パスワードを貼り付けないでください。",
-    "Dirección de Nodus Cloud": "ノーダスクラウドアドレス",
+    "Dirección de Nodus Cloud": "Nodusクラウドアドレス",
     "https://nodus-cloud.tu-subdominio.workers.dev": "https://nodus-cloud.your-subdomain.workers.dev",
     "Correo para administrar tu vault": "ボールトを管理するための電子メール",
     "Contraseña nueva de Nodus Cloud": "新しい Nodus Cloud パスワード",

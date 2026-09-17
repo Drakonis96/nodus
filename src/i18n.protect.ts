@@ -1242,7 +1242,7 @@ export const PROTECT_TRANSLATIONS = {
     "Verificar otro archivo": "別のファイルを確認してください",
     "Verificar una copia trazable": "追跡可能なコピーを検証する",
     "Versión": "バージョン",
-    "Volver a Nodus Protect": "ノーダスプロテクトに戻る",
+    "Volver a Nodus Protect": "Nodusプロテクトに戻る",
     "Vuelve a seleccionar el archivo.": "ファイルを再度選択します。",
     "Válido únicamente a efectos de identificación en el trámite indicado. No constituye firma, autorización contractual ni consentimiento para usos distintos.": "示された手順での識別目的にのみ有効です。これは、署名、契約上の承認、またはさまざまな用途の同意を構成するものではありません。",
     "Web Crypto no está disponible; no se puede autenticar la marca en este entorno.": "Web 暗号化は利用できません。この環境ではマークを認証できません。",

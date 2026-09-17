@@ -478,7 +478,7 @@ const COPY: Record<TutorialLanguage, PlatformCopy> = {
   },
     {
     eyebrow: "読書をする場所で仕事をする",
-    title: "ゾテロのノドゥス",
+    title: "ZoteroのNodus",
     summary: "Nodus コンテキストを Zotero のサイドバーとリーダーに取り込むベータ版プラグイン。",
     body: "開いているドキュメントまたは選択した複数のアイテムについて質問し、ライブラリ全体のリンクを見つけ、会話でページの引用を使用すると、Nodus が自動的に検索されます。",
     detailA: "読者を離れることなく、選択したテキストを要約し、説明し、翻訳し、議論します。",

@@ -3875,7 +3875,7 @@ export const TESTIMONY_TRANSLATIONS = {
     "Puede difundirse según los usos documentados en el acuerdo.": "契約に記載された用途に従って配布される場合があります。",
     "Puede significar que no se vivió, que no se preguntó o que se decidió no contarlo. Nodus no lo interpreta por ti.": "それは、それが生きられなかった、それについて尋ねられなかった、または語られないことを選択したことを意味する可能性があります。 Nodus はそれをあなたのために解釈しません。",
     "Puntúa, acentúa y separa frases. No quita muletillas ni cambia palabras: lo que lo intente se rechaza y se queda como estaba.": "句読点、アクセント、文の分割を行います。フィラーを削除したり単語を変更したりすることはありません。試みたものはすべて拒否され、そのまま残されます。",
-    "Que una entrevista no aporte nada puede significar que no se vivió, que no se preguntó o que se decidió no contarlo. Nodus no lo interpreta.": "何も貢献しないインタビューは、それが生きていなかったこと、それについて質問されなかったこと、または語られないことを選択したことを意味する可能性があります。ノーダスはそれを解釈しません。",
+    "Que una entrevista no aporte nada puede significar que no se vivió, que no se preguntó o que se decidió no contarlo. Nodus no lo interpreta.": "何も貢献しないインタビューは、それが生きていなかったこと、それについて質問されなかったこと、または語られないことを選択したことを意味する可能性があります。Nodusはそれを解釈しません。",
     "Quitar a {name}": "{name} を削除します",
     "Quitar el código {name}": "コード {name} を削除します",
     "Quién cuenta": "誰が物語を語るのか",

@@ -144,7 +144,7 @@ export const ANNOUNCEMENT_TRANSLATIONS = {
   },
   ja: {
     "Avisos de Nodus y actividad reciente": "Nodus の発表と最近の活動",
-    "Avisos de Nodus": "ノーダスのお知らせ",
+    "Avisos de Nodus": "Nodusのお知らせ",
     "Actividad": "活動",
     "Limpiar notificaciones": "通知をクリアする",
     "Se eliminarán todos los avisos de Nodus y la actividad reciente. Esta acción no se puede deshacer.": "Nodus の発表と最近のアクティビティはすべて削除されます。この操作は元に戻すことができません。",

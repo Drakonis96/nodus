@@ -198,7 +198,7 @@ const zhTW = {
 export const LIBRARY_RECOVERY_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN ,
   'zh-TW': zhTW,
   ja: {
-    "Se conservarán colecciones, adjuntos, Markdown, anotaciones, chats, notas, aliases y relaciones. Las obras de vault permanecen separadas.": "コレクション、添付ファイル、マークダウン、注釈、チャット、メモ、エイリアス、および関係は保持されます。金庫室の作業は別々のままです。",
+    "Se conservarán colecciones, adjuntos, Markdown, anotaciones, chats, notas, aliases y relaciones. Las obras de vault permanecen separadas.": "コレクション、添付ファイル、Markdown、注釈、チャット、メモ、エイリアス、および関係は保持されます。金庫室の作業は別々のままです。",
     "Impacto verificado": "検証済みの影響",
     "anotaciones": "注釈",
     "notas": "メモ",

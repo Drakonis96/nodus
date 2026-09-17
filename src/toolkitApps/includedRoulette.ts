@@ -33,7 +33,7 @@ export const ROULETTE_COPY: IncludedAppCopy = {
     eyebrow: 'NODUS · 實用工具', title: '選項轉盤', intro: '至少新增兩個備選項。每次轉動都會隨機選擇一項。', sample: '載入示例', clearOptions: '清空選項', step1: '第 1 步', prepare: '準備轉盤', countOne: '{count} 個選項', countMany: '{count} 個選項', newOption: '新選項', optionPlaceholder: '例如：從第 2 章開始', add: '新增', statusHint: '最多可新增40個選項。', bulkSummary: '一次新增多個', bulkLabel: '每行一個選項', bulkPlaceholder: '選項 A\n選項 B\n選項 C', bulkAdd: '加入轉盤', emptyTitle: '你的轉盤是空的', emptyBody: '輸入一個選項，或載入示例來試用。', step2: '第 2 步', spinChoose: '轉動並選擇', avoidRepeat: '避免重複上次結果', resultLabel: '結果', needTwo: '至少新增兩個選項', resultNote: '選中的選項將顯示在這裡。', spin: '轉動轉盤', space: '空格鍵', latest: '最近轉動', history: '歷史記錄', clearHistory: '清空歷史記錄', historyEmpty: '你還沒有轉動過轉盤。', remove: '移除 {label}', storageError: '無法儲存更改。', addedOne: '已新增 1 個選項。', addedMany: '已新增 {count} 個選項。', maximum: '轉盤最多支援40個選項。', duplicate: '該選項已在轉盤中。', priorSpin: '上次轉動', ariaEmpty: '無選項的轉盤', ariaWith: '含有 {count} 個選項的轉盤：{options}', addOptionsCanvas: '新增選項', spinAgain: '再轉一次', spinning: '正在轉動…', spinningNote: '轉盤正在選擇一個選項。', chosenAmong: '從 {count} 個選項中選出。', confirmClear: '確認清空', cleared: '轉盤已清空。', recoverError: '無法恢復之前的資料。', samples: '散步十分鐘|讀一章|整理書桌|給某人打電話|準備新事物',
   },
   ja: {
-    eyebrow: "ノーダス・ユーティリティ",
+    eyebrow: "Nodus・ユーティリティ",
     title: "オプションホイール",
     intro: "少なくとも2つの代替案を追加します。各スピンではランダムな選択が行われます。",
     sample: "負荷例",

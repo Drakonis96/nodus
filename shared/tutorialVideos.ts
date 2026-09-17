@@ -735,7 +735,7 @@ const COPY: Record<TutorialLanguage, TutorialVideoCopy> = {
     body: "コース、時間割、グループ、ルーブリック、試験、成績表。",
   },
     nodi: {
-    title: "ノディ、あなたの相棒",
+    title: "Nodi、あなたの相棒",
     body: "Nodi を使用してチャットしたり、通知を確認したり、ヘルプを開く方法。",
   },
     toolkit: {
@@ -751,7 +751,7 @@ const COPY: Record<TutorialLanguage, TutorialVideoCopy> = {
     body: "コーパスを傍らに置き、ライブラリから引用しながら Word で書きます。",
   },
     zotero: {
-    title: "ゾテロ",
+    title: "Zotero",
     body: "コレクションを同期し、Zotero 内の Nodus プラグインから作業します。",
   },
     mcp: {

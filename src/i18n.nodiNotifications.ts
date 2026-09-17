@@ -289,7 +289,7 @@ export const NODI_NOTIFICATION_TRANSLATIONS = {
     "{relations} relaciones y {themes} temas nuevos detectados.": "{relations} 個の関係と {themes} 個の新しいテーマが検出されました。",
     "Nodus Radar ha encontrado novedades": "Nodus Radar が新しいアップデートを発見しました",
     "Actualizaciones de investigación listas para revisar: {count}.": "研究の更新をレビューする準備ができています: {count}。",
-    "Nodi ha encontrado relaciones semánticas": "ノディは意味関係を発見した",
+    "Nodi ha encontrado relaciones semánticas": "Nodiは意味関係を発見した",
     "{added} conexiones nuevas tras revisar {scanned} candidatos.": "{scanned} 個の候補を検討した後の {added} 個の新しい接続。",
     "La indexación semántica necesita atención": "セマンティックインデックスには注意が必要です",
     "Embeddings de ideas completados": "アイデアの埋め込みが完了しました",

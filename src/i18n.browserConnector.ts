@@ -99,7 +99,7 @@ export const BROWSER_CONNECTOR_TRANSLATIONS = {
     '開發擴充套件程式（未打包）或其他本地安裝。',
   ]),
   ja: table([
-    "ノーダスリサーチコネクター",
+    "Nodusリサーチコネクター",
     "Nodus Research コネクタを有効にする",
     "Nodus Research コネクターに接続する",
     "この拡張機能が Nodus にページを送信することを許可しますか?",
