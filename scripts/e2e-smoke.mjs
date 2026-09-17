@@ -559,29 +559,38 @@ try {
 
   // A fresh vault opens on its wizard. Walk to the provider step rather than hard-
   // coding its index, which differs by vault type (3 for academic, 1 for the simple
-  // types). That step must not let the user out until BOTH models are chosen — the
-  // requirement the create dialog used to enforce. Discovery reaches the built-in
-  // local models with no key and no network, so the picker always has choices.
+  // types). Discovery reaches the built-in local models with no key and no network, so
+  // the pickers always have choices — but nothing is preselected for either role, and
+  // that is the point: a model that runs on this machine is a deliberate choice, so the
+  // wizard hands the decision to the person instead of opening on the bundled Gemma
+  // (which used to arrive as `choices[0]`).
   const modelStep = page.getByTestId('onboarding-models');
   for (let i = 0; i < 4 && await modelStep.count() === 0; i++) {
     await page.getByRole('button', { name: 'Siguiente', exact: true }).click();
   }
   await modelStep.waitFor({ timeout: 30_000 });
 
-  // Finishing is still gated on having BOTH models, but the wizard fills them in
-  // itself: it discovers the built-in local models with no key and no network, and
-  // pre-selects one per role. So the point to assert is that a fresh vault reaches a
-  // finishable state with no typing — the create dialog no longer asks, and the
-  // wizard does not ask again for what it can find out.
+  // Finishing is gated on having BOTH models, and the gate stays shut until they are
+  // chosen here: an unanswered picker shows its placeholder, and no local model has been
+  // put in the user's name.
   const startButton = page.getByTestId('onboarding-start');
-  await waitForCondition('el asistente descubre ambos modelos por si mismo', () => startButton.isEnabled());
+  const aiTrigger = page.getByTestId('onboarding-ai-model-trigger');
+  await waitForCondition('el asistente deja ambos modelos sin elegir', () => aiTrigger.isVisible());
+  for (const role of ['onboarding-ai-model', 'onboarding-embedding-model']) {
+    const triggerText = await page.getByTestId(`${role}-trigger`).innerText();
+    assert.ok(!/nodus|ollama|lm studio/i.test(triggerText), `${role} does not open on a local model (shows "${triggerText.trim()}")`);
+  }
+  assert.equal(await startButton.isEnabled(), false, 'nothing is preselected, so starting stays disabled');
+
+  // Choosing one per role is what enables it.
   for (const role of ['onboarding-ai-model', 'onboarding-embedding-model']) {
     await page.getByTestId(`${role}-trigger`).click();
     const options = page.getByTestId(role).getByRole('option');
     await options.first().waitFor({ timeout: 30_000 });
     assert.ok(await options.count() > 0, `${role} offers discovered models to choose between`);
-    await page.keyboard.press('Escape');
+    await options.first().click();
   }
+  await waitForCondition('el asistente habilita Empezar tras elegir ambos modelos', () => startButton.isEnabled());
 
   await page.evaluate(async ({ original, temporary }) => {
     const switched = await window.nodus.switchVault(original);
