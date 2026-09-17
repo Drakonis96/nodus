@@ -99,7 +99,7 @@ export const BROWSER_CONNECTOR_TRANSLATIONS = {
     '開發擴充套件程式（未打包）或其他本地安裝。',
   ]),
   ko: table([
-    "노두스 연구 커넥터",
+    "Nodus 연구 커넥터",
     "Nodus Research 커넥터 활성화",
     "Nodus Research 커넥터 연결",
     "이 확장 프로그램이 Nodus에 페이지를 보낼 수 있도록 허용하시겠습니까?",

@@ -735,7 +735,7 @@ const COPY: Record<TutorialLanguage, TutorialVideoCopy> = {
     body: "코스, 시간표, 그룹, 기준표, 시험 및 성적표.",
   },
     nodi: {
-    title: "노디, 당신의 동반자",
+    title: "Nodi, 당신의 동반자",
     body: "Nodi를 사용하여 채팅하고, 알림을 확인하고, 도움말을 여는 방법.",
   },
     toolkit: {
@@ -751,7 +751,7 @@ const COPY: Record<TutorialLanguage, TutorialVideoCopy> = {
     body: "코퍼스와 라이브러리의 인용문을 함께 Word로 작성하세요.",
   },
     zotero: {
-    title: "조테로",
+    title: "Zotero",
     body: "컬렉션을 동기화하고 Zotero 내부의 Nodus 플러그인에서 작업하세요.",
   },
     mcp: {

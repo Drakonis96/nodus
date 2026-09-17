@@ -144,7 +144,7 @@ export const ANNOUNCEMENT_TRANSLATIONS = {
   },
   ko: {
     "Avisos de Nodus y actividad reciente": "Nodus 공지 및 최근 활동",
-    "Avisos de Nodus": "노두스 공지사항",
+    "Avisos de Nodus": "Nodus 공지사항",
     "Actividad": "활동",
     "Limpiar notificaciones": "알림 지우기",
     "Se eliminarán todos los avisos de Nodus y la actividad reciente. Esta acción no se puede deshacer.": "모든 Nodus 공지사항과 최근 활동이 삭제됩니다. 이 작업은 취소할 수 없습니다.",

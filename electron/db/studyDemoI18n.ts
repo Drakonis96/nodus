@@ -104,7 +104,7 @@ export const STUDY_DEMO_TEXT: Record<string, DemoCopy> = {
   ja: "研究室ガイド・浸透", },
   "Material Markdown de ejemplo, listo para abrir, anotar y relacionar.": { es: "Material Markdown de ejemplo, listo para abrir, anotar y relacionar.", en: "Sample Markdown material, ready to open, annotate and link.", "fr": "Support Markdown d’exemple, prêt à ouvrir, annoter et relier.", "de": "Beispiel-Markdown-Material, bereit zum Öffnen, Annotieren und Verknüpfen.", "pt": "Material Markdown de exemplo, pronto para abrir, anotar e relacionar.", "pt-BR": "Material Markdown de exemplo, pronto para abrir, anotar e relacionar.", "it": "Materiale Markdown di esempio, pronto da aprire, annotare e collegare.", "tr": "Açmaya, not almaya ve ilişkilendirmeye hazır örnek Markdown materyali.", "zh-CN": "示例Markdown资料，可直接打开、批注和关联。" ,
   'zh-TW': "示例Markdown資料，可直接開啟、批註和關聯。",
-  ko: "열고, 주석을 달고, 링크할 준비가 된 샘플 마크다운 자료입니다.",
+  ko: "열고, 주석을 달고, 링크할 준비가 된 샘플 Markdown 자료입니다.",
   ja: "サンプルの Markdown マテリアル。すぐに開いて、注釈を付け、リンクできます。", },
   "Departamento de Biología": { es: "Departamento de Biología", en: "Department of Biology", "fr": "Département de Biologie", "de": "Fachbereich Biologie", "pt": "Departamento de Biologia", "pt-BR": "Departamento de Biologia", "it": "Dipartimento di Biologia", "tr": "Biyoloji Bölümü", "zh-CN": "生物学系" ,
   'zh-TW': "生物學系",

@@ -884,19 +884,19 @@ Object.assign(PROSOPOGRAPHY_TRANSLATIONS.tr, {
 });
 
 const observationsEn = {
-  'Editor de observaciones': 'Observation editor',
-  'Un pasaje puede producir varias afirmaciones atómicas sin convertirse en un hecho definitivo.': 'A passage may produce several atomic statements without becoming a definitive fact.',
-  'Revisar y guardar': 'Review and save', 'Selecciona una fuente': 'Select a source',
-  'Segmento citable': 'Citable segment', 'Selecciona un segmento': 'Select a segment',
-  'Resumen del pasaje': 'Passage summary', 'Afirmación {number}': 'Statement {number}',
-  'Eliminar afirmación': 'Delete statement', 'Valor normalizado': 'Normalized value',
-  'Literal de la fuente': 'Source wording', 'Certeza de lectura': 'Reading certainty',
+  'Editor de observaciones': "관찰 편집자",
+  'Un pasaje puede producir varias afirmaciones atómicas sin convertirse en un hecho definitivo.': "한 구절은 확정적인 사실이 되지 않고도 여러 가지 원자적 진술을 생성할 수 있습니다.",
+  'Revisar y guardar': "검토 및 저장", 'Selecciona una fuente': 'Select a source',
+  'Segmento citable': "인용 가능한 세그먼트", 'Selecciona un segmento': "세그먼트 선택",
+  'Resumen del pasaje': "구절 요약", 'Afirmación {number}': 'Statement {number}',
+  'Eliminar afirmación': "명세서 삭제", 'Valor normalizado': "정규화된 값",
+  'Literal de la fuente': "소스 리터럴", 'Certeza de lectura': "읽기 확실성",
   'Modalidad': 'Modality', 'Afirmada': 'Asserted', 'Referida': 'Reported',
-  'Inferida por la fuente': 'Inferred by the source', 'Cuestionada': 'Questioned',
-  'La fuente niega esta afirmación': 'The source negates this statement',
-  'Añadir afirmación': 'Add statement', 'Evidencia revisada': 'Reviewed evidence',
-  'Las contradicciones permanecen visibles; una resolución nunca borra sus alternativas.': 'Contradictions remain visible; a resolution never deletes its alternatives.',
-  'Todavía no hay observaciones.': 'There are no observations yet.', 'negada': 'negated',
+  'Inferida por la fuente': "소스로 추론", 'Cuestionada': 'Questioned',
+  'La fuente niega esta afirmación': "출처는 이 주장을 부인합니다.",
+  'Añadir afirmación': "긍정 추가", 'Evidencia revisada': "증거 검토",
+  'Las contradicciones permanecen visibles; una resolución nunca borra sus alternativas.': "모순은 여전히 ​​가시적이다. 결의안은 결코 대안을 삭제하지 않습니다.",
+  'Todavía no hay observaciones.': "아직 관찰 결과가 없습니다.", 'negada': 'negated',
 };
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.en, observationsEn);
 for (const language of ['fr','de','pt','pt-BR','it','tr','zh-CN', 'zh-TW', 'ko'] as const) Object.assign(PROSOPOGRAPHY_TRANSLATIONS[language], observationsEn);
@@ -938,16 +938,16 @@ Object.assign(PROSOPOGRAPHY_TRANSLATIONS.tr, {
 });
 
 const identityEn = {
-  'Identidad histórica': 'Historical identity', 'Una mención no es una persona: compara, documenta y decide.': 'A mention is not a person: compare, document and decide.',
-  '{count} personas · {mentions} menciones sin resolver': '{count} people · {mentions} unresolved mentions',
-  'menciones': 'mentions', 'Dossier documentado, no biografía inferida.': 'Documented dossier, not an inferred biography.',
-  'Nombres documentados': 'Documented names', 'Sin contexto': 'No context', 'Autoridades': 'Authorities',
-  'Selecciona una persona.': 'Select a person.', 'Individualizar una mención': 'Identify a mention',
-  'Primero conserva la grafía; después busca candidatos.': 'Preserve the spelling first; then search for candidates.',
-  'Nombre tal como aparece': 'Name as it appears', 'Contexto, título, lugar…': 'Context, title, place…',
-  'Buscar candidatos': 'Search candidates', 'Dejar sin resolver': 'Leave unresolved', 'Crear persona': 'Create person',
-  'Organizaciones': 'Organizations', 'Instituciones y variantes se resuelven como autoridades separadas.': 'Institutions and variants are resolved as separate authorities.',
-  'Organización sin nombre': 'Unnamed organization', 'Añadir organización': 'Add organization',
+  'Identidad histórica': "역사적 정체성", 'Una mención no es una persona: compara, documenta y decide.': "언급은 사람이 아닙니다. 비교하고 문서화하고 결정합니다.",
+  '{count} personas · {mentions} menciones sin resolver': "{count}명 · 해결되지 않은 멘션 {mentions}개",
+  'menciones': 'mentions', 'Dossier documentado, no biografía inferida.': "추론된 전기가 아닌 문서화된 서류입니다.",
+  'Nombres documentados': "문서화된 이름", 'Sin contexto': "맥락 없음", 'Autoridades': 'Authorities',
+  'Selecciona una persona.': "사람을 선택합니다.", 'Individualizar una mención': "멘션 개별화",
+  'Primero conserva la grafía; después busca candidatos.': "먼저 철자를 보존하십시오. 그런 다음 후보자를 찾으십시오.",
+  'Nombre tal como aparece': "나타나는 대로 이름을 지정하세요.", 'Contexto, título, lugar…': "맥락, 제목, 장소…",
+  'Buscar candidatos': "후보자 검색", 'Dejar sin resolver': "해결되지 않은 채로 두다", 'Crear persona': "사람 만들기",
+  'Organizaciones': 'Organizations', 'Instituciones y variantes se resuelven como autoridades separadas.': "기관과 변형은 별도의 권한으로 해결됩니다.",
+  'Organización sin nombre': "이름이 없는 조직", 'Añadir organización': "조직 추가",
 };
 for (const language of ['en','fr','de','pt','pt-BR','it','tr','zh-CN', 'zh-TW', 'ko'] as const) Object.assign(PROSOPOGRAPHY_TRANSLATIONS[language], identityEn);
 Object.assign(PROSOPOGRAPHY_TRANSLATIONS.fr, {'Identidad histórica':'Identité historique','menciones':'mentions','Nombres documentados':'Noms documentés','Autoridades':'Autorités','Buscar candidatos':'Chercher des candidats','Dejar sin resolver':'Laisser non résolu','Crear persona':'Créer une personne','Organizaciones':'Organisations','Añadir organización':'Ajouter une organisation'});

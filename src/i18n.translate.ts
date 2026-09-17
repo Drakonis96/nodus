@@ -763,7 +763,7 @@ export const TRANSLATE_TRANSLATIONS = {
     "Zotero · {count} 라이브러리에 연결됨",
     "Zotero · {count} 라이브러리에 연결됨",
     "다시 연결",
-    "조테로 도서관",
+    "Zotero 도서관",
     "도서관 선택",
     "제목, 저자, 연도별로 검색하세요…",
     "이 검색에 대한 결과가 없습니다.",

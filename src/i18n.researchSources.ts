@@ -165,7 +165,7 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
     "El asistente solo consultará {n} obras.": "어시스턴트는 {n}개의 작품만 참조합니다.",
     "Ninguna obra coincide. No se recuperará contexto de otras fuentes.": "일치하는 작품이 없습니다. 다른 소스의 컨텍스트는 검색되지 않습니다.",
     "Filtro desactivado: se consultará todo el corpus.": "필터링 해제: 전체 자료가 검색됩니다.",
-    "{n} obras": "{n} 작동",
+    "{n} obras": "작품 {n}개",
     "1 obra": "작품 1개",
     "El asistente solo consultará esta obra.": "어시스턴트는 이 작업에 대해서만 상담할 것입니다.",
   },

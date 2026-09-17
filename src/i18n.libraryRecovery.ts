@@ -198,7 +198,7 @@ const zhTW = {
 export const LIBRARY_RECOVERY_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN ,
   'zh-TW': zhTW,
   ko: {
-    "Se conservarán colecciones, adjuntos, Markdown, anotaciones, chats, notas, aliases y relaciones. Las obras de vault permanecen separadas.": "컬렉션, 첨부 파일, 마크다운, 주석, 채팅, 메모, 별칭 및 관계가 유지됩니다. Vault 작업은 별도로 유지됩니다.",
+    "Se conservarán colecciones, adjuntos, Markdown, anotaciones, chats, notas, aliases y relaciones. Las obras de vault permanecen separadas.": "컬렉션, 첨부 파일, Markdown, 주석, 채팅, 메모, 별칭 및 관계가 유지됩니다. Vault 작업은 별도로 유지됩니다.",
     "Impacto verificado": "검증된 영향",
     "anotaciones": "주석",
     "notas": "메모",

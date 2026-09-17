@@ -518,7 +518,7 @@ const COPY: Record<TutorialLanguage, PlatformCopy> = {
   },
     {
     eyebrow: '책을 읽는 곳에서 일하세요',
-    title: 'Zotero용 노두스',
+    title: 'Zotero용 Nodus',
     summary: 'Zotero의 사이드바와 리더에 Nodus 컨텍스트를 제공하는 베타 플러그인입니다.',
     body: '열려 있는 문서나 선택한 여러 항목에 대해 질문하고, 라이브러리 전체의 링크를 검색하고, Nodus를 자동으로 찾는 대화에서 페이지 인용을 사용하세요.',
     detailA: '독자를 떠나지 않고도 선택한 텍스트를 요약, 설명, 번역 및 토론할 수 있습니다.',
