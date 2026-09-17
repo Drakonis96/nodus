@@ -63,14 +63,19 @@ See [PRIVACY.md](PRIVACY.md) for the Chrome Web Store disclosure and
 
 ## Interface language
 
-Every string a user can read lives in `_locales/en/messages.json` and
-`_locales/es/messages.json`, including the popup, the settings page, the privacy page and the errors
-the Manifest V3 worker reports back into the popup. Both catalogs must define the same messages with
-the same placeholders, and the static markup mirrors the English catalog so the copy can be reviewed
-in place; `scripts/test-browser-connector.mjs` fails when a message, a placeholder or a rendered
-surface drifts. The pure `lib/` modules carry no Chrome API, so they cannot read `_locales` themselves:
-they default to English labels and accept the ones the adapter renders (`DETECTOR_LABELS`,
-`METADATA_LABELS`, and the transfer message passed to `readResponseWithLimit`).
+The connector ships the nine languages the rest of Nodus speaks, one catalog per language under
+`_locales/`: English, Spanish, French, German, Portuguese (Portugal), Portuguese (Brazil), Italian,
+Turkish and Simplified Chinese. Every string a user can read lives there, including the popup, the
+settings page, the privacy page and the errors the Manifest V3 worker reports back into the popup.
+All nine catalogs must define the same messages with the same placeholders, and the static markup
+mirrors the English catalog so the copy can be reviewed in place; `scripts/test-browser-connector.mjs`
+fails when a message, a placeholder, a translation or a rendered surface drifts.
+
+The pure `lib/` modules carry no Chrome API, so they cannot read `_locales` themselves. They default
+to English labels and accept the ones the adapter renders (`DETECTOR_LABELS`, `METADATA_LABELS`, and
+the transfer message passed to `readResponseWithLimit`). Document-type names are the exception to the
+catalog rule: they live in `lib/presentation.js` for all nine languages because the Chrome popup and
+Nodus Browser's own review dialog share that table.
 
 ## Development and verification
 

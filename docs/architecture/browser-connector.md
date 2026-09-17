@@ -56,6 +56,11 @@ default to English labels and take the ones their caller renders, so the Chrome 
 `_locales` catalog and the integrated dialog passes its own. A user-visible string added to a shared
 module belongs in every adapter's catalog, never hardcoded in one of them.
 
+Document-type names follow the same rule through `presentation.js`, which carries the table for all
+nine interface languages and is the one vocabulary both adapters render. The Chrome package keeps
+the rest of its copy in `_locales`, one catalog per language, and its locale list must match the
+languages Nodus itself ships.
+
 **Maintenance rule:** any Connector capability, field, state or review-flow change must be applied
 to both adapters in the same pull request. Do not copy the shared behavior back into either UI.
 Extend a pure shared module or the common capture pipeline first, then update the two thin adapters.

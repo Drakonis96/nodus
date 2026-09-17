@@ -8,7 +8,14 @@ import { applyMetadataEdits, formatCreators } from './lib/metadata-form.js';
 import { ITEM_TYPES, byline, typeGlyph, typeLabel } from './lib/presentation.js';
 import { collectPageSnapshot } from './lib/snapshot.js';
 import { MAX_ATTACHMENT_BYTES, readResponseWithLimit } from './lib/upload.js';
-const spanishUi = chrome.i18n.getUILanguage().toLowerCase().startsWith('es');
+// The languages the package ships in _locales, keyed by the UI language Chrome
+// resolves them for. Anything else falls back to English, exactly like the
+// catalog lookup, so the copy and the document types never disagree.
+const UI_LOCALES = { en: 'en', es: 'es', fr: 'fr', de: 'de', it: 'it', tr: 'tr', 'pt-pt': 'pt', 'pt-br': 'pt-BR', 'zh-cn': 'zh-CN' };
+function uiLocale() {
+  const language = chrome.i18n.getUILanguage().replace(/_/g, '-').toLowerCase();
+  return UI_LOCALES[language] || UI_LOCALES[language.split('-')[0]] || 'en';
+}
 const $ = (id) => document.getElementById(id);
 const state = {
   capture: null, captures: [], selectedCaptureIndexes: new Set(), tab: null,
@@ -76,7 +83,7 @@ function renderMultiCapture() {
     input.onchange = () => { if (input.checked) state.selectedCaptureIndexes.add(index); else state.selectedCaptureIndexes.delete(index); updateSaveLabel(); };
     const copy = document.createElement('span');
     const title = document.createElement('strong'); title.textContent = capture.metadata.title;
-    const detail = document.createElement('small'); detail.textContent = byline(capture.metadata) || typeLabel(capture.metadata.itemType, spanishUi);
+    const detail = document.createElement('small'); detail.textContent = byline(capture.metadata) || typeLabel(capture.metadata.itemType, uiLocale());
     copy.append(title, detail); label.append(input, copy); return label;
   }));
 }
@@ -91,7 +98,7 @@ function renderCapture(choices = null) {
   const metadata = state.capture.metadata;
   const selectedType = choices?.itemType || metadata.itemType;
   $('item-type').replaceChildren(...ITEM_TYPES.map(([value]) => {
-    const option = document.createElement('option'); option.value = value; option.textContent = typeLabel(value, spanishUi); option.selected = value === selectedType; return option;
+    const option = document.createElement('option'); option.value = value; option.textContent = typeLabel(value, uiLocale()); option.selected = value === selectedType; return option;
   }));
   $('item-type').onchange = () => { $('type-icon').textContent = typeGlyph($('item-type').value); };
   $('document-title').textContent = metadata.title;
