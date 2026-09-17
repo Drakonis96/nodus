@@ -30,8 +30,10 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
   const AVATAR = 20;
   const STEP = 13;
   const COUNTER = 52;
-  const FACES = 10;   // past this a row of faces stops reading as people
-  const SPREAD = 3;   // below this, spreading faces across the card reads as a mistake
+  // The row's own width decides how many faces it holds; this only bounds a card
+  // so wide that a hundred faces would stop reading as people.
+  const FACES = 24;
+  const PER_PAGE = 100;   // the search endpoint's own ceiling
 
   const CACHE_TTL = 24 * 60 * 60 * 1000;
   // The key says what the card counts. It changed meaning when the owner's own
@@ -93,10 +95,6 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
   function draw(host, people, total) {
     const shown = people.slice(0, fit(host, people.length, total));
     const rest = Math.max(0, total - shown.length);
-    // Enough faces to carry the row, or something left over to point at: either
-    // way the row is stretched edge to edge, so it ends on the card's own right
-    // inset instead of leaving a hole beside four faces in the corner.
-    host.classList.toggle('is-full', rest > 0 || shown.length >= SPREAD);
     host.innerHTML = shown.map((person) => `<img src="${person.avatar_url}&s=64" alt="${person.login}" width="${AVATAR}" height="${AVATAR}" loading="lazy"/>`).join('')
       + (rest ? `<span class="more">+${rest.toLocaleString('en')}</span>` : '');
   }
@@ -175,9 +173,10 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
     // are excluded at the source: the qualifier removes them from the total and
     // from the faces in the same request, and no arithmetic here can drift.
     const query = encodeURIComponent(`repo:Drakonis96/nodus -author:${OWNER_LOGIN}`);
-    // More than the five faces are fetched on purpose: the newest entries can
-    // all belong to the same person, and a row of one repeated face says nothing.
-    return fetch(`https://api.github.com/search/issues?q=${query}&per_page=${FACES * 6}&sort=created&order=desc`, { cache: 'no-store' })
+    // A whole page of entries, not just the faces the card shows: the newest of
+    // them can all belong to one person, and a row of one repeated face says
+    // nothing about who is behind the rest.
+    return fetch(`https://api.github.com/search/issues?q=${query}&per_page=${PER_PAGE}&sort=created&order=desc`, { cache: 'no-store' })
       .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`search ${response.status}`))))
       .then((result) => {
         const total = Number(result && result.total_count);

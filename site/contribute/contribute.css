@@ -232,12 +232,13 @@ figures row, and never redefines the shared scale.
 .figure-note { margin: 3px 0 0; font-size: 11.5px; color: var(--ink-3); }
 .figure-loading { color: var(--ink-3); }
 
-/* the contributor faces, and the link that carries whoever is not shown */
-/* The faces belong to the card, not to the text column beside the icon: spanning
-   both columns puts the row on the card's own insets, with the same margin at
-   each end, and gives it the whole width to fill. */
+/* The contributor faces, and the link that carries whoever is not shown. The
+   faces belong to the card, not to the text column beside the icon: spanning
+   both columns gives the row the whole card to grow into. It sits centred, so a
+   few faces keep a wide margin on each side and the margin only closes as more
+   of them arrive — nothing is ever spread apart to reach the edges. */
 .avatars {
-  display: flex; align-items: center;
+  display: flex; align-items: center; justify-content: center;
   grid-column: 1 / -1;
   padding-top: 10px; min-height: 20px;
 }
@@ -253,10 +254,6 @@ figures row, and never redefines the shared scale.
   background: var(--skin-2); color: var(--ink-2);
   font-size: 10.5px; font-weight: 650;
 }
-/* Enough contributors to overflow the row: the faces and the counter spread to
-   the card's full width, so the row ends on the same inset it starts from. */
-.avatars.is-full { justify-content: space-between; }
-.avatars.is-full img, .avatars.is-full .more { margin-left: 0; }
 .avatars:hover .more { color: var(--ink); }
 
 /* ------------------------------------------------ the line under the cards */
