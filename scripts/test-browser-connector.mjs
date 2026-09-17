@@ -263,3 +263,69 @@ test('browser pairing is a cancel-first translated renderer modal', () => {
     assert.match(translations, new RegExp(`(?:^|\\n)  ${locale.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}: table\\(`));
   }
 });
+
+test('every Chrome Connector interface message is translated in English and Spanish', () => {
+  const catalogs = {};
+  for (const locale of ['en', 'es']) {
+    catalogs[locale] = JSON.parse(readFileSync(path.join(root, `browser-extension/_locales/${locale}/messages.json`), 'utf8'));
+  }
+  const { en, es } = catalogs;
+
+  assert.deepEqual(Object.keys(es).sort(), Object.keys(en).sort(), 'both catalogs must define exactly the same messages');
+  for (const key of Object.keys(en)) {
+    assert.ok(en[key].message?.trim(), `${key} needs English copy`);
+    assert.ok(es[key].message?.trim(), `${key} needs Spanish copy`);
+    assert.deepEqual(es[key].placeholders ?? {}, en[key].placeholders ?? {}, `${key} must declare the same placeholders in both catalogs`);
+    for (const [locale, entry] of [['en', en[key]], ['es', es[key]]]) {
+      const declared = Object.keys(entry.placeholders ?? {}).map((name) => name.toLowerCase());
+      const tokens = [...entry.message.matchAll(/\$([A-Za-z_][A-Za-z0-9_]*)\$/g)].map((match) => match[1].toLowerCase());
+      for (const token of new Set(tokens)) {
+        assert.ok(declared.includes(token), `${key} uses $${token}$ without declaring that placeholder in ${locale}`);
+      }
+    }
+  }
+
+  // popup.html, options.html and privacy.html are the three extension surfaces.
+  // Their static markup mirrors the English catalog so the copy can be reviewed
+  // in place; every value the user sees is still read from _locales at runtime.
+  const html = ['popup.html', 'options.html', 'privacy.html']
+    .map((name) => readFileSync(path.join(root, 'browser-extension', name), 'utf8')).join('\n');
+  for (const match of html.matchAll(/<[a-z0-9]+[^<>]*\sdata-i18n="([^"]+)"[^<>]*>([^<]*)</gi)) {
+    assert.equal(match[2].trim(), en[match[1]]?.message, `the static text of data-i18n="${match[1]}" must match the English catalog`);
+  }
+  for (const [attribute, fallbacks] of [['placeholder', ['placeholder']], ['title', ['title', 'aria-label']]]) {
+    for (const match of html.matchAll(new RegExp(`<[a-z0-9]+[^<>]*\\sdata-i18n-${attribute}="([^"]+)"[^<>]*>`, 'gi'))) {
+      const expected = en[match[1]]?.message;
+      const rendered = fallbacks.map((name) => new RegExp(`\\s${name}="([^"]*)"`).exec(match[0])?.[1]);
+      assert.ok(rendered.includes(expected), `the static ${attribute} of data-i18n-${attribute}="${match[1]}" must match the English catalog`);
+    }
+  }
+
+  // Shared, Chrome-free modules cannot reach _locales themselves: they default to
+  // English labels and the popup hands them the rendered language.
+  const detector = readFileSync(path.join(root, 'browser-extension/lib/detector.js'), 'utf8');
+  const popupScript = readFileSync(path.join(root, 'browser-extension/popup.js'), 'utf8');
+  assert.match(popupScript, /detectCaptureCandidates\(snapshot, captureLabels\(\)\)/, 'the popup must review captures with translated detector labels');
+  const labelBlock = /export const DETECTOR_LABELS = Object\.freeze\(\{([\s\S]*?)\}\)/.exec(detector)?.[1] ?? '';
+  const labelKeys = [...labelBlock.matchAll(/(\w+):/g)].map((match) => match[1]);
+  assert.ok(labelKeys.length, 'the detector must declare the labels it can generate');
+  for (const key of labelKeys) {
+    assert.ok(en[key] && es[key], `the detector label ${key} needs both a Spanish and an English catalog entry`);
+  }
+
+  const scripts = ['popup.js', 'options.js', 'privacy.js', 'service-worker.js']
+    .map((name) => readFileSync(path.join(root, 'browser-extension', name), 'utf8')).join('\n');
+  const manifest = readFileSync(path.join(root, 'browser-extension/manifest.json'), 'utf8');
+  const referenced = new Set();
+  for (const match of html.matchAll(/data-i18n(?:-placeholder|-title)?="([^"]+)"/g)) referenced.add(match[1]);
+  for (const match of scripts.matchAll(/msg\(\s*'([A-Za-z][A-Za-z0-9]*)'/g)) referenced.add(match[1]);
+  for (const match of manifest.matchAll(/__MSG_([A-Za-z][A-Za-z0-9]*)__/g)) referenced.add(match[1]);
+
+  for (const key of referenced) {
+    assert.ok(en[key], `_locales/en/messages.json is missing ${key}`);
+    assert.ok(es[key], `_locales/es/messages.json is missing ${key}`);
+  }
+  for (const key of Object.keys(en)) {
+    assert.ok(referenced.has(key), `${key} is translated but no Connector surface renders it`);
+  }
+});

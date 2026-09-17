@@ -16,6 +16,23 @@ const FILE_TYPES = {
   ogg: ['audio/ogg', 'audio-recording'], flac: ['audio/flac', 'audio-recording'], mp4: ['video/mp4', 'video-recording'], webm: ['video/webm', 'video-recording'],
 };
 
+/**
+ * Every label the detector can generate on its own. A page supplies most
+ * metadata; these are the defaults Nodus writes when it does not.
+ *
+ * Detection stays language-neutral: the English set below keeps this module
+ * usable on its own, and each adapter passes the translated set of the language
+ * its user reads (the Chrome popup builds it from `_locales`).
+ */
+export const DETECTOR_LABELS = Object.freeze({
+  untitledDocument: 'Untitled document',
+  untitledWebPage: 'Untitled web page',
+  fullTextPdf: 'Full text PDF',
+  fullText: 'Full text',
+  originalDocument: 'Original document',
+  pageCannotBeCaptured: 'This page cannot be captured.',
+});
+
 const SCHEMA_TYPES = {
   scholarlyarticle: 'journal-article', medicalscholarlyarticle: 'journal-article', article: 'journal-article',
   newsarticle: 'newspaper-article', blogposting: 'blog-post', book: 'book', chapter: 'book-chapter',
@@ -205,14 +222,14 @@ function fromDublinCore(snapshot, map) {
   return { source: 'dublin-core', metadata: { title, itemType, creators: all(map, 'dc.creator', 'dcterms.creator').map((entry) => creator(entry)).filter(Boolean), abstract: first(map, 'dc.description', 'dcterms.abstract'), date, year: yearFrom(date), language: first(map, 'dc.language', 'dcterms.language'), publisher: first(map, 'dc.publisher', 'dcterms.publisher'), url: snapshot.url, doi: doiValue(identifiers.join(' ')), isbn: identifiers.flatMap(isbnValues), issn: [], tags: all(map, 'dc.subject', 'dcterms.subject'), } };
 }
 
-function fromOpenGraph(snapshot, map) {
+function fromOpenGraph(snapshot, map, labels) {
   const title = first(map, 'og:title', 'twitter:title') || snapshot.title;
   const date = first(map, 'article:published_time');
   const kind = first(map, 'og:type').toLowerCase();
-  return { source: title !== snapshot.title ? 'open-graph' : 'generic', metadata: { title: clean(title) || 'Untitled web page', itemType: kind.includes('article') ? 'webpage' : 'webpage', creators: first(map, 'author', 'article:author') ? [creator(first(map, 'author', 'article:author'))].filter(Boolean) : [], abstract: first(map, 'og:description', 'description', 'twitter:description'), date, year: yearFrom(date), language: snapshot.lang, url: first(map, 'og:url') || snapshot.url, doi: doiValue(snapshot.url), isbn: [], issn: [], tags: all(map, 'article:tag', 'keywords').flatMap((entry) => entry.split(/[,;]\s*/)).filter(Boolean) } };
+  return { source: title !== snapshot.title ? 'open-graph' : 'generic', metadata: { title: clean(title) || labels.untitledWebPage, itemType: kind.includes('article') ? 'webpage' : 'webpage', creators: first(map, 'author', 'article:author') ? [creator(first(map, 'author', 'article:author'))].filter(Boolean) : [], abstract: first(map, 'og:description', 'description', 'twitter:description'), date, year: yearFrom(date), language: snapshot.lang, url: first(map, 'og:url') || snapshot.url, doi: doiValue(snapshot.url), isbn: [], issn: [], tags: all(map, 'article:tag', 'keywords').flatMap((entry) => entry.split(/[,;]\s*/)).filter(Boolean) } };
 }
 
-function attachments(snapshot, map, direct) {
+function attachments(snapshot, map, direct, labels) {
   const candidates = [];
   const add = (raw, title, mimeType, role = 'supplement', resolveFullText = false) => {
     const url = absoluteUrl(raw, snapshot.url);
@@ -224,29 +241,29 @@ function attachments(snapshot, map, direct) {
     if (resolveFullText && !/\.pdf$/i.test(fileName)) fileName = 'full-text.pdf';
     const resolvedMime = mimeType || info?.mimeType || (resolveFullText ? 'application/pdf' : 'application/octet-stream');
     candidates.push({
-      url, title: title || (resolvedMime === 'application/pdf' ? 'Full text PDF' : fileName),
+      url, title: title || (resolvedMime === 'application/pdf' ? labels.fullTextPdf : fileName),
       fileName, mimeType: resolvedMime, role, ...(resolveFullText ? { resolveFullText: true } : {}),
     });
   };
-  if (direct) add(snapshot.url, snapshot.title || 'Original document', direct.mimeType, 'original');
-  for (const url of all(map, 'citation_pdf_url', 'eprints.document_url', 'bepress_citation_pdf_url')) add(url, 'Full text PDF', 'application/pdf', direct ? 'supplement' : 'original');
+  if (direct) add(snapshot.url, snapshot.title || labels.originalDocument, direct.mimeType, 'original');
+  for (const url of all(map, 'citation_pdf_url', 'eprints.document_url', 'bepress_citation_pdf_url')) add(url, labels.fullTextPdf, 'application/pdf', direct ? 'supplement' : 'original');
   for (const link of snapshot.links || []) {
     const rel = clean(link.rel, 200).toLowerCase();
     const type = clean(link.type, 200).toLowerCase();
-    if (type === 'application/pdf' || /(?:alternate|enclosure)/.test(rel) && fileInfo(link.href, type)) add(link.href, clean(link.title) || 'Full text', type, candidates.length ? 'supplement' : 'original');
+    if (type === 'application/pdf' || /(?:alternate|enclosure)/.test(rel) && fileInfo(link.href, type)) add(link.href, clean(link.title) || labels.fullText, type, candidates.length ? 'supplement' : 'original');
   }
   const fullTextPattern = /(?:\bpdf\b|full\s*text|texto\s+completo|texte\s+int[ée]gral|volltext|testo\s+completo|texto\s+integral|tam\s+metin|descargar\s+(?:art[ií]culo|pdf)|download\s+(?:article|paper|pdf))/i;
   for (const anchor of snapshot.anchors || []) {
     const info = fileInfo(anchor.href, clean(anchor.type));
     const title = clean(anchor.text) || clean(anchor.title);
     const resolvesFullText = !info && fullTextPattern.test(`${anchor.text || ''} ${anchor.title || ''}`);
-    add(anchor.href, resolvesFullText ? 'Full text PDF' : title, resolvesFullText ? 'application/pdf' : clean(anchor.type), candidates.length ? 'supplement' : 'original', resolvesFullText);
+    add(anchor.href, resolvesFullText ? labels.fullTextPdf : title, resolvesFullText ? 'application/pdf' : clean(anchor.type), candidates.length ? 'supplement' : 'original', resolvesFullText);
   }
   return [...new Map(candidates.map((entry) => [entry.url, entry])).values()].slice(0, 8);
 }
 
-export function detectCapture(snapshot) {
-  if (!snapshot || !absoluteUrl(snapshot.url, snapshot.url)) throw new Error('This page cannot be captured.');
+export function detectCapture(snapshot, labels = DETECTOR_LABELS) {
+  if (!snapshot || !absoluteUrl(snapshot.url, snapshot.url)) throw new Error(labels.pageCannotBeCaptured);
   const map = metaMap(snapshot);
   const direct = fileInfo(snapshot.url, snapshot.contentType);
   const directDocument = direct && direct.itemType !== 'webpage' ? direct : null;
@@ -256,10 +273,10 @@ export function detectCapture(snapshot) {
     try { fileName = decodeURIComponent(new URL(snapshot.url).pathname.split('/').filter(Boolean).at(-1) || snapshot.title || 'Document'); } catch { fileName = snapshot.title || 'Document'; }
     detected = { source: 'direct-file', metadata: { title: clean(snapshot.title) && !/^pdf\.js$/i.test(snapshot.title) ? clean(snapshot.title) : fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' '), itemType: directDocument.itemType, creators: [], year: null, language: snapshot.lang, url: snapshot.url, doi: doiValue(snapshot.url), isbn: isbnValues(snapshot.url), issn: [], tags: [] } };
   } else {
-    detected = fromHighwire(snapshot, map) || fromJsonLd(snapshot) || parseCoins(snapshot) || fromDublinCore(snapshot, map) || fromOpenGraph(snapshot, map);
+    detected = fromHighwire(snapshot, map) || fromJsonLd(snapshot) || parseCoins(snapshot) || fromDublinCore(snapshot, map) || fromOpenGraph(snapshot, map, labels);
   }
   const metadata = detected.metadata;
-  metadata.title = clean(metadata.title) || clean(snapshot.title) || 'Untitled document';
+  metadata.title = clean(metadata.title) || clean(snapshot.title) || labels.untitledDocument;
   metadata.creators = (metadata.creators || []).filter(Boolean);
   metadata.year = metadata.year || yearFrom(metadata.date);
   metadata.isbn = [...new Set(metadata.isbn || [])];
@@ -270,7 +287,7 @@ export function detectCapture(snapshot) {
     pageUrl: snapshot.url,
     metadataSource: detected.source,
     metadata,
-    attachments: attachments(snapshot, map, directDocument),
+    attachments: attachments(snapshot, map, directDocument, labels),
     snapshotAvailable: !directDocument && Boolean(snapshot.html),
     snapshotHtml: !directDocument ? snapshot.html || '' : '',
   };

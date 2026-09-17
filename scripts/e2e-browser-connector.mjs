@@ -13,6 +13,7 @@ const extensionRoot = path.join(root, 'browser-extension');
 const output = path.join(root, 'output', 'browser-connector');
 const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const english = JSON.parse(await readFile(path.join(extensionRoot, '_locales/en/messages.json'), 'utf8'));
+const spanish = JSON.parse(await readFile(path.join(extensionRoot, '_locales/es/messages.json'), 'utf8'));
 
 const contentTypes = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const staticServer = createServer(async (request, response) => {
@@ -166,6 +167,73 @@ async function exerciseMultiCapture() {
   await browser.close();
 }
 
+/**
+ * A catalog only matters if the surfaces render it. This pass stubs the Spanish
+ * locale and reads every localized node back from real Chrome, so a missing or
+ * stale key fails here instead of reaching a Spanish user as an English string.
+ */
+async function exerciseSpanishSurfaces() {
+  const browser = await chromium.launch({ executablePath: chrome, headless: true });
+  const context = await browser.newContext({ viewport: { width: 420, height: 600 }, colorScheme: 'light' });
+  const page = await context.newPage();
+  await page.addInitScript(({ messages, detected }) => {
+    const values = { port: 4321, token: 'visual-test-token', lastCollectionId: null };
+    globalThis.chrome = {
+      i18n: { getUILanguage: () => 'es-ES', getMessage: (key, substitutions) => {
+        const entry = messages[key]; if (!entry) return key;
+        let value = entry.message; const args = Array.isArray(substitutions) ? substitutions : substitutions == null ? [] : [substitutions];
+        for (const [name, placeholder] of Object.entries(entry.placeholders || {})) {
+          const index = Number(/^\$(\d+)$/.exec(placeholder.content)?.[1] || 0) - 1;
+          if (index >= 0) value = value.replaceAll(`$${name.toUpperCase()}$`, String(args[index] ?? ''));
+        }
+        for (const [index, arg] of args.entries()) value = value.replaceAll(`$${index + 1}`, String(arg));
+        return value;
+      } },
+      tabs: { query: async () => [{ id: 11, title: detected.title, url: detected.url }] },
+      scripting: { executeScript: async () => [{ result: detected }] },
+      storage: { local: { get: async (defaults) => ({ ...defaults, ...values }), set: async (input) => Object.assign(values, input), remove: async (keys) => { for (const key of keys) delete values[key]; } } },
+      permissions: { request: async () => true, contains: async () => true, remove: async () => true },
+      runtime: { getManifest: () => ({ version: '5.4.5' }), getURL: (path = '') => `chrome-extension://abcdefghijklmnopabcdefghijklmnop/${path}`, openOptionsPage: async () => undefined },
+    };
+  }, { messages: spanish, detected: snapshot });
+  await page.route('http://127.0.0.1:4321/api/browser/**', async (route) => {
+    const url = route.request().url();
+    if (url.endsWith('/health')) return route.fulfill({ json: { ok: true, app: 'nodus', enabled: true, paired: true, libraryReady: true } });
+    if (url.endsWith('/catalog')) return route.fulfill({ json: { collections, tags: [] } });
+    if (url.endsWith('/preview')) return route.fulfill({ json: { metadata: snapshotMetadata(), warnings: [] } });
+    return route.fulfill({ status: 404, json: { error: 'not found' } });
+  });
+
+  await page.goto(`http://127.0.0.1:${port}/popup.html`);
+  await page.locator('#capture-view:not(.hidden)').waitFor();
+  assert.equal(await page.locator('html').getAttribute('lang'), 'es');
+  assert.equal(await page.locator('#item-type option:checked').textContent(), 'Artículo académico');
+  assert.equal(await page.locator('#collection-label').textContent(), 'Raíz de la biblioteca');
+  assert.equal(await page.locator('#save-button').textContent(), 'Guardar en Nodus');
+  assert.equal(await page.locator('#snapshot-row small').textContent(), spanish.webSnapshotHint.message);
+  await page.screenshot({ path: path.join(output, 'popup-es.png'), fullPage: true });
+
+  for (const [file, titleKey] of [['popup.html', null], ['options.html', 'optionsTitle'], ['privacy.html', 'privacyTitle']]) {
+    await page.goto(`http://127.0.0.1:${port}/${file}`);
+    assert.equal(await page.locator('html').getAttribute('lang'), 'es', `${file} must declare the rendered language`);
+    if (titleKey) assert.equal(await page.title(), spanish[titleKey].message, `${file} must translate its tab title`);
+    if (file !== 'popup.html') await page.screenshot({ path: path.join(output, file.replace('.html', '-es.png')), fullPage: true });
+    const stale = await page.evaluate((expected) => ({
+      text: [...document.querySelectorAll('[data-i18n]')]
+        .filter((element) => element.textContent !== expected[element.dataset.i18n]?.message)
+        .map((element) => `${element.dataset.i18n} = ${element.textContent}`),
+      placeholder: [...document.querySelectorAll('[data-i18n-placeholder]')]
+        .filter((element) => element.placeholder !== expected[element.dataset.i18nPlaceholder]?.message)
+        .map((element) => element.dataset.i18nPlaceholder),
+      title: [...document.querySelectorAll('[data-i18n-title]')]
+        .filter((element) => element.getAttribute('aria-label') !== expected[element.dataset.i18nTitle]?.message)
+        .map((element) => element.dataset.i18nTitle),
+    }), spanish);
+    assert.deepEqual(stale, { text: [], placeholder: [], title: [] }, `${file} must render only Spanish copy`);
+  }
+  await browser.close();
+}
+
 function snapshotMetadata() {
   return {
     title: snapshot.title, itemType: 'journal-article', creators: [{ creatorType: 'author', firstName: 'Alicia', lastName: 'Miranda', fieldMode: 0 }],
@@ -178,7 +246,8 @@ try {
   await exercise('light');
   await exercise('dark');
   await exerciseMultiCapture();
-  console.log(`Browser connector popup passed in light and dark mode. Screenshots: ${output}`);
+  await exerciseSpanishSurfaces();
+  console.log(`Browser connector popup passed in light, dark and Spanish mode. Screenshots: ${output}`);
 } finally {
   await new Promise((resolve) => staticServer.close(resolve));
 }

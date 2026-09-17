@@ -51,6 +51,11 @@ bylines and glyphs come from `browser-extension/lib/presentation.js`; collection
 and tag normalization come from `browser-extension/lib/collections.js`; detection and durable
 Library writes already share the detector and `electron/browser-connector/libraryCapture.ts`.
 
+Those shared modules stay language-neutral because they also run outside a browser surface: they
+default to English labels and take the ones their caller renders, so the Chrome adapter reads its
+`_locales` catalog and the integrated dialog passes its own. A user-visible string added to a shared
+module belongs in every adapter's catalog, never hardcoded in one of them.
+
 **Maintenance rule:** any Connector capability, field, state or review-flow change must be applied
 to both adapters in the same pull request. Do not copy the shared behavior back into either UI.
 Extend a pure shared module or the common capture pipeline first, then update the two thin adapters.

@@ -28,6 +28,24 @@ function localize() {
   for (const element of document.querySelectorAll('[data-i18n-title]')) { element.title = msg(element.dataset.i18nTitle); element.setAttribute('aria-label', msg(element.dataset.i18nTitle)); }
 }
 
+/**
+ * The shared detector and metadata modules stay language-neutral and are used
+ * outside the extension, so they default to English labels. This surface passes
+ * the catalog of the language the popup is actually rendered in.
+ */
+function captureLabels() {
+  return {
+    untitledDocument: msg('untitledDocument'),
+    untitledWebPage: msg('untitledWebPage'),
+    fullTextPdf: msg('fullTextPdf'),
+    fullText: msg('fullText'),
+    originalDocument: msg('originalDocument'),
+    pageCannotBeCaptured: msg('pageCannotBeCaptured'),
+  };
+}
+
+function attachmentName(attachment) { return attachment.title || msg('attachment'); }
+
 function captureUiChoices() {
   return {
     itemType: $('item-type')?.value || '',
@@ -119,7 +137,7 @@ async function detectActiveTab() {
     snapshot = injected?.result || null;
   } catch { /* Chrome's built-in PDF viewer does not accept injected scripts. */ }
   if (!snapshot) snapshot = { title: tab.title || '', url: tab.url, lang: chrome.i18n.getUILanguage(), contentType: '', metas: [], links: [], jsonLd: [], coins: [], anchors: [], html: '' };
-  state.captures = detectCaptureCandidates(snapshot);
+  state.captures = detectCaptureCandidates(snapshot, captureLabels());
   state.capture = state.captures[0];
   state.selectedCaptureIndexes = new Set(state.captures.map((_capture, index) => index));
   state.selectedTags = state.captures.length > 1 ? [] : normalizeTags(state.capture.metadata.tags || []);
@@ -138,7 +156,7 @@ async function api(path, options = {}, token = state.token, port = state.port) {
   if (options.body && !(options.body instanceof ArrayBuffer) && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
   const response = await requestLocalJson(`${baseUrl(port)}${path}`, { ...options, headers });
   if (!response.ok) {
-    const error = new Error(response.data.error || `Nodus returned ${response.status}.`);
+    const error = new Error(response.data.error || msg('nodusReturnedError', [String(response.status)]));
     error.status = response.status;
     throw error;
   }
@@ -277,15 +295,15 @@ async function revokeAttachmentPermissions(origins) {
 
 async function browserUpload(itemId, attachment) {
   const response = await fetch(attachment.url, { credentials: 'include' });
-  if (!response.ok) throw new Error(`${attachment.title}: ${response.status}`);
+  if (!response.ok) throw new Error(msg('downloadFailed', [attachmentName(attachment), String(response.status)]));
   const contentType = (response.headers.get('content-type') || attachment.mimeType || 'application/octet-stream').split(';')[0];
-  if (attachment.mimeType === 'application/pdf' && contentType.includes('html')) throw new Error(`${attachment.title}: the site returned a sign-in page instead of the PDF.`);
-  const bytes = await readResponseWithLimit(response, MAX_ATTACHMENT_BYTES, attachment.title || 'Attachment');
+  if (attachment.mimeType === 'application/pdf' && contentType.includes('html')) throw new Error(msg('signInPageInsteadOfPdf', [attachmentName(attachment)]));
+  const bytes = await readResponseWithLimit(response, MAX_ATTACHMENT_BYTES, msg('fileExceedsLimit', [attachmentName(attachment)]));
   return api(`/api/browser/items/${encodeURIComponent(itemId)}/attachments`, {
     method: 'POST', body: bytes, headers: {
       'Content-Type': 'application/octet-stream',
       'X-Nodus-File-Name': encodeURIComponent(attachment.fileName || 'document'),
-      'X-Nodus-File-Title': encodeURIComponent(attachment.title || 'Captured document'),
+      'X-Nodus-File-Title': encodeURIComponent(attachment.title || msg('capturedDocument')),
       'X-Nodus-Mime-Type': encodeURIComponent(contentType),
       'X-Nodus-Attachment-Role': attachment.role || 'supplement',
       'X-Nodus-Source-Url': encodeURIComponent(attachment.url),
@@ -303,7 +321,7 @@ async function uploadPendingUploads(itemId, pendingUploads, initialAttachmentCou
       const result = await chrome.runtime.sendMessage({ type: 'nodus:upload-pending', itemId, pendingUploads, port: state.port, token: state.token, attachmentCount: initialAttachmentCount, temporaryOrigins });
       if (result?.ok) return { ...result, attachmentCount: result.attachmentCount ?? initialAttachmentCount };
       if (result?.error) return { attachmentCount: initialAttachmentCount, warnings: [result.error] };
-      return { attachmentCount: initialAttachmentCount, warnings: ['Background attachment transfer did not return a result.'] };
+      return { attachmentCount: initialAttachmentCount, warnings: [msg('backgroundTransferNoResult')] };
     } catch (error) {
       return { attachmentCount: initialAttachmentCount, warnings: [error.message || String(error)] };
     }
@@ -325,7 +343,7 @@ async function saveCapture(capture, primary, includeSnapshot) {
       .map((input) => capture.attachments[Number(input.dataset.attachmentIndex)]).filter(Boolean)
     : capture.attachments;
   const metadata = primary
-    ? { ...applyMetadataEdits(capture.metadata, metadataEdits()), itemType: $('item-type').value, tags: state.selectedTags }
+    ? { ...applyMetadataEdits(capture.metadata, metadataEdits(), captureLabels()), itemType: $('item-type').value, tags: state.selectedTags }
     : { ...capture.metadata, tags: state.selectedTags };
   let temporaryOrigins = [];
   try {

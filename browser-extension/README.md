@@ -61,6 +61,17 @@ extension origin and remains limited to the loopback-only API.
 See [PRIVACY.md](PRIVACY.md) for the Chrome Web Store disclosure and
 [STORE_LISTING.md](STORE_LISTING.md) for release instructions and permission justifications.
 
+## Interface language
+
+Every string a user can read lives in `_locales/en/messages.json` and
+`_locales/es/messages.json`, including the popup, the settings page, the privacy page and the errors
+the Manifest V3 worker reports back into the popup. Both catalogs must define the same messages with
+the same placeholders, and the static markup mirrors the English catalog so the copy can be reviewed
+in place; `scripts/test-browser-connector.mjs` fails when a message, a placeholder or a rendered
+surface drifts. The pure `lib/` modules carry no Chrome API, so they cannot read `_locales` themselves:
+they default to English labels and accept the ones the adapter renders (`DETECTOR_LABELS`,
+`METADATA_LABELS`, and the transfer message passed to `readResponseWithLimit`).
+
 ## Development and verification
 
 ```bash
