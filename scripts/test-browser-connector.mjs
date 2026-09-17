@@ -15,9 +15,9 @@ import { ITEM_TYPES, byline, typeGlyph, typeLabel } from '../browser-extension/l
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Every language the connector ships, as the _locales directory names it. */
-const CONNECTOR_LOCALES = ['en', 'es', 'fr', 'de', 'pt_PT', 'pt_BR', 'it', 'tr', 'zh_CN'];
+const CONNECTOR_LOCALES = ['en', 'es', 'fr', 'de', 'pt_PT', 'pt_BR', 'it', 'tr', 'zh_CN', 'ja', 'ko', 'ru', 'zh_TW'];
 /** The same list as the shared presentation module names a language. */
-const CONNECTOR_LANGUAGE_CODES = ['en', 'es', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN'];
+const CONNECTOR_LANGUAGE_CODES = ['en', 'es', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'ja', 'ko', 'ru', 'zh-TW'];
 /** A word that is already that language's own for the item type it names. */
 const NATIVE_TYPE_WORDS = {
   preprint: ['es', 'de', 'it', 'pt', 'pt-BR'], podcast: ['es', 'fr', 'de', 'it', 'pt', 'pt-BR', 'tr'],
@@ -245,8 +245,17 @@ test('Manifest V3 package minimizes permission and contains no remote executable
   const popupScript = readFileSync(path.join(root, 'browser-extension/popup.js'), 'utf8');
   assert.doesNotMatch(popup, /<script[^>]+src=["']https?:/i);
   assert.match(popupScript, /chrome\.i18n\.getUILanguage\(\)\.split/);
-  assert.match(popupScript, /const UI_LOCALES = \{[^}]*\x27pt-pt\x27: \x27pt\x27/, 'Portuguese (Portugal) maps to the shared label table');
-  assert.match(popupScript, /const UI_LOCALES = \{[^}]*\x27zh-cn\x27: \x27zh-CN\x27/, 'Simplified Chinese maps to the shared label table');
+  for (const [reported, shared] of [
+    ['\x27pt-pt\x27: \x27pt\x27', 'Portuguese (Portugal)'],
+    ['\x27pt-br\x27: \x27pt-BR\x27', 'Portuguese (Brazil)'],
+    ['\x27zh-cn\x27: \x27zh-CN\x27', 'Simplified Chinese'],
+    ['\x27zh-tw\x27: \x27zh-TW\x27', 'Traditional Chinese'],
+    ['ja: \x27ja\x27', 'Japanese'],
+    ['ko: \x27ko\x27', 'Korean'],
+    ['ru: \x27ru\x27', 'Russian'],
+  ]) {
+    assert.ok(popupScript.includes(reported), `${shared} must map to the shared label table`);
+  }
   assert.match(popupScript, /snapshotAvailable && !state\.capture\.attachments\.length/, 'a detected full text keeps the HTML snapshot off by default');
   assert.match(popupScript, /if \(!state\.token\) await pair\(\)/, 'opening the popup establishes the local token automatically');
   assert.match(options, /href="https:\/\/nodusresearch\.com"/);
@@ -288,13 +297,13 @@ test('browser pairing is a cancel-first translated renderer modal', () => {
   }
 });
 
-test('every Chrome Connector interface message is translated in all nine languages', () => {
+test('every Chrome Connector interface message is translated in all thirteen languages', () => {
   const catalogs = Object.fromEntries(CONNECTOR_LOCALES.map((locale) => [
     locale,
     JSON.parse(readFileSync(path.join(root, `browser-extension/_locales/${locale}/messages.json`), 'utf8')),
   ]));
   const { en } = catalogs;
-  assert.equal(CONNECTOR_LOCALES.length, 9, 'the connector ships the nine interface languages Nodus supports');
+  assert.equal(CONNECTOR_LOCALES.length, 13, 'the connector ships the nine interface languages Nodus supports plus four more');
 
   // A word that is already that language's own for the message it carries, so an
   // identical English string is a translation and not a missing one.

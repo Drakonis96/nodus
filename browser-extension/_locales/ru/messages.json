@@ -1,0 +1,308 @@
+{
+  "extensionName": {
+    "message": "Nodus Research Connector"
+  },
+  "extensionDescription": {
+    "message": "Сохраняйте научные документы, метаданные, коллекции и теги прямо в локальную библиотеку Nodus."
+  },
+  "actionTitle": {
+    "message": "Сохранить в Nodus"
+  },
+  "connector": {
+    "message": "Коннектор"
+  },
+  "settings": {
+    "message": "Настройки"
+  },
+  "detecting": {
+    "message": "Определяем этот документ…"
+  },
+  "detectingHint": {
+    "message": "После вашего щелчка читается только активная вкладка."
+  },
+  "cannotRead": {
+    "message": "Эту страницу нельзя прочитать"
+  },
+  "connectTitle": {
+    "message": "Подключение к Nodus"
+  },
+  "connectHint": {
+    "message": "Откройте Nodus и включите коннектор Chrome в разделе «Настройки → Интеграции». Этот браузер подключится автоматически."
+  },
+  "port": {
+    "message": "Порт"
+  },
+  "connect": {
+    "message": "Подключить"
+  },
+  "cannotReachNodus": {
+    "message": "Не удалось подключиться к Nodus на порту $PORT$. Откройте Nodus и используйте порт, указанный в разделе «Настройки → Интеграции».",
+    "placeholders": {
+      "port": {
+        "content": "$1"
+      }
+    }
+  },
+  "documentType": {
+    "message": "Тип документа"
+  },
+  "enriching": {
+    "message": "Проверяем библиографические метаданные…"
+  },
+  "saveTo": {
+    "message": "Сохранить в"
+  },
+  "libraryRoot": {
+    "message": "Корень библиотеки"
+  },
+  "searchCollections": {
+    "message": "Поиск коллекций"
+  },
+  "tags": {
+    "message": "Теги"
+  },
+  "addTags": {
+    "message": "Добавить или найти тег"
+  },
+  "files": {
+    "message": "Файлы"
+  },
+  "file": {
+    "message": "Файл"
+  },
+  "webSnapshot": {
+    "message": "Читаемая веб-копия"
+  },
+  "webSnapshotHint": {
+    "message": "Сохранить локальную копию этой страницы вместе с ссылкой."
+  },
+  "save": {
+    "message": "Сохранить в Nodus"
+  },
+  "saving": {
+    "message": "Сохранение…"
+  },
+  "saved": {
+    "message": "Сохранено в Nodus"
+  },
+  "savedSummary": {
+    "message": "Добавлено файлов: $ATTACHMENTCOUNT$. Подготовка чистого чтения продолжится в Nodus.",
+    "placeholders": {
+      "attachmentCount": {
+        "content": "$1"
+      }
+    }
+  },
+  "openInNodus": {
+    "message": "Открыть в Nodus"
+  },
+  "done": {
+    "message": "Закрыть"
+  },
+  "remove": {
+    "message": "Удалить"
+  },
+  "unsupportedPage": {
+    "message": "Откройте обычную веб-страницу или документ (HTTP/HTTPS) и снова нажмите значок Nodus."
+  },
+  "enableInNodus": {
+    "message": "Сначала включите Nodus Research Connector в Nodus → Настройки → Интеграции."
+  },
+  "libraryNotReady": {
+    "message": "Сначала выберите папку резервных копий в Nodus, чтобы можно было создать локальную папку nodus-library."
+  },
+  "nodusPort": {
+    "message": "Локальный порт Nodus"
+  },
+  "portHint": {
+    "message": "Используйте порт, указанный в Nodus → Настройки → Интеграции."
+  },
+  "forgetPairing": {
+    "message": "Сбросить локальное подключение"
+  },
+  "privacy": {
+    "message": "Конфиденциальность"
+  },
+  "sourceCode": {
+    "message": "Исходный код"
+  },
+  "website": {
+    "message": "Nodus Research"
+  },
+  "savedSetting": {
+    "message": "Сохранено."
+  },
+  "pairingForgotten": {
+    "message": "Локальное подключение сброшено. В следующий раз коннектор подключится автоматически."
+  },
+  "editMetadata": {
+    "message": "Изменить метаданные"
+  },
+  "title": {
+    "message": "Название"
+  },
+  "authors": {
+    "message": "Авторы"
+  },
+  "authorsHint": {
+    "message": "По одному автору в строке, для организаций используйте {Организация}"
+  },
+  "date": {
+    "message": "Дата"
+  },
+  "publication": {
+    "message": "Издание"
+  },
+  "multipleDetected": {
+    "message": "Найдено ссылок: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "multipleHint": {
+    "message": "Выберите, что сохранить."
+  },
+  "saveMultiple": {
+    "message": "Сохранить ссылок: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectAtLeastOne": {
+    "message": "Выберите хотя бы одну ссылку."
+  },
+  "savedBatchSummary": {
+    "message": "Сохранено ссылок: $COUNT$, прикреплено файлов: $FILES$.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "files": {
+        "content": "$2"
+      }
+    }
+  },
+  "alreadySaved": {
+    "message": "Уже есть в Nodus"
+  },
+  "updatedExisting": {
+    "message": "Ссылка обновлена"
+  },
+  "duplicateAvoided": {
+    "message": "Дубликат не был создан."
+  },
+  "permissionDenied": {
+    "message": "Разрешение для $ORIGINS$ не выдано.",
+    "placeholders": {
+      "origins": {
+        "content": "$1"
+      }
+    }
+  },
+  "attachment": {
+    "message": "Вложение"
+  },
+  "capturedDocument": {
+    "message": "Сохранённый документ"
+  },
+  "untitledDocument": {
+    "message": "Документ без названия"
+  },
+  "untitledWebPage": {
+    "message": "Веб-страница без названия"
+  },
+  "fullTextPdf": {
+    "message": "Полный текст (PDF)"
+  },
+  "fullText": {
+    "message": "Полный текст"
+  },
+  "originalDocument": {
+    "message": "Исходный документ"
+  },
+  "pageCannotBeCaptured": {
+    "message": "Эту страницу нельзя сохранить."
+  },
+  "downloadFailed": {
+    "message": "$NAME$: не удалось загрузить файл, состояние $STATUS$.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "status": {
+        "content": "$2"
+      }
+    }
+  },
+  "signInPageInsteadOfPdf": {
+    "message": "$NAME$: сайт вернул страницу входа вместо PDF.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "invalidAttachmentUrl": {
+    "message": "$NAME$: недопустимый адрес.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "unsupportedAttachmentUrl": {
+    "message": "$NAME$: неподдерживаемый адрес.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "nodusReturnedError": {
+    "message": "Nodus вернул ошибку ($STATUS$).",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "fileExceedsLimit": {
+    "message": "$NAME$: файл превышает предел в 64 MiB.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "backgroundTransferNoResult": {
+    "message": "Фоновая передача вложений не вернула результат."
+  },
+  "optionsTitle": {
+    "message": "Настройки Nodus Research Connector"
+  },
+  "privacyTitle": {
+    "message": "Конфиденциальность Nodus Research Connector"
+  },
+  "privacyLocalByDesign": {
+    "message": "Локально по замыслу"
+  },
+  "privacyLocalBody": {
+    "message": "Nodus Research Connector читает страницу только после щелчка по его значку на панели инструментов. Он отправляет метаданные, выбранные файлы, теги и выбранную коллекцию в приложение Nodus на вашем компьютере через 127.0.0.1."
+  },
+  "privacyNoTrackingBody": {
+    "message": "Он не работает постоянно, не собирает историю просмотров, не использует аналитику, не показывает рекламу, не продаёт данные и не отправляет сохранённое содержимое разработчикам Nodus."
+  },
+  "privacySiteAccessBody": {
+    "message": "Если Nodus не может загрузить выбранное вложение из открытого доступа, Chrome может запросить доступ именно к этому сайту, чтобы service worker по требованию передал файл локально. Полученный доступ отзывается по завершении передачи. Сопряжение с Nodus также можно сбросить в настройках этого расширения."
+  },
+  "privacyPolicyLink": {
+    "message": "Полная политика конфиденциальности"
+  },
+  "privacySourceLink": {
+    "message": "Исходный код AGPL"
+  }
+}

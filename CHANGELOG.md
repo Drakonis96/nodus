@@ -18,8 +18,6 @@ Nodus Research Connector speaks thirteen languages and every message it composes
 - Nodus Research Connector ships the nine interface languages plus Japanese, Korean, Russian and Traditional Chinese, which the extension gains ahead of the desktop interface. The popup, the settings page, the privacy page it opens and the document-type list you review before saving stop being English only, and the privacy page is localized for the first time instead of existing in English alone.
 - Every message the extension writes by itself is translated as well. The 64 MiB transfer notice, a failed download, the sign-in page a publisher returns instead of the PDF, the errors the Manifest V3 worker reports back into the popup and the labels the detector saves when a page brings none now come from the catalog of the language in use, so the Spanish connector stops mixing English into its own interface.
 - The document-type table moves into the shared presentation module with all thirteen languages. Nodus Browser's built-in connector dialog renders the reviewed type in the language you work in, and a legal hearing stops being translated as an audience.
-
-
 ## 5.4.5 — 2026-09-15
 
 Nodus 5.4.5 gives the Library bulk removal and bulk repair, makes the Documentary

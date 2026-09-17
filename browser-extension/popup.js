@@ -11,7 +11,10 @@ import { MAX_ATTACHMENT_BYTES, readResponseWithLimit } from './lib/upload.js';
 // The languages the package ships in _locales, keyed by the UI language Chrome
 // resolves them for. Anything else falls back to English, exactly like the
 // catalog lookup, so the copy and the document types never disagree.
-const UI_LOCALES = { en: 'en', es: 'es', fr: 'fr', de: 'de', it: 'it', tr: 'tr', 'pt-pt': 'pt', 'pt-br': 'pt-BR', 'zh-cn': 'zh-CN' };
+const UI_LOCALES = {
+  en: 'en', es: 'es', fr: 'fr', de: 'de', it: 'it', tr: 'tr', ja: 'ja', ko: 'ko', ru: 'ru',
+  'pt-pt': 'pt', 'pt-br': 'pt-BR', 'zh-cn': 'zh-CN', 'zh-tw': 'zh-TW',
+};
 function uiLocale() {
   const language = chrome.i18n.getUILanguage().replace(/_/g, '-').toLowerCase();
   return UI_LOCALES[language] || UI_LOCALES[language.split('-')[0]] || 'en';

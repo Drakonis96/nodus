@@ -24,8 +24,8 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
-  // 5.5.0 brings the Chrome connector to the nine interface languages the app
-  // speaks and translates every message the extension composes on its own.
+  // 5.5.0 brings the Chrome connector to thirteen languages and translates every
+  // message the extension composes on its own.
   const currentRelease = RELEASE_NOTES[0];
   assert.equal(currentRelease?.version, '5.5.0');
   assert.equal(currentRelease?.date, '2026-09-17');
@@ -35,7 +35,7 @@ try {
     assert.ok(currentRelease.highlights.every((h) => h[language]?.length > 80));
   }
   for (const phrase of [
-    /speaks all nine interface languages/, /stop being English only/,
+    /speaks thirteen languages/, /stop being English only/,
     /messages the connector writes by itself/, /stops mixing English into your interface/,
   ]) {
     assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.5.0 is missing ${phrase}`);

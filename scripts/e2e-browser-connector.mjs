@@ -179,6 +179,10 @@ const LOCALIZED_SURFACES = [
   { directory: 'it', uiLanguage: 'it-IT', language: 'it' },
   { directory: 'tr', uiLanguage: 'tr-TR', language: 'tr' },
   { directory: 'zh_CN', uiLanguage: 'zh-CN', language: 'zh-CN' },
+  { directory: 'ja', uiLanguage: 'ja-JP', language: 'ja' },
+  { directory: 'ko', uiLanguage: 'ko-KR', language: 'ko' },
+  { directory: 'ru', uiLanguage: 'ru-RU', language: 'ru' },
+  { directory: 'zh_TW', uiLanguage: 'zh-TW', language: 'zh-TW' },
 ];
 const catalogs = Object.fromEntries(await Promise.all(LOCALIZED_SURFACES.map(async (entry) => [
   entry.directory,

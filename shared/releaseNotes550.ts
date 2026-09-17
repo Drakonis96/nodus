@@ -4,23 +4,23 @@
 import type { ReleaseHighlight } from './releaseNotes';
 
 /**
- * v5.5.0: Nodus Connector for Chrome speaks all nine interface languages, and so
- * do the messages it composes itself. The first note covers what a user sees, the
- * second what the extension writes on its own. Keep the order: the raw array is
- * the editorial order and the modal clusters it by scope size.
+ * v5.5.0: Nodus Connector for Chrome speaks thirteen languages, and so do the
+ * messages it composes itself. The first note covers what a user sees, the second
+ * what the extension writes on its own. Keep the order: the raw array is the
+ * editorial order and the modal clusters it by scope size.
  */
 export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
   {
     scope: 'languages',
-    es: 'El conector de Chrome habla los nueve idiomas de la interfaz. El popup, la página de ajustes, la política de privacidad que se abre desde ahí y hasta la lista de tipos de documento que revisas antes de guardar dejan de estar solo en inglés y siguen el idioma con el que trabajas en Nodus.',
-    en: 'The Chrome connector speaks all nine interface languages. The popup, the settings page, the privacy policy it opens and even the list of document types you review before saving stop being English only and follow the language you work in inside Nodus.',
-    fr: 'Le connecteur Chrome parle les neuf langues de l’interface. La fenêtre, la page de réglages, la politique de confidentialité qu’elle ouvre et même la liste des types de document que vous vérifiez avant d’enregistrer ne sont plus uniquement en anglais et suivent la langue dans laquelle vous travaillez dans Nodus.',
-    de: 'Der Chrome-Connector spricht alle neun Sprachen der Oberfläche. Das Popup, die Einstellungsseite, die von dort geöffnete Datenschutzerklärung und sogar die Liste der Dokumenttypen, die du vor dem Speichern prüfst, sind nicht mehr nur englisch und folgen der Sprache, in der du in Nodus arbeitest.',
-    pt: 'O conector do Chrome fala as nove línguas da interface. A janela, a página de definições, a política de privacidade que esta abre e até a lista de tipos de documento que revês antes de guardar deixam de estar apenas em inglês e seguem a língua em que trabalhas no Nodus.',
-    'pt-BR': 'O conector do Chrome fala os nove idiomas da interface. A janela, a página de configurações, a política de privacidade que ela abre e até a lista de tipos de documento que você revisa antes de salvar deixam de ser apenas em inglês e seguem o idioma em que você trabalha no Nodus.',
-    it: 'Il connettore Chrome parla le nove lingue dell’interfaccia. La finestra, la pagina delle impostazioni, l’informativa sulla privacy che apre e perfino l’elenco dei tipi di documento che controlli prima di salvare non sono più solo in inglese e seguono la lingua in cui lavori in Nodus.',
-    tr: 'Chrome bağlayıcısı arayüzün dokuz dilini de konuşuyor. Açılır pencere, ayarlar sayfası, oradan açılan gizlilik politikası ve kaydetmeden önce gözden geçirdiğiniz belge türü listesi artık yalnızca İngilizce değil ve Nodus’ta çalıştığınız dili izliyor.',
-    'zh-CN': 'Chrome 连接器现在支持界面的全部九种语言。弹窗、设置页、由它打开的隐私政策，甚至你在保存前查看的文档类型列表，都不再只有英文，而是跟随你在 Nodus 中使用的语言。',
+    es: 'El conector de Chrome habla trece idiomas. A los nueve de la interfaz se suman el japonés, el coreano, el ruso y el chino tradicional, así que el popup, la página de ajustes, la política de privacidad que se abre desde ahí y hasta la lista de tipos de documento que revisas antes de guardar dejan de estar solo en inglés y siguen el idioma de tu navegador.',
+    en: 'The Chrome connector speaks thirteen languages. Japanese, Korean, Russian and Traditional Chinese join the nine the interface already had, so the popup, the settings page, the privacy policy it opens and even the list of document types you review before saving stop being English only and follow your browser language.',
+    fr: 'Le connecteur Chrome parle treize langues. Le japonais, le coréen, le russe et le chinois traditionnel rejoignent les neuf que l’interface connaissait déjà, donc la fenêtre, la page de réglages, la politique de confidentialité qu’elle ouvre et même la liste des types de document que vous vérifiez avant d’enregistrer ne sont plus uniquement en anglais et suivent la langue de votre navigateur.',
+    de: 'Der Chrome-Connector spricht dreizehn Sprachen. Japanisch, Koreanisch, Russisch und traditionelles Chinesisch kommen zu den neun hinzu, die die Oberfläche schon hatte, sodass das Popup, die Einstellungsseite, die von dort geöffnete Datenschutzerklärung und sogar die Liste der Dokumenttypen, die du vor dem Speichern prüfst, nicht mehr nur englisch sind und der Sprache deines Browsers folgen.',
+    pt: 'O conector do Chrome fala treze línguas. O japonês, o coreano, o russo e o chinês tradicional juntam-se às nove que a interface já tinha, por isso a janela, a página de definições, a política de privacidade que esta abre e até a lista de tipos de documento que revês antes de guardar deixam de estar apenas em inglês e seguem a língua do teu navegador.',
+    'pt-BR': 'O conector do Chrome fala treze idiomas. Japonês, coreano, russo e chinês tradicional se juntam aos nove que a interface já tinha, então a janela, a página de configurações, a política de privacidade que ela abre e até a lista de tipos de documento que você revisa antes de salvar deixam de ser apenas em inglês e seguem o idioma do seu navegador.',
+    it: 'Il connettore Chrome parla tredici lingue. Giapponese, coreano, russo e cinese tradizionale si aggiungono alle nove che l’interfaccia già aveva, così la finestra, la pagina delle impostazioni, l’informativa sulla privacy che apre e perfino l’elenco dei tipi di documento che controlli prima di salvare non sono più solo in inglese e seguono la lingua del tuo browser.',
+    tr: 'Chrome bağlayıcısı on üç dil konuşuyor. Japonca, Korece, Rusça ve geleneksel Çince, arayüzün zaten bildiği dokuz dile katılıyor. Açılır pencere, ayarlar sayfası, oradan açılan gizlilik politikası ve kaydetmeden önce gözden geçirdiğiniz belge türü listesi artık yalnızca İngilizce değil ve tarayıcınızın dilini izliyor.',
+    'zh-CN': 'Chrome 连接器现在支持十三种语言。日语、韩语、俄语和繁体中文加入界面原有的九种语言，因此弹窗、设置页、由它打开的隐私政策，甚至你在保存前查看的文档类型列表，都不再只有英文，而是跟随浏览器的语言。',
   },
   {
     scope: 'connector',
