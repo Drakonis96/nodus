@@ -8,6 +8,7 @@ import { IT } from './i18n.it';
 import { TR } from './i18n.tr';
 import { ZH_CN } from './i18n.zh-CN';
 import { ZH_TW } from './i18n.zh-TW';
+import { JA } from './i18n.ja';
 import { looksLikeSpanishUiText, knownRuntimeErrorText, normalizeUiLanguage } from '@shared/uiLanguage';
 import { NODI_NOTIFICATION_TEXT, type NodiNotificationText } from '@shared/nodiNotifications';
 
@@ -39,6 +40,7 @@ const TABLES: Record<Exclude<AppLanguage, 'es'>, Record<string, string>> = {
   tr: TR,
   'zh-CN': ZH_CN,
   'zh-TW': ZH_TW,
+  ja: JA,
 };
 
 let activeLang: AppLanguage = 'es';

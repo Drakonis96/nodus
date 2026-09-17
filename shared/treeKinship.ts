@@ -301,6 +301,31 @@ export const TREE_KINSHIP_ROLE_LABEL_ZH_TW: Record<TreeKinshipRole, string> = {
 };
 
 /** Every role table by language, for {@link treeKinshipLabel}. */
+export const TREE_KINSHIP_ROLE_LABEL_JA: Record<TreeKinshipRole, string> = {
+  focus: '注目人物', father: '父親', mother: '母親', parent: '親',
+  grandfather: '祖父', grandmother: '祖母', grandparent: '祖父母', paternal_grandfather: '父方の祖父',
+  paternal_grandmother: '父方の祖母', paternal_grandparent: '父方の祖父母', maternal_grandfather: '母方の祖父', maternal_grandmother: '母方の祖母',
+  maternal_grandparent: '母方の祖父母', great_grandfather: '曽祖父', great_grandmother: '曾祖母', great_grandparent: '曽祖父母',
+  great_great_grandfather: '曾曾祖父', great_great_grandmother: '曾曾祖母', great_great_grandparent: '曽祖父母', paternal_ancestor: '父方の祖先',
+  maternal_ancestor: '母方の祖先', ancestor: '祖先', brother: '兄弟', sister: '妹',
+  sibling: '兄弟', husband: '夫', wife: '妻', spouse: '配偶者/パートナー',
+  son: '息子', daughter: '娘', child: '子供', grandson: '孫',
+  granddaughter: '孫娘', grandchild: '孫', great_grandson: 'ひ孫', great_granddaughter: '曾孫娘',
+  great_grandchild: 'ひ孫', great_great_grandson: '曾孫', great_great_granddaughter: '曾曾孫娘', great_great_grandchild: '曾孫',
+  paternal_uncle: '父方の叔父', paternal_aunt: '父方の叔母', maternal_uncle: '母方の叔父', maternal_aunt: '母方の叔母',
+  uncle_aunt: '叔父/叔母', paternal_granduncle: '父方の大叔父', paternal_grandaunt: '父方の大叔母', maternal_granduncle: '母方の大叔父',
+  maternal_grandaunt: '母方の大叔母', granduncle_aunt: '大叔父/大叔母', great_granduncle: '曽祖父', great_grandaunt: '曽祖父',
+  great_granduncle_aunt: '曽祖父/祖父母', nephew: '甥', niece: '姪', nibling: '姪/甥',
+  grandnephew: '甥っ子', grandniece: 'おばあちゃん', grandnibling: '祖父/祖母', great_grandnephew: '曽祖父',
+  great_grandniece: '曾祖母', great_grandnibling: '曾祖父/曾祖母', male_cousin: '男性のいとこ', female_cousin: 'いとこの女性',
+  cousin: 'いとこ', father_in_law: '義父', mother_in_law: '義理の母', parent_in_law: '義父母',
+  son_in_law: '義理の息子', daughter_in_law: '義理の娘', child_in_law: '義理の子', brother_in_law: '義理の兄',
+  sister_in_law: '義理の姉妹', sibling_in_law: '義理の兄弟', stepfather: '継父', stepmother: '継母',
+  stepparent: '義理の親', stepson: '継息子', stepdaughter: '継娘', stepchild: '継子',
+  co_parent: '共同親', descendant: '子孫', relative_by_marriage: '婚姻関係にある親戚', connected_relative: '家族のつながり',
+  unrelated: '血縁関係は記録されていない',
+};
+
 export const TREE_KINSHIP_ROLE_LABELS: Record<AppLanguage, Record<TreeKinshipRole, string>> = {
   es: TREE_KINSHIP_ROLE_LABEL_ES,
   en: TREE_KINSHIP_ROLE_LABEL_EN,
@@ -312,6 +337,7 @@ export const TREE_KINSHIP_ROLE_LABELS: Record<AppLanguage, Record<TreeKinshipRol
   tr: TREE_KINSHIP_ROLE_LABEL_TR,
   'zh-CN': TREE_KINSHIP_ROLE_LABEL_ZH_CN,
   'zh-TW': TREE_KINSHIP_ROLE_LABEL_ZH_TW,
+  ja: TREE_KINSHIP_ROLE_LABEL_JA,
 };
 
 /** The languages kinship labels exist in; derived so it cannot drift from the tables. */
@@ -335,6 +361,7 @@ const SPOUSE_WORD: Record<AppLanguage, readonly [string, string, string]> = {
   tr: ['Koca', 'Eş', 'Eş'],
   'zh-CN': ['丈夫', '妻子', '配偶'],
   'zh-TW': ['丈夫', '妻子', '配偶'],
+  ja: ["夫", "妻", "配偶者"],
 };
 
 const SPOUSE_OF: Record<AppLanguage, (spouse: string, relation: string) => string> = {
@@ -348,6 +375,7 @@ const SPOUSE_OF: Record<AppLanguage, (spouse: string, relation: string) => strin
   tr: (spouse, relation) => `${relation} adlı yakınınızın ${spouse.toLowerCase()}ı`,
   'zh-CN': (spouse, relation) => `其${relation}的${spouse}`,
   'zh-TW': (spouse, relation) => `其${relation}的${spouse}`,
+  ja: (spouse, relation) => `${relation}の${spouse}`,
 };
 
 /** "<relation> of their spouse" — the noun is fixed, so the possessive can agree. */
@@ -362,6 +390,7 @@ const OF_SPOUSE: Record<AppLanguage, (base: string) => string> = {
   tr: (base) => `Eşinizin ${base.toLowerCase()}ı`,
   'zh-CN': (base) => `其配偶的${base}`,
   'zh-TW': (base) => `其配偶的${base}`,
+  ja: (base) => `配偶者の${base}`,
 };
 
 const CONNECTION_LABEL: Record<AppLanguage, string> = {
@@ -375,6 +404,7 @@ const CONNECTION_LABEL: Record<AppLanguage, string> = {
   tr: 'Aile bağlantısı',
   'zh-CN': '家族关联',
   'zh-TW': '家族關聯',
+  ja: "家族のつながり",
 };
 
 export interface TreeKinshipContext {
@@ -826,6 +856,7 @@ export function deriveTreeKinship(input: TreeKinshipInput): Map<string, TreeKins
       it: ['padre', 'madre', 'genitore'], tr: ['baba', 'anne', 'ebeveyn'],
       'zh-CN': ['父亲', '母亲', '父母'],
       'zh-TW': ['父親', '母親', '父母'],
+      ja: ["父親", "母親", "親"],
     },
     child: {
       es: ['hijo', 'hija', 'hijo/a'], en: ['son', 'daughter', 'child'], fr: ['fils', 'fille', 'enfant'],
@@ -833,6 +864,7 @@ export function deriveTreeKinship(input: TreeKinshipInput): Map<string, TreeKins
       it: ['figlio', 'figlia', 'figlio/a'], tr: ['oğul', 'kız', 'çocuk'],
       'zh-CN': ['儿子', '女儿', '子女'],
       'zh-TW': ['兒子', '女兒', '子女'],
+      ja: ["息子", "娘", "子供"],
     },
     spouse: {
       es: ['esposo', 'esposa', 'cónyuge'], en: ['husband', 'wife', 'spouse'], fr: ['époux', 'épouse', 'conjoint'],
@@ -840,6 +872,7 @@ export function deriveTreeKinship(input: TreeKinshipInput): Map<string, TreeKins
       it: ['marito', 'moglie', 'coniuge'], tr: ['koca', 'eş', 'eş'],
       'zh-CN': ['丈夫', '妻子', '配偶'],
       'zh-TW': ['丈夫', '妻子', '配偶'],
+      ja: ["夫", "妻", "配偶者"],
     },
     sibling: {
       es: ['hermano', 'hermana', 'hermano/a'], en: ['brother', 'sister', 'sibling'], fr: ['frère', 'sœur', 'frère/sœur'],
@@ -847,6 +880,7 @@ export function deriveTreeKinship(input: TreeKinshipInput): Map<string, TreeKins
       it: ['fratello', 'sorella', 'fratello/sorella'], tr: ['erkek kardeş', 'kız kardeş', 'kardeş'],
       'zh-CN': ['兄弟', '姐妹', '兄弟姐妹'],
       'zh-TW': ['兄弟', '姐妹', '兄弟姐妹'],
+      ja: ["兄弟", "妹", "兄弟"],
     },
   };
   const stepFor = (sex: string | undefined, kind: keyof typeof STEP_WORDS): ConnectionStep => {

@@ -56,21 +56,29 @@ function localizeRestoreMessage(message: string, language: AppLanguage): string 
   if (language === 'es') return message;
   const pick = (values: Omit<RecoveryStrings, 'es'>) => values[language] ?? values.en;
   if (message.includes('No se pudo descifrar la copia')) return pick({ en: 'The snapshot could not be decrypted. Check the password or recovery key.', fr: 'La sauvegarde n\'a pas pu être déchiffrée. Vérifiez le mot de passe ou la clé de récupération.', de: 'Die Sicherung konnte nicht entschlüsselt werden. Überprüfen Sie das Passwort oder den Wiederherstellungsschlüssel.', pt: 'Não foi possível desencriptar a cópia de segurança. Verifique a palavra-passe ou a chave de recuperação.', 'pt-BR': 'Não foi possível descriptografar o backup. Verifique a senha ou a chave de recuperação.', it: 'Impossibile decifrare la copia. Controlla la password o la chiave di ripristino.', tr: 'Anlık görüntünün şifresi çözülemedi. Parolayı veya kurtarma anahtarını kontrol edin.', 'zh-CN': '无法解密该快照。请检查密码或恢复密钥。' ,
-  'zh-TW': '無法解密該快照。請檢查密碼或恢復金鑰。', });
+  'zh-TW': '無法解密該快照。請檢查密碼或恢復金鑰。',
+  ja: "スナップショットを復号化できませんでした。パスワードまたは回復キーを確認してください。", });
   if (message.includes('falta la contraseña')) return pick({ en: 'Restore cancelled: enter the password or recovery key.', fr: 'Restauration annulée : saisissez le mot de passe ou la clé de récupération.', de: 'Wiederherstellung abgebrochen: Geben Sie das Passwort oder den Wiederherstellungsschlüssel ein.', pt: 'Restauração cancelada: introduza a palavra-passe ou a chave de recuperação.', 'pt-BR': 'Restauração cancelada: digite a senha ou a chave de recuperação.', it: 'Ripristino annullato: inserisci la password o la chiave di ripristino.', tr: 'Geri yükleme iptal edildi: parolayı veya kurtarma anahtarını girin.', 'zh-CN': '恢复已取消：请输入密码或恢复密钥。' ,
-  'zh-TW': '恢復已取消：請輸入密碼或恢復金鑰。', });
+  'zh-TW': '恢復已取消：請輸入密碼或恢復金鑰。',
+  ja: "復元がキャンセルされました: パスワードまたは回復キーを入力してください。", });
   if (message.includes('Formato de copia de seguridad no soportado')) return pick({ en: 'This backup format is not supported.', fr: 'Ce format de sauvegarde n\'est pas pris en charge.', de: 'Dieses Sicherungsformat wird nicht unterstützt.', pt: 'Este formato de cópia de segurança não é suportado.', 'pt-BR': 'Este formato de backup não é suportado.', it: 'Questo formato di backup non è supportato.', tr: 'Bu yedekleme biçimi desteklenmiyor.', 'zh-CN': '不支持此备份格式。' ,
-  'zh-TW': '不支援此備份格式。', });
+  'zh-TW': '不支援此備份格式。',
+  ja: "このバックアップ形式はサポートされていません。", });
   if (message.includes('los hashes internos no coinciden')) return pick({ en: 'Invalid snapshot: its integrity hashes do not match.', fr: 'Sauvegarde invalide : ses hachages d\'intégrité ne correspondent pas.', de: 'Ungültige Sicherung: Die Integritäts-Hashes stimmen nicht überein.', pt: 'Cópia de segurança inválida: os hashes de integridade não coincidem.', 'pt-BR': 'Backup inválido: os hashes de integridade não coincidem.', it: 'Copia non valida: gli hash di integrità non corrispondono.', tr: 'Geçersiz anlık görüntü: bütünlük karmaları eşleşmiyor.', 'zh-CN': '无效快照：其完整性哈希不匹配。' ,
-  'zh-TW': '無效快照：其完整性雜湊不匹配。', });
+  'zh-TW': '無效快照：其完整性雜湊不匹配。',
+  ja: "無効なスナップショット: 整合性ハッシュが一致しません。", });
   if (message.includes('falta la clave de recuperación cifrada')) return pick({ en: 'Invalid snapshot: the encrypted recovery key is missing.', fr: 'Sauvegarde invalide : la clé de récupération chiffrée est manquante.', de: 'Ungültige Sicherung: Der verschlüsselte Wiederherstellungsschlüssel fehlt.', pt: 'Cópia de segurança inválida: falta a chave de recuperação encriptada.', 'pt-BR': 'Backup inválido: falta a chave de recuperação criptografada.', it: 'Copia non valida: manca la chiave di ripristino cifrata.', tr: 'Geçersiz anlık görüntü: şifrelenmiş kurtarma anahtarı eksik.', 'zh-CN': '无效快照：缺少加密的恢复密钥。' ,
-  'zh-TW': '無效快照：缺少加密的恢復金鑰。', });
+  'zh-TW': '無效快照：缺少加密的恢復金鑰。',
+  ja: "無効なスナップショット: 暗号化された回復キーがありません。", });
   if (message.includes('falta el manifiesto interno')) return pick({ en: 'Invalid snapshot: its internal manifest is missing.', fr: 'Sauvegarde invalide : son manifeste interne est manquant.', de: 'Ungültige Sicherung: Das interne Manifest fehlt.', pt: 'Cópia de segurança inválida: falta o manifesto interno.', 'pt-BR': 'Backup inválido: falta o manifesto interno.', it: 'Copia non valida: manca il manifesto interno.', tr: 'Geçersiz anlık görüntü: dahili manifestosu eksik.', 'zh-CN': '无效快照：缺少其内部清单。' ,
-  'zh-TW': '無效快照：缺少其內部清單。', });
+  'zh-TW': '無效快照：缺少其內部清單。',
+  ja: "無効なスナップショット: 内部マニフェストがありません。", });
   if (message.includes('faltan manifest o datos cifrados')) return pick({ en: 'Invalid .nodus file: its manifest or encrypted data is missing.', fr: 'Fichier .nodus invalide : son manifeste ou ses données chiffrées sont manquants.', de: 'Ungültige .nodus-Datei: Das Manifest oder die verschlüsselten Daten fehlen.', pt: 'Ficheiro .nodus inválido: falta o manifesto ou os dados encriptados.', 'pt-BR': 'Arquivo .nodus inválido: falta o manifesto ou os dados criptografados.', it: 'File .nodus non valido: manca il manifesto o mancano i dati cifrati.', tr: 'Geçersiz .nodus dosyası: manifestosu veya şifrelenmiş verileri eksik.', 'zh-CN': '无效的 .nodus 文件：缺少清单或加密数据。' ,
-  'zh-TW': '無效的 .nodus 檔案：缺少清單或加密資料。', });
+  'zh-TW': '無效的 .nodus 檔案：缺少清單或加密資料。',
+  ja: "無効な .nodus ファイル: マニフェストまたは暗号化されたデータが欠落しています。", });
   if (message.includes('esquema más reciente')) return pick({ en: 'This snapshot was created by a newer Nodus version. Update the app before restoring it.', fr: 'Cette sauvegarde a été créée par une version plus récente de Nodus. Mettez à jour l\'application avant de la restaurer.', de: 'Diese Sicherung wurde mit einer neueren Nodus-Version erstellt. Aktualisieren Sie die App, bevor Sie sie wiederherstellen.', pt: 'Esta cópia de segurança foi criada com uma versão mais recente do Nodus. Atualize a aplicação antes de a restaurar.', 'pt-BR': 'Este backup foi criado com uma versão mais recente do Nodus. Atualize o aplicativo antes de restaurá-lo.', it: 'Questa copia è stata creata con una versione più recente di Nodus. Aggiorna l’app prima di ripristinarla.', tr: 'Bu anlık görüntü daha yeni bir Nodus sürümüyle oluşturuldu. Geri yüklemeden önce uygulamayı güncelleyin.', 'zh-CN': '此快照由更新版本的 Nodus 创建。请先更新应用再恢复。' ,
-  'zh-TW': '此快照由更新版本的 Nodus 建立。請先更新應用再恢復。', });
+  'zh-TW': '此快照由更新版本的 Nodus 建立。請先更新應用再恢復。',
+  ja: "このスナップショットは、新しい Nodus バージョンによって作成されました。復元する前にアプリを更新してください。", });
   if (message.includes('reversión automática')) return pick({ en: `Restore failed, but Nodus attempted to preserve the previous state. ${message}`, fr: `La restauration a échoué, mais Nodus a tenté de préserver l'état précédent. ${message}`, de: `Die Wiederherstellung ist fehlgeschlagen, aber Nodus hat versucht, den vorherigen Zustand zu erhalten. ${message}`, pt: `A restauração falhou, mas o Nodus tentou preservar o estado anterior. ${message}`, 'pt-BR': `A restauração falhou, mas o Nodus tentou preservar o estado anterior. ${message}`, it: `Il ripristino non è riuscito, ma Nodus ha tentato di conservare lo stato precedente. ${message}`, tr: `Geri yükleme başarısız oldu ancak Nodus önceki durumu korumaya çalıştı. ${message}`, 'zh-CN': `恢复失败，但 Nodus 尝试保留了之前的状态。${message}` ,
   'zh-TW': `恢復失敗，但 Nodus 嘗試保留了之前的狀態。${message}`, });
   if (message.includes('restauración se canceló antes de modificar')) return pick({ en: `Restore was cancelled before changing your data. ${message}`, fr: `La restauration a été annulée avant toute modification de vos données. ${message}`, de: `Die Wiederherstellung wurde abgebrochen, bevor Ihre Daten geändert wurden. ${message}`, pt: `A restauração foi cancelada antes de alterar os seus dados. ${message}`, 'pt-BR': `A restauração foi cancelada antes de alterar seus dados. ${message}`, it: `Il ripristino è stato annullato prima di modificare i tuoi dati. ${message}`, tr: `Verileriniz değiştirilmeden önce geri yükleme iptal edildi. ${message}`, 'zh-CN': `恢复在更改数据之前已取消。${message}` ,
@@ -81,16 +89,19 @@ function localizeRestoreMessage(message: string, language: AppLanguage): string 
 export function inspectRecoveryFolder(folder: string, language: AppLanguage = 'es'): RecoveryFolderInspection {
   const clean = path.resolve(folder);
   if (!fs.existsSync(clean)) return { path: clean, kind: 'missing', message: tr(language, { es: 'La carpeta no existe.', en: 'The folder does not exist.', fr: "Le dossier n'existe pas.", de: 'Der Ordner existiert nicht.', pt: 'A pasta não existe.', 'pt-BR': 'A pasta não existe.', it: 'La cartella non esiste.', tr: 'Klasör mevcut değil.', 'zh-CN': '该文件夹不存在。' ,
-  'zh-TW': '該資料夾不存在。', }), snapshots: [] };
+  'zh-TW': '該資料夾不存在。',
+  ja: "フォルダが存在しません。", }), snapshots: [] };
   let stat: fs.Stats;
   try {
     stat = fs.statSync(clean);
   } catch {
     return { path: clean, kind: 'missing', message: tr(language, { es: 'No se puede acceder a la carpeta.', en: 'The folder cannot be accessed.', fr: "Impossible d'accéder au dossier.", de: 'Auf den Ordner kann nicht zugegriffen werden.', pt: 'Não é possível aceder à pasta.', 'pt-BR': 'Não é possível acessar a pasta.', it: 'Impossibile accedere alla cartella.', tr: 'Klasöre erişilemiyor.', 'zh-CN': '无法访问该文件夹。' ,
-  'zh-TW': '無法訪問該資料夾。', }), snapshots: [] };
+  'zh-TW': '無法訪問該資料夾。',
+  ja: "フォルダーにアクセスできません。", }), snapshots: [] };
   }
   if (!stat.isDirectory()) return { path: clean, kind: 'invalid', message: tr(language, { es: 'La ruta seleccionada no es una carpeta.', en: 'The selected path is not a folder.', fr: "Le chemin sélectionné n'est pas un dossier.", de: 'Der ausgewählte Pfad ist kein Ordner.', pt: 'O caminho selecionado não é uma pasta.', 'pt-BR': 'O caminho selecionado não é uma pasta.', it: 'Il percorso selezionato non è una cartella.', tr: 'Seçilen yol bir klasör değil.', 'zh-CN': '所选路径不是文件夹。' ,
-  'zh-TW': '所選路徑不是資料夾。', }), snapshots: [] };
+  'zh-TW': '所選路徑不是資料夾。',
+  ja: "選択したパスはフォルダーではありません。", }), snapshots: [] };
 
   const manifest = readRecoveryManifest(clean);
   if (manifest) {
@@ -109,14 +120,16 @@ export function inspectRecoveryFolder(folder: string, language: AppLanguage = 'e
         ? tr(language, { es: `${snapshots.length} copia(s) válida(s) encontrada(s).`, en: `${snapshots.length} valid snapshot(s) found.`, fr: `${snapshots.length} sauvegarde(s) valide(s) trouvée(s).`, de: `${snapshots.length} gültige Sicherung(en) gefunden.`, pt: `${snapshots.length} cópia(s) de segurança válida(s) encontrada(s).`, 'pt-BR': `${snapshots.length} backup(s) válido(s) encontrado(s).`, it: `Trovate ${snapshots.length} copie valide.`, tr: `${snapshots.length} geçerli anlık görüntü bulundu.`, 'zh-CN': `找到 ${snapshots.length} 个有效快照。` ,
   'zh-TW': `找到 ${snapshots.length} 個有效快照。`, })
         : tr(language, { es: 'Carpeta de recuperación válida, todavía sin copias.', en: 'Valid recovery folder, with no snapshots yet.', fr: 'Dossier de récupération valide, encore sans sauvegarde.', de: 'Gültiger Wiederherstellungsordner, noch ohne Sicherungen.', pt: 'Pasta de recuperação válida, ainda sem cópias de segurança.', 'pt-BR': 'Pasta de recuperação válida, ainda sem backups.', it: 'Cartella di ripristino valida, ancora senza copie.', tr: 'Geçerli kurtarma klasörü; henüz anlık görüntü yok.', 'zh-CN': '有效的恢复文件夹，尚无快照。' ,
-  'zh-TW': '有效的恢復資料夾，尚無快照。', }),
+  'zh-TW': '有效的恢復資料夾，尚無快照。',
+  ja: "有効な回復フォルダーですが、スナップショットはまだありません。", }),
       snapshots,
     };
   }
 
   const entries = visibleDirectoryEntries(clean);
   if (entries.length === 0) return { path: clean, kind: 'empty', message: tr(language, { es: 'Carpeta vacía y disponible.', en: 'Empty folder, ready to use.', fr: 'Dossier vide et disponible.', de: 'Ordner leer und verfügbar.', pt: 'Pasta vazia e disponível.', 'pt-BR': 'Pasta vazia e disponível.', it: 'Cartella vuota e disponibile.', tr: 'Boş klasör, kullanıma hazır.', 'zh-CN': '空文件夹，可以使用。' ,
-  'zh-TW': '空資料夾，可以使用。', }), snapshots: [] };
+  'zh-TW': '空資料夾，可以使用。',
+  ja: "空のフォルダー。すぐに使用できます。", }), snapshots: [] };
   return {
     path: clean,
     kind: 'invalid',
@@ -129,11 +142,13 @@ export function inspectRecoveryFolder(folder: string, language: AppLanguage = 'e
 function inspectionFromProbe(probe: RecoveryFolderProbe, language: AppLanguage): RecoveryFolderInspection {
   if (probe.kind === 'missing') {
     return { ...probe, message: tr(language, { es: 'No se puede acceder a la carpeta.', en: 'The folder cannot be accessed.', fr: "Impossible d'accéder au dossier.", de: 'Auf den Ordner kann nicht zugegriffen werden.', pt: 'Não é possível aceder à pasta.', 'pt-BR': 'Não é possível acessar a pasta.', it: 'Impossibile accedere alla cartella.', tr: 'Klasöre erişilemiyor.', 'zh-CN': '无法访问该文件夹。' ,
-  'zh-TW': '無法訪問該資料夾。', }) };
+  'zh-TW': '無法訪問該資料夾。',
+  ja: "フォルダーにアクセスできません。", }) };
   }
   if (probe.kind === 'empty') {
     return { ...probe, message: tr(language, { es: 'Carpeta vacía y disponible.', en: 'Empty folder, ready to use.', fr: 'Dossier vide et disponible.', de: 'Ordner leer und verfügbar.', pt: 'Pasta vazia e disponível.', 'pt-BR': 'Pasta vazia e disponível.', it: 'Cartella vuota e disponibile.', tr: 'Boş klasör, kullanıma hazır.', 'zh-CN': '空文件夹，可以使用。' ,
-  'zh-TW': '空資料夾，可以使用。', }) };
+  'zh-TW': '空資料夾，可以使用。',
+  ja: "空のフォルダー。すぐに使用できます。", }) };
   }
   if (probe.kind === 'recovery') {
     return {
@@ -142,7 +157,8 @@ function inspectionFromProbe(probe: RecoveryFolderProbe, language: AppLanguage):
         ? tr(language, { es: `${probe.snapshots.length} copia(s) válida(s) encontrada(s).`, en: `${probe.snapshots.length} valid snapshot(s) found.`, fr: `${probe.snapshots.length} sauvegarde(s) valide(s) trouvée(s).`, de: `${probe.snapshots.length} gültige Sicherung(en) gefunden.`, pt: `${probe.snapshots.length} cópia(s) de segurança válida(s) encontrada(s).`, 'pt-BR': `${probe.snapshots.length} backup(s) válido(s) encontrado(s).`, it: `Trovate ${probe.snapshots.length} copie valide.`, tr: `${probe.snapshots.length} geçerli anlık görüntü bulundu.`, 'zh-CN': `找到 ${probe.snapshots.length} 个有效快照。` ,
   'zh-TW': `找到 ${probe.snapshots.length} 個有效快照。`, })
         : tr(language, { es: 'Carpeta de recuperación válida, todavía sin copias.', en: 'Valid recovery folder, with no snapshots yet.', fr: 'Dossier de récupération valide, encore sans sauvegarde.', de: 'Gültiger Wiederherstellungsordner, noch ohne Sicherungen.', pt: 'Pasta de recuperação válida, ainda sem cópias de segurança.', 'pt-BR': 'Pasta de recuperação válida, ainda sem backups.', it: 'Cartella di ripristino valida, ancora senza copie.', tr: 'Geçerli kurtarma klasörü; henüz anlık görüntü yok.', 'zh-CN': '有效的恢复文件夹，尚无快照。' ,
-  'zh-TW': '有效的恢復資料夾，尚無快照。', }),
+  'zh-TW': '有效的恢復資料夾，尚無快照。',
+  ja: "有効な回復フォルダーですが、スナップショットはまだありません。", }),
     };
   }
   const entries = probe.visibleEntries ?? 0;
@@ -255,13 +271,15 @@ export async function initializeRecoveryFolder(
   const passwordValidation = validateBackupPassword(password);
   const cleanPassword = passwordValidation.normalized;
   if (!passwordValidation.valid) return { ok: false, message: tr(language, { es: 'La contraseña debe tener al menos 8 caracteres.', en: 'The password must be at least 8 characters long.', fr: 'Le mot de passe doit contenir au moins 8 caractères.', de: 'Das Passwort muss mindestens 8 Zeichen lang sein.', pt: 'A palavra-passe deve ter pelo menos 8 caracteres.', 'pt-BR': 'A senha deve ter pelo menos 8 caracteres.', it: 'La password deve contenere almeno 8 caratteri.', tr: 'Parola en az 8 karakter uzunluğunda olmalıdır.', 'zh-CN': '密码必须至少包含 8 个字符。' ,
-  'zh-TW': '密碼必須至少包含 8 個字元。', }) };
+  'zh-TW': '密碼必須至少包含 8 個字元。',
+  ja: "パスワードは8文字以上である必要があります。", }) };
   let inspection: RecoveryFolderInspection;
   try {
     inspection = await inspectRecoveryFolderSafely(folder, language, 'deep');
   } catch {
     return { ok: false, message: tr(language, { es: 'La carpeta no respondió a tiempo. Haz que esté disponible sin conexión y vuelve a intentarlo.', en: 'The folder did not respond in time. Make it available offline and try again.', fr: 'Le dossier n’a pas répondu à temps. Rendez-le disponible hors connexion et réessayez.', de: 'Der Ordner hat nicht rechtzeitig geantwortet. Machen Sie ihn offline verfügbar und versuchen Sie es erneut.', pt: 'A pasta não respondeu a tempo. Disponibilize-a offline e tente novamente.', 'pt-BR': 'A pasta não respondeu a tempo. Disponibilize-a off-line e tente novamente.', it: 'La cartella non ha risposto in tempo. Rendila disponibile offline e riprova.', tr: 'Klasör zamanında yanıt vermedi. Çevrimdışı kullanılabilir yapıp yeniden deneyin.', 'zh-CN': '文件夹未及时响应。请使其可离线使用，然后重试。' ,
-  'zh-TW': '資料夾未及時響應。請使其可離線使用，然後重試。', }) };
+  'zh-TW': '資料夾未及時響應。請使其可離線使用，然後重試。',
+  ja: "フォルダーが時間内に応答しませんでした。オフラインで利用できるようにして、もう一度試してください。", }) };
   }
   if (inspection.kind !== 'empty') return { ok: false, message: inspection.message };
 
@@ -282,11 +300,13 @@ export async function initializeRecoveryFolder(
     if (!result.ok || !result.path) throw new Error(result.message);
     const snapshot = snapshotSummary(result.path);
     if (!snapshot) throw new Error(tr(language, { es: 'La copia inicial se escribió, pero no superó la verificación del manifiesto.', en: 'The initial snapshot was written but failed manifest verification.', fr: "La sauvegarde initiale a été écrite, mais elle n'a pas passé la vérification du manifeste.", de: 'Die anfängliche Sicherung wurde geschrieben, hat die Manifestprüfung jedoch nicht bestanden.', pt: 'A cópia de segurança inicial foi gravada, mas não passou na verificação do manifesto.', 'pt-BR': 'O backup inicial foi gravado, mas não passou na verificação do manifesto.', it: 'La copia iniziale è stata scritta, ma non ha superato la verifica del manifesto.', tr: 'İlk anlık görüntü yazıldı ancak manifesto doğrulamasından geçemedi.', 'zh-CN': '初始快照已写入，但未通过清单验证。' ,
-  'zh-TW': '初始快照已寫入，但未通過清單驗證。', }));
+  'zh-TW': '初始快照已寫入，但未通過清單驗證。',
+  ja: "最初のスナップショットは書き込まれましたが、マニフェストの検証に失敗しました。", }));
     return {
       ok: true,
       message: tr(language, { es: 'Carpeta de recuperación creada y primera copia verificada.', en: 'Recovery folder created and first snapshot verified.', fr: 'Dossier de récupération créé et première sauvegarde vérifiée.', de: 'Wiederherstellungsordner erstellt und erste Sicherung verifiziert.', pt: 'Pasta de recuperação criada e primeira cópia de segurança verificada.', 'pt-BR': 'Pasta de recuperação criada e primeiro backup verificado.', it: 'Cartella di ripristino creata e prima copia verificata.', tr: 'Kurtarma klasörü oluşturuldu ve ilk anlık görüntü doğrulandı.', 'zh-CN': '恢复文件夹已创建，首个快照已验证。' ,
-  'zh-TW': '恢復資料夾已建立，首個快照已驗證。', }),
+  'zh-TW': '恢復資料夾已建立，首個快照已驗證。',
+  ja: "回復フォルダーが作成され、最初のスナップショットが検証されました。", }),
       snapshot,
       recoveryKey,
     };
@@ -324,12 +344,14 @@ export async function restoreRecoverySnapshot(
     inspection = await inspectRecoveryFolderSafely(root, language, 'deep');
   } catch {
     return { ok: false, message: tr(language, { es: 'La carpeta de recuperación no respondió a tiempo. Hazla disponible sin conexión antes de restaurar.', en: 'The recovery folder did not respond in time. Make it available offline before restoring.', fr: 'Le dossier de récupération n’a pas répondu à temps. Rendez-le disponible hors connexion avant la restauration.', de: 'Der Wiederherstellungsordner hat nicht rechtzeitig geantwortet. Machen Sie ihn vor der Wiederherstellung offline verfügbar.', pt: 'A pasta de recuperação não respondeu a tempo. Disponibilize-a offline antes de restaurar.', 'pt-BR': 'A pasta de recuperação não respondeu a tempo. Disponibilize-a off-line antes de restaurar.', it: 'La cartella di ripristino non ha risposto in tempo. Rendila disponibile offline prima del ripristino.', tr: 'Kurtarma klasörü zamanında yanıt vermedi. Geri yüklemeden önce çevrimdışı kullanılabilir yapın.', 'zh-CN': '恢复文件夹未及时响应。请使其可离线使用后再恢复。' ,
-  'zh-TW': '恢復資料夾未及時響應。請使其可離線使用後再恢復。', }) };
+  'zh-TW': '恢復資料夾未及時響應。請使其可離線使用後再恢復。',
+  ja: "回復フォルダーが時間内に応答しませんでした。復元する前にオフラインで利用できるようにしてください。", }) };
   }
   if (inspection.kind !== 'recovery') return { ok: false, message: inspection.message };
   const snapshot = inspection.snapshots.find((candidate) => candidate.fileName === path.basename(fileName));
   if (!snapshot) return { ok: false, message: tr(language, { es: 'La copia seleccionada no pertenece a esta carpeta de recuperación.', en: 'The selected snapshot does not belong to this recovery folder.', fr: "La sauvegarde sélectionnée n'appartient pas à ce dossier de récupération.", de: 'Die ausgewählte Sicherung gehört nicht zu diesem Wiederherstellungsordner.', pt: 'A cópia de segurança selecionada não pertence a esta pasta de recuperação.', 'pt-BR': 'O backup selecionado não pertence a esta pasta de recuperação.', it: 'La copia selezionata non appartiene a questa cartella di ripristino.', tr: 'Seçilen anlık görüntü bu kurtarma klasörüne ait değil.', 'zh-CN': '所选快照不属于此恢复文件夹。' ,
-  'zh-TW': '所選快照不屬於此恢復資料夾。', }) };
+  'zh-TW': '所選快照不屬於此恢復資料夾。',
+  ja: "選択したスナップショットはこの回復フォルダーに属していません。", }) };
   const result = await restoreBackupArchiveFileSafely(snapshot.path, password, appVersion, onProgress);
   if (!result.ok) return { ...result, message: localizeRestoreMessage(result.message, language) };
   if (result.recoveryKey) setBackupRecoveryKey(result.recoveryKey);
@@ -353,6 +375,7 @@ export async function restoreRecoverySnapshot(
         it: 'Dati ripristinati con la chiave di ripristino. Puoi impostare una nuova password nelle Impostazioni.',
         tr: 'Veriler kurtarma anahtarıyla geri yüklendi. Ayarlar’dan yeni bir parola belirleyebilirsiniz.', 'zh-CN': '已使用恢复密钥恢复数据。你可以在设置中设置新密码。',
   'zh-TW': '已使用恢復金鑰恢復資料。你可以在設定中設定新密碼。',
+  ja: "回復キーを使用してデータが復元されました。 「設定」で新しいパスワードを設定できます。",
       })
       : tr(language, {
         es: 'Datos recuperados y copia de seguridad previa conservada por seguridad.',
@@ -364,6 +387,7 @@ export async function restoreRecoverySnapshot(
         it: 'Dati ripristinati; per sicurezza è stata conservata una copia precedente al ripristino.',
         tr: 'Veriler geri yüklendi ve güvenlik için geri yükleme öncesi anlık görüntü saklandı.', 'zh-CN': '数据已恢复，并保留了恢复前的安全快照。',
   'zh-TW': '資料已恢復，並保留了恢復前的安全快照。',
+  ja: "データが復元され、復元前の安全スナップショットが保持されました。",
       }),
     snapshot,
   };

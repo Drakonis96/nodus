@@ -109,4 +109,16 @@ export const STUDY_SYNONYM_TRANSLATIONS = {
     'alternativas en memoria': '記憶體中的備選',
     'Regenerar alternativas': '重新生成備選',
   },
+  ja: {
+    "Sinónimos con IA": "AIの同義語",
+    "Alternativas de sinónimos": "同義語の代替案",
+    "Sinónimos y reformulaciones": "類義語と言い換え",
+    "Cinco alternativas en el idioma original, elegidas con el contexto de la frase.": "完全な文のコンテキストを使用して選択された、元の言語での5つの選択肢。",
+    "Buscando alternativas…": "代替品を探しています…",
+    "Alternativas actuales": "現在の代替品",
+    "Historial de esta apertura": "このセッションの履歴",
+    "Sustituye": "置き換えます",
+    "alternativas en memoria": "記憶の中の代替案",
+    "Regenerar alternativas": "代替品を再生成する",
+  },
 } as const;

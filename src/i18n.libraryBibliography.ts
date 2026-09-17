@@ -130,6 +130,37 @@ const styleManager = {
     'Este estilo personalizado no declara una licencia. Nodus puede usar tu copia local, pero no la redistribuirá.': '此自定義樣式未宣告許可。Nodus 可以使用你的本地副本，但不會重新分發。',
     'El estilo padre independiente se descargará y guardará la primera vez que se use.': '獨立的父樣式將在首次使用時下載並快取。',
   },
+  ja: {
+    "Gestionar estilos": "スタイルの管理",
+    "se descargará": "ダウンロードされます",
+    "Idioma de la cita": "引用言語",
+    "Buscar estilos instalados…": "インストールされているスタイルを検索…",
+    "Buscar estilos de cita…": "引用スタイルを検索…",
+    "Estilo de cita": "引用スタイル",
+    "Ningún estilo coincide con «{query}».": "「{query}」に一致するスタイルはありません。",
+    "Importar .csl": ".cslをインポートする",
+    "Importar de Zotero": "ゾテロから輸入",
+    "Añadir más estilos": "さらにスタイルを追加する",
+    "Buscar en el repositorio oficial CSL…": "公式 CSL リポジトリを検索してください…",
+    "Consultando estilos oficiales…": "公式スタイルを読み込み中…",
+    "Repositorio": "リポジトリ",
+    "Disponible sin conexión": "オフラインで利用可能",
+    "Descarga pendiente": "ダウンロード保留中",
+    "Añadir estilo del repositorio": "リポジトリスタイルを追加",
+    "Pega el identificador o la URL del estilo en el repositorio de Zotero.": "Zotero リポジトリからスタイル識別子または URL を貼り付けます。",
+    "Estilo CSL instalado.": "CSLスタイルがインストールされています。",
+    "{n} estilo(s) CSL importado(s).": "{n} CSL スタイルがインポートされました。",
+    "Los estilos oficiales pertenecen al proyecto CSL y conservan su autoría y licencia CC BY-SA 3.0. Los estilos privados sin licencia permanecen sólo en tu nodus-library.": "公式スタイルは CSL プロジェクトに属し、その作成者と CC BY-SA 3.0ライセンスを保持します。ライセンスのないプライベートスタイルは、nodus ライブラリにのみ残ります。",
+    "Incluido": "同梱",
+    "De Zotero": "ゾテロから",
+    "Archivo local": "ローカルファイル",
+    "Repositorio Zotero": "Zoteroリポジトリ",
+    "Repositorio CSL": "CSLリポジトリ",
+    "El archivo CSL exacto se guardará desde el repositorio oficial de CSL la primera vez que se use.": "正確な CSL ファイルは、最初の使用時に公式 CSL リポジトリからキャッシュされます。",
+    "El archivo CSL exacto se guardará desde el repositorio de estilos de Zotero la primera vez que se use.": "正確な CSL ファイルは、最初の使用時に Zotero スタイルリポジトリからキャッシュされます。",
+    "Este estilo personalizado no declara una licencia. Nodus puede usar tu copia local, pero no la redistribuirá.": "このカスタムスタイルはライセンスを宣言しません。 Nodus はローカルコピーを使用できますが、再配布はしません。",
+    "El estilo padre independiente se descargará y guardará la primera vez que se use.": "独立した親は、最初の使用時にダウンロードされ、キャッシュされます。",
+  },
 } as const;
 
 const dateColumns = {
@@ -142,6 +173,13 @@ const dateColumns = {
   tr: { 'Fecha de acceso': 'Erişim tarihi', 'Añadido a Zotero': "Zotero'ya eklendi", 'Modificado en Zotero': "Zotero'da değiştirildi", 'Añadido a Nodus': "Nodus'a eklendi", 'Modificado en Nodus': "Nodus'ta değiştirildi" },
   'zh-CN': { 'Fecha de acceso': '访问日期', 'Añadido a Zotero': '已添加到 Zotero', 'Modificado en Zotero': '已在 Zotero 中修改', 'Añadido a Nodus': '已添加到 Nodus', 'Modificado en Nodus': '已在 Nodus 中修改' },
   'zh-TW': { 'Fecha de acceso': '訪問日期', 'Añadido a Zotero': '已新增到 Zotero', 'Modificado en Zotero': '已在 Zotero 中修改', 'Añadido a Nodus': '已新增到 Nodus', 'Modificado en Nodus': '已在 Nodus 中修改' },
+  ja: {
+    "Fecha de acceso": "アクセス済み",
+    "Añadido a Zotero": "ゾテロに追加されました",
+    "Modificado en Zotero": "Zoteroで変更されました",
+    "Añadido a Nodus": "ノダスに追加されました",
+    "Modificado en Nodus": "Nodusで変更されました",
+  },
 } as const;
 
 const en = {
@@ -399,4 +437,30 @@ const zhTW = {
 };
 
 export const LIBRARY_BIBLIOGRAPHY_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN ,
-  'zh-TW': zhTW, } as const;
+  'zh-TW': zhTW,
+  ja: {
+    "Consulta fuentes bibliográficas públicas. Nada se aplica sin tu revisión.": "公開されている書誌ソースを検索します。あなたのレビューがなければ何も適用されません。",
+    "{n} ficha(s) actualizada(s).": "{n} レコードが更新されました。",
+    "Completar metadatos en lote": "メタデータを一括で完成させる",
+    "Se prepara una vista previa y sólo se aplican las fichas que confirmes.": "プレビューが用意されており、確認したレコードのみが適用されます。",
+    "{n} referencia(s) con identificadores compatibles": "サポートされている識別子を持つ {n} 個の参照",
+    "Las consultas se limitan en velocidad y los resultados parciales se conservan si cancelas.": "リクエストにはレート制限があり、キャンセルしても部分的な結果は保持されます。",
+    "Crear vista previa": "プレビューの作成",
+    "Resolviendo metadatos…": "メタデータを解決しています…",
+    "{n} seleccionada(s)": "{n} が選択されました",
+    "Cita copiada al portapapeles.": "引用がクリップボードにコピーされました。",
+    "{n} referencia(s) exportada(s).": "{n} 個の参照がエクスポートされました。",
+    "Citas y exportación": "引用とエクスポート",
+    "{n} referencia(s) seleccionada(s)": "{n} 個の参照が選択されました",
+    "Colección o búsqueda actual": "現在のコレクションまたは検索",
+    "Entrada bibliográfica": "参考文献エントリ",
+    "Cita en el texto": "本文中の引用",
+    "Exportar referencias": "参照のエクスポート",
+    "Los campos desconocidos se conservan para poder volver a importar el archivo sin pérdidas.": "不明なフィールドは保持されるため、データを失うことなくファイルを再度インポートできます。",
+    "Exportar…": "輸出…",
+    "Completar metadatos": "完全なメタデータ",
+    "Citar / exportar": "引用/エクスポート",
+    "BibLaTeX": "ビブラテックス",
+    "EndNote XML": "EndNote XML",
+    "Zotero RDF": "ゾテロ RDF",
+  }, } as const;

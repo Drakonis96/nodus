@@ -90,11 +90,13 @@ const EU_REGULATION_URLS: Record<AppLanguage, string> = {
   tr: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng',
   'zh-CN': 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng',
   'zh-TW': 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng',
+  ja: "https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng",
 };
 
 const DEFAULT_AUTHORITY: Record<AppLanguage, string> = {
   es: 'ES', en: 'IE', fr: 'FR', de: 'DE', pt: 'PT', 'pt-BR': 'PT', it: 'IT', tr: 'IE', 'zh-CN': 'IE',
   'zh-TW': 'IE',
+  ja: "IE",
 };
 
 export function defaultProtectAuthority(language: AppLanguage): string {

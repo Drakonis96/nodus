@@ -332,6 +332,35 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
     ],
     canonicalLabel: '在GitHub上閱讀完整隱私政策',
   },
+  ja: {
+    title: "プライバシーとデータ管理",
+    intro: "Nodus は主にデバイス上で動作します。アカウントは必要なく、広告、テレメトリ、リモート分析は含まれず、ボールトのコンテンツを受信する独自​​のバックエンドは動作しません。",
+    sections: [
+    {
+    heading: "デバイスに残るもの",
+    bullets: [
+    "データベース、ファイル、録音、トランスクリプト、メモ、書類および結果はデバイスに保存されます。",
+    "ファイルを選択したり、録音を開始したりしても、それが Nodus に公開またはアップロードされることはありません。",
+  ],
+  },
+    {
+    heading: "データがデバイスから流出するとき",
+    bullets: [
+    "明示的に有効にしたオプション機能のみがサードパーティ (選択したクラウド AI プロバイダー、Zotero、Unpaywall、GitHub (更新チェック)、または Hugging Face (モデルのダウンロード)) に連絡します。",
+    "OpenAI Secure MCP トンネル経由で ChatGPT に接続すると、OpenAI はツールのリクエストと結果を受け取ります。 Nodus サーバーはこのデバイスに制限されたままになります。",
+    "オプションのセルフホスト型 Nodus Server に接続すると、フィルタリングされたボールトのコピーが HTTPS 経由で公開されます。 PDF、資格情報、パス、埋め込み、生徒名簿、成績は除外されます。",
+    "各外部サービスは使用前に識別されます。",
+  ],
+  },
+    {
+    heading: "生徒と教師のデータ",
+    bullets: [
+    "AI は生徒の名簿、メモ、解答を受け取ることはなく、生徒を採点したり、プロフィールを作成したり、評価したりすることはできません。",
+  ],
+  },
+  ],
+    canonicalLabel: "GitHub でプライバシーポリシーの全文を読む",
+  },
 };
 
 const GDPR: Record<AppLanguage, LegalDocContent> = {
@@ -565,6 +594,28 @@ const GDPR: Record<AppLanguage, LegalDocContent> = {
     ],
     canonicalLabel: '在GitHub上開啟GDPR部署清單',
   },
+  ja: {
+    title: "Nodus が GDPR 準拠をサポートする方法",
+    intro: "この設計では、データの最小化、デフォルトでのプライバシー、録画前のジャストインタイム通知が適用されます。これは GDPR への準拠に役立ちますが、認証ではありません。管理者が法的根拠、保持、アクセス、プロバイダーを決定します。",
+    sections: [
+    {
+    heading: "プライバシーバイデザイン",
+    bullets: [
+    "ローカル処理は、オプションの外部接続から明確に分離されています。",
+    "短い通知は、録音などの機密性の高いアクションの直前に表示されます。",
+  ],
+  },
+    {
+    heading: "あなたに残された責任は何ですか",
+    bullets: [
+    "それぞれの目的、法的根拠、保存期間、受信者を文書化します。",
+    "第13条および第14条の完全な通知を関係者に提供します。",
+    "組織の導入チェックリストを完成させます。",
+  ],
+  },
+  ],
+    canonicalLabel: "GitHub で GDPR 導入チェックリストを開く",
+  },
 };
 
 const LICENSES: Record<AppLanguage, LegalDocContent> = {
@@ -777,6 +828,26 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
       },
     ],
     canonicalLabel: '在GitHub上檢視第三方宣告',
+  },
+  ja: {
+    title: "ライセンスと帰属",
+    intro: "Nodus は GNU AGPL v3でのみリリースされます。対応するソースおよびサードパーティの通知は、リリースごとに同梱されます。",
+    sections: [
+    {
+    heading: "オープンソース",
+    bullets: [
+    "Nodus の情報源、歴史、法的文書は公開されており、監査可能です。",
+  ],
+  },
+    {
+    heading: "第三者からの通知",
+    bullets: [
+    "パッケージ化された各アプリには、AGPL ライセンス、ソースコードの提供、完全な依存関係インベントリ、および必要なアップストリーム通知を含む法的ディレクトリが含まれています。",
+    "LGPL コンポーネントの再構築または交換の手順が含まれています。",
+  ],
+  },
+  ],
+    canonicalLabel: "GitHub でサードパーティの通知を表示する",
   },
 };
 

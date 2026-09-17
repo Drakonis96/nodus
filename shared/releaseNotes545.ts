@@ -24,6 +24,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Kütüphane, geçerli kasada seçtiğiniz eserleri türeyen her şeyle birlikte silebilir. İşlem önce onay ister ve iki yarıyı adlandırır: eserler ve kendilerine ait analiz gider, başka eserlerin onlarla paylaştığı analiz kalır. Tarama şu anda incelenen bir eseri yarıda silmek yerine reddeder, bir şey ters giderse tüm parti geri alınır ve paylaşılan fikirler ile temalar zarar görmeden kalır.',
     'zh-CN': '文献库现在可以删除当前资料库中所选的文献，连同由此派生的一切。操作会先请求确认，并说明两部分：文献及其自身的分析会被删除，其他文献与其共享的分析保留。扫描队列此刻正在分析的文献会被拒绝，而不是删到一半，只要有一处失败整批都会回滚，共享的观点和主题完好无损。',
     'zh-TW': '文獻庫現在可以刪除當前資料庫中所選的文獻，連同由此派生的一切。操作會先請求確認，並說明兩部分：文獻及其自身的分析會被刪除，其他文獻與其共享的分析保留。掃描佇列此刻正在分析的文獻會被拒絕，而不是刪到一半，只要有一處失敗整批都會回滾，共享的觀點和主題完好無損。',
+    ja: "ライブラリは、現在のボールトで選択した作品を、そこから派生したすべてのものとともに削除できます。このアクションは確認を求め、両方の部分に名前を付けます。作品とその独自の分析は削除され、他の作品が共有する分析は残ります。スキャナーが現在分析中の作業は中途半端に削除されるのではなく拒否され、何かが失敗するとバッチ全体が元に戻され、共有されたアイデアやテーマはそのまま残ります。",
   },
   {
     scope: 'library',
@@ -37,6 +38,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Koca bir seçimi tek işlemle onarın. Seçim çubuğu yalnızca eksik, bekleyen ya da başarısız adımları kuyruğa alır ve hâlihazırda bitmiş olanı asla yinelemez, böylece iki yüz eseri denetlemek her satıra iki yüz kez uğramak olmaktan çıkar. İşlem yalnızca tamamlanacak bir şey kaldığı sürece görünür.',
     'zh-CN': '一次修复整个选择。选择栏只把未完成、待处理或失败的步骤加入队列，绝不重跑已经完成的步骤，因此检查两百篇文献不再是两百次逐行点开。只有当还有事情没做完时，该操作才会出现。',
     'zh-TW': '一次修復整個選擇。選擇欄只把未完成、待處理或失敗的步驟加入佇列，絕不重跑已經完成的步驟，因此檢查兩百篇文獻不再是兩百次逐行點開。只有當還有事情沒做完時，該操作才會出現。',
+    ja: "1回の操作で選択範囲全体を修復します。選択バーは、不完全、保留中、または失敗したステップのみをキューに入れ、すでに行われたことを繰り返すことはありません。そのため、200の作業をチェックするのに、各行を200回訪問する必要がなくなります。アクションは、何かがまだ完了していない間のみ表示されます。",
   },
   {
     scope: 'library',
@@ -50,6 +52,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Belgesel Dizini bir günlük görüntüleyici kazanıyor. Sağlayıcı kesintisi, kesilmiş bir JSON yanıtı, eksik bir anahtar ya da düşen bir soket, ya iş satırında tek bir satır olarak kalıyor ya da hiç görünmüyordu ve tek kopyası geliştirici konsolunda yaşıyordu. Günlükler düğmesi çıkarma, OCR, dizinleme ve gömme günlüğünün tamamını açar, düzey, tür, kaynak, kasa ve güne göre süzer, kod, model ya da kimliğe göre arar ve tek bir satırı ya da süzülmüş görünümü kopyalamanıza veya indirmenize izin verir.',
     'zh-CN': '文献索引新增了日志查看器。提供商故障、被截断的 JSON 回答、缺失的密钥或掉线的套接字，最后都只是任务行里的一行字，或者干脆不见踪影，而唯一的副本留在开发者控制台里。新增的「日志」按钮会打开完整的提取、OCR、索引和向量化日志，可按级别、类型、来源、资料库和日期筛选，可按代码、模型或标识符搜索，还能复制或下载单行或筛选后的视图。',
     'zh-TW': '文獻索引新增了日誌檢視器。提供商故障、被截斷的 JSON 回答、缺失的金鑰或掉線的套接字，最後都只是任務行裡的一行字，或者乾脆不見蹤影，而唯一的副本留在開發者控制台裡。新增的「日誌」按鈕會開啟完整的提取、OCR、索引和向量化日誌，可按級別、型別、來源、資料庫和日期篩選，可按程式碼、模型或識別符號搜尋，還能複製或下載單行或篩選後的檢視。',
+    ja: "Documentary Index にはログビューアが追加されました。プロバイダーの停止、JSON の切り捨てられた応答、キーの欠落、またはソケットのドロップはすべて、ジョブ行の1行として終了するか、どこにも存在せず、唯一のコピーが開発者コンソールに存在していました。 [ログ] ボタンをクリックすると、完全な抽出、OCR、インデックス付け、埋め込みログが開きます。レベル、タイプ、発生元、ボールト、日付でフィルタリング可能、コード、モデル、または ID で検索可能で、1行またはフィルタリングされたビュー全体をコピーまたはダウンロードできます。",
   },
   {
     scope: 'library',
@@ -63,6 +66,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Belge profilleri artık dilleri karıştırmıyor ve güvenlerini abartmıyor. Başlığı olmayan bölümler artık kodda yazılı İspanyolca bir başlık taşımıyor, çünkü arayüz onları artık sizin dilinizde adlandırıyor. Birebir alıntılardan yayımlanan bir profil, %100 destek göstermek yerine bunu söylüyor ve sözleşmedeki taban değerle değiştirilen bir güven, ölçüm gibi görünmek yerine öyle işaretleniyor.',
     'zh-CN': '文献画像不再混用语言，也不再夸大置信度。没有标题的章节不再带有写在代码里的西班牙语标题，界面现在会用你的语言为它们命名。由原文引文发布的画像会如实说明，而不是显示 100 % 支撑，被合同下限替换的置信度会标注出来，不再看起来像一次测量。',
     'zh-TW': '文獻畫像不再混用語言，也不再誇大置信度。沒有標題的章節不再帶有寫在程式碼裡的西班牙語標題，介面現在會用你的語言為它們命名。由原文引文釋出的畫像會如實說明，而不是顯示 100 % 支撐，被合同下限替換的置信度會標註出來，不再看起來像一次測量。',
+    ja: "文書プロフィールでは、言語の混在をやめ、自信を誇張するのをやめます。見出しのないセクションには、コード内で書かれたスペイン語のタイトルが付けられなくなりました。これは、インターフェイスでセクションのタイトルが言語で付けられるようになったためです。文字通りの引用から公開されたプロファイルは、100% の支持を示す代わりにそのように述べており、契約の下限によって置き換えられた信頼度は、測定値のように見えるのではなく、そのようにマークされます。",
   },
   {
     scope: 'library',
@@ -76,6 +80,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Referans ekleme alanı artık bir bağlantı kabul ediyor. doi.org, arXiv, PubMed ve PMC adresleri adlandırdıkları kimlik üzerinden çözülüyor ve diğer her sayfa yayımladığı kayıt için okunuyor, PDF bağlantıları da ek olarak geliyor. arXiv makalesi eklemek artık API’sinin istek sınırında başarısız olmuyor, çünkü DataCite üzerinden çözülüyor.',
     'zh-CN': '添加文献的字段现在接受链接。doi.org、arXiv、PubMed 和 PMC 的地址会按它们所指的标识符解析，其他页面则会读取其发布的记录，并把声明中的 PDF 链接作为附件。添加 arXiv 论文不再因其 API 的请求限流而失败，因为现在通过 DataCite 解析。',
     'zh-TW': '新增文獻的欄位現在接受連結。doi.org、arXiv、PubMed 和 PMC 的地址會按它們所指的識別符號解析，其他頁面則會讀取其釋出的記錄，並把宣告中的 PDF 連結作為附件。新增 arXiv 論文不再因其 API 的請求限流而失敗，因為現在通過 DataCite 解析。',
+    ja: "参照を追加するフィールドにはリンクが必要です。 doi.org、arXiv、PubMed、および PMC のアドレスは、それらが指定する識別子によって解決され、他のページは、PDF リンクが添付された状態で、そのページが公開するレコードとして読み取られます。 arXiv ペーパーを追加すると、API のレート制限で失敗しなくなります。これは、DataCite を通じて解決されるようになったためです。",
   },
   {
     scope: 'library',
@@ -89,6 +94,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Bir işi durdurmak ya da duraklatmak artık hata olarak kaydedilmiyor. İstediğiniz iptal, iptal olarak kaydediliyor, her satırın eylemleri kasa değiştirdikten sonra bile işin kasasını hedefliyor, bir kampanyayı durdurmak tek başına çalışan işlerini de iptal ediyor ve bitmiş bir iş artık süre saymıyor.',
     'zh-CN': '停止或暂停任务不再被记为失败。你要求的取消会记为取消，即使你切换了资料库，每行的操作也会指向任务所属的资料库，停止一个批次也会取消它单独运行的任务，已完成的任务不再继续计时。',
     'zh-TW': '停止或暫停任務不再被記為失敗。你要求的取消會記為取消，即使你切換了資料庫，每行的操作也會指向任務所屬的資料庫，停止一個批次也會取消它單獨執行的任務，已完成的任務不再繼續計時。',
+    ja: "ジョブの停止または一時停止は失敗として記録されなくなりました。要求したキャンセルはキャンセルとして保存され、ボールトを切り替えた後でも各行のアクションはジョブのボールトをターゲットにし、キャンペーンを停止するとスタンドアロンジョブもキャンセルされ、完了したジョブは時間のカウントを停止します。",
   },
   {
     scope: 'browser',
@@ -102,6 +108,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Nodus Browser yer imleri tarayıcıya girip çıkabiliyor. Başlangıç sayfası bir indirme ve bir yükleme eylemi kazanıyor: indirme tüm koleksiyonu Chrome, Edge, Firefox, Brave ve Opera’nın okuduğu HTML olarak yazar, yükleme ise bir dosyayı yöneticinin zaten kullandığı önizlemeyle okur ve hiçbir şey birleştirilmeden önce yer imlerini, klasörleri ve yinelenenleri adlandırır.',
     'zh-CN': 'Nodus Browser 的书签可以进出浏览器。起始页新增下载和上传两个操作：下载会把整个收藏写成 Chrome、Edge、Firefox、Brave 和 Opera 都能读取的 HTML，上传则会用书签管理器已有的预览来读取文件，在合并之前说明书签、文件夹和重复项的数量。',
     'zh-TW': 'Nodus Browser 的書籤可以進出瀏覽器。起始頁新增下載和上傳兩個操作：下載會把整個收藏寫成 Chrome、Edge、Firefox、Brave 和 Opera 都能讀取的 HTML，上傳則會用書籤管理器已有的預覽來讀取檔案，在合併之前說明書籤、資料夾和重複項的數量。',
+    ja: "Nodus ブラウザのブックマークはブラウザの内外に移動します。スタートページにはダウンロードとアップロードのアクションが含まれます。ダウンロードでは、Chrome、Edge、Firefox、Brave、Opera が読み取る HTML としてコレクション全体が書き込まれ、アップロードでは、マネージャーが既に使用しているのと同じプレビューを持つものが読み取られ、ブックマーク、フォルダー、重複に名前が付けられてから、何かがマージされます。",
   },
   {
     scope: 'browser',
@@ -115,6 +122,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Her tarayıcı sekmesi aynı genişlikte. Uzun başlıklı bir sekme artık diğerlerini yana itmiyor ve dördüncü sekme, gözün geri döndüğü bir konum oluyor yeniden. Yerden fazla sekme olduğunda şerit, gösterecek bir şeyi kalan uçta bir okla kayıyor ve etkin sekme kendiliğinden görünüme geliyor.',
     'zh-CN': '浏览器的每个标签页宽度相同。标题很长的标签页不再把其他标签挤到一边，第四个标签页重新成为目光可以回到的位置。当标签页比空间多时，标签条会滚动，并在一端还有内容可看时显示箭头，当前标签页会自动滚动到可见范围。',
     'zh-TW': '瀏覽器的每個標籤頁寬度相同。標題很長的標籤頁不再把其他標籤擠到一邊，第四個標籤頁重新成為目光可以回到的位置。當標籤頁比空間多時，標籤條會滾動，並在一端還有內容可看時顯示箭頭，當前標籤頁會自動滾動到可見範圍。',
+    ja: "すべてのブラウザタブの測定値は同じです。長い見出しが残りを横に押しやることはなくなり、4番目のタブに再び目を戻すことができる位置になります。タブの数がスペースを超えている場合、ストリップは表示すべきものがまだある端に矢印が付いてスクロールし、アクティブなタブが自動的に表示されます。",
   },
   {
     scope: 'browser',
@@ -128,6 +136,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Önceki ve Sonraki, tüm çalma listesini tek bir öğede tutan Spotify ya da YouTube gibi oynatıcılarda çalışıyor. Artık sayfanın kendi denetimleri için kaydettiği işleyiciler çağrılıyor, ki bir medya tuşu bunu hiç başaramıyordu, böylece Sonraki gerçekten parça değiştiriyor ve Oynat sesi olması gereken yere geri getiriyor.',
     'zh-CN': '上一首和下一首现在能在把整个播放列表放在同一个元素里的播放器上工作，比如 Spotify 或 YouTube。现在会调用页面自己为其控件注册的处理程序，这是媒体键从未做到的，因此下一首会真正切歌，播放也会把声音带回正确的位置。',
     'zh-TW': '上一首和下一首現在能在把整個播放列表放在同一個元素裡的播放器上工作，比如 Spotify 或 YouTube。現在會呼叫頁面自己為其控制元件註冊的處理程序，這是媒體鍵從未做到的，因此下一首會真正切歌，播放也會把聲音帶回正確的位置。',
+    ja: "Previous と Next は、Spotify や YouTube など、プレイリスト全体を1つの要素内に保持するプレーヤーで動作します。ページ自体がコントロール用に登録したハンドラーが呼び出されますが、これはメディアキーでは決して管理されなかったので、Next は実際にトラックを変更し、Play はサウンドを本来あるべき場所に戻します。",
   },
   {
     scope: 'languages',
@@ -141,6 +150,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Kuyruk hataları sizin dilinizde görünüyor. Arayüz başka bir dildeyken ekrana İspanyolca gelen bir hata artık çevriliyor, aynı şekilde bir işin durumu, bir duraklatmanın gerekçesi ve bir kaydetme uyarısı da, ve kasa süzgeci nihayet düzey, tür, kaynak ve günün yanında duruyor.',
     'zh-CN': '队列故障现在以你的语言显示。界面语言不是西班牙语时却以西班牙语出现的错误，现在会被翻译，任务状态、暂停原因和保存警告也一样，资料库筛选也终于出现在级别、类型、来源和日期的旁边。',
     'zh-TW': '佇列故障現在以你的語言顯示。介面語言不是西班牙語時卻以西班牙語出現的錯誤，現在會被翻譯，任務狀態、暫停原因和儲存警告也一樣，資料庫篩選也終於出現在級別、型別、來源和日期的旁邊。',
+    ja: "キュー障害はあなたの言語で表示されます。インターフェイスが別の言語で表示されていたときにスペイン語で画面に表示されたエラーは、ジョブのステータス、一時停止の理由、保存警告と同様に翻訳され、最終的に Vault フィルターがレベル、タイプ、発生元、日の横に表示されます。",
   },
   {
     scope: 'general',
@@ -154,5 +164,6 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     tr: 'Onay pencereleri koyu modda opak. Yarı saydam bir kartla çiziliyorlardı, bu yüzden arkadaki liste geri alınamayan eylemin metninin içinden okunuyordu ve artık diğer pencerelerle aynı opak yüzeyi kullanıyorlar.',
     'zh-CN': '确认对话框在深色模式下不再透明。它们原先用半透明的卡片绘制，后面的列表会透过那个无法撤销的操作文字显出来，现在改用与其他对话框相同的实心表面。',
     'zh-TW': '確認對話方塊在深色模式下不再透明。它們原先用半透明的卡片繪製，後面的列表會透過那個無法撤銷的操作文字顯出來，現在改用與其他對話方塊相同的實心表面。',
+    ja: "ダークモードでは確認ダイアログが不透明になります。これらは半透明のカードで描かれているため、後ろのリストで元に戻すことのできないアクションの文言が読み取られ、他のダイアログと同じ不透明な表面が使用されるようになりました。",
   },
 ];

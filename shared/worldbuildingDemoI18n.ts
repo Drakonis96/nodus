@@ -34,6 +34,7 @@ export function worldbuildingDemoLocalized(
     tr: worldbuildingDemoText('tr', es, en),
     'zh-CN': worldbuildingDemoText('zh-CN', es, en),
     'zh-TW': worldbuildingDemoText('zh-TW', es, en),
+    ja: worldbuildingDemoText('ja', es, en),
   };
 }
 

@@ -37,6 +37,15 @@ const PACKAGE_COPY: Record<AppLanguage, PackageCopy> = {
   tr: { openHeading: 'Uygulamayı açın', openBody: '`index.html` dosyasını modern bir tarayıcıda açın. Uygulama kurulum gerektirmeden çalışır ve verilerini o tarayıcıda yerel olarak saklar.', contentsHeading: 'Paket içeriği', indexItem: 'kullanıma hazır sürüm.', manifestItem: 'Nodus Apps ile uyumlu özgün paket.', sourceItem: 'uygulamayı saklamak ve değiştirmek için ayrı HTML, CSS ve JavaScript dosyaları.', multiplayer: 'QR ile çok oyunculu bağlantı için uygulamanın Nodus içinde çalıştırılması gerekir. İndirilen sürüm çevrimdışı kalır.' },
   'zh-CN': { openHeading: '打开应用', openBody: '在现代浏览器中打开 `index.html`。应用无需安装即可运行，并将数据保存在该浏览器本地。', contentsHeading: '包内容', indexItem: '开箱即用的版本。', manifestItem: '与 Nodus Apps 兼容的原始包。', sourceItem: '用于保存和修改应用的独立 HTML、CSS 和 JavaScript 文件。', multiplayer: 'QR 多人模式要求在 Nodus 中运行该应用。下载的版本保持离线。' },
   'zh-TW': { openHeading: '開啟應用', openBody: '在現代瀏覽器中開啟 `index.html`。應用無需安裝即可執行，並將資料儲存在該瀏覽器本地。', contentsHeading: '包內容', indexItem: '開箱即用的版本。', manifestItem: '與 Nodus Apps 相容的原始包。', sourceItem: '用於儲存和修改應用的獨立 HTML、CSS 和 JavaScript 檔案。', multiplayer: 'QR 多人模式要求在 Nodus 中執行該應用。下載的版本保持離線。' },
+  ja: {
+    openHeading: "アプリを開く",
+    openBody: "最新のブラウザで「index.html」を開きます。アプリはインストールせずに動作し、データをそのブラウザーにローカルに保存します。",
+    contentsHeading: "パッケージ内容",
+    indexItem: "すぐに使えるバージョン。",
+    manifestItem: "Nodus Appsと互換性のあるオリジナルパッケージ。",
+    sourceItem: "アプリを保存および変更するための個別の HTML、CSS、および JavaScript ファイル。",
+    multiplayer: "QR マルチプレイヤーでは、Nodus 内でアプリを実行する必要があります。ダウンロードしたバージョンはオフラインのままです。",
+  },
 };
 
 /** A local compatibility layer keeps storage-backed apps useful outside Nodus. */

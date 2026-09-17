@@ -77,6 +77,26 @@ const PARTICIPANT_COPY: Record<AppLanguage, Record<ParticipantCopyKey, string>> 
   'zh-TW': {
     enterCode: '輸入程式碼', codeHelp: '輸入 Nodus 中顯示的六位程式碼。', accessCode: '訪問程式碼', continue: '繼續', sixDigits: '請輸入程式碼的全部六位數字。', checking: '檢查中…', invalidOrEnded: '程式碼不正確或會話已結束。', sharedExperience: '共享體驗', sharedApp: '共享應用', displayName: '你希望以什麼名稱顯示？', yourName: '你的名字', openApp: '開啟應用', sessionClosed: '會話已關閉。', loadFailed: '無法載入應用。', sessionFull: '會話已滿。', nameRequired: '請輸入名稱以加入。', participant: '參與者', storageTooLarge: '資料過大。',
   },
+  ja: {
+    enterCode: "コードを入力してください",
+    codeHelp: "Nodusに表示されている6桁のコードを入力してください。",
+    accessCode: "アクセスコード",
+    continue: "続く",
+    sixDigits: "コードの6桁すべてを入力します。",
+    checking: "チェック中…",
+    invalidOrEnded: "コードが間違っているか、セッションが終了しています。",
+    sharedExperience: "共有された経験",
+    sharedApp: "共有アプリ",
+    displayName: "どのように登場したいですか？",
+    yourName: "あなたの名前",
+    openApp: "アプリを開く",
+    sessionClosed: "セッションは終了しました。",
+    loadFailed: "アプリを読み込めませんでした。",
+    sessionFull: "セッションは満席です。",
+    nameRequired: "参加する名前を入力してください。",
+    participant: "参加者",
+    storageTooLarge: "データが大きすぎます。",
+  },
 };
 
 function participantText(language: AppLanguage, key: ParticipantCopyKey): string {

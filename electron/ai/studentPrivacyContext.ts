@@ -128,6 +128,12 @@ export function privacyConsentDetail(privacy: ActivePrivacyScope | null): string
     tr: { prefix: 'Öğrenci adları tanımlayıcılarla değiştirilir', student: 'öğrenci', students: 'öğrenci', detail: 'Ses transkripsiyonunu, görüntü analizini veya embedding’leri kapsamaz.' },
     'zh-CN': { prefix: '学生姓名会替换为标识符', student: '名学生', students: '名学生', detail: '该措施不涵盖音频转写、图像分析或嵌入。' },
     'zh-TW': { prefix: '學生姓名會替換為識別符號', student: '名學生', students: '名學生', detail: '該措施不涵蓋音訊轉寫、影像分析或嵌入。' },
+    ja: {
+      prefix: "学生の名前は識別子に置き換えられます",
+      student: "学生",
+      students: "学生",
+      detail: "音声の転写、画像分析、埋め込みは対象外です。",
+    },
   };
   const text = copy[language] ?? copy.es;
   return `${text.prefix} (${n} ${n === 1 ? text.student : text.students}). ${text.detail}`;

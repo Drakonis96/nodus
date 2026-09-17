@@ -22,10 +22,12 @@ import { DOC_FACET_LABEL_IT, DOC_TYPE_LABEL_IT } from './archiveDocTypes.it';
 import { DOC_FACET_LABEL_TR, DOC_TYPE_LABEL_TR } from './archiveDocTypes.tr';
 import { DOC_FACET_LABEL_ZH_CN, DOC_TYPE_LABEL_ZH_CN } from './archiveDocTypes.zh-CN';
 import { DOC_FACET_LABEL_ZH_TW, DOC_TYPE_LABEL_ZH_TW } from './archiveDocTypes.zh-TW';
+import { DOC_FACET_LABEL_JA, DOC_TYPE_LABEL_JA } from './archiveDocTypes.ja';
 export { DOC_TYPE_LABEL_IT } from './archiveDocTypes.it';
 export { DOC_TYPE_LABEL_TR } from './archiveDocTypes.tr';
 export { DOC_TYPE_LABEL_ZH_CN } from './archiveDocTypes.zh-CN';
 export { DOC_TYPE_LABEL_ZH_TW } from './archiveDocTypes.zh-TW';
+export { DOC_TYPE_LABEL_JA } from './archiveDocTypes.ja';
 
 // ── Categories (dropdown grouping; ES label via i18n) ───────────────────────────
 export type ArchiveDocCategory =
@@ -82,6 +84,7 @@ export interface FacetValue {
   tr?: string;
   'zh-CN'?: string;
   'zh-TW'?: string;
+  ja?: string;
 }
 export type FacetDimensionId =
   | 'naturaleza'
@@ -158,6 +161,7 @@ for (const value of [...NATURALEZA, ...EPOCA, ...AMBITO, ...FUNCION, ...SOPORTE_
   value.tr = DOC_FACET_LABEL_TR[value.en] ?? value.en;
   value['zh-CN'] = DOC_FACET_LABEL_ZH_CN[value.en] ?? value.en;
   value['zh-TW'] = DOC_FACET_LABEL_ZH_TW[value.en] ?? value.en;
+  value.ja = DOC_FACET_LABEL_JA[value.en] ?? value.en;
 }
 
 /** Filter-bar dimensions in display order (dimension name via i18n; values in-data). */
@@ -1280,6 +1284,7 @@ function expand(row: RawDocType): ArchiveDocTypeDef {
       tr: DOC_TYPE_LABEL_TR[id] ?? labelEn,
       'zh-CN': DOC_TYPE_LABEL_ZH_CN[id] ?? labelEn,
       'zh-TW': DOC_TYPE_LABEL_ZH_TW[id] ?? labelEn,
+      ja: DOC_TYPE_LABEL_JA[id] ?? labelEn,
     },
     category,
     fields,

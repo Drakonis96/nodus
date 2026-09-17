@@ -98,4 +98,13 @@ export const BROWSER_CONNECTOR_TRANSLATIONS = {
     '來自Chrome Web Store的Nodus Research官方擴充套件程式。',
     '開發擴充套件程式（未打包）或其他本地安裝。',
   ]),
+  ja: table([
+    "ノーダスリサーチコネクター",
+    "Nodus Research コネクタを有効にする",
+    "Nodus Research コネクターに接続する",
+    "この拡張機能が Nodus にページを送信することを許可しますか?",
+    "起源",
+    "Chrome ウェブストアの公式 Nodus Research 拡張機能。",
+    "解凍された開発拡張機能または別のローカルインストール。",
+  ]),
 } as const;

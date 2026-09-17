@@ -44,4 +44,9 @@ export const DIARIZATION_TRANSLATIONS = {
     'Analizando voces…': '正在分析聲音…',
     'La diarización usa Gemini Flash Lite para distinguir voces y conserva literalmente el texto.': '說話人分離使用 Gemini Flash Lite 區分聲音，並逐字保留文本。',
   },
+  ja: {
+    "Detectar hablantes": "発言者の検出",
+    "Analizando voces…": "音声を分析中…",
+    "La diarización usa Gemini Flash Lite para distinguir voces y conserva literalmente el texto.": "ダイアライゼーションでは、Gemini Flash Lite を使用して音声を区別し、テキストをそのまま保存します。",
+  },
 } as const;

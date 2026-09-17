@@ -161,4 +161,22 @@ export const RESEARCH_REASONING_TRANSLATIONS = {
     "Detener dictado": "停止聽寫",
     "Transcribiendo...": "正在轉錄…"
   },
+  ja: {
+    "Estándar": "標準",
+    "Mínimo": "最小",
+    "Bajo": "低い",
+    "Medio": "中くらい",
+    "Alto": "高い",
+    "Muy alto": "非常に高い",
+    "Máximo": "最大",
+    "Ultra": "ウルトラ",
+    "Thinking activado": "考え中",
+    "Esfuerzo de thinking": "考える努力",
+    "Este modelo no publica un control de thinking.": "このモデルは思考制御を公開しません。",
+    "Más esfuerzo puede mejorar tareas complejas y tardar más.": "努力を重ねると複雑なタスクが改善され、時間がかかる場合があります。",
+    "Thinking desactivado por defecto.": "思考はデフォルトでオフになっています。",
+    "Este modelo requiere thinking; estándar usa el mínimo disponible.": "このモデルには思考が必要です。標準では、使用可能な最も低いレベルが使用されます。",
+    "Detener dictado": "ディクテーションを停止する",
+    "Transcribiendo...": "転記中...",
+  },
 };

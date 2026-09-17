@@ -152,4 +152,21 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
     "1 obra": "1篇文獻",
     "El asistente solo consultará esta obra.": "助手只會查閱此文獻。"
   },
+  ja: {
+    "Filtrar contexto": "フィルターコンテキスト",
+    "Fuentes": "情報源",
+    "Limitar el contexto a las fuentes seleccionadas": "コンテキストを選択したソースに限定する",
+    "Los autores incluyen sus obras, no los textos que solo los mencionan. Si eliges autores y obras, se usará la intersección.": "著者には、単に言及するだけのテキストではなく、自分の作品が含まれています。著者と作品の両方を選択するには、それらの交差部分を使用します。",
+    "Al cambiar las fuentes, las respuestas anteriores con otro contexto no se enviarán al modelo.": "ソースが変更されると、異なるコンテキストを使用した以前の応答はモデルに送信されなくなります。",
+    "Buscar autores": "著者を検索する",
+    "Buscar obras": "作品を探す",
+    "Fuente no disponible": "ソースが利用できません",
+    "Afina la búsqueda para ver más resultados.": "検索を絞り込んでさらに結果を表示します。",
+    "El asistente solo consultará {n} obras.": "アシスタントは {n} の作品のみを参照します。",
+    "Ninguna obra coincide. No se recuperará contexto de otras fuentes.": "一致する作品はありません。他のソースからのコンテキストは取得されません。",
+    "Filtro desactivado: se consultará todo el corpus.": "フィルターをオフにすると、コーパス全体が検索されます。",
+    "{n} obras": "{n} は動作します",
+    "1 obra": "1作品",
+    "El asistente solo consultará esta obra.": "アシスタントはこの作業のみを参照します。",
+  },
 } as const;
