@@ -37,6 +37,13 @@ const KEYS = [
   'Relaciones semánticas',
   'Valida pares de ideas y genera las relaciones del grafo.',
   'Sin un auditor propio, cada ficha documental la puntúa el mismo modelo que la redactó. Elige aquí otro modelo para que la revisión sea independiente.',
+  // The red local-model warning: its title and the three paragraphs of its tooltip.
+  // It accompanies every picker that can end up running on this machine, so it must
+  // read as a deliberate caution in each language rather than as a generic notice.
+  'Aviso sobre los modelos locales',
+  'Los modelos locales pueden tardar bastante en procesar, sobre todo en equipos poco potentes. Nodus analiza los documentos por fragmentos en vez de enviarlos todos de golpe, y eso exige recursos incluso a los modelos pequeños.',
+  'Todavía estamos optimizando los modelos locales incluidos. Gemma es ahora mismo la opción recomendada, aunque pueden quedar problemas menores. Ollama y LM Studio también son compatibles; los proveedores en la nube están mucho más probados y siguen siendo la opción más fiable para Nodus.',
+  'Si encuentras cualquier problema, avísanos: los comentarios y las contribuciones que ayuden a mejorar el soporte de modelos locales son siempre bienvenidos.',
 ] as const;
 
 function table(values: readonly string[]): Record<string, string> {
@@ -81,6 +88,10 @@ const en = table([
   'Semantic relationships',
   'Validates idea pairs and generates graph relationships.',
   'Without a separate auditor, each document profile is graded by the same model that wrote it. Choose another model here so the review is independent.',
+  'About local models',
+  'Local models may require significant processing time, especially on less powerful hardware. Nodus analyzes documents in multiple chunks rather than sending them all at once, which can be demanding even for smaller models.',
+  "We're still optimizing the bundled local models. Gemma is currently the recommended option, although minor issues may remain. Ollama and LM Studio are also supported, while cloud providers have been more extensively tested and currently remain the most reliable option for Nodus.",
+  'If you encounter any problems, please report them — feedback and contributions that help improve local model support are always welcome.',
 ]);
 
 const fr = table([
@@ -120,6 +131,10 @@ const fr = table([
   'Relations sémantiques',
   'Valide les paires d’idées et génère les relations du graphe.',
   'Sans auditeur distinct, chaque fiche documentaire est notée par le modèle qui l’a rédigée. Choisissez ici un autre modèle pour rendre la révision indépendante.',
+  'À propos des modèles locaux',
+  'Les modèles locaux peuvent demander un temps de traitement important, surtout sur du matériel peu puissant. Nodus analyse les documents par fragments plutôt que de tout envoyer d’un coup, ce qui reste exigeant même pour de petits modèles.',
+  'Nous continuons d’optimiser les modèles locaux intégrés. Gemma est actuellement l’option recommandée, même si des problèmes mineurs peuvent subsister. Ollama et LM Studio sont également pris en charge ; les fournisseurs cloud ont été bien plus testés et restent aujourd’hui l’option la plus fiable pour Nodus.',
+  'Si tu rencontres le moindre problème, signale-le : les retours et les contributions qui aident à améliorer la prise en charge des modèles locaux sont toujours bienvenus.',
 ]);
 
 const de = table([
@@ -159,6 +174,10 @@ const de = table([
   'Semantische Beziehungen',
   'Validiert Ideenpaare und erzeugt die Beziehungen des Graphen.',
   'Ohne eigenen Prüfer wird jedes Dokumentprofil von demselben Modell bewertet, das es verfasst hat. Wähle hier ein anderes Modell, damit die Prüfung unabhängig ist.',
+  'Hinweis zu lokalen Modellen',
+  'Lokale Modelle können viel Verarbeitungszeit benötigen, besonders auf weniger leistungsfähiger Hardware. Nodus analysiert Dokumente in mehreren Abschnitten, statt sie alle auf einmal zu senden, was selbst für kleinere Modelle anspruchsvoll ist.',
+  'Die mitgelieferten lokalen Modelle werden weiterhin optimiert. Gemma ist derzeit die empfohlene Option, auch wenn kleinere Probleme bestehen können. Ollama und LM Studio werden ebenfalls unterstützt; Cloud-Anbieter wurden deutlich umfassender getestet und bleiben derzeit die zuverlässigste Option für Nodus.',
+  'Wenn dir Probleme auffallen, melde sie bitte: Feedback und Beiträge, die den Support für lokale Modelle verbessern, sind immer willkommen.',
 ]);
 
 const pt = table([
@@ -198,6 +217,10 @@ const pt = table([
   'Relações semânticas',
   'Valida pares de ideias e gera as relações do grafo.',
   'Sem um auditor próprio, cada ficha documental é avaliada pelo mesmo modelo que a redigiu. Escolhe aqui outro modelo para que a revisão seja independente.',
+  'Aviso sobre os modelos locais',
+  'Os modelos locais podem exigir bastante tempo de processamento, sobretudo em equipamentos menos potentes. O Nodus analisa os documentos por fragmentos em vez de os enviar todos de uma vez, o que é exigente mesmo para modelos pequenos.',
+  'Continuamos a otimizar os modelos locais incluídos. O Gemma é atualmente a opção recomendada, embora possam subsistir problemas menores. O Ollama e o LM Studio também são suportados; os fornecedores na nuvem foram muito mais testados e continuam a ser a opção mais fiável para o Nodus.',
+  'Se encontrares algum problema, avisa-nos: os comentários e os contributos que ajudem a melhorar o suporte de modelos locais são sempre bem-vindos.',
 ]);
 
 const ptBR = table([
@@ -237,6 +260,10 @@ const ptBR = table([
   'Relações semânticas',
   'Valida pares de ideias e gera as relações do grafo.',
   'Sem um auditor próprio, cada ficha documental é avaliada pelo mesmo modelo que a redigiu. Escolha aqui outro modelo para que a revisão seja independente.',
+  'Aviso sobre os modelos locais',
+  'Modelos locais podem exigir bastante tempo de processamento, especialmente em máquinas menos potentes. O Nodus analisa os documentos em partes em vez de enviar tudo de uma vez, o que é exigente até para modelos pequenos.',
+  'Continuamos otimizando os modelos locais incluídos. O Gemma é atualmente a opção recomendada, embora problemas menores possam permanecer. Ollama e LM Studio também são compatíveis; os provedores em nuvem foram muito mais testados e seguem sendo a opção mais confiável para o Nodus.',
+  'Se você encontrar qualquer problema, avise a gente: comentários e contribuições que ajudem a melhorar o suporte a modelos locais são sempre bem-vindos.',
 ]);
 
 const it = table([
@@ -276,6 +303,10 @@ const it = table([
   'Relazioni semantiche',
   'Convalida coppie di idee e genera le relazioni del grafo.',
   'Senza un revisore dedicato, ogni scheda documentale è valutata dallo stesso modello che l’ha redatta. Scegli qui un altro modello perché la revisione sia indipendente.',
+  'Avviso sui modelli locali',
+  'I modelli locali possono richiedere molto tempo di elaborazione, soprattutto su hardware poco potente. Nodus analizza i documenti a blocchi invece di inviarli tutti insieme, il che è impegnativo anche per i modelli più piccoli.',
+  'Stiamo ancora ottimizzando i modelli locali inclusi. Gemma è attualmente l’opzione consigliata, anche se possono restare problemi minori. Anche Ollama e LM Studio sono supportati; i provider cloud sono stati testati molto più a fondo e restano l’opzione più affidabile per Nodus.',
+  'Se riscontri qualsiasi problema, segnalalo: i commenti e i contributi che aiutano a migliorare il supporto ai modelli locali sono sempre benvenuti.',
 ]);
 
 const tr = table([
@@ -315,6 +346,10 @@ const tr = table([
   'Anlamsal ilişkiler',
   'Fikir çiftlerini doğrular ve grafik ilişkilerini oluşturur.',
   'Ayrı bir denetçi yoksa her belge künyesi onu yazan modelin kendisi tarafından puanlanır. İncelemenin bağımsız olması için burada başka bir model seçin.',
+  'Yerel modellerle ilgili uyarı',
+  'Yerel modeller, özellikle güçsüz donanımlarda önemli ölçüde işlem süresi gerektirebilir. Nodus belgeleri tek seferde göndermek yerine parçalar hâlinde analiz eder; bu, küçük modeller için bile zorlayıcıdır.',
+  'Pakete dahil yerel modelleri hâlâ optimize ediyoruz. Gemma şu anda önerilen seçenek, ancak küçük sorunlar kalabilir. Ollama ve LM Studio da destekleniyor; bulut sağlayıcıları çok daha kapsamlı test edildi ve Nodus için hâlâ en güvenilir seçenek olmayı sürdürüyor.',
+  'Herhangi bir sorunla karşılaşırsan bize bildir: yerel model desteğini geliştirmeye yardımcı olan geri bildirimler ve katkılar her zaman memnuniyetle karşılanır.',
 ]);
 
 const zhCN = table([
@@ -354,6 +389,10 @@ const zhCN = table([
   '语义关系',
   '验证观点对并生成图谱关系。',
   '没有独立的审核器时，每份文档档案都由撰写它的同一个模型评分。请在此选择另一个模型，使审核保持独立。',
+  '关于本地模型的提醒',
+  '本地模型可能需要很长的处理时间，尤其是在性能较低的硬件上。Nodus 会分块分析文档，而不是一次性全部发送，即使对较小的模型来说也有一定负担。',
+  '我们仍在优化内置的本地模型。Gemma 是目前推荐的选项，尽管仍可能存在一些小问题。Ollama 和 LM Studio 也受支持；云端提供商经过了更充分的测试，目前仍是 Nodus 最可靠的选择。',
+  '如果你遇到任何问题，欢迎告诉我们：任何有助于改进本地模型支持的反馈和贡献都非常欢迎。',
 ]);
 
 const zhTW = table([
@@ -393,6 +432,10 @@ const zhTW = table([
   '語義關係',
   '驗證觀點對並生成圖譜關係。',
   '沒有獨立的稽核器時，每份文件檔案都由撰寫它的同一個模型評分。請在此選擇另一個模型，使稽核保持獨立。',
+  '關於本地模型的提醒',
+  '本地模型可能需要很長的處理時間，尤其是在效能較低的硬體上。Nodus 會分段分析文件，而不是一次全部送出，即使對較小的模型也相當吃重。',
+  '我們仍在最佳化內建的本地模型。Gemma 是目前建議的選項，不過仍可能有一些小問題。Ollama 和 LM Studio 也支援；雲端供應商經過更充分的測試，目前仍是 Nodus 最可靠的選擇。',
+  '如果你遇到任何問題，歡迎回報：任何有助於改善本地模型支援的意見與貢獻都非常歡迎。',
 ]);
 
 export const MODEL_SETTINGS_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN ,
@@ -434,6 +477,10 @@ export const MODEL_SETTINGS_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, 
     "의미론적 관계",
     "아이디어 쌍을 검증하고 그래프 관계를 생성합니다.",
     "별도의 감사자가 없으면 각 문서 프로필은 이를 작성한 동일한 모델에 따라 등급이 지정됩니다. 검토가 독립적이도록 여기에서 다른 모델을 선택하십시오.",
+    "로컬 모델 안내",
+    "로컬 모델은 특히 성능이 낮은 하드웨어에서 처리 시간이 상당히 오래 걸릴 수 있습니다. Nodus는 문서를 한 번에 보내지 않고 여러 청크로 나누어 분석하므로 작은 모델에도 부담이 됩니다.",
+    "번들로 제공되는 로컬 모델은 아직 최적화 중입니다. Gemma가 현재 권장 옵션이지만 사소한 문제가 남아 있을 수 있습니다. Ollama와 LM Studio도 지원합니다. 클라우드 공급자는 더 폭넓게 검증되었으며 여전히 Nodus에서 가장 안정적인 선택입니다.",
+    "문제가 발생하면 알려 주세요. 로컬 모델 지원을 개선하는 데 도움이 되는 피드백과 기여는 언제나 환영합니다.",
   ]),
   ja: table([
     "再試行する前に、[設定] → [AI モデル] でモデルを構成してください。基本構成または詳細構成を使用できます。",
@@ -472,4 +519,8 @@ export const MODEL_SETTINGS_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, 
     "意味的な関係",
     "アイデアのペアを検証し、グラフの関係を生成します。",
     "個別の監査人がいない場合、各文書プロファイルは、それを作成したのと同じモデルによって評価されます。レビューを独立させるため、ここでは別のモデルを選択してください。",
+    "ローカルモデルに関する注意",
+    "ローカルモデルは、特に性能の低いハードウェアでは処理に時間がかかることがあります。Nodus はドキュメントを一度に送信せず、複数のチャンクに分けて解析するため、小さなモデルでも負荷がかかります。",
+    "同梱のローカルモデルは現在も最適化を進めています。Gemma が現時点で推奨の選択肢ですが、細かな問題が残る可能性があります。Ollama と LM Studio にも対応しています。クラウドプロバイダーはより広く検証されており、現時点で Nodus にとって最も信頼できる選択肢です。",
+    "問題が発生した場合はぜひ報告してください。ローカルモデルのサポート改善に役立つフィードバックや貢献はいつでも歓迎します。",
   ]), } as const;

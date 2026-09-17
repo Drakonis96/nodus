@@ -3,6 +3,7 @@ import type { AppSettings, EmbeddingProvider, ModelInfo } from '@shared/types';
 import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS, PROVIDER_LABELS } from '@shared/providers';
 import { toModelChoices } from '@shared/onboardingModels';
 import { SearchableModelSelect } from './SearchableModelSelect';
+import { LocalModelWarning } from './LocalModelWarning';
 import { t } from '../i18n';
 
 export function EmbeddingModelControl({
@@ -54,13 +55,17 @@ export function EmbeddingModelControl({
   return (
     <div className="w-full max-w-3xl space-y-2">
       <div className="grid gap-2 lg:grid-cols-[11rem_minmax(13rem,1fr)_auto]">
-        <select className="input w-full" value={provider} onChange={(e) => setProvider(e.target.value as EmbeddingProvider)}>
-          {EMBEDDING_PROVIDERS.map((p) => (
-            <option key={p} value={p}>
-              {PROVIDER_LABELS[p]}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-1.5">
+          <select className="input w-full min-w-0 flex-1" value={provider} onChange={(e) => setProvider(e.target.value as EmbeddingProvider)}>
+            {EMBEDDING_PROVIDERS.map((p) => (
+              <option key={p} value={p}>
+                {PROVIDER_LABELS[p]}
+              </option>
+            ))}
+          </select>
+          {/* `nodus`, `ollama` and `lmstudio` run the whole corpus index on this machine. */}
+          <LocalModelWarning provider={provider} testId="embedding-provider-local-warning" />
+        </div>
         <input
           className="input w-full min-w-0"
           value={modelInput}

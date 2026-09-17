@@ -9,6 +9,7 @@ import {
 import { t, tx } from '../i18n';
 import { ConfirmModal } from './ConfirmModal';
 import { SettingsModelList, settingsModelRowClass } from './SettingsModelList';
+import { LocalModelWarning } from './LocalModelWarning';
 import { Icon } from './ui';
 
 function formatBytes(bytes: number): string {
@@ -154,7 +155,12 @@ export function LocalAiModelsSettings({
   return <div className="mt-5 rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950/35" data-testid="nodus-local-ai-models">
     <div className="flex flex-wrap items-start gap-3">
       <div className="min-w-0 flex-1">
-        <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-200">{t('Modelos locales integrados')}</h4>
+        <div className="flex items-center gap-2">
+          <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-200">{t('Modelos locales integrados')}</h4>
+          {/* Everything on this panel runs on the user's machine, so the caveat belongs
+              here too: downloading a model is the moment the cost becomes real. */}
+          <LocalModelWarning provider="nodus" testId="bundled-local-models-warning" />
+        </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-neutral-500">{t('Los modelos no vienen incluidos. Nodus los descarga bajo demanda, los ejecuta en tu equipo y no envía el contenido a terceros.')}</p>
       </div>
       <div className={`rounded-lg border px-3 py-2 text-xs ${status?.runtime.ready ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300' : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300'}`}>
