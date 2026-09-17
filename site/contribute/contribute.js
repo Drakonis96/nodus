@@ -27,11 +27,13 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
   // closes the row needs a little more room than a face. The row is measured
   // against these, so the numbers here and the sizes in contribute.css are one
   // value in two places.
-  const AVATAR = 20;
-  const STEP = 13;
-  const COUNTER = 52;
+  const AVATAR = 24;
+  const STEP = 17;        // the circles overlap by the rest: 7px
+  const GAP = 6;          // the space between two rows of faces
+  const COUNTER = 58;
+  const ROWS = 2;         // a wide card stacks a second row of faces rather than hiding them
   // The row's own width decides how many faces it holds; this only bounds a card
-  // so wide that a hundred faces would stop reading as people.
+  // so wide that every contributor stops being a person and becomes texture.
   const FACES = 24;
   const PER_PAGE = 100;   // the search endpoint's own ceiling
 
@@ -78,17 +80,20 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
     resizeTimer = setTimeout(() => { for (const render of rows.values()) render(); }, 180);
   }, { passive: true });
 
-  /* How many faces a row can hold. A card is as wide as the viewport decides, so
-     a fixed count either wastes half the row on a large screen or overflows on a
-     small one: faces are added while they fit, and the counter that closes the
-     row is only reserved when something really is left over. */
+  /* How many faces a card can hold. A card is as wide as the window decides, so a
+     fixed count either wastes most of it on a large screen or overflows on a
+     small one: the row is measured instead, it may use its second line, and the
+     counter that closes it is only given room when something is really left
+     over. */
   function fit(host, available, total) {
-    const row = (count) => (count ? AVATAR + (count - 1) * STEP + (total > count ? COUNTER : 0) : 0);
+    const cap = Math.min(available, FACES);
     const width = host.clientWidth;
-    if (!width) return Math.min(available, FACES);   // not laid out yet
-    let count = Math.min(available, FACES);
-    while (count > 1 && row(count) > width) count--;
-    return count;
+    if (!width) return cap;   // not laid out yet
+    const perRow = Math.max(1, Math.floor((width - AVATAR) / STEP) + 1);
+    const room = perRow * ROWS;
+    // the counter needs a couple of face slots of its own on the last line
+    const counter = total > room ? Math.ceil((COUNTER + GAP) / STEP) : 0;
+    return Math.max(1, Math.min(cap, room - counter));
   }
 
   /** As many faces as the card can carry, then a counter for everyone else. */

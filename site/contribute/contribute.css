@@ -207,29 +207,39 @@ figures row, and never redefines the shared scale.
 .wiki-btn { margin-left: auto; flex: 0 0 auto; padding: 11px 18px; font-size: 13.5px; }
 
 /* ============================================================ figures */
-/* Four short rows rather than four tall cards: the whole row is context, and it
-   has to leave the funding cards on screen at the same time. */
-.support-numbers { padding: 16px 0 20px; }
+/* The four blocks read as one band: equal height at every width — a fixed floor
+   does that, since two of them carry a row of faces and two do not — and the
+   section keeps the same air above and below. */
+.support-numbers { padding: 26px 0; }
+/* nodus.css gives the section after a hero a taller top than bottom; this band
+   keeps its air even on both sides, which is what makes it read as a band. */
+.page-hero + .support-numbers { padding-top: 26px; }
 .figures {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
-.figure { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 13px; align-items: start; padding: 16px 18px; }
+.figure {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px;
+  align-items: start; align-content: space-between;
+  /* the band the faces sit in, reserved in every block so the four match */
+  --faces-h: 54px;
+  min-height: 186px; padding: 22px 24px;
+}
 .figure .pic {
-  display: grid; place-items: center; width: 36px; height: 36px;
-  border-radius: 11px;
+  display: grid; place-items: center; width: 46px; height: 46px;
+  border-radius: 13px;
   border: 1px solid color-mix(in srgb, var(--violet) 30%, transparent);
   background: color-mix(in srgb, var(--violet) 13%, transparent);
   color: var(--violet-2);
 }
-.figure .pic svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.figure .pic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .figure-value {
   margin: 0;
-  font-size: clamp(22px, 1.9vw, 26px); font-weight: 700; line-height: 1; letter-spacing: -0.035em;
+  font-size: clamp(28px, 2.2vw, 34px); font-weight: 700; line-height: 1; letter-spacing: -0.035em;
   font-variant-numeric: tabular-nums;
 }
-.figure h2 { margin-top: 4px; font-size: 13px; font-weight: 650; line-height: 1.32; letter-spacing: -0.01em; }
-.figure-note { margin: 3px 0 0; font-size: 11.5px; color: var(--ink-3); }
+.figure h2 { margin-top: 5px; font-size: 14.5px; font-weight: 650; line-height: 1.32; letter-spacing: -0.01em; }
+.figure-note { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-3); }
 .figure-loading { color: var(--ink-3); }
 
 /* The contributor faces, and the link that carries whoever is not shown. The
@@ -237,22 +247,26 @@ figures row, and never redefines the shared scale.
    both columns gives the row the whole card to grow into. It sits centred, so a
    few faces keep a wide margin on each side and the margin only closes as more
    of them arrive — nothing is ever spread apart to reach the edges. */
+/* A fixed height, so a second row of faces can never make one card taller than
+   the three beside it: the band stays one height whatever each block holds. */
 .avatars {
-  display: flex; align-items: center; justify-content: center;
+  display: flex; flex-wrap: wrap; align-content: center; justify-content: center;
   grid-column: 1 / -1;
-  padding-top: 10px; min-height: 20px;
+  height: var(--faces-h); row-gap: 6px;
 }
+/* the same band in the blocks that carry no faces, so all four stay equal */
+.figure-spacer { grid-column: 1 / -1; height: var(--faces-h); }
 .avatars img {
-  width: 20px; height: 20px; margin-left: -7px;
+  width: 24px; height: 24px; margin-left: -7px;
   border-radius: 50%; border: 2px solid #0d0a1a; background: var(--skin-2);
 }
 .avatars img:first-child { margin-left: 0; }
 .avatars .more {
-  margin-left: -7px; padding: 0 7px; height: 20px;
+  margin-left: -7px; padding: 0 9px; height: 24px;
   display: inline-flex; align-items: center;
   border-radius: 999px; border: 2px solid #0d0a1a;
   background: var(--skin-2); color: var(--ink-2);
-  font-size: 10.5px; font-weight: 650;
+  font-size: 11px; font-weight: 650;
 }
 .avatars:hover .more { color: var(--ink); }
 
@@ -285,7 +299,14 @@ figures row, and never redefines the shared scale.
 }
 
 @media (max-width: 620px) {
-  .figures { grid-template-columns: minmax(0, 1fr); }
+  /* one column, still four blocks of one size, scaled to the screen */
+  .figures { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .figure { --faces-h: 50px; min-height: 168px; padding: 18px 20px; gap: 14px; }
+  .figure .pic { width: 40px; height: 40px; border-radius: 12px; }
+  .figure .pic svg { width: 19px; height: 19px; }
+  .figure-value { font-size: 26px; }
+  .figure h2 { font-size: 14px; }
+
   .support-offer { padding: 18px; }
   .support-offer-copy { padding-left: 16px; }
   .marquee { flex-wrap: wrap; }
