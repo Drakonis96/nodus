@@ -49,7 +49,7 @@ import { MobileTeaserGuide } from './components/MobileTeaserGuide';
 import { recoveryHealthAdvice, recoveryHealthHeadline } from './recoveryHealth';
 import { NodiMascot } from './components/nodi/NodiMascot';
 import { NodiStyleModal } from './components/NodiStyleModal';
-import { HoverLabelButton, Icon } from './components/ui';
+import { Icon } from './components/ui';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { t, tx, setActiveLang } from './i18n';
 import { resolveStartupGate } from './app/StartupGate';
@@ -116,10 +116,9 @@ function applyAppTheme(appTheme: import('@shared/types').AppTheme, customThemes:
   } catch { /* private mode */ }
 }
 
-/** Header action rendered as an icon that reveals its label on hover/focus, so the
- *  top bar's action rail stays a clean row of icons. Every action shares the same
- *  ghost styling so none stands out; pass `showLabel` to keep the text pinned open
- *  (e.g. an action in progress, or an alert that must be noticed). */
+/** Header action rendered as an icon with a native title tooltip. The top bar stays
+ *  a stable row of actions; pass `showLabel` to keep the text pinned open (e.g. an
+ *  action in progress, or an alert that must be noticed). */
 function HeaderAction({
   icon,
   label,
@@ -154,23 +153,29 @@ function HeaderAction({
   /** Same, for the queue panel. */
   queueTrigger?: boolean;
 }) {
+  const titleText = kbd ? `${title ?? label} · ${kbd}` : title ?? label;
   return (
-    <HoverLabelButton
+    <button
       data-tour={dataTour}
       data-vault-trigger={vaultTrigger ? '' : undefined}
       data-inbox-trigger={inboxTrigger ? '' : undefined}
       data-notifications-trigger={notificationsTrigger ? '' : undefined}
       data-queue-trigger={queueTrigger ? '' : undefined}
-      icon={icon}
-      label={label}
-      title={title}
+      type="button"
       onClick={onClick}
       disabled={disabled}
-      spinning={spinning}
-      showLabel={showLabel}
-      className={`btn-ghost h-9 min-h-9 min-w-9 ${tone}`}
-      trailing={kbd ? <kbd className="composer-kbd ml-1.5">{kbd}</kbd> : undefined}
-    />
+      title={titleText}
+      aria-label={label}
+      className={`header-action btn justify-center px-2.5 py-0 leading-none btn-ghost h-9 min-h-9 min-w-9 ${tone}`}
+    >
+      <Icon name={icon} className={spinning ? 'animate-spin' : ''} />
+      {showLabel && (
+        <span className="flex items-center overflow-hidden whitespace-nowrap transition-all duration-200 ml-1.5 max-w-[14rem] opacity-100">
+          {label}
+          {kbd && <kbd className="composer-kbd ml-1.5">{kbd}</kbd>}
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -1484,18 +1489,13 @@ export function App() {
         )}
 
         <div className="flex-1" />
-        {/* Right-side action rail: icon-only by default, each button reveals its
-            label on hover/focus so the header reads as a clean row of icons. It
-            grows leftwards as labels open, which is why the centre badge measures
-            it instead of assuming a fixed clearance. */}
+        {/* Right-side action rail: icon-only by default, with native title labels so
+            the header stays a stable row of icons. */}
         {/* "Configure an AI model" lives here rather than in the action rail, where its
             pinned-open label spent ~170px of the only room the centred badge has and
             pushed the icons towards it. This half of the header is empty by
             construction, so the alert is centred between the sidebar and the badge and
-            folds its label away like every other action: amber says something needs
-            attention, hovering (or focusing) says what. Its `left` is the band's
-            CENTRE — the button is translated by half its own width, so the label opens
-            symmetrically into the empty middle instead of growing towards the badge. */}
+            keeps its native title label available without adding permanent width. */}
         {!settings.synthesisModel && modelAlertPlacement?.fits && (
           <div
             data-testid="header-model-alert"
@@ -1553,8 +1553,8 @@ export function App() {
           {/* Inside the measured actions box on purpose: the ResizeObserver above feeds
               placeHeaderBadge, which keeps this rail from ever reaching the centred vault
               badge. A badge positioned outside this box is exactly what that geometry
-              cannot see. The wrapper is what the count hangs off — HoverLabelButton's
-              `trailing` slot sits inside a label span that is max-w-0 until hover.
+              cannot see. The wrapper is what the count hangs off — the action's
+              optional shortcut sits inside its label span when that label is pinned.
 
               Only shown once something has actually arrived: the inbox is per vault and
               only means anything for a connected one, so on a local install it was a
