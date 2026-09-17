@@ -739,7 +739,7 @@ export const STUDY_BANK_TRANSLATIONS = { en, fr, de, pt, ptBR, it, tr, 'zh-CN': 
     "Exportación completada": "내보내기 완료",
     "elementos actualizados": "업데이트된 항목",
     "Colección": "수집",
-    "Añadir": "추가하다",
+    "Añadir": "추가",
     "Etiquetas separadas por comas": "쉼표로 구분된 태그",
     "Deseleccionar": "선택 취소",
     "Sin colecciones": "컬렉션 없음",

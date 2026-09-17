@@ -274,7 +274,7 @@ export const PAGE_TRANSLATIONS = {
     "No se encontró la página de esta fila.": "이 행에 대한 페이지를 찾을 수 없습니다.",
     "Cargando página…": "페이지 로드 중…",
     "No se pudo abrir la página.": "페이지를 열 수 없습니다.",
-    "Guardando…": "절약…",
+    "Guardando…": "저장 중…",
     "Guardado": "저장됨",
     "Añadir bloque": "블록 추가",
     "Hay cambios simultáneos en esta página.": "이 페이지에는 동시 변경사항이 있습니다.",

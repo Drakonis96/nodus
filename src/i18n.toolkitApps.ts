@@ -476,7 +476,7 @@ TOOLKIT_APPS_TRANSLATIONS['ko'] = {
   "Crear una app con IA": "AI로 앱 만들기",
   "Buscar apps": "앱 검색",
   "Buscar por tarea o necesidad…": "작업이나 필요로 검색하세요...",
-  "Explorar": "탐구하다",
+  "Explorar": "탐색",
   "Mis apps": "내 앱",
   "Archivadas": "보관됨",
   "No hay apps que coincidan con esta búsqueda.": "이 검색과 일치하는 앱이 없습니다.",

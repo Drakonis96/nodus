@@ -294,7 +294,7 @@ export const PRIMARY_SOURCES_DERIVED_TRANSLATIONS = {
     "Resolver topónimo": "지명 해결",
     "Revertir resolución": "해상도 되돌리기",
     "Buscar en el gacetero local…": "지역신문사를 검색해 보세요…",
-    "Buscar": "찾다",
+    "Buscar": "검색",
     "Punto exacto": "정확한 포인트",
     "Localidad": "소재지",
     "Municipio": "지방 자치체",

@@ -1005,7 +1005,7 @@ export const CLOUDFLARE_TRANSLATIONS = {
     "Mínimo 12 caracteres. No es tu contraseña de Cloudflare.": "12자 이상입니다. 이것은 Cloudflare 비밀번호가 아닙니다.",
     "Comprobando y publicando…": "확인 및 게시 중…",
     "Conectar y publicar el vault": "Vault 연결 및 게시",
-    "Listo": "준비가 된",
+    "Listo": "완료",
     "Guarda tu clave de recuperación": "복구 키 저장",
     "Permite exportar el vault aunque olvides la contraseña. Nodus la conserva cifrada en este dispositivo, pero debes guardar otra copia fuera de él.": "비밀번호를 잊어버린 경우에도 볼트를 내보낼 수 있습니다. Nodus는 이 기기에 암호화된 정보를 보관하지만 다른 사본은 다른 곳에 보관해야 합니다.",
     "Copiar clave": "키 복사",

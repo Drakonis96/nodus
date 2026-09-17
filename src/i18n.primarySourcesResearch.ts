@@ -442,7 +442,7 @@ export const PRIMARY_SOURCES_RESEARCH_TRANSLATIONS = {
     "Interpretación separada de la fuente": "출처와 별개로 해석",
     "Crea una nota, enlaza entidades o fragmentos y conserva siempre visible qué es cita literal y qué es comentario.": "메모를 작성하고, 항목이나 발췌문을 연결하고, 항상 문자 그대로의 인용문과 해설문을 구분하세요.",
     "Crear primera nota": "첫 번째 메모 만들기",
-    "Guardando…": "절약…",
+    "Guardando…": "저장 중…",
     "Guardada": "저장됨",
     "¿Eliminar esta nota? Los enlaces se quitarán, pero las fuentes no se modificarán.": "이 메모를 삭제하시겠습니까? 해당 링크는 제거되지만 소스는 변경되지 않습니다.",
     "Editar": "편집하다",
