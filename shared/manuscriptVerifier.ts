@@ -199,30 +199,45 @@ export function classifyClaimLocally(input: {
     severity = 'info';
     rationale = localizedVerifierText(language, {
       es: 'La frase ya contiene una marca de cita, por lo que no se marca como falta.', en: 'The sentence already contains a citation marker, so it is not flagged as missing.', fr: 'La phrase contient déjà un marqueur de citation ; elle n’est donc pas signalée comme dépourvue de source.', de: 'Der Satz enthält bereits einen Zitiermarker und wird daher nicht als fehlender Beleg markiert.', pt: 'A frase já contém um marcador de citação, pelo que não é assinalada como estando em falta.', 'pt-BR': 'A frase já contém um marcador de citação, portanto não é sinalizada como ausente.', it: 'La frase contiene già un indicatore di citazione, quindi non viene segnalata come priva di fonte.', tr: 'Cümle zaten bir alıntı işareti içerdiğinden eksik olarak işaretlenmez.', 'zh-CN': '该句已包含引注标记，因此不会被标记为缺少引用。',
+  'zh-TW': '該句已包含引註標記，因此不會被標記為缺少引用。',
+  ko: "문장에 이미 인용 표시가 포함되어 있으므로 누락된 것으로 표시되지 않습니다.",
+  ja: "文にはすでに引用マーカーが含まれているため、欠落としてフラグが立てられません。",
     });
   } else if (input.claim.ownContribution) {
     status = 'own_argument';
     severity = 'info';
     rationale = localizedVerifierText(language, {
       es: 'La formulacion presenta esto como aportacion propia del autor.', en: 'The wording frames this as the author’s own contribution.', fr: 'La formulation présente cela comme une contribution propre de l’auteur.', de: 'Die Formulierung stellt dies als eigenen Beitrag des Autors dar.', pt: 'A formulação apresenta isto como um contributo próprio do autor.', 'pt-BR': 'A formulação apresenta isso como uma contribuição própria do autor.', it: 'La formulazione presenta questo come un contributo dell’autore.', tr: 'İfade bunu yazarın kendi katkısı olarak sunuyor.', 'zh-CN': '该表述将其呈现为作者本人的贡献。',
+  'zh-TW': '該表述將其呈現為作者本人的貢獻。',
+  ko: "문구는 이것을 저자 자신의 기여로 구성합니다.",
+  ja: "この文言は、これを著者自身の寄稿であると位置づけています。",
     });
   } else if (strong) {
     status = 'missing_citation';
     severity = top!.score >= 0.42 ? 'high' : 'medium';
     rationale = localizedVerifierText(language, {
       es: 'Hay una coincidencia cercana en el corpus y la frase no tiene marca de cita.', en: 'A close corpus match was found and the sentence has no citation marker.', fr: 'Une correspondance proche a été trouvée dans le corpus et la phrase ne comporte aucun marqueur de citation.', de: 'Im Korpus wurde eine enge Übereinstimmung gefunden, aber der Satz enthält keinen Zitiermarker.', pt: 'Foi encontrada uma correspondência próxima no corpus e a frase não tem marcador de citação.', 'pt-BR': 'Foi encontrada uma correspondência próxima no corpus e a frase não tem marcador de citação.', it: 'È stata trovata una corrispondenza vicina nel corpus e la frase non contiene un indicatore di citazione.', tr: 'Derlemde yakın bir eşleşme bulundu ve cümlede alıntı işareti yok.', 'zh-CN': '在语料库中发现了高度相近的匹配，而该句没有引注标记。',
+  'zh-TW': '在語料庫中發現了高度相近的匹配，而該句沒有引註標記。',
+  ko: "밀접하게 일치하는 코퍼스가 발견되었으며 문장에 인용 표시가 없습니다.",
+  ja: "コーパスに近い一致が見つかりましたが、文には引用マーカーがありません。",
     });
   } else if (direct) {
     status = 'weak_match';
     severity = 'low';
     rationale = localizedVerifierText(language, {
       es: 'El corpus contiene material relacionado, pero la coincidencia no basta para exigir cita.', en: 'The corpus has related material, but the match is not strong enough to demand a citation.', fr: 'Le corpus contient des éléments associés, mais la correspondance n’est pas assez forte pour exiger une citation.', de: 'Das Korpus enthält verwandtes Material, aber die Übereinstimmung ist nicht stark genug, um einen Beleg zu verlangen.', pt: 'O corpus contém material relacionado, mas a correspondência não é suficientemente forte para exigir uma citação.', 'pt-BR': 'O corpus contém material relacionado, mas a correspondência não é forte o bastante para exigir uma citação.', it: 'Il corpus contiene materiale correlato, ma la corrispondenza non è abbastanza forte da richiedere una citazione.', tr: 'Derlemde ilgili malzeme var, ancak eşleşme alıntı gerektirecek kadar güçlü değil.', 'zh-CN': '语料库中有相关材料，但匹配程度不足以要求引用。',
+  'zh-TW': '語料庫中有相關材料，但匹配程度不足以要求引用。',
+  ko: "코퍼스에 관련 자료가 있지만 인용을 요구할 만큼 일치가 강력하지 않습니다.",
+  ja: "コーパスには関連資料が含まれていますが、引用を要求するほど一致度が高くありません。",
     });
   } else {
     status = 'own_argument';
     severity = 'info';
     rationale = localizedVerifierText(language, {
       es: 'No se encontro una coincidencia directa en ideas listadas o indexadas del corpus.', en: 'No direct match was found in listed or indexed corpus ideas.', fr: 'Aucune correspondance directe n’a été trouvée parmi les idées listées ou indexées du corpus.', de: 'Unter den aufgelisteten oder indexierten Korpusideen wurde keine direkte Übereinstimmung gefunden.', pt: 'Não foi encontrada uma correspondência direta nas ideias listadas ou indexadas do corpus.', 'pt-BR': 'Não foi encontrada uma correspondência direta nas ideias listadas ou indexadas do corpus.', it: 'Non è stata trovata alcuna corrispondenza diretta tra le idee elencate o indicizzate del corpus.', tr: 'Listelenen veya dizinlenmiş derlem fikirlerinde doğrudan eşleşme bulunamadı.', 'zh-CN': '在已列出或已索引的语料库观点中未找到直接匹配。',
+  'zh-TW': '在已列出或已索引的語料庫觀點中未找到直接匹配。',
+  ko: "나열되거나 색인화된 말뭉치 아이디어에서 직접 일치하는 항목을 찾을 수 없습니다.",
+  ja: "リストまたは索引付けされたコーパスのアイデアに直接一致するものは見つかりませんでした。",
     });
   }
 

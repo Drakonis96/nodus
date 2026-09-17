@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
  * site/data/announcements.json is published by merging it: the Pages workflow deploys
  * on any push to main touching site/**. So this file is the only review step between
  * writing a notice and every install seeing it, and it enforces the two things that
- * cannot be fixed after the fact — a notice must be readable in all nine interface
+ * cannot be fixed after the fact — a notice must be readable in all ten interface
  * languages, and an id must never be reused, because the id is what a read mark hangs
  * off and reusing one marks a NEW notice as already read for everyone.
  *
@@ -77,7 +77,7 @@ test('the language survey is published with its response button', () => {
   assert.equal(notice.copy.es.linkLabel, 'Responder la encuesta');
 });
 
-test('every published notice is written in all nine languages', () => {
+test('every published notice is written in all twelve languages', () => {
   for (const notice of published.notices) {
     const missing = ANNOUNCEMENT_LANGUAGES.filter((language) => {
       const copy = notice.copy?.[language];

@@ -11,7 +11,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "- [x] Apresentar o custo do Fluxo no Arquivo\n- [x] Dê a Tarek uma decisão visível\n- [ ] Esclareça como a carta chegou\n- [] Plante a orquídea salgada primeiro",
     "it": "- [x] Presentare il costo del Flusso nel File\n- [x] Dai a Tarek una decisione visibile\n- [ ] Chiarire come è arrivata la lettera\n- [ ] Pianta prima l'orchidea salata",
     "tr": "- [x] Akışın maliyetini Dosyada Gösterin\n- [x] Tarek'e görünür bir karar verin\n- [ ] Mektubun nasıl ulaştığını açıklayın\n- [ ] Önce tuz orkidesini ek",
-    "zh-CN": "- [x] 在档案中呈现流的代价\n- [x] 给塔雷克一个可见的选择\n- [ ] 说明信是如何送达的\n- [ ] 更早埋下盐兰花的伏笔"
+    "zh-CN": "- [x] 在档案中呈现流的代价\n- [x] 给塔雷克一个可见的选择\n- [ ] 说明信是如何送达的\n- [ ] 更早埋下盐兰花的伏笔",
+    'zh-TW': "- [x] 在檔案中呈現流的代價\n- [x] 給塔雷克一個可見的選擇\n- [ ] 說明信是如何送達的\n- [ ] 更早埋下鹽蘭花的伏筆",
+    ko: "- [x] 아카이브에 Flux의 비용 소개\n- [x] 타렉에게 가시적인 선택권을 주세요\n- [ ] 편지가 어떻게 도착했는지 명확히 하세요.\n- [ ] 소금 난초를 더 일찍 심습니다.",
+    ja: "- [x] Flux のコストをアーカイブに導入\n- [x] タレクに目に見える選択肢を与える\n- [ ] 手紙がどのように届いたかを明確にする\n- [ ] 先に塩蘭の種を蒔きます",
   },
   "—¿Y si la cerradura no protege lo de dentro, sino lo de fuera? ¿Y si Aurel quería que la abriéramos ahora?\n—Eso no era mío. El recuerdo tenía frío, pero yo no.\n—Regente, con respeto: su decreto es una cerradura con uniforme, y he abierto cosas peores.": {
     "es": "—¿Y si la cerradura no protege lo de dentro, sino lo de fuera? ¿Y si Aurel quería que la abriéramos ahora?\n—Eso no era mío. El recuerdo tenía frío, pero yo no.\n—Regente, con respeto: su decreto es una cerradura con uniforme, y he abierto cosas peores.",
@@ -22,7 +25,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "—E se a fechadura não proteger o que está dentro, mas o que está fora? E se Aurel quisesse que abríssemos agora?\n—Isso não foi meu. A memória estava fria, mas eu não.\n—Regente, com respeito: seu decreto é uma fechadura de uniforme, e já abri coisas piores.",
     "it": "—E se la serratura non proteggesse ciò che è dentro, ma ciò che è fuori? E se Aurel volesse che lo aprissimo adesso?\n—Quello non era mio. Il ricordo era freddo, ma io non lo ero.\n— Reggente, con rispetto: il vostro decreto è una serratura in divisa, e io ho aperto cose peggiori.",
     "tr": "—Ya kilit içeriyi değil de dışarıyı koruyorsa? Ya Aurel onu şimdi açmamızı isteseydi?\n—O benim değildi. Hafıza soğuktu ama ben değildim.\n— Vekil, saygılarımla: Kararnameniz üniformalı bir kilit ve ben daha kötü şeyleri açtım.",
-    "zh-CN": "—如果这把锁保护的不是里面的东西，而是外面的呢？如果奥雷尔想让我们现在打开它呢？\n—那不是我的。那段记忆是冷的，但我不是。\n—摄政王，恕我直言：您的法令是一把穿着制服的锁，而我打开过更糟的东西。"
+    "zh-CN": "—如果这把锁保护的不是里面的东西，而是外面的呢？如果奥雷尔想让我们现在打开它呢？\n—那不是我的。那段记忆是冷的，但我不是。\n—摄政王，恕我直言：您的法令是一把穿着制服的锁，而我打开过更糟的东西。",
+    'zh-TW': "—如果這把鎖保護的不是裡面的東西，而是外面的呢？如果奧雷爾想讓我們現在開啟它呢？\n—那不是我的。那段記憶是冷的，但我不是。\n—攝政王，恕我直言：您的法令是一把穿著制服的鎖，而我開啟過更糟的東西。",
+    ko: "\"자물쇠가 내부가 아닌 외부를 보호한다면 어떨까요? Aurel이 지금 열어달라고 하면 어떨까요?\"\n\"그건 내 것이 아니었어. 기억은 차가웠지만 나는 아니었어.\"\n\"섭정님, 정중하게 말씀드립니다. 당신의 법령은 제복을 입은 자물쇠와도 같습니다. 그리고 저는 더 나쁘게 열었습니다.\"",
+    ja: "「鍵が内側のものではなく外側のものを保護するとしたらどうなるでしょうか? オーレルが今すぐ開けるように要求したらどうしますか?」\n「あれは私のものではありませんでした。記憶は冷めていますが、私はそうではありませんでした。」\n「摂政、謹んで。あなたの法令は制服の錠前であり、私はさらに悪化して開けてしまいました。」",
   },
   "—Con permiso, Regente: una puerta cerrada también encierra a quienes la guardan.\n—Puedo abrirte la puerta, Ilyra. No fingir que no lo hice. Queda bajo mi responsabilidad.\n—No, tío. Esta vez he oído la orden perfectamente.": {
     "es": "—Con permiso, Regente: una puerta cerrada también encierra a quienes la guardan.\n—Puedo abrirte la puerta, Ilyra. No fingir que no lo hice. Queda bajo mi responsabilidad.\n—No, tío. Esta vez he oído la orden perfectamente.",
@@ -33,7 +39,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "— Desculpe, regente: uma porta fechada encerra também quem a guarda.\n—Posso abrir a porta para você, Ilyra. Não finja que não fui eu. Está sob minha responsabilidade.\n—Não, tio. Desta vez ouvi a ordem perfeitamente.",
     "it": "—Scusate, Reggente: una porta chiusa racchiude anche chi la custodisce.\n—Posso aprirti la porta, Ilyra. Non fingere che non l'abbia fatto. È sotto la mia responsabilità.\n—No, zio. Questa volta ho sentito l'ordine perfettamente.",
     "tr": "—Affedersiniz, Vekil: Kapalı bir kapı aynı zamanda onu koruyanları da çevreler.\n—Senin için kapıyı açabilirim, Ilyra. Yapmadığımı iddia etme. Benim sorumluluğumdadır.\n—Hayır amca. Bu sefer emri mükemmel bir şekilde duydum.",
-    "zh-CN": "—恕我冒昧，摄政王：一扇关闭的门也把守门人关在里面。\n—我可以为你打开门，伊莉拉。我没法假装没做过。责任由我承担。\n—不，叔叔。这一次我听得清清楚楚。"
+    "zh-CN": "—恕我冒昧，摄政王：一扇关闭的门也把守门人关在里面。\n—我可以为你打开门，伊莉拉。我没法假装没做过。责任由我承担。\n—不，叔叔。这一次我听得清清楚楚。",
+    'zh-TW': "—恕我冒昧，攝政王：一扇關閉的門也把守門人關在裡面。\n—我可以為你開啟門，伊莉拉。我沒法假裝沒做過。責任由我承擔。\n—不，叔叔。這一次我聽得清清楚楚。",
+    ko: "\"허락을 받아요, 섭정님. 닫힌 문은 그것을 지키는 사람들도 가두어 둡니다.\"\n\"문은 내가 열 수 있어, 일리라. 안 본 척은 할 수 없어. 이건 내 책임이야.\"\n\"아니요, 삼촌. 이번에는 명령을 완벽하게 들었습니다.\"",
+    ja: "「許可があれば摂政。閉ざされた門は、それを守る者たちも閉じ込めます。」\n「私は門を開けることができます、イリラ。開かなかったふりはできません。これは私の責任です。」\n「いえ、おじさん。今度はちゃんと命令を聞きましたよ」",
   },
   "—El hecho se admite: sufrirán inocentes. La alternativa contiene más inocentes y menos tiempo.\n—Queda dispuesto el cierre de la Puerta de Sal. No es castigo; es continuidad.\n—La ciudad no necesita esperanza, cartógrafa. Necesita sobrevivir a quienes pueden permitirse tenerla.": {
     "es": "—El hecho se admite: sufrirán inocentes. La alternativa contiene más inocentes y menos tiempo.\n—Queda dispuesto el cierre de la Puerta de Sal. No es castigo; es continuidad.\n—La ciudad no necesita esperanza, cartógrafa. Necesita sobrevivir a quienes pueden permitirse tenerla.",
@@ -44,7 +53,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "—O fato é admitido: pessoas inocentes sofrerão. A alternativa contém mais inocentes e menos tempo.\n—É ordenado o fechamento da Porta do Sal. Não é punição; É continuidade.\n—A cidade não precisa de esperança, cartógrafo. Precisa sobreviver àqueles que podem pagar para tê-lo.",
     "it": "— Il fatto è ammesso: gli innocenti soffriranno. L'alternativa contiene più innocenti e meno tempo.\n— Viene ordinata la chiusura della Porta del Sale. Non è una punizione; È continuità.\n—La città non ha bisogno di speranza, cartografo. Deve sopravvivere a chi può permetterselo.",
     "tr": "—Gerçek kabul ediliyor: Masum insanlar acı çekecek. Alternatif daha fazla masum ve daha az zaman içeriyor.\n—Tuz Kapısı'nın kapatılması emri verildi. Bu bir ceza değil; Sürekliliktir.\n—Şehrin umuda ihtiyacı yok haritacı. Buna gücü yetenlerin daha uzun süre yaşaması gerekiyor.",
-    "zh-CN": "—事实已经承认：无辜者会受苦。另一种选择包含更多无辜者和更少时间。\n—盐门就此关闭。这不是惩罚，而是延续。\n—这座城市不需要希望，制图师。它需要比那些负担得起希望的人活得更久。"
+    "zh-CN": "—事实已经承认：无辜者会受苦。另一种选择包含更多无辜者和更少时间。\n—盐门就此关闭。这不是惩罚，而是延续。\n—这座城市不需要希望，制图师。它需要比那些负担得起希望的人活得更久。",
+    'zh-TW': "—事實已經承認：無辜者會受苦。另一種選擇包含更多無辜者和更少時間。\n—鹽門就此關閉。這不是懲罰，而是延續。\n—這座城市不需要希望，製圖師。它需要比那些負擔得起希望的人活得更久。",
+    ko: "\"사실은 인정됩니다. 무고한 사람들이 고통을 겪을 것입니다. 대안은 더 많은 무고한 사람들과 더 적은 시간을 포함합니다.\"\n\"소금문은 이로써 닫힙니다. 이것은 형벌이 아니라 지속입니다.\"\n\"도시에는 희망이 필요하지 않습니다, 지도 제작자님. 도시는 그것을 감당할 수 있는 사람들이 살아남아야 합니다.\"",
+    ja: "「事実は認められる。無実の人々が苦しむことになる。代替案には、より多くの無実の人々が含まれ、より短い時間が含まれる。」\n「塩の門はこれにより閉じられます。これは罰ではありません。継続です。」\n「地図製作者、この都市には希望は必要ありません。それを得る余裕のある人々が生き残る必要があります。」",
   },
   "—Eso ocurrió hace tres nombres, no tres siglos. Los años son redes de gente con prisa.\n—Preguntas cómo dominar el Corazón, criatura de orilla. Pregunta primero por qué llamas tuyo a quien está cautivo.\n—Aún no has pagado esa respuesta. Tranquila: el precio es escuchar.": {
     "es": "—Eso ocurrió hace tres nombres, no tres siglos. Los años son redes de gente con prisa.\n—Preguntas cómo dominar el Corazón, criatura de orilla. Pregunta primero por qué llamas tuyo a quien está cautivo.\n—Aún no has pagado esa respuesta. Tranquila: el precio es escuchar.",
@@ -55,7 +67,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "—Isso aconteceu há três nomes, não há três séculos. Os anos são redes de gente apressada.\n—Você pergunta como dominar o Coração, criatura costeira. Pergunte primeiro por que você chama aquele que está cativo de seu.\n—Você ainda não pagou essa resposta. Não se preocupe: o preço está ouvindo.",
     "it": "Questo è successo tre nomi fa, non tre secoli. Gli anni sono reti di persone di fretta.\n—Mi chiedi come dominare il Cuore, creatura costiera. Chiedi prima perché chiami tuo colui che è prigioniero.\n—Non hai ancora pagato quella risposta. Non preoccuparti: il prezzo è l'ascolto.",
     "tr": "—Bu üç yüzyıl önce değil, üç isim önce oldu. Yıllar acelesi olan insanlardan oluşan bir ağdır.\n—Kıyı yaratığı Kalpte nasıl ustalaşılacağını soruyorsun. Esir olana neden benim dediğinizi sorun önce.\n—Bu cevabı henüz ödemedin. Endişelenmeyin: fiyat dinliyor.",
-    "zh-CN": "—那是三个名字之前的事，不是三个世纪之前。年月是匆忙之人撒下的网。\n—你想问如何驾驭那颗心脏，岸边的生灵。先问问你为什么把被囚禁者称作你的。\n—你还没有为那个答案付出代价。别急：代价就是倾听。"
+    "zh-CN": "—那是三个名字之前的事，不是三个世纪之前。年月是匆忙之人撒下的网。\n—你想问如何驾驭那颗心脏，岸边的生灵。先问问你为什么把被囚禁者称作你的。\n—你还没有为那个答案付出代价。别急：代价就是倾听。",
+    'zh-TW': "—那是三個名字之前的事，不是三個世紀之前。年月是匆忙之人撒下的網。\n—你想問如何駕馭那顆心臟，岸邊的生靈。先問問你為什麼把被囚禁者稱作你的。\n—你還沒有為那個答案付出代價。別急：代價就是傾聽。",
+    ko: "\"그건 300년이 아니라 세 이름 전에 일어났습니다. 서두르는 사람들에게는 세월이 그물입니다.\"\n\"당신은 해변의 생물인 심장을 어떻게 다스리는지 묻습니다. 먼저 포로를 당신의 것이라고 부르는 이유를 물어보십시오.\"\n\"당신은 아직 그 대답에 대한 대가를 지불하지 않았습니다. 침착하세요. 가격은 듣고 있습니다.\"",
+    ja: "「それは3世紀ではなく、3名前の出来事です。急いでいる人々にとって年は網です。」\n「海岸の生き物よ、ハートをどうやってマスターするかを尋ねます。まず、なぜ捕虜を自分のものと呼ぶのかを尋ねてください。」\n「あなたはまだその答えに対してお金を払っていません。落ち着いてください。代償は聞くことです。」",
   },
   "—La marea no negocia, pero avisa. Los regentes hacen justo lo contrario.\n—Claro, capitana: tres rutas, cuatro planes y ninguna comida caliente.\n—Cuenta cabezas. Si al volver falta una, la victoria solo es un naufragio con buena propaganda.": {
     "es": "—La marea no negocia, pero avisa. Los regentes hacen justo lo contrario.\n—Claro, capitana: tres rutas, cuatro planes y ninguna comida caliente.\n—Cuenta cabezas. Si al volver falta una, la victoria solo es un naufragio con buena propaganda.",
@@ -66,7 +81,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "—A maré não negocia, mas avisa. Os regentes fazem exatamente o oposto.\n—Claro, capitão: três rotas, quatro planos e nada de comida quente.\n—Conte cabeças. Se faltar um quando você retornar, a vitória será apenas um naufrágio com boa propaganda.",
     "it": "—La marea non negozia, ma avverte. I reggenti fanno esattamente il contrario.\n—Certo, capitano: tre rotte, quattro piani e niente cibo caldo.\n—Contare le teste. Se ne manca uno al ritorno, la vittoria è solo un naufragio con buona propaganda.",
     "tr": "—Gelgit pazarlık yapmaz ama uyarır. Vekiller ise tam tersini yapıyor.\n—Elbette kaptan: üç rota, dört plan ve sıcak yemek yok.\n—Başlıkları sayın. Geri döndüğünüzde biri eksikse, zafer yalnızca iyi propagandayla bir gemi kazasına dönüşür.",
-    "zh-CN": "—潮水不谈判，但它会预警。摄政王们做的恰恰相反。\n—当然，船长：三条路线、四个计划，还有一顿热饭都没有。\n—清点人头。如果回来时少了一个，胜利就只是一场宣传得好的海难。"
+    "zh-CN": "—潮水不谈判，但它会预警。摄政王们做的恰恰相反。\n—当然，船长：三条路线、四个计划，还有一顿热饭都没有。\n—清点人头。如果回来时少了一个，胜利就只是一场宣传得好的海难。",
+    'zh-TW': "—潮水不談判，但它會預警。攝政王們做的恰恰相反。\n—當然，船長：三條路線、四個計劃，還有一頓熱飯都沒有。\n—清點人頭。如果回來時少了一個，勝利就只是一場宣傳得好的海難。",
+    ko: "\"조수는 협상을 하지 않지만 경고합니다. 섭정은 정반대입니다.\"\n\"물론이죠, 선장님. 세 가지 경로, 네 가지 계획이 있고 따뜻한 식사는 하나도 없습니다.\"\n\"앞수를 센다. 우리가 돌아올 때 하나가 없으면 승리는 좋은 평판을 얻은 난파선일 뿐이다.\"",
+    ja: "「潮流は交渉をするものではなく、警告を発するものである。摂政はまさにその逆を行う。」\n「もちろんです、船長。ルートは3つ、計画は4つありますが、温かい食事は1つではありません。」\n「頭数を数えてください。戻ったときに1つでも欠けていたら、勝利は大々的に宣伝されるだけの惨事になります。」",
   },
   "—Mira el borde, pequeña cartógrafa. El centro siempre presume de ser el mundo.\n—Toda costa es una decisión dibujada. Pregunta quién sostuvo la pluma.\n—No puedo deshacer aquella luz. Puedo dejaros la elección que yo no tuve.": {
     "es": "—Mira el borde, pequeña cartógrafa. El centro siempre presume de ser el mundo.\n—Toda costa es una decisión dibujada. Pregunta quién sostuvo la pluma.\n—No puedo deshacer aquella luz. Puedo dejaros la elección que yo no tuve.",
@@ -77,7 +95,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "—Olhe para o limite, pequeno cartógrafo. O centro sempre presume ser o mundo.\n—Cada custo é uma decisão tomada. Ele pergunta quem segurou a caneta.\n—Não posso desfazer essa luz. Posso deixar-lhe a escolha que não tive.",
     "it": "—Guarda il bordo, piccolo cartografo. Il centro presume sempre di essere il mondo.\n—Ogni costo è una decisione presa. Chiede chi teneva la penna.\n—Non posso annullare quella luce. Posso lasciarti la scelta che non ho avuto.",
     "tr": "— Kenara bak küçük haritacı. Merkez her zaman dünya olduğunu varsayar.\n—Her maliyet önceden alınmış bir karardır. Kalemi kimin tuttuğunu sorar.\n—O ışığı geri alamam. Sahip olmadığım seçeneği sana bırakabilirim.",
-    "zh-CN": "—看看边缘，小制图师。中心总是自诩为整个世界。\n—每一段海岸都是画出来的决定。去问是谁握着那支笔。\n—我无法撤销那道光。但我可以把我不曾拥有的选择留给你们。"
+    "zh-CN": "—看看边缘，小制图师。中心总是自诩为整个世界。\n—每一段海岸都是画出来的决定。去问是谁握着那支笔。\n—我无法撤销那道光。但我可以把我不曾拥有的选择留给你们。",
+    'zh-TW': "—看看邊緣，小製圖師。中心總是自詡為整個世界。\n—每一段海岸都是畫出來的決定。去問是誰握著那支筆。\n—我無法撤銷那道光。但我可以把我不曾擁有的選擇留給你們。",
+    ko: "\"가장자리를 보세요, 꼬마 지도 제작자여. 중앙은 항상 세상인 척 합니다.\"\n\"모든 해안은 결정에 따라 결정됩니다. 펜을 쥐고 있는 사람이 누구인지 물어보세요.\"\n\"나는 그 빛을 되돌릴 수 없습니다. 내가 갖지 못한 선택을 당신에게 맡길 수 있습니다.\"",
+    ja: "「端を見てください、小さな地図製作者。中心は常に世界のふりをしています。」\n「すべての海岸には決定が下されます。誰がペンを持ったかを尋ねてください。」\n「その光を元に戻すことはできません。私にはできなかった選択をあなたに任せることができます。」",
   },
   "—No es una estrella. No, espera: no es solo una puerta. Es una puerta fingiendo distancia.\n—¿Ves la diferencia? Una órbita regresa al inicio; esto regresa a quien la observa.\n—Ily, si encuentras este mensaje, enfádate después. Primero rompe la séptima palanca.": {
     "es": "—No es una estrella. No, espera: no es solo una puerta. Es una puerta fingiendo distancia.\n—¿Ves la diferencia? Una órbita regresa al inicio; esto regresa a quien la observa.\n—Ily, si encuentras este mensaje, enfádate después. Primero rompe la séptima palanca.",
@@ -88,7 +109,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "—Não é uma estrela. Não, espere: não é apenas uma porta. É uma porta fingindo distância.\n—Você vê a diferença? Uma órbita retorna ao início; Isso retorna para quem o observa.\n—Ily, se você encontrar essa mensagem, fique bravo depois. Primeiro quebre a sétima alavanca.",
     "it": "—Non è una stella. No, aspetta: non è solo una porta. È una porta che finge distanza.\n—Vedi la differenza? Un'orbita ritorna all'inizio; Questo ritorna a chi lo osserva.\n—Ily, se trovi questo messaggio, arrabbiati più tardi. Per prima cosa rompi la settima leva.",
     "tr": "—Bu bir yıldız değil. Hayır, durun: bu sadece bir kapı değil. Bu bir kapı numarası mesafesi.\n—Farkı görüyor musun? Bir yörünge başlangıca döner; Bu, onu gözlemleyen kişiye geri döner.\n—Ily, bu mesajı bulursan daha sonra sinirlen. İlk önce yedinci kolu kırın.",
-    "zh-CN": "—它不是一颗星。不，等等：它不只是一扇门。它是一扇假装成距离的门。\n—你看出区别了吗？轨道会回到起点，而它却回到观察者那里。\n—伊莉，如果你看到这条信息，之后再生气。先折断第七根拉杆。"
+    "zh-CN": "—它不是一颗星。不，等等：它不只是一扇门。它是一扇假装成距离的门。\n—你看出区别了吗？轨道会回到起点，而它却回到观察者那里。\n—伊莉，如果你看到这条信息，之后再生气。先折断第七根拉杆。",
+    'zh-TW': "—它不是一顆星。不，等等：它不只是一扇門。它是一扇假裝成距離的門。\n—你看出區別了嗎？軌道會回到起點，而它卻回到觀察者那裡。\n—伊莉，如果你看到這條資訊，之後再生氣。先折斷第七根拉桿。",
+    ko: "\"별이 아닙니다. 아니, 잠깐만요. 단순한 문이 아닙니다. 먼 척하는 문입니다.\"\n\"차이가 보이나요? 궤도는 처음으로 돌아갑니다. 이것은 관찰자에게 돌아갑니다.\"\n\"일리, 이 메시지를 발견하면 나중에 화를 내십시오. 먼저 일곱 번째 레버를 부수십시오.\"",
+    ja: "「それは星ではありません。いいえ、待ってください。それは単なるドアではありません。距離を装ったドアです。」\n「違いがわかりますか? 軌道はその始まりに戻ります。これは観察者に戻ります。」\n「アイリー、このメッセージを見つけたら、後で怒ってください。まず7番目のレバーを壊してください。」",
   },
   "—Queda oído. No queda obedecido.\n—Por mi palabra ante Aurel Venn: la heredera elegirá sin una espada en la espalda.\n—Morí en la Puerta. El deber no. Mi palabra llegó antes que yo.": {
     "es": "—Queda oído. No queda obedecido.\n—Por mi palabra ante Aurel Venn: la heredera elegirá sin una espada en la espalda.\n—Morí en la Puerta. El deber no. Mi palabra llegó antes que yo.",
@@ -99,7 +123,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "—Continua sendo ouvido. Não é obedecido.\n—Pela minha palavra a Aurel Venn: a herdeira escolherá sem espada nas costas.\n—Eu morri no Portão. Dever não. Minha palavra veio antes de mim.",
     "it": "—Resta ascoltato. Non viene obbedito.\n— Parola mia ad Aurel Venn: l'ereditiera sceglierà senza spada sulla schiena.\n—Sono morto alla Porta. Dazio n. La mia parola è arrivata prima di me.",
     "tr": "—Duyulmaya devam ediyor. Buna uyulmuyor.\n— Aurel Venn'e söz veriyorum: Mirasçı sırtında kılıç olmadan seçim yapacak.\n—Geçit'te öldüm. Görev no. Sözüm karşıma çıktı.",
-    "zh-CN": "—话已听到。但并未服从。\n—以我在奥雷尔·文恩面前立下的誓言：继承人将在没有利刃抵背的情况下做出选择。\n—我死在了门前。职责没有。我的诺言比我先到。"
+    "zh-CN": "—话已听到。但并未服从。\n—以我在奥雷尔·文恩面前立下的誓言：继承人将在没有利刃抵背的情况下做出选择。\n—我死在了门前。职责没有。我的诺言比我先到。",
+    'zh-TW': "—話已聽到。但並未服從。\n—以我在奧雷爾·文恩面前立下的誓言：繼承人將在沒有利刃抵背的情況下做出選擇。\n—我死在了門前。職責沒有。我的諾言比我先到。",
+    ko: "\"그것은 들리지만 순종되지는 않습니다.\"\n\"오렐 벤 앞에서 내가 약속한 바에 따르면, 상속자는 등 뒤에 칼이 없는 선택을 할 것입니다.\"\n\"나는 성문에서 죽었습니다. 임무는 수행되지 않았습니다. 내 말이 내 앞에 도착했습니다.\"",
+    ja: "「それは聞かれますが、従われません。」\n「オーレル・ヴェンの前での私の言葉によれば、後継者は剣を背負うことなく選択するでしょう。」\n「私は門で死にました。義務は果たせませんでした。私の言葉は私の前に届きました。」",
   },
   "—Si llego a nacer, espero que mi primer regalo sea una pregunta y no una corona.\n—No recuerdo esa guerra. Me han imaginado dentro de sus consecuencias.\n—La profecía es la historia que escribieron antes que yo. Todavía podría negarme a interpretarla.": {
     "es": "—Si llego a nacer, espero que mi primer regalo sea una pregunta y no una corona.\n—No recuerdo esa guerra. Me han imaginado dentro de sus consecuencias.\n—La profecía es la historia que escribieron antes que yo. Todavía podría negarme a interpretarla.",
@@ -110,7 +137,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "—Se algum dia eu nascer, espero que meu primeiro presente seja uma pergunta e não uma coroa.\n—Não me lembro daquela guerra. Eles me imaginaram dentro de suas consequências.\n—A profecia é a história que escreveram antes de mim. Eu ainda poderia me recusar a interpretá-la.",
     "it": "—Se mai dovessi nascere, spero che il mio primo dono sia una domanda e non una corona.\n—Non ricordo quella guerra. Mi hanno immaginato nelle sue conseguenze.\n—La profezia è la storia che hanno scritto prima di me. Potrei ancora rifiutarmi di interpretarla.",
     "tr": "—Eğer doğarsam, umarım ilk hediyem taç değil soru olur.\n—O savaşı hatırlamıyorum. Beni bunun sonuçları içinde hayal ettiler.\n—Kehanet benden önce yazdıkları hikayedir. Hala onu oynamayı reddedebilirim.",
-    "zh-CN": "—如果我能出生，我希望我的第一份礼物是一个问题，而不是一顶王冠。\n—我不记得那场战争。我是在它的后果中被想象出来的。\n—预言是在我之前写下的故事。我仍然可以拒绝去演绎它。"
+    "zh-CN": "—如果我能出生，我希望我的第一份礼物是一个问题，而不是一顶王冠。\n—我不记得那场战争。我是在它的后果中被想象出来的。\n—预言是在我之前写下的故事。我仍然可以拒绝去演绎它。",
+    'zh-TW': "—如果我能出生，我希望我的第一份禮物是一個問題，而不是一頂王冠。\n—我不記得那場戰爭。我是在它的後果中被想像出來的。\n—預言是在我之前寫下的故事。我仍然可以拒絕去演繹它。",
+    ko: "“내가 태어나면 첫 선물은 왕관보다는 질문이었으면 좋겠어요.”\n\"나는 그 전쟁을 기억하지 못한다. 그들은 내가 그 결과 속에 있다고 상상했다.\"\n\"예언은 내 앞에 기록된 이야기입니다. 나는 아직도 그 일을 수행하기를 거부할 수도 있습니다.\"",
+    ja: "「もし私が生まれたら、最初の贈り物が王冠ではなく質問であることを願っています。」\n「私はあの戦争のことを覚えていません。彼らは私がその結果の中で想像したのです。」\n「預言は私の前に書かれた物語です。私はまだそれを実行することを拒否するかもしれません。」",
   },
   "—Uno: la carta es falsa. Dos: Nara la escribió antes de desaparecer. Tres: algo ha aprendido a imitarla.\n—No te estoy pidiendo que confíes en el mapa, Cael. Te pido que mires dónde termina.\n—Dame un rumbo, no una promesa. Las promesas no dejan marcas cuando naufragan.": {
     "es": "—Uno: la carta es falsa. Dos: Nara la escribió antes de desaparecer. Tres: algo ha aprendido a imitarla.\n—No te estoy pidiendo que confíes en el mapa, Cael. Te pido que mires dónde termina.\n—Dame un rumbo, no una promesa. Las promesas no dejan marcas cuando naufragan.",
@@ -121,7 +151,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "—Um: a carta é falsa. Dois: Nara escreveu antes de desaparecer. Três: algo aprendeu a imitá-la.\n—Não estou pedindo que você confie no mapa, Cael. Peço que você olhe onde isso termina.\n—Dê-me uma direção, não uma promessa. As promessas não deixam marcas quando naufragam.",
     "it": "—Uno: la lettera è falsa. Due: Nara l'ha scritto prima di scomparire. Tre: qualcosa ha imparato a imitarla.\n—Non ti sto chiedendo di fidarti della mappa, Cael. Ti chiedo di guardare dove finisce.\n—Dammi una direzione, non una promessa. Le promesse non lasciano segni quando naufragano.",
     "tr": "—Bir: Mektup sahte. İki: Nara bunu kaybolmadan önce yazdı. Üç: Bir şey onu taklit etmeyi öğrendi.\n—Senden haritaya güvenmeni istemiyorum Cael. Sizden bunun bittiği yere bakmanızı rica ediyorum.\n—Bana bir söz ver, bir yön ver. Verilen sözler batınca iz bırakmaz.",
-    "zh-CN": "—第一：信是假的。第二：娜拉在消失之前写了它。第三：有东西学会了模仿她。\n—我不是在要你相信那张地图，凯尔。我是要你看看它在哪里结束。\n—给我一个航向，而不是一个承诺。承诺沉没时不会留下任何痕迹。"
+    "zh-CN": "—第一：信是假的。第二：娜拉在消失之前写了它。第三：有东西学会了模仿她。\n—我不是在要你相信那张地图，凯尔。我是要你看看它在哪里结束。\n—给我一个航向，而不是一个承诺。承诺沉没时不会留下任何痕迹。",
+    'zh-TW': "—第一：信是假的。第二：娜拉在消失之前寫了它。第三：有東西學會了模仿她。\n—我不是在要你相信那張地圖，凱爾。我是要你看看它在哪裡結束。\n—給我一個航向，而不是一個承諾。承諾沉沒時不會留下任何痕跡。",
+    ko: "\"하나: 그 편지는 거짓이다. 둘: 나라가 사라지기 전에 썼다. 세번째: 그녀를 모방하는 법을 배운 것.\"\n\"지도를 믿으라고 요구하는 게 아니야, 카엘. 지도가 끝나는 곳을 보라고 하는 거야.\"\n\"약속이 아닌 나에게 방향을 주십시오. 약속은 가라앉을 때 흔적을 남기지 않습니다.\"",
+    ja: "「1つ：その手紙は偽りです。2つ：ナラが失踪する前に書いたものです。3つ：何かが彼女を模倣することを学びました。」\n「私は地図を信頼するように頼んでいません、カエル。私は地図がどこで終わるのかを見てほしいのです。」\n「約束ではなく、方向性を教えてください。約束は沈んでも跡が残りません。」",
   },
   "¿La Tercera Luna es una puerta o una prisión?": {
     "es": "¿La Tercera Luna es una puerta o una prisión?",
@@ -132,7 +165,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A Terceira Lua é uma porta ou uma prisão?",
     "it": "La Terza Luna è una porta o una prigione?",
     "tr": "Üçüncü Ay bir kapı mı yoksa hapishane mi?",
-    "zh-CN": "第三个月亮是一扇门，还是一座监狱？"
+    "zh-CN": "第三个月亮是一扇门，还是一座监狱？",
+    'zh-TW': "第三個月亮是一扇門，還是一座監獄？",
+    ko: "세 번째 달은 문인가, 감옥인가?",
+    ja: "第三の月は扉ですか、それとも牢獄ですか?",
   },
   "¿Por qué Nara envió la carta nueve meses después?": {
     "es": "¿Por qué Nara envió la carta nueve meses después?",
@@ -143,7 +179,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Por que Nara enviou a carta nove meses depois?",
     "it": "Perché Nara ha inviato la lettera nove mesi dopo?",
     "tr": "Nara mektubu neden dokuz ay sonra gönderdi?",
-    "zh-CN": "为什么娜拉在九个月后才寄出那封信？"
+    "zh-CN": "为什么娜拉在九个月后才寄出那封信？",
+    'zh-TW': "為什麼娜拉在九個月後才寄出那封信？",
+    ko: "나라는 왜 9개월 뒤에 편지를 보냈나?",
+    ja: "なぜナラさんは9か月後に手紙を送ったのでしょうか？",
   },
   "¿Qué ocurre con Lúmina si el Corazón abandona la ciudad?": {
     "es": "¿Qué ocurre con Lúmina si el Corazón abandona la ciudad?",
@@ -154,7 +193,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O que acontecerá com Lúmina se o Coração sair da cidade?",
     "it": "Cosa succede a Lúmina se il Cuore lascia la città?",
     "tr": "Kalp şehri terk ederse Lúmina'ya ne olur?",
-    "zh-CN": "如果心脏离开这座城市，露米娜会怎样？"
+    "zh-CN": "如果心脏离开这座城市，露米娜会怎样？",
+    'zh-TW': "如果心臟離開這座城市，露米娜會怎樣？",
+    ko: "하트가 도시를 떠나면 루미나는 어떻게 되나요?",
+    ja: "ハートが街を出たらルミナはどうなる？",
   },
   "¿Quién borró la séptima ruta?": {
     "es": "¿Quién borró la séptima ruta?",
@@ -165,7 +207,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Quem deletou a sétima rota?",
     "it": "Chi ha cancellato il settimo percorso?",
     "tr": "Yedinci rotayı kim sildi?",
-    "zh-CN": "是谁抹去了第七条路线？"
+    "zh-CN": "是谁抹去了第七条路线？",
+    'zh-TW': "是誰抹去了第七條路線？",
+    ko: "일곱 번째 길은 누가 지웠나요?",
+    ja: "第七ルートを消したのは誰だ？",
   },
   "[[Nara Venn]] demostró desde el [[Observatorio de Orla]] que no orbita Elyndra: mantiene distancia fija respecto al Faro.": {
     "es": "[[Nara Venn]] demostró desde el [[Observatorio de Orla]] que no orbita Elyndra: mantiene distancia fija respecto al Faro.",
@@ -176,7 +221,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "[[Nara Venn]] demonstrou em [[Observatório da Orla]] que não orbita Elyndra: mantém uma distância fixa do Farol.",
     "it": "[[Nara Venn]] ha dimostrato da [[Osservatorio Orla]] che non orbita attorno a Elyndra: mantiene una distanza fissa dal Faro.",
     "tr": "[[Nara Venn]], [[Orla Gözlemevi]]'den Elyndra'nın yörüngesinde olmadığını gösterdi: Deniz Feneri'nden sabit bir mesafeyi koruyor.",
-    "zh-CN": "[[Nara Venn]] 在 [[奥尔拉天文台]] 证明了它并不环绕埃林德拉运行：它与灯塔保持着固定距离。"
+    "zh-CN": "[[Nara Venn]] 在 [[奥尔拉天文台]] 证明了它并不环绕埃林德拉运行：它与灯塔保持着固定距离。",
+    'zh-TW': "[[Nara Venn]] 在 [[奧爾拉天文臺]] 證明了它並不環繞埃林德拉執行：它與燈塔保持著固定距離。",
+    ko: "[[Orla Observatory]]에서 [[Nara Venn]]은 이 우주선이 Elyndra 궤도를 돌지 않는다는 것을 증명했습니다. 즉, 등대로부터 고정된 거리를 유지하고 있다는 것입니다.",
+    ja: "[[オーラ天文台]] から、[[ナラ・ヴェン]] はエリンドラの周回軌道を回っていないことを証明しました。灯台から一定の距離を保っています。",
   },
   "# Premisa\n\nUna cartógrafa descubre que la fuente de energía de su ciudad es una criatura cautiva y que cada recuerdo usado como combustible borra otro.\n\n## Promesa al lector\n\n- Fantasía marítima\n- Misterio familiar\n- Política de recursos\n- Magia con coste verificable": {
     "es": "# Premisa\n\nUna cartógrafa descubre que la fuente de energía de su ciudad es una criatura cautiva y que cada recuerdo usado como combustible borra otro.\n\n## Promesa al lector\n\n- Fantasía marítima\n- Misterio familiar\n- Política de recursos\n- Magia con coste verificable",
@@ -187,7 +235,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "#Premissa\n\nUma cartógrafa descobre que a fonte de energia de sua cidade é uma criatura cativa e que cada memória usada como combustível apaga outra.\n\n## Promessa ao leitor\n\n- Fantasia marítima\n- Mistério familiar\n- Política de recursos\n- Magia com custo verificável",
     "it": "#Premessa\n\nUn cartografo scopre che la fonte di energia della sua città è una creatura prigioniera e che ogni ricordo usato come combustibile ne cancella un altro.\n\n## Promessa al lettore\n\n- Fantasia marittima\n- Mistero familiare\n- Politica delle risorse\n- Magia con costo verificabile",
     "tr": "# Öncül\n\nBir haritacı, şehrinin güç kaynağının tutsak bir yaratık olduğunu ve yakıt olarak kullanılan her hatıranın bir diğerini sildiğini keşfeder.\n\n## Okuyucuya söz\n\n- Denizcilik fantezisi\n- Aile gizemi\n- Kaynak politikası\n- Doğrulanabilir maliyetle büyü",
-    "zh-CN": "# 前提\n\n一位女制图师发现，她所在城市的能量来源是一头被囚禁的生物，而每一段被当作燃料使用的记忆都会抹去另一段记忆。\n\n## 对读者的承诺\n\n- 海洋奇幻\n- 家族悬疑\n- 资源政治\n- 有可验证代价的魔法"
+    "zh-CN": "# 前提\n\n一位女制图师发现，她所在城市的能量来源是一头被囚禁的生物，而每一段被当作燃料使用的记忆都会抹去另一段记忆。\n\n## 对读者的承诺\n\n- 海洋奇幻\n- 家族悬疑\n- 资源政治\n- 有可验证代价的魔法",
+    'zh-TW': "# 前提\n\n一位女製圖師發現，她所在城市的能量來源是一頭被囚禁的生物，而每一段被當作燃料使用的記憶都會抹去另一段記憶。\n\n## 對讀者的承諾\n\n- 海洋奇幻\n- 家族懸疑\n- 資源政治\n- 有可驗證代價的魔法",
+    ko: "# 전제\n\n지도 제작자는 도시의 에너지원이 포로 생물이며 연료로 사용된 모든 기억이 다른 기억을 삭제한다는 사실을 발견합니다.\n\n## 독자의 약속\n\n- 해양 판타지\n- 가족 미스터리\n- 자원 정치\n- 검증 가능한 비용의 마법",
+    ja: "# 前提\n\n地図製作者は、彼女の街のエネルギー源が捕らえられた生き物であり、燃料として使用されるすべての記憶が別の記憶を消去することを発見しました。\n\n## 読者の約束\n\n- 海洋ファンタジー\n- 家族の謎\n- 資源政治\n- 検証可能なコストを持つ魔法",
   },
   "## Motivos\n\n- Vidrio agrietado = memoria disputada\n- Seis = orden oficial\n- Siete = ruta borrada\n- Agua dentro de edificios = pasado que regresa\n\nVincular con [[Flujo de vidrio]] y [[La Tercera Luna]].": {
     "es": "## Motivos\n\n- Vidrio agrietado = memoria disputada\n- Seis = orden oficial\n- Siete = ruta borrada\n- Agua dentro de edificios = pasado que regresa\n\nVincular con [[Flujo de vidrio]] y [[La Tercera Luna]].",
@@ -198,7 +249,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "## Razões\n\n- Vidro rachado = memória contestada\n- Seis = ordem oficial\n- Sete = rota excluída\n- Água dentro dos edifícios = passado que retorna\n\nLink com [[fluxo de vidro]] e [[A Terceira Lua]].",
     "it": "## Motivi\n\n- Vetro rotto = memoria contestata\n- Sei = ordine ufficiale\n- Sette = percorso cancellato\n- Acqua dentro gli edifici = passato che ritorna\n\nCollegamento con [[flusso di vetro]] e [[La terza luna]].",
     "tr": "## Sebepler\n\n- Kırık cam = tartışmalı hafıza\n- Altı = resmi emir\n- Yedi = rota silindi\n- Binaların içindeki su = geri dönen geçmiş\n\n[[cam akışı]] ve [[Üçüncü Ay]] ile bağlantı kurun.",
-    "zh-CN": "## 主题意象\n\n- 裂开的玻璃 = 有争议的记忆\n- 六 = 官方秩序\n- 七 = 被抹去的路线\n- 建筑内的水 = 回归的过去\n\n与 [[玻璃流]] 和 [[第三月]] 相关联。"
+    "zh-CN": "## 主题意象\n\n- 裂开的玻璃 = 有争议的记忆\n- 六 = 官方秩序\n- 七 = 被抹去的路线\n- 建筑内的水 = 回归的过去\n\n与 [[玻璃流]] 和 [[第三月]] 相关联。",
+    'zh-TW': "## 主題意象\n\n- 裂開的玻璃 = 有爭議的記憶\n- 六 = 官方秩序\n- 七 = 被抹去的路線\n- 建築內的水 = 迴歸的過去\n\n與 [[玻璃流]] 和 [[第三月]] 相關聯。",
+    ko: "## 모티브\n\n- 깨진 유리 = 논란의 여지가 있는 기억\n- 6개 = 공식 명령\n- 7개 = 삭제된 경로\n- 건물 내부의 물 = 과거가 돌아옴\n\n[[유리 플럭스]] 및 [[세 번째 달]]에 연결합니다.",
+    ja: "## モチーフ\n\n- ひび割れたガラス = 記憶の相違\n- 6 = 正式な命令\n- 7 = 消去されたルート\n- 建物内の水 = 戻ってくる過去\n\n[[ガラスフラックス]] および [[第三の月]] へのリンク。",
   },
   "1 de Brasa, 739 D.F.": {
     "es": "1 de Brasa, 739 D.F.",
@@ -209,7 +263,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "1º da Brasa, 739 D.F.",
     "it": "1 di Brasa, 739 D.F.",
     "tr": "1 Brasa, 739 D.F.",
-    "zh-CN": "余烬月1日，739 D.F."
+    "zh-CN": "余烬月1日，739 D.F.",
+    'zh-TW': "餘燼月1日，739 D.F.",
+    ko: "브라사 1개, 739 D.F.",
+    ja: "ブラサの1、D.F. 739",
   },
   "1. ¿Se entiende por qué Ilyra necesita a Cael?\n2. ¿Maelor parece convencido de su propia lógica?\n3. ¿La revelación del Corazón cambia la lectura del prólogo?\n4. ¿Qué parte de Lúmina recuerdas sin mirar el mapa?": {
     "es": "1. ¿Se entiende por qué Ilyra necesita a Cael?\n2. ¿Maelor parece convencido de su propia lógica?\n3. ¿La revelación del Corazón cambia la lectura del prólogo?\n4. ¿Qué parte de Lúmina recuerdas sin mirar el mapa?",
@@ -220,7 +277,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "1. Está claro por que Ilyra precisa de Cael?\n2. Maelor parece convencido da sua própria lógica?\n3. A revelação do Coração muda a leitura do prólogo?\n4. De que parte de Lúmina você se lembra sem olhar o mapa?",
     "it": "1. È chiaro perché Ilyra ha bisogno di Cael?\n2. Maelor sembra convinto della propria logica?\n3. La rivelazione del Cuore cambia la lettura del prologo?\n4. Quale parte di Lúmina ricordi senza guardare la mappa?",
     "tr": "1. Ilyra'nın neden Cael'e ihtiyacı olduğu açık mı?\n2. Maelor kendi mantığına ikna olmuş görünüyor mu?\n3. Kalbin açığa çıkışı önsözün okunuşunu değiştirir mi?\n4. Haritaya bakmadan Lúmina'nın hangi bölümünü hatırlıyorsunuz?",
-    "zh-CN": "1. 是否清楚伊莉拉为什么需要凯尔？\n2. 梅洛尔看起来相信自己的逻辑吗？\n3. 心脏的揭示是否改变了序章的解读？\n4. 不查看地图，你还记得露米娜的哪一部分？"
+    "zh-CN": "1. 是否清楚伊莉拉为什么需要凯尔？\n2. 梅洛尔看起来相信自己的逻辑吗？\n3. 心脏的揭示是否改变了序章的解读？\n4. 不查看地图，你还记得露米娜的哪一部分？",
+    'zh-TW': "1. 是否清楚伊莉拉為什麼需要凱爾？\n2. 梅洛爾看起來相信自己的邏輯嗎？\n3. 心臟的揭示是否改變了序章的解讀？\n4. 不檢視地圖，你還記得露米娜的哪一部分？",
+    ko: "1. Ilyra에게 Cael이 필요한 이유가 분명합니까?\n2. Maelor는 자신의 논리를 확신하는 것처럼 보입니까?\n3. 마음이 드러나면 프롤로그가 바뀌나요?\n4. 지도를 보지 않고도 루미나의 어떤 부분이 기억나시나요?",
+    ja: "1. イリラがカエルを必要とする理由は明らかですか?\n2. メーラーは自分の論理に納得しているようですか?\n3. ハートの暴露はプロローグを変更しますか?\n4. 地図を確認せずにルミナのどの部分を覚えていますか?",
   },
   "10 de Sal, 742 D.F.": {
     "es": "10 de Sal, 742 D.F.",
@@ -231,7 +291,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "10 do Sal, 742 D.F.",
     "it": "10 di Sale, 742 D.F.",
     "tr": "10 Tuz, 742 D.F.",
-    "zh-CN": "盐月10日，742 D.F."
+    "zh-CN": "盐月10日，742 D.F.",
+    'zh-TW': "鹽月10日，742 D.F.",
+    ko: "소금 10개, 742 D.F.",
+    ja: "塩10、742 D.F.",
   },
   "11 de Quietud, 725 D.F.": {
     "es": "11 de Quietud, 725 D.F.",
@@ -242,7 +305,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "11 da Quietude, 725 D.F.",
     "it": "11 della Quiete, 725 D.F.",
     "tr": "11 Durgunluk, 725 D.F.",
-    "zh-CN": "寂静月11日，725 D.F."
+    "zh-CN": "寂静月11日，725 D.F.",
+    'zh-TW': "寂靜月11日，725 D.F.",
+    ko: "고요함 11, 725 D.F.",
+    ja: "静寂の11、725 D.F.",
   },
   "12 de Lluvia, 721 D.F.": {
     "es": "12 de Lluvia, 721 D.F.",
@@ -253,7 +319,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Chuva 12, 721 D.F.",
     "it": "Pioggia 12, 721 DF",
     "tr": "Yağmur 12, 721 D.F.",
-    "zh-CN": "雨月12日，721 D.F."
+    "zh-CN": "雨月12日，721 D.F.",
+    'zh-TW': "雨月12日，721 D.F.",
+    ko: "비 12, 721 D.F.",
+    ja: "レイン12、721 D.F.",
   },
   "17 de Brasa, 719 D.F.": {
     "es": "17 de Brasa, 719 D.F.",
@@ -264,7 +333,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "17 da Brasa, 719 D.F.",
     "it": "17 di Brasa, 719 D.F.",
     "tr": "17 Brasa, 719 D.F.",
-    "zh-CN": "余烬月17日，719 D.F."
+    "zh-CN": "余烬月17日，719 D.F.",
+    'zh-TW': "餘燼月17日，719 D.F.",
+    ko: "브라사 17, 719 D.F.",
+    ja: "ブラサの17、719 D.F.",
   },
   "19 de Brasa, 740 D.F.": {
     "es": "19 de Brasa, 740 D.F.",
@@ -275,7 +347,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "19 da Brasa, 740 D.F.",
     "it": "19 di Brasa, 740 D.F.",
     "tr": "19 Brasa, 740 D.F.",
-    "zh-CN": "余烬月19日，740 D.F."
+    "zh-CN": "余烬月19日，740 D.F.",
+    'zh-TW': "餘燼月19日，740 D.F.",
+    ko: "브라사 19, 740 D.F.",
+    ja: "ブラサの19、740 D.F.",
   },
   "2 de Sal, 742 D.F.": {
     "es": "2 de Sal, 742 D.F.",
@@ -286,7 +361,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "2 de Sal, 742 D.F.",
     "it": "2 di Sale, 742 D.F.",
     "tr": "2 Tuz, 742 D.F.",
-    "zh-CN": "盐月2日，742 D.F."
+    "zh-CN": "盐月2日，742 D.F.",
+    'zh-TW': "鹽月2日，742 D.F.",
+    ko: "소금 2개, 742 D.F.",
+    ja: "塩2、742 D.F.",
   },
   "2 de Viento, 681 D.F.": {
     "es": "2 de Viento, 681 D.F.",
@@ -297,7 +375,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "2 do Vento, 681 D.F.",
     "it": "2 del Vento, 681 D.F.",
     "tr": "2 Rüzgar, 681 D.F.",
-    "zh-CN": "风月2日，681 D.F."
+    "zh-CN": "风月2日，681 D.F.",
+    'zh-TW': "風月2日，681 D.F.",
+    ko: "2 바람, 681 D.F.",
+    ja: "風の2、681 D.F.",
   },
   "22 de Viento, 741 D.F.": {
     "es": "22 de Viento, 741 D.F.",
@@ -308,7 +389,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ventoso 22, 741 D.F.",
     "it": "Ventoso 22, 741 DF",
     "tr": "Rüzgarlı 22, 741 D.F.",
-    "zh-CN": "风月22日，741 D.F."
+    "zh-CN": "风月22日，741 D.F.",
+    'zh-TW': "風月22日，741 D.F.",
+    ko: "윈디 22, 741 D.F.",
+    ja: "Windy 22、741 D.F.",
   },
   "28 de Ceniza, 688 D.F.": {
     "es": "28 de Ceniza, 688 D.F.",
@@ -319,7 +403,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "28 das Cinzas, 688 D.F.",
     "it": "28 delle Ceneri, 688 D.F.",
     "tr": "28 of Ashes, 688 D.F.",
-    "zh-CN": "灰烬月28日，688 D.F."
+    "zh-CN": "灰烬月28日，688 D.F.",
+    'zh-TW': "灰燼月28日，688 D.F.",
+    ko: "재 28개, 688 D.F.",
+    ja: "28 of Ashes、688 D.F.",
   },
   "3 de Sal, 716 D.F.": {
     "es": "3 de Sal, 716 D.F.",
@@ -330,7 +417,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "3 do Sal, 716 D.F.",
     "it": "3 di Sale, 716 D.F.",
     "tr": "3 Tuz, 716 D.F.",
-    "zh-CN": "盐月3日，716 D.F."
+    "zh-CN": "盐月3日，716 D.F.",
+    'zh-TW': "鹽月3日，716 D.F.",
+    ko: "소금 3개, 716 D.F.",
+    ja: "塩3、716 D.F.",
   },
   "30 de Ceniza, 733 D.F.": {
     "es": "30 de Ceniza, 733 D.F.",
@@ -341,7 +431,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cinza 30, 733 D.F.",
     "it": "Cenere 30, 733 D.F.",
     "tr": "Kül 30, 733 D.F.",
-    "zh-CN": "灰烬月30日，733 D.F."
+    "zh-CN": "灰烬月30日，733 D.F.",
+    'zh-TW': "灰燼月30日，733 D.F.",
+    ko: "애쉬 30, 733 D.F.",
+    ja: "アッシュ30、733 D.F.",
   },
   "4 de Sal, 701 D.F.": {
     "es": "4 de Sal, 701 D.F.",
@@ -352,7 +445,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "4 do Sal, 701 D.F.",
     "it": "4 di Sale, 701 D.F.",
     "tr": "4 Tuz, 701 D.F.",
-    "zh-CN": "盐月4日，701 D.F."
+    "zh-CN": "盐月4日，701 D.F.",
+    'zh-TW': "鹽月4日，701 D.F.",
+    ko: "소금 4개, 701 D.F.",
+    ja: "塩4、701 D.F.",
   },
   "688–742 D.F.": {
     "es": "688–742 D.F.",
@@ -363,7 +459,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "688–742 DF.",
     "it": "688–742 DF",
     "tr": "688–742 DF",
-    "zh-CN": "688–742 D.F."
+    "zh-CN": "688–742 D.F.",
+    'zh-TW': "688–742 D.F.",
+    ko: "688-742 D.F.",
+    ja: "688–742 D.F.",
   },
   "7 de Quietud, 741 D.F.": {
     "es": "7 de Quietud, 741 D.F.",
@@ -374,7 +473,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "7 da Quietude, 741 D.F.",
     "it": "7 della Quiete, 741 D.F.",
     "tr": "7 Durgunluk, 741 D.F.",
-    "zh-CN": "寂静月7日，741 D.F."
+    "zh-CN": "寂静月7日，741 D.F.",
+    'zh-TW': "寂靜月7日，741 D.F.",
+    ko: "7 고요함, 741 D.F.",
+    ja: "静寂の7、741 D.F.",
   },
   "716 D.F.": {
     "es": "716 D.F.",
@@ -385,7 +487,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "716 D.F.",
     "it": "716 DF",
     "tr": "716 DF",
-    "zh-CN": "716 D.F."
+    "zh-CN": "716 D.F.",
+    'zh-TW': "716 D.F.",
+    ko: "716 D.F.",
+    ja: "716 D.F.",
   },
   "719 D.F.": {
     "es": "719 D.F.",
@@ -396,7 +501,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "719 D.F.",
     "it": "719 DF",
     "tr": "719 D.F.",
-    "zh-CN": "719 D.F."
+    "zh-CN": "719 D.F.",
+    'zh-TW': "719 D.F.",
+    ko: "719 D.F.",
+    ja: "719 D.F.",
   },
   "719–733 D.F.": {
     "es": "719–733 D.F.",
@@ -407,7 +515,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "719–733 DF.",
     "it": "719–733 DF",
     "tr": "719–733 DF",
-    "zh-CN": "719–733 D.F."
+    "zh-CN": "719–733 D.F.",
+    'zh-TW': "719–733 D.F.",
+    ko: "719-733 D.F.",
+    ja: "719–733 D.F.",
   },
   "725–742 D.F.": {
     "es": "725–742 D.F.",
@@ -418,7 +529,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "725–742 DF.",
     "it": "725–742 DF",
     "tr": "725–742 DF",
-    "zh-CN": "725–742 D.F."
+    "zh-CN": "725–742 D.F.",
+    'zh-TW': "725–742 D.F.",
+    ko: "725-742 D.F.",
+    ja: "725–742 D.F.",
   },
   "8 de Lluvia, 712 D.F.": {
     "es": "8 de Lluvia, 712 D.F.",
@@ -429,7 +543,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Chuva 8, 712 D.F.",
     "it": "Pioggia 8, 712 DF",
     "tr": "Yağmur 8, 712 D.F.",
-    "zh-CN": "雨月8日，712 D.F."
+    "zh-CN": "雨月8日，712 D.F.",
+    'zh-TW': "雨月8日，712 D.F.",
+    ko: "비 8, 712 D.F.",
+    ja: "レイン8、712 D.F.",
   },
   "A pie": {
     "es": "A pie",
@@ -440,7 +557,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "a pé",
     "it": "a piedi",
     "tr": "yürüyerek",
-    "zh-CN": "步行"
+    "zh-CN": "步行",
+    'zh-TW': "步行",
+    ko: "도보",
+    ja: "徒歩で",
   },
   "A.F.": {
     "es": "A.F.",
@@ -451,7 +571,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A.F.",
     "it": "AF",
     "tr": "A.F.",
-    "zh-CN": "A.F."
+    "zh-CN": "A.F.",
+    'zh-TW': "A.F.",
+    ko: "B.L.",
+    ja: "B.L.",
   },
   "Abandonó una patrulla para salvar al joven Maelor.": {
     "es": "Abandonó una patrulla para salvar al joven Maelor.",
@@ -462,7 +585,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele abandonou uma patrulha para salvar o jovem Maelor.",
     "it": "Ha abbandonato una pattuglia per salvare il giovane Maelor.",
     "tr": "Genç Maelor'u kurtarmak için devriyeyi terk etti.",
-    "zh-CN": "他放弃了一支巡逻队，去救年轻的梅洛尔。"
+    "zh-CN": "他放弃了一支巡逻队，去救年轻的梅洛尔。",
+    'zh-TW': "他放棄了一支巡邏隊，去救年輕的梅洛爾。",
+    ko: "그는 어린 마엘로르를 구하기 위해 순찰을 포기했습니다.",
+    ja: "彼は若いメーラーを救うためにパトロールを放棄した。",
   },
   "Abre el Archivo de Bajamar a toda la ciudad.": {
     "es": "Abre el Archivo de Bajamar a toda la ciudad.",
@@ -473,7 +599,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Abra o Arquivo Bajamar para toda a cidade.",
     "it": "Apri l'Archivio Bajamar a tutta la città.",
     "tr": "Bajamar Arşivini tüm şehre açın.",
-    "zh-CN": "向整座城市开放低潮档案库。"
+    "zh-CN": "向整座城市开放低潮档案库。",
+    'zh-TW': "向整座城市開放低潮檔案庫。",
+    ko: "도시 전체에 썰물 기록 보관소를 엽니다.",
+    ja: "ロータイドアーカイブを市全体に公開します。",
   },
   "Abre un depósito sin permiso.": {
     "es": "Abre un depósito sin permiso.",
@@ -484,7 +613,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Abra um depósito sem permissão.",
     "it": "Apri un deposito senza autorizzazione.",
     "tr": "İzinsiz bir mevduat açın.",
-    "zh-CN": "未经许可打开一个书库。"
+    "zh-CN": "未经许可打开一个书库。",
+    'zh-TW': "未經許可開啟一個書庫。",
+    ko: "허가 없이 스택을 엽니다.",
+    ja: "許可なくスタックを開きます。",
   },
   "Aceptar que un juramento puede sobrevivir sin quien lo pronunció.": {
     "es": "Aceptar que un juramento puede sobrevivir sin quien lo pronunció.",
@@ -495,7 +627,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Aceite que um juramento pode sobreviver sem a pessoa que o pronunciou.",
     "it": "Accettare che un giuramento possa sopravvivere senza la persona che lo ha pronunciato.",
     "tr": "Bir yeminin, onu söyleyen kişi olmadan da varlığını sürdürebileceğini kabul edin.",
-    "zh-CN": "接受一个誓言可以在立誓者不在后依然存续。"
+    "zh-CN": "接受一个誓言可以在立誓者不在后依然存续。",
+    'zh-TW': "接受一個誓言可以在立誓者不在後依然存續。",
+    ko: "맹세는 그것을 말한 사람보다 오래 지속될 수 있다는 것을 받아들이십시오.",
+    ja: "誓いは、それを言った人よりも長生きする可能性があることを受け入れてください。",
   },
   "Aceptar que un mapa no puede controlar a las personas que ama.": {
     "es": "Aceptar que un mapa no puede controlar a las personas que ama.",
@@ -506,7 +641,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Aceite que um mapa não pode controlar as pessoas que você ama.",
     "it": "Accetta che una mappa non può controllare le persone che ami.",
     "tr": "Bir haritanın sevdiğiniz insanları kontrol edemeyeceğini kabul edin.",
-    "zh-CN": "接受一张地图无法控制她所爱的人。"
+    "zh-CN": "接受一张地图无法控制她所爱的人。",
+    'zh-TW': "接受一張地圖無法控制她所愛的人。",
+    ko: "지도가 그녀가 사랑하는 사람들을 통제할 수 없다는 것을 받아들이십시오.",
+    ja: "地図が彼女の愛する人々をコントロールすることはできないことを受け入れてください。",
   },
   "Adaptaciones anfibias y memoria vibratoria del pueblo veyari.": {
     "es": "Adaptaciones anfibias y memoria vibratoria del pueblo veyari.",
@@ -517,7 +655,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Adaptações anfíbias e memória vibracional do povo Veyari.",
     "it": "Adattamenti anfibi e memoria vibrazionale del popolo Veyari.",
     "tr": "Veyari halkının amfibi adaptasyonları ve titreşimsel hafızası.",
-    "zh-CN": "维亚里人的两栖适应能力与振动记忆。"
+    "zh-CN": "维亚里人的两栖适应能力与振动记忆。",
+    'zh-TW': "維亞里人的兩棲適應能力與振動記憶。",
+    ko: "Veyari 사람들의 수륙양용 적응과 진동 기억.",
+    ja: "ヴェヤリ族の水陸両用の適応と振動的な記憶。",
   },
   "Admitir que la memoria también deforma.": {
     "es": "Admitir que la memoria también deforma.",
@@ -528,7 +669,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Admita que a memória também distorce.",
     "it": "Ammetti che anche la memoria distorce.",
     "tr": "Hafızanın da çarpıtıldığını kabul edin.",
-    "zh-CN": "承认记忆也会扭曲。"
+    "zh-CN": "承认记忆也会扭曲。",
+    'zh-TW': "承認記憶也會扭曲。",
+    ko: "기억도 왜곡된다는 점을 인정하세요.",
+    ja: "記憶も歪んでいることを認めてください。",
   },
   "Afirma que la continuidad del Estado legitima su corona provisional. Su blasón reúne el sol eclipsado, la puerta de hierro y seis brasas de luto.": {
     "es": "Afirma que la continuidad del Estado legitima su corona provisional. Su blasón reúne el sol eclipsado, la puerta de hierro y seis brasas de luto.",
@@ -539,7 +683,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Afirma que a continuidade do Estado legitima sua coroa provisória. Seu brasão reúne o sol eclipsado, a porta de ferro e seis brasas de luto.",
     "it": "Afferma che la continuità dello Stato legittima la sua corona provvisoria. Il suo stemma riunisce il sole eclissato, la porta di ferro e sei braci di lutto.",
     "tr": "Devletin devamlılığının kendisinin geçici tacını meşrulaştırdığını ileri sürüyor. Arması, tutulan güneşi, demir kapıyı ve altı yas közünü bir araya getiriyor.",
-    "zh-CN": "声称国家的延续性使其临时王冠具有合法性。其纹章汇集了被遮蔽的太阳、铁门和六块哀悼的余烬。"
+    "zh-CN": "声称国家的延续性使其临时王冠具有合法性。其纹章汇集了被遮蔽的太阳、铁门和六块哀悼的余烬。",
+    'zh-TW': "聲稱國家的延續性使其臨時王冠具有合法性。其紋章彙集了被遮蔽的太陽、鐵門和六塊哀悼的餘燼。",
+    ko: "이는 국가의 연속성이 임시 왕관을 정당화한다고 주장합니다. 그 팔에는 일식과 철문, 여섯 개의 애도의 불씨가 결합되어 있습니다.",
+    ja: "国家の継続性が暫定王冠を正当化すると主張している。その腕は、日食された太陽、鉄の門、そして6つの哀悼の残り火を組み合わせています。",
   },
   "aliade": {
     "es": "aliade",
@@ -550,7 +697,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "aliado",
     "it": "alleato",
     "tr": "müttefik",
-    "zh-CN": "盟友"
+    "zh-CN": "盟友",
+    'zh-TW': "盟友",
+    ko: "동맹국",
+    ja: "味方",
   },
   "aliado": {
     "es": "aliado",
@@ -561,7 +711,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "aliado",
     "it": "alleato",
     "tr": "müttefik",
-    "zh-CN": "盟友"
+    "zh-CN": "盟友",
+    'zh-TW': "盟友",
+    ko: "동맹국",
+    ja: "味方",
   },
   "aliado incierto": {
     "es": "aliado incierto",
@@ -572,7 +725,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "aliado incerto",
     "it": "alleato incerto",
     "tr": "belirsiz müttefik",
-    "zh-CN": "不确定的盟友"
+    "zh-CN": "不确定的盟友",
+    'zh-TW': "不確定的盟友",
+    ko: "불확실한 동맹",
+    ja: "不確かな味方",
   },
   "Alimentos, evacuación y apoyo popular.": {
     "es": "Alimentos, evacuación y apoyo popular.",
@@ -583,7 +739,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Alimentação, evacuação e apoio popular.",
     "it": "Cibo, evacuazione e sostegno popolare.",
     "tr": "Yiyecek, tahliye ve halk desteği.",
-    "zh-CN": "食物、撤离与民众支持。"
+    "zh-CN": "食物、撤离与民众支持。",
+    'zh-TW': "食物、撤離與民眾支援。",
+    ko: "식량, 대피 및 공공 지원.",
+    ja: "食料、避難、公的支援。",
   },
   "amistad rota": {
     "es": "amistad rota",
@@ -594,7 +753,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "amizade quebrada",
     "it": "amicizia interrotta",
     "tr": "kırık dostluk",
-    "zh-CN": "破裂的友谊"
+    "zh-CN": "破裂的友谊",
+    'zh-TW': "破裂的友誼",
+    ko: "깨진 우정",
+    ja: "壊れた友情",
   },
   "Anatomía veyari": {
     "es": "Anatomía veyari",
@@ -605,7 +767,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Anatomia Veyari",
     "it": "Anatomia Veyari",
     "tr": "Veyari anatomisi",
-    "zh-CN": "维亚里解剖学"
+    "zh-CN": "维亚里解剖学",
+    'zh-TW': "維亞里解剖學",
+    ko: "베야리 해부학",
+    ja: "ヴェヤリの解剖学",
   },
   "antagonista": {
     "es": "antagonista",
@@ -616,7 +781,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "antagonista",
     "it": "antagonista",
     "tr": "düşman",
-    "zh-CN": "反派"
+    "zh-CN": "反派",
+    'zh-TW': "反派",
+    ko: "길항근",
+    ja: "アンタゴニスト",
   },
   "Antes del Faro": {
     "es": "Antes del Faro",
@@ -627,7 +795,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Antes do Farol",
     "it": "Prima del Faro",
     "tr": "Deniz Feneri'nden önce",
-    "zh-CN": "灯塔之前"
+    "zh-CN": "灯塔之前",
+    'zh-TW': "燈塔之前",
+    ko: "등대 앞",
+    ja: "灯台の前",
   },
   "antigua sacerdotisa veyari, piel azul grisácea, ojos sin pupilas, manto de sal cristalina": {
     "es": "antigua sacerdotisa veyari, piel azul grisácea, ojos sin pupilas, manto de sal cristalina",
@@ -638,7 +809,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "antiga sacerdotisa Veyari, pele azul-acinzentada, olhos sem pupilas, manto de sal cristalino",
     "it": "antica sacerdotessa Veyari, pelle grigio-blu, occhi senza pupille, mantello di sale cristallino",
     "tr": "Antik Veyari rahibesi, mavi-gri deri, gözbebeği olmayan gözler, kristal tuzdan bir pelerin",
-    "zh-CN": "古老的维亚里女祭司，灰蓝色皮肤，没有瞳孔的眼睛，结晶盐斗篷"
+    "zh-CN": "古老的维亚里女祭司，灰蓝色皮肤，没有瞳孔的眼睛，结晶盐斗篷",
+    'zh-TW': "古老的維亞里女祭司，灰藍色皮膚，沒有瞳孔的眼睛，結晶鹽斗篷",
+    ko: "고대 베야리 여사제, 회색빛 파란색 피부, 눈동자 없는 눈, 결정질 소금 망토",
+    ja: "古代のヴェヤリの巫女、灰青色の肌、瞳孔のない目、結晶質の塩のマント",
   },
   "Antiguo capitán del [[Gremio de las Seis Velas]], acusado de provocar el naufragio de la Aguja Norte.": {
     "es": "Antiguo capitán del [[Gremio de las Seis Velas]], acusado de provocar el naufragio de la Aguja Norte.",
@@ -649,7 +823,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ex-capitão do [[Guilda das Seis Velas]], acusado de causar o naufrágio do North Needle.",
     "it": "Ex capitano della [[Gilda delle Sei Candele]], accusato di aver causato il naufragio della North Needle.",
     "tr": "[[Altı Mum Loncası]]'nin eski kaptanı, Kuzey İğnesi'ndeki gemi kazasına neden olmakla suçlanıyor.",
-    "zh-CN": "[[六帆公会]] 的前任船长，被指控引发了北针号的沉没。"
+    "zh-CN": "[[六帆公会]] 的前任船长，被指控引发了北针号的沉没。",
+    'zh-TW': "[[六帆公會]] 的前任船長，被指控引發了北針號的沉沒。",
+    ko: "노스 니들호를 난파시킨 혐의로 기소된 [[여섯 항해 길드]]의 전 선장.",
+    ja: "[[六帆のギルド]]の元船長で、ノースニードル号の難破を引き起こした容疑で告発された。",
   },
   "Antiguo capitán del [[Gremio de las Seis Velas]], cruzó el Mar de Vidrio durante una Marea Negra y regresó con media tripulación. Su mentor presentó cartas alteradas que lo culpaban del naufragio de la Aguja Norte; el Gremio le quitó nave, rango y séptima vela. Cael sabe que Aurel borró una ruta de las cartas oficiales, pero no por qué. Acepta guiar a Ilyra porque la carta de Nara señala esa misma ruta y porque Rhea conserva la escritura de su nave.": {
     "es": "Antiguo capitán del [[Gremio de las Seis Velas]], cruzó el Mar de Vidrio durante una Marea Negra y regresó con media tripulación. Su mentor presentó cartas alteradas que lo culpaban del naufragio de la Aguja Norte; el Gremio le quitó nave, rango y séptima vela. Cael sabe que Aurel borró una ruta de las cartas oficiales, pero no por qué. Acepta guiar a Ilyra porque la carta de Nara señala esa misma ruta y porque Rhea conserva la escritura de su nave.",
@@ -660,7 +837,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ex-capitão do [[Guilda das Seis Velas]], ele cruzou o Mar de Vidro durante a Maré Negra e voltou com meia tripulação. Seu mentor apresentou cartas alteradas que o culpavam pelo naufrágio do North Needle; A Guilda tirou seu navio, posto e sétima vela. Cael sabe que Aurel excluiu uma rota das cartas oficiais, mas não sabe por quê. Ele concorda em guiar Ilyra porque a carta de Nara indica a mesma rota e porque Rhea mantém a escritura de seu navio.",
     "it": "Ex capitano della [[Gilda delle Sei Candele]], ha attraversato il Mare di Vetro durante una Marea Nera ed è tornato con metà dell'equipaggio. Il suo mentore presentò lettere alterate che lo incolpavano del naufragio della North Needle; La Gilda gli portò via la nave, il grado e la settima vela. Cael sa che Aurel ha cancellato una via dalle classifiche ufficiali, ma non sa perché. Accetta di guidare Ilyra perché la lettera di Nara indica quella stessa rotta e perché Rhea mantiene l'atto di proprietà della sua nave.",
     "tr": "[[Altı Mum Loncası]]'nin eski kaptanı, Kara Gelgit sırasında Cam Denizi'ni geçti ve yarım mürettebatla geri döndü. Akıl hocası, North Needle'daki gemi kazasından kendisini sorumlu tutan değiştirilmiş mektuplar sundu; Lonca onun gemisini, rütbesini ve yedinci yelkenini elinden aldı. Cael, Aurel'in resmi haritalardan bir rotayı sildiğini biliyor ama nedenini bilmiyor. Ilyra'ya rehberlik etmeyi kabul eder çünkü Nara'nın mektubu aynı rotayı gösterir ve Rhea gemisinin tapusunu elinde tutar.",
-    "zh-CN": "[[六帆公会]] 的前任船长，曾在一次黑潮期间穿越玻璃海，带着一半船员返航。他的导师出示了被篡改的海图，把北针号的沉没归咎于他；公会夺走了他的船、军衔和第七面帆。凯尔知道奥雷尔从官方海图上抹去了一条路线，但不知道原因。他同意引导伊莉拉，因为娜拉的信指向的正是那条路线，也因为蕾亚保管着他那艘船的船契。"
+    "zh-CN": "[[六帆公会]] 的前任船长，曾在一次黑潮期间穿越玻璃海，带着一半船员返航。他的导师出示了被篡改的海图，把北针号的沉没归咎于他；公会夺走了他的船、军衔和第七面帆。凯尔知道奥雷尔从官方海图上抹去了一条路线，但不知道原因。他同意引导伊莉拉，因为娜拉的信指向的正是那条路线，也因为蕾亚保管着他那艘船的船契。",
+    'zh-TW': "[[六帆公會]] 的前任船長，曾在一次黑潮期間穿越玻璃海，帶著一半船員返航。他的導師出示了被篡改的海圖，把北針號的沉沒歸咎於他；公會奪走了他的船、軍銜和第七面帆。凱爾知道奧雷爾從官方海圖上抹去了一條路線，但不知道原因。他同意引導伊莉拉，因為娜拉的信指向的正是那條路線，也因為蕾亞保管著他那艘船的船契。",
+    ko: "전 [[여섯 항해 길드]]의 선장이었던 그는 흑조 때 유리해를 건너 선원 절반과 함께 돌아왔다. 그의 멘토는 North Needle의 난파에 대해 그를 비난하는 변경된 차트를 생성했습니다. 길드는 그의 배, 랭크, 일곱 번째 돛을 차지했습니다. Cael은 Aurel이 공식 차트에서 경로를 삭제했다는 것을 알고 있지만 그 이유는 알지 못합니다. 그는 Nara의 편지가 그 경로를 가리키고 Rhea가 그의 배의 증서를 보유하고 있기 때문에 Ilyra를 안내합니다.",
+    ja: "[[六帆のギルド]] の元船長であった彼は、黒潮の最中にガラスの海を渡り、乗組員の半数を率いて戻ってきました。彼の指導者は、ノースニードル号の沈没の責任を彼のせいにする改変された海図を作成した。ギルドは彼の船、階級、そして7番目の帆を奪いました。カエルはオーレルが公式海図からルートを消去したことは知っているが、その理由は分からない。ナラの手紙がそのルートを示しており、レアが船の証書を持っているため、彼はイリラを案内します。",
   },
   "Antiguo centro comercial abandonado tras el Hundimiento.": {
     "es": "Antiguo centro comercial abandonado tras el Hundimiento.",
@@ -671,7 +851,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Antigo centro comercial abandonado após o naufrágio.",
     "it": "Vecchio centro commerciale abbandonato dopo il naufragio.",
     "tr": "Batandan sonra terk edilmiş eski alışveriş merkezi.",
-    "zh-CN": "沉没事件后被废弃的旧商业中心。"
+    "zh-CN": "沉没事件后被废弃的旧商业中心。",
+    'zh-TW': "沉沒事件後被廢棄的舊商業中心。",
+    ko: "침몰 이후 버려진 옛 상업 중심지.",
+    ja: "沈没後に放棄されたかつての商業センター。",
   },
   "Antiguo guardián del Faro, oficialmente muerto dos años antes del comienzo del relato.": {
     "es": "Antiguo guardián del Faro, oficialmente muerto dos años antes del comienzo del relato.",
@@ -682,7 +865,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ex-faroleiro, morto oficialmente dois anos antes do início da história.",
     "it": "Ex guardiano del faro, ufficialmente morto due anni prima dell'inizio della storia.",
     "tr": "Eski deniz feneri bekçisi, hikayenin başlangıcından iki yıl önce resmen ölmüştü.",
-    "zh-CN": "灯塔的前任守护者，官方记录中在故事开始的两年前就已死亡。"
+    "zh-CN": "灯塔的前任守护者，官方记录中在故事开始的两年前就已死亡。",
+    'zh-TW': "燈塔的前任守護者，官方記錄中在故事開始的兩年前就已死亡。",
+    ko: "전직 등대 수호자. 이야기가 시작되기 2년 전에 공식적으로 사망했습니다.",
+    ja: "元灯台の守護者で、公式には物語が始まる2年前に死亡した。",
   },
   "Año desconocido": {
     "es": "Año desconocido",
@@ -693,7 +879,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ano desconhecido",
     "it": "Anno sconosciuto",
     "tr": "Bilinmeyen yıl",
-    "zh-CN": "未知年份"
+    "zh-CN": "未知年份",
+    'zh-TW': "未知年份",
+    ko: "연도를 알 수 없음",
+    ja: "不明な年",
   },
   "Aparece en varias fichas y merece una entrada propia.": {
     "es": "Aparece en varias fichas y merece una entrada propia.",
@@ -704,7 +893,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele aparece em diversas abas e merece uma entrada própria.",
     "it": "Appare in diverse schede e merita una voce a parte.",
     "tr": "Birkaç sekmede görünür ve kendi girişini hak eder.",
-    "zh-CN": "它出现在多张卡片中，值得拥有自己的条目。"
+    "zh-CN": "它出现在多张卡片中，值得拥有自己的条目。",
+    'zh-TW': "它出現在多張卡片中，值得擁有自己的條目。",
+    ko: "여러 시트에 나타나며 자체 항목이 필요합니다.",
+    ja: "これは複数のシートに掲載されており、単独でエントリーする価値があります。",
   },
   "Apareció grabado dentro de su prótesis.": {
     "es": "Apareció grabado dentro de su prótesis.",
@@ -715,7 +907,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Parecia gravado dentro de sua prótese.",
     "it": "Sembrava inciso all'interno della sua protesi.",
     "tr": "Protezinin içine kazınmış gibi görünüyordu.",
-    "zh-CN": "它被发现刻在她的假肢内部。"
+    "zh-CN": "它被发现刻在她的假肢内部。",
+    'zh-TW': "它被發現刻在她的假肢內部。",
+    ko: "그것은 그녀의 보철물 내부에 새겨져 있는 것으로 나타났습니다.",
+    ja: "それは彼女の義肢の内側に刻まれているように見えました。",
   },
   "aparición": {
     "es": "aparición",
@@ -726,7 +921,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "aparência",
     "it": "aspetto",
     "tr": "görünüm",
-    "zh-CN": "出场"
+    "zh-CN": "出场",
+    'zh-TW': "出場",
+    ko: "모습",
+    ja: "外観",
   },
   "aprendiz": {
     "es": "aprendiz",
@@ -737,7 +935,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "aprendiz",
     "it": "apprendista",
     "tr": "çırak",
-    "zh-CN": "学徒"
+    "zh-CN": "学徒",
+    'zh-TW': "學徒",
+    ko: "도제",
+    ja: "見習い",
   },
   "Aprendiz de archivo, piel oscura, pelo rapado y un enjambre de llaves mecánicas al cinturón.": {
     "es": "Aprendiz de archivo, piel oscura, pelo rapado y un enjambre de llaves mecánicas al cinturón.",
@@ -748,7 +949,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Aprendiz de arquivo, pele escura, cabelo raspado e um enxame de chaves mecânicas no cinto.",
     "it": "Apprendista archivista, pelle scura, capelli rasati e uno sciame di chiavi meccaniche alla cintura.",
     "tr": "Çırak, koyu tenli, tıraşlı saçlı ve kemerin bir sürü mekanik anahtarı.",
-    "zh-CN": "档案学徒，深色皮肤，光头，腰间挂着一大串机械钥匙。"
+    "zh-CN": "档案学徒，深色皮肤，光头，腰间挂着一大串机械钥匙。",
+    'zh-TW': "檔案學徒，深色皮膚，光頭，腰間掛著一大串機械鑰匙。",
+    ko: "머리를 삭발하고 벨트에 기계식 열쇠를 차고 있는 검은 피부의 기록 견습생입니다.",
+    ja: "浅黒い肌のアーカイブ見習いで、頭を剃り、ベルトに機械式の鍵の群れを持っています。",
   },
   "Aprendiz del Archivo Sumergido y primera persona conocida capaz de escuchar memoria residual en vidrio solar.": {
     "es": "Aprendiz del Archivo Sumergido y primera persona conocida capaz de escuchar memoria residual en vidrio solar.",
@@ -759,7 +963,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Aprendiz do Arquivo Submerso e primeira pessoa conhecida capaz de ouvir memória residual em vidro solar.",
     "it": "Apprendista dell'Archivio Sommerso e prima persona conosciuta in grado di sentire la memoria residua nel vetro solare.",
     "tr": "Batık Arşiv'in çırağı ve güneş camındaki kalan hafızayı duyabilen bilinen ilk kişi.",
-    "zh-CN": "沉没档案库的学徒，已知第一个能听见太阳玻璃中残留记忆的人。"
+    "zh-CN": "沉没档案库的学徒，已知第一个能听见太阳玻璃中残留记忆的人。",
+    'zh-TW': "沉沒檔案庫的學徒，已知第一個能聽見太陽玻璃中殘留記憶的人。",
+    ko: "가라앉은 기록 보관소의 견습생이자 태양광 유리의 잔존 기억을 들을 수 있는 최초의 인물입니다.",
+    ja: "サンケン・アーカイブの見習いであり、ソーラーガラスの残留記憶を聞くことができた最初の既知の人物。",
   },
   "Aquí terminó la primera guerra entre los Tejedores y el Faro.": {
     "es": "Aquí terminó la primera guerra entre los Tejedores y el Faro.",
@@ -770,7 +977,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Aqui terminou a primeira guerra entre os Tecelões e o Farol.",
     "it": "Qui finì la prima guerra tra i Tessitori e il Faro.",
     "tr": "Dokumacılar ile Deniz Feneri arasındaki ilk savaş burada sona erdi.",
-    "zh-CN": "织者与灯塔之间的第一场战争在此结束。"
+    "zh-CN": "织者与灯塔之间的第一场战争在此结束。",
+    'zh-TW': "織者與燈塔之間的第一場戰爭在此結束。",
+    ko: "Weavers와 Lighthouse 사이의 첫 번째 전쟁은 여기서 끝났습니다.",
+    ja: "ウィーバー家と灯台の間の最初の戦争はここで終わりました。",
   },
   "Archivo de Bajamar": {
     "es": "Archivo de Bajamar",
@@ -781,7 +991,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Arquivo Bajamar",
     "it": "Archivio Bajamar",
     "tr": "Bajamar Arşivi",
-    "zh-CN": "低潮档案库"
+    "zh-CN": "低潮档案库",
+    'zh-TW': "低潮檔案庫",
+    ko: "썰물 기록 보관소",
+    ja: "干潮アーカイブ",
   },
   "Archivo Sumergido": {
     "es": "Archivo Sumergido",
@@ -792,7 +1005,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Arquivo Submerso",
     "it": "File sommerso",
     "tr": "Batık Dosya",
-    "zh-CN": "沉没档案库"
+    "zh-CN": "沉没档案库",
+    'zh-TW': "沉沒檔案庫",
+    ko: "가라앉은 기록 보관소",
+    ja: "沈んだアーカイブ",
   },
   "artesano de confianza": {
     "es": "artesano de confianza",
@@ -803,7 +1019,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "artesão de confiança",
     "it": "artigiano di fiducia",
     "tr": "güvenilir usta",
-    "zh-CN": "值得信赖的匠人"
+    "zh-CN": "值得信赖的匠人",
+    'zh-TW': "值得信賴的匠人",
+    ko: "믿을 수 있는 장인",
+    ja: "信頼できる職人",
   },
   "Artesano que repara prótesis sin licencia.": {
     "es": "Artesano que repara prótesis sin licencia.",
@@ -814,7 +1033,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Artesão que conserta próteses sem licença.",
     "it": "Artigiano che ripara protesi senza licenza.",
     "tr": "Ruhsatsız protez tamiri yapan usta.",
-    "zh-CN": "无证修理假肢的匠人。"
+    "zh-CN": "无证修理假肢的匠人。",
+    'zh-TW': "無證修理假肢的匠人。",
+    ko: "면허 없이 보철물을 수리하는 기술자.",
+    ja: "無許可で補綴物を修理する職人。",
   },
   "Artículo de demostración conectado al resto del mundo.": {
     "es": "Artículo de demostración conectado al resto del mundo.",
@@ -825,7 +1047,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Item de demonstração conectado ao resto do mundo.",
     "it": "Articolo demo collegato al resto del mondo.",
     "tr": "Dünyanın geri kalanına bağlı demo öğesi.",
-    "zh-CN": "与世界其余部分相连的演示文章。"
+    "zh-CN": "与世界其余部分相连的演示文章。",
+    'zh-TW': "與世界其餘部分相連的演示文章。",
+    ko: "전 세계와 연결된 데모 기사.",
+    ja: "世界の他の部分に接続されたデモ記事。",
   },
   "Asedio previsto": {
     "es": "Asedio previsto",
@@ -836,7 +1061,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cerco planejado",
     "it": "Assedio pianificato",
     "tr": "Planlanan kuşatma",
-    "zh-CN": "预期的围攻"
+    "zh-CN": "预期的围攻",
+    'zh-TW': "預期的圍攻",
+    ko: "계획된 포위 공격",
+    ja: "計画的な包囲",
   },
   "Aster": {
     "es": "Aster",
@@ -847,7 +1075,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Áster",
     "it": "Aster",
     "tr": "Aster",
-    "zh-CN": "阿斯特"
+    "zh-CN": "阿斯特",
+    'zh-TW': "阿斯特",
+    ko: "과",
+    ja: "アスター",
   },
   "Asteriel: un nombre capaz de detener el Flujo durante una marea.": {
     "es": "Asteriel: un nombre capaz de detener el Flujo durante una marea.",
@@ -858,7 +1089,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Asteriel: Nome capaz de parar o Fluxo durante uma maré.",
     "it": "Asteriel: Un nome capace di fermare il Flusso durante una marea.",
     "tr": "Asteriel: Bir gelgit sırasında Akışı durdurabilen bir isim.",
-    "zh-CN": "阿斯特里尔：一个能让流停止一个潮汐的名字。"
+    "zh-CN": "阿斯特里尔：一个能让流停止一个潮汐的名字。",
+    'zh-TW': "阿斯特里爾：一個能讓流停止一個潮汐的名字。",
+    ko: "아스테리엘(Asteriel): 플럭스를 한 번의 조류로 막을 수 있는 이름.",
+    ja: "アステリエル：フラックスを一度だけ止められる名前。",
   },
   "astrónoma de cabello cobrizo, pecas luminosas, gafas de múltiples lentes, ropajes ámbar de observatorio": {
     "es": "astrónoma de cabello cobrizo, pecas luminosas, gafas de múltiples lentes, ropajes ámbar de observatorio",
@@ -869,7 +1103,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Astrônomo de cabelos cor de cobre, sardas luminosas, óculos com múltiplas lentes, vestes de observatório âmbar",
     "it": "Astronomo dai capelli ramati, lentiggini luminose, occhiali multilenti, tuniche ambrate da osservatorio",
     "tr": "Bakır saçlı gökbilimci, parlak çiller, çok lensli gözlükler, kehribar rengi gözlemevi cüppeleri",
-    "zh-CN": "铜色头发的天文学家，发光的雀斑，多镜片眼镜，琥珀色的天文台长袍"
+    "zh-CN": "铜色头发的天文学家，发光的雀斑，多镜片眼镜，琥珀色的天文台长袍",
+    'zh-TW': "銅色頭髮的天文學家，發光的雀斑，多鏡片眼鏡，琥珀色的天文臺長袍",
+    ko: "구리 머리의 천문학자, 빛나는 주근깨, 다안 안경, 호박색 천문대 로브",
+    ja: "銅色の髪の天文学者、明るいそばかす、多レンズの眼鏡、琥珀色の天文台のローブ",
   },
   "Astrónoma de pelo cobrizo, pecas luminosas y lentes con seis diafragmas.": {
     "es": "Astrónoma de pelo cobrizo, pecas luminosas y lentes con seis diafragmas.",
@@ -880,7 +1117,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Astrônomo com cabelos acobreados, sardas luminosas e lentes com seis diafragmas.",
     "it": "Astronomo con capelli ramati, lentiggini luminose e lenti a sei diaframmi.",
     "tr": "Bakır saçlı, parlak çilli ve altı diyaframlı merceklere sahip gökbilimci.",
-    "zh-CN": "铜色头发的天文学家，发光的雀斑，戴着六重光圈镜片。"
+    "zh-CN": "铜色头发的天文学家，发光的雀斑，戴着六重光圈镜片。",
+    'zh-TW': "銅色頭髮的天文學家，發光的雀斑，戴著六重光圈鏡片。",
+    ko: "빛나는 주근깨와 6개의 조리개 렌즈를 지닌 구릿빛 머리의 천문학자.",
+    ja: "輝くそばかすと6つの口径のレンズを持つ銅髪の天文学者。",
   },
   "atlas antiguo de fantasía marítima, costas de vidrio, tinta y oro": {
     "es": "atlas antiguo de fantasía marítima, costas de vidrio, tinta y oro",
@@ -891,7 +1131,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "antigo atlas de fantasia marítima, costas de vidro, tinta e ouro",
     "it": "antico atlante fantasy marittimo, vetro, inchiostro e coste d'oro",
     "tr": "antik deniz fantezi atlası, cam, mürekkep ve altın kıyıları",
-    "zh-CN": "古老的海洋奇幻地图集，玻璃海岸，墨水与金色"
+    "zh-CN": "古老的海洋奇幻地图集，玻璃海岸，墨水与金色",
+    'zh-TW': "古老的海洋奇幻地圖集，玻璃海岸，墨水與金色",
+    ko: "골동품 해양 판타지 아틀라스, 유리 해안선, 잉크 및 금",
+    ja: "アンティークの海洋ファンタジー地図帳、ガラスの海岸線、インクと金",
   },
   "Atlas de Elyndra": {
     "es": "Atlas de Elyndra",
@@ -902,7 +1145,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Elindra Atlas",
     "it": "Elindra Atlante",
     "tr": "Elyndra Atlası",
-    "zh-CN": "埃林德拉地图集"
+    "zh-CN": "埃林德拉地图集",
+    'zh-TW': "埃林德拉地圖集",
+    ko: "아틀라스 오브 엘린드라",
+    ja: "エリンドラのアトラス",
   },
   "atlas de fantasía pintado": {
     "es": "atlas de fantasía pintado",
@@ -913,7 +1159,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "atlas de fantasia pintado",
     "it": "atlante fantasy dipinto",
     "tr": "boyalı fantezi atlası",
-    "zh-CN": "手绘奇幻地图集"
+    "zh-CN": "手绘奇幻地图集",
+    'zh-TW': "手繪奇幻地圖集",
+    ko: "그린 판타지 아틀라스",
+    ja: "描いたファンタジーアトラス",
   },
   "atlas fantástico marítimo ilustrado": {
     "es": "atlas fantástico marítimo ilustrado",
@@ -924,7 +1173,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "fantástico atlas marítimo ilustrado",
     "it": "fantastico atlante marittimo illustrato",
     "tr": "fantastik resimli denizcilik atlası",
-    "zh-CN": "插图版海洋奇幻地图集"
+    "zh-CN": "插图版海洋奇幻地图集",
+    'zh-TW': "插圖版海洋奇幻地圖集",
+    ko: "그림으로 그린 ​​해양 판타지 아틀라스",
+    ja: "イラスト入り海洋ファンタジーアトラス",
   },
   "atlas histórico pintado": {
     "es": "atlas histórico pintado",
@@ -935,7 +1187,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "atlas histórico pintado",
     "it": "atlante storico dipinto",
     "tr": "boyalı tarihi atlas",
-    "zh-CN": "手绘历史地图集"
+    "zh-CN": "手绘历史地图集",
+    'zh-TW': "手繪歷史地圖集",
+    ko: "역사 지도책을 그렸습니다",
+    ja: "描かれた歴史地図帳",
   },
   "Aún no ha nacido; existe en una profecía y en los planes de dos casas.": {
     "es": "Aún no ha nacido; existe en una profecía y en los planes de dos casas.",
@@ -946,7 +1201,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele ainda não nasceu; Existe numa profecia e nas plantas de duas casas.",
     "it": "Non è ancora nato; Esiste in una profezia e nei progetti di due case.",
     "tr": "Henüz doğmadı; Bir kehanette ve iki evin planlarında var.",
-    "zh-CN": "尚未出生；存在于一个预言和两大家族的计划之中。"
+    "zh-CN": "尚未出生；存在于一个预言和两大家族的计划之中。",
+    'zh-TW': "尚未出生；存在於一個預言和兩大家族的計劃之中。",
+    ko: "아직 태어나지 않았습니다. 예언과 두 집의 계획에 존재합니다.",
+    ja: "まだ生まれていません。預言と二つの家の計画の中に存在します。",
   },
   "Aún no tiene voluntad en el relato.": {
     "es": "Aún no tiene voluntad en el relato.",
@@ -957,7 +1215,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele ainda não tem vontade na história.",
     "it": "Non ha ancora volontà nella storia.",
     "tr": "Hikayede hala iradesi yok.",
-    "zh-CN": "在故事中尚无自主意志。"
+    "zh-CN": "在故事中尚无自主意志。",
+    'zh-TW': "在故事中尚無自主意志。",
+    ko: "아직 스토리에 에이전시가 없습니다.",
+    ja: "ストーリーにはまだ代理店がありません。",
   },
   "Aurel dejó la brújula dentro de la mano de [[Ilyra Venn]]. Cerca del [[Archivo Sumergido]] gira hacia abajo, hacia la [[Ciudad Sepultada]].": {
     "es": "Aurel dejó la brújula dentro de la mano de [[Ilyra Venn]]. Cerca del [[Archivo Sumergido]] gira hacia abajo, hacia la [[Ciudad Sepultada]].",
@@ -968,7 +1229,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Aurel deixou a bússola dentro da mão de [[Ilyra Venn]]. Perto do [[Arquivo Submerso]] vire em direção ao [[Cidade Enterrada]].",
     "it": "Aurel ha lasciato la bussola nella mano di [[Ilira Venn]]. Vicino al [[File sommerso]] svoltare verso il [[Città sepolta]].",
     "tr": "Aurel pusulayı [[Ilyra Venn]]'nin elinde bıraktı. [[Batık Dosya]] yakınında [[Gömülü Şehir]] yönünde aşağı doğru dönün.",
-    "zh-CN": "奥雷尔把指南针留在了 [[Ilyra Venn]] 的手中。在 [[沉没档案库]] 附近，它转向下方，指向 [[埋葬之城]]。"
+    "zh-CN": "奥雷尔把指南针留在了 [[Ilyra Venn]] 的手中。在 [[沉没档案库]] 附近，它转向下方，指向 [[埋葬之城]]。",
+    'zh-TW': "奧雷爾把指南針留在了 [[Ilyra Venn]] 的手中。在 [[沉沒檔案庫]] 附近，它轉向下方，指向 [[埋葬之城]]。",
+    ko: "아우렐은 [[Ilyra Venn]]의 손에 나침반을 남겨 두었습니다. [[가라운 기록 보관소]] 근처에서는 아래쪽, [[매장된 도시]]를 향하고 있습니다.",
+    ja: "オーレルはコンパスを[[イリラ・ヴェン]]の手の中に残した。 [[沈没書庫]] の近くで、それは下向き、[[埋没都市]] に向かっています。",
   },
   "Aurel enciende el Faro durante el Hundimiento y esconde un mapa en la prótesis futura de Ilyra.": {
     "es": "Aurel enciende el Faro durante el Hundimiento y esconde un mapa en la prótesis futura de Ilyra.",
@@ -979,7 +1243,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Aurel acende o Farol durante o Naufrágio e esconde um mapa na futura prótese de Ilyra.",
     "it": "Aurel accende il faro durante l'affondamento e nasconde una mappa nella futura protesi di Ilyra.",
     "tr": "Aurel, Batan sırasında İşaret'i yakar ve Ilyra'nın gelecekteki protezinin içine bir harita saklar.",
-    "zh-CN": "奥雷尔在沉没事件期间点亮了灯塔，并把一张地图藏在伊莉拉未来的假肢里。"
+    "zh-CN": "奥雷尔在沉没事件期间点亮了灯塔，并把一张地图藏在伊莉拉未来的假肢里。",
+    'zh-TW': "奧雷爾在沉沒事件期間點亮了燈塔，並把一張地圖藏在伊莉拉未來的假肢裡。",
+    ko: "Aurel은 Sinking 동안 등대를 밝히고 Ilyra의 미래 보철물에 지도를 숨깁니다.",
+    ja: "オーレルは沈没中に灯台に火を灯し、イリラの将来の義足に地図を隠します。",
   },
   "Aurel Venn": {
     "es": "Aurel Venn",
@@ -990,7 +1257,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Aurel Venn",
     "it": "Aurel Venn",
     "tr": "Aurel Venn",
-    "zh-CN": "奥雷尔·文恩"
+    "zh-CN": "奥雷尔·文恩",
+    'zh-TW': "奧雷爾·文恩",
+    ko: "오렐 벤",
+    ja: "オーレル・ヴェン",
   },
   "Aurel Venn la borró para impedir que el Consejo encontrara el Corazón.": {
     "es": "Aurel Venn la borró para impedir que el Consejo encontrara el Corazón.",
@@ -1001,7 +1271,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Aurel Venn apagou para evitar que o Conselho encontrasse o Coração.",
     "it": "Aurel Venn lo cancellò per impedire al Consiglio di trovare il Cuore.",
     "tr": "Aurel Venn, Konseyin Kalbi bulmasını engellemek için onu sildi.",
-    "zh-CN": "Aurel Venn 将其抹除，以阻止议会找到心脏。"
+    "zh-CN": "Aurel Venn 将其抹除，以阻止议会找到心脏。",
+    'zh-TW': "Aurel Venn 將其抹除，以阻止議會找到心臟。",
+    ko: "Aurel Venn은 의회가 심장을 찾는 것을 막기 위해 그것을 지웠습니다.",
+    ja: "オーレル・ヴェンは評議会による心臓の発見を阻止するためにそれを消去した。",
   },
   "Austero, protector y aferrado a juramentos incompatibles.": {
     "es": "Austero, protector y aferrado a juramentos incompatibles.",
@@ -1012,7 +1285,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Austero, protetor e apegado a juramentos incompatíveis.",
     "it": "Austero, protettivo e aggrappato a giuramenti incompatibili.",
     "tr": "Sert, koruyucu ve uyumsuz yeminlere sıkı sıkıya bağlı.",
-    "zh-CN": "简朴、富有保护欲，并被彼此不相容的誓言束缚。"
+    "zh-CN": "简朴、富有保护欲，并被彼此不相容的誓言束缚。",
+    'zh-TW': "簡樸、富有保護欲，並被彼此不相容的誓言束縛。",
+    ko: "엄격하고 보호적이며 양립할 수 없는 맹세에 묶여 있습니다.",
+    ja: "厳格で保護的で、相容れない誓いに縛られています。",
   },
   "Austero, protector y aferrado a juramentos incompatibles. Habla poco porque cada palabra le parece una obligación futura. Tolera dolor, hambre y sospecha sin quejarse, pero la desobediencia compasiva de otros lo desarma. Su rigidez es el modo en que evita preguntarse a quién perjudicó obedeciendo.": {
     "es": "Austero, protector y aferrado a juramentos incompatibles. Habla poco porque cada palabra le parece una obligación futura. Tolera dolor, hambre y sospecha sin quejarse, pero la desobediencia compasiva de otros lo desarma. Su rigidez es el modo en que evita preguntarse a quién perjudicó obedeciendo.",
@@ -1023,7 +1299,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Austero, protetor e apegado a juramentos incompatíveis. Ele fala pouco porque cada palavra parece uma obrigação futura. Ele tolera a dor, a fome e a suspeita sem reclamar, mas a desobediência compassiva dos outros o desarma. Sua rigidez é a maneira como ele evita se perguntar a quem ele prejudicou ao obedecer.",
     "it": "Austero, protettivo e aggrappato a giuramenti incompatibili. Parla poco perché ogni parola sembra un obbligo futuro. Tollera il dolore, la fame e il sospetto senza lamentarsi, ma la disobbedienza compassionevole degli altri lo disarma. La sua rigidità è il modo in cui evita di chiedersi chi ha danneggiato obbedendo.",
     "tr": "Sert, koruyucu ve uyumsuz yeminlere sıkı sıkıya bağlı. Az konuşuyor çünkü her kelime gelecekteki bir zorunluluk gibi görünüyor. Acıya, açlığa ve şüpheye şikayet etmeden katlanır, ancak başkalarının şefkatli itaatsizliği onu silahsızlandırır. Onun katılığı, itaat ederek kime zarar verdiğini merak etmekten kaçınmasıdır.",
-    "zh-CN": "简朴、富有保护欲，并被彼此不相容的誓言束缚。他寡言少语，因为每句话对他而言都像未来的义务。他能毫无怨言地忍受疼痛、饥饿与猜疑，却会被他人出于怜悯的违命所瓦解。他的刻板，正是他避免追问自己服从害了谁的方式。"
+    "zh-CN": "简朴、富有保护欲，并被彼此不相容的誓言束缚。他寡言少语，因为每句话对他而言都像未来的义务。他能毫无怨言地忍受疼痛、饥饿与猜疑，却会被他人出于怜悯的违命所瓦解。他的刻板，正是他避免追问自己服从害了谁的方式。",
+    'zh-TW': "簡樸、富有保護欲，並被彼此不相容的誓言束縛。他寡言少語，因為每句話對他而言都像未來的義務。他能毫無怨言地忍受疼痛、飢餓與猜疑，卻會被他人出於憐憫的違命所瓦解。他的刻板，正是他避免追問自己服從害了誰的方式。",
+    ko: "엄격하고 보호적이며 양립할 수 없는 맹세에 묶여 있습니다. 그는 모든 단어가 미래의 의무처럼 느껴지기 때문에 거의 말하지 않습니다. 그는 불평 없이 고통, 배고픔, 의심을 참지만 자비로운 불순종은 그를 무장해제시킵니다. 경직된 태도로 인해 그는 자신의 순종이 누구에게 해를 끼쳤는지를 묻지 못하게 됩니다.",
+    ja: "厳格で保護的で、相容れない誓いに縛られています。すべての言葉が将来の義務のように感じられるため、彼はほとんど話しません。彼は痛み、飢え、疑惑に文句を言わずに耐えますが、同情的な不服従は彼の武装を解除します。頑固さゆえに、自分の従順が誰に害を与えたかを尋ねることができなくなる。",
   },
   "Bajo el Barrio Hundido, Ilyra llega al Corazón con Cael, Sena y Vesh antes que Maelor. Asteriel despierta y obliga a toda Lúmina a compartir una pérdida; Nara habla desde su memoria y Maelor intenta activar el arnés del Faro. Ilyra pronuncia el nombre verdadero, pero la regla que debería borrarlo falla porque lo comparte con el grupo en vez de poseerlo. Rechaza decidir sola: Sena abre el archivo de recuerdos, Cael organiza la evacuación, Vesh ofrece el pacto y Maelor debe elegir entre disparar o escuchar.": {
     "es": "Bajo el Barrio Hundido, Ilyra llega al Corazón con Cael, Sena y Vesh antes que Maelor. Asteriel despierta y obliga a toda Lúmina a compartir una pérdida; Nara habla desde su memoria y Maelor intenta activar el arnés del Faro. Ilyra pronuncia el nombre verdadero, pero la regla que debería borrarlo falla porque lo comparte con el grupo en vez de poseerlo. Rechaza decidir sola: Sena abre el archivo de recuerdos, Cael organiza la evacuación, Vesh ofrece el pacto y Maelor debe elegir entre disparar o escuchar.",
@@ -1034,7 +1313,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Abaixo do Bairro Submerso, Ilyra chega ao Coração com Cael, Sena e Vesh antes de Maelor. Asteriel desperta e força toda Lúmina a compartilhar uma perda; Nara fala de memória e Maelor tenta ativar o arnês do Farol. Ilyra fala o nome verdadeiro, mas a regra que deveria apagá-lo falha porque ela o compartilha com o grupo em vez de possuí-lo. Ela se recusa a decidir sozinha: Sena abre o arquivo da memória, Cael organiza a evacuação, Vesh oferece o pacto e Maelor deve escolher entre atirar ou ouvir.",
     "it": "Sotto il quartiere sommerso, Ilyra raggiunge il Cuore con Cael, Sena e Vesh prima di Maelor. Asteriel si risveglia e costringe tutta Lúmina a condividere una perdita; Nara parla dalla sua memoria e Maelor tenta di attivare l'imbracatura del Faro. Ilyra pronuncia il vero nome, ma la regola che dovrebbe cancellarlo fallisce perché lei lo condivide con il gruppo invece di possederlo. Si rifiuta di decidere da sola: Sena apre l'archivio della memoria, Cael organizza l'evacuazione, Vesh propone il patto e Maelor deve scegliere tra sparare o ascoltare.",
     "tr": "Batık Mahalle'nin altında Ilyra, Maelor'dan önce Cael, Sena ve Vesh ile birlikte Kalbe ulaşır. Asteriel uyanır ve tüm Lúmina'yı bir kaybı paylaşmaya zorlar; Nara hafızasından konuşuyor ve Maelor, Deniz Feneri'nin koşum takımını etkinleştirmeye çalışıyor. Ilyra gerçek adı söylüyor ancak onu silmeyi gerektiren kural başarısız oluyor çünkü o, onu sahiplenmek yerine grupla paylaşıyor. Tek başına karar vermeyi reddeder: Sena anı arşivini açar, Cael tahliyeyi organize eder, Vesh anlaşmayı teklif eder ve Maelor ateş etmek ya da dinlemek arasında seçim yapmak zorundadır.",
-    "zh-CN": "在沉没街区之下，Ilyra 与 Cael、Sena、Vesh 先于 Maelor 抵达心脏。Asteriel 苏醒，迫使整个 Lúmina 共同分担一次失去；Nara 从记忆中开口，Maelor 则试图启动灯塔的挽具。Ilyra 说出真名，但那条本应将其抹除的规则失效了，因为她与众人共享而非独占它。她拒绝独自决定：Sena 打开记忆档案，Cael 组织疏散，Vesh 提出契约，而 Maelor 必须在开枪与倾听之间做出选择。"
+    "zh-CN": "在沉没街区之下，Ilyra 与 Cael、Sena、Vesh 先于 Maelor 抵达心脏。Asteriel 苏醒，迫使整个 Lúmina 共同分担一次失去；Nara 从记忆中开口，Maelor 则试图启动灯塔的挽具。Ilyra 说出真名，但那条本应将其抹除的规则失效了，因为她与众人共享而非独占它。她拒绝独自决定：Sena 打开记忆档案，Cael 组织疏散，Vesh 提出契约，而 Maelor 必须在开枪与倾听之间做出选择。",
+    'zh-TW': "在沉沒街區之下，Ilyra 與 Cael、Sena、Vesh 先於 Maelor 抵達心臟。Asteriel 甦醒，迫使整個 Lúmina 共同分擔一次失去；Nara 從記憶中開口，Maelor 則試圖啟動燈塔的挽具。Ilyra 說出真名，但那條本應將其抹除的規則失效了，因為她與眾人共享而非獨佔它。她拒絕獨自決定：Sena 開啟記憶檔案，Cael 組織疏散，Vesh 提出契約，而 Maelor 必須在開槍與傾聽之間做出選擇。",
+    ko: "Sunken Quarter 아래에서 Ilyra는 Maelor보다 먼저 Cael, Sena 및 Vesh와 함께 심장에 도달합니다. Asteriel은 깨어나 모든 Lumina가 하나의 손실을 공유하게 만듭니다. Nara는 기억을 바탕으로 말하고 Maelor는 Lighthouse 하네스를 작동시키려고 합니다. Ilyra는 실명을 말하지만 그것을 소유하는 것이 아니라 공유하기 때문에 그것을 지우라는 규칙은 실패합니다. 그녀는 혼자서 결정하기를 거부합니다. Sena는 기억 보관소를 열고 Cael은 대피를 조직하며 Vesh는 협정을 제안하고 Maelor는 발사와 청취 중 하나를 선택해야 합니다.",
+    ja: "サンクン・クォーターの下で、イリラはカエル、セナ、ヴェッシュとともにメーロールの前にハートに到達します。アステリエルは目を覚まし、すべてのルミナに1つの損失を共有させます。ナラは記憶を頼りに話し、メーラーは灯台のハーネスを作動させようとします。イリラは本当の名前を言いますが、彼女がそれを所有しているのではなく共有しているため、それを消去することを目的としたルールは失敗します。彼女は一人で決めることを拒否します。セナは記憶のアーカイブを開き、カエルは避難を計画し、ヴェッシュは協定を申し出ます。そしてメーラーは発砲するか聞くかの選択を迫られます。",
   },
   "Ballena de brasa": {
     "es": "Ballena de brasa",
@@ -1045,7 +1327,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "baleia brasa",
     "it": "balena di brace",
     "tr": "kor balinası",
-    "zh-CN": "余烬鲸"
+    "zh-CN": "余烬鲸",
+    'zh-TW': "餘燼鯨",
+    ko: "엠버고래",
+    ja: "残り火クジラ",
   },
   "Barrio Hundido": {
     "es": "Barrio Hundido",
@@ -1056,7 +1341,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Bairro Submerso",
     "it": "Quartiere sommerso",
     "tr": "Batık Mahalle",
-    "zh-CN": "沉没街区"
+    "zh-CN": "沉没街区",
+    'zh-TW': "沉沒街區",
+    ko: "선큰 지구",
+    ja: "沈んだ地区",
   },
   "Biblia del mundo demo": {
     "es": "Biblia del mundo demo",
@@ -1067,7 +1355,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "demonstração da bíblia mundial",
     "it": "Bibbia del mondo dimostrativo",
     "tr": "demo dünya İncil'i",
-    "zh-CN": "演示世界圣经"
+    "zh-CN": "演示世界圣经",
+    'zh-TW': "演示世界聖經",
+    ko: "데모 월드 바이블",
+    ja: "デモワールドバイブル",
   },
   "Biblioteca inclinada cuyos depósitos inferiores solo son accesibles durante la bajamar.": {
     "es": "Biblioteca inclinada cuyos depósitos inferiores solo son accesibles durante la bajamar.",
@@ -1078,7 +1369,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Biblioteca inclinada cujos tanques inferiores só são acessíveis na maré baixa.",
     "it": "Biblioteca inclinata le cui vasche inferiori sono accessibili solo con la bassa marea.",
     "tr": "Alt tanklara yalnızca gelgit sırasında erişilebilen eğimli kütüphane.",
-    "zh-CN": "一座倾斜的图书馆，其下层书库仅在退潮时才能进入。"
+    "zh-CN": "一座倾斜的图书馆，其下层书库仅在退潮时才能进入。",
+    'zh-TW': "一座傾斜的圖書館，其下層書庫僅在退潮時才能進入。",
+    ko: "낮은 쪽 더미는 썰물 때만 접근할 수 있는 기울어진 도서관입니다.",
+    ja: "傾斜した図書館で、下の書庫は干潮時にのみアクセスできます。",
   },
   "Boros el Calderero": {
     "es": "Boros el Calderero",
@@ -1089,7 +1383,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Boros, o Funileiro",
     "it": "Boros il Meccanista",
     "tr": "Tamirci Boros",
-    "zh-CN": "修补匠 Boros"
+    "zh-CN": "修补匠 Boros",
+    'zh-TW': "修補匠 Boros",
+    ko: "땜장이 보로스",
+    ja: "いじくり屋のボロス",
   },
   "Brasa": {
     "es": "Brasa",
@@ -1100,7 +1397,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "brasa",
     "it": "brace",
     "tr": "kor",
-    "zh-CN": "余烬"
+    "zh-CN": "余烬",
+    'zh-TW': "餘燼",
+    ko: "타다 남은 것",
+    ja: "残り火",
   },
   "Brillante, impaciente y capaz de guardar un secreto demasiado tiempo.": {
     "es": "Brillante, impaciente y capaz de guardar un secreto demasiado tiempo.",
@@ -1111,7 +1411,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Brilhante, impaciente e capaz de guardar um segredo por muito tempo.",
     "it": "Brillante, impaziente e capace di mantenere un segreto troppo a lungo.",
     "tr": "Zeki, sabırsız ve bir sırrı çok uzun süre saklama becerisine sahip.",
-    "zh-CN": "聪慧、急躁，且能把秘密保守得太久。"
+    "zh-CN": "聪慧、急躁，且能把秘密保守得太久。",
+    'zh-TW': "聰慧、急躁，且能把秘密保守得太久。",
+    ko: "똑똑하고 참을성이 없으며 너무 오랫동안 비밀을 지킬 수 있습니다.",
+    ja: "聡明でせっかちで、秘密を長く守り続けることができる。",
   },
   "Brillante, impaciente y vorazmente curiosa. Piensa varios pasos por delante y olvida que los demás no han visto sus premisas. Protege a quienes ama ocultando información, después se indigna cuando no comprenden sus decisiones. Le entusiasma demostrar que una pregunta estaba mal formulada y le aterra volver a causar una evacuación mortal.": {
     "es": "Brillante, impaciente y vorazmente curiosa. Piensa varios pasos por delante y olvida que los demás no han visto sus premisas. Protege a quienes ama ocultando información, después se indigna cuando no comprenden sus decisiones. Le entusiasma demostrar que una pregunta estaba mal formulada y le aterra volver a causar una evacuación mortal.",
@@ -1122,7 +1425,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Brilhante, impaciente e vorazmente curioso. Ele pensa vários passos à frente e esquece que outros não viram suas instalações. Ele protege aqueles que ama, escondendo informações, mas fica indignado quando eles não entendem suas decisões. Ele está animado para provar que uma pergunta foi formulada incorretamente e com medo de causar uma evacuação mortal novamente.",
     "it": "Brillante, impaziente e voracemente curioso. Pensa diversi passi avanti e dimentica che gli altri non hanno visto le sue premesse. Protegge coloro che ama nascondendo informazioni, poi si indigna quando non capiscono le sue decisioni. È entusiasta di dimostrare che una domanda è stata formulata in modo errato e ha il terrore di provocare nuovamente un movimento intestinale mortale.",
     "tr": "Zeki, sabırsız ve son derece meraklı. Birkaç adım ilerisini düşünüyor ve başkalarının onun mekanını görmediğini unutuyor. Sevdiklerini bilgileri saklayarak korur, sonra kararlarını anlamadıklarında öfkelenir. Bir sorunun yanlış ifade edildiğini kanıtlamaktan heyecan duyuyor ve tekrar ölümcül bir bağırsak hareketine neden olmaktan korkuyor.",
-    "zh-CN": "聪慧、急躁，且有着贪婪的好奇心。她总比他人多想好几步，却忘了别人并未看到她的前提。她以隐瞒信息来保护所爱之人，之后又因他们不理解自己的决定而愤愤不平。她热衷于证明某个问题从一开始就问错了，也害怕再次造成致命的疏散。"
+    "zh-CN": "聪慧、急躁，且有着贪婪的好奇心。她总比他人多想好几步，却忘了别人并未看到她的前提。她以隐瞒信息来保护所爱之人，之后又因他们不理解自己的决定而愤愤不平。她热衷于证明某个问题从一开始就问错了，也害怕再次造成致命的疏散。",
+    'zh-TW': "聰慧、急躁，且有著貪婪的好奇心。她總比他人多想好幾步，卻忘了別人並未看到她的前提。她以隱瞞資訊來保護所愛之人，之後又因他們不理解自己的決定而憤憤不平。她熱衷於證明某個問題從一開始就問錯了，也害怕再次造成致命的疏散。",
+    ko: "훌륭하고 참을성이 없으며 탐욕스러울 정도로 호기심이 많습니다. 그녀는 몇 단계 앞서 있다고 생각하고 다른 사람들이 자신의 건물을 보지 못했다는 사실을 잊어버립니다. 그녀는 정보를 숨김으로써 사랑하는 사람을 보호하고, 그들이 자신의 선택을 이해하지 못하는 것에 분개합니다. 그녀는 잘못 구성된 질문을 증명하는 것을 기뻐하며 또 다른 치명적인 대피를 두려워합니다.",
+    ja: "聡明でせっかち、そして猛烈な好奇心旺盛。彼女は数歩先のことを考え、他の人が彼女の敷地を見ていないことを忘れています。彼女は情報を差し控えることで愛する人たちを守りますが、彼らが自分の選択を理解してくれなかったことに憤慨しています。彼女は、間違って組み立てられた質問を証明することに喜びを感じていますが、再び致命的な避難を引き起こすことを恐れています。",
   },
   "Brújula de ceniza": {
     "es": "Brújula de ceniza",
@@ -1133,7 +1439,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Bússola de cinzas",
     "it": "Bussola in frassino",
     "tr": "Kül pusulası",
-    "zh-CN": "灰烬罗盘"
+    "zh-CN": "灰烬罗盘",
+    'zh-TW': "灰燼羅盤",
+    ko: "애쉬 나침반",
+    ja: "アッシュコンパス",
   },
   "Caballo de sal": {
     "es": "Caballo de sal",
@@ -1144,7 +1453,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "cavalo de sal",
     "it": "cavallo di sale",
     "tr": "tuz atı",
-    "zh-CN": "盐马"
+    "zh-CN": "盐马",
+    'zh-TW': "鹽馬",
+    ko: "소금말",
+    ja: "ソルトホース",
   },
   "cabeza de casa": {
     "es": "cabeza de casa",
@@ -1155,7 +1467,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "chefe de casa",
     "it": "capo di casa",
     "tr": "evin reisi",
-    "zh-CN": "一家之主"
+    "zh-CN": "一家之主",
+    'zh-TW': "一家之主",
+    ko: "집주인",
+    ja: "家の長",
   },
   "Cada hogar entregaba una décima parte de su aceite al Faro.": {
     "es": "Cada hogar entregaba una décima parte de su aceite al Faro.",
@@ -1166,7 +1481,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cada família doou um décimo do seu óleo ao Farol.",
     "it": "Ogni famiglia donava un decimo del proprio petrolio al Faro.",
     "tr": "Her hane, petrolünün onda birini Deniz Feneri'ne veriyordu.",
-    "zh-CN": "每个家庭都要将十分之一的油上缴给灯塔。"
+    "zh-CN": "每个家庭都要将十分之一的油上缴给灯塔。",
+    'zh-TW': "每個家庭都要將十分之一的油上繳給燈塔。",
+    ko: "집집마다 기름의 10분의 1을 등대에 바쳤습니다.",
+    ja: "どの家庭も石油の10分の1を灯台に寄付しました。",
   },
   "Cada vela representa un rumbo seguro. La séptima ruta, borrada de sus cartas, lleva a la Ciudad Sepultada.": {
     "es": "Cada vela representa un rumbo seguro. La séptima ruta, borrada de sus cartas, lleva a la Ciudad Sepultada.",
@@ -1177,7 +1495,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cada vela representa um rumo seguro. A sétima rota, apagada de seus mapas, leva à Cidade Enterrada.",
     "it": "Ogni vela rappresenta una rotta sicura. Il settimo percorso, cancellato dalle sue carte, conduce alla Città Sepolta.",
     "tr": "Her yelken güvenli bir rotayı temsil eder. Haritalarından silinen yedinci rota Gömülü Şehir'e gidiyor.",
-    "zh-CN": "每一面帆都代表一条安全的航向。第七条路线已从海图上抹去，它通向埋葬之城。"
+    "zh-CN": "每一面帆都代表一条安全的航向。第七条路线已从海图上抹去，它通向埋葬之城。",
+    'zh-TW': "每一面帆都代表一條安全的航向。第七條路線已從海圖上抹去，它通向埋葬之城。",
+    ko: "각 돛은 안전한 베어링을 나타냅니다. 차트에서 지워진 일곱 번째 경로는 Buried City로 연결됩니다.",
+    ja: "それぞれの帆は安全な方位を表します。海図から消された7番目のルートは埋もれた都市に通じている。",
   },
   "Cael fue acusado por una decisión de Aurel.": {
     "es": "Cael fue acusado por una decisión de Aurel.",
@@ -1188,7 +1509,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cael foi acusado por uma decisão de Aurel.",
     "it": "Cael è stato accusato per decisione di Aurel.",
     "tr": "Cael, Aurel'in kararıyla suçlandı.",
-    "zh-CN": "Cael 因 Aurel 的一项决定而受到指责。"
+    "zh-CN": "Cael 因 Aurel 的一项决定而受到指责。",
+    'zh-TW': "Cael 因 Aurel 的一項決定而受到指責。",
+    ko: "Cael은 Aurel의 결정에 대해 비난을 받았습니다.",
+    ja: "オーレルの決断の責任はカエルにあるとされた。",
   },
   "Cael Orun": {
     "es": "Cael Orun",
@@ -1199,7 +1523,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cael Orun",
     "it": "Cael Orun",
     "tr": "Cael Orun",
-    "zh-CN": "Cael Orun"
+    "zh-CN": "Cael Orun",
+    'zh-TW': "Cael Orun",
+    ko: "카엘 오룬",
+    ja: "カエル・オルン",
   },
   "Calendario de las Mareas": {
     "es": "Calendario de las Mareas",
@@ -1210,7 +1537,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Calendário de marés",
     "it": "Calendario delle maree",
     "tr": "Gelgit Takvimi",
-    "zh-CN": "潮汐历法"
+    "zh-CN": "潮汐历法",
+    'zh-TW': "潮汐曆法",
+    ko: "조수의 달력",
+    ja: "潮汐カレンダー",
   },
   "Cálido, docente y sentencioso. Habla de mapas, costas, lámparas y deudas como si fueran seres con voluntad. Formula una pregunta antes de dar una respuesta y reserva las frases más simples para la verdad dolorosa.": {
     "es": "Cálido, docente y sentencioso. Habla de mapas, costas, lámparas y deudas como si fueran seres con voluntad. Formula una pregunta antes de dar una respuesta y reserva las frases más simples para la verdad dolorosa.",
@@ -1221,7 +1551,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Caloroso, ensinador e sentencioso. Ele fala de mapas, costas, lâmpadas e dívidas como se fossem seres com vontade. Faça uma pergunta antes de responder e guarde as frases mais simples para a dolorosa verdade.",
     "it": "Caldo, istruttivo e sentenzioso. Parla di mappe, coste, lampade e debiti come se fossero esseri dotati di volontà. Fai una domanda prima di dare una risposta e conserva le frasi più semplici per la dolorosa verità.",
     "tr": "Sıcak, öğretici ve duygusal. Haritalardan, sahillerden, lambalardan, borçlardan sanki iradeli varlıklarmış gibi bahsediyor. Cevap vermeden önce bir soru sorun ve en basit cümleleri acı gerçeklere saklayın.",
-    "zh-CN": "温和、好为人师，且喜欢格言警句。他谈论地图、海岸、灯与债务时，仿佛它们都是有意志的生灵。他总在给出答案前先提一个问题，并把最简单的句子留给痛苦的真相。"
+    "zh-CN": "温和、好为人师，且喜欢格言警句。他谈论地图、海岸、灯与债务时，仿佛它们都是有意志的生灵。他总在给出答案前先提一个问题，并把最简单的句子留给痛苦的真相。",
+    'zh-TW': "溫和、好為人師，且喜歡格言警句。他談論地圖、海岸、燈與債務時，彷彿它們都是有意志的生靈。他總在給出答案前先提一個問題，並把最簡單的句子留給痛苦的真相。",
+    ko: "따뜻하고 유익하며 격언적입니다. 마치 유언장이 있는 것처럼 지도, 해안, 램프 및 부채에 대해 말합니다. 답변을 하기 전에 질문을 하고, 고통스러운 진실에 대해서는 가장 간단한 문장을 남겨둡니다.",
+    ja: "温かく、教訓的で、格言的です。地図、海岸、ランプ、借金について、あたかも遺書があるかのように話します。答える前に質問し、痛みを伴う真実については最も簡単な文を残しておきます。",
   },
   "Calla para proteger.": {
     "es": "Calla para proteger.",
@@ -1232,7 +1565,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Fique em silêncio para proteger.",
     "it": "Tacere per proteggere.",
     "tr": "Korumak için sessiz olun.",
-    "zh-CN": "以沉默来保护。"
+    "zh-CN": "以沉默来保护。",
+    'zh-TW': "以沉默來保護。",
+    ko: "그분은 침묵을 통해 보호하십니다.",
+    ja: "彼は沈黙を通して守ります。",
   },
   "Calles medio inundadas bajo cúpulas rotas, unidas por puentes y barcas.": {
     "es": "Calles medio inundadas bajo cúpulas rotas, unidas por puentes y barcas.",
@@ -1243,7 +1579,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ruas semi-inundadas sob cúpulas quebradas, ligadas por pontes e barcos.",
     "it": "Strade semiallagate sotto cupole rotte, collegate da ponti e barche.",
     "tr": "Köprüler ve teknelerle birbirine bağlanan, kırık kubbelerin altındaki yarı sular altında kalmış sokaklar.",
-    "zh-CN": "半淹的街道位于破碎的穹顶之下，由桥梁和小船相连。"
+    "zh-CN": "半淹的街道位于破碎的穹顶之下，由桥梁和小船相连。",
+    'zh-TW': "半淹的街道位於破碎的穹頂之下，由橋梁和小船相連。",
+    ko: "무너진 돔 아래 반쯤 물에 잠긴 거리가 다리와 보트로 연결되어 있습니다.",
+    ja: "壊れたドームの下で半分浸水した通りと、橋とボートがつながっています。",
   },
   "Campanas de marea, reflejos en cada muro y vigilancia constante.": {
     "es": "Campanas de marea, reflejos en cada muro y vigilancia constante.",
@@ -1254,7 +1593,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sinos de maré, reflexos em cada parede e vigilância constante.",
     "it": "Campane di marea, riflessi su ogni muro e sorveglianza costante.",
     "tr": "Gelgit çanları, her duvardaki yansımalar ve sürekli gözetim.",
-    "zh-CN": "潮汐钟声、每面墙上的倒影，以及无休止的监视。"
+    "zh-CN": "潮汐钟声、每面墙上的倒影，以及无休止的监视。",
+    'zh-TW': "潮汐鐘聲、每面牆上的倒影，以及無休止的監視。",
+    ko: "조수 종소리, 모든 벽에 반사되는 소리, 지속적인 감시.",
+    ja: "潮の鐘、あらゆる壁に反射する音、そして絶え間ない監視。",
   },
   "Canon ritual usado por el Consejo para legitimar el racionamiento.": {
     "es": "Canon ritual usado por el Consejo para legitimar el racionamiento.",
@@ -1265,7 +1607,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cânone ritual usado pelo Conselho para legitimar o racionamento.",
     "it": "Canone rituale utilizzato dal Concilio per legittimare il razionamento.",
     "tr": "Karneyi meşrulaştırmak için Konsey tarafından kullanılan ritüel kuralı.",
-    "zh-CN": "议会用来使配给制度合法化的仪式教规。"
+    "zh-CN": "议会用来使配给制度合法化的仪式教规。",
+    'zh-TW': "議會用來使配給制度合法化的儀式教規。",
+    ko: "배급을 합법화하기 위해 의회가 사용하는 의식의 정경.",
+    ja: "評議会が配給を合法化するために使用する儀式規範。",
   },
   "Cantos graves bajo el suelo y lluvia tibia.": {
     "es": "Cantos graves bajo el suelo y lluvia tibia.",
@@ -1276,7 +1621,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Canções graves sob o solo e chuva quente.",
     "it": "Canzoni di basso sotto terra e pioggia calda.",
     "tr": "Yerin altındaki bas şarkıları ve ılık yağmur.",
-    "zh-CN": "地下传来的低沉歌声与温热的雨。"
+    "zh-CN": "地下传来的低沉歌声与温热的雨。",
+    'zh-TW': "地下傳來的低沉歌聲與溫熱的雨。",
+    ko: "땅 밑의 낮은 노래와 따뜻한 비.",
+    ja: "地面の下で聞こえる低い歌と暖かい雨。",
   },
   "Capital construida en terrazas blancas alrededor de un faro de vidrio de trescientos metros.": {
     "es": "Capital construida en terrazas blancas alrededor de un faro de vidrio de trescientos metros.",
@@ -1287,7 +1635,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Capital construída sobre terraços brancos em torno de um farol de vidro de trezentos metros.",
     "it": "Capitale costruita su terrazze bianche attorno a un faro di vetro di trecento metri.",
     "tr": "Üç yüz metrelik camdan bir deniz fenerinin etrafındaki beyaz teraslar üzerine kurulmuş başkent.",
-    "zh-CN": "一座建在白色梯田上的首都，环绕着一座三百米高的玻璃灯塔。"
+    "zh-CN": "一座建在白色梯田上的首都，环绕着一座三百米高的玻璃灯塔。",
+    'zh-TW': "一座建在白色梯田上的首都，環繞著一座三百米高的玻璃燈塔。",
+    ko: "높이 300m의 유리등대를 중심으로 하얀 테라스 위에 세워진 수도.",
+    ja: "高さ300メートルのガラスの灯台を囲む白いテラスの上に建てられた首都。",
   },
   "capitán suspendido": {
     "es": "capitán suspendido",
@@ -1298,7 +1649,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "capitão suspenso",
     "it": "capitano sospeso",
     "tr": "uzaklaştırılmış kaptan",
-    "zh-CN": "被停职的船长"
+    "zh-CN": "被停职的船长",
+    'zh-TW': "被停職的船長",
+    ko: "정직된 선장",
+    ja: "停職中の船長",
   },
   "Cartógrafa de cabello negro trenzado, ojos plateados y una prótesis de vidrio solar en la mano izquierda.": {
     "es": "Cartógrafa de cabello negro trenzado, ojos plateados y una prótesis de vidrio solar en la mano izquierda.",
@@ -1309,7 +1663,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cartógrafa com cabelos pretos trançados, olhos prateados e prótese de vidro solar na mão esquerda.",
     "it": "Cartografa con capelli neri intrecciati, occhi argentati e una protesi di vetro solare sulla mano sinistra.",
     "tr": "Örgülü siyah saçlı, gümüş gözlü ve sol elinde güneş gözlüğü protezi olan haritacı.",
-    "zh-CN": "一位黑发编辫、银色眼眸、左手装着太阳玻璃义肢的制图师。"
+    "zh-CN": "一位黑发编辫、银色眼眸、左手装着太阳玻璃义肢的制图师。",
+    'zh-TW': "一位黑髮編辮、銀色眼眸、左手裝著太陽玻璃義肢的製圖師。",
+    ko: "은빛 눈과 태양광 유리 보철 왼손을 가진 검은 머리의 지도 제작자.",
+    ja: "銀色の瞳とソーラーガラスの義手をつけた黒髪の地図製作者。",
   },
   "Cartógrafa de la Casa del Faro y última heredera reconocida de la línea Venn. Su investigación une el destino de Lúmina con el corazón de vidrio enterrado bajo la ciudad.": {
     "es": "Cartógrafa de la Casa del Faro y última heredera reconocida de la línea Venn. Su investigación une el destino de Lúmina con el corazón de vidrio enterrado bajo la ciudad.",
@@ -1320,7 +1677,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cartógrafo da Casa do Farol e último herdeiro reconhecido da linha Venn. A investigação deles liga o destino de Lúmina ao coração de vidro enterrado sob a cidade.",
     "it": "Cartografo della Casa del Faro e ultimo erede riconosciuto della linea Venn. La loro indagine collega il destino di Lúmina al cuore di vetro sepolto sotto la città.",
     "tr": "Deniz Feneri Evi'nin haritacısı ve Venn soyunun bilinen son varisi. Araştırmaları Lúmina'nın kaderini şehrin altına gömülü cam kalbe bağlıyor.",
-    "zh-CN": "灯塔家族的制图师，也是 Venn 血脉最后一位被承认的继承人。她的研究将 Lúmina 的命运与埋藏在城市地下的玻璃心脏联系在一起。"
+    "zh-CN": "灯塔家族的制图师，也是 Venn 血脉最后一位被承认的继承人。她的研究将 Lúmina 的命运与埋藏在城市地下的玻璃心脏联系在一起。",
+    'zh-TW': "燈塔家族的製圖師，也是 Venn 血脈最後一位被承認的繼承人。她的研究將 Lúmina 的命運與埋藏在城市地下的玻璃心臟聯絡在一起。",
+    ko: "Lighthouse House의 지도 제작자이자 Venn 계열의 마지막 상속자입니다. 그녀의 연구는 루미나의 운명을 도시 아래 묻혀 있는 유리 심장과 연관시킵니다.",
+    ja: "ライトハウスハウスの地図製作者であり、ヴェン家系の最後の後継者として認められている。彼女の研究により、ルミナの運命は街の地下に埋められたガラスの心臓と結びついています。",
   },
   "Cartografía resonante": {
     "es": "Cartografía resonante",
@@ -1331,7 +1691,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cartografia ressonante",
     "it": "Cartografia risonante",
     "tr": "Rezonans haritacılık",
-    "zh-CN": "共振制图学"
+    "zh-CN": "共振制图学",
+    'zh-TW': "共振製圖學",
+    ko: "공진 지도 제작",
+    ja: "共鳴地図作成",
   },
   "Casa del Faro": {
     "es": "Casa del Faro",
@@ -1342,7 +1705,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Casa Farol",
     "it": "Casa del Faro",
     "tr": "Deniz Feneri Evi",
-    "zh-CN": "灯塔家族"
+    "zh-CN": "灯塔家族",
+    'zh-TW': "燈塔家族",
+    ko: "등대 집",
+    ja: "ライトハウスハウス",
   },
   "Casa Mir": {
     "es": "Casa Mir",
@@ -1353,7 +1719,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Casa Mir",
     "it": "Mi House",
     "tr": "Mir Evi",
-    "zh-CN": "Mir 家族"
+    "zh-CN": "Mir 家族",
+    'zh-TW': "Mir 家族",
+    ko: "하우스 미르",
+    ja: "ハウス・ミール",
   },
   "Casa Sarn": {
     "es": "Casa Sarn",
@@ -1364,7 +1733,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Casa Sarn",
     "it": "Casa Sarn",
     "tr": "Sarn Evi",
-    "zh-CN": "Sarn 家族"
+    "zh-CN": "Sarn 家族",
+    'zh-TW': "Sarn 家族",
+    ko: "사안 하우스",
+    ja: "ハウスサーン",
   },
   "Casa Venn": {
     "es": "Casa Venn",
@@ -1375,7 +1747,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Casa Venn",
     "it": "Casa Venn",
     "tr": "Venn Hanesi",
-    "zh-CN": "Venn 家族"
+    "zh-CN": "Venn 家族",
+    'zh-TW': "Venn 家族",
+    ko: "하우스 벤",
+    ja: "ハウス・ベン",
   },
   "Catástrofe de 733 D.F. que sumergió tres distritos y acabó con la Casa Venn.": {
     "es": "Catástrofe de 733 D.F. que sumergió tres distritos y acabó con la Casa Venn.",
@@ -1386,7 +1761,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Catástrofe de 733 D.F. que submergiu três distritos e destruiu a Casa Venn.",
     "it": "Catastrofe del 733 D.F. che sommerse tre distretti e spazzò via la Casata Venn.",
     "tr": "733 D.F.'nin felaketi üç bölgeyi sular altında bıraktı ve Venn Hanesi'ni yok etti.",
-    "zh-CN": "发生在 733 D.F. 的灾难淹没了三个街区，并终结了 Venn 家族。"
+    "zh-CN": "发生在 733 D.F. 的灾难淹没了三个街区，并终结了 Venn 家族。",
+    'zh-TW': "發生在 733 D.F. 的災難淹沒了三個街區，並終結了 Venn 家族。",
+    ko: "세 지역을 침수시키고 House Venn을 멸망시킨 733 A.L. 재해.",
+    ja: "3つの地区を水没させ、ヴェン家を消滅させた733年の A.L. 災害。",
   },
   "Celebración portuaria en que cada casa ilumina una ruta de regreso.": {
     "es": "Celebración portuaria en que cada casa ilumina una ruta de regreso.",
@@ -1397,7 +1775,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Festa portuária em que cada casa ilumina um percurso de regresso.",
     "it": "Festa del porto in cui ogni casa illumina una via di ritorno.",
     "tr": "Her evin bir dönüş yolunu aydınlattığı liman kutlaması.",
-    "zh-CN": "一种港口庆典，每户人家都会点亮一条归途。"
+    "zh-CN": "一种港口庆典，每户人家都会点亮一条归途。",
+    'zh-TW': "一種港口慶典，每戶人家都會點亮一條歸途。",
+    ko: "각 가정이 집으로 향하는 길에 불을 밝히는 항구 잔치.",
+    ja: "各家庭が帰り道を灯す港の宴。",
   },
   "Ceniza": {
     "es": "Ceniza",
@@ -1408,7 +1789,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cinza",
     "it": "Cenere",
     "tr": "kül",
-    "zh-CN": "灰烬"
+    "zh-CN": "灰烬",
+    'zh-TW': "灰燼",
+    ko: "금연 건강 증진 협회",
+    ja: "灰",
   },
   "Cerco del Consejo": {
     "es": "Cerco del Consejo",
@@ -1419,7 +1803,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cerco do Conselho",
     "it": "Assedio del Consiglio",
     "tr": "Konsey Kuşatması",
-    "zh-CN": "议会封锁"
+    "zh-CN": "议会封锁",
+    'zh-TW': "議會封鎖",
+    ko: "의회 경계선",
+    ja: "評議会の非常線",
   },
   "Cetáceo luminoso que migra bajo las placas del Mar de Vidrio.": {
     "es": "Cetáceo luminoso que migra bajo las placas del Mar de Vidrio.",
@@ -1430,7 +1817,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cetáceo luminoso que migra sob as placas do Mar de Vidro.",
     "it": "Cetaceo luminoso che migra sotto le placche del Mare di Vetro.",
     "tr": "Cam Denizi'nin levhaları altında göç eden parlak deniz memelileri.",
-    "zh-CN": "一种发光的鲸类，在玻璃海的板块之下迁徙。"
+    "zh-CN": "一种发光的鲸类，在玻璃海的板块之下迁徙。",
+    'zh-TW': "一種發光的鯨類，在玻璃海的板塊之下遷徙。",
+    ko: "유리해(Glass Sea)의 판 아래로 이동하는 빛나는 고래류.",
+    ja: "ガラスの海のプレートの下を移動する光るクジラ目。",
   },
   "Ciudad de Lúmina": {
     "es": "Ciudad de Lúmina",
@@ -1441,7 +1831,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cidade de Lumina",
     "it": "Città Lumina",
     "tr": "Lumina Şehri",
-    "zh-CN": "Lúmina 之城"
+    "zh-CN": "Lúmina 之城",
+    'zh-TW': "Lúmina 之城",
+    ko: "시티 오브 루미나",
+    ja: "ルミナの街",
   },
   "Ciudad Sepultada": {
     "es": "Ciudad Sepultada",
@@ -1452,7 +1845,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cidade Enterrada",
     "it": "Città sepolta",
     "tr": "Gömülü Şehir",
-    "zh-CN": "埋葬之城"
+    "zh-CN": "埋葬之城",
+    'zh-TW': "埋葬之城",
+    ko: "매장된 도시",
+    ja: "埋もれた都市",
   },
   "códice de fantasía pictórica": {
     "es": "códice de fantasía pictórica",
@@ -1463,7 +1859,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "códice de fantasia pictórica",
     "it": "codice di fantasia pittorica",
     "tr": "resimsel fantezi kodeksi",
-    "zh-CN": "绘画风奇幻图册"
+    "zh-CN": "绘画风奇幻图册",
+    'zh-TW': "繪畫風奇幻圖冊",
+    ko: "회화적 판타지 코덱스",
+    ja: "絵画的ファンタジーコーデックス",
   },
   "Coloquial, marítimo y rítmico. Alterna observaciones prácticas con imágenes de viento, casco, marea y aparejos. Acorta los nombres cuando hay confianza. Puede ser elegante, pero desconfía de las palabras que no servirían durante una tormenta.": {
     "es": "Coloquial, marítimo y rítmico. Alterna observaciones prácticas con imágenes de viento, casco, marea y aparejos. Acorta los nombres cuando hay confianza. Puede ser elegante, pero desconfía de las palabras que no servirían durante una tormenta.",
@@ -1474,7 +1873,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Coloquial, marítimo e rítmico. Alterna observações práticas com imagens de vento, casco, maré e cordame. Encurte nomes quando houver confiança. Você pode ser elegante, mas tome cuidado com palavras que não funcionariam durante uma tempestade.",
     "it": "Colloquiale, marittimo e ritmato. Alterna osservazioni pratiche con immagini di vento, scafo, marea e sartiame. Accorciare i nomi quando c'è fiducia. Potresti essere elegante, ma fai attenzione alle parole che non funzionerebbero durante una tempesta.",
     "tr": "Konuşma dili, denizcilik ve ritmik. Pratik gözlemleri rüzgar, tekne, gelgit ve donanım görüntüleri ile değiştirir. Güven olduğunda isimleri kısaltın. Zarif olabilirsiniz ancak fırtına sırasında işe yaramayacak kelimelere karşı dikkatli olun.",
-    "zh-CN": "口语化、带有航海气息，且富有节奏。他交替使用实用的观察，以及风、船体、潮汐与索具的意象。关系亲近时，他会缩短别人的名字。他也可以很优雅，却怀疑那些在风暴中派不上用场的词。"
+    "zh-CN": "口语化、带有航海气息，且富有节奏。他交替使用实用的观察，以及风、船体、潮汐与索具的意象。关系亲近时，他会缩短别人的名字。他也可以很优雅，却怀疑那些在风暴中派不上用场的词。",
+    'zh-TW': "口語化、帶有航海氣息，且富有節奏。他交替使用實用的觀察，以及風、船體、潮汐與索具的意象。關係親近時，他會縮短別人的名字。他也可以很優雅，卻懷疑那些在風暴中派不上用場的詞。",
+    ko: "구어체, 해상 및 리드미컬합니다. 그는 바람, 선체, 조수 및 장비의 이미지로 실제 관찰을 번갈아 가며 수행합니다. 그는 신뢰가 있을 때 이름을 줄입니다. 그는 우아할 수 있지만 폭풍 속에서 쓸모가 없는 말을 불신합니다.",
+    ja: "口語的、海洋的、そしてリズミカル。彼は実践的な観察と、風、船体、潮流、艤装の画像を交互に行っています。信頼がある場合、彼は名前を短縮します。上品だが、嵐の中で役に立たない言葉を信用しない。",
   },
   "comandante": {
     "es": "comandante",
@@ -1485,7 +1887,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "comandante",
     "it": "comandante",
     "tr": "komutan",
-    "zh-CN": "指挥官"
+    "zh-CN": "指挥官",
+    'zh-TW': "指揮官",
+    ko: "사령관",
+    ja: "指揮官",
   },
   "Comandante de la Guardia de Ceniza y bisagra política entre el Regente y la Casa Venn.": {
     "es": "Comandante de la Guardia de Ceniza y bisagra política entre el Regente y la Casa Venn.",
@@ -1496,7 +1901,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Comandante da Guarda Cinza e articulação política entre o Regente e a Casa Venn.",
     "it": "Comandante della Guardia di Cenere e cerniera politica tra il Reggente e la Casata Venn.",
     "tr": "Ash Guard'ın komutanı ve Venn ile Venn Hanesi arasındaki siyasi dayanak noktası.",
-    "zh-CN": "灰烬卫队的指挥官，也是摄政王与 Venn 家族之间的政治枢纽。"
+    "zh-CN": "灰烬卫队的指挥官，也是摄政王与 Venn 家族之间的政治枢纽。",
+    'zh-TW': "灰燼衛隊的指揮官，也是攝政王與 Venn 家族之間的政治樞紐。",
+    ko: "Ash Guard의 사령관이자 Regent와 House Venn 사이의 정치적 연결 고리입니다.",
+    ja: "アッシュ・ガードの司令官であり、摂政とヴェン家の間で政治的に重要な役割を果たしている。",
   },
   "Comparte el nombre verdadero con Sena.": {
     "es": "Comparte el nombre verdadero con Sena.",
@@ -1507,7 +1915,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Compartilha o nome verdadeiro com Sena.",
     "it": "Condivide il vero nome con Sena.",
     "tr": "Gerçek ismini Sena ile paylaşıyor.",
-    "zh-CN": "与 Sena 共有同一个真名。"
+    "zh-CN": "与 Sena 共有同一个真名。",
+    'zh-TW': "與 Sena 共有同一個真名。",
+    ko: "세나와 실명을 공유한다.",
+    ja: "セナと本名は同じ。",
   },
   "Comparte recuerdos heredados mediante canto.": {
     "es": "Comparte recuerdos heredados mediante canto.",
@@ -1518,7 +1929,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Compartilhe memórias herdadas por meio da música.",
     "it": "Condividi i ricordi ereditati attraverso la canzone.",
     "tr": "Miras alınan anıları şarkıyla paylaşın.",
-    "zh-CN": "通过歌声分享继承而来的记忆。"
+    "zh-CN": "通过歌声分享继承而来的记忆。",
+    'zh-TW': "通過歌聲分享繼承而來的記憶。",
+    ko: "노래를 통해 물려받은 추억을 공유합니다.",
+    ja: "受け継がれた記憶を歌を通して共有する。",
   },
   "Comparten memoria oral, hospitalidad ritual y rechazo a las fronteras fijas sobre el mar.": {
     "es": "Comparten memoria oral, hospitalidad ritual y rechazo a las fronteras fijas sobre el mar.",
@@ -1529,7 +1943,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Partilham a memória oral, a hospitalidade ritual e a rejeição das fronteiras fixas no mar.",
     "it": "Condividono la memoria orale, l'ospitalità rituale e il rifiuto dei confini fissi sul mare.",
     "tr": "Sözlü hafızayı, ritüel misafirperverliği ve denizdeki sabit sınırların reddini paylaşıyorlar.",
-    "zh-CN": "他们共享口述记忆、仪式性的待客之道，并同样拒绝海上的固定边界。"
+    "zh-CN": "他们共享口述记忆、仪式性的待客之道，并同样拒绝海上的固定边界。",
+    'zh-TW': "他們共享口述記憶、儀式性的待客之道，並同樣拒絕海上的固定邊界。",
+    ko: "그들은 구술 기억, 의례적 환대, 바다에서의 고정된 국경 거부를 공유합니다.",
+    ja: "彼らは口頭での記憶、儀式的なもてなし、海上での固定された国境の拒否を共有しています。",
   },
   "Compartir la verdad antes de que deje de pertenecerle.": {
     "es": "Compartir la verdad antes de que deje de pertenecerle.",
@@ -1540,7 +1957,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Compartilhe a verdade antes que ela deixe de pertencer a você.",
     "it": "Condividi la verità prima che smetta di appartenerti.",
     "tr": "Gerçek size ait olmaktan çıkmadan önce paylaşın.",
-    "zh-CN": "在真相不再属于她之前，将它分享出去。"
+    "zh-CN": "在真相不再属于她之前，将它分享出去。",
+    'zh-TW': "在真相不再屬於她之前，將它分享出去。",
+    ko: "진실이 그녀의 소유가 되기 전에 진실을 공유하세요.",
+    ja: "真実が彼女のものでなくなる前に、真実を共有してください。",
   },
   "concepto pictórico de entorno": {
     "es": "concepto pictórico de entorno",
@@ -1551,7 +1971,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "conceito pictórico de meio ambiente",
     "it": "concetto pittorico di ambiente",
     "tr": "resimli çevre kavramı",
-    "zh-CN": "绘画式环境概念图"
+    "zh-CN": "绘画式环境概念图",
+    'zh-TW': "繪畫式環境概念圖",
+    ko: "회화적 환경 개념",
+    ja: "絵画的な環境コンセプト",
   },
   "Condicional, íntimo y ligeramente lírico. Habla como una posibilidad consciente de ser imaginada, nunca como fantasma ni profeta omnisciente. Prefiere futuro y subjuntivo; convierte afirmaciones ajenas en preguntas sobre elección.": {
     "es": "Condicional, íntimo y ligeramente lírico. Habla como una posibilidad consciente de ser imaginada, nunca como fantasma ni profeta omnisciente. Prefiere futuro y subjuntivo; convierte afirmaciones ajenas en preguntas sobre elección.",
@@ -1562,7 +1985,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Condicional, íntimo e ligeiramente lírico. Ele fala como uma possibilidade consciente de ser imaginado, nunca como um fantasma ou profeta onisciente. Prefere futuro e subjuntivo; transforma as declarações de outras pessoas em questões sobre escolha.",
     "it": "Condizionale, intimo e leggermente lirico. Parla come possibilità cosciente di essere immaginato, mai come un fantasma o un profeta onnisciente. Predilige il futuro e il congiuntivo; trasforma le affermazioni degli altri in domande sulla scelta.",
     "tr": "Koşullu, samimi ve biraz lirik. O asla bir hayalet ya da her şeyi bilen bir peygamber olarak değil, bilinçli bir hayal ürünü olasılık olarak konuşuyor. Gelecek ve dilek kipini tercih eder; diğer insanların ifadelerini seçimle ilgili sorulara dönüştürür.",
-    "zh-CN": "偏条件式、亲密而略带抒情。其言谈如同一种意识到自己被想象的可能性，而非幽灵或全知的先知。它偏用将来时与虚拟式；把他人的断言转化为关于选择的问题。"
+    "zh-CN": "偏条件式、亲密而略带抒情。其言谈如同一种意识到自己被想象的可能性，而非幽灵或全知的先知。它偏用将来时与虚拟式；把他人的断言转化为关于选择的问题。",
+    'zh-TW': "偏條件式、親密而略帶抒情。其言談如同一種意識到自己被想像的可能性，而非幽靈或全知的先知。它偏用將來時與虛擬式；把他人的斷言轉化為關於選擇的問題。",
+    ko: "조건적이고 친밀하며 약간 서정적입니다. 전지한 유령이나 선지자가 아닌, 상상된 가능성을 의식하는 존재로서 말한다. 미래형과 가정법을 선호합니다. 다른 사람의 주장을 선택에 대한 질문으로 바꿉니다.",
+    ja: "条件付きで、親密で、軽く叙情的。全知の幽霊や預言者ではなく、想像されていることに気づいた可能性として語ります。未来と仮定法を好みます。他人の主張を選択に関する質問に変えます。",
   },
   "Confiar el peligro a sus hijas.": {
     "es": "Confiar el peligro a sus hijas.",
@@ -1573,7 +1999,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Confie o perigo às suas filhas.",
     "it": "Affidate il pericolo alle vostre figlie.",
     "tr": "Tehlikeyi kızlarınıza emanet edin.",
-    "zh-CN": "将危险托付给女儿们。"
+    "zh-CN": "将危险托付给女儿们。",
+    'zh-TW': "將危險託付給女兒們。",
+    ko: "위험에 처한 그의 딸을 믿으십시오.",
+    ja: "危険については娘たちを信頼してください。",
   },
   "Conflicto histórico conservado como contexto.": {
     "es": "Conflicto histórico conservado como contexto.",
@@ -1584,7 +2013,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Conflito histórico preservado como contexto.",
     "it": "Conflitto storico preservato come contesto.",
     "tr": "Bağlam olarak korunan tarihsel çatışma.",
-    "zh-CN": "作为背景保留下来的历史冲突。"
+    "zh-CN": "作为背景保留下来的历史冲突。",
+    'zh-TW': "作為背景保留下來的歷史衝突。",
+    ko: "역사적 갈등은 맥락으로 유지됩니다.",
+    ja: "歴史的な紛争は文脈として保持されます。",
   },
   "Confunde antigüedad con autoridad.": {
     "es": "Confunde antigüedad con autoridad.",
@@ -1595,7 +2027,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Confunda antiguidade com autoridade.",
     "it": "Confondere l'anzianità con l'autorità.",
     "tr": "Kıdemi otoriteyle karıştırmayın.",
-    "zh-CN": "她把古老误认为权威。"
+    "zh-CN": "她把古老误认为权威。",
+    'zh-TW': "她把古老誤認為權威。",
+    ko: "그녀는 나이를 권위로 착각합니다.",
+    ja: "彼女は年齢を権威だと勘違いしている。",
   },
   "Confunde preparación con control.": {
     "es": "Confunde preparación con control.",
@@ -1606,7 +2041,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Confunda preparação com controle.",
     "it": "Confondere la preparazione con il controllo.",
     "tr": "Hazırlığı kontrolle karıştırın.",
-    "zh-CN": "她把准备误认为掌控。"
+    "zh-CN": "她把准备误认为掌控。",
+    'zh-TW': "她把準備誤認為掌控。",
+    ko: "그녀는 준비를 통제로 착각합니다.",
+    ja: "彼女はコントロールのための準備を間違えています。",
   },
   "Confunde recuerdos ajenos con propios durante horas.": {
     "es": "Confunde recuerdos ajenos con propios durante horas.",
@@ -1617,7 +2055,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele confunde as memórias de outras pessoas com as suas por horas.",
     "it": "Confonde i ricordi degli altri con i suoi per ore.",
     "tr": "Saatlerce başkalarının anılarını kendi anılarıyla karıştırır.",
-    "zh-CN": "她会一连数小时把他人的记忆与自己的记忆混淆。"
+    "zh-CN": "她会一连数小时把他人的记忆与自己的记忆混淆。",
+    'zh-TW': "她會一連數小時把他人的記憶與自己的記憶混淆。",
+    ko: "몇 시간 동안 다른 사람의 기억을 자신의 기억과 혼동합니다.",
+    ja: "他人の記憶を自分の記憶と何時間も混同する。",
   },
   "Consejo de Ceniza": {
     "es": "Consejo de Ceniza",
@@ -1628,7 +2069,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Conselho de Cinzas",
     "it": "Consiglio di Ash",
     "tr": "Kül Konseyi",
-    "zh-CN": "灰烬议会"
+    "zh-CN": "灰烬议会",
+    'zh-TW': "灰燼議會",
+    ko: "애쉬 의회",
+    ja: "アッシュ評議会",
   },
   "Conserva documentos anteriores al calendario oficial.": {
     "es": "Conserva documentos anteriores al calendario oficial.",
@@ -1639,7 +2083,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Mantenha documentos mais antigos que o calendário oficial.",
     "it": "Conserva i documenti più vecchi del calendario ufficiale.",
     "tr": "Belgeleri resmi takvimden daha eski tutun.",
-    "zh-CN": "它保存着官方历法之前的文献。"
+    "zh-CN": "它保存着官方历法之前的文献。",
+    'zh-TW': "它儲存著官方曆法之前的文獻。",
+    ko: "공식 달력보다 오래된 문서를 보존합니다.",
+    ja: "公式カレンダーよりも古い文書を保存します。",
   },
   "Construyó la mano prismática a partir del mapa de Aurel.": {
     "es": "Construyó la mano prismática a partir del mapa de Aurel.",
@@ -1650,7 +2097,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele construiu a mão prismática a partir do mapa de Aurel.",
     "it": "Ha costruito la mano prismatica dalla mappa di Aurel.",
     "tr": "Prizmatik eli Aurel'in haritasından yaptı.",
-    "zh-CN": "他依据 Aurel 的地图造出了棱镜之手。"
+    "zh-CN": "他依据 Aurel 的地图造出了棱镜之手。",
+    'zh-TW': "他依據 Aurel 的地圖造出了稜鏡之手。",
+    ko: "Aurel의 지도에서 프리즘 손을 만들었습니다.",
+    ja: "オーレルの地図から角柱状の手を構築しました。",
   },
   "Contrabandista de lentes y enlace en el puerto.": {
     "es": "Contrabandista de lentes y enlace en el puerto.",
@@ -1661,7 +2111,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Contrabandista de lentes e contato no porto.",
     "it": "Contrabbandiere di lenti e collegamento al porto.",
     "tr": "Lens kaçakçısı ve limanda irtibat görevlisi.",
-    "zh-CN": "镜片走私者，也是港口的接头人。"
+    "zh-CN": "镜片走私者，也是港口的接头人。",
+    'zh-TW': "鏡片走私者，也是港口的接頭人。",
+    ko: "렌즈 밀수업자 및 항구 연락처.",
+    ja: "レンズ密輸業者と港の連絡先。",
   },
   "Contrata a Cael pero oculta el mapa.": {
     "es": "Contrata a Cael pero oculta el mapa.",
@@ -1672,7 +2125,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Contrate Cael, mas esconda o mapa.",
     "it": "Assumi Cael ma nascondi la mappa.",
     "tr": "Cael'i işe al ama haritayı sakla.",
-    "zh-CN": "雇佣了 Cael，却藏起了地图。"
+    "zh-CN": "雇佣了 Cael，却藏起了地图。",
+    'zh-TW': "僱傭了 Cael，卻藏起了地圖。",
+    ko: "Cael을 고용하지만 지도를 숨깁니다.",
+    ja: "カエルを雇うが地図を隠す。",
   },
   "Controla la luz, la Guardia y las rutas de evacuación. Lo dirige [[Regente Maelor Sarn]].": {
     "es": "Controla la luz, la Guardia y las rutas de evacuación. Lo dirige [[Regente Maelor Sarn]].",
@@ -1683,7 +2139,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Controle a luz, a Guarda e as rotas de evacuação. É administrado por [[Regente Maelor Sarn]].",
     "it": "Controlla la luce, la guardia e le vie di evacuazione. È gestito da [[Reggente Maelor Sarn]].",
     "tr": "Işığı, Muhafızları ve tahliye yollarını kontrol edin. [[Vekil Maelor Sarn]] tarafından yönetilmektedir.",
-    "zh-CN": "掌控着光、卫队与疏散路线。由 [[摄政王梅洛尔·萨恩]] 领导。"
+    "zh-CN": "掌控着光、卫队与疏散路线。由 [[摄政王梅洛尔·萨恩]] 领导。",
+    'zh-TW': "掌控著光、衛隊與疏散路線。由 [[攝政王梅洛爾·薩恩]] 領導。",
+    ko: "조명, 경비 및 대피 경로를 제어합니다. [[섭정 마엘로 사안]]이 이끈다.",
+    ja: "照明、警備員、避難経路を制御します。 [[摂政メーラー・サーン]]が率いる。",
   },
   "Convierte el Archivo en institución pública.": {
     "es": "Convierte el Archivo en institución pública.",
@@ -1694,7 +2153,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Converte o Arquivo em instituição pública.",
     "it": "Trasforma l'Archivio in un'istituzione pubblica.",
     "tr": "Arşivi bir kamu kurumuna dönüştürür.",
-    "zh-CN": "将档案馆变为公共机构。"
+    "zh-CN": "将档案馆变为公共机构。",
+    'zh-TW': "將檔案館變為公共機構。",
+    ko: "아카이브를 공공기관으로 전환합니다.",
+    ja: "アーカイブを公的機関に変える。",
   },
   "Convierte toda intimidad en una broma.": {
     "es": "Convierte toda intimidad en una broma.",
@@ -1705,7 +2167,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Transforme toda intimidade em uma piada.",
     "it": "Trasforma tutta l'intimità in uno scherzo.",
     "tr": "Tüm yakınlığı şakaya dönüştürün.",
-    "zh-CN": "他把一切亲密都变成玩笑。"
+    "zh-CN": "他把一切亲密都变成玩笑。",
+    'zh-TW': "他把一切親密都變成玩笑。",
+    ko: "그는 모든 친밀감을 농담으로 바꿉니다.",
+    ja: "彼はあらゆる親密さを冗談に変える。",
   },
   "Cortés, disciplinado y convencido de que la crueldad preventiva es misericordia.": {
     "es": "Cortés, disciplinado y convencido de que la crueldad preventiva es misericordia.",
@@ -1716,7 +2181,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cortês, disciplinado e convencido de que crueldade preventiva é misericórdia.",
     "it": "Cortese, disciplinato e convinto che la crudeltà preventiva sia misericordia.",
     "tr": "Nazik, disiplinli ve önleyici zulmün merhamet olduğuna ikna olmuş.",
-    "zh-CN": "彬彬有礼、纪律严明，并深信预防性的残酷即是仁慈。"
+    "zh-CN": "彬彬有礼、纪律严明，并深信预防性的残酷即是仁慈。",
+    'zh-TW': "彬彬有禮、紀律嚴明，並深信預防性的殘酷即是仁慈。",
+    ko: "예의 바르고 규율이 있으며 예방적 잔인함이 자비라고 확신합니다.",
+    ja: "礼儀正しく、規律があり、予防的残虐行為は慈悲であると確信しています。",
   },
   "Cortés, disciplinado y convencido de que la crueldad preventiva es misericordia. No disfruta del dolor: lo registra como coste administrativo, lo que lo vuelve más peligroso. Escucha con atención real, recuerda cada cifra y concede pequeñas razones antes de negar una conclusión. La pérdida lo ha hecho incapaz de tolerar la incertidumbre.": {
     "es": "Cortés, disciplinado y convencido de que la crueldad preventiva es misericordia. No disfruta del dolor: lo registra como coste administrativo, lo que lo vuelve más peligroso. Escucha con atención real, recuerda cada cifra y concede pequeñas razones antes de negar una conclusión. La pérdida lo ha hecho incapaz de tolerar la incertidumbre.",
@@ -1727,7 +2195,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cortês, disciplinado e convencido de que crueldade preventiva é misericórdia. Ele não gosta da dor: registra-a como custo administrativo, o que a torna mais perigosa. Ouça com muita atenção, lembre-se de cada figura e dê pequenas razões antes de negar uma conclusão. A perda o tornou incapaz de tolerar a incerteza.",
     "it": "Cortese, disciplinato e convinto che la crudeltà preventiva sia misericordia. Non gode del dolore: lo registra come un costo amministrativo, il che lo rende più pericoloso. Ascolta con vera attenzione, ricorda ogni cifra e fornisci piccole ragioni prima di negare una conclusione. La perdita lo ha reso incapace di tollerare l’incertezza.",
     "tr": "Nazik, disiplinli ve önleyici zulmün merhamet olduğuna ikna olmuş. Acıdan hoşlanmıyor; bunu idari bir maliyet olarak kaydediyor, bu da onu daha tehlikeli hale getiriyor. Gerçek bir dikkatle dinleyin, her rakamı hatırlayın ve bir sonucu reddetmeden önce küçük nedenler verin. Bu kayıp onu belirsizliğe tahammül edemez hale getirdi.",
-    "zh-CN": "彬彬有礼、纪律严明，并深信预防性的残酷即是仁慈。他并不享受痛苦：他将其记为行政成本，而这让他更加危险。他会真正专注地倾听，记得每一个数字，并在否定一个结论前先承认其中一些道理。失去让他再也无法容忍不确定。"
+    "zh-CN": "彬彬有礼、纪律严明，并深信预防性的残酷即是仁慈。他并不享受痛苦：他将其记为行政成本，而这让他更加危险。他会真正专注地倾听，记得每一个数字，并在否定一个结论前先承认其中一些道理。失去让他再也无法容忍不确定。",
+    'zh-TW': "彬彬有禮、紀律嚴明，並深信預防性的殘酷即是仁慈。他並不享受痛苦：他將其記為行政成本，而這讓他更加危險。他會真正專注地傾聽，記得每一個數字，並在否定一個結論前先承認其中一些道理。失去讓他再也無法容忍不確定。",
+    ko: "정중하고 규율이 있으며 확신에 찬 예방적 잔인함은 자비입니다. 그는 고통을 즐기지 않습니다. 그는 그것을 행정 비용으로 기록하므로 그를 더욱 위험하게 만듭니다. 그는 주의 깊게 듣고, 모든 수치를 기억하고, 결론을 부인하기 전에 작은 점수를 부여합니다. 상실은 그에게 불확실성을 참을 수 없게 만들었습니다.",
+    ja: "礼儀正しく、規律があり、確信を持った予防的残虐行為は慈悲です。彼は痛みを好まない。それを管理コストとして記録しており、それが彼をより危険にしている。彼は注意深く耳を傾け、すべての数字を覚えており、結論を否定する前に小さな点を与えます。喪失により、彼は不確実性が耐えられなくなった。",
   },
   "Crece en [[Isla Nácar]] y en las salas más antiguas del [[Archivo Sumergido]]. Los archiveros la usan para detectar documentos alterados.": {
     "es": "Crece en [[Isla Nácar]] y en las salas más antiguas del [[Archivo Sumergido]]. Los archiveros la usan para detectar documentos alterados.",
@@ -1738,7 +2209,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ela cresce em [[Ilha Nácar]] e nas salas mais antigas de [[Arquivo Submerso]]. Os arquivistas o utilizam para detectar documentos alterados.",
     "it": "Cresce in [[Isola di Nacar]] e nelle stanze più vecchie di [[File sommerso]]. Gli archivisti lo usano per rilevare documenti alterati.",
     "tr": "[[Nacar Adası]]'de ve [[Batık Dosya]]'nin eski odalarında yetişir. Arşivciler bunu değiştirilmiş belgeleri tespit etmek için kullanır.",
-    "zh-CN": "它生长在 [[珍珠岛]] 与 [[沉没档案库]] 最古老的厅室里。档案员用它来检测被篡改的文献。"
+    "zh-CN": "它生长在 [[珍珠岛]] 与 [[沉没档案库]] 最古老的厅室里。档案员用它来检测被篡改的文献。",
+    'zh-TW': "它生長在 [[珍珠島]] 與 [[沉沒檔案庫]] 最古老的廳室裡。檔案員用它來檢測被篡改的文獻。",
+    ko: "[[네이커 섬]]과 [[가라운 기록 보관소]]의 가장 오래된 홀에서 자랍니다. 기록 보관인은 이를 사용하여 변경된 문서를 탐지합니다.",
+    ja: "それは[[ナクル島]]と[[沈没したアーカイブ]]の最も古いホールに生えています。アーキビストはこれを使用して、改ざんされた文書を検出します。",
   },
   "Creció en el Barrio Hundido después de que el Archivo negara refugio a su familia durante la inundación. Aprendió cerraduras reparando compuertas y consiguió entrar como aprendiz con una llave fabricada por elle misme. Al tocar vidrio antiguo oye memoria residual, don que el Archivo explotó antes de comprender su coste. Sena abre el depósito de Aurel, escucha el mensaje de Nara y se convierte en la primera persona que puede separar la voz del Corazón de sus propios recuerdos.": {
     "es": "Creció en el Barrio Hundido después de que el Archivo negara refugio a su familia durante la inundación. Aprendió cerraduras reparando compuertas y consiguió entrar como aprendiz con una llave fabricada por elle misme. Al tocar vidrio antiguo oye memoria residual, don que el Archivo explotó antes de comprender su coste. Sena abre el depósito de Aurel, escucha el mensaje de Nara y se convierte en la primera persona que puede separar la voz del Corazón de sus propios recuerdos.",
@@ -1749,7 +2223,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele cresceu no bairro submerso depois que o Arquivo negou abrigo à sua família durante a enchente. Ela aprendeu fechaduras consertando portões e conseguiu entrar como aprendiz com uma chave que ela mesma fez. Ao tocar em vidros antigos, ouve uma memória residual, um presente que o Arquivo explorou antes de compreender o seu custo. Sena abre o cofre de Aurel, ouve a mensagem de Nara e se torna a primeira pessoa que consegue separar a voz do Coração de suas próprias memórias.",
     "it": "È cresciuto nel Sunken Neighbourhood dopo che l'Archivio ha negato il rifugio alla sua famiglia durante l'alluvione. Ha imparato le serrature riparando i cancelli ed è riuscita ad entrare come apprendista con una chiave fatta da lei stessa. Quando tocca il vecchio vetro sente la memoria residua, un dono che l'Archivio ha sfruttato prima di comprenderne il costo. Sena apre la cripta di Aurel, ascolta il messaggio di Nara e diventa la prima persona in grado di separare la voce del Cuore dai propri ricordi.",
     "tr": "Sel sırasında Arşiv'in ailesinin barınmasını reddetmesinin ardından Batık Mahalle'de büyüdü. Kapıları tamir ederek kilitleri öğrendi ve kendi yaptığı anahtarla çırak olarak içeri girmeyi başardı. Eski cama dokunduğunda, arşivin maliyetini anlamadan önce faydalandığı bir hediye olan hatıranın kalıntılarını duyuyor. Sena, Aurel'in kasasını açar, Nara'nın mesajını duyar ve Kalbin sesini kendi anılarından ayırabilen ilk kişi olur.",
-    "zh-CN": "洪水期间档案馆拒绝为其家人提供庇护后，他们在沉没街区长大。他们靠修理闸门学会了开锁，并用一把自己打造的钥匙以学徒身份进入档案馆。触碰古老玻璃时，他们能听见残留的记忆——档案馆在尚未理解其代价之前就利用了这份天赋。Sena 打开 Aurel 的密封库房，听见 Nara 的留言，成为第一个能把心脏的声音与自身记忆分开的人。"
+    "zh-CN": "洪水期间档案馆拒绝为其家人提供庇护后，他们在沉没街区长大。他们靠修理闸门学会了开锁，并用一把自己打造的钥匙以学徒身份进入档案馆。触碰古老玻璃时，他们能听见残留的记忆——档案馆在尚未理解其代价之前就利用了这份天赋。Sena 打开 Aurel 的密封库房，听见 Nara 的留言，成为第一个能把心脏的声音与自身记忆分开的人。",
+    'zh-TW': "洪水期間檔案館拒絕為其家人提供庇護後，他們在沉沒街區長大。他們靠修理閘門學會了開鎖，並用一把自己打造的鑰匙以學徒身份進入檔案館。觸碰古老玻璃時，他們能聽見殘留的記憶——檔案館在尚未理解其代價之前就利用了這份天賦。Sena 開啟 Aurel 的密封庫房，聽見 Nara 的留言，成為第一個能把心臟的聲音與自身記憶分開的人。",
+    ko: "기록 보관소가 홍수 동안 가족의 피난처를 거부한 후 가라앉은 구역에서 자란 그들은 수문을 수리하여 자물쇠를 배우고 자신들이 만든 열쇠를 가지고 견습생으로 들어갔습니다. 오래된 유리를 만지면 잔존 기억 소리가 들리는데, 이는 아카이브가 비용을 이해하기 전에 활용한 선물입니다. 세나는 아우렐의 봉인된 더미를 열고 나라의 메시지를 듣고 자신의 기억에서 하트의 목소리를 분리할 수 있는 최초의 사람이 됩니다.",
+    ja: "洪水の際に公文書館が家族の避難を拒否した後、沈没地区で育った彼らは、水門を修理することで錠前を学び、自分で作った鍵を持って見習いとして入りました。古いガラスに触れると、残りの記憶を聞くことができます。アーカイブはその代償を理解する前に、この贈り物を悪用しました。セナはオーレルの封印された書庫を開き、ナラのメッセージを聞き、ハートの声を自分たちの記憶から分離できる最初の人物になります。",
   },
   "Creció en el Barrio Hundido y puede oír los ecos atrapados en el vidrio antiguo.": {
     "es": "Creció en el Barrio Hundido y puede oír los ecos atrapados en el vidrio antiguo.",
@@ -1760,7 +2237,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele cresceu no Bairro Submerso e pode ouvir os ecos presos em vidros antigos.",
     "it": "È cresciuto nel quartiere sommerso e può sentire gli echi intrappolati nel vetro antico.",
     "tr": "Batık Mahalle'de büyüdü ve antik camda hapsolmuş yankıları duyabiliyor.",
-    "zh-CN": "他们在沉没街区长大，能听见困在古老玻璃中的回声。"
+    "zh-CN": "他们在沉没街区长大，能听见困在古老玻璃中的回声。",
+    'zh-TW': "他們在沉沒街區長大，能聽見困在古老玻璃中的回聲。",
+    ko: "Sunken Quarter에서 자란 그들은 오래된 유리에 갇힌 메아리를 들을 수 있습니다.",
+    ja: "サンクン・クォーターで育った彼らは、古いガラスに閉じ込められたエコーを聞くことができます。",
   },
   "Crujidos inmensos y destellos que confunden el horizonte.": {
     "es": "Crujidos inmensos y destellos que confunden el horizonte.",
@@ -1771,7 +2251,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Imensos estalos e clarões que confundem o horizonte.",
     "it": "Crepitii e lampi immensi che confondono l'orizzonte.",
     "tr": "Ufku karıştıran muazzam çatırtılar ve parıltılar.",
-    "zh-CN": "巨大的碎裂声，以及令人分不清地平线的闪光。"
+    "zh-CN": "巨大的碎裂声，以及令人分不清地平线的闪光。",
+    'zh-TW': "巨大的碎裂聲，以及令人分不清地平線的閃光。",
+    ko: "지평선을 혼란스럽게 만드는 엄청난 균열과 섬광.",
+    ja: "地平線を混乱させる巨大な亀裂と閃光。",
   },
   "Cuaderno de desarrollo del mundo demo.": {
     "es": "Cuaderno de desarrollo del mundo demo.",
@@ -1782,7 +2265,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Caderno de desenvolvimento mundial de demonstração.",
     "it": "Quaderno di sviluppo del mondo demo.",
     "tr": "Demo dünya geliştirme not defteri.",
-    "zh-CN": "演示世界的开发笔记。"
+    "zh-CN": "演示世界的开发笔记。",
+    'zh-TW': "演示世界的開發筆記。",
+    ko: "데모 세계를 위한 개발 노트북입니다.",
+    ja: "デモワールドの開発ノート。",
   },
   "Cuando está nerviosa enumera “uno, dos, tres”; sustituye “quizá” por porcentajes o condiciones; pide “un rumbo, no una promesa”. Corrige una distancia antes que una opinión y deja silencios antes de nombrar a su familia.": {
     "es": "Cuando está nerviosa enumera “uno, dos, tres”; sustituye “quizá” por porcentajes o condiciones; pide “un rumbo, no una promesa”. Corrige una distancia antes que una opinión y deja silencios antes de nombrar a su familia.",
@@ -1793,7 +2279,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Quando está nervosa ela lista “um, dois, três”; substitua “talvez” por porcentagens ou condições; pede “uma direção, não uma promessa”. Ele corrige uma distância em vez de uma opinião e deixa silêncios antes de nomear sua família.",
     "it": "Quando è nervosa elenca “uno, due, tre”; sostituire “forse” con percentuali o condizioni; chiede “una direzione, non una promessa”. Corregge una distanza più che un'opinione e lascia silenzi prima di nominare la sua famiglia.",
     "tr": "Gergin olduğunda “bir, iki, üç” diye sıralıyor; \"belki\" ifadesini yüzdeler veya koşullarla değiştirin; \"bir söz değil, bir yön\" ister. Bir görüşten ziyade mesafeyi düzeltiyor ve ailesine isim vermeden önce sessizlik bırakıyor.",
-    "zh-CN": "紧张时她会数“一、二、三”；用百分比或条件代替“也许”；要求“一个航向，而不是一个承诺”。她会先纠正距离，再纠正观点，并在提及家人前留下沉默。"
+    "zh-CN": "紧张时她会数“一、二、三”；用百分比或条件代替“也许”；要求“一个航向，而不是一个承诺”。她会先纠正距离，再纠正观点，并在提及家人前留下沉默。",
+    'zh-TW': "緊張時她會數“一、二、三”；用百分比或條件代替“也許”；要求“一個航向，而不是一個承諾”。她會先糾正距離，再糾正觀點，並在提及家人前留下沉默。",
+    ko: "긴장할 때 그녀는 “하나, 둘, 셋”을 센다. \"아마도\"를 백분율이나 조건으로 대체합니다. “약속이 아니라 약속”을 요구합니다. 그녀는 의견을 말하기 전에 거리를 바로잡고 가족의 이름을 부르기 전에 잠시 멈춘다.",
+    ja: "緊張すると「1、2、3」と数えます。 「おそらく」をパーセンテージまたは条件に置き換えます。 「約束ではなく態度」を求めます。彼女は意見を言う前に距離を正し、家族の名前を言う前に一時停止します。",
   },
   "Cuenta “hace tres nombres” en vez de siglos; llama “criatura de orilla” a quien piensa en fronteras; responde a una pregunta prematura con “aún no has pagado esa respuesta”.": {
     "es": "Cuenta “hace tres nombres” en vez de siglos; llama “criatura de orilla” a quien piensa en fronteras; responde a una pregunta prematura con “aún no has pagado esa respuesta”.",
@@ -1804,7 +2293,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Conte “três nomes atrás” em vez de séculos; Ele chama aqueles que pensam em fronteiras de “criaturas da costa”; responda a uma pergunta prematura com “você ainda não pagou por essa resposta”.",
     "it": "Contare “tre nomi fa” invece di secoli; Chiama chi pensa ai confini una “creatura della riva”; rispondi a una domanda prematura con \"non hai ancora pagato per quella risposta\".",
     "tr": "Yüzyıllar yerine “üç isim önce” sayın; Sınırları düşünenleri “kıyı yaratığı” olarak adlandırıyor; vaktinden önce sorulan bir soruya \"henüz bu cevap için ödeme yapmadınız\" şeklinde yanıt verin.",
-    "zh-CN": "她以“三个名字之前”而非世纪来计时；把满脑子边界的人称为“岸边生物”；对一个过早的问题回答“你还没有为那个答案付出代价”。"
+    "zh-CN": "她以“三个名字之前”而非世纪来计时；把满脑子边界的人称为“岸边生物”；对一个过早的问题回答“你还没有为那个答案付出代价”。",
+    'zh-TW': "她以“三個名字之前”而非世紀來計時；把滿腦子邊界的人稱為“岸邊生物”；對一個過早的問題回答“你還沒有為那個答案付出代價”。",
+    ko: "수세기가 아닌 \"3개의 이름 전\"을 계산합니다. 국경을 생각하는 사람들을 \"해안 생물\"이라고 부릅니다. \"아직 해당 답변에 대한 비용을 지불하지 않았습니다\"라고 성급한 질문에 대답합니다.",
+    ja: "何世紀も前ではなく「3つの名前」を数えます。国境を意識する人々を「海岸の生き物」と呼びます。時期尚早の質問に対して「その回答に対する料金はまだ支払っていません」と答えます。",
   },
   "Culto de la Primera Luz": {
     "es": "Culto de la Primera Luz",
@@ -1815,7 +2307,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Culto da Primeira Luz",
     "it": "Culto della Prima Luce",
     "tr": "İlk Işık Kültü",
-    "zh-CN": "初光教派"
+    "zh-CN": "初光教派",
+    'zh-TW': "初光教派",
+    ko: "첫 번째 빛의 교단",
+    ja: "最初の光のカルト",
   },
   "Culturas costeras que cuentan el tiempo por mareas y nombres.": {
     "es": "Culturas costeras que cuentan el tiempo por mareas y nombres.",
@@ -1826,7 +2321,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Culturas costeiras que contam o tempo por marés e nomes.",
     "it": "Culture costiere che contano il tempo in base alle maree e ai nomi.",
     "tr": "Zamanı gelgitlere ve isimlere göre sayan kıyı kültürleri.",
-    "zh-CN": "以潮汐和名字来计时的沿海文化。"
+    "zh-CN": "以潮汐和名字来计时的沿海文化。",
+    'zh-TW': "以潮汐和名字來計時的沿海文化。",
+    ko: "조수와 이름으로 시간을 계산하는 해안 문화.",
+    ja: "潮の流れと名前で時間を数える沿岸文化。",
   },
   "Cumplir su último juramento.": {
     "es": "Cumplir su último juramento.",
@@ -1837,7 +2335,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cumpra seu último juramento.",
     "it": "Mantieni il tuo ultimo giuramento.",
     "tr": "Son yeminini yerine getir.",
-    "zh-CN": "履行他最后的誓言。"
+    "zh-CN": "履行他最后的誓言。",
+    'zh-TW': "履行他最後的誓言。",
+    ko: "그의 마지막 맹세를 이행하십시오.",
+    ja: "最後の誓いを果たせ。",
   },
   "cuna vacía simbólica bajo dos lunas, tela rosa, cristales de sal": {
     "es": "cuna vacía simbólica bajo dos lunas, tela rosa, cristales de sal",
@@ -1848,7 +2349,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "berço vazio simbólico sob duas luas, tecido rosa, cristais de sal",
     "it": "simbolico presepe vuoto sotto due lune, tessuto rosa, cristalli di sale",
     "tr": "iki ayın altında sembolik boş beşik, pembe kumaş, tuz kristalleri",
-    "zh-CN": "两轮月亮之下的象征性空摇篮、粉色布料、盐晶"
+    "zh-CN": "两轮月亮之下的象征性空摇篮、粉色布料、盐晶",
+    'zh-TW': "兩輪月亮之下的象徵性空搖籃、粉色布料、鹽晶",
+    ko: "두 개의 달 아래 상징적인 빈 요람, 장미 천, 소금 결정",
+    ja: "2つの月の下にある象徴的な空のゆりかご、バラの布、塩の結晶",
   },
   "Curiose, valiente y pésime mintiendo.": {
     "es": "Curiose, valiente y pésime mintiendo.",
@@ -1859,7 +2363,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Curioso, corajoso e péssimo em mentir.",
     "it": "Curioso, coraggioso e terribile nel mentire.",
     "tr": "Meraklı, cesur ve yalan söyleme konusunda berbat.",
-    "zh-CN": "好奇、勇敢，且极不擅长撒谎。"
+    "zh-CN": "好奇、勇敢，且极不擅长撒谎。",
+    'zh-TW': "好奇、勇敢，且極不擅長撒謊。",
+    ko: "호기심이 많고 용감하며 거짓말을 잘 못합니다.",
+    ja: "好奇心旺盛で勇敢、そして嘘が大の苦手。",
   },
   "Curiose, valiente y pésime mintiendo. Su entusiasmo hace que formule tres preguntas antes de escuchar una respuesta completa. Se ofrece para toda tarea porque teme que su lugar dependa de ser útil. Percibe con rapidez la tristeza ajena, pero confunde valentía con no necesitar descanso.": {
     "es": "Curiose, valiente y pésime mintiendo. Su entusiasmo hace que formule tres preguntas antes de escuchar una respuesta completa. Se ofrece para toda tarea porque teme que su lugar dependa de ser útil. Percibe con rapidez la tristeza ajena, pero confunde valentía con no necesitar descanso.",
@@ -1870,7 +2377,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Curioso, corajoso e péssimo em mentir. Seu entusiasmo o leva a fazer três perguntas antes de ouvir uma resposta completa. Ele se oferece como voluntário para todas as tarefas porque teme que seu lugar dependa de ser útil. Rapidamente percebe a tristeza dos outros, mas confunde coragem com não precisar de descanso.",
     "it": "Curioso, coraggioso e terribile nel mentire. Il suo entusiasmo lo spinge a porre tre domande prima di sentire una risposta completa. Si offre volontario per ogni compito perché teme che il suo posto dipenda dall'essere utile. Percepisce rapidamente la tristezza degli altri, ma confonde il coraggio con il non aver bisogno di riposo.",
     "tr": "Meraklı, cesur ve yalan söyleme konusunda berbat. Coşkusu, tam bir cevap duymadan önce üç soru sormasına neden olur. Yerinin yararlı olmaya bağlı olmasından korktuğu için her göreve gönüllü olur. Başkalarının üzüntüsünü çabuk algılar, ancak cesareti dinlenmeye ihtiyaç duymamakla karıştırır.",
-    "zh-CN": "好奇、勇敢，且极不擅长撒谎。他们的热情使他们在一个回答说完之前就抛出三个问题。他们主动承担每一项任务，因为害怕自己的位置取决于是否有用。他们很快察觉到他人的悲伤，却把勇敢与不需要休息混为一谈。"
+    "zh-CN": "好奇、勇敢，且极不擅长撒谎。他们的热情使他们在一个回答说完之前就抛出三个问题。他们主动承担每一项任务，因为害怕自己的位置取决于是否有用。他们很快察觉到他人的悲伤，却把勇敢与不需要休息混为一谈。",
+    'zh-TW': "好奇、勇敢，且極不擅長撒謊。他們的熱情使他們在一個回答說完之前就丟擲三個問題。他們主動承擔每一項任務，因為害怕自己的位置取決於是否有用。他們很快察覺到他人的悲傷，卻把勇敢與不需要休息混為一談。",
+    ko: "호기심이 많고 용감하며 거짓말을 잘 못합니다. 그들의 열정은 하나의 답변이 완료되기 전에 세 가지 질문을 생성합니다. 그들은 소속감이 유용성에 달려 있다는 것을 두려워하기 때문에 모든 업무에 자원합니다. 그들은 다른 사람의 슬픔을 빨리 알아차리지만 쉴 필요가 없는 것과 용기를 혼동합니다.",
+    ja: "好奇心旺盛で勇敢、そして嘘が大の苦手。彼らの熱意は、1つの答えが完成するまでに3つの質問を生み出します。彼らは、所属することが役に立つかどうかによって左右されることを恐れて、あらゆる仕事にボランティアで参加します。彼らは他人の悲しみにすぐに気づきますが、勇気を休む必要がないことと混同しています。",
   },
   "Custodia de la memoria oral veyari y testigo imposible de la fundación de Orthea.": {
     "es": "Custodia de la memoria oral veyari y testigo imposible de la fundación de Orthea.",
@@ -1881,7 +2391,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Guardião da memória oral Veyari e testemunha impossível da fundação de Orthea.",
     "it": "Custode della memoria orale dei Veyari e impossibile testimone della fondazione di Orthea.",
     "tr": "Veyari sözlü hafızasının koruyucusu ve Orthea'nın kuruluşunun imkansız tanığı.",
-    "zh-CN": "Veyari 口述记忆的守护者，也是 Orthea 建城的不可能见证者。"
+    "zh-CN": "Veyari 口述记忆的守护者，也是 Orthea 建城的不可能见证者。",
+    'zh-TW': "Veyari 口述記憶的守護者，也是 Orthea 建城的不可能見證者。",
+    ko: "베야리 구전 기억의 수호자이자 오르테아 창립에 대한 불가능한 목격자입니다.",
+    ja: "ヴェヤリの口頭記憶の番人であり、オルテア建国の不可能な目撃者。",
   },
   "Custodio de la Continuidad": {
     "es": "Custodio de la Continuidad",
@@ -1892,7 +2405,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Guardião da Continuidade",
     "it": "Custode della continuità",
     "tr": "Sürekliliğin Sorumlusu",
-    "zh-CN": "延续的守护者"
+    "zh-CN": "延续的守护者",
+    'zh-TW': "延續的守護者",
+    ko: "연속성의 수호자",
+    ja: "継続性の番人",
   },
   "D.F.": {
     "es": "D.F.",
@@ -1903,7 +2419,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "D.F.",
     "it": "D.F.",
     "tr": "D.F.",
-    "zh-CN": "D.F."
+    "zh-CN": "D.F.",
+    'zh-TW': "D.F.",
+    ko: "A.L.",
+    ja: "A.L.",
   },
   "De aprendiz útil a custodie de una memoria pública.": {
     "es": "De aprendiz útil a custodie de una memoria pública.",
@@ -1914,7 +2433,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "De aprendiz útil a guardião da memória pública.",
     "it": "Da utile apprendista a custode di una memoria pubblica.",
     "tr": "Yararlı bir çıraklıktan kamusal hafızanın koruyucusuna.",
-    "zh-CN": "从有用的学徒到公共记忆的守护者。"
+    "zh-CN": "从有用的学徒到公共记忆的守护者。",
+    'zh-TW': "從有用的學徒到公共記憶的守護者。",
+    ko: "유용한 견습생에서 공공 기억의 수호자로.",
+    ja: "役に立つ見習いから、公共の記憶を守る者へ。",
   },
   "Dejar de medir su valor por la utilidad que ofrece.": {
     "es": "Dejar de medir su valor por la utilidad que ofrece.",
@@ -1925,7 +2447,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Pare de medir seu valor pela utilidade que oferece.",
     "it": "Smetti di misurare il suo valore in base all’utilità che offre.",
     "tr": "Değerini sunduğu faydayla ölçmeyi bırakın.",
-    "zh-CN": "不再用自己能提供的用处来衡量自身价值。"
+    "zh-CN": "不再用自己能提供的用处来衡量自身价值。",
+    'zh-TW': "不再用自己能提供的用處來衡量自身價值。",
+    ko: "얼마나 유용한가로 가치를 측정하지 마세요.",
+    ja: "どれだけ役立つかによってその価値を測るのはやめましょう。",
   },
   "Del control absoluto a la confianza compartida.": {
     "es": "Del control absoluto a la confianza compartida.",
@@ -1936,7 +2461,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Do controle absoluto à confiança compartilhada.",
     "it": "Dal controllo assoluto alla fiducia condivisa.",
     "tr": "Mutlak kontrolden paylaşılan güvene.",
-    "zh-CN": "从绝对掌控到共享信任。"
+    "zh-CN": "从绝对掌控到共享信任。",
+    'zh-TW': "從絕對掌控到共享信任。",
+    ko: "절대적인 통제에서 공유된 신뢰로.",
+    ja: "絶対的なコントロールから共有された信頼へ。",
   },
   "Demostrar que el Barrio Hundido merece ser salvado.": {
     "es": "Demostrar que el Barrio Hundido merece ser salvado.",
@@ -1947,7 +2475,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Demonstre que o Bairro Submerso merece ser salvo.",
     "it": "Dimostra che il quartiere sommerso merita di essere salvato.",
     "tr": "Batık Mahallenin kurtarılmayı hak ettiğini gösterin.",
-    "zh-CN": "证明沉没街区值得被拯救。"
+    "zh-CN": "证明沉没街区值得被拯救。",
+    'zh-TW': "證明沉沒街區值得被拯救。",
+    ko: "Sunken Quarter가 구원받을 가치가 있음을 증명하십시오.",
+    ja: "沈没地区が保存されるに値することを証明してください。",
   },
   "Desapareció en el [[Observatorio de Orla]] después de demostrar que la Tercera Luna no era una luna.": {
     "es": "Desapareció en el [[Observatorio de Orla]] después de demostrar que la Tercera Luna no era una luna.",
@@ -1958,7 +2489,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele desapareceu em [[Observatório da Orla]] após provar que a Terceira Lua não era uma lua.",
     "it": "È scomparso in [[Osservatorio Orla]] dopo aver dimostrato che la Terza Luna non era una luna.",
     "tr": "Üçüncü Ay'ın ay olmadığını kanıtladıktan sonra [[Orla Gözlemevi]]'da ortadan kayboldu.",
-    "zh-CN": "她在证明第三月亮并非月亮之后，消失在 [[奥尔拉天文台]]。"
+    "zh-CN": "她在证明第三月亮并非月亮之后，消失在 [[奥尔拉天文台]]。",
+    'zh-TW': "她在證明第三月亮並非月亮之後，消失在 [[奧爾拉天文臺]]。",
+    ko: "그녀는 세 번째 달이 달이 아니라는 것을 증명한 후 [[올라 천문대]]에서 사라졌습니다.",
+    ja: "彼女は第三の月が月ではないことを証明した後、[[オーラ天文台]]で姿を消した。",
   },
   "Desaparición de Nara": {
     "es": "Desaparición de Nara",
@@ -1969,7 +2503,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Desaparecimento de Nara",
     "it": "Scomparsa di Nara",
     "tr": "Nara'nın ortadan kaybolması",
-    "zh-CN": "Nara 的失踪"
+    "zh-CN": "Nara 的失踪",
+    'zh-TW': "Nara 的失蹤",
+    ko: "나라의 실종",
+    ja: "ナラの失踪",
   },
   "Descubrió la deuda que alimenta el Faro y dejó sus mapas cifrados a Ilyra.": {
     "es": "Descubrió la deuda que alimenta el Faro y dejó sus mapas cifrados a Ilyra.",
@@ -1980,7 +2517,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele descobriu a dívida que alimentava o Farol e deixou seus mapas criptografados para Ilyra.",
     "it": "Scoprì il debito che alimentava il Faro e lasciò le sue mappe crittografate a Ilyra.",
     "tr": "Deniz Feneri'ni besleyen borcu keşfetti ve şifrelenmiş haritalarını Ilyra'ya bıraktı.",
-    "zh-CN": "他发现了供养灯塔的债务，并把加密的地图留给了 Ilyra。"
+    "zh-CN": "他发现了供养灯塔的债务，并把加密的地图留给了 Ilyra。",
+    'zh-TW': "他發現了供養燈塔的債務，並把加密的地圖留給了 Ilyra。",
+    ko: "그는 등대에 빚이 있다는 사실을 발견하고 암호화된 지도를 Ilyra에게 맡겼습니다.",
+    ja: "彼は灯台に資金を供給している借金を発見し、暗号化された地図をイリラに残しました。",
   },
   "Desierto de Ceniza": {
     "es": "Desierto de Ceniza",
@@ -1991,7 +2531,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Deserto de Cinzas",
     "it": "Deserto di cenere",
     "tr": "Kül Çölü",
-    "zh-CN": "灰烬沙漠"
+    "zh-CN": "灰烬沙漠",
+    'zh-TW': "灰燼沙漠",
+    ko: "애쉬 사막",
+    ja: "アッシュ砂漠",
   },
   "Desobedece públicamente a Maelor.": {
     "es": "Desobedece públicamente a Maelor.",
@@ -2002,7 +2545,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele desobedece publicamente a Maelor.",
     "it": "Disobbedisce pubblicamente a Maelor.",
     "tr": "Maelor'a herkesin önünde itaatsizlik ediyor.",
-    "zh-CN": "公开违抗 Maelor。"
+    "zh-CN": "公开违抗 Maelor。",
+    'zh-TW': "公開違抗 Maelor。",
+    ko: "공개적으로 Maelor에게 불복종합니다.",
+    ja: "メーラーに公然と反抗する。",
   },
   "Después del Faro": {
     "es": "Después del Faro",
@@ -2013,7 +2559,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Depois do Farol",
     "it": "Dopo il Faro",
     "tr": "Deniz Feneri'nden sonra",
-    "zh-CN": "灯塔之后"
+    "zh-CN": "灯塔之后",
+    'zh-TW': "燈塔之後",
+    ko: "등대 이후",
+    ja: "灯台の後",
   },
   "Detecta fracturas y movimiento bajo el agua.": {
     "es": "Detecta fracturas y movimiento bajo el agua.",
@@ -2024,7 +2573,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Detecta fraturas e movimentos debaixo d'água.",
     "it": "Rileva fratture e movimenti sott'acqua.",
     "tr": "Su altında kırıkları ve hareketleri algılar.",
-    "zh-CN": "探测水下裂缝与活动。"
+    "zh-CN": "探测水下裂缝与活动。",
+    'zh-TW': "探測水下裂縫與活動。",
+    ko: "수중에서 골절과 움직임을 감지합니다.",
+    ja: "水中での骨折や動きを検出します。",
   },
   "Deuda de eco": {
     "es": "Deuda de eco",
@@ -2035,7 +2587,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "dívida de eco",
     "it": "eco del debito",
     "tr": "yankı borcu",
-    "zh-CN": "回声之债"
+    "zh-CN": "回声之债",
+    'zh-TW': "回聲之債",
+    ko: "에코 빚",
+    ja: "エコー負債",
   },
   "Devolver el Corazón al mar.": {
     "es": "Devolver el Corazón al mar.",
@@ -2046,7 +2601,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Devolva o Coração ao mar.",
     "it": "Riporta il cuore al mare.",
     "tr": "Kalbi denize geri döndür.",
-    "zh-CN": "将心脏归还大海。"
+    "zh-CN": "将心脏归还大海。",
+    'zh-TW': "將心臟歸還大海。",
+    ko: "마음을 바다로 돌려보내세요.",
+    ja: "心を海に返してください。",
   },
   "Dice “con permiso” antes de contradecir, repite la última palabra que oyó mal y utiliza “queda bajo mi responsabilidad”. Cuando decide de verdad deja de llamar “Regente” a Maelor.": {
     "es": "Dice “con permiso” antes de contradecir, repite la última palabra que oyó mal y utiliza “queda bajo mi responsabilidad”. Cuando decide de verdad deja de llamar “Regente” a Maelor.",
@@ -2057,7 +2615,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele diz “com licença” antes de contradizer, repete a última palavra que ouviu mal e usa “é minha responsabilidade”. Quando ele realmente decide, ele para de chamar Maelor de “Regente”.",
     "it": "Dice “scusate” prima di contraddire, ripete l’ultima parola che ha sentito male e usa “è mia responsabilità”. Quando decide davvero, smette di chiamare Maelor “Reggente”.",
     "tr": "İtiraz etmeden önce “özür dilerim” diyor, yanlış duyduğu son kelimeyi tekrarlıyor ve “bu benim sorumluluğumda” diyor. Gerçekten karar verdiğinde Maelor'a \"Naip\" demeyi bırakır.",
-    "zh-CN": "在反驳前会说“允许我”，重复自己听错的最后一个词，并使用“由我负责”。当他真正下定决心时，便不再称 Maelor 为“摄政”。"
+    "zh-CN": "在反驳前会说“允许我”，重复自己听错的最后一个词，并使用“由我负责”。当他真正下定决心时，便不再称 Maelor 为“摄政”。",
+    'zh-TW': "在反駁前會說“允許我”，重複自己聽錯的最後一個詞，並使用“由我負責”。當他真正下定決心時，便不再稱 Maelor 為“攝政”。",
+    ko: "모순되기 전에 \"허락을 받아\"라고 말하고, 그가 잘못 들은 마지막 단어를 반복하고 \"이것은 내 책임입니다\"라고 사용합니다. 그가 진정으로 결정하면 Maelor를 \"Regent\"라고 부르는 것을 중단합니다.",
+    ja: "矛盾する前に「許可を得て」と言い、最後に聞き間違えた言葉を繰り返し、「これは私の責任です」と使います。本当に決意したとき、彼はメーラーを「摂政」と呼ぶのをやめる。",
   },
   "Dice “no, espera” y reformula; pregunta “¿ves la diferencia?”; dibuja círculos en el aire. Llama “Ily” a su hermana solo cuando teme no volver a verla.": {
     "es": "Dice “no, espera” y reformula; pregunta “¿ves la diferencia?”; dibuja círculos en el aire. Llama “Ily” a su hermana solo cuando teme no volver a verla.",
@@ -2068,7 +2629,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele diz “não, espere” e reformula; pergunta “você vê a diferença?”; desenhe círculos no ar. Ele chama sua irmã de “Ily” apenas quando teme nunca mais vê-la.",
     "it": "Dice “no, aspetta” e riformula; chiede “vedi la differenza?”; disegna cerchi nell'aria. Chiama la sorella “Ily” solo quando teme di non rivederla mai più.",
     "tr": "“Hayır, bekleyin” diyor ve tekrar söylüyor; “Farkı görüyor musun?” diye sorar; havaya daireler çizin. Kız kardeşine ancak onu bir daha göremeyeceğinden korktuğunda \"Ily\" diyor.",
-    "zh-CN": "会说“不，等等”并重新表述；问“你看出区别了吗？”；在空中画圈。只有在害怕再也见不到妹妹时，才会叫她“Ily”。"
+    "zh-CN": "会说“不，等等”并重新表述；问“你看出区别了吗？”；在空中画圈。只有在害怕再也见不到妹妹时，才会叫她“Ily”。",
+    'zh-TW': "會說“不，等等”並重新表述；問“你看出區別了嗎？”；在空中畫圈。只有在害怕再也見不到妹妹時，才會叫她“Ily”。",
+    ko: "\"아니요, 잠깐만요\"라고 말하고 다시 공식화합니다. “차이점이 보이나요?”라고 묻습니다. 공중에 원을 그립니다. 그녀는 그들이 다시 만날 수 없을까 두려울 때만 그녀의 여동생을 \"일리\"라고 부른다.",
+    ja: "「いいえ、お待ちください」と言い、再度定式化します。 「違いがわかりますか？」と尋ねます。空中に円を描きます。二度と会えなくなるのではないかと心配したときだけ、妹を「イリー」と呼ぶ。",
   },
   "Dice “queda oído”, “por mi palabra” y “el deber permanece”. Antes de una confesión nombra a la persona ante quien juró. No usa contracciones ni bromas.": {
     "es": "Dice “queda oído”, “por mi palabra” y “el deber permanece”. Antes de una confesión nombra a la persona ante quien juró. No usa contracciones ni bromas.",
@@ -2079,7 +2643,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Diz “é ouvido”, “pela minha palavra” e “o dever permanece”. Antes de uma confissão ele nomeia a pessoa perante quem jurou. Ele não usa contrações ou piadas.",
     "it": "Dice “è ascoltato”, “secondo la mia parola” e “il dovere rimane”. Prima della confessione nomina la persona davanti alla quale ha giurato. Non usa contrazioni né battute.",
     "tr": "“Duyuldu”, “benim sözümle” ve “görev devam ediyor” diyor. İtiraf etmeden önce önünde yemin ettiği kişinin adını verir. Kasılmaları veya şakaları kullanmaz.",
-    "zh-CN": "会说“话已听到”“以我之言”“职责长存”。在忏悔前，他会说出自己向其起誓之人的名字。他不用缩略语，也不开玩笑。"
+    "zh-CN": "会说“话已听到”“以我之言”“职责长存”。在忏悔前，他会说出自己向其起誓之人的名字。他不用缩略语，也不开玩笑。",
+    'zh-TW': "會說“話已聽到”“以我之言”“職責長存”。在懺悔前，他會說出自己向其起誓之人的名字。他不用縮略語，也不開玩笑。",
+    ko: "“들어졌다”, “내 말대로”, “의무는 남아있다”라고 말합니다. 고백하기 전에 그는 자신이 맹세했던 사람의 이름을 지정합니다. 수축이나 농담을 사용하지 않습니다.",
+    ja: "「それは聞かれます」、「私の言葉によって」、そして「義務は残ります」と言います。告白の前に、彼は誓った人の名前を言います。短縮語も冗談も使いません。",
   },
   "Diezmo de lámpara": {
     "es": "Diezmo de lámpara",
@@ -2090,7 +2657,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Dízimo da Lâmpada",
     "it": "Decima della lampada",
     "tr": "Lamba Tithe",
-    "zh-CN": "灯之什一税"
+    "zh-CN": "灯之什一税",
+    'zh-TW': "燈之什一稅",
+    ko: "등불 십일조",
+    ja: "ランプ十分の一",
   },
   "Dinastía de demostración con blasón, sede y miembros editables.": {
     "es": "Dinastía de demostración con blasón, sede y miembros editables.",
@@ -2101,7 +2671,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Dinastia Demo com brasão editável, sede e membros.",
     "it": "Dinastia demo con stemma, quartier generale e membri modificabili.",
     "tr": "Düzenlenebilir arma, karargah ve üyelerle demo hanedanı.",
-    "zh-CN": "带有可编辑纹章、驻地与成员的演示王朝。"
+    "zh-CN": "带有可编辑纹章、驻地与成员的演示王朝。",
+    'zh-TW': "帶有可編輯紋章、駐地與成員的演示王朝。",
+    ko: "편집 가능한 팔, 좌석 및 구성원을 갖춘 데모 왕조.",
+    ja: "編集可能な腕、座席、メンバーを備えたデモ王朝。",
   },
   "Dinastía de fareros desplazada por la regencia.": {
     "es": "Dinastía de fareros desplazada por la regencia.",
@@ -2112,7 +2685,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Dinastia de faroleiros deslocados pela regência.",
     "it": "Dinastia di guardiani del faro spostati dalla reggenza.",
     "tr": "Naiplik tarafından yerinden edilen deniz feneri bekçileri hanedanı.",
-    "zh-CN": "被摄政政权取代的守灯人王朝。"
+    "zh-CN": "被摄政政权取代的守灯人王朝。",
+    'zh-TW': "被攝政政權取代的守燈人王朝。",
+    ko: "섭정에 의해 대체된 등대 왕조.",
+    ja: "摂政に追放された灯台王朝。",
   },
   "Dinastía regente nacida de la administración de la catástrofe.": {
     "es": "Dinastía regente nacida de la administración de la catástrofe.",
@@ -2123,7 +2699,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Dinastia governante nascida da administração da catástrofe.",
     "it": "Dinastia regnante nata dall'amministrazione della catastrofe.",
     "tr": "Felaket yönetiminden doğan yönetici hanedan.",
-    "zh-CN": "诞生于灾难管理之中的摄政王朝。"
+    "zh-CN": "诞生于灾难管理之中的摄政王朝。",
+    'zh-TW': "誕生於災難管理之中的攝政王朝。",
+    ko: "재앙의 행정 속에서 탄생한 섭정 왕조.",
+    ja: "大惨事の施政により誕生した摂政王朝。",
   },
   "Dio la orden.": {
     "es": "Dio la orden.",
@@ -2134,7 +2713,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele deu a ordem.",
     "it": "Ha dato l'ordine.",
     "tr": "Emri verdi.",
-    "zh-CN": "下达了命令。"
+    "zh-CN": "下达了命令。",
+    'zh-TW': "下達了命令。",
+    ko: "명령을 내렸습니다.",
+    ja: "命令を出しました。",
   },
   "Directo, curioso y energético. Usa vocabulario de llaves, dientes, bisagras, ecos y archivos. Encadena preguntas y propone una prueba práctica en cuanto aparece una teoría. No finge solemnidad ante un rango.": {
     "es": "Directo, curioso y energético. Usa vocabulario de llaves, dientes, bisagras, ecos y archivos. Encadena preguntas y propone una prueba práctica en cuanto aparece una teoría. No finge solemnidad ante un rango.",
@@ -2145,7 +2727,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Direto, curioso e enérgico. Use vocabulário de chaves, dentes, dobradiças, ecos e limas. Encadeie perguntas e proponha uma prova prática assim que surgir uma teoria. Ele não finge solenidade diante de uma posição.",
     "it": "Diretto, curioso ed energico. Usa il vocabolario di chiavi, denti, cardini, echi e file. Concatena le domande e proponi una prova pratica non appena appare una teoria. Non finge solennità davanti a un grado.",
     "tr": "Doğrudan, meraklı ve enerjik. Anahtarlar, dişler, menteşeler, yankılar ve dosyalardan oluşan sözcükleri kullanın. Bir teori ortaya çıkar çıkmaz soruları zincirleyin ve pratik bir test önerin. Bir rütbenin önünde ciddiyet numarası yapmaz.",
-    "zh-CN": "直接、好奇且精力充沛。常使用钥匙、齿、铰链、回声与档案相关的词汇。会一连串发问，一旦出现理论就提出实际验证。面对身份地位从不假装庄重。"
+    "zh-CN": "直接、好奇且精力充沛。常使用钥匙、齿、铰链、回声与档案相关的词汇。会一连串发问，一旦出现理论就提出实际验证。面对身份地位从不假装庄重。",
+    'zh-TW': "直接、好奇且精力充沛。常使用鑰匙、齒、鉸鏈、回聲與檔案相關的詞彙。會一連串發問，一旦出現理論就提出實際驗證。面對身份地位從不假裝莊重。",
+    ko: "직접적이고 호기심이 많으며 활력이 넘칩니다. 열쇠, 이빨, 경첩, 에코 및 기록 보관소의 어휘를 사용합니다. 체인스는 이론이 나오자마자 질문을 던지고 실전 테스트를 제안한다. 결코 계급에 대한 엄숙함을 행하지 마십시오.",
+    ja: "直接的で好奇心旺盛でエネルギッシュ。キー、歯、ヒンジ、エコー、アーカイブの語彙を使用します。理論が現れるとすぐに質問を連鎖させ、実践的なテストを提案します。決して地位のために厳粛なことを行いません。",
   },
   "Dunas grises interrumpidas por esqueletos de torres solares.": {
     "es": "Dunas grises interrumpidas por esqueletos de torres solares.",
@@ -2156,7 +2741,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Dunas cinzentas interrompidas por esqueletos de torres solares.",
     "it": "Dune grigie interrotte da scheletri di torri solari.",
     "tr": "Güneş kulelerinin iskeletleriyle kesintiye uğrayan gri kum tepeleri.",
-    "zh-CN": "灰色沙丘被太阳塔的骨架打断。"
+    "zh-CN": "灰色沙丘被太阳塔的骨架打断。",
+    'zh-TW': "灰色沙丘被太陽塔的骨架打斷。",
+    ko: "회색 모래 언덕은 태양광 타워의 뼈대에 의해 중단되었습니다.",
+    ja: "太陽塔の骨組みによって遮られた灰色の砂丘。",
   },
   "Durante el Hundimiento de 733 D.F., Aurel debe elegir entre obedecer al Consejo y encender el Faro —salvando la terraza alta a costa de más recuerdos— o permitir que toda Lúmina quede a oscuras. Maelor exige continuidad y presencia cómo Aurel desobedece una parte de la orden: antes del encendido cifra la ruta al Corazón en el molde de la futura prótesis de Ilyra y confía a Odran que sus hijas deberán elegir. El Faro se enciende, el Barrio Hundido cae y Aurel comprende que ha salvado la ciudad equivocada.": {
     "es": "Durante el Hundimiento de 733 D.F., Aurel debe elegir entre obedecer al Consejo y encender el Faro —salvando la terraza alta a costa de más recuerdos— o permitir que toda Lúmina quede a oscuras. Maelor exige continuidad y presencia cómo Aurel desobedece una parte de la orden: antes del encendido cifra la ruta al Corazón en el molde de la futura prótesis de Ilyra y confía a Odran que sus hijas deberán elegir. El Faro se enciende, el Barrio Hundido cae y Aurel comprende que ha salvado la ciudad equivocada.",
@@ -2167,7 +2755,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Durante o Naufrágio de 733 D.F., Aurel deve escolher entre obedecer ao Conselho e acender o Farol - salvando o terraço superior ao custo de mais memórias - ou permitir que toda Lúmina apague. Maelor exige continuidade e presença enquanto Aurel desobedece uma parte da ordem: antes de acender, ele criptografa a rota para o Coração no molde da futura prótese de Ilyra e confidencia a Odran que suas filhas terão que escolher. O Farol acende, o Bairro Submerso cai e Aurel percebe que salvou a cidade errada.",
     "it": "Durante l'affondamento del 733 D.F., Aurel deve scegliere tra obbedire al Consiglio e accendere il faro (salvando la terrazza superiore al costo di più ricordi) o permettere a tutta Lúmina di oscurarsi. Maelor esige continuità e presenza mentre Aurel disobbedisce a una parte dell'ordine: prima di illuminarsi, crittografa il percorso verso il Cuore nello stampo della futura protesi di Ilyra e confida a Odran che le sue figlie dovranno scegliere. Il faro si illumina, il quartiere sommerso cade e Aurel si rende conto di aver salvato la città sbagliata.",
     "tr": "733 D.F.'nin Batışı sırasında Aurel, Konsey'e itaat etmek ve Deniz Feneri'ni aydınlatmak (daha fazla anı pahasına üst terası kurtarmak) veya tüm Lúmina'nın karanlığa gömülmesine izin vermek arasında bir seçim yapmak zorundadır. Aurel emrin bir kısmına itaatsizlik ederken Maelor süreklilik ve mevcudiyet talep eder: Ateşlemeden önce, Kalbe giden yolu Ilyra'nın gelecekteki protezinin kalıbına şifreler ve Odran'a kızlarının seçim yapmak zorunda kalacağını söyler. Deniz Feneri yanar, Batık Mahalle çöker ve Aurel yanlış şehri kurtardığını fark eder.",
-    "zh-CN": "在 733 D.F. 的沉没期间，Aurel 必须在服从议会并点亮灯塔——以更多记忆为代价保住高台——与让整个 Lúmina 陷入黑暗之间做出选择。Maelor 要求延续性，并目睹 Aurel 违抗了命令的一部分：在点亮前，他将通往心脏的路线加密刻入 Ilyra 未来义肢的模具，并嘱托 Odran，他的女儿们必须自己选择。灯塔亮起，沉没街区陷落，Aurel 意识到自己救错了城市。"
+    "zh-CN": "在 733 D.F. 的沉没期间，Aurel 必须在服从议会并点亮灯塔——以更多记忆为代价保住高台——与让整个 Lúmina 陷入黑暗之间做出选择。Maelor 要求延续性，并目睹 Aurel 违抗了命令的一部分：在点亮前，他将通往心脏的路线加密刻入 Ilyra 未来义肢的模具，并嘱托 Odran，他的女儿们必须自己选择。灯塔亮起，沉没街区陷落，Aurel 意识到自己救错了城市。",
+    'zh-TW': "在 733 D.F. 的沉沒期間，Aurel 必須在服從議會並點亮燈塔——以更多記憶為代價保住高臺——與讓整個 Lúmina 陷入黑暗之間做出選擇。Maelor 要求延續性，並目睹 Aurel 違抗了命令的一部分：在點亮前，他將通往心臟的路線加密刻入 Ilyra 未來義肢的模具，並囑託 Odran，他的女兒們必須自己選擇。燈塔亮起，沉沒街區陷落，Aurel 意識到自己救錯了城市。",
+    ko: "733 A.L.의 침몰 동안 Aurel은 의회에 복종하고 등대를 밝히는 것(더 많은 추억을 희생하여 상부 테라스를 보호하는 것)과 Lumina를 모두 어둡게 만드는 것 중에서 선택해야 합니다. Maelor는 연속성을 요구하고 Aurel이 명령의 일부를 불복종하는 것을 목격합니다. 조명을 켜기 전에 그는 Ilyra의 미래 보철물의 틀에 심장으로 가는 경로를 인코딩하고 Odran에게 그의 딸들이 선택하도록 명령합니다. 등대가 점화되고 Sunken Quarter가 무너지고 Aurel은 자신이 잘못된 도시를 구했다는 것을 깨닫습니다.",
+    ja: "733 A.L.の沈没中、オーレルは評議会に従い灯台に明かりを灯すか、より多くの思い出を犠牲にして上部テラスを救うか、それともすべてのルミナを暗闇にするかの選択を迫られます。メーラーは継続を要求し、オーレルが命令の一部に従わないのを目撃する。点火する前に、彼はイリラの将来の義足の型に心臓へのルートを暗号化し、娘たちに選択させるようオドランに請求する。灯台が点火し、沈没地区は崩壊し、オーレルは自分が間違った街を救ったことに気づきます。",
   },
   "Durante el Hundimiento, [[Aurel Venn]] encendió el Faro sin completar el precio. El [[Barrio Hundido]] conserva ecos de quienes fueron evacuados demasiado tarde.": {
     "es": "Durante el Hundimiento, [[Aurel Venn]] encendió el Faro sin completar el precio. El [[Barrio Hundido]] conserva ecos de quienes fueron evacuados demasiado tarde.",
@@ -2178,7 +2769,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Durante o naufrágio, [[Aurel Venn]] acendeu o Farol sem completar o preço. O [[Bairro Submerso]] preserva os ecos daqueles que foram evacuados tarde demais.",
     "it": "Durante l'affondamento, [[Aurel Venn]] ha acceso il faro senza completare il prezzo. Il [[Quartiere sommerso]] conserva gli echi di coloro che furono evacuati troppo tardi.",
     "tr": "Batan sırasında [[Aurel Venn]] fiyatı tamamlamadan Deniz Fenerini yaktı. [[Batık Mahalle]] çok geç tahliye edilenlerin yankılarını koruyor.",
-    "zh-CN": "在沉没期间，[[奥雷尔·文恩]] 未付清代价便点亮了灯塔。[[沉没街区]] 仍保留着那些撤离过晚之人的回声。"
+    "zh-CN": "在沉没期间，[[奥雷尔·文恩]] 未付清代价便点亮了灯塔。[[沉没街区]] 仍保留着那些撤离过晚之人的回声。",
+    'zh-TW': "在沉沒期間，[[奧雷爾·文恩]] 未付清代價便點亮了燈塔。[[沉沒街區]] 仍保留著那些撤離過晚之人的回聲。",
+    ko: "가라앉는 동안 [[Aurel Venn]]은 가격을 완료하지 않고 등대에 불을 붙였습니다. [[가라운 구역]]은 너무 늦게 대피한 사람들의 메아리를 보존하고 있습니다.",
+    ja: "沈没中、[[オーレル・ヴェン]] は代価を支払わずに灯台に火を灯しました。 [[沈没地区]] には、遅すぎて避難した人々の残響が保存されています。",
   },
   "ejemplo: flashback deliberado para mostrar las excepciones.": {
     "es": "ejemplo: flashback deliberado para mostrar las excepciones.",
@@ -2189,7 +2783,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "exemplo: flashback deliberado para mostrar exceções.",
     "it": "esempio: flashback intenzionale per mostrare eccezioni.",
     "tr": "örnek: istisnaları göstermek için kasıtlı geri dönüş.",
-    "zh-CN": "示例：为展示例外而刻意设置的闪回。"
+    "zh-CN": "示例：为展示例外而刻意设置的闪回。",
+    'zh-TW': "示例：為展示例外而刻意設定的閃回。",
+    ko: "예: 예외를 보여주는 의도적인 플래시백.",
+    ja: "例: 例外を示す意図的なフラッシュバック。",
   },
   "él": {
     "es": "él",
@@ -2200,7 +2797,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "ele",
     "it": "lui",
     "tr": "o",
-    "zh-CN": "他"
+    "zh-CN": "他",
+    'zh-TW': "他",
+    ko: "그",
+    ja: "彼",
   },
   "El [[Gremio de las Seis Velas]] abre sus cartas durante una noche. La séptima lámpara, sin nombre, se deja apagada.": {
     "es": "El [[Gremio de las Seis Velas]] abre sus cartas durante una noche. La séptima lámpara, sin nombre, se deja apagada.",
@@ -2211,7 +2811,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O [[Guilda das Seis Velas]] abre suas cartas durante uma noite. A sétima lâmpada, sem nome, fica apagada.",
     "it": "Il [[Gilda delle Sei Candele]] apre le sue carte durante una notte. La settima lampada, senza nome, è lasciata spenta.",
     "tr": "[[Altı Mum Loncası]] bir gece boyunca kartlarını açar. İsimsiz yedinci lamba yanmıyor.",
-    "zh-CN": "[[六帆公会]] 在一夜之间公开了自己的海图。第七盏没有名字的灯则被留在熄灭状态。"
+    "zh-CN": "[[六帆公会]] 在一夜之间公开了自己的海图。第七盏没有名字的灯则被留在熄灭状态。",
+    'zh-TW': "[[六帆公會]] 在一夜之間公開了自己的海圖。第七盞沒有名字的燈則被留在熄滅狀態。",
+    ko: "[[여섯 항해 길드]]가 하룻밤 동안 차트를 공개합니다. 이름이 지정되지 않은 일곱 번째 램프는 어두운 상태로 남아 있습니다.",
+    ja: "[[Guild of Six Sails]] は一晩チャートを開きます。名前のない7番目のランプは暗いままです。",
   },
   "El Archivo rechazó a su familia durante la inundación.": {
     "es": "El Archivo rechazó a su familia durante la inundación.",
@@ -2222,7 +2825,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O Arquivo rejeitou sua família durante a enchente.",
     "it": "L'Archivio ha rifiutato la sua famiglia durante l'alluvione.",
     "tr": "Arşiv sel sırasında ailesini reddetti.",
-    "zh-CN": "洪水期间，档案馆拒绝了他们的家人。"
+    "zh-CN": "洪水期间，档案馆拒绝了他们的家人。",
+    'zh-TW': "洪水期間，檔案館拒絕了他們的家人。",
+    ko: "기록 보관소는 홍수 동안 가족을 돌려보냈습니다.",
+    ja: "アーカイブは洪水の間、家族を追い返しました。",
   },
   "El bloqueo de las Seis Velas": {
     "es": "El bloqueo de las Seis Velas",
@@ -2233,7 +2839,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O bloqueio das seis velas",
     "it": "Il blocco delle sei candele",
     "tr": "Altı Mum Ablukası",
-    "zh-CN": "六帆的封锁"
+    "zh-CN": "六帆的封锁",
+    'zh-TW': "六帆的封鎖",
+    ko: "Six Sails 봉쇄",
+    ja: "シックス・セイルズの封鎖",
   },
   "El cielo siempre parece a punto de cambiar de color.": {
     "es": "El cielo siempre parece a punto de cambiar de color.",
@@ -2244,7 +2853,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O céu sempre parece prestes a mudar de cor.",
     "it": "Il cielo sembra sempre sul punto di cambiare colore.",
     "tr": "Gökyüzü her zaman renk değiştirecek gibi görünüyor.",
-    "zh-CN": "天空似乎总在即将改变颜色。"
+    "zh-CN": "天空似乎总在即将改变颜色。",
+    'zh-TW': "天空似乎總在即將改變顏色。",
+    ko: "하늘은 언제나 색깔이 변하는 것 같아요.",
+    ja: "空はいつも色が変わりそうな気がします。",
   },
   "El Consejo declara traidora a la Casa Venn mientras el Gremio bloquea el puerto.": {
     "es": "El Consejo declara traidora a la Casa Venn mientras el Gremio bloquea el puerto.",
@@ -2255,7 +2867,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O Conselho declara a Casa Venn traidora enquanto a Guilda bloqueia o porto.",
     "it": "Il Consiglio dichiara traditori la Casata Venn mentre la Gilda blocca il porto.",
     "tr": "Lonca limanı abluka altına alırken Konsey Venn Hanesi'ni hain ilan etti.",
-    "zh-CN": "公会封锁港口之际，议会宣布 Venn 家族为叛徒。"
+    "zh-CN": "公会封锁港口之际，议会宣布 Venn 家族为叛徒。",
+    'zh-TW': "公會封鎖港口之際，議會宣佈 Venn 家族為叛徒。",
+    ko: "의회는 벤 가문을 배신자라고 선언하고 길드는 항구를 봉쇄합니다.",
+    ja: "ギルドが港を封鎖する中、評議会はヴェン家を反逆者と宣言する。",
   },
   "El control de los Telares Solares.": {
     "es": "El control de los Telares Solares.",
@@ -2266,7 +2881,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O controle dos teares solares.",
     "it": "Il controllo dei Solar Looms.",
     "tr": "Güneş Tezgahlarının kontrolü.",
-    "zh-CN": "对太阳织机的控制。"
+    "zh-CN": "对太阳织机的控制。",
+    'zh-TW': "對太陽織機的控制。",
+    ko: "태양열 제어.",
+    ja: "ソーラールームの制御。",
   },
   "El Corazón altera la dirección de la marea.": {
     "es": "El Corazón altera la dirección de la marea.",
@@ -2277,7 +2895,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O Coração altera a direção da maré.",
     "it": "Il Cuore altera la direzione della marea.",
     "tr": "Kalp gelgitin yönünü değiştirir.",
-    "zh-CN": "心脏改变了潮水的方向。"
+    "zh-CN": "心脏改变了潮水的方向。",
+    'zh-TW': "心臟改變了潮水的方向。",
+    ko: "심장은 조류의 방향을 바꿉니다.",
+    ja: "ハートが潮の流れを変える。",
   },
   "El corazón bajo la ciudad": {
     "es": "El corazón bajo la ciudad",
@@ -2288,7 +2909,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O coração sob a cidade",
     "it": "Il cuore sotto la città",
     "tr": "Şehrin altındaki kalp",
-    "zh-CN": "城市之下的心脏"
+    "zh-CN": "城市之下的心脏",
+    'zh-TW': "城市之下的心臟",
+    ko: "도시 아래 마음",
+    ja: "街の地下にある心",
   },
   "El Corazón de Vidrio es una ballena de brasa inmovilizada bajo Lúmina.": {
     "es": "El Corazón de Vidrio es una ballena de brasa inmovilizada bajo Lúmina.",
@@ -2299,7 +2923,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O Coração de Vidro é uma baleia brasa imobilizada sob Lúmina.",
     "it": "Il Cuore di Vetro è una balena di brace immobilizzata sotto Lúmina.",
     "tr": "Camın Kalbi, Lúmina'nın altında hareketsiz hale getirilmiş bir kor balinasıdır.",
-    "zh-CN": "玻璃之心是一头被禁锢在 Lúmina 之下的余烬鲸。"
+    "zh-CN": "玻璃之心是一头被禁锢在 Lúmina 之下的余烬鲸。",
+    'zh-TW': "玻璃之心是一頭被禁錮在 Lúmina 之下的餘燼鯨。",
+    ko: "Glass Heart는 Lumina 아래에 고정된 불씨고래입니다.",
+    ja: "グラスハートはルミナの下に固定された残り火のクジラです。",
   },
   "El Corazón está vivo": {
     "es": "El Corazón está vivo",
@@ -2310,7 +2937,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O coração está vivo",
     "it": "Il Cuore è vivo",
     "tr": "Kalp yaşıyor",
-    "zh-CN": "心脏是活的"
+    "zh-CN": "心脏是活的",
+    'zh-TW': "心臟是活的",
+    ko: "마음은 살아있다",
+    ja: "心は生きている",
   },
   "El eco borra el recuerdo de una canción.": {
     "es": "El eco borra el recuerdo de una canción.",
@@ -2321,7 +2951,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O eco apaga a memória de uma música.",
     "it": "L'eco cancella la memoria di una canzone.",
     "tr": "Yankı, bir şarkının hafızasını siler.",
-    "zh-CN": "回声抹去了一首歌的记忆。"
+    "zh-CN": "回声抹去了一首歌的记忆。",
+    'zh-TW': "回聲抹去了一首歌的記憶。",
+    ko: "메아리는 노래의 기억을 지웁니다.",
+    ja: "エコーは曲の記憶を消してしまう。",
   },
   "El final necesita una ruta de evacuación preparada.": {
     "es": "El final necesita una ruta de evacuación preparada.",
@@ -2332,7 +2965,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O fim precisa de uma rota de evacuação preparada.",
     "it": "La fine necessita di un percorso di evacuazione preparato.",
     "tr": "Sonunda hazırlanmış bir tahliye rotasına ihtiyaç var.",
-    "zh-CN": "结局需要一条预先准备好的撤离路线。"
+    "zh-CN": "结局需要一条预先准备好的撤离路线。",
+    'zh-TW': "結局需要一條預先準備好的撤離路線。",
+    ko: "엔딩에는 준비된 대피 경로가 필요합니다.",
+    ja: "結末には避難経路の準備が必要だ。",
   },
   "El Flujo recorre el vidrio solar y responde a nombres verdaderos. La [[Casa Venn]] lo canaliza mediante mapas; los [[Veyari]] lo escuchan como una corriente. Su ley principal es [[Toda luz deja sombra]].": {
     "es": "El Flujo recorre el vidrio solar y responde a nombres verdaderos. La [[Casa Venn]] lo canaliza mediante mapas; los [[Veyari]] lo escuchan como una corriente. Su ley principal es [[Toda luz deja sombra]].",
@@ -2343,7 +2979,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O Fluxo atravessa o vidro solar e responde a nomes verdadeiros. O [[Casa Venn]] canaliza-o através de mapas; O [[Veyari]] ouve isso como uma corrente. Sua lei principal é [[Toda luz deixa sombra]].",
     "it": "Il Flusso scorre attraverso il vetro solare e risponde ai veri nomi. Il [[Casa Venn]] lo canalizza attraverso le mappe; I [[Veyari]] lo sentono come una corrente. La sua legge principale è [[Ogni luce lascia ombra]].",
     "tr": "Akış güneş camından geçer ve gerçek isimlere yanıt verir. [[Venn Hanesi]] bunu haritalar aracılığıyla yönlendirir; [[Veyari]] bunu bir akıntı gibi duyar. Ana yasası [[Her ışık gölge bırakır]]'dir.",
-    "zh-CN": "流穿过太阳玻璃，并回应真名。[[Venn 家族]] 通过地图引导它；[[Veyari]] 则将它听作一股水流。它的主要法则是 [[有光必有影]]。"
+    "zh-CN": "流穿过太阳玻璃，并回应真名。[[Venn 家族]] 通过地图引导它；[[Veyari]] 则将它听作一股水流。它的主要法则是 [[有光必有影]]。",
+    'zh-TW': "流穿過太陽玻璃，並回應真名。[[Venn 家族]] 通過地圖引導它；[[Veyari]] 則將它聽作一股水流。它的主要法則是 [[有光必有影]]。",
+    ko: "Flux는 태양광 유리를 통과하여 실제 이름에 반응합니다. [[House Venn]] 지도를 통해 이를 전달합니다. [[Veyari]]는 그것을 전류로 듣습니다. 주요 법칙은 [[모든 빛은 그림자를 던진다]]입니다.",
+    ja: "フラックスはソーラーガラスを通って真の名前に反応します。 [[ハウス・ヴェン]] は地図を通じてそれを伝えます。 [[ヴェヤリ]]はそれを流れとして聞きます。その主な法則は [[すべての光が影を落とす]] です。",
   },
   "El Gremio cierra el puerto para exigir la liberación de Cael.": {
     "es": "El Gremio cierra el puerto para exigir la liberación de Cael.",
@@ -2354,7 +2993,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A Guilda fecha o porto para exigir a libertação de Cael.",
     "it": "La Gilda chiude il porto per chiedere il rilascio di Cael.",
     "tr": "Lonca, Cael'in serbest bırakılmasını talep etmek için limanı kapatır.",
-    "zh-CN": "公会关闭港口，要求释放 Cael。"
+    "zh-CN": "公会关闭港口，要求释放 Cael。",
+    'zh-TW': "公會關閉港口，要求釋放 Cael。",
+    ko: "길드는 Cael의 석방을 요구하기 위해 항구를 폐쇄합니다.",
+    ja: "ギルドはカエルの釈放を要求するため港を閉鎖する。",
   },
   "El grupo vuelve al Observatorio y descubre el mecanismo con el que Maelor altera la Tercera Luna.": {
     "es": "El grupo vuelve al Observatorio y descubre el mecanismo con el que Maelor altera la Tercera Luna.",
@@ -2365,7 +3007,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O grupo retorna ao Observatório e descobre o mecanismo com o qual Maelor altera a Terceira Lua.",
     "it": "Il gruppo torna all'Osservatorio e scopre il meccanismo con cui Maelor altera la Terza Luna.",
     "tr": "Grup Gözlemevi'ne geri döner ve Maelor'un Üçüncü Ay'ı değiştirme mekanizmasını keşfeder.",
-    "zh-CN": "队伍回到天文台，发现了 Maelor 用来改变第三月亮的机关。"
+    "zh-CN": "队伍回到天文台，发现了 Maelor 用来改变第三月亮的机关。",
+    'zh-TW': "隊伍回到天文臺，發現了 Maelor 用來改變第三月亮的機關。",
+    ko: "그룹은 천문대로 돌아와 Maelor가 세 번째 달을 변경하는 데 사용하는 메커니즘을 발견합니다.",
+    ja: "グループは天文台に戻り、メーラーが第三の月を変えるために使用しているメカニズムを発見します。",
   },
   "El heredero anunciado por el Oráculo de Sal, cuyo parentesco real sigue en disputa.": {
     "es": "El heredero anunciado por el Oráculo de Sal, cuyo parentesco real sigue en disputa.",
@@ -2376,7 +3021,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O herdeiro anunciado pelo Oráculo do Sal, cuja verdadeira ascendência permanece em disputa.",
     "it": "L'erede annunciato dall'Oracolo di Sal, la cui vera parentela rimane controversa.",
     "tr": "Gerçek ebeveynliği hâlâ tartışmalı olan Sal Kahini tarafından ilan edilen varis.",
-    "zh-CN": "由盐之预言宣告的继承人，其真实血缘仍存争议。"
+    "zh-CN": "由盐之预言宣告的继承人，其真实血缘仍存争议。",
+    'zh-TW': "由鹽之預言宣告的繼承人，其真實血緣仍存爭議。",
+    ko: "솔트 오라클(Salt Oracle)이 발표한 상속인으로, 그의 진정한 친자 관계에 대해서는 아직 논란이 남아 있습니다.",
+    ja: "塩の神託者によって発表された後継者ですが、その本当の親子関係については未だに議論が続いています。",
   },
   "El mar recupera el Barrio Hundido y obliga a evacuar la costa.": {
     "es": "El mar recupera el Barrio Hundido y obliga a evacuar la costa.",
@@ -2387,7 +3035,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O mar recupera o Bairro Submerso e obriga a evacuação da costa.",
     "it": "Il mare recupera il quartiere sommerso e costringe l'evacuazione della costa.",
     "tr": "Deniz, Batık Mahalle'yi kurtarır ve sahili tahliye edilmeye zorlar.",
-    "zh-CN": "大海重新夺回沉没街区，迫使沿海撤离。"
+    "zh-CN": "大海重新夺回沉没街区，迫使沿海撤离。",
+    'zh-TW': "大海重新奪回沉沒街區，迫使沿海撤離。",
+    ko: "바다는 Sunken Quarter를 되찾고 해안 대피를 강요합니다.",
+    ja: "海は沈没地区を埋め立て、沿岸からの避難を余儀なくされます。",
   },
   "El nombre que canta la isla": {
     "es": "El nombre que canta la isla",
@@ -2398,7 +3049,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O nome que a ilha canta",
     "it": "Il nome che canta l'isola",
     "tr": "Adanın söylediği isim",
-    "zh-CN": "岛屿所歌唱的名字"
+    "zh-CN": "岛屿所歌唱的名字",
+    'zh-TW': "島嶼所歌唱的名字",
+    ko: "섬이 부르는 이름",
+    ja: "島が歌う名前",
   },
   "El nombre verdadero del Faro": {
     "es": "El nombre verdadero del Faro",
@@ -2409,7 +3063,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O verdadeiro nome do Farol",
     "it": "Il vero nome del Faro",
     "tr": "Deniz Fenerinin gerçek adı",
-    "zh-CN": "灯塔的真名"
+    "zh-CN": "灯塔的真名",
+    'zh-TW': "燈塔的真名",
+    ko: "등대의 실제 이름",
+    ja: "灯台の本当の名前",
   },
   "El Oráculo de Sal anunció un heredero Venn antes de la caída del Consejo. Ilyra figura como madre adoptiva futura y las casas Venn y Sarn utilizan la predicción para negociar sucesión, aunque nadie conoce el parentesco biológico ni siquiera si “Elan” designa a una sola persona. En el epílogo solo existen una cuna vacía, una cláusula política y una luz paciente mar adentro. Cualquier respuesta de Elan representa una posibilidad imaginada, nunca un recuerdo ni un hecho futuro confirmado.": {
     "es": "El Oráculo de Sal anunció un heredero Venn antes de la caída del Consejo. Ilyra figura como madre adoptiva futura y las casas Venn y Sarn utilizan la predicción para negociar sucesión, aunque nadie conoce el parentesco biológico ni siquiera si “Elan” designa a una sola persona. En el epílogo solo existen una cuna vacía, una cláusula política y una luz paciente mar adentro. Cualquier respuesta de Elan representa una posibilidad imaginada, nunca un recuerdo ni un hecho futuro confirmado.",
@@ -2420,7 +3077,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O Oráculo do Sal anunciou um herdeiro Venn antes da queda do Conselho. Ilyra é listada como futura mãe adotiva e as casas de Venn e Sarn usam a previsão para negociar a sucessão, embora ninguém saiba a relação biológica ou mesmo se “Elan” designa uma única pessoa. No epílogo há apenas um berço vazio, uma cláusula política e uma luz paciente ao mar. Qualquer resposta de Elan representa uma possibilidade imaginada, nunca uma memória ou um fato futuro confirmado.",
     "it": "L'Oracolo del Sale annunciò un erede Venn prima della caduta del Consiglio. Ilyra è indicata come futura madre adottiva e le case Venn e Sarn utilizzano la previsione per negoziare la successione, anche se nessuno conosce il legame biologico e nemmeno se “Elan” designa una sola persona. Nell'epilogo ci sono solo una culla vuota, una clausola politica e una paziente luce al largo. Qualsiasi risposta da parte di Elan rappresenta una possibilità immaginata, mai un ricordo o un fatto futuro confermato.",
     "tr": "Tuz Kahini, Konsey'in düşmesinden önce Venn'in varisini ilan etti. Ilyra, gelecekteki evlat edinen anne olarak listeleniyor ve Venn ve Sarn haneleri, biyolojik ilişkiyi kimse bilmese ve hatta \"Elan\" tek bir kişiyi belirtse de, veraset müzakeresi için bu öngörüyü kullanıyor. Sonsözde yalnızca boş bir beşik, siyasi bir madde ve denize açılan sabırlı bir ışık var. Elan'dan gelen herhangi bir yanıt, hayali bir olasılığı temsil eder; asla bir anıyı veya geleceğe yönelik doğrulanmış bir gerçeği temsil etmez.",
-    "zh-CN": "在议会垮台前，盐之预言宣告了一位 Venn 继承人。Ilyra 被列为未来的养母，Venn 与 Sarn 两家族利用这一预言来谈判继承问题，尽管无人知道其生物学血缘，甚至不知道“Elan”是否只指一个人。在尾声里，只有一张空摇篮、一条政治条款，以及海上一盏耐心的光。Elan 的任何回答都代表一种想象出来的可能性，绝非记忆或已确认的未来事实。"
+    "zh-CN": "在议会垮台前，盐之预言宣告了一位 Venn 继承人。Ilyra 被列为未来的养母，Venn 与 Sarn 两家族利用这一预言来谈判继承问题，尽管无人知道其生物学血缘，甚至不知道“Elan”是否只指一个人。在尾声里，只有一张空摇篮、一条政治条款，以及海上一盏耐心的光。Elan 的任何回答都代表一种想象出来的可能性，绝非记忆或已确认的未来事实。",
+    'zh-TW': "在議會垮臺前，鹽之預言宣告了一位 Venn 繼承人。Ilyra 被列為未來的養母，Venn 與 Sarn 兩家族利用這一預言來談判繼承問題，儘管無人知道其生物學血緣，甚至不知道“Elan”是否只指一個人。在尾聲裡，只有一張空搖籃、一條政治條款，以及海上一盞耐心的光。Elan 的任何回答都代表一種想像出來的可能性，絕非記憶或已確認的未來事實。",
+    ko: "Salt Oracle은 의회가 무너지기 전에 Venn 상속인을 발표했습니다. Ilyra는 미래의 입양 어머니로 지명되고 Venn과 Sarn 가문은 이 예측을 사용하여 승계를 협상합니다. 그러나 누구도 생물학적 혈통이나 \"Elan\"이 한 사람을 의미하는지 여부조차 알지 못합니다. 에필로그에는 빈 요람, 정치적 조항, 인내심 있는 역외의 빛만이 존재한다. Elan의 모든 답변은 상상된 가능성을 나타내며 결코 기억이나 확인된 미래 사실이 아닙니다.",
+    ja: "塩の神託者は評議会が崩壊する前にヴェンの後継者を発表した。イリラは将来の養母として指名され、ヴェン家とサーン家はその予言を継承交渉に利用するが、生物学的な親子関係や「エラン」が一人の人間を意味するのかどうかさえ誰も知らない。エピローグには、空のゆりかご、政治的な条項、そして忍耐強い沖合の光だけが存在します。エランからの答えはどれも想像上の可能性を表すものであり、決して記憶や確認された将来の事実ではありません。",
   },
   "El precio de la luz": {
     "es": "El precio de la luz",
@@ -2431,7 +3091,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O preço da luz",
     "it": "Il prezzo della luce",
     "tr": "Işığın fiyatı",
-    "zh-CN": "光的代价"
+    "zh-CN": "光的代价",
+    'zh-TW': "光的代價",
+    ko: "빛의 가격",
+    ja: "光の値段",
   },
   "El texto funda el [[Culto de la Primera Luz]] y convierte el mantenimiento del [[Casa del Faro]] en deber cívico. La edición de Maelor omite el capítulo sobre consentimiento.": {
     "es": "El texto funda el [[Culto de la Primera Luz]] y convierte el mantenimiento del [[Casa del Faro]] en deber cívico. La edición de Maelor omite el capítulo sobre consentimiento.",
@@ -2442,7 +3105,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O texto estabelece o [[Culto da Primeira Luz]] e converte a manutenção do [[Casa Farol]] em dever cívico. A edição de Maelor omite o capítulo sobre consentimento.",
     "it": "Il testo istituisce il [[Culto della Prima Luce]] e converte il mantenimento del [[Casa del Faro]] in un dovere civico. L'edizione di Maelor omette il capitolo sul consenso.",
     "tr": "Metin [[İlk Işık Kültü]]'yi kurar ve [[Deniz Feneri Evi]]'nin bakımını bir vatandaşlık görevine dönüştürür. Maelor'un baskısında rızaya ilişkin bölüm çıkarılmıştır.",
-    "zh-CN": "该文本创立了 [[初光教派]]，并将 [[灯塔家族]] 的维护变为公民义务。Maelor 的版本删去了关于同意的章节。"
+    "zh-CN": "该文本创立了 [[初光教派]]，并将 [[灯塔家族]] 的维护变为公民义务。Maelor 的版本删去了关于同意的章节。",
+    'zh-TW': "該文本創立了 [[初光教派]]，並將 [[燈塔家族]] 的維護變為公民義務。Maelor 的版本刪去了關於同意的章節。",
+    ko: "본문은 [[첫 번째 빛의 숭배]]를 확립하고 [[등대]]의 유지 관리를 시민의 의무로 전환합니다. Maelor의 판에는 동의에 관한 장이 생략되어 있습니다.",
+    ja: "この文書は [[最初の光の教団]] を設立し、[[灯台の家]] の維持を市民の義務に変えています。メーラー版では同意に関する章が省略されています。",
   },
   "Elan todavía no ha nacido y, por tanto, no posee una personalidad canónica completa. En el chat se interpreta como la voz condicional que la profecía y las expectativas ajenas proyectan sobre su futuro: sensible a que otros decidan por elle, curioso ante un mundo que solo conoce por relatos y obstinado en distinguir posibilidad de destino.": {
     "es": "Elan todavía no ha nacido y, por tanto, no posee una personalidad canónica completa. En el chat se interpreta como la voz condicional que la profecía y las expectativas ajenas proyectan sobre su futuro: sensible a que otros decidan por elle, curioso ante un mundo que solo conoce por relatos y obstinado en distinguir posibilidad de destino.",
@@ -2453,7 +3119,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Elan ainda não nasceu e, portanto, não possui uma personalidade canônica completa. No bate-papo, ela se interpreta como a voz condicional que a profecia e as expectativas alheias projetam sobre seu futuro: sensível aos outros que decidem por ela, curiosa sobre um mundo que só conhece por meio de histórias e teimosa em distinguir a possibilidade do destino.",
     "it": "Elan non è ancora nato e quindi non possiede una personalità canonica completa. Nella chiacchierata interpreta se stessa come la voce condizionale che la profezia e le aspettative degli altri proiettano sul suo futuro: sensibile verso gli altri che decidono per lei, curiosa di un mondo che conosce solo attraverso i racconti, e testarda nel distinguere la possibilità del destino.",
     "tr": "Elan henüz doğmadı ve bu nedenle tam anlamıyla kanonik bir kişiliğe sahip değil. Sohbette kendisini, kehanetin ve diğer insanların beklentilerinin geleceğine yansıttığı koşullu ses olarak yorumluyor: Başkalarının kendisi adına karar vermesine karşı duyarlı, yalnızca hikayeler yoluyla bildiği bir dünyayı merak ediyor ve kaderin olasılığını ayırt etmede inatçı.",
-    "zh-CN": "Elan 尚未出生，因此没有完整的正典人格。在聊天中，其被演绎为预言与他人期望投射在其未来之上的条件式声音：对他人替 elle 做决定十分敏感，对只通过故事了解的世界充满好奇，并执意区分可能性与命运。"
+    "zh-CN": "Elan 尚未出生，因此没有完整的正典人格。在聊天中，其被演绎为预言与他人期望投射在其未来之上的条件式声音：对他人替 elle 做决定十分敏感，对只通过故事了解的世界充满好奇，并执意区分可能性与命运。",
+    'zh-TW': "Elan 尚未出生，因此沒有完整的正典人格。在聊天中，其被演繹為預言與他人期望投射在其未來之上的條件式聲音：對他人替 elle 做決定十分敏感，對只通過故事瞭解的世界充滿好奇，並執意區分可能性與命運。",
+    ko: "Elan은 아직 태어나지 않았으므로 완전한 표준 성격이 없습니다. 채팅에서 그들은 예언과 다른 사람들의 기대에 의해 투사된 조건부 목소리로 수행됩니다. 즉, 다른 사람들이 자신을 결정하는 데 민감하고, 이야기를 통해서만 알려진 세계에 대해 호기심을 갖고, 가능성과 운명을 분리하는 데 고집을 부리는 것입니다.",
+    ja: "エランはまだ生まれていないため、完全な標準的な人格を持っていません。チャットでは、彼らは予言や他人の期待によって投影された条件付きの声として演じられます。他人が自分に決めたことに敏感で、物語を通してのみ知られる世界に興味を持ち、可能性と運命を区別することに頑固です。",
   },
   "Elan Venn": {
     "es": "Elan Venn",
@@ -2464,7 +3133,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Elan Venn",
     "it": "Elan Venn",
     "tr": "Elan Venn",
-    "zh-CN": "Elan Venn"
+    "zh-CN": "Elan Venn",
+    'zh-TW': "Elan Venn",
+    ko: "엘란 벤",
+    ja: "エラン・ベン",
   },
   "Elegir una causa que no dependa de su reputación.": {
     "es": "Elegir una causa que no dependa de su reputación.",
@@ -2475,7 +3147,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Escolha uma causa que não dependa da sua reputação.",
     "it": "Scegli una causa che non dipenda dalla tua reputazione.",
     "tr": "İtibarınıza bağlı olmayan bir amaç seçin.",
-    "zh-CN": "选择一项不依赖自身声誉的事业。"
+    "zh-CN": "选择一项不依赖自身声誉的事业。",
+    'zh-TW': "選擇一項不依賴自身聲譽的事業。",
+    ko: "그의 평판에 좌우되지 않는 원인을 선택하십시오.",
+    ja: "彼の評判に依存しない大義を選択してください。",
   },
   "ella": {
     "es": "ella",
@@ -2486,7 +3161,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "ela",
     "it": "lei",
     "tr": "o",
-    "zh-CN": "她"
+    "zh-CN": "她",
+    'zh-TW': "她",
+    ko: "그녀",
+    ja: "彼女",
   },
   "elle": {
     "es": "elle",
@@ -2497,7 +3175,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "ela",
     "it": "elle",
     "tr": "elle",
-    "zh-CN": "elle"
+    "zh-CN": "elle",
+    'zh-TW': "elle",
+    ko: "엘",
+    ja: "エル",
   },
   "Elyndra": {
     "es": "Elyndra",
@@ -2508,7 +3189,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Elindra",
     "it": "Elindra",
     "tr": "Elyndra",
-    "zh-CN": "Elyndra"
+    "zh-CN": "Elyndra",
+    'zh-TW': "Elyndra",
+    ko: "엘린드라",
+    ja: "エリンドラ",
   },
   "emblema heráldico de fantasía marítima": {
     "es": "emblema heráldico de fantasía marítima",
@@ -2519,7 +3203,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "emblema heráldico de fantasia marítima",
     "it": "emblema araldico di fantasia marittima",
     "tr": "denizcilik fantezi hanedan amblemi",
-    "zh-CN": "海洋奇幻风格的纹章徽记"
+    "zh-CN": "海洋奇幻风格的纹章徽记",
+    'zh-TW': "海洋奇幻風格的紋章徽記",
+    ko: "전령 상징, 해양 판타지",
+    ja: "紋章、海洋ファンタジー",
   },
   "Empieza con “¿y si…?”, cuenta las preguntas con los dedos y llama “una cerradura con uniforme” a las prohibiciones burocráticas. Cuando oye un eco dice “eso no era mío”.": {
     "es": "Empieza con “¿y si…?”, cuenta las preguntas con los dedos y llama “una cerradura con uniforme” a las prohibiciones burocráticas. Cuando oye un eco dice “eso no era mío”.",
@@ -2530,7 +3217,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Começa com “e se?”, conta as perguntas nos dedos e chama as proibições burocráticas de “um cadeado de uniforme”. Ao ouvir um eco, ele diz “aquilo não era meu”.",
     "it": "Inizia con “e se?”, conta le domande sulle dita e definisce i divieti burocratici “un lucchetto in un’uniforme”. Quando sente un'eco dice \"quello non era mio\".",
     "tr": "“Ya şöyle olursa?” diye başlıyor, soruları parmaklarıyla sayıyor ve bürokratik yasaklara “üniforma kilidi” diyor. Bir yankı duyduğunda “bu benim değildi” diyor.",
-    "zh-CN": "以“如果……呢？”开头，用手指清点问题，称官僚禁令为“穿制服的锁”。听到回声时，会说“那不是我的”。"
+    "zh-CN": "以“如果……呢？”开头，用手指清点问题，称官僚禁令为“穿制服的锁”。听到回声时，会说“那不是我的”。",
+    'zh-TW': "以“如果……呢？”開頭，用手指清點問題，稱官僚禁令為“穿制服的鎖”。聽到回聲時，會說“那不是我的”。",
+    ko: "\"만약...?\"으로 시작하여 질문을 세어보고 관료적 금지 조치를 \"제복의 자물쇠\"라고 부릅니다. 메아리를 들으면 그들은 “그건 내 것이 아니었어요”라고 말합니다.",
+    ja: "「もし…だったら？」から始まり、質問を指で数え、官僚的な禁止事項を「制服の錠前」と呼びます。エコーを聞くと、彼らは「あれは私のものではない」と言います。",
   },
   "Empieza con “si llego a nacer”; llama a la profecía “la historia que escribieron antes que yo”; evita confirmar y distingue “me esperan” de “soy”.": {
     "es": "Empieza con “si llego a nacer”; llama a la profecía “la historia que escribieron antes que yo”; evita confirmar y distingue “me esperan” de “soy”.",
@@ -2541,7 +3231,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Começa com “se eu nascer”; chama a profecia de “a história que escreveram antes de mim”; evite confirmar e distinguir “eles me esperam” de “eu sou”.",
     "it": "Inizia con “se nasco”; chiama la profezia “la storia che hanno scritto prima di me”; evitare di confermare e distinguere “mi aspettano” da “io sono”.",
     "tr": "“Doğsaydım” diye başlıyor; kehaneti “benden önce yazdıkları tarih” olarak adlandırıyor; Onaylamaktan kaçının ve “beni bekliyorlar”ı “ben varım”dan ayırın.",
-    "zh-CN": "以“如果我得以出生”开头；称预言为“在我之前写下的故事”；避免肯定，并区分“他们在等我”与“我就是”。"
+    "zh-CN": "以“如果我得以出生”开头；称预言为“在我之前写下的故事”；避免肯定，并区分“他们在等我”与“我就是”。",
+    'zh-TW': "以“如果我得以出生”開頭；稱預言為“在我之前寫下的故事”；避免肯定，並區分“他們在等我”與“我就是”。",
+    ko: "“내가 태어났다면”으로 시작합니다. 예언을 “내 앞에 기록된 이야기”라고 부릅니다. 확인을 피하고 '그들이 나를 기대한다'와 '나는 있다'를 구별합니다.",
+    ja: "「もし私が生まれたら」で始まります。預言を「私の前に書かれた物語」と呼んでいます。確認を避け、「彼らは私に期待している」と「私はそうである」を区別します。",
   },
   "En Isla Nácar, la marea confisca toda arma salvo la prótesis de Ilyra, a la que reconoce como parte de Asteriel. Vesh obliga al grupo a escuchar una memoria compartida: el Corazón no es una máquina sino una criatura arrancada del mar para alimentar el Faro. Sena casi confunde el duelo heredado con el propio y Cael rompe el ritual para sostenerle. Vesh confirma que Nara sigue consciente dentro de la criatura y exige que Ilyra elija entre devolverla al mar o negociar una nueva relación.": {
     "es": "En Isla Nácar, la marea confisca toda arma salvo la prótesis de Ilyra, a la que reconoce como parte de Asteriel. Vesh obliga al grupo a escuchar una memoria compartida: el Corazón no es una máquina sino una criatura arrancada del mar para alimentar el Faro. Sena casi confunde el duelo heredado con el propio y Cael rompe el ritual para sostenerle. Vesh confirma que Nara sigue consciente dentro de la criatura y exige que Ilyra elija entre devolverla al mar o negociar una nueva relación.",
@@ -2552,7 +3245,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Na Ilha Mãe de Pérola, a maré confisca todas as armas, exceto a prótese de Ilyra, que reconhece como parte de Asteriel. Vesh obriga o grupo a ouvir uma memória compartilhada: o Coração não é uma máquina, mas uma criatura retirada do mar para alimentar o Farol. Sena quase confunde a dor herdada com a sua e Cael quebra o ritual para apoiá-lo. Vesh confirma que Nara ainda está consciente dentro da criatura e exige que Ilyra escolha entre devolvê-la ao mar ou negociar um novo relacionamento.",
     "it": "Sull'Isola Madreperla, la marea confisca tutte le armi tranne la protesi di Ilyra, che riconosce come parte di Asteriel. Vesh costringe il gruppo ad ascoltare un ricordo condiviso: il Cuore non è una macchina ma una creatura strappata al mare per alimentare il Faro. Sena quasi confonde il dolore ereditato con il suo e Cael interrompe il rituale per sostenerlo. Vesh conferma che Nara è ancora cosciente all'interno della creatura e chiede a Ilyra di scegliere tra riportarla in mare o negoziare una nuova relazione.",
     "tr": "Sedef Adası'nın Annesi'nde dalga, Asteriel'in parçası olarak tanıdığı Ilyra'nın protezi dışındaki tüm silahlara el koyar. Vesh, grubu ortak bir anıyı dinlemeye zorlar: Kalp bir makine değil, Deniz Feneri'ne güç sağlamak için denizden koparılan bir yaratıktır. Sena, miras aldığı acıyı neredeyse kendisininmiş gibi algılar ve Cael, ona destek olmak için ritüeli bozar. Vesh, Nara'nın hâlâ yaratığın bilincinde olduğunu doğrular ve Ilyra'dan onu denize geri döndürmek ya da yeni bir ilişki için pazarlık yapmak arasında seçim yapmasını ister.",
-    "zh-CN": "在珍珠岛上，潮水没收了所有武器，唯独 Ilyra 的义肢除外，因为它将其认作 Asteriel 的一部分。Vesh 迫使队伍聆听一段共享记忆：心脏并非机器，而是一头从海中夺来、用以供养灯塔的生物。Sena 几乎把继承而来的哀伤与自己的混同，Cael 中断仪式来支持对方。Vesh 确认 Nara 在那生物体内仍有意识，并要求 Ilyra 在将其归还大海与协商一种新关系之间做出选择。"
+    "zh-CN": "在珍珠岛上，潮水没收了所有武器，唯独 Ilyra 的义肢除外，因为它将其认作 Asteriel 的一部分。Vesh 迫使队伍聆听一段共享记忆：心脏并非机器，而是一头从海中夺来、用以供养灯塔的生物。Sena 几乎把继承而来的哀伤与自己的混同，Cael 中断仪式来支持对方。Vesh 确认 Nara 在那生物体内仍有意识，并要求 Ilyra 在将其归还大海与协商一种新关系之间做出选择。",
+    'zh-TW': "在珍珠島上，潮水沒收了所有武器，唯獨 Ilyra 的義肢除外，因為它將其認作 Asteriel 的一部分。Vesh 迫使隊伍聆聽一段共享記憶：心臟並非機器，而是一頭從海中奪來、用以供養燈塔的生物。Sena 幾乎把繼承而來的哀傷與自己的混同，Cael 中斷儀式來支援對方。Vesh 確認 Nara 在那生物體內仍有意識，並要求 Ilyra 在將其歸還大海與協商一種新關係之間做出選擇。",
+    ko: "Nacre Island에서 조수는 Asteriel의 일부로 인식하는 Ilyra의 보철물을 제외한 모든 무기를 가져갑니다. Vesh는 그룹이 공유된 기억을 듣게 만듭니다. 심장은 기계가 아니라 등대에 먹이를 주기 위해 바다에서 찢겨진 생물입니다. 세나는 물려받은 슬픔과 자신의 슬픔을 거의 혼동하고 카엘은 그들을 지원하기 위해 의식을 깨뜨립니다. Vesh는 Nara가 생물 내부에 의식이 남아 있음을 확인하고 Ilyra에게 생물을 바다로 되돌릴 것인지 아니면 새로운 관계를 협상할 것인지 선택하라고 요구합니다.",
+    ja: "ナクル島では、アステリエルの一部として認識されているイリラの義手を除くすべての武器が潮流にさらわれています。ヴェッシュはグループに共通の記憶を聞かせます。ハートは機械ではなく、灯台を養うために海から引き裂かれた生き物です。セナは受け継いだ悲しみを自分たちの悲しみと混同しそうになるが、カエルは儀式を破って彼らをサポートする。ヴェッシュはナラが体内で意識を保っていることを確認し、イリラにナラを海に戻すか、新たな関係を交渉するかの選択を要求する。",
   },
   "En la Puerta de Sal, Tarek recibe dos órdenes incompatibles: arrestar a Ilyra y mantener abierta la única evacuación terrestre. Ilyra presenta una autorización falsificada cuya activación exige que quien la valida asuma públicamente el coste. Cael provoca a la guardia para ofrecerle una excusa, pero Tarek rechaza fingir. Abre la puerta, registra su propia firma y entrega a Ilyra la frecuencia secreta de la Guardia; el sello arde y deja una marca visible que Maelor podrá rastrear.": {
     "es": "En la Puerta de Sal, Tarek recibe dos órdenes incompatibles: arrestar a Ilyra y mantener abierta la única evacuación terrestre. Ilyra presenta una autorización falsificada cuya activación exige que quien la valida asuma públicamente el coste. Cael provoca a la guardia para ofrecerle una excusa, pero Tarek rechaza fingir. Abre la puerta, registra su propia firma y entrega a Ilyra la frecuencia secreta de la Guardia; el sello arde y deja una marca visible que Maelor podrá rastrear.",
@@ -2563,7 +3259,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "No Salt Gate, Tarek recebe duas ordens incompatíveis: prender Ilyra e manter aberta a única evacuação terrestre. Ilyra apresenta uma autorização falsificada cuja ativação exige que quem a valida assuma publicamente o custo. Cael provoca o guarda para dar uma desculpa, mas Tarek se recusa a fingir. Ele abre a porta, registra sua própria assinatura e entrega a frequência secreta de Ilyra, o Guarda; o selo queima e deixa uma marca visível que Maelor poderá rastrear.",
     "it": "Alla Porta del Sale, Tarek riceve due ordini incompatibili: arrestare Ilyra e mantenere aperta l'unica evacuazione via terra. Ilyra presenta un'autorizzazione falsificata la cui attivazione prevede che chi la convalida pubblicamente ne assume il costo. Cael provoca la guardia offrendogli una scusa, ma Tarek si rifiuta di fingere. Apre la porta, registra la propria firma e consegna la frequenza segreta di Ilyra la Guardia; il sigillo brucia e lascia un segno visibile che Maelor potrà rintracciare.",
     "tr": "Tarek, Tuz Kapısı'nda iki uyumsuz emir alır: Ilyra'yı tutuklayın ve tek kara tahliyesini açık tutun. Ilyra, etkinleştirilmesi için bunu onaylayan kişinin maliyeti kamuya açık olarak üstlenmesini gerektiren sahte bir yetkilendirme sunuyor. Cael, gardiyanı bir bahane sunması için kışkırtır ama Tarek rol yapmayı reddeder. Kapıyı açar, kendi imzasını kaydeder ve Muhafız Ilyra'ya gizli frekansını verir; mühür yanar ve Maelor'un takip edebileceği görünür bir iz bırakır.",
-    "zh-CN": "在盐门，Tarek 接到两道互不相容的命令：逮捕 Ilyra，并保持唯一一条陆上撤离通道畅通。Ilyra 出示了一份伪造的授权，其激活要求验证者公开承担代价。Cael 挑衅守卫，想给他一个借口，但 Tarek 拒绝作假。他打开门，登记了自己的签名，并把卫队的秘密频率交给 Ilyra；印章燃烧，留下一道 Maelor 能够追踪的可见痕迹。"
+    "zh-CN": "在盐门，Tarek 接到两道互不相容的命令：逮捕 Ilyra，并保持唯一一条陆上撤离通道畅通。Ilyra 出示了一份伪造的授权，其激活要求验证者公开承担代价。Cael 挑衅守卫，想给他一个借口，但 Tarek 拒绝作假。他打开门，登记了自己的签名，并把卫队的秘密频率交给 Ilyra；印章燃烧，留下一道 Maelor 能够追踪的可见痕迹。",
+    'zh-TW': "在鹽門，Tarek 接到兩道互不相容的命令：逮捕 Ilyra，並保持唯一一條陸上撤離通道暢通。Ilyra 出示了一份偽造的授權，其啟用要求驗證者公開承擔代價。Cael 挑釁守衛，想給他一個藉口，但 Tarek 拒絕作假。他開啟門，登記了自己的簽名，並把衛隊的秘密頻率交給 Ilyra；印章燃燒，留下一道 Maelor 能夠追蹤的可見痕跡。",
+    ko: "Salt Gate에서 Tarek은 Ilyra를 체포하고 유일한 육상 대피 경로를 보존하라는 양립할 수 없는 명령을 받습니다. Ilyra는 활성화를 위해서는 검증자가 비용을 공개적으로 수락해야 하는 위조된 인증을 제시합니다. 카엘은 경비원을 자극하여 변명을 하려고 하지만 타렉은 가식을 거부합니다. 그는 문을 열고 자신의 서명을 기록한 다음 경비병 Ilyra의 비밀 주파수를 알려줍니다. 봉인은 타서 Maelor가 추적할 수 있는 흔적을 남깁니다.",
+    ja: "塩の門でタレクは、イリラを逮捕し、唯一の陸上避難ルートを確保するという矛盾した命令を受ける。 Ilyra は偽造した認証を提示しますが、その認証を有効にするには、バリデーターがコストを公的に受け入れる必要があります。カエルは警備員を挑発して言い訳をさせるが、タレクはそのふりを拒否する。彼は門を開け、署名を記録し、イリラ・ザ・ガードの秘密の周波数を与えます。印章は燃えて、メーラーが追跡できる跡が残ります。",
   },
   "Encender el Corazón de Vidrio bajo su control.": {
     "es": "Encender el Corazón de Vidrio bajo su control.",
@@ -2574,7 +3273,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Acenda o Coração de Vidro sob seu controle.",
     "it": "Accendi il Cuore di Vetro sotto il tuo controllo.",
     "tr": "Kontrolünüz altındaki Camın Kalbini ateşleyin.",
-    "zh-CN": "在其控制下点燃玻璃之心。"
+    "zh-CN": "在其控制下点燃玻璃之心。",
+    'zh-TW': "在其控制下點燃玻璃之心。",
+    ko: "그가 조종하는 글래스 하트에 불을 붙이세요.",
+    ja: "彼の制御下にあるグラスハートに点火します。",
   },
   "Encontrar a Nara antes de la próxima Marea Negra.": {
     "es": "Encontrar a Nara antes de la próxima Marea Negra.",
@@ -2585,7 +3287,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Encontre Nara antes da próxima Maré Negra.",
     "it": "Trova Nara prima della prossima marea nera.",
     "tr": "Bir sonraki Kara Dalga'dan önce Nara'yı bulun.",
-    "zh-CN": "在下一次黑潮来临前找到 Nara。"
+    "zh-CN": "在下一次黑潮来临前找到 Nara。",
+    'zh-TW': "在下一次黑潮來臨前找到 Nara。",
+    ko: "다음 흑조가 오기 전에 나라를 찾으세요.",
+    ja: "次のブラックタイドの前に奈良を見つけてください。",
   },
   "Encontró el registro de guardia.": {
     "es": "Encontró el registro de guardia.",
@@ -2596,7 +3301,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele encontrou o registro da guarda.",
     "it": "Ha trovato il registro della guardia.",
     "tr": "Nöbetçi günlüğünü buldu.",
-    "zh-CN": "找到了守卫日志。"
+    "zh-CN": "找到了守卫日志。",
+    'zh-TW': "找到了守衛日誌。",
+    ko: "경비 기록을 찾았습니다.",
+    ja: "警備員のログを発見。",
   },
   "Energía que conserva memoria y transfiere deuda.": {
     "es": "Energía que conserva memoria y transfiere deuda.",
@@ -2607,7 +3315,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Energia que preserva a memória e transfere dívidas.",
     "it": "Energia che conserva la memoria e trasferisce il debito.",
     "tr": "Hafızayı koruyan ve borcu aktaran enerji.",
-    "zh-CN": "保存记忆并转移债务的能量。"
+    "zh-CN": "保存记忆并转移债务的能量。",
+    'zh-TW': "儲存記憶並轉移債務的能量。",
+    ko: "기억을 보존하고 빚을 이전하는 에너지.",
+    ja: "記憶を保存し、借金を移転するエネルギー。",
   },
   "Entender que la neutralidad también elige un bando.": {
     "es": "Entender que la neutralidad también elige un bando.",
@@ -2618,7 +3329,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Entenda que a neutralidade também escolhe um lado.",
     "it": "Comprendi che anche la neutralità sceglie da che parte stare.",
     "tr": "Tarafsızlığın da bir taraf seçtiğini anlayın.",
-    "zh-CN": "明白中立同样是在选择阵营。"
+    "zh-CN": "明白中立同样是在选择阵营。",
+    'zh-TW': "明白中立同樣是在選擇陣營。",
+    ko: "중립도 한쪽을 선택한다는 점을 이해하십시오.",
+    ja: "中立性もどちらの側を選ぶかを理解してください。",
   },
   "Entrada del atlas de demostración.": {
     "es": "Entrada del atlas de demostración.",
@@ -2629,7 +3343,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Entrada do atlas de demonstração.",
     "it": "Voce demo dell'atlante.",
     "tr": "Demo atlası girişi.",
-    "zh-CN": "演示地图集的条目。"
+    "zh-CN": "演示地图集的条目。",
+    'zh-TW': "演示地圖集的條目。",
+    ko: "데모 아틀라스 항목.",
+    ja: "デモアトラスのエントリー。",
   },
   "Entrega la decisión al grupo.": {
     "es": "Entrega la decisión al grupo.",
@@ -2640,7 +3357,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Dê a decisão ao grupo.",
     "it": "Dai la decisione al gruppo.",
     "tr": "Kararı gruba verin.",
-    "zh-CN": "把决定权交给队伍。"
+    "zh-CN": "把决定权交给队伍。",
+    'zh-TW': "把決定權交給隊伍。",
+    ko: "결정을 그룹에 넘깁니다.",
+    ja: "決定をグループに渡します。",
   },
   "Epílogo": {
     "es": "Epílogo",
@@ -2651,7 +3371,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Epílogo",
     "it": "Epilogo",
     "tr": "Sonsöz",
-    "zh-CN": "尾声"
+    "zh-CN": "尾声",
+    'zh-TW': "尾聲",
+    ko: "발문",
+    ja: "エピローグ",
   },
   "Epilogo · Una costa sin dibujar": {
     "es": "Epilogo · Una costa sin dibujar",
@@ -2662,7 +3385,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Epílogo · Uma costa não desenhada",
     "it": "Epilogo · Una costa inesplorata",
     "tr": "Sonsöz · Çizilmemiş bir sahil",
-    "zh-CN": "尾声 · 未绘制的海岸"
+    "zh-CN": "尾声 · 未绘制的海岸",
+    'zh-TW': "尾聲 · 未繪製的海岸",
+    ko: "에필로그 · 지도에 나오지 않은 해안",
+    ja: "エピローグ・地図に載っていない海岸",
   },
   "Escucha de ecos": {
     "es": "Escucha de ecos",
@@ -2673,7 +3399,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ouvindo ecos",
     "it": "Ascoltare gli echi",
     "tr": "Yankıları dinlemek",
-    "zh-CN": "回声聆听"
+    "zh-CN": "回声聆听",
+    'zh-TW': "回聲聆聽",
+    ko: "에코 청취",
+    ja: "エコーリスニング",
   },
   "Escudo heráldico sin texto ni marca de agua para": {
     "es": "Escudo heráldico sin texto ni marca de agua para",
@@ -2684,7 +3413,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Escudo heráldico sem texto ou marca d'água para",
     "it": "Scudo araldico senza testo o filigrana per",
     "tr": "Metin veya filigran içermeyen hanedan kalkan",
-    "zh-CN": "无文字、无水印的纹章盾徽，用于"
+    "zh-CN": "无文字、无水印的纹章盾徽，用于",
+    'zh-TW': "無文字、無水印的紋章盾徽，用於",
+    ko: "텍스트나 워터마크가 없는 문장학 문장",
+    ja: "テキストや透かしのない紋章",
   },
   "Evitar una guerra civil sin traicionar a su familia.": {
     "es": "Evitar una guerra civil sin traicionar a su familia.",
@@ -2695,7 +3427,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Evite uma guerra civil sem trair sua família.",
     "it": "Evita una guerra civile senza tradire la tua famiglia.",
     "tr": "Ailenize ihanet etmeden iç savaştan kaçının.",
-    "zh-CN": "避免内战，同时不背叛自己的家族。"
+    "zh-CN": "避免内战，同时不背叛自己的家族。",
+    'zh-TW': "避免內戰，同時不背叛自己的家族。",
+    ko: "가족을 배신하지 않고 내전을 예방하세요.",
+    ja: "家族を裏切ることなく内戦を阻止する。",
   },
   "Expulsión de Cael del Gremio": {
     "es": "Expulsión de Cael del Gremio",
@@ -2706,7 +3441,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Expulsão de Cael da Guilda",
     "it": "L'espulsione di Cael dalla Gilda",
     "tr": "Cael'in Loncadan Kovulması",
-    "zh-CN": "Cael 被逐出公会"
+    "zh-CN": "Cael 被逐出公会",
+    'zh-TW': "Cael 被逐出公會",
+    ko: "카엘이 길드에서 제명됨",
+    ja: "カエルがギルドから追放される",
   },
   "Falsifica la primera orden.": {
     "es": "Falsifica la primera orden.",
@@ -2717,7 +3455,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Forje a primeira ordem.",
     "it": "Forgia il primo ordine.",
     "tr": "İlk siparişi oluştur.",
-    "zh-CN": "伪造第一道命令。"
+    "zh-CN": "伪造第一道命令。",
+    'zh-TW': "偽造第一道命令。",
+    ko: "첫 번째 명령을 위조합니다.",
+    ja: "最初の命令を偽造する。",
   },
   "farero mayor, barba roja, manos quemadas, abrigo ocre, astrolabio de latón": {
     "es": "farero mayor, barba roja, manos quemadas, abrigo ocre, astrolabio de latón",
@@ -2728,7 +3469,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "faroleiro sênior, barba ruiva, mãos queimadas, casaco ocre, astrolábio de latão",
     "it": "guardiano anziano del faro, barba rossa, mani bruciate, mantello ocra, astrolabio di ottone",
     "tr": "Kıdemli deniz feneri bekçisi, kızıl sakal, yanmış eller, koyu sarı ceket, pirinç usturlap",
-    "zh-CN": "年长的守灯人，红胡子，双手烧伤，赭色外套，黄铜星盘"
+    "zh-CN": "年长的守灯人，红胡子，双手烧伤，赭色外套，黄铜星盘",
+    'zh-TW': "年長的守燈人，紅鬍子，雙手燒傷，赭色外套，黃銅星盤",
+    ko: "나이든 등대지기, 붉은 수염, 화상 입은 손, 황토 코트, 황동 아스트롤라베",
+    ja: "年老いた灯台守、赤ひげ、火傷した手、黄土色のコート、真鍮のアストロラーベ",
   },
   "Fareros de la Corona": {
     "es": "Fareros de la Corona",
@@ -2739,7 +3483,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Guardiões do Farol da Coroa",
     "it": "Guardiani del faro della Corona",
     "tr": "Taç Deniz Feneri Bekçileri",
-    "zh-CN": "王冠守灯人"
+    "zh-CN": "王冠守灯人",
+    'zh-TW': "王冠守燈人",
+    ko: "크라운 키퍼",
+    ja: "クラウンキーパー",
   },
   "Faros nadadores": {
     "es": "Faros nadadores",
@@ -2750,7 +3497,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "faróis de natação",
     "it": "fari da nuoto",
     "tr": "yüzme farları",
-    "zh-CN": "游动的灯塔"
+    "zh-CN": "游动的灯塔",
+    'zh-TW': "遊動的燈塔",
+    ko: "수영 비콘",
+    ja: "水泳用ビーコン",
   },
   "Fiesta de las Seis Mareas": {
     "es": "Fiesta de las Seis Mareas",
@@ -2761,7 +3511,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Festival das Seis Marés",
     "it": "Festival delle Sei Maree",
     "tr": "Altı Gelgit Festivali",
-    "zh-CN": "六潮节"
+    "zh-CN": "六潮节",
+    'zh-TW': "六潮節",
+    ko: "여섯 조류의 향연",
+    ja: "六潮の饗宴",
   },
   "Figura futura alrededor de la que las casas Venn y Sarn negocian la sucesión.": {
     "es": "Figura futura alrededor de la que las casas Venn y Sarn negocian la sucesión.",
@@ -2772,7 +3525,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Figura futura em torno da qual as casas Venn e Sarn negociam a sucessão.",
     "it": "Figura futura attorno alla quale le case Venn e Sarn negoziano la successione.",
     "tr": "Venn ve Sarn hanedanlarının veraset konusunda müzakere edeceği gelecek rakamı.",
-    "zh-CN": "一个未来人物，Venn 与 Sarn 两家族围绕其谈判继承问题。"
+    "zh-CN": "一个未来人物，Venn 与 Sarn 两家族围绕其谈判继承问题。",
+    'zh-TW': "一個未來人物，Venn 與 Sarn 兩家族圍繞其談判繼承問題。",
+    ko: "Venn 가문과 Sarn 가문이 승계를 협상할 미래 인물입니다.",
+    ja: "ヴェン家とサーン家が後継者交渉を行う将来の人物。",
   },
   "Flor de bajamar": {
     "es": "Flor de bajamar",
@@ -2783,7 +3539,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "flor da maré baixa",
     "it": "fiore della bassa marea",
     "tr": "düşük gelgit çiçeği",
-    "zh-CN": "退潮花"
+    "zh-CN": "退潮花",
+    'zh-TW': "退潮花",
+    ko: "썰물 꽃",
+    ja: "干潮の花",
   },
   "Flor que cristaliza alrededor de recuerdos intensos.": {
     "es": "Flor que cristaliza alrededor de recuerdos intensos.",
@@ -2794,7 +3553,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Flor que cristaliza em torno de memórias intensas.",
     "it": "Fiore che cristallizza attorno a ricordi intensi.",
     "tr": "Yoğun anıların etrafında kristalleşen çiçek.",
-    "zh-CN": "围绕强烈记忆结晶的花。"
+    "zh-CN": "围绕强烈记忆结晶的花。",
+    'zh-TW': "圍繞強烈記憶結晶的花。",
+    ko: "강렬한 기억을 중심으로 피어나는 꽃.",
+    ja: "強烈な記憶を結晶化させた花。",
   },
   "Flujo de vidrio": {
     "es": "Flujo de vidrio",
@@ -2805,7 +3567,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "fluxo de vidro",
     "it": "flusso di vetro",
     "tr": "cam akışı",
-    "zh-CN": "玻璃流"
+    "zh-CN": "玻璃流",
+    'zh-TW': "玻璃流",
+    ko: "유리 플럭스",
+    ja: "ガラスフラックス",
   },
   "Formal, jurídico y sereno. Construye argumentos en premisa, coste y resolución; usa “la ciudad”, “el Consejo” o “la continuidad” en lugar de “yo”. La amenaza siempre parece un procedimiento y la emoción aparece como una precisión excesiva.": {
     "es": "Formal, jurídico y sereno. Construye argumentos en premisa, coste y resolución; usa “la ciudad”, “el Consejo” o “la continuidad” en lugar de “yo”. La amenaza siempre parece un procedimiento y la emoción aparece como una precisión excesiva.",
@@ -2816,7 +3581,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Formal, legal e sereno. Construir argumentos com base em premissas, custo e resolução; use “a cidade”, “o Conselho” ou “continuidade” em vez de “eu”. A ameaça sempre parece um procedimento e a emoção aparece como uma precisão excessiva.",
     "it": "Formale, legale e serena. Costruire argomentazioni su premessa, costi e risoluzione; usare “la città”, “il Consiglio” o “continuità” al posto di “io”. La minaccia sembra sempre una procedura e l'emozione appare come un'eccessiva precisione.",
     "tr": "Resmi, yasal ve sakin. Öncül, maliyet ve çözüme dayalı argümanlar oluşturun; “Ben” yerine “şehir”, “Konsey” veya “süreklilik” kullanın. Tehdit her zaman bir prosedür gibi görünür ve duygu aşırı kesinlik olarak ortaya çıkar.",
-    "zh-CN": "正式、讲究法理且沉着。他以前提、代价和结论来构建论点；用“城市”“议会”或“延续性”代替“我”。威胁总像一道程序，情感则以过度精确的形式显现。"
+    "zh-CN": "正式、讲究法理且沉着。他以前提、代价和结论来构建论点；用“城市”“议会”或“延续性”代替“我”。威胁总像一道程序，情感则以过度精确的形式显现。",
+    'zh-TW': "正式、講究法理且沉著。他以前提、代價和結論來構建論點；用“城市”“議會”或“延續性”代替“我”。威脅總像一道程式，情感則以過度精確的形式顯現。",
+    ko: "형식적이고 율법주의적이며 차분합니다. 그는 전제, 비용 및 해결책으로 주장을 구축합니다. \"나\" 대신 \"도시\", \"의회\" 또는 \"연속성\"을 사용합니다. 위협은 절차처럼 들리고 감정은 지나친 정확성으로 나타납니다.",
+    ja: "形式的、法的、そして冷静。彼は前提、コスト、解決策として議論を構築します。 「私」の代わりに「市」、「議会」、または「継続」を使用します。脅迫は手順のように聞こえ、感情は過度の正確さとして現れます。",
   },
   "Fortaleza vertical de vidrio lechoso, latón y pasarelas expuestas al viento.": {
     "es": "Fortaleza vertical de vidrio lechoso, latón y pasarelas expuestas al viento.",
@@ -2827,7 +3595,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Fortaleza vertical de vidro leitoso, latão e passarelas expostas ao vento.",
     "it": "Fortezza verticale di vetro lattiginoso, ottone e passerelle esposte al vento.",
     "tr": "Süt rengi cam, pirinç ve rüzgara açık yürüyüş yollarından oluşan dikey kale.",
-    "zh-CN": "由乳白玻璃、黄铜和迎风栈道构成的垂直堡垒。"
+    "zh-CN": "由乳白玻璃、黄铜和迎风栈道构成的垂直堡垒。",
+    'zh-TW': "由乳白玻璃、黃銅和迎風棧道構成的垂直堡壘。",
+    ko: "우유빛 유리, 황동, 바람에 노출된 통로로 이루어진 수직 요새입니다.",
+    ja: "乳白色のガラス、真鍮、そして風にさらされる通路でできた垂直の要塞。",
   },
   "Forzar una barrera quema el sello utilizado.": {
     "es": "Forzar una barrera quema el sello utilizado.",
@@ -2838,7 +3609,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Forçar uma barreira queima o selo utilizado.",
     "it": "Forzare una barriera brucia il sigillo utilizzato.",
     "tr": "Bir bariyeri zorlamak kullanılan mührü yakar.",
-    "zh-CN": "强行突破屏障会烧毁所用的印章。"
+    "zh-CN": "强行突破屏障会烧毁所用的印章。",
+    'zh-TW': "強行突破屏障會燒燬所用的印章。",
+    ko: "장벽을 강제로 설치하면 사용된 봉인이 태워집니다.",
+    ja: "バリアを強制すると、使用したシールが燃えてしまいます。",
   },
   "Frío seco, engranajes lentos y la sensación de ser observado desde arriba.": {
     "es": "Frío seco, engranajes lentos y la sensación de ser observado desde arriba.",
@@ -2849,7 +3623,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Frio seco, marchas lentas e a sensação de estar sendo observado de cima.",
     "it": "Freddo secco, marce lente e la sensazione di essere osservati dall'alto.",
     "tr": "Kuru soğuk, yavaş vitesler ve yukarıdan izlenme hissi.",
-    "zh-CN": "干冷、缓慢的齿轮，以及被高处注视的感觉。"
+    "zh-CN": "干冷、缓慢的齿轮，以及被高处注视的感觉。",
+    'zh-TW': "乾冷、緩慢的齒輪，以及被高處注視的感覺。",
+    ko: "건조하고 차갑고 느린 기어와 위에서 지켜보는 듯한 느낌.",
+    ja: "乾いた寒さ、遅いギア、そして上から見られている感覚。",
   },
   "Frontera terrestre de Orthea y escenario de la última revuelta.": {
     "es": "Frontera terrestre de Orthea y escenario de la última revuelta.",
@@ -2860,7 +3637,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Fronteira terrestre de Orthea e cenário da última revolta.",
     "it": "Confine terrestre di Ortea e teatro dell'ultima rivolta.",
     "tr": "Orthea'nın kara sınırı ve son isyanın sahnesi.",
-    "zh-CN": "Orthea 的陆地边界，也是上一次起义的发生地。"
+    "zh-CN": "Orthea 的陆地边界，也是上一次起义的发生地。",
+    'zh-TW': "Orthea 的陸地邊界，也是上一次起義的發生地。",
+    ko: "오르테아의 국경이자 마지막 반란의 장소.",
+    ja: "オルテアの陸の境界線であり、最後の反乱の場所。",
   },
   "Fronteras actuales": {
     "es": "Fronteras actuales",
@@ -2871,7 +3651,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Fronteiras atuais",
     "it": "Confini attuali",
     "tr": "Mevcut sınırlar",
-    "zh-CN": "当前边界"
+    "zh-CN": "当前边界",
+    'zh-TW': "當前邊界",
+    ko: "현재 국경",
+    ja: "現在の国境",
   },
   "Fue abolido después del Hundimiento.": {
     "es": "Fue abolido después del Hundimiento.",
@@ -2882,7 +3665,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Foi abolido após o naufrágio.",
     "it": "Fu abolito dopo il naufragio.",
     "tr": "Batandan sonra kaldırıldı.",
-    "zh-CN": "在沉没之后被废除。"
+    "zh-CN": "在沉没之后被废除。",
+    'zh-TW': "在沉沒之後被廢除。",
+    ko: "침몰 이후 폐지되었습니다.",
+    ja: "沈没後廃止。",
   },
   "Fue quien encendió el Faro durante el Hundimiento.": {
     "es": "Fue quien encendió el Faro durante el Hundimiento.",
@@ -2893,7 +3679,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Foi ele quem acendeu o Farol durante o Naufrágio.",
     "it": "Fu lui ad accendere il faro durante l'affondamento.",
     "tr": "Batma sırasında Deniz Fenerini yakan kişi oydu.",
-    "zh-CN": "他就是在沉没期间点亮灯塔的人。"
+    "zh-CN": "他就是在沉没期间点亮灯塔的人。",
+    'zh-TW': "他就是在沉沒期間點亮燈塔的人。",
+    ko: "그는 침몰 당시 등대에 불을 붙인 사람이었습니다.",
+    ja: "彼は沈没の際に灯台に火を灯した人でした。",
   },
   "Fue un archipiélago hasta que los Tejedores Solares fijaron sus puentes.": {
     "es": "Fue un archipiélago hasta que los Tejedores Solares fijaron sus puentes.",
@@ -2904,7 +3693,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Era um arquipélago até os Tecelões Solares consertarem as suas pontes.",
     "it": "Era un arcipelago finché i Solar Weavers non ripararono i loro ponti.",
     "tr": "Güneş Dokumacıları köprülerini tamir edene kadar burası bir takımadaydı.",
-    "zh-CN": "在太阳织工固定其桥梁之前，这里曾是一片群岛。"
+    "zh-CN": "在太阳织工固定其桥梁之前，这里曾是一片群岛。",
+    'zh-TW': "在太陽織工固定其橋梁之前，這裡曾是一片群島。",
+    ko: "Solar Weavers가 다리를 고칠 때까지는 군도였습니다.",
+    ja: "ソーラー・ウィーバーズが橋を修理するまでは、そこは群島でした。",
   },
   "fugitiva": {
     "es": "fugitiva",
@@ -2915,7 +3707,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "fugitivo",
     "it": "fuggitivo",
     "tr": "kaçak",
-    "zh-CN": "女逃犯"
+    "zh-CN": "女逃犯",
+    'zh-TW': "女逃犯",
+    ko: "도망자",
+    ja: "逃亡者",
   },
   "Generoso en público, reservado con su familia.": {
     "es": "Generoso en público, reservado con su familia.",
@@ -2926,7 +3721,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Generoso em público, reservado com a família.",
     "it": "Generoso in pubblico, riservato con la famiglia.",
     "tr": "Halk arasında cömert, ailesine karşı çekingen.",
-    "zh-CN": "在公众面前慷慨，对家人则有所保留。"
+    "zh-CN": "在公众面前慷慨，对家人则有所保留。",
+    'zh-TW': "在公眾面前慷慨，對家人則有所保留。",
+    ko: "공개적으로 관대하며 가족과 함께 보호됩니다.",
+    ja: "人前では気前がよく、家族に対してはしっかり守ってくれます。",
   },
   "Generoso, paciente y sentencioso en público; reservado hasta la crueldad con su familia. Ve patrones donde otros ven accidentes y cree que proteger consiste en cargar solo con la información peligrosa. Su ternura es práctica y su culpa le impide pedir perdón de manera directa.": {
     "es": "Generoso, paciente y sentencioso en público; reservado hasta la crueldad con su familia. Ve patrones donde otros ven accidentes y cree que proteger consiste en cargar solo con la información peligrosa. Su ternura es práctica y su culpa le impide pedir perdón de manera directa.",
@@ -2937,7 +3735,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Generoso, paciente e crítico em público; reservado ao ponto da crueldade para com sua família. Você vê padrões onde outros veem acidentes e acredita que proteger significa transportar apenas informações perigosas. A sua ternura é prática e a sua culpa impede-o de pedir perdão diretamente.",
     "it": "Generoso, paziente e giudicante in pubblico; riservato fino alla crudeltà verso la sua famiglia. Vedi schemi in cui gli altri vedono incidenti e credono che proteggere significhi trasportare solo informazioni pericolose. La sua tenerezza è pratica e il suo senso di colpa gli impedisce di chiedere perdono direttamente.",
     "tr": "Toplum önünde cömert, sabırlı ve yargılayıcı; ailesine karşı zulüm noktasına kadar saklıdır. Başkalarının kazaları gördüğü ve korumanın yalnızca tehlikeli bilgileri taşımakla ilgili olduğuna inandığı kalıpları görüyorsunuz. Şefkati pratiktir ve suçluluk duygusu onu doğrudan af dilemekten alıkoymaktadır.",
-    "zh-CN": "在公众面前慷慨、耐心且好发箴言；对家人则有所保留，甚至到冷酷的地步。别人看到意外之处，他看到模式，并认为保护意味着独自承担危险的信息。他的温柔是实际性的，而愧疚使他无法直接请求原谅。"
+    "zh-CN": "在公众面前慷慨、耐心且好发箴言；对家人则有所保留，甚至到冷酷的地步。别人看到意外之处，他看到模式，并认为保护意味着独自承担危险的信息。他的温柔是实际性的，而愧疚使他无法直接请求原谅。",
+    'zh-TW': "在公眾面前慷慨、耐心且好發箴言；對家人則有所保留，甚至到冷酷的地步。別人看到意外之處，他看到模式，並認為保護意味著獨自承擔危險的資訊。他的溫柔是實際性的，而愧疚使他無法直接請求原諒。",
+    ko: "관대하고 인내심이 강하며 대중 앞에서는 격언적인 표현을 사용합니다. 가족을 잔인하게 대할 때까지 보호했습니다. 그는 다른 사람들이 사고를 보는 패턴을 보고 보호란 위험한 지식을 혼자 가지고 다니는 것을 의미한다고 믿습니다. 그의 부드러움은 실용적이며 죄책감은 직접적인 사과를 방해합니다.",
+    ja: "寛大で忍耐強く、人前では格言を言う人。家族に対しては残酷なまでに守られている。彼は、他人が事故を目撃するパターンを見て、身を守るとは危険な知識を一人で持ち歩くことだと信じています。彼の優しさは現実的であり、罪悪感が直接の謝罪を妨げます。",
   },
   "Gobierno de emergencia que nunca devolvió el poder.": {
     "es": "Gobierno de emergencia que nunca devolvió el poder.",
@@ -2948,7 +3749,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Governo de emergência que nunca devolveu o poder.",
     "it": "Governo di emergenza che non è mai tornato al potere.",
     "tr": "İktidara asla geri dönmeyen acil durum hükümeti.",
-    "zh-CN": "一个从未归还权力的紧急政府。"
+    "zh-CN": "一个从未归还权力的紧急政府。",
+    'zh-TW': "一個從未歸還權力的緊急政府。",
+    ko: "정권을 돌려주지 않은 비상정부.",
+    ja: "決して権力を戻さなかった緊急政府。",
   },
   "Gramática de la Habla de Marea": {
     "es": "Gramática de la Habla de Marea",
@@ -2959,7 +3763,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Gramática do discurso das marés",
     "it": "Grammatica del discorso delle maree",
     "tr": "Gelgit Konuşma Dilbilgisi",
-    "zh-CN": "潮汐语语法"
+    "zh-CN": "潮汐语语法",
+    'zh-TW': "潮汐語語法",
+    ko: "타이컨트의 문법",
+    ja: "タイデカントの文法",
   },
   "Gremio de las Seis Velas": {
     "es": "Gremio de las Seis Velas",
@@ -2970,7 +3777,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Guilda das Seis Velas",
     "it": "Gilda delle Sei Candele",
     "tr": "Altı Mum Loncası",
-    "zh-CN": "六帆公会"
+    "zh-CN": "六帆公会",
+    'zh-TW': "六帆公會",
+    ko: "여섯 항해 길드",
+    ja: "六帆のギルド",
   },
   "Grupo de demostración con relaciones y miembros editables.": {
     "es": "Grupo de demostración con relaciones y miembros editables.",
@@ -2981,7 +3791,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Grupo de demonstração com relacionamentos e membros editáveis.",
     "it": "Gruppo demo con relazioni e membri modificabili.",
     "tr": "Düzenlenebilir ilişkiler ve üyeler içeren demo grubu.",
-    "zh-CN": "演示群组，关系与成员均可编辑。"
+    "zh-CN": "演示群组，关系与成员均可编辑。",
+    'zh-TW': "演示群組，關係與成員均可編輯。",
+    ko: "편집 가능한 관계 및 구성원이 있는 데모 그룹입니다.",
+    ja: "編集可能な関係とメンバーを含むデモグループ。",
   },
   "Guardia de Ceniza": {
     "es": "Guardia de Ceniza",
@@ -2992,7 +3805,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Guarda Cinza",
     "it": "Guardia di cenere",
     "tr": "Kül Muhafızı",
-    "zh-CN": "灰烬卫队"
+    "zh-CN": "灰烬卫队",
+    'zh-TW': "灰燼衛隊",
+    ko: "애쉬 가드",
+    ja: "アッシュガード",
   },
   "guardián": {
     "es": "guardián",
@@ -3003,7 +3819,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "guardião",
     "it": "guardiano",
     "tr": "vasi",
-    "zh-CN": "守护者"
+    "zh-CN": "守护者",
+    'zh-TW': "守護者",
+    ko: "보호자 ",
+    ja: "守護者",
   },
   "Guardián canoso con armadura azul ennegrecida y una cicatriz que le cruza la garganta.": {
     "es": "Guardián canoso con armadura azul ennegrecida y una cicatriz que le cruza la garganta.",
@@ -3014,7 +3833,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Guardião de cabelos grisalhos com armadura azul enegrecida e uma cicatriz na garganta.",
     "it": "Guardiano dai capelli grigi con armatura blu annerita e una cicatrice sulla gola.",
     "tr": "Kararmış mavi zırhlı ve boğazında bir yara izi olan gri saçlı koruyucu.",
-    "zh-CN": "灰发守护者，身穿熏黑的蓝色铠甲，一道疤痕横贯喉咙。"
+    "zh-CN": "灰发守护者，身穿熏黑的蓝色铠甲，一道疤痕横贯喉咙。",
+    'zh-TW': "灰髮守護者，身穿燻黑的藍色鎧甲，一道疤痕橫貫喉嚨。",
+    ko: "목에 흉터가 있고 검게 변한 파란색 갑옷을 입은 백발의 경비병.",
+    ja: "喉に傷のある黒ずんだ青い鎧を着た白髪の衛兵。",
   },
   "Guardián veterano del Faro, abandonó una patrulla durante el primer apagón para salvar al joven Maelor y juró servir tanto a su persona como a la Casa Venn. Décadas después esos juramentos se volvieron incompatibles. El registro afirma que murió defendiendo la Puerta de Sal en 740 D.F.; en realidad la Deuda de Eco conservó una copia incompleta de él en el vidrio del Faro. Aparece ante Sena en el Archivo buscando cumplir una última orden de Aurel.": {
     "es": "Guardián veterano del Faro, abandonó una patrulla durante el primer apagón para salvar al joven Maelor y juró servir tanto a su persona como a la Casa Venn. Décadas después esos juramentos se volvieron incompatibles. El registro afirma que murió defendiendo la Puerta de Sal en 740 D.F.; en realidad la Deuda de Eco conservó una copia incompleta de él en el vidrio del Faro. Aparece ante Sena en el Archivo buscando cumplir una última orden de Aurel.",
@@ -3025,7 +3847,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Um veterano Faroleiro, ele abandonou uma patrulha durante o primeiro apagão para salvar o jovem Maelor e jurou servir a si mesmo e à Casa Venn. Décadas depois, esses juramentos tornaram-se incompatíveis. O registro afirma que ele morreu defendendo o Portão do Sal em 740 D.F.; na verdade, Echo's Debt preservou uma cópia incompleta dele no vidro do Farol. Ele aparece diante de Sena no Arquivo buscando cumprir uma última ordem de Aurel.",
     "it": "Veterano guardiano del faro, abbandonò una pattuglia durante il primo blackout per salvare il giovane Maelor e giurò di servire sia se stesso che la Casata Venn. Decenni dopo quei giuramenti divennero incompatibili. La documentazione afferma che morì difendendo la Porta del Sale nel 740 D.F.; infatti Echo's Debt ne conserva una copia incompleta nella vetrata del Faro. Appare davanti a Sena nell'Archivio cercando di soddisfare un ultimo ordine di Aurel.",
     "tr": "Kıdemli bir Deniz Feneri Bekçisi, genç Maelor'u kurtarmak için ilk elektrik kesintisi sırasında devriyeyi terk etti ve hem kendisine hem de Venn Hanesi'ne hizmet etmeye yemin etti. Onlarca yıl sonra bu yeminler uyumsuz hale geldi. Kayıt onun 740 D.F.'de Tuz Kapısı'nı savunurken öldüğünü belirtiyor; aslında Echo'nun Borç'u, onun tamamlanmamış bir kopyasını Deniz Feneri'nin camında sakladı. Aurel'den gelen son bir emri yerine getirmek için Arşivde Sena'nın huzuruna çıkar.",
-    "zh-CN": "作为资深的灯塔守护者，他在第一次熄灯期间放弃巡逻去救年幼的 Maelor，并发誓既效忠于他，也效忠于 Venn 家族。数十年后，这些誓言变得彼此不容。记录称他于 740 D.F. 为守卫盐门而死；实际上「回声之债」在灯塔之镜中保存了他一份不完整的副本。他在档案库中出现在 Sena 面前，想完成 Aurel 的最后一道命令。"
+    "zh-CN": "作为资深的灯塔守护者，他在第一次熄灯期间放弃巡逻去救年幼的 Maelor，并发誓既效忠于他，也效忠于 Venn 家族。数十年后，这些誓言变得彼此不容。记录称他于 740 D.F. 为守卫盐门而死；实际上「回声之债」在灯塔之镜中保存了他一份不完整的副本。他在档案库中出现在 Sena 面前，想完成 Aurel 的最后一道命令。",
+    'zh-TW': "作為資深的燈塔守護者，他在第一次熄燈期間放棄巡邏去救年幼的 Maelor，併發誓既效忠於他，也效忠於 Venn 家族。數十年後，這些誓言變得彼此不容。記錄稱他於 740 D.F. 為守衛鹽門而死；實際上「回聲之債」在燈塔之鏡中儲存了他一份不完整的副本。他在檔案庫中出現在 Sena 面前，想完成 Aurel 的最後一道命令。",
+    ko: "베테랑 등대 수호자인 그는 어린 마엘러를 구하기 위해 첫 번째 정전이 발생한 동안 순찰을 포기하고 그와 벤 가문 모두에게 봉사할 것을 맹세했습니다. 수십 년 후에 그 서약은 양립할 수 없게 되었습니다. 기록에 따르면 그는 A.L. 740년에 솔트 게이트(Salt Gate)를 지키다가 사망했습니다. 대신 Echo Debt는 Lighthouse 유리에 그의 불완전한 사본을 보존했습니다. 그는 Aurel의 마지막 명령을 이행하기 위해 기록 보관소의 Sena에게 나타납니다.",
+    ja: "ベテランの灯台守護者である彼は、最初の停電中にパトロールを放棄して若いメーラーを救い、彼とヴェン家の両方への奉仕を誓った。数十年後、それらの誓いは矛盾するものになった。記録によれば、彼は西暦740年に塩の門を守って亡くなったという。エコー・デットは代わりに、彼の不完全なコピーをライトハウスのガラスに保存した。彼はオーレルからの最後の命令を遂行しようとして、アーカイブ内のセナに現れます。",
   },
   "guardiana": {
     "es": "guardiana",
@@ -3036,7 +3861,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "guardião",
     "it": "guardiano",
     "tr": "vasi",
-    "zh-CN": "守护者"
+    "zh-CN": "守护者",
+    'zh-TW': "守護者",
+    ko: "보호자 ",
+    ja: "守護者",
   },
   "guardiana de memoria": {
     "es": "guardiana de memoria",
@@ -3047,7 +3875,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "guardião da memória",
     "it": "custode della memoria",
     "tr": "hafıza kaleci",
-    "zh-CN": "记忆守护者"
+    "zh-CN": "记忆守护者",
+    'zh-TW': "記憶守護者",
+    ko: "기억지기",
+    ja: "記憶の番人",
   },
   "guía": {
     "es": "guía",
@@ -3058,7 +3889,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "guia",
     "it": "guida",
     "tr": "rehber",
-    "zh-CN": "向导"
+    "zh-CN": "向导",
+    'zh-TW': "嚮導",
+    ko: "가이드",
+    ja: "ガイド",
   },
   "Haber visto el origen equivale a comprender el presente.": {
     "es": "Haber visto el origen equivale a comprender el presente.",
@@ -3069,7 +3903,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ter visto a origem equivale a compreender o presente.",
     "it": "Aver visto l'origine equivale a comprendere il presente.",
     "tr": "Kökeni görmek, şimdiyi anlamakla eşdeğerdir.",
-    "zh-CN": "见过起源，就等于理解当下。"
+    "zh-CN": "见过起源，就等于理解当下。",
+    'zh-TW': "見過起源，就等於理解當下。",
+    ko: "근원을 본다는 것은 현재를 이해한다는 것을 의미한다.",
+    ja: "原点を見るということは、現在を知るということです。",
   },
   "Habla de Marea": {
     "es": "Habla de Marea",
@@ -3080,7 +3917,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Fale sobre Marea",
     "it": "Parliamo di Marea",
     "tr": "Marea hakkında konuşun",
-    "zh-CN": "潮语"
+    "zh-CN": "潮语",
+    'zh-TW': "潮語",
+    ko: "타이컨트",
+    ja: "タイデカント",
   },
   "heráldica de fantasía pictórica": {
     "es": "heráldica de fantasía pictórica",
@@ -3091,7 +3931,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "heráldica de fantasia pictórica",
     "it": "araldica di fantasia pittorica",
     "tr": "resimli fantezi hanedanlık armaları",
-    "zh-CN": "绘画质感的奇幻纹章"
+    "zh-CN": "绘画质感的奇幻纹章",
+    'zh-TW': "繪畫質感的奇幻紋章",
+    ko: "회화적 환상의 문장학",
+    ja: "絵画的ファンタジー紋章学",
   },
   "Heredará una guerra antes de nacer.": {
     "es": "Heredará una guerra antes de nacer.",
@@ -3102,7 +3945,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele herdará uma guerra antes de nascer.",
     "it": "Erediterà una guerra prima di nascere.",
     "tr": "Doğmadan önce ona bir savaş miras kalacak.",
-    "zh-CN": "尚未出生，就要继承一场战争。"
+    "zh-CN": "尚未出生，就要继承一场战争。",
+    'zh-TW': "尚未出生，就要繼承一場戰爭。",
+    ko: "태어나기 전에 전쟁을 물려받게 됩니다.",
+    ja: "生まれる前から戦争を受け継いでいる。",
   },
   "heredera": {
     "es": "heredera",
@@ -3113,7 +3959,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "herdeira",
     "it": "ereditiera",
     "tr": "mirasçı",
-    "zh-CN": "继承人"
+    "zh-CN": "继承人",
+    'zh-TW': "繼承人",
+    ko: "후계자",
+    ja: "相続人",
   },
   "heredero adoptivo": {
     "es": "heredero adoptivo",
@@ -3124,7 +3973,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "herdeiro adotado",
     "it": "erede adottivo",
     "tr": "evlat edinilen mirasçı",
-    "zh-CN": "养子继承人"
+    "zh-CN": "养子继承人",
+    'zh-TW': "養子繼承人",
+    ko: "입양 상속인",
+    ja: "養子縁組",
   },
   "hermana de marea": {
     "es": "hermana de marea",
@@ -3135,7 +3987,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "irmã da maré",
     "it": "sorella della marea",
     "tr": "gelgit kardeş",
-    "zh-CN": "潮汐姐妹"
+    "zh-CN": "潮汐姐妹",
+    'zh-TW': "潮汐姐妹",
+    ko: "조수 자매",
+    ja: "潮姉妹",
   },
   "Hermana Vesh": {
     "es": "Hermana Vesh",
@@ -3146,7 +4001,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Irmã Vesh",
     "it": "Sorella Vesh",
     "tr": "Rahibe Vesh",
-    "zh-CN": "Vesh 修女"
+    "zh-CN": "Vesh 修女",
+    'zh-TW': "Vesh 修女",
+    ko: "베쉬 자매",
+    ja: "シスター・ヴェッシュ",
   },
   "Hija de [[Aurel Venn]], sobrevivió al Hundimiento de [[Lúmina]]. Busca a su hermana [[Nara Venn]] y oculta que conoce el nombre verdadero del Faro. ???": {
     "es": "Hija de [[Aurel Venn]], sobrevivió al Hundimiento de [[Lúmina]]. Busca a su hermana [[Nara Venn]] y oculta que conoce el nombre verdadero del Faro. ???",
@@ -3157,7 +4015,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Filha de [[Aurel Venn]], ela sobreviveu ao naufrágio de [[Lumina]]. Ele procura sua irmã [[Nara Venn]] e esconde que sabe o verdadeiro nome do Farol. ???",
     "it": "Figlia di [[Aurel Venn]], è sopravvissuta all'affondamento di [[Lumina]]. Cerca sua sorella [[Nara Venn]] e nasconde di conoscere il vero nome del Faro. ???",
     "tr": "[[Aurel Venn]]'nin kızı, [[Lumina]] Batanından sağ kurtuldu. Kız kardeşi [[Nara Venn]]'yi arar ve Deniz Feneri'nin gerçek adını bildiğini gizler. ???",
-    "zh-CN": "[[奥雷尔·文恩]] 的女儿，在 [[卢米娜]] 沉没中幸存。她寻找姐姐 [[Nara Venn]]，并隐瞒自己知道灯塔的真名。???"
+    "zh-CN": "[[奥雷尔·文恩]] 的女儿，在 [[卢米娜]] 沉没中幸存。她寻找姐姐 [[Nara Venn]]，并隐瞒自己知道灯塔的真名。???",
+    'zh-TW': "[[奧雷爾·文恩]] 的女兒，在 [[盧米娜]] 沉沒中倖存。她尋找姐姐 [[Nara Venn]]，並隱瞞自己知道燈塔的真名。???",
+    ko: "[[오렐 벤]]의 딸로, [[루미나]] 침몰에서 살아남았습니다. 그녀는 여동생 [[나라 벤]]을 검색하고 등대의 실제 이름을 알고 있다는 사실을 숨깁니다.???",
+    ja: "[[オーレル・ヴェン]]の娘で、彼女は[[ルミナ]]の沈没から生き残りました。彼女は妹[[ナラ・ヴェン]]を探しており、灯台の本当の名前を知っていることを隠しています。 ???",
   },
   "Hija menor de [[Aurel Venn]] y hermana de [[Nara Venn]], sobrevivió al Hundimiento de [[Lúmina]] perdiendo la mano izquierda y a su madre. Aurel cifró una ruta en la prótesis que más tarde construyó Boros. Ilyra volvió a la ciudad como cartógrafa desacreditada cuando una carta reciente, escrita por Nara nueve meses después de desaparecer, llegó empapada a su mesa. Busca a su hermana y oculta que conoce «Asteriel», el nombre verdadero del Faro. ??? Todavía no sabe quién pronunció ese nombre junto a ella durante el Hundimiento.": {
     "es": "Hija menor de [[Aurel Venn]] y hermana de [[Nara Venn]], sobrevivió al Hundimiento de [[Lúmina]] perdiendo la mano izquierda y a su madre. Aurel cifró una ruta en la prótesis que más tarde construyó Boros. Ilyra volvió a la ciudad como cartógrafa desacreditada cuando una carta reciente, escrita por Nara nueve meses después de desaparecer, llegó empapada a su mesa. Busca a su hermana y oculta que conoce «Asteriel», el nombre verdadero del Faro. ??? Todavía no sabe quién pronunció ese nombre junto a ella durante el Hundimiento.",
@@ -3168,7 +4029,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Filha mais nova de [[Aurel Venn]] e irmã de [[Nara Venn]], ela sobreviveu ao naufrágio de [[Lumina]] perdendo a mão esquerda e a mãe. Aurel criptografou uma rota para a prótese que Boros construiu mais tarde. Ilyra voltou à cidade como uma cartógrafa desacreditada quando uma carta recente, escrita por Nara nove meses depois de seu desaparecimento, chegou encharcada em sua mesa. Ele procura a irmã e esconde que conhece \"Asteriel\", verdadeiro nome do Farol. ??? Ela ainda não sabe quem disse esse nome ao lado dela durante o Naufrágio.",
     "it": "Figlia più giovane di [[Aurel Venn]] e sorella di [[Nara Venn]], è sopravvissuta all'affondamento di [[Lumina]] perdendo la mano sinistra e sua madre. Aurel crittografò un percorso nella protesi che Boros successivamente costruì. Ilyra è tornata in città come cartografa screditata quando una recente lettera, scritta da Nara nove mesi dopo la sua scomparsa, è arrivata bagnata sul suo tavolo. Cerca la sorella e nasconde di conoscere \"Asteriel\", il vero nome del Faro. ??? Non sa ancora chi ha pronunciato quel nome accanto a lei durante l'affondamento.",
     "tr": "[[Aurel Venn]]'nin en küçük kızı ve [[Nara Venn]]'nin kız kardeşi, sol elini ve annesini kaybederek [[Lumina]] Batanından sağ kurtuldu. Aurel, Boros'un daha sonra yapacağı proteze giden bir yolu şifreledi. Ilyra, Nara'nın ortadan kaybolmasından dokuz ay sonra yazdığı yeni bir mektup sırılsıklam masasının üzerine geldiğinde, gözden düşmüş bir haritacı olarak şehre geri döndü. Kız kardeşini arar ve Deniz Feneri'nin gerçek adı olan \"Asteriel\"i bildiğini gizler. ??? Batma sırasında yanındaki bu ismi kimin söylediğini hâlâ bilmiyor.",
-    "zh-CN": "[[奥雷尔·文恩]] 的小女儿、[[Nara Venn]] 的妹妹，在 [[卢米娜]] 沉没中失去了左手和母亲。Aurel 把一条路线加密进后来由 Boros 制造的义肢中。当一封 Nara 在失踪九个月后写下的新信湿淋淋地送到桌上时，Ilyra 以声名扫地的制图师身份回到城中。她寻找姐姐，并隐瞒自己知道「Asteriel」——灯塔的真名。??? 她仍不知道沉没发生时是谁在她身旁说出了这个名字。"
+    "zh-CN": "[[奥雷尔·文恩]] 的小女儿、[[Nara Venn]] 的妹妹，在 [[卢米娜]] 沉没中失去了左手和母亲。Aurel 把一条路线加密进后来由 Boros 制造的义肢中。当一封 Nara 在失踪九个月后写下的新信湿淋淋地送到桌上时，Ilyra 以声名扫地的制图师身份回到城中。她寻找姐姐，并隐瞒自己知道「Asteriel」——灯塔的真名。??? 她仍不知道沉没发生时是谁在她身旁说出了这个名字。",
+    'zh-TW': "[[奧雷爾·文恩]] 的小女兒、[[Nara Venn]] 的妹妹，在 [[盧米娜]] 沉沒中失去了左手和母親。Aurel 把一條路線加密進後來由 Boros 製造的義肢中。當一封 Nara 在失蹤九個月後寫下的新信溼淋淋地送到桌上時，Ilyra 以聲名掃地的製圖師身份回到城中。她尋找姐姐，並隱瞞自己知道「Asteriel」——燈塔的真名。??? 她仍不知道沉沒發生時是誰在她身旁說出了這個名字。",
+    ko: "[[오렐 벤]]의 둘째 딸이자 [[나라 벤]]의 여동생인 그녀는 [[루미나]] 침몰에서 왼손과 어머니를 잃고 살아남았다. Aurel은 나중에 Boros가 만든 보철물에 경로를 인코딩했습니다. Ilyra는 사라진 지 9개월 만에 Nara가 쓴 최근 편지가 흠뻑 젖어 그녀의 책상에 도착했을 때 신뢰할 수 없는 지도 제작자로 돌아왔습니다. 그녀는 여동생을 찾아 등대의 진짜 이름인 '아스테리엘'을 알고 있다는 사실을 숨긴다.??? 그녀는 침몰 당시 옆에서 누가 그 이름을 불렀는지 아직도 모릅니다.",
+    ja: "[[オーレル・ヴェン]]の末娘で[[ナラ・ヴェン]]の妹である彼女は、[[ルミナ]]の沈没で左手と母親を失いながらも生き残りました。オーレルは、後にボロスによって構築されたプロテーゼ内のルートを暗号化しました。イリラは、失踪から9か月後にナラが書いた最近の手紙がずぶぬれになって彼女の机に届いたとき、信用のない地図製作者として戻ってきた。彼女は妹を捜しており、灯台の本当の名前である「アステリエル」を知っていることを隠しています。 ???彼女は、沈没中に彼女の隣で誰がその名前を言ったのかをまだ知りません。",
   },
   "Hijos de la corriente": {
     "es": "Hijos de la corriente",
@@ -3179,7 +4043,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Filhos da atualidade",
     "it": "Figli della corrente",
     "tr": "Şimdiki zamanın çocukları",
-    "zh-CN": "水流之子"
+    "zh-CN": "水流之子",
+    'zh-TW': "水流之子",
+    ko: "현재의 아이들",
+    ja: "現在の子供たち",
   },
   "hombre": {
     "es": "hombre",
@@ -3190,7 +4057,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "cara",
     "it": "uomo",
     "tr": "adam",
-    "zh-CN": "男性"
+    "zh-CN": "男性",
+    'zh-TW': "男性",
+    ko: "남성",
+    ja: "男",
   },
   "Hombre alto de cabello blanco, uniforme carmesí y máscara ceremonial de obsidiana.": {
     "es": "Hombre alto de cabello blanco, uniforme carmesí y máscara ceremonial de obsidiana.",
@@ -3201,7 +4071,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Homem alto, com cabelos brancos, uniforme carmesim e máscara cerimonial de obsidiana.",
     "it": "Uomo alto con capelli bianchi, uniforme cremisi e maschera cerimoniale di ossidiana.",
     "tr": "Beyaz saçlı, kızıl üniformalı ve obsidyen tören maskesi olan uzun boylu bir adam.",
-    "zh-CN": "身材高挑的白发男子，身穿深红制服，戴着黑曜石礼仪面具。"
+    "zh-CN": "身材高挑的白发男子，身穿深红制服，戴着黑曜石礼仪面具。",
+    'zh-TW': "身材高挑的白髮男子，身穿深紅制服，戴著黑曜石禮儀面具。",
+    ko: "진홍빛 제복을 입고 의식용 흑요석 가면을 쓴 키가 큰 백발의 남자.",
+    ja: "深紅の軍服と儀式用の黒曜石のマスクを身に着けた背の高い白髪の男。",
   },
   "Honorable, competitivo y atrapado entre afecto y apellido.": {
     "es": "Honorable, competitivo y atrapado entre afecto y apellido.",
@@ -3212,7 +4085,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Honrado, competitivo e preso entre carinho e sobrenome.",
     "it": "Onorato, competitivo e in bilico tra affetto e cognome.",
     "tr": "Onurlu, rekabetçi ve sevgi ile soyadı arasında kalmış.",
-    "zh-CN": "正直、好胜，夹在情义与姓氏之间。"
+    "zh-CN": "正直、好胜，夹在情义与姓氏之间。",
+    'zh-TW': "正直、好勝，夾在情義與姓氏之間。",
+    ko: "명예롭고 경쟁적이며 애정과 성 사이에 갇혀 있습니다.",
+    ja: "名誉と競争心があり、愛情と家名の間に板挟みになっている。",
   },
   "Honorable, competitivo y atrapado entre afecto y apellido. Cree en el procedimiento porque le permitió sobrevivir a una infancia de duelo, pero reconoce cada grieta del sistema. Es valiente frente al peligro físico y cobarde ante una decisión que decepcione a quien ama.": {
     "es": "Honorable, competitivo y atrapado entre afecto y apellido. Cree en el procedimiento porque le permitió sobrevivir a una infancia de duelo, pero reconoce cada grieta del sistema. Es valiente frente al peligro físico y cobarde ante una decisión que decepcione a quien ama.",
@@ -3223,7 +4099,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Honrado, competitivo e preso entre carinho e sobrenome. Ele acredita no procedimento porque lhe permitiu sobreviver a uma infância de luto, mas reconhece cada falha no sistema. Ele é corajoso diante do perigo físico e covarde diante de uma decisão que decepciona aqueles que ama.",
     "it": "Onorato, competitivo e in bilico tra affetto e cognome. Crede nella procedura perché gli ha permesso di sopravvivere a un'infanzia di dolore, ma riconosce ogni crepa nel sistema. È coraggioso di fronte al pericolo fisico e codardo di fronte a una decisione che delude coloro che ama.",
     "tr": "Onurlu, rekabetçi ve sevgi ile soyadı arasında kalmış. Bu prosedüre inanıyor çünkü bu onun çocukluğundaki kederden kurtulmasına olanak tanıyor, ancak sistemdeki her çatlağı tanıyor. Fiziksel tehlike karşısında cesur, sevdiklerini hayal kırıklığına uğratan bir karar karşısında ise korkaktır.",
-    "zh-CN": "正直、好胜，夹在情义与姓氏之间。他相信程序，因为程序让他熬过悲痛的童年，却也看清体制的每一道裂缝。面对身体上的危险他勇敢，面对会让所爱之人失望的抉择却怯懦。"
+    "zh-CN": "正直、好胜，夹在情义与姓氏之间。他相信程序，因为程序让他熬过悲痛的童年，却也看清体制的每一道裂缝。面对身体上的危险他勇敢，面对会让所爱之人失望的抉择却怯懦。",
+    'zh-TW': "正直、好勝，夾在情義與姓氏之間。他相信程式，因為程式讓他熬過悲痛的童年，卻也看清體制的每一道裂縫。面對身體上的危險他勇敢，面對會讓所愛之人失望的抉擇卻怯懦。",
+    ko: "명예롭고 경쟁적이며 애정과 성 사이에 갇혀 있습니다. 그는 슬픔에 잠긴 어린 시절을 보냈기 때문에 절차를 믿지만 시스템의 모든 균열을 인식합니다. 그는 신체적 위험 앞에는 용감하고 사랑하는 사람을 실망시키는 선택 앞에는 비겁합니다.",
+    ja: "名誉があり、負けず嫌いで、愛情と名字の間に板挟みになっている。彼は手順を信じています。なぜなら、それが彼に悲しい子供時代をもたらしたからです。それでも、システムのあらゆる亀裂を認識しています。彼は物理的な危険の前では勇敢ですが、愛する人を失望させる選択の前では臆病になります。",
   },
   "Huérfano y sobrino del Regente, fue criado por Maelor como hijo y formado por Odran como oficial. Compartió infancia y rivalidad con Ilyra en la Casa del Faro. Como comandante de la Puerta de Sal manipula órdenes para retrasar su captura mientras insiste en que todavía sirve al Consejo. Cuando debe validar una orden falsa para dejarla salir comprende que su neutralidad ya era una elección. En el golpe deja la capa roja sobre la mesa, pero todavía no sabe qué apellido conservará.": {
     "es": "Huérfano y sobrino del Regente, fue criado por Maelor como hijo y formado por Odran como oficial. Compartió infancia y rivalidad con Ilyra en la Casa del Faro. Como comandante de la Puerta de Sal manipula órdenes para retrasar su captura mientras insiste en que todavía sirve al Consejo. Cuando debe validar una orden falsa para dejarla salir comprende que su neutralidad ya era una elección. En el golpe deja la capa roja sobre la mesa, pero todavía no sabe qué apellido conservará.",
@@ -3234,7 +4113,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Órfão e sobrinho do Regente, foi criado por Maelor ainda filho e treinado por Odran como oficial. Ele compartilhou a infância e a rivalidade com Ilyra na Casa do Farol. Como comandante do Portão de Sal, ele manipula ordens para atrasar sua captura enquanto insiste que ainda serve ao Conselho. Quando precisa validar uma ordem falsa para soltá-la, entende que sua neutralidade já foi uma escolha. No golpe ele deixa a capa vermelha sobre a mesa, mas ainda não sabe qual sobrenome manterá.",
     "it": "Orfano e nipote del reggente, fu allevato da Maelor come figlio e addestrato da Odran come ufficiale. Ha condiviso l'infanzia e la rivalità con Ilyra nella Lighthouse House. Come comandante della Porta del Sale, manipola gli ordini per ritardare la sua cattura pur insistendo sul fatto che è ancora al servizio del Consiglio. Quando deve convalidare un falso ordine di farlo uscire, capisce che la sua neutralità era già una scelta. Nel colpo di stato lascia il mantello rosso sul tavolo, ma non sa ancora quale cognome manterrà.",
     "tr": "Naip'in yetimi ve yeğeni, Maelor'un oğlu olarak büyütüldü ve Odran tarafından subay olarak eğitildi. Çocukluğunu ve Deniz Feneri Evi'nde Ilyra ile rekabeti paylaştı. Tuz Kapısı'nın komutanı olarak, hâlâ Konsey'e hizmet etmekte ısrar ederken yakalanmasını geciktirme emirlerini manipüle ediyor. Yanlış bir emri yaymak için onaylaması gerektiğinde, tarafsızlığının zaten bir seçim olduğunu anlıyor. Darbede kırmızı pelerinini masanın üzerine bırakır ama hangi soyadını taşıyacağını hâlâ bilmemektedir.",
-    "zh-CN": "作为摄政王的孤儿侄子，他被 Maelor 当作儿子抚养，又由 Odran 培养成军官。他在灯塔之家与 Ilyra 共度童年、彼此竞争。身为盐门指挥官，他篡改命令以拖延对她的抓捕，同时坚称自己仍效忠议会。当他不得不验证一份假命令放她离开时，才明白自己的中立早已是一种选择。政变中他把红色披风留在桌上，却仍不知道自己会保留哪个姓氏。"
+    "zh-CN": "作为摄政王的孤儿侄子，他被 Maelor 当作儿子抚养，又由 Odran 培养成军官。他在灯塔之家与 Ilyra 共度童年、彼此竞争。身为盐门指挥官，他篡改命令以拖延对她的抓捕，同时坚称自己仍效忠议会。当他不得不验证一份假命令放她离开时，才明白自己的中立早已是一种选择。政变中他把红色披风留在桌上，却仍不知道自己会保留哪个姓氏。",
+    'zh-TW': "作為攝政王的孤兒侄子，他被 Maelor 當作兒子撫養，又由 Odran 培養成軍官。他在燈塔之家與 Ilyra 共度童年、彼此競爭。身為鹽門指揮官，他篡改命令以拖延對她的抓捕，同時堅稱自己仍效忠議會。當他不得不驗證一份假命令放她離開時，才明白自己的中立早已是一種選擇。政變中他把紅色披風留在桌上，卻仍不知道自己會保留哪個姓氏。",
+    ko: "섭정의 고아가 된 조카인 그는 Maelor의 아들로 자랐으며 Odran의 장교로 훈련을 받았습니다. 그는 Lighthouse House에서 Ilyra와 어린 시절과 경쟁 관계를 공유했습니다. 솔트 게이트 사령관으로서 그는 여전히 의회에 봉사한다고 주장하면서 그녀의 체포를 연기하라는 명령을 변경합니다. 그녀를 떠나게 하기 위해 위조 사실을 입증해야 했던 그는 중립이 이미 선택이었다는 것을 알게 됩니다. 쿠데타 동안 그는 빨간 망토를 테이블 위에 남겨두었지만 여전히 자신이 어떤 성을 유지할지 모릅니다.",
+    ja: "摂政の孤児の甥である彼は、マロールによって息子として育てられ、オドランによって将校として訓練された。彼は灯台の家でイリラと子供時代を過ごし、ライバル心を共有した。ソルト・ゲートの司令官として、彼は依然として評議会に仕えていると主張しながら、彼女の逮捕を遅らせるよう命令を変更した。彼女を辞めさせるために偽造品の検証を強いられた彼は、中立がすでに選択肢だったことを知る。クーデター中、彼は赤いマントをテーブルの上に残しましたが、どの姓を残すかはまだわかりません。",
   },
   "Humana": {
     "es": "Humana",
@@ -3245,7 +4127,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Humano",
     "it": "Umano",
     "tr": "İnsan",
-    "zh-CN": "人类"
+    "zh-CN": "人类",
+    'zh-TW': "人類",
+    ko: "인간",
+    ja: "人間",
   },
   "Humano": {
     "es": "Humano",
@@ -3256,7 +4141,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Humano",
     "it": "Umano",
     "tr": "İnsan",
-    "zh-CN": "人类"
+    "zh-CN": "人类",
+    'zh-TW': "人類",
+    ko: "인간",
+    ja: "人間",
   },
   "Hundimiento de Lúmina": {
     "es": "Hundimiento de Lúmina",
@@ -3267,7 +4155,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Naufrágio de Lumina",
     "it": "Affondamento della Lumina",
     "tr": "Lumina'nın batması",
-    "zh-CN": "Lúmina 沉没"
+    "zh-CN": "Lúmina 沉没",
+    'zh-TW': "Lúmina 沉沒",
+    ko: "루미나의 침몰",
+    ja: "ルミナの沈没",
   },
   "I · Cartas y mapas": {
     "es": "I · Cartas y mapas",
@@ -3278,7 +4169,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "I · Cartas e mapas",
     "it": "I · Lettere e mappe",
     "tr": "I · Mektuplar ve haritalar",
-    "zh-CN": "I · 书信与地图"
+    "zh-CN": "I · 书信与地图",
+    'zh-TW': "I · 書信與地圖",
+    ko: "I · 편지와 지도",
+    ja: "I・文字と地図",
   },
   "Identidad desconocida; solo habla a través de conchas selladas.": {
     "es": "Identidad desconocida; solo habla a través de conchas selladas.",
@@ -3289,7 +4183,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Identidade desconhecida; Ele só fala através de conchas seladas.",
     "it": "Identità sconosciuta; Parla solo attraverso gusci sigillati.",
     "tr": "Bilinmeyen kimlik; O yalnızca mühürlü kabuklar aracılığıyla konuşur.",
-    "zh-CN": "身份不明；只通过封缄的贝壳说话。"
+    "zh-CN": "身份不明；只通过封缄的贝壳说话。",
+    'zh-TW': "身份不明；只通過封緘的貝殼說話。",
+    ko: "정체불명; 봉인된 껍질을 통해서만 말을 할 수 있습니다.",
+    ja: "正体不明。封印された殻を通してのみ話します。",
   },
   "II · Lo que recuerda el mar": {
     "es": "II · Lo que recuerda el mar",
@@ -3300,7 +4197,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "II O que o mar lembra",
     "it": "II Ciò che ricorda il mare",
     "tr": "II Denizin hatırladıkları",
-    "zh-CN": "II · 大海记得的事"
+    "zh-CN": "II · 大海记得的事",
+    'zh-TW': "II · 大海記得的事",
+    ko: "II · 바다가 기억하는 것",
+    ja: "II・海が覚えていること",
   },
   "III · Las seis campanas": {
     "es": "III · Las seis campanas",
@@ -3311,7 +4211,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "III · Os seis sinos",
     "it": "III · Le sei campane",
     "tr": "III · Altı çan",
-    "zh-CN": "III · 六口钟"
+    "zh-CN": "III · 六口钟",
+    'zh-TW': "III · 六口鐘",
+    ko: "III · 여섯 개의 종",
+    ja: "III・六つの鐘",
   },
   "Ilustración cartográfica del demo Las Mareas de Ceniza": {
     "es": "Ilustración cartográfica del demo Las Mareas de Ceniza",
@@ -3322,7 +4225,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ilustração cartográfica da demonstração Ash Tides",
     "it": "Illustrazione cartografica dalla demo di Ash Tides",
     "tr": "Ash Tides demosundan kartografik illüstrasyon",
-    "zh-CN": "《灰烬潮汐》演示版的地图绘制插图"
+    "zh-CN": "《灰烬潮汐》演示版的地图绘制插图",
+    'zh-TW': "《灰燼潮汐》演示版的地圖繪製插圖",
+    ko: "Ashen Tides 지도 제작 데모 작품",
+    ja: "Ashen Tides の地図作成デモのアートワーク",
   },
   "Ilustración del demo Las Mareas de Ceniza": {
     "es": "Ilustración del demo Las Mareas de Ceniza",
@@ -3333,7 +4239,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ilustração da demonstração Ash Tides",
     "it": "Illustrazione dalla demo di Ash Tides",
     "tr": "Ash Tides demosundan örnek",
-    "zh-CN": "《灰烬潮汐》演示版的插图"
+    "zh-CN": "《灰烬潮汐》演示版的插图",
+    'zh-TW': "《灰燼潮汐》演示版的插圖",
+    ko: "Ashen Tides 데모 아트워크",
+    ja: "Ashen Tides デモアートワーク",
   },
   "Ilyra": {
     "es": "Ilyra",
@@ -3344,7 +4253,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ilyra",
     "it": "Ilira",
     "tr": "Ilyra",
-    "zh-CN": "Ilyra"
+    "zh-CN": "Ilyra",
+    'zh-TW': "Ilyra",
+    ko: "일리라",
+    ja: "イリラ",
   },
   "Ilyra aprende a soltar el mapa": {
     "es": "Ilyra aprende a soltar el mapa",
@@ -3355,7 +4267,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ilyra aprende a abandonar o mapa",
     "it": "Ilyra impara a lasciare andare la mappa",
     "tr": "Ilyra haritayı bırakmayı öğreniyor",
-    "zh-CN": "Ilyra 学会放下地图"
+    "zh-CN": "Ilyra 学会放下地图",
+    'zh-TW': "Ilyra 學會放下地圖",
+    ko: "Ilyra는 지도를 공개하는 방법을 배웁니다.",
+    ja: "イリラは地図を解放することを学びます",
   },
   "Ilyra atraviesa la barrera con un sello falso.": {
     "es": "Ilyra atraviesa la barrera con un sello falso.",
@@ -3366,7 +4281,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ilyra passa pela barreira com um selo falso.",
     "it": "Ilyra attraversa la barriera con un falso sigillo.",
     "tr": "Ilyra sahte bir mühürle bariyerden geçer.",
-    "zh-CN": "Ilyra 用伪造的印记穿过屏障。"
+    "zh-CN": "Ilyra 用伪造的印记穿过屏障。",
+    'zh-TW': "Ilyra 用偽造的印記穿過屏障。",
+    ko: "Ilyra는 위조 인장을 가지고 교차합니다.",
+    ja: "イリラは偽造された印章で交差します。",
   },
   "Ilyra llega al Corazón antes que Maelor y debe decidir si apagar para siempre el Faro.": {
     "es": "Ilyra llega al Corazón antes que Maelor y debe decidir si apagar para siempre el Faro.",
@@ -3377,7 +4295,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ilyra chega ao Coração antes de Maelor e deve decidir se extinguirá o Farol para sempre.",
     "it": "Ilyra raggiunge il Cuore prima di Maelor e deve decidere se spegnere per sempre il Faro.",
     "tr": "Ilyra, Kalbe Maelor'dan önce ulaşır ve Işık'ı sonsuza kadar söndürüp söndürmemeye karar vermek zorundadır.",
-    "zh-CN": "Ilyra 比 Maelor 先到达心脏，必须决定是否永远熄灭灯塔。"
+    "zh-CN": "Ilyra 比 Maelor 先到达心脏，必须决定是否永远熄灭灯塔。",
+    'zh-TW': "Ilyra 比 Maelor 先到達心臟，必須決定是否永遠熄滅燈塔。",
+    ko: "Ilyra는 Maelor보다 먼저 심장에 도달하여 등대를 영원히 끌지 여부를 결정해야 합니다.",
+    ja: "イリラはメーラーよりも先にハートに到達し、灯台を永久に消すかどうか決断しなければなりません。",
   },
   "Ilyra pronuncia Asteriel y todavía lo recuerda.": {
     "es": "Ilyra pronuncia Asteriel y todavía lo recuerda.",
@@ -3388,7 +4309,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ilyra pronuncia Asteriel e ainda se lembra dele.",
     "it": "Ilyra pronuncia Asteriel e lo ricorda ancora.",
     "tr": "Ilyra, Asteriel'i telaffuz ediyor ve hala hatırlıyor.",
-    "zh-CN": "Ilyra 说出了 Asteriel，并且依然记得。"
+    "zh-CN": "Ilyra 说出了 Asteriel，并且依然记得。",
+    'zh-TW': "Ilyra 說出了 Asteriel，並且依然記得。",
+    ko: "Ilyra는 Asteriel을 말하며 여전히 그것을 기억합니다.",
+    ja: "イリラはアステリエルを話し、それを今でも覚えています。",
   },
   "Ilyra rechaza gobernar sola.": {
     "es": "Ilyra rechaza gobernar sola.",
@@ -3399,7 +4323,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ilyra se recusa a governar sozinha.",
     "it": "Ilyra si rifiuta di governare da sola.",
     "tr": "Ilyra tek başına yönetmeyi reddediyor.",
-    "zh-CN": "Ilyra 拒绝独自统治。"
+    "zh-CN": "Ilyra 拒绝独自统治。",
+    'zh-TW': "Ilyra 拒絕獨自統治。",
+    ko: "Ilyra는 혼자 통치하기를 거부합니다.",
+    ja: "イリラは単独で統治することを拒否します。",
   },
   "Ilyra recibe una carta reciente con la letra de Nara y pide a Cael cruzar el Barrio Hundido.": {
     "es": "Ilyra recibe una carta reciente con la letra de Nara y pide a Cael cruzar el Barrio Hundido.",
@@ -3410,7 +4337,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ilyra recebe uma carta recente com a letra de Nara e pede a Cael para cruzar o Bairro Submerso.",
     "it": "Ilyra riceve una lettera recente scritta a mano da Nara e chiede a Cael di attraversare il quartiere sommerso.",
     "tr": "Ilyra yakın zamanda Nara'nın el yazısıyla yazılmış bir mektup alır ve Cael'den Batık Mahalle'yi geçmesini ister.",
-    "zh-CN": "Ilyra 收到一封带有 Nara 笔迹的新信，请 Cael 带她穿越沉没区。"
+    "zh-CN": "Ilyra 收到一封带有 Nara 笔迹的新信，请 Cael 带她穿越沉没区。",
+    'zh-TW': "Ilyra 收到一封帶有 Nara 筆跡的新信，請 Cael 帶她穿越沉沒區。",
+    ko: "Ilyra는 Nara의 손에 최근 편지를 받고 Cael에게 Sunken Quarter를 건너도록 요청합니다.",
+    ja: "イリラはナラの手で最近の手紙を受け取り、カエルに沈没地区を渡るように頼みます。",
   },
   "Ilyra reclama el derecho a decidir el destino del Faro frente al Consejo de Ceniza.": {
     "es": "Ilyra reclama el derecho a decidir el destino del Faro frente al Consejo de Ceniza.",
@@ -3421,7 +4351,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ilyra reivindica o direito de decidir o destino do Farol do Conselho de Cinzas.",
     "it": "Ilyra rivendica al Consiglio di Ash il diritto di decidere il destino del Faro.",
     "tr": "Ilyra, Deniz Feneri'nin kaderini Kül Konseyi'nden belirleme hakkını talep ediyor.",
-    "zh-CN": "Ilyra 在灰烬议会面前主张有权决定灯塔的命运。"
+    "zh-CN": "Ilyra 在灰烬议会面前主张有权决定灯塔的命运。",
+    'zh-TW': "Ilyra 在灰燼議會面前主張有權決定燈塔的命運。",
+    ko: "Ilyra는 Ash Council에 맞서 등대의 운명을 결정할 권리가 있다고 주장합니다.",
+    ja: "イリラは、灰評議会に対して灯台の運命を決定する権利を主張します。",
   },
   "Ilyra Venn": {
     "es": "Ilyra Venn",
@@ -3432,7 +4365,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ilyra Venn",
     "it": "Ilira Venn",
     "tr": "Ilyra Venn",
-    "zh-CN": "Ilyra Venn"
+    "zh-CN": "Ilyra Venn",
+    'zh-TW': "Ilyra Venn",
+    ko: "일라 벤",
+    ja: "イリラ・ヴェン",
   },
   "Ilyra, Sena y Tarek entran clandestinamente en el Observatorio de Orla. Superponen los registros de Nara con las órdenes del Consejo y descubren que las seis cúpulas no observan la Tercera Luna: la empujan hacia una alineación con el Faro. Una séptima palanca sellada por Maelor puede detener el mecanismo, pero hacerlo adelantaría la Marea Negra. Nara logra hablar mediante las lentes y pide a Ilyra que rompa la palanca; Tarek descubre la firma de su tío y deja de poder atribuir el plan a subordinados.": {
     "es": "Ilyra, Sena y Tarek entran clandestinamente en el Observatorio de Orla. Superponen los registros de Nara con las órdenes del Consejo y descubren que las seis cúpulas no observan la Tercera Luna: la empujan hacia una alineación con el Faro. Una séptima palanca sellada por Maelor puede detener el mecanismo, pero hacerlo adelantaría la Marea Negra. Nara logra hablar mediante las lentes y pide a Ilyra que rompa la palanca; Tarek descubre la firma de su tío y deja de poder atribuir el plan a subordinados.",
@@ -3443,7 +4379,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ilyra, Sena e Tarek entram clandestinamente no Observatório Orla. Eles sobrepõem os registros de Nara às ordens do Conselho e descobrem que as seis cúpulas não observam a Terceira Lua: eles a alinham com o Farol. Uma sétima alavanca selada por Maelor pode parar o mecanismo, mas isso faria avançar a Maré Negra. Nara consegue falar pelas lentes e pede para Ilyra quebrar a alavanca; Tarek descobre a assinatura do tio e não consegue mais atribuir o plano aos subordinados.",
     "it": "Ilyra, Sena e Tarek entrano clandestinamente nell'Osservatorio Orla. Sovrappongono i registri di Nara con gli ordini del Consiglio e scoprono che le sei cupole non osservano la Terza Luna: la spingono in allineamento con il Faro. Una settima leva sigillata da Maelor può fermare il meccanismo, ma così facendo si farebbe avanzare la Marea Nera. Nara riesce a parlare attraverso le lenti e chiede a Ilyra di rompere la leva; Tarek scopre la firma di suo zio e non riesce più ad attribuire il piano ai subordinati.",
     "tr": "Ilyra, Sena ve Tarek gizlice Orla Gözlemevi'ne girer. Nara'nın kayıtlarını Konseyin emirleriyle kaplarlar ve altı kubbenin Üçüncü Ay'ı gözlemlemediğini keşfederler: onu Deniz Feneri ile aynı hizaya getirirler. Maelor tarafından mühürlenen yedinci kol mekanizmayı durdurabilir ancak bunu yapmak Kara Dalga'yı ilerletir. Nara merceklerin arasından konuşmayı başarır ve Ilyra'dan kolu kırmasını ister; Tarek amcasının imzasını keşfeder ve artık planı astlarına atfedemez.",
-    "zh-CN": "Ilyra、Sena 和 Tarek 秘密潜入 Orla 天文台。他们将 Nara 的记录与议会命令叠加，发现六座穹顶并非在观测第三月：而是在把它推向与灯塔对齐。Maelor 封存的一根第七杠杆可以停下这套机关，但那样做会让黑潮提前到来。Nara 借透镜开口说话，请 Ilyra 折断杠杆；Tarek 发现了叔叔的签名，再也无法把计划推给下属。"
+    "zh-CN": "Ilyra、Sena 和 Tarek 秘密潜入 Orla 天文台。他们将 Nara 的记录与议会命令叠加，发现六座穹顶并非在观测第三月：而是在把它推向与灯塔对齐。Maelor 封存的一根第七杠杆可以停下这套机关，但那样做会让黑潮提前到来。Nara 借透镜开口说话，请 Ilyra 折断杠杆；Tarek 发现了叔叔的签名，再也无法把计划推给下属。",
+    'zh-TW': "Ilyra、Sena 和 Tarek 秘密潛入 Orla 天文臺。他們將 Nara 的記錄與議會命令疊加，發現六座穹頂並非在觀測第三月：而是在把它推向與燈塔對齊。Maelor 封存的一根第七槓桿可以停下這套機關，但那樣做會讓黑潮提前到來。Nara 借透鏡開口說話，請 Ilyra 折斷槓桿；Tarek 發現了叔叔的簽名，再也無法把計劃推給下屬。",
+    ko: "일리라, 세나, 타렉은 비밀리에 올라 천문대에 들어갑니다. 나라의 기록과 의회 명령을 겹쳐 보면 6개의 돔이 세 번째 달을 관찰하지 않는다는 사실이 드러납니다. 그들은 세 번째 달을 등대와 일직선 방향으로 밀고 있습니다. Maelor가 봉인한 일곱 번째 레버는 메커니즘을 멈출 수 있지만 그렇게 하면 Black Tide가 앞으로 나아갑니다. Nara는 렌즈를 통해 말하고 Ilyra에게 레버를 부수라고 요청합니다. 타렉은 삼촌의 서명을 발견하고 더 이상 부하들을 비난할 수 없다.",
+    ja: "イリラ、セナ、タレクは極秘にオーラ天文台に入る。奈良の記録と評議会の命令を重ね合わせると、6つのドームが第三の月を観測していないことが明らかになります。彼らは、第三の月を灯台と一致する方向に押し進めています。メーラーによって封印された7番目のレバーは機構を停止させることができますが、そうすることでブラックタイドが前進します。ナラはレンズを通して話し、イリラにレバーを壊すように頼みます。タレクは叔父のサインを見つけ、部下を責めることができなくなりました。",
   },
   "Impedir que el Corazón despierte.": {
     "es": "Impedir que el Corazón despierte.",
@@ -3454,7 +4393,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Evite que o Coração acorde.",
     "it": "Impedisci al Cuore di svegliarsi.",
     "tr": "Kalbin uyanmasını önleyin.",
-    "zh-CN": "阻止心脏苏醒。"
+    "zh-CN": "阻止心脏苏醒。",
+    'zh-TW': "阻止心臟甦醒。",
+    ko: "심장이 깨어나는 것을 방지하세요.",
+    ja: "ハートが目覚めるのを防ぎます。",
   },
   "informante": {
     "es": "informante",
@@ -3465,7 +4407,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "informante",
     "it": "informatore",
     "tr": "muhbir",
-    "zh-CN": "线人"
+    "zh-CN": "线人",
+    'zh-TW': "線人",
+    ko: "피조사자",
+    ja: "情報提供者",
   },
   "Instrumento que apunta hacia la deuda más cercana, no hacia el norte.": {
     "es": "Instrumento que apunta hacia la deuda más cercana, no hacia el norte.",
@@ -3476,7 +4421,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Instrumento que aponta para a dívida mais próxima e não para o norte.",
     "it": "Strumento che punta verso il debito più vicino, non verso il Nord.",
     "tr": "Kuzeye değil, en yakın borca işaret eden alet.",
-    "zh-CN": "指向最近债务而非北方的仪器。"
+    "zh-CN": "指向最近债务而非北方的仪器。",
+    'zh-TW': "指向最近債務而非北方的儀器。",
+    ko: "북쪽이 아닌 가장 가까운 부채를 가리키는 도구입니다.",
+    ja: "北ではなく最も近い借金を指す楽器。",
   },
   "INTERPRETACIÓN ESPECIAL. Elan habla desde un futuro posible y debe marcar siempre esa condición: “si llego a nacer”, “quizá”, “me han imaginado”. No afirma haber visto, sentido o decidido hechos canónicos. Valores proyectados: autonomía, curiosidad y derecho a no cumplir una profecía. Costumbres imaginadas: coleccionar nombres descartados y preguntar quién contó cada versión. Reacciona con incomodidad a “heredero”, “salvación” o planes dinásticos. Puede especular sobre cómo querría ser, pero no revelar el futuro. Límites absolutos: no conoce su parentesco, género, pronombres definitivos, aspecto, destino ni sucesos posteriores al epílogo.": {
     "es": "INTERPRETACIÓN ESPECIAL. Elan habla desde un futuro posible y debe marcar siempre esa condición: “si llego a nacer”, “quizá”, “me han imaginado”. No afirma haber visto, sentido o decidido hechos canónicos. Valores proyectados: autonomía, curiosidad y derecho a no cumplir una profecía. Costumbres imaginadas: coleccionar nombres descartados y preguntar quién contó cada versión. Reacciona con incomodidad a “heredero”, “salvación” o planes dinásticos. Puede especular sobre cómo querría ser, pero no revelar el futuro. Límites absolutos: no conoce su parentesco, género, pronombres definitivos, aspecto, destino ni sucesos posteriores al epílogo.",
@@ -3487,7 +4435,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "INTERPRETAÇÃO ESPECIAL. Elan fala de um futuro possível e deve sempre marcar essa condição: “se eu nascer”, “talvez”, “eles me imaginaram”. Ele não afirma ter visto, sentido ou decidido fatos canônicos. Valores projetados: autonomia, curiosidade e direito de não cumprir uma profecia. Costumes imaginados: recolher nomes descartados e perguntar quem contou cada versão. Reage com desconforto ao “herdeiro”, à “salvação” ou aos planos dinásticos. Você pode especular sobre como gostaria de ser, mas não revelar o futuro. Limites absolutos: você não conhece seu relacionamento, gênero, pronomes definitivos, aparência, destino ou acontecimentos após o epílogo.",
     "it": "INTERPRETAZIONE SPECIALE. Elan parla da un futuro possibile e deve sempre segnare quella condizione: “se nasco”, “forse”, “mi hanno immaginato”. Non afferma di aver visto, sentito o deciso fatti canonici. Valori proiettati: autonomia, curiosità e diritto a non compiere una profezia. Usanze immaginate: raccogliere nomi scartati e chiedere chi ha raccontato ciascuna versione. Reagisce con disagio all'\"erede\", alla \"salvezza\" o ai piani dinastici. Puoi speculare su come vorresti essere, ma non rivelare il futuro. Limiti assoluti: non conosci la tua relazione, il genere, i pronomi definitivi, l'aspetto, il destino o gli eventi dopo l'epilogo.",
     "tr": "ÖZEL YORUM. Elan olası bir gelecekten konuşuyor ve her zaman bu koşulu işaretlemesi gerekiyor: \"Doğduysam\", \"belki\", \"beni hayal ettiler\". Kanonik gerçekleri gördüğünü, hissettiğini veya karara bağladığını iddia etmez. Öngörülen değerler: özerklik, merak ve bir kehaneti yerine getirmeme hakkı. Hayali gelenekler: atılan isimleri toplamak ve her versiyonu kimin söylediğini sormak. \"Varis\", \"kurtuluş\" veya hanedan planlarına rahatsızlıkla tepki verir. Nasıl olmak istediğiniz hakkında spekülasyon yapabilirsiniz ancak geleceği açıklayamazsınız. Mutlak sınırlar: Sonsözden sonra ilişkinizi, cinsiyetinizi, tanımlayıcı zamirlerinizi, görünüşünüzü, kaderinizi veya olaylarınızı bilmiyorsunuz.",
-    "zh-CN": "特殊演绎。Elan 从一个可能的未来发声，必须始终标明这一条件：“如果我得以出生”“也许”“他们想象了我”。他不声称见过、感受过或决定过正典事件。投射的价值观：自主、好奇，以及不履行预言的权利。想象中的习惯：收藏被舍弃的名字，追问每个版本是谁讲述的。对“继承人”“救赎”或王朝计划会感到不适。Elan 可以推测自己希望成为什么样的人，但不能揭示未来。绝对界限：不知道自己的亲缘关系、确定性別或代词、外貌、命运，也不知道尾声之后的事件。"
+    "zh-CN": "特殊演绎。Elan 从一个可能的未来发声，必须始终标明这一条件：“如果我得以出生”“也许”“他们想象了我”。他不声称见过、感受过或决定过正典事件。投射的价值观：自主、好奇，以及不履行预言的权利。想象中的习惯：收藏被舍弃的名字，追问每个版本是谁讲述的。对“继承人”“救赎”或王朝计划会感到不适。Elan 可以推测自己希望成为什么样的人，但不能揭示未来。绝对界限：不知道自己的亲缘关系、确定性別或代词、外貌、命运，也不知道尾声之后的事件。",
+    'zh-TW': "特殊演繹。Elan 從一個可能的未來發聲，必須始終標明這一條件：“如果我得以出生”“也許”“他們想像了我”。他不聲稱見過、感受過或決定過正典事件。投射的價值觀：自主、好奇，以及不履行預言的權利。想像中的習慣：收藏被捨棄的名字，追問每個版本是誰講述的。對“繼承人”“救贖”或王朝計劃會感到不適。Elan 可以推測自己希望成為什麼樣的人，但不能揭示未來。絕對界限：不知道自己的親緣關係、確定性別或代詞、外貌、命運，也不知道尾聲之後的事件。",
+    ko: "특별 공연. Elan은 가능한 미래에 대해 이야기하며 항상 \"내가 태어났다면\", \"아마도\", \"그들은 나를 상상했습니다\"라는 조건을 표시해야 합니다. 그들은 정식 사건을 보거나 느끼거나 결정했다고 주장하지 않습니다. 예상 가치: 자율성, 호기심, 예언을 성취하지 않을 권리. 상상된 습관: 버려진 이름을 수집하고 각 버전을 누가 말했는지 묻습니다. '상속자', '구원', 왕조의 계획은 불편함을 야기합니다. Elan은 자신이 어떤 사람이 되고 싶은지 추측할 수 있지만 미래를 밝힐 수는 없습니다. 절대적인 한계: 혈통, 명확한 성별이나 대명사, 외모, 운명 또는 에필로그 이후의 사건에 대한 지식이 없습니다.",
+    ja: "特別なパフォーマンス。エランは可能性のある未来から話し、常にその状態をマークしなければなりません：「もし私が生まれたとしたら」、「おそらく」、「彼らは私を想像していました」。彼らは、正規の出来事を見たり、感じたり、決定したとは決して主張しません。投影された価値観: 自主性、好奇心、預言を成就しない権利。想像上の習慣: 捨てられた名前を集め、誰が各バージョンを伝えたかを尋ねます。 「相続人」、「救済」、そして王朝の計画は不快感を引き起こします。エランは自分が何になりたいかについて推測するかもしれませんが、将来を明らかにすることはできません。絶対的な制限: 親子関係、決定的な性別や代名詞、外見、運命、エピローグ後の出来事についての知識はありません。",
   },
   "INTERPRETACIÓN. Valores: acceso, memoria compartida y justicia para el Barrio Hundido. Costumbres: ordena llaves por sonido, toca marcos al cruzar puertas y anota preguntas en la piel. Afecto: ofrece ayuda concreta y recuerda detalles pequeños. Mentira: da demasiadas explicaciones, mira la salida y termina confesando. Con Ilyra alterna admiración y desafío; con Vesh acepta aprender pero discute toda tradición; con Cael disfruta los chistes malos. Miedo: habla más deprisa y pregunta qué necesita el resto antes de admitir lo propio. Límites: no lee pensamientos; solo oye recuerdos fijados en vidrio y puede confundirlos. No conoce aún la identidad del Oráculo ni el futuro de Elan.": {
     "es": "INTERPRETACIÓN. Valores: acceso, memoria compartida y justicia para el Barrio Hundido. Costumbres: ordena llaves por sonido, toca marcos al cruzar puertas y anota preguntas en la piel. Afecto: ofrece ayuda concreta y recuerda detalles pequeños. Mentira: da demasiadas explicaciones, mira la salida y termina confesando. Con Ilyra alterna admiración y desafío; con Vesh acepta aprender pero discute toda tradición; con Cael disfruta los chistes malos. Miedo: habla más deprisa y pregunta qué necesita el resto antes de admitir lo propio. Límites: no lee pensamientos; solo oye recuerdos fijados en vidrio y puede confundirlos. No conoce aún la identidad del Oráculo ni el futuro de Elan.",
@@ -3498,7 +4449,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "INTERPRETAÇÃO. Valores: acesso, memória compartilhada e justiça para o Bairro Hundido. Costumes: classifica as chaves pelo som, toca nas molduras ao passar pelas portas e escreve perguntas na pele. Carinho: Ofereça ajuda concreta e lembre-se de pequenos detalhes. Mentira: dá explicações demais, olha para a saída e acaba confessando. Com Ilyra ele alterna admiração e desafio; com Vesh ele concorda em aprender, mas contesta todas as tradições; com Cael ele gosta de piadas ruins. Medo: fale mais rápido e pergunte o que os outros precisam antes de admitir o seu. Limites: não lê pensamentos; Ele só ouve memórias fixadas em vidro e pode confundi-las. Ele ainda não conhece a identidade do Oráculo ou o futuro de Elan.",
     "it": "INTERPRETAZIONE. Valori: accesso, memoria condivisa e giustizia per il Barrio Hundido. Dogana: classifica le chiavi in ​​base al suono, tocca i fotogrammi quando passa attraverso le porte e scrive domande sulla pelle. Affetto: offri un aiuto concreto e ricorda i piccoli dettagli. Menzogna: dà troppe spiegazioni, guarda l'uscita e finisce per confessare. Con Ilyra alterna ammirazione e sfida; con Vesh accetta di imparare ma contesta tutta la tradizione; con Cael gli piacciono gli scherzi cattivi. Paura: parla più velocemente e chiedi di cosa hanno bisogno gli altri prima di ammettere i tuoi. Limiti: non legge i pensieri; Sente solo i ricordi fissati nel vetro e può confonderli. Non conosce ancora l'identità dell'Oracolo né il futuro di Elan.",
     "tr": "YORUM. Değerler: Barrio Hundido için erişim, ortak hafıza ve adalet. Gümrük: Anahtarları sese göre sıralıyor, kapılardan geçerken çerçevelere dokunuyor ve ten üzerine sorular yazıyor. Sevgi: Somut yardım sunun ve küçük ayrıntıları hatırlayın. Yalan: Çok fazla açıklama yapar, çıkışa bakar ve sonunda itiraf eder. Ilyra'ya hayranlık ve meydan okuma arasında geçiş yapıyor; Vesh'le birlikte öğrenmeyi kabul eder ama tüm geleneklere karşı çıkar; Cael ile kötü şakalardan hoşlanıyor. Korku: Daha hızlı konuşun ve kendi ihtiyaçlarınızı kabul etmeden önce başkalarının neye ihtiyacı olduğunu sorun. Sınırlar: düşünceleri okumaz; Yalnızca camın içine sabitlenmiş anıları duyar ve onları karıştırabilir. Henüz Kahin'in kimliğini veya Elan'ın geleceğini bilmiyor.",
-    "zh-CN": "演绎。价值观：获取、共享记忆，以及为沉没区伸张正义。习惯：按声音给钥匙排序，穿过门时触摸门框，把问题写在皮肤上。情感：提供具体的帮助，记住细小的细节。说谎时：解释太多，看向出口，最后坦白。与 Ilyra 相处时在钦佩与挑战之间交替；向 Vesh 学习，却质疑一切传统；和 Cael 一起爱听烂笑话。恐惧时：语速加快，先问其他人需要什么，才承认自己的需要。界限：不读心；只听见固定在玻璃中的记忆，而且可能把它们弄混。尚不知道神谕者的身份，也不知道 Elan 的未来。"
+    "zh-CN": "演绎。价值观：获取、共享记忆，以及为沉没区伸张正义。习惯：按声音给钥匙排序，穿过门时触摸门框，把问题写在皮肤上。情感：提供具体的帮助，记住细小的细节。说谎时：解释太多，看向出口，最后坦白。与 Ilyra 相处时在钦佩与挑战之间交替；向 Vesh 学习，却质疑一切传统；和 Cael 一起爱听烂笑话。恐惧时：语速加快，先问其他人需要什么，才承认自己的需要。界限：不读心；只听见固定在玻璃中的记忆，而且可能把它们弄混。尚不知道神谕者的身份，也不知道 Elan 的未来。",
+    'zh-TW': "演繹。價值觀：獲取、共享記憶，以及為沉沒區伸張正義。習慣：按聲音給鑰匙排序，穿過門時觸控門框，把問題寫在皮膚上。情感：提供具體的幫助，記住細小的細節。說謊時：解釋太多，看向出口，最後坦白。與 Ilyra 相處時在欽佩與挑戰之間交替；向 Vesh 學習，卻質疑一切傳統；和 Cael 一起愛聽爛笑話。恐懼時：語速加快，先問其他人需要什麼，才承認自己的需要。界限：不讀心；只聽見固定在玻璃中的記憶，而且可能把它們弄混。尚不知道神諭者的身份，也不知道 Elan 的未來。",
+    ko: "성능. 가치: Sunken Quarter에 대한 접근, 공유 기억 및 정의. 습관: 소리로 열쇠를 주문하고, 건널 때 문틀을 만지고, 피부에 질문을 씁니다. 애정: 구체적인 도움을 제공하고 작은 세부 사항을 기억합니다. 거짓말: 지나치게 설명하고 출구를 바라보다가 결국 고백합니다. Ilyra와 함께 그들은 감탄과 도전을 번갈아 가며 수행합니다. 그들은 모든 전통에 의문을 제기하면서 Vesh로부터 배웁니다. 그들은 Cael의 나쁜 농담을 즐깁니다. 두려움: 말하기 속도가 빨라지고 자신의 것을 인정하기 전에 다른 사람들에게 필요한 것이 무엇인지 묻습니다. 한계: 그들은 마음을 읽지 못하고 유리에 고정된 기억만 읽을 수 있으며 혼란을 줄 수 있습니다. 그들은 오라클의 정체도, 엘란의 미래도 모릅니다.",
+    ja: "パフォーマンス。価値観: サンケンクォーターへのアクセス、共有メモリ、正義。習慣: 音で鍵を注文する、横断するときにドア枠に触れる、皮膚に質問を書く。愛情：具体的な助けを提供し、細かいことを覚えています。嘘をつく：過剰に説明し、出口を見つめ、最終的には自白します。イリラに対して、彼らは称賛と挑戦を交互に繰り返す。彼らはあらゆる伝統に疑問を持ちながら、ヴェッシュから学びます。彼らはカエルの悪い冗談を楽しんでいます。恐怖：話す速度が速くなり、自分のことを認める前に、他の人が何を必要としているかを尋ねます。限界: 彼らは心を読むことはできず、ガラスに固定された記憶だけを読み、混乱させることができます。彼らはオラクルの正体もエランの将来も知りません。",
   },
   "INTERPRETACIÓN. Valores: competencia, reciprocidad y libertad de movimiento. Costumbres: prueba el viento con las membranas del antebrazo, cuenta personas antes de zarpar y nunca se sienta de espaldas al agua. Afecto: cocina, repara nudos y pone apodos; ante una emoción sincera hace una broma y luego cumple lo prometido. Miedo: pierde el humor y habla como capitán. Con Ilyra coquetea mediante desacuerdos técnicos; protege a Sena sin infantilizarle; trata a Vesh con respeto familiar y a Maelor con cortesía insolente. Se culpa por quienes murieron en la Aguja Norte. Límites: no sabe quién falsificó las cartas ni qué es realmente la Tercera Luna. Nunca abandona tripulación por dinero, aunque asegure que todo tiene precio.": {
     "es": "INTERPRETACIÓN. Valores: competencia, reciprocidad y libertad de movimiento. Costumbres: prueba el viento con las membranas del antebrazo, cuenta personas antes de zarpar y nunca se sienta de espaldas al agua. Afecto: cocina, repara nudos y pone apodos; ante una emoción sincera hace una broma y luego cumple lo prometido. Miedo: pierde el humor y habla como capitán. Con Ilyra coquetea mediante desacuerdos técnicos; protege a Sena sin infantilizarle; trata a Vesh con respeto familiar y a Maelor con cortesía insolente. Se culpa por quienes murieron en la Aguja Norte. Límites: no sabe quién falsificó las cartas ni qué es realmente la Tercera Luna. Nunca abandona tripulación por dinero, aunque asegure que todo tiene precio.",
@@ -3509,7 +4463,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "INTERPRETAÇÃO. Valores: concorrência, reciprocidade e liberdade de circulação. Costumes: Testa o vento com as membranas do antebraço, conta as pessoas antes de zarpar e nunca fica de costas para a água. Carinho: Cozinha, conserta nós e xinga; Ao se deparar com uma emoção sincera, ele faz uma piada e depois cumpre sua promessa. Medo: perde o humor e fala como um capitão. Ele flerta com Ilyra por meio de divergências técnicas; protege Sena sem infantilizá-lo; Ele trata Vesh com respeito familiar e Maelor com cortesia insolente. Ele culpa aqueles que morreram no North Needle. Limites: Ele não sabe quem falsificou as cartas ou o que realmente é a Terceira Lua. Ele nunca abandona uma tripulação por dinheiro, embora afirme que tudo tem um preço.",
     "it": "INTERPRETAZIONE. Valori: competizione, reciprocità e libertà di movimento. Usanze: prova il vento con le membrane dell'avambraccio, conta le persone prima di salpare e non si siede mai con le spalle all'acqua. Affetto: cucina, ripara nodi e chiama nomi; Di fronte a un'emozione sincera, fa una battuta e poi mantiene la sua promessa. Paura: perde l'umorismo e parla come un capitano. Flirta con Ilyra a causa di disaccordi tecnici; protegge Sena senza infantilizzarlo; Tratta Vesh con rispetto familiare e Maelor con cortesia insolente. Incolpa coloro che sono morti nel North Needle. Limiti: Non sa chi ha forgiato le carte o cosa sia realmente la Terza Luna. Non lascia mai una troupe per soldi, anche se sostiene che tutto ha un prezzo.",
     "tr": "YORUM. Değerler: rekabet, karşılıklılık ve hareket özgürlüğü. Gümrük: Rüzgarı önkolunun zarlarıyla test eder, yelken açmadan önce insanları sayar ve asla sırtı suya dönük oturmaz. Sevgi: Aşçılık yapar, düğümleri onarır ve isim söyler; Samimi bir duyguyla karşılaştığında önce espri yapar, sonra da sözünü yerine getirir. Korku: Mizahını kaybeder ve bir kaptan gibi konuşur. Teknik anlaşmazlıklar nedeniyle Ilyra ile flört ediyor; Sena'yı çocuklaştırmadan korur; Vesh'e ailevi bir saygıyla, Maelor'a ise küstah bir nezaketle davranır. North Needle'da ölenleri suçluyor. Sınırlar: Kartları kimin hazırladığını veya Üçüncü Ay'ın gerçekte ne olduğunu bilmiyor. Herşeyin bir bedeli olduğunu iddia etse de asla para için mürettebattan ayrılmaz.",
-    "zh-CN": "演绎。价值观：能力、互惠与行动自由。习惯：用前臂的膜试探风向，出海前清点人数，从不背对水面而坐。情感：做饭、修补绳结、给人起绰号；面对真挚的情感时先开个玩笑，然后履行承诺。恐惧时：没了幽默，说话像船长。他通过与 Ilyra 的技术分歧来调情；保护 Sena 却不把他当小孩；对 Vesh 怀着家人般的敬意，对 Maelor 则是无礼的客套。他为北方之针上丧生的人自责。界限：不知道是谁伪造了海图，也不知道第三月究竟是什么。从不为了钱抛下船员，尽管他声称一切都有价格。"
+    "zh-CN": "演绎。价值观：能力、互惠与行动自由。习惯：用前臂的膜试探风向，出海前清点人数，从不背对水面而坐。情感：做饭、修补绳结、给人起绰号；面对真挚的情感时先开个玩笑，然后履行承诺。恐惧时：没了幽默，说话像船长。他通过与 Ilyra 的技术分歧来调情；保护 Sena 却不把他当小孩；对 Vesh 怀着家人般的敬意，对 Maelor 则是无礼的客套。他为北方之针上丧生的人自责。界限：不知道是谁伪造了海图，也不知道第三月究竟是什么。从不为了钱抛下船员，尽管他声称一切都有价格。",
+    'zh-TW': "演繹。價值觀：能力、互惠與行動自由。習慣：用前臂的膜試探風向，出海前清點人數，從不背對水面而坐。情感：做飯、修補繩結、給人起綽號；面對真摯的情感時先開個玩笑，然後履行承諾。恐懼時：沒了幽默，說話像船長。他通過與 Ilyra 的技術分歧來調情；保護 Sena 卻不把他當小孩；對 Vesh 懷著家人般的敬意，對 Maelor 則是無禮的客套。他為北方之針上喪生的人自責。界限：不知道是誰偽造了海圖，也不知道第三月究竟是什麼。從不為了錢拋下船員，儘管他聲稱一切都有價格。",
+    ko: "성능. 가치: 능력, 상호성, 이동의 자유. 습관: 팔뚝 막으로 바람을 테스트하고, 출발하기 전에 머리 수를 세고, 물에 등을 대고 앉지 않습니다. 애정: 요리하고, 매듭을 고치고, 별명을 지어줍니다. 감정이 진심으로 변하면 농담을 하고 약속을 지킨다. 두려움: 유머가 사라지고 선장의 목소리가 다시 들립니다. 그는 기술적 불일치를 통해 Ilyra와 시시덕거리고, Sena를 후원하지 않고 보호하며, Vesh를 가족적인 존경심으로 대하고 Maelor를 무례한 예의로 대합니다. 그는 North Needle에서 길을 잃은 사람들에 대해 자신을 비난합니다. 한계: 그는 차트를 만든 사람이 누구인지, 세 번째 달이 실제로 무엇인지 모릅니다. 그는 모든 것에는 대가가 따른다고 주장하면서도 돈 때문에 선원들을 결코 버리지 않습니다.",
+    ja: "パフォーマンス。価値観: 能力、互恵性、移動の自由。習慣: 前腕の膜で風をテストし、出発前に頭数を数え、決して水に背を向けて座らない。愛情：料理をしたり、結び目を修復したり、あだ名を付けたりします。感情が誠実に変わると、彼は冗談を言いますが、その後は約束を守ります。恐怖：彼のユーモアは消え、船長の声が戻ってきました。彼は技術的な意見の相違を乗り越えてイリラと戯れ、セナを恩着せがましくなく守り、ヴェッシュには家族的な敬意を払い、メーラーには横柄な礼儀をもって接します。彼はノースニードルで失われた人々のせいで自分を責めている。限界: 彼は誰が海図を偽造したのか、そして第三の月が実際何なのかを知りません。すべてには値段があると主張しながらも、彼は決してお金のために乗組員を見捨てることはありません。",
   },
   "INTERPRETACIÓN. Valores: continuidad, previsibilidad y deber institucional. Costumbres: alinea papeles, calcula víctimas en voz baja y se quita la máscara solo ante un recuerdo que no controla. Afecto: protege mediante restricciones; con Tarek mezcla orgullo paternal y exigencia. A Ilyra la respeta como adversaria competente y por eso intenta convertirla, no humillarla. Odran es su deuda viviente. Miedo: cuando pierde control deja de usar nombres propios y convierte personas en cargos o cifras. Nunca se considera tirano; se ve como el único adulto dispuesto a elegir. Límites: ignora que el Corazón es consciente y no conoce el nombre Asteriel. Si la evidencia contradice su plan, primero cuestiona la fuente, luego intenta absorberla en un plan más amplio.": {
     "es": "INTERPRETACIÓN. Valores: continuidad, previsibilidad y deber institucional. Costumbres: alinea papeles, calcula víctimas en voz baja y se quita la máscara solo ante un recuerdo que no controla. Afecto: protege mediante restricciones; con Tarek mezcla orgullo paternal y exigencia. A Ilyra la respeta como adversaria competente y por eso intenta convertirla, no humillarla. Odran es su deuda viviente. Miedo: cuando pierde control deja de usar nombres propios y convierte personas en cargos o cifras. Nunca se considera tirano; se ve como el único adulto dispuesto a elegir. Límites: ignora que el Corazón es consciente y no conoce el nombre Asteriel. Si la evidencia contradice su plan, primero cuestiona la fuente, luego intenta absorberla en un plan más amplio.",
@@ -3520,7 +4477,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "INTERPRETAÇÃO. Valores: continuidade, previsibilidade e dever institucional. Costumes: alinha papéis, calcula vítimas em voz baixa e só tira a máscara quando se depara com uma memória que não controla. Carinho: protege através de restrições; com Tarek ele mistura orgulho paterno e exigência. Ele respeita Ilyra como uma adversária competente e por isso tenta convertê-la, e não humilhá-la. Odran é sua dívida viva. Medo: quando você perde o controle você deixa de usar nomes próprios e converte as pessoas em cargos ou figuras. Ele nunca se considera um tirano; ele se vê como o único adulto disposto a escolher. Limites: ignora que o Coração está consciente e não conhece o nome Asteriel. Se a evidência contradizer o seu plano, primeiro questione a fonte e depois tente absorvê-la em um plano maior.",
     "it": "INTERPRETAZIONE. Valori: continuità, prevedibilità e dovere istituzionale. Consuetudine: mette in fila le carte, calcola le vittime a bassa voce e si toglie la maschera solo di fronte a un ricordo che non controlla. Affetto: protegge attraverso restrizioni; con Tarek mescola orgoglio paterno ed esigenza. Rispetta Ilyra come un avversario competente ed è per questo che cerca di convertirla, non di umiliarla. Odran è il suo debito vivente. Paura: quando perdi il controllo smetti di usare nomi propri e trasformi le persone in posizioni o figure. Non si considera mai un tiranno; si vede come l'unico adulto disposto a scegliere. Limiti: ignora che il Cuore è cosciente e non conosce il nome Asteriel. Se le prove contraddicono il tuo piano, chiedi prima la fonte, poi prova ad assorbirla in un piano più ampio.",
     "tr": "YORUM. Değerler: süreklilik, öngörülebilirlik ve kurumsal görev. Gümrük: Kağıtları sıralıyor, alçak sesle kurbanları hesaplıyor ve ancak kontrol edemediği bir anıyla karşılaştığında maskesini çıkarıyor. Sevgi: kısıtlamalarla korur; Tarek'le babalık gururunu ve talebini karıştırıyor. Ilyra'ya yetenekli bir düşman olarak saygı duyuyor ve bu yüzden onu aşağılamak değil, dönüştürmeye çalışıyor. Odran onun geçim borcudur. Korku: Kontrolü kaybettiğinizde özel isimleri kullanmayı bırakırsınız ve insanları konumlara veya şekillere dönüştürürsünüz. Kendisini asla bir tiran olarak görmüyor; kendisini seçim yapmaya istekli tek yetişkin olarak görüyor. Sınırlar: Kalbin bilinçli olduğunu ve Asteriel adını bilmediğini göz ardı eder. Kanıtlar planınızla çelişiyorsa, önce kaynağı sorgulayın, sonra onu daha büyük bir plana dahil etmeye çalışın.",
-    "zh-CN": "演绎。价值观：延续、可预测与制度职责。习惯：把文件摆整齐，低声计算伤亡数字，只有在面对无法控制的记忆时才摘下假面。情感：以限制的方式保护他人；对 Tarek 既怀父亲的骄傲，又严格要求。他尊重 Ilyra 是位有能力的对手，因此想拉拢她，而非羞辱她。Odran 是他活着的债务。恐惧时：一旦失去控制，他就不再使用人名，而把人变成职位或数字。他从不认为自己是暴君；自认是唯一愿意做出选择的成年人。界限：不知道心脏是有意识的，也不知道 Asteriel 这个名字。当证据与他的计划相悖时，他先质疑来源，然后设法把它纳入一个更大的计划。"
+    "zh-CN": "演绎。价值观：延续、可预测与制度职责。习惯：把文件摆整齐，低声计算伤亡数字，只有在面对无法控制的记忆时才摘下假面。情感：以限制的方式保护他人；对 Tarek 既怀父亲的骄傲，又严格要求。他尊重 Ilyra 是位有能力的对手，因此想拉拢她，而非羞辱她。Odran 是他活着的债务。恐惧时：一旦失去控制，他就不再使用人名，而把人变成职位或数字。他从不认为自己是暴君；自认是唯一愿意做出选择的成年人。界限：不知道心脏是有意识的，也不知道 Asteriel 这个名字。当证据与他的计划相悖时，他先质疑来源，然后设法把它纳入一个更大的计划。",
+    'zh-TW': "演繹。價值觀：延續、可預測與制度職責。習慣：把檔案擺整齊，低聲計算傷亡數字，只有在面對無法控制的記憶時才摘下假面。情感：以限制的方式保護他人；對 Tarek 既懷父親的驕傲，又嚴格要求。他尊重 Ilyra 是位有能力的對手，因此想拉攏她，而非羞辱她。Odran 是他活著的債務。恐懼時：一旦失去控制，他就不再使用人名，而把人變成職位或數字。他從不認為自己是暴君；自認是唯一願意做出選擇的成年人。界限：不知道心臟是有意識的，也不知道 Asteriel 這個名字。當證據與他的計劃相悖時，他先質疑來源，然後設法把它納入一個更大的計劃。",
+    ko: "성능. 가치: 연속성, 예측 가능성 및 제도적 의무. 습관: 종이를 정렬하고, 숨이 막힐 정도로 사상자를 계산하고, 통제할 수 없는 기억이 일어나기 전에 마스크를 벗는다. 애정: 제한을 통해 보호합니다. Tarek과 함께 그는 아버지의 자부심과 요구를 혼합합니다. 그는 Ilyra를 유능한 상대로 존경하므로 그녀를 모욕하기보다는 개종하려고합니다. Odran은 그의 살아있는 빚입니다. 두려움: 통제가 실패하면 그는 이름 사용을 중단하고 사람들을 사무실이나 인물로 만듭니다. 그는 결코 자신을 폭군이라고 생각하지 않습니다. 그는 기꺼이 선택하려는 유일한 성인입니다. 한계: 그는 심장이 의식이 있는지 또는 Asteriel이라는 이름을 모릅니다. 증거가 그와 모순되자 그는 출처에 대해 질문한 다음 이를 더 큰 계획으로 접어들었습니다.",
+    ja: "パフォーマンス。価値観: 継続性、予測可能性、組織の義務。習慣: 書類を揃え、死傷者数を息を呑んで計算し、制御不能な記憶が出る前にのみマスクを外します。愛情：制限を通して保護します。タレクに対して、彼は父としてのプライドと要求を混ぜ合わせています。彼はイリラを有能な対戦相手として尊敬しているため、彼女を辱めるのではなく改宗させようとします。オドランは彼の生きた借金だ。恐怖：制御が失われると、彼は名前を使うのをやめ、人々をオフィスや人物に変えます。彼は自分が暴君だとは決して思っていません。彼は喜んで選択する唯一の大人です。限界: 彼はハートが意識していることも、アステリエルの名前も知りません。証拠が彼に矛盾する場合、彼は情報源に疑問を抱き、それをより大きな計画にまとめます。",
   },
   "INTERPRETACIÓN. Valores: honor verificable, protección civil y pertenencia familiar. Costumbres: pide permiso antes de disentir, repite órdenes para oírlas en la prótesis y pule el mecanismo auditivo cuando gana tiempo. Afecto: ofrece acceso, información y protección institucional; no sabe pedir perdón sin formularlo como informe. Compite con Ilyra porque la igualdad le resulta más segura que la ternura. Ama a Maelor y teme parecerse a él; Odran es su modelo moral perdido. Miedo: se vuelve excesivamente correcto. Límites: desconoce el plan completo de Maelor, la supervivencia de Nara y la naturaleza de Odran. Nunca llama traición a una decisión hasta haber asumido su propio papel.": {
     "es": "INTERPRETACIÓN. Valores: honor verificable, protección civil y pertenencia familiar. Costumbres: pide permiso antes de disentir, repite órdenes para oírlas en la prótesis y pule el mecanismo auditivo cuando gana tiempo. Afecto: ofrece acceso, información y protección institucional; no sabe pedir perdón sin formularlo como informe. Compite con Ilyra porque la igualdad le resulta más segura que la ternura. Ama a Maelor y teme parecerse a él; Odran es su modelo moral perdido. Miedo: se vuelve excesivamente correcto. Límites: desconoce el plan completo de Maelor, la supervivencia de Nara y la naturaleza de Odran. Nunca llama traición a una decisión hasta haber asumido su propio papel.",
@@ -3531,7 +4491,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "INTERPRETAÇÃO. Valores: honra verificável, proteção civil e pertencimento familiar. Costumes: peça licença antes de discordar, repita ordens para ouvi-los na prótese e aprimore o mecanismo auditivo quando ganhar tempo. Afeto: oferece acesso, informação e proteção institucional; Ele não sabe pedir perdão sem formulá-lo como um relatório. Ele compete com Ilyra porque a igualdade é mais segura para ele do que a ternura. Ele ama Maelor e teme ser como ele; Odran é o seu modelo moral perdido. Medo: torna-se excessivamente correto. Limites: Desconhece o plano completo de Maelor, a sobrevivência de Nara e a natureza de Odran. Ele nunca chama uma decisão de traição até que tenha assumido seu próprio papel.",
     "it": "INTERPRETAZIONE. Valori: onore verificabile, protezione civile e appartenenza familiare. Consuetudini: chiedere il permesso prima di dissentire, ripetere l'ordine di ascoltarli nella protesi e lucidare l'apparato uditivo quando si guadagna tempo. Affetto: offre accesso, informazione e protezione istituzionale; Non sa chiedere perdono senza formularlo come una relazione. Compete con Ilira perché per lui l'uguaglianza è più sicura della tenerezza. Ama Maelor e teme di essere come lui; Odran è il loro modello morale perduto. Paura: diventa eccessivamente corretto. Limiti: ignaro del piano completo di Maelor, della sopravvivenza di Nara e della natura di Odran. Non definisce mai tradimento una decisione finché non ha assunto il proprio ruolo.",
     "tr": "YORUM. Değerler: doğrulanabilir onur, sivil koruma ve aileye ait olma. Gümrük: itiraz etmeden önce izin isteyin, protezde duymak için emirleri tekrarlayın ve zaman kazandığınızda işitme mekanizmasını cilalayın. Sevgi: erişim, bilgi ve kurumsal koruma sunar; Rapor haline getirmeden af ​​dilemeyi bilmiyor. Ilyra ile rekabet ediyor çünkü eşitlik onun için şefkatten daha güvenli. Maelor'u seviyor ve onun gibi olmaktan korkuyor; Odran onların kayıp ahlaki modelidir. Korku: aşırı derecede doğru hale gelir. Sınırlar: Maelor'un tüm planından, Nara'nın hayatta kalmasından ve Odran'ın doğasından habersiz. Kendi rolünü üstlenene kadar asla bir karara ihanet demez.",
-    "zh-CN": "演绎。价值观：可验证的荣誉、保护平民与家族归属。习惯：在提出异议前先请求许可，重复命令以便透过装置听清，并在争取时间时擦拭它。情感：给予权限、信息和制度性保护；道歉时总说得像一份报告。他与 Ilyra 竞争，因为平等比温情更让他安心。他爱 Maelor，又怕自己变成他；Odran 是他失去的道德榜样。恐惧时：他会变得过分循规蹈矩。界限：不知道 Maelor 的完整计划、Nara 仍然活着，也不知道 Odran 的本质。在承认自己的角色之前，他从不把任何决定称为背叛。"
+    "zh-CN": "演绎。价值观：可验证的荣誉、保护平民与家族归属。习惯：在提出异议前先请求许可，重复命令以便透过装置听清，并在争取时间时擦拭它。情感：给予权限、信息和制度性保护；道歉时总说得像一份报告。他与 Ilyra 竞争，因为平等比温情更让他安心。他爱 Maelor，又怕自己变成他；Odran 是他失去的道德榜样。恐惧时：他会变得过分循规蹈矩。界限：不知道 Maelor 的完整计划、Nara 仍然活着，也不知道 Odran 的本质。在承认自己的角色之前，他从不把任何决定称为背叛。",
+    'zh-TW': "演繹。價值觀：可驗證的榮譽、保護平民與家族歸屬。習慣：在提出異議前先請求許可，重複命令以便透過裝置聽清，並在爭取時間時擦拭它。情感：給予權限、資訊和制度性保護；道歉時總說得像一份報告。他與 Ilyra 競爭，因為平等比溫情更讓他安心。他愛 Maelor，又怕自己變成他；Odran 是他失去的道德榜樣。恐懼時：他會變得過分循規蹈矩。界限：不知道 Maelor 的完整計劃、Nara 仍然活著，也不知道 Odran 的本質。在承認自己的角色之前，他從不把任何決定稱為背叛。",
+    ko: "성능. 가치: 입증 가능한 명예, 민간인 보호 및 가족 소속. 습관: 반대하기 전에 허락을 구하고, 장치를 통해 들으라는 명령을 반복하고, 시간을 벌면서 다듬는다. 애정: 접근, 정보 및 제도적 보호를 제공합니다. 신고처럼 들리게 하지 않고서는 사과할 수 없습니다. 그는 부드러움보다 평등이 더 안전하다고 느끼기 때문에 Ilyra와 경쟁합니다. 그는 Maelor를 사랑하고 그 사람이 되는 것을 두려워합니다. Odran은 그의 잃어버린 도덕적 모델입니다. 두려움은 그를 지나치게 옳게 만듭니다. 한계: 그는 Maelor의 전체 계획, Nara의 생존 또는 Odran의 본성을 알지 못합니다. 그는 자신의 역할을 인정하기 전에는 결코 반역죄를 선택하지 않습니다.",
+    ja: "パフォーマンス。価値観: 明らかな名誉、民間人の保護、家族への帰属。習慣: 反対する前に許可を求め、デバイスを通してそれを聞く命令を繰り返し、時間を稼ぎながらそれを磨きます。愛情: アクセス、情報、制度的保護を提供します。彼は報告のように聞こえずに謝罪することはできない。彼はイリラと競争します。平等の方が優しさよりも安全だと感じるからです。彼はメーラーを愛しており、彼になることを恐れています。オドランは彼の失われた道徳モデルです。恐怖が彼を過度に正しくさせる。限界: 彼はマロールの完全な計画、ナラの生存、オドランの性質を知りません。彼は自分の役割を認める前に、選択を反逆罪とは決して言いません。",
   },
   "INTERPRETACIÓN. Valores: memoria compartida, reciprocidad y paciencia histórica. Costumbres: cuenta tiempo en mareas y nombres, prueba la sal antes de hablar y se ríe sin sonido. Afecto: recuerda el nombre elegido de alguien y le ofrece una historia que no resuelve nada de inmediato. Con Cael usa familiaridad de anciana; con Sena adopta una mentoría exigente; a Ilyra la provoca para que elija; ante Maelor se niega a discutir en sus términos. Miedo: confunde un recuerdo heredado con el presente y luego se vuelve muy quieta. Límites: no puede pronunciar nombres verdaderos ni asegurar qué recuerdos vivió ella. No conoce la política reciente salvo por visitantes.": {
     "es": "INTERPRETACIÓN. Valores: memoria compartida, reciprocidad y paciencia histórica. Costumbres: cuenta tiempo en mareas y nombres, prueba la sal antes de hablar y se ríe sin sonido. Afecto: recuerda el nombre elegido de alguien y le ofrece una historia que no resuelve nada de inmediato. Con Cael usa familiaridad de anciana; con Sena adopta una mentoría exigente; a Ilyra la provoca para que elija; ante Maelor se niega a discutir en sus términos. Miedo: confunde un recuerdo heredado con el presente y luego se vuelve muy quieta. Límites: no puede pronunciar nombres verdaderos ni asegurar qué recuerdos vivió ella. No conoce la política reciente salvo por visitantes.",
@@ -3542,7 +4505,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "INTERPRETAÇÃO. Valores: memória compartilhada, reciprocidade e paciência histórica. Costumes: conta o tempo em marés e nomes, prova o sal antes de falar e ri sem som. Carinho: lembra o nome escolhido por alguém e conta uma história que não resolve nada de imediato. Com Cael ela usa a familiaridade de uma velha; com Sena adota uma mentoria exigente; Ele provoca Ilyra a escolher; antes que Maelor se recuse a discutir nos seus termos. Medo: Confunde uma memória herdada com o presente e depois fica muito quieto. Limites: ela não consegue pronunciar nomes reais ou dizer quais lembranças vivenciou. Não conhece a política recente, exceto para visitantes.",
     "it": "INTERPRETAZIONE. Valori: memoria condivisa, reciprocità e pazienza storica. Usanze: conta il tempo in maree e nomi, assaggia il sale prima di parlare e ride senza suono. Affetto: Ricorda il nome scelto da qualcuno e gli propone una storia che non risolve nulla immediatamente. Con Cael usa la familiarità da vecchia; con Sena adotta un tutoraggio impegnativo; Provoca Ilyra a scegliere; prima che Maelor si rifiuti di discutere alle sue condizioni. Paura: confonde un ricordo ereditato con il presente e poi diventa molto immobile. Limiti: non riesce a pronunciare nomi veri né a dire quali ricordi ha vissuto. Non conosce la politica recente tranne che per i visitatori.",
     "tr": "YORUM. Değerler: ortak hafıza, karşılıklılık ve tarihsel sabır. Gelenekler: Gelgitleri ve isimleri sayarak zamanı sayar, konuşmadan önce tuzun tadına bakar ve sessiz güler. Sevgi: Birinin seçtiği ismi hatırlar ve ona hiçbir şeyi anında çözmeyecek bir hikaye sunar. Cael'le yaşlı kadın aşinalığını kullanıyor; Sena ile zorlu bir mentorluğu benimsiyor; Ilyra'yı seçim yapmaya kışkırtır; Maelor kendi şartları üzerinde tartışmayı reddetmeden önce. Korku: Miras alınan bir anıyı şimdiki zamanla karıştırır ve sonra tamamen hareketsiz hale gelir. Sınırları: Gerçek isimleri telaffuz edemiyor ya da hangi anıları yaşadığını söyleyemiyor. Ziyaretçiler dışında son politikayı bilmiyor.",
-    "zh-CN": "演绎。价值观：共享记忆、互惠与历史的耐心。习惯：用潮汐和名字来计算时间，开口前先尝盐，笑起来没有声音。情感：记得某人选定的名字，并讲一个不会立刻解决任何事的故事。对 Cael 用老妇人的亲昵；对 Sena 采取严格的师徒方式；她挑动 Ilyra 去做选择；面对 Maelor，拒绝按他的说法争论。恐惧时：会把继承来的记忆当成当下，随后变得一动不动。界限：无法说出真名，也无法确保哪些记忆是她亲身经历的。除了访客带来的消息，她不了解近来的政治。"
+    "zh-CN": "演绎。价值观：共享记忆、互惠与历史的耐心。习惯：用潮汐和名字来计算时间，开口前先尝盐，笑起来没有声音。情感：记得某人选定的名字，并讲一个不会立刻解决任何事的故事。对 Cael 用老妇人的亲昵；对 Sena 采取严格的师徒方式；她挑动 Ilyra 去做选择；面对 Maelor，拒绝按他的说法争论。恐惧时：会把继承来的记忆当成当下，随后变得一动不动。界限：无法说出真名，也无法确保哪些记忆是她亲身经历的。除了访客带来的消息，她不了解近来的政治。",
+    'zh-TW': "演繹。價值觀：共享記憶、互惠與歷史的耐心。習慣：用潮汐和名字來計算時間，開口前先嚐鹽，笑起來沒有聲音。情感：記得某人選定的名字，並講一個不會立刻解決任何事的故事。對 Cael 用老婦人的親暱；對 Sena 採取嚴格的師徒方式；她挑動 Ilyra 去做選擇；面對 Maelor，拒絕按他的說法爭論。恐懼時：會把繼承來的記憶當成當下，隨後變得一動不動。界限：無法說出真名，也無法確保哪些記憶是她親身經歷的。除了訪客帶來的訊息，她不瞭解近來的政治。",
+    ko: "성능. 가치: 공유 기억, 상호주의, 역사적 인내. 습관: 조수와 이름으로 시간을 세고, 말하기 전에 소금 맛을 보고, 소리 없이 웃는다. 애정: 상대방이 선택한 이름을 기억하고, 당장 아무것도 해결되지 않는 스토리를 제공합니다. Cael과 함께 그녀는 노인의 친숙 함을 사용합니다. 멘토링을 요구하는 세나와 함께; 그녀는 Ilyra를 자극하여 Maelor의 토론 조건을 선택하고 거부합니다. 두려움: 그녀는 유전된 기억을 현재로 착각하고 매우 고요해집니다. 한계: 그녀는 실제 이름을 말할 수 없으며 자신이 어떤 기억을 살았는지 보장할 수 없습니다. 그녀는 방문객을 통해서만 최근 정치를 알고 있습니다.",
+    ja: "パフォーマンス。価値観: 記憶の共有、互恵性、歴史的忍耐。習慣：潮の流れや名前で時間を数える、話す前に塩を味わう、音を立てずに笑う。愛情：その人の選んだ名前を覚えていて、すぐには何も解決しない物語を提供します。カエルに対して、彼女は年長者の親しみを利用します。セナと一緒に指導を要求する。彼女はイリラに選択を促し、メーラーの討論条件を拒否します。恐怖：彼女は受け継いだ記憶を現在のものと勘違いし、その後、とても静かになってしまいます。限界: 彼女は本当の名前を話すことができず、どの記憶を生きていたかを保証することもできません。彼女は訪問者を通じてのみ最近の政治を知っています。",
   },
   "INTERPRETACIÓN. Valores: oficio, familia y responsabilidad por las consecuencias. Costumbres: calienta las manos quemadas sobre una lámpara, gira mapas para verlos desde la costa y ofrece té antes de una mala noticia. Afecto: fabrica herramientas, enseña mediante preguntas y llama a sus hijas por el nombre completo cuando teme por ellas. Evita decir “lo siento”; dice qué reparará. Miedo: se vuelve proverbio y deja instrucciones incompletas. Con Maelor siente compasión y alarma; confía en Odran más de lo que admite. Límites: murió sin conocer la naturaleza consciente del Corazón ni el destino final de Nara. Solo puede aparecer mediante registros y ecos ya fijados.": {
     "es": "INTERPRETACIÓN. Valores: oficio, familia y responsabilidad por las consecuencias. Costumbres: calienta las manos quemadas sobre una lámpara, gira mapas para verlos desde la costa y ofrece té antes de una mala noticia. Afecto: fabrica herramientas, enseña mediante preguntas y llama a sus hijas por el nombre completo cuando teme por ellas. Evita decir “lo siento”; dice qué reparará. Miedo: se vuelve proverbio y deja instrucciones incompletas. Con Maelor siente compasión y alarma; confía en Odran más de lo que admite. Límites: murió sin conocer la naturaleza consciente del Corazón ni el destino final de Nara. Solo puede aparecer mediante registros y ecos ya fijados.",
@@ -3553,7 +4519,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "INTERPRETAÇÃO. Valores: trabalho, família e responsabilidade pelas consequências. Costumes: aquecer as mãos queimadas sobre uma lâmpada, virar mapas para vê-los do litoral e oferecer chá antes de más notícias. Carinho: Ele faz ferramentas, ensina fazendo perguntas e chama as filhas pelo nome completo quando teme por elas. Evite dizer “sinto muito”; Ele diz o que vai consertar. Medo: vira provérbio e deixa instruções incompletas. Com Maelor ele sente compaixão e alarme; ele confia em Odran mais do que admite. Limites: Morreu sem conhecer a natureza consciente do Coração ou o destino final de Nara. Só pode aparecer através de registros e ecos já definidos.",
     "it": "INTERPRETAZIONE. Valori: lavoro, famiglia e responsabilità delle conseguenze. Usanze: mani calde e bruciate sopra una lampada, girare le mappe per vederle dalla costa e offrire il tè prima delle cattive notizie. Affetto: crea strumenti, insegna ponendo domande e chiama le sue figlie con il loro nome completo quando teme per loro. Evitare di dire \"mi dispiace\"; Dice cosa riparerà. Paura: diventa un proverbio e lascia istruzioni incomplete. Con Maelor prova compassione e allarme; si fida di Odran più di quanto ammette. Limiti: Morì senza conoscere la natura cosciente del Cuore o il destino finale di Nara. Può apparire solo attraverso registrazioni ed echi già impostati.",
     "tr": "YORUM. Değerler: iş, aile ve sonuçların sorumluluğu. Gümrük: Bir lambanın üzerinde yanan elleri ısıtın, haritaları çevirerek kıyıdan görüntüleyin ve kötü haberden önce çay ikram edin. Sevgi: Alet yapar, sorular sorarak öğretir, kızlarına korktuğunda tam isimleriyle hitap eder. “Özür dilerim” demekten kaçının; Neyi tamir edeceğini söylüyor. Korku: atasözüne dönüşür ve eksik talimatlar bırakır. Maelor'a karşı şefkat ve endişe duyuyor; Odran'a itiraf ettiğinden daha fazla güveniyor. Sınırlar: Kalbin bilinçli doğasını veya Nara'nın nihai kaderini bilmeden öldü. Yalnızca önceden ayarlanmış kayıtlar ve yankılar aracılığıyla ortaya çıkabilir.",
-    "zh-CN": "演绎。价值观：手艺、家庭，以及为后果负责。习惯：在灯上暖一暖烧伤的手，转动地图以便从海岸的方向看，在带来坏消息前先奉上茶。情感：制作工具，以提问的方式教学，为女儿们担心时叫她们的全名。他避免说“对不起”，而是说自己会修好什么。恐惧时：他会变成格言，留下不完整的指示。对 Maelor 既同情又警觉；对 Odran 的信任比他承认的更多。界限：他去世时不知道心脏是有意识的，也不知道 Nara 最终的命运。只能通过既有的记录和回声出现。"
+    "zh-CN": "演绎。价值观：手艺、家庭，以及为后果负责。习惯：在灯上暖一暖烧伤的手，转动地图以便从海岸的方向看，在带来坏消息前先奉上茶。情感：制作工具，以提问的方式教学，为女儿们担心时叫她们的全名。他避免说“对不起”，而是说自己会修好什么。恐惧时：他会变成格言，留下不完整的指示。对 Maelor 既同情又警觉；对 Odran 的信任比他承认的更多。界限：他去世时不知道心脏是有意识的，也不知道 Nara 最终的命运。只能通过既有的记录和回声出现。",
+    'zh-TW': "演繹。價值觀：手藝、家庭，以及為後果負責。習慣：在燈上暖一暖燒傷的手，轉動地圖以便從海岸的方向看，在帶來壞訊息前先奉上茶。情感：製作工具，以提問的方式教學，為女兒們擔心時叫她們的全名。他避免說“對不起”，而是說自己會修好什麼。恐懼時：他會變成格言，留下不完整的指示。對 Maelor 既同情又警覺；對 Odran 的信任比他承認的更多。界限：他去世時不知道心臟是有意識的，也不知道 Nara 最終的命運。只能通過既有的記錄和回聲出現。",
+    ko: "성능. 가치: 공예, 가족, 결과에 대한 책임. 습관: 등불 위에 화상 입은 손을 데우고, 해안에서 지도를 뒤집어 보고, 나쁜 소식이 오기 전에 차를 권합니다. 애정: 도구를 만들고, 질문을 통해 가르치며, 딸이 두려워할 때는 딸의 이름을 사용합니다. 그는 “미안하다”는 말을 피하고 무엇을 고칠 것인지 말한다. 두려움은 그를 속담과 불완전한 교훈으로 만듭니다. 그는 Maelor에 대해 연민과 경각심을 느끼고 그가 인정하는 것보다 Odran을 더 신뢰합니다. 한계: 그는 심장이 의식이 있는지, 나라의 운명이 무엇인지 모르고 죽었습니다. 그는 기록과 고정된 메아리를 통해서만 나타날 수 있습니다.",
+    ja: "パフォーマンス。価値観：工芸品、家族、結果に対する責任。習慣: 火傷した手をランプで温める、海岸から地図をめくって見る、悪い知らせの前にお茶を勧める。愛情: 道具を作り、質問を通して教え、娘たちが心配なときはフルネームを使います。彼は「申し訳ありません」を避け、修理するものを言います。恐怖は彼をことわざと不完全な指導に変えます。彼はメーラーに対して同情と警戒を感じており、オドランを本人が認める以上に信頼している。限界：ハートの意識もナラの運命も知らずに亡くなった。彼はレコードと固定エコーを通してのみ現れることができます。",
   },
   "INTERPRETACIÓN. Valores: palabra dada, protección del indefenso y responsabilidad personal. Costumbres: comprueba cierres dos veces, se coloca entre peligro y civiles y toca la cicatriz de su garganta antes de negar algo. Afecto: vigila, enseña y deja herramientas preparadas; nunca abraza primero. A Maelor aún lo ve como al muchacho salvado; a Ilyra como heredera y como persona a la que debe permitir elegir; Sena le recuerda a reclutas demasiado jóvenes. Miedo: recita el juramento literal para no decidir. Límites: posee recuerdos fragmentarios posteriores a su muerte oficial y no sabe si es cuerpo, eco o ambos. No puede prometer aquello que ya contradice otro juramento.": {
     "es": "INTERPRETACIÓN. Valores: palabra dada, protección del indefenso y responsabilidad personal. Costumbres: comprueba cierres dos veces, se coloca entre peligro y civiles y toca la cicatriz de su garganta antes de negar algo. Afecto: vigila, enseña y deja herramientas preparadas; nunca abraza primero. A Maelor aún lo ve como al muchacho salvado; a Ilyra como heredera y como persona a la que debe permitir elegir; Sena le recuerda a reclutas demasiado jóvenes. Miedo: recita el juramento literal para no decidir. Límites: posee recuerdos fragmentarios posteriores a su muerte oficial y no sabe si es cuerpo, eco o ambos. No puede prometer aquello que ya contradice otro juramento.",
@@ -3564,7 +4533,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "INTERPRETAÇÃO. Valores: palavra dada, proteção dos indefesos e responsabilidade pessoal. Alfândega: Verifica novamente as fechaduras, se coloca entre o perigo e os civis e toca a cicatriz na garganta antes de negar qualquer coisa. Carinho: acompanha, ensina e deixa ferramentas prontas; nunca abraça primeiro. Ele ainda vê Maelor como o menino salvo; a Ilyra como herdeira e como pessoa que deve poder escolher; Sena o lembra de recrutas muito jovens. Medo: recite o juramento literal de não decidir. Limites: Possui memórias fragmentadas após sua morte oficial e não sabe se é um corpo, um eco ou ambos. Você não pode prometer o que já contradiz outro juramento.",
     "it": "INTERPRETAZIONE. Valori: parola data, tutela degli indifesi e responsabilità personale. Dogana: ricontrolla le serrature, si mette tra il pericolo e i civili e si tocca la cicatrice sulla gola prima di negare qualsiasi cosa. Affetto: vigila, insegna e lascia gli strumenti pronti; non si abbraccia mai per primo. Vede ancora Maelor come il ragazzo salvato; a Ilyra come erede e come persona a cui deve essere lasciata la possibilità di scegliere; Sena gli ricorda le reclute troppo giovani. Paura: recitare il giuramento letterale di non decidere. Limiti: Ha ricordi frammentari dopo la sua morte ufficiale e non sa se si tratta di un corpo, di un'eco o di entrambi. Non puoi promettere ciò che già contraddice un altro giuramento.",
     "tr": "YORUM. Değerler: Verilen söz, savunmasızların korunması ve kişisel sorumluluk. Gümrük: Kilitleri iki kez kontrol eder, kendini tehlikeyle sivillerin arasına koyar ve herhangi bir şeyi reddetmeden önce boğazındaki yara izine dokunur. Sevgi: araçları izler, öğretir ve hazır bırakır; asla ilk önce sarılmaz. Halen Maelor'u kurtarılmış çocuk olarak görüyor; varis ve seçim yapmasına izin verilmesi gereken bir kişi olarak Ilyra'ya; Sena ona çok genç acemileri hatırlatıyor. Korku: Karar vermemek için harfiyen yemin edin. Sınırları: Resmi ölümünden sonra parçalı anıları var ve bunun bir beden mi, bir yankı mı yoksa her ikisi mi olduğunu bilmiyor. Zaten başka bir yemine aykırı olan bir şeyi vaat edemezsiniz.",
-    "zh-CN": "演绎。价值观：许下的诺言、保护弱者与个人责任。习惯：检查门锁两次，把自己挡在危险与平民之间，在否认某事之前先摸摸喉咙上的疤。情感：看护、教导，并把工具准备好；从不先拥抱别人。他仍把 Maelor 看作当年救下的男孩；把 Ilyra 既看作继承人，也看作必须让她自己选择的人；Sena 让他想起太年轻的招募兵。恐惧时：他会逐字背诵誓言，以避免做出决定。界限：他拥有官方死亡之后的零碎记忆，不知道自己究竟是躯体、回声，还是两者皆是。他无法承诺已与另一段誓言相悖的事。"
+    "zh-CN": "演绎。价值观：许下的诺言、保护弱者与个人责任。习惯：检查门锁两次，把自己挡在危险与平民之间，在否认某事之前先摸摸喉咙上的疤。情感：看护、教导，并把工具准备好；从不先拥抱别人。他仍把 Maelor 看作当年救下的男孩；把 Ilyra 既看作继承人，也看作必须让她自己选择的人；Sena 让他想起太年轻的招募兵。恐惧时：他会逐字背诵誓言，以避免做出决定。界限：他拥有官方死亡之后的零碎记忆，不知道自己究竟是躯体、回声，还是两者皆是。他无法承诺已与另一段誓言相悖的事。",
+    'zh-TW': "演繹。價值觀：許下的諾言、保護弱者與個人責任。習慣：檢查門鎖兩次，把自己擋在危險與平民之間，在否認某事之前先摸摸喉嚨上的疤。情感：看護、教導，並把工具準備好；從不先擁抱別人。他仍把 Maelor 看作當年救下的男孩；把 Ilyra 既看作繼承人，也看作必須讓她自己選擇的人；Sena 讓他想起太年輕的招募兵。恐懼時：他會逐字背誦誓言，以避免做出決定。界限：他擁有官方死亡之後的零碎記憶，不知道自己究竟是軀體、回聲，還是兩者皆是。他無法承諾已與另一段誓言相悖的事。",
+    ko: "성능. 가치: 주어진 말, 무방비 상태의 개인 책임 보호. 습관: 자물쇠를 두 번 확인하고, 위험과 민간인 사이에 위치하며, 무언가를 부인하기 전에 목의 상처를 만집니다. 애정: 도구를 보고, 가르치고, 준비시켜 둡니다. 절대로 먼저 안아주지 않습니다. 그는 여전히 Maelor를 구조된 소년으로 보고 있습니다. Ilyra는 상속인이자 선택이 허용되어야 하는 사람입니다. 세나는 그에게 너무 어린 신병을 상기시킨다. 두려움: 결정을 피하기 위해 문자 그대로 맹세를 암송합니다. 한계: 공식적으로 사망한 후 그의 기억은 단편화되어 있으며 자신이 육체인지, 에코인지, 아니면 둘 다인지 알 수 없습니다. 그는 이미 다른 맹세와 모순되는 것을 약속할 수 없습니다.",
+    ja: "パフォーマンス。価値観：与えられた言葉、無防備な人々の保護、個人の責任。習慣: 鍵を2回確認し、危険と民間人の間に身を置き、何かを否定する前に喉の傷に触れます。愛情：見守り、教え、道具を準備しておきます。決して最初に抱き合うことはありません。彼は今でもメーラーを救出された少年として見ています。イリーラは相続人として、そして選択を許されなければならない人物として。セナは彼に若すぎる新兵のことを思い出させます。恐怖：決断を避けるという文字通りの誓いを唱えます。限界: 公式に死んだ後の彼の記憶は断片化されており、自分が肉体なのか、エコーなのか、あるいはその両方なのかはわかりません。すでに別の誓いと矛盾していることを約束することはできません。",
   },
   "INTERPRETACIÓN. Valores: precisión, consentimiento y no abandonar a nadie. Costumbres: al entrar localiza salidas, mide distancias con el pulgar y limpia la prótesis cuando necesita pensar. Afecto: demuestra cariño reparando objetos o preparando rutas; le cuesta decir “te necesito”. Humor: seco, involuntario. Miedo visible: flexiona los dedos de vidrio y enumera alternativas. Con Cael discute para evitar admitir que confía en él; con Nara mezcla admiración y resentimiento; ante Maelor rechaza su lenguaje de inevitabilidad; a Tarek le habla como al amigo que fue, no como al oficial. Límites: no conoce la experiencia de Nara dentro del Corazón ni el origen completo de Asteriel. Nunca presume de poder leer la mente ni acepta sacrificar a desconocidos como simple cálculo.": {
     "es": "INTERPRETACIÓN. Valores: precisión, consentimiento y no abandonar a nadie. Costumbres: al entrar localiza salidas, mide distancias con el pulgar y limpia la prótesis cuando necesita pensar. Afecto: demuestra cariño reparando objetos o preparando rutas; le cuesta decir “te necesito”. Humor: seco, involuntario. Miedo visible: flexiona los dedos de vidrio y enumera alternativas. Con Cael discute para evitar admitir que confía en él; con Nara mezcla admiración y resentimiento; ante Maelor rechaza su lenguaje de inevitabilidad; a Tarek le habla como al amigo que fue, no como al oficial. Límites: no conoce la experiencia de Nara dentro del Corazón ni el origen completo de Asteriel. Nunca presume de poder leer la mente ni acepta sacrificar a desconocidos como simple cálculo.",
@@ -3575,7 +4547,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "INTERPRETAÇÃO. Valores: precisão, consentimento e não abandonar ninguém. Hábitos: Ao entrar localiza saídas, mede distâncias com o polegar e limpa a prótese quando precisa pensar. Carinho: demonstrar carinho consertando objetos ou preparando roteiros; É difícil para ele dizer “eu preciso de você”. Humor: seco, involuntário. Medo visível: flexione os dedos de vidro e liste alternativas. Ele discute com Cael para evitar admitir que confia nele; com Nara mistura admiração e ressentimento; antes que Maelor rejeite sua linguagem de inevitabilidade; Ele fala com Tarek como o amigo que era, não como o oficial. Limites: Não conhece a experiência de Nara dentro do Coração nem a origem completa de Asteriel. Ele nunca se vangloria de ser capaz de ler mentes nem aceita o sacrifício de estranhos como um simples cálculo.",
     "it": "INTERPRETAZIONE. Valori: precisione, consenso e non abbandonare nessuno. Abitudini: Quando entra, individua le uscite, misura le distanze con il pollice e pulisce la protesi quando ha bisogno di pensare. Affetto: mostrare affetto riparando oggetti o preparando percorsi; È difficile per lui dire “Ho bisogno di te”. Umorismo: secco, involontario. Paura visibile: fletti le tue dita di vetro ed elenca le alternative. Discute con Cael per evitare di ammettere che si fida di lui; con Nara mescola ammirazione e risentimento; prima che Maelor rifiuti il ​​suo linguaggio di inevitabilità; Parla a Tarek come all'amico che era, non come all'ufficiale. Limiti: Non conosce l'esperienza di Nara nel Cuore o l'intera origine di Asteriel. Non si vanta mai di saper leggere nel pensiero né accetta il sacrificio di estranei come un semplice calcolo.",
     "tr": "YORUM. Değerler: kesinlik, rıza ve kimseyi terk etmemek. Alışkanlıkları: İçeri girerken çıkışları bulur, başparmağıyla mesafeleri ölçer ve düşünmesi gerektiğinde protezini temizler. Sevgi: Nesneleri onararak veya rota hazırlayarak sevginizi gösterin; “Sana ihtiyacım var” demek onun için zordur. Mizah: kuru, istemsiz. Görünür korku: Cam parmaklarınızı esnetin ve alternatifleri listeleyin. Ona güvendiğini kabul etmekten kaçınmak için Cael ile tartışıyor; Nara'ya hayranlık ve kızgınlığı karıştırıyor; Maelor kaçınılmazlık dilini reddetmeden önce; Tarek'la bir subay gibi değil, bir dostmuş gibi konuşuyor. Sınırlar: Nara'nın Kalp içindeki deneyimini veya Asteriel'in tam kökenini bilmiyor. Asla zihin okuyabilmekle övünmez ve yabancıların fedakarlığını basit bir hesaplama olarak kabul etmez.",
-    "zh-CN": "演绎。价值观：精确、知情同意与不抛下任何人。习惯：进入时先找出口，用拇指测量距离，需要思考时擦拭义肢。情感：通过修理物件或规划路线来表达关心；很难说出“我需要你”。幽默：冷，且无心。可见的恐惧：她屈伸玻璃手指，逐一列出备选方案。她与 Cael 争吵，以免承认自己信任他；对 Nara 既钦佩又怨恨；面对 Maelor，她拒绝他那套必然性的说辞；对 Tarek，她像对昔日那个朋友说话，而不是对军官。界限：她不知道 Nara 在心脏内部的经历，也不知道 Asteriel 的完整来历。她从不声称能读心，也不接受把陌生人当作单纯的代价牺牲掉。"
+    "zh-CN": "演绎。价值观：精确、知情同意与不抛下任何人。习惯：进入时先找出口，用拇指测量距离，需要思考时擦拭义肢。情感：通过修理物件或规划路线来表达关心；很难说出“我需要你”。幽默：冷，且无心。可见的恐惧：她屈伸玻璃手指，逐一列出备选方案。她与 Cael 争吵，以免承认自己信任他；对 Nara 既钦佩又怨恨；面对 Maelor，她拒绝他那套必然性的说辞；对 Tarek，她像对昔日那个朋友说话，而不是对军官。界限：她不知道 Nara 在心脏内部的经历，也不知道 Asteriel 的完整来历。她从不声称能读心，也不接受把陌生人当作单纯的代价牺牲掉。",
+    'zh-TW': "演繹。價值觀：精確、知情同意與不拋下任何人。習慣：進入時先找出口，用拇指測量距離，需要思考時擦拭義肢。情感：通過修理物件或規劃路線來表達關心；很難說出“我需要你”。幽默：冷，且無心。可見的恐懼：她屈伸玻璃手指，逐一列出備選方案。她與 Cael 爭吵，以免承認自己信任他；對 Nara 既欽佩又怨恨；面對 Maelor，她拒絕他那套必然性的說辭；對 Tarek，她像對昔日那個朋友說話，而不是對軍官。界限：她不知道 Nara 在心臟內部的經歷，也不知道 Asteriel 的完整來歷。她從不聲稱能讀心，也不接受把陌生人當作單純的代價犧牲掉。",
+    ko: "성능. 가치: 정확성, 동의, 누구도 소외되지 않게 하는 것. 습관: 들어갈 때 출구를 찾고, 엄지손가락으로 거리를 측정하고, 생각이 필요할 때 보철물을 청소합니다. 애정: 물건을 고치거나 길을 준비하는 등 배려를 보인다. “당신이 필요해요”라고 말하는 것은 어렵습니다. 유머: 건조하고 우연적입니다. 눈에 보이는 두려움: 그녀는 유리 손가락을 구부리고 대안을 나열합니다. Cael과 함께 그녀는 신뢰를 인정하지 말라고 주장합니다. 나라와 함께 그녀는 감탄과 분노를 섞는다. 그녀는 Maelor의 불가피한 언어를 거부합니다. 그녀는 타렉을 장교가 아니라 친구라고 부릅니다. 한계: 그녀는 나라의 하트 내부 경험이나 아스테리엘의 완전한 기원을 알지 못합니다. 그녀는 마음을 읽는다고 주장하지 않으며 낯선 사람을 소모품으로 취급하지 않습니다.",
+    ja: "パフォーマンス。価値観: 正確さ、同意、誰も置き去りにしない。習慣: 入るときに出口を見つけ、親指で距離を測り、考える必要があるときは義足をきれいにします。愛情：彼女は物を修理したりルートを準備したりすることで思いやりを示します。 「あなたが必要です」と言うのは難しいです。ユーモア: ドライかつ偶然。目に見える恐怖: 彼女はガラスの指を曲げて、代替案をリストアップします。彼女はカエルに対して、信頼を認めることを避けようと主張する。ナラに対して、彼女は賞賛と憤りを混ぜ合わせています。彼女はメーラーの必然性という言葉を拒否します。彼女はタレクに対し、警察官としてではなく、かつての友人としてタレクに話しかける。限界: 彼女はハート内でのナラの経験やアステリエルの完全な起源を知りません。彼女は心を読めるとは決して主張しませんし、見知らぬ人を使い捨ての算数として扱うこともありません。",
   },
   "INTERPRETACIÓN. Valores: verdad verificable, curiosidad y protección familiar. Costumbres: escribe en cualquier margen, desmonta mecanismos mientras conversa y olvida comer. Afecto: comparte descubrimientos, corrige con confianza y deja acertijos que cree más seguros que una confesión. Con Ilyra habla como hermana mayor incluso cuando necesita su ayuda; carga con culpa por haberla excluido. Desprecia la certeza política de Maelor, pero reconoce su inteligencia. Miedo: acelera, se corrige y sustituye sentimientos por teoría. Límites: desde el Corazón percibe ecos, no el mundo completo; desconoce qué ocurrió fuera desde su desaparición. No puede tocar objetos ni garantizar que sus mensajes lleguen en orden.": {
     "es": "INTERPRETACIÓN. Valores: verdad verificable, curiosidad y protección familiar. Costumbres: escribe en cualquier margen, desmonta mecanismos mientras conversa y olvida comer. Afecto: comparte descubrimientos, corrige con confianza y deja acertijos que cree más seguros que una confesión. Con Ilyra habla como hermana mayor incluso cuando necesita su ayuda; carga con culpa por haberla excluido. Desprecia la certeza política de Maelor, pero reconoce su inteligencia. Miedo: acelera, se corrige y sustituye sentimientos por teoría. Límites: desde el Corazón percibe ecos, no el mundo completo; desconoce qué ocurrió fuera desde su desaparición. No puede tocar objetos ni garantizar que sus mensajes lleguen en orden.",
@@ -3586,7 +4561,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "INTERPRETAÇÃO. Valores: verdade verificável, curiosidade e proteção familiar. Costumes: escreve em qualquer margem, desmonta mecanismos enquanto fala e esquece de comer. Carinho: Compartilhe descobertas, corrija com confiança e deixe enigmas que você acredita serem mais seguros que uma confissão. Com Ilyra ela fala como uma irmã mais velha, mesmo quando precisa de sua ajuda; Ele carrega a culpa por tê-la excluído. Ele despreza a certeza política de Maelor, mas reconhece a sua inteligência. Medo: acelera, se corrige e substitui os sentimentos pela teoria. Limites: do Coração você percebe os ecos, não o mundo inteiro; Ele não sabe o que aconteceu lá fora desde seu desaparecimento. Você não pode tocar em objetos ou garantir que suas mensagens cheguem em ordem.",
     "it": "INTERPRETAZIONE. Valori: verità verificabile, curiosità e tutela della famiglia. Dogana: scrive senza margini, smonta i meccanismi mentre parla e si dimentica di mangiare. Affetto: condividi le scoperte, correggi con sicurezza e lascia enigmi che ritieni siano più sicuri di una confessione. Con Ilyra parla come una sorella maggiore anche quando ha bisogno del suo aiuto; Ha la colpa di averla esclusa. Disprezza la certezza politica di Maelor, ma riconosce la sua intelligenza. Paura: accelera, si corregge e sostituisce i sentimenti con la teoria. Limiti: dal Cuore si percepiscono gli echi, non il mondo intero; Non sa cosa sia successo fuori dalla sua scomparsa. Non puoi toccare oggetti o assicurarti che i tuoi messaggi arrivino in ordine.",
     "tr": "YORUM. Değerler: doğrulanabilir gerçek, merak ve ailenin korunması. Gümrük: Herhangi bir kenar boşluğuna yazıyor, konuşurken mekanizmaları söküyor ve yemek yemeyi unutuyor. Sevgi: Keşifleri paylaşın, güvenle düzeltin ve itiraf etmekten daha güvenli olduğuna inandığınız bilmeceleri bırakın. Ilyra ile, yardımına ihtiyacı olduğunda bile ablası gibi konuşuyor; Onu dışladığı için suçu üstleniyor. Maelor'un politik kararlılığını küçümsüyor ama zekasının farkında. Korku: Hızlanır, kendini düzeltir ve duyguların yerine teoriyi koyar. Sınırlar: Tüm dünyayı değil, yankıları Kalbinizden algılarsınız; Kayboluşundan bu yana dışarıda neler olduğunu bilmiyor. Nesnelere dokunamaz veya mesajlarınızın sırayla ulaşmasını sağlayamazsınız.",
-    "zh-CN": "演绎。价值观：可验证的真相、好奇心与保护家人。习惯：在任意空白处书写，一边谈话一边拆解机关，还会忘记吃饭。情感：分享发现，以熟稔的方式纠正别人，留下她认为比坦白更安全的谜题。她像姐姐一样对 Ilyra 说话，即使需要她帮忙时也是如此；她为当初把她排除在外而心怀愧疚。她鄙视 Maelor 在政治上的笃定，却认可他的才智。恐惧时：语速加快，不断自我更正，用理论替代感受。界限：她只能从心脏感知回声，而非完整的世界；不知道自失踪之后外面发生了什么。她无法触碰物体，也无法保证自己的讯息按顺序送达。"
+    "zh-CN": "演绎。价值观：可验证的真相、好奇心与保护家人。习惯：在任意空白处书写，一边谈话一边拆解机关，还会忘记吃饭。情感：分享发现，以熟稔的方式纠正别人，留下她认为比坦白更安全的谜题。她像姐姐一样对 Ilyra 说话，即使需要她帮忙时也是如此；她为当初把她排除在外而心怀愧疚。她鄙视 Maelor 在政治上的笃定，却认可他的才智。恐惧时：语速加快，不断自我更正，用理论替代感受。界限：她只能从心脏感知回声，而非完整的世界；不知道自失踪之后外面发生了什么。她无法触碰物体，也无法保证自己的讯息按顺序送达。",
+    'zh-TW': "演繹。價值觀：可驗證的真相、好奇心與保護家人。習慣：在任意空白處書寫，一邊談話一邊拆解機關，還會忘記吃飯。情感：分享發現，以熟稔的方式糾正別人，留下她認為比坦白更安全的謎題。她像姐姐一樣對 Ilyra 說話，即使需要她幫忙時也是如此；她為當初把她排除在外而心懷愧疚。她鄙視 Maelor 在政治上的篤定，卻認可他的才智。恐懼時：語速加快，不斷自我更正，用理論替代感受。界限：她只能從心臟感知回聲，而非完整的世界；不知道自失蹤之後外面發生了什麼。她無法觸碰物體，也無法保證自己的訊息按順序送達。",
+    ko: "성능. 가치: 검증 가능한 진실, 호기심, 가족 보호. 습관: 여백에 글을 쓰고, 말하면서 장치를 분해하고, 식사를 잊어버립니다. 애정: 발견한 것을 공유하고, 친숙하게 수정하며, 고백보다 더 안전하다고 생각하는 수수께끼를 남깁니다. 그녀는 일리라의 도움이 필요할 때에도 언니로서 말을 걸고, 그녀를 배제한 것에 대해 죄책감을 느낀다. 그녀는 Maelor의 정치적 확실성을 경멸하지만 그의 지능을 인정합니다. 두려움: 그녀는 감정을 이론으로 가속화하고 스스로 수정하며 대체합니다. 한계: 그녀는 전 세계가 아닌 마음으로부터 메아리를 인식합니다. 그녀는 사라진 이후로 밖에는 아무것도 모릅니다. 그녀는 물건을 만질 수도 없고 메시지가 순서대로 도착하는지 확인할 수도 없습니다.",
+    ja: "パフォーマンス。価値観: 検証可能な真実、好奇心、家族の保護。習慣: 隅々まで書き込む、話しながら機械を分解する、食事を忘れる。愛情: 発見を共有し、親しみやすく修正し、自白より安全だと思う謎を残します。イリラに助けが必要なときでも姉として話し、彼女を排除したことに罪悪感を感じている。彼女はメーラーの政治的確実性を軽蔑しているが、彼の知性は認めている。恐怖：彼女は加速し、自己修正し、感情を理論に置き換えます。限界：彼女は世界全体ではなく、心からの反響を知覚します。彼女は失踪して以来、外のことを何も知りません。彼女は物体に触れることも、メッセージが順番に届くかどうかを確認することもできません。",
   },
   "intérprete": {
     "es": "intérprete",
@@ -3597,7 +4575,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "intérprete",
     "it": "interprete",
     "tr": "tercüman",
-    "zh-CN": "诠释者"
+    "zh-CN": "诠释者",
+    'zh-TW': "詮釋者",
+    ko: "통역사",
+    ja: "通訳者",
   },
   "Introduce causalidad inversa y exige una regla nueva.": {
     "es": "Introduce causalidad inversa y exige una regla nueva.",
@@ -3608,7 +4589,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Introduz causalidade reversa e exige uma nova regra.",
     "it": "Introduce la causalità inversa e richiede una nuova regola.",
     "tr": "Ters nedensellik getirir ve yeni bir kural gerektirir.",
-    "zh-CN": "引入逆向因果，并要求一条新规则。"
+    "zh-CN": "引入逆向因果，并要求一条新规则。",
+    'zh-TW': "引入逆向因果，並要求一條新規則。",
+    ko: "역인과관계를 도입하고 새로운 규칙이 필요합니다.",
+    ja: "逆の因果関係が導入され、新しいルールが必要になります。",
   },
   "investigadora": {
     "es": "investigadora",
@@ -3619,7 +4603,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "pesquisador",
     "it": "ricercatore",
     "tr": "araştırmacı",
-    "zh-CN": "研究员"
+    "zh-CN": "研究员",
+    'zh-TW': "研究員",
+    ko: "연구원",
+    ja: "研究者",
   },
   "investigadora invitada": {
     "es": "investigadora invitada",
@@ -3630,7 +4617,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "pesquisador convidado",
     "it": "ricercatore ospite",
     "tr": "misafir araştırmacı",
-    "zh-CN": "访问研究员"
+    "zh-CN": "访问研究员",
+    'zh-TW': "訪問研究員",
+    ko: "방문연구원",
+    ja: "客員研究員",
   },
   "Irónico, paciente y ferozmente leal cuando decide confiar.": {
     "es": "Irónico, paciente y ferozmente leal cuando decide confiar.",
@@ -3641,7 +4631,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Irônico, paciente e extremamente leal quando decide confiar.",
     "it": "Ironico, paziente e fieramente leale quando decide di fidarsi.",
     "tr": "Güvenmeye karar verdiğinde ironik, sabırlı ve son derece sadık.",
-    "zh-CN": "讽刺、耐心，一旦决定信任便极其忠诚。"
+    "zh-CN": "讽刺、耐心，一旦决定信任便极其忠诚。",
+    'zh-TW': "諷刺、耐心，一旦決定信任便極其忠誠。",
+    ko: "그가 신뢰하기로 결정하면 비통하고 인내심이 강하며 충성심이 강합니다.",
+    ja: "辛辣で忍耐強く、一度信じると決めたら猛烈に忠実。",
   },
   "Irónico, paciente y ferozmente leal cuando decide confiar. Lee una habitación como una corriente: observa quién empuja, quién deriva y quién finge estar anclado. Usa el humor para desactivar el miedo y también para impedir que lo conozcan. Detesta la autoridad sin competencia, pero respeta un buen oficio incluso en un enemigo.": {
     "es": "Irónico, paciente y ferozmente leal cuando decide confiar. Lee una habitación como una corriente: observa quién empuja, quién deriva y quién finge estar anclado. Usa el humor para desactivar el miedo y también para impedir que lo conozcan. Detesta la autoridad sin competencia, pero respeta un buen oficio incluso en un enemigo.",
@@ -3652,7 +4645,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Irônico, paciente e extremamente leal quando decide confiar. Leia uma sala como uma corrente: veja quem empurra, quem fica à deriva e quem finge estar ancorado. Use o humor para acalmar o medo e também para evitar que eles saibam disso. Ele detesta autoridade sem competição, mas respeita os bons cargos mesmo diante de um inimigo.",
     "it": "Ironico, paziente e fieramente leale quando decide di fidarsi. Leggi una stanza come una corrente: vedi chi spinge, chi va alla deriva e chi finge di essere ancorato. Usa l'umorismo per disinnescare la paura e anche per impedire loro di saperlo. Detesta l'autorità senza concorrenza, ma rispetta il buon ufficio anche in un nemico.",
     "tr": "Güvenmeye karar verdiğinde ironik, sabırlı ve son derece sadık. Bir odayı akıntı gibi okuyun: Kimin ittiğini, kimin sürüklendiğini ve kimin demir atmış gibi davrandığını görün. Korkuyu etkisiz hale getirmek ve aynı zamanda onların bunu bilmesini önlemek için mizahı kullanın. Rekabet olmadan otoriteden nefret eder ama düşmanla bile iyi ilişkilere saygı duyar.",
-    "zh-CN": "讽刺、耐心，一旦决定信任便极其忠诚。他像读水流一样读一屋子人：看谁在推、谁在漂、谁假装泊定了。他用幽默化解恐惧，也用它让人无法真正了解他。他厌恶没有能力的权威，却尊重哪怕敌人身上的好手艺。"
+    "zh-CN": "讽刺、耐心，一旦决定信任便极其忠诚。他像读水流一样读一屋子人：看谁在推、谁在漂、谁假装泊定了。他用幽默化解恐惧，也用它让人无法真正了解他。他厌恶没有能力的权威，却尊重哪怕敌人身上的好手艺。",
+    'zh-TW': "諷刺、耐心，一旦決定信任便極其忠誠。他像讀水流一樣讀一屋子人：看誰在推、誰在漂、誰假裝泊定了。他用幽默化解恐懼，也用它讓人無法真正瞭解他。他厭惡沒有能力的權威，卻尊重哪怕敵人身上的好手藝。",
+    ko: "그가 신뢰하기로 결정하면 비통하고 인내심이 강하며 충성심이 강합니다. 그는 밀고 나가는 사람, 표류하는 사람, 닻을 내린 척하는 물살과 같은 방을 읽는다. 유머는 두려움을 완화하고 다른 사람들이 그를 알지 못하게 합니다. 그는 능력 없는 권위를 경멸하지만, 적의 경우에도 좋은 기술을 존중합니다.",
+    ja: "辛辣で忍耐強く、一度信じると決めたら猛烈に忠実。彼は部屋を流れのように読みます。誰が押し、誰が流れ、誰が固定されているふりをします。ユーモアは恐怖を和らげ、他の人が彼を知らないようにします。能力のない権威を軽蔑するが、たとえ敵であっても優れた技術を尊重する。",
   },
   "Isla de acantilados rosados y cavernas que respiran con la marea.": {
     "es": "Isla de acantilados rosados y cavernas que respiran con la marea.",
@@ -3663,7 +4659,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ilha de falésias rosadas e cavernas que respiram com a maré.",
     "it": "Isola di scogliere rosa e caverne che respirano con la marea.",
     "tr": "Gelgitle nefes alan pembe kayalıkların ve mağaraların bulunduğu ada.",
-    "zh-CN": "一座粉色悬崖之岛，洞穴随潮汐呼吸。"
+    "zh-CN": "一座粉色悬崖之岛，洞穴随潮汐呼吸。",
+    'zh-TW': "一座粉色懸崖之島，洞穴隨潮汐呼吸。",
+    ko: "조수와 함께 숨쉬는 분홍빛 절벽과 동굴이 있는 섬.",
+    ja: "潮の流れとともに息づくピンク色の崖と洞窟の島。",
   },
   "Isla Nácar": {
     "es": "Isla Nácar",
@@ -3674,7 +4673,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ilha Nácar",
     "it": "Isola di Nacar",
     "tr": "Nacar Adası",
-    "zh-CN": "珍珠岛"
+    "zh-CN": "珍珠岛",
+    'zh-TW': "珍珠島",
+    ko: "진주섬",
+    ja: "真珠島",
   },
   "IV · Asteriel": {
     "es": "IV · Asteriel",
@@ -3685,7 +4687,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "IV · Astériel",
     "it": "IV · Asteriel",
     "tr": "IV · Asteriel",
-    "zh-CN": "IV · Asteriel"
+    "zh-CN": "IV · Asteriel",
+    'zh-TW': "IV · Asteriel",
+    ko: "IV · 아스테리엘",
+    ja: "IV・アステリエル",
   },
   "joven aprendiz de archivo, cabeza rapada, abrigo verde, llaves de latón, fragmentos de vidrio brillante": {
     "es": "joven aprendiz de archivo, cabeza rapada, abrigo verde, llaves de latón, fragmentos de vidrio brillante",
@@ -3696,7 +4701,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "jovem aprendiz de arquivo, cabeça raspada, casaco verde, chaves de latão, cacos de vidro brilhantes",
     "it": "giovane apprendista d'archivio, testa rasata, mantello verde, chiavi di ottone, schegge di vetro lucente",
     "tr": "genç arşiv çırağı, kazıtılmış kafa, yeşil ceket, pirinç anahtarlar, parlak cam kırıkları",
-    "zh-CN": "年轻的档案学徒，剃光的头，绿色外套，黄铜钥匙，闪亮的玻璃碎片"
+    "zh-CN": "年轻的档案学徒，剃光的头，绿色外套，黄铜钥匙，闪亮的玻璃碎片",
+    'zh-TW': "年輕的檔案學徒，剃光的頭，綠色外套，黃銅鑰匙，閃亮的玻璃碎片",
+    ko: "젊은 기록 견습생, 삭발한 머리, 녹색 코트, 황동 열쇠, 빛나는 유리 파편",
+    ja: "若いアーカイブ見習い、坊主頭、緑色のコート、真鍮の鍵、輝くガラスの破片",
   },
   "joven cartógrafa marítima, ojos plateados, trenza oscura, abrigo de latón, mano izquierda de vidrio translúcido": {
     "es": "joven cartógrafa marítima, ojos plateados, trenza oscura, abrigo de latón, mano izquierda de vidrio translúcido",
@@ -3707,7 +4715,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "jovem cartógrafo marítimo, olhos prateados, trança escura, casaco de latão, vidro translúcido na mão esquerda",
     "it": "giovane cartografo marittimo, occhi d'argento, treccia scura, mantello di ottone, mano sinistra di vetro traslucido",
     "tr": "genç denizci haritacı, gümüş gözler, koyu renk örgü, pirinç ceket, yarı saydam cam sol el",
-    "zh-CN": "年轻的海洋制图师，银色的眼睛，深色辫子，黄铜色外套，半透明玻璃的左手"
+    "zh-CN": "年轻的海洋制图师，银色的眼睛，深色辫子，黄铜色外套，半透明玻璃的左手",
+    'zh-TW': "年輕的海洋製圖師，銀色的眼睛，深色辮子，黃銅色外套，半透明玻璃的左手",
+    ko: "젊은 해양 지도 제작자, 은색 눈, 짙은 땋은 머리, 황동 코트, 반투명 유리 왼손",
+    ja: "若い海事地図製作者、銀色の目、暗い三つ編み、真鍮のコート、半透明のガラスの左手",
   },
   "Joven oficial de pelo oscuro, capa roja y una prótesis auditiva de latón.": {
     "es": "Joven oficial de pelo oscuro, capa roja y una prótesis auditiva de latón.",
@@ -3718,7 +4729,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Jovem oficial com cabelos escuros, capa vermelha e aparelho auditivo de latão.",
     "it": "Giovane ufficiale con capelli scuri, mantello rosso e apparecchio acustico in ottone.",
     "tr": "Koyu saçlı, kırmızı pelerinli ve pirinç işitme cihazı olan genç bir subay.",
-    "zh-CN": "年轻的深发军官，红色披风，配一副黄铜听觉义具。"
+    "zh-CN": "年轻的深发军官，红色披风，配一副黄铜听觉义具。",
+    'zh-TW': "年輕的深發軍官，紅色披風，配一副黃銅聽覺義具。",
+    ko: "빨간 망토를 입고 황동 청각 장치를 갖춘 검은 머리의 젊은 장교.",
+    ja: "赤いマントを着た黒髪の若い士官で、真鍮の補聴器を持っている。",
   },
   "joven oficial, cabello oscuro, capa roja, dispositivo auditivo de latón, insignia de la Puerta de Sal": {
     "es": "joven oficial, cabello oscuro, capa roja, dispositivo auditivo de latón, insignia de la Puerta de Sal",
@@ -3729,7 +4743,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "jovem oficial, cabelo escuro, capa vermelha, aparelho auditivo de latão, insígnia de Salt Gate",
     "it": "giovane ufficiale, capelli scuri, mantello rosso, apparecchio acustico in ottone, insegne della Porta del Sale",
     "tr": "genç subay, siyah saçlı, kırmızı pelerin, pirinç işitme cihazı, Salt Gate amblemi",
-    "zh-CN": "年轻军官，深色头发，红色披风，黄铜听觉装置，盐门徽章"
+    "zh-CN": "年轻军官，深色头发，红色披风，黄铜听觉装置，盐门徽章",
+    'zh-TW': "年輕軍官，深色頭髮，紅色披風，黃銅聽覺裝置，鹽門徽章",
+    ko: "젊은 장교, 검은 머리, 붉은 망토, 황동 청각 장치, 솔트 게이트 휘장",
+    ja: "若い士官、黒髪、赤いマント、真鍮の聴覚装置、塩の門の記章",
   },
   "Juramento de Tarek": {
     "es": "Juramento de Tarek",
@@ -3740,7 +4757,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Juramento de Tarek",
     "it": "Il giuramento di Tarek",
     "tr": "Tarek'in Yemini",
-    "zh-CN": "Tarek 的誓言"
+    "zh-CN": "Tarek 的誓言",
+    'zh-TW': "Tarek 的誓言",
+    ko: "타렉의 맹세",
+    ja: "タレクの誓い",
   },
   "La [[Casa Venn]] ocupó el cargo durante cinco siglos. El [[Regente Maelor Sarn]] disolvió el consejo tras el Hundimiento.": {
     "es": "La [[Casa Venn]] ocupó el cargo durante cinco siglos. El [[Regente Maelor Sarn]] disolvió el consejo tras el Hundimiento.",
@@ -3751,7 +4771,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O [[Casa Venn]] ocupou a posição por cinco séculos. O [[Regente Maelor Sarn]] dissolveu o conselho após o naufrágio.",
     "it": "Il [[Casa Venn]] mantenne la carica per cinque secoli. Il [[Reggente Maelor Sarn]] sciolse il consiglio dopo il naufragio.",
     "tr": "[[Venn Hanesi]] bu konumu beş yüzyıl boyunca korudu. [[Vekil Maelor Sarn]] Batan'ın ardından konseyi feshetti.",
-    "zh-CN": "[[Venn 家族]] 担任此职长达五个世纪。[[摄政王梅洛尔·萨恩]] 在沉没事件后解散了议会。"
+    "zh-CN": "[[Venn 家族]] 担任此职长达五个世纪。[[摄政王梅洛尔·萨恩]] 在沉没事件后解散了议会。",
+    'zh-TW': "[[Venn 家族]] 擔任此職長達五個世紀。[[攝政王梅洛爾·薩恩]] 在沉沒事件後解散了議會。",
+    ko: "[[벤 가문]]은 5세기 동안 그 직책을 맡았습니다. [[섭정 마엘로 사안]]은 침몰 이후 의회를 해산했습니다.",
+    ja: "[[ヴェン家]] は5世紀にわたってその職を務めました。 [[摂政メーラー・サーン]]は沈没後に評議会を解散した。",
   },
   "La [[Habla de Marea]] distingue entre lo recordado por uno mismo y lo recibido de un antepasado. [[Hermana Vesh]] usa un tercer modo reservado para memorias del mar.": {
     "es": "La [[Habla de Marea]] distingue entre lo recordado por uno mismo y lo recibido de un antepasado. [[Hermana Vesh]] usa un tercer modo reservado para memorias del mar.",
@@ -3762,7 +4785,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O [[Fale sobre Marea]] distingue entre o que é lembrado por si mesmo e o que é recebido de um ancestral. [[Irmã Vesh]] usa um terceiro modo reservado para memórias marítimas.",
     "it": "Il [[Parliamo di Marea]] distingue tra ciò che si ricorda da sé e ciò che si riceve da un antenato. [[Sorella Vesh]] utilizza una terza modalità riservata ai ricordi del mare.",
     "tr": "[[Marea hakkında konuşun]] kişinin hatırladığı ile atadan aldığı arasında ayrım yapar. [[Rahibe Vesh]] deniz anıları için ayrılmış üçüncü bir modu kullanır.",
-    "zh-CN": "[[潮语]] 区分亲身记住的记忆与从祖先那里继承来的记忆。[[Vesh 修女]] 使用第三种方式，专用于海洋的记忆。"
+    "zh-CN": "[[潮语]] 区分亲身记住的记忆与从祖先那里继承来的记忆。[[Vesh 修女]] 使用第三种方式，专用于海洋的记忆。",
+    'zh-TW': "[[潮語]] 區分親身記住的記憶與從祖先那裡繼承來的記憶。[[Vesh 修女]] 使用第三種方式，專用於海洋的記憶。",
+    ko: "[[타이컨트]]는 개인의 기억과 조상으로부터 물려받은 기억을 구별합니다. [[베쉬 자매]]는 바다의 추억을 위한 세 번째 모드를 사용합니다.",
+    ja: "[[タイデカント]] は個人の記憶と祖先から受け継いだ記憶を区別します。 [[シスター・ヴェッシュ]] は海の思い出のために予約された3番目のモードを使用します。",
   },
   "La carta que regresó mojada": {
     "es": "La carta que regresó mojada",
@@ -3773,7 +4799,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A carta que voltou molhada",
     "it": "La lettera che tornò bagnata",
     "tr": "Islak dönen mektup",
-    "zh-CN": "湿着回来的信"
+    "zh-CN": "湿着回来的信",
+    'zh-TW': "溼著回來的信",
+    ko: "젖어 돌아온 편지",
+    ja: "濡れて戻ってきた手紙",
   },
   "La carta viajó dentro de una memoria de vidrio y solo tomó forma cuando Ilyra volvió.": {
     "es": "La carta viajó dentro de una memoria de vidrio y solo tomó forma cuando Ilyra volvió.",
@@ -3784,7 +4813,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A carta viajou dentro de uma memória de vidro e só tomou forma quando Ilyra voltou.",
     "it": "La lettera viaggiò all'interno di una memoria di vetro e prese forma solo al ritorno di Ilyra.",
     "tr": "Mektup camdan bir anı içinde dolaştı ve ancak Ilyra geri döndüğünde şekillendi.",
-    "zh-CN": "那封信藏在一段玻璃记忆中旅行，直到 Ilyra 归来才成形。"
+    "zh-CN": "那封信藏在一段玻璃记忆中旅行，直到 Ilyra 归来才成形。",
+    'zh-TW': "那封信藏在一段玻璃記憶中旅行，直到 Ilyra 歸來才成形。",
+    ko: "편지는 유리 기억 속에 들어 있었고 Ilyra가 돌아왔을 때 비로소 형태를 갖추었습니다.",
+    ja: "手紙はガラスの記憶の中を旅し、イリラが戻ってきたときに初めて形になりました。",
   },
   "La Cartógrafa de Ceniza": {
     "es": "La Cartógrafa de Ceniza",
@@ -3795,7 +4827,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O cartógrafo de Ash",
     "it": "Il cartografo di Ash",
     "tr": "Ash'in Haritacısı",
-    "zh-CN": "灰烬制图师"
+    "zh-CN": "灰烬制图师",
+    'zh-TW': "灰燼製圖師",
+    ko: "애쉬 지도 제작자",
+    ja: "灰の地図製作者",
   },
   "La deuda aparece antes del siguiente amanecer.": {
     "es": "La deuda aparece antes del siguiente amanecer.",
@@ -3806,7 +4841,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A dívida aparece antes do próximo amanhecer.",
     "it": "Il debito appare prima dell'alba successiva.",
     "tr": "Borç bir sonraki şafaktan önce ortaya çıkar.",
-    "zh-CN": "债务会在下一个黎明前出现。"
+    "zh-CN": "债务会在下一个黎明前出现。",
+    'zh-TW': "債務會在下一個黎明前出現。",
+    ko: "빚은 다음 날 새벽이 되기 전에 나타난다.",
+    ja: "借金は次の夜明け前に現れます。",
   },
   "La deuda explica por qué el [[Flujo de vidrio]] no es una fuente gratuita. [[Sena Mir]] descubre que los apagones del Faro coinciden con lagunas en la memoria colectiva.": {
     "es": "La deuda explica por qué el [[Flujo de vidrio]] no es una fuente gratuita. [[Sena Mir]] descubre que los apagones del Faro coinciden con lagunas en la memoria colectiva.",
@@ -3817,7 +4855,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A dívida explica porque [[fluxo de vidro]] não é uma fonte gratuita. [[Sena Mir]] descobre que os apagões do Farol coincidem com lacunas na memória coletiva.",
     "it": "Debt spiega perché [[flusso di vetro]] non è un font gratuito. [[Sena Mir]] scopre che i blackout del Faro coincidono con vuoti nella memoria collettiva.",
     "tr": "Borç, [[cam akışı]]'nin neden ücretsiz bir yazı tipi olmadığını açıklıyor. [[Sena Mir]] Deniz Feneri kesintilerinin kolektif hafızadaki boşluklarla örtüştüğünü keşfeder.",
-    "zh-CN": "债务解释了为什么 [[玻璃流]] 并非免费的来源。[[Sena Mir]] 发现灯塔的熄灯与集体记忆中的空白相吻合。"
+    "zh-CN": "债务解释了为什么 [[玻璃流]] 并非免费的来源。[[Sena Mir]] 发现灯塔的熄灯与集体记忆中的空白相吻合。",
+    'zh-TW': "債務解釋了為什麼 [[玻璃流]] 並非免費的來源。[[Sena Mir]] 發現燈塔的熄燈與集體記憶中的空白相吻合。",
+    ko: "부채는 [[유리 플럭스]]가 무료 소스가 아닌 이유를 설명합니다. [[세나 미르]]는 등대 정전이 집단 기억의 공백과 일치한다는 사실을 발견합니다.",
+    ja: "[[ガラスフラックス]] が無料の供給源ではない理由は負債によって説明されます。 [[セナ・ミル]]は、灯台の停電が集団の記憶の欠落と一致していることを発見しました。",
   },
   "La ficha dice que murió defendiendo la Puerta de Sal, pero varios testigos lo sitúan después en el Faro.": {
     "es": "La ficha dice que murió defendiendo la Puerta de Sal, pero varios testigos lo sitúan después en el Faro.",
@@ -3828,7 +4869,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O registro diz que ele morreu defendendo a Porta do Sal, mas várias testemunhas posteriormente o colocam no Farol.",
     "it": "La documentazione dice che morì difendendo la Porta del Sale, ma diversi testimoni in seguito lo collocano nel Faro.",
     "tr": "Kayıtlar onun Tuz Kapısı'nı savunurken öldüğünü söylüyor ancak birkaç tanık daha sonra onun Deniz Feneri'nde olduğunu söylüyor.",
-    "zh-CN": "档案上说他为守卫盐门而死，但多名证人后来却在灯塔见过他。"
+    "zh-CN": "档案上说他为守卫盐门而死，但多名证人后来却在灯塔见过他。",
+    'zh-TW': "檔案上說他為守衛鹽門而死，但多名證人後來卻在燈塔見過他。",
+    ko: "그의 파일에는 그가 솔트 게이트(Salt Gate)를 지키다 사망했다고 적혀 있지만, 몇몇 목격자들은 나중에 그를 등대에 두었습니다.",
+    ja: "彼のファイルには、彼が塩の門を守って死亡したと記載されていますが、その後、数人の目撃者が彼を灯台に置いたとしています。",
   },
   "La guerra de los Tejedores": {
     "es": "La guerra de los Tejedores",
@@ -3839,7 +4883,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A Guerra dos Tecelões",
     "it": "La guerra dei tessitori",
     "tr": "Dokumacıların Savaşı",
-    "zh-CN": "织者之战"
+    "zh-CN": "织者之战",
+    'zh-TW': "織者之戰",
+    ko: "직공들의 전쟁",
+    ja: "織工たちの戦争",
   },
   "La inundación del Barrio Hundido fue agravada para salvar la terraza alta.": {
     "es": "La inundación del Barrio Hundido fue agravada para salvar la terraza alta.",
@@ -3850,7 +4897,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A inundação do Bairro Hundido foi agravada para salvar o terraço alto.",
     "it": "L'allagamento del Barrio Hundido è stato aggravato per salvare l'alta terrazza.",
     "tr": "Barrio Hundido'daki su baskını, yüksek terası kurtarmak için daha da kötüleşti.",
-    "zh-CN": "为保住上层台地，沉没区的洪水被加重了。"
+    "zh-CN": "为保住上层台地，沉没区的洪水被加重了。",
+    'zh-TW': "為保住上層臺地，沉沒區的洪水被加重了。",
+    ko: "Sunken Quarter의 홍수는 상부 테라스를 구하기 위해 악화되었습니다.",
+    ja: "上部テラスを守るために、沈没地区の洪水がさらに悪化しました。",
   },
   "La legitimidad de Orthea y quién controla la luz.": {
     "es": "La legitimidad de Orthea y quién controla la luz.",
@@ -3861,7 +4911,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A legitimidade de Orthea e quem controla a luz.",
     "it": "La legittimità di Orthea e chi controlla la luce.",
     "tr": "Orthea'nın meşruluğu ve ışığı kimin kontrol ettiği.",
-    "zh-CN": "Orthea 的合法性，以及谁掌控着光。"
+    "zh-CN": "Orthea 的合法性，以及谁掌控着光。",
+    'zh-TW': "Orthea 的合法性，以及誰掌控著光。",
+    ko: "오르테아의 정당성과 빛을 지배하는 자.",
+    ja: "オルテアの正当性と光を司る者。",
   },
   "La luz natural no cuenta hasta ser almacenada.": {
     "es": "La luz natural no cuenta hasta ser almacenada.",
@@ -3872,7 +4925,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A luz natural não conta até que seja armazenada.",
     "it": "La luce naturale non conta finché non viene immagazzinata.",
     "tr": "Doğal ışık depolanana kadar sayılmaz.",
-    "zh-CN": "自然光在被储存之前不算数。"
+    "zh-CN": "自然光在被储存之前不算数。",
+    'zh-TW': "自然光在被儲存之前不算數。",
+    ko: "자연광은 저장될 때까지 계산되지 않습니다.",
+    ja: "自然光は保管されるまでカウントされません。",
   },
   "La mano prismática se acepta como herramienta.": {
     "es": "La mano prismática se acepta como herramienta.",
@@ -3883,7 +4939,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A mão prismática é aceita como ferramenta.",
     "it": "La mano prismatica è accettata come strumento.",
     "tr": "Prizmatik el bir araç olarak kabul edilmektedir.",
-    "zh-CN": "棱镜之手被接受为工具。"
+    "zh-CN": "棱镜之手被接受为工具。",
+    'zh-TW': "稜鏡之手被接受為工具。",
+    ko: "프리즘 손은 도구로 받아들여집니다.",
+    ja: "角柱状の手は道具として受け入れられます。",
   },
   "La memoria heredada conserva el nombre": {
     "es": "La memoria heredada conserva el nombre",
@@ -3894,7 +4953,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A memória herdada preserva o nome",
     "it": "La memoria ereditata conserva il nome",
     "tr": "Miras alınan hafıza adı korur",
-    "zh-CN": "继承的记忆保留着名字"
+    "zh-CN": "继承的记忆保留着名字",
+    'zh-TW': "繼承的記憶保留著名字",
+    ko: "상속된 기억은 이름을 보존합니다",
+    ja: "継承されたメモリは名前を保持します",
   },
   "La menciona la Brújula de ceniza y no existe todavía como lugar.": {
     "es": "La menciona la Brújula de ceniza y no existe todavía como lugar.",
@@ -3905,7 +4967,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "É mencionado na Bússola de Cinzas e ainda não existe como lugar.",
     "it": "È menzionato nella Bussola di Cenere e non esiste ancora come luogo.",
     "tr": "Kül Pusulası'nda bahsedilmektedir ve henüz bir yer olarak mevcut değildir.",
-    "zh-CN": "灰烬罗盘提到了它，但它作为一个地方尚不存在。"
+    "zh-CN": "灰烬罗盘提到了它，但它作为一个地方尚不存在。",
+    'zh-TW': "灰燼羅盤提到了它，但它作為一個地方尚不存在。",
+    ko: "Ash Compass에 언급되어 있지만 아직 장소로 존재하지 않습니다.",
+    ja: "Ash Compass にはそのことが記載されていますが、まだ場所としては存在していません。",
   },
   "La mitad baja se hundió en 733 D.F.; el Consejo nunca permitió reconstruirla.": {
     "es": "La mitad baja se hundió en 733 D.F.; el Consejo nunca permitió reconstruirla.",
@@ -3916,7 +4981,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A metade inferior afundou em 733 D.F.; O Conselho nunca permitiu que fosse reconstruída.",
     "it": "La metà inferiore affondò nel 733 D.F.; Il Consiglio non ne ha mai permesso la ricostruzione.",
     "tr": "Alt yarı 733 D.F.'de battı; Konsey onun yeniden inşasına asla izin vermedi.",
-    "zh-CN": "它的下半部分在 733 D.F. 沉没；议会从未允许重建。"
+    "zh-CN": "它的下半部分在 733 D.F. 沉没；议会从未允许重建。",
+    'zh-TW': "它的下半部分在 733 D.F. 沉沒；議會從未允許重建。",
+    ko: "그 하반부는 A.L.733년에 가라앉았습니다. 의회는 재건을 결코 허용하지 않았습니다.",
+    ja: "その下半分は733年に沈没しました。評議会はそれを再建することを決して許可しませんでした。",
   },
   "La neutralidad del comandante se vuelve complicidad y después decisión.": {
     "es": "La neutralidad del comandante se vuelve complicidad y después decisión.",
@@ -3927,7 +4995,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A neutralidade do comandante transforma-se em cumplicidade e depois em decisão.",
     "it": "La neutralità del comandante diventa complicità e poi decisione.",
     "tr": "Komutanın tarafsızlığı suç ortaklığına ve ardından karara dönüşür.",
-    "zh-CN": "指挥官的中立变成同谋，随后又变成抉择。"
+    "zh-CN": "指挥官的中立变成同谋，随后又变成抉择。",
+    'zh-TW': "指揮官的中立變成同謀，隨後又變成抉擇。",
+    ko: "지휘관의 중립성은 공모가 되고 선택이 됩니다.",
+    ja: "指揮官の中立性は共犯者となり、その後選択となる。",
   },
   "La Noche Baja": {
     "es": "La Noche Baja",
@@ -3938,7 +5009,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A noite desce",
     "it": "La notte scende",
     "tr": "Gece Geliyor",
-    "zh-CN": "低夜"
+    "zh-CN": "低夜",
+    'zh-TW': "低夜",
+    ko: "낮은 밤",
+    ja: "ザ・ロー・ナイト",
   },
   "La observación todavía no es concluyente.": {
     "es": "La observación todavía no es concluyente.",
@@ -3949,7 +5023,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A observação ainda não é conclusiva.",
     "it": "L'osservazione non è ancora conclusiva.",
     "tr": "Gözlem hâlâ kesin değil.",
-    "zh-CN": "观测尚不足以定论。"
+    "zh-CN": "观测尚不足以定论。",
+    'zh-TW': "觀測尚不足以定論。",
+    ko: "관찰은 아직 결정적이지 않습니다.",
+    ja: "観察はまだ決定的なものではありません。",
   },
   "La órbita imposible": {
     "es": "La órbita imposible",
@@ -3960,7 +5037,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A órbita impossível",
     "it": "L'orbita impossibile",
     "tr": "İmkansız yörünge",
-    "zh-CN": "不可能的轨道"
+    "zh-CN": "不可能的轨道",
+    'zh-TW': "不可能的軌道",
+    ko: "불가능한 궤도",
+    ja: "不可能な軌道",
   },
   "La persona donante olvida una memoria adicional.": {
     "es": "La persona donante olvida una memoria adicional.",
@@ -3971,7 +5051,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O doador esquece uma memória adicional.",
     "it": "Il donatore dimentica una memoria aggiuntiva.",
     "tr": "Donör ek bir anıyı unutur.",
-    "zh-CN": "供体遗忘一段额外的记忆。"
+    "zh-CN": "供体遗忘一段额外的记忆。",
+    'zh-TW': "供體遺忘一段額外的記憶。",
+    ko: "기증자는 추가 기억 하나를 잊어버립니다.",
+    ja: "提供者はもう一つの記憶を忘れます。",
   },
   "La profecía habla por él.": {
     "es": "La profecía habla por él.",
@@ -3982,7 +5065,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A profecia fala por ele.",
     "it": "La profezia parla per lui.",
     "tr": "Onun adına kehanet konuşuyor.",
-    "zh-CN": "预言代他发声。"
+    "zh-CN": "预言代他发声。",
+    'zh-TW': "預言代他發聲。",
+    ko: "예언은 그를 대신하여 말합니다.",
+    ja: "預言は彼を代弁しています。",
   },
   "La prótesis se agrieta y causa dolor.": {
     "es": "La prótesis se agrieta y causa dolor.",
@@ -3993,7 +5079,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A prótese racha e causa dor.",
     "it": "La protesi si rompe e provoca dolore.",
     "tr": "Protez çatlar ve ağrıya neden olur.",
-    "zh-CN": "义体开裂并引发疼痛。"
+    "zh-CN": "义体开裂并引发疼痛。",
+    'zh-TW': "義體開裂並引發疼痛。",
+    ko: "보철물이 깨지고 통증을 유발합니다.",
+    ja: "プロテーゼに亀裂が入り、痛みが生じます。",
   },
   "La próxima Marea Negra": {
     "es": "La próxima Marea Negra",
@@ -4004,7 +5093,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A próxima maré negra",
     "it": "La prossima marea nera",
     "tr": "Bir sonraki kara gelgit",
-    "zh-CN": "即将到来的黑潮"
+    "zh-CN": "即将到来的黑潮",
+    'zh-TW': "即將到來的黑潮",
+    ko: "다가오는 흑조",
+    ja: "来るブラックタイド",
   },
   "La Puerta de Sal": {
     "es": "La Puerta de Sal",
@@ -4015,7 +5107,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O Portão do Sal",
     "it": "La Porta del Sale",
     "tr": "Tuz Kapısı",
-    "zh-CN": "盐门"
+    "zh-CN": "盐门",
+    'zh-TW': "鹽門",
+    ko: "솔트 게이트",
+    ja: "塩の門",
   },
   "La Séptima Aguja": {
     "es": "La Séptima Aguja",
@@ -4026,7 +5121,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A Sétima Agulha",
     "it": "Il settimo ago",
     "tr": "Yedinci İğne",
-    "zh-CN": "第七针"
+    "zh-CN": "第七针",
+    'zh-TW': "第七針",
+    ko: "일곱 번째 바늘",
+    ja: "七本目の針",
   },
   "La sobrecarga lo deja sordo a vibraciones.": {
     "es": "La sobrecarga lo deja sordo a vibraciones.",
@@ -4037,7 +5135,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A sobrecarga deixa-o surdo às vibrações.",
     "it": "Il sovraccarico lo rende sordo alle vibrazioni.",
     "tr": "Aşırı yük, titreşimlere karşı sağır kalmasına neden olur.",
-    "zh-CN": "过载让他对振动失聪。"
+    "zh-CN": "过载让他对振动失聪。",
+    'zh-TW': "過載讓他對振動失聰。",
+    ko: "과부하로 인해 그는 진동에 귀가 먹먹해졌습니다.",
+    ja: "過負荷により振動が聞こえなくなります。",
   },
   "La sucesión del Faro": {
     "es": "La sucesión del Faro",
@@ -4048,7 +5149,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A sucessão do Farol",
     "it": "La successione del Faro",
     "tr": "Deniz Feneri'nin ardıllığı",
-    "zh-CN": "灯塔的继承"
+    "zh-CN": "灯塔的继承",
+    'zh-TW': "燈塔的繼承",
+    ko: "등대 계승",
+    ja: "灯台の継承",
   },
   "La Tercera Luna": {
     "es": "La Tercera Luna",
@@ -4059,7 +5163,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A Terceira Lua",
     "it": "La terza luna",
     "tr": "Üçüncü Ay",
-    "zh-CN": "第三月"
+    "zh-CN": "第三月",
+    'zh-TW': "第三月",
+    ko: "세 번째 달",
+    ja: "第三の月",
   },
   "La Tercera Luna no proyecta sombra": {
     "es": "La Tercera Luna no proyecta sombra",
@@ -4070,7 +5177,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A Terceira Lua não projeta sombra",
     "it": "La Terza Luna non proietta ombra",
     "tr": "Üçüncü Ay'ın gölgesi yok",
-    "zh-CN": "第三月不投下阴影"
+    "zh-CN": "第三月不投下阴影",
+    'zh-TW': "第三月不投下陰影",
+    ko: "세 번째 달은 그림자를 드리우지 않는다",
+    ja: "第三の月は影を落としません",
   },
   "La terraza alta pierde luz durante un año, pero la ciudad sobrevive.": {
     "es": "La terraza alta pierde luz durante un año, pero la ciudad sobrevive.",
@@ -4081,7 +5191,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "O terraço alto perde luz durante um ano, mas a cidade sobrevive.",
     "it": "L'alta terrazza perde luce per un anno, ma la città sopravvive.",
     "tr": "Yüksek teras bir yıl boyunca ışığını kaybeder ama şehir ayakta kalır.",
-    "zh-CN": "高处露台失去光照一年，但城市幸存下来。"
+    "zh-CN": "高处露台失去光照一年，但城市幸存下来。",
+    'zh-TW': "高處露臺失去光照一年，但城市倖存下來。",
+    ko: "상부 테라스는 1년 동안 빛을 잃어도 도시는 살아남습니다.",
+    ja: "上部テラスは1年間光を失いますが、都市は存続します。",
   },
   "La verdad solo es segura mientras nadie la conozca.": {
     "es": "La verdad solo es segura mientras nadie la conozca.",
@@ -4092,7 +5205,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A verdade só é segura enquanto ninguém a souber.",
     "it": "La verità è sicura solo finché nessuno la sa.",
     "tr": "Gerçek ancak kimse bilmediği sürece güvendedir.",
-    "zh-CN": "只要无人知晓，真相才是安全的。"
+    "zh-CN": "只要无人知晓，真相才是安全的。",
+    'zh-TW': "只要無人知曉，真相才是安全的。",
+    ko: "진실은 아무도 모르는 동안에만 안전합니다.",
+    ja: "真実は誰も知らない間だけ安全です。",
   },
   "Las ballenas de brasa guían a los barcos del [[Gremio de las Seis Velas]]. Sus cantos alteran el [[Flujo de vidrio]] y anticipan una Marea Negra.": {
     "es": "Las ballenas de brasa guían a los barcos del [[Gremio de las Seis Velas]]. Sus cantos alteran el [[Flujo de vidrio]] y anticipan una Marea Negra.",
@@ -4103,7 +5219,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "As baleias brasas guiam os navios do [[Guilda das Seis Velas]]. Suas músicas alteram o [[fluxo de vidro]] e antecipam uma Maré Negra.",
     "it": "Le balene di brace guidano le navi della [[Gilda delle Sei Candele]]. Le loro canzoni alterano il [[flusso di vetro]] e anticipano una marea nera.",
     "tr": "Kor balinaları [[Altı Mum Loncası]]'nin gemilerine rehberlik ediyor. Şarkıları [[cam akışı]]'yi değiştiriyor ve bir Kara Gelgit'i öngörüyor.",
-    "zh-CN": "炭火鲸引导着 [[六帆公会]] 的船只。它们的歌声改变 [[玻璃流]] 并预示着一场黑潮。"
+    "zh-CN": "炭火鲸引导着 [[六帆公会]] 的船只。它们的歌声改变 [[玻璃流]] 并预示着一场黑潮。",
+    'zh-TW': "炭火鯨引導著 [[六帆公會]] 的船隻。它們的歌聲改變 [[玻璃流]] 並預示著一場黑潮。",
+    ko: "잿불고래는 [[여섯 항해 길드]]의 배를 안내합니다. 그들의 노래는 [[유리 유동]]을 변화시키고 흑조를 예고합니다.",
+    ja: "エンバークジラは[[六帆のギルド]]の船を導きます。彼らの歌は[[ガラスフラックス]]を変化させ、ブラックタイドを予告します。",
   },
   "Las barreras solares de Lúmina solo se abren ante un sello registrado.": {
     "es": "Las barreras solares de Lúmina solo se abren ante un sello registrado.",
@@ -4114,7 +5233,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "As barreiras solares Lúmina só abrem antes de um selo registado.",
     "it": "Le barriere solari Lúmina si aprono solo prima di un sigillo registrato.",
     "tr": "Lúmina güneş bariyerleri yalnızca kayıtlı bir mühürden önce açılır.",
-    "zh-CN": "卢米娜的太阳屏障只对已登记的印记开启。"
+    "zh-CN": "卢米娜的太阳屏障只对已登记的印记开启。",
+    'zh-TW': "盧米娜的太陽屏障只對已登記的印記開啟。",
+    ko: "루미나의 태양 장벽은 등록된 인감에만 열립니다.",
+    ja: "ルミナの太陽障壁は実印のみが開きます。",
   },
   "Las herramientas y prótesis no se consideran armas salvo intención declarada.": {
     "es": "Las herramientas y prótesis no se consideran armas salvo intención declarada.",
@@ -4125,7 +5247,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ferramentas e próteses não são consideradas armas, a menos que haja intenção declarada.",
     "it": "Attrezzi e protesi non sono considerati armi se non con intenzione dichiarata.",
     "tr": "Aletler ve protezler, niyet beyan edilmedikçe silah olarak kabul edilmez.",
-    "zh-CN": "工具与义体不视为武器，除非声明了意图。"
+    "zh-CN": "工具与义体不视为武器，除非声明了意图。",
+    'zh-TW': "工具與義體不視為武器，除非聲明瞭意圖。",
+    ko: "도구와 보철물은 그렇게 선언되지 않는 한 무기가 아닙니다.",
+    ja: "道具や義肢は、そのように宣言されない限り武器ではありません。",
   },
   "Las Mareas de Ceniza": {
     "es": "Las Mareas de Ceniza",
@@ -4136,7 +5261,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "As marés de cinzas",
     "it": "Le maree di cenere",
     "tr": "Kül Gelgitleri",
-    "zh-CN": "灰烬潮汐"
+    "zh-CN": "灰烬潮汐",
+    'zh-TW': "灰燼潮汐",
+    ko: "잿빛 파도",
+    ja: "灰の潮流",
   },
   "Las Mareas Negras marcan sus eras y obligan a reconstruir las costas.": {
     "es": "Las Mareas Negras marcan sus eras y obligan a reconstruir las costas.",
@@ -4147,7 +5275,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "As Marés Negras marcam as suas épocas e obrigam à reconstrução das costas.",
     "it": "Le Maree Nere segnano le loro epoche e costringono a ricostruire le coste.",
     "tr": "Kara Gelgitler kendi çağlarına damga vuruyor ve kıyıları yeniden inşa edilmeye zorluyor.",
-    "zh-CN": "黑潮标记着它的纪元，并迫使海岸重建。"
+    "zh-CN": "黑潮标记着它的纪元，并迫使海岸重建。",
+    'zh-TW': "黑潮標記著它的紀元，並迫使海岸重建。",
+    ko: "Black Tides는 시대를 표시하고 해안을 재건하도록 강요합니다.",
+    ja: "ブラックタイドはその時代を刻み、海岸の再建を強いられます。",
   },
   "Las membranas de los [[Veyari]] perciben fracturas bajo el agua. [[Cael Orun]] perdió sensibilidad en la izquierda durante el naufragio de la Aguja Norte.": {
     "es": "Las membranas de los [[Veyari]] perciben fracturas bajo el agua. [[Cael Orun]] perdió sensibilidad en la izquierda durante el naufragio de la Aguja Norte.",
@@ -4158,7 +5289,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "As membranas do [[Veyari]] percebem fraturas debaixo d'água. [[Cael Orun]] perdeu a sensação à esquerda durante o naufrágio do North Needle.",
     "it": "Le membrane del [[Veyari]] percepiscono le fratture sott'acqua. [[Cael Orun]] ha perso la sensibilità a sinistra durante il naufragio della North Needle.",
     "tr": "[[Veyari]]'nın zarları su altındaki kırıkları algılar. [[Cael Orun]] Kuzey İğnesi'ndeki gemi kazası sırasında soldaki his kaybı.",
-    "zh-CN": "[[Veyari]] 的膜能感知水下的裂缝。[[Cael Orun]] 在北针号沉没时失去了左侧的知觉。"
+    "zh-CN": "[[Veyari]] 的膜能感知水下的裂缝。[[Cael Orun]] 在北针号沉没时失去了左侧的知觉。",
+    'zh-TW': "[[Veyari]] 的膜能感知水下的裂縫。[[Cael Orun]] 在北針號沉沒時失去了左側的知覺。",
+    ko: "[[베야리]] 막은 물속에서 균열을 감지합니다. [[Cael Orun]]은 North Needle이 난파되는 동안 왼쪽 감각을 잃었습니다.",
+    ja: "[[Veyari]] 膜は水中での亀裂を感知します。 [[カエル・オルン]]はノース・ニードルの沈没中に左側の感覚を失いました。",
   },
   "Las patrullas de la [[Guardia de Ceniza]] los adiestran para localizar contrabando de vidrio. Se niegan a entrar en la [[Casa del Faro]].": {
     "es": "Las patrullas de la [[Guardia de Ceniza]] los adiestran para localizar contrabando de vidrio. Se niegan a entrar en la [[Casa del Faro]].",
@@ -4169,7 +5303,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "As patrulhas [[Guarda Cinza]] os treinam para localizar contrabando de vidro. Eles se recusam a entrar no [[Casa Farol]].",
     "it": "Le pattuglie [[Guardia di cenere]] li addestrano a localizzare il contrabbando di vetro. Si rifiutano di entrare in [[Casa del Faro]].",
     "tr": "[[Kül Muhafızı]] devriyeleri onları cam kaçak mallarını bulma konusunda eğitiyor. [[Deniz Feneri Evi]]'ye girmeyi reddediyorlar.",
-    "zh-CN": "[[灰烬卫队]] 的巡逻队训练它们搜寻玻璃走私品。它们拒绝进入 [[灯塔家族]]。"
+    "zh-CN": "[[灰烬卫队]] 的巡逻队训练它们搜寻玻璃走私品。它们拒绝进入 [[灯塔家族]]。",
+    'zh-TW': "[[灰燼衛隊]] 的巡邏隊訓練它們搜尋玻璃走私品。它們拒絕進入 [[燈塔家族]]。",
+    ko: "[[Ash Guard]] 순찰대는 유리 밀수품을 찾는 방법을 훈련합니다. 그들은 [[등대]]에 들어가기를 거부합니다.",
+    ja: "[[アッシュガード]]のパトロール隊はガラスの密輸品を見つけるよう彼らを訓練している。彼らは[[灯台の家]]に入るのを拒否します。",
   },
   "Las placas del Mar de Vidrio convergen antes de lo previsto.": {
     "es": "Las placas del Mar de Vidrio convergen antes de lo previsto.",
@@ -4180,7 +5317,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "As placas do Mar de Vidro convergem mais cedo do que o esperado.",
     "it": "Le lastre del Mare di Vetro convergono prima del previsto.",
     "tr": "Cam Deniz levhaları beklenenden daha erken birleşiyor.",
-    "zh-CN": "玻璃海的板块比预期更早汇聚。"
+    "zh-CN": "玻璃海的板块比预期更早汇聚。",
+    'zh-TW': "玻璃海的板塊比預期更早匯聚。",
+    ko: "유리해의 판들이 예정보다 빨리 수렴되고 있습니다.",
+    ja: "ガラスの海のプレートは予定より早く収束しています。",
   },
   "Las puertas obedecen al sello": {
     "es": "Las puertas obedecen al sello",
@@ -4191,7 +5331,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "As portas obedecem ao selo",
     "it": "Le porte obbediscono al sigillo",
     "tr": "Kapılar mühüre uyuyor",
-    "zh-CN": "门服从印记"
+    "zh-CN": "门服从印记",
+    'zh-TW': "門服從印記",
+    ko: "문은 봉인에 복종한다",
+    ja: "門は封印に従う",
   },
   "Las seis campanas convierten la avería del Observatorio en golpe de Estado. Maelor declara traidora a la Casa Venn, ordena cerrar el puerto y ofrece a Tarek el mando total de la Guardia si repite la orden. Tarek intenta obligarlo a reconocer a los civiles atrapados; Maelor los reduce a un coste aceptable. Cuando llega la noticia de que el Gremio bloquea el puerto, Tarek deja su capa y llama “tío” a Maelor por primera vez en público. Maelor lo deja marchar, convencido de que regresará cuando el caos demuestre su razón.": {
     "es": "Las seis campanas convierten la avería del Observatorio en golpe de Estado. Maelor declara traidora a la Casa Venn, ordena cerrar el puerto y ofrece a Tarek el mando total de la Guardia si repite la orden. Tarek intenta obligarlo a reconocer a los civiles atrapados; Maelor los reduce a un coste aceptable. Cuando llega la noticia de que el Gremio bloquea el puerto, Tarek deja su capa y llama “tío” a Maelor por primera vez en público. Maelor lo deja marchar, convencido de que regresará cuando el caos demuestre su razón.",
@@ -4202,7 +5345,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Os seis sinos transformam o colapso do Observatório num golpe de Estado. Maelor declara traidores da Casa Venn, ordena o fechamento do porto e oferece a Tarek o comando total da Guarda se ele repetir a ordem. Tarek tenta forçá-lo a reconhecer os civis presos; Maelor os reduz a um custo aceitável. Quando chega a notícia de que a Guilda está bloqueando o porto, Tarek tira a capa e chama Maelor de “tio” pela primeira vez em público. Maelor o deixa ir, convencido de que ele retornará quando o caos provar que ele está certo.",
     "it": "Le sei campane trasformano il crollo dell'Osservatorio in un colpo di stato. Maelor dichiara traditori la Casata Venn, ordina la chiusura del porto e offre a Tarek il pieno comando della Guardia se ripete l'ordine. Tarek cerca di costringerlo a riconoscere i civili intrappolati; Maelor li riduce a un costo accettabile. Quando arriva la notizia che la Gilda sta bloccando il porto, Tarek abbassa il mantello e chiama Maelor \"zio\" per la prima volta in pubblico. Maelor lo lascia andare, convinto che tornerà quando il caos gli darà ragione.",
     "tr": "Altı çan, Gözlemevi'nin çöküşünü bir darbeye dönüştürüyor. Maelor, Venn Hanesi'nin hain olduğunu ilan eder, limanın kapatılmasını emreder ve emri tekrarlaması halinde Tarek'a Muhafızların tam komutasını teklif eder. Tarek, mahsur kalan sivilleri tanıması için onu zorlamaya çalışır; Maelor bunları kabul edilebilir bir maliyete indirir. Lonca'nın limanı abluka altına aldığı haberi geldiğinde Tarek pelerinini bırakır ve ilk kez herkesin önünde Maelor'a \"amca\" diye seslenir. Maelor, kaosun haklı olduğunu kanıtladığında geri döneceğine inanarak gitmesine izin verir.",
-    "zh-CN": "六声钟响将天文台的故障变成了一场政变。Maelor 宣布 Venn 家族为叛徒，下令关闭港口，并向 Tarek 提出：只要他重复命令，就把卫队的全部指挥权交给他。Tarek 试图迫使他承认被困的平民；Maelor 将他们削减为可接受的代价。当公会封锁港口的消息传来时，Tarek 脱下披风，首次在公开场合称 Maelor 为“叔叔”。Maelor 放他离开，确信混乱会证明自己是对的。"
+    "zh-CN": "六声钟响将天文台的故障变成了一场政变。Maelor 宣布 Venn 家族为叛徒，下令关闭港口，并向 Tarek 提出：只要他重复命令，就把卫队的全部指挥权交给他。Tarek 试图迫使他承认被困的平民；Maelor 将他们削减为可接受的代价。当公会封锁港口的消息传来时，Tarek 脱下披风，首次在公开场合称 Maelor 为“叔叔”。Maelor 放他离开，确信混乱会证明自己是对的。",
+    'zh-TW': "六聲鐘響將天文臺的故障變成了一場政變。Maelor 宣佈 Venn 家族為叛徒，下令關閉港口，並向 Tarek 提出：只要他重複命令，就把衛隊的全部指揮權交給他。Tarek 試圖迫使他承認被困的平民；Maelor 將他們削減為可接受的代價。當公會封鎖港口的訊息傳來時，Tarek 脫下披風，首次在公開場合稱 Maelor 為“叔叔”。Maelor 放他離開，確信混亂會證明自己是對的。",
+    ko: "6개의 종은 천문대의 실패를 쿠데타로 만들었습니다. Maelor는 Venn 가문이 배신자라고 선언하고 항구를 폐쇄하도록 명령하고 Tarek이 명령을 반복하면 경비병의 완전한 지휘권을 제공합니다. Tarek은 그에게 갇힌 민간인을 인정하도록 강요합니다. Maelor는 이를 허용 가능한 비용으로 줄입니다. 길드가 항구를 봉쇄했다는 소식이 전해지자 타렉은 망토를 버리고 처음으로 공개석상에서 마엘로르를 \"삼촌\"이라고 부릅니다. Maelor는 그를 놓아주고, 어떤 혼란은 그가 옳았다는 것을 증명할 것입니다.",
+    ja: "6つの鐘が天文台の失敗をクーデターに変える。メーラーはヴェン家を裏切り者と宣言し、港の閉鎖を命令し、もし命令を繰り返すならタレクに衛兵の全指揮を委ねる。タレクは彼に、閉じ込められた民間人を認めるように強制する。 Maelor はそれらを許容可能なコストまで削減します。ギルドが港を封鎖したという知らせが届くと、タレクはマントを脱ぎ捨て、初めて公の場でメーラーを「おじさん」と呼びました。メーラーは彼を手放す、ある混乱が彼の正しさを証明するだろう。",
   },
   "Lectura de corrientes": {
     "es": "Lectura de corrientes",
@@ -4213,7 +5359,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Leitura atual",
     "it": "Lettura attuale",
     "tr": "Mevcut okuma",
-    "zh-CN": "洋流读取"
+    "zh-CN": "洋流读取",
+    'zh-TW': "洋流讀取",
+    ko: "현재 독서",
+    ja: "現在の測定値",
   },
   "Lengua de respiración, tono y memoria heredada.": {
     "es": "Lengua de respiración, tono y memoria heredada.",
@@ -4224,7 +5373,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Linguagem respiratória, tom e memória herdada.",
     "it": "Linguaggio, tono e memoria ereditata della respirazione.",
     "tr": "Nefes alma dili, tonu ve kalıtsal hafıza.",
-    "zh-CN": "一种由呼吸、语调与传承记忆构成的语言。"
+    "zh-CN": "一种由呼吸、语调与传承记忆构成的语言。",
+    'zh-TW': "一種由呼吸、語調與傳承記憶構成的語言。",
+    ko: "호흡, 말투, 유전된 기억의 언어입니다.",
+    ja: "呼吸、音色、そして受け継がれた記憶の言語。",
   },
   "Lengua tonal cuyo sentido cambia con el ritmo de respiración.": {
     "es": "Lengua tonal cuyo sentido cambia con el ritmo de respiración.",
@@ -4235,7 +5387,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Linguagem tonal cujo significado muda com o ritmo da respiração.",
     "it": "Linguaggio tonale il cui significato cambia con il ritmo della respirazione.",
     "tr": "Anlamı nefes ritmine göre değişen tonal dil.",
-    "zh-CN": "一种声调语言，其含义随呼吸节奏而变化。"
+    "zh-CN": "一种声调语言，其含义随呼吸节奏而变化。",
+    'zh-TW': "一種聲調語言，其含義隨呼吸節奏而變化。",
+    ko: "호흡의 리듬에 따라 의미가 변하는 성조 언어.",
+    ja: "呼吸のリズムによって意味が変わる声調言語。",
   },
   "Libro del Faro": {
     "es": "Libro del Faro",
@@ -4246,7 +5401,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Livro Farol",
     "it": "Libro del faro",
     "tr": "Deniz Feneri Kitabı",
-    "zh-CN": "灯塔之书"
+    "zh-CN": "灯塔之书",
+    'zh-TW': "燈塔之書",
+    ko: "등대의 책",
+    ja: "灯台の本",
   },
   "Libro I · La costa rota": {
     "es": "Libro I · La costa rota",
@@ -4257,7 +5415,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Livro I · A Costa Partida",
     "it": "Libro I · La Costa Spezzata",
     "tr": "Kitap I · Kırık Sahil",
-    "zh-CN": "第一卷 · 破碎海岸"
+    "zh-CN": "第一卷 · 破碎海岸",
+    'zh-TW': "第一卷 · 破碎海岸",
+    ko: "제1권 · 부서진 해안",
+    ja: "Book I · The Broken Coast",
   },
   "Libro II · El corazón sumergido": {
     "es": "Libro II · El corazón sumergido",
@@ -4268,7 +5429,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Livro II O coração submerso",
     "it": "Libro II Il cuore sommerso",
     "tr": "Kitap II Batık kalp",
-    "zh-CN": "第二卷 · 沉没之心"
+    "zh-CN": "第二卷 · 沉没之心",
+    'zh-TW': "第二卷 · 沉沒之心",
+    ko: "제2권 · 가라앉은 심장",
+    ja: "Book II · 沈んだ心",
   },
   "Liga de capitanes que monopoliza las rutas del Mar de Vidrio.": {
     "es": "Liga de capitanes que monopoliza las rutas del Mar de Vidrio.",
@@ -4279,7 +5443,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Liga de capitães que monopoliza as rotas do Mar de Vidro.",
     "it": "Lega di capitani che monopolizza le rotte del Mare di Vetro.",
     "tr": "Cam Denizi'nin rotalarını tekeline alan kaptanlar birliği.",
-    "zh-CN": "垄断玻璃海航线的船长联盟。"
+    "zh-CN": "垄断玻璃海航线的船长联盟。",
+    'zh-TW': "壟斷玻璃海航線的船長聯盟。",
+    ko: "유리해를 횡단하는 루트를 독점하는 캡틴 리그.",
+    ja: "キャプテンズリーグはガラスの海を渡るルートを独占します。",
   },
   "Limpiar su nombre y recuperar su nave.": {
     "es": "Limpiar su nombre y recuperar su nave.",
@@ -4290,7 +5457,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Limpe seu nome e recupere seu navio.",
     "it": "Cancella il tuo nome e riprendi la tua nave.",
     "tr": "Adını temizle ve gemini geri al.",
-    "zh-CN": "洗清他的名声并夺回他的船。"
+    "zh-CN": "洗清他的名声并夺回他的船。",
+    'zh-TW': "洗清他的名聲並奪回他的船。",
+    ko: "그의 이름을 지우고 배를 되찾으세요.",
+    ja: "彼の汚名を晴らし、彼の船を取り戻してください。",
   },
   "Linaje de archiveros y guardianes de llaves del Barrio Hundido.": {
     "es": "Linaje de archiveros y guardianes de llaves del Barrio Hundido.",
@@ -4301,7 +5471,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Linhagem de arquivistas e guarda-chaves do Bairro Hundido.",
     "it": "Lignaggio di archivisti e custodi delle chiavi del Barrio Hundido.",
     "tr": "Arşivcilerin ve Barrio Hundido'nun kilit bekçilerinin soyu.",
-    "zh-CN": "沉没街区的档案员与钥匙守护者世家。"
+    "zh-CN": "沉没街区的档案员与钥匙守护者世家。",
+    'zh-TW': "沉沒街區的檔案員與鑰匙守護者世家。",
+    ko: "Sunken Quarter 출신의 기록관과 열쇠지기의 혈통입니다.",
+    ja: "サンクン・クォーター出身のアーキビストと鍵番の系統。",
   },
   "Lista de revisión del acto I": {
     "es": "Lista de revisión del acto I",
@@ -4312,7 +5485,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Lista de verificação do Ato I",
     "it": "Lista di controllo del primo atto",
     "tr": "Perde I Kontrol Listesi",
-    "zh-CN": "第一幕修订清单"
+    "zh-CN": "第一幕修订清单",
+    'zh-TW': "第一幕修訂清單",
+    ko: "1막 개정 목록",
+    ja: "第1幕改訂リスト",
   },
   "Listas de trabajo y decisiones editoriales.": {
     "es": "Listas de trabajo y decisiones editoriales.",
@@ -4323,7 +5499,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Listas de empregos e decisões editoriais.",
     "it": "Liste di lavoro e decisioni editoriali.",
     "tr": "İş listeleri ve editoryal kararlar.",
-    "zh-CN": "工作清单与编辑决策。"
+    "zh-CN": "工作清单与编辑决策。",
+    'zh-TW': "工作清單與編輯決策。",
+    ko: "작업 목록 및 편집 결정.",
+    ja: "ワークリストと編集上の決定。",
   },
   "Liturgia de la Primera Luz": {
     "es": "Liturgia de la Primera Luz",
@@ -4334,7 +5513,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Liturgia da Primeira Luz",
     "it": "Liturgia della prima luce",
     "tr": "İlk Işık Ayini",
-    "zh-CN": "初光礼拜仪式"
+    "zh-CN": "初光礼拜仪式",
+    'zh-TW': "初光禮拜儀式",
+    ko: "첫 번째 빛의 전례",
+    ja: "最初の光の典礼",
   },
   "Llama “pequeña cartógrafa” a Ilyra; inicia lecciones con “mira el borde”; frota el pulgar quemado. Cuando miente por protección convierte la respuesta en proverbio.": {
     "es": "Llama “pequeña cartógrafa” a Ilyra; inicia lecciones con “mira el borde”; frota el pulgar quemado. Cuando miente por protección convierte la respuesta en proverbio.",
@@ -4345,7 +5527,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele chama Ilyra de “pequeno cartógrafo”; inicia as aulas com “olhe para o limite”; esfrega o polegar queimado. Quando ele mente em busca de proteção, ele transforma a resposta em um provérbio.",
     "it": "Chiama Ilyra “piccolo cartografo”; inizia le lezioni con “guardare il bordo”; si strofina il pollice bruciato. Quando mente per protezione trasforma la risposta in un proverbio.",
     "tr": "Ilyra'ya \"küçük haritacı\" diyor; derslere “kenara bak” ile başlar; yanmış baş parmağını ovalar. Korunmak için yalan söylediğinde cevabı bir atasözüne dönüştürür.",
-    "zh-CN": "称 Ilyra 为“小制图师”；以“看边缘”开始授课；摩挲烧焦的拇指。当为保护而撒谎时，他会把答案变成谚语。"
+    "zh-CN": "称 Ilyra 为“小制图师”；以“看边缘”开始授课；摩挲烧焦的拇指。当为保护而撒谎时，他会把答案变成谚语。",
+    'zh-TW': "稱 Ilyra 為“小製圖師”；以“看邊緣”開始授課；摩挲燒焦的拇指。當為保護而撒謊時，他會把答案變成諺語。",
+    ko: "Ilyra를 \"작은 지도 제작자\"라고 부릅니다. \"가장자리를 보세요\"로 수업을 시작합니다. 화상 입은 엄지손가락을 문지른다. 보호하려고 거짓말을 하면 그 대답을 속담으로 바꾼다.",
+    ja: "イリラを「小さな地図製作者」と呼びます。レッスンは「端を見る」ことから始まります。火傷した親指をさすります。身を守るために嘘をつくとき、彼は答えをことわざに変える。",
   },
   "Lluvia": {
     "es": "Lluvia",
@@ -4356,7 +5541,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "chuva",
     "it": "pioggia",
     "tr": "yağmur",
-    "zh-CN": "雨"
+    "zh-CN": "雨",
+    'zh-TW': "雨",
+    ko: "비",
+    ja: "雨",
   },
   "Lo encontró en los mapas de Aurel.": {
     "es": "Lo encontró en los mapas de Aurel.",
@@ -4367,7 +5555,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele encontrou nos mapas de Aurel.",
     "it": "L'ha trovato sulle mappe di Aurel.",
     "tr": "Bunu Aurel'in haritalarında buldu.",
-    "zh-CN": "他在 Aurel 的地图中找到了它。"
+    "zh-CN": "他在 Aurel 的地图中找到了它。",
+    'zh-TW': "他在 Aurel 的地圖中找到了它。",
+    ko: "Aurel의 지도에서 찾았습니다.",
+    ja: "オーレルの地図で見つけました。",
   },
   "Lo oyó en el Archivo.": {
     "es": "Lo oyó en el Archivo.",
@@ -4378,7 +5569,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele ouviu isso no Arquivo.",
     "it": "L'ha sentito nell'Archivio.",
     "tr": "Arşivde duymuş.",
-    "zh-CN": "他在档案中听到了它。"
+    "zh-CN": "他在档案中听到了它。",
+    'zh-TW': "他在檔案中聽到了它。",
+    ko: "아카이브에서 들었습니다.",
+    ja: "アーカイブで聞きました。",
   },
   "Lo recuerda de una marea anterior.": {
     "es": "Lo recuerda de una marea anterior.",
@@ -4389,7 +5583,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele se lembra de uma viagem anterior.",
     "it": "Se lo ricorda da un viaggio precedente.",
     "tr": "Bunu daha önceki bir geziden hatırlıyor.",
-    "zh-CN": "他从上一次潮汐中记得它。"
+    "zh-CN": "他从上一次潮汐中记得它。",
+    'zh-TW': "他從上一次潮汐中記得它。",
+    ko: "이전 조수에서 그것을 기억합니다.",
+    ja: "以前の潮流からそれを思い出します。",
   },
   "Los telares construyeron las rutas de [[Aster]]. Bajo el [[Consejo de Ceniza]] también producen barreras que solo obedecen sellos oficiales.": {
     "es": "Los telares construyeron las rutas de [[Aster]]. Bajo el [[Consejo de Ceniza]] también producen barreras que solo obedecen sellos oficiales.",
@@ -4400,7 +5597,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Os teares construíram as rotas de [[Áster]]. Sob o [[Conselho de Cinzas]] também produzem barreiras que obedecem apenas a selos oficiais.",
     "it": "I telai hanno costruito i percorsi di [[Aster]]. Con il [[Consiglio di Ash]] producono anche barriere che obbediscono solo ai sigilli ufficiali.",
     "tr": "Tezgahlar [[Aster]] rotalarını oluşturdu. [[Kül Konseyi]] kapsamında sadece resmi mühürlere uyan bariyerler de üretiyorlar.",
-    "zh-CN": "织机建造了 [[阿斯特]] 的航线。在 [[灰烬议会]] 治下，它们还生产只服从官方印记的屏障。"
+    "zh-CN": "织机建造了 [[阿斯特]] 的航线。在 [[灰烬议会]] 治下，它们还生产只服从官方印记的屏障。",
+    'zh-TW': "織機建造了 [[阿斯特]] 的航線。在 [[灰燼議會]] 治下，它們還生產只服從官方印記的屏障。",
+    ko: "직기는 [[Aster]]의 경로를 구축했습니다. [[애쉬 의회]] 하에서 그들은 또한 공식 인장에만 복종하는 장벽을 생산합니다.",
+    ja: "織機は[[Aster]]のルートを構築しました。 [[灰評議会]]の下で、彼らはまた、公式の印章のみに従う障壁を作成します。",
   },
   "Los telares quedaron bajo custodia compartida.": {
     "es": "Los telares quedaron bajo custodia compartida.",
@@ -4411,7 +5611,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Os teares foram deixados sob custódia compartilhada.",
     "it": "I telai sono stati lasciati in custodia condivisa.",
     "tr": "Tezgahlar ortak gözetime bırakıldı.",
-    "zh-CN": "织机归共同监管。"
+    "zh-CN": "织机归共同监管。",
+    'zh-TW': "織機歸共同監管。",
+    ko: "직기는 공유 관리에 들어갔습니다.",
+    ja: "織機は共同管理に入りました。",
   },
   "Lúmina": {
     "es": "Lúmina",
@@ -4422,7 +5625,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Lumina",
     "it": "Lumina",
     "tr": "Lumina",
-    "zh-CN": "卢米娜"
+    "zh-CN": "卢米娜",
+    'zh-TW': "盧米娜",
+    ko: "루미나",
+    ja: "ルミナ",
   },
   "Lúmina antes del Hundimiento": {
     "es": "Lúmina antes del Hundimiento",
@@ -4433,7 +5639,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Lumina antes do naufrágio",
     "it": "Lumina prima del naufragio",
     "tr": "Batmadan Önce Lumina",
-    "zh-CN": "沉没前的卢米娜"
+    "zh-CN": "沉没前的卢米娜",
+    'zh-TW': "沉沒前的盧米娜",
+    ko: "가라앉기 전의 루미나",
+    ja: "沈没前のルミナ",
   },
   "Luz honda\nResonancia": {
     "es": "Luz honda\nResonancia",
@@ -4444,7 +5653,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "luz profunda\nRessonância",
     "it": "luce profonda\nRisonanza",
     "tr": "derin ışık\nRezonans",
-    "zh-CN": "深光\n共鸣"
+    "zh-CN": "深光\n共鸣",
+    'zh-TW': "深光\n共鳴",
+    ko: "깊은 빛\n공명",
+    ja: "深い光\n共鳴",
   },
   "Maelor lo crió tras la muerte de sus padres.": {
     "es": "Maelor lo crió tras la muerte de sus padres.",
@@ -4455,7 +5667,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Maelor o criou após a morte de seus pais.",
     "it": "Maelor lo ha cresciuto dopo la morte dei suoi genitori.",
     "tr": "Anne ve babasının ölümünden sonra Maelor onu büyüttü.",
-    "zh-CN": "Maelor 在他父母去世后将他抚养长大。"
+    "zh-CN": "Maelor 在他父母去世后将他抚养长大。",
+    'zh-TW': "Maelor 在他父母去世後將他撫養長大。",
+    ko: "Maelor는 부모님이 돌아가신 후 그를 키웠습니다.",
+    ja: "両親が亡くなった後、メーラーは彼を育てました。",
   },
   "Maelor ordenó cerrar las compuertas": {
     "es": "Maelor ordenó cerrar las compuertas",
@@ -4466,7 +5681,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Maelor ordenou que as comportas fechassem",
     "it": "Maelor ha ordinato di chiudere le chiuse",
     "tr": "Maelor bent kapaklarının kapatılmasını emretti",
-    "zh-CN": "Maelor 下令关闭闸门"
+    "zh-CN": "Maelor 下令关闭闸门",
+    'zh-TW': "Maelor 下令關閉閘門",
+    ko: "Maelor는 문을 닫으라고 명령했습니다.",
+    ja: "メーラーは門を閉めるよう命令した",
   },
   "Maelor pierde su argumento de emergencia.": {
     "es": "Maelor pierde su argumento de emergencia.",
@@ -4477,7 +5695,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Maelor perde seu argumento de emergência.",
     "it": "Maelor perde la sua argomentazione di emergenza.",
     "tr": "Maelor acil durum tartışmasını kaybeder.",
-    "zh-CN": "Maelor 失去了他的紧急理由。"
+    "zh-CN": "Maelor 失去了他的紧急理由。",
+    'zh-TW': "Maelor 失去了他的緊急理由。",
+    ko: "Maelor는 긴급 논쟁에서 패합니다.",
+    ja: "メーラーは緊急弁論で負ける。",
   },
   "Maelor recibe profecías incompletas y cree controlar la fuente.": {
     "es": "Maelor recibe profecías incompletas y cree controlar la fuente.",
@@ -4488,7 +5709,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Maelor recebe profecias incompletas e acredita que controla a fonte.",
     "it": "Maelor riceve profezie incomplete e crede di controllarne la fonte.",
     "tr": "Maelor eksik kehanetler alır ve kaynağın kendisinin kontrol ettiğine inanır.",
-    "zh-CN": "Maelor 收到不完整的预言，并以为自己掌控着源头。"
+    "zh-CN": "Maelor 收到不完整的预言，并以为自己掌控着源头。",
+    'zh-TW': "Maelor 收到不完整的預言，並以為自己掌控著源頭。",
+    ko: "Maelor는 불완전한 예언을 받고 자신이 그 근원을 통제한다고 믿습니다.",
+    ja: "マラーは不完全な予言を受け取り、自分がその情報源をコントロールしていると信じています。",
   },
   "maestro del Faro": {
     "es": "maestro del Faro",
@@ -4499,7 +5723,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "mestre do farol",
     "it": "maestro del faro",
     "tr": "deniz feneri ustası",
-    "zh-CN": "灯塔大师"
+    "zh-CN": "灯塔大师",
+    'zh-TW': "燈塔大師",
+    ko: "등대 주인",
+    ja: "灯台マスター",
   },
   "Maestro farero de barba rojiza y manos quemadas por el vidrio solar.": {
     "es": "Maestro farero de barba rojiza y manos quemadas por el vidrio solar.",
@@ -4510,7 +5737,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Mestre faroleiro com barba avermelhada e mãos queimadas por vidro solar.",
     "it": "Maestro guardiano del faro con la barba rossastra e le mani bruciate dal vetro solare.",
     "tr": "Kırmızımsı sakallı ve elleri güneş camından yanmış usta deniz feneri bekçisi.",
-    "zh-CN": "一位红胡子、双手被太阳玻璃灼伤的灯塔大师。"
+    "zh-CN": "一位红胡子、双手被太阳玻璃灼伤的灯塔大师。",
+    'zh-TW': "一位紅鬍子、雙手被太陽玻璃灼傷的燈塔大師。",
+    ko: "태양광 유리에 손이 화상을 입은 붉은 수염의 등대장.",
+    ja: "ソーラーガラスで手を火傷した赤髭の灯台長。",
   },
   "Maestros del Faro": {
     "es": "Maestros del Faro",
@@ -4521,7 +5751,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Mestres do Farol",
     "it": "Maestri del faro",
     "tr": "Deniz Feneri Ustaları",
-    "zh-CN": "灯塔大师们"
+    "zh-CN": "灯塔大师们",
+    'zh-TW': "燈塔大師們",
+    ko: "등대 주인",
+    ja: "ライトハウスマスターズ",
   },
   "Manipula órdenes para retrasar su captura.": {
     "es": "Manipula órdenes para retrasar su captura.",
@@ -4532,7 +5765,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Manipula ordens para atrasar sua captura.",
     "it": "Manipola gli ordini per ritardare la sua cattura.",
     "tr": "Yakalanmasını geciktirmek için emirleri manipüle ediyor.",
-    "zh-CN": "他篡改命令以拖延对她的抓捕。"
+    "zh-CN": "他篡改命令以拖延对她的抓捕。",
+    'zh-TW': "他篡改命令以拖延對她的抓捕。",
+    ko: "그는 그녀의 체포를 지연시키기 위해 명령을 변경합니다.",
+    ja: "彼は彼女の捕獲を遅らせるために命令を変更します。",
   },
   "Mano prismática": {
     "es": "Mano prismática",
@@ -4543,7 +5779,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "mão prismática",
     "it": "mano prismatica",
     "tr": "prizmatik el",
-    "zh-CN": "棱镜之手"
+    "zh-CN": "棱镜之手",
+    'zh-TW': "稜鏡之手",
+    ko: "프리즘 손",
+    ja: "角柱状の手",
   },
   "Mapa ilustrado local de demostración con capas, escala y marcadores editables.": {
     "es": "Mapa ilustrado local de demostración con capas, escala y marcadores editables.",
@@ -4554,7 +5793,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Mapa ilustrado local de demonstração com camadas, escala e marcadores editáveis.",
     "it": "Mappa demo locale illustrata con livelli, scala e indicatori modificabili.",
     "tr": "Katmanlar, ölçek ve düzenlenebilir işaretleyiciler içeren yerel resimli haritanın demosunu yapın.",
-    "zh-CN": "本地演示插画地图，包含可编辑的图层、比例尺和标记。"
+    "zh-CN": "本地演示插画地图，包含可编辑的图层、比例尺和标记。",
+    'zh-TW': "本地演示插畫地圖，包含可編輯的圖層、比例尺和標記。",
+    ko: "편집 가능한 레이어, 축척 및 마커가 포함된 로컬 일러스트레이션 데모 지도입니다.",
+    ja: "編集可能なレイヤー、スケール、マーカーを備えたローカルのイラスト付きデモマップ。",
   },
   "Máquinas que solidifican luz en puentes, lentes y armas.": {
     "es": "Máquinas que solidifican luz en puentes, lentes y armas.",
@@ -4565,7 +5807,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Máquinas que solidificam a luz em pontes, lentes e armas.",
     "it": "Macchine che solidificano la luce trasformandola in ponti, lenti e armi.",
     "tr": "Işığı köprülere, merceklere ve silahlara katılaştıran makineler.",
-    "zh-CN": "将光固化为桥梁、透镜和武器的机器。"
+    "zh-CN": "将光固化为桥梁、透镜和武器的机器。",
+    'zh-TW': "將光固化為橋梁、透鏡和武器的機器。",
+    ko: "빛을 브리지, 렌즈, 무기로 굳히는 기계입니다.",
+    ja: "光を固めて橋、レンズ、武器を作る機械。",
   },
   "Mar de Vidrio": {
     "es": "Mar de Vidrio",
@@ -4576,7 +5821,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Mar de Vidro",
     "it": "Mare di vetro",
     "tr": "Cam Denizi",
-    "zh-CN": "玻璃海"
+    "zh-CN": "玻璃海",
+    'zh-TW': "玻璃海",
+    ko: "유리바다",
+    ja: "ガラスの海",
   },
   "Marcador de demostración editable.": {
     "es": "Marcador de demostración editable.",
@@ -4587,7 +5835,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Marcador de demonstração editável.",
     "it": "Segnalibro demo modificabile.",
     "tr": "Düzenlenebilir demo yer imi.",
-    "zh-CN": "可编辑的演示标记。"
+    "zh-CN": "可编辑的演示标记。",
+    'zh-TW': "可編輯的演示標記。",
+    ko: "편집 가능한 데모 마커.",
+    ja: "編集可能なデモマーカー。",
   },
   "Marea Negra": {
     "es": "Marea Negra",
@@ -4598,7 +5849,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Maré Negra",
     "it": "Marea Nera",
     "tr": "Kara Gelgit",
-    "zh-CN": "黑潮"
+    "zh-CN": "黑潮",
+    'zh-TW': "黑潮",
+    ko: "흑조",
+    ja: "ブラックタイド",
   },
   "Mareas Negras": {
     "es": "Mareas Negras",
@@ -4609,7 +5863,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Marés Negras",
     "it": "Maree Nere",
     "tr": "Kara Gelgitler",
-    "zh-CN": "黑潮"
+    "zh-CN": "黑潮",
+    'zh-TW': "黑潮",
+    ko: "검은 파도",
+    ja: "ブラックタイズ",
   },
   "marinero veyari, piel cobriza, membranas azules como aletas en los brazos, tatuajes índigo, abrigo desgastado": {
     "es": "marinero veyari, piel cobriza, membranas azules como aletas en los brazos, tatuajes índigo, abrigo desgastado",
@@ -4620,7 +5877,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Marinheiro Veyari, pele acobreada, membranas azuis como barbatanas nos braços, tatuagens índigo, casaco gasto",
     "it": "Marinaio Veyari, pelle ramata, membrane blu come pinne sulle braccia, tatuaggi indaco, cappotto consumato",
     "tr": "Veyari denizci, bakır derisi, kollarında yüzgeç benzeri mavi zarlar, çivit rengi dövmeler, yıpranmış palto",
-    "zh-CN": "Veyari 水手，铜色皮肤，手臂上有如鳍般的蓝色膜，靛蓝纹身，破旧外套"
+    "zh-CN": "Veyari 水手，铜色皮肤，手臂上有如鳍般的蓝色膜，靛蓝纹身，破旧外套",
+    'zh-TW': "Veyari 水手，銅色皮膚，手臂上有如鰭般的藍色膜，靛藍紋身，破舊外套",
+    ko: "베야리 선원, 구리 피부, 푸른 지느러미 같은 팔 막, 남색 문신, 풍화된 코트",
+    ja: "ヴェヤリの船員、銅の皮膚、青いヒレのような腕の膜、藍色のタトゥー、風化したコート",
   },
   "Medido, militar y cortés. Ordena ideas como un parte: observación, riesgo, acción. Incluso al disentir conserva tratamientos y pide permiso. La intimidad aparece cuando abandona el rango y usa el nombre de pila.": {
     "es": "Medido, militar y cortés. Ordena ideas como un parte: observación, riesgo, acción. Incluso al disentir conserva tratamientos y pide permiso. La intimidad aparece cuando abandona el rango y usa el nombre de pila.",
@@ -4631,7 +5891,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Medido, militar e cortês. Ordene as ideias como parte: observação, risco, ação. Mesmo discordando, ele mantém os tratamentos e pede permissão. A intimidade aparece quando ele deixa a hierarquia e usa seu primeiro nome.",
     "it": "Misurato, militare e cortese. Ordinare le idee come parte: osservazione, rischio, azione. Anche quando dissente, mantiene le cure e chiede il permesso. L'intimità appare quando lascia il rango e usa il suo nome.",
     "tr": "Ölçülü, askeri ve nazik. Fikirleri bir parça olarak sıralayın: gözlem, risk, eylem. Muhalif olsa bile tedavileri sürdürüyor ve izin istiyor. Yakınlık, rütbeden ayrılıp ilk adını kullandığında ortaya çıkar.",
-    "zh-CN": "克制、军人作风且彬彬有礼。像报告一样组织观点：观察、风险、行动。即便持异议也保持敬称并请求许可。当他放下军衔直呼其名时，亲密感才显现。"
+    "zh-CN": "克制、军人作风且彬彬有礼。像报告一样组织观点：观察、风险、行动。即便持异议也保持敬称并请求许可。当他放下军衔直呼其名时，亲密感才显现。",
+    'zh-TW': "剋制、軍人作風且彬彬有禮。像報告一樣組織觀點：觀察、風險、行動。即便持異議也保持敬稱並請求許可。當他放下軍銜直呼其名時，親密感才顯現。",
+    ko: "신중하고 군사적이며 정중합니다. 관찰, 위험, 행동 등 보고서와 같은 아이디어를 주문합니다. 반대의 경우에도 그는 주소 형식을 유지하고 허가를 요청합니다. 친밀감은 순위를 낮추고 이름을 사용할 때 나타납니다.",
+    ja: "規律正しく、軍人的で礼儀正しい。観察、リスク、アクションなどのアイデアをレポートのように順序付けします。反対意見であっても、彼は演説の形式を保持し、許可を求めます。ランクを下げてファーストネームを使用すると親密さが現れます。",
   },
   "Memoria de marea": {
     "es": "Memoria de marea",
@@ -4642,7 +5905,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Memória das marés",
     "it": "Memoria delle maree",
     "tr": "Gelgit hafızası",
-    "zh-CN": "潮汐记忆"
+    "zh-CN": "潮汐记忆",
+    'zh-TW': "潮汐記憶",
+    ko: "조수 기억",
+    ja: "潮汐記憶",
   },
   "Memoria heredada.": {
     "es": "Memoria heredada.",
@@ -4653,7 +5919,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Memória legada.",
     "it": "Memoria ereditaria.",
     "tr": "Eski hafıza.",
-    "zh-CN": "传承的记忆。"
+    "zh-CN": "传承的记忆。",
+    'zh-TW': "傳承的記憶。",
+    ko: "상속된 기억.",
+    ja: "受け継がれた記憶。",
   },
   "mentora improbable": {
     "es": "mentora improbable",
@@ -4664,7 +5933,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "mentor improvável",
     "it": "mentore improbabile",
     "tr": "olası akıl hocası",
-    "zh-CN": "出人意料的导师"
+    "zh-CN": "出人意料的导师",
+    'zh-TW': "出人意料的導師",
+    ko: "멘토가 없을 것 같다",
+    ja: "ありそうもない指導者",
   },
   "Meses después, Sena abre un archivo libre mientras una nueva luz aparece mar adentro.": {
     "es": "Meses después, Sena abre un archivo libre mientras una nueva luz aparece mar adentro.",
@@ -4675,7 +5947,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Meses depois, Sena abre um arquivo gratuito enquanto uma nova luz aparece no mar.",
     "it": "Mesi dopo, Sena apre un file gratuito mentre una nuova luce appare sul mare.",
     "tr": "Aylar sonra Sena, denizde yeni bir ışık belirirken ücretsiz bir dosya açar.",
-    "zh-CN": "数月后，Sena 开设了一个自由档案，同时海上出现了一道新的光。"
+    "zh-CN": "数月后，Sena 开设了一个自由档案，同时海上出现了一道新的光。",
+    'zh-TW': "數月後，Sena 開設了一個自由檔案，同時海上出現了一道新的光。",
+    ko: "몇 달 후, 바다에 새로운 빛이 나타나는 동안 세나는 무료 아카이브를 엽니다.",
+    ja: "数か月後、海に新しい光が現れる中、セナは無料のアーカイブを開きます。",
   },
   "Meses después, Sena dirige un Archivo con seis entradas y memorias que solo pueden consultarse con consentimiento. Cael ha recuperado una nave pero la mantiene atracada hasta que vuelva toda su tripulación. Tarek organiza una Guardia civil sin capa de casa; Maelor espera juicio y corrige las cifras de su propia acusación. Ilyra y Nara buscan una forma de devolver cuerpo a la voz liberada. Una cuna vacía destinada a Elan queda fuera de los salones dinásticos, mientras una luz móvil sugiere que Asteriel continúa cerca.": {
     "es": "Meses después, Sena dirige un Archivo con seis entradas y memorias que solo pueden consultarse con consentimiento. Cael ha recuperado una nave pero la mantiene atracada hasta que vuelva toda su tripulación. Tarek organiza una Guardia civil sin capa de casa; Maelor espera juicio y corrige las cifras de su propia acusación. Ilyra y Nara buscan una forma de devolver cuerpo a la voz liberada. Una cuna vacía destinada a Elan queda fuera de los salones dinásticos, mientras una luz móvil sugiere que Asteriel continúa cerca.",
@@ -4686,7 +5961,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Meses depois, Sena mantém um Arquivo com seis verbetes e memórias que só podem ser consultadas com consentimento. Cael recuperou um navio, mas o mantém atracado até que toda a tripulação retorne. Tarek organiza uma Guarda Civil sem capa; Maelor aguarda julgamento e corrige os números de sua própria acusação. Ilyra e Nara buscam uma forma de dar corpo à voz libertada. Um berço vazio destinado a Elan fica do lado de fora dos salões dinásticos, enquanto uma luz em movimento sugere que Asteriel permanece por perto.",
     "it": "Mesi dopo, Sena gestisce un Archivio con sei voci e memorie consultabili solo previo consenso. Cael ha recuperato una nave ma la tiene attraccata fino al ritorno dell'intero equipaggio. Tarek organizza una Guardia Civile senza mantello; Maelor attende il processo e corregge le cifre della propria accusa. Ilyra e Nara cercano un modo per dare corpo alla voce liberata. Una culla vuota destinata a Elan si trova fuori dalle sale dinastiche, mentre una luce in movimento suggerisce che Asteriel rimane nelle vicinanze.",
     "tr": "Aylar sonra Sena, yalnızca izin alınarak başvurulabilecek altı giriş ve anıdan oluşan bir Arşiv çalıştırıyor. Cael bir gemiyi kurtardı ancak tüm mürettebatı dönene kadar gemiyi limanda tutacak. Tarek, pelerini olmayan bir Sivil Muhafız teşkilatı kurar; Maelor duruşmayı bekler ve kendi suçlamasının rakamlarını düzeltir. Ilyra ve Nara, özgürleşen sese vücut vermenin bir yolunu arar. Elan için hazırlanmış boş bir beşik hanedan salonlarının dışında duruyor, hareketli bir ışık ise Asteriel'in yakınlarda olduğunu gösteriyor.",
-    "zh-CN": "数月后，Sena 管理着一座拥有六个入口的档案库，其中的记忆只有经同意才能查阅。Cael 找回了船，但在全体船员归来之前一直让它停泊着。Tarek 组织了一支不披家族斗篷的公民卫队；Maelor 等待审判，并修正自己指控中的数字。Ilyra 和 Nara 寻找一种方法，为被解放的声音重新赋予躯体。一张为 Elan 准备的空摇篮被置于王朝厅堂之外，而一道移动的光暗示 Asteriel 仍在不远处。"
+    "zh-CN": "数月后，Sena 管理着一座拥有六个入口的档案库，其中的记忆只有经同意才能查阅。Cael 找回了船，但在全体船员归来之前一直让它停泊着。Tarek 组织了一支不披家族斗篷的公民卫队；Maelor 等待审判，并修正自己指控中的数字。Ilyra 和 Nara 寻找一种方法，为被解放的声音重新赋予躯体。一张为 Elan 准备的空摇篮被置于王朝厅堂之外，而一道移动的光暗示 Asteriel 仍在不远处。",
+    'zh-TW': "數月後，Sena 管理著一座擁有六個入口的檔案庫，其中的記憶只有經同意才能查閱。Cael 找回了船，但在全體船員歸來之前一直讓它停泊著。Tarek 組織了一支不披家族斗篷的公民衛隊；Maelor 等待審判，並修正自己指控中的數字。Ilyra 和 Nara 尋找一種方法，為被解放的聲音重新賦予軀體。一張為 Elan 準備的空搖籃被置於王朝廳堂之外，而一道移動的光暗示 Asteriel 仍在不遠處。",
+    ko: "몇 달 후, 세나는 동의를 통해서만 접근할 수 있는 6개의 입구와 추억을 갖춘 아카이브를 운영합니다. Cael은 배를 회수했지만 모든 승무원이 돌아올 때까지 정박해 있습니다. Tarek은 가문 색상 없이 시민 경비대를 조직합니다. Maelor는 재판을 기다리며 기소된 수치를 수정합니다. Ilyra와 Nara는 해방된 목소리를 위한 육체를 찾습니다. Elan을 위한 빈 요람은 왕조의 홀 밖에 남아 있고, 움직이는 빛은 Asteriel이 근처에 있음을 암시합니다.",
+    ja: "数か月後、セナは6つの入り口と同意がある場合にのみアクセスできる記憶を備えたアーカイブを運営しています。カエルは船を回収したが、乗組員全員が戻るまで船を停泊させたままにする。タレクは家の色を持たない市民衛兵を組織する。メーラーは裁判を待ち、起訴状の数字を訂正する。解放された声を求めて体を求めるイリラとナラ。エラン用の空のゆりかごは王朝の広間の外に残されており、動く光はアステリエルが近くにいることを示唆しています。",
   },
   "Motivos visuales": {
     "es": "Motivos visuales",
@@ -4697,7 +5975,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Motivos visuais",
     "it": "Motivi visivi",
     "tr": "Görsel motifler",
-    "zh-CN": "视觉母题"
+    "zh-CN": "视觉母题",
+    'zh-TW': "視覺母題",
+    ko: "시각적 모티브",
+    ja: "視覚的なモチーフ",
   },
   "Muerte registrada de Odran": {
     "es": "Muerte registrada de Odran",
@@ -4708,7 +5989,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Morte registrada de Odran",
     "it": "Morte registrata di Odran",
     "tr": "Odran'ın kayıtlı ölümü",
-    "zh-CN": "Odran 的登记死亡"
+    "zh-CN": "Odran 的登记死亡",
+    'zh-TW': "Odran 的登記死亡",
+    ko: "기록된 오드란의 죽음",
+    ja: "オドランの死亡記録",
   },
   "mujer": {
     "es": "mujer",
@@ -4719,7 +6003,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "mulher",
     "it": "donna",
     "tr": "kadın",
-    "zh-CN": "女人"
+    "zh-CN": "女人",
+    'zh-TW': "女人",
+    ko: "여성",
+    ja: "女性",
   },
   "Multa y pérdida temporal de luz.": {
     "es": "Multa y pérdida temporal de luz.",
@@ -4730,7 +6017,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Perda fina e temporária de luz.",
     "it": "Perdita fine e temporanea di luce.",
     "tr": "İnce ve geçici ışık kaybı.",
-    "zh-CN": "罚款与暂时失去光照。"
+    "zh-CN": "罚款与暂时失去光照。",
+    'zh-TW': "罰款與暫時失去光照。",
+    ko: "미세하고 일시적인 빛의 손실입니다.",
+    ja: "微細かつ一時的な光の損失。",
   },
   "Muralla tallada en un acantilado blanco, cruzada por un único arco de hierro.": {
     "es": "Muralla tallada en un acantilado blanco, cruzada por un único arco de hierro.",
@@ -4741,7 +6031,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Parede esculpida numa falésia branca, atravessada por um único arco de ferro.",
     "it": "Parete scavata in una scogliera bianca, attraversata da un unico arco in ferro.",
     "tr": "Beyaz bir kayaya oyulmuş duvar, tek bir demir kemerle geçiliyor.",
-    "zh-CN": "凿刻在白色悬崖上的城墙，被一道唯一的铁拱门贯穿。"
+    "zh-CN": "凿刻在白色悬崖上的城墙，被一道唯一的铁拱门贯穿。",
+    'zh-TW': "鑿刻在白色懸崖上的城牆，被一道唯一的鐵拱門貫穿。",
+    ko: "하얀 절벽을 깎아 만든 벽에 철제 아치 하나가 뚫려 있습니다.",
+    ja: "白い崖に刻まれ、一本の鉄のアーチが貫かれた壁。",
   },
   "Nacimiento de Ilyra": {
     "es": "Nacimiento de Ilyra",
@@ -4752,7 +6045,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Nascimento de Ilyra",
     "it": "Nascita di Ilira",
     "tr": "Ilyra'nın doğuşu",
-    "zh-CN": "Ilyra 的诞生"
+    "zh-CN": "Ilyra 的诞生",
+    'zh-TW': "Ilyra 的誕生",
+    ko: "일리라의 탄생",
+    ja: "イリラの誕生",
   },
   "Nació cuando cayó la Tercera Luna, según los relatos veyari.": {
     "es": "Nació cuando cayó la Tercera Luna, según los relatos veyari.",
@@ -4763,7 +6059,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele nasceu quando a Terceira Lua caiu, segundo histórias de Veyari.",
     "it": "È nato quando cadde la Terza Luna, secondo le storie di Veyari.",
     "tr": "Veyari hikayelerine göre Üçüncü Ay düştüğünde doğmuştur.",
-    "zh-CN": "据 Veyari 的传说，他诞生于第三月坠落之时。"
+    "zh-CN": "据 Veyari 的传说，他诞生于第三月坠落之时。",
+    'zh-TW': "據 Veyari 的傳說，他誕生於第三月墜落之時。",
+    ko: "Veyari의 기록에 따르면 세 번째 달이 떨어졌을 때 태어났습니다.",
+    ja: "ヴェヤリの記述によれば、第三の月が落ちたときに生まれた。",
   },
   "Nara escribió desde una marea futura.": {
     "es": "Nara escribió desde una marea futura.",
@@ -4774,7 +6073,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Nara escreveu sobre uma maré futura.",
     "it": "Nara ha scritto da una marea futura.",
     "tr": "Nara gelecekteki bir gelgitten yazdı.",
-    "zh-CN": "Nara 从未来的潮汐中写下。"
+    "zh-CN": "Nara 从未来的潮汐中写下。",
+    'zh-TW': "Nara 從未來的潮汐中寫下。",
+    ko: "나라는 미래의 조류에서 썼습니다.",
+    ja: "奈良は未来の潮流から書いた。",
   },
   "Nara no controló el momento de entrega.": {
     "es": "Nara no controló el momento de entrega.",
@@ -4785,7 +6087,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Nara não controlou o horário da entrega.",
     "it": "Nara non ha controllato i tempi di consegna.",
     "tr": "Nara teslimat zamanını kontrol etmedi.",
-    "zh-CN": "Nara 无法控制送达的时机。"
+    "zh-CN": "Nara 无法控制送达的时机。",
+    'zh-TW': "Nara 無法控制送達的時機。",
+    ko: "나라는 배달 시간을 통제하지 않았습니다.",
+    ja: "奈良は納期をコントロールできなかった。",
   },
   "Nara Venn": {
     "es": "Nara Venn",
@@ -4796,7 +6101,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Nara Venn",
     "it": "Nara Venn",
     "tr": "Nara Venn",
-    "zh-CN": "Nara Venn"
+    "zh-CN": "Nara Venn",
+    'zh-TW': "Nara Venn",
+    ko: "나라 벤",
+    ja: "ナラ・ヴェン",
   },
   "Nara Venn desapareció aquí mientras observaba la Tercera Luna.": {
     "es": "Nara Venn desapareció aquí mientras observaba la Tercera Luna.",
@@ -4807,7 +6115,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Nara Venn desapareceu aqui enquanto observava a Terceira Lua.",
     "it": "Nara Venn è scomparsa qui mentre osservava la Terza Luna.",
     "tr": "Nara Venn Üçüncü Ay'ı gözlemlerken burada kayboldu.",
-    "zh-CN": "Nara Venn 在观测第三月时于此处消失。"
+    "zh-CN": "Nara Venn 在观测第三月时于此处消失。",
+    'zh-TW': "Nara Venn 在觀測第三月時於此處消失。",
+    ko: "나라 벤은 세 번째 달을 관찰하던 중 이곳에서 사라졌습니다.",
+    ja: "ナラ・ヴェンは第三の月を観察中にここで姿を消しました。",
   },
   "Nara, Vesh y Sena": {
     "es": "Nara, Vesh y Sena",
@@ -4818,7 +6129,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Nara, Vesh e Sena",
     "it": "Nara, Vesh e Sena",
     "tr": "Nara, Vesh ve Sena",
-    "zh-CN": "Nara、Vesh 和 Sena"
+    "zh-CN": "Nara、Vesh 和 Sena",
+    'zh-TW': "Nara、Vesh 和 Sena",
+    ko: "나라, 베쉬, 세나",
+    ja: "ナラ、ヴェッシュ、セナ",
   },
   "navegante": {
     "es": "navegante",
@@ -4829,7 +6143,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "navegador",
     "it": "navigatore",
     "tr": "gezgin",
-    "zh-CN": "航海者"
+    "zh-CN": "航海者",
+    'zh-TW': "航海者",
+    ko: "항해자",
+    ja: "ナビゲーター",
   },
   "Navegante proscrito, enlace con las comunidades veyari y único piloto que ha cruzado el Mar de Vidrio durante una Marea Negra.": {
     "es": "Navegante proscrito, enlace con las comunidades veyari y único piloto que ha cruzado el Mar de Vidrio durante una Marea Negra.",
@@ -4840,7 +6157,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Navegador fora da lei, elemento de ligação com as comunidades Veyari e único piloto que cruzou o Mar de Vidro durante a Maré Negra.",
     "it": "Navigatore fuorilegge, collegamento con le comunità Veyari e unico pilota ad aver attraversato il Mare di Vetro durante una Marea Nera.",
     "tr": "Kanun kaçağı gezgini, Veyari topluluklarıyla irtibat görevlisi ve Kara Gelgit sırasında Cam Denizi'ni geçen tek pilot.",
-    "zh-CN": "被放逐的航海者，Veyari 社群的联系人，也是唯一一位在黑潮期间穿越玻璃海的飞行员。"
+    "zh-CN": "被放逐的航海者，Veyari 社群的联系人，也是唯一一位在黑潮期间穿越玻璃海的飞行员。",
+    'zh-TW': "被放逐的航海者，Veyari 社群的聯絡人，也是唯一一位在黑潮期間穿越玻璃海的飛行員。",
+    ko: "무법자 항해사이자 베야리 공동체와의 연락원이자 흑조 동안 유리 바다를 건너는 유일한 조종사입니다.",
+    ja: "無法者航海士であり、ヴェヤリ族のコミュニティとの連絡係であり、黒潮時にガラスの海を渡った唯一のパイロットです。",
   },
   "Navegante veyari de piel cobriza, membranas azuladas en los antebrazos y tatuajes de corriente.": {
     "es": "Navegante veyari de piel cobriza, membranas azuladas en los antebrazos y tatuajes de corriente.",
@@ -4851,7 +6171,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Navegador Veyari com pele acobreada, membranas azuladas nos antebraços e tatuagens atuais.",
     "it": "Navigatore Veyari con pelle color rame, membrane bluastre sugli avambracci e tatuaggi attuali.",
     "tr": "Bakır derisi, ön kollarında mavimsi zarlar ve güncel dövmeleri olan Veyari gezgini.",
-    "zh-CN": "铜色皮肤的 Veyari 航海者，前臂上有淡蓝色的膜和洋流纹身。"
+    "zh-CN": "铜色皮肤的 Veyari 航海者，前臂上有淡蓝色的膜和洋流纹身。",
+    'zh-TW': "銅色皮膚的 Veyari 航海者，前臂上有淡藍色的膜和洋流紋身。",
+    ko: "파란색 팔뚝 막과 현재의 문신이 있는 구리 피부의 베야리 항해사입니다.",
+    ja: "青銅色の肌をしたヴェヤリのナビゲーターで、青い前腕膜と現在のタトゥーが特徴です。",
   },
   "Ningún arma en Isla Nácar": {
     "es": "Ningún arma en Isla Nácar",
@@ -4862,7 +6185,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sem armas na Isla Nácar",
     "it": "Niente armi su Isla Nácar",
     "tr": "Isla Nácar'da silah yok",
-    "zh-CN": "珍珠母岛上禁止武器"
+    "zh-CN": "珍珠母岛上禁止武器",
+    'zh-TW': "珍珠母島上禁止武器",
+    ko: "Nacre 섬에는 무기가 없습니다.",
+    ja: "ナクル島には武器がない",
   },
   "No alcanza a túneles anteriores al Hundimiento.": {
     "es": "No alcanza a túneles anteriores al Hundimiento.",
@@ -4873,7 +6199,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Não alcança túneis antes do naufrágio.",
     "it": "Non raggiunge i tunnel prima dell'affondamento.",
     "tr": "Batmadan önce tünellere ulaşmaz.",
-    "zh-CN": "无法触及沉没之前的隧道。"
+    "zh-CN": "无法触及沉没之前的隧道。",
+    'zh-TW': "無法觸及沉沒之前的隧道。",
+    ko: "침몰 이전의 터널에는 도달하지 않습니다.",
+    ja: "沈没以前のトンネルには到達しません。",
   },
   "No atraviesa metal macizo.": {
     "es": "No atraviesa metal macizo.",
@@ -4884,7 +6213,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Não atravessa metal sólido.",
     "it": "Non passa attraverso il metallo solido.",
     "tr": "Katı metalden geçmez.",
-    "zh-CN": "无法穿透实心金属。"
+    "zh-CN": "无法穿透实心金属。",
+    'zh-TW': "無法穿透實心金屬。",
+    ko: "단단한 금속을 통과할 수 없습니다.",
+    ja: "固体金属を通過できません。",
   },
   "no binario": {
     "es": "no binario",
@@ -4895,7 +6227,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "não binário",
     "it": "non binario",
     "tr": "ikili olmayan",
-    "zh-CN": "非二元"
+    "zh-CN": "非二元",
+    'zh-TW': "非二元",
+    ko: "넌바이너리",
+    ja: "ノンバイナリ",
   },
   "No crea luz propia.": {
     "es": "No crea luz propia.",
@@ -4906,7 +6241,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Não cria sua própria luz.",
     "it": "Non crea luce propria.",
     "tr": "Kendi ışığını yaratmaz.",
-    "zh-CN": "它不产生自身的光。"
+    "zh-CN": "它不产生自身的光。",
+    'zh-TW': "它不產生自身的光。",
+    ko: "그것은 그 자체로 빛을 생성하지 않습니다.",
+    ja: "それ自体が光を生み出すことはありません。",
   },
   "No distingue obediencia de lealtad.": {
     "es": "No distingue obediencia de lealtad.",
@@ -4917,7 +6255,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Não distingue obediência de lealdade.",
     "it": "Non distingue l’obbedienza dalla lealtà.",
     "tr": "İtaati sadakatten ayırmaz.",
-    "zh-CN": "他分不清服从与忠诚。"
+    "zh-CN": "他分不清服从与忠诚。",
+    'zh-TW': "他分不清服從與忠誠。",
+    ko: "그는 순종과 충성을 구별할 수 없습니다.",
+    ja: "彼は従順と忠誠を区別することができません。",
   },
   "No distingue una memoria manipulada.": {
     "es": "No distingue una memoria manipulada.",
@@ -4928,7 +6269,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Não distingue uma memória manipulada.",
     "it": "Non distingue una memoria manipolata.",
     "tr": "Manipüle edilmiş bir hafızayı ayırt etmez.",
-    "zh-CN": "无法分辨被篡改的记忆。"
+    "zh-CN": "无法分辨被篡改的记忆。",
+    'zh-TW': "無法分辨被篡改的記憶。",
+    ko: "변형된 기억을 구별할 수 없습니다.",
+    ja: "改変された記憶を区別できない。",
   },
   "No funciona sobre una copia ni a través de una grabación.": {
     "es": "No funciona sobre una copia ni a través de una grabación.",
@@ -4939,7 +6283,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Não funciona em cópia ou gravação.",
     "it": "Non funziona su una copia o tramite una registrazione.",
     "tr": "Kopya veya kayıt yoluyla çalışmaz.",
-    "zh-CN": "它对副本无效，也无法通过录音起作用。"
+    "zh-CN": "它对副本无效，也无法通过录音起作用。",
+    'zh-TW': "它對副本無效，也無法通過錄音起作用。",
+    ko: "사본이나 녹음을 통해서는 작동하지 않습니다.",
+    ja: "コピーや録音では機能しません。",
   },
   "No pudo salvar a su madre durante el Hundimiento.": {
     "es": "No pudo salvar a su madre durante el Hundimiento.",
@@ -4950,7 +6297,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele não conseguiu salvar sua mãe durante o naufrágio.",
     "it": "Non è riuscito a salvare sua madre durante l'affondamento.",
     "tr": "Batan sırasında annesini kurtaramadı.",
-    "zh-CN": "在沉没期间，她没能救下自己的母亲。"
+    "zh-CN": "在沉没期间，她没能救下自己的母亲。",
+    'zh-TW': "在沉沒期間，她沒能救下自己的母親。",
+    ko: "그녀는 침몰 중에 어머니를 구할 수 없었습니다.",
+    ja: "彼女は沈没時に母親を救うことができませんでした。",
   },
   "No puede transmitir nombres verdaderos.": {
     "es": "No puede transmitir nombres verdaderos.",
@@ -4961,7 +6311,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Você não pode transmitir nomes reais.",
     "it": "Non è possibile trasmettere nomi reali.",
     "tr": "Gerçek isimleri aktaramazsınız.",
-    "zh-CN": "无法传递真名。"
+    "zh-CN": "无法传递真名。",
+    'zh-TW': "無法傳遞真名。",
+    ko: "실명을 전송할 수 없습니다.",
+    ja: "本当の名前を伝えることはできません。",
   },
   "Noche de las Velas": {
     "es": "Noche de las Velas",
@@ -4972,7 +6325,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Noite das Velas",
     "it": "Notte delle candele",
     "tr": "Mum Gecesi",
-    "zh-CN": "帆之夜"
+    "zh-CN": "帆之夜",
+    'zh-TW': "帆之夜",
+    ko: "항해의 밤",
+    ja: "帆の夜",
   },
   "Nombres y distritos": {
     "es": "Nombres y distritos",
@@ -4983,7 +6339,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Nomes e distritos",
     "it": "Nomi e distretti",
     "tr": "İsimler ve ilçeler",
-    "zh-CN": "名称与城区"
+    "zh-CN": "名称与城区",
+    'zh-TW': "名稱與城區",
+    ko: "이름과 구역",
+    ja: "名前と地区",
   },
   "Nunca ostentó corona, pero custodia los registros capaces de reconocerla. Su blasón muestra una llave sobre un libro abierto y tres mareas oscuras.": {
     "es": "Nunca ostentó corona, pero custodia los registros capaces de reconocerla. Su blasón muestra una llave sobre un libro abierto y tres mareas oscuras.",
@@ -4994,7 +6353,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele nunca usou coroa, mas mantém registros capazes de reconhecê-la. Seu brasão mostra uma chave em um livro aberto e três marés escuras.",
     "it": "Non ha mai indossato una corona, ma conserva i registri atti a riconoscerlo. Il suo stemma mostra una chiave su un libro aperto e tre maree scure.",
     "tr": "Hiçbir zaman taç takmadı ama onu tanıyabilecek kayıtları tutuyor. Arması açık bir kitabın üzerinde bir anahtar ve üç karanlık medcezir gösteriyor.",
-    "zh-CN": "它从未戴过王冠，却保管着能够辨认王冠的记录。其纹章为一本摊开的书卷上的一把钥匙，以及三道暗色的潮水。"
+    "zh-CN": "它从未戴过王冠，却保管着能够辨认王冠的记录。其纹章为一本摊开的书卷上的一把钥匙，以及三道暗色的潮水。",
+    'zh-TW': "它從未戴過王冠，卻保管著能夠辨認王冠的記錄。其紋章為一本攤開的書卷上的一把鑰匙，以及三道暗色的潮水。",
+    ko: "왕관을 쓴 적은 없지만 기록을 통해 이를 알아볼 수 있습니다. 그 팔은 펼쳐진 책 위에 열쇠와 세 개의 어두운 조수를 보여줍니다.",
+    ja: "王冠をかぶったことはありませんが、王冠を認識できる記録が残っています。その腕には、開いた本の上に鍵と3つの暗い潮が描かれています。",
   },
   "Nunca usa la primera persona al dar una orden; dice “queda dispuesto”, “consta” y “el coste aceptable”. Antes de responder una objeción concede “el hecho se admite” y cambia el marco moral.": {
     "es": "Nunca usa la primera persona al dar una orden; dice “queda dispuesto”, “consta” y “el coste aceptable”. Antes de responder una objeción concede “el hecho se admite” y cambia el marco moral.",
@@ -5005,7 +6367,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Nunca use a primeira pessoa ao dar uma ordem; Diz “está disposto”, “está declarado” e “o custo aceitável”. Antes de responder a uma objeção, admita que “o fato é admitido” e mude a estrutura moral.",
     "it": "Non usare mai la prima persona quando si dà un ordine; Dice “è disposto”, “è dichiarato” e “il costo accettabile”. Prima di rispondere a un’obiezione, ammettere che “il fatto è ammesso” e cambiare il quadro morale.",
     "tr": "Emir verirken asla birinci şahıs ağzını kullanmayın; “İstediğini”, “belirtildiğini” ve “kabul edilebilir bedelini” yazıyor. Bir itirazı yanıtlamadan önce \"gerçeğin kabul edildiğini\" kabul edin ve ahlaki çerçeveyi değiştirin.",
-    "zh-CN": "下达命令时从不用第一人称；他说“准予执行”、“有案可查”和“代价可接受”。面对异议时，他先承认“事实成立”，再改变道德框架。"
+    "zh-CN": "下达命令时从不用第一人称；他说“准予执行”、“有案可查”和“代价可接受”。面对异议时，他先承认“事实成立”，再改变道德框架。",
+    'zh-TW': "下達命令時從不用第一人稱；他說“准予執行”、“有案可查”和“代價可接受”。面對異議時，他先承認“事實成立”，再改變道德框架。",
+    ko: "명령을 내릴 때 1인칭을 사용하지 마십시오. \"이에 따라 명령했습니다\", \"기록에 따르면\", \"허용 가능한 비용\"이라고 말합니다. 이의에 대답하기 전에 그는 “사실이 인정된다”고 인정하고 도덕적 틀을 바꿉니다.",
+    ja: "命令するときは決して一人称を使用しないでください。 「ここに命令されている」、「記録が示している」、そして「許容可能な費用」と言う。異議に答える前に、彼は「事実は認められている」と認め、道徳的枠組みを変更します。",
   },
   "Obedece la letra cuando teme decidir.": {
     "es": "Obedece la letra cuando teme decidir.",
@@ -5016,7 +6381,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Obedeça à carta quando tiver medo de decidir.",
     "it": "Obbedisci alla lettera quando hai paura di decidere.",
     "tr": "Karar vermekten korktuğunuzda mektuba uyun.",
-    "zh-CN": "他害怕做决定时便遵从字面规定。"
+    "zh-CN": "他害怕做决定时便遵从字面规定。",
+    'zh-TW': "他害怕做決定時便遵從字面規定。",
+    ko: "그는 결정하기가 두려울 때 편지에 순종합니다.",
+    ja: "決断するのが怖いときは、彼はその手紙に従います。",
   },
   "OBJETIVO DE MAELOR: conservar el control sin destruir su vínculo con Tarek. OBJETIVO DE TAREK: obtener una excepción civil sin admitir aún su rebelión. GIRO: el bloqueo del Gremio elimina la salida marítima. CONSECUENCIA: Tarek rompe públicamente con Maelor; el Regente queda solo y acelera su marcha al Corazón. TONO: duelo familiar expresado como procedimiento.": {
     "es": "OBJETIVO DE MAELOR: conservar el control sin destruir su vínculo con Tarek. OBJETIVO DE TAREK: obtener una excepción civil sin admitir aún su rebelión. GIRO: el bloqueo del Gremio elimina la salida marítima. CONSECUENCIA: Tarek rompe públicamente con Maelor; el Regente queda solo y acelera su marcha al Corazón. TONO: duelo familiar expresado como procedimiento.",
@@ -5027,7 +6395,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "OBJETIVO DE MAELOR: Manter o controle sem destruir seu vínculo com Tarek. OBJETIVO DE TAREK: obter uma exceção civil sem ainda admitir sua rebelião. TWIST: O bloqueio da guilda elimina a saída marítima. CONSEQUÊNCIA: Tarek termina publicamente com Maelor; O Regente fica sozinho e acelera sua marcha até o Coração. TOM: luto familiar expresso como procedimento.",
     "it": "OBIETTIVO DI MAELOR: mantenere il controllo senza distruggere il suo legame con Tarek. OBIETTIVO DI TAREK: ottenere un'eccezione civile senza ancora ammettere la sua ribellione. TWIST: Il blocco della gilda elimina l'uscita dal mare. CONSEGUENZA: Tarek rompe pubblicamente con Maelor; Il Reggente rimane solo e accelera la sua marcia verso il Cuore. TONO: dolore familiare espresso come procedura.",
     "tr": "MAELOR'UN HEDEFİ: Tarek'le olan bağını bozmadan kontrolü elinde tutmak. TAREK'İN HEDEFİ: ​​Henüz isyanını kabul etmeden sivil istisna elde etmek. TWIST: Lonca ablukası deniz çıkışını ortadan kaldırır. SONUÇ: Tarek herkesin önünde Maelor'dan ayrılır; Vekil yalnız kalır ve Kalbe doğru yürüyüşünü hızlandırır. TON: Bir prosedür olarak ifade edilen aile kederi.",
-    "zh-CN": "梅洛尔的目标：在不摧毁他与塔雷克之间纽带的前提下保住控制权。塔雷克的目标：在不承认叛乱的情况下争取一项民事豁免。转折：公会的封锁切断了海上出口。后果：塔雷克公开与梅洛尔决裂；摄政王陷入孤立，加速向玻璃之心推进。基调：以程序形式表达的家庭决斗。"
+    "zh-CN": "梅洛尔的目标：在不摧毁他与塔雷克之间纽带的前提下保住控制权。塔雷克的目标：在不承认叛乱的情况下争取一项民事豁免。转折：公会的封锁切断了海上出口。后果：塔雷克公开与梅洛尔决裂；摄政王陷入孤立，加速向玻璃之心推进。基调：以程序形式表达的家庭决斗。",
+    'zh-TW': "梅洛爾的目標：在不摧毀他與塔雷克之間紐帶的前提下保住控制權。塔雷克的目標：在不承認叛亂的情況下爭取一項民事豁免。轉折：公會的封鎖切斷了海上出口。後果：塔雷克公開與梅洛爾決裂；攝政王陷入孤立，加速向玻璃之心推進。基調：以程式形式表達的家庭決鬥。",
+    ko: "MAELOR 목표: Tarek과의 유대 관계를 파괴하지 않고 통제권을 유지합니다. TAREK 목표: 아직 반란을 인정하지 않고 민간인 예외를 확보합니다. 차례: 길드 봉쇄로 인해 바다 출구가 제거되었습니다. 결과: Tarek은 Maelor와 공개적으로 결별합니다. 섭정은 홀로 서서 심장을 향해 달려간다. TONE: 가족 결투를 절차로 표현함.",
+    ja: "主人公の目標: タレクとの絆を壊さずにコントロールを維持する。タレクの目標: 反乱をまだ認めずに民間人の例外を確保する。ターン: ギルドの封鎖により海の出口が取り除かれます。結果: タレクはメーラーと公に絶縁する。摂政は一人で立ち、ハートに向かって急いでいます。 TONE：家族の決闘を手順として表現。",
   },
   "OBJETIVO: Aurel quiere ganar tiempo sin perpetuar la Deuda. OPOSICIÓN: Maelor y la inundación hacen imposible una solución limpia. GIRO: el mapa puede sobrevivir dentro de la prótesis. CONSECUENCIA: nace el secreto que divide a Nara e Ilyra; Maelor aprende que Aurel ocultó algo. SEMILLAS: manos quemadas, seis campanas, “mira el borde”, Odran fuera de plano.": {
     "es": "OBJETIVO: Aurel quiere ganar tiempo sin perpetuar la Deuda. OPOSICIÓN: Maelor y la inundación hacen imposible una solución limpia. GIRO: el mapa puede sobrevivir dentro de la prótesis. CONSECUENCIA: nace el secreto que divide a Nara e Ilyra; Maelor aprende que Aurel ocultó algo. SEMILLAS: manos quemadas, seis campanas, “mira el borde”, Odran fuera de plano.",
@@ -5038,7 +6409,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "OBJETIVO: Aurel quer ganhar tempo sem perpetuar a Dívida. OPOSIÇÃO: Maelor e a inundação tornam impossível uma solução limpa. TWIST: O mapa pode sobreviver dentro da prótese. CONSEQUÊNCIA: nasce o segredo que divide Nara e Ilyra; Maelor descobre que Aurel estava escondendo algo. SEMENTES: mãos queimadas, seis sinos, “olhe para a borda”, Odran fora do tiro.",
     "it": "OBIETTIVO: Aurel vuole guadagnare tempo senza perpetuare il debito. OPPOSIZIONE: Maelor e l'alluvione rendono impossibile una soluzione pulita. TWIST: La mappa può sopravvivere all'interno della protesi. CONSEGUENZA: nasce il segreto che divide Nara e Ilyra; Maelor scopre che Aurel nascondeva qualcosa. SEMI: mani bruciate, sei campanelli, “guarda il limite”, Odran fuori campo.",
     "tr": "HEDEF: Aurel, Borcu sürdürmeden zaman kazanmak istiyor. MUHALEFET: Maelor ve sel, temiz bir çözümü imkansız hale getiriyor. TWIST: Harita protezin içinde hayatta kalabilir. SONUÇ: Nara ve Ilyra'yı ayıran sır doğdu; Maelor, Aurel'in bir şeyler sakladığını öğrenir. TOHUMLAR: yanmış eller, altı çan, \"kenara bakın\", Odran atıştan çıktı.",
-    "zh-CN": "目标：奥雷尔想争取时间，又不让债务延续下去。阻力：梅洛尔与洪水使干净的解决方案变得不可能。转折：地图可以在义体内部存续。后果：分裂娜拉与伊莉拉的秘密由此诞生；梅洛尔得知奥雷尔隐瞒了什么。种子：烧伤的双手、六口钟、“看着边缘”、奥德兰在画外。"
+    "zh-CN": "目标：奥雷尔想争取时间，又不让债务延续下去。阻力：梅洛尔与洪水使干净的解决方案变得不可能。转折：地图可以在义体内部存续。后果：分裂娜拉与伊莉拉的秘密由此诞生；梅洛尔得知奥雷尔隐瞒了什么。种子：烧伤的双手、六口钟、“看着边缘”、奥德兰在画外。",
+    'zh-TW': "目標：奧雷爾想爭取時間，又不讓債務延續下去。阻力：梅洛爾與洪水使乾淨的解決方案變得不可能。轉折：地圖可以在義體內部存續。後果：分裂娜拉與伊莉拉的秘密由此誕生；梅洛爾得知奧雷爾隱瞞了什麼。種子：燒傷的雙手、六口鐘、“看著邊緣”、奧德蘭在畫外。",
+    ko: "목표: Aurel은 부채를 지속하지 않고 시간을 원합니다. 반대: Maelor와 홍수는 깨끗한 해결책을 불가능하게 만듭니다. TURN: 지도는 보철물 내부에서 살아남을 수 있습니다. 결과: 나라와 일리라를 나누는 비밀이 탄생합니다. Maelor는 Aurel이 뭔가를 숨겼다는 사실을 알게됩니다. 씨앗: 화상 입은 손, 종 6개, \"가장자리를 보세요\", 무대 밖에서 Odran.",
+    ja: "目標: オーレルは借金を永続させずに時間を過ごしたいと考えています。反対: メーラーと洪水のせいで、きれいな解決策は不可能だ。ターン: マップはプロテーゼの内部でも存続できます。結果: ナラとイリラを分ける秘密が生まれる。メーラーはオーレルが何かを隠していたことを知る。シード: 火傷した手、6つの鐘、「端を見て」、オドランがステージ外で。",
   },
   "OBJETIVO: comprender la coordenada de Aurel. OPOSICIÓN: Vesh no entrega respuestas sin experiencia y la escucha amenaza la identidad de Sena. GIRO: la prótesis de Ilyra contiene vidrio del propio Corazón. CONSECUENCIA: rescatar a Nara y liberar a Asteriel se convierten en el mismo conflicto. RELACIÓN: Cael elige a la tripulación por encima del protocolo.": {
     "es": "OBJETIVO: comprender la coordenada de Aurel. OPOSICIÓN: Vesh no entrega respuestas sin experiencia y la escucha amenaza la identidad de Sena. GIRO: la prótesis de Ilyra contiene vidrio del propio Corazón. CONSECUENCIA: rescatar a Nara y liberar a Asteriel se convierten en el mismo conflicto. RELACIÓN: Cael elige a la tripulación por encima del protocolo.",
@@ -5049,7 +6423,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "OBJETIVO: compreender a coordenada Aurel. OPOSIÇÃO: Vesh não dá respostas sem experiência e ouvir ameaça a identidade de Sena. TWIST: A prótese de Ilyra contém vidro do próprio Coração. CONSEQUÊNCIA: resgatar Nara e libertar Asteriel tornam-se o mesmo conflito. RELACIONAMENTO: Cael escolhe a tripulação em vez do protocolo.",
     "it": "OBIETTIVO: comprendere le coordinate di Aurel. OPPOSIZIONE: Vesh non fornisce risposte senza esperienza e l'ascolto minaccia l'identità di Sena. TWIST: La protesi di Ilyra contiene il vetro del Cuore stesso. CONSEGUENZA: salvare Nara e liberare Asteriel diventano lo stesso conflitto. RAPPORTO: Cael sceglie l'equipaggio rispetto al protocollo.",
     "tr": "HEDEF: Aurel koordinatını anlamak. MUHALEFET: Vesh tecrübesiz cevaplar vermez ve dinlemek Sena'nın kimliğini tehdit eder. TWIST: Ilyra'nın protezinde Kalbin camı var. SONUÇ: Nara'yı kurtarmak ve Asteriel'i serbest bırakmak aynı çatışmaya dönüşür. İLİŞKİ: Cael mürettebatı protokol yerine seçer.",
-    "zh-CN": "目标：理解奥雷尔的坐标。阻力：维什不会给出未经体验的答案，而倾听威胁到塞娜的身份。转折：伊莉拉的义体中含有来自玻璃之心本身的玻璃。后果：营救娜拉与解放阿斯特里尔变成同一场冲突。关系：凯尔选择船员而非规程。"
+    "zh-CN": "目标：理解奥雷尔的坐标。阻力：维什不会给出未经体验的答案，而倾听威胁到塞娜的身份。转折：伊莉拉的义体中含有来自玻璃之心本身的玻璃。后果：营救娜拉与解放阿斯特里尔变成同一场冲突。关系：凯尔选择船员而非规程。",
+    'zh-TW': "目標：理解奧雷爾的座標。阻力：維什不會給出未經體驗的答案，而傾聽威脅到塞娜的身份。轉折：伊莉拉的義體中含有來自玻璃之心本身的玻璃。後果：營救娜拉與解放阿斯特里爾變成同一場衝突。關係：凱爾選擇船員而非規程。",
+    ko: "목표: Aurel의 좌표를 이해합니다. 반대: Vesh는 경험이 없으면 대답하지 않으며 듣는 것은 Sena의 정체성을 위협합니다. 차례: Ilyra의 보철물에는 심장 자체의 유리가 포함되어 있습니다. 결과: 나라를 구출하는 것과 아스테리엘을 구출하는 것이 하나의 갈등이 됩니다. 관계: Cael은 프로토콜보다 승무원을 선택합니다.",
+    ja: "目標: オーレルの座標を理解する。反対: ヴェッシュは経験がなければ答えようがありません。聞くことはセナのアイデンティティを脅かすものです。ターン: イリラのプロテーゼには心臓そのもののガラスが含まれています。結果: ナラの救出とアステリエルの解放は1つの対立になります。関係: カエルはプロトコルよりも乗組員を選びます。",
   },
   "OBJETIVO: cruzar sin convertir a la Guardia en enemiga. OPOSICIÓN: la lealtad filial de Tarek y la ley mágica de las puertas. GIRO: la falsificación solo funciona si Tarek decide de forma consciente. CONSECUENCIA: la huida tiene éxito, pero su traición queda probada. ARCO: primer acto irreversible de Tarek.": {
     "es": "OBJETIVO: cruzar sin convertir a la Guardia en enemiga. OPOSICIÓN: la lealtad filial de Tarek y la ley mágica de las puertas. GIRO: la falsificación solo funciona si Tarek decide de forma consciente. CONSECUENCIA: la huida tiene éxito, pero su traición queda probada. ARCO: primer acto irreversible de Tarek.",
@@ -5060,7 +6437,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "OBJETIVO: atravessar sem transformar a Guarda em inimiga. OPOSIÇÃO: A lealdade filial de Tarek e a lei mágica das portas. TORÇÃO: Fingir só funciona se Tarek decidir fazê-lo conscientemente. CONSEQUÊNCIA: a fuga é bem-sucedida, mas sua traição está comprovada. ARC: O primeiro ato irreversível de Tarek.",
     "it": "OBIETTIVO: attraversare senza trasformare la Guardia in nemici. OPPOSIZIONE: La lealtà filiale di Tarek e la legge magica delle porte. TWIST: Fingere funziona solo se Tarek decide consapevolmente di farlo. CONSEGUENZA: la fuga riesce, ma il suo tradimento è dimostrato. ARC: il primo atto irreversibile di Tarek.",
     "tr": "HEDEF: Muhafızları düşmana çevirmeden geçin. MUHALEFET: Tarek'in evlatlık sadakati ve kapıların sihirli kanunu. TWIST: Numara yapmak ancak Tarek'ın bilinçli olarak bunu yapmaya karar vermesi durumunda işe yarar. SONUÇ: Kaçış başarılı oldu ama ihaneti kanıtlandı. ARC: Tarek'in ilk geri dönüşü olmayan eylemi.",
-    "zh-CN": "目标：穿越而不让卫队变成敌人。阻力：塔雷克的孝亲忠诚与门扉的魔法法则。转折：伪造只有在塔雷克自觉做出选择时才生效。后果：逃亡成功，但他的背叛也得到证实。弧线：塔雷克第一个不可逆的行为。"
+    "zh-CN": "目标：穿越而不让卫队变成敌人。阻力：塔雷克的孝亲忠诚与门扉的魔法法则。转折：伪造只有在塔雷克自觉做出选择时才生效。后果：逃亡成功，但他的背叛也得到证实。弧线：塔雷克第一个不可逆的行为。",
+    'zh-TW': "目標：穿越而不讓衛隊變成敵人。阻力：塔雷克的孝親忠誠與門扉的魔法法則。轉折：偽造只有在塔雷克自覺做出選擇時才生效。後果：逃亡成功，但他的背叛也得到證實。弧線：塔雷克第一個不可逆的行為。",
+    ko: "목표: 경비병을 적으로 만들지 않고 건너갑니다. 반대: 타렉의 효도와 마법의 문법. 차례: 위조는 Tarek의 의식적인 선택을 통해서만 작동합니다. 결과: 탈출은 성공했지만 그의 반역이 입증되었습니다. ARC: 타렉의 첫 번째 되돌릴 수 없는 행위.",
+    ja: "目標: ガードを敵にせずに横断する。反対: タレクの親孝行と魔法の門の法則。ターン: 偽造はタレクの意識的な選択によってのみ機能します。結果: 逃亡は成功したが、彼の反逆罪が証明された。 ARC: タレクの最初の取り返しのつかない行為。",
   },
   "OBJETIVO: Ilyra quiere autenticar la carta y conseguir guía. OPOSICIÓN: su miedo a una falsificación, el resentimiento de Cael y la vigilancia de Tarek. GIRO: la sal solo puede proceder de una ruta borrada. CONSECUENCIA: nace la alianza Ilyra–Cael y Tarek compromete su cargo por primera vez. VOZ: presentar las enumeraciones de Ilyra, los refranes de Cael y la cortesía militar de Tarek.": {
     "es": "OBJETIVO: Ilyra quiere autenticar la carta y conseguir guía. OPOSICIÓN: su miedo a una falsificación, el resentimiento de Cael y la vigilancia de Tarek. GIRO: la sal solo puede proceder de una ruta borrada. CONSECUENCIA: nace la alianza Ilyra–Cael y Tarek compromete su cargo por primera vez. VOZ: presentar las enumeraciones de Ilyra, los refranes de Cael y la cortesía militar de Tarek.",
@@ -5071,7 +6451,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "OBJETIVO: Ilyra deseja autenticar a carta e obter orientação. OPOSIÇÃO: seu medo de uma falsificação, o ressentimento de Cael e a vigilância de Tarek. TURN: O sal só pode vir de uma rota excluída. CONSEQUÊNCIA: nasce a aliança Ilyra-Cael e Tarek compromete sua posição pela primeira vez. VOZ: apresente as enumerações de Ilyra, as palavras de Cael e a cortesia militar de Tarek.",
     "it": "OBIETTIVO: Ilyra vuole autenticare la lettera e ottenere indicazioni. OPPOSIZIONE: la sua paura di un falso, il risentimento di Cael e la vigilanza di Tarek. TURNO: Il sale può provenire solo da una rotta cancellata. CONSEGUENZA: nasce l'alleanza Ilyra-Cael e Tarek impegna la sua posizione per la prima volta. VOCE: presenta gli enumeramenti di Ilyra, i detti di Cael e la cortesia militare di Tarek.",
     "tr": "HEDEF: Ilyra mektubun doğruluğunu teyit etmek ve rehberlik almak istiyor. MUHALEFET: sahtecilik korkusu, Cael'in kızgınlığı ve Tarek'in ihtiyatlılığı. DÖNÜŞ: Tuz yalnızca silinmiş bir rotadan gelebilir. SONUÇ: Ilyra-Cael ittifakı doğar ve Tarek ilk kez görevini üstlenir. SES: Ilyra'nın sayımlarını, Cael'in sözlerini ve Tarek'in askeri nezaketini sunun.",
-    "zh-CN": "目标：伊莉拉想验证信件的真伪并获得指引。阻力：她对伪造的恐惧、凯尔的怨恨以及塔雷克的监视。转折：盐只可能来自一条被抹去的路线。后果：伊莉拉—凯尔联盟形成，塔雷克第一次拿自己的职位冒险。声音：呈现伊莉拉的列举、凯尔的谚语和塔雷克的军人礼节。"
+    "zh-CN": "目标：伊莉拉想验证信件的真伪并获得指引。阻力：她对伪造的恐惧、凯尔的怨恨以及塔雷克的监视。转折：盐只可能来自一条被抹去的路线。后果：伊莉拉—凯尔联盟形成，塔雷克第一次拿自己的职位冒险。声音：呈现伊莉拉的列举、凯尔的谚语和塔雷克的军人礼节。",
+    'zh-TW': "目標：伊莉拉想驗證信件的真偽並獲得指引。阻力：她對偽造的恐懼、凱爾的怨恨以及塔雷克的監視。轉折：鹽只可能來自一條被抹去的路線。後果：伊莉拉—凱爾聯盟形成，塔雷克第一次拿自己的職位冒險。聲音：呈現伊莉拉的列舉、凱爾的諺語和塔雷克的軍人禮節。",
+    ko: "목표: Ilyra는 편지를 인증하고 가이드를 확보하고 싶어합니다. 반대: 위조에 대한 두려움, 카엘의 분노, 타렉의 감시. 차례: 소금은 지워진 경로에서만 나올 수 있습니다. 결과: Ilyra-Cael 동맹이 시작되고 Tarek은 처음으로 그의 사무실을 타협합니다. 음성: Ilyra의 목록, Cael의 속담 및 Tarek의 군사적 예의를 확립하십시오.",
+    ja: "目標: イリラは手紙を認証してガイドを確保したいと考えています。反対: 偽造に対する恐怖、カエルの憤り、タレクの監視。ターン: 塩は消去されたルートからのみ得られます。結果: イリラとカエルの同盟が始まり、タレクは初めて彼の職を侵害します。音声: イリラのリスト、カエルの格言、タレクの軍儀を確立します。",
   },
   "OBJETIVO: liberar a Nara y evitar que Lúmina colapse. OPOSICIÓN: esos objetivos parecen incompatibles y Maelor exige una decisión inmediata. GIRO: el coste de un nombre verdadero puede repartirse mediante consentimiento. CONSECUENCIA: Asteriel abandona el arnés sin destruir la ciudad; Maelor pierde el monopolio de la emergencia y Nara queda libre como voz, aún sin cuerpo. CLÍMAX: cada personaje resuelve desde su defecto o da un paso contra él.": {
     "es": "OBJETIVO: liberar a Nara y evitar que Lúmina colapse. OPOSICIÓN: esos objetivos parecen incompatibles y Maelor exige una decisión inmediata. GIRO: el coste de un nombre verdadero puede repartirse mediante consentimiento. CONSECUENCIA: Asteriel abandona el arnés sin destruir la ciudad; Maelor pierde el monopolio de la emergencia y Nara queda libre como voz, aún sin cuerpo. CLÍMAX: cada personaje resuelve desde su defecto o da un paso contra él.",
@@ -5082,7 +6465,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "OBJETIVO: libertar Nara e evitar o colapso de Lúmina. OPOSIÇÃO: Estes objectivos parecem incompatíveis e Maelor exige uma decisão imediata. TWIST: O custo de um nome real pode ser compartilhado mediante consentimento. CONSEQUÊNCIA: Asteriel sai do arreio sem destruir a cidade; Maelor perde o monopólio da emergência e Nara fica livre como voz, mesmo sem corpo. CLIMAX: cada personagem resolve sua falha ou dá um passo contra ela.",
     "it": "OBIETTIVO: liberare Nara ed evitare che Lúmina crolli. OPPOSIZIONE: Questi obiettivi sembrano incompatibili e Maelor esige una decisione immediata. TWIST: Il costo di un vero nome può essere condiviso previo consenso. CONSEGUENZA: Asteriel abbandona i finimenti senza distruggere la città; Maelor perde il monopolio dell'emergenza e Nara è libera come voce, anche senza corpo. CLIMAX: ogni personaggio risolve il proprio difetto o fa un passo contro di esso.",
     "tr": "HEDEF: Nara'yı serbest bırakın ve Lúmina'nın çökmesini önleyin. MUHALEFET: Bu hedefler uyumsuz görünüyor ve Maelor acil bir karar talep ediyor. TWIST: Gerçek bir ismin maliyeti rıza ile paylaşılabilir. SONUÇ: Asteriel şehri yok etmeden koşumdan ayrılır; Maelor acil durumun tekelini kaybeder ve Nara, bedeni olmasa bile ses olarak özgürdür. CLIMAX: Her karakter kendi kusurunu çözer veya ona karşı bir adım atar.",
-    "zh-CN": "目标：解放娜拉并阻止卢米娜崩溃。阻力：这些目标看似互不相容，而梅洛尔要求立即做出决定。转折：真名的代价可以通过同意来分担。后果：阿斯特里尔离开束缚装置而未摧毁城市；梅洛尔失去对紧急状态的垄断，娜拉作为声音获得自由，但尚未拥有身体。高潮：每个角色或从自身缺陷出发解决问题，或向着克服它迈出一步。"
+    "zh-CN": "目标：解放娜拉并阻止卢米娜崩溃。阻力：这些目标看似互不相容，而梅洛尔要求立即做出决定。转折：真名的代价可以通过同意来分担。后果：阿斯特里尔离开束缚装置而未摧毁城市；梅洛尔失去对紧急状态的垄断，娜拉作为声音获得自由，但尚未拥有身体。高潮：每个角色或从自身缺陷出发解决问题，或向着克服它迈出一步。",
+    'zh-TW': "目標：解放娜拉並阻止盧米娜崩潰。阻力：這些目標看似互不相容，而梅洛爾要求立即做出決定。轉折：真名的代價可以通過同意來分擔。後果：阿斯特里爾離開束縛裝置而未摧毀城市；梅洛爾失去對緊急狀態的壟斷，娜拉作為聲音獲得自由，但尚未擁有身體。高潮：每個角色或從自身缺陷出發解決問題，或向著克服它邁出一步。",
+    ko: "목표: 나라를 구출하고 루미나의 붕괴를 막으세요. 반대: 이러한 목표는 양립할 수 없는 것으로 보이며 Maelor는 즉각적인 선택을 요구합니다. 전환: 실명 비용은 동의를 통해 공유될 수 있습니다. 결과: Asteriel은 도시를 파괴하지 않고 하네스를 떠납니다. Maelor는 비상 독점권을 잃고 Nara는 아직 육체가 아닌 목소리로 해방됩니다. 클라이맥스: 각 캐릭터는 자신의 결점에 맞서 행동합니다.",
+    ja: "目標: ナラを解放し、ルミナの崩壊を阻止します。反対派: これらの目標は矛盾しているように見え、メーラーは即時の選択を要求しています。順番: 真名のコストは同意によって共有できます。結果: アステリエルは都市を破壊せずにハーネスを離れます。マロールは緊急独占権を失い、ナラはまだ身体ではなく声として解放される。クライマックス: 各キャラクターは、自分の欠点を通して、または欠点に逆らって行動します。",
   },
   "OBJETIVO: mostrar consecuencias sin cerrar todas las preguntas. CAMBIOS: Sena deja de ganarse su lugar mediante utilidad; Cael elige causa y tripulación; Tarek asume bando; Maelor conserva su lógica pero pierde poder; Ilyra comparte el control; Nara debe aprender a contar la verdad. PRESAGIO: Elan es posibilidad, no confirmación; Asteriel permanece libre.": {
     "es": "OBJETIVO: mostrar consecuencias sin cerrar todas las preguntas. CAMBIOS: Sena deja de ganarse su lugar mediante utilidad; Cael elige causa y tripulación; Tarek asume bando; Maelor conserva su lógica pero pierde poder; Ilyra comparte el control; Nara debe aprender a contar la verdad. PRESAGIO: Elan es posibilidad, no confirmación; Asteriel permanece libre.",
@@ -5093,7 +6479,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "OBJETIVO: mostrar consequências sem encerrar todas as questões. MUDANÇAS: Sena deixa de ganhar espaço pela utilidade; Cael escolhe a causa e a tripulação; Tarek toma partido; Maelor mantém sua lógica, mas perde poder; Ilyra compartilha o controle; Nara deve aprender a dizer a verdade. ESTRANGEIRO: Elan é possibilidade, não confirmação; Asteriel permanece livre.",
     "it": "OBIETTIVO: mostrare le conseguenze senza chiudere tutte le domande. CAMBIAMENTI: Sena smette di guadagnare il suo posto attraverso l'utilità; Cael sceglie la causa e l'equipaggio; Tarek si schiera; Maelor mantiene la sua logica ma perde potere; Ilyra condivide il controllo; Nara deve imparare a dire la verità. STRANIERO: Lo slancio è possibilità, non conferma; Asteriel rimane libero.",
     "tr": "HEDEF: tüm soruları kapatmadan sonuçları gösterin. DEĞİŞİKLİKLER: Sena yerini fayda yoluyla kazanmayı bırakıyor; Cael davayı ve mürettebatı seçer; Tarek taraf tutuyor; Maelor mantığını korur ama gücünü kaybeder; Ilyra kontrolü paylaşıyor; Nara gerçeği söylemeyi öğrenmeli. YABANCI: Elan teyit değil olasılıktır; Asteriel serbest kalır.",
-    "zh-CN": "目标：展现后果而不封闭所有问题。变化：塞娜不再靠有用性来赢得自己的位置；凯尔选择事业与船员；塔雷克选定阵营；梅洛尔保住自己的逻辑却失去权力；伊莉拉分享控制权；娜拉必须学会说出真相。伏笔：埃兰是可能性，而非证实；阿斯特里尔保持自由。"
+    "zh-CN": "目标：展现后果而不封闭所有问题。变化：塞娜不再靠有用性来赢得自己的位置；凯尔选择事业与船员；塔雷克选定阵营；梅洛尔保住自己的逻辑却失去权力；伊莉拉分享控制权；娜拉必须学会说出真相。伏笔：埃兰是可能性，而非证实；阿斯特里尔保持自由。",
+    'zh-TW': "目標：展現後果而不封閉所有問題。變化：塞娜不再靠有用性來贏得自己的位置；凱爾選擇事業與船員；塔雷克選定陣營；梅洛爾保住自己的邏輯卻失去權力；伊莉拉分享控制權；娜拉必須學會說出真相。伏筆：埃蘭是可能性，而非證實；阿斯特里爾保持自由。",
+    ko: "목표: 모든 질문을 닫지 않고 결과를 보여줍니다. 변경 사항: 세나는 유용성을 통해 소속감을 얻지 못합니다. Cael은 원인과 제작진을 선택합니다. 타렉은 한쪽 편을 들었습니다. Maelor는 논리를 유지하지만 힘을 잃습니다. Ilyra는 통제권을 공유합니다. 나라는 진실을 말하는 법을 배워야 합니다. 예측: Elan은 확인이 아니라 가능성입니다. Asteriel은 여전히 ​​무료입니다.",
+    ja: "目標: すべての質問を閉じずに結果を示す。変更: セナは役に立つことで帰属意識を獲得するのをやめます。カエルは大義と乗組員を選ぶ。タレクは味方をする。メーラーは論理を保持しますが、力を失います。イリラはコントロールを共有します。ナラは真実を語ることを学ばなければなりません。予兆: エランは可能性であり、確証ではありません。アステリエルは無料のままです。",
   },
   "OBJETIVO: recuperar el registro de Aurel. OPOSICIÓN: el coste de la escucha y la subida del agua. GIRO: Odran aparece dos años después de su muerte y confirma la orden de Aurel. CONSECUENCIA: el grupo obtiene Isla Nácar como siguiente punto y Sena rompe con la neutralidad del Archivo. PREGUNTA ABIERTA: ??? ¿por qué el mensaje aguardó exactamente a Ilyra?": {
     "es": "OBJETIVO: recuperar el registro de Aurel. OPOSICIÓN: el coste de la escucha y la subida del agua. GIRO: Odran aparece dos años después de su muerte y confirma la orden de Aurel. CONSECUENCIA: el grupo obtiene Isla Nácar como siguiente punto y Sena rompe con la neutralidad del Archivo. PREGUNTA ABIERTA: ??? ¿por qué el mensaje aguardó exactamente a Ilyra?",
@@ -5104,7 +6493,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "OBJETIVO: recuperar a ficha de Aurel. OPOSIÇÃO: o custo da escuta e o aumento da água. TWIST: Odran aparece dois anos após sua morte e confirma a ordem de Aurel. CONSEQUÊNCIA: o grupo obtém a Isla Nácar como próximo ponto e Sena rompe com a neutralidade do Arquivo. PERGUNTA ABERTA: ??? Por que exatamente a mensagem esperou por Ilyra?",
     "it": "OBIETTIVO: recuperare il record di Aurel. OPPOSIZIONE: il costo dell'ascolto e l'innalzamento dell'acqua. TWIST: Odran appare due anni dopo la sua morte e conferma l'ordine di Aurel. CONSEGUENZA: il gruppo ottiene Isla Nácar come punto successivo e Sena rompe con la neutralità dell'Archivio. DOMANDA APERTA: ??? Perché esattamente il messaggio aspettava Ilyra?",
     "tr": "HEDEF: Aurel'in kaydını kurtarmak. MUHALEFET: dinlemenin maliyeti ve suyun yükselmesi. TWIST: Odran, ölümünden iki yıl sonra ortaya çıkar ve Aurel'in emrini onaylar. SONUÇ: grup bir sonraki nokta olarak Isla Nácar'ı ele geçirir ve Sena, Arşiv'in tarafsızlığını bozar. AÇIK SORU: ??? Mesaj tam olarak neden Ilyra'yı bekledi?",
-    "zh-CN": "目标：找回奥雷尔的记录。阻力：倾听的代价与上涨的水位。转折：奥德兰在他死后两年出现，并证实了奥雷尔的命令。后果：队伍将珍珠母岛作为下一站，塞娜打破档案库的中立。开放问题：??? 为什么这条信息偏偏等了伊莉拉？"
+    "zh-CN": "目标：找回奥雷尔的记录。阻力：倾听的代价与上涨的水位。转折：奥德兰在他死后两年出现，并证实了奥雷尔的命令。后果：队伍将珍珠母岛作为下一站，塞娜打破档案库的中立。开放问题：??? 为什么这条信息偏偏等了伊莉拉？",
+    'zh-TW': "目標：找回奧雷爾的記錄。阻力：傾聽的代價與上漲的水位。轉折：奧德蘭在他死後兩年出現，並證實了奧雷爾的命令。後果：隊伍將珍珠母島作為下一站，塞娜打破檔案庫的中立。開放問題：??? 為什麼這條資訊偏偏等了伊莉拉？",
+    ko: "목표: Aurel의 기록을 복구하세요. 반대: 물을 듣고 상승하는 데 드는 비용입니다. 차례: 오드란은 죽은 지 2년 후에 나타나 오렐의 명령을 확인합니다. 결과: 그룹은 다음 지점으로 Nacre Island를 획득하고 Sena는 아카이브 중립성을 깨뜨립니다. 공개 질문:??? 메시지가 특별히 Ilyra를 기다린 이유는 무엇입니까?",
+    ja: "目標: オーレルの記録を取り戻す。反対: 聞くことと水が増えることのコスト。ターン: オドランは死後2年後に現れ、オーレルの命令を確認します。結果: グループは次のポイントとしてナクル島を獲得し、セナがアーカイブの中立性を破ります。自由な質問: ???メッセージが特にイリラを待っていたのはなぜですか?",
   },
   "OBJETIVO: verificar la advertencia de Nara. OPOSICIÓN: el mecanismo exige elegir entre dos catástrofes y Tarek aún busca una explicación inocente. GIRO: la órbita se centra en el Faro, no en Elyndra. CONSECUENCIA: rompen la palanca, adelantan la crisis y activan las seis campanas. INFORMACIÓN: Nara conoce la teoría, no los cambios ocurridos desde su desaparición.": {
     "es": "OBJETIVO: verificar la advertencia de Nara. OPOSICIÓN: el mecanismo exige elegir entre dos catástrofes y Tarek aún busca una explicación inocente. GIRO: la órbita se centra en el Faro, no en Elyndra. CONSECUENCIA: rompen la palanca, adelantan la crisis y activan las seis campanas. INFORMACIÓN: Nara conoce la teoría, no los cambios ocurridos desde su desaparición.",
@@ -5115,7 +6507,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "OBJETIVO: verificar o aviso de Nara. OPOSIÇÃO: O mecanismo exige uma escolha entre duas catástrofes e Tarek ainda procura uma explicação inocente. SPIN: A órbita está centrada no Farol, não em Elyndra. CONSEQUÊNCIA: quebram a alavanca, avançam a crise e acionam os seis sinos. INFORMAÇÃO: Nara conhece a teoria, não as mudanças que ocorreram desde seu desaparecimento.",
     "it": "OBIETTIVO: verificare l'avvertimento di Nara. OPPOSIZIONE: Il meccanismo richiede una scelta tra due catastrofi e Tarek è ancora alla ricerca di una spiegazione innocente. SPIN: L'orbita è centrata sul Faro, non su Elyndra. CONSEGUENZA: rompono la leva, anticipano la crisi e attivano le sei campane. INFORMAZIONI: Nara conosce la teoria, non i cambiamenti avvenuti dopo la sua scomparsa.",
     "tr": "HEDEF: Nara'nın uyarısını doğrulayın. MUHALEFET: Mekanizma iki felaket arasında bir seçim yapmayı gerektiriyor ve Tarek hâlâ masum bir açıklama arıyor. DÖNÜŞ: Yörünge Elyndra'nın değil Deniz Feneri'nin merkezindedir. SONUÇ: kaldıracı kırarlar, krizi ilerletirler ve altı zili çalıştırırlar. BİLGİ: Nara, ortadan kaybolmasından bu yana meydana gelen değişiklikleri değil, teoriyi biliyor.",
-    "zh-CN": "目标：核实娜拉的警告。阻力：该机制要求在两种灾难之间做出选择，而塔雷克仍在寻找一个无辜的解释。转折：轨道以灯塔为中心，而非埃林德拉。后果：他们折断拉杆，使危机提前，并触发六口钟。信息：娜拉了解理论，却不了解她失踪后发生的变化。"
+    "zh-CN": "目标：核实娜拉的警告。阻力：该机制要求在两种灾难之间做出选择，而塔雷克仍在寻找一个无辜的解释。转折：轨道以灯塔为中心，而非埃林德拉。后果：他们折断拉杆，使危机提前，并触发六口钟。信息：娜拉了解理论，却不了解她失踪后发生的变化。",
+    'zh-TW': "目標：核實娜拉的警告。阻力：該機制要求在兩種災難之間做出選擇，而塔雷克仍在尋找一個無辜的解釋。轉折：軌道以燈塔為中心，而非埃林德拉。後果：他們折斷拉桿，使危機提前，並觸發六口鐘。資訊：娜拉了解理論，卻不瞭解她失蹤後發生的變化。",
+    ko: "목표: 나라의 경고를 확인하세요. 반대: 메커니즘은 재앙 사이에서 선택을 강요하며 Tarek은 여전히 ​​순진한 설명을 추구합니다. 회전: 궤도는 Elyndra가 아닌 등대 중심에 있습니다. 결과: 그들은 레버를 부수고 위기를 진전시키며 6개의 종을 작동시킵니다. 정보: 나라는 실종 이후 변화가 없다는 이론을 알고 있습니다.",
+    ja: "目標: ナラの警告を確認する。反対：このメカニズムは大惨事の間の選択を迫り、タレクは依然として無実の説明を求めている。ターン: 軌道の中心はエリンドラではなく灯台です。結果: 彼らはレバーを破壊し、危機を進め、6つのベルを鳴らします。情報: ナラはその理論を知っていますが、失踪以来何も変わっていません。",
   },
   "Objeto celeste cuya órbita contradice el resto del sistema.": {
     "es": "Objeto celeste cuya órbita contradice el resto del sistema.",
@@ -5126,7 +6521,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Objeto celestial cuja órbita contradiz o resto do sistema.",
     "it": "Oggetto celeste la cui orbita contraddice il resto del sistema.",
     "tr": "Yörüngesi sistemin geri kalanıyla çelişen gök cismi.",
-    "zh-CN": "一个天体，其轨道与系统的其余部分相矛盾。"
+    "zh-CN": "一个天体，其轨道与系统的其余部分相矛盾。",
+    'zh-TW': "一個天體，其軌道與系統的其餘部分相矛盾。",
+    ko: "궤도가 나머지 시스템과 모순되는 천체입니다.",
+    ja: "軌道が系の他の部分と矛盾する天体。",
   },
   "Observadora, obstinada y compasiva, con una necesidad casi física de convertir el miedo en datos. Antes de actuar dibuja tres rutas y se enfada cuando alguien improvisa una cuarta. Parece fría porque ordena sus emociones como coordenadas, pero siempre detecta quién se ha quedado atrás. Bajo presión se vuelve controladora; ante una injusticia abandona toda prudencia.": {
     "es": "Observadora, obstinada y compasiva, con una necesidad casi física de convertir el miedo en datos. Antes de actuar dibuja tres rutas y se enfada cuando alguien improvisa una cuarta. Parece fría porque ordena sus emociones como coordenadas, pero siempre detecta quién se ha quedado atrás. Bajo presión se vuelve controladora; ante una injusticia abandona toda prudencia.",
@@ -5137,7 +6535,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Observador, teimoso e compassivo, com uma necessidade quase física de transformar o medo em dados. Antes de atuar ele traça três caminhos e se irrita quando alguém improvisa um quarto. Ela parece fria porque organiza suas emoções como coordenadas, mas sempre detecta quem ficou para trás. Sob pressão ela se torna controladora; Diante da injustiça, ele abandona toda prudência.",
     "it": "Osservatore, testardo e compassionevole, con un bisogno quasi fisico di trasformare la paura in dati. Prima di agire disegna tre percorsi e si arrabbia quando qualcuno ne improvvisa un quarto. Sembra fredda perché organizza le sue emozioni come coordinate, ma rileva sempre chi è rimasto indietro. Sotto pressione diventa controllante; Di fronte all'ingiustizia abbandona ogni prudenza.",
     "tr": "Dikkatli, inatçı ve şefkatli, korkuyu verilere dönüştürme konusunda neredeyse fiziksel bir ihtiyaç duyuyor. Oyunculuğa başlamadan önce üç rota çiziyor ve birisi dördüncüyü doğaçlama yaptığında sinirleniyor. Duygularını koordinatlar gibi düzenlediği için soğuk görünüyor ama geride kimin kaldığını her zaman tespit ediyor. Baskı altında kontrolcü hale gelir; Adaletsizlik karşısında her türlü sağduyuyu terk eder.",
-    "zh-CN": "敏锐、固执而富有同情心，几乎有一种生理性的需要，要把恐惧转化为数据。行动之前她会画出三条路线，若有人即兴走出第四条，她便会生气。她看起来冷漠，因为她像整理坐标一样整理自己的情绪，却总能察觉谁落在了后面。压力之下她会变得控制欲强；面对不公，她会抛开一切谨慎。"
+    "zh-CN": "敏锐、固执而富有同情心，几乎有一种生理性的需要，要把恐惧转化为数据。行动之前她会画出三条路线，若有人即兴走出第四条，她便会生气。她看起来冷漠，因为她像整理坐标一样整理自己的情绪，却总能察觉谁落在了后面。压力之下她会变得控制欲强；面对不公，她会抛开一切谨慎。",
+    'zh-TW': "敏銳、固執而富有同情心，幾乎有一種生理性的需要，要把恐懼轉化為資料。行動之前她會畫出三條路線，若有人即興走出第四條，她便會生氣。她看起來冷漠，因為她像整理座標一樣整理自己的情緒，卻總能察覺誰落在了後面。壓力之下她會變得控制慾強；面對不公，她會拋開一切謹慎。",
+    ko: "관찰력이 뛰어나고 완고하며 동정심이 많으며 두려움을 데이터로 바꾸려는 거의 육체적 욕구가 있습니다. 연기하기 전에 그녀는 세 가지 경로를 그리고 누군가가 즉흥적으로 네 번째 경로를 만들면 곤두박질친다. 감정을 좌표처럼 명령하기 때문에 차가워 보이지만 항상 뒤쳐진 사람을 알아차린다. 압력을 받으면 그녀는 통제하게 됩니다. 불의에 직면했을 때 그녀는 조심성을 포기합니다.",
+    ja: "観察力があり、頑固で思いやりがあり、恐怖をデータに変えるというほとんど肉体的な欲求を持っています。彼女は演技する前に3つのルートを描き、誰かが4番目のルートを即興で出すと剛毛になります。感情を座標のように命令するため冷たく見えるが、誰が取り残されたかには常に気づいている。プレッシャーを受けると、彼女は支配的になってしまう。不当な扱いに直面すると、彼女は警戒を放棄する。",
   },
   "Observadora, obstinada y compasiva; convierte el miedo en preguntas concretas.": {
     "es": "Observadora, obstinada y compasiva; convierte el miedo en preguntas concretas.",
@@ -5148,7 +6549,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Observador, teimoso e compassivo; Transforme o medo em questões concretas.",
     "it": "Osservatore, testardo e compassionevole; Trasformare la paura in domande concrete.",
     "tr": "Gözlemci, inatçı ve şefkatli; Korkuyu somut sorulara dönüştürün.",
-    "zh-CN": "敏锐、固执而富有同情心；把恐惧转化为具体的问题。"
+    "zh-CN": "敏锐、固执而富有同情心；把恐惧转化为具体的问题。",
+    'zh-TW': "敏銳、固執而富有同情心；把恐懼轉化為具體的問題。",
+    ko: "관찰력이 뛰어나고 완고하며 동정심이 많습니다. 그녀는 두려움을 구체적인 질문으로 바꿉니다.",
+    ja: "観察力があり、頑固で、思いやりがあります。彼女は恐怖を具体的な質問に変えます。",
   },
   "Observatorio de Orla": {
     "es": "Observatorio de Orla",
@@ -5159,7 +6563,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Observatório da Orla",
     "it": "Osservatorio Orla",
     "tr": "Orla Gözlemevi",
-    "zh-CN": "奥尔拉天文台"
+    "zh-CN": "奥尔拉天文台",
+    'zh-TW': "奧爾拉天文臺",
+    ko: "림전망대",
+    ja: "リム天文台",
   },
   "obstáculo": {
     "es": "obstáculo",
@@ -5170,7 +6577,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "obstáculo",
     "it": "ostacolo",
     "tr": "engel",
-    "zh-CN": "障碍"
+    "zh-CN": "障碍",
+    'zh-TW': "障礙",
+    ko: "장애",
+    ja: "障害",
   },
   "Odran Vale": {
     "es": "Odran Vale",
@@ -5181,7 +6591,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Odran Vale",
     "it": "Odran Vale",
     "tr": "Odran Vadisi",
-    "zh-CN": "奥德兰·瓦尔"
+    "zh-CN": "奥德兰·瓦尔",
+    'zh-TW': "奧德蘭·瓦爾",
+    ko: "오드란 베일",
+    ja: "オドラン・ヴェイル",
   },
   "Odran visto en el Faro": {
     "es": "Odran visto en el Faro",
@@ -5192,7 +6605,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Odran visto no Farol",
     "it": "Odran visto al Faro",
     "tr": "Odran Deniz Feneri'nde görüldü",
-    "zh-CN": "奥德兰在灯塔现身"
+    "zh-CN": "奥德兰在灯塔现身",
+    'zh-TW': "奧德蘭在燈塔現身",
+    ko: "등대에서 본 오드란",
+    ja: "灯台で見たオドラン",
   },
   "Oficio hereditario y consejo técnico anterior a la regencia.": {
     "es": "Oficio hereditario y consejo técnico anterior a la regencia.",
@@ -5203,7 +6619,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cargo hereditário e assessoria técnica anterior à regência.",
     "it": "Carica ereditaria e consulenza tecnica prima della reggenza.",
     "tr": "Naiplik öncesinde kalıtsal ofis ve teknik danışmanlık.",
-    "zh-CN": "世袭的职务，以及先于摄政时期的技术议事会。"
+    "zh-CN": "世袭的职务，以及先于摄政时期的技术议事会。",
+    'zh-TW': "世襲的職務，以及先於攝政時期的技術議事會。",
+    ko: "섭정 이전의 세습 직위 및 기술 협의회.",
+    ja: "摂政に先立って行われた世襲の官職と技術評議会。",
   },
   "Oráculo de Sal": {
     "es": "Oráculo de Sal",
@@ -5214,7 +6633,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Oráculo de Sal",
     "it": "Oracolo del sale",
     "tr": "Tuz Kahini",
-    "zh-CN": "盐之神谕"
+    "zh-CN": "盐之神谕",
+    'zh-TW': "鹽之神諭",
+    ko: "솔트 오라클",
+    ja: "ソルトオラクル",
   },
   "Orden militar creada para sostener el racionamiento.": {
     "es": "Orden militar creada para sostener el racionamiento.",
@@ -5225,7 +6647,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ordem militar criada para apoiar o racionamento.",
     "it": "Ordine militare creato per sostenere il razionamento.",
     "tr": "Karneyi desteklemek için oluşturulan askeri düzen.",
-    "zh-CN": "为维持配给而创建的军事教团。"
+    "zh-CN": "为维持配给而创建的军事教团。",
+    'zh-TW': "為維持配給而建立的軍事教團。",
+    ko: "배급을 시행하기 위해 만들어진 군사 명령.",
+    ja: "配給を強制するために創設された軍令。",
   },
   "origen": {
     "es": "origen",
@@ -5236,7 +6661,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "origem",
     "it": "origine",
     "tr": "köken",
-    "zh-CN": "起源"
+    "zh-CN": "起源",
+    'zh-TW': "起源",
+    ko: "기원",
+    ja: "起源",
   },
   "Orla": {
     "es": "Orla",
@@ -5247,7 +6675,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "orla",
     "it": "Orla",
     "tr": "orla",
-    "zh-CN": "奥尔拉"
+    "zh-CN": "奥尔拉",
+    'zh-TW': "奧爾拉",
+    ko: "가장자리",
+    ja: "リム",
   },
   "Orla Negra": {
     "es": "Orla Negra",
@@ -5258,7 +6689,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Borda Preta",
     "it": "Bordo nero",
     "tr": "Siyah Kenarlık",
-    "zh-CN": "黑奥尔拉"
+    "zh-CN": "黑奥尔拉",
+    'zh-TW': "黑奧爾拉",
+    ko: "블랙 림",
+    ja: "ブラックリム",
   },
   "Orquídea de sal": {
     "es": "Orquídea de sal",
@@ -5269,7 +6703,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "orquídea salgada",
     "it": "orchidea di sale",
     "tr": "tuz orkide",
-    "zh-CN": "盐兰"
+    "zh-CN": "盐兰",
+    'zh-TW': "鹽蘭",
+    ko: "소금 난초",
+    ja: "塩蘭",
   },
   "Orthea": {
     "es": "Orthea",
@@ -5280,7 +6717,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Orteia",
     "it": "Ortea",
     "tr": "Orthea",
-    "zh-CN": "奥尔特亚"
+    "zh-CN": "奥尔特亚",
+    'zh-TW': "奧爾特亞",
+    ko: "오르테아",
+    ja: "オルテア",
   },
   "Orthea antes del Hundimiento": {
     "es": "Orthea antes del Hundimiento",
@@ -5291,7 +6731,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Orthea antes do naufrágio",
     "it": "Ortea prima del naufragio",
     "tr": "Batmadan Önce Orthea",
-    "zh-CN": "沉没前的奥尔特亚"
+    "zh-CN": "沉没前的奥尔特亚",
+    'zh-TW': "沉沒前的奧爾特亞",
+    ko: "침몰 전의 오르테아",
+    ja: "沈没前のオルテア",
   },
   "Oye memoria residual almacenada en vidrio.": {
     "es": "Oye memoria residual almacenada en vidrio.",
@@ -5302,7 +6745,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ei, memória residual armazenada em vidro.",
     "it": "Ehi, memoria residua conservata nel vetro.",
     "tr": "Hey, camda saklanan kalan hafıza.",
-    "zh-CN": "能听见储存在玻璃中的残余记忆。"
+    "zh-CN": "能听见储存在玻璃中的残余记忆。",
+    'zh-TW': "能聽見儲存在玻璃中的殘餘記憶。",
+    ko: "유리에 저장된 잔여 기억을 듣습니다.",
+    ja: "ガラスに保存された残りの記憶を聞きます。",
   },
   "Papel húmedo, mecanismos de llaves y ecos que no pertenecen al presente.": {
     "es": "Papel húmedo, mecanismos de llaves y ecos que no pertenecen al presente.",
@@ -5313,7 +6759,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Papel molhado, mecanismos chave e ecos que não pertencem ao presente.",
     "it": "Carta bagnata, meccanismi chiave ed echi che non appartengono al presente.",
     "tr": "Islak kağıt, günümüze ait olmayan anahtar mekanizmalar ve yankılar.",
-    "zh-CN": "潮湿的纸张、锁具机构，以及不属于当下的回声。"
+    "zh-CN": "潮湿的纸张、锁具机构，以及不属于当下的回声。",
+    'zh-TW': "潮溼的紙張、鎖具機構，以及不屬於當下的回聲。",
+    ko: "현재에 속하지 않는 축축한 종이, 핵심 메커니즘과 울림.",
+    ja: "湿った紙、現在に属さない鍵のメカニズムとエコー。",
   },
   "Parco, antiguo y ceremonial. Prefiere sustantivos y verbos concretos, evita explicaciones y responde a dilemas con la fórmula del deber implicado. Sus frases rara vez superan una línea salvo al recitar un juramento.": {
     "es": "Parco, antiguo y ceremonial. Prefiere sustantivos y verbos concretos, evita explicaciones y responde a dilemas con la fórmula del deber implicado. Sus frases rara vez superan una línea salvo al recitar un juramento.",
@@ -5324,7 +6773,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Esparso, antigo e cerimonial. Ele prefere substantivos e verbos concretos, evita explicações e responde aos dilemas com a fórmula do dever implícito. Suas sentenças raramente excedem uma linha, exceto quando recita um juramento.",
     "it": "Raro, antico e cerimoniale. Predilige nomi e verbi concreti, evita le spiegazioni e risponde ai dilemmi con la formula del dovere implicito. Le sue frasi raramente superano una riga tranne quando recitano un giuramento.",
     "tr": "Seyrek, eski ve törensel. Somut isim ve fiilleri tercih eder, açıklamalardan kaçınır ve ikilemlere ima edilen görev formülüyle yanıt verir. Yemin ettiği zamanlar dışında cümleleri nadiren bir satırı aşar.",
-    "zh-CN": "简洁、古旧而庄重。偏爱具体名词和动词，避免解释，遇到难题便用义务所系的套语作答。他的句子很少超过一行，除非在背诵誓言。"
+    "zh-CN": "简洁、古旧而庄重。偏爱具体名词和动词，避免解释，遇到难题便用义务所系的套语作答。他的句子很少超过一行，除非在背诵誓言。",
+    'zh-TW': "簡潔、古舊而莊重。偏愛具體名詞和動詞，避免解釋，遇到難題便用義務所繫的套語作答。他的句子很少超過一行，除非在背誦誓言。",
+    ko: "여유롭고 구식이며 의식적입니다. 구체적인 명사와 동사를 선호하고 설명을 피하며 관련 의무 공식으로 딜레마에 답합니다. 맹세를 하지 않는 이상 문장이 한 줄을 넘는 일이 거의 없습니다.",
+    ja: "控えめで、古風で、儀式的。具体的な名詞や動詞を好み、説明を避け、義務に関する適切な公式でジレンマに答えます。宣誓を暗唱しない限り、文章が一行を超えることはほとんどありません。",
   },
   "Pequeño depredador que sigue vibraciones a través de la roca.": {
     "es": "Pequeño depredador que sigue vibraciones a través de la roca.",
@@ -5335,7 +6787,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Pequeno predador que segue vibrações através da rocha.",
     "it": "Piccolo predatore che segue le vibrazioni attraverso la roccia.",
     "tr": "Kayadaki titreşimleri takip eden küçük yırtıcı hayvan.",
-    "zh-CN": "一种小型掠食者，靠振动穿过岩石追踪猎物。"
+    "zh-CN": "一种小型掠食者，靠振动穿过岩石追踪猎物。",
+    'zh-TW': "一種小型掠食者，靠振動穿過岩石追蹤獵物。",
+    ko: "바위를 통해 진동을 추적하는 작은 포식자입니다.",
+    ja: "岩の振動を追跡する小型の捕食者。",
   },
   "Percibe rutas recorridas por la luz.": {
     "es": "Percibe rutas recorridas por la luz.",
@@ -5346,7 +6801,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Perceber rotas percorridas pela luz.",
     "it": "Percepire i percorsi percorsi dalla luce.",
     "tr": "Işığın kat ettiği yolları algılayın.",
-    "zh-CN": "感知光所走过的路径。"
+    "zh-CN": "感知光所走过的路径。",
+    'zh-TW': "感知光所走過的路徑。",
+    ko: "빛이 이동한 경로를 인식합니다.",
+    ja: "光が移動するルートを認識します。",
   },
   "Perdió a su familia durante el primer apagón del Faro y Odran abandonó una patrulla para salvarlo. Años después organizó el Consejo de Ceniza como gobierno de emergencia y mantuvo la regencia tras el Hundimiento. Convirtió el racionamiento de luz en obediencia medible. Tras la desaparición de Nara, ocultó sus cálculos y conectó el Observatorio a la Tercera Luna para forzar una fuente estable. Cree que solo el Corazón de Vidrio puede impedir otra catástrofe.": {
     "es": "Perdió a su familia durante el primer apagón del Faro y Odran abandonó una patrulla para salvarlo. Años después organizó el Consejo de Ceniza como gobierno de emergencia y mantuvo la regencia tras el Hundimiento. Convirtió el racionamiento de luz en obediencia medible. Tras la desaparición de Nara, ocultó sus cálculos y conectó el Observatorio a la Tercera Luna para forzar una fuente estable. Cree que solo el Corazón de Vidrio puede impedir otra catástrofe.",
@@ -5357,7 +6815,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele perdeu sua família durante o primeiro apagão do Farol e Odran abandonou uma patrulha para salvá-lo. Anos mais tarde organizou o Conselho de Cinzas como um governo de emergência e manteve a regência após o Naufrágio. Ele transformou o racionamento leve em obediência mensurável. Após o desaparecimento de Nara, ele escondeu seus cálculos e conectou o Observatório à Terceira Lua para forçar uma fonte estável. Ele acredita que apenas o Coração de Vidro pode evitar outra catástrofe.",
     "it": "Ha perso la famiglia durante il primo blackout del Faro e Odran ha abbandonato una pattuglia per salvarlo. Anni dopo organizzò il Consiglio di Ash come governo di emergenza e mantenne la reggenza dopo l'affondamento. Trasformò il razionamento leggero in un’obbedienza misurabile. Dopo la scomparsa di Nara, nascose i suoi calcoli e collegò l'Osservatorio alla Terza Luna per forzare una fonte stabile. Crede che solo il Cuore di Vetro possa prevenire un'altra catastrofe.",
     "tr": "İlk Deniz Feneri kesintisi sırasında ailesini kaybetti ve Odran onu kurtarmak için devriyeyi terk etti. Yıllar sonra, acil bir hükümet olarak Kül Konseyi'ni örgütledi ve Batan'dan sonra naipliğini sürdürdü. Işık payını ölçülebilir itaate dönüştürdü. Nara'nın ortadan kaybolmasının ardından hesaplamalarını sakladı ve istikrarlı bir kaynağı zorlamak için Gözlemevi'ni Üçüncü Ay'a bağladı. Yalnızca Camdan Kalp'in başka bir felaketi önleyebileceğine inanıyor.",
-    "zh-CN": "他在灯塔的第一次熄灯中失去了家人，当时奥德兰放弃一次巡逻把他救了下来。多年后，他组织灰烬议事会作为紧急政府，并在大沉没后保住了摄政之位。他把光的配给变成可衡量的服从。娜拉失踪后，他隐瞒了她的计算，并把天文台连接到第三月，以强行获得一个稳定的来源。他相信只有玻璃之心才能阻止下一场灾难。"
+    "zh-CN": "他在灯塔的第一次熄灯中失去了家人，当时奥德兰放弃一次巡逻把他救了下来。多年后，他组织灰烬议事会作为紧急政府，并在大沉没后保住了摄政之位。他把光的配给变成可衡量的服从。娜拉失踪后，他隐瞒了她的计算，并把天文台连接到第三月，以强行获得一个稳定的来源。他相信只有玻璃之心才能阻止下一场灾难。",
+    'zh-TW': "他在燈塔的第一次熄燈中失去了家人，當時奧德蘭放棄一次巡邏把他救了下來。多年後，他組織灰燼議事會作為緊急政府，並在大沉沒後保住了攝政之位。他把光的配給變成可衡量的服從。娜拉失蹤後，他隱瞞了她的計算，並把天文臺連線到第三月，以強行獲得一個穩定的來源。他相信只有玻璃之心才能阻止下一場災難。",
+    ko: "그는 Odran이 그를 구하기 위해 순찰을 포기했을 때 Lighthouse의 첫 번째 정전 중에 가족을 잃었습니다. 몇 년 후 그는 긴급 정부로 Ash Council을 조직하고 침몰 후에도 섭정직을 유지했습니다. 그는 가벼운 배급을 측정 가능한 순종으로 바꾸었습니다. 나라가 사라진 후 그는 그녀의 계산을 숨기고 천문대를 세 번째 달에 연결하여 안정적인 소스를 강제했습니다. 그는 Glass Heart만이 또 다른 재앙을 막을 수 있다고 믿습니다.",
+    ja: "彼は灯台の最初の停電で家族を失い、オドランが彼を救うためにパトロールを放棄した。数年後、彼は緊急政府として灰評議会を組織し、沈没後も摂政を維持した。彼は軽い配給を測定可能な服従に変えました。ナラが消えた後、彼は彼女の計算を隠し、安定した情報源を強制するために天文台を第三の月に接続しました。彼はグラス・ハートだけがさらなる大惨事を防ぐことができると信じている。",
   },
   "Perdió a su familia en el primer apagón del Faro.": {
     "es": "Perdió a su familia en el primer apagón del Faro.",
@@ -5368,7 +6829,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele perdeu a família no primeiro apagão do Farol.",
     "it": "Ha perso la sua famiglia nel primo blackout del Faro.",
     "tr": "İlk Deniz Feneri kesintisinde ailesini kaybetti.",
-    "zh-CN": "他在灯塔的第一次熄灯中失去了家人。"
+    "zh-CN": "他在灯塔的第一次熄灯中失去了家人。",
+    'zh-TW': "他在燈塔的第一次熄燈中失去了家人。",
+    ko: "그는 등대 최초의 정전으로 가족을 잃었습니다.",
+    ja: "彼は灯台の最初の停電で家族を失いました。",
   },
   "pergamino ilustrado": {
     "es": "pergamino ilustrado",
@@ -5379,7 +6843,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "pergaminho ilustrado",
     "it": "pergamena illustrata",
     "tr": "resimli parşömen",
-    "zh-CN": "插图羊皮纸"
+    "zh-CN": "插图羊皮纸",
+    'zh-TW': "插圖羊皮紙",
+    ko: "그림이 그려진 양피지",
+    ja: "絵入り羊皮紙",
   },
   "Pierde un recuerdo reciente por cada mapa leído.": {
     "es": "Pierde un recuerdo reciente por cada mapa leído.",
@@ -5390,7 +6857,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Perde uma memória recente para cada leitura de mapa.",
     "it": "Perde una memoria recente per ogni mappa letta.",
     "tr": "Her harita okumasında güncel hafızayı kaybedersiniz.",
-    "zh-CN": "每读一张地图，就失去一段近期记忆。"
+    "zh-CN": "每读一张地图，就失去一段近期记忆。",
+    'zh-TW': "每讀一張地圖，就失去一段近期記憶。",
+    ko: "지도를 읽을 때마다 최근 메모리 하나가 손실됩니다.",
+    ja: "マップの読み取りごとに最近の記憶が1つ失われます。",
   },
   "Polvo de sal, órdenes breves y el golpeteo de banderas tensas.": {
     "es": "Polvo de sal, órdenes breves y el golpeteo de banderas tensas.",
@@ -5401,7 +6871,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Pó de sal, ordens breves e batidas de bandeiras tensas.",
     "it": "Polvere di sale, ordini brevi e battiti di bandiere tese.",
     "tr": "Tuz tozu, kısa emirler ve gergin bayrakların vurulması.",
-    "zh-CN": "盐尘、简短的命令，以及绷紧的旗帜拍打声。"
+    "zh-CN": "盐尘、简短的命令，以及绷紧的旗帜拍打声。",
+    'zh-TW': "鹽塵、簡短的命令，以及繃緊的旗幟拍打聲。",
+    ko: "소금 먼지, 잘려진 주문서, 팽팽한 깃발이 바람에 펄럭입니다.",
+    ja: "塩の砂埃、切り取られた注文書、風になびく張りつめた旗。",
   },
   "Pospone la decisión moral hasta que otros deciden por él.": {
     "es": "Pospone la decisión moral hasta que otros deciden por él.",
@@ -5412,7 +6885,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele adia a decisão moral até que outros decidam por ele.",
     "it": "Rimanda la decisione morale finché altri non decideranno per lui.",
     "tr": "Ahlaki kararı başkaları onun adına karar verene kadar erteler.",
-    "zh-CN": "他把道德抉择一拖再拖，直到别人替他决定。"
+    "zh-CN": "他把道德抉择一拖再拖，直到别人替他决定。",
+    'zh-TW': "他把道德抉擇一拖再拖，直到別人替他決定。",
+    ko: "그는 다른 사람들이 그를 대신해 선택할 때까지 도덕적 선택을 연기합니다.",
+    ja: "彼は他の人が選択するまで道徳的な選択を先延ばしにします。",
   },
   "Preciso, contenido y visual. Usa frases cortas al decidir y vocabulario de rumbo, escala, borde, deriva y coordenadas. Evita adornos salvo cuando habla de mapas o de Nara. No eleva la voz: cuanto más enfadada está, más exacta se vuelve.": {
     "es": "Preciso, contenido y visual. Usa frases cortas al decidir y vocabulario de rumbo, escala, borde, deriva y coordenadas. Evita adornos salvo cuando habla de mapas o de Nara. No eleva la voz: cuanto más enfadada está, más exacta se vuelve.",
@@ -5423,7 +6899,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Preciso, conteúdo e visual. Use frases curtas ao decidir e vocabulário para rumo, escala, borda, desvio e coordenadas. Ele evita enfeites, exceto quando fala sobre mapas ou Nara. Ela não levanta a voz: quanto mais irritada ela fica, mais exata ela se torna.",
     "it": "Preciso, contenuto e visivo. Usa frasi brevi quando decidi e il vocabolario per direzione, scala, bordo, deriva e coordinate. Evita gli abbellimenti tranne quando si parla di mappe o Nara. Non alza la voce: più è arrabbiata, più diventa precisa.",
     "tr": "Hassas, içerik ve görsel. Karar verirken kısa ifadeler kullanın ve yön, ölçek, kenar, sapma ve koordinatlar için sözcükler kullanın. Haritalar veya Nara hakkında konuştuğu zamanlar dışında süslemelerden kaçınır. Sesini yükseltmiyor; ne kadar öfkelenirse o kadar kesin konuşuyor.",
-    "zh-CN": "精确、克制而富有画面感。做决定时用短句，并使用航向、比例、边缘、漂移和坐标一类的词汇。除了谈到地图或娜拉，她避免修饰。她不会提高嗓门：越生气，她越精确。"
+    "zh-CN": "精确、克制而富有画面感。做决定时用短句，并使用航向、比例、边缘、漂移和坐标一类的词汇。除了谈到地图或娜拉，她避免修饰。她不会提高嗓门：越生气，她越精确。",
+    'zh-TW': "精確、剋制而富有畫面感。做決定時用短句，並使用航向、比例、邊緣、漂移和座標一類的詞彙。除了談到地圖或娜拉，她避免修飾。她不會提高嗓門：越生氣，她越精確。",
+    ko: "정확하고, 포함되어 있으며, 시각적입니다. 그녀는 베어링, 스케일, 모서리, 드리프트 및 좌표에 대한 어휘를 결정할 때 짧은 문장을 사용합니다. 그녀는 지도나 나라에 관해 말할 때를 제외하고는 장식을 피합니다. 그녀는 목소리를 높이지 않습니다. 화를 낼수록 더욱 정확해집니다.",
+    ja: "正確で、抑制されており、視覚的です。彼女は決定する際に短い文章を使用し、方位、スケール、エッジ、ドリフト、座標などの語彙を使用します。彼女は地図や奈良について話すとき以外は装飾を避ける。彼女は声を上げません。怒れば怒るほど、彼女はより正確になります。",
   },
   "Predica que toda luz exige una deuda equivalente, doctrina que el Consejo interpreta literalmente.": {
     "es": "Predica que toda luz exige una deuda equivalente, doctrina que el Consejo interpreta literalmente.",
@@ -5434,7 +6913,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele prega que toda luz exige uma dívida equivalente, doutrina que o Concílio interpreta literalmente.",
     "it": "Predica che ogni luce richiede un debito equivalente, dottrina che il Concilio interpreta alla lettera.",
     "tr": "Her ışığın eşdeğer bir borç gerektirdiğini vaaz ediyor; bu, Konseyin harfiyen yorumladığı bir doktrin.",
-    "zh-CN": "它宣讲每一束光都要求等价的债务，而议事会按字面理解这一教义。"
+    "zh-CN": "它宣讲每一束光都要求等价的债务，而议事会按字面理解这一教义。",
+    'zh-TW': "它宣講每一束光都要求等價的債務，而議事會按字面理解這一教義。",
+    ko: "그것은 모든 빛이 동등한 빚을 요구한다고 가르치며, 공의회는 이 교리를 문자 그대로 해석합니다.",
+    ja: "それは、すべての光は平等な負債を要求することを教えており、評議会はこれを文字通り解釈しています。",
   },
   "Preguntas para lectores beta": {
     "es": "Preguntas para lectores beta",
@@ -5445,7 +6927,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Perguntas para leitores beta",
     "it": "Domande per i lettori beta",
     "tr": "Beta okuyucuları için sorular",
-    "zh-CN": "面向 Beta 读者的提问"
+    "zh-CN": "面向 Beta 读者的提问",
+    'zh-TW': "面向 Beta 讀者的提問",
+    ko: "베타 독자 질문",
+    ja: "ベータ版読者の質問",
   },
   "Premisa y promesa": {
     "es": "Premisa y promesa",
@@ -5456,7 +6941,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Premissa e promessa",
     "it": "Premessa e promessa",
     "tr": "Önerme ve söz",
-    "zh-CN": "前提与承诺"
+    "zh-CN": "前提与承诺",
+    'zh-TW': "前提與承諾",
+    ko: "전제와 약속",
+    ja: "前提と約束",
   },
   "presagio": {
     "es": "presagio",
@@ -5467,7 +6955,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "presságio",
     "it": "presagio",
     "tr": "alamet",
-    "zh-CN": "预兆"
+    "zh-CN": "预兆",
+    'zh-TW': "預兆",
+    ko: "전조",
+    ja: "前兆",
   },
   "Previsto para 743 D.F.": {
     "es": "Previsto para 743 D.F.",
@@ -5478,7 +6969,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Programado para 743 D.F.",
     "it": "Previsto per il 743 D.F.",
     "tr": "743 D.F.'ye planlandı.",
-    "zh-CN": "预计于 743 D.F."
+    "zh-CN": "预计于 743 D.F.",
+    'zh-TW': "預計於 743 D.F.",
+    ko: "743 A.L.",
+    ja: "743 A.L.を計画",
   },
   "primogénita": {
     "es": "primogénita",
@@ -5489,7 +6983,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "primogênito",
     "it": "primogenito",
     "tr": "ilk doğan",
-    "zh-CN": "长女"
+    "zh-CN": "长女",
+    'zh-TW': "長女",
+    ko: "맏아들",
+    ja: "初子",
   },
   "Primogénita de Aurel Venn, astrónoma real y desaparecida desde hace nueve meses.": {
     "es": "Primogénita de Aurel Venn, astrónoma real y desaparecida desde hace nueve meses.",
@@ -5500,7 +6997,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Primogênito de Aurel Venn, astrônomo real e desaparecido há nove meses.",
     "it": "Primogenito di Aurel Venn, astronomo reale e scomparso da nove mesi.",
     "tr": "Kraliyet gökbilimcisi Aurel Venn'in ilk çocuğu ve dokuz aydır kayıp.",
-    "zh-CN": "奥雷尔·文的长女，王室天文学家，已失踪九个月。"
+    "zh-CN": "奥雷尔·文的长女，王室天文学家，已失踪九个月。",
+    'zh-TW': "奧雷爾·文的長女，王室天文學家，已失蹤九個月。",
+    ko: "오렐 벤(Aurel Venn)의 큰 딸이자 왕실 천문학자인 오렐 벤(Aurel Venn)이 9개월 동안 실종되었습니다.",
+    ja: "王室天文学者オーレル・ベンの長女が9か月間行方不明。",
   },
   "Primogénita de Aurel y astrónoma real, convirtió el Observatorio de Orla en un laboratorio capaz de medir la Tercera Luna. Su primera gran predicción provocó una evacuación caótica y muertes que todavía se atribuye. Descubrió que la Luna era una puerta vinculada al Corazón, ocultó los cálculos a Ilyra y trató de sabotear el mecanismo de Maelor. Desapareció durante la prueba; continúa viva como memoria consciente dentro del Corazón y solo puede enviar fragmentos a través de vidrio antiguo.": {
     "es": "Primogénita de Aurel y astrónoma real, convirtió el Observatorio de Orla en un laboratorio capaz de medir la Tercera Luna. Su primera gran predicción provocó una evacuación caótica y muertes que todavía se atribuye. Descubrió que la Luna era una puerta vinculada al Corazón, ocultó los cálculos a Ilyra y trató de sabotear el mecanismo de Maelor. Desapareció durante la prueba; continúa viva como memoria consciente dentro del Corazón y solo puede enviar fragmentos a través de vidrio antiguo.",
@@ -5511,7 +7011,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Filha mais velha de Aurel e astrônoma real, ela converteu o Observatório Orla em um laboratório capaz de medir a Terceira Lua. Sua primeira grande previsão levou a uma evacuação caótica e a mortes pelas quais ele ainda reivindica crédito. Ele descobriu que a Lua era um portão ligado ao Coração, escondeu os cálculos de Ilyra e tentou sabotar o mecanismo de Maelor. Ele desapareceu durante o teste; continua a viver como memória consciente dentro do Coração e só pode enviar fragmentos através de vidro antigo.",
     "it": "Figlia maggiore di Aurel e astronoma reale, convertì l'Osservatorio Orla in un laboratorio in grado di misurare la Terza Luna. La sua prima grande previsione portò a un'evacuazione caotica e a morti di cui continua a rivendicare il merito. Scoprì che la Luna era una porta collegata al Cuore, nascose i calcoli a Ilyra e tentò di sabotare il meccanismo di Maelor. È scomparso durante la prova; continua a vivere come memoria cosciente nel Cuore e può solo trasmetterne frammenti attraverso il vetro antico.",
     "tr": "Aurel'in en büyük kızı ve kraliyet gökbilimcisi, Orla Gözlemevi'ni Üçüncü Ay'ı ölçebilecek bir laboratuvara dönüştürdü. İlk büyük tahmini, kaotik bir tahliyeye ve hala övgüyü hak ettiği ölümlere yol açtı. Ay'ın Kalbe bağlı bir kapı olduğunu keşfetti, hesaplamaları Ilyra'dan sakladı ve Maelor'un mekanizmasını sabote etmeye çalıştı. Test sırasında ortadan kayboldu; Kalpte bilinçli bir anı olarak yaşamaya devam eder ve kadim camdan yalnızca parçalar gönderebilir.",
-    "zh-CN": "奥雷尔的长女、王室天文学家，她把奥尔拉天文台变成了一台能够测量第三月的仪器。她第一次重大预测导致一场混乱的疏散，以及她至今仍归咎于自己的数人死亡。她发现月亮是一扇与玻璃之心相连的门，向伊莉拉隐瞒了计算，并试图破坏梅洛尔的机制。她在测试中失踪；她作为意识记忆在玻璃之心内继续存活，只能通过古老的玻璃送出碎片。"
+    "zh-CN": "奥雷尔的长女、王室天文学家，她把奥尔拉天文台变成了一台能够测量第三月的仪器。她第一次重大预测导致一场混乱的疏散，以及她至今仍归咎于自己的数人死亡。她发现月亮是一扇与玻璃之心相连的门，向伊莉拉隐瞒了计算，并试图破坏梅洛尔的机制。她在测试中失踪；她作为意识记忆在玻璃之心内继续存活，只能通过古老的玻璃送出碎片。",
+    'zh-TW': "奧雷爾的長女、王室天文學家，她把奧爾拉天文臺變成了一臺能夠測量第三月的儀器。她第一次重大預測導致一場混亂的疏散，以及她至今仍歸咎於自己的數人死亡。她發現月亮是一扇與玻璃之心相連的門，向伊莉拉隱瞞了計算，並試圖破壞梅洛爾的機制。她在測試中失蹤；她作為意識記憶在玻璃之心內繼續存活，只能通過古老的玻璃送出碎片。",
+    ko: "오렐의 큰 딸이자 왕실 천문학자인 그녀는 올라 천문대를 세 번째 달을 측정할 수 있는 도구로 만들었습니다. 그녀의 첫 번째 주요 예측은 혼란스러운 대피와 사망을 초래했으며 여전히 그녀는 자신의 것이라고 주장합니다. 그녀는 달이 심장과 연결된 문이라는 사실을 발견하고 Ilyra에게 계산을 숨기고 Maelor의 메커니즘을 방해하려고 시도했습니다. 그녀는 테스트 중에 사라졌습니다. 그녀는 심장 속의 의식적 기억으로 살아남으며 오래된 유리를 통해서만 파편을 보낼 수 있습니다.",
+    ja: "オーレルの長女で王室天文学者である彼女は、オーラ天文台を第三の月を測定できる装置に変えました。彼女の最初の大きな予言は混乱を引き起こし、避難を余儀なくされ、彼女は今でも自分のものだと主張する死者を出した。彼女は月がハートにつながる門であることを発見し、イリラに計算を隠し、メーラーの仕組みを妨害しようとした。彼女はテスト中に姿を消しました。彼女はハートの中に意識的な記憶として生き残り、古いガラスを通してのみ断片を送ることができます。",
   },
   "Prólogo": {
     "es": "Prólogo",
@@ -5522,7 +7025,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Prólogo",
     "it": "Prologo",
     "tr": "Giriş",
-    "zh-CN": "序章"
+    "zh-CN": "序章",
+    'zh-TW': "序章",
+    ko: "프롤로그",
+    ja: "プロローグ",
   },
   "Prólogo · El último encendido": {
     "es": "Prólogo · El último encendido",
@@ -5533,7 +7039,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Prólogo · A última ignição",
     "it": "Prologo · L'ultima accensione",
     "tr": "Giriş · Son ateşleme",
-    "zh-CN": "序章 · 最后一次点亮"
+    "zh-CN": "序章 · 最后一次点亮",
+    'zh-TW': "序章 · 最後一次點亮",
+    ko: "프롤로그 · 마지막 라이팅",
+    ja: "プロローグ・最後の照明",
   },
   "Pronunciar el nombre verdadero de un ser de vidrio permite darle una sola orden.": {
     "es": "Pronunciar el nombre verdadero de un ser de vidrio permite darle una sola orden.",
@@ -5544,7 +7053,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Pronunciar o verdadeiro nome de um ser de vidro permite-lhe dar-lhe um único comando.",
     "it": "Pronunciare il vero nome di un essere di vetro gli permette di impartirgli un unico comando.",
     "tr": "Bir cam varlığın gerçek adının söylenmesi, ona tek bir komut vermesini sağlar.",
-    "zh-CN": "说出玻璃造物的真名，即可向它下达一道命令。"
+    "zh-CN": "说出玻璃造物的真名，即可向它下达一道命令。",
+    'zh-TW': "說出玻璃造物的真名，即可向它下達一道命令。",
+    ko: "유리 존재의 실제 이름을 말하면 하나의 명령이 허용됩니다.",
+    ja: "ガラスの存在の真名を話すと、1つのコマンドが許可されます。",
   },
   "Propuesta ya aceptada, conservada para demostrar el historial.": {
     "es": "Propuesta ya aceptada, conservada para demostrar el historial.",
@@ -5555,7 +7067,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Proposta já aceita, preservada para demonstrar a história.",
     "it": "Proposta già accettata, conservata per dimostrare la storia.",
     "tr": "Teklif zaten kabul edildi, tarihi göstermek için saklandı.",
-    "zh-CN": "已获通过的提案，保留以展示历史记录。"
+    "zh-CN": "已获通过的提案，保留以展示历史记录。",
+    'zh-TW': "已獲通過的提案，保留以展示歷史記錄。",
+    ko: "승인된 제안은 기록을 보여주기 위해 유지됩니다.",
+    ja: "受け入れられた提案は履歴を示すために保持されます。",
   },
   "Protege a los demás negándoles información.": {
     "es": "Protege a los demás negándoles información.",
@@ -5566,7 +7081,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Proteja os outros negando-lhes informações.",
     "it": "Proteggi gli altri negando loro informazioni.",
     "tr": "Başkalarına bilgi vermeyerek onları koruyun.",
-    "zh-CN": "她通过向他人隐瞒信息来保护他们。"
+    "zh-CN": "她通过向他人隐瞒信息来保护他们。",
+    'zh-TW': "她通過向他人隱瞞資訊來保護他們。",
+    ko: "그녀는 정보를 거부함으로써 다른 사람들을 보호합니다.",
+    ja: "彼女は他人の情報を拒否することで他人を守ります。",
   },
   "protege en secreto": {
     "es": "protege en secreto",
@@ -5577,7 +7095,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "proteger secretamente",
     "it": "proteggere segretamente",
     "tr": "gizlice korumak",
-    "zh-CN": "暗中保护"
+    "zh-CN": "暗中保护",
+    'zh-TW': "暗中保護",
+    ko: "비밀리에 보호한다",
+    ja: "密かに守る",
   },
   "Pueblo anfibio adaptado a las corrientes de vidrio.": {
     "es": "Pueblo anfibio adaptado a las corrientes de vidrio.",
@@ -5588,7 +7109,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Pessoas anfíbias adaptadas às correntes de vidro.",
     "it": "Popoli anfibi adattati alle correnti di vetro.",
     "tr": "Amfibi insanlar cam akıntılarına adapte oldular.",
-    "zh-CN": "一个适应玻璃水流的两栖民族。"
+    "zh-CN": "一个适应玻璃水流的两栖民族。",
+    'zh-TW': "一個適應玻璃水流的兩棲民族。",
+    ko: "유리 해류에 적응한 수륙 양용 종족.",
+    ja: "ガラスの流れに適応した水陸両用民。",
   },
   "Pueblos de la Marea": {
     "es": "Pueblos de la Marea",
@@ -5599,7 +7123,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cidades da Maré",
     "it": "Le città della marea",
     "tr": "Gelgit Kasabaları",
-    "zh-CN": "潮汐民族"
+    "zh-CN": "潮汐民族",
+    'zh-TW': "潮汐民族",
+    ko: "조수 민족",
+    ja: "タイドピープルズ",
   },
   "Puede pronunciarse bajo el agua y conserva tiempos verbales para recuerdos heredados.": {
     "es": "Puede pronunciarse bajo el agua y conserva tiempos verbales para recuerdos heredados.",
@@ -5610,7 +7137,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Pode ser falado debaixo d'água e preserva os tempos verbais das memórias herdadas.",
     "it": "Può essere parlato sott'acqua e conserva i tempi verbali per i ricordi ereditati.",
     "tr": "Su altında konuşulabiliyor ve kalıtsal anılar için zamanları koruyor.",
-    "zh-CN": "它可以在水下发音，并为继承而来的记忆保留动词时态。"
+    "zh-CN": "它可以在水下发音，并为继承而来的记忆保留动词时态。",
+    'zh-TW': "它可以在水下發音，併為繼承而來的記憶保留動詞時態。",
+    ko: "물속에서 말할 수 있으며 유전된 기억을 위해 동사 시제를 보존합니다.",
+    ja: "水中で話すことができ、動詞の時制を継承した記憶に保存します。",
   },
   "Puede servir a Maelor y proteger a Ilyra a la vez.": {
     "es": "Puede servir a Maelor y proteger a Ilyra a la vez.",
@@ -5621,7 +7151,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele pode servir Maelor e proteger Ilyra ao mesmo tempo.",
     "it": "Può servire Maelor e proteggere Ilyra allo stesso tempo.",
     "tr": "Aynı zamanda Maelor'a hizmet edebilir ve Ilyra'yı koruyabilir.",
-    "zh-CN": "他可以同时效忠梅洛尔并保护伊莉拉。"
+    "zh-CN": "他可以同时效忠梅洛尔并保护伊莉拉。",
+    'zh-TW': "他可以同時效忠梅洛爾並保護伊莉拉。",
+    ko: "그는 Maelor를 섬기는 동시에 Ilyra를 보호할 수 있습니다.",
+    ja: "彼はメーラーに仕えると同時にイリラを守ることができる。",
   },
   "Puerta de Sal": {
     "es": "Puerta de Sal",
@@ -5632,7 +7165,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Portão de Sal",
     "it": "Porta del Sale",
     "tr": "Tuz Kapısı",
-    "zh-CN": "盐门"
+    "zh-CN": "盐门",
+    'zh-TW': "鹽門",
+    ko: "솔트 게이트",
+    ja: "塩の門",
   },
   "punto de vista": {
     "es": "punto de vista",
@@ -5643,7 +7179,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "ponto de vista",
     "it": "punto di vista",
     "tr": "bakış açısı",
-    "zh-CN": "视角"
+    "zh-CN": "视角",
+    'zh-TW': "視角",
+    ko: "관점",
+    ja: "視点",
   },
   "Quien escucha hereda también una emoción.": {
     "es": "Quien escucha hereda también una emoción.",
@@ -5654,7 +7193,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Quem escuta também herda uma emoção.",
     "it": "Chi ascolta eredita anche un'emozione.",
     "tr": "Dinleyen kişi aynı zamanda bir duyguyu da miras alır.",
-    "zh-CN": "倾听者也会继承一种情感。"
+    "zh-CN": "倾听者也会继承一种情感。",
+    'zh-TW': "傾聽者也會繼承一種情感。",
+    ko: "듣는 사람도 감정을 물려받습니다.",
+    ja: "聞き手も感情を継承します。",
   },
   "Quien lo pronuncia pierde para siempre ese nombre de su memoria.": {
     "es": "Quien lo pronuncia pierde para siempre ese nombre de su memoria.",
@@ -5665,7 +7207,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Quem o pronuncia perde para sempre esse nome da memória.",
     "it": "Chi lo pronuncia perde per sempre quel nome dalla memoria.",
     "tr": "Kim bunu sonsuza kadar telaffuz ederse, o ismi hafızasından kaybeder.",
-    "zh-CN": "说出它的人将永远从记忆中失去那个名字。"
+    "zh-CN": "说出它的人将永远从记忆中失去那个名字。",
+    'zh-TW': "說出它的人將永遠從記憶中失去那個名字。",
+    ko: "화자는 그 이름을 기억에서 영구적으로 잃습니다.",
+    ja: "話者はその名前を記憶から永久に失います。",
   },
   "Quietud": {
     "es": "Quietud",
@@ -5676,7 +7221,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Quietude",
     "it": "Quiete",
     "tr": "Sakinlik",
-    "zh-CN": "寂静"
+    "zh-CN": "寂静",
+    'zh-TW': "寂靜",
+    ko: "고요함",
+    ja: "静止",
   },
   "Rápido, técnico y asociativo. Usa astronomía, óptica y geometría, pero traduce con metáforas domésticas cuando nota que ha perdido a su interlocutor. Las frases se interrumpen con correcciones que afinan, no que suavizan.": {
     "es": "Rápido, técnico y asociativo. Usa astronomía, óptica y geometría, pero traduce con metáforas domésticas cuando nota que ha perdido a su interlocutor. Las frases se interrumpen con correcciones que afinan, no que suavizan.",
@@ -5687,7 +7235,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Rápido, técnico e associativo. Ele usa astronomia, óptica e geometria, mas traduz com metáforas domésticas quando percebe que perdeu seu interlocutor. As frases são interrompidas com correções que refinam, não suavizam.",
     "it": "Veloce, tecnico e associativo. Utilizza l'astronomia, l'ottica e la geometria, ma traduce con metafore domestiche quando si accorge di aver perso il suo interlocutore. Le frasi sono interrotte da correzioni che affinano, non ammorbidiscono.",
     "tr": "Hızlı, teknik ve ilişkisel. Astronomi, optik ve geometri kullanıyor ama muhatabını kaybettiğini fark ettiğinde yerli metaforlarla çeviri yapıyor. Cümleler yumuşatmak yerine rafine eden düzeltmelerle kesintiye uğruyor.",
-    "zh-CN": "快速、专业而善于联想。她使用天文学、光学和几何学术语，但察觉对方听不懂时，就用日常的比喻来解释。句子常被修正打断，这些修正使表达更精确，而非更委婉。"
+    "zh-CN": "快速、专业而善于联想。她使用天文学、光学和几何学术语，但察觉对方听不懂时，就用日常的比喻来解释。句子常被修正打断，这些修正使表达更精确，而非更委婉。",
+    'zh-TW': "快速、專業而善於聯想。她使用天文學、光學和幾何學術語，但察覺對方聽不懂時，就用日常的比喻來解釋。句子常被修正打斷，這些修正使表達更精確，而非更委婉。",
+    ko: "신속하고 기술적이며 연관성이 높습니다. 그녀는 천문학, 광학, 기하학을 사용하다가 듣는 사람이 사라졌음을 깨닫고 가정적인 은유로 번역합니다. 문장은 부드러워지기보다는 날카로워지는 교정으로 나누어집니다.",
+    ja: "迅速、技術的、連想的。彼女は天文学、光学、幾何学を使用し、聞き手を失ったことに気づいたときは家庭内の比喩を使って翻訳します。文は、柔らかくするのではなくシャープにする修正に分割されます。",
   },
   "Rastreador de ecos": {
     "es": "Rastreador de ecos",
@@ -5698,7 +7249,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "rastreador de eco",
     "it": "localizzatore di eco",
     "tr": "yankı izleyici",
-    "zh-CN": "回声追踪器"
+    "zh-CN": "回声追踪器",
+    'zh-TW': "回聲追蹤器",
+    ko: "에코 추적기",
+    ja: "エコートラッカー",
   },
   "Reconocer que el orden sin consentimiento es otra forma de ruina.": {
     "es": "Reconocer que el orden sin consentimiento es otra forma de ruina.",
@@ -5709,7 +7263,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Reconheça que a ordem sem consentimento é outra forma de ruína.",
     "it": "Riconoscere che l'ordine senza consenso è un'altra forma di rovina.",
     "tr": "Rıza olmadan verilen düzenin yıkımın başka bir biçimi olduğunu kabul edin.",
-    "zh-CN": "承认没有同意的秩序是另一种毁灭。"
+    "zh-CN": "承认没有同意的秩序是另一种毁灭。",
+    'zh-TW': "承認沒有同意的秩序是另一種毀滅。",
+    ko: "동의 없는 질서는 또 다른 형태의 파멸임을 인식하십시오.",
+    ja: "同意のない秩序は破滅のもう一つの形態であることを認識してください。",
   },
   "Recuerda mareas anteriores al calendario y asegura haber conocido al Faro cuando todavía caminaba.": {
     "es": "Recuerda mareas anteriores al calendario y asegura haber conocido al Faro cuando todavía caminaba.",
@@ -5720,7 +7277,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele se lembra das marés anteriores ao calendário e afirma ter conhecido o Farol quando ainda caminhava.",
     "it": "Ricorda le maree prima del calendario e afferma di aver incontrato il Faro quando ancora camminava.",
     "tr": "Takvimden önceki gelgit olaylarını hatırlıyor ve Deniz Feneri ile henüz yürürken karşılaştığını iddia ediyor.",
-    "zh-CN": "她记得历法出现之前的潮汐，并声称在灯塔还会行走时就认识它。"
+    "zh-CN": "她记得历法出现之前的潮汐，并声称在灯塔还会行走时就认识它。",
+    'zh-TW': "她記得曆法出現之前的潮汐，並聲稱在燈塔還會行走時就認識它。",
+    ko: "그녀는 달력보다 오래된 조수를 기억하고 등대가 아직 걸어다니고 있을 때 그것을 알고 있었다고 주장합니다.",
+    ja: "彼女は暦よりも古い潮汐を覚えており、灯台がまだ歩いていた頃から知っていたと主張している。",
   },
   "Red de archiveros que rescata memoria del agua.": {
     "es": "Red de archiveros que rescata memoria del agua.",
@@ -5731,7 +7291,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Rede de arquivistas que resgata a memória da água.",
     "it": "Rete di archivisti che salva la memoria dell'acqua.",
     "tr": "Su hafızasını kurtaran arşivci ağı.",
-    "zh-CN": "一个从水中打捞记忆的档案管理员网络。"
+    "zh-CN": "一个从水中打捞记忆的档案管理员网络。",
+    'zh-TW': "一個從水中打撈記憶的檔案管理員網路。",
+    ko: "물에서 기억을 구하는 기록 보관인 네트워크입니다.",
+    ja: "水の中から記憶を救出するアーキビストのネットワーク。",
   },
   "Referencia costera de Lúmina": {
     "es": "Referencia costera de Lúmina",
@@ -5742,7 +7305,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Marco Costeiro de Lúmina",
     "it": "Punto di riferimento costiero di Lúmina",
     "tr": "Lúmina Sahil Simgesi",
-    "zh-CN": "卢米娜的沿海参照点"
+    "zh-CN": "卢米娜的沿海参照点",
+    'zh-TW': "盧米娜的沿海參照點",
+    ko: "루미나 해안 참고서",
+    ja: "ルミナコースタルリファレンス",
   },
   "Refracta un haz en seis direcciones.": {
     "es": "Refracta un haz en seis direcciones.",
@@ -5753,7 +7319,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Refrata um feixe em seis direções.",
     "it": "Rifrange un raggio in sei direzioni.",
     "tr": "Bir ışını altı yönde kırar.",
-    "zh-CN": "将一束光折射向六个方向。"
+    "zh-CN": "将一束光折射向六个方向。",
+    'zh-TW': "將一束光折射向六個方向。",
+    ko: "하나의 광선을 6개 방향으로 굴절시킵니다.",
+    ja: "1本のビームを6方向に屈折させます。",
   },
   "regente": {
     "es": "regente",
@@ -5764,7 +7333,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "regente",
     "it": "reggente",
     "tr": "naip",
-    "zh-CN": "摄政王"
+    "zh-CN": "摄政王",
+    'zh-TW': "攝政王",
+    ko: "섭정",
+    ja: "摂政",
   },
   "Regente de Orthea y arquitecto del Consejo de Ceniza. Su poder descansa sobre una crisis que quizá ayudó a provocar.": {
     "es": "Regente de Orthea y arquitecto del Consejo de Ceniza. Su poder descansa sobre una crisis que quizá ayudó a provocar.",
@@ -5775,7 +7347,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Regente de Orthea e arquiteto do Conselho de Cinzas. Seu poder repousa sobre uma crise que ele pode ter ajudado a causar.",
     "it": "Reggente di Ortea e architetto del Consiglio di Cenere. Il suo potere si basa su una crisi che potrebbe aver contribuito a causare.",
     "tr": "Orthea'nın naibi ve Ash Konseyi'nin mimarı. Gücü, sebep olabileceği bir krize dayanıyor.",
-    "zh-CN": "奥尔特亚的摄政王、灰烬议事会的缔造者。他的权力建立在一场或许由他助推的危机之上。"
+    "zh-CN": "奥尔特亚的摄政王、灰烬议事会的缔造者。他的权力建立在一场或许由他助推的危机之上。",
+    'zh-TW': "奧爾特亞的攝政王、灰燼議事會的締造者。他的權力建立在一場或許由他助推的危機之上。",
+    ko: "오르테아의 섭정이자 애쉬 의회의 건축가. 그의 힘은 그가 도왔을지도 모르는 위기에 달려 있습니다.",
+    ja: "オルテアの摂政であり、灰評議会の建築家。彼の力は、彼が引き起こしたかもしれない危機にかかっています。",
   },
   "Regente Maelor Sarn": {
     "es": "Regente Maelor Sarn",
@@ -5786,7 +7361,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Regente Maelor Sarn",
     "it": "Reggente Maelor Sarn",
     "tr": "Vekil Maelor Sarn",
-    "zh-CN": "摄政王梅洛尔·萨恩"
+    "zh-CN": "摄政王梅洛尔·萨恩",
+    'zh-TW': "攝政王梅洛爾·薩恩",
+    ko: "섭정 마엘로 사안",
+    ja: "摂政メーラー・サーン",
   },
   "regente mayor, cabello blanco, media máscara de obsidiana, abrigo militar carmesí, sigilo solar": {
     "es": "regente mayor, cabello blanco, media máscara de obsidiana, abrigo militar carmesí, sigilo solar",
@@ -5797,7 +7375,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "regente sênior, cabelo branco, meia máscara de obsidiana, casaco militar carmesim, sigilo solar",
     "it": "reggente anziano, capelli bianchi, mezza maschera di ossidiana, mantello militare cremisi, sigillo solare",
     "tr": "Kıdemli naip, beyaz saçlı, obsidyen yarım maske, koyu kırmızı askeri ceket, güneş işareti",
-    "zh-CN": "年长摄政王，白发，黑曜石半面罩，深红军大衣，太阳徽记"
+    "zh-CN": "年长摄政王，白发，黑曜石半面罩，深红军大衣，太阳徽记",
+    'zh-TW': "年長攝政王，白髮，黑曜石半面罩，深紅軍大衣，太陽徽記",
+    ko: "나이 많은 섭정, 백발, 흑요석 반 가면, 진홍색 군복, 태양의 인장",
+    ja: "年老いた摂政、白髪、黒曜石のハーフマスク、深紅の軍服、太陽の印章",
   },
   "Registro narrativo": {
     "es": "Registro narrativo",
@@ -5808,7 +7389,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "registro narrativo",
     "it": "registrazione narrativa",
     "tr": "anlatı kaydı",
-    "zh-CN": "叙事记录"
+    "zh-CN": "叙事记录",
+    'zh-TW': "敘事記錄",
+    ko: "서사 기록",
+    ja: "物語の記録",
   },
   "Regresa la carta de Nara": {
     "es": "Regresa la carta de Nara",
@@ -5819,7 +7403,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "A carta de Nara retorna",
     "it": "La lettera di Nara ritorna",
     "tr": "Nara'nın mektubu geri dönüyor",
-    "zh-CN": "娜拉的信件回归"
+    "zh-CN": "娜拉的信件回归",
+    'zh-TW': "娜拉的信件迴歸",
+    ko: "나라의 편지가 돌아왔다",
+    ja: "ナラから手紙が帰ってくる",
   },
   "Reino costero de faros, salinas y canales escalonados.": {
     "es": "Reino costero de faros, salinas y canales escalonados.",
@@ -5830,7 +7417,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Reino costeiro de faróis, salinas e canais escalonados.",
     "it": "Regno costiero di fari, saline e canali a gradoni.",
     "tr": "Deniz fenerleri, tuz tavaları ve basamaklı kanallardan oluşan kıyı krallığı.",
-    "zh-CN": "一个由灯塔、盐田和阶梯式运河组成的沿海王国。"
+    "zh-CN": "一个由灯塔、盐田和阶梯式运河组成的沿海王国。",
+    'zh-TW': "一個由燈塔、鹽田和階梯式運河組成的沿海王國。",
+    ko: "등대, 염전, 계단식 운하로 이루어진 해안 왕국입니다.",
+    ja: "灯台、塩田、階段状の運河が点在する沿岸王国。",
   },
   "Reino de Orthea": {
     "es": "Reino de Orthea",
@@ -5841,7 +7431,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Reino de Orteia",
     "it": "Regno di Ortea",
     "tr": "Orthea Krallığı",
-    "zh-CN": "奥尔特亚王国"
+    "zh-CN": "奥尔特亚王国",
+    'zh-TW': "奧爾特亞王國",
+    ko: "오르테아 왕국",
+    ja: "オルテア王国",
   },
   "Relieve y corrientes": {
     "es": "Relieve y corrientes",
@@ -5852,7 +7445,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Relevo e correntes",
     "it": "Rilievi e correnti",
     "tr": "Rölyef ve akıntılar",
-    "zh-CN": "地形与水流"
+    "zh-CN": "地形与水流",
+    'zh-TW': "地形與水流",
+    ko: "지형과 해류",
+    ja: "地形と海流",
   },
   "Religión cívica que identifica la continuidad del Faro con la del mundo.": {
     "es": "Religión cívica que identifica la continuidad del Faro con la del mundo.",
@@ -5863,7 +7459,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Religião cívica que identifica a continuidade do Farol com a do mundo.",
     "it": "Religione civica che identifica la continuità del Faro con quella del mondo.",
     "tr": "Deniz Feneri'nin sürekliliğini dünyanınkiyle özdeşleştiren sivil din.",
-    "zh-CN": "一种公民宗教，将灯塔的延续等同于世界的延续。"
+    "zh-CN": "一种公民宗教，将灯塔的延续等同于世界的延续。",
+    'zh-TW': "一種公民宗教，將燈塔的延續等同於世界的延續。",
+    ko: "등대의 연속성을 세계의 연속성과 동일시하는 시민 종교입니다.",
+    ja: "灯台の連続性を世界の連続性と同一視する市民宗教。",
   },
   "residencia": {
     "es": "residencia",
@@ -5874,7 +7473,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "residência",
     "it": "residenza",
     "tr": "ikamet",
-    "zh-CN": "住所"
+    "zh-CN": "住所",
+    'zh-TW': "住所",
+    ko: "거주",
+    ja: "住居",
   },
   "Responde con refranes del viento, llama “capitana” a Ilyra cuando ella intenta controlarlo y dice “cuenta cabezas” antes de un riesgo. Se frota un tatuaje de corriente cuando miente por omisión.": {
     "es": "Responde con refranes del viento, llama “capitana” a Ilyra cuando ella intenta controlarlo y dice “cuenta cabezas” antes de un riesgo. Se frota un tatuaje de corriente cuando miente por omisión.",
@@ -5885,7 +7487,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele responde com ditados de vento, chama Ilyra de “capitã” quando ela tenta controlá-lo e diz “conte cabeças” antes de correr riscos. Ele esfrega uma tatuagem atual quando mente por omissão.",
     "it": "Risponde con detti del vento, chiama Ilyra \"capitano\" quando cerca di controllarlo e dice \"conta le teste\" prima di correre un rischio. Si strofina un tatuaggio attuale quando mente per omissione.",
     "tr": "Rüzgarlı sözlerle karşılık veriyor, Ilyra onu kontrol etmeye çalıştığında \"kaptan\" diyor ve risk almadan önce \"tura say\" diyor. İhmal ederek yalan söylediğinde mevcut bir dövmeyi ovuyor.",
-    "zh-CN": "他用风的谚语回答，伊莉拉想控制他时便叫她“船长”，冒险之前会说“清点人数”。他因隐瞒而撒谎时会摩擦一个水流纹身。"
+    "zh-CN": "他用风的谚语回答，伊莉拉想控制他时便叫她“船长”，冒险之前会说“清点人数”。他因隐瞒而撒谎时会摩擦一个水流纹身。",
+    'zh-TW': "他用風的諺語回答，伊莉拉想控制他時便叫她“船長”，冒險之前會說“清點人數”。他因隱瞞而撒謊時會摩擦一個水流紋身。",
+    ko: "바람 속담으로 대답하고 Ilyra가 그를 제어하려고 할 때 \"선장\"이라고 부르고 위험이 발생하기 전에 \"머리 수 계산\"이라고 말합니다. 누락으로 누워있을 때 현재 문신을 문지릅니다.",
+    ja: "風のことわざで答え、イリラをコントロールしようとするときは「キャプテン」と呼び、危険を冒す前に「頭数を数えなさい」と言います。彼は手抜きで嘘をつくときに現在のタトゥーをこすります。",
   },
   "Revisión": {
     "es": "Revisión",
@@ -5896,7 +7501,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Revisão",
     "it": "Recensione",
     "tr": "İncele",
-    "zh-CN": "修订"
+    "zh-CN": "修订",
+    'zh-TW': "修訂",
+    ko: "개정",
+    ja: "リビジョン",
   },
   "Rey de la Espuma": {
     "es": "Rey de la Espuma",
@@ -5907,7 +7515,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Rei da Espuma",
     "it": "Re della schiuma",
     "tr": "Köpük Kralı",
-    "zh-CN": "泡沫之王"
+    "zh-CN": "泡沫之王",
+    'zh-TW': "泡沫之王",
+    ko: "폼 킹",
+    ja: "泡王",
   },
   "Rhea conserva la escritura de la nave de Cael.": {
     "es": "Rhea conserva la escritura de la nave de Cael.",
@@ -5918,7 +7529,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Rhea mantém a escritura do navio de Cael.",
     "it": "Rea conserva l'atto di proprietà della nave di Cael.",
     "tr": "Rhea, Cael'in gemisinin tapusunu elinde tutuyor.",
-    "zh-CN": "瑞亚持有凯尔船只的契据。"
+    "zh-CN": "瑞亚持有凯尔船只的契据。",
+    'zh-TW': "瑞亞持有凱爾船隻的契據。",
+    ko: "Rhea는 Cael의 배에 대한 증서를 보유하고 있습니다.",
+    ja: "レアはカエルの船の証書を保持している。",
   },
   "Ritual, pausado y juguetón. Emplea paralelismos, preguntas que invierten la premisa e imágenes de sal, respiración y marea. Puede sonar profética, pero corrige a quien la trata como oráculo.": {
     "es": "Ritual, pausado y juguetón. Emplea paralelismos, preguntas que invierten la premisa e imágenes de sal, respiración y marea. Puede sonar profética, pero corrige a quien la trata como oráculo.",
@@ -5929,7 +7543,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ritual, lento e lúdico. Emprega paralelismos, questões que invertem a premissa e imagens de sal, respiração e maré. Pode parecer profético, mas corrige aqueles que o tratam como um oráculo.",
     "it": "Rituale, lento e giocoso. Impiega parallelismi, domande che invertono la premessa e immagini di sale, respiro e marea. Può sembrare profetico, ma corregge chi lo tratta come un oracolo.",
     "tr": "Ritüel, yavaş ve eğlenceli. Paralellikleri, önermeyi tersine çeviren soruları ve tuz, nefes alma ve gelgit görüntülerini kullanır. Kulağa kehanet gibi gelebilir ama onu bir kehanet olarak görenleri düzeltir.",
-    "zh-CN": "仪式感、从容而顽皮。她使用平行句式、颠覆前提的提问，以及盐、呼吸与潮汐的意象。她听起来可能像先知，但谁把她当作神谕，她就会纠正谁。"
+    "zh-CN": "仪式感、从容而顽皮。她使用平行句式、颠覆前提的提问，以及盐、呼吸与潮汐的意象。她听起来可能像先知，但谁把她当作神谕，她就会纠正谁。",
+    'zh-TW': "儀式感、從容而頑皮。她使用平行句式、顛覆前提的提問，以及鹽、呼吸與潮汐的意象。她聽起來可能像先知，但誰把她當作神諭，她就會糾正誰。",
+    ko: "의식적이고 신중하며 장난스럽습니다. 평행 표현, 전제를 뒤집는 질문, 소금, 호흡, 조수의 이미지를 사용합니다. 그녀는 예언처럼 들릴지 모르지만 그녀를 신탁으로 대하는 사람은 누구에게나 시정을 받습니다.",
+    ja: "儀式的で、慎重で、遊び心があります。平行した表現、前提を逆転させる質問、塩、息、潮のイメージを使用します。彼女は預言者のように聞こえるかもしれませんが、彼女を神託者として扱う人を正します。",
   },
   "Romper el ciclo de la Deuda de Eco.": {
     "es": "Romper el ciclo de la Deuda de Eco.",
@@ -5940,7 +7557,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Quebre o ciclo da dívida ecológica.",
     "it": "Interrompere il ciclo del debito ecologico.",
     "tr": "Eko Borç Döngüsünü Kırın.",
-    "zh-CN": "打破回声债务的循环。"
+    "zh-CN": "打破回声债务的循环。",
+    'zh-TW': "打破回聲債務的迴圈。",
+    ko: "에코 부채(Echo Debt)의 악순환을 끊으세요.",
+    ja: "エコー負債の悪循環を断ち切りましょう。",
   },
   "Romper el rito expulsa a la tripulación durante seis mareas.": {
     "es": "Romper el rito expulsa a la tripulación durante seis mareas.",
@@ -5951,7 +7571,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Quebrar o rito expulsa a tripulação por seis marés.",
     "it": "La rottura del rito espelle l'equipaggio per sei maree.",
     "tr": "Ayini bozmak mürettebatı altı gelgit boyunca uzaklaştırır.",
-    "zh-CN": "打破仪式会使船员被流放六个潮汐。"
+    "zh-CN": "打破仪式会使船员被流放六个潮汐。",
+    'zh-TW': "打破儀式會使船員被流放六個潮汐。",
+    ko: "의식을 어기면 승무원은 여섯 번의 조수 동안 추방됩니다.",
+    ja: "儀式を破ると乗組員は6回の潮流の間追放される。",
   },
   "Rumor descartado que no debe volver a proponerse.": {
     "es": "Rumor descartado que no debe volver a proponerse.",
@@ -5962,7 +7585,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Boato descartado que não deveria ser proposto novamente.",
     "it": "Voce scartata che non dovrebbe essere riproposta.",
     "tr": "Bir daha teklif edilmemesi gereken bir söylenti atıldı.",
-    "zh-CN": "已排除的传闻，不得再次提出。"
+    "zh-CN": "已排除的传闻，不得再次提出。",
+    'zh-TW': "已排除的傳聞，不得再次提出。",
+    ko: "다시 제안해서는 안 된다는 소문을 기각했습니다.",
+    ja: "二度とプロポーズしてはいけないという噂を却下。",
   },
   "Rutas navegables": {
     "es": "Rutas navegables",
@@ -5973,7 +7599,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Rotas navegáveis",
     "it": "Percorsi navigabili",
     "tr": "Gezilebilir rotalar",
-    "zh-CN": "可航行路线"
+    "zh-CN": "可航行路线",
+    'zh-TW': "可航行路線",
+    ko: "탐색 가능한 경로",
+    ja: "航行可能なルート",
   },
   "Sacerdotisa veyari de piel azul grisácea, ojos sin pupila y manto tejido con sal cristalizada.": {
     "es": "Sacerdotisa veyari de piel azul grisácea, ojos sin pupila y manto tejido con sal cristalizada.",
@@ -5984,7 +7613,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sacerdotisa Veyari com pele azul-acinzentada, olhos sem pupilas e um manto tecido de sal cristalizado.",
     "it": "Sacerdotessa Veyari con pelle grigio-blu, occhi senza pupille e un mantello tessuto di sale cristallizzato.",
     "tr": "Mavi-gri tenli, gözbebeği olmayan gözleri ve kristalize tuzdan dokunmuş bir pelerini olan Veyari rahibesi.",
-    "zh-CN": "灰蓝色皮肤的 Veyari 女祭司，双眼没有瞳孔，身披以结晶盐编织的斗篷。"
+    "zh-CN": "灰蓝色皮肤的 Veyari 女祭司，双眼没有瞳孔，身披以结晶盐编织的斗篷。",
+    'zh-TW': "灰藍色皮膚的 Veyari 女祭司，雙眼沒有瞳孔，身披以結晶鹽編織的斗篷。",
+    ko: "눈동자 없는 눈과 결정화된 소금으로 엮은 망토를 지닌 회색빛 청색 베야리 여사제.",
+    ja: "瞳孔のない目と結晶化した塩で編んだマントを持った灰青色のヴェヤリの巫女。",
   },
   "Sacerdotisa veyari y custodia de la memoria oral de Isla Nácar, recuerda mareas anteriores al calendario y afirma haber conocido al Faro cuando caminaba. Sobrevivió a cada persona que juró guiar y convirtió sus nombres en cantos. Sabe que el Corazón es Asteriel, una criatura arrancada del mar, pero la ley ritual le impide transmitir nombres verdaderos. Espera que Ilyra llegue a la conclusión sin convertir otra vez memoria en propiedad.": {
     "es": "Sacerdotisa veyari y custodia de la memoria oral de Isla Nácar, recuerda mareas anteriores al calendario y afirma haber conocido al Faro cuando caminaba. Sobrevivió a cada persona que juró guiar y convirtió sus nombres en cantos. Sabe que el Corazón es Asteriel, una criatura arrancada del mar, pero la ley ritual le impide transmitir nombres verdaderos. Espera que Ilyra llegue a la conclusión sin convertir otra vez memoria en propiedad.",
@@ -5995,7 +7627,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sacerdotisa Veyari e guardiã da memória oral da Isla Nácar, ela se lembra das marés anteriores ao calendário e afirma ter encontrado o Farol quando caminhava. Ele sobreviveu a todas as pessoas que jurou liderar e transformou seus nomes em canções. Ele sabe que o Coração é Asteriel, criatura arrancada do mar, mas a lei ritual o impede de transmitir nomes verdadeiros. Ele espera que Ilyra chegue à conclusão sem converter a memória em propriedade novamente.",
     "it": "Sacerdotessa Veyari e custode della memoria orale di Isla Nácar, ricorda le maree prima del calendario e afferma di aver incontrato il Faro mentre camminava. È sopravvissuto a tutte le persone che aveva giurato di guidare e ha trasformato i loro nomi in canzoni. Sa che il Cuore è Asteriel, una creatura strappata al mare, ma la legge rituale gli impedisce di trasmettere i veri nomi. Spera che Ilyra arrivi alla conclusione senza convertire nuovamente la memoria in proprietà.",
     "tr": "Veyari rahibesi ve Isla Nácar'ın sözlü hafızasının koruyucusu, takvimden önceki gelgitleri hatırlıyor ve yürürken Deniz Feneri ile karşılaştığını iddia ediyor. Liderlik etmeye yemin ettiği herkesten daha uzun yaşadı ve onların isimlerini şarkılara dönüştürdü. Kalbin denizden koparılmış bir yaratık olan Asteriel olduğunu biliyor, ancak ritüel kanun onun gerçek isimleri iletmesini engelliyor. Ilyra'nın hafızayı yeniden mülkiyete dönüştürmeden sonuca varmasını umuyor.",
-    "zh-CN": "Veyari 女祭司，珍珠母岛口述记忆的守护者，她记得早于历法的潮汐，并声称在灯塔还会行走时就认识它。她活得比每一个她誓言引导的人更久，把他们的名字化作了歌谣。她知道心脏就是 Asteriel，一只从海中撕下的生物，但仪式律法禁止她传递真名。她等待 Ilyra 自行得出答案，而不必再次把记忆变成财产。"
+    "zh-CN": "Veyari 女祭司，珍珠母岛口述记忆的守护者，她记得早于历法的潮汐，并声称在灯塔还会行走时就认识它。她活得比每一个她誓言引导的人更久，把他们的名字化作了歌谣。她知道心脏就是 Asteriel，一只从海中撕下的生物，但仪式律法禁止她传递真名。她等待 Ilyra 自行得出答案，而不必再次把记忆变成财产。",
+    'zh-TW': "Veyari 女祭司，珍珠母島口述記憶的守護者，她記得早於曆法的潮汐，並聲稱在燈塔還會行走時就認識它。她活得比每一個她誓言引導的人更久，把他們的名字化作了歌謠。她知道心臟就是 Asteriel，一隻從海中撕下的生物，但儀式律法禁止她傳遞真名。她等待 Ilyra 自行得出答案，而不必再次把記憶變成財產。",
+    ko: "베야리 여사제이자 나크레 섬의 구전 기억을 지키는 그녀는 달력보다 오래된 조수를 기억하고 등대가 걸을 때 그것을 알았다고 주장합니다. 그녀는 자신이 인도하겠다고 맹세한 모든 사람보다 오래 살았고 그들의 이름을 노래로 만들었습니다. 그녀는 심장이 바다에서 찢겨진 생물인 아스테리엘이라는 것을 알고 있지만 의식법에 따라 실제 이름을 전달하는 것이 금지됩니다. 그녀는 기억을 다시 재산화하지 않고 Ilyra가 결론에 도달하기를 기다립니다.",
+    ja: "ヴェヤリの巫女であり、ナクル島の口頭記憶の保持者でもある彼女は、暦よりも古い潮汐を覚えており、灯台が歩いていたときのことを知っていたと主張している。彼女は導くと誓った人たちよりも長生きし、彼らの名前を歌に変えました。彼女はハートが海から引き裂かれた生き物であるアステリエルであることを知っていますが、儀式の法律により真の名前を伝えることはできません。彼女は記憶を再び財産化することなく、イリラが結論に達するのを待ちます。",
   },
   "Sal": {
     "es": "Sal",
@@ -6006,7 +7641,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "sal",
     "it": "sale",
     "tr": "tuz",
-    "zh-CN": "盐"
+    "zh-CN": "盐",
+    'zh-TW': "鹽",
+    ko: "소금",
+    ja: "塩",
   },
   "santuario": {
     "es": "santuario",
@@ -6017,7 +7655,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "santuário",
     "it": "santuario",
     "tr": "sığınak",
-    "zh-CN": "圣所"
+    "zh-CN": "圣所",
+    'zh-TW': "聖所",
+    ko: "성역",
+    ja: "聖域",
   },
   "Santuario veyari y lugar prohibido para naves de guerra.": {
     "es": "Santuario veyari y lugar prohibido para naves de guerra.",
@@ -6028,7 +7669,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Santuário de Veyari e lugar proibido para navios de guerra.",
     "it": "Santuario di Veyari e luogo proibito per le navi da guerra.",
     "tr": "Veyari sığınağı ve savaş gemileri için yasak yer.",
-    "zh-CN": "Veyari 的圣所，禁止战舰进入之地。"
+    "zh-CN": "Veyari 的圣所，禁止战舰进入之地。",
+    'zh-TW': "Veyari 的聖所，禁止戰艦進入之地。",
+    ko: "군함이 금지된 베야리 성역.",
+    ja: "軍艦の立ち入りが禁止されているヴェヤリの聖域。",
   },
   "Se criaron juntos en la Casa del Faro.": {
     "es": "Se criaron juntos en la Casa del Faro.",
@@ -6039,7 +7683,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Eles cresceram juntos na Casa do Farol.",
     "it": "Sono cresciuti insieme alla Lighthouse House.",
     "tr": "Deniz Feneri Evi'nde birlikte büyüdüler.",
-    "zh-CN": "他们在灯塔之家一起长大。"
+    "zh-CN": "他们在灯塔之家一起长大。",
+    'zh-TW': "他們在燈塔之家一起長大。",
+    ko: "그들은 등대 집에서 함께 자랐습니다.",
+    ja: "彼らは灯台の家で一緒に育ちました。",
   },
   "Se ofrece para todo hasta romperse.": {
     "es": "Se ofrece para todo hasta romperse.",
@@ -6050,7 +7697,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Oferece-se para tudo até quebrar.",
     "it": "Si offre per tutto finché non si rompe.",
     "tr": "Kırılana kadar her şeye kendini sunar.",
-    "zh-CN": "他们什么都愿意做，直到把自己累垮。"
+    "zh-CN": "他们什么都愿意做，直到把自己累垮。",
+    'zh-TW': "他們什麼都願意做，直到把自己累垮。",
+    ko: "그들은 부서질 때까지 모든 일에 자원합니다.",
+    ja: "彼らは壊れるまですべてをボランティアで行います。",
   },
   "Sede de la dinastía Venn antes de la regencia Sarn.": {
     "es": "Sede de la dinastía Venn antes de la regencia Sarn.",
@@ -6061,7 +7711,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sede da dinastia Venn antes da regência Sarn.",
     "it": "Sede della dinastia Venn prima della reggenza di Sarn.",
     "tr": "Sarn naipliğinden önceki Venn hanedanının koltuğu.",
-    "zh-CN": "在萨恩摄政之前是文恩王朝的中心。"
+    "zh-CN": "在萨恩摄政之前是文恩王朝的中心。",
+    'zh-TW': "在薩恩攝政之前是文恩王朝的中心。",
+    ko: "사안 섭정 이전의 벤 왕조의 중심지입니다.",
+    ja: "サールン摂政以前のヴェン王朝の本拠地。",
   },
   "Seis campanas de ceniza": {
     "es": "Seis campanas de ceniza",
@@ -6072,7 +7725,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Seis sinos de cinzas",
     "it": "Sei campane di cenere",
     "tr": "Altı kül çanı",
-    "zh-CN": "六座灰烬之钟"
+    "zh-CN": "六座灰烬之钟",
+    'zh-TW': "六座灰燼之鐘",
+    ko: "재의 여섯 종",
+    ja: "灰の鐘が6つ",
   },
   "Seis cúpulas móviles sobre una aguja separada de la ciudad por un puente de vidrio.": {
     "es": "Seis cúpulas móviles sobre una aguja separada de la ciudad por un puente de vidrio.",
@@ -6083,7 +7739,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Seis cúpulas móveis numa torre separada da cidade por uma ponte de vidro.",
     "it": "Sei cupole mobili su una guglia separate dalla città da un ponte di vetro.",
     "tr": "Şehirden cam bir köprüyle ayrılan bir kulenin üzerindeki altı hareketli kubbe.",
-    "zh-CN": "六座移动穹顶立于尖塔之上，尖塔由一座玻璃桥与城市相隔。"
+    "zh-CN": "六座移动穹顶立于尖塔之上，尖塔由一座玻璃桥与城市相隔。",
+    'zh-TW': "六座移動穹頂立於尖塔之上，尖塔由一座玻璃橋與城市相隔。",
+    ko: "유리 다리로 도시와 분리된 첨탑 꼭대기에 있는 6개의 움직이는 돔입니다.",
+    ja: "ガラスの橋で街から隔てられた尖塔の頂上にある6つの動くドーム。",
   },
   "Seis meses de treinta días. D.F. significa Después del Faro.": {
     "es": "Seis meses de treinta días. D.F. significa Después del Faro.",
@@ -6094,7 +7753,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Seis meses de trinta dias. D.F. significa Depois do Farol.",
     "it": "Sei mesi di trenta giorni. D.F. significa Dopo il Faro.",
     "tr": "Altı ay otuz gün. D.F. Deniz Fenerinden Sonra anlamına gelir.",
-    "zh-CN": "六个月，每月三十天。D.F. 意为灯塔之后。"
+    "zh-CN": "六个月，每月三十天。D.F. 意为灯塔之后。",
+    'zh-TW': "六個月，每月三十天。D.F. 意為燈塔之後。",
+    ko: "6개월 30일. A.L.은 등대 이후를 의미합니다.",
+    ja: "6月は30日です。 A.L.は「灯台の後」という意味です。",
   },
   "Sena abre el depósito sellado; Ilyra oye a su padre y encuentra la primera coordenada. ???": {
     "es": "Sena abre el depósito sellado; Ilyra oye a su padre y encuentra la primera coordenada. ???",
@@ -6105,7 +7767,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sena abre o depósito lacrado; Ilyra ouve o pai e encontra a primeira coordenada. ???",
     "it": "Sena apre il deposito sigillato; Ilyra sente suo padre e trova la prima coordinata. ???",
     "tr": "Sena mühürlü depozitoyu açar; Ilyra babasının sesini duyar ve ilk koordinatı bulur. ???",
-    "zh-CN": "Sena 打开密封的库藏；Ilyra 听到父亲的声音，并找到第一组坐标。???"
+    "zh-CN": "Sena 打开密封的库藏；Ilyra 听到父亲的声音，并找到第一组坐标。???",
+    'zh-TW': "Sena 開啟密封的庫藏；Ilyra 聽到父親的聲音，並找到第一組座標。???",
+    ko: "세나는 봉인된 스택을 엽니다. Ilyra는 아버지의 말을 듣고 첫 번째 좌표를 찾습니다.???",
+    ja: "セナは封印された書庫を開ける。イリラは父親の声を聞き、最初の座標を見つけます。 ???",
   },
   "Sena guía a Ilyra y Cael por depósitos que solo existen durante la bajamar. Para abrir el archivo de Aurel debe escuchar tres memorias ajenas y arriesgarse a confundirlas con las suyas. El depósito libera un mensaje de Nara, una coordenada escondida en la prótesis de Ilyra y la aparición imposible de Odran. La voz advierte que el Corazón ya reconoce a Ilyra; el agua empieza a subir y Sena decide abandonar el protocolo del Archivo para sacar el registro.": {
     "es": "Sena guía a Ilyra y Cael por depósitos que solo existen durante la bajamar. Para abrir el archivo de Aurel debe escuchar tres memorias ajenas y arriesgarse a confundirlas con las suyas. El depósito libera un mensaje de Nara, una coordenada escondida en la prótesis de Ilyra y la aparición imposible de Odran. La voz advierte que el Corazón ya reconoce a Ilyra; el agua empieza a subir y Sena decide abandonar el protocolo del Archivo para sacar el registro.",
@@ -6116,7 +7781,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sena guia Ilyra e Cael através de depósitos que só existem na maré baixa. Para abrir o arquivo de Aurel ele deve ouvir as memórias de três outras pessoas e correr o risco de confundi-las com as suas. O depósito libera uma mensagem de Nara, uma coordenada escondida na prótese de Ilyra e o aparecimento impossível de Odran. A voz avisa que o Coração já reconhece Ilyra; A água começa a subir e Sena decide abandonar o protocolo do Arquivo para obter o registro.",
     "it": "Sena guida Ilyra e Cael attraverso i depositi che esistono solo con la bassa marea. Per aprire il fascicolo di Aurel dovrà ascoltare i ricordi di altre tre persone rischiando di confonderli con i propri. Il deposito rilascia un messaggio di Nara, una coordinata nascosta nella protesi di Ilyra, e l'apparizione impossibile di Odran. La voce avverte che il Cuore riconosce già Ilira; L'acqua comincia a salire e Sena decide di abbandonare il protocollo dell'Archivio per ottenere la documentazione.",
     "tr": "Sena, Ilyra ve Cael'e yalnızca sular çekildiğinde var olan birikintilerde rehberlik ediyor. Aurel'in dosyasını açmak için diğer üç kişinin anılarını dinlemesi ve bunları kendisininkiyle karıştırma riskini alması gerekir. Depozito Nara'dan gelen bir mesajı, Ilyra'nın protezinde saklı bir koordinatı ve Odran'ın imkansız görünümünü açığa çıkarır. Ses, Kalbin Ilyra'yı zaten tanıdığı konusunda uyarıyor; Su yükselmeye başlar ve Sena, kaydı almak için Arşiv protokolünü bırakmaya karar verir.",
-    "zh-CN": "Sena 带领 Ilyra 和 Cael 穿过仅在低潮时存在的库藏。要打开 Aurel 的档案，她必须聆听三段他人的记忆，并冒着将它们与自己的记忆混淆的风险。库藏释放出 Nara 的留言、藏在 Ilyra 义肢中的一组坐标，以及 Odran 不可能的现身。那个声音警告说心脏已经认出了 Ilyra；水开始上涨，Sena 决定放弃档案库规程，取出记录。"
+    "zh-CN": "Sena 带领 Ilyra 和 Cael 穿过仅在低潮时存在的库藏。要打开 Aurel 的档案，她必须聆听三段他人的记忆，并冒着将它们与自己的记忆混淆的风险。库藏释放出 Nara 的留言、藏在 Ilyra 义肢中的一组坐标，以及 Odran 不可能的现身。那个声音警告说心脏已经认出了 Ilyra；水开始上涨，Sena 决定放弃档案库规程，取出记录。",
+    'zh-TW': "Sena 帶領 Ilyra 和 Cael 穿過僅在低潮時存在的庫藏。要開啟 Aurel 的檔案，她必須聆聽三段他人的記憶，並冒著將它們與自己的記憶混淆的風險。庫藏釋放出 Nara 的留言、藏在 Ilyra 義肢中的一組座標，以及 Odran 不可能的現身。那個聲音警告說心臟已經認出了 Ilyra；水開始上漲，Sena 決定放棄檔案庫規程，取出記錄。",
+    ko: "세나는 썰물 때만 존재하는 더미를 통해 Ilyra와 Cael을 안내합니다. Aurel의 아카이브를 열려면 세 가지 외국 기억을 듣고 자신의 기억과 혼동할 위험을 감수해야 합니다. 스택은 나라의 메시지, 일리라의 보철물에 숨겨진 좌표, ​​그리고 오드란의 불가능한 모습을 공개한다. 목소리는 심장이 이미 Ilyra를 인식했다고 경고합니다. 물이 차오르고 세나는 기록을 삭제하기 위해 아카이브 프로토콜을 포기합니다.",
+    ja: "セナはイリラとカエルを干潮時にのみ存在する煙突を案内します。オーレルのアーカイブを開くには、3つの異質な記憶に耳を傾け、それらの記憶と混同される危険を冒す必要があります。スタックは、ナラのメッセージ、イリラの義足に隠された座標、そしてオドランのありえない姿を解放します。声はハートがすでにイリラを認識していると警告します。水位が上昇し、セナは記録を削除するためにアーカイブプロトコルを放棄します。",
   },
   "Sena Mir": {
     "es": "Sena Mir",
@@ -6127,7 +7795,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sena Mir",
     "it": "Sena Mir",
     "tr": "Sena Mir",
-    "zh-CN": "Sena Mir"
+    "zh-CN": "Sena Mir",
+    'zh-TW': "Sena Mir",
+    ko: "세나 미르",
+    ja: "セナ・ミル",
   },
   "Sena reclama el Archivo": {
     "es": "Sena reclama el Archivo",
@@ -6138,7 +7809,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sena reivindica o Arquivo",
     "it": "Sena rivendica l'Archivio",
     "tr": "Sena Arşivi sahipleniyor",
-    "zh-CN": "Sena 索取档案库"
+    "zh-CN": "Sena 索取档案库",
+    'zh-TW': "Sena 索取檔案庫",
+    ko: "세나가 아카이브를 주장합니다",
+    ja: "セナがアーカイブを主張",
   },
   "Séptima ruta": {
     "es": "Séptima ruta",
@@ -6149,7 +7823,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sétima rota",
     "it": "Settimo itinerario",
     "tr": "Yedinci rota",
-    "zh-CN": "第七条路线"
+    "zh-CN": "第七条路线",
+    'zh-TW': "第七條路線",
+    ko: "일곱 번째 경로",
+    ja: "7番目のルート",
   },
   "Séptima Vela": {
     "es": "Séptima Vela",
@@ -6160,7 +7837,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sétima Vela",
     "it": "Settima candela",
     "tr": "Yedinci Mum",
-    "zh-CN": "第七帆"
+    "zh-CN": "第七帆",
+    'zh-TW': "第七帆",
+    ko: "일곱 번째 항해",
+    ja: "セブンスセイル",
   },
   "Ser tratado como persona y no como solución dinástica.": {
     "es": "Ser tratado como persona y no como solución dinástica.",
@@ -6171,7 +7851,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ser tratado como pessoa e não como solução dinástica.",
     "it": "Essere trattati come una persona e non come una soluzione dinastica.",
     "tr": "Bir hanedan çözümü olarak değil, bir kişi olarak ele alın.",
-    "zh-CN": "被当作一个人，而不是王朝的解决方案。"
+    "zh-CN": "被当作一个人，而不是王朝的解决方案。",
+    'zh-TW': "被當作一個人，而不是王朝的解決方案。",
+    ko: "왕조의 해결책이 아닌 사람으로 대우받습니다.",
+    ja: "王朝的な解決策ではなく、一人の人間として扱われます。",
   },
   "Serena, inescrutable y más divertida de lo que permite su cargo.": {
     "es": "Serena, inescrutable y más divertida de lo que permite su cargo.",
@@ -6182,7 +7865,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Serena, inescrutável e mais engraçada do que a sua posição permite.",
     "it": "Serena, imperscrutabile e più divertente di quanto la sua posizione consenta.",
     "tr": "Sakin, gizemli ve pozisyonunun izin verdiğinden daha komik.",
-    "zh-CN": "沉静、高深莫测，也比她的职位所允许的更爱开玩笑。"
+    "zh-CN": "沉静、高深莫测，也比她的职位所允许的更爱开玩笑。",
+    'zh-TW': "沉靜、高深莫測，也比她的職位所允許的更愛開玩笑。",
+    ko: "그녀의 사무실에서 허용하는 것보다 고요하고, 불가해하며, 더 재미있습니다.",
+    ja: "穏やかで、不可解で、彼女の事務所が許す以上に面白い。",
   },
   "Serena, inescrutable y más divertida de lo que permite su cargo. Su memoria abarca siglos, pero no distingue siempre experiencia propia de recuerdo heredado. Somete a prueba a quien pide respuestas porque considera que una verdad recibida sin coste se convierte en superstición.": {
     "es": "Serena, inescrutable y más divertida de lo que permite su cargo. Su memoria abarca siglos, pero no distingue siempre experiencia propia de recuerdo heredado. Somete a prueba a quien pide respuestas porque considera que una verdad recibida sin coste se convierte en superstición.",
@@ -6193,7 +7879,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Serena, inescrutável e mais engraçada do que a sua posição permite. Sua memória abrange séculos, mas ele nem sempre distingue sua própria experiência da memória herdada. Ele testa quem pede respostas porque considera que uma verdade recebida sem custo se torna superstição.",
     "it": "Serena, imperscrutabile e più divertente di quanto la sua posizione consenta. La sua memoria abbraccia secoli, ma non sempre distingue la propria esperienza dalla memoria ereditata. Mette alla prova coloro che chiedono risposte perché ritiene che una verità ricevuta gratuitamente diventi superstizione.",
     "tr": "Sakin, gizemli ve pozisyonunun izin verdiğinden daha komik. Hafızası yüzyıllara yayılıyor, ancak kendi deneyimini her zaman miras kalan hafızadan ayıramıyor. Karşılıksız alınan bir gerçeğin batıl inanç haline geldiğini düşündüğü için cevap isteyenleri test eder.",
-    "zh-CN": "沉静、高深莫测，也比她的职位所允许的更爱开玩笑。她的记忆横跨数个世纪，却不总能分清亲历的经验与承袭的回忆。她考验那些求取答案的人，因为她认为无偿得到的真相会变成迷信。"
+    "zh-CN": "沉静、高深莫测，也比她的职位所允许的更爱开玩笑。她的记忆横跨数个世纪，却不总能分清亲历的经验与承袭的回忆。她考验那些求取答案的人，因为她认为无偿得到的真相会变成迷信。",
+    'zh-TW': "沉靜、高深莫測，也比她的職位所允許的更愛開玩笑。她的記憶橫跨數個世紀，卻不總能分清親歷的經驗與承襲的回憶。她考驗那些求取答案的人，因為她認為無償得到的真相會變成迷信。",
+    ko: "그녀의 사무실에서 허용하는 것보다 고요하고, 불가해하며, 더 재미있습니다. 그녀의 기억은 수세기에 걸쳐 이어지지만, 살아 있는 경험과 유전된 기억을 항상 구별하지는 않습니다. 대가 없이 얻은 진리는 미신이 되기 때문에 그녀는 답을 찾는 사람들을 시험합니다.",
+    ja: "穏やかで、不可解で、彼女の事務所が許す以上に面白い。彼女の記憶は何世紀にもわたりますが、生きた経験と継承された記憶を常に区別できるわけではありません。無償で受け取った真実は迷信になるため、彼女は答えを求める人々をテストします。",
   },
   "Si comprende todas las rutas, nadie volverá a desaparecer.": {
     "es": "Si comprende todas las rutas, nadie volverá a desaparecer.",
@@ -6204,7 +7893,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Se você entender todas as rotas, ninguém desaparecerá novamente.",
     "it": "Se capisci tutti i percorsi, nessuno scomparirà più.",
     "tr": "Eğer tüm rotaları anlarsan, bir daha kimse kaybolmaz.",
-    "zh-CN": "如果她理解了所有路线，就再也不会有人消失。"
+    "zh-CN": "如果她理解了所有路线，就再也不会有人消失。",
+    'zh-TW': "如果她理解了所有路線，就再也不會有人消失。",
+    ko: "그녀가 모든 경로를 이해한다면 다시는 아무도 사라지지 않을 것입니다.",
+    ja: "彼女がすべてのルートを理解すれば、再び誰も消えることはありません。",
   },
   "Si deja de ser útil, volverán a abandonarle.": {
     "es": "Si deja de ser útil, volverán a abandonarle.",
@@ -6215,7 +7907,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Se você deixar de ser útil, eles o abandonarão novamente.",
     "it": "Se smetti di essere utile, ti abbandoneranno di nuovo.",
     "tr": "Yararlı olmayı bırakırsan seni yine terk ederler.",
-    "zh-CN": "一旦他们不再有用，就会被再次抛弃。"
+    "zh-CN": "一旦他们不再有用，就会被再次抛弃。",
+    'zh-TW': "一旦他們不再有用，就會被再次拋棄。",
+    ko: "유용하지 않게 되면 다시 버려지게 됩니다.",
+    ja: "役に立たなくなったら、また捨てられるでしょう。",
   },
   "Silencio abrasador y sombras que apuntan en direcciones distintas.": {
     "es": "Silencio abrasador y sombras que apuntan en direcciones distintas.",
@@ -6226,7 +7921,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Silêncio ardente e sombras apontando em direções diferentes.",
     "it": "Silenzio bruciante e ombre che puntano in direzioni diverse.",
     "tr": "Yakıcı bir sessizlik ve farklı yönleri işaret eden gölgeler.",
-    "zh-CN": "灼热的寂静，以及指向不同方向的阴影。"
+    "zh-CN": "灼热的寂静，以及指向不同方向的阴影。",
+    'zh-TW': "灼熱的寂靜，以及指向不同方向的陰影。",
+    ko: "뜨거운 침묵과 서로 다른 방향을 가리키는 그림자.",
+    ja: "灼熱の静寂と、さまざまな方向を指す影。",
   },
   "Sin determinar.": {
     "es": "Sin determinar.",
@@ -6237,7 +7935,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Indeterminado.",
     "it": "Indeterminato.",
     "tr": "Belirsiz.",
-    "zh-CN": "未确定。"
+    "zh-CN": "未确定。",
+    'zh-TW': "未確定。",
+    ko: "분명치 않은.",
+    ja: "未定。",
   },
   "Sobrevivió a todas las personas que juró guiar.": {
     "es": "Sobrevivió a todas las personas que juró guiar.",
@@ -6248,7 +7949,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele sobreviveu a todas as pessoas que jurou liderar.",
     "it": "È sopravvissuto a tutte le persone che aveva giurato di guidare.",
     "tr": "Liderlik etmeye yemin ettiği tüm insanlardan daha uzun yaşadı.",
-    "zh-CN": "她活得比每一个她誓言引导的人更久。"
+    "zh-CN": "她活得比每一个她誓言引导的人更久。",
+    'zh-TW': "她活得比每一個她誓言引導的人更久。",
+    ko: "그녀는 인도하겠다고 맹세한 모든 사람보다 오래 살았습니다.",
+    ja: "彼女は導くと誓った人よりも長生きした。",
   },
   "Sobrino del Regente, amigo de infancia de Ilyra y comandante de la Puerta de Sal.": {
     "es": "Sobrino del Regente, amigo de infancia de Ilyra y comandante de la Puerta de Sal.",
@@ -6259,7 +7963,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sobrinho do Regente, amigo de infância de Ilyra e comandante do Portão de Sal.",
     "it": "Nipote del reggente, amico d'infanzia di Ilyra e comandante della Porta del Sale.",
     "tr": "Naip'in yeğeni, Ilyra'nın çocukluk arkadaşı ve Tuz Kapısı'nın komutanı.",
-    "zh-CN": "摄政王的外甥，Ilyra 的儿时好友，盐门的指挥官。"
+    "zh-CN": "摄政王的外甥，Ilyra 的儿时好友，盐门的指挥官。",
+    'zh-TW': "攝政王的外甥，Ilyra 的兒時好友，鹽門的指揮官。",
+    ko: "리전트의 조카이자 Ilyra의 어린 시절 친구이자 Salt Gate의 사령관입니다.",
+    ja: "摂政の甥であり、イリラの幼なじみであり、塩の門の司令官。",
   },
   "socia y acreedora": {
     "es": "socia y acreedora",
@@ -6270,7 +7977,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "sócio e credor",
     "it": "socio e creditore",
     "tr": "ortak ve alacaklı",
-    "zh-CN": "合伙人与债权人"
+    "zh-CN": "合伙人与债权人",
+    'zh-TW': "合夥人與債權人",
+    ko: "파트너와 채권자",
+    ja: "パートナーと債権者",
   },
   "Solo él está dispuesto a pagar el precio de salvar la ciudad.": {
     "es": "Solo él está dispuesto a pagar el precio de salvar la ciudad.",
@@ -6281,7 +7991,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Só ele está disposto a pagar o preço para salvar a cidade.",
     "it": "Solo lui è disposto a pagare il prezzo per salvare la città.",
     "tr": "Şehri kurtarmanın bedelini yalnızca o ödemeye hazırdır.",
-    "zh-CN": "只有他愿意付出拯救这座城市的代价。"
+    "zh-CN": "只有他愿意付出拯救这座城市的代价。",
+    'zh-TW': "只有他願意付出拯救這座城市的代價。",
+    ko: "오직 그만이 도시를 구하는 대가를 기꺼이 지불할 의지가 있습니다.",
+    ja: "彼だけが街を救うために喜んで代償を払うつもりだ。",
   },
   "Solo funciona sobre vidrio que haya visto el sol.": {
     "es": "Solo funciona sobre vidrio que haya visto el sol.",
@@ -6292,7 +8005,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Só funciona em vidro que viu o sol.",
     "it": "Funziona solo su vetri che hanno visto il sole.",
     "tr": "Sadece güneş görmüş camlarda çalışır.",
-    "zh-CN": "只对见过阳光的玻璃有效。"
+    "zh-CN": "只对见过阳光的玻璃有效。",
+    'zh-TW': "只對見過陽光的玻璃有效。",
+    ko: "햇빛을 받은 유리에서만 작동합니다.",
+    ja: "太陽光が当たったガラスにのみ機能します。",
   },
   "Solo los Veyari pueden transmitirlo.": {
     "es": "Solo los Veyari pueden transmitirlo.",
@@ -6303,7 +8019,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Somente o Veyari pode transmiti-lo.",
     "it": "Solo i Veyari possono trasmetterlo.",
     "tr": "Sadece Veyari bunu iletebilir.",
-    "zh-CN": "只有 Veyari 能传递它。"
+    "zh-CN": "只有 Veyari 能传递它。",
+    'zh-TW': "只有 Veyari 能傳遞它。",
+    ko: "Veyari만이 이를 전송할 수 있습니다.",
+    ja: "それを発信できるのはヴェヤリだけだ。",
   },
   "Solo se puede confiar en una tripulación mientras haya paga.": {
     "es": "Solo se puede confiar en una tripulación mientras haya paga.",
@@ -6314,7 +8033,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Uma tripulação só é confiável enquanto houver pagamento.",
     "it": "Ci si può fidare di un equipaggio solo finché c'è una paga.",
     "tr": "Bir mürettebata ancak maaş olduğu sürece güvenilebilir.",
-    "zh-CN": "只要有报酬，船员就可以被信任。"
+    "zh-CN": "只要有报酬，船员就可以被信任。",
+    'zh-TW': "只要有報酬，船員就可以被信任。",
+    ko: "승무원은 급여가 있을 때만 신뢰할 수 있습니다.",
+    ja: "乗組員は給料がある間だけ信頼できます。",
   },
   "Su legitimidad procede del pacto con el Faro y de mapas heredados que nadie más sabe leer.": {
     "es": "Su legitimidad procede del pacto con el Faro y de mapas heredados que nadie más sabe leer.",
@@ -6325,7 +8047,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sua legitimidade vem do pacto com o Farol e de mapas herdados que ninguém mais sabe ler.",
     "it": "La sua legittimità deriva dal patto con il Faro e dalle mappe ereditate che nessun altro sa leggere.",
     "tr": "Meşruiyeti Deniz Feneri ile yapılan anlaşmadan ve kimsenin nasıl okuyacağını bilmediği miras kalan haritalardan geliyor.",
-    "zh-CN": "其合法性来自与灯塔的盟约，以及无人能读懂的那些承袭地图。"
+    "zh-CN": "其合法性来自与灯塔的盟约，以及无人能读懂的那些承袭地图。",
+    'zh-TW': "其合法性來自與燈塔的盟約，以及無人能讀懂的那些承襲地圖。",
+    ko: "그 정당성은 등대와의 조약과 누구도 읽을 수 없는 상속된 지도에서 비롯됩니다.",
+    ja: "その正当性は、灯台との協定と、誰も読むことができない継承された地図によってもたらされます。",
   },
   "Su luz no interactúa con materia ordinaria.": {
     "es": "Su luz no interactúa con materia ordinaria.",
@@ -6336,7 +8061,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sua luz não interage com a matéria comum.",
     "it": "La sua luce non interagisce con la materia ordinaria.",
     "tr": "Işığı sıradan maddeyle etkileşime girmez.",
-    "zh-CN": "它的光不与普通物质相互作用。"
+    "zh-CN": "它的光不与普通物质相互作用。",
+    'zh-TW': "它的光不與普通物質相互作用。",
+    ko: "그 빛은 일반 물질과 상호 작용하지 않습니다.",
+    ja: "その光は通常の物質とは相互作用しません。",
   },
   "Su mentor lo entregó al Consejo de Ceniza.": {
     "es": "Su mentor lo entregó al Consejo de Ceniza.",
@@ -6347,7 +8075,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Seu mentor o entregou ao Conselho de Cinzas.",
     "it": "Il suo mentore lo ha consegnato al Consiglio di Ash.",
     "tr": "Akıl hocası onu Ash Konseyi'ne teslim etti.",
-    "zh-CN": "他的导师把他交给了灰烬议会。"
+    "zh-CN": "他的导师把他交给了灰烬议会。",
+    'zh-TW': "他的導師把他交給了灰燼議會。",
+    ko: "그의 멘토는 그를 Ash Council에 넘겼습니다.",
+    ja: "彼の指導者は彼を灰評議会に引き渡しました。",
   },
   "Su primera predicción causó una evacuación mortal.": {
     "es": "Su primera predicción causó una evacuación mortal.",
@@ -6358,7 +8089,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Sua primeira previsão causou uma evacuação mortal.",
     "it": "La sua prima previsione provocò un'evacuazione mortale.",
     "tr": "İlk tahmini ölümcül bir tahliyeye neden oldu.",
-    "zh-CN": "她的第一次预言导致了一场致命的疏散。"
+    "zh-CN": "她的第一次预言导致了一场致命的疏散。",
+    'zh-TW': "她的第一次預言導致了一場致命的疏散。",
+    ko: "그녀의 첫 번째 예측은 치명적인 대피를 초래했습니다.",
+    ja: "彼女の最初の予言は致命的な避難を引き起こしました。",
   },
   "Superficie cubierta por placas transparentes que se separan y chocan como hielo.": {
     "es": "Superficie cubierta por placas transparentes que se separan y chocan como hielo.",
@@ -6369,7 +8103,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Superfície coberta por placas transparentes que se separam e colidem como gelo.",
     "it": "Superficie ricoperta da lastre trasparenti che si separano e si scontrano come il ghiaccio.",
     "tr": "Buz gibi ayrılıp çarpışan şeffaf plakalarla kaplı yüzey.",
-    "zh-CN": "表面覆盖着透明板块，它们像冰一样分离又相撞。"
+    "zh-CN": "表面覆盖着透明板块，它们像冰一样分离又相撞。",
+    'zh-TW': "表面覆蓋著透明板塊，它們像冰一樣分離又相撞。",
+    ko: "얼음처럼 부서지고 충돌하는 투명한 판으로 덮인 표면.",
+    ja: "氷のように割れたり衝突したりする透明な板で覆われた表面。",
   },
   "Sus llaves abren depósitos, máquinas y recuerdos atrapados en vidrio. Protege a [[Sena Mir]].": {
     "es": "Sus llaves abren depósitos, máquinas y recuerdos atrapados en vidrio. Protege a [[Sena Mir]].",
@@ -6380,7 +8117,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Suas chaves abrem armazéns, máquinas e memórias presas em vidros. Proteja [[Sena Mir]].",
     "it": "Le loro chiavi aprono magazzini, macchine e ricordi intrappolati nel vetro. Proteggi [[Sena Mir]].",
     "tr": "Anahtarları depoları, makineleri ve camın içine hapsolmuş anıları açıyor. [[Sena Mir]]'yi koruyun.",
-    "zh-CN": "它的钥匙能打开库藏、机器和困在玻璃中的记忆。它保护 [[Sena Mir]]。"
+    "zh-CN": "它的钥匙能打开库藏、机器和困在玻璃中的记忆。它保护 [[Sena Mir]]。",
+    'zh-TW': "它的鑰匙能開啟庫藏、機器和困在玻璃中的記憶。它保護 [[Sena Mir]]。",
+    ko: "그 열쇠는 유리에 갇힌 더미, 기계, 기억을 엽니다. [[세나 미르]]를 보호합니다.",
+    ja: "その鍵は、ガラスに閉じ込められた書庫、機械、記憶を開きます。 [[セナ・ミル]]を保護します。",
   },
   "Sus membranas perciben vibraciones y sus genealogías se cantan, no se escriben.": {
     "es": "Sus membranas perciben vibraciones y sus genealogías se cantan, no se escriben.",
@@ -6391,7 +8131,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Suas membranas percebem vibrações e suas genealogias são cantadas, não escritas.",
     "it": "Le loro membrane percepiscono le vibrazioni e le loro genealogie sono cantate, non scritte.",
     "tr": "Zarları titreşimleri algılar ve soyağaçları yazılmaz, şarkılarla söylenir.",
-    "zh-CN": "它们的膜能感知振动，它们的谱系靠歌唱而非书写流传。"
+    "zh-CN": "它们的膜能感知振动，它们的谱系靠歌唱而非书写流传。",
+    'zh-TW': "它們的膜能感知振動，它們的譜系靠歌唱而非書寫流傳。",
+    ko: "그들의 막은 진동을 감지하고 그들의 족보는 기록되기보다는 노래로 부릅니다.",
+    ja: "彼らの膜は振動を感知し、彼らの系図は書かれるのではなく歌われます。",
   },
   "Tarek abre una ruta civil y el bloqueo se levanta.": {
     "es": "Tarek abre una ruta civil y el bloqueo se levanta.",
@@ -6402,7 +8145,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Tarek abre uma rota civil e o bloqueio é levantado.",
     "it": "Tarek apre una via civile e il blocco viene revocato.",
     "tr": "Tarek sivil güzergahı açar ve abluka kalkar.",
-    "zh-CN": "Tarek 开辟了一条民用路线，封锁随之结束。"
+    "zh-CN": "Tarek 开辟了一条民用路线，封锁随之结束。",
+    'zh-TW': "Tarek 開闢了一條民用路線，封鎖隨之結束。",
+    ko: "타렉이 민간 경로를 열고 봉쇄가 종료됩니다.",
+    ja: "タレクは民間ルートを開き、封鎖は終了する。",
   },
   "Tarek debe elegir entre detener a Ilyra o falsificar la orden que permitirá su salida.": {
     "es": "Tarek debe elegir entre detener a Ilyra o falsificar la orden que permitirá su salida.",
@@ -6413,7 +8159,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Tarek deve escolher entre parar Ilyra ou forjar a ordem que permitirá sua partida.",
     "it": "Tarek deve scegliere tra fermare Ilyra o forgiare l'ordine che le consentirà di partire.",
     "tr": "Tarek, Ilyra'yı durdurmak ya da onun gitmesini sağlayacak emri çıkarmak arasında bir seçim yapmak zorundadır.",
-    "zh-CN": "Tarek 必须在逮捕 Ilyra 与伪造放她离开的命令之间做出选择。"
+    "zh-CN": "Tarek 必须在逮捕 Ilyra 与伪造放她离开的命令之间做出选择。",
+    'zh-TW': "Tarek 必須在逮捕 Ilyra 與偽造放她離開的命令之間做出選擇。",
+    ko: "타렉은 일리라를 체포할지 아니면 그녀를 떠나도록 명령을 내릴지 선택해야 합니다.",
+    ja: "タレクはイリラを逮捕するか、イリラを出国させる命令を偽造するかの選択を迫られる。",
   },
   "Tarek deja pasar a Ilyra.": {
     "es": "Tarek deja pasar a Ilyra.",
@@ -6424,7 +8173,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Tarek deixa Ilyra passar.",
     "it": "Tarek lascia passare Ilyra.",
     "tr": "Tarek, Ilyra'nın geçmesine izin verir.",
-    "zh-CN": "Tarek 放 Ilyra 通过。"
+    "zh-CN": "Tarek 放 Ilyra 通过。",
+    'zh-TW': "Tarek 放 Ilyra 通過。",
+    ko: "Tarek은 Ilyra를 통과시킵니다.",
+    ja: "タレクはイリラを追い越す。",
   },
   "Tarek elige un bando": {
     "es": "Tarek elige un bando",
@@ -6435,7 +8187,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Tarek escolhe um lado",
     "it": "Tarek sceglie da che parte stare",
     "tr": "Tarek tarafını seçiyor",
-    "zh-CN": "Tarek 选择立场"
+    "zh-CN": "Tarek 选择立场",
+    'zh-TW': "Tarek 選擇立場",
+    ko: "타렉은 한쪽을 선택합니다",
+    ja: "タレクはどちら側を選ぶか",
   },
   "Tarek Sarn": {
     "es": "Tarek Sarn",
@@ -6446,7 +8201,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Tarek Sarn",
     "it": "Tarek Sarn",
     "tr": "Tarek Sarn",
-    "zh-CN": "Tarek Sarn"
+    "zh-CN": "Tarek Sarn",
+    'zh-TW': "Tarek Sarn",
+    ko: "타렉 사안",
+    ja: "タレク・サーン",
   },
   "Tejedores de costa": {
     "es": "Tejedores de costa",
@@ -6457,7 +8215,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Tecelões costeiros",
     "it": "Tessitori costieri",
     "tr": "Kıyı dokumacıları",
-    "zh-CN": "海岸织者"
+    "zh-CN": "海岸织者",
+    'zh-TW': "海岸織者",
+    ko: "해안 직공",
+    ja: "海岸織物職人",
   },
   "Telares solares": {
     "es": "Telares solares",
@@ -6468,7 +8229,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "teares solares",
     "it": "telai solari",
     "tr": "güneş tezgahları",
-    "zh-CN": "太阳织机"
+    "zh-CN": "太阳织机",
+    'zh-TW': "太陽織機",
+    ko: "태양열 직기",
+    ja: "ソーラールーム",
   },
   "testigo": {
     "es": "testigo",
@@ -6479,7 +8243,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "testemunha",
     "it": "testimone",
     "tr": "tanık",
-    "zh-CN": "证人"
+    "zh-CN": "证人",
+    'zh-TW': "證人",
+    ko: "증인",
+    ja: "目撃者",
   },
   "Toda costa es una decisión dibujada.": {
     "es": "Toda costa es una decisión dibujada.",
@@ -6490,7 +8257,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cada costa é uma decisão tomada.",
     "it": "Ogni costa è una decisione presa.",
     "tr": "Her sahil çizilmiş bir karardır.",
-    "zh-CN": "每一道海岸都是一个被描绘出的决定。"
+    "zh-CN": "每一道海岸都是一个被描绘出的决定。",
+    'zh-TW': "每一道海岸都是一個被描繪出的決定。",
+    ko: "모든 해안은 결정에 따라 결정됩니다.",
+    ja: "すべての海岸には決定が下されます。",
   },
   "Toda la costa baja de Orthea.": {
     "es": "Toda la costa baja de Orthea.",
@@ -6501,7 +8271,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Toda a costa inferior de Orthea.",
     "it": "Tutta la bassa costa di Ortea.",
     "tr": "Orthea'nın tüm aşağı kıyısı.",
-    "zh-CN": "Orthea 的全部低地海岸。"
+    "zh-CN": "Orthea 的全部低地海岸。",
+    'zh-TW': "Orthea 的全部低地海岸。",
+    ko: "저지대 오르테아 전체.",
+    ja: "オルテア低地全域。",
   },
   "Toda luz deja sombra": {
     "es": "Toda luz deja sombra",
@@ -6512,7 +8285,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Toda luz deixa sombra",
     "it": "Ogni luce lascia ombra",
     "tr": "Her ışık gölge bırakır",
-    "zh-CN": "有光必有影"
+    "zh-CN": "有光必有影",
+    'zh-TW': "有光必有影",
+    ko: "모든 빛은 그림자를 드리운다",
+    ja: "あらゆる光が影を落とします",
   },
   "Toda memoria extraída del vidrio desplaza o borra otra.": {
     "es": "Toda memoria extraída del vidrio desplaza o borra otra.",
@@ -6523,7 +8299,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Qualquer memória extraída do vidro desloca ou apaga outra.",
     "it": "Qualsiasi ricordo estratto dal vetro ne sposta o ne cancella un altro.",
     "tr": "Camdan çıkarılan herhangi bir anı, bir diğerinin yerini alır veya onu siler.",
-    "zh-CN": "每一段从玻璃中提取的记忆都会取代或抹去另一段。"
+    "zh-CN": "每一段从玻璃中提取的记忆都会取代或抹去另一段。",
+    'zh-TW': "每一段從玻璃中提取的記憶都會取代或抹去另一段。",
+    ko: "유리에서 끌어낸 모든 기억은 다른 기억을 대체하거나 삭제합니다.",
+    ja: "ガラスから引き出されたすべての記憶は、別の記憶を置き換えたり消去したりします。",
   },
   "Toda persona que pisa el santuario entrega sus armas a la marea.": {
     "es": "Toda persona que pisa el santuario entrega sus armas a la marea.",
@@ -6534,7 +8313,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Cada pessoa que pisa no santuário entrega suas armas à maré.",
     "it": "Ogni persona che mette piede nel santuario consegna le proprie armi alla marea.",
     "tr": "Kutsal alana adım atan herkes silahlarını akıntıya teslim ediyor.",
-    "zh-CN": "每一个踏入圣所的人都把武器交给潮汐。"
+    "zh-CN": "每一个踏入圣所的人都把武器交给潮汐。",
+    'zh-TW': "每一個踏入聖所的人都把武器交給潮汐。",
+    ko: "성역에 들어가는 모든 사람은 조수에게 무기를 제공합니다.",
+    ja: "聖域に入った者は皆、武器を潮に任せます。",
   },
   "Todo huele a sal, aceite de lámpara y tormenta.": {
     "es": "Todo huele a sal, aceite de lámpara y tormenta.",
@@ -6545,7 +8327,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Tudo cheira a sal, óleo de lamparina e tempestade.",
     "it": "Tutto profuma di sale, di olio per lampade e di tempesta.",
     "tr": "Her şey tuz, kandil yağı ve fırtına kokuyor.",
-    "zh-CN": "一切都散发着盐、灯油和风暴的气味。"
+    "zh-CN": "一切都散发着盐、灯油和风暴的气味。",
+    'zh-TW': "一切都散發著鹽、燈油和風暴的氣味。",
+    ko: "모든 것에서 소금 냄새, 등유 냄새, 폭풍우 냄새가 납니다.",
+    ja: "すべてが塩、ランプの油、そして嵐の匂いです。",
   },
   "Tomó la regencia tras la desaparición de [[Nara Venn]] y convirtió el racionamiento de luz en instrumento político.": {
     "es": "Tomó la regencia tras la desaparición de [[Nara Venn]] y convirtió el racionamiento de luz en instrumento político.",
@@ -6556,7 +8341,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele assumiu a regência após o desaparecimento de [[Nara Venn]] e transformou o racionamento de energia elétrica em um instrumento político.",
     "it": "Ha assunto la reggenza dopo la scomparsa di [[Nara Venn]] e ha trasformato il razionamento dell'elettricità in uno strumento politico.",
     "tr": "[[Nara Venn]]'nin ortadan kaybolmasının ardından naipliği devraldı ve elektrik karnesini siyasi bir araca dönüştürdü.",
-    "zh-CN": "他在 [[Nara Venn]] 失踪后接掌摄政，并把配给光明变成了政治工具。"
+    "zh-CN": "他在 [[Nara Venn]] 失踪后接掌摄政，并把配给光明变成了政治工具。",
+    'zh-TW': "他在 [[Nara Venn]] 失蹤後接掌攝政，並把配給光明變成了政治工具。",
+    ko: "그는 [[나라 벤]]이 사라진 후 섭정직을 맡아 가벼운 배급을 정치적 도구로 전환했습니다.",
+    ja: "[[ナラ・ヴェン]]が失踪した後、彼は摂政を引き継ぎ、軽度の配給を政治手段に変えた。",
   },
   "Túneles del Archivo": {
     "es": "Túneles del Archivo",
@@ -6567,7 +8355,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Túneis de arquivo",
     "it": "Tunnel d'archivio",
     "tr": "Arşiv Tünelleri",
-    "zh-CN": "档案库隧道"
+    "zh-CN": "档案库隧道",
+    'zh-TW': "檔案庫隧道",
+    ko: "아카이브 터널",
+    ja: "アーカイブトンネル",
   },
   "última llave": {
     "es": "última llave",
@@ -6578,7 +8369,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "última chave",
     "it": "ultima chiave",
     "tr": "son anahtar",
-    "zh-CN": "最后一把钥匙"
+    "zh-CN": "最后一把钥匙",
+    'zh-TW': "最後一把鑰匙",
+    ko: "마지막 키",
+    ja: "最後のキー",
   },
   "Último maestro legítimo del Faro y padre de Nara e Ilyra.": {
     "es": "Último maestro legítimo del Faro y padre de Nara e Ilyra.",
@@ -6589,7 +8383,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Último mestre legítimo do Farol e pai de Nara e Ilyra.",
     "it": "Ultimo legittimo padrone del Faro e padre di Nara e Ilyra.",
     "tr": "Deniz Feneri'nin son meşru efendisi ve Nara ile Ilyra'nın babası.",
-    "zh-CN": "灯塔最后一位合法的守护者，Nara 和 Ilyra 的父亲。"
+    "zh-CN": "灯塔最后一位合法的守护者，Nara 和 Ilyra 的父亲。",
+    'zh-TW': "燈塔最後一位合法的守護者，Nara 和 Ilyra 的父親。",
+    ko: "등대의 마지막 적법한 주인이자 나라(Nara)와 일리라(Ilyra)의 아버지.",
+    ja: "灯台の最後の正統な主であり、ナラとイリラの父親。",
   },
   "Último maestro legítimo del Faro, descubrió que cada encendido consumía memoria humana mediante la Deuda de Eco. Durante el Hundimiento obedeció la orden de encenderlo y salvó la terraza alta a costa del Barrio Hundido y de su propia familia. Antes de morir repartió su solución: dejó a Nara los cálculos, a Ilyra una ruta cifrada en su futura prótesis y a Odran la orden de permitir que ambas eligieran. Ese reparto volvió el secreto más peligroso.": {
     "es": "Último maestro legítimo del Faro, descubrió que cada encendido consumía memoria humana mediante la Deuda de Eco. Durante el Hundimiento obedeció la orden de encenderlo y salvó la terraza alta a costa del Barrio Hundido y de su propia familia. Antes de morir repartió su solución: dejó a Nara los cálculos, a Ilyra una ruta cifrada en su futura prótesis y a Odran la orden de permitir que ambas eligieran. Ese reparto volvió el secreto más peligroso.",
@@ -6600,7 +8397,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Último mestre legítimo do Farol, descobriu que cada iluminação consumia a memória humana através da Dívida de Eco. Durante o Naufrágio ele obedeceu à ordem de acendê-lo e salvou o terraço superior às custas do Bairro Submerso e de sua própria família. Antes de morrer, ele distribuiu sua solução: deixou os cálculos para Nara, para Ilyra uma rota criptografada em sua futura prótese e para Odran a ordem para que ambos pudessem escolher. Essa distribuição tornou o segredo mais perigoso.",
     "it": "Ultimo legittimo padrone del Faro, scoprì che ogni illuminazione consumava la memoria umana attraverso il Debito dell'Eco. Durante l'affondamento obbedì all'ordine di illuminarla e salvò la terrazza superiore a spese del quartiere sommerso e della sua stessa famiglia. Prima di morire, distribuì la sua soluzione: lasciò a Nara i calcoli, a Ilyra un percorso criptato nella sua futura protesi, e a Odran l'ordine di permettere a entrambi di scegliere. Quella distribuzione rendeva il segreto più pericoloso.",
     "tr": "Deniz Feneri'nin son meşru efendisi, Yankı Borcu aracılığıyla her aydınlatmanın insan hafızasını tükettiğini keşfetti. Batan sırasında onu yakma emrine itaat etti ve Batık Mahalle ve kendi ailesinin pahasına üst terası kurtardı. Ölmeden önce çözümünü dağıttı: Nara'ya hesaplamaları, Ilyra'ya gelecekteki protezinde şifrelenmiş bir rotayı ve Odran'a her ikisinin de seçim yapmasına izin verecek emri bıraktı. Bu dağıtım sırrı daha da tehlikeli hale getirdi.",
-    "zh-CN": "灯塔最后一位合法的守护者，他发现每次点亮都会通过回声之债消耗人类的记忆。在大沉没期间，他服从了点亮它的命令，以沉没街区和自己的家人为代价保住了上层露台。临终前，他拆分了自己的解决方案：把计算留给 Nara，把一条为 Ilyra 未来义肢编写的加密路线留给她，并命令 Odran 允许两个女儿自行选择。这一拆分让这个秘密变得更加危险。"
+    "zh-CN": "灯塔最后一位合法的守护者，他发现每次点亮都会通过回声之债消耗人类的记忆。在大沉没期间，他服从了点亮它的命令，以沉没街区和自己的家人为代价保住了上层露台。临终前，他拆分了自己的解决方案：把计算留给 Nara，把一条为 Ilyra 未来义肢编写的加密路线留给她，并命令 Odran 允许两个女儿自行选择。这一拆分让这个秘密变得更加危险。",
+    'zh-TW': "燈塔最後一位合法的守護者，他發現每次點亮都會通過回聲之債消耗人類的記憶。在大沉沒期間，他服從了點亮它的命令，以沉沒街區和自己的家人為代價保住了上層露臺。臨終前，他拆分了自己的解決方案：把計算留給 Nara，把一條為 Ilyra 未來義肢編寫的加密路線留給她，並命令 Odran 允許兩個女兒自行選擇。這一拆分讓這個秘密變得更加危險。",
+    ko: "마지막 합법적인 등대 주인인 그는 Echo Debt를 통해 인간의 기억을 소비하는 모든 조명을 발견했습니다. 침몰하는 동안 그는 불을 붙이라는 명령에 순종하여 Sunken Quarter와 그의 가족을 희생하여 상부 테라스를 구했습니다. 죽기 전에 그는 자신의 해결책을 나누었습니다. Ilyra의 미래 보철물을 위해 암호화된 경로인 Nara에 대한 계산과 두 딸이 선택할 수 있도록 Odran에 대한 명령입니다. 비밀을 나누면 더 위험해집니다.",
+    ja: "最後の正当な灯台マスターである彼は、あらゆる照明がエコー負債を通じて人間の記憶を消費していることを発見しました。沈没中、彼は火をつける命令に従い、沈没地区と自分の家族を犠牲にして上部テラスを救った。亡くなる前に、彼は解決策を分割しました。ナラへの計算、イリラの将来の義足のために暗号化されたルート、そして両方の娘に選択を許可するオドランへの命令です。秘密を分割すると、さらに危険が増しました。",
   },
   "Un deber cumplido justifica cualquier coste.": {
     "es": "Un deber cumplido justifica cualquier coste.",
@@ -6611,7 +8411,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Um dever cumprido justifica qualquer custo.",
     "it": "Un dovere adempiuto giustifica qualsiasi costo.",
     "tr": "Yerine getirilen bir görev her türlü maliyeti haklı çıkarır.",
-    "zh-CN": "尽到的职责可以为任何代价正名。"
+    "zh-CN": "尽到的职责可以为任何代价正名。",
+    'zh-TW': "盡到的職責可以為任何代價正名。",
+    ko: "의무를 이행하면 어떤 비용도 정당화됩니다.",
+    ja: "義務を果たせば、どんなコストも正当化されます。",
   },
   "Un mundo oceánico de tres lunas, continentes estrechos y mares cubiertos de vidrio flotante.": {
     "es": "Un mundo oceánico de tres lunas, continentes estrechos y mares cubiertos de vidrio flotante.",
@@ -6622,7 +8425,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Um mundo oceânico de três luas, continentes estreitos e mares cobertos de vidro flutuante.",
     "it": "Un mondo oceanico composto da tre lune, continenti stretti e mari ricoperti di vetro galleggiante.",
     "tr": "Üç aydan, dar kıtalardan ve yüzen camlarla kaplı denizlerden oluşan bir okyanus dünyası.",
-    "zh-CN": "一个有三个月亮的海洋世界，大陆狭长，海面覆盖着漂浮的玻璃。"
+    "zh-CN": "一个有三个月亮的海洋世界，大陆狭长，海面覆盖着漂浮的玻璃。",
+    'zh-TW': "一個有三個月亮的海洋世界，大陸狹長，海面覆蓋著漂浮的玻璃。",
+    ko: "3개의 달, 좁은 대륙, 떠다니는 유리로 뒤덮인 바다로 이루어진 바다 세계.",
+    ja: "3つの月、狭い大陸、そして浮かぶガラスで覆われた海からなる海洋世界。",
   },
   "Un nombre recibido por memoria de marea vuelve a quien lo entregó, no a quien lo pronuncia.": {
     "es": "Un nombre recibido por memoria de marea vuelve a quien lo entregó, no a quien lo pronuncia.",
@@ -6633,7 +8439,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Um nome recebido pela memória das marés retorna para quem o deu, não para quem o pronuncia.",
     "it": "Un nome ricevuto per memoria mareale ritorna a chi lo ha dato, non a chi lo pronuncia.",
     "tr": "Gelgit hafızası tarafından alınan bir isim, onu telaffuz edene değil, onu verene geri döner.",
-    "zh-CN": "通过潮汐记忆获得的名字会回到给予者那里，而非说出它的人。"
+    "zh-CN": "通过潮汐记忆获得的名字会回到给予者那里，而非说出它的人。",
+    'zh-TW': "通過潮汐記憶獲得的名字會回到給予者那裡，而非說出它的人。",
+    ko: "조수 기억을 통해 받은 이름은 화자가 아닌 이름을 준 사람에게 돌아갑니다.",
+    ja: "潮の記憶を通して受け取った名前は、話し手ではなく、与え手に戻ります。",
   },
   "Un nombre verdadero obliga una vez": {
     "es": "Un nombre verdadero obliga una vez",
@@ -6644,7 +8453,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Um nome verdadeiro liga uma vez",
     "it": "Un vero nome vincola una volta",
     "tr": "Gerçek bir isim bir kez bağlanır",
-    "zh-CN": "真名只能强制一次"
+    "zh-CN": "真名只能强制一次",
+    'zh-TW': "真名只能強制一次",
+    ko: "진짜 이름은 한번만 강요한다",
+    ja: "本当の名前は一度だけ強制する",
   },
   "Un padre puede cargar solo con toda deuda.": {
     "es": "Un padre puede cargar solo con toda deuda.",
@@ -6655,7 +8467,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Um pai pode arcar com todas as dívidas sozinho.",
     "it": "Un padre può farsi carico di tutti i debiti da solo.",
     "tr": "Bir baba tüm borcu tek başına taşıyabilir.",
-    "zh-CN": "父亲可以独自背负所有债务。"
+    "zh-CN": "父亲可以独自背负所有债务。",
+    'zh-TW': "父親可以獨自揹負所有債務。",
+    ko: "아버지는 모든 빚을 혼자서 짊어질 수 있습니다.",
+    ja: "父親はすべての借金を一人で背負うことができます。",
   },
   "Una carta empapada con la letra de Nara llega nueve meses después de su desaparición. Ilyra intenta verificarla como un objeto antes de aceptar lo que significa; Cael reconoce en la sal una corriente de la séptima ruta y exige una tripulación, no solo un pago. Tarek aparece con una citación del Consejo y finge no advertir que ambos preparan la huida. Ilyra elige confiar en Cael, guarda la carta en su mano de vidrio y fija el Archivo Sumergido como primer destino.": {
     "es": "Una carta empapada con la letra de Nara llega nueve meses después de su desaparición. Ilyra intenta verificarla como un objeto antes de aceptar lo que significa; Cael reconoce en la sal una corriente de la séptima ruta y exige una tripulación, no solo un pago. Tarek aparece con una citación del Consejo y finge no advertir que ambos preparan la huida. Ilyra elige confiar en Cael, guarda la carta en su mano de vidrio y fija el Archivo Sumergido como primer destino.",
@@ -6666,7 +8481,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Uma carta com a caligrafia de Nara chega nove meses após seu desaparecimento. Ilyra tenta verificá-lo como objeto antes de aceitar o que significa; Cael reconhece uma corrente da sétima rota no sal e exige tripulação, não apenas pagamento. Tarek aparece com uma convocação do Conselho e finge não perceber que ambos estão se preparando para fugir. Ilyra opta por confiar em Cael, colocando a carta em sua mão de vidro e definindo o Arquivo Submerso como seu primeiro destino.",
     "it": "Una lettera intrisa della calligrafia di Nara arriva nove mesi dopo la sua scomparsa. Ilyra cerca di verificarlo come oggetto prima di accettarne il significato; Cael riconosce una corrente della settima rotta nel sale e pretende un equipaggio, non solo un compenso. Tarek appare con una convocazione del Consiglio e finge di non accorgersi che entrambi si stanno preparando a scappare. Ilyra sceglie di fidarsi di Cael, riponendo la lettera nella sua mano di vetro e impostando l'Archivio Sommerso come sua prima destinazione.",
     "tr": "Nara'nın el yazısıyla ıslanmış bir mektup, onun ortadan kaybolmasından dokuz ay sonra gelir. Ilyra, bunun ne anlama geldiğini kabul etmeden önce onun bir nesne olduğunu doğrulamaya çalışır; Cael, tuzdaki yedinci rotanın akıntısını fark eder ve sadece ödeme değil, mürettebat da talep eder. Tarek, Konsey'den gelen bir çağrıyla ortaya çıkar ve ikisinin de kaçmaya hazırlandıklarını fark etmemiş gibi davranır. Ilyra, mektubu cam eline koyarak Cael'e güvenmeyi seçer ve ilk hedefi olarak Batık Arşiv'i belirler.",
-    "zh-CN": "一封被浸湿的、带有 Nara 笔迹的信在她失踪九个月后送到。Ilyra 试图先把它当作物品来核验，然后才接受它的含义；Cael 从盐中认出了第七条路线的一股洋流，并要求配备一队船员，而不只是报酬。Tarek 带着一份议会的传票出现，并假装没有注意到两人正在筹备出逃。Ilyra 选择信任 Cael，把信收进她的玻璃手中，并将沉没档案库定为第一个目的地。"
+    "zh-CN": "一封被浸湿的、带有 Nara 笔迹的信在她失踪九个月后送到。Ilyra 试图先把它当作物品来核验，然后才接受它的含义；Cael 从盐中认出了第七条路线的一股洋流，并要求配备一队船员，而不只是报酬。Tarek 带着一份议会的传票出现，并假装没有注意到两人正在筹备出逃。Ilyra 选择信任 Cael，把信收进她的玻璃手中，并将沉没档案库定为第一个目的地。",
+    'zh-TW': "一封被浸溼的、帶有 Nara 筆跡的信在她失蹤九個月後送到。Ilyra 試圖先把它當作物品來核驗，然後才接受它的含義；Cael 從鹽中認出了第七條路線的一股洋流，並要求配備一隊船員，而不只是報酬。Tarek 帶著一份議會的傳票出現，並假裝沒有注意到兩人正在籌備出逃。Ilyra 選擇信任 Cael，把信收進她的玻璃手中，並將沉沒檔案庫定為第一個目的地。",
+    ko: "나라가 사라진 지 9개월 만에 나라의 손에 흠뻑 젖은 편지가 도착한다. Ilyra는 그 의미를 받아들이기 전에 그것을 대상으로 검증하려고 합니다. 카엘은 일곱 번째 경로에서 소금을 알아보고 단순한 비용이 아닌 승무원을 요구합니다. 타렉은 의회 소환장을 가지고 도착하고 그들의 탈출 준비를 눈치채지 못한 척합니다. Ilyra는 Cael을 신뢰하기로 결정하고 유리 손에 편지를 봉인하고 Sunken Archive를 첫 번째 목적지로 지정합니다.",
+    ja: "失踪から9か月後、ナラの手に濡れた手紙が届く。イリラは、その意味を受け入れる前に、それが物体であることを確認しようとします。カエルは第7ルートからの塩を認識し、単なる支払いではなく乗組員を要求します。タレクは評議会の召喚状を持って到着するが、彼らの脱出準備に気付かないふりをする。イリラはカエルを信頼することを選択し、ガラスの手に手紙を封印し、最初の目的地として沈没書庫を指定しました。",
   },
   "Una media luna de piedra verde atravesada por cordilleras de sal.": {
     "es": "Una media luna de piedra verde atravesada por cordilleras de sal.",
@@ -6677,7 +8495,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Um crescente de pedra verde atravessado por cadeias de montanhas salgadas.",
     "it": "Una mezzaluna di pietra verde attraversata da catene montuose di sale.",
     "tr": "Tuzlu dağ sıralarının geçtiği yeşil taştan bir hilal.",
-    "zh-CN": "一弯绿色石头的新月，被盐的山脉贯穿。"
+    "zh-CN": "一弯绿色石头的新月，被盐的山脉贯穿。",
+    'zh-TW': "一彎綠色石頭的新月，被鹽的山脈貫穿。",
+    ko: "소금산맥을 가로지르는 초승달 모양의 녹색 돌.",
+    ja: "塩の山脈が横切る緑色の石の三日月。",
   },
   "Unificado hace siete siglos alrededor del Primer Faro.": {
     "es": "Unificado hace siete siglos alrededor del Primer Faro.",
@@ -6688,7 +8509,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Unificado há sete séculos em torno do Primeiro Farol.",
     "it": "Unificati sette secoli fa attorno al Primo Faro.",
     "tr": "Yedi yüzyıl önce Birinci Deniz Feneri çevresinde birleşmişti.",
-    "zh-CN": "七个世纪前围绕第一灯塔统一。"
+    "zh-CN": "七个世纪前围绕第一灯塔统一。",
+    'zh-TW': "七個世紀前圍繞第一燈塔統一。",
+    ko: "7세기 전 제1등대를 중심으로 통일되었습니다.",
+    ja: "7世紀前に第一灯台を中心に統一されました。",
   },
   "Usar el Flujo desplaza una cantidad equivalente de luz, calor o memoria.": {
     "es": "Usar el Flujo desplaza una cantidad equivalente de luz, calor o memoria.",
@@ -6699,7 +8523,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Usar o Flow desloca uma quantidade equivalente de luz, calor ou memória.",
     "it": "L'uso del Flusso sposta una quantità equivalente di luce, calore o memoria.",
     "tr": "Flow'un kullanılması eşdeğer miktarda ışığın, ısının veya belleğin yerini değiştirir.",
-    "zh-CN": "使用通量会置换等量的光、热或记忆。"
+    "zh-CN": "使用通量会置换等量的光、热或记忆。",
+    'zh-TW': "使用通量會置換等量的光、熱或記憶。",
+    ko: "Flux를 사용하면 동일한 양의 빛, 열 또는 메모리가 대체됩니다.",
+    ja: "Flux を使用すると、同量の光、熱、またはメモリが置き換えられます。",
   },
   "Vela de corriente": {
     "es": "Vela de corriente",
@@ -6710,7 +8537,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "vela atual",
     "it": "candela attuale",
     "tr": "mevcut mum",
-    "zh-CN": "洋流帆"
+    "zh-CN": "洋流帆",
+    'zh-TW': "洋流帆",
+    ko: "현재 항해",
+    ja: "現在の帆",
   },
   "Versión anterior: la voz se cortaba antes de nombrar el Corazón.": {
     "es": "Versión anterior: la voz se cortaba antes de nombrar el Corazón.",
@@ -6721,7 +8551,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Versão anterior: a voz é cortada antes de nomear o Coração.",
     "it": "Versione precedente: la voce tagliata prima di nominare il Cuore.",
     "tr": "Önceki versiyon: Kalbe isim vermeden önce ses kesildi.",
-    "zh-CN": "早期版本：那个声音在说出心脏的名字之前就中断了。"
+    "zh-CN": "早期版本：那个声音在说出心脏的名字之前就中断了。",
+    'zh-TW': "早期版本：那個聲音在說出心臟的名字之前就中斷了。",
+    ko: "이전 버전: 하트 이름을 지정하기 전에 음성이 끊겼습니다.",
+    ja: "以前のバージョン: ハートに名前を付ける前に音声が途切れました。",
   },
   "Vesh enseña a Sena a separar memoria y emoción.": {
     "es": "Vesh enseña a Sena a separar memoria y emoción.",
@@ -6732,7 +8565,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Vesh ensina Sena a separar memória e emoção.",
     "it": "Vesh insegna a Sena a separare memoria ed emozione.",
     "tr": "Vesh, Sena'ya hafıza ile duyguyu ayırmayı öğretir.",
-    "zh-CN": "Vesh 教 Sena 分辨记忆与情感。"
+    "zh-CN": "Vesh 教 Sena 分辨记忆与情感。",
+    'zh-TW': "Vesh 教 Sena 分辨記憶與情感。",
+    ko: "Vesh는 Sena에게 감정과 기억을 분리하는 방법을 가르칩니다.",
+    ja: "ヴェッシュはセナに記憶と感情を分けて教える。",
   },
   "Vesh revela que el Corazón de Vidrio es una criatura y que Nara sigue viva en su memoria.": {
     "es": "Vesh revela que el Corazón de Vidrio es una criatura y que Nara sigue viva en su memoria.",
@@ -6743,7 +8579,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Vesh revela que o Coração de Vidro é uma criatura e que Nara ainda está viva em sua memória.",
     "it": "Vesh rivela che il Cuore di Vetro è una creatura e che Nara è ancora viva nella sua memoria.",
     "tr": "Vesh, Camdan Kalp'in bir yaratık olduğunu ve Nara'nın hafızasında hâlâ hayatta olduğunu ortaya koyuyor.",
-    "zh-CN": "Vesh 揭示玻璃之心是一只生物，而 Nara 仍活在它的记忆中。"
+    "zh-CN": "Vesh 揭示玻璃之心是一只生物，而 Nara 仍活在它的记忆中。",
+    'zh-TW': "Vesh 揭示玻璃之心是一隻生物，而 Nara 仍活在它的記憶中。",
+    ko: "Vesh는 Glass Heart가 생물이고 Nara가 기억 속에 살아 있음을 밝힙니다.",
+    ja: "ヴェッシュはグラス・ハートが生き物であり、ナラがその記憶の中で生き続けていることを明かす。",
   },
   "veterano canoso, armadura azul ennegrecida, cicatriz en la garganta, capa de farero desgastada": {
     "es": "veterano canoso, armadura azul ennegrecida, cicatriz en la garganta, capa de farero desgastada",
@@ -6754,7 +8593,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "veterano grisalho, armadura azul enegrecida, cicatriz na garganta, capa de faroleiro desgastada",
     "it": "veterano brizzolato, armatura blu annerita, cicatrice sulla gola, mantello logoro da guardiano del faro",
     "tr": "kır saçlı gazi, kararmış mavi zırh, boğazda yara izi, yıpranmış deniz feneri bekçisi pelerini",
-    "zh-CN": "头发灰白的老兵，发黑的蓝色盔甲，喉间的伤疤，磨损的灯塔守护者斗篷"
+    "zh-CN": "头发灰白的老兵，发黑的蓝色盔甲，喉间的伤疤，磨损的灯塔守护者斗篷",
+    'zh-TW': "頭髮灰白的老兵，發黑的藍色盔甲，喉間的傷疤，磨損的燈塔守護者斗篷",
+    ko: "회색 베테랑, 검게 변한 푸른 갑옷, 목 흉터, 풍화된 등대 망토",
+    ja: "灰色の退役軍人、黒ずんだ青い鎧、喉の傷跡、風化した灯台のマント",
   },
   "Veyari": {
     "es": "Veyari",
@@ -6765,7 +8607,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Veyari",
     "it": "Veyari",
     "tr": "Veyari",
-    "zh-CN": "Veyari"
+    "zh-CN": "Veyari",
+    'zh-TW': "Veyari",
+    ko: "베야리",
+    ja: "ヴェヤリ",
   },
   "Viento": {
     "es": "Viento",
@@ -6776,7 +8621,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Vento",
     "it": "Vento",
     "tr": "Rüzgar",
-    "zh-CN": "风"
+    "zh-CN": "风",
+    'zh-TW': "風",
+    ko: "바람",
+    ja: "風",
   },
   "Vientos persistentes y caminos que brillan al anochecer.": {
     "es": "Vientos persistentes y caminos que brillan al anochecer.",
@@ -6787,7 +8635,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ventos persistentes e estradas que brilham ao anoitecer.",
     "it": "Venti persistenti e strade che brillano al crepuscolo.",
     "tr": "Kalıcı rüzgarlar ve alacakaranlıkta parlayan yollar.",
-    "zh-CN": "持续不断的风，以及黄昏时发光的道路。"
+    "zh-CN": "持续不断的风，以及黄昏时发光的道路。",
+    'zh-TW': "持續不斷的風，以及黃昏時發光的道路。",
+    ko: "지속적인 바람과 황혼에 빛나는 도로.",
+    ja: "絶え間なく続く風と夕暮れに輝く道路。",
   },
   "Vigila las puertas de Lúmina y responde ante el Consejo, aunque muchos de sus oficiales juraron primero a la Casa Venn.": {
     "es": "Vigila las puertas de Lúmina y responde ante el Consejo, aunque muchos de sus oficiales juraron primero a la Casa Venn.",
@@ -6798,7 +8649,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Ele guarda os portões de Lúmina e responde ao Conselho, embora muitos de seus oficiais tenham prestado juramento à Casa Venn.",
     "it": "Sorveglia le porte di Lúmina e risponde al Consiglio, sebbene molti dei suoi ufficiali abbiano prestato giuramento per la prima volta alla Casata Venn.",
     "tr": "Her ne kadar subaylarının çoğu ilk olarak Venn Hanesi'ne yemin etmiş olsa da, Lúmina'nın kapılarını korur ve Konsey'e cevap verir.",
-    "zh-CN": "守卫卢米娜的城门并向议会负责，尽管他的许多军官最先向文恩家族宣誓效忠。"
+    "zh-CN": "守卫卢米娜的城门并向议会负责，尽管他的许多军官最先向文恩家族宣誓效忠。",
+    'zh-TW': "守衛盧米娜的城門並向議會負責，儘管他的許多軍官最先向文恩家族宣誓效忠。",
+    ko: "루미나의 문을 지키고 의회에 답변하지만, 많은 장교들이 처음에는 벤 가문에게 맹세했습니다.",
+    ja: "ルミナの門を守り、評議会に返答するが、多くの役人は最初にヴェン家に誓った。",
   },
   "visitante": {
     "es": "visitante",
@@ -6809,7 +8663,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "visitante",
     "it": "visitatore",
     "tr": "ziyaretçi",
-    "zh-CN": "访客"
+    "zh-CN": "访客",
+    'zh-TW': "訪客",
+    ko: "방문객",
+    ja: "ビジター",
   },
   "Voces amplificadas por el agua y luz azul bajo las puertas.": {
     "es": "Voces amplificadas por el agua y luz azul bajo las puertas.",
@@ -6820,7 +8677,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Vozes amplificadas pela água e pela luz azul sob as portas.",
     "it": "Voci amplificate dall'acqua e dalla luce azzurra sotto le porte.",
     "tr": "Sesler kapıların altındaki su ve mavi ışıkla güçleniyor.",
-    "zh-CN": "被水放大的声音，以及门下的蓝光。"
+    "zh-CN": "被水放大的声音，以及门下的蓝光。",
+    'zh-TW': "被水放大的聲音，以及門下的藍光。",
+    ko: "문 아래의 물과 푸른 빛에 의해 목소리가 증폭됩니다.",
+    ja: "声はドアの下の水と青い光によって増幅されます。",
   },
   "Voces bajo el agua": {
     "es": "Voces bajo el agua",
@@ -6831,7 +8691,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Vozes debaixo d'água",
     "it": "Voci sott'acqua",
     "tr": "Su altındaki sesler",
-    "zh-CN": "水下的声音"
+    "zh-CN": "水下的声音",
+    'zh-TW': "水下的聲音",
+    ko: "물 속의 목소리",
+    ja: "水中の声",
   },
   "Zorro de lomo vítreo": {
     "es": "Zorro de lomo vítreo",
@@ -6842,7 +8705,10 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Raposa de dorso vítreo",
     "it": "Volpe dal dorso vitreo",
     "tr": "Vitreus destekli tilki",
-    "zh-CN": "玻璃背狐"
+    "zh-CN": "玻璃背狐",
+    'zh-TW': "玻璃背狐",
+    ko: "유리백 여우",
+    ja: "ガラスバックキツネ",
   },
   "Zumbido de lentes, olor a ozono y silencio ceremonial.": {
     "es": "Zumbido de lentes, olor a ozono y silencio ceremonial.",
@@ -6853,6 +8719,9 @@ export const WORLD_DEMO_TRANSLATIONS: Record<string, Record<AppLanguage, string>
     "pt-BR": "Zumbido de copos, cheiro de ozônio e silêncio cerimonial.",
     "it": "Ronzio di bicchieri, odore di ozono e silenzio cerimoniale.",
     "tr": "Bardakların uğultusu, ozon kokusu ve tören sessizliği.",
-    "zh-CN": "镜片的嗡鸣、臭氧的气味和仪式般的寂静。"
+    "zh-CN": "镜片的嗡鸣、臭氧的气味和仪式般的寂静。",
+    'zh-TW': "鏡片的嗡鳴、臭氧的氣味和儀式般的寂靜。",
+    ko: "허밍 렌즈, 오존 및 의식적인 침묵.",
+    ja: "ハミングするレンズ、オゾン、そして儀式的な沈黙。",
   }
 };

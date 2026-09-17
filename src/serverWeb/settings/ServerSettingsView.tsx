@@ -162,6 +162,9 @@ const LANGUAGE_LABELS: Record<string, string> = {
   it: "Italiano",
   tr: "Türkçe",
   "zh-CN": "简体中文",
+  "zh-TW": "繁體中文",
+  ja: "日本語",
+  ko: "한국어",
 };
 const SERVER_EXECUTION_PROVIDERS = new Set([
   "openai",

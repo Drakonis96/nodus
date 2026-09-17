@@ -39,4 +39,19 @@ export const DIARIZATION_TRANSLATIONS = {
     'Analizando voces…': '正在分析声音…',
     'La diarización usa Gemini Flash Lite para distinguir voces y conserva literalmente el texto.': '说话人分离使用 Gemini Flash Lite 区分声音，并逐字保留文本。',
   },
+  'zh-TW': {
+    'Detectar hablantes': '檢測說話人',
+    'Analizando voces…': '正在分析聲音…',
+    'La diarización usa Gemini Flash Lite para distinguir voces y conserva literalmente el texto.': '說話人分離使用 Gemini Flash Lite 區分聲音，並逐字保留文本。',
+  },
+  ko: {
+    "Detectar hablantes": "스피커 감지",
+    "Analizando voces…": "음성 분석 중…",
+    "La diarización usa Gemini Flash Lite para distinguir voces y conserva literalmente el texto.": "Diarization은 Gemini Flash Lite를 사용하여 음성을 구별하고 텍스트를 그대로 보존합니다.",
+  },
+  ja: {
+    "Detectar hablantes": "発言者の検出",
+    "Analizando voces…": "音声を分析中…",
+    "La diarización usa Gemini Flash Lite para distinguir voces y conserva literalmente el texto.": "ダイアライゼーションでは、Gemini Flash Lite を使用して音声を区別し、テキストをそのまま保存します。",
+  },
 } as const;

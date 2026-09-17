@@ -1,6 +1,6 @@
 import type { AppLanguage } from '@shared/types';
 
-export const INCLUDED_APP_LANGUAGES: AppLanguage[] = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN'];
+export const INCLUDED_APP_LANGUAGES: AppLanguage[] = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja', 'ko'];
 
 export type IncludedAppCopy = Record<AppLanguage, Record<string, string>>;
 

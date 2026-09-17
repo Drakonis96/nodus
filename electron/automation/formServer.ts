@@ -22,6 +22,31 @@ const FORM_CHROME: Record<AppLanguage, FormChrome> = {
   it: { accessToken: 'Token di accesso', access: 'Accedi', choose: 'Seleziona un’opzione', yes: 'Sì', submit: 'Invia risposta', notFound: 'Non trovato', unavailable: 'Modulo non disponibile', invalidToken: 'Il token non è valido.', tooLarge: 'La risposta supera 1 MB.', error: 'Errore' },
   tr: { accessToken: 'Erişim belirteci', access: 'Giriş yap', choose: 'Bir seçenek seçin', yes: 'Evet', submit: 'Yanıtı gönder', notFound: 'Bulunamadı', unavailable: 'Form kullanılamıyor', invalidToken: 'Belirteç geçerli değil.', tooLarge: 'Yanıt 1 MB boyutunu aşıyor.', error: 'Hata' },
   'zh-CN': { accessToken: '访问令牌', access: '登录', choose: '请选择一项', yes: '是', submit: '提交回复', notFound: '未找到', unavailable: '表单不可用', invalidToken: '令牌无效。', tooLarge: '回复超过 1 MB。', error: '错误' },
+  'zh-TW': { accessToken: '訪問令牌', access: '登入', choose: '請選擇一項', yes: '是', submit: '提交回復', notFound: '未找到', unavailable: '表單不可用', invalidToken: '令牌無效。', tooLarge: '回覆超過 1 MB。', error: '錯誤' },
+  ko: {
+    accessToken: "액세스 토큰",
+    access: "로그인",
+    choose: "옵션을 선택하세요",
+    yes: "예",
+    submit: "응답 제출",
+    notFound: "찾을 수 없음",
+    unavailable: "양식을 사용할 수 없습니다.",
+    invalidToken: "토큰이 유효하지 않습니다.",
+    tooLarge: "응답이 1MB를 초과합니다.",
+    error: "오류",
+  },
+  ja: {
+    accessToken: "アクセストークン",
+    access: "サインイン",
+    choose: "オプションを選択してください",
+    yes: "はい",
+    submit: "応答を送信する",
+    notFound: "見つかりません",
+    unavailable: "フォームが利用できません",
+    invalidToken: "トークンが無効です。",
+    tooLarge: "応答が1 MB を超えています。",
+    error: "エラー",
+  },
 };
 
 function formLanguage(request: IncomingMessage, url: URL): AppLanguage {
@@ -36,6 +61,11 @@ function formLanguage(request: IncomingMessage, url: URL): AppLanguage {
   if (candidate.startsWith('pt')) return 'pt';
   if (candidate.startsWith('it')) return 'it';
   if (candidate.startsWith('tr')) return 'tr';
+  // Script subtags win; a traditional region (zh-TW/HK/MO) gets the Traditional table.
+  if (candidate === 'zh-tw' || candidate.startsWith('zh-tw-')
+    || candidate === 'zh-hant' || candidate.startsWith('zh-hant-')
+    || candidate === 'zh-hk' || candidate.startsWith('zh-hk-')
+    || candidate === 'zh-mo' || candidate.startsWith('zh-mo-')) return 'zh-TW';
   // Simplified Chinese: zh-CN, zh-Hans, zh-SG and any bare `zh` locale.
   if (candidate === 'zh' || candidate.startsWith('zh-')) return 'zh-CN';
   return 'en';

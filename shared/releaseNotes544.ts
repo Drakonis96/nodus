@@ -20,6 +20,9 @@ export const RELEASE_5_4_4_HIGHLIGHTS: ReleaseHighlight[] = [
     it: 'Nodus Research è ora disponibile in cinese semplificato.',
     tr: 'Nodus Research artık Basitleştirilmiş Çince dilinde kullanılabiliyor.',
     'zh-CN': 'Nodus Research 现已提供简体中文版本。',
+    'zh-TW': 'Nodus Research 現已提供簡體中文版本。',
+    ko: "Nodus Research는 이제 중국어 간체로 제공됩니다.",
+    ja: "Nodus Research は簡体字中国語でも利用できるようになりました。",
   },
   {
     scope: 'ai',
@@ -32,6 +35,9 @@ export const RELEASE_5_4_4_HIGHLIGHTS: ReleaseHighlight[] = [
     it: 'Le analisi su un gateway personale non muoiono più per una connessione caduta. Un errore di socket senza stato, il «Connection error.» dell’SDK o un reset della connessione, ora viene considerato recuperabile, così la coda riprova invece di arrendersi. Nodus inoltra inoltre al fornitore personalizzato lo sforzo di ragionamento che scegli e chiede a un modello di ragionamento di omettere la sua traccia privata nelle analisi in background, che era ciò che esauriva il budget e allungava la generazione finché il gateway la interrompeva.',
     tr: 'Özel bir ağ geçidi üzerindeki taramalar artık kopan bağlantı yüzünden ölmüyor. Durum kodu olmayan bir soket hatası, SDK’nın «Connection error.» iletisi ya da bir bağlantı sıfırlaması, artık kurtarılabilir sayılıyor ve kuyruk pes etmek yerine yeniden deniyor. Nodus ayrıca seçtiğiniz akıl yürütme eforunu özel sağlayıcıya iletiyor ve bir akıl yürütme modelinden arka plan taramalarında özel izini atlamasını istiyor. Bütçeyi tüketen ve üretimi ağ geçidi kesene kadar uzatan da buydu.',
     'zh-CN': '在自定义网关上运行的扫描不再因为连接中断而失败。没有状态码的套接字故障、SDK 的「Connection error.」或连接重置，现在会被视为可恢复，队列会重试而不是放弃。Nodus 还会把你选择的推理强度转发给自定义提供商，并在后台扫描时要求推理模型跳过其私有思考过程，正是它耗尽了预算并让生成拖到网关切断连接。',
+    'zh-TW': '在自定義閘道器上執行的掃描不再因為連線中斷而失敗。沒有狀態碼的套接字故障、SDK 的「Connection error.」或連線重置，現在會被視為可恢復，佇列會重試而不是放棄。Nodus 還會把你選擇的推理強度轉發給自定義提供商，並在後臺掃描時要求推理模型跳過其私有思考過程，正是它耗盡了預算並讓生成拖到閘道器切斷連線。',
+    ko: "연결 끊김으로 인해 사용자 지정 게이트웨이에 대한 스캔이 더 이상 중단되지 않습니다. 상태 없는 소켓 오류, SDK의 \"연결 오류\"입니다. 또는 연결 재설정은 이제 복구 가능한 것으로 처리되므로 대기열은 포기하는 대신 다시 시도합니다. Nodus는 또한 귀하가 선택한 추론 노력을 맞춤형 제공자에게 전달하고 사고 모델에 백그라운드 스캔의 개인 추적을 건너뛰도록 요청합니다. 이로 인해 예산이 소진되고 게이트웨이가 이를 삭감할 때까지 세대가 늘어납니다.",
+    ja: "カスタムゲートウェイでのスキャンは、接続の切断による停止を停止します。ステータスのないソケット障害、SDK の「接続エラー」。接続のリセットは回復可能として扱われるようになったため、キューはあきらめずに再試行します。また、Nodus は、ユーザーが選択した推論作業をカスタムプロバイダーに転送し、バックグラウンドスキャンでのプライベートトレースをスキップするように思考モデルに要求します。これにより、予算が使い果たされ、ゲートウェイが予算をカットするまで世代が延長されました。",
   },
   {
     scope: 'library',
@@ -44,6 +50,9 @@ export const RELEASE_5_4_4_HIGHLIGHTS: ReleaseHighlight[] = [
     it: 'L’Indice documentale mostra anche le analisi singole. L’analisi di una sola opera o la preparazione di un Deep Research creavano un lavoro senza campagna che non compariva in nessuna riga, così premere riprova accodava lavoro invisibile. Ora ognuno ha la sua riga, con un pulsante riprova se ha fallito e uno annulla se è ancora in corso, e il pannello e il contatore dell’intestazione lo contano come qualsiasi altro lavoro.',
     tr: 'Belgesel Dizini tek başına çalışan taramaları da gösteriyor. Tek bir eserin analizi ya da bir Deep Research hazırlığı, kampanyası olmayan ve hiçbir satırda görünmeyen bir iş oluşturuyordu, bu yüzden yeniden dene’ye basmak görünmez bir işi kuyruğa alıyordu. Artık her birinin kendi satırı var, başarısızsa yeniden dene, hâlâ sürüyorsa iptal düğmesiyle, ve panel ile başlık rozeti onu diğer işler gibi sayıyor.',
     'zh-CN': '文献索引现在也会显示单独的扫描任务。单篇作品的分析或 Deep Research 的准备工作会创建一个没有批次的任务，它不出现在任何一行里，于是点击重试只是把看不见的工作排入队列。现在每个任务都有自己的行，失败时有重试按钮，仍在运行时有取消按钮，面板和标题栏徽章也会像其他任务一样统计它。',
+    'zh-TW': '文獻索引現在也會顯示單獨的掃描任務。單篇作品的分析或 Deep Research 的準備工作會建立一個沒有批次的任務，它不出現在任何一行裡，於是點選重試只是把看不見的工作排入佇列。現在每個任務都有自己的行，失敗時有重試按鈕，仍在執行時有取消按鈕，面板和標題欄徽章也會像其他任務一樣統計它。',
+    ko: "다큐멘터리 색인에는 독립 실행형 스캔도 표시됩니다. 단일 작업 분석이나 Deep Research 준비로 인해 캠페인이 없는 작업이 연속으로 나타나지 않아 재시도를 누르면 보이지 않는 작업이 대기열에 추가되었습니다. 이제 각 작업에는 실패한 경우 재시도 버튼, 계속 실행 중인 경우 취소 버튼이 있는 자체 행이 있으며, 패널과 헤더 배지는 다른 작업과 마찬가지로 이를 계산합니다.",
+    ja: "ドキュメンタリーインデックスにはスタンドアロンスキャンも表示されます。単一の作業の分析またはディープリサーチの準備により、キャンペーンが表示されないジョブが作成され、行が表示されなかったため、再試行を押すと目に見えない作業がキューに入れられました。それぞれに独自の行があり、失敗した場合は再試行ボタン、まだ実行中の場合はキャンセルボタンがあり、パネルとヘッダーバッジは他のジョブと同様にカウントします。",
   },
   {
     scope: 'library',
@@ -56,6 +65,9 @@ export const RELEASE_5_4_4_HIGHLIGHTS: ReleaseHighlight[] = [
     it: 'Il collegamento dalla biblioteca globale si vede subito. Quando portavi opere in un deposito, la sua lista di Biblioteca veniva da una cache che il collegamento non invalidava, così tornando a «Questo deposito» vedevi la pagina precedente. Ora il collegamento aggiorna la lista. Anche la coda di estrazione smette di mostrare messaggi non tradotti, e una riga viene dipinta di rosso solo quando il lavoro è davvero fallito.',
     tr: 'Genel kütüphaneden bağlama anında görünüyor. Eserleri bir kasaya taşıdığınızda, o kasanın Kütüphane listesi bağlamanın geçersiz kılmadığı bir önbellekten geliyordu, bu yüzden «Bu kasa»ya döndüğünüzde önceki sayfayı görüyordunuz. Artık bağlama listeyi yeniliyor. Çıkarma kuyruğu da çevrilmemiş iletileri göstermeyi bırakıyor ve bir satır yalnızca iş gerçekten başarısız olduğunda kırmızıya boyanıyor.',
     'zh-CN': '从全局文献库链接后会立即反映。把作品带入某个 vault 时，它的文献库列表来自一个链接从未失效的缓存，因此返回「此 vault」时看到的还是上一页。现在链接会刷新列表。提取队列也不再显示未翻译的消息，只有当任务真正失败时行才会变红。',
+    'zh-TW': '從全域性文獻庫連結後會立即反映。把作品帶入某個 vault 時，它的文獻庫列表來自一個連結從未失效的快取，因此返回「此 vault」時看到的還是上一頁。現在連結會重新整理列表。提取佇列也不再顯示未翻譯的訊息，只有當任務真正失敗時行才會變紅。',
+    ko: "글로벌 라이브러리에서 연결하면 바로 나타납니다. 작품을 Vault로 가져오면 해당 라이브러리 목록이 캐시에서 제공되므로 링크는 무효화되지 않으므로 \"이 Vault\"로 돌아가면 이전 페이지가 표시됩니다. 이제 연결하면 목록이 새로 고쳐집니다. 또한 추출 대기열은 번역되지 않은 메시지 표시를 중지하고 작업이 실제로 실패한 경우에만 행이 빨간색으로 칠해집니다.",
+    ja: "グローバルライブラリからのリンクはすぐに表示されます。作品を Vault に持ち込むと、そのライブラリリストはリンクが無効化されなかったキャッシュから提供されるため、「この Vault」に戻ると前のページが表示されます。リンクするとリストが更新されます。抽出キューにも未翻訳メッセージの表示が停止され、ジョブが実際に失敗した場合にのみ行が赤く塗られます。",
   },
   {
     scope: 'server',
@@ -68,5 +80,8 @@ export const RELEASE_5_4_4_HIGHLIGHTS: ReleaseHighlight[] = [
     it: 'L’immagine di Nodus Server torna ad avviarsi. Il suo percorso PDF importava una dipendenza per ritagliare i glifi cinesi che l’immagine non installava, così il container cadeva appena partiva. La dipendenza ora è dichiarata e il controllo di salute all’avvio passa.',
     tr: 'Nodus Server imajı yeniden başlıyor. PDF yolu, imajın kurmadığı bir bağımlılığı, Çince glifleri kırpmak için içe aktarıyordu, bu yüzden konteyner başlar başlamaz düşüyordu. Bağımlılık artık bildirildi ve başlangıçtaki sağlık denetimi geçiyor.',
     'zh-CN': 'Nodus Server 镜像重新可以启动。它的 PDF 流程引入了一个用于裁剪中文字形的依赖，而镜像从未安装它，于是容器一启动就崩溃。该依赖现已声明，启动时的健康检查通过。',
+    'zh-TW': 'Nodus Server 映象重新可以啟動。它的 PDF 流程引入了一個用於裁剪中文字形的依賴，而映象從未安裝它，於是容器一啟動就崩潰。該依賴現已宣告，啟動時的健康檢查通過。',
+    ko: "Nodus 서버 이미지가 다시 시작됩니다. 해당 PDF 경로는 이미지가 설치되지 않은 중국어 문자 부분 집합에 대한 종속성을 가져왔으므로 컨테이너는 시작되자마자 넘어졌습니다. 이제 종속성이 선언되고 시작 상태 확인이 통과됩니다.",
+    ja: "Nodus Server イメージが再び起動します。その PDF パスは、イメージが決してインストールしなかった中国語のグリフをサブセット化するための依存関係をインポートしたため、コンテナーは開始するとすぐに失敗しました。これで依存関係が宣言され、起動時のヘルスチェックに合格しました。",
   },
 ];

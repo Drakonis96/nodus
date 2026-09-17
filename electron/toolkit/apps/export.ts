@@ -36,6 +36,25 @@ const PACKAGE_COPY: Record<AppLanguage, PackageCopy> = {
   it: { openHeading: 'Apri l’app', openBody: 'Apri `index.html` in un browser moderno. L’app funziona senza installazione e salva i dati localmente nel browser.', contentsHeading: 'Contenuto del pacchetto', indexItem: 'versione pronta all’uso.', manifestItem: 'pacchetto originale compatibile con Nodus Apps.', sourceItem: 'file HTML, CSS e JavaScript separati per conservare e modificare l’app.', multiplayer: 'La connessione multigiocatore tramite QR richiede l’esecuzione dell’app in Nodus. La versione scaricata rimane offline.' },
   tr: { openHeading: 'Uygulamayı açın', openBody: '`index.html` dosyasını modern bir tarayıcıda açın. Uygulama kurulum gerektirmeden çalışır ve verilerini o tarayıcıda yerel olarak saklar.', contentsHeading: 'Paket içeriği', indexItem: 'kullanıma hazır sürüm.', manifestItem: 'Nodus Apps ile uyumlu özgün paket.', sourceItem: 'uygulamayı saklamak ve değiştirmek için ayrı HTML, CSS ve JavaScript dosyaları.', multiplayer: 'QR ile çok oyunculu bağlantı için uygulamanın Nodus içinde çalıştırılması gerekir. İndirilen sürüm çevrimdışı kalır.' },
   'zh-CN': { openHeading: '打开应用', openBody: '在现代浏览器中打开 `index.html`。应用无需安装即可运行，并将数据保存在该浏览器本地。', contentsHeading: '包内容', indexItem: '开箱即用的版本。', manifestItem: '与 Nodus Apps 兼容的原始包。', sourceItem: '用于保存和修改应用的独立 HTML、CSS 和 JavaScript 文件。', multiplayer: 'QR 多人模式要求在 Nodus 中运行该应用。下载的版本保持离线。' },
+  'zh-TW': { openHeading: '開啟應用', openBody: '在現代瀏覽器中開啟 `index.html`。應用無需安裝即可執行，並將資料儲存在該瀏覽器本地。', contentsHeading: '包內容', indexItem: '開箱即用的版本。', manifestItem: '與 Nodus Apps 相容的原始包。', sourceItem: '用於儲存和修改應用的獨立 HTML、CSS 和 JavaScript 檔案。', multiplayer: 'QR 多人模式要求在 Nodus 中執行該應用。下載的版本保持離線。' },
+  ko: {
+    openHeading: "앱 열기",
+    openBody: "최신 브라우저에서 `index.html`을 엽니다. 앱은 설치 없이 작동하며 해당 브라우저에 로컬로 데이터를 저장합니다.",
+    contentsHeading: "패키지 내용",
+    indexItem: "바로 사용할 수 있는 버전.",
+    manifestItem: "Nodus Apps와 호환되는 원본 패키지.",
+    sourceItem: "앱을 보존하고 수정하기 위해 별도의 HTML, CSS 및 JavaScript 파일.",
+    multiplayer: "QR 멀티플레이어를 사용하려면 Nodus 내에서 앱을 실행해야 합니다. 다운로드한 버전은 오프라인 상태로 유지됩니다.",
+  },
+  ja: {
+    openHeading: "アプリを開く",
+    openBody: "最新のブラウザで「index.html」を開きます。アプリはインストールせずに動作し、データをそのブラウザーにローカルに保存します。",
+    contentsHeading: "パッケージ内容",
+    indexItem: "すぐに使えるバージョン。",
+    manifestItem: "Nodus Appsと互換性のあるオリジナルパッケージ。",
+    sourceItem: "アプリを保存および変更するための個別の HTML、CSS、および JavaScript ファイル。",
+    multiplayer: "QR マルチプレイヤーでは、Nodus 内でアプリを実行する必要があります。ダウンロードしたバージョンはオフラインのままです。",
+  },
 };
 
 /** A local compatibility layer keeps storage-backed apps useful outside Nodus. */

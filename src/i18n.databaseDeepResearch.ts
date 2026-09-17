@@ -8,7 +8,7 @@ const catalog = [
     "Deep Research de dados",
     "Deep Research de dados",
     "Deep Research sui dati",
-    "Veri Deep Research", "数据深度研究",
+    "Veri Deep Research", "数据深度研究", "資料深度研究", "データのDeep Research", "데이터 Deep Research"
   ],
   [
     "Investiga tus tablas con una pregunta clara, trazabilidad de fuentes y control del coste.",
@@ -18,7 +18,7 @@ const catalog = [
     "Investigue as suas tabelas com uma pergunta clara, rastreabilidade das fontes e controlo de custos.",
     "Pesquise suas tabelas com uma pergunta clara, rastreabilidade das fontes e controle de custos.",
     "Indaga le tue tabelle con una domanda chiara, fonti tracciabili e controllo dei costi.",
-    "Tablolarınızı net bir soruyla, izlenebilir kaynaklar ve maliyet kontrolüyle araştırın.", "用明确的问题、来源可追溯性和成本控制来研究你的表格。",
+    "Tablolarınızı net bir soruyla, izlenebilir kaynaklar ve maliyet kontrolüyle araştırın.", "用明确的问题、来源可追溯性和成本控制来研究你的表格。", "用明確的問題、來源可追溯性和成本控制來研究你的表格。", "明確な質問、ソースの追跡可能性、コスト管理を行ってテーブルを調査します。", "명확한 질문, 소스 추적성 및 비용 관리를 통해 테이블을 조사하십시오."
   ],
   [
     "Solo usa datos de este vault",
@@ -28,7 +28,7 @@ const catalog = [
     "Usa apenas dados deste vault",
     "Usa apenas dados deste vault",
     "Usa solo i dati di questo vault",
-    "Yalnızca bu vaulttaki verileri kullanır", "仅使用此资料库的数据",
+    "Yalnızca bu vaulttaki verileri kullanır", "仅使用此资料库的数据", "僅使用此資料庫的資料", "このボールトのデータのみを使用します", "이 저장소의 데이터만 사용합니다."
   ],
   [
     "1. Define el objetivo",
@@ -38,7 +38,7 @@ const catalog = [
     "1. Defina o objetivo",
     "1. Defina o objetivo",
     "1. Definisci l’obiettivo",
-    "1. Amacı tanımlayın", "1. 定义目标",
+    "1. Amacı tanımlayın", "1. 定义目标", "1. 定義目標", "1. 目的を定義する", "1. 목표 정의"
   ],
   [
     "La pregunta guía qué filas se leen y cómo se organiza la respuesta.",
@@ -48,7 +48,7 @@ const catalog = [
     "A pergunta orienta as linhas lidas e a organização da resposta.",
     "A pergunta orienta as linhas lidas e a organização da resposta.",
     "La domanda guida le righe lette e l’organizzazione della risposta.",
-    "Soru, hangi satırların okunacağını ve yanıtın nasıl düzenleneceğini belirler.", "问题决定读取哪些行以及如何组织答案。",
+    "Soru, hangi satırların okunacağını ve yanıtın nasıl düzenleneceğini belirler.", "问题决定读取哪些行以及如何组织答案。", "問題決定讀取哪些行以及如何組織答案。", "質問は、どの行が読み取られるか、および回答がどのように構成されているかを示します。", "질문은 읽을 행과 답변 구성 방법을 안내합니다."
   ],
   [
     "¿Qué quieres descubrir, comparar o explicar con estas bases de datos?",
@@ -58,7 +58,7 @@ const catalog = [
     "O que pretende descobrir, comparar ou explicar com estas bases de dados?",
     "O que você quer descobrir, comparar ou explicar com esses bancos de dados?",
     "Cosa vuoi scoprire, confrontare o spiegare con questi database?",
-    "Bu veritabanlarıyla neyi keşfetmek, karşılaştırmak veya açıklamak istiyorsunuz?", "你想通过这些数据库发现、比较或解释什么？",
+    "Bu veritabanlarıyla neyi keşfetmek, karşılaştırmak veya açıklamak istiyorsunuz?", "你想通过这些数据库发现、比较或解释什么？", "你想通過這些資料庫發現、比較或解釋什麼？", "これらのデータベースを使って何を発見、比較、説明したいですか?", "이 데이터베이스를 통해 무엇을 발견하고, 비교하고, 설명하고 싶나요?"
   ],
   [
     "Bases y vistas",
@@ -68,7 +68,7 @@ const catalog = [
     "Bases e vistas",
     "Bancos e visualizações",
     "Database e viste",
-    "Veritabanları ve görünümler", "数据库与视图",
+    "Veritabanları ve görünümler", "数据库与视图", "資料庫與檢視", "データベースとビュー", "데이터베이스 및 보기"
   ],
   [
     "Filtro de filas",
@@ -78,7 +78,7 @@ const catalog = [
     "Filtro de linhas",
     "Filtro de linhas",
     "Filtro righe",
-    "Satır filtresi", "行筛选",
+    "Satır filtresi", "行筛选", "行篩選", "行フィルター", "행 필터"
   ],
   [
     "Buscar texto dentro de las filas…",
@@ -88,7 +88,7 @@ const catalog = [
     "Pesquisar texto nas linhas…",
     "Pesquisar texto nas linhas…",
     "Cerca testo nelle righe…",
-    "Satırların içinde metin ara…", "在行内搜索文本…",
+    "Satırların içinde metin ara…", "在行内搜索文本…", "在行內搜尋文本…", "行内のテキストを検索…", "행 안의 텍스트 검색…"
   ],
   [
     "El filtro solo recorta el conjunto de trabajo; no modifica tus bases.",
@@ -98,7 +98,7 @@ const catalog = [
     "O filtro apenas reduz o conjunto de trabalho; não altera as bases.",
     "O filtro apenas reduz o conjunto de trabalho; não altera os bancos.",
     "Il filtro restringe solo il set di lavoro; non modifica i database.",
-    "Filtre yalnızca çalışma kümesini daraltır; veritabanlarınızı değiştirmez.", "筛选仅缩小工作集；不会修改你的数据库。",
+    "Filtre yalnızca çalışma kümesini daraltır; veritabanlarınızı değiştirmez.", "筛选仅缩小工作集；不会修改你的数据库。", "篩選僅縮小工作集；不會修改你的資料庫。", "フィルターはワーキングセットを絞り込むだけです。データベースは変更されません。", "필터는 작업 세트의 범위를 좁힐 뿐입니다. 데이터베이스는 수정되지 않습니다."
   ],
   [
     "2. Asigna roles a las columnas",
@@ -108,7 +108,7 @@ const catalog = [
     "2. Atribua funções às colunas",
     "2. Atribua funções às colunas",
     "2. Assegna ruoli alle colonne",
-    "2. Sütun rollerini ata", "2. 为列分配角色",
+    "2. Sütun rollerini ata", "2. 为列分配角色", "2. 為列分配角色", "2. 列の役割を割り当てる", "2. 컬럼 역할 할당"
   ],
   [
     "Ayuda al planificador a distinguir afirmaciones, contexto y contraste.",
@@ -118,7 +118,7 @@ const catalog = [
     "Ajuda o planeador a distinguir afirmações, contexto e contraste.",
     "Ajuda o planejador a distinguir afirmações, contexto e contraste.",
     "Aiuta il pianificatore a distinguere affermazioni, contesto e confronto.",
-    "Planlayıcının iddiaları, bağlamı ve karşılaştırmayı ayırt etmesine yardım edin.", "帮助规划器区分论断、背景与对照。",
+    "Planlayıcının iddiaları, bağlamı ve karşılaştırmayı ayırt etmesine yardım edin.", "帮助规划器区分论断、背景与对照。", "幫助規劃器區分論斷、背景與對照。", "プランナーが主張、文脈、対比を区別できるようにします。", "기획자가 주장, 맥락, 대조를 구별할 수 있도록 도와주세요."
   ],
   [
     "Afirmaciones",
@@ -128,7 +128,7 @@ const catalog = [
     "Afirmações",
     "Afirmações",
     "Affermazioni",
-    "İddialar", "论断",
+    "İddialar", "论断", "論斷", "クレーム", "청구"
   ],
   [
     "Qué sostiene o demuestra cada fila",
@@ -138,7 +138,7 @@ const catalog = [
     "O que cada linha sustenta ou demonstra",
     "O que cada linha sustenta ou demonstra",
     "Cosa sostiene o dimostra ogni riga",
-    "Her satırın desteklediği veya gösterdiği şey", "每行支持或证明了什么",
+    "Her satırın desteklediği veya gösterdiği şey", "每行支持或证明了什么", "每行支援或證明了什麼", "各行がサポートまたは実証しているもの", "각 행이 지원하거나 보여주는 것"
   ],
   [
     "Contexto",
@@ -148,7 +148,7 @@ const catalog = [
     "Contexto",
     "Contexto",
     "Contesto",
-    "Bağlam", "背景",
+    "Bağlam", "背景", "背景", "コンテクスト", "문맥"
   ],
   [
     "Antecedentes, fechas y alcance",
@@ -158,7 +158,7 @@ const catalog = [
     "Contexto, datas e âmbito",
     "Contexto, datas e escopo",
     "Contesto, date e ambito",
-    "Arka plan, tarihler ve kapsam", "背景信息、日期与范围",
+    "Arka plan, tarihler ve kapsam", "背景信息、日期与范围", "背景資訊、日期與範圍", "背景、日付、範囲", "배경, 날짜 및 범위"
   ],
   [
     "Contraste",
@@ -168,7 +168,7 @@ const catalog = [
     "Contraste",
     "Contraste",
     "Confronto",
-    "Karşılaştırma", "对照",
+    "Karşılaştırma", "对照", "對照", "対比", "차이"
   ],
   [
     "Señales que matizan o contradicen",
@@ -178,7 +178,7 @@ const catalog = [
     "Sinais que matizam ou contradizem",
     "Sinais que ponderam ou contradizem",
     "Segnali che qualificano o contraddicono",
-    "Nüanslandıran veya çelişen sinyaller", "能够限定或反驳的信号",
+    "Nüanslandıran veya çelişen sinyaller", "能够限定或反驳的信号", "能夠限定或反駁的訊號", "適格または矛盾するシグナル", "자격이 있거나 모순되는 신호"
   ],
   [
     "Método",
@@ -188,7 +188,7 @@ const catalog = [
     "Método",
     "Método",
     "Metodo",
-    "Yöntem", "方法",
+    "Yöntem", "方法", "方法", "方法", "방법"
   ],
   [
     "Cómo se obtuvo o midió el dato",
@@ -198,7 +198,7 @@ const catalog = [
     "Como o dado foi obtido ou medido",
     "Como o dado foi obtido ou medido",
     "Come è stato ottenuto o misurato il dato",
-    "Verinin nasıl elde edildiği veya ölçüldüğü", "数据如何获得或测量",
+    "Verinin nasıl elde edildiği veya ölçüldüğü", "数据如何获得或测量", "資料如何獲得或測量", "データの取得または測定方法", "데이터 획득 또는 측정 방법"
   ],
   [
     "Detectar automáticamente",
@@ -208,7 +208,7 @@ const catalog = [
     "Detetar automaticamente",
     "Detectar automaticamente",
     "Rileva automaticamente",
-    "Otomatik algıla", "自动检测",
+    "Otomatik algıla", "自动检测", "自動檢測", "自動検出", "자동으로 감지"
   ],
   [
     "3. Preview editable",
@@ -218,7 +218,7 @@ const catalog = [
     "3. Pré-visualização editável",
     "3. Pré-visualização editável",
     "3. Anteprima modificabile",
-    "3. Düzenlenebilir önizleme", "3. 可编辑预览",
+    "3. Düzenlenebilir önizleme", "3. 可编辑预览", "3. 可編輯預覽", "3. 編集可能なプレビュー", "3. 편집 가능한 미리보기"
   ],
   [
     "Revisa la muestra y ajusta la estructura antes de gastar presupuesto.",
@@ -228,7 +228,7 @@ const catalog = [
     "Reveja a amostra e ajuste a estrutura antes de gastar orçamento.",
     "Revise a amostra e ajuste a estrutura antes de gastar orçamento.",
     "Controlla il campione e adatta la struttura prima di spendere il budget.",
-    "Bütçe harcamadan önce örneği inceleyin ve yapıyı ayarlayın.", "在消耗预算前查看样本并调整结构。",
+    "Bütçe harcamadan önce örneği inceleyin ve yapıyı ayarlayın.", "在消耗预算前查看样本并调整结构。", "在消耗預算前檢視樣本並調整結構。", "予算を使う前にサンプルを確認し、構造を調整してください。", "예산을 지출하기 전에 샘플을 검토하고 구조를 조정하세요."
   ],
   [
     "Muestra de evidencia",
@@ -238,7 +238,7 @@ const catalog = [
     "Amostra de evidência",
     "Amostra de evidência",
     "Campione di evidenze",
-    "Kanıt örneği", "证据样本",
+    "Kanıt örneği", "证据样本", "證據樣本", "証拠サンプル", "증거 샘플"
   ],
   [
     "Presupuesto y modelo",
@@ -248,7 +248,7 @@ const catalog = [
     "Orçamento e modelo",
     "Orçamento e modelo",
     "Budget e modello",
-    "Bütçe ve model", "预算与模型",
+    "Bütçe ve model", "预算与模型", "預算與模型", "予算とモデル", "예산 및 모델"
   ],
   [
     "El límite se comprueba antes de encolar el trabajo.",
@@ -258,7 +258,7 @@ const catalog = [
     "O limite é verificado antes de colocar o trabalho na fila.",
     "O limite é verificado antes de colocar o trabalho na fila.",
     "Il limite viene verificato prima di accodare il lavoro.",
-    "Sınır, iş kuyruğa alınmadan önce kontrol edilir.", "在将任务加入队列前会检查限额。",
+    "Sınır, iş kuyruğa alınmadan önce kontrol edilir.", "在将任务加入队列前会检查限额。", "在將任務加入佇列前會檢查限額。", "作業をキューに入れる前に制限がチェックされます。", "작업을 대기열에 넣기 전에 한도를 확인합니다."
   ],
   [
     "Modelo",
@@ -268,7 +268,7 @@ const catalog = [
     "Modelo",
     "Modelo",
     "Modello",
-    "Model", "模型",
+    "Model", "模型", "模型", "モデル", "모델"
   ],
   [
     "Profundidad",
@@ -278,7 +278,7 @@ const catalog = [
     "Profundidade",
     "Profundidade",
     "Profondità",
-    "Derinlik", "深度",
+    "Derinlik", "深度", "深度", "深さ", "깊이"
   ],
   [
     "Rápida",
@@ -288,7 +288,7 @@ const catalog = [
     "Rápida",
     "Rápida",
     "Rapida",
-    "Hızlı", "快速",
+    "Hızlı", "快速", "快速", "素早い", "빠른"
   ],
   [
     "Equilibrada",
@@ -298,7 +298,7 @@ const catalog = [
     "Equilibrada",
     "Equilibrada",
     "Bilanciata",
-    "Dengeli", "均衡",
+    "Dengeli", "均衡", "均衡", "バランスの取れた", "균형 잡힌"
   ],
   [
     "Profunda",
@@ -308,7 +308,7 @@ const catalog = [
     "Profunda",
     "Profunda",
     "Approfondita",
-    "Derin", "深入",
+    "Derin", "深入", "深入", "深い", "깊은"
   ],
   [
     "Límite del coste estimado (USD)",
@@ -318,7 +318,7 @@ const catalog = [
     "Limite do custo estimado (USD)",
     "Limite do custo estimado (USD)",
     "Limite del costo stimato (USD)",
-    "Tahmini maliyet sınırı (USD)", "预估成本限额（USD）",
+    "Tahmini maliyet sınırı (USD)", "预估成本限额（USD）", "預估成本限額（USD）", "推定コスト制限 (USD)", "예상 비용 한도(USD)"
   ],
   [
     "Coste estimado",
@@ -328,7 +328,7 @@ const catalog = [
     "Custo estimado",
     "Custo estimado",
     "Costo stimato",
-    "Tahmini maliyet", "预估成本",
+    "Tahmini maliyet", "预估成本", "預估成本", "推定コスト", "예상 비용"
   ],
   [
     "Dentro del límite",
@@ -338,7 +338,7 @@ const catalog = [
     "Dentro do limite",
     "Dentro do limite",
     "Entro il limite",
-    "Sınır içinde", "在限额内",
+    "Sınır içinde", "在限额内", "在限額內", "制限内", "한도 내"
   ],
   [
     "Ajusta la profundidad o aumenta el límite",
@@ -348,7 +348,7 @@ const catalog = [
     "Ajuste a profundidade ou aumente o limite",
     "Ajuste a profundidade ou aumente o limite",
     "Regola la profondità o aumenta il limite",
-    "Derinliği ayarlayın veya sınırı artırın", "调整深度或提高限额",
+    "Derinliği ayarlayın veya sınırı artırın", "调整深度或提高限额", "調整深度或提高限額", "深さを調整するか、制限を増やします", "깊이를 조정하거나 한계를 늘리십시오."
   ],
   [
     "Iniciar investigación",
@@ -358,7 +358,7 @@ const catalog = [
     "Iniciar investigação",
     "Iniciar pesquisa",
     "Avvia ricerca",
-    "Araştırmayı başlat", "开始研究",
+    "Araştırmayı başlat", "开始研究", "開始研究", "研究を始める", "연구 시작"
   ],
   [
     "Timeline de ejecución",
@@ -368,7 +368,7 @@ const catalog = [
     "Linha do tempo da execução",
     "Linha do tempo da execução",
     "Cronologia di esecuzione",
-    "Yürütme zaman çizelgesi", "执行时间线",
+    "Yürütme zaman çizelgesi", "执行时间线", "執行時間線", "実行タイムライン", "실행 타임라인"
   ],
   [
     "Cada fase deja un rastro revisable.",
@@ -378,7 +378,7 @@ const catalog = [
     "Cada fase deixa um rasto verificável.",
     "Cada fase deixa um rastro verificável.",
     "Ogni fase lascia una traccia verificabile.",
-    "Her aşama incelenebilir bir iz bırakır.", "每个阶段都会留下可核查的痕迹。",
+    "Her aşama incelenebilir bir iz bırakır.", "每个阶段都会留下可核查的痕迹。", "每個階段都會留下可核查的痕跡。", "各フェーズはレビュー可能な痕跡を残します。", "각 단계는 검토 가능한 흔적을 남깁니다."
   ],
   [
     "Trabajos",
@@ -388,7 +388,7 @@ const catalog = [
     "Trabalhos",
     "Trabalhos",
     "Lavori",
-    "İşler", "任务",
+    "İşler", "任务", "任務", "求人", "채용정보"
   ],
   [
     "La cola conserva estado, fase y coste de cada investigación.",
@@ -398,7 +398,7 @@ const catalog = [
     "A fila conserva o estado, fase e custo de cada investigação.",
     "A fila conserva o status, fase e custo de cada pesquisa.",
     "La coda conserva stato, fase e costo di ogni ricerca.",
-    "Kuyruk her araştırmanın durumunu, aşamasını ve maliyetini saklar.", "队列会保留每次研究的状态、阶段和成本。",
+    "Kuyruk her araştırmanın durumunu, aşamasını ve maliyetini saklar.", "队列会保留每次研究的状态、阶段和成本。", "佇列會保留每次研究的狀態、階段和成本。", "キューは、すべての調査実行のステータス、フェーズ、コストを保持します。", "대기열은 모든 연구 실행의 상태, 단계 및 비용을 유지합니다."
   ],
   [
     "Galería de resultados",
@@ -408,7 +408,7 @@ const catalog = [
     "Galeria de resultados",
     "Galeria de resultados",
     "Galleria dei risultati",
-    "Sonuç galerisi", "结果库",
+    "Sonuç galerisi", "结果库", "結果庫", "結果ギャラリー", "결과 갤러리"
   ],
   [
     "Abre un informe para leerlo y revisar sus fuentes.",
@@ -418,7 +418,7 @@ const catalog = [
     "Abra um relatório para o ler e rever as fontes.",
     "Abra um relatório para lê-lo e revisar suas fontes.",
     "Apri un report per leggerlo e controllare le fonti.",
-    "Bir raporu okumak ve kaynaklarını incelemek için açın.", "打开报告以阅读并查看其来源。",
+    "Bir raporu okumak ve kaynaklarını incelemek için açın.", "打开报告以阅读并查看其来源。", "開啟報告以閱讀並檢視其來源。", "レポートを開いて読んでソースを確認します。", "보고서를 열어서 읽고 소스를 검토하세요."
   ],
   [
     "Evidencia",
@@ -428,7 +428,7 @@ const catalog = [
     "Evidência",
     "Evidência",
     "Evidenze",
-    "Kanıt", "证据",
+    "Kanıt", "证据", "證據", "証拠", "증거"
   ],
   [
     "Detalle seleccionado",
@@ -438,7 +438,7 @@ const catalog = [
     "Detalhe selecionado",
     "Detalhe selecionado",
     "Dettaglio selezionato",
-    "Seçilen ayrıntı", "所选详情",
+    "Seçilen ayrıntı", "所选详情", "所選詳情", "選択された詳細", "선택한 세부정보"
   ],
   [
     "Fila sin título",
@@ -448,7 +448,7 @@ const catalog = [
     "Linha sem título",
     "Linha sem título",
     "Riga senza titolo",
-    "Başlıksız satır", "无标题行",
+    "Başlıksız satır", "无标题行", "無標題行", "無題の行", "제목 없는 행"
   ],
   [
     "Fila de base de datos",
@@ -458,7 +458,7 @@ const catalog = [
     "Linha da base de dados",
     "Linha do banco de dados",
     "Riga del database",
-    "Veritabanı satırı", "数据库行",
+    "Veritabanı satırı", "数据库行", "資料庫行", "データベース行", "데이터베이스 행"
   ],
   [
     "Investigación de base de datos",
@@ -468,7 +468,7 @@ const catalog = [
     "Investigação de base de dados",
     "Pesquisa de banco de dados",
     "Ricerca sul database",
-    "Veritabanı araştırması", "数据库研究",
+    "Veritabanı araştırması", "数据库研究", "資料庫研究", "データベース調査", "데이터베이스 연구"
   ],
   [
     "Preparando",
@@ -478,7 +478,7 @@ const catalog = [
     "A preparar",
     "Preparando",
     "Preparazione",
-    "Hazırlanıyor", "准备中",
+    "Hazırlanıyor", "准备中", "準備中", "準備中", "준비 중"
   ],
   [
     "Planteamiento y alcance",
@@ -488,7 +488,7 @@ const catalog = [
     "Enquadramento e âmbito",
     "Formulação e escopo",
     "Impostazione e ambito",
-    "Çerçeve ve kapsam", "问题设定与范围",
+    "Çerçeve ve kapsam", "问题设定与范围", "問題設定與範圍", "枠組みと範囲", "프레이밍 및 범위"
   ],
   [
     "Qué pregunta responde la investigación y qué queda fuera.",
@@ -498,7 +498,7 @@ const catalog = [
     "Que pergunta a investigação responde e o que fica de fora.",
     "Qual pergunta a pesquisa responde e o que fica fora do escopo.",
     "A quale domanda risponde la ricerca e cosa resta fuori ambito.",
-    "Araştırmanın hangi soruyu yanıtladığı ve kapsam dışında kalanlar.", "研究回答什么问题，以及哪些不在范围内。",
+    "Araştırmanın hangi soruyu yanıtladığı ve kapsam dışında kalanlar.", "研究回答什么问题，以及哪些不在范围内。", "研究回答什麼問題，以及哪些不在範圍內。", "研究ではどの疑問が解決され、何が範囲外なのか。", "연구에서 답변하는 질문과 범위를 벗어나는 질문은 무엇입니까?"
   ],
   [
     "Patrones principales",
@@ -508,7 +508,7 @@ const catalog = [
     "Padrões principais",
     "Padrões principais",
     "Pattern principali",
-    "Ana örüntüler", "主要模式",
+    "Ana örüntüler", "主要模式", "主要模式", "主なパターン", "주요 패턴"
   ],
   [
     "Qué relaciones, cambios o concentraciones aparecen en los datos.",
@@ -518,7 +518,7 @@ const catalog = [
     "Que relações, alterações ou concentrações aparecem nos dados.",
     "Quais relações, mudanças ou concentrações aparecem nos dados.",
     "Quali relazioni, cambiamenti o concentrazioni emergono dai dati.",
-    "Verilerde hangi ilişkilerin, değişimlerin veya yoğunlaşmaların görüldüğü.", "数据中出现了哪些关系、变化或集中现象。",
+    "Verilerde hangi ilişkilerin, değişimlerin veya yoğunlaşmaların görüldüğü.", "数据中出现了哪些关系、变化或集中现象。", "資料中出現了哪些關係、變化或集中現象。", "データにどのような関係、変化、集中が現れるか。", "데이터에 어떤 관계, 변화 또는 집중이 나타나는지."
   ],
   [
     "Contrastes y excepciones",
@@ -528,7 +528,7 @@ const catalog = [
     "Contrastes e exceções",
     "Contrastes e exceções",
     "Contrasti ed eccezioni",
-    "Karşıtlıklar ve istisnalar", "对照与例外",
+    "Karşıtlıklar ve istisnalar", "对照与例外", "對照與例外", "対照と例外", "대조 및 예외"
   ],
   [
     "Qué filas matizan la lectura dominante o abren una duda.",
@@ -538,7 +538,7 @@ const catalog = [
     "Que linhas matizam a leitura dominante ou levantam uma dúvida.",
     "Quais linhas ponderam a leitura dominante ou levantam uma dúvida.",
     "Quali righe qualificano la lettura dominante o aprono un dubbio.",
-    "Hangi satırların baskın yorumu nüanslandırdığı veya soru doğurduğu.", "哪些行限定了主流解读或提出了疑问。",
+    "Hangi satırların baskın yorumu nüanslandırdığı veya soru doğurduğu.", "哪些行限定了主流解读或提出了疑问。", "哪些行限定了主流解讀或提出了疑問。", "どの行が主な解釈を決定するか、または疑問を引き起こします。", "어느 행이 지배적인 읽기에 적합하거나 질문을 제기하는지."
   ],
   [
     "Conclusiones verificables",
@@ -548,7 +548,7 @@ const catalog = [
     "Conclusões verificáveis",
     "Conclusões verificáveis",
     "Conclusioni verificabili",
-    "Doğrulanabilir sonuçlar", "可验证的结论",
+    "Doğrulanabilir sonuçlar", "可验证的结论", "可驗證的結論", "検証可能な結論", "검증 가능한 결론"
   ],
   [
     "Qué se puede afirmar y qué conviene revisar después.",
@@ -558,7 +558,7 @@ const catalog = [
     "O que pode ser afirmado e o que convém rever depois.",
     "O que pode ser afirmado e o que deve ser revisado depois.",
     "Cosa si può affermare e cosa conviene verificare in seguito.",
-    "Nelerin söylenebileceği ve sonrasında neyin incelenmesi gerektiği.", "可以断言什么，以及之后应复查什么。",
+    "Nelerin söylenebileceği ve sonrasında neyin incelenmesi gerektiği.", "可以断言什么，以及之后应复查什么。", "可以斷言什麼，以及之後應複查什麼。", "何が主張できるのか、次に何を見直すべきなのか。", "주장할 수 있는 것과 다음에 검토해야 할 것은 무엇인가."
   ],
   [
     "Escribe un objetivo antes de iniciar la investigación.",
@@ -568,7 +568,7 @@ const catalog = [
     "Escreva um objetivo antes de iniciar a investigação.",
     "Escreva um objetivo antes de iniciar a pesquisa.",
     "Scrivi un obiettivo prima di avviare la ricerca.",
-    "Araştırmaya başlamadan önce bir amaç yazın.", "在开始研究前写下目标。",
+    "Araştırmaya başlamadan önce bir amaç yazın.", "在开始研究前写下目标。", "在開始研究前寫下目標。", "研究を始める前に目的を書きましょう。", "연구를 시작하기 전에 목표를 작성하세요."
   ],
   [
     "Selecciona al menos una base de datos.",
@@ -578,7 +578,7 @@ const catalog = [
     "Selecione pelo menos uma base de dados.",
     "Selecione pelo menos um banco de dados.",
     "Seleziona almeno un database.",
-    "En az bir veritabanı seçin.", "至少选择一个数据库。",
+    "En az bir veritabanı seçin.", "至少选择一个数据库。", "至少選擇一個數據庫。", "少なくとも1つのデータベースを選択します。", "데이터베이스를 하나 이상 선택하세요."
   ],
   [
     "Contexto: investigación sobre las bases de datos seleccionadas.",
@@ -588,7 +588,7 @@ const catalog = [
     "Contexto: investigação sobre as bases de dados selecionadas.",
     "Contexto: pesquisa sobre os bancos selecionados.",
     "Contesto: ricerca sui database selezionati.",
-    "Bağlam: seçilen veritabanları üzerinde araştırma.", "背景：针对所选数据库的研究。",
+    "Bağlam: seçilen veritabanları üzerinde araştırma.", "背景：针对所选数据库的研究。", "背景：針對所選資料庫的研究。", "コンテキスト: 選択したデータベースを調査します。", "컨텍스트: 선택한 데이터베이스를 조사합니다."
   ],
   [
     "Investigación añadida a la cola.",
@@ -598,7 +598,7 @@ const catalog = [
     "Investigação adicionada à fila.",
     "Pesquisa adicionada à fila.",
     "Ricerca aggiunta alla coda.",
-    "Araştırma kuyruğa eklendi.", "研究已加入队列。",
+    "Araştırma kuyruğa eklendi.", "研究已加入队列。", "研究已加入佇列。", "研究がキューに追加されました。", "연구가 대기열에 추가되었습니다."
   ],
   [
     "No hay bases de datos disponibles.",
@@ -608,7 +608,7 @@ const catalog = [
     "Não há bases de dados disponíveis.",
     "Nenhum banco de dados disponível.",
     "Nessun database disponibile.",
-    "Kullanılabilir veritabanı yok.", "没有可用的数据库。",
+    "Kullanılabilir veritabanı yok.", "没有可用的数据库。", "沒有可用的資料庫。", "利用可能なデータベースがありません。", "사용 가능한 데이터베이스가 없습니다."
   ],
   [
     "Preparando preview…",
@@ -618,9 +618,9 @@ const catalog = [
     "A preparar a pré-visualização…",
     "Preparando prévia…",
     "Preparazione dell’anteprima…",
-    "Önizleme hazırlanıyor…", "正在准备预览…",
+    "Önizleme hazırlanıyor…", "正在准备预览…", "正在準備預覽…", "プレビューを準備しています…", "미리보기 준비 중…"
   ],
-  ["Tokens", "Tokens", "Tokens", "Token", "Tokens", "Tokens", "Token", "Token", "词元"],
+  ["Tokens", "Tokens", "Tokens", "Token", "Tokens", "Tokens", "Token", "Token", "词元", "詞元", "トークン", "토큰"],
   [
     "Estimación",
     "Estimate",
@@ -629,7 +629,7 @@ const catalog = [
     "Estimativa",
     "Estimativa",
     "Stima",
-    "Tahmin", "估算",
+    "Tahmin", "估算", "估算", "見積もり", "추정"
   ],
   [
     "Título de sección {n}",
@@ -639,7 +639,7 @@ const catalog = [
     "Título da secção {n}",
     "Título da seção {n}",
     "Titolo sezione {n}",
-    "Bölüm başlığı {n}", "第 {n} 节标题",
+    "Bölüm başlığı {n}", "第 {n} 节标题", "第 {n} 節標題", "セクションのタイトル {n}", "섹션 제목 {n}"
   ],
   [
     "Foco de sección {n}",
@@ -649,7 +649,7 @@ const catalog = [
     "Foco da secção {n}",
     "Foco da seção {n}",
     "Focus sezione {n}",
-    "Bölüm odağı {n}", "第 {n} 节焦点",
+    "Bölüm odağı {n}", "第 {n} 节焦点", "第 {n} 節焦點", "セクションのフォーカス {n}", "섹션 포커스 {n}"
   ],
   [
     "No hay filas para esta selección.",
@@ -659,7 +659,7 @@ const catalog = [
     "Não há linhas para esta seleção.",
     "Não há linhas para esta seleção.",
     "Non ci sono righe per questa selezione.",
-    "Bu seçim için satır yok.", "此选择没有行。",
+    "Bu seçim için satır yok.", "此选择没有行。", "此選擇沒有行。", "この選択には行がありません。", "이 선택 항목에 대한 행이 없습니다."
   ],
   [
     "Selecciona una base para ver el preview.",
@@ -669,7 +669,7 @@ const catalog = [
     "Selecione uma base para ver a pré-visualização.",
     "Selecione um banco para ver a prévia.",
     "Seleziona un database per vedere l’anteprima.",
-    "Önizlemeyi görmek için bir veritabanı seçin.", "选择一个数据库以查看预览。",
+    "Önizlemeyi görmek için bir veritabanı seçin.", "选择一个数据库以查看预览。", "選擇一個數據庫以檢視預覽。", "データベースを選択してプレビューを表示します。", "미리보기를 보려면 데이터베이스를 선택하세요."
   ],
   [
     "Modelo para la investigación de bases de datos",
@@ -679,7 +679,7 @@ const catalog = [
     "Modelo para investigação de bases de dados",
     "Modelo para pesquisa de bancos de dados",
     "Modello per la ricerca sui database",
-    "Veritabanı araştırması modeli", "用于数据库研究的模型",
+    "Veritabanı araştırması modeli", "用于数据库研究的模型", "用於資料庫研究的模型", "データベース研究用モデル", "데이터베이스 연구를 위한 모델"
   ],
   [
     "Encolando…",
@@ -689,7 +689,7 @@ const catalog = [
     "A colocar na fila…",
     "Enfileirando…",
     "Accodamento…",
-    "Kuyruğa alınıyor…", "正在加入队列…",
+    "Kuyruğa alınıyor…", "正在加入队列…", "正在加入佇列…", "キュー中…", "대기 중…"
   ],
   [
     "Preparar el conjunto",
@@ -699,7 +699,7 @@ const catalog = [
     "Preparar o conjunto",
     "Preparar o conjunto",
     "Prepara il set",
-    "Kümeyi hazırla", "准备工作集",
+    "Kümeyi hazırla", "准备工作集", "準備工作集", "セットを準備する", "세트를 준비하세요"
   ],
   [
     "Explorar patrones",
@@ -709,7 +709,7 @@ const catalog = [
     "Explorar padrões",
     "Explorar padrões",
     "Esplora i pattern",
-    "Örüntüleri keşfet", "探索模式",
+    "Örüntüleri keşfet", "探索模式", "探索模式", "パターンを探索する", "패턴 탐색"
   ],
   [
     "Contrastar evidencia",
@@ -719,7 +719,7 @@ const catalog = [
     "Contrastar evidência",
     "Contrastar evidências",
     "Confronta le evidenze",
-    "Kanıtları karşılaştır", "对照证据",
+    "Kanıtları karşılaştır", "对照证据", "對照證據", "対照的な証拠", "대조 증거"
   ],
   [
     "Redactar y verificar",
@@ -729,7 +729,7 @@ const catalog = [
     "Redigir e verificar",
     "Redigir e verificar",
     "Redigi e verifica",
-    "Yaz ve doğrula", "撰写并验证",
+    "Yaz ve doğrula", "撰写并验证", "撰寫並驗證", "書いて検証する", "작성 및 확인"
   ],
   [
     "Aplica las vistas y filtros elegidos.",
@@ -739,7 +739,7 @@ const catalog = [
     "Aplique as vistas e filtros escolhidos.",
     "Aplique as visualizações e filtros escolhidos.",
     "Applica viste e filtri scelti.",
-    "Seçilen görünümleri ve filtreleri uygula.", "应用所选的视图和筛选。",
+    "Seçilen görünümleri ve filtreleri uygula.", "应用所选的视图和筛选。", "應用所選的檢視和篩選。", "選択したビューとフィルターを適用します。", "선택한 보기와 필터를 적용합니다."
   ],
   [
     "Busca relaciones y anomalías.",
@@ -749,7 +749,7 @@ const catalog = [
     "Procure relações e anomalias.",
     "Busque relações e anomalias.",
     "Cerca relazioni e anomalie.",
-    "İlişkileri ve anormallikleri bul.", "查找关系与异常。",
+    "İlişkileri ve anormallikleri bul.", "查找关系与异常。", "查詢關係與異常。", "関係性と異常性を見つけます。", "관계와 이상 징후를 찾아보세요."
   ],
   [
     "Separa señal de excepción.",
@@ -759,7 +759,7 @@ const catalog = [
     "Separe sinal de exceção.",
     "Separe sinal de exceção.",
     "Separa il segnale dall’eccezione.",
-    "Sinyali istisnadan ayır.", "将信号与例外分开。",
+    "Sinyali istisnadan ayır.", "将信号与例外分开。", "將訊號與例外分開。", "信号と例外を分離します。", "신호와 예외를 분리하세요."
   ],
   [
     "Entrega conclusiones con evidencia.",
@@ -769,7 +769,7 @@ const catalog = [
     "Apresente conclusões com evidência.",
     "Apresente conclusões com evidências.",
     "Fornisci conclusioni con evidenze.",
-    "Kanıtlarla sonuçlar sun.", "交付有证据支持的结论。",
+    "Kanıtlarla sonuçlar sun.", "交付有证据支持的结论。", "交付有證據支援的結論。", "証拠を伴った結論を導き出します。", "증거를 바탕으로 결론을 내립니다."
   ],
   [
     "Todavía no hay investigaciones en la cola.",
@@ -779,7 +779,7 @@ const catalog = [
     "Ainda não há investigações na fila.",
     "Ainda não há pesquisas na fila.",
     "Non ci sono ancora ricerche in coda.",
-    "Kuyrukta henüz araştırma yok.", "队列中还没有研究。",
+    "Kuyrukta henüz araştırma yok.", "队列中还没有研究。", "佇列中還沒有研究。", "キューにはまだ調査実行がありません。", "아직 대기열에 실행된 연구가 없습니다."
   ],
   [
     "Tus resultados aparecerán aquí cuando termine una investigación.",
@@ -789,7 +789,7 @@ const catalog = [
     "Os seus resultados aparecerão aqui quando uma investigação terminar.",
     "Seus resultados aparecerão aqui quando uma pesquisa terminar.",
     "I risultati appariranno qui al termine di una ricerca.",
-    "Araştırma tamamlandığında sonuçlarınız burada görünür.", "研究完成后，结果会显示在这里。",
+    "Araştırma tamamlandığında sonuçlarınız burada görünür.", "研究完成后，结果会显示在这里。", "研究完成後，結果會顯示在這裡。", "研究が完了すると、結果がここに表示されます。", "연구가 완료되면 결과가 여기에 표시됩니다."
   ],
   [
     "Este informe no tiene evidencias detalladas.",
@@ -799,7 +799,7 @@ const catalog = [
     "Este relatório não tem evidências detalhadas.",
     "Este relatório não tem evidências detalhadas.",
     "Questo report non contiene evidenze dettagliate.",
-    "Bu raporda ayrıntılı kanıt yok.", "此报告没有详细证据。",
+    "Bu raporda ayrıntılı kanıt yok.", "此报告没有详细证据。", "此報告沒有詳細證據。", "この報告書には詳細な証拠はありません。", "이 보고서에는 자세한 증거가 없습니다."
   ],
   [
     "Investiga patrones y contrastes en tus tablas con evidencia trazable.",
@@ -809,7 +809,7 @@ const catalog = [
     "Investigue padrões e contrastes nas suas tabelas com evidência rastreável.",
     "Pesquise padrões e contrastes em suas tabelas com evidências rastreáveis.",
     "Indaga pattern e contrasti nelle tue tabelle con evidenze tracciabili.",
-    "Tablolarınızdaki örüntüleri ve karşıtlıkları izlenebilir kanıtlarla araştırın.", "用可追溯的证据研究你表格中的模式与对照。",
+    "Tablolarınızdaki örüntüleri ve karşıtlıkları izlenebilir kanıtlarla araştırın.", "用可追溯的证据研究你表格中的模式与对照。", "用可追溯的證據研究你表格中的模式與對照。", "追跡可能な証拠を使用して、テーブル内のパターンとコントラストを調査します。", "추적 가능한 증거를 사용하여 테이블의 패턴과 대조를 조사합니다."
   ],
   [
     "Limpiar finalizados",
@@ -819,7 +819,7 @@ const catalog = [
     "Limpar concluídos",
     "Limpar concluídos",
     "Cancella terminati",
-    "Tamamlananları temizle", "清除已完成",
+    "Tamamlananları temizle", "清除已完成", "清除已完成", "クリア済み", "클리어 완료"
   ],
   [
     "Enfocada",
@@ -829,7 +829,7 @@ const catalog = [
     "Focada",
     "Focada",
     "Mirata",
-    "Odaklı", "聚焦",
+    "Odaklı", "聚焦", "聚焦", "集中した", "집중"
   ],
   [
     "Exhaustiva",
@@ -839,7 +839,7 @@ const catalog = [
     "Exaustiva",
     "Exaustiva",
     "Esaustiva",
-    "Kapsamlı", "详尽",
+    "Kapsamlı", "详尽", "詳盡", "網羅的", "철저한"
   ],
   [
     "Una pasada, síntesis compacta",
@@ -849,7 +849,7 @@ const catalog = [
     "Uma passagem, síntese compacta",
     "Uma passagem, síntese compacta",
     "Un passaggio, sintesi compatta",
-    "Tek geçiş, kısa sentez", "单次遍历，紧凑综合",
+    "Tek geçiş, kısa sentez", "单次遍历，紧凑综合", "單次遍歷，緊湊綜合", "ワンパス、コンパクトな合成", "원패스, 컴팩트 합성"
   ],
   [
     "Cobertura y contraste recomendados",
@@ -859,7 +859,7 @@ const catalog = [
     "Cobertura e contraste recomendados",
     "Cobertura e contraste recomendados",
     "Copertura e confronto consigliati",
-    "Önerilen kapsam ve karşılaştırma", "推荐的覆盖与对照",
+    "Önerilen kapsam ve karşılaştırma", "推荐的覆盖与对照", "推薦的覆蓋與對照", "推奨されるカバレッジとコントラスト", "권장 적용 범위 및 대비"
   ],
   [
     "Más iteraciones y evidencia",
@@ -869,7 +869,7 @@ const catalog = [
     "Mais iterações e evidência",
     "Mais iterações e evidências",
     "Più iterazioni ed evidenze",
-    "Daha fazla yineleme ve kanıt", "更多迭代与证据",
+    "Daha fazla yineleme ve kanıt", "更多迭代与证据", "更多迭代與證據", "さらなる反復と証拠", "더 많은 반복과 증거"
   ],
   [
     "La API de Deep Research de datos no está disponible todavía.",
@@ -879,7 +879,7 @@ const catalog = [
     "A API de Deep Research de dados ainda não está disponível.",
     "A API de Deep Research de dados ainda não está disponível.",
     "L’API Deep Research sui dati non è ancora disponibile.",
-    "Veri Deep Research API’si henüz kullanılamıyor.", "数据深度研究API尚不可用。",
+    "Veri Deep Research API’si henüz kullanılamıyor.", "数据深度研究API尚不可用。", "資料 Deep Research API尚不可用。", "データ Deep Research API はまだ利用できません。", "데이터 Deep Research API는 아직 사용할 수 없습니다."
   ],
   [
     "Formula una pregunta sobre tus tablas y crea un informe con configuración automática; si lo necesitas, ajusta roles y estructura desde Opciones avanzadas.",
@@ -889,7 +889,7 @@ const catalog = [
     "Faça uma pergunta sobre as suas tabelas e crie um relatório com configuração automática; se necessário, ajuste as funções e a estrutura nas Opções avançadas.",
     "Faça uma pergunta sobre suas tabelas e crie um relatório com configuração automática; se necessário, ajuste as funções e a estrutura nas Opções avançadas.",
     "Formula una domanda sulle tue tabelle e crea un report con configurazione automatica; se necessario, modifica ruoli e struttura nelle Opzioni avanzate.",
-    "Tablolarınız hakkında bir soru sorun ve otomatik yapılandırmayla bir rapor oluşturun; gerekirse Gelişmiş seçeneklerden rolleri ve yapıyı ayarlayın.", "针对你的表格提出问题，并使用自动配置创建报告；如有需要，可在「高级选项」中调整角色和结构。",
+    "Tablolarınız hakkında bir soru sorun ve otomatik yapılandırmayla bir rapor oluşturun; gerekirse Gelişmiş seçeneklerden rolleri ve yapıyı ayarlayın.", "针对你的表格提出问题，并使用自动配置创建报告；如有需要，可在「高级选项」中调整角色和结构。", "針對你的表格提出問題，並使用自動配置建立報告；如有需要，可在「進階選項」中調整角色和結構。", "テーブルについて質問し、自動構成でレポートを作成します。必要に応じて、詳細オプションで役割と構造を調整します。", "테이블에 대해 질문하고 자동 구성으로 보고서를 작성하세요. 필요한 경우 고급 옵션에서 역할과 구조를 조정하세요."
   ],
   [
     "Resultado reproducible",
@@ -899,7 +899,7 @@ const catalog = [
     "Resultado reproduzível",
     "Resultado reproduzível",
     "Risultato riproducibile",
-    "Yeniden üretilebilir sonuç", "可复现结果",
+    "Yeniden üretilebilir sonuç", "可复现结果", "可復現結果", "再現可能な結果", "재현 가능한 결과"
   ],
   [
     "Selecciona un modelo antes de iniciar la investigación.",
@@ -909,7 +909,7 @@ const catalog = [
     "Selecione um modelo antes de iniciar a investigação.",
     "Selecione um modelo antes de iniciar a pesquisa.",
     "Seleziona un modello prima di avviare la ricerca.",
-    "Araştırmaya başlamadan önce bir model seçin.", "在开始研究前选择模型。",
+    "Araştırmaya başlamadan önce bir model seçin.", "在开始研究前选择模型。", "在開始研究前選擇模型。", "研究を始める前にモデルを選択してください。", "연구를 시작하기 전에 모델을 선택하세요."
   ],
   [
     "El ZIP incluirá el snapshot bruto de las filas seleccionadas. ¿Continuar?",
@@ -919,7 +919,7 @@ const catalog = [
     "O ZIP incluirá o snapshot bruto das linhas selecionadas. Continuar?",
     "O ZIP incluirá o snapshot bruto das linhas selecionadas. Continuar?",
     "Il file ZIP includerà lo snapshot grezzo delle righe selezionate. Continuare?",
-    "ZIP, seçilen satırların ham snapshot’ını içerecek. Devam edilsin mi?", "ZIP将包含所选行的原始快照。是否继续？",
+    "ZIP, seçilen satırların ham snapshot’ını içerecek. Devam edilsin mi?", "ZIP将包含所选行的原始快照。是否继续？", "ZIP將包含所選行的原始快照。是否繼續？", "ZIP には、選択した行の生のスナップショットが含まれます。続く？", "ZIP에는 선택한 행의 원시 스냅샷이 포함됩니다. 계속하다?"
   ],
   [
     "Exportado: {path}",
@@ -929,7 +929,7 @@ const catalog = [
     "Exportado: {path}",
     "Exportado: {path}",
     "Esportato: {path}",
-    "Dışa aktarıldı: {path}", "已导出：{path}",
+    "Dışa aktarıldı: {path}", "已导出：{path}", "已匯出：{path}", "エクスポート済み: {path}", "내보낸 날짜: {path}"
   ],
   [
     "{n} investigación(es) usan un snapshot obsoleto. Revisa las fuentes antes de confiar en el informe.",
@@ -939,7 +939,7 @@ const catalog = [
     "{n} investigação(ões) usam um snapshot obsoleto. Reveja as fontes antes de confiar no relatório.",
     "{n} pesquisa(s) usam um snapshot obsoleto. Revise as fontes antes de confiar no relatório.",
     "{n} ricerca/che usa/no uno snapshot obsoleto. Verifica le fonti prima di fidarti del report.",
-    "{n} araştırma eski bir snapshot kullanıyor. Rapora güvenmeden önce kaynakları inceleyin.", "{n} 项研究使用了过期的快照。在采信报告前请核查来源。",
+    "{n} araştırma eski bir snapshot kullanıyor. Rapora güvenmeden önce kaynakları inceleyin.", "{n} 项研究使用了过期的快照。在采信报告前请核查来源。", "{n} 項研究使用了過期的快照。在採信報告前請核查來源。", "{n} 個の調査実行で古いスナップショットが使用されています。レポートを信頼する前に情報源を確認してください。", "{n} 연구 실행에서 오래된 스냅샷을 사용합니다. 보고서를 신뢰하기 전에 출처를 검토하세요."
   ],
   [
     "Ayuda al planificador a distinguir resultados, tratamientos, tiempo y confusores.",
@@ -949,7 +949,7 @@ const catalog = [
     "Ajuda o planeador a distinguir resultados, tratamentos, tempo e confundidores.",
     "Ajuda o planejador a distinguir resultados, tratamentos, tempo e confundidores.",
     "Aiuta il pianificatore a distinguere risultati, trattamenti, tempo e confondenti.",
-    "Planlayıcının sonuçları, tedavileri, zamanı ve karıştırıcıları ayırt etmesine yardımcı olur.", "帮助规划器区分结果、处理、时间与混杂因素。",
+    "Planlayıcının sonuçları, tedavileri, zamanı ve karıştırıcıları ayırt etmesine yardımcı olur.", "帮助规划器区分结果、处理、时间与混杂因素。", "幫助規劃器區分結果、處理、時間與混雜因素。", "プランナーが結果、治療法、時間、交絡因子を区別できるように支援します。", "계획자가 결과, 치료, 시간 및 혼란 요인을 구별할 수 있도록 도와주세요."
   ],
   [
     "Snapshot obsoleto: verifica las fuentes antes de reutilizar este resultado.",
@@ -959,7 +959,7 @@ const catalog = [
     "Snapshot obsoleto: verifique as fontes antes de reutilizar este resultado.",
     "Snapshot obsoleto: verifique as fontes antes de reutilizar este resultado.",
     "Snapshot obsoleto: verifica le fonti prima di riutilizzare questo risultato.",
-    "Eski snapshot: bu sonucu yeniden kullanmadan önce kaynakları doğrulayın.", "快照已过期：在复用此结果前请核实来源。",
+    "Eski snapshot: bu sonucu yeniden kullanmadan önce kaynakları doğrulayın.", "快照已过期：在复用此结果前请核实来源。", "快照已過期：在複用此結果前請核實來源。", "古いスナップショット: この結果を再利用する前にソースを確認してください。", "오래된 스냅샷: 이 결과를 재사용하기 전에 소스를 확인하세요."
   ],
   [
     "Incluir snapshot en ZIP",
@@ -969,9 +969,9 @@ const catalog = [
     "Incluir snapshot no ZIP",
     "Incluir snapshot no ZIP",
     "Includi snapshot nello ZIP",
-    "Snapshot’ı ZIP’e dahil et", "在ZIP中包含快照",
+    "Snapshot’ı ZIP’e dahil et", "在ZIP中包含快照", "在ZIP中包含快照", "スナップショットを ZIP に含める", "ZIP에 스냅샷 포함"
   ],
-  ["IC", "CI", "IC", "KI", "IC", "IC", "IC", "GA", "置信区间"],
+  ["IC", "CI", "IC", "KI", "IC", "IC", "IC", "GA", "置信区间", "置信區間", "CI", "CI"],
   [
     "Resultado",
     "Outcome",
@@ -980,7 +980,7 @@ const catalog = [
     "Resultado",
     "Resultado",
     "Risultato",
-    "Sonuç", "结果",
+    "Sonuç", "结果", "結果", "結果", "결과"
   ],
   [
     "Variable que quieres explicar o estimar.",
@@ -990,7 +990,7 @@ const catalog = [
     "Variável que pretende explicar ou estimar.",
     "Variável que você quer explicar ou estimar.",
     "Variabile da spiegare o stimare.",
-    "Açıklamak veya tahmin etmek istediğiniz değişken.", "你想解释或估计的变量。",
+    "Açıklamak veya tahmin etmek istediğiniz değişken.", "你想解释或估计的变量。", "你想解釋或估計的變數。", "説明または推定したい変数。", "설명하거나 추정하려는 변수입니다."
   ],
   [
     "Tratamiento",
@@ -1000,7 +1000,7 @@ const catalog = [
     "Tratamento",
     "Tratamento",
     "Trattamento",
-    "Tedavi", "处理",
+    "Tedavi", "处理", "處理", "処理", "치료"
   ],
   [
     "Exposición, intervención o grupo comparado.",
@@ -1010,7 +1010,7 @@ const catalog = [
     "Exposição, intervenção ou grupo de comparação.",
     "Exposição, intervenção ou grupo comparado.",
     "Esposizione, intervento o gruppo di confronto.",
-    "Maruziyet, müdahale veya karşılaştırma grubu.", "暴露、干预或对照分组。",
+    "Maruziyet, müdahale veya karşılaştırma grubu.", "暴露、干预或对照分组。", "暴露、干預或對照分組。", "暴露、介入、または比較グループ。", "노출, 개입 또는 비교 그룹."
   ],
   [
     "Confusores",
@@ -1020,7 +1020,7 @@ const catalog = [
     "Confundidores",
     "Confundidores",
     "Confondenti",
-    "Karıştırıcılar", "混杂因素",
+    "Karıştırıcılar", "混杂因素", "混雜因素", "交絡者", "혼란스러운 사람들"
   ],
   [
     "Variables que pueden explicar una asociación.",
@@ -1030,9 +1030,9 @@ const catalog = [
     "Variáveis que podem explicar uma associação.",
     "Variáveis que podem explicar uma associação.",
     "Variabili che possono spiegare un’associazione.",
-    "Bir ilişkiyi açıklayabilecek değişkenler.", "可能解释关联的变量。",
+    "Bir ilişkiyi açıklayabilecek değişkenler.", "可能解释关联的变量。", "可能解釋關聯的變數。", "関連性を説明できる変数。", "연관성을 설명할 수 있는 변수입니다."
   ],
-  ["Tiempo", "Time", "Temps", "Zeit", "Tempo", "Tempo", "Tempo", "Zaman", "时间"],
+  ["Tiempo", "Time", "Temps", "Zeit", "Tempo", "Tempo", "Tempo", "Zaman", "时间", "時間", "時間", "시간"],
   [
     "Fecha o instante de la observación.",
     "Date or instant of the observation.",
@@ -1041,7 +1041,7 @@ const catalog = [
     "Data ou instante da observação.",
     "Data ou instante da observação.",
     "Data o istante dell’osservazione.",
-    "Gözlemin tarihi veya anı.", "观测的日期或时刻。",
+    "Gözlemin tarihi veya anı.", "观测的日期或时刻。", "觀測的日期或時刻。", "観測の日付または瞬間。", "관찰 날짜 또는 순간."
   ],
   [
     "Duración",
@@ -1051,7 +1051,7 @@ const catalog = [
     "Duração",
     "Duração",
     "Durata",
-    "Süre", "持续时间",
+    "Süre", "持续时间", "持續時間", "間隔", "지속"
   ],
   [
     "Tiempo hasta el resultado o evento.",
@@ -1061,7 +1061,7 @@ const catalog = [
     "Tempo até ao resultado ou evento.",
     "Tempo até o resultado ou evento.",
     "Tempo fino al risultato o all’evento.",
-    "Sonuca veya olaya kadar geçen süre.", "到结果或事件发生的时间。",
+    "Sonuca veya olaya kadar geçen süre.", "到结果或事件发生的时间。", "到結果或事件發生的時間。", "結果またはイベントまでの時間。", "결과 또는 이벤트까지의 시간입니다."
   ],
   [
     "Evento",
@@ -1071,7 +1071,7 @@ const catalog = [
     "Evento",
     "Evento",
     "Evento",
-    "Olay", "事件",
+    "Olay", "事件", "事件", "イベント", "이벤트"
   ],
   [
     "Indicador de que el evento ocurrió.",
@@ -1081,7 +1081,7 @@ const catalog = [
     "Indicador de que o evento ocorreu.",
     "Indicador de que o evento ocorreu.",
     "Indicatore che l’evento si è verificato.",
-    "Olayın gerçekleştiğini gösteren işaret.", "事件是否发生的指示变量。",
+    "Olayın gerçekleştiğini gösteren işaret.", "事件是否发生的指示变量。", "事件是否發生的指示變數。", "イベントが発生したことを示すインジケーター。", "이벤트가 발생했음을 나타내는 표시입니다."
   ],
   [
     "Entidad",
@@ -1091,7 +1091,7 @@ const catalog = [
     "Entidade",
     "Entidade",
     "Entità",
-    "Varlık", "实体",
+    "Varlık", "实体", "實體", "実在物", "실재"
   ],
   [
     "Unidad, persona o registro observado.",
@@ -1101,9 +1101,9 @@ const catalog = [
     "Unidade, pessoa ou registo observado.",
     "Unidade, pessoa ou registro observado.",
     "Unità, persona o record osservato.",
-    "Gözlemlenen birim, kişi veya kayıt.", "所观测的单位、个人或记录。",
+    "Gözlemlenen birim, kişi veya kayıt.", "所观测的单位、个人或记录。", "所觀測的單位、個人或記錄。", "観測された単位、人物、または記録。", "관찰된 단위, 사람 또는 기록입니다."
   ],
-  ["Texto", "Text", "Texte", "Text", "Texto", "Texto", "Testo", "Metin", "文本"],
+  ["Texto", "Text", "Texte", "Text", "Texto", "Texto", "Testo", "Metin", "文本", "文本", "文章", "텍스트"],
   [
     "Columnas textuales para contexto.",
     "Text columns for context.",
@@ -1112,7 +1112,7 @@ const catalog = [
     "Colunas de texto para contexto.",
     "Colunas de texto para contexto.",
     "Colonne testuali per il contesto.",
-    "Bağlam için metin sütunları.", "用于提供背景的文本列。",
+    "Bağlam için metin sütunları.", "用于提供背景的文本列。", "用於提供背景的文本列。", "コンテキストのテキスト列。", "컨텍스트에 대한 텍스트 열입니다."
   ],
   [
     "Ubicación",
@@ -1122,7 +1122,7 @@ const catalog = [
     "Localização",
     "Localização",
     "Posizione",
-    "Konum", "位置",
+    "Konum", "位置", "位置", "位置", "위치"
   ],
   [
     "Lugar o coordenada asociada.",
@@ -1132,7 +1132,7 @@ const catalog = [
     "Local ou coordenada associada.",
     "Local ou coordenada associada.",
     "Luogo o coordinata associata.",
-    "İlişkili yer veya koordinat.", "关联的地点或坐标。",
+    "İlişkili yer veya koordinat.", "关联的地点或坐标。", "關聯的地點或座標。", "関連する場所または座標。", "연관된 장소 또는 좌표."
   ],
   [
     "Capturar snapshot",
@@ -1142,7 +1142,7 @@ const catalog = [
     "Capturar snapshot",
     "Capturar snapshot",
     "Acquisisci snapshot",
-    "Snapshot al", "捕获快照",
+    "Snapshot al", "捕获快照", "捕獲快照", "スナップショットをキャプチャする", "스냅샷 캡처"
   ],
   [
     "Perfilar semántica",
@@ -1152,7 +1152,7 @@ const catalog = [
     "Criar perfil semântico",
     "Criar perfil semântico",
     "Profilare la semantica",
-    "Anlamsal profil oluştur", "分析语义",
+    "Anlamsal profil oluştur", "分析语义", "分析語義", "プロファイルのセマンティクス", "프로필 의미"
   ],
   [
     "Planificar análisis",
@@ -1162,7 +1162,7 @@ const catalog = [
     "Planear análises",
     "Planejar análises",
     "Pianificare le analisi",
-    "Analizleri planla", "规划分析",
+    "Analizleri planla", "规划分析", "規劃分析", "計画分析", "계획 분석"
   ],
   [
     "Calcular resultados",
@@ -1172,7 +1172,7 @@ const catalog = [
     "Calcular resultados",
     "Calcular resultados",
     "Calcolare i risultati",
-    "Sonuçları hesapla", "计算结果",
+    "Sonuçları hesapla", "计算结果", "計算結果", "結果の計算", "결과 계산"
   ],
   [
     "Comprobar sensibilidad",
@@ -1182,7 +1182,7 @@ const catalog = [
     "Verificar sensibilidade",
     "Verificar sensibilidade",
     "Verificare la sensibilità",
-    "Duyarlılığı kontrol et", "检查敏感性",
+    "Duyarlılığı kontrol et", "检查敏感性", "檢查敏感性", "感度をチェックする", "민감도 확인"
   ],
   [
     "Revisar objeciones",
@@ -1192,7 +1192,7 @@ const catalog = [
     "Rever objeções",
     "Revisar objeções",
     "Rivedere le obiezioni",
-    "İtirazları incele", "审查异议",
+    "İtirazları incele", "审查异议", "審查異議", "異議を検討する", "이의제기 검토"
   ],
   [
     "Verificar evidencia",
@@ -1202,7 +1202,7 @@ const catalog = [
     "Verificar evidência",
     "Verificar evidências",
     "Verificare le evidenze",
-    "Kanıtları doğrula", "验证证据",
+    "Kanıtları doğrula", "验证证据", "驗證證據", "証拠を検証する", "증거 확인"
   ],
   [
     "Ensamblar informe",
@@ -1212,7 +1212,7 @@ const catalog = [
     "Montar relatório",
     "Montar relatório",
     "Assemblare il report",
-    "Raporu oluştur", "组装报告",
+    "Raporu oluştur", "组装报告", "組裝報告", "報告書をまとめる", "보고서 조립"
   ],
   [
     "Fija las filas, vistas y filtros usados.",
@@ -1222,7 +1222,7 @@ const catalog = [
     "Fixa as linhas, vistas e filtros usados.",
     "Fixa as linhas, visualizações e filtros usados.",
     "Fissa righe, viste e filtri usati.",
-    "Kullanılan satırları, görünümleri ve filtreleri sabitler.", "固定所用的行、视图和筛选。",
+    "Kullanılan satırları, görünümleri ve filtreleri sabitler.", "固定所用的行、视图和筛选。", "固定所用的行、檢視和篩選。", "使用される行、ビュー、フィルターを修正します。", "사용된 행, 보기 및 필터를 수정합니다."
   ],
   [
     "Describe tipos, cobertura y valores ausentes.",
@@ -1232,7 +1232,7 @@ const catalog = [
     "Descreve tipos, cobertura e valores ausentes.",
     "Descreve tipos, cobertura e valores ausentes.",
     "Descrive tipi, copertura e valori mancanti.",
-    "Türleri, kapsamı ve eksik değerleri açıklar.", "描述类型、覆盖情况和缺失值。",
+    "Türleri, kapsamı ve eksik değerleri açıklar.", "描述类型、覆盖情况和缺失值。", "描述型別、覆蓋情況和缺失值。", "タイプ、カバレッジ、欠損値について説明します。", "유형, 적용 범위 및 누락된 값에 대해 설명합니다."
   ],
   [
     "Explicita hipótesis, estimandos y riesgos.",
@@ -1242,7 +1242,7 @@ const catalog = [
     "Explicita hipóteses, estimandos e riscos.",
     "Explicita hipóteses, estimandos e riscos.",
     "Rende esplicite ipotesi, stimandi e rischi.",
-    "Hipotezleri, tahmin hedeflerini ve riskleri açıklar.", "明确假设、估计目标和风险。",
+    "Hipotezleri, tahmin hedeflerini ve riskleri açıklar.", "明确假设、估计目标和风险。", "明確假設、估計目標和風險。", "仮説、推定値、リスクを明確にします。", "가설, 추정, 위험을 명시적으로 만듭니다."
   ],
   [
     "Ejecuta los cálculos reproducibles.",
@@ -1252,7 +1252,7 @@ const catalog = [
     "Executa cálculos reproduzíveis.",
     "Executa cálculos reproduzíveis.",
     "Esegue calcoli riproducibili.",
-    "Yeniden üretilebilir hesaplamaları çalıştırır.", "执行可复现的计算。",
+    "Yeniden üretilebilir hesaplamaları çalıştırır.", "执行可复现的计算。", "執行可復現的計算。", "再現可能な計算を実行します。", "재현 가능한 계산을 실행합니다."
   ],
   [
     "Mide la estabilidad ante supuestos alternativos.",
@@ -1262,7 +1262,7 @@ const catalog = [
     "Mede a estabilidade perante pressupostos alternativos.",
     "Mede a estabilidade diante de premissas alternativas.",
     "Misura la stabilità con ipotesi alternative.",
-    "Alternatif varsayımlar altındaki kararlılığı ölçer.", "衡量在替代假设下的稳定性。",
+    "Alternatif varsayımlar altındaki kararlılığı ölçer.", "衡量在替代假设下的稳定性。", "衡量在替代假設下的穩定性。", "別の仮定の下での安定性を測定します。", "대체 가정 하에서 안정성을 측정합니다."
   ],
   [
     "Busca contraejemplos y explicaciones rivales.",
@@ -1272,7 +1272,7 @@ const catalog = [
     "Procura contraexemplos e explicações alternativas.",
     "Busca contraexemplos e explicações alternativas.",
     "Cerca controesempi e spiegazioni alternative.",
-    "Karşı örnekleri ve rakip açıklamaları arar.", "寻找反例和竞争性解释。",
+    "Karşı örnekleri ve rakip açıklamaları arar.", "寻找反例和竞争性解释。", "尋找反例和競爭性解釋。", "反例やライバルの説明を探します。", "반례와 상충되는 설명을 찾습니다."
   ],
   [
     "Contrasta claims con su ledger de evidencia.",
@@ -1282,7 +1282,7 @@ const catalog = [
     "Compara afirmações com o respetivo ledger de evidência.",
     "Compara afirmações com seu ledger de evidências.",
     "Confronta le affermazioni con il loro registro delle evidenze.",
-    "İddiaları kanıt defterleriyle karşılaştırır.", "将论断与其证据台账进行对照。",
+    "İddiaları kanıt defterleriyle karşılaştırır.", "将论断与其证据台账进行对照。", "將論斷與其證據臺賬進行對照。", "請求を証拠台帳と照合します。", "증거 원장을 기준으로 주장을 확인합니다."
   ],
   [
     "Redacta el informe y sus limitaciones.",
@@ -1292,7 +1292,7 @@ const catalog = [
     "Redige o relatório e as suas limitações.",
     "Redige o relatório e suas limitações.",
     "Redige il report e i suoi limiti.",
-    "Raporu ve sınırlılıklarını yazar.", "撰写报告及其局限性。",
+    "Raporu ve sınırlılıklarını yazar.", "撰写报告及其局限性。", "撰寫報告及其侷限性。", "レポートとその制限事項を作成します。", "보고서와 그 한계를 작성합니다."
   ],
   [
     "Los roles sensibles deben pertenecer a una sola base de datos.",
@@ -1302,7 +1302,7 @@ const catalog = [
     "Os papéis sensíveis devem pertencer a uma única base de dados.",
     "Os papéis sensíveis devem pertencer a um único banco de dados.",
     "I ruoli sensibili devono appartenere a un solo database.",
-    "Hassas roller tek bir veritabanına ait olmalıdır.", "敏感角色必须属于同一个数据库。",
+    "Hassas roller tek bir veritabanına ait olmalıdır.", "敏感角色必须属于同一个数据库。", "敏感角色必須屬於同一個資料庫。", "機密ロールは1つのデータベースに属している必要があります。", "중요한 역할은 하나의 데이터베이스에 속해야 합니다."
   ],
   [
     "{n} investigación(es) terminaron parcialmente. Revisa limitaciones y evidencia antes de usar sus conclusiones.",
@@ -1312,7 +1312,7 @@ const catalog = [
     "{n} investigação(ões) terminaram parcialmente. Reveja limitações e evidências antes de usar as conclusões.",
     "{n} pesquisa(s) terminaram parcialmente. Revise limitações e evidências antes de usar as conclusões.",
     "{n} ricerca/che è/sono terminata/e parzialmente. Verifica limiti ed evidenze prima di usare le conclusioni.",
-    "{n} araştırma kısmen tamamlandı. Sonuçlarını kullanmadan önce sınırlamaları ve kanıtları inceleyin.", "{n} 项研究部分完成。在使用其结论前请查看局限性和证据。",
+    "{n} araştırma kısmen tamamlandı. Sonuçlarını kullanmadan önce sınırlamaları ve kanıtları inceleyin.", "{n} 项研究部分完成。在使用其结论前请查看局限性和证据。", "{n} 項研究部分完成。在使用其結論前請檢視侷限性和證據。", "{n} 個の研究実行が部分的に終了しました。結論を使用する前に、制限と証拠を確認してください。", "{n} 연구 실행이 부분적으로 완료되었습니다. 결론을 사용하기 전에 한계와 증거를 검토하십시오."
   ],
   [
     "Informe parcial: contiene limitaciones o artefactos no verificables.",
@@ -1322,7 +1322,7 @@ const catalog = [
     "Relatório parcial: contém limitações ou artefactos não verificáveis.",
     "Relatório parcial: contém limitações ou artefatos não verificáveis.",
     "Report parziale: contiene limiti o artefatti non verificabili.",
-    "Kısmi rapor: sınırlamalar veya doğrulanamayan yapılar içeriyor.", "部分报告：包含局限性或无法验证的产物。",
+    "Kısmi rapor: sınırlamalar veya doğrulanamayan yapılar içeriyor.", "部分报告：包含局限性或无法验证的产物。", "部分報告：包含侷限性或無法驗證的產物。", "部分レポート: 制限事項または検証できないアーティファクトが含まれています。", "부분 보고서: 제한사항이나 검증할 수 없는 아티팩트가 포함되어 있습니다."
   ],
   [
     "Parcial",
@@ -1332,7 +1332,7 @@ const catalog = [
     "Parcial",
     "Parcial",
     "Parziale",
-    "Kısmi", "部分",
+    "Kısmi", "部分", "部分", "部分的", "부분"
   ],
   [
     "Informe parcial",
@@ -1342,7 +1342,7 @@ const catalog = [
     "Relatório parcial",
     "Relatório parcial",
     "Report parziale",
-    "Kısmi rapor", "部分报告",
+    "Kısmi rapor", "部分报告", "部分報告", "部分的なレポート", "부분보고"
   ],
   [
     "Conjunto filtrado; IDs redactados",
@@ -1352,116 +1352,116 @@ const catalog = [
     "Conjunto filtrado; IDs ocultados",
     "Conjunto filtrado; IDs ocultados",
     "Set filtrato; ID oscurati",
-    "Filtrelenmiş küme; kimlikler gizlendi", "已筛选集合；ID已脱敏",
+    "Filtrelenmiş küme; kimlikler gizlendi", "已筛选集合；ID已脱敏", "已篩選集合；ID已脫敏", "フィルタリングされたセット。 ID が編集されました", "필터링된 세트; ID가 수정되었습니다."
   ],
-  ["Tipo de informe", "Report type", "Type de rapport", "Berichtstyp", "Tipo de relatório", "Tipo de relatório", "Tipo di report", "Rapor türü", "报告类型"],
-  ["Idioma del informe", "Report language", "Langue du rapport", "Berichtssprache", "Idioma do relatório", "Idioma do relatório", "Lingua del report", "Rapor dili", "报告语言"],
-  ["Filtrar por tipo", "Filter by type", "Filtrer par type", "Nach Typ filtern", "Filtrar por tipo", "Filtrar por tipo", "Filtra per tipo", "Türe göre filtrele", "按类型筛选"],
-  ["Todos los tipos", "All types", "Tous les types", "Alle Typen", "Todos os tipos", "Todos os tipos", "Tutti i tipi", "Tüm türler", "所有类型"],
-  ["Elige el enfoque; Nodus validará sus requisitos.", "Choose the focus; Nodus will validate its requirements.", "Choisissez l’approche ; Nodus validera ses exigences.", "Wähle den Fokus; Nodus prüft die Anforderungen.", "Escolha o foco; o Nodus validará os requisitos.", "Escolha o foco; o Nodus validará os requisitos.", "Scegli l’approccio; Nodus ne validerà i requisiti.", "Odağı seçin; Nodus gereksinimleri doğrular.", "选择侧重点；Nodus将验证其需求。"],
-  ["Investigación general", "General research", "Recherche générale", "Allgemeine Recherche", "Investigação geral", "Pesquisa geral", "Ricerca generale", "Genel araştırma", "通用研究"],
-  ["Panorama adaptativo de calidad, patrones y explicaciones.", "Adaptive overview of quality, patterns, and explanations.", "Vue adaptative de la qualité, des motifs et des explications.", "Adaptiver Überblick über Qualität, Muster und Erklärungen.", "Visão adaptativa de qualidade, padrões e explicações.", "Visão adaptativa de qualidade, padrões e explicações.", "Panoramica adattiva di qualità, pattern e spiegazioni.", "Kalite, örüntüler ve açıklamalar için uyarlanabilir genel bakış.", "质量、模式与解释的自适应概览。"],
-  ["Calidad de datos", "Data quality", "Qualité des données", "Datenqualität", "Qualidade dos dados", "Qualidade dos dados", "Qualità dei dati", "Veri kalitesi", "数据质量"],
-  ["Ausencias, duplicados, tipos, outliers e integridad.", "Missingness, duplicates, types, outliers, and integrity.", "Valeurs manquantes, doublons, types, valeurs aberrantes et intégrité.", "Fehlende Werte, Duplikate, Typen, Ausreißer und Integrität.", "Ausências, duplicados, tipos, outliers e integridade.", "Ausências, duplicados, tipos, outliers e integridade.", "Valori mancanti, duplicati, tipi, outlier e integrità.", "Eksikler, kopyalar, türler, aykırı değerler ve bütünlük.", "缺失、重复、类型、离群值与完整性。"],
-  ["Comparación de cohortes", "Cohort comparison", "Comparaison de cohortes", "Kohortenvergleich", "Comparação de coortes", "Comparação de coortes", "Confronto tra coorti", "Kohort karşılaştırması", "队列比较"],
-  ["Contrasta grupos con efectos, intervalos y corrección FDR.", "Compare groups with effects, intervals, and FDR correction.", "Comparez les groupes avec effets, intervalles et correction FDR.", "Vergleiche Gruppen mit Effekten, Intervallen und FDR-Korrektur.", "Compare grupos com efeitos, intervalos e correção FDR.", "Compare grupos com efeitos, intervalos e correção FDR.", "Confronta gruppi con effetti, intervalli e correzione FDR.", "Grupları etkiler, aralıklar ve FDR düzeltmesiyle karşılaştırın.", "使用效应量、区间和FDR校正来比较各组。"],
-  ["Anomalías temporales", "Temporal anomalies", "Anomalies temporelles", "Zeitliche Anomalien", "Anomalias temporais", "Anomalias temporais", "Anomalie temporali", "Zamansal anomaliler", "时间异常"],
-  ["Tendencias, estacionalidad, cambios, drift y lags.", "Trends, seasonality, changes, drift, and lags.", "Tendances, saisonnalité, changements, dérive et décalages.", "Trends, Saisonalität, Veränderungen, Drift und Verzögerungen.", "Tendências, sazonalidade, mudanças, drift e desfasamentos.", "Tendências, sazonalidade, mudanças, drift e defasagens.", "Tendenze, stagionalità, cambiamenti, drift e ritardi.", "Eğilimler, mevsimsellik, değişimler, kayma ve gecikmeler.", "趋势、季节性、变化、漂移与滞后。"],
-  ["Relaciones e integridad", "Relationships and integrity", "Relations et intégrité", "Beziehungen und Integrität", "Relações e integridade", "Relações e integridade", "Relazioni e integrità", "İlişkiler ve bütünlük", "关系与完整性"],
-  ["Grafos, huérfanos, ciclos, cardinalidad y rollups.", "Graphs, orphans, cycles, cardinality, and rollups.", "Graphes, orphelins, cycles, cardinalité et agrégations.", "Graphen, verwaiste Datensätze, Zyklen, Kardinalität und Rollups.", "Grafos, órfãos, ciclos, cardinalidade e rollups.", "Grafos, órfãos, ciclos, cardinalidade e rollups.", "Grafi, orfani, cicli, cardinalità e rollup.", "Grafikler, yetimler, döngüler, kardinalite ve toplamalar.", "图、孤儿、环、基数与汇总。"],
-  ["Impacto causal", "Causal impact", "Impact causal", "Kausale Wirkung", "Impacto causal", "Impacto causal", "Impatto causale", "Nedensel etki", "因果影响"],
-  ["Efectos bajo supuestos explícitos y análisis de sensibilidad.", "Effects under explicit assumptions and sensitivity analysis.", "Effets sous hypothèses explicites et analyse de sensibilité.", "Effekte unter expliziten Annahmen und Sensitivitätsanalyse.", "Efeitos sob pressupostos explícitos e análise de sensibilidade.", "Efeitos sob suposições explícitas e análise de sensibilidade.", "Effetti sotto ipotesi esplicite e analisi di sensibilità.", "Açık varsayımlar altında etkiler ve duyarlılık analizi.", "在明确假设下的效应及敏感性分析。"],
-  ["Supervivencia y retención", "Survival and retention", "Survie et rétention", "Überleben und Bindung", "Sobrevivência e retenção", "Sobrevivência e retenção", "Sopravvivenza e retention", "Sağkalım ve elde tutma", "生存与留存"],
-  ["Censura, Kaplan–Meier, log-rank y Cox.", "Censoring, Kaplan–Meier, log-rank, and Cox.", "Censure, Kaplan–Meier, log-rank et Cox.", "Zensierung, Kaplan–Meier, Log-Rank und Cox.", "Censura, Kaplan–Meier, log-rank e Cox.", "Censura, Kaplan–Meier, log-rank e Cox.", "Censura, Kaplan–Meier, log-rank e Cox.", "Sansür, Kaplan–Meier, log-rank ve Cox.", "删失、Kaplan–Meier、log-rank与Cox。"],
-  ["Privacidad y adjuntos", "Privacy and attachments", "Confidentialité et pièces jointes", "Datenschutz und Anhänge", "Privacidade e anexos", "Privacidade e anexos", "Privacy e allegati", "Gizlilik ve ekler", "隐私与附件"],
-  ["PII, exposición, MIME, disponibilidad, hashes y OCR.", "PII, exposure, MIME, availability, hashes, and OCR.", "PII, exposition, MIME, disponibilité, hashes et OCR.", "PII, Offenlegung, MIME, Verfügbarkeit, Hashes und OCR.", "PII, exposição, MIME, disponibilidade, hashes e OCR.", "PII, exposição, MIME, disponibilidade, hashes e OCR.", "PII, esposizione, MIME, disponibilità, hash e OCR.", "Kişisel veriler, maruziyet, MIME, kullanılabilirlik, hash ve OCR.", "PII、暴露、MIME、可用性、哈希与OCR。"],
-  ["Fórmulas y reconciliación", "Formulas and reconciliation", "Formules et rapprochement", "Formeln und Abstimmung", "Fórmulas e reconciliação", "Fórmulas e reconciliação", "Formule e riconciliazione", "Formüller ve mutabakat", "公式与对账"],
-  ["Lineage, divergencias, ciclos y totales reconciliados.", "Lineage, divergences, cycles, and reconciled totals.", "Lignage, divergences, cycles et totaux rapprochés.", "Lineage, Abweichungen, Zyklen und abgestimmte Summen.", "Linhas de origem, divergências, ciclos e totais reconciliados.", "Linhas de origem, divergências, ciclos e totais reconciliados.", "Lineage, divergenze, cicli e totali riconciliati.", "Soy kütüğü, farklılıklar, döngüler ve mutabık toplamlar.", "数据血缘、差异、循环与对账合计。"],
-  ["Necesita una cohorte/grupo y al menos una métrica numérica.", "It needs a cohort/group and at least one numeric metric.", "Une cohorte/groupe et au moins une mesure numérique sont nécessaires.", "Eine Kohorte/Gruppe und mindestens eine numerische Kennzahl sind erforderlich.", "É necessária uma coorte/grupo e pelo menos uma métrica numérica.", "É necessária uma coorte/grupo e pelo menos uma métrica numérica.", "Serve una coorte/gruppo e almeno una metrica numerica.", "Bir kohort/grup ve en az bir sayısal ölçüm gerekir.", "需要队列/分组以及至少一个数值指标。"],
-  ["Necesita una columna temporal y una métrica numérica.", "It needs a time column and a numeric metric.", "Une colonne temporelle et une mesure numérique sont nécessaires.", "Eine Zeitspalte und eine numerische Kennzahl sind erforderlich.", "É necessária uma coluna temporal e uma métrica numérica.", "É necessária uma coluna temporal e uma métrica numérica.", "Serve una colonna temporale e una metrica numerica.", "Bir zaman sütunu ve sayısal ölçüm gerekir.", "需要时间列和数值指标。"],
-  ["Necesita relaciones, rollups o varias bases seleccionadas.", "It needs relationships, rollups, or multiple selected databases.", "Des relations, agrégations ou plusieurs bases sélectionnées sont nécessaires.", "Beziehungen, Rollups oder mehrere ausgewählte Datenbanken sind erforderlich.", "São necessárias relações, rollups ou várias bases selecionadas.", "São necessárias relações, rollups ou vários bancos selecionados.", "Servono relazioni, rollup o più database selezionati.", "İlişkiler, toplamalar veya birden fazla seçili veritabanı gerekir.", "需要关系、汇总或多个已选数据库。"],
-  ["Declara resultado, tratamiento y al menos un confusor.", "Declare an outcome, treatment, and at least one confounder.", "Déclarez un résultat, un traitement et au moins un facteur de confusion.", "Gib ein Ergebnis, eine Behandlung und mindestens einen Confounder an.", "Declare um resultado, tratamento e pelo menos um confundidor.", "Declare um resultado, tratamento e pelo menos um confundidor.", "Dichiara un outcome, un trattamento e almeno un confondente.", "Sonuç, tedavi ve en az bir karıştırıcı değişken belirtin.", "声明结果、处理和至少一个混杂因素。"],
-  ["Declara duración y evento para analizar supervivencia.", "Declare duration and event to analyze survival.", "Déclarez la durée et l’événement pour analyser la survie.", "Gib Dauer und Ereignis für die Überlebensanalyse an.", "Declare duração e evento para analisar a sobrevivência.", "Declare duração e evento para analisar a sobrevivência.", "Dichiara durata ed evento per analizzare la sopravvivenza.", "Sağkalımı analiz etmek için süre ve olay belirtin.", "声明持续时间和事件以分析生存。"],
-  ["No se detectan columnas de privacidad o adjuntos.", "No privacy or attachment columns were detected.", "Aucune colonne de confidentialité ou de pièces jointes n’a été détectée.", "Keine Datenschutz- oder Anhangsspalten erkannt.", "Não foram detetadas colunas de privacidade ou anexos.", "Nenhuma coluna de privacidade ou anexo foi detectada.", "Nessuna colonna di privacy o allegati rilevata.", "Gizlilik veya ek sütunu algılanmadı.", "未检测到隐私或附件列。"],
-  ["Necesita fórmulas, rollups, comparaciones o relaciones.", "It needs formulas, rollups, comparisons, or relationships.", "Des formules, agrégations, comparaisons ou relations sont nécessaires.", "Formeln, Rollups, Vergleiche oder Beziehungen sind erforderlich.", "São necessárias fórmulas, rollups, comparações ou relações.", "São necessárias fórmulas, rollups, comparações ou relações.", "Servono formule, rollup, confronti o relazioni.", "Formüller, toplamalar, karşılaştırmalar veya ilişkiler gerekir.", "需要公式、汇总、比较或关系。"],
-  ["Selecciona una columna de cohorte o grupo.", "Select a cohort or group column.", "Sélectionnez une colonne de cohorte ou de groupe.", "Wähle eine Kohorten- oder Gruppenspalte.", "Selecione uma coluna de coorte ou grupo.", "Selecione uma coluna de coorte ou grupo.", "Seleziona una colonna di coorte o gruppo.", "Bir kohort veya grup sütunu seçin.", "选择队列或分组列。"],
-  ["Selecciona al menos una métrica numérica.", "Select at least one numeric metric.", "Sélectionnez au moins une mesure numérique.", "Wähle mindestens eine numerische Kennzahl.", "Selecione pelo menos uma métrica numérica.", "Selecione pelo menos uma métrica numérica.", "Seleziona almeno una metrica numerica.", "En az bir sayısal metrik seçin.", "至少选择一个数值指标。"],
-  ["Selecciona una métrica numérica temporal.", "Select a numeric temporal metric.", "Sélectionnez une mesure numérique temporelle.", "Wähle eine numerische Zeitkennzahl.", "Selecione uma métrica numérica temporal.", "Selecione uma métrica numérica temporal.", "Seleziona una metrica numerica temporale.", "Sayısal bir zamansal metrik seçin.", "选择一个时间数值指标。"],
-  ["Selecciona relaciones, rollups o al menos dos bases de datos.", "Select relationships, rollups, or at least two databases.", "Sélectionnez des relations, agrégations ou au moins deux bases.", "Wähle Beziehungen, Rollups oder mindestens zwei Datenbanken.", "Selecione relações, rollups ou pelo menos duas bases de dados.", "Selecione relações, rollups ou pelo menos dois bancos.", "Seleziona relazioni, rollup o almeno due database.", "İlişkileri, toplamaları veya en az iki veritabanını seçin.", "选择关系、汇总或至少两个数据库。"],
-  ["Selecciona un rol resultado.", "Select an outcome role.", "Sélectionnez un rôle de résultat.", "Wähle eine Ergebnisrolle.", "Selecione um papel de resultado.", "Selecione um papel de resultado.", "Seleziona un ruolo outcome.", "Sonuç rolü seçin.", "选择结果角色。"],
-  ["Selecciona un rol tratamiento.", "Select a treatment role.", "Sélectionnez un rôle de traitement.", "Wähle eine Behandlungsrolle.", "Selecione um papel de tratamento.", "Selecione um papel de tratamento.", "Seleziona un ruolo di trattamento.", "Tedavi rolü seçin.", "选择处理角色。"],
-  ["Declara al menos un confusor.", "Declare at least one confounder.", "Déclarez au moins un facteur de confusion.", "Gib mindestens einen Confounder an.", "Declare pelo menos um confundidor.", "Declare pelo menos um confundidor.", "Dichiara almeno un confondente.", "En az bir karıştırıcı değişken belirtin.", "声明至少一个混杂因素。"],
-  ["Selecciona un rol temporal.", "Select a temporal role.", "Sélectionnez un rôle temporel.", "Wähle eine Zeitrolle.", "Selecione um papel temporal.", "Selecione um papel temporal.", "Seleziona un ruolo temporale.", "Zamansal rol seçin.", "选择时间角色。"],
-  ["Selecciona un rol duración.", "Select a duration role.", "Sélectionnez un rôle de durée.", "Wähle eine Dauerrrolle.", "Selecione um papel de duração.", "Selecione um papel de duração.", "Seleziona un ruolo di durata.", "Süre rolü seçin.", "选择持续时间角色。"],
-  ["Selecciona un rol evento.", "Select an event role.", "Sélectionnez un rôle d’événement.", "Wähle eine Ereignisrolle.", "Selecione um papel de evento.", "Selecione um papel de evento.", "Seleziona un ruolo evento.", "Olay rolü seçin.", "选择事件角色。"],
-  ["No hay columnas de PII, ubicación o adjuntos seleccionadas.", "No PII, location, or attachment columns are selected.", "Aucune colonne de PII, localisation ou pièce jointe n’est sélectionnée.", "Keine PII-, Standort- oder Anhangsspalten ausgewählt.", "Não há colunas de PII, localização ou anexos selecionadas.", "Nenhuma coluna de PII, localização ou anexo foi selecionada.", "Nessuna colonna PII, posizione o allegato selezionata.", "PII, konum veya ek sütunu seçilmedi.", "未选择PII、位置或附件列。"],
-  ["No hay fórmulas, rollups, comparaciones o relaciones que reconciliar.", "No formulas, rollups, comparisons, or relationships to reconcile.", "Aucune formule, agrégation, comparaison ou relation à rapprocher.", "Keine Formeln, Rollups, Vergleiche oder Beziehungen abzustimmen.", "Não há fórmulas, rollups, comparações ou relações a reconciliar.", "Mutabık hale getirilecek formül, toplama, karşılaştırma veya ilişki yok.", "Nessuna formula, rollup, confronto o relazione da riconciliare.", "Mutabakat için formül, toplama, karşılaştırma veya ilişki yok.", "没有需要对账的公式、汇总、比较或关系。"],
-  ["Este tipo de informe no es aplicable a la selección.", "This report type is not applicable to the selection.", "Ce type de rapport ne s’applique pas à la sélection.", "Dieser Berichtstyp ist für die Auswahl nicht anwendbar.", "Este tipo de relatório não se aplica à seleção.", "Este tipo de relatório não se aplica à seleção.", "Questo tipo di report non è applicabile alla selezione.", "Bu rapor türü seçime uygulanamaz.", "此报告类型不适用于当前选择。"],
-  ["No aplicable a esta selección.", "Not applicable to this selection.", "Non applicable à cette sélection.", "Für diese Auswahl nicht anwendbar.", "Não aplicável a esta seleção.", "Não aplicável a esta seleção.", "Non applicabile a questa selezione.", "Bu seçim için uygulanamaz.", "不适用于此选择。"],
-  ["Cohorte o grupo", "Cohort or group", "Cohorte ou groupe", "Kohorte oder Gruppe", "Coorte ou grupo", "Coorte ou grupo", "Coorte o gruppo", "Kohort veya grup", "队列或分组"],
-  ["Categoría que define los grupos que se compararán.", "Category defining the groups to compare.", "Catégorie qui définit les groupes à comparer.", "Kategorie, die die zu vergleichenden Gruppen definiert.", "Categoria que define os grupos a comparar.", "Categoria que define os grupos a comparar.", "Categoria che definisce i gruppi da confrontare.", "Karşılaştırılacak grupları tanımlayan kategori.", "定义要比较的分组的类别。"],
-  ["Métricas", "Metrics", "Mesures", "Kennzahlen", "Métricas", "Métricas", "Metriche", "Metrikler", "指标"],
-  ["Medidas numéricas que se resumirán o compararán.", "Numeric measures to summarize or compare.", "Mesures numériques à résumer ou comparer.", "Numerische Messwerte zum Zusammenfassen oder Vergleichen.", "Medidas numéricas a resumir ou comparar.", "Medidas numéricas a resumir ou comparar.", "Misure numeriche da riassumere o confrontare.", "Özetlenecek veya karşılaştırılacak sayısal ölçüler.", "将要汇总或比较的数值度量。"],
-  ["Datos sensibles", "Sensitive data", "Données sensibles", "Sensible Daten", "Dados sensíveis", "Dados sensíveis", "Dati sensibili", "Hassas veriler", "敏感数据"],
-  ["Columnas que deben redactarse y auditarse con precaución.", "Columns that must be redacted and audited carefully.", "Colonnes à masquer et à auditer avec précaution.", "Spalten, die redigiert und sorgfältig geprüft werden müssen.", "Colunas que devem ser ocultadas e auditadas com cuidado.", "Colunas que devem ser ocultadas e auditadas com cuidado.", "Colonne da oscurare e verificare con cautela.", "Redakte edilmesi ve dikkatle denetlenmesi gereken sütunlar.", "必须脱敏并谨慎审计的列。"],
-  ["Reconciliación", "Reconciliation", "Rapprochement", "Abstimmung", "Reconciliação", "Reconciliação", "Riconciliazione", "Mutabakat", "对账"],
-  ["Columnas de totales, fórmulas o controles que deben cuadrar.", "Total, formula, or control columns that must reconcile.", "Colonnes de totaux, formules ou contrôles à rapprocher.", "Summen-, Formel- oder Kontrollspalten, die abgestimmt werden müssen.", "Colunas de totais, fórmulas ou controlos que devem reconciliar.", "Colunas de totais, fórmulas ou controles que devem reconciliar.", "Colonne di totali, formule o controlli da riconciliare.", "Mutabık olması gereken toplam, formül veya kontrol sütunları.", "必须对平的合计、公式或控制列。"],
-  ["Análisis obligatorios", "Required analyses", "Analyses obligatoires", "Erforderliche Analysen", "Análises obrigatórias", "Análises obrigatórias", "Analisi obbligatorie", "Zorunlu analizler", "必需分析"],
-  ["Análisis opcionales", "Optional analyses", "Analyses facultatives", "Optionale Analysen", "Análises opcionais", "Análises opcionais", "Analisi facoltative", "İsteğe bağlı analizler", "可选分析"],
-  ["El grupo debe ser una columna categórica.", "The group must be a categorical column.", "Le groupe doit être une colonne catégorielle.", "Die Gruppe muss eine kategoriale Spalte sein.", "O grupo deve ser uma coluna categórica.", "O grupo deve ser uma coluna categórica.", "Il gruppo deve essere una colonna categoriale.", "Grup kategorik bir sütun olmalıdır.", "分组必须是分类列。"],
-  ["Todas las métricas deben ser numéricas.", "All metrics must be numeric.", "Toutes les mesures doivent être numériques.", "Alle Kennzahlen müssen numerisch sein.", "Todas as métricas devem ser numéricas.", "Todas as métricas devem ser numéricas.", "Tutte le metriche devono essere numeriche.", "Tüm metrikler sayısal olmalıdır.", "所有指标都必须是数值型。"],
-  ["El rol temporal debe ser una fecha, hora o timestamp.", "The time role must be a date, time, or timestamp.", "Le rôle temporel doit être une date, une heure ou un horodatage.", "Die Zeitrolle muss ein Datum, eine Uhrzeit oder ein Zeitstempel sein.", "O papel temporal deve ser uma data, hora ou timestamp.", "O papel temporal deve ser uma data, hora ou timestamp.", "Il ruolo temporale deve essere una data, un'ora o un timestamp.", "Zaman rolü bir tarih, saat veya zaman damgası olmalıdır.", "时间角色必须是日期、时间或时间戳。"],
-  ["Todas las métricas temporales deben ser numéricas.", "All temporal metrics must be numeric.", "Toutes les mesures temporelles doivent être numériques.", "Alle zeitlichen Kennzahlen müssen numerisch sein.", "Todas as métricas temporais devem ser numéricas.", "Todas as métricas temporais devem ser numéricas.", "Tutte le metriche temporali devono essere numeriche.", "Tüm zamansal metrikler sayısal olmalıdır.", "所有时间指标都必须是数值型。"],
-  ["Selecciona al menos una relación o rollup que conecte los datos.", "Select at least one relationship or rollup connecting the data.", "Sélectionnez au moins une relation ou agrégation reliant les données.", "Wähle mindestens eine Beziehung oder ein Rollup, das die Daten verbindet.", "Selecione pelo menos uma relação ou rollup que ligue os dados.", "Selecione pelo menos uma relação ou rollup que conecte os dados.", "Seleziona almeno una relazione o rollup che colleghi i dati.", "Verileri bağlayan en az bir ilişki veya toplama seçin.", "至少选择一个连接数据的关系或汇总。"],
+  ["Tipo de informe", "Report type", "Type de rapport", "Berichtstyp", "Tipo de relatório", "Tipo de relatório", "Tipo di report", "Rapor türü", "报告类型", "報告型別", "レポートの種類", "보고서 유형"],
+  ["Idioma del informe", "Report language", "Langue du rapport", "Berichtssprache", "Idioma do relatório", "Idioma do relatório", "Lingua del report", "Rapor dili", "报告语言", "報告語言", "レポート言語", "보고 언어"],
+  ["Filtrar por tipo", "Filter by type", "Filtrer par type", "Nach Typ filtern", "Filtrar por tipo", "Filtrar por tipo", "Filtra per tipo", "Türe göre filtrele", "按类型筛选", "按型別篩選", "タイプでフィルタリングする", "유형별로 필터링"],
+  ["Todos los tipos", "All types", "Tous les types", "Alle Typen", "Todos os tipos", "Todos os tipos", "Tutti i tipi", "Tüm türler", "所有类型", "所有型別", "全種類", "모든 유형"],
+  ["Elige el enfoque; Nodus validará sus requisitos.", "Choose the focus; Nodus will validate its requirements.", "Choisissez l’approche ; Nodus validera ses exigences.", "Wähle den Fokus; Nodus prüft die Anforderungen.", "Escolha o foco; o Nodus validará os requisitos.", "Escolha o foco; o Nodus validará os requisitos.", "Scegli l’approccio; Nodus ne validerà i requisiti.", "Odağı seçin; Nodus gereksinimleri doğrular.", "选择侧重点；Nodus将验证其需求。", "選擇側重點；Nodus將驗證其需求。", "焦点を選択してください。 Nodus はその要件を検証します。", "초점을 선택하세요. Nodus는 요구 사항을 검증합니다."],
+  ["Investigación general", "General research", "Recherche générale", "Allgemeine Recherche", "Investigação geral", "Pesquisa geral", "Ricerca generale", "Genel araştırma", "通用研究", "通用研究", "一般研究", "일반 연구"],
+  ["Panorama adaptativo de calidad, patrones y explicaciones.", "Adaptive overview of quality, patterns, and explanations.", "Vue adaptative de la qualité, des motifs et des explications.", "Adaptiver Überblick über Qualität, Muster und Erklärungen.", "Visão adaptativa de qualidade, padrões e explicações.", "Visão adaptativa de qualidade, padrões e explicações.", "Panoramica adattiva di qualità, pattern e spiegazioni.", "Kalite, örüntüler ve açıklamalar için uyarlanabilir genel bakış.", "质量、模式与解释的自适应概览。", "質量、模式與解釋的自適應概覽。", "品質、パターン、説明の適応的な概要。", "품질, 패턴 및 설명에 대한 적응형 개요."],
+  ["Calidad de datos", "Data quality", "Qualité des données", "Datenqualität", "Qualidade dos dados", "Qualidade dos dados", "Qualità dei dati", "Veri kalitesi", "数据质量", "資料質量", "データ品質", "데이터 품질"],
+  ["Ausencias, duplicados, tipos, outliers e integridad.", "Missingness, duplicates, types, outliers, and integrity.", "Valeurs manquantes, doublons, types, valeurs aberrantes et intégrité.", "Fehlende Werte, Duplikate, Typen, Ausreißer und Integrität.", "Ausências, duplicados, tipos, outliers e integridade.", "Ausências, duplicados, tipos, outliers e integridade.", "Valori mancanti, duplicati, tipi, outlier e integrità.", "Eksikler, kopyalar, türler, aykırı değerler ve bütünlük.", "缺失、重复、类型、离群值与完整性。", "缺失、重複、型別、離群值與完整性。", "欠損、重複、タイプ、外れ値、および整合性。", "누락, 중복, 유형, 이상값 및 무결성."],
+  ["Comparación de cohortes", "Cohort comparison", "Comparaison de cohortes", "Kohortenvergleich", "Comparação de coortes", "Comparação de coortes", "Confronto tra coorti", "Kohort karşılaştırması", "队列比较", "佇列比較", "コホートの比較", "코호트 비교"],
+  ["Contrasta grupos con efectos, intervalos y corrección FDR.", "Compare groups with effects, intervals, and FDR correction.", "Comparez les groupes avec effets, intervalles et correction FDR.", "Vergleiche Gruppen mit Effekten, Intervallen und FDR-Korrektur.", "Compare grupos com efeitos, intervalos e correção FDR.", "Compare grupos com efeitos, intervalos e correção FDR.", "Confronta gruppi con effetti, intervalli e correzione FDR.", "Grupları etkiler, aralıklar ve FDR düzeltmesiyle karşılaştırın.", "使用效应量、区间和FDR校正来比较各组。", "使用效應量、區間和FDR校正來比較各組。", "効果、間隔、FDR 補正を使用してグループを比較します。", "효과, 간격, FDR 보정을 사용하여 그룹을 비교합니다."],
+  ["Anomalías temporales", "Temporal anomalies", "Anomalies temporelles", "Zeitliche Anomalien", "Anomalias temporais", "Anomalias temporais", "Anomalie temporali", "Zamansal anomaliler", "时间异常", "時間異常", "時間的異常", "시간적 이상"],
+  ["Tendencias, estacionalidad, cambios, drift y lags.", "Trends, seasonality, changes, drift, and lags.", "Tendances, saisonnalité, changements, dérive et décalages.", "Trends, Saisonalität, Veränderungen, Drift und Verzögerungen.", "Tendências, sazonalidade, mudanças, drift e desfasamentos.", "Tendências, sazonalidade, mudanças, drift e defasagens.", "Tendenze, stagionalità, cambiamenti, drift e ritardi.", "Eğilimler, mevsimsellik, değişimler, kayma ve gecikmeler.", "趋势、季节性、变化、漂移与滞后。", "趨勢、季節性、變化、漂移與滯後。", "トレンド、季節性、変化、ドリフト、ラグ。", "추세, 계절성, 변화, 드리프트 및 지연."],
+  ["Relaciones e integridad", "Relationships and integrity", "Relations et intégrité", "Beziehungen und Integrität", "Relações e integridade", "Relações e integridade", "Relazioni e integrità", "İlişkiler ve bütünlük", "关系与完整性", "關係與完整性", "人間関係と誠実さ", "관계와 성실성"],
+  ["Grafos, huérfanos, ciclos, cardinalidad y rollups.", "Graphs, orphans, cycles, cardinality, and rollups.", "Graphes, orphelins, cycles, cardinalité et agrégations.", "Graphen, verwaiste Datensätze, Zyklen, Kardinalität und Rollups.", "Grafos, órfãos, ciclos, cardinalidade e rollups.", "Grafos, órfãos, ciclos, cardinalidade e rollups.", "Grafi, orfani, cicli, cardinalità e rollup.", "Grafikler, yetimler, döngüler, kardinalite ve toplamalar.", "图、孤儿、环、基数与汇总。", "圖、孤兒、環、基數與彙總。", "グラフ、オーファン、サイクル、カーディナリティ、ロールアップ。", "그래프, 고아, 주기, 카디널리티 및 롤업."],
+  ["Impacto causal", "Causal impact", "Impact causal", "Kausale Wirkung", "Impacto causal", "Impacto causal", "Impatto causale", "Nedensel etki", "因果影响", "因果影響", "因果関係", "인과적 영향"],
+  ["Efectos bajo supuestos explícitos y análisis de sensibilidad.", "Effects under explicit assumptions and sensitivity analysis.", "Effets sous hypothèses explicites et analyse de sensibilité.", "Effekte unter expliziten Annahmen und Sensitivitätsanalyse.", "Efeitos sob pressupostos explícitos e análise de sensibilidade.", "Efeitos sob suposições explícitas e análise de sensibilidade.", "Effetti sotto ipotesi esplicite e analisi di sensibilità.", "Açık varsayımlar altında etkiler ve duyarlılık analizi.", "在明确假设下的效应及敏感性分析。", "在明確假設下的效應及敏感性分析。", "明示的な仮定と感度分析に基づく効果。", "명시적 가정 및 민감도 분석에 따른 효과."],
+  ["Supervivencia y retención", "Survival and retention", "Survie et rétention", "Überleben und Bindung", "Sobrevivência e retenção", "Sobrevivência e retenção", "Sopravvivenza e retention", "Sağkalım ve elde tutma", "生存与留存", "生存與留存", "生存と保持", "생존 및 유지"],
+  ["Censura, Kaplan–Meier, log-rank y Cox.", "Censoring, Kaplan–Meier, log-rank, and Cox.", "Censure, Kaplan–Meier, log-rank et Cox.", "Zensierung, Kaplan–Meier, Log-Rank und Cox.", "Censura, Kaplan–Meier, log-rank e Cox.", "Censura, Kaplan–Meier, log-rank e Cox.", "Censura, Kaplan–Meier, log-rank e Cox.", "Sansür, Kaplan–Meier, log-rank ve Cox.", "删失、Kaplan–Meier、log-rank与Cox。", "刪失、Kaplan–Meier、log-rank與Cox。", "検閲、カプラン・マイヤー、ログランク、およびコックス。", "검열, Kaplan–Meier, 로그 순위 및 Cox."],
+  ["Privacidad y adjuntos", "Privacy and attachments", "Confidentialité et pièces jointes", "Datenschutz und Anhänge", "Privacidade e anexos", "Privacidade e anexos", "Privacy e allegati", "Gizlilik ve ekler", "隐私与附件", "隱私與附件", "プライバシーと添付ファイル", "개인 정보 보호 및 첨부 파일"],
+  ["PII, exposición, MIME, disponibilidad, hashes y OCR.", "PII, exposure, MIME, availability, hashes, and OCR.", "PII, exposition, MIME, disponibilité, hashes et OCR.", "PII, Offenlegung, MIME, Verfügbarkeit, Hashes und OCR.", "PII, exposição, MIME, disponibilidade, hashes e OCR.", "PII, exposição, MIME, disponibilidade, hashes e OCR.", "PII, esposizione, MIME, disponibilità, hash e OCR.", "Kişisel veriler, maruziyet, MIME, kullanılabilirlik, hash ve OCR.", "PII、暴露、MIME、可用性、哈希与OCR。", "PII、暴露、MIME、可用性、雜湊與OCR。", "PII、公開、MIME、可用性、ハッシュ、OCR。", "PII, 노출, MIME, 가용성, 해시 및 OCR."],
+  ["Fórmulas y reconciliación", "Formulas and reconciliation", "Formules et rapprochement", "Formeln und Abstimmung", "Fórmulas e reconciliação", "Fórmulas e reconciliação", "Formule e riconciliazione", "Formüller ve mutabakat", "公式与对账", "公式與對賬", "公式と調整", "공식 및 조정"],
+  ["Lineage, divergencias, ciclos y totales reconciliados.", "Lineage, divergences, cycles, and reconciled totals.", "Lignage, divergences, cycles et totaux rapprochés.", "Lineage, Abweichungen, Zyklen und abgestimmte Summen.", "Linhas de origem, divergências, ciclos e totais reconciliados.", "Linhas de origem, divergências, ciclos e totais reconciliados.", "Lineage, divergenze, cicli e totali riconciliati.", "Soy kütüğü, farklılıklar, döngüler ve mutabık toplamlar.", "数据血缘、差异、循环与对账合计。", "資料血緣、差異、迴圈與對賬合計。", "系統、分岐、サイクル、調整された合計。", "계보, 분기, 주기 및 조정된 합계입니다."],
+  ["Necesita una cohorte/grupo y al menos una métrica numérica.", "It needs a cohort/group and at least one numeric metric.", "Une cohorte/groupe et au moins une mesure numérique sont nécessaires.", "Eine Kohorte/Gruppe und mindestens eine numerische Kennzahl sind erforderlich.", "É necessária uma coorte/grupo e pelo menos uma métrica numérica.", "É necessária uma coorte/grupo e pelo menos uma métrica numérica.", "Serve una coorte/gruppo e almeno una metrica numerica.", "Bir kohort/grup ve en az bir sayısal ölçüm gerekir.", "需要队列/分组以及至少一个数值指标。", "需要佇列/分組以及至少一個數值指標。", "コホート/グループと少なくとも1つの数値指標が必要です。", "코호트/그룹과 하나 이상의 숫자 측정항목이 필요합니다."],
+  ["Necesita una columna temporal y una métrica numérica.", "It needs a time column and a numeric metric.", "Une colonne temporelle et une mesure numérique sont nécessaires.", "Eine Zeitspalte und eine numerische Kennzahl sind erforderlich.", "É necessária uma coluna temporal e uma métrica numérica.", "É necessária uma coluna temporal e uma métrica numérica.", "Serve una colonna temporale e una metrica numerica.", "Bir zaman sütunu ve sayısal ölçüm gerekir.", "需要时间列和数值指标。", "需要時間列和數值指標。", "時間列と数値メトリックが必要です。", "시간 열과 숫자 측정항목이 필요합니다."],
+  ["Necesita relaciones, rollups o varias bases seleccionadas.", "It needs relationships, rollups, or multiple selected databases.", "Des relations, agrégations ou plusieurs bases sélectionnées sont nécessaires.", "Beziehungen, Rollups oder mehrere ausgewählte Datenbanken sind erforderlich.", "São necessárias relações, rollups ou várias bases selecionadas.", "São necessárias relações, rollups ou vários bancos selecionados.", "Servono relazioni, rollup o più database selezionati.", "İlişkiler, toplamalar veya birden fazla seçili veritabanı gerekir.", "需要关系、汇总或多个已选数据库。", "需要關係、彙總或多個已選資料庫。", "リレーションシップ、ロールアップ、または複数の選択されたデータベースが必要です。", "관계, 롤업 또는 선택한 여러 데이터베이스가 필요합니다."],
+  ["Declara resultado, tratamiento y al menos un confusor.", "Declare an outcome, treatment, and at least one confounder.", "Déclarez un résultat, un traitement et au moins un facteur de confusion.", "Gib ein Ergebnis, eine Behandlung und mindestens einen Confounder an.", "Declare um resultado, tratamento e pelo menos um confundidor.", "Declare um resultado, tratamento e pelo menos um confundidor.", "Dichiara un outcome, un trattamento e almeno un confondente.", "Sonuç, tedavi ve en az bir karıştırıcı değişken belirtin.", "声明结果、处理和至少一个混杂因素。", "宣告結果、處理和至少一個混雜因素。", "結果、治療法、および少なくとも1つの交絡因子を宣言します。", "결과, 치료법 및 적어도 하나의 혼란 요인을 선언하십시오."],
+  ["Declara duración y evento para analizar supervivencia.", "Declare duration and event to analyze survival.", "Déclarez la durée et l’événement pour analyser la survie.", "Gib Dauer und Ereignis für die Überlebensanalyse an.", "Declare duração e evento para analisar a sobrevivência.", "Declare duração e evento para analisar a sobrevivência.", "Dichiara durata ed evento per analizzare la sopravvivenza.", "Sağkalımı analiz etmek için süre ve olay belirtin.", "声明持续时间和事件以分析生存。", "宣告持續時間和事件以分析生存。", "生存期間を分析するための期間とイベントを宣言します。", "생존을 분석하기 위해 기간과 이벤트를 선언합니다."],
+  ["No se detectan columnas de privacidad o adjuntos.", "No privacy or attachment columns were detected.", "Aucune colonne de confidentialité ou de pièces jointes n’a été détectée.", "Keine Datenschutz- oder Anhangsspalten erkannt.", "Não foram detetadas colunas de privacidade ou anexos.", "Nenhuma coluna de privacidade ou anexo foi detectada.", "Nessuna colonna di privacy o allegati rilevata.", "Gizlilik veya ek sütunu algılanmadı.", "未检测到隐私或附件列。", "未檢測到隱私或附件列。", "プライバシー列や添付ファイル列は検出されませんでした。", "개인 정보 보호 또는 첨부 파일 열이 감지되지 않았습니다."],
+  ["Necesita fórmulas, rollups, comparaciones o relaciones.", "It needs formulas, rollups, comparisons, or relationships.", "Des formules, agrégations, comparaisons ou relations sont nécessaires.", "Formeln, Rollups, Vergleiche oder Beziehungen sind erforderlich.", "São necessárias fórmulas, rollups, comparações ou relações.", "São necessárias fórmulas, rollups, comparações ou relações.", "Servono formule, rollup, confronti o relazioni.", "Formüller, toplamalar, karşılaştırmalar veya ilişkiler gerekir.", "需要公式、汇总、比较或关系。", "需要公式、彙總、比較或關係。", "数式、ロールアップ、比較、または関係が必要です。", "수식, 롤업, 비교 또는 관계가 필요합니다."],
+  ["Selecciona una columna de cohorte o grupo.", "Select a cohort or group column.", "Sélectionnez une colonne de cohorte ou de groupe.", "Wähle eine Kohorten- oder Gruppenspalte.", "Selecione uma coluna de coorte ou grupo.", "Selecione uma coluna de coorte ou grupo.", "Seleziona una colonna di coorte o gruppo.", "Bir kohort veya grup sütunu seçin.", "选择队列或分组列。", "選擇佇列或分組列。", "コホート列またはグループ列を選択します。", "코호트 또는 그룹 열을 선택합니다."],
+  ["Selecciona al menos una métrica numérica.", "Select at least one numeric metric.", "Sélectionnez au moins une mesure numérique.", "Wähle mindestens eine numerische Kennzahl.", "Selecione pelo menos uma métrica numérica.", "Selecione pelo menos uma métrica numérica.", "Seleziona almeno una metrica numerica.", "En az bir sayısal metrik seçin.", "至少选择一个数值指标。", "至少選擇一個數值指標。", "少なくとも1つの数値メトリックを選択します。", "숫자 측정항목을 하나 이상 선택하세요."],
+  ["Selecciona una métrica numérica temporal.", "Select a numeric temporal metric.", "Sélectionnez une mesure numérique temporelle.", "Wähle eine numerische Zeitkennzahl.", "Selecione uma métrica numérica temporal.", "Selecione uma métrica numérica temporal.", "Seleziona una metrica numerica temporale.", "Sayısal bir zamansal metrik seçin.", "选择一个时间数值指标。", "選擇一個時間數值指標。", "数値の時間的メトリックを選択します。", "숫자로 된 시간 측정항목을 선택하세요."],
+  ["Selecciona relaciones, rollups o al menos dos bases de datos.", "Select relationships, rollups, or at least two databases.", "Sélectionnez des relations, agrégations ou au moins deux bases.", "Wähle Beziehungen, Rollups oder mindestens zwei Datenbanken.", "Selecione relações, rollups ou pelo menos duas bases de dados.", "Selecione relações, rollups ou pelo menos dois bancos.", "Seleziona relazioni, rollup o almeno due database.", "İlişkileri, toplamaları veya en az iki veritabanını seçin.", "选择关系、汇总或至少两个数据库。", "選擇關係、彙總或至少兩個資料庫。", "リレーションシップ、ロールアップ、または少なくとも2つのデータベースを選択します。", "관계, 롤업 또는 두 개 이상의 데이터베이스를 선택합니다."],
+  ["Selecciona un rol resultado.", "Select an outcome role.", "Sélectionnez un rôle de résultat.", "Wähle eine Ergebnisrolle.", "Selecione um papel de resultado.", "Selecione um papel de resultado.", "Seleziona un ruolo outcome.", "Sonuç rolü seçin.", "选择结果角色。", "選擇結果角色。", "結果の役割を選択します。", "결과 역할을 선택합니다."],
+  ["Selecciona un rol tratamiento.", "Select a treatment role.", "Sélectionnez un rôle de traitement.", "Wähle eine Behandlungsrolle.", "Selecione um papel de tratamento.", "Selecione um papel de tratamento.", "Seleziona un ruolo di trattamento.", "Tedavi rolü seçin.", "选择处理角色。", "選擇處理角色。", "治療の役割を選択します。", "치료 역할을 선택하세요."],
+  ["Declara al menos un confusor.", "Declare at least one confounder.", "Déclarez au moins un facteur de confusion.", "Gib mindestens einen Confounder an.", "Declare pelo menos um confundidor.", "Declare pelo menos um confundidor.", "Dichiara almeno un confondente.", "En az bir karıştırıcı değişken belirtin.", "声明至少一个混杂因素。", "宣告至少一個混雜因素。", "少なくとも1つの交絡因子を宣言します。", "적어도 하나의 혼란자를 선언하십시오."],
+  ["Selecciona un rol temporal.", "Select a temporal role.", "Sélectionnez un rôle temporel.", "Wähle eine Zeitrolle.", "Selecione um papel temporal.", "Selecione um papel temporal.", "Seleziona un ruolo temporale.", "Zamansal rol seçin.", "选择时间角色。", "選擇時間角色。", "一時的な役割を選択します。", "임시 역할을 선택합니다."],
+  ["Selecciona un rol duración.", "Select a duration role.", "Sélectionnez un rôle de durée.", "Wähle eine Dauerrrolle.", "Selecione um papel de duração.", "Selecione um papel de duração.", "Seleziona un ruolo di durata.", "Süre rolü seçin.", "选择持续时间角色。", "選擇持續時間角色。", "期間の役割を選択します。", "기간 역할을 선택합니다."],
+  ["Selecciona un rol evento.", "Select an event role.", "Sélectionnez un rôle d’événement.", "Wähle eine Ereignisrolle.", "Selecione um papel de evento.", "Selecione um papel de evento.", "Seleziona un ruolo evento.", "Olay rolü seçin.", "选择事件角色。", "選擇事件角色。", "イベントの役割を選択します。", "이벤트 역할을 선택하세요."],
+  ["No hay columnas de PII, ubicación o adjuntos seleccionadas.", "No PII, location, or attachment columns are selected.", "Aucune colonne de PII, localisation ou pièce jointe n’est sélectionnée.", "Keine PII-, Standort- oder Anhangsspalten ausgewählt.", "Não há colunas de PII, localização ou anexos selecionadas.", "Nenhuma coluna de PII, localização ou anexo foi selecionada.", "Nessuna colonna PII, posizione o allegato selezionata.", "PII, konum veya ek sütunu seçilmedi.", "未选择PII、位置或附件列。", "未選擇PII、位置或附件列。", "PII、場所、または添付ファイルの列が選択されていません。", "PII, 위치 또는 첨부 파일 열이 선택되지 않았습니다."],
+  ["No hay fórmulas, rollups, comparaciones o relaciones que reconciliar.", "No formulas, rollups, comparisons, or relationships to reconcile.", "Aucune formule, agrégation, comparaison ou relation à rapprocher.", "Keine Formeln, Rollups, Vergleiche oder Beziehungen abzustimmen.", "Não há fórmulas, rollups, comparações ou relações a reconciliar.", "Mutabık hale getirilecek formül, toplama, karşılaştırma veya ilişki yok.", "Nessuna formula, rollup, confronto o relazione da riconciliare.", "Mutabakat için formül, toplama, karşılaştırma veya ilişki yok.", "没有需要对账的公式、汇总、比较或关系。", "沒有需要對賬的公式、彙總、比較或關係。", "調整する数式、ロールアップ、比較、または関係はありません。", "조정할 수식, 롤업, 비교 또는 관계가 없습니다."],
+  ["Este tipo de informe no es aplicable a la selección.", "This report type is not applicable to the selection.", "Ce type de rapport ne s’applique pas à la sélection.", "Dieser Berichtstyp ist für die Auswahl nicht anwendbar.", "Este tipo de relatório não se aplica à seleção.", "Este tipo de relatório não se aplica à seleção.", "Questo tipo di report non è applicabile alla selezione.", "Bu rapor türü seçime uygulanamaz.", "此报告类型不适用于当前选择。", "此報告型別不適用於當前選擇。", "このレポートタイプは選択には適用されません。", "이 보고서 유형은 선택 사항에 적용할 수 없습니다."],
+  ["No aplicable a esta selección.", "Not applicable to this selection.", "Non applicable à cette sélection.", "Für diese Auswahl nicht anwendbar.", "Não aplicável a esta seleção.", "Não aplicável a esta seleção.", "Non applicabile a questa selezione.", "Bu seçim için uygulanamaz.", "不适用于此选择。", "不適用於此選擇。", "この選択には適用されません。", "이 선택 항목에는 적용되지 않습니다."],
+  ["Cohorte o grupo", "Cohort or group", "Cohorte ou groupe", "Kohorte oder Gruppe", "Coorte ou grupo", "Coorte ou grupo", "Coorte o gruppo", "Kohort veya grup", "队列或分组", "佇列或分組", "コホートまたはグループ", "코호트 또는 그룹"],
+  ["Categoría que define los grupos que se compararán.", "Category defining the groups to compare.", "Catégorie qui définit les groupes à comparer.", "Kategorie, die die zu vergleichenden Gruppen definiert.", "Categoria que define os grupos a comparar.", "Categoria que define os grupos a comparar.", "Categoria che definisce i gruppi da confrontare.", "Karşılaştırılacak grupları tanımlayan kategori.", "定义要比较的分组的类别。", "定義要比較的分組的類別。", "比較するグループを定義するカテゴリ。", "비교할 그룹을 정의하는 카테고리입니다."],
+  ["Métricas", "Metrics", "Mesures", "Kennzahlen", "Métricas", "Métricas", "Metriche", "Metrikler", "指标", "指標", "メトリクス", "측정항목"],
+  ["Medidas numéricas que se resumirán o compararán.", "Numeric measures to summarize or compare.", "Mesures numériques à résumer ou comparer.", "Numerische Messwerte zum Zusammenfassen oder Vergleichen.", "Medidas numéricas a resumir ou comparar.", "Medidas numéricas a resumir ou comparar.", "Misure numeriche da riassumere o confrontare.", "Özetlenecek veya karşılaştırılacak sayısal ölçüler.", "将要汇总或比较的数值度量。", "將要彙總或比較的數值度量。", "要約または比較するための数値基準。", "요약하거나 비교할 수치 측정값입니다."],
+  ["Datos sensibles", "Sensitive data", "Données sensibles", "Sensible Daten", "Dados sensíveis", "Dados sensíveis", "Dati sensibili", "Hassas veriler", "敏感数据", "敏感資料", "機密データ", "민감한 데이터"],
+  ["Columnas que deben redactarse y auditarse con precaución.", "Columns that must be redacted and audited carefully.", "Colonnes à masquer et à auditer avec précaution.", "Spalten, die redigiert und sorgfältig geprüft werden müssen.", "Colunas que devem ser ocultadas e auditadas com cuidado.", "Colunas que devem ser ocultadas e auditadas com cuidado.", "Colonne da oscurare e verificare con cautela.", "Redakte edilmesi ve dikkatle denetlenmesi gereken sütunlar.", "必须脱敏并谨慎审计的列。", "必須脫敏並謹慎審計的列。", "慎重に編集して監査する必要がある列。", "신중하게 수정하고 감사해야 하는 열입니다."],
+  ["Reconciliación", "Reconciliation", "Rapprochement", "Abstimmung", "Reconciliação", "Reconciliação", "Riconciliazione", "Mutabakat", "对账", "對賬", "和解", "화해"],
+  ["Columnas de totales, fórmulas o controles que deben cuadrar.", "Total, formula, or control columns that must reconcile.", "Colonnes de totaux, formules ou contrôles à rapprocher.", "Summen-, Formel- oder Kontrollspalten, die abgestimmt werden müssen.", "Colunas de totais, fórmulas ou controlos que devem reconciliar.", "Colunas de totais, fórmulas ou controles que devem reconciliar.", "Colonne di totali, formule o controlli da riconciliare.", "Mutabık olması gereken toplam, formül veya kontrol sütunları.", "必须对平的合计、公式或控制列。", "必須對平的合計、公式或控制列。", "調整する必要がある合計、数式、または制御列。", "조정해야 하는 합계, 수식 또는 제어 열입니다."],
+  ["Análisis obligatorios", "Required analyses", "Analyses obligatoires", "Erforderliche Analysen", "Análises obrigatórias", "Análises obrigatórias", "Analisi obbligatorie", "Zorunlu analizler", "必需分析", "必需分析", "必要な分析", "필수 분석"],
+  ["Análisis opcionales", "Optional analyses", "Analyses facultatives", "Optionale Analysen", "Análises opcionais", "Análises opcionais", "Analisi facoltative", "İsteğe bağlı analizler", "可选分析", "可選分析", "オプションの分析", "선택적 분석"],
+  ["El grupo debe ser una columna categórica.", "The group must be a categorical column.", "Le groupe doit être une colonne catégorielle.", "Die Gruppe muss eine kategoriale Spalte sein.", "O grupo deve ser uma coluna categórica.", "O grupo deve ser uma coluna categórica.", "Il gruppo deve essere una colonna categoriale.", "Grup kategorik bir sütun olmalıdır.", "分组必须是分类列。", "分組必須是分類列。", "グループはカテゴリ列である必要があります。", "그룹은 범주형 열이어야 합니다."],
+  ["Todas las métricas deben ser numéricas.", "All metrics must be numeric.", "Toutes les mesures doivent être numériques.", "Alle Kennzahlen müssen numerisch sein.", "Todas as métricas devem ser numéricas.", "Todas as métricas devem ser numéricas.", "Tutte le metriche devono essere numeriche.", "Tüm metrikler sayısal olmalıdır.", "所有指标都必须是数值型。", "所有指標都必須是數值型。", "すべてのメトリクスは数値である必要があります。", "모든 지표는 숫자여야 합니다."],
+  ["El rol temporal debe ser una fecha, hora o timestamp.", "The time role must be a date, time, or timestamp.", "Le rôle temporel doit être une date, une heure ou un horodatage.", "Die Zeitrolle muss ein Datum, eine Uhrzeit oder ein Zeitstempel sein.", "O papel temporal deve ser uma data, hora ou timestamp.", "O papel temporal deve ser uma data, hora ou timestamp.", "Il ruolo temporale deve essere una data, un'ora o un timestamp.", "Zaman rolü bir tarih, saat veya zaman damgası olmalıdır.", "时间角色必须是日期、时间或时间戳。", "時間角色必須是日期、時間或時間戳。", "時間の役割は、日付、時刻、またはタイムスタンプである必要があります。", "시간 역할은 날짜, 시간 또는 타임스탬프여야 합니다."],
+  ["Todas las métricas temporales deben ser numéricas.", "All temporal metrics must be numeric.", "Toutes les mesures temporelles doivent être numériques.", "Alle zeitlichen Kennzahlen müssen numerisch sein.", "Todas as métricas temporais devem ser numéricas.", "Todas as métricas temporais devem ser numéricas.", "Tutte le metriche temporali devono essere numeriche.", "Tüm zamansal metrikler sayısal olmalıdır.", "所有时间指标都必须是数值型。", "所有時間指標都必須是數值型。", "すべての時間的メトリクスは数値である必要があります。", "모든 시간 측정항목은 숫자여야 합니다."],
+  ["Selecciona al menos una relación o rollup que conecte los datos.", "Select at least one relationship or rollup connecting the data.", "Sélectionnez au moins une relation ou agrégation reliant les données.", "Wähle mindestens eine Beziehung oder ein Rollup, das die Daten verbindet.", "Selecione pelo menos uma relação ou rollup que ligue os dados.", "Selecione pelo menos uma relação ou rollup que conecte os dados.", "Seleziona almeno una relazione o rollup che colleghi i dati.", "Verileri bağlayan en az bir ilişki veya toplama seçin.", "至少选择一个连接数据的关系或汇总。", "至少選擇一個連線資料的關係或彙總。", "データを接続する関係またはロールアップを少なくとも1つ選択します。", "데이터를 연결하는 관계 또는 롤업을 하나 이상 선택하세요."],
   // Report-type descriptions are rendered from the shared option catalogue.
-  ["Exploración adaptativa y verificable de los datos seleccionados.", "Adaptive, verifiable exploration of the selected data.", "Exploration adaptative et vérifiable des données sélectionnées.", "Adaptive, überprüfbare Erkundung der ausgewählten Daten.", "Exploração adaptativa e verificável dos dados selecionados.", "Exploração adaptativa e verificável dos dados selecionados.", "Esplorazione adattiva e verificabile dei dati selezionati.", "Seçilen verilerin uyarlanabilir ve doğrulanabilir keşfi.", "对所选数据的自适应且可验证的探索。"],
-  ["Cobertura, missingness, duplicados, validez e integridad del conjunto.", "Coverage, missingness, duplicates, validity, and dataset integrity.", "Couverture, valeurs manquantes, doublons, validité et intégrité du jeu de données.", "Abdeckung, fehlende Werte, Duplikate, Gültigkeit und Integrität des Datensatzes.", "Cobertura, valores em falta, duplicados, validade e integridade do conjunto.", "Cobertura, dados ausentes, duplicatas, validade e integridade do conjunto.", "Copertura, valori mancanti, duplicati, validità e integrità del set di dati.", "Kapsam, eksik veriler, kopyalar, geçerlilik ve veri kümesi bütünlüğü.", "覆盖、缺失、重复、有效性及数据集完整性。"],
-  ["Compara grupos con magnitudes de efecto, incertidumbre y corrección de multiplicidad.", "Compare groups with effect sizes, uncertainty, and multiplicity correction.", "Comparez les groupes avec tailles d’effet, incertitude et correction de la multiplicité.", "Vergleiche Gruppen mit Effektstärken, Unsicherheit und Korrektur für multiples Testen.", "Compare grupos com magnitudes de efeito, incerteza e correção de multiplicidade.", "Compare grupos com tamanhos de efeito, incerteza e correção de multiplicidade.", "Confronta i gruppi con dimensioni dell’effetto, incertezza e correzione per molteplicità.", "Grupları etki büyüklükleri, belirsizlik ve çoklu test düzeltmesiyle karşılaştırın.", "使用效应量、不确定性和多重性校正来比较各组。"],
-  ["Detecta tendencia, estacionalidad, drift y cambios de régimen.", "Detect trends, seasonality, drift, and regime changes.", "Détectez les tendances, la saisonnalité, la dérive et les changements de régime.", "Erkenne Trends, Saisonalität, Drift und Regimewechsel.", "Detete tendências, sazonalidade, drift e mudanças de regime.", "Detecte tendências, sazonalidade, drift e mudanças de regime.", "Rileva tendenze, stagionalità, drift e cambi di regime.", "Eğilimleri, mevsimselliği, kaymayı ve rejim değişikliklerini algılayın.", "检测趋势、季节性、漂移和状态变化。"],
-  ["Audita joins, huérfanos, ciclos, cardinalidad y redes entre bases.", "Audit joins, orphans, cycles, cardinality, and networks across databases.", "Auditez les jointures, orphelins, cycles, cardinalité et réseaux entre bases.", "Prüfe Joins, verwaiste Datensätze, Zyklen, Kardinalität und Netzwerke zwischen Datenbanken.", "Audite joins, órfãos, ciclos, cardinalidade e redes entre bases.", "Audite joins, órfãos, ciclos, cardinalidade e redes entre bancos.", "Verifica join, orfani, cicli, cardinalità e reti tra database.", "Veritabanları arasındaki birleştirmeleri, yetimleri, döngüleri, kardinaliteyi ve ağları denetleyin.", "审计联接、孤儿、环、基数及数据库间的网络。"],
-  ["Estima asociaciones bajo un contrato causal explícito y supuestos visibles.", "Estimate associations under an explicit causal contract and visible assumptions.", "Estimez les associations selon un contrat causal explicite et des hypothèses visibles.", "Schätze Zusammenhänge unter einem expliziten kausalen Vertrag und sichtbaren Annahmen.", "Estime associações sob um contrato causal explícito e pressupostos visíveis.", "Estime associações sob um contrato causal explícito e suposições visíveis.", "Stima le associazioni secondo un contratto causale esplicito e ipotesi visibili.", "Açık bir nedensel sözleşme ve görünür varsayımlar altında ilişkileri tahmin edin.", "在明确的因果契约和可见假设下估计关联。"],
-  ["Analiza duración, evento, censura, retención y riesgo relativo.", "Analyze duration, events, censoring, retention, and relative risk.", "Analysez la durée, les événements, la censure, la rétention et le risque relatif.", "Analysiere Dauer, Ereignisse, Zensierung, Bindung und relatives Risiko.", "Analise duração, eventos, censura, retenção e risco relativo.", "Analise duração, eventos, censura, retenção e risco relativo.", "Analizza durata, eventi, censura, retention e rischio relativo.", "Süreyi, olayları, sansürü, elde tutmayı ve göreli riski analiz edin.", "分析持续时间、事件、删失、留存和相对风险。"],
-  ["Audita PII, exposición, metadatos y disponibilidad de archivos.", "Audit PII, exposure, metadata, and file availability.", "Auditez les PII, l’exposition, les métadonnées et la disponibilité des fichiers.", "Prüfe personenbezogene Daten, Offenlegung, Metadaten und Dateiverfügbarkeit.", "Audite PII, exposição, metadados e disponibilidade de ficheiros.", "Audite PII, exposição, metadados e disponibilidade de arquivos.", "Verifica PII, esposizione, metadati e disponibilità dei file.", "Kişisel verileri, maruziyeti, meta verileri ve dosya kullanılabilirliğini denetleyin.", "审计PII、暴露、元数据和文件可用性。"],
-  ["Reconstruye lineage, dependencias, divergencias y totales.", "Reconstruct lineage, dependencies, divergences, and totals.", "Reconstruisez la traçabilité, les dépendances, les divergences et les totaux.", "Rekonstruiere Herkunft, Abhängigkeiten, Abweichungen und Summen.", "Reconstrua a linhagem, dependências, divergências e totais.", "Reconstrua a linhagem, dependências, divergências e totais.", "Ricostruisci lineage, dipendenze, divergenze e totali.", "Soy kütüğünü, bağımlılıkları, farklılıkları ve toplamları yeniden oluşturun.", "重建数据血缘、依赖、差异和合计。"],
+  ["Exploración adaptativa y verificable de los datos seleccionados.", "Adaptive, verifiable exploration of the selected data.", "Exploration adaptative et vérifiable des données sélectionnées.", "Adaptive, überprüfbare Erkundung der ausgewählten Daten.", "Exploração adaptativa e verificável dos dados selecionados.", "Exploração adaptativa e verificável dos dados selecionados.", "Esplorazione adattiva e verificabile dei dati selezionati.", "Seçilen verilerin uyarlanabilir ve doğrulanabilir keşfi.", "对所选数据的自适应且可验证的探索。", "對所選資料的自適應且可驗證的探索。", "選択したデータの適応的で検証可能な探索。", "선택된 데이터에 대한 적응적이고 검증 가능한 탐색."],
+  ["Cobertura, missingness, duplicados, validez e integridad del conjunto.", "Coverage, missingness, duplicates, validity, and dataset integrity.", "Couverture, valeurs manquantes, doublons, validité et intégrité du jeu de données.", "Abdeckung, fehlende Werte, Duplikate, Gültigkeit und Integrität des Datensatzes.", "Cobertura, valores em falta, duplicados, validade e integridade do conjunto.", "Cobertura, dados ausentes, duplicatas, validade e integridade do conjunto.", "Copertura, valori mancanti, duplicati, validità e integrità del set di dati.", "Kapsam, eksik veriler, kopyalar, geçerlilik ve veri kümesi bütünlüğü.", "覆盖、缺失、重复、有效性及数据集完整性。", "覆蓋、缺失、重複、有效性及資料集完整性。", "カバレッジ、欠損、重複、有効性、およびデータセットの整合性。", "적용 범위, 누락, 중복, 유효성 및 데이터 세트 무결성."],
+  ["Compara grupos con magnitudes de efecto, incertidumbre y corrección de multiplicidad.", "Compare groups with effect sizes, uncertainty, and multiplicity correction.", "Comparez les groupes avec tailles d’effet, incertitude et correction de la multiplicité.", "Vergleiche Gruppen mit Effektstärken, Unsicherheit und Korrektur für multiples Testen.", "Compare grupos com magnitudes de efeito, incerteza e correção de multiplicidade.", "Compare grupos com tamanhos de efeito, incerteza e correção de multiplicidade.", "Confronta i gruppi con dimensioni dell’effetto, incertezza e correzione per molteplicità.", "Grupları etki büyüklükleri, belirsizlik ve çoklu test düzeltmesiyle karşılaştırın.", "使用效应量、不确定性和多重性校正来比较各组。", "使用效應量、不確定性和多重性校正來比較各組。", "効果の大きさ、不確実性、多重度補正を使用してグループを比較します。", "효과 크기, 불확실성, 다중성 보정을 사용하여 그룹을 비교합니다."],
+  ["Detecta tendencia, estacionalidad, drift y cambios de régimen.", "Detect trends, seasonality, drift, and regime changes.", "Détectez les tendances, la saisonnalité, la dérive et les changements de régime.", "Erkenne Trends, Saisonalität, Drift und Regimewechsel.", "Detete tendências, sazonalidade, drift e mudanças de regime.", "Detecte tendências, sazonalidade, drift e mudanças de regime.", "Rileva tendenze, stagionalità, drift e cambi di regime.", "Eğilimleri, mevsimselliği, kaymayı ve rejim değişikliklerini algılayın.", "检测趋势、季节性、漂移和状态变化。", "檢測趨勢、季節性、漂移和狀態變化。", "トレンド、季節性、ドリフト、体制の変化を検出します。", "추세, 계절성, 드리프트 및 체제 변화를 감지합니다."],
+  ["Audita joins, huérfanos, ciclos, cardinalidad y redes entre bases.", "Audit joins, orphans, cycles, cardinality, and networks across databases.", "Auditez les jointures, orphelins, cycles, cardinalité et réseaux entre bases.", "Prüfe Joins, verwaiste Datensätze, Zyklen, Kardinalität und Netzwerke zwischen Datenbanken.", "Audite joins, órfãos, ciclos, cardinalidade e redes entre bases.", "Audite joins, órfãos, ciclos, cardinalidade e redes entre bancos.", "Verifica join, orfani, cicli, cardinalità e reti tra database.", "Veritabanları arasındaki birleştirmeleri, yetimleri, döngüleri, kardinaliteyi ve ağları denetleyin.", "审计联接、孤儿、环、基数及数据库间的网络。", "審計聯接、孤兒、環、基數及資料庫間的網路。", "データベース間の結合、孤立、サイクル、カーディナリティ、およびネットワークを監査します。", "데이터베이스 전체에서 조인, 고아, 주기, 카디널리티 및 네트워크를 감사합니다."],
+  ["Estima asociaciones bajo un contrato causal explícito y supuestos visibles.", "Estimate associations under an explicit causal contract and visible assumptions.", "Estimez les associations selon un contrat causal explicite et des hypothèses visibles.", "Schätze Zusammenhänge unter einem expliziten kausalen Vertrag und sichtbaren Annahmen.", "Estime associações sob um contrato causal explícito e pressupostos visíveis.", "Estime associações sob um contrato causal explícito e suposições visíveis.", "Stima le associazioni secondo un contratto causale esplicito e ipotesi visibili.", "Açık bir nedensel sözleşme ve görünür varsayımlar altında ilişkileri tahmin edin.", "在明确的因果契约和可见假设下估计关联。", "在明確的因果契約和可見假設下估計關聯。", "明示的な因果関係の契約と目に見える仮定に基づいて関連性を推定します。", "명시적인 인과관계 계약과 가시적인 가정 하에서 연관성을 추정합니다."],
+  ["Analiza duración, evento, censura, retención y riesgo relativo.", "Analyze duration, events, censoring, retention, and relative risk.", "Analysez la durée, les événements, la censure, la rétention et le risque relatif.", "Analysiere Dauer, Ereignisse, Zensierung, Bindung und relatives Risiko.", "Analise duração, eventos, censura, retenção e risco relativo.", "Analise duração, eventos, censura, retenção e risco relativo.", "Analizza durata, eventi, censura, retention e rischio relativo.", "Süreyi, olayları, sansürü, elde tutmayı ve göreli riski analiz edin.", "分析持续时间、事件、删失、留存和相对风险。", "分析持續時間、事件、刪失、留存和相對風險。", "期間、イベント、打ち切り、保持、相対リスクを分析します。", "기간, 이벤트, 검열, 유지 및 상대적 위험을 분석합니다."],
+  ["Audita PII, exposición, metadatos y disponibilidad de archivos.", "Audit PII, exposure, metadata, and file availability.", "Auditez les PII, l’exposition, les métadonnées et la disponibilité des fichiers.", "Prüfe personenbezogene Daten, Offenlegung, Metadaten und Dateiverfügbarkeit.", "Audite PII, exposição, metadados e disponibilidade de ficheiros.", "Audite PII, exposição, metadados e disponibilidade de arquivos.", "Verifica PII, esposizione, metadati e disponibilità dei file.", "Kişisel verileri, maruziyeti, meta verileri ve dosya kullanılabilirliğini denetleyin.", "审计PII、暴露、元数据和文件可用性。", "審計PII、暴露、後設資料和檔案可用性。", "PII、公開、メタデータ、およびファイルの可用性を監査します。", "PII, 노출, 메타데이터 및 파일 가용성을 감사합니다."],
+  ["Reconstruye lineage, dependencias, divergencias y totales.", "Reconstruct lineage, dependencies, divergences, and totals.", "Reconstruisez la traçabilité, les dépendances, les divergences et les totaux.", "Rekonstruiere Herkunft, Abhängigkeiten, Abweichungen und Summen.", "Reconstrua a linhagem, dependências, divergências e totais.", "Reconstrua a linhagem, dependências, divergências e totais.", "Ricostruisci lineage, dipendenze, divergenze e totali.", "Soy kütüğünü, bağımlılıkları, farklılıkları ve toplamları yeniden oluşturun.", "重建数据血缘、依赖、差异和合计。", "重建資料血緣、依賴、差異和合計。", "系統、依存関係、分岐、合計を再構築します。", "계보, 종속성, 차이 및 합계를 재구성합니다."],
   // Deterministic eligibility messages returned by the shared validator.
-  ["El grupo debe ser select, status o checkbox; las categorías multivalor y de personas requieren un mapeo explícito aún no configurado.", "The group must be a select, status, or checkbox; multi-value and person categories require an explicit mapping that is not configured yet.", "Le groupe doit être un select, un statut ou une case à cocher ; les catégories multivaluées et de personnes nécessitent un mappage explicite encore non configuré.", "Die Gruppe muss ein Select, Status oder Kontrollkästchen sein; Mehrwert- und Personenkategorien benötigen eine noch nicht konfigurierte explizite Zuordnung.", "O grupo deve ser um select, status ou checkbox; as categorias multivalor e de pessoas requerem um mapeamento explícito ainda não configurado.", "O grupo deve ser um select, status ou checkbox; categorias multivaloradas e de pessoas exigem um mapeamento explícito ainda não configurado.", "Il gruppo deve essere un select, uno status o una casella; le categorie multivalore e persona richiedono una mappatura esplicita non ancora configurata.", "Grup select, status veya onay kutusu olmalıdır; çok değerli ve kişi kategorileri henüz yapılandırılmamış açık bir eşleme gerektirir.", "分组必须是select、status或checkbox；多值和人员类别需要尚未配置的显式映射。"],
-  ["El resultado debe ser numérico.", "The outcome must be numeric.", "Le résultat doit être numérique.", "Das Ergebnis muss numerisch sein.", "O resultado deve ser numérico.", "O resultado deve ser numérico.", "L’outcome deve essere numerico.", "Sonuç sayısal olmalıdır.", "结果必须是数值型。"],
-  ["El tratamiento debe ser binario numérico o checkbox; las categorías requieren un mapeo explícito aún no configurado.", "The treatment must be binary numeric or a checkbox; categories require an explicit mapping that is not configured yet.", "Le traitement doit être numérique binaire ou une case à cocher ; les catégories nécessitent un mappage explicite encore non configuré.", "Die Behandlung muss binär numerisch oder ein Kontrollkästchen sein; Kategorien benötigen eine noch nicht konfigurierte explizite Zuordnung.", "O tratamento deve ser numérico binário ou checkbox; as categorias requerem um mapeamento explícito ainda não configurado.", "O tratamento deve ser numérico binário ou checkbox; categorias exigem um mapeamento explícito ainda não configurado.", "Il trattamento deve essere numerico binario o una casella; le categorie richiedono una mappatura esplicita non ancora configurata.", "Tedavi ikili sayısal veya onay kutusu olmalıdır; kategoriler henüz yapılandırılmamış açık bir eşleme gerektirir.", "处理必须是二值数值或checkbox；类别需要尚未配置的显式映射。"],
-  ["Todos los confusores deben ser numéricos.", "All confounders must be numeric.", "Tous les facteurs de confusion doivent être numériques.", "Alle Confounder müssen numerisch sein.", "Todos os confundidores devem ser numéricos.", "Todos os confundidores devem ser numéricos.", "Tutti i confondenti devono essere numerici.", "Tüm karıştırıcı değişkenler sayısal olmalıdır.", "所有混杂因素都必须是数值型。"],
-  ["La duración debe ser numérica o temporal.", "Duration must be numeric or temporal.", "La durée doit être numérique ou temporelle.", "Die Dauer muss numerisch oder zeitbezogen sein.", "A duração deve ser numérica ou temporal.", "A duração deve ser numérica ou temporal.", "La durata deve essere numerica o temporale.", "Süre sayısal veya zamansal olmalıdır.", "持续时间必须是数值型或时间型。"],
-  ["El evento debe ser binario numérico o checkbox; las categorías requieren un mapeo explícito aún no configurado.", "The event must be binary numeric or a checkbox; categories require an explicit mapping that is not configured yet.", "L’événement doit être numérique binaire ou une case à cocher ; les catégories nécessitent un mappage explicite encore non configuré.", "Das Ereignis muss binär numerisch oder ein Kontrollkästchen sein; Kategorien benötigen eine noch nicht konfigurierte explizite Zuordnung.", "O evento deve ser numérico binário ou checkbox; as categorias requerem um mapeamento explícito ainda não configurado.", "O evento deve ser numérico binário ou checkbox; categorias exigem um mapeamento explícito ainda não configurado.", "L’evento deve essere numerico binario o una casella; le categorie richiedono una mappatura esplicita non ancora configurata.", "Olay ikili sayısal veya onay kutusu olmalıdır; kategoriler henüz yapılandırılmamış açık bir eşleme gerektirir.", "事件必须是二值数值或checkbox；类别需要尚未配置的显式映射。"],
+  ["El grupo debe ser select, status o checkbox; las categorías multivalor y de personas requieren un mapeo explícito aún no configurado.", "The group must be a select, status, or checkbox; multi-value and person categories require an explicit mapping that is not configured yet.", "Le groupe doit être un select, un statut ou une case à cocher ; les catégories multivaluées et de personnes nécessitent un mappage explicite encore non configuré.", "Die Gruppe muss ein Select, Status oder Kontrollkästchen sein; Mehrwert- und Personenkategorien benötigen eine noch nicht konfigurierte explizite Zuordnung.", "O grupo deve ser um select, status ou checkbox; as categorias multivalor e de pessoas requerem um mapeamento explícito ainda não configurado.", "O grupo deve ser um select, status ou checkbox; categorias multivaloradas e de pessoas exigem um mapeamento explícito ainda não configurado.", "Il gruppo deve essere un select, uno status o una casella; le categorie multivalore e persona richiedono una mappatura esplicita non ancora configurata.", "Grup select, status veya onay kutusu olmalıdır; çok değerli ve kişi kategorileri henüz yapılandırılmamış açık bir eşleme gerektirir.", "分组必须是select、status或checkbox；多值和人员类别需要尚未配置的显式映射。", "分組必須是select、status或checkbox；多值和人員類別需要尚未配置的顯式對映。", "グループは選択、ステータス、またはチェックボックスである必要があります。複数値カテゴリと個人カテゴリには、まだ構成されていない明示的なマッピングが必要です。", "그룹은 선택, 상태 또는 확인란이어야 합니다. 다중 값 및 개인 범주에는 아직 구성되지 않은 명시적 매핑이 필요합니다."],
+  ["El resultado debe ser numérico.", "The outcome must be numeric.", "Le résultat doit être numérique.", "Das Ergebnis muss numerisch sein.", "O resultado deve ser numérico.", "O resultado deve ser numérico.", "L’outcome deve essere numerico.", "Sonuç sayısal olmalıdır.", "结果必须是数值型。", "結果必須是數值型。", "結果は数値でなければなりません。", "결과는 숫자여야 합니다."],
+  ["El tratamiento debe ser binario numérico o checkbox; las categorías requieren un mapeo explícito aún no configurado.", "The treatment must be binary numeric or a checkbox; categories require an explicit mapping that is not configured yet.", "Le traitement doit être numérique binaire ou une case à cocher ; les catégories nécessitent un mappage explicite encore non configuré.", "Die Behandlung muss binär numerisch oder ein Kontrollkästchen sein; Kategorien benötigen eine noch nicht konfigurierte explizite Zuordnung.", "O tratamento deve ser numérico binário ou checkbox; as categorias requerem um mapeamento explícito ainda não configurado.", "O tratamento deve ser numérico binário ou checkbox; categorias exigem um mapeamento explícito ainda não configurado.", "Il trattamento deve essere numerico binario o una casella; le categorie richiedono una mappatura esplicita non ancora configurata.", "Tedavi ikili sayısal veya onay kutusu olmalıdır; kategoriler henüz yapılandırılmamış açık bir eşleme gerektirir.", "处理必须是二值数值或checkbox；类别需要尚未配置的显式映射。", "處理必須是二值數值或checkbox；類別需要尚未配置的顯式對映。", "処理は2進数またはチェックボックスである必要があります。カテゴリには、まだ構成されていない明示的なマッピングが必要です。", "처리 방법은 이진수 또는 확인란이어야 합니다. 카테고리에는 아직 구성되지 않은 명시적 매핑이 필요합니다."],
+  ["Todos los confusores deben ser numéricos.", "All confounders must be numeric.", "Tous les facteurs de confusion doivent être numériques.", "Alle Confounder müssen numerisch sein.", "Todos os confundidores devem ser numéricos.", "Todos os confundidores devem ser numéricos.", "Tutti i confondenti devono essere numerici.", "Tüm karıştırıcı değişkenler sayısal olmalıdır.", "所有混杂因素都必须是数值型。", "所有混雜因素都必須是數值型。", "すべての交絡因子は数値でなければなりません。", "모든 혼란변수는 숫자여야 합니다."],
+  ["La duración debe ser numérica o temporal.", "Duration must be numeric or temporal.", "La durée doit être numérique ou temporelle.", "Die Dauer muss numerisch oder zeitbezogen sein.", "A duração deve ser numérica ou temporal.", "A duração deve ser numérica ou temporal.", "La durata deve essere numerica o temporale.", "Süre sayısal veya zamansal olmalıdır.", "持续时间必须是数值型或时间型。", "持續時間必須是數值型或時間型。", "期間は数値または一時的なものでなければなりません。", "기간은 숫자 또는 시간이어야 합니다."],
+  ["El evento debe ser binario numérico o checkbox; las categorías requieren un mapeo explícito aún no configurado.", "The event must be binary numeric or a checkbox; categories require an explicit mapping that is not configured yet.", "L’événement doit être numérique binaire ou une case à cocher ; les catégories nécessitent un mappage explicite encore non configuré.", "Das Ereignis muss binär numerisch oder ein Kontrollkästchen sein; Kategorien benötigen eine noch nicht konfigurierte explizite Zuordnung.", "O evento deve ser numérico binário ou checkbox; as categorias requerem um mapeamento explícito ainda não configurado.", "O evento deve ser numérico binário ou checkbox; categorias exigem um mapeamento explícito ainda não configurado.", "L’evento deve essere numerico binario o una casella; le categorie richiedono una mappatura esplicita non ancora configurata.", "Olay ikili sayısal veya onay kutusu olmalıdır; kategoriler henüz yapılandırılmamış açık bir eşleme gerektirir.", "事件必须是二值数值或checkbox；类别需要尚未配置的显式映射。", "事件必須是二值數值或checkbox；類別需要尚未配置的顯式對映。", "イベントはバイナリ数値またはチェックボックスである必要があります。カテゴリには、まだ構成されていない明示的なマッピングが必要です。", "이벤트는 이진수이거나 확인란이어야 합니다. 카테고리에는 아직 구성되지 않은 명시적 매핑이 필요합니다."],
   // Validation errors from request normalization, surfaced by UI error notices.
-  ["La petición de investigación no es válida.", "The research request is invalid.", "La demande de recherche n’est pas valide.", "Die Forschungsanfrage ist ungültig.", "O pedido de investigação não é válido.", "A solicitação de pesquisa não é válida.", "La richiesta di ricerca non è valida.", "Araştırma isteği geçersiz.", "研究请求无效。"],
-  ["La investigación necesita una base de datos.", "Research needs a database.", "La recherche nécessite une base de données.", "Die Recherche benötigt eine Datenbank.", "A investigação precisa de uma base de dados.", "A pesquisa precisa de um banco de dados.", "La ricerca richiede un database.", "Araştırma için bir veritabanı gerekir.", "研究需要一个数据库。"],
-  ["La investigación necesita un objetivo.", "Research needs an objective.", "La recherche nécessite un objectif.", "Die Recherche benötigt ein Ziel.", "A investigação precisa de um objetivo.", "A pesquisa precisa de um objetivo.", "La ricerca richiede un obiettivo.", "Araştırma için bir amaç gerekir.", "研究需要一个目标。"],
-  ["El objetivo de investigación supera el límite de 20.000 caracteres.", "The research objective exceeds the 20,000-character limit.", "L’objectif de recherche dépasse la limite de 20 000 caractères.", "Das Forschungsziel überschreitet das Limit von 20.000 Zeichen.", "O objetivo de investigação excede o limite de 20.000 caracteres.", "O objetivo de pesquisa excede o limite de 20.000 caracteres.", "L’obiettivo di ricerca supera il limite di 20.000 caratteri.", "Araştırma amacı 20.000 karakter sınırını aşıyor.", "研究目标超过20,000个字符的限制。"],
-  ["El modelo de investigación no es válido.", "The research model is invalid.", "Le modèle de recherche n’est pas valide.", "Das Forschungsmodell ist ungültig.", "O modelo de investigação não é válido.", "O modelo de pesquisa não é válido.", "Il modello di ricerca non è valido.", "Araştırma modeli geçersiz.", "研究模型无效。"],
-  ["El objetivo debe tener entre 1 y 20.000 caracteres.", "The objective must be between 1 and 20,000 characters.", "L’objectif doit comporter entre 1 et 20 000 caractères.", "Das Ziel muss zwischen 1 und 20.000 Zeichen lang sein.", "O objetivo deve ter entre 1 e 20.000 caracteres.", "O objetivo deve ter entre 1 e 20.000 caracteres.", "L’obiettivo deve contenere tra 1 e 20.000 caratteri.", "Amaç 1 ile 20.000 karakter arasında olmalıdır.", "目标长度必须在1到20,000个字符之间。"],
-  ["Selecciona entre 1 y 100 bases de datos.", "Select between 1 and 100 databases.", "Sélectionnez entre 1 et 100 bases de données.", "Wähle zwischen 1 und 100 Datenbanken.", "Selecione entre 1 e 100 bases de dados.", "Selecione entre 1 e 100 bancos de dados.", "Seleziona da 1 a 100 database.", "1 ile 100 arasında veritabanı seçin.", "选择1到100个数据库。"],
-  ["Guardar a notas", "Save to notes", "Enregistrer dans les notes", "In Notizen speichern", "Guardar nas notas", "Salvar nas notas", "Salva nelle note", "Notlara kaydet", "保存到笔记"],
-  ["No hay evidencia registrada.", "No evidence recorded.", "Aucune preuve enregistrée.", "Keine Evidenz erfasst.", "Não há evidências registadas.", "Nenhuma evidência registrada.", "Nessuna evidenza registrata.", "Kayıtlı kanıt yok.", "没有已记录的证据。"],
-  ["Informe copiado.", "Report copied.", "Rapport copié.", "Bericht kopiert.", "Relatório copiado.", "Relatório copiado.", "Report copiato.", "Rapor kopyalandı.", "报告已复制。"],
-  ["Informe guardado en notas.", "Report saved to notes.", "Rapport enregistré dans les notes.", "Bericht in Notizen gespeichert.", "Relatório guardado nas notas.", "Relatório salvo nas notas.", "Report salvato nelle note.", "Rapor notlara kaydedildi.", "报告已保存到笔记。"],
-  ["Incluir snapshot bruto en el ZIP reproducible", "Include raw snapshot in the reproducible ZIP", "Inclure l’instantané brut dans le ZIP reproductible", "Rohdaten-Snapshot in das reproduzierbare ZIP aufnehmen", "Incluir snapshot bruto no ZIP reprodutível", "Incluir snapshot bruto no ZIP reproduzível", "Includi lo snapshot grezzo nello ZIP riproducibile", "Ham anlık görüntüyü yeniden üretilebilir ZIP’e ekle", "在可复现ZIP中包含原始快照"],
-  ["Investiga tus bases de datos con evidencia trazable y un lector completo.", "Research your databases with traceable evidence and a complete reader.", "Explorez vos bases de données avec des preuves traçables et un lecteur complet.", "Untersuche deine Datenbanken mit nachvollziehbarer Evidenz und einem vollständigen Reader.", "Investigue as suas bases de dados com evidência rastreável e um leitor completo.", "Pesquise seus bancos de dados com evidências rastreáveis e um leitor completo.", "Analizza i tuoi database con evidenze tracciabili e un lettore completo.", "Veritabanlarınızı izlenebilir kanıtlar ve eksiksiz bir okuyucuyla araştırın.", "用可追溯的证据和完整的阅读器研究你的数据库。"],
-  ["Buscar entre tus informes", "Search your reports", "Rechercher dans vos rapports", "Berichte durchsuchen", "Pesquisar nos seus relatórios", "Pesquisar nos seus relatórios", "Cerca nei tuoi report", "Raporlarınızda ara", "在你的报告中搜索"],
-  ["Filtrar por lectura", "Filter by read status", "Filtrer par état de lecture", "Nach Lesestatus filtern", "Filtrar por estado de leitura", "Filtrar por status de leitura", "Filtra per stato di lettura", "Okunma durumuna göre filtrele", "按阅读状态筛选"],
-  ["No leídos", "Unread", "Non lus", "Ungelesen", "Não lidos", "Não lidos", "Non letti", "Okunmamış", "未读"],
-  ["Leídos", "Read", "Lus", "Gelesen", "Lidos", "Lidos", "Letti", "Okunmuş", "已读"],
-  ["No leído", "Unread", "Non lu", "Ungelesen", "Não lido", "Não lido", "Non letto", "Okunmamış", "未读"],
-  ["Marcar leído", "Mark as read", "Marquer comme lu", "Als gelesen markieren", "Marcar como lido", "Marcar como lido", "Segna come letto", "Okundu olarak işaretle", "标记为已读"],
-  ["Ningún informe coincide con los filtros.", "No reports match the filters.", "Aucun rapport ne correspond aux filtres.", "Keine Berichte entsprechen den Filtern.", "Nenhum relatório corresponde aos filtros.", "Nenhum relatório corresponde aos filtros.", "Nessun report corrisponde ai filtri.", "Filtrelerle eşleşen rapor yok.", "没有报告符合筛选条件。"],
-  ["Aún no hay informes. Crea el primero y quedará aquí listo para leerse.", "There are no reports yet. Create the first one and it will appear here ready to read.", "Il n’y a pas encore de rapports. Créez le premier : il apparaîtra ici, prêt à être lu.", "Noch keine Berichte. Erstelle den ersten; er erscheint hier zum Lesen.", "Ainda não há relatórios. Crie o primeiro e ficará aqui pronto para ler.", "Ainda não há relatórios. Crie o primeiro e ele aparecerá aqui pronto para leitura.", "Non ci sono ancora report. Crea il primo e apparirà qui pronto da leggere.", "Henüz rapor yok. İlkini oluşturun; okunmaya hazır şekilde burada görünecek.", "还没有报告。创建第一个，它就会出现在这里供你阅读。"],
-  ["Define el objetivo; las opciones avanzadas son opcionales.", "Define the objective; advanced options are optional.", "Définissez l’objectif ; les options avancées sont facultatives.", "Lege das Ziel fest; die erweiterten Optionen sind optional.", "Defina o objetivo; as opções avançadas são opcionais.", "Defina o objetivo; as opções avançadas são opcionais.", "Definisci l’obiettivo; le opzioni avanzate sono facoltative.", "Amacı tanımlayın; gelişmiş seçenekler isteğe bağlıdır.", "定义目标；高级选项是可选的。"],
-  ["Filtro de filas y columnas", "Row and column filter", "Filtre de lignes et de colonnes", "Zeilen- und Spaltenfilter", "Filtro de linhas e colunas", "Filtro de linhas e colunas", "Filtro di righe e colonne", "Satır ve sütun filtresi", "行和列筛选"],
-  ["Prepara y edita la estructura antes de encolar.", "Prepare and edit the structure before queueing.", "Préparez et modifiez la structure avant la mise en file.", "Bereite die Struktur vor und bearbeite sie vor dem Einreihen.", "Prepare e edite a estrutura antes de colocar na fila.", "Prepare e edite a estrutura antes de colocar na fila.", "Prepara e modifica la struttura prima di accodare.", "Kuyruğa almadan önce yapıyı hazırlayın ve düzenleyin.", "在加入队列前准备并编辑结构。"],
-  ["Preparar automáticamente", "Prepare automatically", "Préparer automatiquement", "Automatisch vorbereiten", "Preparar automaticamente", "Preparar automaticamente", "Prepara automaticamente", "Otomatik hazırla", "自动准备"],
-  ["Usar automático", "Use automatic mode", "Utiliser le mode automatique", "Automatik verwenden", "Usar modo automático", "Usar modo automático", "Usa modalità automatica", "Otomatik modu kullan", "使用自动模式"],
-  ["Resultado agregado disponible; los valores de celdas están redactados.", "Aggregated result available; cell values are redacted.", "Résultat agrégé disponible ; les valeurs des cellules sont masquées.", "Aggregiertes Ergebnis verfügbar; Zellwerte sind geschwärzt.", "Resultado agregado disponível; os valores das células estão ocultados.", "Resultado agregado disponível; os valores das células estão ocultos.", "Risultato aggregato disponibile; i valori delle celle sono oscurati.", "Toplu sonuç mevcut; hücre değerleri gizlenmiştir.", "聚合结果可用；单元格值已脱敏。"],
-  ["Afirmación respaldada por evidencia determinista; valores sensibles omitidos.", "Claim supported by deterministic evidence; sensitive values omitted.", "Affirmation étayée par des preuves déterministes ; valeurs sensibles omises.", "Aussage durch deterministische Evidenz gestützt; sensible Werte ausgelassen.", "Afirmação sustentada por evidência determinística; valores sensíveis omitidos.", "Afirmação sustentada por evidências determinísticas; valores sensíveis omitidos.", "Affermazione supportata da evidenze deterministiche; valori sensibili omessi.", "İddia deterministik kanıtlarla destekleniyor; hassas değerler çıkarıldı.", "论断由确定性证据支持；敏感值已省略。"],
+  ["La petición de investigación no es válida.", "The research request is invalid.", "La demande de recherche n’est pas valide.", "Die Forschungsanfrage ist ungültig.", "O pedido de investigação não é válido.", "A solicitação de pesquisa não é válida.", "La richiesta di ricerca non è valida.", "Araştırma isteği geçersiz.", "研究请求无效。", "研究請求無效。", "調査依頼は無効です。", "연구 요청이 유효하지 않습니다."],
+  ["La investigación necesita una base de datos.", "Research needs a database.", "La recherche nécessite une base de données.", "Die Recherche benötigt eine Datenbank.", "A investigação precisa de uma base de dados.", "A pesquisa precisa de um banco de dados.", "La ricerca richiede un database.", "Araştırma için bir veritabanı gerekir.", "研究需要一个数据库。", "研究需要一個數據庫。", "研究にはデータベースが必要です。", "연구에는 데이터베이스가 필요합니다."],
+  ["La investigación necesita un objetivo.", "Research needs an objective.", "La recherche nécessite un objectif.", "Die Recherche benötigt ein Ziel.", "A investigação precisa de um objetivo.", "A pesquisa precisa de um objetivo.", "La ricerca richiede un obiettivo.", "Araştırma için bir amaç gerekir.", "研究需要一个目标。", "研究需要一個目標。", "研究には目的が必要です。", "연구에는 목표가 필요합니다."],
+  ["El objetivo de investigación supera el límite de 20.000 caracteres.", "The research objective exceeds the 20,000-character limit.", "L’objectif de recherche dépasse la limite de 20 000 caractères.", "Das Forschungsziel überschreitet das Limit von 20.000 Zeichen.", "O objetivo de investigação excede o limite de 20.000 caracteres.", "O objetivo de pesquisa excede o limite de 20.000 caracteres.", "L’obiettivo di ricerca supera il limite di 20.000 caratteri.", "Araştırma amacı 20.000 karakter sınırını aşıyor.", "研究目标超过20,000个字符的限制。", "研究目標超過20,000個字元的限制。", "研究目的が20,000文字の制限を超えています。", "연구 목표가 20,000자 제한을 초과했습니다."],
+  ["El modelo de investigación no es válido.", "The research model is invalid.", "Le modèle de recherche n’est pas valide.", "Das Forschungsmodell ist ungültig.", "O modelo de investigação não é válido.", "O modelo de pesquisa não é válido.", "Il modello di ricerca non è valido.", "Araştırma modeli geçersiz.", "研究模型无效。", "研究模型無效。", "研究モデルが無効です。", "연구 모델이 유효하지 않습니다."],
+  ["El objetivo debe tener entre 1 y 20.000 caracteres.", "The objective must be between 1 and 20,000 characters.", "L’objectif doit comporter entre 1 et 20 000 caractères.", "Das Ziel muss zwischen 1 und 20.000 Zeichen lang sein.", "O objetivo deve ter entre 1 e 20.000 caracteres.", "O objetivo deve ter entre 1 e 20.000 caracteres.", "L’obiettivo deve contenere tra 1 e 20.000 caratteri.", "Amaç 1 ile 20.000 karakter arasında olmalıdır.", "目标长度必须在1到20,000个字符之间。", "目標長度必須在1到20,000個字元之間。", "目標は1 ～ 20,000文字にする必要があります。", "목표는 1~20,000자(영문 기준) 사이여야 합니다."],
+  ["Selecciona entre 1 y 100 bases de datos.", "Select between 1 and 100 databases.", "Sélectionnez entre 1 et 100 bases de données.", "Wähle zwischen 1 und 100 Datenbanken.", "Selecione entre 1 e 100 bases de dados.", "Selecione entre 1 e 100 bancos de dados.", "Seleziona da 1 a 100 database.", "1 ile 100 arasında veritabanı seçin.", "选择1到100个数据库。", "選擇1到100個數據庫。", "1 ～ 100のデータベースを選択します。", "1~100개의 데이터베이스 중에서 선택하세요."],
+  ["Guardar a notas", "Save to notes", "Enregistrer dans les notes", "In Notizen speichern", "Guardar nas notas", "Salvar nas notas", "Salva nelle note", "Notlara kaydet", "保存到笔记", "儲存到筆記", "メモに保存", "메모에 저장"],
+  ["No hay evidencia registrada.", "No evidence recorded.", "Aucune preuve enregistrée.", "Keine Evidenz erfasst.", "Não há evidências registadas.", "Nenhuma evidência registrada.", "Nessuna evidenza registrata.", "Kayıtlı kanıt yok.", "没有已记录的证据。", "沒有已記錄的證據。", "証拠は記録されていない。", "기록된 증거가 없습니다."],
+  ["Informe copiado.", "Report copied.", "Rapport copié.", "Bericht kopiert.", "Relatório copiado.", "Relatório copiado.", "Report copiato.", "Rapor kopyalandı.", "报告已复制。", "報告已複製。", "レポートがコピーされました。", "보고서가 복사되었습니다."],
+  ["Informe guardado en notas.", "Report saved to notes.", "Rapport enregistré dans les notes.", "Bericht in Notizen gespeichert.", "Relatório guardado nas notas.", "Relatório salvo nas notas.", "Report salvato nelle note.", "Rapor notlara kaydedildi.", "报告已保存到笔记。", "報告已儲存到筆記。", "レポートはノートに保存されました。", "보고서가 메모에 저장되었습니다."],
+  ["Incluir snapshot bruto en el ZIP reproducible", "Include raw snapshot in the reproducible ZIP", "Inclure l’instantané brut dans le ZIP reproductible", "Rohdaten-Snapshot in das reproduzierbare ZIP aufnehmen", "Incluir snapshot bruto no ZIP reprodutível", "Incluir snapshot bruto no ZIP reproduzível", "Includi lo snapshot grezzo nello ZIP riproducibile", "Ham anlık görüntüyü yeniden üretilebilir ZIP’e ekle", "在可复现ZIP中包含原始快照", "在可復現ZIP中包含原始快照", "生のスナップショットを再現可能な ZIP に含める", "재현 가능한 ZIP에 원시 스냅샷 포함"],
+  ["Investiga tus bases de datos con evidencia trazable y un lector completo.", "Research your databases with traceable evidence and a complete reader.", "Explorez vos bases de données avec des preuves traçables et un lecteur complet.", "Untersuche deine Datenbanken mit nachvollziehbarer Evidenz und einem vollständigen Reader.", "Investigue as suas bases de dados com evidência rastreável e um leitor completo.", "Pesquise seus bancos de dados com evidências rastreáveis e um leitor completo.", "Analizza i tuoi database con evidenze tracciabili e un lettore completo.", "Veritabanlarınızı izlenebilir kanıtlar ve eksiksiz bir okuyucuyla araştırın.", "用可追溯的证据和完整的阅读器研究你的数据库。", "用可追溯的證據和完整的閱讀器研究你的資料庫。", "追跡可能な証拠と完全なリーダーを使用してデータベースを調査します。", "추적 가능한 증거와 완전한 판독기를 사용하여 데이터베이스를 조사하십시오."],
+  ["Buscar entre tus informes", "Search your reports", "Rechercher dans vos rapports", "Berichte durchsuchen", "Pesquisar nos seus relatórios", "Pesquisar nos seus relatórios", "Cerca nei tuoi report", "Raporlarınızda ara", "在你的报告中搜索", "在你的報告中搜索", "レポートを検索する", "보고서 검색"],
+  ["Filtrar por lectura", "Filter by read status", "Filtrer par état de lecture", "Nach Lesestatus filtern", "Filtrar por estado de leitura", "Filtrar por status de leitura", "Filtra per stato di lettura", "Okunma durumuna göre filtrele", "按阅读状态筛选", "按閱讀狀態篩選", "読み取りステータスによるフィルタリング", "읽기 상태로 필터링"],
+  ["No leídos", "Unread", "Non lus", "Ungelesen", "Não lidos", "Não lidos", "Non letti", "Okunmamış", "未读", "未讀", "未読", "읽히지 않는"],
+  ["Leídos", "Read", "Lus", "Gelesen", "Lidos", "Lidos", "Letti", "Okunmuş", "已读", "已讀", "読む", "읽다"],
+  ["No leído", "Unread", "Non lu", "Ungelesen", "Não lido", "Não lido", "Non letto", "Okunmamış", "未读", "未讀", "未読", "읽히지 않는"],
+  ["Marcar leído", "Mark as read", "Marquer comme lu", "Als gelesen markieren", "Marcar como lido", "Marcar como lido", "Segna come letto", "Okundu olarak işaretle", "标记为已读", "標記為已讀", "既読としてマークする", "읽음으로 표시"],
+  ["Ningún informe coincide con los filtros.", "No reports match the filters.", "Aucun rapport ne correspond aux filtres.", "Keine Berichte entsprechen den Filtern.", "Nenhum relatório corresponde aos filtros.", "Nenhum relatório corresponde aos filtros.", "Nessun report corrisponde ai filtri.", "Filtrelerle eşleşen rapor yok.", "没有报告符合筛选条件。", "沒有報告符合篩選條件。", "フィルターに一致するレポートはありません。", "필터와 일치하는 보고서가 없습니다."],
+  ["Aún no hay informes. Crea el primero y quedará aquí listo para leerse.", "There are no reports yet. Create the first one and it will appear here ready to read.", "Il n’y a pas encore de rapports. Créez le premier : il apparaîtra ici, prêt à être lu.", "Noch keine Berichte. Erstelle den ersten; er erscheint hier zum Lesen.", "Ainda não há relatórios. Crie o primeiro e ficará aqui pronto para ler.", "Ainda não há relatórios. Crie o primeiro e ele aparecerá aqui pronto para leitura.", "Non ci sono ancora report. Crea il primo e apparirà qui pronto da leggere.", "Henüz rapor yok. İlkini oluşturun; okunmaya hazır şekilde burada görünecek.", "还没有报告。创建第一个，它就会出现在这里供你阅读。", "還沒有報告。建立第一個，它就會出現在這裡供你閱讀。", "まだ報告はありません。最初のものを作成すると、ここに表示されてすぐに読むことができます。", "아직 보고서가 없습니다. 첫 번째 항목을 생성하면 읽을 준비가 된 상태로 여기에 표시됩니다."],
+  ["Define el objetivo; las opciones avanzadas son opcionales.", "Define the objective; advanced options are optional.", "Définissez l’objectif ; les options avancées sont facultatives.", "Lege das Ziel fest; die erweiterten Optionen sind optional.", "Defina o objetivo; as opções avançadas são opcionais.", "Defina o objetivo; as opções avançadas são opcionais.", "Definisci l’obiettivo; le opzioni avanzate sono facoltative.", "Amacı tanımlayın; gelişmiş seçenekler isteğe bağlıdır.", "定义目标；高级选项是可选的。", "定義目標；進階選項是可選的。", "目的を定義します。詳細オプションはオプションです。", "목표를 정의합니다. 고급 옵션은 선택 사항입니다."],
+  ["Filtro de filas y columnas", "Row and column filter", "Filtre de lignes et de colonnes", "Zeilen- und Spaltenfilter", "Filtro de linhas e colunas", "Filtro de linhas e colunas", "Filtro di righe e colonne", "Satır ve sütun filtresi", "行和列筛选", "行和列篩選", "行と列のフィルター", "행 및 열 필터"],
+  ["Prepara y edita la estructura antes de encolar.", "Prepare and edit the structure before queueing.", "Préparez et modifiez la structure avant la mise en file.", "Bereite die Struktur vor und bearbeite sie vor dem Einreihen.", "Prepare e edite a estrutura antes de colocar na fila.", "Prepare e edite a estrutura antes de colocar na fila.", "Prepara e modifica la struttura prima di accodare.", "Kuyruğa almadan önce yapıyı hazırlayın ve düzenleyin.", "在加入队列前准备并编辑结构。", "在加入佇列前準備並編輯結構。", "キューに入れる前に構造を準備および編集します。", "대기열에 넣기 전에 구조를 준비하고 편집하세요."],
+  ["Preparar automáticamente", "Prepare automatically", "Préparer automatiquement", "Automatisch vorbereiten", "Preparar automaticamente", "Preparar automaticamente", "Prepara automaticamente", "Otomatik hazırla", "自动准备", "自動準備", "自動的に準備する", "자동으로 준비"],
+  ["Usar automático", "Use automatic mode", "Utiliser le mode automatique", "Automatik verwenden", "Usar modo automático", "Usar modo automático", "Usa modalità automatica", "Otomatik modu kullan", "使用自动模式", "使用自動模式", "自動モードを使用する", "자동 모드 사용"],
+  ["Resultado agregado disponible; los valores de celdas están redactados.", "Aggregated result available; cell values are redacted.", "Résultat agrégé disponible ; les valeurs des cellules sont masquées.", "Aggregiertes Ergebnis verfügbar; Zellwerte sind geschwärzt.", "Resultado agregado disponível; os valores das células estão ocultados.", "Resultado agregado disponível; os valores das células estão ocultos.", "Risultato aggregato disponibile; i valori delle celle sono oscurati.", "Toplu sonuç mevcut; hücre değerleri gizlenmiştir.", "聚合结果可用；单元格值已脱敏。", "聚合結果可用；單元格值已脫敏。", "集計結果が利用可能。セル値は編集されます。", "집계된 결과가 제공됩니다. 셀 값이 수정됩니다."],
+  ["Afirmación respaldada por evidencia determinista; valores sensibles omitidos.", "Claim supported by deterministic evidence; sensitive values omitted.", "Affirmation étayée par des preuves déterministes ; valeurs sensibles omises.", "Aussage durch deterministische Evidenz gestützt; sensible Werte ausgelassen.", "Afirmação sustentada por evidência determinística; valores sensíveis omitidos.", "Afirmação sustentada por evidências determinísticas; valores sensíveis omitidos.", "Affermazione supportata da evidenze deterministiche; valori sensibili omessi.", "İddia deterministik kanıtlarla destekleniyor; hassas değerler çıkarıldı.", "论断由确定性证据支持；敏感值已省略。", "論斷由確定性證據支援；敏感值已省略。", "決定論的な証拠によって裏付けられた主張。機密性の高い値は省略されています。", "결정론적 증거로 뒷받침되는 주장 민감한 값은 생략되었습니다."],
 ];
 
-const languages = ["es", "en", "fr", "de", "pt", "pt-BR", "it", "tr", "zh-CN"] as const;
+const languages = ["es", "en", "fr", "de", "pt", "pt-BR", "it", "tr", "zh-CN", 'zh-TW', 'ja', 'ko'] as const;
 export const DATABASE_DEEP_RESEARCH_TRANSLATIONS = Object.fromEntries(
   languages.map((language, index) => [
     language,

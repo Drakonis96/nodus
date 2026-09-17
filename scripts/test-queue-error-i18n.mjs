@@ -33,7 +33,7 @@ execFileSync(
 const i18n = require(entry);
 const read = (file) => readFileSync(path.join(repoRoot, file), 'utf8');
 
-const LANGUAGES = ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN'];
+const LANGUAGES = ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja', 'ko'];
 
 /**
  * The sentences the queue can put in front of a reader, grouped by where they come from.

@@ -28,14 +28,20 @@ const PDF_LABELS = {
   it: { outline: 'Schema della ricerca', next: 'Passi successivi', limitations: 'Limiti', bibliography: 'Bibliografia', empty: 'Il report non contiene contenuti.', cover: 'Report Deep Research' },
   tr: { outline: 'Araştırma planı', next: 'Sonraki adımlar', limitations: 'Sınırlamalar', bibliography: 'Kaynakça', empty: 'Raporda içerik yok.', cover: 'Deep Research raporu' },
   'zh-CN': { outline: '研究大纲', next: '后续步骤', limitations: '局限性', bibliography: '参考文献', empty: '报告没有内容。', cover: 'Deep Research 报告' },
+  'zh-TW': { outline: '研究大綱', next: '後續步驟', limitations: '侷限性', bibliography: '參考文獻', empty: '報告沒有內容。', cover: 'Deep Research 報告' },
+  ja: { outline: '研究概要', next: '次のステップ', limitations: '限界', bibliography: '参考文献', empty: 'レポートに内容がありません。', cover: 'Deep Research レポート' },
+  ko: { outline: '연구 개요', next: '다음 단계', limitations: '한계', bibliography: '참고문헌', empty: '보고서에 내용이 없습니다.', cover: 'Deep Research 보고서' },
 };
 
 function pdfLanguage(value) {
   if (value === 'pt-BR') return value;
   if (typeof value === 'string') {
     const tag = value.trim().replace(/_/g, '-').toLowerCase();
-    // Only Simplified Chinese is shipped; Traditional tags fall through to English below.
     if (tag === 'zh' || tag === 'zh-cn' || tag === 'zh-hans' || tag === 'zh-sg') return 'zh-CN';
+    if (tag === 'zh-tw' || tag === 'zh-hant' || tag === 'zh-hk' || tag === 'zh-mo') return 'zh-TW';
+    if (tag === 'ja' || tag.startsWith('ja-')) return 'ja';
+    if (tag === 'ko' || tag.startsWith('ko-')) return 'ko';
+    if (tag === 'ja' || tag.startsWith('ja-')) return 'ja';
   }
   return Object.prototype.hasOwnProperty.call(PDF_LABELS, value) ? value : 'en';
 }

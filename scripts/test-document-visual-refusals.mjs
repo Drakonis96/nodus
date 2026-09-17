@@ -105,7 +105,7 @@ test('every refusal motive is translated in every language', () => {
     checked++;
     const row = table.split('\n').find(line => line.includes(`['${spanish}'`));
     assert.ok(row, `"${spanish}" has no row in the log catalogue's translations`);
-    assert.equal(row.match(/'(((?:\\.|[^'])*)')/g).length, 9, `"${spanish}" must carry its Spanish source and eight translations`);
+    assert.equal(row.match(/'(((?:\\.|[^'])*)')/g).length, 10, `"${spanish}" must carry its Spanish source and nine translations`);
   }
   assert.ok(checked >= 17, `every reason in the catalogue was checked, not a pattern that matches nothing (${checked})`);
 });

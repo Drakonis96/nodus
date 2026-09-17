@@ -40,6 +40,9 @@ let verifyPayloadCache: ProtectFilePayload | null = null;
 
 const SUFFIX: Record<AppLanguage, string> = {
   es: 'protegido', en: 'protected', fr: 'protege', de: 'geschuetzt', pt: 'protegido', 'pt-BR': 'protegido', it: 'protetto', tr: 'korumali', 'zh-CN': '受保护',
+  'zh-TW': '受保護',
+  ko: "보호됨",
+  ja: "保護された",
 };
 
 function copy(): ProtectComposeCopy {

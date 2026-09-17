@@ -60,6 +60,25 @@ export async function runStudyAiTask<T>(input: { task: StudyAiTask; explicitMode
         it: { title: 'Dati fuori dal dispositivo', message: 'Nodus invierà questa richiesta di studio a', purpose: 'Finalità', detail: 'Verranno inviati fino a', chars: 'caratteri entro i tuoi limiti.', cancel: 'Annulla', continue: 'Continua' },
         tr: { title: 'Veriler cihazdan çıkacak', message: 'Nodus bu çalışma isteğini şu sağlayıcıya gönderecek:', purpose: 'Amaç', detail: 'Sınırlarınız dahilinde en fazla', chars: 'karakter gönderilecek.', cancel: 'İptal', continue: 'Devam' },
         'zh-CN': { title: '数据将离开此设备', message: 'Nodus 会将此学习请求发送至', purpose: '用途', detail: '最多', chars: '个字符将在你的限额内发送。', cancel: '取消', continue: '继续' },
+        'zh-TW': { title: '資料將離開此裝置', message: 'Nodus 會將此學習請求傳送至', purpose: '用途', detail: '最多', chars: '個字元將在你的限額內傳送。', cancel: '取消', continue: '繼續' },
+        ko: {
+          title: "이 기기에서 나가는 데이터",
+          message: "Nodus는 이 연구 요청을 다음으로 보낼 것입니다.",
+          purpose: "목적",
+          detail: "최대",
+          chars: "문자는 한도 내에서 전송됩니다.",
+          cancel: "취소",
+          continue: "계속하다",
+        },
+        ja: {
+          title: "このデバイスから送信されるデータ",
+          message: "Nodus はこの調査リクエストを次の宛先に送信します。",
+          purpose: "目的",
+          detail: "まで",
+          chars: "制限内で文字が送信されます。",
+          cancel: "キャンセル",
+          continue: "続く",
+        },
       }[language] ?? null;
       const localized = copy ?? {
         title: 'Data leaving this device', message: 'Nodus will send this study request to', purpose: 'Purpose', detail: 'Up to', chars: 'characters will be sent within your limits.', cancel: 'Cancel', continue: 'Continue',

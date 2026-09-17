@@ -8,7 +8,7 @@ import { spawn } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
 import test from 'node:test';
 import AdmZip from 'adm-zip';
-import { missingServerTranslations } from '../server/lib/i18n.mjs';
+import { SERVER_LANGUAGES, missingServerTranslations } from '../server/lib/i18n.mjs';
 import { Store, pairingCode } from '../server/lib/store.mjs';
 
 /**
@@ -36,9 +36,12 @@ test('a pairing code can be read aloud and typed back without a second try', () 
 });
 
 test('Nodus Server web translations cover every supported app language', () => {
-  assert.deepEqual(missingServerTranslations(), {
-    en: [], es: [], fr: [], de: [], pt: [], 'pt-BR': [], it: [], tr: [], 'zh-CN': [],
-  });
+  // Derived from the language list, so a locale can never be added to the server
+  // without its catalogue following.
+  assert.deepEqual(
+    missingServerTranslations(),
+    Object.fromEntries(SERVER_LANGUAGES.map((language) => [language, []]))
+  );
 });
 
 test('existing server state without a language migrates to English', async () => {
