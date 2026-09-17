@@ -44,6 +44,19 @@ const WORKSPACE = {
 
 const EMPTY_WORKSPACE = { ...WORKSPACE, courses: [], subjects: [], topics: [], folders: [] };
 
+/**
+ * Point a global at the jsdom one. Node already defines `Event` (and `navigator`,
+ * from v21 on) as getter-only properties, so assigning throws where defining does
+ * not; a non-configurable global simply stays as Node defined it.
+ */
+function defineGlobal(key, value) {
+  try {
+    Object.defineProperty(globalThis, key, { value, writable: true, configurable: true });
+  } catch {
+    // Left as it is: jsdom works with Node's own `navigator`.
+  }
+}
+
 /** Render the real component in jsdom against a stub of the preload bridge. */
 async function renderModal({ workspace = WORKSPACE, ...props } = {}) {
   const { JSDOM } = require('jsdom');
@@ -51,11 +64,11 @@ async function renderModal({ workspace = WORKSPACE, ...props } = {}) {
   for (const key of Object.getOwnPropertyNames(dom.window)) {
     if (!(key in globalThis)) globalThis[key] = dom.window[key];
   }
+  defineGlobal('window', dom.window);
+  defineGlobal('document', dom.window.document);
+  defineGlobal('navigator', dom.window.navigator);
   // Node has its own Event, and jsdom refuses to dispatch a foreign one.
-  globalThis.window = dom.window;
-  globalThis.document = dom.window.document;
-  globalThis.navigator = dom.window.navigator;
-  globalThis.Event = dom.window.Event;
+  defineGlobal('Event', dom.window.Event);
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
   const calls = { notes: [], documents: [], opened: [], workspaceEvents: 0 };
