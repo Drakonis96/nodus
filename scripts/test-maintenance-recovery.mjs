@@ -7,8 +7,9 @@
 //      the REAL local planner reserves the answer budget the task asks for instead of
 //      clamping it to the 512-token floor that cut the reply the user saw.
 //
-// Run: node scripts/verify-maintenance-recovery.mjs
-// Exit code 0 means the flow and the batching hold; 1 lists what broke.
+// Part of the suite (`node --test scripts/test-*.mjs`): exit code 0 means the flow
+// and the batching hold, 1 lists what broke.
+// Run alone: node scripts/test-maintenance-recovery.mjs
 
 import { build } from 'esbuild';
 import { mkdtemp, rm } from 'node:fs/promises';

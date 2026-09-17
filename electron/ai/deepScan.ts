@@ -555,42 +555,9 @@ export async function runDeepScan(
     const extractionPool = settings.aiConcurrencyMode === 'automatic'
       ? 8
       : Math.max(1, Math.min(8, settings.concurrency));
-    // Fragments are extracted in parallel, so the line belongs to the phase and not to
-    // each worker: a per-worker writer let the counter, the percentage and the seconds
-    // jump between fragments that had started at different times (fragment 3/3 at one
-    // second, fragment 9/12 at ninety) every time the last worker to tick was another
-    // one. The counter names the oldest fragment still in flight, the percentage counts
-    // fragments finished and the seconds measure the phase, so all three only advance.
-    let fragmentsDone = 0;
-    const fragmentPhaseStart = Date.now();
-    const reportFragmentPhase = () => {
-      const seconds = Math.round((Date.now() - fragmentPhaseStart) / 1000);
-      const current = Math.min(fragmentsDone + 1, chunks.length);
-      onProgress?.({
-        detail: seconds > 0
-          ? `Analizando fragmento ${current}/${chunks.length} con IA… (${seconds}s)`
-          : `Analizando fragmento ${current}/${chunks.length} con IA…`,
-        pct: FRAGMENT_PHASE_SHARE * (fragmentsDone / chunks.length),
-      });
-    };
-    const fragmentHeartbeat = setInterval(reportFragmentPhase, 1000);
-    let results: DeepResult[];
-    try {
-      reportFragmentPhase();
-      results = await mapOrderedPool(chunks, extractionPool, async (_chunk, i, poolSignal) => {
-        try {
-          return await extractFragment(i, poolSignal);
-        } finally {
-          fragmentsDone += 1;
-          reportFragmentPhase();
-        }
-      });
-    } finally {
-      clearInterval(fragmentHeartbeat);
-    }
 
     /** One fragment: a checkpointed result, or the model call that produces it. */
-    async function extractFragment(i: number, poolSignal: AbortSignal): Promise<DeepResult> {
+    const extractFragment = async (i: number, poolSignal: AbortSignal): Promise<DeepResult> => {
       // Resume from checkpoint if available.
       const defaultSourceAlias = chunks[i].match(/\[\[src:([^\]\s]+)/i)?.[1] ?? null;
       const reusable = usableCheckpoint(checkpoints.get(i), sourceMap, defaultSourceAlias, citationCorpus);
@@ -728,6 +695,40 @@ export async function runDeepScan(
         llmDone({ status: 'error', chunk: i + 1 });
         throw e;
       }
+    }
+
+    // Fragments are extracted in parallel, so the line belongs to the phase and not to
+    // each worker: a per-worker writer let the counter, the percentage and the seconds
+    // jump between fragments that had started at different times (fragment 3/3 at one
+    // second, fragment 9/12 at ninety) every time the last worker to tick was another
+    // one. The counter names the oldest fragment still in flight, the percentage counts
+    // fragments finished and the seconds measure the phase, so all three only advance.
+    let fragmentsDone = 0;
+    const fragmentPhaseStart = Date.now();
+    const reportFragmentPhase = () => {
+      const seconds = Math.round((Date.now() - fragmentPhaseStart) / 1000);
+      const current = Math.min(fragmentsDone + 1, chunks.length);
+      onProgress?.({
+        detail: seconds > 0
+          ? `Analizando fragmento ${current}/${chunks.length} con IA… (${seconds}s)`
+          : `Analizando fragmento ${current}/${chunks.length} con IA…`,
+        pct: FRAGMENT_PHASE_SHARE * (fragmentsDone / chunks.length),
+      });
+    };
+    const fragmentHeartbeat = setInterval(reportFragmentPhase, 1000);
+    let results: DeepResult[];
+    try {
+      reportFragmentPhase();
+      results = await mapOrderedPool(chunks, extractionPool, async (_chunk, i, poolSignal) => {
+        try {
+          return await extractFragment(i, poolSignal);
+        } finally {
+          fragmentsDone += 1;
+          reportFragmentPhase();
+        }
+      });
+    } finally {
+      clearInterval(fragmentHeartbeat);
     }
 
     llmDone({ results: results.length });

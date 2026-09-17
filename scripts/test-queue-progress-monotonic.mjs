@@ -7,8 +7,9 @@
 // scheduler) with a stubbed transport, because that is where the counters are
 // produced; nothing here is a re-implementation of the display maths.
 //
-// Run: node scripts/verify-queue-progress-monotonic.mjs
-// Exit code 0 means every invariant holds; 1 lists the frames that broke one.
+// Part of the suite (`node --test scripts/test-*.mjs`): exit code 0 means every
+// invariant holds, 1 lists the frames that broke one.
+// Run alone: node scripts/test-queue-progress-monotonic.mjs
 
 import { build } from 'esbuild';
 import { mkdtemp, rm } from 'node:fs/promises';
