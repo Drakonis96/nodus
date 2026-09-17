@@ -30,6 +30,7 @@ const PDF_LABELS = {
   'zh-CN': { outline: '研究大纲', next: '后续步骤', limitations: '局限性', bibliography: '参考文献', empty: '报告没有内容。', cover: 'Deep Research 报告' },
   'zh-TW': { outline: '研究大綱', next: '後續步驟', limitations: '侷限性', bibliography: '參考文獻', empty: '報告沒有內容。', cover: 'Deep Research 報告' },
   ja: { outline: '研究概要', next: '次のステップ', limitations: '限界', bibliography: '参考文献', empty: 'レポートに内容がありません。', cover: 'Deep Research レポート' },
+  ko: { outline: '연구 개요', next: '다음 단계', limitations: '한계', bibliography: '참고문헌', empty: '보고서에 내용이 없습니다.', cover: 'Deep Research 보고서' },
 };
 
 function pdfLanguage(value) {
