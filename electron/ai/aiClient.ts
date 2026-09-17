@@ -21,7 +21,7 @@ import {
   groqFreeTpm,
   isGroqReasoningModel,
 } from './providers';
-import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS } from '@shared/providers';
+import { DEFAULT_EMBEDDING_MODELS, isLocalEndpointAddress, normalizeEmbeddingModel, PROVIDER_LABELS } from '@shared/providers';
 import type { AiProvider, CodexReasoningEffort, EmbeddingProvider, LocalProvider, ModelRef, PromptLanguage, ReasoningEffort } from '@shared/types';
 import { vaultTypePromptPack } from '@shared/vaultTypes';
 import { codexReasoningFor } from '@shared/codexReasoning';
@@ -43,8 +43,14 @@ import {
   deanonymizeDeep,
   findResidualNames,
 } from '@shared/studentPseudonyms';
-import { classifyProviderError, isTransientNetworkFailure, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields } from './providerErrors';
+import { classifyProviderError, isTransientNetworkFailure, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields } from './providerErrors';
 import { rememberTemperatureUnsupported, temperatureUnsupported } from './samplingSupport';
+import {
+  optionalBodyUnsupported,
+  reasoningHintUnsupported,
+  rememberOptionalBodyUnsupported,
+  rememberReasoningHintUnsupported,
+} from './optionalFieldsSupport';
 import { completeWithChatGptSubscription } from './codexSubscription';
 import { completeWithGitHubCopilotSubscription } from './githubCopilotSubscription';
 import { completeWithOpenCodeGo, OUTPUT_TRUNCATED_MARKER } from './openCodeGoCompletion';
@@ -383,9 +389,19 @@ function truncatedOutputMessage(model: ModelRef, maxTokens: number): string {
 const CLOUD_COMPLETION_TIMEOUT_MS = 180_000;
 const ON_DEVICE_COMPLETION_TIMEOUT_MS = 1_200_000;
 
-/** True when the model runs on this machine: the built-in runtime, or a local server. */
+/**
+ * True when the model runs on this machine or the user's own network: the built-in
+ * runtime, a local server, or a custom endpoint whose address is local.
+ *
+ * The custom case has to be read off the address, because `custom` is not a server but a
+ * promise that whatever the user runs answers the OpenAI contract — and the setups that
+ * promise exists for (a bare llama.cpp, vLLM or LiteLLM on the same laptop) were exactly
+ * the ones held to the cloud ceiling. The user said where it is by typing its URL; asking
+ * them again in Settings would be asking them to repeat themselves, and there is no
+ * question to ask: `isLocalEndpointAddress` knows every shape a local address takes.
+ */
 function runsOnDevice(provider: AiProvider): boolean {
-  return provider === 'nodus' || isLocalProvider(provider);
+  return provider === 'nodus' || isLocalProvider(provider) || (provider === 'custom' && isLocalEndpointAddress(customBaseUrl()));
 }
 
 export function completionTimeoutMs(model: ModelRef): number {
@@ -800,10 +816,14 @@ export async function localModelContextWindow(model: ModelRef): Promise<number |
  * be rejected by some models, so callers retry once without them on a 400.
  */
 function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEffort, opts: CallOpts): Record<string, unknown> {
+  // A gateway that already refused this body once keeps the plain one for the rest of the
+  // session: rediscovering the refusal per chunk would triple the requests a long scan
+  // costs. See optionalFieldsSupport.ts.
+  if (optionalBodyUnsupported(model)) return {};
   const auditedOpenRouterProvider = process.env.NODUS_AUDIT_OPENROUTER_PROVIDER?.trim();
   return {
     ...(jsonMode && supportsJsonMode(model.provider) ? { response_format: { type: 'json_object' as const } } : {}),
-    ...(opts.researchEffort === undefined ? reasoningBody(model.provider, reasoning, model.model, opts.requestClass === 'background') : {}),
+    ...(opts.researchEffort === undefined && !reasoningHintUnsupported(model) ? reasoningBody(model.provider, reasoning, model.model, opts.requestClass === 'background') : {}),
     // Groq's reasoning models (gpt-oss/qwen3) reason at medium by default, which slows scans and
     // burns tokens. reasoningBody can't send it (no model id), so minimise it here. Groq rejects
     // reasoning_effort:'none' — 'low' is its floor; non-reasoning models 400 and the caller strips it.
@@ -887,6 +907,76 @@ function retryOptionalBody(model: ModelRef, extras: Record<string, unknown>, err
     return { ...rest, ...auditedProvider };
   }
   return auditedProvider;
+}
+
+/**
+ * The bodies to try after a refusal, in the order the refusal justifies.
+ *
+ * A refusal that NAMES a field drops the optional body outright — that is the original
+ * contract, and the provider has said what it wants. A refusal that names nothing can only
+ * come from a custom gateway, and it is a guess: Nodus answers it with the smallest change
+ * first, because when the reasoning hint is what had been sent, dropping just that field
+ * keeps JSON mode, which is the contract the scan asked for. A gateway that refuses the
+ * smaller body too gets the plain OpenAI body — nothing Nodus added — as the last resort,
+ * since a scan that runs in prose still beats one that never starts. The JSON contract
+ * survives either way: the prompt asks for JSON, and `extractJson` parses, repairs and
+ * validates the reply no matter what the gateway agreed to.
+ */
+function optionalFieldReplays(
+  model: ModelRef,
+  extras: Record<string, unknown>,
+  error: unknown,
+  sentReasoning: boolean,
+): Array<Record<string, unknown>> {
+  const minimal = retryOptionalBody(model, extras, error, sentReasoning);
+  // Only a step that still carries something optional is worth taking: when the reasoning
+  // hint was the only field sent, `minimal` is already the plain body and repeating it
+  // would spend a request to learn nothing.
+  if (sentReasoning && model.provider === 'custom' && rejectsOptionalBodyWithoutNaming(error) && Object.keys(minimal).length > 0) {
+    return [minimal, {}];
+  }
+  return [minimal];
+}
+
+/**
+ * Remember which optional fields the accepted body had to drop, so the calls that follow
+ * start there instead of walking the ladder again.
+ */
+function rememberAcceptedOptionalBody(model: ModelRef, extras: Record<string, unknown>, accepted: Record<string, unknown>): void {
+  if ('reasoning_effort' in extras && !('reasoning_effort' in accepted)) rememberReasoningHintUnsupported(model);
+  if ('response_format' in extras && !('response_format' in accepted)) rememberOptionalBodyUnsupported(model);
+}
+
+/**
+ * Answer a refusal of the optional body by replaying the request without it, from the
+ * smallest change to the plainest body. Returns the first accepted attempt, or throws the
+ * last failure — which, for a refusal that named nothing, is the gateway's real answer:
+ * what is left is the request the caller asked for, and if that fails too, the failure
+ * belongs to it and not to the fields Nodus added.
+ */
+async function replayRefusedOptionalFields<T>(
+  model: ModelRef,
+  extras: Record<string, unknown>,
+  refusal: unknown,
+  sentReasoning: boolean,
+  attempt: (body: Record<string, unknown>) => Promise<T>,
+): Promise<T> {
+  const unnamed = rejectsOptionalBodyWithoutNaming(refusal);
+  const replays = optionalFieldReplays(model, extras, refusal, sentReasoning);
+  let lastError: unknown = refusal;
+  for (const body of replays) {
+    try {
+      const value = await attempt(body);
+      if (unnamed) rememberAcceptedOptionalBody(model, extras, body);
+      return value;
+    } catch (next) {
+      lastError = next;
+      // Only another refusal of the same unnamed kind justifies dropping the next field;
+      // a 5xx, a dropped socket or an auth error is the gateway's real answer.
+      if (!unnamed || !rejectsOptionalBodyWithoutNaming(next)) throw next;
+    }
+  }
+  throw lastError;
 }
 
 /** True for provider throttling. OpenRouter also uses 529 when the selected
@@ -1299,17 +1389,19 @@ async function rawCompleteTransport(
   const baseBody = bodyFor(false);
   const extras = optionalBody(model, jsonMode, reasoning, opts);
   const compatStarted = Date.now();
+  /** One replay, dispatched through the same retry/scheduler seam as the first attempt. */
+  const replayBody = (body: Record<string, unknown>) => withProviderRetries(freeTier, () => scheduleProviderRequest(
+    model, opts, key, schedulerEndpoint, () => createCompletion({ ...baseBody, ...body } as any),
+  ), opts.signal, !opts.noRetry);
   try {
     let res;
     try {
-      res = await withProviderRetries(freeTier, () => scheduleProviderRequest(
-        model, opts, key, schedulerEndpoint, () => createCompletion({ ...baseBody, ...extras } as any),
-      ), opts.signal, !opts.noRetry);
+      res = await replayBody(extras);
     } catch (e: any) {
-      // The optional reasoning/JSON/routing params may be unsupported by this model.
-      // Retry once as a plain request before surfacing the error. A custom gateway
-      // that refused our reasoning hint without naming it also lands here, and keeps
-      // the rest of the optional body so the scan does not lose JSON mode.
+      // The optional reasoning/JSON/routing params may be unsupported by this model, so the
+      // request is replayed without them before the error is surfaced: see
+      // `optionalFieldReplays` for the order and `replayRefusedOptionalFields` for how far a
+      // custom gateway is allowed to push the request back to the plain OpenAI body.
       const sentReasoning = (extras as any).reasoning_effort !== undefined;
       if (!opts.noRetry && rejectsTemperatureParameter(e)) {
         // A reasoning model that deprecates `temperature`: drop it and remember the model so
@@ -1318,13 +1410,8 @@ async function rawCompleteTransport(
         res = await withProviderRetries(freeTier, () => scheduleProviderRequest(
           model, opts, key, schedulerEndpoint, () => createCompletion({ ...bodyFor(true), ...extras } as any),
         ), opts.signal, !opts.noRetry);
-      } else if (!opts.noRetry && shouldRetryWithoutOptionalFields(e, { provider: model.provider, sentReasoning }) && Object.keys(extras).length > 0) {
-        res = await withProviderRetries(freeTier, () => scheduleProviderRequest(
-          model, opts, key, schedulerEndpoint, () => createCompletion({
-            ...baseBody,
-            ...retryOptionalBody(model, extras, e, sentReasoning),
-          } as any),
-        ), opts.signal, !opts.noRetry);
+      } else if (!opts.noRetry && Object.keys(extras).length > 0 && shouldRetryWithoutOptionalFields(e, { provider: model.provider })) {
+        res = await replayRefusedOptionalFields(model, extras, e, sentReasoning, replayBody);
       } else {
         throw e;
       }
@@ -2014,12 +2101,13 @@ async function rawCompleteStreamTransport(
         }), body, transportSignal))
       : consumeStream(client, body, transportSignal),
   );
+  /** One replay, dispatched through the same retry/scheduler seam as the first attempt. */
+  const replayStream = (body: Record<string, unknown>) => withProviderRetries(freeTier, () => scheduleProviderRequest(
+    model, scheduleOpts, key, schedulerEndpoint, () => executeStream({ ...baseBody, ...body } as any),
+  ), signal, !opts.noRetry);
   try {
     try {
-      await withProviderRetries(freeTier, () => scheduleProviderRequest(
-        model, scheduleOpts, key, schedulerEndpoint,
-        () => executeStream({ ...baseBody, ...extras } as any),
-      ), signal, !opts.noRetry);
+      await replayStream(extras);
     } catch (e: any) {
       const sentReasoning = (extras as any).reasoning_effort !== undefined;
       if (!opts.noRetry && rejectsTemperatureParameter(e)) {
@@ -2030,11 +2118,8 @@ async function rawCompleteStreamTransport(
           model, scheduleOpts, key, schedulerEndpoint,
           () => executeStream({ ...bodyFor(true), ...extras } as any),
         ), signal, !opts.noRetry);
-      } else if (shouldRetryWithoutOptionalFields(e, { provider: model.provider, sentReasoning }) && Object.keys(extras).length > 0) {
-        await withProviderRetries(freeTier, () => scheduleProviderRequest(
-          model, scheduleOpts, key, schedulerEndpoint,
-          () => executeStream({ ...baseBody, ...retryOptionalBody(model, extras, e, sentReasoning) } as any),
-        ), signal, !opts.noRetry);
+      } else if (Object.keys(extras).length > 0 && shouldRetryWithoutOptionalFields(e, { provider: model.provider })) {
+        await replayRefusedOptionalFields(model, extras, e, sentReasoning, replayStream);
       } else {
         throw e;
       }

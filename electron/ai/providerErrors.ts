@@ -172,26 +172,42 @@ export function rejectsTemperatureParameter(error: unknown): boolean {
   return statusOf(error) === 400 && TEMPERATURE_REJECTION.test(messageOf(error));
 }
 
+/** The statuses a provider answers with when it refused a request before running it. */
+const REFUSAL_STATUSES = new Set([400, 422]);
+
+/**
+ * A refusal that did NOT name the field it disliked — the shape every proxy in front of a
+ * real API produces, and the only case where which field to drop has to be guessed.
+ */
+export function rejectsOptionalBodyWithoutNaming(error: unknown): boolean {
+  return !rejectsOptionalTransportField(error) && REFUSAL_STATUSES.has(statusOf(error) ?? 0);
+}
+
 /**
  * Whether one request should be replayed without its optional body fields.
  *
- * The second case is why this cannot live inside the transport alone: a custom gateway
- * may refuse the reasoning hint Nodus added *without naming it* — a proxy in front of
- * the real API often answers a bare "Bad Request". Nodus added that field, so Nodus
- * owns the recovery; refusing to replay there would turn a fix that helps some setups
- * into scans that fail on the ones it does not help.
+ * The second case is why this cannot live inside the transport alone: a custom gateway may
+ * refuse the optional body Nodus added *without naming it*, because a proxy in front of the
+ * real API often answers a bare "Bad Request". Nodus added those fields, so Nodus owns the
+ * recovery; refusing to replay there turns a fix that helps some setups into scans that fail
+ * on the ones it does not help.
+ *
+ * It used to require that Nodus had sent the reasoning hint, on the theory that a gateway
+ * cannot object to a field it was never sent. That held only while the reasoning hint was
+ * the sole optional field — but every JSON call also carries `response_format`, and a
+ * gateway that refuses *that* with an opaque 400 matched no branch here at all: one request,
+ * no replay, and the whole scan ended on "the provider rejected the request (400)". The
+ * question is not what Nodus remembers sending, it is whether the request carried anything
+ * optional at all, which the caller checks before replaying.
  *
  * A 400/422 is a refusal, not a completed generation: the request was rejected before
- * running, so a single replay without the extras cannot double-charge. Rejections of
- * any *other* optional field are still only replayed when the provider names it.
+ * running, so replays cannot double-charge. Rejections of any *other* optional field are
+ * still only replayed when the provider names it.
  */
 export function shouldRetryWithoutOptionalFields(
   error: unknown,
-  options: { provider?: string; sentReasoning?: boolean } = {},
+  options: { provider?: string } = {},
 ): boolean {
   if (rejectsOptionalTransportField(error)) return true;
-  const status = statusOf(error);
-  return options.provider === 'custom'
-    && options.sentReasoning === true
-    && (status === 400 || status === 422);
+  return options.provider === 'custom' && REFUSAL_STATUSES.has(statusOf(error) ?? 0);
 }

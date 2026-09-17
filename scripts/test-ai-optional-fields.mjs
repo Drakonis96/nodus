@@ -1,16 +1,18 @@
-// A custom gateway that refuses the reasoning field must not make the scan fail.
+// A custom gateway that refuses the optional request body must not make the scan fail.
 //
-// Nodus adds `reasoning_effort` to background scans of a thinking model on a custom
-// endpoint, where it cannot know whether the gateway accepts it. Two recoveries keep
-// that safe:
+// Nodus layers fields onto the plain OpenAI contract that a gateway may not know:
+// `response_format` on every JSON call, and `reasoning_effort` on a background scan of a
+// thinking model. Two decisions keep that safe:
 //   · a rejection that NAMES an optional field is replayed without the optional body
 //     (the pre-existing behaviour, for any provider);
-//   · a 400/422 from a custom endpoint after Nodus sent the reasoning field is replayed
-//     too, even when the gateway does not name it — a proxy in front of the real API
-//     often answers a bare "Bad Request", and without this the field we added would
-//     turn a scan that used to run into one that fails.
+//   · a 400/422 from a custom gateway that names nothing is replayed too — a proxy in front
+//     of the real API often answers a bare "Bad Request". This used to require that Nodus had
+//     sent the reasoning hint, which left `response_format`, carried by every JSON call, with
+//     no recovery at all: one request and the whole library ended on a bare 400 (issue #802).
+//     The ladder itself, and what it may drop, is exercised end to end by
+//     scripts/test-custom-gateway-recovery.mjs.
 //
-// A 400/422 is a refusal, not a generation, so a single replay cannot double-charge.
+// A 400/422 is a refusal, not a generation, so replays cannot double-charge.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
@@ -35,7 +37,7 @@ function load(file) {
   return require(bundle);
 }
 
-const { rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields } = load('electron/ai/providerErrors.ts');
+const { rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields } = load('electron/ai/providerErrors.ts');
 
 /** A provider HTTP failure with the shape the OpenAI SDK throws. */
 const failure = (status, message) => Object.assign(new Error(message), { status, error: { message } });
@@ -54,26 +56,29 @@ test('a named rejection is only a 400; other statuses keep their meaning', () =>
   assert.equal(rejectsOptionalTransportField(new Error('socket hang up')), false);
 });
 
-test('an unnamed custom rejection is replayable once Nodus sent the reasoning field', () => {
+test('an unnamed custom rejection is replayable, whatever Nodus had added', () => {
   // The exact shape a proxy returns for a field it does not know: no field named.
-  assert.equal(
-    shouldRetryWithoutOptionalFields(failure(400, 'Bad Request'), { provider: 'custom', sentReasoning: true }),
-    true,
-  );
-  assert.equal(
-    shouldRetryWithoutOptionalFields(failure(422, 'Unprocessable Entity'), { provider: 'custom', sentReasoning: true }),
-    true,
-  );
+  assert.equal(shouldRetryWithoutOptionalFields(failure(400, 'Bad Request'), { provider: 'custom' }), true);
+  assert.equal(shouldRetryWithoutOptionalFields(failure(422, 'Unprocessable Entity'), { provider: 'custom' }), true);
+  // It no longer matters which optional field had been sent: every JSON call carries
+  // `response_format`, and a gateway that refuses it deserves the same replay as one that
+  // refuses the reasoning hint.
+  assert.equal(rejectsOptionalBodyWithoutNaming(failure(400, 'Bad Request')), true);
+  assert.equal(rejectsOptionalBodyWithoutNaming(failure(422, 'Unprocessable Entity')), true);
 });
 
-test('the unnamed fallback stays narrow: custom only, reasoning only, 400/422 only', () => {
-  assert.equal(shouldRetryWithoutOptionalFields(failure(400, 'Bad Request'), { provider: 'custom', sentReasoning: false }), false, 'we added nothing, so we own nothing');
-  assert.equal(shouldRetryWithoutOptionalFields(failure(400, 'Bad Request'), { provider: 'custom' }), false);
-  assert.equal(shouldRetryWithoutOptionalFields(failure(400, 'Bad Request'), { provider: 'openai', sentReasoning: true }), false, 'only a custom gateway is unknown');
-  assert.equal(shouldRetryWithoutOptionalFields(failure(422, 'Bad Request'), { provider: 'openrouter', sentReasoning: true }), false);
-  assert.equal(shouldRetryWithoutOptionalFields(failure(500, 'Bad Request'), { provider: 'custom', sentReasoning: true }), false, 'a 5xx did not refuse the request');
-  assert.equal(shouldRetryWithoutOptionalFields(failure(429, 'Too Many Requests'), { provider: 'custom', sentReasoning: true }), false);
-  assert.equal(shouldRetryWithoutOptionalFields(new Error('Connection error.'), { provider: 'custom', sentReasoning: true }), false, 'transport failures belong to the retry layer');
+test('the unnamed fallback stays narrow: custom only, 400/422 only', () => {
+  assert.equal(shouldRetryWithoutOptionalFields(failure(400, 'Bad Request'), { provider: 'openai' }), false, 'only a custom gateway is unknown');
+  assert.equal(shouldRetryWithoutOptionalFields(failure(422, 'Bad Request'), { provider: 'openrouter' }), false);
+  assert.equal(shouldRetryWithoutOptionalFields(failure(500, 'Bad Request'), { provider: 'custom' }), false, 'a 5xx did not refuse the request');
+  assert.equal(shouldRetryWithoutOptionalFields(failure(429, 'Too Many Requests'), { provider: 'custom' }), false);
+  assert.equal(shouldRetryWithoutOptionalFields(new Error('Connection error.'), { provider: 'custom' }), false, 'transport failures belong to the retry layer');
+  // A refusal that names the field stays a naming decision: only the unnamed case is the
+  // one where the ladder has to guess which field to drop.
+  assert.equal(rejectsOptionalBodyWithoutNaming(failure(400, 'Unknown field response_format')), false);
+  assert.equal(rejectsOptionalBodyWithoutNaming(failure(400, 'Unsupported parameter: reasoning_effort')), false);
+  assert.equal(rejectsOptionalBodyWithoutNaming(failure(500, 'Bad Request')), false);
+  assert.equal(rejectsOptionalBodyWithoutNaming(new Error('socket hang up')), false);
 });
 
 test('a 400 that names `temperature` as deprecated is recoverable, and nothing else is', () => {
@@ -114,13 +119,18 @@ test('both transports drop the knob on that signal and keep the rest of the requ
 
 test('the transport recovers by dropping only the reasoning field, keeping JSON mode', () => {
   const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
-  // The predicate is imported, not reimplemented locally.
-  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
+  // The predicates are imported, not reimplemented locally.
+  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
   assert.doesNotMatch(source, /^function rejectsOptionalTransportField/m);
   // Both the non-streaming and the streaming transport mark whether the field was sent…
   assert.equal((source.match(/const sentReasoning = \(extras as any\)\.reasoning_effort !== undefined;/g) ?? []).length, 2);
-  // …and both replay through the helper that keeps everything except the field we added.
-  assert.equal((source.match(/retryOptionalBody\(model, extras, e, sentReasoning\)/g) ?? []).length, 2);
+  // …and both resolve the refusal through the one ladder, so a gateway is answered the same
+  // way whichever transport reached it.
+  assert.equal((source.match(/replayRefusedOptionalFields\(model, extras, e, sentReasoning, replay(?:Body|Stream)\)/g) ?? []).length, 2);
+  assert.equal((source.match(/retryOptionalBody\(model, extras, error, sentReasoning\)/g) ?? []).length, 1);
   assert.match(source, /if \(sentReasoning && !rejectsOptionalTransportField\(error\)\) \{/);
   assert.match(source, /delete rest\.reasoning_effort;/);
+  // The last rung is the plain OpenAI body, and it is only reached when the smaller body was
+  // refused too — so JSON mode is given up last, never first.
+  assert.match(source, /if \(sentReasoning && model\.provider === 'custom' && rejectsOptionalBodyWithoutNaming\(error\) && Object\.keys\(minimal\)\.length > 0\) \{\n\s*return \[minimal, \{\}\];/);
 });
