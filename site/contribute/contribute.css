@@ -201,7 +201,7 @@ figures row, and never redefines the shared scale.
   color: var(--violet-2);
 }
 .support-offer .pic svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.support-offer-copy { padding-left: clamp(18px, 3vw, 30px); border-left: 1px solid var(--membrane); }
+.support-offer-copy { flex: 1 1 260px; padding-left: clamp(18px, 3vw, 30px); border-left: 1px solid var(--membrane); }
 .support-offer-copy h2 { font-size: 15.5px; letter-spacing: -0.018em; }
 .support-offer-copy p { margin: 5px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
 .wiki-btn { margin-left: auto; flex: 0 0 auto; padding: 11px 18px; font-size: 13.5px; }
@@ -233,7 +233,14 @@ figures row, and never redefines the shared scale.
 .figure-loading { color: var(--ink-3); }
 
 /* the contributor faces, and the link that carries whoever is not shown */
-.avatars { display: flex; align-items: center; padding-top: 8px; min-height: 20px; }
+/* The faces belong to the card, not to the text column beside the icon: spanning
+   both columns puts the row on the card's own insets, with the same margin at
+   each end, and gives it the whole width to fill. */
+.avatars {
+  display: flex; align-items: center;
+  grid-column: 1 / -1;
+  padding-top: 10px; min-height: 20px;
+}
 .avatars img {
   width: 20px; height: 20px; margin-left: -7px;
   border-radius: 50%; border: 2px solid #0d0a1a; background: var(--skin-2);
@@ -246,6 +253,10 @@ figures row, and never redefines the shared scale.
   background: var(--skin-2); color: var(--ink-2);
   font-size: 10.5px; font-weight: 650;
 }
+/* Enough contributors to overflow the row: the faces and the counter spread to
+   the card's full width, so the row ends on the same inset it starts from. */
+.avatars.is-full { justify-content: space-between; }
+.avatars.is-full img, .avatars.is-full .more { margin-left: 0; }
 .avatars:hover .more { color: var(--ink); }
 
 /* ------------------------------------------------ the line under the cards */

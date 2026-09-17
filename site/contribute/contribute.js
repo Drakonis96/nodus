@@ -20,7 +20,16 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
   // The project's owner opens the list, whatever the contribution counts say.
   const OWNER = 'drakonis96';
 
-  const FACES = 5;
+  // A face is 20px wide and overlaps the one before it by 7px; the counter that
+  // closes the row needs a little more room than a face. The row is measured
+  // against these, so the numbers here and the sizes in contribute.css are one
+  // value in two places.
+  const AVATAR = 20;
+  const STEP = 13;
+  const COUNTER = 52;
+  const FACES = 10;   // past this a row of faces stops reading as people
+  const SPREAD = 3;   // below this, spreading faces across the card reads as a mistake
+
   const CACHE_TTL = 24 * 60 * 60 * 1000;
 
   /* ------------------------------------------------------------ cache */
@@ -52,13 +61,46 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
 
   /* ------------------------------------------------------------ faces */
 
-  /** The first few faces plus a counter for the rest. Each one links to its account. */
+  /* Every row on the page, so each can be measured again when the window
+     changes size instead of holding whatever the first paint decided. */
+  const rows = new Map();
+  let resizeTimer = 0;
+  addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { for (const render of rows.values()) render(); }, 180);
+  }, { passive: true });
+
+  /* How many faces a row can hold. A card is as wide as the viewport decides, so
+     a fixed count either wastes half the row on a large screen or overflows on a
+     small one: faces are added while they fit, and the counter that closes the
+     row is only reserved when something really is left over. */
+  function fit(host, available, total) {
+    const row = (count) => (count ? AVATAR + (count - 1) * STEP + (total > count ? COUNTER : 0) : 0);
+    const width = host.clientWidth;
+    if (!width) return Math.min(available, FACES);   // not laid out yet
+    let count = Math.min(available, FACES);
+    while (count > 1 && row(count) > width) count--;
+    return count;
+  }
+
+  /** As many faces as the card can carry, then a counter for everyone else. */
+  function draw(host, people, total) {
+    const shown = people.slice(0, fit(host, people.length, total));
+    const rest = Math.max(0, total - shown.length);
+    // Enough faces to carry the row, or something left over to point at: either
+    // way the row is stretched edge to edge, so it ends on the card's own right
+    // inset instead of leaving a hole beside four faces in the corner.
+    host.classList.toggle('is-full', rest > 0 || shown.length >= SPREAD);
+    host.innerHTML = shown.map((person) => `<img src="${person.avatar_url}&s=64" alt="${person.login}" width="${AVATAR}" height="${AVATAR}" loading="lazy"/>`).join('')
+      + (rest ? `<span class="more">+${rest.toLocaleString('en')}</span>` : '');
+  }
+
   function faces(host, people, total) {
     if (!host) return;
-    const shown = people.slice(0, FACES);
-    const rest = Math.max(0, (total || people.length) - shown.length);
-    host.innerHTML = shown.map((person) => `<img src="${person.avatar_url}&s=64" alt="${person.login}" width="28" height="28" loading="lazy"/>`).join('')
-      + (rest ? `<span class="more">+${rest.toLocaleString('en')}</span>` : '');
+    const value = total || people.length;
+    const render = () => draw(host, people, value);
+    rows.set(host, render);
+    render();
   }
 
   function number(host, value) {
@@ -115,16 +157,9 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
   function issues() {
     const count = document.getElementById('issue-count');
     const host = document.getElementById('issue-avatars');
-    const show = (entries, total) => {
+    const show = (total, authors) => {
       if (!Number.isFinite(total) || total <= 0) return false;
       number(count, total);
-      const authors = [];
-      for (const entry of entries) {
-        const author = entry && entry.user;
-        if (!isPerson(author)) continue;
-        if (authors.some((person) => person.login === author.login)) continue;
-        authors.push(author);
-      }
       faces(host, authors, total);
       return true;
     };
@@ -136,18 +171,24 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
       .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`search ${response.status}`))))
       .then((result) => {
         const total = Number(result && result.total_count);
-        const entries = (result && result.items) || [];
-        if (Number.isFinite(total)) writeCache('nodus-issues', { total, logins: entries.map((entry) => entry?.user?.login).filter(Boolean) });
-        return show(entries, total);
+        const authors = [];
+        for (const entry of (result && result.items) || []) {
+          const author = entry && entry.user;
+          if (!isPerson(author)) continue;
+          if (authors.some((person) => person.login === author.login)) continue;
+          authors.push({ login: author.login, avatar_url: author.avatar_url });
+        }
+        if (Number.isFinite(total)) writeCache('nodus-issues', { total, authors });
+        return show(total, authors);
       })
       .catch(() => {
         // The search endpoint throttles anonymous callers hard, so a card the
-        // visitor already has stays filled; an unknown total is left unknown
-        // rather than shown as a number the project never reached.
+        // visitor already has is redrawn whole — number and faces together, or
+        // the row would come back empty while the total looked fine. An unknown
+        // total is left unknown rather than shown as a number never reached.
         const cached = readCache('nodus-issues');
         if (!cached) return false;
-        number(count, cached.total);
-        return true;
+        return show(cached.total, cached.authors || []);
       })
       .then((shown) => {
         if (!shown) unknown(count, host);
