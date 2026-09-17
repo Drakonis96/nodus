@@ -1001,6 +1001,10 @@ export function normalizeServerLanguage(value) {
     const tag = value.trim().replace(/_/g, '-').toLowerCase();
     if (SIMPLIFIED_CHINESE_TAGS.has(tag)) return 'zh-CN';
     if (TRADITIONAL_CHINESE_TAGS.has(tag)) return 'zh-TW';
+    // A browser sends the region too (ja-JP, ko-KR, fr-CA); the catalogue is keyed by
+    // the base language, so resolve on that before giving up on English.
+    const base = tag.split('-')[0];
+    if (SERVER_LANGUAGES.includes(base)) return base;
   }
   return 'en';
 }
