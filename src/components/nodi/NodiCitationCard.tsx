@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { MarkdownCitation } from '../Markdown';
 import { Icon } from '../ui';
-import { evidenceLocator, openEvidenceAtPage } from '../../evidenceJump';
 import { parsePageNumber } from '@shared/pageLocation';
 import { t, tx } from '../../i18n';
 
@@ -60,6 +59,22 @@ function missingFor(kind: MarkdownCitation['kind']): string {
 /** Physical page behind the card's anchor, when it has one. */
 function citedPage(view: CiteView): number | null {
   return view.pageNumber ?? parsePageNumber(view.location);
+}
+
+/**
+ * Reach the page the card names. Only Zotero's reader is reachable from the
+ * overlay: when the answer is that a library copy would have to be opened, the
+ * in-app reader lives in the main window, so the user continues there. The event
+ * the main window's own jump dispatches would go nowhere in this window.
+ */
+async function openCitedPage(view: CiteView): Promise<void> {
+  if (!view.nodusId) return;
+  const result = await window.nodus.openEvidenceAtPage(view.nodusId, {
+    location: view.location ?? null,
+    sourceRef: view.sourceRef ?? null,
+    pageNumber: view.pageNumber ?? null,
+  }).catch(() => null);
+  if (result?.mode === 'local') await window.nodus.nodiOpenMainWindow();
 }
 
 function authorYear(authors: string[] | undefined, year: number | null | undefined): string {
@@ -189,7 +204,7 @@ export function NodiCitationCard({ citation, isOverlay, onClose }: { citation: M
                     <button
                       className="nodi-cite-btn primary"
                       data-testid="nodi-cite-jump-page"
-                      onClick={() => void openEvidenceAtPage(view.nodusId!, evidenceLocator({ location: view.location, source_ref: view.sourceRef, page_number: view.pageNumber }))}
+                      onClick={() => void openCitedPage(view)}
                     >
                       <Icon name="external" size={13} /> {tx('Ver página {n}', { n: citedPage(view)! })}
                     </button>

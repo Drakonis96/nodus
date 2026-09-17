@@ -128,6 +128,12 @@ export const NODI_WINDOW_METHODS = [
   'getWork',
   'getPassage',
   'openInZotero',
+  // The card can name a page, so it asks for the same exact-page handoff the main
+  // window uses. Only Zotero's half of that answer is reachable from here: the
+  // overlay cannot open the in-app reader, so a `local` answer sends the user to
+  // the main window instead. The library-copy fallback the main window performs is
+  // deliberately not part of this window's surface.
+  'openEvidenceAtPage',
 ] as const satisfies readonly (keyof NodusApi)[];
 
 export type NodiApi = Pick<NodusApi, (typeof NODI_WINDOW_METHODS)[number]>;
