@@ -6,6 +6,7 @@ import { ChatCapabilityResult } from './ChatCapabilityResult';
 import { ChatCapabilityArtifact } from './ChatCapabilityArtifact';
 import { ChatCapabilityView } from './CapabilityView';
 import { ChatLegacyResult } from './ChatLegacyResult';
+import { RouteFixPrompt } from './RouteFixPrompt';
 import { Icon } from './ui';
 import { localizeRuntimeError } from '@shared/uiLanguage';
 import { t, getActiveLang } from '../i18n';
@@ -26,9 +27,23 @@ export function capabilityActivityTitle(source: string): string {
   return capabilityIdentifierTitle(identifier);
 }
 
+/** A stored artifact and the view that travelled with it are one result, emitted as two
+ *  blocks. Rendering both paints the same drawing twice, so a reference is skipped when its
+ *  own inline view follows it. A reference with no inline view still renders as the card. */
+function hasInlineView(parts: ReturnType<typeof splitChatVisuals>, index: number): boolean {
+  for (let next = index + 1; next < parts.length; next++) {
+    const candidate = parts[next];
+    if (candidate.kind === 'markdown' && !candidate.content.trim()) continue;
+    return candidate.kind === 'capability-view';
+  }
+  return false;
+}
+
 export function ChatMarkdown({ content, streaming = false, ...props }: ComponentProps<typeof Markdown> & { streaming?: boolean }) {
   const claims = useCapabilityFences();
-  return <div className="chat-rich-answer">{splitChatVisuals(content, claims.fences, claims.legacyFences).map((part, index) => {
+  const parts = splitChatVisuals(content, claims.fences, claims.legacyFences);
+  return <div className="chat-rich-answer">{parts.map((part, index) => {
+    if (part.kind === 'capability-artifact' && hasInlineView(parts, index)) return null;
     // A block an earlier release already finished. It is rendered by whoever owns that
     // fence now, never shown as work in progress.
     if (part.kind === 'capability-legacy' && part.complete) return <ChatLegacyResult key={index} fence={part.fence!} source={part.content} />;
@@ -43,6 +58,8 @@ export function ChatMarkdown({ content, streaming = false, ...props }: Component
       return <div key={index} className="chat-visual-error" role="alert">{localizeRuntimeError(message, getActiveLang())}</div>;
     }
     if (part.kind === 'markdown') return <Markdown key={index} {...props} content={part.content} chatVisuals />;
+    if (part.kind === 'route-fix' && part.complete && !streaming) return <RouteFixPrompt key={index} content={part.content} />;
+    if (part.kind === 'route-fix') return null;
     if (part.kind === 'capability-artifact' && part.complete && !streaming) return <ChatCapabilityArtifact key={index} source={part.content} />;
     if (part.kind === 'capability-view' && part.complete && !streaming) return <ChatCapabilityView key={index} source={part.content} />;
     if (part.kind === 'capability-artifact' || part.kind === 'capability-view') return <div key={index} role="status" className="chat-visual-pending"><Icon name="sparkles" size={22} /><div><b>{capabilityActivityTitle(part.content)}</b><span>{streaming ? t('Cargando…') : t('La generación se interrumpió. Vuelve a intentarlo.')}</span></div></div>;

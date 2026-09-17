@@ -8230,4 +8230,6 @@ export const IT: Record<string, string> = {
   "Nodus Server · experimental": "Nodus Server · sperimentale",
   "Zotero es una marca registrada de Corporation for Digital Scholarship. Nodus es independiente y no está respaldado por Zotero.": "Zotero è un marchio registrato della Corporation for Digital Scholarship. Nodus è indipendente e non è approvato da Zotero.",
   "Error del sombreador": "Errore dello shader",
+  "Ask the model to fix the failed steps": "Chiedi al modello di correggere i passaggi non riusciti",
+  "Sent": "Inviato",
 };
