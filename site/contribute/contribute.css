@@ -59,95 +59,19 @@ figures row, and never redefines the shared scale.
 .traits i { font-style: normal; font-size: 12.5px; color: var(--ink-3); }
 
 /* ------------------------------------------------ the world behind it
-   A ringed planet read the way a photograph reads: a near-black body with the
-   light on one limb only, a thin ring that passes behind the sphere on one side
-   and in front on the other, and the point where the two cross lit up. Almost
-   nothing here is a filled shape — the whole effect is gradients at the edge,
-   which is what keeps it from looking like a sticker. */
-.planet-stage {
-  position: absolute; z-index: 0; pointer-events: none;
-  top: 0; left: 0; right: 0; height: 150%;
-  overflow: clip;
-}
-.planet {
-  position: absolute; top: 50%; right: min(-16vw, -130px); translate: 0 -50%;
-  width: min(1060px, 84vw); aspect-ratio: 1;
-  /* the body dissolves before the stage clips it, so no straight edge shows */
-  mask-image: linear-gradient(180deg, #000 66%, transparent 96%);
-  -webkit-mask-image: linear-gradient(180deg, #000 66%, transparent 96%);
-}
-.planet-ball {
-  position: absolute; inset: 0; border-radius: 50%;
-  background:
-    /* the lit hemisphere: a whisper from the upper left, ending in a terminator */
-    radial-gradient(ellipse 42% 42% at 26% 26%, rgba(126, 100, 236, 0.26) 0%, rgba(72, 46, 158, 0.10) 40%, rgba(30, 20, 68, 0.02) 70%, transparent 92%),
-    radial-gradient(ellipse 50% 50% at 50% 50%, #120e2c 0%, #0c0a1e 48%, #070614 80%, #040309 100%);
-  box-shadow: inset -70px -50px 150px 24px rgba(0, 0, 0, 0.95);
-}
-/* the limb: the thin bright arc that tells the eye the body is round */
-.planet-limb {
-  position: absolute; inset: 0; border-radius: 50%;
-  background: radial-gradient(ellipse 50% 50% at 50% 50%,
-    transparent 0 95.4%,
-    rgba(246, 242, 255, 0.92) 96.4%,
-    rgba(190, 166, 255, 0.5) 97.6%,
-    rgba(120, 62, 232, 0.14) 98.8%,
-    transparent 100%);
-  mask-image: linear-gradient(140deg, #000 2%, rgba(0, 0, 0, 0.9) 22%, rgba(0, 0, 0, 0.45) 42%, transparent 60%);
-  -webkit-mask-image: linear-gradient(140deg, #000 2%, rgba(0, 0, 0, 0.9) 22%, rgba(0, 0, 0, 0.45) 42%, transparent 60%);
-}
-/* the air the bright edge lights up, which is what a limb does to a dark sky */
-.planet-bloom {
-  position: absolute; inset: -0.8%; border-radius: 50%;
-  background: radial-gradient(ellipse 50% 50% at 50% 50%,
-    transparent 0 90%,
-    rgba(139, 92, 246, 0.22) 95%,
-    rgba(196, 181, 253, 0.09) 97.6%,
-    transparent 100%);
-  mask-image: linear-gradient(140deg, #000 2%, rgba(0, 0, 0, 0.55) 22%, transparent 46%);
-  -webkit-mask-image: linear-gradient(140deg, #000 2%, rgba(0, 0, 0, 0.55) 22%, transparent 46%);
-  filter: blur(20px);
-}
-/* the ring, in two copies: the back one is covered by the body, the front one
-   is masked to the near half so only the arc that passes in front is drawn */
-.ring { position: absolute; inset: 0; }
-.ring > i {
-  position: absolute; left: 50%; top: 50%; width: 176%; aspect-ratio: 1;
-  translate: -50% -50%; transform: rotate(-19deg) scaleY(0.145);
-  border-radius: 50%;
-  border: 1px solid rgba(206, 194, 255, 0.36);
-  box-shadow: 0 0 14px rgba(139, 92, 246, 0.4);
-}
-.ring.back { z-index: 0; }
-.ring.front {
-  z-index: 3;
-  mask-image: linear-gradient(199deg, transparent 45%, #000 53%);
-  -webkit-mask-image: linear-gradient(199deg, transparent 45%, #000 53%);
-}
-/* where the ring crosses the lit limb, the crossing is the brightest thing here */
-.planet-spark {
-  position: absolute; z-index: 4; left: 6.5%; top: 74%;
-  width: 8px; height: 8px; border-radius: 50%;
-  background: radial-gradient(circle, #fff 0%, rgba(233, 228, 255, 0.8) 30%, rgba(167, 139, 250, 0.28) 60%, transparent 76%);
-  box-shadow: 0 0 26px 6px rgba(167, 139, 250, 0.32);
-}
+   The planet is the standalone WebGL component, so this file only places it: the
+   component keeps its own proportions, its glow, its orbit and its caption, and
+   its rules never leave .nodus-planet. The sphere is already cropped by the
+   component's frame on its right, so the frame is what meets the window edge —
+   nothing on this page bleeds sideways for it.
 
-/* the dashed transit line, from the words out to the far edge */
-.planet-line {
-  position: absolute; z-index: 1; pointer-events: none;
-  top: 46%; left: 50%; right: 4%;
-  border-top: 1px dashed rgba(167, 139, 250, 0.22);
-  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+   It is taller than the hero on purpose: the sections below sit above it, so the
+   sphere's lower half passes behind the figures on its way out of the hero. */
+.support-hero .hero-planet {
+  position: absolute; z-index: 0; pointer-events: none;
+  top: 50%; right: 0; translate: 0 -50%;
+  width: min(780px, 64vw);
 }
-.planet-caption {
-  position: absolute; z-index: 2; top: 36%; right: clamp(16px, 5vw, 78px);
-  display: grid; justify-items: end; gap: 3px;
-  font-size: 10.5px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase;
-  color: var(--ink-2);
-}
-.planet-caption i { font-style: normal; }
-.planet-caption em { width: 17px; height: 1px; margin-top: 7px; background: var(--membrane-2); }
 
 /* ============================================================ ways
    First section under the hero on purpose: the three ways to give are the whole
@@ -210,7 +134,7 @@ figures row, and never redefines the shared scale.
 /* The four blocks read as one band: equal height at every width — a fixed floor
    does that, since two of them carry a row of faces and two do not — and the
    section keeps the same air above and below. */
-.support-numbers { padding: 26px 0; }
+.support-numbers { position: relative; z-index: 1; padding: 26px 0; }
 /* nodus.css gives the section after a hero a taller top than bottom; this band
    keeps its air even on both sides, which is what makes it read as a band. */
 .page-hero + .support-numbers { padding-top: 26px; }
@@ -294,7 +218,7 @@ figures row, and never redefines the shared scale.
 
 @media (max-width: 900px) {
   /* the planet is decoration: on a phone it only steals the words their room */
-  .planet, .planet-line, .planet-caption { display: none; }
+  .support-hero .hero-planet { display: none; }
   .support-hero .scrim { max-width: 100%; }
 }
 
