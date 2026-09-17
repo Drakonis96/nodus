@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-export const SERVER_LANGUAGES = ['en', 'es', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW'];
+export const SERVER_LANGUAGES = ['en', 'es', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja'];
 
 const EN = {
   sourceCode: 'Source code',

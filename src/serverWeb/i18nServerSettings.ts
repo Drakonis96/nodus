@@ -698,7 +698,7 @@ export const SERVER_SETTINGS_TRANSLATIONS: Record<
     "Disponible mediante Desktop": "デスクトップから利用可能",
     Sustituir: "交換する",
     Guardar: "保存",
-    Eliminar: "取り除く",
+    Eliminar: "消去",
     "Este proveedor requiere el runtime o la red local de Nodus Desktop; sus favoritos se conservan, pero Server no intenta ejecutarlo.": "このプロバイダーには、Nodus Desktop ランタイムまたはローカルネットワークが必要です。お気に入りは保存されますが、サーバーはそれを実行しようとしません。",
     "Actualizando catálogo…": "カタログを更新中…",
     "Catálogo en vivo del proveedor": "ライブプロバイダーカタログ",

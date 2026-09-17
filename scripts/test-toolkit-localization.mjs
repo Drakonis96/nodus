@@ -11,7 +11,7 @@ import { mainSourceText } from './ipc-channel-census.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 const outDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-toolkit-localization-'));
-const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW'];
+const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja'];
 
 function bundle(entry) {
   const outfile = path.join(outDir, `${path.basename(entry, path.extname(entry))}.cjs`);

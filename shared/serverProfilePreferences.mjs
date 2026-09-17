@@ -375,7 +375,7 @@ export function sanitizeServerProfilePreferences(value) {
       // Tolerate profiles written before this key existed.
       appTheme: enumValue(appearance.appTheme ?? 'default', allowedAppThemes),
       customThemes,
-      uiLanguage: enumValue(appearance.uiLanguage, ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW']),
+      uiLanguage: enumValue(appearance.uiLanguage, ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja']),
       promptLanguage: enumValue(appearance.promptLanguage, ['es', 'en', 'fr', 'tr', 'de', 'pt', 'pt-BR', 'it', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko']),
       animationSpeed: number(appearance.animationSpeed, 0, 1),
       interfaceScale: number(appearance.interfaceScale, 0.75, 1.5),

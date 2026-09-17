@@ -1103,7 +1103,8 @@ export function seedTeachingDemoData(): boolean {
         const [value, status] = marks[index];
         const entryId = `${student.id}-entry-${index}`;
         insertEntry.run(entryId, student.id, itemId, value, status, pick(STATUS_NOTE[status] ?? { es: '', en: '', 'zh-CN': '' ,
-  'zh-TW': '', }), createdAt, updatedAt);
+  'zh-TW': '',
+  ja: "", }), createdAt, updatedAt);
         // The commentary leaf is marked with the rubric, so it also carries the level
         // chosen for each criterion.
         if (itemId === 'demo-teaching-item-commentary-guided' && status === 'evaluated') {

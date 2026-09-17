@@ -57,6 +57,11 @@
           "title": "NVIDIA 裝置上的本地模型：我們正在調查一個問題",
           "body": "Nodus 為內建模型安裝的引擎在 Windows 和 Linux 上以 CPU 版本分發，因此在配備 NVIDIA GPU 的裝置上，這些模型由處理器完成計算：即使顯示卡效能強勁、驅動也是最新的，它們也可能耗時極長或看起來卡住。在問題解決之前，如果你想要 GPU 加速，請在「設定 → AI 模型」中把 Nodus 指向 Ollama 或 LM Studio；如果繼續使用內建模型，請以 CPU 的速度為準。",
           "linkLabel": "在 GitHub 上關注報告"
+        },
+        "ja": {
+          "title": "NVIDIA マシン上のローカルモデル: 問題を調査中です",
+          "body": "Nodus が統合モデル用にインストールするエンジンは、CPU ビルドとして Windows および Linux に出荷されるため、NVIDIA GPU を搭載したマシンでは、これらのモデルはプロセッサ上で実行されます。対応するカードと最新のドライバーを使用していても、非常に長い時間がかかったり、フリーズしたように見える場合があります。私たちが修正している間、GPU アクセラレーションが必要な場合は、[設定] → [AI モデル] で Nodus を Ollama または LM Studio にポイントしてください。統合モデルでは、CPU 速度が期待されます。",
+          "linkLabel": "GitHub でレポートをフォローしてください"
         }
       }
     },
@@ -115,6 +120,11 @@
           "title": "幫助構建 Nodus Research",
           "body": "Nodus 幾乎完全由一位開發者開發和維護。如果你喜歡這個專案並希望幫助它成長，任何貢獻都歡迎：程式碼、修復、新功能、文件、翻譯或想法。",
           "linkLabel": "在 GitHub 上貢獻"
+        },
+        "ja": {
+          "title": "Nodus Research の構築を支援する",
+          "body": "Nodus は、ほぼすべて1人の開発者によって開発および保守されています。プロジェクトが気に入ってプロジェクトの成長を支援したい場合は、コード、修正、新機能、ドキュメント、翻訳、アイデアなど、あらゆる貢献を歓迎します。",
+          "linkLabel": "GitHub に貢献する"
         }
       }
     },
@@ -173,6 +183,11 @@
           "title": "喜歡 Nodus 嗎？",
           "body": "如果你喜歡 Nodus，請在 GitHub 上給我們一顆星，以支援我們並幫助專案成長。",
           "linkLabel": "在 GitHub 上給我們一顆星"
+        },
+        "ja": {
+          "title": "ノーダスを楽しんでいますか？",
+          "body": "Nodus を気に入っていただけましたら、GitHub でスターを付けてプロジェクトをサポートし、プロジェクトの成長を支援してください。",
+          "linkLabel": "GitHub 上のスターノーダス"
         }
       }
     },
@@ -231,6 +246,11 @@
           "title": "你希望在 Nodus 中看到哪種語言？",
           "body": "填寫一份簡短問卷，幫助我們決定接下來為 Nodus 新增哪種語言。",
           "linkLabel": "填寫問卷"
+        },
+        "ja": {
+          "title": "Nodus でどの言語を使用したいですか?",
+          "body": "簡単なアンケートにご協力いただき、次に Nodus に追加する言語の決定にご協力ください。",
+          "linkLabel": "アンケートに回答してください"
         }
       }
     },
@@ -289,6 +309,11 @@
           "title": "喜歡 Nodus 嗎？",
           "body": "如果你喜歡 Nodus，請在 GitHub 上給我們一顆星，以支援我們並幫助專案成長。",
           "linkLabel": "在 GitHub 上給我們一顆星"
+        },
+        "ja": {
+          "title": "ノーダスを楽しんでいますか？",
+          "body": "Nodus を気に入っていただけましたら、GitHub でスターを付けてプロジェクトをサポートし、プロジェクトの成長を支援してください。",
+          "linkLabel": "GitHub 上のスターノーダス"
         }
       }
     },
@@ -347,6 +372,11 @@
           "title": "Nodus 啟用新網站",
           "body": "Nodus 的網站有了新地址：nodusresearch.com。它把 wiki、教程、部落格和互動式演示彙集在同一處。",
           "linkLabel": "訪問 nodusresearch.com"
+        },
+        "ja": {
+          "title": "Nodusには新しいウェブサイトがあります",
+          "body": "Nodus Web サイトのアドレスは、nodusresearch.com になりました。 Wiki、チュートリアル、ブログ、インタラクティブなデモを1か所にまとめます。",
+          "linkLabel": "nodusresearch.com にアクセスしてください"
         }
       }
     },
@@ -406,6 +436,11 @@
           "title": "Nodus Connector for Chrome 已上架 Chrome 應用商店",
           "body": "Nodus Connector for Chrome 會把你當前開啟的學術網頁或文件儲存到本地文獻庫。它識別頁面內嵌的書目後設資料、DOI 或 ISBN 以及可用的檔案，並讓你在儲存前選擇 Nodus 的巢狀合集以及已有或新建的標籤。只有在你點選工具欄中的圖示後，它才會讀取當前標籤頁。",
           "linkLabel": "從 Chrome 應用商店安裝"
+        },
+        "ja": {
+          "title": "Chrome 用 Nodus Connector、Chrome ウェブストアに登場",
+          "body": "Nodus Connector for Chrome は、開いている学術ページまたはドキュメントをローカルライブラリにキャプチャします。埋め込まれた書誌メタデータ、DOI/ISBN、利用可能なファイルを検出し、ユーザーが保存する前にネストされた Nodus コレクションと既存または新しいタグを選択できるようにします。ツールバーのアイコンがクリックされた後にのみ、アクティブなタブが読み取られます。",
+          "linkLabel": "Chrome ウェブストアからインストールする"
         }
       }
     },
@@ -465,6 +500,11 @@
           "title": "Nodus 4 改用 AGPL v3 許可證",
           "body": "從第 4 版起，Nodus 在 GNU Affero 通用公共許可證第 3 版下分發。",
           "linkLabel": "檢視 AGPL v3 許可證"
+        },
+        "ja": {
+          "title": "Nodus 4の AGPL v3ライセンスの変更",
+          "body": "バージョン4以降、Nodus は GNU Affero General Public License v3に基づいて配布されます。",
+          "linkLabel": "AGPL v3ライセンスを表示する"
         }
       }
     },
@@ -523,6 +563,11 @@
           "title": "Nodus 移動應用 | 興趣調查",
           "body": "我們正在開發 Nodus 移動應用，非常希望瞭解你的想法。",
           "linkLabel": "填寫問卷"
+        },
+        "ja": {
+          "title": "Nodusモバイルアプリ |関心調査",
+          "body": "私たちは Nodus モバイルアプリを開発中ですので、皆様のご意見をお待ちしております。",
+          "linkLabel": "アンケートに回答してください"
         }
       }
     }

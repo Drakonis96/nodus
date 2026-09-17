@@ -60,6 +60,7 @@ const TRANSLATIONS = [
   { name: 'Turkish', lang: 'tr', file: 'src/i18n.tr.ts', export: 'TR' },
   { name: 'Simplified Chinese', lang: 'zh-CN', file: 'src/i18n.zh-CN.ts', export: 'ZH_CN' },
   { name: 'Traditional Chinese', lang: 'zh-TW', file: 'src/i18n.zh-TW.ts', export: 'ZH_TW' },
+  { name: 'Japanese', lang: 'ja', file: 'src/i18n.ja.ts', export: 'JA' },
 ].map((entry) => ({ ...entry, table: loadModule(entry.file)[entry.export] }));
 
 // Server Web renders through its own adapter: t() there walks the server
@@ -965,7 +966,7 @@ test('the two Portuguese variants are really different', () => {
 
 // The languages that in-data labels must also carry. Spanish and English are the
 // source pair every table already had.
-const IN_DATA_LANGUAGES = ['fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW'];
+const IN_DATA_LANGUAGES = ['fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja'];
 
 test('in-data labels are translated alongside the i18n table', () => {
   // These labels ship inside shared/ data rather than the i18n table, so the
@@ -977,7 +978,7 @@ test('in-data labels are translated alongside the i18n table', () => {
   // Assert against the source maps, not the expanded `labels`: those are
   // `DOC_TYPE_LABEL_XX[id] ?? labelEn`, so a missing id would silently look fine.
   // A label equal to the English one is legitimate ("Illustration", "Notes").
-  const docTypeMaps = { fr: docTypes.DOC_TYPE_LABEL_FR, de: docTypes.DOC_TYPE_LABEL_DE, pt: docTypes.DOC_TYPE_LABEL_PT, 'pt-BR': docTypes.DOC_TYPE_LABEL_PT_BR, it: docTypes.DOC_TYPE_LABEL_IT, tr: docTypes.DOC_TYPE_LABEL_TR, 'zh-CN': docTypes.DOC_TYPE_LABEL_ZH_CN, 'zh-TW': docTypes.DOC_TYPE_LABEL_ZH_TW };
+  const docTypeMaps = { fr: docTypes.DOC_TYPE_LABEL_FR, de: docTypes.DOC_TYPE_LABEL_DE, pt: docTypes.DOC_TYPE_LABEL_PT, 'pt-BR': docTypes.DOC_TYPE_LABEL_PT_BR, it: docTypes.DOC_TYPE_LABEL_IT, tr: docTypes.DOC_TYPE_LABEL_TR, 'zh-CN': docTypes.DOC_TYPE_LABEL_ZH_CN, 'zh-TW': docTypes.DOC_TYPE_LABEL_ZH_TW, ja: docTypes.DOC_TYPE_LABEL_JA };
   for (const language of IN_DATA_LANGUAGES) {
     const map = docTypeMaps[language];
     assert.ok(map, `no doc-type label map for ${language}`);
@@ -1005,6 +1006,7 @@ test('in-data labels are translated alongside the i18n table', () => {
   const { RELEASE_NOTES_TR } = loadModule('shared/releaseNotes.tr.ts');
   const { RELEASE_NOTES_ZH } = loadModule('shared/releaseNotes.zh-CN.ts');
   const { RELEASE_NOTES_ZH_TW } = loadModule('shared/releaseNotes.zh-TW.ts');
+  const { RELEASE_NOTES_JA } = loadModule('shared/releaseNotes.ja.ts');
   const highlights = RELEASE_NOTES.flatMap((note) => note.highlights.map((h) => [note.version, h]));
   for (const language of IN_DATA_LANGUAGES) {
     const missing = highlights.filter(([, h]) => !h[language]?.trim()).map(([version]) => version);
@@ -1022,6 +1024,10 @@ test('in-data labels are translated alongside the i18n table', () => {
     note.highlights.flatMap((_, index) => RELEASE_NOTES_ZH_TW[note.version]?.[index]?.trim() ? [] : [`${note.version}#${index}`])
   );
   assert.deepEqual(missingTraditionalChineseSources, [], 'Traditional Chinese release notes must not silently fall back to English');
+  const missingJapaneseSources = RELEASE_NOTES.flatMap((note) =>
+    note.highlights.flatMap((_, index) => RELEASE_NOTES_JA[note.version]?.[index]?.trim() ? [] : [`${note.version}#${index}`])
+  );
+  assert.deepEqual(missingJapaneseSources, [], 'Japanese release notes must not silently fall back to English');
 });
 
 test('keys reached indirectly and through ternaries are collected', () => {

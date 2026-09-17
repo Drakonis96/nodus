@@ -127,6 +127,7 @@ BRAINSTORM_COPY.it.ideaRequired = 'Scrivi un’idea prima di inviarla.';
 BRAINSTORM_COPY.tr.ideaRequired = 'Göndermeden önce bir fikir yazın.';
 BRAINSTORM_COPY['zh-CN'].ideaRequired = '发送前请先写下想法。';
 BRAINSTORM_COPY['zh-TW'].ideaRequired = '傳送前請先寫下想法。';
+BRAINSTORM_COPY['ja'].ideaRequired = '送信する前にアイデアを書いてください。';
 
 export const INCLUDED_BRAINSTORM_MANIFEST: ToolkitAppManifest = {
   schemaVersion: 2,

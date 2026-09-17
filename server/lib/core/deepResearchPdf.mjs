@@ -29,6 +29,7 @@ const PDF_LABELS = {
   tr: { outline: 'Araştırma planı', next: 'Sonraki adımlar', limitations: 'Sınırlamalar', bibliography: 'Kaynakça', empty: 'Raporda içerik yok.', cover: 'Deep Research raporu' },
   'zh-CN': { outline: '研究大纲', next: '后续步骤', limitations: '局限性', bibliography: '参考文献', empty: '报告没有内容。', cover: 'Deep Research 报告' },
   'zh-TW': { outline: '研究大綱', next: '後續步驟', limitations: '侷限性', bibliography: '參考文獻', empty: '報告沒有內容。', cover: 'Deep Research 報告' },
+  ja: { outline: '研究概要', next: '次のステップ', limitations: '限界', bibliography: '参考文献', empty: 'レポートに内容がありません。', cover: 'Deep Research レポート' },
 };
 
 function pdfLanguage(value) {
@@ -37,6 +38,8 @@ function pdfLanguage(value) {
     const tag = value.trim().replace(/_/g, '-').toLowerCase();
     if (tag === 'zh' || tag === 'zh-cn' || tag === 'zh-hans' || tag === 'zh-sg') return 'zh-CN';
     if (tag === 'zh-tw' || tag === 'zh-hant' || tag === 'zh-hk' || tag === 'zh-mo') return 'zh-TW';
+    if (tag === 'ja' || tag.startsWith('ja-')) return 'ja';
+    if (tag === 'ja' || tag.startsWith('ja-')) return 'ja';
   }
   return Object.prototype.hasOwnProperty.call(PDF_LABELS, value) ? value : 'en';
 }
