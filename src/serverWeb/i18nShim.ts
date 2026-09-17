@@ -4353,7 +4353,7 @@ const SERVER_WEB_VAULT_TRANSLATIONS: Partial<
     "Etiqueta normalizada": "Normalised label",
     "Ficha de persona": "Person profile",
     "Fechas no documentadas": "Undocumented dates",
-    "Nombres documentados": "文書化された名前",
+    "Nombres documentados": "Documented names",
     "Lugares contenidos": "Contained places",
     Apariencia: "Appearance",
     Atmósfera: "Atmosphere",
