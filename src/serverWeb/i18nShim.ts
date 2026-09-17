@@ -14,6 +14,8 @@ import { PT_BR } from "../i18n.pt-BR";
 import { IT } from "../i18n.it";
 import { TR } from "../i18n.tr";
 import { ZH_CN } from "../i18n.zh-CN";
+import { ZH_TW } from "../i18n.zh-TW";
+import { JA } from "../i18n.ja";
 import { SERVER_TRANSLATIONS } from "../i18n.server";
 import { SERVER_SETTINGS_TRANSLATIONS } from "./i18nServerSettings";
 
@@ -5352,7 +5354,8 @@ const DESKTOP_TABLES: TranslationTables = {
   it: IT,
   tr: TR,
   "zh-CN": ZH_CN,
-  'zh-TW': ZH_CN,
+  "zh-TW": ZH_TW,
+  ja: JA,
 };
 
 export function setActiveLang(language: AppLanguage): void {
