@@ -19,6 +19,8 @@
 // Usage:
 //   node scripts/e2e-local-ai-extraction.mjs [--models=gemma,granite,qwen,lfm2]
 //     [--userdata=<dir>] [--report=<file>] [--skip-download] [--keep-open]
+//     [--provider=nodus|custom --base-url=<url> [--model-id=<slug>]] [--serial]
+//     [--paper-ids=1512.03385,1412.6980] [--papers=<dir>]
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { existsSync } from 'node:fs';
@@ -65,13 +67,51 @@ const skipDownload = process.argv.includes('--skip-download');
 const dryRun = process.argv.includes('--dry-run');
 const keepOpen = process.argv.includes('--keep-open');
 const queueTimeoutMs = Number(arg('--queue-timeout-ms', String(6 * 60 * 60 * 1000)));
+// The document index runs a section pass plus an audit pass per work, which on a GPU is a
+// matter of minutes. Through a serial gateway on a laptop's integrated GPU it is not: the
+// budget is a flag so a slow-but-healthy run finishes instead of being recorded as blocked.
+const documentIndexTimeoutMs = Number(arg('--docindex-timeout-ms', String(45 * 60 * 1000)));
+// The document index is minutes per work on a GPU and the better part of an hour through a
+// serial gateway on a laptop. A run that is validating something else can skip it, and then
+// computes the idea embeddings before the relation pass — which is the order the app itself
+// is in by the time a user reprocesses connections.
+const skipDocumentIndex = process.argv.includes('--skip-document-index');
+
+// The provider under test. Everything else in this harness was written for the integrated
+// runtime (`nodus`), which is a provider Nodus owns end to end; the custom
+// (OpenAI-compatible) provider is the one whose server, contract and locality are the
+// user's, so validating a fix there means driving the same pipeline against a gateway this
+// script does not control — see scripts/e2e-custom-provider-local-model.mjs, which starts
+// the engine and the optional refusing gateway and calls this harness with `--provider=custom`.
+const providerName = arg('--provider', 'nodus');
+if (providerName !== 'nodus' && providerName !== 'custom') {
+  throw new Error(`proveedor no soportado: ${providerName}`);
+}
+const baseUrl = arg('--base-url', '');
+const modelIdOverride = arg('--model-id');
+if (providerName === 'custom' && !baseUrl) throw new Error('--provider=custom necesita --base-url');
+// `--serial` admits one request at a time through the app's own scheduler, so a validation
+// run measures the pipeline rather than the machine's tolerance for contention.
+const serial = process.argv.includes('--serial') || providerName === 'custom';
+
+/** The corpus: every paper, or the ones named by `--papers=1512.03385,1412.6980`. */
+const paperFilter = arg('--paper-ids');
+const papersById = (list) => {
+  if (!paperFilter) return list;
+  const wanted = paperFilter.split(',').map((entry) => entry.trim()).filter(Boolean);
+  const selected = list.filter((paper) => wanted.includes(paper.arxiv));
+  for (const id of wanted) {
+    if (!selected.some((paper) => paper.arxiv === id)) throw new Error(`--paper-ids no conoce el paper ${id}`);
+  }
+  return selected;
+};
 
 if (!existsSync(path.join(root, 'dist-electron/main.js')) || !existsSync(path.join(root, 'dist/index.html'))) {
   throw new Error('Falta el build. Ejecuta npm run build antes de validar el pipeline local.');
 }
 
 // ── The corpus: six real English papers from arXiv ──────────────────────────
-const PAPERS = [
+const ALL_PAPERS = [
   {
     arxiv: '1706.03762', key: 'ARXIVATTN', title: 'Attention Is All You Need', year: 2017, pages: 15,
     abstract: 'The dominant sequence transduction models are based on complex recurrent or convolutional neural networks that include an encoder and a decoder. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely.',
@@ -97,6 +137,9 @@ const PAPERS = [
     abstract: 'While the Transformer architecture has become the de-facto standard for natural language processing tasks, its applications to computer vision remain limited. We show that a pure Transformer applied directly to sequences of image patches can perform very well on image classification tasks.',
   },
 ];
+
+/** The papers this run ingests, in corpus order; one at a time, never in parallel. */
+const PAPERS = papersById(ALL_PAPERS);
 
 for (const paper of PAPERS) {
   const file = path.join(papersDirectory, `${paper.arxiv}.pdf`);
@@ -348,9 +391,12 @@ try {
 
   // ── Phase 2: one vault per extraction model ──────────────────────────────
   for (const name of dryRun ? [] : requestedModels) {
-    const modelId = MODEL_IDS[name];
-    const vaultName = `Local AI · ${MODEL_LABELS[name]}`;
-    const profile = { model: name, modelId, vaultName, startedAt: new Date().toISOString() };
+    const modelId = modelIdOverride ?? MODEL_IDS[name];
+    const modelRef = { provider: providerName, model: modelId };
+    const vaultName = providerName === 'custom'
+      ? `Custom gateway · ${MODEL_LABELS[name]}`
+      : `Local AI · ${MODEL_LABELS[name]}`;
+    const profile = { model: name, modelId, provider: providerName, baseUrl: baseUrl || null, vaultName, startedAt: new Date().toISOString() };
     report.profiles[name] = profile;
     try {
       const vaults = await ipc('listVaults');
@@ -358,7 +404,7 @@ try {
       const vault = existing ?? (await ipc('createVault', {
         name: vaultName,
         type: 'academic',
-        aiModel: { provider: 'nodus', model: modelId },
+        aiModel: modelRef,
         embeddingProvider: 'nodus',
         embeddingModel: 'bge-m3-q8_0',
       })).vault;
@@ -368,13 +414,17 @@ try {
 
       await ipc('updateSettings', {
         modelSettingsMode: 'advanced',
-        synthesisModel: { provider: 'nodus', model: modelId },
-        extractionModel: { provider: 'nodus', model: modelId },
-        summaryModel: { provider: 'nodus', model: modelId },
-        fusionModel: { provider: 'nodus', model: modelId },
-        relationModel: { provider: 'nodus', model: modelId },
-        documentProfileModel: { provider: 'nodus', model: modelId },
-        documentAuditModel: { provider: 'nodus', model: modelId },
+        synthesisModel: modelRef,
+        extractionModel: modelRef,
+        summaryModel: modelRef,
+        fusionModel: modelRef,
+        relationModel: modelRef,
+        documentProfileModel: modelRef,
+        documentAuditModel: modelRef,
+        // The endpoint the user typed. Only the custom provider carries one, and it is what
+        // decides both the request contract and — since the address is local — the transport
+        // budget the run is meant to exercise.
+        ...(providerName === 'custom' ? { customProvider: { baseUrl, models: [modelId] } } : {}),
         embeddingProvider: 'nodus',
         embeddingModel: 'bge-m3-q8_0',
         zoteroUserId: '0',
@@ -384,7 +434,7 @@ try {
         autoBridgeAfterQueue: false,
         documentIndexingEnabled: false,
         promptLanguage: 'en',
-        aiConcurrencyMode: 'automatic',
+        ...(serial ? { aiConcurrencyMode: 'manual', concurrency: 1 } : { aiConcurrencyMode: 'automatic' }),
       });
       profile.settings = await ipc('getSettings').then((settings) => ({
         extractionModel: settings.extractionModel, summaryModel: settings.summaryModel,
@@ -422,7 +472,6 @@ try {
         return queue.current == null && queue.done + queue.failed >= queue.total;
       });
 
-      const modelRef = { provider: 'nodus', model: modelId };
       // The scan queue pauses globally when a model is refused for the extraction role
       // (which is exactly what happens in the vaults whose model the capability matrix
       // blocks). A previous vault's refusal must not silently carry over into this one,
@@ -456,46 +505,16 @@ try {
       }
       profile.works = summarizeWorks(await ipc('listWorks'));
 
-      // Theme + relation reprocessing: the only analysis role that is not gated by
-      // the extraction capability matrix, so the two models Nodus refuses to use
-      // for idea extraction still get a real, persisted inference pass.
-      profile.reprocess = await ipc('reprocessThemeConnections', { relations: true }, { provider: 'nodus', model: modelId })
-        .then((result) => ({ ok: true, result }))
-        .catch((error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) }));
-
-      // Document index (profiles) for the imported works. Bounded twice: the deadline,
-      // and a stall detector — a vault whose model is blocked for the document-profile
-      // role leaves jobs queued with nothing running, and waiting the full budget would
-      // hide that instead of recording it.
-      const campaign = await ipc('startDocumentIndexCampaign', { includeArchived: false });
-      profile.documentIndexCampaignId = campaign?.campaignId ?? campaign?.id ?? null;
-      let stalledPolls = 0;
-      await waitFor(`índice documental de ${name}`, async () => {
-        const progress = await ipc('getDocumentIndexProgress');
-        profile.documentIndex = { active: progress.active, queued: progress.queued, failed: progress.failed, jobs: progress.jobs?.length ?? 0 };
-        noteOnce(`docindex:${name}`, `${name}: document index active=${progress.active} queued=${progress.queued} jobs=${progress.jobs?.length ?? 0} failed=${progress.failed}`);
-        if (progress.active === 0 && progress.queued === 0) return true;
-        if (progress.active === 0) {
-          stalledPolls += 1;
-          if (stalledPolls >= 5) {
-            profile.documentIndex.blocked = 'queued jobs never started (the document-profile role is refused for this model)';
-            note(`${name}: document index is stalled with ${progress.queued} queued jobs and nothing running; recording it as blocked`);
-            return true;
-          }
-        } else {
-          stalledPolls = 0;
-        }
-        return null;
-      }, { timeout: 45 * 60 * 1000 });
-
       // Embeddings: ideas, then full-text passages (BGE-M3 Q8 through llama.cpp).
       // A vault where extraction was refused has nothing to embed; that is recorded
       // instead of waiting for a pipeline that will never be started.
-      profile.ideasPersisted = (profile.works ?? []).reduce((sum, work) => sum + (work.ideas ?? 0), 0);
-      if (!profile.ideasPersisted) {
-        profile.embeddings = { skipped: 'no ideas persisted (extraction refused by the capability matrix)' };
-        profile.passageEmbeddings = { skipped: 'same' };
-      } else {
+      const runEmbeddings = async () => {
+        profile.ideasPersisted = (profile.works ?? []).reduce((sum, work) => sum + (work.ideas ?? 0), 0);
+        if (!profile.ideasPersisted) {
+          profile.embeddings = { skipped: 'no ideas persisted (extraction refused by the capability matrix)' };
+          profile.passageEmbeddings = { skipped: 'same' };
+          return;
+        }
         await ipc('startEmbedding', nodusIds);
         await waitFor(`embeddings de ideas de ${name}`, async () => {
           const status = await ipc('getEmbeddingStatus');
@@ -511,6 +530,52 @@ try {
           noteOnce(`pass:${name}`, `${name}: passage embeddings ${status.passagesEmbedded}/${status.totalPassages} running=${status.running}`);
           return status.running === false && (status.startedAt != null || status.error != null);
         }, { timeout: 90 * 60 * 1000 });
+      };
+
+      // The relation pass reads idea embeddings to find the pairs it validates, and on the
+      // app's own path they already exist by the time anyone reprocesses connections. A run
+      // that skips the document index below therefore computes them first, so the pass it is
+      // measuring has candidates instead of an empty neighbour list.
+      if (skipDocumentIndex) await runEmbeddings();
+
+      // Theme + relation reprocessing: the only analysis role that is not gated by
+      // the extraction capability matrix, so the two models Nodus refuses to use
+      // for idea extraction still get a real, persisted inference pass.
+      profile.reprocess = await ipc('reprocessThemeConnections', { relations: true }, modelRef)
+        .then((result) => ({ ok: true, result }))
+        .catch((error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+
+      // Document index (profiles) for the imported works. Bounded twice: the deadline,
+      // and a stall detector — a vault whose model is blocked for the document-profile
+      // role leaves jobs queued with nothing running, and waiting the full budget would
+      // hide that instead of recording it.
+      if (skipDocumentIndex) {
+        profile.documentIndex = { skipped: '--skip-document-index' };
+        note(`${name}: document index skipped, as asked`);
+        await runEmbeddings();
+      } else {
+        const campaign = await ipc('startDocumentIndexCampaign', { includeArchived: false });
+        profile.documentIndexCampaignId = campaign?.campaignId ?? campaign?.id ?? null;
+        let stalledPolls = 0;
+        await waitFor(`índice documental de ${name}`, async () => {
+          const progress = await ipc('getDocumentIndexProgress');
+          profile.documentIndex = { active: progress.active, queued: progress.queued, failed: progress.failed, jobs: progress.jobs?.length ?? 0 };
+          noteOnce(`docindex:${name}`, `${name}: document index active=${progress.active} queued=${progress.queued} jobs=${progress.jobs?.length ?? 0} failed=${progress.failed}`);
+          if (progress.active === 0 && progress.queued === 0) return true;
+          if (progress.active === 0) {
+            stalledPolls += 1;
+            if (stalledPolls >= 5) {
+              profile.documentIndex.blocked = 'queued jobs never started (the document-profile role is refused for this model)';
+              note(`${name}: document index is stalled with ${progress.queued} queued jobs and nothing running; recording it as blocked`);
+              return true;
+            }
+          } else {
+            stalledPolls = 0;
+          }
+          return null;
+        }, { timeout: documentIndexTimeoutMs });
+
+        await runEmbeddings();
       }
 
       // Persisted results.

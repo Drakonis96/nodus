@@ -114,7 +114,7 @@ export function chatSkillsOutputContract(skills: ChatSkill[]): string {
 }
 
 export interface ChatVisualPart {
-  kind: 'markdown' | 'svg' | 'capability-request' | 'capability-result' | 'capability-artifact' | 'capability-view' | 'capability-pending' | 'capability-legacy' | 'image-request' | 'image-error';
+  kind: 'markdown' | 'svg' | 'capability-request' | 'capability-result' | 'capability-artifact' | 'capability-view' | 'capability-pending' | 'capability-legacy' | 'image-request' | 'image-error' | 'route-fix';
   content: string;
   complete: boolean;
   /** For `capability-pending` and `capability-legacy`: the fence tag a provider claimed,
@@ -162,6 +162,7 @@ export function splitChatVisuals(content: string, claimed: ReadonlySet<string> =
         : language === 'nodus-capability-result' ? 'capability-result'
         : language === 'nodus-artifact' ? 'capability-artifact'
         : language === 'nodus-view' ? 'capability-view'
+        : language === 'nodus-route-fix' ? 'route-fix'
         // A legacy fence is a result an earlier release already finished writing. Reading
         // it as work in progress is what turns an old answer into "the generation was
         // interrupted", so it is recognised before the pending case.
@@ -195,7 +196,8 @@ export function serializeChatVisualPart(part: ChatVisualPart): string {
       : part.kind === 'capability-request' ? 'nodus-capability'
         : part.kind === 'capability-result' ? 'nodus-capability-result'
           : part.kind === 'capability-artifact' ? 'nodus-artifact'
-            : part.kind === 'capability-view' ? 'nodus-view' : part.kind;
+            : part.kind === 'capability-view' ? 'nodus-view'
+              : part.kind === 'route-fix' ? 'nodus-route-fix' : part.kind;
   return `\n\n\`\`\`${language}\n${part.content}\n${part.complete ? '```' : ''}\n\n`;
 }
 

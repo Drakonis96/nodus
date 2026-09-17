@@ -2,14 +2,14 @@
 SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
 SPDX-License-Identifier: AGPL-3.0-only
 
-The one navigation shared by the home page, the wiki, the blog, contribute,
-the FAQ and every live demo.
+The one navigation shared by the home page, the wiki, the blog, the Research
+Atlas, the FAQ, the About page, contribute and every live demo.
 
 Hosts opt in with a placeholder element:
   <div data-nodus-site-header data-base="../" data-page="wiki" data-context="wiki"></div>
 
   data-base    path back to site/ from the current page ('' at the root)
-  data-page    home | atlas | wiki | blog | about | contribute | faq | demo — marks the current item
+  data-page    home | wiki | blog | atlas | faq | about | contribute | demo — marks the current item
   data-context 'wiki' adds the docs menu button
 */
 (function () {
@@ -31,16 +31,16 @@ Hosts opt in with a placeholder element:
 
   const PAGES = [
     { id: 'home', label: 'Home', href: (base) => base || './' },
-    { id: 'atlas', label: 'Atlas', href: (base) => `${base}research-atlas/` },
     // Nodus Browser reveals this prepared slot from its isolated preload. It is
     // hidden everywhere else, so a normal web visitor never sees a local-only
     // destination or a custom-protocol prompt that cannot work in their browser.
     { id: 'bookmarks', label: 'Bookmarks', href: () => '#nodus-bookmarks', browserOnly: true },
     { id: 'wiki', label: 'Wiki', href: (base) => `${base}wiki/` },
     { id: 'blog', label: 'Blog', href: (base) => `${base}blog/` },
-    { id: 'about', label: 'About', href: (base) => `${base}about/` },
-    { id: 'contribute', label: 'Contribute', href: (base) => `${base}contribute/` },
+    { id: 'atlas', label: 'Atlas', href: (base) => `${base}research-atlas/` },
     { id: 'faq', label: 'FAQ', href: (base) => `${base}faq/` },
+    { id: 'about', label: 'About', href: (base) => `${base}about/` },
+    { id: 'contribute', label: 'Support Nodus', href: (base) => `${base}contribute/` },
   ];
 
   function markup(base, page, context) {

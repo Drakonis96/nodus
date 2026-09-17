@@ -104,6 +104,14 @@ export interface DeepScanProgress {
   pct: number | null;
 }
 
+/**
+ * Share of a deep scan's own progress that fragment extraction owns; fusion takes the
+ * rest. Fusion cannot start before the last fragment lands, so the two phases share one
+ * scale instead of each restarting from zero — which is what made the bar's percentage
+ * fall back to 0% when the analysis moved on from 92%.
+ */
+const FRAGMENT_PHASE_SHARE = 0.9;
+
 function isRawDeepResult(v: unknown): v is Record<string, unknown> {
   if (typeof v !== 'object' || v === null) return false;
   const raw = v as Record<string, unknown>;
@@ -547,7 +555,9 @@ export async function runDeepScan(
     const extractionPool = settings.aiConcurrencyMode === 'automatic'
       ? 8
       : Math.max(1, Math.min(8, settings.concurrency));
-    const results = await mapOrderedPool(chunks, extractionPool, async (_chunk, i, poolSignal) => {
+
+    /** One fragment: a checkpointed result, or the model call that produces it. */
+    const extractFragment = async (i: number, poolSignal: AbortSignal): Promise<DeepResult> => {
       // Resume from checkpoint if available.
       const defaultSourceAlias = chunks[i].match(/\[\[src:([^\]\s]+)/i)?.[1] ?? null;
       const reusable = usableCheckpoint(checkpoints.get(i), sourceMap, defaultSourceAlias, citationCorpus);
@@ -556,15 +566,7 @@ export async function runDeepScan(
         saveCheckpoint(work.nodus_id, checkpointHash, 'deep_chunk', i, reusable);
         return reusable;
       }
-      onProgress?.({ detail: `Analizando fragmento ${i + 1}/${chunks.length} con IA…`, pct: i / chunks.length });
       const chunkWordCount = chunks[i].split(/\s+/).filter(Boolean).length;
-      // Heartbeat: the LLM call is non-streaming and can take a long time on slow
-      // (e.g. reasoning) models, so tick the elapsed seconds to show it isn't frozen.
-      const chunkStart = Date.now();
-      const heartbeat = setInterval(() => {
-        const secs = Math.round((Date.now() - chunkStart) / 1000);
-        onProgress?.({ detail: `Analizando fragmento ${i + 1}/${chunks.length} con IA… (${secs}s)`, pct: i / chunks.length });
-      }, 1000);
       const input = {
         zotero_key: work.zotero_key,
         title: work.title,
@@ -692,10 +694,43 @@ export async function runDeepScan(
         chunkDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
         llmDone({ status: 'error', chunk: i + 1 });
         throw e;
-      } finally {
-        clearInterval(heartbeat);
       }
-    });
+    }
+
+    // Fragments are extracted in parallel, so the line belongs to the phase and not to
+    // each worker: a per-worker writer let the counter, the percentage and the seconds
+    // jump between fragments that had started at different times (fragment 3/3 at one
+    // second, fragment 9/12 at ninety) every time the last worker to tick was another
+    // one. The counter names the oldest fragment still in flight, the percentage counts
+    // fragments finished and the seconds measure the phase, so all three only advance.
+    let fragmentsDone = 0;
+    const fragmentPhaseStart = Date.now();
+    const reportFragmentPhase = () => {
+      const seconds = Math.round((Date.now() - fragmentPhaseStart) / 1000);
+      const current = Math.min(fragmentsDone + 1, chunks.length);
+      onProgress?.({
+        detail: seconds > 0
+          ? `Analizando fragmento ${current}/${chunks.length} con IA… (${seconds}s)`
+          : `Analizando fragmento ${current}/${chunks.length} con IA…`,
+        pct: FRAGMENT_PHASE_SHARE * (fragmentsDone / chunks.length),
+      });
+    };
+    const fragmentHeartbeat = setInterval(reportFragmentPhase, 1000);
+    let results: DeepResult[];
+    try {
+      reportFragmentPhase();
+      results = await mapOrderedPool(chunks, extractionPool, async (_chunk, i, poolSignal) => {
+        try {
+          return await extractFragment(i, poolSignal);
+        } finally {
+          fragmentsDone += 1;
+          reportFragmentPhase();
+        }
+      });
+    } finally {
+      clearInterval(fragmentHeartbeat);
+    }
+
     llmDone({ results: results.length });
 
     const merged = mergeByLabel(results);
@@ -758,12 +793,20 @@ export async function runDeepScan(
         // error and the queue resumes from these checkpoints later.
         const fusionCheckpoints = loadCheckpoints(work.nodus_id, checkpointHash, 'deep_fusion');
         const failedFusion: number[] = [];
+        // Same contract as the fragment phase: ideas are resolved in parallel, so the
+        // line is written once per completion instead of once per worker, and the
+        // percentage continues the fragment phase's scale rather than starting over.
+        let ideasDone = 0;
+        const reportFusionPhase = () => {
+          const current = Math.min(ideasDone + 1, ideaEntries.length);
+          onProgress?.({
+            detail: `Fusionando idea ${current}/${ideaEntries.length}…`,
+            pct: FRAGMENT_PHASE_SHARE + (1 - FRAGMENT_PHASE_SHARE) * (ideasDone / ideaEntries.length),
+          });
+        };
+        if (ideaEntries.length > 0) reportFusionPhase();
         const plans = await mapOrderedPool(preparedIdeas, extractionPool, async (prepared, i) => {
           const { labelKey, idea, ideaThemeLabels, embeddingText } = prepared;
-          onProgress?.({
-            detail: `Fusionando idea ${i + 1}/${ideaEntries.length}…`,
-            pct: ideaEntries.length ? i / ideaEntries.length : null,
-          });
           const ext: ExtractedIdea = {
             localId: labelKey,
             type: idea.type,
@@ -789,6 +832,9 @@ export async function runDeepScan(
             // gets checkpointed, so the retry only redoes the ideas collected here.
             failedFusion.push(i);
             return null;
+          } finally {
+            ideasDone += 1;
+            reportFusionPhase();
           }
         });
         if (failedFusion.length > 0) {

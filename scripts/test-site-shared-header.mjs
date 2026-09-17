@@ -65,13 +65,6 @@ test('the design-system pages take the header from nodus.css, and only the other
 
 test('the shared component owns every control visible in the header', () => {
   for (const token of [
-    "{ id: 'home', label: 'Home'",
-    "{ id: 'atlas', label: 'Atlas'",
-    "{ id: 'bookmarks', label: 'Bookmarks'",
-    "{ id: 'wiki', label: 'Wiki'",
-    "{ id: 'blog', label: 'Blog'",
-    "{ id: 'contribute', label: 'Contribute'",
-    "{ id: 'faq', label: 'FAQ'",
     'class="gh-badge"',
     'id="release-downloads"',
     'id="site-nav-toggle"',
@@ -80,7 +73,24 @@ test('the shared component owns every control visible in the header', () => {
   assert.equal((headerScript.match(/return `<nav class="nav/g) ?? []).length, 1);
   assert.match(headerScript, /class="nav\$\{isWiki \? ' wiki-nav' : ''\}" id="site-header"/);
   assert.match(headerScript, /data-nodus-browser-bookmarks hidden/, 'Bookmarks is an inert prepared slot in ordinary browsers');
-  assert.match(headerScript, /atlas[\s\S]*bookmarks[\s\S]*wiki/, 'Bookmarks occupies the same position as on the local start page');
+  // Destination order is part of the design, so it is asserted as a whole
+  // rather than one label at a time. The browser-only Bookmarks slot sits
+  // immediately ahead of Wiki, the way the Nodus Browser start page orders them.
+  const destinations = [...headerScript.matchAll(/\{ id: '([a-z]+)', label: '([^']+)'/g)].map((match) => `${match[1]}:${match[2]}`);
+  assert.deepEqual(
+    destinations,
+    [
+      'home:Home',
+      'bookmarks:Bookmarks',
+      'wiki:Wiki',
+      'blog:Blog',
+      'atlas:Atlas',
+      'faq:FAQ',
+      'about:About',
+      'contribute:Support Nodus',
+    ],
+    'the header reads Home, Wiki, Blog, Atlas, FAQ, About, Support Nodus',
+  );
 });
 
 test('the redesign is English only, so the header carries no language switcher', () => {
@@ -100,6 +110,10 @@ test('both header stylesheets keep the same fixed dimensions and breakpoint', ()
   for (const styles of [systemStyles, headerStyles]) {
     assert.match(styles, /@media \(max-width: 1320px\) \{[\s\S]*?\.nav-toggle \{ display: block/);
     assert.match(styles, /\.nav \.links > a\.link\[aria-current="page"\]/);
+    // The browser-only Bookmarks slot is removed with the hidden attribute, and a
+    // class that sets `display` outranks the user-agent rule for it, so both
+    // stylesheets have to neutralize it or the demo pages show a dead link.
+    assert.match(styles, /\[hidden\] \{ display: none !important; \}/);
   }
   // the demo shell has to reserve the row the fixed header occupies
   assert.match(read('site/demo/demo.css'), /body\.demo-page > \[data-nodus-site-header\] \{ display: block; height: 62px; \}/);

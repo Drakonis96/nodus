@@ -5,6 +5,7 @@ import { Icon } from './ui';
 import { ConfirmModal } from './ConfirmModal';
 import { t, tr, tx } from '../i18n';
 import { elapsedTimeLabel } from '@shared/elapsedTime';
+import { displayedQueueItem } from '@shared/queueProgress';
 import { useElapsedClock } from '../useElapsedClock';
 
 const KIND_LABELS: Record<QueueKind, string> = {
@@ -41,7 +42,7 @@ export function QueueBar({ progress }: { progress: QueueProgress | null }) {
   if (!progress || (progress.total === 0 && !progress.maintenanceError && !progress.maintenanceRunning)) return null;
   const {
     done, failed, total, current, paused, pausedReason, maintenanceError,
-    maintenanceRunning, maintenanceDetail, startedAt, finishedAt, items,
+    maintenanceRunning, maintenanceDetail, maintenanceStartedAt, maintenanceAttempt, startedAt, finishedAt, items,
   } = progress;
   const terminalItems = items.filter((item) => item.state === 'done' || item.state === 'failed' || item.state === 'cancelled').length;
   const itemPct = total ? Math.round((terminalItems / total) * 100) : 0;
@@ -52,9 +53,15 @@ export function QueueBar({ progress }: { progress: QueueProgress | null }) {
   const workActive = items.some((item) => item.state === 'queued' || item.state === 'running' || item.state === 'paused');
   const active = workActive || maintenanceRunning;
   const terminal = !active && !maintenanceError;
-  const running = items.find((i) => i.state === 'running');
+  // The same work the snapshot names in `current`: the oldest one still running, so the
+  // title, the detail line and the elapsed time all keep narrating one work at a time.
+  const running = displayedQueueItem(items);
   const totalElapsed = elapsedTimeLabel(startedAt, finishedAt, now);
   const itemElapsed = elapsedTimeLabel(running?.started_at, running?.finished_at, now);
+  // Graph maintenance is one model call per batch and says nothing in between, so the
+  // pass measures itself: this clock is the only sign that a silent step is alive.
+  const maintenanceElapsed = elapsedTimeLabel(maintenanceStartedAt, null, now);
+  const attempts = maintenanceAttempt ?? 0;
 
   return (
     <div className="border-t border-neutral-200 bg-neutral-100/80 backdrop-blur px-4 py-2 text-sm dark:border-neutral-800 dark:bg-neutral-900/80" data-testid="queue-progress-bar">
@@ -69,8 +76,23 @@ export function QueueBar({ progress }: { progress: QueueProgress | null }) {
       {maintenanceError && (
         <div className="mb-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/60 dark:text-amber-300">
           <Icon name="warning" size={14} className="shrink-0" />
-          <span className="flex-1">{t('Postprocesado del grafo pendiente:')} {tr(maintenanceError)}</span>
-          <button className="btn btn-ghost h-7 px-2" onClick={() => window.nodus.resumeQueue()}>{t('Reintentar')}</button>
+          {maintenanceRunning ? (
+            // A retry keeps the same banner space but must not keep repeating the old
+            // failure as if the click had done nothing: it says what is happening now.
+            <span className="flex-1">
+              {t('Reintentando el postprocesado del grafo…')}
+              {attempts > 1 && <span className="ml-1 opacity-80">· {tx('Intento {n}', { n: attempts })}</span>}
+              {maintenanceElapsed && <span className="ml-1 tabular-nums">· {maintenanceElapsed}</span>}
+            </span>
+          ) : (
+            <>
+              <span className="flex-1">
+                {t('Postprocesado del grafo pendiente:')} {tr(maintenanceError)}
+                {attempts > 1 && <span className="ml-1 opacity-80">· {tx('Intento {n}', { n: attempts })}</span>}
+              </span>
+              <button className="btn btn-ghost h-7 px-2" onClick={() => window.nodus.resumeQueue()}>{t('Reintentar')}</button>
+            </>
+          )}
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3">
@@ -93,7 +115,10 @@ export function QueueBar({ progress }: { progress: QueueProgress | null }) {
                   {itemElapsed && <span className="ml-1 tabular-nums text-neutral-500">· {t('Obra')} {itemElapsed}</span>}
                 </>
               ) : maintenanceRunning ? (
-                <>{tr(maintenanceDetail ?? 'Postprocesando relaciones del grafo…')}</>
+                <span>
+                  {tr(maintenanceDetail ?? 'Postprocesando relaciones del grafo…')}
+                  {maintenanceElapsed && <span className="ml-1 tabular-nums text-neutral-500">· {maintenanceElapsed}</span>}
+                </span>
               ) : paused ? (
                 t('Cola en pausa')
               ) : active ? (

@@ -701,10 +701,20 @@ export function ResearchAssistantModal({
     await generate(conversationId, messagesRef.current, content, files);
   };
 
+  // One click on a route-fix prompt sends the checker's correction request as the user's
+  // next message. The model only proposes; the reply is re-checked and re-drawn.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const prompt = (event as CustomEvent<{ prompt?: string }>).detail?.prompt;
+      if (typeof prompt === 'string' && prompt.trim()) void send(prompt);
+    };
+    window.addEventListener('nodus:route-fix', handler as EventListener);
+    return () => window.removeEventListener('nodus:route-fix', handler as EventListener);
+  }, [send]);
+
   // Re-answer the most recent user turn (dropping the answer it produced). Uses the
   // current model + context selection, so it doubles as "try again with this context".
-  const regenerateLast = async () => {
-    if (sending || !selectedModel || !systemPrompts.ready) return;
+  const regenerateLast = async () => {    if (sending || !selectedModel || !systemPrompts.ready) return;
     const current = messagesRef.current;
     let lastUserIdx = -1;
     for (let i = current.length - 1; i >= 0; i--) {

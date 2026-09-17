@@ -1,132 +1,242 @@
 /*
 SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
 SPDX-License-Identifier: AGPL-3.0-only
+
+The Support Nodus page. Everything here builds on the tokens and components of
+nodus.css: this file adds the hero graphic, the funding cards and the compact
+figures row, and never redefines the shared scale.
 */
 
-.contrib-hero {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
-  gap: clamp(30px, 5vw, 70px); align-items: center;
-}
-.contrib-actions { display: flex; flex-wrap: wrap; gap: 13px; margin-top: 32px; }
-
-/* the grain field: one dot per contribution, drifting down */
-.sand-box {
+/* ============================================================ hero */
+.support-hero {
   position: relative;
-  border: 1px solid var(--membrane); border-radius: var(--r-xl);
-  background: linear-gradient(180deg, rgba(23, 19, 40, 0.86), rgba(11, 9, 21, 0.82));
-  overflow: hidden;
+  /* tighter than a reading page: the funding cards have to land in the first
+     screen, so nothing above them is allowed to take more room than it needs */
+  padding-top: calc(var(--nav-h) + clamp(16px, 3.2vh, 46px));
+  padding-bottom: clamp(18px, 3.2vh, 44px);
 }
-#sand { display: block; width: 100%; height: 340px; }
-.sand-cap {
-  position: absolute; left: 0; right: 0; bottom: 0; margin: 0;
-  padding: 14px; text-align: center;
-  font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+.support-hero-grid { position: relative; z-index: 2; }
+.support-hero .scrim { max-width: min(100%, 640px); }
+
+.support-title {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: clamp(42px, 6.6vw, 78px);
+  font-weight: 800;
+  line-height: 1.0;
+  letter-spacing: -0.04em;
+}
+/* one masked row, so the line can rise into place on its own beat */
+.support-title .line { display: block; overflow: hidden; padding-bottom: 0.06em; }
+.support-title .line > i { display: block; font-style: inherit; animation: support-rise 1s var(--ease) both; }
+@keyframes support-rise { from { transform: translateY(108%); } }
+
+/* the word that carries the accent, in the same violet the rest of the site uses */
+.grad {
+  background: linear-gradient(115deg, var(--violet-3), var(--violet-2) 45%, var(--violet));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+.support-hero .lead { max-width: 50ch; margin-top: clamp(14px, 2.4vh, 22px); }
+
+/* ------------------------------------------------ the three promises */
+.traits {
+  display: flex; flex-wrap: wrap; gap: clamp(18px, 3.4vw, 46px);
+  margin: clamp(22px, 3.4vh, 34px) 0 0; padding: 0; list-style: none;
+}
+.traits li {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto;
+  column-gap: 12px; align-items: center;
+}
+.traits .pic {
+  grid-row: 1 / span 2;
+  display: grid; place-items: center; width: 38px; height: 38px;
+  border-radius: 50%; border: 1px solid var(--membrane); background: var(--skin);
+  color: var(--violet-2);
+}
+.traits .pic svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.traits b { font-size: 13.5px; font-weight: 650; }
+.traits i { font-style: normal; font-size: 12.5px; color: var(--ink-3); }
+
+/* ------------------------------------------------ the world behind it
+   The planet is the standalone WebGL component, so this file only places it: the
+   component keeps its own proportions, its glow, its orbit and its caption, and
+   its rules never leave .nodus-planet. The sphere is already cropped by the
+   component's frame on its right, so the frame is what meets the window edge —
+   nothing on this page bleeds sideways for it.
+
+   It is taller than the hero on purpose: the sections below sit above it, so the
+   sphere's lower half passes behind the figures on its way out of the hero. */
+.support-hero .hero-planet {
+  position: absolute; z-index: 0; pointer-events: none;
+  top: 50%; right: 0; translate: 0 -50%;
+  width: min(780px, 64vw);
+}
+
+/* ============================================================ ways
+   First section under the hero on purpose: the three ways to give are the whole
+   point of the page, and they sit above the fold with them. */
+.support-ways-section {
+  position: relative; z-index: 1;
+  padding: 20px 0 46px;
+}
+.ways-line {
+  max-width: 62ch; margin: 0 auto 20px;
+  text-align: center;
+  font-size: 15px; line-height: 1.55; color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.ways {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.way {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center; gap: 14px; padding: 14px 16px;
+  color: var(--ink);
+}
+.way-mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; background: #fff; flex: 0 0 auto; }
+.way-mark svg { width: 23px; height: 23px; }
+.way-mark.kofi svg { fill: none; stroke: #ff5e5b; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+/* GitHub's mark is recognised by its silhouette alone, so it keeps its fill and
+   drops the white tile the other two need */
+.way-mark.github { background: transparent; }
+.way-mark.github svg { width: 36px; height: 36px; fill: var(--ink); }
+.way-mark.paypal svg .back { fill: #003087; }
+.way-mark.paypal svg .front { fill: #009cde; }
+.way-copy b { display: block; font-size: 15px; font-weight: 700; letter-spacing: -0.015em; }
+.way-copy span { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
+.way-arrow { color: var(--violet-2); }
+.way-arrow svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.3s var(--ease); }
+.way:hover .way-arrow svg { transform: translateX(5px); }
+.way:hover { color: var(--ink); }
+
+/* ------------------------------------------------ the offer beside them */
+.support-offer {
+  display: flex; align-items: center; gap: clamp(16px, 2.4vw, 24px);
+  margin-top: 12px; padding: 16px 20px;
+}
+.support-offer .pic {
+  display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto;
+  border-radius: 13px;
+  border: 1px solid color-mix(in srgb, var(--violet) 30%, transparent);
+  background: color-mix(in srgb, var(--violet) 13%, transparent);
+  color: var(--violet-2);
+}
+.support-offer .pic svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.support-offer-copy { flex: 1 1 260px; padding-left: clamp(18px, 3vw, 30px); border-left: 1px solid var(--membrane); }
+.support-offer-copy h2 { font-size: 15.5px; letter-spacing: -0.018em; }
+.support-offer-copy p { margin: 5px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+.wiki-btn { margin-left: auto; flex: 0 0 auto; padding: 11px 18px; font-size: 13.5px; }
+
+/* ============================================================ figures */
+/* The four blocks read as one band: equal height at every width — a fixed floor
+   does that, since two of them carry a row of faces and two do not — and the
+   section keeps the same air above and below. */
+.support-numbers { position: relative; z-index: 1; padding: 26px 0; }
+/* nodus.css gives the section after a hero a taller top than bottom; this band
+   keeps its air even on both sides, which is what makes it read as a band. */
+.page-hero + .support-numbers { padding-top: 26px; }
+.figures {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.figure {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px;
+  align-items: start; align-content: space-between;
+  /* the band the faces sit in, reserved in every block so the four match */
+  --faces-h: 54px;
+  min-height: 186px; padding: 22px 24px;
+}
+.figure .pic {
+  display: grid; place-items: center; width: 46px; height: 46px;
+  border-radius: 13px;
+  border: 1px solid color-mix(in srgb, var(--violet) 30%, transparent);
+  background: color-mix(in srgb, var(--violet) 13%, transparent);
+  color: var(--violet-2);
+}
+.figure .pic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.figure-value {
+  margin: 0;
+  font-size: clamp(28px, 2.2vw, 34px); font-weight: 700; line-height: 1; letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+}
+.figure h2 { margin-top: 5px; font-size: 14.5px; font-weight: 650; line-height: 1.32; letter-spacing: -0.01em; }
+.figure-note { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.figure-loading { color: var(--ink-3); }
+
+/* The contributor faces, and the link that carries whoever is not shown. The
+   faces belong to the card, not to the text column beside the icon: spanning
+   both columns gives the row the whole card to grow into. It sits centred, so a
+   few faces keep a wide margin on each side and the margin only closes as more
+   of them arrive — nothing is ever spread apart to reach the edges. */
+/* A fixed height, so a second row of faces can never make one card taller than
+   the three beside it: the band stays one height whatever each block holds. */
+.avatars {
+  display: flex; flex-wrap: wrap; align-content: center; justify-content: center;
+  grid-column: 1 / -1;
+  height: var(--faces-h); row-gap: 6px;
+}
+/* the same band in the blocks that carry no faces, so all four stay equal */
+.figure-spacer { grid-column: 1 / -1; height: var(--faces-h); }
+.avatars img {
+  width: 24px; height: 24px; margin-left: -7px;
+  border-radius: 50%; border: 2px solid #0d0a1a; background: var(--skin-2);
+}
+.avatars img:first-child { margin-left: 0; }
+.avatars .more {
+  margin-left: -7px; padding: 0 9px; height: 24px;
+  display: inline-flex; align-items: center;
+  border-radius: 999px; border: 2px solid #0d0a1a;
+  background: var(--skin-2); color: var(--ink-2);
+  font-size: 11px; font-weight: 650;
+}
+.avatars:hover .more { color: var(--ink); }
+
+/* ------------------------------------------------ the line under the cards */
+.marquee {
+  display: flex; align-items: center; gap: clamp(10px, 2vw, 20px);
+  margin: clamp(24px, 3.4vw, 36px) 0 0;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase;
   color: var(--ink-3);
-  background: linear-gradient(transparent, rgba(6, 5, 11, 0.85));
+}
+.marquee b { font-weight: 400; color: var(--membrane-2); }
+.marquee::before, .marquee::after {
+  content: ''; flex: 1 1 0; height: 1px; min-width: 24px;
+  background: linear-gradient(90deg, transparent, var(--membrane));
+}
+.marquee::after { background: linear-gradient(270deg, transparent, var(--membrane)); }
+
+/* ============================================================ narrow screens */
+@media (max-width: 1080px) {
+  .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ways { grid-template-columns: minmax(0, 1fr); }
+  .wiki-btn { margin-left: 0; }
+  .support-offer { flex-wrap: wrap; }
 }
 
 @media (max-width: 900px) {
-  .contrib-hero { grid-template-columns: minmax(0, 1fr); }
-  #sand { height: 240px; }
+  /* the planet is decoration: on a phone it only steals the words their room */
+  .support-hero .hero-planet { display: none; }
+  .support-hero .scrim { max-width: 100%; }
 }
 
-/* ============================================================ ways */
-.ways {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px; margin-top: 48px;
-}
-@media (max-width: 980px) { .ways { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .ways { grid-template-columns: minmax(0, 1fr); } }
-.way { padding: 26px; display: flex; flex-direction: column; }
-.way .pic {
-  display: grid; place-items: center; width: 42px; height: 42px; margin-bottom: 16px;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--wc) 40%, transparent);
-  background: color-mix(in srgb, var(--wc) 13%, transparent);
-  color: var(--wc);
-}
-.way .pic svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.way h3 { font-size: 17.5px; margin-bottom: 10px; }
-.way p { margin: 0 0 18px; font-size: 14.5px; color: var(--ink-2); line-height: 1.6; }
-.way p b { color: var(--ink); font-weight: 620; }
-.way p code {
-  padding: 1px 6px; border-radius: 5px;
-  background: rgba(255, 255, 255, 0.07); border: 1px solid var(--membrane);
-  font: 0.86em var(--mono); color: var(--violet-3);
-}
-.way .arrow-link { margin-top: auto; color: var(--wc); font-size: 13.5px; }
-.way:hover { border-color: color-mix(in srgb, var(--wc) 45%, transparent); }
+@media (max-width: 620px) {
+  /* one column, still four blocks of one size, scaled to the screen */
+  .figures { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .figure { --faces-h: 50px; min-height: 168px; padding: 18px 20px; gap: 14px; }
+  .figure .pic { width: 40px; height: 40px; border-radius: 12px; }
+  .figure .pic svg { width: 19px; height: 19px; }
+  .figure-value { font-size: 26px; }
+  .figure h2 { font-size: 14px; }
 
-/* ============================================================ setup */
-.setup-grid {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: clamp(30px, 5vw, 64px); align-items: center;
-}
-.terminal {
-  border: 1px solid var(--membrane); border-radius: var(--r-l);
-  background: linear-gradient(180deg, rgba(14, 11, 24, 0.96), rgba(8, 6, 14, 0.96));
-  box-shadow: var(--shadow); overflow: hidden;
-}
-.terminal-bar {
-  display: flex; align-items: center; gap: 7px;
-  padding: 11px 15px; border-bottom: 1px solid var(--membrane);
-  background: rgba(255, 255, 255, 0.022);
-}
-.terminal-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--membrane-2); }
-.terminal-bar span {
-  margin-left: 8px; font: 600 10.5px var(--mono);
-  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3);
-}
-.terminal pre { margin: 0; padding: 20px 22px; overflow-x: auto; }
-.terminal code { font: 13px/1.85 var(--mono); color: var(--ink); }
-.terminal .c { color: var(--ink-3); }
-.terminal .p { color: var(--good); user-select: none; }
-
-@media (max-width: 900px) { .setup-grid { grid-template-columns: minmax(0, 1fr); } }
-
-/* ============================================================ rules */
-.rules { list-style: none; margin: 48px 0 0; padding: 0; display: grid; gap: 0; }
-.rules li {
-  position: relative;
-  padding: 20px 20px 20px 46px;
-  border-top: 1px solid var(--membrane);
-  font-size: 15.5px; color: var(--ink-2); line-height: 1.62;
-  transition: background 0.3s var(--ease);
-}
-.rules li:last-child { border-bottom: 1px solid var(--membrane); }
-.rules li:hover { background: rgba(255, 255, 255, 0.022); }
-.rules li::before {
-  content: ''; position: absolute; left: 18px; top: 28px;
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--accent); box-shadow: 0 0 14px var(--accent);
-}
-.rules li b { color: var(--ink); font-weight: 650; }
-.rules-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
-
-/* ============================================================ people */
-.people {
-  display: flex; flex-wrap: wrap; gap: 10px;
-  margin-top: 44px;
-}
-.people-loading { font-size: 14px; color: var(--ink-3); }
-.person {
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 7px 15px 7px 7px; border-radius: 999px;
-  border: 1px solid var(--membrane); background: rgba(255, 255, 255, 0.035);
-  color: var(--ink); font-size: 13.5px; font-weight: 600;
-  transition: border-color 0.25s var(--ease), transform 0.25s var(--ease), background 0.25s var(--ease);
-}
-.person:hover {
-  color: var(--ink); border-color: rgba(167, 139, 250, 0.55);
-  background: rgba(139, 92, 246, 0.1); transform: translateY(-2px);
-}
-.person img { width: 26px; height: 26px; border-radius: 50%; background: var(--skin-2); }
-.person em {
-  font-style: normal; padding-left: 9px; margin-left: 2px;
-  border-left: 1px solid var(--membrane);
-  font: 600 11.5px var(--mono); color: var(--ink-3);
+  .support-offer { padding: 18px; }
+  .support-offer-copy { padding-left: 16px; }
+  .marquee { flex-wrap: wrap; }
+  .marquee::before, .marquee::after { display: none; }
 }
 
-/* ============================================================ final */
-.contrib-final { text-align: center; }
-.contrib-final .lead { margin-inline: auto; }
+@media (prefers-reduced-motion: reduce) {
+  .support-title .line > i { animation: none; }
+}

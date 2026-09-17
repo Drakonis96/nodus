@@ -18,7 +18,8 @@ import type {
   PromptLanguage,
   ProjectChapterIdea,
 } from '@shared/types';
-import { AiError, completeJson, embedMany } from './aiClient';
+import { AiError, embedMany } from './aiClient';
+import { completeJsonWithHeadroom } from './structuredHeadroom';
 import { getChapter, listChapterChunks } from '../db/projectsRepo';
 import {
   chapterIdeasSourceHash,
@@ -141,7 +142,7 @@ export async function extractChapterIdeas(
     items: sampled,
     initialBatchSize: EXTRACT_CHUNK_BATCH,
     execute: async (batch, context) => {
-      const res = await completeJson<ExtractResponse>(
+        const res = await completeJsonWithHeadroom<ExtractResponse>(
         {
           system: chapterPromptPack(language).extract,
           user: JSON.stringify(
@@ -287,7 +288,7 @@ export async function typeRelations(
           entry.candidates.push(pair.candidate);
           grouped.set(pair.idea.id, entry);
         }
-        const res = await completeJson<TypeResponse>(
+        const res = await completeJsonWithHeadroom<TypeResponse>(
           {
             system: chapterPromptPack(language).type,
             user: JSON.stringify(

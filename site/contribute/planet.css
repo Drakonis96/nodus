@@ -1,0 +1,90 @@
+/*
+SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+SPDX-License-Identifier: AGPL-3.0-only
+
+The Support Nodus hero planet — scoped, dependency-free styles. Copied from
+the standalone component unchanged: it is a WebGL surface with an SVG orbit, and
+this file only says where it sits. Its own rules never leave .nodus-planet.
+*/
+.nodus-planet {
+  --planet-ink: #aca8d0;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 720 / 828;
+  overflow: hidden;
+  isolation: isolate;
+  container-type: inline-size;
+  background: #090c18;
+  pointer-events: none;
+}
+.nodus-planet canvas,
+.nodus-planet .np-orbit,
+.nodus-planet .np-fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.nodus-planet canvas { z-index: 1; }
+.nodus-planet .np-orbit { z-index: 2; overflow: visible; }
+.nodus-planet .np-caption {
+  position: absolute;
+  z-index: 3;
+  left: 69.3%;
+  top: 55.4%;
+  margin: 0;
+  color: var(--planet-ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 2.42cqw;
+  font-weight: 500;
+  line-height: 1.95;
+  letter-spacing: .23em;
+  text-transform: uppercase;
+}
+.nodus-planet .np-caption span { display: block; }
+.nodus-planet .np-caption::after {
+  content: '';
+  display: block;
+  width: 4.1cqw;
+  height: .3cqw;
+  min-height: 1px;
+  margin-top: 2.3cqw;
+  background: #a885ef;
+}
+.nodus-planet[data-caption='false'] .np-caption { display: none; }
+/* A static approximation stays visible when WebGL is unavailable. */
+.nodus-planet .np-fallback {
+  background: radial-gradient(ellipse at 30% 38%, #20194760, transparent 53%), #090c18;
+}
+.nodus-planet .np-fallback::after {
+  content: '';
+  position: absolute;
+  width: 126.667%;
+  aspect-ratio: 1;
+  left: 22.222%;
+  top: 9.903%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 17% 28%, #251956, #0b0d1b 43%, #070a12 66%);
+  box-shadow: inset 3px 1px 6px #8c6ae871, -3px -1px 13px #8d5bff4a;
+}
+.nodus-planet[data-ready='true'] .np-fallback { visibility: hidden; }
+.nodus-planet[data-animate='true'] .np-flare {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: np-breathe 6s ease-in-out infinite;
+}
+@keyframes np-breathe { 0%,100% { opacity: .86; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .nodus-planet .np-flare { animation: none !important; }
+}
+/* Optional edge blending for placement over the site's organism background. */
+.nodus-planet[data-blend='true'] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 10%),
+                      linear-gradient(to bottom, transparent, #000 5%, #000 82%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 10%),
+              linear-gradient(to bottom, transparent, #000 5%, #000 82%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.nodus-planet .np-caption { user-select: none; }

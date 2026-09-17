@@ -87,6 +87,30 @@ try {
     assert.ok(budget >= 1_200_000, `${provider} must clear a full extraction chunk on slow hardware, got ${budget}ms`);
   }
 
+  // A custom endpoint is the one provider whose locality is not in its id, so it is read off
+  // the address the user typed. These are the setups the provider exists for — a bare
+  // llama.cpp, vLLM or LiteLLM server on the same laptop or the same desk — and they used to
+  // be held to the cloud ceiling with no setting able to say otherwise (issue #802).
+  for (const url of ['http://127.0.0.1:8080/v1', 'http://localhost:1234/v1', 'http://192.168.1.20:8000/v1', 'http://gpu.lan:5000']) {
+    settingsRepo.updateSettings({ customProvider: { baseUrl: url, models: ['local-model'] } });
+    const budget = aiClient.completionTimeoutMs({ provider: 'custom', model: 'local-model' });
+    assert.ok(budget > cloudBudget, `a custom endpoint at ${url} serves the user's own hardware, got ${budget}ms`);
+    assert.ok(budget >= 1_200_000, `and must clear a full extraction chunk, got ${budget}ms`);
+  }
+  // A gateway on the internet keeps the three-minute ceiling: nothing on the user's desk is
+  // doing the work, so silence means a stuck request rather than a slow one.
+  for (const url of ['https://gateway.example.com/v1', 'http://203.0.113.7:8080/v1']) {
+    settingsRepo.updateSettings({ customProvider: { baseUrl: url, models: ['remote-model'] } });
+    assert.equal(
+      aiClient.completionTimeoutMs({ provider: 'custom', model: 'remote-model' }),
+      cloudBudget,
+      `a custom endpoint at ${url} is reached over the internet and keeps the cloud ceiling`,
+    );
+  }
+  // No endpoint configured is no evidence of a local one.
+  settingsRepo.updateSettings({ customProvider: { baseUrl: '', models: [] } });
+  assert.equal(aiClient.completionTimeoutMs({ provider: 'custom', model: 'x' }), cloudBudget);
+
   // --- 2. A timeout is tagged, not merely worded ------------------------------
   //
   // The deep scan answers a timeout by splitting the chunk, which it must not do for an

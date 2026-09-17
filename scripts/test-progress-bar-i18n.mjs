@@ -119,27 +119,29 @@ const LINES = [
   { text: 'Comprobando índice de Zotero…', source: 'electron/extraction/textExtractor.ts' },
   { text: 'Buscando texto abierto (Unpaywall)…', source: 'electron/extraction/textExtractor.ts' },
 
-  // ---- Deep scan: the per-chunk counters the bar ticks through for minutes.
+  // ---- Deep scan: the per-chunk counters the bar ticks through for minutes. Both
+  // spellings live in one reporter that owns the whole phase, so a parallel worker
+  // can no longer write a lower fragment after a higher one.
   {
     text: 'Analizando fragmento 2/5 con IA…',
     key: 'Analizando fragmento {current}/{total} con IA…',
     params: { current: '2', total: '5' },
     source: 'electron/ai/deepScan.ts',
-    snippet: 'Analizando fragmento ${i + 1}/${chunks.length} con IA…',
+    snippet: 'Analizando fragmento ${current}/${chunks.length} con IA…`',
   },
   {
     text: 'Analizando fragmento 2/5 con IA… (8s)',
     key: 'Analizando fragmento {current}/{total} con IA… ({seconds}s)',
     params: { current: '2', total: '5', seconds: '8' },
     source: 'electron/ai/deepScan.ts',
-    snippet: 'Analizando fragmento ${i + 1}/${chunks.length} con IA… (${secs}s)',
+    snippet: 'Analizando fragmento ${current}/${chunks.length} con IA… (${seconds}s)',
   },
   {
     text: 'Fusionando idea 2/5…',
     key: 'Fusionando idea {current}/{total}…',
     params: { current: '2', total: '5' },
     source: 'electron/ai/deepScan.ts',
-    snippet: 'Fusionando idea ${i + 1}/${ideaEntries.length}…',
+    snippet: 'Fusionando idea ${current}/${ideaEntries.length}…',
   },
 
   // ---- Semantic bridges, whose counter is appended around the label.
