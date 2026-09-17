@@ -39,7 +39,7 @@ test('Database Deep Research keeps one complete translation row per supported la
   const keys = new Set(catalog.map((row) => row[0]));
   for (const key of REQUIRED_KEYS) assert.ok(keys.has(key), `missing catalog key: ${key}`);
   for (const row of catalog) {
-    assert.equal(row.length, 9, `catalog row ${JSON.stringify(row[0])} must have es/en/fr/de/pt/pt-BR/it/tr/zh-CN`);
+    assert.equal(row.length, 10, `catalog row ${JSON.stringify(row[0])} must have es/en/fr/de/pt/pt-BR/it/tr/zh-CN/zh-TW`);
     assert.ok(row.every((value) => typeof value === 'string' && value.trim()), `blank translation for ${row[0]}`);
   }
 });
