@@ -102,10 +102,50 @@ function clip(text: string): string {
   return clean.length > STATEMENT_CLIP ? `${clean.slice(0, STATEMENT_CLIP)}…` : clean;
 }
 
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
+/**
+ * Characters of statement text one request may carry.
+ *
+ * A batch used to be bounded only by how many items it held, and the request ships the
+ * statement of every idea in it. When the prompt leaves no room, the local planner
+ * clamps the answer to its 512-token floor: the model was cut mid-JSON and the whole
+ * post-processing failed with "the response was cut off at the 512-output-token limit",
+ * a failure a retry reproduces because nothing about the request had changed. Keeping
+ * the prompt text inside this budget leaves the planner room for the answer the task
+ * needs — and, on a heavy vault, it makes the batch counter advance more than once.
+ */
+const BATCH_TEXT_BUDGET = 10000;
+
+/**
+ * Batches of at most `maxItems` items whose measured text stays within the budget.
+ * A single item heavier than the budget travels alone rather than looping forever.
+ */
+function batchByText<T>(items: T[], maxItems: number, weight: (item: T) => number): T[][] {
+  const batches: T[][] = [];
+  let current: T[] = [];
+  let currentWeight = 0;
+  for (const item of items) {
+    const cost = weight(item);
+    if (current.length > 0 && (current.length >= maxItems || currentWeight + cost > BATCH_TEXT_BUDGET)) {
+      batches.push(current);
+      current = [];
+      currentWeight = 0;
+    }
+    current.push(item);
+    currentWeight += cost;
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
+
+/** What one idea contributes to the grouping prompt, clipped as the request clips it. */
+function ideaTextWeight(idea: IdeaRow): number {
+  return Math.min(idea.statement.length, STATEMENT_CLIP) + idea.label.length + 40;
+}
+
+/** What one pair contributes to the validation prompt: both sides, both statements. */
+function candidateTextWeight(candidate: RelationCandidate): number {
+  return Math.min(candidate.fromStatement.length, STATEMENT_CLIP) + Math.min(candidate.toStatement.length, STATEMENT_CLIP)
+    + candidate.fromLabel.length + candidate.toLabel.length + 60;
 }
 
 /**
@@ -177,10 +217,13 @@ export async function reprocessConnections(
 
   // Checkpoints are reusable only for the exact content, prompt policy, model and
   // theme vocabulary. IDs alone reused stale answers after a statement/model change.
+  // Policy 3 bounds each request by the text it carries: a checkpoint written under
+  // the old item-count batching covers a different set of ideas, so it must not be
+  // reused batch-by-batch.
   const contentHash = crypto
     .createHash('sha256')
     .update(JSON.stringify({
-      policy: 2,
+      policy: 3,
       locked,
       existingLabels: [...existingLabels].sort(),
       system,
@@ -198,7 +241,7 @@ export async function reprocessConnections(
   // ── Phase 1: reassign ideas to themes ──────────────────────────────────────
   const themesByIdea = new Map<string, string[]>();
   const newThemeNorms = new Set<string>();
-  const themeBatches = chunk(activeIdeas, THEME_BATCH);
+  const themeBatches = batchByText(activeIdeas, THEME_BATCH, ideaTextWeight);
   const themeCheckpoints = loadCheckpoints('reprocess', contentHash, 'reproc_theme_batch');
   for (let bi = 0; bi < themeBatches.length; bi++) {
     const batch = themeBatches[bi];
@@ -412,7 +455,7 @@ async function reprocessRelations(
   const cappedCandidates = candidates.slice(0, RELATION_MAX_CANDIDATES);
   if (cappedCandidates.length === 0) return 0;
 
-  const batches = chunk(cappedCandidates, RELATION_VALIDATION_BATCH);
+  const batches = batchByText(cappedCandidates, RELATION_VALIDATION_BATCH, candidateTextWeight);
   const relationHash = crypto
     .createHash('sha1')
     .update(`${contentHash ?? ''}:${cappedCandidates.map((c) => `${c.fromId}:${c.toId}`).sort().join(',')}`)

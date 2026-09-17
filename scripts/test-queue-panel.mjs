@@ -255,6 +255,34 @@ test('queue dropdown retains and controls every processing lane', { timeout: 240
       await page.getByRole('button', { name: 'Reintentar', exact: true }).click(); await action('resumeQueue');
       assert.equal(await page.getByTestId('attention').innerText(), 'true');
     });
+    await t.test('graph maintenance ticks its own clock and narrates its retries', async () => {
+      await fresh(); await open();
+      const bar = page.getByTestId('queue-progress-bar');
+      const waitForText = (needle) => page.waitForFunction(
+        (text) => document.querySelector('[data-testid="queue-progress-bar"]')?.innerText.includes(text),
+        needle,
+      );
+      const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
+
+      // A pass is one silent model call per batch: the clock is its only sign of life.
+      await emit('onQueueProgress', { ...emptyQueue, maintenanceRunning: true, maintenanceDetail: 'Agrupando ideas en temas (1/1)', maintenanceStartedAt: fiveSecondsAgo, maintenanceAttempt: 1 });
+      await waitForText('Agrupando ideas en temas (1/1)');
+      assert.match(await bar.innerText(), /· 5 s/, 'la línea del mantenimiento debe mostrar su propio reloj');
+
+      // A retry must not keep repeating the failure as if the click had done nothing.
+      await emit('onQueueProgress', { ...emptyQueue, maintenanceRunning: true, maintenanceDetail: 'Agrupando ideas en temas (1/1)', maintenanceStartedAt: fiveSecondsAgo, maintenanceError: 'Revisión pendiente', maintenanceAttempt: 2 });
+      await waitForText('Reintentando el postprocesado del grafo…');
+      assert.ok((await bar.innerText()).includes('Intento 2'), 'el reintento debe registrar el intento');
+      assert.equal(await bar.getByRole('button', { name: 'Reintentar', exact: true }).count(), 0, 'no se ofrece reintentar mientras un intento está en vuelo');
+
+      // Stopped after a failure: the reason, how many attempts it took, and the button.
+      await emit('onQueueProgress', { ...emptyQueue, maintenanceError: 'Revisión pendiente', maintenanceStartedAt: null, maintenanceAttempt: 3 });
+      await waitForText('Revisión pendiente');
+      const failed = await bar.innerText();
+      assert.ok(failed.includes('Intento 3'), `el fallo debe registrar los intentos: ${failed}`);
+      assert.doesNotMatch(failed, /Reintentando el postprocesado/, 'con el paso detenido no se anuncia un reintento');
+      await page.getByRole('button', { name: 'Reintentar', exact: true }).click(); await action('resumeQueue');
+    });
     await t.test('scan pause/resume, retry, prioritization, removal and both modal confirmations', async () => {
       await fresh({ getQueue: queue() }); await open(); const bar = page.getByTestId('queue-progress-bar');
       await bar.getByRole('button', { name: 'Pausar la cola' }).click(); await action('pauseQueue');

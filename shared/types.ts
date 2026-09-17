@@ -5128,6 +5128,17 @@ export interface QueueProgress {
   /** Global relation maintenance remains visible until it has really settled. */
   maintenanceRunning: boolean;
   maintenanceDetail: string | null;
+  /**
+   * When the maintenance pass now in flight started, so the bar can tick a clock while
+   * a single model call (which reports no progress of its own) is running. Null when no
+   * pass is in flight.
+   */
+  maintenanceStartedAt?: string | null;
+  /**
+   * Attempts made for the current maintenance step: 1 the first time, 2 after the user
+   * asked for a retry or a new drain resumed a failed one. Reset once it settles.
+   */
+  maintenanceAttempt?: number;
   /** Wall time for the whole queue task, including required post-processing. */
   startedAt: string | null;
   finishedAt: string | null;

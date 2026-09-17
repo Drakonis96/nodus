@@ -62,6 +62,9 @@ class ScanQueue {
   /** Required post-batch work stays visible; the queue is not complete until this clears. */
   private maintenanceRunning = false;
   private maintenanceDetail: string | null = null;
+  /** When the pass in flight began, and how many times this step has been attempted. */
+  private maintenanceStartedAt: string | null = null;
+  private maintenanceAttempt = 0;
   /** Visible, resumable failure from global relation/bridge preparation. */
   private maintenanceError: string | null = null;
   /** Wall-clock bounds for the queue session, including required maintenance. */
@@ -127,6 +130,8 @@ class ScanQueue {
       maintenanceError: this.maintenanceError,
       maintenanceRunning: this.maintenanceRunning,
       maintenanceDetail: this.maintenanceDetail,
+      maintenanceStartedAt: this.maintenanceStartedAt,
+      maintenanceAttempt: this.maintenanceAttempt,
       startedAt: this.taskStartedAt,
       finishedAt: this.taskFinishedAt,
       total: this.items.length,
@@ -364,6 +369,7 @@ class ScanQueue {
       this.bridgeAfterDrain = false;
       this.deepSinceReprocess = false;
       this.maintenanceError = null;
+      this.maintenanceAttempt = 0;
     }
     this.notifiedTerminalIds.clear();
     this.paused = false;
@@ -477,6 +483,11 @@ class ScanQueue {
     if (this.maintenanceRunning) return;
     this.maintenanceRunning = true;
     this.maintenanceDetail = 'Postprocesando relaciones del grafo…';
+    // A pass is one model call per batch and reports nothing in between, so the bar
+    // needs a clock of its own; the attempt counter is what tells a retry apart from
+    // the first run when it fails the same way again.
+    this.maintenanceStartedAt = new Date().toISOString();
+    this.maintenanceAttempt += 1;
     this.taskFinishedAt = null;
     this.emit();
     const ids = Array.from(this.pendingIndexWorks);
@@ -493,6 +504,7 @@ class ScanQueue {
         if (ids.length > 0) this.maybeEnqueueBridge(ids);
       }
       settledSuccessfully = true;
+      this.maintenanceAttempt = 0;
     } catch (error) {
       for (const id of ids) this.pendingIndexWorks.add(id);
       this.deepSinceReprocess = true;
@@ -507,6 +519,7 @@ class ScanQueue {
     } finally {
       this.maintenanceRunning = false;
       this.maintenanceDetail = null;
+      this.maintenanceStartedAt = null;
       this.emit();
       if (settledSuccessfully) this.notifyDrain();
     }
