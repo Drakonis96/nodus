@@ -31,7 +31,6 @@ import type {
 
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { getAiConcurrencySnapshot, onAiConcurrencySnapshot, refreshAiConcurrencyPolicy } from './ai/aiClient';
-import { calibrateDownloadedNodusLocalModels } from './ai/nodusLocalAi';
 import * as protect from './protect/protectService';
 import { createIpcContext } from './ipc/context';
 import { registerProsopographyIpc } from './ipc/prosopography';
@@ -427,24 +426,11 @@ export function registerIpc(
     if (patch.aiConcurrencyMode !== undefined || patch.concurrency !== undefined) {
       refreshAiConcurrencyPolicy();
     }
-    const patchSelectsLocalModel = Object.values(patch).some((value) => Boolean(
-      value && typeof value === 'object'
-      && (value as any).provider === 'nodus'
-      && typeof (value as any).model === 'string',
-    )) || patch.embeddingProvider === 'nodus'
-      || (patch.embeddingModel !== undefined && next.embeddingProvider === 'nodus');
-    if (next.aiConcurrencyMode === 'automatic'
-      && (patch.aiConcurrencyMode === 'automatic' || patchSelectsLocalModel)) {
-      const selectedLocalModels = Object.values(next)
-        .filter((value): value is { provider: 'nodus'; model: string } => Boolean(
-          value && typeof value === 'object' && (value as any).provider === 'nodus' && typeof (value as any).model === 'string',
-        ))
-        .map((value) => value.model);
-      if (next.embeddingProvider === 'nodus' && next.embeddingModel) selectedLocalModels.push(next.embeddingModel);
-      // Calibration is offline and isolated from user requests by the runtime lease.
-      // Settings persistence must stay responsive while the benchmark runs.
-      void calibrateDownloadedNodusLocalModels(selectedLocalModels).catch(() => undefined);
-    }
+    // Concurrency is deliberately NOT calibrated here. Selecting a local model used
+    // to enqueue a blocking synthetic benchmark that every later local request had
+    // to wait behind, which on a CPU fallback looked like a frozen app (issue #851).
+    // The conservative single slot stays in force until the user asks for a
+    // measurement from Settings → Modelos IA.
     if (patch.documentIndexingEnabled !== undefined || patch.documentIndexIncludeArchived !== undefined) {
       await documentIndexQueue.configureContinuous(getActiveVault().id, next.documentIndexingEnabled);
     }

@@ -14,6 +14,18 @@ import type { IdeaType, EdgeType, EdgeBasis, ModelRef } from '@shared/types';
 import { perfLog, startPerf, type PerfContext } from '../perf';
 import { modelRefSupportsCapability } from '@shared/localAiModels';
 
+/**
+ * The fusion decision itself is a few hundred tokens of JSON, but the ceiling also has
+ * to survive a model that reasons before answering. 800 tokens was sized for models that
+ * answer directly; a reasoning-capable one (Gemma 4 E2B on the integrated runtime, for
+ * instance) spends part of that budget on its trace and stops with the JSON unfinished,
+ * which the scan can only report as an unfinished fusion. The first attempt now asks for
+ * real headroom and a cut-off answer gets exactly one retry at a larger ceiling, mirroring
+ * the summary's truncation recovery.
+ */
+const FUSION_MAX_TOKENS = 2_000;
+const FUSION_RETRY_MAX_TOKENS = 6_000;
+
 export interface ExtractedIdea {
   localId: string;
   type: IdeaType;
@@ -24,7 +36,12 @@ export interface ExtractedIdea {
 export interface FusionDecision {
   resolution: 'same_as' | 'variant_of' | 'new';
   matched_id: string | null;
-  merged_label: string;
+  /**
+   * Canonical formulation for the merged idea. Models that answer `new` routinely
+   * send null instead of repeating the idea's own label, so it is optional here and
+   * `buildFusionPlan` falls back to the label of the idea being fused.
+   */
+  merged_label: string | null;
   edge_to_existing: { type: EdgeType; basis: EdgeBasis; confidence: number } | null;
   rationale: string;
   confidence: number;
@@ -73,7 +90,13 @@ function isFusionResult(v: unknown): v is FusionDecision {
   if (typeof v !== 'object' || v === null) return false;
   const o = v as Record<string, unknown>;
   if (o.resolution !== 'same_as' && o.resolution !== 'variant_of' && o.resolution !== 'new') return false;
-  if (typeof o.merged_label !== 'string' || !o.merged_label.trim()) return false;
+  // A missing `merged_label` is not a broken decision: the only consumer falls back
+  // to the fused idea's own label (`result.merged_label || idea.label`). Requiring a
+  // non-empty string here rejected the very answer small local models give for a new
+  // idea — {"resolution":"new","merged_label":null,…} — and every affected idea was
+  // reported as "respuesta JSON inválida", which left whole works at deep_status=failed
+  // long after their extraction had succeeded.
+  if (o.merged_label != null && typeof o.merged_label !== 'string') return false;
   if (typeof o.rationale !== 'string' || !o.rationale.trim()) return false;
   if (typeof o.confidence !== 'number' || !Number.isFinite(o.confidence) || o.confidence < 0 || o.confidence > 1) return false;
   const matchedId = typeof o.matched_id === 'string' && o.matched_id.trim() ? o.matched_id : null;
@@ -264,19 +287,24 @@ export async function resolveIdeaFusion(
 
   const fusionDone = startPerf('LLM fusion', opts.perf, { idea: idea.label, candidates: candidates.length });
   try {
-    const result = await completeJson<FusionDecision>(
-      {
-        system: coreStructuredPrompt('fusion', getSettings().promptLanguage ?? 'es'),
-        user: JSON.stringify(input),
-        temperature: 0.1,
-        maxTokens: 800,
-        perf: opts.perf,
-        requestClass: 'fusion',
-        jobId: `fusion:${idea.localId}`,
-      },
-      isFusionResult,
-      fusionModel
-    );
+    const request = {
+      system: coreStructuredPrompt('fusion', getSettings().promptLanguage ?? 'es'),
+      user: JSON.stringify(input),
+      temperature: 0.1,
+      perf: opts.perf,
+      requestClass: 'fusion' as const,
+      jobId: `fusion:${idea.localId}`,
+    };
+    let result: FusionDecision;
+    try {
+      result = await completeJson<FusionDecision>({ ...request, maxTokens: FUSION_MAX_TOKENS }, isFusionResult, fusionModel);
+    } catch (error) {
+      // Only a cut-off answer is worth one retry with more room; a schema miss or an
+      // invalid reply would repeat with the same budget, and a transport failure must
+      // not be replayed (it is already handled upstream).
+      if (!(error instanceof AiError && error.code === 'output_truncated')) throw error;
+      result = await completeJson<FusionDecision>({ ...request, maxTokens: FUSION_RETRY_MAX_TOKENS }, isFusionResult, fusionModel);
+    }
     fusionDone({ resolution: result.resolution, matched: Boolean(result.matched_id) });
     return { plan: buildFusionPlan(idea, result, candidates, embedding, embeddingText, opts, fusionModel), decision: result };
   } catch (error) {
@@ -284,6 +312,12 @@ export async function resolveIdeaFusion(
     // the graph with a lower-quality answer. The caller checkpoints the successes
     // and retries only this idea, so the work resumes instead of restarting.
     fusionDone({ status: 'error' });
+    // The caller aggregates these into "could not fuse N of M ideas", which is all a
+    // report can quote. Name the idea, the candidates it was judged against and the
+    // underlying failure so the cause (invalid JSON, schema miss, timeout, empty
+    // reply) is readable instead of guessed.
+    const detail = error instanceof Error ? `${(error as { code?: string }).code ?? error.name}: ${error.message}` : String(error);
+    console.warn(`[fusion] "${idea.label}" (candidates=${candidates.length}) failed: ${detail.slice(0, 300)}`);
     throw error;
   }
 }

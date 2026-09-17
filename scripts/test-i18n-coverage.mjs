@@ -30,9 +30,15 @@ const outDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-i18n-'));
 /** Bundle a TS module so its real exported values can be asserted on. */
 function loadModule(file) {
   const bundle = path.join(outDir, `${path.basename(file, '.ts')}.cjs`);
+  // Run esbuild through the current Node/Electron binary and its JS entry point.
+  // The `node_modules/.bin/esbuild` shim is a shell script, which Windows cannot
+  // execute directly, so this stays the portable invocation.
   execFileSync(
-    path.join(repoRoot, 'node_modules/.bin/esbuild'),
-    [path.join(repoRoot, file), '--bundle', '--platform=node', '--format=cjs', '--target=es2022', `--outfile=${bundle}`],
+    process.execPath,
+    [
+      path.join(repoRoot, 'node_modules/esbuild/bin/esbuild'),
+      path.join(repoRoot, file), '--bundle', '--platform=node', '--format=cjs', '--target=es2022', `--outfile=${bundle}`,
+    ],
     { cwd: repoRoot, stdio: 'inherit' }
   );
   return require(bundle);

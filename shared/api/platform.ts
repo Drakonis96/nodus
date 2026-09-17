@@ -184,6 +184,10 @@ export interface PlatformApi {
   downloadNodusLocalModel(model: string, onProgress?: (fraction: number) => void): Promise<NodusLocalAiStatus>;
   cancelNodusLocalDownloads(): Promise<NodusLocalAiStatus>;
   deleteNodusLocalModel(model: string): Promise<NodusLocalAiStatus>;
+  /** Probe the installed runtime again and install the best build this machine can use. */
+  recheckNodusLocalRuntime(): Promise<NodusLocalAiStatus>;
+  /** Explicitly measure safe concurrency for a downloaded model (never runs on its own). */
+  calibrateNodusLocalModel(model: string): Promise<NodusLocalAiStatus>;
   getNodusLocalImageStatus(): Promise<NodusLocalImageStatus>;
   installNodusLocalImageRuntime(onProgress?: (fraction: number) => void): Promise<NodusLocalImageStatus>;
   downloadNodusLocalImageModel(model: string, onProgress?: (fraction: number) => void): Promise<NodusLocalImageStatus>;
