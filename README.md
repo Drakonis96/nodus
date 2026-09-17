@@ -1,10 +1,6 @@
 <p align="center">
-  <img src="site/assets/nodus-logo.png" width="104" alt="Nodus Research logo">
+  <img src="docs/screenshots/readme-banner.png" alt="Nodus Research, an open-source, local-first research workspace for academic research, teaching, study, databases and Zotero integration. Research deeper, teach smarter, study better. Free forever, no account required, on macOS, Windows and Linux.">
 </p>
-
-<h1 align="center">Nodus Research</h1>
-
-<p align="center"><strong>One place for research, teaching and study</strong></p>
 
 <p align="center">
   <a href="https://github.com/Drakonis96/nodus/releases/latest"><img alt="Download Nodus Research" src="https://img.shields.io/badge/Download_Nodus_Research-4f46e5?style=for-the-badge&amp;logo=github&amp;logoColor=white"></a>
@@ -27,14 +23,16 @@ and user-created themes. See the
 
 Download the installer for your computer and open it. There is no server to configure and no account is required to begin.
 
-| Platform | Latest installer |
-| --- | --- |
-| macOS with Apple silicon | [Download DMG](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-mac-arm64.dmg) |
-| macOS with an Intel processor | [Download DMG](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-mac-x64.dmg) |
-| Windows 10 and 11 | [Download EXE](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-win-x64.exe) |
-| Ubuntu and Debian | [Download DEB](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-amd64.deb) |
-| Fedora, openSUSE and other RPM-based distributions | [Download RPM](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-x86_64.rpm) |
-| Other Linux distributions | [Download AppImage](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-x86_64.AppImage) |
+| Platform | Latest installer | Downloads |
+| --- | --- | --- |
+| macOS with Apple silicon | [Download DMG](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-mac-arm64.dmg) | <img alt="Downloads of the macOS Apple silicon installer" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnodusresearch.com%2Fdata%2Fgithub-release-downloads.json&amp;query=%24.installers.macosArm64&amp;label=DMG&amp;style=flat-square&amp;color=374151"> |
+| macOS with an Intel processor | [Download DMG](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-mac-x64.dmg) | <img alt="Downloads of the macOS Intel installer" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnodusresearch.com%2Fdata%2Fgithub-release-downloads.json&amp;query=%24.installers.macosIntel&amp;label=DMG&amp;style=flat-square&amp;color=374151"> |
+| Windows 10 and 11 | [Download EXE](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-win-x64.exe) | <img alt="Downloads of the Windows installer" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnodusresearch.com%2Fdata%2Fgithub-release-downloads.json&amp;query=%24.installers.windows&amp;label=EXE&amp;style=flat-square&amp;color=374151"> |
+| Ubuntu and Debian | [Download DEB](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-amd64.deb) | <img alt="Downloads of the Debian and Ubuntu package" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnodusresearch.com%2Fdata%2Fgithub-release-downloads.json&amp;query=%24.installers.linuxDeb&amp;label=DEB&amp;style=flat-square&amp;color=374151"> |
+| Fedora, openSUSE and other RPM-based distributions | [Download RPM](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-x86_64.rpm) | <img alt="Downloads of the RPM package" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnodusresearch.com%2Fdata%2Fgithub-release-downloads.json&amp;query=%24.installers.linuxRpm&amp;label=RPM&amp;style=flat-square&amp;color=374151"> |
+| Other Linux distributions | [Download AppImage](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-x86_64.AppImage) | <img alt="Downloads of the AppImage" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnodusresearch.com%2Fdata%2Fgithub-release-downloads.json&amp;query=%24.installers.linuxAppImage&amp;label=AppImage&amp;style=flat-square&amp;color=374151"> |
+
+Each counter follows the installer in its row across every release, refreshed by the same deploy as the total in the header. They count installers alone, so they add up to less than that total: it also includes the update packages the app fetches by itself.
 
 The standalone Zotero plugin is available from the same release as [nodus-zotero.xpi](https://github.com/Drakonis96/nodus/releases/latest/download/nodus-zotero.xpi). In Zotero 9 or 10, open **Tools → Plugins**, choose **Install Add-on From File** from the gear menu, and select the downloaded file.
 
