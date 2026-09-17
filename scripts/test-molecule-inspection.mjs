@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const dir = await mkdtemp(path.join(os.tmpdir(), 'molecule-inspection-'));
 await build({ entryPoints: ['shared/moleculeInspection.ts'], outfile: path.join(dir, 'inspection.mjs'), bundle: true, platform: 'node', format: 'esm' });
-const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findReactionLines, findStepConditions, declaresRacemic, normalizeRouteAudit, formatRouteAudit, formatRouteFixPrompt, ROUTE_CONTINUITY_SYSTEM_RULE } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
+const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findReactionLines, findStepConditions, declaresRacemic, normalizeRouteAudit, formatRouteAudit, formatRouteFixPrompt, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
 await build({ entryPoints: ['shared/chatSkills.ts'], outfile: path.join(dir, 'chatSkills.mjs'), bundle: true, platform: 'node', format: 'esm' });
 const { splitChatVisuals, serializeChatVisualPart } = await import(pathToFileURL(path.join(dir, 'chatSkills.mjs')));
 await build({ entryPoints: ['shared/synthesisPrompt.ts'], outfile: path.join(dir, 'synthesisPrompt.mjs'), bundle: true, platform: 'node', format: 'esm' });
@@ -385,4 +385,94 @@ test('a declared racemate is formatted as a caveat, not a refusal', () => {
   const text = formatRouteAudit(audit);
   assert.match(text, /declared racemic/);
   assert.doesNotMatch(text, /unspecified stereocentre/);
+});
+
+const fixPayload = (fence) => JSON.parse(fence.replace(/^```nodus-route-fix\n/, '').replace(/\n```$/, ''));
+const passingStep = (index, reaction, products = []) => ({ index, reaction, ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0, reactants: [], agents: [], products });
+const species = (canonicalSmiles, formula) => ({ input: canonicalSmiles, canonicalSmiles, skeletonSmiles: canonicalSmiles, formula, charge: 0, heavyAtoms: 1, stereocentres: 0, unspecifiedStereocentres: 0 });
+
+test('a route whose steps all pass but which is disconnected is still offered a fix', () => {
+  const steps = ['O=C1CCCC1.BrBr>>O=C1C(Br)(Br)CC(Br)C1Br.Br', 'O=C1C=CC2(Br)C1C1C=CC2(Br)C1=O>>O=C(O)C1CC=CC1'];
+  const audit = normalizeRouteAudit({
+    continuous: false,
+    blocked: ['Step 1 is disconnected: it neither uses an intermediate from an earlier step nor produces one used later.'],
+    isolated: [0],
+    steps: [passingStep(0, steps[0]), passingStep(1, steps[1])],
+    links: [],
+  });
+  assert.deepEqual(audit.isolated, [0]);
+  const prompt = fixPayload(formatRouteFixPrompt(steps, audit)).prompt;
+  assert.ok(prompt.startsWith(ROUTE_FIX_PROMPT_LEAD));
+  assert.match(prompt, /The route as a whole has these problems:/);
+  assert.match(prompt, /Step 1 is disconnected/);
+  assert.ok(prompt.includes(`Currently: \`${steps[0]}\``), 'the disconnected step is quoted');
+  assert.match(prompt, /insert any missing step\(s\)/, 'the model may insert the missing steps');
+  assert.doesNotMatch(prompt, /rejected these steps/, 'no step failed on its own');
+
+  // An older package only writes the sentence; the step is still found.
+  const legacy = normalizeRouteAudit({ ...audit, isolated: undefined });
+  assert.equal(legacy.isolated, undefined);
+  assert.match(fixPayload(formatRouteFixPrompt(steps, legacy)).prompt, /Step 1 is disconnected/);
+});
+
+test('a route that never forms the requested target is reported and offered a fix', () => {
+  const steps = ['CCO>>CC=O.[H][H]'];
+  const audit = normalizeRouteAudit({
+    continuous: false,
+    blocked: ['No step forms the target CC(=O)O (C2H4O2).'],
+    steps: [passingStep(0, steps[0], [species('CC=O', 'C2H4O'), species('[H][H]', 'H2')])],
+    links: [],
+    target: { input: 'OC(C)=O', canonicalSmiles: 'CC(=O)O', formula: 'C2H4O2', formedAt: null, reason: 'not-formed' },
+  });
+  assert.equal(audit.target.reason, 'not-formed');
+  assert.match(formatRouteAudit(audit), /Target `CC\(=O\)O` \(C2H4O2\): FAIL — no step forms it\./);
+  const prompt = fixPayload(formatRouteFixPrompt(steps, audit)).prompt;
+  assert.match(prompt, /never forms the requested target `CC\(=O\)O` \(C2H4O2\); its last step stops at `CC=O`, `\[H\]\[H\]`/);
+
+  const formed = normalizeRouteAudit({ ...audit, continuous: true, blocked: [], target: { ...audit.target, canonicalSmiles: 'CC=O', formula: 'C2H4O', formedAt: 0, reason: 'formed' } });
+  assert.match(formatRouteAudit(formed), /Target `CC=O` \(C2H4O\): formed in step 1\./);
+  assert.equal(formatRouteFixPrompt(steps, formed), '', 'a formed target is not a failure');
+
+  assert.equal(normalizeRouteAudit({ ...audit, target: { input: 'x', reason: 'made-up' } }).target, undefined, 'an unknown verdict is dropped');
+});
+
+test('an intermediate that changes stereochemistry between steps is offered a fix', () => {
+  const steps = ['C/C=C\\C>>C/C=C/C', 'C/C=C\\C.[H][H]>>CCCC'];
+  const audit = normalizeRouteAudit({
+    continuous: false,
+    blocked: ['Step 1 → 2: the intermediate has the same constitution but different stereochemistry or charge.'],
+    steps: [passingStep(0, steps[0]), passingStep(1, steps[1])],
+    links: [{ from: 0, to: 1, ok: false, reason: 'constitution-only', carried: [], skeletonOnly: [{ product: 'C/C=C/C', reactant: 'C/C=C\\C', skeletonSmiles: 'CC=CC' }] }],
+  });
+  const prompt = fixPayload(formatRouteFixPrompt(steps, audit)).prompt;
+  assert.match(prompt, /Steps 1 → 2: the intermediate changes stereochemistry or charge/);
+  assert.ok(prompt.includes('`C/C=C/C` is made but `C/C=C\\C` is used'));
+});
+
+test('the fix prompt no longer forbids the counterion it requires on both sides', () => {
+  const audit = normalizeRouteAudit({
+    continuous: false, blocked: ['x'],
+    steps: [{ index: 0, reaction: 'A>>B', ok: true, balanced: false, chargeBalanced: true, differences: ['C: reactants 2, products 1'], unspecifiedStereocentres: 0 }],
+    links: [],
+  });
+  const prompt = fixPayload(formatRouteFixPrompt(['A>>B'], audit)).prompt;
+  assert.doesNotMatch(prompt, /Never put the same species on both sides/);
+  assert.match(prompt, /the only species that appears on both sides is a salt's counterion/);
+  assert.match(prompt, /Write each ion of a salt once per side/);
+});
+
+test('the requested target is read from the synthesis request', () => {
+  assert.equal(findRequestedTarget('Propose a synthesis of tropinone (SMILES: CN1C2CCC1CC(=O)C2). You may use methylamine (CN).'), 'CN1C2CCC1CC(=O)C2');
+  assert.equal(findRequestedTarget('Propose a step-by-step laboratory synthesis of sulfanilamide (4-aminobenzenesulfonamide, SMILES: Nc1ccc(cc1)S(N)(=O)=O), starting from benzene (c1ccccc1)'), 'Nc1ccc(cc1)S(N)(=O)=O');
+  assert.equal(findRequestedTarget('Propose a synthesis of (Z)-hex-3-ene (SMILES: CC/C=C\\CC), starting from acetylene'), 'CC/C=C\\CC');
+  assert.equal(findRequestedTarget('Synthesis of cubane, SMILES: `C12C3C4C1C5C2C3C45`.'), 'C12C3C4C1C5C2C3C45');
+  assert.equal(findRequestedTarget('Propose a synthesis of aspirin starting from phenol (SMILES: Oc1ccccc1)'), null, 'a starting material is not the target');
+  assert.equal(findRequestedTarget('Compare and contrast to this approach: Step 1 phenol, SMILES: Oc1ccccc1'), null);
+  assert.equal(findRequestedTarget('What is the SMILES: of water?'), null);
+
+  const request = 'Propose a synthesis of tropinone (SMILES: CN1C2CCC1CC(=O)C2).';
+  const correction = `${ROUTE_FIX_PROMPT_LEAD}\n\nThe route checker rejected these steps: ...`;
+  assert.equal(requestedTargetFor([request, correction, correction]), 'CN1C2CCC1CC(=O)C2', 'a correction keeps the target of the request it corrects');
+  assert.equal(requestedTargetFor([request, 'are you saying the stereochemistry does not matter?']), null, 'a new question has its own (absent) target');
+  assert.equal(requestedTargetFor([]), null);
 });

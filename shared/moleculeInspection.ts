@@ -89,11 +89,23 @@ export interface RouteLinkAudit {
   declaredCarrier?: { input: string; canonicalSmiles: string | null; inProduct: boolean; inReactant: boolean };
 }
 
+export interface RouteTargetAudit {
+  input: string;
+  canonicalSmiles: string | null;
+  formula: string | null;
+  formedAt: number | null;
+  reason: 'formed' | 'stereo-mismatch' | 'not-formed' | 'unparsed';
+}
+
 export interface RouteAudit {
   steps: RouteStepAudit[];
   links: RouteLinkAudit[];
   continuous: boolean;
   blocked: string[];
+  /** Steps connected to nothing. Older packages only say so in `blocked`. */
+  isolated?: number[];
+  /** Whether the route forms the requested target; absent when none was named. */
+  target?: RouteTargetAudit;
 }
 
 const SMILES_CHARS = /^[A-Za-z0-9@+\-=\\#()[\]/.,%*:]+$/;
@@ -384,6 +396,35 @@ export function findStepConditions(text: string, count: number): string[] {
   return out;
 }
 
+/** The request's target, from the usual phrasing "a synthesis of <name> (SMILES: <smiles>)".
+ *  A SMILES named after "from", "starting" or "using" is a starting material, not the target,
+ *  so the match stops there rather than guess. */
+const TARGET_PATTERN = /\bsynthes[a-z]*\s+(?:of|for)\b(?:(?!\b(?:from|starting|using|with)\b)[^\n]){0,160}?\bSMILES\s*[:=]\s*`?([^\s`,;]+)/i;
+
+export function findRequestedTarget(text: string): string | null {
+  const match = TARGET_PATTERN.exec(text);
+  if (!match) return null;
+  let value = match[1].replace(/\.+$/, '');
+  // "(SMILES: CCO)" leaves the prose's closing parenthesis on the SMILES.
+  const unbalanced = () => (value.match(/\)/g) ?? []).length > (value.match(/\(/g) ?? []).length;
+  while (value.endsWith(')') && unbalanced()) value = value.slice(0, -1);
+  return value && value.length <= 2000 && SMILES_CHARS.test(value) ? value : null;
+}
+
+/** The first line of the route-fix prompt, so the request behind a correction can be found. */
+export const ROUTE_FIX_PROMPT_LEAD = 'Correction needed for the synthesis route above.';
+
+/** The target of the conversation's current synthesis request. A correction sent from the
+ *  route-fix button carries no target, so it is skipped for the request it corrects; any
+ *  other message is the request. */
+export function requestedTargetFor(userMessages: string[]): string | null {
+  for (let index = userMessages.length - 1; index >= 0; index--) {
+    if (userMessages[index].trimStart().startsWith(ROUTE_FIX_PROMPT_LEAD)) continue;
+    return findRequestedTarget(userMessages[index]);
+  }
+  return null;
+}
+
 const RACEMIC_PATTERN = /\bracemic\b|\bracemate\b|\bracemi[cs]\b/i;
 
 /** Whether the answer declares a racemic outcome. This is model prose, not a verification: it
@@ -493,7 +534,35 @@ export function normalizeRouteAudit(data: unknown): RouteAudit | null {
   const links = (Array.isArray(value.links) ? value.links : []).map((entry, index) => normalizeRouteLink(entry, index))
     .filter((entry): entry is RouteLinkAudit => entry !== null).slice(0, 15);
   const blocked = stringArray(value.blocked).map((entry) => entry.slice(0, 300)).slice(0, 32);
-  return { steps, links, continuous: boolOr(value.continuous, blocked.length === 0), blocked };
+  const isolated = Array.isArray(value.isolated)
+    ? value.isolated.filter((entry): entry is number => Number.isInteger(entry) && entry >= 0 && entry < 16).slice(0, 16)
+    : undefined;
+  const target = normalizeRouteTarget(value.target);
+  return { steps, links, continuous: boolOr(value.continuous, blocked.length === 0), blocked, ...(isolated ? { isolated } : {}), ...(target ? { target } : {}) };
+}
+
+const ROUTE_TARGET_REASONS: RouteTargetAudit['reason'][] = ['formed', 'stereo-mismatch', 'not-formed', 'unparsed'];
+
+function normalizeRouteTarget(entry: unknown): RouteTargetAudit | null {
+  const value = asRecord(entry);
+  if (!value || typeof value.input !== 'string' || !(ROUTE_TARGET_REASONS as unknown[]).includes(value.reason)) return null;
+  return {
+    input: value.input.slice(0, 2000),
+    canonicalSmiles: typeof value.canonicalSmiles === 'string' ? value.canonicalSmiles.slice(0, 2000) : null,
+    formula: typeof value.formula === 'string' ? value.formula.slice(0, 200) : null,
+    formedAt: Number.isInteger(value.formedAt) ? value.formedAt as number : null,
+    reason: value.reason as RouteTargetAudit['reason'],
+  };
+}
+
+/** Steps connected to nothing, from the structured field or, for an older package, from the
+ *  sentence it writes into `blocked`. */
+function isolatedSteps(audit: RouteAudit): number[] {
+  if (audit.isolated) return audit.isolated;
+  return audit.blocked.flatMap((entry) => {
+    const match = /^Step (\d+) is disconnected/.exec(entry);
+    return match ? [Number(match[1]) - 1] : [];
+  });
 }
 
 const sideTrace = (species: RouteSpeciesSummary[]): string => species.map((entry) => entry.formula || entry.canonicalSmiles).join(' + ');
@@ -540,6 +609,17 @@ export function formatRouteAudit(audit: RouteAudit): string {
       }
     }
   }
+  const target = audit.target;
+  if (target) {
+    const name = target.canonicalSmiles ? `\`${target.canonicalSmiles}\`${target.formula ? ` (${target.formula})` : ''}` : `\`${target.input}\``;
+    lines.push('', target.reason === 'formed' && target.formedAt !== null
+      ? `Target ${name}: formed in step ${target.formedAt + 1}.`
+      : target.reason === 'stereo-mismatch'
+        ? `Target ${name}: FAIL — a step forms its constitution but not its stereochemistry.`
+        : target.reason === 'not-formed'
+          ? `Target ${name}: FAIL — no step forms it.`
+          : `Target ${name}: not checked — the requested structure could not be read.`);
+  }
   lines.push('', audit.continuous
     ? 'Route verified: every intermediate is carried over as the same structure.'
     : `Route blocked: ${audit.blocked.join(' ')}`);
@@ -569,6 +649,41 @@ function prescriptiveBalance(step: RouteStepAudit): string {
   return parts.join('; ');
 }
 
+/** The problems that belong to the route rather than to one equation: an intermediate that
+ *  changes between steps, a step connected to nothing, and a target the route never forms.
+ *  Each can pass every per-step check, so without these the route is blocked and no fix is
+ *  offered. */
+function routeFixProblems(steps: string[], audit: RouteAudit): string[] {
+  const problems: string[] = [];
+  for (const link of audit.links) {
+    if (link.ok) continue;
+    const pair = `Steps ${link.from + 1} → ${link.to + 1}`;
+    if (link.reason === 'constitution-only') {
+      const forms = link.skeletonOnly.map((item) => `\`${item.product}\` is made but \`${item.reactant}\` is used`).join('; ');
+      problems.push(`- ${pair}: the intermediate changes stereochemistry or charge between the steps${forms ? ` (${forms})` : ''}. Write it with the same isomeric SMILES in both steps.`);
+    } else if (link.reason === 'declared-mismatch') {
+      problems.push(`- Step ${link.to + 1}: the declared intermediate is not both a product of an earlier step and a reactant of this one.`);
+    } else if (link.reason === 'no-overlap') {
+      problems.push(`- ${pair}: no intermediate is carried over.`);
+    }
+  }
+  for (const index of isolatedSteps(audit)) {
+    problems.push(`- Step ${index + 1} is disconnected: none of its reactants is made by an earlier step and none of its products is used by a later one. Either a step is missing between it and its neighbours, or an intermediate is written with different SMILES in the two steps. Insert the missing step(s) where they belong, or make the SMILES identical.${steps[index] ? `\n  Currently: \`${steps[index]}\`` : ''}`);
+  }
+  const target = audit.target;
+  if (target && audit.steps.every((step) => step.ok)) {
+    const wanted = `\`${target.canonicalSmiles ?? target.input}\`${target.formula ? ` (${target.formula})` : ''}`;
+    const last = audit.steps[audit.steps.length - 1];
+    const stops = last?.products.map((entry) => `\`${entry.canonicalSmiles}\``).join(', ');
+    if (target.reason === 'not-formed') {
+      problems.push(`- The route never forms the requested target ${wanted}${stops ? `; its last step stops at ${stops}` : ''}. Add the missing step(s) so that a final step's products include the target with exactly that SMILES.`);
+    } else if (target.reason === 'stereo-mismatch') {
+      problems.push(`- The route forms the target's constitution but not its stereochemistry. The target is ${wanted}: write the step that sets it with the target's stereodescriptors.`);
+    }
+  }
+  return problems;
+}
+
 /** One instruction per rejected step: the checker's own reason, made directional where the
  *  totals allow it. */
 function stepFixInstruction(step: RouteStepAudit): string {
@@ -592,19 +707,19 @@ export function formatRouteFixPrompt(steps: string[], audit: RouteAudit): string
   // A declared racemate is an accepted outcome, not a failure the model can fix by
   // specifying an enantiomer, so it is never offered back as a correction.
   const failures = audit.steps.filter(step => !(step.ok && step.balanced === true && (step.unspecifiedStereocentres === 0 || step.racemic === true)));
-  if (!failures.length) return '';
+  const problems = routeFixProblems(steps, audit);
+  if (!failures.length && !problems.length) return '';
   const lines = failures.map(step =>
     `- Step ${step.index + 1}: ${stepFixInstruction(step)}\n  Currently: \`${steps[step.index]}\` — change it; do not repeat it unchanged.`);
   const prompt = [
-    'Correction needed for the synthesis route above.',
+    ROUTE_FIX_PROMPT_LEAD,
     '',
-    'The route checker rejected these steps:',
-    ...lines,
-    '',
-    'Re-output the same route in the same order. Rewrite only the rejected step(s) in place and leave the passing steps exactly as they are. You can split a rejected step into consecutive steps when the reason asks for it: for example Step 3 becomes 3a and 3b, or the route grows from four steps to five by adding the extra step where Step 3 was. The original steps keep their relative order. Rules that resolve these failures:',
-    '- Keep the step order: never reorder, merge or duplicate a step, and never add a second copy of a step that already passes. You MAY split a rejected step into consecutive steps when the checker asks you to (e.g. 3 becomes 3a and 3b) — the new steps stay where the original was, so the route order is unchanged even if the numbering shifts.',
+    ...(lines.length ? ['The route checker rejected these steps:', ...lines, ''] : []),
+    ...(problems.length ? ['The route as a whole has these problems:', ...problems, ''] : []),
+    `Re-output the same route in the same order. Rewrite only the rejected step(s) in place${problems.length ? ', insert any missing step(s) where the route problems say they belong,' : ''} and leave the passing steps exactly as they are. You can split a rejected step into consecutive steps when the reason asks for it: for example Step 3 becomes 3a and 3b, or the route grows from four steps to five by adding the extra step where Step 3 was. The original steps keep their relative order. Rules that resolve these failures:`,
+    '- Keep the step order: never reorder, merge or duplicate a step, and never add a second copy of a step that already passes. You MAY split a rejected step into consecutive steps when the checker asks you to (e.g. 3 becomes 3a and 3b) — the new steps stay where the original was, so the route order is unchanged even if the numbering shifts. When the route problems say a step is missing, insert it where it belongs in the same way.',
     '- Conserve every element and the total charge on both sides. A species that is short on one side is a reagent (on the reactant side) or a byproduct (on the product side) that is missing from the equation.',
-    '- List every species that is consumed or produced, once per side. Never put the same species on both sides, and do not add water or a solvent unless the step consumes or produces it.',
+    '- List every species that is consumed or produced, once per side. Never put the same molecule on both sides; the only species that appears on both sides is a salt\'s counterion, as the salt rules below explain. Do not add water or a solvent unless the step consumes or produces it.',
     '- Every reactive group in a molecule reacts: saponify every ester, protonate every carboxylate, alkylate every position you intend. A group that leaves — an alcohol from an alkoxide, a hydrogen halide, water, ammonia, CO2 — is a product and must be written out.',
     '- A metal that enters as a reagent leaves as its salt (for example `[Na+].[Br-]`, `[Na+].[Cl-]`); never leave a metal ion on one side only, and count one equivalent of base or acid for each group that reacts.',
     '- Write each ion of a salt once per side and let the coefficient count it: if `[Na+]` appears once among the reactants, write it once among the products too. A disodium salt is one `[Na+]` with the dianion, not `[Na+].[Na+]` on one side only; hydrochloric acid is one `[H+].[Cl-]`, not two. An ion written a different number of times on the two sides is the usual reason a metal will not balance.',

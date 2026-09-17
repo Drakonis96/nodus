@@ -34,6 +34,8 @@ interface InspectOptions {
   enabled?: boolean;
   /** The conversation that owns stored artifacts, when the chat is saved. */
   owner?: string;
+  /** The requested target as SMILES; the route check then requires the route to form it. */
+  target?: string | null;
 }
 
 function inspectProvider() {
@@ -135,8 +137,9 @@ function chemistryRunner(options: InspectOptions) {
 
 type Runner = ReturnType<typeof createTrustedCapabilityRunner>;
 
-async function invokeRoute(runner: Runner, provider: CapabilityProvider, steps: string[], racemic?: boolean): Promise<RouteAudit | null> {
-  const result = await runner.invoke({ provider, toolId: ROUTE_TOOL, input: { steps, ...(racemic ? { racemic } : {}) } });
+async function invokeRoute(runner: Runner, provider: CapabilityProvider, steps: string[], racemic?: boolean, target?: string | null): Promise<RouteAudit | null> {
+  // A package that predates `target` ignores it, and the audit simply has no target entry.
+  const result = await runner.invoke({ provider, toolId: ROUTE_TOOL, input: { steps, ...(racemic ? { racemic } : {}), ...(target ? { target } : {}) } });
   const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'route-audit');
   return artifact ? normalizeRouteAudit(artifact.data) : null;
 }
@@ -147,7 +150,7 @@ async function verifyRouteSteps(steps: string[], options: InspectOptions, racemi
   if (!provider) return null;
   const runner = chemistryRunner(options);
   try {
-    return await invokeRoute(runner, provider, steps, racemic);
+    return await invokeRoute(runner, provider, steps, racemic, options.target);
   } catch {
     return null;
   } finally {
@@ -232,7 +235,7 @@ export async function appendRouteReportAndDrawings(
   const compile = compileProvider();
   const runner = chemistryRunner(options);
   try {
-    const audit = await invokeRoute(runner, provider, steps, racemic);
+    const audit = await invokeRoute(runner, provider, steps, racemic, options.target);
     if (!audit) return finalAnswer;
     const report = formatRouteAudit(audit);
     const drawings = compile ? await drawRouteSteps(runner, compile, steps, conditions, audit, options) : '';

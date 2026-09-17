@@ -9,7 +9,7 @@ import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getConversation } from '../db/chatRepo';
 import { executeChatSkills } from './chatSkillExecution';
 import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings } from './moleculeInspection';
-import { MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE } from '@shared/moleculeInspection';
+import { MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE, requestedTargetFor } from '@shared/moleculeInspection';
 import { SYNTHESIS_TEMPLATE_ADDENDUM, looksLikeSynthesisRequest } from '@shared/synthesisPrompt';
 import type {
   Author,
@@ -191,7 +191,8 @@ const CHAT_CITATION_ATTEMPTS = 3;
 function skillExecution(request: ResearchChatRequest) {
   const vaultId = getActiveVault().id;
   const owner = request.conversationId ? chatAssetOwner('assistant', request.conversationId, vaultId) : undefined;
-  return { skills: enabledChatSkills('assistant'), question: request.messages.filter(message => message.role === 'user').at(-1)?.content, model: request.model, owner, version: owner ? chatAssetVersion(owner) : 0,
+  const userMessages = request.messages.filter(message => message.role === 'user').map(message => message.content);
+  return { skills: enabledChatSkills('assistant'), question: userMessages.at(-1), target: requestedTargetFor(userMessages), model: request.model, owner, version: owner ? chatAssetVersion(owner) : 0,
     isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getConversation(request.conversationId)) };
 }
 
@@ -203,7 +204,7 @@ async function finalizeWithAudit(answer: string, execution: ReturnType<typeof sk
   const chemistryEnabled = execution.skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
   const options = { model: execution.model, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner };
   const withStructures = await appendStructureAudit(skilled, answer, options);
-  return appendRouteReportAndDrawings(withStructures, answer, options);
+  return appendRouteReportAndDrawings(withStructures, answer, { ...options, target: execution.target });
 }
 
 
