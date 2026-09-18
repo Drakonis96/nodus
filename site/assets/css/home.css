@@ -187,7 +187,8 @@ body {
 /* --- the screenshots inside it --- */
 .shots { position: relative; display: grid; background: #0b0913; }
 .shot {
-  position: relative; grid-area: 1 / 1; margin: 0;
+  grid-area: 1 / 1; margin: 0;
+  display: flex; flex-direction: column;
   opacity: 0; pointer-events: none;
   transition: opacity 0.4s var(--ease);
 }
@@ -196,11 +197,16 @@ body {
   display: block; width: 100%; height: auto; aspect-ratio: 16 / 10;
   object-fit: cover; object-position: top center;
 }
+/* The caption is a bar under the shot, never a scrim over it: the screenshot is
+   the point of the window, so nothing is laid on top of it. `flex: 1` lets the
+   longest caption in the set set the bar's height for all of them, so the strip
+   under the image is the same in every view and never jumps. */
 .shot figcaption {
-  position: absolute; inset: auto 0 0 0;
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 14px;
-  padding: 40px 16px 13px;
-  background: linear-gradient(180deg, transparent, rgba(6, 5, 11, 0.74) 55%, rgba(6, 5, 11, 0.92));
+  flex: 1 1 auto;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+  padding: 10px 15px 12px;
+  border-top: 1px solid var(--membrane);
+  background: rgba(255, 255, 255, 0.022);
   font-size: 12.5px; color: var(--ink-2); line-height: 1.45;
 }
 .shot .shot-step {
@@ -229,8 +235,7 @@ body {
   .shot { transition: none; }
 }
 @media (max-width: 700px) {
-  /* the caption sits on the screenshot, so it gives back all the room it can */
-  .shot figcaption { padding: 26px 12px 10px; font-size: 12px; gap: 8px; }
+  .shot figcaption { padding: 9px 12px 11px; font-size: 12px; gap: 8px; }
   .shot-arrow { width: 32px; height: 32px; }
   .shot-arrow.prev { left: 8px; }
   .shot-arrow.next { right: 8px; }

@@ -217,6 +217,12 @@ test('the carousel is a row of screenshots that swaps in place, with real arrows
   assert.match(css, /\.shots \{ position: relative; display: grid;/, 'the views stack in one cell, so a swap cannot shift the layout');
   assert.match(css, /\.shot\.is-active \{ opacity: 1;/, 'the current view is the opaque one');
   assert.match(css, /\.shot img \{[^}]*aspect-ratio: 16 \/ 10/, 'every screenshot keeps the 16:10 window it was captured in');
+  // The screenshot is what the window is for. A caption laid over it — the scrim
+  // that came first — hid a strip of the app on every view, so the caption is a
+  // bar under the image and nothing is drawn on top of the shot itself.
+  assert.match(css, /\.shot figcaption \{[^}]*flex: 1 1 auto/, 'the caption is in the flow, under the image');
+  assert.doesNotMatch(css, /\.shot figcaption \{[^}]*position: absolute/, 'the caption is not laid over the screenshot');
+  assert.doesNotMatch(css, /\.shot figcaption \{[^}]*linear-gradient/, 'no scrim darkens the bottom of the screenshot');
   // `hidden` is how the markup keeps the arrows out of a script-less page, and
   // display: grid would otherwise beat the browser's own [hidden] rule.
   assert.match(css, /\.shot-arrow\[hidden\] \{ display: none; \}/, 'a hidden arrow is really hidden');
