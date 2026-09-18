@@ -1,7 +1,10 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const legalRoot = path.join(root, 'legal');
@@ -294,9 +297,25 @@ function aggregatePackageLicenses() {
   return { destination, packages: packages.length, groups: groups.size, sha256: sha256(output) };
 }
 
+/** Electron 43 has no install script: `npm install` unpacks the package but not the
+ *  distribution, which is downloaded the first time the module is required. Chromium's licence
+ *  notice lives in that distribution, so ask for it rather than assuming an earlier step
+ *  already did — otherwise packaging a fresh clone fails, blaming an install step that no
+ *  longer exists. */
+function materializeElectronDist() {
+  if (process.env.ELECTRON_DIST_PATH) return;
+  if (fs.existsSync(path.join(nodeModulesRoot, 'electron', 'dist'))) return;
+  try {
+    require('electron'); // resolves the executable, downloading the distribution if it is absent
+  } catch (error) {
+    console.warn(`[legal] Electron distribution could not be resolved: ${error.message}`);
+  }
+}
+
 function copyElectronLegalFiles() {
   const electronPackage = readJson(path.join(nodeModulesRoot, 'electron', 'package.json'));
   const electronLicense = path.join(nodeModulesRoot, 'electron', 'LICENSE');
+  materializeElectronDist();
   const chromiumCandidates = [
     path.join(nodeModulesRoot, 'electron', 'dist', 'LICENSES.chromium.html'),
     process.env.ELECTRON_DIST_PATH
@@ -306,8 +325,9 @@ function copyElectronLegalFiles() {
   const chromiumLicenses = chromiumCandidates.find((candidate) => fs.existsSync(candidate));
   if (!fs.existsSync(electronLicense) || !chromiumLicenses) {
     throw new Error(
-      'Electron legal files are incomplete. Run npm ci without --ignore-scripts ' +
-      '(or set ELECTRON_DIST_PATH to a verified Electron distribution).',
+      `Electron ${electronPackage.version} legal files are incomplete: its distribution is ` +
+      'downloaded on demand and could not be fetched. Run `node node_modules/electron/install.js` ' +
+      'with network access, or set ELECTRON_DIST_PATH to a verified Electron distribution.',
     );
   }
   const copies = [
