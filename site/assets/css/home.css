@@ -393,12 +393,6 @@ body {
 .path-card h3 { font-size: 18px; margin-bottom: 9px; }
 .path-card p { margin: 0 0 16px; font-size: 14px; color: var(--ink-2); line-height: 1.55; }
 
-/* ============================================================ final */
-.final { text-align: center; padding-bottom: clamp(90px, 12vw, 150px); }
-.final .n-mark { width: 62px; height: 62px; margin-bottom: 26px; }
-.final .lead { margin-inline: auto; }
-.final .ctas { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin-top: 36px; }
-
 /* ============================================================ responsive */
 @media (max-width: 980px) {
   /* minmax(0, 1fr), never a bare 1fr: a bare fr keeps an automatic minimum, so

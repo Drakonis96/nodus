@@ -49,6 +49,38 @@ test('the home page presents the four main vaults, the rest, and the toolkit', (
   }
 });
 
+test('the way into the app sits with the licence band, not in a section of its own', () => {
+  const home = read('index.html');
+  // The page used to close on a second "Point it at your own library" statement
+  // carrying the same two buttons. One call to action, in the band that already
+  // says the app is free and local-first.
+  assert.ok(!home.includes('class="final'), 'the separate closing section is gone');
+  assert.ok(!home.includes('Point it at your own library'), 'and so is its heading');
+
+  const band = home.slice(home.indexOf('<section class="band'));
+  const section = band.slice(0, band.indexOf('</section>'));
+  assert.match(section, /Free to use\. Yours to keep\./, 'the band still makes its statement');
+  assert.match(section, /<div class="ctas">/, 'the band carries the buttons');
+  assert.match(section, /href="demo\/"/, 'one of them opens the live demo');
+  assert.match(section, /data-download/, 'the other one downloads the app');
+  assert.equal((section.match(/data-download/g) ?? []).length, 1, 'the app is offered once, not twice');
+});
+
+test('the band pills hold one line while they fit, and give way as the window narrows', () => {
+  const css = fs.readFileSync(path.join(siteRoot, 'assets', 'css', 'nodus.css'), 'utf8');
+  const pills = css.match(/\.band \.pills \{[^}]*\}/)?.[0];
+  const pill = css.match(/\.band \.pill \{[^}]*\}/)?.[0];
+  assert.ok(pills && pill, 'the band pills are still styled');
+  // One row until it cannot be one row: the row wraps, and each pill gives back
+  // type and padding against the viewport before a pill is pushed to a line alone.
+  assert.match(pills, /flex-wrap: wrap/);
+  assert.match(pills, /justify-content: center/);
+  assert.match(pill, /font-size: clamp\(/);
+  assert.match(pill, /padding: clamp\([^)]*\) clamp\(/);
+  // A pill is one label; it must never wrap its own text into two lines.
+  assert.match(pill, /white-space: nowrap/);
+});
+
 test('every live demo can switch directly to every other demo vault', () => {
   const demoPages = ['index.html', 'teaching.html', 'study.html', 'databases.html', 'genealogy.html', 'worldbuilding.html'];
   const switcher = read('demo/vault-switcher.js');
