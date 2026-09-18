@@ -37,7 +37,23 @@ test('the main workflow tests then publishes amd64 and arm64 images', () => {
     assert.match(workflow, new RegExp(`scripts/${suite.replace('.', '\\.')}`), `${suite} does not run before publishing`);
   }
   assert.match(workflow, /Run image health smoke test/);
-  assert.match(workflow, /platforms:\s*linux\/amd64,linux\/arm64/);
+  // Both architectures used to build on the amd64 runner with arm64 under QEMU. The
+  // emulated `npm install` died with an illegal instruction and left the build hung
+  // until the job timeout: the run only said "cancelled" and the `main` tag silently
+  // stayed on the previous merge. Each architecture now builds on its own runner.
+  assert.doesNotMatch(workflow, /setup-qemu/, 'the arm64 image must not be built under emulation again');
+  assert.match(workflow, /runs-on: ubuntu-24\.04-arm/, 'the arm64 image needs a native arm64 runner');
+  assert.match(workflow, /platforms:\s*linux\/amd64\b/, 'the amd64 image is built for amd64');
+  assert.match(workflow, /platforms:\s*linux\/arm64\b/, 'the arm64 image is built for arm64');
+  assert.match(workflow, /docker buildx imagetools create/, 'both architecture digests are joined into one manifest list');
+  assert.ok(
+    workflow.indexOf('Test server and deployment contract') < workflow.indexOf('docker buildx imagetools create'),
+    'the contract suites have to pass before the tag can move',
+  );
+  assert.match(workflow, /\.config\.Labels\["org\.opencontainers\.image\.revision"\] == \$revision/,
+    'the published tag has to be verified against the commit that produced it');
+  assert.match(workflow, /group: nodus-server-image-\$\{\{ github\.event_name \}\}/,
+    "a merge to main must not cancel another run's pull-request smoke");
   assert.match(workflow, /type=raw,value=main/);
   assert.match(workflow, /packages:\s*write/);
   assert.match(workflow, /Verify Portainer can pull main anonymously/);
