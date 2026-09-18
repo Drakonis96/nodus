@@ -9,9 +9,20 @@
 // a real answer (not a refusal) for answerable questions, and it never invents its way
 // past a question whose honest answer is "planned" or "not available".
 //
+// The walk outlives a lot of things: a shell that times out, a terminal that closes, a
+// session that restarts. Any of those signals the walk process, and Playwright answers a
+// signal by closing the Electron app it launched — so a single signal ninety answers in
+// used to end the run there, with the app's exit code never printed and every remaining
+// question recorded as a failure. The app is therefore a *restartable* resource: the walk
+// says why the instance went away, brings up a fresh one against the same profile, and
+// re-asks only the questions whose answers went down with it.
+//
 // Usage: node scripts/verify-nodi-documentation.mjs [--limit N] [--sample]
+//   --kill-app-after N                take the app down after N answers, to exercise the
+//                                     relaunch-and-continue path on purpose
 //   NODUS_DOCS_MODEL=deepseek-flash   model id (provider is always deepseek here)
 //   NODUS_DEEPSEEK_KEY_FILE=…         encrypted key file to copy into the throwaway profile
+//   NODUS_DOCS_RELAUNCHES=…           replacement apps the walk may launch (default 4)
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -20,6 +31,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { _electron as electron } from 'playwright-core';
 import { FORBIDDEN, RECALL, TRAPS } from './nodus-docs-questions.mjs';
+import { createInstanceKeeper } from './lib/walk-app-instance.mjs';
 
 const repoRoot = process.env.NODUS_REPO_ROOT ?? path.resolve(import.meta.dirname, '..');
 const require = createRequire(import.meta.url);
@@ -73,39 +85,93 @@ const from = Number(process.argv[process.argv.indexOf('--from') + 1]) || 0;
 const to = Number(process.argv[process.argv.indexOf('--to') + 1]) || filtered.length;
 const run = (limit ? filtered.slice(0, limit) : filtered).slice(from, to);
 
-const app = await electron.launch({ executablePath: require('electron'), args: [repoRoot], env: childEnv });
-// A long walk must not fail silently: capture why the app went away.
-app.process().stdout?.on('data', (chunk) => process.stdout.write(`[app-out] ${chunk}`));
-app.process().stderr?.on('data', (chunk) => process.stdout.write(`[app-err] ${chunk}`));
 const failures = [];
 const results = [];
+const collected = [];
+const RELAUNCH_LIMIT = Number(process.env.NODUS_DOCS_RELAUNCHES ?? 4);
+const killAppAfter = Number(process.argv[process.argv.indexOf('--kill-app-after') + 1]) || 0;
+let app = null;
+let page = null;
+let pageCrashed = false;
 
-try {
-  const page = await app.firstWindow();
-  page.setDefaultTimeout(60_000);
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => !!document.getElementById('root')?.children.length, { timeout: 60_000 });
-  await page.evaluate(() => window.nodus.updateSettings({
+/** Whether the walk has an instance it can ask a question of. A crashed renderer counts as
+ *  gone: the app process survives its renderer, but that window will never answer again.
+ *  This must never throw: once the app is gone, Playwright's own handles start throwing
+ *  (ElectronApplication.process() reads a dispatcher that no longer exists), and a dead
+ *  instance is exactly what that means. */
+function appIsUp() {
+  try {
+    return !!app && !!page && !pageCrashed
+      && app.process().exitCode === null && app.process().signalCode === null
+      && !page.isClosed();
+  } catch {
+    return false;
+  }
+}
+
+/** Launch the app and leave it in the walk's starting state: settings applied, shell
+ *  rendered, welcome modals out of the way. The throwaway profile keeps what the first
+ *  instance wrote, so a relaunch mostly re-proves it. */
+async function startWalkedApp(label) {
+  const launched = await electron.launch({ executablePath: require('electron'), args: [repoRoot], env: childEnv });
+  // The exit code and signal are the part of "why the app went away" the log used to omit:
+  // from the outside, quitting, being killed and crashing all look alike.
+  launched.process().stdout?.on('data', (chunk) => process.stdout.write(`[app-out] ${chunk}`));
+  launched.process().stderr?.on('data', (chunk) => process.stdout.write(`[app-err] ${chunk}`));
+  launched.process().on('exit', (code, signal) => {
+    console.log(`[docs] app exited (code=${code ?? 'null'} signal=${signal ?? 'null'}) — ${label}`);
+  });
+  const window = await launched.firstWindow();
+  window.setDefaultTimeout(60_000);
+  window.on('crash', () => {
+    pageCrashed = true;
+    console.log('[docs] the renderer crashed — the walk will relaunch the app');
+  });
+  await window.waitForLoadState('domcontentloaded');
+  await window.waitForFunction(() => !!document.getElementById('root')?.children.length, { timeout: 60_000 });
+  await window.evaluate(() => window.nodus.updateSettings({
     onboardingComplete: true, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true,
     basicsTutorialVersion: 5, uiLanguage: 'es', promptLanguage: 'es', mascotEnabled: false,
     reduceMotion: true, theme: 'dark', chatModel: { provider: 'deepseek', model: 'deepseek-flash' },
   }));
-  await page.reload();
-  await page.getByTestId('app-shell').waitFor({ timeout: 60_000 });
+  await window.reload();
+  await window.getByTestId('app-shell').waitFor({ timeout: 60_000 });
   for (let i = 0; i < 10; i++) {
-    if (!await page.locator('.whats-new-backdrop, .nodi-style-backdrop').count()) break;
-    await page.keyboard.press('Escape').catch(() => {});
-    await page.locator('.whats-new-close').click({ force: true }).catch(() => {});
-    await page.waitForTimeout(300);
+    if (!await window.locator('.whats-new-backdrop, .nodi-style-backdrop').count()) break;
+    await window.keyboard.press('Escape').catch(() => {});
+    await window.locator('.whats-new-close').click({ force: true }).catch(() => {});
+    await window.waitForTimeout(300);
   }
-  const ask = (question) => page.evaluate(async ([text, model]) => {
+  pageCrashed = false;
+  return { launched, window };
+}
+
+// The app a signal to *this* process takes down is not the end of the walk: the keeper
+// brings up a fresh instance and the lost question is asked again on it.
+const keeper = createInstanceKeeper({
+  limit: RELAUNCH_LIMIT,
+  isUp: appIsUp,
+  close: () => app?.close().catch(() => {}),
+  launch: async () => {
+    ({ launched: app, window: page } = await startWalkedApp(`relaunch ${keeper.relaunches}/${RELAUNCH_LIMIT}`));
+  },
+  log: (message) => console.log(`[docs] ${message}`),
+});
+
+/** One Nodi answer, surviving an instance that dies under it. */
+function askNodi(question, contexts = ['documentation']) {
+  return keeper.ask(() => page.evaluate(async ([text, model, selected]) => {
     const answer = await window.nodus.nodiChatStream({
       messages: [{ role: 'user', content: text }],
-      contexts: ['documentation'],
+      contexts: selected,
       model: { provider: 'deepseek', model },
     }, { onDelta: () => {} });
     return typeof answer === 'string' ? answer : JSON.stringify(answer);
-  }, [question, modelId]);
+  }, [question, modelId, contexts]));
+}
+
+try {
+  ({ launched: app, window: page } = await startWalkedApp('first instance'));
 
   // A small worker pool: DeepSeek is fast, the app pipeline is not the bottleneck.
   // Stress mode: the same call N times in one app instance, to separate "this question
@@ -128,17 +194,28 @@ try {
   }
 
   const queue = [...run];
-  const collected = [];
+  let appKilled = false;
   const worker = async () => {
     while (queue.length) {
       const item = queue.shift();
       const started = Date.now();
+      // Self-test for the recovery path: --kill-app-after takes the app down between
+      // answers, the way an OOM or a stray kill does, so the relaunch is exercised on
+      // purpose instead of assumed.
+      if (killAppAfter && !appKilled && collected.length >= killAppAfter) {
+        appKilled = true;
+        console.log(`[docs] --kill-app-after ${killAppAfter}: taking the app down to exercise the relaunch`);
+        app.process().kill('SIGKILL');
+      }
       try {
-        const answer = await ask(item.question);
+        const answer = await askNodi(item.question);
         collected.push({ ...item, answer, ms: Date.now() - started });
       } catch (error) {
-        collected.push({ ...item, answer: '', ms: Date.now() - started, error: error instanceof Error ? error.message : String(error) });
-        if (String(error).includes('closed') || String(error).includes('exited')) queue.length = 0;
+        const message = error instanceof Error ? error.message : String(error);
+        collected.push({ ...item, answer: '', ms: Date.now() - started, error: message });
+        // A walk that could not bring the app back fails its remaining questions instead of
+        // dropping them: the report then says how much of the matrix went unasked.
+        if (!keeper.isUp) for (const left of queue.splice(0)) collected.push({ ...left, answer: '', ms: 0, error: message });
       }
     }
   };
@@ -247,15 +324,13 @@ ${sheet.body.es}` : 'No hay ficha: la respuesta honesta debe negarse o remitir a
         : 'Comprueba que toda afirmación de la respuesta esté respaldada por el material y que la respuesta sea útil (pasos, rutas y nombres exactos cuando proceda).',
       'Devuelve SOLO un objeto JSON, sin texto alrededor: {"faithful": true|false, "useful": true|false, "unsupported": ["afirmación no respaldada", ...]}',
     ].join('\n\n');
-    const raw = await page.evaluate(async ([content, model]) => window.nodus.nodiChatStream({
-      messages: [{ role: 'user', content }], contexts: [], model: { provider: 'deepseek', model },
-    }, { onDelta: () => {} }), [prompt, modelId]);
+    const raw = await askNodi(prompt, []);
     const match = /\{[\s\S]*\}/.exec(raw ?? '');
     if (!match) return { verdict: null, raw: (raw ?? '').slice(0, 300) };
     try { return { verdict: JSON.parse(match[0]), raw: '' }; }
     catch { return { verdict: null, raw: match[0].slice(0, 300) }; }
   };
-  const alive = await page.evaluate(() => true).catch(() => false);
+  const alive = appIsUp() && await page.evaluate(() => true).catch(() => false);
   for (const item of judged) {
     if (!alive) break;
     const { verdict, raw } = await judgeOne(item);
@@ -269,8 +344,11 @@ ${sheet.body.es}` : 'No hay ficha: la respuesta honesta debe negarse o remitir a
     if (entry) delete entry.answer;
   }
   writeFileSync(path.join(shots, 'nodi-documentation-report.json'), JSON.stringify(results, null, 2));
-  console.log(`[docs] ${results.length - failures.length}/${results.length} answers grounded; report in ${shots}`);
+  // An instance that died mid-walk is part of the result, not a footnote: a run that needed
+  // one says so here, with the reason, instead of hiding it behind a green count.
+  const instances = keeper.losses.length ? ` — ${keeper.losses.length} app loss(es): ${keeper.losses.join('; ')}` : '';
+  console.log(`[docs] ${results.length - failures.length}/${results.length} answers grounded${instances}; report in ${shots}`);
   assert.deepEqual(failures, [], `${failures.length} of ${results.length} answers were not grounded in the documentation`);
 } finally {
-  await app.close().catch(() => {});
+  await app?.close().catch(() => {});
 }
