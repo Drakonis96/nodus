@@ -32,7 +32,7 @@ try {
   // own translated messages.
   const currentRelease = RELEASE_NOTES[0];
   assert.equal(currentRelease?.version, '5.5.0');
-  assert.equal(currentRelease?.date, '2026-09-17');
+  assert.equal(currentRelease?.date, '2026-09-18');
   assert.equal(currentRelease?.highlights.length, 21);
   assert.deepEqual(currentRelease.highlights.map((h) => h.scope), [
     'ai', 'ai', 'ai', 'ai', 'ai', 'ai', 'ai', 'ai',

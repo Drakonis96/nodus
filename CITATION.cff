@@ -13,7 +13,7 @@ authors:
   - name: "Nodus contributors"
 type: software
 version: "5.5.0"
-date-released: "2026-09-17"
+date-released: "2026-09-18"
 license: "AGPL-3.0-only"
 repository-code: "https://github.com/Drakonis96/nodus"
 url: "https://nodusresearch.com/"

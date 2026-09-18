@@ -1,6 +1,6 @@
 # Changelog
 
-## 5.5.0 — 2026-09-17
+## 5.5.0 — 2026-09-18
 
 Nodus speaks twelve interface languages, the local engine reaches the GPU on
 Windows and Linux, and the app gains colour palettes.

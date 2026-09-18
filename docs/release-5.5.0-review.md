@@ -3,7 +3,7 @@
 5.5.0 collects everything merged after the 5.4.5 tag (`ef2e74ad`) up to `7b5c1920`,
 plus the three interface languages that landed on 2026-09-17. The published 5.4.5
 and older entries remain unchanged. Release metadata is aligned to 5.5.0 and
-2026-09-17 in `package.json`, and `CITATION.cff`, the site JSON-LD and the sitemap
+2026-09-18 in `package.json`, and `CITATION.cff`, the site JSON-LD and the sitemap
 are regenerated from it.
 
 The review read the merged pull requests, their diffs and the documentation they
@@ -54,19 +54,18 @@ notes and the three single-note scopes (Connector, Estudio, Word).
   `test-zotero-plugin`, `test-i18n-resource-regressions` and the eleven `test-site-*`
   checks accompany the version promotion.
 - `npm run citation:sync` and `npm run site:metadata` regenerate `CITATION.cff`
-  (dated 2026-09-17) and the three site pages from `package.json`.
+  (dated 2026-09-18) and the three site pages from `package.json`.
 
 ## Decisions
 
-- The changelog section that was `Unreleased` becomes `## 5.5.0 — 2026-09-17`, with
+- The changelog section that was `Unreleased` becomes `## 5.5.0 — 2026-09-18`, with
   the entries the merged work had not written yet (the interface languages, the
   palettes, the tooltips, the citations, the two-column reading, the profiles, the
   study note and Word exports, RDKit, the red warning, DeepSeek, the document
   skills and the RPM), and the usual closing line for the modal.
-- `releaseMetadata.dateReleased` moves from 2026-09-15 to 2026-09-17, the date the
-  release notes carry. If the tag is finally cut on another day, this is the one
-  value to change, together with the `date` in `shared/releaseNotes.ts` and the
-  pinned date in `scripts/test-release-notes.mjs` and `test-v4-release-readiness.mjs`.
+- `releaseMetadata.dateReleased` moves from 2026-09-15 to 2026-09-18, the day the
+  tag is cut, and the release notes, the changelog heading and `CITATION.cff`
+  carry the same date.
 - The Japanese and Korean columns of the 5.5.0 notes are written by hand for this
   release rather than machine-translated, and `releaseNotes.ja.ts` and
   `releaseNotes.ko.ts` now map them from the release's own columns, the way the
