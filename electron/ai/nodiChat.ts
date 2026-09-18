@@ -29,6 +29,7 @@ import {
   validateCitations as validateWorldCitations,
 } from '@shared/worldChatContext';
 import { buildNodusDocumentation } from '@shared/nodiDocumentation';
+import { buildNodusDocsTurn, NODUS_DOCS_SKILL_ID, type NodusDocsSelection } from '@shared/nodusDocs';
 import { getNodiChatPromptPack } from '@shared/nodiChatPromptPacks';
 import type { NodiChatRequest, NodiContextKind, NodiQuoteSelection, NodiViewContext } from '@shared/types';
 
@@ -285,6 +286,9 @@ async function buildContext(
   /** El canal de acceso que corresponde al modelo elegido: un proveedor remoto SACA el
    *  material del equipo, y eso exige un uso documentado distinto del de la IA local. */
   channel: 'localAi' | 'externalAi',
+  /** Fichas de producto recuperadas para esta pregunta. Las sirve el contexto de
+   *  documentación; la skill oculta del mismo turno solo lleva el protocolo y el índice. */
+  docs?: NodusDocsSelection | null,
 ): Promise<{ text: string; sources: string[] }> {
   const selected = new Set<NodiContextKind>(request.contexts);
   const pack = getPromptPack();
@@ -307,9 +311,16 @@ async function buildContext(
   // The document the user is asking about wins the context budget. Product
   // documentation follows it, so a long report is never silently clipped merely
   // because both default context toggles are enabled.
-  if (selected.has('documentation')) {
+  //
+  // The sheets that answer THIS question come first; other interface languages keep the
+  // compact localized guide behind them, because that guide carries the application's own
+  // vocabulary in that language while the sheets carry the exhaustive facts.
+  if (selected.has('documentation') && docs) {
     const documentationLanguage = getSettings().promptLanguage ?? getSettings().uiLanguage;
-    add(pack.contextLabels.documentation, buildNodusDocumentation(documentationLanguage), 24_000);
+    const localized = documentationLanguage === 'es' || documentationLanguage === 'en'
+      ? ''
+      : buildNodusDocumentation(documentationLanguage);
+    add(pack.contextLabels.documentation, [docs.text, localized].filter(Boolean).join('\n\n'), 24_000);
   }
   if (selected.has('vault') || selected.has('all_vaults')) {
     try {
@@ -352,7 +363,19 @@ export async function streamNodiChat(
   };
   assertChatSkillSession(execution, signal);
   const { skills } = execution;
-  const context = await buildContext(request, question, chatModel && isLocalProvider(chatModel.provider) ? 'localAi' : 'externalAi');
+  // The documentation context is not only data: it carries a hidden skill with the answer
+  // protocol and the index of every documented sheet. It is built per reply and never
+  // written to the skills library, so the Skills UI can neither show nor deactivate it, and
+  // it exists exactly while this context is selected.
+  const documentationLanguage = getSettings().promptLanguage ?? getSettings().uiLanguage;
+  const docsTurn = request.contexts.includes('documentation')
+    ? buildNodusDocsTurn({ question, language: documentationLanguage })
+    : null;
+  const docs = docsTurn?.selection ?? null;
+  const promptSkills = docsTurn
+    ? [...skills.filter((skill) => skill.id !== NODUS_DOCS_SKILL_ID), docsTurn.skill]
+    : skills;
+  const context = await buildContext(request, question, chatModel && isLocalProvider(chatModel.provider) ? 'localAi' : 'externalAi', docs);
   const pack = getPromptPack();
   const history = messages.slice(0, Math.max(0, latestUserIndex)).map((message) => `${message.role === 'user' ? pack.historyUser : pack.historyAssistant}: ${clip(message.content, 6_000)}`).join('\n\n');
   const user = [
@@ -360,12 +383,12 @@ export async function streamNodiChat(
     history ? `<${pack.contextLabels.historyTag}>\n${history}\n</${pack.contextLabels.historyTag}>` : '',
     `<${pack.contextLabels.currentQuestionTag}>\n${question}\n</${pack.contextLabels.currentQuestionTag}>`,
     pack.answerOnly,
-    chatSkillsOutputContract(skills),
+    chatSkillsOutputContract(promptSkills),
   ].filter(Boolean).join('\n\n');
   const settings = getSettings();
   assertChatSkillSession(execution, signal);
   let answer = await completeTextStream(
-    { system: `${buildSystemPrompt(request, context.sources)}\n\n${buildChatSkillsPrompt(skills)}`, user, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), maxTokens: skills.length ? 10_000 : 1_200, temperature: 0.2, reasoning: 'off', useConfiguredCodexReasoning: true, plainContext: true },
+    { system: `${buildSystemPrompt(request, context.sources)}\n\n${buildChatSkillsPrompt(promptSkills)}`, user, englishImagePrompts: promptSkills.some(skill => skillHasCapability(skill, 'image')), maxTokens: promptSkills.length ? 10_000 : 1_200, temperature: 0.2, reasoning: 'off', useConfiguredCodexReasoning: true, plainContext: true },
     (delta, kind) => { if (kind === 'content') onDelta(delta); },
     request.model ?? settings.nodiModel ?? settings.chatModel,
     signal
