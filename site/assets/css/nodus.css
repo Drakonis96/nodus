@@ -543,23 +543,41 @@ h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -0.032em; line-hei
   border-color: rgba(251, 191, 36, 0.28); background: rgba(251, 191, 36, 0.09); color: var(--warn);
 }
 
-/* ============================================================ footer */
 /* ============================================================ band */
 /* A centred, full-width statement with a row of reassurance pills under it.
-   Shared by the home page and the long-form research pages. */
+   Shared by the home page and the long-form research pages.
+
+   The pills are one line while they fit and break only when they cannot. They
+   give back type and padding as the window narrows — every measure below is a
+   clamp against the viewport — so the row keeps fitting on a laptop instead of
+   dropping one pill onto a line of its own, and still reads as one line of
+   reassurance rather than a block of chips. */
 .band { text-align: center; }
 .band .lead { margin-inline: auto; }
 .band .pills {
-  display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
-  margin-top: 38px;
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: clamp(6px, 0.5vw, 9px);
+  margin-top: clamp(28px, 2.6vw, 38px);
 }
 .band .pill {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 10px 17px; border-radius: 999px;
+  display: inline-flex; align-items: center;
+  gap: clamp(5px, 0.42vw, 7px);
+  padding: clamp(7px, 0.72vw, 10px) clamp(8px, 0.9vw, 15px);
+  border-radius: 999px;
   border: 1px solid rgba(52, 211, 153, 0.22); background: rgba(52, 211, 153, 0.07);
-  font-size: 13.5px; font-weight: 600; color: var(--ink);
+  font-size: clamp(11px, 0.84vw, 12.5px); font-weight: 600; color: var(--ink);
+  white-space: nowrap;
 }
-.band .pill svg { width: 14px; height: 14px; fill: none; stroke: var(--good); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.band .pill svg {
+  width: clamp(11px, 0.9vw, 14px); height: clamp(11px, 0.9vw, 14px);
+  flex: 0 0 auto;
+  fill: none; stroke: var(--good); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round;
+}
+/* the way out of the page, for whoever has read this far */
+.band .ctas {
+  display: flex; flex-wrap: wrap; gap: 14px; justify-content: center;
+  margin-top: clamp(30px, 3vw, 40px);
+}
 
 /* ============================================================ footer */
 footer.site-foot {

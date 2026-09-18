@@ -155,7 +155,7 @@ body {
 .cap p { margin: 0; font-size: 14.5px; color: var(--ink-2); line-height: 1.58; }
 .cap p b { color: var(--ink); font-weight: 620; }
 
-/* the framed device that holds each vault's visual */
+/* the window that holds each vault's screenshots: the same ones the README shows */
 .frame {
   position: relative;
   border: 1px solid var(--membrane); border-radius: var(--r-l);
@@ -165,123 +165,81 @@ body {
   transition: transform 0.6s var(--ease), border-color 0.6s var(--ease);
 }
 .scene:hover .frame { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
-.frame::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 62%);
-}
 .frame-bar {
-  display: flex; align-items: center; gap: 7px;
-  padding: 11px 15px; border-bottom: 1px solid var(--membrane);
-  background: rgba(255, 255, 255, 0.022);
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border-bottom: 1px solid var(--membrane);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018));
 }
-.frame-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--membrane-2); }
+/* the three controls of a window on the desktop, in their own three colours */
+.frame-bar i {
+  width: 11px; height: 11px; border-radius: 50%; flex: 0 0 auto;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.3);
+}
+.frame-bar i:nth-child(1) { background: #ff5f57; }
+.frame-bar i:nth-child(2) { background: #febc2e; }
+.frame-bar i:nth-child(3) { background: #28c840; }
 .frame-bar span {
   margin-left: 8px; font: 600 10.5px/1 var(--mono);
   letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3);
 }
-.frame-body { padding: 20px; }
+.frame-body { padding: 0; }
 
-/* --- academic: a graph --- */
-.graph-svg { width: 100%; height: auto; display: block; }
-.graph-svg text { font: 600 8.5px var(--sans); fill: var(--ink-2); }
-.graph-svg text.theme { font-size: 7.5px; letter-spacing: 0.1em; fill: var(--teaching); }
-.graph-svg .edge { stroke-dasharray: 120; stroke-dashoffset: 120; }
-.seen .graph-svg .edge { animation: draw-edge 1.1s var(--ease) forwards; }
-.seen .graph-svg .edge:nth-of-type(2) { animation-delay: 0.12s; }
-.seen .graph-svg .edge:nth-of-type(3) { animation-delay: 0.24s; }
-.seen .graph-svg .edge:nth-of-type(4) { animation-delay: 0.36s; }
-.seen .graph-svg .edge:nth-of-type(5) { animation-delay: 0.48s; }
-.seen .graph-svg .edge:nth-of-type(6) { animation-delay: 0.6s; }
-@keyframes draw-edge { to { stroke-dashoffset: 0; } }
-.graph-svg .node { opacity: 0; transform-box: fill-box; transform-origin: center; }
-.seen .graph-svg .node { animation: pop 0.5s var(--ease) forwards; }
-.seen .graph-svg .node:nth-of-type(2) { animation-delay: 0.1s; }
-.seen .graph-svg .node:nth-of-type(3) { animation-delay: 0.2s; }
-.seen .graph-svg .node:nth-of-type(4) { animation-delay: 0.3s; }
-.seen .graph-svg .node:nth-of-type(5) { animation-delay: 0.4s; }
-.seen .graph-svg .node:nth-of-type(6) { animation-delay: 0.5s; }
-.seen .graph-svg .node:nth-of-type(7) { animation-delay: 0.6s; }
-@keyframes pop { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+/* --- the screenshots inside it --- */
+.shots { position: relative; display: grid; background: #0b0913; }
+.shot {
+  grid-area: 1 / 1; margin: 0;
+  display: flex; flex-direction: column;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.4s var(--ease);
+}
+.shot.is-active { opacity: 1; pointer-events: auto; }
+.shot img {
+  display: block; width: 100%; height: auto; aspect-ratio: 16 / 10;
+  object-fit: cover; object-position: top center;
+}
+/* The caption is a bar under the shot, never a scrim over it: the screenshot is
+   the point of the window, so nothing is laid on top of it. `flex: 1` lets the
+   longest caption in the set set the bar's height for all of them, so the strip
+   under the image is the same in every view and never jumps. */
+.shot figcaption {
+  flex: 1 1 auto;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+  padding: 10px 15px 12px;
+  border-top: 1px solid var(--membrane);
+  background: rgba(255, 255, 255, 0.022);
+  font-size: 12.5px; color: var(--ink-2); line-height: 1.45;
+}
+.shot .shot-step {
+  flex: 0 0 auto; font: 600 10.5px/1 var(--mono);
+  letter-spacing: 0.14em; color: var(--ink-3);
+}
+.shot-arrow {
+  position: absolute; top: 50%; z-index: 2;
+  display: grid; place-items: center; width: 36px; height: 36px; padding: 0;
+  transform: translateY(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.24); border-radius: 50%;
+  background: rgba(9, 7, 17, 0.6); color: var(--ink);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  cursor: pointer; opacity: 0.86;
+  transition: opacity 0.22s var(--ease), background 0.22s var(--ease), border-color 0.22s var(--ease);
+}
+.shot-arrow.prev { left: 13px; }
+.shot-arrow.next { right: 13px; }
+.shot-arrow svg { width: 17px; height: 17px; }
+.shot-arrow:hover, .frame:hover .shot-arrow { opacity: 1; }
+.shot-arrow:hover { border-color: var(--accent); background: rgba(9, 7, 17, 0.86); }
+.shot-arrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; opacity: 1; }
+.shot-arrow[hidden] { display: none; }
 
-.evidence {
-  margin-top: 14px; padding: 12px 14px;
-  border-left: 2px solid var(--accent); border-radius: 0 var(--r-s) var(--r-s) 0;
-  background: rgba(255, 255, 255, 0.028);
-  font-size: 12.5px; color: var(--ink-2); font-style: italic;
+@media (prefers-reduced-motion: reduce) {
+  .shot { transition: none; }
 }
-.evidence b { display: block; margin-top: 6px; font-style: normal; font-size: 11px; color: var(--ink-3); }
-
-/* --- teaching: gradebook --- */
-.grid-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.grid-table th {
-  padding: 8px 6px; text-align: left; font-weight: 600; font-size: 10px;
-  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3);
-  border-bottom: 1px solid var(--membrane);
+@media (max-width: 700px) {
+  .shot figcaption { padding: 9px 12px 11px; font-size: 12px; gap: 8px; }
+  .shot-arrow { width: 32px; height: 32px; }
+  .shot-arrow.prev { left: 8px; }
+  .shot-arrow.next { right: 8px; }
 }
-.grid-table td { padding: 9px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); color: var(--ink-2); }
-.grid-table tr:last-child td { border-bottom: 0; }
-.grid-table td b { color: var(--ink); font-weight: 620; }
-.mark-pill {
-  display: inline-block; min-width: 34px; padding: 3px 8px; border-radius: 6px;
-  text-align: center; font-weight: 700; font-size: 11.5px;
-}
-.mark-pill.ok { background: rgba(52, 211, 153, 0.14); color: var(--good); }
-.mark-pill.mid { background: rgba(251, 191, 36, 0.14); color: var(--warn); }
-.mark-pill.na { background: rgba(255, 255, 255, 0.06); color: var(--ink-3); font-size: 10.5px; }
-.rubric { margin-top: 16px; display: grid; gap: 8px; }
-.rubric-row { display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: var(--ink-2); }
-.rubric-row .bar { flex: 1; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
-.rubric-row .bar i {
-  display: block; height: 100%; border-radius: 3px;
-  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 45%, white));
-  width: 0; transition: width 1.1s var(--ease);
-}
-.seen .rubric-row .bar i { width: var(--w, 60%); }
-.rubric-row em { font-style: normal; width: 34px; text-align: right; color: var(--ink-3); font-family: var(--mono); font-size: 10.5px; }
-
-/* --- study: schedule + card --- */
-.week { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-.week .day { text-align: center; font: 700 9.5px var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); padding-bottom: 6px; }
-.week .slot {
-  padding: 9px 7px; border-radius: 9px; font-size: 10.5px; font-weight: 600;
-  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--membrane); color: var(--ink-2);
-  min-height: 44px;
-}
-.week .slot.on {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-  color: var(--ink);
-}
-.week .slot small { display: block; margin-top: 3px; font-weight: 500; font-size: 9.5px; color: var(--ink-3); }
-.flash {
-  margin-top: 16px; padding: 16px; border-radius: var(--r-m);
-  border: 1px solid var(--membrane); background: rgba(255, 255, 255, 0.03);
-}
-.flash b { display: block; font-size: 13.5px; margin-bottom: 8px; }
-.flash p { margin: 0 0 12px; font-size: 12px; color: var(--ink-3); }
-.flash .row { display: flex; gap: 7px; }
-.flash .row span {
-  flex: 1; padding: 7px; border-radius: 8px; text-align: center;
-  font-size: 10.5px; font-weight: 600; border: 1px solid var(--membrane); color: var(--ink-3);
-}
-.flash .row span.pick { border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--ink); background: color-mix(in srgb, var(--accent) 14%, transparent); }
-
-/* --- databases: table + chart --- */
-.db-cols { display: flex; gap: 6px; margin-bottom: 12px; }
-.db-cols span {
-  padding: 4px 9px; border-radius: 6px; font: 600 10px var(--mono);
-  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--membrane); color: var(--ink-3);
-}
-.bars { display: flex; align-items: flex-end; gap: 8px; height: 96px; margin-top: 16px; }
-.bars i {
-  flex: 1; border-radius: 5px 5px 2px 2px;
-  background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 22%, transparent));
-  height: 0; transition: height 0.9s var(--ease);
-  transition-delay: var(--d, 0ms);
-}
-.seen .bars i { height: var(--h, 50%); }
-.bars-axis { display: flex; gap: 8px; margin-top: 7px; }
-.bars-axis span { flex: 1; text-align: center; font: 600 9.5px var(--mono); color: var(--ink-3); }
 
 /* ============================================================ more vaults */
 .more-grid {
@@ -434,12 +392,6 @@ body {
 .path-card .pic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .path-card h3 { font-size: 18px; margin-bottom: 9px; }
 .path-card p { margin: 0 0 16px; font-size: 14px; color: var(--ink-2); line-height: 1.55; }
-
-/* ============================================================ final */
-.final { text-align: center; padding-bottom: clamp(90px, 12vw, 150px); }
-.final .n-mark { width: 62px; height: 62px; margin-bottom: 26px; }
-.final .lead { margin-inline: auto; }
-.final .ctas { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin-top: 36px; }
 
 /* ============================================================ responsive */
 @media (max-width: 980px) {
