@@ -253,26 +253,42 @@ SPDX-License-Identifier: AGPL-3.0-only
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
     </div>
     <div class="scene-visual reveal" style="--delay:120ms">
-      <div class="frame">
-        <div class="frame-bar"><i></i><i></i><i></i><span>Graph · 7 nodes</span></div>
+      <div class="frame" data-shots>
+        <div class="frame-bar"><i></i><i></i><i></i><span>Nodus Research · Academic vault</span></div>
         <div class="frame-body">
-          <svg class="graph-svg" viewBox="0 0 420 200" role="img" aria-label="A graph of ideas: nodes for claims linked by supporting, contradicting and refining edges.">
-            <line class="edge" x1="108" y1="52" x2="200" y2="104" stroke="#34d399" stroke-width="1.4" opacity="0.85"/>
-            <line class="edge" x1="200" y1="104" x2="300" y2="54" stroke="#34d399" stroke-width="1.4" opacity="0.85"/>
-            <line class="edge" x1="200" y1="104" x2="326" y2="146" stroke="#f87171" stroke-width="1.4" opacity="0.9"/>
-            <line class="edge" x1="108" y1="52" x2="84" y2="152" stroke="#a78bfa" stroke-width="1.4" opacity="0.85"/>
-            <line class="edge" x1="84" y1="152" x2="200" y2="104" stroke="#8b5cf6" stroke-width="1.4" opacity="0.85"/>
-            <line class="edge" x1="300" y1="54" x2="326" y2="146" stroke="#fbbf24" stroke-width="1.4" opacity="0.75"/>
-            <g class="node"><circle cx="108" cy="52" r="9" fill="#fb923c"/><text class="theme" x="122" y="49">RETRIEVAL PRACTICE</text></g>
-            <g class="node"><circle cx="200" cy="104" r="6.5" fill="#818cf8"/><text x="211" y="101">Active retrieval beats re-reading</text></g>
-            <g class="node"><circle cx="300" cy="54" r="5.5" fill="#34d399"/><text x="310" y="51">Testing effect at a delay</text></g>
-            <g class="node"><circle cx="326" cy="146" r="5.5" fill="#f87171"/><text x="248" y="166">Effect fades with complexity</text></g>
-            <g class="node"><circle cx="84" cy="152" r="5.5" fill="#22d3ee"/><text x="96" y="156">Desirable difficulties</text></g>
-            <g class="node"><circle cx="40" cy="92" r="4.5" fill="#fbbf24"/><text x="10" y="80">Element interactivity</text></g>
-            <g class="node"><circle cx="376" cy="100" r="7.5" fill="#fb923c"/><text class="theme" x="300" y="90">COGNITIVE LOAD</text></g>
-          </svg>
-          <div class="evidence">“Repeated testing produced greater long-term retention than repeated studying, despite lower performance during practice.”
-            <b>Roediger &amp; Karpicke 2006 · p. 251 · linked to 3 ideas</b></div>
+          <div class="shots" role="group" aria-roledescription="carousel" aria-label="The academic vault in five screenshots">
+            <figure class="shot is-active">
+              <img src="assets/screenshots/academic-demo.webp" width="1280" height="800" decoding="async"
+                   alt="Academic vault demo with a twelve-theme knowledge graph in Nodus Research"/>
+              <figcaption><span class="shot-text">A twelve-theme knowledge graph over the corpus</span><span class="shot-step">01 / 05</span></figcaption>
+            </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/academic-theme-relations.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Relationships between ideas in the Retrieval practice theme in Nodus Research"/>
+              <figcaption><span class="shot-text">How the ideas inside a theme connect</span><span class="shot-step">02 / 05</span></figcaption>
+            </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/academic-argument-map.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus Research argument map with connected claims and colour-coded relationship branches"/>
+              <figcaption><span class="shot-text">An argument map with colour-coded branches</span><span class="shot-step">03 / 05</span></figcaption>
+            </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/academic-deep-research.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus Research Deep Research report on learning science with an AI-generated illustration"/>
+              <figcaption><span class="shot-text">A Deep Research report, saved with its evidence</span><span class="shot-step">04 / 05</span></figcaption>
+            </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/academic-immersion.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus Research Immersion learning route with an AI-generated illustration"/>
+              <figcaption><span class="shot-text">An Immersion route through a topic</span><span class="shot-step">05 / 05</span></figcaption>
+            </figure>
+            <button class="shot-arrow prev" type="button" data-shots-prev hidden aria-label="Show the previous academic vault screenshot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </button>
+            <button class="shot-arrow next" type="button" data-shots-next hidden aria-label="Show the next academic vault screenshot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -297,25 +313,16 @@ SPDX-License-Identifier: AGPL-3.0-only
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
     </div>
     <div class="scene-visual reveal" style="--delay:120ms">
-      <div class="frame">
-        <div class="frame-bar"><i></i><i></i><i></i><span>Gradebook · Year 10 · Term 2</span></div>
+      <div class="frame" data-shots>
+        <div class="frame-bar"><i></i><i></i><i></i><span>Nodus Research · Teaching vault</span></div>
         <div class="frame-body">
-          <table class="grid-table">
-            <thead><tr><th>Student</th><th>Essay</th><th>Sources</th><th>Oral</th><th>Term</th></tr></thead>
-            <tbody>
-              <tr><td><b>STU_0431</b></td><td><span class="mark-pill ok">8.4</span></td><td><span class="mark-pill ok">9.0</span></td><td><span class="mark-pill mid">6.2</span></td><td><b>8.1</b></td></tr>
-              <tr><td><b>STU_0432</b></td><td><span class="mark-pill mid">6.8</span></td><td><span class="mark-pill ok">7.9</span></td><td><span class="mark-pill na">absent</span></td><td><b>—</b></td></tr>
-              <tr><td><b>STU_0433</b></td><td><span class="mark-pill ok">9.2</span></td><td><span class="mark-pill ok">8.6</span></td><td><span class="mark-pill ok">9.4</span></td><td><b>9.1</b></td></tr>
-              <tr><td><b>STU_0434</b></td><td><span class="mark-pill na">pending</span></td><td><span class="mark-pill mid">6.5</span></td><td><span class="mark-pill ok">7.8</span></td><td><b>—</b></td></tr>
-            </tbody>
-          </table>
-          <div class="rubric">
-            <div class="rubric-row">Use of sources <span class="bar"><i style="--w:88%"></i></span><em>40%</em></div>
-            <div class="rubric-row">Argument <span class="bar"><i style="--w:72%"></i></span><em>35%</em></div>
-            <div class="rubric-row">Presentation <span class="bar"><i style="--w:55%"></i></span><em>25%</em></div>
+          <div class="shots">
+            <figure class="shot is-active">
+              <img src="assets/screenshots/teaching-demo.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Teaching vault demo in Nodus Research, with courses, groups, rubrics and a gradebook"/>
+              <figcaption><span class="shot-text">Courses, groups, question banks and a gradebook. Names, grades and student data stay out of every AI request.</span></figcaption>
+            </figure>
           </div>
-          <div class="evidence">Names never reach the model. Students are addressed by pseudonym, and grades stay out of every AI request.
-            <b>Teaching vault · privacy rule</b></div>
         </div>
       </div>
     </div>
@@ -340,24 +347,16 @@ SPDX-License-Identifier: AGPL-3.0-only
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
     </div>
     <div class="scene-visual reveal" style="--delay:120ms">
-      <div class="frame">
-        <div class="frame-bar"><i></i><i></i><i></i><span>Week 14 · General Biology</span></div>
+      <div class="frame" data-shots>
+        <div class="frame-bar"><i></i><i></i><i></i><span>Nodus Research · Study vault</span></div>
         <div class="frame-body">
-          <div class="week" aria-hidden="true">
-            <div class="day">Mon</div><div class="day">Tue</div><div class="day">Wed</div><div class="day">Thu</div><div class="day">Fri</div>
-            <div class="slot on">Cell bio<small>09:00</small></div>
-            <div class="slot">Lab<small>11:00</small></div>
-            <div class="slot on">Genetics<small>09:00</small></div>
-            <div class="slot">Seminar<small>15:00</small></div>
-            <div class="slot on">Review<small>10:00</small></div>
+          <div class="shots">
+            <figure class="shot is-active">
+              <img src="assets/screenshots/study-demo.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Study vault demo in Nodus Research, with a course plan, materials, question banks and review"/>
+              <figcaption><span class="shot-text">Courses, materials, question banks and spaced review. Every question links back to the page or the minute it came from.</span></figcaption>
+            </figure>
           </div>
-          <div class="flash">
-            <b>Which phase separates sister chromatids?</b>
-            <p>From your lecture recording · 00:24:16</p>
-            <div class="row"><span>Prophase</span><span class="pick">Anaphase</span><span>Telophase</span></div>
-          </div>
-          <div class="evidence">Every question is generated from your own notes and recordings, and links back to the moment it came from.
-            <b>Study vault · question bank</b></div>
         </div>
       </div>
     </div>
@@ -382,25 +381,16 @@ SPDX-License-Identifier: AGPL-3.0-only
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
     </div>
     <div class="scene-visual reveal" style="--delay:120ms">
-      <div class="frame">
-        <div class="frame-bar"><i></i><i></i><i></i><span>Field samples · 248 rows</span></div>
+      <div class="frame" data-shots>
+        <div class="frame-bar"><i></i><i></i><i></i><span>Nodus Research · Databases vault</span></div>
         <div class="frame-body">
-          <div class="db-cols" aria-hidden="true"><span>title</span><span>select</span><span>number</span><span>relation</span><span>formula</span></div>
-          <table class="grid-table">
-            <thead><tr><th>Sample</th><th>Site</th><th>pH</th><th>Depth</th></tr></thead>
-            <tbody>
-              <tr><td><b>FS-091</b></td><td>Ridge north</td><td>6.8</td><td>12 cm</td></tr>
-              <tr><td><b>FS-092</b></td><td>Ridge north</td><td>7.1</td><td>25 cm</td></tr>
-              <tr><td><b>FS-093</b></td><td>Valley floor</td><td>5.4</td><td>10 cm</td></tr>
-            </tbody>
-          </table>
-          <div class="bars" aria-hidden="true">
-            <i style="--h:38%;--d:0ms"></i><i style="--h:62%;--d:70ms"></i><i style="--h:88%;--d:140ms"></i>
-            <i style="--h:71%;--d:210ms"></i><i style="--h:46%;--d:280ms"></i><i style="--h:29%;--d:350ms"></i>
+          <div class="shots">
+            <figure class="shot is-active">
+              <img src="assets/screenshots/databases-demo.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Databases vault demo in Nodus Research, with typed fields, relations and analysis over the rows"/>
+              <figcaption><span class="shot-text">Typed fields, relations, formulas and charts, computed in the app from your own rows.</span></figcaption>
+            </figure>
           </div>
-          <div class="bars-axis" aria-hidden="true"><span>5.0</span><span>5.6</span><span>6.2</span><span>6.8</span><span>7.4</span><span>8.0</span></div>
-          <div class="evidence">pH distribution across 248 samples · r = 0.62 with depth, computed in the app from your own rows.
-            <b>Databases vault · analysis</b></div>
         </div>
       </div>
     </div>
@@ -713,6 +703,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <script src="assets/js/organism.js?v=20260820a"></script>
 <script src="assets/js/site.js?v=20260815"></script>
 <script src="assets/js/home.js?v=20260820e"></script>
+<script src="assets/js/vault-shots.js?v=20260918a"></script>
 <script src="assets/js/back-to-top.js?v=20260817b"></script>
 </body>
 </html>

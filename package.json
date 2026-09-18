@@ -36,6 +36,7 @@
     "blog:build": "npm run site:metadata && npm run blog:pages && npm run blog:feed && npm run site:sitemap",
     "site:metadata": "node scripts/build-site-metadata.mjs",
     "site:social": "node scripts/build-social-image.mjs",
+    "site:screenshots": "node scripts/build-site-screenshots.mjs",
     "site:artifact": "node scripts/build-pages-artifact.mjs",
     "site:build": "npm run blog:build && npm run site:artifact",
     "site:verify": "node --test scripts/test-site-*.mjs",
