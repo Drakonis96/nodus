@@ -162,10 +162,8 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
+          # Labels only: the tags belong to publish-main, the one job allowed to move them.
           images: ${{ env.IMAGE }}
-          tags: |
-            type=raw,value=main
-            type=sha,prefix=main-
           labels: |
             org.opencontainers.image.title=Nodus Server
             org.opencontainers.image.description=Experimental self-hosted Nodus MCP server
@@ -182,10 +180,9 @@ jobs:
           context: .
           file: server/Dockerfile
           platforms: linux/amd64
-          # Untagged: the digest is the only handle, so a half-finished run can never
-          # move `main`. publish-main is what tags the joined manifest list.
-          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
-          tags: ${{ steps.meta.outputs.tags }}
+          # A digest, never a tag: a tagged reference cannot be pushed by digest, and
+          # only publish-main may move `main`, once both legs are in.
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,push=true
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=nodus-server-amd64
           cache-to: type=gha,mode=max,scope=nodus-server-amd64
@@ -228,10 +225,8 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
+          # Labels only: the tags belong to publish-main, the one job allowed to move them.
           images: ${{ env.IMAGE }}
-          tags: |
-            type=raw,value=main
-            type=sha,prefix=main-
           labels: |
             org.opencontainers.image.title=Nodus Server
             org.opencontainers.image.description=Experimental self-hosted Nodus MCP server
@@ -284,8 +279,9 @@ jobs:
           context: .
           file: server/Dockerfile
           platforms: linux/arm64
-          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
-          tags: ${{ steps.meta.outputs.tags }}
+          # A digest, never a tag: a tagged reference cannot be pushed by digest, and
+          # only publish-main may move `main`, once both legs are in.
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,push=true
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=nodus-server-arm64
           cache-to: type=gha,mode=max,scope=nodus-server-arm64
