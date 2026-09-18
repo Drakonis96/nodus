@@ -41,7 +41,12 @@
 .chat-skills-search button { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; padding: 0; border-radius: 5px; color: #a1a1aa; }
 .chat-skills-search button:hover { background: color-mix(in srgb, var(--vault-accent, #6366f1) 11.0%, transparent); color: color-mix(in srgb, var(--vault-accent, #6366f1) 55%, white); }
 .chat-skills-empty { display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 25px 12px; border: 1px dashed color-mix(in srgb, var(--vault-accent, #6366f1) 18.8%, transparent); border-radius: 12px; color: #a1a1aa; font-size: 12px; text-align: center; }
-.chat-skills-list { display: grid; gap: 10px; }
+/* One column, and never wider than the panel. An `auto` track — the default — is sized by
+   the widest card's min-content, and a skill name is nowrap: "Mapa de argumentos por autor"
+   made the column 434px inside a 310px popover, so the whole panel scrolled sideways and
+   the cards were cut off. minmax(0, 1fr) pins the column to its container and leaves the
+   name to the ellipsis the card was built for. */
+.chat-skills-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .chat-skill-item { border: 1px solid #ffffff12; border-radius: 12px; padding: 14px; background: #ffffff02; }
 .chat-skill-item.enabled { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 20.0%, transparent); background: linear-gradient(135deg,color-mix(in srgb, var(--vault-accent, #6366f1) 3.1%, transparent),color-mix(in srgb, var(--vault-accent, #6366f1) 1.6%, transparent)); }
 .chat-skill-main { display: flex; align-items: flex-start; gap: 12px; }
