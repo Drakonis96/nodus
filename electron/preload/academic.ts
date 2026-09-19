@@ -565,6 +565,10 @@ export const academicApi: AcademicApi = {
     const onReasoning = (_e: unknown, id: string, delta: string) => {
       if (id === requestId) handlers.onReasoning?.(delta);
     };
+    const onConcilium = (_e: unknown, id: string, result: import('@shared/researchConcilium').ConciliumResult) => {
+      if (id === requestId) handlers.onConcilium?.(result);
+    };
+    ipcRenderer.on('research:chatStream:concilium', onConcilium);
     ipcRenderer.on('research:chatStream:delta', onDelta);
     ipcRenderer.on('research:chatStream:reasoning', onReasoning);
     activeChatRequestId = requestId;
@@ -574,6 +578,7 @@ export const academicApi: AcademicApi = {
       return response;
     } finally {
       if (activeChatRequestId === requestId) activeChatRequestId = null;
+      ipcRenderer.removeListener('research:chatStream:concilium', onConcilium);
       ipcRenderer.removeListener('research:chatStream:delta', onDelta);
       ipcRenderer.removeListener('research:chatStream:reasoning', onReasoning);
     }

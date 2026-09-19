@@ -1,3 +1,4 @@
+import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -8232,4 +8233,5 @@ export const IT: Record<string, string> = {
   "Error del sombreador": "Errore dello shader",
   "Ask the model to fix the failed steps": "Chiedi al modello di correggere i passaggi non riusciti",
   "Sent": "Inviato",
+  ...CONCILIUM_TRANSLATIONS['it'],
 };

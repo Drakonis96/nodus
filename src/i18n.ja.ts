@@ -1,3 +1,4 @@
+import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -8188,4 +8189,5 @@ export const JA: Record<string, string> = {
   "Error del sombreador": "シェーダエラー",
   "Ask the model to fix the failed steps": "失敗したステップを修正するようモデルに依頼する",
   "Sent": "送信済み",
+  ...CONCILIUM_TRANSLATIONS['ja'],
 };

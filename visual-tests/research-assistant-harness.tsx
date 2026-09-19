@@ -1,3 +1,4 @@
+import { DEFAULT_CHAT_SKILLS } from '../shared/chatSkills';
 import { vaultTypeColor } from '../shared/vaultTypes';
 import { DatabasesChatView } from '../src/views/DatabasesChatView';
 import { StudyChatView } from '../src/views/StudyChatView';
@@ -17,6 +18,12 @@ const settings = { synthesisModel: { provider: 'openai', model: 'gpt-5.4' }, uiL
   // captured and inspected here rather than only asserted.
   { provider: 'deepseek', model: 'deepseek-flash' }, { provider: 'opencode-go', model: 'deepseek-flash' },
 ], sttProvider: 'transformers', sttTransformersModel: 'whisper-tiny' } as AppSettings;
+if (params.get('concilium')) {
+  settings.uiLanguage = 'en';
+  settings.chatModel = { provider: 'deepseek', model: 'deepseek-flash' };
+  settings.synthesisModel = settings.chatModel;
+  settings.favorites = [settings.chatModel, { provider: 'gemini', model: 'gemini-2.5-flash-lite' }, { provider: 'openrouter', model: 'xiaomi/mimo-v2.5' }];
+}
 const win = window as any;
 win.requests = []; win.updates = []; win.saved = [];
 const conversations = new Map<string, any>();
@@ -29,6 +36,7 @@ const nativeStream = async (request: any, handlers: any) => { win.requests.push(
 
 window.nodus = new Proxy({
   getSettings: async () => settings,
+  listChatSkills: async () => params.get('concilium') ? DEFAULT_CHAT_SKILLS.map(skill => ({ ...skill, enabled: { assistant: skill.builtin === 'svg', nodi: false } })) : [],
   getResearchSystemPrompts: async (key: string) => ({ prompts: [...systemPrompts.values()].sort((a, b) => a.name.localeCompare(b.name)), selectedId: promptSelections.get(key) ?? null }),
   saveResearchSystemPrompt: async (input: any) => { const prompt = { ...input, id: input.id ?? crypto.randomUUID(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; systemPrompts.set(prompt.id, prompt); return prompt; },
   selectResearchSystemPrompt: async (key: string, id: string | null) => { if (id) promptSelections.set(key, id); else promptSelections.delete(key); },
@@ -76,11 +84,13 @@ window.nodus = new Proxy({
   },
   updateSettings: async (patch: any) => { win.updates.push(patch); return Object.assign(settings, patch); },
   researchChatStream: async (request: any, handlers: any) => {
-    win.requests.push(request); handlers.onDelta('Respuesta de prueba.');
+    win.requests.push(request);
+    if (win.conciliumLiveRequest) { win.conciliumHandlers = handlers; return win.conciliumLiveRequest(request); }
+    handlers.onDelta('Respuesta de prueba.');
     return { answer: 'Respuesta de prueba.', stats: { sections: [], works: 0, documents: 0, passages: 0, contextChars: 0, truncated: false } };
   },
 }, { get(target: any, key: string) { return target[key] ?? (key.startsWith('on') ? () => () => {} : async () => []); } });
-setActiveLang('es');
+setActiveLang(params.get('lang') === 'en' || params.get('concilium') ? 'en' : 'es');
 document.documentElement.className = `${params.get('theme') === 'dark' ? 'dark' : 'light'} ${vaultType}`;
 if (params.get('fallback') === 'chat') delete (settings as any).synthesisModel;
 const onEvidence = (id: string) => { win.openedEvidence = id; };
