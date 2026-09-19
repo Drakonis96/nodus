@@ -1,6 +1,7 @@
 // Real-window regression coverage for the two cinematic startup modals.
 // Run after `npm run build`: node scripts/verify-modal-animation-performance.mjs
 import assert from 'node:assert/strict';
+import { waitForCondition } from './lib/waitForCondition.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -111,7 +112,9 @@ try {
   await whatsNew.getByRole('button', { name: /Explorar las novedades/ }).click();
   await whatsNew.waitFor({ state: 'detached' });
 
-  await page.waitForFunction(async () => (await window.nodus.getUpdateStatus())?.status === 'not-available');
+  await waitForCondition('startup update check to finish', () => page.evaluate(async () =>
+    (await window.nodus.getUpdateStatus())?.status === 'not-available'
+  ));
   await page.getByTestId('update-ready-notice').waitFor({ state: 'detached' });
   assert.equal(await page.getByTestId('startup-update-modal').count(), 0);
   step('startup update check leaves no blocking surface');

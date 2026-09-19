@@ -3,6 +3,7 @@
 // methodological demo through the renderer, and exercises the layered network
 // in both colour schemes.
 import assert from 'node:assert/strict';
+import { waitForCondition } from './lib/waitForCondition.mjs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -108,7 +109,9 @@ try {
     await page.waitForTimeout(50);
   }
   await whatsNewModal.waitFor({ state: 'detached' });
-  await page.waitForFunction(async () => (await window.nodus.getUpdateStatus())?.status === 'not-available');
+  await waitForCondition('startup update check to finish', () => page.evaluate(async () =>
+    (await window.nodus.getUpdateStatus())?.status === 'not-available'
+  ));
   await page.getByTestId('update-ready-notice').waitFor({ state: 'detached' });
   assert.equal(await page.getByTestId('startup-update-modal').count(), 0);
 

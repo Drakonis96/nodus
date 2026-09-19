@@ -6,6 +6,7 @@
 //
 // Requires a build (dist/ + dist-electron/); run via `npm run test:e2e`.
 import assert from 'node:assert/strict';
+import { waitForCondition } from './lib/waitForCondition.mjs';
 import { execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { existsSync } from 'node:fs';
@@ -105,22 +106,6 @@ async function closeElectronApp(instance) {
   ]);
   clearTimeout(timeout);
   if (!closedCleanly && child.exitCode === null && !child.killed) child.kill('SIGKILL');
-}
-
-async function waitForCondition(label, probe, { timeout = 30_000, interval = 100 } = {}) {
-  const deadline = Date.now() + timeout;
-  let lastError = null;
-  while (Date.now() < deadline) {
-    try {
-      if (await probe()) return;
-      lastError = null;
-    } catch (cause) {
-      lastError = cause;
-    }
-    await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-  const detail = lastError instanceof Error ? ` Último error: ${lastError.message}` : '';
-  throw new Error(`Tiempo agotado esperando: ${label}.${detail}`);
 }
 
 let app = null;
@@ -461,7 +446,9 @@ try {
   await page.getByTestId('app-shell').waitFor();
   assert.equal(await page.getByTestId('basics-tutorial-language').count(), 0, 'a seen cinematic tutorial does not return after restart/update');
   assert.equal(await page.getByTestId('whats-new-cinematic-modal').count(), 0, 'the release modal stays dismissed for the exact running version');
-  await page.waitForFunction(async () => (await window.nodus.getUpdateStatus())?.status === 'not-available');
+  await waitForCondition('startup update check to finish', () => page.evaluate(async () =>
+    (await window.nodus.getUpdateStatus())?.status === 'not-available'
+  ));
   await page.getByTestId('update-ready-notice').waitFor({ state: 'detached' });
   assert.equal(await page.getByTestId('startup-update-modal').count(), 0);
   console.log('[e2e] essential tutorial language preferences + persistent seen-once gate ok');
