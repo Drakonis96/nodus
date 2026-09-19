@@ -12,9 +12,9 @@ export interface StellarTabSnapshot {
 export interface StellarGraphTabDescriptor {
   id: number;
   label: string;
-  /** The themes hub lives on its own tab; every other tab is a blank canvas. */
+  /** The themes hub lives on its own tab, separate from theme and exploration tabs. */
   mode?: "themes";
-  /** Theme the hub tab has drilled into, if any. */
+  /** Theme displayed by this graph tab, if any. */
   themeId?: string;
   themeLabel?: string;
   /** Ideas pinned to the themes hub during this app session. */
