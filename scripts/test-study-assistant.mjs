@@ -113,6 +113,34 @@ try {
   assistant.deleteStudyAssistantConversation(conversation.id);
   assert.equal(assistant.getStudyAssistantConversation(conversation.id), null);
 
+  // Organization changes preserve the persisted source selection and old citations.
+  const search = require(path.join(repoRoot, 'electron/ai/studySearch.ts'));
+  const otherSubject = org.createStudySubject({ courseId: course.id, name: 'Biología' });
+  const secondPlacement = materials.addStudyMaterialPlacement(material.material.id, { courseId: course.id, subjectId: otherSubject.id });
+  const materialKey = `material:${material.material.id}`;
+  const catalogBefore = assistant.getStudyAssistantSources().find((s) => s.sourceKey === materialKey);
+  assert.equal(catalogBefore.placements.length, 2, 'the catalogue exposes every placement');
+  assert.equal(catalogBefore.chunks, 1, 'placements do not multiply evidence count');
+  const evidenceBefore = await search.retrieveStudyAssistantEntries('bucle', {}, [materialKey]);
+  assert.equal(evidenceBefore.length, 1, 'the same fragment is not repeated for each placement');
+  const materialChat = assistant.createStudyAssistantConversation({ selection: { scope: 'manual', sourceKeys: [materialKey] } });
+  const folder = org.createStudyFolder({ subjectId: otherSubject.id, name: 'Lecturas' });
+  materials.moveStudyMaterialPlacement(material.material.id, secondPlacement.id, { folderId: folder.id });
+  const evidenceAfter = await search.retrieveStudyAssistantEntries('bucle', { folderId: folder.id }, [materialKey]);
+  assert.equal(evidenceAfter.length, 1, 'scope cache updates immediately without an embedding rebuild');
+  assert.deepEqual(JSON.parse(JSON.stringify(evidenceAfter[0].location)), JSON.parse(JSON.stringify(evidenceBefore[0].location)), 'old citation locations remain valid');
+  assert.deepEqual(assistant.getStudyAssistantConversation(materialChat.id).selection.sourceKeys, [materialKey]);
+  const newMaterialPath = path.join(root, 'other.txt'); fs.writeFileSync(newMaterialPath, 'Otro material añadido después.');
+  await materials.importStudyMaterialFile(newMaterialPath, { subjectId: otherSubject.id, folderId: folder.id });
+  assert.deepEqual(assistant.getStudyAssistantConversation(materialChat.id).selection.sourceKeys, [materialKey], 'adding a material to the folder does not change a saved selection');
+  org.updateStudyEntity('subject', otherSubject.id, { name: 'Biología molecular' });
+  assert.match((await search.retrieveStudyAssistantEntries('bucle', { folderId: folder.id }, [materialKey]))[0].subtitle, /molecular/, 'renaming organization refreshes cached labels');
+  const emptyPath = path.join(root, 'empty.wav'); fs.writeFileSync(emptyPath, 'RIFFfakeWAVE');
+  const empty = await materials.importStudyMaterialFile(emptyPath, { folderId: folder.id });
+  const emptyOption = assistant.getStudyAssistantSources().find((s) => s.sourceId === empty.material.id);
+  assert.equal(emptyOption.available, false);
+  assert.equal(emptyOption.unavailableReason, 'no_content');
+  assert.equal(emptyOption.placements[0].folderId, folder.id, 'unusable materials retain their organization');
   closeDb();
   console.log('Study grounded assistant phase 8 tests passed!');
 } finally {

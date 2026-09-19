@@ -1,3 +1,4 @@
+import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -126,6 +127,7 @@ export const ZH_CN: Record<string, string> = {
   ...WORLD_CHAT_TRANSLATIONS['zh-CN'],
   ...STUDY_SYNONYM_TRANSLATIONS['zh-CN'],
   ...STUDY_BANK_TRANSLATIONS['zh-CN'],
+  ...STUDY_SOURCE_TRANSLATIONS["zh-CN"],
   ...STUDY_IMPROVE_TRANSLATIONS['zh-CN'],
   ...WORKSPACE_TRANSLATIONS['zh-CN'],
   ...AI_OCR_TRANSLATIONS['zh-CN'],

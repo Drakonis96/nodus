@@ -1237,6 +1237,11 @@ export function registerAcademicIpc(context: IpcContext): void {
     const result = studyMaterials.addStudyMaterialPlacement(id, input); studyKnowledgeRepo.syncStudyKnowledgeSourceScopes('material', id);
     queueStudyKnowledgeSources('material', [id]); studySearch.queueStudySearchIndexRefresh(); return result;
   });
+  h('study:materials:placement:move', async (_e, id: string, placementId: string | null, destination: StudyPlacementInput) => {
+    // Relocation needs no extraction or AI generation. The lexical catalogue reads
+    // placements directly and reuses existing vectors by content hash.
+    return studyMaterials.moveStudyMaterialPlacement(id, placementId, destination);
+  });
   h('study:materials:placement:setPrimary', async (_e, id: string, input: StudyMaterialImportInput) => {
     const result = studyMaterials.setPrimaryStudyMaterialPlacement(id, input); studyKnowledgeRepo.syncStudyKnowledgeSourceScopes('material', id);
     queueStudyKnowledgeSources('material', [id]); studySearch.queueStudySearchIndexRefresh(); return result;

@@ -1,3 +1,4 @@
+import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -91,6 +92,7 @@ export const JA: Record<string, string> = {
   ...WORLD_CHAT_TRANSLATIONS.ja,
   ...STUDY_SYNONYM_TRANSLATIONS.ja,
   ...STUDY_BANK_TRANSLATIONS.ja,
+  ...STUDY_SOURCE_TRANSLATIONS["ja"],
   ...STUDY_IMPROVE_TRANSLATIONS.ja,
   ...WORKSPACE_TRANSLATIONS.ja,
   ...WORLDBUILDING_TRANSLATIONS.ja,

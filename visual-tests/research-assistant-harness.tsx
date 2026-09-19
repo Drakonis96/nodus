@@ -1,3 +1,4 @@
+import { studySourceFixtures } from './study-source-fixtures';
 import { vaultTypeColor } from '../shared/vaultTypes';
 import { DatabasesChatView } from '../src/views/DatabasesChatView';
 import { StudyChatView } from '../src/views/StudyChatView';
@@ -34,7 +35,7 @@ window.nodus = new Proxy({
   selectResearchSystemPrompt: async (key: string, id: string | null) => { if (id) promptSelections.set(key, id); else promptSelections.delete(key); },
   deleteResearchSystemPrompt: async (id: string) => { systemPrompts.delete(id); for (const [key, value] of promptSelections) if (value === id) promptSelections.delete(key); },
   listDatabases: async () => [{ id: 'database-1', name: 'Base seleccionada' }, { id: 'database-2', name: 'Otra base' }],
-  listStudyAssistantSources: async () => [{ sourceKey: 'material:material-1', title: 'Fuente original', subtitle: 'Material' }],
+  ...studySourceFixtures(Number(params.get('sources') ?? 1)),
   listWorldEntries: async () => [{ key: 'character:character-1', id: 'character-1', kind: 'character', title: 'Personaje' }],
   listDatabaseChatConversations: async () => [...nativeConversations.values()],
   listStudyAssistantConversations: async () => [...nativeConversations.values()],

@@ -7,7 +7,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
-const url = 'http://127.0.0.1:5198/visual-tests/research-assistant-harness.html';
+const url = `${process.env.NODUS_VISUAL_URL ?? 'http://127.0.0.1:5198'}/visual-tests/research-assistant-harness.html`;
 try {
   await page.goto(url);
   const composerStyle = await page.locator('.research-composer').evaluate(el => { const s = getComputedStyle(el); return [s.borderRadius, s.minHeight, s.backgroundColor, s.padding]; });
@@ -51,10 +51,11 @@ try {
         assert.equal(await page.getByRole('button', { name: 'Enviar', exact: true }).isDisabled(), true);
         await panel.getByLabel('Otra base', { exact: true }).check();
       } else {
-        await panel.locator('select').selectOption('manual');
+        await (view === 'study' || view === 'teaching' ? panel.getByTestId('study-chat-scope') : panel.locator('select')).selectOption('manual');
         await input.fill('Consulta con fuentes limitadas');
         assert.equal(await page.getByRole('button', { name: 'Enviar', exact: true }).isDisabled(), true);
-        await panel.locator('input[type=checkbox]').first().check();
+        if (view === 'study' || view === 'teaching') await panel.getByRole('checkbox', { name: 'Fuente original', exact: true }).check();
+        else await panel.locator('input[type=checkbox]').first().check();
       }
       await input.fill('Consulta con fuentes limitadas');
       await input.press('Enter');

@@ -1,3 +1,4 @@
+import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -130,6 +131,7 @@ export const DE: Record<string, string> = {
   ...WORLD_CHAT_TRANSLATIONS.de,
   ...STUDY_SYNONYM_TRANSLATIONS.de,
   ...STUDY_BANK_TRANSLATIONS.de,
+  ...STUDY_SOURCE_TRANSLATIONS["de"],
   ...STUDY_IMPROVE_TRANSLATIONS.de,
   ...WORKSPACE_TRANSLATIONS.de,
   "Lo que cuenta el mapa": "Was die Karte erzählt",

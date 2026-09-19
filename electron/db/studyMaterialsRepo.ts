@@ -23,6 +23,7 @@ import type {
 import type { ZoteroAttachmentInfo, ZoteroItem, ZoteroLibrary } from '@shared/types';
 import { EMPTY_STUDY_BIBLIOGRAPHY, STUDY_MATERIAL_EXTENSIONS, studyMaterialPreviewKind } from '@shared/studyMaterials';
 import { createStudyShortId, normalizeStudyName } from '@shared/studyOrg';
+import type { StudyPlacementInput } from '@shared/studyOrg';
 import { extractFromPath } from '../extraction/textExtractor';
 import { getDb } from './database';
 import { createStudyDocument } from './studyOrgRepo';
@@ -231,6 +232,70 @@ export function setPrimaryStudyMaterialPlacement(materialId: string, input: Stud
 export function removeStudyMaterialPlacement(materialId: string, placementId: string): void {
   materialRow(materialId);
   getDb().prepare('DELETE FROM study_material_placements WHERE id = ? AND material_id = ?').run(placementId, materialId);
+}
+
+/** Move one organizational link, never the material or its other placements. */
+export function moveStudyMaterialPlacement(materialId: string, placementId: string | null, destination: StudyPlacementInput): StudyMaterialPlacement | null {
+  const db = getDb();
+  return db.transaction(() => {
+    const material = materialRow(materialId);
+    if (material.deleted_at || material.archived_at) throw new Error('El material no está disponible.');
+    const placements = db.prepare('SELECT * FROM study_material_placements WHERE material_id = ? AND deleted_at IS NULL').all(materialId) as Row[];
+    const origin = placementId === null ? null : placements.find((p) => p.id === placementId && !p.archived_at);
+    if (placementId !== null && !origin) throw new Error('La ubicación de origen ya no existe.');
+    if (placementId === null && placements.some((p) => !p.archived_at)) throw new Error('Selecciona la ubicación de origen.');
+    const active = (table: 'study_courses' | 'study_subjects' | 'study_folders' | 'study_topics', id: string): Row => {
+      const row = db.prepare(`SELECT * FROM ${table} WHERE id = ? AND deleted_at IS NULL AND archived_at IS NULL`).get(id) as Row | undefined;
+      if (!row) throw new Error('El destino ya no está disponible.');
+      return row;
+    };
+    let courseId = destination.courseId || null;
+    let subjectId = destination.subjectId || null;
+    let folderId = destination.folderId || null;
+    const topicId = destination.topicId || null;
+    if (topicId) {
+      const topic = active('study_topics', topicId);
+      if ((subjectId && subjectId !== topic.subject_id) || (folderId && folderId !== topic.folder_id)) throw new Error('El tema no pertenece al destino seleccionado.');
+      subjectId = String(topic.subject_id);
+      folderId = topic.folder_id ? String(topic.folder_id) : null;
+    }
+    if (folderId) {
+      const folder = active('study_folders', folderId);
+      if ((subjectId && subjectId !== folder.subject_id) || (courseId && courseId !== folder.course_id)) throw new Error('La carpeta no pertenece al destino seleccionado.');
+      subjectId = folder.subject_id ? String(folder.subject_id) : null;
+      courseId = folder.course_id ? String(folder.course_id) : null;
+    }
+    if (subjectId) {
+      const subject = active('study_subjects', subjectId);
+      if (courseId && courseId !== subject.course_id) throw new Error('La asignatura no pertenece al curso seleccionado.');
+      courseId = String(subject.course_id);
+    }
+    if (courseId) active('study_courses', courseId);
+    // A document attachment is provenance, not a destination chosen by this dialog.
+    const documentId = origin?.document_id ? String(origin.document_id) : null;
+    const input = { courseId, subjectId, folderId, topicId, documentId };
+    const values = placementValues(input);
+    if (origin && ['course_id', 'subject_id', 'topic_id', 'folder_id', 'document_id'].every((key, index) => (origin[key] ?? null) === values[index])) return toPlacement(origin);
+    const duplicate = placements.find((p) => p.id !== placementId && !p.archived_at
+      && ['course_id', 'subject_id', 'topic_id', 'folder_id', 'document_id'].every((key, index) => (p[key] ?? null) === values[index]));
+    if (duplicate || values.every((value) => value === null)) {
+      if (origin) db.prepare('DELETE FROM study_material_placements WHERE id = ?').run(origin.id);
+      return duplicate ? toPlacement(duplicate) : null;
+    }
+    if (!origin) {
+      // The import helper can reuse an archived link. A move from the unfiled
+      // group needs a new active location, leaving archived history untouched.
+      const key = ids('MPL'); const timestamp = now();
+      const position = Number((db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS value FROM study_material_placements WHERE material_id = ?').get(materialId) as Row).value);
+      db.prepare(`INSERT INTO study_material_placements
+        (id, short_id, material_id, course_id, subject_id, topic_id, folder_id, document_id, position, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(key.id, key.shortId, materialId, ...values, position, timestamp, timestamp);
+      return toPlacement(db.prepare('SELECT * FROM study_material_placements WHERE id = ?').get(key.id) as Row);
+    }
+    db.prepare(`UPDATE study_material_placements SET course_id = ?, subject_id = ?, topic_id = ?, folder_id = ?, document_id = ?, updated_at = ? WHERE id = ?`)
+      .run(...values, now(), origin.id);
+    return toPlacement(db.prepare('SELECT * FROM study_material_placements WHERE id = ?').get(origin.id) as Row);
+  })();
 }
 
 export async function importStudyMaterialFile(filePath: string, input: StudyMaterialImportInput = {}): Promise<StudyMaterialImportResult> {
