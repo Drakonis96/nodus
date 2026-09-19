@@ -1,3 +1,4 @@
+import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -7838,4 +7839,5 @@ export const ZH_CN: Record<string, string> = {
   "Error del sombreador": "着色器错误",
   "Ask the model to fix the failed steps": "请模型修正失败的步骤",
   "Sent": "已发送",
+  ...CONCILIUM_TRANSLATIONS['zh-CN'],
 };

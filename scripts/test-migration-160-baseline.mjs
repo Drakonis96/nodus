@@ -138,6 +138,7 @@ try {
   // expose the failure-reason column, and move Zotero markup away from UI text.
   db.exec('ALTER TABLE works DROP COLUMN summary_error; ALTER TABLE works DROP COLUMN zotero_title_markup;');
   db.exec('ALTER TABLE chat_messages DROP COLUMN attachments_json;');
+  db.exec('ALTER TABLE chat_messages DROP COLUMN concilium_json;');
   db.exec('ALTER TABLE document_profile_fields DROP COLUMN confidence_source;');
   const rawRichTitle = '<span style="font-variant:small-caps;">CLE</span> peptides &amp; plant-biotic interactions';
   db.prepare(`INSERT INTO works(nodus_id,zotero_key,zotero_version,zotero_fingerprint,title,summary_status)
@@ -200,6 +201,7 @@ try {
     db.exec(`ALTER TABLE document_index_jobs DROP COLUMN ${column}`);
   }
   db.exec('ALTER TABLE chat_messages DROP COLUMN attachments_json;');
+  db.exec('ALTER TABLE chat_messages DROP COLUMN concilium_json;');
   db.exec('ALTER TABLE document_profile_fields DROP COLUMN confidence_source;');
   db.pragma('user_version = 161');
   runMigrations(db);
@@ -250,6 +252,7 @@ try {
     db.exec(`ALTER TABLE document_index_jobs DROP COLUMN ${column}`);
   }
   db.exec('ALTER TABLE chat_messages DROP COLUMN attachments_json;');
+  db.exec('ALTER TABLE chat_messages DROP COLUMN concilium_json;');
   db.exec('ALTER TABLE document_profile_fields DROP COLUMN confidence_source;');
   db.pragma('user_version = 163');
   runMigrations(db);

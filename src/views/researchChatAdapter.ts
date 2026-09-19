@@ -24,7 +24,7 @@ export interface ResearchChatAdapter {
   deleteConversation: (id: string) => Promise<unknown>;
   archiveConversation?: (id: string, archived: boolean) => Promise<unknown>;
   generateConversationTitle?: (id: string, model?: ModelRef | null) => Promise<unknown>;
-  researchChatStream: (request: ResearchChatRequest, handlers: { onDelta: (delta: string) => void; onReasoning?: (delta: string) => void }) => Promise<{ answer: string; aborted?: boolean; stats?: ResearchContextStats; message?: Partial<ResearchUiMessage> }>;
+  researchChatStream: (request: ResearchChatRequest, handlers: import('@shared/types').ResearchChatStreamHandlers) => Promise<{ answer: string; aborted?: boolean; stats?: ResearchContextStats; message?: Partial<ResearchUiMessage> }>;
   cancelResearchChat: () => Promise<unknown>;
   renderMessage: (message: ResearchUiMessage, streaming: boolean) => ReactNode;
 }
