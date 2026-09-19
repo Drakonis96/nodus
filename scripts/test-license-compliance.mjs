@@ -42,6 +42,17 @@ test('packaging generates and exposes the legal bundle', () => {
   }
 });
 
+test("the legal bundle fetches Electron's distribution on demand", () => {
+  // Electron 43 ships no install script: `dist/`, and Chromium's notice inside it, appear the
+  // first time the module is required. The generator must ask for it — assuming an earlier
+  // step produced it makes `npm run dist:*` fail on a fresh clone, and the old message blamed
+  // --ignore-scripts for something no install script is involved in.
+  const source = read('scripts/generate-third-party-licenses.mjs');
+  assert.match(source, /require\('electron'\)/, 'the distribution is resolved, not assumed');
+  assert.doesNotMatch(source, /--ignore-scripts/, 'the obsolete advice is gone');
+  assert.match(source, /ELECTRON_DIST_PATH/, 'a verified distribution supplied by hand still wins');
+});
+
 test('special notices cover data, native runtimes and LGPL replacement', () => {
   const notices = read('THIRD_PARTY_NOTICES.md');
   for (const marker of ['GeoNames', 'CC BY 4.0', 'Multilingual E5 small', 'Transformers.js 3.8.1', 'ONNX Runtime', 'libheif-js', 'sharp-libvips', 'IDprotector']) {
