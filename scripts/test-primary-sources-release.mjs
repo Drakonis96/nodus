@@ -105,7 +105,8 @@ if (!process.argv.includes('--electron-primary-sources-release-test')) {
   assert.match(sources.archiveView, /Lugar de procedencia/);
   assert.doesNotMatch(sources.archiveView, /placeRole: 'creation'/);
   assert.match(sources.placePicker, /searchGazetteer/);
-  assert.match(sources.toolkit, /TOOLKIT_TOOLS\.map/);
+  assert.match(sources.toolkit, /const visibleTools = TOOLKIT_TOOLS\.filter\(/, 'search filters the shared catalogue');
+  assert.match(sources.toolkit, /visibleTools\.map\(/, 'the hub renders the filtered shared catalogue');
   assert.doesNotMatch(sources.app, /PrimarySourcesToolkitView/);
   assert.match(sources.app, /toolkit: \([^)]*\)[\s\S]{0,120}<ToolkitView/);
   for (const relative of [

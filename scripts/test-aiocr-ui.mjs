@@ -43,7 +43,7 @@ test('the OCR Workspace card is activated and routed to its own view', async () 
   assert.match(view, /settings: AppSettings \| null/, 'the hub accepts settings to pass down');
 
   const app = await read('@shell');
-  assert.match(app, /<ToolkitView page=\{toolkitPage\} onNavigate=\{setToolkitPage\} settings=\{settings\} \/>/, 'App threads settings into the toolkit');
+  assert.match(app, /<ToolkitView\b[^>]*\bsettings=\{settings\}[^>]*\/>/, 'App threads settings into the toolkit even when other navigation props are present');
 });
 
 test('the library view is addressable and follows Toolkit design conventions', async () => {
