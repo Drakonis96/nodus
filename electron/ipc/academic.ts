@@ -1615,7 +1615,8 @@ export function registerAcademicIpc(context: IpcContext): void {
           const channel = kind === 'reasoning' ? 'research:chatStream:reasoning' : 'research:chatStream:delta';
           e.sender.send(channel, requestId, delta);
         },
-        controller.signal
+        controller.signal,
+        result => { if (!e.sender.isDestroyed()) e.sender.send('research:chatStream:concilium', requestId, result); }
       );
     } finally {
       chatAborters.delete(requestId);

@@ -1,4 +1,5 @@
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -8778,4 +8779,5 @@ export const PT: Record<string, string> = {
   "Error del sombreador": "Erro do sombreador",
   "Ask the model to fix the failed steps": "Pedir ao modelo para corrigir os passos que falharam",
   "Sent": "Enviado",
+  ...CONCILIUM_TRANSLATIONS['pt'],
 };

@@ -1,0 +1,56 @@
+.concilium-control { --c-accent: var(--vault-accent, #6366f1); display: inline-flex; min-width: 0; }
+.concilium-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 6px 11px; border: 1px solid var(--theme-border-dark-strong); border-radius: 8px; background: transparent; color: var(--theme-text-dark); font-size: 12px; white-space: nowrap; }
+.concilium-trigger > svg { flex-shrink: 0; }
+.concilium-trigger:hover { background: color-mix(in srgb, var(--c-accent) 8%, transparent); }
+.concilium-trigger:focus-visible, .concilium-panel button:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
+.concilium-control.is-active > .concilium-trigger { border-color: color-mix(in srgb, var(--c-accent) 40%, transparent); background: color-mix(in srgb, var(--c-accent) 9%, transparent); color: var(--c-accent); }
+.concilium-count { padding: 1px 6px; border-radius: 5px; background: color-mix(in srgb, var(--c-accent) 12%, transparent); font-size: 10px; }
+.concilium-panel { position: fixed; inset: auto; margin: 0; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border: 1px solid var(--theme-border-dark-strong); border-radius: 15px; background: var(--n-900); color: var(--theme-text-dark); box-shadow: 0 16px 50px #0004; font-size: 13px; line-height: 1.55; }
+.concilium-heading, .concilium-heading > span, .concilium-seat-label, .concilium-response-meta { display: flex; align-items: center; gap: 8px; }
+.concilium-heading { justify-content: space-between; font-size: 17px; font-weight: 600; }
+.concilium-heading svg { color: var(--c-accent); }
+.concilium-heading > button { padding: 4px; color: var(--theme-text-dark-muted); }
+.concilium-intro { margin: 6px 0 18px; color: var(--theme-text-dark-muted); }
+.concilium-toggle { display: flex; align-items: center; gap: 16px; justify-content: space-between; padding: 14px 0; border-top: 1px solid var(--theme-border-dark); border-bottom: 1px solid var(--theme-border-dark); }
+.concilium-toggle strong, .concilium-toggle span { display: block; }
+.concilium-toggle div > span { margin-top: 3px; font-size: 11px; color: var(--theme-text-dark-muted); }
+.concilium-toggle [role=switch] { flex-shrink: 0; width: 34px; height: 20px; border-radius: 20px; padding: 3px; background: var(--n-600); }
+.concilium-toggle [role=switch] > span { width: 14px; height: 14px; background: white; border-radius: 50%; transition: transform .15s; }
+.concilium-toggle [aria-checked=true] { background: var(--c-accent); }
+.concilium-toggle [aria-checked=true] > span { transform: translateX(14px); }
+.concilium-roster { display: grid; gap: 17px; margin: 18px 0; }
+.concilium-seat-label { margin-bottom: 7px; font-size: 11px; }
+.concilium-seat-label strong { flex: 1; }
+.concilium-seat-number { color: var(--theme-text-dark-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.concilium-role { color: var(--c-accent); font-size: 10px; }
+.concilium-link { font-size: 10px; color: var(--theme-text-dark-muted); }
+.concilium-link:hover { color: var(--c-accent); }
+.concilium-seat .input { font-size: 12px; min-height: 37px; }
+.concilium-add { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px dashed var(--theme-border-dark-strong); border-radius: 7px; width: 100%; color: var(--c-accent); font-size: 12px; }
+.concilium-add > span { margin-left: auto; font-size: 10px; color: var(--theme-text-dark-muted); }
+.concilium-panel button:disabled, .concilium-trigger:disabled { opacity: .45; cursor: default; }
+.concilium-footnote { margin: 16px 0 0; color: var(--theme-text-dark-muted); font-size: 11px; line-height: 1.7; }
+.concilium-responses { padding: 2px 0 13px; margin-bottom: 13px; border-bottom: 1px solid var(--theme-border-dark); }
+.concilium-progress { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; font-size: 11px; color: var(--theme-text-dark-muted); }
+.concilium-progress > svg { color: var(--vault-accent, #6366f1); }
+.concilium-progress strong { color: var(--theme-text-dark); font-weight: 600; }
+.concilium-phase { margin-left: auto; }
+.concilium-members { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.concilium-member > .concilium-trigger { padding: 5px 8px; font-size: 10px; border-radius: 6px; gap: 6px; }
+.concilium-status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--n-500); flex-shrink: 0; }
+.is-complete .concilium-status-dot { background: #22a47a; }
+.is-thinking .concilium-status-dot { background: var(--c-accent); animation: concilium-pulse 1.2s ease-in-out infinite; }
+.is-error .concilium-status-dot { background: #e77756; }
+.concilium-member-chair { color: var(--c-accent); font-size: 9px; }
+.concilium-response-meta { justify-content: space-between; margin: 8px 0 18px; font-size: 11px; color: var(--theme-text-dark-muted); }
+.concilium-reasoning { margin-bottom: 14px; font-size: 12px; color: var(--theme-text-dark-muted); }
+.concilium-reasoning p { white-space: pre-wrap; margin-top: 10px; }
+.concilium-member-error { color: #db6d50; font-size: 12px; }
+.light .concilium-trigger { color: var(--theme-text-light); border-color: var(--theme-border-light-strong); }
+.light .concilium-panel { background: var(--n-50); color: var(--theme-text-light); border-color: var(--theme-border-light-strong); box-shadow: 0 14px 45px #17234420; }
+.light .concilium-toggle, .light .concilium-responses { border-color: var(--theme-border-light); }
+.light .concilium-add { border-color: var(--theme-border-light-strong); }
+.light .concilium-progress strong { color: var(--theme-text-light); }
+.light .concilium-intro, .light .concilium-footnote, .light .concilium-response-meta, .light .concilium-progress, .light .concilium-toggle div > span, .light .concilium-seat-number, .light .concilium-link { color: var(--theme-text-light-muted); }
+@keyframes concilium-pulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .is-thinking .concilium-status-dot { animation: none; } }

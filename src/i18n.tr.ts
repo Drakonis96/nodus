@@ -1,4 +1,5 @@
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -8586,4 +8587,5 @@ export const TR: Record<string, string> = {
   "Error del sombreador": "Gölgelendirici hatası",
   "Ask the model to fix the failed steps": "Modelden başarısız adımları düzeltmesini isteyin",
   "Sent": "Gönderildi",
+  ...CONCILIUM_TRANSLATIONS['tr'],
 };
