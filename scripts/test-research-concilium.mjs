@@ -56,6 +56,8 @@ try {
   }
   assert.match(calls[3].options.system, /svg/i);
   assert.ok(snapshots.some(s => s.members[1].status === 'complete' && s.members[0].status === 'thinking'), 'out-of-order completion is delivered live');
+  const { SCHEMA_VERSION } = load('electron/db/migrations.ts');
+  assert.equal(load('electron/db/database.ts').getDb().pragma('user_version', { simple: true }), SCHEMA_VERSION, 'Concilium migration matches the advertised schema version');
   const chats = load('electron/db/chatRepo.ts');
   const conversation = chats.createConversation({ model: models[1], selection });
   chats.saveMessages(conversation.id, [{ id: 'user', role: 'user', content: 'Question' }, { id: 'answer', role: 'assistant', content: response.answer, concilium: response.concilium }]);
