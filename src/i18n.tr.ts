@@ -61,6 +61,13 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
+  // Nodus Tools catalogue
+  "Navega por la web y guarda fuentes para tu investigación.": "Web’de gezinin ve araştırmanız için kaynakları kaydedin.",
+  "Descubre literatura académica en fuentes abiertas.": "Açık kaynaklarda akademik literatürü keşfedin.",
+  "Sigue fuentes y descubre novedades para tu investigación.": "Kaynakları takip edin ve araştırmanız için yenilikleri keşfedin.",
+  "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Nodus’tan ayrılmadan kaynakları keşfedin, yenilikleri takip edin ve dosyalarınızla çalışın.",
+  "Buscar herramientas": "Araç ara",
+
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Açık veya koyu modu seçin ya da işletim sistemini takip edin.',
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['tr'],
   "Research chat": "Research chat",

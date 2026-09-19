@@ -61,6 +61,13 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
+  // Nodus Tools catalogue
+  "Navega por la web y guarda fuentes para tu investigación.": "Naviga sul web e salva fonti per la tua ricerca.",
+  "Descubre literatura académica en fuentes abiertas.": "Scopri la letteratura accademica nelle fonti aperte.",
+  "Sigue fuentes y descubre novedades para tu investigación.": "Segui le fonti e scopri novità per la tua ricerca.",
+  "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Esplora fonti, segui le novità e lavora sui tuoi file senza uscire da Nodus.",
+  "Buscar herramientas": "Cerca strumenti",
+
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Scegli la modalità chiara, scura o segui il sistema operativo.',
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['it'],
   "Research chat": "Research chat",

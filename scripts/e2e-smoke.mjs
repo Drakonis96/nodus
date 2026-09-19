@@ -1196,7 +1196,8 @@ try {
   // measured on the real rendered shell rather than trusted from the classes.
   await page.locator('[data-tour="toolkit"]').click();
   await page.getByTestId('toolkit-home').waitFor({ timeout: 30_000 });
-  const toolCards = ['toolkit-card-apps', 'toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-translate', 'toolkit-card-presenter', 'toolkit-card-aiocr'];
+  const toolCards = ['toolkit-card-apps', 'toolkit-card-browser', 'toolkit-card-compass', 'toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-radar', 'toolkit-card-translate', 'toolkit-card-aiocr', 'toolkit-card-presenter'];
+  assert.deepEqual(await page.locator('.toolkit-card').evaluateAll((cards) => cards.map((card) => card.dataset.testid)), toolCards, 'the shared catalogue shows all nine tools in alphabetical order');
   const cardBoxes = [];
   for (const testId of toolCards) {
     const box = await page.getByTestId(testId).boundingBox();
@@ -1208,7 +1209,8 @@ try {
     1,
     `every toolkit card has the same dimensions: ${cardBoxes.map((b) => `${b.testId} ${Math.round(b.width)}x${Math.round(b.height)}`).join(', ')}`
   );
-  assert.equal(new Set(cardBoxes.map((b) => Math.round(b.y))).size, 3, 'the cards form three aligned rows');
+  const firstRowCount = cardBoxes.filter((box) => Math.round(box.y) === Math.round(cardBoxes[0].y)).length;
+  assert.equal(new Set(cardBoxes.map((b) => Math.round(b.y))).size, Math.ceil(toolCards.length / firstRowCount), 'the cards form aligned rows at the current responsive column count');
   // Each card's icon tile is square and its glyph sits dead centre in it.
   for (const testId of toolCards) {
     const centring = await page.getByTestId(testId).evaluate((card) => {

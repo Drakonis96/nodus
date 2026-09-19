@@ -66,6 +66,13 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * translator's review debt and should be treated as a first pass.
  */
 export const KO: Record<string, string> = {
+  // Nodus Tools catalogue
+  "Navega por la web y guarda fuentes para tu investigación.": "웹을 탐색하고 연구 자료를 저장하세요.",
+  "Descubre literatura académica en fuentes abiertas.": "공개 출처에서 학술 문헌을 찾아보세요.",
+  "Sigue fuentes y descubre novedades para tu investigación.": "출처를 팔로우하고 연구에 필요한 새로운 소식을 확인하세요.",
+  "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Nodus 안에서 출처를 탐색하고, 새 소식을 확인하고, 파일을 작업하세요.",
+  "Buscar herramientas": "도구 검색",
+
   ...RESEARCH_ATTACHMENT_TRANSLATIONS.ko,
   ...DOCUMENT_SKILLS_TRANSLATIONS.ko,
   ...RESEARCH_PROMPT_TRANSLATIONS.ko,

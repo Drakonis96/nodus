@@ -67,6 +67,13 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 /** Simplified Chinese UI table. Keys are the Spanish source strings (see i18n.ts). */
 export const ZH_CN: Record<string, string> = {
+  // Nodus Tools catalogue
+  "Navega por la web y guarda fuentes para tu investigación.": "浏览网页并保存研究资料。",
+  "Descubre literatura académica en fuentes abiertas.": "在开放来源中发现学术文献。",
+  "Sigue fuentes y descubre novedades para tu investigación.": "关注来源并发现研究新动态。",
+  "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "无需离开 Nodus，即可探索来源、关注动态并处理文件。",
+  "Buscar herramientas": "搜索工具",
+
   "Elige entre modo claro, oscuro o seguir el sistema operativo.": "选择浅色模式、深色模式，或跟随操作系统。",
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['zh-CN'],
   ...RESEARCH_PROMPT_TRANSLATIONS['zh-CN'],
