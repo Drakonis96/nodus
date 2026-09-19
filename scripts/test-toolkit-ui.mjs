@@ -144,11 +144,11 @@ test('the hub renders every built tool including Nodus Translate', async () => {
   // set of tools from each other.
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.map((tool) => `toolkit-card-${tool.testid}`),
-    ['toolkit-card-apps', 'toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-translate', 'toolkit-card-presenter', 'toolkit-card-aiocr']
+    ['toolkit-card-apps', 'toolkit-card-browser', 'toolkit-card-compass', 'toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-radar', 'toolkit-card-translate', 'toolkit-card-aiocr', 'toolkit-card-presenter']
   );
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.map((tool) => tool.name),
-    ['Nodus Apps', 'Nodus Convert', 'Nodus Protect', 'Nodus Translate', 'PDF Presenter', 'OCR Workspace'],
+    ['Nodus Apps', 'Nodus Browser', 'Nodus Compass', 'Nodus Convert', 'Nodus Protect', 'Nodus Radar', 'Nodus Translate', 'OCR Workspace', 'PDF Presenter'],
     'brand names stay untranslated'
   );
   assert.match(view, /name=\{tool\.name\}/, 'the card shows the brand name verbatim, never through t()');
@@ -166,7 +166,7 @@ test('the hub renders every built tool including Nodus Translate', async () => {
   );
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'wip').map((tool) => tool.page),
-    ['apps', 'convert', 'protect', 'translate', 'presenter', 'ocr'],
+    ['apps', 'browser', 'compass', 'convert', 'protect', 'radar', 'translate', 'ocr', 'presenter'],
     'every tool uses the in-development badge'
   );
   assert.match(view, /const disabled = state === 'soon'/);
@@ -259,7 +259,7 @@ test('Toolkit tools remain nested destinations even when pinned into the sidebar
   const app = await read('@shell');
   // The tools are NOT views: the optional shortcuts are namespaced ids and open
   // the existing nested page, so vault-type allow-lists never need to grow.
-  const toolPages = new Set(navigation.TOOLKIT_TOOLS.map((tool) => tool.page));
+  const toolPages = new Set(navigation.TOOLKIT_TOOLS.filter((tool) => !navigation.isToolkitStandalonePage(tool.page)).map((tool) => tool.page));
   assert.ok(
     !navigation.NAV_ITEMS.some((n) => toolPages.has(n.id)),
     'the tools stay out of the canonical nav table'
@@ -274,7 +274,7 @@ test('the hub cards share one shape and omit development labels', async () => {
   const view = await read('src/views/ToolkitView.tsx');
   // One ToolCard component renders every card, so they cannot drift apart.
   assert.equal((view.match(/<ToolCard\b/g) ?? []).length, 1, 'a single ToolCard renders the whole catalogue');
-  assert.match(view, /grid gap-4 sm:grid-cols-2/, 'the cards use a two-column grid when space permits');
+  assert.match(view, /grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3/, 'the cards adapt from one to three columns');
   assert.match(view, /className=\{`toolkit-card flex h-full w-full flex-col/, 'each card fills its grid cell');
   assert.match(view, /h-12 w-12 shrink-0 items-center justify-center/, 'the card icon sits in a fixed centred tile');
   assert.doesNotMatch(view, /t\('En desarrollo'\)/, 'available apps do not show a development label');
@@ -303,7 +303,7 @@ test('a tool page returns to the hub and keeps the shared hero action row unifor
   assert.match(app, /title=\{t\('Abrir Nodus Toolkit'\)\}/);
   assert.match(
     app,
-    /toolkit: \([^)]*\) => <ToolkitView page=\{toolkitPage\} onNavigate=\{setToolkitPage\} settings=\{settings\} \/>/,
+    /toolkit: \([^)]*\) => <ToolkitView page=\{toolkitPage\} onNavigate=\{setToolkitPage\} onOpenView=\{setView\} settings=\{settings\} vaultType=\{activeVault\?\.type\} \/>/,
     'every vault renders the same generic Toolkit whose active page App owns'
   );
   assert.doesNotMatch(app, /PrimarySourcesToolkitView/, 'there is no primary-source Toolkit fork');

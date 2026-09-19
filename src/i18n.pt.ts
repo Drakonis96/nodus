@@ -66,6 +66,13 @@ import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch
 import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const PT: Record<string, string> = {
+  // Nodus Tools catalogue
+  "Navega por la web y guarda fuentes para tu investigación.": "Navega na web e guarda fontes para a tua investigação.",
+  "Descubre literatura académica en fuentes abiertas.": "Descobre literatura académica em fontes abertas.",
+  "Sigue fuentes y descubre novedades para tu investigación.": "Segue fontes e descobre novidades para a tua investigação.",
+  "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Explora fontes, acompanha novidades e trabalha com os teus ficheiros sem sair do Nodus.",
+  "Buscar herramientas": "Pesquisar ferramentas",
+
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Escolha o modo claro, escuro ou siga o sistema operativo.',
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['pt'],
   "Research chat": "Research chat",

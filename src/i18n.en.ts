@@ -65,6 +65,13 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  // Nodus Tools catalogue
+  "Navega por la web y guarda fuentes para tu investigación.": "Browse the web and save sources for your research.",
+  "Descubre literatura académica en fuentes abiertas.": "Discover academic literature across open sources.",
+  "Sigue fuentes y descubre novedades para tu investigación.": "Follow sources and discover updates for your research.",
+  "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Explore sources, follow updates and work with your files without leaving Nodus.",
+  "Buscar herramientas": "Search tools",
+
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Choose light mode, dark mode, or follow the operating system.',
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['en'],
   "Research chat": "Research chat",

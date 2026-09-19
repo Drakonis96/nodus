@@ -66,6 +66,13 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * translator's review debt and should be treated as a first pass.
  */
 export const JA: Record<string, string> = {
+  // Nodus Tools catalogue
+  "Navega por la web y guarda fuentes para tu investigación.": "ウェブを閲覧し、研究のための資料を保存します。",
+  "Descubre literatura académica en fuentes abiertas.": "公開情報源から学術文献を見つけます。",
+  "Sigue fuentes y descubre novedades para tu investigación.": "情報源をフォローして研究の最新情報を見つけます。",
+  "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Nodus を離れずに情報源を探し、最新情報を追跡し、ファイルを操作できます。",
+  "Buscar herramientas": "ツールを検索",
+
   ...RESEARCH_ATTACHMENT_TRANSLATIONS.ja,
   ...DOCUMENT_SKILLS_TRANSLATIONS.ja,
   ...RESEARCH_PROMPT_TRANSLATIONS.ja,

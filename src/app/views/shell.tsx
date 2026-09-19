@@ -14,7 +14,7 @@ export const shellViews = {
   browser: () => <NodusBrowserView />,
   radar: ({ radarTarget }) => <RadarView target={radarTarget} />,
   compass: ({ snapshots }) => <CompassView snapshot={snapshots.read('compass')} onSnapshotChange={(patch) => snapshots.patch('compass', patch)} />,
-  toolkit: ({ setToolkitPage, settings, toolkitPage }) => <ToolkitView page={toolkitPage} onNavigate={setToolkitPage} settings={settings} />,
+  toolkit: ({ setToolkitPage, setView, settings, toolkitPage, activeVault }) => <ToolkitView page={toolkitPage} onNavigate={setToolkitPage} onOpenView={setView} settings={settings} vaultType={activeVault?.type} />,
   settings: ({ activeVault, recoveryStatus, reloadSettings, reloadVaults, setManualWhatsNewOpen, setRoadmapOpen, settings, vaults }) => (
     <Settings
       settings={settings}
