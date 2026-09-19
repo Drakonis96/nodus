@@ -104,9 +104,20 @@ any native build begins.
 Desktop updates download automatically, but installation and restart require
 the explicit **Install and restart** action on every supported platform. An
 ordinary app quit never installs a pending update. The downloaded update remains
-accessible from the header and Settings after choosing **Later**, including when
-the startup dialog was closed before the download finished. Settings reads the
-current main-process status when reopened instead of waiting for another event.
+accessible from the header and Settings after choosing **Later**. On launch, the
+header banner shows the update check, available version, and download progress
+without blocking the workspace. It disappears when no update is available; an
+initial check or download error is shown briefly and dismissed after five seconds.
+Subsequent checks and downloads stay silent until an update is ready to install.
+Settings reads the current main-process status when reopened instead of waiting
+for another event.
+
+The following screenshots show the shared banner in an isolated UI fixture with
+synthetic update events:
+
+![Update download progress](docs/images/update-banner-downloading.png)
+
+![Update ready to install](docs/images/update-banner-ready.png)
 
 Before installing a Beta build, the desktop app requires Recovery to be
 configured and commits a full encrypted, verified `nodus-pre-update-*` snapshot.

@@ -91,7 +91,7 @@ try {
       theme: 'light',
     });
   });
-  // The test deliberately validates the startup update modal after vault setup.
+  // The test deliberately validates the automatic startup update check after vault setup.
   // Treat this reload as a fresh app session, matching the dedicated smoke test.
   await page.evaluate(() => sessionStorage.removeItem('nodus.startupUpdateChecked'));
   await page.reload();
@@ -108,13 +108,9 @@ try {
     await page.waitForTimeout(50);
   }
   await whatsNewModal.waitFor({ state: 'detached' });
-  const startupUpdateModal = page.getByTestId('startup-update-modal');
-  await startupUpdateModal.waitFor();
-  await page.waitForFunction(() =>
-    document.querySelector('[data-testid="startup-update-modal"]')?.getAttribute('data-update-status') === 'not-available'
-  );
-  await startupUpdateModal.getByRole('button', { name: 'Entendido', exact: false }).click();
-  await startupUpdateModal.waitFor({ state: 'detached' });
+  await page.waitForFunction(async () => (await window.nodus.getUpdateStatus())?.status === 'not-available');
+  await page.getByTestId('update-ready-notice').waitFor({ state: 'detached' });
+  assert.equal(await page.getByTestId('startup-update-modal').count(), 0);
 
   for (const label of ['Buscar', 'Población', 'Personas', 'Fuentes', 'Análisis', 'Redes', 'Notas']) {
     assert.equal(await page.getByRole('button', { name: label, exact: true }).count(), 1, `${label} appears once`);

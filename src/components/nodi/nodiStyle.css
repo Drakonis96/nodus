@@ -57,7 +57,7 @@
 .nodi-style-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 74; /* above the startup update modal (72), which it follows */
+  z-index: 74; /* above the release notes, which it follows */
   display: grid;
   place-items: center;
   padding: 24px;

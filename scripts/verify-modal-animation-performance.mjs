@@ -111,18 +111,10 @@ try {
   await whatsNew.getByRole('button', { name: /Explorar las novedades/ }).click();
   await whatsNew.waitFor({ state: 'detached' });
 
-  const updateModal = page.getByTestId('startup-update-modal');
-  await updateModal.waitFor();
-  await page.waitForFunction(() => (
-    document.querySelector('[data-testid="startup-update-modal"]')?.getAttribute('data-update-status') === 'not-available'
-  ));
-  await assertAvatarPaused(updateModal, 'celebrating', 'startup update orb Nodi');
-  await page.screenshot({ path: path.join(shots, 'startup-update-paused.png') });
-  await updateModal.getByRole('button', { name: /Entendido/ }).click();
-  await updateModal.waitFor({ state: 'detached' });
-  await page.waitForTimeout(400);
-  assert.equal(await page.getByTestId('startup-update-modal').count(), 0, 'the closed update modal remounted');
-  step('startup update modal detaches cleanly after close');
+  await page.waitForFunction(async () => (await window.nodus.getUpdateStatus())?.status === 'not-available');
+  await page.getByTestId('update-ready-notice').waitFor({ state: 'detached' });
+  assert.equal(await page.getByTestId('startup-update-modal').count(), 0);
+  step('startup update check leaves no blocking surface');
 } finally {
   await app.close();
 }

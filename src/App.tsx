@@ -43,7 +43,6 @@ import { ToolkitBetaUpdateTour } from './components/ToolkitBetaGuide';
 import { useUpdateProgress } from './useUpdateProgress';
 import { pendingUpdateVersion, updateInstallBusy } from './updateStatus';
 import { UpdateReadyNotice } from './components/UpdateReadyNotice';
-import { StartupUpdateModal } from './components/StartupUpdateModal';
 import { AiModelRequiredModal } from './components/AiModelRequiredModal';
 import { MobileTeaserGuide } from './components/MobileTeaserGuide';
 import { recoveryHealthAdvice, recoveryHealthHeadline } from './recoveryHealth';
@@ -202,10 +201,10 @@ export function App() {
   // Users who completed the essential guide before the video tutorials existed were
   // never asked "video or text", so the catalogue is announced to them once, here.
   const [tutorialVideosSettled, setTutorialVideosSettled] = useState(false);
-  // Set once the startup update check is done with the screen, so the one-time Nodi
-  // choice can queue up behind it instead of fighting it for the foreground.
-  const [updateSettled, setUpdateSettled] = useState(false);
-  const [updateProgress, setUpdateProgress] = useUpdateProgress();
+  // Startup progress is non-blocking; later checks stay silent until ready to install.
+  const [updateProgress, setUpdateProgress, showStartupProgress] = useUpdateProgress({ checkOnStartup: true });
+  const startupGuidesSettled = whatsNewSettled && pdfPresenterTutorialSettled && mobileTeaserSettled
+    && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled;
   const [deferredUpdate, setDeferredUpdate] = useState<string | null>(null);
   const readyVersion = pendingUpdateVersion(updateProgress);
   const updateNoticeKey = readyVersion ? `${readyVersion}${updateProgress?.errorCode ?? ''}` : null;
@@ -1698,7 +1697,7 @@ export function App() {
         />
       </header>
 
-      {updateSettled && updateProgress && updateNoticeKey && deferredUpdate !== updateNoticeKey && <UpdateReadyNotice
+      {updateProgress && (showStartupProgress || (updateNoticeKey && deferredUpdate !== updateNoticeKey)) && <UpdateReadyNotice
         update={updateProgress}
         onUpdate={setUpdateProgress}
         onLater={() => setDeferredUpdate(updateNoticeKey)}
@@ -2251,19 +2250,10 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && pdfPresenterTutorialSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && !updateSettled && (
-        <StartupUpdateModal
-          settings={settings}
-          activeVaultType={activeVault?.type ?? null}
-          onSettled={() => setUpdateSettled(true)}
-          onDefer={(version) => setDeferredUpdate(version)}
-        />
-      )}
-
       {/* Users who already saw the cinematic tutorial were never offered the choice of
-          Nodi, so it is made here instead — once, behind the update check. New users
+          Nodi, so it is made here instead — once, after the startup guides. New users
           pick inside the tutorial and reach this already chosen. */}
-      {updateSettled && !manualWhatsNewOpen && !isPreviewVault &&
+      {startupGuidesSettled && !manualWhatsNewOpen && !isPreviewVault &&
         settings.onboardingComplete &&
         settings.basicsTutorialVersion > 0 &&
         !recoveryStatus?.needsSetup &&
@@ -2272,7 +2262,7 @@ export function App() {
           <NodiStyleModal onChosen={async () => { await reloadSettings(); }} />
         )}
 
-      {!manualWhatsNewOpen && updateSettled && <NodiMascot settings={settings} />}
+      {!manualWhatsNewOpen && startupGuidesSettled && <NodiMascot settings={settings} />}
     </div>
   );
 }

@@ -6,13 +6,13 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (file) => readFile(path.join(root, file), 'utf8');
-const [avatar, orb, classicCss, orbCss, whatsNew, startupUpdate, app, styles, main] = await Promise.all([
+const [avatar, orb, classicCss, orbCss, whatsNew, updateProgress, app, styles, main] = await Promise.all([
   read('src/components/nodi/NodiAvatar.tsx'),
   read('src/components/nodi/NodiOrb.tsx'),
   read('src/components/nodi/nodi.css'),
   read('src/components/nodi/nodiOrb.css'),
   read('src/components/WhatsNewModal.tsx'),
-  read('src/components/StartupUpdateModal.tsx'),
+  read('src/useUpdateProgress.ts'),
   read('src/App.tsx'),
   read('src/index.css'),
   read('electron/main.ts'),
@@ -27,14 +27,10 @@ test('cinematic modals bound the expensive Nodi SVG animation', () => {
   assert.match(avatar, /export const NodiAvatar = memo\(NodiAvatarComponent\)/);
   assert.match(whatsNew, /const WhatsNewNodi = memo/);
   assert.match(whatsNew, /<NodiAvatar[\s\S]*settings=\{settings\}[\s\S]*activeVaultType=\{activeVaultType\}[\s\S]*state="celebrating"[\s\S]*restAfterMs=\{0\}/);
-  assert.match(startupUpdate, /const StartupUpdateNodi = memo/);
-  assert.match(startupUpdate, /<NodiAvatar[\s\S]*settings=\{settings\}[\s\S]*activeVaultType=\{activeVaultType\}[\s\S]*state=\{state\}[\s\S]*restAfterMs=\{0\}/);
   assert.match(whatsNew, /restAfterMs=\{0\}[\s\S]*lightweight/);
-  assert.match(startupUpdate, /restAfterMs=\{0\}[\s\S]*lightweight/);
   assert.match(orb, /!lightweight && \([\s\S]*feTurbulence/);
   assert.match(orb, /!lightweight && <g className="fx fx-celebrating">/);
   assert.match(app, /<WhatsNewModal[\s\S]*settings=\{settings\}[\s\S]*activeVaultType=\{activeVault\?\.type \?\? null\}/);
-  assert.match(app, /<StartupUpdateModal[\s\S]*settings=\{settings\}[\s\S]*activeVaultType=\{activeVault\?\.type \?\? null\}/);
   assert.match(classicCss, /\.nodi-svg\.nodi-at-rest \* \{ animation-play-state: paused !important; \}/);
   assert.match(orbCss, /\.nodi-orb\.nodi-at-rest \* \{ animation-play-state: paused !important; \}/);
 });
@@ -42,41 +38,28 @@ test('cinematic modals bound the expensive Nodi SVG animation', () => {
 test('cinematic decoration finishes instead of repainting forever', () => {
   const whatsNewAurora = styles.match(/\.whats-new-aurora \{[^\n]+/u)?.[0] ?? '';
   const whatsNewConfetti = styles.match(/\.whats-new-confetti \{[^\n]+/u)?.[0] ?? '';
-  const updateAurora = styles.match(/\.startup-update-aurora \{[^\n]+/u)?.[0] ?? '';
-  assert.ok(whatsNewAurora && whatsNewConfetti && updateAurora);
+  assert.ok(whatsNewAurora && whatsNewConfetti);
   assert.doesNotMatch(whatsNewAurora, /infinite/);
   assert.doesNotMatch(whatsNewConfetti, /infinite/);
-  assert.doesNotMatch(updateAurora, /infinite/);
 });
 
-test('closing the update modal removes its listener and progress is throttled', () => {
-  assert.match(startupUpdate, /if \(!shouldShow \|\| !open\) return;/);
-  assert.match(startupUpdate, /\[attempt, open, shouldShow\]/);
-  assert.match(app, /!manualWhatsNewOpen && !updateSettled && \(\s*<StartupUpdateModal/);
+test('the update subscription cleans up and main-process progress stays throttled', () => {
+  assert.match(updateProgress, /return \(\) => \{ alive = false; unsubscribe\(\); \}/);
   assert.match(main, /const UPDATE_PROGRESS_MIN_INTERVAL_MS = 500;/);
   assert.match(main, /roundedPercent === lastDownloadProgressPercent/);
   assert.match(main, /now - lastDownloadProgressEmitAt < UPDATE_PROGRESS_MIN_INTERVAL_MS/);
-  assert.match(startupUpdate, /const RENDER_PROGRESS_MIN_INTERVAL_MS = 500/);
-  assert.match(startupUpdate, /sameVisibleUpdate/);
-  assert.match(startupUpdate, /pendingUpdateRef/);
-  assert.match(startupUpdate, /progressTimerRef/);
-  assert.match(startupUpdate, /window\.clearTimeout\(progressTimerRef\.current\)/);
 });
 
 test('cinematic modals keep their look without a per-frame React animation engine', () => {
   assert.doesNotMatch(whatsNew, /from 'framer-motion'/);
-  assert.doesNotMatch(startupUpdate, /from 'framer-motion'/);
   assert.match(styles, /@keyframes whats-new-modal-in/);
-  assert.match(styles, /@keyframes startup-update-modal-in/);
   assert.match(styles, /\.whats-new-cinema \{[^\n]*animation: whats-new-modal-in/s);
-  assert.match(styles, /\.startup-update-cinema \{[^\n]*animation: startup-update-modal-in/s);
   assert.match(styles, /\.whats-new-backdrop \{[^\n]*backdrop-filter: blur\(10px\)/s);
-  assert.match(styles, /\.startup-update-backdrop \{[^\n]*backdrop-filter: blur\(10px\)/s);
 });
 
 test('release and update overlays suspend hidden duplicate work', () => {
   assert.match(whatsNew, /const STARTUP_VERSION_HISTORY_LIMIT = 12/);
   assert.match(whatsNew, /showSeenReleaseNotes\) return releaseNotesSince\(null, current\)/);
   assert.match(whatsNew, /releaseNotesSince\(null, current\)\.slice\(0, STARTUP_VERSION_HISTORY_LIMIT\)/);
-  assert.match(app, /\{!manualWhatsNewOpen && updateSettled && <NodiMascot settings=\{settings\} \/>\}/);
+  assert.match(app, /\{!manualWhatsNewOpen && startupGuidesSettled && <NodiMascot settings=\{settings\} \/>\}/);
 });
