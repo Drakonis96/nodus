@@ -763,10 +763,28 @@ footer.site-foot {
 }
 .dl-plat:hover { border-color: rgba(167, 139, 250, 0.55); background: var(--skin-2); transform: translateX(3px); color: var(--ink); }
 .dl-plat .os { width: 26px; height: 26px; fill: var(--ink-2); flex: 0 0 auto; }
-.dl-plat .os-set { display: flex; align-items: center; gap: 4px; width: 56px; flex: 0 0 auto; }
 .dl-plat div { flex: 1; min-width: 0; }
 .dl-plat b { display: block; font-size: 15px; }
 .dl-plat .note { font-size: 12.5px; color: var(--ink-3); }
+.dl-plat.dl-toggle { width: 100%; font: inherit; text-align: left; cursor: pointer; }
+.dl-toggle .chev {
+  width: 18px; height: 18px; flex: 0 0 auto; color: var(--ink-3);
+  transition: transform 0.22s var(--ease);
+}
+.dl-toggle[aria-expanded="true"] { border-color: rgba(167, 139, 250, 0.4); background: var(--skin-2); }
+.dl-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.dl-builds { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+.dl-build {
+  flex: 1 1 150px; display: flex; flex-direction: column; align-items: center;
+  padding: 14px 12px 12px; border: 1px solid var(--membrane); border-radius: var(--r-m);
+  background: var(--skin); color: var(--ink); text-align: center;
+  transition: all 0.22s var(--ease);
+}
+.dl-build:hover { border-color: rgba(167, 139, 250, 0.55); background: var(--skin-2); transform: translateY(-2px); }
+.dl-build-logo { display: flex; align-items: center; justify-content: center; height: 24px; margin-bottom: 9px; }
+.dl-build-logo svg { height: 100%; width: auto; fill: var(--ink-2); }
+.dl-build b { font-size: 13.5px; }
+.dl-build .note { font-size: 12px; color: var(--ink-3); }
 .dl-plat .arr { color: var(--ink-3); }
 .dl-all { display: block; margin: 16px 0 4px; text-align: center; font-size: 13.5px; }
 .dl-close {
