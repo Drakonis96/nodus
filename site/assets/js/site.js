@@ -236,19 +236,31 @@ page is still a complete, readable document.
           if (version) version.textContent = `Latest release · ${release.tag_name} · ${new Date(release.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`;
           const assets = release.assets || [];
           const find = (suffix) => assets.find((asset) => asset.name.endsWith(suffix));
+          const mb = (asset) => `${(asset.size / 1048576).toFixed(0)} MB`;
           const wire = (id, asset, fallbackLabel) => {
             const anchor = document.getElementById(id);
             if (!anchor) return;
             if (asset) {
               anchor.href = asset.browser_download_url;
-              const sub = anchor.querySelector('span:not(.arr)');
-              if (sub) sub.textContent = `${fallbackLabel} · ${(asset.size / 1048576).toFixed(0)} MB`;
+              const sub = anchor.querySelector('.note');
+              if (sub) sub.textContent = `${fallbackLabel} · ${mb(asset)}`;
             }
           };
-          wire('dl-mac', find('-mac-arm64.dmg'), 'Apple Silicon · .dmg');
-          wire('dl-mac-intel', find('-mac-x64.dmg'), 'Intel · .dmg');
           wire('dl-win', find('-win-x64.exe'), 'x64 installer · .exe');
           wire('dl-linux', find('-linux-x86_64.AppImage'), 'x86_64 · .AppImage');
+
+          /* macOS ships one build per architecture, so its single row lists both
+             downloads and keeps pointing at the release page to choose between them. */
+          const macRow = document.getElementById('dl-mac');
+          const macArm = find('-mac-arm64.dmg');
+          const macIntel = find('-mac-x64.dmg');
+          if (macRow && (macArm || macIntel)) {
+            const builds = [];
+            if (macArm) builds.push(`Apple Silicon ${mb(macArm)}`);
+            if (macIntel) builds.push(`Intel ${mb(macIntel)}`);
+            const note = macRow.querySelector('.note');
+            if (note) note.textContent = builds.join(' · ');
+          }
         })
         .catch(() => {
           if (version) version.textContent = 'Open the releases page for every build.';
