@@ -124,8 +124,8 @@ test('the files on disk are exactly the ones the mirror script produces', () => 
 
   for (const shot of SITE_SHOTS) {
     assert.ok(
-      fs.existsSync(path.join(root, 'docs', 'screenshots', shot.source)),
-      `docs/screenshots/${shot.source} is the README original; the mirror cannot be rebuilt without it`,
+      fs.existsSync(path.join(root, shot.source)),
+      `${shot.source} is the original capture; the mirror cannot be rebuilt without it`,
     );
   }
 });
@@ -174,11 +174,16 @@ test('the academic vault carries all five of its README views, and steps through
   );
 });
 
-test('a vault with a single view gets no carousel controls', () => {
+test('every other main vault has the same five-view gallery as Academic', () => {
   for (const window of windows.slice(1)) {
-    assert.equal(window.figures.length, 1, `${window.vault} has one README screenshot`);
-    assert.equal(window.arrows.length, 0, `${window.vault} has nothing to step to, so it has no arrows`);
-    assert.equal(window.figures[0].step, undefined, `${window.vault} does not count views it does not have`);
+    assert.equal(window.figures.length, 5, `${window.vault} has five useful views`);
+    assert.equal(window.arrows.length, 2, `${window.vault} has previous and next controls`);
+    assert.deepEqual(window.figures.map((figure) => figure.step), ['01 / 05', '02 / 05', '03 / 05', '04 / 05', '05 / 05']);
+    assert.ok(window.figures[0].classes.includes('is-active'));
+    for (const figure of window.figures.slice(1)) {
+      assert.ok(figure.ariaHidden);
+      assert.ok(figure.lazy);
+    }
   }
 });
 

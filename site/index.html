@@ -33,7 +33,7 @@ SPDX-License-Identifier: AGPL-3.0-only
   <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin/>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin/>
-<link rel="stylesheet" href="assets/css/nodus.css?v=20260902a"/>
+<link rel="stylesheet" href="assets/css/nodus.css?v=20260920a"/>
 <link rel="stylesheet" href="assets/css/home.css?v=20260822a"/>
 <script>
   /* Arm the opening sequence before the first paint. Anything that goes wrong
@@ -316,12 +316,38 @@ SPDX-License-Identifier: AGPL-3.0-only
       <div class="frame" data-shots>
         <div class="frame-bar"><i></i><i></i><i></i><span>Nodus Research · Teaching vault</span></div>
         <div class="frame-body">
-          <div class="shots">
+          <div class="shots" role="group" aria-roledescription="carousel" aria-label="The teaching vault in five screenshots">
             <figure class="shot is-active">
               <img src="assets/screenshots/teaching-demo.webp" width="1280" height="800" loading="lazy" decoding="async"
                    alt="Teaching vault demo in Nodus Research, with courses, groups, rubrics and a gradebook"/>
-              <figcaption><span class="shot-text">Courses, groups, question banks and a gradebook. Names, grades and student data stay out of every AI request.</span></figcaption>
+              <figcaption><span class="shot-text">Courses, groups, question banks and a gradebook. Names, grades and student data stay out of every AI request.</span><span class="shot-step">01 / 05</span></figcaption>
             </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/teaching-questions.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus teaching vault: question banks with answers, explanations and source passages"/>
+              <figcaption><span class="shot-text">Question banks with answers, explanations and source passages</span><span class="shot-step">02 / 05</span></figcaption>
+            </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/teaching-rubrics.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus teaching vault: assessment rubrics organised by subject and criteria"/>
+              <figcaption><span class="shot-text">Assessment rubrics organised by subject and criteria</span><span class="shot-step">03 / 05</span></figcaption>
+            </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/teaching-timetable.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus teaching vault: the weekly teaching timetable across subjects"/>
+              <figcaption><span class="shot-text">The weekly teaching timetable across subjects</span><span class="shot-step">04 / 05</span></figcaption>
+            </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/teaching-calendar.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus teaching vault: classes, deadlines and events in one calendar"/>
+              <figcaption><span class="shot-text">Classes, deadlines and events in one calendar</span><span class="shot-step">05 / 05</span></figcaption>
+            </figure>
+            <button class="shot-arrow prev" type="button" data-shots-prev hidden aria-label="Show the previous teaching vault screenshot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </button>
+            <button class="shot-arrow next" type="button" data-shots-next hidden aria-label="Show the next teaching vault screenshot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
           </div>
         </div>
       </div>
@@ -350,12 +376,38 @@ SPDX-License-Identifier: AGPL-3.0-only
       <div class="frame" data-shots>
         <div class="frame-bar"><i></i><i></i><i></i><span>Nodus Research · Study vault</span></div>
         <div class="frame-body">
-          <div class="shots">
+          <div class="shots" role="group" aria-roledescription="carousel" aria-label="The study vault in five screenshots">
             <figure class="shot is-active">
               <img src="assets/screenshots/study-demo.webp" width="1280" height="800" loading="lazy" decoding="async"
                    alt="Study vault demo in Nodus Research, with a course plan, materials, question banks and review"/>
-              <figcaption><span class="shot-text">Courses, materials, question banks and spaced review. Every question links back to the page or the minute it came from.</span></figcaption>
+              <figcaption><span class="shot-text">Courses, materials, question banks and spaced review. Every question links back to the page or the minute it came from.</span><span class="shot-step">01 / 05</span></figcaption>
             </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/study-questions.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus study vault: questions and flashcards linked to the original material"/>
+              <figcaption><span class="shot-text">Questions and flashcards linked to the original material</span><span class="shot-step">02 / 05</span></figcaption>
+            </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/study-review.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus study vault: a review session tailored by subject, theme and question type"/>
+              <figcaption><span class="shot-text">A review session tailored by subject, theme and question type</span><span class="shot-step">03 / 05</span></figcaption>
+            </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/study-graph.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus study vault: explore how concepts in your study material connect"/>
+              <figcaption><span class="shot-text">Explore how concepts in your study material connect</span><span class="shot-step">04 / 05</span></figcaption>
+            </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/study-schedule.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus study vault: plan the week with a timetable for your subjects"/>
+              <figcaption><span class="shot-text">Plan the week with a timetable for your subjects</span><span class="shot-step">05 / 05</span></figcaption>
+            </figure>
+            <button class="shot-arrow prev" type="button" data-shots-prev hidden aria-label="Show the previous study vault screenshot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </button>
+            <button class="shot-arrow next" type="button" data-shots-next hidden aria-label="Show the next study vault screenshot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
           </div>
         </div>
       </div>
@@ -384,12 +436,38 @@ SPDX-License-Identifier: AGPL-3.0-only
       <div class="frame" data-shots>
         <div class="frame-bar"><i></i><i></i><i></i><span>Nodus Research · Databases vault</span></div>
         <div class="frame-body">
-          <div class="shots">
+          <div class="shots" role="group" aria-roledescription="carousel" aria-label="The databases vault in five screenshots">
             <figure class="shot is-active">
               <img src="assets/screenshots/databases-demo.webp" width="1280" height="800" loading="lazy" decoding="async"
                    alt="Databases vault demo in Nodus Research, with typed fields, relations and analysis over the rows"/>
-              <figcaption><span class="shot-text">Typed fields, relations, formulas and charts, computed in the app from your own rows.</span></figcaption>
+              <figcaption><span class="shot-text">Typed fields, relations, formulas and charts, computed in the app from your own rows.</span><span class="shot-step">01 / 05</span></figcaption>
             </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/databases-analysis.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus databases vault: distributions and charts computed from the database rows"/>
+              <figcaption><span class="shot-text">Distributions and charts computed from the database rows</span><span class="shot-step">02 / 05</span></figcaption>
+            </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/databases-relations.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus databases vault: structured fieldwork records with typed columns"/>
+              <figcaption><span class="shot-text">Structured fieldwork records with typed columns</span><span class="shot-step">03 / 05</span></figcaption>
+            </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/databases-record.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus databases vault: edit a record with categories, dates and source notes"/>
+              <figcaption><span class="shot-text">Edit a record with categories, dates and source notes</span><span class="shot-step">04 / 05</span></figcaption>
+            </figure>
+            <figure class="shot" aria-hidden="true">
+              <img src="assets/screenshots/databases-gallery.webp" width="1280" height="800" loading="lazy" decoding="async"
+                   alt="Nodus databases vault: browse the same records as a visual card gallery"/>
+              <figcaption><span class="shot-text">Browse the same records as a visual card gallery</span><span class="shot-step">05 / 05</span></figcaption>
+            </figure>
+            <button class="shot-arrow prev" type="button" data-shots-prev hidden aria-label="Show the previous databases vault screenshot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </button>
+            <button class="shot-arrow next" type="button" data-shots-next hidden aria-label="Show the next databases vault screenshot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
           </div>
         </div>
       </div>
@@ -677,6 +755,21 @@ SPDX-License-Identifier: AGPL-3.0-only
     <a class="dl-plat" id="dl-linux" href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">
       <svg class="os" viewBox="0 0 24 24"><path d="M12 1.7c-2 0-3.2 1.6-3.2 3.8 0 .8.1 1.4.1 2 0 .7-.5 1.1-1.1 1.9-.9 1.2-2.3 2.8-2.3 4.6 0 .5.1.9.2 1.3-.6.5-1.3 1.1-1.7 1.9-.4.7-.2 1.3.4 1.5.4.1.9 0 1.4.1.4.1.7.5 1.3.8 1.3.6 3.1.7 4.3.7s3-.1 4.3-.7c.6-.3.9-.7 1.3-.8.5-.1 1 0 1.4-.1.6-.2.8-.8.4-1.5-.4-.8-1.1-1.4-1.7-1.9.1-.4.2-.8.2-1.3 0-1.8-1.4-3.4-2.3-4.6-.6-.8-1.1-1.2-1.1-1.9 0-.6.1-1.2.1-2 0-2.2-1.2-3.8-3.2-3.8Zm-1.5 4.1c.4 0 .7.4.7.9s-.3.9-.7.9-.7-.4-.7-.9.3-.9.7-.9Zm3 0c.4 0 .7.4.7.9s-.3.9-.7.9-.7-.4-.7-.9.3-.9.7-.9Zm-1.5 2.4c.7 0 1.6.5 1.6 1 0 .3-.5.5-.9.7-.3.2-.6.4-.7.4s-.4-.2-.7-.4c-.4-.2-.9-.4-.9-.7 0-.5.9-1 1.6-1Z"/></svg>
       <div><b>Linux</b><span>x86_64 · .AppImage · .deb · .rpm</span></div><span class="arr">→</span>
+    </a>
+    <a class="dl-plat" id="dl-zotero" href="https://github.com/Drakonis96/nodus/releases/latest/download/nodus-zotero.xpi" target="_blank" rel="noopener">
+      <svg xmlns="http://www.w3.org/2000/svg" class="os" aria-hidden="true" viewBox="0 0 16 16">
+  <polygon fill="#cc2936" points="13.863 2.73 13.027 1 2.137 1 2.137 3.8 2.137 3.921 8.822 3.921 1.289 13.233 2.137 15 13.863 15 13.863 12.142 13.863 12.021 6.448 12.021 13.863 2.73"/>
+</svg>
+      <div><b>Zotero plugin</b><span>Semantic search inside Zotero · .xpi</span></div><span class="arr">→</span>
+    </a>
+    <a class="dl-plat" id="dl-chrome" href="https://chromewebstore.google.com/detail/ilcclajjhofhieoljdjmikmfopfbamej" target="_blank" rel="noopener">
+      <svg class="os" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="#ea4335" d="M12 2a10 10 0 0 1 8.66 5H12a5 5 0 0 0-4.33 2.5L4.34 3.57A9.96 9.96 0 0 1 12 2Z"/>
+        <path fill="#fbbc05" d="M20.66 7a10 10 0 0 1-8.66 15l4.33-7.5A5 5 0 0 0 12 7Z"/>
+        <path fill="#34a853" d="M12 22A10 10 0 0 1 4.34 3.57L7.67 9.5a5 5 0 0 0 8.66 5Z"/>
+        <circle cx="12" cy="12" r="4.5" fill="#4285f4" stroke="#fff" stroke-width="1"/>
+      </svg>
+      <div><b>Chrome extension</b><span>Research Connector · Chrome Web Store</span></div><span class="arr">→</span>
     </a>
     <a class="dl-all" href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">All formats &amp; previous versions →</a>
     <button class="dl-close" type="button" onclick="closeDl()">Close</button>
