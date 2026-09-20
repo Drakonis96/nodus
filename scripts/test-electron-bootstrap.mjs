@@ -13,11 +13,35 @@ const bootstrap = () => spawnSync(process.execPath, ['scripts/prepare-electron-t
   cwd: root, encoding: 'utf8', timeout: 60_000,
 });
 
-test('npm test prepares and verifies Electron before launching parallel test workers', () => {
+test('local and CI test commands prepare Electron before launching parallel test workers', () => {
   assert.equal(packageJson.scripts.pretest, 'node scripts/prepare-electron-tests.mjs');
+  assert.equal(packageJson.scripts['pretest:ci'], packageJson.scripts.pretest);
   const result = bootstrap();
   assert.equal(result.status, 0, result.stderr);
   assert.ok(result.stdout.includes(`Electron ${require('electron/package.json').version} is installed and can start.`));
+});
+
+test('npm run test:ci stops before the test runner when Electron preparation fails', () => {
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-electron-ci-lifecycle-'));
+  try {
+    // Exercise npm's lifecycle ordering without launching the entire suite or
+    // modifying the shared Electron installation used by other test workers.
+    fs.writeFileSync(path.join(fixture, 'package.json'), JSON.stringify({ scripts: {
+      'pretest:ci': packageJson.scripts['pretest:ci'],
+      'test:ci': 'node -e "console.log(\'TEST_RUNNER_STARTED\')"',
+    } }));
+    fs.mkdirSync(path.join(fixture, 'scripts'));
+    fs.writeFileSync(path.join(fixture, 'scripts/prepare-electron-tests.mjs'),
+      `import ${JSON.stringify(new URL('./prepare-electron-tests.mjs', import.meta.url).href)};`);
+    const result = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'test:ci'], {
+      cwd: fixture, encoding: 'utf8', timeout: 30_000,
+      shell: process.platform === 'win32',
+      env: { ...process.env, ELECTRON_OVERRIDE_DIST_PATH: fixture, npm_config_ignore_scripts: 'false' },
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /ENOENT/);
+    assert.doesNotMatch(result.stdout, /TEST_RUNNER_STARTED/);
+  } finally { fs.rmSync(fixture, { recursive: true, force: true }); }
 });
 
 test('an unusable Electron distribution fails the prerequisite instead of starting tests', () => {

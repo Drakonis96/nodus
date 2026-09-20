@@ -49,6 +49,12 @@ The Manual Electron harness now follows main's non-blocking startup-update behav
 
 ## Reproduction
 
+### CI runtime preparation follow-up
+
+The first PR CI run completed 3,759 tests with 3,756 passes, one failure and two skips. The Manual integration test failed before executing its assertions: macOS rejected a partially extracted Electron framework while concurrent workers triggered Electron's lazy download. `npm test` already ran the runtime prerequisite, but `npm run test:ci` did not inherit that lifecycle hook.
+
+`pretest:ci` now runs the same preparation and version/startup verification before any parallel workers start. The lifecycle regression was confirmed to fail before the fix and pass afterward; it verifies that an unusable runtime stops npm before the test runner launches. The bootstrap and Manual integration tests then passed together (4/4).
+
 ```sh
 npm ci
 npx electron-builder install-app-deps
