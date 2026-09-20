@@ -14,6 +14,7 @@ try {
   for (const view of ['embedded', 'database', 'study', 'teaching', 'world']) {
     await page.goto(`${url}?view=${view}`);
     await page.evaluate(() => localStorage.clear());
+    if (view === 'embedded') await page.evaluate(() => localStorage.setItem('nodus.researchChatContextOpen', '1'));
     await page.reload();
     assert.equal(await page.getByRole('region', { name: 'Research chat' }).count(), 1);
     assert.equal(await page.getByRole('dialog').count(), 0);
@@ -21,8 +22,21 @@ try {
     assert.equal(await page.getByTestId('research-history-sidebar').isVisible(), false);
     await page.getByTestId('research-history-toggle').click();
     assert.equal(await page.getByTestId('research-history-sidebar').isVisible(), true);
-    await page.getByTestId('research-context-toggle').click();
-    assert.equal(await page.getByTestId('research-context-sidebar').isVisible(), true);
+    assert.equal(await page.locator('.research-assistant-header').getByRole('button', { name: 'Nueva conversación', exact: true }).count(), 0);
+    if (view === 'embedded') {
+      assert.equal(await page.getByTestId('research-context-toggle').count(), 0);
+      assert.equal(await page.getByTestId('research-context-sidebar').count(), 0, 'a saved sidebar preference cannot restore the redundant academic panel');
+      for (const mode of ['Documentos', 'Síntesis']) {
+        await page.getByTestId('research-context-trigger').click();
+        await page.locator('.research-context-panel').getByRole('button', { name: new RegExp(`^${mode} `) }).click();
+        await page.locator('.research-context-panel').getByRole('button', { name: 'Listo', exact: true }).click();
+        assert.match(await page.getByTestId('research-context-trigger').innerText(), new RegExp(mode));
+        assert.equal(await page.getByTestId('research-focus-trigger').count(), 0);
+      }
+    } else {
+      await page.getByTestId('research-context-toggle').click();
+      assert.equal(await page.getByTestId('research-context-sidebar').isVisible(), true);
+    }
     const input = page.locator('.research-composer-input');
     await input.fill(`Pregunta ${view}`);
     await page.getByRole('button', { name: /Esfuerzo de thinking:/ }).click();
@@ -73,13 +87,15 @@ try {
       assert.equal(prior[0].content, 'Consulta con fuentes limitadas');
     }
     await page.getByTestId('research-history-toggle').click();
-    await page.getByTestId('research-context-toggle').click();
+    if (view !== 'embedded') await page.getByTestId('research-context-toggle').click();
     assert.equal(await page.getByTestId('research-history-sidebar').isVisible(), false);
     assert.equal(await page.getByTestId('research-context-sidebar').count(), 0);
     await page.setViewportSize({ width: 650, height: 800 });
-    await page.getByTestId('research-context-toggle').click();
-    const bounds = await page.getByTestId('research-context-sidebar').boundingBox();
-    assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= 650);
+    if (view !== 'embedded') {
+      await page.getByTestId('research-context-toggle').click();
+      const bounds = await page.getByTestId('research-context-sidebar').boundingBox();
+      assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= 650);
+    }
     await page.screenshot({ path: `${output}/view-${view}-compact.png` });
     await page.setViewportSize({ width: 1440, height: 960 });
   }
