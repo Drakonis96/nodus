@@ -777,6 +777,13 @@ footer.site-foot {
 .dl-build { margin-left: 14px; }
 .dl-build-logo { display: flex; align-items: center; justify-content: center; min-width: 44px; flex: 0 0 auto; }
 .dl-build-logo svg { height: 20px; width: auto; fill: var(--ink-2); }
+.dl-build-logo img { height: 20px; width: auto; display: block; }
+.dl-builds-3 { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px 14px; }
+.dl-build-col {
+  flex: 1 1 104px; flex-direction: column; gap: 0; align-items: center;
+  padding: 4px 10px; margin: 0; text-align: center;
+}
+.dl-build-col .dl-build-logo { min-width: 0; }
 .dl-plat .arr { color: var(--ink-3); }
 .dl-all { display: block; margin: 16px 0 4px; text-align: center; font-size: 13.5px; }
 .dl-close {
