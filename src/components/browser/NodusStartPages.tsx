@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ConfirmModal } from '../ConfirmModal';
 import { Icon } from '../ui';
 import { t, tx } from '../../i18n';
@@ -64,7 +64,7 @@ function openSitePage(url: string) {
 }
 
 function SiteLink({ label, url, className = '', current = false, onOpen }: {
-  label: string; url: string; className?: string; current?: boolean; onOpen?: () => void;
+  label: ReactNode; url: string; className?: string; current?: boolean; onOpen?: () => void;
 }) {
   return <button type="button" className={className} aria-current={current ? 'page' : undefined} onClick={() => { onOpen?.(); openSitePage(url); }}>{label}</button>;
 }
@@ -143,20 +143,54 @@ function NodusSiteBackdrop() {
 function NodusSiteHeader({ page }: { page: 'atlas' | 'bookmarks' }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
-  return <header className="nodus-site-header" data-testid="nodus-site-header">
+  const headerRef = useRef<HTMLElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const [stars, setStars] = useState<string>('·');
+  const [downloads, setDownloads] = useState<string>('—');
+  useEffect(() => {
+    const controller = new AbortController();
+    const compact = (value: number) => new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+    void fetch('https://api.github.com/repos/Drakonis96/nodus', { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((result) => { if (typeof result?.stargazers_count === 'number') setStars(compact(result.stargazers_count)); })
+      .catch(() => {});
+    void fetch(`${NODUS_SITE}data/github-release-downloads.json`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((result) => { if (typeof result?.total === 'number') setDownloads(compact(result.total)); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setOpen(false); toggleRef.current?.focus(); }
+    };
+    const pointerdown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !headerRef.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener('keydown', keydown);
+    document.addEventListener('pointerdown', pointerdown);
+    return () => {
+      document.removeEventListener('keydown', keydown);
+      document.removeEventListener('pointerdown', pointerdown);
+    };
+  }, [open]);
+  return <header ref={headerRef} className="nodus-site-header" data-testid="nodus-site-header">
     <button type="button" className="nodus-site-logo" aria-label={t('Nodus Research, inicio')} onClick={() => openSitePage(NODUS_SITE)}><img src={NODUS_LOGO} alt="" /> Nodus Research</button>
-    <button type="button" className="nodus-site-nav-toggle" aria-label={open ? t('Cerrar menú') : t('Abrir menú')} aria-expanded={open} onClick={() => setOpen((value) => !value)}><span /><span /><span /></button>
-    <nav className={`nodus-site-links${open ? ' open' : ''}`} aria-label="Nodus Research">
-      <SiteLink className="nodus-site-link" label={t('Inicio')} url={NODUS_SITE} onOpen={close} />
-      <SiteLink className="nodus-site-link" label="Atlas" url={NODUS_RESEARCH_ATLAS_URL} current={page === 'atlas'} onOpen={close} />
-      <SiteLink className="nodus-site-link" label={t('Marcadores')} url={NODUS_BOOKMARKS_URL} current={page === 'bookmarks'} onOpen={close} />
+    <button ref={toggleRef} type="button" className="nodus-site-nav-toggle" aria-controls="nodus-start-site-links" aria-label={open ? t('Cerrar menú') : t('Abrir menú')} aria-expanded={open} onClick={() => setOpen((value) => !value)}><span /><span /><span /></button>
+    <nav id="nodus-start-site-links" className={`nodus-site-links${open ? ' open' : ''}`} aria-label="Nodus Research">
+      <SiteLink className="nodus-site-link" label="Home" url={NODUS_SITE} onOpen={close} />
+      <SiteLink className="nodus-site-link" label="Bookmarks" url={NODUS_BOOKMARKS_URL} current={page === 'bookmarks'} onOpen={close} />
       <SiteLink className="nodus-site-link" label="Wiki" url={`${NODUS_SITE}wiki/`} onOpen={close} />
       <SiteLink className="nodus-site-link" label="Blog" url={`${NODUS_SITE}blog/`} onOpen={close} />
-      <SiteLink className="nodus-site-link" label={t('Colaborar')} url={`${NODUS_SITE}contribute/`} onOpen={close} />
+      <SiteLink className="nodus-site-link" label="Atlas" url={NODUS_RESEARCH_ATLAS_URL} current={page === 'atlas'} onOpen={close} />
       <SiteLink className="nodus-site-link" label="FAQ" url={`${NODUS_SITE}faq/`} onOpen={close} />
+      <SiteLink className="nodus-site-link" label="About" url={`${NODUS_SITE}about/`} onOpen={close} />
+      <SiteLink className="nodus-site-link" label="Support Nodus" url={`${NODUS_SITE}contribute/`} onOpen={close} />
       <span className="nodus-site-nav-sep" aria-hidden="true" />
-      <SiteLink className="nodus-site-badge" label={t('Destacar en GitHub')} url={NODUS_REPOSITORY} onOpen={close} />
-      <SiteLink className="nodus-site-primary" label={t('Probar la demo')} url={`${NODUS_SITE}demo/`} onOpen={close} />
+      <SiteLink className="nodus-site-badge" label={<><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg><span>Star</span><span className="nodus-site-stars"><Icon name="star" size={12} />{stars}</span></>} url={NODUS_REPOSITORY} onOpen={close} />
+      <SiteLink className="nodus-site-badge nodus-site-downloads" label={<><Icon name="download" size={14} /><span>{downloads}</span><span>downloads</span></>} url={`${NODUS_REPOSITORY}/releases`} onOpen={close} />
+      <SiteLink className="nodus-site-primary" label="Try the live demo" url={`${NODUS_SITE}demo/`} onOpen={close} />
     </nav>
   </header>;
 }

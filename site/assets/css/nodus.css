@@ -735,6 +735,7 @@ footer.site-foot {
 .dl-overlay.open { display: grid; }
 .dl-modal {
   width: min(100%, 440px); padding: 30px;
+  max-height: calc(100dvh - 48px); overflow-y: auto;
   border: 1px solid var(--membrane); border-radius: var(--r-xl);
   background: linear-gradient(180deg, #141021, #0b0913);
   box-shadow: var(--shadow);
