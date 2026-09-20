@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { SHOT_HEIGHT, SHOT_WIDTH, SITE_SHOTS } from './build-site-screenshots.mjs';
 
@@ -174,17 +175,24 @@ test('the academic vault carries all five of its README views, and steps through
   );
 });
 
-test('every other main vault has the same five-view gallery as Academic', () => {
-  for (const window of windows.slice(1)) {
-    assert.equal(window.figures.length, 5, `${window.vault} has five useful views`);
+test('the other vaults include their expanded, distinct feature galleries', () => {
+  const counts = [7, 7, 6];
+  for (const [index, window] of windows.slice(1).entries()) {
+    const count = counts[index];
+    assert.equal(window.figures.length, count, `${window.vault} has ${count} useful views`);
     assert.equal(window.arrows.length, 2, `${window.vault} has previous and next controls`);
-    assert.deepEqual(window.figures.map((figure) => figure.step), ['01 / 05', '02 / 05', '03 / 05', '04 / 05', '05 / 05']);
+    assert.deepEqual(window.figures.map((figure) => figure.step), Array.from({ length: count }, (_, i) => `${String(i + 1).padStart(2, '0')} / ${String(count).padStart(2, '0')}`));
     assert.ok(window.figures[0].classes.includes('is-active'));
     for (const figure of window.figures.slice(1)) {
       assert.ok(figure.ariaHidden);
       assert.ok(figure.lazy);
     }
   }
+  for (const feature of ['teaching-exams', 'teaching-grades', 'study-questions', 'study-courses', 'study-calendar', 'databases-board']) {
+    assert.ok(home.includes(`assets/screenshots/${feature}.webp`), `${feature} is shown on the homepage`);
+  }
+  const hashes = SITE_SHOTS.map(({ target }) => createHash('sha256').update(fs.readFileSync(path.join(site, 'assets/screenshots', target))).digest('hex'));
+  assert.equal(new Set(hashes).size, hashes.length, 'each slide uses a distinct capture');
 });
 
 test('the drawn app views left with the graphics they belonged to', () => {

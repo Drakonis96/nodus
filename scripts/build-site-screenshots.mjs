@@ -2,14 +2,14 @@
 SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
 SPDX-License-Identifier: AGPL-3.0-only
 
-Mirrors the README and wiki screenshots the home page shows into the website's own asset
+Mirrors the README and dedicated desktop screenshots the home page shows into the website's own asset
 tree. The website is published from site/ alone (see build-pages-artifact.mjs),
 so it cannot reach docs/screenshots at runtime: the window shown on the home page
 has to be a copy that travels with the site.
 
 The copy is derived, never hand-made. Run `npm run site:screenshots` after the
 source images change and this script regenerates exactly the files the home page
-references, from the README and wiki captures listed below.
+references, from the original captures listed below.
 */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,20 +33,25 @@ export const SITE_SHOTS = [
   { source: 'docs/screenshots/readme-academic-deep-research.jpg', target: 'academic-deep-research.webp' },
   { source: 'docs/screenshots/readme-academic-immersion.jpg', target: 'academic-immersion.webp' },
   { source: 'docs/screenshots/readme-teaching-demo.jpg', target: 'teaching-demo.webp' },
-  { source: 'site/wiki/assets/teaching/questions.png', target: 'teaching-questions.webp' },
-  { source: 'site/wiki/assets/teaching/rubrics.png', target: 'teaching-rubrics.webp' },
-  { source: 'site/wiki/assets/teaching/timetable.png', target: 'teaching-timetable.webp' },
-  { source: 'site/wiki/assets/teaching/calendar.png', target: 'teaching-calendar.webp' },
+  { source: 'docs/screenshots/site/teaching-questions.png', target: 'teaching-questions.webp' },
+  { source: 'docs/screenshots/site/teaching-rubrics.png', target: 'teaching-rubrics.webp' },
+  { source: 'docs/screenshots/site/teaching-timetable.png', target: 'teaching-timetable.webp' },
+  { source: 'docs/screenshots/site/teaching-calendar.png', target: 'teaching-calendar.webp' },
+  { source: 'docs/screenshots/site/teaching-exams.png', target: 'teaching-exams.webp' },
+  { source: 'docs/screenshots/site/teaching-grades.png', target: 'teaching-grades.webp' },
   { source: 'docs/screenshots/readme-study-demo.jpg', target: 'study-demo.webp' },
-  { source: 'site/wiki/assets/study/questions.png', target: 'study-questions.webp' },
-  { source: 'site/wiki/assets/study/review.png', target: 'study-review.webp' },
-  { source: 'site/wiki/assets/study/graph.png', target: 'study-graph.webp' },
-  { source: 'site/wiki/assets/study/schedule.png', target: 'study-schedule.webp' },
+  { source: 'docs/screenshots/site/study-questions.png', target: 'study-questions.webp' },
+  { source: 'docs/screenshots/site/study-review.png', target: 'study-review.webp' },
+  { source: 'docs/screenshots/site/study-graph.png', target: 'study-graph.webp' },
+  { source: 'docs/screenshots/site/study-schedule.png', target: 'study-schedule.webp' },
+  { source: 'docs/screenshots/site/study-courses.png', target: 'study-courses.webp' },
+  { source: 'docs/screenshots/site/study-calendar.png', target: 'study-calendar.webp' },
   { source: 'docs/screenshots/readme-databases-demo.jpg', target: 'databases-demo.webp' },
-  { source: 'site/wiki/assets/databases/analysis.png', target: 'databases-analysis.webp' },
-  { source: 'site/wiki/assets/databases/relations.png', target: 'databases-relations.webp' },
-  { source: 'site/wiki/assets/databases/record.png', target: 'databases-record.webp' },
-  { source: 'site/wiki/assets/databases/gallery.png', target: 'databases-gallery.webp' },
+  { source: 'docs/screenshots/site/databases-analysis.png', target: 'databases-analysis.webp' },
+  { source: 'docs/screenshots/site/databases-relations.png', target: 'databases-relations.webp' },
+  { source: 'docs/screenshots/site/databases-record.png', target: 'databases-record.webp' },
+  { source: 'docs/screenshots/site/databases-gallery.png', target: 'databases-gallery.webp' },
+  { source: 'docs/screenshots/site/databases-board.png', target: 'databases-board.webp' },
 ];
 
 export async function buildSiteScreenshots({ root = repoRoot, quiet = false } = {}) {
@@ -88,6 +93,6 @@ export async function buildSiteScreenshots({ root = repoRoot, quiet = false } = 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const written = await buildSiteScreenshots({ root: repoRoot });
   const total = written.reduce((sum, shot) => sum + shot.bytes, 0);
-  console.log(`\n${written.length} screenshots mirrored from the README and wiki (${(total / 1024).toFixed(0)} KB total).`);
-  console.log(`The frames live in site/index.html; the sources are the README and wiki captures listed above.`);
+  console.log(`\n${written.length} screenshots mirrored from the original desktop captures (${(total / 1024).toFixed(0)} KB total).`);
+  console.log(`The frames live in site/index.html; the sources are the captures listed above.`);
 }
