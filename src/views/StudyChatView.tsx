@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { AppSettings, StudyAssistantCitation, StudyAssistantSelection, StudyAssistantSourceOption } from '@shared/types';
+import { useMemo, useState } from 'react';
+import type { AppSettings, StudyAssistantCitation, StudyAssistantSelection } from '@shared/types';
 import { DEFAULT_STUDY_ASSISTANT_SELECTION } from '@shared/studyAssistant';
 import type { StudySearchLocation } from '@shared/studySearch';
 import { ChatMarkdown } from '../components/ChatMarkdown';
 import { t } from '../i18n';
 import { ResearchAssistantModal } from './ResearchAssistantModal';
+import { StudySourcePicker } from '../components/StudySourcePicker';
 import { nativeSummary, type ResearchChatAdapter, type ResearchUiMessage } from './researchChatAdapter';
 import type { ResearchConversationNavigationTarget } from '../researchNoteProvenance';
 
@@ -48,9 +49,7 @@ export function StudyChatView({ settings, onOpenDocument, onOpenMaterial, onOpen
   onOpenRecording: (id: string, timestamp?: number | null) => void; initialPrompt?: string | null; conversationTarget?: ResearchConversationNavigationTarget | null; onOpenSavedNote?: (id: string) => void; variant?: StudyChatVariant;
 }) {
   const copy = COPY[variant];
-  const [sources, setSources] = useState<StudyAssistantSourceOption[]>([]);
   const [selection, setSelection] = useState<StudyAssistantSelection>(() => ({ ...DEFAULT_STUDY_ASSISTANT_SELECTION, sourceKeys: [] }));
-  useEffect(() => { void window.nodus.listStudyAssistantSources().then(setSources); }, []);
   const initialTarget = useMemo(() => initialPrompt ? { prompt: initialPrompt, nonce: Date.now() } : null, [initialPrompt]);
   // The citation knows the page or slide it came from; passing it along is what
   // makes the click land on the quoted passage instead of the first page of the
@@ -64,7 +63,7 @@ export function StudyChatView({ settings, onOpenDocument, onOpenMaterial, onOpen
   const adapter: ResearchChatAdapter = {
     id: 'study', modelFeature: 'studyModel', contextKey: JSON.stringify(selection), subtitle: copy.subtitle, suggestions: copy.starters,
     canSend: selection.scope !== 'manual' || selection.sourceKeys.length > 0,
-    contextPanel: <><label className="mt-3 block text-[10px] text-neutral-500">{t('Ámbito')}<select data-testid="study-chat-scope" className="input mt-1 w-full" value={selection.scope} onChange={(event) => setSelection((current) => ({ ...current, scope: event.target.value as StudyAssistantSelection['scope'], sourceKeys: [] }))}><option value="library">{t('Toda la biblioteca')}</option><option value="manual">{t('Selección manual')}</option></select></label>{selection.scope === 'manual' && <div className="mt-3 max-h-[calc(100vh-220px)] space-y-1 overflow-y-auto">{sources.map((source) => <label key={source.sourceKey} className="flex cursor-pointer gap-2 rounded-lg border border-neutral-200 p-2 text-xs research-source-option dark:border-neutral-800"><input type="checkbox" checked={selection.sourceKeys.includes(source.sourceKey)} onChange={(event) => setSelection((current) => ({ ...current, sourceKeys: event.target.checked ? [...current.sourceKeys, source.sourceKey] : current.sourceKeys.filter((key) => key !== source.sourceKey) }))} /><span className="min-w-0"><span className="block truncate font-medium">{source.title}</span><span className="block truncate text-[9px] text-neutral-500">{source.subtitle}</span></span></label>)}</div>}<p className="mt-4 rounded-lg bg-neutral-100 p-3 text-[10px] leading-5 text-neutral-500 dark:bg-neutral-900/60">{t(copy.scopeNote)}</p></>,
+    contextPanel: <><StudySourcePicker selection={selection} onChange={setSelection} /><p className="mt-4 rounded-lg bg-neutral-100 p-3 text-[10px] leading-5 text-neutral-500 dark:bg-neutral-900/60">{t(copy.scopeNote)}</p></>,
     listConversations: async includeArchived => (await window.nodus.listStudyAssistantConversations(includeArchived)).map(nativeSummary),
     getConversation: async id => { const chat = await window.nodus.getStudyAssistantConversation(id); if (!chat) return null; setSelection(chat.selection); return { ...nativeSummary(chat), selection: null, messages: chat.messages.map(message => ({ id: message.id, role: message.role, content: message.content, error: message.error, interrupted: message.interrupted, study: message, attachments: message.attachments, selectionKey: message.selectionKey ?? JSON.stringify(chat.selection) })) }; },
     createConversation: input => window.nodus.createStudyAssistantConversation({ title: input.title, model: input.model, selection }),

@@ -1176,7 +1176,7 @@ export function ResearchAssistantModal({
               </div>
             </footer>
           </section>
-          {embedded && contextOpen && <aside className="research-chat-context w-72 shrink-0 overflow-y-auto border-l border-neutral-800 p-4" data-testid="research-context-sidebar">
+          {embedded && contextOpen && <aside className={`research-chat-context ${adapter?.id === 'study' ? 'w-96 min-w-[280px] max-w-[45vw]' : 'w-72'} shrink-0 overflow-y-auto border-l border-neutral-800 p-4`} data-testid="research-context-sidebar">
             <div className="mb-4 flex items-center gap-2"><h2 className="text-xs font-semibold">{t('Ámbito y fuentes')}</h2><button className="btn btn-ghost ml-auto" title={t('Ocultar ámbito y fuentes')} onClick={toggleContext}><Icon name="x" size={14} /></button></div>
             <fieldset disabled={sending} className="min-w-0 space-y-3">{adapter ? adapter.contextPanel : <>
               <p className="text-xs text-neutral-400">{isGenealogy ? t('El asistente usa el contexto familiar: personas, parentescos, eventos, documentos y evidencia.') : t('Elegir qué partes del corpus ve el asistente')}</p>

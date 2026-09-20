@@ -317,6 +317,7 @@ export const academicApi: AcademicApi = {
   restoreStudyMaterialVersion: (id, versionId) => ipcRenderer.invoke('study:materials:version:restore', id, versionId),
   addStudyMaterialPlacement: (id, input) => ipcRenderer.invoke('study:materials:placement:add', id, input),
   setPrimaryStudyMaterialPlacement: (id, input) => ipcRenderer.invoke('study:materials:placement:setPrimary', id, input),
+  moveStudyMaterialPlacement: (id, placementId, destination) => ipcRenderer.invoke('study:materials:placement:move', id, placementId, destination),
   removeStudyMaterialPlacement: (id, placementId) => ipcRenderer.invoke('study:materials:placement:remove', id, placementId).then(() => undefined),
   createStudyMaterialAnnotation: (materialId, input) => ipcRenderer.invoke('study:materials:annotation:create', materialId, input),
   updateStudyMaterialAnnotation: (id, patch) => ipcRenderer.invoke('study:materials:annotation:update', id, patch),

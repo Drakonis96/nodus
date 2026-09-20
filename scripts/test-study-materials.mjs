@@ -145,6 +145,41 @@ try {
   assert.match(noteDoc.contentMarkdown, /concepto de prueba/);
   assert.equal(materials.getStudyMaterial(first.material.id).fragmentLinks[0].documentId, note.documentId, 'fragment-to-note provenance is durable');
 
+  // #779: moving changes only one placement; all durable material data survives.
+  materials.setStudyMaterialEmbedding(first.material.id, [0.1, 0.2, 0.3], { provider: 'test', model: 'stable', textHash: 'stable' });
+  const beforeMove = materials.getStudyMaterial(first.material.id);
+  const beforeRow = getDb().prepare('SELECT * FROM study_materials WHERE id = ?').get(first.material.id);
+  const movingPlacement = beforeMove.placements.find((p) => p.folderId === folder.id);
+  const untouched = beforeMove.placements.filter((p) => p.id !== movingPlacement.id);
+  const targetFolder = org.createStudyFolder({ subjectId: destinationSubject.id, name: 'Destino anidado' });
+  const nestedFolder = org.createStudyFolder({ parentId: targetFolder.id, name: 'Lecturas' });
+  const moved = materials.moveStudyMaterialPlacement(first.material.id, movingPlacement.id, { folderId: nestedFolder.id });
+  assert.equal(moved.id, movingPlacement.id, 'move preserves the placement identity');
+  assert.equal(moved.courseId, destinationCourse.id, 'folder destination resolves its course');
+  assert.equal(moved.subjectId, destinationSubject.id, 'folder destination resolves its subject');
+  const afterMove = materials.getStudyMaterial(first.material.id);
+  assert.deepEqual(afterMove.placements.filter((p) => p.id !== moved.id), untouched);
+  for (const field of ['annotations', 'fragmentLinks', 'versions', 'bibliography', 'metadata', 'extractedText', 'contentHash', 'indexStatus']) assert.deepEqual(afterMove[field], beforeMove[field], field);
+  assert.deepEqual(getDb().prepare('SELECT * FROM study_materials WHERE id = ?').get(first.material.id), beforeRow, 'file, embeddings and every material column are unchanged');
+  assert.equal(afterMove.annotations.find((a) => a.id === annotation.id).pageNumber, 1, 'old citation/annotation still targets the same material and page');
+  assert.equal(org.getStudyWorkspace().documents.find((d) => d.id === note.documentId).contentMarkdown, noteDoc.contentMarkdown, 'the linked note remains unchanged');
+  for (const invalid of [{ folderId: 'missing' }, { subjectId: subject.id, folderId: nestedFolder.id }, { courseId: course.id, subjectId: destinationSubject.id }, { folderId: nestedFolder.id, topicId: topic.id }]) {
+    assert.throws(() => materials.moveStudyMaterialPlacement(first.material.id, moved.id, invalid));
+    assert.deepEqual(materials.getStudyMaterial(first.material.id), afterMove, 'invalid destination rolls back fully');
+  }
+  assert.throws(() => materials.moveStudyMaterialPlacement(first.material.id, null, {}), /origen/);
+  assert.throws(() => materials.moveStudyMaterialPlacement(first.material.id, 'missing-placement', {}), /origen/);
+  const existingDestination = materials.addStudyMaterialPlacement(first.material.id, { courseId: destinationCourse.id, subjectId: destinationSubject.id });
+  assert.equal(materials.moveStudyMaterialPlacement(first.material.id, moved.id, { subjectId: destinationSubject.id }).id, existingDestination.id, 'an existing destination is reused');
+  assert.equal(materials.getStudyMaterial(first.material.id).placements.length, 2, 'collision removes only the moved duplicate');
+  const generalFolder = org.createStudyFolder({ name: 'Fuentes generales' });
+  materials.moveStudyMaterialPlacement(first.material.id, existingDestination.id, { folderId: generalFolder.id });
+  const general = materials.getStudyMaterial(first.material.id).placements.find((p) => p.folderId === generalFolder.id);
+  assert.equal(general.subjectId, null, 'general folders are valid destinations');
+  const attachment = materials.addStudyMaterialPlacement(first.material.id, { subjectId: subject.id, documentId: note.documentId });
+  const attachedMove = materials.moveStudyMaterialPlacement(first.material.id, attachment.id, { subjectId: destinationSubject.id });
+  assert.equal(attachedMove.documentId, note.documentId, 'document provenance survives movement');
+
   const { PDFDocument } = require('pdf-lib');
   const sourcePdf = await PDFDocument.create(); sourcePdf.addPage([400, 500]);
   const sourcePdfBytes = await sourcePdf.save();
@@ -173,6 +208,16 @@ try {
   assert.equal(audio.material.previewKind, 'audio');
   assert.equal(audio.material.extractionStatus, 'unsupported');
 
+  const unplacedMove = materials.moveStudyMaterialPlacement(html.material.id, null, { subjectId: subject.id });
+  assert.equal(unplacedMove.subjectId, subject.id);
+  materials.moveStudyMaterialPlacement(html.material.id, unplacedMove.id, {});
+  assert.equal(materials.getStudyMaterial(html.material.id).placements.length, 0, 'returning to unfiled keeps the material');
+  const archivedPlacement = materials.addStudyMaterialPlacement(html.material.id, { courseId: course.id, subjectId: subject.id });
+  getDb().prepare('UPDATE study_material_placements SET archived_at = ? WHERE id = ?').run('2026-09-01', archivedPlacement.id);
+  const fromArchived = materials.moveStudyMaterialPlacement(html.material.id, null, { subjectId: subject.id });
+  assert.notEqual(fromArchived.id, archivedPlacement.id, 'moving an unfiled material creates an active link instead of reusing an archived one');
+  assert.equal(fromArchived.archivedAt, null);
+  assert.equal(getDb().prepare('SELECT archived_at FROM study_material_placements WHERE id = ?').get(archivedPlacement.id).archived_at, '2026-09-01');
   materials.setStudyMaterialLifecycle(html.material.id, 'archive');
   assert.equal(materials.listStudyMaterials().some((item) => item.id === html.material.id), false);
   materials.setStudyMaterialLifecycle(html.material.id, 'restore');

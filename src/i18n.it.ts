@@ -1,3 +1,4 @@
+import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
@@ -129,6 +130,7 @@ export const IT: Record<string, string> = {
   ...WORLD_CHAT_TRANSLATIONS.it,
   ...STUDY_SYNONYM_TRANSLATIONS.it,
   ...STUDY_BANK_TRANSLATIONS.it,
+  ...STUDY_SOURCE_TRANSLATIONS["it"],
   ...STUDY_IMPROVE_TRANSLATIONS.it,
   ...WORKSPACE_TRANSLATIONS.it,
   "Lo que cuenta el mapa": "Cosa racconta la mappa",

@@ -1,3 +1,4 @@
+import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
@@ -131,6 +132,7 @@ export const PT_BR: Record<string, string> = {
   ...WORLD_CHAT_TRANSLATIONS.ptBR,
   ...STUDY_SYNONYM_TRANSLATIONS.ptBR,
   ...STUDY_BANK_TRANSLATIONS.ptBR,
+  ...STUDY_SOURCE_TRANSLATIONS["pt-BR"],
   ...STUDY_IMPROVE_TRANSLATIONS.ptBR,
   ...WORKSPACE_TRANSLATIONS.ptBR,
   "Lo que cuenta el mapa": "O que o mapa conta",

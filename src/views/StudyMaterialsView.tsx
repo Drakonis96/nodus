@@ -17,6 +17,7 @@ import type { StudyMaterialNavigationTarget } from '../navigation';
 import { Icon, Spinner } from '../components/ui';
 import { LinkedKnowledgeDeleteFlow, type LinkedKnowledgeDeleteStep } from '../components/LinkedKnowledgeDeleteFlow';
 import { TextInputModal } from '../components/TextInputModal';
+import { StudyMaterialMoveDialog } from '../components/StudyMaterialMoveDialog';
 import { ChipSelectCell } from '../components/dbGrid';
 import { announceStudyWorkspaceChanged, STUDY_WORKSPACE_CHANGED } from '../components/StudySidebar';
 import { Markdown } from '../components/Markdown';
@@ -320,7 +321,9 @@ export function StudyMaterialsView({ onOpenDocument, target }: { onOpenDocument:
     </main>
     {selected && <MaterialViewer materialId={selected} locator={materialLocator?.id === selected ? materialLocator : null} workspace={workspace} onClose={() => { setSelected(null); setMaterialLocator(null); }} onChanged={load} onOpenDocument={onOpenDocument} onRequestDelete={(material) => requestDelete([{ kind: 'material', id: material.id, title: material.title }])} />}
     {editing && <MaterialMetadataDialog material={editing} onCancel={() => setEditing(null)} onSave={async (patch) => { await window.nodus.updateStudyMaterial(editing.id, patch); setEditing(null); await load(); }} />}
-    {locating && workspace && <MaterialLocationDialog material={locating.material} mode={locating.mode} workspace={workspace} onCancel={() => setLocating(null)} onSave={async (input) => { if (locating.mode === 'move') await window.nodus.setPrimaryStudyMaterialPlacement(locating.material.id, input); else await window.nodus.addStudyMaterialPlacement(locating.material.id, input); setLocating(null); await load(); }} />}
+    {locating && workspace && (locating.mode === 'move'
+      ? <StudyMaterialMoveDialog material={locating.material} workspace={workspace} onCancel={() => setLocating(null)} onMoved={() => { setLocating(null); void load(); }} />
+      : <MaterialLocationDialog material={locating.material} mode="duplicate" workspace={workspace} onCancel={() => setLocating(null)} onSave={async (input) => { await window.nodus.addStudyMaterialPlacement(locating.material.id, input); announceStudyWorkspaceChanged(); setLocating(null); await load(); }} />)}
     {pendingDelete && <LinkedKnowledgeDeleteFlow items={pendingDelete.sources} step={pendingDelete.step} onContinue={() => setPendingDelete((current) => current ? { ...current, step: 'knowledge' } : current)} onChoose={(purge) => void deletePendingSources(purge)} onCancel={() => setPendingDelete(null)} />}
     {importDialogPaths && workspace && <MaterialImportDialog initialPaths={importDialogPaths} initialPlacement={{ courseId: courseId || null, subjectId: subjectId || null, topicId: topicId || null }} workspace={workspace} onCancel={() => setImportDialogPaths(null)} onSave={async (draft) => { await commitMaterialImport(draft); setImportDialogPaths(null); }} />}
     {zoteroImportOpen && <ZoteroMaterialImportModal placement={{ courseId: courseId || null, subjectId: subjectId || null, topicId: topicId || null }} onClose={() => setZoteroImportOpen(false)} onImported={async (result) => finishImport([result])} />}

@@ -1,3 +1,4 @@
+import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
@@ -92,6 +93,7 @@ export const KO: Record<string, string> = {
   ...WORLD_CHAT_TRANSLATIONS.ko,
   ...STUDY_SYNONYM_TRANSLATIONS.ko,
   ...STUDY_BANK_TRANSLATIONS.ko,
+  ...STUDY_SOURCE_TRANSLATIONS["ko"],
   ...STUDY_IMPROVE_TRANSLATIONS.ko,
   ...WORKSPACE_TRANSLATIONS.ko,
   ...WORLDBUILDING_TRANSLATIONS.ko,
