@@ -35,6 +35,18 @@ The full suite was not rerun after each presentation-only refinement; the focuse
 
 Zotero E2E uses a local API fixture, including a recoverable HTTP 403. Failure/retry and alternate embedding-model scenarios use a controlled client; default E5 inference and search are also exercised for real. Research-context tests verify the data delivered to Chat/Deep Research without paid external generation calls. All screenshot materials and quotations are explicitly fictitious examples.
 
+## Validation after integrating main
+
+Verified on 2026-09-20 after merging `main` at `998cf264` into implementation commit `ba1176fe`:
+
+- `npm run lint`: passed.
+- `npm run build`, including renderer/main type checks: passed.
+- Focused integration run: **78/78 passed**, no failures, cancellations or skips. Files: `test-academic-manual`, `test-i18n-coverage`, `test-i18n-no-duplicate-keys`, `test-vault-onboarding-ui`, `test-onboarding-models`, `test-backup-vaults`, `test-vaults`, `test-research-concilium`, and `test-research-source-filters` (all under `scripts/`, with `.mjs` extension; concurrency 2).
+- `node scripts/e2e-academic-manual.mjs`: passed with no renderer errors, including real E5 inference, standalone semantic search after editing, embeddings-only request instrumentation, first/additional Auto/Manual onboarding, recoverable Zotero failure, duplication, directed-edge preservation, form layout/theme interactions and full application restart.
+- `git diff --check origin/main...HEAD`: passed.
+
+The Manual Electron harness now follows main's non-blocking startup-update behavior. The complete suite and general smoke results above predate this merge; only the focused integration and Manual Electron flows were repeated on the integrated revision.
+
 ## Reproduction
 
 ```sh
