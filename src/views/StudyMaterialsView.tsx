@@ -17,7 +17,7 @@ import type { StudyMaterialNavigationTarget } from '../navigation';
 import { Icon, Spinner } from '../components/ui';
 import { LinkedKnowledgeDeleteFlow, type LinkedKnowledgeDeleteStep } from '../components/LinkedKnowledgeDeleteFlow';
 import { TextInputModal } from '../components/TextInputModal';
-import { StudyMaterialMoveDialog } from '../components/StudyMaterialMoveDialog';
+import { StudyDocumentMoveDialog, StudyMaterialMoveDialog } from '../components/StudyMaterialMoveDialog';
 import { ChipSelectCell } from '../components/dbGrid';
 import { announceStudyWorkspaceChanged, STUDY_WORKSPACE_CHANGED } from '../components/StudySidebar';
 import { Markdown } from '../components/Markdown';
@@ -98,6 +98,7 @@ export function StudyMaterialsView({ onOpenDocument, target }: { onOpenDocument:
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedSources, setSelectedSources] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<StudyMaterialSummary | null>(null);
+  const [movingDocument, setMovingDocument] = useState<StudyDocument | null>(null);
   const [locating, setLocating] = useState<{ material: StudyMaterialSummary; mode: 'move' | 'duplicate' } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ sources: StudyLibraryDeleteSource[]; step: LinkedKnowledgeDeleteStep } | null>(null);
   const [message, setMessage] = useState('');
@@ -302,7 +303,7 @@ export function StudyMaterialsView({ onOpenDocument, target }: { onOpenDocument:
     <main className="relative min-h-0 flex-1 overflow-auto">
       {dragActive && <div className="pointer-events-none absolute inset-3 z-[60] grid place-items-center rounded-2xl border-2 border-dashed border-teal-500 bg-teal-50/95 text-center shadow-2xl dark:bg-teal-950/90" data-testid="study-material-dropzone"><div><Icon name="upload" size={32} className="mx-auto mb-3 text-teal-600 dark:text-teal-300" /><p className="font-semibold text-teal-900 dark:text-teal-100">{t('Suelta los materiales para prepararlos')}</p><p className="mt-1 text-xs text-teal-700 dark:text-teal-300">{t('Se abrirá el formulario para completar sus metadatos y ubicaciones.')}</p></div></div>}
       {materials.length === 0 && notes.length === 0 && <div className="grid h-full place-items-center text-center"><div><span className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-teal-950 text-teal-400"><Icon name="book" size={28} /></span><h2 className="text-base font-semibold text-neutral-300">{t('Tu biblioteca de materiales está vacía')}</h2><p className="mt-1 max-w-md text-sm text-neutral-600">{t('Añade PDF, Word, Markdown, presentaciones, EPUB, imágenes o audio. Los archivos se guardan dentro del vault.')}</p><button className="btn btn-primary mt-4" onClick={() => setImportDialogPaths([])}><Icon name="upload" size={13} /> {t('Añadir primer material')}</button></div></div>}
-      {notes.length > 0 && <section className="border-b border-neutral-800" data-testid="study-material-notes-section"><div className="sticky left-0 flex items-center gap-2 border-b border-neutral-800 bg-neutral-900/40 px-4 py-2"><Icon name="notebook" size={13} className="text-indigo-300" /><h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{t('Apuntes')}</h2><span className="text-[10px] text-neutral-600">{notes.length}</span></div><StudyNotesTable notes={notes} placements={workspace?.placements ?? []} workspace={workspace} selected={selectedSources} onToggle={toggleSource} onOpen={onOpenDocument} onDelete={(document) => requestDelete([{ kind: 'document', id: document.id, title: document.title }])} /></section>}
+      {notes.length > 0 && <section className="border-b border-neutral-800" data-testid="study-material-notes-section"><div className="sticky left-0 flex items-center gap-2 border-b border-neutral-800 bg-neutral-900/40 px-4 py-2"><Icon name="notebook" size={13} className="text-indigo-300" /><h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{t('Apuntes')}</h2><span className="text-[10px] text-neutral-600">{notes.length}</span></div><StudyNotesTable notes={notes} placements={workspace?.placements ?? []} workspace={workspace} selected={selectedSources} onToggle={toggleSource} onOpen={onOpenDocument} onMove={setMovingDocument} onDelete={(document) => requestDelete([{ kind: 'document', id: document.id, title: document.title }])} /></section>}
       {materials.length === 0 ? null : <MaterialTable
         materials={materials}
         workspace={workspace}
@@ -321,6 +322,7 @@ export function StudyMaterialsView({ onOpenDocument, target }: { onOpenDocument:
     </main>
     {selected && <MaterialViewer materialId={selected} locator={materialLocator?.id === selected ? materialLocator : null} workspace={workspace} onClose={() => { setSelected(null); setMaterialLocator(null); }} onChanged={load} onOpenDocument={onOpenDocument} onRequestDelete={(material) => requestDelete([{ kind: 'material', id: material.id, title: material.title }])} />}
     {editing && <MaterialMetadataDialog material={editing} onCancel={() => setEditing(null)} onSave={async (patch) => { await window.nodus.updateStudyMaterial(editing.id, patch); setEditing(null); await load(); }} />}
+    {movingDocument && workspace && <StudyDocumentMoveDialog document={movingDocument} workspace={workspace} onCancel={() => setMovingDocument(null)} onMoved={() => { setMovingDocument(null); void load(); }} />}
     {locating && workspace && (locating.mode === 'move'
       ? <StudyMaterialMoveDialog material={locating.material} workspace={workspace} onCancel={() => setLocating(null)} onMoved={() => { setLocating(null); void load(); }} />
       : <MaterialLocationDialog material={locating.material} mode="duplicate" workspace={workspace} onCancel={() => setLocating(null)} onSave={async (input) => { await window.nodus.addStudyMaterialPlacement(locating.material.id, input); announceStudyWorkspaceChanged(); setLocating(null); await load(); }} />)}
@@ -330,13 +332,14 @@ export function StudyMaterialsView({ onOpenDocument, target }: { onOpenDocument:
   </div>;
 }
 
-function StudyNotesTable({ notes, placements, workspace, selected, onToggle, onOpen, onDelete }: {
+function StudyNotesTable({ notes, placements, workspace, selected, onToggle, onOpen, onMove, onDelete }: {
   notes: StudyDocument[];
   placements: StudyPlacement[];
   workspace: StudyWorkspace | null;
   selected: Set<string>;
   onToggle: (source: Pick<StudyLibraryDeleteSource, 'kind' | 'id'>) => void;
   onOpen: (id: string) => void;
+  onMove: (document: StudyDocument) => void;
   onDelete: (document: StudyDocument) => void;
 }) {
   const locationNames = (documentId: string, dimension: 'course' | 'subject' | 'folder' | 'topic') => {
@@ -350,7 +353,7 @@ function StudyNotesTable({ notes, placements, workspace, selected, onToggle, onO
   const allSelected = notes.every((document) => selected.has(studyLibrarySourceKey({ kind: 'document', id: document.id })));
   return <table className="w-full min-w-[980px] border-collapse text-xs" data-testid="study-material-notes-table">
     <thead className="bg-neutral-950/95"><tr className="border-b border-neutral-800 text-neutral-500"><th className="w-10 px-3 py-2 text-center"><input type="checkbox" aria-label={t('Seleccionar todos')} checked={allSelected} onChange={() => notes.forEach((document) => { const isSelected = selected.has(studyLibrarySourceKey({ kind: 'document', id: document.id })); if (isSelected === allSelected) onToggle({ kind: 'document', id: document.id }); })} /></th><th className="w-[320px] px-4 py-2 text-center font-medium">{t('Apunte')}</th><th className="px-3 py-2 text-center font-medium">{t('Curso')}</th><th className="px-3 py-2 text-center font-medium">{t('Asignatura')}</th><th className="px-3 py-2 text-center font-medium">{t('Carpeta')}</th><th className="px-3 py-2 text-center font-medium">{t('Tema')}</th><th className="w-[110px] px-3 py-2 text-center font-medium">{t('Formato')}</th><th className="w-[90px] px-3 py-2 text-center font-medium">{t('Acciones')}</th></tr></thead>
-    <tbody>{notes.map((document) => <tr key={document.id} data-testid={`study-material-note-${document.id}`} className="cursor-pointer border-b border-neutral-800/60 hover:bg-neutral-900/40" onClick={() => onOpen(document.id)}><td className="px-3 py-2.5"><input type="checkbox" aria-label={document.title} checked={selected.has(studyLibrarySourceKey({ kind: 'document', id: document.id }))} onClick={(event) => event.stopPropagation()} onChange={() => onToggle({ kind: 'document', id: document.id })} /></td><td className="px-4 py-2.5"><div className="flex max-w-[310px] items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-indigo-600/15 text-indigo-300">{document.emoji ? <span>{document.emoji}</span> : <Icon name={document.icon || 'notebook'} size={15} />}</span><span className="min-w-0"><span className="block truncate font-medium text-neutral-200">{document.title}</span><span className="block truncate text-[10px] text-neutral-600">{document.description || t('Apunte creado en Nodus')}</span></span></div></td>{(['course', 'subject', 'folder', 'topic'] as const).map((dimension) => <td key={dimension} className="max-w-[180px] truncate px-3 py-2.5 text-neutral-500">{locationNames(document.id, dimension)}</td>)}<td className="px-3 py-2.5 text-neutral-500">{t('Apunte')}</td><td className="px-3 py-2.5 text-right"><div className="flex justify-end"><button className="btn btn-ghost h-7 px-2" title={t('Abrir apunte')} onClick={(event) => { event.stopPropagation(); onOpen(document.id); }}><Icon name="external" size={12} /></button><button className="btn btn-ghost h-7 px-2 text-red-400" title={t('Mover a la papelera')} onClick={(event) => { event.stopPropagation(); onDelete(document); }}><Icon name="trash" size={12} /></button></div></td></tr>)}</tbody>
+    <tbody>{notes.map((document) => <tr key={document.id} data-testid={`study-material-note-${document.id}`} className="cursor-pointer border-b border-neutral-800/60 hover:bg-neutral-900/40" onClick={() => onOpen(document.id)}><td className="px-3 py-2.5"><input type="checkbox" aria-label={document.title} checked={selected.has(studyLibrarySourceKey({ kind: 'document', id: document.id }))} onClick={(event) => event.stopPropagation()} onChange={() => onToggle({ kind: 'document', id: document.id })} /></td><td className="px-4 py-2.5"><div className="flex max-w-[310px] items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-indigo-600/15 text-indigo-300">{document.emoji ? <span>{document.emoji}</span> : <Icon name={document.icon || 'notebook'} size={15} />}</span><span className="min-w-0"><span className="block truncate font-medium text-neutral-200">{document.title}</span><span className="block truncate text-[10px] text-neutral-600">{document.description || t('Apunte creado en Nodus')}</span></span></div></td>{(['course', 'subject', 'folder', 'topic'] as const).map((dimension) => <td key={dimension} className="max-w-[180px] truncate px-3 py-2.5 text-neutral-500">{locationNames(document.id, dimension)}</td>)}<td className="px-3 py-2.5 text-neutral-500">{t('Apunte')}</td><td className="px-3 py-2.5 text-right"><div className="flex justify-end"><button className="btn btn-ghost h-7 px-2" title={t('Abrir apunte')} onClick={(event) => { event.stopPropagation(); onOpen(document.id); }}><Icon name="external" size={12} /></button><button className="btn btn-ghost h-7 px-2" title={t('Mover a otra ubicación')} aria-label={t('Mover a otra ubicación')} onClick={(event) => { event.stopPropagation(); onMove(document); }}><Icon name="folderMove" size={12} /></button><button className="btn btn-ghost h-7 px-2 text-red-400" title={t('Mover a la papelera')} onClick={(event) => { event.stopPropagation(); onDelete(document); }}><Icon name="trash" size={12} /></button></div></td></tr>)}</tbody>
   </table>;
 }
 
@@ -492,7 +495,7 @@ function MaterialTable({
           {material.origin === 'zotero_import' && <MaterialAction icon="external" label={t('Abrir origen en Zotero')} onClick={() => void window.nodus.openStudyMaterialInZotero(material.id)} />}
           <MaterialAction label={t(material.favorite ? 'Quitar de favoritos' : 'Marcar como favorito')} onClick={() => void onFavorite(material)}><Icon name="star" size={12} className={material.favorite ? 'text-amber-400' : 'text-neutral-600'} /></MaterialAction>
           <MaterialAction icon="edit" label={t('Editar nombre y metadatos')} onClick={() => onEdit(material)} />
-          <MaterialAction icon="folder" label={t('Cambiar ubicación')} onClick={() => onLocate(material, 'move')} />
+          <MaterialAction icon="folderMove" label={t('Cambiar ubicación')} onClick={() => onLocate(material, 'move')} />
           <MaterialAction icon="copy" label={t('Duplicar en otra ubicación')} onClick={() => onLocate(material, 'duplicate')} />
           <MaterialAction icon="trash" label={t('Mover a la papelera')} tone="text-red-400" onClick={() => onDelete(material)} />
         </div></td>

@@ -1,17 +1,32 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { StudyMaterialSummary, StudyPlacementInput, StudyWorkspace } from '@shared/types';
+import type { StudyDocument, StudyMaterialSummary, StudyPlacement, StudyPlacementInput, StudyWorkspace } from '@shared/types';
 import { studyOrganizationPaths } from '@shared/studySourceTree';
 import { announceStudyWorkspaceChanged } from './StudySidebar';
 import { t } from '../i18n';
 
-export function StudyMaterialMoveDialog({ material, workspace, onMoved, onCancel }: {
-  material: StudyMaterialSummary; workspace: StudyWorkspace; onMoved: () => void; onCancel: () => void;
+type MoveDialogProps = {
+  workspace: StudyWorkspace; onMoved: () => void; onCancel: () => void; initialPlacementId?: string;
+};
+
+export function StudyMaterialMoveDialog({ material, ...props }: MoveDialogProps & { material: StudyMaterialSummary }) {
+  return <StudyPlacementMoveDialog {...props} source={material} onSave={(originId, destination) => window.nodus.moveStudyMaterialPlacement(material.id, originId, destination)} />;
+}
+
+export function StudyDocumentMoveDialog({ document, ...props }: MoveDialogProps & { document: StudyDocument }) {
+  return <StudyPlacementMoveDialog {...props} source={{ title: document.title, placements: props.workspace.placements.filter((p) => p.documentId === document.id) }}
+    onSave={(originId, destination) => window.nodus.moveStudyPlacement(document.id, originId, destination)} />;
+}
+
+function StudyPlacementMoveDialog({ source: material, workspace, onMoved, onCancel, initialPlacementId, onSave }: MoveDialogProps & {
+  source: { title: string; placements: Array<Pick<StudyPlacement, 'id' | 'courseId' | 'subjectId' | 'folderId' | 'topicId' | 'archivedAt' | 'deletedAt'>> };
+  onSave: (originId: string | null, destination: StudyPlacementInput) => Promise<unknown>;
 }) {
   const paths = studyOrganizationPaths(workspace);
   const placements = material.placements.filter((p) => !p.archivedAt && !p.deletedAt);
-  const [originId, setOriginId] = useState(placements[0]?.id ?? '');
-  const [destination, setDestination] = useState<StudyPlacementInput>(paths.resolve(placements[0] ?? { courseId: null, subjectId: null, folderId: null, topicId: null }));
+  const initial = placements.find((p) => p.id === initialPlacementId) ?? placements[0];
+  const [originId, setOriginId] = useState(initial?.id ?? '');
+  const [destination, setDestination] = useState<StudyPlacementInput>(paths.resolve(initial ?? { courseId: null, subjectId: null, folderId: null, topicId: null }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const form = useRef<HTMLFormElement>(null);
@@ -38,11 +53,11 @@ export function StudyMaterialMoveDialog({ material, workspace, onMoved, onCancel
       }
     }} onSubmit={(event) => {
       event.preventDefault(); if (busy) return; setBusy(true); setError('');
-      void window.nodus.moveStudyMaterialPlacement(material.id, originId || null, destination).then(() => {
+      void onSave(originId || null, destination).then(() => {
         announceStudyWorkspaceChanged(); onMoved();
       }).catch((reason: unknown) => { setError(reason instanceof Error ? reason.message : t('No se pudo guardar.')); setBusy(false); });
     }}>
-      <div><h2 id={titleId} className="font-semibold">{t('Mover material…')}</h2><p className="mt-1 truncate text-sm text-neutral-500" title={material.title}>{material.title}</p></div>
+      <div><h2 id={titleId} className="font-semibold">{t('Mover elemento')}</h2><p className="mt-1 truncate text-sm text-neutral-500" title={material.title}>{material.title}</p></div>
       <fieldset disabled={busy} className="space-y-3">
         <label className="block text-xs">{t('Ubicación de origen')}<select aria-label={t('Ubicación de origen')} className="input mt-1 w-full" value={originId} onChange={(event) => {
           const id = event.target.value; setOriginId(id);
@@ -58,7 +73,7 @@ export function StudyMaterialMoveDialog({ material, workspace, onMoved, onCancel
           const folder = workspace.folders.find((f) => f.id === event.target.value);
           setDestination({ ...destination, ...(folder ? { courseId: folder.courseId, subjectId: folder.subjectId } : {}), folderId: folder?.id ?? null, topicId: null });
         }}><option value="">{t('Sin carpeta')}</option>{folders.map((f) => <option key={f.id} value={f.id}>{paths.label({ courseId: f.courseId, subjectId: f.subjectId, folderId: f.id, topicId: null })}</option>)}</select></label>
-        <label className="block text-xs">{t('Tema (opcional)')}<select aria-label={t('Tema (opcional)')} className="input mt-1 w-full" value={destination.topicId ?? ''} onChange={(event) => setDestination({ ...destination, topicId: event.target.value || null })}><option value="">{t('Sin tema')}</option>{topics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
+        <label className="block text-xs">{t('Tema (opcional)')}<select aria-label={t('Tema (opcional)')} className="input mt-1 w-full" value={destination.topicId ?? ''} onChange={(event) => setDestination({ ...destination, topicId: event.target.value || null })}><option value="">{t('Sin tema')}</option>{topics.map((topic) => <option key={topic.id} value={topic.id}>{paths.label({ courseId, subjectId, folderId: folderId || null, topicId: topic.id })}</option>)}</select></label>
       </fieldset>
       {error && <p role="alert" className="text-xs text-red-500">{error}</p>}
       <div className="flex justify-end gap-2"><button type="button" disabled={busy} className="btn btn-ghost" onClick={onCancel}>{t('Cancelar')}</button><button disabled={busy} className="btn btn-primary">{t(busy ? 'Guardando…' : 'Mover')}</button></div>

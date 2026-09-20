@@ -119,6 +119,23 @@ try {
   assert.equal(assessmentContext.ideas.length, 1, 'assessment retrieval respects explicit source selection');
   assert.match(assessmentContext.outline, /Separación de poderes/);
 
+  const movedNote = org.createStudyDocument({ title: 'Apunte con ideas', contentMarkdown: 'Idea conservada', placement: { subjectId: subjectB.id } });
+  knowledge.replaceStudySourceKnowledge({ subjectId: subjectB.id, sourceKind: 'document', sourceId: movedNote.id,
+    sourceTitle: movedNote.title, sourceHash: 'note-hash', ideas: [{ ...extraction.ideas[0], label: 'Idea del apunte', statement: 'Una idea propia del apunte.' }],
+    relations: [], embeddings: [[0, 1, 0]], embeddingProvider: 'test', embeddingModel: 'test' });
+  const noteIdea = knowledge.listStudyIdeas(subjectB.id).find((idea) => idea.label === 'Idea del apunte');
+  const noteEvidence = knowledge.getStudyIdeaDetail(noteIdea.id);
+  const notePlacement = org.getStudyWorkspace().placements.find((p) => p.documentId === movedNote.id);
+  org.moveStudyPlacement(movedNote.id, notePlacement.id, { subjectId: subjectA.id });
+  knowledge.syncStudyKnowledgeSourceScopes('document', movedNote.id);
+  assert.deepEqual(knowledge.getStudyIdeaDetail(noteIdea.id), noteEvidence, 'moving a note preserves generated ideas, evidence and embeddings');
+  org.moveStudyPlacement(movedNote.id, notePlacement.id, {});
+  knowledge.syncStudyKnowledgeSourceScopes('document', movedNote.id);
+  assert.deepEqual(knowledge.getStudyIdeaDetail(noteIdea.id), noteEvidence, 'unfiling a note preserves its knowledge');
+  org.setStudyLifecycle('document', movedNote.id, 'trash');
+  knowledge.syncStudyKnowledgeSourceScopes('document', movedNote.id);
+  assert.equal(knowledge.getStudyIdeaDetail(noteIdea.id), null, 'explicit lifecycle cleanup still works');
+
   const sourcePath3 = path.join(root, 'tema-3.txt'); fs.writeFileSync(sourcePath3, 'La separación de poderes limita la concentración política.');
   const third = await materials.importStudyMaterialFile(sourcePath3, { courseId: course.id, subjectId: subjectA.id });
   knowledge.replaceStudySourceKnowledge({ subjectId: subjectA.id, sourceKind: 'material', sourceId: third.material.id,

@@ -989,6 +989,12 @@ export function registerAcademicIpc(context: IpcContext): void {
     const result = studyOrg.setPrimaryStudyPlacement(documentId, input); studyKnowledgeRepo.syncStudyKnowledgeSourceScopes('document', documentId);
     queueStudyKnowledgeSources('document', [documentId]); studySearch.queueStudySearchIndexRefresh(); return result;
   });
+  h('study:placement:move', async (_e, documentId: string, placementId: string | null, destination: StudyPlacementInput) => {
+    const result = studyOrg.moveStudyPlacement(documentId, placementId, destination);
+    studyKnowledgeRepo.syncStudyKnowledgeSourceScopes('document', documentId);
+    // Relocation preserves generated knowledge and never starts a new AI analysis.
+    studySearch.queueStudySearchIndexRefresh(); return result;
+  });
   h('study:placement:remove', async (_e, id: string) => {
     const row = getDb().prepare('SELECT document_id FROM study_placements WHERE id=?').get(id) as { document_id: string } | undefined;
     const result = studyOrg.removeStudyPlacement(id); if (row) { studyKnowledgeRepo.syncStudyKnowledgeSourceScopes('document', row.document_id); queueStudyKnowledgeSources('document', [row.document_id]); studySearch.queueStudySearchIndexRefresh(); }
