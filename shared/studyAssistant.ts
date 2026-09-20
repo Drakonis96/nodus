@@ -25,6 +25,13 @@ export interface StudyAssistantSourceOption {
   scope: StudySearchScope;
   chunks: number;
   updatedAt: string;
+  /** All current locations; selection remains keyed by sourceKey, not location. */
+  placements?: Array<StudySearchScope & { id: string | null }>;
+  fileName?: string;
+  tags?: string[];
+  available?: boolean;
+  unavailableReason?: 'no_content' | 'excluded';
+  indexStatus?: import('./studyMaterials').StudyMaterialIndexStatus;
 }
 
 export interface StudyAssistantCitation {

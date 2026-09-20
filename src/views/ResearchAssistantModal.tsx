@@ -1,3 +1,5 @@
+import { ResearchConciliumControl, ConciliumResponses } from '../components/ResearchConcilium';
+import type { ConciliumConfig, ConciliumResult } from '@shared/researchConcilium';
 import type { ResearchAttachment, ResearchAttachmentSurface } from '@shared/researchAttachments';
 import { ResearchSystemPromptControl } from '../components/ResearchSystemPromptControl';
 import { useResearchSystemPrompts } from '../hooks/useResearchSystemPrompts';
@@ -255,6 +257,7 @@ export function ResearchAssistantModal({
 
   const [contextTitle, setContextTitle] = useState<string | null>(null);
   const [activeModeId, setActiveModeId] = useState<ActiveAssistantModeId>('synthesis');
+  const [concilium, setConcilium] = useState<ConciliumConfig | null>(null);
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, adapter?.modelFeature ?? 'chatModel', adapter?.modelFeature === 'studyModel' ? 'chatModel' : undefined);
   const [sending, setSending] = useState(false);
   const [thinkingEffort, setThinkingEffort] = useState<ResearchEffort>('standard');
@@ -312,8 +315,9 @@ export function ResearchAssistantModal({
     add(settings.chatModel);
     add(selectedModel);
     for (const model of settings.favorites ?? []) add(model);
+    for (const model of concilium?.models ?? []) add(model);
     return sortModelRefs(models);
-  }, [settings.chatModel, settings.favorites, settings.synthesisModel, selectedModel]);
+  }, [settings.chatModel, settings.favorites, settings.synthesisModel, selectedModel, concilium]);
 
   const refreshConversations = useCallback(async () => {
     setConversations(await apiRef.current.listConversations(true));
@@ -507,6 +511,8 @@ export function ResearchAssistantModal({
     setActiveId(conversation.id);
     const loadedMessages = conversation.messages.map((m) => ({ ...m, id: m.id || crypto.randomUUID() }));
     setMessages(loadedMessages);
+    const council = loadedMessages.filter(message => message.role === 'assistant').at(-1)?.concilium;
+    setConcilium(council ? { chairman: council.chairman, models: council.members.map(member => member.model) } : null);
     setStoppedMessageId(null);
     setSelection(cloneSelection(conversation.selection ?? SYNTHESIS_SELECTION));
     if (conversation.model) setSelectedModel(conversation.model);
@@ -558,6 +564,7 @@ export function ResearchAssistantModal({
   const persist = useCallback(
     async (conversationId: string, finalMessages: UiMessage[], shouldTitle: boolean) => {
       const records: UiMessage[] = finalMessages.map((m) => ({
+        concilium: m.concilium,
         interrupted: m.interrupted,
         study: m.study,
         attachments: m.attachments,
@@ -603,11 +610,17 @@ export function ResearchAssistantModal({
     window.setTimeout(() => scrollToBottom('auto'), 0);
 
     let streamed = '';
+    let councilResult: ConciliumResult | undefined;
     try {
       if (requestMessages.some(message => message.attachments?.length)) await persist(conversationId, [...priorMessages, userMessage], false);
       const response = await api.researchChatStream(
-        { attachmentIds: [...new Set([...priorMessages, userMessage].flatMap(message => message.attachments?.map(file => file.id) ?? []))], messages: requestMessages, selection, model: selectedModel, conversationId, thinkingEffort, systemPromptId: systemPrompts.selectedId },
+        { attachmentIds: [...new Set([...priorMessages, userMessage].flatMap(message => message.attachments?.map(file => file.id) ?? []))], messages: requestMessages, selection, model: selectedModel, conversationId, thinkingEffort, systemPromptId: systemPrompts.selectedId, concilium: !adapter ? concilium ?? undefined : undefined },
         {
+          onConcilium: (result) => {
+            councilResult = result;
+            if (activeIdRef.current !== conversationId) return;
+            setMessages(current => current.map(message => message.id === assistantId ? { ...message, concilium: result } : message));
+          },
           onDelta: (delta) => {
             streamed += delta;
             if (activeIdRef.current !== conversationId) return; // user switched away
@@ -631,12 +644,13 @@ export function ResearchAssistantModal({
       // A user-triggered stop resolves with the partial answer; treat an empty
       // partial as "nothing generated" and drop the placeholder bubble.
       const aborted = stopRequestedRef.current || Boolean(response.aborted);
+      if ('concilium' in response && response.concilium) councilResult = response.concilium;
       const answer = response.answer.trim();
-      const finalMessages: UiMessage[] = answer
+      const finalMessages: UiMessage[] = answer || councilResult
         ? [
             ...priorMessages,
             userMessage,
-            { id: assistantId, role: 'assistant', content: answer, selectionKey, stats: response.stats, ...('message' in response ? response.message : {}), interrupted: aborted },
+            { id: assistantId, role: 'assistant', content: answer, concilium: councilResult, selectionKey, stats: response.stats, ...('message' in response ? response.message : {}), interrupted: aborted },
           ]
         : [...priorMessages, userMessage];
       if (activeIdRef.current === conversationId) {
@@ -650,8 +664,8 @@ export function ResearchAssistantModal({
         // The user stopped the stream: keep the text that already arrived and mark
         // the message as aborted instead of replacing everything with the error.
         const partial = streamed.trim();
-        const finalMessages: UiMessage[] = partial
-          ? [...priorMessages, userMessage, { id: assistantId, role: 'assistant', content: partial, selectionKey }]
+        const finalMessages: UiMessage[] = partial || councilResult
+          ? [...priorMessages, userMessage, { id: assistantId, role: 'assistant', content: partial, concilium: councilResult, interrupted: true, selectionKey }]
           : [...priorMessages, userMessage];
         if (activeIdRef.current === conversationId) {
           setMessages(finalMessages);
@@ -666,6 +680,7 @@ export function ResearchAssistantModal({
           content: e instanceof Error ? e.message : String(e),
           selectionKey,
           error: true,
+          concilium: councilResult,
         };
         const finalMessages = [...priorMessages, userMessage, errorMessage];
         if (activeIdRef.current === conversationId) {
@@ -832,7 +847,8 @@ export function ResearchAssistantModal({
           </div>
           <select
             className="input text-xs py-1 max-w-xs"
-            title={t('Modelo del chat')}
+            title={concilium ? t('Chairman') : t('Modelo del chat')}
+            disabled={sending || !!concilium}
             value={serializedModel}
             onChange={(e) => setSelectedModel(e.target.value ? parseModel(e.target.value) : null)}
           >
@@ -875,6 +891,11 @@ export function ResearchAssistantModal({
           }} />}
           <ResearchSystemPromptControl prompts={systemPrompts.prompts} selectedId={systemPrompts.selectedId} disabled={sending || !systemPrompts.ready} onSelect={systemPrompts.select} refresh={systemPrompts.refresh} />
           <ChatSkillsControl surface="assistant" disabled={sending} />
+          {!adapter && <ResearchConciliumControl value={concilium} models={availableModels} selectedModel={selectedModel} disabled={sending} onChange={next => {
+            setConcilium(next);
+            if (next) setSelectedModel(next.models[next.chairman]);
+          }} />}
+
           {!adapter && !isGenealogy && contextTitle && (
             <button
               type="button"
@@ -990,10 +1011,10 @@ export function ResearchAssistantModal({
                     >
                       <div className="absolute right-2 top-2 flex items-center gap-0.5">
                         {message.role === 'assistant' &&
-                          !message.error &&
+                          (!message.error || message.concilium) &&
                           message.id === lastMessageId &&
                           message.id !== streamingId &&
-                          message.content.trim() && (
+                          (message.content.trim() || message.concilium) && (
                             <button
                               className="rounded p-1 text-neutral-500 opacity-70 transition hover:bg-neutral-800 research-accent-hover hover:opacity-100 disabled:opacity-40"
                               title={t('Regenerar respuesta')}
@@ -1043,6 +1064,7 @@ export function ResearchAssistantModal({
                         </button>
                       </div>
                       {message.attachments?.length ? renderAttachments(message.attachments) : null}
+                      {message.concilium && <ConciliumResponses result={message.concilium} onCitation={handleCitation} />}
                       {message.role === 'assistant' && message.reasoning?.trim() && (
                         <details className="mb-2 rounded border border-neutral-800 bg-neutral-950/60" open={!message.content.trim()}>
                           <summary className="cursor-pointer select-none px-2 py-1 text-[11px] text-neutral-400 hover:text-neutral-200">
@@ -1154,7 +1176,7 @@ export function ResearchAssistantModal({
               </div>
             </footer>
           </section>
-          {embedded && contextOpen && <aside className="research-chat-context w-72 shrink-0 overflow-y-auto border-l border-neutral-800 p-4" data-testid="research-context-sidebar">
+          {embedded && contextOpen && <aside className={`research-chat-context ${adapter?.id === 'study' ? 'w-96 min-w-[280px] max-w-[45vw]' : 'w-72'} shrink-0 overflow-y-auto border-l border-neutral-800 p-4`} data-testid="research-context-sidebar">
             <div className="mb-4 flex items-center gap-2"><h2 className="text-xs font-semibold">{t('Ámbito y fuentes')}</h2><button className="btn btn-ghost ml-auto" title={t('Ocultar ámbito y fuentes')} onClick={toggleContext}><Icon name="x" size={14} /></button></div>
             <fieldset disabled={sending} className="min-w-0 space-y-3">{adapter ? adapter.contextPanel : <>
               <p className="text-xs text-neutral-400">{isGenealogy ? t('El asistente usa el contexto familiar: personas, parentescos, eventos, documentos y evidencia.') : t('Elegir qué partes del corpus ve el asistente')}</p>

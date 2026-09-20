@@ -1,4 +1,6 @@
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
+import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -68,6 +70,13 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const DE: Record<string, string> = {
   ...ACADEMIC_MANUAL_TRANSLATIONS["de"],
+  // Nodus Tools catalogue
+  "Navega por la web y guarda fuentes para tu investigación.": "Durchsuche das Web und speichere Quellen für deine Forschung.",
+  "Descubre literatura académica en fuentes abiertas.": "Entdecke wissenschaftliche Literatur in offenen Quellen.",
+  "Sigue fuentes y descubre novedades para tu investigación.": "Folge Quellen und entdecke Neuigkeiten für deine Forschung.",
+  "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Entdecke Quellen, verfolge Neuigkeiten und bearbeite deine Dateien direkt in Nodus.",
+  "Buscar herramientas": "Werkzeuge suchen",
+
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Wähle den hellen oder dunklen Modus oder folge dem Betriebssystem.',
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['de'],
   "Research chat": "Research chat",
@@ -125,6 +134,7 @@ export const DE: Record<string, string> = {
   ...WORLD_CHAT_TRANSLATIONS.de,
   ...STUDY_SYNONYM_TRANSLATIONS.de,
   ...STUDY_BANK_TRANSLATIONS.de,
+  ...STUDY_SOURCE_TRANSLATIONS["de"],
   ...STUDY_IMPROVE_TRANSLATIONS.de,
   ...WORKSPACE_TRANSLATIONS.de,
   "Lo que cuenta el mapa": "Was die Karte erzählt",
@@ -8829,4 +8839,5 @@ export const DE: Record<string, string> = {
   "Error del sombreador": "Shader-Fehler",
   "Ask the model to fix the failed steps": "Das Modell bitten, die fehlgeschlagenen Schritte zu korrigieren",
   "Sent": "Gesendet",
+  ...CONCILIUM_TRANSLATIONS['de'],
 };

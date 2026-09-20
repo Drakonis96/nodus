@@ -149,8 +149,15 @@ export const NAV_ITEMS: NavItem[] = [
  * adding a tool never expands the vault-type allow-lists. 'home' is the catalogue. */
 export type ToolkitPage = 'home' | ToolkitToolPage;
 
+export type ToolkitStandalonePage = Extract<View, 'browser' | 'radar' | 'compass'>;
+export type ToolkitCatalogPage = ToolkitToolPage | ToolkitStandalonePage;
+
+export function isToolkitStandalonePage(page: ToolkitCatalogPage): page is ToolkitStandalonePage {
+  return page === 'browser' || page === 'radar' || page === 'compass';
+}
+
 export interface ToolkitToolDef {
-  page: ToolkitToolPage;
+  page: ToolkitCatalogPage;
   /** Marca de la herramienta; NO se traduce. */
   name: string;
   /** Clave i18n (español) de la descripción de la tarjeta. */
@@ -163,7 +170,7 @@ export interface ToolkitToolDef {
 }
 
 /** Single source of truth for the toolkit catalogue. */
-export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
+export const TOOLKIT_TOOLS = ([
   {
     page: 'apps',
     name: 'Nodus Apps',
@@ -171,6 +178,30 @@ export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
     icon: 'grid',
     state: 'wip',
     testid: 'apps',
+  },
+  {
+    page: 'browser',
+    name: 'Nodus Browser',
+    description: 'Navega por la web y guarda fuentes para tu investigación.',
+    icon: 'globe',
+    state: 'wip',
+    testid: 'browser',
+  },
+  {
+    page: 'compass',
+    name: 'Nodus Compass',
+    description: 'Descubre literatura académica en fuentes abiertas.',
+    icon: 'compass',
+    state: 'wip',
+    testid: 'compass',
+  },
+  {
+    page: 'radar',
+    name: 'Nodus Radar',
+    description: 'Sigue fuentes y descubre novedades para tu investigación.',
+    icon: 'radar',
+    state: 'wip',
+    testid: 'radar',
   },
   {
     page: 'convert',
@@ -212,7 +243,7 @@ export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
     state: 'wip',
     testid: 'aiocr',
   },
-];
+] satisfies ToolkitToolDef[]).sort((a, b) => a.name.localeCompare(b.name, 'en'));
 
 export type ToolkitSidebarId = `toolkit:${ToolkitToolPage}`;
 
@@ -235,7 +266,7 @@ export function toolkitSidebarId(page: ToolkitToolPage): ToolkitSidebarId {
 export function pinnedToolkitSidebarItems(pages: unknown): ToolkitSidebarNavItem[] {
   const pinned = new Set(Array.isArray(pages) ? pages : []);
   return TOOLKIT_TOOLS
-    .filter((tool) => pinned.has(tool.page))
+    .filter((tool): tool is typeof tool & { page: ToolkitToolPage } => !isToolkitStandalonePage(tool.page) && pinned.has(tool.page))
     .map((tool) => ({
       id: toolkitSidebarId(tool.page),
       label: tool.name,

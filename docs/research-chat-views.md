@@ -21,3 +21,34 @@ These checks use local fixtures and simulated generation; they make no paid infe
 ## File attachments
 
 Research chat alone exposes an integrated + button for conversation-owned files. All four native engines consume the same extracted document/table content and provider-specific vision parts. See [Research chat attachments](research-chat-attachments.md) for formats, persistence, bounds and the verification matrix.
+
+## Study and Teaching source organization
+
+The manual context picker shares the vault's courses, subjects and nested folders.
+Search matches titles, filenames, tags and organizational paths without requiring
+accents or matching case. Group checkboxes select current matching, usable source
+keys (including descendants); hidden selections survive filtering and collapsing.
+A material shown in several locations is selected once. Existing conversations
+continue to store explicit `sourceKeys`, so adding/moving a material does not alter
+an already saved context. Unusable or excluded materials remain visible but cannot
+be added as evidence. Virtual rows keep large catalogues bounded in the DOM.
+
+Users can create or rename folders in the picker and move individual materials via
+its action menu. Materials uses the same movement dialog. The
+`moveStudyMaterialPlacement(id, placementId, destination)` IPC operation validates
+and updates one placement transactionally, infers organizational ancestors, and
+preserves other placements and document provenance. A null origin is allowed only
+for an unfiled material; an existing destination is reused. Files, versions,
+annotations, material IDs and vectors are untouched. The source catalogue and
+retrieval cache refresh organization without requesting AI extraction or embeddings.
+
+Generated ideas and evidence keep their original subject and material provenance
+after relocating or unlinking a live material, including on later background
+knowledge sync. Notes, questions and review progress are not moved automatically.
+Explicit knowledge purge and material lifecycle cleanup retain their existing paths.
+
+Validation: `node --test scripts/test-study-source-tree.mjs scripts/test-study-materials.mjs scripts/test-study-assistant.mjs scripts/test-study-knowledge.mjs scripts/test-study-search.mjs`
+and `node scripts/verify-study-source-picker.mjs` against the renderer-only harness
+on port 5197 (or `NODUS_VISUAL_URL`). The UI check uses 5,000 material fixtures in
+Study/light and Teaching/dark, including keyboard navigation, selection, folder
+management, failed/successful relocation, requests and citation navigation.

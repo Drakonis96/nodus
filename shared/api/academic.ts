@@ -490,6 +490,7 @@ export interface AcademicApi {
   restoreStudyMaterialVersion(id: string, versionId: string): Promise<StudyMaterialSummary>;
   addStudyMaterialPlacement(id: string, input: StudyMaterialImportInput): Promise<StudyMaterialPlacement | null>;
   setPrimaryStudyMaterialPlacement(id: string, input: StudyMaterialImportInput): Promise<StudyMaterialPlacement | null>;
+  moveStudyMaterialPlacement(id: string, placementId: string | null, destination: StudyPlacementInput): Promise<StudyMaterialPlacement | null>;
   removeStudyMaterialPlacement(id: string, placementId: string): Promise<void>;
   createStudyMaterialAnnotation(materialId: string, input: StudyMaterialAnnotationInput): Promise<StudyMaterialAnnotation>;
   updateStudyMaterialAnnotation(id: string, patch: Partial<StudyMaterialAnnotationInput>): Promise<StudyMaterialAnnotation>;

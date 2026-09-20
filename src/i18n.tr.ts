@@ -1,4 +1,6 @@
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
+import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -63,6 +65,13 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
   ...ACADEMIC_MANUAL_TRANSLATIONS["tr"],
+  // Nodus Tools catalogue
+  "Navega por la web y guarda fuentes para tu investigación.": "Web’de gezinin ve araştırmanız için kaynakları kaydedin.",
+  "Descubre literatura académica en fuentes abiertas.": "Açık kaynaklarda akademik literatürü keşfedin.",
+  "Sigue fuentes y descubre novedades para tu investigación.": "Kaynakları takip edin ve araştırmanız için yenilikleri keşfedin.",
+  "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Nodus’tan ayrılmadan kaynakları keşfedin, yenilikleri takip edin ve dosyalarınızla çalışın.",
+  "Buscar herramientas": "Araç ara",
+
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Açık veya koyu modu seçin ya da işletim sistemini takip edin.',
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['tr'],
   "Research chat": "Research chat",
@@ -123,6 +132,7 @@ export const TR: Record<string, string> = {
   ...WORLD_CHAT_TRANSLATIONS.tr,
   ...STUDY_SYNONYM_TRANSLATIONS.tr,
   ...STUDY_BANK_TRANSLATIONS.tr,
+  ...STUDY_SOURCE_TRANSLATIONS["tr"],
   ...STUDY_IMPROVE_TRANSLATIONS.tr,
   ...WORKSPACE_TRANSLATIONS.tr,
   "Lo que cuenta el mapa": "Haritanın anlattıkları",
@@ -8579,4 +8589,5 @@ export const TR: Record<string, string> = {
   "Error del sombreador": "Gölgelendirici hatası",
   "Ask the model to fix the failed steps": "Modelden başarısız adımları düzeltmesini isteyin",
   "Sent": "Gönderildi",
+  ...CONCILIUM_TRANSLATIONS['tr'],
 };

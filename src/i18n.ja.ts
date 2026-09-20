@@ -1,4 +1,6 @@
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
+import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -68,6 +70,13 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  */
 export const JA: Record<string, string> = {
   ...ACADEMIC_MANUAL_TRANSLATIONS["ja"],
+  // Nodus Tools catalogue
+  "Navega por la web y guarda fuentes para tu investigación.": "ウェブを閲覧し、研究のための資料を保存します。",
+  "Descubre literatura académica en fuentes abiertas.": "公開情報源から学術文献を見つけます。",
+  "Sigue fuentes y descubre novedades para tu investigación.": "情報源をフォローして研究の最新情報を見つけます。",
+  "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Nodus を離れずに情報源を探し、最新情報を追跡し、ファイルを操作できます。",
+  "Buscar herramientas": "ツールを検索",
+
   ...RESEARCH_ATTACHMENT_TRANSLATIONS.ja,
   ...DOCUMENT_SKILLS_TRANSLATIONS.ja,
   ...RESEARCH_PROMPT_TRANSLATIONS.ja,
@@ -86,6 +95,7 @@ export const JA: Record<string, string> = {
   ...WORLD_CHAT_TRANSLATIONS.ja,
   ...STUDY_SYNONYM_TRANSLATIONS.ja,
   ...STUDY_BANK_TRANSLATIONS.ja,
+  ...STUDY_SOURCE_TRANSLATIONS["ja"],
   ...STUDY_IMPROVE_TRANSLATIONS.ja,
   ...WORKSPACE_TRANSLATIONS.ja,
   ...WORLDBUILDING_TRANSLATIONS.ja,
@@ -8190,4 +8200,5 @@ export const JA: Record<string, string> = {
   "Error del sombreador": "シェーダエラー",
   "Ask the model to fix the failed steps": "失敗したステップを修正するようモデルに依頼する",
   "Sent": "送信済み",
+  ...CONCILIUM_TRANSLATIONS['ja'],
 };

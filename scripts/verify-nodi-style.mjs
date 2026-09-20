@@ -56,19 +56,13 @@ try {
 
   // A fresh profile has never seen this version's release notes, so those come first.
   await whatsNew.waitFor();
-  assert.equal(await updateModal.count(), 0, 'the update check must wait for the release notes');
+  assert.equal(await updateModal.count(), 0, 'updates must never open a modal');
   assert.equal(await styleModal.count(), 0, 'the Nodi choice must wait for the release notes');
-  step('release notes come first, with the update check and the Nodi choice held back');
+  step('release notes come first, with the Nodi choice held back');
   await whatsNew.getByRole('button', { name: /Explorar las novedades/ }).click();
 
-  await updateModal.waitFor();
-  assert.equal(await styleModal.count(), 0, 'the Nodi choice must not fight the update check for the foreground');
-  step('the startup update modal comes second, with the Nodi choice still held back');
-  await page.screenshot({ path: path.join(shots, '1-update-modal-first.png') });
-
-  await page.getByTestId('startup-update-modal').getByRole('button', { name: /Entendido/ }).click();
   await styleModal.waitFor();
-  step('closing the update check reveals the Nodi choice, last in the chain');
+  step('the Nodi choice follows the startup guides without waiting for updates');
   await page.screenshot({ path: path.join(shots, '2-nodi-choice.png') });
 
   // Both Nodi must be alive in the picker, each drawn from its own component.
@@ -99,8 +93,7 @@ try {
   await page.evaluate(() => sessionStorage.clear());
   await page.reload();
   await page.getByTestId('app-shell').waitFor();
-  await updateModal.waitFor();
-  await page.getByTestId('startup-update-modal').getByRole('button', { name: /Entendido/ }).click();
+  assert.equal(await updateModal.count(), 0);
   await page.waitForTimeout(1_000);
   assert.equal(await styleModal.count(), 0, 'the Nodi choice came back on a fresh session');
   step('the choice does not come back on a fresh session either');

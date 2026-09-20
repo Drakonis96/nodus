@@ -5846,6 +5846,7 @@ export interface ResearchChatMessage {
 }
 
 export interface ResearchChatRequest {
+  concilium?: import('./researchConcilium').ConciliumConfig;
   attachmentIds?: string[];
   /** Optional vault-local preference; null/absence keeps the original application prompt. */
   systemPromptId?: string | null;
@@ -5868,6 +5869,7 @@ export interface ResearchContextStats {
 }
 
 export interface ResearchChatResponse {
+  concilium?: import('./researchConcilium').ConciliumResult;
   answer: string;
   stats: ResearchContextStats;
   /** The user stopped the stream: `answer` is the partial text that had already arrived. */
@@ -5875,6 +5877,7 @@ export interface ResearchChatResponse {
 }
 
 export interface ResearchChatStreamHandlers {
+  onConcilium?(result: import('./researchConcilium').ConciliumResult): void;
   onDelta(delta: string): void;
   /** Reasoning/thinking trace, streamed for live display only. */
   onReasoning?(delta: string): void;
@@ -6044,6 +6047,7 @@ export interface ArgumentRouteSuggestion {
 
 /** One persisted chat message. `stats`/`selectionKey`/`error` mirror the in-memory UI message. */
 export interface ChatMessageRecord {
+  concilium?: import('./researchConcilium').ConciliumResult;
   attachments?: import('./researchAttachments').ResearchAttachment[];
   id: string;
   role: 'user' | 'assistant';

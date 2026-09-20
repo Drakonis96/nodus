@@ -1,4 +1,6 @@
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
+import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -69,6 +71,13 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 /** Simplified Chinese UI table. Keys are the Spanish source strings (see i18n.ts). */
 export const ZH_CN: Record<string, string> = {
   ...ACADEMIC_MANUAL_TRANSLATIONS["zh-CN"],
+  // Nodus Tools catalogue
+  "Navega por la web y guarda fuentes para tu investigación.": "浏览网页并保存研究资料。",
+  "Descubre literatura académica en fuentes abiertas.": "在开放来源中发现学术文献。",
+  "Sigue fuentes y descubre novedades para tu investigación.": "关注来源并发现研究新动态。",
+  "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "无需离开 Nodus，即可探索来源、关注动态并处理文件。",
+  "Buscar herramientas": "搜索工具",
+
   "Elige entre modo claro, oscuro o seguir el sistema operativo.": "选择浅色模式、深色模式，或跟随操作系统。",
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['zh-CN'],
   ...RESEARCH_PROMPT_TRANSLATIONS['zh-CN'],
@@ -121,6 +130,7 @@ export const ZH_CN: Record<string, string> = {
   ...WORLD_CHAT_TRANSLATIONS['zh-CN'],
   ...STUDY_SYNONYM_TRANSLATIONS['zh-CN'],
   ...STUDY_BANK_TRANSLATIONS['zh-CN'],
+  ...STUDY_SOURCE_TRANSLATIONS["zh-CN"],
   ...STUDY_IMPROVE_TRANSLATIONS['zh-CN'],
   ...WORKSPACE_TRANSLATIONS['zh-CN'],
   ...AI_OCR_TRANSLATIONS['zh-CN'],
@@ -7833,4 +7843,5 @@ export const ZH_CN: Record<string, string> = {
   "Error del sombreador": "着色器错误",
   "Ask the model to fix the failed steps": "请模型修正失败的步骤",
   "Sent": "已发送",
+  ...CONCILIUM_TRANSLATIONS['zh-CN'],
 };

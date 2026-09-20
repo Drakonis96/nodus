@@ -46,9 +46,6 @@ async function waitUntil(read, timeout = 30_000) {
   throw new Error('Timed out waiting for the asynchronous application state');
 }
 async function settle() {
-  const update = page.getByTestId('startup-update-modal');
-  await update.waitFor({ timeout: 1500 }).catch(() => {});
-  if (await update.isVisible()) await update.getByRole('button', { name: /Entendido/ }).click();
   const hideBackup = page.getByTestId('backup-health-banner').getByRole('button', { name: 'Ocultar aviso' });
   if (await hideBackup.isVisible()) await hideBackup.click();
 }
@@ -298,7 +295,6 @@ try {
   await page.reload(); await settle();
   log('Additional Manual + Zotero wizard: recoverable connection error, selected collection sync without generated ideas; keyboard, back and cancel/discard verified.');
   await app.close(); app = null; await boot();
-  await page.getByTestId('startup-update-modal').waitFor();
   await settle();
   assert.equal((await page.evaluate(() => window.nodus.getSettings())).academicMode, 'manual');
   await page.locator('[data-tour="nav-ideas"]').click();

@@ -86,11 +86,11 @@ test('the choice is stored app-wide, so it survives creating and switching vault
   assert.match(defaults, /mascotStyleChosen: false/);
 });
 
-test('the one-time modal is gated on the flag and behind the update check', async () => {
+test('the one-time modal is gated on the flag and behind the startup guides', async () => {
   const app = await read('src/App.tsx');
-  assert.match(app, /updateSettled &&[\s\S]{0,400}?!settings\.mascotStyleChosen &&[\s\S]{0,80}?<NodiStyleModal/);
-  // It has to wait for the update modal rather than fight it for the foreground.
-  assert.match(app, /<StartupUpdateModal[\s\S]*settings=\{settings\}[\s\S]*onSettled=\{\(\) => setUpdateSettled\(true\)\}/);
+  assert.match(app, /startupGuidesSettled &&[\s\S]{0,400}?!settings\.mascotStyleChosen &&[\s\S]{0,80}?<NodiStyleModal/);
+  // Update progress is non-blocking and no longer owns the foreground.
+  assert.doesNotMatch(app, /StartupUpdateModal|updateSettled/);
   // Users still in the tutorial pick there instead.
   assert.match(app, /settings\.basicsTutorialVersion > 0 &&[\s\S]{0,200}?<NodiStyleModal/);
 });
@@ -116,7 +116,6 @@ test('every surface draws NodiAvatar, so the choice holds across the whole app',
   const surfaces = [
     'src/components/nodi/NodiCompanion.tsx',
     'src/components/WhatsNewModal.tsx',
-    'src/components/StartupUpdateModal.tsx',
     'src/views/RecoverySetupWizard.tsx',
     'src/views/BasicsTutorial.tsx',
   ];

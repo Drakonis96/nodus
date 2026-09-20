@@ -1,4 +1,6 @@
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
+import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -68,6 +70,13 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  */
 export const KO: Record<string, string> = {
   ...ACADEMIC_MANUAL_TRANSLATIONS["ko"],
+  // Nodus Tools catalogue
+  "Navega por la web y guarda fuentes para tu investigación.": "웹을 탐색하고 연구 자료를 저장하세요.",
+  "Descubre literatura académica en fuentes abiertas.": "공개 출처에서 학술 문헌을 찾아보세요.",
+  "Sigue fuentes y descubre novedades para tu investigación.": "출처를 팔로우하고 연구에 필요한 새로운 소식을 확인하세요.",
+  "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Nodus 안에서 출처를 탐색하고, 새 소식을 확인하고, 파일을 작업하세요.",
+  "Buscar herramientas": "도구 검색",
+
   ...RESEARCH_ATTACHMENT_TRANSLATIONS.ko,
   ...DOCUMENT_SKILLS_TRANSLATIONS.ko,
   ...RESEARCH_PROMPT_TRANSLATIONS.ko,
@@ -86,6 +95,7 @@ export const KO: Record<string, string> = {
   ...WORLD_CHAT_TRANSLATIONS.ko,
   ...STUDY_SYNONYM_TRANSLATIONS.ko,
   ...STUDY_BANK_TRANSLATIONS.ko,
+  ...STUDY_SOURCE_TRANSLATIONS["ko"],
   ...STUDY_IMPROVE_TRANSLATIONS.ko,
   ...WORKSPACE_TRANSLATIONS.ko,
   ...WORLDBUILDING_TRANSLATIONS.ko,
@@ -8190,4 +8200,5 @@ export const KO: Record<string, string> = {
   "Error del sombreador": "셰이더 오류",
   "Ask the model to fix the failed steps": "실패한 단계를 수정하도록 모델에 요청하세요",
   "Sent": "전송됨",
+  ...CONCILIUM_TRANSLATIONS['ko'],
 };

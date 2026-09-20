@@ -317,6 +317,7 @@ export const academicApi: AcademicApi = {
   restoreStudyMaterialVersion: (id, versionId) => ipcRenderer.invoke('study:materials:version:restore', id, versionId),
   addStudyMaterialPlacement: (id, input) => ipcRenderer.invoke('study:materials:placement:add', id, input),
   setPrimaryStudyMaterialPlacement: (id, input) => ipcRenderer.invoke('study:materials:placement:setPrimary', id, input),
+  moveStudyMaterialPlacement: (id, placementId, destination) => ipcRenderer.invoke('study:materials:placement:move', id, placementId, destination),
   removeStudyMaterialPlacement: (id, placementId) => ipcRenderer.invoke('study:materials:placement:remove', id, placementId).then(() => undefined),
   createStudyMaterialAnnotation: (materialId, input) => ipcRenderer.invoke('study:materials:annotation:create', materialId, input),
   updateStudyMaterialAnnotation: (id, patch) => ipcRenderer.invoke('study:materials:annotation:update', id, patch),
@@ -565,6 +566,10 @@ export const academicApi: AcademicApi = {
     const onReasoning = (_e: unknown, id: string, delta: string) => {
       if (id === requestId) handlers.onReasoning?.(delta);
     };
+    const onConcilium = (_e: unknown, id: string, result: import('@shared/researchConcilium').ConciliumResult) => {
+      if (id === requestId) handlers.onConcilium?.(result);
+    };
+    ipcRenderer.on('research:chatStream:concilium', onConcilium);
     ipcRenderer.on('research:chatStream:delta', onDelta);
     ipcRenderer.on('research:chatStream:reasoning', onReasoning);
     activeChatRequestId = requestId;
@@ -574,6 +579,7 @@ export const academicApi: AcademicApi = {
       return response;
     } finally {
       if (activeChatRequestId === requestId) activeChatRequestId = null;
+      ipcRenderer.removeListener('research:chatStream:concilium', onConcilium);
       ipcRenderer.removeListener('research:chatStream:delta', onDelta);
       ipcRenderer.removeListener('research:chatStream:reasoning', onReasoning);
     }

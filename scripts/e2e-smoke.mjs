@@ -6,6 +6,7 @@
 //
 // Requires a build (dist/ + dist-electron/); run via `npm run test:e2e`.
 import assert from 'node:assert/strict';
+import { waitForCondition } from './lib/waitForCondition.mjs';
 import { execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { existsSync } from 'node:fs';
@@ -105,22 +106,6 @@ async function closeElectronApp(instance) {
   ]);
   clearTimeout(timeout);
   if (!closedCleanly && child.exitCode === null && !child.killed) child.kill('SIGKILL');
-}
-
-async function waitForCondition(label, probe, { timeout = 30_000, interval = 100 } = {}) {
-  const deadline = Date.now() + timeout;
-  let lastError = null;
-  while (Date.now() < deadline) {
-    try {
-      if (await probe()) return;
-      lastError = null;
-    } catch (cause) {
-      lastError = cause;
-    }
-    await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-  const detail = lastError instanceof Error ? ` Último error: ${lastError.message}` : '';
-  throw new Error(`Tiempo agotado esperando: ${label}.${detail}`);
 }
 
 let app = null;
@@ -461,13 +446,11 @@ try {
   await page.getByTestId('app-shell').waitFor();
   assert.equal(await page.getByTestId('basics-tutorial-language').count(), 0, 'a seen cinematic tutorial does not return after restart/update');
   assert.equal(await page.getByTestId('whats-new-cinematic-modal').count(), 0, 'the release modal stays dismissed for the exact running version');
-  const startupUpdateModal = page.getByTestId('startup-update-modal');
-  await startupUpdateModal.waitFor({ timeout: 30_000 });
-  await page.waitForFunction(() => document.querySelector('[data-testid="startup-update-modal"]')?.getAttribute('data-update-status') === 'not-available');
-  assert.equal(await startupUpdateModal.getByText('Ya tienes la última versión', { exact: true }).count(), 1, 'startup update check reports that the installed version is current');
-  assert.equal(await startupUpdateModal.getByText(`v${appVersion}`, { exact: true }).count(), 1, 'startup update modal identifies the installed version');
-  await startupUpdateModal.getByRole('button', { name: 'Entendido', exact: false }).click();
-  await startupUpdateModal.waitFor({ state: 'detached' });
+  await waitForCondition('startup update check to finish', () => page.evaluate(async () =>
+    (await window.nodus.getUpdateStatus())?.status === 'not-available'
+  ));
+  await page.getByTestId('update-ready-notice').waitFor({ state: 'detached' });
+  assert.equal(await page.getByTestId('startup-update-modal').count(), 0);
   console.log('[e2e] essential tutorial language preferences + persistent seen-once gate ok');
 
   // No startup dialog offers document understanding any more: it is opted into from
@@ -1198,7 +1181,8 @@ try {
   // measured on the real rendered shell rather than trusted from the classes.
   await page.locator('[data-tour="toolkit"]').click();
   await page.getByTestId('toolkit-home').waitFor({ timeout: 30_000 });
-  const toolCards = ['toolkit-card-apps', 'toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-translate', 'toolkit-card-presenter', 'toolkit-card-aiocr'];
+  const toolCards = ['toolkit-card-apps', 'toolkit-card-browser', 'toolkit-card-compass', 'toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-radar', 'toolkit-card-translate', 'toolkit-card-aiocr', 'toolkit-card-presenter'];
+  assert.deepEqual(await page.locator('.toolkit-card').evaluateAll((cards) => cards.map((card) => card.dataset.testid)), toolCards, 'the shared catalogue shows all nine tools in alphabetical order');
   const cardBoxes = [];
   for (const testId of toolCards) {
     const box = await page.getByTestId(testId).boundingBox();
@@ -1210,7 +1194,8 @@ try {
     1,
     `every toolkit card has the same dimensions: ${cardBoxes.map((b) => `${b.testId} ${Math.round(b.width)}x${Math.round(b.height)}`).join(', ')}`
   );
-  assert.equal(new Set(cardBoxes.map((b) => Math.round(b.y))).size, 3, 'the cards form three aligned rows');
+  const firstRowCount = cardBoxes.filter((box) => Math.round(box.y) === Math.round(cardBoxes[0].y)).length;
+  assert.equal(new Set(cardBoxes.map((b) => Math.round(b.y))).size, Math.ceil(toolCards.length / firstRowCount), 'the cards form aligned rows at the current responsive column count');
   // Each card's icon tile is square and its glyph sits dead centre in it.
   for (const testId of toolCards) {
     const centring = await page.getByTestId(testId).evaluate((card) => {

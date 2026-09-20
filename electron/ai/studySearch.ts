@@ -134,11 +134,17 @@ function nameMaps() {
   const courses = new Map((db.prepare('SELECT id, name FROM study_courses').all() as Row[]).map((row) => [String(row.id), String(row.name)]));
   const subjects = new Map((db.prepare('SELECT id, name FROM study_subjects').all() as Row[]).map((row) => [String(row.id), String(row.name)]));
   const topics = new Map((db.prepare('SELECT id, name FROM study_topics').all() as Row[]).map((row) => [String(row.id), String(row.name)]));
-  return { courses, subjects, topics };
+  const folders = new Map((db.prepare('SELECT id, name, parent_id FROM study_folders').all() as Row[]).map((row) => [String(row.id), { name: String(row.name), parentId: row.parent_id ? String(row.parent_id) : null }]));
+  return { courses, subjects, topics, folders };
 }
 
 function scopeSubtitle(scope: { courseId: string | null; subjectId: string | null; folderId: string | null; topicId: string | null }, maps: ReturnType<typeof nameMaps>): string {
-  return [scope.courseId ? maps.courses.get(scope.courseId) : '', scope.subjectId ? maps.subjects.get(scope.subjectId) : '', scope.topicId ? maps.topics.get(scope.topicId) : ''].filter(Boolean).join(' · ');
+  const folders: string[] = []; const seen = new Set<string>(); let folderId = scope.folderId;
+  while (folderId && !seen.has(folderId)) {
+    seen.add(folderId); const folder = maps.folders.get(folderId); if (!folder) break;
+    folders.unshift(folder.name); folderId = folder.parentId;
+  }
+  return [scope.courseId ? maps.courses.get(scope.courseId) : '', scope.subjectId ? maps.subjects.get(scope.subjectId) : '', ...folders, scope.topicId ? maps.topics.get(scope.topicId) : ''].filter(Boolean).join(' · ');
 }
 
 function textChunks(text: string, size = 1400, overlap = 180): Array<{ text: string; from: number; to: number }> {
@@ -265,22 +271,58 @@ export function collectStudySearchEntries(): StudySearchIndexEntry[] {
 
 /** Lightweight source catalogue for the assistant's manual context picker. */
 export function listStudyAssistantSourceOptions(): StudyAssistantSourceOption[] {
-  const entries = ensureLexicalIndex().entries.filter((entry) => !entry.excluded);
+  const store = ensureLexicalIndex();
+  const entries = store.entries.filter((entry) => !entry.excluded);
   const grouped = new Map<string, StudyAssistantSourceOption>();
+  const fragments = new Set<string>();
   for (const entry of entries) {
     const sourceKey = studyAssistantSourceKey(entry.kind, entry.sourceId);
+    const fragmentKey = assistantFragmentKey(entry);
+    const newFragment = !fragments.has(fragmentKey);
+    fragments.add(fragmentKey);
     const current = grouped.get(sourceKey);
     if (current) {
-      current.chunks += 1;
+      if (newFragment) current.chunks += 1;
+      if (!current.placements!.some((p) => JSON.stringify(p) === JSON.stringify({ ...entry.scope, id: null }))) current.placements!.push({ ...entry.scope, id: null });
       if (entry.updatedAt > current.updatedAt) current.updatedAt = entry.updatedAt;
       continue;
     }
     grouped.set(sourceKey, {
       sourceKey, kind: entry.kind, sourceId: entry.sourceId, title: entry.title, subtitle: entry.subtitle,
-      scope: entry.scope, chunks: 1, updatedAt: entry.updatedAt,
+      scope: entry.scope, chunks: 1, updatedAt: entry.updatedAt, placements: [{ ...entry.scope, id: null }], tags: entry.tags, available: true,
     });
   }
+  // Read material organization independently from the index: empty/unsupported
+  // materials still belong in the picker, with an honest unavailable state.
+  const placements = new Map<string, NonNullable<StudyAssistantSourceOption['placements']>>();
+  for (const row of getDb().prepare('SELECT * FROM study_material_placements WHERE deleted_at IS NULL AND archived_at IS NULL ORDER BY position, id').all() as Row[]) {
+    const id = String(row.material_id);
+    const list = placements.get(id) ?? [];
+    list.push({ id: String(row.id), courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null,
+      folderId: row.folder_id ? String(row.folder_id) : null, topicId: row.topic_id ? String(row.topic_id) : null });
+    placements.set(id, list);
+  }
+  const maps = nameMaps();
+  const excluded = new Set(store.excludedSourceIds);
+  for (const row of getDb().prepare('SELECT id, title, file_name, metadata_json, index_status, updated_at FROM study_materials WHERE deleted_at IS NULL AND archived_at IS NULL').all() as Row[]) {
+    const sourceId = String(row.id); const sourceKey = studyAssistantSourceKey('material', sourceId);
+    const prior = grouped.get(sourceKey);
+    const locations = placements.get(sourceId) ?? [];
+    const scope = locations[0] ?? { courseId: null, subjectId: null, folderId: null, topicId: null };
+    grouped.set(sourceKey, { sourceKey, sourceId, kind: 'material', title: String(row.title), subtitle: scopeSubtitle(scope, maps), scope,
+      chunks: prior?.chunks ?? 0, updatedAt: String(row.updated_at), placements: locations,
+      fileName: String(row.file_name), tags: parseJson<{ tags?: string[] }>(row.metadata_json, {}).tags ?? [],
+      available: Boolean(prior?.chunks) && !excluded.has(sourceId),
+      unavailableReason: excluded.has(sourceId) ? 'excluded' : prior?.chunks ? undefined : 'no_content',
+      indexStatus: String(row.index_status) as StudyAssistantSourceOption['indexStatus'] });
+  }
   return [...grouped.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.title.localeCompare(b.title));
+}
+
+/** The same passage can be indexed under several placements. Keep page/location
+ * in the identity so repeated text on different pages remains distinct evidence. */
+function assistantFragmentKey(entry: StudySearchIndexEntry): string {
+  return JSON.stringify([entry.kind, entry.sourceId, entry.location, entry.contentHash]);
 }
 
 function matchesAssistantRetrievalOptions(entry: StudySearchIndexEntry, options: StudySearchOptions): boolean {
@@ -306,9 +348,14 @@ export async function retrieveStudyAssistantEntries(
 ): Promise<StudySearchIndexEntry[]> {
   const store = ensureLexicalIndex();
   const selected = new Set(sourceKeys);
+  const seenFragments = new Set<string>();
   const candidates = store.entries.filter((entry) => !entry.excluded
     && (!selected.size || selected.has(studyAssistantSourceKey(entry.kind, entry.sourceId)))
-    && matchesAssistantRetrievalOptions(entry, options));
+    && matchesAssistantRetrievalOptions(entry, options)).filter((entry) => {
+      const key = assistantFragmentKey(entry);
+      if (seenFragments.has(key)) return false;
+      seenFragments.add(key); return true;
+    });
   const hasVectors = candidates.some((entry) => entry.embedding?.length);
   const queryVector = hasVectors ? await embed(query).catch(() => null) : null;
   const ranked = rankStudySearchEntries(query, candidates, { ...options, limit: Math.max(limit * 3, 60) }, queryVector);
@@ -395,7 +442,13 @@ function ensureLexicalIndex(): StudySearchStore {
     const old = oldByHash.get(entry.contentHash);
     return { ...entry, embedding: old?.embedding ?? entry.embedding ?? null, excluded: excluded.has(entry.sourceId) };
   });
-  const unchanged = entries.length === store.entries.length && entries.every((entry, index) => entry.contentHash === store.entries[index]?.contentHash && entry.excluded === store.entries[index]?.excluded);
+  const unchanged = entries.length === store.entries.length && entries.every((entry, index) => {
+    const old = store.entries[index];
+    return old && entry.contentHash === old.contentHash && entry.excluded === old.excluded && entry.indexId === old.indexId
+      && entry.updatedAt === old.updatedAt && entry.subtitle === old.subtitle
+      && JSON.stringify(entry.scope) === JSON.stringify(old.scope) && JSON.stringify(entry.tags) === JSON.stringify(old.tags)
+      && JSON.stringify(entry.location) === JSON.stringify(old.location);
+  });
   if (unchanged) return store;
   const next = { ...store, updatedAt: now(), modelProvider: store.modelProvider || config.provider, modelName: store.modelName || config.model, entries };
   writeStore(next); return next;

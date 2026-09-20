@@ -2,15 +2,20 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const [smoke, settings, workflow] = await Promise.all([
+const [smoke, settings, workflow, prosopography, modalPerformance] = await Promise.all([
   readFile(new URL('./e2e-smoke.mjs', import.meta.url), 'utf8'),
   readFile(new URL('../src/views/Settings.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'),
+  readFile(new URL('./test-prosopography-e2e.mjs', import.meta.url), 'utf8'),
+  readFile(new URL('./verify-modal-animation-performance.mjs', import.meta.url), 'utf8'),
 ]);
 
 test('E2E IPC waits are polled from Node instead of returning async promises to waitForFunction', () => {
-  assert.doesNotMatch(smoke, /waitForFunction\(async\b/);
-  assert.match(smoke, /async function waitForCondition\(/);
+  for (const script of [smoke, prosopography, modalPerformance]) {
+    assert.doesNotMatch(script, /waitForFunction\(async\b/);
+    assert.match(script, /import \{ waitForCondition \} from '\.\/lib\/waitForCondition\.mjs'/);
+    assert.match(script, /waitForCondition\('startup update check to finish'/);
+  }
 });
 
 test('generic CSS presence waits select one match instead of relying on Playwright strict mode', () => {

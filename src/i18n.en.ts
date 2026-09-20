@@ -1,4 +1,6 @@
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
+import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -67,6 +69,13 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  */
 export const EN: Record<string, string> = {
   ...ACADEMIC_MANUAL_TRANSLATIONS["en"],
+  // Nodus Tools catalogue
+  "Navega por la web y guarda fuentes para tu investigación.": "Browse the web and save sources for your research.",
+  "Descubre literatura académica en fuentes abiertas.": "Discover academic literature across open sources.",
+  "Sigue fuentes y descubre novedades para tu investigación.": "Follow sources and discover updates for your research.",
+  "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Explore sources, follow updates and work with your files without leaving Nodus.",
+  "Buscar herramientas": "Search tools",
+
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Choose light mode, dark mode, or follow the operating system.',
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['en'],
   "Research chat": "Research chat",
@@ -124,6 +133,7 @@ export const EN: Record<string, string> = {
   ...WORLD_CHAT_TRANSLATIONS.en,
   ...STUDY_SYNONYM_TRANSLATIONS.en,
   ...STUDY_BANK_TRANSLATIONS.en,
+  ...STUDY_SOURCE_TRANSLATIONS["en"],
   ...STUDY_IMPROVE_TRANSLATIONS.en,
   ...WORKSPACE_TRANSLATIONS.en,
   "Lo que cuenta el mapa": "What the map tells you",
@@ -9057,4 +9067,5 @@ export const EN: Record<string, string> = {
   "Error del sombreador": "Shader error",
   "Ask the model to fix the failed steps": "Ask the model to fix the failed steps",
   "Sent": "Sent",
+  ...CONCILIUM_TRANSLATIONS['en'],
 };

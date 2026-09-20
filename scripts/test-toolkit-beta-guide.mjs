@@ -19,7 +19,7 @@ test('the 2.4.0 update queues a one-off toolkit guide behind release notes', asy
   assert.match(app, /whatsNewSettled && pdfPresenterTutorialSettled && mobileTeaserSettled && platformHighlightsSettled && !toolkitBetaTourSettled/);
   assert.match(app, /whatsNewSettled && pdfPresenterTutorialSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled/);
   assert.ok(app.indexOf('<WhatsNewModal') < app.indexOf('<ToolkitBetaUpdateTour'));
-  assert.ok(app.indexOf('<ToolkitBetaUpdateTour') < app.indexOf('<StartupUpdateModal'));
+  assert.ok(app.indexOf('<ToolkitBetaUpdateTour') < app.indexOf('<NodiStyleModal'));
 });
 
 test('the guide covers all five tools, extraction choices, performance and subscriptions', async () => {

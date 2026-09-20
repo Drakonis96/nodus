@@ -108,9 +108,12 @@ try {
   assert.deepEqual(ai.chunkStudyKnowledgeText('A'.repeat(120) + '\n\n' + 'B'.repeat(120), 150, 4).map((part) => part.length), [120, 120]);
 
   const placementB = materials.getStudyMaterial(imported.material.id).placements.find((placement) => placement.subjectId === subjectB.id);
-  materials.removeStudyMaterialPlacement(imported.material.id, placementB.id);
+  const knowledgeBeforeMove = knowledge.listStudyIdeas(subjectB.id).map((idea) => knowledge.getStudyIdeaDetail(idea.id));
+  materials.moveStudyMaterialPlacement(imported.material.id, placementB.id, { subjectId: subjectA.id });
   knowledge.syncStudyKnowledgeSourceScopes('material', imported.material.id);
-  assert.equal(knowledge.listStudyIdeas(subjectB.id).length, 0, 'removing a placement removes only that subject projection');
+  assert.deepEqual(knowledge.listStudyIdeas(subjectB.id).map((idea) => knowledge.getStudyIdeaDetail(idea.id)), knowledgeBeforeMove, 'moving preserves the original subject knowledge and evidence');
+  knowledge.syncStudyKnowledgeSourceScopes('material', imported.material.id);
+  assert.deepEqual(knowledge.listStudyIdeas(subjectB.id).map((idea) => knowledge.getStudyIdeaDetail(idea.id)), knowledgeBeforeMove, 'future background sync cannot erase relocation provenance');
   assert.ok(knowledge.listStudyIdeas(subjectA.id).length >= 1, 'the other subject projection remains intact');
   const assessmentContext = await ai.retrieveStudyKnowledgeContext(subjectA.id, 'limitación del poder', [`material:${imported.material.id}`]);
   assert.equal(assessmentContext.ideas.length, 1, 'assessment retrieval respects explicit source selection');

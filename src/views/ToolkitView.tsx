@@ -1,14 +1,12 @@
-// Nodus Toolkit — el hub de Herramientas: utilidades locales de proceso de
-// archivos (conversión, protección, presentación de PDFs y OCR asistido). La navegación
-// interna (catálogo ↔ herramienta) no añade ids a la union View: los accesos
-// fijados del sidebar apuntan a estas páginas anidadas, y la página activa la
-// controla App (así el estado sobrevive a salir de la sección).
+// Nodus Tools combines nested file utilities and existing standalone research
+// views. Standalone cards reuse their sidebar visibility; nested tools use pins.
 import { useState } from 'react';
 import type { AppSettings } from '@shared/types';
-import { normalizeToolkitToolPages, type ToolkitToolPage } from '@shared/toolkitNavigation';
+import { effectiveSidebarHidden } from '@shared/vaultTypes';
+import { normalizeToolkitToolPages } from '@shared/toolkitNavigation';
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
-import { TOOLKIT_TOOLS, toolkitSidebarId, type ToolkitPage } from '../navigation';
+import { TOOLKIT_TOOLS, isToolkitStandalonePage, toolkitSidebarId, type ToolkitCatalogPage, type ToolkitStandalonePage, type ToolkitPage } from '../navigation';
 import { ToolkitConvertView } from './ToolkitConvertView';
 import { ToolkitProtectView } from './ToolkitProtectView';
 import { ToolkitPresenterView } from './ToolkitPresenterView';
@@ -84,22 +82,50 @@ function ToolCard({ testid, icon, name, description, state, pinned, pinBusy, onO
 export function ToolkitView({
   page,
   onNavigate,
+  onOpenView,
   settings,
+  vaultType,
 }: {
   page: ToolkitPage;
   onNavigate: (page: ToolkitPage) => void;
+  onOpenView: (view: ToolkitStandalonePage) => void;
   settings: AppSettings | null;
+  vaultType: string | undefined;
 }) {
-  const [pinBusy, setPinBusy] = useState<ToolkitToolPage | null>(null);
+  const [pinBusy, setPinBusy] = useState<ToolkitCatalogPage | null>(null);
+  const [query, setQuery] = useState('');
+  const normalizeSearch = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
+  const search = normalizeSearch(query.trim());
+  const visibleTools = TOOLKIT_TOOLS.filter((tool) => normalizeSearch(`${tool.name} ${t(tool.description)}`).includes(search));
+  const sidebarHidden = effectiveSidebarHidden(settings?.sidebarHidden ?? [], settings?.sidebarCustomized ?? false, vaultType);
   const pinnedPages = normalizeToolkitToolPages(settings?.toolkitPinnedPages);
   const pinned = new Set(pinnedPages);
 
-  const togglePinned = async (toolPage: ToolkitToolPage) => {
+  const isToolPinned = (toolPage: ToolkitCatalogPage) => isToolkitStandalonePage(toolPage)
+    ? Boolean(settings && !sidebarHidden.includes(toolPage))
+    : pinned.has(toolPage);
+
+  const togglePinned = async (toolPage: ToolkitCatalogPage) => {
     if (!settings || pinBusy) return;
     setPinBusy(toolPage);
-    const id = toolkitSidebarId(toolPage);
-    const isPinned = pinned.has(toolPage);
     try {
+      // Standalone tools already have canonical sidebar entries. Reuse their
+      // visibility preferences so pinning never creates duplicate shortcuts.
+      if (isToolkitStandalonePage(toolPage)) {
+        const wasPinned = isToolPinned(toolPage);
+        await window.nodus.updateSettings({
+          sidebarCustomized: true,
+          sidebarHidden: wasPinned
+            ? [...sidebarHidden, toolPage]
+            : sidebarHidden.filter((id) => id !== toolPage),
+          sidebarOrder: wasPinned
+            ? settings.sidebarOrder.filter((id) => id !== toolPage)
+            : settings.sidebarOrder,
+        });
+        return;
+      }
+      const id = toolkitSidebarId(toolPage);
+      const isPinned = pinned.has(toolPage);
       await window.nodus.updateSettings({
         toolkitPinnedPages: isPinned
           ? pinnedPages.filter((pageId) => pageId !== toolPage)
@@ -143,12 +169,41 @@ export function ToolkitView({
             <div className="min-w-0">
               <h1 className="toolkit-page-title text-lg font-semibold text-neutral-900 dark:text-neutral-100">{t('Herramientas')}</h1>
               <p className="toolkit-page-description text-sm text-neutral-500">
-                {t('Utilidades locales para investigación, docencia y estudio: convierte y procesa archivos sin salir de Nodus.')}
+                {t('Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.')}
               </p>
             </div>
           </header>
-          <div className="grid gap-4 sm:grid-cols-2 auto-rows-fr">
-            {TOOLKIT_TOOLS.map((tool) => (
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">
+              <Icon name="search" size={18} />
+            </span>
+            <input
+              type="search"
+              data-testid="toolkit-search"
+              aria-label={t('Buscar herramientas')}
+              placeholder={t('Buscar herramientas')}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => { if (event.key === 'Escape') setQuery(''); }}
+              className="w-full rounded-xl border border-neutral-200 bg-white py-3 pl-10 pr-12 text-sm text-neutral-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 dark:border-neutral-800 dark:bg-neutral-900/40 dark:text-neutral-100 [&::-webkit-search-cancel-button]:hidden"
+            />
+            {query && (
+              <button
+                type="button"
+                aria-label={t('Limpiar búsqueda')}
+                title={t('Limpiar búsqueda')}
+                onClick={() => setQuery('')}
+                className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              >
+                <Icon name="x" size={16} />
+              </button>
+            )}
+          </div>
+          {visibleTools.length === 0 && (
+            <p role="status" className="py-12 text-center text-sm text-neutral-500">{t('Sin resultados')}</p>
+          )}
+          <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleTools.map((tool) => (
               <ToolCard
                 key={tool.page}
                 testid={`toolkit-card-${tool.testid}`}
@@ -156,9 +211,9 @@ export function ToolkitView({
                 name={tool.name}
                 description={t(tool.description)}
                 state={tool.state}
-                pinned={pinned.has(tool.page)}
-                pinBusy={pinBusy === tool.page}
-                onOpen={() => onNavigate(tool.page)}
+                pinned={isToolPinned(tool.page)}
+                pinBusy={!settings || pinBusy !== null}
+                onOpen={() => isToolkitStandalonePage(tool.page) ? onOpenView(tool.page) : onNavigate(tool.page)}
                 onTogglePinned={() => void togglePinned(tool.page)}
               />
             ))}

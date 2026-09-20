@@ -1,4 +1,6 @@
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
+import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -68,6 +70,13 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const FR: Record<string, string> = {
   ...ACADEMIC_MANUAL_TRANSLATIONS["fr"],
+  // Nodus Tools catalogue
+  "Navega por la web y guarda fuentes para tu investigación.": "Parcourez le web et enregistrez des sources pour vos recherches.",
+  "Descubre literatura académica en fuentes abiertas.": "Découvrez la littérature scientifique dans des sources ouvertes.",
+  "Sigue fuentes y descubre novedades para tu investigación.": "Suivez des sources et découvrez les nouveautés pour vos recherches.",
+  "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Explorez des sources, suivez les nouveautés et travaillez sur vos fichiers sans quitter Nodus.",
+  "Buscar herramientas": "Rechercher des outils",
+
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Choisissez le mode clair, le mode sombre ou suivez le système d’exploitation.',
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['fr'],
   "Research chat": "Research chat",
@@ -125,6 +134,7 @@ export const FR: Record<string, string> = {
   ...WORLD_CHAT_TRANSLATIONS.fr,
   ...STUDY_SYNONYM_TRANSLATIONS.fr,
   ...STUDY_BANK_TRANSLATIONS.fr,
+  ...STUDY_SOURCE_TRANSLATIONS["fr"],
   ...STUDY_IMPROVE_TRANSLATIONS.fr,
   ...WORKSPACE_TRANSLATIONS.fr,
   "Lo que cuenta el mapa": "Ce que raconte la carte",
@@ -8820,4 +8830,5 @@ export const FR: Record<string, string> = {
   "Error del sombreador": "Erreur de shader",
   "Ask the model to fix the failed steps": "Demander au modèle de corriger les étapes qui ont échoué",
   "Sent": "Envoyé",
+  ...CONCILIUM_TRANSLATIONS['fr'],
 };
