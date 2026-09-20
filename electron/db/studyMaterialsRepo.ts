@@ -26,7 +26,7 @@ import { createStudyShortId, normalizeStudyName } from '@shared/studyOrg';
 import type { StudyPlacementInput } from '@shared/studyOrg';
 import { extractFromPath } from '../extraction/textExtractor';
 import { getDb } from './database';
-import { createStudyDocument } from './studyOrgRepo';
+import { createStudyDocument, resolveStudyMoveDestination } from './studyOrgRepo';
 import { encodeEmbedding } from './ideasRepo';
 
 type Row = Record<string, unknown>;
@@ -244,33 +244,7 @@ export function moveStudyMaterialPlacement(materialId: string, placementId: stri
     const origin = placementId === null ? null : placements.find((p) => p.id === placementId && !p.archived_at);
     if (placementId !== null && !origin) throw new Error('La ubicación de origen ya no existe.');
     if (placementId === null && placements.some((p) => !p.archived_at)) throw new Error('Selecciona la ubicación de origen.');
-    const active = (table: 'study_courses' | 'study_subjects' | 'study_folders' | 'study_topics', id: string): Row => {
-      const row = db.prepare(`SELECT * FROM ${table} WHERE id = ? AND deleted_at IS NULL AND archived_at IS NULL`).get(id) as Row | undefined;
-      if (!row) throw new Error('El destino ya no está disponible.');
-      return row;
-    };
-    let courseId = destination.courseId || null;
-    let subjectId = destination.subjectId || null;
-    let folderId = destination.folderId || null;
-    const topicId = destination.topicId || null;
-    if (topicId) {
-      const topic = active('study_topics', topicId);
-      if ((subjectId && subjectId !== topic.subject_id) || (folderId && folderId !== topic.folder_id)) throw new Error('El tema no pertenece al destino seleccionado.');
-      subjectId = String(topic.subject_id);
-      folderId = topic.folder_id ? String(topic.folder_id) : null;
-    }
-    if (folderId) {
-      const folder = active('study_folders', folderId);
-      if ((subjectId && subjectId !== folder.subject_id) || (courseId && courseId !== folder.course_id)) throw new Error('La carpeta no pertenece al destino seleccionado.');
-      subjectId = folder.subject_id ? String(folder.subject_id) : null;
-      courseId = folder.course_id ? String(folder.course_id) : null;
-    }
-    if (subjectId) {
-      const subject = active('study_subjects', subjectId);
-      if (courseId && courseId !== subject.course_id) throw new Error('La asignatura no pertenece al curso seleccionado.');
-      courseId = String(subject.course_id);
-    }
-    if (courseId) active('study_courses', courseId);
+    const { courseId, subjectId, folderId, topicId } = resolveStudyMoveDestination(destination);
     // A document attachment is provenance, not a destination chosen by this dialog.
     const documentId = origin?.document_id ? String(origin.document_id) : null;
     const input = { courseId, subjectId, folderId, topicId, documentId };

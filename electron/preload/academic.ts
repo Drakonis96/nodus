@@ -206,6 +206,7 @@ export const academicApi: AcademicApi = {
   moveStudyEntity: (kind, id, input) => ipcRenderer.invoke('study:entity:move', kind, id, input),
   addStudyPlacement: (documentId, input) => ipcRenderer.invoke('study:placement:add', documentId, input),
   setPrimaryStudyPlacement: (documentId, input) => ipcRenderer.invoke('study:placement:setPrimary', documentId, input),
+  moveStudyPlacement: (documentId, placementId, destination) => ipcRenderer.invoke('study:placement:move', documentId, placementId, destination),
   removeStudyPlacement: (id) => ipcRenderer.invoke('study:placement:remove', id).then(() => undefined),
   setStudyLifecycle: (kind, id, action, options) => ipcRenderer.invoke('study:lifecycle:set', kind, id, action, options).then(() => undefined),
   duplicateStudyTree: (kind, id) => ipcRenderer.invoke('study:tree:duplicate', kind, id),

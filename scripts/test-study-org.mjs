@@ -181,6 +181,83 @@ try {
   const capturedTreeDocs = shared.buildStudyTree(org.getStudyWorkspace())[0].subjects[0].topics[0].children[0].documents.map((item) => item.id);
   assert.ok(capturedTreeDocs.includes(captured.id), 'the captured note appears in the topic tree');
 
+  // Moving one placement never drops other locations, tags, content, or identity.
+  const moveDoc = org.createStudyDocument({ title: 'Mover sin perder datos', contentMarkdown: '**Contenido**', placement: { subjectId: subject.id } });
+  org.setStudyDocumentTags(moveDoc.id, [tag.id]);
+  const otherLink = org.addStudyPlacement(moveDoc.id, { subjectId: destinationSubject.id });
+  const links = () => org.getStudyWorkspace({ includeArchived: true, includeDeleted: true }).placements.filter((p) => p.documentId === moveDoc.id);
+  let origin = links().find((p) => p.id !== otherLink.id);
+  const globalFolder = org.createStudyFolder({ name: 'Carpeta global' });
+  const courseFolder = org.createStudyFolder({ name: 'Carpeta del curso', courseId: course.id });
+  const nestedFolder = org.createStudyFolder({ name: 'Subcarpeta', courseId: course.id, subjectId: subject.id, parentId: folder.id });
+  const destinations = [
+    [{ courseId: course.id }, { courseId: course.id, subjectId: null, folderId: null, topicId: null }],
+    [{ folderId: globalFolder.id }, { courseId: null, subjectId: null, folderId: globalFolder.id, topicId: null }],
+    [{ folderId: courseFolder.id }, { courseId: course.id, subjectId: null, folderId: courseFolder.id, topicId: null }],
+    [{ folderId: nestedFolder.id }, { courseId: course.id, subjectId: subject.id, folderId: nestedFolder.id, topicId: null }],
+    [{ topicId: subtopic.id }, { courseId: course.id, subjectId: subject.id, folderId: folder.id, topicId: subtopic.id }],
+  ];
+  for (const [input, expected] of destinations) {
+    const result = org.moveStudyPlacement(moveDoc.id, origin.id, input);
+    assert.equal(result.id, origin.id, 'moving preserves the placement ID');
+    for (const [field, value] of Object.entries(expected)) assert.equal(result[field], value, field);
+    assert.equal(links().length, 2);
+    assert.deepEqual(links().find((p) => p.id === otherLink.id), otherLink, 'unselected location is untouched');
+    assert.deepEqual(org.getStudyEntity('document', moveDoc.id), moveDoc, 'content and metadata are untouched');
+  }
+  const beforeInvalid = links();
+  for (const invalid of [{ courseId: 'missing' }, { subjectId: 'missing' }, { folderId: 'missing' }, { topicId: 'missing' }, { courseId: destinationCourse.id, topicId: topic.id }, { subjectId: destinationSubject.id, folderId: folder.id }, { folderId: nestedFolder.id, topicId: topic.id }]) {
+    assert.throws(() => org.moveStudyPlacement(moveDoc.id, origin.id, invalid));
+    assert.deepEqual(links(), beforeInvalid, 'an invalid move is atomic');
+  }
+  assert.throws(() => org.moveStudyPlacement(moveDoc.id, otherLink.id + '-stale', {}), /origen/);
+  assert.throws(() => org.moveStudyPlacement(moveDoc.id, null, {}), /origen/);
+  assert.throws(() => org.moveStudyPlacement(document.id, otherLink.id, {}), /origen/);
+  assert.deepEqual(org.moveStudyPlacement(moveDoc.id, origin.id, { topicId: subtopic.id }), beforeInvalid.find((p) => p.id === origin.id), 'same destination is a no-op');
+  org.setStudyLifecycle('folder', globalFolder.id, 'archive');
+  assert.throws(() => org.moveStudyPlacement(moveDoc.id, origin.id, { folderId: globalFolder.id }), /disponible/);
+  org.setStudyLifecycle('folder', globalFolder.id, 'restore');
+  const merged = org.moveStudyPlacement(moveDoc.id, origin.id, { subjectId: destinationSubject.id });
+  assert.equal(merged.id, otherLink.id, 'existing destination is reused');
+  assert.equal(links().length, 1);
+  assert.equal(org.moveStudyPlacement(moveDoc.id, otherLink.id, {}), null, 'can leave a note unfiled');
+  assert.equal(links().length, 0);
+  origin = org.moveStudyPlacement(moveDoc.id, null, { subjectId: subject.id });
+  getDb().prepare('UPDATE study_placements SET archived_at = ? WHERE id = ?').run(new Date().toISOString(), origin.id);
+  const fresh = org.moveStudyPlacement(moveDoc.id, null, { subjectId: subject.id });
+  assert.equal(fresh.id, origin.id, 'the unique archived location is reused');
+  assert.equal(fresh.archivedAt, null, 'the reused location becomes visible');
+  assert.equal(org.getStudyWorkspace().documentTags.filter((link) => link.documentId === moveDoc.id).length, 1);
+  org.setStudyLifecycle('document', moveDoc.id, 'trash');
+  assert.throws(() => org.moveStudyPlacement(moveDoc.id, fresh.id, {}), /disponible/);
+  org.setStudyLifecycle('document', moveDoc.id, 'recover');
+
+  // Folder moves preserve a full subtree and support course/global folders.
+  const movableFolder = org.createStudyFolder({ name: 'Traslado', subjectId: subject.id, courseId: course.id });
+  const movableChild = org.createStudyFolder({ name: 'Hija', parentId: movableFolder.id, subjectId: subject.id, courseId: course.id });
+  const folderDoc = org.createStudyDocument({ title: 'Dentro', placement: { folderId: movableChild.id } });
+  assert.throws(() => org.moveStudyEntity('folder', movableFolder.id, { parentId: movableChild.id }), /sí misma/);
+  org.moveStudyEntity('folder', movableFolder.id, { parentId: globalFolder.id });
+  let movedChild = org.getStudyEntity('folder', movableChild.id);
+  assert.equal(movedChild.parentId, movableFolder.id);
+  assert.equal(movedChild.subjectId, null);
+  assert.equal(movedChild.courseId, null);
+  org.moveStudyEntity('folder', movableFolder.id, { courseId: destinationCourse.id });
+  assert.equal(org.getStudyEntity('folder', movableChild.id).courseId, destinationCourse.id);
+  org.moveStudyEntity('folder', movableFolder.id, { subjectId: destinationSubject.id });
+  assert.equal(org.getStudyWorkspace().placements.find((p) => p.documentId === folderDoc.id).subjectId, destinationSubject.id);
+  const movableTopic = org.createStudyTopic({ name: 'Tema trasladable', subjectId: destinationSubject.id, folderId: movableChild.id });
+  const movableSubtopic = org.createStudyTopic({ name: 'Subtema', subjectId: destinationSubject.id, parentId: movableTopic.id });
+  assert.throws(() => org.moveStudyEntity('topic', movableTopic.id, { parentId: movableSubtopic.id }), /sí mismo/);
+  assert.throws(() => org.moveStudyEntity('folder', movableFolder.id, {}), /asignatura/, 'topics require a subject');
+  assert.equal(org.getStudyEntity('folder', movableFolder.id).subjectId, destinationSubject.id, 'failed move leaves the tree intact');
+  org.moveStudyEntity('folder', movableFolder.id, { subjectId: subject.id });
+  assert.equal(org.getStudyEntity('topic', movableSubtopic.id).subjectId, subject.id);
+  org.moveStudyEntity('topic', movableTopic.id, { subjectId: destinationSubject.id });
+  assert.equal(org.getStudyEntity('topic', movableSubtopic.id).subjectId, destinationSubject.id);
+  assert.equal(org.getStudyEntity('topic', movableSubtopic.id).folderId, null);
+  console.log('Placement move matrix and subtree integrity checks passed.');
+
   // Upgrade a genuine v52 database and prove unrelated content survives intact.
   const legacyPath = path.join(root, 'legacy-v52.sqlite');
   const legacy = new Database(legacyPath);

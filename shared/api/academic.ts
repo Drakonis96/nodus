@@ -429,6 +429,8 @@ export interface AcademicApi {
   moveStudyEntity(kind: Exclude<StudyEntityKind, 'course' | 'document'>, id: string, input: StudyEntityMoveInput): Promise<StudySubject | StudyTopic | StudyFolder>;
   addStudyPlacement(documentId: string, input: StudyPlacementInput): Promise<StudyPlacement>;
   setPrimaryStudyPlacement(documentId: string, input: StudyPlacementInput): Promise<StudyPlacement>;
+  /** Move a single location; null destination fields leave it unfiled. Other locations are retained. */
+  moveStudyPlacement(documentId: string, placementId: string | null, destination: StudyPlacementInput): Promise<StudyPlacement | null>;
   removeStudyPlacement(id: string): Promise<void>;
   setStudyLifecycle(kind: StudyEntityKind, id: string, action: StudyLifecycleAction, options?: { purgeLinkedKnowledge?: boolean }): Promise<void>;
   /** The copy keeps the original's academic year; re-file it by editing the copy. */

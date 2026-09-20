@@ -193,10 +193,11 @@ export function sourceSubjectIds(kind: StudyKnowledgeSourceKind, sourceId: strin
 }
 
 export function syncStudyKnowledgeSourceScopes(kind: StudyKnowledgeSourceKind, sourceId: string): void {
-  // Generated knowledge has its own provenance. Moving/unlinking a live material
+  // Generated knowledge has its own provenance. Moving/unlinking a live source
   // must not erase it, including when a later background analysis runs this sync.
   // Explicit purge and lifecycle cleanup still use the existing deletion paths.
-  if (kind === 'material' && getDb().prepare('SELECT 1 FROM study_materials WHERE id = ? AND deleted_at IS NULL AND archived_at IS NULL').get(sourceId)) return;
+  const sourceTable = kind === 'material' ? 'study_materials' : 'study_docs';
+  if (getDb().prepare(`SELECT 1 FROM ${sourceTable} WHERE id = ? AND deleted_at IS NULL AND archived_at IS NULL`).get(sourceId)) return;
   const allowed = new Set(sourceSubjectIds(kind, sourceId)); const db = getDb();
   db.transaction(() => {
     const subjects = db.prepare(`SELECT DISTINCT i.subject_id id FROM study_idea_occurrences o JOIN study_ideas i ON i.id=o.idea_id

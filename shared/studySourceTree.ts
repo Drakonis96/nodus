@@ -38,10 +38,18 @@ export function studyOrganizationPaths(workspace: StudySourceOrganization) {
     }
     return chain;
   };
+  const topicChain = (id: string | null): string[] => {
+    const chain: string[] = []; const seen = new Set<string>();
+    while (id && !seen.has(id)) {
+      seen.add(id); const topic = topics.get(id); if (!topic) break;
+      chain.unshift(topic.name); id = topic.parentId;
+    }
+    return chain;
+  };
   const label = (input: StudySearchScope) => {
     const scope = resolve(input);
     return [scope.courseId ? courses.get(scope.courseId)?.name : '', scope.subjectId ? subjects.get(scope.subjectId)?.name : '',
-      ...folderChain(scope.folderId), scope.topicId ? topics.get(scope.topicId)?.name : ''].filter(Boolean).join(' / ');
+      ...folderChain(scope.folderId), ...topicChain(scope.topicId)].filter(Boolean).join(' / ');
   };
   return { resolve, label };
 }

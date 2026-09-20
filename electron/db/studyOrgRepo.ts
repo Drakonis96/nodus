@@ -440,6 +440,77 @@ export function addStudyPlacement(documentId: string, input: StudyPlacementInput
   return toPlacement(db.prepare('SELECT * FROM study_placements WHERE id = ?').get(key.id) as Row);
 }
 
+/** Validate the complete destination before changing any existing placement. */
+export function resolveStudyMoveDestination(destination: StudyPlacementInput) {
+  const db = getDb();
+  const active = (table: 'study_courses' | 'study_subjects' | 'study_folders' | 'study_topics', id: string): Row => {
+    const row = db.prepare(`SELECT * FROM ${table} WHERE id = ? AND deleted_at IS NULL AND archived_at IS NULL`).get(id) as Row | undefined;
+    if (!row) throw new Error('El destino ya no está disponible.');
+    return row;
+  };
+  let courseId = destination.courseId || null;
+  let subjectId = destination.subjectId || null;
+  let folderId = destination.folderId || null;
+  const topicId = destination.topicId || null;
+  if (topicId) {
+    const topic = active('study_topics', topicId);
+    if ((subjectId && subjectId !== topic.subject_id) || (folderId && folderId !== topic.folder_id)) throw new Error('El tema no pertenece al destino seleccionado.');
+    subjectId = String(topic.subject_id);
+    folderId = topic.folder_id ? String(topic.folder_id) : null;
+  }
+  if (folderId) {
+    const folder = active('study_folders', folderId);
+    if ((subjectId && subjectId !== folder.subject_id) || (courseId && courseId !== folder.course_id)) throw new Error('La carpeta no pertenece al destino seleccionado.');
+    subjectId = folder.subject_id ? String(folder.subject_id) : null;
+    courseId = folder.course_id ? String(folder.course_id) : null;
+  }
+  if (subjectId) {
+    const subject = active('study_subjects', subjectId);
+    if (courseId && courseId !== subject.course_id) throw new Error('La asignatura no pertenece al curso seleccionado.');
+    courseId = String(subject.course_id);
+  }
+  if (courseId) active('study_courses', courseId);
+  return { courseId, subjectId, folderId, topicId };
+}
+
+/** Move one location atomically, preserving other locations and document data. */
+export function moveStudyPlacement(documentId: string, placementId: string | null, destination: StudyPlacementInput): StudyPlacement | null {
+  const db = getDb();
+  return db.transaction(() => {
+    const document = getStudyEntity('document', documentId);
+    if (!document || document.deletedAt || document.archivedAt) throw new Error('El documento no está disponible.');
+    const placements = (db.prepare('SELECT * FROM study_placements WHERE document_id = ?').all(documentId) as Row[]).map(toPlacement);
+    const active = placements.filter((p) => !p.archivedAt && !p.deletedAt);
+    const origin = active.find((p) => p.id === placementId);
+    if (placementId !== null && !origin) throw new Error('La ubicación de origen ya no existe.');
+    if (placementId === null && active.length) throw new Error('Selecciona la ubicación de origen.');
+    const target = resolveStudyMoveDestination(destination);
+    const key = studyPlacementKey(target);
+    if (origin && studyPlacementKey(origin) === key) return origin;
+    const duplicate = placements.find((p) => p.id !== placementId && studyPlacementKey(p) === key);
+    if (duplicate || Object.values(target).every((value) => value === null)) {
+      if (origin) db.prepare('DELETE FROM study_placements WHERE id = ?').run(origin.id);
+      if (duplicate && (duplicate.archivedAt || duplicate.deletedAt)) {
+        db.prepare('UPDATE study_placements SET archived_at = NULL, deleted_at = NULL, updated_at = ? WHERE id = ?').run(now(), duplicate.id);
+        return toPlacement(db.prepare('SELECT * FROM study_placements WHERE id = ?').get(duplicate.id) as Row);
+      }
+      return duplicate ?? null;
+    }
+    if (origin) {
+      db.prepare('UPDATE study_placements SET course_id = ?, subject_id = ?, folder_id = ?, topic_id = ?, updated_at = ? WHERE id = ?')
+        .run(target.courseId, target.subjectId, target.folderId, target.topicId, now(), origin.id);
+      return toPlacement(db.prepare('SELECT * FROM study_placements WHERE id = ?').get(origin.id) as Row);
+    }
+    // No existing location matches the destination.
+    const keyId = ids('placement');
+    const timestamp = now();
+    db.prepare(`INSERT INTO study_placements (id, short_id, document_id, course_id, subject_id, folder_id, topic_id, position, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(keyId.id, keyId.shortId, documentId, target.courseId, target.subjectId, target.folderId, target.topicId,
+        nextPosition('study_placements', 'document_id', documentId), timestamp, timestamp);
+    return toPlacement(db.prepare('SELECT * FROM study_placements WHERE id = ?').get(keyId.id) as Row);
+  })();
+}
+
 export function setPrimaryStudyPlacement(documentId: string, input: StudyPlacementInput): StudyPlacement {
   const db = getDb();
   return db.transaction(() => {
@@ -571,7 +642,7 @@ function descendantIds(kind: StudyEntityKind, id: string): Record<StudyEntityKin
   return result;
 }
 
-function updateStudyScopeReferences(scopeColumn: 'subject_id' | 'folder_id' | 'topic_id', ids: string[], patch: { courseId?: string; subjectId?: string; folderId?: string | null }): void {
+function updateStudyScopeReferences(scopeColumn: 'subject_id' | 'folder_id' | 'topic_id', ids: string[], patch: { courseId?: string | null; subjectId?: string | null; folderId?: string | null }): void {
   if (!ids.length) return;
   const db = getDb();
   const placeholders = ids.map(() => '?').join(',');
@@ -594,9 +665,11 @@ function updateStudyScopeReferences(scopeColumn: 'subject_id' | 'folder_id' | 't
 export function moveStudyEntity(kind: 'subject' | 'folder' | 'topic', id: string, input: StudyEntityMoveInput): StudySubject | StudyFolder | StudyTopic {
   const db = getDb();
   return db.transaction(() => {
+    const source = getStudyEntity(kind, id);
+    if (!source || source.deletedAt || source.archivedAt) throw new Error('El elemento no está disponible.');
     if (kind === 'subject') {
       const courseId = input.courseId ?? '';
-      if (!db.prepare('SELECT 1 FROM study_courses WHERE id = ? AND deleted_at IS NULL').get(courseId)) throw new Error('El curso de destino no existe.');
+      if (!db.prepare('SELECT 1 FROM study_courses WHERE id = ? AND deleted_at IS NULL AND archived_at IS NULL').get(courseId)) throw new Error('El curso de destino no existe.');
       if (!getStudyEntity('subject', id)) throw new Error('La asignatura no existe.');
       db.prepare('UPDATE study_subjects SET course_id = ?, updated_at = ? WHERE id = ?').run(courseId, now(), id);
       db.prepare('UPDATE study_folders SET course_id = ?, updated_at = ? WHERE subject_id = ?').run(courseId, now(), id);
@@ -607,24 +680,28 @@ export function moveStudyEntity(kind: 'subject' | 'folder' | 'topic', id: string
     if (kind === 'folder') {
       const scope = descendantIds('folder', id);
       if (!scope.folder.has(id) || !getStudyEntity('folder', id)) throw new Error('La carpeta no existe.');
-      let subjectId = input.subjectId ?? '';
+      let subjectId = input.subjectId || null;
+      let courseId = input.courseId || null;
       const parentId = input.parentId ?? null;
       if (parentId) {
         if (scope.folder.has(parentId)) throw new Error('La carpeta no puede moverse dentro de sí misma.');
-        const parent = db.prepare('SELECT subject_id FROM study_folders WHERE id = ? AND deleted_at IS NULL').get(parentId) as Row | undefined;
-        if (!parent?.subject_id) throw new Error('La carpeta de destino no existe.');
-        const parentSubjectId = String(parent.subject_id);
+        const parent = db.prepare('SELECT subject_id, course_id FROM study_folders WHERE id = ? AND deleted_at IS NULL AND archived_at IS NULL').get(parentId) as Row | undefined;
+        if (!parent) throw new Error('La carpeta de destino no existe.');
+        const parentSubjectId = parent.subject_id ? String(parent.subject_id) : null;
         if (subjectId && subjectId !== parentSubjectId) throw new Error('La carpeta de destino no pertenece a la asignatura seleccionada.');
         subjectId = parentSubjectId;
+        courseId = parent.course_id ? String(parent.course_id) : null;
       }
-      const subject = db.prepare('SELECT course_id FROM study_subjects WHERE id = ? AND deleted_at IS NULL').get(subjectId) as Row | undefined;
-      if (!subject) throw new Error('La asignatura de destino no existe.');
-      const courseId = String(subject.course_id);
+      const destination = resolveStudyMoveDestination({ courseId, subjectId });
+      courseId = destination.courseId;
+      subjectId = destination.subjectId;
+      if (!subjectId && scope.topic.size) throw new Error('Los temas necesitan una asignatura de destino.');
       const folderIds = [...scope.folder];
       const placeholders = folderIds.map(() => '?').join(',');
       db.prepare(`UPDATE study_folders SET course_id = ?, subject_id = ?, updated_at = ? WHERE id IN (${placeholders})`).run(courseId, subjectId, now(), ...folderIds);
       db.prepare('UPDATE study_folders SET parent_id = ?, updated_at = ? WHERE id = ?').run(parentId, now(), id);
       updateStudyScopeReferences('folder_id', folderIds, { courseId, subjectId });
+      updateStudyScopeReferences('topic_id', [...scope.topic], { courseId, subjectId });
       return getStudyEntity('folder', id) as StudyFolder;
     }
 
@@ -635,17 +712,17 @@ export function moveStudyEntity(kind: 'subject' | 'folder' | 'topic', id: string
     const parentId = input.parentId ?? null;
     if (parentId) {
       if (scope.topic.has(parentId)) throw new Error('El tema no puede moverse dentro de sí mismo.');
-      const parent = db.prepare('SELECT subject_id, folder_id FROM study_topics WHERE id = ? AND deleted_at IS NULL').get(parentId) as Row | undefined;
+      const parent = db.prepare('SELECT subject_id, folder_id FROM study_topics WHERE id = ? AND deleted_at IS NULL AND archived_at IS NULL').get(parentId) as Row | undefined;
       if (!parent) throw new Error('El tema superior de destino no existe.');
       const parentSubjectId = String(parent.subject_id);
       if (subjectId && subjectId !== parentSubjectId) throw new Error('El tema superior no pertenece a la asignatura seleccionada.');
       subjectId = parentSubjectId;
       folderId = parent.folder_id ? String(parent.folder_id) : null;
     }
-    const subject = db.prepare('SELECT course_id FROM study_subjects WHERE id = ? AND deleted_at IS NULL').get(subjectId) as Row | undefined;
+    const subject = db.prepare('SELECT course_id FROM study_subjects WHERE id = ? AND deleted_at IS NULL AND archived_at IS NULL').get(subjectId) as Row | undefined;
     if (!subject) throw new Error('La asignatura de destino no existe.');
     if (folderId) {
-      const folder = db.prepare('SELECT subject_id FROM study_folders WHERE id = ? AND deleted_at IS NULL').get(folderId) as Row | undefined;
+      const folder = db.prepare('SELECT subject_id FROM study_folders WHERE id = ? AND deleted_at IS NULL AND archived_at IS NULL').get(folderId) as Row | undefined;
       if (!folder || String(folder.subject_id ?? '') !== subjectId) throw new Error('La carpeta no pertenece a la asignatura seleccionada.');
     }
     const courseId = String(subject.course_id);
