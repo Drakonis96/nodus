@@ -24,7 +24,7 @@ const tr = (lang, key) => lang === 'es' ? key : dictionaries[lang][key];
 
 test('every static update-flow message has an explicit translation and intact placeholders in all languages', async () => {
   const keys = new Set();
-  for (const file of ['src/updateStatus.ts', 'src/components/StartupUpdateModal.tsx', 'src/components/UpdateReadyNotice.tsx']) {
+  for (const file of ['src/updateStatus.ts', 'src/components/UpdateReadyNotice.tsx']) {
     const source = await readFile(path.join(root, file), 'utf8');
     const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const visit = (node) => {
@@ -46,14 +46,15 @@ test('Settings and the app shell consume the persistent snapshot; every installe
   assert.match(settings, /\[updateProgress, setUpdateProgress\] = useUpdateProgress\(\)/);
   assert.match(settings, /canInstallUpdate\(updateProgress\)/);
   assert.match(settings, /installUpdateManually\(updateProgress\)/);
-  assert.match(app, /<UpdateReadyNotice/); assert.match(app, /onDefer=\{/);
+  assert.match(app, /<UpdateReadyNotice/); assert.match(app, /checkOnStartup: true/);
 });
 
 const chrome = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(existsSync);
 const ready = { status: 'downloaded', message: '', version: '5.2.0', downloadedVersion: '5.2.0', progress: 100, at: '2026-09-06T00:00:00Z' };
-test('real update UI: work, postpone, revisit, retry and install in all languages', { timeout: 180_000 }, async (t) => {
+test('real update UI: work, postpone, revisit, retry and install in all languages', { timeout: 300_000 }, async (t) => {
   if (!chrome) { t.skip('Chrome/Chromium not installed'); return; }
-  const bundle = await build({ outfile: path.join(dir, 'fixture.js'), entryPoints: [path.join(root, 'scripts/fixtures/manual-update/renderer.tsx')], bundle: true, write: false, platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"', __APP_VERSION__: '"5.1.7"' } });
+  const buildFixture = (mode) => build({ outfile: path.join(dir, 'fixture.js'), entryPoints: [path.join(root, 'scripts/fixtures/manual-update/renderer.tsx')], bundle: true, write: false, platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': JSON.stringify(mode), __APP_VERSION__: '"5.1.7"' } });
+  const [bundle, strictBundle] = await Promise.all([buildFixture('production'), buildFixture('development')]);
   execFileSync(path.join(root, 'node_modules/.bin/tailwindcss'), ['-i', 'src/index.css', '-o', path.join(dir, 'style.css'), '--minify'], { cwd: root, stdio: 'pipe' });
   const css = await readFile(path.join(dir, 'style.css'), 'utf8');
   const browser = await chromium.launch({ executablePath: chrome, headless: true });
@@ -64,16 +65,20 @@ test('real update UI: work, postpone, revisit, retry and install in all language
     page = await browser.newPage({ viewport: { width: 1120, height: 800 } }); page.setDefaultTimeout(8000);
     page.on('pageerror', (e) => errors.push(e.message));
     await page.route('http://updates.test/', (route) => route.fulfill({ contentType: 'text/html', body: '<html class="dark"><body><div id="root"></div></body></html>' }));
-    await page.goto('http://updates.test/'); await page.addStyleTag({ content: css + bundle.outputFiles.find((f) => f.path.endsWith('.css')).text });
+    await page.goto('http://updates.test/'); await page.addStyleTag({ content: css + (bundle.outputFiles.find((f) => f.path.endsWith('.css'))?.text ?? '') });
     await page.evaluate((config) => { window.config = { initial: null, lang: 'es', ...config }; }, config);
-    await page.addScriptTag({ content: bundle.outputFiles.find((f) => f.path.endsWith('.js')).text });
+    const script = config.strict ? strictBundle : bundle;
+    await page.addScriptTag({ content: script.outputFiles.find((f) => f.path.endsWith('.js')).text });
     await page.getByTestId('working-document').waitFor();
   }
   const emit = (event) => page.evaluate((event) => window.emit(event), event);
   try {
-    await t.test('a download finishing after the startup modal was closed is visible without interrupting work', async () => {
+    await t.test('startup download progress and completion never interrupt work', async () => {
       await fresh({ startup: true, initial: { ...ready, status: 'downloading', downloadedVersion: null, progress: 20 } });
-      await page.getByRole('button', { name: 'Continuar en segundo plano' }).click();
+      await page.getByRole('progressbar').waitFor();
+      assert.equal(await page.getByRole('progressbar').getAttribute('aria-valuenow'), '20');
+      assert.match(await page.getByTestId('update-ready-notice').innerText(), /5.2.0/);
+      assert.equal(await page.getByRole('dialog').count(), 0);
       await page.getByTestId('working-document').fill('Trabajo sin perder');
       await emit(ready); await page.getByTestId('update-ready-notice').waitFor();
       assert.equal(await page.getByTestId('working-document').inputValue(), 'Trabajo sin perder');
@@ -92,6 +97,53 @@ test('real update UI: work, postpone, revisit, retry and install in all language
       assert.equal(await page.getByTestId('update-ready-notice').getByRole('button', { name: 'Instalar y reiniciar' }).count(), 0);
       await page.evaluate((event) => window.finishInstall(event), { ...ready, status: 'installing' });
       await page.getByTestId('update-ready-notice').getByText('Instalando Nodus 5.2.0 y reiniciando…', { exact: true }).waitFor();
+    });
+    await t.test('startup checking disappears when current, and later checks/downloads remain silent', async () => {
+      await fresh({ startup: true, holdCheck: true, strict: true });
+      await page.getByText('Buscando actualizaciones…', { exact: true }).waitFor();
+      assert.equal(await page.evaluate(() => window.checks), 1, 'StrictMode must not duplicate the startup request');
+      const current = { status: 'not-available', message: '', version: '5.1.7', downloadedVersion: null };
+      await emit({ status: 'checking', message: '' });
+      await page.evaluate((event) => window.resolveCheck(event), current);
+      await page.getByTestId('update-ready-notice').waitFor({ state: 'detached' });
+      for (const status of ['checking', 'available', 'downloading', 'error', 'not-available']) {
+        await emit({ ...current, status, progress: 45 });
+        assert.equal(await page.getByTestId('update-ready-notice').count(), 0, status);
+      }
+      await emit(ready);
+      await page.getByTestId('update-ready-notice').waitFor();
+    });
+    await t.test('startup errors disappear automatically and disabled updates leave no banner', async () => {
+      await fresh({ startup: true, rejectCheck: true });
+      await page.getByText('No se pudo comprobar si hay actualizaciones.', { exact: true }).waitFor();
+      await page.getByTestId('update-ready-notice').waitFor({ state: 'detached' });
+      await emit({ status: 'checking', message: '' });
+      assert.equal(await page.getByTestId('update-ready-notice').count(), 0);
+      await fresh({ startup: true, initial: { status: 'disabled', message: '' } });
+      await page.getByTestId('update-ready-notice').waitFor({ state: 'detached' });
+    });
+    await t.test('session reload skips the startup check but restores a pending installer', async () => {
+      await fresh({ startup: true, checked: true, initial: ready });
+      await page.getByTestId('update-ready-notice').waitFor();
+      assert.equal(await page.evaluate(() => window.checks), 0);
+    });
+    await t.test('a late startup response cannot replace live download progress or completion', async () => {
+      await fresh({ startup: true, holdCheck: true });
+      await emit({ ...ready, status: 'downloading', downloadedVersion: null, progress: 68 });
+      await page.getByRole('progressbar').waitFor();
+      await page.evaluate(() => window.resolveCheck({ status: 'available', version: '5.2.0', message: '' }));
+      assert.equal(await page.getByRole('progressbar').getAttribute('aria-valuenow'), '68');
+      if (process.env.UPDATE_QA_DIR) {
+        for (const theme of ['light', 'dark']) {
+          await page.evaluate((theme) => { document.documentElement.className = theme; }, theme);
+          await page.screenshot({ path: path.join(process.env.UPDATE_QA_DIR, `downloading-${theme}.png`) });
+        }
+        await page.setViewportSize({ width: 420, height: 700 });
+        await page.screenshot({ path: path.join(process.env.UPDATE_QA_DIR, 'downloading-narrow.png') });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      }
+      await emit(ready);
+      await page.getByRole('button', { name: 'Instalar y reiniciar' }).waitFor();
     });
     await t.test('a stale initial snapshot cannot overwrite a downloaded event', async () => {
       await fresh({ holdSnapshot: true }); await emit(ready);
@@ -113,8 +165,8 @@ test('real update UI: work, postpone, revisit, retry and install in all language
       for (const lang of languages) for (const theme of ['light', 'dark']) {
         await fresh({ initial: ready, startup: true, lang });
         await page.evaluate((theme) => { document.documentElement.className = theme; }, theme);
-        const modal = page.getByTestId('startup-update-modal');
-        await modal.getByText(tr(lang, 'Puedes seguir trabajando. Nodus solo se reiniciará cuando elijas instalar la actualización.')).waitFor();
+        const modal = page.getByTestId('update-ready-notice');
+        await modal.waitFor();
         await modal.getByRole('button', { name: tr(lang, 'Instalar y reiniciar') }).waitFor();
         await modal.getByRole('button', { name: tr(lang, 'Más tarde'), exact: true }).click();
         assert.equal(await page.getByTestId('update-ready-notice').count(), 0, `${lang}: later must not immediately reopen the banner`);

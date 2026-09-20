@@ -602,7 +602,7 @@ function createWindow(): void {
 }
 
 async function checkForUpdates(reason: string): Promise<UpdateCheckResponse> {
-  // Deterministic real-window coverage for the startup modal without contacting
+  // Deterministic real-window coverage for the startup banner without contacting
   // release infrastructure from the isolated E2E profile.
   if (process.env.NODUS_E2E_UPDATE_STATUS === 'not-available') {
     return emitUpdate({
@@ -950,7 +950,7 @@ function setupAutoUpdates(): void {
     });
   });
 
-  // The renderer's cinematic startup modal performs the immediate check and
+  // The renderer's startup banner performs the immediate check and
   // presents its result. Keep the long-running scheduled checks here.
   //
   // Announcements ride this timer rather than starting a second one: they change a few

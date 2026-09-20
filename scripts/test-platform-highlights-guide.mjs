@@ -58,7 +58,7 @@ test('existing users get the cinematic summary after the PDF Presenter announcem
   assert.match(app, /platformHighlightsSettled && !toolkitBetaTourSettled/);
   assert.ok(app.indexOf('<WhatsNewModal') < app.indexOf('<PlatformHighlightsUpdateTour'));
   assert.ok(app.indexOf('<PlatformHighlightsUpdateTour') < app.indexOf('<ToolkitBetaUpdateTour'));
-  assert.ok(app.indexOf('<PlatformHighlightsUpdateTour') < app.indexOf('<StartupUpdateModal'));
+  assert.ok(app.indexOf('<PlatformHighlightsUpdateTour') < app.indexOf('<NodiStyleModal'));
 
   assert.match(styles, /\.platform-guide-hero/);
   assert.match(styles, /\.platform-guide-zotero-brand/);

@@ -329,11 +329,11 @@ test('the videos are announced once to installs that predate them', async () => 
   // Completing the cinematic guide answers the same question, so it settles the
   // announcement too — a fresh install must never be told about a choice it just made.
   assert.match(await read('src/app/StartupGate.tsx'), /markTutorialVideosAnnouncementSeen\(\);\s*\n\s*await window\.nodus\.updateSettings\(\{ basicsTutorialVersion: BASICS_TUTORIAL_VERSION \}\)/);
-  // It queues behind the other one-time tours and ahead of the update check, so two
+  // It queues behind the other one-time tours and ahead of the Nodi choice, so two
   // modals never fight for the foreground.
-  const order = ['<WhatsNewModal', '<PlatformHighlightsUpdateTour', '<ToolkitBetaUpdateTour', '<TutorialVideosUpdateTour', '<StartupUpdateModal'].map((tag) => app.indexOf(tag));
-  assert.deepEqual(order, [...order].sort((a, b) => a - b), 'the videos announcement sits between the toolkit tour and the update check');
-  assert.match(app, /toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && !updateSettled && \(\s*<StartupUpdateModal/);
+  const order = ['<WhatsNewModal', '<PlatformHighlightsUpdateTour', '<ToolkitBetaUpdateTour', '<TutorialVideosUpdateTour', '<NodiStyleModal'].map((tag) => app.indexOf(tag));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b), 'the videos announcement sits between the toolkit tour and the Nodi choice');
+  assert.match(app, /startupGuidesSettled && !manualWhatsNewOpen/);
 });
 
 test('the announcement speaks every interface language', async () => {
@@ -567,7 +567,7 @@ test('a packaged renderer still gets the real player, not YouTube error 153', as
 test('PDF Presenter queues after release notes and before every other startup announcement', async () => {
   const app = await read('src/App.tsx');
   assert.match(app, /whatsNewSettled && !pdfPresenterTutorialSettled && !manualWhatsNewOpen && \(\s*<PdfPresenterTutorialAnnouncement/);
-  for (const component of ['MobileTeaserGuide', 'PlatformHighlightsUpdateTour', 'ToolkitBetaUpdateTour', 'TutorialVideosUpdateTour', 'StartupUpdateModal']) {
+  for (const component of ['MobileTeaserGuide', 'PlatformHighlightsUpdateTour', 'ToolkitBetaUpdateTour', 'TutorialVideosUpdateTour']) {
     assert.match(app, new RegExp(`whatsNewSettled && pdfPresenterTutorialSettled &&[^\\n]+\\(\\s*<${component}`));
   }
   const wiki = await read('site/wiki/wiki.js');
