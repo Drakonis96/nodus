@@ -72,7 +72,7 @@ import type { ResearchConversationNavigationTarget } from './researchNoteProvena
 import type { ToolkitPage } from './navigation';
 import { OPEN_LIBRARY_DOCUMENT_EVENT, type OpenLibraryDocumentDetail } from './evidenceJump';
 import type { LibraryScope } from '@shared/libraryTypes';
-import { placeHeaderBadge, placeHeaderModelAlert, type HeaderBadgePlacement, type HeaderModelAlertPlacement } from './headerLayout';
+import { placeHeaderBadge, type HeaderBadgePlacement } from './headerLayout';
 import { registerSkillMarketplace } from './components/skillMarketplaceOpener';
 import { effectiveSidebarHidden, isPreviewVaultType, isViewAllowedForVaultType, normalizeVaultType, viewsDisallowedForType } from '@shared/vaultTypes';
 import { CommandPalette, type Command } from './components/CommandPalette';
@@ -323,7 +323,6 @@ export function App() {
   const [headerActionsEl, setHeaderActionsEl] = useState<HTMLElement | null>(null);
   const [vaultBadgeEl, setVaultBadgeEl] = useState<HTMLElement | null>(null);
   const [vaultBadgePlacement, setVaultBadgePlacement] = useState<HeaderBadgePlacement | null>(null);
-  const [modelAlertPlacement, setModelAlertPlacement] = useState<HeaderModelAlertPlacement | null>(null);
   const toggleVaults = useCallback(
     (el: HTMLElement) => setVaultAnchor((cur) => (cur === el ? null : el)),
     []
@@ -1068,7 +1067,6 @@ export function App() {
   useLayoutEffect(() => {
     if (!headerEl || !headerLogoEl || !headerActionsEl) {
       setVaultBadgePlacement(null);
-      setModelAlertPlacement(null);
       return undefined;
     }
     const measure = () => {
@@ -1086,16 +1084,6 @@ export function App() {
         // rail's open/close animation and each state write would re-render the app.
         if (previous && previous.fits === badge.fits && Math.abs(previous.left - badge.left) < 0.5) return previous;
         return badge;
-      });
-      // The alert's band ends wherever the next thing begins — the badge when it is
-      // shown, the action rail when the window is too narrow for one.
-      setModelAlertPlacement((previous) => {
-        const next = placeHeaderModelAlert({
-          logoWidth: headerLogoEl.offsetWidth,
-          bandRight: badge?.fits ? badge.left : headerEl.clientWidth - headerActionsEl.offsetWidth,
-        });
-        if (previous && previous.fits === next.fits && Math.abs(previous.centre - next.centre) < 0.5) return previous;
-        return next;
       });
     };
     measure();
@@ -1490,28 +1478,6 @@ export function App() {
         <div className="flex-1" />
         {/* Right-side action rail: icon-only by default, with native title labels so
             the header stays a stable row of icons. */}
-        {/* "Configure an AI model" lives here rather than in the action rail, where its
-            pinned-open label spent ~170px of the only room the centred badge has and
-            pushed the icons towards it. This half of the header is empty by
-            construction, so the alert is centred between the sidebar and the badge and
-            keeps its native title label available without adding permanent width. */}
-        {!settings.synthesisModel && modelAlertPlacement?.fits && (
-          <div
-            data-testid="header-model-alert"
-            className="absolute top-1/2 z-10"
-            style={{ left: `${modelAlertPlacement.centre}px`, transform: 'translate(-50%, -50%)' }}
-          >
-            <HeaderAction
-              dataTour="model"
-              icon="alert"
-              label={t('Configura un modelo de IA')}
-              title={t('Configura un modelo de IA')}
-              tone="text-amber-500 dark:text-amber-400"
-              onClick={() => setView('settings')}
-            />
-          </div>
-        )}
-
         <div ref={setHeaderActionsEl} data-testid="header-actions" className="header-action-rail flex min-w-0 items-center justify-end gap-0.5 overflow-hidden pr-4">
           {/* No Bóvedas button: the centred badge is the way in, and it is now shown at
               every width for exactly that reason (see the badge above). */}
@@ -1679,6 +1645,12 @@ export function App() {
           onClose={() => setNotificationsAnchor(null)}
           notifications={notifications}
           announcements={announcements}
+          needsAiModel={!settings.synthesisModel}
+          onConfigureAiModel={() => {
+            localStorage.setItem('nodus.settingsTarget', 'models');
+            setNotificationsAnchor(null);
+            setView('settings');
+          }}
           language={settings.uiLanguage}
           onMarkAnnouncementRead={markAnnouncementRead}
           onRefresh={refreshNotificationCenter}
