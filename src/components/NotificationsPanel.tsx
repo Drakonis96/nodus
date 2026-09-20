@@ -137,6 +137,8 @@ interface NotificationsPanelProps {
   onClose: () => void;
   notifications: NodiNotification[];
   announcements: AnnouncementEntry[];
+  needsAiModel: boolean;
+  onConfigureAiModel: () => void;
   language: string;
   onMarkAnnouncementRead: (id: string) => void;
   onRefresh: () => Promise<AnnouncementRefreshResult>;
@@ -151,6 +153,8 @@ export function NotificationsPanel({
   onClose,
   notifications,
   announcements,
+  needsAiModel,
+  onConfigureAiModel,
   language,
   onMarkAnnouncementRead,
   onRefresh,
@@ -262,7 +266,8 @@ export function NotificationsPanel({
     };
   }, [captureBrowserOverlaySnapshot, open, setBrowserOverlayVisible]);
 
-  const empty = announcements.length === 0 && notifications.length === 0;
+  const hasClearableNotifications = announcements.length > 0 || notifications.length > 0;
+  const empty = !needsAiModel && !hasClearableNotifications;
 
   return createPortal(
     <AnimatePresence>
@@ -324,7 +329,7 @@ export function NotificationsPanel({
               >
                 <Icon name="refresh" className={refreshing ? 'animate-spin' : ''} />
               </button>
-              {!empty && (
+              {hasClearableNotifications && (
                 <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setClearConfirmation(true)}>
                   {t('Limpiar')}
                 </button>
@@ -350,6 +355,21 @@ export function NotificationsPanel({
             <p className="px-3 py-6 text-center text-xs text-neutral-500">{t('No hay notificaciones.')}</p>
           ) : (
             <div className="max-h-[min(60vh,26rem)] overflow-y-auto">
+              {needsAiModel && (
+                <div data-testid="notifications-model-alert" className="flex items-start gap-2 border-b border-neutral-900 px-3 py-2.5">
+                  <Icon name="alert" size={14} className="mt-0.5 shrink-0 text-amber-500 dark:text-amber-400" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-neutral-100">{t('Configura un modelo de IA')}</p>
+                    <button
+                      type="button"
+                      className="btn btn-ghost mt-1.5 px-1.5 py-0.5 text-[11px] text-indigo-600 dark:text-indigo-300"
+                      onClick={onConfigureAiModel}
+                    >
+                      <Icon name="settings" size={12} /> {t('Ir a Ajustes y Modelos')}
+                    </button>
+                  </div>
+                </div>
+              )}
               {announcements.length > 0 && (
                 <>
                   <div className="border-b border-neutral-900 bg-neutral-900/40 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
