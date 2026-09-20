@@ -24,17 +24,36 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
+  const release560 = RELEASE_NOTES[0];
+  assert.equal(release560.version, '5.6.0');
+  assert.equal(release560.date, '2026-09-20');
+  assert.equal(release560.highlights.length, 12);
+  assert.deepEqual(release560.highlights.map(h => h.scope), [
+    'academic', 'academic', 'academic', 'academic',
+    'general', 'general', 'general', 'estudio', 'estudio', 'nodi', 'toolkit', 'zotero',
+  ]);
+  for (const lang of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja', 'ko']) {
+    for (const h of release560.highlights) {
+      assert.ok(h[lang]?.trim().length > 30, `5.6.0 missing ${lang} translation`);
+      if (lang !== 'en') assert.notEqual(h[lang], h.en, `5.6.0 ${lang} fell back to English`);
+      assert.doesNotMatch(h[lang], /[;—]/, `5.6.0 ${lang} must use simple sentences`);
+    }
+  }
+  for (const phrase of [/Auto or Manual/, /indexed locally/, /two to five models/, /Graph themes/, /header notice/, /Notifications/, /duplicate actions/, /select chat sources/, /move notes and materials/, /Nodus documentation/, /searchable catalogue/, /Zotero plugin/]) {
+    assert.ok(release560.highlights.some(h => phrase.test(h.en)), `5.6.0 missing ${phrase}`);
+  }
+
   // 5.5.0 renders the app in twelve interface languages, moves the integrated
   // local engine to the GPU on Windows and Linux, adds colour palettes, keeps
   // citations on the page they name, reads two-column PDFs by column, saves chat
   // answers as study notes, exports reports to Word and brings RDKit molecule
   // inspection. The connector keeps the languages note it already had and its
   // own translated messages.
-  const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '5.5.0');
-  assert.equal(currentRelease?.date, '2026-09-18');
-  assert.equal(currentRelease?.highlights.length, 21);
-  assert.deepEqual(currentRelease.highlights.map((h) => h.scope), [
+  const release550 = RELEASE_NOTES.find(note => note.version === '5.5.0');
+  assert.equal(release550?.version, '5.5.0');
+  assert.equal(release550?.date, '2026-09-18');
+  assert.equal(release550?.highlights.length, 21);
+  assert.deepEqual(release550.highlights.map((h) => h.scope), [
     'ai', 'ai', 'ai', 'ai', 'ai', 'ai', 'ai', 'ai',
     'general', 'general', 'general', 'general', 'general',
     'library', 'library', 'library',
@@ -42,7 +61,7 @@ try {
     'connector', 'estudio', 'word',
   ]);
   for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
-    assert.ok(currentRelease.highlights.every((h) => h[language]?.length > 80));
+    assert.ok(release550.highlights.every((h) => h[language]?.length > 80));
   }
   for (const phrase of [
     /Local models now run on your graphics card/, /reports the installed engine instead of assuming it/,
@@ -55,10 +74,10 @@ try {
     /connector speaks thirteen languages/, /messages the connector writes by itself/,
     /saved as a study note/, /exported to Word/,
   ]) {
-    assert.ok(currentRelease.highlights.some((h) => phrase.test(h.en)), `5.5.0 is missing ${phrase}`);
+    assert.ok(release550.highlights.some((h) => phrase.test(h.en)), `5.5.0 is missing ${phrase}`);
   }
   assert.ok(
-    currentRelease.highlights.every((h) => ['fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja', 'ko']
+    release550.highlights.every((h) => ['fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja', 'ko']
       .every((language) => h[language] !== h.en)),
     'no 5.5.0 translation may fall back to English',
   );
@@ -69,7 +88,7 @@ try {
   // cancellations, moves Nodus Browser bookmarks in and out, makes the tab strip
   // and the media controls behave, translates every queue failure and keeps
   // confirmation dialogs opaque in dark mode.
-  const release545 = RELEASE_NOTES[1];
+  const release545 = RELEASE_NOTES.find(note => note.version === '5.4.5');
   assert.equal(release545?.version, '5.4.5');
   assert.equal(release545?.date, '2026-09-15');
   assert.equal(release545?.highlights.length, 11);
@@ -98,7 +117,7 @@ try {
   // a custom gateway from dropping long scans, shows the Documentary Index's
   // standalone jobs, refreshes the vault list after a global link and boots the
   // Server image again. The languages note is one plain line on purpose.
-  const release544 = RELEASE_NOTES[2];
+  const release544 = RELEASE_NOTES.find(note => note.version === '5.4.4');
   assert.equal(release544?.version, '5.4.4');
   assert.equal(release544?.date, '2026-09-14');
   assert.equal(release544?.highlights.length, 5);
@@ -115,7 +134,7 @@ try {
   // 5.4.3 keeps the modal it shipped with: the work summary stored clipped at the
   // model's output ceiling, the browser pairing prompt on macOS and the JSON a
   // capability tool dumped into a chat.
-  const release543 = RELEASE_NOTES[3];
+  const release543 = RELEASE_NOTES.find(note => note.version === '5.4.3');
   assert.equal(release543?.version, '5.4.3');
   assert.equal(release543?.date, '2026-09-14');
   assert.equal(release543?.highlights.length, 3);
@@ -124,7 +143,7 @@ try {
   // 5.4.2 rebuilt the Study question bank, rendered Markdown and LaTeX on every
   // question and flashcard surface, added seven prompt languages and carried the
   // fixes merged since the 5.4.1 hotfix.
-  const release542 = RELEASE_NOTES[4];
+  const release542 = RELEASE_NOTES.find(note => note.version === '5.4.2');
   assert.equal(release542?.version, '5.4.2');
   assert.equal(release542?.date, '2026-09-13');
   assert.equal(release542?.highlights.length, 11);
@@ -147,15 +166,15 @@ try {
 
   assert.ok(!RELEASE_NOTES.some(note => note.version === '5.3.2'), 'the unpublished slug must not appear in release history');
   const packageVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
-  assert.equal(currentRelease.version, packageVersion);
+  assert.equal(release560.version, packageVersion);
 
   // 5.4.0 keeps its own entry, and 5.4.1 shows exactly the same highlights: someone
   // already on 5.4.0 has read them, and someone arriving from 5.3.1 must not miss them.
-  const release541 = RELEASE_NOTES[5];
+  const release541 = RELEASE_NOTES.find(note => note.version === '5.4.1');
   assert.equal(release541?.version, '5.4.1');
   assert.equal(release541?.date, '2026-09-13');
   assert.equal(release541?.highlights.length, 25);
-  const release540 = RELEASE_NOTES[6];
+  const release540 = RELEASE_NOTES.find(note => note.version === '5.4.0');
   assert.equal(release540?.version, '5.4.0');
   assert.equal(release540?.date, '2026-09-12');
   assert.deepEqual(release540?.highlights, release541?.highlights);
@@ -183,7 +202,7 @@ try {
   }
 
   // 5.3.1 keeps the modal it shipped with.
-  const release531 = RELEASE_NOTES[7];
+  const release531 = RELEASE_NOTES.find(note => note.version === '5.3.1');
   assert.equal(release531?.version, '5.3.1');
   assert.equal(release531?.date, '2026-09-10');
   assert.equal(release531?.highlights.length, 8);
@@ -542,9 +561,9 @@ try {
   const readMarkersRelease = RELEASE_NOTES.find((note) => note.version === '3.2.3');
   assert.equal(readMarkersRelease?.date, '2026-08-05');
   assert.equal(readMarkersRelease?.highlights.length, 4);
-  for (const highlight of currentRelease.highlights) {
+  for (const highlight of release550.highlights) {
     // Written for the person using Nodus: no module names, no internal vocabulary.
-    // Every note of the current release is a full paragraph, so the floor is the
+    // Every note of 5.5.0 is a full paragraph, so the floor is the
     // usual one again.
     for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR']) {
       assert.ok(highlight[language]?.length > 80, `a ${language} highlight is too short to explain anything`);
@@ -595,7 +614,7 @@ try {
   assert.ok(!RELEASE_NOTES.some((note) => note.version === '2.8.0'));
   // it/tr fall back to en when their index-matched array is short, which would pass a
   // mere length check while silently shipping English to two locales.
-  assert.ok(currentRelease?.highlights.every((h) => h.it !== h.en && h.tr !== h.en));
+  assert.ok(release550?.highlights.every((h) => h.it !== h.en && h.tr !== h.en));
 
   // From 3.1.0 on, a highlight is short plain sentences: no semicolons, no em dashes.
   // Both were how these notes grew into paragraph-long subordinate clauses, and the

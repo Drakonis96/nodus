@@ -852,7 +852,7 @@ export const TR: Record<string, string> = {
   "Aviso": "Uyarı",
   "Apoya el proyecto": "Projeyi destekleyin",
   "Nodus acaba de mejorar": "Nodus daha da iyi oldu",
-  "Hemos preparado nuevas funciones y mejoras para que sigas construyendo conocimiento con menos fricción.": "Daha az sorunla bilgi oluşturmaya devam edebilmeniz için yeni özellikler ve iyileştirmeler hazırladık.",
+  "Consulta las nuevas funciones y mejoras de esta versión.": "Bu sürümdeki yeni özellikleri ve iyileştirmeleri inceleyin.",
   "Nueva versión": "Yeni sürüm",
   "¡Tenemos novedades!": "Haberlerimiz var!",
   "Lo más destacado": "Öne çıkanlar",

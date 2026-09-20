@@ -1,8 +1,10 @@
+import { RELEASE_5_6_0_HIGHLIGHTS } from './releaseNotes560';
 /* Japanese release notes, keyed by version. Machine-translated from the English highlights. */
 import { RELEASE_5_5_0_HIGHLIGHTS } from './releaseNotes550';
 export const RELEASE_NOTES_JA: Record<string, string[]> = {
   // 5.5.0 reads its Japanese from the release's own highlight columns, the same
   // way the Italian, Turkish and both Chinese tables do.
+  "5.6.0": RELEASE_5_6_0_HIGHLIGHTS.map(highlight => highlight['ja']),
   "5.5.0": RELEASE_5_5_0_HIGHLIGHTS.map(highlight => highlight.ja),
   "5.4.5": [
     "ライブラリは、現在のボールトで選択した作品を、そこから派生したすべてのものとともに削除できます。このアクションは確認を求め、両方の部分に名前を付けます。作品とその独自の分析は削除され、他の作品が共有する分析は残ります。スキャナーが現在分析中の作業は中途半端に削除されるのではなく拒否され、何かが失敗するとバッチ全体が元に戻され、共有されたアイデアやテーマはそのまま残ります。",

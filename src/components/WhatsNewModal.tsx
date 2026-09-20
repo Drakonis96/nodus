@@ -356,7 +356,7 @@ export function WhatsNewModal({
           <div className="whats-new-hero-copy">
             <div className="whats-new-kicker"><Icon name="star" size={14} /> {t('Novedades')}</div>
             <h2>{t('Nodus acaba de mejorar')}</h2>
-            <p>{t('Hemos preparado nuevas funciones y mejoras para que sigas construyendo conocimiento con menos fricción.')}</p>
+            <p>{t('Consulta las nuevas funciones y mejoras de esta versión.')}</p>
             <div className="whats-new-version">
               <span>{selectedNote.version === current.split('-')[0] ? t('Nueva versión') : t('Versiones')}</span>
               <b>v{selectedNote.version}</b>
