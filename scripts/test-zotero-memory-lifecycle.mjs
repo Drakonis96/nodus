@@ -92,3 +92,113 @@ test('sidebar and bootstrap release long-lived resources on unload', () => {
   assert.match(sidebar, /clearTimeout\(refreshTimer\)/);
   assert.match(bootstrap, /_popupMods = null/);
 });
+
+function loadDatabaseManager(Zotero) {
+  const sandbox = {
+    ChromeUtils: { importESModule: () => ({ Zotero }) },
+  };
+  const source = readSource('zotero-plugin/content/evidence-db.sys.mjs')
+    .replace('export const EvidenceDatabases =', 'globalThis.EvidenceDatabases =');
+  vm.runInNewContext(source, sandbox);
+  return sandbox.EvidenceDatabases;
+}
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((r) => { resolve = r; });
+  return { promise, resolve };
+}
+
+test('shutdown closes orphaned sidebar connections and awaits an in-flight close', async () => {
+  const gate = deferred();
+  const closed = [];
+  const manager = loadDatabaseManager({
+    DBConnection: class {
+      constructor(path) { this.path = path; }
+      async closeDatabase(permanent) {
+        assert.equal(permanent, true);
+        closed.push(this.path);
+        await gate.promise;
+      }
+    },
+    logError(error) { throw error; },
+  });
+  // No window references or unload events: the module must own both connections.
+  const first = manager.open('sidebar.sqlite');
+  manager.open('popup.sqlite');
+  const earlyClose = manager.close(first);
+  assert.equal(manager.close(first), earlyClose, 'concurrent cleanup shares one close');
+  let finished = false;
+  const shutdown = manager.shutdown().then(() => { finished = true; });
+  await new Promise(setImmediate);
+  assert.deepEqual(closed.sort(), ['popup.sqlite', 'sidebar.sqlite']);
+  assert.equal(finished, false, 'shutdown waits for SQLite');
+  assert.throws(() => manager.open('late.sqlite'), /evidence-db-closed/);
+  gate.resolve();
+  await shutdown;
+  await manager.shutdown();
+  assert.equal(closed.length, 2, 'already closed connections are not closed again');
+  manager.start();
+  manager.open('reenabled.sqlite');
+  await manager.shutdown();
+  assert.equal(closed.length, 3);
+});
+
+test('shutdown retries failed early cleanup and still closes other connections', async () => {
+  const attempts = new Map();
+  const errors = [];
+  const manager = loadDatabaseManager({
+    DBConnection: class {
+      constructor(path) { this.path = path; }
+      async closeDatabase() {
+        const count = (attempts.get(this.path) || 0) + 1;
+        attempts.set(this.path, count);
+        if (this.path === 'failed.sqlite' || (this.path === 'retry.sqlite' && count === 1)) throw new Error(this.path);
+      }
+    },
+    logError(error) { errors.push(error.message); },
+  });
+  await assert.rejects(manager.close(manager.open('retry.sqlite')), /retry.sqlite/);
+  manager.open('failed.sqlite');
+  manager.open('other.sqlite');
+  await manager.shutdown();
+  assert.equal(attempts.get('retry.sqlite'), 2);
+  assert.equal(attempts.get('other.sqlite'), 1);
+  assert.deepEqual(errors, ['failed.sqlite']);
+});
+
+test('bootstrap awaits database shutdown even after all windows have disappeared', async () => {
+  const gate = deferred();
+  let chromeDestroyed = false;
+  const sandbox = {
+    Zotero: { getMainWindows: () => [] },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(readSource('zotero-plugin/bootstrap.js'), sandbox);
+  sandbox.Nodus.databases = { shutdown: () => gate.promise };
+  sandbox.chromeHandle = { destruct() { chromeDestroyed = true; } };
+  const shutdown = sandbox.shutdown();
+  assert.equal(chromeDestroyed, false);
+  gate.resolve();
+  await shutdown;
+  assert.equal(chromeDestroyed, true);
+});
+
+test('closing a store while its directory is being prepared cannot open a late connection', async () => {
+  const gate = deferred();
+  let opened = 0;
+  const { NodusStore: store } = loadContentScript('zotero-plugin/content/store.js', {
+    ChromeUtils: { importESModule: (uri) => uri.includes('evidence-db')
+      ? { EvidenceDatabases: { open() { opened++; } } }
+      : { Zotero: { logError() {} } } },
+    Services: { dirsvc: { get: () => ({ path: '/test-profile' }) } },
+    Components: { interfaces: { nsIFile: {} } },
+    PathUtils: { join: path.join },
+    IOUtils: { makeDirectory: () => gate.promise },
+  });
+  const pending = store.evidenceCacheStats();
+  await store.closeEvidenceDb();
+  gate.resolve();
+  await pending;
+  assert.equal(opened, 0);
+});
