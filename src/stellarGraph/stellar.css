@@ -699,8 +699,10 @@
 }
 /* Theme navigation only needs the visible-relation budget and neighbourhood depth. */
 .stellar-theme-view .stellar-player { width: max-content; padding: 8px 12px; }
-.stellar-theme-view .stellar-player-line { gap: 5px; }
-.stellar-theme-view .stellar-player label { gap: 5px; }
+.stellar-theme-view .stellar-player-line { gap: 16px; height: auto; min-height: 34px; flex-wrap: wrap; overflow: visible; }
+.stellar-theme-view .stellar-player label { gap: 8px; font-size: 11px; }
+.stellar-theme-view .stellar-player select { color: var(--stellar-text); }
+.stellar-theme-focus { margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--stellar-line); color: var(--stellar-muted); font-size: 11px; max-width: 560px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stellar-theme-view .stellar-player button { padding: 7px 9px; }
 .stellar-theme-view .stellar-player .stellar-play { min-width: 78px; }
 .stellar-child-limit input { width: 46px; }

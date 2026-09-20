@@ -210,6 +210,16 @@ test('walking a theme keeps an isolated focus visible and never invents relation
  assert.deepEqual(view.edges,[]);
 });
 
+test('simplifying connections preserves the complete neighbourhood and isolated theme ideas',()=>{
+ const data={nodes:['a','b','c','d','isolated'].map(node),edges:[edge('1','a','b'),edge('2','a','c'),edge('3','c','d')]};
+ const nearby=neighbourhood(data,'a',2);
+ const simplified=capRelations(nearby,1);
+ assert.deepEqual(simplified.nodes.map(n=>n.id),['a','b','c','d']);
+ assert.ok(simplified.edges.length<nearby.edges.length);
+ assert.deepEqual(capRelations(nearby,0),nearby);
+ assert.equal(capRelations(neighbourhood(data,'a',0),1).nodes.length,5,'whole-theme mode also keeps isolated ideas');
+});
+
 const {loadCorpusContext}=await import(path.join(tmp,'context.mjs'));
 test('corpus context includes every unique idea, isolated ideas and cross-theme links',async()=>{
  const g={nodes:Array.from({length:503},(_,i)=>({...node('c'+i),themes:[i%2?'A':'B']})),edges:Array.from({length:502},(_,i)=>edge('c'+i,'c'+i,'c'+(i+1)))};

@@ -61,8 +61,8 @@ function readableZoom(
 }
 /** A whole theme at once is unreadable: start with the strongest few relations per idea. */
 const DEFAULT_CHILD_LIMIT = 6;
-/** How far out of the focused idea a theme opens. Two steps reads; the whole theme does not. */
-const DEFAULT_DEPTH = 2;
+/** Open the entire theme; neighbourhood exploration is an explicit choice. */
+const DEFAULT_DEPTH = 0;
 /** Past this many ideas the spiral packing stops reading and the force layout takes over. */
 const FORCE_LAYOUT_FROM = 300;
 export interface StellarWorkspaceProps {
@@ -152,16 +152,10 @@ function StellarTabs(props: StellarWorkspaceProps) {
     setTabs(current => [...current, { id, label: "" }]);
     setActive(id);
   };
-  /** Entering a theme replaces the hub inside its own tab, so navigation stays in place. */
-  const openTheme = (tabId: number, theme: StellarTheme) => {
-    delete tabStates.current[tabId];
-    setTabs(current => current.map(tab => tab.id === tabId
-      ? { ...tab, themeId: theme.id, themeLabel: theme.label, label: theme.label } : tab));
-  };
-  const closeTheme = (tabId: number) => {
-    delete tabStates.current[tabId];
-    setTabs(current => current.map(tab => tab.id === tabId
-      ? { ...tab, themeId: undefined, themeLabel: undefined, label: "" } : tab));
+  const openTheme = (theme: StellarTheme) => {
+    const id = nextId.current++;
+    setTabs(current => [...current, { id, themeId: theme.id, themeLabel: theme.label, label: theme.label }]);
+    setActive(id);
   };
   /** A saved canvas belongs to the theme it was captured in, never to the next one. */
   const restoredState = (tab: StellarGraphTabDescriptor) =>
@@ -200,23 +194,23 @@ function StellarTabs(props: StellarWorkspaceProps) {
     </div>
     {fullscreenError && <p role="alert">{t("No se pudo activar la pantalla completa.")}</p>}
     {tabs.map(tab => <div key={tab.id} role="tabpanel" id={`${tabsId}-panel-${tab.id}`} aria-labelledby={`${tabsId}-tab-${tab.id}`} className={active === tab.id ? "stellar-tab-panel" : "hidden"}>
-      {tab.mode === "themes" && <div className={tab.themeId ? "hidden" : "stellar-hub-panel"}>
-        <ThemesOverview source={source} toolbar={props.toolbar} sidebar={active === tab.id ? props.sidebar : undefined} initialIdeaIds={tab.hubIdeaIds} active={active === tab.id && !tab.themeId}
+      {tab.mode === "themes" && <div className="stellar-hub-panel">
+        <ThemesOverview source={source} toolbar={props.toolbar} sidebar={active === tab.id ? props.sidebar : undefined} initialIdeaIds={tab.hubIdeaIds} active={active === tab.id}
           onIdeasChange={hubIdeaIds => setTabs(current => current.map(item => item.id === tab.id ? { ...item, hubIdeaIds } : item))}
           onOpenIdea={node => {
             const id = nextId.current++;
             setTabs(current => [...current, { id, label: node.label, initialSeed: node.id }]);
             setActive(id);
-          }} onOpen={theme => openTheme(tab.id, theme)} />
+          }} onOpen={openTheme} />
       </div>}
-      {(tab.mode !== "themes" || tab.themeId) && <StellarGraphTab {...props} key={tab.themeId || "canvas"} source={source} active={active === tab.id}
+      {tab.mode !== "themes" && <StellarGraphTab {...props} key={tab.themeId || "canvas"} source={source} active={active === tab.id}
             initialSeed={tab.initialSeed} initialEdge={tab.initialEdge}
             initialSearch={tab.initialSearch} author={tab.author}
             themeId={tab.themeId} themeLabel={tab.themeLabel}
-            onBack={tab.mode === "themes" ? () => closeTheme(tab.id) : undefined}
+            onBack={tab.themeId ? () => setActive(tabs[0].id) : undefined}
             initialState={restoredState(tab)}
             onTabSnapshot={state => { tabStates.current[tab.id] = state; publishSnapshot(); }}
-            onTitleChange={label => setTabs(current => current.map(item => item.id === tab.id ? { ...item, label } : item))} />}
+            onTitleChange={label => setTabs(current => current.map(item => item.id === tab.id ? { ...item, label: item.themeLabel || label } : item))} />}
     </div>)}
   </div>;
 }
@@ -275,6 +269,9 @@ function StellarGraphTab({
     [detailLoading, setDetailLoading] = useState<DetailLoading | null>(null);
   const [playbackNotice, setPlaybackNotice] = useState("");
   const [childLimit, setChildLimit] = useState(initialState?.childLimit ?? DEFAULT_CHILD_LIMIT);
+  const [customChildLimit, setCustomChildLimit] = useState(
+    ![0, 3, 6, 10].includes(initialState?.childLimit ?? DEFAULT_CHILD_LIMIT),
+  );
   const [depth, setDepth] = useState(initialState?.depth ?? DEFAULT_DEPTH);
   const [focal, setFocal] = useState<string | null>(null);
   const framedFocal = useRef<string | null>(null);
@@ -420,10 +417,9 @@ function StellarGraphTab({
       data.nodes.length &&
       data.nodes.every((n) => positions[n.id])
     ) {
-      // A whole theme fitted on screen is a field of dots: open on its busiest idea at
-      // reading zoom, the way a canvas grown by hand already looks. "Fit all" still zooms out.
-      if (themeId) {
-        if (layoutProgress < 1) return;
+      if (themeId && layoutProgress < 1) return;
+      // Whole-theme mode fits every idea; a neighbourhood opens around its focus.
+      if (themeId && depth) {
         fitOnce.current = true;
         const degree = new Map<string, number>();
         for (const edge of data.edges)
@@ -437,7 +433,7 @@ function StellarGraphTab({
       fitOnce.current = true;
       if (!follow || !focusRequest) api.current?.fit();
     }
-  }, [positions, data, follow, focusRequest, themeId, layoutProgress]);
+  }, [positions, data, follow, focusRequest, themeId, depth, layoutProgress]);
   const next = useCallback(async () => {
     if (!engine || stepping.current) return;
     stepping.current = true;
@@ -623,24 +619,22 @@ function StellarGraphTab({
     setPositions(current => Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)));
     closeDetail(); setPlaybackNotice(""); setMessage(t("Idea retirada del lienzo."));
   };
-  // Inside a theme every idea stays on the canvas; only how many relations each one
-  // draws is capped, and whatever playback has already revealed is never hidden.
-  const capped = useMemo(
+  // Choose the ideas using all connections, then simplify only the lines between them.
+  const scoped = useMemo(
+    () => themeId ? neighbourhood(data, focal, depth) : data,
+    [themeId, data, focal, depth],
+  );
+  const view = useMemo(
     () => themeId
-      ? capRelations(data, childLimit, [
+      ? capRelations(scoped, childLimit, [
           ...(engine?.history.slice(0, engine.cursor) || []),
           ...(activeEdge ? [activeEdge] : []),
         ])
-      : data,
-    [themeId, data, childLimit, engine, activeEdge],
-  );
-  const view = useMemo(
-    () => themeId ? neighbourhood(capped, focal, depth) : capped,
-    [themeId, capped, focal, depth],
+      : scoped,
+    [themeId, scoped, childLimit, engine, activeEdge],
   );
   const corpusContext = useCorpusContext(source, view, positions, active);
-  // A theme is always entered from somewhere. Without this a restored session would open
-  // on the whole theme at once, which is exactly the wall of lines the walk exists to avoid.
+  // Until an idea is selected, neighbourhood mode starts at the most connected idea.
   useEffect(() => {
     if (!themeId || focal || !data.nodes.length) return;
     const degree = new Map<string, number>();
@@ -650,15 +644,16 @@ function StellarGraphTab({
     setFocal(data.nodes.reduce((best, node) =>
       (degree.get(node.id) || 0) > (degree.get(best.id) || 0) ? node : best, data.nodes[0]).id);
   }, [themeId, focal, data]);
-  const hiddenRelations = data.edges.length - capped.edges.length;
+  const hiddenRelations = scoped.edges.length - view.edges.length;
   // A walked neighbourhood is a handful of ideas: frame it rather than keeping the camera
   // wherever the previous step left it.
   useEffect(() => {
-    if (!themeId || !focal || !depth || framedFocal.current === focal) return;
+    const frameKey = depth ? `${focal}:${depth}` : "all";
+    if (!themeId || !focal || framedFocal.current === frameKey || layoutProgress < 1) return;
     if (!view.nodes.length || !view.nodes.every(node => positions[node.id])) return;
-    framedFocal.current = focal;
+    framedFocal.current = frameKey;
     api.current?.fit();
-  }, [themeId, focal, depth, view, positions]);
+  }, [themeId, focal, depth, view, positions, layoutProgress]);
   const visibleIds = useMemo(() => new Set(view.nodes.map(node => node.id)), [view.nodes]);
   const connections = useMemo(
     () =>
@@ -888,42 +883,45 @@ function StellarGraphTab({
               </button>
               <span className="stellar-divider" />
               </>}
-              {themeId && <label className="stellar-child-limit">
-                {t("Visibles por idea")}
-                <input
-                  aria-label={t("Relaciones visibles por idea")}
+              {themeId && <>
+                <label>
+                  {t("Mostrar ideas")}
+                  <select
+                    aria-label={t("Mostrar ideas")}
+                    value={depth}
+                    onChange={(e) => { framedFocal.current = null; setDepth(Number(e.target.value)); }}
+                  >
+                    <option value={0}>{t("Todo el tema")}</option>
+                    <option value={1}>{t("A 1 conexión")}</option>
+                    <option value={2}>{tx("A {n} conexiones", { n: 2 })}</option>
+                    <option value={3}>{tx("A {n} conexiones", { n: 3 })}</option>
+                  </select>
+                </label>
+                <label>
+                  {t("Conexiones por idea")}
+                  <select
+                    aria-label={t("Conexiones por idea")}
+                    value={customChildLimit ? "custom" : childLimit}
+                    onChange={(e) => {
+                      const custom = e.target.value === "custom";
+                      setCustomChildLimit(custom);
+                      setChildLimit(custom ? childLimit || DEFAULT_CHILD_LIMIT : Number(e.target.value));
+                    }}
+                  >
+                    <option value={0}>{t("Todas")}</option>
+                    {[3, 6, 10].map(n => <option key={n} value={n}>{tx("Hasta {n}", { n })}</option>)}
+                    <option value="custom">{t("Personalizar…")}</option>
+                  </select>
+                </label>
+                {customChildLimit && <input
+                  aria-label={t("Máximo de conexiones por idea")}
                   type="number"
                   min="1"
                   max="1000"
-                  disabled={childLimit === 0}
-                  value={childLimit || DEFAULT_CHILD_LIMIT}
-                  onChange={(e) =>
-                    setChildLimit(Math.max(1, Math.min(1000, Number(e.target.value) || DEFAULT_CHILD_LIMIT)))
-                  }
-                />
-              </label>}
-              {themeId && <button
-                className={childLimit === 0 ? "active" : ""}
-                aria-pressed={childLimit === 0}
-                aria-label={t("Mostrar todas las relaciones del tema")}
-                title={t("Mostrar todas las relaciones del tema")}
-                onClick={() => setChildLimit((v) => (v === 0 ? DEFAULT_CHILD_LIMIT : 0))}
-              >
-                ∞
-              </button>}
-              {themeId && <label className="stellar-child-limit">
-                {t("Pasos")}
-                <select
-                  aria-label={t("Pasos desde la idea enfocada")}
-                  value={depth}
-                  onChange={(e) => { framedFocal.current = null; setDepth(Number(e.target.value)); }}
-                >
-                  <option value={1}>1</option>
-                  <option value={2}>2</option>
-                  <option value={3}>3</option>
-                  <option value={0}>{t("Todo")}</option>
-                </select>
-              </label>}
+                  value={childLimit}
+                  onChange={(e) => setChildLimit(Math.max(1, Math.min(1000, Number(e.target.value) || DEFAULT_CHILD_LIMIT)))}
+                />}
+              </>}
               {!themeId && <>
               <label>
                 {t("Relaciones por idea")}
@@ -963,6 +961,9 @@ function StellarGraphTab({
               </select>
               </>}
             </div>
+            {themeId && depth > 0 && focal && <div className="stellar-theme-focus" title={engine?.nodes.get(focal)?.label}>
+              {tx("Explorando alrededor de: {idea}", { idea: engine?.nodes.get(focal)?.label || "…" })}
+            </div>}
             {!themeId && <div className="stellar-player-selection">
             {selected && !step ? (
               <div className="stellar-node-actions" aria-label={t("Acciones de la idea seleccionada")}>
