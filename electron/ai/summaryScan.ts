@@ -1,3 +1,4 @@
+import { assertAcademicAutomation } from './academicMode';
 import crypto from 'node:crypto';
 import type { ModelRef, TextBlockReason, Work } from '@shared/types';
 import { AiError, completeText, embed } from './aiClient';
@@ -61,6 +62,7 @@ export function summaryContentHash(
  * Nodus. Full text is only used when neither ideas nor an abstract is available.
  */
 export async function runSummaryScan(work: Work, model?: ModelRef | null, options: { force?: boolean } = {}): Promise<void> {
+  assertAcademicAutomation();
   const perf = { nodusId: work.nodus_id, title: work.title };
   const summaryDone = startPerf('summary pipeline', perf);
   const settings = getSettings();

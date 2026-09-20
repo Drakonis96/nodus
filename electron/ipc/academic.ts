@@ -1,3 +1,5 @@
+import { manualIndexStatus, scheduleManualIndex } from '../ai/manualIdeaIndex';
+import { assertAcademicAutomation } from '../ai/academicMode';
 import { registerResearchAttachmentIpc } from './researchAttachments';
 import { dialogTitle } from '../dialogTitles';
 import { getResearchSystemPrompts, saveResearchSystemPrompt, selectResearchSystemPrompt, deleteResearchSystemPrompt } from '../db/researchSystemPromptsRepo';
@@ -449,7 +451,13 @@ function pageCapableLibraryCopy(nodusId: string): OpenEvidenceAtPageResult['loca
 }
 
 export function registerAcademicIpc(context: IpcContext): void {
-  const { h, getWindow, chatAborters } = context;
+  const { getWindow, chatAborters } = context;
+  const h: IpcContext['h'] = (channel, listener) => context.h(channel, (event, ...args) => {
+    if (/^(scan:|works:(setManualDeep|analyzeBoth|process|retry|rescan|reassignThemes|summarize|synthesizeIdeas)|study:improve$|themes:reprocess|bridges:discover|queue:enqueue|notes:reorderByAI|notes:folders:suggestIdeas|ideas:(merge|dedup|audit)|dictionary:(scan|retrieve))/.test(channel)) assertAcademicAutomation();
+    return listener(event, ...args);
+  });
+  h('manualIdeas:indexStatus', async () => manualIndexStatus());
+  h('manualIdeas:retryIndex', async () => { scheduleManualIndex(true); });
   registerResearchAttachmentIpc(context);
   const studyImproveAborters = new Map<string, AbortController>();
   const studyAssistantAborters = new Map<string, AbortController>();
@@ -1778,7 +1786,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('notes:move', async (_e, id: string, folderId: string | null) => notes.moveNote(id, folderId ?? null));
   h('notes:tags:patch', async (_e, noteIds: string[], patch: NoteTagPatch) => notes.patchNoteTags(noteIds, patch));
   h('notes:trash', async (_e, noteIds: string[]) => { notes.trashNotes(noteIds); });
-  h('notes:restore', async (_e, noteIds: string[]) => { notes.restoreNotes(noteIds); });
+  h('notes:restore', async (_e, noteIds: string[]) => { notes.restoreNotes(noteIds); scheduleManualIndex(); });
   h('notes:deletePermanently', async (_e, noteIds: string[]) => {
     for (const id of [...new Set(noteIds)]) {
       const note = notes.getNote(id);

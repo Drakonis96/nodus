@@ -247,6 +247,12 @@ db = database.getDb();
 db.prepare('DELETE FROM works WHERE nodus_id=?').run('work-approximate');
 database.closeDb();
 
+const beforeManualSettings = database.getDb().prepare("SELECT value FROM settings WHERE key='app'").get().value;
+database.getDb().prepare("UPDATE settings SET value=json_set(value,'$.academicMode','manual') WHERE key='app'").run();
+const manualReuse = await analysisReuse.reuseVaultAnalysisForWorks(['work-reused']);
+assert.equal(manualReuse.imported, 0, 'manual vault cannot inherit generated knowledge from another vault');
+assert.equal(database.getDb().prepare("SELECT COUNT(*) AS n FROM idea_occurrences WHERE nodus_id='work-reused'").get().n, 0);
+database.getDb().prepare("UPDATE settings SET value=? WHERE key='app'").run(beforeManualSettings);
 const reused = await analysisReuse.reuseVaultAnalysisForWorks(['work-reused']);
 assert.equal(reused.requested, 1);
 assert.equal(reused.matched, 1);

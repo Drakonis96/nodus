@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import type { ArgumentBlock, ArgumentMap, ArgumentMapRequest, ArgumentRouteSuggestion, EdgeType, IdeaType, ModelRef, PromptLanguage } from '@shared/types';
 import { getDb } from '../db/database';
+import { activeManualIdeaIds } from '../db/manualIdeaVisibility';
 import { getIdeaSummary } from '../db/ideasRepo';
 import { getSettings } from '../db/settingsRepo';
 import { completeJson } from './aiClient';
@@ -159,7 +160,8 @@ function listArgumentIdeas(): IdeaRow[] {
   const rows = getDb()
     .prepare('SELECT global_id, type, label, statement FROM ideas')
     .all() as RawIdeaRow[];
-  return rows.map((row) => ({
+  const visible = getSettings().academicMode === 'manual' ? activeManualIdeaIds(getDb()) : null;
+  return rows.filter(row => !visible || visible.has(row.global_id)).map((row) => ({
     global_id: row.global_id,
     type: row.type ?? 'claim',
     label: row.label ?? row.global_id,

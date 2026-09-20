@@ -1,3 +1,4 @@
+import { isManualAcademic } from '../ai/academicMode';
 import { BrowserWindow } from 'electron';
 import fs from 'node:fs';
 import type {
@@ -1468,7 +1469,7 @@ export async function linkGlobalLibraryItemsToVault(itemIds: string[], vaultId: 
     getDb().prepare("UPDATE works SET source_type='markdown' WHERE nodus_id=?").run(linked.nodus_id);
     const revisionFingerprints = Object.fromEntries((['light', 'deep', 'summary', 'ideas', 'passages', 'embeddings'] as const)
       .map((component) => [component, libraryRevisionFingerprint(record, component)])) as Record<LibraryAnalysisReuseComponent, string | null>;
-    await reuseVaultAnalysisForWorks([linked.nodus_id], {
+    if (!isManualAcademic()) await reuseVaultAnalysisForWorks([linked.nodus_id], {
       targetVaultId: vault.id,
       context: { libraryItemId: record.id, revisionFingerprints },
     });

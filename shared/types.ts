@@ -1873,7 +1873,11 @@ export interface AiConcurrencySnapshot {
   lastChangeReason: string;
 }
 
+export type AcademicMode = 'auto' | 'manual';
+
 export interface AppSettings {
+  /** Vault-local, fixed after onboarding. Legacy vaults use Auto. */
+  academicMode?: AcademicMode;
   /** Whether the user explicitly enabled the cross-vault catalogue. */
   libraryGlobalEnabled: boolean;
   /** Last scope selected after the compatibility-first Library introduction. */
@@ -5343,6 +5347,7 @@ export interface GraphData {
 }
 
 export interface IdeaDetail {
+  themes?: string[];
   idea: Idea;
   occurrences: (IdeaOccurrence & { work: WorkView })[];
   evidence: Evidence[];
@@ -6228,6 +6233,8 @@ export interface ManualIdeaEvidence {
 
 /** A connection from this idea to another idea (manual or accepted suggestion). */
 export interface ManualIdeaConnection {
+  /** Incoming connections are displayed but owned by their source idea. */
+  incoming?: boolean;
   toId: string;
   toLabel: string;
   type: EdgeType;
@@ -6237,6 +6244,9 @@ export interface ManualIdeaConnection {
 }
 
 export interface ManualIdeaPayload {
+  themes?: string[];
+  /** Edit links without overwriting a concurrently autosaved document. */
+  linksOnly?: boolean;
   globalId: string;
   noteId: string;
   title: string;

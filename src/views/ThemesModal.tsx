@@ -172,11 +172,13 @@ export function ThemesModal({
         </header>
 
         <div className="p-4 overflow-y-auto space-y-4">
+          {settings.academicMode !== 'manual' && (
           <p className="text-xs text-neutral-400 leading-relaxed">
             {t('Los temas principales son los grandes nodos que agrupan tus ideas en el grafo. Añade los tuyos para controlarlos manualmente; mientras estén bloqueados, los análisis solo usarán estos temas y no generarán otros nuevos.')}{' '}
             <span className="text-neutral-300">{t('Reprocesar')}</span>{' '}
             {t('coge las ideas ya extraídas (afirmaciones, hallazgos…) y las vuelve a agrupar bajo estos temas con los modelos configurados en Ajustes, sin volver a leer los documentos ni re-extraer ideas.')}
           </p>
+          )}
 
           {/* Add a manual theme */}
           <div className="flex gap-2">
@@ -198,6 +200,7 @@ export function ThemesModal({
           </div>
 
           {/* Lock toggle */}
+          {settings.academicMode !== 'manual' && (
           <label className="flex items-start gap-3 card p-3 cursor-pointer">
             <input type="checkbox" className="h-4 w-4 mt-0.5 accent-indigo-500" checked={locked} onChange={() => void toggleLocked()} disabled={busy} />
             <span className="text-sm">
@@ -210,6 +213,7 @@ export function ThemesModal({
               </span>
             </span>
           </label>
+          )}
 
           {/* Theme list */}
           <div className="space-y-1.5">
@@ -284,6 +288,7 @@ export function ThemesModal({
           {notice && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 dark:text-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-900">{notice}</div>}
         </div>
 
+        {settings.academicMode !== 'manual' && (
         <footer className="border-t border-neutral-800 p-3 space-y-3">
           <div className="flex flex-col gap-1.5">
             <span className="text-xs uppercase text-neutral-500">{t('Qué reprocesar')}</span>
@@ -351,6 +356,7 @@ export function ThemesModal({
             </button>
           </div>
         </footer>
+        )}
       </div>
 
       {pendingDelete && (

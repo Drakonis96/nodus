@@ -1,3 +1,4 @@
+import { assertAcademicAutomation } from './academicMode';
 import { v4 as uuid } from 'uuid';
 import crypto from 'node:crypto';
 import type {
@@ -159,6 +160,7 @@ export async function reprocessConnections(
   model?: ModelRef | null,
   onProgress?: (p: ReprocessProgress) => void
 ): Promise<ReprocessConnectionsResult> {
+  assertAcademicAutomation();
   const db = getDb();
   const settings = getSettings();
   const prompt = reprocessConnectionsPromptPack(settings.promptLanguage ?? 'es');

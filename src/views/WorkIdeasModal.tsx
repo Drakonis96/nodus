@@ -28,6 +28,7 @@ export function WorkIdeasModal({
   work,
   model,
   enableSynthesis = false,
+  manual = false,
   onClose,
   onOpenGraph,
   onOpenWorkGraph,
@@ -35,6 +36,7 @@ export function WorkIdeasModal({
   work: { nodus_id: string; title: string };
   model?: ModelRef | null;
   enableSynthesis?: boolean;
+  manual?: boolean;
   onClose: () => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenWorkGraph: (work: { nodus_id: string; title: string }) => void;
@@ -212,7 +214,7 @@ export function WorkIdeasModal({
             <p className="truncate text-xs text-neutral-500">
               {loading
                 ? t('Cargando ideas…')
-                : tx('{n} idea(s) extraída(s) de esta obra', { n: total })}
+                : manual ? `${total} · ${t('Ideas')}` : tx('{n} idea(s) extraída(s) de esta obra', { n: total })}
             </p>
           </div>
           <div className="flex-1" />
@@ -238,8 +240,10 @@ export function WorkIdeasModal({
               ) : ideas.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 px-6 py-10 text-center text-sm text-neutral-400">
                   <Icon name="bulb" size={26} className="text-neutral-600" />
+                  {manual ? <p>{t('Las obras, citas y relaciones son opcionales. Puedes empezar con una idea independiente.')}</p> : <>
                   <p>{t('Esta obra aún no tiene ideas extraídas.')}</p>
                   <p className="text-xs text-neutral-500">{t('Ejecuta un análisis profundo de la obra para extraer sus ideas.')}</p>
+                  </>}
                 </div>
               ) : (
                 <ul className="space-y-1">
@@ -297,7 +301,7 @@ export function WorkIdeasModal({
 
           {/* Idea detail */}
           <div className="min-w-0 flex-1 overflow-y-auto p-4">
-            {enableSynthesis && (
+            {enableSynthesis && !manual && (
               <section className="mb-4 rounded-lg border border-neutral-800 bg-neutral-900/60 p-3">
                 <div className="mb-2 flex items-center gap-2">
                   <Icon name="wand" size={14} className="text-indigo-400" />

@@ -1068,7 +1068,7 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('library', 'Automatización de análisis', 'analizar temas profundo resumen cola relaciones reanudar') && (
+      {settings.academicMode !== 'manual' && visibleSettingsSection('library', 'Automatización de análisis', 'analizar temas profundo resumen cola relaciones reanudar') && (
           <Section title={t('Automatización de análisis')}>
             <Row label={t('Analizar temas al sincronizar')}>
               <input type="checkbox" checked={settings.autoLightScan} onChange={(e) => patch({ autoLightScan: e.target.checked })} />

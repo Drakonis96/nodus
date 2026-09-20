@@ -1,3 +1,4 @@
+import { assertAcademicAutomation } from './academicMode';
 import { createHash, randomUUID } from 'node:crypto';
 import type {
   DocumentIdeaLink,
@@ -1140,6 +1141,7 @@ function emit(
 
 /** Full-text, hierarchical, audited document scan. */
 export async function runDocumentProfileScan(work: Work, options: RunDocumentProfileOptions): Promise<string> {
+  assertAcademicAutomation();
   const scanStartedAt = Date.now();
   options = { ...options, perf: options.perf ?? { nodusId: work.nodus_id, title: work.title } };
   // The profile pipeline's prompts scale with the document, and a local server rejects a

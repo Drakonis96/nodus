@@ -1,3 +1,4 @@
+import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
@@ -68,6 +69,7 @@ import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch
 import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const FR: Record<string, string> = {
+  ...ACADEMIC_MANUAL_TRANSLATIONS["fr"],
   // Nodus Tools catalogue
   "Navega por la web y guarda fuentes para tu investigación.": "Parcourez le web et enregistrez des sources pour vos recherches.",
   "Descubre literatura académica en fuentes abiertas.": "Découvrez la littérature scientifique dans des sources ouvertes.",

@@ -1,3 +1,4 @@
+import { isManualAcademic } from '../ai/academicMode';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import type { LibraryAnalysisReuseComponent } from '@shared/libraryTypes';
@@ -741,7 +742,7 @@ export async function reuseVaultAnalysisForWorks(nodusIds: string[], options: Va
   const ids = [...new Set(nodusIds.map((id) => id.trim()).filter(Boolean))];
   const targetDb = getDb();
   const works: VaultAnalysisReuseWorkResult[] = [];
-  if (ids.length === 0) return { requested: 0, matched: 0, imported: 0, canceled: false, works };
+  if (isManualAcademic() || ids.length === 0) return { requested: 0, matched: 0, imported: 0, canceled: false, works };
 
   const rows = targetDb
     .prepare(`SELECT * FROM works WHERE nodus_id IN (${placeholders(ids)})`)

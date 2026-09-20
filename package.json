@@ -27,6 +27,7 @@
     "build:server-web": "vite build --config vite.server-web.config.ts",
     "pretest": "node scripts/prepare-electron-tests.mjs",
     "test": "node --test scripts/test-*.mjs",
+    "pretest:ci": "node scripts/prepare-electron-tests.mjs",
     "test:ci": "node --test --test-concurrency=2 scripts/test-*.mjs",
     "capabilities:keygen": "node scripts/capability-keygen.mjs",
     "test:skill-capabilities": "node --test scripts/test-plugin-assets.mjs scripts/test-capability-*.mjs scripts/test-core-purity.mjs scripts/test-skill-capabilities.mjs scripts/test-chat-skills.mjs scripts/test-skill-marketplace.mjs scripts/test-skill-capability-matrix.mjs scripts/test-chat-skills-surfaces.mjs && node scripts/verify-skill-capability-sandbox.mjs && node scripts/verify-capability-worker-host.mjs && node scripts/verify-capability-worker-deadline.mjs && node scripts/verify-capability-package-install.mjs legalize && node scripts/verify-capability-package-install.mjs alphagenome && node scripts/verify-capability-package-install.mjs chemistry-studio && node scripts/verify-capability-package-install.mjs research-visuals && node scripts/verify-marketplace-plugin-install.mjs && node scripts/verify-skill-tool-sandbox.mjs",

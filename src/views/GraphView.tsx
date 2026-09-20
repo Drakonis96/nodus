@@ -23,7 +23,9 @@ export function GraphView({
   testId,
   snapshot,
   onSnapshotChange,
+  onEditManualIdea,
 }: {
+  onEditManualIdea?: (noteId: string) => void;
   settings: AppSettings;
   onSettingsChange: () => void;
   target?: GraphNavigationTarget | null;
@@ -54,7 +56,7 @@ export function GraphView({
     setModal("");
     setRevision((v) => v + 1);
   };
-  const actions = [
+  const actions = settings.academicMode === 'manual' ? [] : [
     ...(dataSource.capabilities.tutor
       ? [{ id: "tutor", label: "Tutor", icon: "tutorOrbit" }]
       : []),
@@ -72,6 +74,7 @@ export function GraphView({
     <div className="h-full min-h-0" data-testid={testId || "graph-view"}>
       <StellarWorkspace
         source={source}
+        onEditIdea={settings.academicMode === 'manual' ? onEditManualIdea : undefined}
         snapshot={snapshot}
         onSnapshotChange={onSnapshotChange}
         navigationKey={tutorTarget?.nonce || target?.nonce}
@@ -87,7 +90,7 @@ export function GraphView({
         openEvidence={dataSource.openEvidence}
         saveIdea={dataSource.saveIdea}
         saveEdge={dataSource.saveEdge}
-        audit={dataSource.capabilities.audit}
+        audit={settings.academicMode !== 'manual' && dataSource.capabilities.audit}
         sidebar={modal === "tutor" ? (
           <TutorPanel
             settings={settings}

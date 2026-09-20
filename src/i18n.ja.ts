@@ -1,3 +1,4 @@
+import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
@@ -68,6 +69,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * translator's review debt and should be treated as a first pass.
  */
 export const JA: Record<string, string> = {
+  ...ACADEMIC_MANUAL_TRANSLATIONS["ja"],
   // Nodus Tools catalogue
   "Navega por la web y guarda fuentes para tu investigación.": "ウェブを閲覧し、研究のための資料を保存します。",
   "Descubre literatura académica en fuentes abiertas.": "公開情報源から学術文献を見つけます。",

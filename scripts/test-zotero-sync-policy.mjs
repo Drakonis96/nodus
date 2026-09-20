@@ -110,7 +110,7 @@ test('realtime sync notices a Zotero library revision reset as well as an increa
 
 test('the production manual path guards every analysis side effect', async () => {
   const sync = await fs.readFile(path.join(repoRoot, 'electron/sync/syncService.ts'), 'utf8');
-  assert.match(sync, /const automateAnalysis = shouldAutomateAnalysisAfterSync\(mode, options\)/);
+  assert.match(sync, /const automateAnalysis = !isManualAcademic\(\) && shouldAutomateAnalysisAfterSync\(mode, options\)/);
   assert.match(sync, /if \(automateAnalysis && settings\.autoLightScan/);
   assert.match(sync, /if \(automateAnalysis\) \{[\s\S]*probeWorkTextAvailability[\s\S]*scanQueue\.enqueue\(nodusId, item\.title, 'deep'\)/);
   assert.match(sync, /if \(automateAnalysis && DOCUMENT_INDEX_CONTINUOUS_AVAILABLE/);

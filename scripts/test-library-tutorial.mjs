@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (file) => readFile(path.join(root, file), 'utf8');
 
-test('the Library guide greets everyone once and is reopened from the header', async () => {
+test('the Auto Library guide is seen once; Manual keeps its own guidance', async () => {
   const [modal, shell, library] = await Promise.all([
     read('src/components/LibraryTutorialModal.tsx'),
     read('src/views/GlobalLibraryView.tsx'),
@@ -19,12 +19,12 @@ test('the Library guide greets everyone once and is reopened from the header', a
   assert.match(modal, /LIBRARY_TUTORIAL_SEEN_KEY = 'nodus\.libraryTutorialSeen\.v1'/);
   assert.match(modal, /localStorage\.setItem\(LIBRARY_TUTORIAL_SEEN_KEY, '1'\)/);
   assert.match(modal, /catch \{ return true; \}/, 'unavailable storage must not reopen the guide forever');
-  assert.match(shell, /useState\(\(\) => !libraryTutorialSeen\(\)\)/);
+  assert.match(shell, /useState\(\(\) => settings\.academicMode !== 'manual' && !libraryTutorialSeen\(\)\)/);
   assert.match(shell, /if \(autoPresented\.current\) markLibraryTutorialSeen\(\);/);
   assert.match(shell, /<LibraryTutorialModal/);
 
   // The «?» lives beside Colecciones and Índice documental, and ignores the flag.
-  assert.match(library, /data-testid="library-open-tutorial"[\s\S]*?onClick=\{onOpenTutorial\}/);
+  assert.match(library, /data-testid="library-open-tutorial"[\s\S]*?onClick=\{academicMode === 'manual' \? \(\) => toast\([\s\S]*?: onOpenTutorial\}/);
   assert.match(library, /data-testid="library-open-tutorial"[\s\S]*?<Icon name="help"/);
   // Glyph-only among labelled buttons, so it wears the vault's accent to be findable.
   assert.match(library, /data-testid="library-open-tutorial"[\s\S]*?'--library-help-accent'[^\n]*vaultTypeColor\(vaultType\)/);

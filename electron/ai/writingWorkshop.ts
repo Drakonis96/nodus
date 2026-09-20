@@ -19,6 +19,7 @@ import type {
   WritingWorkshopWorkCandidate,
 } from '@shared/types';
 import { getDb } from '../db/database';
+import { activeManualIdeaIds } from '../db/manualIdeaVisibility';
 import { getContradictions } from '../graph/graphService';
 import { listTutorRoutes } from '../db/tutorRepo';
 import { completeJson } from './aiClient';
@@ -197,7 +198,7 @@ export async function buildWritingWorkshopSnapshot(
     generatedAt: new Date().toISOString(),
     brief,
     stats: {
-      ideas: countTable('ideas'),
+      ideas: getSettings().academicMode === 'manual' ? activeManualIdeaIds(getDb()).size : countTable('ideas'),
       themes: countTable('themes'),
       gaps: countTable('gaps'),
       contradictions: getContradictions().length,
@@ -699,7 +700,7 @@ function ideaCandidateById(globalId: string, score: number): WritingWorkshopIdea
         GROUP BY i.global_id`
     )
     .get(globalId) as Omit<IdeaRow, 'work_ids'> | undefined;
-  if (!row) return null;
+  if (!row || (getSettings().academicMode === 'manual' && !activeManualIdeaIds(getDb()).has(globalId))) return null;
   return {
     id: row.global_id,
     label: row.label,
@@ -759,7 +760,9 @@ function rankedIdeas(tokens: Set<string>, semanticIndex: WorkshopSemanticRanking
     )
     .all() as IdeaRow[];
 
+  const active = getSettings().academicMode === 'manual' ? activeManualIdeaIds(getDb()) : null;
   return rows
+    .filter(row => !active || active.has(row.global_id))
     .map((row): Scored<WritingWorkshopIdeaCandidate> => {
       const themeList = splitList(row.themes);
       const baseText = [row.label, row.statement, themeList.join(' ')].join(' ');
@@ -1168,7 +1171,8 @@ function selectedIdeas(ids: string[]) {
     )
     .all(...ids) as Array<IdeaRow>;
 
-  return rows.map((row) => ({
+  const active = getSettings().academicMode === 'manual' ? activeManualIdeaIds(getDb()) : null;
+  return rows.filter(row => !active || active.has(row.global_id)).map((row) => ({
     id: row.global_id,
     tipo: row.type,
     etiqueta: row.label,

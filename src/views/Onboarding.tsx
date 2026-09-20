@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import './onboarding.css';
 import { motion } from 'framer-motion';
-import type { AiProvider, AppSettings, ZoteroCollection, ModelRef, VaultSummary, ZoteroPingResult } from '@shared/types';
+import type { AiProvider, AppSettings, AcademicMode, ZoteroCollection, ModelRef, VaultSummary, ZoteroPingResult } from '@shared/types';
 import { normalizeEmbeddingModel, normalizeEmbeddingProvider } from '@shared/providers';
 import { getNodusLocalModel } from '@shared/localAiModels';
 import { Spinner, Icon } from '../components/ui';
@@ -32,7 +33,9 @@ export function Onboarding({
   onCancel?: () => void | Promise<unknown>;
   discardsVault?: boolean;
 }) {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState((activeVault?.type ?? 'academic') === 'academic' ? -1 : 0);
+  const [academicMode, setAcademicMode] = useState<AcademicMode | null>(null);
+  const manual = academicMode === 'manual';
   const [ping, setPing] = useState<ZoteroPingResult | null>(null);
   const [collections, setCollections] = useState<ZoteroCollection[]>([]);
   const [libraryError, setLibraryError] = useState<string | null>(null);
@@ -73,6 +76,24 @@ export function Onboarding({
   const connectsZotero = usesZoteroOnboarding && librarySetup === 'zotero';
   const aiStep = simple ? 1 : 3; // the "AI provider" step index
   const doneStep = simple ? 2 : 4; // the final step index
+  const progressRef = useRef<HTMLOListElement>(null);
+
+  useEffect(() => {
+    const progress = progressRef.current;
+    if (!progress) return;
+    const revealCurrentStep = () => {
+      const current = progress.querySelector<HTMLElement>('[aria-current="step"]');
+      if (!current) return;
+      const start = current.offsetLeft;
+      const end = start + current.offsetWidth;
+      if (start < progress.scrollLeft) progress.scrollLeft = start;
+      else if (end > progress.scrollLeft + progress.clientWidth) progress.scrollLeft = end - progress.clientWidth;
+    };
+    revealCurrentStep();
+    const observer = new ResizeObserver(revealCurrentStep);
+    observer.observe(progress);
+    return () => observer.disconnect();
+  }, [step, connectsZotero, manual, settings.uiLanguage]);
 
   const exitOnboarding = async () => {
     if (!onCancel || exiting) return;
@@ -173,6 +194,25 @@ export function Onboarding({
   };
 
   const finish = async () => {
+    if (manual) {
+      setFinishing(true);
+      setFinishError(null);
+      try {
+        await window.nodus.updateSettings({
+          academicMode: 'manual',
+          ...(connectsZotero ? { monitoredCollections: Array.from(selected), readTag, zoteroStoragePath: storagePath } : {}),
+        });
+        if (connectsZotero) {
+          const sync = await window.nodus.syncNow();
+          setSyncSummary(sync.summary);
+          setSyncedWorks((await window.nodus.listWorks()).length);
+        }
+        await window.nodus.updateSettings({ onboardingComplete: true, tourComplete: true, advancedTourComplete: true });
+        setStep(doneStep);
+      } catch (error) { setFinishError(error instanceof Error ? error.message : String(error)); }
+      finally { setFinishing(false); }
+      return;
+    }
     if (!aiModel || !embeddingModel) {
       setModelError(t('Elige un modelo de IA y uno de embeddings para continuar.'));
       return;
@@ -248,7 +288,7 @@ export function Onboarding({
   const pingHint = ping && !ping.ok ? zoteroConnectionHint(ping) : null;
   const steps = simple
     ? [t('Introducción'), t('Proveedor de IA'), t('Listo')]
-    : [t('Biblioteca'), connectsZotero ? t('Colecciones de Zotero') : t('Añadir contenido'), connectsZotero ? t('Lecturas de Zotero') : t('Cómo funciona'), t('Proveedor de IA'), t('Primer resultado')];
+    : [t('Biblioteca'), connectsZotero ? t('Colecciones de Zotero') : t('Añadir contenido'), connectsZotero ? t('Lecturas de Zotero') : t('Cómo funciona'), manual ? t('Índice local') : t('Proveedor de IA'), t('Primer resultado')];
   const intro =
     vaultType === 'primary_sources'
       ? {
@@ -293,11 +333,12 @@ export function Onboarding({
         : { subtitle: '', body: '' };
 
   return (
-    <div className="h-full flex items-center justify-center p-8">
+    <div className="onboarding-shell">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="card w-full max-w-2xl p-8"
+        className="card onboarding-card w-full max-w-2xl"
+        data-testid="onboarding-card"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="text-2xl font-semibold mb-1">{t('Bienvenido a Nodus')}</div>
@@ -311,7 +352,7 @@ export function Onboarding({
             </button>
           )}
         </div>
-        <p className="text-neutral-400 text-sm mb-6">
+        <p className="text-neutral-400 text-sm mb-5">
           {simple ? intro.subtitle : t('Construye tu biblioteca dentro de Nodus o conecta Zotero. Las dos opciones terminan en el mismo grafo local.')}
         </p>
 
@@ -332,18 +373,35 @@ export function Onboarding({
           </div>
         )}
 
-        <div className="flex gap-2 mb-6">
-          {steps.map((s, i) => (
-            <div
+        <ol ref={progressRef} className="onboarding-progress" data-testid="onboarding-progress" tabIndex={0}
+          aria-label={tx('Paso {a} de {b}', { a: simple ? step + 1 : step + 2, b: simple ? steps.length : steps.length + 1 })}>
+          {(simple ? steps : [t('Modo académico'), ...steps]).map((s, index) => { const i = simple ? index : index - 1; return (
+            <li
               key={s}
-              className={`flex-1 text-center text-xs py-1.5 rounded-lg ${
-                i === step ? 'bg-indigo-600 text-white' : i < step ? 'bg-neutral-800 text-neutral-300' : 'bg-neutral-900 text-neutral-600'
+              aria-current={i === step ? 'step' : undefined}
+              className={`onboarding-step ${
+                i === step ? 'bg-indigo-600 text-white' : i < step ? 'bg-neutral-800/70 text-neutral-300' : 'text-neutral-500'
               }`}
             >
               {s}
-            </div>
-          ))}
-        </div>
+            </li>
+          ); })}
+        </ol>
+
+        {step === -1 && !simple && (
+          <div className="grid gap-3 sm:grid-cols-2" role="group" aria-label={t('Modo académico')}>
+            {(['auto', 'manual'] as const).map((mode) => (
+              <button key={mode} type="button" data-testid={`onboarding-mode-${mode}`} aria-pressed={academicMode === mode}
+                className={`rounded-xl border p-5 text-left ${academicMode === mode ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 hover:border-neutral-500'}`}
+                onClick={() => setAcademicMode(mode)}>
+                <span className="font-semibold">{mode === 'auto' ? t('Modo Auto (con IA)') : t('Modo Manual')}</span>
+                <span className="mt-2 block text-sm leading-6 text-neutral-400">{mode === 'auto'
+                  ? t('La IA analiza tus materiales, extrae ideas y establece relaciones.')
+                  : t('Crea tus ideas, vincula obras y añade citas y relaciones a tu ritmo. Nodus las indexa para facilitar la búsqueda.')}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {step === 0 && simple && (
           <div className="space-y-3">
@@ -398,7 +456,7 @@ export function Onboarding({
         {step === 1 && !simple && connectsZotero && (
           <div className="space-y-3">
             <p className="text-sm text-neutral-400">
-              {t('Elige las colecciones a monitorizar. Despliega cualquier colección para elegir subcolecciones concretas si una es demasiado grande. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.')}
+              {manual ? t('Las obras, citas y relaciones son opcionales. Puedes empezar con una idea independiente.') : t('Elige las colecciones a monitorizar. Despliega cualquier colección para elegir subcolecciones concretas si una es demasiado grande. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.')}
             </p>
             {selected.size > 0 && (
               <p className="text-xs text-emerald-400">{tx('{n} seleccionadas', { n: selected.size })}</p>
@@ -441,11 +499,11 @@ export function Onboarding({
         {step === 2 && !simple && !connectsZotero && (
           <div className="space-y-3 rounded-xl border border-neutral-800 p-4">
             <h3 className="font-semibold">{t('Biblioteca y análisis son independientes')}</h3>
-            <p className="text-sm leading-6 text-neutral-400">{t('La Biblioteca conserva referencias y archivos. Cuando añades una obra a este vault, habilitas sus análisis, ideas, pasajes, embeddings y conexiones dentro de este espacio.')}</p>
+            <p className="text-sm leading-6 text-neutral-400">{manual ? t('Las obras, citas y relaciones son opcionales. Puedes empezar con una idea independiente.') : t('La Biblioteca conserva referencias y archivos. Cuando añades una obra a este vault, habilitas sus análisis, ideas, pasajes, embeddings y conexiones dentro de este espacio.')}</p>
           </div>
         )}
 
-        {step === aiStep && (
+        {step === aiStep && !manual && (
           <div className="space-y-4">
             <OnboardingModelStep
               providerKeys={providerKeys ?? {}}
@@ -483,6 +541,14 @@ export function Onboarding({
           </div>
         )}
 
+        {step === aiStep && manual && (
+          <div className="space-y-3 rounded-xl border border-neutral-800 p-4">
+            <h3 className="font-semibold">{t('Índice local')}</h3>
+            <p className="text-sm leading-6 text-neutral-400">{t('Tus ideas se indexan en este equipo con Multilingual E5 Small. Puedes cambiar el modelo en Ajustes. La indexación no crea ideas ni relaciones.')}</p>
+            <p className="text-xs text-neutral-500">{t('El modelo se prepara en segundo plano al guardar tu primera idea. Puedes seguir escribiendo sin conexión.')}</p>
+            {finishError && <p role="alert">{finishError}</p>}
+          </div>
+        )}
         {step === doneStep && (
           <div className="space-y-4">
             <div>
@@ -517,14 +583,22 @@ export function Onboarding({
           </div>
         )}
 
-        <div className="flex justify-between mt-8">
-          <button className="btn btn-ghost" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0 || finishing}>
+        {modelError && step === -1 && <p role="alert">{modelError}</p>}
+        <div className="onboarding-footer flex flex-wrap items-center justify-between gap-3 mt-6">
+          <button className="btn btn-ghost" onClick={() => setStep((s) => Math.max(simple ? 0 : -1, s - 1))} disabled={step === (simple ? 0 : -1) || step === doneStep || finishing}>
             {t('Atrás')}
           </button>
           {step < aiStep ? (
-            <button className="btn btn-primary" onClick={() => setStep((s) => s + 1)}>
+            <button className="btn btn-primary" disabled={step === -1 && !academicMode} onClick={async () => {
+              try {
+                if (step === -1 && academicMode) await window.nodus.updateSettings({ academicMode });
+                setStep((s) => s + 1);
+              } catch (error) { setModelError(String(error)); }
+            }}>
               {t('Siguiente')}
             </button>
+          ) : step === aiStep && manual ? (
+            <button className="btn btn-primary" data-testid="onboarding-start" onClick={finish} disabled={finishing}>{finishing ? t('Preparando...') : t('Empezar')}</button>
           ) : step === aiStep ? (
             <div className="flex gap-2">
               <button
@@ -547,8 +621,8 @@ export function Onboarding({
                 </button>
               )}
               {!simple && (
-                <button className="btn btn-ghost border border-neutral-700" onClick={() => onDone(aiModel ? 'library' : 'settings')} disabled={finishing}>
-                  {aiModel ? t('Ir a Biblioteca') : t('Configurar IA')}
+                <button className="btn btn-ghost border border-neutral-700" onClick={() => onDone(manual || aiModel ? 'library' : 'settings')} disabled={finishing}>
+                  {manual || aiModel ? t('Ir a Biblioteca') : t('Configurar IA')}
                 </button>
               )}
               <button className="btn btn-primary" onClick={() => onDone('home')} disabled={finishing}>

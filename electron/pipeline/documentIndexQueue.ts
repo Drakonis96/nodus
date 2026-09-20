@@ -1,3 +1,4 @@
+import { assertAcademicAutomation, isManualAcademic } from '../ai/academicMode';
 import type {
   DocumentIndexCampaign,
   DocumentIndexJob,
@@ -118,7 +119,7 @@ class DocumentIndexQueue {
       await withVaultDatabase(vault.id, async () => {
         recoverInterruptedDocumentJobs();
         const settings = getSettings();
-        if (DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && settings.documentIndexingEnabled) {
+        if (!isManualAcademic() && DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && settings.documentIndexingEnabled) {
           await this.ensureContinuousCampaignInside(vault.id, settings.documentIndexIncludeArchived);
         } else {
           for (const campaign of listDocumentIndexCampaigns().filter((item) =>
@@ -141,7 +142,7 @@ class DocumentIndexQueue {
     for (const vault of listVaults().filter((item) => writable(item) && !this.maintenanceVaults.has(item.id))) {
       await withVaultDatabase(vault.id, async () => {
         const settings = getSettings();
-        if (DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && settings.documentIndexingEnabled) {
+        if (!isManualAcademic() && DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && settings.documentIndexingEnabled) {
           await this.ensureContinuousCampaignInside(vault.id, settings.documentIndexIncludeArchived);
         }
       }).catch((error) => console.error('[document-index] continuous refresh failed', vault.id, error));
@@ -157,7 +158,7 @@ class DocumentIndexQueue {
     if (!vault || !writable(vault) || this.stopping || this.maintenanceAll || this.maintenanceVaults.has(vaultId)) return;
     await withVaultDatabase(vault.id, async () => {
       const settings = getSettings();
-      if (DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && settings.documentIndexingEnabled) {
+      if (!isManualAcademic() && DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && settings.documentIndexingEnabled) {
         await this.ensureContinuousCampaignInside(vault.id, settings.documentIndexIncludeArchived);
       }
     });
@@ -196,6 +197,7 @@ class DocumentIndexQueue {
     if (!vault || !writable(vault)) throw new Error('Este vault no permite generar análisis documentales.');
     if (this.maintenanceAll || this.maintenanceVaults.has(vaultId)) throw new Error('El vault está en mantenimiento; el análisis se reanudará al terminar.');
     const campaign = await withVaultDatabase(vaultId, () => {
+      assertAcademicAutomation();
       const mode = options.mode ?? 'manual';
       const settings = getSettings();
       const defaultGenerator = settings.documentProfileModel ?? settings.summaryModel ?? settings.synthesisModel;
@@ -250,6 +252,7 @@ class DocumentIndexQueue {
   }
 
   private async ensureContinuousCampaignInside(vaultId: string, includeArchived: boolean): Promise<void> {
+    if (isManualAcademic()) return;
     const existing = listDocumentIndexCampaigns().find((campaign) =>
       campaign.mode === 'continuous' && ['queued', 'running', 'paused'].includes(campaign.status)
     );
@@ -279,6 +282,7 @@ class DocumentIndexQueue {
     reason = 'research',
     options: { allowUnavailable?: boolean; allowFailed?: boolean; signal?: AbortSignal } = {},
   ): Promise<void> {
+    if (await withVaultDatabase(vaultId, () => isManualAcademic())) return;
     const ids = [...new Set(nodusIds)].filter(Boolean);
     if (!ids.length) return;
     options.signal?.throwIfAborted();
@@ -338,6 +342,7 @@ class DocumentIndexQueue {
   async enqueueWork(vaultId: string, nodusId: string, priority = 500, reason = 'manual'): Promise<DocumentIndexJob> {
     if (this.maintenanceAll || this.maintenanceVaults.has(vaultId)) throw new Error('El vault está en mantenimiento; inténtalo al terminar.');
     const result = await withVaultDatabase(vaultId, () => {
+      assertAcademicAutomation();
       const settings = getSettings();
       const generator = settings.documentProfileModel ?? settings.summaryModel ?? settings.synthesisModel;
       return enqueueDocumentIndexJob({
@@ -482,7 +487,7 @@ class DocumentIndexQueue {
     for (let offset = 0; offset < vaults.length; offset += 1) {
       const index = (this.roundRobin + offset) % vaults.length;
       const vault = vaults[index];
-      const job = await withVaultDatabase(vault.id, () => claimNextDocumentIndexJob()).catch(() => null);
+      const job = await withVaultDatabase(vault.id, () => isManualAcademic() ? null : claimNextDocumentIndexJob()).catch(() => null);
       if (job) { this.roundRobin = (index + 1) % vaults.length; return { vault, job }; }
     }
     return null;
@@ -490,6 +495,7 @@ class DocumentIndexQueue {
 
   private async run(vault: VaultSummary, job: DocumentIndexJob, signal: AbortSignal): Promise<void> {
     await withVaultDatabase(vault.id, async () => {
+      assertAcademicAutomation();
       const work = getDb().prepare('SELECT * FROM works WHERE nodus_id=?').get(job.nodusId) as Work | undefined;
       if (!work) {
         updateDocumentIndexJob(job.jobId, { status: 'unavailable', phase: 'done', progress: 1, error: 'La obra ya no existe.' });

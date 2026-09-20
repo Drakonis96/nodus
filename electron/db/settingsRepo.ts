@@ -58,6 +58,7 @@ function sanitizeTranscriptionModel(value: unknown): ModelRef | null {
 const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   // Compatibility first: a v3 settings blob has none of these keys, therefore its
   // first Nodus 4 Library visit remains the unchanged vault corpus.
+  academicMode: 'auto',
   libraryGlobalEnabled: false,
   libraryScope: 'vault',
   libraryScopeOnboardingVersion: 0,
@@ -550,6 +551,25 @@ export function getSettings(): AppSettings {
 }
 
 export function updateSettings(patch: Partial<AppSettings>): AppSettings {
+  const previous = getSettings();
+  if (patch.academicMode !== undefined) {
+    if (patch.academicMode !== 'auto' && patch.academicMode !== 'manual') throw new Error('Invalid academic mode.');
+    if (previous.onboardingComplete && patch.academicMode !== (previous.academicMode ?? 'auto')) {
+      throw new Error('El modo académico se elige al crear la bóveda.');
+    }
+    if (patch.academicMode === 'auto' && previous.academicMode === 'manual' && !previous.onboardingComplete) {
+      patch = { ...patch, autoLightScan: DEFAULTS.autoLightScan, autoDeepScanOnReadTag: DEFAULTS.autoDeepScanOnReadTag,
+        autoSummaryAfterDeep: DEFAULTS.autoSummaryAfterDeep, autoBridgeAfterQueue: DEFAULTS.autoBridgeAfterQueue,
+        autoResumeQueue: DEFAULTS.autoResumeQueue, documentIndexingEnabled: DEFAULTS.documentIndexingEnabled };
+    }
+    if (patch.academicMode === 'manual' && previous.academicMode !== 'manual') {
+      patch = { ...patch, embeddingProvider: 'nodus', embeddingModel: DEFAULT_EMBEDDING_MODELS.nodus };
+    }
+  }
+  if ((patch.academicMode ?? previous.academicMode) === 'manual') {
+    patch = { ...patch, autoLightScan: false, autoDeepScanOnReadTag: false,
+      autoSummaryAfterDeep: false, autoBridgeAfterQueue: false, autoResumeQueue: false, documentIndexingEnabled: false };
+  }
   if (patch.browserConnectorOrigin !== undefined) {
     const value = typeof patch.browserConnectorOrigin === 'string'
       ? patch.browserConnectorOrigin.trim().toLowerCase()

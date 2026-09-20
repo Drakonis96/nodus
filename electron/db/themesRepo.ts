@@ -1,3 +1,5 @@
+import { isManualAcademic } from '../ai/academicMode';
+import { manualIdeaVisible } from './manualIdeaVisibility';
 import { getDb } from './database';
 import { v4 as uuid } from 'uuid';
 import type { ManagedTheme, Theme } from '@shared/types';
@@ -68,7 +70,7 @@ export function setWorkThemes(nodusId: string, labels: string[]): void {
     // Prune orphan auto-themes, but keep user-curated (pinned) ones so they survive a
     // reprocess even before any work is assigned to them.
     db.prepare(
-      'DELETE FROM themes WHERE pinned = 0 AND theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes)'
+      'DELETE FROM themes WHERE pinned = 0 AND theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes) AND theme_id NOT IN (SELECT DISTINCT theme_id FROM idea_theme_links)'
     ).run();
   });
   tx();
@@ -169,7 +171,7 @@ export function replaceIdeaThemeLinks(
 /** Drop themes that are neither pinned nor referenced by any work. */
 export function pruneOrphanThemes(): void {
   getDb()
-    .prepare('DELETE FROM themes WHERE pinned = 0 AND theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes)')
+    .prepare('DELETE FROM themes WHERE pinned = 0 AND theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes) AND theme_id NOT IN (SELECT DISTINCT theme_id FROM idea_theme_links)')
     .run();
 }
 
@@ -183,6 +185,10 @@ export function listThemeLabels(): string[] {
  * manager. Includes pinned themes that have no works/ideas yet.
  */
 export function listManagedThemes(): ManagedTheme[] {
+  if (isManualAcademic()) {
+    const visible = new Map(listGraphThemes().map(theme => [theme.theme_id, theme]));
+    return listThemes().map(theme => ({ ...theme, pinned: Boolean(theme.pinned), work_count: visible.get(theme.theme_id)?.work_count ?? 0, idea_count: visible.get(theme.theme_id)?.idea_count ?? 0 }));
+  }
   const rows = getDb()
     .prepare(
       `SELECT
@@ -235,7 +241,7 @@ export function setThemePinned(themeId: string, pinned: boolean): void {
     // An unpinned theme with no works is just clutter — drop it like an auto-theme.
     getDb()
       .prepare(
-        'DELETE FROM themes WHERE theme_id = ? AND pinned = 0 AND theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes)'
+        'DELETE FROM themes WHERE theme_id = ? AND pinned = 0 AND theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes) AND theme_id NOT IN (SELECT DISTINCT theme_id FROM idea_theme_links)'
       )
       .run(themeId);
   }
@@ -287,6 +293,14 @@ export interface GraphTheme extends Theme {
  */
 export function listGraphThemes(): GraphTheme[] {
   const db = getDb();
+  if (isManualAcademic()) return db.prepare(`
+    SELECT t.*, COUNT(DISTINCT it.global_id) AS idea_count,
+      COUNT(DISTINCT io.nodus_id) AS work_count
+    FROM themes t JOIN idea_theme_links it ON it.theme_id=t.theme_id
+    LEFT JOIN idea_occurrences io ON io.global_id=it.global_id
+    WHERE it.nodus_id='manual' AND ${manualIdeaVisible('it.global_id')}
+    GROUP BY t.theme_id ORDER BY t.label
+  `).all() as GraphTheme[];
   // Curated (pinned) themes are always graph-hub candidates so the user's chosen main
   // themes never get capped out by auto-themes.
   const supportClause = `(pinned = 1 OR idea_count > 0 OR work_count >= @minWorks)`;

@@ -60,6 +60,7 @@ export function NodeDetailPanel({
   onClose,
   relations,
   onOpenIdea,
+  onEditIdea,
   onEdgeFeedback,
   onOpenEvidence,
   showEdgeAudit = true,
@@ -84,6 +85,7 @@ export function NodeDetailPanel({
    *  navigable "Conectada con" list. */
   relations?: RelationRow[];
   onOpenIdea?: (ideaId: string) => void;
+  onEditIdea?: (ideaId: string) => void;
   /** Called after the user sets/clears an audit verdict, so the host view can refresh its graph. */
   onEdgeFeedback?: (verdict: 'rejected' | 'confirmed' | null) => void;
   onOpenEvidence?: (sourceRef: string, location: string | null) => void;
@@ -120,7 +122,8 @@ export function NodeDetailPanel({
         onPointerDown={startResize}
       />
       <div className="graph-detail-header relative z-10 flex shrink-0 items-center justify-end gap-1 border-b border-neutral-800 px-4 py-2">
-        {!readOnly && (ideaDetail || edgeDetail) && (
+        {ideaDetail && onEditIdea && <button className="btn btn-primary mr-auto text-xs" data-testid="graph-edit-manual-idea" onClick={() => onEditIdea(ideaDetail.idea.global_id)}><Icon name="edit" size={13} /> {t('Editar')}</button>}
+        {!onEditIdea && !readOnly && (ideaDetail || edgeDetail) && (
           <button
             className="card mr-auto inline-flex items-center gap-1.5 bg-neutral-900 px-2 py-1 text-xs hover:bg-neutral-800"
             title={t('Guardar en notas')}

@@ -1,3 +1,4 @@
+import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
@@ -69,6 +70,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 /** Simplified Chinese UI table. Keys are the Spanish source strings (see i18n.ts). */
 export const ZH_CN: Record<string, string> = {
+  ...ACADEMIC_MANUAL_TRANSLATIONS["zh-CN"],
   // Nodus Tools catalogue
   "Navega por la web y guarda fuentes para tu investigación.": "浏览网页并保存研究资料。",
   "Descubre literatura académica en fuentes abiertas.": "在开放来源中发现学术文献。",

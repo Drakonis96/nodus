@@ -12,6 +12,7 @@ import type {
 } from '@shared/types';
 import { completeJson } from './aiClient';
 import { getDb } from '../db/database';
+import { academicIdeaAvailable } from '../db/manualIdeaVisibility';
 
 export type DeepResearchApproachVariant = 'academic' | 'genealogy' | 'study' | 'unit' | 'client';
 
@@ -848,7 +849,8 @@ export function academicRelationshipContext(snapshot: WritingWorkshopSnapshot): 
        FROM edges e
        JOIN ideas source ON source.global_id = e.from_id
        JOIN ideas target ON target.global_id = e.to_id
-      WHERE e.from_id IN (${placeholders}) OR e.to_id IN (${placeholders})
+      WHERE (e.from_id IN (${placeholders}) OR e.to_id IN (${placeholders}))
+        AND ${academicIdeaAvailable('e.from_id')} AND ${academicIdeaAvailable('e.to_id')}
       ORDER BY e.confidence DESC
       LIMIT 80`
   ).all(...ids, ...ids) as Array<{ from_label: string; type: string; to_label: string; confidence: number }>;

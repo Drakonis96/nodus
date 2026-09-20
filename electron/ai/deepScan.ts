@@ -1,3 +1,4 @@
+import { assertAcademicAutomation } from './academicMode';
 import crypto from 'node:crypto';
 import { completeJson, embedMany, AiError } from './aiClient';
 import { modelRefSupportsExtraction } from '@shared/localAiModels';
@@ -465,6 +466,7 @@ export async function runDeepScan(
   publicationOrdinal?: number,
   options: { force?: boolean } = {},
 ): Promise<void> {
+  assertAcademicAutomation();
   // Queue callers reserve this before PDF extraction. Direct scans still receive a
   // safe ordinal here, preserving a single ordering domain for graph publication.
   const publishOrdinal = publicationOrdinal ?? publicationBarrier.issue();

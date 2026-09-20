@@ -429,6 +429,7 @@ export function Library({
   target,
   onTargetConsumed,
   vaultType,
+  academicMode,
   snapshot,
   onSnapshotChange,
   onOpenCollections,
@@ -446,6 +447,7 @@ export function Library({
   /** Pending navigation targets are commands: apply once, then discard. */
   onTargetConsumed?: () => void;
   vaultType?: VaultType;
+  academicMode?: 'auto' | 'manual';
   /** Where this section was last left. Read once, at mount, and never again. */
   snapshot?: LibraryVaultSnapshot;
   onSnapshotChange?: (next: LibraryVaultSnapshot) => void;
@@ -1246,7 +1248,7 @@ export function Library({
         </div>
         {scopeControls}
         <div className="library-header-actions">
-          {DOCUMENT_INDEX_MANAGER_VISIBLE && vaultType === 'academic' && <button
+          {academicMode !== 'manual' && DOCUMENT_INDEX_MANAGER_VISIBLE && vaultType === 'academic' && <button
             data-testid="document-index-manager-button"
             className="btn btn-ghost border border-neutral-700 gap-1.5"
             onClick={() => setDocumentManagerOpen(true)}
@@ -1311,7 +1313,7 @@ export function Library({
             type="button"
             className="library-help-button"
             style={{ ['--library-help-accent' as string]: vaultTypeColor(vaultType) }}
-            onClick={onOpenTutorial}
+            onClick={academicMode === 'manual' ? () => toast(t('Crea tus ideas, vincula obras y añade citas y relaciones a tu ritmo. Nodus las indexa para facilitar la búsqueda.')) : onOpenTutorial}
             aria-label={t('Cómo funciona la Biblioteca')}
             title={t('Cómo funciona la Biblioteca')}
           >
@@ -1544,6 +1546,7 @@ export function Library({
         {/* One-click status filters. These replaced a row of counters that showed
             the same information but could not be clicked, sitting next to a
             separate control that filtered by it. */}
+        {academicMode !== 'manual' && <>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -1598,6 +1601,7 @@ export function Library({
             </span>
           </div>
         )}
+        </>}
           </div>
         )}
         {selectedZoteroTags.length > 0 && (
@@ -1720,6 +1724,7 @@ export function Library({
         <div className="mb-3 rounded-lg border border-indigo-800/70 bg-indigo-950/20 px-3 py-2 flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-indigo-200">{tx('{n} seleccionadas', { n: selectedVisibleIds.length })}</span>
           <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
+          {academicMode !== 'manual' && <>
           <label
             className="flex min-w-0 max-w-full items-center gap-2 rounded-md border border-indigo-800/70 bg-indigo-950/30 px-2.5 py-1.5 text-xs text-indigo-100"
             title={t('Busca coincidencias en otras bóvedas y, si encuentra ideas, embeddings, resúmenes o pasajes ya generados, los importa antes de usar IA.')}
@@ -1784,6 +1789,7 @@ export function Library({
               { label: t('Comprender documentos completos'), icon: 'layers', onClick: () => void window.nodus.startDocumentIndexCampaign({ nodusIds: selectedVisibleIds }) },
             ]}
           />
+          </>}
           {/* Destructive and irreversible, so it sits apart from the verbs above: past
               the overflow menu, away from the primary action, and red in both themes. */}
           <button
@@ -1902,8 +1908,8 @@ export function Library({
                   )}
                 </div>
                 <div className="min-w-0 p-1">
-                  {status && <StatusPill status={status} work={w} onClick={() => setStatusWork(w)} />}
-                  {vaultType === 'academic' && <button
+                  {academicMode === 'manual' ? <span className="text-xs text-neutral-500">{t('Modo Manual')}</span> : status && <StatusPill status={status} work={w} onClick={() => setStatusWork(w)} />}
+                  {academicMode !== 'manual' && vaultType === 'academic' && <button
                     className={`mt-1 block max-w-full truncate text-[10px] ${documentStatuses.get(w.nodus_id) === 'current' ? 'text-cyan-400' : documentStatuses.get(w.nodus_id) === 'failed' ? 'text-red-400' : 'text-neutral-600'}`}
                     onClick={() => setDocumentWork(w)}
                     title={t('Abrir la ficha documental completa')}
@@ -1919,13 +1925,13 @@ export function Library({
                 </div>
                 <div className="p-1 whitespace-nowrap">
                   <div className="flex items-center gap-1">
-                    <button
+                    {academicMode !== 'manual' && <button
                       className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs"
                       title={t('Analizar: temas, ideas, resumen, indexado y relaciones')}
                       onClick={() => processFullWork(w)}
                     >
                       {t('Analizar')}
-                    </button>
+                    </button>}
                     <RowIconButton
                       title={t('Abrir lector limpio')}
                       icon="book"
@@ -1976,7 +1982,7 @@ export function Library({
                         {
                           label: t('Grafo de ideas de la obra'),
                           icon: 'network',
-                          disabled: w.deep_status !== 'done',
+                          disabled: academicMode !== 'manual' && w.deep_status !== 'done',
                           onClick: () => setGraphWork({ nodus_id: w.nodus_id, title: w.title }),
                         },
                         {
@@ -2003,7 +2009,7 @@ export function Library({
                                 `${w.title}\n${w.authors.join(', ')}${w.year ? ` (${w.year})` : ''}`,
                             }),
                         },
-                      ]}
+                      ].filter(item => academicMode !== 'manual' || ['book', 'search', 'network', 'map', 'chat'].includes(item.icon))}
                     />
                   </div>
                 </div>
@@ -2040,6 +2046,7 @@ export function Library({
       {ideasWork && (
         <WorkIdeasModal
           work={ideasWork}
+          manual={academicMode === 'manual'}
           onClose={() => setIdeasWork(null)}
           onOpenGraph={onOpenGraph}
           onOpenWorkGraph={(w) => {
@@ -2048,7 +2055,7 @@ export function Library({
           }}
         />
       )}
-      {statusWork && (() => {
+      {academicMode !== 'manual' && statusWork && (() => {
         // Keep an open modal attached to the freshly loaded row. Holding the
         // original object made successful retries look ineffective until close/reopen.
         const currentWork = works.find((work) => work.nodus_id === statusWork.nodus_id) ?? statusWork;

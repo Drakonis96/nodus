@@ -1,3 +1,4 @@
+import { manualIdeaVisible } from './manualIdeaVisibility';
 import { getDb } from './database';
 import { scanSimilar } from './vectorScan';
 import { v4 as uuid } from 'uuid';
@@ -373,6 +374,7 @@ export function findSimilarIdeas(
   // Dormant ideas (no occurrences after a rescan) are hidden from every
   // retrieval consumer; only fusion opts in, so it can revive them.
   const dormantSql = options.includeDormant ? '' : 'AND orphaned_at IS NULL';
+  const manualScope = getSettings().academicMode === 'manual' ? `AND ${manualIdeaVisible('ideas.global_id')}` : '';
   return getDb()
     .prepare(
       `SELECT * FROM (
@@ -383,6 +385,7 @@ export function findSimilarIdeas(
            AND embedding_model = ?
            AND embedding_dim = ?
            ${dormantSql}
+           ${manualScope}
            ${excludeSql}
        ) WHERE similarity >= ?
        ORDER BY similarity DESC
@@ -629,7 +632,7 @@ export function addEdge(input: NewEdgeInput): string | null {
   if (!type) return null;
   const basis = normalizeEdgeBasis(input.basis);
   const confidence = clampConfidence(input.confidence);
-  const endpoints = canonicalEdgeEndpoints(input.from_id, input.to_id, type);
+  const endpoints = input.source_work === 'manual' ? { from_id: input.from_id, to_id: input.to_id } : canonicalEdgeEndpoints(input.from_id, input.to_id, type);
   const db = getDb();
   const existing = db
     .prepare('SELECT id, confidence FROM edges WHERE from_id = ? AND to_id = ? AND type = ?')
@@ -872,7 +875,8 @@ export function getIdeaDetail(globalId: string, worksCache?: Map<string, WorkVie
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
   const evidence = db.prepare('SELECT * FROM evidence WHERE global_id = ?').all(globalId) as Evidence[];
-  return { idea, occurrences, evidence };
+  const themes = (db.prepare('SELECT DISTINCT t.label FROM idea_theme_links it JOIN themes t ON t.theme_id=it.theme_id WHERE it.global_id=? ORDER BY t.label').all(globalId) as { label: string }[]).map(row => row.label);
+  return { idea, occurrences, evidence, themes };
 }
 
 /**
@@ -887,14 +891,14 @@ export function listPickerIdeas(): IdeaPickerItem[] {
     .prepare(
       `SELECT i.global_id, i.type, i.label, i.statement
          FROM ideas i
-        WHERE EXISTS (
+        WHERE (${manualIdeaVisible('i.global_id')} OR EXISTS (
           SELECT 1
             FROM idea_occurrences io
             JOIN works w ON w.nodus_id = io.nodus_id
            WHERE io.global_id = i.global_id
              AND w.archived = 0
              AND w.deep_status = 'done'
-        )`
+        ))`
     )
     .all() as Array<Omit<IdeaPickerItem, 'type' | 'label' | 'statement'> & {
       type: IdeaType | null;
@@ -914,13 +918,13 @@ export function listIdeasPage(request: IdeaPageRequest): IdeaPage {
   const limit = Math.min(200, Math.max(1, Math.trunc(request.limit)));
   const offset = Math.max(0, Math.trunc(request.offset));
   const clauses = [
-    `EXISTS (
+    `(${manualIdeaVisible('i.global_id')} OR EXISTS (
       SELECT 1 FROM idea_occurrences active_io
       JOIN works active_w ON active_w.nodus_id = active_io.nodus_id
       WHERE active_io.global_id = i.global_id
         AND active_w.archived = 0
         AND active_w.deep_status = 'done'
-    )`,
+    ))`,
   ];
   const params: Record<string, unknown> = { limit, offset };
   if (request.type) {
@@ -946,7 +950,7 @@ export function listIdeasPage(request: IdeaPageRequest): IdeaPage {
       `SELECT i.global_id AS id, i.label, i.type, i.statement,
               (SELECT COUNT(DISTINCT io.nodus_id)
                  FROM idea_occurrences io JOIN works w ON w.nodus_id = io.nodus_id
-                WHERE io.global_id = i.global_id AND w.archived = 0 AND w.deep_status = 'done') AS work_count,
+                WHERE io.global_id = i.global_id AND w.archived = 0 AND (w.deep_status = 'done' OR ${manualIdeaVisible('io.global_id')})) AS work_count,
               (SELECT MAX(io.confidence) FROM idea_occurrences io WHERE io.global_id = i.global_id) AS max_confidence,
               (SELECT COUNT(*) FROM visible_edges e
                 WHERE e.type != 'contains' AND (e.from_id = i.global_id OR e.to_id = i.global_id)) AS connection_count
@@ -1002,7 +1006,7 @@ export function listIdeaConnections(globalId: string): IdeaConnection[] {
       `SELECT e.id, e.from_id, e.to_id, e.type AS edge_type, e.basis, e.confidence,
               other.global_id AS other_id, other.label, other.type AS idea_type, other.statement,
               (SELECT COUNT(DISTINCT io.nodus_id) FROM idea_occurrences io JOIN works w ON w.nodus_id = io.nodus_id
-                WHERE io.global_id = other.global_id AND w.archived = 0 AND w.deep_status = 'done') AS work_count,
+                WHERE io.global_id = other.global_id AND w.archived = 0 AND (w.deep_status = 'done' OR ${manualIdeaVisible('io.global_id')})) AS work_count,
               (SELECT MAX(io.confidence) FROM idea_occurrences io WHERE io.global_id = other.global_id) AS max_confidence,
               (SELECT COUNT(*) FROM visible_edges linked
                 WHERE linked.type != 'contains' AND (linked.from_id = other.global_id OR linked.to_id = other.global_id)) AS connection_count
