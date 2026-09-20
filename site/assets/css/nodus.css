@@ -749,6 +749,11 @@ footer.site-foot {
   background: rgba(52, 211, 153, 0.08); border: 1px solid rgba(52, 211, 153, 0.2);
   font-size: 12.5px; font-weight: 600; color: var(--good); text-align: center;
 }
+.dl-modal .dl-group {
+  margin: 22px 0 9px; font-size: 11.5px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3);
+}
+.dl-modal .dl-group:first-of-type { margin-top: 0; }
 .dl-plat {
   display: flex; align-items: center; gap: 14px;
   margin-bottom: 10px; padding: 14px 16px;
@@ -760,7 +765,25 @@ footer.site-foot {
 .dl-plat .os { width: 26px; height: 26px; fill: var(--ink-2); flex: 0 0 auto; }
 .dl-plat div { flex: 1; min-width: 0; }
 .dl-plat b { display: block; font-size: 15px; }
-.dl-plat span:not(.arr) { font-size: 12.5px; color: var(--ink-3); }
+.dl-plat .note { font-size: 12.5px; color: var(--ink-3); }
+.dl-plat.dl-toggle { width: 100%; font: inherit; text-align: left; cursor: pointer; }
+.dl-toggle .chev {
+  width: 18px; height: 18px; flex: 0 0 auto; color: var(--ink-3);
+  transition: transform 0.22s var(--ease);
+}
+.dl-toggle[aria-expanded="true"] { border-color: rgba(167, 139, 250, 0.4); background: var(--skin-2); }
+.dl-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.dl-builds { margin: 0; }
+.dl-build { margin-left: 14px; }
+.dl-build-logo { display: flex; align-items: center; justify-content: center; min-width: 44px; flex: 0 0 auto; }
+.dl-build-logo svg { height: 20px; width: auto; fill: var(--ink-2); }
+.dl-build-logo img { height: 20px; width: auto; display: block; }
+.dl-builds-3 { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px 14px; }
+.dl-build-col {
+  flex: 1 1 104px; flex-direction: column; gap: 0; align-items: center;
+  padding: 4px 10px; margin: 0; text-align: center;
+}
+.dl-build-col .dl-build-logo { min-width: 0; }
 .dl-plat .arr { color: var(--ink-3); }
 .dl-all { display: block; margin: 16px 0 4px; text-align: center; font-size: 13.5px; }
 .dl-close {

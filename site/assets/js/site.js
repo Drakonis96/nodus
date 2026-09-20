@@ -215,6 +215,17 @@ page is still a complete, readable document.
     for (const trigger of document.querySelectorAll('[data-download]')) {
       trigger.addEventListener('click', (event) => { event.preventDefault(); open(); });
     }
+
+    /* Rows that reveal the builds behind them, one disclosure per platform. */
+    for (const toggle of modal.querySelectorAll('.dl-toggle')) {
+      const panel = document.getElementById(toggle.getAttribute('aria-controls'));
+      if (!panel) continue;
+      toggle.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', String(!expanded));
+        panel.hidden = expanded;
+      });
+    }
     overlay.addEventListener('click', (event) => { if (event.target === overlay) close(); });
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && overlay.classList.contains('open')) close();
@@ -236,19 +247,32 @@ page is still a complete, readable document.
           if (version) version.textContent = `Latest release · ${release.tag_name} · ${new Date(release.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`;
           const assets = release.assets || [];
           const find = (suffix) => assets.find((asset) => asset.name.endsWith(suffix));
+          const mb = (asset) => `${(asset.size / 1048576).toFixed(0)} MB`;
           const wire = (id, asset, fallbackLabel) => {
             const anchor = document.getElementById(id);
             if (!anchor) return;
             if (asset) {
               anchor.href = asset.browser_download_url;
-              const sub = anchor.querySelector('span:not(.arr)');
-              if (sub) sub.textContent = `${fallbackLabel} · ${(asset.size / 1048576).toFixed(0)} MB`;
+              const sub = anchor.querySelector('.note');
+              if (sub) sub.textContent = `${fallbackLabel} · ${mb(asset)}`;
             }
           };
-          wire('dl-mac', find('-mac-arm64.dmg'), 'Apple Silicon · .dmg');
-          wire('dl-mac-intel', find('-mac-x64.dmg'), 'Intel · .dmg');
           wire('dl-win', find('-win-x64.exe'), 'x64 installer · .exe');
-          wire('dl-linux', find('-linux-x86_64.AppImage'), 'x86_64 · .AppImage');
+
+          /* macOS and Linux each ship several builds: every choice behind their row
+             links straight at its own download. */
+          const wireBuild = (id, asset, suffix = '') => {
+            const anchor = document.getElementById(id);
+            if (!anchor || !asset) return;
+            anchor.href = asset.browser_download_url;
+            const note = anchor.querySelector('.note');
+            if (note) note.textContent = `${mb(asset)}${suffix}`;
+          };
+          wireBuild('dl-mac-arm', find('-mac-arm64.dmg'), ' · .dmg');
+          wireBuild('dl-mac-intel', find('-mac-x64.dmg'), ' · .dmg');
+          wireBuild('dl-linux-appimage', find('-linux-x86_64.AppImage'));
+          wireBuild('dl-linux-deb', find('-linux-amd64.deb'));
+          wireBuild('dl-linux-rpm', find('-linux-x86_64.rpm'));
         })
         .catch(() => {
           if (version) version.textContent = 'Open the releases page for every build.';

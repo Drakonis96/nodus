@@ -156,6 +156,29 @@ Zotero is developed by the Corporation for Digital Scholarship. Zotero and its
 logo are trademarks of the Corporation for Digital Scholarship. Nodus is an
 independent project and is not affiliated with or endorsed by Zotero.
 
+## Site platform marks
+
+The download dialog on nodusresearch.com identifies each build with its
+platform's own mark:
+
+- the Apple M series mark (`site/index.html`) is the public-domain
+  [Apple M1](https://commons.wikimedia.org/wiki/File:Apple_M1.svg) artwork from
+  Wikimedia Commons, drawn in the dialog's ink colour;
+- the Intel wordmark (`site/index.html`) is the public-domain
+  [Intel logo 2023](https://commons.wikimedia.org/wiki/File:Intel_logo_2023.svg),
+  kept in Intel's own blue and cyan;
+- the AppImage mark (`site/assets/brands/appimage.svg`) is the public-domain
+  [App-image-logo](https://commons.wikimedia.org/wiki/File:App-image-logo.svg) by
+  Peter Simon;
+- the Tux, Debian and Fedora marks are the corresponding paths from
+  [simple-icons](https://github.com/simple-icons/simple-icons), released under
+  CC0-1.0.
+
+Apple, Intel, AppImage, Debian, Fedora and their logos are trademarks of their
+respective owners, used here only to identify the platform each download is
+built for. Nodus is an independent project and is not affiliated with or
+endorsed by any of them.
+
 ## Citation Style Language styles and locales — CC BY-SA 3.0
 
 Nodus can download unmodified citation styles from the official CSL styles repository
