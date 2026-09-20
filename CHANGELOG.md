@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fixed the Zotero plugin leaving its evidence database open after the sidebar was destroyed, which could prevent Zotero from exiting and block the next launch (#909). The plugin now owns and awaits database cleanup independently of its windows; the live smoke test also checks normal shutdown.
+
 ## 5.5.0 — 2026-09-18
 
 Nodus speaks twelve interface languages, the local engine reaches the GPU on

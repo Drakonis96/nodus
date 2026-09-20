@@ -92,6 +92,7 @@ export function buildXpi() {
     files = collectFiles(staging);
     if (!files.some((f) => f.relPath === 'manifest.json')) throw new Error('manifest.json not found at plugin root');
     for (const required of [
+      'content/evidence-db.sys.mjs',
       'content/local-embeddings.js',
       'content/runtime/local-embedding-worker.js',
       'content/runtime/ort-wasm-simd-threaded.jsep.mjs',

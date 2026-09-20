@@ -5,7 +5,8 @@
 // Opt-in live Zotero smoke test. It launches the real Zotero binary with a
 // disposable profile, enables foreign-extension scanning only in that profile,
 // and proves that the built XPI is registered, active and actually reaches its
-// bootstrap startup. The user's Zotero profile and library are never opened.
+// bootstrap startup, opens its evidence database, and exits normally. The user's
+// Zotero profile and library are never opened.
 import { spawn } from 'node:child_process';
 import {
   cpSync,
@@ -56,11 +57,55 @@ const installedXpi = path.join(extensionsDir, `${addon.id}.xpi`);
 mkdirSync(dataDir, { recursive: true });
 mkdirSync(extensionsDir, { recursive: true });
 cpSync(xpiPath, installedXpi);
+// A separate diagnostic add-on requests a normal quit only after the host has
+// verified startup. It never closes Nodus resources itself: that is the test.
+const quitRequestPath = path.join(profileDir, 'request-normal-quit');
+const driver = new AdmZip();
+const driverID = 'nodus-live-smoke@example.invalid';
+driver.addFile('manifest.json', Buffer.from(JSON.stringify({
+  manifest_version: 2, name: 'Nodus isolated smoke driver', version: '1.0',
+  applications: { zotero: {
+    id: driverID, strict_min_version: '9.0', strict_max_version: '10.*',
+    update_url: 'https://example.invalid/updates.json',
+  } },
+})));
+driver.addFile('bootstrap.js', Buffer.from(`
+var timer;
+function install() {}
+function uninstall() {}
+function onMainWindowLoad() {}
+function onMainWindowUnload() {}
+function shutdown() { if (timer) clearTimeout(timer); }
+function startup() {
+  async function check() {
+    try {
+      if (await IOUtils.exists(${JSON.stringify(quitRequestPath)})) {
+        const win = Zotero.getMainWindow();
+        const store = win?.document.getElementById('nodus-sidebar-frame')?.contentWindow?.NodusStore;
+        // Bootstrap finishes before the sidebar's content scripts necessarily do.
+        if (!store || !win.document.getElementById('nodus-tb-button')) {
+          timer = setTimeout(check, 250);
+          return;
+        }
+        const stats = await store.evidenceCacheStats();
+        if (!(await IOUtils.exists(stats.database))) throw new Error('Evidence database missing');
+        Zotero.debug('[Nodus smoke] UI and evidence database ready; requesting normal quit');
+        Services.startup.quit(Components.interfaces.nsIAppStartup.eAttemptQuit);
+        return;
+      }
+      timer = setTimeout(check, 250);
+    } catch (error) { Zotero.debug('[Nodus smoke] FAILED: ' + error); }
+  }
+  timer = setTimeout(check, 250);
+}
+`));
+driver.writeZip(path.join(extensionsDir, `${driverID}.xpi`));
 writeFileSync(path.join(profileDir, 'prefs.js'), [
   'user_pref("extensions.startupScanScopes", 15);',
   'user_pref("extensions.autoDisableScopes", 0);',
   'user_pref("extensions.update.enabled", false);',
   'user_pref("extensions.zotero.httpServer.enabled", false);',
+  'user_pref("extensions.zotero.nodus.mode", "standalone");',
   'user_pref("extensions.zotero.useDataDir", true);',
   `user_pref("extensions.zotero.dataDir", ${JSON.stringify(dataDir)});`,
   '',
@@ -136,6 +181,7 @@ try {
   // normal subsequent launch and persists the per-add-on update opt-out.
   child = startZotero();
   const startupDeadline = Date.now() + timeoutMs;
+  let started = false;
   while (Date.now() < startupDeadline) {
     if (child.exitCode !== null || child.signalCode !== null) throw new Error(`Zotero exited during startup with code ${child.exitCode}`);
     const state = readState();
@@ -147,18 +193,30 @@ try {
       && state.applyBackgroundUpdates === 0
       && output.includes(`[Nodus] startup complete v${manifest.version}`)
     ) {
-      succeeded = true;
-      console.log(`Zotero live smoke passed: ${addon.id} v${manifest.version}`);
-      console.log('registered=true active=true appDisabled=false userDisabled=false backgroundUpdates=disabled startup=true');
+      started = true;
       break;
     }
     await wait(250);
   }
-  if (!succeeded) {
+  if (!started) {
     throw new Error(`Zotero did not start the registered add-on within ${timeoutMs} ms\nstate=${JSON.stringify(readState())}\n${diagnostic()}`);
   }
+  writeFileSync(quitRequestPath, 'quit');
+  const shutdownDeadline = Date.now() + 20_000;
+  while (child.exitCode === null && child.signalCode === null && Date.now() < shutdownDeadline) {
+    if (output.includes('[Nodus smoke] FAILED:')) throw new Error(diagnostic());
+    await wait(100);
+  }
+  if (child.exitCode !== 0 || child.signalCode !== null
+    || !output.includes('[Nodus smoke] UI and evidence database ready; requesting normal quit')) {
+    throw new Error(`Zotero did not exit normally after opening the evidence database\n${diagnostic()}`);
+  }
+  succeeded = true;
+  console.log(`Zotero live smoke passed: ${addon.id} v${manifest.version}`);
+  console.log('registered=true active=true appDisabled=false userDisabled=false backgroundUpdates=disabled startup=true ui=true evidence=true normalShutdown=true');
 } finally {
   await stopZotero();
+  writeFileSync(path.join(profileDir, 'smoke.log'), output);
   if (keepProfile || !succeeded) console.error(`Live-smoke profile kept at ${profileDir}`);
   else rmSync(profileDir, { recursive: true, force: true });
 }

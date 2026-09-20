@@ -304,6 +304,9 @@
   const EVIDENCE_CACHE_VERSION = 1;
   let evidenceDbPromise = null;
   let evidenceDbClosed = false;
+  let evidenceDbConnection = null;
+  let evidenceDatabases = null;
+  let evidenceDbClosePromise = null;
 
   function legacyIndexDir() {
     const dir = Services.dirsvc.get("ProfD", Components.interfaces.nsIFile).path;
@@ -420,7 +423,10 @@
     if (evidenceDbPromise) return evidenceDbPromise;
     evidenceDbPromise = (async () => {
       await IOUtils.makeDirectory(evidenceDir(), { ignoreExisting: true });
-      const db = new Zotero.DBConnection(evidenceDbPath());
+      if (evidenceDbClosed) throw new Error("evidence-db-closed");
+      evidenceDatabases = ChromeUtils.importESModule("chrome://nodus/content/evidence-db.sys.mjs").EvidenceDatabases;
+      const db = evidenceDatabases.open(evidenceDbPath());
+      evidenceDbConnection = db;
       await db.queryAsync(
         "CREATE TABLE IF NOT EXISTS evidence_indexes (" +
         "library_id INTEGER NOT NULL, attachment_key TEXT NOT NULL, item_key TEXT NOT NULL, " +
@@ -431,21 +437,27 @@
       );
       await db.queryAsync("CREATE INDEX IF NOT EXISTS evidence_indexes_updated ON evidence_indexes(updated_at)");
       return db;
-    })().catch((error) => {
+    })().catch(async (error) => {
+      if (evidenceDbConnection) {
+        await evidenceDatabases.close(evidenceDbConnection);
+        evidenceDbConnection = null;
+      }
       evidenceDbPromise = null;
       throw error;
     });
     return evidenceDbPromise;
   }
-  async function closeEvidenceDb() {
+  function closeEvidenceDb() {
     evidenceDbClosed = true;
-    const pending = evidenceDbPromise;
-    evidenceDbPromise = null;
-    if (!pending) return;
-    try {
-      const db = await pending;
-      if (db && db.closeDatabase) await db.closeDatabase(true);
-    } catch (e) { try { Zotero.logError(e); } catch (x) {} }
+    if (!evidenceDbClosePromise) {
+      // Transfer cleanup to the persistent module before yielding: this window
+      // may be destroyed immediately after its unload handler returns.
+      evidenceDbClosePromise = evidenceDbConnection
+        ? evidenceDatabases.close(evidenceDbConnection)
+        : Promise.resolve();
+      evidenceDbPromise = null;
+    }
+    return evidenceDbClosePromise;
   }
   async function loadEvidenceIndex(libraryID, attachmentKey) {
     let dataPath = evidenceDataPath(libraryID, attachmentKey);

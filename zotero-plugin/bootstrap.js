@@ -61,6 +61,8 @@ async function startup({ id, version, rootURI, resourceURI }) {
     .getService(Components.interfaces.amIAddonManagerStartup);
   const manifestURI = Services.io.newURI(rootURI + "manifest.json");
   chromeHandle = aomStartup.registerChrome(manifestURI, [["content", "nodus", rootURI + "content/"]]);
+  Nodus.databases = ChromeUtils.importESModule("chrome://nodus/content/evidence-db.sys.mjs").EvidenceDatabases;
+  Nodus.databases.start();
 
   await disableBackgroundUpdates();
 
@@ -77,7 +79,10 @@ function onMainWindowUnload({ window }) {
   try { removeLibraryButton(window); removeSidebar(window); } catch (e) {}
 }
 
-function shutdown() {
+async function shutdown() {
+  // Main windows may already be gone. The module still owns their connections,
+  // and Zotero awaits this promise before finishing application shutdown.
+  if (Nodus.databases) await Nodus.databases.shutdown();
   try { eachMainWindow((w) => { removeLibraryButton(w); removeSidebar(w); }); } catch (e) {}
   if (Nodus.readerToolbarListener) {
     try { Zotero.Reader.unregisterEventListener("renderToolbar", Nodus.readerToolbarListener); } catch (e) {}
@@ -88,7 +93,7 @@ function shutdown() {
     Nodus.selectionListener = null;
   }
   try {
-    if (_popupMods && _popupMods.NS && _popupMods.NS.closeEvidenceDb) _popupMods.NS.closeEvidenceDb().catch(() => {});
+    if (_popupMods && _popupMods.NS && _popupMods.NS.closeEvidenceDb) await _popupMods.NS.closeEvidenceDb();
   } catch (e) {}
   _popupMods = null;
   if (chromeHandle) { try { chromeHandle.destruct(); } catch (e) {} chromeHandle = null; }
