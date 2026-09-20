@@ -1,3 +1,6 @@
+import { notifyDataChanged } from '../hooks';
+import { ManualIdeaEditor } from './ManualIdeaEditor';
+import { ManualIndexStatus } from '../components/ManualIndexStatus';
 // El espacio de trabajo de la bóveda académica: notas, ideas y colecciones en una sola
 // vista, y el mismo editor que ya usan Estudio y Docencia.
 //
@@ -672,9 +675,15 @@ export function WorkspaceView({
   const selectedCollection = scope.kind === 'collection' ? tree.folders.find((folder) => folder.id === scope.id) ?? null : null;
   const contextNote = itemContextMenu ? tree.notes.find((note) => note.id === itemContextMenu.noteId) ?? null : null;
 
-  const editorPane = active && (
+  const editorPane = active && (settings.academicMode === 'manual' && itemKind(active) === 'idea' && active.source?.ref ? (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <ManualIndexStatus />
+      <ManualIdeaEditor key={active.id} note={active} globalId={active.source.ref} manual onSaved={() => { void refresh(); notifyDataChanged(); }} onOpenGraph={onOpenGraph} />
+    </div>
+  ) : (
     <div className="flex min-h-0 flex-1">
-      <div className="min-h-0 min-w-0 flex-1">
+      <div className="min-h-0 min-w-0 flex-1 flex flex-col">
+        {settings.academicMode === 'manual' && <ManualIndexStatus />}
         <Suspense fallback={<div className="grid h-full place-items-center"><Spinner label={t('Cargando editor…')} /></div>}>
           <StudyEditor
             key={active.id}
@@ -687,6 +696,7 @@ export function WorkspaceView({
             onActivate={openNote}
             onClose={closeNote}
             onSaved={(updated) => {
+              if (settings.academicMode === 'manual') notifyDataChanged();
               setTree((current) => ({
                 ...current,
                 notes: current.notes.map((note) => note.id === updated.id
@@ -746,7 +756,7 @@ export function WorkspaceView({
         <LibraryLinksPanel ownerKind="note" ownerId={active.id} ownerLabel={active.title} links={links} onChanged={refresh} />
       </aside>
     </div>
-  );
+  ));
 
   const browser = (
     <div data-testid="workspace-view" className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950">

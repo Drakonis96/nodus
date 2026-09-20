@@ -1,3 +1,4 @@
+import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -66,6 +67,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * translator's review debt and should be treated as a first pass.
  */
 export const KO: Record<string, string> = {
+  ...ACADEMIC_MANUAL_TRANSLATIONS["ko"],
   ...RESEARCH_ATTACHMENT_TRANSLATIONS.ko,
   ...DOCUMENT_SKILLS_TRANSLATIONS.ko,
   ...RESEARCH_PROMPT_TRANSLATIONS.ko,

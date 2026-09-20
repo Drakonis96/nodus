@@ -1,3 +1,4 @@
+import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -67,6 +68,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 /** Traditional Chinese UI table. Keys are the Spanish source strings (see i18n.ts). */
 export const ZH_TW: Record<string, string> = {
+  ...ACADEMIC_MANUAL_TRANSLATIONS["zh-TW"],
   "Elige entre modo claro, oscuro o seguir el sistema operativo.": "選擇淺色模式、深色模式，或跟隨作業系統。",
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['zh-TW'],
   ...RESEARCH_PROMPT_TRANSLATIONS['zh-TW'],

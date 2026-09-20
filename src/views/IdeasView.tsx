@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { GraphEdge, IdeaConnection, IdeaDetail, IdeaListItem, IdeaType, EdgeDetail } from '@shared/types';
+import { ManualIdeaEditor } from './ManualIdeaEditor';
+import { ManualIndexStatus } from '../components/ManualIndexStatus';
+import type { Note } from '@shared/types';
 import { Badge, EDGE_LABELS, NODE_LABELS, Icon, Spinner, TypeDot } from '../components/ui';
 import { OccurrenceCard, EvidenceLocationLink } from '../components/NodeDetailPanel';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
@@ -33,6 +36,7 @@ export function IdeasView({
   onOpenAssistant,
   dataSource = academicKnowledgeViewSource,
   scopeControl,
+  manual = false,
   emptyMessage,
   testId,
 }: {
@@ -45,6 +49,7 @@ export function IdeasView({
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
   dataSource?: KnowledgeViewSource;
   scopeControl?: ReactNode;
+  manual?: boolean;
   emptyMessage?: string;
   testId?: string;
 }) {
@@ -227,7 +232,7 @@ export function IdeasView({
           </span>
           <div>
             <h1 className="text-base font-semibold">{t('Ideas')}</h1>
-            <p className="text-[11px] text-neutral-500">{tx('{n} ideas extraídas', { n: totalIdeas })}</p>
+            <p className="text-[11px] text-neutral-500">{manual ? `${totalIdeas} · ${t('Modo Manual')}` : tx('{n} ideas extraídas', { n: totalIdeas })}</p>
           </div>
         </div>
 
@@ -264,6 +269,10 @@ export function IdeasView({
           <div className="shrink-0 border-b border-neutral-200 p-3 dark:border-neutral-800">
             <div className="flex flex-wrap items-center gap-2">
               {scopeControl}
+              {manual && <button className="btn btn-primary" data-testid="manual-create-idea" onClick={async () => {
+                const created = await window.nodus.createManualIdea({ folderId: null });
+                notifyDataChanged(); showIdea({ id: created.globalId, label: created.note.title });
+              }}><Icon name="plus" size={14} /> {t('Crear idea')}</button>}
               <div className="relative min-w-[240px] flex-1">
                 <Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
                 <input
@@ -319,7 +328,7 @@ export function IdeasView({
                 <div className="grid h-48 place-items-center"><Spinner label={t('Cargando ideas…')} /></div>
               ) : ideas.length === 0 ? (
                 <div className="grid h-48 place-items-center p-8 text-center text-sm text-neutral-500">
-                  {totalIdeas === 0 ? (emptyMessage ?? t('Aún no hay ideas. Ejecuta escaneos profundos para extraer ideas de tus obras.')) : t('Sin resultados para los filtros actuales.')}
+                  {totalIdeas === 0 ? (emptyMessage ?? (manual ? t('Las obras, citas y relaciones son opcionales. Puedes empezar con una idea independiente.') : t('Aún no hay ideas. Ejecuta escaneos profundos para extraer ideas de tus obras.'))) : t('Sin resultados para los filtros actuales.')}
                 </div>
               ) : ideas.map((node) => (
                 <button
@@ -359,7 +368,7 @@ export function IdeasView({
 
         {openIdeas.map((idea) => (
           <div key={idea.id} className={surface === 'idea' && activeIdeaId === idea.id ? 'h-full' : 'hidden'}>
-            <IdeaDetailTab
+            {manual ? <ManualIdeaTab globalId={idea.id} onOpenGraph={onOpenGraph} onSaved={(label) => { updateIdeaLabel(idea.id, label); notifyDataChanged(); reload(true); }} /> : <IdeaDetailTab
               idea={idea}
               summary={ideas.find((candidate) => candidate.id === idea.id) ?? null}
               vaultId={vaultId}
@@ -374,12 +383,38 @@ export function IdeasView({
                 reload(true);
               }}
               testId={testId}
-            />
+            />}
           </div>
         ))}
       </main>
     </div>
   );
+}
+
+function ManualIdeaTab({ globalId, onOpenGraph, onSaved }: {
+  globalId: string;
+  onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  onSaved: (label: string) => void;
+}) {
+  const [note, setNote] = useState<Note | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let active = true;
+    void window.nodus.getNotesTree().then(tree => {
+      if (!active) return;
+      setNote(tree.notes.find(n => n.source?.note === 'manual-idea' && n.source.ref === globalId && !n.trashedAt) ?? null);
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, [globalId]);
+  if (loading) return <Spinner />;
+  if (!note) return <p className="p-6 text-sm text-neutral-500">{t('No se encontró la idea.')}</p>;
+  return <div className="flex h-full min-h-0 flex-col">
+    <ManualIndexStatus />
+    <ManualIdeaEditor note={note} globalId={globalId} manual onOpenGraph={onOpenGraph} onSaved={() => {
+      void window.nodus.getIdeaDetail(globalId).then(detail => { if (detail) onSaved(detail.idea.label); });
+    }} />
+  </div>;
 }
 
 function IdeaDetailTab({

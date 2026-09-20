@@ -1,3 +1,4 @@
+import { assertAcademicAutomation } from './academicMode';
 import crypto from 'node:crypto';
 import type { EdgeType, ModelRef, PromptLanguage, SemanticBridgeResult, SemanticBridgeProgress } from '@shared/types';
 import { getDb } from '../db/database';
@@ -346,6 +347,7 @@ export async function discoverSemanticBridges(
   nodusIds?: string[],
   language: PromptLanguage = getSettings().promptLanguage ?? 'es'
 ): Promise<SemanticBridgeResult> {
+  assertAcademicAutomation();
   model ??= getSettings().relationModel ?? getSettings().fusionModel ?? getSettings().synthesisModel ?? null;
   if (running) {
     return { candidatesScanned: 0, crossThemeCandidates: 0, validated: 0, added: 0 };

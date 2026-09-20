@@ -1,3 +1,4 @@
+import { isManualAcademic } from '../ai/academicMode';
 import { v4 as uuid } from 'uuid';
 import { getSettings } from '../db/settingsRepo';
 import { addSyncLog, getSyncLog } from '../db/syncRepo';
@@ -283,7 +284,7 @@ export async function fullSync(mode: ZoteroSyncMode, options: ZoteroSyncOptions 
   const settings = getSettings();
   const userId = settings.zoteroUserId;
   const catalogOnly = options.catalogOnly === true;
-  const automateAnalysis = shouldAutomateAnalysisAfterSync(mode, options);
+  const automateAnalysis = !isManualAcademic() && shouldAutomateAnalysisAfterSync(mode, options);
   const lastSuccessfulSyncAt = getSyncLog(1)[0]?.at ?? null;
   let added = 0;
   let changed = 0;

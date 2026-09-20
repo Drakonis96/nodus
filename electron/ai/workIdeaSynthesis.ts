@@ -1,3 +1,4 @@
+import { assertAcademicAutomation } from './academicMode';
 import { createHash } from 'node:crypto';
 import type { IdeaByWork, IdeaType, ModelRef, WorkIdeaSynthesis } from '@shared/types';
 import { getDb } from '../db/database';
@@ -155,6 +156,7 @@ function ideaBlock(ideas: IdeaByWork[], prompt: SynthesisPromptPack): string {
 }
 
 export async function synthesizeWorkIdeas(nodusId: string, model?: ModelRef | null): Promise<WorkIdeaSynthesis> {
+  assertAcademicAutomation();
   const work = loadWork(nodusId);
   if (!work) throw new Error('Obra no encontrada');
 

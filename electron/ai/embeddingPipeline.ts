@@ -1,3 +1,5 @@
+import { isManualAcademic } from './academicMode';
+import { scheduleManualIndex } from './manualIdeaIndex';
 import type { EmbeddingPipelineProgress, WorkEmbeddingStatus } from '@shared/types';
 import { getDb } from '../db/database';
 import {
@@ -132,6 +134,7 @@ async function waitIfPaused(): Promise<boolean> {
  * If nodusIds is empty, processes all deep-scanned works.
  */
 export async function startEmbedding(nodusIds?: string[]): Promise<void> {
+  if (isManualAcademic()) { scheduleManualIndex(true); return; }
   if (state.running) {
     // A caller awaiting required post-processing must not receive a false success.
     // Let the active batch finish, then run its requested scope explicitly.

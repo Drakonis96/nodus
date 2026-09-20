@@ -1,3 +1,4 @@
+import { assertAcademicAutomation } from './academicMode';
 import { AiError, completeJson } from './aiClient';
 import { modelRefSupportsExtraction } from '@shared/localAiModels';
 import { lightScanPrompt } from './prompts';
@@ -40,6 +41,7 @@ export async function runLightScan(
   model?: ModelRef | null,
   options: LightScanOptions = {}
 ): Promise<void> {
+  assertAcademicAutomation();
   const settings = getSettings();
   const scanModel = model ?? settings.extractionModel ?? settings.synthesisModel ?? null;
   // Vision-only local models can't extract (see runDeepScan). Fail once, actionably, not silently.

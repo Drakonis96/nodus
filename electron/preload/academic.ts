@@ -692,6 +692,8 @@ export const academicApi: AcademicApi = {
   deleteNotesPermanently: (noteIds) => ipcRenderer.invoke('notes:deletePermanently', noteIds).then(() => undefined),
   deleteNote: (id) => ipcRenderer.invoke('notes:delete', id).then(() => undefined),
 
+  getManualIndexStatus: () => ipcRenderer.invoke('manualIdeas:indexStatus'),
+  retryManualIndex: () => ipcRenderer.invoke('manualIdeas:retryIndex'),
   createManualIdea: (input) => ipcRenderer.invoke('manualIdeas:create', input),
   saveManualIdea: (payload) => ipcRenderer.invoke('manualIdeas:save', payload).then(() => undefined),
   autoIndexManualIdea: (input) => ipcRenderer.invoke('manualIdeas:autoIndex', input),

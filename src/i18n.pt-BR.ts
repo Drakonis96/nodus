@@ -1,3 +1,4 @@
+import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -66,6 +67,7 @@ import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch
 import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const PT_BR: Record<string, string> = {
+  ...ACADEMIC_MANUAL_TRANSLATIONS["pt-BR"],
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Escolha o modo claro, escuro ou siga o sistema operacional.',
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['pt-BR'],
   "Research chat": "Research chat",

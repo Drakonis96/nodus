@@ -1,3 +1,5 @@
+import { isManualAcademic } from '../ai/academicMode';
+import { scheduleManualIndex } from '../ai/manualIdeaIndex';
 // El Workspace por dentro: el editor completo sobre una NOTA, y los enlaces con la
 // biblioteca.
 //
@@ -225,6 +227,12 @@ export function updateWorkspaceNote(noteId: string, input: StudyDocUpdateInput):
       JSON.stringify(input.customDictionary ?? parseJson<string[]>(current.custom_dictionary_json, [])),
       now(), noteId
     );
+    const source = parseJson<{ note?: string; ref?: string }>(current.source_json, {});
+    if (isManualAcademic() && source.note === 'manual-idea' && source.ref) {
+      db.prepare(`UPDATE ideas SET label=?, statement=?, embedding=CASE WHEN label<>? OR statement<>? THEN NULL ELSE embedding END WHERE global_id=?`)
+        .run(title, content, title, content, source.ref);
+      scheduleManualIndex();
+    }
     synchronizeNotePage(noteId, title, content);
     return getNote(noteId)!;
   })();

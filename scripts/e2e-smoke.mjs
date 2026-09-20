@@ -564,6 +564,8 @@ try {
   // that is the point: a model that runs on this machine is a deliberate choice, so the
   // wizard hands the decision to the person instead of opening on the bundled Gemma
   // (which used to arrive as `choices[0]`).
+  const modeChoice = page.getByTestId('onboarding-mode-auto');
+  if (await modeChoice.isVisible()) await modeChoice.click();
   const modelStep = page.getByTestId('onboarding-models');
   for (let i = 0; i < 4 && await modelStep.count() === 0; i++) {
     await page.getByRole('button', { name: 'Siguiente', exact: true }).click();

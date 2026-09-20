@@ -1,3 +1,4 @@
+import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -61,6 +62,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
+  ...ACADEMIC_MANUAL_TRANSLATIONS["it"],
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Scegli la modalità chiara, scura o segui il sistema operativo.',
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['it'],
   "Research chat": "Research chat",

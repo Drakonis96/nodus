@@ -385,6 +385,8 @@ try {
     plugins: [{
       name: 'inject-test-database',
       setup(builder) {
+        builder.onResolve({ filter: /\/settingsRepo$/ }, () => ({ path: 'settings', namespace: 'test-settings' }));
+        builder.onLoad({ filter: /.*/, namespace: 'test-settings' }, () => ({ contents: 'export function getSettings(){ return { academicMode: \"auto\" }; }', loader: 'js' }));
         builder.onResolve({ filter: /\/database$/ }, () => ({ path: 'database', namespace: 'test-db' }));
         builder.onLoad({ filter: /.*/, namespace: 'test-db' }, () => ({
           contents: 'export function getDb(){ return globalThis.__nodusDecorativeTestDb; }',

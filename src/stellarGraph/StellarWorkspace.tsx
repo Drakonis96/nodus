@@ -80,6 +80,7 @@ export interface StellarWorkspaceProps {
   /** Optional right-hand panel occupying the same layout slot as idea details. */
   sidebar?: ReactNode;
   onOpenIdea?(id: string): void;
+  onEditIdea?(id: string): void;
   openEvidence?(ref: string, location: string | null): void;
   saveIdea?(detail: IdeaDetail): Promise<void>;
   saveEdge?(detail: EdgeDetail): Promise<void>;
@@ -235,6 +236,7 @@ function StellarGraphTab({
   toolbar,
   sidebar,
   onOpenIdea,
+  onEditIdea,
   openEvidence,
   saveIdea,
   saveEdge,
@@ -1055,6 +1057,7 @@ function StellarGraphTab({
               };
             })}
             onOpenIdea={openNode}
+            onEditIdea={onEditIdea}
             onOpenEvidence={openEvidence}
             onSaveIdea={saveIdea}
             onSaveEdge={saveEdge}

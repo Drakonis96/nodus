@@ -29,6 +29,8 @@ import type {
 } from '@shared/types';
 import { researchAssistantPromptPack } from '@shared/researchAssistantPromptPacks';
 import { getDb } from '../db/database';
+import { activeManualIdeaIds } from '../db/manualIdeaVisibility';
+import { getIdeaEdges } from '../db/ideasRepo';
 import { getSettings } from '../db/settingsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { buildGenealogyContext } from './genealogyChatContext';
@@ -615,6 +617,10 @@ async function buildRelevanceScope(selection: ResearchContextSelection, question
  * the section stays bounded even without embeddings.
  */
 function resolveIdeaIds(scope: RelevanceScope, limit: number): string[] {
+  if (getSettings().academicMode === 'manual') {
+    const active = activeManualIdeaIds(getDb());
+    return (scope.ideaIds ?? [...active]).filter(id => active.has(id) && (!scope.sourceScope || scope.sourceScope.ideaIds.has(id))).slice(0, limit);
+  }
   if (scope.ideaIds) return scope.ideaIds.slice(0, limit);
   const rows = getDb()
     .prepare(
@@ -775,6 +781,7 @@ function listIdeas(linkedWorkIds: Set<string>, scope: RelevanceScope) {
     .prepare(`SELECT global_id, type, label, statement, created_at FROM ideas WHERE global_id IN (${placeholders})`)
     .all(...ideaIds) as IdeaRow[];
   const ideaById = new Map(ideas.map((idea) => [idea.global_id, idea]));
+  const manualIds = getSettings().academicMode === 'manual' ? activeManualIdeaIds(db) : null;
 
   const occurrences = db
     .prepare(
@@ -818,6 +825,9 @@ function listIdeas(linkedWorkIds: Set<string>, scope: RelevanceScope) {
         type: idea.type,
         label: idea.label,
         statement: idea.statement,
+        ...(manualIds ? { connections: getIdeaEdges(idea.global_id)
+          .filter(({ edge }) => manualIds.has(edge.from_id) && manualIds.has(edge.to_id) && (!scope.sourceScope || (scope.sourceScope.ideaIds.has(edge.from_id) && scope.sourceScope.ideaIds.has(edge.to_id))))
+          .map(({ edge, fromLabel, toLabel }) => ({ from: edge.from_id, fromLabel, to: edge.to_id, toLabel, type: edge.type, basis: edge.basis })) } : {}),
         occurrences: occs.map((o) => ({
           role: o.role,
           development: o.development,

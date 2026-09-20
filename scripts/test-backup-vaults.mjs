@@ -44,6 +44,7 @@ try {
   // ── Two vaults of different types, each with its own data ───────────────────
   const legacy = vaults.getActiveVault(); // the default 'academic' vault
   assert.equal(legacy.type, 'academic');
+  getDb().prepare("INSERT OR REPLACE INTO settings(key,value) VALUES('app',?)").run(JSON.stringify({ academicMode: 'manual' }));
   const alice = entities.createPerson({ displayName: 'Alice Académica' });
   assert.ok(entities.getPerson(alice.personId), 'person seeded in vault A');
   const documentProfiles = require(path.join(repoRoot, 'electron/db/documentProfilesRepo.ts'));
@@ -195,6 +196,7 @@ try {
 
   switchTo(legacy.id);
   assert.ok(entities.getPerson(alice.personId), 'Alice restored in the academic vault');
+  assert.equal(settingsRepo.getSettings().academicMode, 'manual', 'manual mode survives encrypted backup and restore');
   assert.equal(documentProfiles.getDocumentProfile('backup-doc').fields[0].text, 'Tesis preservada.', 'the audited document profile is restored');
   // Vector ids are scoped to the version that published them, so the restored row is found by
   // its kind and text rather than by the id the pipeline proposed.

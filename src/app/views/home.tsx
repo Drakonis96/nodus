@@ -1,3 +1,5 @@
+import { ManualIndexStatus } from '../../components/ManualIndexStatus';
+import { t } from '../../i18n';
 // «Inicio» is one section of the sidebar and nine different screens.
 //
 // It is the one view whose implementation is chosen by vault type rather than by
@@ -120,6 +122,22 @@ export const renderHome: ViewRenderer = (ctx) => {
   if (ctx.isProsopography) return <ProsopographyHome onNavigate={setView} />;
   // A preview vault renders no home at all: it is someone else's corpus, opened
   // read-only, and the academic home offers actions that would write to it.
+  if (!ctx.isPreviewVault && settings.academicMode === 'manual') return (
+    <div className="home-dashboard h-full overflow-y-auto p-6" data-testid="manual-academic-home">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <div><p className="text-xs uppercase tracking-wide text-indigo-500">{t('Vault académico')} · {t('Modo Manual')}</p>
+          <h1 className="mt-2 text-2xl font-semibold">{t('Tu espacio de investigación')}</h1>
+          <p className="mt-3 text-sm text-neutral-500">{t('Crea tus ideas, vincula obras y añade citas y relaciones a tu ritmo. Nodus las indexa para facilitar la búsqueda.')}</p></div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button className="card p-5 text-left" onClick={async () => { const { globalId } = await window.nodus.createManualIdea({ folderId: null }); ctx.openIdea(globalId); }}><b>{t('Crear idea')}</b><p className="mt-2 text-xs text-neutral-500">{t('Las obras, citas y relaciones son opcionales. Puedes empezar con una idea independiente.')}</p></button>
+          <button className="card p-5 text-left" onClick={() => setView('library')}><b>{t('Biblioteca')}</b><p className="mt-2 text-xs text-neutral-500">Nodus · Zotero</p></button>
+          <button className="card p-5 text-left" onClick={() => setView('ideas')}><b>{t('Ideas')}</b></button>
+          <button className="card p-5 text-left" onClick={() => setView('graph')}><b>{t('Grafo')}</b></button>
+        </div>
+        <ManualIndexStatus />
+      </div>
+    </div>
+  );
   if (ctx.isPreviewVault) return null;
   return (
     <HomeView

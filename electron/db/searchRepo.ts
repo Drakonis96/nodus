@@ -1,3 +1,5 @@
+import { getSettings } from './settingsRepo';
+import { manualIdeaVisible } from './manualIdeaVisibility';
 // Global search across the workspace: ideas, works, gaps, themes, authors and
 // notes. Each match is shaped into a GlobalSearchResult that carries enough to
 // route the user to the right surface (graph node, reading view, gaps, the note
@@ -73,6 +75,7 @@ export function globalSearch(query: string, limitPerKind = 8, browse = false, ki
       .prepare(
         `SELECT global_id, type, label, statement FROM ideas
           WHERE orphaned_at IS NULL
+            ${getSettings().academicMode === 'manual' ? `AND ${manualIdeaVisible('ideas.global_id')}` : ''}
             AND (label LIKE ? ESCAPE '\\' OR statement LIKE ? ESCAPE '\\')
           ORDER BY length(label) ASC LIMIT ?`
       )

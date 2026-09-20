@@ -1,3 +1,4 @@
+import { assertAcademicAutomation, isManualAcademic } from '../ai/academicMode';
 import { v4 as uuid } from 'uuid';
 import type { QueueItem, QueueKind, QueueProgress, Work, ModelRef } from '@shared/types';
 import { getDb } from '../db/database';
@@ -205,6 +206,7 @@ class ScanQueue {
   }
 
   enqueue(nodusId: string, title: string, kind: QueueKind, model?: ModelRef | null, opts?: { chain?: boolean; refresh?: boolean }): void {
+    assertAcademicAutomation();
     // Avoid duplicate pending/running jobs for the same work+kind.
     const existing = this.items.find(
       (i) => i.nodus_id === nodusId && i.kind === kind && (i.state === 'queued' || i.state === 'running')
@@ -237,6 +239,7 @@ class ScanQueue {
   }
 
   enqueueBridge(model?: ModelRef | null, scopeNodusIds?: string[]): void {
+    assertAcademicAutomation();
     const existing = this.items.find((i) => i.kind === 'bridge' && (i.state === 'queued' || i.state === 'running'));
     if (existing) {
       if (!scopeNodusIds) existing.scopeNodusIds = undefined;
@@ -414,6 +417,7 @@ class ScanQueue {
   }
 
   private async run(): Promise<void> {
+    if (isManualAcademic()) return;
     if (this.running || this.paused) return;
     this.running = true;
     try {
@@ -895,6 +899,7 @@ class ScanQueue {
 
   /** Re-enqueue any work left in a pending state, so scans resume after restart. */
   resumePending(): void {
+    if (isManualAcademic()) return;
     const db = getDb();
     const pendingLight = db
       .prepare("SELECT nodus_id, title FROM works WHERE light_status = 'pending' AND archived = 0")

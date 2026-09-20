@@ -817,6 +817,9 @@ export interface AcademicApi {
   deleteNotesPermanently(noteIds: string[]): Promise<void>;
   deleteNote(id: string): Promise<void>;
 
+  getManualIndexStatus(): Promise<{ state: 'idle' | 'queued' | 'preparing' | 'indexing' | 'ready' | 'error'; error: string | null }>;
+  retryManualIndex(): Promise<void>;
+
   // manual ideas (user-authored, note-owned graph ideas)
   /** Create an empty manual idea plus the note that owns it. */
   createManualIdea(input: { folderId: string | null; title?: string }): Promise<{ note: Note; globalId: string }>;

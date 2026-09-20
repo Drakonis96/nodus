@@ -1,3 +1,4 @@
+import { manualIdeaVisible } from '../db/manualIdeaVisibility';
 import { getDb } from "../db/database";
 import { getActiveVault } from "../vaults/vaultRegistry";
 import type { GraphNode, GraphEdge } from "@shared/types";
@@ -9,8 +10,8 @@ import type {
 } from "@shared/stellarGraph";
 
 const eligible = (id: string) =>
-  `EXISTS (SELECT 1 FROM idea_occurrences io JOIN works w ON w.nodus_id=io.nodus_id WHERE io.global_id=${id} AND w.archived=0 AND w.deep_status='done')`;
-const edgeScope = `${eligible("e.from_id")} AND ${eligible("e.to_id")} AND (e.source_work IS NULL OR EXISTS (SELECT 1 FROM works w WHERE w.nodus_id=e.source_work AND w.archived=0 AND w.deep_status='done'))`;
+  `(${manualIdeaVisible(id)} OR EXISTS (SELECT 1 FROM idea_occurrences io JOIN works w ON w.nodus_id=io.nodus_id WHERE io.global_id=${id} AND w.archived=0 AND w.deep_status='done'))`;
+const edgeScope = `${eligible("e.from_id")} AND ${eligible("e.to_id")} AND (e.source_work IS NULL OR (e.source_work='manual' AND ${manualIdeaVisible('e.from_id')}) OR EXISTS (SELECT 1 FROM works w WHERE w.nodus_id=e.source_work AND w.archived=0 AND w.deep_status='done'))`;
 const edgeSelect = `SELECT e.id,e.from_id AS source,e.to_id AS target,e.type,e.basis,e.confidence,
  (SELECT f.verdict FROM edge_feedback f WHERE f.type=e.type AND f.verdict='confirmed' AND ((f.from_id=e.from_id AND f.to_id=e.to_id) OR (f.from_id=e.to_id AND f.to_id=e.from_id)) LIMIT 1) AS verdict FROM visible_edges e`;
 /**
@@ -25,7 +26,8 @@ const themeMembers = (theme: string) => `SELECT io.global_id FROM idea_occurrenc
  WHERE w.archived=0 AND w.deep_status='done' AND (
    EXISTS (SELECT 1 FROM idea_theme_links it WHERE it.global_id=io.global_id AND it.nodus_id=io.nodus_id AND it.theme_id=${theme})
    OR (EXISTS (SELECT 1 FROM work_themes wt WHERE wt.nodus_id=io.nodus_id AND wt.theme_id=${theme})
-       AND NOT EXISTS (SELECT 1 FROM idea_theme_links l WHERE l.global_id=io.global_id AND l.nodus_id=io.nodus_id)))`;
+       AND NOT EXISTS (SELECT 1 FROM idea_theme_links l WHERE l.global_id=io.global_id AND l.nodus_id=io.nodus_id)))
+ UNION SELECT it.global_id FROM idea_theme_links it WHERE it.nodus_id='manual' AND it.theme_id=${theme} AND ${manualIdeaVisible('it.global_id')}`;
 
 /** Every theme hub of the vault: those a scan extracted and those the user curated. */
 export function stellarThemes(): StellarTheme[] {
@@ -38,6 +40,8 @@ export function stellarThemes(): StellarTheme[] {
          WHERE w.archived=0 AND w.deep_status='done' AND i.orphaned_at IS NULL
        ),
        membership AS (
+         SELECT it.theme_id,it.global_id FROM idea_theme_links it WHERE it.nodus_id='manual' AND ${manualIdeaVisible('it.global_id')}
+         UNION
          SELECT it.theme_id, it.global_id FROM idea_theme_links it
          JOIN eligible e ON e.nodus_id=it.nodus_id AND e.global_id=it.global_id
          UNION
@@ -73,7 +77,7 @@ function nodes(ids: string[]): GraphNode[] {
     .all(bind) as Pick<GraphNode, "id" | "label" | "statement" | "type">[];
   const works = db
     .prepare(
-      `SELECT io.global_id,w.nodus_id,w.year,w.authors_json,w.read_tag,io.confidence FROM idea_occurrences io JOIN works w ON w.nodus_id=io.nodus_id WHERE io.global_id IN (SELECT value FROM json_each(?)) AND w.archived=0 AND w.deep_status='done'`,
+      `SELECT io.global_id,w.nodus_id,w.year,w.authors_json,w.read_tag,io.confidence FROM idea_occurrences io JOIN works w ON w.nodus_id=io.nodus_id WHERE io.global_id IN (SELECT value FROM json_each(?)) AND w.archived=0 AND (w.deep_status='done' OR ${manualIdeaVisible('io.global_id')})`,
     )
     .all(bind) as {
     global_id: string;

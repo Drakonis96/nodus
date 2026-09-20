@@ -1,3 +1,4 @@
+import { assertAcademicAutomation } from './academicMode';
 import { AiError, completeJson, embed } from './aiClient';
 import { coreStructuredPrompt } from './prompts';
 import {
@@ -219,6 +220,7 @@ export async function resolveIdeaFusion(
   optionsOrModel: FuseIdeaOptions | ModelRef | null = {},
   cachedDecision: FusionDecision | null = null,
 ): Promise<FusionOutcome> {
+  assertAcademicAutomation();
   const opts: FuseIdeaOptions = optionsOrModel && 'provider' in optionsOrModel ? { model: optionsOrModel } : optionsOrModel ?? {};
   const settings = getSettings();
   const fusionModel = opts.model ?? settings.fusionModel ?? settings.synthesisModel ?? null;
@@ -362,6 +364,7 @@ function buildFusionPlan(
 
 /** Apply a previously planned decision. Callers may compose this inside a transaction. */
 export function applyFusionPlan(plan: FusionPlan, sourceWork: string): string {
+  assertAcademicAutomation();
   if (plan.existingId && getIdea(plan.existingId)) return plan.existingId;
   const created = createIdea({
     type: plan.idea.type,

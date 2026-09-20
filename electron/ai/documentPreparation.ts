@@ -1,3 +1,4 @@
+import { isManualAcademic } from './academicMode';
 import { getDb } from '../db/database';
 import { documentProfileStatuses } from '../db/documentProfilesRepo';
 import { documentIndexQueue } from '../pipeline/documentIndexQueue';
@@ -26,7 +27,7 @@ export async function prepareRelevantDocumentProfiles(
   signal?.throwIfAborted();
   const vault = getActiveVault();
   const unique = [...new Set(orderedNodusIds)].filter(Boolean);
-  if (vault.type !== 'academic' || unique.length === 0) {
+  if (isManualAcademic() || vault.type !== 'academic' || unique.length === 0) {
     return { considered: unique.length, requested: 0, prepared: 0, unavailable: 0, failed: 0 };
   }
   const rows = getDb().prepare(

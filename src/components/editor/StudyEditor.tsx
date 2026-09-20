@@ -550,7 +550,7 @@ export function StudyEditor({
   };
 
   const runQuickImprovement = async (style: StudyStyle, target = selectionImprove?.target ?? resolveImproveSelection(false)) => {
-    if (!target || improveStreamingStyleId || !active || !data) return;
+    if (settings.academicMode === 'manual' || !target || improveStreamingStyleId || !active || !data) return;
     const base = draft;
     let streamed = '';
     let frame = 0;
@@ -732,7 +732,7 @@ export function StudyEditor({
     const keydown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void save('manual'); }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); setShowSearch(true); }
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'i') { event.preventDefault(); setShowImprovePrompts(true); }
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'i') { event.preventDefault(); setShowImprovePrompts(settings.academicMode !== 'manual'); }
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
@@ -935,11 +935,13 @@ export function StudyEditor({
           setAudioCursor(rawTextareaRef.current?.selectionStart ?? target?.from ?? 0);
           setShowAudio((value) => !value);
         }} title={t('Lectura por voz')} aria-label={t('Lectura por voz')}><Icon name="play" size={13} /></button>
-        <button data-testid="study-improve-toggle" className={`btn btn-ghost h-8 w-8 p-0 ${showImprovePrompts ? 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300' : ''}`} onClick={() => setShowImprovePrompts(true)} title={`${t('Prompts de mejora')} (⌘⇧I)`} aria-label={t('Prompts de mejora')}><Icon name="wand" size={13} /></button>
+        {settings.academicMode !== 'manual' && <>
+        <button data-testid="study-improve-toggle" className={`btn btn-ghost h-8 w-8 p-0 ${showImprovePrompts ? 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300' : ''}`} onClick={() => setShowImprovePrompts(settings.academicMode !== 'manual')} title={`${t('Prompts de mejora')} (⌘⇧I)`} aria-label={t('Prompts de mejora')}><Icon name="wand" size={13} /></button>
         <div data-testid="study-editor-model-picker" className="study-editor-model-picker-wrap min-w-32 max-w-52 flex-1 sm:flex-none">
           <ModelPicker settings={settings} value={aiModel} onChange={setAiModel} compact menu allowEmpty={false} triggerModelOnly ariaLabel={t('Modelo de IA para mejorar texto')} className="study-editor-model-picker" />
         </div>
-        {quickImproveStyles.map((prompt) => <button type="button" key={prompt.id} data-testid={`study-toolbar-quick-improve-${prompt.id.replace(':', '-')}`} className="btn btn-ghost h-8 w-8 p-0 text-teal-700 dark:text-teal-300" title={`${prompt.name} · ${prompt.description}`} aria-label={prompt.name} disabled={Boolean(improveStreamingStyleId)} onClick={() => void runQuickImprovement(prompt)}><ImproveStyleMark style={prompt} size={15} /></button>)}
+        </>}
+        {(settings.academicMode === 'manual' ? [] : quickImproveStyles).map((prompt) => <button type="button" key={prompt.id} data-testid={`study-toolbar-quick-improve-${prompt.id.replace(':', '-')}`} className="btn btn-ghost h-8 w-8 p-0 text-teal-700 dark:text-teal-300" title={`${prompt.name} · ${prompt.description}`} aria-label={prompt.name} disabled={Boolean(improveStreamingStyleId)} onClick={() => void runQuickImprovement(prompt)}><ImproveStyleMark style={prompt} size={15} /></button>)}
         <button data-testid="study-doc-style" className={`study-editor-style-button btn btn-ghost h-8 w-8 p-0 ${showStyle ? 'is-active bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} title={t('Apariencia y metadatos')} aria-label={t('Apariencia y metadatos')} onClick={() => setShowStyle(!showStyle)}><Icon name="palette" size={16} /></button>
         <button className={`btn btn-ghost h-8 w-8 p-0 ${showHistory ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} title={t('Historial de versiones')} aria-label={t('Historial de versiones')} onClick={() => setShowHistory(!showHistory)}><Icon name="clock" size={13} /></button>
         <button className={`btn btn-ghost h-8 w-8 p-0 ${focusMode ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} onClick={() => setFocusMode(!focusMode)} title={t('Modo concentración')} aria-label={t('Modo concentración')}><Icon name="eye" size={13} /></button>
@@ -1132,10 +1134,10 @@ export function StudyEditor({
             )}
           </aside>
         )}
-        {selectionImprove && selectionToolbar && createPortal(<><div className="divider" data-testid="study-selection-tools-divider" />{quickImproveStyles.map((prompt) => {
+        {selectionImprove && selectionToolbar && createPortal(<><div className="divider" data-testid="study-selection-tools-divider" />{(settings.academicMode === 'manual' ? [] : quickImproveStyles).map((prompt) => {
           const label = studyStyleTooltip(prompt);
           return <button type="button" key={prompt.id} data-testid={`study-quick-improve-${prompt.id.replace(':', '-')}`} className="toolbar-item study-selection-tool study-selection-tooltip" data-study-tooltip={label} aria-label={label} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); void runQuickImprovement(prompt, selectionImprove.target); }}><ImproveStyleMark style={prompt} /></button>;
-        })}<button type="button" data-testid="study-synonyms-toggle" className="toolbar-item study-selection-tool study-synonyms-trigger study-selection-tooltip" data-study-tooltip={t('Sinónimos con IA')} aria-label={t('Sinónimos con IA')} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openSynonymPanel(event.currentTarget, selectionImprove.target); }}><Icon name="aiSynonyms" size={16} /></button><label className="toolbar-item study-selection-color study-selection-tooltip" data-study-tooltip={t('Color del texto')} aria-label={t('Color del texto')}><Icon name="palette" size={16} /><input data-testid="study-selection-text-color" aria-label={t('Color del texto')} type="color" defaultValue="#0f766e" onInput={(event) => milkdownRef.current?.setTextColor((event.target as HTMLInputElement).value)} /></label><span className="study-selection-tooltip" data-study-tooltip={t('Nivel de título')}><select data-testid="study-selection-heading" className="study-selection-heading" defaultValue="" aria-label={t('Nivel de título')} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => { milkdownRef.current?.setHeading(Number(event.target.value)); event.target.value = ''; }}><option value="" disabled>H</option><option value="0">{t('Párrafo')}</option>{[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>H{level}</option>)}</select></span></>, selectionToolbar)}
+        })}{settings.academicMode !== 'manual' && <button type="button" data-testid="study-synonyms-toggle" className="toolbar-item study-selection-tool study-synonyms-trigger study-selection-tooltip" data-study-tooltip={t('Sinónimos con IA')} aria-label={t('Sinónimos con IA')} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openSynonymPanel(event.currentTarget, selectionImprove.target); }}><Icon name="aiSynonyms" size={16} /></button>}<label className="toolbar-item study-selection-color study-selection-tooltip" data-study-tooltip={t('Color del texto')} aria-label={t('Color del texto')}><Icon name="palette" size={16} /><input data-testid="study-selection-text-color" aria-label={t('Color del texto')} type="color" defaultValue="#0f766e" onInput={(event) => milkdownRef.current?.setTextColor((event.target as HTMLInputElement).value)} /></label><span className="study-selection-tooltip" data-study-tooltip={t('Nivel de título')}><select data-testid="study-selection-heading" className="study-selection-heading" defaultValue="" aria-label={t('Nivel de título')} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => { milkdownRef.current?.setHeading(Number(event.target.value)); event.target.value = ''; }}><option value="" disabled>H</option><option value="0">{t('Párrafo')}</option>{[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>H{level}</option>)}</select></span></>, selectionToolbar)}
       </div>
       {synonymPanel && createPortal(
         <div ref={synonymPanelRef} data-testid="study-synonyms-panel" role="dialog" aria-label={t('Alternativas de sinónimos')} className="study-synonyms-panel" style={{ left: synonymPanel.x, top: synonymPanel.y }}>

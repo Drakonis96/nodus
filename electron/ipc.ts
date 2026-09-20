@@ -1,3 +1,4 @@
+import { scheduleManualIndex } from './ai/manualIdeaIndex';
 import { getDocumentVisuals, enrichDocumentVisuals, cancelDocumentVisuals, undoVisualEnrichment, removeDocumentFigure } from './ai/documentVisuals';
 import { dialogTitle } from './dialogTitles';
 import { listDocumentSkills } from './capabilities/documentCatalog';
@@ -383,7 +384,7 @@ export function registerIpc(
   };
 
   // settings + secrets
-  h('settings:get', async () => getSettings());
+  h('settings:get', async () => { const settings = getSettings(); if (settings.academicMode === 'manual') scheduleManualIndex(); return settings; });
   h('ai:concurrency:get', async () => getAiConcurrencySnapshot());
   h('settings:update', async (_e, patch: Partial<AppSettings>) => {
     const previous = getSettings();
@@ -423,6 +424,7 @@ export function registerIpc(
       }
     }
     const next = updateSettings(patch);
+    if (next.academicMode === 'manual' && (patch.embeddingProvider !== undefined || patch.embeddingModel !== undefined)) scheduleManualIndex(true);
     if (patch.aiConcurrencyMode !== undefined || patch.concurrency !== undefined) {
       refreshAiConcurrencyPolicy();
     }

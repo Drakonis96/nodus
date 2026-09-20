@@ -1,3 +1,5 @@
+import { isManualAcademic } from '../ai/academicMode';
+import { manualIdeaVisible } from '../db/manualIdeaVisibility';
 import { getDb } from '../db/database';
 import { SubstringIndex } from '@shared/substringIndex';
 import type {
@@ -110,14 +112,14 @@ interface VisibleIdeaEdgeRow {
 /** Build the ideas-lens graph: idea nodes + typed edges, enriched for filtering. */
 export async function buildIdeaGraph(): Promise<GraphData> {
   const db = getDb();
-  const ideas = db
+  const ideas = isManualAcademic() ? db.prepare(`SELECT i.global_id, i.type, i.label, i.statement, i.created_at FROM ideas i WHERE i.orphaned_at IS NULL AND ${manualIdeaVisible('i.global_id')}`).all() as IdeaRow[] : db
     .prepare(
       `SELECT DISTINCT i.global_id, i.type, i.label, i.statement, i.created_at
        FROM ideas i
        JOIN idea_occurrences io ON io.global_id = i.global_id
        JOIN works w ON w.nodus_id = io.nodus_id
        WHERE w.archived = 0
-         AND w.deep_status = 'done'`
+         AND (w.deep_status = 'done' OR ${manualIdeaVisible('io.global_id')})`
     )
     .all() as IdeaRow[];
   const themeRows = listGraphThemes();
@@ -144,7 +146,7 @@ export async function buildIdeaGraph(): Promise<GraphData> {
              JOIN works w ON w.nodus_id = io.nodus_id
              JOIN ideas i ON i.global_id = io.global_id
             WHERE w.archived = 0
-              AND w.deep_status = 'done'`
+              AND (w.deep_status = 'done' OR ${manualIdeaVisible('io.global_id')})`
         )
         .all() as { global_id: string; nodus_id: string; year: number | null; authors_json: string; read_tag: number }[])
     : [];
@@ -275,7 +277,7 @@ export async function buildIdeaGraph(): Promise<GraphData> {
   // orphaned. Here we link an idea to a theme when it's semantically close to that
   // theme's existing idea cluster (centroid of member embeddings), so the backlog of
   // ideas gets folded under the right parent without re-scanning.
-  const inferredThemeEdges = await buildSemanticThemeEdges(themeEdges, nodeIds);
+  const inferredThemeEdges = isManualAcademic() ? [] : await buildSemanticThemeEdges(themeEdges, nodeIds);
 
   const edges = [...themeEdges, ...inferredThemeEdges, ...ideaEdges];
 
@@ -289,6 +291,7 @@ function listVisibleIdeaEdgeRows(): VisibleIdeaEdgeRow[] {
        FROM visible_edges e
        LEFT JOIN works w ON w.nodus_id = e.source_work
        WHERE e.source_work IS NULL
+          OR (e.source_work='manual' AND ${manualIdeaVisible('e.from_id')} AND ${manualIdeaVisible('e.to_id')})
           OR (w.archived = 0 AND w.deep_status = 'done')`
     )
     .all() as VisibleIdeaEdgeRow[];
@@ -323,6 +326,13 @@ function buildThemeMemberships(): ThemeMembership {
     labels.add(themeLabel);
     labelsByIdea.set(ideaId, labels);
   };
+
+  if (isManualAcademic()) {
+    const rows = db.prepare(`SELECT it.theme_id,t.label,it.global_id FROM idea_theme_links it
+      JOIN themes t ON t.theme_id=it.theme_id WHERE it.nodus_id='manual' AND ${manualIdeaVisible('it.global_id')}`).all() as { theme_id: string; label: string; global_id: string }[];
+    for (const row of rows) add(row.theme_id, row.label, row.global_id, 1, 'explicit', 'theme-link');
+    return { edges: Array.from(edges.values()), labelsByIdea };
+  }
 
   const explicit = db
     .prepare(

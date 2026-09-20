@@ -1,3 +1,4 @@
+import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
@@ -65,6 +66,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  ...ACADEMIC_MANUAL_TRANSLATIONS["en"],
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Choose light mode, dark mode, or follow the operating system.',
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['en'],
   "Research chat": "Research chat",
