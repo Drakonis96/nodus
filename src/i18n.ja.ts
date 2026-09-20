@@ -474,7 +474,7 @@ export const JA: Record<string, string> = {
   "Aviso": "リマインダー",
   "Apoya el proyecto": "プロジェクトをサポートする",
   "Nodus acaba de mejorar": "ノダスはさらに良くなった",
-  "Hemos preparado nuevas funciones y mejoras para que sigas construyendo conocimiento con menos fricción.": "スムーズに知識を構築し続けることができるように、新しい機能と改善を用意しました。",
+  "Consulta las nuevas funciones y mejoras de esta versión.": "このバージョンの新機能と改善点をご確認ください。",
   "Nueva versión": "新しいバージョン",
   "¡Tenemos novedades!": "ニュースがあります！",
   "Lo más destacado": "ハイライト",

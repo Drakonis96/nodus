@@ -1,8 +1,21 @@
 # Changelog
 
-## Unreleased
+## 5.6.0 — 2026-09-20
 
-- Fixed the Zotero plugin leaving its evidence database open after the sidebar was destroyed, which could prevent Zotero from exiting and block the next launch (#909). The plugin now owns and awaits database cleanup independently of its windows; the live smoke test also checks normal shutdown.
+- When creating an academic vault, you can choose Auto or Manual. In Manual mode, importing or syncing documents does not automatically generate ideas or themes. The choice is saved for that vault and cannot be changed after creation.
+- Manual mode lets you write ideas and add quotations, works, themes and connections in one form. All these links are optional. Ideas are indexed locally for search, without generative AI. Research Chat and Deep Research can use them when you run those tools.
+- Concilium is a new Research Chat feature that lets you consult two to five models with the same question, sources and files. The model you choose as coordinator writes the final answer from the individual responses. You can open each response and inspect errors, even after reopening the conversation.
+- Graph themes open in separate tabs. You can show the whole theme or ideas within one, two or three connections of the selected idea, and limit the connections drawn per idea without hiding ideas in the selected set.
+- Updates appear in the header notice without opening a second dialog when the app starts. The notice shows progress and the available actions.
+- The warning about a missing AI model configuration appears in Notifications. You can open the relevant settings from there to complete the configuration.
+- The Research Chat header keeps its controls within the available space and removes duplicate actions. This makes it easier to use in narrow windows.
+- In Study and Teaching, you can select chat sources by course, subject and folder. Search finds titles, filenames, tags and locations. You can select groups and keep your selection while filtering.
+- In Study and Teaching, you can move notes and materials between locations from the list or grid. Content, annotations, generated knowledge and other locations are preserved. Folders and topics use the same move action.
+- Nodi searches the Nodus documentation for information relevant to your questions about the app. This provides more complete information about features, settings and procedures. The Skills picker also avoids horizontal scrolling.
+- Nodus Tools brings utilities and research tools together in a searchable catalogue. You can open a tool from the catalogue and pin it individually to the sidebar.
+- The Zotero plugin closes its database on exit, even if you closed the sidebar first. This fixes a problem that could prevent Zotero from shutting down and block the next launch.
+- Added the 5.6.0 What’s New modal in all twelve interface languages.
+- Updated the desktop, server, Zotero and browser connector versions, source release links, citation and website metadata.
 
 ## 5.5.0 — 2026-09-18
 

@@ -486,8 +486,7 @@ export const FR: Record<string, string> = {
   'Aviso': 'Rappel',
   'Apoya el proyecto': 'Soutenez le projet',
   'Nodus acaba de mejorar': 'Nodus vient de s\'améliorer',
-  'Hemos preparado nuevas funciones y mejoras para que sigas construyendo conocimiento con menos fricción.':
-    'Nous avons préparé de nouvelles fonctionnalités et améliorations pour que vous continuiez à construire des connaissances avec moins de friction.',
+  "Consulta las nuevas funciones y mejoras de esta versión.": "Découvrez les nouvelles fonctions et les améliorations de cette version.",
   'Nueva versión': 'Nouvelle version',
   '¡Tenemos novedades!': 'Nous avons des nouveautés !',
   'Lo más destacado': 'Les temps forts',

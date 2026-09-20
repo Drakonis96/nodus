@@ -474,7 +474,7 @@ export const KO: Record<string, string> = {
   "Aviso": "알림",
   "Apoya el proyecto": "프로젝트를 지원하세요",
   "Nodus acaba de mejorar": "Nodus가 좋아졌어요",
-  "Hemos preparado nuevas funciones y mejoras para que sigas construyendo conocimiento con menos fricción.": "우리는 마찰을 줄이면서 계속해서 지식을 쌓을 수 있도록 새로운 기능과 개선 사항을 준비했습니다.",
+  "Consulta las nuevas funciones y mejoras de esta versión.": "이 버전의 새로운 기능과 개선 사항을 확인하세요.",
   "Nueva versión": "새 버전",
   "¡Tenemos novedades!": "새로운 소식이 있습니다!",
   "Lo más destacado": "하이라이트",

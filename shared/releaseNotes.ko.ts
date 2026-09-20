@@ -1,8 +1,10 @@
+import { RELEASE_5_6_0_HIGHLIGHTS } from './releaseNotes560';
 /* Korean release notes, keyed by version. Machine-translated from the English highlights. */
 import { RELEASE_5_5_0_HIGHLIGHTS } from './releaseNotes550';
 export const RELEASE_NOTES_KO: Record<string, string[]> = {
   // 5.5.0 reads its Korean from the release's own highlight columns, the same
   // way the Italian, Turkish and both Chinese tables do.
+  "5.6.0": RELEASE_5_6_0_HIGHLIGHTS.map(highlight => highlight['ko']),
   "5.5.0": RELEASE_5_5_0_HIGHLIGHTS.map(highlight => highlight.ko),
   "5.4.5": [
     "도서관은 현재 저장소에서 선택한 작품과 그 작품에서 파생된 모든 작품을 삭제할 수 있습니다. 작업은 확인을 요청하고 두 부분 모두 이름을 지정합니다. 작업과 자체 분석은 사라지고 다른 작업과 공유하는 분석은 그대로 유지됩니다. 스캐너가 지금 분석 중인 작업은 반쯤 완성된 상태로 삭제되는 대신 거부되고, 문제가 발생하면 전체 배치가 취소되며, 공유된 아이디어와 테마는 그대로 유지됩니다.",

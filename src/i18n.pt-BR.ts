@@ -486,8 +486,7 @@ export const PT_BR: Record<string, string> = {
   'Aviso': 'Aviso',
   'Apoya el proyecto': 'Apoie o projeto',
   'Nodus acaba de mejorar': 'O Nodus acabou de melhorar',
-  'Hemos preparado nuevas funciones y mejoras para que sigas construyendo conocimiento con menos fricción.':
-    'Preparamos novos recursos e melhorias para você continuar construindo conhecimento com menos atrito.',
+  "Consulta las nuevas funciones y mejoras de esta versión.": "Confira as novas funções e melhorias desta versão.",
   'Nueva versión': 'Nova versão',
   '¡Tenemos novedades!': 'Temos novidades!',
   'Lo más destacado': 'Os destaques',

@@ -467,7 +467,7 @@ export const ZH_TW: Record<string, string> = {
   "Aviso": "提醒",
   "Apoya el proyecto": "支援該專案",
   "Nodus acaba de mejorar": "Nodus 又進步了",
-  "Hemos preparado nuevas funciones y mejoras para que sigas construyendo conocimiento con menos fricción.": "我們準備了新功能和改進，讓你能以更小的阻力持續構建知識。",
+  "Consulta las nuevas funciones y mejoras de esta versión.": "查看此版本的新功能與改進。",
   "¡Tenemos novedades!": "我們有新訊息！",
   "Lo más destacado": "亮點",
   "Idiomas": "語言",
