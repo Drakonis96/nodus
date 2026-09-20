@@ -240,7 +240,7 @@ export function ResearchAssistantModal({
   apiRef.current = api;
   const panelKey = adapter?.id ?? 'research';
   const [historyOpen, setHistoryOpen] = useState(() => !embedded || localStorage.getItem(`nodus.${panelKey}ChatHistoryOpen`) === '1');
-  const [contextOpen, setContextOpen] = useState(() => embedded && localStorage.getItem(`nodus.${panelKey}ChatContextOpen`) === '1');
+  const [contextOpen, setContextOpen] = useState(() => embedded && !!adapter && localStorage.getItem(`nodus.${panelKey}ChatContextOpen`) === '1');
   const toggleHistory = () => setHistoryOpen(open => { localStorage.setItem(`nodus.${panelKey}ChatHistoryOpen`, open ? '0' : '1'); return !open; });
   const toggleContext = () => setContextOpen(open => { localStorage.setItem(`nodus.${panelKey}ChatContextOpen`, open ? '0' : '1'); return !open; });
   const [selection, setSelection] = useState<ResearchContextSelection>(() => cloneSelection(SYNTHESIS_SELECTION));
@@ -289,9 +289,7 @@ export function ResearchAssistantModal({
   const stopRequestedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const contextAnchorRef = useRef<HTMLButtonElement | null>(null);
   const contextTriggerRef = useRef<HTMLButtonElement>(null);
-  const focusTriggerRef = useRef<HTMLButtonElement>(null);
   const contextPanelRef = useRef<HTMLDivElement>(null);
   const lastInitialTargetRef = useRef<number | null>(null);
   const lastConversationTargetRef = useRef<number | null>(null);
@@ -340,14 +338,14 @@ export function ResearchAssistantModal({
   useLayoutEffect(() => {
     if (!showContext) return;
     const place = () => {
-      const rect = (contextAnchorRef.current ?? contextTriggerRef.current ?? focusTriggerRef.current)?.getBoundingClientRect();
+      const rect = contextTriggerRef.current?.getBoundingClientRect();
       if (!rect) return;
       const width = Math.min(420, window.innerWidth - 24);
       const below = window.innerHeight - rect.bottom - 20;
       const above = rect.top - 20;
       const upwards = below < 360 && above > below;
       setContextPanelStyle({
-        '--vault-accent': getComputedStyle((contextAnchorRef.current ?? contextTriggerRef.current ?? focusTriggerRef.current)!).getPropertyValue('--vault-accent').trim() || 'var(--a-500)',
+        '--vault-accent': getComputedStyle(contextTriggerRef.current!).getPropertyValue('--vault-accent').trim() || 'var(--a-500)',
         position: 'fixed',
         width,
         left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
@@ -372,7 +370,6 @@ export function ResearchAssistantModal({
       const target = event.target as Node;
       if (
         !contextTriggerRef.current?.contains(target) &&
-        !focusTriggerRef.current?.contains(target) &&
         !contextPanelRef.current?.contains(target)
       ) {
         setShowContext(false);
@@ -860,7 +857,7 @@ export function ResearchAssistantModal({
             ))}
           </select>
           <div className="research-assistant-actions">
-          {adapter ? <button className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1 research-accent-soft research-accent-text" disabled={sending} onClick={toggleContext}><Icon name="layers" size={15} />{t('Contexto')}</button> : isGenealogy ? (
+          {adapter ? <button className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1 research-accent-soft research-accent-text" disabled={sending} data-testid="research-context-toggle" aria-expanded={contextOpen} onClick={toggleContext}><Icon name="layers" size={15} />{t('Contexto')}</button> : isGenealogy ? (
             <span
               className="inline-flex items-center gap-1.5 rounded-md border research-accent-soft px-2 py-1 text-xs research-accent-text"
               title={t('El asistente usa el contexto familiar: personas, parentescos, eventos, documentos y evidencia.')}
@@ -876,10 +873,10 @@ export function ResearchAssistantModal({
               title={t('Elegir qué partes del corpus ve el asistente')}
               aria-haspopup="dialog"
               aria-expanded={showContext}
-              onClick={(event) => { contextAnchorRef.current = event.currentTarget; setShowContext((value) => !value); }}
+              onClick={() => setShowContext((value) => !value)}
             >
               <Icon name="layers" size={15} className="research-accent-text" />
-              <span className="hidden sm:inline">{activeMode ? t(activeMode.label) : t('Contexto')}</span>
+              <span className="hidden min-w-0 truncate sm:inline">{activeMode ? t(activeMode.label) : t('Contexto')}</span>
               <span className="research-accent-badge rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
             </button>
           )}
@@ -896,24 +893,8 @@ export function ResearchAssistantModal({
             if (next) setSelectedModel(next.models[next.chairman]);
           }} />}
 
-          {!adapter && !isGenealogy && contextTitle && (
-            <button
-              type="button"
-              ref={focusTriggerRef}
-              data-testid="research-focus-trigger"
-              className="hidden md:inline-flex items-center gap-1.5 rounded-md border research-accent-soft px-2 py-1 text-xs research-accent-text"
-              title={t('Elegir qué partes del corpus ve el asistente')}
-              aria-haspopup="dialog"
-              aria-expanded={showContext}
-              onClick={(event) => { contextAnchorRef.current = event.currentTarget; setShowContext((value) => !value); }}
-            >
-              <Icon name="fit" size={15} />
-              <span className="truncate">{contextTitle}</span>
-            </button>
-          )}
           </div>
           <div className="flex-1" />
-          {embedded && <><button className="btn btn-ghost" aria-label={t('Nueva conversación')} title={t('Nueva conversación')} disabled={sending} onClick={startNewConversation}><Icon name="plus" /></button><button className="btn btn-ghost" data-testid="research-context-toggle" aria-label={t('Ámbito y fuentes')} title={t('Ámbito y fuentes')} aria-expanded={contextOpen} onClick={toggleContext}><Icon name="columns" size={16} /></button></>}
           {!embedded && <button className="btn btn-ghost" onClick={onClose} title={t('Cerrar')}>
             <Icon name="x" />
           </button>}
@@ -1176,12 +1157,9 @@ export function ResearchAssistantModal({
               </div>
             </footer>
           </section>
-          {embedded && contextOpen && <aside className={`research-chat-context ${adapter?.id === 'study' ? 'w-96 min-w-[280px] max-w-[45vw]' : 'w-72'} shrink-0 overflow-y-auto border-l border-neutral-800 p-4`} data-testid="research-context-sidebar">
+          {embedded && adapter && contextOpen && <aside className={`research-chat-context ${adapter?.id === 'study' ? 'w-96 min-w-[280px] max-w-[45vw]' : 'w-72'} shrink-0 overflow-y-auto border-l border-neutral-800 p-4`} data-testid="research-context-sidebar">
             <div className="mb-4 flex items-center gap-2"><h2 className="text-xs font-semibold">{t('Ámbito y fuentes')}</h2><button className="btn btn-ghost ml-auto" title={t('Ocultar ámbito y fuentes')} onClick={toggleContext}><Icon name="x" size={14} /></button></div>
-            <fieldset disabled={sending} className="min-w-0 space-y-3">{adapter ? adapter.contextPanel : <>
-              <p className="text-xs text-neutral-400">{isGenealogy ? t('El asistente usa el contexto familiar: personas, parentescos, eventos, documentos y evidencia.') : t('Elegir qué partes del corpus ve el asistente')}</p>
-              {!isGenealogy && ASSISTANT_MODES.map(mode => <button key={mode.id} className="btn btn-ghost w-full justify-start" onClick={() => applyMode(mode)}><Icon name={mode.icon} size={15} />{t(mode.label)}{activeModeId === mode.id && <Icon name="check" size={14} />}</button>)}
-            </>}</fieldset>
+            <fieldset disabled={sending} className="min-w-0 space-y-3">{adapter.contextPanel}</fieldset>
           </aside>}
         </div>
       </div>
