@@ -41,13 +41,27 @@
   width: 100%; height: 60px; padding: 0 36px 0 18px; border: 0; outline: 0;
   background: transparent; color: var(--ink-2); font: 650 13px/1 var(--sans);
   cursor: pointer; appearance: none; -webkit-appearance: none;
+  /* The list behind this control is drawn by the platform, not by the page, so
+     the page can only tell it which way to dress: the control declares the dark
+     scheme and the options carry the site's own surface and ink. Left alone they
+     follow the operating system, which is how a dark bar ended up opening a
+     white menu. The in-app start pages import this stylesheet for the same
+     controls, so they inherit the same list. */
+  color-scheme: dark;
 }
 .atlas-engine-wrap::after {
   content: ''; position: absolute; right: 17px; top: 50%; width: 7px; height: 7px;
   border-right: 1.5px solid var(--ink-3); border-bottom: 1.5px solid var(--ink-3);
   transform: translateY(-68%) rotate(45deg); pointer-events: none;
 }
-.atlas-engine option { color: #111; background: #fff; }
+/* The options themselves: the same surface and ink as the bar they hang from,
+   with the chosen one in the violet the rest of the page uses. The second
+   selector is the app's: its start pages wear this button as a <select>, and
+   they read this stylesheet directly (NodusBookmarks.css imports it). */
+.atlas-engine option,
+select.atlas-facet-button option { color: var(--ink); background: var(--raised); }
+.atlas-engine option:checked,
+select.atlas-facet-button option:checked { color: var(--violet-3); }
 .atlas-search-sep { height: 28px; background: var(--membrane); }
 .atlas-input-wrap { position: relative; display: flex; align-items: center; min-width: 0; }
 .atlas-search-icon { flex: 0 0 auto; width: 19px; height: 19px; margin-left: 18px; color: var(--ink-3); }
