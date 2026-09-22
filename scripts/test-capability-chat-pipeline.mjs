@@ -264,6 +264,28 @@ test('a claim on the drawing lane retires a hand-drawn SVG from the same reply',
   assert.match(kept, /Hand-drawn Spain/, 'a claim that does not take the lane leaves the drawing');
 });
 
+test('a nested mistake in a tool input is named by path', async () => {
+  const chemistry = provider({
+    id: 'nodus:chemistry', priority: 300, tools: [tool('compile', { inputSchema: { type: 'object', properties: { plan: { type: 'string' }, source: { type: 'object', properties: { label: { type: 'string', maxLength: 5 }, license: { type: 'string' } }, required: ['label', 'license'], additionalProperties: false } }, required: ['plan', 'source'], additionalProperties: false } })],
+    artifacts: [{ type: 'compile-result', version: 1, label: { en: 'Compiled' }, modelVisibility: 'projection' }],
+    requests: [{ fence: 'chemistry-plan', toolId: 'compile', maxPerReply: 1, answerMode: 'replace-block' }],
+  });
+  const runner = runnerOf({});
+  const refusals = [];
+  for (const input of [
+    { plan: 'x', source: { label: 'Ethanol' } },
+    { plan: 'x', source: { label: 'Ethanol', license: 'CC0', extra: 1 } },
+    { plan: 'x', source: { label: 'Ethanol', license: 'CC0' }, period: {} },
+  ]) {
+    const answer = await runTrustedChatPipeline('```chemistry-plan\n' + JSON.stringify(input) + '\n```', registryOf(chemistry), runner, { onProblem: () => {} });
+    refusals.push(/Capability error: ([^\n]+)/.exec(answer)?.[1] ?? 'no refusal');
+  }
+  assert.match(refusals[0], /the input\.source is missing required property "license"/, refusals[0]);
+  assert.match(refusals[1], /the input\.source has unknown property "extra"; allowed: label, license/, refusals[1]);
+  assert.match(refusals[2], /the input has unknown property "period"/, refusals[2]);
+  assert.ok(!runner.calls.some(call => call.startsWith('invoke:')), 'nothing was dispatched');
+});
+
 test('cancellation propagates instead of being swallowed as a provider problem', async () => {
   const chemistry = provider({
     id: 'nodus:chemistry', priority: 300, tools: [tool('compile')],

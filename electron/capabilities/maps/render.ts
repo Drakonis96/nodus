@@ -58,7 +58,7 @@ export async function renderMap(request: MapRenderRequest, layers: Array<{ geojs
   const top = 28 + titleLines.length * 28;
   const bottom = height - 28 - credits.length * 17;
   const right = width - 36 - (request.legend?.length ? 230 : 0);
-  if (bottom - top < 180 || (request.legend?.length ?? 0)*42 > bottom-top) throw new Error('Map attribution or legend needs a larger canvas or shorter labels.');
+  if (bottom - top < 180 || (request.legend?.length ?? 0)*52 > bottom-top) throw new Error('Map attribution or legend needs a larger canvas or shorter labels.');
   const viewport: [[number,number],[number,number]] = [[36,top+12],[right,bottom-18]];
   const projection: GeoProjection = (projectionName === 'mercator' ? geoMercator() : projectionName === 'equirectangular' ? geoEquirectangular() : geoEqualEarth()).rotate([-(request.centralMeridian ?? 0),0]).precision(.3);
   const geometry = layers.map((l,i) => selectMapLayer(validateMapGeometry(l.geojson), request.layers![i]));
@@ -178,7 +178,9 @@ export async function renderMap(request: MapRenderRequest, layers: Array<{ geojs
   for(const [i,item] of (request.legend ?? []).entries()) {
     const y=top+32+i*42;
     svg.push(`<rect x="${right+22}" y="${y-12}" width="14" height="14" rx="2" fill="${item.color}"/>`);
-    const lines=wrap(item.label,180); if(lines.length>2) throw new Error('Legend label is too long; shorten it.');
+    // Three lines of about 26 characters: the ceiling the schema publishes for a label, so a
+    // legend entry that validates is one the renderer can actually draw.
+    const lines=wrap(item.label,180); if(lines.length>3) throw new Error('Legend label is too long; shorten it (about 78 characters fit).');
     lines.forEach((line,j)=>svg.push(`<text x="${right+44}" y="${y+j*15}" font-size="12">${xml(line)}</text>`));
   }
   credits.forEach((line,i)=>svg.push(`<text x="32" y="${bottom+17+i*17}" font-size="11" fill="#526273">${xml(line)}</text>`));
