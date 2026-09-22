@@ -10,8 +10,8 @@ import { enabledChatSkills } from '../chatSkills';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getConversation } from '../db/chatRepo';
 import { executeChatSkills } from './chatSkillExecution';
-import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings } from './moleculeInspection';
-import { MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE, requestedTargetFor } from '@shared/moleculeInspection';
+import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings, ensureRouteConsistency, resolveNamedRoute } from './moleculeInspection';
+import { countRouteSteps, findReactionLines, findStepNamedSpecies, formatMissingSpeciesPrompt, formatNameCorrectionNote, MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE, requestedTargetFor } from '@shared/moleculeInspection';
 import { SYNTHESIS_TEMPLATE_ADDENDUM, looksLikeSynthesisRequest } from '@shared/synthesisPrompt';
 import type {
   Author,
@@ -206,9 +206,29 @@ function skillExecution(request: ResearchChatRequest) {
 async function finalizeWithAudit(answer: string, execution: ReturnType<typeof skillExecution>, signal?: AbortSignal): Promise<string> {
   const skilled = await executeChatSkills(answer, execution, signal);
   const chemistryEnabled = execution.skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
-  const options = { model: execution.model, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner };
-  const withStructures = await appendStructureAudit(skilled, answer, options);
-  return appendRouteReportAndDrawings(withStructures, answer, { ...options, target: execution.target });
+  const options = { model: execution.model, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner, signal };
+  // Names-first: resolve every species name to a structure (PubChem first, OPSIN fallback),
+  // derive the equations from the resolved structures, and attach the derived SMILES to the
+  // answer. An unresolved reactant/product name is sent back to the model to correct, and the
+  // route is still checked and drawn; the clarification is appended after it. When the
+  // installed package has no resolve-names tool, the legacy reaction-line path runs instead.
+  const resolved = await resolveNamedRoute(skilled, skilled, options);
+  if (resolved.legacy) {
+    const gated = await ensureRouteConsistency(skilled, skilled, options);
+    const withStructures = await appendStructureAudit(gated.answer, gated.answer, options);
+    const routed = await appendRouteReportAndDrawings(withStructures, gated.answer, { ...options, target: execution.target });
+    const body = gated.clarification ? `${routed.trimEnd()}\n\n${gated.clarification}\n` : routed;
+    // A route that describes steps but lists no species cannot be checked; offer one click to
+    // have the model re-emit it with the four labelled lines.
+    const steps = options.enabled !== false ? countRouteSteps(skilled) : 0;
+    const missingSpecies = steps > 0 && findReactionLines(skilled).length === 0 && !findStepNamedSpecies(skilled, steps).some((step) => step.length);
+    return missingSpecies ? `${body.trimEnd()}\n\n${formatMissingSpeciesPrompt()}\n` : body;
+  }
+  const withStructures = await appendStructureAudit(resolved.answer, resolved.answer, options);
+  const routed = await appendRouteReportAndDrawings(withStructures, resolved.answer, { ...options, target: execution.target }, { steps: resolved.steps, labels: resolved.labels });
+  const correctionNote = formatNameCorrectionNote(resolved.corrections);
+  const withNotes = correctionNote ? `${routed.trimEnd()}\n\n${correctionNote}\n` : routed;
+  return resolved.clarification ? `${withNotes.trimEnd()}\n\n${resolved.clarification}\n` : withNotes;
 }
 
 
