@@ -6,7 +6,10 @@
   padding: calc(var(--nav-h) + clamp(52px, 7vw, 90px)) var(--gut) clamp(96px, 11vw, 140px);
 }
 .atlas-shell { width: min(100%, var(--measure)); margin: 0 auto; }
-.atlas-intro { width: min(100%, 940px); margin: 0 auto; text-align: center; }
+/* The heading column also holds the search field and the facet row. It is wide
+   enough for the row — five pills carrying chosen values are wider than the field
+   ever is — while the field and the copy keep their own measures below. */
+.atlas-intro { width: min(100%, 1040px); margin: 0 auto; text-align: center; }
 .atlas-title {
   margin: 0; font-family: var(--serif); font-size: clamp(50px, 7.7vw, 92px);
   font-weight: 650; line-height: .98; letter-spacing: -.055em; color: var(--ink);
@@ -17,10 +20,14 @@
 }
 
 /* main search */
-.atlas-search-wrap { width: min(100%, 920px); margin: 34px auto 0; }
+/* The facet row below needs more room than the search field does — five pills
+   carrying chosen values are wider than the field ever is — so the wrap is sized
+   for the row and the field keeps its own measure, centred in it. */
+.atlas-search-wrap { width: min(100%, 1040px); margin: 34px auto 0; }
 .atlas-searchbar {
   display: grid; grid-template-columns: minmax(160px, 205px) 1px minmax(0, 1fr) 52px;
-  align-items: center; min-height: 62px; border: 1px solid var(--membrane);
+  align-items: center; width: min(100%, 920px); margin-inline: auto; min-height: 62px;
+  border: 1px solid var(--membrane);
   border-radius: 18px; background: rgba(16,13,28,.76);
   backdrop-filter: blur(16px) saturate(1.2); -webkit-backdrop-filter: blur(16px) saturate(1.2);
   box-shadow: var(--shadow);
@@ -124,6 +131,9 @@
 .atlas-facet-count { color: var(--ink-3); font: 500 10.5px/1 var(--mono); }
 .atlas-facet-empty { padding: 18px 10px; color: var(--ink-3); text-align: center; font-size: 12px; }
 .atlas-reset {
+  /* Never squeezed and never wrapped: the button is one short label, and the row
+     is kept to one line by the pills giving up width, not by breaking it in two. */
+  flex: 0 0 auto; white-space: nowrap;
   height: 38px; padding: 0 13px; border: 1px solid transparent; border-radius: 999px;
   background: transparent; color: var(--ink-3); font: 600 11.5px/1 var(--sans); cursor: pointer;
 }
@@ -194,4 +204,21 @@
     max-height: min(520px,calc(100vh - 40px)); transform: translate(-50%,-50%);
   }
   .atlas-facet-options { max-height: min(390px,calc(100vh - 150px)); }
+}
+/* Desktop keeps the facets on one row, and they stay there. A pill is as wide as
+   the value chosen in it — picking "Knowledge area · Social Sciences" replaces
+   the facet's own name with a longer one — so a wrapping row re-flowed on every
+   selection and pushed the last pill, and "Clear filters" with it, onto a line
+   of its own. Instead the pills share out the row they have: a pill that runs
+   out of room ellipsizes the value inside it (the label keeps its word) rather
+   than moving its neighbour down. min-width: 0 lets the flex row hand out that
+   smaller width, and the button follows its box instead of its longest value. */
+@media (min-width: 861px) {
+  .atlas-filterbar { flex-wrap: nowrap; }
+  .atlas-facet-button { width: 100%; }
+  /* What a pill refuses to shrink past: the facet's automatic minimum is its
+     content, and the value's own floor is that content — its name, the chevron,
+     and a stub of the value. A short value such as "Spain" then survives a full
+     row intact, and the longer ones, which have room to spare, do the giving. */
+  .atlas-facet-value { min-width: 3.4em; }
 }

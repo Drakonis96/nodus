@@ -165,8 +165,12 @@ Keep the two in step when the header changes; a test checks that they agree.
   z-index: 60;
   top: calc(100% + 9px);
   right: 0;
+  /* The box grows leftwards from the chip, which sits at the right end of the
+     header, and it is capped by the room the window actually has left of the
+     edge: a fixed 300px is what let the tail of the sentence reach past the
+     window on a narrow one, where the chip is already close to the edge. */
   width: max-content;
-  max-width: min(300px, 80vw);
+  max-width: min(300px, 80vw, calc(100vw - 2 * clamp(14px, 3vw, 30px)));
   padding: 8px 11px;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 9px;

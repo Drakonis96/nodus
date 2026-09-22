@@ -581,3 +581,29 @@ test('every page shows the planet at the Support Nodus size, fixed behind the pa
     assert.match(read(page), /planet\.js\?v=[^"]+/, `${page} loads the planet component`);
   }
 });
+
+test('the research atlas holds its five facets on one row on a desktop screen', () => {
+  const css = read('assets/css/research-atlas.css');
+
+  // A pill is as wide as the value picked in it — the chosen value replaces the
+  // facet's own name — so a wrapping row re-flowed on every selection and dropped
+  // the last pill, and "Clear filters" with it, onto a line of its own.
+  const desktop = css.match(/@media \(min-width: 861px\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(desktop, 'the atlas states what its filter row does on a desktop screen');
+  assert.match(desktop, /\.atlas-filterbar \{ flex-wrap: nowrap; \}/, 'the facets hold one row');
+  // Narrow layouts keep wrapping: below the breakpoint the row cannot hold them.
+  assert.match(css, /\.atlas-filterbar \{[\s\S]*?flex-wrap: wrap;[\s\S]*?\}/, 'the narrow layouts still wrap');
+
+  // The row is only able to hold them because it is wider than the search field,
+  // which keeps its own measure and stays centred in it...
+  assert.match(css, /\.atlas-intro \{ width: min\(100%, 1040px\)/, 'the intro column is sized for the facet row');
+  assert.match(css, /\.atlas-searchbar \{[\s\S]*?width: min\(100%, 920px\);[\s\S]*?margin-inline: auto;/, 'the field keeps its measure');
+  // ...and because a pill gives way inside itself instead of pushing its
+  // neighbour down: it follows the width the row hands it, keeps its name, and
+  // ellipsizes the value, which refuses to shrink past a readable stub.
+  assert.match(desktop, /\.atlas-facet-button \{ width: 100%; \}/, 'a pill follows the width it is given');
+  assert.match(desktop, /\.atlas-facet-value \{ min-width: 3\.4em; \}/, 'a value keeps a readable stub');
+  assert.match(css, /\.atlas-facet-button \{[\s\S]*?max-width: 225px/, 'a pill is still capped');
+  assert.match(css, /\.atlas-facet-value \{[^}]*text-overflow: ellipsis/, 'its value ellipsizes instead of overflowing');
+  assert.match(css, /\.atlas-reset \{[\s\S]*?flex: 0 0 auto; white-space: nowrap;/, 'Clear filters keeps its one line');
+});
