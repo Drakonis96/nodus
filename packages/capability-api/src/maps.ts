@@ -3,7 +3,7 @@ import type { FeatureCollection, Position } from 'geojson';
 
 /** No fetch URLs, paths, credentials or executable styles. Source links are inert attribution. */
 export const MAP_LIMITS = { calls: 8, retrievals: 4, layers: 4, features: 5000, positions: 200000, inputBytes: 12000000, responseBytes: 16000000, svgChars: 300000, markers: 200, routes: 100, timeoutMs: 30000 } as const;
-export const MAP_PROVIDERS = ['natural-earth', 'geoboundaries'] as const;
+export const MAP_PROVIDERS = ['natural-earth', 'geoboundaries', 'openhistoricalmap'] as const;
 export type MapProviderId = typeof MAP_PROVIDERS[number];
 export type MapProjection = 'equal-earth' | 'mercator' | 'equirectangular';
 export interface MapQuery { provider: MapProviderId; country?: string; level?: number; period?: { from: string; to: string } }
@@ -59,8 +59,17 @@ export function validateMapQuery(value: any): MapQuery {
   object(value, ['provider','country','level','period'], 'source query');
   if (!MAP_PROVIDERS.includes(value.provider)) throw new Error('Map provider is not approved.');
   if (value.period !== undefined) period(value.period);
-  if (value.provider === 'natural-earth') { if (value.country !== undefined || value.level !== undefined) throw new Error('Natural Earth supplies the world countries layer; select features after retrieval.'); }
-  else if (typeof value.country !== 'string' || !/^[A-Z]{3}$/.test(value.country) || value.country === 'ALL' || !Number.isInteger(value.level) || value.level < 0 || value.level > 2) throw new Error('Administrative retrieval requires one ISO alpha-3 country and level 0, 1 or 2.');
+  if (value.provider === 'natural-earth') {
+    if (value.country !== undefined || value.level !== undefined) throw new Error('Natural Earth supplies the world countries layer; select features after retrieval.');
+    if (value.period !== undefined) throw new Error('This provider does not support historical date queries. No modern geometry was substituted.');
+  } else if (value.provider === 'openhistoricalmap') {
+    // Dated by construction: the adapter keeps the elements whose own start/end dates cover
+    // the period, so a query without one would have no rule to select by and no date to report.
+    if (value.country !== undefined) throw new Error('OpenHistoricalMap is retrieved by area and date, not by country; give the map its bounds and period.');
+    if (value.level !== 2 && value.level !== 4) throw new Error('OpenHistoricalMap retrieval needs admin level 2 (states and polities) or 4 (regions and provinces where mapped).');
+    if (value.period === undefined) throw new Error('OpenHistoricalMap retrieval needs the period it is drawn for.');
+  } else if (typeof value.country !== 'string' || !/^[A-Z]{3}$/.test(value.country) || value.country === 'ALL' || !Number.isInteger(value.level) || value.level < 0 || value.level > 2) throw new Error('Administrative retrieval requires one ISO alpha-3 country and level 0, 1 or 2.');
+  else if (value.period !== undefined) throw new Error('This provider does not support historical date queries. No modern geometry was substituted.');
   return structuredClone(value);
 }
 export function validateMapGeometry(input: unknown): FeatureCollection {

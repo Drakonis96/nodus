@@ -294,6 +294,38 @@ try {
             assert.match(refused, /unknown property "timeframe"/, 'and names the property it refused');
             assert.match(refused, /allowed: title, alt/, 'and lists what the tool does take');
           } finally { await runner.dispose(); }
+          // The period's own boundaries, asked for the way a chat asks for them: an
+          // openhistoricalmap query with a level and the period, retrieved inside the frame.
+          // Off by default because it reaches a public endpoint, on with NODUS_LIVE_HISTORICAL=1.
+          if (process.env.NODUS_LIVE_HISTORICAL === '1') {
+            stage = 'a dated historical map through every chat surface';
+            const dated = { title: 'Regiones históricas de España en 1940', alt: 'Dated historic regions of Spain in 1940, from OpenHistoricalMap.', period: { from: '1940-01-01', to: '1940-12-31' },
+              projection: 'mercator', bounds: [-10, 35.5, 4.5, 44], width: 1200, height: 900,
+              layers: [{ query: { provider: 'openhistoricalmap', level: 4, period: { from: '1940-01-01', to: '1940-12-31' } }, fill: '#dcd3bd', labelProperty: 'name' }],
+              legend: [{ label: 'Región histórica (1833-1982)', color: '#dcd3bd' }] };
+            for (const surface of ['assistant','nodi','deep-research','immersion']) {
+              const runner = createTrustedCapabilityRunner({ owner: chatAssetOwner(surface, 'research-visuals-dated'), question: 'Mapa de las regiones históricas de España en 1940.', locale: 'es', pins: pinCapabilitiesForTurn(), runCoreStages: async answer => answer });
+              try {
+                // The public endpoint rate-limits bursts; wait it out rather than reporting the
+                // endpoint's load as a defect in this build.
+                let answer = '';
+                for (let attempt = 1; ; attempt++) {
+                  try {
+                    answer = await runTrustedChatPipeline(fence('historical-map-request', dated), registry, runner, {onProblem: (_provider,error)=>{throw error;}});
+                    break;
+                  } catch (error) {
+                    if (attempt >= 4 || !/busy or rate-limiting/.test(String(error.message))) throw error;
+                    await new Promise(resolve => setTimeout(resolve, 20_000 * attempt));
+                  }
+                }
+                assert.match(answer, /nodus-artifact/, surface + ' produced a map artifact');
+                assert.match(answer, /nodus-view/, surface + ' renders its result');
+                assert.match(answer, /Historical source period: 1940-01-01 to 1940-12-31/, surface + ' reports the period it was drawn for');
+                assert.doesNotMatch(answer, /Approximate historical reconstruction/, surface + ' does not label dated boundaries as a reconstruction');
+              } finally { await runner.dispose(); }
+            }
+            console.log('  Research Visuals: dated OpenHistoricalMap boundaries retrieved, rendered and labelled through all four chat pipelines.');
+          }
           console.log('  Research Visuals: four real worker requests (provider, dated, reconstructed, image), property-named refusals and native SVG/provenance through Assistant, Nodi, Deep Research and Immersion pipelines.');
         }
 

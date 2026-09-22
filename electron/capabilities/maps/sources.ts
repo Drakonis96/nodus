@@ -2,12 +2,24 @@ import { createHash } from 'node:crypto';
 import type { FeatureCollection } from 'geojson';
 import { assertPublicHost } from '../../../skill-capabilities/publicHost';
 import { MAP_LIMITS, validateMapGeometry, validateMapQuery, type MapQuery, type MapSource } from '../../../packages/capability-api/src/maps';
+import { retrieveOpenHistoricalMap } from './openHistoricalMap';
 
 /** Reviewed open sources, not a URL proxy. Every URL is constructed here from a fixed
- * origin/path template. Neither a Skill nor a provider response may supply a fetch URL. */
+ *  origin/path template. Neither a Skill nor a provider response may supply a fetch URL. */
 export const NATURAL_EARTH_URL = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_110m_admin_0_countries.geojson';
+export const OPENHISTORICALMAP_API = 'https://overpass-api.openhistoricalmap.org/api/interpreter';
+/** The only two Overpass queries this adapter may issue, as the templates it builds them from:
+ *  an index of the boundary relations inside the frame, and the geometry of the ones whose own
+ *  dates cover the period. The URL is rebuilt from validated fields, so no caller text reaches it. */
+const OHM_INDEX = /^\[out:json\]\[timeout:\d{1,3}\];relation\["boundary"="administrative"\]\["admin_level"~"\^\((?:2|4)\)\$"\]\(-?\d{1,3}(?:\.\d+)?(?:,-?\d{1,3}(?:\.\d+)?){3}\);out tags;$/;
+const OHM_GEOMETRY = /^\[out:json\]\[timeout:\d{1,3}\];relation\(id:\d{1,12}(?:,\d{1,12}){0,119}\);out geom;$/;
 export function assertApprovedMapUrl(url: string): void {
   if (url === NATURAL_EARTH_URL || /^https:\/\/www\.geoboundaries\.org\/api\/current\/gbOpen\/[A-Z]{3}\/ADM[012]\/$/.test(url)) return;
+  if (url.startsWith(`${OPENHISTORICALMAP_API}?data=`)) {
+    const data = new URL(url).searchParams.get('data') ?? '';
+    if (OHM_INDEX.test(data) || OHM_GEOMETRY.test(data)) return;
+    throw new Error('Map source URL is not approved.');
+  }
   const match = /^https:\/\/(?:raw\.githubusercontent\.com\/|media\.githubusercontent\.com\/media\/)wmgeolab\/geoBoundaries\/[a-f0-9]{7,40}\/releaseData\/gbOpen\/([A-Z]{3})\/ADM([012])\/geoBoundaries-([A-Z]{3})-ADM([012])_simplified\.geojson$/.exec(url);
   if (!match || match[1] !== match[3] || match[2] !== match[4]) throw new Error('Map source URL is not approved.');
 }
@@ -54,11 +66,14 @@ export function geoBoundaryLicense(meta: Record<string, unknown>): { license: st
   throw new Error(`The source licence has not been approved for maps: ${name}.`);
 }
 
-export async function retrieveMapSource(input: MapQuery, signal: AbortSignal, transport: MapSourceTransport = mapSourceTransport): Promise<{geojson: FeatureCollection; source: MapSource}> {
+export async function retrieveMapSource(input: MapQuery, signal: AbortSignal, transport: MapSourceTransport = mapSourceTransport, window?: readonly [number, number, number, number]): Promise<{geojson: FeatureCollection; source: MapSource}> {
   const query=validateMapQuery(input); signal.throwIfAborted();
-  if(query.period) throw new Error('This provider does not support historical date queries. No modern geometry was substituted.');
+  if(query.period && query.provider!=='openhistoricalmap') throw new Error('This provider does not support historical date queries. No modern geometry was substituted.');
   let bytes: Uint8Array, source: Omit<MapSource,'sha256'>;
   const boundedRead = async (url: string, limit: number) => { const value=await readWithCancellation(transport,url,signal,limit); signal.throwIfAborted(); if(value.byteLength>limit) throw new Error('Map source exceeds its byte limit.'); return value; };
+  if(query.provider==='openhistoricalmap') {
+    return retrieveOpenHistoricalMap({query, window, signal, read: boundedRead});
+  }
   if(query.provider==='natural-earth') {
     bytes=await boundedRead(NATURAL_EARTH_URL,MAP_LIMITS.responseBytes);
     source={origin:'provider',provider:query.provider,label:'Natural Earth · admin 0 · 110m',attribution:'Made with Natural Earth — naturalearthdata.com',license:'Public domain',url:'https://www.naturalearthdata.com/about/terms-of-use/',version:'5.1.2',retrievedAt:new Date().toISOString(),modifications:['Property normalization; cartographic boundaries at 1:110m.']};
