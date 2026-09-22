@@ -285,6 +285,20 @@ try {
               }
             } finally { await runner.dispose(); }
           }
+          // A map request answered by hand: the package claims the drawing lane, which retires
+          // the hand-drawn block and leaves a notice saying what to do next. This is the case
+          // the whole correction started from.
+          {
+            const backtick = String.fromCharCode(96).repeat(3);
+            const drawn = 'Aquí tienes el mapa.\\n\\n' + backtick + 'svg\\n<svg xmlns="http://www.w3.org/2000/svg"><title>España dibujada a mano</title></svg>\\n' + backtick;
+            const runner = createTrustedCapabilityRunner({ owner: chatAssetOwner('assistant', 'research-visuals-fixture'), question: 'Crea un mapa de España en 1940', locale: 'es', pins: pinCapabilitiesForTurn(), runCoreStages: async answer => answer });
+            try {
+              const answer = await runTrustedChatPipeline(drawn, registry, runner, {onProblem: (_provider,error)=>{throw error;}});
+              assert.doesNotMatch(answer, /España dibujada a mano/, 'the hand-drawn map is retired from the reply');
+              assert.match(answer, /herramienta de cartografía/, 'and the reply says what to do instead');
+              assert.match(answer, /Aquí tienes el mapa/, 'while the prose stays');
+            } finally { await runner.dispose(); }
+          }
           // A near-miss input is refused by name, not by "invalid request": the model that sent
           // an extra top-level field reads which field, and which ones the tool does take.
           const runner = createTrustedCapabilityRunner({ owner: chatAssetOwner('assistant', 'research-visuals-fixture'), question: 'Draw a 1940 route.', locale: 'en', pins: pinCapabilitiesForTurn(), runCoreStages: async answer => answer });

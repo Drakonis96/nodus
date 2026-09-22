@@ -121,13 +121,21 @@ const thin = (ring: Array<[number, number]>, tolerance: number): Array<[number, 
 };
 
 /** Overpass answers a burst with an HTML error page, and a raw JSON parse error would tell a
- *  reader nothing about what to do. There is no retry here: substituting another source or
- *  hammering a public endpoint are both worse than saying the service is busy. */
-async function readOverpass(read: (url: string, limit: number) => Promise<Uint8Array>, url: string): Promise<{ elements?: unknown[] }> {
-  const text = Buffer.from(await read(url, MAP_LIMITS.responseBytes)).toString('utf8');
-  if (!text.trim().startsWith('{')) throw new Error('OpenHistoricalMap is busy or rate-limiting this request; try again in a moment.');
-  try { return JSON.parse(text) as { elements?: unknown[] }; }
-  catch { throw new Error('OpenHistoricalMap returned a response this adapter cannot read.'); }
+ *  reader nothing about what to do. Rate limiting is transient, so one short wait and one repeat
+ *  is worth it; nothing else is retried, no other source is substituted, and a second busy answer
+ *  is reported as the service being busy rather than hidden. */
+async function readOverpass(read: (url: string, limit: number) => Promise<Uint8Array>, url: string, signal: AbortSignal): Promise<{ elements?: unknown[] }> {
+  for (let attempt = 1; ; attempt++) {
+    const text = Buffer.from(await read(url, MAP_LIMITS.responseBytes)).toString('utf8');
+    if (text.trim().startsWith('{')) {
+      try { return JSON.parse(text) as { elements?: unknown[] }; }
+      catch { throw new Error('OpenHistoricalMap returned a response this adapter cannot read.'); }
+    }
+    if (attempt >= 2) throw new Error('OpenHistoricalMap is busy or rate-limiting this request; try again in a moment.');
+    signal.throwIfAborted();
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    signal.throwIfAborted();
+  }
 }
 
 export interface OpenHistoricalMapInput {
@@ -144,7 +152,7 @@ export async function retrieveOpenHistoricalMap(input: OpenHistoricalMapInput): 
   if (!window) throw new Error('OpenHistoricalMap retrieval needs the map frame: give the request bounds, which are also the retrieval window.');
   const from = yearOfPeriod(period.from), to = yearOfPeriod(period.to);
 
-  const index = await readOverpass(input.read, openHistoricalMapIndexUrl(level, window));
+  const index = await readOverpass(input.read, openHistoricalMapIndexUrl(level, window), input.signal);
   if (!Array.isArray(index.elements)) throw new Error('OpenHistoricalMap did not return a boundary index; its response changed.');
   const eligible: number[] = [];
   let undated = 0;
@@ -160,13 +168,13 @@ export async function retrieveOpenHistoricalMap(input: OpenHistoricalMapInput): 
     const end = openHistoricalMapYear(tags.end_date);
     if (start <= from && (end === null || end >= to)) eligible.push(element.id);
   }
-  if (!eligible.length) throw new Error(`OpenHistoricalMap has no admin level ${level} boundary covering ${period.from} to ${period.to} inside these bounds.`);
+  if (!eligible.length) throw new Error(`OpenHistoricalMap has no admin level ${level} boundary covering ${period.from} to ${period.to} inside these bounds: the project has not mapped one there, or the frame is tighter than the division. Supply dated GeoJSON, or draw it as a stated reconstruction.`);
   if (eligible.length > MAX_RELATIONS) throw new Error(`OpenHistoricalMap returned ${eligible.length} boundaries for this frame; narrow the bounds or choose another level (at most ${MAX_RELATIONS}).`);
 
   const elements: Array<Record<string, unknown>> = [];
   const readBatch = async (ids: number[], depth = 0): Promise<void> => {
     try {
-      const payload = await readOverpass(input.read, openHistoricalMapGeometryUrl(ids));
+      const payload = await readOverpass(input.read, openHistoricalMapGeometryUrl(ids), input.signal);
       if (!Array.isArray(payload.elements)) throw new Error('OpenHistoricalMap did not return geometry for the selected boundaries.');
       elements.push(...payload.elements as Array<Record<string, unknown>>);
     } catch (error) {

@@ -141,7 +141,14 @@ export async function runTrustedChatPipeline(
       if (mutation.op === 'notice') { placeAt(anchorFor(visible, mutation.position)).after.push(runner.renderView({ provider, view: mutation.view })); continue; }
       if (mutation.op === 'claim') {
         claimedBy.add(provider);
-        if (mutation.suppressSvgRefinement) suppressSvgRefinement = true;
+        if (mutation.suppressSvgRefinement) {
+          suppressSvgRefinement = true;
+          // A claim on the drawing lane means the drawing is not the model's to make: a raw SVG
+          // block in the same reply is exactly what the claim is about, and leaving it beside the
+          // provider's own result would show two answers to one question. A hook cannot remove a
+          // node it does not own, so the lane is retired here, where the claim is honoured.
+          for (const node of visible) if (node.kind === 'fence' && node.fence === 'svg') removed.add(node.id);
+        }
         if (mutation.exclusive) exclusive = provider;
         continue;
       }

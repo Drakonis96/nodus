@@ -240,6 +240,30 @@ test('an exclusive claim stands down every other provider for that reply', async
   assert.ok(!runner.calls.includes('hook:nodus:chemistry:prepare'));
 });
 
+test('a claim on the drawing lane retires a hand-drawn SVG from the same reply', async () => {
+  // The case that started this: a cartography package exists, the model answers a map request by
+  // drawing one itself, and the reply shows a map nobody checked. A hook cannot remove a node it
+  // does not own, so the pipeline drops the hand-drawn block when the claim is honoured.
+  const cartography = provider({
+    id: 'example:cartography', priority: 400, tools: [tool('render')],
+    artifacts: [{ type: 'research-map', version: 1, label: { en: 'Map' }, modelVisibility: 'none' }],
+    requests: [{ fence: 'research-map-request', toolId: 'render', maxPerReply: 4, answerMode: 'replace-block' }],
+    hooks: { prepare: true },
+  });
+  const claiming = runnerOf({
+    hook: ({ provider, nodes }) => provider.id === 'example:cartography' && nodes.some(node => node.fence === 'svg')
+      ? [{ op: 'claim', suppressSvgRefinement: true }] : [],
+  });
+  const drawn = 'Prose about 1940.\n\n```svg\n<svg xmlns="http://www.w3.org/2000/svg"><title>Hand-drawn Spain</title></svg>\n```\n';
+  const answer = await runTrustedChatPipeline(drawn, registryOf(cartography), claiming);
+  assert.doesNotMatch(answer, /Hand-drawn Spain/, 'the hand-drawn map is not shown');
+  assert.match(answer, /Prose about 1940/, 'and the prose around it stays');
+  // A claim without the drawing lane leaves a diagram alone: this is about the lane, not about SVG.
+  const quiet = runnerOf({ hook: () => [{ op: 'claim' }] });
+  const kept = await runTrustedChatPipeline(drawn, registryOf(cartography), quiet);
+  assert.match(kept, /Hand-drawn Spain/, 'a claim that does not take the lane leaves the drawing');
+});
+
 test('cancellation propagates instead of being swallowed as a provider problem', async () => {
   const chemistry = provider({
     id: 'nodus:chemistry', priority: 300, tools: [tool('compile')],

@@ -196,6 +196,22 @@ test('OpenHistoricalMap fails closed on licences, frames, levels and volume',asy
   assert.equal(built.geometry[0].features.length,1);
 });
 
+test('a rate-limited provider answer is waited out once, then reported as busy',async()=>{
+  const member={role:'outer',geometry:[{lat:1,lon:1},{lat:1,lon:2},{lat:2,lon:2},{lat:2,lon:1},{lat:1,lon:1}]};
+  const index=encode({elements:[{type:'relation',id:7,tags:{name:'Region',start_date:'1800'}}]});
+  const geometry=encode({elements:[{type:'relation',id:7,tags:{name:'Region'},members:[member]}]});
+  const query={provider:'openhistoricalmap',level:4,period:{from:'1900-01-01',to:'1900-12-31'}};
+  const render=async(busyAnswers)=>{const calls=[];const net={calls,async read(url,_signal,_limit){calls.push(url);
+    const answer=calls.length<=busyAnswers?'<html>rate limited</html>':new URL(url).searchParams.get('data').includes('out tags')?index:geometry;return Buffer.from(answer);}};
+    return fresh({providers:['openhistoricalmap'],transport:net}).render({title:'x',alt:'y',bounds:[0,0,10,10],layers:[{query}]},signal());};
+  const recovered=await render(1);
+  assert.equal(recovered.geometry[0].features.length,1,'one busy answer is waited out and the map still renders');
+  await assert.rejects(render(99),/busy or rate-limiting/);
+  const net={calls:[],async read(url,_signal,_limit){this.calls.push(url);return Buffer.from('<html>rate limited</html>');}};
+  const attempts=fresh({providers:['openhistoricalmap'],transport:net});
+  await assert.rejects(attempts.render({title:'x',alt:'y',bounds:[0,0,10,10],layers:[{query}]},signal()),/busy or rate-limiting/);
+  assert.equal(net.calls.length,2,'at most one repeat per read, never a loop against a public endpoint');
+});
 test('an OpenHistoricalMap request is retrieved inside a map, not as a bare dataset',async()=>{
   await assert.rejects(fresh({providers:['openhistoricalmap'],transport:{async read(){throw new Error('offline');}}}).retrieve({provider:'openhistoricalmap',level:4,period:{from:'1900-01-01',to:'1900-12-31'}},signal()),/inside a map/);
   for(const url of ['https://overpass-api.openhistoricalmap.org/api/interpreter?data=%5Bout%3Ajson%5D%5Btimeout%3A25%5D%3Bnode%3Bout%3B','https://overpass-api.openhistoricalmap.org/api/interpreter','https://overpass-api.openhistoricalmap.org/api/other?data=x']) assert.throws(()=>sources.assertApprovedMapUrl(url),/not approved/);

@@ -206,7 +206,9 @@ positions per layer; source responses at 16 MB; SVG at 300,000 characters; overl
 the existing tighter 64,000-character limit. Use provider queries or trusted host-owned
 datasets for larger geometry. Cancellation propagates to fetch and native rendering,
 and cancels pending host services when a worker is cancelled/stopped. Late results are
-discarded. There is no automatic retry, source substitution or recursive model call.
+discarded. A rate-limited OpenHistoricalMap answer is retried once after a short wait, because
+that limit is transient; nothing else is retried, no source is ever substituted for another, and
+there is no recursive model call.
 
 Model-authored result/view/artifact blocks are rejected before execution across the
 shared chat dispatcher. Native outputs enter as execution results and are not reparsed
