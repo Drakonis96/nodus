@@ -138,3 +138,19 @@ test('every vault uses its canonical Nodus pictogram instead of a letter badge',
   assert.match(css, /\.vault-icon-svg \{[^}]*display: block/);
   assert.doesNotMatch(css, /\.search-result span \{/);
 });
+
+test('the Wiki carries the shared page behaviour, not just the shared styles', () => {
+  const html = fs.readFileSync(path.join(wikiRoot, 'index.html'), 'utf8');
+  // The docs reader used to load the design system's stylesheet and none of its
+  // behaviour, so the cursor ring that follows the pointer everywhere else on the
+  // site was missing here. The wiki's own script only renders the documentation.
+  assert.match(html, /assets\/js\/site\.js\?v=[^"]+/, 'the wiki loads the shared page behaviour');
+  assert.match(html, /assets\/js\/organism\.js\?v=[^"]+/, 'and still loads the organism it was built around');
+  for (const rule of [
+    /body\.cursor-ready \.cursor, body\.cursor-ready \.cursor-dot \{ opacity: 1; \}/,
+    /@media \(hover: none\), \(pointer: coarse\) \{[\s\S]*?\.cursor, \.cursor-dot \{ display: none; \}/,
+  ]) {
+    assert.match(fs.readFileSync(path.join(root, 'site', 'assets', 'css', 'nodus.css'), 'utf8'), rule,
+      'the cursor is styled once, in the design system the wiki loads');
+  }
+});

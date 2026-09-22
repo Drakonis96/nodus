@@ -296,7 +296,11 @@ body.cursor-press .cursor { width: 26px; height: 26px; margin: -13px 0 0 -13px; 
 .nav .links > a.link[aria-current="page"] { color: var(--ink); }
 .nav .links > a.link[aria-current="page"]::after {
   content: ''; position: absolute; left: 13px; right: 13px; bottom: 12px;
-  height: 2px; border-radius: 2px; background: var(--accent);
+  /* The header is site chrome, not part of the section under it: --accent is
+     retuned per section (and per wiki page), which turned this underline orange
+     on the Teaching manual and cyan on the FAQ. It stays the brand violet, the
+     same one the standalone header in site-header.css paints. */
+  height: 2px; border-radius: 2px; background: var(--violet-2);
 }
 
 .nav-sep { width: 1px; height: 22px; margin: 0 8px; background: var(--membrane); flex: 0 0 auto; }

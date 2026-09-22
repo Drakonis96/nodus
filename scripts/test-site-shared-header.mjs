@@ -110,6 +110,13 @@ test('both header stylesheets keep the same fixed dimensions and breakpoint', ()
   for (const styles of [systemStyles, headerStyles]) {
     assert.match(styles, /@media \(max-width: 1320px\) \{[\s\S]*?\.nav-toggle \{ display: block/);
     assert.match(styles, /\.nav \.links > a\.link\[aria-current="page"\]/);
+    // The active destination keeps the brand violet in both. In nodus.css it used
+    // to read --accent, which the page retunes per section: that turned the wiki's
+    // underline orange (on the Teaching manual) and the FAQ's cyan.
+    const underline = styles.match(/\.nav \.links > a\.link\[aria-current="page"\]::after \{[\s\S]*?\n\}/)?.[0];
+    assert.ok(underline, 'both stylesheets underline the active destination');
+    assert.match(underline, /background: (?:var\(--violet-2\)|#a78bfa)/,
+      'the underline is the site violet, never the section accent');
     // The browser-only Bookmarks slot is removed with the hidden attribute, and a
     // class that sets `display` outranks the user-agent rule for it, so both
     // stylesheets have to neutralize it or the demo pages show a dead link.
