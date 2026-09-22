@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const dir = await mkdtemp(path.join(os.tmpdir(), 'molecule-inspection-'));
 await build({ entryPoints: ['shared/moleculeInspection.ts'], outfile: path.join(dir, 'inspection.mjs'), bundle: true, platform: 'node', format: 'esm' });
-const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findReactionLines, findStepConditions, declaresRacemic, normalizeRouteAudit, formatRouteAudit, formatRouteFixPrompt, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD, findStepSpeciesLabels, findDuplicateRoleProblems, findStepEquationProblems, hasCheckerScaffolding, parseRouteConsistencyVerdict, formatRouteClarification, routeLabelNames, buildRouteConsistencyRequest, ROUTE_CONSISTENCY_SYSTEM, ROUTE_REPAIR_SYSTEM, countRouteSteps, findStepNamedSpecies, buildRouteSteps, annotateSpeciesSmiles, formatNameCorrectionNote, formatMissingSpeciesPrompt, parseNameFeedback, ROUTE_NAME_FEEDBACK_SYSTEM, formatUnresolvedNameClarification } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
+const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findReactionLines, findStepConditions, declaresRacemic, normalizeRouteAudit, formatRouteAudit, formatRouteFixPrompt, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD, findStepSpeciesLabels, findDuplicateRoleProblems, findStepEquationProblems, hasCheckerScaffolding, parseRouteConsistencyVerdict, formatRouteClarification, routeLabelNames, buildRouteConsistencyRequest, ROUTE_CONSISTENCY_SYSTEM, ROUTE_REPAIR_SYSTEM, countRouteSteps, findStepNamedSpecies, buildRouteSteps, annotateSpeciesSmiles, formatNameCorrectionNote, formatNamedRouteFixPrompt, formatMissingSpeciesPrompt, parseNameFeedback, ROUTE_NAME_FEEDBACK_SYSTEM, formatUnresolvedNameClarification } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
 await build({ entryPoints: ['shared/chatSkills.ts'], outfile: path.join(dir, 'chatSkills.mjs'), bundle: true, platform: 'node', format: 'esm' });
 const { splitChatVisuals, serializeChatVisualPart } = await import(pathToFileURL(path.join(dir, 'chatSkills.mjs')));
 await build({ entryPoints: ['shared/synthesisPrompt.ts'], outfile: path.join(dir, 'synthesisPrompt.mjs'), bundle: true, platform: 'node', format: 'esm' });
@@ -105,6 +105,20 @@ test('answer audit reads only code spans, never free prose', () => {
 test('a bare bond or stereo fragment is not treated as a species', () => {
   assert.deepEqual(findAnswerSpecies('quoted as `=O` and `/C=C\\` in the prose'), []);
   assert.deepEqual(findSmilesCandidates('the direction /C=C/C=C/C is not a molecule'), []);
+});
+
+test('a names-first step backticking its role labels does not report the labels as molecules', () => {
+  const answer = [
+    '`Reactants:`phenol — `C1=CC=C(C=C1)O`;sodium hydroxide — `[OH-].[Na+]`',
+    '`Products:`sodium phenoxide — `[O-]C1=CC=CC=C1.[Na+]`',
+    '`Byproducts:`water — `O`',
+    '`Agents:`water (solvent)',
+  ].join('\n');
+  const species = findAnswerSpecies(answer);
+  for (const label of ['Reactants:', 'Products:', 'Byproducts:', 'Agents:']) {
+    assert.ok(!species.includes(label), `role label leaked into species: ${JSON.stringify(species)}`);
+  }
+  assert.deepEqual(species, ['C1=CC=C(C=C1)O', '[OH-].[Na+]', '[O-]C1=CC=CC=C1.[Na+]', 'O']);
 });
 
 test('answer audit marks verified and unparseable species deterministically', () => {
@@ -856,6 +870,30 @@ test('corrections are summarized for the user, and the feedback prompt parses', 
   const payload = fixPayload(fence);
   assert.equal(payload.label, 'Confirm the intended structure');
   assert.match(payload.prompt, /sodium but-1-ynide/);
+});
+
+test('a route derived from names is corrected with a names-only prompt, never a SMILES', () => {
+  const labels = [[
+    { role: 'reactant', byproduct: false, name: 'phenol', smiles: 'Oc1ccccc1' },
+    { role: 'reactant', byproduct: false, name: 'sodium hydroxide', smiles: '[Na+].[OH-]' },
+    { role: 'product', byproduct: false, name: 'sodium phenoxide', smiles: '[Na+].[O-]c1ccccc1' },
+    { role: 'agent', byproduct: false, name: 'water', smiles: 'O' },
+  ]];
+  const audit = normalizeRouteAudit({
+    continuous: false, blocked: ['Step 1 is not balanced.'],
+    steps: [{ index: 0, reaction: 'x', ok: true, balanced: false, chargeBalanced: true, differences: ['H: reactants 7, products 8'], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }],
+    links: [],
+  });
+  const fence = formatNamedRouteFixPrompt(labels, audit);
+  const payload = JSON.parse(fence.replace(/^```nodus-route-fix\n/, '').replace(/\n```$/, ''));
+  assert.equal(payload.label, 'Ask the model to fix the failed steps');
+  assert.match(payload.prompt, /Reactants: phenol; sodium hydroxide/);
+  assert.match(payload.prompt, /Products: sodium phenoxide/);
+  assert.match(payload.prompt, /Do not write SMILES/);
+  assert.doesNotMatch(payload.prompt, /oc1ccccc1|\[Na\+\]\.\[OH-\]/, 'no derived SMILES is shown to the model');
+  // A route whose failing steps are all passing yields no prompt.
+  const clean = normalizeRouteAudit({ continuous: true, blocked: [], steps: [{ index: 0, reaction: 'x', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }], links: [] });
+  assert.equal(formatNamedRouteFixPrompt(labels, clean), '');
 });
 
 test('a route with no species lists offers a one-click prompt to add them', () => {

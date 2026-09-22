@@ -219,8 +219,12 @@ export function formatMoleculeDossier(dossier: MoleculeDossier): string {
 
 const SMILES_TOKEN_ONLY = /^[A-Za-z0-9@+\-=\\#()[\]/.,%*:]+$/;
 const SMILES_SIGNAL = /[()[\]@=#/\\]|[A-Z]/;
+/** A role heading a names-first step backticks ("`Reactants:`"). It is shaped like a SMILES
+ *  token (letters plus the colon) but is a label, not a molecule the model proposed. */
+const ROLE_LABEL = /^(?:reactants?|products?|byproducts?|agents?|reagents?|catalysts?|solvents?|conditions?|notes?):?$/i;
 
 function isSpeciesToken(token: string): boolean {
+  if (ROLE_LABEL.test(token)) return false;
   return token.length >= 1 && token.length <= 2000 && !BOND_EDGE.test(token) && SMILES_TOKEN_ONLY.test(token) && SMILES_SIGNAL.test(token);
 }
 
@@ -1245,6 +1249,71 @@ export function formatRouteFixPrompt(steps: string[], audit: RouteAudit, namePro
     '- Coefficients are solved for you: give each distinct species once and let the numbers come out. Use at most 12 species per equation; if a step genuinely cannot balance, split it into consecutive steps.',
     '- Give each step as one balanced reaction in the exact form `reactants>agents>products` (exactly two ">"), consumed reagents as reactants, byproducts as products, and only true catalysts or solvents as agents.',
     '- Every species must carry its systematic IUPAC name beside the exact isomeric SMILES, for example `ethanoic acid — `CC(=O)O``. The name and the SMILES must denote the same structure the prose describes; the prose is fixed and is never rewritten.',
+  ].join('\n');
+  return `\`\`\`nodus-route-fix\n${JSON.stringify({ label: 'Ask the model to fix the failed steps', prompt })}\n\`\`\``;
+}
+
+/** A names-first follow-up for a route that was derived from IUPAC names. It shows each failing
+ *  step as its four labelled species lines (names only — never the derived SMILES) and asks the
+ *  model to correct the names and roles; the application re-derives the structures and the
+ *  equation. Empty when there is nothing to fix. */
+export function formatNamedRouteFixPrompt(labels: RouteSpeciesLabel[][], audit: RouteAudit): string {
+  const names = (index: number, role: RouteLabelRole, byproduct?: boolean): string => {
+    const entries = (labels[index] ?? []).filter((entry) => entry.role === role && (byproduct === undefined || entry.byproduct === byproduct));
+    return entries.map((entry) => entry.name).filter(Boolean).join('; ') || 'none';
+  };
+  const stepLines = (index: number): string => [
+    `  Reactants: ${names(index, 'reactant')}`,
+    `  Products: ${names(index, 'product', false)}`,
+    `  Byproducts: ${names(index, 'product', true)}`,
+    `  Agents: ${names(index, 'agent')}`,
+  ].join('\n');
+
+  const failures: string[] = [];
+  for (const step of audit.steps) {
+    if (step.nameProblems?.length) {
+      failures.push(`- Step ${step.index + 1}: ${step.nameProblems.join('; ')}\n${stepLines(step.index)}`);
+      continue;
+    }
+    if (step.ok && step.balanced === true && (step.unspecifiedStereocentres === 0 || step.racemic === true)) continue;
+    const reason = !step.ok
+      ? step.error ?? 'could not be parsed'
+      : step.balanced !== true
+        ? `not balanced (${step.differences.join('; ')})`
+        : `${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s) — name the stereoisomer, or state that the outcome is racemic`;
+    failures.push(`- Step ${step.index + 1}: ${reason}\n${stepLines(step.index)}`);
+  }
+
+  const problems: string[] = [];
+  for (const index of isolatedSteps(audit)) {
+    problems.push(`- Step ${index + 1} is disconnected: none of its species is made by an earlier step or used by a later one. Insert the missing step where it belongs, or write the carried species with the same IUPAC name in both steps.`);
+  }
+  const target = audit.target;
+  if (target && audit.steps.every((step) => step.ok)) {
+    const wanted = target.canonicalSmiles ?? target.input;
+    const lastProducts = (labels[labels.length - 1] ?? []).filter((entry) => entry.role === 'product').map((entry) => entry.name).join(', ');
+    if (target.reason === 'not-formed') problems.push(`- No step forms the requested target${target.formula ? ` (${target.formula})` : ''}${lastProducts ? `; the last step stops at ${lastProducts}` : ''}. Add the missing step so a final step's Products line names the target.`);
+    else if (target.reason === 'stereo-mismatch') problems.push(`- The route forms the target's constitution but not its stereochemistry (${wanted}). Name the target with its stereodescriptors in the step that sets them.`);
+  }
+  if (!failures.length && !problems.length) return '';
+
+  const prompt = [
+    ROUTE_FIX_PROMPT_LEAD,
+    '',
+    ...(failures.length ? ['The route checker rejected these steps:', ...failures, ''] : []),
+    ...(problems.length ? ['The route as a whole has these problems:', ...problems, ''] : []),
+    'Re-output the same route in the same order, keeping the prose for each step. Rewrite only the rejected step(s) in place; you may split a rejected step into consecutive steps when the reason asks for it. Give EVERY step as four labelled lines of systematic IUPAC names, names only:',
+    '  Reactants: <systematic IUPAC name>; <systematic IUPAC name>',
+    '  Products: <systematic IUPAC name>',
+    '  Byproducts: <systematic IUPAC name>',
+    '  Agents: <catalyst or solvent, or none>',
+    'Do not write SMILES, formulae or a reaction line — the application derives the structure and the balanced equation from your names. Rules that resolve these failures:',
+    '- Keep the step order: never reorder, merge or duplicate a step, and never add a second copy of a step that already passes.',
+    '- Conserve every element and the total charge on both sides. A species that is short on one side is a missing reagent (Reactants) or byproduct (Products/Byproducts); list it by systematic IUPAC name.',
+    '- List every species that is consumed or produced once per side, under one role only. A true catalyst or solvent goes under Agents; never list a species that takes no part.',
+    '- A metal that enters as a reagent leaves as its salt: name the metal-containing product or byproduct (for example sodium salicylate, sodium chloride).',
+    '- Carry a species from one step into the next with the same systematic IUPAC name, including its stereodescriptors.',
+    '- If a step cannot balance as one equation, split it into consecutive steps rather than merging transformations.',
   ].join('\n');
   return `\`\`\`nodus-route-fix\n${JSON.stringify({ label: 'Ask the model to fix the failed steps', prompt })}\n\`\`\``;
 }

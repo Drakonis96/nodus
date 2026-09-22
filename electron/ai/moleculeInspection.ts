@@ -15,6 +15,7 @@ import {
   findStepEquationProblems,
   findStepNamedSpecies,
   findStepSpeciesLabels,
+  formatNamedRouteFixPrompt,
   formatRouteAudit,
   formatRouteClarification,
   formatRouteFixPrompt,
@@ -581,7 +582,10 @@ export async function appendRouteReportAndDrawings(
     const drawings = compile ? await drawRouteSteps(runner, compile, steps, conditions, audit, options) : '';
     // A refusal the checker can name and the app cannot fix is offered back to the model as
     // one click: it proposes a corrected step, and this same path checks and draws it again.
-    const fix = formatRouteFixPrompt(steps, audit);
+    // When the route was derived from names, the correction speaks names and roles only — the
+    // model never authored the derived SMILES, so it is not asked to rewrite one.
+    const named = Boolean(overrides.labels?.some((entries) => entries.length));
+    const fix = named ? formatNamedRouteFixPrompt(labels, audit) : formatRouteFixPrompt(steps, audit);
     return `${finalAnswer.trimEnd()}\n\n${report}\n${drawings}${fix ? `\n${fix}\n` : ''}`;
   } catch {
     return finalAnswer;
