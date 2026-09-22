@@ -124,7 +124,13 @@ try {
       assert.equal(entry.release.tag, `${entry.id}-v${manifest.version}`);
     });
     check(`${entry.id}: this build would accept the version the catalog offers`, () => {
-      assert.ok(sdk.compareSemver('5.4.0', manifest.compatibility.minNodusVersion) >= 0);
+      // The application's own version, read from the checkout being verified. This was a literal
+      // 5.4.0 that nobody moved, so the check tested a build that no longer existed and a package
+      // could raise its minimum past the application without anything noticing.
+      assert.ok(sdk.compareSemver(
+        JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version,
+        manifest.compatibility.minNodusVersion,
+      ) >= 0, `${entry.id} requires Nodus ${manifest.compatibility.minNodusVersion} or newer; this checkout is ${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}`);
     });
   }
 
@@ -187,7 +193,9 @@ try {
       setup(api) {
         api.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'mock' }));
         api.onLoad({ filter: /.*/, namespace: 'mock' }, () => ({
-          contents: `export const app={getPath:()=>${JSON.stringify(profile)},getVersion:()=>"5.4.0",isPackaged:false,getAppPath:()=>${JSON.stringify(scratch)}};`
+          // The simulated build is this checkout's build: a package that requires a newer
+          // application must be refused here, exactly as the installed application refuses it.
+          contents: `export const app={getPath:()=>${JSON.stringify(profile)},getVersion:()=>${JSON.stringify(JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version)},isPackaged:false,getAppPath:()=>${JSON.stringify(scratch)}};`
             + 'export const safeStorage={isEncryptionAvailable:()=>true,encryptString:v=>Buffer.from(v),decryptString:v=>v.toString("utf8")};',
           loader: 'js',
         }));
