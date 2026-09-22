@@ -2,6 +2,7 @@ import { selectPackagedModel } from '../../electron/pluginAssets';
 import { serializeChatVisualPart, skillHasCapability, type ChatSkill } from '../../shared/chatSkills';
 import { METERED_CALL_LIMIT, SANDBOXED_CALL_LIMIT, capabilityIsMetered, normalizeCapabilityId, type CapabilityChatResult, type CapabilityInvocation } from '../contracts';
 import { resolveInstalledCapability } from '../../electron/skillPlugins';
+import { capabilityProvider } from '../../electron/capabilities/registry';
 import { chatAssetVersion, storeCapabilityFile, storeChatImage } from '../../electron/chatAssets';
 import { runCapabilitySandbox } from '../sandbox/runtime';
 import type { ChatCallBudget, ChatSkillExecution } from '../registry/types';
@@ -25,7 +26,17 @@ export async function executeExternalCapability(content: string, complete: boole
     if (!invocation || typeof invocation.skillId !== 'string' || typeof invocation.capabilityId !== 'string' || typeof invocation.toolId !== 'string' || !('input' in invocation)) throw new Error('Invalid capability request.');
     const skill = execution.skills.find(item => item.id === invocation.skillId), capabilityId = normalizeCapabilityId(invocation.capabilityId);
     if (!skill || capabilityId.startsWith('nodus:') || !skillHasCapability(skill, capabilityId)) throw new Error('This capability is not enabled for this reply.');
-    const runtime = resolveInstalledCapability(capabilityId, skill.plugin ? { version: skill.plugin.version, digest: skill.plugin.digest } : undefined); if (!runtime) throw new Error('The capability runtime is unavailable.');
+    const runtime = resolveInstalledCapability(capabilityId, skill.plugin ? { version: skill.plugin.version, digest: skill.plugin.digest } : undefined);
+    if (!runtime) {
+      // A signed v2 package never resolves here: this lane reads v1 plugin state, and such a
+      // package executes through the protocol it declares instead. Naming that block is the
+      // difference between the next turn fixing its envelope and repeating it — the old
+      // answer, "the capability runtime is unavailable", was true and useless.
+      const provider = capabilityProvider(capabilityId);
+      const fence = provider?.chat?.requestProtocols[0]?.fence;
+      if (provider?.source === 'plugin' && fence) throw new Error(`${capabilityId} is provided by the installed signed package ${provider.plugin?.id ?? provider.id}. Request it in a fenced ${fence} block whose body is the tool input, not in a nodus-capability envelope.`);
+      throw new Error('The capability runtime is unavailable.');
+    }
     // The lane is chosen from what this capability actually declared, not from the request.
     if (capabilityIsMetered(runtime.manifest.permissions)) {
       if (++budget.metered > METERED_CALL_LIMIT) throw new Error(`At most ${METERED_CALL_LIMIT} capability calls that use the network, secrets or storage are allowed per reply.`);

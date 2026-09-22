@@ -1,4 +1,5 @@
 import { LIMITS } from '../../packages/capability-api/src/limits';
+import { jsonSchemaMatches, type JsonSchema } from '../../packages/capability-api/src/json';
 import {
   parseChatAst, serializeChatAst, validateFinalMutations, validatePrepareMutations,
   type ChatAstNode, type FinalMutation, type PrepareMutation,
@@ -82,6 +83,11 @@ export async function runTrustedChatPipeline(
     const count = (perFence.get(`${provider.id}:${toolId}`) ?? 0) + 1;
     perFence.set(`${provider.id}:${toolId}`, count);
     if (count > tool.maxPerReply) throw new Error(`At most ${tool.maxPerReply} ${toolId} requests are allowed per reply.`);
+    // Checked here rather than left to the provider, because the provider's own refusal is
+    // the one with no room to explain itself: a worker that validates exact keys answers
+    // "Invalid map request." and names nothing, which is a dead end for the next turn.
+    const mismatch = describeInputMismatch(tool.inputSchema, input);
+    if (mismatch) throw new Error(`${toolId} was not run: ${mismatch}.`);
     const result = await runner.invoke({ provider, toolId, input, nodeId: node.id });
     const pieces: string[] = [];
     for (const artifact of result.artifacts ?? []) pieces.push(await runner.persistArtifact({ provider, artifact }));
@@ -204,6 +210,32 @@ function serialize(nodes: readonly ChatAstNode[], removed: ReadonlySet<string>, 
 function errorText(error: unknown): string {
   const message = String(error instanceof Error ? error.message : error).replace(/[\r\n`*<>[\]]/g, ' ').slice(0, 500);
   return `\n\nCapability error: ${message}\n\n`;
+}
+
+/** What is wrong with a tool input, in the words that let the next turn fix it.
+ *
+ *  Naming the property is the whole point: a model that sent `period` to a tool with no
+ *  such field reads "unknown property period; allowed: …" and corrects itself, while the
+ *  same refusal phrased as "invalid request" leaves it guessing at its own schema. Only the
+ *  two shapes worth naming are diagnosed — an unknown or missing top-level property — and
+ *  anything else falls back to a plain statement that the input does not match. */
+function describeInputMismatch(schema: JsonSchema | undefined, input: unknown): string | null {
+  if (!schema || jsonSchemaMatches(schema, input)) return null;
+  if (schema.type === 'object' && input && typeof input === 'object' && !Array.isArray(input)) {
+    const record = input as Record<string, unknown>;
+    const unknown = Object.keys(record).filter(key => schema.additionalProperties === false && !schema.properties?.[key]);
+    const missing = (schema.required ?? []).filter(key => !(key in record));
+    if (unknown.length || missing.length) {
+      const named = (keys: string[]) => keys.map(key => JSON.stringify(key)).join(', ');
+      const allowed = Object.keys(schema.properties ?? {});
+      return [
+        ...(unknown.length ? [`unknown ${unknown.length === 1 ? 'property' : 'properties'} ${named(unknown)}`] : []),
+        ...(missing.length ? [`missing required ${missing.length === 1 ? 'property' : 'properties'} ${named(missing)}`] : []),
+        ...(allowed.length ? [`allowed: ${allowed.join(', ')}`] : []),
+      ].join('; ');
+    }
+  }
+  return 'the input does not match the schema the tool declares';
 }
 
 export const TRUSTED_PIPELINE_LIMITS = LIMITS;
