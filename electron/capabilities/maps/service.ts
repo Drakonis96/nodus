@@ -8,24 +8,32 @@ import { callerMapSource, renderMap } from './render';
 export function createMapService(options: { providers: readonly MapProviderId[]; maxCalls?: number; transport?: MapSourceTransport; beforeRetrieve?: () => void }) {
   let calls=0, retrievals=0; const datasets=new Map<string,MapDataset>();
   const charge = (signal: AbortSignal) => { signal.throwIfAborted(); if(++calls>Math.min(options.maxCalls ?? MAP_LIMITS.calls,MAP_LIMITS.calls)) throw new Error('Map call budget exhausted.'); };
-  const retrieve = async (input: unknown, signal: AbortSignal): Promise<MapDataset> => {
+  const retrieve = async (input: unknown, signal: AbortSignal, window?: readonly [number,number,number,number]): Promise<MapDataset> => {
     const query=validateMapQuery(input);
     if(!options.providers.includes(query.provider)) throw new Error('This Skill has no permission for that map provider.');
-    if(query.period) throw new Error('Historical retrieval is unsupported by this provider; no geography was substituted.');
+    // Per-provider rules live in the query validator, which is the only place that knows which
+    // provider carries dates and which one refuses them.
     if(++retrievals>MAP_LIMITS.retrievals) throw new Error('Map retrieval budget exhausted.');
     options.beforeRetrieve?.();
-    const result=await retrieveMapSource(query,signal,options.transport);
+    const result=await retrieveMapSource(query,signal,options.transport,window);
     signal.throwIfAborted(); const dataset={...result,datasetId:randomUUID()}; datasets.set(dataset.datasetId,dataset); return structuredClone(dataset);
   };
   return {
-    async retrieve(input: unknown, signal: AbortSignal) { charge(signal); return retrieve(input,AbortSignal.any([signal,AbortSignal.timeout(MAP_LIMITS.timeoutMs)])); },
+    async retrieve(input: unknown, signal: AbortSignal) {
+      // A boundary index knows no country: this provider is retrieved inside a map, where the
+      // frame is the window. A bare retrieval would have nothing to select by.
+      if(validateMapQuery(input).provider==='openhistoricalmap') throw new Error('OpenHistoricalMap is retrieved inside a map: call render with the query in a layer, so the frame fixes the retrieval window.');
+      charge(signal); return retrieve(input,AbortSignal.any([signal,AbortSignal.timeout(MAP_LIMITS.timeoutMs)]));
+    },
     async render(input: unknown, signal: AbortSignal) {
       charge(signal); const bounded=AbortSignal.any([signal,AbortSignal.timeout(MAP_LIMITS.timeoutMs)]);
       const request=validateMapRenderRequest(input);
       const layers=[];
       for(const layer of request.layers ?? []) {
         bounded.throwIfAborted();
-        if(layer.query) layers.push(await retrieve(layer.query,bounded));
+        // The frame is also the retrieval window: a boundary index has no country key, and a
+        // reader asks for what the map is showing.
+        if(layer.query) layers.push(await retrieve(layer.query,bounded,request.bounds));
         else if(layer.datasetId) { const dataset=datasets.get(layer.datasetId); if(!dataset) throw new Error('Map dataset reference is unknown or belongs to another invocation scope.'); layers.push(structuredClone(dataset)); }
         else layers.push({geojson:layer.data!.geojson,source:callerMapSource(layer.data!.source,layer.data!.geojson)});
       }

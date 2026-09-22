@@ -119,9 +119,13 @@ crossing ±180°; straight and curved routes reject that ambiguous input. Connec
 are cartographic lines, never road routing or navigation directions. Curvature is a
 deterministic visual offset, not evidence of a real travelled path.
 
-Labels are bounded and clamped to the map frame; there is no global collision solver
-or automatic inset layout. Dense labels require fewer labels or a larger canvas.
-SVG exports use their own white canvas and readable ink in either application theme.
+Labels are bounded, clamped to the map frame and placed at the anchor their data gives them: a
+feature's projected centroid, a marker, a route's middle. One that cannot be placed without
+starting outside the frame or covering a label already placed is **omitted** — markers and routes
+claim theirs first, polygons largest-first. There is no global collision solver and no automatic
+inset layout: a division too small for its own name keeps its geometry and loses the label, which
+is the honest answer at that scale. Dense maps still read best with fewer labels or a larger
+canvas. SVG exports use their own white canvas and readable ink in either application theme.
 
 ## Sources, licensing and provenance
 
@@ -133,6 +137,7 @@ cannot become a fetch URL. Requests cannot select arbitrary repositories or file
 | --- | --- |
 | `natural-earth` | World country polygons, 1:110m, pinned tag 5.1.2. [Natural Earth terms](https://www.naturalearthdata.com/about/terms-of-use/) place the data in the public domain. Visible credit is retained even though it is not required. |
 | `geoboundaries` | [gbOpen API](https://www.geoboundaries.org/api.html), one ISO alpha-3 country and ADM0, ADM1 or ADM2. Metadata must match the request; downloads are confined to the geoBoundaries repository and its returned revision. Git LFS downloads additionally require exact size and SHA-256. [Catalogue licensing](https://github.com/wmgeolab/geoBoundaries/blob/main/LICENSE) does not override the original source licence. |
+| `openhistoricalmap` | [Overpass API](https://overpass-api.openhistoricalmap.org/api/interpreter), admin level 2 or 4 inside the map's own bounds and for one period. [OpenHistoricalMap](https://www.openhistoricalmap.org/copyright) dedicates its data to the public domain under **CC0**, except individual elements carrying their own `license=*`; the adapter refuses those rather than assuming. Two fixed query templates exist — a boundary index and the geometry of the selected relations — and both are rebuilt from validated fields, so no caller text reaches the URL. |
 
 The geoBoundaries adapter accepts explicitly reviewed CC BY 4.0, CC BY 3.0, CC0,
 public-domain metadata and the INE Data License on `www.ine.es`; other terms fail closed.
@@ -143,15 +148,30 @@ a published 2017 snapshot; ADM2 uses a 2018 snapshot from INE. The
 require attribution and identifying adapted information; this is included in the map.
 Published snapshots are not guaranteed current or authoritative legal boundaries.
 
+The OpenHistoricalMap adapter selects by the element's own dates: a boundary is kept only
+when its `start_date` is at or before the period and its `end_date` at or after it, an
+element with no start date is not drawn (an undated boundary cannot be placed in a period),
+and an element whose centre falls outside the map frame is a neighbour the map is not about.
+Its relations carry OSM-detail member ways, so geometry is fetched in batches that fit the
+response ceiling, thinned with Douglas-Peucker towards a point budget, and simplified again
+by the renderer for the screen; the tolerance used is reported in the provenance, together
+with the duplicate relations collapsed, the undated and unclosed elements left out, and the
+elements outside the frame. Coverage is community-mapped and uneven: Spanish provinces are
+mostly absent, some regions exist only as labels, and a boundary the project has not mapped
+is reported as absent rather than approximated. The public endpoint rate-limits bursts and
+answers with an HTML error page, which the adapter reports as the service being busy; it
+never retries and never substitutes another source.
+
 No OSM tile server is integrated. The [OSM tile policy](https://operations.osmfoundation.org/policies/tiles/)
 is not treated as permission to use community servers as an application backend.
-[OpenHistoricalMap](https://www.openhistoricalmap.org/copyright) was reviewed but is
-not integrated: feature-specific licences and temporal semantics require a separate
-adapter. `query.period: {from, to}` validates ISO dates (including expanded signed BCE years, such as `-000500-01-01`) and **fails before any network
-request** for both present providers. Modern polygons are never substituted for a
-historical request. Caller-supplied verified historical GeoJSON can carry `source.period`;
-Nodus still marks that provenance as caller-supplied, not provider-verified. No historical
-map example is claimed in this release.
+`query.period: {from, to}` validates ISO dates (including expanded signed BCE years, such as `-000500-01-01`).
+It is **refused before any network request** for `natural-earth` and `geoboundaries`, which
+publish only the present; `openhistoricalmap` requires it, because a boundary without a date
+cannot be selected or reported. Modern polygons are never substituted for a historical
+request. Caller-supplied historical GeoJSON can carry `source.period` and an evidence `url`;
+Nodus still marks that provenance as caller-supplied, not provider-verified, and a request
+whose supplied sources carry no covering dated period renders as a stated approximate
+reconstruction rather than as a dated map.
 
 Every SVG has visible attribution and a `desc#nodus-map-provenance` containing escaped
 JSON. The production SVG sanitizer preserves it. The structured result includes:
@@ -186,7 +206,9 @@ positions per layer; source responses at 16 MB; SVG at 300,000 characters; overl
 the existing tighter 64,000-character limit. Use provider queries or trusted host-owned
 datasets for larger geometry. Cancellation propagates to fetch and native rendering,
 and cancels pending host services when a worker is cancelled/stopped. Late results are
-discarded. There is no automatic retry, source substitution or recursive model call.
+discarded. A rate-limited OpenHistoricalMap answer is retried once after a short wait, because
+that limit is transient; nothing else is retried, no source is ever substituted for another, and
+there is no recursive model call.
 
 Model-authored result/view/artifact blocks are rejected before execution across the
 shared chat dispatcher. Native outputs enter as execution results and are not reparsed
@@ -224,4 +246,4 @@ remains the human contributor's action. See the [release runbook](capability-rel
 
 ## Marketplace workflows
 
-The signed [Research Visuals package](https://github.com/NodusResearch/nodus-research-skill-marketplace/tree/main/plugins/research-visuals) supplies General Maps and Historical Maps. Both delegate rendering to this service. Historical Maps enforces supplied dated sources and refuses modern provider substitution. [Verification examples](verification/research-visuals/README.md) preserve editable SVG, attribution and visual previews.
+The signed [Research Visuals package](https://github.com/NodusResearch/nodus-research-skill-marketplace/tree/main/plugins/research-visuals) supplies General Maps and Historical Maps. Both delegate rendering to this service. Historical Maps labels what it renders: a source whose declared period covers the request and carries an evidence link produces a dated map, any other supplied geometry or coordinate overlay produces an approximate reconstruction that says so in the map itself, and a `layers[].query` is drawn as a **reference frame** — attributed, described in the map as today's boundaries, and never counted as a dated source. Administrative divisions asked for by name therefore appear even when only the current division is published, and the map says which one it is drawing. [Verification examples](verification/research-visuals/README.md) preserve editable SVG, attribution and visual previews.

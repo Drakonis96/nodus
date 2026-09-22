@@ -58,7 +58,7 @@ export async function renderMap(request: MapRenderRequest, layers: Array<{ geojs
   const top = 28 + titleLines.length * 28;
   const bottom = height - 28 - credits.length * 17;
   const right = width - 36 - (request.legend?.length ? 230 : 0);
-  if (bottom - top < 180 || (request.legend?.length ?? 0)*42 > bottom-top) throw new Error('Map attribution or legend needs a larger canvas or shorter labels.');
+  if (bottom - top < 180 || (request.legend?.length ?? 0)*52 > bottom-top) throw new Error('Map attribution or legend needs a larger canvas or shorter labels.');
   const viewport: [[number,number],[number,number]] = [[36,top+12],[right,bottom-18]];
   const projection: GeoProjection = (projectionName === 'mercator' ? geoMercator() : projectionName === 'equirectangular' ? geoEquirectangular() : geoEqualEarth()).rotate([-(request.centralMeridian ?? 0),0]).precision(.3);
   const geometry = layers.map((l,i) => selectMapLayer(validateMapGeometry(l.geojson), request.layers![i]));
@@ -66,7 +66,13 @@ export async function renderMap(request: MapRenderRequest, layers: Array<{ geojs
     const oriented = orientMapGeometry(fc);
     if (request.detail === 'full') return oriented;
     const [[w,s],[e,north]] = geoBounds(oriented);
-    const tolerance = Math.max(1e-8, (e < w ? e + 360 - w : e - w) * (north - s) / (width * height) * .06);
+    // Display simplification is a screen decision, so its tolerance is derived from the frame's
+    // scale: half a pixel, expressed as the triangle area this simplifier actually compares
+    // against. The old form scaled the frame's area by the canvas and a small constant, which
+    // for a country-sized frame came out at a millionth of a degree — no simplification at all,
+    // and a dense administrative layer then hit the SVG ceiling with detail nobody could see.
+    const pixelX = (e < w ? e + 360 - w : e - w) / (right - 36), pixelY = (north - s) / (bottom - top - 30);
+    const tolerance = Math.max(1e-12, pixelX * pixelY * 0.5);
     const topo = presimplify(topology({ map: oriented }) as Parameters<typeof presimplify>[0]);
     const reduced = feature(simplify(topo,tolerance), topo.objects.map) as FeatureCollection;
     // Never erase tiny islands or holes which become degenerate under simplification.
@@ -107,11 +113,27 @@ export async function renderMap(request: MapRenderRequest, layers: Array<{ geojs
   titleLines.forEach((line,i) => svg.push(`<text x="32" y="${32+i*28}" font-size="24" font-weight="700">${xml(line)}</text>`));
   svg.push(`<defs><clipPath id="map-frame"><rect x="36" y="${top+12}" width="${right-36}" height="${bottom-top-30}"/></clipPath></defs><rect x="36" y="${top+12}" width="${right-36}" height="${bottom-top-30}" fill="#f0f5f8" rx="8"/><g clip-path="url(#map-frame)">`);
   const labels: string[] = [];
-  const label = (text: unknown, point: [number,number], size = 13) => {
+  const boxes: Array<{x0:number;y0:number;x1:number;y1:number}> = [];
+  /** Where a label goes, and whether it can go anywhere.
+   *
+   *  The anchor is the data's own: a feature's projected centroid, a marker, a route's middle.
+   *  What the renderer decides is whether that label can be read — one that would start outside
+   *  the frame, or land on another label already placed, is dropped. Markers and routes claim
+   *  their labels first and a polygon's label is considered largest-first, so a dense
+   *  administrative layer keeps its geometry and the names of the divisions that can hold them,
+   *  instead of printing a smear of overlapping text. Nothing is inferred: an omitted label is
+   *  the honest answer for a division too small to carry its own name at this scale. */
+  const label = (text: unknown, point: [number,number], size = 13): string | null => {
     const value = String(text); if(value.length > 80) throw new Error('Map label exceeds 80 characters.');
-    const x = Math.min(Math.max(point[0],45+value.length*size*.28),right-8-value.length*size*.28), y = Math.max(top+28,Math.min(bottom-28,point[1]));
+    const half = value.length*size*.28;
+    const x = Math.min(Math.max(point[0],45+half),right-8-half), y = Math.max(top+28,Math.min(bottom-28,point[1]));
+    const box = {x0:x-half-2, y0:y-size*.95, x1:x+half+2, y1:y+size*.4};
+    if (box.x0 < 36 || box.x1 > right || box.y0 < top+12 || box.y1 > bottom) return null;
+    if (boxes.some(b => box.x0 < b.x1 && box.x1 > b.x0 && box.y0 < b.y1 && box.y1 > b.y0)) return null;
+    boxes.push(box);
     return `<text x="${n(x)}" y="${n(y)}" text-anchor="middle" font-size="${size}" paint-order="stroke" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" fill="#243447">${xml(value)}</text>`;
   };
+  const pending: Array<{text:string; point:[number,number]; size:number; area:number}> = [];
   for (let i=0; i<oriented.length; i++) for (let j=0; j<oriented[i].features.length; j++) {
     signal?.throwIfAborted(); if (j % 25 === 0) await new Promise<void>(r=>setImmediate(r));
     const f = oriented[i].features[j], layer = request.layers![i];
@@ -123,7 +145,9 @@ export async function renderMap(request: MapRenderRequest, layers: Array<{ geojs
       if (d) svg.push(`<path d="${d}" fill="${line ? 'none' : fill}" fill-rule="evenodd" stroke="${line ? fill : '#ffffff'}" stroke-width="${line ? 1.5 : .9}"><title>${xml(f.properties?.name ?? f.id ?? 'Feature')}</title></path>`);
     };
     const d = path(f); draw(f.geometry);
-    if (layer.labelProperty && d) { const center = path.centroid(f); if(center.every(Number.isFinite) && center[0]>=36 && center[0]<=right && center[1]>=top && center[1]<=bottom) labels.push(label(value(layer.labelProperty),center)); }
+    // Collected rather than placed: the overlays below claim their labels first, and among
+    // polygons the largest is the one whose name a reader is looking for.
+    if (layer.labelProperty && d) { const center = path.centroid(f); if(center.every(Number.isFinite) && center[0]>=36 && center[0]<=right && center[1]>=top && center[1]<=bottom) pending.push({text:String(value(layer.labelProperty)),point:center,size:13,area:path.area(f)}); }
     if (svg.reduce((sum,s)=>sum+s.length,0) > MAP_LIMITS.svgChars) throw new Error('Map SVG exceeds 300 KB; use simpler geometry or select fewer features.');
   }
   const project = (p: [number,number]): [number,number] => {
@@ -142,18 +166,21 @@ export async function renderMap(request: MapRenderRequest, layers: Array<{ geojs
       const d = route.kind === 'great-circle' ? path({type:'LineString',coordinates:[route.coordinates[j-1],route.coordinates[j]]}) : `M${n(a[0])},${n(a[1])} ${route.kind === 'curved' ? `Q${n(mx-(b[1]-a[1])*.18)},${n(my+(b[0]-a[0])*.18)} ` : 'L'}${n(b[0])},${n(b[1])}`;
       if(d) svg.push(`<path d="${d}" fill="none" stroke="${color}" stroke-width="${route.width ?? 2.5}" stroke-linecap="round"${arrow}/>`);
     }
-    if(route.label) labels.push(label(route.label,xy[Math.floor(xy.length/2)]));
+    if(route.label) { const markup = label(route.label,xy[Math.floor(xy.length/2)]); if(markup) labels.push(markup); }
   }
   for (const marker of request.markers ?? []) {
     const xy = project(marker.coordinates);
     svg.push(`<circle cx="${n(xy[0])}" cy="${n(xy[1])}" r="${marker.radius ?? 5}" fill="${marker.color ?? '#b04c51'}" stroke="#ffffff" stroke-width="2"/>`);
-    if(marker.label) labels.push(label(marker.label,[xy[0],xy[1]-12],14));
+    if(marker.label) { const markup = label(marker.label,[xy[0],xy[1]-12],14); if(markup) labels.push(markup); }
   }
+  for (const candidate of pending.sort((a,b) => b.area - a.area)) { const markup = label(candidate.text,candidate.point,candidate.size); if(markup) labels.push(markup); }
   svg.push(...labels, '</g>');
   for(const [i,item] of (request.legend ?? []).entries()) {
     const y=top+32+i*42;
     svg.push(`<rect x="${right+22}" y="${y-12}" width="14" height="14" rx="2" fill="${item.color}"/>`);
-    const lines=wrap(item.label,180); if(lines.length>2) throw new Error('Legend label is too long; shorten it.');
+    // Three lines of about 26 characters: the ceiling the schema publishes for a label, so a
+    // legend entry that validates is one the renderer can actually draw.
+    const lines=wrap(item.label,180); if(lines.length>3) throw new Error('Legend label is too long; shorten it (about 78 characters fit).');
     lines.forEach((line,j)=>svg.push(`<text x="${right+44}" y="${y+j*15}" font-size="12">${xml(line)}</text>`));
   }
   credits.forEach((line,i)=>svg.push(`<text x="32" y="${bottom+17+i*17}" font-size="11" fill="#526273">${xml(line)}</text>`));

@@ -1,4 +1,5 @@
 import { LIMITS } from '../../packages/capability-api/src/limits';
+import { jsonSchemaMatches, type JsonSchema } from '../../packages/capability-api/src/json';
 import {
   parseChatAst, serializeChatAst, validateFinalMutations, validatePrepareMutations,
   type ChatAstNode, type FinalMutation, type PrepareMutation,
@@ -82,6 +83,11 @@ export async function runTrustedChatPipeline(
     const count = (perFence.get(`${provider.id}:${toolId}`) ?? 0) + 1;
     perFence.set(`${provider.id}:${toolId}`, count);
     if (count > tool.maxPerReply) throw new Error(`At most ${tool.maxPerReply} ${toolId} requests are allowed per reply.`);
+    // Checked here rather than left to the provider, because the provider's own refusal is
+    // the one with no room to explain itself: a worker that validates exact keys answers
+    // "Invalid map request." and names nothing, which is a dead end for the next turn.
+    const mismatch = describeInputMismatch(tool.inputSchema, input);
+    if (mismatch) throw new Error(`${toolId} was not run: ${mismatch}.`);
     const result = await runner.invoke({ provider, toolId, input, nodeId: node.id });
     const pieces: string[] = [];
     for (const artifact of result.artifacts ?? []) pieces.push(await runner.persistArtifact({ provider, artifact }));
@@ -135,7 +141,14 @@ export async function runTrustedChatPipeline(
       if (mutation.op === 'notice') { placeAt(anchorFor(visible, mutation.position)).after.push(runner.renderView({ provider, view: mutation.view })); continue; }
       if (mutation.op === 'claim') {
         claimedBy.add(provider);
-        if (mutation.suppressSvgRefinement) suppressSvgRefinement = true;
+        if (mutation.suppressSvgRefinement) {
+          suppressSvgRefinement = true;
+          // A claim on the drawing lane means the drawing is not the model's to make: a raw SVG
+          // block in the same reply is exactly what the claim is about, and leaving it beside the
+          // provider's own result would show two answers to one question. A hook cannot remove a
+          // node it does not own, so the lane is retired here, where the claim is honoured.
+          for (const node of visible) if (node.kind === 'fence' && node.fence === 'svg') removed.add(node.id);
+        }
         if (mutation.exclusive) exclusive = provider;
         continue;
       }
@@ -204,6 +217,65 @@ function serialize(nodes: readonly ChatAstNode[], removed: ReadonlySet<string>, 
 function errorText(error: unknown): string {
   const message = String(error instanceof Error ? error.message : error).replace(/[\r\n`*<>[\]]/g, ' ').slice(0, 500);
   return `\n\nCapability error: ${message}\n\n`;
+}
+
+/** The shape a schema asks for, in a few words: enough for a model to correct itself. */
+function expectedShape(schema: JsonSchema): string {
+  const size = schema.minLength !== undefined && schema.maxLength !== undefined && schema.minLength === schema.maxLength ? ` of exactly ${schema.maxLength} characters`
+    : schema.maxLength !== undefined ? ` of at most ${schema.maxLength} characters`
+      : schema.minLength !== undefined ? ` of at least ${schema.minLength} characters` : '';
+  if (schema.enum) return `one of ${schema.enum.map(value => JSON.stringify(value)).join(', ')}`;
+  if (schema.type === 'string') return `a string${size}`;
+  if (schema.type === 'array') return `an array of ${schema.maxItems !== undefined ? `at most ${schema.maxItems} ` : ''}items`;
+  if (schema.type === 'object') return 'an object';
+  if (schema.type === 'integer' || schema.type === 'number') return `a${schema.type === 'integer' ? 'n integer' : ' number'}${schema.minimum !== undefined || schema.maximum !== undefined ? ` between ${schema.minimum ?? '-∞'} and ${schema.maximum ?? '∞'}` : ''}`;
+  if (schema.type === 'boolean') return 'true or false';
+  return 'a different value';
+}
+const receivedType = (value: unknown): string => Array.isArray(value) ? 'an array' : value === null ? 'null' : typeof value;
+
+/** The first place an input disagrees with its schema, named by path.
+ *
+ *  Naming it is the whole point: a model that sent `period` to a tool with no such field, a
+ *  colour that is not seven characters, or an `overlaySource` missing its licence reads which
+ *  property is wrong and what it must be, and corrects itself. A refusal that says "invalid
+ *  request" — or "must be an object" about a value that is an object — leaves it guessing at
+ *  the schema it cannot see. */
+function mismatchPath(schema: JsonSchema, value: unknown, path: string, depth = 0): string | null {
+  if (jsonSchemaMatches(schema, value) || depth > 4) return null;
+  if (schema.type === 'object' && value && typeof value === 'object' && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    const named = (keys: string[]) => keys.map(key => JSON.stringify(key)).join(', ');
+    const unknown = Object.keys(record).filter(key => schema.additionalProperties === false && !schema.properties?.[key]);
+    if (unknown.length) {
+      const allowed = Object.keys(schema.properties ?? {});
+      return `${path} has unknown ${unknown.length === 1 ? 'property' : 'properties'} ${named(unknown)}${allowed.length ? `; allowed: ${allowed.join(', ')}` : ''}`;
+    }
+    const missing = (schema.required ?? []).filter(key => !(key in record));
+    if (missing.length) return `${path} is missing required ${missing.length === 1 ? 'property' : 'properties'} ${named(missing)}`;
+    for (const [key, child] of Object.entries(schema.properties ?? {})) {
+      if (!(key in record)) continue;
+      const nested = mismatchPath(child, record[key], `${path}.${key}`, depth + 1);
+      if (nested) return nested;
+    }
+    return null;
+  }
+  if (schema.type === 'array' && Array.isArray(value)) {
+    if (schema.maxItems !== undefined && value.length > schema.maxItems) return `${path} has ${value.length} items; at most ${schema.maxItems} are allowed`;
+    if (schema.items) for (const [index, item] of value.entries()) {
+      const nested = mismatchPath(schema.items, item, `${path}[${index}]`, depth + 1);
+      if (nested) return nested;
+    }
+    return null;
+  }
+  return `${path} must be ${expectedShape(schema)} (received ${receivedType(value)})`;
+}
+
+/** What is wrong with a tool input, as one sentence. */
+function describeInputMismatch(schema: JsonSchema | undefined, input: unknown): string | null {
+  if (!schema || jsonSchemaMatches(schema, input)) return null;
+  const problem = mismatchPath(schema, input, 'the input');
+  return problem ? `${problem}.` : 'the input does not match the schema the tool declares.';
 }
 
 export const TRUSTED_PIPELINE_LIMITS = LIMITS;

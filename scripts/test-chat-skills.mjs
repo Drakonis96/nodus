@@ -280,6 +280,26 @@ test('custom tools are gated by the active skill snapshot and results cannot inv
   assert.match(flood, /At most 16 sandboxed tool and capability calls/);
 });
 
+test('a package capability tool is advertised under its own fence, with its schema', () => {
+  const packaged = { id: 'package-skill', name: 'Packaged Maps', description: 'A workflow from a signed package.', instructions: 'Call render-historical-map.', enabled: { assistant: true, nodi: false },
+    capabilityTools: [{ capabilityId: 'example:cartography', toolId: 'render-historical-map', fence: 'historical-map-request', description: 'Render a dated map.', inputSchema: { type: 'object', properties: { title: { type: 'string' }, period: { type: 'object' } }, required: ['title', 'period'], additionalProperties: false }, resultKinds: [] }] };
+  const prompt = lib.buildChatSkillsPrompt([packaged]), contract = lib.chatSkillsOutputContract([packaged]);
+  assert.match(prompt, /PACKAGE CAPABILITY TOOLS/);
+  assert.match(prompt, /"fence":"historical-map-request"/, 'the model is told which block reaches the tool');
+  assert.match(prompt, /"inputSchema"/, 'and given the schema, so an input is built instead of guessed');
+  assert.match(prompt, /CAPABILITY ROUTING/, "the subject a listed tool renders is not the model's to hand-draw");
+  assert.doesNotMatch(prompt, /fenced nodus-capability JSON block containing skillId/, 'a package tool is never offered the envelope it cannot be reached through');
+  assert.match(contract, /PACKAGE TOOLS ARE AVAILABLE/, 'and the contract beside the question says the same');
+});
+
+test('a native capability tool keeps the generic envelope and no package paragraph', () => {
+  const native = { id: 'native-skill', name: 'Native Maps', description: 'A core capability workflow.', instructions: 'Call render.', enabled: { assistant: true, nodi: false },
+    capabilityTools: [{ capabilityId: 'nodus:maps', toolId: 'render', description: 'Render geometry.', inputSchema: { type: 'object' }, resultKinds: ['svg'] }] };
+  const prompt = lib.buildChatSkillsPrompt([native]);
+  assert.match(prompt, /EXTERNAL CAPABILITY TOOLS/);
+  assert.doesNotMatch(prompt, /PACKAGE CAPABILITY TOOLS|CAPABILITY ROUTING/);
+});
+
 test('external capabilities resolve from the plugin snapshot, share the four-call budget and stay inert', async () => {
   const directory = path.join(temporary, 'external-plugin');
   const plugin = { schemaVersion: 1, id: 'external-kit', name: 'External Kit', version: '1.0.0', author: 'researcher', description: 'External capability test.', license: 'MIT', compatibility: { capabilityApi: 1, minNodusVersion: '5.3.0' }, skills: ['skills/external/skill.json'], capabilities: ['capabilities/echo/capability.json'] };

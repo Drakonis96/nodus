@@ -13,10 +13,10 @@ process.on('exit',()=>fs.rmSync(scratch,{recursive:true,force:true}));
 const root=path.resolve(import.meta.dirname,'..');
 const require=createRequire(import.meta.url);
 const bundles={};
-for(const [key,file] of Object.entries({sdk:'packages/capability-api/src/index.ts',service:'electron/capabilities/maps/service.ts',sources:'electron/capabilities/maps/sources.ts',render:'electron/capabilities/maps/render.ts',contract:'skill-capabilities/builtins/maps/contract.ts'})) {
+for(const [key,file] of Object.entries({sdk:'packages/capability-api/src/index.ts',service:'electron/capabilities/maps/service.ts',sources:'electron/capabilities/maps/sources.ts',render:'electron/capabilities/maps/render.ts',ohm:'electron/capabilities/maps/openHistoricalMap.ts',contract:'skill-capabilities/builtins/maps/contract.ts'})) {
   const out=path.join(scratch,key+'.cjs'); await build({entryPoints:[path.join(root,file)],outfile:out,bundle:true,platform:'node',format:'cjs',logLevel:'silent'}); bundles[key]=require(out);
 }
-const {sdk,service,sources,render,contract}=bundles;
+const {sdk,service,sources,render,ohm,contract}=bundles;
 const fresh=options=>service.createMapService({providers:[],...options});
 const signal=()=>new AbortController().signal;
 const changed=(edit)=>{const v=structuredClone(request);edit(v);return v;};
@@ -53,6 +53,23 @@ test('three projections create deterministic, attributed SVG and preserve source
     assert.equal(a.provenance.sources[0].origin,'caller');assert.equal(a.provenance.sources[0].sha256.length,64);assert.deepEqual(a.geometry[0],geometry);svgs.push(a.svg);
   }
   assert.equal(new Set(svgs).size,3);
+});
+test('a label that cannot be read without covering another is dropped, not printed',()=>{
+  // The data's own anchor decides where a label goes; the renderer only decides whether it can
+  // be read there. Two overlapping regions with long names cannot both be labelled, a marker's
+  // label is placed before any polygon's, and a division that loses its label keeps its geometry.
+  const region=(id,name,w,s,e,n)=>({type:'Feature',id,geometry:{type:'Polygon',coordinates:[[[w,s],[e,s],[e,n],[w,n],[w,s]]]},properties:{name}});
+  const labelled={title:'Label placement',alt:'Two overlapping regions with long names, one marker over a third region.',projection:'equirectangular',width:900,height:600,bounds:[0,0,10,10],
+    layers:[{fill:'#dcd3bd',labelProperty:'name',data:{geojson:{type:'FeatureCollection',features:[region('a','Region of the Very Long Name A',1,1,4,4),region('b','Region of the Very Long Name B',3,1,6,4),region('c','Region C',6.5,1,9,4)]},source}}],
+    markers:[{coordinates:[7.75,2.5],label:'Marker C'}],overlaySource:source,legend:[]};
+  return fresh().render(labelled,signal()).then(result=>{
+    const texts=[...result.svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map(match=>match[1]);
+    assert.ok(texts.includes('Region of the Very Long Name A'),'the first of two overlapping labels is kept');
+    assert.ok(!texts.includes('Region of the Very Long Name B'),'the second is dropped rather than printed over it');
+    assert.ok(texts.includes('Marker C'),'a marker label is placed before polygon labels');
+    assert.ok(!texts.includes('Region C'),'and a polygon label that would sit on it is dropped');
+    assert.equal((result.svg.match(/<path /g)??[]).length,3,'every region is still drawn');
+  });
 });
 test('all seven GeoJSON types render, including a lone point and unfilled line geometry',async()=>{
   const polygon=geometry.features[0].geometry;
@@ -138,7 +155,68 @@ test('HTTP transport denies other origins/paths and private DNS, omits credentia
   lookup.mock.mockImplementation(async()=>[{address:'127.0.0.1',family:4}]);await assert.rejects(sources.mapSourceTransport.read(sources.NATURAL_EARTH_URL,signal(),10),/not public/);
 });
 test('historical query does not substitute modern data or contact a provider',async()=>{
-  const net=transport();await assert.rejects(fresh({providers:['geoboundaries'],transport:net}).retrieve({provider:'geoboundaries',country:'TST',level:1,period:{from:'1800-01-01',to:'1800-12-31'}},signal()),/Historical retrieval/);assert.equal(net.calls.length,0);
+  const net=transport();await assert.rejects(fresh({providers:['geoboundaries'],transport:net}).retrieve({provider:'geoboundaries',country:'TST',level:1,period:{from:'1800-01-01',to:'1800-12-31'}},signal()),/does not support historical date queries/);assert.equal(net.calls.length,0);
+  await assert.rejects(fresh().render(changed(v=>{v.layers=[{query:{provider:'natural-earth',period:{from:'1800-01-01',to:'1800-12-31'}}}];}),signal()),/does not support historical date queries/);
+});
+test('OpenHistoricalMap is retrieved by frame and period, and only what its own dates support',async()=>{
+  const tagged=(id,name,extra={})=>({type:'relation',id,tags:{name,...extra}});
+  const member={role:'outer',geometry:[{lat:1,lon:1},{lat:1,lon:2},{lat:2,lon:2},{lat:2,lon:1},{lat:1,lon:1}]};
+  const index=encode({elements:[tagged(11,'Region covering 1900',{start_date:'1833-11-20'}),tagged(12,'Region that ended in 1850',{start_date:'1800',end_date:'1850'}),tagged(13,'Region with no date'),tagged(14,'Region with the same name',{start_date:'1833-11-20'}),tagged(11,'Region covering 1900',{start_date:'1833-11-20'})]});
+  const geometry=encode({elements:[{...tagged(11,'Region covering 1900'),members:[member]},{...tagged(11,'Region covering 1900'),members:[member,member]}]});
+  const net={calls:[],async read(url,_signal,_limit){this.calls.push(url);return new URL(url).searchParams.get('data').includes('out tags')?index:geometry;}};
+  const dated={title:'Regiones de 1900',alt:'Fronteras datadas de 1900.',width:900,height:600,bounds:[0,0,10,10],layers:[{query:{provider:'openhistoricalmap',level:4,period:{from:'1900-01-01',to:'1900-12-31'}},labelProperty:'name'}]};
+  const result=await fresh({providers:['openhistoricalmap'],transport:net}).render(dated,signal());
+  for(const url of net.calls) sources.assertApprovedMapUrl(url);
+  assert.equal(net.calls.length,2,'one index read and one geometry read');
+  assert.equal(result.geometry[0].features.length,1,'only the boundary whose own dates cover the period is drawn');
+  assert.equal(result.geometry[0].features[0].properties.name,'Region covering 1900');
+  const source=result.provenance.sources[0];
+  assert.equal(source.origin,'provider');assert.equal(source.provider,'openhistoricalmap');
+  assert.deepEqual(source.period,{from:'1900-01-01',to:'1900-12-31'},'the map reports the period the data was selected for');
+  assert.match(source.license,/CC0/);assert.match(source.attribution,/OpenHistoricalMap/);
+  assert.match(source.modifications.join(' '),/without a start date were not drawn/);
+  assert.match(source.modifications.join(' '),/duplicate relation/);
+  assert.match(result.svg,/Regiones de 1900/);
+});
+
+test('OpenHistoricalMap fails closed on licences, frames, levels and volume',async()=>{
+  const member={role:'outer',geometry:[{lat:1,lon:1},{lat:1,lon:2},{lat:2,lon:2},{lat:2,lon:1},{lat:1,lon:1}]};
+  const render=async(elements,geometryElements,query)=>{const net={calls:[],async read(url,_signal,_limit){return new URL(url).searchParams.get('data').includes('out tags')?encode({elements}):encode({elements:geometryElements});}};
+    return fresh({providers:['openhistoricalmap'],transport:net}).render({title:'x',alt:'y',bounds:[0,0,10,10],layers:[{query}]},signal());};
+  const period={from:'1900-01-01',to:'1900-12-31'},query={provider:'openhistoricalmap',level:4,period};
+  await assert.rejects(render([{type:'relation',id:1,tags:{name:'Share-alike',start_date:'1800',license:'CC BY-SA 4.0'}}],[],query),/licence this adapter has not reviewed/);
+  await assert.rejects(fresh({providers:['openhistoricalmap'],transport:{async read(){throw new Error('offline');}}}).render({title:'x',alt:'y',layers:[{query}]},signal()),/needs the map frame/);
+  for(const bad of [{provider:'openhistoricalmap',level:6,period},{provider:'openhistoricalmap',level:4},{provider:'openhistoricalmap',country:'ESP',level:4,period}]) await assert.rejects(fresh({providers:['openhistoricalmap'],transport:{async read(){throw new Error('offline');}}}).retrieve(bad,signal()),/OpenHistoricalMap/);
+  const many=Array.from({length:121},(_,i)=>({type:'relation',id:i+1,tags:{name:`Region ${i}`,start_date:'1800'}}));
+  await assert.rejects(render(many,[],query),/narrow the bounds or choose another level/);
+  await assert.rejects(render([{type:'relation',id:9,tags:{name:'No geometry',start_date:'1800'}}],[{type:'relation',id:9,tags:{name:'No geometry'},members:[]}],query),/without closed geometry/);
+  await assert.rejects(render([{type:'relation',id:9,tags:{name:'Elsewhere',start_date:'1990'}}],[],query),/no admin level 4 boundary covering/);
+  const enclosed={...member};
+  const built=await render([{type:'relation',id:5,tags:{name:'Fine',start_date:'1800'}}],[{type:'relation',id:5,tags:{name:'Fine'},members:[enclosed]}],query);
+  assert.equal(built.geometry[0].features.length,1);
+});
+
+test('a rate-limited provider answer is waited out once, then reported as busy',async()=>{
+  const member={role:'outer',geometry:[{lat:1,lon:1},{lat:1,lon:2},{lat:2,lon:2},{lat:2,lon:1},{lat:1,lon:1}]};
+  const index=encode({elements:[{type:'relation',id:7,tags:{name:'Region',start_date:'1800'}}]});
+  const geometry=encode({elements:[{type:'relation',id:7,tags:{name:'Region'},members:[member]}]});
+  const query={provider:'openhistoricalmap',level:4,period:{from:'1900-01-01',to:'1900-12-31'}};
+  const render=async(busyAnswers)=>{const calls=[];const net={calls,async read(url,_signal,_limit){calls.push(url);
+    const answer=calls.length<=busyAnswers?'<html>rate limited</html>':new URL(url).searchParams.get('data').includes('out tags')?index:geometry;return Buffer.from(answer);}};
+    return fresh({providers:['openhistoricalmap'],transport:net}).render({title:'x',alt:'y',bounds:[0,0,10,10],layers:[{query}]},signal());};
+  const recovered=await render(1);
+  assert.equal(recovered.geometry[0].features.length,1,'one busy answer is waited out and the map still renders');
+  await assert.rejects(render(99),/busy or rate-limiting/);
+  const net={calls:[],async read(url,_signal,_limit){this.calls.push(url);return Buffer.from('<html>rate limited</html>');}};
+  const attempts=fresh({providers:['openhistoricalmap'],transport:net});
+  await assert.rejects(attempts.render({title:'x',alt:'y',bounds:[0,0,10,10],layers:[{query}]},signal()),/busy or rate-limiting/);
+  assert.equal(net.calls.length,2,'at most one repeat per read, never a loop against a public endpoint');
+});
+test('an OpenHistoricalMap request is retrieved inside a map, not as a bare dataset',async()=>{
+  await assert.rejects(fresh({providers:['openhistoricalmap'],transport:{async read(){throw new Error('offline');}}}).retrieve({provider:'openhistoricalmap',level:4,period:{from:'1900-01-01',to:'1900-12-31'}},signal()),/inside a map/);
+  for(const url of ['https://overpass-api.openhistoricalmap.org/api/interpreter?data=%5Bout%3Ajson%5D%5Btimeout%3A25%5D%3Bnode%3Bout%3B','https://overpass-api.openhistoricalmap.org/api/interpreter','https://overpass-api.openhistoricalmap.org/api/other?data=x']) assert.throws(()=>sources.assertApprovedMapUrl(url),/not approved/);
+  sources.assertApprovedMapUrl(ohm.openHistoricalMapIndexUrl(4,[0,0,10,10]));
+  sources.assertApprovedMapUrl(ohm.openHistoricalMapGeometryUrl([11,12]));
 });
 test('failures and parallel calls consume bounded budgets',async()=>{
   const limited=fresh({maxCalls:2});await assert.rejects(limited.render({},signal()));await assert.rejects(limited.render({},signal()));await assert.rejects(limited.render(request,signal()),/budget/);
