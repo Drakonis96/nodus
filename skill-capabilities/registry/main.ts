@@ -85,7 +85,10 @@ export async function runCoreChatStages(answer: string, execution: ChatSkillExec
         // instead of reading "not enabled" about a tool that is.
         const capability = skill?.capabilityTools?.find(item => item.toolId === request.toolId);
         throw new Error(capability
-          ? `${request.toolId} is a capability tool. Request it in a nodus-capability block with capabilityId ${capability.capabilityId}.`
+          ? capability.fence
+            // A package's tool has one envelope, and it is the one the package declares.
+            ? `${request.toolId} is a capability tool of an installed package. Request it in a fenced ${capability.fence} block whose body is the tool input.`
+            : `${request.toolId} is a capability tool. Request it in a nodus-capability block with capabilityId ${capability.capabilityId}.`
           : 'This tool is not enabled for this reply.');
       }
       execution.beforeInvoke?.();

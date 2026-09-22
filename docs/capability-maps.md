@@ -149,8 +149,10 @@ is not treated as permission to use community servers as an application backend.
 not integrated: feature-specific licences and temporal semantics require a separate
 adapter. `query.period: {from, to}` validates ISO dates (including expanded signed BCE years, such as `-000500-01-01`) and **fails before any network
 request** for both present providers. Modern polygons are never substituted for a
-historical request. Caller-supplied verified historical GeoJSON can carry `source.period`;
-Nodus still marks that provenance as caller-supplied, not provider-verified. No historical
+historical request. Caller-supplied historical GeoJSON can carry `source.period` and an
+evidence `url`; Nodus still marks that provenance as caller-supplied, not
+provider-verified, and a request whose supplied sources carry no covering dated period
+renders as a stated approximate reconstruction rather than as a dated map. No historical
 map example is claimed in this release.
 
 Every SVG has visible attribution and a `desc#nodus-map-provenance` containing escaped
@@ -224,4 +226,4 @@ remains the human contributor's action. See the [release runbook](capability-rel
 
 ## Marketplace workflows
 
-The signed [Research Visuals package](https://github.com/NodusResearch/nodus-research-skill-marketplace/tree/main/plugins/research-visuals) supplies General Maps and Historical Maps. Both delegate rendering to this service. Historical Maps enforces supplied dated sources and refuses modern provider substitution. [Verification examples](verification/research-visuals/README.md) preserve editable SVG, attribution and visual previews.
+The signed [Research Visuals package](https://github.com/NodusResearch/nodus-research-skill-marketplace/tree/main/plugins/research-visuals) supplies General Maps and Historical Maps. Both delegate rendering to this service. Historical Maps refuses modern provider substitution and labels what it renders: a source whose declared period covers the request and carries an evidence link produces a dated map, and any other supplied geometry or coordinate overlay produces an approximate reconstruction that says so in the map itself. [Verification examples](verification/research-visuals/README.md) preserve editable SVG, attribution and visual previews.

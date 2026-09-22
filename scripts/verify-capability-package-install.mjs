@@ -153,7 +153,16 @@ try {
         const packagedSkills = materializeTrustedPluginSkills(payload.packageId).filter(skill => skill.plugin?.id === payload.packageId);
         assert.ok(packagedSkills.length > 0, 'the package installs at least one workflow');
         for (const skill of packagedSkills) {
-          assert.equal(deriveCapabilityTools(skill), undefined, 'a trusted v2 workflow is not advertised through the legacy nodus-capability fence');
+          const advertised = deriveCapabilityTools(skill) ?? [];
+          assert.ok(advertised.length > 0, 'a trusted v2 workflow advertises the tools its package declares');
+          for (const tool of advertised) {
+            // Each skill may reach a different capability of the same package, so the
+            // protocol a tool travels under is the one its own provider declared.
+            const owner = registry.providers.get(tool.capabilityId);
+            assert.ok(owner, 'the advertised tool names a registered capability: ' + tool.capabilityId);
+            assert.ok(owner.chat.requestProtocols.some(protocol => protocol.fence === tool.fence && protocol.toolId === tool.toolId), tool.toolId + ' travels under the fence ' + owner.id + ' declared');
+            assert.ok(tool.inputSchema, 'carrying the published schema, so an input is built instead of guessed');
+          }
         }
 
         stage = 'worker';
@@ -255,18 +264,37 @@ try {
           await imageHandle.stop();
           const source = { label: 'Synthetic route fixture', attribution: 'Synthetic fixture, not historical evidence', license: 'CC0', url: 'https://example.org/fixture', period: { from: '1850-01-01', to: '1850-12-31' } };
           const map = { title: 'Synthetic route', alt: 'Two synthetic points linked by an arrow', markers: [{ coordinates: [0,0], label: 'A' }, { coordinates: [1,1], label: 'B' }], routes: [{ coordinates: [[0,0],[1,1]], arrow: true }], overlaySource: source };
+          // The same route with no dataset behind it: the request that used to be refused
+          // outright. It renders, and the map itself says what it is.
+          const reconstructed = { ...map, overlaySource: { label: 'Reconstruction from general knowledge', attribution: 'Synthetic fixture, not historical evidence', license: 'CC0' } };
+          const requests = [
+            ['research-map-request', map, null],
+            ['historical-map-request', { ...map, period: source.period }, null],
+            ['historical-map-request', { ...reconstructed, period: { from: '1940-01-01', to: '1940-12-31' } }, /Approximate historical reconstruction/],
+            ['research-image-request', { query: 'synthetic plate' }, null],
+          ];
+          const fence = (tag, input) => String.fromCharCode(96).repeat(3) + tag + String.fromCharCode(10) + JSON.stringify(input) + String.fromCharCode(10) + String.fromCharCode(96).repeat(3);
           for (const surface of ['assistant','nodi','deep-research','immersion']) {
             const runner = createTrustedCapabilityRunner({ owner: chatAssetOwner(surface, 'research-visuals-fixture'), question: 'Draw a synthetic research route and find a plate image.', locale: 'en', pins: pinCapabilitiesForTurn(), runCoreStages: async answer => answer });
             try {
-              for (const [fence,input] of [['research-map-request',map],['historical-map-request',{...map,period:source.period}],['research-image-request',{query:'synthetic plate'}]]) {
-                const text = String.fromCharCode(96).repeat(3) + fence + String.fromCharCode(10) + JSON.stringify(input) + String.fromCharCode(10) + String.fromCharCode(96).repeat(3);
-                const answer = await runTrustedChatPipeline(text, registry, runner, {onProblem: (_provider,error)=>{throw error;}});
-                assert.match(answer, /nodus-artifact/, surface + ' ' + fence);
-                assert.match(answer, /nodus-view/, surface + ' renders its result');
+              for (const [tag, input, labels] of requests) {
+                const answer = await runTrustedChatPipeline(fence(tag, input), registry, runner, {onProblem: (_provider,error)=>{throw error;}});
+                assert.match(answer, /nodus-artifact/, surface + ' ' + tag);
+                assert.match(answer, /nodus-view/, surface + ' ' + tag + ' renders its result');
+                if (labels) assert.match(answer, labels, surface + ' ' + tag + ' labels what it is');
               }
             } finally { await runner.dispose(); }
           }
-          console.log('  Research Visuals: three real worker tools, native SVG/provenance and disabled-source fallback through Assistant, Nodi, Deep Research and Immersion pipelines.');
+          // A near-miss input is refused by name, not by "invalid request": the model that sent
+          // an extra top-level field reads which field, and which ones the tool does take.
+          const runner = createTrustedCapabilityRunner({ owner: chatAssetOwner('assistant', 'research-visuals-fixture'), question: 'Draw a 1940 route.', locale: 'en', pins: pinCapabilitiesForTurn(), runCoreStages: async answer => answer });
+          try {
+            const refused = await runTrustedChatPipeline(fence('historical-map-request', { ...reconstructed, period: source.period, timeframe: '1940' }), registry, runner);
+            assert.match(refused, /historical-map-request was not run|was not run/, 'the refusal is reported as text');
+            assert.match(refused, /unknown property "timeframe"/, 'and names the property it refused');
+            assert.match(refused, /allowed: title, alt/, 'and lists what the tool does take');
+          } finally { await runner.dispose(); }
+          console.log('  Research Visuals: four real worker requests (provider, dated, reconstructed, image), property-named refusals and native SVG/provenance through Assistant, Nodi, Deep Research and Immersion pipelines.');
         }
 
         stage = 'permission gating';
