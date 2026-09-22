@@ -89,13 +89,24 @@ this file only says where it sits. Its own rules never leave .nodus-planet.
 }
 .nodus-planet .np-caption { user-select: none; }
 
-/* Shared decoration for the site's reading pages and directory. */
+/* Shared decoration for the site's reading pages and directory.
+   One graphic, one size, one place. --planet-size is that size: the measure the
+   Support Nodus hero gives the planet, which contribute.css now reads from here
+   instead of repeating, so no page can quietly show a smaller planet than the
+   rest. And the planet hangs off the window rather than off the hero, so it
+   behaves like the backdrop it is: the page scrolls past it and it stays put. */
+:root { --planet-size: min(780px, 64vw); }
 .has-planet, .atlas-main { position: relative; isolation: isolate; }
 .has-planet > .wrap, .atlas-main > .atlas-shell { position: relative; z-index: 1; }
 .has-planet > .page-planet, .atlas-main > .page-planet {
-  position: absolute; z-index: 0; top: 50%; right: 0;
-  translate: 0 -50%; width: min(680px, 54vw); pointer-events: none;
+  position: fixed; z-index: 0; top: 50%; right: 0;
+  translate: 0 -50%; width: var(--planet-size); pointer-events: none;
 }
+/* The backdrop is never allowed on top of the reading surface. A hero lifts its
+   own words already; the sections below a hero have to be lifted too, or the
+   graphic reaches past the hero and swallows whatever scrolls into its band —
+   the FAQ filter bar was the first thing it took. */
+main > section { position: relative; z-index: 1; }
 .has-planet .scrim { max-width: min(100%, 640px) !important; }
 .atlas-main > .page-planet { top: 62px; translate: none; opacity: .65; }
 @media (max-width: 760px) {

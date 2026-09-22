@@ -110,10 +110,25 @@ test('both header stylesheets keep the same fixed dimensions and breakpoint', ()
   for (const styles of [systemStyles, headerStyles]) {
     assert.match(styles, /@media \(max-width: 1320px\) \{[\s\S]*?\.nav-toggle \{ display: block/);
     assert.match(styles, /\.nav \.links > a\.link\[aria-current="page"\]/);
+    // The active destination keeps the brand violet in both. In nodus.css it used
+    // to read --accent, which the page retunes per section: that turned the wiki's
+    // underline orange (on the Teaching manual) and the FAQ's cyan.
+    const underline = styles.match(/\.nav \.links > a\.link\[aria-current="page"\]::after \{[\s\S]*?\n\}/)?.[0];
+    assert.ok(underline, 'both stylesheets underline the active destination');
+    assert.match(underline, /background: (?:var\(--violet-2\)|#a78bfa)/,
+      'the underline is the site violet, never the section accent');
     // The browser-only Bookmarks slot is removed with the hidden attribute, and a
     // class that sets `display` outranks the user-agent rule for it, so both
     // stylesheets have to neutralize it or the demo pages show a dead link.
     assert.match(styles, /\[hidden\] \{ display: none !important; \}/);
+    // The downloads tooltip grows leftwards from the chip, the last item before
+    // the window edge, so its width is capped by the room the window has and not
+    // by a fixed measure: no viewport can push its tail off the edge.
+    const tooltip = styles.match(/\.download-tooltip \{[\s\S]*?\n\}/)?.[0];
+    assert.ok(tooltip, 'both stylesheets place the downloads tooltip');
+    assert.match(tooltip, /right: 0;/);
+    assert.match(tooltip, /max-width: min\(300px, 80vw, calc\(100vw - 2 \* clamp\(14px, 3vw, 30px\)\)\);/,
+      'the tooltip is capped by the window, not by a fixed width');
   }
   // the demo shell has to reserve the row the fixed header occupies
   assert.match(read('site/demo/demo.css'), /body\.demo-page > \[data-nodus-site-header\] \{ display: block; height: 62px; \}/);

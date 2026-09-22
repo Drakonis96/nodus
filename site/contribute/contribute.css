@@ -65,12 +65,15 @@ figures row, and never redefines the shared scale.
    component's frame on its right, so the frame is what meets the window edge —
    nothing on this page bleeds sideways for it.
 
-   It is taller than the hero on purpose: the sections below sit above it, so the
-   sphere's lower half passes behind the figures on its way out of the hero. */
+   It hangs off the window, not off the hero, so it stays where the visitor found
+   it while the page scrolls, and it is taller than the hero so the sphere's
+   lower half passes behind the figures below. Its size is the shared
+   --planet-size from planet.css: this hero used to be the only page that carried
+   that measure, and every other placement shrank it. */
 .support-hero .hero-planet {
-  position: absolute; z-index: 0; pointer-events: none;
+  position: fixed; z-index: 0; pointer-events: none;
   top: 50%; right: 0; translate: 0 -50%;
-  width: min(780px, 64vw);
+  width: var(--planet-size);
 }
 
 /* ============================================================ ways
