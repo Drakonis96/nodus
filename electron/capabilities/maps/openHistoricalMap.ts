@@ -191,7 +191,7 @@ export async function retrieveOpenHistoricalMap(input: OpenHistoricalMapInput): 
   for (let index = 0; index < eligible.length; index += GEOMETRY_BATCH) await readBatch(eligible.slice(index, index + GEOMETRY_BATCH));
   const span = Math.max(Math.abs(window[2] - window[0]), Math.abs(window[3] - window[1]));
   const features: FeatureCollection['features'] = [];
-  let duplicates = 0, unclosed = 0, outside = 0, assembled = 0;
+  let duplicates = 0, unclosed = 0, outside = 0;
   const collected: Array<{ id: number; name: string; outers: Array<Array<[number, number]>>; inners: Array<Array<[number, number]>>; thinnedOuters?: Array<Array<[number, number]>>; thinnedInners?: Array<Array<[number, number]>> }> = [];
   for (const relation of elements as Array<{ type?: string; id?: number; tags?: Record<string, unknown>; members?: Array<{ role?: string; geometry?: Array<{ lon: number; lat: number }> }> }>) {
     if (relation?.type !== 'relation' || !eligible.includes(relation.id as number)) continue;
@@ -203,7 +203,6 @@ export async function retrieveOpenHistoricalMap(input: OpenHistoricalMapInput): 
     // is not about, and drawing it would put another country's divisions on this period's map.
     const centre = centreOf(outers.reduce((largest, ring) => ringArea(ring) > ringArea(largest) ? ring : largest));
     if (centre[0] < window[0] || centre[0] > window[2] || centre[1] < window[1] || centre[1] > window[3]) { outside++; continue; }
-    assembled++;
     collected.push({ id: relation.id as number, name: String(relation.tags?.name).slice(0, 160), outers, inners });
   }
   // Three different dead ends, said differently: a boundary the project has not mapped, one
