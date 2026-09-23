@@ -800,3 +800,26 @@ regressions. The new 70-passage fixture fails its second batch and resumes witho
 requesting the first 32 vectors again. Both TypeScript projects passed. No paid
 calls were made. Campaign sharing, cross-vault execution and the new preparation
 UI remain separate, unfinished acceptance items.
+
+## Closing delivery: owning-vault execution
+
+The existing profile queue now claims work across academic vaults. Each job opens
+an explicit owning-vault database and scopes source/path resolution across awaits;
+changing the UI vault does not redirect or stop that work. Startup can resume
+academic work while another vault engine is open. Detached callbacks discard
+closed job contexts. Global attachments use the native private staging extractor
+rather than enqueueing into the active Library extraction lane.
+
+Source permission/revision checks run between preparation operations and before
+saving returned embedding batches or publishing vectors. Text stage leases now
+also distinguish interruption from a provider/extraction failure.
+
+Five focused owner/queue/vault compatibility scripts passed at
+`/private/tmp/nodus-research-Vu4MyF`. After the additional permission and text-stage
+interruption checks, the three affected store/writer/owning-vault scripts passed
+at `/private/tmp/nodus-research-xMY7w3`. All roots verified the OS write/descendant/
+network denials before test execution. The real queue fixture prepares two vaults,
+switches the UI during an extraction await, checks the owning connections and
+proves text-only work cannot call the stubbed embedding or conversation methods.
+Both TypeScript projects passed. These are deterministic native repository/queue
+tests, not live-provider or GUI acceptance.

@@ -13,7 +13,7 @@ import { documentaryChunks } from './documentaryChunking';
 import { researchCorpusInventory } from './researchCorpusInventory';
 import { assertResearchDocumentPermission, researchFingerprint } from './researchCorpusScope';
 import { getLibraryReaderRawContent } from '../libraryReader/libraryReaderStore';
-import { getGlobalLibraryItem, enqueueLibraryExtraction, listLibraryExtractionJobs } from '../library/libraryService';
+import { getGlobalLibraryItem } from '../library/libraryService';
 import { currentEmbeddingConfig } from '../db/ideasRepo';
 import { embedMany, effectiveEmbeddingConfig, type EmbeddingExecutionConfig } from './aiClient';
 import { DocumentaryEmbeddingBatches } from '../db/documentaryEmbeddingBatches';
@@ -25,7 +25,8 @@ import { getSettings } from '../db/settingsRepo';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { documentarySourceText, readDocumentarySourceMap, extractTraditionalResearchWork, extractGlobalResearchAttachments, type DocumentarySourcePart } from './documentaryExtraction';
 import { onGlobalLibraryChanged } from '../library/libraryRuntime';
-import { getActiveVault } from '../vaults/vaultRegistry';
+import { getActiveVault, getVault, listVaults, withOwningVault, withoutOwningVault } from '../vaults/vaultRegistry';
+import { withVaultDatabase, withoutDatabaseContext } from '../db/database';
 import { onResearchCorpusChanged } from './researchCorpusEvents';
 
 let shared: DocumentaryStore | null = null;
@@ -70,7 +71,10 @@ export async function prepareDocumentaryText(document: ResearchCorpusDocument, t
     store.complete(job);
     return { indexKey, chunks };
   } catch (error) {
-    if (store.getJob(indexKey)?.lease_token === job.lease_token) store.fail(job, 'documentary_preparation_failed');
+    if (store.getJob(indexKey)?.lease_token === job.lease_token) {
+      if (signal?.aborted || stopping || store.preference('paused')) store.interrupt(job);
+      else store.fail(job, 'documentary_preparation_failed');
+    }
     throw error;
   } finally { clearInterval(heartbeat); }
 }
@@ -79,8 +83,9 @@ function embeddingIdentityParameters(config: EmbeddingExecutionConfig) {
   return { endpoint: createHash('sha256').update(config.endpoint).digest('hex'), inputPolicy: 'utf8-4096/2' };
 }
 
-export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: DocumentaryChunk[], signal?: AbortSignal, execution = effectiveEmbeddingConfig()): Promise<{ indexKey: string; vectors: number[][]; provider: string; model: string }> {
+export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: DocumentaryChunk[], signal?: AbortSignal, execution = effectiveEmbeddingConfig(), assertAuthorized: () => void = () => {}): Promise<{ indexKey: string; vectors: number[][]; provider: string; model: string }> {
   const store = documentaryStore();
+  assertAuthorized();
   const base = JSON.parse(store.getJob(indexKey)!.identity_json) as DocumentaryIndexIdentity;
   const config = { provider: execution.provider, model: execution.modelId };
   const parameters = embeddingIdentityParameters(execution);
@@ -129,7 +134,7 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
         const received = await embedMany(batch, controller.signal, { config: execution, jobId: operation });
         controller.signal.throwIfAborted();
         if (received.some(vector => !vector?.length)) throw new Error('documentary_embeddings_unavailable');
-        checkpoints.complete(attempt, batch, received as number[][], () => requests.renew(lease));
+        checkpoints.complete(attempt, batch, received as number[][], () => { requests.renew(lease); assertAuthorized(); });
         vectors.splice(start, batch.length, ...received);
       } catch (error) { checkpoints.uncertain(attempt); throw error; }
       start = end;
@@ -138,6 +143,7 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
     requests.renew(lease);
     if (store.preference('paused')) throw new Error('documentary_paused');
     if (vectors.some(vector => !vector?.length) || !vectors.length) throw new Error('documentary_embeddings_unavailable');
+    assertAuthorized();
     const identity: DocumentaryIndexIdentity = { ...base, embedding: { ...config, dimensions: vectors[0]!.length, metric: 'cosine', parameters } };
     const id = store.enqueue(identity, {});
     job = store.claim(Date.now(), 60000, id);
@@ -250,27 +256,33 @@ export function cancelResearchDocuments(documentIds: string[]): void {
     if (activePreparationDocument === id) activePreparation?.abort();
   }
 }
-export async function drainDocumentaryRequests(): Promise<void> {
+export function drainDocumentaryRequests(): Promise<void> {
+  return withoutOwningVault(() => withoutDatabaseContext(drainOwnedDocumentaryRequests));
+}
+async function drainOwnedDocumentaryRequests(): Promise<void> {
   if (draining || stopping) return;
   const store = documentaryStore();
   if (store.preference('paused')) return;
   draining = true;
   const requests = new DocumentaryRequests(store.db);
-  const vaultId = getActiveVault().id;
+  const owners = () => listVaults().filter(vault => vault.type === 'academic').map(vault => vault.id);
+  // Adopt only legacy requests belonging to the active academic vault.
+  if (getActiveVault().type === 'academic') store.db.prepare("UPDATE documentary_requests SET vault_id=? WHERE vault_id=''").run(getActiveVault().id);
   if (retryTimer) clearTimeout(retryTimer);
   try {
     // One worker initially; existing Library extraction has its own bounded pool.
     for (;;) {
-      if (store.preference('paused')) break;
-      if (getActiveVault().id !== vaultId) break;
-      const request = requests.claim(vaultId);
+      if (stopping || store.preference('paused')) break;
+      const request = requests.claim(owners());
       if (!request) break;
       const controller = new AbortController();
       activePreparation = controller;
       activePreparationDocument = request.document_id;
       const heartbeat = setInterval(() => { try { requests.renew(request); } catch { controller.abort(); } }, 15000);
-      const checkLease = () => { controller.signal.throwIfAborted(); if (getActiveVault().id !== vaultId) throw new Error('research_scope_changed'); requests.renew(request); };
+      let validateSource = () => {};
+      const checkLease = () => { controller.signal.throwIfAborted(); validateSource(); if (getVault(request.vault_id)?.type !== 'academic') throw new Error('research_vault_unavailable'); requests.renew(request); };
       try {
+        await withOwningVault(request.vault_id, () => withVaultDatabase(request.vault_id, async () => {
         // Legacy authorized jobs capture their existing provider once at first
         // dispatch; new jobs already carry the enqueue-time configuration.
         const configuration = request.configuration_json ? JSON.parse(request.configuration_json) as { embedding: EmbeddingExecutionConfig | null; processingVersion: string }
@@ -279,6 +291,10 @@ export async function drainDocumentaryRequests(): Promise<void> {
         if (configuration.processingVersion !== 'nodus-documentary/1') throw new Error('documentary_processing_version_unavailable');
         const document = researchCorpusInventory().documents.find(item => item.id === request.document_id);
         if (!document || document.revision !== request.revision) throw new Error('research_source_not_authorized');
+        validateSource = () => {
+          const current = researchCorpusInventory().documents.find(item => item.id === document.id);
+          if (!current || current.revision !== document.revision || current.permissionRevision !== document.permissionRevision) throw new Error('research_source_not_authorized');
+        };
         checkLease();
         let text = '';
         let coverage = document.coverage;
@@ -304,36 +320,22 @@ export async function drainDocumentaryRequests(): Promise<void> {
           sourceMap.note = `note:${getActiveVault().id}:${note.id}`;
         }
         if (document.libraryItemId) {
-          let item = getGlobalLibraryItem(document.libraryItemId);
-          if ((item?.attachments.length ?? 0) > 1) {
-            parts = await extractGlobalResearchAttachments(document.libraryItemId, controller.signal);
-            coverage = parts.length ? 'fulltext' : 'abstract';
-          }
-          let raw = getLibraryReaderRawContent(document.libraryItemId);
-          let map = raw ? readDocumentarySourceMap(raw.folder, item?.files?.sourceMap) : null;
-          const compatible = () => !!raw && !!map && map.reader.sha256 === createHash('sha256').update(raw.markdown).digest('hex')
-            && !!item?.attachments.some(attachment => attachment.sha256 === map!.source.sha256)
+          const item = getGlobalLibraryItem(document.libraryItemId);
+          const raw = getLibraryReaderRawContent(document.libraryItemId);
+          const map = raw ? readDocumentarySourceMap(raw.folder, item?.files?.sourceMap) : null;
+          const compatible = !!raw && !!map && map.reader.sha256 === createHash('sha256').update(raw.markdown).digest('hex')
+            && item?.attachments.length === 1 && item.attachments[0].sha256 === map.source.sha256
             && item.contentRevision?.components.extraction.freshness === 'current';
-          if (!parts.length && !compatible() && item?.attachments.length) {
-            const queued = enqueueLibraryExtraction([document.libraryItemId], { ocrMode: 'off', maxOcrPages: 0, force: true });
-            const deadline = Date.now() + 120000;
-            while (queued.jobIds.length) {
-              checkLease();
-              const jobs = listLibraryExtractionJobs().filter(job => queued.jobIds.includes(job.id));
-              if (jobs.every(job => ['done', 'failed', 'canceled'].includes(job.status))) break;
-              if (Date.now() >= deadline) throw new Error('documentary_extraction_timeout');
-              await new Promise(resolve => setTimeout(resolve, 200));
-            }
-            item = getGlobalLibraryItem(document.libraryItemId);
-            raw = getLibraryReaderRawContent(document.libraryItemId);
-            map = raw ? readDocumentarySourceMap(raw.folder, item?.files?.sourceMap) : null;
-          }
-          if (!compatible()) raw = null;
-          if (raw?.markdown) {
+          if (compatible && raw?.markdown) {
             text = documentarySourceText(raw.markdown, map, 'library');
             sourceMap.library = `library:${document.libraryItemId}:${document.attachmentId ?? 'reader'}`;
             coverage = 'fulltext';
-          } else { text = item?.metadata.abstract ?? ''; coverage = 'abstract'; }
+          } else {
+            // Use a private staging worker, not the active-vault Library queue.
+            // Every compatible attachment keeps its own revision and locators.
+            if (item?.attachments.length) parts = await extractGlobalResearchAttachments(document.libraryItemId, controller.signal);
+            if (!parts.length) { text = item?.metadata.abstract ?? ''; coverage = 'abstract'; }
+          }
         }
         if (!text && !parts.length && document.workId) {
           const work = getWork(document.workId);
@@ -366,20 +368,21 @@ export async function drainDocumentaryRequests(): Promise<void> {
         // Publish every lexical attachment before any optional vector request.
         for (const result of prepared) {
           checkLease();
-          if (configuration.embedding) await prepareDocumentaryEmbeddings(result.indexKey, result.chunks, controller.signal, configuration.embedding);
+          if (configuration.embedding) await prepareDocumentaryEmbeddings(result.indexKey, result.chunks, controller.signal, configuration.embedding, checkLease);
         }
         checkLease();
         requests.finish(request, null);
+        }));
       } catch (error) {
-        try { requests.finish(request, error instanceof Error ? error.message.slice(0, 120) : 'documentary_preparation_failed', store.preference('paused')); } catch { /* A newer request owns publication. */ }
+        try { requests.finish(request, error instanceof Error ? error.message.slice(0, 120) : 'documentary_preparation_failed', store.preference('paused') || stopping || controller.signal.aborted); } catch { /* A newer request owns publication. */ }
       } finally { clearInterval(heartbeat); if (activePreparation === controller) { activePreparation = null; activePreparationDocument = null; } }
     }
   } finally {
     draining = false;
     if (stopping) { store.close(); shared = null; }
     else {
-      const delay = requests.nextDelay(vaultId);
-      if (delay !== null && !store.preference('paused') && getActiveVault().id === vaultId) {
+      const delay = requests.nextDelay(owners());
+      if (delay !== null && !store.preference('paused')) {
         retryTimer = setTimeout(() => { retryTimer = null; void drainDocumentaryRequests().catch(() => undefined); }, delay);
         retryTimer.unref();
       }
@@ -401,9 +404,11 @@ let unsubscribe: (() => void) | null = null;
 let autoTimer: ReturnType<typeof setTimeout> | null = null;
 export function notifyResearchCorpusChanged(): void {
   if (getActiveVault().type !== 'academic') return;
+  const vaultId = getActiveVault().id;
     if (autoTimer) clearTimeout(autoTimer);
-    autoTimer = setTimeout(() => {
+    autoTimer = withoutOwningVault(() => withoutDatabaseContext(() => setTimeout(() => {
       autoTimer = null;
+      void Promise.resolve().then(() => withOwningVault(vaultId, () => withVaultDatabase(vaultId, async () => {
       if (!documentaryStore().preference('enabled') || getActiveVault().type !== 'academic') return;
       const documents = researchCorpusInventory().documents.filter(document => {
         if (document.conversationAttachment && !listResearchNotebooks().some(notebook => notebook.sources.some(source => source.kind === 'conversation-attachment' && source.id === document.id)
@@ -414,8 +419,9 @@ export function notifyResearchCorpusChanged(): void {
         const previous = documentaryStore().db.prepare('SELECT revision FROM documentary_requests WHERE document_id=?').get(document.id) as { revision: string } | undefined;
         return previous?.revision !== document.revision;
       });
-      if (documents.length) void prepareResearchDocuments(documents.map(document => document.id)).catch(() => undefined);
-    }, 1000);
+      if (documents.length) await prepareResearchDocuments(documents.map(document => document.id));
+      }))).catch(() => undefined);
+    }, 1000)));
     autoTimer.unref();
 }
 export function initializeDocumentaryPreparation(): void {
@@ -424,7 +430,7 @@ export function initializeDocumentaryPreparation(): void {
   const authored = onResearchCorpusChanged(notifyResearchCorpusChanged);
   unsubscribe = () => { global(); authored(); };
   // Resume explicitly queued work after a restart, including a crashed stage.
-  if (fs.existsSync(path.join(app.getPath('userData'), 'documentary/store.sqlite')) && getActiveVault().type === 'academic') void drainDocumentaryRequests().catch(() => undefined);
+  if (fs.existsSync(path.join(app.getPath('userData'), 'documentary/store.sqlite'))) void drainDocumentaryRequests().catch(() => undefined);
 }
 
 export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchScope, query: string, settings: RetrievalSettings, vector: number[] | null, signal?: AbortSignal, read?: ResearchDocumentRead): Promise<{ evidence: ResearchEvidence[]; traversal: { partial: boolean; rounds: number; candidates: number; evidenceTokens: number; visited: string[] } }> {

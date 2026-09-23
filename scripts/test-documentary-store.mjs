@@ -27,6 +27,7 @@ try {
   assert.equal(first.claim(1900), null);
   const recovered = second.claim(2001, 1000);
   assert.equal(recovered.stage, 'chunk');
+  assert.equal(recovered.attempts, 1, 'a crash preserves the failure allowance');
   assert.throws(() => first.saveExtraction(a, 'stale writer', 2100), /lease_lost/);
   second.saveChunks(recovered, [{ text: 'North field measured 23 units.', pageLabel: 'iv', pageNumber: 6, sourceRef: 'pdf:source' }], 2100);
   second.publishLexical(recovered, 2200);
@@ -56,7 +57,12 @@ try {
   first.setPreference('paused', true);
   assert.equal(second.claim(60000), null);
   first.setPreference('paused', false);
-  assert.ok(second.claim(60000));
+  const pausedJob = second.claim(60000);
+  assert.ok(pausedJob);
+  second.interrupt(pausedJob, 60001);
+  const resumedJob = second.claim(60002, 60000, pausedJob.id);
+  assert.equal(resumedJob.attempts, 1, 'pause does not consume an extraction attempt');
+  second.complete(resumedJob, 60003);
   const attachments = ['appendix-a', 'appendix-b'].map(attachmentId => ({ ...identity, documentId: 'multi', attachmentId, attachmentRevision: 'bytes-1' }));
   const keys = attachments.map(attachment => first.enqueue(attachment, {}, 0, 70000));
   for (const [index, key] of keys.entries()) {

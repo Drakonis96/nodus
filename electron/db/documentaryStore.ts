@@ -87,7 +87,7 @@ export class DocumentaryStore {
   claim(now = Date.now(), leaseMs = 60000, jobId: string | null = null): DocumentaryJob | null {
     if (this.preference('paused')) return null;
     return this.db.transaction(() => {
-      this.db.prepare(`UPDATE documentary_jobs SET state=CASE WHEN attempts>=3 THEN 'failed' ELSE 'queued' END,
+      this.db.prepare(`UPDATE documentary_jobs SET state='queued',attempts=MAX(0,attempts-1),
         lease_token=NULL,lease_until=NULL,updated_at=? WHERE state='running' AND lease_until<=?`).run(now, now);
       const job = this.db.prepare(`SELECT * FROM documentary_jobs WHERE state='queued' AND available_at<=? AND attempts<3 AND (? IS NULL OR id=?)
         ORDER BY priority + ((? - created_at) / 60000) DESC, created_at, id LIMIT 1`).get(now, jobId, jobId, now) as DocumentaryJob | undefined;
@@ -176,6 +176,13 @@ export class DocumentaryStore {
       this.db.prepare(`UPDATE documentary_jobs SET state=CASE WHEN attempts>=3 THEN 'failed' ELSE 'queued' END,
         error=?,available_at=?,lease_token=NULL,lease_until=NULL,updated_at=? WHERE id=?`)
         .run(errorCode.slice(0, 120), now + 1000 * 2 ** job.attempts, now, job.id);
+    }).immediate();
+  }
+  interrupt(job: DocumentaryJob, now = Date.now()): void {
+    this.db.transaction(() => {
+      this.assertLease(job, now);
+      this.db.prepare(`UPDATE documentary_jobs SET state='queued',attempts=MAX(0,attempts-1),
+        available_at=?,lease_token=NULL,lease_until=NULL,updated_at=? WHERE id=?`).run(now, now, job.id);
     }).immediate();
   }
   cancel(id: string): void { this.db.prepare("UPDATE documentary_jobs SET state='cancelled',lease_token=NULL,lease_until=NULL WHERE id=? AND state<>'complete'").run(id); }
