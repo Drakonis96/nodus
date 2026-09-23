@@ -1,0 +1,56 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { installRuntimeHooks, requireElectronRuntime, repoRoot } from './lib/tsRuntimeHooks.mjs';
+if (!requireElectronRuntime(fileURLToPath(import.meta.url), '--documentary-store')) process.exit(0);
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-documentary-'));
+installRuntimeHooks(scratch);
+const require = createRequire(import.meta.url);
+const { DocumentaryStore } = require(path.join(repoRoot, 'electron/db/documentaryStore.ts'));
+const filename = path.join(scratch, 'shared.sqlite');
+let first = new DocumentaryStore(filename);
+const second = new DocumentaryStore(filename);
+try {
+  const identity = { documentId: 'work', attachmentId: 'pdf', revision: 'r1', textFingerprint: 'hash', chunkerVersion: '280-60/1', processingVersion: '1',
+    embedding: { provider: 'fixture', model: 'fixture', dimensions: 2, metric: 'cosine', parameters: {} } };
+  const id = first.enqueue(identity, {}, 1, 1000);
+  assert.equal(second.enqueue(identity, {}, 1, 1000), id, 'one index shared across producers');
+  const a = first.claim(1000, 1000);
+  assert.ok(a);
+  assert.equal(second.claim(1000, 1000), null, 'transactional claim is exclusive');
+  first.saveExtraction(a, 'North field measured 23 units.', 1100);
+  first.close();
+  first = new DocumentaryStore(filename);
+  assert.equal(first.claim(1900), null);
+  const recovered = second.claim(2001, 1000);
+  assert.equal(recovered.stage, 'chunk');
+  assert.throws(() => first.saveExtraction(a, 'stale writer', 2100), /lease_lost/);
+  second.saveChunks(recovered, [{ text: 'North field measured 23 units.', pageLabel: 'iv', pageNumber: 6, sourceRef: 'pdf:source' }], 2100);
+  second.publishLexical(recovered, 2200);
+  assert.equal(first.lexicalSearch('23 units', [id], 5).length, 1, 'searchable before embeddings');
+  assert.equal(first.lexicalSearch('23 units', [], 5).length, 0);
+  assert.equal(first.revision(id).embedding_ready, 0);
+  assert.throws(() => second.publishEmbeddings(recovered, [[1, 2, 3]], 2300), /space_mismatch/);
+  second.publishEmbeddings(recovered, [[1, 0]], 2300);
+  assert.equal(first.revision(id).embedding_ready, 1);
+  const nextId = first.enqueue({ ...identity, revision: 'r2' }, {}, 0, 3000);
+  const next = first.claim(3000, 1000);
+  first.saveExtraction(next, 'changed', 3100);
+  first.cancel(nextId);
+  assert.throws(() => first.saveChunks(next, [], 3200), /lease_lost/);
+  assert.equal(first.lexicalSearch('23 units', [id], 5).length, 1, 'failed rebuild preserves old revision');
+  assert.equal(first.db.prepare('SELECT index_key FROM documentary_current').get().index_key, id);
+  const failedId = first.enqueue({ ...identity, documentId: 'failure' }, {}, 0, 4000);
+  for (const now of [4000, 10000, 20000]) { const job = first.claim(now); first.fail(job, 'provider_failed', now); }
+  assert.equal(first.getJob(failedId).state, 'failed');
+  assert.equal(first.claim(50000), null, 'retry bound enforced');
+  first.enqueue({ ...identity, documentId: 'paused' }, {}, 0, 60000);
+  first.setPreference('paused', true);
+  assert.equal(second.claim(60000), null);
+  first.setPreference('paused', false);
+  assert.ok(second.claim(60000));
+  console.log('Shared documentary store: idempotency, transactional leases, restart recovery, fencing, lexical-first publication, vector compatibility, cancellation, bounded retries and pause passed.');
+} finally { first.close(); second.close(); fs.rmSync(scratch, { recursive: true, force: true }); }
