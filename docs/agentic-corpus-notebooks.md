@@ -765,3 +765,14 @@ and `XUWDEV`; the later runs recheck amended activity/worker tests and exercise
 chat compatibility. Final build, both TypeScript projects and focused lint passed.
 See `docs/research-evidence/2026-09-23-research-activity.json` for the exact roots,
 process IDs and test outcomes. Only synthetic screenshots are committed.
+
+## Closing delivery: asynchronous retrieval regression
+
+The activity wrapper preserves the awaited routed retrieval lane. Updated its
+structural regression and added a behavioral gate proving that retrieval remains
+pending until routed evidence arrives while another event-loop turn runs.
+Both affected scripts passed in the isolated harness at
+`/private/tmp/nodus-research-pnemov` with two workers and verified inside-write,
+outside-write, descendant-write, external-network and loopback negative probes.
+This fixes the single test failure in CI run 35885655558; it does not imply that
+the remaining closing-plan acceptance criteria have passed.
