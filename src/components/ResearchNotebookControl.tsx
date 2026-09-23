@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RETRIEVAL_PRESETS, type ResearchCorpusCollection, type ResearchCorpusDocument, type ResearchNotebook, type ResearchNotebookInput, type ResearchPreparationInventory, type ResearchSourceReference } from '@shared/researchCorpus';
 import { ResearchZoteroControl } from './ResearchZoteroControl';
+import { ResearchSystemPromptControl } from './ResearchSystemPromptControl';
+import type { ResearchSystemPrompt } from '@shared/researchSystemPrompts';
 import { t } from '../i18n';
 
 export function ResearchNotebookControl({ value, onChange }: { value?: string | null; onChange: (id: string | null) => void }) {
@@ -38,8 +40,11 @@ function NotebookDialog({ notebook, onClose, onSaved }: { notebook: ResearchNote
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [membershipChanges, setMembershipChanges] = useState<{ added: string[]; removed: string[] }>({ added: [], removed: [] });
+  const [prompts, setPrompts] = useState<ResearchSystemPrompt[]>([]);
+  const refreshPrompts = async () => setPrompts((await window.nodus.getResearchSystemPrompts()).prompts);
   useEffect(() => {
     dialog.current?.showModal();
+    void refreshPrompts().catch(reason => setError(String(reason)));
     let active = true;
     void Promise.all([window.nodus.getResearchCorpusSources(), window.nodus.getResearchPreparationInventory()]).then(([sources, preparation]) => {
       if (active) { setDocuments(sources.documents); setCollections(sources.collections); setInventory(preparation); }
@@ -119,6 +124,18 @@ function NotebookDialog({ notebook, onClose, onSaved }: { notebook: ResearchNote
         ] as const).map(([key, label, min, max]) => <label key={key}>{t(label)}<input className="input block w-full" type="number" required min={min} max={max} step={1} value={settings[key]}
           onChange={event => setDraft({ ...draft, settings: { ...settings, [key]: Number(event.target.value) } })} /></label>)}
       </fieldset>}
+      <details className="mb-3 text-sm"><summary>{t('Ajustes de conversación')}</summary>
+        <label className="block my-2"><input type="checkbox" checked={!!draft.conversationSettings} onChange={event => setDraft({ ...draft,
+          conversationSettings: event.target.checked ? { systemPromptId: null, thinkingEffort: 'standard' } : undefined })} /> {t('Usar ajustes del cuaderno')}</label>
+        {draft.conversationSettings && <div className="flex flex-wrap items-center gap-3">
+          <ResearchSystemPromptControl prompts={prompts} selectedId={draft.conversationSettings.systemPromptId ?? null} disabled={busy} refresh={refreshPrompts}
+            onSelect={async systemPromptId => setDraft({ ...draft, conversationSettings: { ...draft.conversationSettings, systemPromptId } })} />
+          <label>{t('Esfuerzo de thinking')}<select className="input block" value={draft.conversationSettings.thinkingEffort ?? 'standard'} onChange={event => setDraft({ ...draft,
+            conversationSettings: { ...draft.conversationSettings, thinkingEffort: event.target.value as NonNullable<ResearchNotebookInput['conversationSettings']>['thinkingEffort'] } })}>
+            {([['standard', 'Estándar'], ['low', 'Bajo'], ['medium', 'Medio'], ['high', 'Alto']] as const).map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
+          </select></label>
+        </div>}
+      </details>
       <details className="mb-3 text-sm"><summary>{t('Umbral vectorial avanzado')}</summary>
         <label className="block my-2"><input type="checkbox" checked={settings.threshold.mode === 'automatic'} disabled={!inventory?.embeddingSpaces?.length}
           onChange={event => setDraft({ ...draft, settings: { ...settings, threshold: event.target.checked ? { mode: 'automatic' } : { mode: 'manual', value: 0.3, metric: 'cosine', embeddingSpace: inventory!.embeddingSpaces![0].id } } })} /> {t('Umbral automático')}</label>

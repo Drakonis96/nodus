@@ -66,6 +66,7 @@ export function authorizeNotebookRequest(input: ResearchChatRequest): ScopedRequ
   if (scope.vaultId !== getActiveVault().id || (notebook && notebook.revision !== scope.notebookRevision)) throw new Error('research_scope_changed');
   if (notebook && input.conversationId) notebooks.associateNotebookConversation(notebook.id, input.conversationId);
   return { ...input, [pinnedScope]: scope, attachmentIds: [],
+    ...(notebook?.conversationSettings ?? {}),
     messages: authorizedNotebookHistory(input, scope),
     selection: { ...input.selection, documents: false, passages: true, retrieval: validateRetrievalSettings(notebook?.settings ?? input.selection.retrieval ?? RETRIEVAL_PRESETS.balanced),
       sourceFilter: { enabled: true, authorIds: [], workIds: scope.documents.flatMap(document => document.workId ? [document.workId] : []) } } };
@@ -92,8 +93,9 @@ function authorizedNotebookHistory(input: ResearchChatRequest, scope: ResolvedRe
  * Renderer-supplied history metadata and manually saved assistant text cannot. */
 export function rememberNotebookTurn(input: ResearchChatRequest, answer: string): string {
   const scope = requestNotebookScope(input);
-  if (!scope || !input.conversationId) return answer;
+  if (!scope) return answer;
   validateNotebookRequest(input);
+  if (!input.conversationId) return answer;
   const user = input.messages.filter(message => message.role === 'user').at(-1);
   const insert = getDb().prepare(`INSERT OR IGNORE INTO research_conversation_provenance(conversation_id,scope_id,role,content_hash,created_at) VALUES (?,?,?,?,?)`);
   getDb().transaction(() => {

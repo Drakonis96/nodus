@@ -29,6 +29,10 @@ export function saveResearchNotebook(input: ResearchNotebookInput, resolvedIds: 
       || (source.kind === 'zotero-collection' && (!['user', 'group'].includes(source.libraryType ?? '') || !source.libraryId))) throw new Error('Invalid notebook source');
   }
   if ((input.description?.length ?? 0) > 10000 || input.noteIds?.some(id => typeof id !== 'string')) throw new Error('Invalid notebook metadata');
+  const conversation = input.conversationSettings;
+  if (conversation && (typeof conversation !== 'object'
+    || (conversation.systemPromptId != null && (typeof conversation.systemPromptId !== 'string' || conversation.systemPromptId.length > 200))
+    || (conversation.thinkingEffort !== undefined && !['standard', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'on'].includes(conversation.thinkingEffort)))) throw new Error('Invalid notebook conversation settings');
   const existing = input.id ? getResearchNotebook(input.id) : null;
   if (input.id && !existing) throw new Error('Notebook not found');
   const id = existing?.id ?? randomUUID();

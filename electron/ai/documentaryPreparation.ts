@@ -324,7 +324,9 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
   const space = researchFingerprint({ ...config, dimensions: vector?.length ?? 0, metric: 'cosine', parameters });
   const threshold = settings.threshold.mode === 'manual' && settings.threshold.embeddingSpace === space ? settings.threshold.value : -1;
   signal?.throwIfAborted();
-  const worker = new Worker(path.join(__dirname, 'documentaryRetrievalWorker.js'));
+  if (!keys.length && !vectorKeys.length) return { evidence: [], traversal: { partial: scope.documents.length > 0, rounds: 1, candidates: 0, evidenceTokens: 0, visited: [] } };
+  const packagedWorker = path.join(__dirname, 'documentaryRetrievalWorker.js');
+  const worker = new Worker(fs.existsSync(packagedWorker) ? packagedWorker : path.join(app.getAppPath(), 'dist-electron/documentaryRetrievalWorker.js'));
   const result = await new Promise<{ passages: ReturnType<DocumentaryStore['lexicalSearch']>; traversal: { partial: boolean; rounds: number; candidates: number; evidenceTokens: number; visited: string[] } }>((resolve, reject) => {
     let settled = false;
     const finish = (error: Error | null, value?: Parameters<typeof resolve>[0]) => {

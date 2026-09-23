@@ -7095,6 +7095,7 @@ export interface SupportAuditEntry {
 }
 
 export interface WritingWorkshopDraft {
+  researchTraversal?: import('./researchCorpus').ResearchTraversal;
   documentSkills?: import('./documentSkills').DocumentSkillPolicy;
   documentVisualHints?: string[];
   generatedAt: string;
@@ -7416,6 +7417,7 @@ export interface DeepResearchJobRecord {
 
 /** Coverage + evidence accounting attached to a finished report. */
 export interface DeepResearchMeta {
+  researchTraversal?: import('./researchCorpus').ResearchTraversal;
   /** Engine generation that produced the report. */
   deepResearchVersion: import('./deepResearchVersions').DeepResearchVersion;
   /** Visible report structure; internal evidence planning may still use movements. */
@@ -7457,7 +7459,7 @@ export interface DeepResearchMeta {
   coverage?: { questions: string[]; ratio: number } | null;
   /** Retrieval order used for this report. New academic reports lock the idea-graph
    * argument before whole-document evidence can enter. */
-  retrievalStrategy?: 'idea_first_document_enrichment' | 'legacy' | null;
+  retrievalStrategy?: 'idea_first_document_enrichment' | 'scoped_documentary' | 'legacy' | null;
   /** Outcome of the bounded, post-plan document-profile preparation pass. */
   documentPreparation?: {
     considered: number;
@@ -9356,6 +9358,8 @@ export interface WorkPassageStatus {
 }
 
 export interface PassageDetail {
+  revision?: string;
+  historical?: boolean;
   libraryItemId?: string | null;
   provenance?: 'source' | 'abstract';
   passage_id: string;

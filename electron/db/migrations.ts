@@ -9314,24 +9314,24 @@ export const migrations: Migration[] = [
   { version: 177, up: `ALTER TABLE document_profile_fields ADD COLUMN confidence_source TEXT;` },
   { version: 178, up: `ALTER TABLE chat_messages ADD COLUMN concilium_json TEXT;` },
   { version: 179, up: `
-    CREATE TABLE research_notebooks (
+    CREATE TABLE IF NOT EXISTS research_notebooks (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
       revision INTEGER NOT NULL DEFAULT 1, mode TEXT NOT NULL CHECK(mode IN ('fixed','linked')),
       sources_json TEXT NOT NULL, exclusions_json TEXT NOT NULL, resolved_ids_json TEXT NOT NULL,
       settings_json TEXT, notes_json TEXT NOT NULL DEFAULT '[]', conversation_settings_json TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
-    CREATE TABLE research_notebook_conversations (
+    CREATE TABLE IF NOT EXISTS research_notebook_conversations (
       conversation_id TEXT PRIMARY KEY REFERENCES chat_conversations(id) ON DELETE CASCADE,
       notebook_id TEXT NOT NULL REFERENCES research_notebooks(id) ON DELETE CASCADE
     );
-    CREATE INDEX research_notebook_conversations_notebook ON research_notebook_conversations(notebook_id);
-    CREATE TABLE research_run_scopes (
+    CREATE INDEX IF NOT EXISTS research_notebook_conversations_notebook ON research_notebook_conversations(notebook_id);
+    CREATE TABLE IF NOT EXISTS research_run_scopes (
       id TEXT PRIMARY KEY, notebook_id TEXT, scope_json TEXT NOT NULL, created_at TEXT NOT NULL
     );
   ` },
   { version: 180, up: `
-    CREATE TABLE research_conversation_provenance (
+    CREATE TABLE IF NOT EXISTS research_conversation_provenance (
       conversation_id TEXT NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
       scope_id TEXT NOT NULL REFERENCES research_run_scopes(id),
       role TEXT NOT NULL CHECK(role IN ('user','assistant')), content_hash TEXT NOT NULL, created_at TEXT NOT NULL,
@@ -9339,7 +9339,7 @@ export const migrations: Migration[] = [
     );
   ` },
   { version: 181, up: `
-    CREATE TABLE passage_publications (
+    CREATE TABLE IF NOT EXISTS passage_publications (
       nodus_id TEXT PRIMARY KEY REFERENCES works(nodus_id) ON DELETE CASCADE,
       token TEXT NOT NULL, content_hash TEXT NOT NULL, created_at TEXT NOT NULL
     );

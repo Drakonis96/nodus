@@ -216,3 +216,28 @@ The real Zotero 10.0.3 import, managed stdio and external Streamable HTTP scope 
 Academic Deep Research v1 completed without Ideas or document profiles in 68.11 s, produced 1,017 words and cited all three sources. Its separate support audit checked 10 citations: six partial, zero unsupported. This is not a claim of full entailment for every citation. The harness requested a two-section ceiling but the existing core clamps it to three; the report recorded three sections. V2 and specialized approaches still need real-provider checks.
 
 Thirty calls used an accounted upper bound of **$0.03684347**: OpenRouter reports actual per-request cost; DeepSeek usage is valued conservatively at peak cache-miss prices ($0.30/M input and $1.20/M output). No unresolved reservations remain. Evidence is in `artifacts/live-campaign.json`, `live-preparation.json`, `live-process-metrics.json` and `zotero-startup.json` under the fixture root; provider metrics and the durable ledger are under the campaign root. Baseline comparison and broad acceptance remain unfinished.
+
+### Unified traversal and compatibility follow-up
+
+Academic chat and Deep Research now share `ResearchCorpusRun`, including bounded
+Auto Expand and a common execution ledger. Deep Research persists its query trail,
+source counts and partial-coverage flag with the report. Notebook search now uses
+the configured embeddings with a lexical fallback; the comparative live-provider
+case must be repeated to verify the earlier discrepancy. Notebook conversation
+overrides are validated in the backend. Historic immutable documentary citations
+remain readable after a content revision while current permissions still apply;
+the citation UI labels them and suppresses jumps into a newer source revision.
+
+The application build passed. Twelve focused suites passed under Seatbelt at
+`/private/tmp/nodus-research-WadGHn`, including scope/history revocation, shared
+budgets, schema demotion recovery and the corrected TypeScript test loaders.
+The second full-suite attempt at `/private/tmp/nodus-research-Bjhwkw` was
+interrupted and is not a full pass. Existing installer simulations now respect
+the disposable scratch directory; the historical helper simulation changes only
+its scratch prefix, not its bundle-selection logic.
+
+Native run 35843189094 passed Linux and macOS ARM (including real isolated
+Electron on ARM). Windows installed the hash-locked runtime but failed importing
+pywin32 from a `--target` directory. Intel compiled pinned OpenSSL but could not
+find its installed maturin executable. Explicit private-runtime paths address
+both failures; those two targets still require a successful native rerun.

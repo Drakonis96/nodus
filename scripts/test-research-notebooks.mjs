@@ -39,6 +39,8 @@ try {
   assert.throws(() => scopeApi.assertResearchDocument(fixed, 'b', docs[1]), /not_authorized/);
   assert.throws(() => scopeApi.assertResearchDocument(fixed, 'a', { ...docs[0], permissionRevision: 'p2' }), /not_authorized/);
   assert.throws(() => scopeApi.assertResearchDocument(fixed, 'a', { ...docs[0], revision: 'r2' }), /revision_changed/);
+  assert.equal(scopeApi.assertResearchDocumentPermission(fixed, 'a', { ...docs[0], revision: 'r2' }).revision, docs[0].revision);
+  assert.throws(() => scopeApi.assertResearchDocumentPermission(fixed, 'a', { ...docs[0], permissionRevision: 'p2' }), /not_authorized/);
   assert.notEqual(scopeApi.resolveNotebookScope('vault', notebook, [{ ...docs[0], revision: 'r2' }], collections).id, fixed.id);
   const identity = { documentId: 'a', revision: 'r1', attachmentId: 'pdf1', textFingerprint: 'text', chunkerVersion: '280-60/1', processingVersion: '1',
     embedding: { model: 'model', provider: 'provider', dimensions: 1024, metric: 'cosine', parameters: {} } };

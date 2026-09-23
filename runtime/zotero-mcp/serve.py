@@ -17,6 +17,12 @@ from urllib.parse import urlparse
 
 RUNTIME = Path(__file__).resolve().parent
 sys.path.insert(0, str(RUNTIME / "dependencies"))
+# --target installs do not execute pywin32.pth. Load only the pinned runtime's
+# known directories, without processing arbitrary .pth or user site packages.
+if sys.platform == "win32":
+    for directory in ("win32", "win32/lib", "Pythonwin"):
+        sys.path.insert(0, str(RUNTIME / "dependencies" / directory))
+    _win32_dlls = os.add_dll_directory(str(RUNTIME / "dependencies" / "pywin32_system32"))
 os.environ["PYTHON_DOTENV_DISABLED"] = "1"
 os.environ['FASTMCP_CHECK_FOR_UPDATES'] = 'off'
 

@@ -1,4 +1,4 @@
-import type { ResearchEvidence, ResolvedResearchScope, RetrievalSettings } from '@shared/researchCorpus';
+import type { ResearchEvidence, ResearchTraversal, ResolvedResearchScope, RetrievalSettings } from '@shared/researchCorpus';
 import { RETRIEVAL_PRESETS, validateRetrievalSettings } from '@shared/researchCorpus';
 import { ResearchRetrievalBudget } from '@shared/researchRetrievalBudget';
 import type { DeepResearchRequest, WritingWorkshopBrief, WritingWorkshopIdeaCandidate, WritingWorkshopPassageCandidate, WritingWorkshopSnapshot } from '@shared/types';
@@ -46,18 +46,21 @@ export class ResearchCorpusRun {
     const current = researchCorpusInventory().documents;
     for (const document of this.scope.documents) assertResearchDocument(this.scope, document.id, current.find(item => item.id === document.id));
   }
-  async retrieve(query: string): Promise<void> {
+  async retrieve(query: string, expandRounds = 2): Promise<void> {
     this.validate();
     if (!this.budget.nextRound()) return;
     const settings = this.budget.settings;
-    const vector = await embed(query).catch(() => null);
+    if (!this.scope.documents.length) return;
+    const vector = await embed(query, this.signal).catch(() => null);
     this.validate();
     const hierarchy = await retrieveHierarchical(query, { embedding: vector, nodusIds: this.workIds, ideaIds: this.ideaIds,
       documentLimit: settings.candidates, ideaLimit: settings.passagesPerRound, passageLimit: settings.candidates,
       minIdeaSimilarity: -1, minPassageSimilarity: -1, minDocumentSimilarity: -1 });
     const remaining = this.budget.evidenceTokenLimit - this.budget.usedEvidenceTokens;
+    const expansion = settings.autoExpand ? Math.max(1, Math.min(expandRounds, settings.rounds - this.budget.rounds + 1)) : 1;
     const shared = remaining >= 256 ? await retrieveSharedDocumentaryEvidence(this.scope, query,
-      { ...settings, rounds: 1, autoExpand: false, evidenceTokens: remaining }, vector, this.signal) : { evidence: [], traversal: { candidates: 0, partial: true } };
+      { ...settings, rounds: expansion, evidenceTokens: remaining }, vector, this.signal) : { evidence: [], traversal: { rounds: 1, candidates: 0, partial: true } };
+    for (let round = 1; round < shared.traversal.rounds; round++) this.budget.nextRound();
     this.validate();
     // Interleave independent native/shared lanes, retaining source diversity.
     const candidates = shared.evidence.map(item => this.passage(item));
@@ -65,8 +68,10 @@ export class ResearchCorpusRun {
       id: hit.passage_id, label: hit.title, summary: hit.text, nodus_id: hit.nodus_id, pageLabel: hit.page_label,
       authors: this.scope.documents.find(document => document.workId === hit.nodus_id)?.authors ?? [], year: hit.year, zotero_key: hit.zotero_key, citation: `nodus://passage/${encodeURIComponent(hit.passage_id)}`, score: hit.similarity, reason: 'source',
     }));
+    let selected = 0;
     for (let index = 0; index < Math.max(candidates.length, legacy.length); index++) for (const candidate of [candidates[index], legacy[index]]) {
-      if (candidate && this.budget.accept(`passage:${candidate.id}`, candidate.summary)) this.evidence.set(candidate.id, candidate);
+      if (selected >= settings.passagesPerRound * shared.traversal.rounds) { this.budget.partial = true; break; }
+      if (candidate && this.budget.accept(`passage:${candidate.id}`, candidate.summary)) { this.evidence.set(candidate.id, candidate); selected++; }
     }
     const lexical = getDb().prepare(`SELECT global_id,type,label,statement FROM ideas WHERE global_id IN (SELECT value FROM json_each(?))`).all(JSON.stringify(this.ideaIds)) as Array<{ global_id: string; type: WritingWorkshopIdeaCandidate['type']; label: string; statement: string }>;
     const words = query.toLocaleLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [];
@@ -83,6 +88,10 @@ export class ResearchCorpusRun {
     this.budget.candidates += hierarchy.passages.length + shared.traversal.candidates;
     this.budget.partial ||= shared.traversal.partial;
     this.traversal.push({ query, sources: this.scope.documents.map(document => document.id), candidates: hierarchy.passages.length + shared.traversal.candidates, partial: this.budget.partial });
+  }
+  coverage(): ResearchTraversal {
+    return { scopeId: this.scope.id, sourceCount: this.scope.documents.length, rounds: this.budget.rounds,
+      evidenceTokens: this.budget.usedEvidenceTokens, partial: this.budget.partial, queries: this.traversal.map(query => ({ ...query, sources: [...query.sources] })) };
   }
   private passage(item: ResearchEvidence): WritingWorkshopPassageCandidate {
     const document = this.scope.documents.find(document => document.id === item.documentId)!;
@@ -161,7 +170,7 @@ export function bindAcademicCorpusRun(deps: DeepResearchDeps, request: DeepResea
     });
     run.validate();
     return result;
-  }, retrieveForSection: input => run.section(input),
+  }, retrieveForSection: input => run.section(input), researchTraversal: async () => run.coverage(),
     // Basic searchable documents are independent from optional enriched analyses.
     preparePlanEvidence: undefined,
     finalize: input => deps.finalize({ ...input, supportConcerns: [...(input.supportConcerns ?? []), ...(run.budget.partial ? ['Documentary coverage is partial: the shared retrieval budget was reached.'] : [])] }) };

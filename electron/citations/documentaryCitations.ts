@@ -3,7 +3,7 @@ import type { DocumentaryIndexIdentity, ResolvedResearchScope } from '@shared/re
 import { getDb } from '../db/database';
 import { documentaryStore } from '../ai/documentaryPreparation';
 import { researchCorpusInventory } from '../ai/researchCorpusInventory';
-import { assertResearchDocument } from '../ai/researchCorpusScope';
+import { assertResearchDocumentPermission } from '../ai/researchCorpusScope';
 import { getResearchNotebook } from '../db/researchNotebooksRepo';
 import { resolveResearchNotebook } from '../ai/researchNotebookService';
 import { getActiveVault } from '../vaults/vaultRegistry';
@@ -26,13 +26,15 @@ export function getDocumentaryPassageDetail(id: string): PassageDetail | null {
       } | undefined;
     if (!passage) return null;
     const inventory = researchCorpusInventory();
-    const document = assertResearchDocument(scope, passage.document_id, inventory.documents.find(item => item.id === passage.document_id));
+    const current = inventory.documents.find(item => item.id === passage.document_id);
+    const document = assertResearchDocumentPermission(scope, passage.document_id, current);
     if (scope.notebookId && getResearchNotebook(scope.notebookId)
       && !resolveResearchNotebook(scope.notebookId).documents.some(item => item.id === document.id)) return null;
     const identity: DocumentaryIndexIdentity = JSON.parse(passage.identity_json);
     if (identity.revision !== document.revision || identity.attachmentId !== document.attachmentId) return null;
     const locator = JSON.parse(passage.locator_json);
     return { passage_id: id, nodus_id: document.workId ?? document.id, libraryItemId: document.libraryItemId,
+      revision: identity.revision, historical: current?.revision !== identity.revision,
       provenance: (identity.coverage ?? document.coverage) === 'abstract' ? 'abstract' : 'source', text: passage.text,
       page_label: locator.pageLabel, source_ref: locator.sourceRef, page_number: locator.pageNumber,
       chunk_index: passage.ordinal, work: { title: document.title, authors: document.authors, year: document.year,

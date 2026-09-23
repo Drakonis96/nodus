@@ -285,6 +285,11 @@ export function SupportMatrix({
             </div>
           ))}
           <SupportAudit entries={draft.supportAudit ?? []} />
+          {draft.researchTraversal && <details className="card p-3 text-sm">
+            <summary>{t('Cobertura documental')}: {draft.researchTraversal.sourceCount} {t('Fuentes')}{draft.researchTraversal.partial ? ` · ${t('Cobertura parcial')}` : ''}</summary>
+            <p className="my-2">{t('Tokens de evidencia')}: {draft.researchTraversal.evidenceTokens}</p>
+            <ol className="list-decimal pl-5">{draft.researchTraversal.queries.map((query, index) => <li key={index}>{query.query} · {query.candidates} {t('Candidatos por búsqueda')}</li>)}</ol>
+          </details>}
           {draft.qualityAssessment && <DeepResearchQualityPanel assessment={draft.qualityAssessment} />}
           <PanelList title={t('Siguientes pasos')} items={draft.nextSteps} />
           <PanelList title={t('Limitaciones')} items={draft.limitations} />

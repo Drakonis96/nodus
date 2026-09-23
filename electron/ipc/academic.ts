@@ -1,4 +1,5 @@
 import { manualIndexStatus, scheduleManualIndex } from '../ai/manualIdeaIndex';
+import { embed as embedResearchQuery } from '../ai/aiClient';
 import { assertAcademicAutomation } from '../ai/academicMode';
 import { registerResearchAttachmentIpc } from './researchAttachments';
 import { dialogTitle } from '../dialogTitles';
@@ -1634,9 +1635,15 @@ export function registerAcademicIpc(context: IpcContext): void {
     if (typeof query !== 'string' || query.length > 10000) throw new Error('Invalid research query');
     const scope = researchNotebooks.resolveResearchNotebook(id);
     const notebook = researchNotebooks.listResearchNotebooks().find(item => item.id === id)!;
-    const result = await documentaryPreparation.retrieveSharedDocumentaryEvidence(scope, query, notebook.settings ?? RETRIEVAL_PRESETS.balanced, null);
-    if (researchNotebooks.resolveResearchNotebook(id).id !== scope.id) throw new Error('research_scope_changed');
-    return { evidence: result.evidence, scopeId: scope.id, partial: result.traversal.partial };
+    const controller = new AbortController();
+    const release = researchNotebooks.registerNotebookRun(id, controller);
+    try {
+      const vector = scope.documents.length ? await embedResearchQuery(query, controller.signal).catch(() => null) : null;
+      controller.signal.throwIfAborted();
+      const result = await documentaryPreparation.retrieveSharedDocumentaryEvidence(scope, query, notebook.settings ?? RETRIEVAL_PRESETS.balanced, vector, controller.signal);
+      if (researchNotebooks.resolveResearchNotebook(id).id !== scope.id) throw new Error('research_scope_changed');
+      return { evidence: result.evidence, scopeId: scope.id, partial: result.traversal.partial };
+    } finally { release(); }
   });
   h('research:preparation:inventory', async () => documentaryPreparation.getResearchPreparationInventory());
   h('research:preparation:start', async (_e, ids: string[]) => documentaryPreparation.prepareResearchDocuments(ids));

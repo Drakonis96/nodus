@@ -26,11 +26,11 @@ export async function freePort() {
 }
 
 export async function waitForHealth(origin, child, logs) {
-  const deadline = Date.now() + 8_000;
+  const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error(`Nodus Server exited early (${child.exitCode}).\n${logs.join('')}`);
     try {
-      const response = await fetch(`${origin}/healthz`);
+      const response = await fetch(`${origin}/healthz`, { signal: AbortSignal.timeout(2000) });
       if (response.ok) return;
     } catch {
       // The listener is still starting.

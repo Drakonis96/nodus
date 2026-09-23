@@ -40,7 +40,7 @@ try {
   const preparation = load('electron/ai/documentaryPreparation.ts');
   preparation.retrieveSharedDocumentaryEvidence = async requested => {
     assert.deepEqual(requested.documents.map(document => document.workId), ['inside']);
-    return { evidence: [], traversal: { candidates: 0, partial: false } };
+    return { evidence: [], traversal: { rounds: 1, candidates: 0, partial: false } };
   };
   const { ResearchCorpusRun, bindAcademicCorpusRun } = load('electron/ai/researchCorpusRun.ts');
   const { RETRIEVAL_PRESETS } = load('shared/researchCorpus.ts');
@@ -63,6 +63,10 @@ try {
   assert.equal(deps.preparePlanEvidence, undefined);
   await deps.buildSnapshot({ kind: 'deep_research', objective: 'measure' });
   assert.equal(legacyDiscovery, 0);
+  const coverage = await deps.researchTraversal();
+  assert.equal(coverage.scopeId, scope.id);
+  assert.equal(coverage.queries.length, 1);
+  assert.equal(coverage.sourceCount, 1);
   const conversation = load('electron/db/chatRepo.ts').createConversation({ title: 'Scoped history' });
   const request = { conversationId: conversation.id, selection: { notebookId: notebook.id }, messages: [{ role: 'user', content: 'measure?' }] };
   const authorized = notebookService.authorizeNotebookRequest(request);
@@ -71,9 +75,15 @@ try {
   const retained = notebookService.authorizeNotebookRequest(next);
   assert.equal(retained.messages.length, 3);
   assert.doesNotMatch(JSON.stringify(retained.messages), /FORGED/);
+  const configured = notebookService.saveResearchNotebook({ ...notebook, conversationSettings: { thinkingEffort: 'low', systemPromptId: null } });
+  const overridden = notebookService.authorizeNotebookRequest({ ...request, thinkingEffort: 'high', systemPromptId: 'unrelated' });
+  assert.equal(overridden.thinkingEffort, 'low');
+  assert.equal(overridden.systemPromptId, null);
+  assert.throws(() => notebookService.saveResearchNotebook({ ...configured, conversationSettings: { thinkingEffort: 'unbounded' } }), /Invalid notebook conversation/);
   notebookService.saveResearchNotebook({ ...notebook, sources: [], exclusions: [] });
   assert.deepEqual(notebookService.authorizeNotebookRequest(next).messages, [{ role: 'user', content: 'Explain that result.' }]);
   assert.throws(() => run.validate(), /scope_changed/);
+  assert.throws(() => notebookService.rememberNotebookTurn({ ...overridden, conversationId: undefined }, 'stale answer'), /scope_changed/);
   await assert.rejects(() => deps.planReport({}), /scope_changed/);
   console.log('Corpus run: pre-ranking scope, mixed Ideas, lexical-only retrieval, shared section budget, no profile barrier and selection revocation passed.');
 } finally {

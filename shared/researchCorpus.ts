@@ -48,7 +48,7 @@ export interface ResearchNotebookInput {
   exclusions: string[];
   settings?: RetrievalSettings;
   noteIds?: string[];
-  conversationSettings?: { systemPromptId?: string | null; thinkingEffort?: 'low' | 'medium' | 'high' };
+  conversationSettings?: { systemPromptId?: string | null; thinkingEffort?: import('./researchReasoning').ResearchEffort };
 }
 export interface ResearchNotebook extends ResearchNotebookInput {
   id: string;
@@ -112,6 +112,15 @@ export interface ResearchEvidence {
   locator: { sourceRef: string | null; pageNumber: number | null; pageLabel: string | null; charStart?: number; charEnd?: number };
   provenance: 'source' | 'abstract' | 'idea-evidence' | 'profile-support';
   limitations: string[];
+}
+
+export interface ResearchTraversal {
+  scopeId: string;
+  sourceCount: number;
+  rounds: number;
+  evidenceTokens: number;
+  partial: boolean;
+  queries: Array<{ query: string; sources: string[]; candidates: number; partial: boolean }>;
 }
 
 export interface DocumentPreparationState {

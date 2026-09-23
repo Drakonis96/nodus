@@ -626,6 +626,7 @@ export interface FinalizeResult {
  * logic can be tested with fakes — no DB, no AI provider, no Electron.
  */
 export interface DeepResearchDeps {
+  researchTraversal?(): Promise<import('@shared/researchCorpus').ResearchTraversal>;
   buildSnapshot(brief: WritingWorkshopBrief): Promise<WritingWorkshopSnapshot>;
   /** Academic adapters may plan specialized probes using an already authorized
    * snapshot; every supplemental query uses the same run's scope and budget. */
@@ -1581,6 +1582,14 @@ export async function orchestrateDeepResearch(
       roles: Object.fromEntries(Object.entries(claimAuditRoles).filter(([, counts]) => counts.checked > 0)),
     } : null,
   };
+
+  const traversal = await deps.researchTraversal?.();
+  if (traversal) {
+    meta.researchTraversal = traversal;
+    meta.retrievalStrategy = 'scoped_documentary';
+    draft.researchTraversal = traversal;
+    draft.stats.truncated ||= traversal.partial;
+  }
 
   emit({
     phase: 'done',

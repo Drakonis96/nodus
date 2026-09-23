@@ -53,7 +53,8 @@ fs.rmSync(dependencies, { recursive: true, force: true });
 execFileSync(python, ['-I', '-m', 'pip', '--isolated', '--cache-dir', path.join(cache, 'pip'), 'install', '--disable-pip-version-check', '--only-binary=:all:',
   '--require-hashes', '--no-compile', '-r', path.join(source, 'build-requirements.lock')], { cwd: cache, stdio: 'inherit' });
 let nativeCrypto = null;
-let buildEnvironment = { ...process.env, PIP_CACHE_DIR: path.join(cache, 'pip'), PYTHONNOUSERSITE: '1' };
+let buildEnvironment = { ...process.env, PIP_CACHE_DIR: path.join(cache, 'pip'), PYTHONNOUSERSITE: '1',
+  PATH: `${path.dirname(python)}${path.delimiter}${process.env.PATH ?? ''}` };
 if (platform === 'darwin-x64') {
   const cryptoBuild = manifest.nativeCryptoBuild;
   const opensslArchive = await archive(cryptoBuild.url, cryptoBuild.sha256, `openssl-${cryptoBuild.openssl}.tar.gz`);

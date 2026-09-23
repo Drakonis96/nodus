@@ -65,8 +65,16 @@ export function resolveNotebookScope(vaultId: string, notebook: ResearchNotebook
 
 /** Direct reads revalidate both authorization and pinned content; never substitute revisions. */
 export function assertResearchDocument(scope: ResolvedResearchScope, documentId: string, current: ResearchCorpusDocument | undefined): ResearchCorpusDocument {
+  const pinned = assertResearchDocumentPermission(scope, documentId, current);
+  if (!current) throw new Error('research_source_not_authorized');
+  if (pinned.revision !== current.revision || pinned.attachmentId !== current.attachmentId) throw new Error('research_source_revision_changed');
+  return pinned;
+}
+
+/** Historical immutable evidence stays readable after a content edit. Access
+ * revocations still win; active executions use the stricter revision check. */
+export function assertResearchDocumentPermission(scope: ResolvedResearchScope, documentId: string, current: ResearchCorpusDocument | undefined): ResearchCorpusDocument {
   const pinned = scope.documents.find(document => document.id === documentId);
   if (!pinned || !current || pinned.permissionRevision !== current.permissionRevision) throw new Error('research_source_not_authorized');
-  if (pinned.revision !== current.revision || pinned.attachmentId !== current.attachmentId) throw new Error('research_source_revision_changed');
   return pinned;
 }

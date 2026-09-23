@@ -106,7 +106,11 @@ function install(script, bundleName) {
   const root = mkdtempSync(path.join(tmpdir(), 'nodus-bundle-name-'));
   try {
     const scriptPath = path.join(root, 'helper.sh');
-    writeFileSync(scriptPath, script, { mode: 0o700 });
+    // The released helper hardcoded /private/tmp. Relocate only its scratch
+    // prefix in this disposable simulation; preserve its bundle-selection code.
+    const boundedScript = process.env.NODUS_ISOLATED_ROOT
+      ? script.replaceAll('/private/tmp/nodus-update.', `${root}/nodus-update.`) : script;
+    writeFileSync(scriptPath, boundedScript, { mode: 0o700 });
 
     const stage = path.join(root, 'stage', bundleName, 'Contents', 'MacOS');
     mkdirSync(stage, { recursive: true });

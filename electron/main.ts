@@ -288,7 +288,7 @@ function unsignedMacUpdateHelperScript(): string {
     // but never installed — which is exactly what a user reaching for Force Quit
     // does every single time the quit below fails to land.
     "trap '' TERM HUP INT",
-    'STAGING="$(/usr/bin/mktemp -d /private/tmp/nodus-update.XXXXXX)"',
+    'STAGING="$(/usr/bin/mktemp -d "${TMPDIR:-/private/tmp}/nodus-update.XXXXXX")"',
     'BACKUP="${TARGET}.previous"',
     'finish() { /bin/rm -rf "$STAGING"; /bin/rm -f "$0"; }',
     "fail() { /usr/bin/printf '%s\\n' '{\"status\":\"failed\"}' > \"$STATE\"; finish; exit 1; }",

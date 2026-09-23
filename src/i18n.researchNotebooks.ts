@@ -41,7 +41,12 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Espacio de embeddings": "Embedding space",
     "Similitud mínima": "Minimum similarity",
     "El umbral manual solo se aplica al espacio seleccionado.": "The manual threshold applies only to the selected space.",
-    "Cancelar preparación": "Cancel preparation"
+    "Cancelar preparación": "Cancel preparation",
+    "Ajustes de conversación": "Conversation settings",
+    "Usar ajustes del cuaderno": "Use notebook settings",
+    "Cobertura documental": "Documentary coverage",
+    "Cobertura parcial": "Partial coverage",
+    "Esta cita conserva una revisión anterior de la fuente.": "This citation preserves an earlier source revision."
   },
   "fr": {
     "Cuaderno de investigación": "Carnet de recherche",
@@ -85,7 +90,12 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Espacio de embeddings": "Espace des embeddings",
     "Similitud mínima": "Similarité minimale",
     "El umbral manual solo se aplica al espacio seleccionado.": "Le seuil manuel ne s’applique qu’à l’espace sélectionné.",
-    "Cancelar preparación": "Annuler la préparation"
+    "Cancelar preparación": "Annuler la préparation",
+    "Ajustes de conversación": "Paramètres de conversation",
+    "Usar ajustes del cuaderno": "Utiliser les paramètres du carnet",
+    "Cobertura documental": "Couverture documentaire",
+    "Cobertura parcial": "Couverture partielle",
+    "Esta cita conserva una revisión anterior de la fuente.": "Cette citation conserve une version antérieure de la source."
   },
   "de": {
     "Cuaderno de investigación": "Forschungsnotizbuch",
@@ -129,7 +139,12 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Espacio de embeddings": "Embedding-Raum",
     "Similitud mínima": "Minimale Ähnlichkeit",
     "El umbral manual solo se aplica al espacio seleccionado.": "Der manuelle Schwellenwert gilt nur für den gewählten Raum.",
-    "Cancelar preparación": "Vorbereitung abbrechen"
+    "Cancelar preparación": "Vorbereitung abbrechen",
+    "Ajustes de conversación": "Gesprächseinstellungen",
+    "Usar ajustes del cuaderno": "Notizbucheinstellungen verwenden",
+    "Cobertura documental": "Dokumentabdeckung",
+    "Cobertura parcial": "Teilweise Abdeckung",
+    "Esta cita conserva una revisión anterior de la fuente.": "Dieses Zitat bewahrt eine frühere Version der Quelle."
   },
   "it": {
     "Cuaderno de investigación": "Quaderno di ricerca",
@@ -173,7 +188,12 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Espacio de embeddings": "Spazio degli embedding",
     "Similitud mínima": "Similarità minima",
     "El umbral manual solo se aplica al espacio seleccionado.": "La soglia manuale si applica solo allo spazio selezionato.",
-    "Cancelar preparación": "Annulla preparazione"
+    "Cancelar preparación": "Annulla preparazione",
+    "Ajustes de conversación": "Impostazioni della conversazione",
+    "Usar ajustes del cuaderno": "Usa le impostazioni del quaderno",
+    "Cobertura documental": "Copertura documentale",
+    "Cobertura parcial": "Copertura parziale",
+    "Esta cita conserva una revisión anterior de la fuente.": "Questa citazione conserva una versione precedente della fonte."
   },
   "pt": {
     "Cuaderno de investigación": "Caderno de investigação",
@@ -217,7 +237,12 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Espacio de embeddings": "Espaço de embeddings",
     "Similitud mínima": "Semelhança mínima",
     "El umbral manual solo se aplica al espacio seleccionado.": "O limiar manual aplica-se apenas ao espaço selecionado.",
-    "Cancelar preparación": "Cancelar preparação"
+    "Cancelar preparación": "Cancelar preparação",
+    "Ajustes de conversación": "Definições da conversa",
+    "Usar ajustes del cuaderno": "Usar definições do caderno",
+    "Cobertura documental": "Cobertura documental",
+    "Cobertura parcial": "Cobertura parcial",
+    "Esta cita conserva una revisión anterior de la fuente.": "Esta citação conserva uma revisão anterior da fonte."
   },
   "pt-BR": {
     "Cuaderno de investigación": "Caderno de pesquisa",
@@ -261,7 +286,12 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Espacio de embeddings": "Espaço de embeddings",
     "Similitud mínima": "Similaridade mínima",
     "El umbral manual solo se aplica al espacio seleccionado.": "O limite manual se aplica apenas ao espaço selecionado.",
-    "Cancelar preparación": "Cancelar preparação"
+    "Cancelar preparación": "Cancelar preparação",
+    "Ajustes de conversación": "Configurações da conversa",
+    "Usar ajustes del cuaderno": "Usar configurações do caderno",
+    "Cobertura documental": "Cobertura documental",
+    "Cobertura parcial": "Cobertura parcial",
+    "Esta cita conserva una revisión anterior de la fuente.": "Esta citação preserva uma revisão anterior da fonte."
   },
   "tr": {
     "Cuaderno de investigación": "Araştırma defteri",
@@ -305,7 +335,12 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Espacio de embeddings": "Gömme uzayı",
     "Similitud mínima": "En düşük benzerlik",
     "El umbral manual solo se aplica al espacio seleccionado.": "Manuel eşik yalnızca seçilen uzaya uygulanır.",
-    "Cancelar preparación": "Hazırlamayı iptal et"
+    "Cancelar preparación": "Hazırlamayı iptal et",
+    "Ajustes de conversación": "Konuşma ayarları",
+    "Usar ajustes del cuaderno": "Defter ayarlarını kullan",
+    "Cobertura documental": "Belge kapsamı",
+    "Cobertura parcial": "Kısmi kapsam",
+    "Esta cita conserva una revisión anterior de la fuente.": "Bu alıntı, kaynağın önceki bir sürümünü korur."
   },
   "zh-CN": {
     "Cuaderno de investigación": "研究笔记本",
@@ -349,7 +384,12 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Espacio de embeddings": "嵌入空间",
     "Similitud mínima": "最低相似度",
     "El umbral manual solo se aplica al espacio seleccionado.": "手动阈值仅适用于所选空间。",
-    "Cancelar preparación": "取消准备"
+    "Cancelar preparación": "取消准备",
+    "Ajustes de conversación": "对话设置",
+    "Usar ajustes del cuaderno": "使用笔记本设置",
+    "Cobertura documental": "文献覆盖范围",
+    "Cobertura parcial": "部分覆盖",
+    "Esta cita conserva una revisión anterior de la fuente.": "此引用保留了来源的早期版本。"
   },
   "zh-TW": {
     "Cuaderno de investigación": "研究筆記本",
@@ -393,7 +433,12 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Espacio de embeddings": "嵌入空間",
     "Similitud mínima": "最低相似度",
     "El umbral manual solo se aplica al espacio seleccionado.": "手動閾值僅適用於所選空間。",
-    "Cancelar preparación": "取消準備"
+    "Cancelar preparación": "取消準備",
+    "Ajustes de conversación": "對話設定",
+    "Usar ajustes del cuaderno": "使用筆記本設定",
+    "Cobertura documental": "文獻涵蓋範圍",
+    "Cobertura parcial": "部分涵蓋",
+    "Esta cita conserva una revisión anterior de la fuente.": "此引用保留了來源的早期版本。"
   },
   "ja": {
     "Cuaderno de investigación": "研究ノートブック",
@@ -437,7 +482,12 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Espacio de embeddings": "埋め込み空間",
     "Similitud mínima": "最小類似度",
     "El umbral manual solo se aplica al espacio seleccionado.": "手動閾値は選択した空間にのみ適用されます。",
-    "Cancelar preparación": "準備をキャンセル"
+    "Cancelar preparación": "準備をキャンセル",
+    "Ajustes de conversación": "会話の設定",
+    "Usar ajustes del cuaderno": "ノートの設定を使用",
+    "Cobertura documental": "文献の網羅範囲",
+    "Cobertura parcial": "一部のみ網羅",
+    "Esta cita conserva una revisión anterior de la fuente.": "この引用は出典の以前の版を保持しています。"
   },
   "ko": {
     "Cuaderno de investigación": "연구 노트북",
@@ -481,6 +531,11 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Espacio de embeddings": "임베딩 공간",
     "Similitud mínima": "최소 유사도",
     "El umbral manual solo se aplica al espacio seleccionado.": "수동 임계값은 선택한 공간에만 적용됩니다.",
-    "Cancelar preparación": "준비 취소"
+    "Cancelar preparación": "준비 취소",
+    "Ajustes de conversación": "대화 설정",
+    "Usar ajustes del cuaderno": "노트북 설정 사용",
+    "Cobertura documental": "문헌 검색 범위",
+    "Cobertura parcial": "일부 범위만 검색",
+    "Esta cita conserva una revisión anterior de la fuente.": "이 인용은 출처의 이전 버전을 보존합니다."
   }
 };

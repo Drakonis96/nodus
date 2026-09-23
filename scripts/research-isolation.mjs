@@ -33,7 +33,7 @@ export function researchTestEnvironment(root) {
     TMPDIR: path.join(root, 'tmp'), TMP: path.join(root, 'tmp'), TEMP: path.join(root, 'tmp') };
 }
 
-export function macResearchSandbox(root, { liveProviders = false } = {}) {
+export function macResearchSandbox(root) {
   if (process.platform !== 'darwin') throw new Error('Use a disposable native test environment on this platform');
   const quoted = JSON.stringify(fs.realpathSync(root));
   const productionRoots = [
@@ -49,7 +49,7 @@ export function macResearchSandbox(root, { liveProviders = false } = {}) {
     `(deny network-outbound (remote ip "localhost:23119"))\n` +
     `(deny file-write* (require-not (require-any (subpath ${quoted}) (literal "/dev/null"))))\n` +
     productionRoots.map(value => `(deny file-read* (subpath ${JSON.stringify(value)}))`).join('\n') + '\n' +
-    (liveProviders ? '' : '(deny network-outbound (require-not (remote ip "localhost:*")))\n');
+    '(deny network-outbound (require-not (remote ip "localhost:*")))\n';
 }
 
 export function verifyResearchSandbox(root, profile = macResearchSandbox(root)) {
