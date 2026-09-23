@@ -7,6 +7,7 @@ on:
       - 'scripts/verify-research-installer.mjs'
       - 'electron/bootstrap.ts'
       - 'electron/qa/isolatedProfile.ts'
+      - 'electron/workers/background*.ts'
       - 'runtime/zotero-mcp/**'
       - 'build/**'
 permissions:

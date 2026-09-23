@@ -1,0 +1,143 @@
+{
+  "root": "/private/tmp/nodus-research-w0c0lu",
+  "profile": "/private/tmp/nodus-research-w0c0lu/zotero/profile",
+  "data": "/private/tmp/nodus-research-w0c0lu/zotero/data",
+  "proof": {
+    "writeInsideAllowed": true,
+    "writeOutsideDenied": true,
+    "descendantWriteDenied": true,
+    "externalNetworkDenied": true,
+    "forbiddenLoopbackPortDenied": true,
+    "allowedLoopbackPorts": [
+      65270,
+      65271
+    ]
+  },
+  "pid": 92585,
+  "endpoint": "http://127.0.0.1:65270/api",
+  "passed": true,
+  "mcp": {
+    "version": {
+      "name": "nodus-zotero-mcp",
+      "version": "0.13.0+nodus.1"
+    },
+    "transport": "stdio",
+    "physicalPage": 1,
+    "evidenceMarker": "NORTH23",
+    "unauthorizedSourceRejected": true
+  },
+  "nodus": {
+    "passed": true,
+    "ownedWorkers": [
+      {
+        "pid": 93152,
+        "service": "Nodus recovery inspection",
+        "closed": true
+      },
+      {
+        "pid": 93167,
+        "service": "Nodus document extraction",
+        "closed": true
+      },
+      {
+        "pid": 93184,
+        "service": "Nodus document extraction",
+        "closed": true
+      },
+      {
+        "pid": 93204,
+        "service": "Nodus document extraction",
+        "closed": true
+      },
+      {
+        "pid": 93238,
+        "service": "Nodus migration recovery validation",
+        "closed": true
+      },
+      {
+        "pid": 93301,
+        "service": "Nodus documentary chunking",
+        "closed": true
+      },
+      {
+        "pid": 93326,
+        "service": "Nodus documentary retrieval",
+        "closed": true
+      },
+      {
+        "pid": 93835,
+        "service": "Nodus document extraction",
+        "closed": true
+      },
+      {
+        "pid": 93862,
+        "service": "Nodus document extraction",
+        "closed": true
+      },
+      {
+        "pid": 93894,
+        "service": "Nodus documentary chunking",
+        "closed": true
+      },
+      {
+        "pid": 93907,
+        "service": "Nodus documentary chunking",
+        "closed": true
+      },
+      {
+        "pid": 93927,
+        "service": "Nodus documentary retrieval",
+        "closed": true
+      },
+      {
+        "pid": 93956,
+        "service": "Nodus recovery inspection",
+        "closed": true
+      },
+      {
+        "pid": 93958,
+        "service": "Nodus recovery inspection",
+        "closed": true
+      },
+      {
+        "pid": 93959,
+        "service": "Nodus document extraction",
+        "closed": true
+      },
+      {
+        "pid": 93970,
+        "service": "Nodus document extraction",
+        "closed": true
+      }
+    ],
+    "status": {
+      "installed": true,
+      "mode": "managed",
+      "state": "connected",
+      "version": "0.13.0+nodus.1",
+      "transport": "stdio",
+      "error": null,
+      "notebookId": "8ca94a55-06f9-4f04-a95a-fa718daf2141",
+      "scopeId": "0b75783c47cba1b438c205c2f29a92479aad5719290f12aa9bde8b3fe694fb67"
+    },
+    "importedSources": 3,
+    "lexicalPhysicalPage": 1,
+    "attachmentReads": {
+      "passed": true,
+      "independentAttachments": 2,
+      "physicalPage": 1,
+      "marker": "SOUTH41",
+      "foreignAttachmentRejected": true
+    },
+    "modelCalls": 0,
+    "unauthorizedSourceRejected": true,
+    "manualSelectionRevokedConnection": true,
+    "external": {
+      "transport": "streamable-http",
+      "scopeMismatchRejected": true,
+      "processPreserved": true
+    }
+  },
+  "zoteroVersion": "10.0.3",
+  "sources": 3
+}

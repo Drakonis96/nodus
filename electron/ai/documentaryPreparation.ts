@@ -1,7 +1,7 @@
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Worker } from 'node:worker_threads';
+import { backgroundProcess } from '../workers/backgroundProcess';
 import { createHash } from 'node:crypto';
 import { RETRIEVAL_CHUNKER_VERSION } from '@shared/retrievalChunks';
 import { unpreparedResearchAttachmentIds } from '@shared/researchCorpus';
@@ -422,7 +422,7 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
   signal?.throwIfAborted();
   if (!keys.length && !vectorKeys.length) return { evidence: [], traversal: { partial: scope.documents.length > 0, rounds: 1, candidates: 0, evidenceTokens: 0, visited: [] } };
   const packagedWorker = path.join(__dirname, 'documentaryRetrievalWorker.js');
-  const worker = new Worker(fs.existsSync(packagedWorker) ? packagedWorker : path.join(app.getAppPath(), 'dist-electron/documentaryRetrievalWorker.js'));
+  const worker = backgroundProcess(fs.existsSync(packagedWorker) ? packagedWorker : path.join(app.getAppPath(), 'dist-electron/documentaryRetrievalWorker.js'), 'Nodus documentary retrieval');
   const result = await new Promise<{ passages: ReturnType<DocumentaryStore['lexicalSearch']>; traversal: { partial: boolean; rounds: number; candidates: number; evidenceTokens: number; visited: string[] } }>((resolve, reject) => {
     let settled = false;
     const finish = (error: Error | null, value?: Parameters<typeof resolve>[0]) => {
@@ -430,8 +430,7 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
       settled = true;
       clearTimeout(deadline);
       signal?.removeEventListener('abort', abort);
-      void worker.terminate();
-      if (error) reject(error); else resolve(value!);
+      void worker.terminate().finally(() => { if (error) reject(error); else resolve(value!); });
     };
     const abort = () => finish(new Error('documentary_retrieval_cancelled'));
     const deadline = setTimeout(() => finish(new Error('documentary_retrieval_timeout')), 30000);

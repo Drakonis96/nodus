@@ -26,9 +26,10 @@ under macOS Seatbelt against a synthetic HTTP fixture. It does not represent
 integration with a running Zotero application or testing of another platform.
 
 Upstream MIT license, dependency license files and CPython's license files are
-retained in the runtime. `runtime.json` inventories the exact distributed files
-and their SHA-256 hashes. Licensing review and native installer/signing checks
-remain release gates; the development bundle is not a signed distribution.
+retained in the runtime. `runtime.json` inventories the locked payload before
+application code signing. Signing changes Mach-O signature bytes; packaged macOS
+identity is verified separately through the installer hash, Developer ID signature
+and stapled notarization. The development runtime alone is not signed.
 
 ## Installed-byte notices
 

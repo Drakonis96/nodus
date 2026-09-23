@@ -284,6 +284,7 @@ export default defineConfig({
           main: 'electron/bootstrap.ts',
           application: 'electron/main.ts',
           documentaryChunkWorker: 'electron/workers/documentaryChunkWorker.ts',
+          backgroundUtility: 'electron/workers/backgroundUtility.ts',
           documentaryRetrievalWorker: 'electron/workers/documentaryRetrievalWorker.ts',
           computeWorker: 'electron/workers/computeWorker.ts',
           libraryExtractionWorker: 'electron/workers/libraryExtractionWorker.ts',

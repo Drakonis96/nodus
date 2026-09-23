@@ -3,7 +3,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { Worker } from 'node:worker_threads';
+import { backgroundProcess, type BackgroundProcess } from '../workers/backgroundProcess';
 import type { LibraryExtractionOptions, LibraryItemRecord } from '@shared/libraryTypes';
 import {
   extractLibraryItem,
@@ -22,7 +22,7 @@ export interface LibraryWorkerExtractionInput {
   remoteOcr?: LibraryRemoteOcr;
 }
 
-const activeWorkers = new Set<Worker>();
+const activeWorkers = new Set<BackgroundProcess>();
 
 function workerFile(): string {
   return process.env.NODUS_LIBRARY_EXTRACTION_WORKER_FILE
@@ -39,16 +39,17 @@ function abortError(): Error {
   return error;
 }
 
-/** Run the complete extraction pipeline away from Electron's main event loop. */
+/** Run the complete extraction pipeline in an owned process outside Electron's main process. */
 export async function extractLibraryItemInWorker(input: LibraryWorkerExtractionInput): Promise<LibraryExtractionResult> {
   if (!libraryExtractionWorkerAvailable()) {
+    if (process.type === 'browser') throw new Error('Library extraction process is unavailable.');
     // Source-level unit tests do not build the worker entry. Production and
     // packaged development builds always include it; retain a functional
     // fallback for those isolated tests and explicit diagnostic opt-outs.
     return extractLibraryItem(input);
   }
   if (input.signal?.aborted) throw abortError();
-  const worker = new Worker(workerFile());
+  const worker = backgroundProcess(workerFile(), 'Nodus document extraction');
   activeWorkers.add(worker);
   worker.unref();
   return new Promise<LibraryExtractionResult>((resolve, reject) => {
@@ -60,9 +61,7 @@ export async function extractLibraryItemInWorker(input: LibraryWorkerExtractionI
       if (forcedTermination) clearTimeout(forcedTermination);
       input.signal?.removeEventListener('abort', cancel);
       activeWorkers.delete(worker);
-      void worker.terminate().catch(() => undefined);
-      if (error) reject(error);
-      else resolve(result!);
+      void worker.terminate().finally(() => { if (error) reject(error); else resolve(result!); });
     };
     const cancel = (): void => {
       worker.postMessage({ kind: 'cancel' });

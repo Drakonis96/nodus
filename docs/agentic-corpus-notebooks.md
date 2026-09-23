@@ -23,7 +23,7 @@ disposable TCP loopback endpoints. See the corrective isolation record below;
 older write-only checks must not be read as proof of network exclusion.
 
 **Acceptance remains open:** factual grounding of long Deep Research reports,
-full signed/notarized installer lifecycle, and final-head native verification.
+upgrades between different versions, exhaustive failure-matrix coverage, and final-head native verification.
 The matched synthetic comparison is retained in `docs/research-evidence/`;
 citation existence and automatic support scores are not factual acceptance.
 No release, tag or merge has been created.
@@ -649,3 +649,42 @@ roots and both application-name casings. Private XDG paths are also validated fo
 symlink escapes before any application module import. Six isolation tests and lint
 pass; the native installer campaign is being repeated. Startup failures now retain
 bounded diagnostics in the evidence JSON instead of only a window timeout.
+
+
+### Four-platform native installer results
+
+Campaign [35862266301](https://github.com/Drakonis96/nodus/actions/runs/35862266301)
+passed at `736823e0` on macOS ARM64/x64, Windows x64 and Linux x64. macOS packages
+were signed and notarized. All four installed the native package, launched the
+packaged application twice across same-version reinstallation, loaded the private
+Python server and removed their application while preserving notebooks, profiles
+and foreign fixtures. Durable reports, installer hashes and exact platform roots
+are in `docs/research-evidence/2026-09-23-installers.json`. Windows/Linux ran on
+disposable hosted machines; their evidence does not claim a macOS Seatbelt boundary.
+An upgrade between different application versions remains untested.
+
+### Separate processes for heavy document work
+
+Extraction, documentary chunking and hybrid retrieval now own an Electron utility
+process per bounded operation. Each utility hosts the existing Node worker thread:
+PDF.js detects Electron utility contexts as browsers, so this preserves its tested
+Node/Canvas/OCR environment without changing runtime identity. The heavy work is
+outside the main OS process. Cancellation waits for process exit, including a
+synchronous blocked worker; application shutdown owns all active extraction
+processes. Plain Node harnesses use fork IPC with advanced serialization.
+
+The initial direct-utility integration exposed PDF.js's missing worker-source
+error; it is retained in `/private/tmp/nodus-research-BzuytI`. The corrected bridge
+passed the real Zotero 10.0.3/Electron 43.4.0 integration at
+`/private/tmp/nodus-research-w0c0lu`: three distinct service PIDs, every owned PID
+closed, full-text physical-page evidence, managed/external MCP and second-attachment
+citation navigation. Full build, type checks and focused lint passed. The four focused isolated scripts passed
+at `/private/tmp/nodus-research-W8Ei0H`, including distinct PID, synchronous
+cancellation, worker startup failure, lexical-first publication and scoped reads.
+Installer validation now additionally imports a synthetic PDF and requires a real
+first-page source citation before and after same-version replacement.
+
+UI evidence from the corrected isolation campaign (synthetic content only):
+
+![Notebook preparation controls, light theme, 1280px](research-evidence/notebook-light-1280.png)
+![Notebook preparation controls, dark theme, 800px](research-evidence/notebook-dark-800.png)

@@ -1,4 +1,4 @@
-import { parentPort } from 'node:worker_threads';
+import { parentPort } from './backgroundParentPort';
 import { planRetrievalChunks } from '@shared/retrievalChunks';
 parentPort?.on('message', (input: { text: string; sourceMap: Record<string, string> }) => {
   try { parentPort!.postMessage({ chunks: planRetrievalChunks(input.text, { sourceMap: input.sourceMap }) }); }

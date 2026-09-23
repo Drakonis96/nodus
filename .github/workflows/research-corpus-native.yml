@@ -52,7 +52,7 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
       - name: Synthetic scope and durable queue regressions
-        run: node --test --test-concurrency=2 scripts/test-documentary-store.mjs scripts/test-documentary-requests.mjs scripts/test-research-notebooks.mjs scripts/test-research-corpus-run.mjs scripts/test-research-request-budget.mjs scripts/test-documentary-writers.mjs
+        run: node --test --test-concurrency=2 scripts/test-research-background-process.mjs scripts/test-documentary-store.mjs scripts/test-documentary-requests.mjs scripts/test-research-notebooks.mjs scripts/test-research-corpus-run.mjs scripts/test-research-request-budget.mjs scripts/test-documentary-writers.mjs
       - name: Isolated real Electron notebooks on macOS
         if: runner.os == 'macOS'
         run: node scripts/e2e-research-isolated.mjs --notebooks

@@ -140,8 +140,10 @@ try {
   const transport = new StdioClientTransport({ command: '/usr/bin/sandbox-exec', args: ['-p', policy, path.join(runtime, 'python/bin/python3'), '-I', '-B', path.join(runtime, 'serve.py'), scopeFile],
     env: { ...researchTestEnvironment(root), HOME: root, XDG_CACHE_HOME: path.join(root, 'mcp/cache'), XDG_CONFIG_HOME: path.join(root, 'mcp/config') }, stderr: 'pipe' });
   const client = new Client({ name: 'nodus-real-zotero-test', version: '1' });
+  const mcpLog = fs.createWriteStream(path.join(root, 'artifacts/fixture-mcp.log'));
+  transport.stderr?.pipe(mcpLog);
   try {
-    await client.connect(transport, { timeout: 15000 });
+    await client.connect(transport, { timeout: 60000 });
     const args = { library_type: 'user', library_id: '0', item_key: firstItem.key };
     assert.equal((await client.callTool({ name: 'zotero_get_item_metadata', arguments: args })).isError, false);
     const pages = await client.callTool({ name: 'zotero_read_pdf_pages', arguments: { ...args, attachment_key: attachmentItem.key, start_page: 1, end_page: 1 } });
@@ -149,7 +151,7 @@ try {
     assert.match(JSON.stringify(pages), /NORTH23/);
     assert.equal((await client.callTool({ name: 'zotero_get_item_metadata', arguments: { ...args, item_key: corpus.items[1].key } })).isError, true);
     Object.assign(report, { mcp: { version: client.getServerVersion(), transport: 'stdio', physicalPage: 1, evidenceMarker: 'NORTH23', unauthorizedSourceRejected: true } });
-  } finally { await client.close(); }
+  } finally { await client.close(); mcpLog.end(); }
   if (process.argv.includes('--nodus') || providerProxy) {
     const { verifyZoteroNodusProduct } = await import('./verify-zotero-nodus-product.mjs');
     report.nodus = await verifyZoteroNodusProduct(root, report.endpoint, corpus, { providerProxy: providerProxy?.url, externalMcpPort, baselineWorkspace, chatOnly: process.argv.includes('--chat-only'), adversarial: process.argv.includes('--adversarial') });

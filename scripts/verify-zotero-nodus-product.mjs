@@ -15,11 +15,21 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus, { provide
   const app = await _electron.launch({ executablePath: wrapper, args: ['--no-sandbox', '--disable-gpu', baselineWorkspace ?? path.resolve(import.meta.dirname, '..')], cwd: root,
     env: { ...researchTestEnvironment(root), NODUS_ZOTERO_API_BASE: endpoint,
       ...(providerProxy ? { NODUS_RESEARCH_PROVIDER_PROXY: providerProxy } : {}) }, timeout: 60000 });
+  const ownedWorkers = [];
   let external;
   let externalLog;
   try {
     const page = await app.firstWindow();
     await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length), { timeout: 60000 });
+    await app.evaluate(({ utilityProcess }) => {
+      globalThis.researchOwnedWorkers = [];
+      const original = utilityProcess.fork.bind(utilityProcess);
+      utilityProcess.fork = (...args) => {
+        const child = original(...args);
+        child.once('spawn', () => globalThis.researchOwnedWorkers.push({ pid: child.pid, service: args[2]?.serviceName }));
+        return child;
+      };
+    });
     if (providerProxy) {
       await page.evaluate(() => window.nodus.updateSettings({ chatModel: { provider: 'deepseek', model: 'deepseek-flash' },
         deepResearchModel: { provider: 'deepseek', model: 'deepseek-flash' }, synthesisModel: { provider: 'deepseek', model: 'deepseek-flash' },
@@ -110,12 +120,20 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus, { provide
       live = await runResearchLiveCampaign(page, app, root, imported.inventory.documents, { chatOnly, adversarial });
     }
     const attachmentReads = providerProxy ? undefined : await (await import('./verify-research-attachment-reads.mjs')).verifyResearchAttachmentReads(page, app, root, source.id);
-    return { passed: true, status, importedSources: imported.inventory.documents.length, lexicalPhysicalPage: 1,
+    ownedWorkers.push(...await app.evaluate(() => globalThis.researchOwnedWorkers));
+    for (const name of ['Nodus document extraction', 'Nodus documentary chunking', 'Nodus documentary retrieval']) {
+      assert.ok(ownedWorkers.some(worker => worker.service === name && worker.pid !== app.process().pid), `${name} must run outside the main OS process`);
+    }
+    return { passed: true, ownedWorkers, status, importedSources: imported.inventory.documents.length, lexicalPhysicalPage: 1,
       attachmentReads,
       ...(providerProxy ? { live } : { modelCalls: 0 }), unauthorizedSourceRejected: true, manualSelectionRevokedConnection: true,
       external: { transport: externalStatus.transport, scopeMismatchRejected: true, processPreserved: true } };
   } finally {
     await app.close();
+    for (const worker of ownedWorkers) {
+      assert.throws(() => process.kill(worker.pid, 0), error => error.code === 'ESRCH', 'owned heavy process exited after application shutdown');
+      worker.closed = true;
+    }
     if (external && external.exitCode === null) {
       external.kill('SIGTERM');
       await Promise.race([new Promise(resolve => external.once('exit', resolve)), new Promise(resolve => setTimeout(resolve, 5000))]);

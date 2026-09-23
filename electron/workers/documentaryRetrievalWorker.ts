@@ -1,4 +1,4 @@
-import { parentPort } from 'node:worker_threads';
+import { parentPort } from './backgroundParentPort';
 import { DocumentaryStore } from '../db/documentaryStore';
 import { ResearchRetrievalBudget } from '@shared/researchRetrievalBudget';
 import { validateResearchDocumentRead, type ResearchDocumentRead, type RetrievalSettings } from '@shared/researchCorpus';

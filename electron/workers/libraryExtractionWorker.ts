@@ -10,7 +10,7 @@
  * event loop and producing an operating-system "application not responding"
  * state while the Library is open.
  */
-import { parentPort } from 'node:worker_threads';
+import { parentPort } from './backgroundParentPort';
 import type { LibraryExtractionOptions, LibraryItemRecord } from '@shared/libraryTypes';
 import { extractLibraryItem } from '../library/libraryExtractionEngine';
 import { LibraryDiskStore } from '../library/libraryStorage';
