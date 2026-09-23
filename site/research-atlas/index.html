@@ -23,7 +23,7 @@
 <link rel="preload" as="font" type="font/woff2" href="../assets/fonts/inter-latin.woff2" crossorigin/>
 <link rel="preload" as="font" type="font/woff2" href="../assets/fonts/fraunces-latin.woff2" crossorigin/>
 <link rel="stylesheet" href="../assets/css/nodus.css?v=20260922b"/>
-<link rel="stylesheet" href="../assets/css/research-atlas.css?v=20260923a"/>
+<link rel="stylesheet" href="../assets/css/research-atlas.css?v=20260923b"/>
 <link rel="stylesheet" href="../contribute/planet.css?v=20260922a"/>
 </head>
 <body>
@@ -43,16 +43,20 @@
       <div class="atlas-search-wrap">
         <div class="atlas-searchbar">
           <div class="atlas-engine-wrap">
-            <label class="sr-only" for="atlas-engine">Search engine</label>
-            <select class="atlas-engine" id="atlas-engine">
-              <option value="directory">Directory</option>
-              <option value="google">Google</option>
-              <option value="bing">Bing</option>
-              <option value="duckduckgo">DuckDuckGo</option>
-              <option value="brave">Brave Search</option>
-              <option value="startpage">Startpage</option>
-              <option value="scholar">Google Scholar</option>
-            </select>
+            <span class="sr-only" id="atlas-engine-label">Search engine</span>
+            <!-- The list is drawn by the page, not by the platform. A native
+                 select hands its popup to the operating system, which paints
+                 that popup from ITS appearance setting: `color-scheme: dark` on
+                 the control reaches the closed control and every option's
+                 computed style, and the menu still opens light. The only way
+                 the list is dark is to own it. -->
+            <button class="atlas-engine" id="atlas-engine" type="button"
+                    aria-haspopup="listbox" aria-expanded="false"
+                    aria-labelledby="atlas-engine-label atlas-engine-value">
+              <span id="atlas-engine-value">Directory</span>
+            </button>
+            <div class="atlas-engine-menu" id="atlas-engine-menu" role="listbox"
+                 aria-labelledby="atlas-engine-label" hidden></div>
           </div>
           <span class="atlas-search-sep" aria-hidden="true"></span>
           <div class="atlas-input-wrap">
@@ -223,7 +227,7 @@
 
 
 <script src="../assets/js/organism.js?v=20260820a"></script>
-<script src="../assets/js/research-atlas.js?v=20260923a"></script>
+<script src="../assets/js/research-atlas.js?v=20260923b"></script>
 <script src="../assets/js/site.js?v=20260815"></script>
 <script src="../assets/js/back-to-top.js?v=20260817b"></script>
 <script src="../contribute/planet.js?v=20260917a"></script>

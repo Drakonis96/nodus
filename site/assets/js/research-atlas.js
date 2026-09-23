@@ -7,11 +7,13 @@
   const grid = document.getElementById('atlas-grid');
   const input = document.getElementById('atlas-search');
   const engine = document.getElementById('atlas-engine');
+  const engineValue = document.getElementById('atlas-engine-value');
+  const engineMenu = document.getElementById('atlas-engine-menu');
   const submit = document.getElementById('atlas-submit');
   const clear = document.getElementById('atlas-clear');
   const reset = document.getElementById('atlas-reset');
   const status = document.getElementById('atlas-status');
-  if (!grid || !input || !engine || !submit || !clear || !reset || !status) return;
+  if (!grid || !input || !engine || !engineValue || !engineMenu || !submit || !clear || !reset || !status) return;
 
   let catalogue;
   try {
@@ -224,6 +226,9 @@
 
   function closeAll(except='') {
     for (const key of Object.keys(FACETS)) if (key !== except) closeFacet(key);
+    // The engine list is drawn here too, so the click that closes one panel
+    // closes the other.
+    closeEngine();
   }
 
   function update() {
@@ -285,24 +290,68 @@
     });
   }
 
-  const ENGINES = {
-    google: q => `https://www.google.com/search?q=${encodeURIComponent(q)}`,
-    bing: q => `https://www.bing.com/search?q=${encodeURIComponent(q)}`,
-    duckduckgo: q => `https://duckduckgo.com/?q=${encodeURIComponent(q)}`,
-    brave: q => `https://search.brave.com/search?q=${encodeURIComponent(q)}`,
-    startpage: q => `https://www.startpage.com/sp/search?query=${encodeURIComponent(q)}`,
-    scholar: q => `https://scholar.google.com/scholar?q=${encodeURIComponent(q)}`
-  };
+  /**
+   * The search engine, drawn here rather than by the platform.
+   *
+   * This was a <select>, and the operating system painted its popup from its
+   * own appearance setting, so a dark page opened a light menu. Nothing in CSS
+   * reaches that popup: `color-scheme: dark` on the control (and on the
+   * document) is inherited by the closed control and by every <option>'s
+   * computed style, and the menu still opened light — verified, not assumed.
+   * Owning the list is the only way the list is dark.
+   */
+  const ENGINES = [
+    ['directory', 'Directory', null],
+    ['google', 'Google', q => `https://www.google.com/search?q=${encodeURIComponent(q)}`],
+    ['bing', 'Bing', q => `https://www.bing.com/search?q=${encodeURIComponent(q)}`],
+    ['duckduckgo', 'DuckDuckGo', q => `https://duckduckgo.com/?q=${encodeURIComponent(q)}`],
+    ['brave', 'Brave Search', q => `https://search.brave.com/search?q=${encodeURIComponent(q)}`],
+    ['startpage', 'Startpage', q => `https://www.startpage.com/sp/search?query=${encodeURIComponent(q)}`],
+    ['scholar', 'Google Scholar', q => `https://scholar.google.com/scholar?q=${encodeURIComponent(q)}`]
+  ];
+  let chosenEngine = ENGINES[0];
+
+  function renderEngineMenu() {
+    engineMenu.textContent = '';
+    for (const [value, label] of ENGINES) {
+      const chosen = value === chosenEngine[0];
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = `atlas-engine-option${chosen ? ' is-selected' : ''}`;
+      row.dataset.value = value;
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', String(chosen));
+      row.innerHTML = `<span class="atlas-engine-tick" aria-hidden="true"></span><span>${esc(label)}</span>`;
+      engineMenu.appendChild(row);
+    }
+  }
+
+  function closeEngine() {
+    engineMenu.hidden = true;
+    engine.setAttribute('aria-expanded', 'false');
+  }
+
+  /** Choosing an engine also decides what the field promises to do with it. */
+  function chooseEngine(value) {
+    chosenEngine = ENGINES.find(([candidate]) => candidate === value) ?? ENGINES[0];
+    const directory = chosenEngine[0] === 'directory';
+    engineValue.textContent = chosenEngine[1];
+    input.placeholder = directory ? 'Search the research directory…' : `Search with ${chosenEngine[1]}…`;
+    submit.title = directory ? 'Filter directory' : `Search with ${chosenEngine[1]}`;
+    // Re-drawn now, not on the next open, so the tick matches the choice even
+    // while the list is shut.
+    renderEngineMenu();
+  }
 
   function runSearch() {
     const q = input.value.trim();
     if (!q) return;
-    if (engine.value === 'directory') {
+    const makeUrl = chosenEngine[2];
+    if (!makeUrl) {
       update();
       return;
     }
-    const makeUrl = ENGINES[engine.value];
-    if (makeUrl) window.open(makeUrl(q),'_blank','noopener');
+    window.open(makeUrl(q),'_blank','noopener');
   }
 
   input.addEventListener('input', update);
@@ -313,14 +362,21 @@
     }
   });
 
-  engine.addEventListener('change', () => {
-    const name = engine.options[engine.selectedIndex].textContent;
-    input.placeholder = engine.value === 'directory'
-      ? 'Search the research directory…'
-      : `Search with ${name}…`;
-    submit.title = engine.value === 'directory'
-      ? 'Filter directory'
-      : `Search with ${name}`;
+  engine.addEventListener('click', (event) => {
+    // Without this the document handler behind it would close the list in the
+    // same click that opened it.
+    event.stopPropagation();
+    const opening = engineMenu.hidden;
+    closeAll();
+    if (opening) renderEngineMenu();
+    engineMenu.hidden = !opening;
+    engine.setAttribute('aria-expanded', String(opening));
+  });
+  engineMenu.addEventListener('click', (event) => {
+    const row = event.target.closest('.atlas-engine-option');
+    if (!row) return;
+    chooseEngine(row.dataset.value);
+    closeEngine();
   });
 
   submit.addEventListener('click', runSearch);
@@ -341,5 +397,6 @@
     if (event.key === 'Escape') closeAll();
   });
 
+  chooseEngine('directory');
   update();
 })();
