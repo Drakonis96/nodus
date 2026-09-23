@@ -206,7 +206,7 @@ function skillExecution(request: ResearchChatRequest) {
 async function finalizeWithAudit(answer: string, execution: ReturnType<typeof skillExecution>, signal?: AbortSignal): Promise<string> {
   const skilled = await executeChatSkills(answer, execution, signal);
   const chemistryEnabled = execution.skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
-  const options = { model: execution.model, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner, signal };
+  const options = { model: execution.model, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner, signal, question: execution.question };
   // Names-first: resolve every species name to a structure (PubChem first, OPSIN fallback),
   // derive the equations from the resolved structures, and attach the derived SMILES to the
   // answer. An unresolved reactant/product name is sent back to the model to correct, and the

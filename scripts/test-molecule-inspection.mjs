@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const dir = await mkdtemp(path.join(os.tmpdir(), 'molecule-inspection-'));
 await build({ entryPoints: ['shared/moleculeInspection.ts'], outfile: path.join(dir, 'inspection.mjs'), bundle: true, platform: 'node', format: 'esm' });
-const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findReactionLines, findStepConditions, declaresRacemic, normalizeRouteAudit, formatRouteAudit, formatRouteFixPrompt, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD, findStepSpeciesLabels, findDuplicateRoleProblems, findStepEquationProblems, hasCheckerScaffolding, parseRouteConsistencyVerdict, formatRouteClarification, routeLabelNames, buildRouteConsistencyRequest, ROUTE_CONSISTENCY_SYSTEM, ROUTE_REPAIR_SYSTEM, countRouteSteps, findStepNamedSpecies, buildRouteSteps, annotateSpeciesSmiles, formatNameCorrectionNote, formatNamedRouteFixPrompt, formatMissingSpeciesPrompt, parseNameFeedback, ROUTE_NAME_FEEDBACK_SYSTEM, formatUnresolvedNameClarification } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
+const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findReactionLines, findStepConditions, declaresRacemic, normalizeRouteAudit, formatRouteAudit, formatRouteFixPrompt, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD, findStepSpeciesLabels, findDuplicateRoleProblems, findStepEquationProblems, hasCheckerScaffolding, parseRouteConsistencyVerdict, parseRouteReview, formatRouteClarification, routeLabelNames, buildRouteConsistencyRequest, ROUTE_CONSISTENCY_SYSTEM, ROUTE_REPAIR_SYSTEM, countRouteSteps, findStepNamedSpecies, buildRouteSteps, annotateSpeciesSmiles, formatNameCorrectionNote, formatNamedRouteFixPrompts, formatMissingSpeciesPrompt, parseNameFeedback, ROUTE_NAME_FEEDBACK_SYSTEM, formatUnresolvedNameClarification } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
 await build({ entryPoints: ['shared/chatSkills.ts'], outfile: path.join(dir, 'chatSkills.mjs'), bundle: true, platform: 'node', format: 'esm' });
 const { splitChatVisuals, serializeChatVisualPart } = await import(pathToFileURL(path.join(dir, 'chatSkills.mjs')));
 await build({ entryPoints: ['shared/synthesisPrompt.ts'], outfile: path.join(dir, 'synthesisPrompt.mjs'), bundle: true, platform: 'node', format: 'esm' });
@@ -270,7 +270,38 @@ test('a route audit is normalized defensively and formatted deterministically', 
   assert.match(text, /- Step 1 FAIL — NOT balanced \(H: reactants 6, products 4\)\. C2H6O → C2H4O/);
   assert.match(text, /- Step 2 OK — balanced\./);
   assert.match(text, /- Step 1 → 2 OK — carried C2H4O/);
-  assert.match(text, /Route blocked: Step 1 is not balanced/);
+  assert.match(text, /\*\*Route not verified\*\* — 1 of 2 step\(s\) do not pass \(step 1\)\./);
+  assert.match(text, /Not verified: Step 1 is not balanced/);
+});
+
+test('a route review blocks the verdict and is shown as a model finding', () => {
+  const audit = normalizeRouteAudit({
+    continuous: true, blocked: [],
+    steps: [passingStep(0, 'a>>b')], links: [],
+  });
+  assert.ok(audit);
+  const clean = formatRouteAudit(audit);
+  assert.match(clean, /\*\*Route verified\*\*/);
+  assert.doesNotMatch(clean, /Route review/);
+  const review = parseRouteReview('{"status":"problems","problems":[{"step":1,"detail":"the Products line names a different compound than the target."}]}');
+  assert.deepEqual(review, { status: 'problems', problems: [{ step: 1, detail: 'the Products line names a different compound than the target.' }] });
+  const blockedText = formatRouteAudit(audit, [], review);
+  assert.match(blockedText, /\*\*Route not verified\*\* — a route review raised 1 problem\(s\)\./);
+  assert.match(blockedText, /### Route review \(model\)/);
+  assert.match(blockedText, /- Step 1: the Products line names a different compound than the target\./);
+  assert.match(blockedText, /Not verified: The route review raised 1 problem\(s\)\./);
+});
+
+test('an unreadable review is not a problem and never blocks', () => {
+  assert.equal(parseRouteReview('sorry, I could not read the route'), null);
+  assert.equal(parseRouteReview('{"status":"problems","problems":[]}'), null);
+  assert.equal(parseRouteReview('{"status":"weird"}'), null);
+  assert.deepEqual(parseRouteReview('here it is: {"status":"ok"}'), { status: 'ok', problems: [] });
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
+  assert.ok(audit);
+  assert.match(formatRouteAudit(audit, [], null), /\*\*Route verified\*\*/);
+  // A review of `ok` does not block either.
+  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"ok"}')), /\*\*Route verified\*\*/);
 });
 
 test('the continuity rule tells the model to reuse the same isomeric SMILES', () => {
@@ -872,7 +903,9 @@ test('corrections are summarized for the user, and the feedback prompt parses', 
   assert.match(payload.prompt, /sodium but-1-ynide/);
 });
 
-test('a route derived from names is corrected with a names-only prompt, never a SMILES', () => {
+const routeFixChips = (text) => splitChatVisuals(text).filter((part) => part.kind === 'route-fix').map((part) => JSON.parse(part.content));
+
+test('a route derived from names is corrected with a names-only chip set, never a SMILES', () => {
   const labels = [[
     { role: 'reactant', byproduct: false, name: 'phenol', smiles: 'Oc1ccccc1' },
     { role: 'reactant', byproduct: false, name: 'sodium hydroxide', smiles: '[Na+].[OH-]' },
@@ -884,16 +917,75 @@ test('a route derived from names is corrected with a names-only prompt, never a 
     steps: [{ index: 0, reaction: 'x', ok: true, balanced: false, chargeBalanced: true, differences: ['H: reactants 7, products 8'], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }],
     links: [],
   });
-  const fence = formatNamedRouteFixPrompt(labels, audit);
-  const payload = JSON.parse(fence.replace(/^```nodus-route-fix\n/, '').replace(/\n```$/, ''));
-  assert.equal(payload.label, 'Ask the model to fix the failed steps');
-  assert.match(payload.prompt, /Reactants: phenol; sodium hydroxide/);
-  assert.match(payload.prompt, /Products: sodium phenoxide/);
-  assert.match(payload.prompt, /Do not write SMILES/);
-  assert.doesNotMatch(payload.prompt, /oc1ccccc1|\[Na\+\]\.\[OH-\]/, 'no derived SMILES is shown to the model');
-  // A route whose failing steps are all passing yields no prompt.
-  const clean = normalizeRouteAudit({ continuous: true, blocked: [], steps: [{ index: 0, reaction: 'x', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }], links: [] });
-  assert.equal(formatNamedRouteFixPrompt(labels, clean), '');
+  const chips = routeFixChips(formatNamedRouteFixPrompts(labels, audit));
+  assert.deepEqual(chips.map((chip) => chip.label), ['Ask the model to fix the failed steps', 'Fix from the target backwards', 'Fix step 1']);
+  for (const chip of chips) {
+    assert.match(chip.prompt, /Do not write SMILES/);
+    assert.doesNotMatch(chip.prompt, /oc1ccccc1|\[Na\+\]\.\[OH-\]/, 'no derived SMILES is shown to the model');
+  }
+  assert.match(chips[0].prompt, /Reactants: phenol; sodium hydroxide/);
+  assert.match(chips[0].prompt, /Products: sodium phenoxide/);
+  assert.match(chips[0].prompt, /insert, remove, split or merge/, 'fix-all may re-plan');
+  assert.match(chips[1].prompt, /Work backwards from the final step/);
+  assert.match(chips[2].prompt, /Step 1 was rejected: not balanced/);
+  assert.match(chips[2].prompt, /You may split step 1 into consecutive steps, or combine it with an adjacent step/);
+  // A route whose steps all pass yields no chip.
+  const clean = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'x')], links: [] });
+  assert.equal(formatNamedRouteFixPrompts(labels, clean), '');
+});
+
+test('every flagged step gets a chip, emitted last-first, and passing steps get none', () => {
+  const labels = Array.from({ length: 6 }, (_, index) => [
+    { role: 'reactant', byproduct: false, name: `reactant ${index + 1}`, smiles: `C${index + 1}` },
+    { role: 'product', byproduct: false, name: `product ${index + 1}`, smiles: `O${index + 1}` },
+  ]);
+  const audit = normalizeRouteAudit({
+    continuous: false, isolated: [1],
+    steps: [
+      passingStep(0, 'a>>b'),
+      { index: 1, reaction: 'b>>c', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] },
+      passingStep(2, 'c>>d'),
+      { index: 3, reaction: 'd>>e', ok: true, balanced: false, chargeBalanced: true, differences: ['C: reactants 9, products 8'], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] },
+      passingStep(4, 'e>>f'),
+      { index: 5, reaction: 'f>>g', ok: true, balanced: false, chargeBalanced: true, differences: ['H: reactants 8, products 10'], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] },
+    ],
+    links: [],
+  });
+  const chips = routeFixChips(formatNamedRouteFixPrompts(labels, audit));
+  assert.deepEqual(chips.map((chip) => chip.label), [
+    'Ask the model to fix the failed steps',
+    'Fix from the target backwards',
+    'Fix step 6',
+    'Fix step 4',
+    'Fix step 2',
+  ]);
+  // The disconnected-but-balanced step 2 is offered; passing steps 3 and 5 are not.
+  assert.match(chips[4].prompt, /Step 2 was rejected: disconnected from the rest of the route/);
+  assert.match(chips[2].prompt, /Step 6 was rejected: not balanced/);
+  assert.match(chips[2].prompt, /Step 5 Products: product 5/, 'the previous step is given as context');
+  assert.match(chips[2].prompt, /It is the last step/, 'the last step is told to name the target');
+  assert.match(chips[3].prompt, /Step 5 Reactants: reactant 5/, 'the next step is given as context');
+});
+
+test('a review-only block still offers chips, with the review findings folded in', () => {
+  const labels = [[
+    { role: 'reactant', byproduct: false, name: '2-hydroxybenzoic acid', smiles: 'O=C(O)c1ccccc1O' },
+    { role: 'product', byproduct: false, name: '2-acetylsalicylic acid', smiles: 'CC(=O)C1(O)C=CC=CC1C(=O)O' },
+  ], [
+    { role: 'reactant', byproduct: false, name: 'starting material', smiles: 'C' },
+    { role: 'product', byproduct: false, name: 'final product', smiles: 'CC' },
+  ]];
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b'), passingStep(1, 'b>>c')], links: [] });
+  const review = parseRouteReview(JSON.stringify({ status: 'problems', problems: [
+    { step: 1, detail: '"2-acetylsalicylic acid" is a different compound than the requested target.' },
+    { step: 0, detail: 'the route methylates and then demethylates without need.' },
+  ] }));
+  const chips = routeFixChips(formatNamedRouteFixPrompts(labels, audit, review));
+  assert.deepEqual(chips.map((chip) => chip.label), ['Ask the model to fix the failed steps', 'Fix from the target backwards', 'Fix step 1']);
+  assert.match(chips[0].prompt, /A model review of the route plan also reported:/);
+  assert.match(chips[0].prompt, /Step 1: "2-acetylsalicylic acid" is a different compound/);
+  assert.match(chips[0].prompt, /the route methylates and then demethylates without need\./);
+  assert.match(chips[2].prompt, /Step 1 was rejected: review: "2-acetylsalicylic acid" is a different compound/);
 });
 
 test('a route with no species lists offers a one-click prompt to add them', () => {

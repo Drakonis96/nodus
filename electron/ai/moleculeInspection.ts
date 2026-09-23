@@ -4,6 +4,7 @@ import {
   buildNameFeedbackRequest,
   buildRouteConsistencyRequest,
   buildRouteRepairRequest,
+  buildRouteReviewRequest,
   buildRouteSteps,
   countRouteSteps,
   declaresRacemic,
@@ -15,7 +16,7 @@ import {
   findStepEquationProblems,
   findStepNamedSpecies,
   findStepSpeciesLabels,
-  formatNamedRouteFixPrompt,
+  formatNamedRouteFixPrompts,
   formatRouteAudit,
   formatRouteClarification,
   formatRouteFixPrompt,
@@ -26,14 +27,17 @@ import {
   normalizeRouteAudit,
   parseNameFeedback,
   parseRouteConsistencyVerdict,
+  parseRouteReview,
   ROUTE_CONSISTENCY_SYSTEM,
   ROUTE_NAME_FEEDBACK_SYSTEM,
   ROUTE_REPAIR_SYSTEM,
+  ROUTE_REVIEW_SYSTEM,
   type MoleculeDossier,
   type NamedSpecies,
   type ResolvedSpecies,
   type RouteAudit,
   type RouteConsistencyVerdict,
+  type RouteReview,
   type RouteSpeciesLabel,
   type UnresolvedName,
 } from '@shared/moleculeInspection';
@@ -61,6 +65,8 @@ interface InspectOptions {
   owner?: string;
   /** The requested target as SMILES; the route check then requires the route to form it. */
   target?: string | null;
+  /** The researcher's request, given to the route review as context. */
+  question?: string;
 }
 
 function inspectProvider() {
@@ -293,6 +299,23 @@ async function requestCorrectedNames(prose: string, unresolved: UnresolvedName[]
     return parseNameFeedback(raw);
   } catch {
     return [];
+  }
+}
+
+/** One model review of the route plan: the problems a balance and continuity check cannot
+ *  see. Defensive — an unreadable reply yields no review, so it never blocks a route. */
+async function requestRouteReview(question: string, labels: RouteSpeciesLabel[][], audit: RouteAudit, options: InspectOptions): Promise<RouteReview | null> {
+  try {
+    const raw = await completeText({
+      system: ROUTE_REVIEW_SYSTEM,
+      user: buildRouteReviewRequest(question, labels, audit),
+      temperature: 0,
+      maxTokens: 1200,
+      ...(options.signal ? { signal: options.signal } : {}),
+    }, options.model ?? null);
+    return parseRouteReview(raw);
+  } catch {
+    return null;
   }
 }
 
@@ -578,14 +601,19 @@ export async function appendRouteReportAndDrawings(
   try {
     const audit = await invokeRoute(runner, provider, steps, racemic, options.target, labels);
     if (!audit) return finalAnswer;
-    const report = formatRouteAudit(audit, labels);
+    // When the route was derived from names, one model review looks for plan problems the
+    // checker cannot see (prose vs names, a product that is a different compound, a step that
+    // cannot work, a redundant step). It is blocking: a finding marks the route not verified.
+    // An unreadable reply yields no review and never blocks.
+    const named = Boolean(overrides.labels?.some((entries) => entries.length));
+    const review = named ? await requestRouteReview(options.question ?? '', labels, audit, options) : null;
+    const report = formatRouteAudit(audit, labels, review);
     const drawings = compile ? await drawRouteSteps(runner, compile, steps, conditions, audit, options) : '';
     // A refusal the checker can name and the app cannot fix is offered back to the model as
     // one click: it proposes a corrected step, and this same path checks and draws it again.
     // When the route was derived from names, the correction speaks names and roles only — the
     // model never authored the derived SMILES, so it is not asked to rewrite one.
-    const named = Boolean(overrides.labels?.some((entries) => entries.length));
-    const fix = named ? formatNamedRouteFixPrompt(labels, audit) : formatRouteFixPrompt(steps, audit);
+    const fix = named ? formatNamedRouteFixPrompts(labels, audit, review) : formatRouteFixPrompt(steps, audit);
     return `${finalAnswer.trimEnd()}\n\n${report}\n${drawings}${fix ? `\n${fix}\n` : ''}`;
   } catch {
     return finalAnswer;
