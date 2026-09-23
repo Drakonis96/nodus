@@ -20,7 +20,7 @@ import { documentaryCitationId } from '../citations/documentaryCitations';
 import { getSettings } from '../db/settingsRepo';
 import { readAutomaticResearchZotero, pinZoteroOriginals, type ZoteroOriginalPins } from '../mcp/researchZotero';
 import type { OriginalPage } from '../extraction/researchOriginal';
-import { auditResearchProse } from './researchClaimAudit';
+import { createResearchProseAuditor, findResearchConflicts } from './researchClaimAudit';
 import { deepenResearch } from './researchActionCoordinator';
 import { getGlobalLibraryItem, globalLibraryAttachmentPath } from '../library/libraryService';
 import { readResearchOriginalInWorker } from '../library/libraryExtractionWorkerHost';
@@ -334,18 +334,23 @@ export function bindAcademicCorpusRun(deps: DeepResearchDeps, request: DeepResea
   const run = new ResearchCorpusRun(scope, settings, signal, true);
   let windowPromise: ReturnType<typeof researchModelContextWindow> | undefined;
   const model = request.model ?? getSettings().deepResearchModel ?? getSettings().synthesisModel;
+  // One auditor per report: a proposition rejected in any part stays rejected in
+  // every later section, summary, limitation and next step.
+  const auditor = createResearchProseAuditor(model, signal);
   const auditProse = async (markdown: string) => {
     const sources = () => [...run.evidence.values()].map(item => ({ id: item.id, text: item.summary ?? '', label: item.label, citation: item.citation }));
-    let audit = await auditResearchProse(markdown, sources(), model, signal);
-    const missing = audit.claims.find(claim => claim.status === 'removed');
-    if (missing && run.budget.settings.autoExpand && run.budget.rounds < run.budget.settings.rounds) {
+    const expand = run.budget.settings.autoExpand && run.budget.rounds < run.budget.settings.rounds;
+    let audit = await auditor.audit(markdown, sources(), !expand);
+    const missing = expand ? audit.claims.find(claim => claim.status === 'removed') : undefined;
+    if (missing) {
       await run.retrieve(missing.sentence.slice(0, 1000), 1);
-      audit = await auditResearchProse(markdown, sources(), model, signal);
-    }
+      audit = await auditor.audit(markdown, sources());
+    } else if (expand) auditor.remember(audit);
     run.validate();
     return { ...audit, passages: [...run.evidence.values()] };
   };
-  const bounded: DeepResearchDeps = { ...deps, strictDocumentaryGrounding: true, auditFactualProse: auditProse, buildSnapshot: async brief => {
+  const bounded: DeepResearchDeps = { ...deps, strictDocumentaryGrounding: true, auditFactualProse: auditProse,
+    auditReportConsistency: statements => findResearchConflicts(statements, model, signal), buildSnapshot: async brief => {
     await run.investigate(brief.objective, model);
     const snapshot = run.snapshotFromEvidence(brief);
     if (!deps.prepareScopedSnapshot) return snapshot;

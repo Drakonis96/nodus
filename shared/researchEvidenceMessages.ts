@@ -17,3 +17,21 @@ const messages: Record<PromptLanguage, string> = {
   uk: 'Доступних доказів недостатньо для обґрунтованої відповіді. Перевірте вибрані джерела, доступні тексти й документи, що очікують обробки. Неперевірені твердження вилучено.',
 };
 export const researchEvidenceLimitation = (language: PromptLanguage): string => messages[language];
+const consistencyMessages: Record<PromptLanguage, string> = {
+  es: 'No se pudo comprobar la coherencia interna del informe; trátalo como un borrador sin verificar.',
+  en: 'The report\'s internal consistency could not be checked; treat it as an unverified draft.',
+  fr: 'La cohérence interne du rapport n\'a pas pu être vérifiée ; traitez-le comme un brouillon non vérifié.',
+  de: 'Die innere Widerspruchsfreiheit des Berichts konnte nicht geprüft werden; behandeln Sie ihn als ungeprüften Entwurf.',
+  pt: 'Não foi possível verificar a coerência interna do relatório; trate-o como um rascunho não verificado.',
+  'pt-BR': 'Não foi possível verificar a coerência interna do relatório; trate-o como um rascunho não verificado.',
+  it: 'Non è stato possibile verificare la coerenza interna del rapporto; consideralo una bozza non verificata.',
+  tr: 'Raporun iç tutarlılığı denetlenemedi; doğrulanmamış bir taslak olarak değerlendirin.',
+  'zh-Hans': '无法检查报告的内部一致性；请将其视为未经核实的草稿。',
+  'zh-Hant': '無法檢查報告的內部一致性；請將其視為未經核實的草稿。',
+  ja: 'レポートの内部整合性を確認できませんでした。未検証の草稿として扱ってください。',
+  ko: '보고서의 내부 일관성을 확인할 수 없었습니다. 검증되지 않은 초안으로 취급하세요.',
+  vi: 'Không thể kiểm tra tính nhất quán nội bộ của báo cáo; hãy coi đây là bản nháp chưa được xác minh.',
+  ru: 'Не удалось проверить внутреннюю согласованность отчёта; считайте его непроверенным черновиком.',
+  uk: 'Не вдалося перевірити внутрішню узгодженість звіту; вважайте його неперевіреною чернеткою.',
+};
+export const researchConsistencyUnverified = (language: PromptLanguage): string => consistencyMessages[language];

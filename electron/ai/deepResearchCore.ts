@@ -1,5 +1,5 @@
-import { researchEvidenceLimitation } from '@shared/researchEvidenceMessages';
-import type { ResearchProseAudit, ResearchClaimRecord } from '@shared/researchClaimAudit';
+import { researchConsistencyUnverified, researchEvidenceLimitation } from '@shared/researchEvidenceMessages';
+import { reconcileResearchReport, researchProseSpans, researchSentenceKey, type ResearchConflict, type ResearchProseAudit, type ResearchClaimRecord } from '@shared/researchClaimAudit';
 // Citation naming lives in @shared/citationLabel so the reader that re-derives a
 // stored label at open time cannot drift from the writer that produced it.
 import {
@@ -630,6 +630,8 @@ export interface FinalizeResult {
 export interface DeepResearchDeps {
   strictDocumentaryGrounding?: boolean;
   auditFactualProse?(markdown: string): Promise<ResearchProseAudit & { passages?: import('@shared/types').WritingWorkshopPassageCandidate[] }>;
+  /** Pairs of final statements that cannot both hold. Throws when unavailable. */
+  auditReportConsistency?(statements: string[]): Promise<ResearchConflict[]>;
 
   researchTraversal?(): Promise<import('@shared/researchCorpus').ResearchTraversal>;
   buildSnapshot(brief: WritingWorkshopBrief): Promise<WritingWorkshopSnapshot>;
@@ -1436,6 +1438,7 @@ export async function orchestrateDeepResearch(
   }
 
   const claimLedger: ResearchClaimRecord[] = [];
+  let consistency: { checked: boolean; conflicts: number; removed: number } | null = null;
   if (deps.auditFactualProse) {
     for (const item of written) {
       const audit = await deps.auditFactualProse(item.markdown);
@@ -1536,10 +1539,41 @@ export async function orchestrateDeepResearch(
     // Audit them before reintroducing deterministic coverage limitations below.
     finalize.limitations = (await auditFinalText([...finalize.limitations, ...coherenceIssues.map(issue => L.coherenceLimitation(issue))].join('\n'))).split('\n').filter(Boolean);
     finalize.nextSteps = (await auditFinalText(finalize.nextSteps.join('\n'))).split('\n').filter(Boolean);
-    if (claimLedger.some(claim => claim.status !== 'supported') || !written.length) {
+    // Each part was audited on its own. Reconcile the whole report: a proposition
+    // retired anywhere cannot survive in another part, and statements that cannot
+    // both hold leave together instead of the report silently choosing a side.
+    const reconciled = await reconcileResearchReport({ sections: written.map(item => item.markdown), abstract: finalize.abstract,
+      limitations: finalize.limitations, nextSteps: finalize.nextSteps }, claimLedger, deps.auditReportConsistency?.bind(deps));
+    consistency = { checked: reconciled.consistencyChecked, conflicts: reconciled.conflicts, removed: reconciled.removed };
+    written.forEach((item, index) => { item.markdown = reconciled.parts.sections[index]; });
+    for (let index = written.length - 1; index >= 0; index--) {
+      if (!stripInitialHeading(written[index].markdown).trim()) written.splice(index, 1);
+    }
+    if (!written.some(item => claimLedger.some(claim => claim.status === 'supported' && claim.kind !== 'nonfactual'
+      && researchProseSentenceKeys(item.markdown).has(researchSentenceKey(claim.sentence))))) written.length = 0;
+    finalize.abstract = reconciled.parts.abstract || researchEvidenceLimitation(language);
+    finalize.limitations = reconciled.parts.limitations;
+    finalize.nextSteps = reconciled.parts.nextSteps;
+    for (const item of written) {
+      const present = researchProseSentenceKeys(item.markdown);
+      item.section.keyClaims = item.section.keyClaims.filter(claim => present.has(researchSentenceKey(claim)));
+      item.section.title = item.markdown.match(/^#{1,6}\s+(.+)$/m)?.[1] ?? effectiveRequest.objective;
+    }
+    // Citations are recounted from what finally remains, not from removed prose.
+    coveredIdeaIds.clear(); Object.values(citedIds).forEach(set => set.clear());
+    for (const text of [...written.map(item => item.markdown), finalize.abstract]) {
+      const { cited } = applyCitationPolicy(text, maps);
+      for (const key of Object.keys(citedIds) as Array<keyof typeof citedIds>) cited[key].forEach(id => citedIds[key].add(id));
+      cited.ideas.forEach(id => coveredIdeaIds.add(id));
+      cited.passages.forEach(id => { const work = maps.passageWorkId.get(id); if (work) citedIds.works.add(work); });
+    }
+    totalWords = written.reduce((sum, item) => sum + countWords(item.markdown), 0);
+    if (!written.length) finalize.abstract = researchEvidenceLimitation(language);
+    if (claimLedger.some(claim => claim.status !== 'supported') || !written.length || !reconciled.consistencyChecked) {
       finalize.limitations = dedupe([...finalize.limitations, researchEvidenceLimitation(language)]);
       stoppedReason = researchEvidenceLimitation(language);
     }
+    if (!reconciled.consistencyChecked) finalize.limitations = dedupe([...finalize.limitations, researchConsistencyUnverified(language)]);
   }
 
   // Works actually referenced = works cited directly + the works behind every cited idea.
@@ -1618,7 +1652,8 @@ export async function orchestrateDeepResearch(
     ...(deps.auditFactualProse ? { factualAudit: { checked: claimLedger.length,
       supported: claimLedger.filter(claim => claim.status === 'supported').length,
       removed: claimLedger.filter(claim => claim.status === 'removed').length,
-      unverified: claimLedger.filter(claim => claim.status === 'unverified').length } } : {}),
+      unverified: claimLedger.filter(claim => claim.status === 'unverified').length,
+      ...(consistency ? { consistency } : {}) } } : {}),
     deepResearchVersion: request.deepResearchVersion ?? 'v1',
     structure: singleNarrative ? 'single' : 'sectioned',
     sectionLength: requestedSectionLength,
@@ -2644,6 +2679,9 @@ export function normalizeNarrativeSection(markdown: string, title: string): stri
   return `## ${title}\n\n${body}`.trim();
 }
 
+function researchProseSentenceKeys(markdown: string): Set<string> {
+  return new Set(researchProseSpans(markdown).map(span => researchSentenceKey(span.text)));
+}
 function stripInitialHeading(markdown: string): string {
   return markdown.replace(/^#{1,6}\s+[^\n]+\n*/u, '').trim();
 }
