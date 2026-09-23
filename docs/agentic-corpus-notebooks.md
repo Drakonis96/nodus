@@ -80,3 +80,29 @@ USD 5 ceiling. No paid inference has been performed at this stage.
 - [ ] Migrations, real Electron regression and provider evaluation
 
 Checked items must describe executable, tested functionality, not designs.
+
+### Incremental integration evidence, 2026-09-23
+
+- `scripts/e2e-research-isolated.mjs --notebooks` passed in
+  `/private/tmp/nodus-research-66KJg2`: three synthetic collections and sources,
+  fixed membership with an exclusion, lexical publication without a provider,
+  scoped evidence search, notebook editor and Escape focus handling. The report
+  records actual OS write denial, private Electron paths and zero model calls.
+- `scripts/verify-independent-zotero.mjs` passed in
+  `/private/tmp/nodus-research-9DvBFN`: Zotero 10.0.3 with explicit private profile
+  and data directory, synthetic PDF imports using Zotero's supported APIs, an
+  independent local endpoint, and the private MCP runtime over stdio. It read
+  physical page 1 containing NORTH23 and rejected an unselected item.
+- `scripts/verify-managed-zotero-mcp.mjs` passed against a synthetic HTTP fixture
+  in `/private/tmp/nodus-research-AUH7n3`, including the local server identity
+  header, four read-only tools, revision checks and rejected identifiers.
+- Six focused regression tests passed (notebooks, durable store, hierarchical
+  retrieval and source filters). Renderer and Electron type checks and targeted
+  lint passed. These are local macOS ARM64 results, not native cross-platform
+  installation or external HTTP integration results.
+
+The UI and basic shared retrieval are implemented incrementally. Deep Research,
+all legacy writers, scoped citation navigation, managed connector settings,
+packaging/signing across platforms and the paid comparison remain unfinished.
+The two credential helpers exist but have not read production secrets. No paid
+inference has been performed.

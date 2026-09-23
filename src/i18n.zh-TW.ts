@@ -1,3 +1,4 @@
+import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
@@ -83,6 +84,7 @@ export const ZH_TW: Record<string, string> = {
   ...RESEARCH_PROMPT_TRANSLATIONS['zh-TW'],
   ...RESEARCH_SOURCE_TRANSLATIONS["zh-TW"],
   ...RESEARCH_REASONING_TRANSLATIONS["zh-TW"],
+  ...RESEARCH_NOTEBOOK_TRANSLATIONS["zh-TW"],
   ...CHAT_SKILLS_TRANSLATIONS['zh-TW'],
   ...CAPABILITIES_TRANSLATIONS['zh-TW'],
   ...DOCUMENT_SKILLS_TRANSLATIONS['zh-TW'],

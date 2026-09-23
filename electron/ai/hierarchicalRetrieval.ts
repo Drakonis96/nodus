@@ -36,6 +36,7 @@ export interface HierarchicalRetrievalResult {
 export interface HierarchicalRetrievalOptions {
   /** Hard corpus boundary, applied before ranking in every lane. [] matches nothing. */
   nodusIds?: string[];
+  ideaIds?: string[];
   embedding?: number[] | null;
   documentLimit?: number;
   ideaLimit?: number;
@@ -260,7 +261,7 @@ export async function retrieveHierarchical(
       ? findSimilarDocuments(vector, options.minDocumentSimilarity ?? 0.2, documentLimit * 2, corpus)
       : Promise.resolve([]),
     ideaLimit > 0
-      ? findSimilarIdeasPaged(vector, options.minIdeaSimilarity ?? -1, ideaLimit, corpus)
+      ? findSimilarIdeasPaged(vector, options.minIdeaSimilarity ?? -1, ideaLimit, { ...corpus, ideaIds: options.ideaIds })
       : Promise.resolve([]),
     passageLimit > 0
       ? findSimilarPassagesPaged(vector, options.minPassageSimilarity ?? -1, passageLimit, corpus)

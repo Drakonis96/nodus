@@ -35,6 +35,62 @@ try {
   assert.ok(audit.length > 0);
   for (const row of audit) assert.ok(row.path.startsWith(`${root}/profile/`));
   await page.screenshot({ path: path.join(root, 'artifacts/startup.png') });
+  if (process.argv.includes('--notebooks')) {
+    const corpus = await page.evaluate(async (root) => {
+      await window.nodus.updateSettings({ autoBackupFolder: `${root}/library`, onboardingComplete: true,
+        basicsTutorialVersion: 99, recoverySetupVersion: 999, tourComplete: true, advancedTourComplete: true,
+        uiLanguage: 'es', mascotStyle: 'orb', mascotStyleChosen: true, mascotEnabled: false, reduceMotion: true,
+        chatModel: { provider: 'deepseek', model: 'deepseek-flash' } });
+      const collections = [];
+      for (const name of ['Synthetic North', 'Synthetic South', 'Synthetic Comparison']) collections.push(await window.nodus.createGlobalLibraryCollection(name, null));
+      const items = [];
+      for (const [i, text] of ['North field measured 23 units. Evidence marker NORTH23.', 'South field measured 41 units. Evidence marker SOUTH41.', 'The comparison found conflicting measurements. Evidence marker COMPARE64.'].entries()) {
+        items.push(await window.nodus.createGlobalLibraryItem({ title: `Synthetic research ${i + 1}`, itemType: 'report', creators: [], abstract: text }, [collections[i].id]));
+      }
+      const notebook = await window.nodus.saveResearchNotebook({ name: 'Synthetic fixed notebook', mode: 'fixed',
+        sources: [{ kind: 'library-collection', id: collections[0].id }, { kind: 'library-item', id: items[1].id }], exclusions: [items[1].id] });
+      const scope = await window.nodus.resolveResearchNotebook(notebook.id);
+      await window.nodus.prepareResearchDocuments(scope.documents.map(document => document.id));
+      return { collections, items, notebook, scope };
+    }, root);
+    assert.equal(corpus.scope.documents.length, 1);
+    assert.equal(corpus.scope.documents[0].id, corpus.items[0].id);
+    let preparation;
+    const deadline = Date.now() + 60000;
+    do {
+      preparation = await page.evaluate(() => window.nodus.getResearchPreparationInventory());
+      if (preparation.documents.find(document => document.id === corpus.items[0].id)?.preparation.lexical === 'ready') break;
+      await new Promise(resolve => setTimeout(resolve, 200));
+    } while (Date.now() < deadline);
+    fs.writeFileSync(path.join(root, 'artifacts/corpus.json'), JSON.stringify(corpus, null, 2));
+    fs.writeFileSync(path.join(root, 'artifacts/preparation.json'), JSON.stringify(preparation, null, 2));
+    const prepared = preparation.documents.find(document => document.id === corpus.items[0].id);
+    assert.ok(prepared.preparation.passages > 0);
+    assert.equal(preparation.documents.find(document => document.id === corpus.items[1].id).preparation.lexical, 'missing');
+    const search = await page.evaluate(async notebookId => window.nodus.searchResearchNotebook(notebookId, 'NORTH23'), corpus.notebook.id);
+    assert.equal(search.evidence.length, 1);
+    assert.match(search.evidence[0].text, /NORTH23/);
+    assert.equal(search.evidence[0].provenance, 'abstract');
+    assert.equal(search.evidence[0].locator.pageNumber, null, 'abstracts never acquire invented PDF page numbers');
+    fs.writeFileSync(path.join(root, 'artifacts/corpus.json'), JSON.stringify(corpus, null, 2));
+    fs.writeFileSync(path.join(root, 'artifacts/preparation.json'), JSON.stringify(preparation, null, 2));
+    Object.assign(report, { notebooks: { passed: true, collections: corpus.collections.length, sources: corpus.items.length, preparedPassages: prepared.preparation.passages } });
+    await page.evaluate(version => {
+      localStorage.setItem('nodus.lastSeenVersion', version);
+      for (const key of ['nodus.mobileTeaserSeen.3.2.4', 'nodus.platformHighlightsSeen.2026-07',
+        'nodus.tutorialVideosAnnouncementSeen.2026-07', 'nodus.pdfPresenterTutorialSeen.e2js_u-05OA', 'nodus.toolkitBetaGuideSeen.2.4.0']) localStorage.setItem(key, '1');
+    }, JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).version);
+    await page.reload();
+    await page.getByRole('button', { name: 'Research chat', exact: true }).first().click({ timeout: 20000 });
+    const control = page.getByTestId('research-notebooks');
+    await control.waitFor();
+    await control.getByRole('combobox').selectOption(corpus.notebook.id);
+    await control.getByRole('button', { name: /Editar|Edit/ }).click();
+    await page.getByRole('dialog').filter({ has: page.locator('#research-notebook-title') }).waitFor();
+    await page.screenshot({ path: path.join(root, 'artifacts/notebook-editor.png') });
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#research-notebook-title').count(), 0, 'Escape closes the notebook editor');
+  }
   Object.assign(report, { completed: true, paths, databaseOpens: audit.length });
 } finally {
   if (app) await app.close();

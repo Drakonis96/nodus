@@ -18,6 +18,12 @@ if (requestedRoot) {
   process.env.NODUS_DISABLE_AUTO_UPDATE = '1';
   process.env.NODUS_E2E_DISABLE_STUDY_BACKGROUND_AI = '1';
   process.env.NODUS_TESSDATA_CACHE = isolatedPath(root, 'cache/tessdata');
+  const zoteroEndpoint = new URL(process.env.NODUS_ZOTERO_API_BASE || 'http://127.0.0.1:1/api');
+  if (zoteroEndpoint.protocol !== 'http:' || zoteroEndpoint.hostname !== '127.0.0.1' || !zoteroEndpoint.port
+      || zoteroEndpoint.port === '23119' || zoteroEndpoint.pathname !== '/api' || zoteroEndpoint.username || zoteroEndpoint.password) {
+    throw new Error('Isolated tests require an independent loopback Zotero endpoint');
+  }
+  process.env.NODUS_ZOTERO_API_BASE = zoteroEndpoint.href;
   process.env.TMPDIR = isolatedPath(root, 'tmp');
   process.env.TMP = process.env.TMPDIR;
   process.env.TEMP = process.env.TMPDIR;

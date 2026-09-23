@@ -41,6 +41,8 @@ def load_scope(filename: str) -> dict:
         raise ValueError("Invalid Zotero endpoint")
     if not isinstance(scope.get('items'), list) or len(scope['items']) > 10000:
         raise ValueError('Invalid source inventory')
+    if not isinstance(scope.get('serverId'), str) or not scope['serverId']:
+        raise ValueError('A verified Zotero server identity is required')
     identities = set()
     for item in scope['items']:
         identity = (item['libraryType'], str(item['libraryId']), item['itemKey'])
@@ -59,7 +61,8 @@ def load_scope(filename: str) -> dict:
 def build_server(scope: dict) -> FastMCP:
     server = FastMCP("nodus-zotero-mcp", version="0.13.0+nodus.1")
     allowed = {(str(item["libraryType"]), str(item["libraryId"]), str(item["itemKey"])): item for item in scope["items"]}
-    client = httpx.Client(timeout=20, trust_env=False, follow_redirects=False)
+    client = httpx.Client(timeout=20, trust_env=False, follow_redirects=False,
+                         headers={'Zotero-Server-ID': scope['serverId'], 'Zotero-API-Version': '3', 'Zotero-Allowed-Request': '1'})
 
     def source(library_type: str, library_id: str, item_key: str) -> dict:
         item = allowed.get((library_type, library_id, item_key))
@@ -76,6 +79,8 @@ def build_server(scope: dict) -> FastMCP:
                 if response.status_code == 404:
                     raise ToolError("source_unavailable")
                 response.raise_for_status()
+                if response.headers.get('Zotero-Server-ID') != scope['serverId']:
+                    raise ToolError('zotero_server_identity_changed')
                 content = bytearray()
                 for chunk in response.iter_bytes():
                     content.extend(chunk)

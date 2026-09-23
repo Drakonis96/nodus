@@ -5825,6 +5825,8 @@ export interface ResearchGraphPartsSelection {
 }
 
 export interface ResearchContextSelection {
+  notebookId?: string | null;
+  retrieval?: import('./researchCorpus').RetrievalSettings;
   sourceFilter?: import('./researchContextFilters').ResearchSourceFilter;
   ideas: boolean;
   themes: boolean;

@@ -195,6 +195,10 @@ import { extractFromPath } from '../extraction/textExtractor';
 import { runDeepScan } from '../ai/deepScan';
 import { summaryContentHash } from '../ai/summaryScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from '../ai/researchAssistant';
+import * as researchNotebooks from '../ai/researchNotebookService';
+import { researchCorpusInventory } from '../ai/researchCorpusInventory';
+import * as documentaryPreparation from '../ai/documentaryPreparation';
+import { RETRIEVAL_PRESETS } from '@shared/researchCorpus';
 import { listResearchContextSources } from '../ai/researchSourceScope';
 import { answerTutorStep, buildTutorPlan, streamTutorStep } from '../ai/tutor';
 import { buildArgumentMap, discoverArgumentRoutes } from '../ai/argumentMap';
@@ -1615,6 +1619,23 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('hypothesis:generate', async (_e, request: HypothesisLabRequest) => generateHypothesisLab(request));
 
   // research assistant
+  h('research:corpus:sources', async () => researchCorpusInventory());
+  h('research:notebooks:list', async () => researchNotebooks.listResearchNotebooks());
+  h('research:notebooks:save', async (_e, input) => researchNotebooks.saveResearchNotebook(input));
+  h('research:notebooks:delete', async (_e, id: string) => researchNotebooks.deleteResearchNotebook(id));
+  h('research:notebooks:resolve', async (_e, id: string) => researchNotebooks.resolveResearchNotebook(id));
+  h('research:notebooks:search', async (_e, id: string, query: string) => {
+    if (typeof query !== 'string' || query.length > 10000) throw new Error('Invalid research query');
+    const scope = researchNotebooks.resolveResearchNotebook(id);
+    const notebook = researchNotebooks.listResearchNotebooks().find(item => item.id === id)!;
+    const result = await documentaryPreparation.retrieveSharedDocumentaryEvidence(scope, query, notebook.settings ?? RETRIEVAL_PRESETS.balanced, null);
+    if (researchNotebooks.resolveResearchNotebook(id).id !== scope.id) throw new Error('research_scope_changed');
+    return { evidence: result.evidence, scopeId: scope.id, partial: result.traversal.partial };
+  });
+  h('research:preparation:inventory', async () => documentaryPreparation.getResearchPreparationInventory());
+  h('research:preparation:start', async (_e, ids: string[]) => documentaryPreparation.prepareResearchDocuments(ids));
+  h('research:preparation:enabled', async (_e, enabled: boolean) => documentaryPreparation.setResearchPreparationEnabled(enabled));
+  h('research:preparation:paused', async (_e, paused: boolean) => documentaryPreparation.setResearchPreparationPaused(paused));
   h('research:chat', async (_e, request: ResearchChatRequest) => answerResearchChat(request));
   h('research:chatStream', async (e, requestId: string, request: ResearchChatRequest) => {
     // Track the in-flight stream so `research:chatStream:cancel` can abort it. On
@@ -1622,6 +1643,7 @@ export function registerAcademicIpc(context: IpcContext): void {
     // partial text had streamed, which the renderer keeps.
     const controller = new AbortController();
     chatAborters.set(requestId, controller);
+    const unregisterNotebook = request.selection.notebookId ? researchNotebooks.registerNotebookRun(request.selection.notebookId, controller) : () => {};
     try {
       return await streamResearchChat(
         request,
@@ -1634,6 +1656,7 @@ export function registerAcademicIpc(context: IpcContext): void {
       );
     } finally {
       chatAborters.delete(requestId);
+      unregisterNotebook();
     }
   });
   h('research:chatStream:cancel', async (_e, requestId: string) => {

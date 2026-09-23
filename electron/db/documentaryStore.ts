@@ -72,13 +72,13 @@ export class DocumentaryStore {
     }).immediate();
     return id;
   }
-  claim(now = Date.now(), leaseMs = 60000): DocumentaryJob | null {
+  claim(now = Date.now(), leaseMs = 60000, jobId: string | null = null): DocumentaryJob | null {
     if (this.preference('paused')) return null;
     return this.db.transaction(() => {
       this.db.prepare(`UPDATE documentary_jobs SET state=CASE WHEN attempts>=3 THEN 'failed' ELSE 'queued' END,
         lease_token=NULL,lease_until=NULL,updated_at=? WHERE state='running' AND lease_until<=?`).run(now, now);
-      const job = this.db.prepare(`SELECT * FROM documentary_jobs WHERE state='queued' AND available_at<=? AND attempts<3
-        ORDER BY priority + ((? - created_at) / 60000) DESC, created_at, id LIMIT 1`).get(now, now) as DocumentaryJob | undefined;
+      const job = this.db.prepare(`SELECT * FROM documentary_jobs WHERE state='queued' AND available_at<=? AND attempts<3 AND (? IS NULL OR id=?)
+        ORDER BY priority + ((? - created_at) / 60000) DESC, created_at, id LIMIT 1`).get(now, jobId, jobId, now) as DocumentaryJob | undefined;
       if (!job) return null;
       const token = randomUUID();
       this.db.prepare(`UPDATE documentary_jobs SET state='running',attempts=attempts+1,lease_token=?,lease_until=?,updated_at=? WHERE id=?`)
@@ -176,5 +176,28 @@ export class DocumentaryStore {
     return this.db.prepare(`SELECT p.id,p.document_id,p.index_key,p.text,p.locator_json FROM documentary_fts f JOIN documentary_passages p ON p.id=f.id
       WHERE documentary_fts MATCH ? AND p.index_key IN (SELECT value FROM json_each(?)) ORDER BY bm25(documentary_fts),p.id LIMIT ?`)
       .all(terms, JSON.stringify(indexKeys), limit) as ReturnType<DocumentaryStore['lexicalSearch']>;
+  }
+  semanticSearch(query: number[], indexKeys: string[], limit: number, threshold = -1): ReturnType<DocumentaryStore['lexicalSearch']> {
+    if (!indexKeys.length || !query.length || limit <= 0) return [];
+    const norm = Math.sqrt(query.reduce((sum, value) => sum + value * value, 0));
+    if (!norm) return [];
+    this.db.function('documentary_similarity', (json: string) => {
+      const vector: number[] = JSON.parse(json);
+      if (vector.length !== query.length || vector.some(value => !Number.isFinite(value))) return -2;
+      let dot = 0, magnitude = 0;
+      for (let index = 0; index < vector.length; index++) { dot += vector[index] * query[index]; magnitude += vector[index] ** 2; }
+      return magnitude ? dot / (norm * Math.sqrt(magnitude)) : -2;
+    });
+    return this.db.prepare(`SELECT id,document_id,index_key,text,locator_json FROM (
+      SELECT *,documentary_similarity(vector_json) similarity FROM documentary_passages
+      WHERE vector_json IS NOT NULL AND index_key IN (SELECT value FROM json_each(?)))
+      WHERE similarity>=? ORDER BY similarity DESC,id LIMIT ?`).all(JSON.stringify(indexKeys), threshold, limit) as ReturnType<DocumentaryStore['lexicalSearch']>;
+  }
+  adjacentPassages(id: string, indexKeys: string[], radius = 1): ReturnType<DocumentaryStore['lexicalSearch']> {
+    if (!indexKeys.length || radius < 0 || radius > 3) return [];
+    return this.db.prepare(`SELECT p.id,p.document_id,p.index_key,p.text,p.locator_json FROM documentary_passages p
+      JOIN documentary_passages origin ON origin.index_key=p.index_key
+      WHERE origin.id=? AND p.index_key IN (SELECT value FROM json_each(?)) AND ABS(p.ordinal-origin.ordinal)<=? ORDER BY p.ordinal`)
+      .all(id, JSON.stringify(indexKeys), radius) as ReturnType<DocumentaryStore['lexicalSearch']>;
   }
 }

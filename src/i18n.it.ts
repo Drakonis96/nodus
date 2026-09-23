@@ -1,3 +1,4 @@
+import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
@@ -79,6 +80,7 @@ export const IT: Record<string, string> = {
   ...RESEARCH_PROMPT_TRANSLATIONS["it"],
   ...RESEARCH_SOURCE_TRANSLATIONS["it"],
   ...RESEARCH_REASONING_TRANSLATIONS["it"],
+  ...RESEARCH_NOTEBOOK_TRANSLATIONS["it"],
   ...CHAT_SKILLS_TRANSLATIONS['it'],
   ...CAPABILITIES_TRANSLATIONS['it'],
   ...DOCUMENT_SKILLS_TRANSLATIONS['it'],

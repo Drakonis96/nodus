@@ -15,6 +15,16 @@ let activeStudyAssistantRequestId: string | null = null;
 let activeStudySttRequestId: string | null = null;
 
 export const academicApi: AcademicApi = {
+  getResearchCorpusSources: () => ipcRenderer.invoke('research:corpus:sources'),
+  listResearchNotebooks: () => ipcRenderer.invoke('research:notebooks:list'),
+  saveResearchNotebook: input => ipcRenderer.invoke('research:notebooks:save', input),
+  deleteResearchNotebook: id => ipcRenderer.invoke('research:notebooks:delete', id),
+  resolveResearchNotebook: id => ipcRenderer.invoke('research:notebooks:resolve', id),
+  searchResearchNotebook: (id, query) => ipcRenderer.invoke('research:notebooks:search', id, query),
+  getResearchPreparationInventory: () => ipcRenderer.invoke('research:preparation:inventory'),
+  prepareResearchDocuments: ids => ipcRenderer.invoke('research:preparation:start', ids),
+  setResearchPreparationEnabled: enabled => ipcRenderer.invoke('research:preparation:enabled', enabled),
+  setResearchPreparationPaused: paused => ipcRenderer.invoke('research:preparation:paused', paused),
   listDictionaryEntries: (request) => ipcRenderer.invoke('dictionary:list', request),
   listDictionaryFacets: () => ipcRenderer.invoke('dictionary:facets'),
   getDictionaryEntry: (id) => ipcRenderer.invoke('dictionary:get', id),

@@ -27,7 +27,7 @@ export interface ResearchSourceScope {
   edgeIds: Set<string>;
 }
 
-export function resolveResearchSourceScope(value?: ResearchSourceFilter): ResearchSourceScope | null {
+export function resolveResearchSourceScope(value?: ResearchSourceFilter, strictProvenance = false): ResearchSourceScope | null {
   const filter = normalizeResearchSourceFilter(value);
   if (!filter.enabled) return null;
   const workIds = matchingResearchWorkIds(listResearchContextSources(), filter);
@@ -36,7 +36,10 @@ export function resolveResearchSourceScope(value?: ResearchSourceFilter): Resear
   const ids = (sql: string) => new Set((db.prepare(sql).all(bound) as Array<{ id: string }>).map(row => row.id));
   return {
     workIds: new Set(workIds),
-    ideaIds: ids('SELECT DISTINCT global_id id FROM idea_occurrences WHERE nodus_id IN (SELECT value FROM json_each(?))'),
+    ideaIds: ids(strictProvenance ? `WITH allowed AS (SELECT value FROM json_each(?))
+      SELECT DISTINCT io.global_id id FROM idea_occurrences io WHERE io.nodus_id IN (SELECT value FROM allowed)
+      AND NOT EXISTS (SELECT 1 FROM idea_occurrences other WHERE other.global_id=io.global_id AND other.nodus_id NOT IN (SELECT value FROM allowed))`
+      : 'SELECT DISTINCT global_id id FROM idea_occurrences WHERE nodus_id IN (SELECT value FROM json_each(?))'),
     themeIds: ids(`WITH allowed AS (SELECT value FROM json_each(?))
       SELECT DISTINCT theme_id id FROM work_themes WHERE nodus_id IN (SELECT value FROM allowed)
       UNION SELECT theme_id id FROM idea_theme_links WHERE nodus_id IN (SELECT value FROM allowed)`),

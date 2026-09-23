@@ -14,6 +14,7 @@ let version = 3;
 const fixture = http.createServer((request, response) => {
   calls.push({ method: request.method, url: request.url });
   response.setHeader('Content-Type', 'application/json');
+  response.setHeader('Zotero-Server-ID', 'synthetic-server');
   const key = request.url.split('/')[5];
   response.end(JSON.stringify(request.url.endsWith('/fulltext')
     ? { content: 'Synthetic evidence: the north field measured 23 units.' }
@@ -21,6 +22,7 @@ const fixture = http.createServer((request, response) => {
 });
 await new Promise(resolve => fixture.listen(0, '127.0.0.1', resolve));
 const scope = { format: 'nodus.zotero-mcp-scope/1', root,
+  serverId: 'synthetic-server',
   endpoint: `http://127.0.0.1:${fixture.address().port}/api`,
   items: [{ libraryType: 'user', libraryId: '0', itemKey: 'SOURCE01', version: 3, revision: 'synthetic-v3',
     attachments: [{ key: 'ATTACH01', version: 3 }] }] };

@@ -1083,6 +1083,8 @@ app.whenReady().then(async () => {
   );
   createWindow();
   // The isolated graph review copy never resumes background jobs or connects integrations.
+  const { initializeDocumentaryPreparation } = await import('./ai/documentaryPreparation');
+  initializeDocumentaryPreparation();
   if (process.env.NODUS_ISOLATED_ROOT || process.env.NODUS_STELLAR_PREVIEW === '1') return;
   // Existing installs may have one full database copy per historical schema update.
   // Queue every registered vault after the window exists; the utility worker applies

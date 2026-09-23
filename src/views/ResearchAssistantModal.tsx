@@ -5,6 +5,7 @@ import { ResearchSystemPromptControl } from '../components/ResearchSystemPromptC
 import { useResearchSystemPrompts } from '../hooks/useResearchSystemPrompts';
 import type { ResearchChatAdapter, ResearchUiMessage } from './researchChatAdapter';
 import { ResearchSourceFilterControl } from '../components/ResearchSourceFilterControl';
+import { ResearchNotebookControl } from '../components/ResearchNotebookControl';
 import { normalizeResearchSourceFilter } from '@shared/researchContextFilters';
 import { ResearchEffortControl } from '../components/ResearchEffortControl';
 import type { ResearchEffort } from '@shared/researchReasoning';
@@ -444,7 +445,7 @@ export function ResearchAssistantModal({
     [selection]
   );
 
-  const updateSelection = (key: keyof Omit<ResearchContextSelection, 'graphParts' | 'sourceFilter'>, value: boolean) => {
+  const updateSelection = (key: keyof Omit<ResearchContextSelection, 'graphParts' | 'sourceFilter' | 'notebookId' | 'retrieval'>, value: boolean) => {
     setSelection((current) => ({ ...current, [key]: value }));
   };
 
@@ -454,7 +455,7 @@ export function ResearchAssistantModal({
 
   const applyMode = (mode: (typeof ASSISTANT_MODES)[number]) => {
     setActiveModeId(mode.id);
-    setSelection(current => ({ ...cloneSelection(mode.selection), sourceFilter: current.sourceFilter }));
+    setSelection(current => ({ ...cloneSelection(mode.selection), sourceFilter: current.sourceFilter, notebookId: current.notebookId, retrieval: current.retrieval }));
     setContextTitle(t(mode.label));
     if (!input.trim()) setInput(t(mode.starter));
   };
@@ -880,14 +881,20 @@ export function ResearchAssistantModal({
               <span className="research-accent-badge rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
             </button>
           )}
-          {!adapter && !isGenealogy && <ResearchSourceFilterControl key={activeId ?? 'new'} value={selection.sourceFilter} disabled={sending} onChange={async sourceFilter => {
+          {!adapter && !isGenealogy && <ResearchNotebookControl value={selection.notebookId} onChange={notebookId => {
+            if (sending) void api.cancelResearchChat();
+            const next = { ...selection, notebookId };
+            setSelection(next);
+            if (activeId) void api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
+          }} />}
+          {!adapter && !isGenealogy && !selection.notebookId && <ResearchSourceFilterControl key={activeId ?? 'new'} value={selection.sourceFilter} disabled={sending} onChange={async sourceFilter => {
             const next = { ...selection, sourceFilter };
             if (activeId) await api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
             setSelection(next);
             setShowContext(false);
           }} />}
           <ResearchSystemPromptControl prompts={systemPrompts.prompts} selectedId={systemPrompts.selectedId} disabled={sending || !systemPrompts.ready} onSelect={systemPrompts.select} refresh={systemPrompts.refresh} />
-          <ChatSkillsControl surface="assistant" disabled={sending} />
+          {!selection.notebookId && <ChatSkillsControl surface="assistant" disabled={sending} />}
           {!adapter && <ResearchConciliumControl value={concilium} models={availableModels} selectedModel={selectedModel} disabled={sending} onChange={next => {
             setConcilium(next);
             if (next) setSelectedModel(next.models[next.chairman]);
@@ -1221,7 +1228,7 @@ export function ResearchAssistantModal({
                   onClick={() => {
                     setActiveModeId('custom');
                     setContextTitle(t('Todo'));
-                    setSelection(current => ({ ...cloneSelection(ALL_SELECTION), sourceFilter: current.sourceFilter }));
+                    setSelection(current => ({ ...cloneSelection(ALL_SELECTION), sourceFilter: current.sourceFilter, notebookId: current.notebookId, retrieval: current.retrieval }));
                   }}
                 >
                   {t('Todo')}
@@ -1231,7 +1238,7 @@ export function ResearchAssistantModal({
                   onClick={() => {
                     setActiveModeId('custom');
                     setContextTitle(t('Manual'));
-                    setSelection(current => ({ ...cloneSelection(DEFAULT_SELECTION), sourceFilter: current.sourceFilter }));
+                    setSelection(current => ({ ...cloneSelection(DEFAULT_SELECTION), sourceFilter: current.sourceFilter, notebookId: current.notebookId, retrieval: current.retrieval }));
                   }}
                 >
                   {t('Nada')}

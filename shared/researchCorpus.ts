@@ -141,10 +141,12 @@ export interface ResearchPreparationInventory {
 }
 
 export interface ResearchCorpusApi {
+  getResearchCorpusSources(): Promise<{ documents: ResearchCorpusDocument[]; collections: ResearchCorpusCollection[] }>;
   listResearchNotebooks(): Promise<ResearchNotebook[]>;
   saveResearchNotebook(input: ResearchNotebookInput): Promise<ResearchNotebook>;
   deleteResearchNotebook(id: string): Promise<void>;
   resolveResearchNotebook(id: string): Promise<ResolvedResearchScope>;
+  searchResearchNotebook(id: string, query: string): Promise<{ evidence: ResearchEvidence[]; scopeId: string; partial: boolean }>;
   getResearchPreparationInventory(): Promise<ResearchPreparationInventory>;
   prepareResearchDocuments(documentIds: string[]): Promise<void>;
   setResearchPreparationEnabled(enabled: boolean): Promise<void>;

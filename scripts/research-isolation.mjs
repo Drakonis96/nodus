@@ -24,6 +24,8 @@ export function researchTestEnvironment(root) {
     if (process.env[name]) env[name] = process.env[name];
   }
   return { ...env, NODUS_ISOLATED_ROOT: root, NODUS_USERDATA: path.join(root, 'profile'),
+    // No test may silently fall back to the user's running Zotero on 23119.
+    NODUS_ZOTERO_API_BASE: 'http://127.0.0.1:1/api',
     NODUS_DISABLE_AUTO_UPDATE: '1', NODUS_E2E_UPDATE_STATUS: 'not-available',
     TMPDIR: path.join(root, 'tmp'), TMP: path.join(root, 'tmp'), TEMP: path.join(root, 'tmp') };
 }
@@ -41,6 +43,7 @@ export function macResearchSandbox(root, { liveProviders = false } = {}) {
   ];
   // The descendants inherit the OS sandbox. /dev/null is the sole writable device.
   return `(version 1)\n(allow default)\n` +
+    `(deny network-outbound (remote ip "localhost:23119"))\n` +
     `(deny file-write* (require-not (require-any (subpath ${quoted}) (literal "/dev/null"))))\n` +
     productionRoots.map(value => `(deny file-read* (subpath ${JSON.stringify(value)}))`).join('\n') + '\n' +
     (liveProviders ? '' : '(deny network-outbound (require-not (remote ip "localhost:*")))\n');

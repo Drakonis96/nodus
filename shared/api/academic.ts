@@ -223,7 +223,9 @@ import type {
   ZoteroTag,
 } from '../types';
 
-export interface AcademicApi {
+export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCorpusApi,
+  'getResearchCorpusSources' | 'listResearchNotebooks' | 'saveResearchNotebook' | 'deleteResearchNotebook' | 'resolveResearchNotebook' | 'searchResearchNotebook'
+  | 'getResearchPreparationInventory' | 'prepareResearchDocuments' | 'setResearchPreparationEnabled' | 'setResearchPreparationPaused'> {
   // Dictionary: persistent evidence-backed concept syntheses
   listDictionaryEntries(request: DictionaryListRequest): Promise<DictionaryEntryPage>;
   listDictionaryFacets(): Promise<DictionaryFacets>;
