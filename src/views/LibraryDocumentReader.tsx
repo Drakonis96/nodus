@@ -381,6 +381,7 @@ export function LibraryDocumentReader({
   const [bookmarkMenuOpen, setBookmarkMenuOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'annotations' | 'metadata' | 'chat'>('annotations');
   const [previewPage, setPreviewPage] = useState<number | null>(null);
+  const [previewAttachmentId, setPreviewAttachmentId] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState('clean');
   const [openingFormatPrompt, setOpeningFormatPrompt] = useState(false);
   const [rememberOpeningFormat, setRememberOpeningFormat] = useState(false);
@@ -710,6 +711,14 @@ export function LibraryDocumentReader({
   // citation to the system viewer would land on page 1, which is the bug.
   const jumpToCitedPage = (page: number) => {
     if (!reader) return;
+    if (reference.attachmentId) {
+      const attachment = reader.attachments.find(attachment => attachment.id === reference.attachmentId && attachment.available);
+      if (!attachment) return;
+      setSelectedSource(attachment.id);
+      if (attachment.viewer === 'pdf') { setPreviewAttachmentId(attachment.id); setPreviewPage(page); }
+      return;
+    }
+    setPreviewAttachmentId(null);
     if (reader.originalMimeType === 'application/pdf' && reader.originalUrl) { setPreviewPage(page); return; }
     const index = reader.sections.findIndex((section) => typeof section.page === 'number' && section.page >= page);
     if (index >= 0) scrollToSection(index);
@@ -1133,7 +1142,7 @@ export function LibraryDocumentReader({
         onChoose={chooseOpeningFormat}
         onCancel={onBack}
       />}
-      {previewPage && primaryOriginalAttachment(reader) && <OriginalPagePreview documentId={reference.id} attachmentId={primaryOriginalAttachment(reader)!.id} initialPage={previewPage} title={reader.title} onClose={() => setPreviewPage(null)} onOpenFull={() => void window.nodus.openLibraryReaderOriginal(reference.id)} />}
+      {previewPage && (previewAttachmentId || primaryOriginalAttachment(reader)) && <OriginalPagePreview documentId={reference.id} attachmentId={previewAttachmentId ?? primaryOriginalAttachment(reader)!.id} initialPage={previewPage} title={reader.title} onClose={() => { setPreviewPage(null); setPreviewAttachmentId(null); }} onOpenFull={() => previewAttachmentId ? void window.nodus.openGlobalLibraryAttachment(reference.id, previewAttachmentId) : void window.nodus.openLibraryReaderOriginal(reference.id)} />}
       {citation && <SourceCitationModal target={citation} onClose={() => setCitation(null)} />}
     </div>
   );

@@ -1,6 +1,6 @@
 /** Documentary retrieval contracts. No credentials or model-generated permissions. */
 export interface ResearchSourceReference {
-  kind: 'work' | 'library-item' | 'library-collection' | 'zotero-collection';
+  kind: 'work' | 'library-item' | 'library-collection' | 'zotero-collection' | 'note';
   id: string;
   libraryId?: string;
   libraryType?: 'user' | 'group';
@@ -65,9 +65,12 @@ export interface ResearchCorpusDocument {
   year: number | null;
   workId: string | null;
   libraryItemId: string | null;
+  noteId?: string;
+  authoredKind?: 'user-note' | 'generated-report';
   origin: { kind: 'zotero'; libraryType: 'user' | 'group'; libraryId: string; itemKey: string } | { kind: 'nodus'; id: string };
   revision: string;
   attachmentId: string | null;
+  attachments?: Array<{ id: string; revision: string }>;
   coverage: 'metadata' | 'abstract' | 'fulltext';
   permissionRevision: string;
 }
@@ -95,6 +98,7 @@ export interface DocumentaryIndexIdentity {
   coverage?: 'fulltext' | 'abstract' | 'metadata';
   documentId: string;
   attachmentId: string | null;
+  attachmentRevision?: string;
   revision: string;
   textFingerprint: string;
   chunkerVersion: string;
@@ -107,10 +111,11 @@ export interface ResearchEvidence {
   documentId: string;
   workId: string | null;
   attachmentId: string | null;
+  attachmentRevision?: string;
   revision: string;
   text: string;
   locator: { sourceRef: string | null; pageNumber: number | null; pageLabel: string | null; charStart?: number; charEnd?: number };
-  provenance: 'source' | 'abstract' | 'idea-evidence' | 'profile-support';
+  provenance: 'source' | 'abstract' | 'idea-evidence' | 'profile-support' | 'user-note' | 'generated-report';
   limitations: string[];
 }
 

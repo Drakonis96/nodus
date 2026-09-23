@@ -428,6 +428,12 @@ export async function fullSync(mode: ZoteroSyncMode, options: ZoteroSyncOptions 
     ? `${added} altas, ${changed} cambios${baselineSummary}; catálogo actualizado sin iniciar análisis${failureSummary}`
     : `${added} altas, ${changed} cambios${baselineSummary}, ${lightQueued} temas encolados, ${deepQueued} profundos encolados${failureSummary}`;
   const log = addSyncLog(mode, summary);
+  if ((added > 0 || changed > 0) && getActiveVault().type === 'academic') {
+    // Basic preparation follows the profile's prior consent independently of
+    // optional Ideas, summaries and Documentary Index automation settings.
+    void import('../ai/documentaryPreparation').then(({ notifyResearchCorpusChanged }) => notifyResearchCorpusChanged())
+      .catch(error => console.warn('[documentary] post-sync preparation unavailable', error));
+  }
   if (collectionFailures.length) {
     throw new Error(`La sincronización de Zotero quedó incompleta: ${collectionFailures.length} lectura(s) fallaron. No se avanzó el checkpoint.`);
   }

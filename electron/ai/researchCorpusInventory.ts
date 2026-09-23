@@ -13,6 +13,12 @@ export function researchCorpusInventory(): { documents: ResearchCorpusDocument[]
   const collections: ResearchCorpusCollection[] = [];
   const linkedWorks = new Set<string>();
   const works = getDb().prepare('SELECT * FROM works WHERE archived=0').all() as Work[];
+  const userId = getSettings().zoteroUserId || '0';
+  const workByZoteroIdentity = new Map(works.flatMap(work => {
+    const match = /^groups:([^:]+):(.+)$/.exec(work.zotero_key);
+    if (!match && !/^[A-Z0-9]{8}$/.test(work.zotero_key)) return [];
+    return [[JSON.stringify([match ? 'group' : 'user', match?.[1] ?? userId, match?.[2] ?? work.zotero_key]), work.nodus_id] as const];
+  }));
   const availableWorkIds = new Set(works.map(work => work.nodus_id));
   const links = listGlobalLibraryVaultLinks().filter(link => link.vaultId === vault.id);
   const globalMembership = new Map<string, string[]>();
@@ -21,14 +27,16 @@ export function researchCorpusInventory(): { documents: ResearchCorpusDocument[]
     for (const summary of page.items) {
       const item = getGlobalLibraryItem(summary.id);
       if (!item || item.deletedAt || item.sourceState === 'library-missing') continue;
-      const linkedId = links.find(link => link.itemId === item.id)?.workId ?? item.vaultWorkIds?.[vault.id] ?? null;
+      const identity = item.sourceIdentities.find(source => source.source === 'zotero' && (source.libraryType === 'user' || source.libraryType === 'group'));
+      const canonicalWork = identity ? workByZoteroIdentity.get(JSON.stringify([identity.libraryType, identity.libraryId, identity.itemKey])) : null;
+      const linkedId = links.find(link => link.itemId === item.id)?.workId ?? item.vaultWorkIds?.[vault.id] ?? canonicalWork ?? null;
       const workId = linkedId && availableWorkIds.has(linkedId) ? linkedId : null;
       if (workId) linkedWorks.add(workId);
-      const identity = item.sourceIdentities.find(source => source.source === 'zotero' && (source.libraryType === 'user' || source.libraryType === 'group'));
       documents.push({ id: item.id, workId, libraryItemId: item.id, title: item.metadata.title,
         authors: item.metadata.creators.filter(creator => creator.creatorType === 'author').map(creator => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')),
         year: item.metadata.year ?? null, revision: researchFingerprint({ metadata: item.metadata, attachments: item.attachments.map(attachment => [attachment.id, attachment.sha256, attachment.sourceVersion]) }),
         attachmentId: item.attachments.length === 1 ? item.attachments[0].id : null,
+        attachments: item.attachments.map(attachment => ({ id: attachment.id, revision: researchFingerprint([attachment.sha256, attachment.sourceVersion]) })),
         origin: identity ? { kind: 'zotero', libraryType: identity.libraryType as 'user' | 'group', libraryId: identity.libraryId, itemKey: identity.itemKey } : { kind: 'nodus', id: item.id },
         permissionRevision: researchFingerprint({ id: item.id, sourceState: item.sourceState ?? 'current', sources: item.sourceIdentities }),
         coverage: summary.readerAvailable ? 'fulltext' : item.metadata.abstract ? 'abstract' : 'metadata' });
@@ -40,7 +48,6 @@ export function researchCorpusInventory(): { documents: ResearchCorpusDocument[]
     reference: { kind: 'library-collection', id: collection.id }, name: collection.name, parentId: collection.parentId,
     documentIds: globalMembership.get(collection.id) ?? [],
   });
-  const userId = getSettings().zoteroUserId || '0';
   for (const work of works) {
     if (linkedWorks.has(work.nodus_id)) continue;
     const match = /^groups:([^:]+):(.+)$/.exec(work.zotero_key);
@@ -61,6 +68,17 @@ export function researchCorpusInventory(): { documents: ResearchCorpusDocument[]
     collections.push({ reference: { kind: 'zotero-collection', id: match?.[2] ?? row.collection_key, libraryType: match ? 'group' : 'user', libraryId: match?.[1] ?? userId },
       name: row.name, parentId: row.parent_key?.replace(/^groups:[^:]+:/, '') ?? null,
       documentIds: members.filter(member => member.collection_key === row.collection_key).flatMap(member => documents.filter(document => document.workId === member.nodus_id).map(document => document.id)) });
+  }
+  // A selectable note is not an implicit corpus member. General chat selects
+  // linked works only; notebooks must explicitly select a note reference.
+  const notes = getDb().prepare("SELECT id,title,kind,content FROM notes WHERE trashed_at IS NULL AND length(trim(content))>0 AND kind IN ('markdown','assistant','writing')")
+    .all() as Array<{ id: string; title: string; kind: string; content: string }>;
+  for (const note of notes) {
+    const id = `vault:${vault.id}:note:${note.id}`;
+    documents.push({ id, noteId: note.id, authoredKind: note.kind === 'markdown' ? 'user-note' : 'generated-report',
+      workId: null, libraryItemId: null, title: note.title, authors: [], year: null, attachmentId: null,
+      origin: { kind: 'nodus', id }, revision: researchFingerprint([note.title, note.content]),
+      permissionRevision: researchFingerprint([vault.id, note.id, 'active-note']), coverage: 'fulltext' });
   }
   return { documents, collections };
 }

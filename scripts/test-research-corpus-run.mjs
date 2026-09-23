@@ -55,6 +55,10 @@ try {
   assert.equal(embeddingCalls, 3, 'one budget covers initial discovery and every section');
   assert.equal(run.budget.partial, true);
   assert.equal(run.budget.rounds, 3);
+  const reused = await run.section({ ...section, excludePassageIds: snapshot.passages.map(item => item.id) });
+  assert.equal(reused.passages.length, snapshot.passages.length, 'later sections can cite existing evidence after exhausting discovery');
+  assert.equal(embeddingCalls, 3, 'reusing the evidence ledger incurs no provider request');
+  assert.equal(run.coverage().queries.at(-1).partial, true, 'budget-blocked section probes remain in the traversal');
   assert.ok(run.budget.usedEvidenceTokens <= RETRIEVAL_PRESETS.balanced.evidenceTokens);
   let legacyDiscovery = 0;
   const deps = bindAcademicCorpusRun({ buildSnapshot: async () => { legacyDiscovery++; throw new Error('unscoped'); },
@@ -85,6 +89,14 @@ try {
   assert.throws(() => run.validate(), /scope_changed/);
   assert.throws(() => notebookService.rememberNotebookTurn({ ...overridden, conversationId: undefined }, 'stale answer'), /scope_changed/);
   await assert.rejects(() => deps.planReport({}), /scope_changed/);
+  const note = load('electron/db/notesRepo.ts').createNote({ title: 'Explicit synthetic report', kind: 'writing', content: 'A generated note is not primary evidence.' });
+  assert.ok(!notebookService.resolveAcademicResearchScope().documents.some(document => document.noteId === note.id), 'notes never enter general corpus implicitly');
+  const noteBook = notebookService.saveResearchNotebook({ name: 'Explicit note source', mode: 'fixed', sources: [{ kind: 'note', id: note.id }], exclusions: [] });
+  const noteScope = notebookService.resolveResearchNotebook(noteBook.id);
+  assert.equal(noteScope.documents.length, 1);
+  assert.equal(noteScope.documents[0].authoredKind, 'generated-report');
+  load('electron/db/notesRepo.ts').trashNotes([note.id]);
+  assert.equal(notebookService.resolveResearchNotebook(noteBook.id).documents.length, 0, 'trashing a promoted note revokes future access');
   console.log('Corpus run: pre-ranking scope, mixed Ideas, lexical-only retrieval, shared section budget, no profile barrier and selection revocation passed.');
 } finally {
   load('electron/ai/documentaryPreparation.ts').closeDocumentaryPreparation();

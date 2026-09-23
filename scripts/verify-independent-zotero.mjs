@@ -12,6 +12,12 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { createResearchTestRoot, macResearchSandbox, researchTestEnvironment, verifyResearchSandbox } from './research-isolation.mjs';
 
 const root = createResearchTestRoot();
+const baselineWorkspace = process.argv.find(argument => argument.startsWith('--baseline-workspace='))?.slice('--baseline-workspace='.length);
+const sourceCorpusRoot = process.argv.find(argument => argument.startsWith('--corpus-root='))?.slice('--corpus-root='.length);
+if (baselineWorkspace) {
+  const manifest = JSON.parse(fs.readFileSync(path.join(baselineWorkspace, '../artifacts/baseline.json'), 'utf8'));
+  if (manifest.base !== 'f54995e7' || manifest.exitCode !== 0 || manifest.workspace !== fs.realpathSync(baselineWorkspace)) throw new Error('Unverified baseline build');
+}
 const policy = macResearchSandbox(root);
 const proof = verifyResearchSandbox(root, policy);
 let providerProxy;
@@ -58,7 +64,7 @@ for (let index = 0; index < 3; index++) {
   const page = pdf.addPage([612, 792]);
   const body = `${text}\n\nThis synthetic report documents an isolated research fixture. The observation belongs\nto the named field only. The measurement was recorded after a controlled inspection.\nThe report contains no evidence about other fields beyond its explicit statements.\nThese records are invented for software validation and do not describe real research.\nThe source identity and original page must remain attached to any retrieved evidence.`;
   page.drawText(body, { x: 40, y: 700, size: 10, lineHeight: 16, font });
-  const bytes = await pdf.save();
+  const bytes = sourceCorpusRoot ? fs.readFileSync(path.join(sourceCorpusRoot, 'fixtures', `source-${index + 1}.pdf`)) : await pdf.save();
   const file = path.join(root, 'fixtures', `source-${index + 1}.pdf`);
   fs.writeFileSync(file, bytes);
   records.push({ title: `Synthetic research source ${index + 1}`, abstract: text, file, sha256: createHash('sha256').update(bytes).digest('hex') });
@@ -140,7 +146,7 @@ try {
   } finally { await client.close(); }
   if (process.argv.includes('--nodus') || providerProxy) {
     const { verifyZoteroNodusProduct } = await import('./verify-zotero-nodus-product.mjs');
-    report.nodus = await verifyZoteroNodusProduct(root, report.endpoint, corpus, { providerProxy: providerProxy?.url });
+    report.nodus = await verifyZoteroNodusProduct(root, report.endpoint, corpus, { providerProxy: providerProxy?.url, baselineWorkspace });
   }
   Object.assign(report, { passed: true, zoteroVersion: corpus.version, sources: corpus.items.length });
 } finally {

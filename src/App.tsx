@@ -432,6 +432,7 @@ export function App() {
         scope: detail.scope,
         readerItemId: detail.itemId,
         readerPage: typeof detail.page === 'number' && detail.page > 0 ? detail.page : null,
+        readerAttachmentId: typeof detail.attachmentId === 'string' ? detail.attachmentId : null,
         nonce: Date.now(),
       });
       setView('library');
@@ -1190,6 +1191,14 @@ export function App() {
     setNoteTarget({ id, nonce: Date.now() });
     setView(isAcademic ? 'workspace' : 'notes');
   }, [isAcademic]);
+  useEffect(() => {
+    const open = (event: Event) => {
+      const id = (event as CustomEvent<unknown>).detail;
+      if (typeof id === 'string') openNoteFromSearch(id);
+    };
+    window.addEventListener('nodus:open-research-note', open);
+    return () => window.removeEventListener('nodus:open-research-note', open);
+  }, [openNoteFromSearch]);
 
   const openResearchConversation = useCallback((target: Omit<ResearchConversationNavigationTarget, 'nonce'>) => {
     setResearchConversationTarget({ ...target, nonce: Date.now() });

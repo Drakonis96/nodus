@@ -1151,6 +1151,7 @@ function GlobalLibraryContent({
     const itemId = target?.readerItemId;
     if (!itemId) return;
     const page = target.readerPage ?? null;
+    const attachmentId = target.readerAttachmentId ?? null;
     onTargetConsumed?.();
     void window.nodus.getGlobalLibraryItem(itemId).then((item) => {
       if (!item) return;
@@ -1161,10 +1162,11 @@ function GlobalLibraryContent({
         authors: item.metadata.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean),
         year: item.metadata.year ?? null,
         ...(page ? { page } : {}),
+        ...(attachmentId && item.attachments.some(attachment => attachment.id === attachmentId) ? { attachmentId } : {}),
       });
       else setDetailId(item.id);
     });
-  }, [onOpenReader, onTargetConsumed, target?.nonce, target?.readerItemId, target?.readerPage]);
+  }, [onOpenReader, onTargetConsumed, target?.nonce, target?.readerItemId, target?.readerPage, target?.readerAttachmentId]);
   useEffect(() => {
     if (!target?.citationStyles) return;
     setCitationItems([]);

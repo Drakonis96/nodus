@@ -778,6 +778,7 @@ export interface LibraryReaderReference {
   preferredSource?: 'clean' | 'original';
   /** Physical 1-based page to land on once open; absent means the reader's own last position. */
   page?: number | null;
+  attachmentId?: string | null;
 }
 
 export type LibraryReaderAttachmentViewer = 'pdf' | 'epub' | 'image' | 'html' | 'text' | 'external';
@@ -9358,10 +9359,12 @@ export interface WorkPassageStatus {
 }
 
 export interface PassageDetail {
+  noteId?: string;
   revision?: string;
   historical?: boolean;
   libraryItemId?: string | null;
-  provenance?: 'source' | 'abstract';
+  attachmentId?: string | null;
+  provenance?: 'source' | 'abstract' | 'user-note' | 'generated-report';
   passage_id: string;
   nodus_id: string;
   text: string;

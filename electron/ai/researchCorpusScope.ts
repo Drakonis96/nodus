@@ -21,9 +21,9 @@ export function selectResearchDocuments(sources: ResearchSourceReference[], excl
   const available = new Map(documents.map(document => [document.id, document]));
   const byKey = new Map(collections.map(collection => [sourceReferenceKey(collection.reference), collection]));
   for (const source of sources) {
-    if (source.kind === 'work' || source.kind === 'library-item') {
+    if (source.kind === 'work' || source.kind === 'library-item' || source.kind === 'note') {
       for (const document of documents) {
-        if ((source.kind === 'work' ? document.workId : document.libraryItemId) === source.id) selected.add(document.id);
+        if ((source.kind === 'work' ? document.workId : source.kind === 'note' ? document.noteId : document.libraryItemId) === source.id) selected.add(document.id);
       }
       continue;
     }

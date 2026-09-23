@@ -48,6 +48,25 @@ try {
   const inventory = preparation.getResearchPreparationInventory();
   assert.equal(inventory.embeddingSpaces.length, 1);
   assert.match(inventory.embeddingSpaces[0].id, /^[a-f0-9]{64}$/);
+  const files = [];
+  for (const attachmentId of ['appendix-a', 'appendix-b']) {
+    files.push(await preparation.prepareDocumentaryText({ ...doc, coverage: 'fulltext', attachmentId,
+      attachments: [{ id: attachmentId, revision: `hash-${attachmentId}` }] }, `Independent ${attachmentId} evidence`));
+  }
+  const scope = load('electron/ai/researchNotebookService.ts').resolveAcademicResearchScope();
+  const found = await preparation.retrieveSharedDocumentaryEvidence(scope, 'Independent', load('shared/researchCorpus.ts').RETRIEVAL_PRESETS.balanced, null);
+  assert.deepEqual([...new Set(found.evidence.map(item => item.attachmentId))].sort(), ['appendix-a', 'appendix-b']);
+  assert.equal(preparation.getResearchPreparationInventory().documents.find(item => item.id === doc.id).preparation.passages, 2);
+  const citations = load('electron/citations/documentaryCitations.ts');
+  const citationId = citations.documentaryCitationId(scope.id, found.evidence[0].id);
+  const before = citations.getDocumentaryPassageDetail(citationId);
+  assert.equal(before.attachmentId, found.evidence[0].attachmentId);
+  db.prepare('UPDATE works SET resolved_text_hash=? WHERE nodus_id=?').run('changed-content', 'inside');
+  const historical = citations.getDocumentaryPassageDetail(citationId);
+  assert.equal(historical.historical, true);
+  assert.equal(historical.text, before.text, 'immutable citation keeps its exact original text after a content edit');
+  db.prepare('UPDATE works SET archived=1 WHERE nodus_id=?').run('inside');
+  assert.equal(citations.getDocumentaryPassageDetail(citationId), null, 'revocation still blocks historical source reads');
   console.log('Legacy fencing, lexical-first shared preparation, pre-dispatch embedding lease and compatible vector reuse passed.');
 } finally {
   load('electron/ai/documentaryPreparation.ts').closeDocumentaryPreparation();

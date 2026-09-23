@@ -39,6 +39,12 @@ export class DocumentaryStore {
       );
       CREATE TABLE IF NOT EXISTS documentary_current (document_id TEXT PRIMARY KEY, index_key TEXT NOT NULL REFERENCES documentary_revisions(index_key));
       CREATE TABLE IF NOT EXISTS documentary_desired (document_id TEXT PRIMARY KEY, index_key TEXT NOT NULL REFERENCES documentary_revisions(index_key));
+      CREATE TABLE IF NOT EXISTS documentary_attachment_heads (
+        document_id TEXT NOT NULL, attachment_id TEXT NOT NULL,
+        desired_key TEXT NOT NULL REFERENCES documentary_revisions(index_key),
+        current_key TEXT REFERENCES documentary_revisions(index_key),
+        PRIMARY KEY(document_id,attachment_id)
+      );
       CREATE TABLE IF NOT EXISTS documentary_passages (
         id TEXT PRIMARY KEY, index_key TEXT NOT NULL REFERENCES documentary_revisions(index_key),
         document_id TEXT NOT NULL, ordinal INTEGER NOT NULL, text TEXT NOT NULL, locator_json TEXT NOT NULL, vector_json TEXT
@@ -70,6 +76,8 @@ export class DocumentaryStore {
       this.db.prepare(`INSERT OR IGNORE INTO documentary_jobs(id,document_id,identity_json,payload_json,priority,available_at,created_at,updated_at)
         VALUES (?,?,?,?,?,?,?,?)`).run(id, identity.documentId, JSON.stringify(identity), JSON.stringify(payload), priority, now, now, now);
       this.db.prepare('INSERT INTO documentary_desired VALUES (?,?) ON CONFLICT(document_id) DO UPDATE SET index_key=excluded.index_key').run(identity.documentId, id);
+      this.db.prepare(`INSERT INTO documentary_attachment_heads(document_id,attachment_id,desired_key) VALUES (?,?,?)
+        ON CONFLICT(document_id,attachment_id) DO UPDATE SET desired_key=excluded.desired_key`).run(identity.documentId, identity.attachmentId ?? '', id);
     }).immediate();
     return id;
   }
@@ -130,6 +138,9 @@ export class DocumentaryStore {
         fts.run(id, text);
       });
       this.db.prepare('UPDATE documentary_revisions SET lexical_ready=1 WHERE index_key=?').run(job.id);
+      const identity: DocumentaryIndexIdentity = JSON.parse(job.identity_json);
+      this.db.prepare(`UPDATE documentary_attachment_heads SET current_key=?
+        WHERE document_id=? AND attachment_id=? AND desired_key=?`).run(job.id, job.document_id, identity.attachmentId ?? '', job.id);
       // A slower obsolete build may finish after a newer revision was requested.
       // Keep its immutable evidence, but never replace the requested revision.
       if (this.db.prepare('SELECT 1 FROM documentary_desired WHERE document_id=? AND index_key=?').get(job.document_id, job.id)) {

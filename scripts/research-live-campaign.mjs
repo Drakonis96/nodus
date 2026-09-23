@@ -2,6 +2,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
+export const RESEARCH_CAMPAIGN_QUERIES = [
+  { name: 'exact', text: 'Cita literalmente la frase de NORTH23 e indica cuántas unidades se midieron en el campo norte.', expected: /23/, marker: 'NORTH23' },
+  { name: 'comparison', text: 'Compara las mediciones de los campos norte y sur. ¿Respaldan una medición uniforme? Cita ambas fuentes.', expected: /23[\s\S]*41|41[\s\S]*23/, marker: 'SOUTH41' },
+  { name: 'multilingual', text: 'Quelle quantité a été mesurée dans le champ sud ? Réponds en français et cite la source.', expected: /41/, marker: 'SOUTH41' },
+  { name: 'absence', text: '¿Cuántas unidades se midieron en el campo este? Si las fuentes no lo indican, dilo expresamente y cita la evidencia de esa ausencia.', expected: /no (?:se |hay |existe|indica|proporciona)|ausencia|sin (?:datos|medici)|desconoc/i, marker: 'east' },
+];
+
 /** Real provider calls only through the separately owned, cost-reserving gate. */
 export async function runResearchLiveCampaign(page, app, root, documents) {
   const ids = documents.map(document => document.id);
@@ -34,13 +41,7 @@ export async function runResearchLiveCampaign(page, app, root, documents) {
     fs.writeFileSync(path.join(root, 'artifacts/live-preparation.json'), JSON.stringify(inventory, null, 2));
     assert.ok(ids.every(id => inventory.documents.find(document => document.id === id)?.preparation.embeddings === 'ready'), 'real embeddings must be published for every synthetic source');
     assert.ok(inventory.embeddingSpaces.some(space => space.model === 'baai/bge-m3' && space.dimensions === 1024));
-    const queries = [
-      { name: 'exact', text: 'Cita literalmente la frase de NORTH23 e indica cuántas unidades se midieron en el campo norte.', expected: /23/, marker: 'NORTH23' },
-      { name: 'comparison', text: 'Compara las mediciones de los campos norte y sur. ¿Respaldan una medición uniforme? Cita ambas fuentes.', expected: /23[\s\S]*41|41[\s\S]*23/, marker: 'SOUTH41' },
-      { name: 'multilingual', text: 'Quelle quantité a été mesurée dans le champ sud ? Réponds en français et cite la source.', expected: /41/, marker: 'SOUTH41' },
-      { name: 'absence', text: '¿Cuántas unidades se midieron en el campo este? Si las fuentes no lo indican, dilo expresamente y cita la evidencia de esa ausencia.', expected: /no (?:se |hay |existe|indica|proporciona)|ausencia|sin (?:datos|medici)|desconoc/i, marker: 'east' },
-    ];
-    for (const query of queries) {
+    for (const query of RESEARCH_CAMPAIGN_QUERIES) {
       const started = performance.now();
       const search = await page.evaluate(input => window.nodus.searchResearchNotebook(input.id, input.query), { id: notebook.id, query: query.text });
       const response = await page.evaluate(async input => window.nodus.researchChat({ model: { provider: 'deepseek', model: 'deepseek-flash' }, thinkingEffort: 'standard',
@@ -56,11 +57,22 @@ export async function runResearchLiveCampaign(page, app, root, documents) {
       fs.writeFileSync(path.join(root, 'artifacts/live-campaign.json'), JSON.stringify(result, null, 2));
       assert.ok(check.expectedAnswer, `${query.name}: answer must agree with known synthetic evidence`);
       assert.ok(check.citationsExist, `${query.name}: citations must resolve within the authorized scope`);
+      assert.ok(check.knownEvidenceRetrieved, `${query.name}: search must retrieve the known source marker`);
     }
-    const started = performance.now();
-    const report = await page.evaluate(async id => window.nodus.generateDeepResearchReport({ notebookId: id, objective: 'Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.',
-      approach: 'general', language: 'es', sectionLimit: 2, sectionLength: 300, model: { provider: 'deepseek', model: 'deepseek-flash' } }), notebook.id);
-    result.deepResearch = { latencyMs: performance.now() - started, report };
+    result.deepResearchCases = [];
+    for (const [deepResearchVersion, approach] of [['v1', 'general'], ['v2', 'general'], ['v1', 'comparative'], ['v2', 'comparative']]) {
+      const started = performance.now();
+      const report = await page.evaluate(async input => window.nodus.generateDeepResearchReport({ notebookId: input.id,
+        objective: 'Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.',
+        deepResearchVersion: input.deepResearchVersion, approach: input.approach, language: 'es', sectionLimit: 3,
+        sectionLength: 300, model: { provider: 'deepseek', model: 'deepseek-flash' } }), { id: notebook.id, deepResearchVersion, approach });
+      const measured = { deepResearchVersion, approach, latencyMs: performance.now() - started, report };
+      result.deepResearchCases.push(measured);
+      if (deepResearchVersion === 'v1' && approach === 'general') result.deepResearch = measured;
+      fs.writeFileSync(path.join(root, 'artifacts/live-campaign.json'), JSON.stringify(result, null, 2));
+      assert.equal(report.draft.researchTraversal.sourceCount, 3, 'each engine records its authorized corpus');
+      assert.ok(report.draft.researchTraversal.queries.length > 0, 'each engine records its documentary traversal');
+    }
     result.completedAt = new Date().toISOString();
     return result;
   } finally {

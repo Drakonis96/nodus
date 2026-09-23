@@ -31,11 +31,17 @@ export function getDocumentaryPassageDetail(id: string): PassageDetail | null {
     if (scope.notebookId && getResearchNotebook(scope.notebookId)
       && !resolveResearchNotebook(scope.notebookId).documents.some(item => item.id === document.id)) return null;
     const identity: DocumentaryIndexIdentity = JSON.parse(passage.identity_json);
-    if (identity.revision !== document.revision || identity.attachmentId !== document.attachmentId) return null;
+    if (identity.revision !== document.revision) return null;
+    if (document.attachments?.length && identity.attachmentId !== null
+        && !document.attachments.some(attachment => attachment.id === identity.attachmentId
+          && (!identity.attachmentRevision || attachment.revision === identity.attachmentRevision))) return null;
+    if (!document.attachments?.length && document.attachmentId !== null && identity.attachmentId !== document.attachmentId) return null;
     const locator = JSON.parse(passage.locator_json);
     return { passage_id: id, nodus_id: document.workId ?? document.id, libraryItemId: document.libraryItemId,
+      attachmentId: identity.attachmentId,
+      noteId: document.noteId,
       revision: identity.revision, historical: current?.revision !== identity.revision,
-      provenance: (identity.coverage ?? document.coverage) === 'abstract' ? 'abstract' : 'source', text: passage.text,
+      provenance: document.authoredKind ?? ((identity.coverage ?? document.coverage) === 'abstract' ? 'abstract' : 'source'), text: passage.text,
       page_label: locator.pageLabel, source_ref: locator.sourceRef, page_number: locator.pageNumber,
       chunk_index: passage.ordinal, work: { title: document.title, authors: document.authors, year: document.year,
         zotero_key: document.origin.kind === 'zotero' ? document.origin.itemKey : '' } };

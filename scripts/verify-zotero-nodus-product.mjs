@@ -8,12 +8,12 @@ import { _electron } from 'playwright-core';
 import { researchTestEnvironment } from './research-isolation.mjs';
 
 /** Called only after the parent harness has verified the inherited OS boundary. */
-export async function verifyZoteroNodusProduct(root, endpoint, corpus, { providerProxy } = {}) {
+export async function verifyZoteroNodusProduct(root, endpoint, corpus, { providerProxy, baselineWorkspace } = {}) {
   const require = createRequire(import.meta.url);
   const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
   const wrapper = path.join(root, 'electron-isolated');
   fs.writeFileSync(wrapper, `#!/bin/sh\nexec /usr/bin/sandbox-exec -f ${quote(path.join(root, 'isolation.sb'))} ${quote(require('electron'))} "$@"\n`, { mode: 0o700 });
-  const app = await _electron.launch({ executablePath: wrapper, args: ['--no-sandbox', path.resolve(import.meta.dirname, '..')], cwd: root,
+  const app = await _electron.launch({ executablePath: wrapper, args: ['--no-sandbox', '--disable-gpu', baselineWorkspace ?? path.resolve(import.meta.dirname, '..')], cwd: root,
     env: { ...researchTestEnvironment(root), NODUS_ZOTERO_API_BASE: endpoint,
       ...(providerProxy ? { NODUS_RESEARCH_PROVIDER_PROXY: providerProxy } : {}) }, timeout: 60000 });
   let external;
@@ -28,15 +28,20 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus, { provide
         autoLightScan: false, autoDeepScanOnReadTag: false, autoSummaryAfterDeep: false, autoBridgeAfterQueue: false,
         autoResumeQueue: false, documentIndexingEnabled: false, syncMode: 'manual' }));
     }
-    const imported = await page.evaluate(async root => {
+    const imported = await page.evaluate(async ({ root, baseline }) => {
       await window.nodus.updateSettings({ autoBackupFolder: `${root}/library`, onboardingComplete: true,
         basicsTutorialVersion: 99, recoverySetupVersion: 999, tourComplete: true, advancedTourComplete: true,
         mascotEnabled: false, reduceMotion: true });
       const libraries = await window.nodus.listZoteroImportLibraries();
       const report = await window.nodus.importZoteroLibrary('synthetic-product-import', { libraryIds: libraries.map(library => library.id), copyAttachments: true, fullRefresh: true });
-      return { libraries, report, inventory: await window.nodus.getResearchPreparationInventory() };
-    }, root);
+      return { libraries, report, inventory: baseline ? { documents: (await window.nodus.listGlobalLibraryItems({ limit: 500 })).items } : await window.nodus.getResearchPreparationInventory() };
+    }, { root, baseline: Boolean(baselineWorkspace) });
     fs.writeFileSync(path.join(root, 'artifacts/nodus-import.json'), JSON.stringify(imported, null, 2));
+    if (baselineWorkspace) {
+      const { runResearchBaselineCampaign } = await import('./research-baseline-campaign.mjs');
+      const live = await runResearchBaselineCampaign(page, app, root, imported.inventory.documents);
+      return { passed: true, baseline: 'f54995e7', importedSources: imported.inventory.documents.length, live };
+    }
     const source = imported.inventory.documents.find(document => document.origin.itemKey === corpus.items[0].key);
     assert.ok(source, 'supported Zotero import exposes the synthetic source');
     const notebook = await page.evaluate(async id => window.nodus.saveResearchNotebook({ name: 'Real isolated Zotero', mode: 'fixed', sources: [{ kind: 'library-item', id }], exclusions: [] }), source.id);

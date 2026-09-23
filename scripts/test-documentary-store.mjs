@@ -52,5 +52,21 @@ try {
   assert.equal(second.claim(60000), null);
   first.setPreference('paused', false);
   assert.ok(second.claim(60000));
+  const attachments = ['appendix-a', 'appendix-b'].map(attachmentId => ({ ...identity, documentId: 'multi', attachmentId, attachmentRevision: 'bytes-1' }));
+  const keys = attachments.map(attachment => first.enqueue(attachment, {}, 0, 70000));
+  for (const [index, key] of keys.entries()) {
+    const job = first.claim(70000, 60000, key);
+    first.saveChunks(job, [{ text: `Independent evidence ${index}`, pageLabel: '1', pageNumber: 1, sourceRef: attachments[index].attachmentId }], 71000);
+    first.publishLexical(job, 72000);
+    first.complete(job, 73000);
+  }
+  const heads = first.db.prepare('SELECT attachment_id,current_key FROM documentary_attachment_heads WHERE document_id=? ORDER BY attachment_id').all('multi');
+  assert.deepEqual(heads.map(head => head.current_key), keys, 'attachments publish independently within one canonical work');
+  const changed = first.enqueue({ ...attachments[0], attachmentRevision: 'bytes-2' }, {}, 0, 74000);
+  assert.notEqual(changed, keys[0], 'attachment revision participates in identity');
+  first.cancel(changed);
+  assert.deepEqual(first.db.prepare('SELECT current_key FROM documentary_attachment_heads WHERE document_id=? ORDER BY attachment_id').all('multi').map(row => row.current_key), keys,
+    'failed replacement retains both attachment heads');
+  assert.equal(first.lexicalSearch('Independent', keys, 10).length, 2);
   console.log('Shared documentary store: idempotency, transactional leases, restart recovery, fencing, lexical-first publication, vector compatibility, cancellation, bounded retries and pause passed.');
 } finally { first.close(); second.close(); fs.rmSync(scratch, { recursive: true, force: true }); }

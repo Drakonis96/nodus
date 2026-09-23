@@ -48,7 +48,10 @@ export class ResearchCorpusRun {
   }
   async retrieve(query: string, expandRounds = 2): Promise<void> {
     this.validate();
-    if (!this.budget.nextRound()) return;
+    if (!this.budget.nextRound()) {
+      this.traversal.push({ query, sources: this.scope.documents.map(document => document.id), candidates: 0, partial: true });
+      return;
+    }
     const settings = this.budget.settings;
     if (!this.scope.documents.length) return;
     const vector = await embed(query, this.signal).catch(() => null);
@@ -70,8 +73,11 @@ export class ResearchCorpusRun {
     }));
     let selected = 0;
     for (let index = 0; index < Math.max(candidates.length, legacy.length); index++) for (const candidate of [candidates[index], legacy[index]]) {
+      if (!candidate) continue;
+      const key = `passage-content:${JSON.stringify([candidate.nodus_id, candidate.summary, candidate.pageLabel])}`;
+      if (this.budget.visited.has(key)) continue;
       if (selected >= settings.passagesPerRound * shared.traversal.rounds) { this.budget.partial = true; break; }
-      if (candidate && this.budget.accept(`passage:${candidate.id}`, candidate.summary)) { this.evidence.set(candidate.id, candidate); selected++; }
+      if (this.budget.accept(key, candidate.summary)) { this.evidence.set(candidate.id, candidate); selected++; }
     }
     const lexical = getDb().prepare(`SELECT global_id,type,label,statement FROM ideas WHERE global_id IN (SELECT value FROM json_each(?))`).all(JSON.stringify(this.ideaIds)) as Array<{ global_id: string; type: WritingWorkshopIdeaCandidate['type']; label: string; statement: string }>;
     const words = query.toLocaleLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [];
@@ -149,8 +155,13 @@ export class ResearchCorpusRun {
   }
   async section(input: SectionRetrievalInput) {
     await this.retrieve([input.objective, input.sectionTitle, input.purpose, ...input.keyClaims, ...(input.coverageQuestions ?? [])].join('\n'));
-    return { ideas: [...this.ideas.values()].filter(idea => !input.excludeIdeaIds.includes(idea.id)).slice(0, input.limits.ideas),
-      passages: [...this.evidence.values()].filter(passage => !input.excludePassageIds.includes(passage.id)).slice(0, input.limits.passages), evidencePacks: [] };
+    // These exclusions prefer fresh evidence; they are not access revocations.
+    // A small corpus must remain citable in later sections after discovery runs
+    // out. Reusing already authorized evidence consumes no new retrieval budget.
+    const preferUnused = <T extends { id: string }>(items: T[], used: string[], limit: number) =>
+      [...items.filter(item => !used.includes(item.id)), ...items.filter(item => used.includes(item.id))].slice(0, limit);
+    return { ideas: preferUnused([...this.ideas.values()], input.excludeIdeaIds, input.limits.ideas),
+      passages: preferUnused([...this.evidence.values()], input.excludePassageIds, input.limits.passages), evidencePacks: [] };
   }
 }
 

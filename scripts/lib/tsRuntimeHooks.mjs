@@ -117,7 +117,7 @@ export function requireElectronRuntime(scriptPath, flag) {
   // context writes binary test events into ordinary stdout and hides failures.
   delete environment.NODE_TEST_CONTEXT;
   execFileSync(
-    path.join(repoRoot, 'node_modules/.bin/electron'),
+    require('electron'),
     [scriptPath, flag],
     { cwd: repoRoot, env: environment, stdio: 'inherit' }
   );

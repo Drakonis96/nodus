@@ -241,3 +241,51 @@ Electron on ARM). Windows installed the hash-locked runtime but failed importing
 pywin32 from a `--target` directory. Intel compiled pinned OpenSSL but could not
 find its installed maturin executable. Explicit private-runtime paths address
 both failures; those two targets still require a successful native rerun.
+
+
+### Attachment identities, explicit authored sources and report evidence
+
+Attachments now retain independent index heads, identities and revision hashes;
+lexical publication for each attachment precedes optional vectors. Citation
+navigation carries the attachment identifier to the reader. Synthetic SQLite and
+worker checks passed at `/private/tmp/nodus-research-Z7nqdc` and
+`/private/tmp/nodus-research-Wk439K`, including two attachments and immutable
+historical citation reads after content changes. Canonical inventory deduplication
+preserves user/group library identity and passed at
+`/private/tmp/nodus-research-ZAWeFv`.
+
+Notes and generated reports are selectable notebook references, excluded from
+general academic source discovery unless explicitly selected. Their evidence
+records authored provenance and a non-primary-evidence limitation. The source
+selection/trash regression passed at `/private/tmp/nodus-research-vUKw0o`.
+Conversational attachment promotion remains outstanding.
+
+The unified real campaign at `/private/tmp/nodus-research-iZ6IZk` passed all four
+known-answer, known-retrieval-marker and citation-existence chat checks. All four
+academic Deep Research paths completed and recorded scoped traversal. Their
+quality audits still reported `needs_review`; v2 comparative reported nine
+unsupported claims and three internal contradictions. These are quality failures,
+not acceptance passes. Investigation found that later sections lost already-used
+evidence once the shared discovery budget expired and that planners omitted
+available documentary passages. Both paths now preserve and reuse authorized
+evidence, and all 15 planner languages include the documentary contract. Focused
+prompt, sync-policy and citation UI checks passed at
+`/private/tmp/nodus-research-lpNzLL`; a fourth nonexistent test name was a harness
+invocation error, now rejected before execution. The application build passed in
+`artifacts/research-notes-build.log`. A new live quality campaign is pending.
+
+The real baseline uses `f54995e7` plus recorded isolation/provider-gate-only
+instrumentation in `/private/tmp/nodus-research-lSi4Gs/artifacts/baseline.json`.
+Baseline run `/private/tmp/nodus-research-4DGqSt` imported the exact same PDF bytes,
+prepared three passages, and passed all four chat known-answer/citation-existence
+checks. It did not run Deep Research. At the end of those runs the one shared
+campaign ledger recorded 164 calls and a $0.27879616 accounted upper bound.
+
+Native CI run 35845344992 passed macOS ARM, macOS Intel and Linux. Windows passed
+private runtime startup and the application build but its focused tests could not
+spawn the npm Electron shim. Test loaders now use Electron's actual executable;
+a Windows rerun is required. Signing/notarization and disposable native
+installation/update/removal remain unverified. Full-suite attempts using Node's
+shared runner were interrupted; the harness now owns two independent single-file
+runners, retains every result and continues after failures. No interrupted run is
+counted as a suite pass.

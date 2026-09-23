@@ -1052,6 +1052,7 @@ async function aiAuditPlanCoverage(
 
 async function aiPlanReport(input: PlanInput, model: ModelRef | null, approach?: AcademicApproachContext): Promise<DeepResearchPlan> {
   const promptPack = deepResearchPlanningPromptPack(input.language, {
+    documentaryEvidence: input.passages.length > 0,
     sectionCount: input.sectionCount,
     sectionMode: input.sectionMode,
     approachRules: approach?.rules.planner ?? [],
@@ -1080,6 +1081,7 @@ async function aiPlanReport(input: PlanInput, model: ModelRef | null, approach?:
       huecos: input.gaps,
       contradicciones: input.contradictions,
       obras: input.works,
+      pasajes_documentales: input.passages,
       relaciones_del_grafo: approach?.relationships?.length ? approach.relationships : (input.relationships ?? []),
       ...(approach ? {
         enfoque_de_investigacion: approach.approach,
@@ -1102,6 +1104,7 @@ async function aiPlanReport(input: PlanInput, model: ModelRef | null, approach?:
       ideas: input.ideas.slice(0, 70),
       huecos: input.gaps.slice(0, 16),
       contradicciones: input.contradictions.slice(0, 16),
+      pasajes_documentales: input.passages,
       relaciones_del_grafo: approach?.relationships?.length ? approach.relationships : (input.relationships ?? []),
       plan_candidato: draft,
     }, null, 2);
@@ -1126,6 +1129,7 @@ async function aiPlanReport(input: PlanInput, model: ModelRef | null, approach?:
     const ideaById = new Map(input.ideas.map((item) => [item.id, item]));
     const gapById = new Map(input.gaps.map((item) => [item.id, item]));
     const contradictionById = new Map(input.contradictions.map((item) => [item.id, item]));
+    const passageById = new Map(input.passages.map((item) => [item.id, item]));
     const redTeamUser = JSON.stringify({
       objetivo_con_exclusiones_vinculantes: input.objective,
       preguntas_de_cobertura_obligatoria: input.coverageQuestions,
@@ -1135,6 +1139,7 @@ async function aiPlanReport(input: PlanInput, model: ModelRef | null, approach?:
         ideas: section.ideaIds.map((id) => ideaById.get(id)).filter(Boolean),
         huecos: section.gapIds.map((id) => gapById.get(id)).filter(Boolean),
         contradicciones: section.contradictionIds.map((id) => contradictionById.get(id)).filter(Boolean),
+        pasajes_documentales: section.passageIds.map((id) => passageById.get(id)).filter(Boolean),
       })),
     }, null, 2);
     const redTeamed = planFromAi(await completeJson<AiPlan>(
