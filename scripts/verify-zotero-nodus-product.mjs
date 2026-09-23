@@ -30,6 +30,7 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus, { provide
         return child;
       };
     });
+    if (!baselineWorkspace) await page.evaluate(() => window.nodus.setResearchPreparationPolicy({ welcomeVersion: 1, decision: 'pending', futureAdditions: false }));
     if (providerProxy) {
       await page.evaluate(() => window.nodus.updateSettings({ chatModel: { provider: 'deepseek', model: 'deepseek-flash' },
         deepResearchModel: { provider: 'deepseek', model: 'deepseek-flash' }, synthesisModel: { provider: 'deepseek', model: 'deepseek-flash' },

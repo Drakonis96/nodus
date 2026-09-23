@@ -1,5 +1,6 @@
 name: Research corpus disposable installer validation
 on:
+  workflow_dispatch:
   push:
     branches: [codex/agentic-corpus-notebooks]
     paths:
