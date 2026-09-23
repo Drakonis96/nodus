@@ -10,8 +10,8 @@ import { enabledChatSkills } from '../chatSkills';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getConversation } from '../db/chatRepo';
 import { executeChatSkills } from './chatSkillExecution';
-import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings, ensureRouteConsistency, resolveNamedRoute } from './moleculeInspection';
-import { countRouteSteps, findReactionLines, findStepNamedSpecies, formatMissingSpeciesPrompt, formatNameCorrectionNote, MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE, requestedTargetFor } from '@shared/moleculeInspection';
+import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings, resolveNamedRoute } from './moleculeInspection';
+import { countRouteSteps, findStepNamedSpecies, formatMissingSpeciesPrompt, formatNameCorrectionNote, isRouteFixPrompt, MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE, requestedTargetFor } from '@shared/moleculeInspection';
 import { SYNTHESIS_TEMPLATE_ADDENDUM, looksLikeSynthesisRequest } from '@shared/synthesisPrompt';
 import type {
   Author,
@@ -196,7 +196,10 @@ function skillExecution(request: ResearchChatRequest) {
   const vaultId = getActiveVault().id;
   const owner = request.conversationId ? chatAssetOwner('assistant', request.conversationId, vaultId) : undefined;
   const userMessages = request.messages.filter(message => message.role === 'user').map(message => message.content);
-  return { skills: enabledChatSkills('assistant'), question: userMessages.at(-1), target: requestedTargetFor(userMessages), model: request.model, owner, version: owner ? chatAssetVersion(owner) : 0,
+  // The route review must judge the route against the researcher's original request, not the
+  // correction chip the current turn is answering.
+  const lastRequest = [...userMessages].reverse().find(message => !isRouteFixPrompt(message));
+  return { skills: enabledChatSkills('assistant'), question: userMessages.at(-1), request: lastRequest ?? userMessages.at(-1), target: requestedTargetFor(userMessages), model: request.model, owner, version: owner ? chatAssetVersion(owner) : 0,
     isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getConversation(request.conversationId)) };
 }
 
@@ -206,23 +209,21 @@ function skillExecution(request: ResearchChatRequest) {
 async function finalizeWithAudit(answer: string, execution: ReturnType<typeof skillExecution>, signal?: AbortSignal): Promise<string> {
   const skilled = await executeChatSkills(answer, execution, signal);
   const chemistryEnabled = execution.skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
-  const options = { model: execution.model, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner, signal, question: execution.question };
+  const options = { model: execution.model, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner, signal, question: execution.request ?? execution.question };
   // Names-first: resolve every species name to a structure (PubChem first, OPSIN fallback),
   // derive the equations from the resolved structures, and attach the derived SMILES to the
   // answer. An unresolved reactant/product name is sent back to the model to correct, and the
-  // route is still checked and drawn; the clarification is appended after it. When the
-  // installed package has no resolve-names tool, the legacy reaction-line path runs instead.
+  // route is still checked and drawn; the clarification is appended after it. When the answer
+  // carries no named route (or the installed package has no resolve-names tool), only the
+  // structure check and a possible "list the species" chip run.
   const resolved = await resolveNamedRoute(skilled, skilled, options);
   if (resolved.legacy) {
-    const gated = await ensureRouteConsistency(skilled, skilled, options);
-    const withStructures = await appendStructureAudit(gated.answer, gated.answer, options);
-    const routed = await appendRouteReportAndDrawings(withStructures, gated.answer, { ...options, target: execution.target });
-    const body = gated.clarification ? `${routed.trimEnd()}\n\n${gated.clarification}\n` : routed;
+    const withStructures = await appendStructureAudit(skilled, skilled, options);
     // A route that describes steps but lists no species cannot be checked; offer one click to
     // have the model re-emit it with the four labelled lines.
     const steps = options.enabled !== false ? countRouteSteps(skilled) : 0;
-    const missingSpecies = steps > 0 && findReactionLines(skilled).length === 0 && !findStepNamedSpecies(skilled, steps).some((step) => step.length);
-    return missingSpecies ? `${body.trimEnd()}\n\n${formatMissingSpeciesPrompt()}\n` : body;
+    const missingSpecies = steps > 0 && !findStepNamedSpecies(skilled, steps).some((step) => step.length);
+    return missingSpecies ? `${withStructures.trimEnd()}\n\n${formatMissingSpeciesPrompt()}\n` : withStructures;
   }
   const withStructures = await appendStructureAudit(resolved.answer, resolved.answer, options);
   const routed = await appendRouteReportAndDrawings(withStructures, resolved.answer, { ...options, target: execution.target }, { steps: resolved.steps, labels: resolved.labels });
@@ -235,7 +236,11 @@ async function finalizeWithAudit(answer: string, execution: ReturnType<typeof sk
 export async function answerResearchChat(request: ResearchChatRequest): Promise<ResearchChatResponse> {
   if (request.concilium) return streamResearchChat(request, () => {});
   const execution = skillExecution(request);
-  const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request, execution.skills);
+  const { system, user, stats, maxTokens, local, citationRequired: needsCitation } = await buildResearchChatPrompt(request, execution.skills);
+  // A route-fix correction answers the checker, not the literature: it makes no new claims and
+  // must not be held to the citation contract, or a valid correction is thrown away for citing
+  // nothing. The original request still supplied the target and context.
+  const citationRequired = needsCitation && !isRouteFixPrompt(execution.question ?? '');
   const attachments = await prepareResearchAttachments(request, 'research', request.model);
   const opts = { system: system + attachments.system, user: user + attachments.text, images: attachments.images, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, ...await researchGenerationOptions(request, maxTokens, local) };
   let answer = '';
@@ -271,7 +276,10 @@ async function streamResearchChatTurn(
 ): Promise<ResearchChatResponse> {
   const execution = skillExecution(request);
   if (council?.member) execution.skills = [];
-  const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request, execution.skills, council);
+  const { system, user, stats, maxTokens, local, citationRequired: needsCitation } = await buildResearchChatPrompt(request, execution.skills, council);
+  // A route-fix correction answers the checker, not the literature; do not hold it to the
+  // citation contract (see answerResearchChat).
+  const citationRequired = needsCitation && !isRouteFixPrompt(execution.question ?? '');
   // Peer opinions cannot enlarge the set of citable source ids.
   const evidence = JSON.parse(user);
   delete evidence.council_assessments;

@@ -2,41 +2,28 @@ import type { ModelRef } from '@shared/types';
 import {
   annotateSpeciesSmiles,
   buildNameFeedbackRequest,
-  buildRouteConsistencyRequest,
-  buildRouteRepairRequest,
   buildRouteReviewRequest,
   buildRouteSteps,
   countRouteSteps,
   declaresRacemic,
   findAnswerSpecies,
-  findDuplicateRoleProblems,
-  findReactionLines,
   findSmilesCandidates,
   findStepConditions,
-  findStepEquationProblems,
   findStepNamedSpecies,
-  findStepSpeciesLabels,
   formatNamedRouteFixPrompts,
   formatRouteAudit,
-  formatRouteClarification,
-  formatRouteFixPrompt,
   formatStructureAudit,
   formatUnresolvedNameClarification,
-  hasCheckerScaffolding,
   normalizeMoleculeDossier,
   normalizeRouteAudit,
   parseNameFeedback,
-  parseRouteConsistencyVerdict,
   parseRouteReview,
-  ROUTE_CONSISTENCY_SYSTEM,
   ROUTE_NAME_FEEDBACK_SYSTEM,
-  ROUTE_REPAIR_SYSTEM,
   ROUTE_REVIEW_SYSTEM,
   type MoleculeDossier,
   type NamedSpecies,
   type ResolvedSpecies,
   type RouteAudit,
-  type RouteConsistencyVerdict,
   type RouteReview,
   type RouteSpeciesLabel,
   type UnresolvedName,
@@ -404,125 +391,6 @@ export async function resolveNamedRoute(
   }
 }
 
-// ------------------------------------------------- name/prose consistency (legacy gate)
-
-/** How many times the route may be sent back to the model for a name/SMILES rewrite. */
-const CONSISTENCY_ATTEMPTS = 2;
-
-export interface RouteConsistencyOutcome {
-  answer: string;
-  /** False when the gate could not be resolved automatically. The route is still returned
-   *  and rendered; `clarification` is a `nodus-route-fix` fence the caller appends after the
-   *  route report, so a name disagreement annotates the answer instead of hiding it. */
-  consistent: boolean;
-  /** The one-click clarification, present only when `consistent` is false. */
-  clarification?: string;
-}
-
-/** One model call comparing every named species' IUPAC name and SMILES to the step prose.
- *  An unreadable reply returns null, which the caller treats as "not checked" rather than a
- *  fabricated failure. */
-async function checkRouteConsistency(
-  answer: string,
-  steps: string[],
-  labels: RouteSpeciesLabel[][],
-  options: InspectOptions,
-): Promise<RouteConsistencyVerdict | null> {
-  try {
-    const raw = await completeText({
-      system: ROUTE_CONSISTENCY_SYSTEM,
-      user: buildRouteConsistencyRequest(answer, steps, labels),
-      temperature: 0,
-      maxTokens: 1400,
-    }, options.model ?? null);
-    return parseRouteConsistencyVerdict(raw);
-  } catch {
-    return null;
-  }
-}
-
-/** One model call rewriting only the names and reaction SMILES so they agree with the fixed
- *  prose. Returns the corrected answer, or the model's ambiguity question. */
-async function repairRouteConsistency(
-  answer: string,
-  steps: string[],
-  labels: RouteSpeciesLabel[][],
-  verdict: RouteConsistencyVerdict,
-  options: InspectOptions,
-): Promise<{ text: string } | { ambiguous: string } | null> {
-  try {
-    const raw = await completeText({
-      system: ROUTE_REPAIR_SYSTEM,
-      user: buildRouteRepairRequest(answer, steps, labels, verdict),
-      temperature: 0,
-      maxTokens: 6000,
-    }, options.model ?? null);
-    const text = raw.trim();
-    if (!text) return null;
-    const ambiguous = /^AMBIGUOUS\b\s*:?\s*/i.exec(text);
-    if (ambiguous) return { ambiguous: text.slice(ambiguous[0].length).trim().slice(0, 1200) };
-    // A repair that echoes our own request, or loses the reaction lines, is not an answer;
-    // treating it as no repair keeps the original text instead of pasting the request into it.
-    if (hasCheckerScaffolding(text)) return null;
-    return findReactionLines(text).length ? { text } : null;
-  } catch {
-    return null;
-  }
-}
-
-/** The name/prose gate that runs before any of the other chemistry checks. When the answer
- *  names its species, every IUPAC name and isomeric SMILES must denote the structure the
- *  step prose describes; a disagreement is rewritten up to `CONSISTENCY_ATTEMPTS` times and
- *  otherwise becomes a one-click clarification. An answer with no names, or one where no
- *  model is available to check, is passed through untouched. */
-export async function ensureRouteConsistency(
-  finalAnswer: string,
-  modelAnswer: string,
-  options: InspectOptions = {},
-): Promise<RouteConsistencyOutcome> {
-  if (options.enabled === false) return { answer: finalAnswer, consistent: true };
-  let steps = findReactionLines(modelAnswer);
-  if (!steps.length) return { answer: finalAnswer, consistent: true };
-  let labels = findStepSpeciesLabels(modelAnswer, steps.length);
-  if (!labels.some((entries) => entries.length)) return { answer: finalAnswer, consistent: true };
-
-  let answer = finalAnswer;
-  let current = modelAnswer;
-  for (let attempt = 0; attempt <= CONSISTENCY_ATTEMPTS; attempt += 1) {
-    options.signal?.throwIfAborted();
-    // A structure listed under two roles, or a species in the species list that is not in
-    // the step's reaction line (or vice versa), is a deterministic failure; every other
-    // disagreement is semantic and needs the model to read the prose.
-    const deterministic = [...findDuplicateRoleProblems(labels), ...findStepEquationProblems(steps, labels)];
-    const verdict: RouteConsistencyVerdict | null = deterministic.length
-      ? { status: 'mismatch', problems: deterministic }
-      : await checkRouteConsistency(current, steps, labels, options);
-    // No verdict is a transport/shape failure, not a chemical disagreement: fail open.
-    if (!verdict || verdict.status === 'ok') return { answer, consistent: true };
-    // The clarification is returned beside the answer, not spliced into it: the route is still
-    // checked and drawn by the caller, so a name disagreement annotates rather than hides it.
-    if (verdict.status === 'ambiguous' || attempt === CONSISTENCY_ATTEMPTS) {
-      return { answer, consistent: false, clarification: formatRouteClarification(verdict.problems, verdict.question) };
-    }
-    const repaired = await repairRouteConsistency(current, steps, labels, verdict, options);
-    if (!repaired) {
-      return { answer, consistent: false, clarification: formatRouteClarification(verdict.problems, verdict.question) };
-    }
-    if ('ambiguous' in repaired) {
-      return { answer, consistent: false, clarification: formatRouteClarification(verdict.problems, repaired.ambiguous) };
-    }
-    // Only the route is rewritten; if the repair loses the named species there is nothing
-    // left to check and the corrected answer stands on its own.
-    current = repaired.text;
-    answer = repaired.text;
-    steps = findReactionLines(current);
-    if (!steps.length) return { answer, consistent: true };
-    labels = findStepSpeciesLabels(current, steps.length);
-    if (!labels.some((entries) => entries.length)) return { answer, consistent: true };
-  }
-  return { answer, consistent: true };
-}
-
 /** Draws every step the checker accepted, in order, on the runner already opened for the
  *  route check. A step the checker refused is never auto-drawn: the verified lane abstains
  *  for it and its fallback picture is unchecked, so it gets a deterministic note instead. */
@@ -587,12 +455,11 @@ export async function appendRouteReportAndDrawings(
   overrides: { steps?: string[]; labels?: RouteSpeciesLabel[][] } = {},
 ): Promise<string> {
   if (options.enabled === false || !routeVerificationAvailable()) return finalAnswer;
-  // The name-first path derives the equations from resolved names and passes them in; the
-  // legacy path parses reaction lines the model wrote itself.
-  const steps = overrides.steps?.length ? overrides.steps : findReactionLines(modelAnswer);
-  if (!steps.length) return finalAnswer;
+  // The names-first path derives the equations from the resolved names and passes them in.
+  const steps = overrides.steps ?? [];
+  const labels = overrides.labels ?? [];
+  if (!steps.length || !labels.some((entries) => entries.length)) return finalAnswer;
   const conditions = findStepConditions(modelAnswer, steps.length);
-  const labels = overrides.labels ?? findStepSpeciesLabels(modelAnswer, steps.length);
   const racemic = declaresRacemic(modelAnswer);
   const provider = routeProvider();
   if (!provider) return finalAnswer;
@@ -601,19 +468,15 @@ export async function appendRouteReportAndDrawings(
   try {
     const audit = await invokeRoute(runner, provider, steps, racemic, options.target, labels);
     if (!audit) return finalAnswer;
-    // When the route was derived from names, one model review looks for plan problems the
-    // checker cannot see (prose vs names, a product that is a different compound, a step that
-    // cannot work, a redundant step). It is blocking: a finding marks the route not verified.
-    // An unreadable reply yields no review and never blocks.
-    const named = Boolean(overrides.labels?.some((entries) => entries.length));
-    const review = named ? await requestRouteReview(options.question ?? '', labels, audit, options) : null;
+    // One model review looks for plan problems the checker cannot see (prose vs names, a
+    // product that is a different compound, a step that cannot work, a redundant step). It is
+    // blocking: a finding marks the route not verified. An unreadable reply never blocks.
+    const review = await requestRouteReview(options.question ?? '', labels, audit, options);
     const report = formatRouteAudit(audit, labels, review);
     const drawings = compile ? await drawRouteSteps(runner, compile, steps, conditions, audit, options) : '';
-    // A refusal the checker can name and the app cannot fix is offered back to the model as
-    // one click: it proposes a corrected step, and this same path checks and draws it again.
-    // When the route was derived from names, the correction speaks names and roles only — the
-    // model never authored the derived SMILES, so it is not asked to rewrite one.
-    const fix = named ? formatNamedRouteFixPrompts(labels, audit, review) : formatRouteFixPrompt(steps, audit);
+    // A refusal the checker can name and the app cannot fix is offered back to the model as one
+    // click: names and roles only — the model never authored the derived SMILES.
+    const fix = formatNamedRouteFixPrompts(labels, audit, review);
     return `${finalAnswer.trimEnd()}\n\n${report}\n${drawings}${fix ? `\n${fix}\n` : ''}`;
   } catch {
     return finalAnswer;
