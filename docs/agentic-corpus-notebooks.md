@@ -591,3 +591,17 @@ completed successfully at `154ac96a` on macOS ARM64, macOS Intel, Windows x64 an
 Linux x64, including compilation, locked runtime preparation, scoped stdio,
 directory lifecycle and focused regressions; macOS also ran real Electron. This
 preceded the corrected network harness and is not final-head verification.
+
+### Disposable installer campaign
+
+`research-corpus-packaging.yml` runs only on this implementation branch when its
+packaging inputs change. It reuses the release packaging/signing/notarization
+mechanisms with `--publish never`, read-only repository permissions and at most
+two hosted workers. No tag, release or distributable upload is performed; only
+JSON evidence and runtime license inventories are retained. The installer harness
+refuses non-hosted machines. It installs a DMG, NSIS package or Debian package,
+launches the installed application twice across same-version replacement, loads
+the packaged private Python server, checks retained notebooks and removes the
+application while preserving the isolated profile and an unrelated fixture.
+This does not claim an upgrade between different application versions. Syntax,
+lint and workflow parsing passed locally; native results are pending.
