@@ -8778,6 +8778,8 @@ export const DE: Record<string, string> = {
   "Se importaron {bookmarks} marcadores y {folders} carpetas. Se omitieron {duplicates} duplicados.": "Es wurden {bookmarks} Lesezeichen und {folders} Ordner importiert. {duplicates} Duplikate übersprungen.",
   "{bookmarks} marcadores · {folders} carpetas · privado y local": "{bookmarks} Lesezeichen · {folders} Ordner · privat und lokal",
   "Buscar marcadores…": "Lesezeichen suchen…",
+  "Buscar {label}…": "{label} suchen…",
+  "Sin opciones coincidentes.": "Keine passenden Optionen.",
   "Marcador": "Lesezeichen",
   "Vista previa de importación · {fileName}": "Importvorschau · {fileName}",
   "{bookmarks} marcadores · {folders} carpetas · {duplicates} duplicados · {invalidUrls} URL no válidas omitidas": "{bookmarks} Lesezeichen · {folders} Ordner · {duplicates} Duplikate · {invalidUrls} ungültige URLs übersprungen",

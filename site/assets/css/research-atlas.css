@@ -25,6 +25,10 @@
    for the row and the field keeps its own measure, centred in it. */
 .atlas-search-wrap { width: min(100%, 1040px); margin: 34px auto 0; }
 .atlas-searchbar {
+  /* The engine list drops below this bar and over the facet row, which carries
+     its own z-index. Raising the bar is what keeps the open list in front of the
+     pills instead of behind them. */
+  position: relative; z-index: 20;
   display: grid; grid-template-columns: minmax(160px, 205px) 1px minmax(0, 1fr) 52px;
   align-items: center; width: min(100%, 920px); margin-inline: auto; min-height: 62px;
   border: 1px solid var(--membrane);
@@ -37,31 +41,46 @@
   box-shadow: var(--shadow), 0 0 0 3px rgba(139,92,246,.1);
 }
 .atlas-engine-wrap { position: relative; min-width: 0; }
+/* A button, not a <select>. The list it opens is the page's own (below): the
+   platform paints a select's popup from its own appearance setting, and no
+   declaration on the page reaches that popup. */
 .atlas-engine {
   width: 100%; height: 60px; padding: 0 36px 0 18px; border: 0; outline: 0;
   background: transparent; color: var(--ink-2); font: 650 13px/1 var(--sans);
-  cursor: pointer; appearance: none; -webkit-appearance: none;
-  /* The list behind this control is drawn by the platform, not by the page, so
-     the page can only tell it which way to dress: the control declares the dark
-     scheme and the options carry the site's own surface and ink. Left alone they
-     follow the operating system, which is how a dark bar ended up opening a
-     white menu. The in-app start pages import this stylesheet for the same
-     controls, so they inherit the same list. */
-  color-scheme: dark;
+  text-align: left; cursor: pointer;
 }
+.atlas-engine:hover, .atlas-engine[aria-expanded="true"] { color: var(--ink); }
 .atlas-engine-wrap::after {
   content: ''; position: absolute; right: 17px; top: 50%; width: 7px; height: 7px;
   border-right: 1.5px solid var(--ink-3); border-bottom: 1.5px solid var(--ink-3);
   transform: translateY(-68%) rotate(45deg); pointer-events: none;
 }
-/* The options themselves: the same surface and ink as the bar they hang from,
-   with the chosen one in the violet the rest of the page uses. The second
-   selector is the app's: its start pages wear this button as a <select>, and
-   they read this stylesheet directly (NodusBookmarks.css imports it). */
-.atlas-engine option,
-select.atlas-facet-button option { color: var(--ink); background: var(--raised); }
-.atlas-engine option:checked,
-select.atlas-facet-button option:checked { color: var(--violet-3); }
+/* The engine list. Same surface as the facet panels, because it is the same
+   kind of thing: a dark popover drawn by the page. Each row carries its own
+   tick so the chosen engine is legible without the platform's checkmark. */
+.atlas-engine-menu {
+  position: absolute; z-index: 70; top: calc(100% + 4px); left: 6px;
+  min-width: min(232px, calc(100vw - 40px)); max-height: min(300px, calc(100vh - 140px));
+  overflow: auto; overscroll-behavior: contain; padding: 6px;
+  border: 1px solid var(--membrane); border-radius: 14px; background: rgba(10,8,19,.97);
+  backdrop-filter: blur(20px) saturate(1.25); -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  box-shadow: 0 24px 70px -22px rgba(0,0,0,.9);
+}
+.atlas-engine-menu[hidden] { display: none !important; }
+.atlas-engine-option {
+  display: grid; grid-template-columns: 12px minmax(0,1fr); gap: 9px; align-items: center;
+  width: 100%; min-height: 36px; padding: 7px 10px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--ink-2); text-align: left; white-space: nowrap;
+  font: 600 12.5px/1.35 var(--sans); cursor: pointer;
+}
+.atlas-engine-option:hover { background: var(--skin-2); color: var(--ink); }
+.atlas-engine-option.is-selected { color: var(--violet-3); }
+.atlas-engine-tick {
+  justify-self: center; width: 9px; height: 5px; margin-top: -3px;
+  border-left: 1.8px solid currentColor; border-bottom: 1.8px solid currentColor;
+  transform: rotate(-45deg); opacity: 0;
+}
+.atlas-engine-option.is-selected .atlas-engine-tick { opacity: 1; }
 .atlas-search-sep { height: 28px; background: var(--membrane); }
 .atlas-input-wrap { position: relative; display: flex; align-items: center; min-width: 0; }
 .atlas-search-icon { flex: 0 0 auto; width: 19px; height: 19px; margin-left: 18px; color: var(--ink-3); }
@@ -136,12 +155,36 @@ select.atlas-facet-button option:checked { color: var(--violet-3); }
 .atlas-facet-search:focus { border-color: rgba(167,139,250,.5); background: rgba(255,255,255,.05); }
 .atlas-facet-options { max-height: 290px; margin-top: 8px; overflow: auto; overscroll-behavior: contain; }
 .atlas-facet-option {
-  display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: center;
+  display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 10px; align-items: center;
   width: 100%; min-height: 38px; padding: 7px 9px; border: 0; border-radius: 9px;
   background: transparent; color: var(--ink-2); text-align: left; font: 500 12px/1.35 var(--sans); cursor: pointer;
 }
 .atlas-facet-option:hover, .atlas-facet-option.is-selected { background: var(--skin-2); color: var(--ink); }
 .atlas-facet-option.is-selected { color: var(--violet-3); }
+.atlas-facet-option-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The checkbox itself. A real <input> cannot live inside the row's <button>, so
+   the box is drawn here and the row reports its state through aria-pressed. */
+.atlas-facet-check {
+  position: relative; width: 15px; height: 15px; border: 1.5px solid var(--membrane);
+  border-radius: 4.5px; background: rgba(255,255,255,.03); color: var(--ink);
+  transition: background .12s ease, border-color .12s ease;
+}
+.atlas-facet-check::after {
+  content: ''; position: absolute; left: 3.5px; top: .5px; width: 4px; height: 8px;
+  border-right: 1.7px solid currentColor; border-bottom: 1.7px solid currentColor;
+  transform: rotate(42deg) scale(0); transition: transform .12s ease;
+}
+.atlas-facet-option:hover .atlas-facet-check { border-color: rgba(167,139,250,.5); }
+.atlas-facet-option.is-selected .atlas-facet-check {
+  border-color: rgba(167,139,250,.9); background: rgba(139,92,246,.92);
+}
+.atlas-facet-option.is-selected .atlas-facet-check::after { transform: rotate(42deg) scale(1); }
+/* The first row is not one of the values: it is the way back to no filter on
+   this facet, so it is set apart from the list it clears. */
+.atlas-facet-option.is-clear {
+  margin-bottom: 6px; padding-bottom: 11px; border-radius: 9px 9px 0 0;
+  border-bottom: 1px solid var(--membrane);
+}
 .atlas-facet-count { color: var(--ink-3); font: 500 10.5px/1 var(--mono); }
 .atlas-facet-empty { padding: 18px 10px; color: var(--ink-3); text-align: center; font-size: 12px; }
 .atlas-reset {
