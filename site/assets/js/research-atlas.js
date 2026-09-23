@@ -53,7 +53,11 @@
     type: { label: 'Resource type', values: item => item.type_of_use || [] }
   };
 
-  const selected = { continent:'', country:'', region:'', area:'', type:'' };
+  // Every facet holds a LIST of chosen values. Within one facet the values are
+  // alternatives — choosing Spain and Portugal asks for either — while separate
+  // facets still narrow each other, so the whole thing reads as
+  // "these continents, these areas, this kind of resource".
+  const selected = { continent: [], country: [], region: [], area: [], type: [] };
   const facetNodes = {};
 
   for (const key of Object.keys(FACETS)) {
@@ -66,6 +70,10 @@
       search: root.querySelector('.atlas-facet-search'),
       options: root.querySelector('.atlas-facet-options')
     };
+    // The rows are toggle buttons, so the group is named for the facet they
+    // belong to: "Knowledge area, Social Sciences, toggle button, pressed".
+    facetNodes[key].options.setAttribute('role','group');
+    facetNodes[key].options.setAttribute('aria-label', FACETS[key].label);
   }
 
   const cards = [];
@@ -100,7 +108,8 @@
     return !q || item.__search.includes(q);
   };
 
-  const facetMatch = (item,key,value) => !value || FACETS[key].values(item).includes(value);
+  const facetMatch = (item,key,values) => !values.length ||
+    FACETS[key].values(item).some(value => values.includes(value));
 
   function matches(item, exceptKey='') {
     if (!queryMatch(item)) return false;
@@ -134,39 +143,64 @@
     while (changed && guard++ < 6) {
       changed = false;
       for (const key of Object.keys(FACETS)) {
-        if (!selected[key]) continue;
+        if (!selected[key].length) continue;
         const allowed = new Set(possibleValues(key).map(x => x.value));
-        if (!allowed.has(selected[key])) {
-          selected[key] = '';
+        // The chosen values that survive; a value the other facets have put out
+        // of reach is dropped rather than left narrowing the results to nothing.
+        const kept = selected[key].filter(value => allowed.has(value));
+        if (kept.length !== selected[key].length) {
+          selected[key] = kept;
           changed = true;
         }
       }
     }
   }
 
+  /** What the pill reads: its own name, the one value, or how many are chosen. */
+  function facetSummary(key) {
+    const chosen = selected[key];
+    if (!chosen.length) return FACETS[key].label;
+    if (chosen.length === 1) return chosen[0];
+    return `${chosen.length} selected`;
+  }
+
+  function optionRow(key, value, label, count, isChosen) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `atlas-facet-option${value ? '' : ' is-clear'}${isChosen ? ' is-selected' : ''}`;
+    button.dataset.value = value;
+    // A toggle button, not a radio: several rows of one facet stand chosen at
+    // once, which is the whole point of the change.
+    button.setAttribute('aria-pressed', String(Boolean(isChosen)));
+    button.innerHTML =
+      `<span class="atlas-facet-check" aria-hidden="true"></span>` +
+      `<span class="atlas-facet-option-label">${esc(label)}</span>` +
+      `<span class="atlas-facet-count">${count}</span>`;
+    return button;
+  }
+
   function renderFacet(key) {
     const node = facetNodes[key];
-    node.value.textContent = selected[key] || FACETS[key].label;
-    node.button.classList.toggle('is-active', Boolean(selected[key]));
+    const chosen = selected[key];
+    const summary = facetSummary(key);
+    node.value.textContent = summary;
+    // A pill carrying several values can outgrow its own cap and ellipsize, so
+    // the whole summary is kept reachable on hover.
+    node.button.title = chosen.length ? summary : '';
+    node.button.classList.toggle('is-active', Boolean(chosen.length));
 
     const q = fold(node.search.value.trim());
     const options = possibleValues(key).filter(x => !q || fold(x.value).includes(q));
+    // The panel now stays open across picks, so the list is rebuilt under a
+    // reader who is part-way down it. Restoring the offset keeps the rows from
+    // jumping back to the top on every checkbox.
+    const scrollTop = node.options.scrollTop;
     node.options.textContent = '';
 
-    const all = document.createElement('button');
-    all.className = `atlas-facet-option${selected[key] ? '' : ' is-selected'}`;
-    all.type = 'button';
-    all.dataset.value = '';
-    all.innerHTML = `<span>All</span><span class="atlas-facet-count">${resources.filter(item => matches(item,key)).length}</span>`;
-    node.options.appendChild(all);
-
+    node.options.appendChild(optionRow(
+      key, '', 'All', resources.filter(item => matches(item,key)).length, !chosen.length));
     for (const entry of options) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = `atlas-facet-option${selected[key] === entry.value ? ' is-selected' : ''}`;
-      button.dataset.value = entry.value;
-      button.innerHTML = `<span>${esc(entry.value)}</span><span class="atlas-facet-count">${entry.count}</span>`;
-      node.options.appendChild(button);
+      node.options.appendChild(optionRow(key, entry.value, entry.value, entry.count, chosen.includes(entry.value)));
     }
 
     if (!options.length && q) {
@@ -175,6 +209,7 @@
       empty.textContent = 'No matching options.';
       node.options.appendChild(empty);
     }
+    node.options.scrollTop = scrollTop;
   }
 
   function renderAllFacets() {
@@ -201,7 +236,7 @@
       if (show) visible++;
     }
 
-    const filtered = Boolean(input.value.trim() || Object.values(selected).some(Boolean));
+    const filtered = Boolean(input.value.trim() || Object.values(selected).some(chosen => chosen.length));
     status.textContent = filtered ? `${visible} of ${resources.length} resources` : `${resources.length} resources`;
     clear.hidden = !input.value;
 
@@ -236,8 +271,16 @@
     node.options.addEventListener('click', (event) => {
       const option = event.target.closest('.atlas-facet-option');
       if (!option) return;
-      selected[key] = option.dataset.value || '';
-      closeFacet(key);
+      const value = option.dataset.value || '';
+      // "All" is the way back to no filter; any other row toggles itself. The
+      // panel deliberately stays open — picking a second value is the reason it
+      // accepts more than one — and the click is not bubbled, or the document
+      // handler behind it would close the panel on the very first pick.
+      selected[key] = value
+        ? (selected[key].includes(value)
+            ? selected[key].filter(chosen => chosen !== value)
+            : [...selected[key], value])
+        : [];
       update();
     });
   }
@@ -289,7 +332,7 @@
   });
 
   reset.addEventListener('click', () => {
-    for (const key of Object.keys(selected)) selected[key] = '';
+    for (const key of Object.keys(selected)) selected[key] = [];
     update();
   });
 

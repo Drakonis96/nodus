@@ -625,8 +625,9 @@ test('the atlas dropdowns open a dark list, not the system default', () => {
     'the chosen one carries the accent');
   assert.doesNotMatch(css, /#fff|#111/, 'no light menu is left in the atlas styles');
 
-  // Those two rules also reach the app: its start pages read this stylesheet
-  // directly, and there they wear the facet pill on a <select> of their own.
+  // That rule also reaches the app: its start pages read this stylesheet
+  // directly (NodusBookmarks.css imports it) and dress their facet buttons with
+  // the same pill.
   assert.match(bookmarks, /@import url\('\.\.\/\.\.\/\.\.\/site\/assets\/css\/research-atlas\.css'\)/,
     'the in-app start pages import the atlas stylesheet');
   assert.match(read('research-atlas/index.html'), /<select class="atlas-engine"/, 'the site keeps the engine dropdown');

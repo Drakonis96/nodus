@@ -488,34 +488,203 @@ export function NodusBookmarksPage({ store, onEditBookmark, onNewBookmark, onNew
   );
 }
 
+type AtlasFacetKey = 'area' | 'type';
+const FACET_KEYS: AtlasFacetKey[] = ['area', 'type'];
+const ATLAS_FACET_VALUES: Record<AtlasFacetKey, (entry: AtlasResource) => string[]> = {
+  area: (entry) => entry.knowledge_domains ?? [],
+  type: (entry) => entry.type_of_use ?? [],
+};
+
+/**
+ * One Atlas facet: a pill that opens a list of checkboxes.
+ *
+ * Several values of the same facet stand chosen at once, which is the point of
+ * the control — "Spain and Portugal", not "Spain, then a reload, then Portugal".
+ * The panel stays open across picks for the same reason, and closes on a click
+ * outside it or on Escape.
+ *
+ * The markup and class names are the public Research Atlas's own
+ * (site/research-atlas), because this page reads that stylesheet:
+ * NodusBookmarks.css imports it, so the dialog is defined once and dressed the
+ * same in both places.
+ */
+function AtlasFacet({ label, values, counts, chosen, total, onToggle, onClear }: {
+  label: string;
+  values: string[];
+  counts: Map<string, number>;
+  chosen: string[];
+  total: number;
+  onToggle: (value: string) => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [term, setTerm] = useState('');
+  const root = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (event: MouseEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('mousedown', away);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [open]);
+
+  const fold = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const needle = fold(term.trim());
+  const shown = values.filter((value) => !needle || fold(value).includes(needle));
+  const summary = chosen.length === 0
+    ? label
+    : chosen.length === 1
+      ? chosen[0]
+      : tx('{n} seleccionados', { n: chosen.length });
+
+  return (
+    <div className="atlas-facet" ref={root}>
+      <button
+        className={`atlas-facet-button${chosen.length ? ' is-active' : ''}`}
+        type="button"
+        aria-expanded={open}
+        // A pill carrying the facet name *and* several chosen values can
+        // outgrow its own cap and ellipsize, so the summary is reachable whole.
+        title={chosen.length ? summary : undefined}
+        onClick={() => { setOpen((was) => !was); setTerm(''); }}
+      >
+        <span className="atlas-facet-label">{label}</span>
+        <span className="atlas-facet-value">{summary}</span>
+        <span className="atlas-facet-chevron" aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="atlas-facet-panel">
+          <div className="atlas-facet-search-wrap">
+            <Icon name="search" size={15} className="atlas-facet-search-icon" />
+            <input
+              className="atlas-facet-search"
+              type="search"
+              value={term}
+              autoComplete="off"
+              placeholder={tx('Buscar {label}…', { label: label.toLowerCase() })}
+              onChange={(event) => setTerm(event.target.value)}
+            />
+          </div>
+          {/* The rows are toggle buttons, so the group is named for the facet it
+              belongs to: "Knowledge area, Social Sciences, toggle button, pressed". */}
+          <div className="atlas-facet-options" role="group" aria-label={label}>
+            <button
+              type="button"
+              className={`atlas-facet-option is-clear${chosen.length ? '' : ' is-selected'}`}
+              aria-pressed={chosen.length === 0}
+              onClick={onClear}
+            >
+              <span className="atlas-facet-check" aria-hidden="true" />
+              <span className="atlas-facet-option-label">{t('Todos')}</span>
+              <span className="atlas-facet-count">{total}</span>
+            </button>
+            {shown.map((value) => {
+              const isChosen = chosen.includes(value);
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  className={`atlas-facet-option${isChosen ? ' is-selected' : ''}`}
+                  aria-pressed={isChosen}
+                  onClick={() => onToggle(value)}
+                >
+                  <span className="atlas-facet-check" aria-hidden="true" />
+                  <span className="atlas-facet-option-label">{value}</span>
+                  <span className="atlas-facet-count">{counts.get(value) ?? 0}</span>
+                </button>
+              );
+            })}
+            {!shown.length && <div className="atlas-facet-empty">{t('Sin opciones coincidentes.')}</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function NodusResearchAtlasPage({ store, onSave }: {
   store: BrowserBookmarkStore;
   onSave: (candidate: BrowserBookmarkCandidate) => void;
 }) {
   const resources = (atlasCatalogue.resources ?? []) as AtlasResource[];
   const [query, setQuery] = useState('');
-  const [area, setArea] = useState('');
-  const [kind, setKind] = useState('');
-  const areas = useMemo(() => [...new Set(resources.flatMap((entry) => entry.knowledge_domains ?? []))].sort(), [resources]);
-  const kinds = useMemo(() => [...new Set(resources.flatMap((entry) => entry.type_of_use ?? []))].sort(), [resources]);
+  const [chosen, setChosen] = useState<Record<AtlasFacetKey, string[]>>({ area: [], type: [] });
   const saved = useMemo(() => new Set(store.bookmarks.map((entry) => canonicalBookmarkUrl(entry.url)).filter(Boolean)), [store]);
-  const visible = useMemo(() => {
-    const needle = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    return resources.filter((entry) => {
-      const haystack = [entry.name, entry.url, entry.description, ...(entry.knowledge_domains ?? []), ...(entry.type_of_use ?? []), entry.geography?.continent, entry.geography?.country, entry.geography?.region].join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-      return (!needle || haystack.includes(needle)) && (!area || entry.knowledge_domains?.includes(area)) && (!kind || entry.type_of_use?.includes(kind));
-    });
-  }, [area, kind, query, resources]);
+  const allValues = useMemo(() => ({
+    area: [...new Set(resources.flatMap((entry) => entry.knowledge_domains ?? []))].sort(),
+    type: [...new Set(resources.flatMap((entry) => entry.type_of_use ?? []))].sort(),
+  }), [resources]);
+
+  /**
+   * Every result the page shows, plus what each facet's list has to offer.
+   *
+   * The counts deliberately exclude the facet they belong to: a Continent list
+   * that counted its own selection would report one resource per continent the
+   * moment anything was picked, and tell the reader nothing about what picking
+   * a second one would do.
+   */
+  const atlas = useMemo(() => {
+    const fold = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const needle = fold(query.trim());
+    const searchable = (entry: AtlasResource) => fold([
+      entry.name, entry.url, entry.description,
+      ...(entry.knowledge_domains ?? []), ...(entry.type_of_use ?? []),
+      entry.geography?.continent, entry.geography?.country, entry.geography?.region,
+    ].filter(Boolean).join(' '));
+    const matches = (entry: AtlasResource, except?: AtlasFacetKey) => {
+      if (needle && !searchable(entry).includes(needle)) return false;
+      return FACET_KEYS.every((key) => {
+        if (key === except) return true;
+        const picked = chosen[key];
+        return !picked.length || ATLAS_FACET_VALUES[key](entry).some((value) => picked.includes(value));
+      });
+    };
+    const visible = resources.filter((entry) => matches(entry));
+    const counts = {} as Record<AtlasFacetKey, Map<string, number>>;
+    const totals = {} as Record<AtlasFacetKey, number>;
+    const values = {} as Record<AtlasFacetKey, string[]>;
+    for (const key of FACET_KEYS) {
+      const byValue = new Map<string, number>();
+      let total = 0;
+      for (const entry of resources) {
+        if (!matches(entry, key)) continue;
+        total += 1;
+        for (const value of ATLAS_FACET_VALUES[key](entry)) byValue.set(value, (byValue.get(value) ?? 0) + 1);
+      }
+      counts[key] = byValue;
+      totals[key] = total;
+      // A value the other facets have put out of reach is hidden — unless it is
+      // one the reader has already ticked, which has to stay on screen or the
+      // filter it applies could never be taken off again.
+      values[key] = allValues[key].filter((value) => (byValue.get(value) ?? 0) > 0 || chosen[key].includes(value));
+    }
+    return { counts, totals, values, visible };
+  }, [allValues, chosen, query, resources]);
+
+  const toggle = (key: AtlasFacetKey, value: string) => setChosen((current) => ({
+    ...current,
+    [key]: current[key].includes(value)
+      ? current[key].filter((entry) => entry !== value)
+      : [...current[key], value],
+  }));
+
   return (
-    <StartShell title="Research Atlas" copy={t('Explora y filtra un directorio internacional seleccionado de webs de investigación, bibliotecas digitales, archivos, repositorios y colecciones de fuentes primarias.')} query={query} onQuery={setQuery} status={tx('{visible} de {total} recursos', { visible: visible.length, total: resources.length })} toolbar={
+    <StartShell title="Research Atlas" copy={t('Explora y filtra un directorio internacional seleccionado de webs de investigación, bibliotecas digitales, archivos, repositorios y colecciones de fuentes primarias.')} query={query} onQuery={setQuery} status={tx('{visible} de {total} recursos', { visible: atlas.visible.length, total: resources.length })} toolbar={
       <div className="atlas-filterbar">
-        <select className={`atlas-facet-button${area ? ' is-active' : ''}`} value={area} onChange={(event) => setArea(event.target.value)}><option value="">{t('Área de conocimiento')}</option>{areas.map((value) => <option key={value}>{value}</option>)}</select>
-        <select className={`atlas-facet-button${kind ? ' is-active' : ''}`} value={kind} onChange={(event) => setKind(event.target.value)}><option value="">{t('Tipo de recurso')}</option>{kinds.map((value) => <option key={value}>{value}</option>)}</select>
-        {(area || kind || query) && <button className="atlas-reset" onClick={() => { setArea(''); setKind(''); setQuery(''); }}>{t('Limpiar filtros')}</button>}
+        <AtlasFacet label={t('Área de conocimiento')} values={atlas.values.area} counts={atlas.counts.area} chosen={chosen.area} total={atlas.totals.area} onToggle={(value) => toggle('area', value)} onClear={() => setChosen((current) => ({ ...current, area: [] }))} />
+        <AtlasFacet label={t('Tipo de recurso')} values={atlas.values.type} counts={atlas.counts.type} chosen={chosen.type} total={atlas.totals.type} onToggle={(value) => toggle('type', value)} onClear={() => setChosen((current) => ({ ...current, type: [] }))} />
+        {(chosen.area.length || chosen.type.length || query) && <button className="atlas-reset" onClick={() => { setChosen({ area: [], type: [] }); setQuery(''); }}>{t('Limpiar filtros')}</button>}
         <button className="atlas-facet-button" type="button" onClick={() => void window.nodus.openBrowserTab(NODUS_RESEARCH_ATLAS_URL)}><Icon name="external" size={13} /> {t('Atlas público')}</button>
       </div>}
     >
-      {visible.map((entry) => {
+      {atlas.visible.map((entry) => {
         const isSaved = saved.has(canonicalBookmarkUrl(entry.url));
         const geo = [entry.geography?.continent, entry.geography?.country, entry.geography?.region].filter(Boolean).join(' · ');
         return <article key={entry.id} className="card lit atlas-card">
@@ -525,7 +694,7 @@ export function NodusResearchAtlasPage({ store, onSave }: {
           <div className="atlas-card-actions"><button className="atlas-open" onClick={() => void window.nodus.openBrowserTab(entry.url)}>{t('Abrir recurso')} <Icon name="external" size={13} /></button><button className={`atlas-open${isSaved ? ' is-saved' : ''}`} disabled={isSaved} onClick={() => onSave({ title: entry.name, url: entry.url, description: entry.description, faviconDataUrl: null, existingId: null })}><Icon name={isSaved ? 'bookmarkFill' : 'bookmark'} size={13} />{isSaved ? t('Guardado') : t('Guardar')}</button></div>
         </article>;
       })}
-      {!visible.length && <div className="atlas-empty">{t('Sin resultados para los filtros actuales.')}</div>}
+      {!atlas.visible.length && <div className="atlas-empty">{t('Sin resultados para los filtros actuales.')}</div>}
     </StartShell>
   );
 }
