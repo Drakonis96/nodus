@@ -341,7 +341,20 @@ function byId(a: ModelInfo, b: ModelInfo): number {
  * Fetch the live model list for a provider using its stored key. Sorted
  * alphabetically; OpenRouter is additionally grouped/sorted by upstream provider.
  */
+const modelContextCache = new Map<string, { value: number; at: number }>();
+const modelContextKey = (provider: AiProvider, model: string) => JSON.stringify([provider, model, openAiCompatBase(provider)]);
+export function cachedModelContextWindow(provider: AiProvider, model: string): number | null {
+  const cached = modelContextCache.get(modelContextKey(provider, model));
+  return cached && Date.now() - cached.at < 300000 ? cached.value : null;
+}
 export async function listModels(provider: AiProvider, key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
+  const models = await fetchModels(provider, key, signal);
+  for (const model of models) if (Number.isSafeInteger(model.contextLength) && model.contextLength! >= 1024) {
+    modelContextCache.set(modelContextKey(provider, model.id), { value: model.contextLength!, at: Date.now() });
+  }
+  return models;
+}
+async function fetchModels(provider: AiProvider, key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
   switch (provider) {
     case 'anthropic':
       return listAnthropic(key);
@@ -579,12 +592,13 @@ async function listOpenRouter(signal?: AbortSignal): Promise<ModelInfo[]> {
   const res = await fetch('https://openrouter.ai/api/v1/models', signal ? { signal } : undefined);
   if (!res.ok) throw new Error(`OpenRouter /models HTTP ${res.status}`);
   const data = (await res.json()) as {
-    data?: { id: string; name?: string; supported_parameters?: string[]; architecture?: { input_modalities?: string[] } }[];
+    data?: { id: string; name?: string; context_length?: number; top_provider?: { context_length?: number }; supported_parameters?: string[]; architecture?: { input_modalities?: string[] } }[];
   };
   const models: ModelInfo[] = (data.data ?? []).map((m) => ({
     id: m.id,
     name: m.name,
     group: m.id.includes('/') ? m.id.split('/')[0] : 'other',
+    contextLength: Math.min(m.context_length ?? Infinity, m.top_provider?.context_length ?? Infinity) < Infinity ? Math.min(m.context_length ?? Infinity, m.top_provider?.context_length ?? Infinity) : undefined,
     // Flag reasoning models so the picker can warn they are slower for scanning.
     reasoning: (m.supported_parameters ?? []).includes('reasoning'),
     // Modalities let us filter the vision-model picker to image-capable models.

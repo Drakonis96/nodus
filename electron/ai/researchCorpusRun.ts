@@ -12,7 +12,8 @@ import { assertResearchDocument, assertResearchDocumentPermission } from './rese
 import { resolveResearchSourceScope } from './researchSourceScope';
 import { retrieveSharedDocumentaryEvidence } from './documentaryPreparation';
 import { retrieveHierarchical, selectPassageEvidence } from './hierarchicalRetrieval';
-import { embed } from './aiClient';
+import { embed, resolveModelRef, researchModelContextWindow } from './aiClient';
+import { withResearchRequestBudget } from './researchRequestBudget';
 import { documentaryCitationId } from '../citations/documentaryCitations';
 import { getSettings } from '../db/settingsRepo';
 import { activeManualIdeaIds } from '../db/manualIdeaVisibility';
@@ -207,6 +208,8 @@ export function bindAcademicCorpusRun(deps: DeepResearchDeps, request: DeepResea
   const scope = resolveAcademicRunScope(request.notebookId);
   const settings = validateRetrievalSettings(request.retrieval ?? (request.notebookId ? getResearchNotebook(request.notebookId)?.settings : undefined) ?? RETRIEVAL_PRESETS.deep);
   const run = new ResearchCorpusRun(scope, settings, signal, true);
+  let windowPromise: ReturnType<typeof researchModelContextWindow> | undefined;
+  const model = request.model ?? getSettings().deepResearchModel ?? getSettings().synthesisModel;
   const bounded: DeepResearchDeps = { ...deps, buildSnapshot: async brief => {
     const snapshot = await run.snapshot(brief);
     if (!deps.prepareScopedSnapshot) return snapshot;
@@ -226,6 +229,14 @@ export function bindAcademicCorpusRun(deps: DeepResearchDeps, request: DeepResea
   return new Proxy(bounded, { get(target, property) {
     const value = Reflect.get(target, property);
     if (typeof value !== 'function') return value;
-    return async (...args: unknown[]) => { run.validate(); const result = await value(...args); run.validate(); return result; };
+    return async (...args: unknown[]) => {
+      run.validate();
+      const window = await (windowPromise ??= model ? researchModelContextWindow(resolveModelRef(model)) : Promise.resolve({ tokens: 32768, known: false }));
+      // Reserve three quarters for instructions, planning/history, tool framing
+      // and output; every actual completion checks its complete final envelope.
+      run.budget.constrainToWindow(window.tokens, Math.ceil(window.tokens * 0.75));
+      const result = await withResearchRequestBudget(window.tokens, () => { run.budget.partial = true; }, () => value(...args));
+      run.validate(); return result;
+    };
   } });
 }

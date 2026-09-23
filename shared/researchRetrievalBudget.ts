@@ -10,8 +10,12 @@ export class ResearchRetrievalBudget {
   candidates = 0;
   partial = false;
   readonly visited = new Set<string>();
-  constructor(settings: RetrievalSettings, readonly evidenceTokenLimit = settings.evidenceTokens) {
+  constructor(settings: RetrievalSettings, public evidenceTokenLimit = settings.evidenceTokens) {
     this.settings = validateRetrievalSettings(settings);
+  }
+  constrainToWindow(window: number, reservedTokens: number): void {
+    const limit = Math.max(0, Math.floor(window - reservedTokens));
+    if (limit < this.evidenceTokenLimit) { this.evidenceTokenLimit = limit; this.partial = true; }
   }
   nextRound(): boolean {
     const allowed = this.settings.autoExpand ? this.settings.rounds : 1;

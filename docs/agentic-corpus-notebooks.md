@@ -428,3 +428,42 @@ new-run fallback, incomplete publication rejection, unchanged scope during a
 partial rebuild, exact historical citation reads and revocation. Type checking
 and full lint passed. The complete application build and new real-app publication
 check are pending; the current paid campaign deliberately retains the prior build.
+
+### Complete request envelope and repeated real campaign
+
+Academic text requests now check their complete final system/user payload and
+requested output allowance before provider dispatch, using a conservative UTF-8
+upper bound plus framing reserve. Local models use their effective loaded window;
+OpenRouter keeps the smaller advertised model/route context from its normal model
+catalogue. The direct DeepSeek Flash contract is 1M tokens, verified against
+https://api-docs.deepseek.com/quick_start/pricing/ on 2026-09-23. Unknown windows use
+an explicitly conservative 32,768-token operating cap, not a claimed provider
+capacity. Retrieval reserves three quarters of the envelope for instructions,
+history/planning, tool framing and output; each actual call rechecks the final
+payload. Async report limits do not leak into concurrent conversations. General
+chat vision attachments retain the existing multimodal fit path.
+
+Five isolated scripts passed at `/private/tmp/nodus-research-v8VlL4`, including
+actual text/stream/JSON pre-dispatch rejection, UTF-8 accounting, async isolation,
+provider metadata, shared run limits, Concilium and attachment compatibility.
+The first attempt (`OqMp18`) exposed optional-image handling and premature model
+resolution in offline previews; both were corrected. Lint passed. Build pending.
+
+The writing-policy campaign at `/private/tmp/nodus-research-1uwhhc` used the same
+PDF bytes and passed four chat known-answer/retrieval/citation-existence checks.
+All Deep Research paths completed: v1 general `needs_review` (62.4), v2 general
+`weak` (42.2), v1 comparative `weak` (8.4), v2 comparative `weak` (40.4). Their
+citation verification counts (checked/partial/unsupported) were 21/5/0, 17/9/0,
+16/11/0 and 23/14/0. Manual review still found inferences from undocumented methods
+and replication details. The absence of an `unsupported` verdict is not proof that
+all report prose is grounded. Quality acceptance remains open.
+
+The durable matched comparison is in `docs/research-evidence/2026-09-23-comparison.*`.
+Its corpus SHA-256 manifest, latencies, CPU/memory samples, calls, tokens, coverage,
+quality and caveats are retained. The single campaign ledger now accounts for 602
+calls, 1,358,970 input tokens, 620,713 output tokens, $1.14694438 upper-bound spend
+and zero unresolved reservations. No further paid comparison has been started.
+
+The complete publication/context application build subsequently passed:
+`artifacts/research-context-build.log`. The current real Electron/Zotero run will
+exercise that build without paid providers.

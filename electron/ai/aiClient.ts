@@ -1,3 +1,4 @@
+import { currentResearchRequestBudget, researchPromptUpperBound } from './researchRequestBudget';
 import { researchReasoningBody, researchOmitsTemperature, type ResearchEffort } from '@shared/researchReasoning';
 import { getSettings } from '../db/settingsRepo';
 import { documentVisualPlanningPrompt } from './documentVisualContext';
@@ -13,6 +14,7 @@ import {
   OPENROUTER_HEADERS,
   isLocalProvider,
   localContextWindow,
+  cachedModelContextWindow,
   localContextCapabilities,
   localBaseUrl,
   customBaseUrl,
@@ -452,6 +454,8 @@ function nodusLocalMaxTokens(model: ModelRef, opts: CallOpts, requestedMax: numb
 }
 
 export interface CallOpts {
+  /** Backend academic corpus requests only; include all final prompt/output bytes. */
+  corpusContext?: boolean;
   /** Set exclusively by Research Assistant; absent preserves every other surface. */
   researchEffort?: ResearchEffort;
   researchModelInfo?: import('@shared/types').ModelInfo;
@@ -808,6 +812,30 @@ export async function localModelContextWindow(model: ModelRef): Promise<number |
   if (model.provider === 'nodus') return getNodusLocalModel(model.model)?.contextLength ?? null;
   if (!isLocalProvider(model.provider)) return null;
   return localContextWindow(model.provider as LocalProvider, model.model, getApiKey(model.provider));
+}
+
+/** No catalogue/network discovery is started by retrieval. Unknown windows use
+ * a conservative operating cap, not a claim about the provider's model capacity. */
+export async function researchModelContextWindow(model: ModelRef): Promise<{ tokens: number; known: boolean }> {
+  const local = await localModelContextWindow(model);
+  if (local) return { tokens: local, known: true };
+  const advertised = cachedModelContextWindow(model.provider, model.model);
+  if (advertised) return { tokens: advertised, known: true };
+  // Official direct endpoint model contract, verified 2026-09-23:
+  // https://api-docs.deepseek.com/quick_start/pricing/
+  if (model.provider === 'deepseek' && model.model === 'deepseek-flash') return { tokens: 1000000, known: true };
+  return { tokens: 32768, known: false };
+}
+async function assertCorpusRequestFits(model: ModelRef, opts: CallOpts): Promise<void> {
+  const active = currentResearchRequestBudget();
+  if (!active && !opts.corpusContext) return;
+  const effective = await researchModelContextWindow(model);
+  const window = Math.min(effective.tokens, active?.window ?? Infinity);
+  const needed = researchPromptUpperBound(opts.system, opts.user, opts.maxTokens ?? 8000);
+  if (needed > window) {
+    active?.onOverflow();
+    throw new AiError(contextOverflowMessage(model.provider, model.model, window, needed), false, true, 'context_overflow');
+  }
 }
 
 /**
@@ -1175,6 +1203,7 @@ async function rawCompleteTransport(
   // providers do not use API keys, so this deliberately precedes key resolution.
   // The public entry points map the opaque codes back after parsing/repair.
   opts = anonymizeCallOpts({ ...opts, system: excludeInvisibleArtifacts(opts.system), user: excludeInvisibleArtifacts(opts.user) }).sent;
+  await assertCorpusRequestFits(model, opts);
 
   if (model.provider === 'codex') {
     try {
@@ -1861,6 +1890,7 @@ async function rawCompleteStreamTransport(
 ): Promise<string> {
   const { sent, privacy } = anonymizeCallOpts({ ...opts, system: excludeInvisibleArtifacts(opts.system), user: excludeInvisibleArtifacts(opts.user) });
   opts = sent;
+  await assertCorpusRequestFits(model, opts);
   const scheduleOpts = { ...opts, signal: signal ?? opts.signal };
 
   let full = '';

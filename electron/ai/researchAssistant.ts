@@ -11,6 +11,7 @@ import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getConversation } from '../db/chatRepo';
 import { executeChatSkills } from './chatSkillExecution';
 import { authorizeNotebookRequest, validateNotebookRequest, requestNotebookScope, rememberNotebookTurn, registerNotebookRun } from './researchNotebookService';
+import { researchModelContextWindow } from './aiClient';
 import { ResearchCorpusRun } from './researchCorpusRun';
 import { RETRIEVAL_PRESETS, validateRetrievalSettings } from '@shared/researchCorpus';
 import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings, ensureRouteConsistency, resolveNamedRoute } from './moleculeInspection';
@@ -249,7 +250,7 @@ async function answerResearchChatTurn(request: ResearchChatRequest, signal: Abor
   const execution = skillExecution(request);
   const { system, user, stats, maxTokens, local, citationRequired } = await buildResearchChatPrompt(request, execution.skills, undefined, signal);
   const attachments = await prepareResearchAttachments(request, 'research', request.model);
-  const opts = { system: system + attachments.system, user: user + attachments.text, images: attachments.images, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, ...await researchGenerationOptions(request, maxTokens, local, signal), signal };
+  const opts = { corpusContext: !!requestNotebookScope(request) && !attachments.images?.length, system: system + attachments.system, user: user + attachments.text, images: attachments.images, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, ...await researchGenerationOptions(request, maxTokens, local, signal), signal };
   let answer = '';
   for (let attempt = 0; attempt < CHAT_CITATION_ATTEMPTS; attempt += 1) {
     signal.throwIfAborted();
@@ -293,7 +294,7 @@ async function streamResearchChatTurn(
   delete evidence.council_assessments;
   const sourceContext = council?.assessments ? JSON.stringify(evidence) : user;
   const attachments = await prepareResearchAttachments(request, 'research', request.model);
-  const opts = { system: system + attachments.system, user: user + attachments.text, images: attachments.images, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, ...await researchGenerationOptions(request, maxTokens, local, signal), signal };
+  const opts = { corpusContext: !!requestNotebookScope(request) && !attachments.images?.length, system: system + attachments.system, user: user + attachments.text, images: attachments.images, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, ...await researchGenerationOptions(request, maxTokens, local, signal), signal };
   let answer = finalizeAnswer(await withResearchAttachmentFallback(attachments, opts, options => completeTextStream(options, onDelta, request.model, signal)), local, sourceContext);
   // A user-triggered stop ends the turn with the text that already streamed. Running
   // the citation-recovery resample or the skill tools now would either throw an
@@ -448,8 +449,10 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
   // Resolve the effective model up front so a local target can size the whole payload
   // (context + history + output) to its real, small window instead of overflowing.
   const model = resolveModelRef(request.model);
-  const window = await localModelContextWindow(model); // tokens for local models, else null
-  const local = window != null;
+  const loadedWindow = await localModelContextWindow(model);
+  const corpusWindow = requestNotebookScope(request) ? await researchModelContextWindow(model) : null;
+  const window = corpusWindow?.tokens ?? loadedWindow;
+  const local = loadedWindow != null;
   const compact = window != null && window <= LOCAL_COMPACT_WINDOW;
 
   let messages = request.messages
@@ -521,6 +524,8 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
   if (notebookScope) {
     const run = new ResearchCorpusRun(notebookScope, { ...retrieval,
       evidenceTokens: Math.max(256, Math.min(retrieval.evidenceTokens, Math.floor(contextBudget / LOCAL_CHARS_PER_TOKEN))) }, signal);
+    if (window) run.budget.constrainToWindow(window, Math.max(Math.ceil(window * 0.75),
+      new TextEncoder().encode(system + JSON.stringify(messages)).length + maxTokens + 4096));
     await run.retrieve(question, retrieval.rounds);
     const snapshot = run.snapshotFromEvidence({ kind: 'research_question', objective: question, language: promptLanguage });
     context = { generated_at: snapshot.generatedAt, note: prompt.context.note,
