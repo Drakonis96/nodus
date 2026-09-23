@@ -6061,6 +6061,7 @@ export interface ChatMessageRecord {
 
 /** Conversation list entry (no messages) for the history sidebar. */
 export interface ChatConversationSummary {
+  notebookId?: string | null;
   id: string;
   title: string;
   created_at: string;
@@ -7305,6 +7306,8 @@ export interface DeepResearchOutlineSection {
 }
 
 export interface DeepResearchRequest {
+  notebookId?: string | null;
+  retrieval?: import('./researchCorpus').RetrievalSettings;
   documentSkills?: import('./documentSkills').DocumentSkillPolicy;
   /** The research idea/question the whole report must develop. */
   objective: string;
@@ -9353,6 +9356,8 @@ export interface WorkPassageStatus {
 }
 
 export interface PassageDetail {
+  libraryItemId?: string | null;
+  provenance?: 'source' | 'abstract';
   passage_id: string;
   nodus_id: string;
   text: string;

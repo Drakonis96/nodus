@@ -176,6 +176,7 @@ let databaseAutomationFirstTimer: NodeJS.Timeout | null = null;
 let announcementsFirstTimer: NodeJS.Timeout | null = null;
 /** Set once shutdown starts, so timers that fire mid-quit do not reopen the DB. */
 let quitting = false;
+let stopDocumentaryPreparation = () => {};
 
 let pendingDeepLink: string | null = process.argv.find((arg) => arg.startsWith('nodus://')) ?? null;
 
@@ -1083,7 +1084,8 @@ app.whenReady().then(async () => {
   );
   createWindow();
   // The isolated graph review copy never resumes background jobs or connects integrations.
-  const { initializeDocumentaryPreparation } = await import('./ai/documentaryPreparation');
+  const { initializeDocumentaryPreparation, closeDocumentaryPreparation } = await import('./ai/documentaryPreparation');
+  stopDocumentaryPreparation = closeDocumentaryPreparation;
   initializeDocumentaryPreparation();
   if (process.env.NODUS_ISOLATED_ROOT || process.env.NODUS_STELLAR_PREVIEW === '1') return;
   // Existing installs may have one full database copy per historical schema update.
@@ -1268,6 +1270,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   quitting = true;
+  stopDocumentaryPreparation();
   stopStudyCalendarReminders();
   stopAllWhisperCpp();
   if (updateCheckTimer) clearInterval(updateCheckTimer);

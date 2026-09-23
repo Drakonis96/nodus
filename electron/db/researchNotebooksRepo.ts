@@ -48,7 +48,12 @@ export function saveResearchNotebook(input: ResearchNotebookInput, resolvedIds: 
 }
 export function deleteResearchNotebook(id: string): void {
   // Only the association is cascaded. Conversations, messages, works and indexes survive.
-  getDb().prepare('DELETE FROM research_notebooks WHERE id=?').run(id);
+  const db = getDb();
+  db.transaction(() => {
+    db.prepare(`UPDATE chat_conversations SET selection_json=json_remove(selection_json,'$.notebookId')
+      WHERE json_valid(selection_json) AND json_extract(selection_json,'$.notebookId')=?`).run(id);
+    db.prepare('DELETE FROM research_notebooks WHERE id=?').run(id);
+  })();
 }
 export function associateNotebookConversation(notebookId: string | null, conversationId: string): void {
   const db = getDb();

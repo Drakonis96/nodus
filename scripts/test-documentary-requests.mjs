@@ -1,0 +1,54 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { installRuntimeHooks, requireElectronRuntime, repoRoot } from './lib/tsRuntimeHooks.mjs';
+if (!requireElectronRuntime(fileURLToPath(import.meta.url), '--documentary-requests')) process.exit(0);
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-source-jobs-'));
+installRuntimeHooks(root);
+const require = createRequire(import.meta.url);
+const { DocumentaryStore } = require(path.join(repoRoot, 'electron/db/documentaryStore.ts'));
+const { DocumentaryRequests } = require(path.join(repoRoot, 'electron/db/documentaryRequests.ts'));
+const a = new DocumentaryStore(path.join(root, 'jobs.sqlite'));
+const b = new DocumentaryStore(path.join(root, 'jobs.sqlite'));
+try {
+  const first = new DocumentaryRequests(a.db);
+  const second = new DocumentaryRequests(b.db);
+  first.enqueue('source', 'r1', 'vault', 1000);
+  const old = first.claim('vault', 1000, 1000);
+  assert.equal(second.claim('vault', 1100), null);
+  first.enqueue('source', 'r1', 'vault', 1200);
+  assert.equal(second.claim('vault', 1300), null, 'idempotent enqueue preserves the live lease');
+  const recovered = second.claim('vault', 2001, 1000);
+  assert.equal(recovered.attempts, 2);
+  assert.throws(() => first.finish(old, null, false, 2002), /lease_lost/);
+  second.finish(recovered, 'paused', true, 2100);
+  const resumed = first.claim('vault', 2200, 1000);
+  assert.equal(resumed.attempts, 2, 'pausing does not consume retry attempts');
+  first.enqueue('source', 'r2', 'vault', 2300);
+  assert.throws(() => first.renew(resumed, 2400), /lease_lost/);
+  assert.throws(() => first.finish(resumed, null, false, 2400), /lease_lost/);
+  const replacement = second.claim('vault', 2400);
+  assert.equal(replacement.revision, 'r2');
+  second.finish(replacement, null, false, 2500);
+  first.enqueue('foreign', 'r1', 'other-vault', 3000);
+  assert.equal(second.claim('vault', 3000), null, 'work provenance stays vault-bound');
+  first.enqueue('fails', 'r1', 'vault', 3000);
+  for (const now of [3000, 10000, 20000]) {
+    const job = second.claim('vault', now);
+    second.finish(job, 'failure', false, now);
+  }
+  assert.equal(first.claim('vault', 100000), null);
+  first.enqueue('cancel', 'r1', 'vault', 100000);
+  const cancelled = first.claim('vault', 100000);
+  first.cancel('cancel');
+  assert.throws(() => first.finish(cancelled, null), /lease_lost/);
+  const { planRetrievalChunks } = require(path.join(repoRoot, 'shared/retrievalChunks.ts'));
+  const chunks = planRetrievalChunks(`[[src:pdf p. 6]] ${'漢😀'.repeat(10000)}`, { sourceMap: { pdf: 'zotero:pdf' } });
+  assert.ok(chunks.length > 1);
+  assert.ok(chunks.every(chunk => Buffer.byteLength(chunk.text) <= 4096 && chunk.pageNumber === 6 && chunk.sourceRef === 'zotero:pdf'));
+  assert.equal(chunks.map(chunk => chunk.text).join(''), '漢😀'.repeat(10000), 'long unspaced Unicode input is not silently clipped or corrupted');
+  console.log('Source jobs: exclusivity, restart fencing, idempotency, pause, changed revisions, vault boundaries, retry bound, cancellation and Unicode chunk bounds passed.');
+} finally { a.close(); b.close(); fs.rmSync(root, { recursive: true, force: true }); }

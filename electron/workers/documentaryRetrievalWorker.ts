@@ -4,7 +4,7 @@ import { ResearchRetrievalBudget } from '@shared/researchRetrievalBudget';
 import type { RetrievalSettings } from '@shared/researchCorpus';
 
 parentPort?.once('message', (input: { filename: string; query: string; lexicalKeys: string[]; vectorKeys: string[]; vector: number[] | null; settings: RetrievalSettings; threshold: number }) => {
-  const store = new DocumentaryStore(input.filename);
+  const store = new DocumentaryStore(input.filename, true);
   try {
     const budget = new ResearchRetrievalBudget(input.settings);
     budget.nextRound();

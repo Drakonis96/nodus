@@ -92,6 +92,7 @@ export interface ResearchCorpusCollection {
 
 /** Every parameter affecting vector comparability belongs in this identity. */
 export interface DocumentaryIndexIdentity {
+  coverage?: 'fulltext' | 'abstract' | 'metadata';
   documentId: string;
   attachmentId: string | null;
   revision: string;

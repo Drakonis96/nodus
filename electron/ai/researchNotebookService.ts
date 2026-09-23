@@ -1,6 +1,7 @@
 import type { ResearchNotebookInput, ResolvedResearchScope } from '@shared/researchCorpus';
 import type { ResearchChatRequest } from '@shared/types';
 import { RETRIEVAL_PRESETS, validateRetrievalSettings } from '@shared/researchCorpus';
+import { getDb } from '../db/database';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import * as notebooks from '../db/researchNotebooksRepo';
 import { researchCorpusInventory } from './researchCorpusInventory';
@@ -54,9 +55,7 @@ export function authorizeNotebookRequest(input: ResearchChatRequest): ScopedRequ
   if (scope.vaultId !== getActiveVault().id || notebook.revision !== scope.notebookRevision) throw new Error('research_scope_changed');
   if (input.conversationId) notebooks.associateNotebookConversation(notebook.id, input.conversationId);
   return { ...input, [pinnedScope]: scope, attachmentIds: [],
-    // Until individual history turns have backend-owned provenance, never reuse
-    // old unscoped assistant claims or conversational attachments as sources.
-    messages: input.messages.filter(message => message.role === 'user').slice(-1).map(({ role, content }) => ({ role, content })),
+    messages: authorizedNotebookHistory(input, scope),
     selection: { ...input.selection, documents: false, passages: true, retrieval: validateRetrievalSettings(notebook.settings ?? input.selection.retrieval ?? RETRIEVAL_PRESETS.balanced),
       sourceFilter: { enabled: true, authorIds: [], workIds: scope.documents.flatMap(document => document.workId ? [document.workId] : []) } } };
 }
@@ -66,4 +65,28 @@ export function validateNotebookRequest(input: ResearchChatRequest): void {
   if (getActiveVault().id !== scope.vaultId) throw new Error('research_scope_changed');
   const current = resolveResearchNotebook(scope.notebookId!);
   if (current.id !== scope.id) throw new Error('research_scope_changed');
+}
+
+function authorizedNotebookHistory(input: ResearchChatRequest, scope: ResolvedResearchScope): ResearchChatRequest['messages'] {
+  let lastUser = -1;
+  input.messages.forEach((message, index) => { if (message.role === 'user') lastUser = index; });
+  const known = input.conversationId ? getDb().prepare(`SELECT role,content_hash FROM research_conversation_provenance WHERE conversation_id=? AND scope_id=?`)
+    .all(input.conversationId, scope.id) as { role: string; content_hash: string }[] : [];
+  const trusted = new Set(known.map(row => `${row.role}:${row.content_hash}`));
+  return input.messages.filter((message, index) => index === lastUser || trusted.has(`${message.role}:${researchFingerprint(message.content)}`))
+    .map(({ role, content }) => ({ role, content }));
+}
+
+/** Only provider results that passed scope validation can authorize later reuse.
+ * Renderer-supplied history metadata and manually saved assistant text cannot. */
+export function rememberNotebookTurn(input: ResearchChatRequest, answer: string): string {
+  const scope = requestNotebookScope(input);
+  if (!scope || !input.conversationId) return answer;
+  validateNotebookRequest(input);
+  const user = input.messages.filter(message => message.role === 'user').at(-1);
+  const insert = getDb().prepare(`INSERT OR IGNORE INTO research_conversation_provenance(conversation_id,scope_id,role,content_hash,created_at) VALUES (?,?,?,?,?)`);
+  getDb().transaction(() => {
+    for (const [role, content] of [['user', user?.content], ['assistant', answer]]) if (content) insert.run(input.conversationId, scope.id, role, researchFingerprint(content), new Date().toISOString());
+  })();
+  return answer;
 }

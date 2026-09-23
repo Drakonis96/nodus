@@ -119,7 +119,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 179;
+export const SCHEMA_VERSION = 180;
 
 export const migrations: Migration[] = [
   {
@@ -9328,6 +9328,14 @@ export const migrations: Migration[] = [
     CREATE INDEX research_notebook_conversations_notebook ON research_notebook_conversations(notebook_id);
     CREATE TABLE research_run_scopes (
       id TEXT PRIMARY KEY, notebook_id TEXT, scope_json TEXT NOT NULL, created_at TEXT NOT NULL
+    );
+  ` },
+  { version: 180, up: `
+    CREATE TABLE research_conversation_provenance (
+      conversation_id TEXT NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+      scope_id TEXT NOT NULL REFERENCES research_run_scopes(id),
+      role TEXT NOT NULL CHECK(role IN ('user','assistant')), content_hash TEXT NOT NULL, created_at TEXT NOT NULL,
+      PRIMARY KEY(conversation_id,scope_id,role,content_hash)
     );
   ` },
 ];

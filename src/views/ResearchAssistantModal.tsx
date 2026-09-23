@@ -810,7 +810,7 @@ export function ResearchAssistantModal({
   };
 
   const serializedModel = selectedModel ? serializeModel(selectedModel) : '';
-  const visibleConversations = conversations.filter((c) => showArchived || !c.archived);
+  const visibleConversations = conversations.filter((c) => (showArchived || !c.archived) && (!selection.notebookId || c.notebookId === selection.notebookId));
   const archivedCount = conversations.filter((c) => c.archived).length;
   const activeMode = ASSISTANT_MODES.find((mode) => mode.id === activeModeId);
   const lastMessageId = messages.length ? messages[messages.length - 1].id : null;

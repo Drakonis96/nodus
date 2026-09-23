@@ -25,8 +25,9 @@ export interface DocumentaryJob {
  * and vault analyses. Callers choose its path; construction never discovers one. */
 export class DocumentaryStore {
   readonly db: Database.Database;
-  constructor(filename: string) {
-    this.db = new Database(filename);
+  constructor(filename: string, readonly = false) {
+    this.db = new Database(filename, { readonly, fileMustExist: readonly });
+    if (readonly) { this.db.pragma('busy_timeout = 5000'); return; }
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('busy_timeout = 5000');
     this.db.pragma('foreign_keys = ON');

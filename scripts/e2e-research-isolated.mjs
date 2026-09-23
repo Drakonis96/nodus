@@ -72,6 +72,16 @@ try {
     assert.match(search.evidence[0].text, /NORTH23/);
     assert.equal(search.evidence[0].provenance, 'abstract');
     assert.equal(search.evidence[0].locator.pageNumber, null, 'abstracts never acquire invented PDF page numbers');
+    const citationId = `documentary:${search.scopeId}:${search.evidence[0].id}`;
+    const detail = await page.evaluate(id => window.nodus.getPassage(id), citationId);
+    assert.match(detail.text, /NORTH23/);
+    assert.equal(detail.provenance, 'abstract');
+    assert.equal(detail.libraryItemId, corpus.items[0].id);
+    assert.equal(await page.evaluate(id => window.nodus.getPassage(id), citationId.replace(search.scopeId, '0'.repeat(64))), null);
+    const narrowed = await page.evaluate(async notebook => window.nodus.saveResearchNotebook({ ...notebook, exclusions: [...notebook.exclusions, notebook.resolvedDocumentIds[0]] }), corpus.notebook);
+    assert.equal(await page.evaluate(id => window.nodus.getPassage(id), citationId), null, 'manual exclusion revokes direct citation access');
+    corpus.notebook = await page.evaluate(async notebook => window.nodus.saveResearchNotebook(notebook), { ...corpus.notebook, revision: narrowed.revision });
+
     fs.writeFileSync(path.join(root, 'artifacts/corpus.json'), JSON.stringify(corpus, null, 2));
     fs.writeFileSync(path.join(root, 'artifacts/preparation.json'), JSON.stringify(preparation, null, 2));
     Object.assign(report, { notebooks: { passed: true, collections: corpus.collections.length, sources: corpus.items.length, preparedPassages: prepared.preparation.passages } });

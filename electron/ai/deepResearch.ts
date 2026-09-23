@@ -1,3 +1,5 @@
+import { registerNotebookRun } from './researchNotebookService';
+import { bindAcademicCorpusRun } from './researchCorpusRun';
 import { withDocumentVisualPlanning } from './documentVisualContext';
 import { documentSkillCatalog } from '../../shared/documentSkills';
 import { listDocumentSkills } from '../capabilities/documentCatalog';
@@ -109,9 +111,17 @@ function sectionClaimsForWriting(section: DeepResearchPlanSection): string[] {
 
 export async function generateDeepResearchReport(request: DeepResearchRequest, onProgress?: (p: DeepResearchProgress) => void, signal?: AbortSignal): Promise<DeepResearchReport> {
   const settings = getSettings();
-  const hints = await prepareDocumentVisualHints(request.documentSkills, request.objective, request.model ?? settings.deepResearchModel ?? settings.synthesisModel, signal);
+  const academic = getActiveVault().type === 'academic';
+  if (request.notebookId && !academic) throw new Error('Research notebooks require an academic vault');
+  if (academic) request = { ...request, studyMode: false, unitMode: false, documentSkills: undefined };
+  const hints = academic ? [] : await prepareDocumentVisualHints(request.documentSkills, request.objective, request.model ?? settings.deepResearchModel ?? settings.synthesisModel, signal);
   const catalog = request.documentSkills ? documentSkillCatalog(listDocumentSkills(), request.documentSkills) : '[]';
-  return withDocumentVisualPlanning(catalog, hints, () => generateDeepResearchReportWithVisualPlan(request, onProgress, signal, hints));
+  const controller = new AbortController();
+  const release = request.notebookId ? registerNotebookRun(request.notebookId, controller) : () => undefined;
+  const runSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+  try {
+    return await withDocumentVisualPlanning(catalog, hints, () => generateDeepResearchReportWithVisualPlan(request, onProgress, runSignal, hints));
+  } finally { release(); }
 }
 
 async function generateDeepResearchReportWithVisualPlan(
@@ -164,14 +174,14 @@ async function generateDeepResearchReportWithVisualPlan(
   }
   // Both academic routes are graph-first. Full-document profiles are prepared and
   // queried only after the orchestrator has frozen the argument.
-  const deps = deepResearchEnginePath(deepResearchVersion, approach) === 'v1-general'
+  const baseDeps = deepResearchEnginePath(deepResearchVersion, approach) === 'v1-general'
       ? legacyAcademicDeps(model, signal)
     : deepResearchEnginePath(deepResearchVersion, approach) === 'v1-specialized'
       ? legacySpecializedAcademicDeps(model, approach, versionedRequest, signal)
       : deepResearchEnginePath(deepResearchVersion, approach) === 'v2-general'
       ? realDeps(model, signal)
       : specializedAcademicDeps(model, approach, versionedRequest, signal);
-  report = await orchestrateDeepResearch({ ...versionedRequest, model }, deps, onProgress, signal);
+  report = await orchestrateDeepResearch({ ...versionedRequest, model }, bindAcademicCorpusRun(baseDeps, versionedRequest, signal), onProgress, signal);
   return finish(report);
 }
 
@@ -199,13 +209,14 @@ export async function generateDeepResearchPlanPreview(request: DeepResearchReque
   const approach = normalizeDeepResearchApproach(request.approach);
   const deepResearchVersion = parseDeepResearchRequestVersion(request.deepResearchVersion);
   const versionedRequest: DeepResearchRequest = { ...request, deepResearchVersion };
-  const deps = deepResearchEnginePath(deepResearchVersion, approach) === 'v1-general'
+  const baseDeps = deepResearchEnginePath(deepResearchVersion, approach) === 'v1-general'
       ? legacyAcademicDeps(model)
     : deepResearchEnginePath(deepResearchVersion, approach) === 'v1-specialized'
       ? legacySpecializedAcademicDeps(model, approach, versionedRequest)
       : deepResearchEnginePath(deepResearchVersion, approach) === 'v2-general'
       ? realDeps(model)
       : specializedAcademicDeps(model, approach, versionedRequest);
+  const deps = bindAcademicCorpusRun(baseDeps, versionedRequest);
   const language = request.language ?? 'es';
   const brief = {
     kind: 'deep_research' as const,

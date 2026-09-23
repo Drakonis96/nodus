@@ -7,7 +7,9 @@ import type { CitationPreview, CitationRef } from '@shared/types';
 import { getIdeaDetail, getEdgeDetail } from '../db/ideasRepo';
 import { getWork } from '../db/worksRepo';
 import { getGapDetail } from '../db/gapsRepo';
-import { getPassageDetail } from '../db/passagesRepo';
+import { getPassageDetail as getLegacyPassageDetail } from '../db/passagesRepo';
+import { getDocumentaryPassageDetail } from './documentaryCitations';
+const getPassageDetail = (id: string) => id.startsWith('documentary:') ? getDocumentaryPassageDetail(id) : getLegacyPassageDetail(id);
 import { buildCitationPreview } from './citationPreview';
 
 function exists(ref: CitationRef): boolean {

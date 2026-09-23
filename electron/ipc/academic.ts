@@ -259,6 +259,7 @@ import { reprocessConnections } from '../ai/reprocessConnections';
 import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, clearEmbeddingProgress, onEmbeddingProgress, getWorkEmbeddingStatuses } from '../ai/embeddingPipeline';
 import { startPassageEmbedding, pausePassageEmbedding, resumePassageEmbedding, stopPassageEmbedding, clearPassageProgress, onPassageProgress, getWorkPassageStatuses } from '../ai/passageEmbeddingPipeline';
 import { getPassageDetail } from '../db/passagesRepo';
+import { getDocumentaryPassageDetail } from '../citations/documentaryCitations';
 import {
   deleteDocumentProfileOverride,
   documentProfileStatuses,
@@ -1997,7 +1998,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('passages:clearProgress', async () => clearPassageProgress());
   h('passages:status', async () => getPassageSnapshot());
   h('passages:workStatuses', async (_e, nodusIds?: string[]) => getWorkPassageStatuses(nodusIds));
-  h('passages:get', async (_e, passageId: string) => getPassageDetail(passageId));
+  h('passages:get', async (_e, passageId: string) => passageId.startsWith('documentary:') ? getDocumentaryPassageDetail(passageId) : getPassageDetail(passageId));
 
   // semantic bridge discovery
   h('bridges:discover', async (_e, model?: ModelRef | null) => discoverSemanticBridges(model));

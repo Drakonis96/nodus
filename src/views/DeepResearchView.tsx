@@ -1,4 +1,5 @@
 import { DocumentVisualScope, DocumentVisualActions } from '../components/DocumentVisualScope';
+import { ResearchNotebookControl } from '../components/ResearchNotebookControl';
 import { DocumentSkillsControl, useDocumentSkills } from '../components/DocumentSkillsControl';
 // Deep Research — a gallery of saved reports (grid/list, search, sort), a
 // chained generation queue, and tabbed readers that expand reports to full width
@@ -306,6 +307,7 @@ export function DeepResearchView({
   // Composer (new report) state.
   const [composerOpen, setComposerOpen] = useState(false);
   const [objective, setObjective] = useState('');
+  const [notebookId, setNotebookId] = useState<string | null>(null);
   const [approach, setApproach] = useState<DeepResearchApproach>('general');
   const [deepResearchVersion, setDeepResearchVersion] = useState<DeepResearchVersion>('v1');
   const [language, setLanguage] = useState<PromptLanguage>('es');
@@ -541,6 +543,7 @@ export function DeepResearchView({
     const outline = isTeaching && structureMode === 'manual' && deepSectionLimit !== 'single' ? unitOutline : null;
     const request = {
       objective: objective.trim(),
+      ...(!isStudy && !isTeaching && !isGenealogy ? { notebookId } : {}),
       approach,
       deepResearchVersion: normalizeDeepResearchRequestVersion(deepResearchVersion),
       language,
@@ -1216,6 +1219,7 @@ export function DeepResearchView({
             if (mode === 'manual') setDeepSectionLimit('auto');
           }}
           onUnitOutline={setUnitOutline}
+          notebookControl={<ResearchNotebookControl value={notebookId} onChange={setNotebookId} />}
           objective={objective}
           approach={approach}
           version={deepResearchVersion}
@@ -2237,6 +2241,7 @@ export function ComposerModal({
   onStructureMode,
   onUnitOutline,
   objective,
+  notebookControl,
   approach,
   version,
   audience,
@@ -2275,6 +2280,7 @@ export function ComposerModal({
   onStructureMode: (v: 'ai' | 'manual') => void;
   onUnitOutline: (v: DeepResearchOutlineSection[]) => void;
   objective: string;
+  notebookControl?: React.ReactNode;
   approach: DeepResearchApproach;
   version: DeepResearchVersion;
   audience: StudyDeepResearchAudience;
@@ -2332,6 +2338,7 @@ export function ComposerModal({
         </header>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          {notebookControl}
           <textarea
             className="input min-h-28 w-full resize-y"
             value={objective}

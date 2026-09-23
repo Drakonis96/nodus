@@ -27,7 +27,7 @@ export function researchCorpusInventory(): { documents: ResearchCorpusDocument[]
       const identity = item.sourceIdentities.find(source => source.source === 'zotero' && (source.libraryType === 'user' || source.libraryType === 'group'));
       documents.push({ id: item.id, workId, libraryItemId: item.id, title: item.metadata.title,
         authors: item.metadata.creators.filter(creator => creator.creatorType === 'author').map(creator => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')),
-        year: item.metadata.year ?? null, revision: researchFingerprint({ content: item.contentRevision?.contentFingerprint ?? null, extraction: item.contentRevision?.extractionFingerprint ?? null, metadata: item.metadata, attachments: item.attachments.map(attachment => [attachment.id, attachment.sha256, attachment.sourceVersion]) }),
+        year: item.metadata.year ?? null, revision: researchFingerprint({ metadata: item.metadata, attachments: item.attachments.map(attachment => [attachment.id, attachment.sha256, attachment.sourceVersion]) }),
         attachmentId: item.attachments.length === 1 ? item.attachments[0].id : null,
         origin: identity ? { kind: 'zotero', libraryType: identity.libraryType as 'user' | 'group', libraryId: identity.libraryId, itemKey: identity.itemKey } : { kind: 'nodus', id: item.id },
         permissionRevision: researchFingerprint({ id: item.id, sourceState: item.sourceState ?? 'current', sources: item.sourceIdentities }),
@@ -49,7 +49,7 @@ export function researchCorpusInventory(): { documents: ResearchCorpusDocument[]
     let authors: string[] = [];
     try { const parsed = JSON.parse(work.authors_json); if (Array.isArray(parsed)) authors = parsed.filter(value => typeof value === 'string'); } catch { /* Legacy metadata. */ }
     documents.push({ id, workId: work.nodus_id, libraryItemId: null, title: work.title, authors, year: work.year, attachmentId: null,
-      revision: researchFingerprint([work.zotero_version, work.zotero_fingerprint, work.resolved_text_hash, work.deep_hash]),
+      revision: researchFingerprint([work.zotero_version, work.zotero_fingerprint, work.resolved_text_hash]),
       permissionRevision: researchFingerprint([vault.id, work.nodus_id, work.zotero_key, work.archived]),
       origin: zotero ? { kind: 'zotero', libraryType: match ? 'group' : 'user', libraryId: match?.[1] ?? userId, itemKey: match?.[2] ?? work.zotero_key } : { kind: 'nodus', id },
       coverage: work.resolved_source_type === 'abstract_only' ? 'abstract' : work.resolved_text_chars > 0 ? 'fulltext' : 'metadata' });

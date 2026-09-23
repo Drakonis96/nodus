@@ -1,3 +1,4 @@
+import { associateNotebookConversation, notebookForConversation } from './researchNotebooksRepo';
 import { deleteResearchAttachments } from '../researchAttachments';
 import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from '../chatAssets';
 import { getActiveVault } from '../vaults/vaultRegistry';
@@ -49,6 +50,7 @@ function parseJson<T>(value: string | null): T | null {
 function toSummary(row: ConversationRow, messageCount: number): ChatConversationSummary {
   return {
     id: row.id,
+    notebookId: notebookForConversation(row.id),
     title: row.title || DEFAULT_TITLE,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -118,6 +120,7 @@ export function createConversation(input: {
     input.model ? JSON.stringify(input.model) : null,
     input.selection ? JSON.stringify(input.selection) : null
   );
+  if (input.selection?.notebookId) associateNotebookConversation(input.selection.notebookId, id);
   return getConversation(id)!;
 }
 
@@ -159,6 +162,7 @@ export function saveMessages(
       params.model = meta.model ? JSON.stringify(meta.model) : null;
     }
     if (meta && 'selection' in meta) {
+      associateNotebookConversation(meta.selection?.notebookId ?? null, id);
       sets.push('selection_json = @selection');
       params.selection = meta.selection ? JSON.stringify(meta.selection) : null;
     }

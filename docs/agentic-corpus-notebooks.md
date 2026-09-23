@@ -106,3 +106,33 @@ all legacy writers, scoped citation navigation, managed connector settings,
 packaging/signing across platforms and the paid comparison remain unfinished.
 The two credential helpers exist but have not read production secrets. No paid
 inference has been performed.
+
+### Scoped execution and recovery milestone
+
+Academic Deep Research now binds its four engine/approach routes to a backend
+scope and a single evidence budget across discovery and sections. The profile
+preparation barrier is removed from those routes. Scoped Ideas, gaps, themes,
+contradictions and independent documentary evidence feed the existing writer
+and citation-support auditor. Other vault engines retain their dispatch paths.
+
+Shared passage citations include a persisted scope identifier. Direct reads
+revalidate membership, source permissions and revision; the UI distinguishes
+abstract evidence from full text. `/private/tmp/nodus-research-6ts8sn` passed the
+real Electron citation lookup, fabricated-scope rejection and exclusion-after-
+publication checks, with seven audited private database opens and zero calls.
+
+Migration 180 adds backend-owned conversation provenance. Historical messages
+stay visible, while only matching, server-recorded turns can re-enter a notebook
+prompt. Deleting a notebook also removes its conversation selection metadata.
+
+Source discovery now has transactional leases before the text fingerprint is
+known, with restart recovery, fencing, pause, cancellation and bounded retries.
+Traditional extraction stages files through the existing document worker without
+creating Global Library records. Source maps are accepted only for matching
+reader bytes; basic extraction explicitly disables remote OCR. Chunking retains
+the 280/60 starting policy and adds a 4096-byte UTF-8 bound, versioned separately.
+
+Three additional regression scripts pass for scope/history/budget enforcement,
+source-job recovery and notebook persistence. The traditional native PDF worker
+path, full report generation, platform packaging and provider comparison still
+need integration evidence. No claim of full acceptance is made at this milestone.

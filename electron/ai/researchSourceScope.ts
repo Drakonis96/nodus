@@ -38,7 +38,8 @@ export function resolveResearchSourceScope(value?: ResearchSourceFilter, strictP
     workIds: new Set(workIds),
     ideaIds: ids(strictProvenance ? `WITH allowed AS (SELECT value FROM json_each(?))
       SELECT DISTINCT io.global_id id FROM idea_occurrences io WHERE io.nodus_id IN (SELECT value FROM allowed)
-      AND NOT EXISTS (SELECT 1 FROM idea_occurrences other WHERE other.global_id=io.global_id AND other.nodus_id NOT IN (SELECT value FROM allowed))`
+      AND NOT EXISTS (SELECT 1 FROM idea_occurrences other WHERE other.global_id=io.global_id AND other.nodus_id NOT IN (SELECT value FROM allowed))
+      AND NOT EXISTS (SELECT 1 FROM evidence e WHERE e.global_id=io.global_id AND e.nodus_id NOT IN (SELECT value FROM allowed))`
       : 'SELECT DISTINCT global_id id FROM idea_occurrences WHERE nodus_id IN (SELECT value FROM json_each(?))'),
     themeIds: ids(`WITH allowed AS (SELECT value FROM json_each(?))
       SELECT DISTINCT theme_id id FROM work_themes WHERE nodus_id IN (SELECT value FROM allowed)
