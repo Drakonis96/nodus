@@ -19,7 +19,7 @@ import { Menu, MenuItem, clipboard, shell, type BaseWindow, type WebContents } f
 import { searchUrlFor, type BrowserSearchEngineId } from '@shared/browserOmnibox';
 import { decideNavigation } from '@shared/browserNavigation';
 import { browserMenuIcon } from './menuIcons';
-import { appendEditItems, clipboardHasContent } from './editMenu';
+import { appendEditItems, clipboardHasContent, editFlagsOf } from './editMenu';
 
 const MAX_LABEL_CHARS = 40;
 const MAX_SELECTION_CHARS = 20_000;
@@ -64,9 +64,7 @@ export function installContextMenu(contents: WebContents, actions: ContextMenuAc
     const editItems = appendEditItems(menu, contents, {
       isEditable: params.isEditable,
       hasSelection: Boolean(selection),
-      canCut: params.editFlags.canCut,
-      canCopy: params.editFlags.canCopy,
-      canPaste: params.editFlags.canPaste,
+      ...editFlagsOf(params),
       clipboardHasContent: clipboardHasContent(),
     }, t);
     if (editItems > 0 && selection) menu.append(new MenuItem({ type: 'separator' }));

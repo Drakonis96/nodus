@@ -617,12 +617,28 @@ try {
     const waitForSurface = async (url, predicate, description) => {
       const deadline = Date.now() + 5_000;
       let last = null;
+      let lastError = null;
       while (Date.now() < deadline) {
-        last = await surfaceOf(url);
+        // `capturePage()` is not ready the instant a tab finishes loading: the
+        // compositor can refuse with `UnknownVizError` before it has produced a
+        // frame for that view. That refusal is transient, and this loop is
+        // already the thing that waits for the surface — so it is retried here
+        // rather than thrown out of the loop, which is how this check used to
+        // fail while the surface underneath it was correct all along (measured
+        // on its own: a plain page stayed white and a dark-scheme page dark).
+        try {
+          last = await surfaceOf(url);
+          lastError = null;
+        } catch (error) {
+          lastError = error;
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          continue;
+        }
         if (last && predicate(last)) return last;
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
-      assert.fail(`timed out waiting for ${description}; last pixel ${JSON.stringify(last)}`);
+      assert.fail(`timed out waiting for ${description}; last pixel ${JSON.stringify(last)}` +
+        (lastError ? `; last capture error: ${lastError?.message}` : ''));
     };
 
     await call('updateSettings', { theme: 'dark' });
@@ -1108,6 +1124,10 @@ try {
           linkURL: `${target.getURL()}second`,
           frame: target.mainFrame,
           menuSourceType: 'mouse',
+          // Electron always sends this block, and the menu builder reads it; the
+          // probe used to omit it, which is what the check tripped over. Shaped
+          // like a real event's: a selection on a page that is not a text field.
+          editFlags: { canCut: false, canCopy: true, canPaste: false, canSelectAll: true, canUndo: false, canRedo: false },
         });
         return { items: captured, anchored, hasFrame };
       } finally {
