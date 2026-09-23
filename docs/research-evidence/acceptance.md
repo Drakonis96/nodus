@@ -146,3 +146,36 @@ and final-commit platform/upgrade jobs run.
 Paid evaluation continues the original ledger and isolated secret copies. Before
 this rerun it contained 646 calls, USD 1.17735043 accounted including conservative
 reservations, and two unresolved calls. The USD 5 cap has not been reset.
+
+### Live campaign and remaining blockers
+
+- `/private/tmp/nodus-research-QVEGmv`: all four Chat checks and all four academic
+  Deep Research routes completed using `deepseek-flash` and `baai/bge-m3`. The
+  identical-PDF comparison, latency, Electron CPU/memory samples, token/call/cost
+  summaries and coverage are in `final-comparison/`.
+- **Factual acceptance failed.** Manual review found unsupported independence and
+  common-protocol premises surviving V2's semantic verifier. One verifier reason
+  contradicts its own supported boolean. V2 comparative contains contradictory
+  statements about whether missing temporal series can be established. Exact
+  examples are preserved in `2026-09-23-factual-review.json`. Literal citation
+  existence and automatic grades must not be used to close this failure.
+- `/private/tmp/nodus-research-t4JQKj`: live adversarial history, foreign-ID,
+  hostile-document instructions, cancellation on selection change and empty-scope
+  cases passed. The injected URL was not followed; app networking remained bound
+  to explicitly allowed local endpoints and the budgeted provider gate.
+- `/private/tmp/nodus-research-qxurjO` and `...-DGahLS`: two private-runtime profiles,
+  same-version directory replacement, owned child shutdown and unrelated resource
+  preservation passed (5,817 files). This is not a native installer/upgrade test.
+- Final local production build and changed implementation lint passed on
+  `07f0e8bb`. That commit repairs empty citation parentheses; the live reports
+  retain their original pre-fix formatting as evidence.
+- Campaign total after adversarial checks: **854 calls, USD 1.566778505** accounted
+  including unresolved reservations; **three unresolved** (including the cancelled
+  request) retain their conservative upper bounds. Limit remains USD 5.
+
+Final code-commit jobs: CI `35911521709`, native matrix `35911521693`, disposable
+installer/actual v5.6.0 upgrade `35911650545`. At this checkpoint the final native
+macOS ARM64 job passed; the other native jobs and general CI are still running.
+The installer run is queued behind an obsolete run for which cancellation was
+requested. No pending platform, signing/notarization or actual-version-upgrade
+criterion is accepted. The PR remains draft and overall acceptance stays open.

@@ -1,0 +1,1744 @@
+{
+  "generatedAt": "2026-09-23T19:58:21.825Z",
+  "baseCommit": "f54995e7",
+  "baseline": {
+    "root": "/private/tmp/nodus-research-8mDpAT",
+    "source": "/private/tmp/nodus-research-8mDpAT/artifacts/live-campaign.json",
+    "startedAt": "2026-09-23T10:33:31.038Z",
+    "completedAt": "2026-09-23T10:42:51.874Z",
+    "corpus": [
+      {
+        "file": "source-1.pdf",
+        "sha256": "d83535b729ee2c6e5a0cee6b81bb969a73c6e7f9b47d2870b00765235f4d8b99"
+      },
+      {
+        "file": "source-2.pdf",
+        "sha256": "f7565492305c57d5192d12286e1487693239c96b92ec045f13534cb521428964"
+      },
+      {
+        "file": "source-3.pdf",
+        "sha256": "86de27be8f128476e520d187efe61fa58cf39fc0780920687d7e8d02910a98ef"
+      }
+    ],
+    "models": {
+      "generation": "deepseek-flash",
+      "embedding": "baai/bge-m3"
+    },
+    "preparation": {
+      "latencyMs": 1812.9000000059605,
+      "links": {
+        "requested": 3,
+        "linked": 3,
+        "existing": 0,
+        "vaultId": "default",
+        "links": [
+          {
+            "itemId": "nodus:182b55e0-77c6-4979-bc8c-687ecd2228f1",
+            "vaultId": "default",
+            "vaultName": "Principal",
+            "vaultType": "academic",
+            "workId": "nodus:182b55e0-77c6-4979-bc8c-687ecd2228f1",
+            "analysis": {
+              "lightStatus": "none",
+              "deepStatus": "none",
+              "summaryStatus": "none",
+              "ideaCount": 0,
+              "passageCount": 0,
+              "evidenceCount": 0,
+              "gapCount": 0,
+              "hasSummary": false,
+              "hasNotes": false,
+              "archived": false,
+              "reuse": {
+                "light": {
+                  "state": "pending",
+                  "reason": "No reusable light output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "deep": {
+                  "state": "pending",
+                  "reason": "No reusable deep output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "summary": {
+                  "state": "pending",
+                  "reason": "No reusable summary output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "ideas": {
+                  "state": "pending",
+                  "reason": "No reusable ideas output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "passages": {
+                  "state": "pending",
+                  "reason": "No reusable passages output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "embeddings": {
+                  "state": "pending",
+                  "reason": "No reusable embeddings output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                }
+              }
+            }
+          },
+          {
+            "itemId": "nodus:22358e48-9f77-40f3-a975-79f5db150bb4",
+            "vaultId": "default",
+            "vaultName": "Principal",
+            "vaultType": "academic",
+            "workId": "nodus:22358e48-9f77-40f3-a975-79f5db150bb4",
+            "analysis": {
+              "lightStatus": "none",
+              "deepStatus": "none",
+              "summaryStatus": "none",
+              "ideaCount": 0,
+              "passageCount": 0,
+              "evidenceCount": 0,
+              "gapCount": 0,
+              "hasSummary": false,
+              "hasNotes": false,
+              "archived": false,
+              "reuse": {
+                "light": {
+                  "state": "pending",
+                  "reason": "No reusable light output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "deep": {
+                  "state": "pending",
+                  "reason": "No reusable deep output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "summary": {
+                  "state": "pending",
+                  "reason": "No reusable summary output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "ideas": {
+                  "state": "pending",
+                  "reason": "No reusable ideas output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "passages": {
+                  "state": "pending",
+                  "reason": "No reusable passages output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "embeddings": {
+                  "state": "pending",
+                  "reason": "No reusable embeddings output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                }
+              }
+            }
+          },
+          {
+            "itemId": "nodus:aaa31634-c009-4041-a07c-68120cb354a2",
+            "vaultId": "default",
+            "vaultName": "Principal",
+            "vaultType": "academic",
+            "workId": "nodus:aaa31634-c009-4041-a07c-68120cb354a2",
+            "analysis": {
+              "lightStatus": "none",
+              "deepStatus": "none",
+              "summaryStatus": "none",
+              "ideaCount": 0,
+              "passageCount": 0,
+              "evidenceCount": 0,
+              "gapCount": 0,
+              "hasSummary": false,
+              "hasNotes": false,
+              "archived": false,
+              "reuse": {
+                "light": {
+                  "state": "pending",
+                  "reason": "No reusable light output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "deep": {
+                  "state": "pending",
+                  "reason": "No reusable deep output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "summary": {
+                  "state": "pending",
+                  "reason": "No reusable summary output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "ideas": {
+                  "state": "pending",
+                  "reason": "No reusable ideas output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "passages": {
+                  "state": "pending",
+                  "reason": "No reusable passages output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                },
+                "embeddings": {
+                  "state": "pending",
+                  "reason": "No reusable embeddings output with complete provenance.",
+                  "sourceVaultId": null,
+                  "sourceWorkId": null,
+                  "reusedAt": null
+                }
+              }
+            }
+          }
+        ],
+        "reusedComponents": 0,
+        "pendingComponents": 18,
+        "canceled": false
+      },
+      "status": {
+        "running": false,
+        "paused": false,
+        "cancelled": false,
+        "startedAt": "2026-09-23T10:33:31.327Z",
+        "finishedAt": "2026-09-23T10:33:33.004Z",
+        "currentWorkStartedAt": "2026-09-23T10:33:32.617Z",
+        "currentWorkFinishedAt": "2026-09-23T10:33:33.004Z",
+        "currentWorkIndex": 2,
+        "totalWorks": 3,
+        "currentWorkTitle": "Synthetic research source 1",
+        "passagesEmbedded": 3,
+        "totalPassages": 3,
+        "currentPassageIndex": 0,
+        "currentWorkPassages": 1,
+        "error": null
+      }
+    },
+    "chat": [
+      {
+        "name": "exact",
+        "latencyMs": 4275.081,
+        "expectedAnswer": true,
+        "citationCount": 4,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true
+      },
+      {
+        "name": "comparison",
+        "latencyMs": 5505.4663329999985,
+        "expectedAnswer": true,
+        "citationCount": 13,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true
+      },
+      {
+        "name": "multilingual",
+        "latencyMs": 2975.4283749999995,
+        "expectedAnswer": true,
+        "citationCount": 3,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true
+      },
+      {
+        "name": "absence",
+        "latencyMs": 4404.870750000002,
+        "expectedAnswer": true,
+        "citationCount": 9,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true
+      }
+    ],
+    "deepResearch": [
+      {
+        "version": "v1",
+        "approach": "general",
+        "latencyMs": 56063.213165999994,
+        "verification": {
+          "checked": 11,
+          "partial": 5,
+          "unsupported": 0,
+          "unverified": 0
+        },
+        "quality": {
+          "version": 1,
+          "score": 73.4,
+          "grade": "needs_review",
+          "mode": "academic",
+          "sections": 3,
+          "sectionsPassing": 0,
+          "dimensions": {
+            "grounding": 23.4,
+            "depth": 24.5,
+            "diversity": 19.7,
+            "synthesis": 15,
+            "coherence": 9.9
+          },
+          "metrics": {
+            "words": 1021,
+            "citationMentions": 11,
+            "uniqueCitations": 6,
+            "distinctSources": 3,
+            "effectiveSources": 2.974,
+            "topSourceShare": 0.364,
+            "directEvidenceCitations": 6,
+            "crossSourceParagraphs": 4,
+            "uncitedParagraphShare": 0.417,
+            "objectiveCoverage": 1,
+            "objectiveRequirementsSupported": 0,
+            "objectiveRequirementsPartial": 0,
+            "objectiveRequirementsUnsupported": 0,
+            "supportConcernRate": 0.455,
+            "redundancyRate": 0,
+            "supportUnverified": 0,
+            "internalContradictions": 1
+          },
+          "issues": [
+            "uncited_paragraphs",
+            "high_support_repair_rate",
+            "internal_contradiction"
+          ],
+          "sectionScores": [
+            {
+              "title": "Las tres fuentes sintéticas definen un marco de medición desigual que condiciona desde el inicio cualquier comparación entre campos",
+              "score": 86.9,
+              "passing": false,
+              "issues": [
+                "uncited_paragraphs"
+              ]
+            },
+            {
+              "title": "El contraste entre las mediciones del norte y del sur revela coincidencias parciales y divergencias atribuibles a criterios de registro distintos",
+              "score": 78.1,
+              "passing": false,
+              "issues": [
+                "uncited_paragraphs"
+              ]
+            },
+            {
+              "title": "La ausencia de datos del campo este convierte la comparación norte-sur en un balance incompleto y obliga a explicitar sus límites",
+              "score": 85.6,
+              "passing": false,
+              "issues": [
+                "uncited_paragraphs"
+              ]
+            }
+          ],
+          "caveat": "Indicadores estructurales y de trazabilidad. No certifican por sí solos la verdad ni la calidad historiográfica de las fuentes."
+        },
+        "coverage": null,
+        "claimAudit": null
+      },
+      {
+        "version": "v2",
+        "approach": "general",
+        "latencyMs": 212232.13529099998,
+        "verification": {
+          "checked": 5,
+          "partial": 2,
+          "unsupported": 0,
+          "unverified": 0
+        },
+        "quality": {
+          "version": 1,
+          "score": 66.4,
+          "grade": "needs_review",
+          "mode": "academic",
+          "sections": 3,
+          "sectionsPassing": 0,
+          "dimensions": {
+            "grounding": 24.7,
+            "depth": 24.2,
+            "diversity": 20,
+            "synthesis": 15,
+            "coherence": 9.6
+          },
+          "metrics": {
+            "words": 963,
+            "citationMentions": 12,
+            "uniqueCitations": 6,
+            "distinctSources": 3,
+            "effectiveSources": 3,
+            "topSourceShare": 0.333,
+            "directEvidenceCitations": 3,
+            "crossSourceParagraphs": 4,
+            "uncitedParagraphShare": 0.389,
+            "objectiveCoverage": 0.214,
+            "objectiveRequirementsSupported": 0,
+            "objectiveRequirementsPartial": 3,
+            "objectiveRequirementsUnsupported": 4,
+            "supportConcernRate": 0.4,
+            "redundancyRate": 0,
+            "supportUnverified": 0,
+            "internalContradictions": 2
+          },
+          "issues": [
+            "uncited_paragraphs",
+            "incomplete_objective_coverage",
+            "high_support_repair_rate",
+            "internal_contradiction"
+          ],
+          "sectionScores": [
+            {
+              "title": "Las tres fuentes sintéticas registran mediciones en el norte y el sur, pero no en el este",
+              "score": 81.5,
+              "passing": false,
+              "issues": [
+                "uncited_paragraphs"
+              ]
+            },
+            {
+              "title": "La comparación entre norte y sur exige explicitar el marco de medición de cada campo",
+              "score": 86.6,
+              "passing": false,
+              "issues": [
+                "uncited_paragraphs"
+              ]
+            },
+            {
+              "title": "La ausencia de datos del este limita el alcance de toda conclusión comparativa",
+              "score": 85.5,
+              "passing": false,
+              "issues": [
+                "uncited_paragraphs"
+              ]
+            }
+          ],
+          "caveat": "Indicadores estructurales y de trazabilidad. No certifican por sí solos la verdad ni la calidad historiográfica de las fuentes."
+        },
+        "coverage": {
+          "questions": [
+            "¿Qué mediciones se han realizado en el campo norte según las tres fuentes sintéticas?",
+            "¿Qué mediciones se han realizado en el campo sur según las tres fuentes sintéticas?",
+            "¿Qué diferencias existen entre las mediciones del campo norte y las del campo sur?",
+            "¿Qué límites de comparabilidad presentan las mediciones de los campos norte y sur?",
+            "¿Qué datos del campo este están ausentes en las tres fuentes sintéticas?",
+            "¿Qué citas verificables de las tres fuentes sintéticas respaldan las mediciones de los campos norte y sur?",
+            "¿Qué citas verificables de las tres fuentes sintéticas evidencian la ausencia de datos del campo este?"
+          ],
+          "ratio": 0.214
+        },
+        "claimAudit": {
+          "checked": 16,
+          "supported": 0,
+          "partial": 6,
+          "unsupported": 10,
+          "roles": {
+            "fact": {
+              "checked": 28,
+              "supported": 10
+            },
+            "causality": {
+              "checked": 2,
+              "supported": 0
+            },
+            "comparison_side": {
+              "checked": 2,
+              "supported": 0
+            },
+            "limit": {
+              "checked": 5,
+              "supported": 0
+            },
+            "method": {
+              "checked": 11,
+              "supported": 2
+            }
+          }
+        }
+      },
+      {
+        "version": "v1",
+        "approach": "comparative",
+        "latencyMs": 67112.72370799998,
+        "verification": {
+          "checked": 4,
+          "partial": 0,
+          "unsupported": 0,
+          "unverified": 0
+        },
+        "quality": {
+          "version": 1,
+          "score": 84.6,
+          "grade": "strong",
+          "mode": "academic",
+          "sections": 3,
+          "sectionsPassing": 0,
+          "dimensions": {
+            "grounding": 24,
+            "depth": 25,
+            "diversity": 19.6,
+            "synthesis": 15,
+            "coherence": 10
+          },
+          "metrics": {
+            "words": 1241,
+            "citationMentions": 13,
+            "uniqueCitations": 6,
+            "distinctSources": 3,
+            "effectiveSources": 2.983,
+            "topSourceShare": 0.385,
+            "directEvidenceCitations": 4,
+            "crossSourceParagraphs": 3,
+            "uncitedParagraphShare": 0.444,
+            "objectiveCoverage": 1,
+            "objectiveRequirementsSupported": 0,
+            "objectiveRequirementsPartial": 0,
+            "objectiveRequirementsUnsupported": 0,
+            "supportConcernRate": 0,
+            "redundancyRate": 0,
+            "supportUnverified": 0,
+            "internalContradictions": 0
+          },
+          "issues": [
+            "uncited_paragraphs"
+          ],
+          "sectionScores": [
+            {
+              "title": "La comparación entre campos solo es defendible si se explicitan antes las condiciones de las tres fuentes sintéticas",
+              "score": 85.6,
+              "passing": false,
+              "issues": [
+                "uncited_paragraphs"
+              ]
+            },
+            {
+              "title": "Las mediciones de los campos norte y sur son contrastables entre sí, pero su equivalencia depende de criterios que las fuentes no explicitan",
+              "score": 81.4,
+              "passing": false,
+              "issues": [
+                "uncited_paragraphs"
+              ]
+            },
+            {
+              "title": "El campo este queda fuera de la comparación porque las fuentes no lo miden, y ese vacío redefine el alcance de todo el contraste",
+              "score": 86.8,
+              "passing": false,
+              "issues": [
+                "uncited_paragraphs"
+              ]
+            }
+          ],
+          "caveat": "Indicadores estructurales y de trazabilidad. No certifican por sí solos la verdad ni la calidad historiográfica de las fuentes."
+        },
+        "coverage": null,
+        "claimAudit": null
+      },
+      {
+        "version": "v2",
+        "approach": "comparative",
+        "latencyMs": 206241.83962500002,
+        "verification": {
+          "checked": 7,
+          "partial": 3,
+          "unsupported": 0,
+          "unverified": 0
+        },
+        "quality": {
+          "version": 1,
+          "score": 60.8,
+          "grade": "needs_review",
+          "mode": "academic",
+          "sections": 3,
+          "sectionsPassing": 0,
+          "dimensions": {
+            "grounding": 22.2,
+            "depth": 25,
+            "diversity": 19.6,
+            "synthesis": 11.8,
+            "coherence": 10
+          },
+          "metrics": {
+            "words": 1182,
+            "citationMentions": 10,
+            "uniqueCitations": 6,
+            "distinctSources": 3,
+            "effectiveSources": 2.971,
+            "topSourceShare": 0.4,
+            "directEvidenceCitations": 4,
+            "crossSourceParagraphs": 2,
+            "uncitedParagraphShare": 0.556,
+            "objectiveCoverage": 0.429,
+            "objectiveRequirementsSupported": 3,
+            "objectiveRequirementsPartial": 0,
+            "objectiveRequirementsUnsupported": 4,
+            "supportConcernRate": 0.429,
+            "redundancyRate": 0,
+            "supportUnverified": 0,
+            "internalContradictions": 4
+          },
+          "issues": [
+            "uncited_paragraphs",
+            "missing_cross_source_synthesis",
+            "incomplete_objective_coverage",
+            "high_support_repair_rate",
+            "internal_contradiction"
+          ],
+          "sectionScores": [
+            {
+              "title": "Las mediciones del campo norte y del campo sur existen en las tres fuentes sintéticas, pero responden a criterios distintos que condicionan cualquier comparación",
+              "score": 85.6,
+              "passing": false,
+              "issues": [
+                "uncited_paragraphs"
+              ]
+            },
+            {
+              "title": "Las diferencias y similitudes entre campo norte y campo sur son de criterio y cobertura, no de magnitud, y marcan el límite de comparabilidad de las mediciones",
+              "score": 81.4,
+              "passing": false,
+              "issues": [
+                "uncited_paragraphs"
+              ]
+            },
+            {
+              "title": "El campo este carece de mediciones en las tres fuentes sintéticas, de modo que su ausencia es un hallazgo de cobertura y no un resultado comparable",
+              "score": 64.7,
+              "passing": false,
+              "issues": [
+                "uncited_paragraphs",
+                "missing_cross_source_synthesis"
+              ]
+            }
+          ],
+          "caveat": "Indicadores estructurales y de trazabilidad. No certifican por sí solos la verdad ni la calidad historiográfica de las fuentes."
+        },
+        "coverage": {
+          "questions": [
+            "¿Qué mediciones se han realizado en el campo norte según las tres fuentes sintéticas?",
+            "¿Qué mediciones se han realizado en el campo sur según las tres fuentes sintéticas?",
+            "¿Qué diferencias y similitudes existen entre las mediciones del campo norte y las del campo sur?",
+            "¿Qué límites de comparabilidad presentan las mediciones de los campos norte y sur?",
+            "¿Qué datos del campo este están ausentes en las tres fuentes sintéticas?",
+            "¿Qué citas verificables de las tres fuentes sintéticas respaldan las mediciones de los campos norte y sur?",
+            "¿Qué citas verificables de las tres fuentes sintéticas evidencian la ausencia de datos del campo este?"
+          ],
+          "ratio": 0.429
+        },
+        "claimAudit": {
+          "checked": 10,
+          "supported": 0,
+          "partial": 0,
+          "unsupported": 10,
+          "roles": {
+            "fact": {
+              "checked": 6,
+              "supported": 0
+            },
+            "causality": {
+              "checked": 2,
+              "supported": 0
+            },
+            "comparison_side": {
+              "checked": 8,
+              "supported": 0
+            },
+            "reception": {
+              "checked": 6,
+              "supported": 0
+            },
+            "limit": {
+              "checked": 5,
+              "supported": 0
+            },
+            "method": {
+              "checked": 5,
+              "supported": 0
+            }
+          }
+        }
+      }
+    ],
+    "resources": {
+      "samples": 555,
+      "peakSummedWorkingSetSizeKiB": 1205744,
+      "peakSummedProcessCpuPercent": 8.211513587556214,
+      "meanSummedProcessCpuPercent": 2.6527711468110473
+    },
+    "recordedWindowUsage": {
+      "calls": 194,
+      "accountedUpperBoundUsd": 0.26831236999999963,
+      "unresolvedReservations": 0,
+      "inputTokens": 349844,
+      "outputTokens": 139102
+    }
+  },
+  "extension": {
+    "root": "/private/tmp/nodus-research-QVEGmv",
+    "source": "/private/tmp/nodus-research-QVEGmv/artifacts/live-campaign.json",
+    "startedAt": "2026-09-23T19:41:37.931Z",
+    "completedAt": "2026-09-23T19:54:34.807Z",
+    "corpus": [
+      {
+        "file": "source-1.pdf",
+        "sha256": "d83535b729ee2c6e5a0cee6b81bb969a73c6e7f9b47d2870b00765235f4d8b99"
+      },
+      {
+        "file": "source-2.pdf",
+        "sha256": "f7565492305c57d5192d12286e1487693239c96b92ec045f13534cb521428964"
+      },
+      {
+        "file": "source-3.pdf",
+        "sha256": "86de27be8f128476e520d187efe61fa58cf39fc0780920687d7e8d02910a98ef"
+      }
+    ],
+    "models": {
+      "generation": "deepseek-flash",
+      "embedding": "baai/bge-m3"
+    },
+    "preparation": {
+      "enabled": false,
+      "embeddingSpaces": [
+        {
+          "id": "33d1f68df8eb60f259fbcb7bf702508efa0fd3788dfcc716894bc76fef907be0",
+          "provider": "openrouter",
+          "model": "baai/bge-m3",
+          "dimensions": 1024,
+          "metric": "cosine"
+        }
+      ],
+      "documents": [
+        {
+          "id": "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+          "workId": "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+          "libraryItemId": "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+          "title": "Synthetic research source 3",
+          "authors": [],
+          "year": null,
+          "revision": "506c18fb25115afe12e8628f59945053d9a008c248d302788473a4631e4ef277",
+          "attachmentId": "EUW72H4L",
+          "attachments": [
+            {
+              "id": "EUW72H4L",
+              "revision": "85085174fb11d4185996ee2330558f738f097e2e03168943164e90e2bcf95c68"
+            }
+          ],
+          "origin": {
+            "kind": "zotero",
+            "libraryType": "user",
+            "libraryId": "0",
+            "itemKey": "9ZP3EBFW"
+          },
+          "permissionRevision": "400daa4d00d327c7b133bdfb62259886adf8edf8a5a77ebbd00b273ec97b5fa1",
+          "coverage": "fulltext",
+          "indexedSource": {
+            "revision": "506c18fb25115afe12e8628f59945053d9a008c248d302788473a4631e4ef277",
+            "attachmentId": "EUW72H4L",
+            "attachments": [
+              {
+                "id": "EUW72H4L",
+                "revision": "85085174fb11d4185996ee2330558f738f097e2e03168943164e90e2bcf95c68"
+              }
+            ],
+            "indexKeys": [
+              "e8493d8f9c2fa803217a399386b5efb400e71db575e0bd2932d471d64c6c2923"
+            ]
+          },
+          "preparation": {
+            "documentId": "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+            "revision": "506c18fb25115afe12e8628f59945053d9a008c248d302788473a4631e4ef277",
+            "text": "available",
+            "lexical": "ready",
+            "embeddings": "ready",
+            "status": "ready",
+            "reason": null,
+            "error": null,
+            "passages": 1,
+            "embedded": 1,
+            "unpreparedAttachmentIds": []
+          }
+        },
+        {
+          "id": "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+          "workId": "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+          "libraryItemId": "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+          "title": "Synthetic research source 1",
+          "authors": [],
+          "year": null,
+          "revision": "898d5aa2ff8be608b6ccddd1cadfb913115fce91015a1789d03e4e059de6afd7",
+          "attachmentId": "SIZBQWXF",
+          "attachments": [
+            {
+              "id": "SIZBQWXF",
+              "revision": "e1a9fd817317045d2e6342a7752acdb599ff72fafedc125d361f42fd492ee1f3"
+            }
+          ],
+          "origin": {
+            "kind": "zotero",
+            "libraryType": "user",
+            "libraryId": "0",
+            "itemKey": "6PV847L7"
+          },
+          "permissionRevision": "d583f8cadcafa3a92fc53ee175fff461d8dfa84a4ad085e7305b7f61832d5996",
+          "coverage": "abstract",
+          "indexedSource": {
+            "revision": "898d5aa2ff8be608b6ccddd1cadfb913115fce91015a1789d03e4e059de6afd7",
+            "attachmentId": "SIZBQWXF",
+            "attachments": [
+              {
+                "id": "SIZBQWXF",
+                "revision": "e1a9fd817317045d2e6342a7752acdb599ff72fafedc125d361f42fd492ee1f3"
+              }
+            ],
+            "indexKeys": [
+              "e68f87cbc9d480ec5be8d3b970eff7e0cc17133bde60debd894474bc16204276"
+            ]
+          },
+          "preparation": {
+            "documentId": "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+            "revision": "898d5aa2ff8be608b6ccddd1cadfb913115fce91015a1789d03e4e059de6afd7",
+            "text": "available",
+            "lexical": "ready",
+            "embeddings": "ready",
+            "status": "ready",
+            "reason": null,
+            "error": null,
+            "passages": 1,
+            "embedded": 1,
+            "unpreparedAttachmentIds": []
+          }
+        },
+        {
+          "id": "nodus:da02ffab-6e94-4b69-b878-b32fd70581db",
+          "workId": "nodus:da02ffab-6e94-4b69-b878-b32fd70581db",
+          "libraryItemId": "nodus:da02ffab-6e94-4b69-b878-b32fd70581db",
+          "title": "Synthetic research source 2",
+          "authors": [],
+          "year": null,
+          "revision": "aacb52aa8604de4bb29345f702ab8e8d932ad4bc37df0818708e213bf181ca18",
+          "attachmentId": "EE7763XJ",
+          "attachments": [
+            {
+              "id": "EE7763XJ",
+              "revision": "eb57646d30a9417b70ee3dde4af642af8c94235d4be637a32670105797736816"
+            }
+          ],
+          "origin": {
+            "kind": "zotero",
+            "libraryType": "user",
+            "libraryId": "0",
+            "itemKey": "FP9Z5MTK"
+          },
+          "permissionRevision": "a5e9b3d1bed829af95e150c3cb41b0c1065c3576f09e7c90101ca40b59c2b992",
+          "coverage": "fulltext",
+          "indexedSource": {
+            "revision": "aacb52aa8604de4bb29345f702ab8e8d932ad4bc37df0818708e213bf181ca18",
+            "attachmentId": "EE7763XJ",
+            "attachments": [
+              {
+                "id": "EE7763XJ",
+                "revision": "eb57646d30a9417b70ee3dde4af642af8c94235d4be637a32670105797736816"
+              }
+            ],
+            "indexKeys": [
+              "5913d35372a5467f09645938865c713ffccf47046c10a2ae3edf8d886566a268"
+            ]
+          },
+          "preparation": {
+            "documentId": "nodus:da02ffab-6e94-4b69-b878-b32fd70581db",
+            "revision": "aacb52aa8604de4bb29345f702ab8e8d932ad4bc37df0818708e213bf181ca18",
+            "text": "available",
+            "lexical": "ready",
+            "embeddings": "ready",
+            "status": "ready",
+            "reason": null,
+            "error": null,
+            "passages": 1,
+            "embedded": 1,
+            "unpreparedAttachmentIds": []
+          }
+        }
+      ]
+    },
+    "chat": [
+      {
+        "name": "exact",
+        "latencyMs": 6342.991375000001,
+        "expectedAnswer": true,
+        "citationCount": 8,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true
+      },
+      {
+        "name": "comparison",
+        "latencyMs": 9152.506999999998,
+        "expectedAnswer": true,
+        "citationCount": 11,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true
+      },
+      {
+        "name": "multilingual",
+        "latencyMs": 5654.519291999997,
+        "expectedAnswer": true,
+        "citationCount": 6,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true
+      },
+      {
+        "name": "absence",
+        "latencyMs": 7020.689916000003,
+        "expectedAnswer": true,
+        "citationCount": 8,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true
+      }
+    ],
+    "deepResearch": [
+      {
+        "version": "v1",
+        "approach": "general",
+        "latencyMs": 125203.70629200002,
+        "verification": {
+          "checked": 16,
+          "partial": 9,
+          "unsupported": 0,
+          "unverified": 0
+        },
+        "quality": {
+          "version": 1,
+          "score": 39,
+          "grade": "weak",
+          "mode": "academic",
+          "sections": 3,
+          "sectionsPassing": 0,
+          "dimensions": {
+            "grounding": 28.8,
+            "depth": 10,
+            "diversity": 14.7,
+            "synthesis": 10,
+            "coherence": 8
+          },
+          "metrics": {
+            "words": 360,
+            "citationMentions": 24,
+            "uniqueCitations": 3,
+            "distinctSources": 3,
+            "effectiveSources": 2.951,
+            "topSourceShare": 0.375,
+            "directEvidenceCitations": 24,
+            "crossSourceParagraphs": 4,
+            "uncitedParagraphShare": 0,
+            "objectiveCoverage": 1,
+            "objectiveRequirementsSupported": 0,
+            "objectiveRequirementsPartial": 0,
+            "objectiveRequirementsUnsupported": 0,
+            "supportConcernRate": 0.563,
+            "redundancyRate": 0,
+            "supportUnverified": 0,
+            "internalContradictions": 0
+          },
+          "issues": [
+            "thin",
+            "weak_analysis",
+            "low_source_diversity",
+            "source_concentration",
+            "missing_cross_source_synthesis",
+            "high_support_repair_rate"
+          ],
+          "sectionScores": [
+            {
+              "title": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.",
+              "score": 73,
+              "passing": false,
+              "issues": [
+                "thin"
+              ]
+            },
+            {
+              "title": "La diferencia entre 23 y 41 unidades contradice un resultado uniforme pero no permite generalizar a todo el territorio [Synthetic research source 3](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A93da27827ab8770f15a37f3a707c34cd2d96482864652805723c479df97dfb43%3A0) [Synthetic research source 1](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A0136576172f12d85deaaf06cbecc10000d4c907f195c4dba93ee4cdabd32057d%3A0) [Synthetic research source 2](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A13c905c3beecee809ecd6e94d536ec2e463a127f6cf4d2996eb51832c5a604db%3A0)",
+              "score": 64.8,
+              "passing": false,
+              "issues": [
+                "thin",
+                "weak_analysis"
+              ]
+            },
+            {
+              "title": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.",
+              "score": 17.7,
+              "passing": false,
+              "issues": [
+                "thin",
+                "low_source_diversity",
+                "source_concentration",
+                "missing_cross_source_synthesis"
+              ]
+            }
+          ],
+          "caveat": "Indicadores estructurales y de trazabilidad. No certifican por sí solos la verdad ni la calidad historiográfica de las fuentes."
+        },
+        "traversal": {
+          "scopeId": "7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f",
+          "sourceCount": 3,
+          "rounds": 8,
+          "evidenceTokens": 1503,
+          "decisionTokens": 13792,
+          "matchedDocumentIds": [
+            "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+            "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+            "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+          ],
+          "readDocumentIds": [],
+          "sourceCoverage": [
+            {
+              "documentId": "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+              "title": "Synthetic research source 3",
+              "reasons": []
+            },
+            {
+              "documentId": "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+              "title": "Synthetic research source 1",
+              "reasons": []
+            },
+            {
+              "documentId": "nodus:da02ffab-6e94-4b69-b878-b32fd70581db",
+              "title": "Synthetic research source 2",
+              "reasons": []
+            }
+          ],
+          "limitations": [
+            "no_matches",
+            "budget_exhausted"
+          ],
+          "partial": true,
+          "queries": [
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.\nCada fuente registra una única medición local bajo inspección controlada y sin alcance más allá del campo nombrado\nFijar el estatuto de la evidencia disponible: qué mide cada una de las tres fuentes sintéticas, en qué condiciones se registró y por qué su alcance queda restringido al campo nombrado. Esta base es necesaria antes de cualquier comparación.\nLas tres fuentes sintéticas son registros de un mismo tipo: documentan un dispositivo de investigación aislado y no un levantamiento territorial.\nCada observación pertenece exclusivamente al campo nombrado en su propia fuente, sin evidencia sobre otros campos más allá de lo que la fuente afirma explícitamente.\nLas mediciones se registraron tras una inspección controlada, condición que comparten las tres fuentes y que permite tratarlas como observaciones comparables en su forma de obtención.\nEl campo norte queda fijado en 23 unidades y el marcador NORTH23 identifica esa evidencia exacta.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.\nLa diferencia entre 23 y 41 unidades contradice un resultado uniforme pero no permite generalizar a todo el territorio\nEstablecer la comparación efectiva entre el campo norte y el campo sur, señalar que el contraste refuta la hipótesis de un resultado uniforme de 23 unidades y, al mismo tiempo, marcar los límites de comparabilidad: dos mediciones aisladas no constituyen un patrón ni autorizan extrapolación.\nEl campo sur mide 41 unidades, frente a las 23 unidades del campo norte, de modo que existe una diferencia cuantitativa entre ambas mediciones.\nLa medición del campo sur contradice explícitamente un resultado uniforme de 23 unidades, lo que descarta tratar el valor norte como constante de todo el conjunto.\nLa comparación solo puede formularse entre dos observaciones locales registradas bajo inspección controlada, no como regularidad territorial.\nNinguna de las fuentes aporta evidencia sobre campos distintos del nombrado, por lo que la diferencia observada no se puede extender a otras áreas ni a un promedio general.\nEl contraste entre ambas mediciones es el único resultado comparativo que el corpus sostiene sin salir de lo que las fuentes afirman.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "campo norte campo sur campo este medición unidades",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b"
+              ],
+              "candidates": 0,
+              "partial": false
+            },
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.\nLa ausencia de medición del campo este y los controles faltantes acotan lo que la comparación puede concluir\nCerrar el razonamiento integrando lo ya establecido: la comparación norte-sur es válida solo como contraste de dos mediciones locales, el campo este carece por completo de medición y los controles faltantes impiden elevar el resultado a conclusión general.\nNo existe medición alguna del campo este, de modo que cualquier afirmación sobre él queda fuera de lo que el corpus permite.\nEl informe de comparación registra controles faltantes, lo que limita la solidez de cualquier generalización a partir de las mediciones disponibles.\nLa conclusión sostenible se reduce a un contraste entre 23 y 41 unidades en dos campos nombrados, registrado bajo inspección controlada y sin alcance sobre otros campos.\nLas fuentes son registros sintéticos creados como dispositivo de investigación, condición que debe acompañar a cualquier uso de sus cifras.\nLo que no puede afirmarse —uniformidad, promedio territorial o valor del campo este— es tan parte del resultado como la diferencia observada entre norte y sur.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": true
+            },
+            {
+              "query": "## Cada fuente registra una única medición local bajo inspección controlada y sin alcance más allá del campo nombrado",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": true
+            },
+            {
+              "query": "El contraste entre ambas mediciones es el único resultado comparativo que el corpus sostiene.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": true
+            },
+            {
+              "query": "## La ausencia de medición del campo este y los controles faltantes acotan lo que la comparación puede concluir",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": true
+            }
+          ]
+        },
+        "coverage": null,
+        "claimAudit": null
+      },
+      {
+        "version": "v2",
+        "approach": "general",
+        "latencyMs": 272050.749084,
+        "verification": {
+          "checked": 10,
+          "partial": 3,
+          "unsupported": 0,
+          "unverified": 0
+        },
+        "quality": {
+          "version": 1,
+          "score": 63.6,
+          "grade": "needs_review",
+          "mode": "academic",
+          "sections": 3,
+          "sectionsPassing": 0,
+          "dimensions": {
+            "grounding": 29.4,
+            "depth": 17.6,
+            "diversity": 17.9,
+            "synthesis": 15,
+            "coherence": 9.3
+          },
+          "metrics": {
+            "words": 881,
+            "citationMentions": 51,
+            "uniqueCitations": 3,
+            "distinctSources": 3,
+            "effectiveSources": 2.986,
+            "topSourceShare": 0.373,
+            "directEvidenceCitations": 51,
+            "crossSourceParagraphs": 5,
+            "uncitedParagraphShare": 0,
+            "objectiveCoverage": 0.714,
+            "objectiveRequirementsSupported": 5,
+            "objectiveRequirementsPartial": 0,
+            "objectiveRequirementsUnsupported": 2,
+            "supportConcernRate": 0.3,
+            "redundancyRate": 0,
+            "supportUnverified": 0,
+            "internalContradictions": 0
+          },
+          "issues": [
+            "citation_stuffing",
+            "thin",
+            "low_source_diversity",
+            "incomplete_objective_coverage",
+            "high_support_repair_rate"
+          ],
+          "sectionScores": [
+            {
+              "title": "Las tres fuentes sintéticas solo permiten comparar dos campos medidos y documentan un tercero sin medición [Synthetic research source 3](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A93da27827ab8770f15a37f3a707c34cd2d96482864652805723c479df97dfb43%3A0) [Synthetic research source 1](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A0136576172f12d85deaaf06cbecc10000d4c907f195c4dba93ee4cdabd32057d%3A0) [Synthetic research source 2](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A13c905c3beecee809ecd6e94d536ec2e463a127f6cf4d2996eb51832c5a604db%3A0)",
+              "score": 81.1,
+              "passing": false,
+              "issues": [
+                "citation_stuffing"
+              ]
+            },
+            {
+              "title": "El campo norte registra 23 unidades y el campo sur 41, una diferencia que contradice cualquier resultado uniforme [Synthetic research source 1](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A0136576172f12d85deaaf06cbecc10000d4c907f195c4dba93ee4cdabd32057d%3A0) [Synthetic research source 2](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A13c905c3beecee809ecd6e94d536ec2e463a127f6cf4d2996eb51832c5a604db%3A0)",
+              "score": 57,
+              "passing": false,
+              "issues": [
+                "thin",
+                "low_source_diversity"
+              ]
+            },
+            {
+              "title": "La comparación entre norte y sur es válida solo dentro de cada campo y no puede extenderse al campo este ni al conjunto del territorio [Synthetic research source 3](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A93da27827ab8770f15a37f3a707c34cd2d96482864652805723c479df97dfb43%3A0) [Synthetic research source 1](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A0136576172f12d85deaaf06cbecc10000d4c907f195c4dba93ee4cdabd32057d%3A0) [Synthetic research source 2](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A13c905c3beecee809ecd6e94d536ec2e463a127f6cf4d2996eb51832c5a604db%3A0)",
+              "score": 81.6,
+              "passing": false,
+              "issues": [
+                "citation_stuffing"
+              ]
+            }
+          ],
+          "caveat": "Indicadores estructurales y de trazabilidad. No certifican por sí solos la verdad ni la calidad historiográfica de las fuentes."
+        },
+        "traversal": {
+          "scopeId": "7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f",
+          "sourceCount": 3,
+          "rounds": 8,
+          "evidenceTokens": 1503,
+          "decisionTokens": 13792,
+          "matchedDocumentIds": [
+            "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+            "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+            "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+          ],
+          "readDocumentIds": [],
+          "sourceCoverage": [
+            {
+              "documentId": "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+              "title": "Synthetic research source 3",
+              "reasons": []
+            },
+            {
+              "documentId": "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+              "title": "Synthetic research source 1",
+              "reasons": []
+            },
+            {
+              "documentId": "nodus:da02ffab-6e94-4b69-b878-b32fd70581db",
+              "title": "Synthetic research source 2",
+              "reasons": []
+            }
+          ],
+          "limitations": [],
+          "partial": true,
+          "queries": [
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "Usa exclusivamente las tres fuentes sintéticas y citas verificables.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.\nLas tres fuentes sintéticas solo permiten comparar dos campos medidos y documentan un tercero sin medición\nPlantear el alcance real del corpus: qué se puede comparar, qué no y por qué la ausencia del campo este es un dato documental, no un vacío interpretable. Esta sección fija el marco de comparabilidad antes de entrar en las cifras.\nLas tres fuentes sintéticas son informes sintéticos concebidos como artefactos de investigación aislados, no como un levantamiento territorial completo.\nCada observación pertenece exclusivamente al campo nombrado y se registró tras una inspección controlada, lo que impide extrapolarla a otros campos.\nLa ausencia de medición del campo este está explícitamente documentada en una de las fuentes, de modo que la falta de datos es en sí misma un hallazgo verificable.\nLos informes advierten que no contienen evidencia sobre otros campos más allá de sus afirmaciones explícitas, lo que limita cualquier comparación no enunciada.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.\nEl campo norte registra 23 unidades y el campo sur 41, una diferencia que contradice cualquier resultado uniforme\nDesarrollar la comparación efectiva entre las dos únicas mediciones disponibles, mostrando que la discrepancia entre 23 y 41 unidades es el núcleo del contraste y que la propia fuente del campo sur la formula como contradicción de un resultado uniforme.\nLa fuente del campo norte registra una medición de 23 unidades, identificada con el marcador exacto NORTH23.\nLa fuente del campo sur registra una medición de 41 unidades, identificada con el marcador SOUTH41.\nLa fuente del campo sur afirma explícitamente que su resultado contradice un resultado uniforme de 23 unidades, lo que convierte la diferencia en una contradicción documentada y no en una simple variación.\nAmbas mediciones comparten el mismo protocolo declarado, pues se registraron tras una inspección controlada, lo que permite compararlas dentro de los límites que las propias fuentes fijan.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "NORTH23 SOUTH41 campo norte campo sur 23 unidades 41 unidades contradice resultado uniforme",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": true
+            },
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.\nLa comparación entre norte y sur es válida solo dentro de cada campo y no puede extenderse al campo este ni al conjunto del territorio\nCerrar el argumento integrando lo demostrado: la diferencia 23/41 es sólida como contraste entre dos observaciones aisladas, pero los límites de comparabilidad y la ausencia total de datos del campo este impiden leerla como un patrón territorial.\nLa comparación entre 23 y 41 unidades se sostiene únicamente como contraste entre dos observaciones pertenecientes cada una a su campo nombrado.\nLos límites de comparabilidad derivan de que cada informe no contiene evidencia sobre otros campos más allá de sus afirmaciones explícitas, por lo que no cabe inferir valores para campos no medidos.\nEl campo este no tiene medición en ninguna de las tres fuentes, y la única afirmación disponible es precisamente la constatación de que tal medición no existe.\nEn consecuencia, el corpus permite afirmar una diferencia entre norte y sur y una ausencia documentada respecto del este, pero no una comparación completa de los tres campos.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 0,
+              "partial": true
+            }
+          ]
+        },
+        "coverage": {
+          "questions": [
+            "¿Qué mediciones se han realizado en el campo norte según las tres fuentes sintéticas?",
+            "¿Qué mediciones se han realizado en el campo sur según las tres fuentes sintéticas?",
+            "¿Qué diferencias existen entre las mediciones del campo norte y las del campo sur?",
+            "¿Qué límites de comparabilidad presentan las mediciones de los campos norte y sur?",
+            "¿Qué datos del campo este están ausentes en las tres fuentes sintéticas?",
+            "¿Qué citas verificables de las tres fuentes sintéticas respaldan las mediciones de los campos norte y sur?",
+            "¿Qué citas verificables de las tres fuentes sintéticas evidencian la ausencia de datos del campo este?"
+          ],
+          "ratio": 0.714
+        },
+        "claimAudit": null
+      },
+      {
+        "version": "v1",
+        "approach": "comparative",
+        "latencyMs": 113169.81625000003,
+        "verification": {
+          "checked": 11,
+          "partial": 4,
+          "unsupported": 0,
+          "unverified": 0
+        },
+        "quality": {
+          "version": 1,
+          "score": 84.5,
+          "grade": "needs_review",
+          "mode": "academic",
+          "sections": 3,
+          "sectionsPassing": 1,
+          "dimensions": {
+            "grounding": 30,
+            "depth": 25,
+            "diversity": 19.7,
+            "synthesis": 15,
+            "coherence": 10
+          },
+          "metrics": {
+            "words": 831,
+            "citationMentions": 44,
+            "uniqueCitations": 3,
+            "distinctSources": 3,
+            "effectiveSources": 2.994,
+            "topSourceShare": 0.364,
+            "directEvidenceCitations": 44,
+            "crossSourceParagraphs": 7,
+            "uncitedParagraphShare": 0,
+            "objectiveCoverage": 1,
+            "objectiveRequirementsSupported": 0,
+            "objectiveRequirementsPartial": 0,
+            "objectiveRequirementsUnsupported": 0,
+            "supportConcernRate": 0.364,
+            "redundancyRate": 0,
+            "supportUnverified": 0,
+            "internalContradictions": 0
+          },
+          "issues": [
+            "citation_stuffing",
+            "high_support_repair_rate"
+          ],
+          "sectionScores": [
+            {
+              "title": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.",
+              "score": 87.6,
+              "passing": false,
+              "issues": [
+                "citation_stuffing"
+              ]
+            },
+            {
+              "title": "La diferencia entre 23 y 41 unidades impide tratar ambos campos como un resultado uniforme y obliga a leer cada cifra como observación aislada [Synthetic research source 1](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A0136576172f12d85deaaf06cbecc10000d4c907f195c4dba93ee4cdabd32057d%3A0) [Synthetic research source 2](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A13c905c3beecee809ecd6e94d536ec2e463a127f6cf4d2996eb51832c5a604db%3A0)",
+              "score": 99.4,
+              "passing": true,
+              "issues": []
+            },
+            {
+              "title": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.",
+              "score": 90,
+              "passing": false,
+              "issues": [
+                "citation_stuffing"
+              ]
+            }
+          ],
+          "caveat": "Indicadores estructurales y de trazabilidad. No certifican por sí solos la verdad ni la calidad historiográfica de las fuentes."
+        },
+        "traversal": {
+          "scopeId": "7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f",
+          "sourceCount": 3,
+          "rounds": 8,
+          "evidenceTokens": 1503,
+          "decisionTokens": 4438,
+          "matchedDocumentIds": [
+            "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+            "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+            "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+          ],
+          "readDocumentIds": [],
+          "sourceCoverage": [
+            {
+              "documentId": "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+              "title": "Synthetic research source 3",
+              "reasons": []
+            },
+            {
+              "documentId": "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+              "title": "Synthetic research source 1",
+              "reasons": []
+            },
+            {
+              "documentId": "nodus:da02ffab-6e94-4b69-b878-b32fd70581db",
+              "title": "Synthetic research source 2",
+              "reasons": []
+            }
+          ],
+          "limitations": [],
+          "partial": true,
+          "queries": [
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "mediciones campo norte comparadas con campo sur en las fuentes sintéticas 1, 2 y 3",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "límites de comparabilidad entre las mediciones del campo norte y del campo sur según las fuentes sintéticas",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "ausencia de datos del campo este en las fuentes sintéticas 1, 2 y 3",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.\nCada campo dispone de un único registro verificable y el campo este carece por completo de medición\nEstablecer el inventario exacto de lo que las tres fuentes sintéticas permiten afirmar: una medición del campo norte, una del campo sur y ninguna del campo este, con sus marcadores textuales verificables.\nLa fuente sintética 1 registra para el campo norte una medición de 23 unidades, identificada por el marcador exacto NORTH23.\nLa fuente sintética 2 registra para el campo sur una medición de 41 unidades, identificada por el marcador SOUTH41.\nLa fuente sintética 3 documenta que no existe medición alguna del campo este y que la comparación adolece de controles ausentes.\nCada observación pertenece únicamente al campo nombrado y se registró tras una inspección controlada, sin que el corpus aporte evidencia sobre otros campos más allá de sus afirmaciones explícitas.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": true
+            },
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.\nLa diferencia entre 23 y 41 unidades impide tratar ambos campos como un resultado uniforme y obliga a leer cada cifra como observación aislada\nAnalizar el contraste entre las dos mediciones disponibles y explicar por qué la discrepancia 23/41 contradice cualquier lectura de uniformidad, sin que el corpus permita atribuir la diferencia a una causa metodológica concreta.\nLa medición del campo sur, 41 unidades, contradice explícitamente un resultado uniforme de 23 unidades, de modo que ambos registros no pueden presentarse como un mismo valor replicado.\nLa comparación entre campos aparece marcada por controles ausentes, lo que limita la equiparación de las dos cifras.\nEl corpus no especifica criterios de medición, unidades ni procedimientos compartidos más allá de la inspección controlada mencionada, por lo que la diferencia numérica no puede atribuirse a una causa documentada.\nCada fuente declara que su observación pertenece solo al campo nombrado y que no contiene evidencia sobre otros campos, lo que impide extrapolar la cifra de un campo al otro.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 0,
+              "partial": true
+            },
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.\nEl alcance comparativo queda acotado a dos registros únicos y a la constatación de que el campo este no fue medido\nCerrar el razonamiento integrando lo demostrado: solo hay dos mediciones verificables, no son equiparables como réplica de un mismo valor y la ausencia del campo este define el límite estructural de toda comparación entre los tres campos.\nLa comparación entre campos se reduce a dos observaciones únicas, norte con 23 unidades y sur con 41 unidades, sin que exista una tercera medición que permita triangular el resultado.\nLa ausencia de medición del campo este no es un dato negativo recuperable, sino una carencia documentada que impide cualquier comparación que lo incluya.\nLos controles ausentes señalados por la fuente que documenta la carencia del campo este refuerzan el límite de comparabilidad ya visible en las dos mediciones disponibles.\nToda afirmación sobre los campos debe restringirse a lo que cada fuente declara explícitamente sobre el campo nombrado, sin generalizar a otros campos ni a tendencias no registradas.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 0,
+              "partial": true
+            }
+          ]
+        },
+        "coverage": null,
+        "claimAudit": null
+      },
+      {
+        "version": "v2",
+        "approach": "comparative",
+        "latencyMs": 236242.47912499995,
+        "verification": {
+          "checked": 23,
+          "partial": 13,
+          "unsupported": 0,
+          "unverified": 0
+        },
+        "quality": {
+          "version": 1,
+          "score": 64.8,
+          "grade": "needs_review",
+          "mode": "academic",
+          "sections": 3,
+          "sectionsPassing": 0,
+          "dimensions": {
+            "grounding": 30,
+            "depth": 19.8,
+            "diversity": 19.7,
+            "synthesis": 15,
+            "coherence": 9.9
+          },
+          "metrics": {
+            "words": 709,
+            "citationMentions": 38,
+            "uniqueCitations": 3,
+            "distinctSources": 3,
+            "effectiveSources": 2.985,
+            "topSourceShare": 0.368,
+            "directEvidenceCitations": 38,
+            "crossSourceParagraphs": 6,
+            "uncitedParagraphShare": 0,
+            "objectiveCoverage": 0.714,
+            "objectiveRequirementsSupported": 5,
+            "objectiveRequirementsPartial": 0,
+            "objectiveRequirementsUnsupported": 2,
+            "supportConcernRate": 0.565,
+            "redundancyRate": 0,
+            "supportUnverified": 0,
+            "internalContradictions": 0
+          },
+          "issues": [
+            "citation_stuffing",
+            "thin",
+            "weak_analysis",
+            "incomplete_objective_coverage",
+            "high_support_repair_rate"
+          ],
+          "sectionScores": [
+            {
+              "title": "Las tres fuentes sintéticas registran una sola medición por campo y ninguna para el campo este, lo que fija el alcance real de la comparación [Synthetic research source 3](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A93da27827ab8770f15a37f3a707c34cd2d96482864652805723c479df97dfb43%3A0) [Synthetic research source 1](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A0136576172f12d85deaaf06cbecc10000d4c907f195c4dba93ee4cdabd32057d%3A0) [Synthetic research source 2](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A13c905c3beecee809ecd6e94d536ec2e463a127f6cf4d2996eb51832c5a604db%3A0)",
+              "score": 80.6,
+              "passing": false,
+              "issues": [
+                "citation_stuffing"
+              ]
+            },
+            {
+              "title": "El contraste entre 23 y 41 unidades contradice un resultado uniforme, pero la comparabilidad queda limitada por el aislamiento de cada observación y la falta de controles [Synthetic research source 3](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A93da27827ab8770f15a37f3a707c34cd2d96482864652805723c479df97dfb43%3A0) [Synthetic research source 1](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A0136576172f12d85deaaf06cbecc10000d4c907f195c4dba93ee4cdabd32057d%3A0) [Synthetic research source 2](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A13c905c3beecee809ecd6e94d536ec2e463a127f6cf4d2996eb51832c5a604db%3A0)",
+              "score": 89.4,
+              "passing": false,
+              "issues": [
+                "citation_stuffing"
+              ]
+            },
+            {
+              "title": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.",
+              "score": 73.2,
+              "passing": false,
+              "issues": [
+                "thin",
+                "weak_analysis"
+              ]
+            }
+          ],
+          "caveat": "Indicadores estructurales y de trazabilidad. No certifican por sí solos la verdad ni la calidad historiográfica de las fuentes."
+        },
+        "traversal": {
+          "scopeId": "7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f",
+          "sourceCount": 3,
+          "rounds": 8,
+          "evidenceTokens": 1503,
+          "decisionTokens": 4438,
+          "matchedDocumentIds": [
+            "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+            "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+            "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+          ],
+          "readDocumentIds": [],
+          "sourceCoverage": [
+            {
+              "documentId": "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+              "title": "Synthetic research source 3",
+              "reasons": []
+            },
+            {
+              "documentId": "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+              "title": "Synthetic research source 1",
+              "reasons": []
+            },
+            {
+              "documentId": "nodus:da02ffab-6e94-4b69-b878-b32fd70581db",
+              "title": "Synthetic research source 2",
+              "reasons": []
+            }
+          ],
+          "limitations": [],
+          "partial": true,
+          "queries": [
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "mediciones campo norte comparadas con mediciones campo sur en las fuentes sintéticas",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "límites de comparabilidad entre el campo norte y el campo sur según las fuentes sintéticas",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "ausencia de datos del campo este en las fuentes sintéticas",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": false
+            },
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.\nLas tres fuentes sintéticas registran una sola medición por campo y ninguna para el campo este, lo que fija el alcance real de la comparación\nEstablecer el punto de partida empírico del informe: qué mide cada fuente, con qué marcadores verificables y qué campo queda sin medición, para que las secciones posteriores puedan contrastar sin presuponer datos inexistentes.\nCada una de las tres fuentes sintéticas aporta una única observación y esa observación pertenece exclusivamente al campo nombrado en ella.\nEl campo norte queda fijado en 23 unidades mediante el marcador exacto NORTH23, y el campo sur en 41 unidades mediante el marcador exacto SOUTH41.\nEl informe de comparación declara controles faltantes y afirma que no existe medición del campo este, de modo que la ausencia es una constatación documental y no una inferencia.\nLas tres fuentes se presentan como informes sintéticos de un dispositivo de investigación aislado, con registros inventados, lo que acota el estatus de la evidencia.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 3,
+              "partial": true
+            },
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.\nEl contraste entre 23 y 41 unidades contradice un resultado uniforme, pero la comparabilidad queda limitada por el aislamiento de cada observación y la falta de controles\nDesarrollar el núcleo comparativo del informe: confrontar las dos mediciones disponibles bajo un mismo criterio, explicitar la contradicción que el propio corpus formula y delimitar los límites de comparabilidad derivados de la pertenencia exclusiva de cada observación a su campo y de los controles faltantes.\nLa comparación directa de las dos mediciones disponibles arroja 23 unidades para el campo norte frente a 41 unidades para el campo sur, una diferencia que el propio corpus enuncia como contradicción de un resultado uniforme de 23 unidades.\nLa comparabilidad entre ambos campos está limitada porque cada observación pertenece solo al campo nombrado y los informes declaran no contener evidencia sobre otros campos más allá de sus afirmaciones explícitas.\nEl informe de comparación registra controles faltantes, lo que impide tratar las dos mediciones como resultados plenamente equiparables.\nLas tres fuentes comparten el mismo formato declarativo, incluida la anotación de que la medición se registró tras una inspección controlada, pero esa coincidencia de formato no aporta series temporales ni solapamiento entre las mediciones.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 0,
+              "partial": true
+            },
+            {
+              "query": "Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.\nEl balance comparativo se reduce a dos mediciones aisladas y un campo sin datos, sin base documental para generalizar a otros campos\nCerrar el informe integrando únicamente lo ya establecido: el par de mediciones contrastadas, los límites de comparabilidad y la ausencia documentada del campo este, señalando qué preguntas quedan abiertas por el propio corpus.\nEl resultado comparativo sostenible se limita a dos mediciones aisladas, 23 unidades en el campo norte y 41 unidades en el campo sur, más la constatación de que no existe medición del campo este.\nLa contradicción entre 23 y 41 unidades queda registrada como tal, pero no puede resolverse ni promediarse con la evidencia disponible.\nLa declaración de que los informes no contienen evidencia sobre otros campos más allá de sus afirmaciones explícitas impide extender las conclusiones a campos no nombrados.\nLa ausencia de series temporales, de solapamiento entre mediciones y de controles completos deja abiertas preguntas que el corpus no permite responder.",
+              "sources": [
+                "nodus:1aaaf71c-b001-46a1-85f3-f21fd1706c1b",
+                "nodus:596f7c56-a190-4e2c-8bed-50d6e3b001d6",
+                "nodus:da02ffab-6e94-4b69-b878-b32fd70581db"
+              ],
+              "candidates": 0,
+              "partial": true
+            }
+          ]
+        },
+        "coverage": {
+          "questions": [
+            "¿Cuáles son las mediciones del campo norte según las fuentes sintéticas?",
+            "¿Cuáles son las mediciones del campo sur según las fuentes sintéticas?",
+            "¿Qué límites de comparabilidad existen entre las mediciones del campo norte y del campo sur?",
+            "¿Qué datos del campo este están ausentes en las fuentes sintéticas?",
+            "¿Qué citas verificables de las tres fuentes sintéticas respaldan las mediciones del campo norte?",
+            "¿Qué citas verificables de las tres fuentes sintéticas respaldan las mediciones del campo sur?",
+            "¿Qué citas verificables de las tres fuentes sintéticas evidencian la ausencia de datos del campo este?"
+          ],
+          "ratio": 0.714
+        },
+        "claimAudit": {
+          "checked": 4,
+          "supported": 2,
+          "partial": 2,
+          "unsupported": 0,
+          "roles": {
+            "fact": {
+              "checked": 3,
+              "supported": 3
+            },
+            "contradiction": {
+              "checked": 2,
+              "supported": 2
+            },
+            "limit": {
+              "checked": 6,
+              "supported": 5
+            },
+            "method": {
+              "checked": 1,
+              "supported": 0
+            }
+          }
+        }
+      }
+    ],
+    "resources": {
+      "samples": 773,
+      "peakSummedWorkingSetSizeKiB": 1057856,
+      "peakSummedProcessCpuPercent": 4.773237413385033,
+      "meanSummedProcessCpuPercent": 1.913271427028118
+    },
+    "recordedWindowUsage": {
+      "calls": 177,
+      "accountedUpperBoundUsd": 0.3712324099999999,
+      "unresolvedReservations": 0,
+      "inputTokens": 404430,
+      "outputTokens": 208908
+    }
+  },
+  "campaign": {
+    "calls": 854,
+    "accountedUpperBoundUsd": 1.5667785049999998,
+    "unresolvedReservations": 3,
+    "inputTokens": 1837271,
+    "outputTokens": 847172
+  },
+  "limitations": [
+    "One synthetic three-document corpus and one run per engine; not a calibrated benchmark.",
+    "Host load was shared with unrelated user processes. Latency and resource measurements are descriptive, not causal estimates.",
+    "Citation existence, known-answer matching and claim support are distinct checks. A finished report is not a quality pass.",
+    "Recorded-window usage excludes setup calls outside each run window. Campaign usage includes all paid attempts and retained reservations.",
+    "Resource samples cover Electron processes returned by getAppMetrics, not Zotero or the separately owned provider gate."
+  ]
+}
