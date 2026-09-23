@@ -2,9 +2,11 @@
 
 Reviewed against official provider documentation on 2026-09-12.
 
-The composer uses the active vault accent, with a thinking slider and send/stop. Context and source filters remain available in the header. The slider supports keyboard navigation and exposes only useful choices for the selected model. New chats and model changes start at **Standard**. The composer has no context-plus or microphone control.
+The composer uses the active vault accent, with a thinking slider and send/stop. Context and source filters remain available in the header. The slider supports keyboard navigation and exposes only useful choices for the selected model. The chosen level is remembered **per provider+model** (`researchEffortByModel`, keyed `provider:model`): reopening a model, starting a new chat or reopening an old one starts at the level that model was last used at, while a model never used starts at **Standard**. The composer has no context-plus or microphone control.
 
 `ResearchChatRequest.thinkingEffort` is independent of `chatReasoning`, `ModelRef.reasoningEffort`, and Nodi. Both normal and streaming Research Assistant requests carry the same options, including citation retries. Standard explicitly disables thinking where supported; otherwise it selects the lowest legal level. Unsupported or unknown controls are not invented. Subscription catalogues and LM Studio's native catalogue are authoritative; missing catalogue capabilities cannot produce a graded slider.
+
+The memory of that level is app-wide, like the other model preferences: a level belongs to the model, not to the vault that was open when it was picked, so every vault opens the model at the same level. It is written the moment the level is picked (the slider has at most eight stops, so there is nothing to debounce), which also means a level chosen right before the app closes is already on disk. Standard is stored as the **absence** of an entry: putting a model back on Standard removes its entry instead of pinning it there. A level the model no longer publishes — a catalogue that changed under an older memory — is dropped by the picker, which is the only place that knows the live ladder for subscription and catalogue-driven providers; the request path floors anything else through `resolveResearchEffort`, so a stale value can never reach a provider as an unsupported effort.
 
 | Provider | Contract used by Research Assistant |
 | --- | --- |
@@ -24,7 +26,7 @@ The composer uses the active vault accent, with a thinking slider and send/stop.
 
 Thinking allowances leave room for visible output without increasing a local model's fitted context window. Sampling parameters are omitted where reasoning makes them invalid. Compatibility retries retain the thinking control; a provider rejection is surfaced rather than silently switching effort. Local runtimes must offer their native API to honor advertised controls.
 
-Validation: `scripts/test-research-reasoning.mjs`, `scripts/test-research-reasoning-transport.mjs`, and `scripts/verify-research-assistant.mjs` (renderer harness on port 5198). Provider requests are verified with local test endpoints and the actual SDK; no live paid inference is required. Browser screenshots are written to `artifacts/research-assistant/`.
+Validation: `scripts/test-research-reasoning.mjs`, `scripts/test-research-reasoning-transport.mjs`, `scripts/test-research-effort-memory.mjs` (keys, writes, restores, vault sharing, request payload) and `scripts/verify-research-assistant.mjs` (renderer harness on port 5198, which also drives the remembered level across model switches and a relaunch seeded from the stored map). Provider requests are verified with local test endpoints and the actual SDK; no live paid inference is required. Browser screenshots are written to `artifacts/research-assistant/`.
 
 `scripts/verify-deepseek-reasoning-live.mjs` closes the remaining gap for the DeepSeek ids: given `NODUS_AUDIT_DEEPSEEK_KEY` and/or `NODUS_AUDIT_OPENCODE_GO_KEY` in the environment it checks, against the real services, that each catalogue serves the ids the profile handles, that the body Nodus builds for each route is accepted, that the requested effort actually reaches the model, and that an OpenCode Go endpoint refusing `temperature` is recovered without losing the rest of the request.
 

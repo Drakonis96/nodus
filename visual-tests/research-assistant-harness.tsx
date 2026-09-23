@@ -12,13 +12,22 @@ import '../src/index.css';
 const params = new URLSearchParams(location.search);
 const view = params.get('view');
 const vaultType = params.get('vault') ?? ({ database: 'databases', study: 'estudio', teaching: 'docencia', world: 'worldbuilding' }[view ?? ''] ?? 'academic');
+// `?memory=` stands in for a relaunch: the composer then reads the levels a previous session
+// saved, keyed provider:model, instead of an empty map.
+const storedEffort = (): Record<string, string> => {
+  try {
+    return JSON.parse(params.get('memory') ?? '{}') as Record<string, string>;
+  } catch {
+    return {};
+  }
+};
 const settings = { synthesisModel: { provider: 'openai', model: 'gpt-5.4' }, uiLanguage: 'es', chatModel: { provider: 'openai', model: 'gpt-5.4' }, favorites: [
   { provider: 'gemini', model: 'gemini-3-pro-preview' }, { provider: 'xiaomi', model: 'mimo-v2.5' },
   { provider: 'openai', model: 'gpt-4.1' }, { provider: 'codex', model: 'gpt-6-astra' },
   // The unversioned DeepSeek ids each route serves, so the effort control they publish can be
   // captured and inspected here rather than only asserted.
   { provider: 'deepseek', model: 'deepseek-flash' }, { provider: 'opencode-go', model: 'deepseek-flash' },
-], sttProvider: 'transformers', sttTransformersModel: 'whisper-tiny' } as AppSettings;
+], sttProvider: 'transformers', sttTransformersModel: 'whisper-tiny', researchEffortByModel: storedEffort() } as AppSettings;
 if (params.get('concilium')) {
   settings.uiLanguage = 'en';
   settings.chatModel = { provider: 'deepseek', model: 'deepseek-flash' };
