@@ -32,7 +32,7 @@ const server = createServer((req, res) => {
     } else res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'Answer' }, finish_reason: 'stop' }] }));
   });
 });
-await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+await new Promise(resolve => server.listen(Number(process.env.NODUS_TEST_FIXTURE_PORT ?? 0), '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}/v1`;
 // No provider host can be contacted, even if a production route changes later.
 const originalFetch = globalThis.fetch;

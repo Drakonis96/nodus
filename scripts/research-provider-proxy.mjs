@@ -13,7 +13,7 @@ const ENDPOINTS = {
 // Peak/cache-miss prices verified 2026-09-23. Reservation adds 25% and $0.002.
 // https://api-docs.deepseek.com/quick_start/pricing/
 // https://openrouter.ai/baai/bge-m3
-export async function startResearchProviderProxy(root, { dispatch = fetch } = {}) {
+export async function startResearchProviderProxy(root, { dispatch = fetch, port = 0 } = {}) {
   const canonical = fs.realpathSync(root);
   const marker = JSON.parse(fs.readFileSync(path.join(canonical, 'isolation.json'), 'utf8'));
   if (marker.format !== 'nodus.isolated-research-profile/1' || marker.root !== canonical) throw new Error('Invalid campaign root');
@@ -82,7 +82,7 @@ export async function startResearchProviderProxy(root, { dispatch = fetch } = {}
       response.end(JSON.stringify({ error: { message: error instanceof Error && error.message.startsWith('research_') ? error.message : 'research_dispatch_blocked' } }));
     } finally { if (admitted) running--; controllers.delete(controller); }
   });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  await new Promise(resolve => server.listen(port, '127.0.0.1', resolve));
   return { url: `http://127.0.0.1:${server.address().port}/${nonce}`, ledger, close: async () => {
     stopped = true; for (const controller of controllers) controller.abort();
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));

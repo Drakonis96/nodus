@@ -8,7 +8,7 @@ import { startResearchProviderProxy } from './research-provider-proxy.mjs';
 test('paid gate reserves before dispatch, rejects other models and never logs credentials', async () => {
   const root = createResearchTestRoot();
   let dispatches = 0;
-  const proxy = await startResearchProviderProxy(root, { dispatch: async (url, options) => {
+  const proxy = await startResearchProviderProxy(root, { port: Number(process.env.NODUS_TEST_FIXTURE_PORT ?? 0), dispatch: async (url, options) => {
     dispatches++;
     assert.equal(proxy.ledger.read().calls.length, dispatches, 'durable reservation precedes any network dispatch');
     assert.equal(options.redirect, 'error');

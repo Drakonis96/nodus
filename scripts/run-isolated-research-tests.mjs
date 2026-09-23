@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import http from 'node:http';
 import { createHash } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { createResearchTestRoot, macResearchSandbox, researchTestEnvironment, verifyResearchSandbox } from './research-isolation.mjs';
@@ -84,8 +85,20 @@ async function worker() {
     const output = path.join(root, 'artifacts', `${file}.log`);
     const log = fs.openSync(output, 'w');
     const started = Date.now();
-    const child = spawn('/usr/bin/sandbox-exec', ['-p', policy, process.execPath, '--test', '--test-concurrency=1', path.join(testRepo, 'scripts', file)], {
-      cwd: testRepo, env: environment, stdio: ['ignore', log, log], detached: true,
+    let childPolicy = policy;
+    const childEnvironment = { ...environment };
+    if (['test-research-provider-proxy.mjs', 'test-research-reasoning-transport.mjs', 'test-research-attachment-transport.mjs'].includes(file)) {
+      const reservation = http.createServer();
+      await new Promise(resolve => reservation.listen(0, '127.0.0.1', resolve));
+      const port = reservation.address().port;
+      await new Promise(resolve => reservation.close(resolve));
+      childPolicy = macResearchSandbox(root, [port]);
+      const networkProof = verifyResearchSandbox(root, childPolicy);
+      fs.writeFileSync(path.join(root, 'artifacts', `${file}.network.json`), JSON.stringify({ port, ...networkProof }));
+      childEnvironment.NODUS_TEST_FIXTURE_PORT = String(port);
+    }
+    const child = spawn('/usr/bin/sandbox-exec', ['-p', childPolicy, process.execPath, '--test', '--test-concurrency=1', path.join(testRepo, 'scripts', file)], {
+      cwd: testRepo, env: childEnvironment, stdio: ['ignore', log, log], detached: true,
     });
     owned.add(child);
     let timedOut = false;
