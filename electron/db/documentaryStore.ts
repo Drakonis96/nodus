@@ -212,4 +212,13 @@ export class DocumentaryStore {
       WHERE origin.id=? AND p.index_key IN (SELECT value FROM json_each(?)) AND ABS(p.ordinal-origin.ordinal)<=? ORDER BY p.ordinal`)
       .all(id, JSON.stringify(indexKeys), radius) as ReturnType<DocumentaryStore['lexicalSearch']>;
   }
+  physicalPages(indexKeys: string[], from: number, to: number, limit: number, attachmentId?: string): ReturnType<DocumentaryStore['lexicalSearch']> {
+    if (!indexKeys.length || !Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to < from || to - from > 3 || limit < 1 || limit > 500) return [];
+    return this.db.prepare(`SELECT p.id,p.document_id,p.index_key,p.text,p.locator_json FROM documentary_passages p
+      JOIN documentary_revisions r ON r.index_key=p.index_key
+      WHERE p.index_key IN (SELECT value FROM json_each(?))
+      AND json_extract(p.locator_json,'$.pageNumber') BETWEEN ? AND ?
+      AND (? IS NULL OR json_extract(r.identity_json,'$.attachmentId')=?)
+      ORDER BY p.index_key,p.ordinal LIMIT ?`).all(JSON.stringify(indexKeys), from, to, attachmentId ?? null, attachmentId ?? null, limit) as ReturnType<DocumentaryStore['lexicalSearch']>;
+  }
 }

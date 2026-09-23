@@ -949,6 +949,7 @@ async function aiReviseSection(
   approach?: AcademicApproachContext,
 ): Promise<string> {
   const system = deepResearchWritingPromptPack(input.language, {
+    documentaryEvidence: getActiveVault().type === 'academic',
     approachRules: approach?.rules.writer ?? [],
     narrativeRules: deepResearchNarrativeRules(input.language),
   }).sectionEditor;
@@ -1318,6 +1319,7 @@ async function aiPlanSectionEvidence(
   const copy = deepResearchWritingRuntimeCopy(input.language);
   const lengthPlan = sectionLengthPlanOf(input);
   const base = deepResearchWritingPromptPack(input.language, {
+    documentaryEvidence: getActiveVault().type === 'academic',
     approachRules: approach?.rules.writer ?? [],
   }).evidencePlan;
   // A longer section is planned as MORE distinct evidence-bearing paragraphs, not
@@ -1409,6 +1411,7 @@ async function aiWriteSection(
   const lengthPlan = sectionLengthPlanOf(input);
   const lengthPack = deepResearchLengthPromptPack(input.language);
   const base = deepResearchWritingPromptPack(input.language, {
+    documentaryEvidence: getActiveVault().type === 'academic',
     approachRules: approach?.rules.writer ?? [],
     narrativeRules: deepResearchNarrativeRules(input.language),
     isConclusion: input.isConclusion,
@@ -1499,6 +1502,7 @@ async function aiWriteSectionParagraphByParagraph(
       .filter((item): item is NonNullable<typeof item> => Boolean(item));
     if (!evidence.length) continue;
     const paragraphBase = deepResearchWritingPromptPack(input.language, {
+    documentaryEvidence: getActiveVault().type === 'academic',
       approachRules: approach?.rules.writer ?? [],
       narrativeRules: deepResearchNarrativeRules(input.language),
     }).paragraphWriter;
@@ -1553,6 +1557,7 @@ function isAiFinal(v: unknown): v is AiFinal {
 
 async function aiFinalize(input: FinalizeInput, model: ModelRef | null, approach?: AcademicApproachContext): Promise<FinalizeResult> {
   const system = deepResearchWritingPromptPack(input.language, {
+    documentaryEvidence: getActiveVault().type === 'academic',
     approachRules: approach?.rules.finalizer ?? [],
   }).finalizer;
   const user = JSON.stringify(
@@ -1589,6 +1594,7 @@ async function aiAuditFinalSummary(
   approach?: AcademicApproachContext,
 ): Promise<FinalizeResult> {
   const system = deepResearchWritingPromptPack(input.language, {
+    documentaryEvidence: getActiveVault().type === 'academic',
     approachRules: approach?.rules.finalizer ?? [],
   }).finalAudit;
   const user = JSON.stringify({

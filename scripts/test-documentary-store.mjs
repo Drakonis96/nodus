@@ -32,6 +32,11 @@ try {
   second.publishLexical(recovered, 2200);
   assert.equal(first.lexicalSearch('23 units', [id], 5).length, 1, 'searchable before embeddings');
   assert.equal(first.lexicalSearch('23 units', [], 5).length, 0);
+  assert.equal(first.physicalPages([id], 6, 6, 10, 'pdf').length, 1, 'physical page 6 is distinct from printed page iv');
+  assert.equal(first.physicalPages([id], 4, 4, 10).length, 0);
+  assert.deepEqual(first.physicalPages([], 6, 6, 10), []);
+  assert.deepEqual(first.physicalPages([id], 6, 6, 10, 'foreign-file'), []);
+  assert.deepEqual(first.physicalPages([id], 1, 500, 10), [], 'wide page ranges are refused');
   assert.equal(first.revision(id).embedding_ready, 0);
   assert.throws(() => second.publishEmbeddings(recovered, [[1, 2, 3]], 2300), /space_mismatch/);
   second.publishEmbeddings(recovered, [[1, 0]], 2300);

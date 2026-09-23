@@ -61,6 +61,17 @@ try {
   const citationId = citations.documentaryCitationId(scope.id, found.evidence[0].id);
   const before = citations.getDocumentaryPassageDetail(citationId);
   assert.equal(before.attachmentId, found.evidence[0].attachmentId);
+  const { ResearchCorpusRun } = load('electron/ai/researchCorpusRun.ts');
+  const readRun = new ResearchCorpusRun(scope, load('shared/researchCorpus.ts').RETRIEVAL_PRESETS.balanced);
+  const pages = await readRun.readDocument(doc.id, { kind: 'pages', from: 1, attachmentId: 'appendix-b' });
+  assert.equal(pages.evidence.length, 1);
+  assert.equal(pages.evidence[0].attachmentId, 'appendix-b');
+  const context = await readRun.readDocument(doc.id, { kind: 'context', passageId: pages.evidence[0].id, radius: 1 });
+  assert.equal(context.evidence[0].id, pages.evidence[0].id);
+  assert.equal(readRun.budget.rounds, 2, 'document operations share the run discovery budget');
+  await assert.rejects(() => readRun.readDocument('foreign-document', { kind: 'search', query: 'Independent' }), /not_authorized/);
+  await assert.rejects(() => readRun.readDocument(doc.id, { kind: 'pages', from: 1, to: 9 }), /Invalid physical page/);
+  await assert.rejects(() => readRun.readDocument(doc.id, { kind: 'context', passageId: '../../outside' }), /Invalid context/);
   db.prepare('UPDATE works SET resolved_text_hash=? WHERE nodus_id=?').run('changed-content', 'inside');
   const pinnedRead = await preparation.retrieveSharedDocumentaryEvidence(scope, 'Independent', load('shared/researchCorpus.ts').RETRIEVAL_PRESETS.balanced, null);
   assert.deepEqual(pinnedRead.evidence.map(item => item.text), found.evidence.map(item => item.text), 'frozen executions keep original indexed revisions after content changes');

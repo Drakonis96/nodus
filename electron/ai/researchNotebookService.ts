@@ -8,6 +8,7 @@ import { researchCorpusInventory } from './researchCorpusInventory';
 import { researchFingerprint, resolveNotebookScope, selectResearchDocuments } from './researchCorpusScope';
 import { resolveResearchSourceScope } from './researchSourceScope';
 import { notifyAuthoredResearchSourceChanged } from './researchCorpusEvents';
+import { readResearchAttachmentSource } from './researchAttachmentSources';
 
 const active = new Map<string, Set<AbortController>>();
 const key = (id: string) => `${getActiveVault().id}:${id}`;
@@ -50,12 +51,20 @@ export function registerNotebookRun(id: string, controller: AbortController): ()
 const pinnedScope = Symbol('backendResearchScope');
 type ScopedRequest = ResearchChatRequest & { [pinnedScope]?: ResolvedResearchScope };
 export function requestNotebookScope(input: ResearchChatRequest): ResolvedResearchScope | null { return (input as ScopedRequest)[pinnedScope] ?? null; }
-export function resolveAcademicResearchScope(filter?: ResearchChatRequest['selection']['sourceFilter']): ResolvedResearchScope {
+export function resolveAcademicResearchScope(filter?: ResearchChatRequest['selection']['sourceFilter'], attachments?: Pick<ResearchChatRequest, 'conversationId' | 'attachmentIds'>): ResolvedResearchScope {
+  if (attachments?.attachmentIds !== undefined && (!Array.isArray(attachments.attachmentIds) || attachments.attachmentIds.length > 20)) throw new Error('Invalid research attachments');
   const vault = getActiveVault();
   const allowed = filter?.enabled ? resolveResearchSourceScope(filter, true) : null;
   const documents = researchCorpusInventory().documents.filter(document => document.workId && (!allowed || allowed.workIds.has(document.workId))).sort((a, b) => a.id.localeCompare(b.id));
   const permissionFingerprint = researchFingerprint(documents.map(document => [document.id, document.permissionRevision]));
-  const scope: ResolvedResearchScope = { id: researchFingerprint([vault.id, documents, permissionFingerprint]), vaultId: vault.id,
+  const conversationAttachments = [...new Set(attachments?.attachmentIds ?? [])].map(attachmentId => {
+    const conversationId = attachments?.conversationId;
+    const source = conversationId ? readResearchAttachmentSource(conversationId, attachmentId, true) : null;
+    if (!source || !conversationId) throw new Error('research_source_not_authorized');
+    return { conversationId, attachmentId, revision: researchFingerprint(source) };
+  });
+  const scope: ResolvedResearchScope = { id: researchFingerprint([vault.id, documents, permissionFingerprint, conversationAttachments]), vaultId: vault.id,
+    conversationAttachments,
     notebookId: null, notebookRevision: null, documents, permissionFingerprint, resolvedAt: new Date().toISOString(), changes: { added: [], removed: [] } };
   notebooks.recordResearchScope(scope);
   return scope;
@@ -63,11 +72,11 @@ export function resolveAcademicResearchScope(filter?: ResearchChatRequest['selec
 export function authorizeNotebookRequest(input: ResearchChatRequest): ScopedRequest {
   if (!input.selection.notebookId && getActiveVault().type !== 'academic') return input;
   const prior = (input as ScopedRequest)[pinnedScope];
-  const scope = prior ?? (input.selection.notebookId ? resolveResearchNotebook(input.selection.notebookId) : resolveAcademicResearchScope(input.selection.sourceFilter));
+  const scope = prior ?? (input.selection.notebookId ? resolveResearchNotebook(input.selection.notebookId) : resolveAcademicResearchScope(input.selection.sourceFilter, input));
   const notebook = input.selection.notebookId ? notebooks.getResearchNotebook(input.selection.notebookId) : null;
   if (scope.vaultId !== getActiveVault().id || (notebook && notebook.revision !== scope.notebookRevision)) throw new Error('research_scope_changed');
   if (notebook && input.conversationId) notebooks.associateNotebookConversation(notebook.id, input.conversationId);
-  return { ...input, [pinnedScope]: scope, attachmentIds: [],
+  return { ...input, [pinnedScope]: scope, attachmentIds: input.selection.notebookId ? [] : input.attachmentIds,
     ...(notebook?.conversationSettings ?? {}),
     messages: authorizedNotebookHistory(input, scope),
     selection: { ...input.selection, documents: false, passages: true, retrieval: validateRetrievalSettings(notebook?.settings ?? input.selection.retrieval ?? RETRIEVAL_PRESETS.balanced),
@@ -77,7 +86,7 @@ export function validateNotebookRequest(input: ResearchChatRequest): void {
   const scope = (input as ScopedRequest)[pinnedScope];
   if (!scope) return;
   if (getActiveVault().id !== scope.vaultId) throw new Error('research_scope_changed');
-  const current = scope.notebookId ? resolveResearchNotebook(scope.notebookId) : resolveAcademicResearchScope(input.selection.sourceFilter);
+  const current = scope.notebookId ? resolveResearchNotebook(scope.notebookId) : resolveAcademicResearchScope(input.selection.sourceFilter, input);
   if (current.id !== scope.id) throw new Error('research_scope_changed');
 }
 

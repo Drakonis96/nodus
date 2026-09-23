@@ -224,7 +224,7 @@ import type {
 } from '../types';
 
 export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCorpusApi,
-  'getResearchCorpusSources' | 'listResearchNotebooks' | 'saveResearchNotebook' | 'deleteResearchNotebook' | 'resolveResearchNotebook' | 'searchResearchNotebook'
+  'getResearchCorpusSources' | 'listResearchNotebooks' | 'saveResearchNotebook' | 'deleteResearchNotebook' | 'resolveResearchNotebook' | 'searchResearchNotebook' | 'readResearchDocument'
   | 'getResearchPreparationInventory' | 'prepareResearchDocuments' | 'cancelResearchDocuments' | 'setResearchPreparationEnabled' | 'setResearchPreparationPaused'
   | 'getZoteroMcpStatus' | 'connectResearchZotero' | 'disconnectResearchZotero' | 'readResearchZotero'> {
   // Dictionary: persistent evidence-backed concept syntheses

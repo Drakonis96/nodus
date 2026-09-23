@@ -306,6 +306,14 @@ try {
     assert.deepEqual([...cited.works], ['w-1']);
   }
 
+  {
+    const snapshot = makeSnapshot(3);
+    const work = snapshot.works[0];
+    work.reason = 'authorized-source';
+    const menu = buildCitationMenu({ ideaIds: [], workIds: [work.id], gapIds: [], contradictionIds: [], passageIds: [] }, buildSnapshotMaps(snapshot));
+    assert.equal(menu.length, 0, 'catalog metadata never serves as substantive evidence in a scoped run');
+  }
+
   // ── 2a. A visible author-year copied from the menu regains its lost URL ─────
   {
     const snapshot = makeSnapshot(3);

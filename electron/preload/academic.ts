@@ -24,6 +24,7 @@ export const academicApi: AcademicApi = {
   saveResearchNotebook: input => ipcRenderer.invoke('research:notebooks:save', input),
   deleteResearchNotebook: id => ipcRenderer.invoke('research:notebooks:delete', id),
   resolveResearchNotebook: id => ipcRenderer.invoke('research:notebooks:resolve', id),
+  readResearchDocument: input => ipcRenderer.invoke('research:corpus:read', input),
   searchResearchNotebook: (id, query) => ipcRenderer.invoke('research:notebooks:search', id, query),
   getResearchPreparationInventory: () => ipcRenderer.invoke('research:preparation:inventory'),
   prepareResearchDocuments: ids => ipcRenderer.invoke('research:preparation:start', ids),

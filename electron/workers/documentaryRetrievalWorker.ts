@@ -1,14 +1,17 @@
 import { parentPort } from 'node:worker_threads';
 import { DocumentaryStore } from '../db/documentaryStore';
 import { ResearchRetrievalBudget } from '@shared/researchRetrievalBudget';
-import type { RetrievalSettings } from '@shared/researchCorpus';
+import { validateResearchDocumentRead, type ResearchDocumentRead, type RetrievalSettings } from '@shared/researchCorpus';
 
-parentPort?.once('message', (input: { filename: string; query: string; lexicalKeys: string[]; vectorKeys: string[]; vector: number[] | null; settings: RetrievalSettings; threshold: number }) => {
+parentPort?.once('message', (input: { filename: string; query: string; lexicalKeys: string[]; vectorKeys: string[]; vector: number[] | null; settings: RetrievalSettings; threshold: number; read?: ResearchDocumentRead }) => {
   const store = new DocumentaryStore(input.filename, true);
   try {
     const budget = new ResearchRetrievalBudget(input.settings);
     budget.nextRound();
-    const lexical = store.lexicalSearch(input.query, input.lexicalKeys, input.settings.candidates);
+    const read = input.read ? validateResearchDocumentRead(input.read) : null;
+    const lexical = read?.kind === 'pages' ? store.physicalPages(input.lexicalKeys, read.from, read.to ?? read.from, input.settings.candidates, read.attachmentId)
+      : read?.kind === 'context' ? store.adjacentPassages(read.passageId, input.lexicalKeys, read.radius ?? 1)
+      : store.lexicalSearch(input.query, input.lexicalKeys, input.settings.candidates);
     const semantic = input.vector ? store.semanticSearch(input.vector, input.vectorKeys, input.settings.candidates, input.threshold) : [];
     const fused = new Map<string, { score: number; passage: typeof lexical[number] }>();
     for (const lane of [lexical, semantic]) lane.forEach((passage, index) => {
@@ -29,7 +32,7 @@ parentPort?.once('message', (input: { filename: string; query: string; lexicalKe
       if (budget.accept(passage.id, passage.text)) { chosen.push(passage); works.add(passage.document_id); }
     }
     let frontier = chosen.slice();
-    while (input.settings.autoExpand && frontier.length && budget.rounds < input.settings.rounds && budget.nextRound()) {
+    while (!read && input.settings.autoExpand && frontier.length && budget.rounds < input.settings.rounds && budget.nextRound()) {
       const next: typeof lexical = [];
       for (const passage of frontier) {
         for (const adjacent of store.adjacentPassages(passage.id, [...input.lexicalKeys, ...input.vectorKeys])) {

@@ -198,6 +198,7 @@ import { summaryContentHash } from '../ai/summaryScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from '../ai/researchAssistant';
 import * as researchNotebooks from '../ai/researchNotebookService';
 import { researchCorpusInventory } from '../ai/researchCorpusInventory';
+import { ResearchCorpusRun, resolveAcademicRunScope } from '../ai/researchCorpusRun';
 import * as documentaryPreparation from '../ai/documentaryPreparation';
 import { RETRIEVAL_PRESETS } from '@shared/researchCorpus';
 import { listResearchContextSources } from '../ai/researchSourceScope';
@@ -1644,6 +1645,15 @@ export function registerAcademicIpc(context: IpcContext): void {
       if (researchNotebooks.resolveResearchNotebook(id).id !== scope.id) throw new Error('research_scope_changed');
       return { evidence: result.evidence, scopeId: scope.id, partial: result.traversal.partial };
     } finally { release(); }
+  });
+  h('research:corpus:read', async (_e, input: Parameters<import('@shared/researchCorpus').ResearchCorpusApi['readResearchDocument']>[0]) => {
+    if (!input || typeof input.documentId !== 'string' || input.documentId.length > 500) throw new Error('Invalid document identifier');
+    const scope = resolveAcademicRunScope(input.notebookId);
+    const notebook = input.notebookId ? researchNotebooks.listResearchNotebooks().find(item => item.id === input.notebookId) : null;
+    const controller = new AbortController();
+    const release = input.notebookId ? researchNotebooks.registerNotebookRun(input.notebookId, controller) : () => {};
+    try { return await new ResearchCorpusRun(scope, notebook?.settings ?? RETRIEVAL_PRESETS.balanced, controller.signal).readDocument(input.documentId, input.operation); }
+    finally { release(); }
   });
   h('research:preparation:inventory', async () => documentaryPreparation.getResearchPreparationInventory());
   h('research:preparation:start', async (_e, ids: string[]) => documentaryPreparation.prepareResearchDocuments(ids));

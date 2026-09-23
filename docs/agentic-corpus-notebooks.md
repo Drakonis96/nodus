@@ -346,3 +346,66 @@ copied credentials. It is a harness failure, not a baseline capability result.
 Only the browser/unit-test environment now changes HOME; Electron retains its
 existing OS keychain identity while all application paths and writes remain under
 the verified isolated root. A new baseline Deep Research campaign is running.
+
+### Bounded document reads and completed regression inventory
+
+The public research coordinator now supports scoped searches inside one work,
+physical-page ranges (at most four pages), adjacent passage context and reference
+candidates. These operations share a run's evidence/round budget and reject foreign
+works, attachments and passage identifiers. Reference candidates are explicitly
+marked as requiring source review; they are not a parsed bibliography graph.
+Physical and printed page labels remain separate.
+
+The independent Zotero/Electron integration at
+`/private/tmp/nodus-research-A6TNm0` passed actual second-attachment preparation,
+page reading, immutable citation lookup and UI navigation. Its second PDF contains
+SOUTH41 rather than the primary PDF's NORTH23. `attachment-reads.json` records the
+exact identities and `attachment-citation.png` shows the correct PDF/page. No paid
+provider was used. Notebook UI checks at `/private/tmp/nodus-research-12R4NY`
+passed light/dark themes at 1280×800 and 800×640, accessible name lookup and 16-step
+keyboard focus containment. Screenshots were visually inspected; the editor scrolls
+inside its bounded dialog. These are targeted checks, not a complete accessibility
+audit.
+
+All 682 regression scripts ran in four isolated, two-worker shards: 164/171,
+168/171, 168/170 and 169/170 initially passed. All 13 initial failures were corrected
+and passed the 17-script follow-up at `/private/tmp/nodus-research-BYiuxh`, including
+real offline OCR with provisioned language assets, Server Web, headless browser UI,
+legacy attachments, sync and bounded documentary reads. Five additional notebook,
+run and Deep Research regressions passed at `/private/tmp/nodus-research-TfI3nI`.
+These runs span incremental source snapshots and are not described as one full
+final-head suite pass. Full lint and application build passed
+(`research-policy-lint.log`, `research-evidence-policy-build.log`).
+
+General academic chat retains explicitly supplied conversation attachments;
+notebooks still require explicit source promotion. General attachment identities
+and revisions now participate in backend scope/history authorization. Academic
+Deep Research no longer offers catalog-only work titles as factual citation
+sources. All 15 writing languages instruct the writer to distinguish missing data
+from negative findings, avoid inventing methods/causes or independent corroboration,
+and ground each factual claim in its own passage. A paid rerun is required before
+claiming these policies improve report quality.
+
+### Matched baseline and extension comparison
+
+Baseline `/private/tmp/nodus-research-8mDpAT` and extension
+`/private/tmp/nodus-research-Cq5QqL` used byte-identical synthetic PDFs, verified by
+`scripts/build-research-comparison.mjs`. Both passed four chat known-answer,
+retrieval-marker and citation-existence checks and completed four Deep Research
+routes. The generated comparison includes latency, process CPU/memory samples,
+coverage, provider calls, tokens and cost. Its local artifacts are
+`artifacts/research-comparison/comparison.json` and `comparison.md`.
+
+This is one descriptive run per engine on three documents, with host contention;
+no statistically meaningful speed or quality advantage is claimed. Baseline v1
+comparative received a structural `strong` grade but falsely attributed both field
+measurements to all three sources. Thus a quality grade or existing citation alone
+is not factual acceptance. The extension's four reports were graded `weak` and
+still contained unsupported inferences. The shared campaign ledger after the
+matched comparison recorded 482 calls, a $0.85002289 accounted upper bound and no
+unresolved reservations, below the $5 total ceiling.
+
+Native CI run 35848154546 passed all four targets: Windows x64, Linux x64,
+macOS ARM64 and macOS x64. It validates the private runtime, build and focused
+native tests, with isolated Electron checks on macOS. Signing, notarization and
+disposable native installation/update/uninstallation remain unverified.

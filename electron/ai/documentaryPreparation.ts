@@ -4,7 +4,7 @@ import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
 import { RETRIEVAL_CHUNKER_VERSION } from '@shared/retrievalChunks';
-import type { DocumentaryIndexIdentity, ResearchCorpusDocument, ResearchEvidence, ResearchPreparationInventory, ResolvedResearchScope, RetrievalSettings } from '@shared/researchCorpus';
+import type { DocumentaryIndexIdentity, ResearchCorpusDocument, ResearchDocumentRead, ResearchEvidence, ResearchPreparationInventory, ResolvedResearchScope, RetrievalSettings } from '@shared/researchCorpus';
 import { DocumentaryRequests } from '../db/documentaryRequests';
 import { DocumentaryStore, type DocumentaryChunk } from '../db/documentaryStore';
 import { documentaryChunks } from './documentaryChunking';
@@ -370,7 +370,7 @@ export function initializeDocumentaryPreparation(): void {
   if (fs.existsSync(path.join(app.getPath('userData'), 'documentary/store.sqlite')) && getActiveVault().type === 'academic') void drainDocumentaryRequests().catch(() => undefined);
 }
 
-export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchScope, query: string, settings: RetrievalSettings, vector: number[] | null, signal?: AbortSignal): Promise<{ evidence: ResearchEvidence[]; traversal: { partial: boolean; rounds: number; candidates: number; evidenceTokens: number; visited: string[] } }> {
+export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchScope, query: string, settings: RetrievalSettings, vector: number[] | null, signal?: AbortSignal, read?: ResearchDocumentRead): Promise<{ evidence: ResearchEvidence[]; traversal: { partial: boolean; rounds: number; candidates: number; evidenceTokens: number; visited: string[] } }> {
   const inventory = researchCorpusInventory();
   const config = currentEmbeddingConfig();
   const parameters = { endpoint: createHash('sha256').update(openAiCompatBase(config.provider) ?? config.provider).digest('hex'), inputPolicy: 'utf8-4096/2' };
@@ -411,7 +411,7 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
     worker.once('message', message => finish(message.error ? new Error(message.error) : null, message));
     worker.once('error', error => finish(error));
     worker.once('exit', () => { if (!settled) finish(new Error('documentary_retrieval_worker_stopped')); });
-    worker.postMessage({ filename: documentaryStore().db.name, query, lexicalKeys: keys, vectorKeys, vector, settings, threshold });
+    worker.postMessage({ filename: documentaryStore().db.name, query, lexicalKeys: keys, vectorKeys, vector, settings, threshold, read });
   });
   const latest = researchCorpusInventory().documents;
   for (const document of scope.documents) assertResearchDocumentPermission(scope, document.id, latest.find(item => item.id === document.id));
@@ -422,7 +422,7 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
     return { id: passage.id, documentId: document.id, workId: document.workId, attachmentId: identity.attachmentId, attachmentRevision: identity.attachmentRevision,
       revision: document.revision, text: passage.text, locator: JSON.parse(passage.locator_json),
       provenance: document.authoredKind ?? (coverage === 'abstract' ? 'abstract' as const : 'source' as const),
-      limitations: [...(document.authoredKind ? [document.authoredKind, 'not_primary_evidence'] : coverage === 'abstract' ? ['abstract_only'] : []), ...(document.sourceWarning ? [document.sourceWarning] : [])] };
+      limitations: [...(document.authoredKind ? [document.authoredKind, 'not_primary_evidence'] : coverage === 'abstract' ? ['abstract_only'] : []), ...(document.sourceWarning ? [document.sourceWarning] : []), ...(read?.kind === 'references' ? ['reference_candidates_require_source_review'] : [])] };
   });
   return { evidence, traversal: { ...result.traversal, partial: result.traversal.partial || indexedDocuments.size < scope.documents.length } };
 }

@@ -1,5 +1,5 @@
-import type { ResearchEvidence, ResearchTraversal, ResolvedResearchScope, RetrievalSettings } from '@shared/researchCorpus';
-import { RETRIEVAL_PRESETS, validateRetrievalSettings } from '@shared/researchCorpus';
+import type { ResearchDocumentRead, ResearchEvidence, ResearchTraversal, ResolvedResearchScope, RetrievalSettings } from '@shared/researchCorpus';
+import { RETRIEVAL_PRESETS, validateRetrievalSettings, validateResearchDocumentRead } from '@shared/researchCorpus';
 import { ResearchRetrievalBudget } from '@shared/researchRetrievalBudget';
 import type { DeepResearchRequest, WritingWorkshopBrief, WritingWorkshopIdeaCandidate, WritingWorkshopPassageCandidate, WritingWorkshopSnapshot } from '@shared/types';
 import type { DeepResearchDeps, SectionRetrievalInput } from './deepResearchCore';
@@ -105,6 +105,33 @@ export class ResearchCorpusRun {
     this.budget.candidates += hierarchy.passages.length + shared.traversal.candidates;
     this.budget.partial ||= shared.traversal.partial;
     this.traversal.push({ query, sources: this.scope.documents.map(document => document.id), candidates: hierarchy.passages.length + shared.traversal.candidates, partial: this.budget.partial });
+  }
+  async readDocument(documentId: string, operation: ResearchDocumentRead): Promise<{ evidence: ResearchEvidence[]; scopeId: string; partial: boolean }> {
+    this.validate();
+    const read = validateResearchDocumentRead(operation);
+    const document = this.scope.documents.find(item => item.id === documentId);
+    if (!document) throw new Error('research_source_not_authorized');
+    if (read.kind === 'pages' && read.attachmentId && document.attachments && !document.attachments.some(item => item.id === read.attachmentId)) throw new Error('research_source_not_authorized');
+    const query = read.kind === 'search' ? read.query : read.kind === 'references' ? read.query ?? 'references bibliography bibliografía bibliographie literaturverzeichnis' : `${read.kind}:${JSON.stringify(read)}`;
+    if (!this.budget.nextRound() || this.budget.evidenceTokenLimit - this.budget.usedEvidenceTokens < 256) {
+      this.budget.partial = true;
+      this.traversal.push({ query, sources: [document.id], candidates: 0, partial: true });
+      return { scopeId: this.scope.id, evidence: [], partial: true };
+    }
+    const result = await retrieveSharedDocumentaryEvidence({ ...this.scope, documents: [document] }, query,
+      { ...this.budget.settings, rounds: 1, autoExpand: false, evidenceTokens: this.budget.evidenceTokenLimit - this.budget.usedEvidenceTokens }, null, this.signal, read);
+    this.validate();
+    const evidence = result.evidence.filter(item => {
+      const candidate = this.passage(item);
+      if (this.evidence.has(candidate.id)) return true;
+      if (!this.budget.accept(`document-read:${item.id}`, item.text)) return false;
+      this.evidence.set(candidate.id, candidate);
+      return true;
+    });
+    this.budget.candidates += result.traversal.candidates;
+    this.budget.partial ||= result.traversal.partial;
+    this.traversal.push({ query, sources: [document.id], candidates: result.traversal.candidates, partial: this.budget.partial });
+    return { evidence, scopeId: this.scope.id, partial: this.budget.partial };
   }
   coverage(): ResearchTraversal {
     return { scopeId: this.scope.id, sourceCount: this.scope.documents.length, rounds: this.budget.rounds,

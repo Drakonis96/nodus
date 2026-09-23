@@ -78,6 +78,7 @@ export interface ResearchCorpusDocument {
 }
 
 export interface ResolvedResearchScope {
+  conversationAttachments?: Array<{ conversationId: string; attachmentId: string; revision: string }>;
   id: string;
   vaultId: string;
   notebookId: string | null;
@@ -130,6 +131,24 @@ export interface ResearchTraversal {
   queries: Array<{ query: string; sources: string[]; candidates: number; partial: boolean }>;
 }
 
+export type ResearchDocumentRead =
+  | { kind: 'search'; query: string }
+  | { kind: 'pages'; from: number; to?: number; attachmentId?: string }
+  | { kind: 'context'; passageId: string; radius?: number }
+  | { kind: 'references'; query?: string };
+
+export function validateResearchDocumentRead(input: ResearchDocumentRead): ResearchDocumentRead {
+  if (!input || !['search', 'pages', 'context', 'references'].includes(input.kind)) throw new Error('Invalid document operation');
+  if ((input.kind === 'search' && (typeof input.query !== 'string' || !input.query.trim()))
+    || ((input.kind === 'search' || input.kind === 'references') && input.query !== undefined && (typeof input.query !== 'string' || input.query.length > 1000))) throw new Error('Invalid document query');
+  if (input.kind === 'pages' && (!Number.isSafeInteger(input.from) || input.from < 1 || input.from > 1000000
+    || (input.to !== undefined && (!Number.isSafeInteger(input.to) || input.to < input.from || input.to - input.from > 3))
+    || (input.attachmentId !== undefined && (typeof input.attachmentId !== 'string' || input.attachmentId.length > 256)))) throw new Error('Invalid physical page range');
+  if (input.kind === 'context' && (typeof input.passageId !== 'string' || !/^[a-f0-9]{64}:\d+$/.test(input.passageId)
+    || (input.radius !== undefined && (!Number.isInteger(input.radius) || input.radius < 0 || input.radius > 3)))) throw new Error('Invalid context locator');
+  return { ...input };
+}
+
 export interface DocumentPreparationState {
   documentId: string;
   revision: string;
@@ -167,6 +186,7 @@ export interface ResearchCorpusApi {
   deleteResearchNotebook(id: string): Promise<void>;
   resolveResearchNotebook(id: string): Promise<ResolvedResearchScope>;
   searchResearchNotebook(id: string, query: string): Promise<{ evidence: ResearchEvidence[]; scopeId: string; partial: boolean }>;
+  readResearchDocument(input: { notebookId?: string | null; documentId: string; operation: ResearchDocumentRead }): Promise<{ evidence: ResearchEvidence[]; scopeId: string; partial: boolean }>;
   getResearchPreparationInventory(): Promise<ResearchPreparationInventory>;
   prepareResearchDocuments(documentIds: string[]): Promise<void>;
   cancelResearchDocuments(documentIds: string[]): Promise<void>;

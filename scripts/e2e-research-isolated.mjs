@@ -100,6 +100,25 @@ try {
     await page.screenshot({ path: path.join(root, 'artifacts/notebook-editor.png') });
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#research-notebook-title').count(), 0, 'Escape closes the notebook editor');
+    const layouts = [];
+    for (const theme of ['dark', 'light']) for (const viewport of [{ width: 1280, height: 800 }, { width: 800, height: 640 }]) {
+      await page.evaluate(theme => window.nodus.updateSettings({ theme }), theme);
+      await page.setViewportSize(viewport);
+      await control.getByRole('button', { name: /Editar|Edit/ }).click();
+      const editor = page.getByRole('dialog').filter({ has: page.locator('#research-notebook-title') });
+      await editor.waitFor();
+      await editor.getByRole('textbox', { name: 'Nombre', exact: true }).focus();
+      for (let step = 0; step < 16; step++) {
+        await page.keyboard.press('Tab');
+        assert.equal(await editor.evaluate(element => element.contains(document.activeElement)), true, 'keyboard focus remains in the modal');
+      }
+      const box = await editor.boundingBox();
+      assert.ok(box.x >= 0 && box.x + box.width <= viewport.width + 1, 'editor fits the window width');
+      await page.screenshot({ path: path.join(root, 'artifacts', `notebook-${theme}-${viewport.width}.png`) });
+      layouts.push({ theme, viewport, box, keyboardFocusContained: true });
+      await page.keyboard.press('Escape');
+    }
+    report.notebooks.layouts = layouts;
   }
   Object.assign(report, { completed: true, paths, databaseOpens: audit.length });
 } finally {

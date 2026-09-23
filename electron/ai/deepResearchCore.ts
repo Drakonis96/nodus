@@ -704,6 +704,7 @@ export interface CoherenceIssue {
 }
 
 interface WorkInfo {
+  metadataOnly?: boolean;
   nodus_id: string;
   title: string;
   authors: string[];
@@ -2669,6 +2670,7 @@ export function buildSnapshotMaps(snapshot: WritingWorkshopSnapshot): SnapshotMa
     if (!workInfoById.has(w.id)) {
       workInfoById.set(w.id, { nodus_id: w.id, title: w.title, authors: w.authors, year: w.year, zotero_key: w.zotero_key, doi: w.doi ?? null });
     }
+    if (w.reason === 'authorized-source') workInfoById.get(w.id)!.metadataOnly = true;
   }
   for (const g of snapshot.gaps) {
     if (g.work?.nodus_id && !workInfoById.has(g.work.nodus_id)) {
@@ -3340,7 +3342,9 @@ export function buildCitationMenu(section: DeepResearchPlanSection, maps: Snapsh
   }
   for (const id of section.workIds) {
     const work = maps.workInfoById.get(id);
-    if (!work) continue;
+    // A catalog title authorizes discovery and bibliography, not a substantive
+    // claim. Scoped documentary runs must cite their actual passages or Ideas.
+    if (!work || work.metadataOnly) continue;
     items.push({
       token: `[${sourceLabelFromWork(work)}](nodus://work/${encodeURIComponent(id)})`,
       kind: 'work',

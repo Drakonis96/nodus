@@ -112,7 +112,9 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus, { provide
       const { runResearchLiveCampaign } = await import('./research-live-campaign.mjs');
       live = await runResearchLiveCampaign(page, app, root, imported.inventory.documents);
     }
+    const attachmentReads = providerProxy ? undefined : await (await import('./verify-research-attachment-reads.mjs')).verifyResearchAttachmentReads(page, app, root, source.id);
     return { passed: true, status, importedSources: imported.inventory.documents.length, lexicalPhysicalPage: 1,
+      attachmentReads,
       ...(providerProxy ? { live } : { modelCalls: 0 }), unauthorizedSourceRejected: true, manualSelectionRevokedConnection: true,
       external: { transport: externalStatus.transport, scopeMismatchRejected: true, processPreserved: true } };
   } finally {
