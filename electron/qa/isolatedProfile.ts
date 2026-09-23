@@ -31,3 +31,24 @@ export function isolatedPath(root: string, relative: string): string {
   fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
   return destination;
 }
+
+/** Chromium's macOS singleton creates sockets in the system temp directory,
+ * outside the test write boundary. Hold a private exclusive lock instead. A
+ * stale test profile fails closed and can be discarded by its owning harness. */
+export function claimIsolatedProfile(root: string): (() => void) | null {
+  const file = path.join(isolatedPath(validateIsolatedRoot(root), 'profile'), 'isolated-instance.lock');
+  let fd: number;
+  try { fd = fs.openSync(file, 'wx', 0o600); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return null;
+    throw error;
+  }
+  fs.writeFileSync(fd, String(process.pid));
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    fs.closeSync(fd);
+    fs.unlinkSync(file);
+  };
+}

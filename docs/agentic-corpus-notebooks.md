@@ -41,6 +41,26 @@ sandbox test performs a real denied write against a disposable sentinel, never
 against production. Production Nodus, Zotero and MCP directories are denied.
 Application testing must not begin until this check succeeds.
 
+On macOS, Chromium cannot install a nested Seatbelt sandbox. The isolated E2E
+launcher therefore uses the already-inherited OS policy for the entire process
+tree (`--no-sandbox` only in that launcher), retaining context isolation and the
+restricted preload. Chromium's singleton also creates sockets outside its
+configured temp directory; isolated runs use an exclusive profile-local lock,
+while ordinary application startup retains Electron's singleton behavior.
+
+### Verified startup, 2026-09-23
+
+- Four isolation tests passed, including actual denied writes and duplicate
+  profile ownership.
+- Full production build and Electron TypeScript checks passed.
+- A fresh Electron 43.4.0 instance reached the onboarding interface under the
+  OS write boundary. Its native title and visible development badge were checked.
+- All six audited database opens were inside the new profile. `userData`,
+  `sessionData`, temporary storage, application data and downloads resolved below
+  `/private/tmp/nodus-research-fk0o3o`.
+- No model calls, production fixtures or real Zotero connection were involved.
+  Startup screenshot and machine-readable report remain in that test root.
+
 Only encrypted DeepSeek and OpenRouter credentials may be copied by a separate,
 read-only fixture helper, following the user's explicit authorization. Never
 load the production vault registry, preferences, databases or document corpus.

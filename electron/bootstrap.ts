@@ -34,6 +34,9 @@ if (requestedRoot) {
     const label = 'Nodus Research · Desarrollo';
     window.setTitle(label);
     window.on('page-title-updated', event => { event.preventDefault(); window.setTitle(label); });
+    window.webContents.on('did-finish-load', () => {
+      void window.webContents.insertCSS('body::after{content:"Nodus Research · Desarrollo";position:fixed;bottom:4px;right:12px;z-index:2147483647;background:#7f1d1d;color:white;padding:4px 10px;border-radius:4px;font:12px system-ui;pointer-events:none}');
+    });
   });
 } else if (process.env.NODUS_USERDATA) {
   // Compatibility with existing explicitly isolated development harnesses.

@@ -4,7 +4,10 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 export function createResearchTestRoot() {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-research-isolated-')));
+  // Keep Unix socket paths below sockaddr_un's limit (the Darwin user temp
+  // directory plus a profile suffix can already exceed it).
+  const parent = process.platform === 'darwin' ? '/private/tmp' : os.tmpdir();
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(parent, 'nodus-research-')));
   fs.writeFileSync(path.join(root, 'isolation.json'), JSON.stringify({
     format: 'nodus.isolated-research-profile/1', root,
   }), { mode: 0o600 });

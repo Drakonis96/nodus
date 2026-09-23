@@ -9,7 +9,7 @@ import { createResearchTestRoot, researchTestEnvironment, verifyResearchSandbox 
 const root = createResearchTestRoot();
 const outfile = path.join(root, 'paths.mjs');
 await build({ entryPoints: ['electron/qa/isolatedProfile.ts'], outfile, bundle: true, platform: 'node', format: 'esm' });
-const { isolatedPath, validateIsolatedRoot } = await import(pathToFileURL(outfile).href);
+const { isolatedPath, validateIsolatedRoot, claimIsolatedProfile } = await import(pathToFileURL(outfile).href);
 test.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
 test('requires a matching manifest and forbids traversal and symlinks before writes', () => {
@@ -34,6 +34,16 @@ test('environment does not inherit credentials or execution injection', () => {
     if (original === undefined) delete process.env.NODE_OPTIONS;
     else process.env.NODE_OPTIONS = original;
   }
+});
+
+test('private single-instance lock rejects another owner and releases on close', () => {
+  const release = claimIsolatedProfile(root);
+  assert.equal(typeof release, 'function');
+  assert.equal(claimIsolatedProfile(root), null);
+  release();
+  const next = claimIsolatedProfile(root);
+  assert.equal(typeof next, 'function');
+  next();
 });
 
 test('macOS denies an actual child-process write outside the test root', { skip: process.platform !== 'darwin' }, () => {

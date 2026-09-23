@@ -1,4 +1,5 @@
 import { initializeChatSkillDefaults } from './chatSkills';
+import { claimIsolatedProfile } from './qa/isolatedProfile';
 import { initializePluginStore } from './skillPlugins';
 import { initializeCapabilityPluginStore } from './capabilities/pluginStoreV2';
 import { rebuildCapabilityRegistry } from './capabilities/registry';
@@ -144,7 +145,9 @@ if (process.env.NODUS_USERDATA) {
  * process to exit (`while kill -0 "$PID"`) before it replaces the bundle and
  * runs `open -n`, so the lock is already released by then.
  */
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
+const isolatedUnlock = process.env.NODUS_ISOLATED_ROOT ? claimIsolatedProfile(process.env.NODUS_ISOLATED_ROOT) : null;
+const hasSingleInstanceLock = process.env.NODUS_ISOLATED_ROOT ? Boolean(isolatedUnlock) : app.requestSingleInstanceLock();
+if (isolatedUnlock) app.on('will-quit', isolatedUnlock);
 if (!hasSingleInstanceLock) {
   // Hand over to the copy that already owns this profile and leave. Nothing
   // below has run yet, so no database or window has been touched.
