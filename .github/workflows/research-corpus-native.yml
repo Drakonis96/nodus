@@ -8,6 +8,8 @@ on:
       - 'electron/ai/*research*'
       - 'electron/ai/documentary*'
       - 'electron/db/documentary*'
+      - 'electron/citations/*'
+      - 'shared/research*'
       - '.github/workflows/research-corpus-native.yml'
   workflow_dispatch:
 permissions:
@@ -43,12 +45,14 @@ jobs:
         run: npm run research:runtime
       - name: Native stdio against synthetic local API
         run: node scripts/verify-managed-zotero-mcp.mjs --disposable-ci
+      - name: Private runtime directory lifecycle and two-profile coexistence
+        run: node scripts/verify-research-runtime-lifecycle.mjs --disposable-ci > research-runtime-lifecycle.json
       - name: Compile renderer and native entry points
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
       - name: Synthetic scope and durable queue regressions
-        run: node --test --test-concurrency=2 scripts/test-documentary-store.mjs scripts/test-documentary-requests.mjs scripts/test-research-notebooks.mjs scripts/test-research-corpus-run.mjs
+        run: node --test --test-concurrency=2 scripts/test-documentary-store.mjs scripts/test-documentary-requests.mjs scripts/test-research-notebooks.mjs scripts/test-research-corpus-run.mjs scripts/test-research-request-budget.mjs scripts/test-documentary-writers.mjs
       - name: Isolated real Electron notebooks on macOS
         if: runner.os == 'macOS'
         run: node scripts/e2e-research-isolated.mjs --notebooks
@@ -57,6 +61,7 @@ jobs:
         with:
           name: research-runtime-${{ matrix.os }}
           path: |
+            research-runtime-lifecycle.json
             build/zotero-mcp/runtime.json
             build/zotero-mcp/legal/**
           if-no-files-found: warn

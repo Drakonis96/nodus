@@ -48,3 +48,26 @@ export function resolveResearchSourceScope(value?: ResearchSourceFilter, strictP
     edgeIds: ids('SELECT id FROM edges WHERE source_work IN (SELECT value FROM json_each(?))'),
   };
 }
+
+/** A mixed-work Idea's synthesized statement is never reusable under a narrower
+ * scope. Its explicit quotation may route to an authorized current passage only
+ * when the quoted bytes actually occur there. No global label or development text
+ * crosses this adapter; nonseparable/paraphrased syntheses remain excluded. */
+export function scopedIdeaEvidencePassages(query: string, workIds: string[], limit: number): import('./hierarchicalRetrieval').HierarchicalPassageHit[] {
+  if (!workIds.length || limit <= 0) return [];
+  const terms = [...new Set(query.toLocaleLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [])].slice(0, 32);
+  if (!terms.length) return [];
+  const rows = getDb().prepare(`WITH allowed AS (SELECT value FROM json_each(?)), terms AS (SELECT value FROM json_each(?))
+    SELECT DISTINCT p.passage_id,p.nodus_id,p.text,p.page_label,p.source_ref,p.page_number,
+      w.title,w.authors_json,w.year,w.zotero_key,
+      (SELECT COUNT(*) FROM terms WHERE instr(lower(p.text),value)>0) similarity
+    FROM evidence e JOIN passages p ON p.nodus_id=e.nodus_id JOIN works w ON w.nodus_id=p.nodus_id
+    WHERE e.nodus_id IN (SELECT value FROM allowed) AND w.archived=0 AND e.kind='explicit'
+      AND length(trim(e.quote))>=16 AND instr(p.text,e.quote)>0
+      AND EXISTS (SELECT 1 FROM terms WHERE instr(lower(e.quote),value)>0)
+      AND EXISTS (SELECT 1 FROM idea_occurrences other WHERE other.global_id=e.global_id AND other.nodus_id NOT IN (SELECT value FROM allowed))
+      AND ((w.resolved_text_hash IS NOT NULL AND p.content_hash=w.resolved_text_hash)
+        OR (w.resolved_text_hash IS NULL AND (w.deep_hash IS NULL OR p.content_hash=w.deep_hash)))
+    ORDER BY similarity DESC,p.passage_id LIMIT ?`).all(JSON.stringify(workIds), JSON.stringify(terms), Math.min(500, limit)) as import('../db/passagesRepo').SimilarPassage[];
+  return rows.map(row => ({ ...row, lanes: ['support'] }));
+}

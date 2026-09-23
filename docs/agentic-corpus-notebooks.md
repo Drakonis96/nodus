@@ -467,3 +467,44 @@ and zero unresolved reservations. No further paid comparison has been started.
 The complete publication/context application build subsequently passed:
 `artifacts/research-context-build.log`. The current real Electron/Zotero run will
 exercise that build without paid providers.
+
+### Legacy citations, separable evidence and failure/coexistence checks
+
+New academic runs adapt legacy passages to immutable backend receipts within the
+existing profile-local scope record. Receipts require a current content-hash match
+and authorized work before creation; direct foreign IDs, tampering, later notebook
+restrictions and permission revocations fail closed. Rebuilding mutable legacy
+rows cannot replace the cited text. Historical raw URLs remain available through
+the compatibility API for old conversations.
+
+Mixed-work Idea statements remain excluded from narrowed selections. An explicit
+quotation can route to a permitted current passage only when the literal quote
+exists in that passage. The adapter carries no global Idea label or synthesis;
+unverifiable quotes and paraphrased/inseparable syntheses are excluded. Five
+legacy/corpus scripts passed at `/private/tmp/nodus-research-I8Jlfw`; three scoped
+quotation/ranking scripts passed at `/private/tmp/nodus-research-6E9Pwj`.
+
+Two scripts passed at `/private/tmp/nodus-research-ObyFGl`, including an actual
+SQLite page-limit `SQLITE_FULL` during lexical publication. The failed transaction
+leaves the replacement unpublished and preserves the old manifest and searchable
+text. This tests database-full rollback, not every filesystem failure mode.
+
+The native private-runtime directory lifecycle passed at
+`/private/tmp/nodus-research-qqv5cS` with a second profile at
+`/private/tmp/nodus-research-62PAcM`. Both OS write boundaries were verified before
+starting the clients. Two owned Python children used different explicit endpoints
+and profile roots simultaneously; a third child started after same-version staged
+replacement. All 5,817 runtime files/symlinks matched before and after execution.
+Removing the owned runtime directory preserved both profiles and an unrelated
+homonymous executable/configuration fixture. This is a real directory/runtime
+integration test, **not** an OS installer, future-version migration, signing,
+notarization or full Nodus uninstall test. The same check is now included in native
+CI with its JSON evidence artifact.
+
+The real publication/context Electron/Zotero build also passed at
+`/private/tmp/nodus-research-QKMItM` without paid providers.
+
+The lifecycle rerun at `/private/tmp/nodus-research-NJOjuG` (second profile
+`/private/tmp/nodus-research-oJ4QLd`) additionally verified that every recorded owned
+PID had exited before executable removal. Full lint and the complete updated
+application build passed (`research-legacy-lint.log`, `research-legacy-build.log`).

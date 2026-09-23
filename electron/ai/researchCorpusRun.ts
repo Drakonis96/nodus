@@ -9,11 +9,12 @@ import { getResearchNotebook } from '../db/researchNotebooksRepo';
 import { researchCorpusInventory } from './researchCorpusInventory';
 import { resolveResearchNotebook, resolveAcademicResearchScope } from './researchNotebookService';
 import { assertResearchDocument, assertResearchDocumentPermission } from './researchCorpusScope';
-import { resolveResearchSourceScope } from './researchSourceScope';
+import { resolveResearchSourceScope, scopedIdeaEvidencePassages } from './researchSourceScope';
 import { retrieveSharedDocumentaryEvidence } from './documentaryPreparation';
 import { retrieveHierarchical, selectPassageEvidence } from './hierarchicalRetrieval';
 import { embed, resolveModelRef, researchModelContextWindow } from './aiClient';
 import { withResearchRequestBudget } from './researchRequestBudget';
+import { recordScopedLegacyPassage } from '../citations/scopedLegacyCitations';
 import { documentaryCitationId } from '../citations/documentaryCitations';
 import { getSettings } from '../db/settingsRepo';
 import { activeManualIdeaIds } from '../db/manualIdeaVisibility';
@@ -47,10 +48,10 @@ export class ResearchCorpusRun {
     const current = researchCorpusInventory().documents;
     for (const document of this.scope.documents) (this.pinRevisions ? assertResearchDocumentPermission : assertResearchDocument)(this.scope, document.id, current.find(item => item.id === document.id));
     if (this.pinRevisions && this.scope.documents.some(document => current.find(item => item.id === document.id)?.revision !== document.revision)) {
-      // Shared evidence is immutable. Legacy passages and graph analyses are not;
+      // Shared evidence and scoped legacy receipts are immutable. Graph analyses are not;
       // discard their cached copies instead of reading a silently newer revision.
       this.ideas.clear();
-      for (const id of this.evidence.keys()) if (!id.startsWith('documentary:')) this.evidence.delete(id);
+      for (const id of this.evidence.keys()) if (!id.startsWith('documentary:') && !id.startsWith('scoped:')) this.evidence.delete(id);
       this.graphSnapshot = { gaps: [], contradictions: [], themes: [] };
       this.budget.partial = true;
     }
@@ -79,10 +80,13 @@ export class ResearchCorpusRun {
     this.validate();
     // Interleave independent native/shared lanes, retaining source diversity.
     const candidates = shared.evidence.map(item => this.passage(item));
-    const legacy = selectPassageEvidence(hierarchy.passages, settings.passagesPerRound, { preferLexical: true, preferSourceDiversity: true }).map(hit => ({
-      id: hit.passage_id, label: hit.title, summary: hit.text, nodus_id: hit.nodus_id, pageLabel: hit.page_label,
-      authors: this.scope.documents.find(document => document.workId === hit.nodus_id)?.authors ?? [], year: hit.year, zotero_key: hit.zotero_key, citation: `nodus://passage/${encodeURIComponent(hit.passage_id)}`, score: hit.similarity, reason: 'source',
-    }));
+    const separable = scopedIdeaEvidencePassages(query, stableWorks, settings.candidates);
+    const legacy = selectPassageEvidence([...hierarchy.passages, ...separable], settings.passagesPerRound, { preferLexical: true, preferSourceDiversity: true }).flatMap(hit => {
+      const receipt = recordScopedLegacyPassage(this.scope, hit.passage_id);
+      return receipt ? [{ id: receipt.passage_id, label: hit.title, summary: receipt.text, nodus_id: hit.nodus_id, pageLabel: receipt.page_label,
+        authors: this.scope.documents.find(document => document.workId === hit.nodus_id)?.authors ?? [], year: hit.year, zotero_key: hit.zotero_key,
+        citation: `nodus://passage/${encodeURIComponent(receipt.passage_id)}`, score: hit.similarity, reason: 'source' }] : [];
+    });
     let selected = 0;
     for (let index = 0; index < Math.max(candidates.length, legacy.length); index++) for (const candidate of [candidates[index], legacy[index]]) {
       if (!candidate) continue;
@@ -103,9 +107,9 @@ export class ResearchCorpusRun {
         works: documents.map(document => ({ nodus_id: document.workId!, title: document.title, authors: document.authors, year: document.year,
           zotero_key: document.origin.kind === 'zotero' ? document.origin.itemKey : '' })) });
     }
-    this.budget.candidates += hierarchy.passages.length + shared.traversal.candidates;
+    this.budget.candidates += hierarchy.passages.length + separable.length + shared.traversal.candidates;
     this.budget.partial ||= shared.traversal.partial;
-    this.traversal.push({ query, sources: this.scope.documents.map(document => document.id), candidates: hierarchy.passages.length + shared.traversal.candidates, partial: this.budget.partial });
+    this.traversal.push({ query, sources: this.scope.documents.map(document => document.id), candidates: hierarchy.passages.length + separable.length + shared.traversal.candidates, partial: this.budget.partial });
   }
   async readDocument(documentId: string, operation: ResearchDocumentRead): Promise<{ evidence: ResearchEvidence[]; scopeId: string; partial: boolean }> {
     this.validate();

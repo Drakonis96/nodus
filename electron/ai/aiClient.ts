@@ -834,7 +834,8 @@ async function assertCorpusRequestFits(model: ModelRef, opts: CallOpts): Promise
   const needed = researchPromptUpperBound(opts.system, opts.user, opts.maxTokens ?? 8000);
   if (needed > window) {
     active?.onOverflow();
-    throw new AiError(contextOverflowMessage(model.provider, model.model, window, needed), false, true, 'context_overflow');
+    throw new AiError(isLocalProvider(model.provider) || model.provider === 'nodus'
+      ? contextOverflowMessage(model.provider, model.model, window, needed) : genericContextOverflowMessage(), false, true, 'context_overflow');
   }
 }
 

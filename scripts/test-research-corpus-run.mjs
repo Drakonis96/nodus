@@ -24,6 +24,15 @@ try {
     db.prepare("INSERT INTO idea_occurrences(global_id,nodus_id,role,confidence) VALUES (?,?,'principal',1)").run(id, id === 'foreign' ? 'outside' : 'inside');
   }
   db.prepare("INSERT INTO idea_occurrences(global_id,nodus_id) VALUES ('mixed','outside')").run();
+
+  db.prepare("INSERT INTO evidence(id,global_id,nodus_id,quote,kind) VALUES ('mixed-quote','mixed','inside','measure inside evidence','explicit')").run();
+  const scopedQuotes = load('electron/ai/researchSourceScope.ts').scopedIdeaEvidencePassages;
+  assert.equal(scopedQuotes('measure', ['inside'], 10).length, 1, 'a separable literal quotation routes only to its matching authorized passage');
+  assert.deepEqual(scopedQuotes('measure', [], 10), []);
+  assert.doesNotMatch(JSON.stringify(scopedQuotes('measure', ['inside'], 10)), /outside|mixed/);
+  db.prepare("UPDATE evidence SET quote='invented unsupported claim' WHERE id='mixed-quote'").run();
+  assert.deepEqual(scopedQuotes('invented', ['inside'], 10), [], 'unverifiable quotation text never becomes source evidence');
+  db.prepare("UPDATE evidence SET quote='measure inside evidence' WHERE id='mixed-quote'").run();
   const notebookService = load('electron/ai/researchNotebookService.ts');
   const emptyGeneral = notebookService.authorizeNotebookRequest({ selection: { sourceFilter: { enabled: true, authorIds: [], workIds: [] } }, messages: [{ role: 'user', content: 'No sources' }] });
   assert.deepEqual(notebookService.requestNotebookScope(emptyGeneral).documents, [], 'general chat also resolves explicit empty scopes');
@@ -49,6 +58,18 @@ try {
   assert.equal(snapshot.works.length, 1);
   assert.deepEqual(snapshot.ideas.map(idea => idea.id), ['selected']);
   assert.ok(snapshot.passages.length > 0, 'lexical legacy evidence works without embeddings or profiles');
+  const legacyCitations = load('electron/citations/scopedLegacyCitations.ts');
+  const legacyCitation = snapshot.passages[0].id;
+  assert.match(legacyCitation, /^scoped:/);
+  assert.equal(legacyCitations.getScopedLegacyPassageDetail(legacyCitation).text, 'measure inside evidence');
+  db.prepare("UPDATE passages SET text='replacement text' WHERE nodus_id='inside'").run();
+  assert.equal(legacyCitations.getScopedLegacyPassageDetail(legacyCitation).text, 'measure inside evidence', 'rebuilt mutable rows cannot replace a citation receipt');
+  db.prepare("UPDATE passages SET text='measure inside evidence' WHERE nodus_id='inside'").run();
+
+  const outsidePassage = db.prepare("SELECT passage_id FROM passages WHERE nodus_id='outside'").get().passage_id;
+  assert.equal(legacyCitations.recordScopedLegacyPassage(scope, outsidePassage), null, 'direct foreign IDs cannot acquire a scoped receipt');
+  assert.equal(legacyCitations.getScopedLegacyPassageDetail(legacyCitation.replace(/.$/, legacyCitation.endsWith('0') ? '1' : '0')), null, 'tampered receipts are rejected');
+
   assert.doesNotMatch(JSON.stringify(snapshot), /outside|foreign|mixed/);
   const section = { objective: 'measure', sectionTitle: 'measure', purpose: 'measure', keyClaims: [], excludeIdeaIds: [], excludePassageIds: [], limits: { ideas: 6, passages: 6 } };
   await run.section(section); await run.section(section); await run.section(section);
@@ -85,6 +106,7 @@ try {
   assert.equal(overridden.systemPromptId, null);
   assert.throws(() => notebookService.saveResearchNotebook({ ...configured, conversationSettings: { thinkingEffort: 'unbounded' } }), /Invalid notebook conversation/);
   notebookService.saveResearchNotebook({ ...notebook, sources: [], exclusions: [] });
+  assert.equal(legacyCitations.getScopedLegacyPassageDetail(legacyCitation), null, 'manual restriction revokes old legacy receipts');
   assert.deepEqual(notebookService.authorizeNotebookRequest(next).messages, [{ role: 'user', content: 'Explain that result.' }]);
   assert.throws(() => run.validate(), /scope_changed/);
   assert.throws(() => notebookService.rememberNotebookTurn({ ...overridden, conversationId: undefined }, 'stale answer'), /scope_changed/);

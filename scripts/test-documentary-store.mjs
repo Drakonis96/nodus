@@ -73,5 +73,24 @@ try {
   assert.deepEqual(first.db.prepare('SELECT current_key FROM documentary_attachment_heads WHERE document_id=? ORDER BY attachment_id').all('multi').map(row => row.current_key), keys,
     'failed replacement retains both attachment heads');
   assert.equal(first.lexicalSearch('Independent', keys, 10).length, 2);
+
+  // A real SQLITE_FULL during FTS publication must roll back the new revision,
+  // leaving the previous manifest and searchable passages intact.
+  const full = new DocumentaryStore(path.join(scratch, 'full.sqlite'));
+  try {
+    const document = { id: 'full-work', revision: 'r1', attachmentId: 'pdf', attachments: [{ id: 'pdf', revision: 'bytes-1' }], permissionRevision: 'allowed' };
+    const oldKey = full.enqueue({ ...identity, documentId: document.id, attachmentRevision: 'bytes-1' }, {});
+    const oldJob = full.claim(Date.now(), 60000, oldKey);
+    full.saveChunks(oldJob, [{ text: 'Last valid evidence', pageLabel: '1', pageNumber: 1, sourceRef: 'pdf' }]);
+    full.publishLexical(oldJob); full.complete(oldJob); full.publishDocument(document, [oldKey]);
+    const replacementKey = full.enqueue({ ...identity, documentId: document.id, revision: 'r2', attachmentRevision: 'bytes-2' }, {});
+    const replacementJob = full.claim(Date.now(), 60000, replacementKey);
+    full.saveChunks(replacementJob, [{ text: 'large replacement evidence '.repeat(100000), pageLabel: '1', pageNumber: 1, sourceRef: 'pdf' }]);
+    full.db.pragma(`max_page_count = ${full.db.pragma('page_count', { simple: true })}`);
+    assert.throws(() => full.publishLexical(replacementJob), error => error.code === 'SQLITE_FULL');
+    assert.equal(full.revision(replacementKey).lexical_ready, 0);
+    assert.equal(full.lexicalSearch('valid', [oldKey], 5).length, 1);
+    assert.equal(full.publishedDocument({ ...document, revision: 'r2' }).indexedSource.revision, 'r1');
+  } finally { full.close(); }
   console.log('Shared documentary store: idempotency, transactional leases, restart recovery, fencing, lexical-first publication, vector compatibility, cancellation, bounded retries and pause passed.');
 } finally { first.close(); second.close(); fs.rmSync(scratch, { recursive: true, force: true }); }
