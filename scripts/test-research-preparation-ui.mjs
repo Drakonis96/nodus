@@ -8,7 +8,8 @@ import test from 'node:test';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
 const repo = path.resolve(import.meta.dirname, '..');
-const chrome = [process.env.CHROME_BIN, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(existsSync);
+// Same candidates as the other browser fixtures: CI's macOS runner ships Chrome here.
+const chrome = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(existsSync);
 test('preparation welcome fixes selection and supports refusal, local text and independent future consent', { timeout: 120000 }, async t => {
   if (!chrome) { t.skip('An isolated test browser is required'); return; }
   const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-preparation-ui-'));
