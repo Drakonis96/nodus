@@ -283,11 +283,20 @@ async function streamResearchChatInternal(
   if (!request.concilium) return streamResearchChatTurn(request, onDelta, signal);
   const { concilium: config, ...base } = request;
   let stats: ResearchContextStats = { sections: [], works: 0, documents: 0, summaries: 0, passages: 0, contextChars: 0, truncated: false };
+  // One investigation precedes the council. Participant opinions cannot open
+  // additional retrieval loops or silently multiply the corpus allowance.
+  let corpus: { context: SectionPayload; stats: ResearchContextStats } | undefined;
+  let windowCap: number | undefined;
+  if (requestNotebookScope(request)) {
+    windowCap = Math.min(...await Promise.all(config.models.map(async model => (await researchModelContextWindow(resolveModelRef(model))).tokens)));
+    const prepared = await buildResearchChatPrompt({ ...base, model: config.models[config.chairman] }, [], { member: true, windowCap }, signal);
+    corpus = { context: JSON.parse(prepared.user).contexto_modular_seleccionado, stats: prepared.stats };
+  }
   const result = await runConcilium(config, async (model, delta) => {
-    const response = await streamResearchChatTurn({ ...base, model }, delta, signal, { member: true });
+    const response = await streamResearchChatTurn({ ...base, model }, delta, signal, { member: true, corpus, windowCap });
     stats = response.stats;
     return response;
-  }, (model, assessments) => streamResearchChatTurn({ ...base, model }, onDelta, signal, { assessments }), onConcilium, signal);
+  }, (model, assessments) => streamResearchChatTurn({ ...base, model }, onDelta, signal, { assessments, corpus, windowCap }), onConcilium, signal);
   return { answer: '', stats, aborted: signal?.aborted, ...result.response, concilium: result.concilium };
 }
 
@@ -295,7 +304,7 @@ async function streamResearchChatTurn(
   request: ResearchChatRequest,
   onDelta: (delta: string, kind?: 'content' | 'reasoning') => void,
   signal?: AbortSignal,
-  council?: { member?: boolean; assessments?: ConciliumResult },
+  council?: { member?: boolean; assessments?: ConciliumResult; corpus?: { context: SectionPayload; stats: ResearchContextStats }; windowCap?: number },
 ): Promise<ResearchChatResponse> {
   const execution = skillExecution(request);
   if (council?.member) execution.skills = [];
@@ -459,13 +468,14 @@ function truncateTitle(text: string): string {
   return `${clean.slice(0, 57).trim()}…`;
 }
 
-async function buildResearchChatPrompt(request: ResearchChatRequest, skills = enabledChatSkills('assistant'), council?: { member?: boolean; assessments?: ConciliumResult }, signal?: AbortSignal): Promise<PromptBuild> {
+async function buildResearchChatPrompt(request: ResearchChatRequest, skills = enabledChatSkills('assistant'), council?: { member?: boolean; assessments?: ConciliumResult; corpus?: { context: SectionPayload; stats: ResearchContextStats }; windowCap?: number }, signal?: AbortSignal): Promise<PromptBuild> {
   // Resolve the effective model up front so a local target can size the whole payload
   // (context + history + output) to its real, small window instead of overflowing.
   const model = resolveModelRef(request.model);
   const loadedWindow = await localModelContextWindow(model);
   const corpusWindow = requestNotebookScope(request) ? await researchModelContextWindow(model) : null;
-  const window = corpusWindow?.tokens ?? loadedWindow;
+  const availableWindow = corpusWindow?.tokens ?? loadedWindow;
+  const window = council?.windowCap == null ? availableWindow : Math.min(availableWindow ?? council.windowCap, council.windowCap);
   const local = loadedWindow != null;
   const compact = window != null && window <= LOCAL_COMPACT_WINDOW;
 
@@ -535,12 +545,14 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
   const notebookScope = requestNotebookScope(request);
   let context: SectionPayload;
   let stats: ResearchContextStats;
-  if (notebookScope) {
+  if (notebookScope && council?.corpus) {
+    context = council.corpus.context; stats = council.corpus.stats;
+  } else if (notebookScope) {
     const run = new ResearchCorpusRun(notebookScope, { ...retrieval,
       evidenceTokens: Math.max(256, Math.min(retrieval.evidenceTokens, Math.floor(contextBudget / LOCAL_CHARS_PER_TOKEN))) }, signal);
     if (window) run.budget.constrainToWindow(window, Math.max(Math.ceil(window * 0.75),
       new TextEncoder().encode(system + JSON.stringify(messages)).length + maxTokens + 4096));
-    await run.retrieve(question, retrieval.rounds);
+    await run.investigate(question, request.model);
     const finishGraph = startResearchActivity('graph', 'read');
     const snapshot = run.snapshotFromEvidence({ kind: 'research_question', objective: question, language: promptLanguage });
     finishGraph('completed', snapshot.themes.length + snapshot.gaps.length + snapshot.contradictions.length);

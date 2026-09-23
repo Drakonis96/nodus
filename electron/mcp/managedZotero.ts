@@ -111,7 +111,7 @@ export class ManagedZoteroConnection {
     if (!item) throw new Error('research_source_not_authorized');
     if (args.attachment_key && !item.attachments.some(attachment => attachment.key === args.attachment_key)) throw new Error('research_attachment_not_authorized');
     if (tool === 'zotero_read_pdf_pages' && (!Number.isInteger(args.start_page) || !Number.isInteger(args.end_page)
-      || args.start_page! < 1 || args.end_page! < args.start_page! || args.end_page! - args.start_page! >= 12)) throw new Error('research_invalid_page_range');
+      || args.start_page! < 1 || args.end_page! < args.start_page! || args.end_page! - args.start_page! >= 4)) throw new Error('research_invalid_page_range');
     signal?.throwIfAborted();
     const controller = new AbortController();
     const cancel = () => controller.abort();
@@ -119,6 +119,7 @@ export class ManagedZoteroConnection {
     this.controllers.add(controller);
     try {
       const result = await this.client.callTool({ name: tool, arguments: { ...args } }, undefined, { signal: controller.signal, timeout: 25000 });
+      if (Buffer.byteLength(JSON.stringify(result)) > 1024 * 1024) throw new Error('managed_zotero_response_too_large');
       if (result.isError) throw new Error('managed_zotero_read_failed');
       return result;
     } finally { signal?.removeEventListener('abort', cancel); this.controllers.delete(controller); }

@@ -7,6 +7,7 @@ export class ResearchRetrievalBudget {
   readonly settings: RetrievalSettings;
   usedEvidenceTokens = 0;
   rounds = 0;
+  decisionTokens = 0;
   candidates = 0;
   partial = false;
   readonly visited = new Set<string>();
@@ -17,8 +18,15 @@ export class ResearchRetrievalBudget {
     const limit = Math.max(0, Math.floor(window - reservedTokens));
     if (limit < this.evidenceTokenLimit) { this.evidenceTokenLimit = limit; this.partial = true; }
   }
-  nextRound(): boolean {
-    const allowed = this.settings.autoExpand ? this.settings.rounds : 1;
+  reserveDecision(system: string, user: string, output: number): boolean {
+    const bound = new TextEncoder().encode(system + user).length + output + 1024;
+    if (this.usedEvidenceTokens + bound > this.evidenceTokenLimit) { this.partial = true; return false; }
+    this.decisionTokens += bound;
+    this.evidenceTokenLimit -= bound;
+    return true;
+  }
+  nextRound(explicit = false): boolean {
+    const allowed = explicit || this.settings.autoExpand ? this.settings.rounds : 1;
     if (this.rounds >= allowed || this.usedEvidenceTokens >= this.evidenceTokenLimit) { this.partial = true; return false; }
     this.rounds++;
     return true;

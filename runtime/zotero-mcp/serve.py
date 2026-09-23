@@ -147,7 +147,7 @@ def build_server(scope: dict) -> FastMCP:
     @server.tool
     def zotero_read_pdf_pages(library_type: str, library_id: str, item_key: str,
                              attachment_key: str, start_page: int, end_page: int) -> dict:
-        """Read up to 12 physical PDF pages from an authorized revision staged by Nodus."""
+        """Read up to four physical PDF pages from an authorized revision staged by Nodus."""
         item = source(library_type, library_id, item_key)
         attachment = next((a for a in item.get("attachments", []) if a["key"] == attachment_key), None)
         if not attachment or not attachment.get("path"):
@@ -155,14 +155,19 @@ def build_server(scope: dict) -> FastMCP:
         file = Path(attachment["path"]).resolve(strict=True)
         if not file.is_relative_to(scope["root"]):
             raise ToolError("attachment_path_not_authorized")
-        if start_page < 1 or end_page < start_page or end_page - start_page >= 12:
+        if start_page < 1 or end_page < start_page or end_page - start_page >= 4:
             raise ToolError("invalid_page_range")
         with file.open('rb') as stream:
             if hashlib.file_digest(stream, 'sha256').hexdigest() != attachment['sha256']:
                 raise ToolError("source_revision_changed")
+        metadata(library_type, library_id, attachment_key, attachment['version'])
         document = extract_pdf(file, pages=list(range(start_page - 1, end_page)))
+        metadata(library_type, library_id, attachment_key, attachment['version'])
+        with file.open('rb') as stream:
+            if hashlib.file_digest(stream, 'sha256').hexdigest() != attachment['sha256']:
+                raise ToolError('source_revision_changed')
         return {"itemKey": item_key, "attachmentKey": attachment_key, "revision": item["revision"],
-                "pages": [{"pageNumber": n + 1, "text": text} for n, text in zip(document.page_numbers, document.pages)],
+                "pages": [{"pageNumber": n + 1, "text": text[:16000], "partial": len(text) > 16000} for n, text in zip(document.page_numbers, document.pages)],
                 "needsOcr": [n + 1 for n in document.needs_ocr], "totalPages": document.page_count}
 
     return server

@@ -12,6 +12,11 @@ interface PreviewRecord {
   preview: ResearchPreparationPreview;
   configuration: { embedding: EmbeddingExecutionConfig | null; processingVersion: string; ocrLanguages?: string };
 }
+function externalEmbedding(config: EmbeddingExecutionConfig): boolean {
+  if (config.endpoint === 'nodus-local-runtime') return false;
+  try { return !['127.0.0.1', '[::1]', 'localhost'].includes(new URL(config.endpoint).hostname); }
+  catch { return true; }
+}
 function campaigns() { return new DocumentaryCampaigns(documentaryStore().db); }
 function academicVault() {
   const vault = getActiveVault();
@@ -48,7 +53,7 @@ export function previewResearchPreparation(input: { scope: 'vault' | 'selection'
   const local = config && ['ollama', 'lmstudio', 'nodus'].includes(config.provider);
   const available = !!config && (!!local || !!getSettings().providerKeys[config.provider]);
   const preview: ResearchPreparationPreview = { id: randomUUID(), vaultId: vault.id, createdAt: Date.now(), documents,
-    embedding: config ? { provider: config.provider, model: config.modelId, external: !local } : null,
+    embedding: config ? { provider: config.provider, model: config.modelId, external: externalEmbedding(config) } : null,
     embeddingAvailable: available, block: available ? null : 'no_model' };
   const payload: PreviewRecord = { preview, configuration: { embedding: config, processingVersion: 'nodus-documentary/2', ocrLanguages: getSettings().ocrLanguages || 'spa+eng' } };
   repo.db.prepare('INSERT INTO documentary_preparation_previews VALUES(?,?,?,?)').run(preview.id, vault.id, JSON.stringify(payload), preview.createdAt);
@@ -89,7 +94,7 @@ export function getResearchPreparationProgress(): ResearchPreparationProgress {
       }>;
     return { id: campaign.id, vaultId: campaign.vault_id, vaultName: getVault(campaign.vault_id)?.name ?? campaign.vault_name,
       createdAt: campaign.created_at, updatedAt: campaign.updated_at, state: campaign.state,
-      embedding: configuration.embedding ? { provider: configuration.embedding.provider, model: configuration.embedding.modelId, external: !['ollama', 'lmstudio', 'nodus'].includes(configuration.embedding.provider) } : null,
+      embedding: configuration.embedding ? { provider: configuration.embedding.provider, model: configuration.embedding.modelId, external: externalEmbedding(configuration.embedding) } : null,
       jobs: rows.map(row => ({ id: row.job_id, documentId: row.document_id, title: row.title,
         state: row.state !== 'active' ? row.state as ResearchPreparationCampaign['jobs'][number]['state'] : campaign.state !== 'active' ? campaign.state : row.request_state,
         stage: row.stage, completedPassages: row.completed_passages, totalPassages: row.total_passages, unknownRequests: row.unknown_requests, currentPage: row.current_page, totalPages: row.total_pages, error: row.error })) };

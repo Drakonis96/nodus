@@ -1633,9 +1633,10 @@ export function registerAcademicIpc(context: IpcContext): void {
 
   // research assistant
   h('research:corpus:sources', async () => researchCorpusInventory());
+  h('research:zotero:automatic', async (_e, enabled: boolean) => researchZotero.setResearchZoteroAutomatic(enabled));
   h('research:zotero:status', async () => researchZotero.getResearchZoteroStatus());
   h('research:zotero:connect', async (_e, input: Parameters<typeof researchZotero.connectResearchZotero>[0]) => researchZotero.connectResearchZotero(input));
-  h('research:zotero:disconnect', async () => researchZotero.closeResearchZotero());
+  h('research:zotero:disconnect', async () => researchZotero.disconnectResearchZotero());
   h('research:zotero:read', async (_e, input: Parameters<typeof researchZotero.readResearchZotero>[0]) => researchZotero.readResearchZotero(input));
   h('research:notebooks:list', async () => researchNotebooks.listResearchNotebooks());
   h('research:notebooks:save', async (_e, input) => researchNotebooks.saveResearchNotebook(input));

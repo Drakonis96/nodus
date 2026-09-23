@@ -8,8 +8,9 @@ import { getIdeaDetail, getEdgeDetail } from '../db/ideasRepo';
 import { getWork } from '../db/worksRepo';
 import { getGapDetail } from '../db/gapsRepo';
 import { getPassageDetail as getLegacyPassageDetail } from '../db/passagesRepo';
+import { getScopedLegacyPassageDetail } from './scopedLegacyCitations';
 import { getDocumentaryPassageDetail } from './documentaryCitations';
-const getPassageDetail = (id: string) => id.startsWith('documentary:') ? getDocumentaryPassageDetail(id) : getLegacyPassageDetail(id);
+const getPassageDetail = (id: string) => id.startsWith('documentary:') ? getDocumentaryPassageDetail(id) : id.startsWith('scoped:') ? getScopedLegacyPassageDetail(id) : getLegacyPassageDetail(id);
 import { buildCitationPreview } from './citationPreview';
 
 function exists(ref: CitationRef): boolean {

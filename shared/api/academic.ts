@@ -227,7 +227,7 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
   'getResearchCorpusSources' | 'listResearchNotebooks' | 'saveResearchNotebook' | 'deleteResearchNotebook' | 'resolveResearchNotebook' | 'searchResearchNotebook' | 'readResearchDocument'
   | 'getResearchPreparationPolicy' | 'setResearchPreparationPolicy' | 'previewResearchPreparation' | 'startResearchPreparationCampaign' | 'getResearchPreparationProgress' | 'onResearchPreparationProgress' | 'controlResearchPreparationCampaign'
   | 'getResearchPreparationInventory' | 'prepareResearchDocuments' | 'cancelResearchDocuments' | 'setResearchPreparationEnabled' | 'setResearchPreparationPaused'
-  | 'getZoteroMcpStatus' | 'connectResearchZotero' | 'disconnectResearchZotero' | 'readResearchZotero'> {
+  | 'setResearchZoteroAutomatic' | 'getZoteroMcpStatus' | 'connectResearchZotero' | 'disconnectResearchZotero' | 'readResearchZotero'> {
   // Dictionary: persistent evidence-backed concept syntheses
   listDictionaryEntries(request: DictionaryListRequest): Promise<DictionaryEntryPage>;
   listDictionaryFacets(): Promise<DictionaryFacets>;

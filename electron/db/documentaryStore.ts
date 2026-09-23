@@ -65,10 +65,10 @@ export class DocumentaryStore {
     `);
   }
   close(): void { this.db.close(); }
-  setPreference(key: 'enabled' | 'paused', value: boolean): void {
+  setPreference(key: 'enabled' | 'paused' | 'managed-zotero-disabled', value: boolean): void {
     this.db.prepare('INSERT INTO documentary_preferences VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key, String(value));
   }
-  preference(key: 'enabled' | 'paused'): boolean {
+  preference(key: 'enabled' | 'paused' | 'managed-zotero-disabled'): boolean {
     return (this.db.prepare('SELECT value FROM documentary_preferences WHERE key=?').get(key) as { value: string } | undefined)?.value === 'true';
   }
   enqueue(identity: DocumentaryIndexIdentity, payload: unknown, priority = 0, now = Date.now()): string {

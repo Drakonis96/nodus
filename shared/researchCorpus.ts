@@ -125,6 +125,10 @@ export interface ResearchEvidence {
 }
 
 export interface ResearchTraversal {
+  decisionTokens?: number;
+  matchedDocumentIds?: string[];
+  readDocumentIds?: string[];
+  limitations?: string[];
   scopeId: string;
   sourceCount: number;
   rounds: number;
@@ -176,6 +180,9 @@ export interface DocumentPreparationState {
 }
 
 export interface ZoteroMcpStatus {
+  automatic?: boolean;
+  sessionId?: string | null;
+  activeSessions?: number;
   notebookId?: string | null;
   scopeId?: string | null;
   installed: boolean;
@@ -212,6 +219,7 @@ export interface ResearchCorpusApi {
   cancelResearchDocuments(documentIds: string[]): Promise<void>;
   setResearchPreparationEnabled(enabled: boolean): Promise<void>;
   setResearchPreparationPaused(paused: boolean): Promise<void>;
+  setResearchZoteroAutomatic(enabled: boolean): Promise<ZoteroMcpStatus>;
   getZoteroMcpStatus(): Promise<ZoteroMcpStatus>;
   connectResearchZotero(input: { notebookId?: string | null; mode: 'managed' | 'external'; externalUrl?: string }): Promise<ZoteroMcpStatus>;
   disconnectResearchZotero(): Promise<void>;

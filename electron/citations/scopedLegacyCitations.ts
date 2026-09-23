@@ -20,6 +20,13 @@ export function recordScopedLegacyPassage(scope: ResolvedResearchScope, passageI
   const document = scope.documents.find(item => item.workId === detail.nodus_id);
   if (!document || (document.indexedSource && document.indexedSource.revision !== document.revision)) return null;
   assertResearchDocument(scope, document.id, researchCorpusInventory().documents.find(item => item.id === document.id));
+  return recordScopedSourcePassage(scope, document.id, detail);
+}
+
+/** Preserve only backend-read bytes; no index or preparation consent is implied. */
+export function recordScopedSourcePassage(scope: ResolvedResearchScope, documentId: string, detail: PassageDetail): PassageDetail | null {
+  const document = assertResearchDocument(scope, documentId, researchCorpusInventory().documents.find(item => item.id === documentId));
+  if (detail.nodus_id !== (document.workId ?? document.id)) throw new Error('research_source_not_authorized');
   const receipt: Receipt = { documentId: document.id, detail: { ...detail, revision: document.revision } };
   const key = researchFingerprint(receipt);
   recordResearchScope(scope);
@@ -46,7 +53,7 @@ export function getScopedLegacyPassageDetail(id: string): PassageDetail | null {
     if (!receipt || scope.vaultId !== getActiveVault().id || researchFingerprint(receipt) !== match[2]) return null;
     const current = researchCorpusInventory().documents.find(item => item.id === receipt.documentId);
     const document = assertResearchDocumentPermission(scope, receipt.documentId, current);
-    if (document.workId !== receipt.detail.nodus_id || document.revision !== receipt.detail.revision) return null;
+    if ((document.workId ?? document.id) !== receipt.detail.nodus_id || document.revision !== receipt.detail.revision) return null;
     if (scope.notebookId && getResearchNotebook(scope.notebookId)
       && !resolveResearchNotebook(scope.notebookId).documents.some(item => item.id === document.id)) return null;
     return { ...receipt.detail, passage_id: id, historical: current?.revision !== receipt.detail.revision };

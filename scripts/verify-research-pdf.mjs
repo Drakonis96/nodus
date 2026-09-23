@@ -6,6 +6,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
 /** Shared by the real source app and native installed-app checks. */
 export async function verifyResearchPdf(page, app, root) {
     const notebooks = await page.evaluate(() => window.nodus.listResearchNotebooks());
+    let originalRead = null;
     let corpusNotebook = notebooks.find(notebook => notebook.name === 'Packaged PDF extraction');
     if (!corpusNotebook) {
       const pdf = await PDFDocument.create();
@@ -15,14 +16,25 @@ export async function verifyResearchPdf(page, app, root) {
       fs.writeFileSync(filename, await pdf.save());
       await app.evaluate(({ dialog }, filename) => { globalThis.installerOpenDialog = dialog.showOpenDialog; dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [filename] }); }, filename);
       try {
-        corpusNotebook = await page.evaluate(async root => {
+        const prepared = await page.evaluate(async root => {
           await window.nodus.updateSettings({ autoBackupFolder: `${root}/library` });
           const item = await window.nodus.createGlobalLibraryItem({ title: 'Packaged synthetic PDF', itemType: 'report', creators: [] }, []);
           await window.nodus.addGlobalLibraryAttachments(item.id);
           const notebook = await window.nodus.saveResearchNotebook({ name: 'Packaged PDF extraction', mode: 'fixed', sources: [{ kind: 'library-item', id: item.id }], exclusions: [] });
+          const before = await window.nodus.getResearchPreparationProgress();
+          const original = await window.nodus.readResearchDocument({ notebookId: notebook.id, documentId: item.id, operation: { kind: 'pages', from: 1 } });
+          const after = await window.nodus.getResearchPreparationProgress();
+          const receipt = original.evidence[0] ? await window.nodus.getPassage(original.evidence[0].id) : null;
           await window.nodus.prepareResearchDocuments([item.id]);
-          return notebook;
+          return { notebook, original, receipt, beforeCampaigns: before.campaigns.length, afterCampaigns: after.campaigns.length };
         }, root);
+        corpusNotebook = prepared.notebook;
+        assert.equal(prepared.beforeCampaigns, prepared.afterCampaigns, 'reading an unindexed original starts no preparation');
+        assert.match(prepared.original.evidence[0].text, /PACKAGED73/);
+        assert.match(prepared.original.evidence[0].id, /^scoped:/);
+        assert.equal(prepared.receipt.page_number, 1);
+        assert.equal(prepared.receipt.page_label, null);
+        originalRead = { passed: true, noCampaignCreated: true, physicalPage: 1 };
       } finally { await app.evaluate(({ dialog }) => { dialog.showOpenDialog = globalThis.installerOpenDialog; delete globalThis.installerOpenDialog; }); }
     }
     const deadline = Date.now() + 150000;
@@ -33,5 +45,5 @@ export async function verifyResearchPdf(page, app, root) {
       await new Promise(resolve => setTimeout(resolve, 500));
     } while (Date.now() < deadline);
     assert.ok(evidence.some(item => item.provenance === 'source' && item.locator.pageNumber === 1 && item.text.includes('PACKAGED73')), 'packaged extraction and retrieval return original PDF evidence');
-    return { passed: true, notebookId: corpusNotebook.id, physicalPage: 1, marker: 'PACKAGED73' };
+    return { passed: true, notebookId: corpusNotebook.id, physicalPage: 1, originalRead, marker: 'PACKAGED73' };
 }

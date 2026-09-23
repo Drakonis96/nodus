@@ -115,3 +115,29 @@ export function disposeLibraryExtractionWorkers(): void {
   for (const worker of activeWorkers) void worker.terminate().catch(() => undefined);
   activeWorkers.clear();
 }
+
+/** Original page reads use the same owned extractor process without a writable library. */
+export async function readResearchOriginalInWorker(input: import('../extraction/researchOriginal').OriginalPageRead, signal?: AbortSignal): Promise<import('../extraction/researchOriginal').OriginalPage[]> {
+  signal?.throwIfAborted();
+  if (!libraryExtractionWorkerAvailable()) throw new Error('documentary_extraction_worker_unavailable');
+  const worker = backgroundProcess(workerFile(), 'Nodus original reading');
+  activeWorkers.add(worker);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: Error, value?: import('../extraction/researchOriginal').OriginalPage[]) => {
+      if (settled) return;
+      settled = true; clearTimeout(deadline); signal?.removeEventListener('abort', cancel); activeWorkers.delete(worker);
+      void worker.terminate().finally(() => error ? reject(error) : resolve(value!));
+    };
+    const cancel = () => finish(abortError());
+    const deadline = setTimeout(() => finish(new Error('research_original_read_timeout')), 30000);
+    signal?.addEventListener('abort', cancel, { once: true });
+    worker.on('message', (message: any) => {
+      if (message?.kind === 'done') finish(undefined, message.result);
+      if (message?.kind === 'error') finish(new Error(message.error));
+    });
+    worker.once('error', error => finish(error));
+    worker.once('exit', () => finish(new Error('research_original_worker_closed')));
+    worker.postMessage({ kind: 'read-original', input });
+  });
+}

@@ -15,9 +15,15 @@ import { retrieveSharedDocumentaryEvidence } from './documentaryPreparation';
 import { retrieveHierarchical, selectPassageEvidence } from './hierarchicalRetrieval';
 import { embed, resolveModelRef, researchModelContextWindow } from './aiClient';
 import { withResearchRequestBudget } from './researchRequestBudget';
-import { recordScopedLegacyPassage } from '../citations/scopedLegacyCitations';
+import { recordScopedSourcePassage, recordScopedLegacyPassage } from '../citations/scopedLegacyCitations';
 import { documentaryCitationId } from '../citations/documentaryCitations';
 import { getSettings } from '../db/settingsRepo';
+import { readAutomaticResearchZotero, pinZoteroOriginals, type ZoteroOriginalPins } from '../mcp/researchZotero';
+import type { OriginalPage } from '../extraction/researchOriginal';
+import { deepenResearch } from './researchActionCoordinator';
+import { getGlobalLibraryItem, globalLibraryAttachmentPath } from '../library/libraryService';
+import { readResearchOriginalInWorker } from '../library/libraryExtractionWorkerHost';
+import type { ModelRef } from '@shared/types';
 import { activeManualIdeaIds } from '../db/manualIdeaVisibility';
 
 /** Compatibility requests are explicit snapshots of the active vault. A notebook
@@ -31,10 +37,14 @@ export function resolveAcademicRunScope(notebookId?: string | null): ResolvedRes
 export class ResearchCorpusRun {
   readonly budget: ResearchRetrievalBudget;
   readonly evidence = new Map<string, WritingWorkshopPassageCandidate>();
+  readonly limitations = new Set<string>();
+  readonly matchedDocuments = new Set<string>();
+  readonly readDocuments = new Set<string>();
   readonly ideas = new Map<string, WritingWorkshopIdeaCandidate>();
   readonly traversal: Array<{ query: string; sources: string[]; candidates: number; partial: boolean }> = [];
   private readonly workIds: string[];
   private readonly ideaIds: string[];
+  private originalPins?: Promise<ZoteroOriginalPins>;
   private graphSnapshot: Pick<WritingWorkshopSnapshot, 'gaps' | 'contradictions' | 'themes'> | null = null;
   constructor(readonly scope: ResolvedResearchScope, settings: RetrievalSettings, readonly signal?: AbortSignal, readonly pinRevisions = false) {
     this.budget = new ResearchRetrievalBudget(settings);
@@ -56,6 +66,18 @@ export class ResearchCorpusRun {
       this.graphSnapshot = { gaps: [], contradictions: [], themes: [] };
       this.budget.partial = true;
     }
+  }
+  async investigate(query: string, model?: ModelRef | null): Promise<void> {
+    if (this.pinRevisions && !this.originalPins) {
+      const controller = new AbortController();
+      const signal = this.signal ? AbortSignal.any([this.signal, controller.signal]) : controller.signal;
+      const deadline = setTimeout(() => controller.abort(), 15000);
+      this.originalPins = pinZoteroOriginals({ ...this.scope, documents: this.scope.documents.slice(0, this.budget.settings.candidates) }, signal)
+        .catch(() => new Map()).finally(() => clearTimeout(deadline));
+      await this.originalPins; this.validate();
+    }
+    await this.retrieve(query, 1);
+    await deepenResearch(this, query, model);
   }
   async retrieve(query: string, expandRounds = 2): Promise<void> {
     this.validate();
@@ -110,6 +132,10 @@ export class ResearchCorpusRun {
           zotero_key: document.origin.kind === 'zotero' ? document.origin.itemKey : '' })) });
     }
     finishIdeas('completed', this.ideas.size);
+    for (const candidate of [...candidates, ...legacy]) {
+      const document = this.scope.documents.find(doc => (doc.workId ?? doc.id) === candidate.nodus_id);
+      if (document) this.matchedDocuments.add(document.id);
+    }
     this.budget.candidates += hierarchy.passages.length + separable.length + shared.traversal.candidates;
     this.budget.partial ||= shared.traversal.partial;
     this.traversal.push({ query, sources: this.scope.documents.map(document => document.id), candidates: hierarchy.passages.length + separable.length + shared.traversal.candidates, partial: this.budget.partial });
@@ -121,7 +147,7 @@ export class ResearchCorpusRun {
     if (!document) throw new Error('research_source_not_authorized');
     if (read.kind === 'pages' && read.attachmentId && document.attachments && !document.attachments.some(item => item.id === read.attachmentId)) throw new Error('research_source_not_authorized');
     const query = read.kind === 'search' ? read.query : read.kind === 'references' ? read.query ?? 'references bibliography bibliografía bibliographie literaturverzeichnis' : `${read.kind}:${JSON.stringify(read)}`;
-    if (!this.budget.nextRound() || this.budget.evidenceTokenLimit - this.budget.usedEvidenceTokens < 256) {
+    if (!this.budget.nextRound(true) || this.budget.evidenceTokenLimit - this.budget.usedEvidenceTokens < 256) {
       this.budget.partial = true;
       this.traversal.push({ query, sources: [document.id], candidates: 0, partial: true });
       return { scopeId: this.scope.id, evidence: [], partial: true };
@@ -139,11 +165,74 @@ export class ResearchCorpusRun {
     this.budget.candidates += result.traversal.candidates;
     this.budget.partial ||= result.traversal.partial;
     this.traversal.push({ query, sources: [document.id], candidates: result.traversal.candidates, partial: this.budget.partial });
+    if (evidence.length) { this.matchedDocuments.add(document.id); this.readDocuments.add(document.id); }
+    else if (read.kind === 'pages') return this.readOriginal(documentId, read, true);
+    else this.limitations.add('no_matches');
+    return { evidence, scopeId: this.scope.id, partial: this.budget.partial };
+  }
+  async readOriginal(documentId: string, read: Extract<ResearchDocumentRead, { kind: 'pages' }>, counted = false): Promise<{ evidence: ResearchEvidence[]; scopeId: string; partial: boolean }> {
+    this.validate(); validateResearchDocumentRead(read);
+    const document = this.scope.documents.find(item => item.id === documentId);
+    if (!document) throw new Error('research_source_not_authorized');
+    const current = researchCorpusInventory().documents.find(item => item.id === documentId);
+    assertResearchDocument(this.scope, documentId, current);
+    const remaining = this.budget.evidenceTokenLimit - this.budget.usedEvidenceTokens;
+    if ((!counted && !this.budget.nextRound(true)) || remaining < 256) {
+      this.limitations.add('budget_exhausted'); return { evidence: [], scopeId: this.scope.id, partial: true };
+    }
+    const library = document.libraryItemId ? getGlobalLibraryItem(document.libraryItemId) : null;
+    const attachments = library?.attachments.filter(item => item.mimeType === 'application/pdf') ?? [];
+    const attachment = read.attachmentId ? attachments.find(item => item.id === read.attachmentId) : attachments.length === 1 ? attachments[0] : null;
+    if (read.attachmentId && !document.attachments?.some(item => item.id === read.attachmentId)) throw new Error('research_source_not_authorized');
+    let attachmentId = attachment?.id ?? read.attachmentId ?? null;
+    let sourceRef = library && attachment ? `library:${library.id}:${attachment.id}` : null;
+    let pages: OriginalPage[];
+    if (attachment && library) {
+      pages = await researchActivityStep('nodus', 'pages', () => readResearchOriginalInWorker({
+        file: globalLibraryAttachmentPath(library.id, attachment.id), sha256: attachment.sha256,
+        from: read.from, to: read.to ?? read.from, maxBytes: Math.min(64000, remaining), languages: getSettings().ocrLanguages || 'spa+eng',
+      }, this.signal), document.title);
+    } else if (document.origin.kind === 'zotero') {
+      const raw = await readAutomaticResearchZotero(this.scope, { documentId, from: read.from, to: read.to,
+        attachmentKey: read.attachmentId ? library?.attachments.find(item => item.id === read.attachmentId)?.sourceKey ?? read.attachmentId : undefined }, this.signal, this.pinRevisions ? await (this.originalPins ?? Promise.resolve(new Map())) : undefined) as { structuredContent?: unknown; content?: Array<{ type: string; text?: string }> };
+      const content = raw.structuredContent ?? JSON.parse(raw.content?.find(item => item.type === 'text')?.text ?? 'null');
+      const value = content as { itemKey?: string; attachmentKey?: string; revision?: string; pages?: Array<{ text: string; pageNumber: number; partial?: boolean }>; needsOcr?: number[] };
+      if (value?.revision !== document.revision || value.itemKey !== document.origin.itemKey || !value.attachmentKey || !Array.isArray(value.pages)
+        || value.pages.length > 4 || value.pages.some(page => typeof page.text !== 'string' || !Number.isInteger(page.pageNumber) || page.pageNumber < read.from || page.pageNumber > (read.to ?? read.from))) throw new Error('research_mcp_invalid_evidence');
+      attachmentId = library?.attachments.find(item => item.sourceKey === value.attachmentKey)?.id ?? value.attachmentKey;
+      sourceRef = `zotero:${document.origin.libraryType}:${document.origin.libraryId}:${value.attachmentKey}`;
+      let bytes = Math.min(64000, remaining);
+      pages = value.pages.map(page => {
+        const text = Buffer.from(page.text).subarray(0, bytes).toString('utf8').replace(/\uFFFD$/u, '');
+        bytes -= Buffer.byteLength(text);
+        return { text, pageNumber: page.pageNumber, pageLabel: null, partial: !!page.partial || text !== page.text, ocr: false };
+      }).filter(page => page.text.trim());
+      if (value.needsOcr?.length) { this.limitations.add('ocr_pending'); this.budget.partial = true; }
+    } else { this.limitations.add('original_unavailable'); this.budget.partial = true; return { evidence: [], scopeId: this.scope.id, partial: true }; }
+    this.validate(); assertResearchDocument(this.scope, documentId, researchCorpusInventory().documents.find(item => item.id === documentId));
+    const evidence: ResearchEvidence[] = [];
+    for (const page of pages) {
+      const receipt = recordScopedSourcePassage(this.scope, document.id, { passage_id: '', nodus_id: document.workId ?? document.id,
+        libraryItemId: library?.id ?? null, attachmentId, revision: document.revision, provenance: 'source',
+        text: page.text, page_label: page.pageLabel, page_number: page.pageNumber, source_ref: sourceRef, chunk_index: 0,
+        work: { title: document.title, authors: document.authors, year: document.year, zotero_key: document.origin.kind === 'zotero' ? document.origin.itemKey : '' } });
+      if (!receipt || !this.budget.accept(receipt.passage_id, page.text)) continue;
+      this.evidence.set(receipt.passage_id, { id: receipt.passage_id, nodus_id: receipt.nodus_id, label: document.title, summary: page.text,
+        authors: document.authors, year: document.year, pageLabel: page.pageLabel, zotero_key: receipt.work.zotero_key,
+        citation: `nodus://passage/${encodeURIComponent(receipt.passage_id)}`, score: 1, reason: 'source' });
+      evidence.push({ id: receipt.passage_id, documentId: document.id, workId: document.workId, attachmentId,
+        attachmentRevision: document.attachments?.find(item => item.id === attachmentId)?.revision, revision: document.revision, text: page.text,
+        locator: { sourceRef: receipt.source_ref, pageNumber: page.pageNumber, pageLabel: page.pageLabel }, provenance: 'source', limitations: page.partial ? ['page_truncated'] : [] });
+      this.budget.partial ||= page.partial;
+    }
+    if (pages.length) this.readDocuments.add(document.id);
+    if (!evidence.length) this.limitations.add('no_readable_text');
+    this.traversal.push({ query: `original-pages:${read.from}-${read.to ?? read.from}`, sources: [document.id], candidates: pages.length, partial: this.budget.partial });
     return { evidence, scopeId: this.scope.id, partial: this.budget.partial };
   }
   coverage(): ResearchTraversal {
     return { scopeId: this.scope.id, sourceCount: this.scope.documents.length, rounds: this.budget.rounds,
-      evidenceTokens: this.budget.usedEvidenceTokens, partial: this.budget.partial, queries: this.traversal.map(query => ({ ...query, sources: [...query.sources] })) };
+      evidenceTokens: this.budget.usedEvidenceTokens, decisionTokens: this.budget.decisionTokens, matchedDocumentIds: [...this.matchedDocuments], readDocumentIds: [...this.readDocuments], limitations: [...this.limitations], partial: this.budget.partial, queries: this.traversal.map(query => ({ ...query, sources: [...query.sources] })) };
   }
   private passage(item: ResearchEvidence): WritingWorkshopPassageCandidate {
     const document = this.scope.documents.find(document => document.id === item.documentId)!;
@@ -199,8 +288,8 @@ export class ResearchCorpusRun {
       .filter(row => this.budget.accept(`theme:${row.id}`, row.label)).map(row => ({ ...row, summary: row.label, score: row.workCount, reason: 'scoped-theme', pinned: false, ideaCount: 0 }));
     return { gaps, contradictions, themes };
   }
-  async section(input: SectionRetrievalInput) {
-    await this.retrieve([input.objective, input.sectionTitle, input.purpose, ...input.keyClaims, ...(input.coverageQuestions ?? [])].join('\n'));
+  async section(input: SectionRetrievalInput, retrieve = true) {
+    if (retrieve) await this.retrieve([input.objective, input.sectionTitle, input.purpose, ...input.keyClaims, ...(input.coverageQuestions ?? [])].join('\n'));
     // These exclusions prefer fresh evidence; they are not access revocations.
     // A small corpus must remain citable in later sections after discovery runs
     // out. Reusing already authorized evidence consumes no new retrieval budget.
@@ -218,7 +307,8 @@ export function bindAcademicCorpusRun(deps: DeepResearchDeps, request: DeepResea
   let windowPromise: ReturnType<typeof researchModelContextWindow> | undefined;
   const model = request.model ?? getSettings().deepResearchModel ?? getSettings().synthesisModel;
   const bounded: DeepResearchDeps = { ...deps, buildSnapshot: async brief => {
-    const snapshot = await run.snapshot(brief);
+    await run.investigate(brief.objective, model);
+    const snapshot = run.snapshotFromEvidence(brief);
     if (!deps.prepareScopedSnapshot) return snapshot;
     const result = await deps.prepareScopedSnapshot(snapshot, async queries => {
       run.validate();
@@ -229,7 +319,10 @@ export function bindAcademicCorpusRun(deps: DeepResearchDeps, request: DeepResea
     });
     run.validate();
     return result;
-  }, retrieveForSection: input => run.section(input), researchTraversal: async () => run.coverage(),
+  }, retrieveForSection: async input => {
+    await run.investigate([input.objective, input.sectionTitle, input.purpose, ...input.keyClaims].join('\n'), model);
+    return run.section(input, false);
+  }, researchTraversal: async () => run.coverage(),
     // Basic searchable documents are independent from optional enriched analyses.
     preparePlanEvidence: undefined,
     finalize: input => deps.finalize({ ...input, supportConcerns: [...(input.supportConcerns ?? []), ...(run.budget.partial ? ['Documentary coverage is partial: the shared retrieval budget was reached.'] : [])] }) };
