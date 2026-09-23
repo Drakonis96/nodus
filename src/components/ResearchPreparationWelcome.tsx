@@ -4,9 +4,9 @@ import type { ResearchPreparationPolicy, ResearchPreparationPreview } from '@sha
 import { errorText, t, tx } from '../i18n';
 
 const OPEN_EVENT = 'nodus:research-preparation';
-interface PreparationRequest { workIds?: string[]; automatic?: boolean }
-export function openResearchPreparation(workIds?: string[]): void {
-  window.dispatchEvent(new CustomEvent<PreparationRequest>(OPEN_EVENT, { detail: { workIds } }));
+interface PreparationRequest { workIds?: string[]; automatic?: boolean; manage?: boolean }
+export function openResearchPreparation(workIds?: string[], manage = false): void {
+  window.dispatchEvent(new CustomEvent<PreparationRequest>(OPEN_EVENT, { detail: { workIds, manage: manage || !!workIds } }));
 }
 export function openResearchPreparationQueue(): void {
   document.querySelector<HTMLButtonElement>('[data-queue-trigger]')?.click();
@@ -33,6 +33,10 @@ export function ResearchPreparationWelcome({ vaultId, allowAutomatic, onConfigur
 function PreparationDialog({ request, onClose, onConfigure }: { request: PreparationRequest; onClose: () => void; onConfigure: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const descriptionId = useId();
+  const [confirmDecline, setConfirmDecline] = useState(false);
+  const confirmationBack = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (confirmDecline) confirmationBack.current?.focus(); }, [confirmDecline]);
   const [preview, setPreview] = useState<ResearchPreparationPreview | null>(null);
   const [policy, setPolicy] = useState<ResearchPreparationPolicy | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -67,7 +71,11 @@ function PreparationDialog({ request, onClose, onConfigure }: { request: Prepara
     try { await action(); } catch (reason) { setError(errorText(reason)); } finally { setBusy(false); }
   };
   const close = () => void run(async () => {
-    if (!policy || policy.decision === 'pending') await window.nodus.setResearchPreparationPolicy({ welcomeVersion: 1, decision: 'declined' });
+    await window.nodus.setResearchPreparationPolicy({ welcomeVersion: 1 });
+    onClose();
+  });
+  const decline = () => void run(async () => {
+    await window.nodus.setResearchPreparationPolicy({ welcomeVersion: 1, decision: 'declined' });
     onClose();
   });
   const enqueue = (mode: 'text' | 'embeddings') => void run(async () => {
@@ -78,22 +86,40 @@ function PreparationDialog({ request, onClose, onConfigure }: { request: Prepara
   });
   const documents = preview?.documents ?? [];
   const chosen = documents.filter(document => selected.has(document.id));
+  const preflight = preview?.preflight?.filter(entry => selected.has(entry.documentId)) ?? [];
   const matches = documents.filter(document => document.title.toLocaleLowerCase().includes(filter.toLocaleLowerCase()));
-  return createPortal(<dialog ref={dialog} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); if (!busy) close(); }}
-    className="w-[min(920px,95vw)] max-h-[90vh] overflow-y-auto rounded-xl border border-neutral-700 bg-neutral-950 p-6 text-neutral-100 shadow-xl backdrop:bg-black/60" data-testid="research-preparation-welcome">
-    <div className="flex items-start justify-between gap-4">
-      <h2 id={titleId} className="text-lg font-semibold">{t('Preparar fuentes')}</h2>
-      <button className="btn btn-ghost" aria-label={t('Cerrar')} disabled={busy} onClick={close}>×</button>
-    </div>
-    <div className="my-4 grid gap-3 md:grid-cols-3">
-      {[
-        ['1', 'Texto y embeddings', 'Prepara el texto de las obras para buscar pasajes. Solo utiliza el modelo de embeddings seleccionado; no genera Ideas, resúmenes ni perfiles.'],
-        ['2', 'Ideas y relaciones', 'Los análisis de Ideas y sus relaciones son procesos independientes. Puedes conservarlos y consultarlos junto con los documentos.'],
-        ['3', 'Investigación con evidencias', 'Las consultas utilizan las capas disponibles y conservan la procedencia de las evidencias. Preparar una obra no es lo mismo que analizar sus Ideas.'],
-      ].map(([number, title, description]) => <section key={number} className="rounded-lg border border-neutral-700 p-4">
-        <span aria-hidden="true" className="text-indigo-400">{number}</span><h3 className="my-2 font-medium">{t(title)}</h3><p className="text-sm text-neutral-400">{t(description)}</p>
-      </section>)}
-    </div>
+  return createPortal(<dialog ref={dialog} aria-labelledby={titleId} aria-describedby={request.manage ? undefined : descriptionId} onCancel={event => {
+    event.preventDefault(); if (!busy) { if (confirmDecline) setConfirmDecline(false); else close(); }
+  }} className={`research-preparation-cinema${request.manage ? ' research-preparation-manage' : ''}`} data-testid="research-preparation-welcome">
+    <div className="research-preparation-scene" aria-hidden="true"><div className="whats-new-aurora" /><div className="whats-new-stars" /></div>
+    <button className="whats-new-close" aria-label={t('Cerrar')} disabled={busy} onClick={close}>×</button>
+    <div className="research-preparation-content">
+      <div className="research-preparation-kicker">NODUS RESEARCH</div>
+      <div className="research-preparation-mark" aria-hidden="true"><svg viewBox="0 0 80 72" fill="none"><rect x="13" y="7" width="43" height="54" rx="7" /><rect x="24" y="16" width="43" height="49" rx="7" /><path d="M35 30h21M35 39h21M35 48h12" /></svg></div>
+      <h2 id={titleId}>{t(confirmDecline ? '¿Dejar la indexación desactivada?' : request.manage ? 'Preparar fuentes' : 'Tus documentos también tienen respuestas.')}</h2>
+      {confirmDecline ? <>
+        <p id={descriptionId} className="research-preparation-description">{t('No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Preparar fuentes.')}</p>
+        <div className="research-preparation-actions">
+          <button ref={confirmationBack} className="btn" disabled={busy} onClick={() => setConfirmDecline(false)}>{t('Volver')}</button>
+          <button className="btn btn-primary" disabled={busy} onClick={decline}>{t('Sí, dejar desactivado')}</button>
+        </div>
+      </> : !request.manage ? <>
+        <p id={descriptionId} className="research-preparation-description">{t('Ahora Nodus puede consultar el texto completo de tus documentos, además de sus Ideas extraídas.')}</p>
+        <p className="research-preparation-question">{t('¿Quieres indexar la biblioteca de esta bóveda?')}</p>
+        {preview ? <>
+          <p className="research-preparation-model-label">{t('Solo se utilizará tu modelo de embeddings:')}</p>
+          <div className="research-preparation-model">{preview.embedding ? <><span>{preview.embedding.provider}</span><b>{preview.embedding.model}</b></> : t('Modelo de embeddings no disponible')}</div>
+          <p className="research-preparation-note">{tx('{n} obras', { n: documents.length })} · {t('Bóveda actual')}{preview.embedding?.external && <><br />{t('Los fragmentos de texto se enviarán al proveedor de embeddings indicado.')}</>}</p>
+          {!preview.embeddingAvailable && <p className="research-preparation-note">{t('Configura tu modelo de embeddings para comenzar.')}</p>}
+        </> : !error && <p role="status">{t('Cargando…')}</p>}
+        <div className="research-preparation-actions">
+          <button className="btn btn-ghost" disabled={busy} onClick={() => setConfirmDecline(true)}>{t('No')}</button>
+          <button className="btn" disabled={busy} onClick={close}>{t('Más tarde')}</button>
+          <button className="btn btn-primary" disabled={busy || !preview || !selected.size} onClick={() => {
+            if (preview?.embeddingAvailable) enqueue('embeddings'); else { onClose(); onConfigure(); }
+          }}>{t(preview && !preview.embeddingAvailable ? 'Configurar embeddings' : 'Sí, iniciar')}</button>
+        </div>
+      </> : <>
     {!preview && !error && <p role="status">{t('Cargando…')}</p>}
     {preview && <>
       <p className="text-sm font-medium">{t('Bóveda actual')} · {tx('{n} obras', { n: documents.length })}</p>
@@ -105,9 +131,13 @@ function PreparationDialog({ request, onClose, onConfigure }: { request: Prepara
           [t('Selección'), chosen.length],
           [t('Disponible para consultar'), chosen.filter(document => document.preparation.lexical === 'ready').length],
           [t('Embeddings compatibles'), chosen.filter(document => document.preparation.embeddings === 'ready').length],
-          [t('Solo abstract'), chosen.filter(document => document.preparation.text === 'abstract').length],
+          [t('Solo abstract'), preflight.filter(entry => entry.status === 'abstract').length],
+          [t('Archivos inaccesibles'), preflight.filter(entry => entry.status === 'inaccessible').length],
+          [t('OCR pendiente'), preflight.filter(entry => entry.status === 'ocr_pending').length],
+          [t('Disponibilidad sin comprobar'), preflight.filter(entry => entry.status === 'unknown').length],
         ].map(([label, count]) => <div key={label} className="rounded border border-neutral-800 p-2"><dt className="text-neutral-400">{label}</dt><dd>{count}</dd></div>)}
       </dl>
+      <p className="my-2 text-xs text-neutral-400">{t('Los documentos que necesiten OCR se omitirán por ahora.')}</p>
       <p className="text-xs text-neutral-400">{t('Esta campaña incluye la selección mostrada. Las incorporaciones posteriores no se añadirán a ella.')}</p>
       <label className="mt-4 flex items-start gap-2 text-sm"><input type="checkbox" disabled={busy || !policy} checked={policy?.futureAdditions ?? false} onChange={event => {
         const futureAdditions = event.target.checked;
@@ -125,16 +155,20 @@ function PreparationDialog({ request, onClose, onConfigure }: { request: Prepara
           <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={selected.has(document.id)} onChange={event => setSelected(current => {
             const next = new Set(current); if (event.target.checked) next.add(document.id); else next.delete(document.id); return next;
           })} /><span>{document.title}<small className="block text-neutral-400">{t(document.preparation.text === 'abstract' ? 'Solo abstract' : document.preparation.lexical === 'ready' ? 'Disponible para consultar' : 'Preparación pendiente')}</small></span></label>
+          {preview.preflight?.find(entry => entry.documentId === document.id)?.status === 'ocr_pending' && <p className="ml-5 text-xs text-amber-400">{t('OCR pendiente')}</p>}
+          {preview.preflight?.find(entry => entry.documentId === document.id)?.status === 'inaccessible' && <p className="ml-5 text-xs text-amber-400">{t('Archivos inaccesibles')}</p>}
         </li>)}</ul>
         {matches.length > limit && <button className="btn btn-ghost" onClick={() => setLimit(value => value + 100)}>{t('Mostrar más')}</button>}
       </div>}
     </>}
-    {error && <p role="alert" className="my-3 text-sm text-red-400">{error}</p>}
     <div className="mt-5 flex flex-wrap justify-end gap-2">
       <button className="btn btn-ghost" disabled={busy} onClick={close}>{t('Ahora no')}</button>
       {preview && !preview.embeddingAvailable && <button className="btn" disabled={busy} onClick={() => { onClose(); onConfigure(); }}>{t('Configurar embeddings')}</button>}
       <button className="btn" disabled={busy || !preview || !selected.size} onClick={() => enqueue('text')}>{t('Preparar solo texto local')}</button>
       <button className="btn btn-primary" disabled={busy || !preview?.embeddingAvailable || !selected.size} onClick={() => enqueue('embeddings')}>{t(choosing || request.workIds ? 'Encolar selección' : 'Encolar biblioteca actual')}</button>
+    </div>
+    </>}
+    {error && <p role="alert" className="my-3 text-sm text-red-400">{error}</p>}
     </div>
   </dialog>, document.body);
 }

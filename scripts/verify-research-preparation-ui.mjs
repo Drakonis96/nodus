@@ -4,9 +4,12 @@ import path from 'node:path';
 /** Real renderer/preload/campaign queue with synthetic metadata, no provider calls. */
 export async function verifyResearchPreparationUi(page, root) {
   const dialog = page.getByTestId('research-preparation-welcome');
-  await dialog.getByText(/Embeddings: openai/).waitFor({ timeout: 45000 });
-  assert.equal(await dialog.locator('section').count(), 3);
-  assert.equal(await dialog.getByRole('checkbox', { name: 'Preparar nuevas incorporaciones', exact: true }).isChecked(), false);
+  await dialog.getByText('Tus documentos también tienen respuestas.', { exact: true }).waitFor({ timeout: 45000 });
+  assert.equal(await dialog.locator('section').count(), 0);
+  assert.equal(await dialog.getByRole('checkbox').count(), 0);
+  await dialog.getByRole('button', { name: 'No', exact: true }).click();
+  await dialog.getByText('¿Dejar la indexación desactivada?', { exact: true }).waitFor();
+  await dialog.getByRole('button', { name: 'Volver', exact: true }).click();
   const layouts = [];
   for (const theme of ['light', 'dark']) for (const width of [1280, 800]) {
     await page.evaluate(theme => window.nodus.updateSettings({ theme }), theme);
@@ -21,6 +24,12 @@ export async function verifyResearchPreparationUi(page, root) {
     await page.screenshot({ path: path.join(root, 'artifacts', `preparation-${theme}-${width}.png`) });
     layouts.push({ theme, width, box, keyboardFocusContained: true });
   }
+  await dialog.getByRole('button', { name: 'Más tarde', exact: true }).click();
+  assert.equal((await page.evaluate(() => window.nodus.getResearchPreparationProgress())).campaigns.length, 0);
+  // Manual management retains text-only preparation and the independent future policy.
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('nodus:research-preparation', { detail: { manage: true } })));
+  await dialog.getByRole('checkbox', { name: 'Preparar nuevas incorporaciones', exact: true }).waitFor();
+  assert.equal(await dialog.getByRole('checkbox', { name: 'Preparar nuevas incorporaciones', exact: true }).isChecked(), false);
   await dialog.getByRole('button', { name: 'Preparar solo texto local', exact: true }).click();
   await dialog.waitFor({ state: 'detached' });
   let campaign;

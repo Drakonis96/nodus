@@ -1071,7 +1071,7 @@ export function Settings({
 
       {activeVault?.type === 'academic' && visibleSettingsSection('library', 'Preparar fuentes', 'documentos embeddings biblioteca consentimiento') && (
         <Section title={t('Preparar fuentes')}>
-          <button className="btn" onClick={() => openResearchPreparation()}>{t('Preparar fuentes')}</button>
+          <button className="btn" onClick={() => openResearchPreparation(undefined, true)}>{t('Preparar fuentes')}</button>
         </Section>
       )}
 
