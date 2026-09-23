@@ -7421,7 +7421,9 @@ export interface DeepResearchJobRecord {
 
 /** Coverage + evidence accounting attached to a finished report. */
 export interface DeepResearchMeta {
-  factualAudit?: { checked: number; supported: number; removed: number; unverified: number };
+  factualAudit?: { checked: number; supported: number; removed: number; unverified: number;
+    /** Whole-report reconciliation; pairs are kept so removals can be reviewed. */
+    consistency?: { checked: boolean; conflicts: number; removed: number; pruned: number; pairs: Array<{ a: string; b: string; reason: string }> } };
   researchTraversal?: import('./researchCorpus').ResearchTraversal;
   /** Engine generation that produced the report. */
   deepResearchVersion: import('./deepResearchVersions').DeepResearchVersion;

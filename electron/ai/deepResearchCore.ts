@@ -1438,7 +1438,7 @@ export async function orchestrateDeepResearch(
   }
 
   const claimLedger: ResearchClaimRecord[] = [];
-  let consistency: { checked: boolean; conflicts: number; removed: number } | null = null;
+  let consistency: NonNullable<NonNullable<DeepResearchMeta['factualAudit']>['consistency']> | null = null;
   if (deps.auditFactualProse) {
     for (const item of written) {
       const audit = await deps.auditFactualProse(item.markdown);
@@ -1544,7 +1544,7 @@ export async function orchestrateDeepResearch(
     // both hold leave together instead of the report silently choosing a side.
     const reconciled = await reconcileResearchReport({ sections: written.map(item => item.markdown), abstract: finalize.abstract,
       limitations: finalize.limitations, nextSteps: finalize.nextSteps }, claimLedger, deps.auditReportConsistency?.bind(deps));
-    consistency = { checked: reconciled.consistencyChecked, conflicts: reconciled.conflicts, removed: reconciled.removed };
+    consistency = { checked: reconciled.consistencyChecked, conflicts: reconciled.conflicts, removed: reconciled.removed, pruned: reconciled.pruned, pairs: reconciled.conflictPairs };
     written.forEach((item, index) => { item.markdown = reconciled.parts.sections[index]; });
     for (let index = written.length - 1; index >= 0; index--) {
       if (!stripInitialHeading(written[index].markdown).trim()) written.splice(index, 1);

@@ -35,14 +35,36 @@ function validPremise(premise: unknown, position: number): premise is Premise {
     // Inferences may only rest on earlier premises: no cycles, no self-support.
     && Array.isArray(item.from) && item.from.length <= 10 && item.from.every(index => Number.isInteger(index) && index >= 0 && index < position);
 }
-export function validResearchProseVerdicts(input: unknown): input is ResearchProseVerdicts {
-  if (!input || typeof input !== 'object' || !Array.isArray((input as ResearchProseVerdicts).claims)) return false;
-  const claims = (input as ResearchProseVerdicts).claims;
-  return claims.length <= RESEARCH_AUDIT_BATCH && new Set(claims.map(item => item?.index)).size === claims.length && claims.every(item => item
-    && Number.isInteger(item.index) && item.index >= 0 && item.index < RESEARCH_AUDIT_BATCH && ['fact', 'attributed', 'inference', 'nonfactual'].includes(item.kind)
-    && typeof item.supported === 'boolean' && typeof item.explicitInference === 'boolean' && typeof item.reason === 'string' && item.reason.length <= 600
-    && Array.isArray(item.premises) && item.premises.length <= 12 && item.premises.every((premise, position) => validPremise(premise, position))
-    && Array.isArray(item.unsupportedParts) && item.unsupportedParts.length <= 12 && item.unsupportedParts.every(part => typeof part === 'string' && part.length <= 500));
+/** Batch envelope only; each claim is validated separately so one malformed item
+ * leaves its own sentence unverified (and removed) instead of the whole batch. */
+export function validResearchProseVerdicts(input: unknown): input is { claims: unknown[] } {
+  return !!input && typeof input === 'object' && Array.isArray((input as { claims?: unknown }).claims) && (input as { claims: unknown[] }).claims.length <= RESEARCH_AUDIT_BATCH;
+}
+function validClaim(item: unknown): item is Verdict {
+  if (!item || typeof item !== 'object') return false;
+  const claim = item as Verdict;
+  return Number.isInteger(claim.index) && claim.index >= 0 && claim.index < RESEARCH_AUDIT_BATCH && ['fact', 'attributed', 'inference', 'nonfactual'].includes(claim.kind)
+    && typeof claim.supported === 'boolean' && typeof claim.explicitInference === 'boolean' && typeof claim.reason === 'string'
+    && Array.isArray(claim.premises) && claim.premises.length <= 12 && claim.premises.every((premise, position) => validPremise(premise, position))
+    && Array.isArray(claim.unsupportedParts) && claim.unsupportedParts.length <= 12 && claim.unsupportedParts.every(part => typeof part === 'string');
+}
+/** Sanitizing may only make acceptance harder: over-short quotes are dropped (so a
+ * premise may lose its evidence), long diagnostics are clipped, and any other
+ * malformed claim, or an index claimed twice, yields no verdict at all. */
+export function normalizeResearchProseVerdicts(input: { claims: unknown[] }, size: number): Array<Verdict | undefined> {
+  const verdicts: Array<Verdict | undefined> = [];
+  const seen = new Map<number, number>();
+  for (const raw of input.claims) {
+    if (!raw || typeof raw !== 'object') continue;
+    const item = raw as Verdict;
+    const premises = Array.isArray(item.premises) ? item.premises.map(premise => premise && typeof premise === 'object' && Array.isArray(premise.evidence)
+      ? { ...premise, evidence: premise.evidence.filter(evidence => typeof evidence?.quote !== 'string' || evidence.quote.length >= 12) } : premise) : item.premises;
+    const claim = { ...item, premises, reason: typeof item.reason === 'string' ? item.reason.slice(0, 600) : item.reason };
+    if (Number.isInteger(item.index)) seen.set(item.index, (seen.get(item.index) ?? 0) + 1);
+    if (validClaim(claim) && claim.index < size) verdicts[claim.index] = claim;
+  }
+  for (const [index, count] of seen) if (count > 1) verdicts[index] = undefined;
+  return verdicts;
 }
 const CITATION = /\[[^\]]*\]\(nodus:\/\/[^)]+\)/gu;
 const PARENTHESIZED_CITATIONS = new RegExp(`[ \\t]*\\(\\s*(?:${CITATION.source})(?:\\s*[,;]?\\s*(?:${CITATION.source}))*\\s*\\)`, 'gu');
@@ -194,7 +216,7 @@ export function validResearchConflicts(input: unknown): input is { conflicts: Re
  *    answer rather than choosing one side without evidence.
  */
 export async function reconcileResearchReport(parts: ResearchReportParts, ledger: ResearchClaimRecord[],
-  findConflicts?: (statements: string[]) => Promise<ResearchConflict[]>): Promise<{ parts: ResearchReportParts; removed: number; conflicts: number; consistencyChecked: boolean }> {
+  findConflicts?: (statements: string[]) => Promise<ResearchConflict[]>): Promise<{ parts: ResearchReportParts; removed: number; conflicts: number; consistencyChecked: boolean; pruned: number; conflictPairs: Array<{ a: string; b: string; reason: string }> }> {
   const bearsContent = (claim: ResearchClaimRecord) => claim.kind !== 'nonfactual' || claim.failure === 'nonfactual_with_content';
   const rejected = ledger.filter(claim => claim.status !== 'supported' && bearsContent(claim)).map(claim => claim.sentence);
   const byKey = new Map<string, ResearchClaimRecord[]>();
@@ -205,7 +227,40 @@ export async function reconcileResearchReport(parts: ResearchReportParts, ledger
   const retire = (plain: string, failure: ResearchClaimFailure) => {
     for (const claim of byKey.get(researchSentenceKey(plain)) ?? []) if (claim.status === 'supported') { claim.status = 'removed'; claim.failure = failure; claim.evidence = []; }
   };
-  let removed = 0;
+  let removed = 0, pruned = 0;
+  let conflictPairs: Array<{ a: string; b: string; reason: string }> = [];
+  // Structure left behind by removals. Neither step removes a factual claim:
+  // a repeated body sentence keeps its first occurrence, and an organizational
+  // transition must still introduce a claim in its own paragraph.
+  const transition = (plain: string) => (byKey.get(researchSentenceKey(plain)) ?? []).some(claim => claim.kind === 'nonfactual' && claim.status === 'supported');
+  const heading = (text: string) => /^\s*#{1,6}\s/u.test(text);
+  const prune = (text: string, seen: Set<string> | null) => {
+    for (;;) {
+      const spans = researchProseSpans(text);
+      const drop = new Set<number>();
+      const keys = new Set<string>();
+      spans.forEach((span, index) => {
+        const plain = researchPlainSentence(span.text);
+        if (!plain || heading(span.text)) return;
+        const key = researchSentenceKey(plain);
+        if (seen && tokens(plain).size >= 5 && (seen.has(key) || keys.has(key))) { drop.add(index); return; }
+        keys.add(key);
+        if (!transition(plain)) return;
+        const next = spans[index + 1];
+        const introduces = next && !/\n[ \t]*\n/u.test(text.slice(span.end, next.start)) && !heading(next.text) && !transition(researchPlainSentence(next.text));
+        if (!introduces) drop.add(index);
+      });
+      if (!drop.size) { keys.forEach(key => seen?.add(key)); return text; }
+      pruned += drop.size;
+      for (const index of [...drop].sort((a, b) => b - a)) text = text.slice(0, spans[index].start) + text.slice(spans[index].end);
+      text = tidy(text);
+    }
+  };
+  const finish = (conflicts: number, consistencyChecked: boolean) => {
+    const seen = new Set<string>();
+    parts = { ...parts, sections: parts.sections.map(text => prune(text, seen)), abstract: prune(parts.abstract, null) };
+    return { parts, removed, conflicts, consistencyChecked, pruned, conflictPairs };
+  };
   const map = (drop: (plain: string) => boolean, failure: ResearchClaimFailure) => {
     const apply = (text: string) => {
       const result = dropResearchSentences(text, drop);
@@ -221,7 +276,7 @@ export async function reconcileResearchReport(parts: ResearchReportParts, ledger
     if (own?.some(claim => claim.status !== 'supported' && bearsContent(claim))) return true;
     return restatesRejectedClaim(plain, rejected.filter(sentence => researchSentenceKey(sentence) !== researchSentenceKey(plain)));
   }, 'restates_rejected_claim');
-  if (!findConflicts) return { parts, removed, conflicts: 0, consistencyChecked: false };
+  if (!findConflicts) return finish(0, false);
   const statements: string[] = [];
   const seen = new Set<string>();
   for (const text of [...parts.sections, parts.abstract, ...parts.limitations, ...parts.nextSteps]) {
@@ -231,11 +286,13 @@ export async function reconcileResearchReport(parts: ResearchReportParts, ledger
       seen.add(key); statements.push(plain);
     }
   }
-  if (statements.length < 2) return { parts, removed, conflicts: 0, consistencyChecked: true };
+  if (statements.length < 2) return finish(0, true);
   let conflicts: ResearchConflict[];
   try { conflicts = (await findConflicts(statements.slice(0, 160))).filter(item => item.a < statements.length && item.b < statements.length); }
-  catch { return { parts, removed, conflicts: 0, consistencyChecked: false }; }
+  catch { return finish(0, false); }
+  // Kept for manual review: an over-eager consistency judge must be visible.
+  conflictPairs = conflicts.slice(0, 20).map(item => ({ a: statements[item.a].slice(0, 400), b: statements[item.b].slice(0, 400), reason: item.reason.slice(0, 400) }));
   const conflicting = new Set(conflicts.flatMap(item => [researchSentenceKey(statements[item.a]), researchSentenceKey(statements[item.b])]));
   if (conflicting.size) map(plain => conflicting.has(researchSentenceKey(plain)), 'internal_contradiction');
-  return { parts, removed, conflicts: conflicts.length, consistencyChecked: true };
+  return finish(conflicts.length, true);
 }

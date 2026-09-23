@@ -15,7 +15,7 @@ const premise = (text, quote, extra = {}) => ({ text, type: 'fact', entailed: tr
 const verdict = (index, premises, extra = {}) => ({ index, kind: 'fact', premises, unsupportedParts: [], explicitInference: false, supported: true, reason: 'diagnostic', ...extra });
 try {
   const shared = load('shared/researchClaimAudit.ts');
-  const { researchProseSpans, applyResearchProseVerdicts, validResearchProseVerdicts, reconcileResearchReport, dropResearchSentences, restatesRejectedClaim } = shared;
+  const { researchProseSpans, applyResearchProseVerdicts, validResearchProseVerdicts, normalizeResearchProseVerdicts, reconcileResearchReport, dropResearchSentences, restatesRejectedClaim } = shared;
   const sources = [{ id: 'inside', text: 'The north field measured 23 units. The south field measured 7 units.', label: 'Synthetic source', citation: 'nodus://passage/inside' }];
   const north = premise('The north field measured 23 units', 'The north field measured 23 units.');
 
@@ -33,9 +33,19 @@ try {
   const repairedCitation = applyResearchProseVerdicts('The north field measured 23 units ([Old attribution](nodus://passage/foreign)).', sources, [verdict(0, [north])]);
   assert.equal(repairedCitation.markdown, 'The north field measured 23 units. [Synthetic source](nodus://passage/inside)', 'replacing an attribution leaves no empty citation parentheses');
   assert.equal(applyResearchProseVerdicts('An unsupported source.', sources, [verdict(0, [premise('x', sources[0].text, { id: 'foreign' })])]).claims[0].status, 'removed');
-  assert.equal(validResearchProseVerdicts({ claims: [verdict(0, [north]), verdict(0, [north])] }), false, 'duplicate indexes never cover omitted claims');
-  assert.equal(validResearchProseVerdicts({ claims: [verdict(0, [premise('a', 'The north field measured 23 units.', { type: 'inference', from: [0] })])] }), false, 'a premise cannot support itself');
-  assert.equal(validResearchProseVerdicts({ claims: [{ index: 0, kind: 'fact', supported: true, explicitInference: false, evidence: [], reason: 'old shape' }] }), false, 'verdicts without premises are malformed');
+  // One malformed item leaves only its own sentence without a verdict.
+  const normalized = normalizeResearchProseVerdicts({ claims: [verdict(0, [north]), verdict(1, [north]), verdict(1, [north]),
+    verdict(2, [premise('a', 'The north field measured 23 units.', { type: 'inference', from: [0] })]),
+    { index: 3, kind: 'fact', supported: true, explicitInference: false, evidence: [], reason: 'old shape' },
+    verdict(4, [premise('short quote', 'north field')]), verdict(9, [north])] }, 5);
+  assert.ok(normalized[0], 'a valid claim survives a malformed neighbour');
+  assert.equal(normalized[1], undefined, 'duplicate indexes never cover omitted claims');
+  assert.equal(normalized[2], undefined, 'a premise cannot support itself');
+  assert.equal(normalized[3], undefined, 'verdicts without premises are malformed');
+  assert.deepEqual(normalized[4].premises[0].evidence, [], 'an over-short quote is dropped, never accepted');
+  assert.equal(applyResearchProseVerdicts('The north field measured 23 units.', sources, [normalized[4]]).claims[0].failure, 'premise_without_literal_evidence');
+  assert.equal(normalized.length <= 5, true, 'indexes outside the batch are ignored');
+  assert.equal(validResearchProseVerdicts({ claims: Array(9).fill({}) }), false, 'an oversized batch is rejected');
   const unavailable = applyResearchProseVerdicts(text, sources, []);
   assert.ok(unavailable.claims.every(claim => claim.status === 'unverified'));
   assert.equal(unavailable.markdown, '', 'judge failure cannot retain unverified factual prose');
@@ -129,12 +139,29 @@ try {
   assert.doesNotMatch(reconciled.parts.sections[0], /series temporales/, 'both statements of a contradiction are removed');
   assert.match(reconciled.parts.sections[0], /^## Campos\n\nNorth field measured 23 units\. \[Source 1\]\(nodus:\/\/passage\/north\)$/);
   assert.equal(reconciled.conflicts, 1);
+  assert.deepEqual(reconciled.conflictPairs.map(pair => pair.reason), ['absence asserted and declared unknowable'], 'removed pairs remain reviewable');
   assert.ok(reconciled.consistencyChecked);
   assert.equal(ledger[2].status, 'removed');
   assert.equal(ledger[2].failure, 'restates_rejected_claim');
   assert.equal(ledger[4].failure, 'internal_contradiction');
   const unchecked = await reconcileResearchReport(structuredClone(parts), structuredClone(ledger), async () => { throw new Error('judge unavailable'); });
   assert.equal(unchecked.consistencyChecked, false, 'an unavailable consistency check is reported, not presented as passed');
+  // Removals leave structure behind: repeated body sentences and transitions whose
+  // paragraph no longer contains the claim they introduced.
+  const structureLedger = [
+    { sentence: 'Conviene distinguir dos situaciones que suelen confundirse.', kind: 'nonfactual', status: 'supported', evidence: [], reason: 'transition' },
+    { sentence: 'Esto tiene una consecuencia directa sobre la lectura.', kind: 'nonfactual', status: 'supported', evidence: [], reason: 'transition' },
+  ];
+  const structured = await reconcileResearchReport({
+    sections: ['## A\n\nConviene distinguir dos situaciones que suelen confundirse.\n\nNorth field measured 23 units. [S](nodus://passage/north)',
+      '## B\n\nNorth field measured 23 units. [S](nodus://passage/north) Esto tiene una consecuencia directa sobre la lectura. South field measured 41 units.'],
+    abstract: 'North field measured 23 units. Conviene distinguir dos situaciones que suelen confundirse.', limitations: [], nextSteps: ['Conviene distinguir dos situaciones que suelen confundirse.'] }, structureLedger, async () => []);
+  assert.equal(structured.parts.sections[0], '## A\n\nNorth field measured 23 units. [S](nodus://passage/north)', 'a transition cut off from its paragraph goes');
+  assert.equal(structured.parts.sections[1], '## B\n\nEsto tiene una consecuencia directa sobre la lectura. South field measured 41 units.', 'a repeated body sentence keeps its first occurrence; a live transition stays');
+  assert.equal(structured.parts.abstract, 'North field measured 23 units.', 'the abstract may repeat the body but not end on a dangling transition');
+  assert.deepEqual(structured.parts.nextSteps, ['Conviene distinguir dos situaciones que suelen confundirse.'], 'next steps are directives, not transitions');
+  assert.equal(structured.pruned, 3);
+  assert.ok(structureLedger.every(claim => claim.status === 'supported'), 'structural pruning never records a factual removal');
   assert.equal(dropResearchSentences('A. [S](nodus://passage/a)  B follows.', plain => plain === 'A.').markdown, 'B follows.', 'a dropped sentence takes its citations and spacing');
 
   // ── Orchestrator: summaries, limitations and next steps are reconciled too ─
@@ -198,6 +225,7 @@ try {
   assert.match(report.draft.draftMarkdown, /South field measured 41 units\./);
   assert.equal(report.meta.factualAudit.consistency.checked, true);
   assert.equal(report.meta.factualAudit.consistency.conflicts, 1);
+  assert.equal(report.meta.factualAudit.consistency.pairs.length, 1);
   assert.equal(report.draft.stats.truncated, true, 'a reconciled answer is marked partial');
   assert.ok(report.draft.claimLedger.some(claim => claim.failure === 'restates_rejected_claim'));
   assert.ok(report.draft.claimLedger.some(claim => claim.failure === 'internal_contradiction'));
