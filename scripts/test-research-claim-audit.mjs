@@ -31,13 +31,14 @@ try {
   assert.equal(spans.length, 2, 'author initials cannot bypass sentence auditing');
 
   const { orchestrateDeepResearch, fallbackPlan } = load('electron/ai/deepResearchCore.ts');
-  const request = { objective: 'What can this corpus establish?', language: 'en', deepResearchVersion: 'v2' };
+  const request = { objective: 'What can this corpus establish?', language: 'en', deepResearchVersion: 'v2', sectionLimit: 'single' };
   const snapshot = { generatedAt: new Date().toISOString(), brief: {}, ideas: [], passages: [], works: [], themes: [], gaps: [], contradictions: [], tutorRoutes: [], stats: {}, recommendedSelection: {} };
   let generated = 0;
   const resultWithoutEvidence = await orchestrateDeepResearch(request, { strictDocumentaryGrounding: true, buildSnapshot: async () => snapshot,
     planReport: async () => { generated++; throw new Error('must not plan empty evidence'); }, writeSection: async () => { generated++; return 'invented'; }, finalize: async () => { generated++; throw new Error('must not summarize empty evidence'); } });
   assert.equal(generated, 0);
   assert.equal(resultWithoutEvidence.meta.sections, 0);
+  assert.equal(resultWithoutEvidence.meta.structure, 'single', 'abstention preserves the requested output contract');
   assert.deepEqual(resultWithoutEvidence.draft.outline, []);
   assert.match(resultWithoutEvidence.draft.draftMarkdown, /cannot support/);
   assert.equal(resultWithoutEvidence.draft.stats.truncated, true);

@@ -773,7 +773,7 @@ export async function orchestrateDeepResearch(
       selection: { ideaIds: [], themeIds: [], gapIds: [], contradictionIds: [], workIds: [], passageIds: [], tutorRouteIds: [] },
       outline: [], draftMarkdown: explanation, matrix: [], bibliography: [], nextSteps: [], limitations: [explanation], claimLedger: [], researchTraversal: traversal,
       stats: { selectedIdeas: 0, selectedThemes: 0, selectedGaps: 0, selectedContradictions: 0, selectedWorks: 0, selectedPassages: 0, selectedTutorRoutes: 0, contextChars: explanation.length, truncated: true } },
-      meta: { deepResearchVersion: request.deepResearchVersion ?? 'v1', sections: 0, words, pages: pagesFromWords(words), ideasCovered: 0, ideasConsidered: 0,
+      meta: { deepResearchVersion: request.deepResearchVersion ?? 'v1', structure: request.sectionLimit === 'single' ? 'single' : 'sectioned', sections: 0, words, pages: pagesFromWords(words), ideasCovered: 0, ideasConsidered: 0,
         worksCited: 0, stoppedReason: explanation, verification: null, retrievalStrategy: 'scoped_documentary', researchTraversal: traversal } };
   }
   const maps = buildSnapshotMaps(snapshot);

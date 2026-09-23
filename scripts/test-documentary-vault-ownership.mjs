@@ -61,6 +61,9 @@ try {
   assert.equal(registry.getActiveVault().id, nonAcademic.id);
   assert.equal(database.getDb().prepare('SELECT COUNT(*) n FROM works').get().n, 0, 'background work did not write the open vault');
   let embeddingCalls = 0;
+  const settings = load('electron/db/settingsRepo.ts');
+  const getSettings = settings.getSettings;
+  settings.getSettings = () => ({ ...getSettings(), providerKeys: { openai: 'synthetic-test-only' } });
   ai.embedMany = async texts => { embeddingCalls++; return texts.map(() => [1, 0, 1]); };
   extraction.extractTraditionalResearchWork = async () => { throw new Error('compatible text should be reused without contacting Zotero'); };
   await registry.withOwningVault(first.id, () => database.withVaultDatabase(first.id, () => preparation.prepareResearchDocuments([firstDoc.id])));
