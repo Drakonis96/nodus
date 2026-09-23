@@ -72,6 +72,24 @@ function linkAttribute(tag: string, name: string): string {
   return decodeHtmlAttribute(match?.[1] ?? match?.[2] ?? match?.[3] ?? '');
 }
 
+/**
+ * The document a followed fetch landed on, for resolving relative `href`s.
+ *
+ * Electron's `session.fetch()` reports an EMPTY `Response.url`, so the address
+ * the bytes actually came from is not observable from the main process. The
+ * requested address is the only base available, and it is the right one in
+ * every case that matters: icon `href`s are absolute paths or absolute URLs far
+ * more often than not, and a redirect that changes the *directory* is the one
+ * shape that could resolve differently. Treating the missing URL as a failure
+ * instead — as this did — made the base null and threw away every declared
+ * icon on every site.
+ *
+ * Both arguments are already known to be ordinary http(s).
+ */
+function finalDocumentUrl(requested: string, reported: string): string | null {
+  return sanitizeBookmarkUrl(reported) ?? sanitizeBookmarkUrl(requested);
+}
+
 async function discoverFaviconUrls(pageUrl: string): Promise<string[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 4_000);
@@ -82,7 +100,7 @@ async function discoverFaviconUrls(pageUrl: string): Promise<string[]> {
       redirect: 'follow',
       headers: { accept: 'text/html,application/xhtml+xml' },
     });
-    const finalUrl = sanitizeBookmarkUrl(response.url);
+    const finalUrl = finalDocumentUrl(pageUrl, response.url);
     const type = String(response.headers.get('content-type') ?? '').split(';', 1)[0].trim().toLowerCase();
     if (!response.ok || !finalUrl || (type !== 'text/html' && type !== 'application/xhtml+xml')) return [];
     const body = await boundedPrefix(response, MAX_FAVICON_DOCUMENT_BYTES);
@@ -122,7 +140,13 @@ async function fetchOne(url: string): Promise<string | null> {
       credentials: 'omit',
       redirect: 'follow',
     });
-    if (!response.ok || !sanitizeBookmarkUrl(response.url)) return null;
+    // Never `response.url`: Electron's `session.fetch()` leaves it empty, so
+    // checking it here — as this did — rejected every icon that ever arrived
+    // and quietly degraded the whole feature to the globe. The guarantee it was
+    // standing in for is already held upstream, where it belongs: `safe` is
+    // http(s) by construction, and the browser session cancels any request that
+    // leaves http(s), including part-way through a redirect.
+    if (!response.ok) return null;
     const type = String(response.headers.get('content-type') ?? '').split(';', 1)[0].trim().toLowerCase();
     if (!TYPES.has(type)) return null;
     const body = await boundedBody(response);
@@ -135,23 +159,72 @@ async function fetchOne(url: string): Promise<string | null> {
   }
 }
 
-/** Fetch at most four Chromium-discovered candidates, cached and size-limited. */
-export function cachePageFavicon(urls: string[]): Promise<string | null> {
-  const candidates = [...new Set(urls.map(String).filter((url) => sanitizeBookmarkUrl(url)))].slice(0, 4);
-  if (!candidates.length) return Promise.resolve(null);
-  const key = `icons:${candidates.join('\n')}`;
+/** One memoised lookup, evicting the oldest entry once the cache is full. */
+function memoized(key: string, load: () => Promise<string | null>): Promise<string | null> {
   const existing = cache.get(key);
   if (existing) return existing;
-  const pending = (async () => {
-    for (const url of candidates) {
-      const data = await fetchOne(url);
-      if (data) return data;
-    }
-    return null;
-  })();
+  const pending = load();
   cache.set(key, pending);
   if (cache.size > MAX_CACHE_ENTRIES) cache.delete(cache.keys().next().value ?? '');
   return pending;
+}
+
+/** Deduplicated, http(s)-only, and capped so one hostile page cannot fan out. */
+function healthyCandidates(urls: string[]): string[] {
+  return [...new Set(urls.map(String).filter((url) => sanitizeBookmarkUrl(url)))].slice(0, 4);
+}
+
+/**
+ * Where a site keeps its icon when it declared none, or declared only an SVG.
+ *
+ * Order matters: a real `.ico` is the one path a browser is entitled to assume,
+ * and the two larger images are a better icon than nothing rather than a better
+ * icon than the `.ico`.
+ */
+function wellKnownFaviconUrls(origin: string): string[] {
+  return [
+    new URL('/favicon.ico', origin).href,
+    new URL('/favicon.png', origin).href,
+    new URL('/apple-touch-icon.png', origin).href,
+  ];
+}
+
+/** The first candidate that yields usable bytes. */
+async function firstIcon(urls: string[]): Promise<string | null> {
+  for (const url of urls) {
+    const data = await fetchOne(url);
+    if (data) return data;
+  }
+  return null;
+}
+
+/** Fetch at most four Chromium-discovered candidates, cached and size-limited. */
+export function cachePageFavicon(urls: string[]): Promise<string | null> {
+  const candidates = healthyCandidates(urls);
+  if (!candidates.length) return Promise.resolve(null);
+  return memoized(`icons:${candidates.join('\n')}`, () => firstIcon(candidates));
+}
+
+/**
+ * Resolve the icon for a LIVE tab, given whatever Chromium reported for it.
+ *
+ * Chromium's own list is tried first because it is free and usually right, but
+ * it is not sufficient on its own. A site whose only declared icon is an SVG —
+ * which Nodus deliberately never embeds — makes Chromium report nothing usable,
+ * and it does not then fall back to `/favicon.ico` on the site's behalf. Half of
+ * the sites that hit this still serve a perfectly good raster `.ico`, so
+ * without the well-known paths those tabs showed the globe while the icon sat
+ * one request away.
+ */
+export function cachePageFaviconForSite(pageUrl: string, urls: string[]): Promise<string | null> {
+  const safe = sanitizeBookmarkUrl(pageUrl);
+  if (!safe) return cachePageFavicon(urls);
+  const origin = new URL(safe).origin;
+  const candidates = healthyCandidates(urls);
+  return memoized(
+    `page:${origin}:${candidates.join('\n')}`,
+    () => firstIcon([...candidates, ...wellKnownFaviconUrls(origin)]),
+  );
 }
 
 /** Resolve a bookmark icon even when it was imported or saved before Chromium reported one. */
@@ -159,20 +232,9 @@ export function cacheWebsiteFavicon(pageUrl: string): Promise<string | null> {
   const safe = sanitizeBookmarkUrl(pageUrl);
   if (!safe) return Promise.resolve(null);
   const origin = new URL(safe).origin;
-  const key = `website:${origin}`;
-  const existing = cache.get(key);
-  if (existing) return existing;
-  const pending = (async () => {
-    const discovered = await discoverFaviconUrls(safe);
-    const linked = await cachePageFavicon(discovered);
+  return memoized(`website:${origin}`, async () => {
+    const linked = await cachePageFavicon(await discoverFaviconUrls(safe));
     if (linked) return linked;
-    return cachePageFavicon([
-      new URL('/favicon.ico', origin).href,
-      new URL('/favicon.png', origin).href,
-      new URL('/apple-touch-icon.png', origin).href,
-    ]);
-  })();
-  cache.set(key, pending);
-  if (cache.size > MAX_CACHE_ENTRIES) cache.delete(cache.keys().next().value ?? '');
-  return pending;
+    return firstIcon(wellKnownFaviconUrls(origin));
+  });
 }
