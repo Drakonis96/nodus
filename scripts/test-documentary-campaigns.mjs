@@ -22,7 +22,7 @@ try {
   const experience = load('electron/ai/researchPreparationExperience.ts');
   preparation.setResearchPreparationPaused(true);
   const repo = new (load('electron/db/documentaryCampaigns.ts').DocumentaryCampaigns)(preparation.documentaryStore().db);
-  assert.equal(experience.getResearchPreparationPolicy().futureAdditions, false);
+  assert.equal(experience.getResearchPreparationPolicy().futureAdditions, true);
   assert.equal(repo.list().length, 0, 'updating/reading inventory creates no preparation');
   const preview = await experience.previewResearchPreparation({ scope: 'vault' });
   assert.deepEqual(preview.documents.map(doc => doc.title).sort(), ['old-pending', 'one']);
@@ -36,11 +36,13 @@ try {
   assert.equal(progress.campaigns[0].jobs.length, 2, 'confirmation never expands the frozen inventory');
   assert.equal(progress.campaigns[0].embedding, null);
   await assert.rejects(() => experience.startResearchPreparationCampaign({ previewId: preview.id, mode: 'text' }), /expired/);
+  const otherPolicy = repo.policy(other.id);
+  experience.setResearchPreparationPolicy({ futureAdditions: false });
   experience.setResearchPreparationPolicy({ decision: 'declined', welcomeVersion: 1, futureAdditions: true });
   assert.equal(repo.policy(vault.id).known.length, 3, 'enabling future additions records preexisting pending members');
-  assert.equal(repo.policy(other.id).futureAdditions, false, 'consent never expands to another vault');
+  assert.deepEqual(repo.policy(other.id), otherPolicy, 'changing a policy does not modify another vault');
   experience.setResearchPreparationPolicy({ futureAdditions: true, vaultId: other.id, known: [], authorized: {} });
-  assert.equal(repo.policy(other.id).futureAdditions, false, 'untrusted extra policy fields cannot change the owner or baseline');
+  assert.deepEqual(repo.policy(other.id), otherPolicy, 'untrusted extra policy fields cannot change the owner or baseline');
   const beforeDisable = repo.list().length;
   experience.setResearchPreparationPolicy({ futureAdditions: false });
   assert.equal(repo.list().length, beforeDisable);

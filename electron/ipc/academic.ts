@@ -306,10 +306,10 @@ import { isSemanticBridgeRunning } from '../ai/semanticBridges';
 import * as chat from '../db/chatRepo';
 import * as notes from '../db/notesRepo';
 import * as workspace from '../db/workspaceRepo';
-import { getDb } from '../db/database';
+import { getDb, withVaultDatabase } from '../db/database';
 import { deleteWorks, worksRunningNow } from '../db/workDeletion';
 import { removeGlobalLibraryLinksForWorks } from '../library/libraryService';
-import { getActiveVault } from '../vaults/vaultRegistry';
+import { getActiveVault, withOwningVault } from '../vaults/vaultRegistry';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
 // electron sub-build erases type-only @shared imports but cannot resolve the
@@ -654,7 +654,9 @@ export function registerAcademicIpc(context: IpcContext): void {
       if (ids.includes(item.nodus_id)) scanQueue.removeItem(item.id);
     }
 
-    const vaultId = getActiveVault()?.id ?? null;
+    const vaultId = getActiveVault().id;
+    return withOwningVault(vaultId, () => withVaultDatabase(vaultId, async () => {
+    await documentaryPreparation.reconcileResearchDocumentOwnership();
     const result = deleteWorks(ids, { vaultId });
     // The Global Library index lives in its own database and only needs cleanup when it
     // is configured; a failure there must not undo a delete that already happened.
@@ -671,7 +673,9 @@ export function registerAcademicIpc(context: IpcContext): void {
         console.error('[works:delete] no se pudo reconciliar el índice documental', error);
       });
     }
+    await documentaryPreparation.reconcileResearchDocumentOwnership();
     return { ok: true, running: [], deleted: result.deleted, dormantIdeas: result.dormantIdeas, globalLinks };
+    }));
   });
   h('works:processFull', async (_e, nodusId: string, model?: ModelRef | null, options?: AnalysisRunOptions) => {
     processFullChain(nodusId, model, options);

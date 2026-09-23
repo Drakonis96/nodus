@@ -62,11 +62,31 @@ export class DocumentaryStore {
       );
       CREATE INDEX IF NOT EXISTS documentary_jobs_claim ON documentary_jobs(state, available_at, priority);
       CREATE TABLE IF NOT EXISTS documentary_preferences (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS documentary_source_owners (
+        vault_id TEXT NOT NULL, document_id TEXT NOT NULL, PRIMARY KEY(vault_id,document_id)
+      );
       CREATE TABLE IF NOT EXISTS documentary_mcp_choices (
         vault_id TEXT NOT NULL, notebook_id TEXT NOT NULL, endpoint TEXT NOT NULL,
         PRIMARY KEY(vault_id,notebook_id)
       );
     `);
+  }
+  /** Remove every published and working derivative, fencing in-flight leases. */
+  removeDocument(documentId: string): void {
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM documentary_fts WHERE id IN (SELECT id FROM documentary_passages WHERE document_id=?)').run(documentId);
+      for (const table of ['documentary_passages', 'documentary_publications', 'documentary_current', 'documentary_desired', 'documentary_attachment_heads', 'documentary_jobs', 'documentary_revisions']) {
+        this.db.prepare(`DELETE FROM ${table} WHERE document_id=?`).run(documentId);
+      }
+      if (this.db.prepare("SELECT 1 FROM sqlite_master WHERE name='documentary_requests'").get()) {
+        const prefix = `embedding:${documentId}:`;
+        const jobs = this.db.prepare('SELECT document_id FROM documentary_requests WHERE source_id=? OR document_id=? OR substr(document_id,1,?)=?').all(documentId, documentId, prefix.length, prefix) as { document_id: string }[];
+        for (const job of jobs) {
+          for (const table of ['documentary_embedding_chunks', 'documentary_embedding_attempts']) if (this.db.prepare('SELECT 1 FROM sqlite_master WHERE name=?').get(table)) this.db.prepare(`DELETE FROM ${table} WHERE operation=?`).run(job.document_id);
+          this.db.prepare('DELETE FROM documentary_requests WHERE document_id=?').run(job.document_id);
+        }
+      }
+    }).immediate();
   }
   close(): void { this.db.close(); }
   setPreference(key: 'enabled' | 'paused' | 'managed-zotero-disabled', value: boolean): void {

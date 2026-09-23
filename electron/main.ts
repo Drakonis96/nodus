@@ -1088,7 +1088,7 @@ app.whenReady().then(async () => {
   const { initializeDocumentaryPreparation, closeDocumentaryPreparation } = await import('./ai/documentaryPreparation');
   stopDocumentaryPreparation = closeDocumentaryPreparation;
   stopResearchZotero = (await import('./mcp/researchZotero')).closeResearchZotero;
-  initializeDocumentaryPreparation();
+  await initializeDocumentaryPreparation();
   if (process.env.NODUS_ISOLATED_ROOT || process.env.NODUS_STELLAR_PREVIEW === '1') return;
   // Existing installs may have one full database copy per historical schema update.
   // Queue every registered vault after the window exists; the utility worker applies

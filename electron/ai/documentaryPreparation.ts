@@ -1,3 +1,5 @@
+import { listResearchNotebooks } from '../db/researchNotebooksRepo';
+import { selectResearchDocuments } from './researchCorpusScope';
 import { researchActivityEnabled, startResearchActivity } from './researchActivity';
 import { app } from 'electron';
 import fs from 'node:fs';
@@ -32,6 +34,7 @@ import { onResearchCorpusChanged } from './researchCorpusEvents';
 
 let shared: DocumentaryStore | null = null;
 let stopping = false;
+let corpusPoll: ReturnType<typeof setInterval> | null = null;
 export function documentaryStore(): DocumentaryStore {
   if (!shared) {
     const directory = path.join(app.getPath('userData'), 'documentary');
@@ -43,6 +46,7 @@ export function documentaryStore(): DocumentaryStore {
 }
 export function closeDocumentaryPreparation(): void {
   stopping = true;
+  if (corpusPoll) clearInterval(corpusPoll); corpusPoll = null;
   activePreparation?.abort();
   if (retryTimer) clearTimeout(retryTimer);
   if (autoTimer) clearTimeout(autoTimer);
@@ -325,7 +329,7 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
         if (!document || document.revision !== request.revision) throw new Error('research_source_not_authorized');
         validateSource = () => {
           const current = researchCorpusInventory().documents.find(item => item.id === document.id);
-          if (!current || current.revision !== document.revision || current.permissionRevision !== document.permissionRevision) throw new Error('research_source_not_authorized');
+          if (!current || current.revision !== document.revision || current.permissionRevision !== document.permissionRevision || (document.workId && current.workId !== document.workId)) throw new Error('research_source_not_authorized');
         };
         checkLease();
         // OCR is deferred for documentary preparation, including already queued
@@ -427,6 +431,7 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
         let completed = 0, unknown = 0;
         for (const result of prepared) {
           checkLease();
+          if (configuration.embedding && !['ollama', 'lmstudio', 'nodus'].includes(configuration.embedding.provider) && !getSettings().providerKeys[configuration.embedding.provider]) throw new Error('documentary_embeddings_unavailable');
           if (configuration.embedding) await prepareDocumentaryEmbeddings(result.indexKey, result.chunks, controller.signal, configuration.embedding, checkLease, (count, uncertain) => {
             store.db.prepare('UPDATE documentary_requests SET completed_passages=?,unknown_requests=?,updated_at=? WHERE document_id=? AND lease_token=?').run(completed + count, unknown + uncertain, Date.now(), request.document_id, request.lease_token);
             notifyDocumentaryPreparation();
@@ -473,9 +478,45 @@ export function setResearchPreparationEnabled(enabled: boolean): void {
   const repo = new DocumentaryCampaigns(documentaryStore().db);
   const policy = repo.policy(getActiveVault().id);
   if (enabled && !policy.futureAdditions) policy.known = researchCorpusInventory().documents.filter(document => document.workId && !document.noteId && !document.conversationAttachment).map(document => document.id);
-  repo.savePolicy({ ...policy, futureAdditions: enabled });
+  repo.savePolicy({ ...policy, futureAdditions: enabled, futureAdditionsSetByUser: true });
   notifyDocumentaryPreparation();
   initializeDocumentaryPreparation();
+}
+
+/** Reconcile ownership before garbage collection. Shared copies survive other vaults. */
+export async function reconcileResearchDocumentOwnership(): Promise<void> {
+  const store = documentaryStore();
+  const snapshots: Array<{ vaultId: string; ids: Set<string> }> = [];
+  for (const vault of listVaults().filter(vault => vault.type === 'academic')) {
+    await withOwningVault(vault.id, () => withVaultDatabase(vault.id, () => {
+      const inventory = researchCorpusInventory();
+      const ids = new Set(inventory.documents.filter(document => document.workId).map(document => document.id));
+      for (const notebook of listResearchNotebooks()) {
+        const selected = notebook.mode === 'fixed' ? notebook.resolvedDocumentIds : selectResearchDocuments(notebook.sources, notebook.exclusions, inventory.documents, inventory.collections);
+        for (const id of selected) if (inventory.documents.some(document => document.id === id)) ids.add(id);
+      }
+      snapshots.push({ vaultId: vault.id, ids });
+    }));
+  }
+  store.db.transaction(() => {
+    const previous = store.db.prepare('SELECT vault_id,document_id FROM documentary_source_owners').all() as Array<{ vault_id: string; document_id: string }>;
+    store.db.prepare('DELETE FROM documentary_source_owners').run();
+    for (const snapshot of snapshots) for (const id of snapshot.ids) store.db.prepare('INSERT INTO documentary_source_owners VALUES(?,?)').run(snapshot.vaultId, id);
+    const removed = new Set<string>();
+    for (const old of previous) {
+      if (snapshots.some(snapshot => snapshot.vaultId === old.vault_id && snapshot.ids.has(old.document_id))) continue;
+      store.db.prepare("UPDATE documentary_campaign_members SET state='cancelled' WHERE document_id=? AND campaign_id IN (SELECT id FROM documentary_campaigns WHERE vault_id=?)").run(old.document_id, old.vault_id);
+      const policies = new DocumentaryCampaigns(store.db);
+      const policy = policies.policy(old.vault_id);
+      delete policy.authorized[old.document_id];
+      policies.savePolicy({ ...policy, known: policy.known.filter(id => id !== old.document_id) });
+      removed.add(old.document_id);
+    }
+    new DocumentaryCampaigns(store.db).synchronizeOwners(snapshots.map(snapshot => snapshot.vaultId));
+    interruptUnusedDocumentaryRequest();
+    for (const id of removed) if (!store.db.prepare('SELECT 1 FROM documentary_source_owners WHERE document_id=?').get(id)) store.removeDocument(id);
+  }).immediate();
+  notifyDocumentaryPreparation();
 }
 
 let unsubscribe: (() => void) | null = null;
@@ -485,7 +526,9 @@ export function notifyResearchCorpusChanged(): void {
   autoTimer = withoutOwningVault(() => withoutDatabaseContext(() => setTimeout(() => {
     autoTimer = null;
     void (async () => {
+      await initialization;
       const repo = new DocumentaryCampaigns(documentaryStore().db);
+      await reconcileResearchDocumentOwnership();
       for (const vault of listVaults().filter(vault => vault.type === 'academic')) {
         if (!repo.policy(vault.id).futureAdditions) continue;
         await withOwningVault(vault.id, () => withVaultDatabase(vault.id, async () => {
@@ -496,15 +539,39 @@ export function notifyResearchCorpusChanged(): void {
             || (policy.authorized[document.id] !== undefined && policy.authorized[document.id] !== document.revision));
           if (documents.length) await prepareResearchDocuments(documents.map(document => document.id));
           const updated = repo.policy(vault.id);
-          repo.savePolicy({ ...updated, known: [...new Set([...updated.known, ...inventory.map(document => document.id)])] });
-        }));
+          repo.savePolicy({ ...updated, known: inventory.map(document => document.id) });
+        })).catch(() => { /* Retry discovery after configuration/import recovery; keep other vaults moving. */ });
       }
     })().catch(() => undefined);
   }, 1000)));
   autoTimer.unref();
 }
-export function initializeDocumentaryPreparation(): void {
+let initialization: Promise<void> | null = null;
+export function initializeDocumentaryPreparation(): Promise<void> {
+  return initialization ??= initializeOwnedDocumentaryPreparation();
+}
+async function initializeOwnedDocumentaryPreparation(): Promise<void> {
   if (unsubscribe) return;
+  // Baseline pre-update documents without silently indexing the old library.
+  // A new vault has no baseline row, so its first added documents are eligible.
+  const repo = new DocumentaryCampaigns(documentaryStore().db);
+  for (const vault of listVaults().filter(vault => vault.type === 'academic')) {
+    const row = repo.db.prepare('SELECT policy_json FROM documentary_preparation_policies WHERE vault_id=?').get(vault.id);
+    const policy = repo.policy(vault.id);
+    await withOwningVault(vault.id, () => withVaultDatabase(vault.id, () => {
+      for (const document of researchCorpusInventory().documents.filter(document => document.workId))
+        repo.db.prepare('INSERT OR IGNORE INTO documentary_source_owners VALUES(?,?)').run(vault.id, document.id);
+    }));
+    if (row && policy.automaticVersion === 1) continue;
+    await withOwningVault(vault.id, () => withVaultDatabase(vault.id, () => {
+      repo.savePolicy({ ...policy, automaticVersion: 1,
+        futureAdditions: policy.futureAdditionsSetByUser ? policy.futureAdditions : policy.decision !== 'declined',
+        known: researchCorpusInventory().documents.filter(document => document.workId && !document.noteId && !document.conversationAttachment).map(document => document.id) });
+    }));
+  }
+  // Also catches sources added by long-running importers after their initial event.
+  corpusPoll = withoutOwningVault(() => withoutDatabaseContext(() => setInterval(notifyResearchCorpusChanged, 30000)));
+  corpusPoll.unref();
   const global = onGlobalLibraryChanged(notifyResearchCorpusChanged);
   const authored = onResearchCorpusChanged(notifyResearchCorpusChanged);
   unsubscribe = () => { global(); authored(); };

@@ -38,7 +38,7 @@ export function setResearchPreparationPolicy(input: { welcomeVersion?: number; d
     policy.known = researchCorpusInventory().documents.filter(document => document.workId && !document.noteId && !document.conversationAttachment).map(document => document.id);
   }
   repo.savePolicy({ ...policy, welcomeVersion: input.welcomeVersion ?? policy.welcomeVersion,
-    decision: input.decision ?? policy.decision, futureAdditions: input.futureAdditions ?? policy.futureAdditions });
+    decision: input.decision ?? policy.decision, futureAdditions: input.futureAdditions ?? (input.decision === 'declined' ? false : policy.futureAdditions), futureAdditionsSetByUser: input.futureAdditions !== undefined || policy.futureAdditionsSetByUser });
   notifyDocumentaryPreparation();
   return getResearchPreparationPolicy();
 }

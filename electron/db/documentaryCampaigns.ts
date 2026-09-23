@@ -4,6 +4,8 @@ import type { ResearchPreparationAction, ResearchPreparationPolicy } from '@shar
 import { DocumentaryRequests } from './documentaryRequests';
 
 export interface PreparationPolicyRecord extends ResearchPreparationPolicy {
+  automaticVersion?: number;
+  futureAdditionsSetByUser?: boolean;
   known: string[];
   authorized: Record<string, string>;
 }
@@ -26,7 +28,7 @@ export class DocumentaryCampaigns {
   }
   policy(vaultId: string): PreparationPolicyRecord {
     const row = this.db.prepare('SELECT policy_json FROM documentary_preparation_policies WHERE vault_id=?').get(vaultId) as { policy_json: string } | undefined;
-    return row ? JSON.parse(row.policy_json) : { vaultId, welcomeVersion: 0, decision: 'pending', futureAdditions: false, known: [], authorized: {} };
+    return row ? JSON.parse(row.policy_json) : { vaultId, welcomeVersion: 0, decision: 'pending', futureAdditions: true, automaticVersion: 1, known: [], authorized: {} };
   }
   savePolicy(policy: PreparationPolicyRecord): void {
     this.db.prepare('INSERT INTO documentary_preparation_policies VALUES(?,?) ON CONFLICT(vault_id) DO UPDATE SET policy_json=excluded.policy_json').run(policy.vaultId, JSON.stringify(policy));
@@ -86,7 +88,7 @@ export class DocumentaryCampaigns {
     }).immediate();
   }
   blockOwner(jobId: string, vaultId: string): void {
-    this.db.prepare(`UPDATE documentary_campaign_members SET state='blocked' WHERE job_id=? AND campaign_id IN
+    this.db.prepare(`UPDATE documentary_campaign_members SET state='blocked' WHERE state='active' AND job_id=? AND campaign_id IN
       (SELECT id FROM documentary_campaigns WHERE vault_id=?)`).run(jobId, vaultId);
   }
   synchronizeOwners(vaultIds: string[]): void {

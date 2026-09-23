@@ -75,7 +75,7 @@ export function assertResearchDocument(scope: ResolvedResearchScope, documentId:
  * revocations still win; active executions use the stricter revision check. */
 export function assertResearchDocumentPermission(scope: ResolvedResearchScope, documentId: string, current: ResearchCorpusDocument | undefined): ResearchCorpusDocument {
   const pinned = scope.documents.find(document => document.id === documentId);
-  if (!pinned || !current || pinned.permissionRevision !== current.permissionRevision) throw new Error('research_source_not_authorized');
+  if (!pinned || !current || pinned.permissionRevision !== current.permissionRevision || (pinned.workId && pinned.workId !== current.workId)) throw new Error('research_source_not_authorized');
   // Removing an attachment is an access revocation, whereas replacing its
   // content under the same identity leaves immutable historical citations valid.
   if (pinned.attachments?.some(attachment => !current.attachments?.some(item => item.id === attachment.id))) throw new Error('research_source_not_authorized');

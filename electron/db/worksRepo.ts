@@ -1,3 +1,4 @@
+import { notifyAuthoredResearchSourceChanged } from '../ai/researchCorpusEvents';
 import { getDb } from './database';
 import { expandCollectionKeys } from './collectionsRepo';
 import { currentEmbeddingConfig } from './ideasRepo';
@@ -502,6 +503,7 @@ export function upsertWork(input: UpsertWorkInput): void {
   const nodusId = getWorkByZoteroKey(input.zotero_key)!.nodus_id;
   replaceZoteroTags(nodusId, input.zoteroTags);
   recomputeDeepTrigger(nodusId);
+  notifyAuthoredResearchSourceChanged();
 }
 
 /** Replace one work's Zotero-sourced tags without affecting user-managed themes. */
