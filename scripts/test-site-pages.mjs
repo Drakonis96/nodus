@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -602,10 +603,26 @@ test('the research atlas holds its five facets on one row on a desktop screen', 
   // neighbour down: it follows the width the row hands it, keeps its name, and
   // ellipsizes the value, which refuses to shrink past a readable stub.
   assert.match(desktop, /\.atlas-facet-button \{ width: 100%; \}/, 'a pill follows the width it is given');
-  assert.match(desktop, /\.atlas-facet-value \{ min-width: 3\.4em; \}/, 'a value keeps a readable stub');
+  assert.match(desktop, /\.atlas-facet-value \{ min-width: 2\.4em; \}/, 'a value keeps a readable stub');
   assert.match(css, /\.atlas-facet-button \{[\s\S]*?max-width: 225px/, 'a pill is still capped');
   assert.match(css, /\.atlas-facet-value \{[^}]*text-overflow: ellipsis/, 'its value ellipsizes instead of overflowing');
   assert.match(css, /\.atlas-reset \{[\s\S]*?flex: 0 0 auto; white-space: nowrap;/, 'Clear filters keeps its one line');
+
+  // The row is handed a width, so the pill's floor has to live on the box the
+  // row actually hands it to. A flex item will not shrink past its contents
+  // unless told to, and this one wraps a button declared `width: 100%`, whose
+  // content size resolves back to its own width — which is how the row's
+  // minimum came to be five unshrunk pills and the row overflowed its
+  // container below ~1015px, cut at both edges because it is centred.
+  const wrapper = css.match(/\.atlas-facet \{[^}]*\}/)?.[0];
+  assert.ok(wrapper, 'the facet wrapper states its own size');
+  assert.match(wrapper, /min-width: 0/, 'the wrapper may be handed a smaller width than its pill wants');
+  assert.match(desktop, /\.atlas-facet \{ min-width: calc\(2\.6em \+ 2\.4em \+ 54px\); \}/,
+    'and it stops shrinking where the pill stops being usable');
+  // The label is the facet's stable name, so it gives way after the value: a
+  // smaller shrink weight is what keeps two pills from both reading "Co…".
+  assert.match(desktop, /\.atlas-facet-label \{ min-width: 2\.6em; flex-shrink: \.35; \}/,
+    'the label outlasts the value when the row is squeezed');
 });
 
 test('the atlas engine opens a list the page draws, not one the system paints', () => {
@@ -649,4 +666,29 @@ test('the atlas engine opens a list the page draws, not one the system paints', 
   assert.match(bookmarks, /@import url\('\.\.\/\.\.\/\.\.\/site\/assets\/css\/research-atlas\.css'\)/,
     'the in-app start pages import the atlas stylesheet');
   assert.match(bookmarks, /--raised: ?#100d1c;/, 'the imported tokens resolve inside the app as well');
+});
+
+test('every stylesheet the site serves actually parses', () => {
+  // Nothing else here parses CSS. Every other assertion about these files is a
+  // regular expression, so a sheet with an unbalanced brace satisfies all of
+  // them and ships — which is exactly what happened: a stray `}` left in
+  // research-atlas.css passed this whole file, and was caught only by the app's
+  // Vite build, which is not on the site's own path to production.
+  const require = createRequire(import.meta.url);
+  const { parse } = require('postcss');
+  const stylesheets = [];
+  const walk = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith('.css')) stylesheets.push(full);
+    }
+  };
+  walk(path.join(siteRoot, 'assets/css'));
+  assert.ok(stylesheets.length > 0, 'the site ships stylesheets to check');
+  for (const sheet of stylesheets) {
+    const relative = path.relative(siteRoot, sheet);
+    assert.doesNotThrow(() => parse(fs.readFileSync(sheet, 'utf8'), { from: sheet }),
+      `site/${relative} parses`);
+  }
 });

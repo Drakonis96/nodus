@@ -113,7 +113,17 @@
   position: relative; z-index: 10; display: flex; flex-wrap: wrap; justify-content: center;
   gap: 8px; width: min(100%, 1040px); margin: 15px auto 0;
 }
-.atlas-facet { position: relative; }
+/* The wrapper is the row's flex item, so the pill's floor has to be stated here.
+   A flex item will not shrink past its contents unless told to, and this one
+   wraps a button declared `width: 100%`, whose content size resolves back to its
+   own width — so the row's minimum was five unshrunk pills, and the overflow
+   appeared the moment a window was narrower than that. It is also why nothing
+   inside a pill was ever squeezed by the row, only by the pill's own 225px cap.
+   min-width: 0 lets the row hand out a smaller width, and the floor in the
+   desktop block is the point past which that width stops being usable. The
+   wrapper carries the pill's type context so its floor can be stated in the same
+   em the label's and the value's floors use. */
+.atlas-facet { position: relative; min-width: 0; font: 620 11.5px/1 var(--sans); }
 .atlas-facet-button {
   display: inline-flex; align-items: center; gap: 8px; height: 38px; max-width: 225px;
   padding: 0 13px 0 14px; border: 1px solid var(--membrane); border-radius: 999px;
@@ -126,8 +136,16 @@
 .atlas-facet-button.is-active {
   color: var(--violet-3); border-color: rgba(167,139,250,.44); background: rgba(139,92,246,.11);
 }
-.atlas-facet-label { flex: 0 0 auto; color: var(--ink-3); }
-.atlas-facet-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.atlas-facet-label {
+  /* Shrinkable, like the value beside it. A label that could not yield at all
+     was one of two floors the row could not get past, and the row's minimum
+     ended up wider than the container at 861px: because the row is centred,
+     the over-wide result bled off BOTH edges, clipping the first pill and
+     "Clear filters" at once. */
+  flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--ink-3);
+}
+.atlas-facet-value { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .atlas-facet-chevron {
   flex: 0 0 auto; width: 7px; height: 7px; margin: -3px 1px 0 3px;
   border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); opacity: .65;
@@ -267,15 +285,31 @@
    the facet's own name with a longer one — so a wrapping row re-flowed on every
    selection and pushed the last pill, and "Clear filters" with it, onto a line
    of its own. Instead the pills share out the row they have: a pill that runs
-   out of room ellipsizes the value inside it (the label keeps its word) rather
-   than moving its neighbour down. min-width: 0 lets the flex row hand out that
-   smaller width, and the button follows its box instead of its longest value. */
+   out of room ellipsizes what is inside it rather than moving its neighbour
+   down. min-width: 0 lets the flex row hand out that smaller width, and the
+   button follows its box instead of its longest value.
+
+   A desktop row of six controls does not fit in 761px, which is what a 861px
+   window leaves once the page's gutters are taken out, so the pills give way
+   in that order: the value first, then the label, each down to its own floor.
+   Summed, those floors come to ~690px, which is inside the 761px — so the row
+   now always finishes inside its container, at any window width and for any
+   value, instead of running off both edges and being cut. */
 @media (min-width: 861px) {
   .atlas-filterbar { flex-wrap: nowrap; }
   .atlas-facet-button { width: 100%; }
-  /* What a pill refuses to shrink past: the facet's automatic minimum is its
-     content, and the value's own floor is that content — its name, the chevron,
-     and a stub of the value. A short value such as "Spain" then survives a full
-     row intact, and the longer ones, which have room to spare, do the giving. */
-  .atlas-facet-value { min-width: 3.4em; }
+  /* One pill's floor, stated once for the box the row actually hands a width to:
+     the label's stub, the value's stub, and the pill's own chrome (13px + 14px of
+     padding, two 8px gaps, the 11px chevron). Five of these plus the four gaps
+     and "Clear filters" come to ~690px, which is inside the 761px a 861px window
+     leaves — so the row finishes inside its container instead of running off
+     both edges with the first pill and the reset cut. */
+  .atlas-facet { min-width: calc(2.6em + 2.4em + 54px); }
+  /* The label is the facet's stable name and the value is whatever the reader
+     last picked, so a row that has to abbreviate takes it from the value first:
+     the label carries a smaller shrink weight, which is what makes that hold
+     once both are near their floors. Two pills reading "Co…" and "Co…" are
+     indistinguishable, which is how a squeezed row stops being usable at all. */
+  .atlas-facet-label { min-width: 2.6em; flex-shrink: .35; }
+  .atlas-facet-value { min-width: 2.4em; }
 }
