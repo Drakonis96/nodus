@@ -1,0 +1,16 @@
+{
+  "format": "nodus.zotero-mcp-runtime/1",
+  "upstreamVersion": "0.13.0",
+  "upstreamCommit": "62335504262f4239961c4e782e342bd3bab4d5b2",
+  "upstreamUrl": "https://api.github.com/repos/54yyyu/zotero-mcp/tarball/62335504262f4239961c4e782e342bd3bab4d5b2",
+  "upstreamSha256": "2dc6b95cea8824c34d83bb90a7a7aec5025a77f274c2680a2fab1a7cdac667fa",
+  "adapterVersion": "1",
+  "python": "3.12.14",
+  "pythonBuild": "20260901",
+  "platforms": {
+    "darwin-arm64": { "triple": "aarch64-apple-darwin", "sha256": "81a359f1cfadd4da11766534c5913791cea55f26e1bb902cacd2a531bb1e4b2b" },
+    "darwin-x64": { "triple": "x86_64-apple-darwin", "sha256": "65b195c9cedc1fef6767f044f9822069adbd1bd9204d424ece4628776fdc04bb" },
+    "win32-x64": { "triple": "x86_64-pc-windows-msvc", "sha256": "7c45c9622400d578709a9b2cddbe8124cc21d382409d9f13406d706d28e31b14" },
+    "linux-x64": { "triple": "x86_64-unknown-linux-gnu", "sha256": "72748da13197c1fb161e3afeef20a6a385ff24f2165e6e2758e47008e7faba4c" }
+  }
+}
