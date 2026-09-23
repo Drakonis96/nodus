@@ -54,7 +54,7 @@ test('research assistant wires prompt language into all model-facing branches an
   assert.match(assistant, /prompt\.chat\.(compact|full)/);
   assert.match(assistant, /prompt\.genealogy\.(compact|full)/);
   assert.match(assistant, /buildGenealogyContext\(question, promptLanguage\)/);
-  assert.match(assistant, /buildResearchContext\(request\.selection, question, contextBudget, promptLanguage\)/);
+  assert.match(assistant, /buildResearchContext\(request\.selection, question, notebookScope \? Math\.floor\(contextBudget \/ 2\) : contextBudget, promptLanguage\)/);
   assert.match(assistant, /prompt\.context\.sections/);
   assert.match(genealogy, /language: PromptLanguage = getSettings\(\)\.promptLanguage \?\? 'es'/);
   assert.match(genealogy, /treeKinshipLabel\(relative, normalizeUiLanguage\(language\)\)/);

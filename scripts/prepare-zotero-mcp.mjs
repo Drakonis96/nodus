@@ -64,7 +64,10 @@ if (platform === 'darwin-x64') {
   const opensslSource = path.join(buildRoot, `openssl-${cryptoBuild.openssl}`);
   const prefix = path.join(buildRoot, 'install');
   execFileSync('perl', ['Configure', 'darwin64-x86_64-cc', 'no-shared', 'no-tests', 'no-module', `--prefix=${prefix}`], { cwd: opensslSource, stdio: 'inherit' });
-  execFileSync('make', ['-j2', 'install_sw'], { cwd: opensslSource, stdio: 'inherit' });
+  // install_sw starts overlapping recursive build targets under parallel make.
+  // Build once with two workers, then install serially to avoid duplicate writes.
+  execFileSync('make', ['-j2', 'build_sw'], { cwd: opensslSource, stdio: 'inherit' });
+  execFileSync('make', ['-j1', 'install_sw'], { cwd: opensslSource, stdio: 'inherit' });
   const rustVersion = execFileSync('rustc', [`+${cryptoBuild.rust}`, '--version'], { encoding: 'utf8' }).trim();
   if (!rustVersion.startsWith(`rustc ${cryptoBuild.rust} `)) throw new Error('Incorrect native crypto Rust toolchain');
   buildEnvironment = { ...buildEnvironment, OPENSSL_DIR: prefix, OPENSSL_STATIC: '1', RUSTUP_TOOLCHAIN: cryptoBuild.rust,

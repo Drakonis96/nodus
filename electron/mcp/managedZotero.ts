@@ -84,8 +84,16 @@ export class ManagedZoteroConnection {
       if (!content || !('text' in content) || typeof content.text !== 'string') throw new Error('managed_zotero_scope_unverifiable');
       const capabilitiesScope = JSON.parse(content.text);
       const items = this.scope!.items.map(item => [item.libraryType, String(item.libraryId), item.itemKey, item.version, item.revision,
-        item.attachments.map(attachment => [attachment.key, attachment.version]).sort((a, b) => String(a[0]).localeCompare(String(b[0])))])
-        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+        item.attachments.map(attachment => [attachment.key, attachment.version]).sort((a, b) => String(a[0]) < String(b[0]) ? -1 : String(a[0]) > String(b[0]) ? 1 : 0)])
+        // Zotero namespaces and keys are ASCII. Compare the unique identity
+        // tuple exactly as Python does, independently of the host locale.
+        .sort((a, b) => {
+          for (let index = 0; index < 3; index++) {
+            if (String(a[index]) < String(b[index])) return -1;
+            if (String(a[index]) > String(b[index])) return 1;
+          }
+          return 0;
+        });
       const fingerprint = createHash('sha256').update(JSON.stringify([this.scope!.serverId, items])).digest('hex');
       if (capabilitiesScope.format !== 'nodus.zotero-scope-capabilities/1' || capabilitiesScope.readOnly !== true || capabilitiesScope.fingerprint !== fingerprint) throw new Error('managed_zotero_scope_mismatch');
       this.status = { ...this.status, state: 'connected', version: version.version };

@@ -12,6 +12,7 @@ const require = createRequire(import.meta.url);
 const load = file => require(path.join(repoRoot, file));
 try {
   const db = load('electron/db/database.ts').getDb();
+  assert.equal(db.pragma('user_version', { simple: true }), load('electron/db/migrations.ts').SCHEMA_VERSION);
   db.prepare("INSERT INTO works(nodus_id,zotero_key,title,authors_json,item_type,source_type) VALUES('inside','inside','Synthetic','[]','book','text')").run();
   const { beginPassagePublication } = load('electron/db/passagePublications.ts');
   const { replaceWorkPassages } = load('electron/db/passagesRepo.ts');

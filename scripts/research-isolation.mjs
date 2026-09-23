@@ -6,7 +6,9 @@ import { spawnSync } from 'node:child_process';
 export function createResearchTestRoot() {
   // Keep Unix socket paths below sockaddr_un's limit (the Darwin user temp
   // directory plus a profile suffix can already exceed it).
-  const parent = process.platform === 'darwin' ? '/private/tmp' : os.tmpdir();
+  const parent = process.env.NODUS_ISOLATED_ROOT
+    ? path.join(fs.realpathSync(process.env.NODUS_ISOLATED_ROOT), 'tmp')
+    : process.platform === 'darwin' ? '/private/tmp' : os.tmpdir();
   const root = fs.realpathSync(fs.mkdtempSync(path.join(parent, 'nodus-research-')));
   fs.writeFileSync(path.join(root, 'isolation.json'), JSON.stringify({
     format: 'nodus.isolated-research-profile/1', root,
@@ -24,6 +26,7 @@ export function researchTestEnvironment(root) {
     if (process.env[name]) env[name] = process.env[name];
   }
   return { ...env, NODUS_ISOLATED_ROOT: root, NODUS_USERDATA: path.join(root, 'profile'),
+    NODUS_ZOTERO_SQLITE: path.join(root, 'fixtures/no-production-zotero.sqlite'),
     // No test may silently fall back to the user's running Zotero on 23119.
     NODUS_ZOTERO_API_BASE: 'http://127.0.0.1:1/api',
     NODUS_DISABLE_AUTO_UPDATE: '1', NODUS_E2E_UPDATE_STATUS: 'not-available',

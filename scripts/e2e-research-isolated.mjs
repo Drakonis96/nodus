@@ -20,7 +20,7 @@ const report = { root, proof, completed: false, modelCalls: 0, productionFixture
 try {
   // Seatbelt cannot be nested. This test uses the inherited OS profile above
   // for the entire process tree instead of Chromium's additional child profile.
-  app = await _electron.launch({ executablePath: wrapper, args: ['--no-sandbox', repoRoot], cwd: root,
+  app = await _electron.launch({ executablePath: wrapper, args: ['--no-sandbox', '--disable-gpu', repoRoot], cwd: root,
     env: researchTestEnvironment(root), timeout: 60_000 });
   const page = await app.firstWindow();
   await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length), { timeout: 60_000 });

@@ -19,7 +19,7 @@ export function importResearchTestCredentials(root) {
     const candidates = ['Nodus', 'nodus'].map(name => path.join(os.homedir(), 'Library/Application Support', name, 'secrets', filename));
     const source = candidates.find(file => fs.existsSync(file));
     if (!source) throw new Error(`Authorized ${provider} credential not found`);
-    if (fs.lstatSync(source).isSymbolicLink()) throw new Error('Credential source cannot be a symlink');
+    if (fs.lstatSync(source).isSymbolicLink() || fs.realpathSync(source) !== source) throw new Error('Credential source cannot contain a symlink');
     const bytes = fs.readFileSync(source);
     if (bytes.subarray(0, 4).toString() === 'b64:') throw new Error('Legacy plaintext credential requires a separate encrypted import');
     fs.writeFileSync(path.join(target, filename), bytes, { flag: 'wx', mode: 0o600 });
