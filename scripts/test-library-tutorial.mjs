@@ -106,8 +106,11 @@ test('every guide string is translated into every interface language', async () 
   assert.ok(asked.length > 25, `the guide looked wrong (${asked.length} keys parsed)`);
   const declared = new Set([...table.matchAll(/^ {2}'((?:[^'\\]|\\.)*)':/gm)].map((match) => match[1]));
   const borrowed = new Set(['Colecciones de Nodus', 'Colecciones de Zotero', 'Recomendado', 'Colecciones', 'Monitorizar', 'Procesar biblioteca', 'Importar desde Zotero', 'Cerrar', 'Empezar', 'Este vault', 'Global']);
+  const researchFile = await read('src/i18n.researchNotebooks.ts');
+  const research = JSON.parse(researchFile.slice(researchFile.indexOf('{'), researchFile.lastIndexOf('}') + 1));
   for (const key of asked) {
-    assert.ok(declared.has(key) || borrowed.has(key), `untranslated guide string: ${key}`);
+    if (declared.has(key) || borrowed.has(key)) continue;
+    for (const [language, translations] of Object.entries(research)) assert.ok(translations[key], `untranslated guide string (${language}): ${key}`);
   }
   for (const lang of ['en', 'fr', 'de', 'pt', "'pt-BR'", 'it', 'tr', "'zh-CN'", "'zh-TW'"]) {
     assert.ok(table.includes(`${lang}: `) || table.includes(`const ${lang} =`), `missing language: ${lang}`);

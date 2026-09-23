@@ -4,7 +4,7 @@ import { ResearchPreparationWelcome, openResearchPreparation } from '../../../sr
 import { setActiveLang } from '../../../src/i18n';
 const fixture = window as any;
 fixture.actions = [];
-let policy = { vaultId: 'academic', welcomeVersion: 0, decision: 'pending', futureAdditions: false, ...fixture.initial?.policy };
+let policy = { vaultId: 'academic', welcomeVersion: 0, decision: 'pending', futureAdditions: true, ...fixture.initial?.policy };
 const documents = [
   { id: 'one', workId: 'w1', title: 'First source', preparation: { text: 'available', lexical: 'ready', embeddings: 'missing' } },
   { id: 'two', workId: 'w2', title: 'Second source', preparation: { text: 'abstract', lexical: 'missing', embeddings: 'missing' } },
@@ -24,6 +24,7 @@ function App() {
   const [idle, setIdle] = useState(fixture.initial?.idle !== false);
   fixture.setIdle = setIdle;
   return <><button onClick={() => openResearchPreparation()} data-testid="open-preparation">Prepare</button>
+    <button onClick={() => openResearchPreparation(undefined, true)} data-testid="manage-preparation">Manage</button>
     <button onClick={() => openResearchPreparation(['w2'])} data-testid="open-one">Prepare one</button>
     <button data-queue-trigger onClick={() => fixture.actions.push(['queue'])}>Queue</button>
     <ResearchPreparationWelcome vaultId="academic" allowAutomatic={idle} onConfigure={() => fixture.actions.push(['configure'])} />

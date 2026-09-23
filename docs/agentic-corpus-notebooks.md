@@ -988,3 +988,35 @@ the detailed inventory, text-only preparation, selection and independent future
 additions setting. The welcome does not enable future additions. All new copy is
 translated into the eleven additional UI languages. The decorative cinematic
 surface contains no remote media; reduced motion disables its animation.
+
+### Academic Library follow-up: future indexing and deletion
+
+The latest scope decision keeps documentary preparation **academic-only**. Study,
+Teaching and other vault engines are unchanged. This supersedes the earlier
+future-additions-off default in the historical checkpoints above.
+
+Academic This vault now labels its analysis actions **Extract ideas**, with
+separate **Index library**, **Index selection**, and **Index document** actions.
+The library help explains the distinction, automatic additions, Queue controls,
+local OCR deferral, source coverage and shared-copy retention. Existing analysis
+pipelines still generate their configured enriched analyses; document indexing
+uses only extraction and the configured embedding provider. Other vaults retain
+the prior controls/help.
+
+On initial upgrade, existing academic membership is recorded without enqueuing the
+old library. Future additions are enabled by default; explicit refusal/opt-out is
+preserved. Discovery groups multiple additions into a persistent campaign with the
+enqueue-time model configuration. Repository notifications and a periodic recovery
+scan catch additions from both Nodus and Zotero, including asynchronous imports.
+Disabling the preference prevents new automatic jobs but leaves queued jobs intact.
+Missing embedding credentials block the embedding stage after lexical publication;
+OCR remains deferred. Re-importing a removed source counts as a new addition.
+
+The additive `documentary_source_owners` table tracks academic vault/notebook
+interests. Removing a work cancels its campaign interest and revokes old direct
+citation access immediately. Once the last owner disappears, published passages,
+vectors, lexical rows, revisions and working embedding checkpoints are removed.
+An index needed by another academic vault/notebook survives. The source document
+in Global Library or Zotero is not deleted by This vault cleanup. In-flight writers
+must still hold valid leases and source membership and cannot resurrect deleted
+vectors. Work deletion retains its explicit owning database across async cleanup.

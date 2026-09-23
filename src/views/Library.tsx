@@ -1271,7 +1271,7 @@ export function Library({
         {scopeControls}
         <div className="library-header-actions">
           {vaultType === 'academic' && <>
-            <button className="btn btn-ghost border border-neutral-700" data-testid="library-prepare-sources" onClick={() => openResearchPreparation(selected.size ? [...selected] : undefined)}>{t('Preparar fuentes')}</button>
+            <button className="btn btn-ghost border border-neutral-700" data-testid="library-prepare-sources" onClick={() => openResearchPreparation()}>{t('Indexar biblioteca')}</button>
             <button className="btn btn-ghost" onClick={openResearchPreparationQueue}>{t('Ver en Queue')}</button>
           </>}
           {academicMode !== 'manual' && DOCUMENT_INDEX_MANAGER_VISIBLE && vaultType === 'academic' && <button
@@ -1730,7 +1730,7 @@ export function Library({
             onClick={processFullLibrary}
             title={t('Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones para toda la biblioteca filtrada.')}
           >
-            <Icon name="compass" size={13} /> {t('Procesar biblioteca')}
+            <Icon name="compass" size={13} /> {t(vaultType === 'academic' ? 'Extraer ideas' : 'Procesar biblioteca')}
           </button>
         </div>
       )}
@@ -1775,8 +1775,9 @@ export function Library({
             onClick={processFullSelected}
             title={t('Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones.')}
           >
-            <Icon name="compass" /> {tx('Analizar las {n} seleccionadas', { n: selectedVisibleIds.length })}
+            <Icon name="compass" /> {vaultType === 'academic' ? t('Extraer ideas') : tx('Analizar las {n} seleccionadas', { n: selectedVisibleIds.length })}
           </button>
+          {vaultType === 'academic' && <button className="btn" onClick={() => openResearchPreparation(selectedVisibleIds)}><Icon name="layers" /> {t('Indexar selección')}</button>}
           {/* The repair counterpart of the verb above: it never re-runs a step that is
               already done, so it is offered only while some selected work has something
               left to finish. */}
@@ -1960,8 +1961,9 @@ export function Library({
                       title={t('Analizar: temas, ideas, resumen, indexado y relaciones')}
                       onClick={() => processFullWork(w)}
                     >
-                      {t('Analizar')}
+                      {t(vaultType === 'academic' ? 'Extraer ideas' : 'Analizar')}
                     </button>}
+                    {vaultType === 'academic' && <button className="btn btn-ghost text-xs" onClick={() => openResearchPreparation([w.nodus_id])}>{t('Indexar documento')}</button>}
                     <RowIconButton
                       title={t('Abrir lector limpio')}
                       icon="book"
@@ -1982,7 +1984,7 @@ export function Library({
                       label={t('Más acciones')}
                       items={[
                         ...(vaultType === 'academic' ? [
-                          { label: t('Preparar fuentes'), icon: 'layers', onClick: () => openResearchPreparation([w.nodus_id]) },
+                          { label: t('Indexar documento'), icon: 'layers', onClick: () => openResearchPreparation([w.nodus_id]) },
                           { label: t('Completar embeddings pendientes'), icon: 'layers', onClick: () => openResearchPreparation([w.nodus_id]) },
                           { label: t('Actualizar índice'), icon: 'refresh', onClick: () => openResearchPreparation([w.nodus_id]) },
                           { label: t('Ver en Queue'), icon: 'list', onClick: openResearchPreparationQueue },

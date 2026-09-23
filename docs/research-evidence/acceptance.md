@@ -83,3 +83,29 @@ v5.6.0-to-private-higher-version upgrade harness, final UI behavior and accessib
 checks, the rerun of real Zotero integration, live grounded-report review and the
 same-corpus comparison. Keep the PR draft and acceptance open. Do not run these
 final checks until the user resumes verification.
+
+### Academic-only Library follow-up
+
+The proposed extension to other vault types was explicitly withdrawn before commit.
+No Study/Teaching retrieval or indexing changes are included. New isolated tests
+cover automatic academic additions, old-inventory baselining, preserved refusal,
+opt-out, multi-source campaigns, shared-index retention, removal of published and
+working vectors, stale-writer fencing, direct-citation revocation and re-import.
+
+Focused runs (not the final acceptance campaign):
+
+- `/private/tmp/nodus-research-NMIsHZ`: lifecycle and campaign suites passed.
+- `/private/tmp/nodus-research-hjGogm`: lifecycle, cinematic welcome browser fixture
+  and Library help/translation suites passed (three scripts, eight assertions/tests
+  reported by their runners). Browser fixture covers No confirmation, explicit
+  selection, configuration, local-only preparation and narrow-window layout.
+- `/private/tmp/nodus-research-xZx6xf`: both lifecycle and campaign suites passed again,
+  including the legacy-policy migration and preserved refusal.
+- TypeScript (renderer and backend) and lint for changed implementation files passed.
+- Earlier fixture failures were corrected: the publication fixture must temporarily
+  unpause its own store before claiming a synthetic job, and policy expectations
+  must reflect the newly authorized automatic-future default.
+
+Final native/app/MCP/model/installer validation remains pending. The local focused
+runs use inherited OS write/network denials and at most two workers. No production
+source or credential was used and no paid call was made.

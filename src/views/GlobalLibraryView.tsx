@@ -2020,6 +2020,7 @@ export function GlobalLibraryView({
         </div>
       )}
       <LibraryTutorialModal
+        academic={!vaultType || vaultType === 'academic'}
         open={tutorialOpen}
         tab={tutorialTab}
         onTabChange={setTutorialTab}

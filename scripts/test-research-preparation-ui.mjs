@@ -29,15 +29,18 @@ test('preparation welcome fixes selection and supports refusal, local text and i
       await page.addScriptTag({ content: bundle.outputFiles[0].text });
       await page.getByTestId('open-preparation').waitFor();
     }
-    const dialog = () => page.getByRole('dialog', { name: 'Preparar fuentes', exact: true });
+    const dialog = () => page.getByTestId('research-preparation-welcome');
     await mount({ idle: false });
     assert.equal(await dialog().count(), 0, 'active operations are not interrupted');
     await page.evaluate(() => window.setIdle(true));
-    await dialog().getByText('Embeddings: openrouter · baai/bge-m3', { exact: true }).waitFor();
-    assert.equal(await dialog().locator('section').count(), 3);
-    assert.equal(await dialog().getByRole('checkbox').isChecked(), false);
+    await dialog().getByText('baai/bge-m3', { exact: true }).waitFor();
+    assert.equal(await dialog().locator('section').count(), 0);
+    assert.equal(await dialog().getByRole('checkbox').count(), 0);
     assert.equal((await page.evaluate(() => window.actions)).some(action => action[0] === 'start'), false, 'welcome never silently enqueues');
-    await dialog().getByRole('button', { name: 'Ahora no', exact: true }).click();
+    await dialog().getByRole('button', { name: 'No', exact: true }).click();
+    await dialog().getByRole('button', { name: 'Sí, dejar desactivado', exact: true }).waitFor();
+    assert.equal((await page.evaluate(() => window.actions)).some(action => action[0] === 'policy' && action[1].decision === 'declined'), false, 'No requires confirmation');
+    await dialog().getByRole('button', { name: 'Sí, dejar desactivado', exact: true }).click();
     await dialog().waitFor({ state: 'detached' });
     await page.evaluate(() => window.setIdle(false)); await page.evaluate(() => window.setIdle(true));
     assert.equal(await dialog().count(), 0, 'a recorded refusal is not shown repeatedly');
@@ -48,8 +51,11 @@ test('preparation welcome fixes selection and supports refusal, local text and i
     await dialog().waitFor({ state: 'detached' });
     assert.ok((await page.evaluate(() => window.actions)).some(action => action[0] === 'start' && action[1].previewId === 'frozen-preview' && JSON.stringify(action[1].documentIds) === '["two"]' && action[1].mode === 'embeddings'));
     await mount({ available: false }, 640);
-    await dialog().getByText('Embeddings: openrouter · baai/bge-m3', { exact: true }).waitFor();
-    assert.equal(await dialog().getByRole('button', { name: 'Encolar biblioteca actual', exact: true }).isDisabled(), true);
+    await dialog().getByText('baai/bge-m3', { exact: true }).waitFor();
+    await dialog().getByRole('button', { name: 'Configurar embeddings', exact: true }).click();
+    assert.ok((await page.evaluate(() => window.actions)).some(action => action[0] === 'configure'));
+    await page.getByTestId('manage-preparation').click();
+    await dialog().getByRole('checkbox', { name: 'Preparar nuevas incorporaciones', exact: true }).uncheck();
     await dialog().getByRole('checkbox', { name: 'Preparar nuevas incorporaciones', exact: true }).check();
     await page.waitForFunction(() => window.actions.some(action => action[0] === 'policy' && action[1].futureAdditions === true));
     await dialog().getByRole('button', { name: 'Elegir obras', exact: true }).click();
@@ -62,7 +68,7 @@ test('preparation welcome fixes selection and supports refusal, local text and i
     await dialog().waitFor({ state: 'detached' });
     assert.ok((await page.evaluate(() => window.actions)).some(action => action[0] === 'start' && action[1].mode === 'text' && JSON.stringify(action[1].documentIds) === '["one"]'));
     await page.getByTestId('open-preparation').click();
-    await dialog().getByText('Embeddings: openrouter · baai/bge-m3', { exact: true }).waitFor();
+    await dialog().getByText('baai/bge-m3', { exact: true }).waitFor();
     await page.keyboard.press('Escape'); await dialog().waitFor({ state: 'detached' });
     assert.equal(await page.getByTestId('open-preparation').evaluate(el => el === document.activeElement), true);
     assert.deepEqual(errors, []);

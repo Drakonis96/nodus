@@ -101,7 +101,18 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "¿Dejar la indexación desactivada?": "Keep indexing off?",
     "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Preparar fuentes.": "Your library will not be indexed. You can enable it manually from Library → Prepare sources.",
     "Sí, dejar desactivado": "Yes, keep it off",
-    "Más tarde": "Later"
+    "Más tarde": "Later",
+    "Extraer ideas": "Extract ideas",
+    "Indexar biblioteca": "Index library",
+    "Indexar selección": "Index selection",
+    "Indexar documento": "Index document",
+    "Los documentos nuevos se indexarán automáticamente.": "New documents will be indexed automatically.",
+    "Extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas. Este análisis utiliza modelos generativos.": "Extract Ideas and relationships from the whole library or selected works. This analysis uses generative models.",
+    "Indexa el texto completo con el modelo de embeddings configurado, sin extraer Ideas. También puedes indexar solo una selección.": "Index the full text with your configured embedding model, without extracting Ideas. You can also index a selection.",
+    "Controla el progreso, la pausa y la reanudación desde Queue. Puedes desactivar la preparación automática en Ajustes → Preparar fuentes.": "Control progress, pause and resume from Queue. Disable automatic preparation in Settings → Prepare sources.",
+    "Chat y Deep Research combinan las Ideas disponibles con pasajes de tus documentos y consultas a originales. Si falta una capa, utilizan las demás y explican los límites.": "Chat and Deep Research combine available Ideas with document passages and original-source reads. If a layer is missing, they use the others and explain the limits.",
+    "Al quitar una obra de esta bóveda se retiran sus índices; solo se conservan las copias compartidas que otra bóveda o cuaderno todavía utiliza.": "Removing a work from this vault removes its indexes; shared copies remain only while another vault or notebook uses them.",
+    "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Indexar biblioteca.": "Your library will not be indexed. You can enable it manually from Library → Index library."
   },
   "fr": {
     "Disponible: revisión anterior": "Disponible : révision précédente",
@@ -205,7 +216,18 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "¿Dejar la indexación desactivada?": "Laisser l’indexation désactivée ?",
     "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Preparar fuentes.": "Votre bibliothèque ne sera pas indexée. Vous pourrez l’activer manuellement depuis Bibliothèque → Préparer les sources.",
     "Sí, dejar desactivado": "Oui, laisser désactivée",
-    "Más tarde": "Plus tard"
+    "Más tarde": "Plus tard",
+    "Extraer ideas": "Extraire les idées",
+    "Indexar biblioteca": "Indexer la bibliothèque",
+    "Indexar selección": "Indexer la sélection",
+    "Indexar documento": "Indexer le document",
+    "Los documentos nuevos se indexarán automáticamente.": "Les nouveaux documents seront indexés automatiquement.",
+    "Extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas. Este análisis utiliza modelos generativos.": "Extrayez les Idées et leurs relations de toute la bibliothèque ou des œuvres sélectionnées. Cette analyse utilise des modèles génératifs.",
+    "Indexa el texto completo con el modelo de embeddings configurado, sin extraer Ideas. También puedes indexar solo una selección.": "Indexez le texte intégral avec votre modèle d’embeddings configuré, sans extraire d’Idées. Vous pouvez aussi indexer une sélection.",
+    "Controla el progreso, la pausa y la reanudación desde Queue. Puedes desactivar la preparación automática en Ajustes → Preparar fuentes.": "Suivez la progression, mettez en pause et reprenez depuis Queue. Désactivez la préparation automatique dans Paramètres → Préparer les sources.",
+    "Chat y Deep Research combinan las Ideas disponibles con pasajes de tus documentos y consultas a originales. Si falta una capa, utilizan las demás y explican los límites.": "Chat et Deep Research combinent les Idées disponibles, les passages et la consultation des originaux. Si une couche manque, ils utilisent les autres et expliquent les limites.",
+    "Al quitar una obra de esta bóveda se retiran sus índices; solo se conservan las copias compartidas que otra bóveda o cuaderno todavía utiliza.": "Retirer une œuvre de ce coffre supprime ses index ; les copies partagées sont conservées tant qu’un autre coffre ou carnet les utilise.",
+    "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Indexar biblioteca.": "Votre bibliothèque ne sera pas indexée. Vous pourrez l’activer manuellement depuis Bibliothèque → Indexer la bibliothèque."
   },
   "de": {
     "Disponible: revisión anterior": "Verfügbar: vorherige Revision",
@@ -309,7 +331,18 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "¿Dejar la indexación desactivada?": "Indexierung deaktiviert lassen?",
     "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Preparar fuentes.": "Ihre Bibliothek wird nicht indexiert. Sie können dies unter Bibliothek → Quellen vorbereiten manuell aktivieren.",
     "Sí, dejar desactivado": "Ja, deaktiviert lassen",
-    "Más tarde": "Später"
+    "Más tarde": "Später",
+    "Extraer ideas": "Ideen extrahieren",
+    "Indexar biblioteca": "Bibliothek indexieren",
+    "Indexar selección": "Auswahl indexieren",
+    "Indexar documento": "Dokument indexieren",
+    "Los documentos nuevos se indexarán automáticamente.": "Neue Dokumente werden automatisch indexiert.",
+    "Extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas. Este análisis utiliza modelos generativos.": "Extrahieren Sie Ideen und Beziehungen aus der gesamten Bibliothek oder ausgewählten Werken. Diese Analyse nutzt generative Modelle.",
+    "Indexa el texto completo con el modelo de embeddings configurado, sin extraer Ideas. También puedes indexar solo una selección.": "Indexieren Sie den Volltext mit Ihrem konfigurierten Embedding-Modell, ohne Ideen zu extrahieren. Auch eine Auswahl ist möglich.",
+    "Controla el progreso, la pausa y la reanudación desde Queue. Puedes desactivar la preparación automática en Ajustes → Preparar fuentes.": "Fortschritt, Pause und Fortsetzung steuern Sie über Queue. Deaktivieren Sie die automatische Vorbereitung unter Einstellungen → Quellen vorbereiten.",
+    "Chat y Deep Research combinan las Ideas disponibles con pasajes de tus documentos y consultas a originales. Si falta una capa, utilizan las demás y explican los límites.": "Chat und Deep Research kombinieren verfügbare Ideen, Dokumentpassagen und Originalquellen. Fehlt eine Ebene, nutzen sie die anderen und erläutern die Grenzen.",
+    "Al quitar una obra de esta bóveda se retiran sus índices; solo se conservan las copias compartidas que otra bóveda o cuaderno todavía utiliza.": "Beim Entfernen eines Werks aus diesem Tresor werden seine Indizes gelöscht. Geteilte Kopien bleiben erhalten, solange ein anderer Tresor oder ein Notizbuch sie nutzt.",
+    "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Indexar biblioteca.": "Ihre Bibliothek wird nicht indexiert. Sie können dies unter Bibliothek → Bibliothek indexieren manuell aktivieren."
   },
   "it": {
     "Disponible: revisión anterior": "Disponibile: revisione precedente",
@@ -413,7 +446,18 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "¿Dejar la indexación desactivada?": "Lasciare disattivata l’indicizzazione?",
     "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Preparar fuentes.": "La tua biblioteca non verrà indicizzata. Potrai attivarla manualmente da Biblioteca → Prepara fonti.",
     "Sí, dejar desactivado": "Sì, lascia disattivata",
-    "Más tarde": "Più tardi"
+    "Más tarde": "Più tardi",
+    "Extraer ideas": "Estrai idee",
+    "Indexar biblioteca": "Indicizza biblioteca",
+    "Indexar selección": "Indicizza selezione",
+    "Indexar documento": "Indicizza documento",
+    "Los documentos nuevos se indexarán automáticamente.": "I nuovi documenti verranno indicizzati automaticamente.",
+    "Extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas. Este análisis utiliza modelos generativos.": "Estrai Idee e relazioni dall’intera biblioteca o dalle opere selezionate. Questa analisi utilizza modelli generativi.",
+    "Indexa el texto completo con el modelo de embeddings configurado, sin extraer Ideas. También puedes indexar solo una selección.": "Indicizza il testo completo con il modello di embedding configurato, senza estrarre Idee. Puoi anche indicizzare una selezione.",
+    "Controla el progreso, la pausa y la reanudación desde Queue. Puedes desactivar la preparación automática en Ajustes → Preparar fuentes.": "Controlla avanzamento, pausa e ripresa da Queue. Disattiva la preparazione automatica in Impostazioni → Prepara fonti.",
+    "Chat y Deep Research combinan las Ideas disponibles con pasajes de tus documentos y consultas a originales. Si falta una capa, utilizan las demás y explican los límites.": "Chat e Deep Research combinano Idee disponibili, passaggi dei documenti e consultazione degli originali. Se manca un livello, usano gli altri e spiegano i limiti.",
+    "Al quitar una obra de esta bóveda se retiran sus índices; solo se conservan las copias compartidas que otra bóveda o cuaderno todavía utiliza.": "Rimuovere un’opera dal vault elimina i suoi indici; le copie condivise restano solo se un altro vault o quaderno le utilizza.",
+    "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Indexar biblioteca.": "La tua biblioteca non verrà indicizzata. Potrai attivarla manualmente da Biblioteca → Indicizza biblioteca."
   },
   "pt": {
     "Disponible: revisión anterior": "Disponível: revisão anterior",
@@ -517,7 +561,18 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "¿Dejar la indexación desactivada?": "Manter a indexação desativada?",
     "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Preparar fuentes.": "A tua biblioteca não será indexada. Podes ativar a indexação manualmente em Biblioteca → Preparar fontes.",
     "Sí, dejar desactivado": "Sim, manter desativada",
-    "Más tarde": "Mais tarde"
+    "Más tarde": "Mais tarde",
+    "Extraer ideas": "Extrair ideias",
+    "Indexar biblioteca": "Indexar biblioteca",
+    "Indexar selección": "Indexar seleção",
+    "Indexar documento": "Indexar documento",
+    "Los documentos nuevos se indexarán automáticamente.": "Os novos documentos serão indexados automaticamente.",
+    "Extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas. Este análisis utiliza modelos generativos.": "Extrai Ideias e relações de toda a biblioteca ou das obras selecionadas. Esta análise utiliza modelos generativos.",
+    "Indexa el texto completo con el modelo de embeddings configurado, sin extraer Ideas. También puedes indexar solo una selección.": "Indexa o texto completo com o modelo de embeddings configurado, sem extrair Ideias. Também podes indexar uma seleção.",
+    "Controla el progreso, la pausa y la reanudación desde Queue. Puedes desactivar la preparación automática en Ajustes → Preparar fuentes.": "Controla o progresso, a pausa e a retoma na Queue. Desativa a preparação automática em Definições → Preparar fontes.",
+    "Chat y Deep Research combinan las Ideas disponibles con pasajes de tus documentos y consultas a originales. Si falta una capa, utilizan las demás y explican los límites.": "O Chat e o Deep Research combinam Ideias disponíveis, passagens dos documentos e consulta de originais. Se faltar uma camada, usam as restantes e explicam os limites.",
+    "Al quitar una obra de esta bóveda se retiran sus índices; solo se conservan las copias compartidas que otra bóveda o cuaderno todavía utiliza.": "Remover uma obra deste cofre elimina os seus índices; as cópias partilhadas permanecem enquanto outro cofre ou caderno as utilizar.",
+    "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Indexar biblioteca.": "A tua biblioteca não será indexada. Podes ativar a indexação manualmente em Biblioteca → Indexar biblioteca."
   },
   "pt-BR": {
     "Disponible: revisión anterior": "Disponível: revisão anterior",
@@ -621,7 +676,18 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "¿Dejar la indexación desactivada?": "Manter a indexação desativada?",
     "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Preparar fuentes.": "Sua biblioteca não será indexada. Você poderá ativar a indexação manualmente em Biblioteca → Preparar fontes.",
     "Sí, dejar desactivado": "Sim, manter desativada",
-    "Más tarde": "Mais tarde"
+    "Más tarde": "Mais tarde",
+    "Extraer ideas": "Extrair ideias",
+    "Indexar biblioteca": "Indexar biblioteca",
+    "Indexar selección": "Indexar seleção",
+    "Indexar documento": "Indexar documento",
+    "Los documentos nuevos se indexarán automáticamente.": "Novos documentos serão indexados automaticamente.",
+    "Extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas. Este análisis utiliza modelos generativos.": "Extraia Ideias e relações de toda a biblioteca ou das obras selecionadas. Esta análise utiliza modelos generativos.",
+    "Indexa el texto completo con el modelo de embeddings configurado, sin extraer Ideas. También puedes indexar solo una selección.": "Indexe o texto completo com o modelo de embeddings configurado, sem extrair Ideias. Você também pode indexar uma seleção.",
+    "Controla el progreso, la pausa y la reanudación desde Queue. Puedes desactivar la preparación automática en Ajustes → Preparar fuentes.": "Controle o progresso, a pausa e a retomada na Queue. Desative a preparação automática em Configurações → Preparar fontes.",
+    "Chat y Deep Research combinan las Ideas disponibles con pasajes de tus documentos y consultas a originales. Si falta una capa, utilizan las demás y explican los límites.": "O Chat e o Deep Research combinam Ideias disponíveis, passagens dos documentos e consulta aos originais. Se uma camada faltar, usam as outras e explicam os limites.",
+    "Al quitar una obra de esta bóveda se retiran sus índices; solo se conservan las copias compartidas que otra bóveda o cuaderno todavía utiliza.": "Remover uma obra deste cofre elimina seus índices; cópias compartilhadas permanecem enquanto outro cofre ou caderno as utilizar.",
+    "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Indexar biblioteca.": "Sua biblioteca não será indexada. Você poderá ativar a indexação manualmente em Biblioteca → Indexar biblioteca."
   },
   "tr": {
     "Disponible: revisión anterior": "Kullanılabilir: önceki sürüm",
@@ -725,7 +791,18 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "¿Dejar la indexación desactivada?": "İndeksleme kapalı kalsın mı?",
     "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Preparar fuentes.": "Kütüphaneniz indekslenmeyecek. Kütüphane → Kaynakları hazırla bölümünden elle etkinleştirebilirsiniz.",
     "Sí, dejar desactivado": "Evet, kapalı kalsın",
-    "Más tarde": "Daha sonra"
+    "Más tarde": "Daha sonra",
+    "Extraer ideas": "Fikirleri çıkar",
+    "Indexar biblioteca": "Kütüphaneyi indeksle",
+    "Indexar selección": "Seçimi indeksle",
+    "Indexar documento": "Belgeyi indeksle",
+    "Los documentos nuevos se indexarán automáticamente.": "Yeni belgeler otomatik olarak indekslenecek.",
+    "Extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas. Este análisis utiliza modelos generativos.": "Tüm kütüphaneden veya seçilen eserlerden Fikirleri ve ilişkileri çıkarın. Bu analiz üretken modeller kullanır.",
+    "Indexa el texto completo con el modelo de embeddings configurado, sin extraer Ideas. También puedes indexar solo una selección.": "Fikir çıkarmadan, yapılandırılmış embedding modeliyle tam metni indeksleyin. Yalnızca bir seçimi de indeksleyebilirsiniz.",
+    "Controla el progreso, la pausa y la reanudación desde Queue. Puedes desactivar la preparación automática en Ajustes → Preparar fuentes.": "İlerlemeyi, duraklatmayı ve sürdürmeyi Queue üzerinden yönetin. Otomatik hazırlamayı Ayarlar → Kaynakları hazırla bölümünden kapatabilirsiniz.",
+    "Chat y Deep Research combinan las Ideas disponibles con pasajes de tus documentos y consultas a originales. Si falta una capa, utilizan las demás y explican los límites.": "Chat ve Deep Research mevcut Fikirleri, belge bölümlerini ve özgün kaynak okumalarını birleştirir. Bir katman eksikse diğerlerini kullanır ve sınırları açıklar.",
+    "Al quitar una obra de esta bóveda se retiran sus índices; solo se conservan las copias compartidas que otra bóveda o cuaderno todavía utiliza.": "Bir eseri bu kasadan kaldırmak indekslerini siler; paylaşılan kopyalar yalnızca başka bir kasa veya defter kullanıyorsa korunur.",
+    "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Indexar biblioteca.": "Kütüphaneniz indekslenmeyecek. Kütüphane → Kütüphaneyi indeksle bölümünden elle etkinleştirebilirsiniz."
   },
   "zh-CN": {
     "Disponible: revisión anterior": "可查询：先前版本",
@@ -829,7 +906,18 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "¿Dejar la indexación desactivada?": "保持索引关闭？",
     "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Preparar fuentes.": "不会为你的文献建立索引。你可以从「文献库 → 准备来源」手动开启。",
     "Sí, dejar desactivado": "是，保持关闭",
-    "Más tarde": "稍后"
+    "Más tarde": "稍后",
+    "Extraer ideas": "提取想法",
+    "Indexar biblioteca": "索引文献库",
+    "Indexar selección": "索引所选项",
+    "Indexar documento": "索引文档",
+    "Los documentos nuevos se indexarán automáticamente.": "新文档将自动建立索引。",
+    "Extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas. Este análisis utiliza modelos generativos.": "从整个文献库或所选文献中提取想法与关系。此分析使用生成式模型。",
+    "Indexa el texto completo con el modelo de embeddings configurado, sin extraer Ideas. También puedes indexar solo una selección.": "使用配置的嵌入模型为全文建立索引，不提取想法。也可仅索引所选文献。",
+    "Controla el progreso, la pausa y la reanudación desde Queue. Puedes desactivar la preparación automática en Ajustes → Preparar fuentes.": "在 Queue 中查看进度、暂停和恢复。可在「设置 → 准备来源」关闭自动准备。",
+    "Chat y Deep Research combinan las Ideas disponibles con pasajes de tus documentos y consultas a originales. Si falta una capa, utilizan las demás y explican los límites.": "Chat 和 Deep Research 结合已有想法、文档片段和原文阅读。缺少某一层时，会使用其他层并说明限制。",
+    "Al quitar una obra de esta bóveda se retiran sus índices; solo se conservan las copias compartidas que otra bóveda o cuaderno todavía utiliza.": "从此知识库移除文献会删除其索引；仅保留其他知识库或笔记本仍在使用的共享副本。",
+    "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Indexar biblioteca.": "不会为你的文献建立索引。你可以从「文献库 → 索引文献库」手动开启。"
   },
   "zh-TW": {
     "Disponible: revisión anterior": "可查詢：先前版本",
@@ -933,7 +1021,18 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "¿Dejar la indexación desactivada?": "保持索引關閉？",
     "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Preparar fuentes.": "不會為你的文獻建立索引。你可以從「文獻庫 → 準備來源」手動開啟。",
     "Sí, dejar desactivado": "是，保持關閉",
-    "Más tarde": "稍後"
+    "Más tarde": "稍後",
+    "Extraer ideas": "擷取想法",
+    "Indexar biblioteca": "索引文獻庫",
+    "Indexar selección": "索引所選項目",
+    "Indexar documento": "索引文件",
+    "Los documentos nuevos se indexarán automáticamente.": "新文件將自動建立索引。",
+    "Extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas. Este análisis utiliza modelos generativos.": "從整個文獻庫或所選文獻擷取想法與關係。此分析使用生成式模型。",
+    "Indexa el texto completo con el modelo de embeddings configurado, sin extraer Ideas. También puedes indexar solo una selección.": "使用設定的嵌入模型為全文建立索引，不擷取想法。也可僅索引所選文獻。",
+    "Controla el progreso, la pausa y la reanudación desde Queue. Puedes desactivar la preparación automática en Ajustes → Preparar fuentes.": "在 Queue 中查看進度、暫停及恢復。可在「設定 → 準備來源」關閉自動準備。",
+    "Chat y Deep Research combinan las Ideas disponibles con pasajes de tus documentos y consultas a originales. Si falta una capa, utilizan las demás y explican los límites.": "Chat 和 Deep Research 結合現有想法、文件片段和原文閱讀。缺少某一層時，會使用其他層並說明限制。",
+    "Al quitar una obra de esta bóveda se retiran sus índices; solo se conservan las copias compartidas que otra bóveda o cuaderno todavía utiliza.": "從此知識庫移除文獻會刪除其索引；僅保留其他知識庫或筆記本仍在使用的共用副本。",
+    "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Indexar biblioteca.": "不會為你的文獻建立索引。你可以從「文獻庫 → 索引文獻庫」手動開啟。"
   },
   "ja": {
     "Disponible: revisión anterior": "利用可能：以前の版",
@@ -1037,7 +1136,18 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "¿Dejar la indexación desactivada?": "インデックス化を無効のままにしますか？",
     "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Preparar fuentes.": "ライブラリはインデックス化されません。「ライブラリ → ソースを準備」から手動で有効にできます。",
     "Sí, dejar desactivado": "はい、無効のままにする",
-    "Más tarde": "後で"
+    "Más tarde": "後で",
+    "Extraer ideas": "アイデアを抽出",
+    "Indexar biblioteca": "ライブラリを索引化",
+    "Indexar selección": "選択項目を索引化",
+    "Indexar documento": "文書を索引化",
+    "Los documentos nuevos se indexarán automáticamente.": "新しい文書は自動的にインデックス化されます。",
+    "Extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas. Este análisis utiliza modelos generativos.": "ライブラリ全体または選択した文献からアイデアと関係を抽出します。この分析には生成モデルを使用します。",
+    "Indexa el texto completo con el modelo de embeddings configurado, sin extraer Ideas. También puedes indexar solo una selección.": "設定済みの埋め込みモデルで全文をインデックス化します。アイデアは抽出しません。選択した文献だけでも実行できます。",
+    "Controla el progreso, la pausa y la reanudación desde Queue. Puedes desactivar la preparación automática en Ajustes → Preparar fuentes.": "Queue で進捗の確認、一時停止、再開ができます。「設定 → ソースを準備」で自動準備を無効にできます。",
+    "Chat y Deep Research combinan las Ideas disponibles con pasajes de tus documentos y consultas a originales. Si falta una capa, utilizan las demás y explican los límites.": "Chat と Deep Research は既存のアイデア、文書の一節、原文の参照を組み合わせます。一部がなくても他の情報を使い、限界を説明します。",
+    "Al quitar una obra de esta bóveda se retiran sus índices; solo se conservan las copias compartidas que otra bóveda o cuaderno todavía utiliza.": "この保管庫から文献を削除すると索引も削除されます。他の保管庫やノートブックが使う共有コピーのみ保持されます。",
+    "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Indexar biblioteca.": "ライブラリはインデックス化されません。「ライブラリ → ライブラリを索引化」から手動で有効にできます。"
   },
   "ko": {
     "Disponible: revisión anterior": "사용 가능: 이전 버전",
@@ -1141,6 +1251,17 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "¿Dejar la indexación desactivada?": "인덱싱을 꺼둘까요?",
     "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Preparar fuentes.": "라이브러리를 인덱싱하지 않습니다. 라이브러리 → 소스 준비에서 직접 활성화할 수 있습니다.",
     "Sí, dejar desactivado": "예, 꺼두기",
-    "Más tarde": "나중에"
+    "Más tarde": "나중에",
+    "Extraer ideas": "아이디어 추출",
+    "Indexar biblioteca": "라이브러리 인덱싱",
+    "Indexar selección": "선택 항목 인덱싱",
+    "Indexar documento": "문서 인덱싱",
+    "Los documentos nuevos se indexarán automáticamente.": "새 문서는 자동으로 인덱싱됩니다.",
+    "Extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas. Este análisis utiliza modelos generativos.": "전체 라이브러리 또는 선택한 문헌에서 아이디어와 관계를 추출합니다. 이 분석에는 생성 모델을 사용합니다.",
+    "Indexa el texto completo con el modelo de embeddings configurado, sin extraer Ideas. También puedes indexar solo una selección.": "아이디어를 추출하지 않고 설정된 임베딩 모델로 전체 텍스트를 인덱싱합니다. 선택한 항목만 인덱싱할 수도 있습니다.",
+    "Controla el progreso, la pausa y la reanudación desde Queue. Puedes desactivar la preparación automática en Ajustes → Preparar fuentes.": "Queue에서 진행 상황을 확인하고 일시 중지하거나 재개하세요. 설정 → 소스 준비에서 자동 준비를 끌 수 있습니다.",
+    "Chat y Deep Research combinan las Ideas disponibles con pasajes de tus documentos y consultas a originales. Si falta una capa, utilizan las demás y explican los límites.": "Chat과 Deep Research는 기존 아이디어, 문서 구절, 원문 읽기를 결합합니다. 일부 계층이 없으면 나머지를 사용하고 한계를 설명합니다.",
+    "Al quitar una obra de esta bóveda se retiran sus índices; solo se conservan las copias compartidas que otra bóveda o cuaderno todavía utiliza.": "이 보관함에서 문헌을 제거하면 인덱스도 삭제됩니다. 다른 보관함이나 노트북에서 사용하는 공유 사본만 유지됩니다.",
+    "No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Indexar biblioteca.": "라이브러리를 인덱싱하지 않습니다. 라이브러리 → 라이브러리 인덱싱에서 직접 활성화할 수 있습니다."
   }
 } as const;

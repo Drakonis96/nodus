@@ -75,7 +75,7 @@ function PreparationDialog({ request, onClose, onConfigure }: { request: Prepara
     onClose();
   });
   const decline = () => void run(async () => {
-    await window.nodus.setResearchPreparationPolicy({ welcomeVersion: 1, decision: 'declined' });
+    await window.nodus.setResearchPreparationPolicy({ welcomeVersion: 1, decision: 'declined', futureAdditions: false });
     onClose();
   });
   const enqueue = (mode: 'text' | 'embeddings') => void run(async () => {
@@ -98,7 +98,7 @@ function PreparationDialog({ request, onClose, onConfigure }: { request: Prepara
       <div className="research-preparation-mark" aria-hidden="true"><svg viewBox="0 0 80 72" fill="none"><rect x="13" y="7" width="43" height="54" rx="7" /><rect x="24" y="16" width="43" height="49" rx="7" /><path d="M35 30h21M35 39h21M35 48h12" /></svg></div>
       <h2 id={titleId}>{t(confirmDecline ? '¿Dejar la indexación desactivada?' : request.manage ? 'Preparar fuentes' : 'Tus documentos también tienen respuestas.')}</h2>
       {confirmDecline ? <>
-        <p id={descriptionId} className="research-preparation-description">{t('No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Preparar fuentes.')}</p>
+        <p id={descriptionId} className="research-preparation-description">{t('No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Indexar biblioteca.')}</p>
         <div className="research-preparation-actions">
           <button ref={confirmationBack} className="btn" disabled={busy} onClick={() => setConfirmDecline(false)}>{t('Volver')}</button>
           <button className="btn btn-primary" disabled={busy} onClick={decline}>{t('Sí, dejar desactivado')}</button>
@@ -109,7 +109,7 @@ function PreparationDialog({ request, onClose, onConfigure }: { request: Prepara
         {preview ? <>
           <p className="research-preparation-model-label">{t('Solo se utilizará tu modelo de embeddings:')}</p>
           <div className="research-preparation-model">{preview.embedding ? <><span>{preview.embedding.provider}</span><b>{preview.embedding.model}</b></> : t('Modelo de embeddings no disponible')}</div>
-          <p className="research-preparation-note">{tx('{n} obras', { n: documents.length })} · {t('Bóveda actual')}{preview.embedding?.external && <><br />{t('Los fragmentos de texto se enviarán al proveedor de embeddings indicado.')}</>}</p>
+          <p className="research-preparation-note">{policy?.futureAdditions && <>{t('Los documentos nuevos se indexarán automáticamente.')}<br /></>}{tx('{n} obras', { n: documents.length })} · {t('Bóveda actual')}{preview.embedding?.external && <><br />{t('Los fragmentos de texto se enviarán al proveedor de embeddings indicado.')}</>}</p>
           {!preview.embeddingAvailable && <p className="research-preparation-note">{t('Configura tu modelo de embeddings para comenzar.')}</p>}
         </> : !error && <p role="status">{t('Cargando…')}</p>}
         <div className="research-preparation-actions">

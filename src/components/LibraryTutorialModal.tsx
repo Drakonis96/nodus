@@ -66,7 +66,7 @@ function Step({ number, title, badge, children }: { number: number; title: strin
   );
 }
 
-function AnalysisTab() {
+function LegacyAnalysisTab() {
   return (
     <div className="library-tutorial-panel" data-testid="library-tutorial-panel-analysis">
       <p className="toolkit-guide-summary">{t('En «Este vault» reúnes las obras que quieres analizar. Cada una queda vinculada al vault y alimenta sus ideas, sus temas y sus conexiones.')}</p>
@@ -112,6 +112,50 @@ function AnalysisTab() {
       <Step number={4} title={t('Para qué sirve el «Índice documental»')} badge="BETA">
         <p>{t('Es la lectura profunda de un documento entero: Nodus recorre todo el texto, reconstruye su estructura por capítulos y secciones y deja un índice que el asistente puede consultar. Se gestiona desde el botón de la cabecera.')}</p>
         <p>{t('Está en beta: en documentos muy largos puede tardar bastante y no siempre acierta con la estructura.')}</p>
+      </Step>
+    </div>
+  );
+}
+
+function AnalysisTab({ academic }: { academic: boolean }) {
+  if (!academic) return <LegacyAnalysisTab />;
+  return (
+    <div className="library-tutorial-panel" data-testid="library-tutorial-panel-analysis">
+      <p className="toolkit-guide-summary">{t('En «Este vault» reúnes las obras que quieres analizar. Cada una queda vinculada al vault y alimenta sus ideas, sus temas y sus conexiones.')}</p>
+
+      <Step number={1} title={t('Abre «Colecciones»')}>
+        <p>{t('Pulsa «Colecciones» en la cabecera y elige de dónde vienen tus obras.')}</p>
+        <div className="library-tutorial-sources">
+          <SourceCard logo={nodusLogo} name={t('Colecciones de Nodus')} badge="BETA" badgeTone="beta">
+            {t('La biblioteca propia de Nodus, compartida por todos tus vaults.')}
+          </SourceCard>
+          <SourceCard logo={zoteroMark} name={t('Colecciones de Zotero')} badge={t('Recomendado')} badgeTone="recommended">
+            {t('Tu biblioteca de Zotero en modo solo lectura: Nodus nunca escribe en ella.')}
+          </SourceCard>
+        </div>
+      </Step>
+
+      <Step number={2} title={t('Elige qué colecciones seguir')}>
+        <p>{t('En Zotero, pulsa «Monitorizar» en cada colección que quieras traer. Nodus sincroniza esas obras en este vault y mantiene la lista al día.')}</p>
+        <div className="library-tutorial-chips">
+          <span><Icon name="folder" size={13} /> {t('Colecciones')}</span>
+          <Icon name="arrowRight" size={13} className="library-tutorial-arrow" />
+          <span><Icon name="check" size={13} /> {t('Monitorizar')}</span>
+        </div>
+      </Step>
+
+      <Step number={3} title={t('Extraer ideas')}>
+        <p>{t('Extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas. Este análisis utiliza modelos generativos.')}</p>
+      </Step>
+      <Step number={4} title={t('Indexar biblioteca')}>
+        <p>{t('Indexa el texto completo con el modelo de embeddings configurado, sin extraer Ideas. También puedes indexar solo una selección.')}</p>
+        <p>{t('Los documentos nuevos se indexarán automáticamente.')}</p>
+        <p>{t('Controla el progreso, la pausa y la reanudación desde Queue. Puedes desactivar la preparación automática en Ajustes → Preparar fuentes.')}</p>
+        <p>{t('Los documentos que necesiten OCR se omitirán por ahora.')}</p>
+      </Step>
+      <Step number={5} title={t('Investigación con evidencias')}>
+        <p>{t('Chat y Deep Research combinan las Ideas disponibles con pasajes de tus documentos y consultas a originales. Si falta una capa, utilizan las demás y explican los límites.')}</p>
+        <p>{t('Al quitar una obra de esta bóveda se retiran sus índices; solo se conservan las copias compartidas que otra bóveda o cuaderno todavía utiliza.')}</p>
       </Step>
     </div>
   );
@@ -173,7 +217,8 @@ function ManagerTab() {
   );
 }
 
-export function LibraryTutorialModal({ open, tab, onTabChange, onClose }: {
+export function LibraryTutorialModal({ open, tab, onTabChange, onClose, academic = true }: {
+  academic?: boolean;
   open: boolean;
   tab: LibraryTutorialTab;
   onTabChange: (tab: LibraryTutorialTab) => void;
@@ -258,7 +303,7 @@ export function LibraryTutorialModal({ open, tab, onTabChange, onClose }: {
                 <Icon name={tab === 'analysis' ? 'compass' : 'library'} size={15} />
                 {tab === 'analysis' ? t('Lo que añadas aquí es lo que Nodus analiza') : t('Tu bibliografía, sin salir de Nodus')}
               </div>
-              {tab === 'analysis' ? <AnalysisTab /> : <ManagerTab />}
+              {tab === 'analysis' ? <AnalysisTab academic={academic} /> : <ManagerTab />}
             </motion.div>
           </AnimatePresence>
         </div>
