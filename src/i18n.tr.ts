@@ -8529,6 +8529,8 @@ export const TR: Record<string, string> = {
   "Se importaron {bookmarks} marcadores y {folders} carpetas. Se omitieron {duplicates} duplicados.": "{bookmarks} yer işareti ve {folders} klasör içe aktarıldı. {duplicates} yinelenen atlandı.",
   "{bookmarks} marcadores · {folders} carpetas · privado y local": "{bookmarks} yer işareti · {folders} klasör · özel ve yerel",
   "Buscar marcadores…": "Yer işaretlerinde ara…",
+  "Buscar {label}…": "{label} ara…",
+  "Sin opciones coincidentes.": "Eşleşen seçenek yok.",
   "Marcador": "Yer işareti",
   "Vista previa de importación · {fileName}": "İçe aktarma önizlemesi · {fileName}",
   "{bookmarks} marcadores · {folders} carpetas · {duplicates} duplicados · {invalidUrls} URL no válidas omitidas": "{bookmarks} yer işareti · {folders} klasör · {duplicates} yinelenen · {invalidUrls} geçersiz URL atlandı",
