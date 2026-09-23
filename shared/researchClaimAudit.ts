@@ -19,6 +19,7 @@ export function validResearchProseVerdicts(input: unknown): input is ResearchPro
       && evidence.id.length <= 512 && typeof evidence.quote === 'string' && evidence.quote.length >= 12 && evidence.quote.length <= 1500));
 }
 const CITATION = /\[[^\]]*\]\(nodus:\/\/[^)]+\)/gu;
+const PARENTHESIZED_CITATIONS = new RegExp(`[ \\t]*\\(\\s*(?:${CITATION.source})(?:\\s*[,;]?\\s*(?:${CITATION.source}))*\\s*\\)`, 'gu');
 /** Same-length masking protects author initials and URL punctuation. */
 export function researchProseSpans(markdown: string): Array<{ start: number; end: number; text: string }> {
   const spans: Array<{ start: number; end: number; text: string }> = [];
@@ -53,7 +54,7 @@ export function applyResearchProseVerdicts(markdown: string, sources: ResearchAu
     // anchors to authorized evidence. Existing unsupported citation links go away.
     const sourceIds = new Set(quotes.map(evidence => evidence.id));
     const cited = sources.filter(source => sourceIds.has(source.id));
-    const text = span.text.replace(CITATION, '').trimEnd();
+    const text = span.text.replace(PARENTHESIZED_CITATIONS, '').replace(CITATION, '').trimEnd();
     const links = cited.map(source => `[${source.label.replace(/[[\]\\]/g, '')}](${source.citation})`).join(' ');
     edits.push({ ...span, text: `${text} ${links}` });
   }

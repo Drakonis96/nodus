@@ -23,6 +23,8 @@ try {
   assert.deepEqual(result.claims.map(claim => claim.status), ['supported', 'supported', 'removed', 'removed']);
   assert.equal(applyResearchProseVerdicts('An unqualified conclusion.', sources, [{ ...supported, kind: 'inference' }]).claims[0].status, 'removed');
   assert.equal(applyResearchProseVerdicts('An unsupported source.', sources, [{ ...supported, evidence: [{ id: 'foreign', quote: sources[0].text }] }]).claims[0].status, 'removed');
+  const repairedCitation = applyResearchProseVerdicts('The north field measured 23 units ([Old attribution](nodus://passage/foreign)).', sources, [supported]);
+  assert.equal(repairedCitation.markdown, 'The north field measured 23 units. [Synthetic source](nodus://passage/inside)', 'replacing an attribution leaves no empty citation parentheses');
   assert.equal(validResearchProseVerdicts({ claims: [supported, supported] }), false, 'duplicate indexes never cover omitted claims');
   const unavailable = applyResearchProseVerdicts(text, sources, []);
   assert.ok(unavailable.claims.every(claim => claim.status === 'unverified'));
